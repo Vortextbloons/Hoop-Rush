@@ -11,7 +11,11 @@
     'initial-grant': 'Initial grant',
     'block-grant': 'Block grant',
     'objective-reward': 'Objective reward',
+    'campaign-reward': 'Campaign reward',
     'extra-trade-offer': 'Extra trade offer',
+    'trade-inquiry-purchase': 'Trade inquiry',
+    'trade-cash-sent': 'Trade cash sent',
+    'trade-cash-received': 'Trade cash received',
     'risky-rehab': 'Risky rehab',
     'free-agent-signing': 'Free-agent signing',
   };
@@ -99,7 +103,7 @@
       {atCap
         ? 'at the +8 cap — grants apply 0'
         : atFloor
-          ? 'at the −3 floor — spends are rejected'
+          ? 'at the 0 floor — spends are rejected'
           : 'spendable this window'}
     </p>
   </div>
@@ -126,8 +130,8 @@
             </p>
             <p class="font-mono text-[10px] text-muted-foreground">
               {affordance.purpose === 'extra-trade-offer'
-                ? 'Generates a fourth human offer this window'
-                : '60% chance to cut one game off the recovery; 40% risk of lengthening it and opening the recurrence window'}
+                ? 'Generates a fourth human offer this window (1 Influence)'
+                : 'Risky rehab: 60% cuts one game off absence (1 → 0); 40% leaves estimate unchanged. Success adds +60 bp rehab premium for 10 games after return (100 bp total with base 40 bp). Floor 0 — spends reject, never clamp.'}
             </p>
           </div>
           <button
@@ -226,7 +230,7 @@
         </div>
         <p class="mt-2 text-sm text-muted-foreground">
           {affordanceLabel(pendingSpend)}. The balance would move to
-          <strong class="text-foreground"> {balance - pendingSpend.cost}</strong> (floor −3).
+          <strong class="text-foreground"> {balance - pendingSpend.cost}</strong> (floor 0).
         </p>
         <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
           <button

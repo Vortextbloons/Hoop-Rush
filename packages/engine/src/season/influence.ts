@@ -30,7 +30,7 @@ export function createInitialSeasonInfluenceState(
   }
   return {
     schemaVersion: 1,
-    influenceVersion: 'season-influence-v1',
+    influenceVersion: 'season-influence-v2',
     balances,
     ledger,
     windows,
@@ -144,7 +144,7 @@ export function applySeasonBlockInfluenceGrants(
 export interface SeasonInfluenceSpendInput {
   influence: SeasonInfluenceState;
   franchiseId: string;
-  source: 'extra-trade-offer' | 'risky-rehab';
+  source: import('@hoop-rush/data-contracts').SeasonInfluenceSource;
 
   requestedDelta: number;
   blockIndex: number | null;

@@ -1774,10 +1774,10 @@ describe('season AI contracts (M2.1, M2.4 roster-generation-v2)', () => {
     expect(seasonRosterTargetsSchema.safeParse(undefined).success).toBe(false);
   });
 
-  it('round-trips a schema-10 run with its aiPools and M2.5 state', () => {
+  it('round-trips a schema-11 run with its aiPools and M2.5.5 state', () => {
     const run = roundTrip(seasonRunSchema, buildRun());
-    expect(run.schemaVersion).toBe(10);
-    expect(run.versions.runSchemaVersion).toBe(10);
+    expect(run.schemaVersion).toBe(11);
+    expect(run.versions.runSchemaVersion).toBe(11);
     expect(run.versions.rosterGenerationVersion).toBe('roster-generation-v2');
     expect(run.versions.aiVersion).toBe('season-ai-v2');
     expect(run.versions.rosterTargetsVersion).toBe('roster-targets-v2');
@@ -1823,13 +1823,13 @@ describe('season AI contracts (M2.1, M2.4 roster-generation-v2)', () => {
   });
 });
 
-describe('season health family (M2.5, season-health-v1)', () => {
+describe('season health family (M2.5, season-health-v2)', () => {
   it('round-trips an empty health state and rejects wrong versions', () => {
     const state = roundTrip(seasonHealthStateSchema, buildEmptyHealth());
     expect(state.injuries).toEqual([]);
     expect(state.schemaVersion).toBe(1);
     expect(() =>
-      seasonHealthStateSchema.parse({ ...buildEmptyHealth(), healthVersion: 'season-health-v2' }),
+      seasonHealthStateSchema.parse({ ...buildEmptyHealth(), healthVersion: 'season-health-v1' }),
     ).toThrow();
     expect(() =>
       seasonHealthStateSchema.parse({ ...buildEmptyHealth(), schemaVersion: 2 }),
@@ -1907,7 +1907,7 @@ describe('season transaction family (M2.5)', () => {
   });
 });
 
-describe('season influence family (M2.5, season-influence-v1)', () => {
+describe('season influence family (M2.5, season-influence-v2)', () => {
   it('round-trips the initial state (30 franchises at +2)', () => {
     const state = roundTrip(seasonInfluenceStateSchema, buildInitialInfluence());
     expect(Object.keys(state.balances)).toHaveLength(30);
@@ -1924,7 +1924,7 @@ describe('season influence family (M2.5, season-influence-v1)', () => {
     delete balances.lakers;
     expect(() => seasonInfluenceStateSchema.parse({ ...state, balances })).toThrow();
     expect(() =>
-      seasonInfluenceStateSchema.parse({ ...state, influenceVersion: 'season-influence-v2' }),
+      seasonInfluenceStateSchema.parse({ ...state, influenceVersion: 'season-influence-v1' }),
     ).toThrow();
     expect(() =>
       seasonInfluenceStateSchema.parse({
@@ -2164,7 +2164,7 @@ describe('season pending block family (M2.5)', () => {
     expect(pending.teamAggregates).toHaveLength(0);
     expect(pending.playerAggregates).toHaveLength(0);
     expect(pending.nextGameId).toBe('s000001');
-    expect(pending.blockVersion).toBe('season-block-v4');
+    expect(pending.blockVersion).toBe('season-block-v5');
     expect(pending.objectiveId).toBeNull();
   });
 
@@ -2212,9 +2212,9 @@ describe('season pending block family (M2.5)', () => {
   });
 });
 
-describe('season commands (M2.5/M2.6, schema 9)', () => {
+describe('season commands (M2.5/M2.6, schema 11)', () => {
   const base = {
-    schemaVersion: 10,
+    schemaVersion: 11,
     commandId: 'cmd-1',
     runId: 'fixture-run-1',
     expectedStateRevision: 3,
@@ -2519,8 +2519,8 @@ describe('season commands (M2.5/M2.6, schema 9)', () => {
 
   it('parses submit-season-block with the M2.5 objective and state fields', () => {
     const command = {
-      schemaVersion: 10,
-      blockVersion: 'season-block-v4',
+      schemaVersion: 11,
+      blockVersion: 'season-block-v5',
       command: 'submit-season-block',
       commandId: 'cmd-submit-1',
       runId: 'fixture-run-1',
@@ -2585,8 +2585,8 @@ describe('season checkpoint M2.5 facts', () => {
     expect(checkpoint.objective.success).toBeNull();
     expect(checkpoint.expectedStateRevision).toBe(0);
     expect(checkpoint.stateDigest).toBe('0'.repeat(32));
-    expect(checkpoint.versions.healthVersion).toBe('season-health-v1');
-    expect(checkpoint.versions.tradeTargetsVersion).toBe('trade-targets-v2');
+    expect(checkpoint.versions.healthVersion).toBe('season-health-v2');
+    expect(checkpoint.versions.tradeTargetsVersion).toBe('trade-targets-v3');
     expect(checkpoint.freeAgency.windows).toEqual([]);
   });
 
@@ -2642,11 +2642,11 @@ describe('season checkpoint M2.5 facts', () => {
   });
 });
 
-describe('season worker wire v6 (M2.6.5)', () => {
+describe('season worker wire v7 (M2.5.5)', () => {
   function buildStartRequest() {
     const run = buildRun();
     return {
-      schemaVersion: 6,
+      schemaVersion: 7,
       type: 'season-block-start',
       requestId: 'req-1',
       runId: run.runId,
@@ -2713,14 +2713,14 @@ describe('season worker wire v6 (M2.6.5)', () => {
 
   it('round-trips complete messages with committed and interrupted results', () => {
     const committed = roundTrip(seasonWorkerCompleteMessageSchema, {
-      schemaVersion: 6,
+      schemaVersion: 7,
       type: 'season-block-complete',
       requestId: 'req-1',
       result: { status: 'committed', checkpoint: buildCheckpointFixture() },
     });
     expect(committed.result.status).toBe('committed');
     const interrupted = roundTrip(seasonWorkerCompleteMessageSchema, {
-      schemaVersion: 6,
+      schemaVersion: 7,
       type: 'season-block-complete',
       requestId: 'req-1',
       result: { status: 'interrupted', pending: buildPendingBlockFixture() },
@@ -2728,7 +2728,7 @@ describe('season worker wire v6 (M2.6.5)', () => {
     expect(interrupted.result.status).toBe('interrupted');
     expect(() =>
       seasonWorkerCompleteMessageSchema.parse({
-        schemaVersion: 6,
+        schemaVersion: 7,
         type: 'season-block-complete',
         requestId: 'req-1',
         result: { status: 'committed', pending: buildPendingBlockFixture() },
@@ -2792,12 +2792,12 @@ describe('season game summary injury events (M2.5)', () => {
   });
 });
 
-describe('season block recap M2.5 evidence', () => {
+describe('season block recap M2.5.5 evidence', () => {
   it('round-trips injury, objective, trade, and influence evidence', () => {
     const run = buildRun();
     const recap = {
       schemaVersion: 1,
-      recapVersion: 'season-recap-v4',
+      recapVersion: 'season-recap-v5',
       runId: run.runId,
       blockIndex: 1,
       completedRounds: 10,
@@ -2840,6 +2840,7 @@ describe('season block recap M2.5 evidence', () => {
           turnovers: 120,
         },
       },
+      campaignEvidence: null,
       tradeEvidence: { tradesAccepted: 1, influenceDelta: 2 },
       freeAgencyEvidence: {
         windowIndex: 0,

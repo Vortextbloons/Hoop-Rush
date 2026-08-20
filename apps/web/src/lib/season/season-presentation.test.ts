@@ -455,12 +455,12 @@ describe('deriveBlockRecap', () => {
       run: {
         health: {
           schemaVersion: 1,
-          healthVersion: 'season-health-v1',
+          healthVersion: 'season-health-v2',
           injuries: [],
         },
         influence: {
           schemaVersion: 1,
-          influenceVersion: 'season-influence-v1',
+          influenceVersion: 'season-influence-v2',
           balances: { lakers: 3 },
           ledger: [],
           windows: {},

@@ -4,6 +4,7 @@
   import type { RouteId } from '$app/types';
   import { blockRoundRange } from '@hoop-rush/data-contracts';
   import BlockProgress from '$lib/components/season/BlockProgress.svelte';
+  import CampaignPanel from '$lib/components/season/CampaignPanel.svelte';
   import ChampionSummary from '$lib/components/season/ChampionSummary.svelte';
   import HealthStrip from '$lib/components/season/HealthStrip.svelte';
   import InfluencePanel from '$lib/components/season/InfluencePanel.svelte';
@@ -73,6 +74,14 @@
 
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
 
+  let mounted = $state(true);
+  $effect(() => {
+    mounted = true;
+    return () => {
+      mounted = false;
+    };
+  });
+
   const run = $derived(shell.run);
   const snapshot = $derived(shell.snapshot);
   const humanFranchiseId = $derived(shell.humanFranchiseId);
@@ -117,6 +126,13 @@
     );
   });
   const objectiveVm = $derived(run !== null ? objectiveChoicesViewModel(run) : null);
+  const hasCampaign = $derived(run !== null && (run as unknown as { campaign?: unknown }).campaign !== undefined);
+  const campaignCommandError = $derived.by(() => {
+    const e = commandError;
+    if (e === null) return null;
+    const campaignCommands = new Set(['select-gm-identity', 'select-campaign-opportunity', 'evolve-gm-campaign']);
+    return campaignCommands.has(e.command) ? e.message : null;
+  });
 
   const rehabAffordances = $derived.by((): InfluenceSpendAffordance[] => {
     const affordances = influenceVm?.affordances ?? [];
@@ -217,14 +233,16 @@
     submitError = null;
     try {
       await shell.refresh?.();
+      if (!mounted) return;
       const result = await buildSubmitBlockEnvelope(shell);
+      if (!mounted) return;
       if (!result.ok) {
         submitError = result.error.message;
         return;
       }
       shell.hub?.startBlock(result.envelope);
     } finally {
-      submitting = false;
+      if (mounted) submitting = false;
     }
   }
 
@@ -553,7 +571,27 @@
             </span>
           </div>
 
-          {#if objectiveVm !== null}
+          {#if hasCampaign}
+            <CampaignPanel
+              run={run}
+              nextBlockIndex={nextBlockIndex}
+              busy={block.phase === 'running'}
+              commandError={campaignCommandError}
+              playerName={shell.playerName}
+              onSelectIdentity={(input) => {
+                if (!mounted) return;
+                void shell.selectGmIdentity?.(input);
+              }}
+              onSelectOpportunity={(input) => {
+                if (!mounted) return;
+                void shell.selectCampaignOpportunity?.(input);
+              }}
+              onEvolve={(input) => {
+                if (!mounted) return;
+                void shell.evolveGmCampaign?.(input);
+              }}
+            />
+          {:else if objectiveVm !== null}
             {#if commandError !== null && commandError.command === 'select-block-objective'}
               <p
                 role="alert"
@@ -569,7 +607,7 @@
               busy={block.phase === 'running'}
               onSelect={(objectiveId) => {
                 if (objectiveVm.blockIndex !== null) {
-                  shell.selectBlockObjective({ blockIndex: objectiveVm.blockIndex, objectiveId });
+                  void shell.selectBlockObjective({ blockIndex: objectiveVm.blockIndex, objectiveId });
                 }
               }}
             />

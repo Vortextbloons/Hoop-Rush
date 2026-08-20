@@ -12,6 +12,7 @@ import { seasonCheckpointStateSchema } from './season-checkpoint.ts';
 import { seasonHealthStateSchema } from './season-health.ts';
 import { seasonInfluenceStateSchema } from './season-influence.ts';
 import { seasonObjectiveStateSchema } from './season-objective.ts';
+import { seasonCampaignStateSchema } from './season-campaign.ts';
 import { seasonTradeStateSchema } from './season-trade.ts';
 import { seasonTransactionEntrySchema } from './season-transactions.ts';
 import {
@@ -37,6 +38,8 @@ import {
   SEASON_GAME_TARGETS_VERSION,
   SEASON_GAME_VERSION,
   SEASON_HEALTH_VERSION,
+  SEASON_CAMPAIGN_TARGETS_VERSION,
+  SEASON_CAMPAIGN_VERSION,
   SEASON_HOME_COURT_VERSION,
   SEASON_INFLUENCE_TARGETS_VERSION,
   SEASON_INFLUENCE_VERSION,
@@ -259,6 +262,9 @@ export const seasonRunVersionsSchema = z.object({
 
   objectiveVersion: z.literal(SEASON_OBJECTIVE_VERSION),
 
+  campaignVersion: z.literal(SEASON_CAMPAIGN_VERSION).optional(),
+  campaignTargetsVersion: z.literal(SEASON_CAMPAIGN_TARGETS_VERSION).optional(),
+
   injuryTargetsVersion: z.literal(SEASON_INJURY_TARGETS_VERSION),
 
   tradeTargetsVersion: z.literal(SEASON_TRADE_TARGETS_VERSION),
@@ -334,6 +340,7 @@ export const seasonRunSchema = z
     freeAgency: seasonFreeAgencyStateSchema,
 
     objectives: seasonObjectiveStateSchema,
+    campaign: seasonCampaignStateSchema.optional(),
 
     health: seasonHealthStateSchema,
 

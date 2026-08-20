@@ -562,7 +562,7 @@ async function advanceHubRunToHumanGame(
       throw new Error(`the run ended before a human rotation decision: ${decision.kind}`);
     }
     const command: SeasonRunCommand = {
-      schemaVersion: 10,
+      schemaVersion: 11,
       commandId: `hub-adv-${String(guard)}`,
       runId: current.runId,
       expectedStateRevision: current.stateRevision,

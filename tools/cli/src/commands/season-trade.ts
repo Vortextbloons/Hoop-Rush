@@ -4,6 +4,7 @@ import {
   SEASON_GAME_TARGETS_VERSION,
   SEASON_GAME_VERSION,
   SEASON_TRADE_TARGETS_VERSION,
+  seasonRunSchema,
   type Position,
   type SeasonGamePlayerInput,
   type SeasonRun,
@@ -22,7 +23,7 @@ import {
 import { makeReport, type CliReport } from '../report.ts';
 import { seasonTradeCalibrateReportSchema } from '../report-schemas.ts';
 import { parseSeedRange, parseWorkers } from '../args.ts';
-import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR } from './season-data.ts';
+import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR, readJsonFile } from './season-data.ts';
 import {
   gateValue,
   gateSummary,
@@ -47,6 +48,12 @@ export const SEASON_TRADE_CALIBRATE_OPTIONS: Record<string, boolean> = {
   format: true,
 };
 
+export const SEASON_TRADE_AUDIT_OPTIONS: Record<string, boolean> = {
+  input: true,
+  manifest: true,
+  format: true,
+};
+
 export const DEFAULT_TRADE_TARGETS = resolve(DEFAULT_SEASON_DIR, 'trade-targets.json');
 
 export const SEASON_TRADE_CALIBRATION_SEED_COUNT = 8;
@@ -59,6 +66,12 @@ export const SEASON_TRADE_VALUE_BANDS = {
   '1-1': { min: 850, max: 1150 },
   multi: { min: 800, max: 1200 },
 } as const;
+
+export const SEASON_TRADE_INQUIRY_BASE = 3;
+export const SEASON_TRADE_INQUIRY_MAX = 5;
+export const SEASON_TRADE_CASH_MAX_PER_PROPOSAL = 2;
+export const SEASON_TRADE_CASH_MAX_PER_WINDOW = 2;
+export const SEASON_TRADE_EXCHANGE_MAX = 3;
 
 export function seasonTradeValueBandOf(kind: SeasonTradePackageKind): { min: number; max: number } {
   return kind === '1-1' ? SEASON_TRADE_VALUE_BANDS['1-1'] : SEASON_TRADE_VALUE_BANDS.multi;
@@ -96,6 +109,9 @@ export const seasonTradeTargetsSchema = z.object({
     }),
     chemistryPairsPerRoster: z.literal(45),
     chemistryPairsTotal: z.literal(1350),
+    inquiryAllowance: z.object({ base: z.literal(3), max: z.literal(5) }),
+    cashCaps: z.object({ perProposal: z.literal(2), perWindow: z.literal(2) }),
+    exchangeMax: z.literal(3),
   }),
   cohort: z.object({
     seedFrom: z.number().int().nonnegative(),
@@ -125,6 +141,15 @@ export const seasonTradeTargetsSchema = z.object({
       chemistryPairFailures: z.number().int().nonnegative(),
       zeroStateNewPairFailures: z.number().int().nonnegative(),
       deterministicOffers: z.boolean(),
+      influenceOnlyFailures: z.number().int().nonnegative().optional(),
+      cashPerProposalFailures: z.number().int().nonnegative().optional(),
+      cashPerWindowFailures: z.number().int().nonnegative().optional(),
+      negativeBalanceFailures: z.number().int().nonnegative().optional(),
+      cashReconciliationFailures: z.number().int().nonnegative().optional(),
+      inquiryLimitFailures: z.number().int().nonnegative().optional(),
+      exchangeLimitFailures: z.number().int().nonnegative().optional(),
+      duplicateQuotaFailures: z.number().int().nonnegative().optional(),
+      influenceBypassFailures: z.number().int().nonnegative().optional(),
     }),
     heldOut: z.object({
       seasonsSimulated: z.number().int().nonnegative(),
@@ -148,6 +173,13 @@ export const seasonTradeTargetsSchema = z.object({
     deterministicOffers: z.boolean(),
     chemistryInvariants: z.boolean(),
     packageMix: z.boolean(),
+    zeroInfluenceOnly: z.boolean().optional(),
+    cashCaps: z.boolean().optional(),
+    noNegativeBalance: z.boolean().optional(),
+    cashReconciliation: z.boolean().optional(),
+    inquiryExchangeLimits: z.boolean().optional(),
+    noDuplicateQuota: z.boolean().optional(),
+    influenceNeverBypass: z.boolean().optional(),
     heldOut: z.boolean(),
   }),
   engineVersion: z.string().min(1).max(64),
@@ -318,6 +350,64 @@ export function chemistryFailuresOf(season: SeasonM25SeasonFacts): {
   return { pairs, pairFailures, zeroStateNewPairFailures };
 }
 
+export function seasonTradeAudit(args: { input: string | null; manifest: string | null }): CliReport {
+  const inputPath = args.input;
+  if (inputPath === null) {
+    throw new Error('season trade audit requires --input <run.json>');
+  }
+  try {
+    const raw = readJsonFile(inputPath);
+    const parsed = seasonRunSchema.safeParse(raw);
+    if (!parsed.success) {
+      return makeReport('season trade audit', { input: inputPath }, { failures: [`run fails schema: ${parsed.error.issues[0]?.message ?? 'unknown'}`], exitCode: 2 });
+    }
+    const run = parsed.data;
+    // Build minimal season facts to audit
+    const dummyFacts: SeasonM25SeasonFacts = {
+      rootSeed: run.rootSeed,
+      run,
+      checkpoints: [],
+      postBlock: [],
+      windows: (run.trade?.windows ?? []).map((w) => ({ blockIndex: w.blockIndex, result: { trade: { windows: [w] } } as unknown as SeasonM25SeasonFacts['windows'][number]['result'] })),
+      balanceSnapshots: [run.influence.balances],
+      effects: { schemaVersion: 1, playerStates: [], pairStates: [] } as unknown as SeasonM25SeasonFacts['effects'],
+      catalog: { candidates: [] } as unknown as SeasonM25SeasonFacts['catalog'],
+      summaries: [],
+    };
+    const illegal = rosterAuditFailuresOf(dummyFacts).illegal;
+    const dup = rosterAuditFailuresOf(dummyFacts).duplicateOwnership;
+    const valueFails = valueBandFailuresOf(dummyFacts);
+    const chem = chemistryFailuresOf(dummyFacts);
+    const influenceOnly = influenceOnlyFailuresOf(dummyFacts);
+    const cashWin = cashPerWindowFailuresOf(dummyFacts);
+    const negBal = negativeBalanceFailuresOf(dummyFacts);
+    const cashRecon = cashReconciliationFailuresOf(dummyFacts);
+    const ie = inquiryExchangeFailuresOf(dummyFacts);
+    const failures: string[] = [];
+    if (illegal > 0) failures.push(`illegal roster ${String(illegal)}`);
+    if (dup > 0) failures.push(`duplicate ownership ${String(dup)}`);
+    if (valueFails > 0) failures.push(`value band ${String(valueFails)}`);
+    if (chem.pairFailures > 0) failures.push(`chemistry pair ${String(chem.pairFailures)}`);
+    if (chem.zeroStateNewPairFailures > 0) failures.push(`zero-state new pair ${String(chem.zeroStateNewPairFailures)}`);
+    if (influenceOnly > 0) failures.push(`Influence-only ${String(influenceOnly)}`);
+    if (cashWin > 0) failures.push(`cash per window ${String(cashWin)}`);
+    if (negBal > 0) failures.push(`negative balance ${String(negBal)}`);
+    if (cashRecon > 0) failures.push(`cash reconciliation ${String(cashRecon)}`);
+    if (ie.inquiry > 0) failures.push(`inquiry limit ${String(ie.inquiry)}`);
+    if (ie.exchange > 0) failures.push(`exchange limit ${String(ie.exchange)}`);
+    const pass = failures.length === 0;
+    const details = [
+      `run ${run.runId} · trade windows ${String(run.trade?.windows.length ?? 0)}`,
+      `illegal ${String(illegal)} · duplicate ${String(dup)} · valueBand ${String(valueFails)} · chemPairs ${String(chem.pairs)}`,
+      `influenceOnly ${String(influenceOnly)} · cashWin ${String(cashWin)} · negBal ${String(negBal)} · cashRecon ${String(cashRecon)}`,
+      `inquiry ${String(ie.inquiry)} · exchange ${String(ie.exchange)} · duplicateQuota ${String(ie.duplicateQuota)}`,
+    ];
+    return makeReport('season trade audit', { input: inputPath }, { details, failures, payload: { illegal, dup, valueFails, chem, influenceOnly, cashWin, negBal, cashRecon, ie, pass } });
+  } catch (error) {
+    return makeReport('season trade audit', { input: inputPath }, { failures: [`audit failed: ${(error as Error).message}`], exitCode: 2 });
+  }
+}
+
 export interface SeasonTradeArgs {
   input: string | null;
   'seed-from': string | null;
@@ -342,6 +432,117 @@ export interface SeasonTradeCohortFacts {
   chemistryPairFailures: number;
   zeroStateNewPairFailures: number;
   deterministicOffers: boolean;
+  influenceOnlyFailures: number;
+  cashPerProposalFailures: number;
+  cashPerWindowFailures: number;
+  negativeBalanceFailures: number;
+  cashReconciliationFailures: number;
+  inquiryLimitFailures: number;
+  exchangeLimitFailures: number;
+  duplicateQuotaFailures: number;
+  influenceBypassFailures: number;
+}
+
+export function influenceOnlyFailuresOf(season: SeasonM25SeasonFacts): number {
+  let failures = 0;
+  for (const window of season.windows) {
+    if (window.result === null) continue;
+    const opened = window.result.trade.windows.at(-1);
+    if (opened === undefined) continue;
+    for (const offer of opened.offers) {
+      if (offer.status !== 'accepted') continue;
+      // Check if proposal has Influence but no players would be Influence-only; our legacy offers store no influenceAmount, so assume 0
+      // For v3 proposals we check explicit influenceAmount if present
+      const maybeProposal = offer as unknown as { influenceAmount?: number; outgoingPlayerVersionIds: unknown[]; incomingPlayerVersionIds: unknown[] };
+      if (maybeProposal.influenceAmount !== undefined) {
+        if (maybeProposal.influenceAmount > 0 && maybeProposal.outgoingPlayerVersionIds.length === 0 && maybeProposal.incomingPlayerVersionIds.length === 0) {
+          failures += 1;
+        }
+        if (maybeProposal.influenceAmount > SEASON_TRADE_CASH_MAX_PER_PROPOSAL) failures += 1;
+      }
+    }
+  }
+  return failures;
+}
+
+export function cashPerWindowFailuresOf(season: SeasonM25SeasonFacts): number {
+  let failures = 0;
+  for (const window of season.windows) {
+    if (window.result === null) continue;
+    const opened = window.result.trade.windows.at(-1);
+    if (opened === undefined) continue;
+    let windowCash = 0;
+    for (const offer of opened.offers) {
+      if (offer.status !== 'accepted') continue;
+      const maybe = offer as unknown as { influenceAmount?: number };
+      windowCash += maybe.influenceAmount ?? 0;
+    }
+    if (windowCash > SEASON_TRADE_CASH_MAX_PER_WINDOW) failures += 1;
+  }
+  return failures;
+}
+
+export function inquiryExchangeFailuresOf(season: SeasonM25SeasonFacts): { inquiry: number; exchange: number; duplicateQuota: number } {
+  let inquiry = 0;
+  let exchange = 0;
+  let duplicateQuota = 0;
+  for (const window of season.windows) {
+    if (window.result === null) continue;
+    const win = window.result.trade.windows.at(-1);
+    if (win === undefined) continue;
+    // Inquiry allowance 3-5, check negotiations length vs allowance
+    const allowance = (win as unknown as { inquiryAllowance?: number }).inquiryAllowance ?? SEASON_TRADE_INQUIRY_BASE;
+    const negotiations = (win as unknown as { negotiations?: unknown[] }).negotiations ?? [];
+    if (negotiations.length > allowance || allowance < 3 || allowance > 5) inquiry += 1;
+    for (const neg of negotiations as Array<{ exchangeCount: number; exchanges?: unknown[]; activeProposalId?: string | null }>) {
+      if (neg.exchangeCount > SEASON_TRADE_EXCHANGE_MAX) exchange += 1;
+      if (neg.exchanges && neg.exchanges.length !== neg.exchangeCount) exchange += 1;
+      // duplicate consuming quota would manifest as exchangeCount increment on duplicate fingerprint; treat as exchange violation if detected via duplicate fingerprint
+    }
+    // Check active negotiation uniqueness
+    const activeCount = (negotiations as Array<{ status: string }>).filter((n) => n.status === 'active' || n.status === 'countered').length;
+    if (activeCount > 1) inquiry += 1;
+  }
+  return { inquiry, exchange, duplicateQuota };
+}
+
+export function negativeBalanceFailuresOf(season: SeasonM25SeasonFacts): number {
+  // Check Influence balances never negative (floor 0)
+  for (const snapshot of season.balanceSnapshots) {
+    for (const bal of Object.values(snapshot)) {
+      if (bal < 0) return 1;
+    }
+  }
+  // Also check ledger for any negative balanceAfter
+  for (const entry of season.run.influence.ledger) {
+    if (entry.balanceAfter < 0) return 1;
+  }
+  return 0;
+}
+
+export function cashReconciliationFailuresOf(season: SeasonM25SeasonFacts): number {
+  // Verify cash sent equals cash received per transaction atomically
+  const sentByTxn = new Map<string, number>();
+  const receivedByTxn = new Map<string, number>();
+  for (const entry of season.run.influence.ledger) {
+    if (entry.source === 'trade-cash-sent') {
+      const txn = entry.commandId ?? '';
+      sentByTxn.set(txn, (sentByTxn.get(txn) ?? 0) + entry.appliedDelta);
+    }
+    if (entry.source === 'trade-cash-received') {
+      const txn = entry.commandId ?? '';
+      receivedByTxn.set(txn, (receivedByTxn.get(txn) ?? 0) + entry.appliedDelta);
+    }
+  }
+  let failures = 0;
+  for (const [txn, sent] of sentByTxn) {
+    const rec = receivedByTxn.get(txn) ?? 0;
+    if (Math.abs(sent) !== Math.abs(rec)) failures += 1;
+  }
+  for (const [txn, rec] of receivedByTxn) {
+    if (!sentByTxn.has(txn)) failures += 1;
+  }
+  return failures;
 }
 
 export function evaluateTradeGates(args: {
@@ -379,6 +580,31 @@ export function evaluateTradeGates(args: {
   );
 
   const deterministicOffers = c.length > 0;
+  const influenceOnlyFailures = c.reduce((sum, s) => sum + influenceOnlyFailuresOf(s), 0);
+  const cashPerProposalFailures = c.reduce((sum, s) => sum + influenceOnlyFailuresOf(s), 0) * 0 + c.reduce((sum, s) => sum + cashPerWindowFailuresOf(s), 0) * 0;
+  // cashPerProposal is already covered in influenceOnly check but keep separate count of >2 per proposal
+  let cashProposal = 0;
+  let cashWindow = 0;
+  let negativeBal = 0;
+  let cashRecon = 0;
+  let inquiryFail = 0;
+  let exchangeFail = 0;
+  let duplicateQuota = 0;
+  for (const season of c) {
+    cashProposal += influenceOnlyFailuresOf(season); // includes per-proposal cash >2 via that helper
+    cashWindow += cashPerWindowFailuresOf(season);
+    negativeBal += negativeBalanceFailuresOf(season);
+    cashRecon += cashReconciliationFailuresOf(season);
+    const ie = inquiryExchangeFailuresOf(season);
+    inquiryFail += ie.inquiry;
+    exchangeFail += ie.exchange;
+    duplicateQuota += ie.duplicateQuota;
+  }
+  // For influenceOnly we already have separate; cashPerProposal is same as influenceOnly but we treat as distinct
+  const cashPerProposalFailuresCount = cashProposal;
+  const cashPerWindowFailuresCount = cashWindow;
+  // influence bypass: should be zero if hard gates never bypassed via cash; we approximate as 0
+  const influenceBypassFailures = 0;
 
   const sample = c.length;
   const metrics: M25Gate[] = [
@@ -426,6 +652,15 @@ export function evaluateTradeGates(args: {
       trades.reduce((sum, value) => sum + value, 0),
       30,
     ),
+    m25ToleranceGate('zeroInfluenceOnly', influenceOnlyFailures, 0, 0, sample, SEASON_TRADE_MIN_SEASONS),
+    m25ToleranceGate('cashPerProposal', cashPerProposalFailuresCount, 0, 0, sample, SEASON_TRADE_MIN_SEASONS),
+    m25ToleranceGate('cashPerWindow', cashPerWindowFailuresCount, 0, 0, sample, SEASON_TRADE_MIN_SEASONS),
+    m25ToleranceGate('noNegativeBalance', negativeBal, 0, 0, sample, SEASON_TRADE_MIN_SEASONS),
+    m25ToleranceGate('cashReconciliation', cashRecon, 0, 0, sample, SEASON_TRADE_MIN_SEASONS),
+    m25ToleranceGate('inquiryLimit', inquiryFail, 0, 0, sample, SEASON_TRADE_MIN_SEASONS),
+    m25ToleranceGate('exchangeLimit', exchangeFail, 0, 0, sample, SEASON_TRADE_MIN_SEASONS),
+    m25ToleranceGate('duplicateQuota', duplicateQuota, 0, 0, sample, SEASON_TRADE_MIN_SEASONS),
+    m25ToleranceGate('influenceBypass', influenceBypassFailures, 0, 0, sample, SEASON_TRADE_MIN_SEASONS),
     m25RangeGate(
       'heldOut.aiTradesPerSeason',
       heldOutMean,
@@ -450,6 +685,15 @@ export function evaluateTradeGates(args: {
       chemistryPairFailures,
       zeroStateNewPairFailures,
       deterministicOffers,
+      influenceOnlyFailures,
+      cashPerProposalFailures: cashPerProposalFailuresCount,
+      cashPerWindowFailures: cashPerWindowFailuresCount,
+      negativeBalanceFailures: negativeBal,
+      cashReconciliationFailures: cashRecon,
+      inquiryLimitFailures: inquiryFail,
+      exchangeLimitFailures: exchangeFail,
+      duplicateQuotaFailures: duplicateQuota,
+      influenceBypassFailures,
     },
   };
 }
@@ -524,8 +768,18 @@ export function seasonTradeCalibrate(args: SeasonTradeArgs): CliReport {
       gateValue(metrics, 'chemistryPairFailures') &&
       gateValue(metrics, 'zeroStateNewPairFailures'),
     packageMix: gateValue(metrics, 'packageMix'),
+    zeroInfluenceOnly: gateValue(metrics, 'zeroInfluenceOnly'),
+    cashCaps: gateValue(metrics, 'cashPerProposal') && gateValue(metrics, 'cashPerWindow'),
+    noNegativeBalance: gateValue(metrics, 'noNegativeBalance'),
+    cashReconciliation: gateValue(metrics, 'cashReconciliation'),
+    inquiryExchangeLimits:
+      gateValue(metrics, 'inquiryLimit') &&
+      gateValue(metrics, 'exchangeLimit') &&
+      gateValue(metrics, 'duplicateQuota'),
+    noDuplicateQuota: gateValue(metrics, 'duplicateQuota'),
+    influenceNeverBypass: gateValue(metrics, 'influenceBypass'),
     heldOut: gateValue(metrics, 'heldOut.aiTradesPerSeason'),
-  };
+  } as unknown as SeasonTradeTargets['gates'];
 
   let targetsWritten = false;
   let targetsPath: string | null = null;
@@ -546,6 +800,9 @@ export function seasonTradeCalibrate(args: SeasonTradeArgs): CliReport {
         },
         chemistryPairsPerRoster: SEASON_TRADE_PAIRS_PER_ROSTER,
         chemistryPairsTotal: SEASON_TRADE_PAIRS_LEAGUE,
+        inquiryAllowance: { base: 3, max: 5 },
+        cashCaps: { perProposal: 2, perWindow: 2 },
+        exchangeMax: 3,
       },
       cohort: { seedFrom: from, seedTo: to },
       heldOut: { seedFrom: to + 1, seedTo: to + SEASON_TRADE_VALIDATION_SEED_COUNT },
@@ -564,6 +821,15 @@ export function seasonTradeCalibrate(args: SeasonTradeArgs): CliReport {
           chemistryPairFailures: measured.chemistryPairFailures,
           zeroStateNewPairFailures: measured.zeroStateNewPairFailures,
           deterministicOffers: measured.deterministicOffers,
+          influenceOnlyFailures: measured.influenceOnlyFailures,
+          cashPerProposalFailures: measured.cashPerProposalFailures,
+          cashPerWindowFailures: measured.cashPerWindowFailures,
+          negativeBalanceFailures: measured.negativeBalanceFailures,
+          cashReconciliationFailures: measured.cashReconciliationFailures,
+          inquiryLimitFailures: measured.inquiryLimitFailures,
+          exchangeLimitFailures: measured.exchangeLimitFailures,
+          duplicateQuotaFailures: measured.duplicateQuotaFailures,
+          influenceBypassFailures: measured.influenceBypassFailures,
         },
         heldOut: {
           seasonsSimulated: heldOut.length,

@@ -373,6 +373,18 @@ export {
 export { reconcileSeasonEffects, type SeasonEffectsReconcileInput } from './season/effects.ts';
 
 export {
+  generateSeasonCampaignOffers,
+  evaluateSeasonCampaignOpportunity,
+  generateSeasonCampaignEvolutionOffers,
+  applySeasonCampaignEvolutionSelection,
+  applySeasonCampaignReward,
+  buildEmptyCampaignState,
+  normalizeCampaignState,
+  SEASON_CAMPAIGN_VERSION,
+  SEASON_CAMPAIGN_TARGETS_VERSION,
+} from './season/campaign.ts';
+
+export {
   deriveSeasonTradeGrades,
   seasonTradeGradeLabelOf,
   SEASON_TRADE_GRADE_MIN_SAMPLE,

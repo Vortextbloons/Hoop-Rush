@@ -242,7 +242,7 @@ function offer(
 }
 
 function tradeState(windows: SeasonTradeState['windows']): SeasonTradeState {
-  return { schemaVersion: 1, tradeVersion: 'season-trade-v2', windows };
+  return { schemaVersion: 1, tradeVersion: 'season-trade-v3', windows };
 }
 
 function runWithTrade(): {

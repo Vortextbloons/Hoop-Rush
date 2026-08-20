@@ -146,14 +146,14 @@ function buildCheckpoint(effects: SeasonEffectsState): SeasonCandidateCheckpoint
   const run = buildRun();
   return {
     schemaVersion: 1,
-    checkpointVersion: 'season-checkpoint-v4',
+    checkpointVersion: 'season-checkpoint-v5',
     runId: run.runId,
     rootSeed: run.rootSeed,
     versions: {
-      blockVersion: 'season-block-v4',
+      blockVersion: 'season-block-v5',
       summaryVersion: 'season-game-summary-v3',
       aggregatesVersion: 'season-aggregates-v2',
-      recapVersion: 'season-recap-v4',
+      recapVersion: 'season-recap-v5',
       leadersVersion: 'season-leaders-v1',
       homeCourtVersion: 'season-home-court-v1',
       gameVersion: 'season-game-v4',
@@ -162,13 +162,15 @@ function buildCheckpoint(effects: SeasonEffectsState): SeasonCandidateCheckpoint
       staminaVersion: 'season-stamina-v1',
       chemistryVersion: 'season-chemistry-v2',
       effectsTargetsVersion: 'season-effect-targets-v1',
-      healthVersion: 'season-health-v1',
-      tradeVersion: 'season-trade-v2',
-      influenceVersion: 'season-influence-v1',
+      healthVersion: 'season-health-v2',
+      tradeVersion: 'season-trade-v3',
+      influenceVersion: 'season-influence-v2',
       objectiveVersion: 'season-objective-v1',
-      injuryTargetsVersion: 'injury-targets-v1',
-      tradeTargetsVersion: 'trade-targets-v2',
-      influenceTargetsVersion: 'influence-targets-v1',
+      campaignVersion: 'season-campaign-v1',
+      campaignTargetsVersion: 'campaign-targets-v1',
+      injuryTargetsVersion: 'injury-targets-v2',
+      tradeTargetsVersion: 'trade-targets-v3',
+      influenceTargetsVersion: 'influence-targets-v2',
       freeAgencyVersion: SEASON_FREE_AGENCY_VERSION,
       freeAgencyIndexVersion: 'free-agency-index-v1',
       freeAgencyTargetsVersion: 'free-agency-targets-v1',
@@ -225,7 +227,7 @@ function buildCheckpoint(effects: SeasonEffectsState): SeasonCandidateCheckpoint
     retainedDetails: [],
     recap: {
       schemaVersion: 1,
-      recapVersion: 'season-recap-v4',
+      recapVersion: 'season-recap-v5',
       runId: run.runId,
       blockIndex: 0,
       completedRounds: 0,
@@ -245,6 +247,7 @@ function buildCheckpoint(effects: SeasonEffectsState): SeasonCandidateCheckpoint
         humanTeamInjuries: [],
       },
       objectiveEvidence: null,
+      campaignEvidence: null,
       tradeEvidence: { tradesAccepted: 0, influenceDelta: 0 },
       freeAgencyEvidence: {
         windowIndex: null,
@@ -279,6 +282,11 @@ function buildCheckpoint(effects: SeasonEffectsState): SeasonCandidateCheckpoint
         },
         tipCountedGames: 0,
       },
+    },
+    campaign: {
+      opportunityId: null,
+      outcome: null,
+      evaluation: null,
     },
     expectedStateRevision: 0,
     expectedStateDigest: '0'.repeat(32),
@@ -674,7 +682,7 @@ describe('season block recap effects evidence (M2.4)', () => {
     const run = buildRun();
     return {
       schemaVersion: 1,
-      recapVersion: 'season-recap-v4',
+      recapVersion: 'season-recap-v5',
       runId: run.runId,
       blockIndex: 0,
       completedRounds: 0,
@@ -694,6 +702,7 @@ describe('season block recap effects evidence (M2.4)', () => {
         humanTeamInjuries: [],
       },
       objectiveEvidence: null,
+      campaignEvidence: null,
       tradeEvidence: { tradesAccepted: 0, influenceDelta: 0 },
       freeAgencyEvidence: {
         windowIndex: null,
@@ -808,13 +817,15 @@ describe('season run schema version 7 (M2.5)', () => {
 
   it('freezes the seven M2.5 material versions and the state chain on the run', () => {
     const run = buildRun();
-    expect(run.versions.healthVersion).toBe('season-health-v1');
-    expect(run.versions.tradeVersion).toBe('season-trade-v2');
-    expect(run.versions.influenceVersion).toBe('season-influence-v1');
+    expect(run.versions.healthVersion).toBe('season-health-v2');
+    expect(run.versions.tradeVersion).toBe('season-trade-v3');
+    expect(run.versions.influenceVersion).toBe('season-influence-v2');
     expect(run.versions.objectiveVersion).toBe('season-objective-v1');
-    expect(run.versions.injuryTargetsVersion).toBe('injury-targets-v1');
-    expect(run.versions.tradeTargetsVersion).toBe('trade-targets-v2');
-    expect(run.versions.influenceTargetsVersion).toBe('influence-targets-v1');
+    expect(run.versions.campaignVersion).toBe('season-campaign-v1');
+    expect(run.versions.campaignTargetsVersion).toBe('campaign-targets-v1');
+    expect(run.versions.injuryTargetsVersion).toBe('injury-targets-v2');
+    expect(run.versions.tradeTargetsVersion).toBe('trade-targets-v3');
+    expect(run.versions.influenceTargetsVersion).toBe('influence-targets-v2');
     expect(run.checkpointState).toBeNull();
     expect(run.stateRevision).toBe(0);
     expect(run.stateDigest).toBe('0'.repeat(32));

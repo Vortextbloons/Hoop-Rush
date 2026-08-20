@@ -11,7 +11,7 @@ import { jsonPayload, REPO_ROOT, runCli, TMP } from './cli-test-helpers.ts';
 
 const SEASON_RUN = join(REPO_ROOT, 'tools/cli/src/fixtures/season-run.json');
 
-const BLOCK_ZERO_DIGEST = '623840d1feffa17d73461c1fc24d2001';
+const BLOCK_ZERO_DIGEST = 'b4a56279ab857e9567e8a0f3f4c7d749';
 
 describe('cli: season block simulate', () => {
   let blockZero: Awaited<ReturnType<typeof runCli>>;

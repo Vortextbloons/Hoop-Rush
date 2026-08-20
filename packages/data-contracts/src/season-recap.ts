@@ -150,7 +150,16 @@ export const seasonBlockRecapSchema = z.object({
 
   injuryEvidence: seasonBlockInjuryEvidenceSchema,
 
-  objectiveEvidence: seasonBlockObjectiveEvidenceSchema.nullable(),
+  objectiveEvidence: seasonBlockObjectiveEvidenceSchema.nullable().optional(),
+
+  campaignEvidence: z
+    .object({
+      outcome: z.enum(['missed', 'completed', 'breakthrough']).nullable(),
+      appliedRewardIds: z.array(z.string()).max(5),
+      facts: z.record(z.string(), z.unknown()).optional(),
+    })
+    .nullable()
+    .optional(),
 
   tradeEvidence: seasonBlockTradeEvidenceSchema,
 

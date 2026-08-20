@@ -165,7 +165,7 @@ describe('freeAgencyVersionTuples', () => {
       ],
     };
     expect(
-      catalogCandidateOfFreeAgency(catalog as never, freeAgency.windows[0].candidates[0] as never)
+      catalogCandidateOfFreeAgency(catalog as never, freeAgency.windows[0]!.candidates[0] as never)
         ?.playerVersionId,
     ).toBe('pv-fa-1');
   });

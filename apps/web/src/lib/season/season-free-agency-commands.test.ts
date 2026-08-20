@@ -474,8 +474,8 @@ describe('SeasonHubState free-agency commands (M2.6.5)', () => {
       command: { schemaVersion: number };
       run: SeasonRun;
     };
-    expect(applied.command.schemaVersion).toBe(10);
-    expect(applied.run.freeAgency.windows[0]?.status).toBe('resolved');
+    expect(applied.command.schemaVersion).toBe(11);
+    expect(applied.run.freeAgency.windows[0]!?.status).toBe('resolved');
     hub.destroy();
   });
 
@@ -604,7 +604,7 @@ describe('SeasonHubState free-agency commands (M2.6.5)', () => {
     const authoritative = applied.run;
     const staleOutput = handleSeasonRunCommand(
       {
-        schemaVersion: 10,
+        schemaVersion: 11,
         command: 'declare-free-agent-interest',
         commandId: 'cmd-stale-engine',
         runId: authoritative.runId,

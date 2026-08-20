@@ -7,7 +7,11 @@ export const seasonInfluenceSourceSchema = z.enum([
   'initial-grant',
   'block-grant',
   'objective-reward',
+  'campaign-reward',
   'extra-trade-offer',
+  'trade-inquiry-purchase',
+  'trade-cash-sent',
+  'trade-cash-received',
   'risky-rehab',
   'free-agent-signing',
 ]);
@@ -31,7 +35,11 @@ export type SeasonInfluenceLedgerEntry = z.infer<typeof seasonInfluenceLedgerEnt
 
 export const seasonInfluenceWindowStateSchema = z.object({
   windowIndex: z.number().int().min(0).max(2),
-  extraOfferSpent: z.boolean(),
+  extraOfferSpent: z.boolean().optional(),
+  purchasedInquiryUsed: z.boolean().optional(),
+  earnedInquiryUsed: z.boolean().optional(),
+  tradeCashSent: z.number().int().min(0).max(2).optional(),
+  tradeCashReceived: z.number().int().min(0).max(2).optional(),
 });
 export type SeasonInfluenceWindowState = z.infer<typeof seasonInfluenceWindowStateSchema>;
 
@@ -46,7 +54,7 @@ export const seasonInfluenceRehabStateSchema = z.object({
 export type SeasonInfluenceRehabState = z.infer<typeof seasonInfluenceRehabStateSchema>;
 
 export const SEASON_INFLUENCE_CAP = 8;
-export const SEASON_INFLUENCE_FLOOR = -3;
+export const SEASON_INFLUENCE_FLOOR = 0;
 
 export const seasonInfluenceStateSchema = z
   .object({

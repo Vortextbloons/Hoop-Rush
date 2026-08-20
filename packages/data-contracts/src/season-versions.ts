@@ -1,8 +1,8 @@
-export const SEASON_RUN_SCHEMA_VERSION = 10;
+export const SEASON_RUN_SCHEMA_VERSION = 11;
 
 export const SEASON_DRAFT_SAVE_SCHEMA_VERSION = 3;
 
-export const SEASON_RUN_SAVE_SCHEMA_VERSION = 7;
+export const SEASON_RUN_SAVE_SCHEMA_VERSION = 8;
 
 export const SEASON_LEAGUE_VERSION = 'league-v1';
 
@@ -78,19 +78,19 @@ export const SEASON_ROSTER_TARGETS_V2 = 'roster-targets-v2';
 
 export const SEASON_ROSTER_TARGETS_VERSION = 'roster-targets-v3';
 
-export const SEASON_BLOCK_VERSION = 'season-block-v4';
+export const SEASON_BLOCK_VERSION = 'season-block-v5';
 
 export const SEASON_GAME_SUMMARY_VERSION = 'season-game-summary-v3';
 
 export const SEASON_AGGREGATES_VERSION = 'season-aggregates-v2';
 
-export const SEASON_RECAP_VERSION = 'season-recap-v4';
+export const SEASON_RECAP_VERSION = 'season-recap-v5';
 
 export const SEASON_LEADERS_VERSION = 'season-leaders-v1';
 
 export const SEASON_HOME_COURT_VERSION = 'season-home-court-v1';
 
-export const SEASON_CHECKPOINT_VERSION = 'season-checkpoint-v4';
+export const SEASON_CHECKPOINT_VERSION = 'season-checkpoint-v5';
 
 export const SEASON_STAMINA_VERSION = 'season-stamina-v2';
 
@@ -116,19 +116,23 @@ export const SEASON_PROJECTION_TARGETS_VERSION = 'season-projection-targets-v1';
 
 export const SEASON_ROSTER_AUTOFILL_VERSION = 'season-roster-autofill-v1';
 
-export const SEASON_HEALTH_VERSION = 'season-health-v1';
+export const SEASON_HEALTH_VERSION = 'season-health-v2';
 
-export const SEASON_TRADE_VERSION = 'season-trade-v2';
+export const SEASON_TRADE_VERSION = 'season-trade-v3';
 
-export const SEASON_INFLUENCE_VERSION = 'season-influence-v1';
+export const SEASON_INFLUENCE_VERSION = 'season-influence-v2';
 
 export const SEASON_OBJECTIVE_VERSION = 'season-objective-v1';
 
-export const SEASON_INJURY_TARGETS_VERSION = 'injury-targets-v1';
+export const SEASON_CAMPAIGN_VERSION = 'season-campaign-v1';
 
-export const SEASON_TRADE_TARGETS_VERSION = 'trade-targets-v2';
+export const SEASON_CAMPAIGN_TARGETS_VERSION = 'campaign-targets-v1';
 
-export const SEASON_INFLUENCE_TARGETS_VERSION = 'influence-targets-v1';
+export const SEASON_INJURY_TARGETS_VERSION = 'injury-targets-v2';
+
+export const SEASON_TRADE_TARGETS_VERSION = 'trade-targets-v3';
+
+export const SEASON_INFLUENCE_TARGETS_VERSION = 'influence-targets-v2';
 
 export const SEASON_DURABILITY_VERSION = 'durability-v1';
 

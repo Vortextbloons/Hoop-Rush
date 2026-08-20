@@ -89,6 +89,7 @@ function stateDigestOf(adapters: Adapters, run: SeasonRun): string {
     transactions: run.transactions,
     trade: run.trade,
     objectives: run.objectives,
+    campaign: run.campaign ?? null,
     rosters: run.rosters,
     ownership: run.ownership,
     rotations: run.rotations,
@@ -103,7 +104,7 @@ function commandOf(
   commandId: string,
 ): SeasonRunCommand {
   return {
-    schemaVersion: 10,
+    schemaVersion: 11,
     command,
     commandId,
     runId: run.runId,

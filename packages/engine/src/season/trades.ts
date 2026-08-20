@@ -917,7 +917,7 @@ function applyAiInfluenceSpends(
       (window) => window.windowIndex === windowIndex && window.extraOfferSpent,
     );
     const balance = influence.balances[franchiseId] ?? 0;
-    if (wantExtra && !spentExtra && balance >= -2) {
+    if (wantExtra && !spentExtra && balance >= 1) {
       const commandId = `ai-window-${String(windowIndex)}-${franchiseId}-extra-offer`;
       const result = applySeasonInfluenceSpend({
         influence,
@@ -981,7 +981,7 @@ function applyAiInfluenceSpends(
         pick !== undefined &&
         wantRehab &&
         influence.rehabs[pick.injuryId] === undefined &&
-        currentBalance >= -1
+        currentBalance >= 2
       ) {
         const outcome = rollSeasonRehabOutcome(rootSeed, pick.injuryId);
         health = applyRiskyRehabOutcome(health, pick.injuryId, outcome);
@@ -1164,6 +1164,7 @@ export function openSeasonTradeWindow(
     trade: next.trade,
     freeAgency: next.freeAgency,
     objectives: next.objectives,
+    campaign: (next as { campaign?: unknown }).campaign as never,
     rosters: next.rosters,
     ownership: next.ownership,
     rotations: next.rotations,

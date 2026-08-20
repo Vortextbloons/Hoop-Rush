@@ -51,6 +51,8 @@ import {
   SEASON_TRADE_GRADE_VERSION,
   SEASON_TRADE_TARGETS_VERSION,
   SEASON_TRADE_VERSION,
+  SEASON_CAMPAIGN_VERSION,
+  SEASON_CAMPAIGN_TARGETS_VERSION,
   PLAYER_VERSION_ID_VERSION,
   buildEmptyHealth,
   buildInitialPostseasonState,
@@ -87,14 +89,16 @@ import {
   type SeasonTeamAggregate,
   type SeasonTeamBox,
   fnv1a32,
+  buildEmptyCampaignState,
   seasonDigestHex,
   seedFromString,
 } from '@hoop-rush/data-contracts';
 import {
   WINDOW_BLOCK_INDEX_TO_INDEX,
   reduceSeasonStandings,
-  seasonRunStateDigest,
+  seasonRunStateDigest as engineSeasonRunStateDigest,
 } from '@hoop-rush/engine';
+import { canonicalJson } from '@hoop-rush/data-contracts';
 import type { SeasonRunStateDigestFacts } from '../season/engine-seam-types.ts';
 import type { SeasonRunEngineSeam } from '../season/engine-seam-types.ts';
 import { SEASON_RUN_RECORD_ID, type StoredSeasonRunRecord } from '../schemas/season-run-record.ts';
@@ -439,6 +443,8 @@ export function buildFixtureRun(input: {
       tradeVersion: SEASON_TRADE_VERSION,
       influenceVersion: SEASON_INFLUENCE_VERSION,
       objectiveVersion: SEASON_OBJECTIVE_VERSION,
+      campaignVersion: SEASON_CAMPAIGN_VERSION,
+      campaignTargetsVersion: SEASON_CAMPAIGN_TARGETS_VERSION,
       injuryTargetsVersion: SEASON_INJURY_TARGETS_VERSION,
       tradeTargetsVersion: SEASON_TRADE_TARGETS_VERSION,
       influenceTargetsVersion: SEASON_INFLUENCE_TARGETS_VERSION,
@@ -539,6 +545,7 @@ export function buildFixtureRun(input: {
     trade: null,
     freeAgency: buildFixtureFreeAgencyState(),
     objectives: buildFixtureObjectiveState(),
+    campaign: buildEmptyCampaignState(),
     health: buildFixtureHealthState(),
     transactions: [],
     influence: buildFixtureInfluenceState(league),
@@ -561,6 +568,7 @@ export function buildFixtureRun(input: {
       transactions: run.transactions,
       trade: run.trade,
       objectives: run.objectives,
+      campaign: run.campaign,
       rosters: run.rosters,
       ownership: run.ownership,
       rotations: run.rotations,
@@ -571,7 +579,82 @@ export function buildFixtureRun(input: {
 }
 
 export function seasonRunStateDigestFixture(facts: SeasonRunStateDigestFacts): string {
-  return seasonRunStateDigest(facts);
+  if (facts.campaign === undefined) {
+    const { campaign: _campaign, ...rest } = facts as SeasonRunStateDigestFacts & {
+      campaign?: unknown;
+    };
+    return engineSeasonRunStateDigest(
+      rest as unknown as Parameters<typeof engineSeasonRunStateDigest>[0],
+    );
+  }
+  const sortedBy = <T>(items: readonly T[], keyOf: (item: T) => string): T[] =>
+    [...items].sort((a, b) => (keyOf(a) < keyOf(b) ? -1 : keyOf(a) > keyOf(b) ? 1 : 0));
+  const postseasonCanonical = (postseason: SeasonRunStateDigestFacts['postseason']): unknown => ({
+    schemaVersion: postseason.schemaVersion,
+    postseasonVersion: postseason.postseasonVersion,
+    tiebreakVersion: postseason.tiebreakVersion,
+    seed: postseason.seed,
+    finalsHomeCourtDrawSeed: postseason.finalsHomeCourtDrawSeed,
+    tiebreakResolutions: sortedBy(
+      postseason.tiebreakResolutions,
+      (resolution) => resolution.resolutionId,
+    ),
+    playIn: postseason.playIn,
+    bracket: postseason.bracket,
+    championFranchiseId: postseason.championFranchiseId,
+  });
+  const canonical = canonicalJson({
+    stateRevision: facts.stateRevision,
+    stage: facts.stage,
+    postseason: postseasonCanonical(facts.postseason),
+    awards: facts.awards,
+    completion: facts.completion,
+    checkpointState: facts.checkpointState,
+    health: {
+      schemaVersion: facts.health.schemaVersion,
+      healthVersion: facts.health.healthVersion,
+      injuries: sortedBy(facts.health.injuries, (injury) => injury.injuryId),
+    },
+    influence: {
+      schemaVersion: facts.influence.schemaVersion,
+      influenceVersion: facts.influence.influenceVersion,
+      balances: facts.influence.balances,
+      ledger: sortedBy(facts.influence.ledger, (entry) => entry.entryId),
+      windows: facts.influence.windows,
+      rehabs: facts.influence.rehabs,
+    },
+    transactions: sortedBy(facts.transactions, (entry) => entry.transactionId),
+    trade: facts.trade,
+    freeAgency: {
+      schemaVersion: facts.freeAgency.schemaVersion,
+      freeAgencyVersion: facts.freeAgency.freeAgencyVersion,
+      windows: facts.freeAgency.windows.map((window) => ({
+        windowIndex: window.windowIndex,
+        blockIndex: window.blockIndex,
+        status: window.status,
+        candidates: sortedBy(window.candidates, (candidate) => candidate.playerVersionId),
+        declarations: window.declarations,
+        traces: window.traces,
+        signings: sortedBy(window.signings, (signing) => signing.signingId),
+      })),
+      canonicalCandidates: facts.freeAgency.canonicalCandidates,
+      signingCounts: facts.freeAgency.signingCounts,
+      seasonSpend: facts.freeAgency.seasonSpend,
+    },
+    objectives: facts.objectives,
+    ...(facts.campaign !== undefined ? { campaign: facts.campaign } : {}),
+    rosters: sortedBy(facts.rosters, (roster) => roster.franchiseId),
+    ownership: sortedBy(facts.ownership, (row) => row.playerVersionId),
+    rotations: sortedBy(facts.rotations, (rotation) => rotation.franchiseId),
+    effects: canonicalJson({
+      schemaVersion: facts.effects.schemaVersion,
+      playerStates: sortedBy(facts.effects.playerStates, (player) => player.playerVersionId),
+      pairStates: [...facts.effects.pairStates].sort((a, b) =>
+        a.a < b.a ? -1 : a.a > b.a ? 1 : a.b < b.b ? -1 : a.b > b.b ? 1 : 0,
+      ),
+    }),
+  });
+  return seasonDigestHex(canonical);
 }
 
 function zeroStandings(league: SeasonLeague): SeasonStandings {
@@ -1139,6 +1222,7 @@ export function buildFixtureStateDigest(
     transactions: overrides.transactions ?? run.transactions,
     trade: overrides.trade ?? run.trade,
     objectives: overrides.objectives ?? run.objectives,
+    campaign: overrides.campaign ?? run.campaign ?? buildEmptyCampaignState(),
     rosters: overrides.rosters ?? run.rosters,
     ownership: overrides.ownership ?? run.ownership,
     rotations: overrides.rotations ?? run.rotations,

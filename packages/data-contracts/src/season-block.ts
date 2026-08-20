@@ -4,6 +4,7 @@ import { seasonRunCommandBaseSchema } from './season-command-base.ts';
 import { seasonCandidateCheckpointSchema } from './season-checkpoint.ts';
 import { seasonRotationSetDigestSchema } from './season-digests.ts';
 import { seasonObjectiveIdSchema } from './season-objective.ts';
+import { seasonCampaignOpportunityIdSchema } from './season-campaign.ts';
 import { SEASON_BLOCK_VERSION } from './season-versions.ts';
 
 export const seasonSubmitBlockCommandSchema = seasonRunCommandBaseSchema.extend({
@@ -16,7 +17,8 @@ export const seasonSubmitBlockCommandSchema = seasonRunCommandBaseSchema.extend(
 
   rotationDigest: seasonRotationSetDigestSchema,
 
-  objectiveId: seasonObjectiveIdSchema.nullable(),
+  objectiveId: seasonObjectiveIdSchema.nullable().optional(),
+  campaignOpportunityId: seasonCampaignOpportunityIdSchema.nullable().optional(),
 });
 export type SeasonSubmitBlockCommand = z.infer<typeof seasonSubmitBlockCommandSchema>;
 
@@ -69,6 +71,15 @@ export const seasonInvalidObjectiveRejectionSchema = z.object({
 });
 export type SeasonInvalidObjectiveRejection = z.infer<typeof seasonInvalidObjectiveRejectionSchema>;
 
+export const seasonInvalidCampaignRejectionSchema = z.object({
+  code: z.literal('invalid-campaign'),
+  expected: z.enum(['required', 'none', 'not-offered']),
+
+  opportunityId: z.string().min(1).max(64).optional(),
+  blockIndex: z.number().int().min(0).max(8),
+});
+export type SeasonInvalidCampaignRejection = z.infer<typeof seasonInvalidCampaignRejectionSchema>;
+
 export const seasonFreeAgencyUnresolvedRejectionSchema = z.object({
   code: z.literal('free-agency-unresolved'),
 
@@ -86,6 +97,7 @@ export const seasonSubmitBlockRejectionSchema = z.discriminatedUnion('code', [
   seasonNonBoundaryBlockRejectionSchema,
   seasonRunMismatchRejectionSchema,
   seasonInvalidObjectiveRejectionSchema,
+  seasonInvalidCampaignRejectionSchema,
   seasonFreeAgencyUnresolvedRejectionSchema,
 ]);
 export type SeasonSubmitBlockRejection = z.infer<typeof seasonSubmitBlockRejectionSchema>;

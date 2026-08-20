@@ -18,6 +18,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import type { StoredSeasonRunRecord } from '../schemas/season-run-record.ts';
 import type { SeasonRunEngineSeam } from './engine-seam-types.ts';
+import { auditReplayDivergences } from './replay.ts';
 
 export interface SeasonRunAuditFacts {
   league: SeasonLeague;
@@ -707,6 +708,7 @@ export function auditSeasonRunState(
       transactions: stored.transactions,
       trade: stored.trade,
       objectives: stored.objectives,
+      campaign: stored.campaign ?? null,
       rosters: stored.run.rosters,
       ownership: stored.run.ownership,
       rotations: stored.run.rotations,
@@ -750,6 +752,16 @@ export function auditSeasonRunState(
     failures.push(digestFailure);
   } else if (recomputedDigest !== stored.stateDigest) {
     failures.push('stored stateDigest does not recompute over the stored mutable state');
+    try {
+      const divergences = auditReplayDivergences(stored, recomputedDigest, seam);
+      for (const divergence of divergences) {
+        if (divergence.kind !== 'state-digest') {
+          failures.push(`${divergence.kind}: ${divergence.message}`);
+        }
+      }
+    } catch {
+      // ignore replay audit failures
+    }
   }
 
   const { trade } = stored;

@@ -122,13 +122,26 @@ export function seasonCheckpointCanonical(candidate: SeasonCheckpointFacts): str
       influenceVersion: candidate.influence.influenceVersion,
       balances: candidate.influence.balances,
       ledger: [...candidate.influence.ledger].sort((a, b) => (a.entryId < b.entryId ? -1 : 1)),
-      windows: candidate.influence.windows,
-      rehabs: candidate.influence.rehabs,
+      windows: Object.fromEntries(
+        Object.entries(candidate.influence.windows)
+          .sort(([a], [b]) => (a < b ? -1 : 1))
+          .map(([franchiseId, windows]) => [
+            franchiseId,
+            [...windows].sort((a, b) => a.windowIndex - b.windowIndex),
+          ]),
+      ),
+      rehabs: Object.fromEntries(Object.entries(candidate.influence.rehabs).sort(([a], [b]) => (a < b ? -1 : 1))),
     }),
     transactions: [...candidate.transactions].sort((a, b) =>
       a.transactionId < b.transactionId ? -1 : 1,
     ),
     objective: candidate.objective,
+    campaign: (candidate as unknown as { campaign?: unknown }).campaign
+      ? canonicalJson((candidate as unknown as { campaign: unknown }).campaign)
+      : undefined,
+    trade: (candidate as unknown as { trade?: unknown }).trade
+      ? canonicalJson((candidate as unknown as { trade: unknown }).trade)
+      : undefined,
 
     expectedStateRevision: candidate.expectedStateRevision,
     expectedStateDigest: candidate.expectedStateDigest,

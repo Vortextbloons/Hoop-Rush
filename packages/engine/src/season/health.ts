@@ -120,10 +120,21 @@ export function seasonGameHealthSeam(
   }
 
   const recurrenceOf = new Map<string, number>();
+  const rehabPremiumOf = new Map<string, number>();
   for (const record of health.injuries) {
     const current = recurrenceOf.get(record.playerVersionId) ?? 0;
     if (record.recurrenceWindowRoundsRemaining > current) {
       recurrenceOf.set(record.playerVersionId, record.recurrenceWindowRoundsRemaining);
+    }
+    // Track rehab premium for players with successful rehab still in window
+    if (
+      record.rehabRecurrencePremiumApplied &&
+      (record.rehabRecurrencePremiumBasisPoints ?? 0) > 0 &&
+      record.recurrenceWindowRoundsRemaining > 0
+    ) {
+      const curPremium = rehabPremiumOf.get(record.playerVersionId) ?? 0;
+      const premium = record.rehabRecurrencePremiumBasisPoints ?? 60;
+      if (premium > curPremium) rehabPremiumOf.set(record.playerVersionId, premium);
     }
   }
 
@@ -161,6 +172,7 @@ export function seasonGameHealthSeam(
         recentLoadBasisPoints: loadOf.get(player.playerVersionId) ?? 0,
         targetMinutes,
         recurrenceWindowRoundsRemaining: recurrenceOf.get(player.playerVersionId) ?? 0,
+        rehabPremiumBasisPoints: rehabPremiumOf.get(player.playerVersionId) ?? 0,
       });
       if (!roll.occurred || roll.injury === null) continue;
       newInjuries.push(roll.injury);
@@ -204,6 +216,7 @@ export function assembleSeasonPendingBlock(input: {
   expectedStateRevision: number;
   expectedStateDigest: string;
   objectiveId: SeasonObjectiveId | null;
+  campaignOpportunityId?: string | null;
   nextGameId: string;
   summaries: readonly SeasonGameSummary[];
   retainedDetails: readonly SeasonRetainedGameDetail[];
@@ -223,6 +236,7 @@ export function assembleSeasonPendingBlock(input: {
     expectedStateRevision: input.expectedStateRevision,
     expectedStateDigest: input.expectedStateDigest,
     objectiveId: input.objectiveId,
+    campaignOpportunityId: (input as unknown as { campaignOpportunityId?: string | null }).campaignOpportunityId ?? null,
     nextGameId: input.nextGameId,
     summaries: [...input.summaries],
     retainedDetails: [...input.retainedDetails],

@@ -189,7 +189,7 @@ type SeasonRunCommandFragment = {
 
 function commandOf(run: SeasonRun, command: SeasonRunCommandFragment): SeasonRunCommand {
   return {
-    schemaVersion: 10,
+    schemaVersion: 11,
     runId: run.runId,
     expectedStateRevision: run.stateRevision,
     expectedStateDigest: run.stateDigest,
@@ -223,7 +223,7 @@ function pendingOf(
 ): SeasonPendingBlockCandidate {
   return {
     schemaVersion: 1,
-    blockVersion: 'season-block-v4',
+    blockVersion: 'season-block-v5',
     runId: run.runId,
     commandId: 'block-3-command',
     blockIndex: 3,

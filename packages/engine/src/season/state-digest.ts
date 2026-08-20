@@ -1,6 +1,7 @@
 import {
   seasonDigestHex,
   type SeasonAwards,
+  type SeasonCampaignState,
   type SeasonCheckpointState,
   type SeasonEffectsState,
   type SeasonFreeAgencyState,
@@ -36,6 +37,7 @@ export interface SeasonRunStateDigestFacts {
 
   freeAgency: SeasonFreeAgencyState;
   objectives: SeasonObjectiveState;
+  campaign?: SeasonCampaignState | null;
   rosters: readonly SeasonRoster[];
   ownership: readonly SeasonOwnership[];
   rotations: readonly SeasonRotation[];
@@ -81,11 +83,33 @@ export function seasonRunStateDigest(facts: SeasonRunStateDigestFacts): string {
       influenceVersion: facts.influence.influenceVersion,
       balances: facts.influence.balances,
       ledger: sortedBy(facts.influence.ledger, (entry) => entry.entryId),
-      windows: facts.influence.windows,
-      rehabs: facts.influence.rehabs,
+      windows: Object.fromEntries(
+        Object.entries(facts.influence.windows)
+          .sort(([a], [b]) => (a < b ? -1 : 1))
+          .map(([franchiseId, windows]) => [
+            franchiseId,
+            [...windows].sort((a, b) => a.windowIndex - b.windowIndex),
+          ]),
+      ),
+      rehabs: Object.fromEntries(
+        Object.entries(facts.influence.rehabs).sort(([a], [b]) => (a < b ? -1 : 1)),
+      ),
     },
     transactions: sortedBy(facts.transactions, (entry) => entry.transactionId),
-    trade: facts.trade,
+    trade: facts.trade
+      ? {
+          ...facts.trade,
+          windows: [...facts.trade.windows]
+            .sort((a, b) => a.windowIndex - b.windowIndex)
+            .map((window) => ({
+              ...window,
+              offers: sortedBy(window.offers, (offer) => offer.offerId),
+              boardProfiles: window.boardProfiles ? sortedBy(window.boardProfiles, (p) => p.franchiseId) : undefined,
+              negotiations: window.negotiations ? sortedBy(window.negotiations, (n) => n.inquiryId) : undefined,
+              valueTrends: window.valueTrends ? sortedBy(window.valueTrends, (t) => t.playerVersionId) : undefined,
+            })),
+        }
+      : null,
     freeAgency: {
       schemaVersion: facts.freeAgency.schemaVersion,
       freeAgencyVersion: facts.freeAgency.freeAgencyVersion,
@@ -103,6 +127,33 @@ export function seasonRunStateDigest(facts: SeasonRunStateDigestFacts): string {
       seasonSpend: facts.freeAgency.seasonSpend,
     },
     objectives: facts.objectives,
+    ...(facts.campaign !== undefined && facts.campaign !== null
+      ? {
+          campaign: {
+            schemaVersion: facts.campaign.schemaVersion,
+            campaignVersion: facts.campaign.campaignVersion,
+            startingIdentity: facts.campaign.startingIdentity,
+            startingFocus: facts.campaign.startingFocus,
+            offers: Object.fromEntries(
+              Object.entries(facts.campaign.offers)
+                .sort(([a], [b]) => Number(a) - Number(b))
+                .map(([blockIndex, offers]) => [
+                  blockIndex,
+                  sortedBy(offers as import('@hoop-rush/data-contracts').SeasonCampaignOpportunity[], (o) => o.opportunityId),
+                ]),
+            ),
+            selections: Object.fromEntries(
+              Object.entries(facts.campaign.selections).sort(([a], [b]) => Number(a) - Number(b)),
+            ),
+            evaluations: sortedBy(facts.campaign.evaluations, (e) => `${String(e.blockIndex)}:${e.opportunityId}`),
+            branchState: Object.fromEntries(Object.entries(facts.campaign.branchState).sort(([a], [b]) => (a < b ? -1 : 1))),
+            evolutionOffers: facts.campaign.evolutionOffers ? sortedBy(facts.campaign.evolutionOffers, (o) => o.offerId) : null,
+            evolutionSelection: facts.campaign.evolutionSelection,
+            rewardEntitlements: facts.campaign.rewardEntitlements,
+            appliedRewardIds: [...facts.campaign.appliedRewardIds].sort(),
+          },
+        }
+      : {}),
     rosters: sortedBy(facts.rosters, (roster) => roster.franchiseId),
     ownership: sortedBy(facts.ownership, (row) => row.playerVersionId),
     rotations: sortedBy(facts.rotations, (rotation) => rotation.franchiseId),

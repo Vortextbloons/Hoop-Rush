@@ -65,7 +65,7 @@ export const seasonInfluenceTargetsSchema = z.object({
     blockGrant: z.literal(1),
     objectiveReward: z.literal(1),
     cap: z.literal(8),
-    floor: z.literal(-3),
+    floor: z.literal(0),
     objectiveSuccessEnvelope: z.tuple([z.literal(0.65), z.literal(0.95)]),
     debtFrequencyMax: z.literal(0.1),
     extraOfferSpendRateMax: z.literal(0.5),

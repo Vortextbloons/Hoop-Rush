@@ -239,36 +239,6 @@ describe('season influence spends', () => {
       explanation: 'b',
       windowIndex: 0,
     }).influence;
-    influence = applySeasonInfluenceSpend({
-      influence,
-      franchiseId: humanFranchiseId,
-      source: 'extra-trade-offer',
-      requestedDelta: -1,
-      blockIndex: 2,
-      commandId: 'cmd-c',
-      explanation: 'c',
-      windowIndex: 0,
-    }).influence;
-    influence = applySeasonInfluenceSpend({
-      influence,
-      franchiseId: humanFranchiseId,
-      source: 'extra-trade-offer',
-      requestedDelta: -1,
-      blockIndex: 2,
-      commandId: 'cmd-d',
-      explanation: 'd',
-      windowIndex: 0,
-    }).influence;
-    influence = applySeasonInfluenceSpend({
-      influence,
-      franchiseId: humanFranchiseId,
-      source: 'extra-trade-offer',
-      requestedDelta: -1,
-      blockIndex: 2,
-      commandId: 'cmd-e',
-      explanation: 'e',
-      windowIndex: 0,
-    }).influence;
     expect(influence.balances[humanFranchiseId]).toBe(SEASON_INFLUENCE_FLOOR);
     expect(() =>
       applySeasonInfluenceSpend({
@@ -277,8 +247,8 @@ describe('season influence spends', () => {
         source: 'extra-trade-offer',
         requestedDelta: -1,
         blockIndex: 2,
-        commandId: 'cmd-f',
-        explanation: 'f',
+        commandId: 'cmd-c',
+        explanation: 'c',
         windowIndex: 0,
       }),
     ).toThrow(SeasonInfluenceFloorError);
@@ -289,7 +259,7 @@ describe('season influence spends', () => {
   it('spends never exceed the floor and never clamp silently', () => {
     const { run, humanFranchiseId } = fixture();
     const balance = run.influence.balances[humanFranchiseId] ?? 0;
-    expect(SEASON_INFLUENCE_FLOOR).toBe(-3);
+    expect(SEASON_INFLUENCE_FLOOR).toBe(0);
 
     expect(balance + -6).toBeLessThan(SEASON_INFLUENCE_FLOOR);
     expect(() =>

@@ -365,7 +365,7 @@ describe('Season Run performance pass (dexie v9)', () => {
       rotations: run.rotations,
       recap: {
         schemaVersion: 1,
-        recapVersion: 'season-recap-v4',
+        recapVersion: 'season-recap-v5',
         runId: run.runId,
         blockIndex: 0,
         completedRounds: 10,
@@ -442,7 +442,7 @@ describe('Season Run performance pass (dexie v9)', () => {
     const rotationDigest = seam.seasonRotationSetDigest(run.rotations);
     const windowHealth: SeasonHealthState = {
       schemaVersion: 1,
-      healthVersion: 'season-health-v1',
+      healthVersion: 'season-health-v2',
       injuries: [
         {
           injuryId: 'inj-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
@@ -466,7 +466,7 @@ describe('Season Run performance pass (dexie v9)', () => {
     };
     const trade: SeasonTradeState = {
       schemaVersion: 1,
-      tradeVersion: 'season-trade-v2' as const,
+      tradeVersion: 'season-trade-v3' as const,
       windows: [
         {
           windowIndex: 0,
@@ -509,6 +509,7 @@ describe('Season Run performance pass (dexie v9)', () => {
         transactions: [],
         trade: null,
         objectives: run.objectives,
+        campaign: run.campaign ?? null,
         rosters: run.rosters,
         ownership: run.ownership,
         rotations: run.rotations,
@@ -530,7 +531,7 @@ describe('Season Run performance pass (dexie v9)', () => {
         rotations: run.rotations,
         recap: {
           schemaVersion: 1,
-          recapVersion: 'season-recap-v4',
+          recapVersion: 'season-recap-v5',
           runId: run.runId,
           blockIndex,
           completedRounds: toRound,
@@ -606,6 +607,7 @@ describe('Season Run performance pass (dexie v9)', () => {
       transactions: [],
       trade,
       objectives: run.objectives,
+      campaign: run.campaign ?? null,
       rosters: run.rosters,
       ownership: run.ownership,
       rotations: run.rotations,
@@ -639,7 +641,7 @@ describe('Season Run performance pass (dexie v9)', () => {
       rotations: run.rotations,
       recap: {
         schemaVersion: 1,
-        recapVersion: 'season-recap-v4',
+        recapVersion: 'season-recap-v5',
         runId: run.runId,
         blockIndex,
         completedRounds: 30,
@@ -722,7 +724,7 @@ describe('Season Run performance pass (dexie v9)', () => {
       runId: run.runId,
       ordinal: 0,
       command: {
-        schemaVersion: 10,
+        schemaVersion: 11,
         command: 'select-block-objective',
         commandId: 'cmd-ps',
         runId: run.runId,

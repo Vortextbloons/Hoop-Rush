@@ -159,24 +159,42 @@ Commands:
                           per-block digests, the final digest, the M2.5 state
                           chain, and final health/transaction facts.
                           --input <run.json> --manifest <path> --profile <eraId>
-  season health calibrate
-                          Freeze injury-targets-v1 from a season cohort plus a
-                          roll-level probe (incidence, severity, durations,
-                          same-game return, recurrence, season-ending,
-                          monotonicity, standings independence).
-                          --input <run.json> --seed-from N --seed-to N
-                          --out <path> --validate <path> --manifest <path>
-  season trade calibrate  Freeze trade-targets-v1 from seasons with windows at
-                          blocks 2/4/5 (AI trades per season, legality, value
-                          bands, determinism, chemistry invariants).
-                          --input <run.json> --seed-from N --seed-to N
-                          --out <path> --validate <path> --manifest <path>
+  season campaign audit  Audit campaign hard gates: exactly 2 offers per
+                           eligible checkpoint (blocks 0-7), zero
+                           unsupported-fact/duplicate-reward/branch/evolution
+                           violations, determinism and order-invariance.
+                           --input <run.json> --manifest <path>
+  season campaign calibrate Freeze campaign-targets-v1 from a season cohort:
+                           offer feasibility, branch/evolution, determinism,
+                           completion/breakthrough rates with held-out cohort.
+                           --input <run.json> --seed-from N --seed-to N
+                           --out <path> --validate <path> --manifest <path> --write
+  season trade audit       Audit trade hard gates: ownership/roster/rotation/
+                           chemistry/health/ledger/state-chain, no Influence-only,
+                           cash caps, inquiry/exchange limits, reconciliation.
+                           --input <run.json> --manifest <path>
+  season trade calibrate  Freeze trade-targets-v3 from seasons with windows at
+                           blocks 2/4/5 (AI trades per season, legality, value
+                           bands, determinism, chemistry invariants, Influence
+                           cash caps, inquiry/exchange limits, reconciliation).
+                           --input <run.json> --seed-from N --seed-to N
+                           --out <path> --validate <path> --manifest <path>
   season influence calibrate
-                          Freeze influence-targets-v1 (ledger reconciliation,
-                          income identity, debt frequency, cap violations,
-                          objective success, spend rates).
-                          --input <run.json> --seed-from N --seed-to N
-                          --out <path> --validate <path> --manifest <path>
+                           Freeze influence-targets-v2 (floor 0, ledger
+                           reconciliation, income identity, debt frequency, cap
+                           violations, campaign rewards, inquiry purchases,
+                           trade cash 1-2 per proposal/window, cash reconciliation,
+                           rehab spends 2 per injury).
+                           --input <run.json> --seed-from N --seed-to N
+                           --out <path> --validate <path> --manifest <path>
+  season health calibrate  Freeze injury-targets-v2 from a season cohort plus
+                           roll-level probe (incidence, severity, durations,
+                           same-game return, recurrence 40bp + rehab premium
+                           60bp = 100bp total for 10-game window, season-ending,
+                           monotonicity, standings independence, zero-rehab
+                           byte-identical, rehab failure no-change).
+                           --input <run.json> --seed-from N --seed-to N
+                           --out <path> --validate <path> --manifest <path>
   season free-agency audit
                           Audit a persisted run's recorded free-agency facts
                           (window order 2/4/6, candidate uniqueness, one
@@ -232,12 +250,15 @@ Commands:
                           harness (commit/reload p95, storage size).
                           --samples N --out <path>
   season run reproduce   Rebuild a completed Season Run from a full-run replay
-                          export (replay-export-v1) and fail at the FIRST
-                          divergence: ordinal, command id, state digest, result
-                          digest, game result, awards, trade grades, champion,
-                          or free-agency facts.
-                          --input <export.json> --manifest <path>
-                          --profile <eraId> --format <format>
+                           export (replay-export-v1) and fail at the FIRST
+                           divergence: ordinal, command id, state digest, result
+                           digest, game result, awards, trade grades, champion,
+                           free-agency facts, or specific M2.5.5 kinds
+                           (campaign-offers/evaluations, board/inquiries,
+                           AI response/counter, AI transaction, rehab outcome,
+                           value trends, Influence cash).
+                           --input <export.json> --manifest <path>
+                           --profile <eraId> --format <format>
   season postseason audit
                           Audit a completed postseason (export or fixture):
                           duplicate/missing teams, invalid feeders, incorrect

@@ -96,6 +96,7 @@ export interface SeasonBlockStartInput {
   humanFranchiseId: string | null;
 
   objectiveId: SeasonObjectiveId | null;
+  campaignOpportunityId?: string | null;
   homeCourt: SeasonHomeCourtProfile;
   catalogUrl: string;
   catalogHash: string;
@@ -390,6 +391,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         ...checkpoint.retainedDetails,
       ]);
       const objectives = objectivesWithSuccess(state.input.run, authoritative);
+      const campaign = (committed as unknown as { campaign?: import('@hoop-rush/data-contracts').SeasonCampaignState | null }).campaign ?? null;
       await repository.commitSeasonBlock({
         runId: authoritative.runId,
         revision: authoritative.revision + 1,
@@ -412,6 +414,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         influence: window !== null ? window.influence : authoritative.influence,
         trade: window !== null ? window.trade : state.input.run.trade,
         objectives,
+        campaign,
         checkpointState: committed.checkpointState,
         stateRevision: committed.stateRevision,
         stateDigest: committed.stateDigest,
@@ -459,6 +462,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         rotationDigest: state.rotationDigest,
         window,
         freeAgency: committed.freeAgency,
+        campaign,
         checkpointState: committed.checkpointState,
         stateRevision: committed.stateRevision,
         stateDigest: committed.stateDigest,
@@ -609,6 +613,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
 
       startGameId: state.resumePending?.nextGameId ?? null,
       objectiveId: state.input.objectiveId,
+      campaignOpportunityId: (state.input as unknown as { campaignOpportunityId?: string | null }).campaignOpportunityId ?? null,
 
       priorInfluence: cloneForWorker(state.input.run.influence),
       priorTransactions: cloneForWorker(state.input.run.transactions),
@@ -619,14 +624,14 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
 
     if (newSummaries !== undefined) {
       return seasonWorkerContinueRequestSchema.parse({
-        schemaVersion: 6,
+        schemaVersion: 7,
         type: 'season-block-continue',
         rotations: plainRotations,
         ...plainCommon,
       });
     }
     return seasonWorkerStartRequestSchema.parse({
-      schemaVersion: 6,
+      schemaVersion: 7,
       type: 'season-block-start',
 
       run: cloneForWorker({
@@ -808,7 +813,8 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
             rotationDigest: input.rotationDigest,
             commandId: input.commandId,
             humanFranchiseId: input.humanFranchiseId,
-            objectiveId: pending.objectiveId,
+            objectiveId: pending.objectiveId ?? null,
+      campaignOpportunityId: (pending as unknown as { campaignOpportunityId?: string | null }).campaignOpportunityId ?? null,
             homeCourt: input.homeCourt,
             catalogUrl: input.catalogUrl,
             catalogHash: input.catalogHash,
@@ -851,7 +857,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       if (worker === null || requestId !== currentRequestId) return;
       worker.postMessage(
         seasonWorkerCancelRequestSchema.parse({
-          schemaVersion: 6,
+          schemaVersion: 7,
           type: 'season-block-cancel',
           requestId,
         }),
@@ -886,7 +892,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
           warmRequestId = requestId;
           target.postMessage(
             seasonWorkerWarmRequestSchema.parse({
-              schemaVersion: 6,
+              schemaVersion: 7,
               type: 'season-block-warm',
               requestId,
               catalogUrl: artifacts.catalogUrl,
@@ -931,6 +937,7 @@ export function assembleCommittedSnapshot(input: {
   window: SeasonWindowOpenResult | null;
 
   freeAgency: SeasonFreeAgencyState;
+  campaign?: import('@hoop-rush/data-contracts').SeasonCampaignState | null;
   checkpointState: SeasonCheckpointState;
   stateRevision: number;
   stateDigest: string;
@@ -944,6 +951,10 @@ export function assembleCommittedSnapshot(input: {
 }): SeasonRunSnapshot {
   const { run, rotations, checkpoint, window, schedule } = input;
   const objectives = objectivesWithSuccess(run, checkpoint);
+  const campaign =
+    (input as { campaign?: import('@hoop-rush/data-contracts').SeasonCampaignState | null }).campaign ??
+    (run as { campaign?: import('@hoop-rush/data-contracts').SeasonCampaignState | null }).campaign ??
+    null;
   const postCommitRun: SeasonRun = {
     ...run,
 
@@ -959,6 +970,7 @@ export function assembleCommittedSnapshot(input: {
 
     freeAgency: input.freeAgency,
     objectives,
+    campaign: campaign as unknown as SeasonRun['campaign'],
     checkpointState: input.checkpointState,
     stateRevision: input.stateRevision,
     stateDigest: input.stateDigest,

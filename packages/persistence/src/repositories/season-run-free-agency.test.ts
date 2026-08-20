@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   playerVersionId,
+  SEASON_RUN_SAVE_SCHEMA_VERSION,
   seasonCommandLogDigest,
   seasonFreeAgencyStateSchema,
   type SeasonFreeAgencyCandidate,
@@ -283,7 +284,7 @@ function resolveCommand(
     freeAgency: openWindowState(adapters.run),
   });
   return {
-    schemaVersion: 10,
+    schemaVersion: 11,
     command: 'resolve-free-agent-market',
     commandId: 'cmd-resolve-fa-0',
     runId: adapters.run.runId,
@@ -421,7 +422,7 @@ describe('season run free-agency persistence (M2.6.5)', () => {
     const { db, repo, run } = adapters;
     await promote(adapters);
     const row = await db.seasonRuns.get(SEASON_RUN_RECORD_ID);
-    expect(row?.saveSchemaVersion).toBe(7);
+    expect(row?.saveSchemaVersion).toBe(SEASON_RUN_SAVE_SCHEMA_VERSION);
     expect(row?.run.freeAgency.windows).toEqual([]);
     expect(row?.run.freeAgency.signingCounts).toHaveProperty('lakers', 0);
 
@@ -434,7 +435,7 @@ describe('season run free-agency persistence (M2.6.5)', () => {
       pending: null,
     });
     const stored = await db.seasonRuns.get(SEASON_RUN_RECORD_ID);
-    expect(stored?.saveSchemaVersion).toBe(7);
+    expect(stored?.saveSchemaVersion).toBe(SEASON_RUN_SAVE_SCHEMA_VERSION);
     expect(stored?.run.freeAgency.windows[0]?.status).toBe('resolved');
     expect(stored?.run.freeAgency.signingCounts.lakers).toBe(1);
     expect(stored?.run.freeAgency.seasonSpend.celtics).toBe(2);
@@ -495,7 +496,7 @@ describe('season run free-agency persistence (M2.6.5)', () => {
     await expect(repo.loadActiveRun()).rejects.toMatchObject({
       name: 'SeasonRunIncompatibleError',
       info: {
-        storedSaveSchemaVersion: 7,
+        storedSaveSchemaVersion: 6,
         storedRunSchemaVersion: 9,
         runId: run.runId,
       },
@@ -753,7 +754,7 @@ describe('season run free-agency persistence (M2.6.5)', () => {
     };
     const declareDigest = await apply({
       command: {
-        schemaVersion: 10,
+        schemaVersion: 11,
         command: 'declare-free-agent-interest',
         commandId: 'cmd-declare-fa-0',
         runId: run.runId,
@@ -788,7 +789,7 @@ describe('season run free-agency persistence (M2.6.5)', () => {
     };
     const skipDigest = await apply({
       command: {
-        schemaVersion: 10,
+        schemaVersion: 11,
         command: 'skip-free-agent-market',
         commandId: 'cmd-skip-fa-0',
         runId: run.runId,
@@ -849,7 +850,7 @@ describe('season run free-agency persistence (M2.6.5)', () => {
     await repo.applySeasonRunCommand({
       runId: run.runId,
       command: {
-        schemaVersion: 10,
+        schemaVersion: 11,
         command: 'resolve-free-agent-market',
         commandId: 'cmd-resolve-fa-0',
         runId: run.runId,

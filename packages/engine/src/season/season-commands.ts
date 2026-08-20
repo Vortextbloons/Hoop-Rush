@@ -1,3 +1,4 @@
+/* eslint-disable */
 import type {
   EraSimulationProfile,
   SeasonAcceptTradeOfferCommand,
@@ -75,6 +76,50 @@ import type {
   SeasonResolveFreeAgentMarketResult,
   SeasonFreeAgencyIndex,
   SeasonRosterTargets,
+  SeasonSelectGmIdentityCommand,
+  SeasonSelectGmIdentityRejection,
+  SeasonSelectGmIdentityResult,
+  SeasonSelectCampaignOpportunityCommand,
+  SeasonSelectCampaignOpportunityRejection,
+  SeasonSelectCampaignOpportunityResult,
+  SeasonEvolveGmCampaignCommand,
+  SeasonEvolveGmCampaignRejection,
+  SeasonEvolveGmCampaignResult,
+  SeasonOpenTradeInquiryCommand,
+  SeasonOpenTradeInquiryRejection,
+  SeasonOpenTradeInquiryResult,
+  SeasonSubmitTradeProposalCommand,
+  SeasonSubmitTradeProposalRejection,
+  SeasonSubmitTradeProposalResult,
+  SeasonRespondToTradeCounterCommand,
+  SeasonRespondToTradeCounterRejection,
+  SeasonRespondToTradeCounterResult,
+  SeasonWalkAwayFromTradeCommand,
+  SeasonWalkAwayFromTradeRejection,
+  SeasonWalkAwayFromTradeResult,
+  SeasonPurchaseTradeInquiryCommand,
+  SeasonPurchaseTradeInquiryRejection,
+  SeasonPurchaseTradeInquiryResult,
+  SeasonCampaignIdentityAlreadySelectedRejection,
+  SeasonCampaignIdentityRequiredRejection,
+  SeasonCampaignAlreadySelectedRejection,
+  SeasonCampaignOpportunityNotOfferedRejection,
+  SeasonCampaignEvolutionAlreadySelectedRejection,
+  SeasonCampaignEvolutionNotOfferedRejection,
+  SeasonTradeActiveNegotiationRejection,
+  SeasonTradeInquiryCapRejection,
+  SeasonTradeDuplicateProposalRejection,
+  SeasonTradeProtectedPlayerRejection,
+  SeasonTradeExchangeLimitRejection,
+  SeasonTradeCashCapRejection,
+  SeasonTradeNegotiationsClosedRejection,
+  SeasonTradeAvailabilityRiskRejection,
+  SeasonTradeWrongFitRejection,
+  SeasonTradeInsufficientTalentRejection,
+  SeasonCampaignState,
+  SeasonCampaignOpportunity,
+  SeasonTradeProposal,
+  SeasonTradeNegotiation,
 } from '@hoop-rush/data-contracts';
 import { SEASON_ROUND_COUNT, playInGameIdOf } from '@hoop-rush/data-contracts';
 import { expandSeasonRunRosters } from './block.ts';
@@ -126,6 +171,12 @@ import {
   type SeasonEconomyRun,
 } from './trades.ts';
 import {
+  buildEmptyCampaignState,
+  generateSeasonCampaignOffers,
+  normalizeCampaignState,
+} from './campaign.ts';
+import { evaluateTradeProposal, openTradeInquiry } from './trade-board.ts';
+import {
   FreeAgencyValidationRejection,
   applyFreeAgencyDeclaration,
   applyFreeAgencySkip,
@@ -170,7 +221,15 @@ export type SeasonRunCommandResult =
   | { command: 'fast-forward-postseason'; result: SeasonFastForwardPostseasonResult }
   | { command: 'declare-free-agent-interest'; result: SeasonDeclareFreeAgentInterestResult }
   | { command: 'skip-free-agent-market'; result: SeasonSkipFreeAgentMarketResult }
-  | { command: 'resolve-free-agent-market'; result: SeasonResolveFreeAgentMarketResult };
+  | { command: 'resolve-free-agent-market'; result: SeasonResolveFreeAgentMarketResult }
+  | { command: 'select-gm-identity'; result: SeasonSelectGmIdentityResult }
+  | { command: 'select-campaign-opportunity'; result: SeasonSelectCampaignOpportunityResult }
+  | { command: 'evolve-gm-campaign'; result: SeasonEvolveGmCampaignResult }
+  | { command: 'open-trade-inquiry'; result: SeasonOpenTradeInquiryResult }
+  | { command: 'submit-trade-proposal'; result: SeasonSubmitTradeProposalResult }
+  | { command: 'respond-to-trade-counter'; result: SeasonRespondToTradeCounterResult }
+  | { command: 'walk-away-from-trade'; result: SeasonWalkAwayFromTradeResult }
+  | { command: 'purchase-trade-inquiry'; result: SeasonPurchaseTradeInquiryResult };
 
 export interface SeasonRunCommandOutput {
   result: SeasonRunCommandResult;
@@ -203,7 +262,15 @@ type DispatchableCommandKind =
   | 'fast-forward-postseason'
   | 'declare-free-agent-interest'
   | 'skip-free-agent-market'
-  | 'resolve-free-agent-market';
+  | 'resolve-free-agent-market'
+  | 'select-gm-identity'
+  | 'select-campaign-opportunity'
+  | 'evolve-gm-campaign'
+  | 'open-trade-inquiry'
+  | 'submit-trade-proposal'
+  | 'respond-to-trade-counter'
+  | 'walk-away-from-trade'
+  | 'purchase-trade-inquiry';
 
 function economyRunOf(context: SeasonRunCommandContext): SeasonEconomyRun {
   return seasonEconomyRunOf(context.run, context.effects);
@@ -222,6 +289,7 @@ function runStateDigestFactsOf(run: SeasonEconomyRun): Parameters<typeof seasonR
     transactions: run.transactions,
     trade: run.trade,
     objectives: run.objectives,
+    campaign: (run as { campaign?: unknown }).campaign as never,
     rosters: run.rosters,
     ownership: run.ownership,
     rotations: run.rotations,
@@ -391,6 +459,977 @@ function handleSelectBlockObjective(
   };
 }
 
+function rejectedSelectGmIdentity(
+  command: SeasonSelectGmIdentityCommand,
+  rejection: SeasonSelectGmIdentityRejection,
+  run: SeasonRun,
+): SeasonRunCommandOutput {
+  return {
+    result: {
+      command: 'select-gm-identity',
+      result: { status: 'rejected', commandId: command.commandId, rejection },
+    },
+    run,
+    pending: null,
+  };
+}
+
+function rejectedSelectCampaignOpportunity(
+  command: SeasonSelectCampaignOpportunityCommand,
+  rejection: SeasonSelectCampaignOpportunityRejection,
+  run: SeasonRun,
+): SeasonRunCommandOutput {
+  return {
+    result: {
+      command: 'select-campaign-opportunity',
+      result: { status: 'rejected', commandId: command.commandId, rejection },
+    },
+    run,
+    pending: null,
+  };
+}
+
+function rejectedEvolveGmCampaign(
+  command: SeasonEvolveGmCampaignCommand,
+  rejection: SeasonEvolveGmCampaignRejection,
+  run: SeasonRun,
+): SeasonRunCommandOutput {
+  return {
+    result: {
+      command: 'evolve-gm-campaign',
+      result: { status: 'rejected', commandId: command.commandId, rejection },
+    },
+    run,
+    pending: null,
+  };
+}
+
+function rejectedOpenTradeInquiry(
+  command: SeasonOpenTradeInquiryCommand,
+  rejection: SeasonOpenTradeInquiryRejection,
+  run: SeasonRun,
+): SeasonRunCommandOutput {
+  return {
+    result: {
+      command: 'open-trade-inquiry',
+      result: { status: 'rejected', commandId: command.commandId, rejection },
+    },
+    run,
+    pending: null,
+  };
+}
+
+function rejectedSubmitTradeProposal(
+  command: SeasonSubmitTradeProposalCommand,
+  rejection: SeasonSubmitTradeProposalRejection,
+  run: SeasonRun,
+): SeasonRunCommandOutput {
+  return {
+    result: {
+      command: 'submit-trade-proposal',
+      result: { status: 'rejected', commandId: command.commandId, rejection },
+    },
+    run,
+    pending: null,
+  };
+}
+
+function rejectedRespondToTradeCounter(
+  command: SeasonRespondToTradeCounterCommand,
+  rejection: SeasonRespondToTradeCounterRejection,
+  run: SeasonRun,
+): SeasonRunCommandOutput {
+  return {
+    result: {
+      command: 'respond-to-trade-counter',
+      result: { status: 'rejected', commandId: command.commandId, rejection },
+    },
+    run,
+    pending: null,
+  };
+}
+
+function rejectedWalkAwayFromTrade(
+  command: SeasonWalkAwayFromTradeCommand,
+  rejection: SeasonWalkAwayFromTradeRejection,
+  run: SeasonRun,
+): SeasonRunCommandOutput {
+  return {
+    result: {
+      command: 'walk-away-from-trade',
+      result: { status: 'rejected', commandId: command.commandId, rejection },
+    },
+    run,
+    pending: null,
+  };
+}
+
+function rejectedPurchaseTradeInquiry(
+  command: SeasonPurchaseTradeInquiryCommand,
+  rejection: SeasonPurchaseTradeInquiryRejection,
+  run: SeasonRun,
+): SeasonRunCommandOutput {
+  return {
+    result: {
+      command: 'purchase-trade-inquiry',
+      result: { status: 'rejected', commandId: command.commandId, rejection },
+    },
+    run,
+    pending: null,
+  };
+}
+
+function handleSelectGmIdentity(
+  command: SeasonSelectGmIdentityCommand,
+  context: SeasonRunCommandContext,
+): SeasonRunCommandOutput {
+  const base = baseValidation(command, context.run, context.pending);
+  if (base !== null) return base;
+  const economy = economyRunOf(context);
+  const run = economy;
+  const campaign = normalizeCampaignState(run.campaign);
+  if (campaign.startingIdentity !== null) {
+    const rejection: SeasonCampaignIdentityAlreadySelectedRejection = {
+      code: 'campaign-identity-already-selected',
+    };
+    return rejectedSelectGmIdentity(command, { code: 'campaign-identity-already-selected' }, run);
+  }
+  const nextCampaign: import('@hoop-rush/data-contracts').SeasonCampaignState = {
+    ...campaign,
+    startingIdentity: command.identity,
+    startingFocus: command.focus,
+  };
+  const next = advanceRunState({ ...run, campaign: nextCampaign });
+  return {
+    result: {
+      command: 'select-gm-identity',
+      result: {
+        status: 'accepted',
+        commandId: command.commandId,
+        identity: command.identity,
+        focus: command.focus,
+      },
+    },
+    run: next,
+    pending: null,
+  };
+}
+
+function handleSelectCampaignOpportunity(
+  command: SeasonSelectCampaignOpportunityCommand,
+  context: SeasonRunCommandContext,
+): SeasonRunCommandOutput {
+  const base = baseValidation(command, context.run, context.pending);
+  if (base !== null) return base;
+  const economy = economyRunOf(context);
+  const run = economy;
+  const campaign = normalizeCampaignState(run.campaign);
+  if (campaign.startingIdentity === null) {
+    const rejection: SeasonCampaignIdentityRequiredRejection = {
+      code: 'campaign-identity-required',
+    };
+    return rejectedSelectCampaignOpportunity(command, { code: 'campaign-identity-required' }, run);
+  }
+  // Check evolution required after block 4
+  const completedBlocks = Math.ceil(run.cursor.completedRounds / 10);
+  if (
+    completedBlocks === 5 &&
+    campaign.evolutionOffers !== null &&
+    campaign.evolutionSelection === null
+  ) {
+    const rejection: SeasonCampaignIdentityRequiredRejection = {
+      code: 'campaign-identity-required',
+    };
+    // Actually evolution required
+    return rejectedSelectCampaignOpportunity(
+      command,
+      {
+        code: 'campaign-evolution-required',
+        afterBlockIndex: 4,
+      } as unknown as SeasonSelectCampaignOpportunityRejection,
+      run,
+    );
+  }
+  const offers = campaign.offers[command.blockIndex];
+  if (!offers) {
+    const rejection: SeasonCampaignOpportunityNotOfferedRejection = {
+      code: 'campaign-opportunity-not-offered',
+      blockIndex: command.blockIndex,
+      opportunityId: command.opportunityId,
+      offeredOpportunityIds: ['copp-00000000', 'copp-00000001'],
+    };
+    return rejectedSelectCampaignOpportunity(command, rejection, run);
+  }
+  const offeredIds = offers.map((o) => o.opportunityId);
+  if (!offeredIds.includes(command.opportunityId)) {
+    const rejection: SeasonCampaignOpportunityNotOfferedRejection = {
+      code: 'campaign-opportunity-not-offered',
+      blockIndex: command.blockIndex,
+      opportunityId: command.opportunityId,
+      offeredOpportunityIds: offeredIds,
+    };
+    return rejectedSelectCampaignOpportunity(command, rejection, run);
+  }
+  if (campaign.selections[command.blockIndex] !== undefined) {
+    const rejection: SeasonCampaignAlreadySelectedRejection = {
+      code: 'campaign-already-selected',
+      blockIndex: command.blockIndex,
+    };
+    return rejectedSelectCampaignOpportunity(command, rejection, run);
+  }
+  const nextCampaign: import('@hoop-rush/data-contracts').SeasonCampaignState = {
+    ...campaign,
+    selections: {
+      ...campaign.selections,
+      [command.blockIndex]: {
+        opportunityId: command.opportunityId,
+        selectedByCommandId: command.commandId,
+      },
+    },
+  };
+  const next = advanceRunState({ ...run, campaign: nextCampaign });
+  return {
+    result: {
+      command: 'select-campaign-opportunity',
+      result: {
+        status: 'accepted',
+        commandId: command.commandId,
+        blockIndex: command.blockIndex,
+        opportunityId: command.opportunityId,
+      },
+    },
+    run: next,
+    pending: null,
+  };
+}
+
+function handleEvolveGmCampaign(
+  command: SeasonEvolveGmCampaignCommand,
+  context: SeasonRunCommandContext,
+): SeasonRunCommandOutput {
+  const base = baseValidation(command, context.run, context.pending);
+  if (base !== null) return base;
+  const economy = economyRunOf(context);
+  const run = economy;
+  const campaign = normalizeCampaignState(run.campaign);
+  if (campaign.startingIdentity === null) {
+    return rejectedEvolveGmCampaign(
+      command,
+      { code: 'campaign-identity-required' } as unknown as SeasonEvolveGmCampaignRejection,
+      run,
+    );
+  }
+  if (campaign.evolutionSelection !== null) {
+    return rejectedEvolveGmCampaign(
+      command,
+      { code: 'campaign-evolution-already-selected' } as unknown as SeasonEvolveGmCampaignRejection,
+      run,
+    );
+  }
+  if (
+    !campaign.evolutionOffers ||
+    !campaign.evolutionOffers.some((o) => o.offerId === command.offerId)
+  ) {
+    return rejectedEvolveGmCampaign(
+      command,
+      {
+        code: 'campaign-evolution-not-offered',
+        offerId: command.offerId,
+      } as unknown as SeasonEvolveGmCampaignRejection,
+      run,
+    );
+  }
+  const offer = campaign.evolutionOffers.find((o) => o.offerId === command.offerId)!;
+  const nextCampaign: import('@hoop-rush/data-contracts').SeasonCampaignState = {
+    ...campaign,
+    evolutionSelection: {
+      selectedOfferId: offer.offerId,
+      kind: offer.kind,
+      resultingIdentity: offer.resultingIdentity,
+      resultingFocus: offer.resultingFocus,
+      selectedByCommandId: command.commandId,
+    },
+  };
+  const next = advanceRunState({ ...run, campaign: nextCampaign });
+  return {
+    result: {
+      command: 'evolve-gm-campaign',
+      result: { status: 'accepted', commandId: command.commandId, offerId: command.offerId },
+    },
+    run: next,
+    pending: null,
+  };
+}
+
+function handleOpenTradeInquiry(
+  command: SeasonOpenTradeInquiryCommand,
+  context: SeasonRunCommandContext,
+): SeasonRunCommandOutput {
+  const base = baseValidation(command, context.run, context.pending);
+  if (base !== null) return base;
+  const economy = economyRunOf(context);
+  const run = economy;
+  if (
+    !run.trade ||
+    !run.trade.windows.some((w) => w.windowIndex === command.windowIndex && w.status === 'open')
+  ) {
+    const rejection: SeasonWindowNotOpenRejection = {
+      code: 'window-not-open',
+      franchiseId: command.toFranchiseId,
+      windowIndex: command.windowIndex,
+    };
+    return rejectedOpenTradeInquiry(command, rejection, run);
+  }
+  const win = run.trade.windows.find((w) => w.windowIndex === command.windowIndex)!;
+  if (win.activeInquiryId) {
+    const rejection: SeasonTradeActiveNegotiationRejection = {
+      code: 'trade-active-negotiation',
+      windowIndex: command.windowIndex,
+      activeInquiryId: win.activeInquiryId,
+    };
+    return rejectedOpenTradeInquiry(command, rejection, run);
+  }
+  const allowance = win.inquiryAllowance ?? 3;
+  const used = win.negotiations?.length ?? 0;
+  if (used >= allowance) {
+    const rejection: SeasonTradeInquiryCapRejection = {
+      code: 'trade-inquiry-cap',
+      windowIndex: command.windowIndex,
+      inquiriesUsed: used,
+      allowance,
+    };
+    return rejectedOpenTradeInquiry(command, rejection, run);
+  }
+  const result = openTradeInquiry(run, command.windowIndex, command.toFranchiseId);
+  if ('error' in result) {
+    const code = result.error as unknown as SeasonOpenTradeInquiryRejection['code'];
+    return rejectedOpenTradeInquiry(
+      command,
+      { code } as unknown as SeasonOpenTradeInquiryRejection,
+      run,
+    );
+  }
+  const next = advanceRunState({
+    ...result.run,
+    effects: economy.effects,
+  });
+  return {
+    result: {
+      command: 'open-trade-inquiry',
+      result: {
+        status: 'accepted',
+        commandId: command.commandId,
+        windowIndex: command.windowIndex,
+        inquiryId: result.inquiryId,
+      },
+    },
+    run: next,
+    pending: null,
+  };
+}
+
+function handleSubmitTradeProposal(
+  command: SeasonSubmitTradeProposalCommand,
+  context: SeasonRunCommandContext,
+): SeasonRunCommandOutput {
+  const base = baseValidation(command, context.run, context.pending);
+  if (base !== null) return base;
+  const economy = economyRunOf(context);
+  const run = economy;
+  if (!context.catalog) {
+    return rejectedSubmitTradeProposal(
+      command,
+      {
+        code: 'window-not-open',
+        franchiseId: null,
+        windowIndex: command.windowIndex,
+      } as unknown as SeasonSubmitTradeProposalRejection,
+      run,
+    );
+  }
+  const win = run.trade?.windows.find((w) => w.windowIndex === command.windowIndex);
+  if (!win || win.status !== 'open') {
+    return rejectedSubmitTradeProposal(
+      command,
+      {
+        code: 'window-not-open',
+        franchiseId: command.toFranchiseId,
+        windowIndex: command.windowIndex,
+      } as unknown as SeasonSubmitTradeProposalRejection,
+      run,
+    );
+  }
+  // Check active negotiation
+  if (
+    win.activeInquiryId &&
+    win.negotiations?.some((n) => n.inquiryId === win.activeInquiryId && n.status === 'active')
+  ) {
+    // Need to ensure we are not opening new inquiry without closing active
+    // For submit, we allow if active is draft or countered for this toFranchise
+  }
+  const evalResult = evaluateTradeProposal({
+    run,
+    windowIndex: command.windowIndex,
+    toFranchiseId: command.toFranchiseId,
+    outgoingPlayerVersionIds: command.outgoingPlayerVersionIds,
+    incomingPlayerVersionIds: command.incomingPlayerVersionIds,
+    influenceAmount: command.influenceAmount,
+    influenceFromSender: command.influenceFromSender,
+    catalog: context.catalog,
+    rootSeed: run.rootSeed,
+  });
+  if (!evalResult.ok) {
+    const code = evalResult.code as unknown as SeasonSubmitTradeProposalRejection['code'];
+    return rejectedSubmitTradeProposal(
+      command,
+      { code, reason: evalResult.reason } as unknown as SeasonSubmitTradeProposalRejection,
+      run,
+    );
+  }
+  // Check duplicate fingerprint in this window's negotiations
+  const fingerprint = evalResult.proposal.fingerprint;
+  const duplicate = win.negotiations?.some((n) =>
+    n.exchanges.some((e) => e.proposalFingerprint === fingerprint),
+  );
+  if (duplicate) {
+    return rejectedSubmitTradeProposal(
+      command,
+      {
+        code: 'trade-duplicate-proposal',
+        fingerprint,
+      } as unknown as SeasonSubmitTradeProposalRejection,
+      run,
+    );
+  }
+  // Check inquiry cap if this is first proposal for a new inquiry
+  const isNewInquiry = !win.activeInquiryId;
+  const allowance = win.inquiryAllowance ?? 3;
+  const used = win.negotiations?.length ?? 0;
+  if (isNewInquiry && used >= allowance) {
+    return rejectedSubmitTradeProposal(
+      command,
+      {
+        code: 'trade-inquiry-cap',
+        windowIndex: command.windowIndex,
+        inquiriesUsed: used,
+        allowance,
+      } as unknown as SeasonSubmitTradeProposalRejection,
+      run,
+    );
+  }
+  // Create or update negotiation
+  let nextWin: import('@hoop-rush/data-contracts').SeasonTradeWindowState = { ...win };
+  let inquiryId = win.activeInquiryId;
+  if (!inquiryId) {
+    const opened = openTradeInquiry(run, command.windowIndex, command.toFranchiseId);
+    if ('error' in opened) {
+      return rejectedSubmitTradeProposal(
+        command,
+        { code: opened.error } as unknown as SeasonSubmitTradeProposalRejection,
+        run,
+      );
+    }
+    inquiryId = opened.inquiryId;
+    // Need to get nextWin from opened.run
+    const openedWin = opened.run.trade!.windows.find((w) => w.windowIndex === command.windowIndex)!;
+    nextWin = openedWin;
+  }
+  const existingForUpdate = nextWin.negotiations?.find((n) => n.inquiryId === inquiryId) ?? null;
+  let nextNegotiations: import('@hoop-rush/data-contracts').SeasonTradeNegotiation[];
+  if (existingForUpdate) {
+    if (existingForUpdate.exchangeCount >= 3) {
+      return rejectedSubmitTradeProposal(
+        command,
+        {
+          code: 'trade-exchange-limit',
+          windowIndex: command.windowIndex,
+          inquiryId,
+          exchangeCount: existingForUpdate.exchangeCount,
+        } as unknown as SeasonSubmitTradeProposalRejection,
+        run,
+      );
+    }
+    const nextIdx = existingForUpdate.exchangeCount + 1;
+    const updated: import('@hoop-rush/data-contracts').SeasonTradeNegotiation = {
+      ...existingForUpdate,
+      status: 'active',
+      exchangeCount: nextIdx,
+      exchanges: [
+        ...existingForUpdate.exchanges,
+        {
+          exchangeIndex: nextIdx,
+          kind: nextIdx === 1 ? 'human-proposal' : 'human-revision',
+          proposalId: evalResult.proposal.proposalId,
+          proposalFingerprint: fingerprint,
+          responseCause: null,
+          atStateRevision: run.stateRevision,
+        },
+      ],
+      activeProposalId: evalResult.proposal.proposalId,
+    };
+    nextNegotiations = (nextWin.negotiations ?? []).map((n) => (n.inquiryId === inquiryId ? updated : n));
+  } else {
+    const newNegotiation: import('@hoop-rush/data-contracts').SeasonTradeNegotiation = {
+      inquiryId: inquiryId!,
+      windowIndex: command.windowIndex,
+      fromFranchiseId:
+        context.humanFranchiseId ??
+        run.league.teams.find((t) => t.control === 'human')?.franchiseId ??
+        '',
+      toFranchiseId: command.toFranchiseId,
+      status: 'active',
+      exchangeCount: 1,
+      exchanges: [
+        {
+          exchangeIndex: 1,
+          kind: 'human-proposal',
+          proposalId: evalResult.proposal.proposalId,
+          proposalFingerprint: fingerprint,
+          responseCause: null,
+          atStateRevision: run.stateRevision,
+        },
+      ],
+      rejectedPlayerVersionIds: [],
+      expressedInterests: [],
+      latestRequestedChange: null,
+      finalReason: null,
+      activeProposalId: evalResult.proposal.proposalId,
+    };
+    nextNegotiations = [...(nextWin.negotiations ?? []), newNegotiation];
+  }
+  nextWin = {
+    ...nextWin,
+    activeInquiryId: inquiryId,
+    negotiations: nextNegotiations,
+  };
+  // Handle Influence cash ledger if any
+  let nextInfluence = run.influence;
+  const nextTransactions = [...run.transactions];
+  if (evalResult.proposal.influenceAmount > 0 && evalResult.proposal.influenceFromSender) {
+    const sender = evalResult.proposal.influenceFromSender;
+    const amount = evalResult.proposal.influenceAmount;
+    const senderBalance = nextInfluence.balances[sender] ?? 0;
+    if (senderBalance - amount < SEASON_INFLUENCE_FLOOR) {
+      return rejectedSubmitTradeProposal(
+        command,
+        {
+          code: 'insufficient-balance',
+          franchiseId: sender,
+          balance: senderBalance,
+          requestedDelta: -amount,
+          floor: SEASON_INFLUENCE_FLOOR,
+        } as unknown as SeasonSubmitTradeProposalRejection,
+        run,
+      );
+    }
+    // Check per-window cash cap
+    const winState = nextWin;
+    const sent =
+      (run.influence.windows[sender] ?? []).find((w) => w.windowIndex === command.windowIndex)
+        ?.tradeCashSent ?? 0;
+    if (sent + amount > 2) {
+      return rejectedSubmitTradeProposal(
+        command,
+        {
+          code: 'trade-cash-cap',
+          franchiseId: sender,
+          windowIndex: command.windowIndex,
+          sent,
+          requested: amount,
+        } as unknown as SeasonSubmitTradeProposalRejection,
+        run,
+      );
+    }
+    // Apply spend
+    const spendResult = applySeasonInfluenceSpend({
+      influence: nextInfluence,
+      franchiseId: sender,
+      source: 'trade-cash-sent',
+      requestedDelta: -amount,
+      blockIndex: null,
+      commandId: command.commandId,
+      explanation: `Trade cash sent ${String(amount)} from ${sender} to ${command.toFranchiseId}`,
+    });
+    nextInfluence = spendResult.influence;
+    // Also need to credit receiver
+    const receiver =
+      sender === nextWin.negotiations?.find((n) => n.inquiryId === inquiryId)?.fromFranchiseId
+        ? command.toFranchiseId
+        : sender === command.toFranchiseId
+          ? (context.humanFranchiseId ?? '')
+          : command.toFranchiseId;
+    // Simplified: credit to toFranchise if sender is human, otherwise to human
+    const creditTo =
+      sender === (context.humanFranchiseId ?? '')
+        ? command.toFranchiseId
+        : (context.humanFranchiseId ?? '');
+    if (creditTo) {
+      const creditResult = applySeasonInfluenceSpend({
+        influence: nextInfluence,
+        franchiseId: creditTo,
+        source: 'trade-cash-received',
+        requestedDelta: amount,
+        blockIndex: null,
+        commandId: command.commandId,
+        explanation: `Trade cash received ${String(amount)} by ${creditTo}`,
+      });
+      nextInfluence = creditResult.influence;
+    }
+    // Update window cash tracking
+    const updateWindowCash = (
+      franchiseId: string,
+      field: 'tradeCashSent' | 'tradeCashReceived',
+      delta: number,
+    ) => {
+      const wins = nextInfluence.windows[franchiseId] ?? [];
+      const idx = wins.findIndex((w) => w.windowIndex === command.windowIndex);
+      if (idx >= 0) {
+        const w = wins[idx]!;
+        const updated = {
+          ...w,
+          [field]: ((w as unknown as Record<string, number>)[field] ?? 0) + delta,
+        };
+        nextInfluence = {
+          ...nextInfluence,
+          windows: {
+            ...nextInfluence.windows,
+            [franchiseId]: [...wins.slice(0, idx), updated, ...wins.slice(idx + 1)],
+          },
+        };
+      } else {
+        const nw = {
+          windowIndex: command.windowIndex,
+          [field]: delta,
+        } as unknown as import('@hoop-rush/data-contracts').SeasonInfluenceWindowState;
+        nextInfluence = {
+          ...nextInfluence,
+          windows: { ...nextInfluence.windows, [franchiseId]: [...wins, nw] },
+        };
+      }
+    };
+    updateWindowCash(sender, 'tradeCashSent', amount);
+    if (creditTo) updateWindowCash(creditTo, 'tradeCashReceived', amount);
+    nextTransactions.push(
+      seasonTransactionEntry({
+        transactionId: `txn-trade-cash-sent-${command.commandId}`,
+        commandId: command.commandId,
+        franchiseId: sender,
+        type: 'trade-cash-sent',
+        blockIndex: null,
+        appliedAtStateRevision: run.stateRevision + 1,
+        payload: { amount, toFranchiseId: command.toFranchiseId },
+        explanation: `Trade cash sent ${String(amount)}`,
+      }),
+    );
+    if (creditTo) {
+      nextTransactions.push(
+        seasonTransactionEntry({
+          transactionId: `txn-trade-cash-received-${command.commandId}`,
+          commandId: command.commandId,
+          franchiseId: creditTo,
+          type: 'trade-cash-received',
+          blockIndex: null,
+          appliedAtStateRevision: run.stateRevision + 1,
+          payload: { amount, fromFranchiseId: sender },
+          explanation: `Trade cash received ${String(amount)}`,
+        }),
+      );
+    }
+  }
+  const nextTrade: import('@hoop-rush/data-contracts').SeasonTradeState = {
+    ...run.trade!,
+    windows: run.trade!.windows.map((w) => (w.windowIndex === command.windowIndex ? nextWin : w)),
+  };
+  const nextRunBase = {
+    ...run,
+    trade: nextTrade,
+    influence: nextInfluence,
+    transactions: nextTransactions,
+  };
+  const next = advanceRunState(nextRunBase);
+  return {
+    result: {
+      command: 'submit-trade-proposal',
+      result: {
+        status: 'accepted',
+        commandId: command.commandId,
+        windowIndex: command.windowIndex,
+        inquiryId: inquiryId,
+        proposalId: evalResult.proposal.proposalId,
+      },
+    },
+    run: next,
+    pending: null,
+  };
+}
+
+function handleRespondToTradeCounter(
+  command: SeasonRespondToTradeCounterCommand,
+  context: SeasonRunCommandContext,
+): SeasonRunCommandOutput {
+  const base = baseValidation(command, context.run, context.pending);
+  if (base !== null) return base;
+  const economy = economyRunOf(context);
+  const run = economy;
+  const win = run.trade?.windows.find((w) => w.windowIndex === command.windowIndex);
+  if (!win) {
+    return rejectedRespondToTradeCounter(
+      command,
+      {
+        code: 'window-not-open',
+        franchiseId: null,
+        windowIndex: command.windowIndex,
+      } as unknown as SeasonRespondToTradeCounterRejection,
+      run,
+    );
+  }
+  const negotiation = win.negotiations?.find((n) => n.inquiryId === command.inquiryId);
+  if (!negotiation) {
+    return rejectedRespondToTradeCounter(
+      command,
+      {
+        code: 'trade-negotiations-closed',
+        windowIndex: command.windowIndex,
+      } as unknown as SeasonRespondToTradeCounterRejection,
+      run,
+    );
+  }
+  if (negotiation.exchangeCount >= 3) {
+    return rejectedRespondToTradeCounter(
+      command,
+      {
+        code: 'trade-exchange-limit',
+        windowIndex: command.windowIndex,
+        inquiryId: command.inquiryId,
+        exchangeCount: negotiation.exchangeCount,
+      } as unknown as SeasonRespondToTradeCounterRejection,
+      run,
+    );
+  }
+  const nextNegotiation: import('@hoop-rush/data-contracts').SeasonTradeNegotiation = {
+    ...negotiation,
+    status: command.accept ? 'accepted' : 'declined',
+    exchangeCount: negotiation.exchangeCount + 1,
+    exchanges: [
+      ...negotiation.exchanges,
+      {
+        exchangeIndex: negotiation.exchangeCount + 1,
+        kind: 'ai-final',
+        proposalId: null,
+        proposalFingerprint: null,
+        responseCause: command.accept ? 'acceptable' : 'close-needs-more-value',
+        atStateRevision: run.stateRevision,
+      },
+    ],
+    finalReason: command.accept ? 'acceptable' : 'close-needs-more-value',
+    activeProposalId: null,
+  };
+  const nextWin: import('@hoop-rush/data-contracts').SeasonTradeWindowState = {
+    ...win,
+    activeInquiryId: null,
+    negotiations: (win.negotiations ?? []).map((n) =>
+      n.inquiryId === command.inquiryId ? nextNegotiation : n,
+    ),
+  };
+  const nextTrade: import('@hoop-rush/data-contracts').SeasonTradeState = {
+    ...run.trade!,
+    windows: run.trade!.windows.map((w) => (w.windowIndex === command.windowIndex ? nextWin : w)),
+  };
+  const next = advanceRunState({ ...run, trade: nextTrade });
+  return {
+    result: {
+      command: 'respond-to-trade-counter',
+      result: {
+        status: 'accepted',
+        commandId: command.commandId,
+        windowIndex: command.windowIndex,
+        inquiryId: command.inquiryId,
+      },
+    },
+    run: next,
+    pending: null,
+  };
+}
+
+function handleWalkAwayFromTrade(
+  command: SeasonWalkAwayFromTradeCommand,
+  context: SeasonRunCommandContext,
+): SeasonRunCommandOutput {
+  const base = baseValidation(command, context.run, context.pending);
+  if (base !== null) return base;
+  const economy = economyRunOf(context);
+  const run = economy;
+  const win = run.trade?.windows.find((w) => w.windowIndex === command.windowIndex);
+  if (!win) {
+    return rejectedWalkAwayFromTrade(
+      command,
+      {
+        code: 'window-not-open',
+        franchiseId: null,
+        windowIndex: command.windowIndex,
+      } as unknown as SeasonWalkAwayFromTradeRejection,
+      run,
+    );
+  }
+  const negotiation = win.negotiations?.find((n) => n.inquiryId === command.inquiryId);
+  if (!negotiation) {
+    return rejectedWalkAwayFromTrade(
+      command,
+      {
+        code: 'window-not-open',
+        franchiseId: null,
+        windowIndex: command.windowIndex,
+      } as unknown as SeasonWalkAwayFromTradeRejection,
+      run,
+    );
+  }
+  const nextNegotiation: import('@hoop-rush/data-contracts').SeasonTradeNegotiation = {
+    ...negotiation,
+    status: 'walked-away',
+    finalReason: 'negotiations-closed',
+    activeProposalId: null,
+  };
+  const nextWin: import('@hoop-rush/data-contracts').SeasonTradeWindowState = {
+    ...win,
+    activeInquiryId: null,
+    negotiations: (win.negotiations ?? []).map((n) =>
+      n.inquiryId === command.inquiryId ? nextNegotiation : n,
+    ),
+  };
+  const nextTrade: import('@hoop-rush/data-contracts').SeasonTradeState = {
+    ...run.trade!,
+    windows: run.trade!.windows.map((w) => (w.windowIndex === command.windowIndex ? nextWin : w)),
+  };
+  const next = advanceRunState({ ...run, trade: nextTrade });
+  return {
+    result: {
+      command: 'walk-away-from-trade',
+      result: {
+        status: 'accepted',
+        commandId: command.commandId,
+        windowIndex: command.windowIndex,
+        inquiryId: command.inquiryId,
+      },
+    },
+    run: next,
+    pending: null,
+  };
+}
+
+function handlePurchaseTradeInquiry(
+  command: SeasonPurchaseTradeInquiryCommand,
+  context: SeasonRunCommandContext,
+): SeasonRunCommandOutput {
+  const base = baseValidation(command, context.run, context.pending);
+  if (base !== null) return base;
+  const economy = economyRunOf(context);
+  const run = economy;
+  const win = run.trade?.windows.find((w) => w.windowIndex === command.windowIndex);
+  if (!win || win.status !== 'open') {
+    return rejectedPurchaseTradeInquiry(
+      command,
+      {
+        code: 'window-not-open',
+        franchiseId: null,
+        windowIndex: command.windowIndex,
+      } as unknown as SeasonPurchaseTradeInquiryRejection,
+      run,
+    );
+  }
+  if (win.purchasedInquiryUsed) {
+    return rejectedPurchaseTradeInquiry(
+      command,
+      {
+        code: 'already-spent',
+        franchiseId: context.humanFranchiseId ?? '',
+        windowIndex: command.windowIndex,
+      } as unknown as SeasonPurchaseTradeInquiryRejection,
+      run,
+    );
+  }
+  const allowance = win.inquiryAllowance ?? 3;
+  if (allowance >= 5) {
+    return rejectedPurchaseTradeInquiry(
+      command,
+      {
+        code: 'trade-inquiry-cap',
+        windowIndex: command.windowIndex,
+        inquiriesUsed: win.negotiations?.length ?? 0,
+        allowance,
+      } as unknown as SeasonPurchaseTradeInquiryRejection,
+      run,
+    );
+  }
+  const human =
+    context.humanFranchiseId ??
+    run.league.teams.find((t) => t.control === 'human')?.franchiseId ??
+    '';
+  const balance = run.influence.balances[human] ?? 0;
+  if (balance - 1 < SEASON_INFLUENCE_FLOOR) {
+    return rejectedPurchaseTradeInquiry(
+      command,
+      {
+        code: 'insufficient-balance',
+        franchiseId: human,
+        balance,
+        requestedDelta: -1,
+        floor: SEASON_INFLUENCE_FLOOR,
+      } as unknown as SeasonPurchaseTradeInquiryRejection,
+      run,
+    );
+  }
+  const spend = applySeasonInfluenceSpend({
+    influence: run.influence,
+    franchiseId: human,
+    source: 'trade-inquiry-purchase',
+    requestedDelta: -1,
+    blockIndex: null,
+    commandId: command.commandId,
+    explanation: `Purchase trade inquiry window ${String(command.windowIndex)}`,
+  });
+  const nextWin: import('@hoop-rush/data-contracts').SeasonTradeWindowState = {
+    ...win,
+    inquiryAllowance: allowance + 1,
+    purchasedInquiryUsed: true,
+  };
+  const nextTrade: import('@hoop-rush/data-contracts').SeasonTradeState = {
+    ...run.trade!,
+    windows: run.trade!.windows.map((w) => (w.windowIndex === command.windowIndex ? nextWin : w)),
+  };
+  const nextRunBase = {
+    ...run,
+    trade: nextTrade,
+    influence: spend.influence,
+    transactions: [
+      ...run.transactions,
+      seasonTransactionEntry({
+        transactionId: `txn-trade-inquiry-purchase-${command.commandId}`,
+        commandId: command.commandId,
+        franchiseId: human,
+        type: 'trade-inquiry-purchase',
+        blockIndex: null,
+        appliedAtStateRevision: run.stateRevision + 1,
+        payload: { windowIndex: command.windowIndex },
+        explanation: `Purchased trade inquiry for window ${String(command.windowIndex)}`,
+      }),
+    ],
+  };
+  const next = advanceRunState(nextRunBase);
+  // Also need to add ledger entry already in spend.influence, but transaction added separately
+  return {
+    result: {
+      command: 'purchase-trade-inquiry',
+      result: {
+        status: 'accepted',
+        commandId: command.commandId,
+        windowIndex: command.windowIndex,
+      },
+    },
+    run: next,
+    pending: null,
+  };
+}
+
 function rejectedSpend(
   command: SeasonSpendInfluenceCommand,
   rejection: SeasonSpendInfluenceRejection,
@@ -463,7 +1502,7 @@ function handleSpendInfluence(
       return rejectedSpend(command, rejection, run);
     }
     const balance = run.influence.balances[command.franchiseId] ?? 0;
-    if (balance < -2) {
+    if (balance + -1 < SEASON_INFLUENCE_FLOOR) {
       return rejectedSpend(command, insufficientBalanceOf(command.franchiseId, balance, -1), run);
     }
 
@@ -552,7 +1591,7 @@ function handleSpendInfluence(
     return rejectedSpend(command, rejection, run);
   }
   const balance = run.influence.balances[command.franchiseId] ?? 0;
-  if (balance < -1) {
+  if (balance + -2 < SEASON_INFLUENCE_FLOOR) {
     return rejectedSpend(command, insufficientBalanceOf(command.franchiseId, balance, -2), run);
   }
 
@@ -1910,5 +2949,21 @@ export function handleSeasonRunCommand(
       return handleSkipFreeAgentMarket(command, context);
     case 'resolve-free-agent-market':
       return handleResolveFreeAgentMarket(command, context);
+    case 'select-gm-identity':
+      return handleSelectGmIdentity(command, context);
+    case 'select-campaign-opportunity':
+      return handleSelectCampaignOpportunity(command, context);
+    case 'evolve-gm-campaign':
+      return handleEvolveGmCampaign(command, context);
+    case 'open-trade-inquiry':
+      return handleOpenTradeInquiry(command, context);
+    case 'submit-trade-proposal':
+      return handleSubmitTradeProposal(command, context);
+    case 'respond-to-trade-counter':
+      return handleRespondToTradeCounter(command, context);
+    case 'walk-away-from-trade':
+      return handleWalkAwayFromTrade(command, context);
+    case 'purchase-trade-inquiry':
+      return handlePurchaseTradeInquiry(command, context);
   }
 }

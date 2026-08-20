@@ -103,7 +103,7 @@ describe('season m25 report schema round-trips', () => {
     const input = {
       schemaVersion: 1,
       command: 'season health calibrate',
-      targetsVersion: 'injury-targets-v1',
+      targetsVersion: 'injury-targets-v2',
       calibrationSeeds: 16,
       validationSeeds: 4,
       seasonsSimulated: 20,
@@ -156,7 +156,7 @@ describe('season m25 report schema round-trips', () => {
     const input = {
       schemaVersion: 1,
       command: 'season trade calibrate',
-      targetsVersion: 'trade-targets-v2',
+      targetsVersion: 'trade-targets-v3',
       calibrationSeeds: 8,
       validationSeeds: 4,
       seasonsSimulated: 12,
@@ -195,7 +195,7 @@ describe('season m25 report schema round-trips', () => {
     const input = {
       schemaVersion: 1,
       command: 'season influence calibrate',
-      targetsVersion: 'influence-targets-v1',
+      targetsVersion: 'influence-targets-v2',
       calibrationSeeds: 12,
       validationSeeds: 4,
       seasonsSimulated: 16,

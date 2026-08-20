@@ -20,7 +20,7 @@ import {
 function healthWith(injuries: SeasonInjuryRecord[]): SeasonHealthState {
   return {
     schemaVersion: 1,
-    healthVersion: 'season-health-v1',
+    healthVersion: 'season-health-v2',
     injuries,
   };
 }

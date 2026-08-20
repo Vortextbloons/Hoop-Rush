@@ -20,7 +20,7 @@ const FRANCHISE = 'lakers';
 function influenceState(overrides: Partial<SeasonInfluenceState> = {}): SeasonInfluenceState {
   return {
     schemaVersion: 1,
-    influenceVersion: 'season-influence-v1',
+    influenceVersion: 'season-influence-v2',
     balances: { [FRANCHISE]: 3, celtics: 2 },
     ledger: [
       {
@@ -55,7 +55,7 @@ function influenceState(overrides: Partial<SeasonInfluenceState> = {}): SeasonIn
 function healthWithInjuries(): SeasonHealthState {
   return {
     schemaVersion: 1,
-    healthVersion: 'season-health-v1',
+    healthVersion: 'season-health-v2',
     injuries: [
       {
         injuryId: 'inj-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
@@ -134,7 +134,7 @@ describe('influenceViewModel', () => {
     const vm = influenceViewModel(influenceState(), FRANCHISE);
     expect(vm.balance).toBe(3);
     expect(vm.cap).toBe(8);
-    expect(vm.floor).toBe(-3);
+    expect(vm.floor).toBe(0);
     expect(vm.atCap).toBe(false);
     expect(vm.atFloor).toBe(false);
     expect(vm.recentEntries.map((entry) => entry.entryId)).toEqual(['e-2', 'e-1']);
@@ -181,14 +181,15 @@ describe('influenceViewModel', () => {
     expect(rehab?.rehabOutcome).toBe('success');
   });
 
-  it('rejects an unaffordable spend (floor -3)', () => {
-    const state = influenceState({ balances: { [FRANCHISE]: -2, celtics: 2 } });
+  it('rejects an unaffordable spend (floor 0)', () => {
+    const state = influenceState({ balances: { [FRANCHISE]: 0, celtics: 2 } });
     const vm = influenceViewModel(state, FRANCHISE, healthWithInjuries());
     const rehab = vm.affordances.find((a) => a.purpose === 'risky-rehab');
     expect(rehab?.affordable).toBe(false);
-    expect(vm.atFloor).toBe(false);
-    expect(canAffordSpend(-2, 2)).toBe(false);
-    expect(canAffordSpend(-1, 2)).toBe(true);
+    expect(vm.atFloor).toBe(true);
+    expect(canAffordSpend(0, 2)).toBe(false);
+    expect(canAffordSpend(1, 2)).toBe(false);
+    expect(canAffordSpend(2, 2)).toBe(true);
   });
 
   it('marks the cap', () => {

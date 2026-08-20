@@ -41,7 +41,7 @@ function blockedHealthOf(run: SeasonBlockSimulationInput['run']): SeasonHealthSt
     recurrenceWindowRoundsRemaining: 0,
     seedPath: ['injuries', 's000001', player.playerVersionId, 'occurrence'],
   }));
-  return { schemaVersion: 1, healthVersion: 'season-health-v1', injuries };
+  return { schemaVersion: 1, healthVersion: 'season-health-v2', injuries };
 }
 
 describe('M2.5 block pipeline with injuries', () => {
@@ -116,10 +116,10 @@ describe('M2.5 block pipeline with injuries', () => {
       command: { ...pipelineInput(run, catalog, 0).command, objectiveId: offered },
     };
     const candidate = simulateSeasonBlock(withObjective);
-    expect(candidate.objective.objectiveId).toBe(offered);
-    expect(typeof candidate.objective.success).toBe('boolean');
-    expect(candidate.objective.evaluation.blockIndex).toBe(0);
-    expect(candidate.objective.evaluation.objectiveId).toBe(offered);
+    expect(candidate.objective!.objectiveId).toBe(offered);
+    expect(typeof candidate.objective!.success).toBe('boolean');
+    expect(candidate.objective!.evaluation.blockIndex).toBe(0);
+    expect(candidate.objective!.evaluation.objectiveId).toBe(offered);
 
     const franchiseIds = run.league.teams.map((team) => team.franchiseId);
     for (const franchiseId of franchiseIds) {
@@ -131,7 +131,7 @@ describe('M2.5 block pipeline with injuries', () => {
     const humanDelta = candidate.influence.ledger
       .filter((entry) => entry.franchiseId === 'lakers' && entry.blockIndex === 0)
       .reduce((sum, entry) => sum + entry.appliedDelta, 0);
-    expect(humanDelta).toBe(candidate.objective.success ? 2 : 1);
+    expect(humanDelta).toBe(candidate.objective!.success ? 2 : 1);
     expect(candidate.recap.tradeEvidence.influenceDelta).toBe(humanDelta);
     expect(candidate.recap.influenceBalance.humanBalance).toBe(
       candidate.influence.balances['lakers'] ?? 0,
@@ -139,12 +139,12 @@ describe('M2.5 block pipeline with injuries', () => {
 
     expect(candidate.transactions.some((entry) => entry.type === 'block-grant')).toBe(true);
     expect(candidate.transactions.filter((entry) => entry.type === 'objective-reward').length).toBe(
-      candidate.objective.success ? 1 : 0,
+      candidate.objective!.success ? 1 : 0,
     );
 
-    if (candidate.objective.objectiveId !== null) {
-      expect(candidate.recap.objectiveEvidence?.objectiveId).toBe(candidate.objective.objectiveId);
-      expect(candidate.recap.objectiveEvidence?.success).toBe(candidate.objective.success);
+    if (candidate.objective!.objectiveId !== null) {
+      expect(candidate.recap.objectiveEvidence?.objectiveId).toBe(candidate.objective!.objectiveId);
+      expect(candidate.recap.objectiveEvidence?.success).toBe(candidate.objective!.success);
     }
     expect(auditSeasonBlock(candidate, withObjective)).toEqual([]);
   }, 60_000);

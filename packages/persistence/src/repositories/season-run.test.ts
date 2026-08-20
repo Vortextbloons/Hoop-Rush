@@ -571,7 +571,7 @@ describe('season run development-row auto-clear (M2.4)', () => {
     await expect(repo.loadActiveRun()).rejects.toMatchObject({
       name: 'SeasonRunIncompatibleError',
       info: {
-        storedSaveSchemaVersion: SEASON_RUN_SAVE_SCHEMA_VERSION,
+        storedSaveSchemaVersion: 1,
         storedRunSchemaVersion: 4,
         runId: run.runId,
       },
@@ -1093,7 +1093,7 @@ describe('season run M2.5 command application (v5)', () => {
     overrides: Partial<SeasonRunCommand> = {},
   ): SeasonRunCommand {
     return {
-      schemaVersion: 10,
+      schemaVersion: 11,
       command: 'select-block-objective',
       commandId: 'cmd-select-0',
       runId: adapters.run.runId,
@@ -1285,7 +1285,7 @@ describe('season run M2.5 reload audit (v5)', () => {
     const base = commitInputFor(adapters, 2);
     const trade = {
       schemaVersion: 1 as const,
-      tradeVersion: 'season-trade-v2' as const,
+      tradeVersion: 'season-trade-v3' as const,
       windows: [
         {
           windowIndex: 0,
@@ -1304,6 +1304,7 @@ describe('season run M2.5 reload audit (v5)', () => {
       transactions: base.transactions,
       trade,
       objectives: base.objectives,
+      campaign: run.campaign ?? null,
       rosters: run.rosters,
       ownership: run.ownership,
       rotations: base.rotations,
@@ -1356,6 +1357,7 @@ describe('season run M2.5 reload audit (v5)', () => {
       transactions: base.transactions,
       trade: base.trade,
       objectives: base.objectives,
+      campaign: run.campaign ?? null,
       rosters: run.rosters,
       ownership: run.ownership,
       rotations: run.rotations,
@@ -1382,6 +1384,7 @@ describe('season run M2.5 reload audit (v5)', () => {
       transactions: snapshot.run.transactions,
       trade: snapshot.run.trade,
       objectives: snapshot.run.objectives,
+      campaign: run.campaign ?? null,
       rosters: snapshot.run.rosters,
       ownership: snapshot.run.ownership,
       rotations: snapshot.run.rotations,
@@ -1423,6 +1426,7 @@ describe('season run M2.5 reload audit (v5)', () => {
         transactions: snapshot?.run.transactions ?? base.transactions,
         trade: snapshot?.run.trade ?? base.trade,
         objectives: snapshot?.run.objectives ?? base.objectives,
+        campaign: snapshot?.run.campaign ?? adapters.run.campaign ?? null,
         rosters: snapshot?.run.rosters ?? adapters.run.rosters,
         ownership: snapshot?.run.ownership ?? adapters.run.ownership,
         rotations: snapshot?.run.rotations ?? locked,
@@ -1459,6 +1463,7 @@ describe('season run M2.5 reload audit (v5)', () => {
       transactions: base.transactions,
       trade: base.trade,
       objectives: base.objectives,
+      campaign: run.campaign ?? null,
       rosters: run.rosters,
       ownership: run.ownership,
       rotations: locked,
@@ -1511,6 +1516,7 @@ describe('season run M2.5 reload audit (v5)', () => {
       transactions: stored.transactions,
       trade,
       objectives: stored.objectives,
+      campaign: stored.campaign ?? adapters.run.campaign ?? null,
       rosters: stored.run.rosters,
       ownership: stored.run.ownership,
       rotations,
@@ -1711,7 +1717,7 @@ describe('season run M2.5 reload audit (v5)', () => {
     await expect(repo.loadActiveRun()).rejects.toMatchObject({
       name: 'SeasonRunIncompatibleError',
       info: {
-        storedSaveSchemaVersion: SEASON_RUN_SAVE_SCHEMA_VERSION,
+        storedSaveSchemaVersion: 3,
         storedRunSchemaVersion: 7,
       },
     });

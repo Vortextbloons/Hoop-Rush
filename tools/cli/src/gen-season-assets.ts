@@ -7,6 +7,8 @@ import {
   SEASON_ALMANAC_VERSION,
   SEASON_AWARDS_VERSION,
   SEASON_BLOCK_VERSION,
+  SEASON_CAMPAIGN_TARGETS_VERSION,
+  SEASON_CAMPAIGN_VERSION,
   SEASON_CHECKPOINT_VERSION,
   SEASON_CHEMISTRY_VERSION,
   SEASON_COMMAND_LOG_VERSION,
@@ -63,6 +65,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import {
   applySeasonDraftCommand,
+  buildEmptyCampaignState,
   createInitialSeasonInfluenceState,
   createSeasonEffectsState,
   expandSeasonRunRosters,
@@ -226,6 +229,8 @@ function buildRun(
       tradeVersion: SEASON_TRADE_VERSION,
       influenceVersion: SEASON_INFLUENCE_VERSION,
       objectiveVersion: SEASON_OBJECTIVE_VERSION,
+      campaignVersion: SEASON_CAMPAIGN_VERSION,
+      campaignTargetsVersion: SEASON_CAMPAIGN_TARGETS_VERSION,
       injuryTargetsVersion: SEASON_INJURY_TARGETS_VERSION,
       tradeTargetsVersion: SEASON_TRADE_TARGETS_VERSION,
       influenceTargetsVersion: SEASON_INFLUENCE_TARGETS_VERSION,
@@ -336,6 +341,7 @@ function buildRun(
 
     trade: null,
     objectives,
+    campaign: buildEmptyCampaignState(),
     health: {
       schemaVersion: 1,
       healthVersion: SEASON_HEALTH_VERSION,
@@ -378,6 +384,7 @@ function buildRun(
     trade: run.trade,
     freeAgency: run.freeAgency,
     objectives: run.objectives,
+    campaign: run.campaign,
     rosters: run.rosters,
     ownership: run.ownership,
     rotations: run.rotations,

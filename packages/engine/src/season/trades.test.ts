@@ -334,7 +334,7 @@ describe('season trade window opening', () => {
       );
     }
     for (const franchiseId of Object.keys(result.influence.balances)) {
-      expect(result.influence.balances[franchiseId] ?? 0).toBeGreaterThanOrEqual(-3);
+      expect(result.influence.balances[franchiseId] ?? 0).toBeGreaterThanOrEqual(0);
     }
   });
 
@@ -509,7 +509,7 @@ describe('season applySeasonTrade', () => {
       ...base,
       trade: {
         schemaVersion: 1,
-        tradeVersion: 'season-trade-v2' as const,
+        tradeVersion: 'season-trade-v3' as const,
         windows: [{ windowIndex: 0, blockIndex: 2, status: 'open' as const, offers: [offer] }],
       },
       effects,

@@ -94,8 +94,30 @@ export function buildPostseason(seed: string): SeasonRun['postseason'] {
 export function buildEmptyHealth(): SeasonHealthState {
   return {
     schemaVersion: 1,
-    healthVersion: 'season-health-v1',
+    healthVersion: 'season-health-v2',
     injuries: [],
+  };
+}
+
+export function buildEmptyCampaign() {
+  return {
+    schemaVersion: 1 as const,
+    campaignVersion: 'season-campaign-v1' as const,
+    startingIdentity: null,
+    startingFocus: null,
+    offers: {},
+    selections: {},
+    evaluations: [],
+    branchState: {},
+    evolutionOffers: null,
+    evolutionSelection: null,
+    rewardEntitlements: {
+      influenceEarned: 0,
+      inquiryCredits: 0,
+      informationBenefits: 0,
+      followUpUnlocks: [] as string[],
+    },
+    appliedRewardIds: [] as string[],
   };
 }
 
@@ -115,7 +137,7 @@ export function buildInitialInfluence(): SeasonInfluenceState {
   const franchises = [...CONFERENCE_TEAMS.east, ...CONFERENCE_TEAMS.west];
   return {
     schemaVersion: 1,
-    influenceVersion: 'season-influence-v1',
+    influenceVersion: 'season-influence-v2',
     balances: Object.fromEntries(franchises.map((franchiseId) => [franchiseId, 2])),
     ledger: franchises.map((franchiseId) => ({
       entryId: `influence-initial-${franchiseId}`,
@@ -175,11 +197,11 @@ export function buildRun(): SeasonRun {
                 : ('active-trader' as const),
   }));
   return {
-    schemaVersion: 10,
+    schemaVersion: 11,
     runId: 'fixture-run-1',
     rootSeed: SEED,
     versions: {
-      runSchemaVersion: 10,
+      runSchemaVersion: 11,
       leagueVersion: 'league-v1',
       scheduleVersion: 'schedule-v1',
       scheduleFormulaVersion: 'schedule-formula-v1',
@@ -197,23 +219,25 @@ export function buildRun(): SeasonRun {
       gameVersion: 'season-game-v4',
       gameTargetsVersion: 'season-game-targets-v4',
       rosterTargetsVersion: 'roster-targets-v2',
-      blockVersion: 'season-block-v4',
+      blockVersion: 'season-block-v5',
       summaryVersion: 'season-game-summary-v3',
       aggregatesVersion: 'season-aggregates-v2',
-      recapVersion: 'season-recap-v4',
+      recapVersion: 'season-recap-v5',
       leadersVersion: 'season-leaders-v1',
       homeCourtVersion: 'season-home-court-v1',
-      checkpointVersion: 'season-checkpoint-v4',
+      checkpointVersion: 'season-checkpoint-v5',
       staminaVersion: 'season-stamina-v1',
       chemistryVersion: 'season-chemistry-v2',
       effectsTargetsVersion: 'season-effect-targets-v1',
-      healthVersion: 'season-health-v1',
-      tradeVersion: 'season-trade-v2',
-      influenceVersion: 'season-influence-v1',
+      healthVersion: 'season-health-v2',
+      tradeVersion: 'season-trade-v3',
+      influenceVersion: 'season-influence-v2',
       objectiveVersion: 'season-objective-v1',
-      injuryTargetsVersion: 'injury-targets-v1',
-      tradeTargetsVersion: 'trade-targets-v2',
-      influenceTargetsVersion: 'influence-targets-v1',
+      campaignVersion: 'season-campaign-v1',
+      campaignTargetsVersion: 'campaign-targets-v1',
+      injuryTargetsVersion: 'injury-targets-v2',
+      tradeTargetsVersion: 'trade-targets-v3',
+      influenceTargetsVersion: 'influence-targets-v2',
       tiebreakVersion: 'tiebreaker-v1',
       postseasonSummaryVersion: 'postseason-summary-v1',
       awardsVersion: 'awards-v1',
@@ -407,6 +431,7 @@ export function buildRun(): SeasonRun {
       catalog: [...SEASON_OBJECTIVE_CATALOG],
       selections: {},
     },
+    campaign: buildEmptyCampaign(),
     checkpointState: null,
     stateRevision: 0,
     stateDigest: '0'.repeat(32),
@@ -606,7 +631,7 @@ function buildPlayerAggregateRows(): SeasonPlayerAggregate[] {
 function buildRecapFixture(run: SeasonRun): SeasonCandidateCheckpoint['recap'] {
   return {
     schemaVersion: 1,
-    recapVersion: 'season-recap-v4',
+    recapVersion: 'season-recap-v5',
     runId: run.runId,
     blockIndex: 0,
     completedRounds: 0,
@@ -626,6 +651,7 @@ function buildRecapFixture(run: SeasonRun): SeasonCandidateCheckpoint['recap'] {
       humanTeamInjuries: [],
     },
     objectiveEvidence: null,
+    campaignEvidence: null,
     tradeEvidence: { tradesAccepted: 0, influenceDelta: 0 },
     freeAgencyEvidence: {
       windowIndex: null,
@@ -642,14 +668,14 @@ export function buildCheckpointFixture(): SeasonCandidateCheckpoint {
   const run = buildRun();
   return {
     schemaVersion: 1,
-    checkpointVersion: 'season-checkpoint-v4',
+    checkpointVersion: 'season-checkpoint-v5',
     runId: run.runId,
     rootSeed: run.rootSeed,
     versions: {
-      blockVersion: 'season-block-v4',
+      blockVersion: 'season-block-v5',
       summaryVersion: 'season-game-summary-v3',
       aggregatesVersion: 'season-aggregates-v2',
-      recapVersion: 'season-recap-v4',
+      recapVersion: 'season-recap-v5',
       leadersVersion: 'season-leaders-v1',
       homeCourtVersion: 'season-home-court-v1',
       gameVersion: 'season-game-v4',
@@ -658,13 +684,15 @@ export function buildCheckpointFixture(): SeasonCandidateCheckpoint {
       staminaVersion: 'season-stamina-v1',
       chemistryVersion: 'season-chemistry-v2',
       effectsTargetsVersion: 'season-effect-targets-v1',
-      healthVersion: 'season-health-v1',
-      tradeVersion: 'season-trade-v2',
-      influenceVersion: 'season-influence-v1',
+      healthVersion: 'season-health-v2',
+      tradeVersion: 'season-trade-v3',
+      influenceVersion: 'season-influence-v2',
       objectiveVersion: 'season-objective-v1',
-      injuryTargetsVersion: 'injury-targets-v1',
-      tradeTargetsVersion: 'trade-targets-v2',
-      influenceTargetsVersion: 'influence-targets-v1',
+      campaignVersion: 'season-campaign-v1',
+      campaignTargetsVersion: 'campaign-targets-v1',
+      injuryTargetsVersion: 'injury-targets-v2',
+      tradeTargetsVersion: 'trade-targets-v3',
+      influenceTargetsVersion: 'influence-targets-v2',
       freeAgencyVersion: SEASON_FREE_AGENCY_VERSION,
       freeAgencyIndexVersion: 'free-agency-index-v1',
       freeAgencyTargetsVersion: 'free-agency-targets-v1',
@@ -704,6 +732,11 @@ export function buildCheckpointFixture(): SeasonCandidateCheckpoint {
         tipCountedGames: 0,
       },
     },
+    campaign: {
+      opportunityId: null,
+      outcome: null,
+      evaluation: null,
+    },
     expectedStateRevision: 0,
     expectedStateDigest: '0'.repeat(32),
     stateRevision: 0,
@@ -716,7 +749,7 @@ export function buildPendingBlockFixture(): SeasonPendingBlockCandidate {
   const run = buildRun();
   return {
     schemaVersion: 1,
-    blockVersion: 'season-block-v4',
+    blockVersion: 'season-block-v5',
     runId: run.runId,
     commandId: 'submit-b0',
     blockIndex: 0,
@@ -724,6 +757,7 @@ export function buildPendingBlockFixture(): SeasonPendingBlockCandidate {
     expectedStateRevision: 0,
     expectedStateDigest: '0'.repeat(32),
     objectiveId: null,
+    campaignOpportunityId: null,
     nextGameId: 's000001',
     summaries: [],
     retainedDetails: [],

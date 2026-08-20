@@ -1,9 +1,11 @@
 import {
   blockIndexForRound,
+  buildEmptyCampaignState,
   emptySeasonPlayerAggregate,
   humanTeamOf,
   seasonAcceptedBlockSchema,
   seasonAlmanacSchema,
+  seasonCampaignStateSchema,
   seasonCheckpointDigestSchema,
   seasonCommandLogDigest,
   seasonCommandLogEntrySchema,
@@ -17,6 +19,7 @@ import {
   seasonRunCommandSchema,
   seasonRunSchema,
   seasonScheduleSchema,
+  SEASON_CAMPAIGN_VERSION,
   SEASON_COMMAND_LOG_VERSION,
   SEASON_OBJECTIVE_CATALOG,
   SEASON_OBJECTIVE_VERSION,
@@ -27,6 +30,7 @@ import {
   SEASON_RUN_SCHEMA_VERSION,
   type SeasonAcceptedBlock,
   type SeasonActiveRunIndex,
+  type SeasonCampaignState,
   type SeasonCommandLog,
   type SeasonGameSummary,
   type SeasonInvalidRosterInterruption,
@@ -163,7 +167,8 @@ function incompatibleInfoOf(row: unknown): SeasonRunIncompatibleInfo | null {
       ? record.run.versions.runSchemaVersion
       : SEASON_RUN_SCHEMA_VERSION - 1;
   return {
-    storedSaveSchemaVersion: SEASON_RUN_SAVE_SCHEMA_VERSION,
+    storedSaveSchemaVersion:
+      typeof saveVersion === 'number' ? saveVersion : SEASON_RUN_SAVE_SCHEMA_VERSION,
     storedRunSchemaVersion: runSchemaVersion,
     runId: typeof record.run?.runId === 'string' ? record.run.runId : 'unknown-legacy-run',
   };
@@ -334,6 +339,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
           transactions: stored.transactions,
           trade: stored.trade,
           objectives: stored.objectives,
+          campaign: stored.campaign ?? null,
           rosters: stored.run.rosters,
           ownership: stored.run.ownership,
           rotations: stored.run.rotations,
@@ -416,6 +422,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
           transactions: stored.transactions,
           trade: stored.trade,
           objectives: stored.objectives,
+          campaign: stored.campaign ?? null,
           rosters: stored.run.rosters,
           ownership: stored.run.ownership,
           rotations: stored.run.rotations,
@@ -614,6 +621,10 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
       influence: stored.influence,
       trade: stored.trade,
       objectives: stored.objectives,
+      campaign:
+        stored.campaign ??
+        (stored.run as { campaign?: unknown }).campaign ??
+        buildEmptyCampaignState(),
       checkpointState: stored.checkpointState,
       stateRevision: stored.stateRevision,
       stateDigest: stored.stateDigest,
@@ -816,12 +827,19 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
         }
 
         const window = input.window;
+        const existingCampaign = (checkpoint as { campaign?: unknown }).campaign;
         const mutableState = {
           health: window !== null ? window.health : input.health,
           transactions: window !== null ? window.transactions : input.transactions,
           influence: window !== null ? window.influence : input.influence,
           trade: window !== null ? window.trade : input.trade,
           objectives: input.objectives,
+          campaign:
+            input.campaign !== undefined
+              ? input.campaign
+              : existingCampaign !== undefined
+                ? (existingCampaign as SeasonCampaignState | null)
+                : null,
           checkpointState: input.checkpointState,
           stateRevision: input.stateRevision,
           stateDigest: input.stateDigest,
@@ -1043,6 +1061,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
           influence: input.run.influence,
           trade: input.run.trade,
           objectives: input.run.objectives,
+          campaign: input.run.campaign ?? null,
           checkpointState: input.run.checkpointState,
           stateRevision: input.run.stateRevision,
           stateDigest: input.run.stateDigest,
@@ -1136,6 +1155,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
       catalog: [...SEASON_OBJECTIVE_CATALOG],
       selections: {},
     });
+    const campaign = seasonCampaignStateSchema.parse(buildEmptyCampaignState());
     const stateDigest = this.seam.seasonRunStateDigest({
       stateRevision: 0,
       stage: validatedRun.stage,
@@ -1148,6 +1168,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
       transactions: [],
       trade: null,
       objectives,
+      campaign,
       rosters: validatedRun.rosters,
       ownership: validatedRun.ownership,
       rotations: validatedRun.rotations,
@@ -1173,6 +1194,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
       influence,
       trade: null,
       objectives,
+      campaign,
       checkpointState: null,
       stateRevision: 0,
       stateDigest,
@@ -1473,6 +1495,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
           influence: validatedRun.influence,
           trade: validatedRun.trade,
           objectives: validatedRun.objectives,
+          campaign: validatedRun.campaign ?? null,
           checkpointState: validatedRun.checkpointState,
           stateRevision: validatedRun.stateRevision,
           stateDigest: validatedRun.stateDigest,

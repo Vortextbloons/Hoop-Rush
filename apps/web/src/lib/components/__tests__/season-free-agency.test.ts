@@ -195,7 +195,7 @@ function fixtureRun(): SeasonRun {
 }
 
 function windowOf(freeAgency: SeasonFreeAgencyState): SeasonFreeAgencyWindowState {
-  const window = freeAgency.windows[0];
+  const window = freeAgency.windows[0]!;
   if (window === undefined) throw new Error('fixture has no open window');
   return window;
 }
@@ -834,7 +834,7 @@ describe('free-agency recap evidence (M2.6.5)', () => {
     const module = await import('$lib/components/season/CheckpointRecap.svelte');
     const recap: import('@hoop-rush/data-contracts').SeasonBlockRecap = {
       schemaVersion: 1,
-      recapVersion: 'season-recap-v4',
+      recapVersion: 'season-recap-v5',
       runId: 'run-1',
       blockIndex: 2,
       completedRounds: 10,

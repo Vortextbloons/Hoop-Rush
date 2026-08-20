@@ -47,6 +47,7 @@ function resultShell(): SeasonRunShellData {
     catalog: null,
     schedule: null,
     playerSlice: new Map(),
+    playersIndex: [],
     playerSliceReady: true,
     facesByVersion: new Map(),
     facesReady: false,

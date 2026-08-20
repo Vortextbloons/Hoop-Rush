@@ -64,7 +64,7 @@ function injuryRecord(overrides: Partial<SeasonInjuryRecord>): SeasonInjuryRecor
 function healthState(): SeasonHealthState {
   return {
     schemaVersion: 1,
-    healthVersion: 'season-health-v1',
+    healthVersion: 'season-health-v2',
     injuries: [
       injuryRecord({ playerVersionId: PLAYER_A, missedGamesRemaining: 2, gameId: 's000001' }),
       injuryRecord({
@@ -97,7 +97,7 @@ function roster() {
 function influenceState(balance: number): SeasonInfluenceState {
   return {
     schemaVersion: 1,
-    influenceVersion: 'season-influence-v1',
+    influenceVersion: 'season-influence-v2',
     balances: { lakers: balance, celtics: 2 },
     ledger: [
       {
@@ -186,7 +186,7 @@ function interruption(): SeasonInvalidRosterInterruption {
 function pending(): SeasonPendingBlockCandidate {
   return {
     schemaVersion: 1,
-    blockVersion: 'season-block-v4',
+    blockVersion: 'season-block-v5',
     runId: 'run-1',
     commandId: 'blk-1',
     blockIndex: 1,
@@ -302,7 +302,7 @@ describe('InfluencePanel', () => {
     });
     const text = document.body.textContent;
     expect(text).toContain('3');
-    expect(text).toContain('cap 8 · floor -3');
+    expect(text).toContain('cap 8 · floor 0');
     expect(text).toContain('Extra trade offer');
     expect(text).toContain('Risky rehab');
     const spendButton = screen.getByRole('button', { name: /Spend 1/ });
@@ -463,7 +463,7 @@ describe('CheckpointRecap (M2.5)', () => {
   it('renders the health strip and the injury evidence from recorded facts', () => {
     const recap: import('@hoop-rush/data-contracts').SeasonBlockRecap = {
       schemaVersion: 1,
-      recapVersion: 'season-recap-v4',
+      recapVersion: 'season-recap-v5',
       runId: 'run-1',
       blockIndex: 0,
       completedRounds: 10,

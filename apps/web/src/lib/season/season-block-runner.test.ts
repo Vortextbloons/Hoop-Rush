@@ -359,7 +359,7 @@ function makeCandidate(
   );
   const recap: SeasonBlockRecap = {
     schemaVersion: 1,
-    recapVersion: 'season-recap-v4',
+    recapVersion: 'season-recap-v5',
     runId: run.runId,
     blockIndex: 0,
     completedRounds: 10,
@@ -391,7 +391,7 @@ function makeCandidate(
   };
   const base: SeasonCandidateCheckpoint = {
     schemaVersion: 1,
-    checkpointVersion: 'season-checkpoint-v4',
+    checkpointVersion: 'season-checkpoint-v5',
     runId: run.runId,
     rootSeed: run.rootSeed,
     versions: run.versions,
@@ -406,7 +406,7 @@ function makeCandidate(
     retainedDetails: [],
     recap,
     effects: buildZeroEffects(run),
-    health: { schemaVersion: 1, healthVersion: 'season-health-v1', injuries: [] },
+    health: { schemaVersion: 1, healthVersion: 'season-health-v2', injuries: [] },
     influence: run.influence,
     freeAgency: run.freeAgency,
     transactions: [],
@@ -443,7 +443,7 @@ function makeCandidate(
 function makePending(run: SeasonRun, nextGameId = 's000016'): SeasonPendingBlockCandidate {
   return {
     schemaVersion: 1,
-    blockVersion: 'season-block-v4',
+    blockVersion: 'season-block-v5',
     runId: run.runId,
     commandId: 'cmd-1',
     blockIndex: 0,
@@ -455,7 +455,7 @@ function makePending(run: SeasonRun, nextGameId = 's000016'): SeasonPendingBlock
     summaries: [],
     retainedDetails: [],
     effects: buildZeroEffects(run),
-    health: { schemaVersion: 1, healthVersion: 'season-health-v1', injuries: [] },
+    health: { schemaVersion: 1, healthVersion: 'season-health-v2', injuries: [] },
     standings: run.standings,
     teamAggregates: [],
     playerAggregates: [],
@@ -518,13 +518,13 @@ describe('season block runner (M2.5 wire)', () => {
     expect(raw).toBeDefined();
 
     const start = seasonWorkerStartRequestSchema.parse(raw);
-    expect(start.schemaVersion).toBe(6);
+    expect(start.schemaVersion).toBe(7);
     expect(start.runId).toBe(run.runId);
     expect(start.objectiveId).toBe('win-six');
     expect(start.startGameId).toBeNull();
     expect(start.priorHealth).toEqual({
       schemaVersion: 1,
-      healthVersion: 'season-health-v1',
+      healthVersion: 'season-health-v2',
       injuries: [],
     });
     expect(start.commandId).toBe('cmd-1');
@@ -625,7 +625,7 @@ describe('season block runner (M2.5 wire)', () => {
 
     expect(FakeWorker.instances).toHaveLength(1);
     const start = seasonWorkerStartRequestSchema.parse(FakeWorker.instances[0]?.posted[0]);
-    expect(start.schemaVersion).toBe(6);
+    expect(start.schemaVersion).toBe(7);
     expect(start.startGameId).toBe('s000016');
     expect(start.objectiveId).toBe('win-six');
     expect(start.priorHealth).toEqual(pending.health);
@@ -647,7 +647,7 @@ describe('season block runner (M2.5 wire)', () => {
     const cancelRaw = FakeWorker.instances[0]?.posted[1];
     expect(cancelRaw).toBeDefined();
     const cancel = seasonWorkerCancelRequestSchema.parse(cancelRaw);
-    expect(cancel.schemaVersion).toBe(6);
+    expect(cancel.schemaVersion).toBe(7);
     expect(cancel.requestId).toBe(requestId);
   });
 
@@ -710,7 +710,7 @@ describe('season block runner (M2.5 wire)', () => {
     const started = events.find((event) => event.type === 'started');
     const requestId = started?.requestId ?? 'sb-1';
     worker?.emit({
-      schemaVersion: 6,
+      schemaVersion: 7,
       type: 'season-block-complete',
       requestId,
       result: { status: 'committed', checkpoint: makeCandidate(run) },
@@ -744,7 +744,7 @@ describe('season block runner (M2.5 wire)', () => {
     const requestId = started?.requestId ?? 'sb-1';
     const candidate = makeCandidate(run);
     worker?.emit({
-      schemaVersion: 6,
+      schemaVersion: 7,
       type: 'season-block-complete',
       requestId,
       result: { status: 'committed', checkpoint: candidate },
@@ -778,7 +778,7 @@ describe('season block runner (M2.5 wire)', () => {
       ...makeRun(),
       freeAgency: {
         schemaVersion: 1 as const,
-        freeAgencyVersion: SEASON_FREE_AGENCY_VERSION,
+        freeAgencyVersion: 'season-free-agency-v1' as const,
         windows: [],
         canonicalCandidates: {
           'p-magic': {
@@ -816,7 +816,7 @@ describe('season block runner (M2.5 wire)', () => {
     const candidate = makeCandidate(run, {
       freeAgency: {
         schemaVersion: 1,
-        freeAgencyVersion: SEASON_FREE_AGENCY_VERSION,
+        freeAgencyVersion: 'season-free-agency-v1' as const,
         windows: [],
         canonicalCandidates: {},
         signingCounts: Object.fromEntries(LEAGUE.teams.map((team) => [team.franchiseId, 0])),
@@ -824,7 +824,7 @@ describe('season block runner (M2.5 wire)', () => {
       },
     });
     worker?.emit({
-      schemaVersion: 6,
+      schemaVersion: 7,
       type: 'season-block-complete',
       requestId,
       result: { status: 'committed', checkpoint: candidate },
@@ -874,7 +874,7 @@ describe('season block runner (M2.5 wire)', () => {
     const started = events.find((event) => event.type === 'started');
     const requestId = started?.requestId ?? 'sb-1';
     worker?.emit({
-      schemaVersion: 6,
+      schemaVersion: 7,
       type: 'season-block-complete',
       requestId,
       result: {
@@ -915,7 +915,7 @@ describe('season block runner (M2.5 wire)', () => {
     const requestId = started?.requestId ?? 'sb-1';
     const candidate = makeCandidate(run);
     worker?.emit({
-      schemaVersion: 6,
+      schemaVersion: 7,
       type: 'season-block-complete',
       requestId,
       result: { status: 'committed', checkpoint: candidate },
@@ -953,7 +953,7 @@ describe('season block runner (M2.5 wire)', () => {
     const worker = FakeWorker.instances[0];
     const requestId = events.find((event) => event.type === 'started')?.requestId ?? 'sb-1';
     worker?.emit({
-      schemaVersion: 6,
+      schemaVersion: 7,
       type: 'season-block-complete',
       requestId,
       result: { status: 'committed', checkpoint: makeCandidate(run) },
@@ -1006,7 +1006,7 @@ describe('season block runner (M2.5 wire)', () => {
     const requestId = started?.requestId ?? 'sb-1';
     const candidate = makeCandidate(run, { expectedStateRevision: 5 });
     worker?.emit({
-      schemaVersion: 6,
+      schemaVersion: 7,
       type: 'season-block-complete',
       requestId,
       result: { status: 'committed', checkpoint: candidate },
@@ -1041,7 +1041,7 @@ describe('season block runner (M2.5 wire)', () => {
     const requestId = started?.requestId ?? 'sb-1';
     const pending = makePending(run);
     worker?.emit({
-      schemaVersion: 6,
+      schemaVersion: 7,
       type: 'season-block-complete',
       requestId,
       result: { status: 'interrupted', pending },

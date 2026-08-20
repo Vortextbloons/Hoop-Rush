@@ -4,6 +4,8 @@ import {
   seasonSubmitBlockCommandSchema,
   type EraSimulationProfile,
   type SeasonActiveRunIndex,
+  type SeasonCampaignOpportunity,
+  type SeasonCampaignState,
   type SeasonDraftCatalog,
   type SeasonEffectsState,
   type SeasonFreeAgencyIndex,
@@ -22,8 +24,17 @@ import {
   type SeasonScoreline,
   type SeasonSpendInfluenceCommand,
   type SeasonSubmitBlockCommand,
+  type SeasonTradeBoardTeamProfile,
+  type SeasonTradeNegotiation,
+  type SeasonTradeState,
+  type SeasonTradeValueTrend,
+  type SeasonTradeWindowState,
 } from '@hoop-rush/data-contracts';
-import { handleSeasonRunCommand, type SeasonRunCommandContext } from '@hoop-rush/engine';
+import {
+  generateSeasonCampaignOffers,
+  handleSeasonRunCommand,
+  type SeasonRunCommandContext,
+} from '@hoop-rush/engine';
 import type {
   SeasonBlockResumeInput,
   SeasonBlockRunner,
@@ -578,6 +589,141 @@ export class SeasonHubState {
       expectedStateDigest: this.requiredStateDigest(),
       blockIndex: input.blockIndex,
       objectiveId: input.objectiveId,
+    };
+    await this.dispatch(command);
+  }
+
+  async selectGmIdentity(input: { identity: string; focus: string | null }): Promise<void> {
+    const command: SeasonRunCommand = {
+      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      command: 'select-gm-identity',
+      commandId: newSeasonId('gm'),
+      runId: this.requiredRunId(),
+      expectedStateRevision: this.requiredStateRevision(),
+      expectedStateDigest: this.requiredStateDigest(),
+      identity: input.identity as never,
+      focus: input.focus as never,
+    };
+    await this.dispatch(command);
+  }
+
+  async selectCampaignOpportunity(input: { blockIndex: number; opportunityId: string }): Promise<void> {
+    const command: SeasonRunCommand = {
+      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      command: 'select-campaign-opportunity',
+      commandId: newSeasonId('camp'),
+      runId: this.requiredRunId(),
+      expectedStateRevision: this.requiredStateRevision(),
+      expectedStateDigest: this.requiredStateDigest(),
+      blockIndex: input.blockIndex,
+      opportunityId: input.opportunityId as never,
+    };
+    await this.dispatch(command);
+  }
+
+  async evolveGmCampaign(input: { offerId: string }): Promise<void> {
+    const command: SeasonRunCommand = {
+      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      command: 'evolve-gm-campaign',
+      commandId: newSeasonId('evo'),
+      runId: this.requiredRunId(),
+      expectedStateRevision: this.requiredStateRevision(),
+      expectedStateDigest: this.requiredStateDigest(),
+      offerId: input.offerId as never,
+    };
+    await this.dispatch(command);
+  }
+
+  async openTradeInquiry(input: { windowIndex: number; toFranchiseId: string }): Promise<void> {
+    const command: SeasonRunCommand = {
+      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      command: 'open-trade-inquiry',
+      commandId: newSeasonId('inq'),
+      runId: this.requiredRunId(),
+      expectedStateRevision: this.requiredStateRevision(),
+      expectedStateDigest: this.requiredStateDigest(),
+      windowIndex: input.windowIndex,
+      toFranchiseId: input.toFranchiseId as never,
+    };
+    await this.dispatch(command);
+  }
+
+  async submitTradeProposal(input: {
+    windowIndex: number;
+    toFranchiseId: string;
+    outgoingPlayerVersionIds: string[];
+    incomingPlayerVersionIds: string[];
+    influenceAmount: number;
+    influenceFromSender: string | null;
+  }): Promise<void> {
+    try {
+      await this.ensureCatalog();
+    } catch (error) {
+      this.commandError = {
+        command: 'submit-trade-proposal',
+        rejection: null,
+        message: `The draft catalog is unavailable: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      };
+      this.emit();
+      return;
+    }
+    const command: SeasonRunCommand = {
+      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      command: 'submit-trade-proposal',
+      commandId: newSeasonId('prop'),
+      runId: this.requiredRunId(),
+      expectedStateRevision: this.requiredStateRevision(),
+      expectedStateDigest: this.requiredStateDigest(),
+      windowIndex: input.windowIndex,
+      toFranchiseId: input.toFranchiseId as never,
+      outgoingPlayerVersionIds: input.outgoingPlayerVersionIds as never,
+      incomingPlayerVersionIds: input.incomingPlayerVersionIds as never,
+      influenceAmount: input.influenceAmount,
+      influenceFromSender: input.influenceFromSender as never,
+    };
+    await this.dispatch(command);
+  }
+
+  async respondToTradeCounter(input: { windowIndex: number; inquiryId: string; accept: boolean }): Promise<void> {
+    const command: SeasonRunCommand = {
+      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      command: 'respond-to-trade-counter',
+      commandId: newSeasonId('resp'),
+      runId: this.requiredRunId(),
+      expectedStateRevision: this.requiredStateRevision(),
+      expectedStateDigest: this.requiredStateDigest(),
+      windowIndex: input.windowIndex,
+      inquiryId: input.inquiryId as never,
+      accept: input.accept,
+    };
+    await this.dispatch(command);
+  }
+
+  async walkAwayFromTrade(input: { windowIndex: number; inquiryId: string }): Promise<void> {
+    const command: SeasonRunCommand = {
+      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      command: 'walk-away-from-trade',
+      commandId: newSeasonId('walk'),
+      runId: this.requiredRunId(),
+      expectedStateRevision: this.requiredStateRevision(),
+      expectedStateDigest: this.requiredStateDigest(),
+      windowIndex: input.windowIndex,
+      inquiryId: input.inquiryId as never,
+    };
+    await this.dispatch(command);
+  }
+
+  async purchaseTradeInquiry(input: { windowIndex: number }): Promise<void> {
+    const command: SeasonRunCommand = {
+      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      command: 'purchase-trade-inquiry',
+      commandId: newSeasonId('purch'),
+      runId: this.requiredRunId(),
+      expectedStateRevision: this.requiredStateRevision(),
+      expectedStateDigest: this.requiredStateDigest(),
+      windowIndex: input.windowIndex,
     };
     await this.dispatch(command);
   }
@@ -1271,6 +1417,188 @@ function indexAfterCommit(
   };
 }
 
+export interface CampaignViewModel {
+  startingIdentity: SeasonCampaignState['startingIdentity'];
+  startingFocus: SeasonCampaignState['startingFocus'];
+  offers: SeasonCampaignState['offers'];
+  selections: SeasonCampaignState['selections'];
+  evaluations: SeasonCampaignState['evaluations'];
+  branchState: SeasonCampaignState['branchState'];
+  evolutionOffers: SeasonCampaignState['evolutionOffers'];
+  evolutionSelection: SeasonCampaignState['evolutionSelection'];
+  rewardEntitlements: SeasonCampaignState['rewardEntitlements'];
+  appliedRewardIds: SeasonCampaignState['appliedRewardIds'];
+  currentBlockIndex: number | null;
+  isIdentityRequired: boolean;
+  isEvolutionRequired: boolean;
+  isOpportunityRequired: boolean;
+  nextBlockOpportunityIds: string[];
+}
+
+export function campaignViewModel(
+  run: SeasonRun | null,
+  nextBlockIndex: number | null,
+): CampaignViewModel | null {
+  if (run === null) return null;
+  const campaign = (run.campaign ?? {
+    schemaVersion: 1,
+    campaignVersion: 'season-campaign-v1',
+    startingIdentity: null,
+    startingFocus: null,
+    offers: {},
+    selections: {},
+    evaluations: [],
+    branchState: {},
+    evolutionOffers: null,
+    evolutionSelection: null,
+    rewardEntitlements: {
+      influenceEarned: 0,
+      inquiryCredits: 0,
+      informationBenefits: 0,
+      followUpUnlocks: [],
+    },
+    appliedRewardIds: [],
+  }) as SeasonCampaignState;
+  const isIdentityRequired = campaign.startingIdentity === null;
+  const completedBlocks = Math.ceil(run.cursor.completedRounds / 10);
+  const isEvolutionRequired =
+    completedBlocks === 5 &&
+    campaign.evolutionOffers !== null &&
+    campaign.evolutionSelection === null;
+  const targetBlock = nextBlockIndex ?? completedBlocks;
+  const isOpportunityRequired =
+    !isIdentityRequired &&
+    !isEvolutionRequired &&
+    targetBlock >= 0 &&
+    targetBlock < 8 &&
+    campaign.selections[targetBlock] === undefined;
+  const nextOffers =
+    targetBlock !== null && targetBlock >= 0 && targetBlock < 8
+      ? (campaign.offers[targetBlock] ?? null)
+      : null;
+  return {
+    startingIdentity: campaign.startingIdentity,
+    startingFocus: campaign.startingFocus,
+    offers: campaign.offers,
+    selections: campaign.selections,
+    evaluations: campaign.evaluations,
+    branchState: campaign.branchState,
+    evolutionOffers: campaign.evolutionOffers,
+    evolutionSelection: campaign.evolutionSelection,
+    rewardEntitlements: campaign.rewardEntitlements,
+    appliedRewardIds: campaign.appliedRewardIds,
+    currentBlockIndex: targetBlock,
+    isIdentityRequired,
+    isEvolutionRequired,
+    isOpportunityRequired,
+    nextBlockOpportunityIds: nextOffers?.map((o) => o.opportunityId) ?? [],
+  };
+}
+
+export function generatePreviewCampaignOffers(
+  run: SeasonRun,
+  blockIndex: number,
+  schedule: import('@hoop-rush/data-contracts').SeasonSchedule,
+  humanFranchiseId: string | null,
+): SeasonCampaignOpportunity[] | null {
+  try {
+    return generateSeasonCampaignOffers({
+      rootSeed: run.rootSeed,
+      blockIndex,
+      humanFranchiseId,
+      schedule,
+      standings: run.standings,
+      health: run.health,
+      rotations: run.rotations,
+      rosters: run.rosters,
+      transactions: run.transactions,
+      summaries: [],
+      campaignState: (run.campaign ?? {
+        schemaVersion: 1,
+        campaignVersion: 'season-campaign-v1',
+        startingIdentity: null,
+        startingFocus: null,
+        offers: {},
+        selections: {},
+        evaluations: [],
+        branchState: {},
+        evolutionOffers: null,
+        evolutionSelection: null,
+        rewardEntitlements: {
+          influenceEarned: 0,
+          inquiryCredits: 0,
+          informationBenefits: 0,
+          followUpUnlocks: [],
+        },
+        appliedRewardIds: [],
+      }) as SeasonCampaignState,
+    });
+  } catch {
+    return null;
+  }
+}
+
+export interface TradeBoardViewModel {
+  windows: SeasonTradeWindowState[];
+  openWindow: SeasonTradeWindowState | null;
+  boardProfiles: SeasonTradeBoardTeamProfile[];
+  negotiations: SeasonTradeNegotiation[];
+  valueTrends: SeasonTradeValueTrend[];
+  inquiryAllowance: number;
+  inquiriesUsed: number;
+  inquiriesRemaining: number;
+  purchasedInquiryUsed: boolean;
+  earnedInquiryUsed: boolean;
+  activeInquiryId: string | null;
+  exchangeCounts: Record<string, number>;
+}
+
+export function tradeBoardViewModel(run: SeasonRun | null): TradeBoardViewModel | null {
+  if (run === null || run.trade === null) {
+    return {
+      windows: [],
+      openWindow: null,
+      boardProfiles: [],
+      negotiations: [],
+      valueTrends: [],
+      inquiryAllowance: 3,
+      inquiriesUsed: 0,
+      inquiriesRemaining: 3,
+      purchasedInquiryUsed: false,
+      earnedInquiryUsed: false,
+      activeInquiryId: null,
+      exchangeCounts: {},
+    };
+  }
+  const trade: SeasonTradeState = run.trade;
+  const openWindow = trade.windows.find((w) => w.status === 'open') ?? null;
+  const allowance = openWindow?.inquiryAllowance ?? 3;
+  const used = openWindow?.negotiations?.length ?? 0;
+  const purchasedUsed = openWindow?.purchasedInquiryUsed ?? false;
+  const earnedUsed = openWindow?.earnedInquiryUsed ?? false;
+  const boardProfiles = openWindow?.boardProfiles ?? [];
+  const negotiations = openWindow?.negotiations ?? [];
+  const valueTrends = openWindow?.valueTrends ?? [];
+  const exchangeCounts: Record<string, number> = {};
+  for (const n of negotiations) {
+    exchangeCounts[n.inquiryId] = n.exchangeCount;
+  }
+  return {
+    windows: trade.windows,
+    openWindow,
+    boardProfiles,
+    negotiations,
+    valueTrends,
+    inquiryAllowance: allowance,
+    inquiriesUsed: used,
+    inquiriesRemaining: Math.max(0, allowance - used),
+    purchasedInquiryUsed: purchasedUsed,
+    earnedInquiryUsed: earnedUsed,
+    activeInquiryId: openWindow?.activeInquiryId ?? null,
+    exchangeCounts,
+  };
+}
+
 export function describeCommandRejection(
   command: SeasonRunCommand['command'],
   rejection: SeasonRunCommandRejection,
@@ -1385,6 +1713,42 @@ export function describeCommandRejection(
       return `The market cannot resolve until every human-controlled franchise declares or skips.`;
     case 'free-agency-ownership-conflict':
       return `The signing would create an ownership conflict: ${rejection.reason}.`;
+    case 'campaign-identity-required':
+      return 'Select a GM identity first.';
+    case 'campaign-identity-already-selected':
+      return 'GM identity already selected.';
+    case 'campaign-evolution-required':
+      return 'Complete the midseason evolution choice first.';
+    case 'campaign-opportunity-required':
+      return `Select a campaign opportunity for block ${String(rejection.blockIndex + 1)}.`;
+    case 'campaign-opportunity-not-offered':
+      return 'That campaign opportunity was not offered for this block.';
+    case 'campaign-already-selected':
+      return `Block ${String(rejection.blockIndex + 1)} already has a campaign selection.`;
+    case 'campaign-evolution-already-selected':
+      return 'GM evolution already selected.';
+    case 'campaign-evolution-not-offered':
+      return 'That evolution option was not offered.';
+    case 'trade-inquiry-cap':
+      return `Trade inquiry cap reached (${String(rejection.inquiriesUsed)}/${String(rejection.allowance)}).`;
+    case 'trade-active-negotiation':
+      return 'Finish the active trade negotiation first.';
+    case 'trade-duplicate-proposal':
+      return 'That package is a duplicate of a previous proposal.';
+    case 'trade-protected-player':
+      return `Player ${rejection.playerVersionId} is protected.`;
+    case 'trade-exchange-limit':
+      return 'This inquiry has reached its exchange limit.';
+    case 'trade-cash-cap':
+      return `Trade cash cap reached for this window.`;
+    case 'trade-negotiations-closed':
+      return 'Negotiations are closed for this window.';
+    case 'trade-availability-risk':
+      return `Player ${rejection.playerVersionId} has an availability risk.`;
+    case 'trade-wrong-fit':
+      return `Trade fit issue: ${rejection.reason}`;
+    case 'trade-insufficient-talent':
+      return `Insufficient talent: ${rejection.reason}`;
     default:
       return `The ${command} command was rejected.`;
   }

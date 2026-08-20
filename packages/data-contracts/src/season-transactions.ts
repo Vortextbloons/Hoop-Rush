@@ -4,6 +4,10 @@ import { commandIdSchema, franchiseIdSchema, idSchema } from './ids.ts';
 export const seasonTransactionTypeSchema = z.enum([
   'trade',
   'objective-reward',
+  'campaign-reward',
+  'trade-cash-sent',
+  'trade-cash-received',
+  'trade-inquiry-purchase',
   'block-grant',
   'influence-spend',
   'initial-grant',

@@ -387,17 +387,17 @@
           Injuries this block
         </h2>
         <p class="mt-1 text-sm text-muted-foreground">{injurySummary}</p>
-        {#if recap.objectiveEvidence !== null}
+        {#if recap.objectiveEvidence! !== null}
           <p class="mt-1 text-sm">
             <strong class="text-foreground">Objective:</strong>
-            <span class="ml-1">{recap.objectiveEvidence.objectiveId}</span>
+            <span class="ml-1">{recap.objectiveEvidence!.objectiveId}</span>
             <span
               class="ml-2 rounded-full px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] {recap
-                .objectiveEvidence.success
+                .objectiveEvidence!.success
                 ? 'bg-positive/15 text-positive'
                 : 'bg-destructive/15 text-destructive'}"
             >
-              {recap.objectiveEvidence.success ? 'Success · +1 Influence' : 'Missed'}
+              {recap.objectiveEvidence!.success ? 'Success · +1 Influence' : 'Missed'}
             </span>
           </p>
         {/if}

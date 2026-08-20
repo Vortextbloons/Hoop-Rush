@@ -81,7 +81,7 @@ function runWithCommit(): SeasonRun {
   }
   run.health = {
     schemaVersion: 1,
-    healthVersion: 'season-health-v1',
+    healthVersion: 'season-health-v2',
     injuries: [
       {
         injuryId: 'inj-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',

@@ -16,6 +16,7 @@ import {
   seasonFreeAgencyStateSchema,
   seasonGameSimulationResultSchema,
   seasonGameSummarySchema,
+  seasonCampaignStateSchema,
   seasonHealthStateSchema,
   seasonInfluenceStateSchema,
   seasonInvalidRosterInterruptionSchema,
@@ -84,6 +85,7 @@ export const seasonRunRecordFieldsSchema = z.object({
   trade: seasonTradeStateSchema.nullable(),
 
   objectives: seasonObjectiveStateSchema,
+  campaign: seasonCampaignStateSchema.optional(),
 
   checkpointState: seasonCheckpointStateSchema.nullable(),
 
@@ -122,6 +124,7 @@ export const seasonRunCursorSchema = z.object({
   influence: seasonInfluenceStateSchema,
   trade: seasonTradeStateSchema.nullable(),
   objectives: seasonObjectiveStateSchema,
+  campaign: seasonCampaignStateSchema.optional(),
   checkpointState: seasonCheckpointStateSchema.nullable(),
   stateRevision: z.number().int().nonnegative(),
   stateDigest: seasonCheckpointDigestSchema,
@@ -148,6 +151,9 @@ export const seasonRunCheckpointDeltaSchema = seasonRunRecordFieldsSchema
     stateRevision: true,
     stateDigest: true,
     updatedAtIso: true,
+  })
+  .extend({
+    campaign: seasonCampaignStateSchema.optional(),
   })
   .extend({
     run: z.object({

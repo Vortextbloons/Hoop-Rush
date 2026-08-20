@@ -23,6 +23,9 @@ export type SeasonInjurySource = z.infer<typeof seasonInjurySourceSchema>;
 export const injuryIdSchema = z.string().regex(/^inj-[0-9a-f]{32}$/);
 export type InjuryId = z.infer<typeof injuryIdSchema>;
 
+export const SEASON_REHAB_RECURRENCE_PREMIUM_BASIS_POINTS = 60;
+export const SEASON_REHAB_SUCCESS_BASIS_POINTS = 6000;
+
 export const seasonInjuryRecordSchema = z.object({
   injuryId: injuryIdSchema,
   playerVersionId: playerVersionIdSchema,
@@ -50,6 +53,11 @@ export const seasonInjuryRecordSchema = z.object({
   recurrenceWindowRoundsRemaining: z.number().int().min(0).max(10),
 
   seedPath: z.array(z.string()).min(1),
+
+  rehabAttempted: z.boolean().optional(),
+  rehabOutcome: z.enum(['success', 'failure', 'pending']).nullable().optional(),
+  rehabRecurrencePremiumApplied: z.boolean().optional(),
+  rehabRecurrencePremiumBasisPoints: z.number().int().min(0).max(200).optional(),
 });
 export type SeasonInjuryRecord = z.infer<typeof seasonInjuryRecordSchema>;
 

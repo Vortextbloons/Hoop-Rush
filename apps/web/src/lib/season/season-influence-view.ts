@@ -68,7 +68,7 @@ export function influenceViewModel(
       windowIndex,
       injuryId: null,
       playerVersionId: null,
-      spent,
+      spent: spent ?? false,
       affordable: !spent && balance - 1 >= SEASON_INFLUENCE_FLOOR,
       rehabOutcome: null,
     });

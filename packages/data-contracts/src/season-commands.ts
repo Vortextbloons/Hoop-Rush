@@ -16,6 +16,11 @@ import {
 import { injuryIdSchema } from './season-health.ts';
 import { seasonInfluenceLedgerEntrySchema } from './season-influence.ts';
 import { seasonObjectiveIdSchema } from './season-objective.ts';
+import {
+  seasonCampaignFocusSchema,
+  seasonCampaignGmIdentitySchema,
+  seasonCampaignOpportunityIdSchema,
+} from './season-campaign.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import { seasonTradeOfferIdSchema, seasonTradeOfferSchema } from './season-trade.ts';
 import { postseasonGameIdSchema } from './season-postseason.ts';
@@ -746,6 +751,319 @@ export type SeasonForfeitInterruptedGameRejection = z.infer<
   typeof seasonForfeitInterruptedGameRejectionSchema
 >;
 
+export const seasonCampaignIdentityRequiredRejectionSchema = z.object({
+  code: z.literal('campaign-identity-required'),
+});
+export type SeasonCampaignIdentityRequiredRejection = z.infer<
+  typeof seasonCampaignIdentityRequiredRejectionSchema
+>;
+
+export const seasonCampaignEvolutionRequiredRejectionSchema = z.object({
+  code: z.literal('campaign-evolution-required'),
+  afterBlockIndex: z.number().int().min(4).max(4),
+});
+export type SeasonCampaignEvolutionRequiredRejection = z.infer<
+  typeof seasonCampaignEvolutionRequiredRejectionSchema
+>;
+
+export const seasonCampaignOpportunityRequiredRejectionSchema = z.object({
+  code: z.literal('campaign-opportunity-required'),
+  blockIndex: z.number().int().min(0).max(7),
+});
+export type SeasonCampaignOpportunityRequiredRejection = z.infer<
+  typeof seasonCampaignOpportunityRequiredRejectionSchema
+>;
+
+export const seasonCampaignOpportunityNotOfferedRejectionSchema = z.object({
+  code: z.literal('campaign-opportunity-not-offered'),
+  blockIndex: z.number().int().min(0).max(7),
+  opportunityId: seasonCampaignOpportunityIdSchema,
+  offeredOpportunityIds: z.array(seasonCampaignOpportunityIdSchema).length(2),
+});
+export type SeasonCampaignOpportunityNotOfferedRejection = z.infer<
+  typeof seasonCampaignOpportunityNotOfferedRejectionSchema
+>;
+
+export const seasonCampaignAlreadySelectedRejectionSchema = z.object({
+  code: z.literal('campaign-already-selected'),
+  blockIndex: z.number().int().min(0).max(7),
+});
+export type SeasonCampaignAlreadySelectedRejection = z.infer<
+  typeof seasonCampaignAlreadySelectedRejectionSchema
+>;
+
+export const seasonCampaignIdentityAlreadySelectedRejectionSchema = z.object({
+  code: z.literal('campaign-identity-already-selected'),
+});
+export type SeasonCampaignIdentityAlreadySelectedRejection = z.infer<
+  typeof seasonCampaignIdentityAlreadySelectedRejectionSchema
+>;
+
+export const seasonCampaignEvolutionAlreadySelectedRejectionSchema = z.object({
+  code: z.literal('campaign-evolution-already-selected'),
+});
+export type SeasonCampaignEvolutionAlreadySelectedRejection = z.infer<
+  typeof seasonCampaignEvolutionAlreadySelectedRejectionSchema
+>;
+
+export const seasonCampaignEvolutionNotOfferedRejectionSchema = z.object({
+  code: z.literal('campaign-evolution-not-offered'),
+  offerId: z.string().regex(/^evo-[0-9a-f]{8,32}$/),
+});
+export type SeasonCampaignEvolutionNotOfferedRejection = z.infer<
+  typeof seasonCampaignEvolutionNotOfferedRejectionSchema
+>;
+
+export const seasonTradeInquiryCapRejectionSchema = z.object({
+  code: z.literal('trade-inquiry-cap'),
+  windowIndex: z.number().int().min(0).max(2),
+  inquiriesUsed: z.number().int().min(0).max(5),
+  allowance: z.number().int().min(3).max(5),
+});
+export type SeasonTradeInquiryCapRejection = z.infer<typeof seasonTradeInquiryCapRejectionSchema>;
+
+export const seasonTradeActiveNegotiationRejectionSchema = z.object({
+  code: z.literal('trade-active-negotiation'),
+  windowIndex: z.number().int().min(0).max(2),
+  activeInquiryId: z.string().regex(/^inq-[0-9a-f]{32}$/),
+});
+export type SeasonTradeActiveNegotiationRejection = z.infer<
+  typeof seasonTradeActiveNegotiationRejectionSchema
+>;
+
+export const seasonTradeDuplicateProposalRejectionSchema = z.object({
+  code: z.literal('trade-duplicate-proposal'),
+  fingerprint: z.string().min(1).max(128),
+});
+export type SeasonTradeDuplicateProposalRejection = z.infer<
+  typeof seasonTradeDuplicateProposalRejectionSchema
+>;
+
+export const seasonTradeProtectedPlayerRejectionSchema = z.object({
+  code: z.literal('trade-protected-player'),
+  playerVersionId: playerVersionIdSchema,
+});
+export type SeasonTradeProtectedPlayerRejection = z.infer<
+  typeof seasonTradeProtectedPlayerRejectionSchema
+>;
+
+export const seasonTradeExchangeLimitRejectionSchema = z.object({
+  code: z.literal('trade-exchange-limit'),
+  windowIndex: z.number().int().min(0).max(2),
+  inquiryId: z.string().regex(/^inq-[0-9a-f]{32}$/),
+  exchangeCount: z.number().int().min(0).max(3),
+});
+export type SeasonTradeExchangeLimitRejection = z.infer<
+  typeof seasonTradeExchangeLimitRejectionSchema
+>;
+
+export const seasonTradeCashCapRejectionSchema = z.object({
+  code: z.literal('trade-cash-cap'),
+  franchiseId: franchiseIdSchema,
+  windowIndex: z.number().int().min(0).max(2),
+  sent: z.number().int().min(0).max(2),
+  requested: z.number().int().min(1).max(2),
+});
+export type SeasonTradeCashCapRejection = z.infer<typeof seasonTradeCashCapRejectionSchema>;
+
+export const seasonTradeNegotiationsClosedRejectionSchema = z.object({
+  code: z.literal('trade-negotiations-closed'),
+  windowIndex: z.number().int().min(0).max(2),
+});
+export type SeasonTradeNegotiationsClosedRejection = z.infer<
+  typeof seasonTradeNegotiationsClosedRejectionSchema
+>;
+
+export const seasonTradeAvailabilityRiskRejectionSchema = z.object({
+  code: z.literal('trade-availability-risk'),
+  playerVersionId: playerVersionIdSchema,
+});
+export type SeasonTradeAvailabilityRiskRejection = z.infer<
+  typeof seasonTradeAvailabilityRiskRejectionSchema
+>;
+
+export const seasonTradeWrongFitRejectionSchema = z.object({
+  code: z.literal('trade-wrong-fit'),
+  reason: z.string().min(1).max(512),
+});
+export type SeasonTradeWrongFitRejection = z.infer<typeof seasonTradeWrongFitRejectionSchema>;
+
+export const seasonTradeInsufficientTalentRejectionSchema = z.object({
+  code: z.literal('trade-insufficient-talent'),
+  reason: z.string().min(1).max(512),
+});
+export type SeasonTradeInsufficientTalentRejection = z.infer<
+  typeof seasonTradeInsufficientTalentRejectionSchema
+>;
+
+// New campaign & trade board commands
+
+export const seasonSelectGmIdentityCommandSchema = seasonRunCommandBaseSchema.extend({
+  command: z.literal('select-gm-identity'),
+  identity: seasonCampaignGmIdentitySchema,
+  focus: seasonCampaignFocusSchema.nullable(),
+});
+export type SeasonSelectGmIdentityCommand = z.infer<typeof seasonSelectGmIdentityCommandSchema>;
+
+export const seasonSelectCampaignOpportunityCommandSchema = seasonRunCommandBaseSchema.extend({
+  command: z.literal('select-campaign-opportunity'),
+  blockIndex: z.number().int().min(0).max(7),
+  opportunityId: seasonCampaignOpportunityIdSchema,
+});
+export type SeasonSelectCampaignOpportunityCommand = z.infer<
+  typeof seasonSelectCampaignOpportunityCommandSchema
+>;
+
+export const seasonEvolveGmCampaignCommandSchema = seasonRunCommandBaseSchema.extend({
+  command: z.literal('evolve-gm-campaign'),
+  offerId: z.string().regex(/^evo-[0-9a-f]{8,32}$/),
+});
+export type SeasonEvolveGmCampaignCommand = z.infer<typeof seasonEvolveGmCampaignCommandSchema>;
+
+export const seasonOpenTradeInquiryCommandSchema = seasonRunCommandBaseSchema.extend({
+  command: z.literal('open-trade-inquiry'),
+  windowIndex: z.number().int().min(0).max(2),
+  toFranchiseId: franchiseIdSchema,
+});
+export type SeasonOpenTradeInquiryCommand = z.infer<typeof seasonOpenTradeInquiryCommandSchema>;
+
+export const seasonSubmitTradeProposalCommandSchema = seasonRunCommandBaseSchema.extend({
+  command: z.literal('submit-trade-proposal'),
+  windowIndex: z.number().int().min(0).max(2),
+  toFranchiseId: franchiseIdSchema,
+  outgoingPlayerVersionIds: z.array(playerVersionIdSchema).min(1).max(2),
+  incomingPlayerVersionIds: z.array(playerVersionIdSchema).min(1).max(2),
+  influenceAmount: z.number().int().min(0).max(2),
+  influenceFromSender: franchiseIdSchema.nullable(),
+});
+export type SeasonSubmitTradeProposalCommand = z.infer<
+  typeof seasonSubmitTradeProposalCommandSchema
+>;
+
+export const seasonRespondToTradeCounterCommandSchema = seasonRunCommandBaseSchema.extend({
+  command: z.literal('respond-to-trade-counter'),
+  windowIndex: z.number().int().min(0).max(2),
+  inquiryId: z.string().regex(/^inq-[0-9a-f]{32}$/),
+  accept: z.boolean(),
+});
+export type SeasonRespondToTradeCounterCommand = z.infer<
+  typeof seasonRespondToTradeCounterCommandSchema
+>;
+
+export const seasonWalkAwayFromTradeCommandSchema = seasonRunCommandBaseSchema.extend({
+  command: z.literal('walk-away-from-trade'),
+  windowIndex: z.number().int().min(0).max(2),
+  inquiryId: z.string().regex(/^inq-[0-9a-f]{32}$/),
+});
+export type SeasonWalkAwayFromTradeCommand = z.infer<typeof seasonWalkAwayFromTradeCommandSchema>;
+
+export const seasonPurchaseTradeInquiryCommandSchema = seasonRunCommandBaseSchema.extend({
+  command: z.literal('purchase-trade-inquiry'),
+  windowIndex: z.number().int().min(0).max(2),
+});
+export type SeasonPurchaseTradeInquiryCommand = z.infer<
+  typeof seasonPurchaseTradeInquiryCommandSchema
+>;
+
+export const seasonSelectGmIdentityRejectionSchema = z.discriminatedUnion('code', [
+  seasonRunMismatchRejectionSchema,
+  seasonStaleStateRejectionSchema,
+  seasonDuplicateCommandRejectionSchema,
+  seasonCampaignIdentityAlreadySelectedRejectionSchema,
+]);
+export type SeasonSelectGmIdentityRejection = z.infer<typeof seasonSelectGmIdentityRejectionSchema>;
+
+export const seasonSelectCampaignOpportunityRejectionSchema = z.discriminatedUnion('code', [
+  seasonRunMismatchRejectionSchema,
+  seasonStaleStateRejectionSchema,
+  seasonDuplicateCommandRejectionSchema,
+  seasonCampaignIdentityRequiredRejectionSchema,
+  seasonCampaignEvolutionRequiredRejectionSchema,
+  seasonCampaignOpportunityNotOfferedRejectionSchema,
+  seasonCampaignAlreadySelectedRejectionSchema,
+]);
+export type SeasonSelectCampaignOpportunityRejection = z.infer<
+  typeof seasonSelectCampaignOpportunityRejectionSchema
+>;
+
+export const seasonEvolveGmCampaignRejectionSchema = z.discriminatedUnion('code', [
+  seasonRunMismatchRejectionSchema,
+  seasonStaleStateRejectionSchema,
+  seasonDuplicateCommandRejectionSchema,
+  seasonCampaignIdentityRequiredRejectionSchema,
+  seasonCampaignEvolutionAlreadySelectedRejectionSchema,
+  seasonCampaignEvolutionNotOfferedRejectionSchema,
+]);
+export type SeasonEvolveGmCampaignRejection = z.infer<typeof seasonEvolveGmCampaignRejectionSchema>;
+
+export const seasonOpenTradeInquiryRejectionSchema = z.discriminatedUnion('code', [
+  seasonRunMismatchRejectionSchema,
+  seasonStaleStateRejectionSchema,
+  seasonDuplicateCommandRejectionSchema,
+  seasonWindowNotOpenRejectionSchema,
+  seasonTradeActiveNegotiationRejectionSchema,
+  seasonTradeInquiryCapRejectionSchema,
+]);
+export type SeasonOpenTradeInquiryRejection = z.infer<typeof seasonOpenTradeInquiryRejectionSchema>;
+
+export const seasonSubmitTradeProposalRejectionSchema = z.discriminatedUnion('code', [
+  seasonRunMismatchRejectionSchema,
+  seasonStaleStateRejectionSchema,
+  seasonDuplicateCommandRejectionSchema,
+  seasonWindowNotOpenRejectionSchema,
+  seasonTradeActiveNegotiationRejectionSchema,
+  seasonTradeInquiryCapRejectionSchema,
+  seasonTradeDuplicateProposalRejectionSchema,
+  seasonTradeProtectedPlayerRejectionSchema,
+  seasonRosterIllegalRejectionSchema,
+  seasonOwnershipConflictRejectionSchema,
+  seasonTradeAvailabilityRiskRejectionSchema,
+  seasonTradeInsufficientTalentRejectionSchema,
+  seasonTradeWrongFitRejectionSchema,
+  seasonTradeExchangeLimitRejectionSchema,
+  seasonInsufficientBalanceRejectionSchema,
+  seasonTradeCashCapRejectionSchema,
+  seasonTradeNegotiationsClosedRejectionSchema,
+]);
+export type SeasonSubmitTradeProposalRejection = z.infer<
+  typeof seasonSubmitTradeProposalRejectionSchema
+>;
+
+export const seasonRespondToTradeCounterRejectionSchema = z.discriminatedUnion('code', [
+  seasonRunMismatchRejectionSchema,
+  seasonStaleStateRejectionSchema,
+  seasonDuplicateCommandRejectionSchema,
+  seasonWindowNotOpenRejectionSchema,
+  seasonTradeExchangeLimitRejectionSchema,
+  seasonTradeNegotiationsClosedRejectionSchema,
+]);
+export type SeasonRespondToTradeCounterRejection = z.infer<
+  typeof seasonRespondToTradeCounterRejectionSchema
+>;
+
+export const seasonWalkAwayFromTradeRejectionSchema = z.discriminatedUnion('code', [
+  seasonRunMismatchRejectionSchema,
+  seasonStaleStateRejectionSchema,
+  seasonDuplicateCommandRejectionSchema,
+  seasonWindowNotOpenRejectionSchema,
+]);
+export type SeasonWalkAwayFromTradeRejection = z.infer<
+  typeof seasonWalkAwayFromTradeRejectionSchema
+>;
+
+export const seasonPurchaseTradeInquiryRejectionSchema = z.discriminatedUnion('code', [
+  seasonRunMismatchRejectionSchema,
+  seasonStaleStateRejectionSchema,
+  seasonDuplicateCommandRejectionSchema,
+  seasonWindowNotOpenRejectionSchema,
+  seasonAlreadySpentRejectionSchema,
+  seasonInsufficientBalanceRejectionSchema,
+  seasonTradeInquiryCapRejectionSchema,
+]);
+export type SeasonPurchaseTradeInquiryRejection = z.infer<
+  typeof seasonPurchaseTradeInquiryRejectionSchema
+>;
+
 export const seasonTradeRosterChangeSchema = z.object({
   franchiseId: franchiseIdSchema,
   added: z.array(playerVersionIdSchema).min(1).max(2),
@@ -947,6 +1265,131 @@ export type SeasonFastForwardPostseasonResult = z.infer<
   typeof seasonFastForwardPostseasonResultSchema
 >;
 
+export const seasonSelectGmIdentityResultSchema = z.discriminatedUnion('status', [
+  z.object({
+    status: z.literal('rejected'),
+    commandId: commandIdSchema,
+    rejection: seasonSelectGmIdentityRejectionSchema,
+  }),
+  z.object({
+    status: z.literal('accepted'),
+    commandId: commandIdSchema,
+    identity: seasonCampaignGmIdentitySchema,
+    focus: seasonCampaignFocusSchema.nullable(),
+  }),
+]);
+export type SeasonSelectGmIdentityResult = z.infer<typeof seasonSelectGmIdentityResultSchema>;
+
+export const seasonSelectCampaignOpportunityResultSchema = z.discriminatedUnion('status', [
+  z.object({
+    status: z.literal('rejected'),
+    commandId: commandIdSchema,
+    rejection: seasonSelectCampaignOpportunityRejectionSchema,
+  }),
+  z.object({
+    status: z.literal('accepted'),
+    commandId: commandIdSchema,
+    blockIndex: z.number().int().min(0).max(7),
+    opportunityId: seasonCampaignOpportunityIdSchema,
+  }),
+]);
+export type SeasonSelectCampaignOpportunityResult = z.infer<
+  typeof seasonSelectCampaignOpportunityResultSchema
+>;
+
+export const seasonEvolveGmCampaignResultSchema = z.discriminatedUnion('status', [
+  z.object({
+    status: z.literal('rejected'),
+    commandId: commandIdSchema,
+    rejection: seasonEvolveGmCampaignRejectionSchema,
+  }),
+  z.object({
+    status: z.literal('accepted'),
+    commandId: commandIdSchema,
+    offerId: z.string().regex(/^evo-[0-9a-f]{8,32}$/),
+  }),
+]);
+export type SeasonEvolveGmCampaignResult = z.infer<typeof seasonEvolveGmCampaignResultSchema>;
+
+export const seasonOpenTradeInquiryResultSchema = z.discriminatedUnion('status', [
+  z.object({
+    status: z.literal('rejected'),
+    commandId: commandIdSchema,
+    rejection: seasonOpenTradeInquiryRejectionSchema,
+  }),
+  z.object({
+    status: z.literal('accepted'),
+    commandId: commandIdSchema,
+    windowIndex: z.number().int().min(0).max(2),
+    inquiryId: z.string().regex(/^inq-[0-9a-f]{32}$/),
+  }),
+]);
+export type SeasonOpenTradeInquiryResult = z.infer<typeof seasonOpenTradeInquiryResultSchema>;
+
+export const seasonSubmitTradeProposalResultSchema = z.discriminatedUnion('status', [
+  z.object({
+    status: z.literal('rejected'),
+    commandId: commandIdSchema,
+    rejection: seasonSubmitTradeProposalRejectionSchema,
+  }),
+  z.object({
+    status: z.literal('accepted'),
+    commandId: commandIdSchema,
+    windowIndex: z.number().int().min(0).max(2),
+    inquiryId: z.string().regex(/^inq-[0-9a-f]{32}$/),
+    proposalId: z.string().regex(/^prop-[0-9a-f]{32}$/),
+  }),
+]);
+export type SeasonSubmitTradeProposalResult = z.infer<typeof seasonSubmitTradeProposalResultSchema>;
+
+export const seasonRespondToTradeCounterResultSchema = z.discriminatedUnion('status', [
+  z.object({
+    status: z.literal('rejected'),
+    commandId: commandIdSchema,
+    rejection: seasonRespondToTradeCounterRejectionSchema,
+  }),
+  z.object({
+    status: z.literal('accepted'),
+    commandId: commandIdSchema,
+    windowIndex: z.number().int().min(0).max(2),
+    inquiryId: z.string().regex(/^inq-[0-9a-f]{32}$/),
+  }),
+]);
+export type SeasonRespondToTradeCounterResult = z.infer<
+  typeof seasonRespondToTradeCounterResultSchema
+>;
+
+export const seasonWalkAwayFromTradeResultSchema = z.discriminatedUnion('status', [
+  z.object({
+    status: z.literal('rejected'),
+    commandId: commandIdSchema,
+    rejection: seasonWalkAwayFromTradeRejectionSchema,
+  }),
+  z.object({
+    status: z.literal('accepted'),
+    commandId: commandIdSchema,
+    windowIndex: z.number().int().min(0).max(2),
+    inquiryId: z.string().regex(/^inq-[0-9a-f]{32}$/),
+  }),
+]);
+export type SeasonWalkAwayFromTradeResult = z.infer<typeof seasonWalkAwayFromTradeResultSchema>;
+
+export const seasonPurchaseTradeInquiryResultSchema = z.discriminatedUnion('status', [
+  z.object({
+    status: z.literal('rejected'),
+    commandId: commandIdSchema,
+    rejection: seasonPurchaseTradeInquiryRejectionSchema,
+  }),
+  z.object({
+    status: z.literal('accepted'),
+    commandId: commandIdSchema,
+    windowIndex: z.number().int().min(0).max(2),
+  }),
+]);
+export type SeasonPurchaseTradeInquiryResult = z.infer<
+  typeof seasonPurchaseTradeInquiryResultSchema
+>;
+
 export const seasonRunCommandSchema = z.discriminatedUnion('command', [
   seasonSelectBlockObjectiveCommandSchema,
   seasonSpendInfluenceCommandSchema,
@@ -963,6 +1406,14 @@ export const seasonRunCommandSchema = z.discriminatedUnion('command', [
   seasonDeclareFreeAgentInterestCommandSchema,
   seasonSkipFreeAgentMarketCommandSchema,
   seasonResolveFreeAgentMarketCommandSchema,
+  seasonSelectGmIdentityCommandSchema,
+  seasonSelectCampaignOpportunityCommandSchema,
+  seasonEvolveGmCampaignCommandSchema,
+  seasonOpenTradeInquiryCommandSchema,
+  seasonSubmitTradeProposalCommandSchema,
+  seasonRespondToTradeCounterCommandSchema,
+  seasonWalkAwayFromTradeCommandSchema,
+  seasonPurchaseTradeInquiryCommandSchema,
 ]);
 export type SeasonRunCommand = z.infer<typeof seasonRunCommandSchema>;
 
@@ -1009,5 +1460,23 @@ export const seasonRunCommandRejectionSchema = z.discriminatedUnion('code', [
   seasonFreeAgencyInsufficientBalanceRejectionSchema,
   seasonFreeAgencyPendingDeclarationRejectionSchema,
   seasonFreeAgencyOwnershipConflictRejectionSchema,
+  seasonCampaignIdentityRequiredRejectionSchema,
+  seasonCampaignEvolutionRequiredRejectionSchema,
+  seasonCampaignOpportunityRequiredRejectionSchema,
+  seasonCampaignOpportunityNotOfferedRejectionSchema,
+  seasonCampaignAlreadySelectedRejectionSchema,
+  seasonCampaignIdentityAlreadySelectedRejectionSchema,
+  seasonCampaignEvolutionAlreadySelectedRejectionSchema,
+  seasonCampaignEvolutionNotOfferedRejectionSchema,
+  seasonTradeInquiryCapRejectionSchema,
+  seasonTradeActiveNegotiationRejectionSchema,
+  seasonTradeDuplicateProposalRejectionSchema,
+  seasonTradeProtectedPlayerRejectionSchema,
+  seasonTradeExchangeLimitRejectionSchema,
+  seasonTradeCashCapRejectionSchema,
+  seasonTradeNegotiationsClosedRejectionSchema,
+  seasonTradeAvailabilityRiskRejectionSchema,
+  seasonTradeWrongFitRejectionSchema,
+  seasonTradeInsufficientTalentRejectionSchema,
 ]);
 export type SeasonRunCommandRejection = z.infer<typeof seasonRunCommandRejectionSchema>;

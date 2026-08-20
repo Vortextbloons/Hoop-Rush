@@ -99,7 +99,7 @@ function postError(
   diagnostics: { seed?: string | null; gameId?: string | null; blockIndex?: number | null } = {},
 ): void {
   const payload: SeasonWorkerErrorMessage = {
-    schemaVersion: 6,
+    schemaVersion: 7,
     type: 'season-block-error',
     requestId,
     code,
@@ -251,7 +251,8 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
       expectedRevision: request.expectedRevision,
       blockIndex: request.blockIndex,
       rotationDigest: request.rotationDigest,
-      objectiveId: request.objectiveId,
+      objectiveId: request.objectiveId ?? null,
+      campaignOpportunityId: (request as unknown as { campaignOpportunityId?: string | null }).campaignOpportunityId ?? null,
       expectedStateRevision,
       expectedStateDigest,
     },
@@ -267,7 +268,10 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     health: accumulatedHealth,
     influence: request.priorInfluence ?? initialInfluence(run),
     transactions: request.priorTransactions ?? [],
-    objectiveId: request.objectiveId,
+    objectiveId: request.objectiveId ?? null,
+    campaignOpportunityId: (request as unknown as { campaignOpportunityId?: string | null }).campaignOpportunityId ?? null,
+    objectives: (run as unknown as { objectives?: import('@hoop-rush/data-contracts').SeasonObjectiveState }).objectives,
+    campaignState: (run as unknown as { campaign?: import('@hoop-rush/data-contracts').SeasonCampaignState }).campaign,
   };
 
   const rejection = seasonBlockRejection(input);
@@ -356,7 +360,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     if (isLast || now - lastProgressAt >= PROGRESS_MIN_INTERVAL_MS) {
       lastProgressAt = now;
       post({
-        schemaVersion: 6,
+        schemaVersion: 7,
         type: 'season-block-progress',
         requestId: request.requestId,
         blockIndex: request.blockIndex,
@@ -383,7 +387,8 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
       expectedRevision: request.expectedRevision,
       expectedStateRevision,
       expectedStateDigest,
-      objectiveId: request.objectiveId,
+      objectiveId: request.objectiveId ?? null,
+      campaignOpportunityId: (request as unknown as { campaignOpportunityId?: string | null }).campaignOpportunityId ?? null,
       nextGameId: interruption.nextGameId,
       summaries,
       retainedDetails,
@@ -392,7 +397,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
       rotationDigest: request.rotationDigest,
     });
     post({
-      schemaVersion: 6,
+      schemaVersion: 7,
       type: 'season-block-complete',
       requestId: request.requestId,
       result: { status: 'interrupted', pending },
@@ -421,7 +426,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     ...summaries,
   ];
   post({
-    schemaVersion: 6,
+    schemaVersion: 7,
     type: 'season-block-complete',
     requestId: request.requestId,
     result: { status: 'committed', checkpoint: candidate },
@@ -468,7 +473,7 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
           loadProfileCached(request.profileUrl, request.profileHash),
         ]);
         post({
-          schemaVersion: 6,
+          schemaVersion: 7,
           type: 'season-block-warm-ack',
           requestId: request.requestId,
         });

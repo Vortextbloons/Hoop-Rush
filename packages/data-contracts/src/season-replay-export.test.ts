@@ -29,7 +29,7 @@ function commandLogEntry(ordinal: number): SeasonCommandLogEntry {
     runId: 'fixture-run-1',
     ordinal,
     command: {
-      schemaVersion: 10,
+      schemaVersion: 11,
       command: 'start-postseason',
       commandId: `cmd-ps-${String(ordinal)}`,
       runId: 'fixture-run-1',

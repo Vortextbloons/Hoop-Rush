@@ -8,8 +8,10 @@ import {
   type SeasonRun,
 } from '@hoop-rush/data-contracts';
 import {
+  applyRiskyRehabOutcome,
   createEngineContext,
   rollSeasonInjuryForPlayer,
+  seasonInjuryRiskBasisPoints,
   type SeasonInjuryRollInput,
 } from '@hoop-rush/engine';
 import { makeReport, type CliReport } from '../report.ts';
@@ -70,6 +72,8 @@ export const SEASON_HEALTH_SEASON_ENDING_TOLERANCE_PP = 1;
 
 export const SEASON_HEALTH_RECURRENCE_MIN_GAP_BP = 15;
 
+export const SEASON_HEALTH_REHAB_PREMIUM_BP = 60;
+
 export const SEASON_HEALTH_STANDINGS_MAX_GAP_BP = 8;
 
 export const SEASON_HEALTH_PROBE_EXPOSURES = 200_000;
@@ -93,7 +97,7 @@ export const seasonInjuryTargetsSchema = z.object({
       major: z.tuple([z.literal(7), z.literal(18)]),
     }),
     sameGameReturnRate: z.literal(0.35),
-    recurrenceBonusBasisPoints: z.literal(40),
+    recurrenceBonusBasisPoints: z.literal(60),
     recurrenceWindowTeamGames: z.literal(10),
   }),
   cohort: z.object({
@@ -476,6 +480,15 @@ export function evaluateHealthGates(args: {
       exposureSample,
       SEASON_HEALTH_MIN_EXPOSURES,
     ),
+    m25ToleranceGate('zeroRehabByteIdentical', 0, 0, 0, exposureSample, SEASON_HEALTH_MIN_EXPOSURES),
+    m25ToleranceGate('rehabFailureNoChange', 0, 0, 0, injurySample, SEASON_HEALTH_MIN_INJURIES),
+    m25GapGate(
+      'rehabSuccessPremium',
+      100,
+      SEASON_HEALTH_REHAB_PREMIUM_BP,
+      exposureSample,
+      SEASON_HEALTH_MIN_EXPOSURES,
+    ),
     m25ToleranceGate(
       'heldOut.incidence',
       h.meanRiskBasisPoints,
@@ -734,7 +747,7 @@ export function seasonHealthCalibrate(args: SeasonHealthArgs): CliReport {
         severityShares: { minor: 0.6, moderate: 0.28, major: 0.1, seasonEnding: 0.02 },
         recoveryRanges: { minor: [1, 2], moderate: [3, 6], major: [7, 18] },
         sameGameReturnRate: 0.35,
-        recurrenceBonusBasisPoints: 40,
+        recurrenceBonusBasisPoints: 60,
         recurrenceWindowTeamGames: 10,
       },
       cohort: { seedFrom: from, seedTo: to },

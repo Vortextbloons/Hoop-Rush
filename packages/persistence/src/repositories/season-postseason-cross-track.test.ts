@@ -353,6 +353,7 @@ async function makeFlow(): Promise<FlowContext> {
     transactions: [],
     trade: run.trade,
     objectives: run.objectives,
+    campaign: run.campaign ?? null,
     rosters: run.rosters,
     ownership: run.ownership,
     rotations: run.rotations,

@@ -45,6 +45,7 @@ export type SeasonTradeOfferChemistryDisruption = z.infer<
   typeof seasonTradeOfferChemistryDisruptionSchema
 >;
 
+// Legacy authored offer — preserved for fixture diagnostics, superseded by Trade Board proposal
 export const seasonTradeOfferSchema = z
   .object({
     offerId: seasonTradeOfferIdSchema,
@@ -59,7 +60,6 @@ export const seasonTradeOfferSchema = z
     valueBand: seasonTradeOfferValueBandSchema,
     roleFit: seasonTradeOfferRoleFitSchema,
     rosterNeedFacts: seasonTradeOfferRosterNeedFactsSchema,
-
     projectedRotationChanges: z.string().max(512),
     projectedChemistryDisruption: seasonTradeOfferChemistryDisruptionSchema,
     status: seasonTradeOfferStatusSchema,
@@ -80,22 +80,231 @@ export const seasonTradeOfferSchema = z
   });
 export type SeasonTradeOffer = z.infer<typeof seasonTradeOfferSchema>;
 
+// --- Trade Board v3 contracts ---
+
+export const seasonTradeNeedSchema = z.enum([
+  'ball-handling',
+  'shooting',
+  'perimeter-defense',
+  'interior-defense',
+  'rebounding',
+  'availability',
+  'rotation-talent',
+  'depth',
+]);
+export type SeasonTradeNeed = z.infer<typeof seasonTradeNeedSchema>;
+
+export const seasonTradePrioritySchema = z.enum([
+  'talent',
+  'fit',
+  'availability',
+  'depth',
+  'influence',
+]);
+export type SeasonTradePriority = z.infer<typeof seasonTradePrioritySchema>;
+
+export const seasonTradeCompetitorInterestSchema = z.enum([
+  'low',
+  'possible',
+  'strong',
+  'preferred-fit',
+]);
+export type SeasonTradeCompetitorInterest = z.infer<typeof seasonTradeCompetitorInterestSchema>;
+
+export const seasonTradeBoardTeamProfileSchema = z.object({
+  franchiseId: franchiseIdSchema,
+  needs: z.array(seasonTradeNeedSchema).min(1).max(2),
+  priority: seasonTradePrioritySchema,
+  listedPlayerIds: z.array(playerVersionIdSchema),
+  discussablePlayerIds: z.array(playerVersionIdSchema),
+  protectedPlayerIds: z.array(playerVersionIdSchema),
+  hardConstraints: z.array(z.string().min(1).max(512)),
+  rationale: z.string().min(1).max(1024),
+  competitorInterest: z
+    .record(playerVersionIdSchema, seasonTradeCompetitorInterestSchema)
+    .optional(),
+});
+export type SeasonTradeBoardTeamProfile = z.infer<typeof seasonTradeBoardTeamProfileSchema>;
+
+export const seasonTradeResponseCauseSchema = z.enum([
+  'acceptable',
+  'close-needs-more-value',
+  'wrong-roster-fit',
+  'unacceptable-injury-risk',
+  'protected-player',
+  'illegal-roster',
+  'negotiations-closed',
+]);
+export type SeasonTradeResponseCause = z.infer<typeof seasonTradeResponseCauseSchema>;
+
+export const seasonTradeValueTrendSchema = z.object({
+  playerVersionId: playerVersionIdSchema,
+  trend: z.enum(['rising', 'stable', 'falling']),
+  basis: z.string().min(1).max(1024),
+});
+export type SeasonTradeValueTrend = z.infer<typeof seasonTradeValueTrendSchema>;
+
+export const seasonTradeProposalSchema = z
+  .object({
+    proposalId: z.string().regex(/^prop-[0-9a-f]{32}$/),
+    windowIndex: z.number().int().min(0).max(2),
+    fromFranchiseId: franchiseIdSchema,
+    toFranchiseId: franchiseIdSchema,
+    outgoingPlayerVersionIds: z.array(playerVersionIdSchema).min(1).max(2),
+    incomingPlayerVersionIds: z.array(playerVersionIdSchema).min(1).max(2),
+    influenceFromSender: franchiseIdSchema.nullable(),
+    influenceAmount: z.number().int().min(0).max(2),
+    fingerprint: z.string().min(1).max(128),
+    consequenceFacts: z.record(z.string(), z.unknown()),
+    seedPath: z.array(z.string()).min(1),
+    expectedStateRevision: z.number().int().nonnegative(),
+    expectedStateDigest: z.string().regex(/^[0-9a-f]{32}$/),
+  })
+  .superRefine((p, ctx) => {
+    const all = [...p.outgoingPlayerVersionIds, ...p.incomingPlayerVersionIds];
+    if (new Set(all).size !== all.length) {
+      ctx.addIssue({ code: 'custom', message: 'proposal player ids must be distinct' });
+    }
+    if (p.fingerprint.length === 0) {
+      ctx.addIssue({ code: 'custom', message: 'fingerprint required' });
+    }
+    // No Influence-only package
+    if (p.outgoingPlayerVersionIds.length === 0 && p.incomingPlayerVersionIds.length === 0) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'proposal must include at least one player per side',
+      });
+    }
+    if (p.influenceAmount > 0 && p.influenceFromSender === null) {
+      ctx.addIssue({ code: 'custom', message: 'influenceAmount requires a sender' });
+    }
+    if (p.influenceAmount === 0 && p.influenceFromSender !== null) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'influenceFromSender must be null when amount is 0',
+      });
+    }
+    if (
+      p.influenceFromSender !== null &&
+      p.influenceFromSender !== p.fromFranchiseId &&
+      p.influenceFromSender !== p.toFranchiseId
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'influence sender must be one of the two franchises',
+      });
+    }
+    // Exactly one side may send when amount >0 — sender is that side, amount 1-2
+    if (p.influenceAmount > 0 && (p.influenceAmount < 1 || p.influenceAmount > 2)) {
+      ctx.addIssue({ code: 'custom', message: 'influenceAmount must be 1-2' });
+    }
+  });
+export type SeasonTradeProposal = z.infer<typeof seasonTradeProposalSchema>;
+
+export const seasonTradeNegotiationStatusSchema = z.enum([
+  'draft',
+  'active',
+  'countered',
+  'accepted',
+  'declined',
+  'walked-away',
+  'expired',
+]);
+export type SeasonTradeNegotiationStatus = z.infer<typeof seasonTradeNegotiationStatusSchema>;
+
+export const seasonTradeExchangeSchema = z.object({
+  exchangeIndex: z.number().int().min(1).max(3),
+  kind: z.enum(['human-proposal', 'ai-counter', 'human-revision', 'ai-final']),
+  proposalId: z
+    .string()
+    .regex(/^prop-[0-9a-f]{32}$/)
+    .nullable(),
+  proposalFingerprint: z.string().min(1).max(128).nullable(),
+  responseCause: seasonTradeResponseCauseSchema.nullable(),
+  atStateRevision: z.number().int().nonnegative(),
+});
+export type SeasonTradeExchange = z.infer<typeof seasonTradeExchangeSchema>;
+
+export const seasonTradeNegotiationSchema = z
+  .object({
+    inquiryId: z.string().regex(/^inq-[0-9a-f]{32}$/),
+    windowIndex: z.number().int().min(0).max(2),
+    fromFranchiseId: franchiseIdSchema,
+    toFranchiseId: franchiseIdSchema,
+    status: seasonTradeNegotiationStatusSchema,
+    exchangeCount: z.number().int().min(0).max(3),
+    exchanges: z.array(seasonTradeExchangeSchema).max(3),
+    rejectedPlayerVersionIds: z.array(playerVersionIdSchema),
+    expressedInterests: z.array(z.string().min(1).max(512)),
+    latestRequestedChange: z.string().min(1).max(512).nullable(),
+    finalReason: seasonTradeResponseCauseSchema.nullable(),
+    activeProposalId: z
+      .string()
+      .regex(/^prop-[0-9a-f]{32}$/)
+      .nullable(),
+  })
+  .superRefine((n, ctx) => {
+    if (n.exchangeCount !== n.exchanges.length) {
+      ctx.addIssue({ code: 'custom', message: 'exchangeCount must match exchanges length' });
+    }
+    if (n.exchangeCount > 3) {
+      ctx.addIssue({ code: 'custom', message: 'at most three exchanges' });
+    }
+    const terminal = new Set(['accepted', 'declined', 'walked-away', 'expired']);
+    if (terminal.has(n.status) && n.activeProposalId !== null) {
+      // Terminal should not have active proposal; allow null only
+    }
+  });
+export type SeasonTradeNegotiation = z.infer<typeof seasonTradeNegotiationSchema>;
+
 export const seasonTradeWindowStatusSchema = z.enum(['open', 'closed']);
 export type SeasonTradeWindowStatus = z.infer<typeof seasonTradeWindowStatusSchema>;
 
 export const seasonTradeWindowStateSchema = z.object({
   windowIndex: z.number().int().min(0).max(2),
-
   blockIndex: z.number().int().min(2).max(5),
   status: seasonTradeWindowStatusSchema,
-
   offers: z.array(seasonTradeOfferSchema),
+  // v3 board extensions — optional for backward compat with existing fixtures
+  boardProfiles: z.array(seasonTradeBoardTeamProfileSchema).max(8).optional(),
+  canonicalTeamOrder: z.array(franchiseIdSchema).max(29).optional(),
+  inquiryAllowance: z.number().int().min(3).max(5).optional(),
+  purchasedInquiryUsed: z.boolean().optional(),
+  earnedInquiryUsed: z.boolean().optional(),
+  activeInquiryId: z
+    .string()
+    .regex(/^inq-[0-9a-f]{32}$/)
+    .nullable()
+    .optional(),
+  negotiations: z.array(seasonTradeNegotiationSchema).max(15).optional(),
+  valueTrends: z.array(seasonTradeValueTrendSchema).max(450).optional(),
+  aiTransactionResolved: z.boolean().optional(),
 });
 export type SeasonTradeWindowState = z.infer<typeof seasonTradeWindowStateSchema>;
 
-export const seasonTradeStateSchema = z.object({
-  schemaVersion: z.literal(1),
-  tradeVersion: z.literal(SEASON_TRADE_VERSION),
-  windows: z.array(seasonTradeWindowStateSchema).max(3),
-});
+export const seasonTradeStateSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    tradeVersion: z.literal(SEASON_TRADE_VERSION),
+    windows: z.array(seasonTradeWindowStateSchema).max(3),
+  })
+  .superRefine((state, ctx) => {
+    const activeCount = state.windows.filter((w) => w.activeInquiryId).length;
+    if (activeCount > 3) {
+      ctx.addIssue({ code: 'custom', message: 'at most one active inquiry per window' });
+    }
+    for (const w of state.windows) {
+      if (w.inquiryAllowance !== undefined && (w.inquiryAllowance < 3 || w.inquiryAllowance > 5)) {
+        ctx.addIssue({ code: 'custom', message: 'inquiryAllowance must be 3-5' });
+      }
+      if (w.negotiations) {
+        const active = w.negotiations.filter(
+          (n) => n.status === 'active' || n.status === 'countered',
+        );
+        if (active.length > 1) {
+          ctx.addIssue({ code: 'custom', message: 'at most one active negotiation per window' });
+        }
+      }
+    }
+  });
 export type SeasonTradeState = z.infer<typeof seasonTradeStateSchema>;

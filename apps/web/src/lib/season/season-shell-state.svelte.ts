@@ -144,6 +144,45 @@ export class SeasonRunShell implements SeasonRunShellData {
   };
   forfeitInterruptedGame = (): Promise<void> => Promise.resolve();
   resumeBlock = (): Promise<void> => Promise.resolve();
+  selectGmIdentity = (input: { identity: string; focus: string | null }): Promise<void> => {
+    void input;
+    return Promise.resolve();
+  };
+  selectCampaignOpportunity = (input: { blockIndex: number; opportunityId: string }): Promise<void> => {
+    void input;
+    return Promise.resolve();
+  };
+  evolveGmCampaign = (input: { offerId: string }): Promise<void> => {
+    void input;
+    return Promise.resolve();
+  };
+  openTradeInquiry = (input: { windowIndex: number; toFranchiseId: string }): Promise<void> => {
+    void input;
+    return Promise.resolve();
+  };
+  submitTradeProposal = (input: {
+    windowIndex: number;
+    toFranchiseId: string;
+    outgoingPlayerVersionIds: string[];
+    incomingPlayerVersionIds: string[];
+    influenceAmount: number;
+    influenceFromSender: string | null;
+  }): Promise<void> => {
+    void input;
+    return Promise.resolve();
+  };
+  respondToTradeCounter = (input: { windowIndex: number; inquiryId: string; accept: boolean }): Promise<void> => {
+    void input;
+    return Promise.resolve();
+  };
+  walkAwayFromTrade = (input: { windowIndex: number; inquiryId: string }): Promise<void> => {
+    void input;
+    return Promise.resolve();
+  };
+  purchaseTradeInquiry = (input: { windowIndex: number }): Promise<void> => {
+    void input;
+    return Promise.resolve();
+  };
   startPostseason = (): Promise<void> => Promise.resolve();
   advancePostseason = (input?: { targetGameId?: string }): Promise<void> => {
     void input;

@@ -5,6 +5,7 @@
   import { resolve } from '$app/paths';
   import type { RouteId } from '$app/types';
   import {
+    ArrowLeftRight,
     BarChart3,
     CalendarDays,
     ClipboardList,
@@ -75,10 +76,20 @@
     icon: Gavel,
   };
 
+  const tradeBoardNavItem: NavItem = {
+    id: 'trades',
+    label: 'Trades',
+    href: '/season/run/trades',
+    icon: ArrowLeftRight,
+  };
+
   const navItems = $derived.by(() => {
     const stage = shell.run?.stage ?? null;
+    const isRegularSeason = stage === 'regular-season' || stage === null;
     const freeAgencyVisible = (shell.run?.freeAgency.windows.length ?? 0) > 0;
-    const base = freeAgencyVisible ? [...seasonNavItems, freeAgencyNavItem] : seasonNavItems;
+    let base = [...seasonNavItems];
+    if (isRegularSeason) base = [...base, tradeBoardNavItem];
+    if (freeAgencyVisible) base = [...base, freeAgencyNavItem];
     return stage === 'play-in' || stage === 'playoffs' || stage === 'completed'
       ? [
           ...base,
@@ -473,6 +484,40 @@
   };
   shell.resumeBlock = async () => {
     await shell.hub?.resumeBlock();
+    mirrorHub();
+  };
+
+  // M2.5.5 campaign & trade board
+  shell.selectGmIdentity = async (input) => {
+    await shell.hub?.selectGmIdentity(input);
+    mirrorHub();
+  };
+  shell.selectCampaignOpportunity = async (input) => {
+    await shell.hub?.selectCampaignOpportunity(input);
+    mirrorHub();
+  };
+  shell.evolveGmCampaign = async (input) => {
+    await shell.hub?.evolveGmCampaign(input);
+    mirrorHub();
+  };
+  shell.openTradeInquiry = async (input) => {
+    await shell.hub?.openTradeInquiry(input);
+    mirrorHub();
+  };
+  shell.submitTradeProposal = async (input) => {
+    await shell.hub?.submitTradeProposal(input);
+    mirrorHub();
+  };
+  shell.respondToTradeCounter = async (input) => {
+    await shell.hub?.respondToTradeCounter(input);
+    mirrorHub();
+  };
+  shell.walkAwayFromTrade = async (input) => {
+    await shell.hub?.walkAwayFromTrade(input);
+    mirrorHub();
+  };
+  shell.purchaseTradeInquiry = async (input) => {
+    await shell.hub?.purchaseTradeInquiry(input);
     mirrorHub();
   };
 

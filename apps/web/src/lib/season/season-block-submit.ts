@@ -23,6 +23,7 @@ export type SubmitBlockFailureCode =
   | 'rotation-invalid'
   | 'asset-unavailable'
   | 'objective-not-selected'
+  | 'campaign-not-selected'
   | 'free-agency-unresolved';
 
 export interface SubmitBlockFailure {
@@ -73,7 +74,41 @@ export async function buildSubmitBlockEnvelope(
 
   const objectiveId: SeasonObjectiveId | null =
     nextBlockIndex >= 8 ? null : selectedObjectiveIdOf(run, nextBlockIndex);
-  if (objectiveId === null && nextBlockIndex < 8) {
+  // Campaign takes precedence when present (M2.5.5) — typed rejections, never UI-only fallback
+  const campaignState = (run as unknown as { campaign?: import('@hoop-rush/data-contracts').SeasonCampaignState }).campaign as
+    | import('@hoop-rush/data-contracts').SeasonCampaignState
+    | undefined;
+  const campaignOpportunityId: string | null =
+    nextBlockIndex >= 8
+      ? null
+      : campaignState?.selections[nextBlockIndex]?.opportunityId ?? null;
+  const hasCampaign = campaignState !== undefined;
+  if (hasCampaign) {
+    // Mandatory identity after draft
+    if (campaignState.startingIdentity === null) {
+      return fail(
+        'campaign-not-selected',
+        'Select a GM identity first — the campaign identity locks before the first block.',
+      );
+    }
+    // Mandatory evolution after block 4 before block 5
+    if (
+      nextBlockIndex === 5 &&
+      campaignState.evolutionOffers !== null &&
+      campaignState.evolutionSelection === null
+    ) {
+      return fail(
+        'campaign-not-selected',
+        'Complete the midseason evolution choice first — it locks before block 6.',
+      );
+    }
+    if (campaignOpportunityId === null && nextBlockIndex < 8) {
+      return fail(
+        'campaign-not-selected',
+        'Pick a campaign opportunity first — the selected opportunity locks into this block.',
+      );
+    }
+  } else if (objectiveId === null && nextBlockIndex < 8) {
     return fail(
       'objective-not-selected',
       'Pick a block objective first — the selected objective locks into this block.',
@@ -146,6 +181,7 @@ export async function buildSubmitBlockEnvelope(
     blockIndex,
     rotationDigest,
     objectiveId,
+    campaignOpportunityId: campaignOpportunityId as unknown as never,
     expectedStateRevision: run.stateRevision,
     expectedStateDigest: run.stateDigest,
   };
@@ -160,6 +196,7 @@ export async function buildSubmitBlockEnvelope(
     commandId,
     humanFranchiseId,
     objectiveId,
+    campaignOpportunityId: campaignOpportunityId as unknown as never,
     homeCourt,
     catalogUrl: artifactUrls.catalogUrl,
     catalogHash: artifactUrls.catalogHash,

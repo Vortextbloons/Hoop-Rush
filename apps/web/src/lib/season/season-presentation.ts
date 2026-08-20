@@ -1,10 +1,20 @@
 import {
+  SEASON_INFLUENCE_CAP,
+  SEASON_INFLUENCE_FLOOR,
   SEASON_RECAP_VERSION,
+  SEASON_ROSTER_MAX_SIZE,
+  SEASON_ROSTER_MIN_SIZE,
+  SEASON_ROTATION_SIZE,
   SEASON_ROUND_COUNT,
   blockRoundRange,
   type HoopRushManifest,
   type SeasonBlockInjuryEvidence,
   type SeasonBlockRecap,
+  type SeasonCampaignCondition,
+  type SeasonCampaignEvaluation,
+  type SeasonCampaignOpportunity,
+  type SeasonCampaignReward,
+  type SeasonCampaignState,
   type SeasonFreeAgencyState,
   type SeasonGame,
   type SeasonGameSummary,
@@ -20,6 +30,9 @@ import {
   type SeasonStreak,
   type SeasonTeamAggregate,
   type SeasonTeamBox,
+  type SeasonTradeBoardTeamProfile,
+  type SeasonTradeNegotiation,
+  type SeasonTradeValueTrend,
   type SeasonUpcomingHumanGame,
   type SeasonVersionSpotlight,
 } from '@hoop-rush/data-contracts';
@@ -914,4 +927,389 @@ export function humanUpcomingGamesFromGames(
   blockIndex: number,
 ): SeasonUpcomingHumanGame[] {
   return humanUpcomingGames(games, humanFranchiseId, blockIndex);
+}
+
+// --- M2.5.5 Campaign presentation helpers ---
+
+export const CAMPAIGN_IDENTITY_LABELS: Record<string, string> = {
+  'win-now': 'Win now',
+  'player-development': 'Player development',
+  'team-identity': 'Team identity',
+};
+
+export const CAMPAIGN_FOCUS_LABELS: Record<string, string> = {
+  defense: 'Defense',
+  shooting: 'Shooting',
+  'ball-movement': 'Ball movement',
+  depth: 'Depth',
+};
+
+export const CAMPAIGN_FAMILY_LABELS: Record<string, string> = {
+  results: 'Results',
+  marquee: 'Marquee',
+  style: 'Style',
+  'player-role': 'Player role',
+  'roster-response': 'Roster response',
+};
+
+export const CAMPAIGN_OUTCOME_LABELS: Record<SeasonCampaignEvaluation['outcome'], string> = {
+  missed: 'Missed',
+  completed: 'Completed',
+  breakthrough: 'Breakthrough',
+};
+
+export const CAMPAIGN_REWARD_LABELS: Record<SeasonCampaignReward['type'], string> = {
+  influence: 'Influence',
+  'trade-board-information': 'Trade board information',
+  'trade-inquiry-credit': 'Trade inquiry credit',
+  'follow-up-unlock': 'Follow-up unlock',
+};
+
+export function formatCampaignCondition(condition: SeasonCampaignCondition): string {
+  const op =
+    condition.comparisonOperator === 'gte'
+      ? '≥'
+      : condition.comparisonOperator === 'lte'
+        ? '≤'
+        : condition.comparisonOperator === 'gt'
+          ? '>'
+          : condition.comparisonOperator === 'lt'
+            ? '<'
+            : '=';
+  switch (condition.kind) {
+    case 'block-wins':
+      return `Win ${op}${String(condition.threshold)} of this block`;
+    case 'winning-block':
+      return `Post a winning block (${op}${String(condition.threshold)})`;
+    case 'top-six':
+      return `Finish top six in conference`;
+    case 'play-in':
+      return `Reach Play-In position`;
+    case 'win-over-higher':
+      return `Beat a higher-ranked team ${op}${String(condition.threshold)}`;
+    case 'beat-conference-leader':
+      return `Beat the conference leader`;
+    case 'sweep-opponent':
+      return `Sweep ${condition.opponentFranchiseId ?? 'opponent'} ${op}${String(condition.threshold)}`;
+    case 'defensive-efficiency':
+      return `Allow ${op}${String(condition.threshold)} pts / game (defensive efficiency)`;
+    case 'three-point-volume':
+      return `Make ${op}${String(condition.threshold)} threes this block`;
+    case 'assists':
+      return `Record ${op}${String(condition.threshold)} assists this block`;
+    case 'turnover-control':
+      return `Commit ${op}${String(condition.threshold)} turnovers`;
+    case 'rebound-margin':
+      return `Rebound margin ${op}${String(condition.threshold)}`;
+    case 'bench-contribution':
+      return `Bench scores ${op}${String(condition.threshold)} pts`;
+    case 'player-minutes':
+      return `${condition.playerVersionId.slice(0, 8)}… logs ${op}${String(condition.threshold)} minutes`;
+    case 'player-starts':
+      return `${condition.playerVersionId.slice(0, 8)}… starts ${op}${String(condition.threshold)} games`;
+    case 'player-availability':
+      return `${condition.playerVersionId.slice(0, 8)}… available ${op}${String(condition.threshold)} games`;
+    case 'player-points':
+      return `${condition.playerVersionId.slice(0, 8)}… scores ${op}${String(condition.threshold)} pts`;
+    case 'player-assists':
+      return `${condition.playerVersionId.slice(0, 8)}… ${op}${String(condition.threshold)} assists`;
+    case 'player-rebounds':
+      return `${condition.playerVersionId.slice(0, 8)}… ${op}${String(condition.threshold)} rebounds`;
+    case 'roster-new-player-minutes':
+      return `New arrival plays ${op}${String(condition.threshold)} minutes`;
+    case 'roster-new-player-starts':
+      return `New arrival starts ${op}${String(condition.threshold)} games`;
+    case 'roster-replace-unavailable':
+      return `Replace unavailable rotation member`;
+    case 'roster-depth-coverage':
+      return `Cover depth weakness ${op}${String(condition.threshold)}`;
+    default: {
+      const anyCond = condition as unknown as { kind: string; threshold: number };
+      return `${anyCond.kind} ${op}${String(anyCond.threshold)}`;
+    }
+  }
+}
+
+export function formatCampaignReward(reward: SeasonCampaignReward): string {
+  const label = CAMPAIGN_REWARD_LABELS[reward.type] ?? reward.type;
+  return `+${String(reward.amount)} ${label} · ${reward.rewardId}`;
+}
+
+export function campaignRewardSummary(
+  evaluations: readonly SeasonCampaignEvaluation[],
+  appliedRewardIds: readonly string[],
+): string {
+  const totalApplied = appliedRewardIds.length;
+  const byOutcome = evaluations.reduce(
+    (acc, ev) => {
+      acc[ev.outcome] = (acc[ev.outcome] ?? 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>,
+  );
+  return `${String(totalApplied)} rewards applied · missed ${String(byOutcome['missed'] ?? 0)} · completed ${String(byOutcome['completed'] ?? 0)} · breakthrough ${String(byOutcome['breakthrough'] ?? 0)}`;
+}
+
+export interface CampaignCardViewModel {
+  opportunity: SeasonCampaignOpportunity;
+  isSelected: boolean;
+  targetLabel: string;
+  breakthroughLabel: string | null;
+  completedRewardLabel: string;
+  breakthroughRewardLabel: string | null;
+  feasibilityFacts: Record<string, unknown>;
+}
+
+export interface CampaignTimelineViewModel {
+  startingIdentity: SeasonCampaignState['startingIdentity'];
+  startingFocus: SeasonCampaignState['startingFocus'];
+  priorEvaluation: SeasonCampaignEvaluation | null;
+  branchEntries: Array<{ branchId: string; state: string }>;
+  currentOffers: CampaignCardViewModel[];
+  isIdentityRequired: boolean;
+  isEvolutionRequired: boolean;
+  isBlock8NoOpportunity: boolean;
+  currentBlockIndex: number | null;
+  rewardEntitlements: SeasonCampaignState['rewardEntitlements'];
+  appliedRewardIds: SeasonCampaignState['appliedRewardIds'];
+}
+
+export function campaignTimelineViewModel(
+  run: SeasonRun | null,
+  nextBlockIndex: number | null,
+): CampaignTimelineViewModel | null {
+  if (run === null) return null;
+  const campaign = (run.campaign ?? {
+    schemaVersion: 1,
+    campaignVersion: 'season-campaign-v1',
+    startingIdentity: null,
+    startingFocus: null,
+    offers: {},
+    selections: {},
+    evaluations: [],
+    branchState: {},
+    evolutionOffers: null,
+    evolutionSelection: null,
+    rewardEntitlements: {
+      influenceEarned: 0,
+      inquiryCredits: 0,
+      informationBenefits: 0,
+      followUpUnlocks: [],
+    },
+    appliedRewardIds: [],
+  }) as SeasonCampaignState;
+  const evaluations = campaign.evaluations ?? [];
+  const priorEvaluation = evaluations.length > 0 ? evaluations[evaluations.length - 1]! : null;
+  const branchEntries = Object.entries(campaign.branchState ?? {}).map(([branchId, state]) => ({
+    branchId,
+    state,
+  }));
+  const completedBlocks = Math.ceil(run.cursor.completedRounds / 10);
+  const targetBlock = nextBlockIndex ?? completedBlocks;
+  const isIdentityRequired = campaign.startingIdentity === null;
+  const isEvolutionRequired =
+    completedBlocks === 5 &&
+    campaign.evolutionOffers !== null &&
+    campaign.evolutionSelection === null;
+  const isBlock8NoOpportunity = targetBlock === 8;
+  const offersForBlock =
+    targetBlock !== null && targetBlock >= 0 && targetBlock < 8
+      ? (campaign.offers[targetBlock] ?? [])
+      : [];
+  const selections = campaign.selections ?? {};
+  const currentOffers: CampaignCardViewModel[] = offersForBlock.map((opp) => {
+    const isSelected = selections[targetBlock!]?.opportunityId === opp.opportunityId;
+    return {
+      opportunity: opp,
+      isSelected,
+      targetLabel: formatCampaignCondition(opp.target),
+      breakthroughLabel: opp.breakthrough ? formatCampaignCondition(opp.breakthrough) : null,
+      completedRewardLabel: formatCampaignReward(opp.completedReward),
+      breakthroughRewardLabel: opp.breakthroughReward
+        ? formatCampaignReward(opp.breakthroughReward)
+        : null,
+      feasibilityFacts: opp.feasibilityFacts as Record<string, unknown>,
+    };
+  });
+  return {
+    startingIdentity: campaign.startingIdentity,
+    startingFocus: campaign.startingFocus,
+    priorEvaluation,
+    branchEntries,
+    currentOffers,
+    isIdentityRequired,
+    isEvolutionRequired,
+    isBlock8NoOpportunity,
+    currentBlockIndex: targetBlock,
+    rewardEntitlements: campaign.rewardEntitlements,
+    appliedRewardIds: campaign.appliedRewardIds,
+  };
+}
+
+// --- Trade Board presentation ---
+
+export const TRADE_NEED_LABELS: Record<string, string> = {
+  'ball-handling': 'Ball-handling',
+  shooting: 'Shooting',
+  'perimeter-defense': 'Perimeter defense',
+  'interior-defense': 'Interior defense',
+  rebounding: 'Rebounding',
+  availability: 'Availability',
+  'rotation-talent': 'Rotation talent',
+  depth: 'Depth',
+};
+
+export const TRADE_PRIORITY_LABELS: Record<string, string> = {
+  talent: 'Talent',
+  fit: 'Fit',
+  availability: 'Availability',
+  depth: 'Depth',
+  influence: 'Influence',
+};
+
+export const COMPETITOR_INTEREST_LABELS: Record<string, string> = {
+  low: 'Low',
+  possible: 'Possible',
+  strong: 'Strong',
+  'preferred-fit': 'Preferred fit',
+};
+
+export const TRADE_RESPONSE_CAUSE_LABELS: Record<string, string> = {
+  acceptable: 'acceptable',
+  'close-needs-more-value': 'close needs more value',
+  'wrong-roster-fit': 'wrong roster fit',
+  'unacceptable-injury-risk': 'unacceptable injury/availability risk',
+  'protected-player': 'protected player',
+  'illegal-roster': 'illegal roster/rotation',
+  'negotiations-closed': 'negotiations closed',
+  'close needs more value': 'close needs more value',
+  'wrong roster fit': 'wrong roster fit',
+  'unacceptable injury risk': 'unacceptable injury/availability risk',
+};
+
+export function formatTradeNeeds(needs: readonly string[]): string {
+  return needs.map((n) => TRADE_NEED_LABELS[n] ?? n).join(' / ');
+}
+
+export function formatTradePriority(priority: string): string {
+  return TRADE_PRIORITY_LABELS[priority] ?? priority;
+}
+
+export function competitorInterestLabel(interest: string): string {
+  return COMPETITOR_INTEREST_LABELS[interest] ?? interest;
+}
+
+export function responseCauseLabel(cause: string | null): string {
+  if (cause === null) return '—';
+  return TRADE_RESPONSE_CAUSE_LABELS[cause] ?? cause;
+}
+
+export function inquiryCounterLabel(
+  allowance: number,
+  used: number,
+  purchasedUsed: boolean,
+  earnedUsed: boolean,
+): string {
+  const base = 3;
+  const extra = allowance - base;
+  const purchased = purchasedUsed ? 1 : 0;
+  const earned = earnedUsed ? 1 : 0;
+  return `${String(used)}/${String(allowance)} used · 3 base + ${String(extra)} extra (purchased ${String(purchased)}/1 · earned ${String(earned)}/1)`;
+}
+
+export interface PackageConsequenceFacts {
+  fromRosterSize: number;
+  toRosterSize: number;
+  fromAfter: number;
+  toAfter: number;
+  legal: boolean;
+  outgoingAvailable: Array<{ playerVersionId: string; available: boolean }>;
+  incomingAvailable: Array<{ playerVersionId: string; available: boolean }>;
+  roleCoverage: string;
+  chemistryRemoved: number;
+  chemistryNew: number;
+  influenceNote: string;
+}
+
+export function packageConsequenceFacts(input: {
+  fromRosterSize: number;
+  toRosterSize: number;
+  outgoingIds: readonly string[];
+  incomingIds: readonly string[];
+  outgoingAvailable: readonly boolean[];
+  incomingAvailable: readonly boolean[];
+  influenceAmount: number;
+  influenceFromSender: string | null;
+  humanFranchiseId: string;
+  toFranchiseId: string;
+}): PackageConsequenceFacts {
+  const fromAfter = input.fromRosterSize - input.outgoingIds.length + input.incomingIds.length;
+  const toAfter = input.toRosterSize - input.incomingIds.length + input.outgoingIds.length;
+  const legal = fromAfter >= SEASON_ROSTER_MIN_SIZE && fromAfter <= SEASON_ROSTER_MAX_SIZE && toAfter >= SEASON_ROSTER_MIN_SIZE && toAfter <= SEASON_ROSTER_MAX_SIZE;
+  const outgoingAvailable = input.outgoingIds.map((id, idx) => ({
+    playerVersionId: id,
+    available: input.outgoingAvailable[idx] ?? true,
+  }));
+  const incomingAvailable = input.incomingIds.map((id, idx) => ({
+    playerVersionId: id,
+    available: input.incomingAvailable[idx] ?? true,
+  }));
+  const anyUnavailable = [...outgoingAvailable, ...incomingAvailable].some((p) => !p.available);
+  const roleCoverage = anyUnavailable
+    ? 'Availability flag: one or more players currently out — rotation will use contingency'
+    : 'Role coverage: rotation will repair by slotting incoming to outgoing minutes; both teams retain a legal ten';
+  const chemistryRemoved = input.outgoingIds.length * 9;
+  const chemistryNew = input.incomingIds.length * 9;
+  const influenceNote =
+    input.influenceAmount === 0
+      ? 'No Influence attached'
+      : `${String(input.influenceAmount)} Influence from ${input.influenceFromSender === input.humanFranchiseId ? 'you' : input.influenceFromSender === input.toFranchiseId ? 'them' : input.influenceFromSender} · never alone, 1–2 max, capped at 5% per point (10% total)`;
+  return {
+    fromRosterSize: input.fromRosterSize,
+    toRosterSize: input.toRosterSize,
+    fromAfter,
+    toAfter,
+    legal,
+    outgoingAvailable,
+    incomingAvailable,
+    roleCoverage,
+    chemistryRemoved,
+    chemistryNew,
+    influenceNote,
+  };
+}
+
+export function chemistryFootnote(removedPairs: number, newPairs: number): string {
+  return `Chemistry: 45 active pairs per team (1,350 per league) · resets ${String(removedPairs)} existing pairings and starts ${String(newPairs)} new at neutral`;
+}
+
+export function valueTrendToneLabel(trend: SeasonTradeValueTrend['trend']): string {
+  switch (trend) {
+    case 'rising':
+      return 'Rising';
+    case 'falling':
+      return 'Falling';
+    case 'stable':
+      return 'Stable';
+  }
+}
+
+export function rehabPresentationFacts(balance: number): {
+  floor: number;
+  cap: number;
+  cost: number;
+  successRate: string;
+  successNote: string;
+  failureNote: string;
+  recurrenceNote: string;
+} {
+  return {
+    floor: SEASON_INFLUENCE_FLOOR,
+    cap: SEASON_INFLUENCE_CAP,
+    cost: 2,
+    successRate: '60%',
+    successNote: 'Success reduces remaining absence by one team game',
+    failureNote: 'Failure leaves the estimate unchanged',
+    recurrenceNote: 'After actual return, +60 bp rehab recurrence premium for 10 games (100 bp total with base 40 bp during window)',
+  };
 }

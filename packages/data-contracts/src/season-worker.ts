@@ -18,12 +18,13 @@ import { seasonHealthStateSchema } from './season-health.ts';
 import { seasonHomeCourtProfileSchema } from './season-home-court.ts';
 import { seasonInfluenceStateSchema } from './season-influence.ts';
 import { seasonObjectiveIdSchema } from './season-objective.ts';
+import { seasonCampaignOpportunityIdSchema } from './season-campaign.ts';
 import { seasonPendingBlockCandidateSchema } from './season-pending-block.ts';
 import { seasonBlockRunContextSchema } from './season-run.ts';
 import { seasonScheduleSchema } from './season-schedule.ts';
 import { seasonTransactionEntrySchema } from './season-transactions.ts';
 
-export const SEASON_WORKER_WIRE_SCHEMA_VERSION = 6 as const;
+export const SEASON_WORKER_WIRE_SCHEMA_VERSION = 7 as const;
 
 export const seasonScorelineSchema = z.object({
   gameId: seasonGameIdSchema,
@@ -70,7 +71,8 @@ export const seasonWorkerStartRequestSchema = z
 
     startGameId: seasonGameIdSchema.nullable(),
 
-    objectiveId: seasonObjectiveIdSchema.nullable(),
+    objectiveId: seasonObjectiveIdSchema.nullable().optional(),
+    campaignOpportunityId: seasonCampaignOpportunityIdSchema.nullable().optional(),
 
     priorInfluence: seasonInfluenceStateSchema.nullable(),
 
@@ -109,7 +111,8 @@ export const seasonWorkerContinueRequestSchema = z
     priorEffects: seasonEffectsStateSchema.nullable().optional(),
     priorHealth: seasonHealthStateSchema.nullable().optional(),
     startGameId: seasonGameIdSchema.nullable(),
-    objectiveId: seasonObjectiveIdSchema.nullable(),
+    objectiveId: seasonObjectiveIdSchema.nullable().optional(),
+    campaignOpportunityId: seasonCampaignOpportunityIdSchema.nullable().optional(),
     priorInfluence: seasonInfluenceStateSchema.nullable(),
     priorTransactions: z.array(seasonTransactionEntrySchema).max(2000).optional(),
     expectedStateRevision: z.number().int().nonnegative(),

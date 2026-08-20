@@ -7,6 +7,7 @@ import { seasonGameSummarySchema, seasonRetainedGameDetailSchema } from './seaso
 import { seasonEffectsStateSchema } from './season-effects.ts';
 import { seasonHealthStateSchema } from './season-health.ts';
 import { seasonObjectiveIdSchema } from './season-objective.ts';
+import { seasonCampaignOpportunityIdSchema } from './season-campaign.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import { SEASON_BLOCK_VERSION } from './season-versions.ts';
 
@@ -30,7 +31,8 @@ export const seasonPendingBlockCandidateSchema = z.object({
   expectedRevision: z.number().int().nonnegative(),
   expectedStateRevision: z.number().int().nonnegative(),
   expectedStateDigest: seasonCheckpointDigestSchema,
-  objectiveId: seasonObjectiveIdSchema.nullable(),
+  objectiveId: seasonObjectiveIdSchema.nullable().optional(),
+  campaignOpportunityId: seasonCampaignOpportunityIdSchema.nullable().optional(),
   nextGameId: seasonGameIdSchema,
 
   summaries: z.array(seasonGameSummarySchema).max(150),

@@ -62,6 +62,7 @@ function minimalShell(): SeasonRunShellData {
     catalog: null,
     schedule: null,
     playerSlice: new Map(),
+    playersIndex: [],
     playerSliceReady: true,
     facesByVersion: new Map(),
     facesReady: true,
@@ -261,7 +262,7 @@ describe('CheckpointRecap (M2.4)', () => {
   it('renders the mechanism-evidence section with recorded figures', () => {
     const recap: SeasonBlockRecap = {
       schemaVersion: 1,
-      recapVersion: 'season-recap-v4',
+      recapVersion: 'season-recap-v5',
       runId: 'run-1',
       blockIndex: 0,
       completedRounds: 10,
@@ -334,7 +335,7 @@ describe('CheckpointRecap (M2.4)', () => {
       props: {
         recap: {
           schemaVersion: 1,
-          recapVersion: 'season-recap-v4',
+          recapVersion: 'season-recap-v5',
           runId: 'run-1',
           blockIndex: 0,
           completedRounds: 10,

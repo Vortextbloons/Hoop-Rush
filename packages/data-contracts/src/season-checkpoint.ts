@@ -9,11 +9,14 @@ import { seasonEffectsStateSchema } from './season-effects.ts';
 import { seasonHealthStateSchema } from './season-health.ts';
 import { seasonInfluenceStateSchema } from './season-influence.ts';
 import { seasonObjectiveEvaluationSchema, seasonObjectiveIdSchema } from './season-objective.ts';
+import { seasonCampaignEvaluationSchema } from './season-campaign.ts';
 import { seasonTransactionEntrySchema } from './season-transactions.ts';
 import { seasonFreeAgencyStateSchema } from './season-free-agency.ts';
 import {
   SEASON_AGGREGATES_VERSION,
   SEASON_BLOCK_VERSION,
+  SEASON_CAMPAIGN_TARGETS_VERSION,
+  SEASON_CAMPAIGN_VERSION,
   SEASON_CHECKPOINT_VERSION,
   SEASON_CHEMISTRY_VERSION,
   SEASON_EFFECT_TARGETS_LEGACY_VERSION,
@@ -69,6 +72,9 @@ export const seasonCheckpointVersionsSchema = z.object({
   influenceVersion: z.literal(SEASON_INFLUENCE_VERSION),
 
   objectiveVersion: z.literal(SEASON_OBJECTIVE_VERSION),
+
+  campaignVersion: z.literal(SEASON_CAMPAIGN_VERSION).optional(),
+  campaignTargetsVersion: z.literal(SEASON_CAMPAIGN_TARGETS_VERSION).optional(),
 
   injuryTargetsVersion: z.literal(SEASON_INJURY_TARGETS_VERSION),
 
@@ -126,6 +132,14 @@ export const seasonCandidateCheckpointSchema = z.object({
     success: z.boolean().nullable(),
     evaluation: seasonObjectiveEvaluationSchema,
   }),
+
+  campaign: z
+    .object({
+      opportunityId: z.string().nullable(),
+      outcome: z.enum(['missed', 'completed', 'breakthrough']).nullable(),
+      evaluation: seasonCampaignEvaluationSchema.nullable(),
+    })
+    .optional(),
 
   expectedStateRevision: z.number().int().nonnegative(),
   expectedStateDigest: seasonCheckpointDigestSchema,

@@ -94,6 +94,8 @@ export interface SeasonInjuryRollInput {
   targetMinutes: number;
 
   recurrenceWindowRoundsRemaining: number;
+
+  rehabPremiumBasisPoints?: number;
 }
 
 export interface SeasonInjuryRollResult {
@@ -113,6 +115,7 @@ export function seasonInjuryRiskBasisPoints(input: {
   recentLoadBasisPoints: number;
   targetMinutes: number;
   recurrenceWindowRoundsRemaining: number;
+  rehabPremiumBasisPoints?: number;
 }): number {
   const raw =
     SEASON_INJURY_BASE_RISK_BP +
@@ -122,7 +125,8 @@ export function seasonInjuryRiskBasisPoints(input: {
     input.recentLoadBasisPoints / SEASON_INJURY_RECENT_LOAD_DIVISOR +
     Math.max(0, input.targetMinutes - SEASON_INJURY_MINUTES_EXPOSURE_BASE) *
       SEASON_INJURY_MINUTES_EXPOSURE_FACTOR +
-    (input.recurrenceWindowRoundsRemaining > 0 ? SEASON_INJURY_RECURRENCE_BONUS_BP : 0);
+    (input.recurrenceWindowRoundsRemaining > 0 ? SEASON_INJURY_RECURRENCE_BONUS_BP : 0) +
+    (input.rehabPremiumBasisPoints ?? 0);
   const clamped = Math.min(SEASON_INJURY_RISK_MAX_BP, Math.max(SEASON_INJURY_RISK_MIN_BP, raw));
 
   return Math.floor(clamped + 0.5);
@@ -133,7 +137,14 @@ export function seasonInjuryIdOf(seedPath: readonly string[]): string {
 }
 
 export function rollSeasonInjuryForPlayer(input: SeasonInjuryRollInput): SeasonInjuryRollResult {
-  const riskBasisPoints = seasonInjuryRiskBasisPoints(input);
+  const riskBasisPoints = seasonInjuryRiskBasisPoints({
+    durabilityRating: input.durabilityRating,
+    fatigueBasisPoints: input.fatigueBasisPoints,
+    recentLoadBasisPoints: input.recentLoadBasisPoints,
+    targetMinutes: input.targetMinutes,
+    recurrenceWindowRoundsRemaining: input.recurrenceWindowRoundsRemaining,
+    rehabPremiumBasisPoints: input.rehabPremiumBasisPoints,
+  });
   const occurrenceSeed = injurySeed(
     input.rootSeed,
     input.gameId,
@@ -315,12 +326,24 @@ export function applyRiskyRehabOutcome(
     updated.missedGamesTotal = SEASON_ENDING_MISSED_GAMES_SENTINEL;
     updated.missedGamesRemaining = SEASON_ENDING_MISSED_GAMES_SENTINEL;
     updated.rehabModifier = outcome === 'success' ? -1 : 1;
+    updated.rehabAttempted = true;
+    updated.rehabOutcome = outcome;
+    updated.rehabRecurrencePremiumApplied = outcome === 'success';
+    updated.rehabRecurrencePremiumBasisPoints = outcome === 'success' ? 60 : 0;
   } else if (outcome === 'success') {
-    updated.missedGamesRemaining = Math.max(1, updated.missedGamesRemaining - 1);
+    updated.missedGamesRemaining = Math.max(0, updated.missedGamesRemaining - 1);
     updated.rehabModifier = -1;
+    updated.rehabAttempted = true;
+    updated.rehabOutcome = 'success';
+    updated.rehabRecurrencePremiumApplied = true;
+    updated.rehabRecurrencePremiumBasisPoints = 60;
   } else {
-    updated.missedGamesRemaining += 1;
-    updated.rehabModifier = 1;
+    // Failure leaves recovery facts unchanged per health-v2 spec
+    updated.rehabModifier = 0;
+    updated.rehabAttempted = true;
+    updated.rehabOutcome = 'failure';
+    updated.rehabRecurrencePremiumApplied = false;
+    updated.rehabRecurrencePremiumBasisPoints = 0;
   }
   return {
     ...health,

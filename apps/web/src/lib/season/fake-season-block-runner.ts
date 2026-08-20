@@ -269,7 +269,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
           rotationDigest: input.rotationDigest,
           commandId: input.commandId,
           humanFranchiseId: input.humanFranchiseId,
-          objectiveId: pending.objectiveId,
+          objectiveId: pending.objectiveId ?? null,
           homeCourt: input.homeCourt,
           catalogUrl: input.catalogUrl,
           catalogHash: input.catalogHash,

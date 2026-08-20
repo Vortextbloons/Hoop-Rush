@@ -101,6 +101,21 @@ export class TestDatabase extends Dexie {
       seasonCompletedIndex: 'recordId, completedAtIso',
       seasonRunPlayerSlices: 'runId',
     });
+    this.version(11).stores({
+      seasonRuns: 'recordId',
+      seasonRunSummaries: '[runId+gameId], [runId+blockIndex], runId, blockIndex',
+      seasonRunDetails: '[runId+gameId], runId',
+      seasonRunBlocks: '[runId+blockIndex], runId',
+      seasonRunIndex: 'recordId',
+      seasonPendingBlocks: 'runId',
+      seasonPostseasonSummaries: '[runId+gameId], runId',
+      seasonPostseasonDetails: '[runId+gameId], runId',
+      seasonCommandLog: '[runId+ordinal], runId',
+      seasonAlmanacs: 'runId',
+      seasonCompletedRuns: 'runId',
+      seasonCompletedIndex: 'recordId, completedAtIso',
+      seasonRunPlayerSlices: 'runId',
+    });
   }
 }
 

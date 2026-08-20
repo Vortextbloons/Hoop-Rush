@@ -200,7 +200,7 @@ export function buildReplayedRun(): ReplayedRun {
 
   const acceptOutput = record(
     {
-      schemaVersion: 10,
+      schemaVersion: 11,
       command: 'accept-trade-offer',
       commandId: 'repro-accept-1',
       runId: run.runId,
@@ -215,7 +215,7 @@ export function buildReplayedRun(): ReplayedRun {
   effects = acceptOutput.effects;
   const selectOutput = record(
     {
-      schemaVersion: 10,
+      schemaVersion: 11,
       command: 'select-block-objective',
       commandId: 'repro-select-1',
       runId: run.runId,
@@ -232,7 +232,7 @@ export function buildReplayedRun(): ReplayedRun {
   if (secondOpen !== undefined) {
     finalRun = record(
       {
-        schemaVersion: 10,
+        schemaVersion: 11,
         command: 'decline-trade-offer',
         commandId: 'repro-decline-1',
         runId: run.runId,
@@ -359,7 +359,7 @@ export function buildFreeAgencyReplayedRun(
 
   const skipOutput = record(
     {
-      schemaVersion: 10,
+      schemaVersion: 11,
       command: 'skip-free-agent-market',
       commandId: 'repro-fa-skip-1',
       runId: run.runId,
@@ -373,7 +373,7 @@ export function buildFreeAgencyReplayedRun(
   );
   const resolveOutput = record(
     {
-      schemaVersion: 10,
+      schemaVersion: 11,
       command: 'resolve-free-agent-market',
       commandId: 'repro-fa-resolve-1',
       runId: run.runId,

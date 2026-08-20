@@ -2,6 +2,7 @@ import type {
   SeasonAcceptedBlock,
   SeasonActiveRunIndex,
   SeasonBlockRecap,
+  SeasonCampaignState,
   SeasonCandidateCheckpoint,
   SeasonCheckpointState,
   SeasonEffectsState,
@@ -63,6 +64,8 @@ export interface CommitSeasonBlockInput {
 
   objectives: SeasonObjectiveState;
 
+  campaign?: SeasonCampaignState | null;
+
   checkpointState: SeasonCheckpointState;
 
   stateRevision: number;
@@ -88,7 +91,7 @@ export interface SeasonRunSnapshot {
 }
 
 export interface SeasonRunIncompatibleInfo {
-  storedSaveSchemaVersion: typeof SEASON_RUN_SAVE_SCHEMA_VERSION;
+  storedSaveSchemaVersion: number;
 
   storedRunSchemaVersion: number;
 

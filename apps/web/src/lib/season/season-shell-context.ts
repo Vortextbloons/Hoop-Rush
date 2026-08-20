@@ -125,6 +125,21 @@ export interface SeasonRunShellData {
 
   forfeitInterruptedGame: () => Promise<void>;
   resumeBlock: () => Promise<void>;
+  selectGmIdentity?: (input: { identity: string; focus: string | null }) => Promise<void>;
+  selectCampaignOpportunity?: (input: { blockIndex: number; opportunityId: string }) => Promise<void>;
+  evolveGmCampaign?: (input: { offerId: string }) => Promise<void>;
+  openTradeInquiry?: (input: { windowIndex: number; toFranchiseId: string }) => Promise<void>;
+  submitTradeProposal?: (input: {
+    windowIndex: number;
+    toFranchiseId: string;
+    outgoingPlayerVersionIds: string[];
+    incomingPlayerVersionIds: string[];
+    influenceAmount: number;
+    influenceFromSender: string | null;
+  }) => Promise<void>;
+  respondToTradeCounter?: (input: { windowIndex: number; inquiryId: string; accept: boolean }) => Promise<void>;
+  walkAwayFromTrade?: (input: { windowIndex: number; inquiryId: string }) => Promise<void>;
+  purchaseTradeInquiry?: (input: { windowIndex: number }) => Promise<void>;
 
   startPostseason: () => Promise<void>;
   advancePostseason: (input?: { targetGameId?: string }) => Promise<void>;
@@ -202,6 +217,14 @@ export function initialSeasonRunShellData(): SeasonRunShellData {
     resolveFreeAgentMarket: () => Promise.resolve(),
     forfeitInterruptedGame: () => Promise.resolve(),
     resumeBlock: () => Promise.resolve(),
+    selectGmIdentity: () => Promise.resolve(),
+    selectCampaignOpportunity: () => Promise.resolve(),
+    evolveGmCampaign: () => Promise.resolve(),
+    openTradeInquiry: () => Promise.resolve(),
+    submitTradeProposal: () => Promise.resolve(),
+    respondToTradeCounter: () => Promise.resolve(),
+    walkAwayFromTrade: () => Promise.resolve(),
+    purchaseTradeInquiry: () => Promise.resolve(),
     startPostseason: () => Promise.resolve(),
     advancePostseason: () => Promise.resolve(),
     submitPostseasonRotation: () => Promise.resolve(),

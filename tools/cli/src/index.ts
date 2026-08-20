@@ -575,11 +575,53 @@ const COMMANDS: Record<string, CommandEntry> = {
         }),
     };
   }),
+  'season campaign audit': command(async () => {
+    const { seasonCampaignAudit, SEASON_CAMPAIGN_AUDIT_OPTIONS } =
+      await import('./commands/season-campaign.ts');
+    return {
+      options: SEASON_CAMPAIGN_AUDIT_OPTIONS,
+      run: (args) =>
+        seasonCampaignAudit({
+          input: getOptionString(args, 'input') ?? null,
+          manifest: getOptionString(args, 'manifest') ?? null,
+        }),
+    };
+  }),
+  'season campaign calibrate': command(async () => {
+    const { seasonCampaignCalibrate, SEASON_CAMPAIGN_CALIBRATE_OPTIONS } =
+      await import('./commands/season-campaign.ts');
+    return {
+      options: SEASON_CAMPAIGN_CALIBRATE_OPTIONS,
+      run: (args) =>
+        seasonCampaignCalibrate({
+          input: getOptionString(args, 'input') ?? null,
+          'seed-from': getOptionString(args, 'seed-from') ?? null,
+          'seed-to': getOptionString(args, 'seed-to') ?? null,
+          workers: getOptionString(args, 'workers') ?? null,
+          out: getOptionString(args, 'out') ?? null,
+          manifest: getOptionString(args, 'manifest') ?? null,
+          validate: getOptionString(args, 'validate') ?? null,
+          write: hasOption(args, 'write'),
+        }),
+    };
+  }),
+  'season trade audit': command(async () => {
+    const { seasonTradeAudit, SEASON_TRADE_AUDIT_OPTIONS } =
+      await import('./commands/season-trade.ts');
+    return {
+      options: SEASON_TRADE_AUDIT_OPTIONS,
+      run: (args) =>
+        seasonTradeAudit({
+          input: getOptionString(args, 'input') ?? null,
+          manifest: getOptionString(args, 'manifest') ?? null,
+        }),
+    };
+  }),
   'season trade calibrate': command(async () => {
     const { seasonTradeCalibrate, SEASON_TRADE_CALIBRATE_OPTIONS } =
       await import('./commands/season-trade.ts');
     return {
-      options: SEASON_TRADE_CALIBRATE_OPTIONS,
+      options: { ...SEASON_TRADE_CALIBRATE_OPTIONS, write: false },
       run: (args) =>
         seasonTradeCalibrate({
           input: getOptionString(args, 'input') ?? null,
@@ -596,7 +638,7 @@ const COMMANDS: Record<string, CommandEntry> = {
     const { seasonInfluenceCalibrate, SEASON_INFLUENCE_CALIBRATE_OPTIONS } =
       await import('./commands/season-influence.ts');
     return {
-      options: SEASON_INFLUENCE_CALIBRATE_OPTIONS,
+      options: { ...SEASON_INFLUENCE_CALIBRATE_OPTIONS, write: false },
       run: (args) =>
         seasonInfluenceCalibrate({
           input: getOptionString(args, 'input') ?? null,

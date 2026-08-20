@@ -40,7 +40,7 @@ function record(overrides: Partial<SeasonInjuryRecord>): SeasonInjuryRecord {
 }
 
 function health(records: SeasonInjuryRecord[]): SeasonHealthState {
-  return { schemaVersion: 1, healthVersion: 'season-health-v1', injuries: records };
+  return { schemaVersion: 1, healthVersion: 'season-health-v2', injuries: records };
 }
 
 function roster(ids: string[]): SeasonRoster {
