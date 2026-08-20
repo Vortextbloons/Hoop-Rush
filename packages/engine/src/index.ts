@@ -363,7 +363,6 @@ export {
   applyFreeAgencyDeclaration,
   applyFreeAgencySkip,
   resolveSeasonFreeAgencyWindow,
-  reconcileRotationsForAppliedSignings,
   FreeAgencyValidationRejection,
   type SeasonFreeAgencyContext,
   type SeasonFreeAgencyWindowOpenResult,

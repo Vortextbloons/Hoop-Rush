@@ -967,7 +967,9 @@ function handleSubmitTradeProposal(
       ],
       activeProposalId: evalResult.proposal.proposalId,
     };
-    nextNegotiations = (nextWin.negotiations ?? []).map((n) => (n.inquiryId === inquiryId ? updated : n));
+    nextNegotiations = (nextWin.negotiations ?? []).map((n) =>
+      n.inquiryId === inquiryId ? updated : n,
+    );
   } else {
     const newNegotiation: import('@hoop-rush/data-contracts').SeasonTradeNegotiation = {
       inquiryId: inquiryId!,
@@ -2885,7 +2887,6 @@ function handleResolveFreeAgentMarket(
     influence: resolution.influence,
     transactions: resolution.transactions,
     effects: resolution.effects,
-    rotations: resolution.rotations,
   });
   const humanSigned = resolution.signings.some(
     (signing) => signing.franchiseId === context.humanFranchiseId,

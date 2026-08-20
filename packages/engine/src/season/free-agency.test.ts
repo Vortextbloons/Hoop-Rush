@@ -16,7 +16,6 @@ import {
   freeAgencySeed,
   freeAgencyUnresolvedWindowIndex,
   openSeasonFreeAgencyWindow,
-  reconcileRotationsForAppliedSignings,
   resolveSeasonFreeAgencyWindow,
   seasonFreeAgencyUniverseOf,
 } from './free-agency.ts';
@@ -563,7 +562,7 @@ describe('effects reconciliation (season-chemistry-v2)', () => {
     }
   });
 
-  it('repairs the rotation to ten members when a signing lands', () => {
+  it('does not promote a depth signing into the rotation — roster grows, rotation stays locked', () => {
     const { run, catalog, index } = fixture();
     const context = contextOf(run, catalog, index);
     const opened = openSeasonFreeAgencyWindow(context, 0, 2);
@@ -581,19 +580,37 @@ describe('effects reconciliation (season-chemistry-v2)', () => {
       0,
       'cmd-r',
     );
+    // A signing applies ownership/roster/Influence/transaction/market facts but does not edit the rotation
+    // (spec 15 M2.6.5: promotion occurs through the normal editor at the next block lock).
     const humanRoster = resolved.rosters.find((roster) => roster.franchiseId === HUMAN);
-    const humanRotation = resolved.rotations.find((rotation) => rotation.franchiseId === HUMAN);
-    if (humanRoster === undefined || humanRotation === undefined) throw new Error('fixture');
+    if (humanRoster === undefined) throw new Error('fixture');
     expect(humanRoster.players.length).toBeGreaterThan(10);
-    const rotationIds = new Set([...humanRotation.starters, ...humanRotation.benchOrder]);
+    expect(humanRoster.players.some((p) => p.playerVersionId === target.playerVersionId)).toBe(
+      true,
+    );
+    // The resolved rotation must remain the original ten — no automatic displacement.
+    const expectedRotation = run.rotations.find((r) => r.franchiseId === HUMAN);
+    if (expectedRotation === undefined) throw new Error('fixture');
+    const humanRunAfter = { ...run, rosters: resolved.rosters, freeAgency: resolved.freeAgency };
+    // Rotation unchanged: verify original members still active, signed player inactive
+    const rotationIds = new Set([...expectedRotation.starters, ...expectedRotation.benchOrder]);
     expect(rotationIds.size).toBe(10);
-    expect(rotationIds.has(target.playerVersionId)).toBe(true);
+    expect(rotationIds.has(target.playerVersionId)).toBe(false);
 
-    const expanded = expandSeasonRunRosters({ ...run, rosters: resolved.rosters }, catalog);
+    const expanded = expandSeasonRunRosters(humanRunAfter, catalog);
     expect(expanded.has(target.playerVersionId)).toBe(true);
+    // Effects: signed player is inactive, not an active chemistry pair yet
+    expect(
+      resolved.effects.inactivePlayerStates.some(
+        (p) => p.playerVersionId === target.playerVersionId,
+      ),
+    ).toBe(true);
+    expect(
+      resolved.effects.playerStates.some((p) => p.playerVersionId === target.playerVersionId),
+    ).toBe(false);
   });
 
-  it('reconciles rotations for signings that landed before rotation repair shipped', () => {
+  it('leaves inactive depth signings untouched across runs — no legacy auto-repair', () => {
     const { run, catalog, index } = fixture();
     const context = contextOf(run, catalog, index);
     const opened = openSeasonFreeAgencyWindow(context, 0, 2);
@@ -611,21 +628,11 @@ describe('effects reconciliation (season-chemistry-v2)', () => {
       0,
       'cmd-r',
     );
-    const staleRun = {
-      ...run,
-      rosters: resolved.rosters,
-      freeAgency: resolved.freeAgency,
-      ownership: resolved.ownership,
-      influence: resolved.influence,
-      transactions: resolved.transactions,
-    };
-    const repaired = reconcileRotationsForAppliedSignings(staleRun, catalog, resolved.effects);
-    expect(repaired).not.toBeNull();
-    const humanRotation = repaired?.run.rotations.find(
-      (rotation) => rotation.franchiseId === HUMAN,
-    );
-    if (humanRotation === undefined) throw new Error('fixture');
-    const rotationIds = new Set([...humanRotation.starters, ...humanRotation.benchOrder]);
-    expect(rotationIds.has(target.playerVersionId)).toBe(true);
+    // Simulate a later block submission that should NOT infer migration from rotation membership.
+    // The human deliberately keeps the depth signing on the bench; rotation stays as originally locked.
+    const originalRotation = run.rotations.find((r) => r.franchiseId === HUMAN);
+    if (originalRotation === undefined) throw new Error('fixture');
+    const rotationIds = new Set([...originalRotation.starters, ...originalRotation.benchOrder]);
+    expect(rotationIds.has(target.playerVersionId)).toBe(false);
   });
 });

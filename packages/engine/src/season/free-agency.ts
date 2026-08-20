@@ -16,14 +16,11 @@ import type {
   SeasonFreeAgencyWindowState,
   SeasonInfluenceState,
   SeasonOwnership,
-  SeasonRoster,
   SeasonRosterEntry,
   SeasonRosterRole,
-  SeasonRotation,
   SeasonRun,
   SeasonTransactionEntry,
 } from '@hoop-rush/data-contracts';
-import type { Position } from '@hoop-rush/data-contracts';
 import {
   SEASON_ROSTER_MAX_SIZE,
   SEASON_SEED_NAMESPACES,
@@ -43,8 +40,6 @@ import {
   type SeasonRosterMemberInput,
 } from './roster-rules.ts';
 import { seasonPlayerAvailable } from './injuries.ts';
-import { reconcileSeasonEffects } from './effects.ts';
-import { buildMinimalRotation, validateSeasonRotation } from './rotation.ts';
 import { seasonTransactionEntry } from './transactions.ts';
 import { SEASON_INFLUENCE_FLOOR } from './influence.ts';
 
@@ -875,8 +870,6 @@ export interface SeasonFreeAgencyResolutionResult {
 
   rosters: SeasonRun['rosters'];
 
-  rotations: SeasonRun['rotations'];
-
   ownership: SeasonOwnership[];
 }
 
@@ -1051,24 +1044,6 @@ export function resolveSeasonFreeAgencyWindow(
         : entry,
     ),
   };
-  let rotations = context.run.rotations;
-  for (const signing of signings) {
-    rotations = rotations.map((rotation) => {
-      if (rotation.franchiseId !== signing.franchiseId) return rotation;
-      const roster = rosters.find((entry) => entry.franchiseId === signing.franchiseId);
-      if (roster === undefined) {
-        throw new Error(`free agency: missing roster for ${signing.franchiseId}`);
-      }
-      return repairRotationAfterSigning(context, rotation, roster, signing);
-    });
-  }
-  if (signings.length > 0) {
-    effects = reconcileSeasonEffects({
-      previous: effects,
-      rosters,
-      rotations,
-    });
-  }
   return {
     freeAgency,
     signings,
@@ -1077,7 +1052,6 @@ export function resolveSeasonFreeAgencyWindow(
     influence,
     transactions,
     rosters,
-    rotations,
     ownership,
   };
 }
@@ -1489,156 +1463,4 @@ function signingCatalogIndexOf(
 
 function windowBlockIndexOf(windowIndex: number): number {
   return SEASON_FREE_AGENCY_WINDOW_BLOCK_INDEXES[windowIndex] ?? 2;
-}
-
-export function reconcileRotationsForAppliedSignings(
-  run: SeasonRun,
-  catalog: SeasonDraftCatalog,
-  effects: SeasonEffectsState,
-): { run: SeasonRun; effects: SeasonEffectsState } | null {
-  const pendingSignings = run.freeAgency.windows
-    .flatMap((window) => window.signings)
-    .filter((signing) => {
-      const roster = run.rosters.find((entry) => entry.franchiseId === signing.franchiseId);
-      if (roster === undefined) return false;
-      if (!roster.players.some((player) => player.playerVersionId === signing.playerVersionId)) {
-        return false;
-      }
-      const rotation = run.rotations.find((entry) => entry.franchiseId === signing.franchiseId);
-      if (rotation === undefined) return false;
-      const rotationIds = new Set([...rotation.starters, ...rotation.benchOrder]);
-      return !rotationIds.has(signing.playerVersionId);
-    });
-  if (pendingSignings.length === 0) return null;
-
-  const context: SeasonFreeAgencyContext = {
-    run,
-    effects,
-    catalog,
-    index: {
-      schemaVersion: 1,
-      indexVersion: run.versions.freeAgencyIndexVersion,
-      dataVersion: catalog.dataVersion,
-      catalogRef: {
-        catalogVersion: catalog.catalogVersion,
-        contentHash: '0'.repeat(64),
-        candidateCount: catalog.candidates.length,
-      },
-      candidates: [],
-      groupedVersions: {},
-    },
-    humanFranchiseId: null,
-  };
-  let rotations = run.rotations;
-  for (const signing of pendingSignings) {
-    rotations = rotations.map((rotation) => {
-      if (rotation.franchiseId !== signing.franchiseId) return rotation;
-      const roster = run.rosters.find((entry) => entry.franchiseId === signing.franchiseId);
-      if (roster === undefined) {
-        throw new Error(`free agency: missing roster for ${signing.franchiseId}`);
-      }
-      return repairRotationAfterSigning(context, rotation, roster, signing);
-    });
-  }
-  const nextEffects = reconcileSeasonEffects({
-    previous: effects,
-    rosters: run.rosters,
-    rotations,
-  });
-  return {
-    run: { ...run, rotations },
-    effects: nextEffects,
-  };
-}
-
-function repairRotationAfterSigning(
-  context: SeasonFreeAgencyContext,
-  oldRotation: SeasonRotation,
-  roster: SeasonRoster,
-  signing: SeasonFreeAgencySigning,
-): SeasonRotation {
-  const catalogCandidate = context.catalog.candidates.find(
-    (entry) => entry.playerVersionId === signing.playerVersionId,
-  );
-  if (catalogCandidate === undefined) {
-    throw new Error(`free agency: missing catalog candidate for ${signing.playerVersionId}`);
-  }
-  const signingMembership: SeasonRosterMemberInput = {
-    playerVersionId: catalogCandidate.playerVersionId,
-    playable: catalogCandidate.positions.playable,
-  };
-  const rosterMemberInputs = rosterMembers(context, roster);
-  const { members, droppedId } = selectRotationMembersAfterSigning(
-    context,
-    oldRotation.franchiseId,
-    oldRotation,
-    rosterMemberInputs,
-    signingMembership,
-  );
-  const minutesById = new Map(
-    oldRotation.targetMinutes.map((entry) => [entry.playerVersionId, entry.minutes]),
-  );
-  const droppedMinutes = minutesById.get(droppedId) ?? 16;
-  const base = buildMinimalRotation({
-    franchiseId: oldRotation.franchiseId,
-    members,
-  });
-  const rotationMemberIds = members.map((member) => member.playerVersionId);
-  const targetMinutes = rotationMemberIds.map((playerVersionId) => ({
-    playerVersionId,
-    minutes:
-      playerVersionId === signing.playerVersionId
-        ? droppedMinutes
-        : (minutesById.get(playerVersionId) ?? 16),
-  }));
-  const rotation: SeasonRotation = {
-    ...base,
-    targetMinutes,
-    minutePolicy: oldRotation.minutePolicy,
-  };
-  const memberPlayable = new Map<string, readonly Position[]>();
-  for (const member of members) {
-    memberPlayable.set(member.playerVersionId, member.playable);
-  }
-  const failures = validateSeasonRotation(rotation, memberPlayable);
-  if (failures.length > 0) {
-    throw new Error(
-      `free agency: rotation repair for ${oldRotation.franchiseId} failed: ${failures.join('; ')}`,
-    );
-  }
-  return rotation;
-}
-
-function selectRotationMembersAfterSigning(
-  context: SeasonFreeAgencyContext,
-  franchiseId: string,
-  oldRotation: SeasonRotation,
-  rosterMembers: readonly SeasonRosterMemberInput[],
-  signingMembership: SeasonRosterMemberInput,
-): { members: SeasonRosterMemberInput[]; droppedId: string } {
-  const rotationIds = new Set([...oldRotation.starters, ...oldRotation.benchOrder]);
-  const rotationMembers = rosterMembers.filter((member) => rotationIds.has(member.playerVersionId));
-  const assignment = context.run.aiAssignments.find((entry) => entry.franchiseId === franchiseId);
-  const identity = assignment?.identity ?? 'continuity';
-  const scored = rotationMembers
-    .map((member) => ({
-      member,
-      score: identityScore(roleScoresOf(membershipToMember(member, context)), identity),
-    }))
-    .sort((a, b) => {
-      if (a.score !== b.score) return a.score - b.score;
-      return a.member.playerVersionId < b.member.playerVersionId ? -1 : 1;
-    });
-  for (const { member: dropCandidate } of scored) {
-    const remaining = rotationMembers.filter(
-      (member) => member.playerVersionId !== dropCandidate.playerVersionId,
-    );
-    const members = [...remaining, signingMembership];
-    if (members.length !== 10) continue;
-    if (!legalFiveExists(members)) continue;
-    return { members, droppedId: dropCandidate.playerVersionId };
-  }
-  throw new Error(
-    `free agency: rotation repair for ${franchiseId} could not promote ${signingMembership.playerVersionId}`,
-  );
 }

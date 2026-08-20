@@ -607,7 +607,10 @@ export class SeasonHubState {
     await this.dispatch(command);
   }
 
-  async selectCampaignOpportunity(input: { blockIndex: number; opportunityId: string }): Promise<void> {
+  async selectCampaignOpportunity(input: {
+    blockIndex: number;
+    opportunityId: string;
+  }): Promise<void> {
     const command: SeasonRunCommand = {
       schemaVersion: SEASON_RUN_SCHEMA_VERSION,
       command: 'select-campaign-opportunity',
@@ -686,7 +689,11 @@ export class SeasonHubState {
     await this.dispatch(command);
   }
 
-  async respondToTradeCounter(input: { windowIndex: number; inquiryId: string; accept: boolean }): Promise<void> {
+  async respondToTradeCounter(input: {
+    windowIndex: number;
+    inquiryId: string;
+    accept: boolean;
+  }): Promise<void> {
     const command: SeasonRunCommand = {
       schemaVersion: SEASON_RUN_SCHEMA_VERSION,
       command: 'respond-to-trade-counter',
@@ -1187,9 +1194,11 @@ export class SeasonHubState {
     const runId = this.snapshot.run.runId;
     if (this.block.phase === 'running') {
       this.cancel();
-      const deadline = this.now() + 5000;
+      // Use real wall-clock for the cancellation timeout so an injected deterministic
+      // test clock (e.g. now: () => 1_000) cannot freeze the deadline and hang forever.
+      const deadline = Date.now() + 5000;
       const phaseOf = (): BlockPhase => this.block.phase;
-      while (phaseOf() === 'running' && this.now() < deadline) {
+      while (phaseOf() === 'running' && Date.now() < deadline) {
         await sleep(100);
       }
       if (phaseOf() === 'running') {
