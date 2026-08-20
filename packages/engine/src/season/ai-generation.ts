@@ -1937,9 +1937,6 @@ function legalTenExists(state: GenerationState, members: readonly string[]): boo
   const ordered = [...members].sort();
   const picked: string[] = [];
   const rec = (index: number): boolean => {
-    state.nodes += 1;
-    state.nodesByPhase[state.phase] += 1;
-    checkBudget(state);
     if (picked.length === 10) {
       const roster = membersOf(state, picked);
       return (
