@@ -18,6 +18,7 @@ import type {
 import { buildInitialPostseasonState } from './season-postseason.ts';
 import { SEASON_OBJECTIVE_CATALOG } from './season-objective.ts';
 import { SEASON_ALIGNMENT } from './season-alignment.ts';
+import { SEASON_FREE_AGENCY_VERSION } from './season-versions.ts';
 
 export const CONFERENCE_TEAMS: Record<'east' | 'west', string[]> = {
   east: SEASON_ALIGNMENT.filter((entry) => entry.conference === 'east').map(
@@ -102,7 +103,7 @@ export function buildEmptyFreeAgency(): SeasonRun['freeAgency'] {
   const franchises = [...CONFERENCE_TEAMS.east, ...CONFERENCE_TEAMS.west];
   return {
     schemaVersion: 1,
-    freeAgencyVersion: 'season-free-agency-v1',
+    freeAgencyVersion: SEASON_FREE_AGENCY_VERSION,
     windows: [],
     canonicalCandidates: {},
     signingCounts: Object.fromEntries(franchises.map((franchiseId) => [franchiseId, 0])),
@@ -221,7 +222,7 @@ export function buildRun(): SeasonRun {
       almanacVersion: 'almanac-v1',
       replayExportVersion: 'replay-export-v1',
       postseasonTargetsVersion: 'postseason-targets-v1',
-      freeAgencyVersion: 'season-free-agency-v1',
+      freeAgencyVersion: SEASON_FREE_AGENCY_VERSION,
       freeAgencyIndexVersion: 'free-agency-index-v1',
       freeAgencyTargetsVersion: 'free-agency-targets-v1',
     },
@@ -664,7 +665,7 @@ export function buildCheckpointFixture(): SeasonCandidateCheckpoint {
       injuryTargetsVersion: 'injury-targets-v1',
       tradeTargetsVersion: 'trade-targets-v2',
       influenceTargetsVersion: 'influence-targets-v1',
-      freeAgencyVersion: 'season-free-agency-v1',
+      freeAgencyVersion: SEASON_FREE_AGENCY_VERSION,
       freeAgencyIndexVersion: 'free-agency-index-v1',
       freeAgencyTargetsVersion: 'free-agency-targets-v1',
     },

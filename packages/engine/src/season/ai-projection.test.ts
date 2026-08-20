@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   seasonLeagueGenerationResultSchema,
+  RATINGS_VERSION,
   type ProjectionModelArtifact,
   type SimulationPlayer,
 } from '@hoop-rush/data-contracts';
@@ -77,8 +78,8 @@ function tinyModel(): ProjectionModelArtifact {
   return {
     schemaVersion: 1,
     modelVersion: 'projection-model-v1',
-    dataVersion: 'm10-ratings-v3.4',
-    ratingsVersion: 'ratings-v3.4',
+    dataVersion: `m10-${RATINGS_VERSION}`,
+    ratingsVersion: RATINGS_VERSION,
     eraProfileVersions: { '1990s': DEFAULT_ERA_SIM_PROFILE.profileVersion },
     references: {
       '1990s': { neutral: five, archetypes: [] },

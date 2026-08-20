@@ -393,62 +393,16 @@ export class GameRecorder {
   ): Omit<TeamBoxScore, 'diagnostics'> & {
     diagnostics: TeamDiagnostics;
   } {
-    const t = this.sides[side];
     return {
-      teamId,
-      points: t.points,
-      fieldGoals: { made: t.fieldGoalMakes, attempted: t.fieldGoalAttempts },
-      threes: { made: t.threeMakes, attempted: t.threeAttempts },
-      freeThrows: { made: t.freeThrowMakes, attempted: t.freeThrowAttempts },
-      rebounds: {
-        total: t.offensiveRebounds + t.defensiveRebounds + t.teamRebounds,
-        offensive: t.offensiveRebounds,
-        defensive: t.defensiveRebounds,
-        team: t.teamRebounds,
-      },
-      assists: t.assists,
-      steals: t.steals,
-      blocks: t.blocks,
-      turnovers: t.turnovers,
-      fouls: t.fouls,
-      possessions: t.possessions,
-      diagnostics: {
-        assistedFieldGoals: t.assistedFieldGoals,
-        unassistedFieldGoals: t.unassistedFieldGoals,
-        reboundOpportunities:
-          t.fieldGoalAttempts - t.fieldGoalMakes + (t.freeThrowAttempts - t.freeThrowMakes),
-        contestedShots: this.players[side].reduce((sum, p) => sum + p.contestedShots, 0),
-      },
+      ...buildTeamBoxBase(this.sides[side], teamId),
+      diagnostics: teamDiagnostics(this.sides[side], this.players[side]),
     };
   }
 
   teamBox(side: SideIndex, teamId: string): TeamBoxScore {
-    const t = this.sides[side];
     return {
-      teamId,
-      points: t.points,
-      fieldGoals: { made: t.fieldGoalMakes, attempted: t.fieldGoalAttempts },
-      threes: { made: t.threeMakes, attempted: t.threeAttempts },
-      freeThrows: { made: t.freeThrowMakes, attempted: t.freeThrowAttempts },
-      rebounds: {
-        total: t.offensiveRebounds + t.defensiveRebounds + t.teamRebounds,
-        offensive: t.offensiveRebounds,
-        defensive: t.defensiveRebounds,
-        team: t.teamRebounds,
-      },
-      assists: t.assists,
-      steals: t.steals,
-      blocks: t.blocks,
-      turnovers: t.turnovers,
-      fouls: t.fouls,
-      possessions: t.possessions,
-      diagnostics: {
-        assistedFieldGoals: t.assistedFieldGoals,
-        unassistedFieldGoals: t.unassistedFieldGoals,
-        reboundOpportunities:
-          t.fieldGoalAttempts - t.fieldGoalMakes + (t.freeThrowAttempts - t.freeThrowMakes),
-        contestedShots: this.players[side].reduce((sum, p) => sum + p.contestedShots, 0),
-      },
+      ...buildTeamBoxBase(this.sides[side], teamId),
+      diagnostics: teamDiagnostics(this.sides[side], this.players[side]),
     };
   }
 
@@ -456,6 +410,38 @@ export class GameRecorder {
     const t = this.sides[side];
     return zoneSummaryArray(t.zoneAttempts, t.zoneMakes);
   }
+}
+
+function buildTeamBoxBase(t: RecorderSide, teamId: string): Omit<TeamBoxScore, 'diagnostics'> {
+  return {
+    teamId,
+    points: t.points,
+    fieldGoals: { made: t.fieldGoalMakes, attempted: t.fieldGoalAttempts },
+    threes: { made: t.threeMakes, attempted: t.threeAttempts },
+    freeThrows: { made: t.freeThrowMakes, attempted: t.freeThrowAttempts },
+    rebounds: {
+      total: t.offensiveRebounds + t.defensiveRebounds + t.teamRebounds,
+      offensive: t.offensiveRebounds,
+      defensive: t.defensiveRebounds,
+      team: t.teamRebounds,
+    },
+    assists: t.assists,
+    steals: t.steals,
+    blocks: t.blocks,
+    turnovers: t.turnovers,
+    fouls: t.fouls,
+    possessions: t.possessions,
+  };
+}
+
+function teamDiagnostics(t: RecorderSide, players: readonly RecorderPlayer[]): TeamDiagnostics {
+  return {
+    assistedFieldGoals: t.assistedFieldGoals,
+    unassistedFieldGoals: t.unassistedFieldGoals,
+    reboundOpportunities:
+      t.fieldGoalAttempts - t.fieldGoalMakes + (t.freeThrowAttempts - t.freeThrowMakes),
+    contestedShots: players.reduce((sum, player) => sum + player.contestedShots, 0),
+  };
 }
 
 function zoneSummaryArray(

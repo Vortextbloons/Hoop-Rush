@@ -10,6 +10,7 @@ import {
   SEASON_CHEMISTRY_VERSION,
   SEASON_COMMAND_LOG_VERSION,
   SEASON_DRAFT_VERSION,
+  SEASON_DRAFT_SAVE_SCHEMA_VERSION,
   SEASON_EFFECT_TARGETS_VERSION,
   SEASON_FREE_AGENCY_INDEX_VERSION,
   SEASON_FREE_AGENCY_TARGETS_VERSION,
@@ -1389,7 +1390,7 @@ export function buildFixtureStoredDraft(
   const draft = buildSeasonDraftState();
   return {
     recordId: SEASON_DRAFT_RECORD_ID,
-    saveSchemaVersion: 3,
+    saveSchemaVersion: SEASON_DRAFT_SAVE_SCHEMA_VERSION,
     draft: {
       ...draft,
       runId: run.runId,

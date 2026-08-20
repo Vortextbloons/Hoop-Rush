@@ -30,10 +30,7 @@ export function teamSpacing(team: SimulationTeam): number {
 }
 
 export function shotQualityBonus(action: ActionType, zone: ShotZone): number {
-  const table = (
-    ENGINE_CONSTANTS.shotQuality as Partial<Record<ActionType, Partial<Record<ShotZone, number>>>>
-  )[action];
-  return table?.[zone] ?? 0;
+  return ENGINE_CONSTANTS.shotQuality[action][zone];
 }
 
 export function contestPenalty(defender: SimulationPlayer, zone: ShotZone): number {

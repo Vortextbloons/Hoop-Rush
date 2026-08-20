@@ -149,7 +149,7 @@ export class PossessionStepper {
       case 'foul':
         return this.stepFoulCheck();
       case 'inbound': {
-        consumeTime(this.ctx.state, 2);
+        consumeTime(this.ctx.state, ENGINE_CONSTANTS.inboundConsumption);
         this.phase = 'foul';
         return { ended: false, pause: false, periodEnded: false, finished: false };
       }
@@ -304,7 +304,7 @@ export class PossessionStepper {
     const { recorder, state } = this.ctx;
     const offense = this.offenseSide;
     this.continuations += 1;
-    consumeTime(state, 3);
+    consumeTime(state, ENGINE_CONSTANTS.continuationConsumption);
     if (state.secondsRemaining < ENGINE_CONSTANTS.minimumStartSeconds) {
       recorder.possession(offense);
       this.recordTrip();

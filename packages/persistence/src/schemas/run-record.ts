@@ -6,6 +6,7 @@ import {
   gameResultSchema,
   playerIdSchema,
   runModeSchema,
+  runStatusSchema,
   runOutcomeSchema,
   runPlayerSelectionSchema,
   RUN_SCHEMA_VERSION,
@@ -35,7 +36,7 @@ export const activeRunCheckpointSchema = activeRunCheckpointBaseSchema.extend({
   recordId: z.literal('active'),
   saveSchemaVersion: z.literal(CHECKPOINT_SAVE_SCHEMA_VERSION),
 
-  status: z.enum(['active', 'finished']),
+  status: runStatusSchema.extract(['active', 'finished']),
 
   gamesPlayed: z.number().int().min(0).max(82).optional(),
   updatedAtIso: z.iso.datetime().optional(),

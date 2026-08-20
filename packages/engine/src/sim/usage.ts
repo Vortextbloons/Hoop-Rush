@@ -11,6 +11,7 @@ import {
   sameGroupMatchWeight,
   type PositionResponsibilityModifiers,
 } from './position-responsibilities.ts';
+import { SHOT_ZONES } from '../domain/zones.ts';
 
 export type ActionType =
   'isolation' | 'pickAndRoll' | 'pickAndRollRoll' | 'postUp' | 'spotUp' | 'cut' | 'transition';
@@ -256,7 +257,9 @@ export function defenderBase(
   positionModifiers: ReadonlyMap<string, PositionResponsibilityModifiers>,
 ): DefenderBase {
   return {
-    weights: ZONES.map((zone) => team.players.map((defender) => defenderWeight(defender, zone))),
+    weights: SHOT_ZONES.map((zone) =>
+      team.players.map((defender) => defenderWeight(defender, zone)),
+    ),
     rimProtection: team.players.map(
       (defender) => positionModifiers.get(defender.playerId)?.rimProtection ?? 1,
     ),
@@ -285,15 +288,10 @@ export function pickDefender(
   return rng.weightedPick(team.players, weights);
 }
 
-const ZONES: readonly ShotZone[] = ['rim', 'shortMid', 'longMid', 'cornerThree', 'aboveBreakThree'];
-
-const ZONE_INDEX: Record<ShotZone, number> = {
-  rim: 0,
-  shortMid: 1,
-  longMid: 2,
-  cornerThree: 3,
-  aboveBreakThree: 4,
-};
+const ZONE_INDEX = Object.fromEntries(SHOT_ZONES.map((zone, index) => [zone, index])) as Record<
+  ShotZone,
+  number
+>;
 
 export function threePointTarget(shooter: SimulationPlayer, profile: EraSimulationProfile): number {
   const f = shooter.tendencies;
@@ -423,7 +421,7 @@ export function applyZonePulls(
 }
 
 export function pickZone(action: ActionType, prep: ZonePrep, rng: Rng): ShotZone {
-  return rng.weightedPick(ZONES, applyZonePulls(action, prep.base, prep.driveRate));
+  return rng.weightedPick(SHOT_ZONES, applyZonePulls(action, prep.base, prep.driveRate));
 }
 
 export function isThreePointZone(zone: ShotZone): boolean {

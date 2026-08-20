@@ -60,6 +60,7 @@ import {
   seasonCompactInjuryEventSchema,
   seasonBlockRecapSchema,
   SEASON_NEUTRAL_HOME_COURT,
+  RATINGS_VERSION,
   seasonMinutePolicySchema,
 } from './index.ts';
 import {
@@ -954,8 +955,8 @@ describe('season draft catalog schema (M2.1)', () => {
     return {
       schemaVersion: 1,
       catalogVersion: 'season-draft-catalog-v3',
-      dataVersion: 'm10-ratings-v3.4',
-      ratingsVersion: 'ratings-v3.4',
+      dataVersion: `m10-${RATINGS_VERSION}`,
+      ratingsVersion: RATINGS_VERSION,
       positionNormalizationVersion: 'position-v3',
       playerVersionIdVersion: 'player-version-id-v1',
       staminaVersion: 'season-stamina-v1',

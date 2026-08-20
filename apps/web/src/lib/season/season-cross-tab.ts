@@ -52,7 +52,7 @@ export function createSeasonRunChannel(): SeasonRunChannel {
       },
     };
   }
-  const sourceId = `tab-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  const sourceId = `tab-${crypto.randomUUID()}`;
   const channel = new BroadcastChannel(SEASON_RUN_CHANNEL_NAME);
   const listeners = new Set<(mutation: SeasonRunMutation) => void>();
   channel.onmessage = (event: MessageEvent<SeasonRunMutation>) => {

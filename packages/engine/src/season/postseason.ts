@@ -74,6 +74,18 @@ export const POSTSEASON_ALMANAC_DIGEST_PLACEHOLDER = '0'.repeat(32);
 
 const CONFERENCES: readonly ConferenceId[] = ['east', 'west'];
 
+function parsePlayInGameId(gameId: string): {
+  conference: ConferenceId;
+  matchup: PlayInMatchupId;
+} | null {
+  const match = /^pi-(east|west)-(seven-eight|nine-ten|final)$/.exec(gameId);
+  if (match === null) return null;
+  return {
+    conference: match[1] as ConferenceId,
+    matchup: match[2] as PlayInMatchupId,
+  };
+}
+
 const FIRST_ROUND_PAIRS: ReadonlyArray<readonly [number, number]> = [
   [0, 7],
   [3, 4],
@@ -284,10 +296,9 @@ export function seasonPostseasonGameTeamsOf(
   gameId: string,
 ): { home: string; away: string } | null {
   if (postseasonPhaseOfGameId(gameId) === 'play-in') {
-    const match = /^pi-(east|west)-(seven-eight|nine-ten|final)$/.exec(gameId);
-    if (match === null) return null;
-    const conference = match[1] as ConferenceId;
-    const matchup = match[2] as PlayInMatchupId;
+    const parsed = parsePlayInGameId(gameId);
+    if (parsed === null) return null;
+    const { conference, matchup } = parsed;
     const playIn = state.playIn[conference];
     const ranking = playIn.ranking;
     if (ranking === null) return null;
@@ -428,12 +439,11 @@ function applyPlayInGameResult(
   state: SeasonPostseasonState,
   facts: SeasonPostseasonGameFacts,
 ): SeasonPostseasonState {
-  const match = /^pi-(east|west)-(seven-eight|nine-ten|final)$/.exec(facts.gameId);
-  if (match === null) {
+  const parsed = parsePlayInGameId(facts.gameId);
+  if (parsed === null) {
     throw new SeasonPostseasonInvariantError(`malformed play-in game id ${facts.gameId}`);
   }
-  const conference = match[1] as ConferenceId;
-  const matchup = match[2] as PlayInMatchupId;
+  const { conference, matchup } = parsed;
   const playIn = state.playIn[conference];
   const key = gameKeyOf(matchup);
   const game = playIn.games[key];
@@ -1695,16 +1705,16 @@ function roundFactsOf(
   conference: ConferenceId;
 } {
   if (postseasonPhaseOfGameId(gameId) === 'play-in') {
-    const match = /^pi-(east|west)-(seven-eight|nine-ten|final)$/.exec(gameId);
-    if (match === null) {
+    const parsed = parsePlayInGameId(gameId);
+    if (parsed === null) {
       throw new SeasonPostseasonInvariantError(`malformed play-in game id ${gameId}`);
     }
     return {
       phase: 'play-in',
-      round: match[2] as PlayInMatchupId,
+      round: parsed.matchup,
       seriesId: null,
       gameNumber: 1,
-      conference: match[1] as ConferenceId,
+      conference: parsed.conference,
     };
   }
   const parsed = parsePlayoffGameId(gameId);

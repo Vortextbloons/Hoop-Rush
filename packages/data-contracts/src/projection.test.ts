@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   PROJECTION_MODEL_VERSION,
   PROJECTION_SCHEMA_VERSION,
+  RATINGS_VERSION,
   SEASON_DRAFT_CATALOG_VERSION,
   SEASON_DRAFT_CATALOG_V3,
   SEASON_PROJECTION_TARGETS_VERSION,
@@ -167,7 +168,7 @@ function buildBase(offensePoints = 108, defensePoints = 104): BaseFiveProjection
     referenceHash: 'a'.repeat(64),
     eraId: '1990s',
     eraProfileVersion: 'era-1990s-v4',
-    dataVersion: 'm10-ratings-v3.4',
+    dataVersion: `m10-${RATINGS_VERSION}`,
     normalizationVersion: PROJECTION_SCHEMA_VERSION,
     inputDigest: 'b'.repeat(32),
     digest: 'c'.repeat(32),
@@ -214,8 +215,8 @@ function buildModel(): ProjectionModelArtifact {
   return {
     schemaVersion: 1,
     modelVersion: PROJECTION_MODEL_VERSION,
-    dataVersion: 'm10-ratings-v3.4',
-    ratingsVersion: 'ratings-v3.4',
+    dataVersion: `m10-${RATINGS_VERSION}`,
+    ratingsVersion: RATINGS_VERSION,
     eraProfileVersions: { '1990s': 'era-1990s-v4' },
     references: {
       '1990s': {
@@ -368,7 +369,7 @@ describe('season projection schema', () => {
       modelVersion: PROJECTION_MODEL_VERSION,
       eraId: '1990s',
       eraProfileVersion: 'era-1990s-v4',
-      dataVersion: 'm10-ratings-v3.4',
+      dataVersion: `m10-${RATINGS_VERSION}`,
       inputDigest: 'b'.repeat(32),
       digest: 'c'.repeat(32),
       units: [
@@ -416,7 +417,7 @@ describe('season projection schema', () => {
       modelVersion: PROJECTION_MODEL_VERSION,
       eraId: '1990s',
       eraProfileVersion: 'era-1990s-v4',
-      dataVersion: 'm10-ratings-v3.4',
+      dataVersion: `m10-${RATINGS_VERSION}`,
       inputDigest: 'b'.repeat(32),
       digest: 'c'.repeat(32),
       units: [buildUnit('starters', 'starting', 0.7), buildUnit('bench-heavy', 'bench-heavy', 0.4)],
@@ -530,8 +531,8 @@ describe('season draft catalog v4', () => {
     return {
       schemaVersion: 1,
       catalogVersion: SEASON_DRAFT_CATALOG_VERSION,
-      dataVersion: 'm10-ratings-v3.4',
-      ratingsVersion: 'ratings-v3.4',
+      dataVersion: `m10-${RATINGS_VERSION}`,
+      ratingsVersion: RATINGS_VERSION,
       positionNormalizationVersion: 'position-v3',
       playerVersionIdVersion: 'player-version-id-v1',
       staminaVersion: 'season-stamina-v1',

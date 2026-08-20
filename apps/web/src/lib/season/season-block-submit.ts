@@ -5,8 +5,8 @@ import {
   type SeasonRotation,
   type SeasonSubmitBlockCommand,
 } from '@hoop-rush/data-contracts';
-import { freeAgencyUnresolvedWindowIndex } from '@hoop-rush/engine';
-import { loadSeasonHomeCourtProfile, seasonArtifactUrls } from './season-assets';
+import { freeAgencyUnresolvedWindowIndex, reconcileRotationsForAppliedSignings } from '@hoop-rush/engine';
+import { loadSeasonDraftCatalog, loadSeasonHomeCourtProfile, seasonArtifactUrls } from './season-assets';
 import { newSeasonId } from './season-ids';
 import { pendingRotationSetDigest } from './season-lock-preview';
 import type { SubmitBlockEnvelope } from './season-hub-state';
@@ -92,17 +92,15 @@ export async function buildSubmitBlockEnvelope(
 
   const pendingHumanRotation = editor.rotation;
   const blockIndex = nextBlockIndex;
-  const rotations: SeasonRotation[] = run.rotations.map((rotation) =>
-    rotation.franchiseId === humanFranchiseId ? pendingHumanRotation : rotation,
-  );
-  const rotationDigest = pendingRotationSetDigest(run.rotations, pendingHumanRotation);
 
   let homeCourt: Awaited<ReturnType<typeof loadSeasonHomeCourtProfile>>;
   let artifactUrls: Awaited<ReturnType<typeof seasonArtifactUrls>>;
+  let catalog: Awaited<ReturnType<typeof loadSeasonDraftCatalog>>;
   try {
-    [homeCourt, artifactUrls] = await Promise.all([
+    [homeCourt, artifactUrls, catalog] = await Promise.all([
       loadSeasonHomeCourtProfile(),
       seasonArtifactUrls(),
+      loadSeasonDraftCatalog(),
     ]);
   } catch (error) {
     return fail(
@@ -110,6 +108,32 @@ export async function buildSubmitBlockEnvelope(
       `The block cannot start because packaged assets are unavailable: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
+
+  let runForBlock = run;
+  let effectsForBlock = snapshot.effects;
+  const repaired = reconcileRotationsForAppliedSignings(run, catalog, snapshot.effects);
+  if (repaired !== null) {
+    runForBlock = repaired.run;
+    effectsForBlock = repaired.effects;
+  }
+
+  const humanSigning = runForBlock.freeAgency.windows
+    .flatMap((window) => window.signings)
+    .find((signing) => signing.franchiseId === humanFranchiseId);
+  const humanRotationIds = new Set([
+    ...pendingHumanRotation.starters,
+    ...pendingHumanRotation.benchOrder,
+  ]);
+  const humanRotation =
+    humanSigning !== undefined && !humanRotationIds.has(humanSigning.playerVersionId)
+      ? (runForBlock.rotations.find((rotation) => rotation.franchiseId === humanFranchiseId) ??
+        pendingHumanRotation)
+      : pendingHumanRotation;
+
+  const rotations: SeasonRotation[] = runForBlock.rotations.map((rotation) =>
+    rotation.franchiseId === humanFranchiseId ? humanRotation : rotation,
+  );
+  const rotationDigest = pendingRotationSetDigest(runForBlock.rotations, humanRotation);
 
   const commandId = newSeasonId('blk');
   const command: SeasonSubmitBlockCommand = {
@@ -127,8 +151,8 @@ export async function buildSubmitBlockEnvelope(
   };
 
   const start: SeasonBlockStartInput = {
-    run,
-    effects: snapshot.effects,
+    run: runForBlock,
+    effects: effectsForBlock,
     rotations,
     blockIndex,
     expectedRevision: blockIndex,

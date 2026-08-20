@@ -363,6 +363,7 @@ export {
   applyFreeAgencyDeclaration,
   applyFreeAgencySkip,
   resolveSeasonFreeAgencyWindow,
+  reconcileRotationsForAppliedSignings,
   FreeAgencyValidationRejection,
   type SeasonFreeAgencyContext,
   type SeasonFreeAgencyWindowOpenResult,
@@ -380,7 +381,57 @@ export {
   type SeasonTradeGradesInput,
 } from './season/trade-grades.ts';
 
-export * as classic from './modes/classic/draft.ts';
+import {
+  classicRollSeed,
+  sortClassicCatalog,
+  slotRequirement as classicSlotRequirement,
+  classicRollCandidates,
+  classicRerollAvailable,
+  rollClassicPair,
+  createClassicDraft,
+  rerollClassicFranchise,
+  rerollClassicEra,
+  draftClassicPlayer,
+  repositionClassicPlayer,
+  createClassicChallenge,
+} from './modes/classic/draft.ts';
+
+export {
+  classicRollSeed,
+  sortClassicCatalog,
+  classicRollCandidates,
+  classicRerollAvailable,
+  rollClassicPair,
+  createClassicDraft,
+  rerollClassicFranchise,
+  rerollClassicEra,
+  draftClassicPlayer,
+  repositionClassicPlayer,
+  createClassicChallenge,
+} from './modes/classic/draft.ts';
+export { classicSlotRequirement };
+export type {
+  ClassicRollKind,
+  ClassicDraftInput,
+  ClassicDraftPlayerInput,
+  ClassicRepositionInput,
+  ClassicChallengeEnvironment,
+} from './modes/classic/draft.ts';
+
+export const classic = Object.freeze({
+  classicRollSeed,
+  sortClassicCatalog,
+  slotRequirement: classicSlotRequirement,
+  classicRollCandidates,
+  classicRerollAvailable,
+  rollClassicPair,
+  createClassicDraft,
+  rerollClassicFranchise,
+  rerollClassicEra,
+  draftClassicPlayer,
+  repositionClassicPlayer,
+  createClassicChallenge,
+});
 
 export {
   projectBaseFive,

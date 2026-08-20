@@ -11,6 +11,7 @@ import {
   seasonCommandLogEntrySchema,
   seasonCommandLogSchema,
   seasonCompactInjuryEventSchema,
+  seasonControlSchema,
   seasonEffectsStateSchema,
   seasonFreeAgencyStateSchema,
   seasonGameSimulationResultSchema,
@@ -103,7 +104,7 @@ export const seasonRunCursorSchema = z.object({
       teams: z.array(
         z.object({
           franchiseId: z.string().min(1).max(64),
-          control: z.enum(['human', 'ai']),
+          control: seasonControlSchema,
         }),
       ),
     }),
@@ -223,7 +224,7 @@ export const storedSeasonPostseasonSummaryRowSchema = z.object({
 
   gameId: z.string().min(1).max(64),
 
-  phase: z.enum(['play-in', 'playoffs']),
+  phase: seasonPostseasonPhaseSchema,
 
   summary: seasonPostseasonSummarySchema,
 
@@ -254,7 +255,7 @@ export const storedSeasonPostseasonDetailRowSchema = z.object({
 
   gameId: z.string().min(1).max(64),
 
-  phase: z.enum(['play-in', 'playoffs']),
+  phase: seasonPostseasonPhaseSchema,
 
   detail: seasonPostseasonDetailSchema,
 

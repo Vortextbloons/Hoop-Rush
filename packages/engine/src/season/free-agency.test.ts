@@ -16,10 +16,12 @@ import {
   freeAgencySeed,
   freeAgencyUnresolvedWindowIndex,
   openSeasonFreeAgencyWindow,
+  reconcileRotationsForAppliedSignings,
   resolveSeasonFreeAgencyWindow,
   seasonFreeAgencyUniverseOf,
 } from './free-agency.ts';
 import { buildEconomyTestRun } from './season-economy-test-support.ts';
+import { expandSeasonRunRosters } from './block.ts';
 import { reconcileSeasonEffects } from './effects.ts';
 import { buildMinimalRotation } from './rotation.ts';
 
@@ -559,5 +561,71 @@ describe('effects reconciliation (season-chemistry-v2)', () => {
     for (const pair of newPairs) {
       expect(pair.sharedPossessions).toBe(0);
     }
+  });
+
+  it('repairs the rotation to ten members when a signing lands', () => {
+    const { run, catalog, index } = fixture();
+    const context = contextOf(run, catalog, index);
+    const opened = openSeasonFreeAgencyWindow(context, 0, 2);
+    const target = opened.window.candidates[0];
+    if (target === undefined) throw new Error('no candidates');
+    const declared = applyFreeAgencyDeclaration(
+      { ...run, freeAgency: opened.freeAgency },
+      0,
+      HUMAN,
+      'cmd-d',
+      [{ playerVersionId: target.playerVersionId, roleExpectation: 'depth', influence: 1 }],
+    );
+    const resolved = resolveSeasonFreeAgencyWindow(
+      { ...context, run: { ...run, freeAgency: declared } },
+      0,
+      'cmd-r',
+    );
+    const humanRoster = resolved.rosters.find((roster) => roster.franchiseId === HUMAN);
+    const humanRotation = resolved.rotations.find((rotation) => rotation.franchiseId === HUMAN);
+    if (humanRoster === undefined || humanRotation === undefined) throw new Error('fixture');
+    expect(humanRoster.players.length).toBeGreaterThan(10);
+    const rotationIds = new Set([...humanRotation.starters, ...humanRotation.benchOrder]);
+    expect(rotationIds.size).toBe(10);
+    expect(rotationIds.has(target.playerVersionId)).toBe(true);
+
+    const expanded = expandSeasonRunRosters({ ...run, rosters: resolved.rosters }, catalog);
+    expect(expanded.has(target.playerVersionId)).toBe(true);
+  });
+
+  it('reconciles rotations for signings that landed before rotation repair shipped', () => {
+    const { run, catalog, index } = fixture();
+    const context = contextOf(run, catalog, index);
+    const opened = openSeasonFreeAgencyWindow(context, 0, 2);
+    const target = opened.window.candidates[0];
+    if (target === undefined) throw new Error('no candidates');
+    const declared = applyFreeAgencyDeclaration(
+      { ...run, freeAgency: opened.freeAgency },
+      0,
+      HUMAN,
+      'cmd-d',
+      [{ playerVersionId: target.playerVersionId, roleExpectation: 'depth', influence: 1 }],
+    );
+    const resolved = resolveSeasonFreeAgencyWindow(
+      { ...context, run: { ...run, freeAgency: declared } },
+      0,
+      'cmd-r',
+    );
+    const staleRun = {
+      ...run,
+      rosters: resolved.rosters,
+      freeAgency: resolved.freeAgency,
+      ownership: resolved.ownership,
+      influence: resolved.influence,
+      transactions: resolved.transactions,
+    };
+    const repaired = reconcileRotationsForAppliedSignings(staleRun, catalog, resolved.effects);
+    expect(repaired).not.toBeNull();
+    const humanRotation = repaired?.run.rotations.find(
+      (rotation) => rotation.franchiseId === HUMAN,
+    );
+    if (humanRotation === undefined) throw new Error('fixture');
+    const rotationIds = new Set([...humanRotation.starters, ...humanRotation.benchOrder]);
+    expect(rotationIds.has(target.playerVersionId)).toBe(true);
   });
 });

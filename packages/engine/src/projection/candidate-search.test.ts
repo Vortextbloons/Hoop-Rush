@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ProjectionModelArtifact } from '@hoop-rush/data-contracts';
+import { RATINGS_VERSION, type ProjectionModelArtifact } from '@hoop-rush/data-contracts';
 import { DEFAULT_ERA_SIM_PROFILE } from '@hoop-rush/test-fixtures';
 import {
   buildHumanSeasonRoster,
@@ -14,8 +14,8 @@ function smallModel(): ProjectionModelArtifact {
   return {
     schemaVersion: 1,
     modelVersion: 'projection-model-v1',
-    dataVersion: 'm10-ratings-v3.4',
-    ratingsVersion: 'ratings-v3.4',
+    dataVersion: `m10-${RATINGS_VERSION}`,
+    ratingsVersion: RATINGS_VERSION,
     eraProfileVersions: { '1990s': DEFAULT_ERA_SIM_PROFILE.profileVersion },
     references: {
       '1990s': {

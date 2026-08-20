@@ -7,14 +7,7 @@ export default defineConfig({
       'packages/*',
       'tools/*',
       'apps/*',
-      {
-        extends: 'apps/web/vitest.config.ts',
-        test: {
-          name: 'web-jsdom',
-          environment: 'jsdom',
-          include: ['src/lib/components/__tests__/**/*.test.ts'],
-        },
-      },
+      'apps/web/vitest.jsdom.config.ts',
     ],
 
     maxWorkers: process.env.VITEST_MAX_WORKERS

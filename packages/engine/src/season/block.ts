@@ -2,6 +2,8 @@ import {
   SEASON_ENDING_MISSED_GAMES_SENTINEL,
   SEASON_BLOCK_COUNT,
   SEASON_FREE_AGENCY_VERSION,
+  SEASON_ROSTER_MAX_SIZE,
+  SEASON_ROSTER_MIN_SIZE,
   SEASON_ROUND_COUNT,
   SEASON_SEED_NAMESPACES,
   SEASON_TEAM_COUNT,
@@ -234,32 +236,19 @@ export function expandSeasonRunRosters(
   const candidates = new Map(
     catalog.candidates.map((candidate) => [candidate.playerVersionId, candidate]),
   );
-  const rosterByFranchise = new Map(run.rosters.map((roster) => [roster.franchiseId, roster]));
   const expanded = new Map<string, SeasonGamePlayerInput>();
-  const seen = new Set<string>();
-  for (const rotation of run.rotations) {
-    const roster = rosterByFranchise.get(rotation.franchiseId);
-    if (roster === undefined) {
-      throw new Error(`rotation for unknown franchise ${rotation.franchiseId}`);
-    }
-    const rosterById = new Map(roster.players.map((player) => [player.playerVersionId, player]));
-    for (const playerVersionId of [...rotation.starters, ...rotation.benchOrder]) {
-      const player = rosterById.get(playerVersionId);
-      if (player === undefined) {
-        throw new Error(
-          `rotation member ${playerVersionId} is not on roster ${rotation.franchiseId}`,
-        );
+  for (const roster of run.rosters) {
+    for (const player of roster.players) {
+      const { playerVersionId } = player;
+      if (expanded.has(playerVersionId)) {
+        throw new Error(`playerVersionId ${playerVersionId} appears on more than one roster`);
       }
       const candidate = candidates.get(playerVersionId);
       if (candidate === undefined) {
         throw new Error(
-          `roster ${rotation.franchiseId} references unknown catalog version ${playerVersionId}`,
+          `roster ${roster.franchiseId} references unknown catalog version ${playerVersionId}`,
         );
       }
-      if (seen.has(playerVersionId)) {
-        throw new Error(`playerVersionId ${playerVersionId} appears on more than one roster`);
-      }
-      seen.add(playerVersionId);
       expanded.set(playerVersionId, {
         playerVersionId,
         playerId: player.playerId,
@@ -280,9 +269,11 @@ export function expandSeasonRunRosters(
       });
     }
   }
-  if (expanded.size !== SEASON_TEAM_COUNT * 10) {
+  const minExpanded = SEASON_TEAM_COUNT * SEASON_ROSTER_MIN_SIZE;
+  const maxExpanded = SEASON_TEAM_COUNT * SEASON_ROSTER_MAX_SIZE;
+  if (expanded.size < minExpanded || expanded.size > maxExpanded) {
     throw new Error(
-      `expanded rosters must own exactly ${String(SEASON_TEAM_COUNT * 10)} distinct versions (got ${String(expanded.size)})`,
+      `expanded rosters must own between ${String(minExpanded)} and ${String(maxExpanded)} distinct versions (got ${String(expanded.size)})`,
     );
   }
   return expanded;

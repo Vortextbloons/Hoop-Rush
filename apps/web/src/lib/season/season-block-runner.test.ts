@@ -6,6 +6,7 @@ import type {
 } from '@hoop-rush/persistence';
 import {
   SEASON_NEUTRAL_HOME_COURT,
+  SEASON_FREE_AGENCY_VERSION,
   seasonWorkerCancelRequestSchema,
   seasonWorkerContinueRequestSchema,
   seasonWorkerStartRequestSchema,
@@ -777,7 +778,7 @@ describe('season block runner (M2.5 wire)', () => {
       ...makeRun(),
       freeAgency: {
         schemaVersion: 1 as const,
-        freeAgencyVersion: 'season-free-agency-v1' as const,
+        freeAgencyVersion: SEASON_FREE_AGENCY_VERSION,
         windows: [],
         canonicalCandidates: {
           'p-magic': {
@@ -815,7 +816,7 @@ describe('season block runner (M2.5 wire)', () => {
     const candidate = makeCandidate(run, {
       freeAgency: {
         schemaVersion: 1,
-        freeAgencyVersion: 'season-free-agency-v1',
+        freeAgencyVersion: SEASON_FREE_AGENCY_VERSION,
         windows: [],
         canonicalCandidates: {},
         signingCounts: Object.fromEntries(LEAGUE.teams.map((team) => [team.franchiseId, 0])),

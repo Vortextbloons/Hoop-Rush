@@ -1846,6 +1846,7 @@ function handleResolveFreeAgentMarket(
     influence: resolution.influence,
     transactions: resolution.transactions,
     effects: resolution.effects,
+    rotations: resolution.rotations,
   });
   const humanSigned = resolution.signings.some(
     (signing) => signing.franchiseId === context.humanFranchiseId,

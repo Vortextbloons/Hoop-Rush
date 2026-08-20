@@ -1,5 +1,6 @@
 import type { ShotZone, SlotGroup } from '@hoop-rush/data-contracts';
 import type { PositionResponsibilityModifiers } from './position-responsibilities.ts';
+import type { ActionType } from './usage.ts';
 
 export const ENGINE_VERSION = 'm3-engine-v11';
 
@@ -70,7 +71,8 @@ export const ENGINE_CONSTANTS = {
   bonusFoulsRegulation: 5,
   bonusFoulsOvertime: 2,
 
-  secondsPerFreeThrow: 0,
+  inboundConsumption: 2,
+  continuationConsumption: 3,
   shotClockSeconds: 24,
   minimumTripSeconds: 1,
   minimumStartSeconds: 0.5,
@@ -120,13 +122,14 @@ export const ENGINE_CONSTANTS = {
   twoPointAnchorSkillScale: 0.3,
 
   shotQuality: {
-    transition: { rim: 0.03, shortMid: 0.02 },
-    cut: { rim: 0.03 },
-    pickAndRollRoll: { rim: 0.02 },
-    pickAndRoll: { rim: 0.01 },
-    postUp: { rim: -0.005, shortMid: -0.005 },
-    isolation: { longMid: -0.01, shortMid: -0.005 },
-  } as const,
+    isolation: { rim: 0, shortMid: -0.005, longMid: -0.01, cornerThree: 0, aboveBreakThree: 0 },
+    pickAndRoll: { rim: 0.01, shortMid: 0, longMid: 0, cornerThree: 0, aboveBreakThree: 0 },
+    pickAndRollRoll: { rim: 0.02, shortMid: 0, longMid: 0, cornerThree: 0, aboveBreakThree: 0 },
+    postUp: { rim: -0.005, shortMid: -0.005, longMid: 0, cornerThree: 0, aboveBreakThree: 0 },
+    spotUp: { rim: 0, shortMid: 0, longMid: 0, cornerThree: 0, aboveBreakThree: 0 },
+    cut: { rim: 0.03, shortMid: 0, longMid: 0, cornerThree: 0, aboveBreakThree: 0 },
+    transition: { rim: 0.03, shortMid: 0.02, longMid: 0, cornerThree: 0, aboveBreakThree: 0 },
+  } as const satisfies Record<ActionType, Record<ShotZone, number>>,
 
   spacingBonusScale: 0.06,
 

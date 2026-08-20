@@ -105,6 +105,10 @@ export interface SeasonPostseasonProgress {
   error: { code: string; message: string } | null;
 }
 
+export interface SeasonHubStateOptions {
+  now?: () => number;
+}
+
 function postCommandEffects(run: SeasonRun, prior: SeasonEffectsState): SeasonEffectsState {
   const withEffects = run as SeasonRun & { effects?: SeasonEffectsState };
   return withEffects.effects ?? prior;
@@ -149,6 +153,7 @@ export class SeasonHubState {
   private profilePromise: Promise<EraSimulationProfile> | null = null;
 
   private readonly channel: SeasonRunChannel;
+  private readonly now: () => number;
   private unsubscribeChannel: (() => void) | null = null;
 
   private externalReloading = false;
@@ -181,9 +186,11 @@ export class SeasonHubState {
     repo: SeasonRunRepository & SeasonPostseasonRepository,
     runner: SeasonBlockRunner,
     postseasonRunner?: SeasonPostseasonRunner,
+    options: SeasonHubStateOptions = {},
   ) {
     this.repo = repo;
     this.runner = runner;
+    this.now = options.now ?? (() => Date.now());
     this.unsubscribeRunner = runner.subscribe((event) => {
       this.onRunnerEvent(event);
     });
@@ -399,7 +406,7 @@ export class SeasonHubState {
     if (incompatible === null) return;
     await this.repo.clearSeasonRun(incompatible.runId);
     clearCachedSeasonSnapshot();
-    this.channel.announce({ kind: 'clear', runId: incompatible.runId, committedAt: Date.now() });
+    this.channel.announce({ kind: 'clear', runId: incompatible.runId, committedAt: this.now() });
     this.incompatible = null;
     this.snapshot = null;
     this.index = null;
@@ -419,7 +426,7 @@ export class SeasonHubState {
       this.interruption = null;
       this.block = { ...IDLE_BLOCK };
       this.error = null;
-      this.channel.announce({ kind: 'clear', runId: null, committedAt: Date.now() });
+      this.channel.announce({ kind: 'clear', runId: null, committedAt: this.now() });
       await this.refresh();
       return { ok: true, error: null };
     } catch (error) {
@@ -954,7 +961,7 @@ export class SeasonHubState {
         break;
       case 'committed': {
         this.snapshot = event.snapshot;
-        this.index = indexAfterCommit(this.index, event.snapshot);
+        this.index = indexAfterCommit(this.index, event.snapshot, this.now);
         setCachedSeasonSnapshot(event.snapshot);
         this.postseason = {
           ...this.postseason,
@@ -965,7 +972,7 @@ export class SeasonHubState {
         this.channel.announce({
           kind: 'replace',
           runId: event.runId,
-          committedAt: Date.now(),
+          committedAt: this.now(),
         });
         break;
       }
@@ -987,11 +994,11 @@ export class SeasonHubState {
           this.channel.announce({
             kind: 'clear',
             runId: event.runId,
-            committedAt: Date.now(),
+            committedAt: this.now(),
           });
         } else if (event.snapshot !== null) {
           this.snapshot = event.snapshot;
-          this.index = indexAfterCommit(this.index, event.snapshot);
+          this.index = indexAfterCommit(this.index, event.snapshot, this.now);
           setCachedSeasonSnapshot(event.snapshot);
         }
         void this.refresh();
@@ -1034,9 +1041,9 @@ export class SeasonHubState {
     const runId = this.snapshot.run.runId;
     if (this.block.phase === 'running') {
       this.cancel();
-      const deadline = Date.now() + 5000;
+      const deadline = this.now() + 5000;
       const phaseOf = (): BlockPhase => this.block.phase;
-      while (phaseOf() === 'running' && Date.now() < deadline) {
+      while (phaseOf() === 'running' && this.now() < deadline) {
         await sleep(100);
       }
       if (phaseOf() === 'running') {
@@ -1048,7 +1055,7 @@ export class SeasonHubState {
     try {
       await this.repo.clearSeasonRun(runId);
       clearCachedSeasonSnapshot();
-      this.channel.announce({ kind: 'clear', runId, committedAt: Date.now() });
+      this.channel.announce({ kind: 'clear', runId, committedAt: this.now() });
       await this.refresh();
       return { ok: true, error: null };
     } catch (error) {
@@ -1182,14 +1189,14 @@ export class SeasonHubState {
         this.pending = null;
         this.interruption = null;
         this.snapshot = event.snapshot;
-        this.index = indexAfterCommit(this.index, event.snapshot);
+        this.index = indexAfterCommit(this.index, event.snapshot, this.now);
         setCachedSeasonSnapshot(event.snapshot);
         this.block = { ...IDLE_BLOCK };
         this.channel.announce({
           kind: 'commit',
           runId: event.snapshot.run.runId,
           revision: event.snapshot.acceptedBlocks.length,
-          committedAt: Date.now(),
+          committedAt: this.now(),
         });
         this.emit();
         return;
@@ -1232,6 +1239,7 @@ export class SeasonHubState {
 function indexAfterCommit(
   index: SeasonActiveRunIndex | null,
   snapshot: SeasonRunSnapshot,
+  now: () => number,
 ): SeasonActiveRunIndex | null {
   const humanFranchiseId = humanFranchiseIdOf(snapshot.run.league);
   const humanRow =
@@ -1247,7 +1255,7 @@ function indexAfterCommit(
       revision: snapshot.acceptedBlocks.length,
       humanWins: humanRow?.wins ?? 0,
       humanLosses: humanRow?.losses ?? 0,
-      updatedAtIso: new Date().toISOString(),
+      updatedAtIso: new Date(now()).toISOString(),
     };
   }
   return {
@@ -1259,7 +1267,7 @@ function indexAfterCommit(
     revision: snapshot.acceptedBlocks.length,
     humanWins: humanRow?.wins ?? index.humanWins,
     humanLosses: humanRow?.losses ?? index.humanLosses,
-    updatedAtIso: new Date().toISOString(),
+    updatedAtIso: new Date(now()).toISOString(),
   };
 }
 

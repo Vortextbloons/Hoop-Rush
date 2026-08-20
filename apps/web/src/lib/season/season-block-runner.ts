@@ -579,7 +579,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       priorSummaries = summaries;
     }
 
-    const plainRotations = deepClonePlain(state.rotations);
+    const plainRotations = cloneForWorker(state.rotations);
     const plainCommon = {
       requestId,
       runId: state.input.run.runId,
@@ -592,26 +592,26 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       catalogHash: artifacts.catalogHash,
       profileUrl: artifacts.profileUrl,
       profileHash: artifacts.profileHash,
-      ...(priorSummaries !== undefined ? { priorSummaries: deepClonePlain(priorSummaries) } : {}),
-      ...(newSummaries !== undefined ? { newSummaries: deepClonePlain(newSummaries) } : {}),
+      ...(priorSummaries !== undefined ? { priorSummaries: cloneForWorker(priorSummaries) } : {}),
+      ...(newSummaries !== undefined ? { newSummaries: cloneForWorker(newSummaries) } : {}),
 
       ...(state.resumePending !== null
-        ? { priorEffects: deepClonePlain(state.resumePending.effects) }
+        ? { priorEffects: cloneForWorker(state.resumePending.effects) }
         : priorSummaries !== undefined
-          ? { priorEffects: deepClonePlain(state.input.effects) }
+          ? { priorEffects: cloneForWorker(state.input.effects) }
           : {}),
 
       ...(state.resumePending !== null
-        ? { priorHealth: deepClonePlain(state.resumePending.health) }
+        ? { priorHealth: cloneForWorker(state.resumePending.health) }
         : priorSummaries !== undefined
-          ? { priorHealth: deepClonePlain(state.input.run.health) }
+          ? { priorHealth: cloneForWorker(state.input.run.health) }
           : {}),
 
       startGameId: state.resumePending?.nextGameId ?? null,
       objectiveId: state.input.objectiveId,
 
-      priorInfluence: deepClonePlain(state.input.run.influence),
-      priorTransactions: deepClonePlain(state.input.run.transactions),
+      priorInfluence: cloneForWorker(state.input.run.influence),
+      priorTransactions: cloneForWorker(state.input.run.transactions),
       expectedStateRevision: state.input.run.stateRevision,
       expectedStateDigest: state.input.run.stateDigest,
       humanFranchiseId: state.input.humanFranchiseId,
@@ -629,7 +629,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       schemaVersion: 6,
       type: 'season-block-start',
 
-      run: deepClonePlain({
+      run: cloneForWorker({
         schemaVersion: state.input.run.schemaVersion,
         runId: state.input.run.runId,
         rootSeed: state.input.run.rootSeed,
@@ -639,8 +639,8 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         rotations: state.rotations,
         cursor: state.input.run.cursor,
       }),
-      schedule: deepClonePlain(schedule),
-      homeCourt: deepClonePlain(state.input.homeCourt),
+      schedule: cloneForWorker(schedule),
+      homeCourt: cloneForWorker(state.input.homeCourt),
       ...plainCommon,
     });
   }
@@ -650,7 +650,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       if (currentRequestId !== null) {
         throw new Error('a season block is already running; cancel it first');
       }
-      const requestId = `sb-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+      const requestId = `sb-${crypto.randomUUID()}`;
       currentRequestId = requestId;
       current = {
         blockIndex: input.blockIndex,
@@ -750,7 +750,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       if (currentRequestId !== null) {
         throw new Error('a season block is already running; cancel it first');
       }
-      const requestId = `sb-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+      const requestId = `sb-${crypto.randomUUID()}`;
       currentRequestId = requestId;
       void (async () => {
         try {
@@ -882,7 +882,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
               : await import('./season-assets').then((module) => module.seasonArtifactUrls());
           if (requestActive()) return;
           const target = createWorker();
-          const requestId = `warm-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+          const requestId = `warm-${crypto.randomUUID()}`;
           warmRequestId = requestId;
           target.postMessage(
             seasonWorkerWarmRequestSchema.parse({
@@ -1007,15 +1007,28 @@ function objectivesWithSuccess(
   };
 }
 
-function deepClonePlain<T>(value: T): T {
-  if (Array.isArray(value)) {
-    const items = value as unknown[];
-    return items.map((item) => deepClonePlain(item)) as T;
+function cloneForWorker<T>(value: T): T {
+  try {
+    return structuredClone(value);
+  } catch (error) {
+    if (!(error instanceof Error) || error.name !== 'DataCloneError') throw error;
+    return clonePlain(value);
   }
+}
+
+function clonePlain<T>(value: T): T {
+  if (value instanceof Date) return new Date(value.getTime()) as T;
+  if (Array.isArray(value)) return value.map((item) => clonePlain(item)) as T;
+  if (value instanceof Map) {
+    return new Map(
+      [...value.entries()].map(([key, item]) => [clonePlain(key), clonePlain(item)]),
+    ) as T;
+  }
+  if (value instanceof Set) return new Set([...value].map((item) => clonePlain(item))) as T;
   if (value !== null && typeof value === 'object') {
     const out: Record<string, unknown> = {};
     for (const key of Object.keys(value)) {
-      out[key] = deepClonePlain((value as Record<string, unknown>)[key]);
+      out[key] = clonePlain((value as Record<string, unknown>)[key]);
     }
     return out as T;
   }
