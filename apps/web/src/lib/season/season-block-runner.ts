@@ -148,6 +148,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
   const listeners = new Set<(event: SeasonRunnerEvent) => void>();
   let worker: Worker | null = null;
   let currentRequestId: string | null = null;
+  const cancelledBeforeWorker = new Set<string>();
   const requestActive = () => currentRequestId !== null;
 
   let warmRequestId: string | null = null;
@@ -205,6 +206,16 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
 
   function emit(event: SeasonRunnerEvent): void {
     for (const listener of [...listeners]) listener(event);
+  }
+
+  function consumePreWorkerCancellation(requestId: string, blockIndex: number): boolean {
+    if (!cancelledBeforeWorker.delete(requestId)) return false;
+    if (currentRequestId === requestId) {
+      currentRequestId = null;
+      current = null;
+    }
+    emit({ type: 'cancelled', requestId, blockIndex });
+    return true;
   }
 
   let catalogCache: { url: string; hash: string; catalog: SeasonDraftCatalog } | null = null;
@@ -675,6 +686,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
               ? deps.artifacts()
               : import('./season-assets').then((module) => module.seasonArtifactUrls()),
           ]);
+          if (consumePreWorkerCancellation(requestId, input.blockIndex)) return;
           if (currentRequestId !== requestId) return;
           if (
             runState === null ||
@@ -728,12 +740,14 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
           if (seasonRotationSetDigest(input.rotations) !== input.rotationDigest) {
             throw new Error('rotation digest does not match the submitted rotations');
           }
+          if (consumePreWorkerCancellation(requestId, input.blockIndex)) return;
           if (currentRequestId !== requestId) return;
           const plainStart = buildRequest(requestId, current, schedule, artifacts);
           const target = createWorker();
           target.postMessage(plainStart);
           emit({ type: 'started', requestId, blockIndex: input.blockIndex });
         } catch (error) {
+          if (consumePreWorkerCancellation(requestId, input.blockIndex)) return;
           if (currentRequestId !== requestId) return;
           emit({
             type: 'error',
@@ -766,6 +780,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
               ? deps.artifacts()
               : import('./season-assets').then((module) => module.seasonArtifactUrls()),
           ]);
+          if (consumePreWorkerCancellation(requestId, input.blockIndex)) return;
           if (currentRequestId !== requestId) return;
 
           const snapshot = await repository.loadActiveRun();
@@ -821,6 +836,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
             profileUrl: input.profileUrl,
             profileHash: input.profileHash,
           };
+          if (consumePreWorkerCancellation(requestId, input.blockIndex)) return;
           if (currentRequestId !== requestId) return;
           current = {
             blockIndex: input.blockIndex,
@@ -836,6 +852,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
           target.postMessage(plainStart);
           emit({ type: 'started', requestId, blockIndex: input.blockIndex });
         } catch (error) {
+          if (consumePreWorkerCancellation(requestId, input.blockIndex)) return;
           if (currentRequestId !== requestId) return;
           emit({
             type: 'error',
@@ -854,7 +871,11 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     },
 
     cancel(requestId: string): void {
-      if (worker === null || requestId !== currentRequestId) return;
+      if (requestId !== currentRequestId) return;
+      if (worker === null) {
+        cancelledBeforeWorker.add(requestId);
+        return;
+      }
       worker.postMessage(
         seasonWorkerCancelRequestSchema.parse({
           schemaVersion: 7,
@@ -869,6 +890,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       worker = null;
       currentRequestId = null;
       current = null;
+      cancelledBeforeWorker.clear();
       warmRequestId = null;
       warmed = false;
 

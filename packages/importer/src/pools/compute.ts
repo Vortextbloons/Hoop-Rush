@@ -1044,6 +1044,7 @@ export function computePool(
   const playersOut: PoolPlayer[] = [];
   const identityFailures: string[] = [];
   for (const pid of [...eligible.keys()].sort()) {
+    const failureStart = identityFailures.length;
     const candidates = eligible.get(pid);
     if (!candidates) {
       continue;
@@ -1135,7 +1136,7 @@ export function computePool(
     }
     const anchorsOut = sanitizeAnchors(player.anchors as Record<string, unknown>);
     const provenanceOut = (player.provenance ?? {}) as Record<string, HistoricalValueProvenance>;
-    if (identityFailures.length > 0) {
+    if (identityFailures.length > failureStart) {
       continue;
     }
 

@@ -378,7 +378,8 @@ export function seasonBlockRejection(
   if (input.campaignState !== undefined) {
     const campaign = normalizeCampaignState(input.campaignState);
     if (command.blockIndex <= 7) {
-      const expected = (command as unknown as { campaignOpportunityId?: string | null }).campaignOpportunityId;
+      const expected = (command as unknown as { campaignOpportunityId?: string | null })
+        .campaignOpportunityId;
       if (expected == null) {
         return {
           code: 'invalid-campaign',
@@ -397,7 +398,8 @@ export function seasonBlockRejection(
         };
       }
     } else {
-      const expected = (command as unknown as { campaignOpportunityId?: string | null }).campaignOpportunityId;
+      const expected = (command as unknown as { campaignOpportunityId?: string | null })
+        .campaignOpportunityId;
       if (expected != null) {
         return {
           code: 'invalid-campaign',
@@ -897,13 +899,21 @@ export function assembleSeasonBlockCandidate(
   });
 
   // Campaign evaluation (M2.5.5) — replaces flat objective when campaignState is present
-  let campaign: { opportunityId: string | null; outcome: 'missed' | 'completed' | 'breakthrough' | null; evaluation: import('@hoop-rush/data-contracts').SeasonCampaignEvaluation | null } = {
+  let campaign: {
+    opportunityId: string | null;
+    outcome: 'missed' | 'completed' | 'breakthrough' | null;
+    evaluation: import('@hoop-rush/data-contracts').SeasonCampaignEvaluation | null;
+  } = {
     opportunityId: null,
     outcome: null,
     evaluation: null,
   };
   let campaignStateForNext: import('@hoop-rush/data-contracts').SeasonCampaignState | null = null;
-  if (input.campaignState !== undefined && input.campaignOpportunityId !== undefined && input.campaignOpportunityId !== null) {
+  if (
+    input.campaignState !== undefined &&
+    input.campaignOpportunityId !== undefined &&
+    input.campaignOpportunityId !== null
+  ) {
     const campaignState = normalizeCampaignState(input.campaignState);
     const offers = campaignState.offers[command.blockIndex] ?? [];
     const opportunity = offers.find((o) => o.opportunityId === input.campaignOpportunityId) ?? null;
@@ -916,7 +926,10 @@ export function assembleSeasonBlockCandidate(
         summaries: [...summaries],
         standings: standingsForEval,
         rotations: run.rotations,
-        transactions: [...(input.transactions ?? []), ...([] as import('@hoop-rush/data-contracts').SeasonTransactionEntry[])],
+        transactions: [
+          ...(input.transactions ?? []),
+          ...([] as import('@hoop-rush/data-contracts').SeasonTransactionEntry[]),
+        ],
         health,
       });
       campaign = {
@@ -995,8 +1008,15 @@ export function assembleSeasonBlockCandidate(
     tradeVersion: run.versions.tradeVersion,
     influenceVersion: run.versions.influenceVersion,
     objectiveVersion: run.versions.objectiveVersion,
-    campaignVersion: (run.versions as unknown as { campaignVersion?: typeof SEASON_CAMPAIGN_VERSION }).campaignVersion ?? SEASON_CAMPAIGN_VERSION,
-    campaignTargetsVersion: (run.versions as unknown as { campaignTargetsVersion?: typeof SEASON_CAMPAIGN_TARGETS_VERSION }).campaignTargetsVersion ?? SEASON_CAMPAIGN_TARGETS_VERSION,
+    campaignVersion:
+      (run.versions as unknown as { campaignVersion?: typeof SEASON_CAMPAIGN_VERSION })
+        .campaignVersion ?? SEASON_CAMPAIGN_VERSION,
+    campaignTargetsVersion:
+      (
+        run.versions as unknown as {
+          campaignTargetsVersion?: typeof SEASON_CAMPAIGN_TARGETS_VERSION;
+        }
+      ).campaignTargetsVersion ?? SEASON_CAMPAIGN_TARGETS_VERSION,
     injuryTargetsVersion: run.versions.injuryTargetsVersion,
     tradeTargetsVersion: run.versions.tradeTargetsVersion,
     influenceTargetsVersion: run.versions.influenceTargetsVersion,
@@ -1100,13 +1120,21 @@ function campaignWithBlockEvaluation(
   campaignState: import('@hoop-rush/data-contracts').SeasonCampaignState | undefined,
   candidate: SeasonCandidateCheckpoint,
 ): import('@hoop-rush/data-contracts').SeasonCampaignState | undefined {
-  if (!candidate.campaign || !candidate.campaign.evaluation) return campaignState as unknown as import('@hoop-rush/data-contracts').SeasonCampaignState | undefined;
-  const base = normalizeCampaignState(campaignState as unknown as import('@hoop-rush/data-contracts').SeasonCampaignState);
+  if (!candidate.campaign || !candidate.campaign.evaluation)
+    return campaignState as unknown as
+      import('@hoop-rush/data-contracts').SeasonCampaignState | undefined;
+  const base = normalizeCampaignState(
+    campaignState as unknown as import('@hoop-rush/data-contracts').SeasonCampaignState,
+  );
   const evalResult = candidate.campaign.evaluation;
-  const existing = base.evaluations.some((e) => e.blockIndex === evalResult.blockIndex && e.opportunityId === evalResult.opportunityId);
+  const existing = base.evaluations.some(
+    (e) => e.blockIndex === evalResult.blockIndex && e.opportunityId === evalResult.opportunityId,
+  );
   const evaluations = existing ? base.evaluations : [...base.evaluations, evalResult];
   // Update branchState: find opportunity's branchId
-  const branchId = (candidate.campaign.evaluation as unknown as { branchId?: string }).branchId ?? evalResult.opportunityId.slice(0, 12);
+  const branchId =
+    (candidate.campaign.evaluation as unknown as { branchId?: string }).branchId ??
+    evalResult.opportunityId.slice(0, 12);
   // For now, just mark branch as completed if outcome is completed/breakthrough, else missed
   const nextBranchState = { ...base.branchState };
   // Find branchId from candidate's opportunity if available
@@ -1130,12 +1158,23 @@ function campaignWithBlockEvaluation(
       applied.push(rid);
       // Find reward type from opportunity
       const allOffers = Object.values(base.offers).flat();
-      const offerForReward = allOffers.find((o) => o.completedReward.rewardId === rid || o.breakthroughReward?.rewardId === rid);
-      const reward = offerForReward?.completedReward.rewardId === rid ? offerForReward.completedReward : offerForReward?.breakthroughReward;
+      const offerForReward = allOffers.find(
+        (o) => o.completedReward.rewardId === rid || o.breakthroughReward?.rewardId === rid,
+      );
+      const reward =
+        offerForReward?.completedReward.rewardId === rid
+          ? offerForReward.completedReward
+          : offerForReward?.breakthroughReward;
       if (reward) {
         if (reward.type === 'influence') {
           const requested = reward.amount;
-          const appliedDelta = Math.min(requested, 8 - (base.rewardEntitlements.influenceEarned + influenceEarned - base.rewardEntitlements.influenceEarned));
+          const appliedDelta = Math.min(
+            requested,
+            8 -
+              (base.rewardEntitlements.influenceEarned +
+                influenceEarned -
+                base.rewardEntitlements.influenceEarned),
+          );
           // Simplified cap: Influence cap 8, requested vs applied handled via ledger; for entitlements, cap at 8
           influenceEarned = Math.min(8, influenceEarned + requested);
         } else if (reward.type === 'trade-inquiry-credit') inquiryCredits += reward.amount;
@@ -1166,7 +1205,11 @@ export function deriveSeasonPostBlockState(input: {
   rotationDigest: string;
 }): { checkpointState: SeasonCheckpointState; stateRevision: number; stateDigest: string } {
   const objectives = objectivesWithBlockSuccess(input.run.objectives, input.candidate);
-  const campaign = campaignWithBlockEvaluation((input.run as { campaign?: import('@hoop-rush/data-contracts').SeasonCampaignState }).campaign as unknown as import('@hoop-rush/data-contracts').SeasonCampaignState | undefined, input.candidate);
+  const campaign = campaignWithBlockEvaluation(
+    (input.run as { campaign?: import('@hoop-rush/data-contracts').SeasonCampaignState })
+      .campaign as unknown as import('@hoop-rush/data-contracts').SeasonCampaignState | undefined,
+    input.candidate,
+  );
   const checkpointState: SeasonCheckpointState = {
     runId: input.run.runId,
     blockIndex: input.candidate.blockIndex,
@@ -1225,7 +1268,11 @@ export function completeSeasonBlockCommit(input: {
   campaign: import('@hoop-rush/data-contracts').SeasonCampaignState | null;
 } {
   const objectives = objectivesWithBlockSuccess(input.run.objectives, input.candidate);
-  const campaign = campaignWithBlockEvaluation((input.run as { campaign?: import('@hoop-rush/data-contracts').SeasonCampaignState }).campaign as unknown as import('@hoop-rush/data-contracts').SeasonCampaignState | undefined, input.candidate);
+  const campaign = campaignWithBlockEvaluation(
+    (input.run as { campaign?: import('@hoop-rush/data-contracts').SeasonCampaignState })
+      .campaign as unknown as import('@hoop-rush/data-contracts').SeasonCampaignState | undefined,
+    input.candidate,
+  );
   const derived = deriveSeasonPostBlockState({
     run: { ...input.run, objectives, campaign: campaign as unknown as SeasonRun['campaign'] },
     candidate: input.candidate,
@@ -1250,15 +1297,22 @@ export function completeSeasonBlockCommit(input: {
   const nextBlockIdxForCampaign = input.candidate.blockIndex + 1;
   if (
     nextBlockIdxForCampaign <= 7 &&
-    (postBlockRun.campaign as unknown as import('@hoop-rush/data-contracts').SeasonCampaignState | undefined)?.startingIdentity
+    (
+      postBlockRun.campaign as unknown as
+        import('@hoop-rush/data-contracts').SeasonCampaignState | undefined
+    )?.startingIdentity
   ) {
-    const nextCampaignState = postBlockRun.campaign as unknown as import('@hoop-rush/data-contracts').SeasonCampaignState;
+    const nextCampaignState =
+      postBlockRun.campaign as unknown as import('@hoop-rush/data-contracts').SeasonCampaignState;
     if (!nextCampaignState.offers[nextBlockIdxForCampaign]) {
       // After block 4, evolution must be selected before next offers; skip generation if evolution pending
-      const needsEvolution = input.candidate.blockIndex === 4 && !nextCampaignState.evolutionSelection;
+      const needsEvolution =
+        input.candidate.blockIndex === 4 && !nextCampaignState.evolutionSelection;
       if (!needsEvolution) {
         try {
-          const scheduleForCampaign = (input as unknown as { schedule?: import('@hoop-rush/data-contracts').SeasonSchedule }).schedule ??
+          const scheduleForCampaign =
+            (input as unknown as { schedule?: import('@hoop-rush/data-contracts').SeasonSchedule })
+              .schedule ??
             ({ games: [] } as unknown as import('@hoop-rush/data-contracts').SeasonSchedule);
           const nextOffers = generateSeasonCampaignOffers({
             rootSeed: input.run.rootSeed,
@@ -1277,7 +1331,16 @@ export function completeSeasonBlockCommit(input: {
             ...nextCampaignState,
             offers: { ...nextCampaignState.offers, [nextBlockIdxForCampaign]: nextOffers },
           };
-          postBlockRun = { ...postBlockRun, campaign: updatedCampaign as unknown as SeasonRun['campaign'] };
+          postBlockRun = {
+            ...postBlockRun,
+            campaign: updatedCampaign as unknown as SeasonRun['campaign'],
+          };
+          postBlockRun = {
+            ...postBlockRun,
+            stateDigest: seasonRunStateDigest(
+              seasonRunStateDigestFactsOf(postBlockRun, input.effects ?? input.candidate.effects),
+            ),
+          };
         } catch {}
       }
     }
@@ -1349,12 +1412,13 @@ export function completeSeasonBlockCommit(input: {
     };
   }
 
-  const finalCampaign = (runAfterTrade.campaign ?? campaign ?? null) as import('@hoop-rush/data-contracts').SeasonCampaignState | null;
+  const finalCampaign = (runAfterTrade.campaign ?? campaign ?? null) as
+    import('@hoop-rush/data-contracts').SeasonCampaignState | null;
   if (window === null && freeAgencyWindow === null) {
     return {
       checkpointState: derived.checkpointState,
       stateRevision: derived.stateRevision,
-      stateDigest: derived.stateDigest,
+      stateDigest: postBlockRun.stateDigest,
       window: null,
       freeAgencyWindow: null,
       freeAgency,

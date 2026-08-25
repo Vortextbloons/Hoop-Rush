@@ -175,6 +175,7 @@ import {
   generateSeasonCampaignOffers,
   normalizeCampaignState,
 } from './campaign.ts';
+import { generateSeasonSchedule } from './schedule.ts';
 import { evaluateTradeProposal, openTradeInquiry } from './trade-board.ts';
 import {
   FreeAgencyValidationRejection,
@@ -459,6 +460,38 @@ function handleSelectBlockObjective(
   };
 }
 
+function campaignOffersForBlockIfMissing(
+  run: SeasonRun,
+  campaign: import('@hoop-rush/data-contracts').SeasonCampaignState,
+  blockIndex: number,
+  context: SeasonRunCommandContext,
+): import('@hoop-rush/data-contracts').SeasonCampaignState {
+  if (blockIndex < 0 || blockIndex > 7 || campaign.offers[blockIndex]) {
+    return campaign;
+  }
+  const schedule = generateSeasonSchedule({
+    league: run.league,
+    seed: run.schedule.generationSeed,
+  });
+  const offers = generateSeasonCampaignOffers({
+    rootSeed: run.rootSeed,
+    blockIndex,
+    humanFranchiseId: context.humanFranchiseId,
+    schedule,
+    standings: run.standings,
+    health: run.health,
+    rotations: run.rotations,
+    rosters: run.rosters,
+    transactions: run.transactions,
+    summaries: context.regularSeasonSummaries ?? [],
+    campaignState: campaign,
+  });
+  return {
+    ...campaign,
+    offers: { ...campaign.offers, [blockIndex]: offers },
+  };
+}
+
 function rejectedSelectGmIdentity(
   command: SeasonSelectGmIdentityCommand,
   rejection: SeasonSelectGmIdentityRejection,
@@ -594,11 +627,15 @@ function handleSelectGmIdentity(
     };
     return rejectedSelectGmIdentity(command, { code: 'campaign-identity-already-selected' }, run);
   }
-  const nextCampaign: import('@hoop-rush/data-contracts').SeasonCampaignState = {
+  let nextCampaign: import('@hoop-rush/data-contracts').SeasonCampaignState = {
     ...campaign,
     startingIdentity: command.identity,
     startingFocus: command.focus,
   };
+  const blockIndex = seasonNextBlockIndex(run.cursor.completedRounds);
+  if (blockIndex !== null) {
+    nextCampaign = campaignOffersForBlockIfMissing(run, nextCampaign, blockIndex, context);
+  }
   const next = advanceRunState({ ...run, campaign: nextCampaign });
   return {
     result: {
@@ -740,7 +777,7 @@ function handleEvolveGmCampaign(
     );
   }
   const offer = campaign.evolutionOffers.find((o) => o.offerId === command.offerId)!;
-  const nextCampaign: import('@hoop-rush/data-contracts').SeasonCampaignState = {
+  let nextCampaign: import('@hoop-rush/data-contracts').SeasonCampaignState = {
     ...campaign,
     evolutionSelection: {
       selectedOfferId: offer.offerId,
@@ -750,6 +787,10 @@ function handleEvolveGmCampaign(
       selectedByCommandId: command.commandId,
     },
   };
+  const blockIndex = seasonNextBlockIndex(run.cursor.completedRounds);
+  if (blockIndex !== null) {
+    nextCampaign = campaignOffersForBlockIfMissing(run, nextCampaign, blockIndex, context);
+  }
   const next = advanceRunState({ ...run, campaign: nextCampaign });
   return {
     result: {

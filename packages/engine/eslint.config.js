@@ -7,13 +7,21 @@ export default tseslint.config(
   {
     files: ['src/**'],
     rules: {
-      'no-restricted-globals': [
+      'no-restricted-properties': [
         'error',
         {
-          name: 'Math.random',
+          object: 'Math',
+          property: 'random',
           message: 'engine simulation must use injected seeded RNG (createRng)',
         },
-        { name: 'Date.now', message: 'engine code must not read the wall clock; inject clocks' },
+        {
+          object: 'Date',
+          property: 'now',
+          message: 'engine code must not read the wall clock; inject clocks',
+        },
+      ],
+      'no-restricted-globals': [
+        'error',
         { name: 'performance', message: 'engine code must not read the wall clock; inject clocks' },
       ],
     },
@@ -22,10 +30,18 @@ export default tseslint.config(
   {
     files: ['src/**/*.test.ts'],
     rules: {
-      'no-restricted-globals': [
+      'no-restricted-properties': [
         'error',
-        { name: 'Math.random', message: 'engine tests must use injected seeded RNG (createRng)' },
-        { name: 'Date.now', message: 'engine tests must not seed from the wall clock' },
+        {
+          object: 'Math',
+          property: 'random',
+          message: 'engine tests must use injected seeded RNG (createRng)',
+        },
+        {
+          object: 'Date',
+          property: 'now',
+          message: 'engine tests must not seed from the wall clock',
+        },
       ],
     },
   },

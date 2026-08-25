@@ -899,6 +899,34 @@ describe('computePool (fixture)', () => {
     expect(() => parsePool(pool)).not.toThrow();
   });
 
+  it('does not let one incomplete player suppress later eligible players', () => {
+    root = buildStandardFixture('per-player-failures');
+
+    const rosterPath = join(root.nba, '1991-92', 'roster.json');
+    const roster = readJson(rosterPath) as Array<Record<string, unknown>>;
+    const incomplete = roster.find((player) => player.externalId === '9');
+    if (
+      incomplete === undefined ||
+      typeof incomplete.ratings !== 'object' ||
+      incomplete.ratings === null
+    ) {
+      throw new Error('fixture player 9 is missing ratings');
+    }
+    delete (incomplete.ratings as Record<string, unknown>).insideScoring;
+    writeJson(rosterPath, roster);
+
+    const statsPath = join(root.nba, '1991-92', 'season-stats.json');
+    const stats = readJson(statsPath) as Array<Record<string, unknown>>;
+    stats.push(statsRow('1991-92', '9'), statsRow('1991-92', '10'));
+    writeJson(statsPath, stats);
+
+    const pool = computePool('lakers', '1990s', fixtureManifest(), BBREF_IDS, false);
+    expect(pool).toHaveProperty('players');
+    if ('reason' in pool) throw new Error(pool.detail);
+    expect(pool.players.map((player) => player.playerExternalId)).toContain('10');
+    expect(() => parsePool(pool)).not.toThrow();
+  });
+
   it('warns and skips a player missing summaryRatings', () => {
     root = buildStandardFixture('nosummary');
     computePool('lakers', '1990s', fixtureManifest(), BBREF_IDS, false);

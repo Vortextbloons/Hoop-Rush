@@ -78,6 +78,12 @@ import {
 import type { SeasonRunEngineSeam } from '../season/engine-seam-types.ts';
 import { auditSeasonRunState } from '../season/audit.ts';
 import { seasonRunEngineSeam } from '../season/engine-seam.ts';
+import {
+  normalizeSeasonFreeAgencyState,
+  normalizeSeasonInfluenceState,
+  normalizeSeasonRunForPersistence,
+  normalizeSeasonTransactions,
+} from '../season/normalize-mutable-state.ts';
 import { HoopRushDatabase } from './dexie.ts';
 import {
   SeasonPendingBlockRejectedError,
@@ -830,8 +836,12 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
         const existingCampaign = (checkpoint as { campaign?: unknown }).campaign;
         const mutableState = {
           health: window !== null ? window.health : input.health,
-          transactions: window !== null ? window.transactions : input.transactions,
-          influence: window !== null ? window.influence : input.influence,
+          transactions: normalizeSeasonTransactions(
+            window !== null ? window.transactions : input.transactions,
+          ),
+          influence: normalizeSeasonInfluenceState(
+            window !== null ? window.influence : input.influence,
+          ),
           trade: window !== null ? window.trade : input.trade,
           objectives: input.objectives,
           campaign:
@@ -866,7 +876,9 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
             rosters: window !== null ? window.rosters : (cursor.run.rosters as never),
             ownership: window !== null ? window.ownership : (cursor.run.ownership as never),
             rotations: window !== null ? window.rotations : input.rotations,
-            freeAgency: seasonFreeAgencyStateSchema.parse(input.freeAgency),
+            freeAgency: seasonFreeAgencyStateSchema.parse(
+              normalizeSeasonFreeAgencyState(input.freeAgency),
+            ),
           },
         });
         await this.db.seasonRuns.put({
@@ -1044,6 +1056,9 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
           }
         }
 
+        const effectsForDigest = input.effects ?? checkpoint.effects;
+        const run = normalizeSeasonRunForPersistence(input.run, effectsForDigest);
+
         const delta = seasonRunCheckpointDeltaSchema.parse({
           completedRounds: cursor.completedRounds,
           revision: cursor.revision,
@@ -1052,24 +1067,24 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
           lastCheckpointDigest: checkpoint.lastCheckpointDigest,
           standings: checkpoint.standings,
           teamAggregates: checkpoint.teamAggregates,
-          playerAggregates: topUpPlayerAggregates(checkpoint.playerAggregates, input.run.rosters),
+          playerAggregates: topUpPlayerAggregates(checkpoint.playerAggregates, run.rosters),
           recap: checkpoint.recap,
-          effects: input.effects ?? checkpoint.effects,
+          effects: effectsForDigest,
           updatedAtIso: new Date().toISOString(),
-          health: input.run.health,
-          transactions: input.run.transactions,
-          influence: input.run.influence,
-          trade: input.run.trade,
-          objectives: input.run.objectives,
-          campaign: input.run.campaign ?? null,
-          checkpointState: input.run.checkpointState,
-          stateRevision: input.run.stateRevision,
-          stateDigest: input.run.stateDigest,
+          health: run.health,
+          transactions: run.transactions,
+          influence: run.influence,
+          trade: run.trade,
+          objectives: run.objectives,
+          campaign: run.campaign ?? null,
+          checkpointState: run.checkpointState,
+          stateRevision: run.stateRevision,
+          stateDigest: run.stateDigest,
           run: {
-            rosters: input.run.rosters,
-            ownership: input.run.ownership,
-            rotations: input.run.rotations,
-            freeAgency: input.run.freeAgency,
+            rosters: run.rosters,
+            ownership: run.ownership,
+            rotations: run.rotations,
+            freeAgency: run.freeAgency,
           },
         });
         await this.db.seasonRuns.put({
@@ -1088,8 +1103,8 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
           command,
           preStateRevision: command.expectedStateRevision,
           preStateDigest: command.expectedStateDigest,
-          postStateRevision: input.run.stateRevision,
-          postStateDigest: input.run.stateDigest,
+          postStateRevision: run.stateRevision,
+          postStateDigest: run.stateDigest,
           resultDigest: seasonCheckpointDigestSchema.parse(
             input.resultDigest ??
               seasonCommandResultDigest({
@@ -1363,7 +1378,12 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
   }
 
   async commitPostseasonAdvancement(input: CommitPostseasonAdvancementInput): Promise<void> {
-    const validatedRun = seasonRunSchema.parse(input.run);
+    const validatedRun = seasonRunSchema.parse(
+      normalizeSeasonRunForPersistence(
+        input.run,
+        input.effects ?? seasonRunEngineSeam.zeroSeasonEffectsState(input.run.rosters),
+      ),
+    );
     const command = seasonRunCommandSchema.parse(input.command);
     const summaries = input.summaries.map((summary) =>
       seasonPostseasonSummarySchema.parse(summary),

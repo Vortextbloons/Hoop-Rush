@@ -40,7 +40,7 @@ import {
   type SeasonRosterMemberInput,
 } from './roster-rules.ts';
 import { seasonPlayerAvailable } from './injuries.ts';
-import { seasonTransactionEntry } from './transactions.ts';
+import { seasonTransactionEntry, deriveSeasonInfluenceEntryId, deriveSeasonTransactionId } from './transactions.ts';
 import { SEASON_INFLUENCE_FLOOR } from './influence.ts';
 
 export const SEASON_FREE_AGENCY_BAND_SIGNING_CAPS: Record<string, number> = {
@@ -1012,6 +1012,7 @@ export function resolveSeasonFreeAgencyWindow(
   };
   let rosters = context.run.rosters.map((roster) => ({ ...roster, players: [...roster.players] }));
   const ownership = [...context.run.ownership];
+  const resolvedSignings: SeasonFreeAgencySigning[] = [];
   for (const signing of signings) {
     const outcome = applySigningFacts(
       context,
@@ -1021,6 +1022,7 @@ export function resolveSeasonFreeAgencyWindow(
       freeAgency,
       signing,
     );
+    resolvedSignings.push(outcome.signing);
     effects = outcome.effects;
     influence = outcome.influence;
     transactions = outcome.transactions;
@@ -1040,13 +1042,13 @@ export function resolveSeasonFreeAgencyWindow(
     ...freeAgency,
     windows: freeAgency.windows.map((entry) =>
       entry.windowIndex === windowIndex
-        ? { ...entry, status: 'resolved' as const, traces: [trace], signings: [...signings] }
+        ? { ...entry, status: 'resolved' as const, traces: [trace], signings: [...resolvedSignings] }
         : entry,
     ),
   };
   return {
     freeAgency,
-    signings,
+    signings: resolvedSignings,
     traces: [trace],
     effects,
     influence,
@@ -1287,6 +1289,7 @@ interface SeasonSigningFacts {
   influence: SeasonInfluenceState;
   transactions: SeasonTransactionEntry[];
   freeAgency: SeasonFreeAgencyState;
+  signing: SeasonFreeAgencySigning;
 }
 
 function applySigning(
@@ -1316,8 +1319,8 @@ function applySigning(
     influenceCost: target.influence,
     commandId,
     seedPath: [String(windowIndex), 'resolve'],
-    ledgerEntryId: `fa-led-${seed.slice(0, 32)}`,
-    transactionId: `txn-fa-${seed.slice(0, 32)}`,
+    ledgerEntryId: deriveSeasonInfluenceEntryId(`fa-led-${seed.slice(0, 32)}`),
+    transactionId: deriveSeasonTransactionId(`txn-fa-${seed.slice(0, 32)}`),
     appliedAtStateRevision: context.run.stateRevision + 1,
   };
 }
@@ -1366,8 +1369,9 @@ function applySigningFacts(
     });
   }
   const balanceAfter = balance - signing.influenceCost;
+  const ledgerEntryId = deriveSeasonInfluenceEntryId(signing.ledgerEntryId);
   const ledgerEntry = {
-    entryId: signing.ledgerEntryId,
+    entryId: ledgerEntryId,
     franchiseId: signing.franchiseId,
     source: 'free-agent-signing' as const,
     blockIndex: windowBlockIndexOf(signing.windowIndex),
@@ -1391,11 +1395,16 @@ function applySigningFacts(
       band: signing.band,
       roleExpectation: signing.roleExpectation,
       influenceCost: signing.influenceCost,
-      ledgerEntryId: signing.ledgerEntryId,
+      ledgerEntryId,
       signingId: signing.signingId,
     },
     explanation: `Signed ${catalogCandidate.displayName} for ${String(signing.influenceCost)} Influence`,
   });
+  const syncedSigning: SeasonFreeAgencySigning = {
+    ...signing,
+    transactionId: transaction.transactionId,
+    ledgerEntryId,
+  };
   return {
     effects: {
       ...effects,
@@ -1427,6 +1436,7 @@ function applySigningFacts(
           (freeAgency.seasonSpend[signing.franchiseId] ?? 0) + signing.influenceCost,
       },
     },
+    signing: syncedSigning,
   };
 }
 

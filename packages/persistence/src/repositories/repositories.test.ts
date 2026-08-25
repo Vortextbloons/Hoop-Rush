@@ -171,6 +171,26 @@ describe('challenge repository (dexie)', () => {
     expect(loaded?.run.games).toHaveLength(0);
   });
 
+  it('clears stale active checkpoints and their game rows', async () => {
+    const { repo, db } = makeAdapter();
+    await repo.saveActiveRun(finishedRecord());
+    await repo.appendActiveGame({
+      runId: 'run-1',
+      gameNumber: 1,
+      result: buildGameResult(1),
+      aggregates: aggregatesFor(1, 1, 0),
+      status: 'finished',
+      firstLossGameNumber: null,
+    });
+    const checkpoint = await db.active.get('active');
+    expect(checkpoint).toBeDefined();
+    await db.active.put({ ...checkpoint, saveSchemaVersion: 2 } as never);
+
+    expect(await repo.loadActiveRun()).toBeNull();
+    expect(await db.active.count()).toBe(0);
+    expect(await db.activeGames.count()).toBe(0);
+  });
+
   it('returns null when no active run exists', async () => {
     const { repo } = makeAdapter();
     expect(await repo.loadActiveRun()).toBeNull();
@@ -349,6 +369,19 @@ describe('challenge repository (dexie)', () => {
     expect(await repo.loadCompletedRun('missing')).toBeNull();
   });
 
+  it('clears stale completed saves and their history index', async () => {
+    const { repo, db } = makeAdapter();
+    await repo.saveActiveRun(finishedRecord('run-stale'));
+    await repo.promoteActiveToCompleted(finishedRecord('run-stale'), indexFor('run-stale'));
+    const completed = await db.completed.get('run-stale');
+    expect(completed).toBeDefined();
+    await db.completed.put({ ...completed, saveSchemaVersion: 1 } as never);
+
+    expect(await repo.loadCompletedRun('run-stale')).toBeNull();
+    expect(await db.completed.count()).toBe(0);
+    expect(await db.history.count()).toBe(0);
+  });
+
   it('clears history without touching the active run', async () => {
     const { repo } = makeAdapter();
     await repo.saveActiveRun(finishedRecord('run-a'));
@@ -390,6 +423,17 @@ describe('challenge repository (dexie)', () => {
   it('returns null when no classic draft exists', async () => {
     const { repo } = makeAdapter();
     expect(await repo.loadClassicDraft()).toBeNull();
+  });
+
+  it('clears a classic draft with a stale save schema', async () => {
+    const { repo, db } = makeAdapter();
+    await repo.saveClassicDraft(draftRecord());
+    const draft = await db.classicDrafts.get('classic-draft');
+    expect(draft).toBeDefined();
+    await db.classicDrafts.put({ ...draft, saveSchemaVersion: 0 } as never);
+
+    expect(await repo.loadClassicDraft()).toBeNull();
+    expect(await db.classicDrafts.count()).toBe(0);
   });
 
   it('saving a second classic draft replaces the first', async () => {

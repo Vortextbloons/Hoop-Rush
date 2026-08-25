@@ -17,6 +17,7 @@ import {
   type Position,
 } from '@hoop-rush/data-contracts';
 import { buildEraSimulationProfile } from '@hoop-rush/test-fixtures';
+import { buildEmptyCampaignState, normalizeCampaignState } from './campaign.ts';
 import { handleSeasonRunCommand, type SeasonRunCommandContext } from './season-commands.ts';
 import { seasonObjectiveChoicesForBlock } from './objectives.ts';
 import { openSeasonTradeWindow } from './trades.ts';
@@ -2110,5 +2111,43 @@ describe('fast-forward-postseason command', () => {
     );
     if (badTarget.result.result.status !== 'rejected') throw new Error('expected rejection');
     expect(badTarget.result.result.rejection.code).toBe('integrity-failure');
+  });
+});
+
+describe('campaign commands', () => {
+  function campaignFixture(seed = TEST_SEED): SeasonRunCommandContext & {
+    run: SeasonRun;
+    catalog: SeasonDraftCatalog;
+  } {
+    const { run: base, catalog } = buildEconomyTestRun({ seed });
+    const run: SeasonRun = {
+      ...base,
+      campaign: buildEmptyCampaignState(),
+    };
+    return {
+      run,
+      pending: null,
+      humanFranchiseId: HUMAN,
+      catalog,
+      effects: zeroEffectsOf(run),
+    };
+  }
+
+  it('select-gm-identity generates two offers for the current block', () => {
+    const context = campaignFixture();
+    const output = handleSeasonRunCommand(
+      commandOf(context.run, {
+        command: 'select-gm-identity',
+        commandId: 'gm-1',
+        identity: 'team-identity',
+        focus: 'defense',
+      }),
+      context,
+    );
+    if (output.result.result.status !== 'accepted') throw new Error('expected acceptance');
+    const campaign = normalizeCampaignState(output.run.campaign);
+    expect(campaign.startingIdentity).toBe('team-identity');
+    expect(campaign.startingFocus).toBe('defense');
+    expect(campaign.offers[0]).toHaveLength(2);
   });
 });

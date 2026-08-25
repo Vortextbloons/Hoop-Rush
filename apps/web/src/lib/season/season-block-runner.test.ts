@@ -651,6 +651,32 @@ describe('season block runner (M2.5 wire)', () => {
     expect(cancel.requestId).toBe(requestId);
   });
 
+  it('cancels while artifacts are loading before creating a worker', async () => {
+    const run = makeRun();
+    let resolveArtifacts!: (value: Awaited<ReturnType<typeof artifacts>>) => void;
+    const pendingArtifacts = new Promise<Awaited<ReturnType<typeof artifacts>>>((resolve) => {
+      resolveArtifacts = resolve;
+    });
+    const runner = createSeasonBlockRunner({
+      repository: makeRepository(run),
+      schedule,
+      workerUrl: 'fake-worker.ts',
+      artifacts: () => pendingArtifacts,
+    });
+    const events: string[] = [];
+    runner.subscribe((event) => events.push(event.type));
+
+    const requestId = runner.startBlock(startInput(run));
+    runner.cancel(requestId);
+    expect(FakeWorker.instances).toHaveLength(0);
+
+    resolveArtifacts(await artifacts());
+    await flush();
+
+    expect(FakeWorker.instances).toHaveLength(0);
+    expect(events).toEqual(['cancelled']);
+  });
+
   it('drops messages that fail the frozen wire schema', async () => {
     const run = makeRun();
     const runner = createSeasonBlockRunner({

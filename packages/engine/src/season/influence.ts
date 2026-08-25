@@ -5,7 +5,7 @@ import {
   type SeasonInfluenceState,
   type SeasonTransactionEntry,
 } from '@hoop-rush/data-contracts';
-import { seasonTransactionEntry } from './transactions.ts';
+import { deriveSeasonInfluenceEntryId, seasonTransactionEntry } from './transactions.ts';
 
 export function createInitialSeasonInfluenceState(
   franchiseIds: readonly string[],
@@ -189,7 +189,7 @@ export function applySeasonInfluenceSpend(input: SeasonInfluenceSpendInput): {
   }
   const balanceAfter = balanceBefore + requestedDelta;
   const entry: SeasonInfluenceLedgerEntry = {
-    entryId: `influence-spend-${commandId ?? 'system'}`,
+    entryId: deriveSeasonInfluenceEntryId(`influence-spend-${commandId ?? 'system'}`),
     franchiseId,
     source,
     blockIndex,

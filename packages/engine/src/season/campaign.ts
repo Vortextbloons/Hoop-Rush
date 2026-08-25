@@ -27,6 +27,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import { createRng } from '../sim/rng.ts';
 import { seasonPlayerAvailable } from './injuries.ts';
+import { deriveSeasonInfluenceEntryId, seasonTransactionEntry } from './transactions.ts';
 
 export { buildEmptyCampaignState, SEASON_CAMPAIGN_VERSION, SEASON_CAMPAIGN_TARGETS_VERSION };
 
@@ -1806,7 +1807,9 @@ function applyInfluenceReward(
   }
   const balanceAfter = balanceBefore + appliedDelta;
   const entry = {
-    entryId: `influence-campaign-${String(blockIndex)}-${franchiseId}-${rewardId}`,
+    entryId: deriveSeasonInfluenceEntryId(
+      `influence-campaign-${String(blockIndex)}-${franchiseId}-${rewardId}`,
+    ),
     franchiseId,
     source: 'campaign-reward' as const,
     blockIndex,
@@ -1876,21 +1879,23 @@ export function applySeasonCampaignReward(
           ...rewardEntitlements,
           influenceEarned: rewardEntitlements.influenceEarned + res.entry.appliedDelta,
         };
-        transactions.push({
-          transactionId: `txn-campaign-${reward.rewardId}`,
-          commandId: input.commandId ?? null,
-          franchiseId: humanFranchiseId,
-          type: 'campaign-reward',
-          blockIndex,
-          appliedAtStateRevision: 0,
-          payload: {
-            rewardId: reward.rewardId,
-            type: reward.type,
-            requestedDelta: requested,
-            appliedDelta: res.entry.appliedDelta,
-          },
-          explanation: res.entry.explanation,
-        });
+        transactions.push(
+          seasonTransactionEntry({
+            transactionId: `txn-campaign-${reward.rewardId}`,
+            commandId: input.commandId ?? null,
+            franchiseId: humanFranchiseId,
+            type: 'campaign-reward',
+            blockIndex,
+            appliedAtStateRevision: 0,
+            payload: {
+              rewardId: reward.rewardId,
+              type: reward.type,
+              requestedDelta: requested,
+              appliedDelta: res.entry.appliedDelta,
+            },
+            explanation: res.entry.explanation,
+          }),
+        );
         break;
       }
       case 'trade-board-information':

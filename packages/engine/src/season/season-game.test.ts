@@ -174,6 +174,29 @@ describe('season game controller (M2.2)', () => {
     }
   });
 
+  it('applies a tipoff-exact injury removal before choosing the opening unit', () => {
+    const input = buildSeasonGameInput();
+    const playerVersionId = input.home.players[0]?.playerVersionId;
+    if (playerVersionId === undefined) throw new Error('fixture home player missing');
+    const removal: SeasonRemoval = {
+      side: 'home',
+      playerVersionId,
+      period: 1,
+      secondsRemaining: 720,
+      reason: 'injected-injury-removal',
+    };
+    const withRemoval = { ...input, removals: [removal] };
+    const result = simulateSeasonGame(withRemoval, ctx);
+
+    expect(result.outcome).toBe('completed');
+    if (result.outcome === 'completed') {
+      const firstStint = result.unitStints.find((stint) => stint.side === 'home');
+      expect(firstStint?.players).not.toContain(playerVersionId);
+      expect(result.removals[0]).toMatchObject(removal);
+    }
+    expect(checkSeasonGameResult(result, withRemoval)).toEqual([]);
+  });
+
   it('runs real rotation substitutions with dead-ball timestamps', () => {
     const { result } = run('subs-1');
     if (result.outcome !== 'completed') throw new Error('expected a completed game');

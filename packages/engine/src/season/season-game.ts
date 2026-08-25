@@ -338,7 +338,7 @@ class SeasonGameController {
   }
 
   private tipoff(): SeasonGameSimulationResult | null {
-    this.applyDueRemovals(1, REGULATION_PERIOD_SECONDS, REGULATION_PERIOD_SECONDS, false);
+    this.applyDueRemovals(1, REGULATION_PERIOD_SECONDS, REGULATION_PERIOD_SECONDS, false, true);
     this.applyDueReturns(1, REGULATION_PERIOD_SECONDS, REGULATION_PERIOD_SECONDS, false);
     const homeUnit = chooseInitialUnit(this.home.planner, this.home.unavailable);
     const awayUnit = chooseInitialUnit(this.away.planner, this.away.unavailable);
@@ -441,6 +441,7 @@ class SeasonGameController {
     floatClock: number,
     boundaryClock: number,
     periodEnded: boolean,
+    allowPregame: boolean = false,
   ): void {
     for (let index = 0; index < this.removalQueue.length;) {
       const removal = this.removalQueue[index];
@@ -451,7 +452,7 @@ class SeasonGameController {
       }
       const side = removal.side === 'home' ? this.home : this.away;
 
-      if (!side.unit.includes(removal.playerVersionId)) {
+      if (!allowPregame && !side.unit.includes(removal.playerVersionId)) {
         index += 1;
         continue;
       }

@@ -1,5 +1,9 @@
 import Dexie, { type EntityTable, type Table } from 'dexie';
-import { CHECKPOINT_SAVE_SCHEMA_VERSION, SAVE_SCHEMA_VERSION } from '@hoop-rush/data-contracts';
+import {
+  CHECKPOINT_SAVE_SCHEMA_VERSION,
+  CLASSIC_DRAFT_SCHEMA_VERSION,
+  SAVE_SCHEMA_VERSION,
+} from '@hoop-rush/data-contracts';
 import {
   classicDraftRecordSchema,
   type StoredClassicDraft,
@@ -37,6 +41,14 @@ import type {
 
 const ACTIVE_RECORD_ID = 'active';
 const CLASSIC_DRAFT_RECORD_ID = 'classic-draft';
+// The v2 migration is historical; it must not relabel old rows with a future live version.
+const V2_MIGRATED_CHECKPOINT_SAVE_SCHEMA_VERSION = 3;
+
+function hasStaleSaveSchemaVersion(record: unknown, expected: number): boolean {
+  if (typeof record !== 'object' || record === null) return false;
+  if (!Object.hasOwn(record, 'saveSchemaVersion')) return false;
+  return (record as { saveSchemaVersion?: unknown }).saveSchemaVersion !== expected;
+}
 
 export class HoopRushDatabase extends Dexie {
   active!: EntityTable<ActiveRunCheckpoint, 'recordId'>;
@@ -101,7 +113,7 @@ export class HoopRushDatabase extends Dexie {
         const { games: _games, schemaVersion: _schemaVersion, ...run } = validated.run;
         await tx.table('active').put({
           recordId: ACTIVE_RECORD_ID,
-          saveSchemaVersion: CHECKPOINT_SAVE_SCHEMA_VERSION,
+          saveSchemaVersion: V2_MIGRATED_CHECKPOINT_SAVE_SCHEMA_VERSION,
           ...run,
           updatedAtIso: validated.updatedAtIso,
         });
@@ -258,6 +270,10 @@ export class DexieChallengeRepository implements ChallengeRepository {
   async loadActiveRun(): Promise<StoredRunRecord | null> {
     const checkpoint = await this.db.active.get(ACTIVE_RECORD_ID);
     if (checkpoint === undefined) return null;
+    if (hasStaleSaveSchemaVersion(checkpoint, CHECKPOINT_SAVE_SCHEMA_VERSION)) {
+      await this.clearStaleActiveRun();
+      return null;
+    }
     const validatedCheckpoint = activeRunCheckpointSchema.parse(checkpoint);
 
     const rows = await this.db.activeGames
@@ -280,9 +296,22 @@ export class DexieChallengeRepository implements ChallengeRepository {
     });
   }
 
+  private async clearStaleActiveRun(): Promise<void> {
+    await this.db.transaction('rw', this.db.active, this.db.activeGames, async () => {
+      const checkpoint = await this.db.active.get(ACTIVE_RECORD_ID);
+      if (!hasStaleSaveSchemaVersion(checkpoint, CHECKPOINT_SAVE_SCHEMA_VERSION)) return;
+      await this.db.active.delete(ACTIVE_RECORD_ID);
+      await this.db.activeGames.clear();
+    });
+  }
+
   async loadActiveRunCheckpoint(): Promise<ActiveRunCheckpoint | null> {
     const checkpoint = await this.db.active.get(ACTIVE_RECORD_ID);
     if (checkpoint === undefined) return null;
+    if (hasStaleSaveSchemaVersion(checkpoint, CHECKPOINT_SAVE_SCHEMA_VERSION)) {
+      await this.clearStaleActiveRun();
+      return null;
+    }
     const validated = activeRunCheckpointSchema.parse(checkpoint);
     if (validated.gamesPlayed === undefined) {
       const gamesPlayed = await this.db.activeGames.where('runId').equals(validated.runId).count();
@@ -326,6 +355,15 @@ export class DexieChallengeRepository implements ChallengeRepository {
   async loadCompletedRun(runId: string): Promise<StoredRunRecord | null> {
     const record = await this.db.completed.get(runId);
     if (record === undefined) return null;
+    if (hasStaleSaveSchemaVersion(record, SAVE_SCHEMA_VERSION)) {
+      await this.db.transaction('rw', this.db.completed, this.db.history, async () => {
+        const current = await this.db.completed.get(runId);
+        if (!hasStaleSaveSchemaVersion(current, SAVE_SCHEMA_VERSION)) return;
+        await this.db.completed.delete(runId);
+        await this.db.history.delete(runId);
+      });
+      return null;
+    }
     return storedRunRecordSchema.parse(record);
   }
 
@@ -347,6 +385,15 @@ export class DexieChallengeRepository implements ChallengeRepository {
   async loadClassicDraft(): Promise<StoredClassicDraft | null> {
     const record = await this.db.classicDrafts.get(CLASSIC_DRAFT_RECORD_ID);
     if (record === undefined) return null;
+    if (hasStaleSaveSchemaVersion(record, CLASSIC_DRAFT_SCHEMA_VERSION)) {
+      await this.db.transaction('rw', this.db.classicDrafts, async () => {
+        const current = await this.db.classicDrafts.get(CLASSIC_DRAFT_RECORD_ID);
+        if (hasStaleSaveSchemaVersion(current, CLASSIC_DRAFT_SCHEMA_VERSION)) {
+          await this.db.classicDrafts.delete(CLASSIC_DRAFT_RECORD_ID);
+        }
+      });
+      return null;
+    }
     return classicDraftRecordSchema.parse(record);
   }
 

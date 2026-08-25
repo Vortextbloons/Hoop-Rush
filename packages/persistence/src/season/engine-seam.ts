@@ -1,8 +1,6 @@
 import {
-  canonicalJson,
   emptySeasonPlayerAggregate,
   emptySeasonTeamAggregate,
-  seasonDigestHex,
   seasonEffectsStateSchema,
   type SeasonEffectsState,
   type SeasonGameSummary,
@@ -26,85 +24,7 @@ import {
 import type { SeasonRunEngineSeam, SeasonRunStateDigestFacts } from './engine-seam-types.ts';
 
 function wrappedSeasonRunStateDigest(facts: SeasonRunStateDigestFacts): string {
-  // If no campaign, delegate to engine's implementation for exact parity.
-  if (facts.campaign === undefined) {
-    const { campaign: _campaign, ...rest } = facts as SeasonRunStateDigestFacts & {
-      campaign?: unknown;
-    };
-    return engineSeasonRunStateDigest(
-      rest as unknown as Parameters<typeof engineSeasonRunStateDigest>[0],
-    );
-  }
-  // For schema-11 saves with campaign, compute canonical digest including campaign.
-  // Replicate engine's canonical logic but add campaign field.
-  const sortedBy = <T>(items: readonly T[], keyOf: (item: T) => string): T[] =>
-    [...items].sort((a, b) => (keyOf(a) < keyOf(b) ? -1 : keyOf(a) > keyOf(b) ? 1 : 0));
-  const postseasonCanonical = (postseason: SeasonRunStateDigestFacts['postseason']): unknown => ({
-    schemaVersion: postseason.schemaVersion,
-    postseasonVersion: postseason.postseasonVersion,
-    tiebreakVersion: postseason.tiebreakVersion,
-    seed: postseason.seed,
-    finalsHomeCourtDrawSeed: postseason.finalsHomeCourtDrawSeed,
-    tiebreakResolutions: sortedBy(
-      postseason.tiebreakResolutions,
-      (resolution) => resolution.resolutionId,
-    ),
-    playIn: postseason.playIn,
-    bracket: postseason.bracket,
-    championFranchiseId: postseason.championFranchiseId,
-  });
-  const canonical = canonicalJson({
-    stateRevision: facts.stateRevision,
-    stage: facts.stage,
-    postseason: postseasonCanonical(facts.postseason),
-    awards: facts.awards,
-    completion: facts.completion,
-    checkpointState: facts.checkpointState,
-    health: {
-      schemaVersion: facts.health.schemaVersion,
-      healthVersion: facts.health.healthVersion,
-      injuries: sortedBy(facts.health.injuries, (injury) => injury.injuryId),
-    },
-    influence: {
-      schemaVersion: facts.influence.schemaVersion,
-      influenceVersion: facts.influence.influenceVersion,
-      balances: facts.influence.balances,
-      ledger: sortedBy(facts.influence.ledger, (entry) => entry.entryId),
-      windows: facts.influence.windows,
-      rehabs: facts.influence.rehabs,
-    },
-    transactions: sortedBy(facts.transactions, (entry) => entry.transactionId),
-    trade: facts.trade,
-    freeAgency: {
-      schemaVersion: facts.freeAgency.schemaVersion,
-      freeAgencyVersion: facts.freeAgency.freeAgencyVersion,
-      windows: facts.freeAgency.windows.map((window) => ({
-        windowIndex: window.windowIndex,
-        blockIndex: window.blockIndex,
-        status: window.status,
-        candidates: sortedBy(window.candidates, (candidate) => candidate.playerVersionId),
-        declarations: window.declarations,
-        traces: window.traces,
-        signings: sortedBy(window.signings, (signing) => signing.signingId),
-      })),
-      canonicalCandidates: facts.freeAgency.canonicalCandidates,
-      signingCounts: facts.freeAgency.signingCounts,
-      seasonSpend: facts.freeAgency.seasonSpend,
-    },
-    objectives: facts.objectives,
-    ...(facts.campaign !== undefined ? { campaign: facts.campaign } : {}),
-    rosters: sortedBy(facts.rosters, (roster) => roster.franchiseId),
-    ownership: sortedBy(facts.ownership, (row) => row.playerVersionId),
-    rotations: sortedBy(facts.rotations, (rotation) => rotation.franchiseId),
-    effects: canonicalJson({
-      schemaVersion: facts.effects.schemaVersion,
-      playerStates: sortedBy(facts.effects.playerStates, (player) => player.playerVersionId),
-      pairStates: [...facts.effects.pairStates].sort((a, b) =>
-        a.a < b.a ? -1 : a.a > b.a ? 1 : a.b < b.b ? -1 : a.b > b.b ? 1 : 0,
-      ),
-    }),
-  });
-  return seasonDigestHex(canonical);
+  return engineSeasonRunStateDigest(facts);
 }
 
 export const seasonRunEngineSeam: SeasonRunEngineSeam = {
