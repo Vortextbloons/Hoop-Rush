@@ -13,13 +13,11 @@ export function seasonPairIsCanonical(a: string, b: string): boolean {
   return a < b;
 }
 
-export function canonicalRosterPairs(roster: readonly string[]): Array<[string, string]> {
-  if (roster.length !== SEASON_ROSTER_SIZE || new Set(roster).size !== SEASON_ROSTER_SIZE) {
-    throw new Error(
-      `season chemistry: roster must be ten distinct versions (got ${String(roster.length)})`,
-    );
+export function canonicalPlayerPairs(players: readonly string[]): Array<[string, string]> {
+  if (new Set(players).size !== players.length) {
+    throw new Error('season chemistry: player versions must be distinct');
   }
-  const sorted = [...roster].sort();
+  const sorted = [...players].sort();
   const pairs: Array<[string, string]> = [];
   for (let i = 0; i < sorted.length; i += 1) {
     for (let j = i + 1; j < sorted.length; j += 1) {
@@ -29,6 +27,15 @@ export function canonicalRosterPairs(roster: readonly string[]): Array<[string, 
     }
   }
   return pairs;
+}
+
+export function canonicalRosterPairs(roster: readonly string[]): Array<[string, string]> {
+  if (roster.length !== SEASON_ROSTER_SIZE || new Set(roster).size !== SEASON_ROSTER_SIZE) {
+    throw new Error(
+      `season chemistry: roster must be ten distinct versions (got ${String(roster.length)})`,
+    );
+  }
+  return canonicalPlayerPairs(roster);
 }
 
 export function unitPairs(unit: readonly string[]): Array<[string, string]> {

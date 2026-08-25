@@ -23,6 +23,10 @@
     postseasonSummaryRow,
     rankedEntriesOf,
   } from '$lib/season/season-postseason-presentation';
+  import {
+    buildCompletedSeasonRunReplayExport,
+    deriveCompletedSeasonTradeGrades,
+  } from '$lib/season/season-completed-export';
   import AwardsSection from '$lib/components/season/AwardsSection.svelte';
   import ChampionSummary from '$lib/components/season/ChampionSummary.svelte';
   import PostseasonBracket from '$lib/components/season/PostseasonBracket.svelte';
@@ -155,10 +159,31 @@
   );
 
   let exportingGameId = $state<string | null>(null);
+  let exportingFullRun = $state(false);
   let exportError = $state<string | null>(null);
 
+  const humanTradeGrades = $derived.by(() => {
+    const season = completed;
+    const franchiseId = humanFranchiseId;
+    if (season === null || franchiseId === null) return [];
+    const grades = deriveCompletedSeasonTradeGrades(season);
+    return grades.grades.filter((grade) => grade.franchiseId === franchiseId);
+  });
+
+  function downloadJson(filename: string, payload: unknown): void {
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: 'application/json',
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
   async function exportGame(gameId: string): Promise<void> {
-    if (exportingGameId !== null) return;
+    if (exportingGameId !== null || exportingFullRun) return;
     exportingGameId = gameId;
     exportError = null;
     try {
@@ -168,19 +193,25 @@
         exportError = 'No replay export is available for that game.';
         return;
       }
-      const blob = new Blob([JSON.stringify(artifact, null, 2)], {
-        type: 'application/json',
-      });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = `hoop-rush-replay-${runId}-${gameId}.json`;
-      anchor.click();
-      URL.revokeObjectURL(url);
+      downloadJson(`hoop-rush-replay-${runId}-${gameId}.json`, artifact);
     } catch (error) {
       exportError = error instanceof Error ? error.message : String(error);
     } finally {
       exportingGameId = null;
+    }
+  }
+
+  async function exportFullRun(): Promise<void> {
+    if (exportingGameId !== null || exportingFullRun || completed === null) return;
+    exportingFullRun = true;
+    exportError = null;
+    try {
+      const artifact = buildCompletedSeasonRunReplayExport(completed, shell.manifest);
+      downloadJson(`hoop-rush-replay-${runId}-full-run.json`, artifact);
+    } catch (error) {
+      exportError = error instanceof Error ? error.message : String(error);
+    } finally {
+      exportingFullRun = false;
     }
   }
 
@@ -366,7 +397,7 @@
                 type="button"
                 data-season-history-export={row.summary.gameId}
                 onclick={() => void exportGame(row.summary.gameId)}
-                disabled={exportingGameId !== null}
+                disabled={exportingGameId !== null || exportingFullRun}
                 class="shrink-0 rounded-lg border border-border px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {exportingGameId === row.summary.gameId ? 'Exporting…' : 'Export'}
@@ -522,10 +553,45 @@
       </div>
     {/if}
 
-    <p class="mt-6 font-mono text-[10px] text-muted-foreground">
-      Trade grades and a full-run replay export arrive with the replay tooling milestone; each
-      postseason game already exports individually above.
-    </p>
+    {#if humanTradeGrades.length > 0}
+      <div class="mt-8">
+        <h2 class="font-display text-base font-extrabold uppercase tracking-tight">Trade grades</h2>
+        <p class="mt-1 font-mono text-[10px] text-muted-foreground">
+          Post-trade production, availability, minutes, and team trend from recorded facts
+        </p>
+        <ul class="mt-3 flex flex-col gap-1">
+          {#each humanTradeGrades as grade (grade.gradeId)}
+            <li class="rounded-lg bg-surface-1 px-4 py-2.5 text-sm">
+              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+                <span class="font-mono text-lg font-bold tracking-tight">{grade.label}</span>
+                <span class="font-mono text-[10px] text-muted-foreground">
+                  window {grade.windowIndex + 1} · score {grade.score}
+                  {#if grade.neutral}
+                    · limited sample
+                  {/if}
+                </span>
+              </div>
+              <p class="mt-1 text-muted-foreground">{grade.reasons[0]}</p>
+            </li>
+          {/each}
+        </ul>
+      </div>
+    {/if}
+
+    <div class="mt-8 flex flex-wrap items-center gap-3">
+      <button
+        type="button"
+        data-season-history-export-full-run
+        onclick={() => void exportFullRun()}
+        disabled={exportingGameId !== null || exportingFullRun}
+        class="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        {exportingFullRun ? 'Exporting full run…' : 'Export full-run replay'}
+      </button>
+      <p class="font-mono text-[10px] text-muted-foreground">
+        Includes the command log, almanac, and postseason summaries for `season run reproduce`.
+      </p>
+    </div>
   </section>
 {/if}
 

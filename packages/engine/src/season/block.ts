@@ -437,8 +437,10 @@ export function seasonBlockRejection(
   }
   for (const rotation of run.rotations) {
     const roster = run.rosters.find((entry) => entry.franchiseId === rotation.franchiseId);
+    const activePlayerIds = new Set([...rotation.starters, ...rotation.benchOrder]);
     const memberPlayable = new Map<string, readonly Position[]>();
     for (const player of roster?.players ?? []) {
+      if (!activePlayerIds.has(player.playerVersionId)) continue;
       const expanded = input.expanded.get(player.playerVersionId);
       if (expanded !== undefined) {
         memberPlayable.set(expanded.playerVersionId, expanded.positions);
@@ -566,12 +568,17 @@ export function simulateSeasonBlockGame(
       { gameId: game.gameId, blockIndex: command.blockIndex },
     );
   }
-  const homePlayers = homeRoster.players.map((player) =>
-    expandedPlayer(input, game.gameId, player.playerVersionId),
-  );
-  const awayPlayers = awayRoster.players.map((player) =>
-    expandedPlayer(input, game.gameId, player.playerVersionId),
-  );
+  const activePlayers = (
+    roster: typeof homeRoster,
+    rotation: typeof homeRotation,
+  ) => {
+    const activeIds = new Set([...rotation.starters, ...rotation.benchOrder]);
+    return roster.players
+      .filter((player) => activeIds.has(player.playerVersionId))
+      .map((player) => expandedPlayer(input, game.gameId, player.playerVersionId));
+  };
+  const homePlayers = activePlayers(homeRoster, homeRotation);
+  const awayPlayers = activePlayers(awayRoster, awayRotation);
   const seed = seasonNamespaceSeed(run.rootSeed, SEASON_SEED_NAMESPACES.scheduleGames, game.gameId);
 
   let pregame = effects;

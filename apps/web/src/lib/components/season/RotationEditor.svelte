@@ -345,7 +345,29 @@
 
 <div class="flex min-w-0 flex-col gap-4">
   <div class="flex flex-col gap-3">
-    <h2 class="font-display text-base font-extrabold uppercase tracking-tight">Rotation</h2>
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <h2 class="font-display text-base font-extrabold uppercase tracking-tight">Rotation</h2>
+        <p class="mt-0.5 text-xs text-muted-foreground">
+          Only the active 10 enter games. Inactive depth stays rostered and available to swap in.
+        </p>
+      </div>
+      <div
+        class="grid shrink-0 grid-cols-2 overflow-hidden rounded-lg border border-border bg-surface-1"
+        aria-label="Roster participation status"
+      >
+        <div class="border-r border-border px-3 py-2 text-center">
+          <p class="font-display text-lg leading-none font-extrabold text-positive">10 / 10</p>
+          <p class="mt-1 font-mono text-[9px] font-bold tracking-[0.12em] uppercase">Active</p>
+        </div>
+        <div class="px-3 py-2 text-center">
+          <p class="font-display text-lg leading-none font-extrabold">{inactiveRows.length}</p>
+          <p class="mt-1 font-mono text-[9px] font-bold tracking-[0.12em] uppercase text-muted-foreground">
+            Inactive
+          </p>
+        </div>
+      </div>
+    </div>
     <div class="grid grid-cols-3 gap-2" role="group" aria-label="Minute strategies">
       {#each ROTATION_PRESETS as preset (preset)}
         <button
@@ -815,14 +837,14 @@
     <section
       aria-labelledby="inactive-heading"
       data-rotation-inactive-section
-      class="rounded-none bg-surface-1 p-3 sm:rounded-xl"
+      class="rounded-none border-y border-dashed border-border bg-surface-1/60 p-3 sm:rounded-xl sm:border"
     >
       <div class="flex items-center justify-between gap-2">
         <h3
           id="inactive-heading"
           class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
         >
-          Inactive roster
+          Inactive depth · does not play
         </h3>
         <span class="font-mono text-[10px] text-muted-foreground">
           {inactiveRows.length} rostered {inactiveRows.length === 1 ? 'player' : 'players'} outside the
@@ -830,8 +852,8 @@
         </span>
       </div>
       <p class="mt-1 text-xs text-muted-foreground">
-        Promote a player to swap them into the rotation — the move takes effect when the next block
-        locks.
+        These players remain on your roster but receive no minutes. Swap one into the active 10 to
+        make them eligible for the next block.
       </p>
       <ul class="mt-2 flex flex-col divide-y divide-border/60">
         {#each inactiveRows as member (member.playerVersionId)}
@@ -886,7 +908,7 @@
                   class="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-surface-2 px-3 py-1.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <UserPlus class="h-4 w-4" />
-                  {open ? 'Cancel' : 'Promote'}
+                  {open ? 'Cancel swap' : 'Swap into active 10'}
                 </button>
               </div>
             </div>

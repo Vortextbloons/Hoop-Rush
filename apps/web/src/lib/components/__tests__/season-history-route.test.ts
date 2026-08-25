@@ -42,7 +42,36 @@ function resultShell(): SeasonRunShellData {
       command: null,
       startInput: null,
     },
-    manifest: null,
+    manifest: {
+      schemaVersion: 4,
+      dataVersion: 'test',
+      modernFranchiseSlots: Array.from({ length: 30 }, (_, index) => ({
+        franchiseId: index === 0 ? 'lakers' : `team-${String(index)}`,
+        displayName: `Team ${String(index)}`,
+        abbreviation: `T${String(index)}`,
+      })),
+      franchiseLineage: [],
+      eras: [{ eraId: '1990s', label: '1990s', seasonKeys: ['1990-91'] }],
+      pools: [],
+      availability: [],
+      eraSimulationProfiles: [
+        { eraId: '1990s', url: 'era-sim/1990s.json', contentHash: 'a'.repeat(64) },
+      ],
+      season: {
+        league: { url: 'season/league.json', contentHash: 'b'.repeat(64) },
+        schedule: { url: 'season/schedule.json', contentHash: 'c'.repeat(64) },
+        draftCatalog: { url: 'season/draft-catalog.json', contentHash: 'd'.repeat(64) },
+        rosterTargets: { url: 'season/roster-targets.json', contentHash: 'e'.repeat(64) },
+      },
+      assets: {
+        headshotUrlTemplate: null,
+        headshotUrlTemplateSecondary: null,
+        logoUrlTemplate: null,
+        logoUrlTemplateSecondary: null,
+        source: 'test',
+        cacheVersion: 'test',
+      },
+    },
     league: null,
     catalog: null,
     schedule: null,
@@ -106,7 +135,19 @@ function resultShell(): SeasonRunShellData {
 const repoCalls = vi.hoisted(() => ({
   deletedRunIds: [] as string[],
   exportedGameIds: [] as string[],
+  fullRunExports: 0,
 }));
+
+vi.mock('$lib/season/season-completed-export', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('$lib/season/season-completed-export')>();
+  return {
+    ...actual,
+    buildCompletedSeasonRunReplayExport: (...args: Parameters<typeof actual.buildCompletedSeasonRunReplayExport>) => {
+      repoCalls.fullRunExports += 1;
+      return actual.buildCompletedSeasonRunReplayExport(...args);
+    },
+  };
+});
 
 vi.mock('@hoop-rush/persistence', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@hoop-rush/persistence')>();
@@ -467,6 +508,9 @@ function buildCompletedSeason(): SeasonCompletedSeason {
 beforeEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  repoCalls.deletedRunIds = [];
+  repoCalls.exportedGameIds = [];
+  repoCalls.fullRunExports = 0;
 });
 
 describe('CompletedSeasonResult', () => {
@@ -492,6 +536,13 @@ describe('CompletedSeasonResult', () => {
     await fireEvent.click(container.querySelector('[data-season-history-export]') as HTMLElement);
     await waitFor(() => {
       expect(repoCalls.exportedGameIds).toEqual(['pi-west-seven-eight']);
+    });
+
+    await fireEvent.click(
+      container.querySelector('[data-season-history-export-full-run]') as HTMLElement,
+    );
+    await waitFor(() => {
+      expect(repoCalls.fullRunExports).toBe(1);
     });
   });
 

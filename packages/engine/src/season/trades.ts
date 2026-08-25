@@ -19,7 +19,7 @@ import {
   type SimulationRatings,
 } from '@hoop-rush/data-contracts';
 import { slotGroupOf, type SlotGroup } from '../domain/positions.ts';
-import { canonicalRosterPairs } from './chemistry.ts';
+import { canonicalPlayerPairs } from './chemistry.ts';
 import { reconcileSeasonEffects } from './effects.ts';
 import { applyRiskyRehabOutcome, rollSeasonRehabOutcome } from './injuries.ts';
 import { applySeasonInfluenceSpend } from './influence.ts';
@@ -613,10 +613,10 @@ function assembleHumanOffer(
     'starters/bench/closing five rebuilt deterministically by matchStartingFive',
   ].join('; ');
 
-  const removedPairs = canonicalRosterPairs(humanRosterIds).filter(
+  const removedPairs = canonicalPlayerPairs(humanRosterIds).filter(
     ([a, b]) => candidate.outgoing.includes(a) || candidate.outgoing.includes(b),
   ).length;
-  const newPairs = canonicalRosterPairs(humanAfter).filter(
+  const newPairs = canonicalPlayerPairs(humanAfter).filter(
     ([a, b]) => candidate.incoming.includes(a) || candidate.incoming.includes(b),
   ).length;
   const projectedChemistryDisruption = { removedPairs, newPairs };
@@ -834,10 +834,10 @@ function assembleAiOffer(
   const outgoingDepth = coverageDepthOf(aAfter, candidate.incoming, catalogFacts);
   const incomingDepth = coverageDepthOf(bAfter, candidate.outgoing, catalogFacts);
 
-  const removedPairs = canonicalRosterPairs(rosterB).filter(
+  const removedPairs = canonicalPlayerPairs(rosterB).filter(
     ([x, y]) => candidate.incoming.includes(x) || candidate.incoming.includes(y),
   ).length;
-  const newPairs = canonicalRosterPairs(bAfter).filter(
+  const newPairs = canonicalPlayerPairs(bAfter).filter(
     ([x, y]) => candidate.outgoing.includes(x) || candidate.outgoing.includes(y),
   ).length;
 

@@ -1,0 +1,118 @@
+{
+  "schemaVersion": 1,
+  "targetsVersion": "campaign-targets-v1",
+  "policy": {
+    "offersPerCheckpoint": 2,
+    "eligibleBlocks": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "branchLengths": {
+      "min": 2,
+      "max": 3
+    },
+    "maxEvolutionOffers": 3,
+    "thresholds": {
+      "blockWins": {
+        "completed": 6,
+        "breakthrough": 8
+      },
+      "winningBlock": {
+        "completed": 1,
+        "breakthrough": 7
+      },
+      "defensiveEfficiency": {
+        "completed": 110,
+        "breakthrough": 105
+      },
+      "threePointVolume": {
+        "completed": 90,
+        "breakthrough": 110
+      },
+      "assists": {
+        "completed": 220,
+        "breakthrough": 250
+      },
+      "turnoverControl": {
+        "completed": 130,
+        "breakthrough": 110
+      },
+      "reboundMargin": {
+        "completed": 20,
+        "breakthrough": 40
+      },
+      "benchContribution": {
+        "completed": 320
+      },
+      "playerMinutes": {
+        "completed": 160,
+        "breakthrough": 220
+      },
+      "playerPoints": {
+        "completed": 120,
+        "breakthrough": 160
+      },
+      "playerAvailability": {
+        "completed": 8,
+        "breakthrough": 10
+      }
+    }
+  },
+  "cohort": {
+    "seedFrom": 0,
+    "seedTo": 7
+  },
+  "heldOut": {
+    "seedFrom": 8,
+    "seedTo": 11
+  },
+  "measured": {
+    "calibration": {
+      "seasonsSimulated": 8,
+      "eligibleCheckpoints": 64,
+      "offersGenerated": 128,
+      "offerPerCheckpointFailures": 0,
+      "unsupportedFactFailures": 0,
+      "duplicateRewardFailures": 0,
+      "branchViolations": 0,
+      "evolutionViolations": 0,
+      "determinismFailures": 0,
+      "orderInvarianceFailures": 0,
+      "completedShare": 0.3125,
+      "breakthroughShare": 0.265625,
+      "evaluations": 64
+    },
+    "heldOut": {
+      "seasonsSimulated": 4,
+      "eligibleCheckpoints": 32,
+      "offersGenerated": 64,
+      "offerPerCheckpointFailures": 0,
+      "unsupportedFactFailures": 0,
+      "duplicateRewardFailures": 0,
+      "branchViolations": 0,
+      "evolutionViolations": 0,
+      "determinismFailures": 0,
+      "orderInvarianceFailures": 0
+    }
+  },
+  "gates": {
+    "offersPerCheckpoint": true,
+    "zeroUnsupportedFact": true,
+    "zeroDuplicateReward": true,
+    "zeroBranch": true,
+    "zeroEvolution": true,
+    "determinism": true,
+    "orderInvariance": true,
+    "heldOut": true
+  },
+  "engineVersion": "m3-engine-v11",
+  "gameVersion": "season-game-v4",
+  "gameTargetsVersion": "season-game-targets-v4",
+  "generatedAtIso": "2026-08-25T23:45:37.141Z"
+}
