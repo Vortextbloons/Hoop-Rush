@@ -4,7 +4,7 @@ import type { EngineContext } from '../sim/context.ts';
 import { MAX_PERIODS, OVERTIME_PERIOD_SECONDS, REGULATION_PERIOD_SECONDS, overtimePeriodsOf, resolveGameWinner, } from '../sim/periods.ts';
 import { GameRecorder, type SideIndex } from '../sim/recorder.ts';
 import { createGameState, createTripContext, PossessionStepper, type PossessionStep, type TripContext, } from '../sim/possession.ts';
-import { prepareTeam } from '../sim/prepare.ts';
+import { prepareTeam, type TeamPrep } from '../sim/prepare.ts';
 import { chooseInitialUnit, planUnit, plannerCandidates, type PlannerRotationContext, } from './rotation-planner.ts';
 import { seasonHomeCourtMechanisms } from './home-court.ts';
 import { createSeasonEffectsBuffer, type SeasonEffectsBuffer } from './effects.ts';
@@ -178,6 +178,7 @@ class SeasonGameController {
     private readonly removalQueue: SeasonRemoval[];
     private readonly returnQueue: SeasonReturn[];
     private readonly effectsMode: SeasonGameEffectsMode | null;
+    private readonly prepCache = new Map<string, TeamPrep>();
     private offense: SideIndex = 0;
     private secondsRemaining = REGULATION_PERIOD_SECONDS;
     private period = 1;
@@ -558,9 +559,18 @@ class SeasonGameController {
         const { team, rosterIndices } = this.buildUnitTeam(side);
         this.tripContext.teams[side.sideIndex] = team;
         this.tripContext.teamUnits[side.sideIndex] = [...side.unit];
-        this.tripContext.preps[side.sideIndex] = prepareTeam(team, this.profile);
+        this.tripContext.preps[side.sideIndex] = this.cachedPrep(team);
         this.recorder.setActiveFive(side.sideIndex, rosterIndices);
         this.effectsMode?.buffer.hook.setActiveUnits(this.home.unit, this.away.unit);
+    }
+    private cachedPrep(team: SimulationTeam): TeamPrep {
+        const key = `${team.teamId}|${team.players.map((player) => player.playerVersionId ?? player.playerId).join(',')}|${this.profile.profileVersion}`;
+        let prep = this.prepCache.get(key);
+        if (prep === undefined) {
+            prep = prepareTeam(team, this.profile);
+            this.prepCache.set(key, prep);
+        }
+        return prep;
     }
     private buildUnitTeam(side: SideState): {
         team: SimulationTeam;

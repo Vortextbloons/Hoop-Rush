@@ -11,7 +11,10 @@ export async function sha256Hex(bytes: Uint8Array<ArrayBuffer> | ArrayBuffer): P
 }
 export async function verifySha256(bytes: ArrayBuffer, expectedHash: string): Promise<void> {
     const digest = await sha256Hex(new Uint8Array(bytes));
-    if (digest !== null && digest !== expectedHash) {
+    if (digest === null) {
+        throw new Error(`content hash unavailable: WebCrypto subtle.digest not present (expected ${expectedHash})`);
+    }
+    if (digest !== expectedHash) {
         throw new Error(`content hash mismatch: expected ${expectedHash}, got ${digest}`);
     }
 }

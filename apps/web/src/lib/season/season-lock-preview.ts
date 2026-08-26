@@ -1,7 +1,6 @@
-import { fatigueBandOf } from '@hoop-rush/engine';
+import { fatigueBandOf, seasonRotationSetDigest } from '@hoop-rush/engine';
 import { SEASON_BLOCK_TEAM_GAMES, SEASON_FINAL_BLOCK_TEAM_GAMES, blockRoundRange, type SeasonEffectsState, type SeasonGame, type SeasonRotation, type SeasonUpcomingHumanGame, } from '@hoop-rush/data-contracts';
 import { rotationRoleOf } from './season-rotation-editor';
-import { seasonRotationSetDigest } from './season-rotation-digest';
 import { FATIGUE_BAND_LABEL, projectedFatigueBand } from './season-effects-view';
 export interface RotationChange {
     playerVersionId: string;

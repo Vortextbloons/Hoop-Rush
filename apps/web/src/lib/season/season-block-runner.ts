@@ -1,5 +1,5 @@
 import type { SeasonAcceptedBlock, SeasonCandidateCheckpoint, SeasonCheckpointState, SeasonDraftCatalog, SeasonEffectsState, SeasonFreeAgencyIndex, SeasonFreeAgencyState, SeasonGameSummary, SeasonHealthState, SeasonHomeCourtProfile, SeasonInvalidRosterInterruption, SeasonObjectiveId, SeasonObjectiveState, SeasonPendingBlockCandidate, SeasonRetainedGameDetail, SeasonRosterTargets, SeasonRotation, SeasonRun, } from '@hoop-rush/data-contracts';
-import { seasonAcceptedBlockSchema, seasonWorkerCancelRequestSchema, seasonWorkerContinueRequestSchema, seasonWorkerMessageSchema, seasonWorkerStartRequestSchema, seasonWorkerWarmRequestSchema, type SeasonScoreline, type SeasonWorkerContinueRequest, type SeasonWorkerStartRequest, } from '@hoop-rush/data-contracts';
+import { SEASON_WORKER_WIRE_SCHEMA_VERSION, seasonAcceptedBlockSchema, seasonWorkerCancelRequestSchema, seasonWorkerContinueRequestSchema, seasonWorkerMessageSchema, seasonWorkerStartRequestSchema, seasonWorkerWarmRequestSchema, type SeasonScoreline, type SeasonWorkerContinueRequest, type SeasonWorkerStartRequest, } from '@hoop-rush/data-contracts';
 import { completeSeasonBlockCommit, reconstructSeasonGames, seasonCheckpointDigest, seasonFranchiseLegalFiveFacts, seasonNextBlockIndex, seasonRotationSetDigest, } from '@hoop-rush/engine';
 import type { SeasonRunRepository, SeasonRunSnapshot, SeasonWindowOpenResult, } from '@hoop-rush/persistence';
 import type { SeasonSchedule } from '@hoop-rush/data-contracts';
@@ -548,14 +548,14 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         };
         if (newSummaries !== undefined) {
             return seasonWorkerContinueRequestSchema.parse({
-                schemaVersion: 7,
+                schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
                 type: 'season-block-continue',
                 rotations: plainRotations,
                 ...plainCommon,
             });
         }
         return seasonWorkerStartRequestSchema.parse({
-            schemaVersion: 7,
+            schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
             type: 'season-block-start',
             run: cloneForWorker({
                 schemaVersion: state.input.run.schemaVersion,
@@ -791,7 +791,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
                 return;
             }
             worker.postMessage(seasonWorkerCancelRequestSchema.parse({
-                schemaVersion: 7,
+                schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
                 type: 'season-block-cancel',
                 requestId,
             }));
@@ -823,7 +823,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
                     const requestId = `warm-${crypto.randomUUID()}`;
                     warmRequestId = requestId;
                     target.postMessage(seasonWorkerWarmRequestSchema.parse({
-                        schemaVersion: 7,
+                        schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
                         type: 'season-block-warm',
                         requestId,
                         catalogUrl: artifacts.catalogUrl,

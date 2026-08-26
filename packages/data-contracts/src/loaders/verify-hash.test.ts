@@ -18,9 +18,9 @@ describe('verifySha256', () => {
     it('throws when the content hash mismatches', async () => {
         await expect(verifySha256(abcBuffer(), '0'.repeat(64))).rejects.toThrow(/content hash mismatch/);
     });
-    it('skips the check when WebCrypto is unavailable', async () => {
+    it('throws when WebCrypto is unavailable', async () => {
         vi.stubGlobal('crypto', {});
-        await expect(verifySha256(abcBuffer(), '0'.repeat(64))).resolves.toBeUndefined();
+        await expect(verifySha256(abcBuffer(), '0'.repeat(64))).rejects.toThrow(/content hash unavailable/);
     });
 });
 afterEach(() => {

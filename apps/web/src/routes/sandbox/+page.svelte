@@ -245,9 +245,12 @@ async function play82() {
             eraId: p.eraId,
         }));
         const resolved = await resolveRefsToPlayers(refs);
+        if (!mounted) return;
         await startSandboxRun(resolved, generateSeed());
+        if (!mounted) return;
     }
     catch (e) {
+        if (!mounted) return;
         runError = e instanceof Error ? e.message : String(e);
         starting = false;
     }

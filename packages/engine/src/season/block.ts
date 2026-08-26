@@ -1067,8 +1067,10 @@ export function completeSeasonBlockCommit(input: {
                         ...postBlockRun,
                         stateDigest: seasonRunStateDigest(seasonRunStateDigestFactsOf(postBlockRun, input.effects ?? input.candidate.effects)),
                     };
+                } catch (error) {
+                    console.warn(`campaign generation failed for block ${String(nextBlockIdxForCampaign)}`, error);
+                    throw error;
                 }
-                catch { }
             }
         }
     }

@@ -85,13 +85,7 @@ export function loadSeasonFreeAgencyIndex(): Promise<SeasonFreeAgencyIndex> {
     });
 }
 export function loadSeasonFreeAgencyTargets(): Promise<SeasonRosterTargets> {
-    return memoized('season/free-agency-targets', async () => {
-        const manifest = await getManifest();
-        const entry = manifest.season?.rosterTargets;
-        if (!entry)
-            throw new Error('The season roster-targets artifact is unavailable.');
-        return fetchVerified(resolveAssetUrl(entry.url), entry.contentHash, (value: unknown) => seasonRosterTargetsSchema.parse(value));
-    });
+    return loadSeasonRosterTargets();
 }
 export function loadSeasonHomeCourtProfile(): Promise<SeasonHomeCourtProfile> {
     return Promise.resolve({ ...SEASON_HOME_COURT_PROFILE });

@@ -1,4 +1,4 @@
-import { blockIndexForRound, blockRoundRange, loadEraSimulationProfile, loadSeasonDraftCatalog, seasonWorkerMessageSchema, seasonWorkerRequestSchema, SEASON_HEALTH_VERSION, SEASON_RUN_SCHEMA_VERSION, type EraSimulationProfile, type SeasonBlockRunContext, type SeasonDraftCatalog, type SeasonEffectsState, type SeasonGamePlayerInput, type SeasonGameSummary, type SeasonHealthState, type SeasonHomeCourtProfile, type SeasonInfluenceState, type SeasonInvalidRosterInterruption, type SeasonRetainedGameDetail, type SeasonSchedule, type SeasonWorkerCompleteMessage, type SeasonWorkerContinueRequest, type SeasonWorkerErrorMessage, type SeasonWorkerProgressMessage, type SeasonWorkerStartRequest, type SeasonWorkerWarmAckMessage, } from '@hoop-rush/data-contracts';
+import { blockIndexForRound, blockRoundRange, loadEraSimulationProfile, loadSeasonDraftCatalog, SEASON_WORKER_WIRE_SCHEMA_VERSION, seasonWorkerMessageSchema, seasonWorkerRequestSchema, SEASON_HEALTH_VERSION, SEASON_RUN_SCHEMA_VERSION, type EraSimulationProfile, type SeasonBlockRunContext, type SeasonDraftCatalog, type SeasonEffectsState, type SeasonGamePlayerInput, type SeasonGameSummary, type SeasonHealthState, type SeasonHomeCourtProfile, type SeasonInfluenceState, type SeasonInvalidRosterInterruption, type SeasonRetainedGameDetail, type SeasonSchedule, type SeasonWorkerCompleteMessage, type SeasonWorkerContinueRequest, type SeasonWorkerErrorMessage, type SeasonWorkerProgressMessage, type SeasonWorkerStartRequest, type SeasonWorkerWarmAckMessage, } from '@hoop-rush/data-contracts';
 import { assembleSeasonBlockCandidate, assembleSeasonPendingBlock, auditSeasonBlock, createInitialSeasonInfluenceState, createSeasonEffectsState, expandSeasonRunRosters, rosterPlayerIdsOf, seasonBlockGamesOf, seasonBlockRejection, SeasonBlockInvariantError, simulateSeasonBlockGame, type SeasonBlockSimulationInput, } from '@hoop-rush/engine';
 import { sleep } from '../lib/sleep';
 const PROGRESS_MIN_INTERVAL_MS = 250;
@@ -45,7 +45,7 @@ function postError(requestId: string, code: 'invariant-failure' | 'cancelled' | 
     blockIndex?: number | null;
 } = {}): void {
     const payload: SeasonWorkerErrorMessage = {
-        schemaVersion: 7,
+        schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
         type: 'season-block-error',
         requestId,
         code,
@@ -267,7 +267,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
         if (isLast || now - lastProgressAt >= PROGRESS_MIN_INTERVAL_MS) {
             lastProgressAt = now;
             post({
-                schemaVersion: 7,
+                schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
                 type: 'season-block-progress',
                 requestId: request.requestId,
                 blockIndex: request.blockIndex,
@@ -304,7 +304,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
             rotationDigest: request.rotationDigest,
         });
         post({
-            schemaVersion: 7,
+            schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
             type: 'season-block-complete',
             requestId: request.requestId,
             result: { status: 'interrupted', pending },
@@ -323,7 +323,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
         ...summaries,
     ];
     post({
-        schemaVersion: 7,
+        schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
         type: 'season-block-complete',
         requestId: request.requestId,
         result: { status: 'committed', checkpoint: candidate },
@@ -364,7 +364,7 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
                     loadProfileCached(request.profileUrl, request.profileHash),
                 ]);
                 post({
-                    schemaVersion: 7,
+                    schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
                     type: 'season-block-warm-ack',
                     requestId: request.requestId,
                 });
