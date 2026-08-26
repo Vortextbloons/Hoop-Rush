@@ -1,7 +1,5 @@
 import 'mode-watcher';
-
 declare global {
-  namespace App {}
+    namespace App { }
 }
-
 export {};

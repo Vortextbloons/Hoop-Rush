@@ -1,29 +1,19 @@
-<script lang="ts">
-  import type { HoopRushManifest, SeasonAwards } from '@hoop-rush/data-contracts';
-  import { awardsViewModel } from '$lib/season/season-postseason-presentation';
-  import type { SeasonFaceRef } from '$lib/season/season-branding';
-  import SeasonPlayerFace from './SeasonPlayerFace.svelte';
-
-  let {
-    awards,
-    playerName,
-    franchiseName,
-    manifest = null,
-    faces = null,
-  }: {
+<script lang="ts">import type { HoopRushManifest, SeasonAwards } from '@hoop-rush/data-contracts';
+import { awardsViewModel } from '$lib/season/season-postseason-presentation';
+import type { SeasonFaceRef } from '$lib/season/season-branding';
+import SeasonPlayerFace from './SeasonPlayerFace.svelte';
+let { awards, playerName, franchiseName, manifest = null, faces = null, }: {
     awards: SeasonAwards;
     playerName: (playerVersionId: string) => string;
     franchiseName: (franchiseId: string) => string;
     manifest?: HoopRushManifest | null;
     faces?: ReadonlyMap<string, SeasonFaceRef> | null;
-  } = $props();
-
-  const view = $derived(awardsViewModel(awards, playerName, franchiseName));
-
-  const faceOf = (playerVersionId: string): SeasonFaceRef | null => {
+} = $props();
+const view = $derived(awardsViewModel(awards, playerName, franchiseName));
+const faceOf = (playerVersionId: string): SeasonFaceRef | null => {
     const face = faces?.get(playerVersionId);
     return face ?? null;
-  };
+};
 </script>
 
 <section aria-labelledby="awards-heading" data-season-awards class="min-w-0">

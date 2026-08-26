@@ -1,6 +1,5 @@
 import { makeReport, type CliReport } from '../report.ts';
 import { listFixtureIds } from './sim.ts';
-
 export const HELP_TEXT = `hoop-rush — developer CLI for the Hoop Rush engine and data
 
 Usage:
@@ -309,7 +308,6 @@ Common options:
 
 Exit codes: 0 success · 1 failed checks · 2 invalid input or execution error
 `;
-
 export function helpCommand(): CliReport {
-  return makeReport('help', {}, { details: [HELP_TEXT.trimEnd()] });
+    return makeReport('help', {}, { details: [HELP_TEXT.trimEnd()] });
 }

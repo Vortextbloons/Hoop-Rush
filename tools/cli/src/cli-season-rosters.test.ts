@@ -1,510 +1,449 @@
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
-import {
-  seasonDraftCatalogSchema,
-  seasonLeagueSchema,
-  seasonRosterTargetsSchema,
-  type SeasonRosterTargets,
-  type SeasonStrengthBand,
-} from '@hoop-rush/data-contracts';
+import { seasonDraftCatalogSchema, seasonLeagueSchema, seasonRosterTargetsSchema, type SeasonRosterTargets, type SeasonStrengthBand, } from '@hoop-rush/data-contracts';
 import { generateAiLeague } from '@hoop-rush/engine';
-import {
-  seasonDraftReproduceReportSchema,
-  seasonRostersAuditReportSchema,
-  seasonRostersCalibrateReportSchema,
-  seasonRostersGenerateReportSchema,
-} from './report-schemas.ts';
+import { seasonDraftReproduceReportSchema, seasonRostersAuditReportSchema, seasonRostersCalibrateReportSchema, seasonRostersGenerateReportSchema, } from './report-schemas.ts';
 import { jsonPayload, REPO_ROOT, runCli, TMP } from './cli-test-helpers.ts';
 import { fixtureHumanRoster } from './commands/season-data.ts';
 import { sha256Hex } from './io.ts';
-import {
-  seasonRostersCalibrate,
-  type SeasonRostersCalibrateDeps,
-} from './commands/season-rosters.ts';
+import { seasonRostersCalibrate, type SeasonRostersCalibrateDeps, } from './commands/season-rosters.ts';
 import type { RosterCalibrationWorkerRun } from './commands/rosters-calibration-worker.ts';
 import { handBuiltTargets, ROLES } from './cli-season-rosters-test-support.ts';
-
 const DRAFT_COMMANDS = join(REPO_ROOT, 'tools/cli/src/fixtures/season-draft-commands.json');
 const DRAFT_FINALIZED = join(REPO_ROOT, 'tools/cli/src/fixtures/season-draft-finalized.json');
 const MANIFEST = join(REPO_ROOT, 'apps/web/static/data/manifest.json');
 const CATALOG = join(REPO_ROOT, 'apps/web/static/data/season/draft-catalog.json');
 const LEAGUE = join(REPO_ROOT, 'apps/web/static/data/season/league.json');
 const SEED = 'd00d2026a1b2c3d4e5f60718293a4b5c6';
-
 const BAND_SCORES: Record<SeasonStrengthBand, number> = {
-  contender: 90,
-  playoff: 80,
-  average: 70,
-  weaker: 60,
+    contender: 90,
+    playoff: 80,
+    average: 70,
+    weaker: 60,
 };
 const IDENTITIES = [
-  'star-chaser',
-  'depth-builder',
-  'defense-first',
-  'shooting-first',
-  'continuity',
-  'active-trader',
+    'star-chaser',
+    'depth-builder',
+    'defense-first',
+    'shooting-first',
+    'continuity',
+    'active-trader',
 ] as const;
-
 function fakeLeagueRun(seed: string): RosterCalibrationWorkerRun {
-  const bands: SeasonStrengthBand[] = [];
-  const quotas: Array<[SeasonStrengthBand, number]> = [
-    ['contender', 4],
-    ['playoff', 8],
-    ['average', 10],
-    ['weaker', 7],
-  ];
-  for (const [band, count] of quotas) {
-    for (let i = 0; i < count; i += 1) bands.push(band);
-  }
-  return {
-    seed,
-    teams: bands.map((band, i) => ({
-      franchiseId: `ai-${String(i)}`,
-      band,
-      identity: IDENTITIES[i % IDENTITIES.length] ?? 'continuity',
-      strengthScore: BAND_SCORES[band],
-      rolesCovered: 8,
-      roleIds: [...ROLES],
-    })),
-    repairs: 0,
-    backtracks: 0,
-    nodesVisited: 0,
-    failed: false,
-    digest: 'c'.repeat(32),
-    poolFailures: [],
-    selectionFailures: [],
-    anchorsTotal: 16,
-
-    extraEliteTeams: 8,
-    guaranteedAnchorShortfall: 0,
-    tierCounts: {
-      contender: { elite: 4, strong: 4, useful: 0, total: 4 },
-      playoff: { elite: 8, strong: 8, useful: 0, total: 8 },
-      average: { elite: 0, strong: 10, useful: 0, total: 10 },
-      weaker: { elite: 0, strong: 7, useful: 0, total: 7 },
-    },
-  };
-}
-
-function failedRun(seed: string): RosterCalibrationWorkerRun {
-  return {
-    seed,
-    teams: [],
-    repairs: 0,
-    backtracks: 1,
-    nodesVisited: 1,
-    failed: true,
-    digest: '',
-    poolFailures: [],
-    selectionFailures: [],
-    anchorsTotal: 0,
-    extraEliteTeams: 0,
-    guaranteedAnchorShortfall: 0,
-    tierCounts: {
-      contender: { elite: 0, strong: 0, useful: 0, total: 0 },
-      playoff: { elite: 0, strong: 0, useful: 0, total: 0 },
-      average: { elite: 0, strong: 0, useful: 0, total: 0 },
-      weaker: { elite: 0, strong: 0, useful: 0, total: 0 },
-    },
-  };
-}
-
-function fakeCohort(
-  overrides: Partial<RosterCalibrationWorkerRun> = {},
-): NonNullable<SeasonRostersCalibrateDeps['runCohort']> {
-  return (request) =>
-    Promise.resolve(request.seeds.map((seed) => ({ ...fakeLeagueRun(seed), ...overrides })));
-}
-
-const fakeOrderInvariance: NonNullable<SeasonRostersCalibrateDeps['runOrderInvariance']> = (
-  request,
-) =>
-  Promise.resolve(
-    request.seeds.map((seed) => ({
-      seed,
-      digests: ['a'.repeat(32), 'a'.repeat(32), 'a'.repeat(32)],
-    })),
-  );
-
-function writeScratchManifest(
-  targets: SeasonRosterTargets,
-  options: { omitRosterTargets?: boolean } = {},
-): string {
-  const targetsPath = join(TMP, 'roster-targets.json');
-  const targetsBytes = `${JSON.stringify(targets, null, 2)}\n`;
-  writeFileSync(targetsPath, targetsBytes);
-  const manifest = JSON.parse(readFileSync(MANIFEST, 'utf8')) as {
-    season?: Record<string, { url?: string; contentHash?: string }>;
-  };
-  const season = {
-    draftCatalog: manifest.season?.draftCatalog,
-    ...(options.omitRosterTargets === true
-      ? {}
-      : {
-          rosterTargets: {
-            url: 'roster-targets.json',
-            contentHash: sha256Hex(targetsBytes),
-          },
-        }),
-  };
-  const manifestPath = join(TMP, 'manifest.json');
-  writeFileSync(manifestPath, `${JSON.stringify({ ...manifest, season }, null, 2)}\n`);
-  return manifestPath;
-}
-
-describe('cli: season rosters generate (roster-generation-v2)', () => {
-  it('previews a deterministic generation against the verified targets artifact', async () => {
-    const manifestPath = writeScratchManifest(handBuiltTargets());
-    const { code, stdout } = await runCli([
-      'season',
-      'rosters',
-      'generate',
-      '--seed',
-      SEED,
-      '--draft',
-      DRAFT_FINALIZED,
-      '--manifest',
-      manifestPath,
-      '--format',
-      'json',
-    ]);
-    expect(code).toBe(0);
-    const payload = seasonRostersGenerateReportSchema.parse(jsonPayload(stdout));
-    expect(payload.pass).toBe(true);
-    expect(payload.wrote).toBe(false);
-    expect(payload.teams).toBe(30);
-    expect(payload.ownershipRows).toBe(300);
-    expect(payload.pools).toBe(29);
-    expect(payload.anchorsTotal).toBeGreaterThanOrEqual(16);
-    expect(payload.repairCount).toBeGreaterThanOrEqual(0);
-    // Determinism across reruns is covered by the engine rerun tests and by
-    // `season draft reproduce`'s exact-digest pin; one authoritative CLI run
-    // is the boundary sentinel here.
-  }, 300_000);
-
-  it('rejects a tampered targets artifact with a typed failure', async () => {
-    const manifestPath = writeScratchManifest(handBuiltTargets());
-    const targetsPath = join(TMP, 'roster-targets.json');
-    const tampered = JSON.parse(readFileSync(targetsPath, 'utf8')) as SeasonRosterTargets;
-    tampered.measured.anchorFulfillment = 0.5;
-    writeFileSync(targetsPath, `${JSON.stringify(tampered, null, 2)}\n`);
-    const { code, stdout, stderr } = await runCli([
-      'season',
-      'rosters',
-      'generate',
-      '--seed',
-      SEED,
-      '--draft',
-      DRAFT_FINALIZED,
-      '--manifest',
-      manifestPath,
-      '--format',
-      'json',
-    ]);
-    expect(code).toBe(2);
-    const report = JSON.parse((stdout + stderr).slice((stdout + stderr).indexOf('{'))) as {
-      failures: string[];
-    };
-    expect(report.failures[0]).toContain('content hash mismatch');
-  });
-
-  it('rejects a manifest without a rosterTargets entry with a typed failure', async () => {
-    const manifestPath = writeScratchManifest(handBuiltTargets(), { omitRosterTargets: true });
-    const { code, stderr } = await runCli([
-      'season',
-      'rosters',
-      'generate',
-      '--seed',
-      SEED,
-      '--draft',
-      DRAFT_FINALIZED,
-      '--manifest',
-      manifestPath,
-      '--format',
-      'json',
-    ]);
-    expect(code).toBe(2);
-    expect(stderr).toContain('no season.rosterTargets entry');
-  });
-
-  it('rejects a non-hex seed with a usage error', async () => {
-    const manifestPath = writeScratchManifest(handBuiltTargets());
-    const { code, stderr } = await runCli([
-      'season',
-      'rosters',
-      'generate',
-      '--seed',
-      'not-hex',
-      '--draft',
-      DRAFT_FINALIZED,
-      '--manifest',
-      manifestPath,
-    ]);
-    expect(code).toBe(2);
-    expect(stderr).toContain('--seed must be a hex seed');
-  });
-});
-
-describe('cli: season rosters audit (roster-generation-v2)', () => {
-  let resultPath: string;
-  let tamperedPath: string;
-  let manifestPath: string;
-
-  beforeAll(() => {
-    const targets = handBuiltTargets();
-    const catalog = seasonDraftCatalogSchema.parse(JSON.parse(readFileSync(CATALOG, 'utf8')));
-    const league = seasonLeagueSchema.parse(JSON.parse(readFileSync(LEAGUE, 'utf8')));
-    const humanRoster = fixtureHumanRoster(catalog);
-    const result = generateAiLeague({
-      seed: SEED,
-      catalog,
-      league,
-      humanFranchiseIds: ['lakers'],
-      humanRosters: [{ franchiseId: 'lakers', playerVersionIds: humanRoster }],
-      targets,
-    });
-    resultPath = join(TMP, 'generated-league.json');
-    writeFileSync(resultPath, `${JSON.stringify(result, null, 2)}\n`);
-    tamperedPath = join(TMP, 'generated-league.tampered.json');
-    writeFileSync(
-      tamperedPath,
-      `${JSON.stringify({ ...result, digest: '0'.repeat(32) }, null, 2)}\n`,
-    );
-    manifestPath = writeScratchManifest(targets);
-  }, 300_000);
-
-  it('audits an engine-generated league with zero failures', async () => {
-    const { code, stdout } = await runCli([
-      'season',
-      'rosters',
-      'audit',
-      '--input',
-      resultPath,
-      '--manifest',
-      manifestPath,
-      '--human-franchises',
-      'lakers',
-      '--format',
-      'json',
-    ]);
-    expect(code).toBe(0);
-    const payload = seasonRostersAuditReportSchema.parse(jsonPayload(stdout));
-    expect(payload.pass).toBe(true);
-    expect(payload.auditFailures).toBe(0);
-    expect(payload.digestVerified).toBe(true);
-    expect(payload.teams).toBe(30);
-    expect(payload.ownershipRows).toBe(300);
-    expect(payload.pools).toBe(29);
-    expect(payload.poolFailures).toBe(0);
-    expect(payload.anchorFailures).toBe(0);
-    expect(payload.tierFailures).toBe(0);
-    expect(payload.exclusivityFailures).toBe(0);
-    expect(payload.selectionFailures).toBe(0);
-  }, 300_000);
-
-  it('fails on a tampered digest with a nonzero exit', async () => {
-    const { code, stdout, stderr } = await runCli([
-      'season',
-      'rosters',
-      'audit',
-      '--input',
-      tamperedPath,
-      '--manifest',
-      manifestPath,
-      '--human-franchises',
-      'lakers',
-      '--format',
-      'json',
-    ]);
-    expect(code).toBe(1);
-    const payload = seasonRostersAuditReportSchema.parse(jsonPayload(stdout, stderr));
-    expect(payload.pass).toBe(false);
-    expect(payload.digestVerified).toBe(false);
-    expect(payload.auditFailures).toBeGreaterThan(0);
-  });
-});
-
-describe('cli: season rosters calibrate (roster-generation-v2)', () => {
-  it('runs a small cohort through injected doubles, evaluates gates, and rewrites only measured', async () => {
-    const targets = handBuiltTargets();
-    const targetsPath = join(TMP, 'calibration-targets.json');
-    writeFileSync(targetsPath, `${JSON.stringify(targets, null, 2)}\n`);
-    const outPath = join(TMP, 'calibration-out.json');
-    const report = await seasonRostersCalibrate(
-      {
-        targets: targetsPath,
-        out: outPath,
-        'calibration-seeds': '4',
-        'validation-seeds': '2',
-        workers: '2',
-      },
-      { runCohort: fakeCohort(), runOrderInvariance: fakeOrderInvariance },
-    );
-    expect(report.exitCode).toBe(0);
-    const payload = seasonRostersCalibrateReportSchema.parse(report.payload);
-    expect(payload.calibrationSeeds).toBe(4);
-    expect(payload.validationSeeds).toBe(2);
-    expect(payload.measured.generationFailures).toBe(0);
-    expect(payload.measured.poolLegalityFailures).toBe(0);
-    expect(payload.measured.selectionFailures).toBe(0);
-    expect(payload.gates.poolLegality).toBe(true);
-    expect(payload.gates.selectionLegality).toBe(true);
-    expect(payload.gates.failureRate).toBe(true);
-    expect(payload.gates.heldOutPass).toBe(true);
-    expect(payload.gates.orderInvariance).toBe(true);
-    expect(payload.gates.minBandSeparation).toBe(true);
-    expect(payload.gates.anchorFulfillment).toBe(true);
-    expect(payload.gates.extraEliteWithinTolerance).toBe(true);
-    expect(payload.gates.superTeamIncidence).toBe(true);
-    expect(payload.pass).toBe(true);
-    expect(payload.validateOnly).toBe(false);
-    expect(payload.targetsWritten).toBe(true);
-    expect(payload.targetsPath).toBe(outPath);
-
-    const rewritten = seasonRosterTargetsSchema.parse(JSON.parse(readFileSync(outPath, 'utf8')));
-    expect(rewritten.policy).toEqual(targets.policy);
-    expect(rewritten.calibration.gates).toEqual(targets.calibration.gates);
-    expect(rewritten.measured.generationFailures).toBe(0);
-
-    expect(rewritten.measured.bands.contender.median).toBe(90);
-    expect(rewritten.measured.bands.weaker.median).toBe(60);
-  });
-
-  it('fails the failure-rate gate with a nonzero exit when a cohort seed fails', async () => {
-    const targets = handBuiltTargets();
-    const targetsPath = join(TMP, 'failure-targets.json');
-    writeFileSync(targetsPath, `${JSON.stringify(targets, null, 2)}\n`);
-    const report = await seasonRostersCalibrate(
-      {
-        targets: targetsPath,
-        out: join(TMP, 'failure-out.json'),
-        'calibration-seeds': '4',
-        'validation-seeds': '2',
-        workers: '2',
-      },
-      {
-        runCohort: (request) =>
-          Promise.resolve(
-            request.seeds.map((seed, i) => (i === 0 ? failedRun(seed) : fakeLeagueRun(seed))),
-          ),
-        runOrderInvariance: fakeOrderInvariance,
-      },
-    );
-    expect(report.exitCode).toBe(1);
-    const payload = seasonRostersCalibrateReportSchema.parse(report.payload);
-    expect(payload.measured.generationFailures).toBe(1);
-    expect(payload.gates.failureRate).toBe(false);
-    expect(payload.pass).toBe(false);
-    expect(report.failures.join('; ')).toContain('1 generation failures');
-  });
-
-  it('fails the extra-elite tolerance gate when pools overshoot the packed probability', async () => {
-    const targets = handBuiltTargets();
-    const targetsPath = join(TMP, 'elite-targets.json');
-    writeFileSync(targetsPath, `${JSON.stringify(targets, null, 2)}\n`);
-    const report = await seasonRostersCalibrate(
-      {
-        targets: targetsPath,
-        out: join(TMP, 'elite-out.json'),
-        'calibration-seeds': '4',
-        'validation-seeds': '2',
-        workers: '2',
-      },
-      {
-        runCohort: fakeCohort({ extraEliteTeams: 29 }),
-        runOrderInvariance: fakeOrderInvariance,
-      },
-    );
-    expect(report.exitCode).toBe(1);
-    const payload = seasonRostersCalibrateReportSchema.parse(report.payload);
-    expect(payload.gates.extraEliteWithinTolerance).toBe(false);
-    expect(payload.pass).toBe(false);
-  });
-
-  it('worker counts never change the gate report (1 vs 4 workers)', async () => {
-    const targets = handBuiltTargets();
-    const targetsPath = join(TMP, 'workers-targets.json');
-    writeFileSync(targetsPath, `${JSON.stringify(targets, null, 2)}\n`);
-    const run = async (workers: string) => {
-      const report = await seasonRostersCalibrate(
-        { targets: targetsPath, 'calibration-seeds': '4', 'validation-seeds': '2', workers },
-        { runCohort: fakeCohort(), runOrderInvariance: fakeOrderInvariance },
-      );
-      return seasonRostersCalibrateReportSchema.parse(report.payload);
-    };
-    const one = await run('1');
-    const four = await run('4');
-    expect(four.bands).toEqual(one.bands);
-    expect(four.measured).toEqual(one.measured);
-    expect(four.gates).toEqual(one.gates);
-  });
-});
-
-describe('cli: season draft reproduce', () => {
-  it('reproduces the committed fixture with the exact digest', async () => {
-    const manifestPath = writeScratchManifest(handBuiltTargets());
-    const { code, stdout } = await runCli([
-      'season',
-      'draft',
-      'reproduce',
-      '--input',
-      DRAFT_COMMANDS,
-      '--manifest',
-      manifestPath,
-      '--format',
-      'json',
-    ]);
-    expect(code).toBe(0);
-    const payload = seasonDraftReproduceReportSchema.parse(jsonPayload(stdout));
-    expect(payload.pass).toBe(true);
-    expect(payload.identical).toBe(true);
-    expect(payload.finalDigest).toBe('95396ddde716fe01829f4d2fcb6b8e8d');
-    expect(payload.acceptedCount).toBe(payload.commandCount);
-    expect(payload.rejectedCount).toBe(0);
-    expect(payload.offers).toHaveLength(10);
-    expect(payload.picks).toHaveLength(10);
-  }, 300_000);
-
-  it('rejects malformed inputs with a usage error', async () => {
-    const bad = join(REPO_ROOT, 'tools/cli/src/fixtures/season-draft-finalized.json');
-    const { code, stderr } = await runCli(['season', 'draft', 'reproduce', '--input', bad]);
-    expect(code).toBe(2);
-    expect(stderr).toContain('commands input fails the schema');
-  });
-
-  it('reports divergences with a nonzero exit', async () => {
-    const fixture = JSON.parse(readFileSync(DRAFT_COMMANDS, 'utf8')) as {
-      expected: { finalDigest: string; finalRevision: number };
-    };
-    const manifestPath = writeScratchManifest(handBuiltTargets());
-    const tmpPath = join(TMP, 'season-draft-commands.divergence.json');
-    try {
-      writeFileSync(
-        tmpPath,
-        JSON.stringify({
-          ...fixture,
-          expected: { finalDigest: '0'.repeat(32), finalRevision: fixture.expected.finalRevision },
-        }),
-      );
-      const { code, stdout, stderr } = await runCli([
-        'season',
-        'draft',
-        'reproduce',
-        '--input',
-        tmpPath,
-        '--manifest',
-        manifestPath,
-        '--format',
-        'json',
-      ]);
-      expect(code).toBe(1);
-      const payload = seasonDraftReproduceReportSchema.parse(jsonPayload(stdout, stderr));
-      expect(payload.identical).toBe(false);
-      expect(payload.divergences.length).toBeGreaterThan(0);
-    } finally {
-      rmSync(tmpPath, { force: true });
+    const bands: SeasonStrengthBand[] = [];
+    const quotas: Array<[
+        SeasonStrengthBand,
+        number
+    ]> = [
+        ['contender', 4],
+        ['playoff', 8],
+        ['average', 10],
+        ['weaker', 7],
+    ];
+    for (const [band, count] of quotas) {
+        for (let i = 0; i < count; i += 1)
+            bands.push(band);
     }
-  }, 300_000);
+    return {
+        seed,
+        teams: bands.map((band, i) => ({
+            franchiseId: `ai-${String(i)}`,
+            band,
+            identity: IDENTITIES[i % IDENTITIES.length] ?? 'continuity',
+            strengthScore: BAND_SCORES[band],
+            rolesCovered: 8,
+            roleIds: [...ROLES],
+        })),
+        repairs: 0,
+        backtracks: 0,
+        nodesVisited: 0,
+        failed: false,
+        digest: 'c'.repeat(32),
+        poolFailures: [],
+        selectionFailures: [],
+        anchorsTotal: 16,
+        extraEliteTeams: 8,
+        guaranteedAnchorShortfall: 0,
+        tierCounts: {
+            contender: { elite: 4, strong: 4, useful: 0, total: 4 },
+            playoff: { elite: 8, strong: 8, useful: 0, total: 8 },
+            average: { elite: 0, strong: 10, useful: 0, total: 10 },
+            weaker: { elite: 0, strong: 7, useful: 0, total: 7 },
+        },
+    };
+}
+function failedRun(seed: string): RosterCalibrationWorkerRun {
+    return {
+        seed,
+        teams: [],
+        repairs: 0,
+        backtracks: 1,
+        nodesVisited: 1,
+        failed: true,
+        digest: '',
+        poolFailures: [],
+        selectionFailures: [],
+        anchorsTotal: 0,
+        extraEliteTeams: 0,
+        guaranteedAnchorShortfall: 0,
+        tierCounts: {
+            contender: { elite: 0, strong: 0, useful: 0, total: 0 },
+            playoff: { elite: 0, strong: 0, useful: 0, total: 0 },
+            average: { elite: 0, strong: 0, useful: 0, total: 0 },
+            weaker: { elite: 0, strong: 0, useful: 0, total: 0 },
+        },
+    };
+}
+function fakeCohort(overrides: Partial<RosterCalibrationWorkerRun> = {}): NonNullable<SeasonRostersCalibrateDeps['runCohort']> {
+    return (request) => Promise.resolve(request.seeds.map((seed) => ({ ...fakeLeagueRun(seed), ...overrides })));
+}
+const fakeOrderInvariance: NonNullable<SeasonRostersCalibrateDeps['runOrderInvariance']> = (request) => Promise.resolve(request.seeds.map((seed) => ({
+    seed,
+    digests: ['a'.repeat(32), 'a'.repeat(32), 'a'.repeat(32)],
+})));
+function writeScratchManifest(targets: SeasonRosterTargets, options: {
+    omitRosterTargets?: boolean;
+} = {}): string {
+    const targetsPath = join(TMP, 'roster-targets.json');
+    const targetsBytes = `${JSON.stringify(targets, null, 2)}\n`;
+    writeFileSync(targetsPath, targetsBytes);
+    const manifest = JSON.parse(readFileSync(MANIFEST, 'utf8')) as {
+        season?: Record<string, {
+            url?: string;
+            contentHash?: string;
+        }>;
+    };
+    const season = {
+        draftCatalog: manifest.season?.draftCatalog,
+        ...(options.omitRosterTargets === true
+            ? {}
+            : {
+                rosterTargets: {
+                    url: 'roster-targets.json',
+                    contentHash: sha256Hex(targetsBytes),
+                },
+            }),
+    };
+    const manifestPath = join(TMP, 'manifest.json');
+    writeFileSync(manifestPath, `${JSON.stringify({ ...manifest, season }, null, 2)}\n`);
+    return manifestPath;
+}
+describe('cli: season rosters generate (roster-generation-v2)', () => {
+    it('previews a deterministic generation against the verified targets artifact', async () => {
+        const manifestPath = writeScratchManifest(handBuiltTargets());
+        const { code, stdout } = await runCli([
+            'season',
+            'rosters',
+            'generate',
+            '--seed',
+            SEED,
+            '--draft',
+            DRAFT_FINALIZED,
+            '--manifest',
+            manifestPath,
+            '--format',
+            'json',
+        ]);
+        expect(code).toBe(0);
+        const payload = seasonRostersGenerateReportSchema.parse(jsonPayload(stdout));
+        expect(payload.pass).toBe(true);
+        expect(payload.wrote).toBe(false);
+        expect(payload.teams).toBe(30);
+        expect(payload.ownershipRows).toBe(300);
+        expect(payload.pools).toBe(29);
+        expect(payload.anchorsTotal).toBeGreaterThanOrEqual(16);
+        expect(payload.repairCount).toBeGreaterThanOrEqual(0);
+    }, 300000);
+    it('rejects a tampered targets artifact with a typed failure', async () => {
+        const manifestPath = writeScratchManifest(handBuiltTargets());
+        const targetsPath = join(TMP, 'roster-targets.json');
+        const tampered = JSON.parse(readFileSync(targetsPath, 'utf8')) as SeasonRosterTargets;
+        tampered.measured.anchorFulfillment = 0.5;
+        writeFileSync(targetsPath, `${JSON.stringify(tampered, null, 2)}\n`);
+        const { code, stdout, stderr } = await runCli([
+            'season',
+            'rosters',
+            'generate',
+            '--seed',
+            SEED,
+            '--draft',
+            DRAFT_FINALIZED,
+            '--manifest',
+            manifestPath,
+            '--format',
+            'json',
+        ]);
+        expect(code).toBe(2);
+        const report = JSON.parse((stdout + stderr).slice((stdout + stderr).indexOf('{'))) as {
+            failures: string[];
+        };
+        expect(report.failures[0]).toContain('content hash mismatch');
+    });
+    it('rejects a manifest without a rosterTargets entry with a typed failure', async () => {
+        const manifestPath = writeScratchManifest(handBuiltTargets(), { omitRosterTargets: true });
+        const { code, stderr } = await runCli([
+            'season',
+            'rosters',
+            'generate',
+            '--seed',
+            SEED,
+            '--draft',
+            DRAFT_FINALIZED,
+            '--manifest',
+            manifestPath,
+            '--format',
+            'json',
+        ]);
+        expect(code).toBe(2);
+        expect(stderr).toContain('no season.rosterTargets entry');
+    });
+    it('rejects a non-hex seed with a usage error', async () => {
+        const manifestPath = writeScratchManifest(handBuiltTargets());
+        const { code, stderr } = await runCli([
+            'season',
+            'rosters',
+            'generate',
+            '--seed',
+            'not-hex',
+            '--draft',
+            DRAFT_FINALIZED,
+            '--manifest',
+            manifestPath,
+        ]);
+        expect(code).toBe(2);
+        expect(stderr).toContain('--seed must be a hex seed');
+    });
+});
+describe('cli: season rosters audit (roster-generation-v2)', () => {
+    let resultPath: string;
+    let tamperedPath: string;
+    let manifestPath: string;
+    beforeAll(() => {
+        const targets = handBuiltTargets();
+        const catalog = seasonDraftCatalogSchema.parse(JSON.parse(readFileSync(CATALOG, 'utf8')));
+        const league = seasonLeagueSchema.parse(JSON.parse(readFileSync(LEAGUE, 'utf8')));
+        const humanRoster = fixtureHumanRoster(catalog);
+        const result = generateAiLeague({
+            seed: SEED,
+            catalog,
+            league,
+            humanFranchiseIds: ['lakers'],
+            humanRosters: [{ franchiseId: 'lakers', playerVersionIds: humanRoster }],
+            targets,
+        });
+        resultPath = join(TMP, 'generated-league.json');
+        writeFileSync(resultPath, `${JSON.stringify(result, null, 2)}\n`);
+        tamperedPath = join(TMP, 'generated-league.tampered.json');
+        writeFileSync(tamperedPath, `${JSON.stringify({ ...result, digest: '0'.repeat(32) }, null, 2)}\n`);
+        manifestPath = writeScratchManifest(targets);
+    }, 300000);
+    it('audits an engine-generated league with zero failures', async () => {
+        const { code, stdout } = await runCli([
+            'season',
+            'rosters',
+            'audit',
+            '--input',
+            resultPath,
+            '--manifest',
+            manifestPath,
+            '--human-franchises',
+            'lakers',
+            '--format',
+            'json',
+        ]);
+        expect(code).toBe(0);
+        const payload = seasonRostersAuditReportSchema.parse(jsonPayload(stdout));
+        expect(payload.pass).toBe(true);
+        expect(payload.auditFailures).toBe(0);
+        expect(payload.digestVerified).toBe(true);
+        expect(payload.teams).toBe(30);
+        expect(payload.ownershipRows).toBe(300);
+        expect(payload.pools).toBe(29);
+        expect(payload.poolFailures).toBe(0);
+        expect(payload.anchorFailures).toBe(0);
+        expect(payload.tierFailures).toBe(0);
+        expect(payload.exclusivityFailures).toBe(0);
+        expect(payload.selectionFailures).toBe(0);
+    }, 300000);
+    it('fails on a tampered digest with a nonzero exit', async () => {
+        const { code, stdout, stderr } = await runCli([
+            'season',
+            'rosters',
+            'audit',
+            '--input',
+            tamperedPath,
+            '--manifest',
+            manifestPath,
+            '--human-franchises',
+            'lakers',
+            '--format',
+            'json',
+        ]);
+        expect(code).toBe(1);
+        const payload = seasonRostersAuditReportSchema.parse(jsonPayload(stdout, stderr));
+        expect(payload.pass).toBe(false);
+        expect(payload.digestVerified).toBe(false);
+        expect(payload.auditFailures).toBeGreaterThan(0);
+    });
+});
+describe('cli: season rosters calibrate (roster-generation-v2)', () => {
+    it('runs a small cohort through injected doubles, evaluates gates, and rewrites only measured', async () => {
+        const targets = handBuiltTargets();
+        const targetsPath = join(TMP, 'calibration-targets.json');
+        writeFileSync(targetsPath, `${JSON.stringify(targets, null, 2)}\n`);
+        const outPath = join(TMP, 'calibration-out.json');
+        const report = await seasonRostersCalibrate({
+            targets: targetsPath,
+            out: outPath,
+            'calibration-seeds': '4',
+            'validation-seeds': '2',
+            workers: '2',
+        }, { runCohort: fakeCohort(), runOrderInvariance: fakeOrderInvariance });
+        expect(report.exitCode).toBe(0);
+        const payload = seasonRostersCalibrateReportSchema.parse(report.payload);
+        expect(payload.calibrationSeeds).toBe(4);
+        expect(payload.validationSeeds).toBe(2);
+        expect(payload.measured.generationFailures).toBe(0);
+        expect(payload.measured.poolLegalityFailures).toBe(0);
+        expect(payload.measured.selectionFailures).toBe(0);
+        expect(payload.gates.poolLegality).toBe(true);
+        expect(payload.gates.selectionLegality).toBe(true);
+        expect(payload.gates.failureRate).toBe(true);
+        expect(payload.gates.heldOutPass).toBe(true);
+        expect(payload.gates.orderInvariance).toBe(true);
+        expect(payload.gates.minBandSeparation).toBe(true);
+        expect(payload.gates.anchorFulfillment).toBe(true);
+        expect(payload.gates.extraEliteWithinTolerance).toBe(true);
+        expect(payload.gates.superTeamIncidence).toBe(true);
+        expect(payload.pass).toBe(true);
+        expect(payload.validateOnly).toBe(false);
+        expect(payload.targetsWritten).toBe(true);
+        expect(payload.targetsPath).toBe(outPath);
+        const rewritten = seasonRosterTargetsSchema.parse(JSON.parse(readFileSync(outPath, 'utf8')));
+        expect(rewritten.policy).toEqual(targets.policy);
+        expect(rewritten.calibration.gates).toEqual(targets.calibration.gates);
+        expect(rewritten.measured.generationFailures).toBe(0);
+        expect(rewritten.measured.bands.contender.median).toBe(90);
+        expect(rewritten.measured.bands.weaker.median).toBe(60);
+    });
+    it('fails the failure-rate gate with a nonzero exit when a cohort seed fails', async () => {
+        const targets = handBuiltTargets();
+        const targetsPath = join(TMP, 'failure-targets.json');
+        writeFileSync(targetsPath, `${JSON.stringify(targets, null, 2)}\n`);
+        const report = await seasonRostersCalibrate({
+            targets: targetsPath,
+            out: join(TMP, 'failure-out.json'),
+            'calibration-seeds': '4',
+            'validation-seeds': '2',
+            workers: '2',
+        }, {
+            runCohort: (request) => Promise.resolve(request.seeds.map((seed, i) => (i === 0 ? failedRun(seed) : fakeLeagueRun(seed)))),
+            runOrderInvariance: fakeOrderInvariance,
+        });
+        expect(report.exitCode).toBe(1);
+        const payload = seasonRostersCalibrateReportSchema.parse(report.payload);
+        expect(payload.measured.generationFailures).toBe(1);
+        expect(payload.gates.failureRate).toBe(false);
+        expect(payload.pass).toBe(false);
+        expect(report.failures.join('; ')).toContain('1 generation failures');
+    });
+    it('fails the extra-elite tolerance gate when pools overshoot the packed probability', async () => {
+        const targets = handBuiltTargets();
+        const targetsPath = join(TMP, 'elite-targets.json');
+        writeFileSync(targetsPath, `${JSON.stringify(targets, null, 2)}\n`);
+        const report = await seasonRostersCalibrate({
+            targets: targetsPath,
+            out: join(TMP, 'elite-out.json'),
+            'calibration-seeds': '4',
+            'validation-seeds': '2',
+            workers: '2',
+        }, {
+            runCohort: fakeCohort({ extraEliteTeams: 29 }),
+            runOrderInvariance: fakeOrderInvariance,
+        });
+        expect(report.exitCode).toBe(1);
+        const payload = seasonRostersCalibrateReportSchema.parse(report.payload);
+        expect(payload.gates.extraEliteWithinTolerance).toBe(false);
+        expect(payload.pass).toBe(false);
+    });
+    it('worker counts never change the gate report (1 vs 4 workers)', async () => {
+        const targets = handBuiltTargets();
+        const targetsPath = join(TMP, 'workers-targets.json');
+        writeFileSync(targetsPath, `${JSON.stringify(targets, null, 2)}\n`);
+        const run = async (workers: string) => {
+            const report = await seasonRostersCalibrate({ targets: targetsPath, 'calibration-seeds': '4', 'validation-seeds': '2', workers }, { runCohort: fakeCohort(), runOrderInvariance: fakeOrderInvariance });
+            return seasonRostersCalibrateReportSchema.parse(report.payload);
+        };
+        const one = await run('1');
+        const four = await run('4');
+        expect(four.bands).toEqual(one.bands);
+        expect(four.measured).toEqual(one.measured);
+        expect(four.gates).toEqual(one.gates);
+    });
+});
+describe('cli: season draft reproduce', () => {
+    it('reproduces the committed fixture with the exact digest', async () => {
+        const manifestPath = writeScratchManifest(handBuiltTargets());
+        const { code, stdout } = await runCli([
+            'season',
+            'draft',
+            'reproduce',
+            '--input',
+            DRAFT_COMMANDS,
+            '--manifest',
+            manifestPath,
+            '--format',
+            'json',
+        ]);
+        expect(code).toBe(0);
+        const payload = seasonDraftReproduceReportSchema.parse(jsonPayload(stdout));
+        expect(payload.pass).toBe(true);
+        expect(payload.identical).toBe(true);
+        expect(payload.finalDigest).toBe('95396ddde716fe01829f4d2fcb6b8e8d');
+        expect(payload.acceptedCount).toBe(payload.commandCount);
+        expect(payload.rejectedCount).toBe(0);
+        expect(payload.offers).toHaveLength(10);
+        expect(payload.picks).toHaveLength(10);
+    }, 300000);
+    it('rejects malformed inputs with a usage error', async () => {
+        const bad = join(REPO_ROOT, 'tools/cli/src/fixtures/season-draft-finalized.json');
+        const { code, stderr } = await runCli(['season', 'draft', 'reproduce', '--input', bad]);
+        expect(code).toBe(2);
+        expect(stderr).toContain('commands input fails the schema');
+    });
+    it('reports divergences with a nonzero exit', async () => {
+        const fixture = JSON.parse(readFileSync(DRAFT_COMMANDS, 'utf8')) as {
+            expected: {
+                finalDigest: string;
+                finalRevision: number;
+            };
+        };
+        const manifestPath = writeScratchManifest(handBuiltTargets());
+        const tmpPath = join(TMP, 'season-draft-commands.divergence.json');
+        try {
+            writeFileSync(tmpPath, JSON.stringify({
+                ...fixture,
+                expected: { finalDigest: '0'.repeat(32), finalRevision: fixture.expected.finalRevision },
+            }));
+            const { code, stdout, stderr } = await runCli([
+                'season',
+                'draft',
+                'reproduce',
+                '--input',
+                tmpPath,
+                '--manifest',
+                manifestPath,
+                '--format',
+                'json',
+            ]);
+            expect(code).toBe(1);
+            const payload = seasonDraftReproduceReportSchema.parse(jsonPayload(stdout, stderr));
+            expect(payload.identical).toBe(false);
+            expect(payload.divergences.length).toBeGreaterThan(0);
+        }
+        finally {
+            rmSync(tmpPath, { force: true });
+        }
+    }, 300000);
 });

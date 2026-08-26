@@ -1,13 +1,8 @@
-<script lang="ts">
-  import { Dialog } from 'bits-ui';
-  import { X } from '@lucide/svelte';
-  import type {
-    SeasonInfluenceLedgerEntry,
-    SeasonInfluenceSource,
-  } from '@hoop-rush/data-contracts';
-  import type { InfluenceSpendAffordance } from '$lib/season/season-influence-view';
-
-  const SOURCE_LABEL: Record<SeasonInfluenceSource, string> = {
+<script lang="ts">import { Dialog } from 'bits-ui';
+import { X } from '@lucide/svelte';
+import type { SeasonInfluenceLedgerEntry, SeasonInfluenceSource, } from '@hoop-rush/data-contracts';
+import type { InfluenceSpendAffordance } from '$lib/season/season-influence-view';
+const SOURCE_LABEL: Record<SeasonInfluenceSource, string> = {
     'initial-grant': 'Initial grant',
     'block-grant': 'Block grant',
     'objective-reward': 'Objective reward',
@@ -18,20 +13,8 @@
     'trade-cash-received': 'Trade cash received',
     'risky-rehab': 'Risky rehab',
     'free-agent-signing': 'Free-agent signing',
-  };
-
-  let {
-    balance,
-    cap,
-    floor,
-    atCap,
-    atFloor,
-    entries,
-    affordances,
-    busy = false,
-    playerName = null,
-    onSpend,
-  }: {
+};
+let { balance, cap, floor, atCap, atFloor, entries, affordances, busy = false, playerName = null, onSpend, }: {
     balance: number;
     cap: number;
     floor: number;
@@ -40,44 +23,34 @@
     entries: SeasonInfluenceLedgerEntry[];
     affordances: InfluenceSpendAffordance[];
     busy?: boolean;
-
     playerName?: ((playerVersionId: string) => string) | null;
     onSpend: (affordance: InfluenceSpendAffordance) => void;
-  } = $props();
-
-  let pendingSpend: InfluenceSpendAffordance | null = $state(null);
-  let spendOpen = $state(false);
-
-  function openConfirm(affordance: InfluenceSpendAffordance): void {
-    if (affordance.spent || !affordance.affordable || busy) return;
+} = $props();
+let pendingSpend: InfluenceSpendAffordance | null = $state(null);
+let spendOpen = $state(false);
+function openConfirm(affordance: InfluenceSpendAffordance): void {
+    if (affordance.spent || !affordance.affordable || busy)
+        return;
     pendingSpend = affordance;
     spendOpen = true;
-  }
-
-  function confirmSpend(): void {
-    if (pendingSpend === null) return;
+}
+function confirmSpend(): void {
+    if (pendingSpend === null)
+        return;
     spendOpen = false;
     const affordance = pendingSpend;
     pendingSpend = null;
     onSpend(affordance);
-  }
-
-  function affordanceLabel(affordance: InfluenceSpendAffordance): string {
+}
+function affordanceLabel(affordance: InfluenceSpendAffordance): string {
     return affordance.purpose === 'extra-trade-offer'
-      ? `Buy the extra trade offer (window ${String((affordance.windowIndex ?? 0) + 1)}) for 1 Influence`
-      : 'Run a risky rehab for 2 Influence';
-  }
-
-  const recordedOutcomes = $derived(
-    affordances.filter(
-      (affordance) =>
-        affordance.purpose === 'risky-rehab' &&
-        affordance.rehabOutcome !== null &&
-        affordance.rehabOutcome !== 'pending',
-    ),
-  );
-
-  const deltaLabel = (delta: number): string => (delta >= 0 ? `+${String(delta)}` : String(delta));
+        ? `Buy the extra trade offer (window ${String((affordance.windowIndex ?? 0) + 1)}) for 1 Influence`
+        : 'Run a risky rehab for 2 Influence';
+}
+const recordedOutcomes = $derived(affordances.filter((affordance) => affordance.purpose === 'risky-rehab' &&
+    affordance.rehabOutcome !== null &&
+    affordance.rehabOutcome !== 'pending'));
+const deltaLabel = (delta: number): string => (delta >= 0 ? `+${String(delta)}` : String(delta));
 </script>
 
 <section

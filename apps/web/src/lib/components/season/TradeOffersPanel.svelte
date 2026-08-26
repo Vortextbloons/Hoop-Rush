@@ -1,35 +1,14 @@
-<script lang="ts">
-  import { Dialog } from 'bits-ui';
-  import { ArrowRight, ChevronRight, X } from '@lucide/svelte';
-  import type {
-    HoopRushManifest,
-    SeasonDraftCatalog,
-    SeasonGameSummary,
-  } from '@hoop-rush/data-contracts';
-  import {
-    tradeResolvedAt,
-    type TradeOfferViewModel,
-    type TradePlayerViewModel,
-  } from '$lib/season/season-trade-view';
-  import type { SeasonFaceRef } from '$lib/season/season-branding';
-  import { formatPositions } from '$lib/player-positions';
-  import { overallRatingOf, playablePositionsOf } from '$lib/season/season-catalog-index';
-  import { playerSeasonStatsRow } from '$lib/season/season-player-stats-view';
-  import SeasonPlayerFace from './SeasonPlayerFace.svelte';
-  import TradePlayerDetailDialog from './TradePlayerDetailDialog.svelte';
-
-  let {
-    windowIndex,
-    offers,
-    manifest,
-    catalog,
-    summaries,
-    faceOf,
-    commandError = null,
-    busy = false,
-    onAccept,
-    onDecline,
-  }: {
+<script lang="ts">import { Dialog } from 'bits-ui';
+import { ArrowRight, ChevronRight, X } from '@lucide/svelte';
+import type { HoopRushManifest, SeasonDraftCatalog, SeasonGameSummary, } from '@hoop-rush/data-contracts';
+import { tradeResolvedAt, type TradeOfferViewModel, type TradePlayerViewModel, } from '$lib/season/season-trade-view';
+import type { SeasonFaceRef } from '$lib/season/season-branding';
+import { formatPositions } from '$lib/player-positions';
+import { overallRatingOf, playablePositionsOf } from '$lib/season/season-catalog-index';
+import { playerSeasonStatsRow } from '$lib/season/season-player-stats-view';
+import SeasonPlayerFace from './SeasonPlayerFace.svelte';
+import TradePlayerDetailDialog from './TradePlayerDetailDialog.svelte';
+let { windowIndex, offers, manifest, catalog, summaries, faceOf, commandError = null, busy = false, onAccept, onDecline, }: {
     windowIndex: number;
     offers: TradeOfferViewModel[];
     manifest: HoopRushManifest;
@@ -40,64 +19,61 @@
     busy?: boolean;
     onAccept: (offerId: string) => void | Promise<void>;
     onDecline: (offerId: string) => void | Promise<void>;
-  } = $props();
-
-  let pendingOffer: { offer: TradeOfferViewModel; action: 'accept' | 'decline' } | null =
-    $state(null);
-  let detailPlayer: TradePlayerViewModel | null = $state(null);
-  let acting = $state(false);
-
-  function openConfirm(offer: TradeOfferViewModel, action: 'accept' | 'decline'): void {
-    if (offer.offer.status !== 'open' || busy || acting) return;
+} = $props();
+let pendingOffer: {
+    offer: TradeOfferViewModel;
+    action: 'accept' | 'decline';
+} | null = $state(null);
+let detailPlayer: TradePlayerViewModel | null = $state(null);
+let acting = $state(false);
+function openConfirm(offer: TradeOfferViewModel, action: 'accept' | 'decline'): void {
+    if (offer.offer.status !== 'open' || busy || acting)
+        return;
     pendingOffer = { offer, action };
-  }
-
-  async function confirmAction(): Promise<void> {
-    if (pendingOffer === null || acting) return;
+}
+async function confirmAction(): Promise<void> {
+    if (pendingOffer === null || acting)
+        return;
     const { offer, action } = pendingOffer;
     acting = true;
     pendingOffer = null;
     try {
-      if (action === 'accept') await onAccept(offer.offer.offerId);
-      else await onDecline(offer.offer.offerId);
-    } finally {
-      acting = false;
+        if (action === 'accept')
+            await onAccept(offer.offer.offerId);
+        else
+            await onDecline(offer.offer.offerId);
     }
-  }
-
-  function playerSummary(players: TradePlayerViewModel[]): string {
+    finally {
+        acting = false;
+    }
+}
+function playerSummary(players: TradePlayerViewModel[]): string {
     return players
-      .map(
-        (player) =>
-          `${player.displayName}${player.playable.length > 0 ? ` (${formatPositions(player.playable)})` : ''}${
-            player.available ? '' : ' — out'
-          }`,
-      )
-      .join(', ');
-  }
-
-  function healthBadge(player: TradePlayerViewModel): string | null {
-    if (!player.available) return 'Out';
-    if (player.activeInjuryIds.length > 0) return 'Injured';
+        .map((player) => `${player.displayName}${player.playable.length > 0 ? ` (${formatPositions(player.playable)})` : ''}${player.available ? '' : ' — out'}`)
+        .join(', ');
+}
+function healthBadge(player: TradePlayerViewModel): string | null {
+    if (!player.available)
+        return 'Out';
+    if (player.activeInjuryIds.length > 0)
+        return 'Injured';
     return null;
-  }
-
-  function valueLabel(vm: TradeOfferViewModel): string {
+}
+function valueLabel(vm: TradeOfferViewModel): string {
     return vm.valueInsight.body.replace(/^[^:]+:\s*/, '');
-  }
-
-  function runStatsOf(player: TradePlayerViewModel) {
+}
+function runStatsOf(player: TradePlayerViewModel) {
     return playerSeasonStatsRow({
-      playerVersionId: player.playerVersionId,
-      displayName: player.displayName,
-      seasonKey: player.seasonKey,
-      eraId: player.eraId,
-      franchiseId: player.franchiseId,
-      summaries,
-      overallRatingOf: (id) => overallRatingOf(catalog, id),
-      playablePositions: (id) => playablePositionsOf(catalog, id),
+        playerVersionId: player.playerVersionId,
+        displayName: player.displayName,
+        seasonKey: player.seasonKey,
+        eraId: player.eraId,
+        franchiseId: player.franchiseId,
+        summaries,
+        overallRatingOf: (id) => overallRatingOf(catalog, id),
+        playablePositions: (id) => playablePositionsOf(catalog, id),
     });
-  }
+}
 </script>
 
 <section

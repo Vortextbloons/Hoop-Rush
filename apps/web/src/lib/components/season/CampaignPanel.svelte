@@ -1,68 +1,53 @@
-<script lang="ts">
-  import type { SeasonCampaignEvaluation, SeasonCampaignState } from '@hoop-rush/data-contracts';
-  import {
-    campaignTimelineViewModel,
-    CAMPAIGN_FAMILY_LABELS,
-    CAMPAIGN_IDENTITY_LABELS,
-    CAMPAIGN_OUTCOME_LABELS,
-    CAMPAIGN_REWARD_LABELS,
-    formatCampaignCondition,
-    formatCampaignReward,
-  } from '$lib/season/season-presentation';
-  import type { SeasonRun } from '@hoop-rush/data-contracts';
-  import GmIdentityPicker from './GmIdentityPicker.svelte';
-  import EvolutionPicker from './EvolutionPicker.svelte';
-
-  let {
-    run,
-    nextBlockIndex,
-    busy = false,
-    commandError = null,
-    onSelectIdentity,
-    onSelectOpportunity,
-    onEvolve,
-    playerName = (id: string) => id,
-  }: {
+<script lang="ts">import type { SeasonCampaignEvaluation, SeasonCampaignState } from '@hoop-rush/data-contracts';
+import { campaignTimelineViewModel, CAMPAIGN_FAMILY_LABELS, CAMPAIGN_IDENTITY_LABELS, CAMPAIGN_OUTCOME_LABELS, CAMPAIGN_REWARD_LABELS, formatCampaignCondition, formatCampaignReward, } from '$lib/season/season-presentation';
+import type { SeasonRun } from '@hoop-rush/data-contracts';
+import GmIdentityPicker from './GmIdentityPicker.svelte';
+import EvolutionPicker from './EvolutionPicker.svelte';
+let { run, nextBlockIndex, busy = false, commandError = null, onSelectIdentity, onSelectOpportunity, onEvolve, playerName = (id: string) => id, }: {
     run: SeasonRun | null;
     nextBlockIndex: number | null;
     busy?: boolean;
     commandError?: string | null;
-    onSelectIdentity: (input: { identity: string; focus: string | null }) => void;
-    onSelectOpportunity: (input: { blockIndex: number; opportunityId: string }) => void;
-    onEvolve: (input: { offerId: string }) => void;
+    onSelectIdentity: (input: {
+        identity: string;
+        focus: string | null;
+    }) => void;
+    onSelectOpportunity: (input: {
+        blockIndex: number;
+        opportunityId: string;
+    }) => void;
+    onEvolve: (input: {
+        offerId: string;
+    }) => void;
     playerName?: (playerVersionId: string) => string;
-  } = $props();
-
-  const vm = $derived(run !== null ? campaignTimelineViewModel(run, nextBlockIndex) : null);
-  const campaign = $derived(run?.campaign as SeasonCampaignState | undefined);
-
-  const prior = $derived(vm?.priorEvaluation ?? null);
-  const priorRewardIds: string[] = $derived(prior ? prior.appliedRewardIds : []);
-  const priorFactsEntries = $derived(prior ? Object.entries(prior.facts ?? {}) : []);
-  const branchEntries = $derived(vm?.branchEntries ?? []);
-  const currentOffers = $derived(vm?.currentOffers ?? []);
-  const isIdentityRequired = $derived(vm?.isIdentityRequired ?? false);
-  const isEvolutionRequired = $derived(vm?.isEvolutionRequired ?? false);
-  const isBlock8 = $derived(vm?.isBlock8NoOpportunity ?? false);
-  const rewardEntitlements = $derived(vm?.rewardEntitlements ?? { influenceEarned: 0, inquiryCredits: 0, informationBenefits: 0, followUpUnlocks: [] });
-
-  function outcomeBadge(outcome: SeasonCampaignEvaluation['outcome']): string {
+} = $props();
+const vm = $derived(run !== null ? campaignTimelineViewModel(run, nextBlockIndex) : null);
+const campaign = $derived(run?.campaign as SeasonCampaignState | undefined);
+const prior = $derived(vm?.priorEvaluation ?? null);
+const priorRewardIds: string[] = $derived(prior ? prior.appliedRewardIds : []);
+const priorFactsEntries = $derived(prior ? Object.entries(prior.facts ?? {}) : []);
+const branchEntries = $derived(vm?.branchEntries ?? []);
+const currentOffers = $derived(vm?.currentOffers ?? []);
+const isIdentityRequired = $derived(vm?.isIdentityRequired ?? false);
+const isEvolutionRequired = $derived(vm?.isEvolutionRequired ?? false);
+const isBlock8 = $derived(vm?.isBlock8NoOpportunity ?? false);
+const rewardEntitlements = $derived(vm?.rewardEntitlements ?? { influenceEarned: 0, inquiryCredits: 0, informationBenefits: 0, followUpUnlocks: [] });
+function outcomeBadge(outcome: SeasonCampaignEvaluation['outcome']): string {
     switch (outcome) {
-      case 'missed':
-        return 'bg-muted text-muted-foreground border-border';
-      case 'completed':
-        return 'bg-positive/15 text-positive border-positive/30';
-      case 'breakthrough':
-        return 'bg-primary/15 text-primary border-primary/30';
+        case 'missed':
+            return 'bg-muted text-muted-foreground border-border';
+        case 'completed':
+            return 'bg-positive/15 text-positive border-positive/30';
+        case 'breakthrough':
+            return 'bg-primary/15 text-primary border-primary/30';
     }
-  }
-
-  function readablePlayerRef(value: unknown): string {
+}
+function readablePlayerRef(value: unknown): string {
     if (typeof value === 'string' && value.startsWith('pv-')) {
-      return playerName(value);
+        return playerName(value);
     }
     return String(value);
-  }
+}
 </script>
 
 <section aria-labelledby="campaign-heading" class="flex flex-col gap-4" data-testid="campaign-panel">
@@ -82,7 +67,7 @@
     {:else if isEvolutionRequired && campaign?.evolutionOffers}
       <EvolutionPicker offers={campaign.evolutionOffers} {busy} {commandError} onSelect={(offerId) => onEvolve({ offerId })} />
     {:else}
-      <!-- Prior outcome -->
+      
       <div class="overflow-hidden rounded-xl border border-border bg-surface-1">
         <div class="flex flex-wrap items-baseline justify-between gap-2 border-b border-border bg-surface-2 px-4 py-3">
           <h3 class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Prior block result</h3>
@@ -151,7 +136,7 @@
         </div>
       </div>
 
-      <!-- Branch state summary -->
+      
       {#if branchEntries.length > 0}
         <div class="rounded-xl border border-border bg-surface-1 p-4 sm:p-5">
           <h3 class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Branch state</h3>
@@ -170,7 +155,7 @@
         </div>
       {/if}
 
-      <!-- Rewards summary -->
+      
       <div class="rounded-xl border border-border bg-surface-1 p-4 sm:p-5">
         <h3 class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Entitlements</h3>
         <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -196,7 +181,7 @@
         {/if}
       </div>
 
-      <!-- Current cards -->
+      
       <div class="rounded-xl border border-border bg-surface-1 p-4 sm:p-5">
         <div class="flex flex-wrap items-baseline justify-between gap-2">
           <h3 class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">

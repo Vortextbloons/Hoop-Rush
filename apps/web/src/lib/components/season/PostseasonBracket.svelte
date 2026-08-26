@@ -1,28 +1,16 @@
-<script lang="ts">
-  import type { HoopRushManifest, SeasonPostseasonState } from '@hoop-rush/data-contracts';
-  import {
-    bracketColumnsOf,
-    mobileBracketCardsOf,
-  } from '$lib/season/season-postseason-presentation';
-  import SeriesCard from './SeriesCard.svelte';
-  import PlayInCard from './PlayInCard.svelte';
-
-  let {
-    postseason,
-    franchiseName,
-    franchiseAbbrev,
-    manifest,
-    humanFranchiseId,
-  }: {
+<script lang="ts">import type { HoopRushManifest, SeasonPostseasonState } from '@hoop-rush/data-contracts';
+import { bracketColumnsOf, mobileBracketCardsOf, } from '$lib/season/season-postseason-presentation';
+import SeriesCard from './SeriesCard.svelte';
+import PlayInCard from './PlayInCard.svelte';
+let { postseason, franchiseName, franchiseAbbrev, manifest, humanFranchiseId, }: {
     postseason: SeasonPostseasonState;
     franchiseName: (franchiseId: string) => string;
     franchiseAbbrev: (franchiseId: string) => string;
     manifest: HoopRushManifest | null;
     humanFranchiseId: string | null;
-  } = $props();
-
-  const columns = $derived(bracketColumnsOf(postseason, humanFranchiseId));
-  const mobileCards = $derived(mobileBracketCardsOf(postseason, humanFranchiseId));
+} = $props();
+const columns = $derived(bracketColumnsOf(postseason, humanFranchiseId));
+const mobileCards = $derived(mobileBracketCardsOf(postseason, humanFranchiseId));
 </script>
 
 <div class="min-w-0">

@@ -1,370 +1,291 @@
-<script lang="ts">
-  import { goto } from '$app/navigation';
-  import { base, resolve } from '$app/paths';
-  import type { RouteId } from './$types';
-  import { X } from '@lucide/svelte';
-  import type {
-    ClassicDraftState,
-    ClassicPick,
-    HoopRushManifest,
-    PlayersIndex,
-    PlayersIndexEntry,
-    PeakPlayerSeason,
-    SlotIndex,
-  } from '@hoop-rush/data-contracts';
-  import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
-  import { classic, createEngineContext } from '@hoop-rush/engine';
-  import { Dialog } from 'bits-ui';
-  import { getManifest, getPlayersIndex } from '$lib/data';
-  import {
-    buildClassicCatalog,
-    classicDraftSeed,
-    classicPoolRows,
-    clearClassicDraftState,
-    loadClassicDraftState,
-    saveClassicDraftState,
-  } from '$lib/classic-draft';
-  import {
-    registerClassicDraftNavigationGuard,
-    setClassicGuardBypass,
-    type ClassicGuardTarget,
-  } from '$lib/classic-nav-guard';
-  import { startClassicRun } from '$lib/classic-run';
-  import { randomUUID } from '$lib/random-id';
-  import { resolvePlayerRefs } from '$lib/player-refs';
-  import { poolSortLabel, presentationForVariant, variantLabel } from '$lib/draft-presentation';
-  import { formatPositions } from '$lib/player-positions';
-  import TeamLogo from '$lib/components/TeamLogo.svelte';
-  import PlayerFace from '$lib/components/PlayerFace.svelte';
-  import LineupCourt from '$lib/components/LineupCourt.svelte';
-  import LineupSummaryNav from '$lib/components/LineupSummaryNav.svelte';
-  import DraftValuePanel from '$lib/components/DraftValuePanel.svelte';
-  import DraftPoolBrowser from '$lib/components/draft/DraftPoolBrowser.svelte';
-  import ClassicRollReel from '$lib/components/classic/ClassicRollReel.svelte';
-
-  let slotPickerModule: Promise<
-    typeof import('$lib/components/draft/SlotPickerDialog.svelte')
-  > | null = null;
-  function loadSlotPickerDialog(): Promise<
-    typeof import('$lib/components/draft/SlotPickerDialog.svelte')
-  > {
+<script lang="ts">import { goto } from '$app/navigation';
+import { base, resolve } from '$app/paths';
+import type { RouteId } from './$types';
+import { X } from '@lucide/svelte';
+import type { ClassicDraftState, ClassicPick, HoopRushManifest, PlayersIndex, PlayersIndexEntry, PeakPlayerSeason, SlotIndex, } from '@hoop-rush/data-contracts';
+import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
+import { classic, createEngineContext } from '@hoop-rush/engine';
+import { Dialog } from 'bits-ui';
+import { getManifest, getPlayersIndex } from '$lib/data';
+import { buildClassicCatalog, classicDraftSeed, classicPoolRows, clearClassicDraftState, loadClassicDraftState, saveClassicDraftState, } from '$lib/classic-draft';
+import { registerClassicDraftNavigationGuard, setClassicGuardBypass, type ClassicGuardTarget, } from '$lib/classic-nav-guard';
+import { startClassicRun } from '$lib/classic-run';
+import { randomUUID } from '$lib/random-id';
+import { resolvePlayerRefs } from '$lib/player-refs';
+import { poolSortLabel, presentationForVariant, variantLabel } from '$lib/draft-presentation';
+import { formatPositions } from '$lib/player-positions';
+import TeamLogo from '$lib/components/TeamLogo.svelte';
+import PlayerFace from '$lib/components/PlayerFace.svelte';
+import LineupCourt from '$lib/components/LineupCourt.svelte';
+import LineupSummaryNav from '$lib/components/LineupSummaryNav.svelte';
+import DraftValuePanel from '$lib/components/DraftValuePanel.svelte';
+import DraftPoolBrowser from '$lib/components/draft/DraftPoolBrowser.svelte';
+import ClassicRollReel from '$lib/components/classic/ClassicRollReel.svelte';
+let slotPickerModule: Promise<typeof import('$lib/components/draft/SlotPickerDialog.svelte')> | null = null;
+function loadSlotPickerDialog(): Promise<typeof import('$lib/components/draft/SlotPickerDialog.svelte')> {
     slotPickerModule ??= import('$lib/components/draft/SlotPickerDialog.svelte');
     return slotPickerModule;
-  }
-
-  type IndexRow = PlayersIndexEntry;
-  type Variant = 'ratings' | 'ball-knowledge';
-
-  const ROUNDS = [0, 1, 2, 3, 4] as const;
-
-  let manifest = $state.raw<HoopRushManifest | null>(null);
-  let manifestError: string | null = $state(null);
-  let index = $state.raw<PlayersIndex | null>(null);
-  let indexError: string | null = $state(null);
-  let draft = $state.raw<ClassicDraftState | null>(null);
-  let draftLoaded = $state(false);
-  let draftError: string | null = $state(null);
-  let setupError: string | null = $state(null);
-  let actionError: string | null = $state(null);
-  let pickerPlayer = $state<IndexRow | null>(null);
-  let spinning = $state(false);
-  let spinKey = $state(0);
-  let reelAxis = $state<'both' | 'franchise' | 'era'>('both');
-  let guardOpen = $state(false);
-  let guardTarget = $state<ClassicGuardTarget | null>(null);
-  let starting = $state(false);
-  let launchError: string | null = $state(null);
-  let resolvedDraftPlayers = $state.raw<PeakPlayerSeason[]>([]);
-
-  let mounted = true;
-  $effect(() => {
+}
+type IndexRow = PlayersIndexEntry;
+type Variant = 'ratings' | 'ball-knowledge';
+const ROUNDS = [0, 1, 2, 3, 4] as const;
+let manifest = $state.raw<HoopRushManifest | null>(null);
+let manifestError: string | null = $state(null);
+let index = $state.raw<PlayersIndex | null>(null);
+let indexError: string | null = $state(null);
+let draft = $state.raw<ClassicDraftState | null>(null);
+let draftLoaded = $state(false);
+let draftError: string | null = $state(null);
+let setupError: string | null = $state(null);
+let actionError: string | null = $state(null);
+let pickerPlayer = $state<IndexRow | null>(null);
+let spinning = $state(false);
+let spinKey = $state(0);
+let reelAxis = $state<'both' | 'franchise' | 'era'>('both');
+let guardOpen = $state(false);
+let guardTarget = $state<ClassicGuardTarget | null>(null);
+let starting = $state(false);
+let launchError: string | null = $state(null);
+let resolvedDraftPlayers = $state.raw<PeakPlayerSeason[]>([]);
+let mounted = true;
+$effect(() => {
     mounted = true;
     return () => {
-      mounted = false;
+        mounted = false;
     };
-  });
-
-  let unregister: (() => void) | null = null;
-  $effect(() => {
-    unregister = registerClassicDraftNavigationGuard(
-      () => draft,
-      (target) => {
+});
+let unregister: (() => void) | null = null;
+$effect(() => {
+    unregister = registerClassicDraftNavigationGuard(() => draft, (target) => {
         guardTarget = target;
         guardOpen = true;
-      },
-    );
+    });
     return () => {
-      unregister?.();
-      unregister = null;
+        unregister?.();
+        unregister = null;
     };
-  });
-
-  $effect(() => {
+});
+$effect(() => {
     let cancelled = false;
-    getManifest().then(
-      (m) => {
-        if (cancelled) return;
+    getManifest().then((m) => {
+        if (cancelled)
+            return;
         manifest = m;
-        getPlayersIndex().then(
-          (ix) => {
-            if (cancelled) return;
+        getPlayersIndex().then((ix) => {
+            if (cancelled)
+                return;
             index = ix;
-            loadClassicDraftState().then(
-              (saved) => {
-                if (cancelled) return;
+            loadClassicDraftState().then((saved) => {
+                if (cancelled)
+                    return;
                 draft = saved;
                 draftLoaded = true;
-              },
-              (error: unknown) => {
-                if (cancelled) return;
+            }, (error: unknown) => {
+                if (cancelled)
+                    return;
                 draftError = error instanceof Error ? error.message : String(error);
                 draftLoaded = true;
-              },
-            );
-          },
-          (error: unknown) => {
-            if (!cancelled) indexError = error instanceof Error ? error.message : String(error);
-          },
-        );
-      },
-      (error: unknown) => {
-        if (!cancelled) manifestError = error instanceof Error ? error.message : String(error);
-      },
-    );
+            });
+        }, (error: unknown) => {
+            if (!cancelled)
+                indexError = error instanceof Error ? error.message : String(error);
+        });
+    }, (error: unknown) => {
+        if (!cancelled)
+            manifestError = error instanceof Error ? error.message : String(error);
+    });
     return () => {
-      cancelled = true;
+        cancelled = true;
     };
-  });
-
-  const catalog = $derived.by(() =>
-    manifest && index ? buildClassicCatalog(manifest, index) : [],
-  );
-
-  const presentation = $derived(presentationForVariant(draft?.variant ?? 'ratings'));
-
-  const roll = $derived(draft?.roll ?? null);
-
-  const rollFranchise = $derived(
-    roll
-      ? (manifest?.modernFranchiseSlots.find((e) => e.franchiseId === roll.franchiseId) ?? null)
-      : null,
-  );
-
-  const rollEra = $derived(
-    roll ? (manifest?.eras.find((e) => e.eraId === roll.eraId) ?? null) : null,
-  );
-
-  const rollIdentity = $derived(
-    manifest && roll ? resolveEraTeamIdentity(manifest, roll.franchiseId, roll.eraId) : null,
-  );
-
-  const rollRows = $derived(index && roll ? classicPoolRows(index, roll, presentation) : []);
-
-  const poolHeading = $derived(
-    roll && rollFranchise && rollEra && rollIdentity
-      ? `${rollIdentity.abbreviationLabel ?? franchiseAbbreviation(rollFranchise.franchiseId)} · ${rollEra.label}`
-      : 'Draft pool',
-  );
-
-  const countLabel = $derived(`${rollRows.length} players · ${poolSortLabel(presentation)}`);
-
-  const reelAnnouncement = $derived(
-    roll
-      ? `Round ${draft!.round} of 5 · ${
-          rollIdentity?.displayLabel ?? rollFranchise?.displayName ?? roll.franchiseId
-        } · ${rollEra?.label ?? roll.eraId}`
-      : '',
-  );
-
-  const rowByPickKey = $derived(
-    index
-      ? new Map(index.players.map((p) => [`${p.playerId}|${p.franchiseId}|${p.eraId}`, p] as const))
-      : null,
-  );
-
-  function rowForPick(pick: ClassicPick): IndexRow | null {
+});
+const catalog = $derived.by(() => manifest && index ? buildClassicCatalog(manifest, index) : []);
+const presentation = $derived(presentationForVariant(draft?.variant ?? 'ratings'));
+const roll = $derived(draft?.roll ?? null);
+const rollFranchise = $derived(roll
+    ? (manifest?.modernFranchiseSlots.find((e) => e.franchiseId === roll.franchiseId) ?? null)
+    : null);
+const rollEra = $derived(roll ? (manifest?.eras.find((e) => e.eraId === roll.eraId) ?? null) : null);
+const rollIdentity = $derived(manifest && roll ? resolveEraTeamIdentity(manifest, roll.franchiseId, roll.eraId) : null);
+const rollRows = $derived(index && roll ? classicPoolRows(index, roll, presentation) : []);
+const poolHeading = $derived(roll && rollFranchise && rollEra && rollIdentity
+    ? `${rollIdentity.abbreviationLabel ?? franchiseAbbreviation(rollFranchise.franchiseId)} · ${rollEra.label}`
+    : 'Draft pool');
+const countLabel = $derived(`${rollRows.length} players · ${poolSortLabel(presentation)}`);
+const reelAnnouncement = $derived(roll
+    ? `Round ${draft!.round} of 5 · ${rollIdentity?.displayLabel ?? rollFranchise?.displayName ?? roll.franchiseId} · ${rollEra?.label ?? roll.eraId}`
+    : '');
+const rowByPickKey = $derived(index
+    ? new Map(index.players.map((p) => [`${p.playerId}|${p.franchiseId}|${p.eraId}`, p] as const))
+    : null);
+function rowForPick(pick: ClassicPick): IndexRow | null {
     return rowByPickKey?.get(`${pick.playerId}|${pick.franchiseId}|${pick.eraId}`) ?? null;
-  }
-
-  const slots = $derived.by((): (IndexRow | null)[] => {
+}
+const slots = $derived.by((): (IndexRow | null)[] => {
     const rows: (IndexRow | null)[] = [null, null, null, null, null];
-    if (!draft) return rows;
+    if (!draft)
+        return rows;
     for (const pick of draft.picks) {
-      rows[pick.slotIndex] = rowForPick(pick);
+        rows[pick.slotIndex] = rowForPick(pick);
     }
     return rows;
-  });
-
-  $effect(() => {
+});
+$effect(() => {
     const m = manifest;
     const refs = slots
-      .filter((player): player is IndexRow => player !== null)
-      .map((player) => ({
+        .filter((player): player is IndexRow => player !== null)
+        .map((player) => ({
         playerId: player.playerId,
         franchiseId: player.franchiseId,
         eraId: player.eraId,
-      }));
+    }));
     if (!m || refs.length === 0) {
-      resolvedDraftPlayers = [];
-      return;
+        resolvedDraftPlayers = [];
+        return;
     }
     let cancelled = false;
-    resolvePlayerRefs(refs, m).then(
-      (players) => {
-        if (!cancelled) resolvedDraftPlayers = players;
-      },
-      () => {
-        if (!cancelled) resolvedDraftPlayers = [];
-      },
-    );
+    resolvePlayerRefs(refs, m).then((players) => {
+        if (!cancelled)
+            resolvedDraftPlayers = players;
+    }, () => {
+        if (!cancelled)
+            resolvedDraftPlayers = [];
+    });
     return () => {
-      cancelled = true;
+        cancelled = true;
     };
-  });
-
-  const pickedCount = $derived(slots.filter((player) => player !== null).length);
-
-  const franchiseRerollAvailable = $derived(
-    draft && catalog.length > 0
-      ? classic.classicRerollAvailable(draft, 'franchise', catalog)
-      : false,
-  );
-
-  const eraRerollAvailable = $derived(
-    draft && catalog.length > 0 ? classic.classicRerollAvailable(draft, 'era', catalog) : false,
-  );
-
-  async function persist(next: ClassicDraftState): Promise<ClassicDraftState> {
+});
+const pickedCount = $derived(slots.filter((player) => player !== null).length);
+const franchiseRerollAvailable = $derived(draft && catalog.length > 0
+    ? classic.classicRerollAvailable(draft, 'franchise', catalog)
+    : false);
+const eraRerollAvailable = $derived(draft && catalog.length > 0 ? classic.classicRerollAvailable(draft, 'era', catalog) : false);
+async function persist(next: ClassicDraftState): Promise<ClassicDraftState> {
     await saveClassicDraftState(next);
     return next;
-  }
-
-  async function applyRoll(next: ClassicDraftState, axis: 'both' | 'franchise' | 'era') {
+}
+async function applyRoll(next: ClassicDraftState, axis: 'both' | 'franchise' | 'era') {
     draft = await persist(next);
-    if (!mounted) return;
+    if (!mounted)
+        return;
     if (next.roll) {
-      reelAxis = axis;
-      spinKey += 1;
-      launchError = null;
+        reelAxis = axis;
+        spinKey += 1;
+        launchError = null;
     }
-  }
-
-  function onReelSettled() {
+}
+function onReelSettled() {
     spinning = false;
-  }
-
-  async function startDraft(variant: Variant) {
-    if (!manifest || !index) return;
+}
+async function startDraft(variant: Variant) {
+    if (!manifest || !index)
+        return;
     setupError = null;
     actionError = null;
     launchError = null;
     try {
-      spinning = true;
-      const next = classic.createClassicDraft(
-        {
-          draftId: randomUUID(),
-          variant,
-          seed: classicDraftSeed(),
-          dataVersion: manifest.dataVersion,
-          catalog,
-        },
-        createEngineContext(),
-      );
-      draft = await persist(next);
-      if (!mounted) return;
-
-      reelAxis = 'both';
-      spinKey += 1;
-    } catch (error) {
-      spinning = false;
-      setupError = error instanceof Error ? error.message : String(error);
-    }
-  }
-
-  async function rerollFranchise() {
-    if (!draft || catalog.length === 0 || spinning || starting) return;
-    actionError = null;
-    try {
-      const next = classic.rerollClassicFranchise(draft, catalog, createEngineContext());
-      spinning = true;
-      await applyRoll(next, 'franchise');
-    } catch (error) {
-      spinning = false;
-      actionError = error instanceof Error ? error.message : String(error);
-    }
-  }
-
-  async function rerollEra() {
-    if (!draft || catalog.length === 0 || spinning || starting) return;
-    actionError = null;
-    try {
-      const next = classic.rerollClassicEra(draft, catalog, createEngineContext());
-      spinning = true;
-      await applyRoll(next, 'era');
-    } catch (error) {
-      spinning = false;
-      actionError = error instanceof Error ? error.message : String(error);
-    }
-  }
-
-  function openPicker(player: IndexRow) {
-    pickerPlayer = player;
-  }
-
-  async function placePlayer(player: IndexRow, slotIndex: number) {
-    if (!draft || catalog.length === 0 || spinning || starting) return;
-    actionError = null;
-    try {
-      const alreadyDrafted = draft.picks.some((p) => p.playerId === player.playerId);
-      const next = alreadyDrafted
-        ? classic.repositionClassicPlayer(draft, catalog, {
-            playerId: player.playerId,
-            slotIndex: slotIndex as SlotIndex,
-          })
-        : classic.draftClassicPlayer(
-            draft,
-            catalog,
-            { playerId: player.playerId, slotIndex: slotIndex as SlotIndex },
-            createEngineContext(),
-          );
-      if (next.status === 'complete' && !alreadyDrafted) {
-        starting = true;
-        pickerPlayer = null;
-        draft = await persist(next);
-        if (!mounted) return;
-        void launchRun(next);
-      } else {
         spinning = true;
-        pickerPlayer = null;
-        await applyRoll(next, 'both');
-      }
-    } catch (error) {
-      spinning = false;
-      starting = false;
-      actionError = error instanceof Error ? error.message : String(error);
+        const next = classic.createClassicDraft({
+            draftId: randomUUID(),
+            variant,
+            seed: classicDraftSeed(),
+            dataVersion: manifest.dataVersion,
+            catalog,
+        }, createEngineContext());
+        draft = await persist(next);
+        if (!mounted)
+            return;
+        reelAxis = 'both';
+        spinKey += 1;
     }
-  }
-
-  async function launchRun(draftToRun: ClassicDraftState) {
+    catch (error) {
+        spinning = false;
+        setupError = error instanceof Error ? error.message : String(error);
+    }
+}
+async function rerollFranchise() {
+    if (!draft || catalog.length === 0 || spinning || starting)
+        return;
+    actionError = null;
+    try {
+        const next = classic.rerollClassicFranchise(draft, catalog, createEngineContext());
+        spinning = true;
+        await applyRoll(next, 'franchise');
+    }
+    catch (error) {
+        spinning = false;
+        actionError = error instanceof Error ? error.message : String(error);
+    }
+}
+async function rerollEra() {
+    if (!draft || catalog.length === 0 || spinning || starting)
+        return;
+    actionError = null;
+    try {
+        const next = classic.rerollClassicEra(draft, catalog, createEngineContext());
+        spinning = true;
+        await applyRoll(next, 'era');
+    }
+    catch (error) {
+        spinning = false;
+        actionError = error instanceof Error ? error.message : String(error);
+    }
+}
+function openPicker(player: IndexRow) {
+    pickerPlayer = player;
+}
+async function placePlayer(player: IndexRow, slotIndex: number) {
+    if (!draft || catalog.length === 0 || spinning || starting)
+        return;
+    actionError = null;
+    try {
+        const alreadyDrafted = draft.picks.some((p) => p.playerId === player.playerId);
+        const next = alreadyDrafted
+            ? classic.repositionClassicPlayer(draft, catalog, {
+                playerId: player.playerId,
+                slotIndex: slotIndex as SlotIndex,
+            })
+            : classic.draftClassicPlayer(draft, catalog, { playerId: player.playerId, slotIndex: slotIndex as SlotIndex }, createEngineContext());
+        if (next.status === 'complete' && !alreadyDrafted) {
+            starting = true;
+            pickerPlayer = null;
+            draft = await persist(next);
+            if (!mounted)
+                return;
+            void launchRun(next);
+        }
+        else {
+            spinning = true;
+            pickerPlayer = null;
+            await applyRoll(next, 'both');
+        }
+    }
+    catch (error) {
+        spinning = false;
+        starting = false;
+        actionError = error instanceof Error ? error.message : String(error);
+    }
+}
+async function launchRun(draftToRun: ClassicDraftState) {
     starting = true;
     launchError = null;
     try {
-      await startClassicRun(draftToRun, classicDraftSeed());
-    } catch (error) {
-      if (!mounted) return;
-      launchError = error instanceof Error ? error.message : String(error);
-      starting = false;
+        await startClassicRun(draftToRun, classicDraftSeed());
     }
-  }
-
-  async function discardAndLeave() {
+    catch (error) {
+        if (!mounted)
+            return;
+        launchError = error instanceof Error ? error.message : String(error);
+        starting = false;
+    }
+}
+async function discardAndLeave() {
     const target = guardTarget;
     guardOpen = false;
     setClassicGuardBypass(true);
     await clearClassicDraftState();
     const raw = target ? `${target.pathname}${target.search}` : '/';
     void goto(resolve((raw.startsWith(base) ? raw.slice(base.length) : raw) as RouteId));
-  }
+}
 </script>
 
 <svelte:head>

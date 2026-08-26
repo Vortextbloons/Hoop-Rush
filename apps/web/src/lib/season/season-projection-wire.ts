@@ -1,86 +1,58 @@
 import type { SeasonRotation } from '@hoop-rush/data-contracts';
-import type {
-  HumanRosterBuildResult,
-  MinutePlanOptimizationResult,
-  SearchLens,
-} from '@hoop-rush/engine';
-
+import type { HumanRosterBuildResult, MinutePlanOptimizationResult, SearchLens, } from '@hoop-rush/engine';
 export interface ProjectionRosterBuildRequest {
-  type: 'build-roster';
-  requestId: string;
-
-  catalogUrl: string;
-  catalogHash: string;
-  modelUrl: string;
-  modelHash: string;
-  eraProfileUrl: string;
-  eraProfileHash: string;
-
-  locked: readonly string[];
-
-  available: readonly string[];
-  seed: string;
-  lens?: SearchLens;
+    type: 'build-roster';
+    requestId: string;
+    catalogUrl: string;
+    catalogHash: string;
+    modelUrl: string;
+    modelHash: string;
+    eraProfileUrl: string;
+    eraProfileHash: string;
+    locked: readonly string[];
+    available: readonly string[];
+    seed: string;
+    lens?: SearchLens;
 }
-
 export interface ProjectionRotationLoadRow {
-  playerVersionId: string;
-
-  staminaRating: number;
-
-  durability: number;
-
-  fatigueBasisPoints: number;
-
-  recentLoadBasisPoints: number;
+    playerVersionId: string;
+    staminaRating: number;
+    durability: number;
+    fatigueBasisPoints: number;
+    recentLoadBasisPoints: number;
 }
-
 export interface ProjectionRotationOptimizeRequest {
-  type: 'optimize-rotation';
-  requestId: string;
-  catalogUrl: string;
-  catalogHash: string;
-  modelUrl: string;
-  modelHash: string;
-  eraProfileUrl: string;
-  eraProfileHash: string;
-
-  roster: readonly string[];
-
-  structure: SeasonRotation;
-
-  load: readonly ProjectionRotationLoadRow[];
-
-  horizon: number;
-  seed: string;
+    type: 'optimize-rotation';
+    requestId: string;
+    catalogUrl: string;
+    catalogHash: string;
+    modelUrl: string;
+    modelHash: string;
+    eraProfileUrl: string;
+    eraProfileHash: string;
+    roster: readonly string[];
+    structure: SeasonRotation;
+    load: readonly ProjectionRotationLoadRow[];
+    horizon: number;
+    seed: string;
 }
-
-export type ProjectionRosterBuildResponse =
-  | {
-      type: 'complete';
-      requestId: string;
-      result: HumanRosterBuildResult;
-    }
-  | {
-      type: 'error';
-      requestId: string;
-      message: string;
-    };
-
-export type ProjectionRotationOptimizeResponse =
-  | {
-      type: 'complete';
-      requestId: string;
-      result: MinutePlanOptimizationResult;
-    }
-  | {
-      type: 'error';
-      requestId: string;
-      message: string;
-    };
-
-export type ProjectionWorkerRequest =
-  ProjectionRosterBuildRequest | ProjectionRotationOptimizeRequest;
-
-export type ProjectionWorkerResponse =
-  ProjectionRosterBuildResponse | ProjectionRotationOptimizeResponse;
+export type ProjectionRosterBuildResponse = {
+    type: 'complete';
+    requestId: string;
+    result: HumanRosterBuildResult;
+} | {
+    type: 'error';
+    requestId: string;
+    message: string;
+};
+export type ProjectionRotationOptimizeResponse = {
+    type: 'complete';
+    requestId: string;
+    result: MinutePlanOptimizationResult;
+} | {
+    type: 'error';
+    requestId: string;
+    message: string;
+};
+export type ProjectionWorkerRequest = ProjectionRosterBuildRequest | ProjectionRotationOptimizeRequest;
+export type ProjectionWorkerResponse = ProjectionRosterBuildResponse | ProjectionRotationOptimizeResponse;

@@ -1,47 +1,27 @@
-<script lang="ts">
-  import { resolve } from '$app/paths';
-  import { onDestroy } from 'svelte';
-  import { SvelteMap } from 'svelte/reactivity';
-  import { ArrowRight, Check, ChevronDown, Search } from '@lucide/svelte';
-  import { Select } from 'bits-ui';
-  import type {
-    HoopRushManifest,
-    PlayersIndex,
-    RosterDetails,
-    RosterDetailsEntry,
-  } from '@hoop-rush/data-contracts';
-  import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
-  import { clearDataLoaderCaches, getManifest, getPlayersIndex, getRosterDetails } from '$lib/data';
-  import { DETAILED_POSITIONS } from '$lib/player-positions';
-  import {
-    defaultDirection,
-    filterRoster,
-    paginateGroupedRows,
-    sortRoster,
-    type RosterColumn,
-    type RosterDetailRow,
-    type RosterListItem,
-    type RosterSortDirection,
-    type RosterSortId,
-  } from '$lib/roster-browser';
-  import TeamLogo from '$lib/components/TeamLogo.svelte';
-  import AsyncState from '$lib/components/AsyncState.svelte';
-  import RosterComparison from '$lib/components/RosterComparison.svelte';
-  import RosterTable from '$lib/components/RosterTable.svelte';
-
-  let playerDetailModule: Promise<
-    typeof import('$lib/components/PlayerDetailDialog.svelte')
-  > | null = null;
-  function loadPlayerDetailDialog(): Promise<
-    typeof import('$lib/components/PlayerDetailDialog.svelte')
-  > {
+<script lang="ts">import { resolve } from '$app/paths';
+import { onDestroy } from 'svelte';
+import { SvelteMap } from 'svelte/reactivity';
+import { ArrowRight, Check, ChevronDown, Search } from '@lucide/svelte';
+import { Select } from 'bits-ui';
+import type { HoopRushManifest, PlayersIndex, RosterDetails, RosterDetailsEntry, } from '@hoop-rush/data-contracts';
+import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
+import { clearDataLoaderCaches, getManifest, getPlayersIndex, getRosterDetails } from '$lib/data';
+import { DETAILED_POSITIONS } from '$lib/player-positions';
+import { defaultDirection, filterRoster, paginateGroupedRows, sortRoster, type RosterColumn, type RosterDetailRow, type RosterListItem, type RosterSortDirection, type RosterSortId, } from '$lib/roster-browser';
+import TeamLogo from '$lib/components/TeamLogo.svelte';
+import AsyncState from '$lib/components/AsyncState.svelte';
+import RosterComparison from '$lib/components/RosterComparison.svelte';
+import RosterTable from '$lib/components/RosterTable.svelte';
+let playerDetailModule: Promise<typeof import('$lib/components/PlayerDetailDialog.svelte')> | null = null;
+function loadPlayerDetailDialog(): Promise<typeof import('$lib/components/PlayerDetailDialog.svelte')> {
     playerDetailModule ??= import('$lib/components/PlayerDetailDialog.svelte');
     return playerDetailModule;
-  }
-
-  type IndexRow = RosterDetailRow;
-
-  const SORT_OPTIONS: { id: RosterSortId; label: string }[] = [
+}
+type IndexRow = RosterDetailRow;
+const SORT_OPTIONS: {
+    id: RosterSortId;
+    label: string;
+}[] = [
     { id: 'none', label: 'None' },
     { id: 'name', label: 'Name' },
     { id: 'overall', label: 'Overall' },
@@ -53,41 +33,34 @@
     { id: 'decade', label: 'Decade' },
     { id: 'team', label: 'Team' },
     { id: 'position', label: 'Position' },
-  ];
-
-  const POSITION_OPTIONS = DETAILED_POSITIONS;
-  const PAGE_SIZE = 120;
-
-  const SEARCH_DEBOUNCE_MS = 80;
-
-  let manifest = $state.raw<HoopRushManifest | null>(null);
-  let manifestError: string | null = $state(null);
-  let index = $state.raw<PlayersIndex | null>(null);
-  let indexError: string | null = $state(null);
-  let details = $state.raw<RosterDetails | null>(null);
-  let detailsError: string | null = $state(null);
-
-  let franchiseId = $state('');
-  let eraId = $state('');
-  let positionFilter = $state<'PG' | 'SG' | 'SF' | 'PF' | 'C' | null>(null);
-
-  let searchInput = $state('');
-  let search = $state('');
-  let sortId = $state<RosterSortId>('none');
-  let sortDir = $state<RosterSortDirection>('asc');
-  let visibleCount = $state(PAGE_SIZE);
-  let dialogPlayer = $state<IndexRow | null>(null);
-  let compareSelection = $state<IndexRow[]>([]);
-
-  $effect(() => {
+];
+const POSITION_OPTIONS = DETAILED_POSITIONS;
+const PAGE_SIZE = 120;
+const SEARCH_DEBOUNCE_MS = 80;
+let manifest = $state.raw<HoopRushManifest | null>(null);
+let manifestError: string | null = $state(null);
+let index = $state.raw<PlayersIndex | null>(null);
+let indexError: string | null = $state(null);
+let details = $state.raw<RosterDetails | null>(null);
+let detailsError: string | null = $state(null);
+let franchiseId = $state('');
+let eraId = $state('');
+let positionFilter = $state<'PG' | 'SG' | 'SF' | 'PF' | 'C' | null>(null);
+let searchInput = $state('');
+let search = $state('');
+let sortId = $state<RosterSortId>('none');
+let sortDir = $state<RosterSortDirection>('asc');
+let visibleCount = $state(PAGE_SIZE);
+let dialogPlayer = $state<IndexRow | null>(null);
+let compareSelection = $state<IndexRow[]>([]);
+$effect(() => {
     const raw = searchInput;
     const timeout = setTimeout(() => {
-      search = raw;
+        search = raw;
     }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timeout);
-  });
-
-  function loadRosterData() {
+});
+function loadRosterData() {
     manifestError = null;
     indexError = null;
     detailsError = null;
@@ -95,189 +68,147 @@
     index = null;
     details = null;
     let cancelled = false;
-    getManifest().then(
-      (m) => {
-        if (cancelled) return;
+    getManifest().then((m) => {
+        if (cancelled)
+            return;
         manifest = m;
-        getPlayersIndex().then(
-          (ix) => {
-            if (cancelled) return;
+        getPlayersIndex().then((ix) => {
+            if (cancelled)
+                return;
             index = ix;
-          },
-          (error: unknown) => {
-            if (!cancelled) indexError = error instanceof Error ? error.message : String(error);
-          },
-        );
-        getRosterDetails().then(
-          (det) => {
-            if (cancelled) return;
+        }, (error: unknown) => {
+            if (!cancelled)
+                indexError = error instanceof Error ? error.message : String(error);
+        });
+        getRosterDetails().then((det) => {
+            if (cancelled)
+                return;
             details = det;
-          },
-          (error: unknown) => {
-            if (!cancelled) detailsError = error instanceof Error ? error.message : String(error);
-          },
-        );
-      },
-      (error: unknown) => {
-        if (!cancelled) manifestError = error instanceof Error ? error.message : String(error);
-      },
-    );
+        }, (error: unknown) => {
+            if (!cancelled)
+                detailsError = error instanceof Error ? error.message : String(error);
+        });
+    }, (error: unknown) => {
+        if (!cancelled)
+            manifestError = error instanceof Error ? error.message : String(error);
+    });
     return () => {
-      cancelled = true;
+        cancelled = true;
     };
-  }
-
-  $effect(() => loadRosterData());
-
-  function retryRosterData() {
+}
+$effect(() => loadRosterData());
+function retryRosterData() {
     clearDataLoaderCaches();
     loadRosterData();
-  }
-
-  const franchise = $derived(
-    manifest?.modernFranchiseSlots.find((e) => e.franchiseId === franchiseId) ?? null,
-  );
-  const era = $derived(manifest?.eras.find((e) => e.eraId === eraId) ?? null);
-
-  const franchiseItems = $derived([
+}
+const franchise = $derived(manifest?.modernFranchiseSlots.find((e) => e.franchiseId === franchiseId) ?? null);
+const era = $derived(manifest?.eras.find((e) => e.eraId === eraId) ?? null);
+const franchiseItems = $derived([
     { value: '', label: 'Any franchise' },
     ...(manifest?.modernFranchiseSlots ?? []).map((entry) => ({
-      value: entry.franchiseId,
-      label: entry.displayName,
+        value: entry.franchiseId,
+        label: entry.displayName,
     })),
-  ]);
-
-  const eraItems = $derived([
+]);
+const eraItems = $derived([
     { value: '', label: 'Any decade' },
     ...(manifest?.eras ?? []).map((e) => ({
-      value: e.eraId,
-      label: e.label,
+        value: e.eraId,
+        label: e.label,
     })),
-  ]);
-
-  const eraLabel = $derived(new SvelteMap((manifest?.eras ?? []).map((e) => [e.eraId, e.label])));
-
-  const franchiseName = $derived(
-    new SvelteMap(
-      (manifest?.modernFranchiseSlots ?? []).map((e) => [e.franchiseId, e.displayName]),
-    ),
-  );
-
-  const rosterRows = $derived.by((): IndexRow[] => {
-    if (!index || !details) return [];
+]);
+const eraLabel = $derived(new SvelteMap((manifest?.eras ?? []).map((e) => [e.eraId, e.label])));
+const franchiseName = $derived(new SvelteMap((manifest?.modernFranchiseSlots ?? []).map((e) => [e.franchiseId, e.displayName])));
+const rosterRows = $derived.by((): IndexRow[] => {
+    if (!index || !details)
+        return [];
     const byKey = new SvelteMap<string, RosterDetailsEntry>();
     for (const entry of details.players) {
-      byKey.set(`${entry.playerId}/${entry.franchiseId}/${entry.eraId}/${entry.seasonKey}`, entry);
+        byKey.set(`${entry.playerId}/${entry.franchiseId}/${entry.eraId}/${entry.seasonKey}`, entry);
     }
     const rows: IndexRow[] = [];
     for (const player of index.players) {
-      const detail = byKey.get(
-        `${player.playerId}/${player.franchiseId}/${player.eraId}/${player.seasonKey}`,
-      );
-      if (!detail) continue;
-      rows.push({ ...player, ...detail });
+        const detail = byKey.get(`${player.playerId}/${player.franchiseId}/${player.eraId}/${player.seasonKey}`);
+        if (!detail)
+            continue;
+        rows.push({ ...player, ...detail });
     }
     return rows;
-  });
-
-  const filteredRows = $derived.by(() => {
+});
+const filteredRows = $derived.by(() => {
     return filterRoster(rosterRows, {
-      franchiseId: franchiseId || null,
-      eraId: eraId || null,
-      position: positionFilter,
-      query: search,
+        franchiseId: franchiseId || null,
+        eraId: eraId || null,
+        position: positionFilter,
+        query: search,
     });
-  });
-
-  const sortedRows = $derived.by(() => sortRoster(filteredRows, sortId, sortDir));
-
-  const visibleItems = $derived.by((): RosterListItem<IndexRow>[] => {
+});
+const sortedRows = $derived.by(() => sortRoster(filteredRows, sortId, sortDir));
+const visibleItems = $derived.by((): RosterListItem<IndexRow>[] => {
     if (sortId !== 'none') {
-      return sortedRows.slice(0, visibleCount).map((player) => ({ type: 'player', player }));
+        return sortedRows.slice(0, visibleCount).map((player) => ({ type: 'player', player }));
     }
     return paginateGroupedRows(sortedRows, visibleCount);
-  });
-  const hasMore = $derived(filteredRows.length > visibleCount);
-  const visiblePlayers = $derived(Math.min(visibleCount, filteredRows.length));
-
-  $effect(() => {
+});
+const hasMore = $derived(filteredRows.length > visibleCount);
+const visiblePlayers = $derived(Math.min(visibleCount, filteredRows.length));
+$effect(() => {
     void [franchiseId, eraId, positionFilter, search, sortId, sortDir];
     visibleCount = PAGE_SIZE;
-  });
-
-  function selectFranchise(id: string) {
+});
+function selectFranchise(id: string) {
     franchiseId = id;
-  }
-
-  function selectEra(id: string) {
+}
+function selectEra(id: string) {
     eraId = id;
-  }
-
-  function chooseSort(id: RosterSortId) {
+}
+function chooseSort(id: RosterSortId) {
     if (id === sortId && id !== 'none') {
-      sortDir = sortDir === 'asc' ? 'desc' : 'asc';
-      return;
+        sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+        return;
     }
     sortId = id;
     sortDir = defaultDirection(id);
-  }
-
-  function openPlayer(player: IndexRow) {
+}
+function openPlayer(player: IndexRow) {
     dialogPlayer = player;
-  }
-
-  function closePlayer() {
+}
+function closePlayer() {
     dialogPlayer = null;
-  }
-
-  function toggleCompare(player: IndexRow) {
-    const existing = compareSelection.findIndex(
-      (entry) => comparisonKey(entry) === comparisonKey(player),
-    );
+}
+function toggleCompare(player: IndexRow) {
+    const existing = compareSelection.findIndex((entry) => comparisonKey(entry) === comparisonKey(player));
     if (existing >= 0) {
-      compareSelection = compareSelection.filter(
-        (entry) => comparisonKey(entry) !== comparisonKey(player),
-      );
-      return;
+        compareSelection = compareSelection.filter((entry) => comparisonKey(entry) !== comparisonKey(player));
+        return;
     }
-    if (compareSelection.length < 2) compareSelection = [...compareSelection, player];
-  }
-
-  function comparisonKey(player: IndexRow): string {
+    if (compareSelection.length < 2)
+        compareSelection = [...compareSelection, player];
+}
+function comparisonKey(player: IndexRow): string {
     return `${player.franchiseId}/${player.eraId}/${player.playerId}`;
-  }
-
-  function isCompared(player: IndexRow): boolean {
+}
+function isCompared(player: IndexRow): boolean {
     return compareSelection.some((entry) => comparisonKey(entry) === comparisonKey(player));
-  }
-
-  function removeCompare(key: string) {
+}
+function removeCompare(key: string) {
     compareSelection = compareSelection.filter((entry) => comparisonKey(entry) !== key);
-  }
-
-  function clearCompare() {
+}
+function clearCompare() {
     compareSelection = [];
-  }
-
-  onDestroy(clearCompare);
-
-  const eraIdentity = $derived(
-    manifest && franchise && era
-      ? resolveEraTeamIdentity(manifest, franchise.franchiseId, era.eraId)
-      : null,
-  );
-
-  const poolHeading = $derived(
-    franchise && era && eraIdentity
-      ? `${eraIdentity.abbreviationLabel ?? franchiseAbbreviation(franchise.franchiseId)} · ${era.label}`
-      : franchise
+}
+onDestroy(clearCompare);
+const eraIdentity = $derived(manifest && franchise && era
+    ? resolveEraTeamIdentity(manifest, franchise.franchiseId, era.eraId)
+    : null);
+const poolHeading = $derived(franchise && era && eraIdentity
+    ? `${eraIdentity.abbreviationLabel ?? franchiseAbbreviation(franchise.franchiseId)} · ${era.label}`
+    : franchise
         ? franchiseAbbreviation(franchise.franchiseId)
         : era
-          ? era.label
-          : 'All players',
-  );
-
-  const columns: RosterColumn[] = [
+            ? era.label
+            : 'All players');
+const columns: RosterColumn[] = [
     { key: 'player', label: 'Player', sort: 'name' },
     { key: 'pos', label: 'Pos', sort: 'position', hideBelow: 'md' },
     { key: 'decade', label: 'Decade', sort: 'decade', hideBelow: 'lg' },
@@ -288,7 +219,7 @@
     { key: 'assists', label: 'AST', hideBelow: 'lg', numeric: true },
     { key: 'ts', label: 'TS%', hideBelow: 'lg', numeric: true },
     { key: 'per', label: 'PER', sort: 'per', hideBelow: 'lg', numeric: true },
-  ];
+];
 </script>
 
 <svelte:head>

@@ -1,36 +1,19 @@
 export const ARTIFACT_SCHEMA_VERSION = 3;
-
 export const MANIFEST_SCHEMA_VERSION = 4;
-
 export const RUN_SCHEMA_VERSION = 2;
-
 export const SAVE_SCHEMA_VERSION = 2;
-
 export const CHECKPOINT_SAVE_SCHEMA_VERSION = 3;
-
 export const LINEAGE_RULE_VERSION = 'lineage-v1';
-
 export const SOURCE_VERSION = 'source-v1';
-
 export const DERIVATION_METHOD_VERSION = 'derive-v8';
-
 export const RATINGS_VERSION = 'ratings-v3.6';
-
 export const SELECTION_SCORE_VERSION = 'selection-v3.6-ratings-v3.6';
-
 export const RATING_MODEL_VERSION = 'ratings-model-v3.3';
-
 export const THREE_POINT_RECONSTRUCTION_VERSION = 'three-point-reconstruction-v1';
-
 export const COHORT_NORMALIZATION_VERSION = 'overall-cohort-v1';
-
 export const POOL_SCHEMA_VERSION = 5;
 export const PLAYERS_INDEX_SCHEMA_VERSION = 5;
-
 export const POSITION_NORMALIZATION_VERSION = 'position-v3';
-
 export const POSITION_OVERRIDES_VERSION = 'position-overrides-v1';
-
 export const CLASSIC_DRAFT_SCHEMA_VERSION = 1;
-
 export const CLASSIC_ROLL_VERSION = 'classic-roll-v1';

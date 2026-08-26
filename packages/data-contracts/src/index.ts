@@ -81,12 +81,4 @@ export * from './season-commands.ts';
 export * from './season-block.ts';
 export * from './season-worker.ts';
 export * from './season-postseason-worker.ts';
-export {
-  buildEmptyHealth,
-  buildInitialInfluence,
-  buildRun,
-  buildLeague,
-  buildSchedule,
-  SIMULATION_RATINGS,
-  SIMULATION_TENDENCIES,
-} from './season-schemas-fixtures.ts';
+export { buildEmptyHealth, buildInitialInfluence, buildRun, buildLeague, buildSchedule, SIMULATION_RATINGS, SIMULATION_TENDENCIES, } from './season-schemas-fixtures.ts';

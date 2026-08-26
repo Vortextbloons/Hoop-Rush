@@ -1,50 +1,38 @@
-<script lang="ts">
-  import { getContext } from 'svelte';
-  import { page } from '$app/state';
-  import { resolve } from '$app/paths';
-  import type { RouteId } from '$app/types';
-  import TeamDetailView from '$lib/components/season/TeamDetailView.svelte';
-  import {
-    SEASON_RUN_SHELL_CONTEXT,
-    type SeasonRunShellData,
-  } from '$lib/season/season-shell-context';
-  import { seasonTeamDetail } from '$lib/season/season-team-detail-view';
-  import {
-    overallRatingOfSlice,
-    playablePositionsOfSlice,
-    summaryRatingsOfSlice,
-  } from '$lib/season/season-player-slice';
-
-  const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
-
-  const franchiseId = $derived(page.url.searchParams.get('franchiseId') ?? '');
-
-  const detail = $derived.by(() => {
+<script lang="ts">import { getContext } from 'svelte';
+import { page } from '$app/state';
+import { resolve } from '$app/paths';
+import type { RouteId } from '$app/types';
+import TeamDetailView from '$lib/components/season/TeamDetailView.svelte';
+import { SEASON_RUN_SHELL_CONTEXT, type SeasonRunShellData, } from '$lib/season/season-shell-context';
+import { seasonTeamDetail } from '$lib/season/season-team-detail-view';
+import { overallRatingOfSlice, playablePositionsOfSlice, summaryRatingsOfSlice, } from '$lib/season/season-player-slice';
+const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
+const franchiseId = $derived(page.url.searchParams.get('franchiseId') ?? '');
+const detail = $derived.by(() => {
     const run = shell.run;
     const manifest = shell.manifest;
     if (run === null || manifest === null || !shell.playerSliceReady || franchiseId === '')
-      return null;
+        return null;
     const slice = shell.playerSlice;
     const roster = run.rosters.find((r) => r.franchiseId === franchiseId);
     const rotation = run.rotations.find((r) => r.franchiseId === franchiseId);
-    if (roster === undefined || rotation === undefined) return null;
+    if (roster === undefined || rotation === undefined)
+        return null;
     return seasonTeamDetail({
-      roster,
-      rotation,
-      rosters: run.rosters,
-      rotations: run.rotations,
-      standings: run.standings,
-      league: run.league,
-      summaries: shell.snapshot?.summaries ?? [],
-      overallRatingOf: (playerVersionId) => overallRatingOfSlice(slice, playerVersionId),
-      summaryRatingsOf: (playerVersionId) => summaryRatingsOfSlice(slice, playerVersionId),
-      playablePositions: (playerVersionId) => playablePositionsOfSlice(slice, playerVersionId),
+        roster,
+        rotation,
+        rosters: run.rosters,
+        rotations: run.rotations,
+        standings: run.standings,
+        league: run.league,
+        summaries: shell.snapshot?.summaries ?? [],
+        overallRatingOf: (playerVersionId) => overallRatingOfSlice(slice, playerVersionId),
+        summaryRatingsOf: (playerVersionId) => summaryRatingsOfSlice(slice, playerVersionId),
+        playablePositions: (playerVersionId) => playablePositionsOfSlice(slice, playerVersionId),
     });
-  });
-
-  const isHuman = $derived(franchiseId !== '' && shell.humanFranchiseId === franchiseId);
-
-  const manifest = $derived(shell.manifest);
+});
+const isHuman = $derived(franchiseId !== '' && shell.humanFranchiseId === franchiseId);
+const manifest = $derived(shell.manifest);
 </script>
 
 <svelte:head>

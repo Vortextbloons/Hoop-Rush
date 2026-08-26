@@ -1,118 +1,107 @@
-<script lang="ts">
-  import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-  import { resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
-  import { Dialog } from 'bits-ui';
-  import { X } from '@lucide/svelte';
-  import {
-    formatDecimal,
-    formatPct,
-    formatPerGame,
-    perGame,
-    shotPct,
-    type RosterDetailRow,
-  } from '$lib/roster-browser';
-  import { formatPositions } from '$lib/player-positions';
-  import { percentOneDecimal } from '$lib/format';
-  import PlayerFace from './PlayerFace.svelte';
-
-  let {
-    player,
-    manifest,
-    franchiseName,
-    eraLabel,
-    onClose,
-  }: {
+<script lang="ts">import type { HoopRushManifest } from '@hoop-rush/data-contracts';
+import { resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
+import { Dialog } from 'bits-ui';
+import { X } from '@lucide/svelte';
+import { formatDecimal, formatPct, formatPerGame, perGame, shotPct, type RosterDetailRow, } from '$lib/roster-browser';
+import { formatPositions } from '$lib/player-positions';
+import { percentOneDecimal } from '$lib/format';
+import PlayerFace from './PlayerFace.svelte';
+let { player, manifest, franchiseName, eraLabel, onClose, }: {
     player: RosterDetailRow | null;
     manifest: HoopRushManifest;
     franchiseName: Map<string, string>;
     eraLabel: Map<string, string>;
     onClose: () => void;
-  } = $props();
-
-  function teamNameFor(row: RosterDetailRow): string {
+} = $props();
+function teamNameFor(row: RosterDetailRow): string {
     const identity = resolveEraTeamIdentity(manifest, row.franchiseId, row.eraId);
     return identity.displayLabel ?? franchiseName.get(row.franchiseId) ?? row.franchiseId;
-  }
-
-  function statLine(row: RosterDetailRow) {
+}
+function statLine(row: RosterDetailRow) {
     const s = row.stats;
     return {
-      mpg: perGame(s, 'minutes'),
-      ppg: perGame(s, 'points'),
-      rpg: perGame(s, 'rebounds'),
-      apg: perGame(s, 'assists'),
-      spg: perGame(s, 'steals'),
-      bpg: perGame(s, 'blocks'),
-      topg: perGame(s, 'turnovers'),
-      fgPct: shotPct(s.fieldGoalsMade, s.fieldGoalsAttempted),
-      threePct: shotPct(s.threesMade, s.threesAttempted),
-      ftPct: shotPct(s.freeThrowsMade, s.freeThrowsAttempted),
-      ts: s.tsPct ?? 0,
-      efg: s.efgPct ?? 0,
-      per: s.per ?? 0,
-      bpm: s.boxPlusMinus ?? 0,
-      usage: s.usageRate ?? 0,
+        mpg: perGame(s, 'minutes'),
+        ppg: perGame(s, 'points'),
+        rpg: perGame(s, 'rebounds'),
+        apg: perGame(s, 'assists'),
+        spg: perGame(s, 'steals'),
+        bpg: perGame(s, 'blocks'),
+        topg: perGame(s, 'turnovers'),
+        fgPct: shotPct(s.fieldGoalsMade, s.fieldGoalsAttempted),
+        threePct: shotPct(s.threesMade, s.threesAttempted),
+        ftPct: shotPct(s.freeThrowsMade, s.freeThrowsAttempted),
+        ts: s.tsPct ?? 0,
+        efg: s.efgPct ?? 0,
+        per: s.per ?? 0,
+        bpm: s.boxPlusMinus ?? 0,
+        usage: s.usageRate ?? 0,
     };
-  }
-
-  function heightLabel(row: RosterDetailRow): string {
-    if (row.heightInches === null || row.heightInches === undefined) return '—';
+}
+function heightLabel(row: RosterDetailRow): string {
+    if (row.heightInches === null || row.heightInches === undefined)
+        return '—';
     const feet = Math.floor(row.heightInches / 12);
     const inches = row.heightInches % 12;
     return `${feet}'${inches}"`;
-  }
-
-  function weightLabel(row: RosterDetailRow): string {
-    if (row.weightLbs === null || row.weightLbs === undefined) return '—';
+}
+function weightLabel(row: RosterDetailRow): string {
+    if (row.weightLbs === null || row.weightLbs === undefined)
+        return '—';
     return `${row.weightLbs} lbs`;
-  }
-
-  const sections = $derived.by(() => {
+}
+const sections = $derived.by(() => {
     const subject = player;
-    if (!subject) return [] as { title: string; items: [string, string][] }[];
+    if (!subject)
+        return [] as {
+            title: string;
+            items: [
+                string,
+                string
+            ][];
+        }[];
     const s = statLine(subject);
     return [
-      {
-        title: 'Per game',
-        items: [
-          ['Minutes', formatPerGame(s.mpg)],
-          ['Points', formatPerGame(s.ppg)],
-          ['Rebounds', formatPerGame(s.rpg)],
-          ['Assists', formatPerGame(s.apg)],
-          ['Steals', formatPerGame(s.spg)],
-          ['Blocks', formatPerGame(s.bpg)],
-          ['Turnovers', formatPerGame(s.topg)],
-        ],
-      },
-      {
-        title: 'Shooting',
-        items: [
-          ['Field goal', formatPct(s.fgPct)],
-          ['Three point', formatPct(s.threePct)],
-          ['Free throw', formatPct(s.ftPct)],
-          ['Effective FG', formatPct(s.efg)],
-          ['True shooting', formatPct(s.ts)],
-        ],
-      },
-      {
-        title: 'Advanced',
-        items: [
-          ['PER', formatDecimal(s.per)],
-          ['Box plus/minus', formatDecimal(s.bpm)],
-          ['Usage rate', formatDecimal(s.usage)],
-        ],
-      },
-      {
-        title: 'Context',
-        items: [
-          ['Games', String(subject.stats.gamesPlayed)],
-          ['Minutes', String(subject.stats.minutes)],
-          ['Height', heightLabel(subject)],
-          ['Weight', weightLabel(subject)],
-        ],
-      },
+        {
+            title: 'Per game',
+            items: [
+                ['Minutes', formatPerGame(s.mpg)],
+                ['Points', formatPerGame(s.ppg)],
+                ['Rebounds', formatPerGame(s.rpg)],
+                ['Assists', formatPerGame(s.apg)],
+                ['Steals', formatPerGame(s.spg)],
+                ['Blocks', formatPerGame(s.bpg)],
+                ['Turnovers', formatPerGame(s.topg)],
+            ],
+        },
+        {
+            title: 'Shooting',
+            items: [
+                ['Field goal', formatPct(s.fgPct)],
+                ['Three point', formatPct(s.threePct)],
+                ['Free throw', formatPct(s.ftPct)],
+                ['Effective FG', formatPct(s.efg)],
+                ['True shooting', formatPct(s.ts)],
+            ],
+        },
+        {
+            title: 'Advanced',
+            items: [
+                ['PER', formatDecimal(s.per)],
+                ['Box plus/minus', formatDecimal(s.bpm)],
+                ['Usage rate', formatDecimal(s.usage)],
+            ],
+        },
+        {
+            title: 'Context',
+            items: [
+                ['Games', String(subject.stats.gamesPlayed)],
+                ['Minutes', String(subject.stats.minutes)],
+                ['Height', heightLabel(subject)],
+                ['Weight', weightLabel(subject)],
+            ],
+        },
     ];
-  });
+});
 </script>
 
 <Dialog.Root

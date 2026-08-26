@@ -1,51 +1,13 @@
-<script lang="ts">
-  import type {
-    SeasonDraftCatalog,
-    SeasonHealthState,
-    SeasonInfluenceState,
-    SeasonRoster,
-    SeasonRun,
-    SeasonTradeBoardTeamProfile,
-    SeasonTradeNegotiation,
-    SeasonTradeValueTrend,
-    SeasonTradeWindowState,
-  } from '@hoop-rush/data-contracts';
-  import { formatPositions } from '$lib/player-positions';
-  import {
-    competitorInterestLabel,
-    formatTradeNeeds,
-    formatTradePriority,
-    inquiryCounterLabel,
-  } from '$lib/season/season-presentation';
-  import PackageBuilder from './PackageBuilder.svelte';
-  import NegotiationTranscript from './NegotiationTranscript.svelte';
-  import ValueTrendCell from './ValueTrendCell.svelte';
-  import SeasonTeamLogo from './SeasonTeamLogo.svelte';
-  import { franchiseIdentityOf } from '$lib/season/season-branding';
-  import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-
-  let {
-    run,
-    catalog,
-    manifest,
-    windowState,
-    boardProfiles,
-    negotiations,
-    valueTrends,
-    humanFranchiseId,
-    humanBalance,
-    // handlers
-    onOpenInquiry,
-    onSubmitProposal,
-    onRespond,
-    onWalkAway,
-    onPurchaseInquiry,
-    commandError = null,
-    busy = false,
-    playerName = (id: string) => id,
-    playableOf = (id: string) => [] as readonly string[],
-    availableOf = (id: string) => true,
-  }: {
+<script lang="ts">import type { SeasonDraftCatalog, SeasonHealthState, SeasonInfluenceState, SeasonRoster, SeasonRun, SeasonTradeBoardTeamProfile, SeasonTradeNegotiation, SeasonTradeValueTrend, SeasonTradeWindowState, } from '@hoop-rush/data-contracts';
+import { formatPositions } from '$lib/player-positions';
+import { competitorInterestLabel, formatTradeNeeds, formatTradePriority, inquiryCounterLabel, } from '$lib/season/season-presentation';
+import PackageBuilder from './PackageBuilder.svelte';
+import NegotiationTranscript from './NegotiationTranscript.svelte';
+import ValueTrendCell from './ValueTrendCell.svelte';
+import SeasonTeamLogo from './SeasonTeamLogo.svelte';
+import { franchiseIdentityOf } from '$lib/season/season-branding';
+import type { HoopRushManifest } from '@hoop-rush/data-contracts';
+let { run, catalog, manifest, windowState, boardProfiles, negotiations, valueTrends, humanFranchiseId, humanBalance, onOpenInquiry, onSubmitProposal, onRespond, onWalkAway, onPurchaseInquiry, commandError = null, busy = false, playerName = (id: string) => id, playableOf = (id: string) => [] as readonly string[], availableOf = (id: string) => true, }: {
     run: SeasonRun | null;
     catalog: SeasonDraftCatalog | null;
     manifest: HoopRushManifest | null;
@@ -56,8 +18,17 @@
     humanFranchiseId: string;
     humanBalance: number;
     onOpenInquiry: (toFranchiseId: string) => void;
-    onSubmitProposal: (payload: { toFranchiseId: string; outgoing: string[]; incoming: string[]; influenceAmount: number; influenceFromSender: string | null }) => void;
-    onRespond: (input: { inquiryId: string; accept: boolean }) => void;
+    onSubmitProposal: (payload: {
+        toFranchiseId: string;
+        outgoing: string[];
+        incoming: string[];
+        influenceAmount: number;
+        influenceFromSender: string | null;
+    }) => void;
+    onRespond: (input: {
+        inquiryId: string;
+        accept: boolean;
+    }) => void;
     onWalkAway: (inquiryId: string) => void;
     onPurchaseInquiry: () => void;
     commandError?: string | null;
@@ -65,69 +36,58 @@
     playerName?: (playerVersionId: string) => string;
     playableOf?: (playerVersionId: string) => readonly string[];
     availableOf?: (playerVersionId: string) => boolean;
-  } = $props();
-
-  let selectedFranchiseId: string | null = $state(null);
-  let mobileTab: 'board' | 'build' | 'negotiate' = $state('board');
-  let announcement: string = $state('');
-
-  // derive rosters
-  const humanRoster = $derived(run?.rosters.find((r) => r.franchiseId === humanFranchiseId) ?? null);
-  const targetRoster = $derived(
-    selectedFranchiseId ? (run?.rosters.find((r) => r.franchiseId === selectedFranchiseId) ?? null) : null,
-  );
-
-  const activeNegotiation = $derived(
-    windowState?.activeInquiryId ? negotiations.find((n) => n.inquiryId === windowState.activeInquiryId) ?? null : null,
-  );
-
-  const inquiryAllowance = $derived(windowState?.inquiryAllowance ?? 3);
-  const inquiriesUsed = $derived(negotiations.length);
-  const purchasedUsed = $derived(windowState?.purchasedInquiryUsed ?? false);
-  const earnedUsed = $derived(windowState?.earnedInquiryUsed ?? false);
-  const canPurchase = $derived(!purchasedUsed && inquiryAllowance < 5 && humanBalance >= 1);
-
-  const selectedProfile = $derived(boardProfiles.find((p) => p.franchiseId === selectedFranchiseId) ?? null);
-
-  // Value trends for human players
-  const humanTrends = $derived(valueTrends.filter((t) => humanRoster?.players.some((p) => p.playerVersionId === t.playerVersionId) ?? false).slice(0, 6));
-
-  // Closed window history
-  const closedWindows = $derived(run?.trade?.windows.filter((w) => w.status === 'closed') ?? []);
-
-  function selectTeam(franchiseId: string): void {
+} = $props();
+let selectedFranchiseId: string | null = $state(null);
+let mobileTab: 'board' | 'build' | 'negotiate' = $state('board');
+let announcement: string = $state('');
+const humanRoster = $derived(run?.rosters.find((r) => r.franchiseId === humanFranchiseId) ?? null);
+const targetRoster = $derived(selectedFranchiseId ? (run?.rosters.find((r) => r.franchiseId === selectedFranchiseId) ?? null) : null);
+const activeNegotiation = $derived(windowState?.activeInquiryId ? negotiations.find((n) => n.inquiryId === windowState.activeInquiryId) ?? null : null);
+const inquiryAllowance = $derived(windowState?.inquiryAllowance ?? 3);
+const inquiriesUsed = $derived(negotiations.length);
+const purchasedUsed = $derived(windowState?.purchasedInquiryUsed ?? false);
+const earnedUsed = $derived(windowState?.earnedInquiryUsed ?? false);
+const canPurchase = $derived(!purchasedUsed && inquiryAllowance < 5 && humanBalance >= 1);
+const selectedProfile = $derived(boardProfiles.find((p) => p.franchiseId === selectedFranchiseId) ?? null);
+const humanTrends = $derived(valueTrends.filter((t) => humanRoster?.players.some((p) => p.playerVersionId === t.playerVersionId) ?? false).slice(0, 6));
+const closedWindows = $derived(run?.trade?.windows.filter((w) => w.status === 'closed') ?? []);
+function selectTeam(franchiseId: string): void {
     selectedFranchiseId = franchiseId;
     mobileTab = 'build';
-    // browsing is free — do not auto-open inquiry
-  }
-
-  function handlePurchase(): void {
-    if (!canPurchase || busy) return;
+}
+function handlePurchase(): void {
+    if (!canPurchase || busy)
+        return;
     onPurchaseInquiry();
-  }
-
-  function handleSubmit(payload: { outgoing: string[]; incoming: string[]; influenceAmount: number; influenceFromSender: string | null }): void {
-    if (selectedFranchiseId === null) return;
+}
+function handleSubmit(payload: {
+    outgoing: string[];
+    incoming: string[];
+    influenceAmount: number;
+    influenceFromSender: string | null;
+}): void {
+    if (selectedFranchiseId === null)
+        return;
     onSubmitProposal({ toFranchiseId: selectedFranchiseId, ...payload });
-    // after submit, switch to negotiate tab
     mobileTab = 'negotiate';
-  }
-
-  // Announce accepted/rejected without moving focus
-  $effect(() => {
+}
+$effect(() => {
     if (commandError !== null) {
-      announcement = `Rejected: ${commandError}`;
+        announcement = `Rejected: ${commandError}`;
     }
-  });
-  $effect(() => {
-    if (activeNegotiation?.status === 'accepted') announcement = 'Negotiation accepted — announced, focus stays';
-    if (activeNegotiation?.status === 'declined') announcement = 'Negotiation declined — announced, focus stays';
-    if (activeNegotiation?.status === 'walked-away') announcement = 'Walked away — no penalty — announced, focus stays';
-  });
+});
+$effect(() => {
+    if (activeNegotiation?.status === 'accepted')
+        announcement = 'Negotiation accepted — announced, focus stays';
+    if (activeNegotiation?.status === 'declined')
+        announcement = 'Negotiation declined — announced, focus stays';
+    if (activeNegotiation?.status === 'walked-away')
+        announcement = 'Walked away — no penalty — announced, focus stays';
+});
 </script>
 
 <section aria-labelledby="trade-board-heading" class="flex flex-col gap-4" data-testid="trade-board-workspace">
-  <!-- Header tape -->
+  
   <div class="relative overflow-hidden rounded-2xl border border-line-strong bg-surface-1">
     <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary via-amber-500 to-sky-500 opacity-80"></div>
     <div class="flex flex-col gap-3 px-4 py-4 sm:px-5">
@@ -168,7 +128,7 @@
       {/if}
     </div>
 
-    <!-- ticker tape — categorical feedback marquee -->
+    
     <div class="border-t border-border bg-surface-2/60 overflow-hidden">
       <div class="flex animate-[marquee_22s_linear_infinite] motion-safe:animate-[marquee_22s_linear_infinite] motion-reduce:animate-none gap-6 whitespace-nowrap py-2 min-h-11 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground" aria-hidden="true">
         <span class="shrink-0">acceptable</span><span class="text-primary">·</span><span class="shrink-0">close needs more value</span><span class="text-primary">·</span><span class="shrink-0">wrong roster fit</span><span class="text-primary">·</span><span class="shrink-0">unacceptable injury/availability risk</span><span class="text-primary">·</span><span class="shrink-0">protected player</span><span class="text-primary">·</span><span class="shrink-0">illegal roster/rotation</span><span class="text-primary">·</span><span class="shrink-0">negotiations closed</span>
@@ -177,7 +137,7 @@
     </div>
   </div>
 
-  <!-- Mobile tabs -->
+  
   <div class="flex gap-1 rounded-xl bg-surface-2 p-1 lg:hidden" role="tablist" aria-label="Trade board sections">
     {#each [{id:'board',label:'Board'},{id:'build',label:'Builder'},{id:'negotiate',label:'Negotiation'}] as tab (tab.id)}
       <button
@@ -193,9 +153,9 @@
     {/each}
   </div>
 
-  <!-- Main war-room grid -->
+  
   <div class="grid gap-4 lg:grid-cols-[360px_minmax(0,1fr)_380px] lg:items-start">
-    <!-- Board list -->
+    
     <div
       id="panel-board"
       role="tabpanel"
@@ -224,9 +184,9 @@
                   class="group relative flex w-full flex-col gap-2 rounded-xl border bg-card p-3 text-left outline-none transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring {selectedFranchiseId === profile.franchiseId ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border'}"
                   data-testid={`board-team-${profile.franchiseId}`}
                 >
-                  <!-- pushpin -->
+                  
                   <span class="pointer-events-none absolute left-1/2 top-1.5 h-2 w-2 -translate-x-1/2 rounded-full bg-primary shadow-sm ring-2 ring-primary/20"></span>
-                  <!-- perforated edge hint -->
+                  
                   <span class="pointer-events-none absolute inset-y-0 left-0 w-1 rounded-l-xl bg-[repeating-linear-gradient(180deg,transparent_0_6px,var(--color-border)_6px_8px)] opacity-40"></span>
 
                   <span class="flex items-center gap-2 pt-1">
@@ -275,7 +235,7 @@
           </ul>
         {/if}
 
-        <!-- closed window history -->
+        
         {#if closedWindows.length > 0}
           <div class="border-t border-border bg-surface-2/40 p-3">
             <h4 class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Closed-window history</h4>
@@ -298,7 +258,7 @@
         {/if}
       </div>
 
-      <!-- value trends -->
+      
       <div class="rounded-xl border border-border bg-surface-1 p-3">
         <h4 class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Your value trends</h4>
         <p class="mt-1 font-mono text-[10px] text-muted-foreground">Categorical movement from saved production, workload, role, availability — never a precise trade-value number.</p>
@@ -314,7 +274,7 @@
       </div>
     </div>
 
-    <!-- Package builder center -->
+    
     <div id="panel-build" role="tabpanel" aria-label="Package builder" class="flex flex-col gap-3 {mobileTab !== 'build' ? 'hidden lg:flex' : ''}">
       {#if windowState === null}
         <div class="rounded-xl border border-dashed border-border bg-surface-1 p-6 text-center">
@@ -357,7 +317,7 @@
       {/if}
     </div>
 
-    <!-- Negotiation transcript right -->
+    
     <div id="panel-negotiate" role="tabpanel" aria-label="Negotiation" class="flex flex-col gap-3 {mobileTab !== 'negotiate' ? 'hidden lg:flex' : ''}">
       <NegotiationTranscript
         negotiation={activeNegotiation}
@@ -374,7 +334,7 @@
         busy={busy}
       />
 
-      <!-- full negotiation list for window (closed history browse) -->
+      
       {#if negotiations.length > 0}
         <div class="rounded-xl border border-border bg-surface-1 p-3">
           <h4 class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">All inquiries this window</h4>

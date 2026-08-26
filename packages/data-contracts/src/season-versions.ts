@@ -1,171 +1,86 @@
 export const SEASON_RUN_SCHEMA_VERSION = 11;
-
 export const SEASON_DRAFT_SAVE_SCHEMA_VERSION = 3;
-
 export const SEASON_RUN_SAVE_SCHEMA_VERSION = 8;
-
 export const SEASON_LEAGUE_VERSION = 'league-v1';
-
 export const SEASON_SCHEDULE_VERSION = 'schedule-v1';
-
 export const SEASON_SCHEDULE_FORMULA_VERSION = 'schedule-formula-v1';
-
 export const SEASON_STANDINGS_VERSION = 'standings-v1';
-
 export const SEASON_POSTSEASON_VERSION = 'postseason-v2';
-
 export const SEASON_POSTSEASON_LEGACY_VERSION = 'postseason-v1';
-
 export const SEASON_TIEBREAK_VERSION = 'tiebreaker-v1';
-
 export const SEASON_POSTSEASON_SUMMARY_VERSION = 'postseason-summary-v1';
-
 export const SEASON_AWARDS_VERSION = 'awards-v1';
-
 export const SEASON_TRADE_GRADE_VERSION = 'trade-grade-v1';
-
 export const SEASON_COMMAND_LOG_VERSION = 'command-log-v1';
-
 export const SEASON_ALMANAC_VERSION = 'almanac-v1';
-
 export const SEASON_REPLAY_EXPORT_VERSION = 'replay-export-v1';
-
 export const SEASON_POSTSEASON_TARGETS_VERSION = 'postseason-targets-v1';
-
 export const SEASON_SEED_DERIVATION_VERSION = 'season-seeds-v1';
-
 export const PLAYER_VERSION_ID_VERSION = 'player-version-id-v1';
-
 export const SEASON_DRAFT_VERSION = 'season-draft-v2';
-
 export const SEASON_DRAFT_LEGACY_VERSION = 'season-draft-v1';
-
 export const SEASON_DRAFT_OFFER_SIZE = 8;
-
 export const SEASON_DRAFT_SAFE_MINIMUM = 3;
-
 export const SEASON_OFFER_TARGETS_VERSION = 'offer-targets-v1';
-
 export const SEASON_ROSTER_RULES_VERSION = 'season-roster-v2';
-
 export const SEASON_FREE_AGENCY_VERSION = 'season-free-agency-v1';
-
 export const SEASON_FREE_AGENCY_INDEX_VERSION = 'free-agency-index-v1';
-
 export const SEASON_FREE_AGENCY_TARGETS_VERSION = 'free-agency-targets-v1';
-
 export const SEASON_ROSTER_GENERATION_V2 = 'roster-generation-v2';
-
 export const SEASON_ROSTER_GENERATION_VERSION = 'roster-generation-v3';
-
 export const SEASON_AI_V2 = 'season-ai-v2';
-
 export const SEASON_AI_VERSION = 'season-ai-v3';
-
 export const SEASON_ROTATION_VERSION = 'season-rotation-v3';
-
 export const SEASON_ROTATION_V2 = 'season-rotation-v2';
-
 export const SEASON_MINUTE_POLICY_VERSION = 'minute-policy-v1';
-
 export const SEASON_ROTATION_PLANNER_VERSION = 'rotation-planner-v1';
-
 export const SEASON_GAME_VERSION = 'season-game-v4';
-
 export const SEASON_GAME_TARGETS_VERSION = 'season-game-targets-v4';
-
 export const SEASON_ROSTER_TARGETS_V2 = 'roster-targets-v2';
-
 export const SEASON_ROSTER_TARGETS_VERSION = 'roster-targets-v3';
-
 export const SEASON_BLOCK_VERSION = 'season-block-v5';
-
 export const SEASON_GAME_SUMMARY_VERSION = 'season-game-summary-v3';
-
 export const SEASON_AGGREGATES_VERSION = 'season-aggregates-v2';
-
 export const SEASON_RECAP_VERSION = 'season-recap-v5';
-
 export const SEASON_LEADERS_VERSION = 'season-leaders-v1';
-
 export const SEASON_HOME_COURT_VERSION = 'season-home-court-v1';
-
 export const SEASON_CHECKPOINT_VERSION = 'season-checkpoint-v5';
-
 export const SEASON_STAMINA_VERSION = 'season-stamina-v2';
-
 export const SEASON_STAMINA_LEGACY_VERSION = 'season-stamina-v1';
-
 export const SEASON_CHEMISTRY_VERSION = 'season-chemistry-v2';
-
 export const SEASON_EFFECT_TARGETS_VERSION = 'season-effect-targets-v2';
-
 export const SEASON_EFFECT_TARGETS_LEGACY_VERSION = 'season-effect-targets-v1';
-
 export const SEASON_DRAFT_CATALOG_VERSION = 'season-draft-catalog-v4';
-
 export const PROJECTION_MODEL_VERSION = 'projection-model-v1';
-
 export const PROJECTION_TARGETS_VERSION = 'projection-targets-v1';
-
 export const PROJECTION_SCHEMA_VERSION = 'projection-schema-v1';
-
 export const SEASON_PROJECTION_VERSION = 'season-projection-v1';
-
 export const SEASON_PROJECTION_TARGETS_VERSION = 'season-projection-targets-v1';
-
 export const SEASON_ROSTER_AUTOFILL_VERSION = 'season-roster-autofill-v1';
-
 export const SEASON_HEALTH_VERSION = 'season-health-v2';
-
 export const SEASON_TRADE_VERSION = 'season-trade-v3';
-
 export const SEASON_INFLUENCE_VERSION = 'season-influence-v2';
-
 export const SEASON_OBJECTIVE_VERSION = 'season-objective-v1';
-
 export const SEASON_CAMPAIGN_VERSION = 'season-campaign-v1';
-
 export const SEASON_CAMPAIGN_TARGETS_VERSION = 'campaign-targets-v1';
-
 export const SEASON_INJURY_TARGETS_VERSION = 'injury-targets-v2';
-
 export const SEASON_TRADE_TARGETS_VERSION = 'trade-targets-v3';
-
 export const SEASON_INFLUENCE_TARGETS_VERSION = 'influence-targets-v2';
-
 export const SEASON_DURABILITY_VERSION = 'durability-v1';
-
 export const SEASON_HOME_WIN_RATE_TARGET = 0.575;
-
 export const SEASON_LEADER_MIN_GAME_SHARE = 0.7;
-
 export const SEASON_LEADER_DEPTH = 5;
-
 export const SEASON_COMMITTED_DRAFT_SEED = 'd00d2026a1b2c3d4e5f60718293a4b5c6';
-
 export const SEASON_TEAM_COUNT = 30;
-
 export const SEASON_ROUND_COUNT = 82;
-
 export const SEASON_GAME_COUNT = 1230;
-
 export const SEASON_GAMES_PER_ROUND = 15;
-
 export const SEASON_BLOCK_COUNT = 9;
-
 export const SEASON_BLOCK_TEAM_GAMES = 10;
-
 export const SEASON_FINAL_BLOCK_TEAM_GAMES = 2;
-
 export const SEASON_DRAFT_SIZE = 10;
-
 export const SEASON_ROTATION_SIZE = 10;
-
 export const SEASON_ROSTER_MIN_SIZE = 10;
-
 export const SEASON_ROSTER_MAX_SIZE = 15;
-
 export const SEASON_ROSTER_SIZE = 10;
-
 export const SEASON_COMMITTED_SCHEDULE_SEED = 'c0ffee2026a1b2c3d4e5f60718293a4b';

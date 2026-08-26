@@ -1,53 +1,31 @@
-<script lang="ts">
-  import type { HoopRushManifest, SeasonRoster } from '@hoop-rush/data-contracts';
-  import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
-  import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
-  import { eraIdentityOf, franchiseIdentityOf } from '$lib/season/season-branding';
-  import type { SeasonRunShellData } from '$lib/season/season-shell-context';
-  import {
-    FATIGUE_BAND_BADGE,
-    FATIGUE_BAND_LABEL,
-    fatigueBand,
-    fatiguePercent,
-    loadStateOf,
-  } from '$lib/season/season-effects-view';
-  import type { SeasonEffectsState, SeasonGameSummary } from '@hoop-rush/data-contracts';
-  import { formatPositions } from '$lib/player-positions';
-  import { candidateOf } from '$lib/season/season-catalog-index';
-
-  let {
-    roster,
-    manifest,
-    shell,
-    roleOf,
-    effects,
-    summaries,
-    embedded = false,
-  }: {
+<script lang="ts">import type { HoopRushManifest, SeasonRoster } from '@hoop-rush/data-contracts';
+import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
+import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
+import { eraIdentityOf, franchiseIdentityOf } from '$lib/season/season-branding';
+import type { SeasonRunShellData } from '$lib/season/season-shell-context';
+import { FATIGUE_BAND_BADGE, FATIGUE_BAND_LABEL, fatigueBand, fatiguePercent, loadStateOf, } from '$lib/season/season-effects-view';
+import type { SeasonEffectsState, SeasonGameSummary } from '@hoop-rush/data-contracts';
+import { formatPositions } from '$lib/player-positions';
+import { candidateOf } from '$lib/season/season-catalog-index';
+let { roster, manifest, shell, roleOf, effects, summaries, embedded = false, }: {
     roster: SeasonRoster;
     manifest: HoopRushManifest;
     shell: SeasonRunShellData;
-
-    roleOf: (playerVersionId: string) => { role: string; minutes: number | string };
-
+    roleOf: (playerVersionId: string) => {
+        role: string;
+        minutes: number | string;
+    };
     effects: SeasonEffectsState | null;
-
     summaries: SeasonGameSummary[];
-
     embedded?: boolean;
-  } = $props();
-
-  const lastGame = $derived(summaries.length > 0 ? summaries[summaries.length - 1] : null);
-  const lastGameMinutes = $derived(
-    new Map<string, number>(
-      lastGame === null || lastGame === undefined
-        ? []
-        : [...lastGame.homePlayers, ...lastGame.awayPlayers].map((line) => [
-            line.playerVersionId,
-            line.seconds / 60,
-          ]),
-    ),
-  );
+} = $props();
+const lastGame = $derived(summaries.length > 0 ? summaries[summaries.length - 1] : null);
+const lastGameMinutes = $derived(new Map<string, number>(lastGame === null || lastGame === undefined
+    ? []
+    : [...lastGame.homePlayers, ...lastGame.awayPlayers].map((line) => [
+        line.playerVersionId,
+        line.seconds / 60,
+    ])));
 </script>
 
 <section

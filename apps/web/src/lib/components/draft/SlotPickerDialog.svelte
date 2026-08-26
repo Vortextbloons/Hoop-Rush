@@ -1,37 +1,15 @@
-<script lang="ts">
-  import type { HoopRushManifest, PlayersIndexEntry } from '@hoop-rush/data-contracts';
-  import { ArrowRight, Check, Lock, Plus, X } from '@lucide/svelte';
-  import { Dialog } from 'bits-ui';
-  import {
-    ratingBadges,
-    type DraftPresentation,
-    type RatingBadgeLabel,
-  } from '$lib/draft-presentation';
-  import {
-    SLOT_INDEXES,
-    SLOT_LABELS,
-    SLOT_NAMES,
-    canFillSlot,
-    displacementTargetFor,
-  } from '$lib/draft-slots';
-  import { formatPositions } from '$lib/player-positions';
-  import PlayerFace from '$lib/components/PlayerFace.svelte';
-
-  type IndexRow = PlayersIndexEntry;
-
-  const BADGE_TITLES: Record<RatingBadgeLabel, string> = {
+<script lang="ts">import type { HoopRushManifest, PlayersIndexEntry } from '@hoop-rush/data-contracts';
+import { ArrowRight, Check, Lock, Plus, X } from '@lucide/svelte';
+import { Dialog } from 'bits-ui';
+import { ratingBadges, type DraftPresentation, type RatingBadgeLabel, } from '$lib/draft-presentation';
+import { SLOT_INDEXES, SLOT_LABELS, SLOT_NAMES, canFillSlot, displacementTargetFor, } from '$lib/draft-slots';
+import { formatPositions } from '$lib/player-positions';
+import PlayerFace from '$lib/components/PlayerFace.svelte';
+type IndexRow = PlayersIndexEntry;
+const BADGE_TITLES: Record<RatingBadgeLabel, string> = {
     O: 'Overall',
-  };
-
-  let {
-    player,
-    slots,
-    manifest,
-    presentation,
-    allowDisplacement,
-    onplace,
-    onclose,
-  }: {
+};
+let { player, slots, manifest, presentation, allowDisplacement, onplace, onclose, }: {
     player: IndexRow | null;
     slots: (IndexRow | null)[];
     manifest: HoopRushManifest;
@@ -39,83 +17,80 @@
     allowDisplacement: boolean;
     onplace: (player: IndexRow, slotIndex: number) => void;
     onclose: () => void;
-  } = $props();
-
-  type PickerOption = {
+} = $props();
+type PickerOption = {
     index: number;
     incumbent: IndexRow | null;
     state: 'open' | 'self' | 'displace' | 'swap' | 'blocked' | 'cant-play';
     moveTarget: number | null;
     ariaLabel: string;
-  };
-
-  const pickerOptions = $derived.by((): PickerOption[] => {
+};
+const pickerOptions = $derived.by((): PickerOption[] => {
     const subject = player;
-    if (!subject) return [];
+    if (!subject)
+        return [];
     const subjectSlot = slots.findIndex((p) => p !== null && p.playerId === subject.playerId);
     return SLOT_INDEXES.map((i) => {
-      const incumbent = slots[i] ?? null;
-      const slotName = `${SLOT_NAMES[i]} slot ${i + 1}`;
-      if (!canFillSlot(subject, i)) {
+        const incumbent = slots[i] ?? null;
+        const slotName = `${SLOT_NAMES[i]} slot ${i + 1}`;
+        if (!canFillSlot(subject, i)) {
+            return {
+                index: i,
+                incumbent,
+                state: 'cant-play',
+                moveTarget: null,
+                ariaLabel: `${subject.displayName} cannot play ${slotName}`,
+            };
+        }
+        if (!incumbent) {
+            return {
+                index: i,
+                incumbent: null,
+                state: 'open',
+                moveTarget: null,
+                ariaLabel: `Place ${subject.displayName} at ${slotName}`,
+            };
+        }
+        if (incumbent.playerId === subject.playerId) {
+            return {
+                index: i,
+                incumbent,
+                state: 'self',
+                moveTarget: null,
+                ariaLabel: `${subject.displayName} already at ${slotName}`,
+            };
+        }
+        const target = displacementTargetFor(slots, incumbent, i, subjectSlot);
+        if (allowDisplacement && target !== null) {
+            return {
+                index: i,
+                incumbent,
+                state: 'displace',
+                moveTarget: target,
+                ariaLabel: `Place ${subject.displayName} at ${slotName}, moving ${incumbent.displayName} to ${SLOT_NAMES[target]} slot ${target + 1}`,
+            };
+        }
+        if (!allowDisplacement && subjectSlot !== -1 && canFillSlot(incumbent, subjectSlot)) {
+            return {
+                index: i,
+                incumbent,
+                state: 'swap',
+                moveTarget: null,
+                ariaLabel: `Swap ${subject.displayName} with ${incumbent.displayName} at ${slotName}`,
+            };
+        }
         return {
-          index: i,
-          incumbent,
-          state: 'cant-play',
-          moveTarget: null,
-          ariaLabel: `${subject.displayName} cannot play ${slotName}`,
+            index: i,
+            incumbent,
+            state: 'blocked',
+            moveTarget: null,
+            ariaLabel: `${slotName} occupied by ${incumbent.displayName}`,
         };
-      }
-      if (!incumbent) {
-        return {
-          index: i,
-          incumbent: null,
-          state: 'open',
-          moveTarget: null,
-          ariaLabel: `Place ${subject.displayName} at ${slotName}`,
-        };
-      }
-      if (incumbent.playerId === subject.playerId) {
-        return {
-          index: i,
-          incumbent,
-          state: 'self',
-          moveTarget: null,
-          ariaLabel: `${subject.displayName} already at ${slotName}`,
-        };
-      }
-      const target = displacementTargetFor(slots, incumbent, i, subjectSlot);
-      if (allowDisplacement && target !== null) {
-        return {
-          index: i,
-          incumbent,
-          state: 'displace',
-          moveTarget: target,
-          ariaLabel: `Place ${subject.displayName} at ${slotName}, moving ${incumbent.displayName} to ${SLOT_NAMES[target]} slot ${target + 1}`,
-        };
-      }
-
-      if (!allowDisplacement && subjectSlot !== -1 && canFillSlot(incumbent, subjectSlot)) {
-        return {
-          index: i,
-          incumbent,
-          state: 'swap',
-          moveTarget: null,
-          ariaLabel: `Swap ${subject.displayName} with ${incumbent.displayName} at ${slotName}`,
-        };
-      }
-      return {
-        index: i,
-        incumbent,
-        state: 'blocked',
-        moveTarget: null,
-        ariaLabel: `${slotName} occupied by ${incumbent.displayName}`,
-      };
     });
-  });
-
-  function placePlayer(subject: IndexRow, slotIndex: number) {
+});
+function placePlayer(subject: IndexRow, slotIndex: number) {
     onplace(subject, slotIndex);
-  }
+}
 </script>
 
 <Dialog.Root

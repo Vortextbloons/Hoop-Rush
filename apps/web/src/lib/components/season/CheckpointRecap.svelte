@@ -1,87 +1,45 @@
-<script lang="ts">
-  import type {
-    HoopRushManifest,
-    SeasonBlockRecap,
-    SeasonRecordMovement,
-    SeasonRosterEntry,
-  } from '@hoop-rush/data-contracts';
-  import { ordinal, recordLabel, streakLabel } from '$lib/season/season-presentation';
-  import {
-    eraIdentityOf,
-    franchiseIdentityOf,
-    type SeasonFaceRef,
-  } from '$lib/season/season-branding';
-  import {
-    deltaToPp,
-    MECHANISM_LABEL,
-    type BlockMechanismEvidenceRow,
-  } from '$lib/season/season-effects-view';
-  import type { AvailabilityStripRow } from '$lib/season/season-health-view';
-  import HealthStrip from './HealthStrip.svelte';
-  import SeasonPlayerFace from './SeasonPlayerFace.svelte';
-  import SeasonTeamLogo from './SeasonTeamLogo.svelte';
-
-  let {
-    recap,
-    humanRecord,
-    franchiseName,
-    playerName,
-    manifest = null,
-    faces = new Map(),
-    rosterByVersion = new Map(),
-    effectsEvidence = [],
-    healthRows = [],
-  }: {
+<script lang="ts">import type { HoopRushManifest, SeasonBlockRecap, SeasonRecordMovement, SeasonRosterEntry, } from '@hoop-rush/data-contracts';
+import { ordinal, recordLabel, streakLabel } from '$lib/season/season-presentation';
+import { eraIdentityOf, franchiseIdentityOf, type SeasonFaceRef, } from '$lib/season/season-branding';
+import { deltaToPp, MECHANISM_LABEL, type BlockMechanismEvidenceRow, } from '$lib/season/season-effects-view';
+import type { AvailabilityStripRow } from '$lib/season/season-health-view';
+import HealthStrip from './HealthStrip.svelte';
+import SeasonPlayerFace from './SeasonPlayerFace.svelte';
+import SeasonTeamLogo from './SeasonTeamLogo.svelte';
+let { recap, humanRecord, franchiseName, playerName, manifest = null, faces = new Map(), rosterByVersion = new Map(), effectsEvidence = [], healthRows = [], }: {
     recap: SeasonBlockRecap;
     humanRecord: SeasonRecordMovement | null;
     franchiseName: (franchiseId: string) => string;
     playerName: (playerVersionId: string) => string;
-
     manifest?: HoopRushManifest | null;
     faces?: ReadonlyMap<string, SeasonFaceRef>;
     rosterByVersion?: ReadonlyMap<string, SeasonRosterEntry>;
-
     effectsEvidence?: BlockMechanismEvidenceRow[];
-
     healthRows?: AvailabilityStripRow[];
-  } = $props();
-
-  const movementLabel = (movement: SeasonRecordMovement): string =>
-    `${movement.winsBefore}–${movement.lossesBefore} → ${movement.winsAfter}–${movement.lossesAfter} (${
-      movement.positionBefore !== movement.positionAfter
-        ? `${ordinal(movement.positionBefore)} → ${ordinal(movement.positionAfter)}`
-        : `${ordinal(movement.positionAfter)} in conference`
-    })`;
-
-  const injurySummary = $derived(
-    `${String(recap.injuryEvidence.injuries)} ${
-      recap.injuryEvidence.injuries === 1 ? 'injury' : 'injuries'
-    } across the league · ${String(recap.injuryEvidence.sameGameReturns)} same-game return${
-      recap.injuryEvidence.sameGameReturns === 1 ? '' : 's'
-    } · ${String(recap.injuryEvidence.returnedThisBlock)} returned · ${String(
-      recap.injuryEvidence.activeAtBlockEnd,
-    )} still out at block end.`,
-  );
-
-  const franchiseIdentity = (franchiseId: string) =>
-    manifest ? franchiseIdentityOf(manifest, franchiseId) : null;
-
-  function versionSource(playerVersionId: string): {
+} = $props();
+const movementLabel = (movement: SeasonRecordMovement): string => `${movement.winsBefore}–${movement.lossesBefore} → ${movement.winsAfter}–${movement.lossesAfter} (${movement.positionBefore !== movement.positionAfter
+    ? `${ordinal(movement.positionBefore)} → ${ordinal(movement.positionAfter)}`
+    : `${ordinal(movement.positionAfter)} in conference`})`;
+const injurySummary = $derived(`${String(recap.injuryEvidence.injuries)} ${recap.injuryEvidence.injuries === 1 ? 'injury' : 'injuries'} across the league · ${String(recap.injuryEvidence.sameGameReturns)} same-game return${recap.injuryEvidence.sameGameReturns === 1 ? '' : 's'} · ${String(recap.injuryEvidence.returnedThisBlock)} returned · ${String(recap.injuryEvidence.activeAtBlockEnd)} still out at block end.`);
+const franchiseIdentity = (franchiseId: string) => manifest ? franchiseIdentityOf(manifest, franchiseId) : null;
+function versionSource(playerVersionId: string): {
     teamExternalId: string;
     logoCandidates: readonly string[];
     seasonLabel: string;
-  } | null {
+} | null {
     const rosterEntry = rosterByVersion.get(playerVersionId);
-    if (rosterEntry === undefined || manifest === null) return null;
+    if (rosterEntry === undefined || manifest === null)
+        return null;
     const modern = franchiseIdentityOf(manifest, rosterEntry.franchiseId);
-    if (modern === null) return null;
+    if (modern === null)
+        return null;
     const era = eraIdentityOf(manifest, rosterEntry.franchiseId, rosterEntry.eraId);
     return {
-      teamExternalId: modern.teamExternalId,
-      logoCandidates: era.logoCandidates,
-      seasonLabel: era.displayLabel === null ? '' : ` · ${era.displayLabel}`,
+        teamExternalId: modern.teamExternalId,
+        logoCandidates: era.logoCandidates,
+        seasonLabel: era.displayLabel === null ? '' : ` · ${era.displayLabel}`,
     };
-  }
+}
 </script>
 
 <div class="flex flex-col gap-6">

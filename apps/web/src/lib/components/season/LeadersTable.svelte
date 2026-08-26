@@ -1,29 +1,10 @@
-<script lang="ts">
-  import type {
-    HoopRushManifest,
-    SeasonLeaderCategory,
-    SeasonLeaderEntry,
-    SeasonRosterEntry,
-  } from '@hoop-rush/data-contracts';
-  import { LEADER_CATEGORY_LABELS } from '$lib/season/season-presentation';
-  import {
-    eraIdentityOf,
-    franchiseIdentityOf,
-    type SeasonFaceRef,
-  } from '$lib/season/season-branding';
-  import SeasonPlayerFace from './SeasonPlayerFace.svelte';
-  import SeasonTeamLogo from './SeasonTeamLogo.svelte';
-  import { oneDecimal } from '$lib/format';
-
-  let {
-    category,
-    entries,
-    rosterByVersion,
-    faces,
-    manifest,
-    playerName,
-    franchiseAbbrev,
-  }: {
+<script lang="ts">import type { HoopRushManifest, SeasonLeaderCategory, SeasonLeaderEntry, SeasonRosterEntry, } from '@hoop-rush/data-contracts';
+import { LEADER_CATEGORY_LABELS } from '$lib/season/season-presentation';
+import { eraIdentityOf, franchiseIdentityOf, type SeasonFaceRef, } from '$lib/season/season-branding';
+import SeasonPlayerFace from './SeasonPlayerFace.svelte';
+import SeasonTeamLogo from './SeasonTeamLogo.svelte';
+import { oneDecimal } from '$lib/format';
+let { category, entries, rosterByVersion, faces, manifest, playerName, franchiseAbbrev, }: {
     category: SeasonLeaderCategory;
     entries: readonly SeasonLeaderEntry[];
     rosterByVersion: ReadonlyMap<string, SeasonRosterEntry>;
@@ -31,47 +12,42 @@
     manifest: HoopRushManifest;
     playerName: (playerVersionId: string) => string;
     franchiseAbbrev: (franchiseId: string) => string;
-  } = $props();
-
-  const first = $derived(entries[0] ?? null);
-
-  const valueText = (value: number): string =>
-    Number.isInteger(value) ? String(value) : oneDecimal(value);
-
-  function versionSource(entry: SeasonLeaderEntry): {
+} = $props();
+const first = $derived(entries[0] ?? null);
+const valueText = (value: number): string => Number.isInteger(value) ? String(value) : oneDecimal(value);
+function versionSource(entry: SeasonLeaderEntry): {
     teamExternalId: string;
     logoCandidates: readonly string[];
     seasonKey: string;
     seasonLabel: string;
-  } | null {
+} | null {
     const rosterEntry = rosterByVersion.get(entry.playerVersionId);
-    if (rosterEntry === undefined || manifest === null) return null;
+    if (rosterEntry === undefined || manifest === null)
+        return null;
     const modern = franchiseIdentityOf(manifest, rosterEntry.franchiseId);
-    if (modern === null) return null;
+    if (modern === null)
+        return null;
     const era = eraIdentityOf(manifest, rosterEntry.franchiseId, rosterEntry.eraId);
     return {
-      teamExternalId: modern.teamExternalId,
-      logoCandidates: era.logoCandidates,
-      seasonKey: rosterEntry.seasonKey,
-      seasonLabel: era.displayLabel === null ? '' : ` · ${era.displayLabel}`,
+        teamExternalId: modern.teamExternalId,
+        logoCandidates: era.logoCandidates,
+        seasonKey: rosterEntry.seasonKey,
+        seasonLabel: era.displayLabel === null ? '' : ` · ${era.displayLabel}`,
     };
-  }
-
-  const sourceByVersion = $derived.by(() => {
+}
+const sourceByVersion = $derived.by(() => {
     const map = new Map<string, ReturnType<typeof versionSource>>();
-    for (const entry of entries) map.set(entry.playerVersionId, versionSource(entry));
+    for (const entry of entries)
+        map.set(entry.playerVersionId, versionSource(entry));
     return map;
-  });
-  const firstSource = $derived(
-    first !== null ? (sourceByVersion.get(first.playerVersionId) ?? null) : null,
-  );
-
-  function sourceMeta(entry: SeasonLeaderEntry): string {
+});
+const firstSource = $derived(first !== null ? (sourceByVersion.get(first.playerVersionId) ?? null) : null);
+function sourceMeta(entry: SeasonLeaderEntry): string {
     const source = sourceByVersion.get(entry.playerVersionId) ?? null;
     if (source === null)
-      return `${franchiseAbbrev(entry.franchiseId)} · ${String(entry.gamesPlayed)} gp`;
+        return `${franchiseAbbrev(entry.franchiseId)} · ${String(entry.gamesPlayed)} gp`;
     return `${franchiseAbbrev(entry.franchiseId)} · ${source.seasonKey} · ${String(entry.gamesPlayed)} gp${source.seasonLabel}`;
-  }
+}
 </script>
 
 <section

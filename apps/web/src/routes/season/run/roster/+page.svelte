@@ -1,10 +1,8 @@
-<script lang="ts">
-  import { goto } from '$app/navigation';
-  import { resolve } from '$app/paths';
-
-  if (!import.meta.env.SSR) {
+<script lang="ts">import { goto } from '$app/navigation';
+import { resolve } from '$app/paths';
+if (!import.meta.env.SSR) {
     void goto(resolve('/season/run/team'));
-  }
+}
 </script>
 
 <p class="p-6 font-mono text-sm text-muted-foreground">

@@ -1,106 +1,64 @@
-<script lang="ts">
-  import { Check, Minus, Plus } from '@lucide/svelte';
-  import type {
-    HoopRushManifest,
-    SeasonFreeAgencyCandidate,
-    SeasonFreeAgencyRoleExpectation,
-  } from '@hoop-rush/data-contracts';
-  import { formatPositions } from '$lib/player-positions';
-  import type { SeasonFaceRef } from '$lib/season/season-branding';
-  import { initialsOf } from '$lib/season/season-branding';
-  import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
-  import type { CandidateFitFacts, InterestedTeam } from './free-agency-view';
-  import {
-    FREE_AGENCY_BAND_BLURB,
-    FREE_AGENCY_BAND_LABEL,
-    ROLE_EXPECTATION_LABEL,
-  } from './free-agency-view';
-
-  const MAX_STRENGTHS = 4;
-  const MAX_LIMITATIONS = 3;
-
-  let {
-    candidate,
-    fit = null,
-    isBestFit = false,
-    interested = [],
-    franchiseName,
-    face = null,
-    overallRating = null,
-    manifest = null,
-    priority = 0,
-    role = null,
-    influence = null,
-    editable = false,
-    disabled = false,
-    canAddTarget = true,
-    onToggleTarget,
-    onPriorityChange,
-    onRoleChange,
-    onInfluenceChange,
-  }: {
+<script lang="ts">import { Check, Minus, Plus } from '@lucide/svelte';
+import type { HoopRushManifest, SeasonFreeAgencyCandidate, SeasonFreeAgencyRoleExpectation, } from '@hoop-rush/data-contracts';
+import { formatPositions } from '$lib/player-positions';
+import type { SeasonFaceRef } from '$lib/season/season-branding';
+import { initialsOf } from '$lib/season/season-branding';
+import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
+import type { CandidateFitFacts, InterestedTeam } from './free-agency-view';
+import { FREE_AGENCY_BAND_BLURB, FREE_AGENCY_BAND_LABEL, ROLE_EXPECTATION_LABEL, } from './free-agency-view';
+const MAX_STRENGTHS = 4;
+const MAX_LIMITATIONS = 3;
+let { candidate, fit = null, isBestFit = false, interested = [], franchiseName, face = null, overallRating = null, manifest = null, priority = 0, role = null, influence = null, editable = false, disabled = false, canAddTarget = true, onToggleTarget, onPriorityChange, onRoleChange, onInfluenceChange, }: {
     candidate: SeasonFreeAgencyCandidate;
-
     fit?: CandidateFitFacts | null;
-
     isBestFit?: boolean;
-
     interested?: InterestedTeam[];
     franchiseName: (franchiseId: string) => string;
     face?: SeasonFaceRef | null;
     overallRating?: number | null;
     manifest?: HoopRushManifest | null;
-
     priority?: 0 | 1 | 2;
     role?: SeasonFreeAgencyRoleExpectation | null;
     influence?: number | null;
-
     editable?: boolean;
     disabled?: boolean;
-
     canAddTarget?: boolean;
     onToggleTarget: () => void;
     onPriorityChange: (priority: 0 | 1 | 2) => void;
     onRoleChange: (role: SeasonFreeAgencyRoleExpectation) => void;
     onInfluenceChange: (influence: number) => void;
-  } = $props();
-
-  const selected = $derived(priority !== 0);
-  const effectiveInfluence = $derived(influence ?? candidate.minimumInfluence);
-  const displayFace = $derived<SeasonFaceRef>(
-    face ?? {
-      playerId: candidate.playerId,
-      playerExternalId: '',
-      altIds: null,
-      initials: initialsOf(candidate.displayName),
-    },
-  );
-
-  let influenceDraft: string | null = $state(null);
-
-  function onInputValue(raw: string) {
+} = $props();
+const selected = $derived(priority !== 0);
+const effectiveInfluence = $derived(influence ?? candidate.minimumInfluence);
+const displayFace = $derived<SeasonFaceRef>(face ?? {
+    playerId: candidate.playerId,
+    playerExternalId: '',
+    altIds: null,
+    initials: initialsOf(candidate.displayName),
+});
+let influenceDraft: string | null = $state(null);
+function onInputValue(raw: string) {
     influenceDraft = raw;
     const parsed = Number(raw);
     if (raw.trim() !== '' && !Number.isNaN(parsed)) {
-      onInfluenceChange(Math.max(candidate.minimumInfluence, Math.min(3, Math.round(parsed))));
+        onInfluenceChange(Math.max(candidate.minimumInfluence, Math.min(3, Math.round(parsed))));
     }
-  }
-
-  function commitInfluence() {
+}
+function commitInfluence() {
     const raw = influenceDraft ?? String(effectiveInfluence);
     const parsed = Number(raw);
     influenceDraft = null;
     if (!Number.isNaN(parsed)) {
-      onInfluenceChange(Math.max(candidate.minimumInfluence, Math.min(3, Math.round(parsed))));
+        onInfluenceChange(Math.max(candidate.minimumInfluence, Math.min(3, Math.round(parsed))));
     }
-  }
-
-  function stepInfluence(delta: number) {
-    if (!editable || disabled || !selected) return;
+}
+function stepInfluence(delta: number) {
+    if (!editable || disabled || !selected)
+        return;
     influenceDraft = null;
     const next = Math.max(candidate.minimumInfluence, Math.min(3, effectiveInfluence + delta));
     onInfluenceChange(next);
-  }
+}
 </script>
 
 <article

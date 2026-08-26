@@ -1,50 +1,27 @@
-<script lang="ts">
-  import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-  import type { BoxScore } from '$lib/season/season-presentation';
-  import { formatClock } from '$lib/season/season-presentation';
-  import { franchiseIdentityOf } from '$lib/season/season-branding';
-  import SeasonTeamLogo from './SeasonTeamLogo.svelte';
-
-  let {
-    box,
-    opponentName,
-    resultLabel,
-    manifest = null,
-    teamFranchiseId = null,
-    opponentFranchiseId = null,
-  }: {
+<script lang="ts">import type { HoopRushManifest } from '@hoop-rush/data-contracts';
+import type { BoxScore } from '$lib/season/season-presentation';
+import { formatClock } from '$lib/season/season-presentation';
+import { franchiseIdentityOf } from '$lib/season/season-branding';
+import SeasonTeamLogo from './SeasonTeamLogo.svelte';
+let { box, opponentName, resultLabel, manifest = null, teamFranchiseId = null, opponentFranchiseId = null, }: {
     box: BoxScore;
     opponentName: string;
     resultLabel: string;
-
     manifest?: HoopRushManifest | null;
-
     teamFranchiseId?: string | null;
-
     opponentFranchiseId?: string | null;
-  } = $props();
-
-  const teamTotal = $derived(
-    box.players.reduce(
-      (acc, p) => {
-        acc.rebounds += p.offensiveRebounds + p.defensiveRebounds;
-        acc.assists += p.assists;
-        acc.turnovers += p.turnovers;
-        acc.steals += p.steals;
-        acc.blocks += p.blocks;
-        acc.fouls += p.fouls;
-        return acc;
-      },
-      { rebounds: 0, assists: 0, turnovers: 0, steals: 0, blocks: 0, fouls: 0 },
-    ),
-  );
-
-  const teamIdentity = $derived(
-    manifest && teamFranchiseId ? franchiseIdentityOf(manifest, teamFranchiseId) : null,
-  );
-  const opponentIdentity = $derived(
-    manifest && opponentFranchiseId ? franchiseIdentityOf(manifest, opponentFranchiseId) : null,
-  );
+} = $props();
+const teamTotal = $derived(box.players.reduce((acc, p) => {
+    acc.rebounds += p.offensiveRebounds + p.defensiveRebounds;
+    acc.assists += p.assists;
+    acc.turnovers += p.turnovers;
+    acc.steals += p.steals;
+    acc.blocks += p.blocks;
+    acc.fouls += p.fouls;
+    return acc;
+}, { rebounds: 0, assists: 0, turnovers: 0, steals: 0, blocks: 0, fouls: 0 }));
+const teamIdentity = $derived(manifest && teamFranchiseId ? franchiseIdentityOf(manifest, teamFranchiseId) : null);
+const opponentIdentity = $derived(manifest && opponentFranchiseId ? franchiseIdentityOf(manifest, opponentFranchiseId) : null);
 </script>
 
 <div class="rounded-xl bg-surface-1" data-season-box-score>

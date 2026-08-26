@@ -2,49 +2,28 @@ import { z } from 'zod';
 import { seedSchema } from './ids.ts';
 import { seasonDigestHex } from './season-hash.ts';
 import { SEASON_SEED_DERIVATION_VERSION } from './season-versions.ts';
-
 export const SEASON_SEED_NAMESPACES = {
-  draft: 'draft',
-
-  aiRosters: 'ai-rosters',
-
-  scheduleGames: 'schedule-games',
-
-  injuries: 'injuries',
-
-  trades: 'trades',
-
-  objectives: 'objectives',
-
-  upgrades: 'upgrades',
-
-  postseasonTies: 'postseason-ties',
-
-  playInGames: 'postseason-play-in',
-
-  playoffGames: 'postseason-playoff-games',
-
-  aiPostseasonRotations: 'postseason-ai-rotations',
-
-  postseasonInjuries: 'postseason-injuries',
-
-  postseasonDraws: 'postseason-draws',
-
-  freeAgency: 'free-agency',
+    draft: 'draft',
+    aiRosters: 'ai-rosters',
+    scheduleGames: 'schedule-games',
+    injuries: 'injuries',
+    trades: 'trades',
+    objectives: 'objectives',
+    upgrades: 'upgrades',
+    postseasonTies: 'postseason-ties',
+    playInGames: 'postseason-play-in',
+    playoffGames: 'postseason-playoff-games',
+    aiPostseasonRotations: 'postseason-ai-rotations',
+    postseasonInjuries: 'postseason-injuries',
+    postseasonDraws: 'postseason-draws',
+    freeAgency: 'free-agency',
 } as const;
 export type SeasonSeedNamespace = keyof typeof SEASON_SEED_NAMESPACES;
-
-export function seasonNamespaceSeed(
-  rootSeed: z.infer<typeof seedSchema>,
-  namespace: string,
-  ...keys: string[]
-): z.infer<typeof seedSchema> {
-  return seasonDigestHex(
-    [
-      SEASON_SEED_DERIVATION_VERSION,
-      rootSeed,
-      namespace,
-      ...keys.map((key) => key.replaceAll('\u0000', '')),
-    ].join('\u0000'),
-  );
+export function seasonNamespaceSeed(rootSeed: z.infer<typeof seedSchema>, namespace: string, ...keys: string[]): z.infer<typeof seedSchema> {
+    return seasonDigestHex([
+        SEASON_SEED_DERIVATION_VERSION,
+        rootSeed,
+        namespace,
+        ...keys.map((key) => key.replaceAll('\u0000', '')),
+    ].join('\u0000'));
 }

@@ -1,39 +1,9 @@
-<script lang="ts">
-  import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-  import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
-  import {
-    formatDecimal,
-    formatPct,
-    formatPerGame,
-    perGame,
-    type RosterColumn,
-    type RosterDetailRow,
-    type RosterListItem,
-    type RosterSortDirection,
-    type RosterSortId,
-  } from '$lib/roster-browser';
-  import { formatPositions } from '$lib/player-positions';
-  import PlayerFace from './PlayerFace.svelte';
-
-  let {
-    items,
-    columns,
-    sortId,
-    sortDir,
-    eraLabel,
-    manifest,
-    heading,
-    hasMore,
-    visiblePlayers,
-    filteredCount,
-    onSort,
-    onOpen,
-    isCompared,
-    onToggleCompare,
-    compareFull,
-    onShowMore,
-    moreLabel = 'Show more',
-  }: {
+<script lang="ts">import type { HoopRushManifest } from '@hoop-rush/data-contracts';
+import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
+import { formatDecimal, formatPct, formatPerGame, perGame, type RosterColumn, type RosterDetailRow, type RosterListItem, type RosterSortDirection, type RosterSortId, } from '$lib/roster-browser';
+import { formatPositions } from '$lib/player-positions';
+import PlayerFace from './PlayerFace.svelte';
+let { items, columns, sortId, sortDir, eraLabel, manifest, heading, hasMore, visiblePlayers, filteredCount, onSort, onOpen, isCompared, onToggleCompare, compareFull, onShowMore, moreLabel = 'Show more', }: {
     items: RosterListItem[];
     columns: RosterColumn[];
     sortId: RosterSortId;
@@ -51,78 +21,69 @@
     compareFull: boolean;
     onShowMore: () => void;
     moreLabel?: string;
-  } = $props();
-
-  const sortArrow = $derived(sortId === 'none' ? '' : sortDir === 'asc' ? '↑' : '↓');
-
-  const dataColumns = $derived(columns.filter((c) => c.key !== 'player'));
-
-  let desktopViewport = $state<boolean | null>(null);
-  $effect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+} = $props();
+const sortArrow = $derived(sortId === 'none' ? '' : sortDir === 'asc' ? '↑' : '↓');
+const dataColumns = $derived(columns.filter((c) => c.key !== 'player'));
+let desktopViewport = $state<boolean | null>(null);
+$effect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function')
+        return;
     const media = window.matchMedia('(min-width: 640px)');
     const update = () => {
-      desktopViewport = media.matches;
+        desktopViewport = media.matches;
     };
     update();
     media.addEventListener('change', update);
     return () => media.removeEventListener('change', update);
-  });
-
-  const groupKey = (item: RosterListItem): string =>
-    item.type === 'group'
-      ? `group:${item.franchiseId}/${item.eraId}`
-      : `row:${item.player.franchiseId}/${item.player.eraId}/${item.player.playerId}`;
-
-  function groupLabel(franchiseId: string, eraId: string): string {
+});
+const groupKey = (item: RosterListItem): string => item.type === 'group'
+    ? `group:${item.franchiseId}/${item.eraId}`
+    : `row:${item.player.franchiseId}/${item.player.eraId}/${item.player.playerId}`;
+function groupLabel(franchiseId: string, eraId: string): string {
     const identity = resolveEraTeamIdentity(manifest, franchiseId, eraId);
     return identity.displayLabel ?? franchiseAbbreviation(franchiseId);
-  }
-
-  function teamLabelFor(player: RosterDetailRow): string {
+}
+function teamLabelFor(player: RosterDetailRow): string {
     const identity = resolveEraTeamIdentity(manifest, player.franchiseId, player.eraId);
     return identity.abbreviationLabel ?? franchiseAbbreviation(player.franchiseId);
-  }
-
-  function compareLabel(player: RosterDetailRow): string {
+}
+function compareLabel(player: RosterDetailRow): string {
     const added = isCompared(player);
     const suffix = !added && compareFull ? ' (comparison full)' : '';
     return `${added ? 'Remove' : 'Add'} ${player.displayName} to comparison${suffix}`;
-  }
-
-  function hideClass(hideBelow?: 'md' | 'lg'): string {
-    if (!hideBelow) return '';
-    return hideBelow === 'md' ? 'hidden md:table-cell' : 'hidden lg:table-cell';
-  }
-
-  function cellValue(player: RosterDetailRow, key: string): string {
-    switch (key) {
-      case 'pos':
-        return formatPositions(player.positionsPlayable);
-      case 'decade':
-        return eraLabel.get(player.eraId) ?? player.eraId;
-      case 'season':
-        return player.seasonKey;
-      case 'overall':
-        return String(player.overall);
-      case 'points':
-        return formatPerGame(perGame(player.stats, 'points'));
-      case 'rebounds':
-        return formatPerGame(perGame(player.stats, 'rebounds'));
-      case 'assists':
-        return formatPerGame(perGame(player.stats, 'assists'));
-      case 'ts':
-        return formatPct(player.stats.tsPct ?? 0);
-      case 'per':
-        return formatDecimal(player.stats.per ?? 0);
-      default:
+}
+function hideClass(hideBelow?: 'md' | 'lg'): string {
+    if (!hideBelow)
         return '';
+    return hideBelow === 'md' ? 'hidden md:table-cell' : 'hidden lg:table-cell';
+}
+function cellValue(player: RosterDetailRow, key: string): string {
+    switch (key) {
+        case 'pos':
+            return formatPositions(player.positionsPlayable);
+        case 'decade':
+            return eraLabel.get(player.eraId) ?? player.eraId;
+        case 'season':
+            return player.seasonKey;
+        case 'overall':
+            return String(player.overall);
+        case 'points':
+            return formatPerGame(perGame(player.stats, 'points'));
+        case 'rebounds':
+            return formatPerGame(perGame(player.stats, 'rebounds'));
+        case 'assists':
+            return formatPerGame(perGame(player.stats, 'assists'));
+        case 'ts':
+            return formatPct(player.stats.tsPct ?? 0);
+        case 'per':
+            return formatDecimal(player.stats.per ?? 0);
+        default:
+            return '';
     }
-  }
-
-  function rowActionTarget(target: EventTarget | null): boolean {
+}
+function rowActionTarget(target: EventTarget | null): boolean {
     return target instanceof HTMLElement && target.closest('input,button,label,a') !== null;
-  }
+}
 </script>
 
 {#if desktopViewport !== false}

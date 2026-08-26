@@ -1,36 +1,23 @@
-<script lang="ts">
-  import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-  import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
-  import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
-  import { eraIdentityOf, franchiseIdentityOf } from '$lib/season/season-branding';
-  import type { SeasonRunShellData } from '$lib/season/season-shell-context';
-  import { formatPositions } from '$lib/player-positions';
-  import { oneDecimal } from '$lib/format';
-  import type {
-    SeasonTeamDetail,
-    SeasonTeamPlayerRow,
-    SeasonTeamPlayerStats,
-  } from '$lib/season/season-team-detail-view';
-
-  let {
-    detail,
-    manifest,
-    shell,
-    isHuman = false,
-  }: {
+<script lang="ts">import type { HoopRushManifest } from '@hoop-rush/data-contracts';
+import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
+import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
+import { eraIdentityOf, franchiseIdentityOf } from '$lib/season/season-branding';
+import type { SeasonRunShellData } from '$lib/season/season-shell-context';
+import { formatPositions } from '$lib/player-positions';
+import { oneDecimal } from '$lib/format';
+import type { SeasonTeamDetail, SeasonTeamPlayerRow, SeasonTeamPlayerStats, } from '$lib/season/season-team-detail-view';
+let { detail, manifest, shell, isHuman = false, }: {
     detail: SeasonTeamDetail;
     manifest: HoopRushManifest;
     shell: SeasonRunShellData;
     isHuman?: boolean;
-  } = $props();
-
-  const modernIdentity = $derived(franchiseIdentityOf(manifest, detail.franchiseId));
-  const teamExternalId = $derived(modernIdentity?.teamExternalId ?? '');
-
-  const statCells: ReadonlyArray<{
+} = $props();
+const modernIdentity = $derived(franchiseIdentityOf(manifest, detail.franchiseId));
+const teamExternalId = $derived(modernIdentity?.teamExternalId ?? '');
+const statCells: ReadonlyArray<{
     key: keyof Omit<SeasonTeamPlayerStats, 'gamesPlayed'>;
     label: string;
-  }> = [
+}> = [
     { key: 'minutesPerGame', label: 'MPG' },
     { key: 'pointsPerGame', label: 'PPG' },
     { key: 'reboundsPerGame', label: 'RPG' },
@@ -38,26 +25,22 @@
     { key: 'stealsPerGame', label: 'SPG' },
     { key: 'blocksPerGame', label: 'BPG' },
     { key: 'turnoversPerGame', label: 'TOPG' },
-  ];
-
-  function faceOf(playerVersionId: string) {
+];
+function faceOf(playerVersionId: string) {
     return shell.facesByVersion.get(playerVersionId) ?? null;
-  }
-
-  function eraLabelOf(playerVersionId: string, franchiseId: string, eraId: string) {
+}
+function eraLabelOf(playerVersionId: string, franchiseId: string, eraId: string) {
     return eraIdentityOf(manifest, franchiseId, eraId).displayLabel;
-  }
-
-  function statValue(
-    row: SeasonTeamPlayerRow,
-    key: keyof Omit<SeasonTeamPlayerStats, 'gamesPlayed'>,
-  ): string {
+}
+function statValue(row: SeasonTeamPlayerRow, key: keyof Omit<SeasonTeamPlayerStats, 'gamesPlayed'>): string {
     const stats = row.stats;
-    if (stats === null) return '—';
+    if (stats === null)
+        return '—';
     const value = stats[key];
-    if (typeof value !== 'number') return '—';
+    if (typeof value !== 'number')
+        return '—';
     return oneDecimal(value);
-  }
+}
 </script>
 
 <section aria-labelledby="team-detail-heading" class="min-w-0" data-season-team-detail>

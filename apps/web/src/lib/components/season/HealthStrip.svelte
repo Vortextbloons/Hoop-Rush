@@ -1,21 +1,11 @@
-<script lang="ts">
-  import type { AvailabilityStripRow } from '$lib/season/season-health-view';
-
-  let {
-    rows,
-    title = 'Health',
-  }: {
+<script lang="ts">import type { AvailabilityStripRow } from '$lib/season/season-health-view';
+let { rows, title = 'Health', }: {
     rows: AvailabilityStripRow[];
     title?: string;
-  } = $props();
-
-  const outCount = $derived(rows.filter((row) => row.status === 'active').length);
-  const returnedCount = $derived(rows.filter((row) => row.status === 'returned').length);
-  const summary = $derived(
-    `${String(outCount)} player${outCount === 1 ? '' : 's'} out, ${String(
-      returnedCount,
-    )} returning from injury`,
-  );
+} = $props();
+const outCount = $derived(rows.filter((row) => row.status === 'active').length);
+const returnedCount = $derived(rows.filter((row) => row.status === 'returned').length);
+const summary = $derived(`${String(outCount)} player${outCount === 1 ? '' : 's'} out, ${String(returnedCount)} returning from injury`);
 </script>
 
 <section aria-labelledby="health-strip-heading" class="rounded-none bg-surface-1 p-4 sm:rounded-xl">

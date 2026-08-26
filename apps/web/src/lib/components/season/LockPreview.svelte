@@ -1,17 +1,9 @@
-<script lang="ts">
-  import type { LockPreview } from '$lib/season/season-lock-preview';
-
-  let {
-    preview,
-    franchiseName,
-  }: {
+<script lang="ts">import type { LockPreview } from '$lib/season/season-lock-preview';
+let { preview, franchiseName, }: {
     preview: LockPreview;
     franchiseName: (franchiseId: string) => string;
-  } = $props();
-
-  const gamesLabel = $derived(
-    preview.gamesToLock === 1 ? 'the next game' : `the next ${String(preview.gamesToLock)} games`,
-  );
+} = $props();
+const gamesLabel = $derived(preview.gamesToLock === 1 ? 'the next game' : `the next ${String(preview.gamesToLock)} games`);
 </script>
 
 <section
