@@ -1,6 +1,8 @@
 import type { SeasonRotation } from '@hoop-rush/data-contracts';
 import type { HumanRosterBuildResult, MinutePlanOptimizationResult, SearchLens, } from '@hoop-rush/engine';
+export const PROJECTION_WORKER_WIRE_SCHEMA_VERSION = 1 as const;
 export interface ProjectionRosterBuildRequest {
+    schemaVersion: typeof PROJECTION_WORKER_WIRE_SCHEMA_VERSION;
     type: 'build-roster';
     requestId: string;
     catalogUrl: string;
@@ -22,6 +24,7 @@ export interface ProjectionRotationLoadRow {
     recentLoadBasisPoints: number;
 }
 export interface ProjectionRotationOptimizeRequest {
+    schemaVersion: typeof PROJECTION_WORKER_WIRE_SCHEMA_VERSION;
     type: 'optimize-rotation';
     requestId: string;
     catalogUrl: string;

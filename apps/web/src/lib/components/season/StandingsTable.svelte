@@ -46,7 +46,7 @@ const diffText = (pointsFor: number, pointsAgainst: number): string => {
     return `${diff > 0 ? '+' : ''}${String(diff)}`;
 };
 const identityOf = (franchiseId: string) => manifest ? franchiseIdentityOf(manifest, franchiseId) : null;
-let desktopViewport = $state<boolean | null>(null);
+let desktopViewport = $state<boolean>(typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia('(min-width: 768px)').matches : true);
 $effect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function')
         return;

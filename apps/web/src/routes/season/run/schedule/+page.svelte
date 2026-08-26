@@ -34,7 +34,7 @@ function loadBoxScore(): Promise<typeof import('$lib/components/season/BoxScore.
     boxScoreModule ??= import('$lib/components/season/BoxScore.svelte');
     return boxScoreModule;
 }
-let desktopViewport = $state<boolean | null>(null);
+let desktopViewport = $state<boolean>(typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia('(min-width: 768px)').matches : true);
 $effect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function')
         return;

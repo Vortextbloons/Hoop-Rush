@@ -360,7 +360,8 @@ class SeasonGameController {
         }
         return null;
     }
-    private applyDueRemovals(period: number, floatClock: number, boundaryClock: number, periodEnded: boolean, allowPregame: boolean = false): void {
+    private applyDueRemovals(period: number, floatClock: number, boundaryClock: number, periodEnded: boolean, _allowPregame: boolean = false): void {
+        void _allowPregame;
         for (let index = 0; index < this.removalQueue.length;) {
             const removal = this.removalQueue[index];
             if (removal === undefined)
@@ -370,10 +371,6 @@ class SeasonGameController {
                 continue;
             }
             const side = removal.side === 'home' ? this.home : this.away;
-            if (!allowPregame && !side.unit.includes(removal.playerVersionId)) {
-                index += 1;
-                continue;
-            }
             this.removalQueue.splice(index, 1);
             side.removed.add(removal.playerVersionId);
             side.unavailable.add(removal.playerVersionId);

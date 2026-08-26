@@ -5,7 +5,7 @@ import { recordFromState, type SeasonDraftRepository } from '@hoop-rush/persiste
 import { newSeasonId } from './season-ids';
 import { runOneShotWorker } from '$lib/one-shot-worker';
 import { sleep } from '$lib/sleep';
-import type { GenerationWorkerRequest, GenerationWorkerResponse, } from './season-generation-wire.ts';
+import { GENERATION_WORKER_WIRE_SCHEMA_VERSION, type GenerationWorkerRequest, type GenerationWorkerResponse, } from './season-generation-wire.ts';
 export const SOLO_PARTICIPANT_ID = 'human';
 export const COVERAGE_TARGETS = { guards: 4, forwards: 4, centers: 3 } as const;
 export type SeasonDraftFlowPhase = 'idle' | 'drafting' | 'finalized' | 'generating' | 'complete';
@@ -185,6 +185,7 @@ export class SeasonDraftFlow {
             throw new Error('worker generation requires roster targets');
         }
         const request: GenerationWorkerRequest = {
+            schemaVersion: GENERATION_WORKER_WIRE_SCHEMA_VERSION,
             type: 'generate',
             requestId: newSeasonId('gen'),
             input,

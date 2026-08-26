@@ -119,6 +119,9 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     let workerSummaryRunId: string | null = null;
     let workerSummaryCount = 0;
     let workerRosterKey: string | null = null;
+    function rosterKeyOf(rosters: SeasonRun['rosters']): string {
+        return rosters.map((roster) => `${roster.franchiseId}:${roster.players.map((player) => player.playerVersionId).join(',')}`).join('|');
+    }
     const repositoryPromise = deps.repository !== undefined ? Promise.resolve(deps.repository) : null;
     const schedulePromise = deps.schedule !== undefined ? Promise.resolve(deps.schedule) : null;
     function resolveSchedule(): Promise<SeasonSchedule> {
@@ -386,7 +389,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
             runState.stateDigest = committed.stateDigest;
             workerSummaryRunId = checkpoint.runId;
             workerSummaryCount = runState.summaries.length;
-            workerRosterKey = JSON.stringify(state.input.run.rosters);
+            workerRosterKey = rosterKeyOf(state.input.run.rosters);
             const snapshot = assembleCommittedSnapshot({
                 run: state.input.run,
                 rotations: state.rotations,
@@ -485,7 +488,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     }
     function buildRequest(requestId: string, state: NonNullable<typeof current>, schedule: SeasonSchedule, artifacts: SeasonArtifactUrls): SeasonWorkerStartRequest | SeasonWorkerContinueRequest {
         const summaries = runState?.runId === state.input.run.runId ? runState.summaries : [];
-        const rosterKey = JSON.stringify(state.input.run.rosters);
+        const rosterKey = rosterKeyOf(state.input.run.rosters);
         const workerContextMatches = workerSummaryRunId === state.input.run.runId && workerRosterKey === rosterKey;
         let priorSummaries: SeasonGameSummary[] | undefined;
         let newSummaries: SeasonGameSummary[] | undefined;
@@ -500,7 +503,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         }
         else if (workerContextMatches && workerSummaryCount <= summaries.length) {
             const delta = summaries.slice(workerSummaryCount);
-            if (delta.length <= 150) {
+            if (delta.length <= 600) {
                 newSummaries = delta;
             }
             else {
@@ -537,9 +540,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
                     : {}),
             startGameId: state.resumePending?.nextGameId ?? null,
             objectiveId: state.input.objectiveId,
-            campaignOpportunityId: (state.input as unknown as {
-                campaignOpportunityId?: string | null;
-            }).campaignOpportunityId ?? null,
+            campaignOpportunityId: state.input.campaignOpportunityId ?? null,
             priorInfluence: cloneForWorker(state.input.run.influence),
             priorTransactions: cloneForWorker(state.input.run.transactions),
             expectedStateRevision: state.input.run.stateRevision,

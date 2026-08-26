@@ -1,5 +1,5 @@
 import { buildHumanSeasonRoster, optimizeSeasonRotation } from '@hoop-rush/engine';
-import { loadEraSimulationProfile, loadProjectionModelArtifact, loadSeasonDraftCatalog, type SeasonDraftCandidate, type SimulationPlayer, } from '@hoop-rush/data-contracts';
+import { loadEraSimulationProfile, loadProjectionModelArtifact, loadSeasonDraftCatalog, projectionWorkerRequestSchema, type SeasonDraftCandidate, type SimulationPlayer, } from '@hoop-rush/data-contracts';
 import type { ProjectionRotationOptimizeRequest, ProjectionRosterBuildRequest, ProjectionWorkerRequest, ProjectionWorkerResponse, } from '../lib/season/season-projection-wire.ts';
 function candidateToSimulationPlayer(candidate: SeasonDraftCandidate): SimulationPlayer {
     return {
@@ -57,12 +57,12 @@ async function loadAssets(request: {
 function errorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
 }
-const SUPPORTED_REQUEST_TYPES = new Set(['build-roster', 'optimize-rotation'] as const);
-self.addEventListener('message', (event: MessageEvent<ProjectionWorkerRequest>) => {
-    const request = event.data as ProjectionWorkerRequest | null;
-    if (request === null || !SUPPORTED_REQUEST_TYPES.has(request.type)) {
+self.addEventListener('message', (event: MessageEvent<unknown>) => {
+    const parsed = projectionWorkerRequestSchema.safeParse(event.data);
+    if (!parsed.success) {
         return;
     }
+    const request = parsed.data;
     const respond = (response: ProjectionWorkerResponse): void => {
         self.postMessage(response);
     };

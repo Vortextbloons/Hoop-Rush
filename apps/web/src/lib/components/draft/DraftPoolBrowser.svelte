@@ -103,7 +103,7 @@ function poolCardInfoFor(player: IndexRow): PoolCardInfo {
         ? { state: 'displace', displace }
         : { state: 'blocked', displace: null };
 }
-const poolCardInfo = $derived.by((): ReadonlyMap<string, PoolCardInfo> => new Map(rows.map((player) => [player.playerId, poolCardInfoFor(player)])));
+const poolCardInfo = $derived.by((): ReadonlyMap<string, PoolCardInfo> => new Map(visibleRows.map((player) => [player.playerId, poolCardInfoFor(player)])));
 </script>
 
 <div class="rounded-none bg-surface-1 sm:rounded-xl">

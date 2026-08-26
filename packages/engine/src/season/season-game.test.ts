@@ -305,7 +305,7 @@ describe('season game controller (M2.2)', () => {
         expect(earlyEvent?.secondsRemaining).toBeLessThanOrEqual(600);
         expect(lateEvent?.secondsRemaining).toBeLessThanOrEqual(120);
     });
-    it('defers a bench injury until the player has actual court exposure', () => {
+    it('applies bench injury immediately and prevents court exposure', () => {
         const away = buildSeasonTeam('away');
         const benchPlayer = away.players[9];
         if (benchPlayer === undefined)
@@ -327,9 +327,10 @@ describe('season game controller (M2.2)', () => {
             throw new Error('expected a completed game');
         const event = result.removals.find((removal) => removal.playerVersionId === benchPlayer.playerVersionId);
         expect(event).toBeDefined();
-        expect(event?.secondsRemaining).toBeLessThan(700);
+        expect(event?.secondsRemaining).toBeLessThanOrEqual(700);
+        expect(event?.secondsRemaining).toBeGreaterThanOrEqual(680);
         const player = result.away.players.find((row) => row.playerVersionId === benchPlayer.playerVersionId);
-        expect(player?.seconds).toBeGreaterThan(0);
+        expect(player?.seconds).toBe(0);
     });
     it('pregame unavailability selects a contingency unit and marks causes', () => {
         const home = buildSeasonTeam('home');

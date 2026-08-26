@@ -1,4 +1,4 @@
-import { seasonRotationSchema, type SeasonRotation } from '@hoop-rush/data-contracts';
+import { projectionWorkerResponseSchema, PROJECTION_WORKER_WIRE_SCHEMA_VERSION, seasonRotationSchema, type SeasonRotation } from '@hoop-rush/data-contracts';
 import type { HumanRosterBuildResult, MinutePlanOptimizationResult, SearchLens, } from '@hoop-rush/engine';
 import { newSeasonId } from './season-ids';
 import { seasonArtifactUrls } from './season-assets';
@@ -32,6 +32,7 @@ export function createProjectionRunner(deps: ProjectionRunnerDeps = {}): Project
                 throw missingModelError();
             }
             const request: ProjectionRosterBuildRequest = {
+                schemaVersion: PROJECTION_WORKER_WIRE_SCHEMA_VERSION,
                 type: 'build-roster',
                 requestId: newSeasonId('proj'),
                 catalogUrl: urls.catalogUrl,
@@ -53,6 +54,7 @@ export function createProjectionRunner(deps: ProjectionRunnerDeps = {}): Project
                 throw missingModelError();
             }
             const request: ProjectionRotationOptimizeRequest = {
+                schemaVersion: PROJECTION_WORKER_WIRE_SCHEMA_VERSION,
                 type: 'optimize-rotation',
                 requestId: newSeasonId('proj'),
                 catalogUrl: urls.catalogUrl,
@@ -105,17 +107,19 @@ class ProjectionWorkerClient {
             : new Worker(new URL('../../workers/season-projection-worker.ts', import.meta.url), {
                 type: 'module',
             });
-        worker.addEventListener('message', (event: MessageEvent<ProjectionWorkerResponse>) => {
-            const message = event.data;
+        worker.addEventListener('message', (event: MessageEvent<unknown>) => {
+            const parsed = projectionWorkerResponseSchema.safeParse(event.data);
+            if (!parsed.success) return;
+            const message = parsed.data;
             const entry = this.pending.get(message.requestId);
             if (entry === undefined)
                 return;
             this.pending.delete(message.requestId);
             if (message.type === 'complete') {
-                entry.resolve(message.result);
+                entry.resolve((message as { result: unknown }).result);
                 return;
             }
-            entry.reject(new Error(message.message));
+            entry.reject(new Error((message as { message: string }).message));
         });
         worker.addEventListener('error', (event) => {
             const error = new Error(event.message || 'projection worker failed');

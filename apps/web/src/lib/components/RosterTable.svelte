@@ -24,7 +24,7 @@ let { items, columns, sortId, sortDir, eraLabel, manifest, heading, hasMore, vis
 } = $props();
 const sortArrow = $derived(sortId === 'none' ? '' : sortDir === 'asc' ? '↑' : '↓');
 const dataColumns = $derived(columns.filter((c) => c.key !== 'player'));
-let desktopViewport = $state<boolean | null>(null);
+let desktopViewport = $state<boolean>(typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia('(min-width: 640px)').matches : true);
 $effect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function')
         return;

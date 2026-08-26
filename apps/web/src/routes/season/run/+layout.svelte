@@ -155,6 +155,7 @@ function mirrorHub(): void {
     const hub = shell.hub;
     if (hub === null)
         return;
+    const prevSnapshot = shell.snapshot;
     shell.snapshot = hub.snapshot;
     shell.index = hub.index;
     shell.block = hub.block;
@@ -164,6 +165,9 @@ function mirrorHub(): void {
     shell.commandError = hub.commandError;
     shell.hubError = hub.error;
     shell.externalChange = hub.externalChange;
+    if (prevSnapshot === hub.snapshot && prevSnapshot !== null) {
+        return;
+    }
     recomputeRunFacts();
 }
 let unsubscribeHub: (() => void) | null = null;

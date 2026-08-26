@@ -1,9 +1,11 @@
 import { SeasonAiGenerationError, generateAiLeague } from '@hoop-rush/engine';
+import { generationWorkerRequestSchema } from '@hoop-rush/data-contracts';
 import type { GenerationWorkerRequest, GenerationWorkerResponse, } from '../lib/season/season-generation-wire.ts';
-self.addEventListener('message', (event: MessageEvent<GenerationWorkerRequest>) => {
-    const request = event.data as GenerationWorkerRequest | null;
-    if (request?.type !== 'generate')
-        return;
+self.addEventListener('message', (event: MessageEvent<unknown>) => {
+    const parsed = generationWorkerRequestSchema.safeParse(event.data);
+    if (!parsed.success) return;
+    const request = parsed.data as GenerationWorkerRequest;
+    if (request.type !== 'generate') return;
     const respond = (response: GenerationWorkerResponse): void => {
         self.postMessage(response);
     };

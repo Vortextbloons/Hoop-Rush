@@ -58,12 +58,20 @@ function postError(requestId: string, code: 'invariant-failure' | 'cancelled' | 
     self.postMessage(payload);
 }
 const catalogCache = new Map<string, SeasonDraftCatalog>();
+function evictIfNeeded<K, V>(cache: Map<K, V>, limit = 4): void {
+    while (cache.size > limit) {
+        const first = cache.keys().next().value;
+        if (first === undefined) break;
+        cache.delete(first);
+    }
+}
 async function loadCatalogCached(url: string, contentHash: string): Promise<SeasonDraftCatalog> {
     const memo = catalogCache.get(contentHash);
     if (memo !== undefined)
         return memo;
     const catalog = await loadSeasonDraftCatalog(url, contentHash);
     catalogCache.set(contentHash, catalog);
+    evictIfNeeded(catalogCache);
     return catalog;
 }
 const profileCache = new Map<string, EraSimulationProfile>();
@@ -73,6 +81,7 @@ async function loadProfileCached(url: string, contentHash: string): Promise<EraS
         return memo;
     const profile = await loadEraSimulationProfile(url, contentHash);
     profileCache.set(contentHash, profile);
+    evictIfNeeded(profileCache);
     return profile;
 }
 function rosterFingerprint(run: SeasonBlockRunContext): string {
@@ -88,6 +97,7 @@ function expandRostersCached(run: SeasonBlockRunContext, catalog: SeasonDraftCat
         return memo;
     const expanded = expandSeasonRunRosters(run, catalog);
     expandedCache.set(key, expanded);
+    evictIfNeeded(expandedCache);
     return expanded;
 }
 async function yieldToEventLoop(): Promise<void> {
@@ -125,6 +135,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
         homeCourt: request.homeCourt,
         humanFranchiseId: request.humanFranchiseId,
     });
+    evictIfNeeded(contextByRunId);
     if (request.priorSummaries !== undefined) {
         accumulatedRunId = request.runId;
         accumulatedSummaries = request.priorSummaries;
@@ -175,9 +186,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
             blockIndex: request.blockIndex,
             rotationDigest: request.rotationDigest,
             objectiveId: request.objectiveId ?? null,
-            campaignOpportunityId: (request as unknown as {
-                campaignOpportunityId?: string | null;
-            }).campaignOpportunityId ?? null,
+            campaignOpportunityId: request.campaignOpportunityId ?? null,
             expectedStateRevision,
             expectedStateDigest,
         },
@@ -194,9 +203,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
         influence: request.priorInfluence ?? initialInfluence(run),
         transactions: request.priorTransactions ?? [],
         objectiveId: request.objectiveId ?? null,
-        campaignOpportunityId: (request as unknown as {
-            campaignOpportunityId?: string | null;
-        }).campaignOpportunityId ?? null,
+        campaignOpportunityId: request.campaignOpportunityId ?? null,
         objectives: (run as unknown as {
             objectives?: import('@hoop-rush/data-contracts').SeasonObjectiveState;
         }).objectives,
