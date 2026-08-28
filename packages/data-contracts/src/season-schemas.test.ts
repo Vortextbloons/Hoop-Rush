@@ -1446,8 +1446,8 @@ describe('season AI contracts (M2.1, M2.4 roster-generation-v2)', () => {
     });
     it('round-trips a schema-11 run with its aiPools and M2.5.5 state', () => {
         const run = roundTrip(seasonRunSchema, buildRun());
-        expect(run.schemaVersion).toBe(11);
-        expect(run.versions.runSchemaVersion).toBe(11);
+        expect(run.schemaVersion).toBe(12);
+        expect(run.versions.runSchemaVersion).toBe(12);
         expect(run.versions.rosterGenerationVersion).toBe('roster-generation-v2');
         expect(run.versions.aiVersion).toBe('season-ai-v2');
         expect(run.versions.rosterTargetsVersion).toBe('roster-targets-v2');
@@ -1679,7 +1679,7 @@ describe('season objective family (M2.5, season-objective-v1)', () => {
     it('rejects a wrong version, an incomplete catalog, and duplicate objectives', () => {
         expect(() => seasonObjectiveStateSchema.parse({
             ...buildObjectiveState(),
-            objectiveVersion: 'season-objective-v2',
+            objectiveVersion: 'season-objective-v99',
         })).toThrow();
         const state = buildObjectiveState();
         expect(() => seasonObjectiveStateSchema.parse({ ...state, catalog: state.catalog.slice(0, 5) })).toThrow();
@@ -1777,7 +1777,7 @@ describe('season pending block family (M2.5)', () => {
         expect(pending.teamAggregates).toHaveLength(0);
         expect(pending.playerAggregates).toHaveLength(0);
         expect(pending.nextGameId).toBe('s000001');
-        expect(pending.blockVersion).toBe('season-block-v5');
+        expect(pending.blockVersion).toBe('season-block-v6');
         expect(pending.objectiveId).toBeNull();
     });
     it('rejects wrong versions and corrupt fields', () => {

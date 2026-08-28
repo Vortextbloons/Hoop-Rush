@@ -1,0 +1,87 @@
+# Supabase local development config for Hoop Rush M2.7
+# See https://supabase.com/docs/guides/local-development/cli/config
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://localhost:54321"
+
+[invalidation]
+enabled = false
+
+[auth]
+enabled = true
+port = 54324
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:4173"]
+jwt_expiry = 3600
+enable_signup = true
+enable_confirmations = false
+enable_manual_linking = true
+enable_anonymous_sign_ins = true
+enable_captcha = false
+captcha_site_key = ""
+captcha_secret = ""
+
+[auth.external.google]
+enabled = false
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = false
+
+[storage]
+enabled = true
+port = 54325
+file_size_limit = "50MiB"
+import_path = "./storage"
+
+[functions.season-room-create]
+enabled = true
+verify_jwt = true
+import_map = "./functions/deno.json"
+entrypoint = "./functions/season-room-create/index.ts"
+
+[functions.season-room-join]
+enabled = true
+verify_jwt = true
+import_map = "./functions/deno.json"
+entrypoint = "./functions/season-room-join/index.ts"
+
+[functions.season-room-command]
+enabled = true
+verify_jwt = true
+import_map = "./functions/deno.json"
+entrypoint = "./functions/season-room-command/index.ts"
+
+[functions.season-private-decision]
+enabled = true
+verify_jwt = true
+import_map = "./functions/deno.json"
+entrypoint = "./functions/season-private-decision/index.ts"
+
+[functions.season-checkpoint-attest]
+enabled = true
+verify_jwt = true
+import_map = "./functions/deno.json"
+entrypoint = "./functions/season-checkpoint-attest/index.ts"
+
+[functions.season-cron]
+enabled = true
+verify_jwt = false
+import_map = "./functions/deno.json"
+entrypoint = "./functions/season-cron/index.ts"
+schedule = "* * * * *"

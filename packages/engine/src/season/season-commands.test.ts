@@ -146,7 +146,7 @@ type SeasonRunCommandFragment = {
 }[SeasonRunCommand['command']];
 function commandOf(run: SeasonRun, command: SeasonRunCommandFragment): SeasonRunCommand {
     return {
-        schemaVersion: 11,
+        schemaVersion: 12,
         runId: run.runId,
         expectedStateRevision: run.stateRevision,
         expectedStateDigest: run.stateDigest,
@@ -174,7 +174,7 @@ function baseOfferOf(run: SeasonRun): SeasonTradeOffer {
 function pendingOf(run: SeasonRun, overrides: Partial<SeasonPendingBlockCandidate> = {}): SeasonPendingBlockCandidate {
     return {
         schemaVersion: 1,
-        blockVersion: 'season-block-v5',
+        blockVersion: 'season-block-v6',
         runId: run.runId,
         commandId: 'block-3-command',
         blockIndex: 3,

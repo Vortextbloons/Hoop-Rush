@@ -22,6 +22,10 @@ export interface SeasonRunCommandContext {
     run: SeasonRun;
     pending: SeasonPendingBlockCandidate | null;
     humanFranchiseId: string | null;
+    authority?: import('@hoop-rush/data-contracts').SeasonRunAuthority;
+    actorParticipantId?: import('@hoop-rush/data-contracts').SeasonParticipantId | null;
+    actorFranchiseId?: string | null;
+    participantFranchiseIds?: readonly string[];
     catalog?: SeasonDraftCatalog;
     effects?: SeasonEffectsState;
     rankings?: SeasonPostseasonRankingsFn;
@@ -171,7 +175,7 @@ function commandAlreadyRecorded(run: SeasonRun, commandId: string): boolean {
     }
     return false;
 }
-function baseValidation(command: SeasonRunCommand, run: SeasonRun, pending: SeasonPendingBlockCandidate | null): SeasonRunCommandOutput | null {
+function baseValidation(command: SeasonRunCommand, run: SeasonRun, pending: SeasonPendingBlockCandidate | null, context?: SeasonRunCommandContext): SeasonRunCommandOutput | null {
     const commandKind = command.command as DispatchableCommandKind;
     const rejectedWith = (rejection: SeasonRunCommandRejection): SeasonRunCommandOutput => ({
         result: {
@@ -205,6 +209,12 @@ function baseValidation(command: SeasonRunCommand, run: SeasonRun, pending: Seas
             currentStateDigest: run.stateDigest,
         };
         return rejectedWith(rejection);
+    }
+    if (context?.actorFranchiseId) {
+        const targetFranchiseId = (command as unknown as { franchiseId?: string }).franchiseId ?? null;
+        if (targetFranchiseId !== null && targetFranchiseId !== context.actorFranchiseId) {
+            return rejectedWith({ code: 'run-mismatch', expectedRunId: run.runId } as unknown as SeasonRunCommandRejection);
+        }
     }
     return null;
 }

@@ -263,7 +263,7 @@ export function applyRiskyRehabOutcome(health: SeasonHealthState, injuryId: stri
         updated.rehabRecurrencePremiumBasisPoints = outcome === 'success' ? 60 : 0;
     }
     else if (outcome === 'success') {
-        updated.missedGamesRemaining = Math.max(0, updated.missedGamesRemaining - 1);
+        updated.missedGamesRemaining = Math.max(1, updated.missedGamesRemaining - 1);
         updated.rehabModifier = -1;
         updated.rehabAttempted = true;
         updated.rehabOutcome = 'success';
@@ -271,7 +271,11 @@ export function applyRiskyRehabOutcome(health: SeasonHealthState, injuryId: stri
         updated.rehabRecurrencePremiumBasisPoints = 60;
     }
     else {
-        updated.rehabModifier = 0;
+        updated.missedGamesRemaining = Math.min(
+            SEASON_ENDING_MISSED_GAMES_SENTINEL - 1,
+            updated.missedGamesRemaining + 1,
+        );
+        updated.rehabModifier = 1;
         updated.rehabAttempted = true;
         updated.rehabOutcome = 'failure';
         updated.rehabRecurrencePremiumApplied = false;

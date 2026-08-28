@@ -17,17 +17,17 @@ function makeAdapters() {
 async function promote(adapters: ReturnType<typeof makeAdapters>) {
     await adapters.repo.promoteSeasonDraftToRun(buildFixtureStoredDraft(adapters.run), adapters.run);
 }
-describe('M2.5.5 persistence — saveSchema 8, atomic commits, replay, incompatibility', () => {
+describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompatibility', () => {
     afterEach(async () => {
         vi.restoreAllMocks();
     });
-    it('promoted run is saveSchema 8 with schema-11, v5 checkpoint/recap, campaign, trade-v3, influence-v2, health-v2', async () => {
+    it('promoted run is saveSchema 9 with schema-12, v6 checkpoint/recap, campaign, trade-v3, influence-v2, health-v2', async () => {
         const adapters = makeAdapters();
         await promote(adapters);
         const row = await adapters.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
-        expect(row?.saveSchemaVersion).toBe(8);
+        expect(row?.saveSchemaVersion).toBe(9);
         expect(row?.saveSchemaVersion).toBe(SEASON_RUN_SAVE_SCHEMA_VERSION);
-        expect(row?.run.schemaVersion).toBe(11);
+        expect(row?.run.schemaVersion).toBe(12);
         expect(row?.run.schemaVersion).toBe(SEASON_RUN_SCHEMA_VERSION);
         expect(row?.run.versions.blockVersion).toBe(SEASON_BLOCK_VERSION);
         expect(row?.run.versions.checkpointVersion).toBe(SEASON_CHECKPOINT_VERSION);
@@ -132,7 +132,7 @@ describe('M2.5.5 persistence — saveSchema 8, atomic commits, replay, incompati
             }),
         };
         const command: SeasonRunCommand = {
-            schemaVersion: 11,
+            schemaVersion: 12,
             command: 'select-gm-identity',
             commandId: 'cmd-campaign-1',
             runId: adapters.run.runId,
@@ -174,7 +174,7 @@ describe('M2.5.5 persistence — saveSchema 8, atomic commits, replay, incompati
         const adapters = makeAdapters();
         await promote(adapters);
         const command: SeasonRunCommand = {
-            schemaVersion: 11,
+            schemaVersion: 12,
             command: 'select-gm-identity',
             commandId: 'cmd-dup',
             runId: adapters.run.runId,
@@ -338,7 +338,7 @@ describe('M2.5.5 persistence — saveSchema 8, atomic commits, replay, incompati
             }),
         };
         const command: SeasonRunCommand = {
-            schemaVersion: 11,
+            schemaVersion: 12,
             command: 'submit-trade-proposal',
             commandId: 'cmd-trade-1',
             runId: adapters.run.runId,
@@ -487,7 +487,7 @@ describe('M2.5.5 persistence — saveSchema 8, atomic commits, replay, incompati
         const adapters = makeAdapters();
         await promote(adapters);
         const command: SeasonRunCommand = {
-            schemaVersion: 11,
+            schemaVersion: 12,
             command: 'select-gm-identity',
             commandId: 'cmd-xtab-1',
             runId: adapters.run.runId,
@@ -544,7 +544,7 @@ describe('M2.5.5 persistence — saveSchema 8, atomic commits, replay, incompati
     });
     it('Dexie v11 preserves saveSchema 8 and does not auto-migrate saveSchema 7', async () => {
         const adapters = makeAdapters();
-        expect(adapters.db.verno).toBe(11);
+        expect(adapters.db.verno).toBe(12);
         await promote(adapters);
         const row = await adapters.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
         const legacy = {

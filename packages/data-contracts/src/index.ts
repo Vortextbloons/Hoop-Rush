@@ -33,7 +33,16 @@ export * from './three-point-reconstruction.ts';
 export * from './contextual-value.ts';
 export * from './season-versions.ts';
 export * from './season-league.ts';
-export * from './season-alignment.ts';
+export {
+    SEASON_ALIGNMENT,
+    humanTeamOf,
+    humanFranchiseIdOf,
+    participantTeamsOf,
+    participantFranchiseIdsOf,
+    franchiseForParticipant as leagueFranchiseForParticipant,
+    authorityForFranchise as leagueAuthorityForFranchise,
+} from './season-alignment.ts';
+export type { SeasonAlignmentEntry } from './season-alignment.ts';
 export * from './season-schedule.ts';
 export * from './season-game.ts';
 export * from './season-standings.ts';
@@ -74,6 +83,68 @@ export * from './season-influence.ts';
 export * from './season-objective.ts';
 export * from './season-campaign.ts';
 export * from './season-trade.ts';
+export * from './season-authority.ts';
+export {
+    seasonRoomPhaseSchema,
+    seasonRoomCodeSchema,
+    seasonRoomSettingsSchema,
+    seasonRoomPublicSnapshotSchema,
+    seasonRoomMemberPrivateSnapshotSchema,
+    seasonRoomMembershipSchema,
+    seasonDeadlineSchema,
+    seasonPresenceHintSchema,
+    seasonAuthorityTransitionSchema,
+    seasonRoomExpirySchema,
+    seasonPublicCommandEnvelopeSchema,
+    seasonCommandReceiptSchema,
+    seasonPrivateDecisionSubmissionSchema,
+    seasonLockedDecisionPairSchema,
+    seasonVerifiedTimeoutFallbackSchema,
+    seasonCheckpointAttestationSchema,
+    seasonAcceptedCheckpointSchema,
+    seasonRerunRequestSchema,
+    seasonIntegrityFailureSchema2,
+    seasonDirectTradeProposalSchema,
+    seasonDirectTradeResponseSchema,
+    seasonDirectTradeConfirmationSchema,
+    seasonDirectTradeCancellationSchema,
+    seasonDirectTradeCommitSchema,
+    seasonMultiplayerErrorCodeSchema,
+    seasonMultiplayerErrorSchema,
+    SEASON_ENVELOPE_MAX_BYTES,
+    SEASON_CHECKPOINT_MAX_BYTES,
+} from './season-multiplayer-protocol.ts';
+export type {
+    SeasonRoomPhase,
+    SeasonRoomCode,
+    SeasonRoomSettings,
+    SeasonRoomPublicSnapshot,
+    SeasonRoomMemberPrivateSnapshot,
+    SeasonRoomMembership,
+    SeasonDeadline,
+    SeasonPresenceHint,
+    SeasonAuthorityTransition,
+    SeasonRoomExpiry,
+    SeasonPublicCommandEnvelope,
+    SeasonCommandReceipt,
+    SeasonPrivateDecisionSubmission,
+    SeasonLockedDecisionPair,
+    SeasonVerifiedTimeoutFallback,
+    SeasonCheckpointAttestation,
+    SeasonAcceptedCheckpoint,
+    SeasonRerunRequest,
+    SeasonIntegrityFailure2,
+    SeasonDirectTradeProposal,
+    SeasonDirectTradeResponse,
+    SeasonDirectTradeConfirmation,
+    SeasonDirectTradeCancellation,
+    SeasonDirectTradeCommit,
+    SeasonMultiplayerErrorCode,
+    SeasonMultiplayerError,
+    SeasonMultiplayerTransport,
+} from './season-multiplayer-protocol.ts';
+export * from './season-batch.ts';
+export * from './season-multiplayer-in-memory.ts';
 export * from './season-free-agency.ts';
 export * from './season-free-agency-index.ts';
 export * from './season-pending-block.ts';

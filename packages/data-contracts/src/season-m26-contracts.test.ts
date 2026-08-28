@@ -494,6 +494,12 @@ describe('command log (M2.6, command-log-v1)', () => {
             commandLogVersion: 'command-log-v2',
             runId: 'fixture-run-1',
             entries: [],
+        }).success).toBe(true);
+        expect(seasonCommandLogSchema.safeParse({
+            schemaVersion: 1,
+            commandLogVersion: 'command-log-v99' as unknown as 'command-log-v2',
+            runId: 'fixture-run-1',
+            entries: [],
         }).success).toBe(false);
     });
 });

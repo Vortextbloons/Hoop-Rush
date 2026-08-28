@@ -14,6 +14,7 @@ import { seasonInfluenceStateSchema } from './season-influence.ts';
 import { seasonObjectiveStateSchema } from './season-objective.ts';
 import { seasonCampaignStateSchema } from './season-campaign.ts';
 import { seasonTradeStateSchema } from './season-trade.ts';
+import { seasonRunAuthoritySchema } from './season-authority.ts';
 import { seasonTransactionEntrySchema } from './season-transactions.ts';
 import { PLAYER_VERSION_ID_VERSION, SEASON_AI_V2, SEASON_AI_VERSION, SEASON_AGGREGATES_VERSION, SEASON_ALMANAC_VERSION, SEASON_AWARDS_VERSION, SEASON_BLOCK_VERSION, SEASON_CHECKPOINT_VERSION, SEASON_CHEMISTRY_VERSION, SEASON_COMMAND_LOG_VERSION, SEASON_DRAFT_LEGACY_VERSION, SEASON_DRAFT_VERSION, SEASON_EFFECT_TARGETS_LEGACY_VERSION, SEASON_EFFECT_TARGETS_VERSION, SEASON_FREE_AGENCY_INDEX_VERSION, SEASON_FREE_AGENCY_TARGETS_VERSION, SEASON_FREE_AGENCY_VERSION, SEASON_GAME_COUNT, SEASON_GAME_SUMMARY_VERSION, SEASON_GAME_TARGETS_VERSION, SEASON_GAME_VERSION, SEASON_HEALTH_VERSION, SEASON_CAMPAIGN_TARGETS_VERSION, SEASON_CAMPAIGN_VERSION, SEASON_HOME_COURT_VERSION, SEASON_INFLUENCE_TARGETS_VERSION, SEASON_INFLUENCE_VERSION, SEASON_INJURY_TARGETS_VERSION, SEASON_LEAGUE_VERSION, SEASON_LEADERS_VERSION, SEASON_MINUTE_POLICY_VERSION, SEASON_OBJECTIVE_VERSION, SEASON_POSTSEASON_SUMMARY_VERSION, SEASON_POSTSEASON_TARGETS_VERSION, SEASON_POSTSEASON_VERSION, SEASON_RECAP_VERSION, SEASON_REPLAY_EXPORT_VERSION, SEASON_ROSTER_GENERATION_V2, SEASON_ROSTER_GENERATION_VERSION, SEASON_ROSTER_RULES_VERSION, SEASON_ROSTER_TARGETS_V2, SEASON_ROSTER_TARGETS_VERSION, SEASON_DRAFT_SIZE, SEASON_ROTATION_PLANNER_VERSION, SEASON_ROTATION_VERSION, SEASON_RUN_SCHEMA_VERSION, SEASON_SCHEDULE_FORMULA_VERSION, SEASON_SCHEDULE_VERSION, SEASON_SEED_DERIVATION_VERSION, SEASON_STAMINA_LEGACY_VERSION, SEASON_STAMINA_VERSION, SEASON_STANDINGS_VERSION, SEASON_TEAM_COUNT, SEASON_TIEBREAK_VERSION, SEASON_TRADE_GRADE_VERSION, SEASON_TRADE_TARGETS_VERSION, SEASON_TRADE_VERSION, } from './season-versions.ts';
 import { seasonRosterSchema, seasonOwnershipSchema } from './season-roster.ts';
@@ -107,7 +108,11 @@ export const seasonScheduleReferenceSchema = z.object({
 });
 export type SeasonScheduleReference = z.infer<typeof seasonScheduleReferenceSchema>;
 export const seasonRunVersionsSchema = z.object({
-    runSchemaVersion: z.literal(SEASON_RUN_SCHEMA_VERSION),
+    runSchemaVersion: z.union([z.literal(SEASON_RUN_SCHEMA_VERSION), z.literal(11)]),
+    roomProtocolVersion: z.literal(1).optional(),
+    multiplayerVersion: z.string().optional(),
+    timerPolicyVersion: z.string().optional(),
+    authorityVersion: z.string().optional(),
     leagueVersion: z.literal(SEASON_LEAGUE_VERSION),
     scheduleVersion: z.literal(SEASON_SCHEDULE_VERSION),
     scheduleFormulaVersion: z.literal(SEASON_SCHEDULE_FORMULA_VERSION),
@@ -131,13 +136,13 @@ export const seasonRunVersionsSchema = z.object({
         z.literal(SEASON_ROSTER_TARGETS_V2),
         z.literal(SEASON_ROSTER_TARGETS_VERSION),
     ]),
-    blockVersion: z.literal(SEASON_BLOCK_VERSION),
+    blockVersion: z.union([z.literal(SEASON_BLOCK_VERSION), z.literal('season-block-v5')]),
     summaryVersion: z.literal(SEASON_GAME_SUMMARY_VERSION),
     aggregatesVersion: z.literal(SEASON_AGGREGATES_VERSION),
     recapVersion: z.literal(SEASON_RECAP_VERSION),
     leadersVersion: z.literal(SEASON_LEADERS_VERSION),
     homeCourtVersion: z.literal(SEASON_HOME_COURT_VERSION),
-    checkpointVersion: z.literal(SEASON_CHECKPOINT_VERSION),
+    checkpointVersion: z.union([z.literal(SEASON_CHECKPOINT_VERSION), z.literal('season-checkpoint-v5')]),
     staminaVersion: z.union([
         z.literal(SEASON_STAMINA_VERSION),
         z.literal(SEASON_STAMINA_LEGACY_VERSION),
@@ -148,10 +153,10 @@ export const seasonRunVersionsSchema = z.object({
         z.literal(SEASON_EFFECT_TARGETS_LEGACY_VERSION),
     ]),
     healthVersion: z.literal(SEASON_HEALTH_VERSION),
-    tradeVersion: z.literal(SEASON_TRADE_VERSION),
+    tradeVersion: z.union([z.literal(SEASON_TRADE_VERSION), z.literal('season-trade-v3')]),
     influenceVersion: z.literal(SEASON_INFLUENCE_VERSION),
-    objectiveVersion: z.literal(SEASON_OBJECTIVE_VERSION),
-    campaignVersion: z.literal(SEASON_CAMPAIGN_VERSION).optional(),
+    objectiveVersion: z.union([z.literal(SEASON_OBJECTIVE_VERSION), z.literal('season-objective-v1')]),
+    campaignVersion: z.union([z.literal(SEASON_CAMPAIGN_VERSION), z.literal('season-campaign-v1')]).optional(),
     campaignTargetsVersion: z.literal(SEASON_CAMPAIGN_TARGETS_VERSION).optional(),
     injuryTargetsVersion: z.literal(SEASON_INJURY_TARGETS_VERSION),
     tradeTargetsVersion: z.literal(SEASON_TRADE_TARGETS_VERSION),
@@ -160,9 +165,9 @@ export const seasonRunVersionsSchema = z.object({
     postseasonSummaryVersion: z.literal(SEASON_POSTSEASON_SUMMARY_VERSION),
     awardsVersion: z.literal(SEASON_AWARDS_VERSION),
     tradeGradeVersion: z.literal(SEASON_TRADE_GRADE_VERSION),
-    commandLogVersion: z.literal(SEASON_COMMAND_LOG_VERSION),
-    almanacVersion: z.literal(SEASON_ALMANAC_VERSION),
-    replayExportVersion: z.literal(SEASON_REPLAY_EXPORT_VERSION),
+    commandLogVersion: z.union([z.literal(SEASON_COMMAND_LOG_VERSION), z.literal('command-log-v1')]),
+    almanacVersion: z.union([z.literal(SEASON_ALMANAC_VERSION), z.literal('almanac-v1')]),
+    replayExportVersion: z.union([z.literal(SEASON_REPLAY_EXPORT_VERSION), z.literal('replay-export-v1')]),
     postseasonTargetsVersion: z.literal(SEASON_POSTSEASON_TARGETS_VERSION),
     freeAgencyVersion: z.literal(SEASON_FREE_AGENCY_VERSION),
     freeAgencyIndexVersion: z.literal(SEASON_FREE_AGENCY_INDEX_VERSION),
@@ -171,10 +176,11 @@ export const seasonRunVersionsSchema = z.object({
 export type SeasonRunVersions = z.infer<typeof seasonRunVersionsSchema>;
 export const seasonRunSchema = z
     .object({
-    schemaVersion: z.literal(SEASON_RUN_SCHEMA_VERSION),
+    schemaVersion: z.union([z.literal(SEASON_RUN_SCHEMA_VERSION), z.literal(11)]),
     runId: idSchema,
     rootSeed: seedSchema,
     versions: seasonRunVersionsSchema,
+    authority: seasonRunAuthoritySchema.optional(),
     league: seasonLeagueSchema,
     rosters: z.array(seasonRosterSchema).length(SEASON_TEAM_COUNT),
     ownership: z
@@ -238,7 +244,7 @@ export const seasonRunSchema = z
 });
 export type SeasonRun = z.infer<typeof seasonRunSchema>;
 export const seasonBlockRunContextSchema = z.object({
-    schemaVersion: z.literal(SEASON_RUN_SCHEMA_VERSION),
+    schemaVersion: z.union([z.literal(SEASON_RUN_SCHEMA_VERSION), z.literal(11)]),
     runId: idSchema,
     rootSeed: seedSchema,
     versions: seasonRunVersionsSchema,

@@ -52,3 +52,31 @@ export function humanFranchiseIdOf(league: {
 }): string | null {
     return humanTeamOf(league)?.franchiseId ?? null;
 }
+export function participantTeamsOf<T extends {
+    franchiseId: string;
+    control: SeasonControl;
+}>(league: { teams: readonly T[] }): T[] {
+    return league.teams.filter((team) => team.control === 'human');
+}
+export function participantFranchiseIdsOf(league: {
+    teams: readonly { franchiseId: string; control: SeasonControl }[];
+}): string[] {
+    return participantTeamsOf(league).map((t) => t.franchiseId);
+}
+export function franchiseForParticipant(
+    league: { teams: readonly { franchiseId: string; control: SeasonControl }[] },
+    participantId: 'p1' | 'p2',
+): string | null {
+    const ids = participantFranchiseIdsOf(league);
+    if (participantId === 'p1') return ids[0] ?? null;
+    return ids[1] ?? null;
+}
+export function authorityForFranchise(
+    league: { teams: readonly { franchiseId: string; control: SeasonControl }[] },
+    franchiseId: string,
+): 'p1' | 'p2' | null {
+    const ids = participantFranchiseIdsOf(league);
+    if (ids[0] === franchiseId) return 'p1';
+    if (ids[1] === franchiseId) return 'p2';
+    return null;
+}

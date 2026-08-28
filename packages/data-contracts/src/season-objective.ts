@@ -80,12 +80,23 @@ export const seasonObjectiveSelectionSchema = z.object({
     success: z.boolean().nullable(),
 });
 export type SeasonObjectiveSelection = z.infer<typeof seasonObjectiveSelectionSchema>;
+export const seasonObjectivePerFranchiseSelectionSchema = z.record(
+    z.string().min(1).max(64),
+    z.record(z.coerce.number().int().min(0).max(7), seasonObjectiveSelectionSchema),
+);
+export type SeasonObjectivePerFranchiseSelection = z.infer<
+    typeof seasonObjectivePerFranchiseSelectionSchema
+>;
 export const seasonObjectiveStateSchema = z
     .object({
     schemaVersion: z.literal(1),
-    objectiveVersion: z.literal(SEASON_OBJECTIVE_VERSION),
+    objectiveVersion: z.union([
+        z.literal(SEASON_OBJECTIVE_VERSION),
+        z.literal('season-objective-v1'),
+    ]),
     catalog: z.array(seasonObjectiveDefinitionSchema).length(6),
-    selections: z.record(z.number().int().min(0).max(7), seasonObjectiveSelectionSchema),
+    selections: z.record(z.coerce.number().int().min(0).max(7), seasonObjectiveSelectionSchema),
+    franchiseSelections: seasonObjectivePerFranchiseSelectionSchema.optional(),
 })
     .superRefine((state, ctx) => {
     const ids = new Set<string>();

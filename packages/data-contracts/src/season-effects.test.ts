@@ -673,10 +673,10 @@ describe('season run schema version 7 (M2.5)', () => {
     it('freezes the seven M2.5 material versions and the state chain on the run', () => {
         const run = buildRun();
         expect(run.versions.healthVersion).toBe('season-health-v2');
-        expect(run.versions.tradeVersion).toBe('season-trade-v3');
+        expect(run.versions.tradeVersion).toBe('season-trade-v4');
         expect(run.versions.influenceVersion).toBe('season-influence-v2');
-        expect(run.versions.objectiveVersion).toBe('season-objective-v1');
-        expect(run.versions.campaignVersion).toBe('season-campaign-v1');
+        expect(run.versions.objectiveVersion).toBe('season-objective-v2');
+        expect(run.versions.campaignVersion).toBe('season-campaign-v2');
         expect(run.versions.campaignTargetsVersion).toBe('campaign-targets-v1');
         expect(run.versions.injuryTargetsVersion).toBe('injury-targets-v2');
         expect(run.versions.tradeTargetsVersion).toBe('trade-targets-v3');

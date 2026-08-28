@@ -22,7 +22,7 @@ export const seasonInvalidRosterInterruptionSchema = z.object({
 export type SeasonInvalidRosterInterruption = z.infer<typeof seasonInvalidRosterInterruptionSchema>;
 export const seasonPendingBlockCandidateSchema = z.object({
     schemaVersion: z.literal(1),
-    blockVersion: z.literal(SEASON_BLOCK_VERSION),
+    blockVersion: z.union([z.literal(SEASON_BLOCK_VERSION), z.literal('season-block-v5')]),
     runId: idSchema,
     commandId: commandIdSchema,
     blockIndex: z.number().int().min(0).max(8),

@@ -250,11 +250,42 @@ export const seasonTradeWindowStateSchema = z.object({
     aiTransactionResolved: z.boolean().optional(),
 });
 export type SeasonTradeWindowState = z.infer<typeof seasonTradeWindowStateSchema>;
+export const seasonHumanTradeDirectStatusSchema = z.enum([
+    'draft',
+    'submitted',
+    'countered',
+    'final-pending-confirmation',
+    'confirmed',
+    'declined',
+    'cancelled',
+    'expired',
+]);
+export type SeasonHumanTradeDirectStatus = z.infer<typeof seasonHumanTradeDirectStatusSchema>;
+export const seasonHumanTradeDirectNegotiationSchema = z.object({
+    negotiationId: z.string().regex(/^htn-[0-9a-f]{32}$/),
+    windowIndex: z.number().int().min(0).max(2),
+    initiatorFranchiseId: franchiseIdSchema,
+    receiverFranchiseId: franchiseIdSchema,
+    initiatorParticipantId: z.enum(['p1', 'p2']),
+    receiverParticipantId: z.enum(['p1', 'p2']),
+    status: seasonHumanTradeDirectStatusSchema,
+    currentProposal: seasonTradeProposalSchema.nullable(),
+    counterProposal: seasonTradeProposalSchema.nullable(),
+    finalPackageFingerprint: z.string().min(1).max(128).nullable(),
+    confirmations: z.record(franchiseIdSchema, z.boolean()),
+    submittedAtRevision: z.number().int().nonnegative(),
+    expiresAt: z.string().min(1).max(64).nullable(),
+    counterUsed: z.boolean(),
+});
+export type SeasonHumanTradeDirectNegotiation = z.infer<
+    typeof seasonHumanTradeDirectNegotiationSchema
+>;
 export const seasonTradeStateSchema = z
     .object({
     schemaVersion: z.literal(1),
-    tradeVersion: z.literal(SEASON_TRADE_VERSION),
+    tradeVersion: z.union([z.literal(SEASON_TRADE_VERSION), z.literal('season-trade-v3')]),
     windows: z.array(seasonTradeWindowStateSchema).max(3),
+    humanDirectNegotiations: z.array(seasonHumanTradeDirectNegotiationSchema).max(3).optional(),
 })
     .superRefine((state, ctx) => {
     const activeCount = state.windows.filter((w) => w.activeInquiryId).length;

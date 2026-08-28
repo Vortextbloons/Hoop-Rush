@@ -45,6 +45,7 @@ export class TestDatabase extends Dexie {
     seasonCompletedRuns!: EntityTable<StoredSeasonCompletedRunRow, 'runId'>;
     seasonCompletedIndex!: EntityTable<StoredSeasonCompletedIndex, 'recordId'>;
     seasonRunPlayerSlices!: EntityTable<StoredSeasonPlayerSliceRow, 'runId'>;
+    seasonRoomStates!: Table<any, string>;
     constructor(name: string) {
         super(name);
         this.version(1).stores({ active: 'recordId', completed: 'recordId', history: 'recordId' });
@@ -115,6 +116,22 @@ export class TestDatabase extends Dexie {
             seasonCompletedRuns: 'runId',
             seasonCompletedIndex: 'recordId, completedAtIso',
             seasonRunPlayerSlices: 'runId',
+        });
+        this.version(12).stores({
+            seasonRuns: 'recordId',
+            seasonRunSummaries: '[runId+gameId], [runId+blockIndex], runId, blockIndex',
+            seasonRunDetails: '[runId+gameId], runId',
+            seasonRunBlocks: '[runId+blockIndex], runId',
+            seasonRunIndex: 'recordId',
+            seasonPendingBlocks: 'runId',
+            seasonPostseasonSummaries: '[runId+gameId], runId',
+            seasonPostseasonDetails: '[runId+gameId], runId',
+            seasonCommandLog: '[runId+ordinal], runId',
+            seasonAlmanacs: 'runId',
+            seasonCompletedRuns: 'runId',
+            seasonCompletedIndex: 'recordId, completedAtIso',
+            seasonRunPlayerSlices: 'runId',
+            seasonRoomStates: 'roomId',
         });
     }
 }

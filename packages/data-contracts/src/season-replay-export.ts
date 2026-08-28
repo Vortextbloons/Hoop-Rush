@@ -11,7 +11,10 @@ import { SEASON_REPLAY_EXPORT_VERSION } from './season-versions.ts';
 import { canonicalJson, seasonDigestHex } from './season-hash.ts';
 export const seasonReplayExportSchema = z.object({
     schemaVersion: z.literal(1),
-    replayExportVersion: z.literal(SEASON_REPLAY_EXPORT_VERSION),
+    replayExportVersion: z.union([
+        z.literal(SEASON_REPLAY_EXPORT_VERSION),
+        z.literal('replay-export-v1'),
+    ]),
     runId: z.string().min(1).max(64),
     gameId: postseasonGameIdSchema,
     summary: seasonPostseasonSummarySchema,
@@ -37,7 +40,10 @@ export const seasonReplayAssetHashesSchema = z.object({
 export type SeasonReplayAssetHashes = z.infer<typeof seasonReplayAssetHashesSchema>;
 export const seasonRunReplayExportSchema = z.object({
     schemaVersion: z.literal(1),
-    replayExportVersion: z.literal(SEASON_REPLAY_EXPORT_VERSION),
+    replayExportVersion: z.union([
+        z.literal(SEASON_REPLAY_EXPORT_VERSION),
+        z.literal('replay-export-v1'),
+    ]),
     kind: z.literal('full-run'),
     runId: idSchema,
     rootSeed: seedSchema,

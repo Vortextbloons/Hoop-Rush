@@ -5,7 +5,7 @@ import { SEASON_ALMANAC_VERSION } from './season-versions.ts';
 import { canonicalJson, seasonDigestHex } from './season-hash.ts';
 export const seasonAlmanacSchema = z.object({
     schemaVersion: z.literal(1),
-    almanacVersion: z.literal(SEASON_ALMANAC_VERSION),
+    almanacVersion: z.union([z.literal(SEASON_ALMANAC_VERSION), z.literal('almanac-v1')]),
     runId: z.string().min(1).max(64),
     rootSeed: seedSchema,
     championFranchiseId: franchiseIdSchema,

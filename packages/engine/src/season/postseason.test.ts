@@ -286,7 +286,7 @@ type SeasonRunCommandFragment = {
 }[SeasonRunCommand['command']];
 function commandOf(run: SeasonRun, fragment: SeasonRunCommandFragment): SeasonRunCommand {
     return {
-        schemaVersion: 11,
+        schemaVersion: 12,
         runId: run.runId,
         expectedStateRevision: run.stateRevision,
         expectedStateDigest: run.stateDigest,

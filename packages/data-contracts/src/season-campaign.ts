@@ -198,10 +198,29 @@ export const seasonCampaignEvolutionSelectionSchema = z.object({
     selectedByCommandId: commandIdSchema,
 });
 export type SeasonCampaignEvolutionSelection = z.infer<typeof seasonCampaignEvolutionSelectionSchema>;
+export const seasonCampaignPerFranchiseStateSchema = z.object({
+    offers: z.record(z.coerce.number().int().min(0).max(7), z.array(seasonCampaignOpportunitySchema).length(2)),
+    selections: z.record(z.coerce.number().int().min(0).max(7), z.object({
+        opportunityId: seasonCampaignOpportunityIdSchema,
+        selectedByCommandId: commandIdSchema,
+    })),
+    evaluations: z.array(seasonCampaignEvaluationSchema),
+    branchState: z.record(seasonCampaignBranchIdSchema, z.enum(['open', 'completed', 'missed', 'locked'])),
+    evolutionOffers: z.array(seasonCampaignEvolutionOfferSchema).nullable(),
+    evolutionSelection: seasonCampaignEvolutionSelectionSchema.nullable(),
+    rewardEntitlements: z.object({
+        influenceEarned: z.number().int().nonnegative(),
+        inquiryCredits: z.number().int().nonnegative(),
+        informationBenefits: z.number().int().nonnegative(),
+        followUpUnlocks: z.array(z.string()),
+    }),
+    appliedRewardIds: z.array(z.string().regex(/^rew-[0-9a-f]{8,32}$/)),
+});
+export type SeasonCampaignPerFranchiseState = z.infer<typeof seasonCampaignPerFranchiseStateSchema>;
 export const seasonCampaignStateSchema = z
     .object({
     schemaVersion: z.literal(1),
-    campaignVersion: z.literal(SEASON_CAMPAIGN_VERSION),
+    campaignVersion: z.union([z.literal(SEASON_CAMPAIGN_VERSION), z.literal('season-campaign-v1')]),
     startingIdentity: seasonCampaignGmIdentitySchema.nullable(),
     startingFocus: seasonCampaignFocusSchema.nullable(),
     offers: z.record(z.coerce.number().int().min(0).max(7), z.array(seasonCampaignOpportunitySchema).length(2)),
@@ -220,6 +239,7 @@ export const seasonCampaignStateSchema = z
         followUpUnlocks: z.array(z.string()),
     }),
     appliedRewardIds: z.array(z.string().regex(/^rew-[0-9a-f]{8,32}$/)),
+    franchiseStates: z.record(franchiseIdSchema, seasonCampaignPerFranchiseStateSchema).optional(),
 })
     .superRefine((state, ctx) => {
     for (const [blockKey, offers] of Object.entries(state.offers)) {

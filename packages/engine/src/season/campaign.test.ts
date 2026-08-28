@@ -594,7 +594,7 @@ describe('campaign old saves', () => {
     });
     it('buildEmptyCampaignState matches frozen version', () => {
         const state = buildEmptyCampaignState();
-        expect(state.campaignVersion).toBe('season-campaign-v1');
+        expect(state.campaignVersion).toBe('season-campaign-v2');
         expect(state.schemaVersion).toBe(1);
     });
 });
