@@ -115,28 +115,50 @@ Deno.serve(async (req: Request) => {
   if (error || !rooms || rooms.length === 0)
     return json(400, { code: 'invalid-code', message: 'invalid code' });
   const room = rooms[0];
+  const { count: memberCount } = await serviceClient
+    .from('season_room_members')
+    .select('participant_id', { count: 'exact', head: true })
+    .eq('room_id', room.id);
+  const { data: members } = await serviceClient
+    .from('season_room_members')
+    .select('participant_id, last_seen_at')
+    .eq('room_id', room.id);
+  const nowMs = Date.now();
+  const presence = (members ?? []).map((m: unknown) => {
+    const row = m as { participant_id: string; last_seen_at: string | null };
+    const lastSeen = row.last_seen_at ? new Date(row.last_seen_at).getTime() : nowMs;
+    return {
+      participantId: row.participant_id as 'p1' | 'p2',
+      online: nowMs - lastSeen <= 15_000,
+      lastSeenAt: row.last_seen_at ?? new Date(nowMs).toISOString(),
+    };
+  });
+  const isOutdated =
+    (room as unknown as { multiplayer_version?: string }).multiplayer_version !== 'season-multiplayer-v2' ||
+    (room as unknown as { room_protocol_version?: number }).room_protocol_version !== 2;
   const snapshot = {
     roomId: room.id,
     settings: {
-      schemaVersion: 1,
+      schemaVersion: 2,
       pace: room.pace,
       mode: (room as unknown as { mode?: string }).mode ?? 'season',
-      roomProtocolVersion: room.room_protocol_version,
-      multiplayerVersion: room.multiplayer_version,
+      roomProtocolVersion: room.room_protocol_version as unknown as 2,
+      multiplayerVersion: room.multiplayer_version as unknown as 'season-multiplayer-v2',
       timerPolicyVersion: room.timer_policy_version,
     },
     phase: room.phase,
     cursor: room.cursor,
     revision: room.revision,
     digest: room.digest,
-    memberCount: 0,
+    memberCount: memberCount ?? 0,
     codeActive: true,
     expiresAt: room.code_expires_at,
+    mode: (room as unknown as { mode?: string }).mode ?? 'season',
+    settingsRevision: (room as unknown as { settings_revision?: number }).settings_revision ?? 0,
+    guestReady: (room as unknown as { guest_ready?: boolean }).guest_ready ?? false,
+    presence,
+    seed: (room as unknown as { root_seed?: string }).root_seed ?? null,
+    isOutdated: isOutdated || undefined,
   };
-  const { count: memberCount } = await serviceClient
-    .from('season_room_members')
-    .select('participant_id', { count: 'exact', head: true })
-    .eq('room_id', room.id);
-  (snapshot as { memberCount: number }).memberCount = memberCount ?? 0;
   return json(200, { snapshot });
 });

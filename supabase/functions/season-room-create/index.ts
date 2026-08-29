@@ -76,12 +76,8 @@ Deno.serve(async (req: Request) => {
     return json(400, { code: 'phase', message: 'invalid pace' });
   if (typeof rootSeed !== 'string' || rootSeed.length < 8)
     return json(400, { code: 'phase', message: 'invalid rootSeed' });
-  // only season is fully supported — reject classic/sandbox early with friendly code
-  if (mode !== 'season')
-    return json(400, {
-      code: 'phase',
-      message: 'Classic and Sandbox are coming next — Season Run is live now',
-    });
+  // v2 supports all modes: season, classic, sandbox (pace applies to all per spec)
+  // no rejection here; host picks mode before create
 
   const serviceClient = createClient(supabaseUrl, serviceRoleKey);
   const ip = getClientIp(req);
@@ -162,6 +158,10 @@ Deno.serve(async (req: Request) => {
               code,
               code_expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
               phase: 'waiting',
+              guest_ready: false,
+              settings_revision: 0,
+              room_protocol_version: 2,
+              multiplayer_version: 'season-multiplayer-v2',
             } as unknown as Record<string, unknown>)
             .select('id')
             .single();
@@ -204,6 +204,19 @@ Deno.serve(async (req: Request) => {
     });
   }
 
+  // ensure v2 defaults even if RPC used older defaults
+  try {
+    await serviceClient
+      .from('season_rooms')
+      .update({
+        guest_ready: false,
+        settings_revision: 0,
+        room_protocol_version: 2,
+        multiplayer_version: 'season-multiplayer-v2',
+      } as unknown as Record<string, unknown>)
+      .eq('id', roomId);
+  } catch {}
+
   // auto-join creator as p1 so they are a member and can load the room (fixes "not a member" when host doesn't immediately enter)
   const { error: memberError } = await serviceClient.from('season_room_members').insert({
     room_id: roomId,
@@ -214,7 +227,8 @@ Deno.serve(async (req: Request) => {
     control: 'human',
     miss_streak: 0,
     reclaim_requested: false,
-  });
+    last_seen_at: new Date().toISOString(),
+  } as unknown as Record<string, unknown>);
   if (memberError && memberError.code !== '23505') {
     // if insert fails for other reason, log but don't fail room creation
     console.error('auto-join p1 failed', memberError);
@@ -228,14 +242,29 @@ Deno.serve(async (req: Request) => {
   if (roomError || !room)
     return json(500, { code: 'authorization', message: 'room not found after create' });
 
+  // fetch presence for snapshot
+  const { data: membersForSnap } = await serviceClient
+    .from('season_room_members')
+    .select('participant_id, last_seen_at')
+    .eq('room_id', roomId);
+  const nowMs = Date.now();
+  const presence = (membersForSnap ?? []).map((m: unknown) => {
+    const row = m as { participant_id: string; last_seen_at: string | null };
+    const lastSeen = row.last_seen_at ? new Date(row.last_seen_at).getTime() : nowMs;
+    return {
+      participantId: row.participant_id as 'p1' | 'p2',
+      online: nowMs - lastSeen <= 15_000,
+      lastSeenAt: row.last_seen_at ?? new Date(nowMs).toISOString(),
+    };
+  });
   const snapshot = {
     roomId: room.id,
     settings: {
-      schemaVersion: 1,
+      schemaVersion: 2,
       pace: room.pace,
       mode: (room as unknown as { mode?: string }).mode ?? mode ?? 'season',
-      roomProtocolVersion: room.room_protocol_version,
-      multiplayerVersion: room.multiplayer_version,
+      roomProtocolVersion: room.room_protocol_version as 2,
+      multiplayerVersion: room.multiplayer_version as 'season-multiplayer-v2',
       timerPolicyVersion: room.timer_policy_version,
     },
     phase: room.phase,
@@ -248,6 +277,12 @@ Deno.serve(async (req: Request) => {
       !!room.code_expires_at &&
       new Date(room.code_expires_at).getTime() > Date.now(),
     expiresAt: room.code_expires_at,
+    mode: (room as unknown as { mode?: string }).mode ?? mode ?? 'season',
+    settingsRevision: (room as unknown as { settings_revision?: number }).settings_revision ?? 0,
+    guestReady: (room as unknown as { guest_ready?: boolean }).guest_ready ?? false,
+    presence,
+    seed: (room as unknown as { root_seed?: string }).root_seed ?? rootSeed ?? null,
+    isOutdated: undefined,
   };
 
   const membership = {

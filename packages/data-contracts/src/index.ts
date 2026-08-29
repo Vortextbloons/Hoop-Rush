@@ -115,6 +115,8 @@ export {
   seasonMultiplayerErrorSchema,
   SEASON_ENVELOPE_MAX_BYTES,
   SEASON_CHECKPOINT_MAX_BYTES,
+  PRESENCE_OFFLINE_AFTER_MS,
+  seasonRoomStartEventSchema,
 } from './season-multiplayer-protocol.ts';
 export type {
   SeasonRoomPace,
@@ -146,6 +148,7 @@ export type {
   SeasonMultiplayerErrorCode,
   SeasonMultiplayerError,
   SeasonMultiplayerTransport,
+  SeasonRoomStartEvent,
 } from './season-multiplayer-protocol.ts';
 export * from './season-batch.ts';
 export * from './season-multiplayer-in-memory.ts';

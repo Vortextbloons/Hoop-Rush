@@ -35,17 +35,22 @@ Deno.serve(async (req: Request) => {
   const sc = createClient(url, srk);
   const { data: room } = await sc.from("season_rooms").select("*").eq("id", roomId).single();
   if (!room) return json(404, { code: "membership", message: "room not found" });
+  if ((room as unknown as { multiplayer_version?: string }).multiplayer_version !== 'season-multiplayer-v2' || (room as unknown as { room_protocol_version?: number }).room_protocol_version !== 2) {
+    return json(400, { code: 'outdated-room', message: 'outdated room—create a new one' });
+  }
   if (room.phase !== "waiting") return json(400, { code: "phase", message: "not in waiting phase" });
   const { data: member } = await sc.from("season_room_members").select("*").eq("room_id", roomId).eq("uid", uid).maybeSingle();
   if (!member) return json(403, { code: "membership", message: "not a member" });
-  // only host (p1) can remove? allow any member for now
+  if (member.participant_id !== 'p1') return json(403, { code: 'authorization', message: 'only host can remove guest' });
+  if (targetParticipantId !== 'p2') return json(400, { code: 'authorization', message: 'can only remove guest before start' });
   const { error: delError } = await sc.from("season_room_members").delete().eq("room_id", roomId).eq("participant_id", targetParticipantId);
   if (delError) return json(500, { code: "authorization", message: "failed", detail: delError.message });
-  // generate new code
+  // reset guest_ready
+  try { await sc.from("season_rooms").update({ guest_ready: false } as unknown as Record<string,unknown>).eq("id", roomId); } catch {}
   let newCode: string | null = null;
   for (let i = 0; i < 20; i++) {
     const candidate = String(Math.floor(Math.random() * 10000)).padStart(4, "0");
-    const { error: updError } = await sc.from("season_rooms").update({ code: candidate, code_expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(), updated_at: new Date().toISOString() }).eq("id", roomId);
+    const { error: updError } = await sc.from("season_rooms").update({ code: candidate, code_expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(), updated_at: new Date().toISOString(), guest_ready: false } as unknown as Record<string,unknown>).eq("id", roomId);
     if (!updError) {
       newCode = candidate;
       break;

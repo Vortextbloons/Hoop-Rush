@@ -14,6 +14,7 @@
     Check,
     LogIn,
     Plus,
+    Link as LinkIcon,
   } from '@lucide/svelte';
   import { createInMemorySeasonRoomCoordinator } from '$lib/season/season-room-coordinator';
   import {
@@ -22,7 +23,7 @@
     multiplayerDisabledMessage,
   } from '$lib/season/supabase-season-transport';
   import { seasonRootSeed } from '$lib/season/season-ids';
-  import { friendlyJoinError } from '$lib/season/season-room-identity';
+  import { friendlyJoinError, inviteLinkForCode } from '$lib/season/season-room-identity';
 
   type Mode = 'season' | 'classic' | 'sandbox';
   type Pace = 'live' | 'async';
@@ -38,7 +39,8 @@
   let createdCode = $state<string | null>(null);
   let createdRoomId = $state<string | null>(null);
   let expiresAt = $state<string | null>(null);
-  let copied = $state(false);
+  let copiedInvite = $state(false);
+  let copiedCode = $state(false);
   let tick = $state(0);
 
   let countdown = $derived.by(() => {
@@ -53,12 +55,18 @@
 
   onMount(() => {
     const iv = setInterval(() => tick++, 1000);
+    // prefill from invite link ?code=0042
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const codeParam = params.get('code');
+      if (codeParam && /^[0-9]{4}$/.test(codeParam)) {
+        code = codeParam;
+        view = 'join';
+        // auto preview
+        void doPreview();
+      }
+    } catch {}
     return () => clearInterval(iv);
-  });
-
-  // Season is live-only
-  $effect(() => {
-    if (selectedMode === 'season' && pace !== 'live') pace = 'live';
   });
 
   const modes = [
@@ -73,10 +81,10 @@
     {
       id: 'classic' as const,
       name: 'Classic',
-      desc: '5 rounds · same pool · 82-0',
+      desc: '5 rounds · franchise era · 82-0',
       detail: 'Franchise + era, one reroll each.',
       icon: Swords,
-      disabled: true,
+      disabled: false,
     },
     {
       id: 'sandbox' as const,
@@ -84,9 +92,14 @@
       desc: 'Any 5 peak seasons',
       detail: 'Best-of-2, fast.',
       icon: Zap,
-      disabled: true,
+      disabled: false,
     },
   ] as const;
+
+  const paceOptions: { id: Pace; label: string; detail: string }[] = [
+    { id: 'live', label: 'Live', detail: '90s draft · 5m decisions' },
+    { id: 'async', label: 'Async', detail: '24h draft · 12h decisions' },
+  ];
 
   function getCoordinator() {
     const useSupabase = isSupabaseConfigured();
@@ -107,10 +120,6 @@
   }
 
   async function startCreate() {
-    if (selectedMode !== 'season') {
-      error = 'Classic and Sandbox are coming next — Season Run is live now.';
-      return;
-    }
     busy = true;
     error = null;
     createdCode = null;
@@ -129,7 +138,6 @@
     } catch (e) {
       error = friendlyJoinError(e);
       if (!isSupabaseConfigured()) error = multiplayerDisabledMessage();
-      // stay in create view so user can retry, but don't lose picker
     } finally {
       busy = false;
     }
@@ -179,12 +187,21 @@
     }
   }
 
+  async function copyInviteLink() {
+    const toCopy = createdCode ? inviteLinkForCode(createdCode) : null;
+    if (!toCopy) return;
+    try {
+      await navigator.clipboard.writeText(toCopy);
+      copiedInvite = true;
+      setTimeout(() => (copiedInvite = false), 1500);
+    } catch {}
+  }
   async function copyCode() {
     if (!createdCode) return;
     try {
       await navigator.clipboard.writeText(createdCode);
-      copied = true;
-      setTimeout(() => (copied = false), 1500);
+      copiedCode = true;
+      setTimeout(() => (copiedCode = false), 1500);
     } catch {}
   }
 
@@ -193,23 +210,15 @@
   }
 
   function backToChoose() {
-    // keep createdCode if we already have one, just switch view – host shouldn't lose code on "Back"
-    if (createdCode && createdRoomId) {
-      // if user backs from code display, stay on chooser but code still in memory; still allow re-enter
-    }
     view = 'choose';
     error = null;
     preview = null;
-    code = '';
+    // keep code if prefilled via invite link? clear only if not from URL? Keep for UX but prefill stays
+    if (!new URLSearchParams(window.location.search).get('code')) code = '';
   }
 
   function backFromCreate() {
-    if (createdCode) {
-      // if code already created, go to chooser but don't discard code entirely; user can still Enter lobby
-      view = 'choose';
-    } else {
-      view = 'choose';
-    }
+    view = 'choose';
     error = null;
   }
 </script>
@@ -264,8 +273,7 @@
           Start a room
         </h2>
         <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
-          Pick Season Run and pace, then create a 4-digit code. Code lives 15 minutes, cleared after
-          2 join.
+          Pick mode and pace, then create a 4-digit code. Code stays visible until opponent joins.
         </p>
         <span class="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-primary">
           Pick mode & create →
@@ -293,7 +301,7 @@
           Join a room
         </h2>
         <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
-          Got a code? Enter the 4 digits and jump straight into the lobby.
+          Got a code? Enter the 4 digits or open an invite link (/multiplayer?code=0042).
         </p>
         <span class="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-foreground"
           >Enter code → <span
@@ -325,7 +333,7 @@
       <div
         class="mt-6 rounded-2xl border-2 border-dashed border-primary/40 bg-primary/10 p-6 sm:p-8"
       >
-        <p class="text-label tracking-[0.16em] text-primary">Your last room code — still active</p>
+        <p class="text-label tracking-[0.16em] text-primary">Your last room — still active</p>
         <div class="mt-3 flex flex-wrap items-center gap-3">
           <div class="flex gap-1.5">
             {#each createdCode.split('') as d, i (i)}
@@ -337,17 +345,22 @@
           </div>
           <button
             type="button"
+            onclick={copyInviteLink}
+            class="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
+          >
+            {#if copiedInvite}<Check class="h-4 w-4" /> Copied link!{:else}<LinkIcon class="h-4 w-4" /> Copy invite link{/if}
+          </button>
+          <button
+            type="button"
             onclick={copyCode}
             class="inline-flex items-center gap-1.5 rounded-xl bg-card px-4 py-2.5 text-sm font-semibold shadow-sm hover:bg-surface-2"
           >
-            {#if copied}<Check class="h-4 w-4 text-positive" /> Copied!{:else}<Copy
-                class="h-4 w-4"
-              /> Copy invite{/if}
+            {#if copiedCode}<Check class="h-4 w-4 text-positive" /> Copied!{:else}<Copy class="h-4 w-4" /> Copy code{/if}
           </button>
           <button
             type="button"
             onclick={goToRoom}
-            class="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
+            class="inline-flex items-center gap-1.5 rounded-xl bg-card border border-line-soft px-4 py-2.5 text-sm font-semibold hover:border-line-strong"
             >Enter lobby →</button
           >
         </div>
@@ -355,12 +368,11 @@
           <Clock class="h-3.5 w-3.5" />
           {#if countdown && countdown !== 'expired'}expires in {countdown}{:else if countdown === 'expired'}expired
             — create a new room{:else}expires in 15 minutes{/if}
-          · share this, not the room URL
+          · code stays visible in lobby until opponent joins · invite link: /multiplayer?code={createdCode}
         </p>
       </div>
     {/if}
   {:else if view === 'create'}
-    <!-- mode picker before create -->
     {#if !createdCode}
       <div class="rounded-2xl bg-surface-1 p-6 sm:p-7">
         <div class="flex items-center justify-between gap-4">
@@ -369,7 +381,7 @@
               Pick your battle
             </h3>
             <p class="mt-1 text-xs text-muted-foreground">
-              Host picks — opponent sees it before joining. Season Run is live now.
+              Host picks mode and pace — opponent sees both before joining. Pace applies to all modes.
             </p>
           </div>
           <button
@@ -385,30 +397,21 @@
             {@const Icon = m.icon}
             <button
               type="button"
-              onclick={() => {
-                if (!m.disabled) selectedMode = m.id;
-              }}
-              disabled={m.disabled}
+              onclick={() => (selectedMode = m.id)}
               class="flex flex-col rounded-xl border p-4 text-left transition-all {selectedMode ===
               m.id
                 ? 'border-primary bg-primary/10 ring-1 ring-primary'
-                : 'border-line-soft bg-card hover:border-line-strong'} {m.disabled
-                ? 'opacity-50 cursor-not-allowed'
-                : ''}"
+                : 'border-line-soft bg-card hover:border-line-strong'}"
             >
               <Icon
                 class="h-5 w-5 {selectedMode === m.id ? 'text-primary' : 'text-muted-foreground'}"
               />
               <p class="font-display mt-3 text-sm font-extrabold tracking-tight uppercase">
                 {m.name}
-                {#if m.disabled}<span
-                    class="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-bold tracking-widest"
-                    >Soon</span
-                  >{/if}
               </p>
               <p class="mt-1 text-xs font-medium text-muted-foreground">{m.desc}</p>
               <p class="mt-1 text-xs leading-relaxed text-muted-foreground/70">{m.detail}</p>
-              {#if selectedMode === m.id && !m.disabled}<span
+              {#if selectedMode === m.id}<span
                   class="mt-3 inline-flex rounded-full bg-primary px-2 py-0.5 font-mono text-[10px] font-bold tracking-widest text-primary-foreground uppercase"
                   >Selected</span
                 >{/if}
@@ -416,30 +419,32 @@
           {/each}
         </div>
 
-        {#if selectedMode === 'season'}
-          <div class="mt-5 rounded-xl border border-primary/20 bg-primary/5 p-4">
-            <div class="flex items-center gap-2">
-              <Clock class="h-4 w-4 text-primary" />
-              <p class="text-sm font-bold">Live — 90s draft · 5m decisions</p>
-            </div>
-            <p class="mt-1 text-xs text-muted-foreground">
-              Season Run is live-only. Async (24h) coming later.
-            </p>
+        <div class="mt-5">
+          <p class="text-label tracking-[0.12em] text-muted-foreground">Pace</p>
+          <div class="mt-2 grid gap-2 sm:grid-cols-2">
+            {#each paceOptions as p (p.id)}
+              <button
+                type="button"
+                onclick={() => (pace = p.id)}
+                class="flex items-center justify-between rounded-xl border p-4 text-left {pace === p.id
+                  ? 'border-primary bg-primary/10 ring-1 ring-primary'
+                  : 'border-line-soft bg-card hover:border-line-strong'}"
+              >
+                <div>
+                  <p class="text-sm font-bold">{p.label}</p>
+                  <p class="text-xs text-muted-foreground">{p.detail}</p>
+                </div>
+                {#if pace === p.id}<span class="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground">Selected</span>{/if}
+              </button>
+            {/each}
           </div>
-        {:else}
-          <p
-            class="mt-4 rounded-lg border border-dashed border-line-soft bg-card/50 p-3 text-xs text-muted-foreground"
-          >
-            {#if selectedMode === 'classic'}Classic: 5 rounds, same pool — no pace timer. First to
-              82-0 wins.
-            {:else}Sandbox: any 5 peak seasons — best-of-2, no season clock.{/if}
-          </p>
-        {/if}
+          <p class="mt-2 text-xs text-muted-foreground">Pace applies to Season, Classic, and Sandbox identically.</p>
+        </div>
 
         <button
           type="button"
           onclick={startCreate}
-          disabled={busy || selectedMode !== 'season'}
+          disabled={busy}
           class="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-40"
         >
           {busy ? 'Creating…' : 'Create room →'}
@@ -453,11 +458,10 @@
           </p>
         {/if}
         <p class="mt-2 text-center text-xs text-muted-foreground">
-          You’ll get a 4-digit code to share. It’s not in the URL.
+          You’ll get a 4-digit code + invite link to share. Code stays visible in lobby.
         </p>
       </div>
     {:else}
-      <!-- code on top after creation -->
       <div class="rounded-2xl border-2 border-dashed border-primary/40 bg-primary/10 p-6 sm:p-8">
         <div class="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -473,19 +477,24 @@
               </div>
               <button
                 type="button"
+                onclick={copyInviteLink}
+                class="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
+              >
+                {#if copiedInvite}<Check class="h-4 w-4" /> Copied link!{:else}<LinkIcon class="h-4 w-4" /> Copy invite link{/if}
+              </button>
+              <button
+                type="button"
                 onclick={copyCode}
                 class="inline-flex items-center gap-1.5 rounded-xl bg-card px-4 py-2.5 text-sm font-semibold shadow-sm hover:bg-surface-2"
               >
-                {#if copied}<Check class="h-4 w-4 text-positive" /> Copied!{:else}<Copy
-                    class="h-4 w-4"
-                  /> Copy invite{/if}
+                {#if copiedCode}<Check class="h-4 w-4 text-positive" /> Copied!{:else}<Copy class="h-4 w-4" /> Copy code{/if}
               </button>
             </div>
             <p class="mt-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
               <Clock class="h-3.5 w-3.5" />
               {#if countdown && countdown !== 'expired'}expires in {countdown}{:else if countdown === 'expired'}expired
                 — create a new room{:else}expires in 15 minutes{/if}
-              · cleared after 2nd player joins · never in URL
+              · invite link: /multiplayer?code={createdCode} · stays visible until opponent joins
             </p>
           </div>
           <button
@@ -508,10 +517,10 @@
 
       <div class="mt-6 rounded-2xl bg-surface-1 p-6 sm:p-7">
         <h3 class="font-display text-sm font-extrabold tracking-widest uppercase">
-          Mode locked: Season Run
+          Mode locked: {selectedMode === 'season' ? 'Season Run' : selectedMode === 'classic' ? 'Classic' : 'Sandbox'} · {pace === 'live' ? 'Live' : 'Async'}
         </h3>
         <p class="mt-1 text-xs text-muted-foreground">
-          Host chose Season Run · Live — guests see this before joining.
+          Host chose {selectedMode} · {pace} — guests see this before joining.
         </p>
         <button
           type="button"
@@ -521,7 +530,7 @@
           Enter lobby →
         </button>
         <p class="mt-2 text-center text-xs text-muted-foreground">
-          Code stays visible in lobby. Share it now — opponent can join while you enter.
+          Code stays visible in lobby. Share invite link now — opponent can join while you enter.
         </p>
       </div>
     {/if}
@@ -542,7 +551,7 @@
         </div>
         <div>
           <h2 class="font-display text-lg font-extrabold tracking-tight uppercase">Join a room</h2>
-          <p class="text-xs text-muted-foreground">Enter the 4-digit code from your host.</p>
+          <p class="text-xs text-muted-foreground">Enter the 4-digit code or open invite link.</p>
         </div>
       </div>
 
@@ -614,7 +623,7 @@
       {/if}
 
       <p class="mt-6 text-center text-xs leading-relaxed text-muted-foreground">
-        Codes include leading zeros (<code class="font-mono">0042</code>) and expire in 15 minutes.
+        Codes include leading zeros (<code class="font-mono">0042</code>) and expire in 15 minutes. Invite links prefill the code via <code class="font-mono">/multiplayer?code=0042</code>.
       </p>
     </div>
   {/if}

@@ -3,7 +3,9 @@ import { commandIdSchema, franchiseIdSchema, idSchema, seedSchema } from './ids.
 import { seasonCheckpointDigestSchema } from './season-digests.ts';
 import {
   SEASON_MULTIPLAYER_VERSION,
+  SEASON_MULTIPLAYER_VERSION_V1,
   SEASON_ROOM_PROTOCOL_SCHEMA_VERSION,
+  SEASON_ROOM_PROTOCOL_SCHEMA_VERSION_V1,
   SEASON_TIMER_POLICY_VERSION,
 } from './season-versions.ts';
 
@@ -42,6 +44,18 @@ export const seasonRoomSettingsSchema = z.object({
 });
 export type SeasonRoomSettings = z.infer<typeof seasonRoomSettingsSchema>;
 
+// legacy settings for v1 detection (readable as outdated)
+export const seasonRoomSettingsV1Schema = z.object({
+  schemaVersion: z.literal(SEASON_ROOM_PROTOCOL_SCHEMA_VERSION_V1),
+  pace: seasonRoomPaceSchema,
+  mode: seasonRoomModeSchema.default('season'),
+  roomProtocolVersion: z.literal(SEASON_ROOM_PROTOCOL_SCHEMA_VERSION_V1),
+  multiplayerVersion: z.literal(SEASON_MULTIPLAYER_VERSION_V1),
+  timerPolicyVersion: z.literal(SEASON_TIMER_POLICY_VERSION),
+});
+
+export const PRESENCE_OFFLINE_AFTER_MS = 15_000;
+
 export const seasonRoomPublicSnapshotSchema = z.object({
   roomId: idSchema,
   settings: seasonRoomSettingsSchema,
@@ -52,8 +66,31 @@ export const seasonRoomPublicSnapshotSchema = z.object({
   memberCount: z.number().int().min(0).max(2),
   codeActive: z.boolean(),
   expiresAt: z.string().min(1).max(64).nullable(),
+  // v2 additions: authoritative mode, lobby readiness, presence, start state
+  mode: seasonRoomModeSchema,
+  settingsRevision: z.number().int().nonnegative(),
+  guestReady: z.boolean(),
+  presence: z.array(
+    z.object({
+      participantId: z.enum(['p1', 'p2']),
+      online: z.boolean(),
+      lastSeenAt: z.string().min(1).max(64),
+    }),
+  ),
+  seed: seedSchema.nullable(),
+  isOutdated: z.boolean().optional(),
 });
 export type SeasonRoomPublicSnapshot = z.infer<typeof seasonRoomPublicSnapshotSchema>;
+
+export const seasonRoomStartEventSchema = z.object({
+  roomId: idSchema,
+  mode: seasonRoomModeSchema,
+  seed: seedSchema,
+  settingsRevision: z.number().int().nonnegative(),
+  draftCursor: z.string().min(1).max(64),
+  startedAt: z.string().min(1).max(64),
+});
+export type SeasonRoomStartEvent = z.infer<typeof seasonRoomStartEventSchema>;
 
 export const seasonRoomMemberPrivateSnapshotSchema = z.object({
   roomId: idSchema,
@@ -264,6 +301,10 @@ export const seasonMultiplayerErrorCodeSchema = z.enum([
   'code-expired',
   'room-full',
   'negotiation-closed',
+  'outdated-room',
+  'opponent-disconnected',
+  'not-ready',
+  'stale-settings',
 ]);
 export type SeasonMultiplayerErrorCode = z.infer<typeof seasonMultiplayerErrorCodeSchema>;
 
@@ -286,7 +327,8 @@ export interface SeasonMultiplayerTransport {
   >;
   preview(code: string): Promise<SeasonRoomPublicSnapshot>;
   join(code: string): Promise<SeasonRoomMembership>;
-  resume(roomId: string): Promise<SeasonRoomPublicSnapshot>;
+  resume(roomId: string): Promise<SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership }>;
+  refresh?(roomId: string): Promise<SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership }>;
   subscribe(
     roomId: string,
     handler: (snapshot: SeasonRoomPublicSnapshot) => void,
@@ -301,5 +343,13 @@ export interface SeasonMultiplayerTransport {
   surrender(roomId: string, participantId: 'p1' | 'p2'): Promise<void>;
   preDraftRemoval(roomId: string, targetParticipantId: 'p1' | 'p2'): Promise<SeasonRoomCode>;
   close(roomId: string): Promise<void>;
-  startDraft?(roomId: string): Promise<SeasonRoomPublicSnapshot>;
+  startDraft(roomId: string): Promise<SeasonRoomPublicSnapshot>;
+  updateSettings(
+    roomId: string,
+    settings: { mode: SeasonRoomMode; pace: SeasonRoomPace },
+    expectedSettingsRevision?: number,
+  ): Promise<SeasonRoomPublicSnapshot>;
+  setReady(roomId: string, participantId: 'p1' | 'p2', ready: boolean, expectedSettingsRevision?: number): Promise<SeasonRoomPublicSnapshot>;
+  heartbeat(roomId: string, participantId: 'p1' | 'p2'): Promise<void>;
+  leave(roomId: string, participantId: 'p1' | 'p2'): Promise<void>;
 }

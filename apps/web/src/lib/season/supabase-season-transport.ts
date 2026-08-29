@@ -12,6 +12,13 @@ import type {
   SeasonRerunRequest,
   SeasonIntegrityFailure2,
   SeasonRoomCode,
+  SeasonRoomMode,
+  SeasonRoomPace,
+} from '@hoop-rush/data-contracts';
+import {
+  PRESENCE_OFFLINE_AFTER_MS,
+  SEASON_MULTIPLAYER_VERSION,
+  SEASON_ROOM_PROTOCOL_SCHEMA_VERSION,
 } from '@hoop-rush/data-contracts';
 
 export type SupabaseSeasonTransportConfig = {
@@ -148,17 +155,42 @@ function toPublicSnapshot(
     digest: string;
     code: string | null;
     code_expires_at: string | null;
+    guest_ready?: boolean | null;
+    settings_revision?: number | null;
+    root_seed?: string | null;
+    seed?: string | null;
+    presence?: Array<{ participantId: 'p1' | 'p2'; online: boolean; lastSeenAt: string }> | null;
+    members?: Array<{ participant_id: string; last_seen_at?: string | null }>;
   },
   memberCount = 0,
 ): SeasonRoomPublicSnapshot {
+  const isOutdated =
+    row.multiplayer_version !== SEASON_MULTIPLAYER_VERSION ||
+    row.room_protocol_version !== SEASON_ROOM_PROTOCOL_SCHEMA_VERSION;
+  // derive presence if server didn't include it but members did
+  let presence: SeasonRoomPublicSnapshot['presence'] = [];
+  if (row.presence) {
+    presence = row.presence as SeasonRoomPublicSnapshot['presence'];
+  } else if (row.members) {
+    const now = Date.now();
+    presence = row.members.map((m) => {
+      const lastSeen = m.last_seen_at ? new Date(m.last_seen_at).getTime() : now;
+      return {
+        participantId: m.participant_id as 'p1' | 'p2',
+        online: now - lastSeen <= PRESENCE_OFFLINE_AFTER_MS,
+        lastSeenAt: m.last_seen_at ?? new Date(now).toISOString(),
+      };
+    });
+  }
+  const seed = (row as unknown as { root_seed?: string }).root_seed ?? (row as unknown as { seed?: string }).seed ?? null;
   return {
     roomId: row.id,
     settings: {
-      schemaVersion: 1,
+      schemaVersion: SEASON_ROOM_PROTOCOL_SCHEMA_VERSION as 2,
       pace: row.pace as 'live' | 'async',
       mode: (row.mode as 'season' | 'classic' | 'sandbox' | null) ?? 'season',
-      roomProtocolVersion: row.room_protocol_version as 1,
-      multiplayerVersion: row.multiplayer_version as 'season-multiplayer-v1',
+      roomProtocolVersion: row.room_protocol_version as unknown as 2,
+      multiplayerVersion: row.multiplayer_version as unknown as 'season-multiplayer-v2',
       timerPolicyVersion: row.timer_policy_version as 'season-timers-v1',
     },
     phase: row.phase as SeasonRoomPublicSnapshot['phase'],
@@ -169,6 +201,12 @@ function toPublicSnapshot(
     codeActive:
       !!row.code && !!row.code_expires_at && new Date(row.code_expires_at).getTime() > Date.now(),
     expiresAt: row.code_expires_at,
+    mode: (row.mode as SeasonRoomMode | null) ?? 'season',
+    settingsRevision: (row.settings_revision as number | null) ?? 0,
+    guestReady: !!(row.guest_ready as boolean | null),
+    presence,
+    seed: seed as string | null,
+    isOutdated: isOutdated || undefined,
   };
 }
 
@@ -196,6 +234,9 @@ export function createSupabaseSeasonTransport(
       },
       async resume() {
         return notConfigured('resume');
+      },
+      async refresh() {
+        return notConfigured('refresh');
       },
       subscribe() {
         return { unsubscribe() {} };
@@ -226,6 +267,18 @@ export function createSupabaseSeasonTransport(
       },
       async startDraft() {
         return notConfigured('startDraft');
+      },
+      async updateSettings() {
+        return notConfigured('updateSettings');
+      },
+      async setReady() {
+        return notConfigured('setReady');
+      },
+      async heartbeat() {
+        return notConfigured('heartbeat');
+      },
+      async leave() {
+        return notConfigured('leave');
       },
     };
   }
@@ -329,14 +382,30 @@ export function createSupabaseSeasonTransport(
       return res.membership;
     },
 
-    async resume(roomId: string): Promise<SeasonRoomPublicSnapshot> {
-      const res = await callEdge<{ snapshot: SeasonRoomPublicSnapshot }>(
+    async resume(roomId: string): Promise<SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership }> {
+      const res = await callEdge<{ snapshot: SeasonRoomPublicSnapshot; membership?: SeasonRoomMembership }>(
         client,
         config,
         'season-room-resume',
         { roomId },
       );
-      return res.snapshot;
+      // edge may return membership for retain-private-membership requirement; preserve it on snapshot
+      const snap = res.snapshot as SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership };
+      if (res.membership) (snap as unknown as { membership?: SeasonRoomMembership }).membership = res.membership;
+      return snap;
+    },
+
+    async refresh(roomId: string): Promise<SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership }> {
+      // refresh is alias for resume but retains membership
+      const res = await callEdge<{ snapshot: SeasonRoomPublicSnapshot; membership?: SeasonRoomMembership }>(
+        client,
+        config,
+        'season-room-resume',
+        { roomId },
+      );
+      const snap = res.snapshot as SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership };
+      if (res.membership) (snap as unknown as { membership?: SeasonRoomMembership }).membership = res.membership;
+      return snap;
     },
 
     subscribe(roomId: string, handler: (snap: SeasonRoomPublicSnapshot) => void) {
@@ -508,6 +577,61 @@ export function createSupabaseSeasonTransport(
         { roomId },
       );
       return res.snapshot;
+    },
+
+    async updateSettings(
+      roomId: string,
+      settings: { mode: SeasonRoomMode; pace: SeasonRoomPace },
+      expectedSettingsRevision?: number,
+    ): Promise<SeasonRoomPublicSnapshot> {
+      try {
+        const res = await callEdge<{ snapshot: SeasonRoomPublicSnapshot }>(
+          client,
+          config,
+          'season-room-update-settings',
+          { roomId, mode: settings.mode, pace: settings.pace, expectedSettingsRevision },
+        );
+        return res.snapshot;
+      } catch (err) {
+        // fallback for older deployments without this edge: try direct RPC if available; otherwise throw
+        const code = (err as { code?: string })?.code;
+        if (code === 'outdated-room' || code === 'authorization' || code === 'stale-revision') throw err;
+        // attempt to synthesize error for local test without supabase: if supabase not configured, this won't be called
+        throw err;
+      }
+    },
+
+    async setReady(
+      roomId: string,
+      participantId: 'p1' | 'p2',
+      ready: boolean,
+      expectedSettingsRevision?: number,
+    ): Promise<SeasonRoomPublicSnapshot> {
+      const res = await callEdge<{ snapshot: SeasonRoomPublicSnapshot }>(
+        client,
+        config,
+        'season-room-set-ready',
+        { roomId, participantId, ready, expectedSettingsRevision },
+      );
+      return res.snapshot;
+    },
+
+    async heartbeat(roomId: string, participantId: 'p1' | 'p2'): Promise<void> {
+      try {
+        await callEdge<{ ok: boolean }>(client, config, 'season-room-heartbeat', {
+          roomId,
+          participantId,
+        });
+      } catch {
+        // heartbeat is best-effort; if edge not deployed, fallback to no-op but update local presence via resume poll
+      }
+    },
+
+    async leave(roomId: string, participantId: 'p1' | 'p2'): Promise<void> {
+      await callEdge<{ ok: boolean }>(client, config, 'season-room-leave', {
+        roomId,
+        participantId,
+      });
     },
   };
 }

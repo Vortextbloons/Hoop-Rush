@@ -1,9 +1,33 @@
 import tailwindcss from '@tailwindcss/vite';
 import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
+
+/** Stub CDP/health probes that hit the dev server when --host exposes port 5173. */
+function devProbeStubPlugin(): Plugin {
+  const stubs: Record<string, string> = {
+    '/global/health': '{"ok":true}',
+    '/json/version': '{"Browser":"","Protocol-Version":"1.3"}',
+  };
+
+  return {
+    name: 'hoop-rush-dev-probe-stub',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const path = req.url?.split('?')[0];
+        const body = path ? stubs[path] : undefined;
+        if (!body)
+          return next();
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(body);
+      });
+    },
+  };
+}
 
 export default defineConfig({
-  plugins: [sveltekit(), tailwindcss()],
+  plugins: [devProbeStubPlugin(), sveltekit(), tailwindcss()],
   server: {
                                                     
     host: true,

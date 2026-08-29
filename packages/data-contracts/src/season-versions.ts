@@ -1,8 +1,10 @@
-export const SEASON_RUN_SCHEMA_VERSION = 12;
+export const SEASON_RUN_SCHEMA_VERSION = 13;
 export const SEASON_DRAFT_SAVE_SCHEMA_VERSION = 3;
-export const SEASON_RUN_SAVE_SCHEMA_VERSION = 9;
-export const SEASON_ROOM_PROTOCOL_SCHEMA_VERSION = 1;
-export const SEASON_MULTIPLAYER_VERSION = 'season-multiplayer-v1';
+export const SEASON_RUN_SAVE_SCHEMA_VERSION = 10;
+export const SEASON_ROOM_PROTOCOL_SCHEMA_VERSION = 2;
+export const SEASON_ROOM_PROTOCOL_SCHEMA_VERSION_V1 = 1;
+export const SEASON_MULTIPLAYER_VERSION = 'season-multiplayer-v2';
+export const SEASON_MULTIPLAYER_VERSION_V1 = 'season-multiplayer-v1';
 export const SEASON_TIMER_POLICY_VERSION = 'season-timers-v1';
 export const SEASON_AUTHORITY_VERSION = 'season-authority-v1';
 export const SEASON_LEAGUE_VERSION = 'league-v1';

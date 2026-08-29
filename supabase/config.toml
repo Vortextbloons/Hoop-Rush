@@ -127,6 +127,30 @@ verify_jwt = false
 import_map = "./functions/deno.json"
 entrypoint = "./functions/season-room-start-draft/index.ts"
 
+[functions.season-room-update-settings]
+enabled = true
+verify_jwt = false
+import_map = "./functions/deno.json"
+entrypoint = "./functions/season-room-update-settings/index.ts"
+
+[functions.season-room-set-ready]
+enabled = true
+verify_jwt = false
+import_map = "./functions/deno.json"
+entrypoint = "./functions/season-room-set-ready/index.ts"
+
+[functions.season-room-heartbeat]
+enabled = true
+verify_jwt = false
+import_map = "./functions/deno.json"
+entrypoint = "./functions/season-room-heartbeat/index.ts"
+
+[functions.season-room-leave]
+enabled = true
+verify_jwt = false
+import_map = "./functions/deno.json"
+entrypoint = "./functions/season-room-leave/index.ts"
+
 [functions.season-cron]
 enabled = true
 verify_jwt = false

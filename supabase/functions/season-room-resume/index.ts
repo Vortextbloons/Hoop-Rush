@@ -40,7 +40,6 @@ Deno.serve(async (req: Request) => {
   const sc = createClient(url, srk);
   const { data: room, error } = await sc.from('season_rooms').select('*').eq('id', roomId).single();
   if (error || !room) return json(404, { code: 'membership', message: 'room not found' });
-  // verify membership via service_role (bypass RLS but check)
   const { data: member } = await sc
     .from('season_room_members')
     .select('*')
@@ -48,18 +47,45 @@ Deno.serve(async (req: Request) => {
     .eq('uid', uidVal)
     .maybeSingle();
   if (!member) return json(403, { code: 'membership', message: 'not a member' });
+
+  // heartbeat: update last_seen_at for caller
+  try {
+    await sc.from('season_room_members').update({ last_seen_at: new Date().toISOString() } as unknown as Record<string, unknown>).eq('room_id', roomId).eq('uid', uidVal);
+  } catch {}
+
   const { count } = await sc
     .from('season_room_members')
     .select('participant_id', { count: 'exact', head: true })
     .eq('room_id', roomId);
+
+  const { data: allMembers } = await sc
+    .from('season_room_members')
+    .select('participant_id, last_seen_at')
+    .eq('room_id', roomId);
+
+  const nowMs = Date.now();
+  const presence = (allMembers ?? []).map((m: unknown) => {
+    const row = m as { participant_id: string; last_seen_at: string | null };
+    const lastSeen = row.last_seen_at ? new Date(row.last_seen_at).getTime() : nowMs;
+    return {
+      participantId: row.participant_id as 'p1' | 'p2',
+      online: nowMs - lastSeen <= 15_000,
+      lastSeenAt: row.last_seen_at ?? new Date(nowMs).toISOString(),
+    };
+  });
+
+  const isOutdated =
+    (room as unknown as { multiplayer_version?: string }).multiplayer_version !== 'season-multiplayer-v2' ||
+    (room as unknown as { room_protocol_version?: number }).room_protocol_version !== 2;
+
   const snap = {
     roomId: room.id,
     settings: {
-      schemaVersion: 1,
+      schemaVersion: 2,
       pace: room.pace,
       mode: (room as unknown as { mode?: string }).mode ?? 'season',
-      roomProtocolVersion: room.room_protocol_version,
-      multiplayerVersion: room.multiplayer_version,
+      roomProtocolVersion: room.room_protocol_version as unknown as 2,
+      multiplayerVersion: room.multiplayer_version as unknown as 'season-multiplayer-v2',
       timerPolicyVersion: room.timer_policy_version,
     },
     phase: room.phase,
@@ -72,6 +98,21 @@ Deno.serve(async (req: Request) => {
       !!room.code_expires_at &&
       new Date(room.code_expires_at).getTime() > Date.now(),
     expiresAt: room.code_expires_at,
+    mode: (room as unknown as { mode?: string }).mode ?? 'season',
+    settingsRevision: (room as unknown as { settings_revision?: number }).settings_revision ?? 0,
+    guestReady: (room as unknown as { guest_ready?: boolean }).guest_ready ?? false,
+    presence,
+    seed: (room as unknown as { root_seed?: string }).root_seed ?? null,
+    isOutdated: isOutdated || undefined,
   };
-  return json(200, { snapshot: snap });
+
+  const membership = {
+    roomId: member.room_id,
+    participantId: member.participant_id as 'p1' | 'p2',
+    franchiseId: member.franchise_id as string,
+    uid: member.uid as string,
+    seat: member.seat as 'p1' | 'p2',
+  };
+
+  return json(200, { snapshot: snap, membership });
 });
