@@ -75,8 +75,10 @@ Deno.serve(async (req: Request) => {
   });
 
   const isOutdated =
-    (room as unknown as { multiplayer_version?: string }).multiplayer_version !== 'season-multiplayer-v2' ||
-    (room as unknown as { room_protocol_version?: number }).room_protocol_version !== 2;
+    (room as unknown as { multiplayer_version?: string }).multiplayer_version !==
+      'season-multiplayer-v2' ||
+    Number((room as unknown as { room_protocol_version?: number | string }).room_protocol_version) !==
+      2;
 
   const snap = {
     roomId: room.id,

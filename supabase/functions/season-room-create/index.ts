@@ -212,15 +212,22 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  // ensure v2 defaults even if RPC used older defaults
+  // ensure v2 protocol even if RPC/defaults still write v1 (guest_ready update is separate — missing column must not block version bump)
+  try {
+    await serviceClient
+      .from('season_rooms')
+      .update({
+        room_protocol_version: 2,
+        multiplayer_version: 'season-multiplayer-v2',
+      } as unknown as Record<string, unknown>)
+      .eq('id', roomId);
+  } catch {}
   try {
     await serviceClient
       .from('season_rooms')
       .update({
         guest_ready: false,
         settings_revision: 0,
-        room_protocol_version: 2,
-        multiplayer_version: 'season-multiplayer-v2',
       } as unknown as Record<string, unknown>)
       .eq('id', roomId);
   } catch {}

@@ -366,7 +366,15 @@
       </div>
       <p class="mt-2 text-sm text-muted-foreground">This room was created with an old protocol (v1). Rooms are temporary — please create a new room. Your draft progress is still saved locally if you started.</p>
       <div class="mt-4 flex gap-2">
-        <a href={resolve('/multiplayer')} class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Create new room</a>
+        <a
+          href={resolve('/multiplayer')}
+          onclick={() => {
+            clearMembership(roomId);
+            clearCode(roomId);
+          }}
+          class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+          >Create new room</a
+        >
         <button type="button" onclick={handleLeave} class="rounded-lg border border-line-soft bg-card px-4 py-2 text-sm font-semibold">Leave room</button>
       </div>
     </div>

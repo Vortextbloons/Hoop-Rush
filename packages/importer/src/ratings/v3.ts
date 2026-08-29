@@ -430,22 +430,21 @@ export function teamContextAdjustment(
   const apg = safeFloat(stats.assists) / Math.max(1, games);
   // Bad-team / empty-volume penalty: high usage on bad team with only average efficiency/impact
   let penalty = 0;
-  if (pct < 0.42) {
-    const badTeamFactor = clamp((0.42 - pct) / 0.25, 0, 1);
-    const usageExcess = clamp((usage - 24) / 12, 0, 1);
+  if (pct < 0.58) {
+    const badTeamFactor = clamp((0.58 - pct) / 0.3, 0, 1);
+    const usageExcess = clamp((usage - 22) / 14, 0, 1);
     if (usageExcess > 0.05 && badTeamFactor > 0) {
-      const tsProtect = clamp((ts - 0.5) / 0.1, 0, 1);
-      const bpmProtect = clamp((bpm + 1) / 5, 0, 1);
-      const perProtect = clamp((per - 12) / 10, 0, 1);
-      const apgProtect = clamp((apg - 2) / 6, 0, 1);
-      const defProtect = clamp((defenseRating - 58) / 25, 0, 1);
+      const tsProtect = clamp((ts - 0.58) / 0.07, 0, 1);
+      const bpmProtect = clamp((bpm - 1) / 3, 0, 1);
+      const perProtect = clamp((per - 19) / 6, 0, 1);
+      const apgProtect = clamp((apg - 4.5) / 5, 0, 1);
+      const defProtect = clamp((defenseRating - 66) / 16, 0, 1);
       const protection = Math.max(tsProtect, bpmProtect, perProtect, apgProtect, defProtect);
-      const inefficiency = clamp((0.58 - ts) / 0.1, 0, 1) * 0.6 + clamp((1 - bpm) / 4, 0, 1) * 0.4;
-      const emptyVolume = clamp(usageExcess * 0.7 + inefficiency * 0.5, 0, 1);
-      const base = badTeamFactor * emptyVolume * 5;
+      const inefficiency = clamp((0.6 - ts) / 0.12, 0, 1) * 0.6 + clamp((2 - bpm) / 5, 0, 1) * 0.4;
+      const emptyVolume = clamp(usageExcess * 0.65 + inefficiency * 0.55, 0, 1);
+      const base = badTeamFactor * emptyVolume * 6.5;
       penalty = base * (1 - protection * 0.88);
       penalty = clamp(penalty, 0, 5);
-      // Tiny sample should not get full penalty
       if (games < 40 || mpg < 18) {
         penalty *= 0.6;
       }
@@ -465,7 +464,6 @@ export function teamContextAdjustment(
           clamp((per - 12) / 10, 0, 1) * 0.3;
         bonus = eliteFactor * roleFactor * (0.5 + 0.5 * effScale) * 3;
         bonus = clamp(bonus, 0, 3);
-        // Cap around 2-3 as spec; tiny role players get less
         if (mpg < 20 && per < 14 && apg < 3) bonus = Math.min(bonus, 1.2);
       }
     }

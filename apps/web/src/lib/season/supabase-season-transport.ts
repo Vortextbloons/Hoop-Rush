@@ -19,6 +19,7 @@ import {
   PRESENCE_OFFLINE_AFTER_MS,
   SEASON_MULTIPLAYER_VERSION,
   SEASON_ROOM_PROTOCOL_SCHEMA_VERSION,
+  isSeasonRoomProtocolOutdated,
 } from '@hoop-rush/data-contracts';
 
 export type SupabaseSeasonTransportConfig = {
@@ -165,9 +166,7 @@ function toPublicSnapshot(
   },
   memberCount = 0,
 ): SeasonRoomPublicSnapshot {
-  const isOutdated =
-    row.multiplayer_version !== SEASON_MULTIPLAYER_VERSION ||
-    row.room_protocol_version !== SEASON_ROOM_PROTOCOL_SCHEMA_VERSION;
+  const isOutdated = isSeasonRoomProtocolOutdated(row);
   // derive presence if server didn't include it but members did
   let presence: SeasonRoomPublicSnapshot['presence'] = [];
   if (row.presence) {

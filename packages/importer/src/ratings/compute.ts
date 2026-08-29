@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
 import { Worker } from 'node:worker_threads';
-import { DEFAULT_SEASONS, ensureOutputDir } from '../config.ts';
+import { DEFAULT_SEASONS, RAW_CACHE, ensureOutputDir } from '../config.ts';
 import { clamp, fileExists, readJson, safeFloat, writeJsonRetry } from '../json.ts';
+import { join } from 'node:path';
 import { deriveTraits } from './traits.ts';
 import { deriveContract } from './contracts.ts';
 import { derivePlayerRecord, fieldPublished, positionGroup, type SeasonContext } from './v2.ts';
@@ -76,6 +77,41 @@ function safeHeight(value: unknown): number | null {
 function seasonContext(season: string): SeasonContext {
   const era = getEra(season);
   return { leaguePpg: era.leaguePpg, league3PARate: era.league3PARate, pace: era.pace };
+}
+function loadPlayerWinPctMap(season: string): Map<string, number> {
+  const map = new Map<string, number>();
+  const candidates = [
+    join(RAW_CACHE, `league_dash_player_stats_measure__measure=Advanced_season=${season}.json`),
+    join(RAW_CACHE, `league_dash_player_stats__season=${season}.json`),
+  ];
+  for (const path of candidates) {
+    if (!fileExists(path)) continue;
+    try {
+      const data = readJson(path) as unknown;
+      const rows: Array<Record<string, unknown>> = Array.isArray((data as { rows?: unknown }).rows)
+        ? ((data as { rows: Array<Record<string, unknown>> }).rows as Array<
+            Record<string, unknown>
+          >)
+        : Array.isArray(data)
+          ? (data as Array<Record<string, unknown>>)
+          : [];
+      for (const row of rows) {
+        const pid = String(row['PLAYER_ID'] ?? row['playerExternalId'] ?? '');
+        if (!pid) continue;
+        const wPctRaw = row['W_PCT'] ?? row['wPct'] ?? row['winPct'];
+        const wPct = typeof wPctRaw === 'number' && Number.isFinite(wPctRaw) ? wPctRaw : null;
+        if (wPct != null) {
+          map.set(pid, clamp(wPct, 0, 1));
+          // also allow externalId as string version without prefix
+          // stats use playerExternalId as string of externalId
+        }
+      }
+      if (map.size > 0) break;
+    } catch {
+      // ignore and try next candidate
+    }
+  }
+  return map;
 }
 export function estimateTeamWinPctMap(statsList: readonly StatsRow[]): Map<string, number> {
   const teamBuckets = new Map<
@@ -240,6 +276,7 @@ export function computeForSeason(season: string, force = false): void {
   const threePointReconstruction = loadThreePointReconstructionArtifact();
   const ratePriorsByGroup = pooledRatePriors(roster, statsList);
   const teamWinPctMap = estimateTeamWinPctMap(statsList);
+  const playerWinPctMap = loadPlayerWinPctMap(season);
   let computed = 0;
   for (const player of roster) {
     const extId = player.externalId ?? '';
@@ -293,7 +330,9 @@ export function computeForSeason(season: string, force = false): void {
       typeof (player as Record<string, unknown>)['teamExternalId'] === 'string'
         ? ((player as Record<string, unknown>)['teamExternalId'] as string)
         : null;
-    const teamWinPct = teamWinPctForPlayer(stats, rosterTeamId, teamWinPctMap);
+    const playerWinPct = extId ? (playerWinPctMap.get(extId) ?? null) : null;
+    const fallbackTeamWinPct = teamWinPctForPlayer(stats, rosterTeamId, teamWinPctMap);
+    const teamWinPct = playerWinPct ?? fallbackTeamWinPct;
     const derived = derivePlayerRecord({
       season,
       playerId: extId !== '' ? `p-${extId}` : (player.id ?? undefined),
