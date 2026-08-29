@@ -7,7 +7,7 @@ import { LINEAGE_SEGMENTS, MODERN_SLOTS } from '../lineage.ts';
 import { classifyUnattempted, loadCoverageReport, loadManifest, type Pool, } from '../pools/compute.ts';
 type Manifest = Record<string, unknown>;
 export const MANIFEST_PATH = join(PUBLIC_DATA, 'manifest.json');
-export const DATA_VERSION = 'm10-ratings-v3.7';
+export const DATA_VERSION = 'm10-ratings-v3.8';
 function peakPlayerToDraftEntry(player: ReturnType<typeof parsePool>['players'][number]) {
     return {
         playerId: player.playerId,

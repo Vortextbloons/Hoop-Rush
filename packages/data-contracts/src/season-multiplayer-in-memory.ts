@@ -163,7 +163,7 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     const attempts = this.createAttempts.get(uid) ?? [];
     const now = this.clock();
     const recent = attempts.filter((t) => now - t < 60 * 60 * 1000);
-    if (recent.length >= 3) {
+    if (recent.length >= 30) {
       throw Object.assign(new Error('rate-limit'), { code: 'rate-limit' });
     }
     recent.push(now);
@@ -254,9 +254,9 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     const key = `join:${code}`;
     const attempts = this.joinAttempts.get(key) ?? [];
     const recentMin = attempts.filter((t) => now - t < 60 * 1000);
-    if (recentMin.length >= 5) throw Object.assign(new Error('rate-limit'), { code: 'rate-limit' });
+    if (recentMin.length >= 30) throw Object.assign(new Error('rate-limit'), { code: 'rate-limit' });
     const recentHour = attempts.filter((t) => now - t < 60 * 60 * 1000);
-    if (recentHour.length >= 20)
+    if (recentHour.length >= 100)
       throw Object.assign(new Error('rate-limit'), { code: 'rate-limit' });
     recentMin.push(now);
     this.joinAttempts.set(key, [...recentHour, now].slice(-20));

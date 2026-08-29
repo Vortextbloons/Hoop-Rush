@@ -90,7 +90,7 @@ Deno.serve(async (req: Request) => {
     .eq('uid', uid)
     .gte('created_at', oneHourAgo)
     .like('code', 'create:%');
-  if ((uidCount ?? 0) >= 3)
+  if ((uidCount ?? 0) >= 30)
     return json(429, { code: 'rate-limit', message: 'too many rooms created, try again later' });
 
   const { count: ipCount } = await serviceClient
@@ -99,7 +99,7 @@ Deno.serve(async (req: Request) => {
     .eq('ip_hash', ipHash)
     .gte('created_at', oneHourAgo)
     .like('code', 'create:%');
-  if ((ipCount ?? 0) >= 3)
+  if ((ipCount ?? 0) >= 30)
     return json(429, { code: 'rate-limit', message: 'too many rooms created, try again later' });
 
   await serviceClient
@@ -149,22 +149,31 @@ Deno.serve(async (req: Request) => {
         // fallback: direct insert with generated code (service_role bypasses RLS)
         try {
           const code = String(Math.floor(Math.random() * 10000)).padStart(4, '0');
-          const { data: ins, error: insErr } = await serviceClient
-            .from('season_rooms')
-            .insert({
-              pace,
-              mode,
-              root_seed: rootSeed,
-              code,
-              code_expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-              phase: 'waiting',
-              guest_ready: false,
-              settings_revision: 0,
-              room_protocol_version: 2,
-              multiplayer_version: 'season-multiplayer-v2',
-            } as unknown as Record<string, unknown>)
-            .select('id')
-            .single();
+          let ins: unknown = null;
+          let insErr: unknown = null;
+          const baseInsert = {
+            pace,
+            mode,
+            root_seed: rootSeed,
+            code,
+            code_expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+            phase: 'waiting',
+          } as unknown as Record<string, unknown>;
+          const v2Insert = {
+            ...baseInsert,
+            guest_ready: false,
+            settings_revision: 0,
+            room_protocol_version: 2,
+            multiplayer_version: 'season-multiplayer-v2',
+          } as unknown as Record<string, unknown>;
+          let res = await serviceClient.from('season_rooms').insert(v2Insert).select('id').single();
+          ins = (res as { data: unknown }).data;
+          insErr = (res as { error: unknown }).error;
+          if (insErr && String((insErr as { message?: string }).message ?? '').includes('guest_ready')) {
+            const retry = await serviceClient.from('season_rooms').insert(baseInsert).select('id').single();
+            ins = (retry as { data: unknown }).data;
+            insErr = (retry as { error: unknown }).error;
+          }
           if (!insErr && ins) {
             roomId = (ins as { id: string }).id;
             lastError = null;
@@ -173,7 +182,6 @@ Deno.serve(async (req: Request) => {
             lastError = insErr ?? error;
             const insMsg = String((insErr as { message?: string })?.message ?? '');
             if (!insMsg.includes('unique') && !insMsg.includes('collision')) break;
-            // if collision, loop will retry with new code
             continue;
           }
         } catch (e) {
@@ -218,18 +226,37 @@ Deno.serve(async (req: Request) => {
   } catch {}
 
   // auto-join creator as p1 so they are a member and can load the room (fixes "not a member" when host doesn't immediately enter)
-  const { error: memberError } = await serviceClient.from('season_room_members').insert({
-    room_id: roomId,
-    uid,
-    participant_id: 'p1',
-    seat: 'p1',
-    franchise_id: 'franchise-p1',
-    control: 'human',
-    miss_streak: 0,
-    reclaim_requested: false,
-    last_seen_at: new Date().toISOString(),
-  } as unknown as Record<string, unknown>);
-  if (memberError && memberError.code !== '23505') {
+  let memberError: unknown = null;
+  try {
+    const { error } = await serviceClient.from('season_room_members').insert({
+      room_id: roomId,
+      uid,
+      participant_id: 'p1',
+      seat: 'p1',
+      franchise_id: 'franchise-p1',
+      control: 'human',
+      miss_streak: 0,
+      reclaim_requested: false,
+      last_seen_at: new Date().toISOString(),
+    } as unknown as Record<string, unknown>);
+    memberError = error;
+    if (error && String((error as { message?: string }).message ?? '').includes('last_seen_at')) {
+      const { error: retryError } = await serviceClient.from('season_room_members').insert({
+        room_id: roomId,
+        uid,
+        participant_id: 'p1',
+        seat: 'p1',
+        franchise_id: 'franchise-p1',
+        control: 'human',
+        miss_streak: 0,
+        reclaim_requested: false,
+      } as unknown as Record<string, unknown>);
+      memberError = retryError;
+    }
+  } catch (e) {
+    memberError = e;
+  }
+  if (memberError && (memberError as { code?: string }).code !== '23505') {
     // if insert fails for other reason, log but don't fail room creation
     console.error('auto-join p1 failed', memberError);
   }

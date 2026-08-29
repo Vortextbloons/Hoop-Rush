@@ -26,6 +26,7 @@ export interface DerivationInput {
         freeThrowPctPrior?: number;
     };
     threePointReconstruction?: ThreePointReconstructionArtifact;
+    teamWinPct?: number | null;
 }
 export interface DerivedRecord {
     ratings: SimulationRatings;
@@ -563,6 +564,7 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
         playerId: input.playerId ??
             (typeof input.stats.playerExternalId === 'string' ? input.stats.playerExternalId : undefined),
         artifact: input.artifact ?? DEFAULT_RATINGS_MODEL_ARTIFACT,
+        teamWinPct: input.teamWinPct,
     });
     const summaryRatings: SummaryRatings = v3.summaryRatings;
     return {

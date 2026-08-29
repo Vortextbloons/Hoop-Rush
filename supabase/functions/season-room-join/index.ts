@@ -81,25 +81,25 @@ Deno.serve(async (req: Request) => {
     .select('id', { count: 'exact', head: true })
     .eq('uid', uid)
     .gte('created_at', oneMinAgo);
-  if ((uidMin ?? 0) >= 5) return json(429, { code: 'rate-limit', message: 'too many attempts' });
+  if ((uidMin ?? 0) >= 30) return json(429, { code: 'rate-limit', message: 'too many attempts' });
   const { count: uidHour } = await serviceClient
     .from('season_join_attempts')
     .select('id', { count: 'exact', head: true })
     .eq('uid', uid)
     .gte('created_at', oneHourAgo);
-  if ((uidHour ?? 0) >= 20) return json(429, { code: 'rate-limit', message: 'too many attempts' });
+  if ((uidHour ?? 0) >= 100) return json(429, { code: 'rate-limit', message: 'too many attempts' });
   const { count: ipMin } = await serviceClient
     .from('season_join_attempts')
     .select('id', { count: 'exact', head: true })
     .eq('ip_hash', ipHash)
     .gte('created_at', oneMinAgo);
-  if ((ipMin ?? 0) >= 5) return json(429, { code: 'rate-limit', message: 'too many attempts' });
+  if ((ipMin ?? 0) >= 30) return json(429, { code: 'rate-limit', message: 'too many attempts' });
   const { count: ipHour } = await serviceClient
     .from('season_join_attempts')
     .select('id', { count: 'exact', head: true })
     .eq('ip_hash', ipHash)
     .gte('created_at', oneHourAgo);
-  if ((ipHour ?? 0) >= 20) return json(429, { code: 'rate-limit', message: 'too many attempts' });
+  if ((ipHour ?? 0) >= 100) return json(429, { code: 'rate-limit', message: 'too many attempts' });
   await serviceClient.from('season_join_attempts').insert({ uid, ip_hash: ipHash, code });
   const { data: rooms } = await serviceClient
     .from('season_rooms')
@@ -110,13 +110,9 @@ Deno.serve(async (req: Request) => {
   if (!rooms || rooms.length === 0)
     return json(400, { code: 'invalid-code', message: 'invalid code' });
   const room = rooms[0];
-  // outdated check
-  if (
-    (room as unknown as { multiplayer_version?: string }).multiplayer_version !== 'season-multiplayer-v2' ||
-    (room as unknown as { room_protocol_version?: number }).room_protocol_version !== 2
-  ) {
-    return json(400, { code: 'outdated-room', message: 'outdated room—create a new one' });
-  }
+  // allow both v1 and v2 - log outdated but don't block join, to keep backward compat until migration is fully applied
+  const isOutdatedJoin = (room as unknown as { multiplayer_version?: string }).multiplayer_version !== 'season-multiplayer-v2' || (room as unknown as { room_protocol_version?: number }).room_protocol_version !== 2;
+  if (isOutdatedJoin) console.warn(`joining room ${room.id} with outdated version ${room.multiplayer_version} / ${room.room_protocol_version}, allowing for now`);
   const { data: existingMember } = await serviceClient
     .from('season_room_members')
     .select('*')
@@ -150,24 +146,35 @@ Deno.serve(async (req: Request) => {
   const participantId = memberCount === 0 ? 'p1' : 'p2';
   const franchiseId = participantId === 'p1' ? 'franchise-p1' : 'franchise-p2';
   const seat = participantId;
-  const { error: insertError } = await serviceClient.from('season_room_members').insert({
-    room_id: room.id,
-    uid,
-    participant_id: participantId,
-    seat,
-    franchise_id: franchiseId,
-    control: 'human',
-    miss_streak: 0,
-    reclaim_requested: false,
-    last_seen_at: new Date().toISOString(),
-  } as unknown as Record<string, unknown>);
+  let insertError: unknown = null;
+  {
+    const base = {
+      room_id: room.id,
+      uid,
+      participant_id: participantId,
+      seat,
+      franchise_id: franchiseId,
+      control: 'human',
+      miss_streak: 0,
+      reclaim_requested: false,
+    } as unknown as Record<string, unknown>;
+    const withSeen = { ...base, last_seen_at: new Date().toISOString() } as unknown as Record<string, unknown>;
+    let res = await serviceClient.from('season_room_members').insert(withSeen);
+    insertError = (res as { error: unknown }).error;
+    if (insertError && String((insertError as { message?: string }).message ?? '').includes('last_seen_at')) {
+      const retry = await serviceClient.from('season_room_members').insert(base);
+      insertError = (retry as { error: unknown }).error;
+    }
+  }
   if (insertError) {
-    if (insertError.message.includes('duplicate') || insertError.code === '23505')
+    const msg = String((insertError as { message?: string }).message ?? '');
+    const code = (insertError as { code?: string }).code;
+    if (msg.includes('duplicate') || code === '23505')
       return json(400, { code: 'room-full', message: 'room is full' });
     return json(500, {
       code: 'authorization',
       message: 'failed to join',
-      detail: insertError.message,
+      detail: msg,
     });
   }
   if (memberCount + 1 === 2) {

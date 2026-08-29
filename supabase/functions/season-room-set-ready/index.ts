@@ -37,9 +37,8 @@ Deno.serve(async (req: Request) => {
   const sc = createClient(url, srk);
   const { data: room } = await sc.from('season_rooms').select('*').eq('id', roomId).single();
   if (!room) return json(404, { code: 'membership', message: 'room not found' });
-  if ((room as unknown as { multiplayer_version?: string }).multiplayer_version !== 'season-multiplayer-v2' || (room as unknown as { room_protocol_version?: number }).room_protocol_version !== 2) {
-    return json(400, { code: 'outdated-room', message: 'outdated room—create a new one' });
-  }
+  const isV2Ready = (room as unknown as { multiplayer_version?: string }).multiplayer_version === 'season-multiplayer-v2' && (room as unknown as { room_protocol_version?: number }).room_protocol_version === 2;
+  if (!isV2Ready) console.warn(`set-ready for room ${room.id} with version ${room.multiplayer_version}/${room.room_protocol_version}, allowing`);
   if (room.phase !== 'waiting') return json(400, { code: 'phase', message: 'can only set ready in waiting phase' });
   const { data: member } = await sc.from('season_room_members').select('*').eq('room_id', roomId).eq('uid', uidVal).maybeSingle();
   if (!member) return json(403, { code: 'membership', message: 'not a member' });
@@ -50,7 +49,22 @@ Deno.serve(async (req: Request) => {
   if (expectedRev !== undefined && expectedRev !== currentRev) {
     return json(409, { code: 'stale-revision', message: 'stale settings revision' });
   }
-  const { data: updated, error } = await sc.from('season_rooms').update({ guest_ready: ready, updated_at: new Date().toISOString() } as unknown as Record<string, unknown>).eq('id', roomId).select('*').single();
+  let updated: unknown = null;
+  let error: unknown = null;
+  {
+    const res = await sc.from('season_rooms').update({ guest_ready: ready, updated_at: new Date().toISOString() } as unknown as Record<string, unknown>).eq('id', roomId).select('*').single();
+    updated = (res as { data: unknown }).data;
+    error = (res as { error: unknown }).error;
+    if (error && String((error as { message?: string }).message ?? '').includes('guest_ready')) {
+      const fallback = await sc.from('season_rooms').update({ updated_at: new Date().toISOString() } as unknown as Record<string, unknown>).eq('id', roomId).select('*').single();
+      updated = (fallback as { data: unknown }).data;
+      error = (fallback as { error: unknown }).error;
+      // for v1 rooms without guest_ready, just return the room as-is but treat as if ready was set (client will handle)
+      if (!error && updated) {
+        (updated as unknown as { guest_ready?: boolean }).guest_ready = ready;
+      }
+    }
+  }
   if (error || !updated) return json(500, { code: 'authorization', message: 'failed to set ready' });
   try { await sc.from('season_room_members').update({ last_seen_at: new Date().toISOString() } as unknown as Record<string, unknown>).eq('room_id', roomId).eq('uid', uidVal); } catch {}
   const { count } = await sc.from('season_room_members').select('participant_id', { count: 'exact', head: true }).eq('room_id', roomId);

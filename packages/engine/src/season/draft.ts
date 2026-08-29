@@ -445,7 +445,7 @@ export function applySeasonDraftCommand(state: SeasonDraftState | null, catalog:
     }
     const parsedState = seasonDraftStateSchema.safeParse(state);
     if (!parsedState.success) {
-        throw new Error('draft state fails the schema; refusing to continue');
+        throw new Error(`draft state fails the schema; refusing to continue: ${parsedState.error.message}`);
     }
     const validatedState = parsedState.data;
     const prior = validatedState.commandLog.find((record) => record.commandId === command.commandId);

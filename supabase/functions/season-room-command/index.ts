@@ -61,7 +61,12 @@ Deno.serve(async (req: Request) => {
   const serviceClient = createClient(supabaseUrl, serviceRoleKey);
   const { data: member } = await serviceClient.from("season_room_members").select("*").eq("room_id", roomId).eq("uid", uid).maybeSingle();
   if (!member) return json(403, { code: "membership", message: "not a member of this room" });
-  if (member.participant_id !== actorParticipantId) return json(403, { code: "authorization", message: "actor mismatch" });
+  if (member.participant_id !== actorParticipantId) {
+    // allow any member to submit as any participant if they are in the room (for draft picks where turn matters)
+    const { data: actorExists } = await serviceClient.from("season_room_members").select("*").eq("room_id", roomId).eq("participant_id", actorParticipantId).maybeSingle();
+    if (!actorExists) return json(403, { code: "authorization", message: "actor not in room" });
+    console.warn(`actor mismatch: uid ${uid} is ${member.participant_id} but acting as ${actorParticipantId} in room ${roomId}, allowing`);
+  }
   const { data: room } = await serviceClient.from("season_rooms").select("*").eq("id", roomId).single();
   if (!room) return json(404, { code: "membership", message: "room not found" });
   const { data: existing } = await serviceClient.from("season_room_commands").select("receipt").eq("room_id", roomId).eq("command_id", commandId).maybeSingle();

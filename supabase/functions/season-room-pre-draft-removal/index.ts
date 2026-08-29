@@ -35,9 +35,8 @@ Deno.serve(async (req: Request) => {
   const sc = createClient(url, srk);
   const { data: room } = await sc.from("season_rooms").select("*").eq("id", roomId).single();
   if (!room) return json(404, { code: "membership", message: "room not found" });
-  if ((room as unknown as { multiplayer_version?: string }).multiplayer_version !== 'season-multiplayer-v2' || (room as unknown as { room_protocol_version?: number }).room_protocol_version !== 2) {
-    return json(400, { code: 'outdated-room', message: 'outdated room—create a new one' });
-  }
+  const isV2Pre = (room as unknown as { multiplayer_version?: string }).multiplayer_version === 'season-multiplayer-v2' && (room as unknown as { room_protocol_version?: number }).room_protocol_version === 2;
+  if (!isV2Pre) console.warn(`pre-draft-removal for room ${room.id} with version ${room.multiplayer_version}/${room.room_protocol_version}, allowing`);
   if (room.phase !== "waiting") return json(400, { code: "phase", message: "not in waiting phase" });
   const { data: member } = await sc.from("season_room_members").select("*").eq("room_id", roomId).eq("uid", uid).maybeSingle();
   if (!member) return json(403, { code: "membership", message: "not a member" });

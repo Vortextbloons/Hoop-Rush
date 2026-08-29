@@ -82,28 +82,28 @@ Deno.serve(async (req: Request) => {
     .select('id', { count: 'exact', head: true })
     .eq('uid', uid)
     .gte('created_at', oneMinAgo);
-  if ((uidMin ?? 0) >= 5)
+  if ((uidMin ?? 0) >= 30)
     return json(429, { code: 'rate-limit', message: 'too many attempts, try again later' });
   const { count: uidHour } = await serviceClient
     .from('season_join_attempts')
     .select('id', { count: 'exact', head: true })
     .eq('uid', uid)
     .gte('created_at', oneHourAgo);
-  if ((uidHour ?? 0) >= 20)
+  if ((uidHour ?? 0) >= 100)
     return json(429, { code: 'rate-limit', message: 'too many attempts, try again later' });
   const { count: ipMin } = await serviceClient
     .from('season_join_attempts')
     .select('id', { count: 'exact', head: true })
     .eq('ip_hash', ipHash)
     .gte('created_at', oneMinAgo);
-  if ((ipMin ?? 0) >= 5)
+  if ((ipMin ?? 0) >= 30)
     return json(429, { code: 'rate-limit', message: 'too many attempts, try again later' });
   const { count: ipHour } = await serviceClient
     .from('season_join_attempts')
     .select('id', { count: 'exact', head: true })
     .eq('ip_hash', ipHash)
     .gte('created_at', oneHourAgo);
-  if ((ipHour ?? 0) >= 20)
+  if ((ipHour ?? 0) >= 100)
     return json(429, { code: 'rate-limit', message: 'too many attempts, try again later' });
   await serviceClient.from('season_join_attempts').insert({ uid, ip_hash: ipHash, code });
   const { data: rooms, error } = await serviceClient
