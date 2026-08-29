@@ -1,4 +1,4 @@
-import { playerVersionId, SEASON_ALIGNMENT, SEASON_AI_VERSION, SEASON_AGGREGATES_VERSION, SEASON_ALMANAC_VERSION, SEASON_AWARDS_VERSION, SEASON_BLOCK_VERSION, SEASON_CHECKPOINT_VERSION, SEASON_CHEMISTRY_VERSION, SEASON_COMMAND_LOG_VERSION, SEASON_DRAFT_VERSION, SEASON_DRAFT_SAVE_SCHEMA_VERSION, SEASON_EFFECT_TARGETS_VERSION, SEASON_FREE_AGENCY_INDEX_VERSION, SEASON_FREE_AGENCY_TARGETS_VERSION, SEASON_FREE_AGENCY_VERSION, SEASON_GAME_COUNT, SEASON_GAME_SUMMARY_VERSION, SEASON_GAME_TARGETS_VERSION, SEASON_GAME_VERSION, SEASON_HEALTH_VERSION, SEASON_HOME_COURT_VERSION, SEASON_INFLUENCE_TARGETS_VERSION, SEASON_INFLUENCE_VERSION, SEASON_INJURY_TARGETS_VERSION, SEASON_LEADERS_VERSION, SEASON_LEAGUE_VERSION, SEASON_MINUTE_POLICY_VERSION, SEASON_OBJECTIVE_CATALOG, SEASON_OBJECTIVE_VERSION, SEASON_POSTSEASON_SUMMARY_VERSION, SEASON_POSTSEASON_TARGETS_VERSION, SEASON_POSTSEASON_VERSION, SEASON_RECAP_VERSION, SEASON_REPLAY_EXPORT_VERSION, SEASON_ROSTER_GENERATION_VERSION, SEASON_ROSTER_RULES_VERSION, SEASON_ROSTER_SIZE, SEASON_ROSTER_TARGETS_VERSION, SEASON_ROTATION_PLANNER_VERSION, SEASON_ROTATION_VERSION, SEASON_RUN_SAVE_SCHEMA_VERSION, SEASON_RUN_SCHEMA_VERSION, SEASON_SCHEDULE_FORMULA_VERSION, SEASON_SCHEDULE_VERSION, SEASON_STANDINGS_VERSION, SEASON_STAMINA_VERSION, SEASON_SEED_DERIVATION_VERSION, SEASON_TIEBREAK_VERSION, SEASON_TRADE_GRADE_VERSION, SEASON_TRADE_TARGETS_VERSION, SEASON_TRADE_VERSION, SEASON_CAMPAIGN_VERSION, SEASON_CAMPAIGN_TARGETS_VERSION, PLAYER_VERSION_ID_VERSION, buildEmptyHealth, buildInitialPostseasonState, seasonEffectsStateSchema, seasonFreeAgencyStateSchema, seasonGameSimulationResultSchema, seasonHealthStateSchema, seasonObjectiveStateSchema, seasonRunSchema, type SeasonAiAssignment, type SeasonBlockRecap, type SeasonCheckpointState, type SeasonCompactPlayerLine, type SeasonEffectsState, type SeasonGame, type SeasonGameSimulationResult, type SeasonGameSummary, type SeasonDraftState, type SeasonHealthState, type SeasonInfluenceState, type SeasonInvalidRosterInterruption, type SeasonLeague, type SeasonLeagueGenerationResult, type SeasonObjectiveState, type SeasonPairChemistryState, type SeasonPendingBlockCandidate, type SeasonPlayerAggregate, type SeasonRetainedGameDetail, type SeasonRoster, type SeasonRotation, type SeasonRun, type SeasonSchedule, type SeasonStandings, type SeasonTeamAggregate, type SeasonTeamBox, fnv1a32, buildEmptyCampaignState, seasonDigestHex, seedFromString, } from '@hoop-rush/data-contracts';
+import { playerVersionId, SEASON_ALIGNMENT, SEASON_AI_VERSION, SEASON_AUTHORITY_VERSION, SEASON_AGGREGATES_VERSION, SEASON_ALMANAC_VERSION, SEASON_AWARDS_VERSION, SEASON_BLOCK_VERSION, SEASON_CHECKPOINT_VERSION, SEASON_CHEMISTRY_VERSION, SEASON_COMMAND_LOG_VERSION, SEASON_DRAFT_VERSION, SEASON_DRAFT_SAVE_SCHEMA_VERSION, SEASON_EFFECT_TARGETS_VERSION, SEASON_FREE_AGENCY_INDEX_VERSION, SEASON_FREE_AGENCY_TARGETS_VERSION, SEASON_FREE_AGENCY_VERSION, SEASON_GAME_COUNT, SEASON_GAME_SUMMARY_VERSION, SEASON_GAME_TARGETS_VERSION, SEASON_GAME_VERSION, SEASON_HEALTH_VERSION, SEASON_HOME_COURT_VERSION, SEASON_INFLUENCE_TARGETS_VERSION, SEASON_INFLUENCE_VERSION, SEASON_INJURY_TARGETS_VERSION, SEASON_LEADERS_VERSION, SEASON_LEAGUE_VERSION, SEASON_MINUTE_POLICY_VERSION, SEASON_OBJECTIVE_CATALOG, SEASON_OBJECTIVE_VERSION, SEASON_POSTSEASON_SUMMARY_VERSION, SEASON_POSTSEASON_TARGETS_VERSION, SEASON_POSTSEASON_VERSION, SEASON_RECAP_VERSION, SEASON_REPLAY_EXPORT_VERSION, SEASON_ROSTER_GENERATION_VERSION, SEASON_ROSTER_RULES_VERSION, SEASON_ROSTER_SIZE, SEASON_ROSTER_TARGETS_VERSION, SEASON_ROTATION_PLANNER_VERSION, SEASON_ROTATION_VERSION, SEASON_RUN_SAVE_SCHEMA_VERSION, SEASON_RUN_SCHEMA_VERSION, SEASON_SCHEDULE_FORMULA_VERSION, SEASON_SCHEDULE_VERSION, SEASON_STANDINGS_VERSION, SEASON_STAMINA_VERSION, SEASON_SEED_DERIVATION_VERSION, SEASON_TIEBREAK_VERSION, SEASON_TRADE_GRADE_VERSION, SEASON_TRADE_TARGETS_VERSION, SEASON_TRADE_VERSION, SEASON_CAMPAIGN_VERSION, SEASON_CAMPAIGN_TARGETS_VERSION, PLAYER_VERSION_ID_VERSION, buildEmptyHealth, buildInitialPostseasonState, seasonEffectsStateSchema, seasonFreeAgencyStateSchema, seasonGameSimulationResultSchema, seasonHealthStateSchema, seasonObjectiveStateSchema, seasonRunSchema, type SeasonAiAssignment, type SeasonBlockRecap, type SeasonCheckpointState, type SeasonCompactPlayerLine, type SeasonEffectsState, type SeasonGame, type SeasonGameSimulationResult, type SeasonGameSummary, type SeasonDraftState, type SeasonHealthState, type SeasonInfluenceState, type SeasonInvalidRosterInterruption, type SeasonLeague, type SeasonLeagueGenerationResult, type SeasonObjectiveState, type SeasonPairChemistryState, type SeasonPendingBlockCandidate, type SeasonPlayerAggregate, type SeasonRetainedGameDetail, type SeasonRoster, type SeasonRotation, type SeasonRun, type SeasonSchedule, type SeasonStandings, type SeasonTeamAggregate, type SeasonTeamBox, fnv1a32, buildEmptyCampaignState, seasonDigestHex, seedFromString, } from '@hoop-rush/data-contracts';
 import { WINDOW_BLOCK_INDEX_TO_INDEX, reduceSeasonStandings, seasonRunStateDigest as engineSeasonRunStateDigest, } from '@hoop-rush/engine';
 import { canonicalJson } from '@hoop-rush/data-contracts';
 import type { SeasonRunStateDigestFacts } from '../season/engine-seam-types.ts';
@@ -331,6 +331,11 @@ export function buildFixtureRun(input: {
             freeAgencyTargetsVersion: SEASON_FREE_AGENCY_TARGETS_VERSION,
         },
         league,
+        authority: {
+            kind: 'local-solo',
+            soloFranchiseId: league.teams.find(t => t.control === 'human')?.franchiseId ?? null,
+            authorityVersion: SEASON_AUTHORITY_VERSION,
+        },
         rosters,
         ownership: rosters.flatMap((roster) => roster.players.map((player) => ({
             playerVersionId: player.playerVersionId,
@@ -440,6 +445,7 @@ export function buildFixtureRun(input: {
             rotations: run.rotations,
             effects: buildFixtureEffectsState(run.rosters),
             freeAgency: run.freeAgency,
+            authority: run.authority,
         }),
     });
 }
@@ -966,6 +972,7 @@ export function buildFixtureStateDigest(run: SeasonRun, overrides: Partial<Seaso
         rotations: overrides.rotations ?? run.rotations,
         effects: overrides.effects ?? buildFixtureEffectsState(run.rosters),
         freeAgency: overrides.freeAgency ?? run.freeAgency,
+        authority: overrides.authority ?? run.authority,
     });
 }
 export function buildFixtureCheckpointState(input: {

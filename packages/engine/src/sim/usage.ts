@@ -43,7 +43,7 @@ export function creationBurden(player: SimulationPlayer, team: SimulationTeam): 
         return 1;
     const theirCreation = teammates.reduce((sum, p) => sum + creationScore(p), 0) / teammates.length;
     const shortfall = Math.min(1, Math.max(0, (0.6 - theirCreation) / 0.3));
-    return 1 + Math.min(0.2, 0.08 + 0.12 * shortfall);
+    return 1 + Math.min(0.35, 0.1 + 0.18 * shortfall);
 }
 export function teamInitiatorWeights(team: SimulationTeam, positionModifiers: ReadonlyMap<string, PositionResponsibilityModifiers>): number[] {
     return team.players.map((p) => initiatorWeight(p, team, positionModifiers.get(p.playerId) ?? identityModifiers));

@@ -1,7 +1,7 @@
 import type { ShotZone, SlotGroup } from '@hoop-rush/data-contracts';
 import type { PositionResponsibilityModifiers } from './position-responsibilities.ts';
 import type { ActionType } from './usage.ts';
-export const ENGINE_VERSION = 'm3-engine-v12';
+export const ENGINE_VERSION = 'm3-engine-v13';
 export const ENGINE_CONSTANTS = {
   version: ENGINE_VERSION,
   zoneBaseMake: {
@@ -18,13 +18,13 @@ export const ENGINE_CONSTANTS = {
     cornerThree: 0.15,
     aboveBreakThree: 0.12,
   } as const satisfies Record<ShotZone, number>,
-  skillRange: 0.09,
-  contestMax: 0.105,
+  skillRange: 0.095,
+  contestMax: 0.12,
   contestMin: -0.05,
   contestRatioPivot: 66,
   contestRatioRange: 28,
   eraEfficiencyWeight: 0.35,
-  turnoverObservedBlend: 0.7,
+  turnoverObservedBlend: 0.62,
   turnoverNeutralTendency: 0.14,
   turnoverNeutralPressure: 0.671,
   turnoverNeutralHandling: 0.22,
@@ -67,17 +67,17 @@ export const ENGINE_CONSTANTS = {
     offensiveRebound: 0.2,
   } as const,
   estimateToTripsFactor: 0.93,
-  observedThreePointBlend: 0.65,
-  observedFreeThrowBlend: 0.82,
+  observedThreePointBlend: 0.55,
+  observedFreeThrowBlend: 0.72,
   freeThrowCalibrationOffset: -0.001,
-  anchoredThreePointSkillRange: 0.04,
+  anchoredThreePointSkillRange: 0.06,
   threePointCalibrationOffset: -0.003,
   threePointEvidenceMinimum: 0.02,
   threePointLowVolumeThreshold: 0.06,
   threePointLowVolumeCap: 0.08,
   threePointLowVolumeEraPull: 0.05,
   threePointEraPull: 0.3,
-  usageExponent: 1.1,
+  usageExponent: 1.35,
   twoPointAnchorMin: 0.82,
   twoPointAnchorMax: 1.18,
   twoPointAnchorSkillScale: 0.3,

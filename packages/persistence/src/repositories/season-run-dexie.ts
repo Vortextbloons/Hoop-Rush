@@ -220,6 +220,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
                 rotations: stored.run.rotations,
                 effects: stored.effects,
                 freeAgency: stored.run.freeAgency,
+                authority: stored.run.authority,
             });
             const block = seasonAcceptedBlockSchema.parse({
                 ...last,
@@ -296,6 +297,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
                 rotations: stored.run.rotations,
                 effects: stored.effects,
                 freeAgency: stored.run.freeAgency,
+                authority: stored.run.authority,
             });
             if (stateDigest === stored.stateDigest)
                 return false;

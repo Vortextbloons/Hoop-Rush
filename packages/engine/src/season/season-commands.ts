@@ -1,5 +1,5 @@
 import type { EraSimulationProfile, SeasonAcceptTradeOfferCommand, SeasonAcceptTradeOfferRejection, SeasonAcceptTradeOfferResult, SeasonAdvancePostseasonCommand, SeasonAdvancePostseasonRejection, SeasonAdvancePostseasonResult, SeasonAlreadyRehabbedRejection, SeasonAlreadySpentRejection, SeasonBlockMismatchRejection, SeasonDeclineTradeOfferCommand, SeasonDeclineTradeOfferRejection, SeasonDeclineTradeOfferResult, SeasonDraftCatalog, SeasonDuplicateCommandRejection, SeasonEffectsState, SeasonFastForwardPostseasonCommand, SeasonFastForwardPostseasonRejection, SeasonFastForwardPostseasonResult, SeasonForfeitInterruptedGameCommand, SeasonForfeitInterruptedGameRejection, SeasonForfeitInterruptedGameResult, SeasonGameMismatchRejection, SeasonGameSummary, SeasonInjuryNotActiveRejection, SeasonInsufficientBalanceRejection, SeasonInsufficientRehabResourcesRejection, SeasonInvalidRotationRejection, SeasonInvalidStageRejection, SeasonNoPendingBlockRejection, SeasonNotAtBoundaryRejection, SeasonNoWindowRejection, SeasonObjectiveAlreadySelectedRejection, SeasonObjectiveNotOfferedRejection, SeasonOfferNotOpenRejection, SeasonOfferUnknownRejection, SeasonPendingBlockCandidate, SeasonPostseasonState, SeasonPostseasonSummary, Position, SeasonResumeSeasonBlockCommand, SeasonResumeSeasonBlockRejection, SeasonResumeSeasonBlockResult, SeasonRotationDigestMismatchRejection, SeasonRun, SeasonRunCommand, SeasonRunCommandRejection, SeasonRunMismatchRejection, SeasonRunStage, SeasonSelectBlockObjectiveCommand, SeasonSelectBlockObjectiveRejection, SeasonSelectBlockObjectiveResult, SeasonSpectatePostseasonGameCommand, SeasonSpectatePostseasonGameRejection, SeasonSpectatePostseasonGameResult, SeasonSpendInfluenceCommand, SeasonSpendInfluenceRejection, SeasonSpendInfluenceResult, SeasonStaleStateRejection, SeasonStartPostseasonCommand, SeasonStartPostseasonRejection, SeasonStartPostseasonResult, SeasonSubmitPostseasonRotationCommand, SeasonSubmitPostseasonRotationRejection, SeasonSubmitPostseasonRotationResult, SeasonUnavailablePlayerRejection, SeasonWindowNotOpenRejection, SeasonWrongGameRejection, SeasonDeclareFreeAgentInterestCommand, SeasonDeclareFreeAgentInterestResult, SeasonSkipFreeAgentMarketCommand, SeasonSkipFreeAgentMarketResult, SeasonResolveFreeAgentMarketCommand, SeasonResolveFreeAgentMarketResult, SeasonFreeAgencyIndex, SeasonRosterTargets, SeasonSelectGmIdentityCommand, SeasonSelectGmIdentityRejection, SeasonSelectGmIdentityResult, SeasonSelectCampaignOpportunityCommand, SeasonSelectCampaignOpportunityRejection, SeasonSelectCampaignOpportunityResult, SeasonEvolveGmCampaignCommand, SeasonEvolveGmCampaignRejection, SeasonEvolveGmCampaignResult, SeasonOpenTradeInquiryCommand, SeasonOpenTradeInquiryRejection, SeasonOpenTradeInquiryResult, SeasonSubmitTradeProposalCommand, SeasonSubmitTradeProposalRejection, SeasonSubmitTradeProposalResult, SeasonRespondToTradeCounterCommand, SeasonRespondToTradeCounterRejection, SeasonRespondToTradeCounterResult, SeasonWalkAwayFromTradeCommand, SeasonWalkAwayFromTradeRejection, SeasonWalkAwayFromTradeResult, SeasonPurchaseTradeInquiryCommand, SeasonPurchaseTradeInquiryRejection, SeasonPurchaseTradeInquiryResult, SeasonCampaignIdentityAlreadySelectedRejection, SeasonCampaignIdentityRequiredRejection, SeasonCampaignAlreadySelectedRejection, SeasonCampaignOpportunityNotOfferedRejection, SeasonCampaignEvolutionAlreadySelectedRejection, SeasonCampaignEvolutionNotOfferedRejection, SeasonTradeActiveNegotiationRejection, SeasonTradeInquiryCapRejection, SeasonTradeDuplicateProposalRejection, SeasonTradeProtectedPlayerRejection, SeasonTradeExchangeLimitRejection, SeasonTradeCashCapRejection, SeasonTradeNegotiationsClosedRejection, SeasonTradeAvailabilityRiskRejection, SeasonTradeWrongFitRejection, SeasonTradeInsufficientTalentRejection, SeasonCampaignState, SeasonCampaignOpportunity, SeasonTradeProposal, SeasonTradeNegotiation, } from '@hoop-rush/data-contracts';
-import { SEASON_ROUND_COUNT, playInGameIdOf } from '@hoop-rush/data-contracts';
+import { SEASON_ROUND_COUNT, franchiseForParticipant, authorityForFranchise, playInGameIdOf, type SeasonRunAuthority } from '@hoop-rush/data-contracts';
 import { expandSeasonRunRosters } from './block.ts';
 import { advancePendingAfterForfeit, seasonForfeitSummaryForGame, seasonFranchiseLegalFiveFacts, } from './health.ts';
 import { seasonNextBlockIndex } from './block.ts';
@@ -141,7 +141,33 @@ function runStateDigestFactsOf(run: SeasonEconomyRun): Parameters<typeof seasonR
         rotations: run.rotations,
         effects: run.effects,
         freeAgency: run.freeAgency,
+        authority: (run as SeasonRun).authority,
     };
+}
+function authorityOfContext(context: SeasonRunCommandContext | undefined, run: SeasonRun): SeasonRunAuthority | null {
+    if (context?.authority) return context.authority;
+    const runAuthority = (run as unknown as { authority?: SeasonRunAuthority }).authority;
+    if (runAuthority) return runAuthority;
+    return null;
+}
+function participantFranchiseIdsOfContext(context: SeasonRunCommandContext, run: SeasonRun): string[] {
+    if (context.participantFranchiseIds && context.participantFranchiseIds.length > 0) return [...context.participantFranchiseIds];
+    const auth = authorityOfContext(context, run);
+    if (auth) {
+        if (auth.kind === 'local-solo') return auth.soloFranchiseId ? [auth.soloFranchiseId] : [];
+        return [auth.p1.franchiseId, auth.p2.franchiseId];
+    }
+    if (context.humanFranchiseId) return [context.humanFranchiseId];
+    return [];
+}
+function effectiveFranchiseIdOf(context: SeasonRunCommandContext): string | null {
+    return context.actorFranchiseId ?? context.humanFranchiseId ?? null;
+}
+function objectiveSelectionFor(run: SeasonRun, authority: SeasonRunAuthority | null, franchiseId: string | null, blockIndex: number): import('@hoop-rush/data-contracts').SeasonObjectiveSelection | undefined {
+    if (authority?.kind === 'season-multiplayer' && franchiseId) {
+        return (run.objectives.franchiseSelections?.[franchiseId] as Record<number, import('@hoop-rush/data-contracts').SeasonObjectiveSelection> | undefined)?.[blockIndex];
+    }
+    return run.objectives.selections[blockIndex];
 }
 function advanceRunState(run: SeasonEconomyRun): SeasonRun {
     const next = { ...run, stateRevision: run.stateRevision + 1, stateDigest: '' };
@@ -210,7 +236,36 @@ function baseValidation(command: SeasonRunCommand, run: SeasonRun, pending: Seas
         };
         return rejectedWith(rejection);
     }
-    if (context?.actorFranchiseId) {
+    const authority = authorityOfContext(context, run);
+    const actorPid = context?.actorParticipantId ?? null;
+    const actorFid = context?.actorFranchiseId ?? null;
+    if (authority !== null) {
+        if (authority.kind === 'season-multiplayer') {
+            if (actorPid !== null) {
+                const expectedFid = franchiseForParticipant(authority, actorPid);
+                if (expectedFid === null || (actorFid !== null && expectedFid !== actorFid)) {
+                    return rejectedWith({ code: 'run-mismatch', expectedRunId: run.runId } as unknown as SeasonRunCommandRejection);
+                }
+            } else if (actorFid !== null) {
+                const pid = authorityForFranchise(authority, actorFid);
+                if (pid === null) {
+                    return rejectedWith({ code: 'run-mismatch', expectedRunId: run.runId } as unknown as SeasonRunCommandRejection);
+                }
+            }
+            const directFid = (command as unknown as { franchiseId?: string }).franchiseId;
+            if (directFid !== undefined && actorFid !== null && directFid !== actorFid) {
+                return rejectedWith({ code: 'run-mismatch', expectedRunId: run.runId } as unknown as SeasonRunCommandRejection);
+            }
+        } else {
+            if (actorFid !== null && authority.soloFranchiseId !== null && actorFid !== authority.soloFranchiseId) {
+                return rejectedWith({ code: 'run-mismatch', expectedRunId: run.runId } as unknown as SeasonRunCommandRejection);
+            }
+            const directFid = (command as unknown as { franchiseId?: string }).franchiseId;
+            if (directFid !== undefined && actorFid !== null && directFid !== actorFid) {
+                return rejectedWith({ code: 'run-mismatch', expectedRunId: run.runId } as unknown as SeasonRunCommandRejection);
+            }
+        }
+    } else if (context?.actorFranchiseId) {
         const targetFranchiseId = (command as unknown as { franchiseId?: string }).franchiseId ?? null;
         if (targetFranchiseId !== null && targetFranchiseId !== context.actorFranchiseId) {
             return rejectedWith({ code: 'run-mismatch', expectedRunId: run.runId } as unknown as SeasonRunCommandRejection);
@@ -229,10 +284,13 @@ function rejectedSelect(command: SeasonSelectBlockObjectiveCommand, rejection: S
     };
 }
 function handleSelectBlockObjective(command: SeasonSelectBlockObjectiveCommand, context: SeasonRunCommandContext): SeasonRunCommandOutput {
-    const base = baseValidation(command, context.run, null);
+    const base = baseValidation(command, context.run, null, context);
     if (base !== null)
         return base;
     const run = economyRunOf(context);
+    const authority = authorityOfContext(context, run);
+    const effectiveFid = effectiveFranchiseIdOf(context);
+    const isMulti = authority?.kind === 'season-multiplayer';
     const currentBlockIndex = seasonNextBlockIndex(run.cursor.completedRounds);
     if (currentBlockIndex === null ||
         currentBlockIndex >= 8 ||
@@ -254,7 +312,16 @@ function handleSelectBlockObjective(command: SeasonSelectBlockObjectiveCommand, 
         };
         return rejectedSelect(command, rejection, run);
     }
-    if (run.objectives.selections[command.blockIndex] !== undefined) {
+    if (isMulti && effectiveFid) {
+        if (objectiveSelectionFor(run, authority, effectiveFid, command.blockIndex) !== undefined) {
+            const rejection: SeasonObjectiveAlreadySelectedRejection = {
+                code: 'objective-already-selected',
+                blockIndex: command.blockIndex,
+                objectiveId: command.objectiveId,
+            };
+            return rejectedSelect(command, rejection, run);
+        }
+    } else if (run.objectives.selections[command.blockIndex] !== undefined) {
         const rejection: SeasonObjectiveAlreadySelectedRejection = {
             code: 'objective-already-selected',
             blockIndex: command.blockIndex,
@@ -262,9 +329,19 @@ function handleSelectBlockObjective(command: SeasonSelectBlockObjectiveCommand, 
         };
         return rejectedSelect(command, rejection, run);
     }
-    const next = advanceRunState({
-        ...run,
-        objectives: {
+    let nextObjectives: typeof run.objectives;
+    if (isMulti && effectiveFid) {
+        const franchiseSelections = { ...(run.objectives.franchiseSelections ?? {}) };
+        const per = { ...((franchiseSelections[effectiveFid] as Record<number, import('@hoop-rush/data-contracts').SeasonObjectiveSelection> | undefined) ?? {}) };
+        (per as Record<number, import('@hoop-rush/data-contracts').SeasonObjectiveSelection>)[command.blockIndex] = {
+            objectiveId: command.objectiveId,
+            selectedByCommandId: command.commandId,
+            success: null,
+        };
+        franchiseSelections[effectiveFid] = per as unknown as typeof per;
+        nextObjectives = { ...run.objectives, franchiseSelections } as typeof run.objectives;
+    } else {
+        nextObjectives = {
             ...run.objectives,
             selections: {
                 ...run.objectives.selections,
@@ -274,8 +351,9 @@ function handleSelectBlockObjective(command: SeasonSelectBlockObjectiveCommand, 
                     success: null,
                 },
             },
-        },
-    });
+        };
+    }
+    const next = advanceRunState({ ...run, objectives: nextObjectives });
     return {
         result: {
             command: 'select-block-objective',
@@ -397,7 +475,7 @@ function rejectedPurchaseTradeInquiry(command: SeasonPurchaseTradeInquiryCommand
     };
 }
 function handleSelectGmIdentity(command: SeasonSelectGmIdentityCommand, context: SeasonRunCommandContext): SeasonRunCommandOutput {
-    const base = baseValidation(command, context.run, context.pending);
+    const base = baseValidation(command, context.run, context.pending, context);
     if (base !== null)
         return base;
     const economy = economyRunOf(context);
@@ -434,7 +512,7 @@ function handleSelectGmIdentity(command: SeasonSelectGmIdentityCommand, context:
     };
 }
 function handleSelectCampaignOpportunity(command: SeasonSelectCampaignOpportunityCommand, context: SeasonRunCommandContext): SeasonRunCommandOutput {
-    const base = baseValidation(command, context.run, context.pending);
+    const base = baseValidation(command, context.run, context.pending, context);
     if (base !== null)
         return base;
     const economy = economyRunOf(context);
@@ -511,7 +589,7 @@ function handleSelectCampaignOpportunity(command: SeasonSelectCampaignOpportunit
     };
 }
 function handleEvolveGmCampaign(command: SeasonEvolveGmCampaignCommand, context: SeasonRunCommandContext): SeasonRunCommandOutput {
-    const base = baseValidation(command, context.run, context.pending);
+    const base = baseValidation(command, context.run, context.pending, context);
     if (base !== null)
         return base;
     const economy = economyRunOf(context);
@@ -556,7 +634,7 @@ function handleEvolveGmCampaign(command: SeasonEvolveGmCampaignCommand, context:
     };
 }
 function handleOpenTradeInquiry(command: SeasonOpenTradeInquiryCommand, context: SeasonRunCommandContext): SeasonRunCommandOutput {
-    const base = baseValidation(command, context.run, context.pending);
+    const base = baseValidation(command, context.run, context.pending, context);
     if (base !== null)
         return base;
     const economy = economyRunOf(context);
@@ -614,7 +692,7 @@ function handleOpenTradeInquiry(command: SeasonOpenTradeInquiryCommand, context:
     };
 }
 function handleSubmitTradeProposal(command: SeasonSubmitTradeProposalCommand, context: SeasonRunCommandContext): SeasonRunCommandOutput {
-    const base = baseValidation(command, context.run, context.pending);
+    const base = baseValidation(command, context.run, context.pending, context);
     if (base !== null)
         return base;
     const economy = economyRunOf(context);
@@ -884,7 +962,7 @@ function handleSubmitTradeProposal(command: SeasonSubmitTradeProposalCommand, co
     };
 }
 function handleRespondToTradeCounter(command: SeasonRespondToTradeCounterCommand, context: SeasonRunCommandContext): SeasonRunCommandOutput {
-    const base = baseValidation(command, context.run, context.pending);
+    const base = baseValidation(command, context.run, context.pending, context);
     if (base !== null)
         return base;
     const economy = economyRunOf(context);
@@ -955,7 +1033,7 @@ function handleRespondToTradeCounter(command: SeasonRespondToTradeCounterCommand
     };
 }
 function handleWalkAwayFromTrade(command: SeasonWalkAwayFromTradeCommand, context: SeasonRunCommandContext): SeasonRunCommandOutput {
-    const base = baseValidation(command, context.run, context.pending);
+    const base = baseValidation(command, context.run, context.pending, context);
     if (base !== null)
         return base;
     const economy = economyRunOf(context);
@@ -1007,7 +1085,7 @@ function handleWalkAwayFromTrade(command: SeasonWalkAwayFromTradeCommand, contex
     };
 }
 function handlePurchaseTradeInquiry(command: SeasonPurchaseTradeInquiryCommand, context: SeasonRunCommandContext): SeasonRunCommandOutput {
-    const base = baseValidation(command, context.run, context.pending);
+    const base = baseValidation(command, context.run, context.pending, context);
     if (base !== null)
         return base;
     const economy = economyRunOf(context);
@@ -1119,7 +1197,7 @@ function insufficientBalanceOf(franchiseId: string, balance: number, requestedDe
     };
 }
 function handleSpendInfluence(command: SeasonSpendInfluenceCommand, context: SeasonRunCommandContext): SeasonRunCommandOutput {
-    const base = baseValidation(command, context.run, null);
+    const base = baseValidation(command, context.run, null, context);
     if (base !== null)
         return base;
     const run = economyRunOf(context);
@@ -1292,7 +1370,7 @@ function rejectedAccept(command: SeasonAcceptTradeOfferCommand, rejection: Seaso
     };
 }
 function handleAcceptTradeOffer(command: SeasonAcceptTradeOfferCommand, context: SeasonRunCommandContext): SeasonRunCommandOutput {
-    const base = baseValidation(command, context.run, null);
+    const base = baseValidation(command, context.run, null, context);
     if (base !== null)
         return base;
     const run = economyRunOf(context);
@@ -1398,7 +1476,7 @@ function rejectedDecline(command: SeasonDeclineTradeOfferCommand, rejection: Sea
     };
 }
 function handleDeclineTradeOffer(command: SeasonDeclineTradeOfferCommand, context: SeasonRunCommandContext): SeasonRunCommandOutput {
-    const base = baseValidation(command, context.run, null);
+    const base = baseValidation(command, context.run, null, context);
     if (base !== null)
         return base;
     const run = economyRunOf(context);
@@ -1469,7 +1547,7 @@ function rejectedResume(command: SeasonResumeSeasonBlockCommand, rejection: Seas
 }
 function handleResumeSeasonBlock(command: SeasonResumeSeasonBlockCommand, context: SeasonRunCommandContext): SeasonRunCommandOutput {
     const { run, pending } = context;
-    const base = baseValidation(command, run, pending);
+    const base = baseValidation(command, run, pending, context);
     if (base !== null)
         return base;
     if (pending === null) {
@@ -1521,7 +1599,7 @@ function rejectedForfeit(command: SeasonForfeitInterruptedGameCommand, rejection
 }
 function handleForfeitInterruptedGame(command: SeasonForfeitInterruptedGameCommand, context: SeasonRunCommandContext): SeasonRunCommandOutput {
     const { run, pending, humanFranchiseId } = context;
-    const base = baseValidation(command, run, pending);
+    const base = baseValidation(command, run, pending, context);
     if (base !== null)
         return base;
     const economyRun = economyRunOf(context);
@@ -1589,7 +1667,7 @@ function rejectedStart(command: SeasonStartPostseasonCommand, rejection: SeasonS
     };
 }
 function handleStartPostseason(command: SeasonStartPostseasonCommand, context: SeasonRunCommandContext): SeasonRunCommandOutput {
-    const base = baseValidation(command, context.run, null);
+    const base = baseValidation(command, context.run, null, context);
     if (base !== null)
         return base;
     const run = economyRunOf(context);
@@ -1648,7 +1726,7 @@ function rejectedAdvance(command: SeasonAdvancePostseasonCommand, rejection: Sea
     };
 }
 function handleAdvancePostseason(command: SeasonAdvancePostseasonCommand, context: SeasonRunCommandContext): SeasonRunCommandOutput {
-    const base = baseValidation(command, context.run, null);
+    const base = baseValidation(command, context.run, null, context);
     if (base !== null)
         return base;
     const run = economyRunOf(context);
@@ -1774,7 +1852,7 @@ function rejectedSubmit(command: SeasonSubmitPostseasonRotationCommand, rejectio
     };
 }
 function handleSubmitPostseasonRotation(command: SeasonSubmitPostseasonRotationCommand, context: SeasonRunCommandContext): SeasonRunCommandOutput {
-    const base = baseValidation(command, context.run, null);
+    const base = baseValidation(command, context.run, null, context);
     if (base !== null)
         return base;
     const run = economyRunOf(context);
@@ -1962,7 +2040,7 @@ function rejectedSpectate(command: SeasonSpectatePostseasonGameCommand, rejectio
     };
 }
 function handleSpectatePostseasonGame(command: SeasonSpectatePostseasonGameCommand, context: SeasonRunCommandContext): SeasonRunCommandOutput {
-    const base = baseValidation(command, context.run, null);
+    const base = baseValidation(command, context.run, null, context);
     if (base !== null)
         return base;
     const run = economyRunOf(context);
@@ -2060,7 +2138,7 @@ function rejectedFastForward(command: SeasonFastForwardPostseasonCommand, reject
     };
 }
 function handleFastForwardPostseason(command: SeasonFastForwardPostseasonCommand, context: SeasonRunCommandContext): SeasonRunCommandOutput {
-    const base = baseValidation(command, context.run, null);
+    const base = baseValidation(command, context.run, null, context);
     if (base !== null)
         return base;
     const run = economyRunOf(context);
@@ -2169,7 +2247,7 @@ function rejectedFreeAgency(command: SeasonDeclareFreeAgentInterestCommand | Sea
     };
 }
 function handleDeclareFreeAgentInterest(command: SeasonDeclareFreeAgentInterestCommand, context: SeasonRunCommandContext): SeasonRunCommandOutput {
-    const base = baseValidation(command, context.run, null);
+    const base = baseValidation(command, context.run, null, context);
     if (base !== null)
         return base;
     const run = economyRunOf(context);
@@ -2207,7 +2285,7 @@ function handleDeclareFreeAgentInterest(command: SeasonDeclareFreeAgentInterestC
     };
 }
 function handleSkipFreeAgentMarket(command: SeasonSkipFreeAgentMarketCommand, context: SeasonRunCommandContext): SeasonRunCommandOutput {
-    const base = baseValidation(command, context.run, null);
+    const base = baseValidation(command, context.run, null, context);
     if (base !== null)
         return base;
     const run = economyRunOf(context);
@@ -2244,7 +2322,7 @@ function handleSkipFreeAgentMarket(command: SeasonSkipFreeAgentMarketCommand, co
     };
 }
 function handleResolveFreeAgentMarket(command: SeasonResolveFreeAgentMarketCommand, context: SeasonRunCommandContext): SeasonRunCommandOutput {
-    const base = baseValidation(command, context.run, null);
+    const base = baseValidation(command, context.run, null, context);
     if (base !== null)
         return base;
     const run = economyRunOf(context);

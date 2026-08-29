@@ -42,7 +42,7 @@ export function manifestPath(): string {
 }
 export const SCHEMA_VERSION = POOL_SCHEMA_VERSION;
 export const MIN_TEAM_GAMES = 40;
-export const DATA_VERSION = 'm10-ratings-v3.6';
+export const DATA_VERSION = 'm10-ratings-v3.7';
 export const CONFIDENCE_POLICY_VERSION = 'policy-v1';
 export const MAX_LOW_CONFIDENCE_SHARE = 0.4;
 export { POSITION_NORMALIZATION_VERSION, RATINGS_VERSION, SELECTION_SCORE_VERSION, } from '@hoop-rush/data-contracts';
@@ -592,12 +592,41 @@ export function normalizePoolOveralls(rows: PoolOverallRow[]): PoolOverallDiagno
             a.seasonKey.localeCompare(b.seasonKey) ||
             a.franchiseId.localeCompare(b.franchiseId));
     });
-    ranked.forEach((row, index) => {
-        const p = index / totalRowCount;
-        row.summaryRatings.overallRating = overallBandForPercentile(p);
+    // Era-adjusted blending to reduce cross-era inflation (2020s vs 1960s).
+    // Keep global hierarchy but blend 65% global percentile with 35% era percentile.
+    const eraCounts = new Map<string, number>();
+    const eraRank = new Map<string, number>();
+    for (const row of rows) {
+        const eraId = (row as unknown as { eraId?: string }).eraId ?? 'unknown';
+        eraCounts.set(eraId, (eraCounts.get(eraId) ?? 0) + 1);
+    }
+    // Build era-sorted groups for percentile lookup
+    const eraGroups = new Map<string, PoolOverallRow[]>();
+    for (const row of ranked) {
+        const eraId = (row as unknown as { eraId?: string }).eraId ?? 'unknown';
+        let group = eraGroups.get(eraId);
+        if (!group) {
+            group = [];
+            eraGroups.set(eraId, group);
+        }
+        group.push(row);
+    }
+    const eraIndexMap = new Map<PoolOverallRow, number>();
+    for (const [, group] of eraGroups) {
+        // group already in global rank order; preserve that order for era percentile
+        group.forEach((row, idx) => eraIndexMap.set(row, idx));
+    }
+    ranked.forEach((row, globalIndex) => {
+        const pGlobal = globalIndex / totalRowCount;
+        const eraId = (row as unknown as { eraId?: string }).eraId ?? 'unknown';
+        const eraTotal = eraCounts.get(eraId) ?? totalRowCount;
+        const eraIdx = eraIndexMap.get(row) ?? globalIndex;
+        const pEra = eraTotal > 0 ? eraIdx / eraTotal : pGlobal;
+        const pBlended = 0.65 * pGlobal + 0.35 * pEra;
+        row.summaryRatings.overallRating = overallBandForPercentile(pBlended);
         if (hasRawOverallScore(row) && row.ratingProfile != null) {
             row.ratingProfile.overallPercentile =
-                Math.round(((index + 1) / totalRowCount) * 10000) / 10000;
+                Math.round(((globalIndex + 1) / totalRowCount) * 10000) / 10000;
             row.ratingProfile.overallCohortVersion = COHORT_NORMALIZATION_VERSION;
         }
     });

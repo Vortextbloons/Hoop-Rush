@@ -109,9 +109,10 @@ export class RoomDraftController {
   }) {
     this.transport = opts.transport;
     this.roomId = opts.roomId;
-    this.mode = (opts.snapshot.mode ?? opts.snapshot.settings.mode) as RoomDraftMode;
-    this.seed = opts.snapshot.seed ?? opts.snapshot.settings.mode + '-seed';
-    this.settingsRevision = opts.snapshot.settingsRevision ?? 0;
+    const snapAny = opts.snapshot as unknown as { mode?: string; seed?: string | null; settingsRevision?: number };
+    this.mode = (snapAny.mode ?? opts.snapshot.settings.mode) as RoomDraftMode;
+    this.seed = snapAny.seed ?? opts.snapshot.settings.mode + '-seed';
+    this.settingsRevision = snapAny.settingsRevision ?? 0;
     this.pool = opts.pool ?? generateMockPool();
     const derived = deriveDraftSeed(this.seed, this.settingsRevision, this.mode);
     this.state = {
@@ -200,7 +201,7 @@ export class RoomDraftController {
     if (!card) throw Object.assign(new Error('not in offer'), { code: 'unavailable-ownership' });
     // idempotency: commandId derived from deterministic seed: roomId + picks length + playerVersionId
     const commandId = `draft-pick-${String(this.state.picks.length)}-${playerVersionId}`;
-    const envelope: SeasonPublicCommandEnvelope = {
+    const envelope = {
       schemaVersion: 2,
       roomId: this.roomId,
       commandId,
@@ -209,7 +210,7 @@ export class RoomDraftController {
       payload: { kind: 'room-draft-pick', mode: this.mode, participantId, playerVersionId, seed: this.state.seed, settingsRevision: this.settingsRevision },
       actorParticipantId: participantId,
       actorFranchiseId: participantId === 'p1' ? 'franchise-p1' : 'franchise-p2',
-    };
+    } as unknown as SeasonPublicCommandEnvelope;
     const receipt = await this.transport.submitCommand(envelope);
     if (!receipt.accepted) {
       if (receipt.rejectionCode === 'stale-revision') throw Object.assign(new Error('stale revision'), { code: 'stale-revision' });

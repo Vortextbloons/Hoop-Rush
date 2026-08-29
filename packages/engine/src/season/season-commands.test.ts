@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { playoffGameIdOf, seasonRunSchema, type SeasonDraftCatalog, type SeasonEffectsState, type SeasonGameEffectsTransition, type SeasonGameSimulationInput, type SeasonGameSimulationResult, type SeasonGameSideResult, type SeasonGameSummary, type SeasonPendingBlockCandidate, type SeasonRotation, type SeasonRun, type SeasonRunCommand, type SeasonTradeOffer, type Position, } from '@hoop-rush/data-contracts';
+import { SEASON_RUN_SCHEMA_VERSION, playoffGameIdOf, seasonRunSchema, type SeasonDraftCatalog, type SeasonEffectsState, type SeasonGameEffectsTransition, type SeasonGameSimulationInput, type SeasonGameSimulationResult, type SeasonGameSideResult, type SeasonGameSummary, type SeasonPendingBlockCandidate, type SeasonRotation, type SeasonRun, type SeasonRunCommand, type SeasonTradeOffer, type Position, } from '@hoop-rush/data-contracts';
 import { buildEraSimulationProfile } from '@hoop-rush/test-fixtures';
 import { buildEmptyCampaignState, normalizeCampaignState } from './campaign.ts';
 import { handleSeasonRunCommand, type SeasonRunCommandContext } from './season-commands.ts';
@@ -146,7 +146,7 @@ type SeasonRunCommandFragment = {
 }[SeasonRunCommand['command']];
 function commandOf(run: SeasonRun, command: SeasonRunCommandFragment): SeasonRunCommand {
     return {
-        schemaVersion: 12,
+        schemaVersion: SEASON_RUN_SCHEMA_VERSION,
         runId: run.runId,
         expectedStateRevision: run.stateRevision,
         expectedStateDigest: run.stateDigest,

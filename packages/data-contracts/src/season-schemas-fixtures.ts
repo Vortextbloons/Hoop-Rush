@@ -2,7 +2,7 @@ import type { SeasonCandidateCheckpoint, SeasonEffectsState, SeasonGame, SeasonG
 import { buildInitialPostseasonState } from './season-postseason.ts';
 import { SEASON_OBJECTIVE_CATALOG } from './season-objective.ts';
 import { SEASON_ALIGNMENT } from './season-alignment.ts';
-import { SEASON_FREE_AGENCY_VERSION } from './season-versions.ts';
+import { SEASON_FREE_AGENCY_VERSION, SEASON_RUN_SCHEMA_VERSION } from './season-versions.ts';
 export const CONFERENCE_TEAMS: Record<'east' | 'west', string[]> = {
     east: SEASON_ALIGNMENT.filter((entry) => entry.conference === 'east').map((entry) => entry.franchiseId),
     west: SEASON_ALIGNMENT.filter((entry) => entry.conference === 'west').map((entry) => entry.franchiseId),
@@ -158,11 +158,11 @@ export function buildRun(): SeasonRun {
                             : ('active-trader' as const),
     }));
     return {
-        schemaVersion: 12,
+        schemaVersion: SEASON_RUN_SCHEMA_VERSION,
         runId: 'fixture-run-1',
         rootSeed: SEED,
         versions: {
-            runSchemaVersion: 12,
+            runSchemaVersion: SEASON_RUN_SCHEMA_VERSION,
             leagueVersion: 'league-v1',
             scheduleVersion: 'schedule-v1',
             scheduleFormulaVersion: 'schedule-formula-v1',
@@ -212,6 +212,11 @@ export function buildRun(): SeasonRun {
             freeAgencyTargetsVersion: 'free-agency-targets-v1',
         },
         league,
+        authority: {
+            kind: 'local-solo',
+            soloFranchiseId: league.teams.find((t) => t.control === 'human')?.franchiseId ?? null,
+            authorityVersion: 'season-authority-v1',
+        },
         rosters,
         ownership: rosters.flatMap((roster) => roster.players.map((player) => ({
             playerVersionId: player.playerVersionId,

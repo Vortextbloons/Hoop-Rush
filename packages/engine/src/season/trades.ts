@@ -86,6 +86,7 @@ export interface SeasonOpenTradeWindowInput {
     blockIndex: number;
     rootSeed: string;
     humanFranchiseId: string | null;
+    participantFranchiseIds?: readonly string[];
     catalog?: SeasonDraftCatalog;
     effects?: SeasonEffectsState;
 }
@@ -205,10 +206,30 @@ export function rosterPlayerVersionIdsOf(run: SeasonRun, franchiseId: string): s
     return roster.players.map((player) => player.playerVersionId);
 }
 function aiFranchiseIdsOf(run: SeasonRun, humanFranchiseId: string): string[] {
+    const authority = (run as SeasonRun).authority;
+    if (authority?.kind === 'season-multiplayer') {
+        const excluded = new Set([authority.p1.franchiseId, authority.p2.franchiseId]);
+        return run.league.teams
+            .map((team) => team.franchiseId)
+            .filter((franchiseId) => !excluded.has(franchiseId))
+            .sort();
+    }
     return run.league.teams
         .map((team) => team.franchiseId)
         .filter((franchiseId) => franchiseId !== humanFranchiseId)
         .sort();
+}
+function aiFranchiseIdsOfExcluding(run: SeasonRun, participantFranchiseIds: readonly string[]): string[] {
+    const excluded = new Set(participantFranchiseIds);
+    return run.league.teams
+        .map((team) => team.franchiseId)
+        .filter((franchiseId) => !excluded.has(franchiseId))
+        .sort();
+}
+function participantFranchiseIdsOfInput(input: SeasonOpenTradeWindowInput): readonly string[] {
+    if (input.participantFranchiseIds && input.participantFranchiseIds.length > 0) return input.participantFranchiseIds;
+    if (input.humanFranchiseId) return [input.humanFranchiseId];
+    return [];
 }
 function tradeSeed(rootSeed: string, ...keys: string[]): string {
     return seasonNamespaceSeed(rootSeed, SEASON_SEED_NAMESPACES.trades, ...keys);

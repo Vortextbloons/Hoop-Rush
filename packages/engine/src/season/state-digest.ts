@@ -1,4 +1,4 @@
-import { seasonDigestHex, type SeasonAwards, type SeasonCampaignState, type SeasonCheckpointState, type SeasonEffectsState, type SeasonFreeAgencyState, type SeasonHealthState, type SeasonInfluenceState, type SeasonObjectiveState, type SeasonOwnership, type SeasonPostseasonState, type SeasonRoster, type SeasonRotation, type SeasonRunCompletion, type SeasonRunStage, type SeasonTradeState, type SeasonTransactionEntry, } from '@hoop-rush/data-contracts';
+import { seasonDigestHex, type SeasonAwards, type SeasonCampaignState, type SeasonCheckpointState, type SeasonEffectsState, type SeasonFreeAgencyState, type SeasonHealthState, type SeasonInfluenceState, type SeasonObjectiveState, type SeasonOwnership, type SeasonPostseasonState, type SeasonRoster, type SeasonRotation, type SeasonRunCompletion, type SeasonRunStage, type SeasonTradeState, type SeasonTransactionEntry, type SeasonRunAuthority, } from '@hoop-rush/data-contracts';
 import { canonicalJson } from './checkpoint.ts';
 export interface SeasonRunStateDigestFacts {
     stateRevision: number;
@@ -18,6 +18,7 @@ export interface SeasonRunStateDigestFacts {
     ownership: readonly SeasonOwnership[];
     rotations: readonly SeasonRotation[];
     effects: SeasonEffectsState;
+    authority?: SeasonRunAuthority;
 }
 function sortedBy<T>(items: readonly T[], keyOf: (item: T) => string): T[] {
     return [...items].sort((a, b) => (keyOf(a) < keyOf(b) ? -1 : keyOf(a) > keyOf(b) ? 1 : 0));
@@ -33,6 +34,34 @@ function postseasonCanonical(postseason: SeasonPostseasonState): unknown {
         playIn: postseason.playIn,
         bracket: postseason.bracket,
         championFranchiseId: postseason.championFranchiseId,
+    };
+}
+function authorityCanonical(authority: SeasonRunAuthority): unknown {
+    if (authority.kind === 'local-solo') {
+        return {
+            kind: authority.kind,
+            soloFranchiseId: authority.soloFranchiseId,
+            authorityVersion: authority.authorityVersion,
+        };
+    }
+    return {
+        kind: authority.kind,
+        p1: authority.p1,
+        p2: authority.p2,
+        pace: authority.pace,
+        timerPolicyVersion: authority.timerPolicyVersion,
+        authorityVersion: authority.authorityVersion,
+        multiplayerVersion: authority.multiplayerVersion,
+        control: Object.fromEntries(Object.entries(authority.control).sort(([a], [b]) => (a < b ? -1 : 1))),
+        missStreak: Object.fromEntries(Object.entries(authority.missStreak).sort(([a], [b]) => (a < b ? -1 : 1))),
+        reclaimRequests: Object.fromEntries(Object.entries(authority.reclaimRequests).sort(([a], [b]) => (a < b ? -1 : 1))),
+        timeoutEvents: [...authority.timeoutEvents].sort((a, b) => {
+            if (a.participantId !== b.participantId) return a.participantId < b.participantId ? -1 : 1;
+            return a.atRevision - b.atRevision;
+        }),
+        checkpointVerification: authority.checkpointVerification,
+        integrityFailure: authority.integrityFailure,
+        createdAtRevision: authority.createdAtRevision,
     };
 }
 export function seasonRunStateDigest(facts: SeasonRunStateDigestFacts): string {
@@ -124,6 +153,14 @@ export function seasonRunStateDigest(facts: SeasonRunStateDigestFacts): string {
             playerStates: sortedBy(facts.effects.playerStates, (player) => player.playerVersionId),
             pairStates: [...facts.effects.pairStates].sort((a, b) => a.a < b.a ? -1 : a.a > b.a ? 1 : a.b < b.b ? -1 : a.b > b.b ? 1 : 0),
         }),
+        authority: authorityCanonical(
+            (facts.authority as SeasonRunAuthority | undefined) ??
+                ({
+                    kind: 'local-solo',
+                    soloFranchiseId: null,
+                    authorityVersion: 'season-authority-v1',
+                } as SeasonRunAuthority),
+        ),
     });
     return seasonDigestHex(canonical);
 }

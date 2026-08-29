@@ -1,4 +1,4 @@
-import type { SeasonAwards, SeasonCampaignState, SeasonCheckpointState, SeasonEffectsState, SeasonFreeAgencyState, SeasonGame, SeasonGameSummary, SeasonHealthState, SeasonInfluenceState, SeasonLeague, SeasonObjectiveState, SeasonOwnership, SeasonPlayerAggregate, SeasonPostseasonState, SeasonRoster, SeasonRotation, SeasonRunCompletion, SeasonRunStage, SeasonSchedule, SeasonStandings, SeasonTeamAggregate, SeasonTradeState, SeasonTransactionEntry, } from '@hoop-rush/data-contracts';
+import type { SeasonAwards, SeasonRunAuthority, SeasonCampaignState, SeasonCheckpointState, SeasonEffectsState, SeasonFreeAgencyState, SeasonGame, SeasonGameSummary, SeasonHealthState, SeasonInfluenceState, SeasonLeague, SeasonObjectiveState, SeasonOwnership, SeasonPlayerAggregate, SeasonPostseasonState, SeasonRoster, SeasonRotation, SeasonRunCompletion, SeasonRunStage, SeasonSchedule, SeasonStandings, SeasonTeamAggregate, SeasonTradeState, SeasonTransactionEntry, } from '@hoop-rush/data-contracts';
 export interface SeasonRunEngineSeam {
     reconstructSeasonGames(schedule: SeasonSchedule, summaries: readonly SeasonGameSummary[]): SeasonGame[];
     foldSeasonTeamAggregates(league: SeasonLeague, summaries: readonly SeasonGameSummary[]): SeasonTeamAggregate[];
@@ -32,6 +32,7 @@ export interface SeasonRunStateDigestFacts {
     rotations: readonly SeasonRotation[];
     effects: SeasonEffectsState;
     freeAgency: SeasonFreeAgencyState;
+    authority?: SeasonRunAuthority;
 }
 export interface SeasonWindowOpenResult {
     trade: SeasonTradeState;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SEASON_ENDING_MISSED_GAMES_SENTINEL, buildInitialPostseasonState, playoffGameIdOf, playInGameIdOf, seasonNamespaceSeed, seasonPostseasonSummarySchema, seasonRunSchema, type SeasonDraftCatalog, type SeasonEffectsState, type SeasonGamePlayerInput, type SeasonGameSimulationInput, type SeasonGameSimulationResult, type SeasonGameSideResult, type SeasonLeague, type SeasonPostseasonState, type SeasonPostseasonSummary, type SeasonRotation, type SeasonRun, type SeasonRunCommand, type SeasonStandings, type Position, } from '@hoop-rush/data-contracts';
+import { SEASON_ENDING_MISSED_GAMES_SENTINEL, SEASON_RUN_SCHEMA_VERSION, buildInitialPostseasonState, playoffGameIdOf, playInGameIdOf, seasonNamespaceSeed, seasonPostseasonSummarySchema, seasonRunSchema, type SeasonDraftCatalog, type SeasonEffectsState, type SeasonGamePlayerInput, type SeasonGameSimulationInput, type SeasonGameSimulationResult, type SeasonGameSideResult, type SeasonLeague, type SeasonPostseasonState, type SeasonPostseasonSummary, type SeasonRotation, type SeasonRun, type SeasonRunCommand, type SeasonStandings, type Position, } from '@hoop-rush/data-contracts';
 import { buildEraSimulationProfile } from '@hoop-rush/test-fixtures';
 import { createRng } from '../sim/rng.ts';
 import { expandSeasonRunRosters } from './block.ts';
@@ -286,7 +286,7 @@ type SeasonRunCommandFragment = {
 }[SeasonRunCommand['command']];
 function commandOf(run: SeasonRun, fragment: SeasonRunCommandFragment): SeasonRunCommand {
     return {
-        schemaVersion: 12,
+        schemaVersion: SEASON_RUN_SCHEMA_VERSION,
         runId: run.runId,
         expectedStateRevision: run.stateRevision,
         expectedStateDigest: run.stateDigest,

@@ -131,6 +131,7 @@ export function seasonRunStateDigestFactsOf(next: SeasonRun, effects: SeasonEffe
         ownership: next.ownership,
         rotations: next.rotations,
         effects,
+        authority: (next as SeasonRun).authority,
     };
 }
 export interface SeasonBlockSimulationOptions {
@@ -1038,6 +1039,7 @@ export function deriveSeasonPostBlockState(input: {
         ownership: input.run.ownership,
         rotations: input.run.rotations,
         effects: input.candidate.effects,
+        authority: (input.run as SeasonRun).authority,
     });
     return { checkpointState, stateRevision, stateDigest };
 }
@@ -1047,6 +1049,7 @@ export function completeSeasonBlockCommit(input: {
     commandId: string;
     rotationDigest: string;
     humanFranchiseId: string | null;
+    participantFranchiseIds?: readonly string[];
     catalog?: SeasonDraftCatalog;
     effects?: SeasonEffectsState;
     freeAgencyIndex?: SeasonFreeAgencyIndex;
@@ -1071,6 +1074,8 @@ export function completeSeasonBlockCommit(input: {
         commandId: input.commandId,
         rotationDigest: input.rotationDigest,
     });
+    const participantIds = input.participantFranchiseIds ?? (input.humanFranchiseId ? [input.humanFranchiseId] : []);
+    const primaryFranchiseId = participantIds[0] ?? input.humanFranchiseId;
     let postBlockRun: SeasonRun = {
         ...input.run,
         cursor: { schemaVersion: 1, completedRounds: input.candidate.completedRounds },
@@ -1101,7 +1106,7 @@ export function completeSeasonBlockCommit(input: {
                     const nextOffers = generateSeasonCampaignOffers({
                         rootSeed: input.run.rootSeed,
                         blockIndex: nextBlockIdxForCampaign,
-                        humanFranchiseId: input.humanFranchiseId,
+                        humanFranchiseId: primaryFranchiseId,
                         schedule: scheduleForCampaign,
                         standings: input.candidate.standings,
                         health: input.candidate.health,
@@ -1134,10 +1139,11 @@ export function completeSeasonBlockCommit(input: {
         run: postBlockRun,
         blockIndex: input.candidate.blockIndex,
         rootSeed: input.run.rootSeed,
-        humanFranchiseId: input.humanFranchiseId,
+        humanFranchiseId: primaryFranchiseId,
+        participantFranchiseIds: participantIds.length > 1 ? participantIds : undefined,
         catalog: input.catalog,
         effects: input.effects ?? input.candidate.effects,
-    });
+    } as unknown as Parameters<typeof openSeasonTradeWindow>[0]);
     let runAfterTrade: SeasonRun = postBlockRun;
     if (window !== null) {
         runAfterTrade = {
@@ -1169,8 +1175,9 @@ export function completeSeasonBlockCommit(input: {
             catalog: input.catalog as SeasonDraftCatalog,
             index: input.freeAgencyIndex,
             targets: input.freeAgencyTargets,
-            humanFranchiseId: input.humanFranchiseId,
-        }, windowIndex, input.candidate.blockIndex);
+            humanFranchiseId: primaryFranchiseId,
+            participantFranchiseIds: participantIds.length > 1 ? participantIds : undefined,
+        } as unknown as Parameters<typeof openSeasonFreeAgencyWindow>[0], windowIndex, input.candidate.blockIndex);
         freeAgency = opened.freeAgency;
         freeAgencyWindow = opened.window;
         const postWindowEffects = window !== null ? window.effects : (input.effects ?? input.candidate.effects);

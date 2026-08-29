@@ -1,4 +1,4 @@
-import { seasonDigestHex, type SeasonCandidateCheckpoint, type SeasonGame, type SeasonGameSummary, type SeasonSchedule, } from '@hoop-rush/data-contracts';
+import { seasonDigestHex, type SeasonCandidateCheckpoint, type SeasonGame, type SeasonGameSummary, type SeasonSchedule, type SeasonRunAuthority, } from '@hoop-rush/data-contracts';
 import { seasonBlockRecapCanonical } from './recap.ts';
 export function reconstructSeasonGames(schedule: SeasonSchedule, summaries: readonly SeasonGameSummary[]): SeasonGame[] {
     const summaryByGameId = new Map(summaries.map((summary) => [summary.gameId, summary]));
@@ -40,7 +40,9 @@ export function reconstructSeasonGames(schedule: SeasonSchedule, summaries: read
         };
     });
 }
-export type SeasonCheckpointFacts = Omit<SeasonCandidateCheckpoint, 'digest'>;
+export type SeasonCheckpointFacts = Omit<SeasonCandidateCheckpoint, 'digest'> & {
+    authority?: SeasonRunAuthority;
+};
 export function canonicalJson(value: unknown): string {
     if (value === null)
         return 'null';
@@ -66,6 +68,34 @@ function standingsCanonical(candidate: SeasonCheckpointFacts): unknown {
         schemaVersion: candidate.standings.schemaVersion,
         standingsVersion: candidate.standings.standingsVersion,
         rows: [...candidate.standings.rows].sort((a, b) => (a.franchiseId < b.franchiseId ? -1 : 1)),
+    };
+}
+function authorityCanonical(authority: SeasonRunAuthority): unknown {
+    if (authority.kind === 'local-solo') {
+        return {
+            kind: authority.kind,
+            soloFranchiseId: authority.soloFranchiseId,
+            authorityVersion: authority.authorityVersion,
+        };
+    }
+    return {
+        kind: authority.kind,
+        p1: authority.p1,
+        p2: authority.p2,
+        pace: authority.pace,
+        timerPolicyVersion: authority.timerPolicyVersion,
+        authorityVersion: authority.authorityVersion,
+        multiplayerVersion: authority.multiplayerVersion,
+        control: Object.fromEntries(Object.entries(authority.control).sort(([a], [b]) => (a < b ? -1 : 1))),
+        missStreak: Object.fromEntries(Object.entries(authority.missStreak).sort(([a], [b]) => (a < b ? -1 : 1))),
+        reclaimRequests: Object.fromEntries(Object.entries(authority.reclaimRequests).sort(([a], [b]) => (a < b ? -1 : 1))),
+        timeoutEvents: [...authority.timeoutEvents].sort((a, b) => {
+            if (a.participantId !== b.participantId) return a.participantId < b.participantId ? -1 : 1;
+            return a.atRevision - b.atRevision;
+        }),
+        checkpointVerification: authority.checkpointVerification,
+        integrityFailure: authority.integrityFailure,
+        createdAtRevision: authority.createdAtRevision,
     };
 }
 export function seasonCheckpointCanonical(candidate: SeasonCheckpointFacts): string {
@@ -128,6 +158,9 @@ export function seasonCheckpointCanonical(candidate: SeasonCheckpointFacts): str
         expectedStateDigest: candidate.expectedStateDigest,
         stateRevision: candidate.stateRevision,
         stateDigest: candidate.stateDigest,
+        authority: (candidate as unknown as { authority?: SeasonRunAuthority }).authority
+            ? canonicalJson(authorityCanonical((candidate as unknown as { authority: SeasonRunAuthority }).authority))
+            : undefined,
     });
 }
 export function seasonCheckpointDigest(candidate: SeasonCheckpointFacts): string {

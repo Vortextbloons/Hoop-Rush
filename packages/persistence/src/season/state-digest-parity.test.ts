@@ -23,6 +23,7 @@ function digestFactsFromRun(run: ReturnType<typeof buildFixtureRun>, effects = b
         rotations: run.rotations,
         effects,
         freeAgency: run.freeAgency,
+        authority: run.authority,
     };
 }
 describe('seasonRunEngineSeam state digest parity', () => {
@@ -46,6 +47,7 @@ describe('seasonRunEngineSeam state digest parity', () => {
             rotations: run.rotations,
             effects: buildFixtureEffectsState(run.rosters),
             freeAgency: run.freeAgency,
+            authority: run.authority,
         };
         expect(seasonRunEngineSeam.seasonRunStateDigest(factsWithoutCampaign)).toBe(seasonRunStateDigest(factsWithoutCampaign));
     });

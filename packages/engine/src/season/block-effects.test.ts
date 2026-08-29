@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SEASON_AI_VERSION, SEASON_BLOCK_VERSION, SEASON_CHEMISTRY_VERSION, SEASON_EFFECT_TARGETS_VERSION, SEASON_FREE_AGENCY_VERSION, SEASON_GAME_SUMMARY_VERSION, SEASON_GAME_TARGETS_VERSION, SEASON_GAME_VERSION, SEASON_LEAGUE_VERSION, SEASON_MINUTE_POLICY_VERSION, SEASON_POSTSEASON_VERSION, SEASON_RECAP_VERSION, SEASON_ROSTER_GENERATION_VERSION, SEASON_ROSTER_RULES_VERSION, SEASON_ROTATION_PLANNER_VERSION, SEASON_ROTATION_VERSION, SEASON_RUN_SCHEMA_VERSION, SEASON_SCHEDULE_FORMULA_VERSION, SEASON_SCHEDULE_VERSION, SEASON_SEED_DERIVATION_VERSION, SEASON_STAMINA_VERSION, SEASON_STANDINGS_VERSION, buildInitialPostseasonState, seasonRunSchema, type SeasonAiPool, type SeasonCandidateCheckpoint, type SeasonDraftCatalog, type SeasonEffectsState, type SeasonGameSummary, type SeasonRosterEvaluation, type SeasonRun, } from '@hoop-rush/data-contracts';
+import { SEASON_AI_VERSION, SEASON_AUTHORITY_VERSION, SEASON_BLOCK_VERSION, SEASON_CHEMISTRY_VERSION, SEASON_EFFECT_TARGETS_VERSION, SEASON_FREE_AGENCY_VERSION, SEASON_GAME_SUMMARY_VERSION, SEASON_GAME_TARGETS_VERSION, SEASON_GAME_VERSION, SEASON_LEAGUE_VERSION, SEASON_MINUTE_POLICY_VERSION, SEASON_POSTSEASON_VERSION, SEASON_RECAP_VERSION, SEASON_ROSTER_GENERATION_VERSION, SEASON_ROSTER_RULES_VERSION, SEASON_ROTATION_PLANNER_VERSION, SEASON_ROTATION_VERSION, SEASON_RUN_SCHEMA_VERSION, SEASON_SCHEDULE_FORMULA_VERSION, SEASON_SCHEDULE_VERSION, SEASON_SEED_DERIVATION_VERSION, SEASON_STAMINA_VERSION, SEASON_STANDINGS_VERSION, buildInitialPostseasonState, seasonRunSchema, type SeasonAiPool, type SeasonCandidateCheckpoint, type SeasonDraftCatalog, type SeasonEffectsState, type SeasonGameSummary, type SeasonRosterEvaluation, type SeasonRun, } from '@hoop-rush/data-contracts';
 import { ALL_FRANCHISES, TEST_SEED, runBlock, type RunnerState } from './block-test-support.ts';
 import { buildFixtureGenerationAudit, buildFixtureSeasonDraftFacts, buildSeasonDraftCatalog, buildSeasonLeague, } from '@hoop-rush/test-fixtures';
 import { generateSeasonSchedule } from './schedule.ts';
@@ -221,6 +221,11 @@ function buildSynthesizedRun(): {
             freeAgencyTargetsVersion: 'free-agency-targets-v1',
         },
         league,
+        authority: {
+            kind: 'local-solo',
+            soloFranchiseId: 'lakers',
+            authorityVersion: SEASON_AUTHORITY_VERSION,
+        },
         rosters,
         ownership,
         schedule: {

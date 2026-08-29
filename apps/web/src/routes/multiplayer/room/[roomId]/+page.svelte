@@ -188,8 +188,8 @@
         const extra = snap as unknown as { code?: string };
         if (extra.code) storedCode = extra.code;
       }
-      if (snap.isOutdated) outdated = true;
-      if (snap.settingsRevision !== undefined) lastSettingsRevision = snap.settingsRevision;
+      if ((snap as unknown as { isOutdated?: boolean }).isOutdated) outdated = true;
+      lastSettingsRevision = (snap as unknown as { settingsRevision?: number }).settingsRevision ?? null;
       // treat resume as refresh for presence
       coordinator.subscribe(roomId);
       unsubscribe = () => coordinator?.disconnect();
@@ -503,7 +503,7 @@
         <p class="text-label text-muted-foreground">You</p>
         <p class="mt-1 text-sm font-bold">{youLabel}</p>
         <p class="mt-1 text-xs {isHost ? 'text-primary font-semibold' : isGuest ? 'text-positive font-semibold' : 'text-muted-foreground'}">{isHost ? 'Host controls Start' : isGuest ? 'Guest — Ready to confirm' : 'Spectator'}</p>
-        {#if snap.settingsRevision !== undefined}<p class="mt-1 text-xs text-muted-foreground">Settings rev {snap.settingsRevision}</p>{/if}
+        {#if (snap as unknown as { settingsRevision?: number }).settingsRevision !== undefined}<p class="mt-1 text-xs text-muted-foreground">Settings rev {(snap as unknown as { settingsRevision?: number }).settingsRevision}</p>{/if}
       </div>
     </div>
 
@@ -648,10 +648,10 @@
               <div class="mt-3 space-y-1 font-mono text-xs break-all">
                 <div>room {roomId}</div>
                 <div>revision {snap.revision} · digest {snap.digest.slice(0,12)}…</div>
-                <div>cursor {snap.cursor} · settings rev {snap.settingsRevision}</div>
+                <div>cursor {snap.cursor} · settings rev {(snap as unknown as { settingsRevision?: number }).settingsRevision}</div>
                 <div>protocol v{snap.settings.roomProtocolVersion} · multiplayer {snap.settings.multiplayerVersion}</div>
-                <div>presence {JSON.stringify(snap.presence)}</div>
-                <div>seed {snap.seed ? snap.seed.slice(0,12)+'…' : 'null'}</div>
+                <div>presence {JSON.stringify((snap as unknown as { presence?: unknown }).presence)}</div>
+                <div>seed {(snap as unknown as { seed?: string | null }).seed ? (snap as unknown as { seed?: string | null }).seed!.slice(0,12)+'…' : 'null'}</div>
               </div>
             </details>
           {:else}
