@@ -1,8 +1,13 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SEASON_DRAFT_CATALOG_VERSION, SEASON_DURABILITY_VERSION, SEASON_STAMINA_VERSION, playerVersionId, seasonDraftCatalogSchema, type SeasonDraftCandidate, type SeasonDraftCandidateDurability, } from '@hoop-rush/data-contracts';
+import { POSITION_NORMALIZATION_VERSION, RATINGS_VERSION, SEASON_DRAFT_CATALOG_VERSION, SEASON_DURABILITY_VERSION, SEASON_STAMINA_VERSION, playerVersionId, seasonDraftCatalogSchema, type SeasonDraftCandidate, type SeasonDraftCandidateDurability, } from '@hoop-rush/data-contracts';
 import { sha256Hex } from './io.ts';
+function atomicWriteFileSync(target: string, content: string): void {
+    const tmp = `${target}.tmp-${String(Date.now())}-${String(Math.random()).slice(2)}`;
+    writeFileSync(tmp, content);
+    renameSync(tmp, target);
+}
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../');
 const STATIC_DATA = resolve(REPO_ROOT, 'apps/web/static/data');
 const SEASON_DIR = resolve(STATIC_DATA, 'season');
@@ -154,8 +159,8 @@ function main(): void {
         schemaVersion: 1,
         catalogVersion: SEASON_DRAFT_CATALOG_VERSION,
         dataVersion,
-        ratingsVersion: ratingsVersion || 'ratings-v3.4',
-        positionNormalizationVersion: positionNormalizationVersion || 'position-v3',
+        ratingsVersion: ratingsVersion || RATINGS_VERSION,
+        positionNormalizationVersion: positionNormalizationVersion || POSITION_NORMALIZATION_VERSION,
         playerVersionIdVersion: 'player-version-id-v1',
         staminaVersion: SEASON_STAMINA_VERSION,
         durabilityVersion: SEASON_DURABILITY_VERSION,
@@ -169,7 +174,7 @@ function main(): void {
     const content = `${JSON.stringify(parsed.data)}\n`;
     mkdirSync(SEASON_DIR, { recursive: true });
     const target = resolve(SEASON_DIR, 'draft-catalog.json');
-    writeFileSync(target, content);
+    atomicWriteFileSync(target, content);
     const seasonManifest = readJson(MANIFEST_PATH) as {
         season?: Record<string, {
             url?: string;
@@ -181,7 +186,7 @@ function main(): void {
             url: 'season/draft-catalog.json',
             contentHash: sha256Hex(content),
         };
-        writeFileSync(MANIFEST_PATH, `${JSON.stringify(seasonManifest, null, 2)}\n`);
+        atomicWriteFileSync(MANIFEST_PATH, `${JSON.stringify(seasonManifest, null, 2)}\n`);
     }
     console.log(`wrote ${target} (${String(content.length)} bytes, ${String(candidates.size)} candidates, ${String(pools.length)} pools from ${String(sourceCount)} pool artifacts)`);
     console.log(`manifest draftCatalog hash updated (${seasonManifest.season?.draftCatalog?.contentHash ?? 'missing season section'})`);

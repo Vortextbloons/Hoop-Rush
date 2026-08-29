@@ -2,7 +2,7 @@ export { canPlay, type SlotGroup } from './domain/positions.ts';
 export { slotRequirement, validateLineup } from './domain/lineup.ts';
 export { classifyArchetype } from './domain/archetypes.ts';
 export { createEngineContext, type EngineContext } from './sim/context.ts';
-export { fnv1a32, hex32 } from './sim/rng.ts';
+export { fnv1a32, hex32, createRng, type Rng, shuffle, swapAt } from './sim/rng.ts';
 export { usageOf } from './sim/recorder.ts';
 export { simulateGame } from './sim/game.ts';
 export { checkGameResult, gameResultDigest } from './sim/invariants.ts';

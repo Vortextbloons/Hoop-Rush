@@ -723,7 +723,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
                 throw new SeasonPendingBlockRejectedError(`cursor stateRevision ${String(cursor.stateRevision)} does not match the pending's expectedStateRevision ${String(pending.expectedStateRevision)}`);
             }
             if (cursor.stateDigest !== pending.expectedStateDigest) {
-                throw new SeasonPendingBlockRejectedError('cursor stateDigest does not match the pending candidate');
+                throw new SeasonPendingBlockRejectedError(`cursor stateDigest ${cursor.stateDigest} does not match pending ${pending.expectedStateDigest}`);
             }
             if (pending.blockIndex !== cursor.revision) {
                 throw new SeasonPendingBlockRejectedError(`pending blockIndex ${String(pending.blockIndex)} is not the next uncommitted block ${String(cursor.revision)}`);
@@ -861,6 +861,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
                 previousLogDigest: seasonCommandLogDigest(logEntries),
                 relatedGameIds: [...(input.relatedGameIds ?? [])].sort(),
                 transactionIds: [...(input.transactionIds ?? [])].sort(),
+                ...(input.actor ? { actor: input.actor } : {}),
             });
             await this.db.seasonCommandLog.put({
                 runId: input.runId,
@@ -923,6 +924,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
             rotations: validatedRun.rotations,
             effects: this.seam.zeroSeasonEffectsState(validatedRun.rosters),
             freeAgency: validatedRun.freeAgency,
+            authority: validatedRun.authority,
         });
         const checkpointRow = storedSeasonRunRecordSchema.parse({
             recordId: SEASON_RUN_RECORD_ID,
@@ -952,12 +954,20 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
         if (humanFranchiseId === undefined) {
             throw new Error('promoteSeasonDraftToRun: the run league has no human franchise');
         }
+        const authorityKind = validatedRun.authority.kind;
+        const participantFranchiseIds = authorityKind === 'season-multiplayer'
+            ? [validatedRun.authority.p1.franchiseId, validatedRun.authority.p2.franchiseId]
+            : humanFranchiseId
+                ? [humanFranchiseId]
+                : [];
         const indexRow = storedSeasonActiveRunIndexSchema.parse({
             recordId: SEASON_RUN_RECORD_ID,
             index: {
                 runId: validatedRun.runId,
                 rootSeed: validatedRun.rootSeed,
                 humanFranchiseId,
+                participantFranchiseIds: participantFranchiseIds.length > 0 ? participantFranchiseIds as [string, ...string[]] : undefined,
+                authorityKind: authorityKind as 'local-solo' | 'season-multiplayer',
                 completedRounds: 0,
                 revision: 0,
                 humanWins: 0,

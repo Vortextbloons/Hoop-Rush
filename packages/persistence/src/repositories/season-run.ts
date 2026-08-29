@@ -1,4 +1,4 @@
-import type { SeasonAcceptedBlock, SeasonActiveRunIndex, SeasonBlockRecap, SeasonCampaignState, SeasonCandidateCheckpoint, SeasonCheckpointState, SeasonEffectsState, SeasonFreeAgencyState, SeasonGameSummary, SeasonHealthState, SeasonInfluenceState, SeasonInvalidRosterInterruption, SeasonObjectiveState, SeasonPendingBlockCandidate, SeasonRetainedGameDetail, SeasonRotation, SeasonRun, SeasonRunCommand, SeasonStandings, SeasonTeamAggregate, SeasonPlayerAggregate, SeasonTradeState, SeasonTransactionEntry, } from '@hoop-rush/data-contracts';
+import type { SeasonAcceptedBlock, SeasonActiveRunIndex, SeasonBlockRecap, SeasonCampaignState, SeasonCandidateCheckpoint, SeasonCheckpointState, SeasonCommandActor, SeasonEffectsState, SeasonFreeAgencyState, SeasonGameSummary, SeasonHealthState, SeasonInfluenceState, SeasonInvalidRosterInterruption, SeasonObjectiveState, SeasonPendingBlockCandidate, SeasonRetainedGameDetail, SeasonRotation, SeasonRun, SeasonRunCommand, SeasonStandings, SeasonTeamAggregate, SeasonPlayerAggregate, SeasonTradeState, SeasonTransactionEntry, } from '@hoop-rush/data-contracts';
 import { SEASON_RUN_SAVE_SCHEMA_VERSION } from '@hoop-rush/data-contracts';
 import type { StoredSeasonDraft } from '../schemas/season-draft-record.ts';
 import type { SeasonWindowOpenResult } from '../season/engine-seam-types.ts';
@@ -53,6 +53,7 @@ export interface SeasonRunCommandApplication {
     resultDigest?: string;
     relatedGameIds?: string[];
     transactionIds?: string[];
+    actor?: SeasonCommandActor;
 }
 export class SeasonRunCommandStaleStateError extends Error {
     readonly commandId: string;

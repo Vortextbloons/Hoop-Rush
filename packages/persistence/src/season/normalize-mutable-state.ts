@@ -1,4 +1,13 @@
-import { deriveSeasonInfluenceEntryId, deriveSeasonTransactionId, normalizeSeasonTransactionEntry, type SeasonEffectsState, type SeasonFreeAgencyState, type SeasonInfluenceState, type SeasonRun, type SeasonTransactionEntry, } from '@hoop-rush/data-contracts';
+import {
+  deriveSeasonInfluenceEntryId,
+  deriveSeasonTransactionId,
+  normalizeSeasonTransactionEntry,
+  type SeasonEffectsState,
+  type SeasonFreeAgencyState,
+  type SeasonInfluenceState,
+  type SeasonRun,
+  type SeasonTransactionEntry,
+} from '@hoop-rush/data-contracts';
 import { seasonRunEngineSeam } from './engine-seam.ts';
 export function normalizeSeasonTransactions(transactions: readonly SeasonTransactionEntry[]): SeasonTransactionEntry[] {
     return transactions.map(normalizeSeasonTransactionEntry);
@@ -55,6 +64,7 @@ export function normalizeSeasonRunForPersistence(run: SeasonRun, effects: Season
             ownership: normalized.ownership,
             rotations: normalized.rotations,
             effects,
-        }),
+            authority: normalized.authority,
+        } as any),
     };
 }

@@ -282,12 +282,17 @@ export function createSeasonRoomCoordinator(deps: SeasonRoomCoordinatorDeps) {
         state = { ...state, publicSnapshot: snap };
         deps.onSnapshot(snap);
         // treat Realtime as notification, refetch authoritative commands
-        deps.transport.refetch(roomId, lastAcceptedOrdinal).then((cmds) => {
-          if (cmds.length > 0) {
-            lastAcceptedOrdinal = cmds[cmds.length - 1]!.ordinal;
-            deps.onCommands(cmds);
-          }
-        });
+        const after = Number.isFinite(lastAcceptedOrdinal) ? lastAcceptedOrdinal : -1;
+        void deps.transport
+          .refetch(roomId, after)
+          .then((cmds) => {
+            if (cmds.length > 0) {
+              const last = cmds[cmds.length - 1];
+              if (last && typeof last.ordinal === 'number') lastAcceptedOrdinal = last.ordinal;
+              deps.onCommands(cmds);
+            }
+          })
+          .catch(() => {});
       });
       unsubscribe = sub.unsubscribe;
       state = { ...state, roomId, connected: true };
@@ -295,8 +300,10 @@ export function createSeasonRoomCoordinator(deps: SeasonRoomCoordinatorDeps) {
     },
     async refetchAfter(ordinal: number) {
       if (!state.roomId) return [];
-      const cmds = await deps.transport.refetch(state.roomId, ordinal);
-      if (cmds.length > 0) lastAcceptedOrdinal = cmds[cmds.length - 1]!.ordinal;
+      const after = Number.isFinite(ordinal) ? ordinal : -1;
+      const cmds = await deps.transport.refetch(state.roomId, after);
+      const last = cmds[cmds.length - 1];
+      if (last && typeof last.ordinal === 'number') lastAcceptedOrdinal = last.ordinal;
       return cmds;
     },
     async submitCommand(envelope: SeasonPublicCommandEnvelope) {
@@ -335,7 +342,8 @@ export function createSeasonRoomCoordinator(deps: SeasonRoomCoordinatorDeps) {
       state = { ...state, roomId, connected: false };
       const snap = await deps.transport.resume(roomId);
       state = { ...state, publicSnapshot: snap, connected: true };
-      const cmds = await deps.transport.refetch(roomId, lastAcceptedOrdinal);
+      const after = Number.isFinite(lastAcceptedOrdinal) ? lastAcceptedOrdinal : -1;
+      const cmds = await deps.transport.refetch(roomId, after);
       return { lastCheckpoint, commands: cmds, snapshot: snap };
     },
   };

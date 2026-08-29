@@ -295,6 +295,7 @@ async function makeFlow(): Promise<FlowContext> {
         rotations: run.rotations,
         effects,
         freeAgency: run.freeAgency,
+        authority: run.authority,
     });
     const aligned: SeasonRun = {
         ...run,

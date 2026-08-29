@@ -10,4 +10,5 @@ export * from './repositories/season-run-dexie.ts';
 export * from './season/engine-seam.ts';
 export * from './season/engine-seam-types.ts';
 export * from './season/audit.ts';
+export * from './schemas/season-room-state.ts';
 export * from './benchmark/season-run.ts';

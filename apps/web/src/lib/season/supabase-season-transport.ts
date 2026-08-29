@@ -39,6 +39,7 @@ function getErrorCode(err: unknown): string | undefined {
 }
 
 let _memoDevUid: string | null = null;
+let heartbeatFnMissing = false;
 function getOrCreateDevUid(): string {
   if (_memoDevUid && /^[0-9a-f-]{36}$/.test(_memoDevUid)) return _memoDevUid;
   try {
@@ -431,7 +432,7 @@ export function createSupabaseSeasonTransport(
         await ensureAnonAuth(client);
         try {
           channel = client
-            .channel(`season-room-${roomId}`, { config: { private: true } })
+            .channel(`season-room-${roomId}`)
             .on(
               'postgres_changes',
               { event: '*', schema: 'public', table: 'season_rooms', filter: `id=eq.${roomId}` },
@@ -486,13 +487,14 @@ export function createSupabaseSeasonTransport(
     },
 
     async refetch(roomId: string, afterOrdinal: number): Promise<SeasonPublicCommandEnvelope[]> {
+      const after = Number.isFinite(afterOrdinal) ? afterOrdinal : -1;
       const res = await callEdge<{ commands: SeasonPublicCommandEnvelope[] }>(
         client,
         config,
         'season-room-refetch',
-        { roomId, afterOrdinal },
+        { roomId, afterOrdinal: after },
       );
-      return res.commands;
+      return Array.isArray(res.commands) ? res.commands : [];
     },
 
     async submitCommand(envelope: SeasonPublicCommandEnvelope): Promise<SeasonCommandReceipt> {
@@ -617,13 +619,22 @@ export function createSupabaseSeasonTransport(
     },
 
     async heartbeat(roomId: string, participantId: 'p1' | 'p2'): Promise<void> {
+      if (heartbeatFnMissing) {
+        // resume already stamps last_seen_at for the caller
+        await callEdge(client, config, 'season-room-resume', { roomId }).catch(() => {});
+        return;
+      }
       try {
         await callEdge<{ ok: boolean }>(client, config, 'season-room-heartbeat', {
           roomId,
           participantId,
         });
-      } catch {
-        // heartbeat is best-effort; if edge not deployed, fallback to no-op but update local presence via resume poll
+      } catch (err) {
+        const status = (err as { status?: number }).status;
+        // undeployed functions 404 without CORS, so the browser often yields no status
+        if (status && status !== 404) return;
+        heartbeatFnMissing = true;
+        await callEdge(client, config, 'season-room-resume', { roomId }).catch(() => {});
       }
     },
 

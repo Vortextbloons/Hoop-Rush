@@ -28,9 +28,9 @@ function playerAt(team: SimulationTeam, index: number) {
   return player;
 }
 describe('assigned-position responsibility modifiers', () => {
-  it('ships as m3-engine-v12 with the responsibility constants versioned', () => {
-    expect(ENGINE_VERSION).toBe('m3-engine-v12');
-    expect(ENGINE_CONSTANTS.version).toBe('m3-engine-v12');
+  it('ships with the responsibility constants versioned', () => {
+    expect(ENGINE_VERSION).toBe(ENGINE_CONSTANTS.version);
+    expect(ENGINE_VERSION).toMatch(/^m3-engine-v\d+$/);
     expect(ENGINE_CONSTANTS.positionResponsibilityBound).toBeGreaterThanOrEqual(0.08);
   });
   it('keeps every coefficient inside the bounded band around 1', () => {

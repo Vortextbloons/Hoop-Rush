@@ -25,11 +25,15 @@ db.version(2).stores({
 export async function readCachedPool(key: string, expectedHash: string): Promise<FranchiseEraPool | null> {
     try {
         const record = await db.pools.get(key);
-        if (!record || record.contentHash !== expectedHash)
+        if (!record) return null;
+        if (record.contentHash !== expectedHash) {
+            console.warn(`[pool-cache] hash mismatch for ${key}: expected ${expectedHash}, got ${record.contentHash}`);
             return null;
+        }
         return franchiseEraPoolSchema.parse(record.pool);
     }
-    catch {
+    catch (error) {
+        console.warn('[pool-cache] readCachedPool failed', error);
         return null;
     }
 }
@@ -37,7 +41,9 @@ export async function writeCachedPool(key: string, contentHash: string, pool: Fr
     try {
         await db.pools.put({ key, contentHash, pool, savedAt: Date.now() });
     }
-    catch { }
+    catch (error) {
+        console.warn('[pool-cache] writeCachedPool failed', error);
+    }
 }
 export async function readCachedAsset<T>(contentHash: string, parse?: (value: unknown) => T): Promise<T | null> {
     try {
@@ -46,7 +52,8 @@ export async function readCachedAsset<T>(contentHash: string, parse?: (value: un
             return null;
         return parse === undefined ? (record.value as T) : parse(record.value);
     }
-    catch {
+    catch (error) {
+        console.warn('[pool-cache] readCachedAsset failed', error);
         return null;
     }
 }
@@ -54,5 +61,7 @@ export async function writeCachedAsset(contentHash: string, value: unknown): Pro
     try {
         await db.assets.put({ key: contentHash, value, savedAt: Date.now() });
     }
-    catch { }
+    catch (error) {
+        console.warn('[pool-cache] writeCachedAsset failed', error);
+    }
 }

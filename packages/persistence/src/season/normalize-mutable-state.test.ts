@@ -62,6 +62,7 @@ describe('normalizeSeasonRunForPersistence', () => {
             ownership: run.ownership,
             rotations: run.rotations,
             effects,
+            authority: run.authority,
         }));
     });
 });

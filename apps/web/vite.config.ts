@@ -1,6 +1,11 @@
 import tailwindcss from '@tailwindcss/vite';
 import { sveltekit } from '@sveltejs/kit/vite';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig, type Plugin } from 'vite';
+
+const webRoot = path.dirname(fileURLToPath(import.meta.url));
+const buildDir = path.join(webRoot, 'build');
 
 /** Stub CDP/health probes that hit the dev server when --host exposes port 5173. */
 function devProbeStubPlugin(): Plugin {
@@ -35,6 +40,9 @@ export default defineConfig({
     strictPort: true,
                                                                                   
     allowedHosts: true,
+    watch: {
+      ignored: [buildDir, `${buildDir}/**`],
+    },
     fs: {
       allow: ['../..'],
     },

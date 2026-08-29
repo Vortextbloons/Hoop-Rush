@@ -1,9 +1,14 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { Worker } from 'node:worker_threads';
 import { z } from 'zod';
 import { sha256Hex, readJson } from './io.ts';
 import { makeReport, type CliReport } from './report.ts';
+function atomicWriteFileSync(target: string, content: string): void {
+    const tmp = `${target}.tmp-${String(Date.now())}-${String(Math.random()).slice(2)}`;
+    writeFileSync(tmp, content);
+    renameSync(tmp, target);
+}
 export function commitTargetsArtifact(args: {
     outPath: string;
     defaultTargetsPath: string;
@@ -19,7 +24,7 @@ export function commitTargetsArtifact(args: {
     try {
         const target = resolve(args.outPath);
         mkdirSync(dirname(target), { recursive: true });
-        writeFileSync(target, `${JSON.stringify(args.content, null, 2)}\n`);
+        atomicWriteFileSync(target, `${JSON.stringify(args.content, null, 2)}\n`);
         if (resolve(args.outPath) === resolve(args.defaultTargetsPath)) {
             const manifestPathResolved = resolve(args.manifestPath);
             const manifest = JSON.parse(readFileSync(manifestPathResolved, 'utf8')) as {
@@ -33,7 +38,7 @@ export function commitTargetsArtifact(args: {
                     url: args.manifestUrl,
                     contentHash: sha256Hex(readFileSync(target)),
                 };
-                writeFileSync(manifestPathResolved, `${JSON.stringify(manifest, null, 2)}\n`);
+                atomicWriteFileSync(manifestPathResolved, `${JSON.stringify(manifest, null, 2)}\n`);
             }
         }
         return { written: true, path: target, error: null };
@@ -88,13 +93,21 @@ export function runWorkerChunk<TResult>(args: {
     payloadKey: string;
 }): Promise<TResult> {
     return new Promise<TResult>((resolvePromise, rejectPromise) => {
+        let settled = false;
         const worker = new Worker(args.workerUrl, { workerData: args.workerData });
         worker.on('message', (message: unknown) => {
+            if (settled) return;
+            settled = true;
             resolvePromise((message as Record<string, TResult>)[args.payloadKey] as TResult);
-            void worker.terminate();
+            void worker.terminate().catch(() => {});
         });
-        worker.on('error', rejectPromise);
+        worker.on('error', (error) => {
+            if (settled) return;
+            settled = true;
+            rejectPromise(error);
+        });
         worker.on('exit', (code) => {
+            if (settled) return;
             if (code !== 0)
                 rejectPromise(new Error(`worker exited ${String(code)}`));
         });
@@ -107,7 +120,8 @@ export function runWorkerChunks<TItem, TResult>(args: {
     workers: number;
     payloadKey: string;
 }): Promise<TResult[]> {
-    const chunkSize = Math.max(1, Math.ceil(args.items.length / args.workers));
+    const safeWorkers = Math.max(1, Math.floor(args.workers));
+    const chunkSize = Math.max(1, Math.ceil(args.items.length / safeWorkers));
     const chunks: TItem[][] = [];
     for (let i = 0; i < args.items.length; i += chunkSize) {
         chunks.push(args.items.slice(i, i + chunkSize));

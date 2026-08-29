@@ -545,6 +545,7 @@ export function auditSeasonRunState(facts: SeasonRunAuditFacts, seam: SeasonRunE
             rotations: stored.run.rotations,
             effects: stored.effects,
             freeAgency: stored.run.freeAgency,
+            authority: stored.run.authority,
         });
     }
     catch (error) {

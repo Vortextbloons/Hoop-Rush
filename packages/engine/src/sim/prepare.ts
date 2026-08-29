@@ -88,15 +88,6 @@ export function prepareTeam(team: SimulationTeam, profile: EraSimulationProfile)
         passP: passPByPlayer,
     };
 }
-const prepCache = new WeakMap<SimulationTeam, {
-    profile: EraSimulationProfile;
-    prep: TeamPrep;
-}>();
 export function prepareTeamCached(team: SimulationTeam, profile: EraSimulationProfile): TeamPrep {
-    const cached = prepCache.get(team);
-    if (cached !== undefined && cached.profile === profile)
-        return cached.prep;
-    const prep = prepareTeam(team, profile);
-    prepCache.set(team, { profile, prep });
-    return prep;
+    return prepareTeam(team, profile);
 }

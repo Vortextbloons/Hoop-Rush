@@ -3,6 +3,7 @@ import { IDBFactory } from 'fake-indexeddb';
 import type { StoredClassicDraft } from '../schemas/classic-draft-record.ts';
 import type { StoredSeasonDraft } from '../schemas/season-draft-record.ts';
 import type { StoredSeasonAcceptedBlockRow, StoredSeasonActiveRunIndex, StoredSeasonAlmanacRow, StoredSeasonCommandLogRow, StoredSeasonCompletedIndex, StoredSeasonCompletedRunRow, StoredSeasonDetailRow, StoredSeasonPendingBlockRow, StoredSeasonPlayerSliceRow, StoredSeasonPostseasonDetailRow, StoredSeasonPostseasonSummaryRow, StoredSeasonRunRecord, StoredSeasonSummaryRow, } from '../schemas/season-run-record.ts';
+import type { StoredSeasonRoomState } from '../schemas/season-room-state.ts';
 import type { ActiveGameRow, ActiveRunCheckpoint, CompletedRunIndex, StoredRunRecord, } from '../schemas/run-record.ts';
 export class TestDatabase extends Dexie {
     active!: EntityTable<ActiveRunCheckpoint, 'recordId'>;
@@ -45,7 +46,7 @@ export class TestDatabase extends Dexie {
     seasonCompletedRuns!: EntityTable<StoredSeasonCompletedRunRow, 'runId'>;
     seasonCompletedIndex!: EntityTable<StoredSeasonCompletedIndex, 'recordId'>;
     seasonRunPlayerSlices!: EntityTable<StoredSeasonPlayerSliceRow, 'runId'>;
-    seasonRoomStates!: Table<any, string>;
+    seasonRoomStates!: EntityTable<StoredSeasonRoomState, 'roomId'>;
     constructor(name: string) {
         super(name);
         this.version(1).stores({ active: 'recordId', completed: 'recordId', history: 'recordId' });
@@ -118,6 +119,22 @@ export class TestDatabase extends Dexie {
             seasonRunPlayerSlices: 'runId',
         });
         this.version(12).stores({
+            seasonRuns: 'recordId',
+            seasonRunSummaries: '[runId+gameId], [runId+blockIndex], runId, blockIndex',
+            seasonRunDetails: '[runId+gameId], runId',
+            seasonRunBlocks: '[runId+blockIndex], runId',
+            seasonRunIndex: 'recordId',
+            seasonPendingBlocks: 'runId',
+            seasonPostseasonSummaries: '[runId+gameId], runId',
+            seasonPostseasonDetails: '[runId+gameId], runId',
+            seasonCommandLog: '[runId+ordinal], runId',
+            seasonAlmanacs: 'runId',
+            seasonCompletedRuns: 'runId',
+            seasonCompletedIndex: 'recordId, completedAtIso',
+            seasonRunPlayerSlices: 'runId',
+            seasonRoomStates: 'roomId',
+        });
+        this.version(13).stores({
             seasonRuns: 'recordId',
             seasonRunSummaries: '[runId+gameId], [runId+blockIndex], runId, blockIndex',
             seasonRunDetails: '[runId+gameId], runId',

@@ -209,8 +209,6 @@ export class SeasonHubState {
                 mutation.revision === localRevision) {
                 return;
             }
-            if (mutation.kind === 'commit' && localRunId !== null && mutation.runId !== localRunId) {
-            }
             if (this.block.phase === 'running' && this.block.requestId !== null) {
                 this.cancel();
             }
@@ -1092,9 +1090,9 @@ export class SeasonHubState {
         const runId = this.snapshot.run.runId;
         if (this.block.phase === 'running') {
             this.cancel();
-            const deadline = Date.now() + 5000;
+            const deadline = this.now() + 5000;
             const phaseOf = (): BlockPhase => this.block.phase;
-            while (phaseOf() === 'running' && Date.now() < deadline) {
+            while (phaseOf() === 'running' && this.now() < deadline) {
                 await sleep(100);
             }
             if (phaseOf() === 'running') {
@@ -1177,6 +1175,7 @@ export class SeasonHubState {
                 const effects = postCommandEffects(output.run, this.snapshot.effects);
                 this.snapshot = { ...this.snapshot, run: output.run, effects };
                 setCachedSeasonSnapshot(this.snapshot);
+                this.channel.announce({ kind: 'commit', runId: output.run.runId, revision: output.run.stateRevision, committedAt: this.now() });
                 this.emit();
             }
             await this.refresh();
@@ -1197,10 +1196,12 @@ export class SeasonHubState {
         return runId;
     }
     private requiredStateRevision(): number {
-        return this.snapshot?.run.stateRevision ?? 0;
+        if (this.snapshot === null) throw new Error('no active season run to command');
+        return this.snapshot.run.stateRevision;
     }
     private requiredStateDigest(): string {
-        return this.snapshot?.run.stateDigest ?? '0'.repeat(32);
+        if (this.snapshot === null) throw new Error('no active season run to command');
+        return this.snapshot.run.stateDigest;
     }
     private requiredHumanFranchiseId(): string {
         const franchiseId = this.snapshot === null ? null : humanFranchiseIdOf(this.snapshot.run.league);

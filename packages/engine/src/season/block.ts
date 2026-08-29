@@ -493,14 +493,18 @@ export function simulateSeasonBlockGame(input: SeasonBlockSimulationInput, game:
             effects: pregame,
         });
     if (humanPlays) {
-        for (const pid of participantFranchiseIds) {
+        for (const pid of [...participantFranchiseIds].sort()) {
             if (game.homeFranchiseId !== pid && game.awayFranchiseId !== pid) continue;
             const roster = rosterByFranchise.get(pid);
             const availableCount = roster === undefined
                 ? 0
                 : roster.players.filter((player) => seam.pregame.get(player.playerVersionId) === true).length;
-            const collection = input.collectedTipAvailability ?? (input.collectedTipAvailability = []);
-            collection.push({ gameId: game.gameId, availableCount });
+            const nextEntry = { gameId: game.gameId, availableCount };
+            if (input.collectedTipAvailability === undefined) {
+                input.collectedTipAvailability = [nextEntry];
+            } else {
+                input.collectedTipAvailability = [...input.collectedTipAvailability, nextEntry];
+            }
         }
     }
     const gameInput: SeasonGameSimulationInput = {
@@ -684,8 +688,8 @@ export function assembleSeasonBlockCandidate(input: SeasonBlockSimulationInput, 
     const players = foldSeasonPlayerAggregates(allSummaries);
     const { toRound } = blockRoundRange(command.blockIndex);
     const completedRounds = toRound;
-    const participantIds = input.participantFranchiseIds ??
-        (input.humanFranchiseId ? [input.humanFranchiseId] : []);
+    const participantIds = [...(input.participantFranchiseIds ??
+        (input.humanFranchiseId ? [input.humanFranchiseId] : []))].sort();
     const primaryFranchiseId = participantIds[0] ?? input.humanFranchiseId;
     const humanRotation = primaryFranchiseId === null
         ? null
@@ -709,7 +713,7 @@ export function assembleSeasonBlockCandidate(input: SeasonBlockSimulationInput, 
             humanFranchiseId: pid,
             rotation: rot,
             summaries: [...summaries],
-            tipAvailability: (input.collectedTipAvailability ?? []).filter(() => true),
+            tipAvailability: [...(input.collectedTipAvailability ?? [])],
         });
         objectiveEvaluations[pid] = evalRes.evaluation;
         objectiveSuccessByFranchise[pid] = evalRes.success;

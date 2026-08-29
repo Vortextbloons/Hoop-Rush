@@ -9,16 +9,28 @@
     ArrowLeft,
     RefreshCw,
     AlertTriangle,
+    Clock,
+    Wifi,
+    WifiOff,
+    Lock,
+    Check,
+    Loader2
   } from '@lucide/svelte';
   import { createInMemorySeasonRoomCoordinator } from '$lib/season/season-room-coordinator';
   import {
     createSupabaseSeasonTransport,
-    isSupabaseConfigured,
+    isSupabaseConfigured
   } from '$lib/season/supabase-season-transport';
-  import { loadMembership } from '$lib/season/season-room-identity';
-  import type { SeasonRoomPublicSnapshot, SeasonRoomMembership, SeasonMultiplayerTransport } from '@hoop-rush/data-contracts';
+  import { loadMembership, saveMembership } from '$lib/season/season-room-identity';
+  import type {
+    SeasonRoomPublicSnapshot,
+    SeasonRoomMembership,
+    SeasonMultiplayerTransport,
+    SeasonDraftOffer
+  } from '@hoop-rush/data-contracts';
+  import { SEASON_DRAFT_OFFER_SIZE, SEASON_DRAFT_SAFE_MINIMUM } from '@hoop-rush/data-contracts';
   import { RoomDraftController } from '$lib/season/room-draft-controller';
-  // use any for draft state to avoid strict type cascade while controller stabilizes
+
   let roomId = $derived($page.params.roomId as string);
 
   let snap = $state<SeasonRoomPublicSnapshot | null>(null);
@@ -27,20 +39,24 @@
   let error = $state<string | null>(null);
   let coordinator: ReturnType<typeof createInMemorySeasonRoomCoordinator> | null = null;
   let transport: ReturnType<typeof createSupabaseSeasonTransport> | null = null;
-  let draftState: any = $state(null);
-  let controller: any = $state(null);
+  let controller: RoomDraftController | null = $state(null);
+  let draftState: import('@hoop-rush/data-contracts').SeasonDraftState | null = $state(null);
+  let generation: import('@hoop-rush/data-contracts').SeasonLeagueGenerationResult | null = $state(null);
   let picking = $state(false);
+  let drawing = $state(false);
   let pickError = $state<string | null>(null);
+  let finalizeBusy = $state(false);
+  let generateBusy = $state(false);
+  let leagueDigest: string | null = $state(null);
+  let verification: { ok: boolean; msg: string } | null = $state(null);
+  let tick = $state(0);
 
   function getCoordinator() {
     const useSupabase = isSupabaseConfigured();
     transport = useSupabase
       ? createSupabaseSeasonTransport({
-          url:
-            (import.meta as unknown as { env: Record<string, string> }).env.VITE_SUPABASE_URL ?? '',
-          publishableKey:
-            (import.meta as unknown as { env: Record<string, string> }).env
-              .VITE_SUPABASE_PUBLISHABLE_KEY ?? '',
+          url: (import.meta as unknown as { env: Record<string, string> }).env.VITE_SUPABASE_URL ?? '',
+          publishableKey: (import.meta as unknown as { env: Record<string, string> }).env.VITE_SUPABASE_PUBLISHABLE_KEY ?? ''
         })
       : null;
     const t = (transport ?? undefined) as unknown as SeasonMultiplayerTransport | undefined;
@@ -48,16 +64,28 @@
       transport: t,
       onSnapshot: (s) => {
         snap = s;
-        if (s.phase === 'drafting' && controller) {
-          void controller.restoreFromLog().then((state: any) => (draftState = { ...state }));
+        if (controller) {
+          void controller.restoreFromLog().then((state) => {
+            draftState = state ? { ...state } as typeof draftState : null;
+            generation = controller?.getGeneration() ?? null;
+            if (draftState && membership && draftState.currentTurnParticipantId === membership.participantId && !draftState.currentOffer) {
+              void handleDraw();
+            }
+            void maybeAutoAdvance();
+          });
         }
       },
       onCommands: async () => {
         if (controller) {
           const state = await controller.restoreFromLog();
-          draftState = { ...state };
+          draftState = state ? ({ ...state } as typeof draftState) : null;
+          generation = controller.getGeneration();
+          if (draftState && membership && draftState.currentTurnParticipantId === membership.participantId && !draftState.currentOffer && draftState.status === 'drafting') {
+            void handleDraw();
+          }
+          void maybeAutoAdvance();
         }
-      },
+      }
     });
   }
 
@@ -68,41 +96,70 @@
     throw new Error('no transport available');
   }
 
+  async function maybeAutoAdvance() {
+    if (!draftState || !controller) return;
+    if (draftState.status === 'complete' && draftState && controller.getGeneration()) {
+      generation = controller.getGeneration();
+      leagueDigest = generation?.digest ?? null;
+      if (leagueDigest) {
+        const ok = controller.verifyLeagueDigest(leagueDigest);
+        verification = ok ? { ok: true, msg: 'League digest attested — both clients derived identical 28 AI teams (DUO_BAND_QUOTAS)' } : { ok: false, msg: 'Digest mismatch — rerun required' };
+      }
+    }
+  }
+
   async function load() {
     loading = true;
     error = null;
     try {
       coordinator = getCoordinator();
-      membership = loadMembership(roomId);
+      const stored = loadMembership(roomId);
       try {
         coordinator.hydrateFromStorage(roomId);
       } catch {}
-      membership = loadMembership(roomId) ?? membership;
       const t = transport as unknown as SeasonMultiplayerTransport | null;
+      let res: SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership };
       if (t) {
-        const res = await t.resume(roomId) as SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership };
-        snap = res;
-        if ((res as unknown as { membership?: SeasonRoomMembership }).membership) {
-          membership = (res as unknown as { membership: SeasonRoomMembership }).membership;
-        }
+        res = (await t.resume(roomId)) as SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership };
       } else if (coordinator) {
-        const res = await coordinator.refresh(roomId) as unknown as SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership };
-        snap = res;
-        if ((res as unknown as { membership?: SeasonRoomMembership }).membership) membership = (res as unknown as { membership: SeasonRoomMembership }).membership;
+        res = (await coordinator.refresh(roomId)) as unknown as SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership };
+      } else throw new Error('Multiplayer not configured');
+      snap = res as SeasonRoomPublicSnapshot;
+      if ((res as unknown as { membership?: SeasonRoomMembership }).membership) {
+        const m = (res as unknown as { membership: SeasonRoomMembership }).membership;
+        saveMembership(m);
+        membership = m;
       } else {
-        throw new Error('Multiplayer not configured');
+        membership = stored ?? loadMembership(roomId);
       }
-      if (!membership) {
-        const st = coordinator.state;
-        if (st.participantId && st.franchiseId) membership = loadMembership(roomId);
-      }
-      if (snap) {
+      if (snap && membership) {
         coordinator.subscribe(roomId);
-        if (snap.phase === 'drafting' && membership) {
-          const tr = getTransport();
-          controller = new RoomDraftController({ transport: tr, roomId, snapshot: snap });
-          const state = await controller.restoreFromLog();
-          draftState = state;
+        const tr = getTransport();
+        controller = new RoomDraftController({ transport: tr, roomId, snapshot: snap, membership, fetchImpl: fetch });
+        const state = await controller.restoreFromLog();
+        if (!state) {
+          if (snap.phase === 'drafting') {
+            const created = await controller.ensureDraftCreated();
+            draftState = created ? ({ ...created } as typeof draftState) : null;
+            if (draftState && draftState.currentTurnParticipantId === membership.participantId && !draftState.currentOffer) {
+              await handleDraw();
+              draftState = controller.getState() as typeof draftState;
+            }
+          } else {
+            draftState = state as typeof draftState;
+          }
+        } else {
+          draftState = { ...state } as typeof draftState;
+          generation = controller.getGeneration();
+          if (draftState.currentTurnParticipantId === membership.participantId && !draftState.currentOffer && draftState.status === 'drafting') {
+            await handleDraw();
+            draftState = controller.getState() as typeof draftState;
+          }
+          void maybeAutoAdvance();
+        }
+        leagueDigest = generation?.digest ?? null;
+        if (leagueDigest && controller.verifyLeagueDigest(leagueDigest)) {
+          verification = { ok: true, msg: 'League digest verified' };
         }
       }
     } catch (e) {
@@ -114,25 +171,73 @@
 
   onMount(() => {
     load();
-    return () => coordinator?.destroy();
+    const iv = setInterval(() => tick++, 1000);
+    const timerIv = setInterval(() => {
+      tick++;
+      if (controller && membership && snap?.settings.pace === 'live' && draftState?.currentTurnParticipantId === membership.participantId) {
+        const remaining = controller.getSecondsRemaining(Date.now());
+        if (remaining !== null && remaining <= 0) {
+          void controller.autoPickSafe(membership.participantId as 'p1' | 'p2').then((ns) => {
+            if (ns) {
+              draftState = { ...ns } as typeof draftState;
+              generation = controller?.getGeneration() ?? null;
+            }
+          });
+        }
+      }
+    }, 1000);
+    return () => {
+      clearInterval(iv);
+      clearInterval(timerIv);
+      coordinator?.destroy();
+    };
   });
+
+  async function handleDraw() {
+    if (!controller || !membership || drawing) return;
+    const pid = membership.participantId as 'p1' | 'p2';
+    if (draftState?.currentTurnParticipantId !== pid) return;
+    if (draftState?.currentOffer) return;
+    drawing = true;
+    pickError = null;
+    try {
+      const record = await controller.drawOffer(pid);
+      draftState = controller.getState() as typeof draftState;
+      void record;
+    } catch (e) {
+      const code = (e as { code?: string; errorCode?: string })?.code ?? (e as { errorCode?: string })?.errorCode;
+      if (code === 'WRONG_TURN') pickError = 'Not your turn.';
+      else if (code === 'STALE_REVISION') {
+        pickError = 'Stale revision — replaying log.';
+        const s = await controller.restoreFromLog();
+        draftState = s ? ({ ...s } as typeof draftState) : draftState;
+      } else pickError = e instanceof Error ? e.message : String(e);
+    } finally {
+      drawing = false;
+    }
+  }
 
   async function handlePick(playerVersionId: string) {
     if (!controller || !membership) return;
     picking = true;
     pickError = null;
     try {
-      const pid = membership.participantId as 'p1'|'p2';
+      const pid = membership.participantId as 'p1' | 'p2';
       const next = await controller.submitPick(pid, playerVersionId);
-      draftState = { ...next };
+      draftState = { ...next } as typeof draftState;
+      generation = controller.getGeneration();
+      void maybeAutoAdvance();
     } catch (e) {
-      const code = (e as { code?: string })?.code;
-      if (code === 'turn') pickError = 'Not your turn — wait for opponent.';
-      else if (code === 'stale-revision') pickError = 'Stale revision — refreshing.';
+      const code = (e as { code?: string; errorCode?: string })?.code ?? (e as { errorCode?: string })?.errorCode;
+      if (code === 'WRONG_TURN') pickError = 'Not your turn — wait for opponent.';
+      else if (code === 'OWNED_VERSION') pickError = 'That version is already owned — duplicate ownership rejected.';
+      else if (code === 'UNCOMPLETABLE_ROSTER') pickError = 'Unselectable: would make 4G/4F/3C unreachable.';
+      else if (code === 'UNAVAILABLE_POOL') pickError = 'Not in current 8-card offer.';
+      else if (code === 'STALE_REVISION') pickError = 'Stale revision — replaying and retry.';
       else pickError = e instanceof Error ? e.message : String(e);
       if (controller) {
         const state = await controller.restoreFromLog();
-        draftState = { ...state };
+        draftState = state ? ({ ...state } as typeof draftState) : draftState;
       }
     } finally {
       picking = false;
@@ -142,7 +247,53 @@
   async function refreshDraft() {
     if (!controller) return;
     const state = await controller.restoreFromLog();
-    draftState = { ...state };
+    draftState = state ? ({ ...state } as typeof draftState) : null;
+    generation = controller.getGeneration();
+    void maybeAutoAdvance();
+  }
+
+  async function handleFinalize() {
+    if (!controller || finalizeBusy) return;
+    finalizeBusy = true;
+    pickError = null;
+    try {
+      const rec = await controller.finalizeRosters();
+      draftState = controller.getState() as typeof draftState;
+      void rec;
+    } catch (e) {
+      pickError = e instanceof Error ? e.message : String(e);
+      const s = await controller.restoreFromLog();
+      draftState = s ? ({ ...s } as typeof draftState) : draftState;
+    } finally {
+      finalizeBusy = false;
+    }
+  }
+
+  async function handleGenerate() {
+    if (!controller || generateBusy) return;
+    generateBusy = true;
+    pickError = null;
+    verification = null;
+    try {
+      const res = await controller.generateAiLeague();
+      draftState = res.state ? ({ ...res.state } as typeof draftState) : draftState;
+      generation = res.generation;
+      leagueDigest = res.digest;
+      if (res.digest && res.generation) {
+        const ok = controller.verifyLeagueDigest(res.digest);
+        verification = ok
+          ? { ok: true, msg: `League verified — ${res.generation.aiPools.length} AI pools, 28 teams (DUO)` }
+          : { ok: false, msg: 'Digest mismatch' };
+      }
+    } catch (e) {
+      const code = (e as { code?: string; errorCode?: string })?.code ?? (e as { errorCode?: string })?.errorCode;
+      if (code === 'GENERATION_EXHAUSTED') pickError = 'AI generation exhausted — retry with new seed.';
+      else pickError = e instanceof Error ? e.message : String(e);
+      const s = await controller.restoreFromLog();
+      draftState = s ? ({ ...s } as typeof draftState) : draftState;
+    } finally {
+      generateBusy = false;
+    }
   }
 
   let modeLabel = $derived.by(() => {
@@ -151,35 +302,49 @@
     if (raw === 'sandbox') return 'Sandbox';
     return 'Season Run';
   });
-  let isMyTurn = $derived((draftState as any)?.currentTurn === membership?.participantId);
-  let opponentTurn = $derived(((draftState as any)?.currentTurn ?? null) !== null && (draftState as any)?.currentTurn !== membership?.participantId);
+  let isMyTurn = $derived(draftState?.currentTurnParticipantId === membership?.participantId);
+  let opponentTurn = $derived((draftState?.currentTurnParticipantId ?? null) !== null && draftState?.currentTurnParticipantId !== membership?.participantId);
   let picksByParticipant = $derived.by(() => {
-    if (!draftState) return { p1: [], p2: [] } as Record<string, any[]>;
+    if (!draftState) return { p1: [], p2: [] } as Record<string, unknown[]>;
     return {
-      p1: (draftState as any).picks.filter((p: any) => p.participantId === 'p1'),
-      p2: (draftState as any).picks.filter((p: any) => p.participantId === 'p2'),
+      p1: draftState.picks.filter((p) => p.participantId === 'p1'),
+      p2: draftState.picks.filter((p) => p.participantId === 'p2')
     };
   });
-  let totalTarget = $derived(modeLabel === 'Season Run' ? 20 : 10);
-  let progress = $derived(draftState ? `${String((draftState as any).picks.length)}/${String(totalTarget)} picks` : '');
+  let totalTarget = $derived(20);
+  let progress = $derived(draftState ? `${String(draftState.picks.length)}/${String(totalTarget)} picks · ${String(draftState.picks.filter((p: unknown) => (p as { participantId: string }).participantId === membership?.participantId).length)}/10 you` : '');
+  let myOffer = $derived.by(() => {
+    if (!controller || !membership || !draftState) return null;
+    const viewer = membership.participantId;
+    const offer = controller.currentOfferFor(viewer);
+    void tick;
+    return offer as SeasonDraftOffer | null;
+  });
+  let secondsRemaining = $derived.by(() => {
+    void tick;
+    if (!controller || !membership || !draftState) return null;
+    if (snap?.settings.pace !== 'live') return null;
+    if (!isMyTurn) return null;
+    return controller.getSecondsRemaining(Date.now());
+  });
+  let opponentPresence = $derived.by(() => {
+    if (!snap || !membership) return null;
+    const opp = membership.participantId === 'p1' ? 'p2' : 'p1';
+    return snap.presence?.find((p) => p.participantId === opp) ?? null;
+  });
+  let opponentOnline = $derived(opponentPresence?.online ?? (snap ? snap.memberCount >= 2 : false));
+  let isLocked = $derived(draftState?.status === 'complete' || draftState?.status === 'finalized');
+  let canFinalize = $derived(draftState?.picks.length === 20 && draftState?.status === 'drafting');
+  let canGenerate = $derived(draftState?.status === 'finalized');
 </script>
 
 <svelte:head><title>Draft · Room {roomId.slice(0, 8)} — Hoop Rush</title></svelte:head>
 
 <section class="mx-auto w-full max-w-5xl px-4 pb-24 sm:px-6 md:pb-10">
   <div class="flex items-center justify-between gap-3 py-6">
-    <a
-      href={`/multiplayer/room/${roomId}`}
-      class="text-label inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
-      ><ArrowLeft class="h-3.5 w-3.5" /> Back to lobby</a
-    >
+    <a href={`/multiplayer/room/${roomId}`} class="text-label inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground"><ArrowLeft class="h-3.5 w-3.5" /> Back to lobby</a>
     <div class="flex items-center gap-2">
-      <button
-        type="button"
-        onclick={load}
-        class="inline-flex items-center gap-1.5 rounded-lg border border-line-soft bg-card px-3 py-1.5 text-xs font-semibold hover:border-line-strong"
-        ><RefreshCw class="h-3.5 w-3.5" />Refresh</button
-      >
+      <button type="button" onclick={load} class="inline-flex items-center gap-1.5 rounded-lg border border-line-soft bg-card px-3 py-1.5 text-xs font-semibold hover:border-line-strong"><RefreshCw class="h-3.5 w-3.5" />Refresh</button>
       {#if draftState}<button type="button" onclick={refreshDraft} class="inline-flex items-center gap-1.5 rounded-lg border border-line-soft bg-card px-3 py-1.5 text-xs font-semibold">Reload picks</button>{/if}
     </div>
   </div>
@@ -190,9 +355,7 @@
     </div>
   {:else if error}
     <div class="rounded-xl border border-destructive/30 bg-destructive/10 p-6">
-      <div class="flex items-center gap-2 font-semibold text-destructive">
-        <AlertTriangle class="h-4 w-4" />Could not load draft
-      </div>
+      <div class="flex items-center gap-2 font-semibold text-destructive"><AlertTriangle class="h-4 w-4" />Could not load draft</div>
       <p class="mt-2 text-sm text-muted-foreground">{error}</p>
       <div class="mt-4 flex gap-2">
         <button type="button" onclick={load} class="rounded-lg bg-card px-4 py-2 text-sm font-semibold">Retry</button>
@@ -202,7 +365,7 @@
   {:else if !membership}
     <div class="rounded-xl border border-amber-500/30 bg-amber-500/10 p-6">
       <h2 class="font-display text-lg font-extrabold uppercase">No seat found</h2>
-      <p class="mt-2 text-sm text-muted-foreground">This browser has no stored membership for this room. Re-join with the 4-digit invite code.</p>
+      <p class="mt-2 text-sm text-muted-foreground">No authenticated membership. Refresh restores via server (loadMembership + refresh), not localStorage trust. Re-join with 4-digit code.</p>
       <a href={resolve('/multiplayer')} class="mt-4 inline-flex rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Go to Multiplayer entry</a>
       <p class="mt-3 font-mono text-xs text-muted-foreground">Room: {roomId}</p>
     </div>
@@ -210,65 +373,58 @@
     <div class="rounded-xl bg-surface-1 p-8 text-center">
       <p class="text-label text-primary">Draft not yet started</p>
       <h2 class="font-display mt-2 text-2xl font-extrabold uppercase">Waiting for host</h2>
-      <p class="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-        You are {membership.participantId === 'p1' ? 'Host · P1' : 'Guest · P2'} · {modeLabel} · {snap.settings.pace === 'live' ? 'Live 90s / 5m' : 'Async 24h'}. Host must press “Start draft” in the lobby. Both clients will auto-enter draft via authoritative start event (room {snap.roomId.slice(0,8)}…, seed {(snap as unknown as { seed?: string | null }).seed?.slice(0,8) ?? '—'}…, rev {(snap as unknown as { settingsRevision?: number }).settingsRevision}).
-      </p>
+      <p class="mx-auto mt-2 max-w-md text-sm text-muted-foreground">You are {membership.participantId === 'p1' ? 'Host · P1' : 'Guest · P2'} · {modeLabel} · {snap.settings.pace === 'live' ? 'Live 90s / 5m' : 'Async 24h'}. Host must Start draft in lobby. Authenticated membership restored via resume, not localStorage.</p>
       <a href={`/multiplayer/room/${roomId}`} class="mt-6 inline-flex rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground">Back to lobby →</a>
     </div>
-  {:else if snap?.phase === 'drafting' && draftState}
+  {:else if draftState}
     <div class="rounded-xl border border-line-soft bg-surface-1 p-6 sm:p-7">
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p class="text-label tracking-[0.16em] text-primary">Multiplayer draft · {roomId.slice(0, 8)}… · {modeLabel}</p>
           <h1 class="font-display mt-2 text-2xl font-extrabold tracking-tight uppercase">{modeLabel} shared draft</h1>
-          <p class="mt-1 text-sm text-muted-foreground">
-            {membership.participantId === 'p1' ? 'P1 · Host' : 'P2 · Guest'} · {membership.franchiseId} · {snap.settings.pace === 'live' ? 'Live — 90s per pick' : 'Async — 24h per pick'} · {progress}
-          </p>
-          <p class="mt-1 text-xs text-muted-foreground">Seed {(draftState as any).seed.slice(0,12)}… · rev {(draftState as any).settingsRevision} · turn {(draftState as any).currentTurn ?? '—'} · you {isMyTurn ? 'to pick' : opponentTurn ? 'waiting' : '—'}</p>
+          <p class="mt-1 text-sm text-muted-foreground">{membership.participantId === 'p1' ? 'P1 · Host' : 'P2 · Guest'} · {membership.franchiseId} · {snap?.settings.pace === 'live' ? 'Live — 90s per pick' : 'Async — 24h per pick'} · {progress}</p>
+          <p class="mt-1 text-xs text-muted-foreground">Digest {controller?.getDigest()?.slice(0,12) ?? '—'}… · rev {draftState.revision} · turn {draftState.currentTurnParticipantId ?? '—'} · {isLocked ? 'locked' : isMyTurn ? 'your turn' : opponentTurn ? 'opponent turn' : '—'} {secondsRemaining !== null ? `· ${secondsRemaining}s remaining` : ''}</p>
+          {#if !opponentOnline}
+            <p class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-700"><WifiOff class="h-3 w-3" /> Opponent disconnected — waiting for reconnection · presence offline after 15s</p>
+          {:else}
+            <p class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-positive/30 bg-positive/10 px-2.5 py-1 text-xs text-positive"><Wifi class="h-3 w-3" /> Opponent online · both clients replay log on reconnect</p>
+          {/if}
+          {#if isLocked}
+            <p class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-line-soft bg-card px-2.5 py-1 text-xs"><Lock class="h-3 w-3" /> Locked — private offers revealed after lock</p>
+          {/if}
         </div>
         <div class="flex flex-col items-end gap-2">
-          <span class="inline-flex items-center gap-1.5 rounded-full border border-positive/30 bg-positive/10 px-3 py-1 text-xs font-semibold text-positive"><Users class="h-3 w-3" /> {snap.memberCount}/2 · live</span>
-          {#if isMyTurn}<span class="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1 text-xs font-bold text-primary-foreground">Your turn</span>{:else if opponentTurn}<span class="inline-flex items-center gap-1.5 rounded-full border border-line-soft bg-card px-3 py-1 text-xs">Opponent’s turn — wait for authoritative pick</span>{/if}
+          <span class="inline-flex items-center gap-1.5 rounded-full border border-positive/30 bg-positive/10 px-3 py-1 text-xs font-semibold text-positive"><Users class="h-3 w-3" /> {snap?.memberCount ?? 2}/2 · live</span>
+          {#if isMyTurn}<span class="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1 text-xs font-bold text-primary-foreground"><Clock class="h-3 w-3" /> Your turn {secondsRemaining !== null ? `· ${secondsRemaining}s` : ''}</span>{:else if opponentTurn}<span class="inline-flex items-center gap-1.5 rounded-full border border-line-soft bg-card px-3 py-1 text-xs">Opponent’s turn — private offer hidden</span>{/if}
+          {#if draftState.status === 'complete'}<span class="inline-flex items-center gap-1.5 rounded-full bg-positive px-3 py-1 text-xs font-bold text-white"><Check class="h-3 w-3" /> Complete</span>{/if}
         </div>
       </div>
 
-      {#if modeLabel === 'Season Run'}
-        <div class="mt-4 rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs">
-          <p class="font-semibold">Season Run: 10 rounds · alternating picks · 8 cards (≥3 safe) · 4G/4F/3C targets</p>
-          <p class="mt-1 text-muted-foreground">Seeded deterministically from room seed + settings revision + draft cursor (<code class="font-mono">{snap.cursor}</code>). Both clients receive identical seed, offers, picks, turn order.</p>
-        </div>
-      {:else if modeLabel === 'Classic'}
-        <div class="mt-4 rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs">
-          <p class="font-semibold">Classic: 5 rounds each · deterministic franchise-era roll per turn · one reroll each (existing Classic rules)</p>
-          <p class="mt-1 text-muted-foreground">Each roll is deterministic per participant turn; accepting claims that pool against opponent. Roll seed: <code class="font-mono">{(draftState as any).seed.slice(0,16)}…</code></p>
-          {#if (draftState as any).currentTurn}
-            {@const roll = (controller as any)?.classicRollFor((draftState as any).currentTurn)}
-            {#if roll}<p class="mt-1">Current roll for {(draftState as any).currentTurn}: <span class="font-mono font-bold">{roll.franchiseId} / {roll.eraId}</span></p>{/if}
-          {/if}
-        </div>
-      {:else}
-        <div class="mt-4 rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs">
-          <p class="font-semibold">Sandbox: 5 rounds each · unrestricted peak seasons · best-of-2</p>
-          <p class="mt-1 text-muted-foreground">Any 5 peak seasons — deterministic offer per turn, shared draft cursor <code class="font-mono">{snap.cursor}</code>.</p>
-        </div>
-      {/if}
+      <div class="mt-4 rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs">
+        <p class="font-semibold">Season Run: 10 rounds · snake order · 8 cards (≥3 safe) · 4G/4F/3C targets · DUO_BAND_QUOTAS 4/8/9/7</p>
+        <p class="mt-1 text-muted-foreground">Deterministic via room seed + settingsRevision + draft cursor. Offers drawn via drawGlobalOffer; picks via applySeasonDraftCommand with idempotent commandId + expectedRevision. Neither client uses solo /season flow.</p>
+        <p class="mt-1 font-mono text-[11px]">Size {SEASON_DRAFT_OFFER_SIZE} · Safe min {SEASON_DRAFT_SAFE_MINIMUM} · Seed {(snap as unknown as { seed?: string | null })?.seed?.slice(0,12) ?? '—'}… · cursor {snap?.cursor} · digest {controller?.getDigest()?.slice(0,16) ?? '—'}…</p>
+      </div>
 
       <div class="mt-6 grid gap-3 sm:grid-cols-3">
         <div class="rounded-lg border border-line-soft bg-card p-3">
           <p class="text-label text-muted-foreground">Your seat</p>
           <p class="mt-1 text-sm font-bold">{membership.participantId === 'p1' ? 'P1 · Host' : 'P2 · Guest'}</p>
           <p class="mt-1 font-mono text-xs text-muted-foreground">{membership.franchiseId}</p>
-          {#if isMyTurn}<p class="mt-1 text-xs font-bold text-primary">Your turn — pick</p>{:else}<p class="mt-1 text-xs text-muted-foreground">Wait for opponent</p>{/if}
+          {#if isMyTurn}<p class="mt-1 text-xs font-bold text-primary">Your turn — pick {secondsRemaining !== null ? `· ${secondsRemaining}s` : ''}</p>{:else}<p class="mt-1 text-xs text-muted-foreground">Wait for opponent</p>{/if}
+          {#if secondsRemaining !== null && isMyTurn}<div class="mt-2 h-1.5 w-full rounded-full bg-line-soft"><div class="h-1.5 rounded-full bg-primary" style={`width:${(secondsRemaining/90)*100}%`}></div></div>{/if}
         </div>
         <div class="rounded-lg border border-line-soft bg-card p-3">
           <p class="text-label text-muted-foreground">Mode & pace (shared fact)</p>
-          <p class="mt-1 text-sm font-semibold">{modeLabel} · {snap.settings.pace}</p>
-          <p class="mt-1 text-xs text-muted-foreground">Seed {(draftState as any).seed.slice(0,12)}… · rev {(draftState as any).settingsRevision}</p>
+          <p class="mt-1 text-sm font-semibold">{modeLabel} · {snap?.settings.pace}</p>
+          <p class="mt-1 text-xs text-muted-foreground">Seed {(snap as unknown as { seed?: string | null })?.seed?.slice(0,12) ?? '—'}… · rev {draftState.revision} · {snap?.settings.pace === 'live' ? '90s per pick' : '24h per pick'}</p>
+          {#if opponentPresence}<p class="mt-1 text-xs {opponentOnline ? 'text-positive' : 'text-amber-600'}">{opponentOnline ? 'Opponent online' : 'Opponent disconnected — timer paused? live still 90s'} · lastSeen {opponentPresence.lastSeenAt.slice(11,19)}</p>{/if}
         </div>
         <div class="rounded-lg border border-line-soft bg-card p-3">
           <p class="text-label text-muted-foreground">Picks</p>
-          <p class="mt-1 text-sm font-bold">{(draftState as any).picks.length} total</p>
-          <p class="mt-1 text-xs text-muted-foreground">You {picksByParticipant[membership.participantId].length} · Opp {picksByParticipant[membership.participantId === 'p1' ? 'p2' : 'p1'].length}</p>
+          <p class="mt-1 text-sm font-bold">{draftState.picks.length}/20 total</p>
+          <p class="mt-1 text-xs text-muted-foreground">You {picksByParticipant[membership.participantId].length}/10 · Opp {picksByParticipant[membership.participantId === 'p1' ? 'p2' : 'p1'].length}/10 · snake R{draftState.round}</p>
+          {#if draftState.status === 'complete'}<p class="mt-1 text-xs font-semibold text-positive">Draft complete</p>{:else if draftState.status === 'finalized'}<p class="mt-1 text-xs font-semibold text-primary">Rosters finalized — ready to generate AI league</p>{/if}
         </div>
       </div>
     </div>
@@ -276,80 +432,127 @@
     <div class="mt-6 rounded-xl bg-surface-1 p-6">
       <div class="flex items-center justify-between">
         <h2 class="font-display text-sm font-extrabold tracking-widest uppercase">Draft board — {progress}</h2>
-        <span class="text-xs text-muted-foreground">{(draftState as any).currentTurn ? `Turn: ${(draftState as any).currentTurn} ${isMyTurn ? '(you)' : ''}` : 'Complete'}</span>
+        <span class="text-xs text-muted-foreground">{draftState.currentTurnParticipantId ? `Turn: ${draftState.currentTurnParticipantId} ${isMyTurn ? '(you)' : ''} · ${snap?.settings.pace === 'live' && isMyTurn && secondsRemaining !== null ? `${secondsRemaining}s left` : ''}` : 'Complete'}</span>
       </div>
 
-      {#if (draftState as any).status === 'complete'}
+      {#if draftState.status === 'complete' && generation}
         <div class="mt-4 rounded-lg border border-positive/30 bg-positive/10 p-4">
-          <p class="font-semibold text-positive">Draft complete — {(draftState as any).picks.length} picks</p>
-          <p class="mt-1 text-xs text-muted-foreground">Both clients have identical final draft state. Final picks preserved through refresh/disconnect.</p>
+          <p class="font-semibold text-positive flex items-center gap-1.5"><Trophy class="h-4 w-4" /> Draft complete — league verified</p>
+          <p class="mt-1 text-xs text-muted-foreground">Both clients independently derived 28 AI teams (DUO_BAND_QUOTAS) and attested league digest. Duplicate ownership rejected. Identical local Season runs ready.</p>
+          <p class="mt-2 font-mono text-xs break-all">Digest {leagueDigest?.slice(0,32) ?? controller?.getDigest()?.slice(0,32)}…</p>
+          {#if verification}<p class="mt-1 text-xs {verification.ok ? 'text-positive' : 'text-destructive'}">{verification.msg}</p>{/if}
           <div class="mt-3 grid gap-2 sm:grid-cols-2">
-            {#each (draftState as any).picks as pick (pick.playerVersionId)}
+            {#each draftState.picks as pick (pick.playerVersionId)}
               <div class="rounded-lg border border-line-soft bg-card p-2 text-xs">
-                <span class="font-mono font-bold">{pick.playerVersionId}</span> — {pick.participantId} · R{pick.round} P{pick.pickOrdinal}
+                <span class="font-mono font-bold">{pick.playerVersionId.slice(0,22)}</span> — {pick.participantId} · R{pick.round} P{pick.pickOrdinal}
               </div>
             {/each}
           </div>
+          <div class="mt-4 flex gap-2">
+            <a href={`/multiplayer/room/${roomId}/run`} class="inline-flex items-center gap-1.5 rounded-xl bg-primary px-6 py-3 text-sm font-bold text-primary-foreground"><Trophy class="h-4 w-4" /> Enter Season Run →</a>
+            <a href={`/multiplayer/room/${roomId}`} class="rounded-xl border border-line-soft bg-card px-4 py-3 text-sm font-semibold">Back to lobby</a>
+          </div>
+          <p class="mt-2 text-xs text-muted-foreground">Next: private-lock → simulation → hash-verification skeleton with worker (see run shell). No solo /season flow used.</p>
         </div>
-      {:else if (draftState as any).currentOffer}
+      {:else if draftState.status === 'finalized'}
+        <div class="mt-4 rounded-lg border border-primary/30 bg-primary/10 p-4">
+          <p class="font-semibold">Rosters finalized — 10 each, 4G/4F/3C satisfied</p>
+          <p class="mt-1 text-xs text-muted-foreground">Both participants have full legal rosters. Independently derive 28 AI teams and attest league digest. Duplicate version ownership will be rejected.</p>
+          <button type="button" onclick={handleGenerate} disabled={generateBusy} class="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50">{generateBusy ? 'Generating…' : 'Generate AI league (28 teams) →'}</button>
+          {#if pickError}<p role="alert" class="mt-2 text-xs text-destructive">{pickError}</p>{/if}
+          {#if verification}<p class="mt-2 text-xs {verification.ok ? 'text-positive' : 'text-destructive'}">{verification.msg}</p>{/if}
+          {#if leagueDigest}<p class="mt-2 font-mono text-xs break-all">Digest {leagueDigest.slice(0,32)}…</p>{/if}
+          <div class="mt-3 grid gap-2 sm:grid-cols-2">
+            {#each draftState.picks as pick (pick.playerVersionId)}
+              <div class="rounded-lg border border-line-soft bg-card p-2 text-xs"><span class="font-mono font-bold">{pick.playerVersionId.slice(0,22)}</span> — {pick.participantId}</div>
+            {/each}
+          </div>
+        </div>
+      {:else if canFinalize}
+        <div class="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
+          <p class="font-semibold">20 picks complete — finalize rosters</p>
+          <p class="mt-1 text-xs text-muted-foreground">10 per participant, snake order verified. Finalize checks 4G/4F/3C and legalFiveAfterAnyRemoval.</p>
+          <button type="button" onclick={handleFinalize} disabled={finalizeBusy} class="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50">{finalizeBusy ? 'Finalizing…' : 'Finalize rosters →'}</button>
+          {#if pickError}<p role="alert" class="mt-2 text-xs text-destructive">{pickError}</p>{/if}
+        </div>
+      {:else if draftState.status === 'drafting' && myOffer}
         <div class="mt-4">
-          <p class="text-xs text-muted-foreground">Offer for {(draftState as any).currentOffer.participantId} · Round {(draftState as any).currentOffer.round} · Pick {(draftState as any).currentOffer.pickOrdinal} — 8 cards, at least 3 safe.</p>
+          <p class="text-xs text-muted-foreground">Offer for {myOffer.participantId} · Round {myOffer.round} · Pick {myOffer.pickOrdinal} — {SEASON_DRAFT_OFFER_SIZE} cards, ≥{SEASON_DRAFT_SAFE_MINIMUM} safe (private until pick). {snap?.settings.pace === 'live' ? `· ${secondsRemaining ?? 90}s remaining` : '· Async 24h'}</p>
+          {#if secondsRemaining !== null && secondsRemaining <= 15}<p class="mt-1 text-xs font-bold text-amber-600">⚠ {secondsRemaining}s left — auto-picks first safe on expiry</p>{/if}
           <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            {#each (draftState as any).currentOffer.cards as card (card.playerVersionId)}
+            {#each myOffer.cards as card (card.playerVersionId)}
               <button
                 type="button"
                 onclick={() => handlePick(card.playerVersionId)}
-                disabled={!isMyTurn || picking || !card.selectable}
-                class="flex flex-col rounded-xl border p-3 text-left transition {isMyTurn && card.selectable ? 'border-primary hover:bg-primary/10 bg-card' : 'border-line-soft bg-card/50 opacity-60'} disabled:cursor-not-allowed"
+                disabled={picking || drawing || !card.selectable}
+                class="flex flex-col rounded-xl border p-3 text-left transition {card.selectable ? 'border-primary hover:bg-primary/10 bg-card' : 'border-line-soft bg-card/50 opacity-60'} disabled:cursor-not-allowed"
               >
-                <span class="font-mono text-xs font-bold">{card.playerVersionId}</span>
-                <span class="mt-1 text-xs {card.selectable ? 'text-positive' : 'text-destructive'}">{card.selectable ? 'Selectable — safe' : card.reason ?? 'Not selectable'}</span>
-                {#if isMyTurn}<span class="mt-2 text-xs font-semibold text-primary">{picking ? 'Picking…' : 'Pick →'}</span>{:else}<span class="mt-2 text-xs text-muted-foreground">Waiting for {(draftState as any).currentTurn}</span>{/if}
+                <span class="font-mono text-xs font-bold break-all">{card.playerVersionId}</span>
+                <span class="mt-1 text-xs {card.selectable ? 'text-positive' : 'text-destructive'}">{card.selectable ? 'Safe — selectable' : card.coverageReason ?? 'Not selectable'}</span>
+                <span class="mt-2 text-xs font-semibold {card.selectable ? 'text-primary' : 'text-muted-foreground'}">{picking ? 'Picking…' : card.selectable ? 'Pick →' : 'Locked'}</span>
               </button>
             {/each}
           </div>
+          <p class="mt-2 text-xs text-muted-foreground">Private offer: opponent cannot see these 8 cards until you lock. Reconnect replays via refetch.</p>
           {#if pickError}<p role="alert" class="mt-3 text-xs text-destructive">{pickError}</p>{/if}
-          {#if !isMyTurn}<p class="mt-3 text-xs text-muted-foreground">It’s opponent’s turn — waiting for authoritative command before updating both clients.</p>{/if}
+        </div>
+      {:else if draftState.status === 'drafting' && isMyTurn && !myOffer}
+        <div class="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
+          <p class="text-sm font-semibold">Your turn — drawing 8-card offer…</p>
+          <p class="mt-1 text-xs text-muted-foreground">Deterministic via drawGlobalOffer (seasonNamespaceSeed + createRng). ≥3 safe required.</p>
+          <button type="button" onclick={handleDraw} disabled={drawing} class="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">{drawing ? 'Drawing…' : 'Draw offer →'}</button>
+          {#if pickError}<p role="alert" class="mt-2 text-xs text-destructive">{pickError}</p>{/if}
+        </div>
+      {:else if draftState.status === 'drafting' && opponentTurn}
+        <div class="mt-4 rounded-xl border border-line-soft bg-card p-6 text-center">
+          <p class="text-label text-muted-foreground">Opponent’s turn — private offer hidden</p>
+          <p class="mt-1 font-mono text-xs">Waiting for {draftState.currentTurnParticipantId} · Round {draftState.round} · {draftState.picks.length}/20 picks · you see waiting/locked/opponent-disconnected clearly</p>
+          {#if myOffer === null}<p class="mt-1 text-xs text-muted-foreground">You cannot see opponent’s 8 cards until they lock. This preserves private offers until lock.</p>{/if}
+          {#if !opponentOnline}<p class="mt-2 text-xs font-semibold text-amber-700"><WifiOff class="h-3 w-3 inline" /> Opponent disconnected — presence offline</p>{/if}
+          <div class="mt-3 inline-flex items-center gap-1.5 rounded-full bg-line-soft px-3 py-1.5 text-xs"><Loader2 class="h-3 w-3 animate-spin" /> Waiting for authoritative pick via command stream…</div>
+          {#if draftState.currentOffer}<p class="mt-2 font-mono text-xs text-muted-foreground">Current turn holds a private 8-card offer (hidden from you)</p>{/if}
         </div>
       {:else}
-        <p class="mt-4 text-xs text-muted-foreground">No offer available — waiting for turn.</p>
+        <p class="mt-4 text-xs text-muted-foreground">No offer — waiting for turn. Snake order: R{draftState.round} · {draftState.currentTurnParticipantId ?? 'complete'}</p>
       {/if}
 
       <div class="mt-6">
-        <h3 class="text-label tracking-[0.12em] text-muted-foreground">Accepted picks ({(draftState as any).picks.length}) — preserved through refresh</h3>
-        {#if (draftState as any).picks.length === 0}
-          <p class="mt-2 text-xs text-muted-foreground">No picks yet — be the first.</p>
+        <h3 class="text-label tracking-[0.12em] text-muted-foreground">Accepted picks ({draftState.picks.length}/20) — preserved through refresh · snake reversal each round</h3>
+        {#if draftState.picks.length === 0}
+          <p class="mt-2 text-xs text-muted-foreground">No picks yet — draw will produce 8 cards, ≥3 safe.</p>
         {:else}
           <div class="mt-3 space-y-2">
-            {#each (draftState as any).picks as pick, i (pick.playerVersionId + String(i))}
+            {#each draftState.picks as pick, i (pick.playerVersionId + String(i))}
               <div class="flex items-center justify-between rounded-lg border border-line-soft bg-card p-2">
-                <div class="flex items-center gap-2">
-                  <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">{i+1}</span>
-                  <span class="font-mono text-xs font-bold">{pick.playerVersionId}</span>
-                  <span class="text-xs text-muted-foreground">· {pick.participantId} · R{pick.round}</span>
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">{i + 1}</span>
+                  <span class="font-mono text-xs font-bold break-all">{pick.playerVersionId}</span>
+                  <span class="text-xs text-muted-foreground">· {pick.participantId} · R{pick.round} P{pick.pickOrdinal}</span>
                 </div>
-                <span class="inline-flex items-center gap-1 text-xs {pick.participantId===membership.participantId ? 'text-primary font-semibold' : 'text-muted-foreground'}">{pick.participantId===membership.participantId ? 'You' : 'Opponent'} {pick.participantId===membership.participantId ? '✓' : ''}</span>
+                <span class="inline-flex items-center gap-1 text-xs {pick.participantId === membership.participantId ? 'text-primary font-semibold' : 'text-muted-foreground'}">{pick.participantId === membership.participantId ? 'You' : 'Opponent'} {pick.participantId === membership.participantId ? '✓' : ''}</span>
               </div>
             {/each}
           </div>
         {/if}
       </div>
 
-      <div class="mt-6 flex gap-2">
+      <div class="mt-6 flex flex-wrap gap-2">
         <a href={`/multiplayer/room/${roomId}`} class="rounded-lg border border-line-soft bg-card px-4 py-2 text-sm font-semibold">Back to lobby</a>
-        <a href={resolve('/multiplayer')} class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Multiplayer entry</a>
+        <a href={`/multiplayer/room/${roomId}/run`} class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Go to run →</a>
+        <span class="inline-flex items-center gap-1.5 rounded-full border border-line-soft bg-card px-3 py-2 text-xs"><Clock class="h-3 w-3" /> {snap?.settings.pace === 'live' ? 'Live 90s' : 'Async 24h'} · timer {secondsRemaining ?? '—'}s</span>
       </div>
     </div>
 
     <div class="mt-6 rounded-xl border border-line-soft bg-card p-4 text-xs leading-relaxed text-muted-foreground">
-      <p class="font-semibold text-foreground">Authoritative facts</p>
-      <p class="mt-1">Room {roomId.slice(0,8)}… · Mode {modeLabel} · Seed {(draftState as any).seed.slice(0,16)}… · Settings rev {(draftState as any).settingsRevision} · Draft cursor {snap.cursor} · Turn {(draftState as any).currentTurn ?? 'complete'} — same for both clients via deterministic seed derivation + command stream.</p>
-      <p class="mt-1">Every roll/offer/pick goes through room command stream with participant authorization, expected revision, deterministic seed, and idempotency. Neither client falls through to solo flows.</p>
+      <p class="font-semibold text-foreground">Authoritative facts — replayable</p>
+      <p class="mt-1">Room {roomId.slice(0, 8)}… · Mode {modeLabel} · Seed {(snap as unknown as { seed?: string | null })?.seed?.slice(0, 16) ?? '—'}… · Rev {draftState.revision} · Cursor {snap?.cursor} · Turn {draftState.currentTurnParticipantId ?? 'complete'} — same via deterministic seed + command stream.</p>
+      <p class="mt-1">Uses real engine: applySeasonDraftCommand, drawGlobalOffer, seasonDraftStateDigest, seasonDigestHex, createRng/seasonNamespaceSeed. Enforces WRONG_TURN, OWNED_VERSION, UNCOMPLETABLE_ROSTER, idempotent commandId, expectedRevision via last ordinal. No solo /season flow.</p>
+      <p class="mt-1">After both rosters finalize, independently derive 28 AI teams (DUO_BAND_QUOTAS), attest league digest, reject duplicate ownership, create identical local Season runs → /run shows both participants.</p>
     </div>
   {:else}
     <div class="rounded-xl bg-surface-1 p-6">
       <h2 class="font-display text-sm font-extrabold tracking-widest uppercase">Room phase: {snap?.phase}</h2>
-      <p class="mt-2 text-sm text-muted-foreground">This draft view is for the multiplayer room. Current phase is {snap?.phase}. Return to lobby for next steps.</p>
+      <p class="mt-2 text-sm text-muted-foreground">Phase {snap?.phase} — this draft view is for the multiplayer room. Return to lobby.</p>
       <a href={`/multiplayer/room/${roomId}`} class="mt-4 inline-flex rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Back to lobby →</a>
     </div>
   {/if}

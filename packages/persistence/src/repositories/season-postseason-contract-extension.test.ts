@@ -68,6 +68,7 @@ function stateDigestOf(adapters: Adapters, run: SeasonRun): string {
         rotations: run.rotations,
         effects,
         freeAgency: run.freeAgency,
+        authority: run.authority,
     });
 }
 function completedPostseasonOf(adapters: Adapters, champion: string) {
@@ -184,7 +185,7 @@ function commandOf(run: SeasonRun, command: Extract<SeasonRunCommand, {
     command: string;
 }>['command'], commandId: string): SeasonRunCommand {
     return {
-        schemaVersion: 11,
+        schemaVersion: 13,
         command,
         commandId,
         runId: run.runId,

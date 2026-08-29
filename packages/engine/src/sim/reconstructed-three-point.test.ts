@@ -15,7 +15,7 @@ import {
 } from '@hoop-rush/test-fixtures';
 import { createEngineContext } from './context.ts';
 import { simulateGame } from './game.ts';
-import { ENGINE_CONSTANTS } from './constants.ts';
+import { ENGINE_CONSTANTS, ENGINE_VERSION } from './constants.ts';
 import { contestPenalty, makeProbability } from './shooting.ts';
 import { threePointTarget } from './usage.ts';
 const context = createEngineContext();
@@ -287,7 +287,7 @@ describe('reconstructed team end-to-end (spec/12)', () => {
         }),
         context,
       );
-      expect(result.engineVersion).toBe('m3-engine-v12');
+      expect(result.engineVersion).toBe(ENGINE_VERSION);
       for (const side of [result.home, result.away]) {
         expect(Number.isFinite(side.box.threes.made)).toBe(true);
         expect(Number.isFinite(side.box.threes.attempted)).toBe(true);

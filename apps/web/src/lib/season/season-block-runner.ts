@@ -4,6 +4,7 @@ import { completeSeasonBlockCommit, reconstructSeasonGames, seasonCheckpointDige
 import type { SeasonRunRepository, SeasonRunSnapshot, SeasonWindowOpenResult, } from '@hoop-rush/persistence';
 import type { SeasonSchedule } from '@hoop-rush/data-contracts';
 import type { SeasonArtifactUrls } from './season-assets';
+import { randomUUID } from '$lib/random-id';
 export type SeasonRunnerEvent = {
     type: 'started';
     requestId: string;
@@ -192,6 +193,9 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
                     type: 'module',
                 });
         worker.addEventListener('error', (event) => {
+            if (warmRequestId !== null) {
+                warmRequestId = null;
+            }
             if (currentRequestId === null || current === null)
                 return;
             const requestId = currentRequestId;
@@ -210,15 +214,19 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         });
         worker.addEventListener('message', (event: MessageEvent<unknown>) => {
             const parsed = seasonWorkerMessageSchema.safeParse(event.data);
-            if (!parsed.success)
+            if (!parsed.success) {
+                console.warn('[season-block-runner] dropped unparsable worker message', event.data);
                 return;
+            }
             if (parsed.data.type === 'season-block-warm-ack') {
                 if (parsed.data.requestId === warmRequestId)
                     warmRequestId = null;
                 return;
             }
-            if (parsed.data.requestId !== currentRequestId)
+            if (parsed.data.requestId !== currentRequestId) {
+                console.warn(`[season-block-runner] dropped message for stale requestId ${parsed.data.requestId} (expected ${String(currentRequestId)})`);
                 return;
+            }
             const message = parsed.data;
             if (current === null)
                 return;
@@ -578,7 +586,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
             if (currentRequestId !== null) {
                 throw new Error('a season block is already running; cancel it first');
             }
-            const requestId = `sb-${crypto.randomUUID()}`;
+            const requestId = `sb-${randomUUID()}`;
             currentRequestId = requestId;
             current = {
                 blockIndex: input.blockIndex,
@@ -678,7 +686,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
             if (currentRequestId !== null) {
                 throw new Error('a season block is already running; cancel it first');
             }
-            const requestId = `sb-${crypto.randomUUID()}`;
+            const requestId = `sb-${randomUUID()}`;
             currentRequestId = requestId;
             void (async () => {
                 try {
@@ -821,7 +829,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
                     if (requestActive())
                         return;
                     const target = createWorker();
-                    const requestId = `warm-${crypto.randomUUID()}`;
+                    const requestId = `warm-${randomUUID()}`;
                     warmRequestId = requestId;
                     target.postMessage(seasonWorkerWarmRequestSchema.parse({
                         schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,

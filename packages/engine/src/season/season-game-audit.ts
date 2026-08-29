@@ -282,33 +282,33 @@ function substitutionAudit(failures: string[], sideKey: 'home' | 'away', result:
         if (previousUnit !== undefined && !previousUnit.players.includes(sub.playerOut)) {
             failures.push(`${sideKey}: ${sub.playerOut} was not on the floor at the substitution`);
         }
-        const finalPeriod = 4 + result.overtimePeriods;
-        for (const event of result.foulOuts) {
-            if (event.side !== sideKey)
-                continue;
-            if (event.period === finalPeriod && event.secondsRemaining === 0)
-                continue;
-            const backed = subs.some((sub) => sub.reason === 'foul-out' &&
-                sub.playerOut === event.playerVersionId &&
-                sub.period === event.period &&
-                sub.secondsRemaining === event.secondsRemaining);
-            if (!backed) {
-                failures.push(`${sideKey}: foul-out of ${event.playerVersionId} at (${String(event.period)}, ${String(event.secondsRemaining)}) has no removal substitution`);
-            }
+    }
+    const finalPeriod = 4 + result.overtimePeriods;
+    for (const event of result.foulOuts) {
+        if (event.side !== sideKey)
+            continue;
+        if (event.period === finalPeriod && event.secondsRemaining === 0)
+            continue;
+        const backed = subs.some((candidate) => candidate.reason === 'foul-out' &&
+            candidate.playerOut === event.playerVersionId &&
+            candidate.period === event.period &&
+            candidate.secondsRemaining === event.secondsRemaining);
+        if (!backed) {
+            failures.push(`${sideKey}: foul-out of ${event.playerVersionId} at (${String(event.period)}, ${String(event.secondsRemaining)}) has no removal substitution`);
         }
-        for (const sub of subs) {
-            if (sub.reason !== 'foul-out' && sub.reason !== 'injected-injury-removal')
-                continue;
-            const boundaryHasEvent = (sub.reason === 'foul-out' ? result.foulOuts : result.removals).some((event) => event.side === sideKey &&
-                event.period === sub.period &&
-                event.secondsRemaining === sub.secondsRemaining);
-            const playerWasRemoved = (sub.reason === 'foul-out' ? result.foulOuts : result.removals).some((event) => event.side === sideKey &&
-                event.playerVersionId === sub.playerOut &&
-                (event.period < sub.period ||
-                    (event.period === sub.period && event.secondsRemaining >= sub.secondsRemaining)));
-            if (!boundaryHasEvent && !playerWasRemoved) {
-                failures.push(`${sideKey}: ${sub.reason} substitution without a matching event`);
-            }
+    }
+    for (const candidate of subs) {
+        if (candidate.reason !== 'foul-out' && candidate.reason !== 'injected-injury-removal')
+            continue;
+        const boundaryHasEvent = (candidate.reason === 'foul-out' ? result.foulOuts : result.removals).some((event) => event.side === sideKey &&
+            event.period === candidate.period &&
+            event.secondsRemaining === candidate.secondsRemaining);
+        const playerWasRemoved = (candidate.reason === 'foul-out' ? result.foulOuts : result.removals).some((event) => event.side === sideKey &&
+            event.playerVersionId === candidate.playerOut &&
+            (event.period < candidate.period ||
+                (event.period === candidate.period && event.secondsRemaining >= candidate.secondsRemaining)));
+        if (!boundaryHasEvent && !playerWasRemoved) {
+            failures.push(`${sideKey}: ${candidate.reason} substitution without a matching event`);
         }
     }
     for (let i = 1; i < stints.length; i += 1) {

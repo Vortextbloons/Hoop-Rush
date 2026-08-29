@@ -463,6 +463,7 @@ describe('Season Run performance pass (dexie v9)', () => {
                 rotations: run.rotations,
                 effects,
                 freeAgency: run.freeAgency,
+                authority: run.authority,
             });
             await repo.commitSeasonBlock({
                 runId: run.runId,
@@ -558,6 +559,7 @@ describe('Season Run performance pass (dexie v9)', () => {
             rotations: run.rotations,
             effects,
             freeAgency: run.freeAgency,
+            authority: run.authority,
         });
         const window = {
             trade,

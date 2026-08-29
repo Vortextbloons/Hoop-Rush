@@ -1157,6 +1157,7 @@ describe('season run M2.5 reload audit (v5)', () => {
             rotations: run.rotations,
             effects: base.effects,
             freeAgency: run.freeAgency,
+            authority: run.authority,
         });
         await repo.commitSeasonBlock({
             ...base,
@@ -1184,6 +1185,7 @@ describe('season run M2.5 reload audit (v5)', () => {
             rotations: snapshot.run.rotations,
             effects: snapshot.effects,
             freeAgency: snapshot.run.freeAgency,
+            authority: snapshot.run.authority,
         });
         expect(snapshot.run.stateDigest).toBe(repairedDigest);
         expect(snapshot.acceptedBlocks.at(-1)?.stateDigest).toBe(repairedDigest);
@@ -1222,6 +1224,7 @@ describe('season run M2.5 reload audit (v5)', () => {
             rotations: snapshot?.run.rotations ?? locked,
             effects: snapshot?.effects ?? base.effects,
             freeAgency: snapshot?.run.freeAgency ?? adapters.run.freeAgency,
+            authority: snapshot?.run.authority ?? adapters.run.authority,
         }));
         const stored = await db.seasonRuns.get(SEASON_RUN_RECORD_ID);
         expect(stored?.lastRotationDigest).toBe(lockedDigest);
@@ -1255,6 +1258,7 @@ describe('season run M2.5 reload audit (v5)', () => {
             rotations: locked,
             effects: base.effects,
             freeAgency: run.freeAgency,
+            authority: run.authority,
         });
         await repo.commitSeasonBlock({
             ...base,
@@ -1306,6 +1310,7 @@ describe('season run M2.5 reload audit (v5)', () => {
             rotations,
             effects: stored.effects,
             freeAgency: stored.run.freeAgency,
+            authority: stored.run.authority,
         });
         await db.seasonRuns.put({
             ...stored,
