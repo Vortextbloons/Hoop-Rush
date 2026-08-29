@@ -76,6 +76,7 @@ export const seasonCandidateCheckpointSchema = z.object({
         success: z.boolean().nullable(),
         evaluation: seasonObjectiveEvaluationSchema,
     }),
+    objectiveEvaluations: z.record(franchiseIdSchema, seasonObjectiveEvaluationSchema).optional(),
     campaign: z
         .object({
         opportunityId: z.string().nullable(),
@@ -83,6 +84,7 @@ export const seasonCandidateCheckpointSchema = z.object({
         evaluation: seasonCampaignEvaluationSchema.nullable(),
     })
         .optional(),
+    campaignEvaluations: z.record(franchiseIdSchema, seasonCampaignEvaluationSchema).optional(),
     expectedStateRevision: z.number().int().nonnegative(),
     expectedStateDigest: seasonCheckpointDigestSchema,
     stateRevision: z.number().int().nonnegative(),

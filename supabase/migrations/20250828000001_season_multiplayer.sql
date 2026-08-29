@@ -25,7 +25,7 @@ create table if not exists public.season_rooms (
     updated_at timestamptz not null default now(),
     expires_at timestamptz
 );
-create unique index if not exists season_rooms_active_code_uidx on public.season_rooms (code) where code is not null and code_expires_at > now();
+create unique index if not exists season_rooms_active_code_uidx on public.season_rooms (code) where code is not null;
 create index if not exists season_rooms_code_expires_idx on public.season_rooms (code_expires_at) where code is not null;
 
 -- season_room_members

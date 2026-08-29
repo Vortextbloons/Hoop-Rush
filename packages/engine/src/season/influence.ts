@@ -35,7 +35,9 @@ export interface SeasonBlockInfluenceGrantInput {
     influence: SeasonInfluenceState;
     blockIndex: number;
     humanFranchiseId: string | null;
+    participantFranchiseIds?: readonly string[] | null;
     objectiveSuccess: boolean | null;
+    objectiveSuccessByFranchise?: Readonly<Record<string, boolean | null>> | null;
     appliedAtStateRevision?: number;
 }
 export interface SeasonBlockInfluenceGrantOutput {
@@ -86,33 +88,42 @@ export function applySeasonBlockInfluenceGrants(input: SeasonBlockInfluenceGrant
             explanation: `+1 Influence block grant for all 30 franchises (block ${String(blockIndex)})`,
         }),
     ];
-    if (objectiveSuccess === true && humanFranchiseId !== null) {
-        const requestedDelta = 1;
-        const appliedDelta = (balances[humanFranchiseId] ?? 0) < SEASON_INFLUENCE_CAP ? 1 : 0;
-        balances[humanFranchiseId] = (balances[humanFranchiseId] ?? 0) + appliedDelta;
-        ledger.push({
-            entryId: `influence-objective-${String(blockIndex)}-${humanFranchiseId}`,
-            franchiseId: humanFranchiseId,
-            source: 'objective-reward',
-            blockIndex,
-            commandId: null,
-            requestedDelta,
-            appliedDelta,
-            balanceAfter: balances[humanFranchiseId] ?? 0,
-            explanation: appliedDelta === 1
-                ? `+1 Influence objective reward (block ${String(blockIndex)})`
-                : `Objective reward at the +8 cap (block ${String(blockIndex)})`,
-        });
-        entries.push(seasonTransactionEntry({
-            transactionId: `txn-objective-reward-${String(blockIndex)}`,
-            commandId: `sys-objective-reward-${String(blockIndex)}`,
-            franchiseId: humanFranchiseId,
-            type: 'objective-reward',
-            blockIndex,
-            appliedAtStateRevision,
-            payload: { blockIndex, appliedDelta, objectiveSuccess: true },
-            explanation: `+1 Influence objective reward for ${humanFranchiseId} (block ${String(blockIndex)})`,
-        }));
+    const participantIds = input.participantFranchiseIds ??
+        (humanFranchiseId ? [humanFranchiseId] : []);
+    const successMap = input.objectiveSuccessByFranchise ??
+        (humanFranchiseId && objectiveSuccess !== null
+            ? { [humanFranchiseId]: objectiveSuccess }
+            : {});
+    for (const pid of participantIds) {
+        const success = successMap[pid] ?? (pid === humanFranchiseId ? objectiveSuccess : null);
+        if (success === true) {
+            const requestedDelta = 1;
+            const appliedDelta = (balances[pid] ?? 0) < SEASON_INFLUENCE_CAP ? 1 : 0;
+            balances[pid] = (balances[pid] ?? 0) + appliedDelta;
+            ledger.push({
+                entryId: `influence-objective-${String(blockIndex)}-${pid}`,
+                franchiseId: pid,
+                source: 'objective-reward',
+                blockIndex,
+                commandId: null,
+                requestedDelta,
+                appliedDelta,
+                balanceAfter: balances[pid] ?? 0,
+                explanation: appliedDelta === 1
+                    ? `+1 Influence objective reward (block ${String(blockIndex)})`
+                    : `Objective reward at the +8 cap (block ${String(blockIndex)})`,
+            });
+            entries.push(seasonTransactionEntry({
+                transactionId: `txn-objective-reward-${String(blockIndex)}-${pid}`,
+                commandId: `sys-objective-reward-${String(blockIndex)}-${pid}`,
+                franchiseId: pid,
+                type: 'objective-reward',
+                blockIndex,
+                appliedAtStateRevision,
+                payload: { blockIndex, appliedDelta, objectiveSuccess: true },
+                explanation: `+1 Influence objective reward for ${pid} (block ${String(blockIndex)})`,
+            }));
+        }
     }
     return {
         influence: { ...influence, balances, ledger },

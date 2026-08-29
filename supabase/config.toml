@@ -51,33 +51,81 @@ import_path = "./storage"
 
 [functions.season-room-create]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/deno.json"
 entrypoint = "./functions/season-room-create/index.ts"
 
 [functions.season-room-join]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/deno.json"
 entrypoint = "./functions/season-room-join/index.ts"
 
 [functions.season-room-command]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/deno.json"
 entrypoint = "./functions/season-room-command/index.ts"
 
 [functions.season-private-decision]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/deno.json"
 entrypoint = "./functions/season-private-decision/index.ts"
 
 [functions.season-checkpoint-attest]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/deno.json"
 entrypoint = "./functions/season-checkpoint-attest/index.ts"
+
+[functions.season-room-preview]
+enabled = true
+verify_jwt = false
+import_map = "./functions/deno.json"
+entrypoint = "./functions/season-room-preview/index.ts"
+
+[functions.season-room-reclaim]
+enabled = true
+verify_jwt = false
+import_map = "./functions/deno.json"
+entrypoint = "./functions/season-room-reclaim/index.ts"
+
+[functions.season-room-surrender]
+enabled = true
+verify_jwt = false
+import_map = "./functions/deno.json"
+entrypoint = "./functions/season-room-surrender/index.ts"
+
+[functions.season-room-pre-draft-removal]
+enabled = true
+verify_jwt = false
+import_map = "./functions/deno.json"
+entrypoint = "./functions/season-room-pre-draft-removal/index.ts"
+
+[functions.season-room-close]
+enabled = true
+verify_jwt = false
+import_map = "./functions/deno.json"
+entrypoint = "./functions/season-room-close/index.ts"
+
+[functions.season-room-resume]
+enabled = true
+verify_jwt = false
+import_map = "./functions/deno.json"
+entrypoint = "./functions/season-room-resume/index.ts"
+
+[functions.season-room-refetch]
+enabled = true
+verify_jwt = false
+import_map = "./functions/deno.json"
+entrypoint = "./functions/season-room-refetch/index.ts"
+
+[functions.season-room-start-draft]
+enabled = true
+verify_jwt = false
+import_map = "./functions/deno.json"
+entrypoint = "./functions/season-room-start-draft/index.ts"
 
 [functions.season-cron]
 enabled = true

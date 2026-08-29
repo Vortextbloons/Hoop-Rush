@@ -1,158 +1,227 @@
 import { InMemorySeasonMultiplayerTransport } from '@hoop-rush/data-contracts';
 import type {
-    SeasonMultiplayerTransport,
-    SeasonRoomPublicSnapshot,
-    SeasonPublicCommandEnvelope,
-    SeasonPrivateDecisionSubmission,
-    SeasonCheckpointAttestation,
+  SeasonMultiplayerTransport,
+  SeasonRoomPublicSnapshot,
+  SeasonPublicCommandEnvelope,
+  SeasonPrivateDecisionSubmission,
+  SeasonCheckpointAttestation,
+  SeasonRoomMode,
+  SeasonRoomMembership,
+  SeasonRoomCode,
 } from '@hoop-rush/data-contracts';
+import {
+  saveMembership,
+  loadMembership,
+  saveCode,
+  loadCode,
+  saveLastRoomId,
+} from './season-room-identity';
 
 export type SeasonRoomCoordinatorState = {
-    roomId: string | null;
-    participantId: 'p1' | 'p2' | null;
-    franchiseId: string | null;
-    opponentFranchiseId: string | null;
-    publicSnapshot: SeasonRoomPublicSnapshot | null;
-    connected: boolean;
-    deadlineAt: string | null;
-    locked: boolean;
-    integrityFailed: boolean;
+  roomId: string | null;
+  participantId: 'p1' | 'p2' | null;
+  franchiseId: string | null;
+  opponentFranchiseId: string | null;
+  publicSnapshot: SeasonRoomPublicSnapshot | null;
+  connected: boolean;
+  deadlineAt: string | null;
+  locked: boolean;
+  integrityFailed: boolean;
 };
 
 export type SeasonRoomCoordinatorDeps = {
-    transport: SeasonMultiplayerTransport;
-    onSnapshot: (snap: SeasonRoomPublicSnapshot) => void;
-    onCommands: (commands: SeasonPublicCommandEnvelope[]) => void;
+  transport: SeasonMultiplayerTransport;
+  onSnapshot: (snap: SeasonRoomPublicSnapshot) => void;
+  onCommands: (commands: SeasonPublicCommandEnvelope[]) => void;
 };
 
 export function createSeasonRoomCoordinator(deps: SeasonRoomCoordinatorDeps) {
-    let state: SeasonRoomCoordinatorState = {
-        roomId: null,
-        participantId: null,
-        franchiseId: null,
-        opponentFranchiseId: null,
-        publicSnapshot: null,
-        connected: false,
-        deadlineAt: null,
-        locked: false,
-        integrityFailed: false,
-    };
-    let unsubscribe: (() => void) | null = null;
-    let lastAcceptedOrdinal = -1;
-    let uncommittedCandidate: unknown | null = null;
+  let state: SeasonRoomCoordinatorState = {
+    roomId: null,
+    participantId: null,
+    franchiseId: null,
+    opponentFranchiseId: null,
+    publicSnapshot: null,
+    connected: false,
+    deadlineAt: null,
+    locked: false,
+    integrityFailed: false,
+  };
+  let unsubscribe: (() => void) | null = null;
+  let lastAcceptedOrdinal = -1;
+  let uncommittedCandidate: unknown | null = null;
 
-    return {
-        get state() {
-            return state;
+  return {
+    get state() {
+      return state;
+    },
+    get lastAcceptedOrdinal() {
+      return lastAcceptedOrdinal;
+    },
+    get uncommittedCandidate() {
+      return uncommittedCandidate;
+    },
+    setUncommitted(candidate: unknown) {
+      uncommittedCandidate = candidate;
+    },
+    clearUncommitted() {
+      uncommittedCandidate = null;
+    },
+    async createRoom(pace: 'live' | 'async', rootSeed: string, mode: SeasonRoomMode = 'season') {
+      const snap = (await deps.transport.create(
+        {
+          schemaVersion: 1,
+          pace,
+          mode,
+          roomProtocolVersion: 1,
+          multiplayerVersion: 'season-multiplayer-v1',
+          timerPolicyVersion: 'season-timers-v1',
         },
-        get lastAcceptedOrdinal() {
-            return lastAcceptedOrdinal;
-        },
-        get uncommittedCandidate() {
-            return uncommittedCandidate;
-        },
-        setUncommitted(candidate: unknown) {
-            uncommittedCandidate = candidate;
-        },
-        clearUncommitted() {
-            uncommittedCandidate = null;
-        },
-        async createRoom(pace: 'live' | 'async', rootSeed: string) {
-            const snap = await deps.transport.create(
-                {
-                    schemaVersion: 1,
-                    pace,
-                    roomProtocolVersion: 1,
-                    multiplayerVersion: 'season-multiplayer-v1',
-                    timerPolicyVersion: 'season-timers-v1',
-                },
-                rootSeed,
-            );
-            state = { ...state, roomId: snap.roomId, publicSnapshot: snap, connected: true };
-            return snap;
-        },
-        async joinRoom(code: string) {
-            const membership = await deps.transport.join(code);
-            const snap = await deps.transport.resume(membership.roomId);
-            state = {
-                ...state,
-                roomId: membership.roomId,
-                participantId: membership.participantId,
-                franchiseId: membership.franchiseId,
-                publicSnapshot: snap,
-                connected: true,
-            };
-            return { membership, snap };
-        },
-        async previewRoom(code: string) {
-            return deps.transport.preview(code);
-        },
-        subscribe(roomId: string) {
-            unsubscribe?.();
-            const sub = deps.transport.subscribe(roomId, (snap) => {
-                state = { ...state, publicSnapshot: snap };
-                deps.onSnapshot(snap);
-                // treat Realtime as notification, refetch authoritative commands
-                deps.transport.refetch(roomId, lastAcceptedOrdinal).then((cmds) => {
-                    if (cmds.length > 0) {
-                        lastAcceptedOrdinal = cmds[cmds.length - 1]!.ordinal;
-                        deps.onCommands(cmds);
-                    }
-                });
-            });
-            unsubscribe = sub.unsubscribe;
-            state = { ...state, roomId, connected: true };
-        },
-        async refetchAfter(ordinal: number) {
-            if (!state.roomId) return [];
-            const cmds = await deps.transport.refetch(state.roomId, ordinal);
-            if (cmds.length > 0) lastAcceptedOrdinal = cmds[cmds.length - 1]!.ordinal;
-            return cmds;
-        },
-        async submitCommand(envelope: SeasonPublicCommandEnvelope) {
-            const receipt = await deps.transport.submitCommand(envelope);
-            if (receipt.accepted) lastAcceptedOrdinal = receipt.ordinal;
-            return receipt;
-        },
-        async submitPrivateDecision(submission: SeasonPrivateDecisionSubmission) {
-            return deps.transport.submitPrivateDecision(submission);
-        },
-        async publishAttestation(att: SeasonCheckpointAttestation) {
-            const result = await deps.transport.publishAttestation(att);
-            if ('acceptedAt' in result) {
-                uncommittedCandidate = null;
-            }
-            return result;
-        },
-        async handleHashMismatch(inputDigest: string, resultDigest: string) {
-            // first mismatch: discard candidate, reload checkpoint, rerun once
-            uncommittedCandidate = null;
-            return { rerun: true, verifiedInputDigest: inputDigest, verifiedResultDigest: resultDigest };
-        },
-        disconnect() {
-            unsubscribe?.();
-            unsubscribe = null;
-            state = { ...state, connected: false };
-        },
-        destroy() {
-            unsubscribe?.();
-            unsubscribe = null;
-        },
-        // recovery: load last checkpoint and replay commands
-        async reconnect(roomId: string, lastCheckpoint: unknown) {
-            state = { ...state, roomId, connected: false };
-            const snap = await deps.transport.resume(roomId);
-            state = { ...state, publicSnapshot: snap, connected: true };
-            const cmds = await deps.transport.refetch(roomId, lastAcceptedOrdinal);
-            return { lastCheckpoint, commands: cmds, snapshot: snap };
-        },
-    };
+        rootSeed,
+      )) as SeasonRoomPublicSnapshot & { code?: SeasonRoomCode; membership?: SeasonRoomMembership };
+      // persist identity: membership may come from transport (in-memory) or via auto-join; code for host lobby
+      const membership = snap.membership ?? null;
+      const code = snap.code ?? null;
+      if (membership) {
+        saveMembership(membership);
+        state = {
+          ...state,
+          roomId: membership.roomId,
+          participantId: membership.participantId,
+          franchiseId: membership.franchiseId,
+          publicSnapshot: snap,
+          connected: true,
+        };
+      } else {
+        state = { ...state, roomId: snap.roomId, publicSnapshot: snap, connected: true };
+      }
+      if (code) saveCode(snap.roomId, code);
+      saveLastRoomId(snap.roomId);
+      return snap;
+    },
+    async joinRoom(code: string) {
+      const membership = await deps.transport.join(code);
+      const snap = await deps.transport.resume(membership.roomId);
+      saveMembership(membership);
+      saveLastRoomId(membership.roomId);
+      state = {
+        ...state,
+        roomId: membership.roomId,
+        participantId: membership.participantId,
+        franchiseId: membership.franchiseId,
+        publicSnapshot: snap,
+        connected: true,
+      };
+      return { membership, snap };
+    },
+    async previewRoom(code: string) {
+      return deps.transport.preview(code);
+    },
+    hydrateFromStorage(roomId: string): SeasonRoomMembership | null {
+      const stored = loadMembership(roomId);
+      if (stored) {
+        state = {
+          ...state,
+          roomId: stored.roomId,
+          participantId: stored.participantId,
+          franchiseId: stored.franchiseId,
+        };
+      }
+      return stored;
+    },
+    getStoredMembership(roomId: string): SeasonRoomMembership | null {
+      return loadMembership(roomId);
+    },
+    getStoredCode(roomId: string): SeasonRoomCode | null {
+      return loadCode(roomId);
+    },
+    async startDraft(roomId: string) {
+      if (!deps.transport.startDraft) throw new Error('startDraft not supported by transport');
+      const snap = await deps.transport.startDraft(roomId);
+      state = { ...state, publicSnapshot: snap };
+      deps.onSnapshot(snap);
+      return snap;
+    },
+    subscribe(roomId: string) {
+      // hydrate identity before subscribing so room page knows "You are P1/P2" even after reload
+      const stored = loadMembership(roomId);
+      if (stored && !state.participantId) {
+        state = {
+          ...state,
+          roomId: stored.roomId,
+          participantId: stored.participantId,
+          franchiseId: stored.franchiseId,
+        };
+      } else if (!state.roomId) {
+        state = { ...state, roomId, connected: false };
+      }
+      unsubscribe?.();
+      const sub = deps.transport.subscribe(roomId, (snap) => {
+        state = { ...state, publicSnapshot: snap };
+        deps.onSnapshot(snap);
+        // treat Realtime as notification, refetch authoritative commands
+        deps.transport.refetch(roomId, lastAcceptedOrdinal).then((cmds) => {
+          if (cmds.length > 0) {
+            lastAcceptedOrdinal = cmds[cmds.length - 1]!.ordinal;
+            deps.onCommands(cmds);
+          }
+        });
+      });
+      unsubscribe = sub.unsubscribe;
+      state = { ...state, roomId, connected: true };
+    },
+    async refetchAfter(ordinal: number) {
+      if (!state.roomId) return [];
+      const cmds = await deps.transport.refetch(state.roomId, ordinal);
+      if (cmds.length > 0) lastAcceptedOrdinal = cmds[cmds.length - 1]!.ordinal;
+      return cmds;
+    },
+    async submitCommand(envelope: SeasonPublicCommandEnvelope) {
+      const receipt = await deps.transport.submitCommand(envelope);
+      if (receipt.accepted) lastAcceptedOrdinal = receipt.ordinal;
+      return receipt;
+    },
+    async submitPrivateDecision(submission: SeasonPrivateDecisionSubmission) {
+      return deps.transport.submitPrivateDecision(submission);
+    },
+    async publishAttestation(att: SeasonCheckpointAttestation) {
+      const result = await deps.transport.publishAttestation(att);
+      if ('acceptedAt' in result) {
+        uncommittedCandidate = null;
+      }
+      return result;
+    },
+    async handleHashMismatch(inputDigest: string, resultDigest: string) {
+      // first mismatch: discard candidate, reload checkpoint, rerun once
+      uncommittedCandidate = null;
+      return { rerun: true, verifiedInputDigest: inputDigest, verifiedResultDigest: resultDigest };
+    },
+    disconnect() {
+      unsubscribe?.();
+      unsubscribe = null;
+      state = { ...state, connected: false };
+    },
+    destroy() {
+      unsubscribe?.();
+      unsubscribe = null;
+    },
+    // recovery: load last checkpoint and replay commands
+    async reconnect(roomId: string, lastCheckpoint: unknown) {
+      state = { ...state, roomId, connected: false };
+      const snap = await deps.transport.resume(roomId);
+      state = { ...state, publicSnapshot: snap, connected: true };
+      const cmds = await deps.transport.refetch(roomId, lastAcceptedOrdinal);
+      return { lastCheckpoint, commands: cmds, snapshot: snap };
+    },
+  };
 }
 
 export type SeasonRoomCoordinator = ReturnType<typeof createSeasonRoomCoordinator>;
 
 // default in-memory coordinator for tests / local dev without Supabase
-export function createInMemorySeasonRoomCoordinator(deps: Omit<SeasonRoomCoordinatorDeps, 'transport'> & { transport?: SeasonMultiplayerTransport }) {
-    const transport = deps.transport ?? new InMemorySeasonMultiplayerTransport();
-    return createSeasonRoomCoordinator({ ...deps, transport });
+export function createInMemorySeasonRoomCoordinator(
+  deps: Omit<SeasonRoomCoordinatorDeps, 'transport'> & { transport?: SeasonMultiplayerTransport },
+) {
+  const transport = deps.transport ?? new InMemorySeasonMultiplayerTransport();
+  return createSeasonRoomCoordinator({ ...deps, transport });
 }

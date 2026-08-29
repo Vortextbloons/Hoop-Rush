@@ -1,7 +1,7 @@
 <script lang="ts">import { asset, resolve } from '$app/paths';
 import { page } from '$app/state';
 import type { RouteId } from '$app/types';
-import { Home, Users } from '@lucide/svelte';
+import { Home, Users, Swords } from '@lucide/svelte';
 import '../app.css';
 import { ModeWatcher } from 'mode-watcher';
 import { Toaster } from 'svelte-sonner';
@@ -13,9 +13,12 @@ const homeHref = resolve('/');
 const navItems: NavItem[] = [
     { id: 'home', label: 'Home', href: '/', icon: Home },
     { id: 'roster', label: 'Roster', href: '/roster', icon: Users },
+    { id: 'multiplayer', label: 'Multiplayer', href: '/multiplayer', icon: Swords },
 ];
 const routeId = $derived(page.route.id);
-const showBottomNav = $derived(routeId === '/' || routeId === '/roster');
+const showBottomNav = $derived(
+    routeId === '/' || routeId === '/roster' || routeId === '/multiplayer' || routeId?.startsWith('/multiplayer') === true
+);
 function isActive(item: NavItem): boolean {
     return isNavItemActive(item, routeId);
 }

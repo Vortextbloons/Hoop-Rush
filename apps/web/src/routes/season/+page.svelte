@@ -431,6 +431,20 @@ function buildPlayerSlice(run: SeasonRun, catalog: SeasonDraftCatalog): SeasonRu
         {/if}
       </div>
 
+      <a
+        href={resolve('/multiplayer')}
+        class="group flex flex-col rounded-xl border border-primary/30 bg-primary/10 p-6 transition-colors hover:bg-primary/15"
+      >
+        <div class="flex items-center justify-between gap-3">
+          <h2 class="font-display text-lg font-extrabold tracking-tight uppercase">Play with a Friend</h2>
+          <span class="rounded-full bg-primary px-2.5 py-0.5 font-mono text-[10px] font-bold tracking-widest text-primary-foreground uppercase">New</span>
+        </div>
+        <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
+          Multiplayer now has its own lobby. Create a room, share the 4-digit code, and pick Season, Classic, or Sandbox together. Private until both lock, hash-verified.
+        </p>
+        <span class="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">Open multiplayer →<span aria-hidden="true" class="transition-transform group-hover:translate-x-0.5">→</span></span>
+      </a>
+
       {#if league && manifest}
         <section
           aria-labelledby="season-league-heading"

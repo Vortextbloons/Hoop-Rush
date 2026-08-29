@@ -76,12 +76,15 @@ export interface SeasonBlockSimulationInput {
     catalog: SeasonDraftCatalog;
     profile: EraSimulationProfile;
     humanFranchiseId: string | null;
+    participantFranchiseIds?: readonly string[] | null;
     rosterPlayerIds: ReadonlyMap<string, string>;
     priorSummaries: readonly SeasonGameSummary[];
     effects: SeasonEffectsState;
     health: SeasonHealthState;
     objectiveId: SeasonObjectiveId | null;
+    objectiveIds?: ReadonlyMap<string, SeasonObjectiveId | null> | null;
     campaignOpportunityId?: string | null;
+    campaignOpportunityIds?: ReadonlyMap<string, string | null> | null;
     influence?: SeasonInfluenceState;
     transactions?: SeasonTransactionEntry[];
     freeAgency?: SeasonFreeAgencyState;
@@ -433,9 +436,12 @@ export function simulateSeasonBlockGame(input: SeasonBlockSimulationInput, game:
         pregame = applySeasonRecoveryTick(pregame, options.staminaByVersion ?? staminaByVersionOf(input));
     }
     const positions = options.positions ?? positionsOf(input);
+    const participantFranchiseIds = input.participantFranchiseIds ??
+        (input.humanFranchiseId ? [input.humanFranchiseId] : []);
     const humanFranchiseId = input.humanFranchiseId;
-    const humanPlays = humanFranchiseId !== null &&
-        (game.homeFranchiseId === humanFranchiseId || game.awayFranchiseId === humanFranchiseId);
+    const humanPlays = participantFranchiseIds.some((id) =>
+        game.homeFranchiseId === id || game.awayFranchiseId === id
+    );
     let homeLegalFacts: {
         legal: boolean;
         unavailablePlayerVersionIds: string[];
@@ -445,22 +451,23 @@ export function simulateSeasonBlockGame(input: SeasonBlockSimulationInput, game:
         unavailablePlayerVersionIds: string[];
     } | null = null;
     if (humanPlays) {
-        const facts = seasonFranchiseLegalFiveFacts(run, humanFranchiseId, health, positions);
-        if (humanFranchiseId === game.homeFranchiseId)
-            homeLegalFacts = facts;
-        if (humanFranchiseId === game.awayFranchiseId)
-            awayLegalFacts = facts;
-        if (!facts.legal) {
-            const interruption: SeasonInvalidRosterInterruption = {
-                code: 'invalid-roster',
-                runId: run.runId,
-                blockIndex: command.blockIndex,
-                commandId: command.commandId,
-                nextGameId: game.gameId,
-                humanFranchiseId,
-                unavailablePlayerVersionIds: facts.unavailablePlayerVersionIds,
-            };
-            return { interruption };
+        for (const pid of participantFranchiseIds) {
+            if (game.homeFranchiseId !== pid && game.awayFranchiseId !== pid) continue;
+            const facts = seasonFranchiseLegalFiveFacts(run, pid, health, positions);
+            if (pid === game.homeFranchiseId) homeLegalFacts = facts;
+            if (pid === game.awayFranchiseId) awayLegalFacts = facts;
+            if (!facts.legal) {
+                const interruption: SeasonInvalidRosterInterruption = {
+                    code: 'invalid-roster',
+                    runId: run.runId,
+                    blockIndex: command.blockIndex,
+                    commandId: command.commandId,
+                    nextGameId: game.gameId,
+                    humanFranchiseId: pid,
+                    unavailablePlayerVersionIds: facts.unavailablePlayerVersionIds,
+                };
+                return { interruption };
+            }
         }
     }
     homeLegalFacts ??= seasonFranchiseLegalFiveFacts(run, game.homeFranchiseId, health, positions);
@@ -485,13 +492,15 @@ export function simulateSeasonBlockGame(input: SeasonBlockSimulationInput, game:
             effects: pregame,
         });
     if (humanPlays) {
-        const humanRoster = rosterByFranchise.get(humanFranchiseId);
-        const availableCount = humanRoster === undefined
-            ? 0
-            : humanRoster.players.filter((player) => seam.pregame.get(player.playerVersionId) === true)
-                .length;
-        const collection = input.collectedTipAvailability ?? (input.collectedTipAvailability = []);
-        collection.push({ gameId: game.gameId, availableCount });
+        for (const pid of participantFranchiseIds) {
+            if (game.homeFranchiseId !== pid && game.awayFranchiseId !== pid) continue;
+            const roster = rosterByFranchise.get(pid);
+            const availableCount = roster === undefined
+                ? 0
+                : roster.players.filter((player) => seam.pregame.get(player.playerVersionId) === true).length;
+            const collection = input.collectedTipAvailability ?? (input.collectedTipAvailability = []);
+            collection.push({ gameId: game.gameId, availableCount });
+        }
     }
     const gameInput: SeasonGameSimulationInput = {
         schemaVersion: 1,
@@ -556,9 +565,7 @@ export function simulateSeasonBlockGame(input: SeasonBlockSimulationInput, game:
         throw new SeasonBlockInvariantError(`game ${game.gameId} summary audit failed: ${summaryFailures.join('; ')}`, { seed, gameId: game.gameId, blockIndex: command.blockIndex });
     }
     let retainedDetail: SeasonRetainedGameDetail | null = null;
-    if (input.humanFranchiseId !== null &&
-        (game.homeFranchiseId === input.humanFranchiseId ||
-            game.awayFranchiseId === input.humanFranchiseId)) {
+    if (participantFranchiseIds.some((id) => game.homeFranchiseId === id || game.awayFranchiseId === id)) {
         retainedDetail = seasonRetainedDetailFromResult(result, game, run.runId, transition, injuryEvents);
     }
     return { summary, retainedDetail, effects: nextEffects, health: nextHealth };
@@ -676,17 +683,40 @@ export function assembleSeasonBlockCandidate(input: SeasonBlockSimulationInput, 
     const players = foldSeasonPlayerAggregates(allSummaries);
     const { toRound } = blockRoundRange(command.blockIndex);
     const completedRounds = toRound;
-    const humanRotation = input.humanFranchiseId === null
+    const participantIds = input.participantFranchiseIds ??
+        (input.humanFranchiseId ? [input.humanFranchiseId] : []);
+    const primaryFranchiseId = participantIds[0] ?? input.humanFranchiseId;
+    const humanRotation = primaryFranchiseId === null
         ? null
-        : (run.rotations.find((rotation) => rotation.franchiseId === input.humanFranchiseId) ?? null);
+        : (run.rotations.find((rotation) => rotation.franchiseId === primaryFranchiseId) ?? null);
     const objective = evaluateSeasonBlockObjective({
         objectiveId: input.objectiveId,
         blockIndex: command.blockIndex,
-        humanFranchiseId: input.humanFranchiseId,
+        humanFranchiseId: primaryFranchiseId,
         rotation: humanRotation,
         summaries: [...summaries],
         tipAvailability: input.collectedTipAvailability ?? [],
     });
+    const objectiveEvaluations: Record<string, import('@hoop-rush/data-contracts').SeasonObjectiveEvaluation> = {};
+    const objectiveSuccessByFranchise: Record<string, boolean | null> = {};
+    for (const pid of participantIds) {
+        const oid = input.objectiveIds?.get(pid) ?? (pid === primaryFranchiseId ? input.objectiveId : null);
+        const rot = run.rotations.find((r) => r.franchiseId === pid) ?? null;
+        const evalRes = evaluateSeasonBlockObjective({
+            objectiveId: oid,
+            blockIndex: command.blockIndex,
+            humanFranchiseId: pid,
+            rotation: rot,
+            summaries: [...summaries],
+            tipAvailability: (input.collectedTipAvailability ?? []).filter(() => true),
+        });
+        objectiveEvaluations[pid] = evalRes.evaluation;
+        objectiveSuccessByFranchise[pid] = evalRes.success;
+    }
+    if (participantIds.length === 0) {
+        objectiveEvaluations['solo'] = objective.evaluation;
+        objectiveSuccessByFranchise['solo'] = objective.success;
+    }
     let campaign: {
         opportunityId: string | null;
         outcome: 'missed' | 'completed' | 'breakthrough' | null;
@@ -696,34 +726,56 @@ export function assembleSeasonBlockCandidate(input: SeasonBlockSimulationInput, 
         outcome: null,
         evaluation: null,
     };
+    const campaignEvaluations: Record<string, import('@hoop-rush/data-contracts').SeasonCampaignEvaluation> = {};
     let campaignStateForNext: import('@hoop-rush/data-contracts').SeasonCampaignState | null = null;
-    if (input.campaignState !== undefined &&
-        input.campaignOpportunityId !== undefined &&
-        input.campaignOpportunityId !== null) {
+    if (input.campaignState !== undefined) {
         const campaignState = normalizeCampaignState(input.campaignState);
-        const offers = campaignState.offers[command.blockIndex] ?? [];
-        const opportunity = offers.find((o) => o.opportunityId === input.campaignOpportunityId) ?? null;
-        if (opportunity) {
-            const standingsForEval = standings;
-            const evalResult = evaluateSeasonCampaignOpportunity({
-                opportunity,
+        const primaryOppId = input.campaignOpportunityId ?? input.campaignOpportunityIds?.get(primaryFranchiseId ?? '') ?? null;
+        if (primaryOppId !== null) {
+            const offers = campaignState.offers[command.blockIndex] ?? [];
+            const opportunity = offers.find((o) => o.opportunityId === primaryOppId) ?? null;
+            if (opportunity) {
+                const standingsForEval = standings;
+                const evalResult = evaluateSeasonCampaignOpportunity({
+                    opportunity,
+                    blockIndex: command.blockIndex,
+                    humanFranchiseId: primaryFranchiseId,
+                    summaries: [...summaries],
+                    standings: standingsForEval,
+                    rotations: run.rotations,
+                    transactions: [
+                        ...(input.transactions ?? []),
+                        ...([] as import('@hoop-rush/data-contracts').SeasonTransactionEntry[]),
+                    ],
+                    health,
+                });
+                campaign = {
+                    opportunityId: opportunity.opportunityId,
+                    outcome: evalResult.outcome,
+                    evaluation: evalResult,
+                };
+                campaignStateForNext = campaignState;
+                if (primaryFranchiseId) campaignEvaluations[primaryFranchiseId] = evalResult;
+            }
+        }
+        for (const pid of participantIds) {
+            if (pid === primaryFranchiseId) continue;
+            const oppId = input.campaignOpportunityIds?.get(pid) ?? null;
+            if (oppId === null) continue;
+            const offers = campaignState.offers[command.blockIndex] ?? [];
+            const opp = offers.find((o) => o.opportunityId === oppId) ?? null;
+            if (!opp) continue;
+            const evalRes = evaluateSeasonCampaignOpportunity({
+                opportunity: opp,
                 blockIndex: command.blockIndex,
-                humanFranchiseId: input.humanFranchiseId,
+                humanFranchiseId: pid,
                 summaries: [...summaries],
-                standings: standingsForEval,
+                standings,
                 rotations: run.rotations,
-                transactions: [
-                    ...(input.transactions ?? []),
-                    ...([] as import('@hoop-rush/data-contracts').SeasonTransactionEntry[]),
-                ],
+                transactions: [...(input.transactions ?? [])],
                 health,
             });
-            campaign = {
-                opportunityId: opportunity.opportunityId,
-                outcome: evalResult.outcome,
-                evaluation: evalResult,
-            };
-            campaignStateForNext = campaignState;
+            campaignEvaluations[pid] = evalRes;
         }
     }
     const franchiseIds = run.league.teams.map((team) => team.franchiseId);
@@ -733,8 +785,10 @@ export function assembleSeasonBlockCandidate(input: SeasonBlockSimulationInput, 
     const grantResult = applySeasonBlockInfluenceGrants({
         influence: preBlockInfluence,
         blockIndex: command.blockIndex,
-        humanFranchiseId: input.humanFranchiseId,
+        humanFranchiseId: primaryFranchiseId,
+        participantFranchiseIds: participantIds,
         objectiveSuccess: objective.success,
+        objectiveSuccessByFranchise,
     });
     const postTransactions = [...(input.transactions ?? []), ...grantResult.entries];
     const recapInput = {
@@ -824,7 +878,9 @@ export function assembleSeasonBlockCandidate(input: SeasonBlockSimulationInput, 
             success: objective.success,
             evaluation: objective.evaluation,
         },
+        objectiveEvaluations: Object.keys(objectiveEvaluations).length > 0 ? objectiveEvaluations : undefined,
         campaign,
+        campaignEvaluations: Object.keys(campaignEvaluations).length > 0 ? campaignEvaluations : undefined,
         expectedStateRevision: command.expectedStateRevision,
         expectedStateDigest: command.expectedStateDigest,
         stateRevision: 0,
