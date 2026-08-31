@@ -28,8 +28,21 @@
     SeasonMultiplayerTransport,
     SeasonDraftOffer,
     SeasonPublicCommandEnvelope,
+    HoopRushManifest,
+    SeasonDraftCatalog,
+    SeasonDraftCandidate,
   } from '@hoop-rush/data-contracts';
   import { SEASON_DRAFT_OFFER_SIZE, SEASON_DRAFT_SAFE_MINIMUM } from '@hoop-rush/data-contracts';
+  import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
+  import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
+  import { getManifest, getPlayersIndex } from '$lib/data';
+  import { formatPositions } from '$lib/player-positions';
+  import { loadSeasonDraftCatalog } from '$lib/season/season-assets';
+  import {
+    buildVersionFaceIndex,
+    eraIdentityOf,
+    type SeasonFaceRef,
+  } from '$lib/season/season-branding';
   import { RoomDraftController } from '$lib/season/room-draft-controller';
 
   let roomId = $derived($page.params.roomId as string);
@@ -53,12 +66,59 @@
   let leagueDigest: string | null = $state(null);
   let verification: { ok: boolean; msg: string } | null = $state(null);
   let tick = $state(0);
+  let manifest = $state<HoopRushManifest | null>(null);
+  let catalog = $state<SeasonDraftCatalog | null>(null);
+  let faces = $state<Map<string, SeasonFaceRef>>(new Map());
   // Claim 8: surface replay integrity failures
   let replayError = $derived.by(() => controller?.getLastReplayError() ?? null);
   let integrityFailed = $derived.by(() => controller?.hasIntegrityFailure() ?? false);
   // Claim 6: server-authoritative deadline
   let deadlineAt = $derived.by(() => controller?.getDeadlineAt() ?? null);
   let deadlineCursor = $derived.by(() => controller?.getDeadlineCursor() ?? null);
+
+  async function loadDisplayAssets() {
+    const [m, cat, ix] = await Promise.all([
+      getManifest(),
+      loadSeasonDraftCatalog(),
+      getPlayersIndex(),
+    ]);
+    manifest = m;
+    catalog = cat;
+    faces = buildVersionFaceIndex(
+      ix.players,
+      cat.candidates.map((candidate) => ({
+        playerVersionId: candidate.playerVersionId,
+        playerId: candidate.playerId,
+        franchiseId: candidate.franchiseId,
+        eraId: candidate.eraId,
+        seasonKey: candidate.seasonKey,
+        displayName: candidate.displayName,
+      })),
+    );
+  }
+
+  function candidateOf(playerVersionId: string): SeasonDraftCandidate | null {
+    return catalog?.candidates.find((c) => c.playerVersionId === playerVersionId) ?? null;
+  }
+
+  function faceOf(playerVersionId: string): SeasonFaceRef | null {
+    return faces.get(playerVersionId) ?? null;
+  }
+
+  function playerLabel(playerVersionId: string): string {
+    return candidateOf(playerVersionId)?.displayName ?? playerVersionId;
+  }
+
+  function eraLabel(eraId: string): string {
+    return manifest?.eras.find((e) => e.eraId === eraId)?.label ?? eraId;
+  }
+
+  function franchiseLabel(franchiseId: string): string {
+    return (
+      manifest?.modernFranchiseSlots.find((s) => s.franchiseId === franchiseId)?.displayName ??
+      franchiseId
+    );
+  }
 
   function syncDraftFromController(state: typeof draftState) {
     draftState = state ? ({ ...state } as typeof draftState) : null;
@@ -154,6 +214,7 @@
     loading = true;
     error = null;
     try {
+      await loadDisplayAssets();
       coordinator = getCoordinator();
       const stored = loadMembership(roomId);
       try {
@@ -179,15 +240,16 @@
         membership = stored ?? loadMembership(roomId);
       }
       if (snap && membership) {
-        coordinator.subscribe(roomId);
         const tr = getTransport();
         controller = new RoomDraftController({
           transport: tr,
           roomId,
           snapshot: snap,
           membership,
+          catalog,
           fetchImpl: fetch,
         });
+        coordinator.subscribe(roomId);
         // Claim 6: honor server deadline if snapshot carries it, else try to fetch from season_deadlines
         const snapWithDeadline = snap as unknown as {
           deadlineAt?: string | null;
@@ -751,9 +813,23 @@
             </p>{/if}
           <div class="mt-3 grid gap-2 sm:grid-cols-2">
             {#each (draftState as any).picks as pick (pick.playerVersionId)}
-              <div class="rounded-lg border border-line-soft bg-card p-2 text-xs">
-                <span class="font-mono font-bold">{pick.playerVersionId.slice(0, 22)}</span> — {pick.participantId}
-                · R{pick.round} P{pick.pickOrdinal}
+              {@const candidate = candidateOf(pick.playerVersionId)}
+              <div class="flex min-w-0 items-center gap-2 rounded-lg border border-line-soft bg-card p-2 text-xs">
+                {#if manifest && faceOf(pick.playerVersionId)}
+                  <SeasonPlayerFace
+                    face={faceOf(pick.playerVersionId)!}
+                    {manifest}
+                    size="sm"
+                  />
+                {/if}
+                <div class="min-w-0">
+                  <span class="block truncate font-semibold">{playerLabel(pick.playerVersionId)}</span>
+                  <span class="text-muted-foreground"
+                    >{pick.participantId} · R{pick.round} P{pick.pickOrdinal}{candidate
+                      ? ` · ${formatPositions(candidate.positions.playable)}`
+                      : ''}</span
+                  >
+                </div>
               </div>
             {/each}
           </div>
@@ -799,8 +875,18 @@
             </p>{/if}
           <div class="mt-3 grid gap-2 sm:grid-cols-2">
             {#each (draftState as any).picks as pick (pick.playerVersionId)}
-              <div class="rounded-lg border border-line-soft bg-card p-2 text-xs">
-                <span class="font-mono font-bold">{pick.playerVersionId.slice(0, 22)}</span> — {pick.participantId}
+              <div class="flex min-w-0 items-center gap-2 rounded-lg border border-line-soft bg-card p-2 text-xs">
+                {#if manifest && faceOf(pick.playerVersionId)}
+                  <SeasonPlayerFace
+                    face={faceOf(pick.playerVersionId)!}
+                    {manifest}
+                    size="sm"
+                  />
+                {/if}
+                <div class="min-w-0">
+                  <span class="block truncate font-semibold">{playerLabel(pick.playerVersionId)}</span>
+                  <span class="text-muted-foreground">{pick.participantId}</span>
+                </div>
               </div>
             {/each}
           </div>
@@ -837,22 +923,63 @@
             </p>{/if}
           <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             {#each myOffer.cards as card (card.playerVersionId)}
+              {@const candidate = candidateOf(card.playerVersionId)}
+              {@const identity =
+                candidate && manifest
+                  ? eraIdentityOf(manifest, candidate.franchiseId, candidate.eraId)
+                  : { displayLabel: null, logoCandidates: [] }}
               <button
                 type="button"
                 onclick={() => handlePick(card.playerVersionId)}
                 disabled={picking || drawing || !card.selectable}
-                class="flex flex-col rounded-xl border p-3 text-left transition {card.selectable
+                class="flex min-w-0 flex-col gap-2 rounded-xl border p-3 text-left transition {card.selectable
                   ? 'border-primary hover:bg-primary/10 bg-card'
                   : 'border-line-soft bg-card/50 opacity-60'} disabled:cursor-not-allowed"
               >
-                <span class="font-mono text-xs font-bold break-all">{card.playerVersionId}</span>
-                <span class="mt-1 text-xs {card.selectable ? 'text-positive' : 'text-destructive'}"
+                <div class="flex min-w-0 items-start justify-between gap-2">
+                  {#if manifest && faceOf(card.playerVersionId)}
+                    <SeasonPlayerFace
+                      face={faceOf(card.playerVersionId)!}
+                      {manifest}
+                      size="md"
+                      eager={card.selectable}
+                    />
+                  {/if}
+                  {#if manifest && candidate}
+                    <SeasonTeamLogo
+                      {manifest}
+                      franchiseId={candidate.franchiseId}
+                      teamExternalId={manifest.modernFranchiseSlots.find(
+                        (s) => s.franchiseId === candidate.franchiseId,
+                      )?.teamExternalId ?? ''}
+                      logoCandidates={identity.logoCandidates}
+                      alt={identity.displayLabel ?? ''}
+                      size="sm"
+                    />
+                  {/if}
+                </div>
+                <div class="min-w-0">
+                  <p class="truncate text-sm font-bold">
+                    {candidate?.displayName ?? card.playerVersionId}
+                  </p>
+                  {#if candidate}
+                    <p class="truncate font-mono text-[10px] text-muted-foreground">
+                      {candidate.seasonKey} · {formatPositions(candidate.positions.playable)}
+                    </p>
+                    <p class="truncate font-mono text-[10px] text-muted-foreground">
+                      {identity.displayLabel ?? franchiseLabel(candidate.franchiseId)} · {eraLabel(
+                        candidate.eraId,
+                      )}
+                    </p>
+                  {/if}
+                </div>
+                <span class="text-xs {card.selectable ? 'text-positive' : 'text-destructive'}"
                   >{card.selectable
                     ? 'Safe — selectable'
                     : (card.coverageReason ?? 'Not selectable')}</span
                 >
                 <span
-                  class="mt-2 text-xs font-semibold {card.selectable
+                  class="text-xs font-semibold {card.selectable
                     ? 'text-primary'
                     : 'text-muted-foreground'}"
                   >{picking ? 'Picking…' : card.selectable ? 'Pick →' : 'Locked'}</span
@@ -930,18 +1057,29 @@
               <div
                 class="flex items-center justify-between rounded-lg border border-line-soft bg-card p-2"
               >
-                <div class="flex items-center gap-2 min-w-0">
+                <div class="flex min-w-0 items-center gap-2">
                   <span
-                    class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground"
+                    class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground"
                     >{i + 1}</span
                   >
-                  <span class="font-mono text-xs font-bold break-all">{pick.playerVersionId}</span>
-                  <span class="text-xs text-muted-foreground"
-                    >· {pick.participantId} · R{pick.round} P{pick.pickOrdinal}</span
-                  >
+                  {#if manifest && faceOf(pick.playerVersionId)}
+                    <SeasonPlayerFace
+                      face={faceOf(pick.playerVersionId)!}
+                      {manifest}
+                      size="sm"
+                    />
+                  {/if}
+                  <div class="min-w-0">
+                    <span class="block truncate text-sm font-bold"
+                      >{playerLabel(pick.playerVersionId)}</span
+                    >
+                    <span class="text-xs text-muted-foreground"
+                      >{pick.participantId} · R{pick.round} P{pick.pickOrdinal}</span
+                    >
+                  </div>
                 </div>
                 <span
-                  class="inline-flex items-center gap-1 text-xs {pick.participantId ===
+                  class="inline-flex shrink-0 items-center gap-1 text-xs {pick.participantId ===
                   membership.participantId
                     ? 'text-primary font-semibold'
                     : 'text-muted-foreground'}"

@@ -40,7 +40,7 @@ export type SeasonRoomCoordinatorState = {
 export type SeasonRoomCoordinatorDeps = {
   transport: SeasonMultiplayerTransport;
   onSnapshot: (snap: SeasonRoomPublicSnapshot) => void;
-  onCommands: (commands: SeasonPublicCommandEnvelope[]) => void;
+  onCommands: (commands: SeasonPublicCommandEnvelope[]) => void | Promise<void>;
 };
 
 export function createSeasonRoomCoordinator(deps: SeasonRoomCoordinatorDeps) {
@@ -56,6 +56,7 @@ export function createSeasonRoomCoordinator(deps: SeasonRoomCoordinatorDeps) {
     integrityFailed: false,
   };
   let unsubscribe: (() => void) | null = null;
+  let commandSync = Promise.resolve();
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   let lastAcceptedOrdinal = -1;
   let uncommittedCandidate: unknown | null = null;
@@ -96,7 +97,7 @@ export function createSeasonRoomCoordinator(deps: SeasonRoomCoordinatorDeps) {
       uncommittedCandidate = null;
     },
     async createRoom(pace: 'live' | 'async', rootSeed: string, mode: SeasonRoomMode = 'season') {
-      const snap = (await deps.transport.create(
+      const snap = await deps.transport.create(
         {
           schemaVersion: SEASON_ROOM_PROTOCOL_SCHEMA_VERSION,
           pace,
@@ -106,7 +107,7 @@ export function createSeasonRoomCoordinator(deps: SeasonRoomCoordinatorDeps) {
           timerPolicyVersion: SEASON_TIMER_POLICY_VERSION,
         },
         rootSeed,
-      ));
+      );
       // persist identity: membership may come from transport (in-memory) or via auto-join; code for host lobby
       const membership = snap.membership ?? null;
       const code = snap.code ?? null;
@@ -305,17 +306,19 @@ export function createSeasonRoomCoordinator(deps: SeasonRoomCoordinatorDeps) {
         state = { ...state, publicSnapshot: snap };
         deps.onSnapshot(snap);
         // treat Realtime as notification, refetch authoritative commands
-        const after = Number.isFinite(lastAcceptedOrdinal) ? lastAcceptedOrdinal : -1;
-        void deps.transport
-          .refetch(roomId, after)
-          .then((cmds) => {
+        commandSync = commandSync
+          .then(async () => {
+            const after = Number.isFinite(lastAcceptedOrdinal) ? lastAcceptedOrdinal : -1;
+            const cmds = await deps.transport.refetch(roomId, after);
             if (cmds.length > 0) {
+              await deps.onCommands(cmds);
               const last = cmds[cmds.length - 1];
               if (last && typeof last.ordinal === 'number') lastAcceptedOrdinal = last.ordinal;
-              deps.onCommands(cmds);
             }
           })
-          .catch(() => {});
+          .catch((error: unknown) => {
+            console.error('[season-room-coordinator] command sync failed', error);
+          });
       });
       unsubscribe = sub.unsubscribe;
       state = { ...state, roomId, connected: true };

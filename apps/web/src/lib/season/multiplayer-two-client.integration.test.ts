@@ -34,6 +34,68 @@ function settingsLiveSeason() {
 }
 
 describe('multiplayer two-client deterministic flow (claim 11)', () => {
+  it('retries guest command delivery when applying a realtime batch fails', async () => {
+    const backing = new InMemorySeasonMultiplayerTransport();
+    const created = await backing.create(settingsLiveSeason(), ROOT_SEED);
+    const roomId = created.roomId;
+    const snapshot = await backing.resume(roomId);
+    const command: SeasonPublicCommandEnvelope = {
+      schemaVersion: 2 as const,
+      roomId,
+      commandId: 'guest-retry-command',
+      ordinal: 0,
+      expectedRevision: 0,
+      expectedDigest: null,
+      payload: { kind: 'test-command' },
+      actorParticipantId: 'p1' as const,
+      actorFranchiseId: 'franchise-p1',
+    };
+    let notify: ((value: typeof snapshot) => void) | null = null;
+    const refetchAfter: number[] = [];
+    const transport = new Proxy(backing as SeasonMultiplayerTransport, {
+      get(target, property, receiver) {
+        if (property === 'subscribe') {
+          return (_roomId: string, callback: (value: typeof snapshot) => void) => {
+            notify = callback;
+            return { unsubscribe: () => {} };
+          };
+        }
+        if (property === 'refetch') {
+          return (_roomId: string, afterOrdinal: number) => {
+            refetchAfter.push(afterOrdinal);
+            return Promise.resolve(afterOrdinal < command.ordinal ? [command] : []);
+          };
+        }
+        if (property === 'heartbeat') return () => Promise.resolve(snapshot);
+        // The proxy preserves the rest of the concrete in-memory transport methods.
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    let attempts = 0;
+    const delivered: string[] = [];
+    const coordinator = createInMemorySeasonRoomCoordinator({
+      transport,
+      onSnapshot: () => {},
+      onCommands: (commands) => {
+        attempts += 1;
+        if (attempts === 1) return Promise.reject(new Error('guest controller still loading'));
+        delivered.push(...commands.map((entry) => entry.commandId));
+        return Promise.resolve();
+      },
+    });
+
+    coordinator.subscribe(roomId);
+    notify?.(snapshot);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    notify?.(snapshot);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(refetchAfter).toEqual([-1, -1]);
+    expect(delivered).toEqual(['guest-retry-command']);
+    coordinator.destroy();
+  });
+
   it('replays and retries a draft draw after a transient stale ordinal', async () => {
     const backing = new InMemorySeasonMultiplayerTransport();
     const created = await backing.create(settingsLiveSeason(), ROOT_SEED);
