@@ -1,10 +1,14 @@
 import { opponentBracketSchema } from '../bracket.ts';
 import { loadJsonAsset } from './load-json.ts';
-export function loadOpponentBracket(url: string, expectedHash?: string, init?: RequestInit): Promise<import('../bracket.ts').OpponentBracket> {
-    return loadJsonAsset(url, {
-        label: 'opponent bracket',
-        expectedHash,
-        parse: (value: unknown) => opponentBracketSchema.parse(value),
-        init,
-    });
+export function loadOpponentBracket(
+  url: string,
+  expectedHash?: string,
+  init?: RequestInit,
+): Promise<import('../bracket.ts').OpponentBracket> {
+  return loadJsonAsset(url, {
+    label: 'opponent bracket',
+    expectedHash,
+    parse: (value: unknown) => opponentBracketSchema.parse(value),
+    init,
+  });
 }

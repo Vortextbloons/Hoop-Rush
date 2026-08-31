@@ -55,7 +55,7 @@ export function loadCode(roomId: string): SeasonRoomCode | null {
   if (!isBrowser()) return null;
   try {
     const raw = localStorage.getItem(codeKey(roomId));
-    if (raw && /^[0-9]{4}$/.test(raw)) return raw as SeasonRoomCode;
+    if (raw && /^[0-9]{4}$/.test(raw)) return raw;
     return null;
   } catch {
     return null;
@@ -91,10 +91,14 @@ export function friendlyJoinError(err: unknown): string {
   const e = err as { code?: string; message?: string; status?: number };
   const code = String(e?.code ?? '').toLowerCase();
   const msg = String(e?.message ?? '').toLowerCase();
-  if (code === 'outdated-room' || msg.includes('outdated')) return 'Outdated room — create a new one.';
-  if (code === 'opponent-disconnected' || msg.includes('disconnected')) return 'Opponent disconnected — waiting for reconnection.';
-  if (code === 'not-ready' || msg.includes('not ready')) return 'Waiting for Ready — guest must confirm settings.';
-  if (code === 'stale-revision' || code === 'stale-settings' || msg.includes('stale')) return 'Settings changed — please confirm again.';
+  if (code === 'outdated-room' || msg.includes('outdated'))
+    return 'Outdated room — create a new one.';
+  if (code === 'opponent-disconnected' || msg.includes('disconnected'))
+    return 'Opponent disconnected — waiting for reconnection.';
+  if (code === 'not-ready' || msg.includes('not ready'))
+    return 'Waiting for Ready — guest must confirm settings.';
+  if (code === 'stale-revision' || code === 'stale-settings' || msg.includes('stale'))
+    return 'Settings changed — please confirm again.';
   if (code === 'rate-limit' || code === '429' || msg.includes('too many'))
     return 'Too many attempts — wait a minute and try again.';
   if (code === 'room-full' || msg.includes('full'))

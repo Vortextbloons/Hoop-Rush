@@ -1,17 +1,23 @@
-<script lang="ts">import { getContext } from 'svelte';
-import { resolve } from '$app/paths';
-import type { RouteId } from '$app/types';
-import { SEASON_RUN_SHELL_CONTEXT, type SeasonRunShellData, } from '$lib/season/season-shell-context';
-import { postseasonStageLabel } from '$lib/season/season-postseason-presentation';
-import PostseasonBracket from '$lib/components/season/PostseasonBracket.svelte';
-const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
-const run = $derived(shell.run);
-const humanFranchiseId = $derived(shell.humanFranchiseId);
-const manifest = $derived(shell.manifest);
-const stage = $derived(run?.stage ?? null);
-const stageLabel = $derived(postseasonStageLabel(stage ?? 'regular-season'));
-const postseasonStarted = $derived(stage === 'play-in' || stage === 'playoffs' || stage === 'completed');
-const champion = $derived(run?.postseason.championFranchiseId ?? null);
+﻿<script lang="ts">
+  import { getContext } from 'svelte';
+  import { resolve } from '$app/paths';
+  import type { RouteId } from '$app/types';
+  import {
+    SEASON_RUN_SHELL_CONTEXT,
+    type SeasonRunShellData,
+  } from '$lib/season/season-shell-context';
+  import { postseasonStageLabel } from '$lib/season/season-postseason-presentation';
+  import PostseasonBracket from '$lib/components/season/PostseasonBracket.svelte';
+  const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
+  const run = $derived(shell.run);
+  const humanFranchiseId = $derived(shell.humanFranchiseId);
+  const manifest = $derived(shell.manifest);
+  const stage = $derived(run?.stage ?? null);
+  const stageLabel = $derived(postseasonStageLabel(stage ?? 'regular-season'));
+  const postseasonStarted = $derived(
+    stage === 'play-in' || stage === 'playoffs' || stage === 'completed',
+  );
+  const champion = $derived(run?.postseason.championFranchiseId ?? null);
 </script>
 
 <svelte:head>
@@ -34,7 +40,7 @@ const champion = $derived(run?.postseason.championFranchiseId ?? null);
           Finish the regular season — all nine checkpoints — then start the postseason from the hub.
         </p>
         <a
-          href={resolve('/season/run' as RouteId)}
+          href={resolve('/season/run' as any)}
           class="mt-4 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
         >
           Back to the hub
@@ -62,7 +68,7 @@ const champion = $derived(run?.postseason.championFranchiseId ?? null);
         </p>
       </div>
       <a
-        href={resolve('/season/run' as RouteId)}
+        href={resolve('/season/run' as any)}
         class="inline-flex w-fit items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground"
       >
         Hub

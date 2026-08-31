@@ -254,7 +254,8 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     const key = `join:${code}`;
     const attempts = this.joinAttempts.get(key) ?? [];
     const recentMin = attempts.filter((t) => now - t < 60 * 1000);
-    if (recentMin.length >= 30) throw Object.assign(new Error('rate-limit'), { code: 'rate-limit' });
+    if (recentMin.length >= 30)
+      throw Object.assign(new Error('rate-limit'), { code: 'rate-limit' });
     const recentHour = attempts.filter((t) => now - t < 60 * 60 * 1000);
     if (recentHour.length >= 100)
       throw Object.assign(new Error('rate-limit'), { code: 'rate-limit' });
@@ -313,7 +314,10 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     // If a test wants to simulate guest calling, it should pass participantId via overloaded helper; we expose alternative check via expectedSettingsRevision misuse?
     // For now, we don't have caller identity; we will enforce guest cannot call by checking a flag: if expectedSettingsRevision is not undefined and caller is guest, they'd pass wrong revision? Better to add explicit guard for tests via a separate method _updateSettingsAs.
     // To support authorization test, we check if settings.mode/pace are being updated by guest, we throw if guest tries to bypass readiness? We can't distinguish, so we provide helper.
-    if (expectedSettingsRevision !== undefined && expectedSettingsRevision !== room.settingsRevision) {
+    if (
+      expectedSettingsRevision !== undefined &&
+      expectedSettingsRevision !== room.settingsRevision
+    ) {
       throw Object.assign(new Error('stale-settings'), { code: 'stale-revision' });
     }
     // pace applies to all modes; we allow any combination per spec (though Spectrum: Season is live-only historically, now allow pace for all)
@@ -327,13 +331,20 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     };
     room.settingsRevision += 1;
     room.guestReady = false; // reset guest readiness whenever host changes mode or pace
-    room.digest = digestOf({ rootSeed: room.rootSeed, settings: room.settings, settingsRevision: room.settingsRevision });
+    room.digest = digestOf({
+      rootSeed: room.rootSeed,
+      settings: room.settings,
+      settingsRevision: room.settingsRevision,
+    });
     this.notify(room);
     return this.publicSnapshotOf(room);
   }
 
   // helper for testing guest authorization: attempt updateSettings as guest should fail
-  async _updateSettingsAsGuest(roomId: string, settings: { mode: SeasonRoomMode; pace: SeasonRoomPace }): Promise<SeasonRoomPublicSnapshot> {
+  async _updateSettingsAsGuest(
+    roomId: string,
+    settings: { mode: SeasonRoomMode; pace: SeasonRoomPace },
+  ): Promise<SeasonRoomPublicSnapshot> {
     const room = this.rooms.get(roomId);
     if (!room) throw Object.assign(new Error('membership'), { code: 'membership' });
     throw Object.assign(new Error('only host can update settings'), { code: 'authorization' });
@@ -349,12 +360,16 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     if (!room) throw Object.assign(new Error('membership'), { code: 'membership' });
     this.assertNotOutdated(room);
     if (room.phase !== 'waiting') throw Object.assign(new Error('phase'), { code: 'phase' });
-    if (!room.members.has(participantId)) throw Object.assign(new Error('membership'), { code: 'membership' });
+    if (!room.members.has(participantId))
+      throw Object.assign(new Error('membership'), { code: 'membership' });
     // guest-authorized only: p1 cannot set ready
     if (participantId === 'p1') {
       throw Object.assign(new Error('only guest can set ready'), { code: 'authorization' });
     }
-    if (expectedSettingsRevision !== undefined && expectedSettingsRevision !== room.settingsRevision) {
+    if (
+      expectedSettingsRevision !== undefined &&
+      expectedSettingsRevision !== room.settingsRevision
+    ) {
       throw Object.assign(new Error('stale-settings'), { code: 'stale-revision' });
     }
     room.guestReady = ready;
@@ -366,7 +381,8 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
   async heartbeat(roomId: string, participantId: 'p1' | 'p2'): Promise<void> {
     const room = this.rooms.get(roomId);
     if (!room) throw Object.assign(new Error('membership'), { code: 'membership' });
-    if (!room.members.has(participantId)) throw Object.assign(new Error('membership'), { code: 'membership' });
+    if (!room.members.has(participantId))
+      throw Object.assign(new Error('membership'), { code: 'membership' });
     room.presence.set(participantId, this.clock());
     // no notify needed for heartbeat unless presence flips, but we notify for simplicity
     this.notify(room);
@@ -375,7 +391,8 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
   async leave(roomId: string, participantId: 'p1' | 'p2'): Promise<void> {
     const room = this.rooms.get(roomId);
     if (!room) return;
-    if (!room.members.has(participantId)) throw Object.assign(new Error('membership'), { code: 'membership' });
+    if (!room.members.has(participantId))
+      throw Object.assign(new Error('membership'), { code: 'membership' });
     room.members.delete(participantId);
     room.memberPrivate.delete(participantId);
     room.presence.delete(participantId);
@@ -401,7 +418,8 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     if (!room) throw Object.assign(new Error('membership'), { code: 'membership' });
     this.assertNotOutdated(room);
     if (room.phase !== 'waiting') throw Object.assign(new Error('phase'), { code: 'phase' });
-    if (room.members.size !== 2) throw Object.assign(new Error('waiting for opponent'), { code: 'phase' });
+    if (room.members.size !== 2)
+      throw Object.assign(new Error('waiting for opponent'), { code: 'phase' });
     if (!room.guestReady) throw Object.assign(new Error('guest not ready'), { code: 'not-ready' });
     // presence gating: both must be online (within 15s)
     const now = this.clock();
@@ -418,15 +436,23 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
   }
 
   // optional startDraft with actor check for guest auth test
-  async _startDraftAs(roomId: string, participantId: 'p1' | 'p2'): Promise<SeasonRoomPublicSnapshot> {
-    if (participantId !== 'p1') throw Object.assign(new Error('only host can start draft'), { code: 'authorization' });
+  async _startDraftAs(
+    roomId: string,
+    participantId: 'p1' | 'p2',
+  ): Promise<SeasonRoomPublicSnapshot> {
+    if (participantId !== 'p1')
+      throw Object.assign(new Error('only host can start draft'), { code: 'authorization' });
     return this.startDraft(roomId);
   }
 
-  async resume(roomId: string): Promise<SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership }> {
+  async resume(
+    roomId: string,
+  ): Promise<SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership }> {
     const room = this.rooms.get(roomId);
     if (!room) throw Object.assign(new Error('membership'), { code: 'membership' });
-    const snap = this.publicSnapshotOf(room) as SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership };
+    const snap = this.publicSnapshotOf(room) as SeasonRoomPublicSnapshot & {
+      membership?: SeasonRoomMembership;
+    };
     // retain private membership: try to find any member for this transport instance; for in-memory we return host if exists else first
     // In real usage, coordinator will have stored membership; we mimic by returning first membership if present
     const anyMember = room.members.get('p1') ?? room.members.get('p2') ?? null;
@@ -434,7 +460,9 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     return snap;
   }
 
-  async refresh(roomId: string): Promise<SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership }> {
+  async refresh(
+    roomId: string,
+  ): Promise<SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership }> {
     return this.resume(roomId);
   }
 
@@ -657,7 +685,11 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
   }
 
   // inject an outdated v1 room for testing v1 rejection
-  injectOutdatedRoom(roomId: string, settings: Partial<SeasonRoomSettings> = {}, rootSeed = 'outdated-seed'): InMemoryRoom {
+  injectOutdatedRoom(
+    roomId: string,
+    settings: Partial<SeasonRoomSettings> = {},
+    rootSeed = 'outdated-seed',
+  ): InMemoryRoom {
     const now = this.clock();
     const code = randomCode(this.counter++);
     const outdatedSettings: SeasonRoomSettings = {

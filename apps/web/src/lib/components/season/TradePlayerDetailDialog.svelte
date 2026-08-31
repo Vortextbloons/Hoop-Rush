@@ -1,30 +1,38 @@
-<script lang="ts">import type { HoopRushManifest, SeasonDraftCatalog } from '@hoop-rush/data-contracts';
-import { Dialog } from 'bits-ui';
-import { X } from '@lucide/svelte';
-import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
-import { eraIdentityOf, type SeasonFaceRef } from '$lib/season/season-branding';
-import { candidateOf } from '$lib/season/season-catalog-index';
-import { formatPositions } from '$lib/player-positions';
-import type { SeasonPlayerStatsRow } from '$lib/season/season-player-stats-view';
-import type { TradePlayerViewModel } from '$lib/season/season-trade-view';
-import { oneDecimal, percentOneDecimal } from '$lib/format';
-let { player, manifest, catalog, face, runStats = null, onClose, }: {
+<script lang="ts">
+  import type { HoopRushManifest, SeasonDraftCatalog } from '@hoop-rush/data-contracts';
+  import { Dialog } from 'bits-ui';
+  import { X } from '@lucide/svelte';
+  import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
+  import { eraIdentityOf, type SeasonFaceRef } from '$lib/season/season-branding';
+  import { candidateOf } from '$lib/season/season-catalog-index';
+  import { formatPositions } from '$lib/player-positions';
+  import type { SeasonPlayerStatsRow } from '$lib/season/season-player-stats-view';
+  import type { TradePlayerViewModel } from '$lib/season/season-trade-view';
+  import { oneDecimal, percentOneDecimal } from '$lib/format';
+  let {
+    player,
+    manifest,
+    catalog,
+    face,
+    runStats = null,
+    onClose,
+  }: {
     player: TradePlayerViewModel | null;
     manifest: HoopRushManifest;
     catalog: SeasonDraftCatalog | null;
     face: SeasonFaceRef | null;
     runStats?: SeasonPlayerStatsRow | null;
     onClose: () => void;
-} = $props();
-const candidate = $derived(player === null ? null : candidateOf(catalog, player.playerVersionId));
-const eraLabel = $derived(player === null ? null : eraIdentityOf(manifest, player.franchiseId, player.eraId).displayLabel);
-function pct(value: number | null): string {
-    if (value === null)
-        return '—';
-    if (value === 0)
-        return '0%';
+  } = $props();
+  const candidate = $derived(player === null ? null : candidateOf(catalog, player.playerVersionId));
+  const eraLabel = $derived(
+    player === null ? null : eraIdentityOf(manifest, player.franchiseId, player.eraId).displayLabel,
+  );
+  function pct(value: number | null): string {
+    if (value === null) return '—';
+    if (value === 0) return '0%';
     return percentOneDecimal(value);
-}
+  }
 </script>
 
 <Dialog.Root

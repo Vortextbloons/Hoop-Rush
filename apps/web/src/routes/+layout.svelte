@@ -1,31 +1,34 @@
-<script lang="ts">import { asset, resolve } from '$app/paths';
-import { page } from '$app/state';
-import type { RouteId } from '$app/types';
-import { Home, Users, Swords } from '@lucide/svelte';
-import '../app.css';
-import { ModeWatcher } from 'mode-watcher';
-import { Toaster } from 'svelte-sonner';
-import BottomNav from '$lib/components/BottomNav.svelte';
-import { isNavItemActive, type NavItem } from '$lib/nav-items';
-import { warmPlayersIndex } from '$lib/data';
-let { children } = $props();
-const homeHref = resolve('/');
-const navItems: NavItem[] = [
+﻿<script lang="ts">
+  import { asset, resolve } from '$app/paths';
+  import { page } from '$app/state';
+  import type { RouteId } from '$app/types';
+  import { Home, Users, Swords } from '@lucide/svelte';
+  import '../app.css';
+  import { ModeWatcher } from 'mode-watcher';
+  import { Toaster } from 'svelte-sonner';
+  import BottomNav from '$lib/components/BottomNav.svelte';
+  import { isNavItemActive, type NavItem } from '$lib/nav-items';
+  import { warmPlayersIndex } from '$lib/data';
+  let { children } = $props();
+  const homeHref = resolve('/');
+  const navItems: NavItem[] = [
     { id: 'home', label: 'Home', href: '/', icon: Home },
     { id: 'roster', label: 'Roster', href: '/roster', icon: Users },
     { id: 'multiplayer', label: 'Multiplayer', href: '/multiplayer', icon: Swords },
-];
-const routeId = $derived(page.route.id);
-const showBottomNav = $derived(
-    routeId === '/' || routeId === '/roster' || routeId === '/multiplayer' || routeId?.startsWith('/multiplayer') === true
-);
-function isActive(item: NavItem): boolean {
+  ];
+  const routeId = $derived(page.route.id);
+  const showBottomNav = $derived(
+    routeId === '/' ||
+      routeId === '/roster' ||
+      routeId === '/multiplayer' ||
+      routeId?.startsWith('/multiplayer') === true,
+  );
+  function isActive(item: NavItem): boolean {
     return isNavItemActive(item, routeId);
-}
-function warmForRoster(itemId: string): void {
-    if (itemId === 'roster')
-        warmPlayersIndex();
-}
+  }
+  function warmForRoster(itemId: string): void {
+    if (itemId === 'roster') warmPlayersIndex();
+  }
 </script>
 
 <svelte:head>
@@ -57,7 +60,7 @@ function warmForRoster(itemId: string): void {
         {#each navItems as item (item.id)}
           {@const active = isActive(item)}
           <a
-            href={resolve(item.href as RouteId)}
+            href={resolve(item.href as any)}
             aria-current={active ? 'page' : undefined}
             onpointerenter={() => warmForRoster(item.id)}
             onfocus={() => warmForRoster(item.id)}

@@ -1,24 +1,31 @@
-<script lang="ts">import { getContext } from 'svelte';
-import type { SeasonLeaderCategory, SeasonRosterEntry } from '@hoop-rush/data-contracts';
-import AwardsSection from '$lib/components/season/AwardsSection.svelte';
-import LeadersTable from '$lib/components/season/LeadersTable.svelte';
-import { SEASON_RUN_SHELL_CONTEXT, type SeasonRunShellData, } from '$lib/season/season-shell-context';
-import { foldSeasonAggregates, LEADER_CATEGORY_LABELS } from '$lib/season/season-presentation';
-import { engineOrderLeaderTables, LEADER_CATEGORIES } from '$lib/season/season-leaders-view';
-const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
-let activeCategory = $state<SeasonLeaderCategory>('points');
-const aggregates = $derived(shell.snapshot ? foldSeasonAggregates(shell.snapshot.summaries) : null);
-const leaders = $derived(aggregates ? engineOrderLeaderTables(aggregates.players, aggregates.teams) : null);
-const rosterByVersion = $derived.by(() => {
+<script lang="ts">
+  import { getContext } from 'svelte';
+  import type { SeasonLeaderCategory, SeasonRosterEntry } from '@hoop-rush/data-contracts';
+  import AwardsSection from '$lib/components/season/AwardsSection.svelte';
+  import LeadersTable from '$lib/components/season/LeadersTable.svelte';
+  import {
+    SEASON_RUN_SHELL_CONTEXT,
+    type SeasonRunShellData,
+  } from '$lib/season/season-shell-context';
+  import { foldSeasonAggregates, LEADER_CATEGORY_LABELS } from '$lib/season/season-presentation';
+  import { engineOrderLeaderTables, LEADER_CATEGORIES } from '$lib/season/season-leaders-view';
+  const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
+  let activeCategory = $state<SeasonLeaderCategory>('points');
+  const aggregates = $derived(
+    shell.snapshot ? foldSeasonAggregates(shell.snapshot.summaries) : null,
+  );
+  const leaders = $derived(
+    aggregates ? engineOrderLeaderTables(aggregates.players, aggregates.teams) : null,
+  );
+  const rosterByVersion = $derived.by(() => {
     const map = new Map<string, SeasonRosterEntry>();
     for (const roster of shell.run?.rosters ?? []) {
-        for (const entry of roster.players)
-            map.set(entry.playerVersionId, entry);
+      for (const entry of roster.players) map.set(entry.playerVersionId, entry);
     }
     return map;
-});
-const manifest = $derived(shell.manifest);
-const awards = $derived(shell.run?.awards ?? null);
+  });
+  const manifest = $derived(shell.manifest);
+  const awards = $derived(shell.run?.awards ?? null);
 </script>
 
 <svelte:head>

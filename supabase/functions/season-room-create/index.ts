@@ -169,8 +169,15 @@ Deno.serve(async (req: Request) => {
           let res = await serviceClient.from('season_rooms').insert(v2Insert).select('id').single();
           ins = (res as { data: unknown }).data;
           insErr = (res as { error: unknown }).error;
-          if (insErr && String((insErr as { message?: string }).message ?? '').includes('guest_ready')) {
-            const retry = await serviceClient.from('season_rooms').insert(baseInsert).select('id').single();
+          if (
+            insErr &&
+            String((insErr as { message?: string }).message ?? '').includes('guest_ready')
+          ) {
+            const retry = await serviceClient
+              .from('season_rooms')
+              .insert(baseInsert)
+              .select('id')
+              .single();
             ins = (retry as { data: unknown }).data;
             insErr = (retry as { error: unknown }).error;
           }

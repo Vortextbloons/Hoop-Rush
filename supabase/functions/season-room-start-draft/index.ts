@@ -46,8 +46,14 @@ Deno.serve(async (req: Request) => {
     .eq('id', roomId)
     .single();
   if (roomErr || !room) return json(404, { code: 'membership', message: 'room not found' });
-  const isV2Start = (room as unknown as { multiplayer_version?: string }).multiplayer_version === 'season-multiplayer-v2' && (room as unknown as { room_protocol_version?: number }).room_protocol_version === 2;
-  if (!isV2Start) console.warn(`starting room ${room.id} with version ${room.multiplayer_version}/${room.room_protocol_version}, treating as v2-compatible`);
+  const isV2Start =
+    (room as unknown as { multiplayer_version?: string }).multiplayer_version ===
+      'season-multiplayer-v2' &&
+    (room as unknown as { room_protocol_version?: number }).room_protocol_version === 2;
+  if (!isV2Start)
+    console.warn(
+      `starting room ${room.id} with version ${room.multiplayer_version}/${room.room_protocol_version}, treating as v2-compatible`,
+    );
   const { data: member } = await sc
     .from('season_room_members')
     .select('*')
@@ -66,13 +72,21 @@ Deno.serve(async (req: Request) => {
   if ((count ?? 0) < 2) return json(400, { code: 'phase', message: 'need 2 players to start' });
   // guest readiness gating - only for v2 rooms that have guest_ready column; for v1, allow
   const guestReadyRaw = (room as unknown as { guest_ready?: boolean }).guest_ready;
-  const isV2Guest = (room as unknown as { multiplayer_version?: string }).multiplayer_version === 'season-multiplayer-v2';
-  if (isV2Guest && guestReadyRaw === false) return json(400, { code: 'not-ready', message: 'guest not ready' });
+  const isV2Guest =
+    (room as unknown as { multiplayer_version?: string }).multiplayer_version ===
+    'season-multiplayer-v2';
+  if (isV2Guest && guestReadyRaw === false)
+    return json(400, { code: 'not-ready', message: 'guest not ready' });
   // presence gating: both must be online within 15s - only for v2 with last_seen_at
   const nowMs = Date.now();
-  const hasPresenceColumn = (allMembers ?? []).some((m) => (m as unknown as { last_seen_at?: string | null }).last_seen_at !== undefined);
+  const hasPresenceColumn = (allMembers ?? []).some(
+    (m) => (m as unknown as { last_seen_at?: string | null }).last_seen_at !== undefined,
+  );
   if (isV2Guest && hasPresenceColumn) {
-    for (const m of (allMembers ?? []) as unknown as Array<{ participant_id: string; last_seen_at: string | null }>) {
+    for (const m of (allMembers ?? []) as unknown as Array<{
+      participant_id: string;
+      last_seen_at: string | null;
+    }>) {
       if (m.last_seen_at === undefined) continue; // column not exists, treat as online
       const lastSeen = m.last_seen_at ? new Date(m.last_seen_at).getTime() : 0;
       if (m.last_seen_at && nowMs - lastSeen > 15_000) {
@@ -88,7 +102,9 @@ Deno.serve(async (req: Request) => {
     .single();
   if (updErr || !updated)
     return json(500, { code: 'authorization', message: 'failed to start draft' });
-  const presence = ((allMembers ?? []) as unknown as Array<{ participant_id: string; last_seen_at: string | null }>).map((m) => {
+  const presence = (
+    (allMembers ?? []) as unknown as Array<{ participant_id: string; last_seen_at: string | null }>
+  ).map((m) => {
     const lastSeen = m.last_seen_at ? new Date(m.last_seen_at).getTime() : nowMs;
     return {
       participantId: m.participant_id as 'p1' | 'p2',

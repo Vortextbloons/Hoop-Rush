@@ -1,13 +1,42 @@
-<script lang="ts">import { ChevronDown, ChevronUp, Star, UserMinus, UserPlus } from '@lucide/svelte';
-import type { HoopRushManifest, SeasonEffectsState, SeasonGameSummary, SeasonRotation, } from '@hoop-rush/data-contracts';
-import { minuteStrategyOfPreset, type MinutePlanOptimizationResult } from '@hoop-rush/engine';
-import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
-import type { SeasonFaceRef } from '$lib/season/season-branding';
-import { eraIdentityOf } from '$lib/season/season-branding';
-import { FATIGUE_BAND_BADGE, FATIGUE_BAND_LABEL, fatigueBand, fatiguePercent, loadStateOf, } from '$lib/season/season-effects-view';
-import { indexRotationFailures, ROTATION_PRESETS, presetLabel, type MinuteAdjustment, type RotationEditor, type RotationMember, } from '$lib/season/season-rotation-editor';
-import { formatPositions, SLOT_LABELS } from '$lib/player-positions';
-let { editor, disabled, onchange, faces = null, manifest = null, overallByVersion = null, effects = null, summaries = [], optimize = null, }: {
+<script lang="ts">
+  import { ChevronDown, ChevronUp, Star, UserMinus, UserPlus } from '@lucide/svelte';
+  import type {
+    HoopRushManifest,
+    SeasonEffectsState,
+    SeasonGameSummary,
+    SeasonRotation,
+  } from '@hoop-rush/data-contracts';
+  import { minuteStrategyOfPreset, type MinutePlanOptimizationResult } from '@hoop-rush/engine';
+  import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
+  import type { SeasonFaceRef } from '$lib/season/season-branding';
+  import { eraIdentityOf } from '$lib/season/season-branding';
+  import {
+    FATIGUE_BAND_BADGE,
+    FATIGUE_BAND_LABEL,
+    fatigueBand,
+    fatiguePercent,
+    loadStateOf,
+  } from '$lib/season/season-effects-view';
+  import {
+    indexRotationFailures,
+    ROTATION_PRESETS,
+    presetLabel,
+    type MinuteAdjustment,
+    type RotationEditor,
+    type RotationMember,
+  } from '$lib/season/season-rotation-editor';
+  import { formatPositions, SLOT_LABELS } from '$lib/player-positions';
+  let {
+    editor,
+    disabled,
+    onchange,
+    faces = null,
+    manifest = null,
+    overallByVersion = null,
+    effects = null,
+    summaries = [],
+    optimize = null,
+  }: {
     editor: RotationEditor;
     disabled: boolean;
     onchange: (rotation: RotationEditor['rotation'], failures: string[]) => void;
@@ -17,283 +46,266 @@ let { editor, disabled, onchange, faces = null, manifest = null, overallByVersio
     effects?: SeasonEffectsState | null;
     summaries?: SeasonGameSummary[];
     optimize?: {
-        run: (rotation: SeasonRotation) => Promise<MinutePlanOptimizationResult>;
-        busy: boolean;
-        error: string | null;
+      run: (rotation: SeasonRotation) => Promise<MinutePlanOptimizationResult>;
+      busy: boolean;
+      error: string | null;
     } | null;
-} = $props();
-const rows = $derived.by(() => {
+  } = $props();
+  const rows = $derived.by(() => {
     void revision;
     return editor.rows();
-});
-const rowByVersion = $derived(new Map(rows.map((row) => [row.member.playerVersionId, row] as const)));
-const starterIds = $derived.by(() => {
+  });
+  const rowByVersion = $derived(
+    new Map(rows.map((row) => [row.member.playerVersionId, row] as const)),
+  );
+  const starterIds = $derived.by(() => {
     void revision;
     return editor.rotation.starters;
-});
-const benchIds = $derived.by(() => {
+  });
+  const benchIds = $derived.by(() => {
     void revision;
     return editor.rotation.benchOrder;
-});
-const closingIds = $derived.by(() => {
+  });
+  const closingIds = $derived.by(() => {
     void revision;
     return editor.rotation.closingFive;
-});
-const orderedRows = $derived.by(() => {
+  });
+  const orderedRows = $derived.by(() => {
     void revision;
     return [
-        ...starterIds.map((id) => rowByVersion.get(id)).filter((row) => row !== undefined),
-        ...benchIds.map((id) => rowByVersion.get(id)).filter((row) => row !== undefined),
+      ...starterIds.map((id) => rowByVersion.get(id)).filter((row) => row !== undefined),
+      ...benchIds.map((id) => rowByVersion.get(id)).filter((row) => row !== undefined),
     ];
-});
-const minutesTotal = $derived(rows.reduce((sum, row) => sum + row.minutes, 0));
-const minutesRemaining = $derived(240 - minutesTotal);
-const failures = $derived.by(() => {
+  });
+  const minutesTotal = $derived(rows.reduce((sum, row) => sum + row.minutes, 0));
+  const minutesRemaining = $derived(240 - minutesTotal);
+  const failures = $derived.by(() => {
     void revision;
     return editor.validate();
-});
-const failureIndex = $derived(indexRotationFailures(failures));
-let rejection: string | null = $state(null);
-let swap: {
+  });
+  const failureIndex = $derived(indexRotationFailures(failures));
+  let rejection: string | null = $state(null);
+  let swap: {
     kind: 'promote' | 'demote';
     playerVersionId: string;
-} | null = $state(null);
-let swapNotice: string | null = $state(null);
-let swapNoticeTimer: ReturnType<typeof setTimeout> | null = null;
-const inactiveRows = $derived.by(() => {
+  } | null = $state(null);
+  let swapNotice: string | null = $state(null);
+  let swapNoticeTimer: ReturnType<typeof setTimeout> | null = null;
+  const inactiveRows = $derived.by(() => {
     void revision;
     return editor.inactiveMembers();
-});
-let highlightIds = $state<ReadonlySet<string>>(new Set());
-let rebalanceNotice: string | null = $state(null);
-let noticeTimer: ReturnType<typeof setTimeout> | null = null;
-let editingId: string | null = $state(null);
-let editingMinutes: number | null = $state(null);
-let draft = $state('');
-let editingInput: HTMLInputElement | null = $state(null);
-let revision = $state(0);
-let optimizingPreset: (typeof ROTATION_PRESETS)[number] | null = $state(null);
-const minutesProgress = $derived(Math.min(100, Math.round((minutesTotal / 240) * 100)));
-const lastGameMinutes = $derived.by(() => {
+  });
+  let highlightIds = $state<ReadonlySet<string>>(new Set());
+  let rebalanceNotice: string | null = $state(null);
+  let noticeTimer: ReturnType<typeof setTimeout> | null = null;
+  let editingId: string | null = $state(null);
+  let editingMinutes: number | null = $state(null);
+  let draft = $state('');
+  let editingInput: HTMLInputElement | null = $state(null);
+  let revision = $state(0);
+  let optimizingPreset: (typeof ROTATION_PRESETS)[number] | null = $state(null);
+  const minutesProgress = $derived(Math.min(100, Math.round((minutesTotal / 240) * 100)));
+  const lastGameMinutes = $derived.by(() => {
     const last = summaries[summaries.length - 1];
-    if (last === undefined)
-        return new Map<string, number>();
-    return new Map([...last.homePlayers, ...last.awayPlayers].map((line) => [
+    if (last === undefined) return new Map<string, number>();
+    return new Map(
+      [...last.homePlayers, ...last.awayPlayers].map((line) => [
         line.playerVersionId,
         line.seconds / 60,
-    ]));
-});
-$effect(() => {
+      ]),
+    );
+  });
+  $effect(() => {
     if (editingId !== null && editingInput !== null) {
-        editingInput.focus();
-        editingInput.select();
+      editingInput.focus();
+      editingInput.select();
     }
-});
-$effect(() => () => {
-    if (noticeTimer !== null)
-        clearTimeout(noticeTimer);
-    if (swapNoticeTimer !== null)
-        clearTimeout(swapNoticeTimer);
-});
-function emit() {
+  });
+  $effect(() => () => {
+    if (noticeTimer !== null) clearTimeout(noticeTimer);
+    if (swapNoticeTimer !== null) clearTimeout(swapNoticeTimer);
+  });
+  function emit() {
     onchange(editor.rotation, editor.validate());
-}
-function commit(failuresAfter: string[]) {
+  }
+  function commit(failuresAfter: string[]) {
     revision += 1;
-    if (failuresAfter.length === 0)
-        emit();
-}
-function flashAdjustments(adjustments: MinuteAdjustment[]) {
-    if (adjustments.length === 0)
-        return;
+    if (failuresAfter.length === 0) emit();
+  }
+  function flashAdjustments(adjustments: MinuteAdjustment[]) {
+    if (adjustments.length === 0) return;
     highlightIds = new Set(adjustments.map((a) => a.playerVersionId));
     rebalanceNotice = buildRebalanceNotice(adjustments);
-    if (noticeTimer !== null)
-        clearTimeout(noticeTimer);
+    if (noticeTimer !== null) clearTimeout(noticeTimer);
     noticeTimer = setTimeout(() => {
-        highlightIds = new Set();
-        rebalanceNotice = null;
+      highlightIds = new Set();
+      rebalanceNotice = null;
     }, 2200);
-}
-function buildRebalanceNotice(adjustments: MinuteAdjustment[]): string {
+  }
+  function buildRebalanceNotice(adjustments: MinuteAdjustment[]): string {
     const target = adjustments[0];
-    if (target === undefined)
-        return '';
+    if (target === undefined) return '';
     const nameOf = (id: string) => editor.names.get(id) ?? id;
     const others = adjustments.slice(1).map((a) => ({ ...a, name: nameOf(a.playerVersionId) }));
-    const tail = others.length === 0
+    const tail =
+      others.length === 0
         ? ''
         : others.length === 1 && others[0] !== undefined
-            ? ` · ${target.delta > 0 ? 'took' : 'gave'} ${Math.abs(others[0].delta)} from ${others[0].name}`
-            : ` · ${target.delta > 0 ? 'took' : 'gave'} ${others
-                .map((o) => `${Math.abs(o.delta)} from ${o.name}`)
-                .join(', ')}`;
+          ? ` · ${target.delta > 0 ? 'took' : 'gave'} ${Math.abs(others[0].delta)} from ${others[0].name}`
+          : ` · ${target.delta > 0 ? 'took' : 'gave'} ${others
+              .map((o) => `${Math.abs(o.delta)} from ${o.name}`)
+              .join(', ')}`;
     return `${nameOf(target.playerVersionId)} to ${String(target.minutes)} min${tail}`;
-}
-function changeMinutes(playerVersionId: string, delta: number) {
-    if (disabled)
-        return;
+  }
+  function changeMinutes(playerVersionId: string, delta: number) {
+    if (disabled) return;
     rejection = null;
-    const result = editor.rebalanceMinutes(playerVersionId, editor.minutesFor(playerVersionId) + delta);
+    const result = editor.rebalanceMinutes(
+      playerVersionId,
+      editor.minutesFor(playerVersionId) + delta,
+    );
     commit(result.failures);
-    if (result.failures.length === 0)
-        flashAdjustments(result.adjustments);
-}
-function startEdit(playerVersionId: string, current: number) {
-    if (disabled)
-        return;
+    if (result.failures.length === 0) flashAdjustments(result.adjustments);
+  }
+  function startEdit(playerVersionId: string, current: number) {
+    if (disabled) return;
     editingId = playerVersionId;
     editingMinutes = current;
     draft = String(current);
-}
-function cancelEdit() {
+  }
+  function cancelEdit() {
     editingId = null;
     editingMinutes = null;
     draft = '';
-}
-function commitEdit() {
+  }
+  function commitEdit() {
     const targetId = editingId;
     const current = editingMinutes;
     const parsed = Number.parseInt(draft, 10);
     editingId = null;
     editingMinutes = null;
     draft = '';
-    if (targetId === null || current === null || disabled || Number.isNaN(parsed))
-        return;
+    if (targetId === null || current === null || disabled || Number.isNaN(parsed)) return;
     rejection = null;
     const result = editor.rebalanceMinutes(targetId, parsed);
     revision += 1;
     if (result.failures.length === 0) {
-        emit();
-        flashAdjustments(result.adjustments);
+      emit();
+      flashAdjustments(result.adjustments);
+    } else {
+      rejection = `That minutes change is rejected: ${result.failures[0]}`;
     }
-    else {
-        rejection = `That minutes change is rejected: ${result.failures[0]}`;
-    }
-}
-function changeStarter(slotIndex: number, playerVersionId: string) {
-    if (disabled)
-        return;
+  }
+  function changeStarter(slotIndex: number, playerVersionId: string) {
+    if (disabled) return;
     const failuresAfter = editor.assignStarter(slotIndex, playerVersionId);
     revision += 1;
     if (failuresAfter.length === 0) {
-        rejection = null;
-        emit();
+      rejection = null;
+      emit();
+    } else {
+      rejection = `That starter swap is rejected: ${failuresAfter[0]}`;
     }
-    else {
-        rejection = `That starter swap is rejected: ${failuresAfter[0]}`;
-    }
-}
-function toggleClosingFor(playerVersionId: string) {
-    if (disabled)
-        return;
+  }
+  function toggleClosingFor(playerVersionId: string) {
+    if (disabled) return;
     const failuresAfter = editor.toggleClosing(playerVersionId);
     revision += 1;
     if (failuresAfter.length === 0) {
-        rejection = null;
-        emit();
+      rejection = null;
+      emit();
+    } else {
+      rejection = `That closing change is rejected: ${failuresAfter[0]}`;
     }
-    else {
-        rejection = `That closing change is rejected: ${failuresAfter[0]}`;
-    }
-}
-function moveBenchRow(benchIndex: number, delta: -1 | 1) {
-    if (disabled)
-        return;
+  }
+  function moveBenchRow(benchIndex: number, delta: -1 | 1) {
+    if (disabled) return;
     rejection = null;
     commit(editor.moveBench(benchIndex, delta));
-}
-function openSwap(kind: 'promote' | 'demote', playerVersionId: string) {
-    if (disabled)
-        return;
+  }
+  function openSwap(kind: 'promote' | 'demote', playerVersionId: string) {
+    if (disabled) return;
     rejection = null;
     swap = { kind, playerVersionId };
-}
-function closeSwap() {
+  }
+  function closeSwap() {
     swap = null;
-}
-function commitSwap(inactiveId: string, activeId: string) {
-    if (disabled || swap === null)
-        return;
+  }
+  function commitSwap(inactiveId: string, activeId: string) {
+    if (disabled || swap === null) return;
     const failuresAfter = editor.promoteToRotation(inactiveId, activeId);
     swap = null;
     revision += 1;
     if (failuresAfter.length === 0) {
-        rejection = null;
-        emit();
-        const inactiveName = editor.names.get(inactiveId) ?? inactiveId;
-        const activeName = editor.names.get(activeId) ?? activeId;
-        swapNotice = `${inactiveName} joined the rotation replacing ${activeName}.`;
-        if (swapNoticeTimer !== null)
-            clearTimeout(swapNoticeTimer);
-        swapNoticeTimer = setTimeout(() => {
-            swapNotice = null;
-        }, 2200);
+      rejection = null;
+      emit();
+      const inactiveName = editor.names.get(inactiveId) ?? inactiveId;
+      const activeName = editor.names.get(activeId) ?? activeId;
+      swapNotice = `${inactiveName} joined the rotation replacing ${activeName}.`;
+      if (swapNoticeTimer !== null) clearTimeout(swapNoticeTimer);
+      swapNoticeTimer = setTimeout(() => {
+        swapNotice = null;
+      }, 2200);
+    } else {
+      rejection = `That roster move is rejected: ${failuresAfter[0]}`;
     }
-    else {
-        rejection = `That roster move is rejected: ${failuresAfter[0]}`;
-    }
-}
-async function applyPreset(preset: (typeof ROTATION_PRESETS)[number]) {
-    if (disabled)
-        return;
+  }
+  async function applyPreset(preset: (typeof ROTATION_PRESETS)[number]) {
+    if (disabled) return;
     rejection = null;
     if (optimize !== null && !optimize.busy && optimizingPreset === null) {
-        optimizingPreset = preset;
-        try {
-            const result = await optimize.run(editor.rotation);
-            const plan = result.plans.find((candidate) => candidate.strategy === minuteStrategyOfPreset(preset));
-            if (plan !== undefined) {
-                try {
-                    editor.applyRotation(plan.rotation);
-                }
-                catch (error) {
-                    rejection = `That plan is rejected: ${error instanceof Error ? error.message : String(error)}`;
-                    return;
-                }
-                revision += 1;
-                emit();
-                return;
-            }
+      optimizingPreset = preset;
+      try {
+        const result = await optimize.run(editor.rotation);
+        const plan = result.plans.find(
+          (candidate) => candidate.strategy === minuteStrategyOfPreset(preset),
+        );
+        if (plan !== undefined) {
+          try {
+            editor.applyRotation(plan.rotation);
+          } catch (error) {
+            rejection = `That plan is rejected: ${error instanceof Error ? error.message : String(error)}`;
+            return;
+          }
+          revision += 1;
+          emit();
+          return;
         }
-        catch {
-        }
-        finally {
-            optimizingPreset = null;
-        }
+      } catch {
+      } finally {
+        optimizingPreset = null;
+      }
     }
     commit(editor.applyPreset(preset));
-}
-function faceOf(playerVersionId: string): SeasonFaceRef | null {
+  }
+  function faceOf(playerVersionId: string): SeasonFaceRef | null {
     return faces?.get(playerVersionId) ?? null;
-}
-function fatigueOf(row: (typeof rows)[number]): {
+  }
+  function fatigueOf(row: (typeof rows)[number]): {
     label: string;
     badge: string;
     percent: number;
-} | null {
-    if (effects === null)
-        return null;
+  } | null {
+    if (effects === null) return null;
     const load = loadStateOf(effects, row.member.playerVersionId);
-    if (load === null)
-        return null;
+    if (load === null) return null;
     const band = fatigueBand(load.fatigueBasisPoints);
     return {
-        label: FATIGUE_BAND_LABEL[band],
-        badge: FATIGUE_BAND_BADGE[band],
-        percent: fatiguePercent(load.fatigueBasisPoints),
+      label: FATIGUE_BAND_LABEL[band],
+      badge: FATIGUE_BAND_BADGE[band],
+      percent: fatiguePercent(load.fatigueBasisPoints),
     };
-}
-function eraLabelOf(member: RotationMember): string | null {
+  }
+  function eraLabelOf(member: RotationMember): string | null {
     if (manifest === null || member.franchiseId === undefined || member.eraId === undefined) {
-        return null;
+      return null;
     }
     const label = eraIdentityOf(manifest, member.franchiseId, member.eraId).displayLabel;
     return label;
-}
-function highlightOf(playerVersionId: string): string {
+  }
+  function highlightOf(playerVersionId: string): string {
     return highlightIds.has(playerVersionId) ? ' ring-2 ring-primary' : '';
-}
+  }
 </script>
 
 <div class="flex min-w-0 flex-col gap-4">
@@ -315,7 +327,9 @@ function highlightOf(playerVersionId: string): string {
         </div>
         <div class="px-3 py-2 text-center">
           <p class="font-display text-lg leading-none font-extrabold">{inactiveRows.length}</p>
-          <p class="mt-1 font-mono text-[9px] font-bold tracking-[0.12em] uppercase text-muted-foreground">
+          <p
+            class="mt-1 font-mono text-[9px] font-bold tracking-[0.12em] uppercase text-muted-foreground"
+          >
             Inactive
           </p>
         </div>

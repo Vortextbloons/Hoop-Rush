@@ -1,13 +1,24 @@
-<script lang="ts">import { resolve } from '$app/paths';
-import type { RouteId } from '$app/types';
-import { Trophy } from '@lucide/svelte';
-import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persistence';
-import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
-import { variantLabel } from '$lib/draft-presentation';
-import SeasonTierBadge from '$lib/components/SeasonTierBadge.svelte';
-import { seasonTierFromWins } from '$lib/season-tier';
-let { manifest, rows, active, modeLabel, emptyTitle, emptyHref, emptyCta, continueHref, resultHrefFor, }: {
+﻿<script lang="ts">
+  import { resolve } from '$app/paths';
+  import type { RouteId } from '$app/types';
+  import { Trophy } from '@lucide/svelte';
+  import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persistence';
+  import type { HoopRushManifest } from '@hoop-rush/data-contracts';
+  import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
+  import { variantLabel } from '$lib/draft-presentation';
+  import SeasonTierBadge from '$lib/components/SeasonTierBadge.svelte';
+  import { seasonTierFromWins } from '$lib/season-tier';
+  let {
+    manifest,
+    rows,
+    active,
+    modeLabel,
+    emptyTitle,
+    emptyHref,
+    emptyCta,
+    continueHref,
+    resultHrefFor,
+  }: {
     manifest: HoopRushManifest | null;
     rows: CompletedRunIndex[];
     active: ActiveRunCheckpoint | null;
@@ -17,30 +28,31 @@ let { manifest, rows, active, modeLabel, emptyTitle, emptyHref, emptyCta, contin
     emptyCta: string;
     continueHref: string | null;
     resultHrefFor: (runId: string) => string;
-} = $props();
-function franchiseName(franchiseId: string | null): string {
-    if (!franchiseId)
-        return 'Mixed lineup';
-    return (manifest?.modernFranchiseSlots.find((e) => e.franchiseId === franchiseId)?.displayName ??
-        franchiseId);
-}
-function franchiseLabel(franchiseId: string | null): string {
+  } = $props();
+  function franchiseName(franchiseId: string | null): string {
+    if (!franchiseId) return 'Mixed lineup';
+    return (
+      manifest?.modernFranchiseSlots.find((e) => e.franchiseId === franchiseId)?.displayName ??
+      franchiseId
+    );
+  }
+  function franchiseLabel(franchiseId: string | null): string {
     return franchiseId ? franchiseAbbreviation(franchiseId) : 'Mixed';
-}
-function eraName(eraId: string): string {
+  }
+  function eraName(eraId: string): string {
     return manifest?.eras.find((e) => e.eraId === eraId)?.label ?? eraId;
-}
-function formatTime(iso: string): string {
+  }
+  function formatTime(iso: string): string {
     const date = new Date(iso);
     return Number.isNaN(date.getTime()) ? iso : date.toLocaleString();
-}
+  }
 </script>
 
 {#if rows.length === 0 && !active}
   <div class="mt-8 rounded-xl border border-border bg-card p-10 text-center">
     <p class="font-mono text-sm text-muted-foreground">{emptyTitle}</p>
     <a
-      href={resolve(emptyHref as RouteId)}
+      href={resolve(emptyHref as any)}
       class="mt-4 inline-flex rounded-lg bg-primary px-5 py-2.5 font-semibold text-primary-foreground"
     >
       {emptyCta}
@@ -59,7 +71,7 @@ function formatTime(iso: string): string {
         {active.aggregates.team.losses}
       </p>
       <a
-        href={resolve(continueHref as RouteId)}
+        href={resolve(continueHref as any)}
         class="mt-3 inline-flex rounded-lg bg-primary px-5 py-2.5 font-semibold text-primary-foreground"
       >
         Continue
@@ -73,7 +85,7 @@ function formatTime(iso: string): string {
       {@const isClassic = row.mode === 'classic'}
       <li>
         <a
-          href={resolve(resultHrefFor(row.runId) as RouteId)}
+          href={resolve(resultHrefFor(row.runId) as any)}
           class="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-border bg-card p-4 transition-colors hover:border-line-strong"
         >
           <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg {tier.iconClass}">

@@ -3,11 +3,7 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    projects: [
-      'packages/*',
-      'tools/*',
-      'apps/*',
-    ],
+    projects: ['packages/*', 'tools/*', 'apps/*'],
 
     maxWorkers: process.env.VITEST_MAX_WORKERS
       ? Number(process.env.VITEST_MAX_WORKERS)

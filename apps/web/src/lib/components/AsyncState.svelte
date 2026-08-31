@@ -1,18 +1,25 @@
-<script lang="ts">type StateKind = 'loading' | 'empty' | 'error';
-let { kind, title, message, retry, retryLabel = 'Try again', focusOnError = true, }: {
+<script lang="ts">
+  type StateKind = 'loading' | 'empty' | 'error';
+  let {
+    kind,
+    title,
+    message,
+    retry,
+    retryLabel = 'Try again',
+    focusOnError = true,
+  }: {
     kind: StateKind;
     title: string;
     message: string;
     retry?: () => void;
     retryLabel?: string;
     focusOnError?: boolean;
-} = $props();
-let panel = $state<HTMLDivElement | undefined>(undefined);
-$effect(() => {
-    if (kind !== 'error' || !focusOnError)
-        return;
+  } = $props();
+  let panel = $state<HTMLDivElement | undefined>(undefined);
+  $effect(() => {
+    if (kind !== 'error' || !focusOnError) return;
     queueMicrotask(() => panel?.focus());
-});
+  });
 </script>
 
 <div

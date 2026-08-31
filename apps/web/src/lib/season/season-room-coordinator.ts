@@ -98,15 +98,15 @@ export function createSeasonRoomCoordinator(deps: SeasonRoomCoordinatorDeps) {
     async createRoom(pace: 'live' | 'async', rootSeed: string, mode: SeasonRoomMode = 'season') {
       const snap = (await deps.transport.create(
         {
-          schemaVersion: SEASON_ROOM_PROTOCOL_SCHEMA_VERSION as 2,
+          schemaVersion: SEASON_ROOM_PROTOCOL_SCHEMA_VERSION,
           pace,
           mode,
-          roomProtocolVersion: SEASON_ROOM_PROTOCOL_SCHEMA_VERSION as 2,
-          multiplayerVersion: SEASON_MULTIPLAYER_VERSION as 'season-multiplayer-v2',
+          roomProtocolVersion: SEASON_ROOM_PROTOCOL_SCHEMA_VERSION,
+          multiplayerVersion: SEASON_MULTIPLAYER_VERSION,
           timerPolicyVersion: SEASON_TIMER_POLICY_VERSION,
         },
         rootSeed,
-      )) as SeasonRoomPublicSnapshot & { code?: SeasonRoomCode; membership?: SeasonRoomMembership };
+      ));
       // persist identity: membership may come from transport (in-memory) or via auto-join; code for host lobby
       const membership = snap.membership ?? null;
       const code = snap.code ?? null;
@@ -132,8 +132,9 @@ export function createSeasonRoomCoordinator(deps: SeasonRoomCoordinatorDeps) {
       const membership = await deps.transport.join(code);
       const snapRes = await deps.transport.resume(membership.roomId);
       // resume now may also return membership; retain private membership per spec
-      const snap = snapRes as SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership };
-      const effectiveMembership = (snap as unknown as { membership?: SeasonRoomMembership }).membership ?? membership;
+      const snap = snapRes;
+      const effectiveMembership =
+        (snap as unknown as { membership?: SeasonRoomMembership }).membership ?? membership;
       if ((snap as unknown as { membership?: SeasonRoomMembership }).membership) {
         saveMembership((snap as unknown as { membership: SeasonRoomMembership }).membership);
       } else {
@@ -146,7 +147,7 @@ export function createSeasonRoomCoordinator(deps: SeasonRoomCoordinatorDeps) {
         roomId: effectiveMembership.roomId,
         participantId: effectiveMembership.participantId,
         franchiseId: effectiveMembership.franchiseId,
-        publicSnapshot: snap as SeasonRoomPublicSnapshot,
+        publicSnapshot: snap,
         connected: true,
       };
       startHeartbeat(effectiveMembership.roomId);
@@ -209,13 +210,20 @@ export function createSeasonRoomCoordinator(deps: SeasonRoomCoordinatorDeps) {
       clearMembership(roomId);
       clearCode(roomId);
       stopHeartbeat();
-      state = { ...state, roomId: null, participantId: null, franchiseId: null, publicSnapshot: null, connected: false };
+      state = {
+        ...state,
+        roomId: null,
+        participantId: null,
+        franchiseId: null,
+        publicSnapshot: null,
+        connected: false,
+      };
     },
     async refresh(roomId: string) {
       const res = deps.transport.refresh
         ? await deps.transport.refresh(roomId)
         : await deps.transport.resume(roomId);
-      const snap = res as SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership };
+      const snap = res;
       if (snap.membership) {
         saveMembership(snap.membership);
         state = {
@@ -230,12 +238,19 @@ export function createSeasonRoomCoordinator(deps: SeasonRoomCoordinatorDeps) {
         // fallback: try to hydrate membership from storage
         const stored = loadMembership(roomId);
         if (stored) {
-          state = { ...state, roomId, participantId: stored.participantId, franchiseId: stored.franchiseId, publicSnapshot: snap as SeasonRoomPublicSnapshot, connected: true };
+          state = {
+            ...state,
+            roomId,
+            participantId: stored.participantId,
+            franchiseId: stored.franchiseId,
+            publicSnapshot: snap,
+            connected: true,
+          };
         } else {
-          state = { ...state, publicSnapshot: snap as SeasonRoomPublicSnapshot };
+          state = { ...state, publicSnapshot: snap };
         }
       }
-      deps.onSnapshot(snap as SeasonRoomPublicSnapshot);
+      deps.onSnapshot(snap);
       startHeartbeat(roomId);
       return snap;
     },
@@ -243,7 +258,7 @@ export function createSeasonRoomCoordinator(deps: SeasonRoomCoordinatorDeps) {
       const res = deps.transport.refresh
         ? await deps.transport.refresh(roomId)
         : await deps.transport.resume(roomId);
-      const snap = res as SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership };
+      const snap = res;
       if (snap.membership) {
         saveMembership(snap.membership);
         state = {
@@ -251,15 +266,23 @@ export function createSeasonRoomCoordinator(deps: SeasonRoomCoordinatorDeps) {
           roomId: snap.membership.roomId,
           participantId: snap.membership.participantId,
           franchiseId: snap.membership.franchiseId,
-          publicSnapshot: snap as SeasonRoomPublicSnapshot,
+          publicSnapshot: snap,
           connected: true,
         };
       } else {
         const stored = loadMembership(roomId);
-        if (stored) state = { ...state, roomId, participantId: stored.participantId, franchiseId: stored.franchiseId, publicSnapshot: snap as SeasonRoomPublicSnapshot, connected: true };
-        else state = { ...state, publicSnapshot: snap as SeasonRoomPublicSnapshot };
+        if (stored)
+          state = {
+            ...state,
+            roomId,
+            participantId: stored.participantId,
+            franchiseId: stored.franchiseId,
+            publicSnapshot: snap,
+            connected: true,
+          };
+        else state = { ...state, publicSnapshot: snap };
       }
-      deps.onSnapshot(snap as SeasonRoomPublicSnapshot);
+      deps.onSnapshot(snap);
       startHeartbeat(roomId);
       return snap;
     },

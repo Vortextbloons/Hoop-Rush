@@ -170,7 +170,7 @@ function toPublicSnapshot(
   // derive presence if server didn't include it but members did
   let presence: SeasonRoomPublicSnapshot['presence'] = [];
   if (row.presence) {
-    presence = row.presence as SeasonRoomPublicSnapshot['presence'];
+    presence = row.presence;
   } else if (row.members) {
     const now = Date.now();
     presence = row.members.map((m) => {
@@ -182,11 +182,14 @@ function toPublicSnapshot(
       };
     });
   }
-  const seed = (row as unknown as { root_seed?: string }).root_seed ?? (row as unknown as { seed?: string }).seed ?? null;
+  const seed =
+    (row as unknown as { root_seed?: string }).root_seed ??
+    (row as unknown as { seed?: string }).seed ??
+    null;
   return {
     roomId: row.id,
     settings: {
-      schemaVersion: SEASON_ROOM_PROTOCOL_SCHEMA_VERSION as 2,
+      schemaVersion: SEASON_ROOM_PROTOCOL_SCHEMA_VERSION,
       pace: row.pace as 'live' | 'async',
       mode: (row.mode as 'season' | 'classic' | 'sandbox' | null) ?? 'season',
       roomProtocolVersion: row.room_protocol_version as unknown as 2,
@@ -205,7 +208,7 @@ function toPublicSnapshot(
     settingsRevision: (row.settings_revision as number | null) ?? 0,
     guestReady: !!(row.guest_ready as boolean | null),
     presence,
-    seed: seed as string | null,
+    seed: seed,
     isOutdated: isOutdated || undefined,
   };
 }
@@ -336,7 +339,7 @@ export function createSupabaseSeasonTransport(
         'season-room-create',
         {
           pace: settings.pace,
-          mode: (settings as SeasonRoomSettings).mode ?? 'season',
+          mode: (settings).mode ?? 'season',
           rootSeed,
         },
         config.captchaSiteKey,
@@ -355,7 +358,7 @@ export function createSupabaseSeasonTransport(
       // ensure mode is reflected even if server still returns old shape without mode
       if (!(snap.settings as unknown as { mode?: string }).mode) {
         (snap.settings as unknown as { mode: string }).mode =
-          (settings as SeasonRoomSettings).mode ?? 'season';
+          (settings).mode ?? 'season';
       }
       return snap;
     },
@@ -382,29 +385,31 @@ export function createSupabaseSeasonTransport(
       return res.membership;
     },
 
-    async resume(roomId: string): Promise<SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership }> {
-      const res = await callEdge<{ snapshot: SeasonRoomPublicSnapshot; membership?: SeasonRoomMembership }>(
-        client,
-        config,
-        'season-room-resume',
-        { roomId },
-      );
+    async resume(
+      roomId: string,
+    ): Promise<SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership }> {
+      const res = await callEdge<{
+        snapshot: SeasonRoomPublicSnapshot;
+        membership?: SeasonRoomMembership;
+      }>(client, config, 'season-room-resume', { roomId });
       // edge may return membership for retain-private-membership requirement; preserve it on snapshot
       const snap = res.snapshot as SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership };
-      if (res.membership) (snap as unknown as { membership?: SeasonRoomMembership }).membership = res.membership;
+      if (res.membership)
+        (snap as unknown as { membership?: SeasonRoomMembership }).membership = res.membership;
       return snap;
     },
 
-    async refresh(roomId: string): Promise<SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership }> {
+    async refresh(
+      roomId: string,
+    ): Promise<SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership }> {
       // refresh is alias for resume but retains membership
-      const res = await callEdge<{ snapshot: SeasonRoomPublicSnapshot; membership?: SeasonRoomMembership }>(
-        client,
-        config,
-        'season-room-resume',
-        { roomId },
-      );
+      const res = await callEdge<{
+        snapshot: SeasonRoomPublicSnapshot;
+        membership?: SeasonRoomMembership;
+      }>(client, config, 'season-room-resume', { roomId });
       const snap = res.snapshot as SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership };
-      if (res.membership) (snap as unknown as { membership?: SeasonRoomMembership }).membership = res.membership;
+      if (res.membership)
+        (snap as unknown as { membership?: SeasonRoomMembership }).membership = res.membership;
       return snap;
     },
 
@@ -532,11 +537,11 @@ export function createSupabaseSeasonTransport(
             cursor: attestation.cursor,
             reason: (res as { reason: string }).reason,
             attempt: (res as { attempt: number }).attempt,
-          } as SeasonRerunRequest;
+          };
         if (res.kind === 'integrity-failed')
           return (res as { failure: SeasonIntegrityFailure2 }).failure;
       }
-      return res as unknown as SeasonAcceptedCheckpoint;
+      return res;
     },
 
     async requestReclaim(roomId: string, participantId: 'p1' | 'p2'): Promise<void> {
@@ -596,7 +601,8 @@ export function createSupabaseSeasonTransport(
       } catch (err) {
         // fallback for older deployments without this edge: try direct RPC if available; otherwise throw
         const code = (err as { code?: string })?.code;
-        if (code === 'outdated-room' || code === 'authorization' || code === 'stale-revision') throw err;
+        if (code === 'outdated-room' || code === 'authorization' || code === 'stale-revision')
+          throw err;
         // attempt to synthesize error for local test without supabase: if supabase not configured, this won't be called
         throw err;
       }

@@ -1,15 +1,23 @@
-<script lang="ts">import { resolve } from '$app/paths';
-import type { RouteId } from '$app/types';
-import type { HoopRushManifest, SeasonRunCompletion } from '@hoop-rush/data-contracts';
-import { postseasonStageLabel } from '$lib/season/season-postseason-presentation';
-let { championFranchiseId, franchiseName, franchiseAbbrev, manifest, completion, humanWon, }: {
+﻿<script lang="ts">
+  import { resolve } from '$app/paths';
+  import type { RouteId } from '$app/types';
+  import type { HoopRushManifest, SeasonRunCompletion } from '@hoop-rush/data-contracts';
+  import { postseasonStageLabel } from '$lib/season/season-postseason-presentation';
+  let {
+    championFranchiseId,
+    franchiseName,
+    franchiseAbbrev,
+    manifest,
+    completion,
+    humanWon,
+  }: {
     championFranchiseId: string | null;
     franchiseName: (franchiseId: string) => string;
     franchiseAbbrev: (franchiseId: string) => string;
     manifest: HoopRushManifest | null;
     completion: SeasonRunCompletion | null;
     humanWon: boolean;
-} = $props();
+  } = $props();
 </script>
 
 <section
@@ -39,13 +47,13 @@ let { championFranchiseId, franchiseName, franchiseAbbrev, manifest, completion,
   </p>
   <div class="mt-4 flex flex-wrap gap-2">
     <a
-      href={resolve('/season/run/postseason' as RouteId)}
+      href={resolve('/season/run/postseason' as any)}
       class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
     >
       View final bracket
     </a>
     <a
-      href={resolve('/season/run/history' as RouteId)}
+      href={resolve('/season/run/history' as any)}
       class="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground"
     >
       Season history

@@ -1,94 +1,103 @@
-<script lang="ts">import { resolve } from '$app/paths';
-import type { RouteId } from '$app/types';
-import { blockRoundRange, type SeasonAcceptedBlock, type SeasonGameSummary, } from '@hoop-rush/data-contracts';
-import { didWin, recordLabel } from '$lib/season/season-presentation';
-let { acceptedBlocks, nextBlockIndex, summaries, humanFranchiseId, totalBlocks = 9, }: {
+﻿<script lang="ts">
+  import { resolve } from '$app/paths';
+  import type { RouteId } from '$app/types';
+  import {
+    blockRoundRange,
+    type SeasonAcceptedBlock,
+    type SeasonGameSummary,
+  } from '@hoop-rush/data-contracts';
+  import { didWin, recordLabel } from '$lib/season/season-presentation';
+  let {
+    acceptedBlocks,
+    nextBlockIndex,
+    summaries,
+    humanFranchiseId,
+    totalBlocks = 9,
+  }: {
     acceptedBlocks: readonly SeasonAcceptedBlock[];
     nextBlockIndex: number | null;
     summaries: readonly SeasonGameSummary[];
     humanFranchiseId: string | null;
     totalBlocks?: number;
-} = $props();
-interface TapeSegment {
+  } = $props();
+  interface TapeSegment {
     blockIndex: number;
     fromRound: number;
     toRound: number;
     state: 'completed' | 'current' | 'upcoming';
     record: {
-        wins: number;
-        losses: number;
+      wins: number;
+      losses: number;
     } | null;
-}
-const segments = $derived.by(() => {
+  }
+  const segments = $derived.by(() => {
     const result: TapeSegment[] = [];
     for (let blockIndex = 0; blockIndex < totalBlocks; blockIndex += 1) {
-        const completed = acceptedBlocks.some((block) => block.blockIndex === blockIndex);
-        const state: TapeSegment['state'] = completed
-            ? 'completed'
-            : blockIndex === nextBlockIndex
-                ? 'current'
-                : 'upcoming';
-        result.push({
-            blockIndex,
-            fromRound: blockRoundRange(blockIndex).fromRound,
-            toRound: blockRoundRange(blockIndex).toRound,
-            state,
-            record: completed && humanFranchiseId !== null ? blockRecord(blockIndex, humanFranchiseId) : null,
-        });
+      const completed = acceptedBlocks.some((block) => block.blockIndex === blockIndex);
+      const state: TapeSegment['state'] = completed
+        ? 'completed'
+        : blockIndex === nextBlockIndex
+          ? 'current'
+          : 'upcoming';
+      result.push({
+        blockIndex,
+        fromRound: blockRoundRange(blockIndex).fromRound,
+        toRound: blockRoundRange(blockIndex).toRound,
+        state,
+        record:
+          completed && humanFranchiseId !== null ? blockRecord(blockIndex, humanFranchiseId) : null,
+      });
     }
     return result;
-});
-function blockRecord(blockIndex: number, franchiseId: string): {
+  });
+  function blockRecord(
+    blockIndex: number,
+    franchiseId: string,
+  ): {
     wins: number;
     losses: number;
-} {
+  } {
     const { fromRound, toRound } = blockRoundRange(blockIndex);
     let wins = 0;
     let losses = 0;
     for (const summary of summaries) {
-        if (summary.round < fromRound || summary.round > toRound)
-            continue;
-        if (summary.homeFranchiseId !== franchiseId && summary.awayFranchiseId !== franchiseId) {
-            continue;
-        }
-        if (didWin(summary, franchiseId))
-            wins += 1;
-        else
-            losses += 1;
+      if (summary.round < fromRound || summary.round > toRound) continue;
+      if (summary.homeFranchiseId !== franchiseId && summary.awayFranchiseId !== franchiseId) {
+        continue;
+      }
+      if (didWin(summary, franchiseId)) wins += 1;
+      else losses += 1;
     }
     return { wins, losses };
-}
-function labelOf(segment: TapeSegment): string {
+  }
+  function labelOf(segment: TapeSegment): string {
     const range = `Block ${String(segment.blockIndex + 1)} of ${String(totalBlocks)}, rounds ${String(segment.fromRound)}–${String(segment.toRound)}`;
     if (segment.state === 'completed') {
-        const record = segment.record === null
-            ? ''
-            : `, ${recordLabel(segment.record.wins, segment.record.losses)}`;
-        return `${range} complete${record}`;
+      const record =
+        segment.record === null
+          ? ''
+          : `, ${recordLabel(segment.record.wins, segment.record.losses)}`;
+      return `${range} complete${record}`;
     }
     if (segment.state === 'current') {
-        return `${range} — next decision`;
+      return `${range} — next decision`;
     }
     return `${range} upcoming`;
-}
-let track: HTMLElement | null = $state(null);
-let lastCenteredIndex: number | null = null;
-$effect(() => {
-    if (import.meta.env.SSR)
-        return;
+  }
+  let track: HTMLElement | null = $state(null);
+  let lastCenteredIndex: number | null = null;
+  $effect(() => {
+    if (import.meta.env.SSR) return;
     const el = track;
     const currentIndex = nextBlockIndex;
-    if (el === null || currentIndex === null || currentIndex >= totalBlocks)
-        return;
-    if (lastCenteredIndex === currentIndex)
-        return;
+    if (el === null || currentIndex === null || currentIndex >= totalBlocks) return;
+    if (lastCenteredIndex === currentIndex) return;
     lastCenteredIndex = currentIndex;
     const child = el.children[currentIndex] as HTMLElement | undefined;
-    if (child === undefined || typeof el.scrollTo !== 'function')
-        return;
+    if (child === undefined || typeof el.scrollTo !== 'function') return;
     const target = Math.max(0, child.offsetLeft - (el.clientWidth - child.clientWidth) / 2);
     el.scrollTo({ left: target, behavior: 'auto' });
-});
+  });
 </script>
 
 <nav aria-label="Season progress" class="w-full">
@@ -101,9 +110,7 @@ $effect(() => {
         {#if segment.state === 'completed'}
           <li class="w-14 shrink-0 sm:min-w-[4.25rem] sm:flex-1">
             <a
-              href={resolve(
-                `/season/run/checkpoint/?block=${String(segment.blockIndex)}` as RouteId,
-              )}
+              href={resolve(`/season/run/checkpoint/?block=${String(segment.blockIndex)}` as any)}
               data-season-tape-segment={segment.blockIndex}
               aria-label={labelOf(segment)}
               class="flex h-full flex-col items-center gap-0.5 rounded-lg border border-border bg-surface-1 px-1.5 py-2 text-center outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong hover:bg-surface-2"

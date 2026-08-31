@@ -1,162 +1,186 @@
-<script lang="ts">import { getContext } from 'svelte';
-import { page } from '$app/state';
-import { resolve } from '$app/paths';
-import type { RouteId } from '$app/types';
-import type { SeasonGameSummary, SeasonRetainedGameDetail, SeasonRosterEntry, } from '@hoop-rush/data-contracts';
-import { blockRoundRange } from '@hoop-rush/data-contracts';
-import CheckpointRecap from '$lib/components/season/CheckpointRecap.svelte';
-import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
-import { SEASON_RUN_SHELL_CONTEXT, type SeasonRunShellData, } from '$lib/season/season-shell-context';
-import { franchiseIdentityOf } from '$lib/season/season-branding';
-import { aggregateMechanismEvidence } from '$lib/season/season-effects-view';
-import { boxScoreFromSummary, deriveBlockRecap, ordinal, progressLabel, } from '$lib/season/season-presentation';
-import { availabilityStripRows } from '$lib/season/season-health-view';
-const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
-let blockSummaries = $state<SeasonGameSummary[]>([]);
-let retainedGameIds = $state<string[]>([]);
-let blockDetails = $state<SeasonRetainedGameDetail[]>([]);
-let loadError = $state<string | null>(null);
-let openedBoxScores = $state.raw(new Set<string>());
-function onBoxScoreToggle(event: Event, gameId: string) {
-    if (!(event.currentTarget instanceof HTMLDetailsElement))
-        return;
-    if (!event.currentTarget.open || openedBoxScores.has(gameId))
-        return;
+﻿<script lang="ts">
+  import { getContext } from 'svelte';
+  import { page } from '$app/state';
+  import { resolve } from '$app/paths';
+  import type { RouteId } from '$app/types';
+  import type {
+    SeasonGameSummary,
+    SeasonRetainedGameDetail,
+    SeasonRosterEntry,
+  } from '@hoop-rush/data-contracts';
+  import { blockRoundRange } from '@hoop-rush/data-contracts';
+  import CheckpointRecap from '$lib/components/season/CheckpointRecap.svelte';
+  import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
+  import {
+    SEASON_RUN_SHELL_CONTEXT,
+    type SeasonRunShellData,
+  } from '$lib/season/season-shell-context';
+  import { franchiseIdentityOf } from '$lib/season/season-branding';
+  import { aggregateMechanismEvidence } from '$lib/season/season-effects-view';
+  import {
+    boxScoreFromSummary,
+    deriveBlockRecap,
+    ordinal,
+    progressLabel,
+  } from '$lib/season/season-presentation';
+  import { availabilityStripRows } from '$lib/season/season-health-view';
+  const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
+  let blockSummaries = $state<SeasonGameSummary[]>([]);
+  let retainedGameIds = $state<string[]>([]);
+  let blockDetails = $state<SeasonRetainedGameDetail[]>([]);
+  let loadError = $state<string | null>(null);
+  let openedBoxScores = $state.raw(new Set<string>());
+  function onBoxScoreToggle(event: Event, gameId: string) {
+    if (!(event.currentTarget instanceof HTMLDetailsElement)) return;
+    if (!event.currentTarget.open || openedBoxScores.has(gameId)) return;
     openedBoxScores = new Set([...openedBoxScores, gameId]);
-}
-let boxScoreModule: Promise<typeof import('$lib/components/season/BoxScore.svelte')> | null = null;
-function loadBoxScore(): Promise<typeof import('$lib/components/season/BoxScore.svelte')> {
+  }
+  let boxScoreModule: Promise<typeof import('$lib/components/season/BoxScore.svelte')> | null =
+    null;
+  function loadBoxScore(): Promise<typeof import('$lib/components/season/BoxScore.svelte')> {
     boxScoreModule ??= import('$lib/components/season/BoxScore.svelte');
     return boxScoreModule;
-}
-const requestedBlock = $derived.by(() => {
+  }
+  const requestedBlock = $derived.by(() => {
     const raw = page.url.searchParams.get('block');
-    if (raw === null || raw.trim() === '')
-        return null;
+    if (raw === null || raw.trim() === '') return null;
     const parsed = Number.parseInt(raw, 10);
     return Number.isNaN(parsed) ? null : parsed;
-});
-const acceptedBlocks = $derived(shell.snapshot?.acceptedBlocks ?? []);
-const lastAcceptedIndex = $derived(acceptedBlocks.length > 0 ? acceptedBlocks[acceptedBlocks.length - 1]!.blockIndex : null);
-const requestedOutOfRange = $derived(requestedBlock !== null && (requestedBlock < 0 || requestedBlock > 8));
-const requestedNotAccepted = $derived(requestedBlock !== null &&
-    !requestedOutOfRange &&
-    !acceptedBlocks.some((block) => block.blockIndex === requestedBlock));
-const displayBlock = $derived(requestedOutOfRange || requestedNotAccepted
-    ? null
-    : requestedBlock !== null
+  });
+  const acceptedBlocks = $derived(shell.snapshot?.acceptedBlocks ?? []);
+  const lastAcceptedIndex = $derived(
+    acceptedBlocks.length > 0 ? acceptedBlocks[acceptedBlocks.length - 1]!.blockIndex : null,
+  );
+  const requestedOutOfRange = $derived(
+    requestedBlock !== null && (requestedBlock < 0 || requestedBlock > 8),
+  );
+  const requestedNotAccepted = $derived(
+    requestedBlock !== null &&
+      !requestedOutOfRange &&
+      !acceptedBlocks.some((block) => block.blockIndex === requestedBlock),
+  );
+  const displayBlock = $derived(
+    requestedOutOfRange || requestedNotAccepted
+      ? null
+      : requestedBlock !== null
         ? requestedBlock
-        : lastAcceptedIndex);
-const acceptedBlock = $derived(displayBlock === null
-    ? null
-    : (acceptedBlocks.find((block) => block.blockIndex === displayBlock) ?? null));
-const run = $derived(shell.run);
-const humanFranchiseId = $derived(shell.humanFranchiseId);
-const manifest = $derived(shell.manifest);
-const playerNames = $derived.by(() => {
+        : lastAcceptedIndex,
+  );
+  const acceptedBlock = $derived(
+    displayBlock === null
+      ? null
+      : (acceptedBlocks.find((block) => block.blockIndex === displayBlock) ?? null),
+  );
+  const run = $derived(shell.run);
+  const humanFranchiseId = $derived(shell.humanFranchiseId);
+  const manifest = $derived(shell.manifest);
+  const playerNames = $derived.by(() => {
     const map = new Map<string, string>();
     for (const roster of run?.rosters ?? []) {
-        for (const entry of roster.players)
-            map.set(entry.playerVersionId, entry.displayName);
+      for (const entry of roster.players) map.set(entry.playerVersionId, entry.displayName);
     }
     return map;
-});
-const playable = $derived.by(() => {
+  });
+  const playable = $derived.by(() => {
     const map = new Map<string, readonly string[]>();
     for (const roster of run?.rosters ?? []) {
-        for (const entry of roster.players) {
-            map.set(entry.playerVersionId, shell.playablePositions(entry.playerVersionId));
-        }
+      for (const entry of roster.players) {
+        map.set(entry.playerVersionId, shell.playablePositions(entry.playerVersionId));
+      }
     }
     return map;
-});
-const rosterByVersion = $derived.by(() => {
+  });
+  const rosterByVersion = $derived.by(() => {
     const map = new Map<string, SeasonRosterEntry>();
     for (const roster of run?.rosters ?? []) {
-        for (const entry of roster.players)
-            map.set(entry.playerVersionId, entry);
+      for (const entry of roster.players) map.set(entry.playerVersionId, entry);
     }
     return map;
-});
-$effect(() => {
-    if (import.meta.env.SSR)
-        return;
+  });
+  $effect(() => {
+    if (import.meta.env.SSR) return;
     const hub = shell.hub;
     const runId = run?.runId;
     const blockIndex = displayBlock;
-    if (hub === null || runId === undefined || blockIndex === null)
-        return;
+    if (hub === null || runId === undefined || blockIndex === null) return;
     let cancelled = false;
     blockSummaries = [];
     retainedGameIds = [];
     blockDetails = [];
     loadError = null;
     Promise.all([hub.loadBlockSummaries(runId, blockIndex), hub.loadRetainedDetails(runId)])
-        .then(([summaries, details]) => {
-        if (cancelled)
-            return;
+      .then(([summaries, details]) => {
+        if (cancelled) return;
         blockSummaries = summaries;
         const { fromRound, toRound } = blockRoundRange(blockIndex);
-        blockDetails = details.filter((detail) => detail.round >= fromRound && detail.round <= toRound);
+        blockDetails = details.filter(
+          (detail) => detail.round >= fromRound && detail.round <= toRound,
+        );
         retainedGameIds = blockDetails.map((detail) => detail.gameId);
-    })
-        .catch((error: unknown) => {
-        if (cancelled)
-            return;
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
         loadError = error instanceof Error ? error.message : String(error);
-    });
+      });
     return () => {
-        cancelled = true;
+      cancelled = true;
     };
-});
-const humanGames = $derived(blockSummaries.filter((summary) => summary.homeFranchiseId === humanFranchiseId ||
-    summary.awayFranchiseId === humanFranchiseId));
-const recap = $derived.by(() => {
-    if (!run || !humanFranchiseId || !acceptedBlock || !shell.snapshot)
-        return null;
+  });
+  const humanGames = $derived(
+    blockSummaries.filter(
+      (summary) =>
+        summary.homeFranchiseId === humanFranchiseId ||
+        summary.awayFranchiseId === humanFranchiseId,
+    ),
+  );
+  const recap = $derived.by(() => {
+    if (!run || !humanFranchiseId || !acceptedBlock || !shell.snapshot) return null;
     return deriveBlockRecap({
-        runId: run.runId,
-        blockIndex: acceptedBlock.blockIndex,
-        completedRounds: acceptedBlock.completedRounds,
-        standings: run.standings,
-        league: run.league,
-        blockSummaries,
-        allSummaries: shell.snapshot.summaries,
-        rosters: run.rosters.flatMap((roster) => roster.players),
-        games: run.games,
-        humanFranchiseId,
-        run,
+      runId: run.runId,
+      blockIndex: acceptedBlock.blockIndex,
+      completedRounds: acceptedBlock.completedRounds,
+      standings: run.standings,
+      league: run.league,
+      blockSummaries,
+      allSummaries: shell.snapshot.summaries,
+      rosters: run.rosters.flatMap((roster) => roster.players),
+      games: run.games,
+      humanFranchiseId,
+      run,
     });
-});
-const effectsEvidence = $derived(aggregateMechanismEvidence(blockDetails));
-const healthRows = $derived.by(() => {
-    if (!run || !humanFranchiseId)
-        return [];
+  });
+  const effectsEvidence = $derived(aggregateMechanismEvidence(blockDetails));
+  const healthRows = $derived.by(() => {
+    if (!run || !humanFranchiseId) return [];
     const roster = run.rosters.find((r) => r.franchiseId === humanFranchiseId);
-    if (roster === undefined)
-        return [];
-    const humanGames = run.games.filter((game) => game.homeFranchiseId === humanFranchiseId || game.awayFranchiseId === humanFranchiseId);
+    if (roster === undefined) return [];
+    const humanGames = run.games.filter(
+      (game) =>
+        game.homeFranchiseId === humanFranchiseId || game.awayFranchiseId === humanFranchiseId,
+    );
     return availabilityStripRows(run.health, roster, humanGames, playerNames);
-});
-function boxFor(summary: SeasonGameSummary) {
-    if (!humanFranchiseId)
-        return null;
+  });
+  function boxFor(summary: SeasonGameSummary) {
+    if (!humanFranchiseId) return null;
     return boxScoreFromSummary(summary, humanFranchiseId, playerNames, playable);
-}
-function resultLabel(summary: SeasonGameSummary): string {
+  }
+  function resultLabel(summary: SeasonGameSummary): string {
     if (summary.status === 'forfeit') {
-        return summary.forfeitLoserFranchiseId === humanFranchiseId ? 'L · forfeit' : 'W · forfeit';
+      return summary.forfeitLoserFranchiseId === humanFranchiseId ? 'L · forfeit' : 'W · forfeit';
     }
-    const won = summary.homeFranchiseId === humanFranchiseId
+    const won =
+      summary.homeFranchiseId === humanFranchiseId
         ? summary.homeScore > summary.awayScore
         : summary.awayScore > summary.homeScore;
     return won ? 'W' : 'L';
-}
-const opponentOf = (summary: SeasonGameSummary): string => summary.homeFranchiseId === humanFranchiseId
-    ? summary.awayFranchiseId
-    : summary.homeFranchiseId;
-const identityOf = (franchiseId: string) => manifest ? franchiseIdentityOf(manifest, franchiseId) : null;
-const hubHref = resolve('/season/run' as RouteId);
+  }
+  const opponentOf = (summary: SeasonGameSummary): string =>
+    summary.homeFranchiseId === humanFranchiseId
+      ? summary.awayFranchiseId
+      : summary.homeFranchiseId;
+  const identityOf = (franchiseId: string) =>
+    manifest ? franchiseIdentityOf(manifest, franchiseId) : null;
+  const hubHref = resolve('/season/run' as any);
 </script>
 
 <svelte:head>

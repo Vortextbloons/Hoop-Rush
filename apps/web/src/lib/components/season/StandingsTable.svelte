@@ -1,63 +1,84 @@
-<script lang="ts">import type { HoopRushManifest, SeasonLeague, SeasonStandings } from '@hoop-rush/data-contracts';
-import { resolve } from '$app/paths';
-import type { RouteId } from '$app/types';
-import { ordinal, pointDifferential, provisionalRanking, recordLabel, streakLabel, winPct, } from '$lib/season/season-presentation';
-import type { SeasonStandingsRow } from '@hoop-rush/data-contracts';
-import { franchiseIdentityOf } from '$lib/season/season-branding';
-import SeasonTeamLogo from './SeasonTeamLogo.svelte';
-let { standings, league, humanFranchiseId, franchiseName, streakOf, conference = null, manifest = null, rankedOrder = null, }: {
+﻿<script lang="ts">
+  import type { HoopRushManifest, SeasonLeague, SeasonStandings } from '@hoop-rush/data-contracts';
+  import { resolve } from '$app/paths';
+  import type { RouteId } from '$app/types';
+  import {
+    ordinal,
+    pointDifferential,
+    provisionalRanking,
+    recordLabel,
+    streakLabel,
+    winPct,
+  } from '$lib/season/season-presentation';
+  import type { SeasonStandingsRow } from '@hoop-rush/data-contracts';
+  import { franchiseIdentityOf } from '$lib/season/season-branding';
+  import SeasonTeamLogo from './SeasonTeamLogo.svelte';
+  let {
+    standings,
+    league,
+    humanFranchiseId,
+    franchiseName,
+    streakOf,
+    conference = null,
+    manifest = null,
+    rankedOrder = null,
+  }: {
     standings: SeasonStandings;
     league: SeasonLeague;
     humanFranchiseId: string | null;
     franchiseName: (franchiseId: string) => string;
     streakOf: (franchiseId: string) => {
-        kind: 'wins' | 'losses';
-        length: number;
+      kind: 'wins' | 'losses';
+      length: number;
     } | null;
     conference?: 'east' | 'west' | null;
     manifest?: HoopRushManifest | null;
     rankedOrder?: Array<{
-        row: SeasonStandingsRow;
-        rank: number;
-        conference: 'east' | 'west';
+      row: SeasonStandingsRow;
+      rank: number;
+      conference: 'east' | 'west';
     }> | null;
-} = $props();
-const ranked = $derived(rankedOrder ?? provisionalRanking(standings, league));
-const authoritative = $derived(rankedOrder !== null);
-const conferences = $derived.by(() => {
+  } = $props();
+  const ranked = $derived(rankedOrder ?? provisionalRanking(standings, league));
+  const authoritative = $derived(rankedOrder !== null);
+  const conferences = $derived.by(() => {
     const sections: Array<{
-        title: string;
-        entries: typeof ranked;
+      title: string;
+      entries: typeof ranked;
     }> = [];
     if (conference === null || conference === 'east') {
-        sections.push({ title: 'East', entries: ranked.filter((e) => e.conference === 'east') });
+      sections.push({ title: 'East', entries: ranked.filter((e) => e.conference === 'east') });
     }
     if (conference === null || conference === 'west') {
-        sections.push({ title: 'West', entries: ranked.filter((e) => e.conference === 'west') });
+      sections.push({ title: 'West', entries: ranked.filter((e) => e.conference === 'west') });
     }
     return sections;
-});
-const pctText = (wins: number, losses: number): string => {
+  });
+  const pctText = (wins: number, losses: number): string => {
     const pct = winPct(wins, losses);
     return pct === 0 && wins + losses === 0 ? '—' : pct.toFixed(3).slice(1);
-};
-const diffText = (pointsFor: number, pointsAgainst: number): string => {
+  };
+  const diffText = (pointsFor: number, pointsAgainst: number): string => {
     const diff = pointsFor - pointsAgainst;
     return `${diff > 0 ? '+' : ''}${String(diff)}`;
-};
-const identityOf = (franchiseId: string) => manifest ? franchiseIdentityOf(manifest, franchiseId) : null;
-let desktopViewport = $state<boolean>(typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia('(min-width: 768px)').matches : true);
-$effect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function')
-        return;
+  };
+  const identityOf = (franchiseId: string) =>
+    manifest ? franchiseIdentityOf(manifest, franchiseId) : null;
+  let desktopViewport = $state<boolean>(
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia('(min-width: 768px)').matches
+      : true,
+  );
+  $effect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
     const media = window.matchMedia('(min-width: 768px)');
     const update = () => {
-        desktopViewport = media.matches;
+      desktopViewport = media.matches;
     };
     update();
     media.addEventListener('change', update);
     return () => media.removeEventListener('change', update);
-});
+  });
 </script>
 
 {#each conferences as section (section.title)}
@@ -84,7 +105,7 @@ $effect(() => {
               : ''}"
           >
             <a
-              href={resolve(`/season/run/teams/?franchiseId=${row.franchiseId}` as RouteId)}
+              href={resolve(`/season/run/teams/?franchiseId=${row.franchiseId}` as any)}
               data-season-standings-link={row.franchiseId}
               aria-label={`${franchiseName(row.franchiseId)} roster`}
               class="grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-x-2 px-3 py-3 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-2 sm:gap-x-3 sm:px-4"
@@ -193,7 +214,7 @@ $effect(() => {
                 </td>
                 <th scope="row" class="max-w-44 truncate px-3 py-2 text-left font-semibold">
                   <a
-                    href={resolve(`/season/run/teams/?franchiseId=${row.franchiseId}` as RouteId)}
+                    href={resolve(`/season/run/teams/?franchiseId=${row.franchiseId}` as any)}
                     data-season-standings-link={row.franchiseId}
                     aria-label={`${franchiseName(row.franchiseId)} roster`}
                     class="flex items-center gap-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:text-primary"

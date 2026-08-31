@@ -1,8 +1,13 @@
-<script lang="ts">import type { HoopRushManifest, SeasonFreeAgencyCandidate, SeasonFreeAgencyRoleExpectation, } from '@hoop-rush/data-contracts';
-import type { SeasonFaceRef } from '$lib/season/season-branding';
-import FreeAgencyCandidateCard from './FreeAgencyCandidateCard.svelte';
-import type { CandidateFitFacts, InterestedTeam } from './free-agency-view';
-export interface FreeAgencyCardView {
+<script lang="ts">
+  import type {
+    HoopRushManifest,
+    SeasonFreeAgencyCandidate,
+    SeasonFreeAgencyRoleExpectation,
+  } from '@hoop-rush/data-contracts';
+  import type { SeasonFaceRef } from '$lib/season/season-branding';
+  import FreeAgencyCandidateCard from './FreeAgencyCandidateCard.svelte';
+  import type { CandidateFitFacts, InterestedTeam } from './free-agency-view';
+  export interface FreeAgencyCardView {
     candidate: SeasonFreeAgencyCandidate;
     fit: CandidateFitFacts | null;
     isBestFit: boolean;
@@ -12,8 +17,18 @@ export interface FreeAgencyCardView {
     influence: number | null;
     face?: SeasonFaceRef | null;
     overallRating?: number | null;
-}
-let { cards, manifest = null, franchiseName, editable = false, disabled = false, onToggleTarget, onPriorityChange, onRoleChange, onInfluenceChange, }: {
+  }
+  let {
+    cards,
+    manifest = null,
+    franchiseName,
+    editable = false,
+    disabled = false,
+    onToggleTarget,
+    onPriorityChange,
+    onRoleChange,
+    onInfluenceChange,
+  }: {
     cards: FreeAgencyCardView[];
     manifest?: HoopRushManifest | null;
     franchiseName: (franchiseId: string) => string;
@@ -23,8 +38,8 @@ let { cards, manifest = null, franchiseName, editable = false, disabled = false,
     onPriorityChange: (playerVersionId: string, priority: 0 | 1 | 2) => void;
     onRoleChange: (playerVersionId: string, role: SeasonFreeAgencyRoleExpectation) => void;
     onInfluenceChange: (playerVersionId: string, influence: number) => void;
-} = $props();
-const targetedCount = $derived(cards.filter((card) => card.priority !== 0).length);
+  } = $props();
+  const targetedCount = $derived(cards.filter((card) => card.priority !== 0).length);
 </script>
 
 <section aria-labelledby="free-agency-market-heading" class="min-w-0" data-fa-market>

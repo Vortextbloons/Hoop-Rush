@@ -111,8 +111,14 @@ Deno.serve(async (req: Request) => {
     return json(400, { code: 'invalid-code', message: 'invalid code' });
   const room = rooms[0];
   // allow both v1 and v2 - log outdated but don't block join, to keep backward compat until migration is fully applied
-  const isOutdatedJoin = (room as unknown as { multiplayer_version?: string }).multiplayer_version !== 'season-multiplayer-v2' || (room as unknown as { room_protocol_version?: number }).room_protocol_version !== 2;
-  if (isOutdatedJoin) console.warn(`joining room ${room.id} with outdated version ${room.multiplayer_version} / ${room.room_protocol_version}, allowing for now`);
+  const isOutdatedJoin =
+    (room as unknown as { multiplayer_version?: string }).multiplayer_version !==
+      'season-multiplayer-v2' ||
+    (room as unknown as { room_protocol_version?: number }).room_protocol_version !== 2;
+  if (isOutdatedJoin)
+    console.warn(
+      `joining room ${room.id} with outdated version ${room.multiplayer_version} / ${room.room_protocol_version}, allowing for now`,
+    );
   const { data: existingMember } = await serviceClient
     .from('season_room_members')
     .select('*')
@@ -122,7 +128,11 @@ Deno.serve(async (req: Request) => {
   if (existingMember) {
     // heartbeat
     try {
-      await serviceClient.from('season_room_members').update({ last_seen_at: new Date().toISOString() } as unknown as Record<string, unknown>).eq('room_id', room.id).eq('uid', uid);
+      await serviceClient
+        .from('season_room_members')
+        .update({ last_seen_at: new Date().toISOString() } as unknown as Record<string, unknown>)
+        .eq('room_id', room.id)
+        .eq('uid', uid);
     } catch {}
     return json(200, {
       membership: {
@@ -158,10 +168,16 @@ Deno.serve(async (req: Request) => {
       miss_streak: 0,
       reclaim_requested: false,
     } as unknown as Record<string, unknown>;
-    const withSeen = { ...base, last_seen_at: new Date().toISOString() } as unknown as Record<string, unknown>;
+    const withSeen = { ...base, last_seen_at: new Date().toISOString() } as unknown as Record<
+      string,
+      unknown
+    >;
     let res = await serviceClient.from('season_room_members').insert(withSeen);
     insertError = (res as { error: unknown }).error;
-    if (insertError && String((insertError as { message?: string }).message ?? '').includes('last_seen_at')) {
+    if (
+      insertError &&
+      String((insertError as { message?: string }).message ?? '').includes('last_seen_at')
+    ) {
       const retry = await serviceClient.from('season_room_members').insert(base);
       insertError = (retry as { error: unknown }).error;
     }

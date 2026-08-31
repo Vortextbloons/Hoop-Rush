@@ -25,7 +25,13 @@
     createSupabaseSeasonTransport,
     isSupabaseConfigured,
   } from '$lib/season/supabase-season-transport';
-  import { loadMembership, loadCode, inviteLinkForCode, clearMembership, clearCode } from '$lib/season/season-room-identity';
+  import {
+    loadMembership,
+    loadCode,
+    inviteLinkForCode,
+    clearMembership,
+    clearCode,
+  } from '$lib/season/season-room-identity';
   import { friendlyJoinError } from '$lib/season/season-room-identity';
   import type { SeasonRoomPublicSnapshot, SeasonRoomMembership } from '@hoop-rush/data-contracts';
 
@@ -66,9 +72,7 @@
 
   let isHost = $derived(storedMembership?.participantId === 'p1');
   let isGuest = $derived(storedMembership?.participantId === 'p2');
-  let youLabel = $derived(
-    isHost ? 'You · Host' : isGuest ? 'You · Guest' : 'Viewing lobby',
-  );
+  let youLabel = $derived(isHost ? 'You · Host' : isGuest ? 'You · Guest' : 'Viewing lobby');
 
   let modeLabel = $derived.by(() => {
     const raw = (snap?.settings as unknown as { mode?: string })?.mode ?? snap?.mode ?? 'season';
@@ -171,7 +175,9 @@
         res = await t.resume(roomId);
       } else if (coordinator) {
         // fallback to coordinator refresh which retains membership
-        res = await coordinator.refresh(roomId) as SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership };
+        res = (await coordinator.refresh(roomId)) as SeasonRoomPublicSnapshot & {
+          membership?: SeasonRoomMembership;
+        };
       } else {
         throw new Error('Multiplayer not configured');
       }
@@ -189,7 +195,8 @@
         if (extra.code) storedCode = extra.code;
       }
       if ((snap as unknown as { isOutdated?: boolean }).isOutdated) outdated = true;
-      lastSettingsRevision = (snap as unknown as { settingsRevision?: number }).settingsRevision ?? null;
+      lastSettingsRevision =
+        (snap as unknown as { settingsRevision?: number }).settingsRevision ?? null;
       // treat resume as refresh for presence
       coordinator.subscribe(roomId);
       unsubscribe = () => coordinator?.disconnect();
@@ -272,7 +279,10 @@
     }
   }
 
-  async function handleUpdateSettings(newMode: 'season'|'classic'|'sandbox', newPace: 'live'|'async') {
+  async function handleUpdateSettings(
+    newMode: 'season' | 'classic' | 'sandbox',
+    newPace: 'live' | 'async',
+  ) {
     if (!coordinator || !isHost) return;
     settingsBusy = true;
     settingsError = null;
@@ -291,15 +301,23 @@
     if (!coordinator) return;
     try {
       // host removes guest before Start, regenerating invite code
-      const t = transport as unknown as { preDraftRemoval?: (id: string, pid: 'p1'|'p2') => Promise<string> } | null;
+      const t = transport as unknown as {
+        preDraftRemoval?: (id: string, pid: 'p1' | 'p2') => Promise<string>;
+      } | null;
       let newCode: string | null = null;
       if (t?.preDraftRemoval) {
         newCode = await t.preDraftRemoval(roomId, 'p2');
       } else {
         // in-memory fallback via coordinator's transport
-        const anyTransport = (coordinator as unknown as { transport?: { preDraftRemoval: (id: string, pid: string) => Promise<string> } });
+        const anyTransport = coordinator as unknown as {
+          transport?: { preDraftRemoval: (id: string, pid: string) => Promise<string> };
+        };
         // @ts-ignore
-        newCode = await (coordinator as unknown as { transport: { preDraftRemoval: (id: string, pid: string) => Promise<string> } }).transport.preDraftRemoval(roomId, 'p2');
+        newCode = await (
+          coordinator as unknown as {
+            transport: { preDraftRemoval: (id: string, pid: string) => Promise<string> };
+          }
+        ).transport.preDraftRemoval(roomId, 'p2');
       }
       if (newCode) {
         const { saveCode } = await import('$lib/season/season-room-identity');
@@ -364,7 +382,10 @@
       <div class="flex items-center gap-2 font-semibold text-amber-700">
         <AlertTriangle class="h-4 w-4" />Outdated room — create a new one
       </div>
-      <p class="mt-2 text-sm text-muted-foreground">This room was created with an old protocol (v1). Rooms are temporary — please create a new room. Your draft progress is still saved locally if you started.</p>
+      <p class="mt-2 text-sm text-muted-foreground">
+        This room was created with an old protocol (v1). Rooms are temporary — please create a new
+        room. Your draft progress is still saved locally if you started.
+      </p>
       <div class="mt-4 flex gap-2">
         <a
           href={resolve('/multiplayer')}
@@ -375,7 +396,12 @@
           class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
           >Create new room</a
         >
-        <button type="button" onclick={handleLeave} class="rounded-lg border border-line-soft bg-card px-4 py-2 text-sm font-semibold">Leave room</button>
+        <button
+          type="button"
+          onclick={handleLeave}
+          class="rounded-lg border border-line-soft bg-card px-4 py-2 text-sm font-semibold"
+          >Leave room</button
+        >
       </div>
     </div>
   {:else if error}
@@ -417,17 +443,24 @@
                 onclick={copyInvite}
                 class="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
               >
-                {#if copiedInvite}<Check class="h-4 w-4" /> Copied link!{:else}<LinkIcon class="h-4 w-4" /> Copy invite link{/if}
+                {#if copiedInvite}<Check class="h-4 w-4" /> Copied link!{:else}<LinkIcon
+                    class="h-4 w-4"
+                  /> Copy invite link{/if}
               </button>
               <button
                 type="button"
                 onclick={copyCodeOnly}
                 class="inline-flex items-center gap-1.5 rounded-xl bg-card px-4 py-2.5 text-sm font-semibold shadow-sm hover:bg-surface-2"
               >
-                {#if copiedCode}<Check class="h-4 w-4 text-positive" /> Copied!{:else}<Copy class="h-4 w-4" /> Copy code{/if}
+                {#if copiedCode}<Check class="h-4 w-4 text-positive" /> Copied!{:else}<Copy
+                    class="h-4 w-4"
+                  /> Copy code{/if}
               </button>
             </div>
-            <p class="mt-2 text-xs text-muted-foreground">Invite link: <code class="font-mono">/multiplayer?code={storedCode}</code> — prefill & preview for guest.</p>
+            <p class="mt-2 text-xs text-muted-foreground">
+              Invite link: <code class="font-mono">/multiplayer?code={storedCode}</code> — prefill & preview
+              for guest.
+            </p>
             <p class="mt-1 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
               <Clock class="h-3.5 w-3.5" />
               {#if countdown && countdown !== 'expired'}expires in {countdown}{:else if countdown === 'expired'}expired
@@ -436,8 +469,13 @@
             </p>
           </div>
           <div class="flex flex-col items-end gap-2">
-            <span class="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 font-mono text-[11px] font-bold tracking-widest uppercase text-primary">{snap.phase}</span>
-            <span class="inline-flex items-center gap-1.5 rounded-full border border-line-soft bg-card px-2.5 py-1 text-xs">
+            <span
+              class="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 font-mono text-[11px] font-bold tracking-widest uppercase text-primary"
+              >{snap.phase}</span
+            >
+            <span
+              class="inline-flex items-center gap-1.5 rounded-full border border-line-soft bg-card px-2.5 py-1 text-xs"
+            >
               <Wifi class="h-3 w-3 text-positive" /> code live
             </span>
           </div>
@@ -448,23 +486,46 @@
         <div class="flex flex-wrap items-start justify-between gap-4">
           <div class="min-w-0">
             <div class="flex flex-wrap items-center gap-2">
-              <span class="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 font-mono text-[11px] font-bold tracking-widest uppercase text-primary">{snap.phase}</span>
-              <span class="inline-flex items-center gap-1 rounded-full bg-card px-2.5 py-1 text-xs font-medium">{snap.memberCount}/2 players</span>
-              {#if snap.codeActive}<span class="inline-flex items-center gap-1.5 rounded-full border border-line-soft bg-card px-2.5 py-1 text-xs"><Wifi class="h-3 w-3 text-positive" /> code live</span>{:else}<span class="inline-flex items-center gap-1.5 rounded-full border border-line-soft bg-card px-2.5 py-1 text-xs"><WifiOff class="h-3 w-3 text-muted-foreground" /> code cleared</span>{/if}
+              <span
+                class="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 font-mono text-[11px] font-bold tracking-widest uppercase text-primary"
+                >{snap.phase}</span
+              >
+              <span
+                class="inline-flex items-center gap-1 rounded-full bg-card px-2.5 py-1 text-xs font-medium"
+                >{snap.memberCount}/2 players</span
+              >
+              {#if snap.codeActive}<span
+                  class="inline-flex items-center gap-1.5 rounded-full border border-line-soft bg-card px-2.5 py-1 text-xs"
+                  ><Wifi class="h-3 w-3 text-positive" /> code live</span
+                >{:else}<span
+                  class="inline-flex items-center gap-1.5 rounded-full border border-line-soft bg-card px-2.5 py-1 text-xs"
+                  ><WifiOff class="h-3 w-3 text-muted-foreground" /> code cleared</span
+                >{/if}
             </div>
-            <h1 class="font-display mt-3 text-2xl font-extrabold tracking-tight uppercase sm:text-3xl">Room lobby</h1>
+            <h1
+              class="font-display mt-3 text-2xl font-extrabold tracking-tight uppercase sm:text-3xl"
+            >
+              Room lobby
+            </h1>
             <p class="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
               {modeLabel} · {paceLabel} · You: {youLabel}
             </p>
           </div>
           <div class="flex flex-col items-end gap-2">
             {#if storedCode && !snap.codeActive}
-              <span class="inline-flex items-center gap-1.5 rounded-full bg-card px-3 py-1 text-xs font-mono">Code cleared — both joined</span>
+              <span
+                class="inline-flex items-center gap-1.5 rounded-full bg-card px-3 py-1 text-xs font-mono"
+                >Code cleared — both joined</span
+              >
             {:else if snap.codeActive && !storedCode}
-              <span class="inline-flex items-center gap-1.5 rounded-full bg-card px-3 py-1 text-xs">Code active — ask host</span>
+              <span class="inline-flex items-center gap-1.5 rounded-full bg-card px-3 py-1 text-xs"
+                >Code active — ask host</span
+              >
             {/if}
             {#if snap.expiresAt && snap.codeActive}
-              <span class="inline-flex items-center gap-1.5 text-xs text-muted-foreground"><Clock class="h-3 w-3" />expires {countdown}</span>
+              <span class="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
+                ><Clock class="h-3 w-3" />expires {countdown}</span
+              >
             {/if}
           </div>
         </div>
@@ -472,8 +533,12 @@
     {/if}
 
     {#if settingsChangedBanner && isGuest}
-      <div role="status" class="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-800">
-        Host changed {modeLabel} / {paceShort} — please Ready again. <span class="font-semibold">Ready required again.</span>
+      <div
+        role="status"
+        class="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-800"
+      >
+        Host changed {modeLabel} / {paceShort} — please Ready again.
+        <span class="font-semibold">Ready required again.</span>
       </div>
     {/if}
 
@@ -483,35 +548,77 @@
         <p class="text-label text-muted-foreground">Mode</p>
         {#if isHost && snap && snap.phase === 'waiting'}
           <div class="mt-2 grid gap-1.5">
-            {#each ['season','classic','sandbox'] as m (m)}
-              <button type="button" onclick={() => handleUpdateSettings(m as 'season'|'classic'|'sandbox', snap!.settings.pace)} disabled={settingsBusy} class="rounded-lg border px-3 py-2 text-left text-sm font-semibold {snap!.mode === m ? 'border-primary bg-primary/10' : 'border-line-soft bg-surface-1 hover:border-line-strong'} disabled:opacity-50">{m === 'season' ? 'Season Run' : m === 'classic' ? 'Classic' : 'Sandbox'} {snap!.mode === m ? '✓' : ''}</button>
+            {#each ['season', 'classic', 'sandbox'] as m (m)}
+              <button
+                type="button"
+                onclick={() =>
+                  handleUpdateSettings(m as 'season' | 'classic' | 'sandbox', snap!.settings.pace)}
+                disabled={settingsBusy}
+                class="rounded-lg border px-3 py-2 text-left text-sm font-semibold {snap!.mode === m
+                  ? 'border-primary bg-primary/10'
+                  : 'border-line-soft bg-surface-1 hover:border-line-strong'} disabled:opacity-50"
+                >{m === 'season' ? 'Season Run' : m === 'classic' ? 'Classic' : 'Sandbox'}
+                {snap!.mode === m ? '✓' : ''}</button
+              >
             {/each}
           </div>
-          {#if settingsError}<p role="alert" class="mt-2 text-xs text-destructive">{settingsError}</p>{/if}
+          {#if settingsError}<p role="alert" class="mt-2 text-xs text-destructive">
+              {settingsError}
+            </p>{/if}
         {:else}
           <p class="mt-1 text-sm font-bold">{modeLabel}</p>
-          <p class="mt-1 text-xs text-muted-foreground">Host chose before creation — both see same.</p>
+          <p class="mt-1 text-xs text-muted-foreground">
+            Host chose before creation — both see same.
+          </p>
         {/if}
       </div>
       <div class="rounded-lg border border-line-soft bg-card p-4">
         <p class="text-label text-muted-foreground">Pace</p>
         {#if isHost && snap && snap.phase === 'waiting'}
           <div class="mt-2 grid gap-1.5">
-            {#each ['live','async'] as p (p)}
-              <button type="button" onclick={() => handleUpdateSettings(snap!.mode as 'season'|'classic'|'sandbox', p as 'live'|'async')} disabled={settingsBusy} class="rounded-lg border px-3 py-2 text-left text-sm font-semibold {snap!.settings.pace === p ? 'border-primary bg-primary/10' : 'border-line-soft bg-surface-1 hover:border-line-strong'} disabled:opacity-50">{p === 'live' ? 'Live — 90s / 5m' : 'Async — 24h / 12h'} {snap!.settings.pace === p ? '✓' : ''}</button>
+            {#each ['live', 'async'] as p (p)}
+              <button
+                type="button"
+                onclick={() =>
+                  handleUpdateSettings(
+                    snap!.mode as 'season' | 'classic' | 'sandbox',
+                    p as 'live' | 'async',
+                  )}
+                disabled={settingsBusy}
+                class="rounded-lg border px-3 py-2 text-left text-sm font-semibold {snap!.settings
+                  .pace === p
+                  ? 'border-primary bg-primary/10'
+                  : 'border-line-soft bg-surface-1 hover:border-line-strong'} disabled:opacity-50"
+                >{p === 'live' ? 'Live — 90s / 5m' : 'Async — 24h / 12h'}
+                {snap!.settings.pace === p ? '✓' : ''}</button
+              >
             {/each}
           </div>
           {#if settingsBusy}<p class="mt-2 text-xs text-muted-foreground">Updating…</p>{/if}
         {:else}
           <p class="mt-1 text-sm font-bold">{paceLabel}</p>
-          <p class="mt-1 text-xs text-muted-foreground">{paceShort === 'Live' ? '90s draft · 5m decisions' : '24h draft · 12h decisions'}</p>
+          <p class="mt-1 text-xs text-muted-foreground">
+            {paceShort === 'Live' ? '90s draft · 5m decisions' : '24h draft · 12h decisions'}
+          </p>
         {/if}
       </div>
       <div class="rounded-lg border border-line-soft bg-card p-4">
         <p class="text-label text-muted-foreground">You</p>
         <p class="mt-1 text-sm font-bold">{youLabel}</p>
-        <p class="mt-1 text-xs {isHost ? 'text-primary font-semibold' : isGuest ? 'text-positive font-semibold' : 'text-muted-foreground'}">{isHost ? 'Host controls Start' : isGuest ? 'Guest — Ready to confirm' : 'Spectator'}</p>
-        {#if (snap as unknown as { settingsRevision?: number }).settingsRevision !== undefined}<p class="mt-1 text-xs text-muted-foreground">Settings rev {(snap as unknown as { settingsRevision?: number }).settingsRevision}</p>{/if}
+        <p
+          class="mt-1 text-xs {isHost
+            ? 'text-primary font-semibold'
+            : isGuest
+              ? 'text-positive font-semibold'
+              : 'text-muted-foreground'}"
+        >
+          {isHost ? 'Host controls Start' : isGuest ? 'Guest — Ready to confirm' : 'Spectator'}
+        </p>
+        {#if (snap as unknown as { settingsRevision?: number }).settingsRevision !== undefined}<p
+            class="mt-1 text-xs text-muted-foreground"
+          >
+            Settings rev {(snap as unknown as { settingsRevision?: number }).settingsRevision}
+          </p>{/if}
       </div>
     </div>
 
@@ -521,45 +628,116 @@
           <h2 class="font-display text-sm font-extrabold tracking-widest uppercase">Players</h2>
           <div class="mt-4 grid gap-3 sm:grid-cols-2">
             <!-- Host card -->
-            <div class="rounded-xl border p-4 {isHost ? 'border-primary/40 bg-primary/10 ring-1 ring-primary' : 'border-line-soft bg-card'}">
+            <div
+              class="rounded-xl border p-4 {isHost
+                ? 'border-primary/40 bg-primary/10 ring-1 ring-primary'
+                : 'border-line-soft bg-card'}"
+            >
               <div class="flex items-center justify-between">
-                <span class="font-mono text-xs font-bold tracking-widest uppercase flex items-center gap-1.5"><Crown class="h-3.5 w-3.5 text-primary" />P1 · Host {#if isHost}<span class="rounded-full bg-primary px-1.5 py-0.5 text-[10px] text-primary-foreground">YOU</span>{/if}</span>
-                <span class="inline-flex items-center gap-1 text-xs {hostOnline ? 'text-positive' : 'text-amber-600'}">{#if hostOnline}<Wifi class="h-3 w-3" /> connected{:else}<WifiOff class="h-3 w-3" /> offline{/if}</span>
+                <span
+                  class="font-mono text-xs font-bold tracking-widest uppercase flex items-center gap-1.5"
+                  ><Crown class="h-3.5 w-3.5 text-primary" />P1 · Host {#if isHost}<span
+                      class="rounded-full bg-primary px-1.5 py-0.5 text-[10px] text-primary-foreground"
+                      >YOU</span
+                    >{/if}</span
+                >
+                <span
+                  class="inline-flex items-center gap-1 text-xs {hostOnline
+                    ? 'text-positive'
+                    : 'text-amber-600'}"
+                  >{#if hostOnline}<Wifi class="h-3 w-3" /> connected{:else}<WifiOff
+                      class="h-3 w-3"
+                    /> offline{/if}</span
+                >
               </div>
               <p class="mt-2 font-display text-base font-extrabold uppercase">Host</p>
-              <p class="text-xs text-muted-foreground">{snap.memberCount >= 1 ? 'Joined' : 'Waiting'}</p>
-              <p class="mt-1 inline-flex items-center gap-1.5 text-xs"><span class="h-2 w-2 rounded-full {hostOnline ? 'bg-positive' : 'bg-amber-500'}"></span> {hostOnline ? 'Heartbeat fresh' : 'No heartbeat — 15s offline'}</p>
+              <p class="text-xs text-muted-foreground">
+                {snap.memberCount >= 1 ? 'Joined' : 'Waiting'}
+              </p>
+              <p class="mt-1 inline-flex items-center gap-1.5 text-xs">
+                <span class="h-2 w-2 rounded-full {hostOnline ? 'bg-positive' : 'bg-amber-500'}"
+                ></span>
+                {hostOnline ? 'Heartbeat fresh' : 'No heartbeat — 15s offline'}
+              </p>
             </div>
             <!-- Guest card -->
-            <div class="rounded-xl border p-4 {isGuest ? 'border-primary/40 bg-primary/10 ring-1 ring-primary' : snap.memberCount >= 2 ? 'border-positive/30 bg-positive/10' : 'border-dashed border-line-soft bg-card/50'}">
+            <div
+              class="rounded-xl border p-4 {isGuest
+                ? 'border-primary/40 bg-primary/10 ring-1 ring-primary'
+                : snap.memberCount >= 2
+                  ? 'border-positive/30 bg-positive/10'
+                  : 'border-dashed border-line-soft bg-card/50'}"
+            >
               <div class="flex items-center justify-between">
-                <span class="font-mono text-xs font-bold tracking-widest uppercase">P2 · Guest {#if isGuest}<span class="rounded-full bg-primary px-1.5 py-0.5 text-[10px] text-primary-foreground">YOU</span>{/if}</span>
-                <span class="inline-flex items-center gap-1 text-xs {snap.memberCount >=2 ? (guestOnline ? 'text-positive' : 'text-amber-600') : 'text-muted-foreground'}">{#if snap.memberCount >=2}{#if guestOnline}<Wifi class="h-3 w-3" /> connected{:else}<WifiOff class="h-3 w-3" /> offline{/if}{:else}waiting{/if}</span>
+                <span class="font-mono text-xs font-bold tracking-widest uppercase"
+                  >P2 · Guest {#if isGuest}<span
+                      class="rounded-full bg-primary px-1.5 py-0.5 text-[10px] text-primary-foreground"
+                      >YOU</span
+                    >{/if}</span
+                >
+                <span
+                  class="inline-flex items-center gap-1 text-xs {snap.memberCount >= 2
+                    ? guestOnline
+                      ? 'text-positive'
+                      : 'text-amber-600'
+                    : 'text-muted-foreground'}"
+                  >{#if snap.memberCount >= 2}{#if guestOnline}<Wifi class="h-3 w-3" /> connected{:else}<WifiOff
+                        class="h-3 w-3"
+                      /> offline{/if}{:else}waiting{/if}</span
+                >
               </div>
-              <p class="mt-2 font-display text-base font-extrabold uppercase">{snap.memberCount >=2 ? 'Guest' : 'Open'}</p>
-              <p class="text-xs text-muted-foreground">{snap.memberCount >=2 ? (guestReady ? 'Ready ✓' : 'Not ready') : 'Share invite link to fill'}</p>
-              {#if snap.memberCount >=2}
-                <p class="mt-1 inline-flex items-center gap-1.5 text-xs"><span class="h-2 w-2 rounded-full {guestOnline ? 'bg-positive' : 'bg-amber-500'}"></span> {guestOnline ? 'Heartbeat fresh' : 'Offline — waiting for reconnection'}</p>
-                <p class="mt-1 text-xs font-semibold {guestReady ? 'text-positive' : 'text-amber-600'}">{guestReady ? 'Confirmed current settings' : 'Must Ready before Start'}</p>
+              <p class="mt-2 font-display text-base font-extrabold uppercase">
+                {snap.memberCount >= 2 ? 'Guest' : 'Open'}
+              </p>
+              <p class="text-xs text-muted-foreground">
+                {snap.memberCount >= 2
+                  ? guestReady
+                    ? 'Ready ✓'
+                    : 'Not ready'
+                  : 'Share invite link to fill'}
+              </p>
+              {#if snap.memberCount >= 2}
+                <p class="mt-1 inline-flex items-center gap-1.5 text-xs">
+                  <span class="h-2 w-2 rounded-full {guestOnline ? 'bg-positive' : 'bg-amber-500'}"
+                  ></span>
+                  {guestOnline ? 'Heartbeat fresh' : 'Offline — waiting for reconnection'}
+                </p>
+                <p
+                  class="mt-1 text-xs font-semibold {guestReady
+                    ? 'text-positive'
+                    : 'text-amber-600'}"
+                >
+                  {guestReady ? 'Confirmed current settings' : 'Must Ready before Start'}
+                </p>
               {/if}
             </div>
           </div>
 
           {#if snap.phase === 'waiting' && snap.memberCount < 2}
-            <div class="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs leading-relaxed text-muted-foreground">
-              Waiting for opponent — share the invite link (<code class="font-mono">/multiplayer?code={storedCode ?? '----'}</code>) or 4-digit code. Code stays visible until they join. Keep this lobby open — it updates live.
+            <div
+              class="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs leading-relaxed text-muted-foreground"
+            >
+              Waiting for opponent — share the invite link (<code class="font-mono"
+                >/multiplayer?code={storedCode ?? '----'}</code
+              >) or 4-digit code. Code stays visible until they join. Keep this lobby open — it
+              updates live.
             </div>
           {:else if snap.phase === 'waiting' && snap.memberCount === 2 && !guestReady}
             <div class="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs">
-              Guest must press Ready to confirm <span class="font-semibold">{modeLabel} · {paceShort}</span>. If host changes mode/pace, Ready resets.
+              Guest must press Ready to confirm <span class="font-semibold"
+                >{modeLabel} · {paceShort}</span
+              >. If host changes mode/pace, Ready resets.
             </div>
           {:else if snap.phase === 'waiting' && snap.memberCount === 2 && guestReady && bothPresent}
             <div class="mt-4 rounded-lg border border-positive/30 bg-positive/10 p-3 text-xs">
               Both players here and Ready. Host can Start.
             </div>
           {:else if snap.phase === 'waiting' && !bothPresent}
-            <div class="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
-              Opponent disconnected — presence offline after 15s without heartbeat. Preserving membership; Start unavailable until reconnection.
+            <div
+              class="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive"
+            >
+              Opponent disconnected — presence offline after 15s without heartbeat. Preserving
+              membership; Start unavailable until reconnection.
             </div>
           {:else if snap.phase === 'drafting'}
             <div class="mt-4 rounded-lg border border-positive/30 bg-positive/10 p-3 text-xs">
@@ -569,7 +747,12 @@
 
           {#if isHost && snap.phase === 'waiting' && snap.memberCount === 2}
             <div class="mt-4 flex gap-2">
-              <button type="button" onclick={() => showRemoveConfirm = true} class="inline-flex items-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive hover:bg-destructive/20"><UserMinus class="h-3.5 w-3.5" /> Remove guest & regenerate code</button>
+              <button
+                type="button"
+                onclick={() => (showRemoveConfirm = true)}
+                class="inline-flex items-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive hover:bg-destructive/20"
+                ><UserMinus class="h-3.5 w-3.5" /> Remove guest & regenerate code</button
+              >
             </div>
           {/if}
         </div>
@@ -578,12 +761,29 @@
           <h2 class="font-display text-sm font-extrabold tracking-widest uppercase">Invite</h2>
           {#if storedCode}
             <div class="mt-3 flex gap-2">
-              <button type="button" onclick={copyInvite} class="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"><LinkIcon class="h-4 w-4" /> {#if copiedInvite}Copied!{:else}Copy invite link{/if}</button>
-              <button type="button" onclick={copyCodeOnly} class="inline-flex items-center gap-1.5 rounded-lg border border-line-soft bg-card px-4 py-2.5 text-sm font-semibold hover:border-line-strong"><Copy class="h-4 w-4" /> {#if copiedCode}Copied!{:else}Copy code{/if}</button>
+              <button
+                type="button"
+                onclick={copyInvite}
+                class="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
+                ><LinkIcon class="h-4 w-4" />
+                {#if copiedInvite}Copied!{:else}Copy invite link{/if}</button
+              >
+              <button
+                type="button"
+                onclick={copyCodeOnly}
+                class="inline-flex items-center gap-1.5 rounded-lg border border-line-soft bg-card px-4 py-2.5 text-sm font-semibold hover:border-line-strong"
+                ><Copy class="h-4 w-4" />
+                {#if copiedCode}Copied!{:else}Copy code{/if}</button
+              >
             </div>
-            <p class="mt-2 text-xs text-muted-foreground">Link pre-fills code via <code class="font-mono">/multiplayer?code={storedCode}</code> and shows preview before join.</p>
+            <p class="mt-2 text-xs text-muted-foreground">
+              Link pre-fills code via <code class="font-mono">/multiplayer?code={storedCode}</code> and
+              shows preview before join.
+            </p>
           {:else}
-            <p class="mt-3 text-xs text-muted-foreground">Code cleared after both joined. Invite regenerates if host removes guest.</p>
+            <p class="mt-3 text-xs text-muted-foreground">
+              Code cleared after both joined. Invite regenerates if host removes guest.
+            </p>
           {/if}
         </div>
       </div>
@@ -593,58 +793,163 @@
           <h2 class="font-display text-sm font-extrabold tracking-widest uppercase">Next step</h2>
           {#if snap.phase === 'waiting' && snap.memberCount < 2}
             <p class="mt-2 text-sm text-muted-foreground">
-              Waiting for opponent. {storedCode ? 'Your invite link is above — share it.' : 'Ask host for invite.'} Lobby updates live.
+              Waiting for opponent. {storedCode
+                ? 'Your invite link is above — share it.'
+                : 'Ask host for invite.'} Lobby updates live.
             </p>
             <div class="mt-4 flex gap-2">
-              <a href={resolve('/multiplayer')} class="flex-1 rounded-lg border border-line-soft bg-card px-4 py-2 text-center text-sm font-semibold hover:border-line-strong">Back</a>
-              <button type="button" onclick={load} class="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Refresh</button>
+              <a
+                href={resolve('/multiplayer')}
+                class="flex-1 rounded-lg border border-line-soft bg-card px-4 py-2 text-center text-sm font-semibold hover:border-line-strong"
+                >Back</a
+              >
+              <button
+                type="button"
+                onclick={load}
+                class="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+                >Refresh</button
+              >
             </div>
           {:else if snap.phase === 'waiting' && snap.memberCount === 2}
             {#if isHost}
-              <p class="mt-2 text-sm text-muted-foreground">Both players in. You’re host — Start when Ready and presence are green.</p>
-              <button type="button" onclick={handleStartDraft} disabled={!canStart} class="mt-4 w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed">{starting ? 'Starting…' : 'Start draft →'}</button>
-              {#if disableReason}<p class="mt-2 text-xs font-medium {canStart ? 'text-positive' : 'text-amber-700'}">{disableReason}</p>{/if}
-              {#if startError}<p role="alert" class="mt-2 text-xs text-destructive">{startError}</p>{/if}
-              <p class="mt-2 text-xs text-muted-foreground">Guest sees waiting for host. Changing mode/pace clears Ready.</p>
+              <p class="mt-2 text-sm text-muted-foreground">
+                Both players in. You’re host — Start when Ready and presence are green.
+              </p>
+              <button
+                type="button"
+                onclick={handleStartDraft}
+                disabled={!canStart}
+                class="mt-4 w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+                >{starting ? 'Starting…' : 'Start draft →'}</button
+              >
+              {#if disableReason}<p
+                  class="mt-2 text-xs font-medium {canStart ? 'text-positive' : 'text-amber-700'}"
+                >
+                  {disableReason}
+                </p>{/if}
+              {#if startError}<p role="alert" class="mt-2 text-xs text-destructive">
+                  {startError}
+                </p>{/if}
+              <p class="mt-2 text-xs text-muted-foreground">
+                Guest sees waiting for host. Changing mode/pace clears Ready.
+              </p>
             {:else if isGuest}
-              <p class="mt-2 text-sm text-muted-foreground">Host will Start when both are Ready and connected.</p>
-              <button type="button" onclick={() => handleSetReady(!guestReady)} disabled={readyBusy} class="mt-4 w-full rounded-xl border-2 px-4 py-3 text-sm font-extrabold tracking-wide uppercase {guestReady ? 'border-positive bg-positive/10 text-positive' : 'border-primary bg-primary text-primary-foreground hover:opacity-90'} disabled:opacity-50">
-                {readyBusy ? 'Updating…' : guestReady ? '✓ Ready — tap to unready' : 'Ready → confirm settings'}
+              <p class="mt-2 text-sm text-muted-foreground">
+                Host will Start when both are Ready and connected.
+              </p>
+              <button
+                type="button"
+                onclick={() => handleSetReady(!guestReady)}
+                disabled={readyBusy}
+                class="mt-4 w-full rounded-xl border-2 px-4 py-3 text-sm font-extrabold tracking-wide uppercase {guestReady
+                  ? 'border-positive bg-positive/10 text-positive'
+                  : 'border-primary bg-primary text-primary-foreground hover:opacity-90'} disabled:opacity-50"
+              >
+                {readyBusy
+                  ? 'Updating…'
+                  : guestReady
+                    ? '✓ Ready — tap to unready'
+                    : 'Ready → confirm settings'}
               </button>
-              {#if readyError}<p role="alert" class="mt-2 text-xs text-destructive">{readyError}</p>{/if}
-              <p class="mt-2 text-xs text-muted-foreground">Visible to host. Host changing {modeLabel}/{paceShort} requires Ready again.</p>
+              {#if readyError}<p role="alert" class="mt-2 text-xs text-destructive">
+                  {readyError}
+                </p>{/if}
+              <p class="mt-2 text-xs text-muted-foreground">
+                Visible to host. Host changing {modeLabel}/{paceShort} requires Ready again.
+              </p>
             {:else}
               <p class="mt-2 text-sm text-muted-foreground">Waiting for host to start.</p>
-              <button type="button" onclick={load} class="mt-4 w-full rounded-lg border border-line-soft bg-card px-4 py-3 text-sm font-semibold">Refresh status</button>
+              <button
+                type="button"
+                onclick={load}
+                class="mt-4 w-full rounded-lg border border-line-soft bg-card px-4 py-3 text-sm font-semibold"
+                >Refresh status</button
+              >
             {/if}
           {:else if snap.phase === 'drafting'}
-            <p class="mt-2 text-sm text-muted-foreground">Draft is live — both clients auto-navigate to <code class="font-mono text-xs">/multiplayer/room/{roomId.slice(0,8)}…/draft</code>.</p>
-            <button type="button" onclick={() => goto(`/multiplayer/room/${roomId}/draft`)} class="mt-4 w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground">Enter draft →</button>
-            <p class="mt-2 text-xs text-muted-foreground">Reconnecting clients resume there. Mode: {modeLabel} · {paceShort}</p>
+            <p class="mt-2 text-sm text-muted-foreground">
+              Draft is live — both clients auto-navigate to <code class="font-mono text-xs"
+                >/multiplayer/room/{roomId.slice(0, 8)}…/draft</code
+              >.
+            </p>
+            <button
+              type="button"
+              onclick={() => goto(`/multiplayer/room/${roomId}/draft`)}
+              class="mt-4 w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground"
+              >Enter draft →</button
+            >
+            <p class="mt-2 text-xs text-muted-foreground">
+              Reconnecting clients resume there. Mode: {modeLabel} · {paceShort}
+            </p>
           {:else if snap.phase === 'integrity-failed'}
-            <div class="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">Integrity failed — hashes diverged twice. Room frozen. Create new room.</div>
-            <a href={resolve('/multiplayer')} class="mt-3 inline-flex w-full justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">New room</a>
+            <div
+              class="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
+            >
+              Integrity failed — hashes diverged twice. Room frozen. Create new room.
+            </div>
+            <a
+              href={resolve('/multiplayer')}
+              class="mt-3 inline-flex w-full justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+              >New room</a
+            >
           {:else if snap.phase === 'expired'}
-            <div class="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">Expired — 24h grace without verified fallback.</div>
+            <div
+              class="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
+            >
+              Expired — 24h grace without verified fallback.
+            </div>
           {:else}
-            <p class="mt-2 text-sm text-muted-foreground">Phase <code class="font-mono text-xs">{snap.phase}</code></p>
-            <button type="button" onclick={load} class="mt-3 w-full rounded-lg border border-line-soft bg-card px-4 py-2 text-sm font-semibold">Refresh lobby</button>
+            <p class="mt-2 text-sm text-muted-foreground">
+              Phase <code class="font-mono text-xs">{snap.phase}</code>
+            </p>
+            <button
+              type="button"
+              onclick={load}
+              class="mt-3 w-full rounded-lg border border-line-soft bg-card px-4 py-2 text-sm font-semibold"
+              >Refresh lobby</button
+            >
           {/if}
 
           <div class="mt-6 flex gap-2">
-            <button type="button" onclick={() => showLeaveConfirm = true} class="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-line-soft bg-card px-3 py-2 text-xs font-semibold hover:border-line-strong"><LogOut class="h-3.5 w-3.5" /> Leave room</button>
-            <a href={resolve('/multiplayer')} class="flex-1 rounded-lg bg-card border border-line-soft px-3 py-2 text-xs font-semibold text-center hover:border-line-strong">Multiplayer entry</a>
+            <button
+              type="button"
+              onclick={() => (showLeaveConfirm = true)}
+              class="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-line-soft bg-card px-3 py-2 text-xs font-semibold hover:border-line-strong"
+              ><LogOut class="h-3.5 w-3.5" /> Leave room</button
+            >
+            <a
+              href={resolve('/multiplayer')}
+              class="flex-1 rounded-lg bg-card border border-line-soft px-3 py-2 text-xs font-semibold text-center hover:border-line-strong"
+              >Multiplayer entry</a
+            >
           </div>
         </div>
 
-        <div class="rounded-xl border border-line-soft bg-card p-4 text-xs leading-relaxed text-muted-foreground">
+        <div
+          class="rounded-xl border border-line-soft bg-card p-4 text-xs leading-relaxed text-muted-foreground"
+        >
           <p class="font-semibold text-foreground">Room fact summary</p>
           <div class="mt-2 space-y-1">
-            <div class="flex justify-between"><span>mode</span><span class="font-medium text-foreground">{modeLabel}</span></div>
-            <div class="flex justify-between"><span>pace</span><span class="font-medium text-foreground">{paceShort}</span></div>
-            <div class="flex justify-between"><span>members</span><span>{snap.memberCount}/2</span></div>
-            <div class="flex justify-between"><span>ready</span><span class="{guestReady ? 'text-positive font-semibold' : 'text-amber-600'}">{guestReady ? 'Guest ready ✓' : 'Not ready'}</span></div>
-            <div class="flex justify-between"><span>presence</span><span class="{bothPresent ? 'text-positive' : 'text-amber-600'}">{bothPresent ? 'Both online' : 'Offline'}</span></div>
+            <div class="flex justify-between">
+              <span>mode</span><span class="font-medium text-foreground">{modeLabel}</span>
+            </div>
+            <div class="flex justify-between">
+              <span>pace</span><span class="font-medium text-foreground">{paceShort}</span>
+            </div>
+            <div class="flex justify-between">
+              <span>members</span><span>{snap.memberCount}/2</span>
+            </div>
+            <div class="flex justify-between">
+              <span>ready</span><span
+                class={guestReady ? 'text-positive font-semibold' : 'text-amber-600'}
+                >{guestReady ? 'Guest ready ✓' : 'Not ready'}</span
+              >
+            </div>
+            <div class="flex justify-between">
+              <span>presence</span><span class={bothPresent ? 'text-positive' : 'text-amber-600'}
+                >{bothPresent ? 'Both online' : 'Offline'}</span
+              >
+            </div>
           </div>
         </div>
 
@@ -655,19 +960,36 @@
               <summary class="cursor-pointer text-xs font-semibold">Diagnostics (dev only)</summary>
               <div class="mt-3 space-y-1 font-mono text-xs break-all">
                 <div>room {roomId}</div>
-                <div>revision {snap.revision} · digest {snap.digest.slice(0,12)}…</div>
-                <div>cursor {snap.cursor} · settings rev {(snap as unknown as { settingsRevision?: number }).settingsRevision}</div>
-                <div>protocol v{snap.settings.roomProtocolVersion} · multiplayer {snap.settings.multiplayerVersion}</div>
-                <div>presence {JSON.stringify((snap as unknown as { presence?: unknown }).presence)}</div>
-                <div>seed {(snap as unknown as { seed?: string | null }).seed ? (snap as unknown as { seed?: string | null }).seed!.slice(0,12)+'…' : 'null'}</div>
+                <div>revision {snap.revision} · digest {snap.digest.slice(0, 12)}…</div>
+                <div>
+                  cursor {snap.cursor} · settings rev {(
+                    snap as unknown as { settingsRevision?: number }
+                  ).settingsRevision}
+                </div>
+                <div>
+                  protocol v{snap.settings.roomProtocolVersion} · multiplayer {snap.settings
+                    .multiplayerVersion}
+                </div>
+                <div>
+                  presence {JSON.stringify((snap as unknown as { presence?: unknown }).presence)}
+                </div>
+                <div>
+                  seed {(snap as unknown as { seed?: string | null }).seed
+                    ? (snap as unknown as { seed?: string | null }).seed!.slice(0, 12) + '…'
+                    : 'null'}
+                </div>
               </div>
             </details>
           {:else}
             <details class="rounded-xl border border-line-soft bg-card p-4">
               <summary class="cursor-pointer text-xs font-semibold">Details</summary>
               <div class="mt-3 space-y-1 text-xs">
-                <div>Room {roomId.slice(0,8)}… · {modeLabel} · {paceShort}</div>
-                <div>{snap.memberCount}/2 players · {guestReady ? 'Ready' : 'Not ready'} · {bothPresent ? 'Both connected' : 'Reconnecting'}</div>
+                <div>Room {roomId.slice(0, 8)}… · {modeLabel} · {paceShort}</div>
+                <div>
+                  {snap.memberCount}/2 players · {guestReady ? 'Ready' : 'Not ready'} · {bothPresent
+                    ? 'Both connected'
+                    : 'Reconnecting'}
+                </div>
               </div>
             </details>
           {/if}
@@ -679,10 +1001,23 @@
       <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
         <div class="w-full max-w-sm rounded-xl bg-card p-6">
           <h3 class="font-display text-sm font-extrabold tracking-widest uppercase">Leave room?</h3>
-          <p class="mt-2 text-sm text-muted-foreground">You’ll be removed from this room. Your draft progress (if any) stays local. You’ll need a new invite to rejoin before Start.</p>
+          <p class="mt-2 text-sm text-muted-foreground">
+            You’ll be removed from this room. Your draft progress (if any) stays local. You’ll need
+            a new invite to rejoin before Start.
+          </p>
           <div class="mt-4 flex gap-2">
-            <button type="button" onclick={() => showLeaveConfirm=false} class="flex-1 rounded-lg border border-line-soft bg-card px-4 py-2 text-sm font-semibold">Cancel</button>
-            <button type="button" onclick={handleLeave} class="flex-1 rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground">Leave</button>
+            <button
+              type="button"
+              onclick={() => (showLeaveConfirm = false)}
+              class="flex-1 rounded-lg border border-line-soft bg-card px-4 py-2 text-sm font-semibold"
+              >Cancel</button
+            >
+            <button
+              type="button"
+              onclick={handleLeave}
+              class="flex-1 rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground"
+              >Leave</button
+            >
           </div>
         </div>
       </div>
@@ -690,11 +1025,25 @@
     {#if showRemoveConfirm}
       <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
         <div class="w-full max-w-sm rounded-xl bg-card p-6">
-          <h3 class="font-display text-sm font-extrabold tracking-widest uppercase">Remove guest?</h3>
-          <p class="mt-2 text-sm text-muted-foreground">Host will remove guest and regenerate invite code. New invite link required.</p>
+          <h3 class="font-display text-sm font-extrabold tracking-widest uppercase">
+            Remove guest?
+          </h3>
+          <p class="mt-2 text-sm text-muted-foreground">
+            Host will remove guest and regenerate invite code. New invite link required.
+          </p>
           <div class="mt-4 flex gap-2">
-            <button type="button" onclick={() => showRemoveConfirm=false} class="flex-1 rounded-lg border border-line-soft bg-card px-4 py-2 text-sm font-semibold">Cancel</button>
-            <button type="button" onclick={handleRemoveGuest} class="flex-1 rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground">Remove & regen code</button>
+            <button
+              type="button"
+              onclick={() => (showRemoveConfirm = false)}
+              class="flex-1 rounded-lg border border-line-soft bg-card px-4 py-2 text-sm font-semibold"
+              >Cancel</button
+            >
+            <button
+              type="button"
+              onclick={handleRemoveGuest}
+              class="flex-1 rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground"
+              >Remove & regen code</button
+            >
           </div>
         </div>
       </div>

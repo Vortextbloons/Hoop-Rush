@@ -1,34 +1,36 @@
-<script lang="ts">import { getContext } from 'svelte';
-import { resolve } from '$app/paths';
-import { page } from '$app/state';
-import type { SeasonCompletedRunIndexEntry } from '@hoop-rush/persistence';
-import { getSeasonRunRepository } from '$lib/season/season-repo';
-import { SEASON_RUN_SHELL_CONTEXT, type SeasonRunShellData, } from '$lib/season/season-shell-context';
-import CompletedSeasonResult from '$lib/components/season/CompletedSeasonResult.svelte';
-const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
-const selectedRunId = $derived(page.url.searchParams.get('runId'));
-let entries = $state<SeasonCompletedRunIndexEntry[] | null>(null);
-let loadError = $state<string | null>(null);
-let loadedRunId = $state<string | null>(null);
-async function loadHistory(): Promise<void> {
+<script lang="ts">
+  import { getContext } from 'svelte';
+  import { resolve } from '$app/paths';
+  import { page } from '$app/state';
+  import type { SeasonCompletedRunIndexEntry } from '@hoop-rush/persistence';
+  import { getSeasonRunRepository } from '$lib/season/season-repo';
+  import {
+    SEASON_RUN_SHELL_CONTEXT,
+    type SeasonRunShellData,
+  } from '$lib/season/season-shell-context';
+  import CompletedSeasonResult from '$lib/components/season/CompletedSeasonResult.svelte';
+  const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
+  const selectedRunId = $derived(page.url.searchParams.get('runId'));
+  let entries = $state<SeasonCompletedRunIndexEntry[] | null>(null);
+  let loadError = $state<string | null>(null);
+  let loadedRunId = $state<string | null>(null);
+  async function loadHistory(): Promise<void> {
     const runId = shell.run?.runId ?? null;
-    if (runId !== null && runId === loadedRunId)
-        return;
+    if (runId !== null && runId === loadedRunId) return;
     loadedRunId = runId;
     entries = null;
     loadError = null;
     try {
-        const repo = await getSeasonRunRepository();
-        const list = await repo.listCompletedSeasonRuns();
-        entries = list;
+      const repo = await getSeasonRunRepository();
+      const list = await repo.listCompletedSeasonRuns();
+      entries = list;
+    } catch (error) {
+      loadError = error instanceof Error ? error.message : String(error);
     }
-    catch (error) {
-        loadError = error instanceof Error ? error.message : String(error);
-    }
-}
-$effect(() => {
+  }
+  $effect(() => {
     void loadHistory();
-});
+  });
 </script>
 
 <svelte:head>

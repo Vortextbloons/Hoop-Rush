@@ -328,7 +328,9 @@ export interface SeasonMultiplayerTransport {
   preview(code: string): Promise<SeasonRoomPublicSnapshot>;
   join(code: string): Promise<SeasonRoomMembership>;
   resume(roomId: string): Promise<SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership }>;
-  refresh?(roomId: string): Promise<SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership }>;
+  refresh?(
+    roomId: string,
+  ): Promise<SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership }>;
   subscribe(
     roomId: string,
     handler: (snapshot: SeasonRoomPublicSnapshot) => void,
@@ -349,7 +351,12 @@ export interface SeasonMultiplayerTransport {
     settings: { mode: SeasonRoomMode; pace: SeasonRoomPace },
     expectedSettingsRevision?: number,
   ): Promise<SeasonRoomPublicSnapshot>;
-  setReady(roomId: string, participantId: 'p1' | 'p2', ready: boolean, expectedSettingsRevision?: number): Promise<SeasonRoomPublicSnapshot>;
+  setReady(
+    roomId: string,
+    participantId: 'p1' | 'p2',
+    ready: boolean,
+    expectedSettingsRevision?: number,
+  ): Promise<SeasonRoomPublicSnapshot>;
   heartbeat(roomId: string, participantId: 'p1' | 'p2'): Promise<void>;
   leave(roomId: string, participantId: 'p1' | 'p2'): Promise<void>;
 }

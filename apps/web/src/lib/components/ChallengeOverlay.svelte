@@ -1,12 +1,23 @@
-<script lang="ts">import { resolve } from '$app/paths';
-import type { RouteId } from '$app/types';
-import { X } from '@lucide/svelte';
-import type { ChallengeRun, HoopRushManifest } from '@hoop-rush/data-contracts';
-import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
-import type { RunnerPhase } from '$lib/challenge-runner';
-import GameStrip from '$lib/components/GameStrip.svelte';
-import TeamLogo from '$lib/components/TeamLogo.svelte';
-let { manifest, run, phase, error, modeLabel, draftHref, resultHref, onCancel, onResume, }: {
+﻿<script lang="ts">
+  import { resolve } from '$app/paths';
+  import type { RouteId } from '$app/types';
+  import { X } from '@lucide/svelte';
+  import type { ChallengeRun, HoopRushManifest } from '@hoop-rush/data-contracts';
+  import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
+  import type { RunnerPhase } from '$lib/challenge-runner';
+  import GameStrip from '$lib/components/GameStrip.svelte';
+  import TeamLogo from '$lib/components/TeamLogo.svelte';
+  let {
+    manifest,
+    run,
+    phase,
+    error,
+    modeLabel,
+    draftHref,
+    resultHref,
+    onCancel,
+    onResume,
+  }: {
     manifest: HoopRushManifest | null;
     run: ChallengeRun;
     phase: RunnerPhase;
@@ -16,31 +27,33 @@ let { manifest, run, phase, error, modeLabel, draftHref, resultHref, onCancel, o
     resultHref: string | null;
     onCancel: () => void;
     onResume: () => void;
-} = $props();
-function franchiseLabel(franchiseId: string | null): string {
+  } = $props();
+  function franchiseLabel(franchiseId: string | null): string {
     return franchiseId ? franchiseAbbreviation(franchiseId) : 'Mixed';
-}
-const record = $derived(run.aggregates.team);
-const latest = $derived(run.games.at(-1) ?? null);
-const latestOpponent = $derived.by(() => {
-    if (!latest)
-        return null;
+  }
+  const record = $derived(run.aggregates.team);
+  const latest = $derived(run.games.at(-1) ?? null);
+  const latestOpponent = $derived.by(() => {
+    if (!latest) return null;
     const entry = run.bracket.schedule[latest.gameNumber - 1];
     return run.bracket.opponents.find((o) => o.opponentId === entry?.opponentId) ?? null;
-});
-const franchise = $derived(manifest?.modernFranchiseSlots.find((e) => e.franchiseId === run.franchiseId) ?? null);
-const latestOpponentSlot = $derived(latestOpponent && manifest
-    ? (manifest.modernFranchiseSlots.find((e) => e.franchiseId === latestOpponent.teamId) ?? null)
-    : null);
-$effect(() => {
-    if (typeof document === 'undefined')
-        return;
+  });
+  const franchise = $derived(
+    manifest?.modernFranchiseSlots.find((e) => e.franchiseId === run.franchiseId) ?? null,
+  );
+  const latestOpponentSlot = $derived(
+    latestOpponent && manifest
+      ? (manifest.modernFranchiseSlots.find((e) => e.franchiseId === latestOpponent.teamId) ?? null)
+      : null,
+  );
+  $effect(() => {
+    if (typeof document === 'undefined') return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
-        document.body.style.overflow = previous;
+      document.body.style.overflow = previous;
     };
-});
+  });
 </script>
 
 <div
@@ -191,7 +204,7 @@ $effect(() => {
           Continue
         </button>
         <a
-          href={resolve(draftHref as RouteId)}
+          href={resolve(draftHref as any)}
           class="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground"
         >
           Leave the challenge
@@ -205,7 +218,7 @@ $effect(() => {
           Retry
         </button>
         <a
-          href={resolve((resultHref ?? draftHref) as RouteId)}
+          href={resolve((resultHref ?? draftHref) as any)}
           class="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground"
         >
           View progress so far

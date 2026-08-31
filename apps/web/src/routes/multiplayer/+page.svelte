@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
@@ -80,19 +80,19 @@
     },
     {
       id: 'classic' as const,
-      name: 'Classic',
-      desc: '5 rounds · franchise era · 82-0',
-      detail: 'Franchise + era, one reroll each.',
+      name: 'Classic (Coming soon)',
+      desc: '5 rounds · franchise era · 82-0 — multiplayer not yet available',
+      detail: 'Franchise + era, one reroll each. Solo only for now.',
       icon: Swords,
-      disabled: false,
+      disabled: true,
     },
     {
       id: 'sandbox' as const,
-      name: 'Sandbox',
-      desc: 'Any 5 peak seasons',
-      detail: 'Best-of-2, fast.',
+      name: 'Sandbox (Coming soon)',
+      desc: 'Any 5 peak seasons — multiplayer not yet available',
+      detail: 'Best-of-2, fast. Solo only for now.',
       icon: Zap,
-      disabled: false,
+      disabled: true,
     },
   ] as const;
 
@@ -120,6 +120,11 @@
   }
 
   async function startCreate() {
+    if (selectedMode !== 'season') {
+      error =
+        'Classic/Sandbox draft not yet available for multiplayer — Season Run only. Solo play remains available via /classic and /sandbox.';
+      return;
+    }
     busy = true;
     error = null;
     createdCode = null;
@@ -179,7 +184,7 @@
     try {
       const coordinator = getCoordinator();
       const { snap } = await coordinator.joinRoom(code);
-      await goto(`/multiplayer/room/${snap.roomId}`);
+      await goto(resolve('/multiplayer/room/[roomId]', { roomId: snap.roomId }));
     } catch (e) {
       error = friendlyJoinError(e);
     } finally {
@@ -206,7 +211,7 @@
   }
 
   function goToRoom() {
-    if (createdRoomId) goto(`/multiplayer/room/${createdRoomId}`);
+    if (createdRoomId) goto(resolve('/multiplayer/room/[roomId]', { roomId: createdRoomId }));
   }
 
   function backToChoose() {
@@ -348,14 +353,18 @@
             onclick={copyInviteLink}
             class="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
           >
-            {#if copiedInvite}<Check class="h-4 w-4" /> Copied link!{:else}<LinkIcon class="h-4 w-4" /> Copy invite link{/if}
+            {#if copiedInvite}<Check class="h-4 w-4" /> Copied link!{:else}<LinkIcon
+                class="h-4 w-4"
+              /> Copy invite link{/if}
           </button>
           <button
             type="button"
             onclick={copyCode}
             class="inline-flex items-center gap-1.5 rounded-xl bg-card px-4 py-2.5 text-sm font-semibold shadow-sm hover:bg-surface-2"
           >
-            {#if copiedCode}<Check class="h-4 w-4 text-positive" /> Copied!{:else}<Copy class="h-4 w-4" /> Copy code{/if}
+            {#if copiedCode}<Check class="h-4 w-4 text-positive" /> Copied!{:else}<Copy
+                class="h-4 w-4"
+              /> Copy code{/if}
           </button>
           <button
             type="button"
@@ -381,7 +390,8 @@
               Pick your battle
             </h3>
             <p class="mt-1 text-xs text-muted-foreground">
-              Host picks mode and pace — opponent sees both before joining. Pace applies to all modes.
+              Host picks mode and pace — opponent sees both before joining. Pace applies to all
+              modes.
             </p>
           </div>
           <button
@@ -397,11 +407,18 @@
             {@const Icon = m.icon}
             <button
               type="button"
-              onclick={() => (selectedMode = m.id)}
-              class="flex flex-col rounded-xl border p-4 text-left transition-all {selectedMode ===
-              m.id
-                ? 'border-primary bg-primary/10 ring-1 ring-primary'
-                : 'border-line-soft bg-card hover:border-line-strong'}"
+              disabled={m.disabled}
+              title={m.disabled
+                ? 'Multiplayer draft for this mode is not yet available — Season Run only'
+                : undefined}
+              onclick={() => {
+                if (!m.disabled) selectedMode = m.id;
+              }}
+              class="flex flex-col rounded-xl border p-4 text-left transition-all {m.disabled
+                ? 'opacity-50 cursor-not-allowed border-line-soft bg-card'
+                : selectedMode === m.id
+                  ? 'border-primary bg-primary/10 ring-1 ring-primary'
+                  : 'border-line-soft bg-card hover:border-line-strong'}"
             >
               <Icon
                 class="h-5 w-5 {selectedMode === m.id ? 'text-primary' : 'text-muted-foreground'}"
@@ -426,7 +443,8 @@
               <button
                 type="button"
                 onclick={() => (pace = p.id)}
-                class="flex items-center justify-between rounded-xl border p-4 text-left {pace === p.id
+                class="flex items-center justify-between rounded-xl border p-4 text-left {pace ===
+                p.id
                   ? 'border-primary bg-primary/10 ring-1 ring-primary'
                   : 'border-line-soft bg-card hover:border-line-strong'}"
               >
@@ -434,11 +452,16 @@
                   <p class="text-sm font-bold">{p.label}</p>
                   <p class="text-xs text-muted-foreground">{p.detail}</p>
                 </div>
-                {#if pace === p.id}<span class="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground">Selected</span>{/if}
+                {#if pace === p.id}<span
+                    class="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground"
+                    >Selected</span
+                  >{/if}
               </button>
             {/each}
           </div>
-          <p class="mt-2 text-xs text-muted-foreground">Pace applies to Season, Classic, and Sandbox identically.</p>
+          <p class="mt-2 text-xs text-muted-foreground">
+            Pace applies to Season, Classic, and Sandbox identically.
+          </p>
         </div>
 
         <button
@@ -480,14 +503,18 @@
                 onclick={copyInviteLink}
                 class="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
               >
-                {#if copiedInvite}<Check class="h-4 w-4" /> Copied link!{:else}<LinkIcon class="h-4 w-4" /> Copy invite link{/if}
+                {#if copiedInvite}<Check class="h-4 w-4" /> Copied link!{:else}<LinkIcon
+                    class="h-4 w-4"
+                  /> Copy invite link{/if}
               </button>
               <button
                 type="button"
                 onclick={copyCode}
                 class="inline-flex items-center gap-1.5 rounded-xl bg-card px-4 py-2.5 text-sm font-semibold shadow-sm hover:bg-surface-2"
               >
-                {#if copiedCode}<Check class="h-4 w-4 text-positive" /> Copied!{:else}<Copy class="h-4 w-4" /> Copy code{/if}
+                {#if copiedCode}<Check class="h-4 w-4 text-positive" /> Copied!{:else}<Copy
+                    class="h-4 w-4"
+                  /> Copy code{/if}
               </button>
             </div>
             <p class="mt-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -517,7 +544,11 @@
 
       <div class="mt-6 rounded-2xl bg-surface-1 p-6 sm:p-7">
         <h3 class="font-display text-sm font-extrabold tracking-widest uppercase">
-          Mode locked: {selectedMode === 'season' ? 'Season Run' : selectedMode === 'classic' ? 'Classic' : 'Sandbox'} · {pace === 'live' ? 'Live' : 'Async'}
+          Mode locked: {selectedMode === 'season'
+            ? 'Season Run'
+            : selectedMode === 'classic'
+              ? 'Classic'
+              : 'Sandbox'} · {pace === 'live' ? 'Live' : 'Async'}
         </h3>
         <p class="mt-1 text-xs text-muted-foreground">
           Host chose {selectedMode} · {pace} — guests see this before joining.
@@ -623,7 +654,8 @@
       {/if}
 
       <p class="mt-6 text-center text-xs leading-relaxed text-muted-foreground">
-        Codes include leading zeros (<code class="font-mono">0042</code>) and expire in 15 minutes. Invite links prefill the code via <code class="font-mono">/multiplayer?code=0042</code>.
+        Codes include leading zeros (<code class="font-mono">0042</code>) and expire in 15 minutes.
+        Invite links prefill the code via <code class="font-mono">/multiplayer?code=0042</code>.
       </p>
     </div>
   {/if}

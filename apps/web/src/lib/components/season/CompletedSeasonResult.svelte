@@ -1,135 +1,176 @@
-<script lang="ts">import { getContext } from 'svelte';
-import { resolve } from '$app/paths';
-import { goto } from '$app/navigation';
-import { Dialog } from 'bits-ui';
-import { blockRoundRange, type SeasonBlockRecap } from '@hoop-rush/data-contracts';
-import type { SeasonCompletedRunIndexEntry, SeasonCompletedSeason } from '@hoop-rush/persistence';
-import { getSeasonRunRepository } from '$lib/season/season-repo';
-import { SEASON_RUN_SHELL_CONTEXT, type SeasonRunShellData, } from '$lib/season/season-shell-context';
-import { deriveBlockRecap, foldSeasonAggregates, LEADER_CATEGORY_LABELS, recordLabel, } from '$lib/season/season-presentation';
-import { engineOrderLeaderTables, LEADER_CATEGORIES } from '$lib/season/season-leaders-view';
-import { humanInjuryTimeline, INJURY_SEVERITY_LABEL } from '$lib/season/season-health-view';
-import { postseasonRankingsOf, postseasonSummaryRow, rankedEntriesOf, } from '$lib/season/season-postseason-presentation';
-import { buildCompletedSeasonRunReplayExport, deriveCompletedSeasonTradeGrades, } from '$lib/season/season-completed-export';
-import AwardsSection from '$lib/components/season/AwardsSection.svelte';
-import ChampionSummary from '$lib/components/season/ChampionSummary.svelte';
-import PostseasonBracket from '$lib/components/season/PostseasonBracket.svelte';
-import StandingsTable from '$lib/components/season/StandingsTable.svelte';
-import TiebreakExplanations from '$lib/components/season/TiebreakExplanations.svelte';
-const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
-let { runId, }: {
+<script lang="ts">
+  import { getContext } from 'svelte';
+  import { resolve } from '$app/paths';
+  import { goto } from '$app/navigation';
+  import { Dialog } from 'bits-ui';
+  import { blockRoundRange, type SeasonBlockRecap } from '@hoop-rush/data-contracts';
+  import type { SeasonCompletedRunIndexEntry, SeasonCompletedSeason } from '@hoop-rush/persistence';
+  import { getSeasonRunRepository } from '$lib/season/season-repo';
+  import {
+    SEASON_RUN_SHELL_CONTEXT,
+    type SeasonRunShellData,
+  } from '$lib/season/season-shell-context';
+  import {
+    deriveBlockRecap,
+    foldSeasonAggregates,
+    LEADER_CATEGORY_LABELS,
+    recordLabel,
+  } from '$lib/season/season-presentation';
+  import { engineOrderLeaderTables, LEADER_CATEGORIES } from '$lib/season/season-leaders-view';
+  import { humanInjuryTimeline, INJURY_SEVERITY_LABEL } from '$lib/season/season-health-view';
+  import {
+    postseasonRankingsOf,
+    postseasonSummaryRow,
+    rankedEntriesOf,
+  } from '$lib/season/season-postseason-presentation';
+  import {
+    buildCompletedSeasonRunReplayExport,
+    deriveCompletedSeasonTradeGrades,
+  } from '$lib/season/season-completed-export';
+  import AwardsSection from '$lib/components/season/AwardsSection.svelte';
+  import ChampionSummary from '$lib/components/season/ChampionSummary.svelte';
+  import PostseasonBracket from '$lib/components/season/PostseasonBracket.svelte';
+  import StandingsTable from '$lib/components/season/StandingsTable.svelte';
+  import TiebreakExplanations from '$lib/components/season/TiebreakExplanations.svelte';
+  const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
+  let {
+    runId,
+  }: {
     runId: string;
-} = $props();
-let completed = $state<SeasonCompletedSeason | null>(null);
-let indexEntry = $state<SeasonCompletedRunIndexEntry | null>(null);
-let loadError = $state<string | null>(null);
-let loadedRunId = $state<string | null>(null);
-async function loadResult(): Promise<void> {
-    if (runId === '' || runId === loadedRunId)
-        return;
+  } = $props();
+  let completed = $state<SeasonCompletedSeason | null>(null);
+  let indexEntry = $state<SeasonCompletedRunIndexEntry | null>(null);
+  let loadError = $state<string | null>(null);
+  let loadedRunId = $state<string | null>(null);
+  async function loadResult(): Promise<void> {
+    if (runId === '' || runId === loadedRunId) return;
     loadedRunId = runId;
     completed = null;
     indexEntry = null;
     loadError = null;
     try {
-        const repo = await getSeasonRunRepository();
-        const [season, entries] = await Promise.all([
-            repo.loadCompletedSeason(runId),
-            repo.listCompletedSeasonRuns(),
-        ]);
-        if (season === null) {
-            loadError = `No completed season with run id ${runId} was found on this device.`;
-            return;
-        }
-        completed = season;
-        indexEntry = entries.find((entry) => entry.runId === runId) ?? null;
+      const repo = await getSeasonRunRepository();
+      const [season, entries] = await Promise.all([
+        repo.loadCompletedSeason(runId),
+        repo.listCompletedSeasonRuns(),
+      ]);
+      if (season === null) {
+        loadError = `No completed season with run id ${runId} was found on this device.`;
+        return;
+      }
+      completed = season;
+      indexEntry = entries.find((entry) => entry.runId === runId) ?? null;
+    } catch (error) {
+      loadError = error instanceof Error ? error.message : String(error);
     }
-    catch (error) {
-        loadError = error instanceof Error ? error.message : String(error);
-    }
-}
-$effect(() => {
+  }
+  $effect(() => {
     void loadResult();
-});
-const run = $derived(completed?.run ?? null);
-const humanFranchiseId = $derived(run !== null
-    ? (run.league.teams.find((entry) => entry.control === 'human')?.franchiseId ?? null)
-    : null);
-const rankings = $derived(run !== null ? postseasonRankingsOf(run) : null);
-const rankedEntries = $derived(run !== null && rankings !== null ? rankedEntriesOf(rankings, run.standings) : []);
-const postseasonRows = $derived((completed?.postseasonSummaries ?? []).map((summary) => postseasonSummaryRow(summary, humanFranchiseId ?? '')));
-const rosterByVersion = $derived.by(() => {
-    const map = new Map<string, {
+  });
+  const run = $derived(completed?.run ?? null);
+  const humanFranchiseId = $derived(
+    run !== null
+      ? (run.league.teams.find((entry) => entry.control === 'human')?.franchiseId ?? null)
+      : null,
+  );
+  const rankings = $derived(run !== null ? postseasonRankingsOf(run) : null);
+  const rankedEntries = $derived(
+    run !== null && rankings !== null ? rankedEntriesOf(rankings, run.standings) : [],
+  );
+  const postseasonRows = $derived(
+    (completed?.postseasonSummaries ?? []).map((summary) =>
+      postseasonSummaryRow(summary, humanFranchiseId ?? ''),
+    ),
+  );
+  const rosterByVersion = $derived.by(() => {
+    const map = new Map<
+      string,
+      {
         displayName: string;
         franchiseId: string;
-    }>();
+      }
+    >();
     for (const roster of run?.rosters ?? []) {
-        for (const entry of roster.players) {
-            map.set(entry.playerVersionId, {
-                displayName: entry.displayName,
-                franchiseId: entry.franchiseId,
-            });
-        }
+      for (const entry of roster.players) {
+        map.set(entry.playerVersionId, {
+          displayName: entry.displayName,
+          franchiseId: entry.franchiseId,
+        });
+      }
     }
     return map;
-});
-const playerName = $derived((playerVersionId: string): string => rosterByVersion.get(playerVersionId)?.displayName ?? playerVersionId);
-const humanRoster = $derived(run?.rosters.find((roster) => roster.franchiseId === humanFranchiseId) ?? null);
-const injuryTimeline = $derived(run !== null && humanRoster !== null
-    ? humanInjuryTimeline(run.health, humanRoster, humanFranchiseId ?? '', completed?.summaries)
-    : []);
-const blockRecaps = $derived.by((): Array<{
-    blockIndex: number;
-    recap: SeasonBlockRecap;
-}> => {
-    const currentRun = run;
-    const allSummaries = completed?.summaries ?? [];
-    if (currentRun === null || humanFranchiseId === null)
-        return [];
-    const result: Array<{
+  });
+  const playerName = $derived(
+    (playerVersionId: string): string =>
+      rosterByVersion.get(playerVersionId)?.displayName ?? playerVersionId,
+  );
+  const humanRoster = $derived(
+    run?.rosters.find((roster) => roster.franchiseId === humanFranchiseId) ?? null,
+  );
+  const injuryTimeline = $derived(
+    run !== null && humanRoster !== null
+      ? humanInjuryTimeline(run.health, humanRoster, humanFranchiseId ?? '', completed?.summaries)
+      : [],
+  );
+  const blockRecaps = $derived.by(
+    (): Array<{
+      blockIndex: number;
+      recap: SeasonBlockRecap;
+    }> => {
+      const currentRun = run;
+      const allSummaries = completed?.summaries ?? [];
+      if (currentRun === null || humanFranchiseId === null) return [];
+      const result: Array<{
         blockIndex: number;
         recap: SeasonBlockRecap;
-    }> = [];
-    for (let blockIndex = 0; blockIndex < 9; blockIndex += 1) {
+      }> = [];
+      for (let blockIndex = 0; blockIndex < 9; blockIndex += 1) {
         const { fromRound, toRound } = blockRoundRange(blockIndex);
-        const blockSummaries = allSummaries.filter((summary) => summary.round >= fromRound && summary.round <= toRound);
-        if (blockSummaries.length === 0)
-            continue;
+        const blockSummaries = allSummaries.filter(
+          (summary) => summary.round >= fromRound && summary.round <= toRound,
+        );
+        if (blockSummaries.length === 0) continue;
         const recap = deriveBlockRecap({
-            runId: currentRun.runId,
-            blockIndex,
-            completedRounds: Math.min((blockIndex + 1) * 10, 82),
-            standings: currentRun.standings,
-            league: currentRun.league,
-            blockSummaries,
-            allSummaries,
-            rosters: currentRun.rosters.flatMap((roster) => roster.players),
-            games: currentRun.games,
-            humanFranchiseId,
-            run: currentRun,
+          runId: currentRun.runId,
+          blockIndex,
+          completedRounds: Math.min((blockIndex + 1) * 10, 82),
+          standings: currentRun.standings,
+          league: currentRun.league,
+          blockSummaries,
+          allSummaries,
+          rosters: currentRun.rosters.flatMap((roster) => roster.players),
+          games: currentRun.games,
+          humanFranchiseId,
+          run: currentRun,
         });
         result.push({ blockIndex, recap });
-    }
-    return result;
-});
-const aggregates = $derived(completed ? foldSeasonAggregates(completed.summaries) : null);
-const leaderTables = $derived(aggregates ? engineOrderLeaderTables(aggregates.players, aggregates.teams) : null);
-const transactions = $derived(run?.transactions ?? []);
-const humanTransactions = $derived(transactions.filter((entry) => entry.franchiseId === null || entry.franchiseId === humanFranchiseId));
-let exportingGameId = $state<string | null>(null);
-let exportingFullRun = $state(false);
-let exportError = $state<string | null>(null);
-const humanTradeGrades = $derived.by(() => {
+      }
+      return result;
+    },
+  );
+  const aggregates = $derived(completed ? foldSeasonAggregates(completed.summaries) : null);
+  const leaderTables = $derived(
+    aggregates ? engineOrderLeaderTables(aggregates.players, aggregates.teams) : null,
+  );
+  const transactions = $derived(run?.transactions ?? []);
+  const humanTransactions = $derived(
+    transactions.filter(
+      (entry) => entry.franchiseId === null || entry.franchiseId === humanFranchiseId,
+    ),
+  );
+  let exportingGameId = $state<string | null>(null);
+  let exportingFullRun = $state(false);
+  let exportError = $state<string | null>(null);
+  const humanTradeGrades = $derived.by(() => {
     const season = completed;
     const franchiseId = humanFranchiseId;
-    if (season === null || franchiseId === null)
-        return [];
+    if (season === null || franchiseId === null) return [];
     const grades = deriveCompletedSeasonTradeGrades(season);
     return grades.grades.filter((grade) => grade.franchiseId === franchiseId);
-});
-function downloadJson(filename: string, payload: unknown): void {
+  });
+  function downloadJson(filename: string, payload: unknown): void {
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
-        type: 'application/json',
+      type: 'application/json',
     });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
@@ -137,65 +178,60 @@ function downloadJson(filename: string, payload: unknown): void {
     anchor.download = filename;
     anchor.click();
     URL.revokeObjectURL(url);
-}
-async function exportGame(gameId: string): Promise<void> {
-    if (exportingGameId !== null || exportingFullRun)
-        return;
+  }
+  async function exportGame(gameId: string): Promise<void> {
+    if (exportingGameId !== null || exportingFullRun) return;
     exportingGameId = gameId;
     exportError = null;
     try {
-        const repo = await getSeasonRunRepository();
-        const artifact = await repo.buildReplayExport(runId, gameId);
-        if (artifact === null) {
-            exportError = 'No replay export is available for that game.';
-            return;
-        }
-        downloadJson(`hoop-rush-replay-${runId}-${gameId}.json`, artifact);
-    }
-    catch (error) {
-        exportError = error instanceof Error ? error.message : String(error);
-    }
-    finally {
-        exportingGameId = null;
-    }
-}
-async function exportFullRun(): Promise<void> {
-    if (exportingGameId !== null || exportingFullRun || completed === null)
+      const repo = await getSeasonRunRepository();
+      const artifact = await repo.buildReplayExport(runId, gameId);
+      if (artifact === null) {
+        exportError = 'No replay export is available for that game.';
         return;
+      }
+      downloadJson(`hoop-rush-replay-${runId}-${gameId}.json`, artifact);
+    } catch (error) {
+      exportError = error instanceof Error ? error.message : String(error);
+    } finally {
+      exportingGameId = null;
+    }
+  }
+  async function exportFullRun(): Promise<void> {
+    if (exportingGameId !== null || exportingFullRun || completed === null) return;
     exportingFullRun = true;
     exportError = null;
     try {
-        const artifact = buildCompletedSeasonRunReplayExport(completed, shell.manifest);
-        downloadJson(`hoop-rush-replay-${runId}-full-run.json`, artifact);
-    }
-    catch (error) {
-        exportError = error instanceof Error ? error.message : String(error);
-    }
-    finally {
-        exportingFullRun = false;
-    }
-}
-let deleteOpen = $state(false);
-let deleting = $state(false);
-let deleteError = $state<string | null>(null);
-async function confirmDelete(): Promise<void> {
-    if (deleting)
+      if (shell.manifest === null) {
+        exportError = 'Manifest unavailable';
         return;
+      }
+      const artifact = buildCompletedSeasonRunReplayExport(completed, shell.manifest);
+      downloadJson(`hoop-rush-replay-${runId}-full-run.json`, artifact);
+    } catch (error) {
+      exportError = error instanceof Error ? error.message : String(error);
+    } finally {
+      exportingFullRun = false;
+    }
+  }
+  let deleteOpen = $state(false);
+  let deleting = $state(false);
+  let deleteError = $state<string | null>(null);
+  async function confirmDelete(): Promise<void> {
+    if (deleting) return;
     deleting = true;
     deleteError = null;
     try {
-        const repo = await getSeasonRunRepository();
-        await repo.deleteCompletedSeason(runId);
-        deleteOpen = false;
-        await goto(resolve('/season/run/history'));
+      const repo = await getSeasonRunRepository();
+      await repo.deleteCompletedSeason(runId);
+      deleteOpen = false;
+      await goto(resolve('/season/run/history'));
+    } catch (error) {
+      deleteError = error instanceof Error ? error.message : String(error);
+    } finally {
+      deleting = false;
     }
-    catch (error) {
-        deleteError = error instanceof Error ? error.message : String(error);
-    }
-    finally {
-        deleting = false;
-    }
-}
+  }
 </script>
 
 {#if loadError !== null}

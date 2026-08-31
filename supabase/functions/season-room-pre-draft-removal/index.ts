@@ -1,61 +1,106 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "jsr:@supabase/supabase-js@2";
+import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
+import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-dev-uid",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-dev-uid',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 function json(s: number, b: unknown) {
-  return new Response(JSON.stringify(b), { status: s, headers: { "Content-Type": "application/json", ...cors } });
+  return new Response(JSON.stringify(b), {
+    status: s,
+    headers: { 'Content-Type': 'application/json', ...cors },
+  });
 }
 async function resolveUid(req: Request, url: string, srk: string) {
-  const ah = req.headers.get("Authorization");
+  const ah = req.headers.get('Authorization');
   if (ah) {
-    const ac = createClient(url, Deno.env.get("SUPABASE_ANON_KEY") ?? srk, { global: { headers: { Authorization: ah } } });
-    const { data: { user } } = await ac.auth.getUser();
+    const ac = createClient(url, Deno.env.get('SUPABASE_ANON_KEY') ?? srk, {
+      global: { headers: { Authorization: ah } },
+    });
+    const {
+      data: { user },
+    } = await ac.auth.getUser();
     if (user) return user.id;
   }
-  const du = req.headers.get("x-dev-uid");
+  const du = req.headers.get('x-dev-uid');
   if (du && /^[0-9a-f-]{36}$/i.test(du)) return du;
   return null;
 }
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  if (req.method !== "POST") return json(405, { code: "phase", message: "method not allowed" });
-  const url = Deno.env.get("SUPABASE_URL") ?? "";
-  const srk = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-  if (!url || !srk) return json(500, { code: "authorization", message: "server not configured" });
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
+  if (req.method !== 'POST') return json(405, { code: 'phase', message: 'method not allowed' });
+  const url = Deno.env.get('SUPABASE_URL') ?? '';
+  const srk = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  if (!url || !srk) return json(500, { code: 'authorization', message: 'server not configured' });
   const uid = await resolveUid(req, url, srk);
-  if (!uid) return json(401, { code: "authorization", message: "missing auth" });
+  if (!uid) return json(401, { code: 'authorization', message: 'missing auth' });
   const body = await req.json().catch(() => null);
   const roomId = body?.roomId as string | undefined;
   const targetParticipantId = body?.targetParticipantId as string | undefined;
-  if (!roomId || !targetParticipantId) return json(400, { code: "phase", message: "missing fields" });
+  if (!roomId || !targetParticipantId)
+    return json(400, { code: 'phase', message: 'missing fields' });
   const sc = createClient(url, srk);
-  const { data: room } = await sc.from("season_rooms").select("*").eq("id", roomId).single();
-  if (!room) return json(404, { code: "membership", message: "room not found" });
-  const isV2Pre = (room as unknown as { multiplayer_version?: string }).multiplayer_version === 'season-multiplayer-v2' && (room as unknown as { room_protocol_version?: number }).room_protocol_version === 2;
-  if (!isV2Pre) console.warn(`pre-draft-removal for room ${room.id} with version ${room.multiplayer_version}/${room.room_protocol_version}, allowing`);
-  if (room.phase !== "waiting") return json(400, { code: "phase", message: "not in waiting phase" });
-  const { data: member } = await sc.from("season_room_members").select("*").eq("room_id", roomId).eq("uid", uid).maybeSingle();
-  if (!member) return json(403, { code: "membership", message: "not a member" });
-  if (member.participant_id !== 'p1') return json(403, { code: 'authorization', message: 'only host can remove guest' });
-  if (targetParticipantId !== 'p2') return json(400, { code: 'authorization', message: 'can only remove guest before start' });
-  const { error: delError } = await sc.from("season_room_members").delete().eq("room_id", roomId).eq("participant_id", targetParticipantId);
-  if (delError) return json(500, { code: "authorization", message: "failed", detail: delError.message });
+  const { data: room } = await sc.from('season_rooms').select('*').eq('id', roomId).single();
+  if (!room) return json(404, { code: 'membership', message: 'room not found' });
+  const isV2Pre =
+    (room as unknown as { multiplayer_version?: string }).multiplayer_version ===
+      'season-multiplayer-v2' &&
+    (room as unknown as { room_protocol_version?: number }).room_protocol_version === 2;
+  if (!isV2Pre)
+    console.warn(
+      `pre-draft-removal for room ${room.id} with version ${room.multiplayer_version}/${room.room_protocol_version}, allowing`,
+    );
+  if (room.phase !== 'waiting')
+    return json(400, { code: 'phase', message: 'not in waiting phase' });
+  const { data: member } = await sc
+    .from('season_room_members')
+    .select('*')
+    .eq('room_id', roomId)
+    .eq('uid', uid)
+    .maybeSingle();
+  if (!member) return json(403, { code: 'membership', message: 'not a member' });
+  if (member.participant_id !== 'p1')
+    return json(403, { code: 'authorization', message: 'only host can remove guest' });
+  if (targetParticipantId !== 'p2')
+    return json(400, { code: 'authorization', message: 'can only remove guest before start' });
+  const { error: delError } = await sc
+    .from('season_room_members')
+    .delete()
+    .eq('room_id', roomId)
+    .eq('participant_id', targetParticipantId);
+  if (delError)
+    return json(500, { code: 'authorization', message: 'failed', detail: delError.message });
   // reset guest_ready
-  try { await sc.from("season_rooms").update({ guest_ready: false } as unknown as Record<string,unknown>).eq("id", roomId); } catch {}
+  try {
+    await sc
+      .from('season_rooms')
+      .update({ guest_ready: false } as unknown as Record<string, unknown>)
+      .eq('id', roomId);
+  } catch {}
   let newCode: string | null = null;
   for (let i = 0; i < 20; i++) {
-    const candidate = String(Math.floor(Math.random() * 10000)).padStart(4, "0");
-    const { error: updError } = await sc.from("season_rooms").update({ code: candidate, code_expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(), updated_at: new Date().toISOString(), guest_ready: false } as unknown as Record<string,unknown>).eq("id", roomId);
+    const candidate = String(Math.floor(Math.random() * 10000)).padStart(4, '0');
+    const { error: updError } = await sc
+      .from('season_rooms')
+      .update({
+        code: candidate,
+        code_expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        updated_at: new Date().toISOString(),
+        guest_ready: false,
+      } as unknown as Record<string, unknown>)
+      .eq('id', roomId);
     if (!updError) {
       newCode = candidate;
       break;
     }
-    if (!String(updError.message).includes("duplicate") && updError.code !== "23505") return json(500, { code: "authorization", message: "failed to generate code", detail: updError.message });
+    if (!String(updError.message).includes('duplicate') && updError.code !== '23505')
+      return json(500, {
+        code: 'authorization',
+        message: 'failed to generate code',
+        detail: updError.message,
+      });
   }
-  if (!newCode) return json(500, { code: "authorization", message: "failed to generate code" });
+  if (!newCode) return json(500, { code: 'authorization', message: 'failed to generate code' });
   return json(200, { code: newCode });
 });

@@ -50,7 +50,11 @@ Deno.serve(async (req: Request) => {
 
   // heartbeat: update last_seen_at for caller
   try {
-    await sc.from('season_room_members').update({ last_seen_at: new Date().toISOString() } as unknown as Record<string, unknown>).eq('room_id', roomId).eq('uid', uidVal);
+    await sc
+      .from('season_room_members')
+      .update({ last_seen_at: new Date().toISOString() } as unknown as Record<string, unknown>)
+      .eq('room_id', roomId)
+      .eq('uid', uidVal);
   } catch {}
 
   const { count } = await sc
@@ -77,8 +81,9 @@ Deno.serve(async (req: Request) => {
   const isOutdated =
     (room as unknown as { multiplayer_version?: string }).multiplayer_version !==
       'season-multiplayer-v2' ||
-    Number((room as unknown as { room_protocol_version?: number | string }).room_protocol_version) !==
-      2;
+    Number(
+      (room as unknown as { room_protocol_version?: number | string }).room_protocol_version,
+    ) !== 2;
 
   const snap = {
     roomId: room.id,
