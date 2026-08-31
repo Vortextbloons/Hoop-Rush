@@ -49,7 +49,7 @@ function toEnvelope(roomId: string, row: CommandRow) {
     typeof (p as { ordinal?: unknown }).ordinal === 'number' &&
     typeof (p as { commandId?: unknown }).commandId === 'string'
   ) {
-    return p;
+    return { ...(p as Record<string, unknown>), accepted: row.receipt?.accepted !== false };
   }
   return {
     schemaVersion: 2,
@@ -60,6 +60,7 @@ function toEnvelope(roomId: string, row: CommandRow) {
     payload: row.payload,
     actorParticipantId: row.actor_participant_id,
     actorFranchiseId: row.actor_franchise_id,
+    accepted: row.receipt?.accepted !== false,
   };
 }
 
@@ -101,14 +102,7 @@ Deno.serve(async (req: Request) => {
     .order('ordinal', { ascending: true })
     .limit(1000);
   if (error) return json(500, { code: 'authorization', message: error.message });
-  // Filter out rejected rows defensively; stale rejections should never be inserted at authoritative ordinal,
-  // but older poison rows (inserted before fix) could exist. Only replay accepted commands.
-  const filtered = (data ?? []).filter((r: CommandRow) => {
-    const rec = r.receipt as { accepted?: boolean } | null | undefined;
-    if (rec && typeof rec === 'object' && rec.accepted === false) return false;
-    return true;
-  });
   return json(200, {
-    commands: filtered.map((r: CommandRow) => toEnvelope(roomId, r)),
+    commands: (data ?? []).map((r: CommandRow) => toEnvelope(roomId, r)),
   });
 });

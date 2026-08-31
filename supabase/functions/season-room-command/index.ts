@@ -167,11 +167,20 @@ Deno.serve(async (req: Request) => {
     .eq('command_id', commandId)
     .maybeSingle();
   if (existing) return json(200, { receipt: existing.receipt });
-  const { count } = await serviceClient
+  const { data: latestCommands, error: latestError } = await serviceClient
     .from('season_room_commands')
-    .select('id', { count: 'exact', head: true })
-    .eq('room_id', roomId);
-  const expectedOrdinal = count ?? 0;
+    .select('ordinal')
+    .eq('room_id', roomId)
+    .order('ordinal', { ascending: false })
+    .limit(1);
+  if (latestError) {
+    return json(500, {
+      code: 'authorization',
+      message: 'failed to read command cursor',
+      detail: latestError.message,
+    });
+  }
+  const expectedOrdinal = (latestCommands?.[0]?.ordinal ?? -1) + 1;
   if (ordinal !== expectedOrdinal) {
     // Do NOT insert rejected stale commands into the authoritative season_room_commands table at ordinal expectedOrdinal.
     // This prevents poisoning the command stream; rejected payloads must not be replayed as authoritative.
@@ -212,6 +221,24 @@ Deno.serve(async (req: Request) => {
         .eq('command_id', commandId)
         .maybeSingle();
       if (again) return json(200, { receipt: again.receipt });
+      const { data: latestAfterConflict } = await serviceClient
+        .from('season_room_commands')
+        .select('ordinal')
+        .eq('room_id', roomId)
+        .order('ordinal', { ascending: false })
+        .limit(1);
+      const nextOrdinal = (latestAfterConflict?.[0]?.ordinal ?? ordinal) + 1;
+      return json(200, {
+        receipt: {
+          roomId,
+          commandId,
+          ordinal: nextOrdinal,
+          accepted: false,
+          rejectionCode: 'stale-revision',
+          resultDigest: null,
+          expectedOrdinal: nextOrdinal,
+        },
+      });
     }
     return json(500, {
       code: 'authorization',

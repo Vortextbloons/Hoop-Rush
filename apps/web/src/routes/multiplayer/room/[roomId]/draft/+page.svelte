@@ -45,6 +45,7 @@
     $state(null);
   let picking = $state(false);
   let drawing = $state(false);
+  let autoPickAttemptKey: string | null = null;
   let pickError = $state<string | null>(null);
   let finalizeBusy = $state(false);
   let generateBusy = $state(false);
@@ -255,6 +256,9 @@
       ) {
         const remaining = controller.getSecondsRemaining(Date.now());
         if (remaining !== null && remaining <= 0) {
+          const attemptKey = `${membership.participantId}:${String((draftState as any)?.revision ?? 0)}`;
+          if (autoPickAttemptKey === attemptKey) return;
+          autoPickAttemptKey = attemptKey;
           void controller.autoPickSafe(membership.participantId as 'p1' | 'p2').then((ns) => {
             if (ns) {
               draftState = { ...ns } as typeof draftState;
@@ -442,6 +446,7 @@
     (draftState as any)?.picks.length === 20 && (draftState as any)?.status === 'drafting',
   );
   let canGenerate = $derived((draftState as any)?.status === 'finalized');
+  let canEnterRun = $derived((draftState as any)?.status === 'complete' && generation !== null);
 </script>
 
 <svelte:head><title>Draft · Room {roomId.slice(0, 8)} — Hoop Rush</title></svelte:head>
@@ -958,11 +963,19 @@
           class="rounded-lg border border-line-soft bg-card px-4 py-2 text-sm font-semibold"
           >Back to lobby</a
         >
-        <a
-          href={`/multiplayer/room/${roomId}/run`}
-          class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
-          >Go to run →</a
-        >
+        {#if canEnterRun}
+          <a
+            href={`/multiplayer/room/${roomId}/run`}
+            class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+            >Go to run →</a
+          >
+        {:else}
+          <span
+            aria-disabled="true"
+            class="cursor-not-allowed rounded-lg border border-line-soft bg-muted px-4 py-2 text-sm font-semibold text-muted-foreground"
+            >Run unlocks after draft verification</span
+          >
+        {/if}
         <span
           class="inline-flex items-center gap-1.5 rounded-full border border-line-soft bg-card px-3 py-2 text-xs"
           ><Clock class="h-3 w-3" />

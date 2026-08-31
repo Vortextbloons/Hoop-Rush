@@ -70,38 +70,18 @@ Deno.serve(async (req: Request) => {
   if (expectedRev !== undefined && expectedRev !== currentRev) {
     return json(409, { code: 'stale-revision', message: 'stale settings revision' });
   }
-  let updated: unknown = null;
-  let error: unknown = null;
-  {
-    const v2Update = {
+  const { data: updated, error } = await sc
+    .from('season_rooms')
+    .update({
       pace,
       mode,
       settings_revision: currentRev + 1,
       guest_ready: false,
       updated_at: new Date().toISOString(),
-    } as unknown as Record<string, unknown>;
-    const res = await sc
-      .from('season_rooms')
-      .update(v2Update)
-      .eq('id', roomId)
-      .select('*')
-      .single();
-    updated = (res as { data: unknown }).data;
-    error = (res as { error: unknown }).error;
-    if (error && String((error as { message?: string }).message ?? '').includes('guest_ready')) {
-      const fallback = await sc
-        .from('season_rooms')
-        .update({ pace, mode, updated_at: new Date().toISOString() } as unknown as Record<
-          string,
-          unknown
-        >)
-        .eq('id', roomId)
-        .select('*')
-        .single();
-      updated = (fallback as { data: unknown }).data;
-      error = (fallback as { error: unknown }).error;
-    }
-  }
+    } as unknown as Record<string, unknown>)
+    .eq('id', roomId)
+    .select('*')
+    .single();
   if (error || !updated)
     return json(500, { code: 'authorization', message: 'failed to update settings' });
   // heartbeat host

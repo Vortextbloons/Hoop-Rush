@@ -102,9 +102,9 @@ export class RoomDraftController {
       opts.fetchImpl ??
       (typeof fetch !== 'undefined'
         ? fetch.bind(globalThis)
-        : (async () => {
+        : async () => {
             throw new Error('fetch unavailable');
-          }));
+          });
     // Claim 6: restore persisted turn start to avoid granting +90s on reload
     const persisted = this.loadPersistedTurn();
     if (persisted !== null) this.turnStartedAt = persisted;
@@ -391,8 +391,8 @@ export class RoomDraftController {
   }
 
   private franchiseIdOf(participantId: string): string {
-    if (this.state) return franchiseIdOfState(this.state, participantId);
     if (this.membership?.participantId === participantId) return this.membership.franchiseId;
+    if (this.state) return franchiseIdOfState(this.state, participantId);
     return participantId === 'p1' ? 'franchise-p1' : 'franchise-p2';
   }
 
@@ -443,6 +443,9 @@ export class RoomDraftController {
     let applyFailures = 0;
     for (const env of envelopes) {
       lastOrdinal = Math.max(lastOrdinal, env.ordinal);
+      if ((env as SeasonPublicCommandEnvelope & { accepted?: boolean }).accepted === false) {
+        continue;
+      }
       const raw = env.payload;
       let command: SeasonDraftCommand | null = null;
       if (isDraftCommand(raw)) {
@@ -609,6 +612,10 @@ export class RoomDraftController {
       );
     }
     if (this.state !== null) return this.state;
+    if (this.membership?.participantId !== 'p1') {
+      await this.restoreFromLog();
+      return this.state;
+    }
     await this.ensureAssets();
     if (!this.catalog || !this.league) throw new Error('assets not loaded');
     const rootSeed =
@@ -681,7 +688,10 @@ export class RoomDraftController {
     }
   }
 
-  async drawOffer(participantId: 'p1' | 'p2'): Promise<SeasonDraftCommandRecord> {
+  async drawOffer(
+    participantId: 'p1' | 'p2',
+    retryAfterStale = true,
+  ): Promise<SeasonDraftCommandRecord> {
     await this.ensureAssets();
     if (!this.state) {
       await this.restoreFromLog();
@@ -733,6 +743,15 @@ export class RoomDraftController {
     if (!receipt.accepted) {
       if (receipt.rejectionCode === 'stale-revision') {
         await this.restoreFromLog();
+        const prior = this.state?.commandLog.find((record) => record.commandId === commandId);
+        if (prior) return prior;
+        if (
+          retryAfterStale &&
+          this.state?.currentTurnParticipantId === participantId &&
+          !this.state.currentOffer
+        ) {
+          return this.drawOffer(participantId, false);
+        }
         throw Object.assign(new Error('stale revision'), {
           code: 'STALE_REVISION',
           errorCode: 'STALE_REVISION',
@@ -758,7 +777,11 @@ export class RoomDraftController {
     return applied.record;
   }
 
-  async submitPick(participantId: 'p1' | 'p2', playerVersionId: string): Promise<SeasonDraftState> {
+  async submitPick(
+    participantId: 'p1' | 'p2',
+    playerVersionId: string,
+    retryAfterStale = true,
+  ): Promise<SeasonDraftState> {
     await this.ensureAssets();
     if (!this.state) {
       await this.restoreFromLog();
@@ -827,6 +850,16 @@ export class RoomDraftController {
     if (!receipt.accepted) {
       if (receipt.rejectionCode === 'stale-revision') {
         await this.restoreFromLog();
+        if (this.state?.picks.some((pick) => pick.playerVersionId === playerVersionId)) {
+          return this.state;
+        }
+        if (
+          retryAfterStale &&
+          this.state?.currentTurnParticipantId === participantId &&
+          this.state.currentOffer?.cards.some((card) => card.playerVersionId === playerVersionId)
+        ) {
+          return this.submitPick(participantId, playerVersionId, false);
+        }
         throw Object.assign(new Error('stale revision'), {
           code: 'STALE_REVISION',
           errorCode: 'STALE_REVISION',
@@ -902,7 +935,7 @@ export class RoomDraftController {
     }
   }
 
-  async finalizeRosters(): Promise<SeasonDraftCommandRecord> {
+  async finalizeRosters(retryAfterStale = true): Promise<SeasonDraftCommandRecord> {
     await this.ensureAssets();
     if (!this.state) throw new Error('no draft state');
     const state = this.state;
@@ -931,6 +964,11 @@ export class RoomDraftController {
     if (!receipt.accepted) {
       if (receipt.rejectionCode === 'stale-revision') {
         await this.restoreFromLog();
+        const prior = this.state?.commandLog.find((record) => record.commandId === commandId);
+        if (prior) return prior;
+        if (retryAfterStale && this.state?.status === 'drafting') {
+          return this.finalizeRosters(false);
+        }
         throw Object.assign(new Error('stale revision'), { code: 'STALE_REVISION' });
       }
       throw Object.assign(new Error(receipt.rejectionCode ?? 'rejected'), {
@@ -943,7 +981,7 @@ export class RoomDraftController {
     return applied.record;
   }
 
-  async generateAiLeague(): Promise<{
+  async generateAiLeague(retryAfterStale = true): Promise<{
     state: SeasonDraftState | null;
     generation: SeasonLeagueGenerationResult | null;
     digest: string | null;
@@ -979,6 +1017,17 @@ export class RoomDraftController {
     if (!receipt.accepted) {
       if (receipt.rejectionCode === 'stale-revision') {
         await this.restoreFromLog();
+        const restoredState = this.state as SeasonDraftState | null;
+        if (restoredState?.status === 'complete' && this.generation) {
+          return {
+            state: restoredState,
+            generation: this.generation,
+            digest: this.generation.digest,
+          };
+        }
+        if (retryAfterStale && restoredState?.status === 'finalized') {
+          return this.generateAiLeague(false);
+        }
         throw Object.assign(new Error('stale revision'), { code: 'STALE_REVISION' });
       }
       throw Object.assign(new Error(receipt.rejectionCode ?? 'rejected'), {

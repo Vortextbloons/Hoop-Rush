@@ -71,35 +71,15 @@ Deno.serve(async (req: Request) => {
   if (expectedRev !== undefined && expectedRev !== currentRev) {
     return json(409, { code: 'stale-revision', message: 'stale settings revision' });
   }
-  let updated: unknown = null;
-  let error: unknown = null;
-  {
-    const res = await sc
-      .from('season_rooms')
-      .update({ guest_ready: ready, updated_at: new Date().toISOString() } as unknown as Record<
-        string,
-        unknown
-      >)
-      .eq('id', roomId)
-      .select('*')
-      .single();
-    updated = (res as { data: unknown }).data;
-    error = (res as { error: unknown }).error;
-    if (error && String((error as { message?: string }).message ?? '').includes('guest_ready')) {
-      const fallback = await sc
-        .from('season_rooms')
-        .update({ updated_at: new Date().toISOString() } as unknown as Record<string, unknown>)
-        .eq('id', roomId)
-        .select('*')
-        .single();
-      updated = (fallback as { data: unknown }).data;
-      error = (fallback as { error: unknown }).error;
-      // for v1 rooms without guest_ready, just return the room as-is but treat as if ready was set (client will handle)
-      if (!error && updated) {
-        (updated as unknown as { guest_ready?: boolean }).guest_ready = ready;
-      }
-    }
-  }
+  const { data: updated, error } = await sc
+    .from('season_rooms')
+    .update({ guest_ready: ready, updated_at: new Date().toISOString() } as unknown as Record<
+      string,
+      unknown
+    >)
+    .eq('id', roomId)
+    .select('*')
+    .single();
   if (error || !updated)
     return json(500, { code: 'authorization', message: 'failed to set ready' });
   try {

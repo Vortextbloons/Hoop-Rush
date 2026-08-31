@@ -9,6 +9,7 @@ import type {
   SeasonPrivateDecisionSubmission,
   SeasonCheckpointAttestation,
   SeasonPublicCommandEnvelope,
+  SeasonMultiplayerTransport,
 } from '@hoop-rush/data-contracts';
 import { RoomDraftController } from '$lib/season/room-draft-controller';
 import { createInMemorySeasonRoomCoordinator } from '$lib/season/season-room-coordinator';
@@ -33,6 +34,92 @@ function settingsLiveSeason() {
 }
 
 describe('multiplayer two-client deterministic flow (claim 11)', () => {
+  it('replays and retries a draft draw after a transient stale ordinal', async () => {
+    const backing = new InMemorySeasonMultiplayerTransport();
+    const created = await backing.create(settingsLiveSeason(), ROOT_SEED);
+    const roomId = created.roomId;
+    const code = (created as unknown as { code: string }).code;
+    await backing.join(code);
+    await backing.setReady(roomId, 'p2', true, 0);
+    await backing.startDraft(roomId);
+
+    let rejectedDraw = false;
+    const transport = new Proxy(backing as SeasonMultiplayerTransport, {
+      get(target, property, receiver) {
+        if (property !== 'submitCommand') return Reflect.get(target, property, receiver);
+        return async (envelope: SeasonPublicCommandEnvelope) => {
+          const command = envelope.payload as { payload?: { kind?: string } };
+          if (
+            command.payload?.kind === 'draw-season-offer' &&
+            envelope.actorFranchiseId !== 'franchise-p2'
+          ) {
+            throw Object.assign(new Error('actor franchise mismatch'), { code: 'authorization' });
+          }
+          if (!rejectedDraw && command.payload?.kind === 'draw-season-offer') {
+            rejectedDraw = true;
+            return {
+              roomId,
+              commandId: envelope.commandId,
+              ordinal: envelope.ordinal + 1,
+              accepted: false,
+              rejectionCode: 'stale-revision',
+              resultDigest: null,
+            };
+          }
+          return target.submitCommand(envelope);
+        };
+      },
+    });
+    const catalog = buildSeasonDraftCatalog({
+      franchiseIds: ['lakers', 'celtics', 'bulls', 'warriors'],
+      eras: ['1990s', '2000s'],
+      playersPerPool: 12,
+    });
+    const league = buildSeasonLeague({}, { humanFranchiseId: 'lakers' });
+    const rosterTargets = buildFixtureRosterTargets();
+    const controller = new RoomDraftController({
+      transport,
+      roomId,
+      snapshot: await backing.resume(roomId),
+      membership: {
+        roomId,
+        participantId: 'p2',
+        franchiseId: 'franchise-p2',
+        uid: `uid-p2-${roomId}`,
+        seat: 'p2',
+      },
+      catalog,
+      league,
+      rosterTargets,
+    });
+
+    await expect(controller.ensureDraftCreated()).resolves.toBeNull();
+    const hostController = new RoomDraftController({
+      transport: backing,
+      roomId,
+      snapshot: await backing.resume(roomId),
+      membership: {
+        roomId,
+        participantId: 'p1',
+        franchiseId: 'franchise-p1',
+        uid: `uid-p1-${roomId}`,
+        seat: 'p1',
+      },
+      catalog,
+      league,
+      rosterTargets,
+    });
+    await hostController.ensureDraftCreated();
+    await controller.restoreFromLog();
+    const participantId = controller.getTurn() as 'p1' | 'p2';
+    expect(participantId).toBe('p2');
+    await expect(controller.drawOffer(participantId)).resolves.toMatchObject({
+      status: 'accepted',
+    });
+    expect(rejectedDraw).toBe(true);
+    expect(controller.currentOffer()).not.toBeNull();
+  });
+
   it('create → join → drafting → lock → attest → advance covers phases, ordering, idempotency, impersonation, stale-revision', async () => {
     let now = Date.parse('2026-01-01T00:00:00.000Z');
     const clock = () => now;
