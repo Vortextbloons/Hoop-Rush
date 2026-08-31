@@ -657,7 +657,7 @@
               <p class="mt-1 inline-flex items-center gap-1.5 text-xs">
                 <span class="h-2 w-2 rounded-full {hostOnline ? 'bg-positive' : 'bg-amber-500'}"
                 ></span>
-                {hostOnline ? 'Heartbeat fresh' : 'No heartbeat — 15s offline'}
+                {hostOnline ? 'Heartbeat fresh' : 'No heartbeat — 30s offline'}
               </p>
             </div>
             <!-- Guest card -->
@@ -736,7 +736,7 @@
             <div
               class="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive"
             >
-              Opponent disconnected — presence offline after 15s without heartbeat. Preserving
+              Opponent disconnected — presence offline after 30s without heartbeat. Preserving
               membership; Start unavailable until reconnection.
             </div>
           {:else if snap.phase === 'drafting'}

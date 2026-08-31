@@ -65,6 +65,15 @@ Deno.serve(async (req: Request) => {
     return json(403, { code: 'authorization', message: 'only host can start draft' });
   if (room.phase !== 'waiting')
     return json(400, { code: 'phase', message: `cannot start draft from phase ${room.phase}` });
+  // Refresh caller's presence before gating: ensures host is considered online even if last heartbeat was shortly before
+  const nowIso = new Date().toISOString();
+  try {
+    await sc
+      .from('season_room_members')
+      .update({ last_seen_at: nowIso } as unknown as Record<string, unknown>)
+      .eq('room_id', roomId)
+      .eq('uid', uidVal);
+  } catch {}
   const { data: allMembers, count } = await sc
     .from('season_room_members')
     .select('participant_id, last_seen_at', { count: 'exact' })
@@ -77,7 +86,7 @@ Deno.serve(async (req: Request) => {
     'season-multiplayer-v2';
   if (isV2Guest && guestReadyRaw === false)
     return json(400, { code: 'not-ready', message: 'guest not ready' });
-  // presence gating: both must be online within 15s - only for v2 with last_seen_at
+  // presence gating: both must be online within 30s - only for v2 with last_seen_at
   const nowMs = Date.now();
   const hasPresenceColumn = (allMembers ?? []).some(
     (m) => (m as unknown as { last_seen_at?: string | null }).last_seen_at !== undefined,
@@ -89,7 +98,7 @@ Deno.serve(async (req: Request) => {
     }>) {
       if (m.last_seen_at === undefined) continue; // column not exists, treat as online
       const lastSeen = m.last_seen_at ? new Date(m.last_seen_at).getTime() : 0;
-      if (m.last_seen_at && nowMs - lastSeen > 15_000) {
+      if (m.last_seen_at && nowMs - lastSeen > 30_000) {
         return json(400, { code: 'opponent-disconnected', message: 'opponent disconnected' });
       }
     }
@@ -108,7 +117,7 @@ Deno.serve(async (req: Request) => {
     const lastSeen = m.last_seen_at ? new Date(m.last_seen_at).getTime() : nowMs;
     return {
       participantId: m.participant_id as 'p1' | 'p2',
-      online: nowMs - lastSeen <= 15_000,
+      online: nowMs - lastSeen <= 30_000,
       lastSeenAt: m.last_seen_at ?? new Date(nowMs).toISOString(),
     };
   });

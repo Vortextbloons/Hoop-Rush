@@ -213,13 +213,21 @@
   async function load() {
     loading = true;
     error = null;
+    // Start heartbeat/subscribe early so presence stays fresh during asset loads
+    let earlyCoordinator: ReturnType<typeof getCoordinator> | null = null;
     try {
-      await loadDisplayAssets();
-      coordinator = getCoordinator();
-      const stored = loadMembership(roomId);
+      // Ensure coordinator and heartbeat start before slow asset fetches
+      earlyCoordinator = getCoordinator();
+      coordinator = earlyCoordinator;
       try {
         coordinator.hydrateFromStorage(roomId);
       } catch {}
+      // Subscribe early: will start heartbeat every 5s; onSnapshot will be ignored until controller exists
+      try {
+        coordinator.subscribe(roomId);
+      } catch {}
+      await loadDisplayAssets();
+      const stored = loadMembership(roomId);
       const t = transport as unknown as SeasonMultiplayerTransport | null;
       let res: SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership };
       if (t) {
@@ -249,7 +257,10 @@
           catalog,
           fetchImpl: fetch,
         });
-        coordinator.subscribe(roomId);
+        // Ensure subscribe is active with controller present (re-subscribe to bind controller)
+        try {
+          coordinator.subscribe(roomId);
+        } catch {}
         // Claim 6: honor server deadline if snapshot carries it, else try to fetch from season_deadlines
         const snapWithDeadline = snap as unknown as {
           deadlineAt?: string | null;
@@ -618,7 +629,7 @@
               class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-700"
             >
               <WifiOff class="h-3 w-3" /> Opponent disconnected — waiting for reconnection · presence
-              offline after 15s
+              offline after 30s
             </p>
           {:else}
             <p

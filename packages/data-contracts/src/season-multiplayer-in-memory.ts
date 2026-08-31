@@ -421,8 +421,10 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     if (room.members.size !== 2)
       throw Object.assign(new Error('waiting for opponent'), { code: 'phase' });
     if (!room.guestReady) throw Object.assign(new Error('guest not ready'), { code: 'not-ready' });
-    // presence gating: both must be online (within 15s)
+    // Refresh host presence before gating (mirrors edge: ensures caller not considered offline)
     const now = this.clock();
+    if (room.members.has('p1')) room.presence.set('p1', now);
+    // presence gating: both must be online (within 30s)
     for (const pid of ['p1', 'p2'] as const) {
       const lastSeen = room.presence.get(pid);
       if (lastSeen === undefined || now - lastSeen > PRESENCE_OFFLINE_AFTER_MS) {

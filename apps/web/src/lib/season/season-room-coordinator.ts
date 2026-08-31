@@ -63,12 +63,12 @@ export function createSeasonRoomCoordinator(deps: SeasonRoomCoordinatorDeps) {
 
   function startHeartbeat(roomId: string) {
     stopHeartbeat();
-    // heartbeat every 10s, presence offline after 15s
+    // heartbeat every 5s, presence offline after 30s (generous slack for asset loads / throttling)
     heartbeatTimer = setInterval(() => {
       const pid = state.participantId;
       if (!pid || !state.roomId) return;
       void deps.transport.heartbeat(state.roomId, pid).catch(() => {});
-    }, 10_000);
+    }, 5_000);
     // immediate heartbeat
     const pid = state.participantId;
     if (pid) void deps.transport.heartbeat(roomId, pid).catch(() => {});

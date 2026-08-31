@@ -103,7 +103,7 @@ Deno.serve(async (req: Request) => {
     const lastSeen = row.last_seen_at ? new Date(row.last_seen_at).getTime() : nowMs;
     return {
       participantId: row.participant_id as 'p1' | 'p2',
-      online: nowMs - lastSeen <= 15_000,
+      online: nowMs - lastSeen <= 30_000,
       lastSeenAt: row.last_seen_at ?? new Date(nowMs).toISOString(),
     };
   });

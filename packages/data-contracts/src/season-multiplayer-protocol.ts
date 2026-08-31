@@ -54,7 +54,7 @@ export const seasonRoomSettingsV1Schema = z.object({
   timerPolicyVersion: z.literal(SEASON_TIMER_POLICY_VERSION),
 });
 
-export const PRESENCE_OFFLINE_AFTER_MS = 15_000;
+export const PRESENCE_OFFLINE_AFTER_MS = 30_000;
 
 export const seasonRoomPublicSnapshotSchema = z.object({
   roomId: idSchema,

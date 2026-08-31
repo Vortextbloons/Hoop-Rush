@@ -44,8 +44,7 @@ describe('multiplayer two-client deterministic flow (claim 11)', () => {
       roomId,
       commandId: 'guest-retry-command',
       ordinal: 0,
-      expectedRevision: 0,
-      expectedDigest: null,
+      runId: roomId,
       payload: { kind: 'test-command' },
       actorParticipantId: 'p1' as const,
       actorFranchiseId: 'franchise-p1',
@@ -86,9 +85,9 @@ describe('multiplayer two-client deterministic flow (claim 11)', () => {
     });
 
     coordinator.subscribe(roomId);
-    notify?.(snapshot);
+    (notify as unknown as (v: typeof snapshot) => void)?.(snapshot);
     await new Promise((resolve) => setTimeout(resolve, 0));
-    notify?.(snapshot);
+    (notify as unknown as (v: typeof snapshot) => void)?.(snapshot);
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(refetchAfter).toEqual([-1, -1]);
@@ -260,8 +259,8 @@ describe('multiplayer two-client deterministic flow (claim 11)', () => {
     expect(afterStart.presence.find((p) => p.participantId === 'p1')?.online).toBe(true);
     expect(afterStart.presence.find((p) => p.participantId === 'p2')?.online).toBe(true);
 
-    // presence offline after 15s without heartbeat
-    now += 20_000;
+    // presence offline after 30s without heartbeat
+    now += 35_000;
     const snapTimeout = await transport.resume(roomId);
     expect(snapTimeout.presence.find((p) => p.participantId === 'p1')?.online).toBe(false);
     expect(snapTimeout.presence.find((p) => p.participantId === 'p2')?.online).toBe(false);
