@@ -68,6 +68,48 @@ function franchiseIdOfState(state: SeasonDraftState, participantId: string): str
   return p?.franchiseId ?? `franchise-${participantId}`;
 }
 
+function envelopeToDraftCommand(
+  env: SeasonPublicCommandEnvelope,
+  state: SeasonDraftState | null,
+): SeasonDraftCommand | null {
+  if ((env as SeasonPublicCommandEnvelope & { accepted?: boolean }).accepted === false) {
+    return null;
+  }
+  const raw = env.payload;
+  if (isDraftCommand(raw)) return raw;
+  if (!raw || typeof raw !== 'object' || !('kind' in (raw as Record<string, unknown>))) {
+    return null;
+  }
+  const payload = raw as SeasonDraftCommand['payload'];
+  const kinds = [
+    'create-season-draft',
+    'draw-season-offer',
+    'select-draft-player',
+    'finalize-human-rosters',
+    'generate-ai-league',
+    'reveal-draft-roll',
+    'claim-draft-pool',
+  ];
+  if (kinds.includes(payload.kind)) {
+    return {
+      commandId: env.commandId,
+      expectedRevision: state?.revision ?? 0,
+      payload,
+    };
+  }
+  if ((payload as unknown as Record<string, unknown>).kind === 'room-draft-pick') {
+    const p = payload as unknown as { participantId: string; playerVersionId: string };
+    const pid = p.participantId as 'p1' | 'p2';
+    const vid = p.playerVersionId;
+    return {
+      commandId: env.commandId,
+      expectedRevision: state?.revision ?? 0,
+      payload: { kind: 'select-draft-player', participantId: pid, playerVersionId: vid },
+    };
+  }
+  return null;
+}
+
 export class RoomDraftController {
   private transport: SeasonMultiplayerTransport;
   private roomId: string;
@@ -89,6 +131,7 @@ export class RoomDraftController {
   private lastReplayError: string | null = null;
   private integrityFailed = false;
   private skippedCommands = 0;
+  private restoreInFlight: Promise<SeasonDraftState | null> | null = null;
 
   constructor(opts: RoomDraftControllerOptions) {
     this.transport = opts.transport;
@@ -416,181 +459,162 @@ export class RoomDraftController {
     return result.offer;
   }
 
-  async restoreFromLog(): Promise<SeasonDraftState | null> {
+  async restoreFromLog(options?: { full?: boolean }): Promise<SeasonDraftState | null> {
+    if (this.restoreInFlight) return this.restoreInFlight;
+    const run = this.restoreFromLogInner(options?.full ?? false);
+    this.restoreInFlight = run;
+    try {
+      return await run;
+    } finally {
+      if (this.restoreInFlight === run) this.restoreInFlight = null;
+    }
+  }
+
+  async applyIncomingCommands(
+    envelopes: SeasonPublicCommandEnvelope[],
+  ): Promise<SeasonDraftState | null> {
+    if (envelopes.length === 0) return this.state;
     await this.ensureAssets();
     if (!this.catalog || !this.league) throw new Error('catalog or league not loaded');
-    const catalog = this.catalog;
-    const deps = this.generationDeps();
+    if (this.state === null) return this.restoreFromLog({ full: true });
+    const sorted = [...envelopes].sort((a, b) => a.ordinal - b.ordinal);
+    const fresh = sorted.filter((env) => env.ordinal > this.lastOrdinal);
+    if (fresh.length === 0) return this.state;
+    return this.replayEnvelopes(fresh, { resetIntegrity: false });
+  }
+
+  private async restoreFromLogInner(full: boolean): Promise<SeasonDraftState | null> {
+    await this.ensureAssets();
+    if (!this.catalog || !this.league) throw new Error('catalog or league not loaded');
     let envelopes: SeasonPublicCommandEnvelope[] = [];
-    // Claim 8: surface fetch failures instead of silently discarding
+    const afterOrdinal = full || this.state === null ? -1 : this.lastOrdinal;
     try {
-      envelopes = await this.transport.refetch(this.roomId, -1);
+      envelopes = await this.transport.refetch(this.roomId, afterOrdinal);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error('[room-draft-controller] refetch failed', e);
       this.lastReplayError = `refetch failed: ${msg}`;
       this.integrityFailed = true;
-      // Preserve error for UI; do not silently continue with empty log — throw so caller can display
-      // Minimal preserve: set envelopes=[] but flag failure; caller will see hasIntegrityFailure()
       envelopes = [];
     }
+    if (envelopes.length === 0 && this.state !== null && !full) return this.state;
+    return this.replayEnvelopes(envelopes, { resetIntegrity: true, full });
+  }
+
+  private replayEnvelopes(
+    envelopes: SeasonPublicCommandEnvelope[],
+    options: { resetIntegrity: boolean; full?: boolean },
+  ): SeasonDraftState | null {
+    const catalog = this.catalog!;
+    const deps = this.generationDeps();
     envelopes.sort((a, b) => a.ordinal - b.ordinal);
-    let state: SeasonDraftState | null = null;
-    let lastOrdinal = -1;
+    let state: SeasonDraftState | null = options.full ? null : this.state;
+    let lastOrdinal = options.full ? -1 : this.lastOrdinal;
     let generation: SeasonLeagueGenerationResult | null = this.generation;
-    // Reset per-replay counters but keep lastReplayError if already set by fetch failure
-    let skipped = 0;
-    let applyFailures = 0;
-    for (const env of envelopes) {
-      lastOrdinal = Math.max(lastOrdinal, env.ordinal);
-      if ((env as SeasonPublicCommandEnvelope & { accepted?: boolean }).accepted === false) {
-        continue;
-      }
-      const raw = env.payload;
-      let command: SeasonDraftCommand | null = null;
-      if (isDraftCommand(raw)) {
-        command = raw;
-      } else if (raw && typeof raw === 'object' && 'kind' in (raw as Record<string, unknown>)) {
-        const payload = raw as SeasonDraftCommand['payload'];
-        const kinds = [
-          'create-season-draft',
-          'draw-season-offer',
-          'select-draft-player',
-          'finalize-human-rosters',
-          'generate-ai-league',
-          'reveal-draft-roll',
-          'claim-draft-pool',
-        ];
-        if (kinds.includes(payload.kind)) {
-          command = {
+    if (options.resetIntegrity) {
+      let skipped = 0;
+      let applyFailures = 0;
+      for (const env of envelopes) {
+        lastOrdinal = Math.max(lastOrdinal, env.ordinal);
+        const command = envelopeToDraftCommand(env, state);
+        if (!command) {
+          skipped += 1;
+          console.warn('[room-draft-controller] skipping invalid command', {
+            ordinal: env.ordinal,
             commandId: env.commandId,
-            expectedRevision: state?.revision ?? 0,
-            payload,
-          };
-        } else if ((payload as unknown as Record<string, unknown>).kind === 'room-draft-pick') {
-          const p = payload as unknown as { participantId: string; playerVersionId: string };
-          const pid = p.participantId as 'p1' | 'p2';
-          const vid = p.playerVersionId;
-          if (state && state.currentOffer && state.currentOffer.participantId === pid) {
-            command = {
-              commandId: env.commandId,
-              expectedRevision: state.revision,
-              payload: { kind: 'select-draft-player', participantId: pid, playerVersionId: vid },
-            };
-          } else {
-            command = {
-              commandId: env.commandId,
-              expectedRevision: state?.revision ?? 0,
-              payload: { kind: 'select-draft-player', participantId: pid, playerVersionId: vid },
-            };
-          }
+            raw: env.payload,
+          });
+          continue;
+        }
+        try {
+          const result = applySeasonDraftCommand(state, catalog, command, deps);
+          state = result.state;
+          if (result.generation) generation = result.generation;
+        } catch (e) {
+          applyFailures += 1;
+          const msg = e instanceof Error ? e.message : String(e);
+          console.error('[room-draft-controller] replay apply failed', {
+            ordinal: env.ordinal,
+            commandId: env.commandId,
+            error: e,
+          });
+          this.lastReplayError = `replay failed at ordinal ${env.ordinal} (${env.commandId}): ${msg}`;
+          this.integrityFailed = true;
+          continue;
         }
       }
-      if (!command) {
-        // Claim 8: warn and count skipped invalid commands instead of silent continue
-        skipped += 1;
-        console.warn('[room-draft-controller] skipping invalid command', {
-          ordinal: env.ordinal,
-          commandId: env.commandId,
-          raw,
-        });
-        continue;
+      if (skipped > 0) {
+        this.skippedCommands = skipped;
+        const msg = `skipped ${skipped} invalid command(s) during replay`;
+        console.warn('[room-draft-controller]', msg);
+        if (!this.lastReplayError) this.lastReplayError = msg;
+      } else {
+        this.skippedCommands = 0;
       }
-      try {
-        const result = applySeasonDraftCommand(state, catalog, command, deps);
-        state = result.state;
-        if (result.generation) generation = result.generation;
-      } catch (e) {
-        // Claim 8: surface integrity failure instead of swallowing
-        applyFailures += 1;
-        const msg = e instanceof Error ? e.message : String(e);
-        console.error('[room-draft-controller] replay apply failed', {
-          ordinal: env.ordinal,
-          commandId: env.commandId,
-          error: e,
-        });
-        this.lastReplayError = `replay failed at ordinal ${env.ordinal} (${env.commandId}): ${msg}`;
+      if (applyFailures > 0) {
+        if (!this.lastReplayError)
+          this.lastReplayError = `${applyFailures} command(s) failed to apply during replay`;
         this.integrityFailed = true;
-        // Continue replaying other commands but mark failure; UI can show lastReplayError
-        continue;
-      }
-    }
-    if (skipped > 0) {
-      this.skippedCommands = skipped;
-      const msg = `skipped ${skipped} invalid command(s) during replay`;
-      console.warn('[room-draft-controller]', msg);
-      // Preserve first error if none already set
-      if (!this.lastReplayError) this.lastReplayError = msg;
-    } else {
-      this.skippedCommands = 0;
-    }
-    if (applyFailures > 0) {
-      // integrityFailed already set; ensure lastReplayError reflects count if not detailed
-      if (!this.lastReplayError)
-        this.lastReplayError = `${applyFailures} command(s) failed to apply during replay`;
-      this.integrityFailed = true;
-    } else if (
-      skipped === 0 &&
-      this.lastReplayError &&
-      this.lastReplayError.startsWith('refetch failed')
-    ) {
-      // keep refetch error as integrity failure
-    } else if (skipped === 0 && applyFailures === 0 && envelopes.length > 0) {
-      // Successful replay: clear previous non-refetch errors but keep refetch failure if present
-      // Only clear if we previously had a non-refetch error; keep success state clean
-      if (
-        this.integrityFailed &&
+      } else if (
+        skipped === 0 &&
         this.lastReplayError &&
-        !this.lastReplayError.startsWith('refetch failed')
+        this.lastReplayError.startsWith('refetch failed')
       ) {
-        // If prior failure was transient and now replay succeeded, clear it
-        // Uncomment to auto-clear: but safer to clear skipped/apply failures only when this replay succeeded
-        // We clear integrityFailed if this replay had no failures and previous error wasn't refetch
-        this.lastReplayError = null;
-        this.integrityFailed = false;
+        // keep refetch error
+      } else if (skipped === 0 && applyFailures === 0 && envelopes.length > 0) {
+        if (
+          this.integrityFailed &&
+          this.lastReplayError &&
+          !this.lastReplayError.startsWith('refetch failed')
+        ) {
+          this.lastReplayError = null;
+          this.integrityFailed = false;
+        }
       }
       if (
         skipped === 0 &&
         applyFailures === 0 &&
         !this.lastReplayError?.startsWith('refetch failed')
       ) {
-        // Ensure clean if no issues
-        if (!this.integrityFailed) {
+        if (this.integrityFailed && envelopes.length > 0) {
           this.lastReplayError = null;
+          this.integrityFailed = false;
         }
       }
-    }
-    // If replay was fully clean, clear error state
-    if (
-      skipped === 0 &&
-      applyFailures === 0 &&
-      !this.lastReplayError?.startsWith('refetch failed')
-    ) {
-      // If we had a prior error but now replay succeeded with no skipped/failed, clear it
-      if (this.integrityFailed && envelopes.length > 0) {
-        // Only clear if current replay succeeded
-        // Actually we already set logic above; ensure no stale error remains when replay clean
-        this.lastReplayError = null;
-        this.integrityFailed = false;
+    } else {
+      for (const env of envelopes) {
+        lastOrdinal = Math.max(lastOrdinal, env.ordinal);
+        const command = envelopeToDraftCommand(env, state);
+        if (!command) continue;
+        try {
+          const result = applySeasonDraftCommand(state, catalog, command, deps);
+          state = result.state;
+          if (result.generation) generation = result.generation;
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          console.error('[room-draft-controller] incremental apply failed', {
+            ordinal: env.ordinal,
+            commandId: env.commandId,
+            error: e,
+          });
+          this.lastReplayError = `incremental apply failed at ordinal ${env.ordinal}: ${msg}`;
+          this.integrityFailed = true;
+          break;
+        }
       }
     }
     this.state = state;
     this.generation = generation;
     this.lastOrdinal = lastOrdinal;
     if (state?.currentTurnParticipantId) {
-      // Claim 6: do NOT unconditionally reset turnStartedAt = Date.now() on every restore.
-      // Server deadline is authoritative; local timer is fallback and must survive reloads.
       if (this.deadlineAt) {
-        // Server deadline present — keep local turnStartedAt null or existing; remaining derived from deadlineAt
         void seasonNamespaceSeed(state.rootSeed, 'draft', 'first-pick');
         void createRng(seasonNamespaceSeed(state.rootSeed, 'draft', 'offer')).next();
       } else {
-        // No server deadline: restore from persistence if available, otherwise set once
         this.setTurnStartedAtIfNeeded();
         void seasonNamespaceSeed(state.rootSeed, 'draft', 'first-pick');
         void createRng(seasonNamespaceSeed(state.rootSeed, 'draft', 'offer')).next();
       }
-      // Also attempt to sync server deadline lazily (non-blocking) if we have a state round
       void this.fetchServerDeadline(`draft-${state.round}`).catch(() => {});
     } else {
       this.turnStartedAt = null;
@@ -810,6 +834,24 @@ export class RoomDraftController {
         code: 'OWNED_VERSION',
         errorCode: 'OWNED_VERSION',
       });
+    }
+    if (this.catalog && state.participants.length > 1) {
+      const candidate = this.catalog.candidates.find((c) => c.playerVersionId === playerVersionId);
+      if (candidate) {
+        const byVersion = new Map(
+          this.catalog.candidates.map((entry) => [entry.playerVersionId, entry]),
+        );
+        const ownedIdentity = state.picks.some((pick) => {
+          const owned = byVersion.get(pick.playerVersionId);
+          return owned?.playerId === candidate.playerId;
+        });
+        if (ownedIdentity) {
+          throw Object.assign(new Error('that player identity is already owned'), {
+            code: 'OWNED_VERSION',
+            errorCode: 'OWNED_VERSION',
+          });
+        }
+      }
     }
     if (!card.selectable) {
       throw Object.assign(new Error(card.coverageReason ?? 'unselectable'), {

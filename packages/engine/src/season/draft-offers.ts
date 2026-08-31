@@ -19,6 +19,29 @@ export const OFFER_SAFE_ORDER_KEY = 'safe-order';
 export const OFFER_SAMPLE_ORDER_KEY = 'sample-order';
 export const SEASON_DRAFT_COVERAGE_REASON =
   'Selecting this version would leave the 4G/4F/3C completion targets unreachable with the remaining picks';
+export function multiHumanDraft(state: SeasonDraftState): boolean {
+  return state.participants.length > 1;
+}
+export function ownedPlayerIds(
+  state: SeasonDraftState,
+  catalog: SeasonDraftCatalog,
+): Set<string> {
+  const byVersion = new Map(catalog.candidates.map((candidate) => [candidate.playerVersionId, candidate]));
+  const owned = new Set<string>();
+  for (const pick of state.picks) {
+    const candidate = byVersion.get(pick.playerVersionId);
+    if (candidate !== undefined) owned.add(candidate.playerId);
+  }
+  return owned;
+}
+function identityAvailable(
+  state: SeasonDraftState,
+  catalog: SeasonDraftCatalog,
+  candidate: SeasonDraftCandidate,
+): boolean {
+  if (!multiHumanDraft(state)) return true;
+  return !ownedPlayerIds(state, catalog).has(candidate.playerId);
+}
 export function remainingCandidates(
   state: SeasonDraftState,
   catalog: SeasonDraftCatalog,
@@ -26,6 +49,7 @@ export function remainingCandidates(
   const owned = new Set(state.picks.map((pick) => pick.playerVersionId));
   return catalog.candidates
     .filter((candidate) => !owned.has(candidate.playerVersionId))
+    .filter((candidate) => identityAvailable(state, catalog, candidate))
     .sort((a, b) => a.playerVersionId.localeCompare(b.playerVersionId));
 }
 function availableMembers(
@@ -38,6 +62,7 @@ function availableMembers(
   for (const candidate of catalog.candidates) {
     if (owned.has(candidate.playerVersionId)) continue;
     if (candidate.playerVersionId === excludeVersionId) continue;
+    if (!identityAvailable(state, catalog, candidate)) continue;
     members.push({
       playerVersionId: candidate.playerVersionId,
       playable: candidate.positions.playable,

@@ -16,7 +16,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import { createRng } from '../sim/rng.ts';
 import { validateDraftCatalog } from './catalog-validation.ts';
-import { drawGlobalOffer } from './draft-offers.ts';
+import { drawGlobalOffer, multiHumanDraft, ownedPlayerIds } from './draft-offers.ts';
 import {
   completionTargetsMet,
   legalFiveAfterAnyRemoval,
@@ -360,6 +360,31 @@ function selectPlayer(
       generation: null,
     };
   }
+  const candidate = catalog.candidates.find((c) => c.playerVersionId === payload.playerVersionId);
+  if (candidate === undefined) {
+    return {
+      state,
+      record: rejectedRecord(
+        state,
+        command,
+        'UNAVAILABLE_POOL',
+        'the selected version is not in the catalog',
+      ),
+      generation: null,
+    };
+  }
+  if (multiHumanDraft(state) && ownedPlayerIds(state, catalog).has(candidate.playerId)) {
+    return {
+      state,
+      record: rejectedRecord(
+        state,
+        command,
+        'OWNED_VERSION',
+        'that player identity is already owned',
+      ),
+      generation: null,
+    };
+  }
   if (pickCount(state, pid) >= MAX_PICKS_PER_PARTICIPANT) {
     return {
       state,
@@ -380,19 +405,6 @@ function selectPlayer(
       generation: null,
     };
   }
-  const candidate = catalog.candidates.find((c) => c.playerVersionId === payload.playerVersionId);
-  if (candidate === undefined) {
-    return {
-      state,
-      record: rejectedRecord(
-        state,
-        command,
-        'UNAVAILABLE_POOL',
-        'the selected version is not in the catalog',
-      ),
-      generation: null,
-    };
-  }
   const ownedMembers = membersOf(
     state.picks.filter((p) => p.participantId === pid).map((p) => p.playerVersionId),
     catalog,
@@ -404,6 +416,9 @@ function selectPlayer(
   const available = catalog.candidates
     .filter((c) => !ownedVersionIds(state).has(c.playerVersionId))
     .filter((c) => c.playerVersionId !== candidate.playerVersionId)
+    .filter(
+      (c) => !multiHumanDraft(state) || !ownedPlayerIds(state, catalog).has(c.playerId),
+    )
     .map((c) => ({ playerVersionId: c.playerVersionId, playable: c.positions.playable }));
   const remaining = MAX_PICKS_PER_PARTICIPANT - ownedMembers.length - 1;
   if (!rosterFeasible(probe, available, remaining)) {
@@ -494,6 +509,39 @@ function finalizeRosters(
       };
     }
   }
+  if (multiHumanDraft(state)) {
+    const byVersion = new Map(catalog.candidates.map((candidate) => [candidate.playerVersionId, candidate]));
+    const identityOwner = new Map<string, string>();
+    for (const pick of state.picks) {
+      const candidate = byVersion.get(pick.playerVersionId);
+      if (candidate === undefined) {
+        return {
+          state,
+          record: rejectedRecord(
+            state,
+            command,
+            'INVALID_CATALOG',
+            `pick references unknown version ${pick.playerVersionId}`,
+          ),
+          generation: null,
+        };
+      }
+      const priorOwner = identityOwner.get(candidate.playerId);
+      if (priorOwner !== undefined) {
+        return {
+          state,
+          record: rejectedRecord(
+            state,
+            command,
+            'OWNED_VERSION',
+            `human rosters claim identity ${candidate.playerId} more than once`,
+          ),
+          generation: null,
+        };
+      }
+      identityOwner.set(candidate.playerId, pick.participantId);
+    }
+  }
   const nextState: SeasonDraftState = {
     ...state,
     status: 'finalized',
@@ -546,6 +594,13 @@ function generateAiLeague(
           'GENERATION_EXHAUSTED',
           `${error.message}: ${String(error.diagnostics.failedTeams.length)} failed teams, ${String(error.diagnostics.unmetConstraints.length)} unmet constraints, ${String(error.diagnostics.nodesVisited)} nodes visited`,
         ),
+        generation: null,
+      };
+    }
+    if (error instanceof Error && error.message.includes('claim identity')) {
+      return {
+        state,
+        record: rejectedRecord(state, command, 'OWNED_VERSION', error.message),
         generation: null,
       };
     }

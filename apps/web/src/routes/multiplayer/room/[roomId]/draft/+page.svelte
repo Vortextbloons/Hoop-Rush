@@ -27,6 +27,7 @@
     SeasonRoomMembership,
     SeasonMultiplayerTransport,
     SeasonDraftOffer,
+    SeasonPublicCommandEnvelope,
   } from '@hoop-rush/data-contracts';
   import { SEASON_DRAFT_OFFER_SIZE, SEASON_DRAFT_SAFE_MINIMUM } from '@hoop-rush/data-contracts';
   import { RoomDraftController } from '$lib/season/room-draft-controller';
@@ -59,7 +60,25 @@
   let deadlineAt = $derived.by(() => controller?.getDeadlineAt() ?? null);
   let deadlineCursor = $derived.by(() => controller?.getDeadlineCursor() ?? null);
 
-  function getCoordinator() {
+  function syncDraftFromController(state: typeof draftState) {
+    draftState = state ? ({ ...state } as typeof draftState) : null;
+    generation = controller?.getGeneration() ?? null;
+  }
+
+  function maybeDrawOnTurn(state: typeof draftState) {
+    if (
+      state &&
+      membership &&
+      state.currentTurnParticipantId === membership.participantId &&
+      !state.currentOffer &&
+      state.status === 'drafting'
+    ) {
+      void handleDraw();
+    }
+  }
+
+  function ensureCoordinator() {
+    if (coordinator) return coordinator;
     const useSupabase = isSupabaseConfigured();
     transport = useSupabase
       ? createSupabaseSeasonTransport({
@@ -71,59 +90,40 @@
         })
       : null;
     const t = (transport ?? undefined) as unknown as SeasonMultiplayerTransport | undefined;
-    return createInMemorySeasonRoomCoordinator({
+    coordinator = createInMemorySeasonRoomCoordinator({
       transport: t,
       onSnapshot: (s) => {
         snap = s;
-        if (controller) {
-          // Claim 6: keep controller snapshot in sync so pace + server deadline logic uses authoritative snapshot
-          controller.updateSnapshot(s);
-          // If snapshot carries deadline info (supabase season_deadlines extension), honor it
-          const withDeadline = s as unknown as {
-            deadlineAt?: string | null;
-            deadlineCursor?: string | null;
-            fallbackPayload?: unknown;
-          };
-          if (withDeadline?.deadlineAt)
-            controller.setServerDeadline(
-              withDeadline.deadlineAt,
-              withDeadline.fallbackPayload ?? null,
-              withDeadline.deadlineCursor ?? null,
-            );
-          else if (s.cursor) void controller.fetchServerDeadline(s.cursor).catch(() => {});
-          void controller.restoreFromLog().then((state) => {
-            draftState = state ? ({ ...state } as typeof draftState) : null;
-            generation = controller?.getGeneration() ?? null;
-            if (
-              draftState &&
-              membership &&
-              (draftState as any).currentTurnParticipantId === membership.participantId &&
-              !(draftState as any).currentOffer
-            ) {
-              void handleDraw();
-            }
-            void maybeAutoAdvance();
-          });
+        if (!controller) return;
+        controller.updateSnapshot(s);
+        const withDeadline = s as unknown as {
+          deadlineAt?: string | null;
+          deadlineCursor?: string | null;
+          fallbackPayload?: unknown;
+        };
+        if (withDeadline?.deadlineAt) {
+          controller.setServerDeadline(
+            withDeadline.deadlineAt,
+            withDeadline.fallbackPayload ?? null,
+            withDeadline.deadlineCursor ?? null,
+          );
+        } else if (s.cursor) {
+          void controller.fetchServerDeadline(s.cursor).catch(() => {});
         }
       },
-      onCommands: async () => {
-        if (controller) {
-          const state = await controller.restoreFromLog();
-          draftState = state ? ({ ...state } as typeof draftState) : null;
-          generation = controller.getGeneration();
-          if (
-            draftState &&
-            membership &&
-            (draftState as any).currentTurnParticipantId === membership.participantId &&
-            !(draftState as any).currentOffer &&
-            (draftState as any).status === 'drafting'
-          ) {
-            void handleDraw();
-          }
-          void maybeAutoAdvance();
-        }
+      onCommands: async (cmds: SeasonPublicCommandEnvelope[]) => {
+        if (!controller) return;
+        const state = await controller.applyIncomingCommands(cmds);
+        syncDraftFromController(state);
+        maybeDrawOnTurn(state);
+        void maybeAutoAdvance();
       },
     });
+    return coordinator;
+  }
+
+  function getCoordinator() {
+    return ensureCoordinator();
   }
 
   function getTransport(): SeasonMultiplayerTransport {
@@ -201,7 +201,7 @@
             snapWithDeadline.deadlineCursor ?? snap.cursor,
           );
         else void controller.fetchServerDeadline(snap.cursor).catch(() => {});
-        const state = await controller.restoreFromLog();
+        const state = await controller.restoreFromLog({ full: true });
         if (!state) {
           if (snap.phase === 'drafting') {
             const created = await controller.ensureDraftCreated();
@@ -245,31 +245,26 @@
 
   onMount(() => {
     load();
-    const iv = setInterval(() => tick++, 1000);
     const timerIv = setInterval(() => {
       tick++;
       if (
         controller &&
         membership &&
         snap?.settings.pace === 'live' &&
-        (draftState as any)?.currentTurnParticipantId === membership.participantId
+        draftState?.currentTurnParticipantId === membership.participantId
       ) {
         const remaining = controller.getSecondsRemaining(Date.now());
         if (remaining !== null && remaining <= 0) {
-          const attemptKey = `${membership.participantId}:${String((draftState as any)?.revision ?? 0)}`;
+          const attemptKey = `${membership.participantId}:${String(draftState?.revision ?? 0)}`;
           if (autoPickAttemptKey === attemptKey) return;
           autoPickAttemptKey = attemptKey;
           void controller.autoPickSafe(membership.participantId as 'p1' | 'p2').then((ns) => {
-            if (ns) {
-              draftState = { ...ns } as typeof draftState;
-              generation = controller?.getGeneration() ?? null;
-            }
+            if (ns) syncDraftFromController(ns);
           });
         }
       }
     }, 1000);
     return () => {
-      clearInterval(iv);
       clearInterval(timerIv);
       coordinator?.destroy();
     };
@@ -317,7 +312,7 @@
         (e as { errorCode?: string })?.errorCode;
       if (code === 'WRONG_TURN') pickError = 'Not your turn — wait for opponent.';
       else if (code === 'OWNED_VERSION')
-        pickError = 'That version is already owned — duplicate ownership rejected.';
+        pickError = 'That player is already owned — duplicate identity or version rejected.';
       else if (code === 'UNCOMPLETABLE_ROSTER')
         pickError = 'Unselectable: would make 4G/4F/3C unreachable.';
       else if (code === 'UNAVAILABLE_POOL') pickError = 'Not in current 8-card offer.';
@@ -334,9 +329,8 @@
 
   async function refreshDraft() {
     if (!controller) return;
-    const state = await controller.restoreFromLog();
-    draftState = state ? ({ ...state } as typeof draftState) : null;
-    generation = controller.getGeneration();
+    const state = await controller.restoreFromLog({ full: true });
+    syncDraftFromController(state);
     void maybeAutoAdvance();
   }
 
@@ -382,6 +376,9 @@
         (e as { errorCode?: string })?.errorCode;
       if (code === 'GENERATION_EXHAUSTED')
         pickError = 'AI generation exhausted — retry with new seed.';
+      else if (code === 'OWNED_VERSION')
+        pickError =
+          'Rosters claim the same player twice — create a new room and re-draft. Duplicate identities are no longer allowed.';
       else pickError = e instanceof Error ? e.message : String(e);
       const s = await controller.restoreFromLog();
       draftState = s ? ({ ...s } as typeof draftState) : draftState;

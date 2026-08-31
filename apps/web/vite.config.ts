@@ -32,6 +32,10 @@ function devProbeStubPlugin(): Plugin {
 
 export default defineConfig({
   plugins: [devProbeStubPlugin(), sveltekit(), tailwindcss()],
+  optimizeDeps: {
+    // Pre-bundle workspace packages so dev does not serve raw @fs .ts (breaks HMR on paths with spaces).
+    include: ['@hoop-rush/engine', '@hoop-rush/data-contracts'],
+  },
   server: {
     host: true,
     port: 5173,

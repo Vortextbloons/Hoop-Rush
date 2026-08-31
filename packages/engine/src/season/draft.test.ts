@@ -1015,6 +1015,77 @@ describe('season draft picks', () => {
     expect(ownedIds).toContain(lakers00.playerVersionId);
     expect(ownedIds).toHaveLength(2);
   });
+  it('rejects the same player identity across duo human rosters', () => {
+    const catalog = customCatalog([
+      {
+        franchiseId: 'lakers',
+        eraId: '1990s',
+        positions: Array.from({ length: 12 }, (_, i) => (i < 5 ? ['PG'] : i < 10 ? ['SF'] : ['C'])),
+      },
+      {
+        franchiseId: 'celtics',
+        eraId: '1990s',
+        positions: Array.from({ length: 12 }, (_, i) => (i < 5 ? ['PG'] : i < 10 ? ['SF'] : ['C'])),
+      },
+    ]);
+    const lakers = catalog.candidates.find(
+      (c) => c.franchiseId === 'lakers' && c.eraId === '1990s',
+    );
+    const celtics = catalog.candidates.find(
+      (c) => c.franchiseId === 'celtics' && c.eraId === '1990s',
+    );
+    if (!lakers || !celtics) throw new Error('candidates missing');
+    celtics.playerId = lakers.playerId;
+    celtics.playerVersionId = `pv-${seasonDigestHex(`duo-${lakers.playerId}`)}`;
+    const celticsPool = catalog.pools.find(
+      (p) => p.franchiseId === 'celtics' && p.eraId === '1990s',
+    );
+    if (!celticsPool) throw new Error('pool missing');
+    celticsPool.playerVersionIds[0] = celtics.playerVersionId;
+    const created = createDuo(catalog, LEAGUE, seedFromString('duo-same-person'));
+    const state = requireState(created.state, 'create');
+    const firstPicker = state.currentTurnParticipantId;
+    if (firstPicker === null) throw new Error('missing first picker');
+    const secondPicker = firstPicker === 'p1' ? 'p2' : 'p1';
+    const firstVersion = firstPicker === 'p1' ? lakers.playerVersionId : celtics.playerVersionId;
+    const secondVersion = firstPicker === 'p1' ? celtics.playerVersionId : lakers.playerVersionId;
+    const withOffer1 = seasonDraftStateSchema.parse({
+      ...state,
+      currentOffer: handOffer(catalog, firstPicker, 1, 1, [
+        { playerVersionId: firstVersion, selectable: true, coverageReason: null },
+      ]),
+    });
+    const first = applySeasonDraftCommand(
+      withOffer1,
+      catalog,
+      cmd('c-pick-first', 1, {
+        kind: 'select-draft-player',
+        participantId: firstPicker,
+        playerVersionId: firstVersion,
+      }),
+      fakeDeps(),
+    );
+    expectAccepted(first.record);
+    const afterFirst = requireState(first.state, 'pick');
+    const withOffer2 = seasonDraftStateSchema.parse({
+      ...afterFirst,
+      currentTurnParticipantId: secondPicker,
+      currentOffer: handOffer(catalog, secondPicker, 1, 1, [
+        { playerVersionId: secondVersion, selectable: true, coverageReason: null },
+      ]),
+    });
+    const second = applySeasonDraftCommand(
+      withOffer2,
+      catalog,
+      cmd('c-pick-second', 2, {
+        kind: 'select-draft-player',
+        participantId: secondPicker,
+        playerVersionId: secondVersion,
+      }),
+      fakeDeps(),
+    );
+    expect(expectRejected(second.record).errorCode).toBe('OWNED_VERSION');
+  });
 });
 describe('season draft exact version ownership', () => {
   it('never offers an exact version that was already picked, in any later offer', () => {
