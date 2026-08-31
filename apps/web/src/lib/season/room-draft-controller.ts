@@ -11,14 +11,13 @@ import type {
   SeasonLeagueGenerationResult,
   SeasonRosterTargets,
   SeasonDraftOffer,
+  SeasonCommandReceipt,
 } from '@hoop-rush/data-contracts';
 import {
   SEASON_DRAFT_OFFER_SIZE,
   SEASON_DRAFT_SAFE_MINIMUM,
   SEASON_DRAFT_VERSION,
-  seasonDraftCatalogSchema,
-  seasonLeagueSchema,
-  seasonRosterTargetsSchema,
+  SEASON_ROOM_PROTOCOL_SCHEMA_VERSION,
   seasonNamespaceSeed,
   seasonDigestHex,
 } from '@hoop-rush/data-contracts';
@@ -31,6 +30,8 @@ import {
   DUO_BAND_QUOTAS,
   createRng,
 } from '@hoop-rush/engine';
+import { loadSeasonDraftCatalog, loadSeasonLeague, loadSeasonRosterTargets } from './season-assets';
+import { draftCommandId, envelopeToDraftCommand } from './season-draft-command-log';
 
 export type RoomDraftMode = SeasonRoomPublicSnapshot['mode'];
 
@@ -42,72 +43,15 @@ export interface RoomDraftControllerOptions {
   catalog?: SeasonDraftCatalog | null;
   league?: SeasonLeague | null;
   rosterTargets?: SeasonRosterTargets | null;
-  fetchImpl?: typeof fetch;
 }
 
 function commandIdFor(rootSeed: string, kind: string, ...parts: string[]): string {
-  const seed = seasonNamespaceSeed(rootSeed, 'draft', kind, ...parts);
-  const hex = seasonDigestHex(seed);
-  return `${kind}-${hex.slice(0, 16)}`.slice(0, 64);
-}
-
-function isDraftCommand(value: unknown): value is SeasonDraftCommand {
-  if (!value || typeof value !== 'object') return false;
-  const v = value as Record<string, unknown>;
-  return (
-    typeof v.commandId === 'string' &&
-    typeof v.expectedRevision === 'number' &&
-    v.payload !== null &&
-    typeof v.payload === 'object' &&
-    typeof (v.payload as Record<string, unknown>).kind === 'string'
-  );
+  return draftCommandId(rootSeed, kind, ...parts);
 }
 
 function franchiseIdOfState(state: SeasonDraftState, participantId: string): string {
   const p = state.participants.find((x) => x.participantId === participantId);
   return p?.franchiseId ?? `franchise-${participantId}`;
-}
-
-function envelopeToDraftCommand(
-  env: SeasonPublicCommandEnvelope,
-  state: SeasonDraftState | null,
-): SeasonDraftCommand | null {
-  if ((env as SeasonPublicCommandEnvelope & { accepted?: boolean }).accepted === false) {
-    return null;
-  }
-  const raw = env.payload;
-  if (isDraftCommand(raw)) return raw;
-  if (!raw || typeof raw !== 'object' || !('kind' in (raw as Record<string, unknown>))) {
-    return null;
-  }
-  const payload = raw as SeasonDraftCommand['payload'];
-  const kinds = [
-    'create-season-draft',
-    'draw-season-offer',
-    'select-draft-player',
-    'finalize-human-rosters',
-    'generate-ai-league',
-    'reveal-draft-roll',
-    'claim-draft-pool',
-  ];
-  if (kinds.includes(payload.kind)) {
-    return {
-      commandId: env.commandId,
-      expectedRevision: state?.revision ?? 0,
-      payload,
-    };
-  }
-  if ((payload as unknown as Record<string, unknown>).kind === 'room-draft-pick') {
-    const p = payload as unknown as { participantId: string; playerVersionId: string };
-    const pid = p.participantId as 'p1' | 'p2';
-    const vid = p.playerVersionId;
-    return {
-      commandId: env.commandId,
-      expectedRevision: state?.revision ?? 0,
-      payload: { kind: 'select-draft-player', participantId: pid, playerVersionId: vid },
-    };
-  }
-  return null;
 }
 
 export class RoomDraftController {
@@ -118,16 +62,10 @@ export class RoomDraftController {
   private catalog: SeasonDraftCatalog | null;
   private league: SeasonLeague | null;
   private rosterTargets: SeasonRosterTargets | null;
-  private fetchImpl: typeof fetch;
   private state: SeasonDraftState | null = null;
   private generation: SeasonLeagueGenerationResult | null = null;
   private lastOrdinal = -1;
   private turnStartedAt: number | null = null;
-  // Claim 6: server-authoritative deadline handling (season_deadlines table)
-  private deadlineAt: string | null = null;
-  private fallbackPayload: unknown | null = null;
-  private deadlineCursor: string | null = null;
-  // Claim 8: surface replay integrity failures instead of silently discarding
   private lastReplayError: string | null = null;
   private integrityFailed = false;
   private skippedCommands = 0;
@@ -141,28 +79,8 @@ export class RoomDraftController {
     this.catalog = opts.catalog ?? null;
     this.league = opts.league ?? null;
     this.rosterTargets = opts.rosterTargets ?? null;
-    this.fetchImpl =
-      opts.fetchImpl ??
-      (typeof fetch !== 'undefined'
-        ? fetch.bind(globalThis)
-        : async () => {
-            throw new Error('fetch unavailable');
-          });
-    // Claim 6: restore persisted turn start to avoid granting +90s on reload
     const persisted = this.loadPersistedTurn();
     if (persisted !== null) this.turnStartedAt = persisted;
-    // If snapshot already carries a server deadline (coordinator may inject), honor it
-    const snapWithDeadline = opts.snapshot as unknown as {
-      deadlineAt?: string | null;
-      deadlineCursor?: string | null;
-      fallbackPayload?: unknown;
-    };
-    if (snapWithDeadline?.deadlineAt)
-      this.setServerDeadline(
-        snapWithDeadline.deadlineAt,
-        snapWithDeadline.fallbackPayload ?? null,
-        snapWithDeadline.deadlineCursor ?? null,
-      );
   }
 
   getState(): SeasonDraftState | null {
@@ -206,88 +124,9 @@ export class RoomDraftController {
     return this.turnStartedAt;
   }
 
-  // Claim 6: server deadline is authoritative; client timer is fallback only
-  getDeadlineAt(): string | null {
-    return this.deadlineAt;
-  }
-  getDeadlineCursor(): string | null {
-    return this.deadlineCursor;
-  }
-  getFallbackPayload(): unknown | null {
-    return this.fallbackPayload;
-  }
-  /**
-   * Set server-authoritative deadline. Prefer supabase season_deadlines.deadline_at
-   * over local turnStartedAt. When a deadline is set, getSecondsRemaining() derives
-   * from deadlineAt. Fallback payload/cursor are stored for verification.
-   */
-  setServerDeadline(
-    deadlineAt: string | null,
-    fallbackPayload: unknown | null = null,
-    deadlineCursor: string | null = null,
-  ): void {
-    this.deadlineAt = deadlineAt;
-    this.fallbackPayload = fallbackPayload;
-    this.deadlineCursor = deadlineCursor;
-    // Persist for cross-reload stability when server deadline is present
-    this.persistTurnStartedAt(this.turnStartedAt);
-    // If server deadline is present, local timer is secondary; do not reset turnStartedAt
-    // If server deadline cleared, fallback to local timer (may have persisted value)
-  }
-
-  /**
-   * Attempt to fetch server deadline from Supabase REST if fetchImpl and env are available.
-   * Uses season_deadlines table: room_id=eq.<roomId>&cursor=eq.<cursor>&select=deadline_at,fallback_payload,cursor
-   * Falls back silently if not configured; caller may ignore failure and use local timer.
-   */
-  async fetchServerDeadline(cursor: string | null = null): Promise<string | null> {
-    const c = cursor ?? this.deadlineCursor ?? (this.state ? `draft-${this.state.round}` : null);
-    if (!c) return this.deadlineAt;
-    // Try to derive Supabase URL from environment or window
-    let baseUrl: string | null = null;
-    try {
-      const env = (import.meta as unknown as { env?: Record<string, string> })?.env;
-      baseUrl = env?.VITE_SUPABASE_URL ?? null;
-    } catch {}
-    if (!baseUrl) {
-      try {
-        baseUrl = (globalThis as unknown as { __SUPABASE_URL?: string }).__SUPABASE_URL ?? null;
-      } catch {}
-    }
-    if (!baseUrl) return this.deadlineAt;
-    const url = `${baseUrl.replace(/\/$/, '')}/rest/v1/season_deadlines?room_id=eq.${encodeURIComponent(this.roomId)}&cursor=eq.${encodeURIComponent(c)}&select=deadline_at,fallback_payload,cursor&limit=1`;
-    try {
-      const res = await this.fetchImpl(url, { cache: 'no-store' });
-      if (!res.ok) return this.deadlineAt;
-      const rows = (await res.json()) as Array<{
-        deadline_at: string;
-        fallback_payload: unknown;
-        cursor: string;
-      }>;
-      if (rows.length > 0 && rows[0]?.deadline_at) {
-        this.setServerDeadline(
-          rows[0].deadline_at,
-          rows[0].fallback_payload ?? null,
-          rows[0].cursor ?? c,
-        );
-        return this.deadlineAt;
-      }
-    } catch (e) {
-      console.warn('[room-draft-controller] fetchServerDeadline failed', e);
-    }
-    return this.deadlineAt;
-  }
-
   getSecondsRemaining(now = Date.now()): number | null {
     const pace = this.snapshot.settings.pace;
     if (pace !== 'live') return null;
-    // Server deadline is authoritative — derive from deadlineAt if present
-    if (this.deadlineAt) {
-      const deadlineMs = new Date(this.deadlineAt).getTime();
-      if (Number.isFinite(deadlineMs)) {
-        return Math.max(0, Math.floor((deadlineMs - now) / 1000));
-      }
-    }
     if (!this.turnStartedAt) return null;
     const elapsed = (now - this.turnStartedAt) / 1000;
     return Math.max(0, 90 - Math.floor(elapsed));
@@ -314,18 +153,12 @@ export class RoomDraftController {
   }
   private loadPersistedTurn(): number | null {
     try {
-      if (typeof window !== 'undefined') {
-        const raw =
-          window.sessionStorage?.getItem(this.storageKey()) ??
-          window.localStorage?.getItem(this.storageKey()) ??
-          null;
-        if (raw) {
-          const parsed = JSON.parse(raw) as { turnStartedAt?: number; deadlineAt?: string | null };
-          if (typeof parsed.turnStartedAt === 'number' && Number.isFinite(parsed.turnStartedAt)) {
-            // If persisted deadline exists and matches current deadlineAt, still return turnStartedAt
-            return parsed.turnStartedAt;
-          }
-        }
+      if (typeof window === 'undefined') return null;
+      const raw = window.sessionStorage?.getItem(this.storageKey()) ?? null;
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { turnStartedAt?: number };
+      if (typeof parsed.turnStartedAt === 'number' && Number.isFinite(parsed.turnStartedAt)) {
+        return parsed.turnStartedAt;
       }
     } catch {}
     return null;
@@ -336,22 +169,15 @@ export class RoomDraftController {
       const key = this.storageKey();
       if (ts === null) {
         window.sessionStorage?.removeItem(key);
-        window.localStorage?.removeItem(key);
         return;
       }
-      const payload = JSON.stringify({
-        turnStartedAt: ts,
-        deadlineAt: this.deadlineAt,
-        deadlineCursor: this.deadlineCursor,
-        savedAt: Date.now(),
-      });
-      window.sessionStorage?.setItem(key, payload);
-      window.localStorage?.setItem(key, payload);
+      window.sessionStorage?.setItem(
+        key,
+        JSON.stringify({ turnStartedAt: ts, savedAt: Date.now() }),
+      );
     } catch {}
   }
   private setTurnStartedAtIfNeeded(): void {
-    // Do not blindly reset: only set if no server deadline and no existing local start
-    if (this.deadlineAt) return;
     if (this.turnStartedAt !== null) return;
     const persisted = this.loadPersistedTurn();
     if (persisted !== null) {
@@ -382,55 +208,62 @@ export class RoomDraftController {
 
   private async ensureAssets(): Promise<void> {
     if (this.catalog && this.league && this.rosterTargets) return;
-    const needCatalog = !this.catalog;
-    const needLeague = !this.league;
-    const needTargets = !this.rosterTargets;
-    const fetchJson = async (url: string): Promise<unknown> => {
-      const res = await this.fetchImpl(url, { cache: 'no-store' });
-      if (!res.ok) throw new Error(`fetch ${url} failed ${res.status}`);
-      return res.json();
-    };
-    const catalogUrl = '/data/season/draft-catalog.json';
-    const leagueUrl = '/data/season/league.json';
-    const targetsUrl = '/data/season/roster-targets.json';
-    const tasks: Promise<void>[] = [];
-    if (needCatalog) {
-      tasks.push(
-        (async () => {
-          try {
-            const raw = await fetchJson(catalogUrl);
-            this.catalog = seasonDraftCatalogSchema.parse(raw);
-          } catch (e) {
-            if (typeof window !== 'undefined' && window.location?.origin) {
-              const raw = await fetchJson(`${window.location.origin}${catalogUrl}`);
-              this.catalog = seasonDraftCatalogSchema.parse(raw);
-            } else throw e;
-          }
-        })(),
-      );
-    }
-    if (needLeague) {
-      tasks.push(
-        (async () => {
-          const raw = await fetchJson(leagueUrl);
-          this.league = seasonLeagueSchema.parse(raw);
-        })(),
-      );
-    }
-    if (needTargets) {
-      tasks.push(
-        (async () => {
-          const raw = await fetchJson(targetsUrl);
-          this.rosterTargets = seasonRosterTargetsSchema.parse(raw);
-        })(),
-      );
-    }
-    if (tasks.length > 0) await Promise.all(tasks);
-    if (this.catalog && this.catalog.candidates.length < SEASON_DRAFT_OFFER_SIZE) {
+    const [catalog, league, rosterTargets] = await Promise.all([
+      this.catalog ? Promise.resolve(this.catalog) : loadSeasonDraftCatalog(),
+      this.league ? Promise.resolve(this.league) : loadSeasonLeague(),
+      this.rosterTargets ? Promise.resolve(this.rosterTargets) : loadSeasonRosterTargets(),
+    ]);
+    this.catalog = catalog;
+    this.league = league;
+    this.rosterTargets = rosterTargets;
+    if (this.catalog.candidates.length < SEASON_DRAFT_OFFER_SIZE) {
       throw new Error(
         `catalog has ${this.catalog.candidates.length} candidates; need ${SEASON_DRAFT_OFFER_SIZE}`,
       );
     }
+  }
+
+  private actorId(): 'p1' | 'p2' {
+    return (this.membership?.participantId as 'p1' | 'p2') ?? 'p1';
+  }
+
+  private async submitAndApply(
+    state: SeasonDraftState | null,
+    command: SeasonDraftCommand,
+    actorParticipantId: 'p1' | 'p2',
+  ): Promise<{ receipt: SeasonCommandReceipt; record: SeasonDraftCommandRecord | null }> {
+    if (!this.catalog) throw new Error('catalog not loaded');
+    const deps = this.generationDeps();
+    const preview = applySeasonDraftCommand(state, this.catalog, command, deps);
+    if (preview.record.status === 'rejected') {
+      throw Object.assign(new Error(preview.record.message), {
+        code: preview.record.errorCode,
+        errorCode: preview.record.errorCode,
+      });
+    }
+    const envelope: SeasonPublicCommandEnvelope = {
+      schemaVersion: SEASON_ROOM_PROTOCOL_SCHEMA_VERSION,
+      roomId: this.roomId,
+      commandId: command.commandId,
+      ordinal: this.lastOrdinal + 1,
+      runId: this.roomId,
+      payload: command,
+      actorParticipantId,
+      actorFranchiseId: this.franchiseIdOf(actorParticipantId),
+    };
+    const receipt = await this.transport.submitCommand(envelope);
+    if (!receipt.accepted) return { receipt, record: null };
+    this.lastOrdinal = receipt.ordinal;
+    const applied = applySeasonDraftCommand(state, this.catalog, command, deps);
+    if (applied.record.status === 'rejected') {
+      throw Object.assign(new Error(applied.record.message), {
+        code: applied.record.errorCode,
+        errorCode: applied.record.errorCode,
+      });
+    }
+    this.state = applied.state;
+    if (applied.generation) this.generation = applied.generation;
+    return { receipt, record: applied.record };
   }
 
   private franchiseIdOf(participantId: string): string {
@@ -607,15 +440,7 @@ export class RoomDraftController {
     this.generation = generation;
     this.lastOrdinal = lastOrdinal;
     if (state?.currentTurnParticipantId) {
-      if (this.deadlineAt) {
-        void seasonNamespaceSeed(state.rootSeed, 'draft', 'first-pick');
-        void createRng(seasonNamespaceSeed(state.rootSeed, 'draft', 'offer')).next();
-      } else {
-        this.setTurnStartedAtIfNeeded();
-        void seasonNamespaceSeed(state.rootSeed, 'draft', 'first-pick');
-        void createRng(seasonNamespaceSeed(state.rootSeed, 'draft', 'offer')).next();
-      }
-      void this.fetchServerDeadline(`draft-${state.round}`).catch(() => {});
+      this.setTurnStartedAtIfNeeded();
     } else {
       this.turnStartedAt = null;
       this.persistTurnStartedAt(null);
@@ -665,51 +490,21 @@ export class RoomDraftController {
         catalogVersion: SEASON_DRAFT_VERSION,
       },
     };
-    const deps = this.generationDeps();
-    const local = applySeasonDraftCommand(null, this.catalog, command, deps);
-    if (local.record.status === 'rejected') {
-      throw Object.assign(new Error(local.record.message), {
-        code: local.record.errorCode,
-        errorCode: local.record.errorCode,
-      });
-    }
-    const envelope: SeasonPublicCommandEnvelope = {
-      schemaVersion: 2,
-      roomId: this.roomId,
-      commandId: command.commandId,
-      ordinal: this.lastOrdinal + 1,
-      runId,
-      payload: command,
-      actorParticipantId: 'p1',
-      actorFranchiseId: this.franchiseIdOf('p1'),
-    };
-    try {
-      const receipt = await this.transport.submitCommand(envelope);
-      if (!receipt.accepted) {
-        if (
-          receipt.rejectionCode === 'stale-revision' ||
-          receipt.rejectionCode === 'duplicate-command'
-        ) {
-          await this.restoreFromLog();
-          return this.state;
-        }
-        throw Object.assign(new Error(receipt.rejectionCode ?? 'rejected'), {
-          code: receipt.rejectionCode,
-        });
-      }
-      this.lastOrdinal = receipt.ordinal;
-      this.state = local.state;
-      this.generation = local.generation;
-      // Claim 6: do not blindly reset local timer if server deadline governs
-      this.setTurnStartedAtIfNeeded();
-      return this.state;
-    } catch (e) {
-      if ((e as { code?: string })?.code === 'duplicate-command') {
+    const { receipt } = await this.submitAndApply(null, command, 'p1');
+    if (!receipt.accepted) {
+      if (
+        receipt.rejectionCode === 'stale-revision' ||
+        receipt.rejectionCode === 'duplicate-command'
+      ) {
         await this.restoreFromLog();
         return this.state;
       }
-      throw e;
+      throw Object.assign(new Error(receipt.rejectionCode ?? 'rejected'), {
+        code: receipt.rejectionCode,
+      });
     }
+    this.setTurnStartedAtIfNeeded();
+    return this.state;
   }
 
   async drawOffer(
@@ -745,29 +540,11 @@ export class RoomDraftController {
       expectedRevision: state.revision,
       payload: { kind: 'draw-season-offer', participantId },
     };
-    const deps = this.generationDeps();
-    const preview = applySeasonDraftCommand(state, this.catalog!, command, deps);
-    if (preview.record.status === 'rejected') {
-      throw Object.assign(new Error(preview.record.message), {
-        code: preview.record.errorCode,
-        errorCode: preview.record.errorCode,
-      });
-    }
-    const envelope: SeasonPublicCommandEnvelope = {
-      schemaVersion: 2,
-      roomId: this.roomId,
-      commandId,
-      ordinal: this.lastOrdinal + 1,
-      runId: this.roomId,
-      payload: command,
-      actorParticipantId: participantId,
-      actorFranchiseId: this.franchiseIdOf(participantId),
-    };
-    const receipt = await this.transport.submitCommand(envelope);
+    const { receipt, record } = await this.submitAndApply(state, command, participantId);
     if (!receipt.accepted) {
       if (receipt.rejectionCode === 'stale-revision') {
         await this.restoreFromLog();
-        const prior = this.state?.commandLog.find((record) => record.commandId === commandId);
+        const prior = this.state?.commandLog.find((entry) => entry.commandId === commandId);
         if (prior) return prior;
         if (
           retryAfterStale &&
@@ -783,22 +560,15 @@ export class RoomDraftController {
       }
       if (receipt.rejectionCode === 'duplicate-command') {
         await this.restoreFromLog();
-        const prior = this.state?.commandLog.find((r) => r.commandId === commandId);
+        const prior = this.state?.commandLog.find((entry) => entry.commandId === commandId);
         if (prior) return prior;
       }
       throw Object.assign(new Error(receipt.rejectionCode ?? 'rejected'), {
         code: receipt.rejectionCode,
       });
     }
-    this.lastOrdinal = receipt.ordinal;
-    const applied = applySeasonDraftCommand(state, this.catalog!, command, deps);
-    if (applied.record.status === 'rejected') {
-      throw Object.assign(new Error(applied.record.message), { code: applied.record.errorCode });
-    }
-    this.state = applied.state;
-    // Claim 6: draw does not advance turn — keep existing timer, only init if missing and no server deadline
     this.setTurnStartedAtIfNeeded();
-    return applied.record;
+    return record!;
   }
 
   async submitPick(
@@ -870,25 +640,7 @@ export class RoomDraftController {
       expectedRevision: state.revision,
       payload: { kind: 'select-draft-player', participantId, playerVersionId },
     };
-    const deps = this.generationDeps();
-    const preview = applySeasonDraftCommand(state, this.catalog!, command, deps);
-    if (preview.record.status === 'rejected') {
-      throw Object.assign(new Error(preview.record.message), {
-        code: preview.record.errorCode,
-        errorCode: preview.record.errorCode,
-      });
-    }
-    const envelope: SeasonPublicCommandEnvelope = {
-      schemaVersion: 2,
-      roomId: this.roomId,
-      commandId,
-      ordinal: this.lastOrdinal + 1,
-      runId: this.roomId,
-      payload: command,
-      actorParticipantId: participantId,
-      actorFranchiseId: this.franchiseIdOf(participantId),
-    };
-    const receipt = await this.transport.submitCommand(envelope);
+    const { receipt } = await this.submitAndApply(state, command, participantId);
     if (!receipt.accepted) {
       if (receipt.rejectionCode === 'stale-revision') {
         await this.restoreFromLog();
@@ -915,18 +667,9 @@ export class RoomDraftController {
         code: receipt.rejectionCode,
       });
     }
-    this.lastOrdinal = receipt.ordinal;
-    const applied = applySeasonDraftCommand(state, this.catalog!, command, deps);
-    if (applied.record.status === 'rejected') {
-      throw Object.assign(new Error(applied.record.message), { code: applied.record.errorCode });
-    }
-    this.state = applied.state;
-    // Claim 6: only reset local timer if no server deadline; otherwise server drives countdown
-    if (!this.deadlineAt) {
-      this.turnStartedAt = null;
-      this.persistTurnStartedAt(null);
-      if (this.state?.currentTurnParticipantId) this.setTurnStartedAtIfNeeded();
-    }
+    this.turnStartedAt = null;
+    this.persistTurnStartedAt(null);
+    if (this.state?.currentTurnParticipantId) this.setTurnStartedAtIfNeeded();
     if (
       this.state?.currentOffer &&
       this.state.currentOffer.cards.length !== SEASON_DRAFT_OFFER_SIZE
@@ -987,26 +730,11 @@ export class RoomDraftController {
       expectedRevision: state.revision,
       payload: { kind: 'finalize-human-rosters' },
     };
-    const deps = this.generationDeps();
-    const preview = applySeasonDraftCommand(state, this.catalog!, command, deps);
-    if (preview.record.status === 'rejected') {
-      throw Object.assign(new Error(preview.record.message), { code: preview.record.errorCode });
-    }
-    const envelope: SeasonPublicCommandEnvelope = {
-      schemaVersion: 2,
-      roomId: this.roomId,
-      commandId,
-      ordinal: this.lastOrdinal + 1,
-      runId: this.roomId,
-      payload: command,
-      actorParticipantId: (this.membership?.participantId as 'p1' | 'p2') ?? 'p1',
-      actorFranchiseId: this.franchiseIdOf((this.membership?.participantId as 'p1' | 'p2') ?? 'p1'),
-    };
-    const receipt = await this.transport.submitCommand(envelope);
+    const { receipt, record } = await this.submitAndApply(state, command, this.actorId());
     if (!receipt.accepted) {
       if (receipt.rejectionCode === 'stale-revision') {
         await this.restoreFromLog();
-        const prior = this.state?.commandLog.find((record) => record.commandId === commandId);
+        const prior = this.state?.commandLog.find((entry) => entry.commandId === commandId);
         if (prior) return prior;
         if (retryAfterStale && this.state?.status === 'drafting') {
           return this.finalizeRosters(false);
@@ -1017,10 +745,7 @@ export class RoomDraftController {
         code: receipt.rejectionCode,
       });
     }
-    this.lastOrdinal = receipt.ordinal;
-    const applied = applySeasonDraftCommand(state, this.catalog!, command, deps);
-    this.state = applied.state;
-    return applied.record;
+    return record!;
   }
 
   async generateAiLeague(retryAfterStale = true): Promise<{
@@ -1040,22 +765,7 @@ export class RoomDraftController {
       expectedRevision: state.revision,
       payload: { kind: 'generate-ai-league' },
     };
-    const deps = this.generationDeps();
-    const preview = applySeasonDraftCommand(state, this.catalog, command, deps);
-    if (preview.record.status === 'rejected') {
-      throw Object.assign(new Error(preview.record.message), { code: preview.record.errorCode });
-    }
-    const envelope: SeasonPublicCommandEnvelope = {
-      schemaVersion: 2,
-      roomId: this.roomId,
-      commandId,
-      ordinal: this.lastOrdinal + 1,
-      runId: this.roomId,
-      payload: command,
-      actorParticipantId: (this.membership?.participantId as 'p1' | 'p2') ?? 'p1',
-      actorFranchiseId: this.franchiseIdOf((this.membership?.participantId as 'p1' | 'p2') ?? 'p1'),
-    };
-    const receipt = await this.transport.submitCommand(envelope);
+    const { receipt } = await this.submitAndApply(state, command, this.actorId());
     if (!receipt.accepted) {
       if (receipt.rejectionCode === 'stale-revision') {
         await this.restoreFromLog();
@@ -1076,15 +786,9 @@ export class RoomDraftController {
         code: receipt.rejectionCode,
       });
     }
-    this.lastOrdinal = receipt.ordinal;
-    const applied = applySeasonDraftCommand(state, this.catalog, command, deps);
-    if (applied.record.status === 'rejected') {
-      throw Object.assign(new Error(applied.record.message), { code: applied.record.errorCode });
-    }
-    this.state = applied.state;
-    this.generation = applied.generation;
-    if (applied.generation) {
-      const gen = applied.generation;
+    if (this.generation) {
+      const gen = this.generation;
+      const appliedState = this.state;
       const counts = { contender: 0, playoff: 0, average: 0, weaker: 0 } as Record<string, number>;
       for (const a of gen.aiAssignments) {
         const isHuman = state.participants.some((p) => p.franchiseId === a.franchiseId);
@@ -1114,12 +818,14 @@ export class RoomDraftController {
         }
       }
       const digest = gen.digest;
-      void seasonDraftStateCanonical(applied.state!);
-      void seasonDraftStateDigest(applied.state!);
+      if (appliedState) {
+        void seasonDraftStateCanonical(appliedState);
+        void seasonDraftStateDigest(appliedState);
+      }
       void seasonDigestHex(digest);
-      return { state: applied.state, generation: gen, digest };
+      return { state: appliedState, generation: gen, digest };
     }
-    return { state: applied.state, generation: null, digest: null };
+    return { state: this.state, generation: null, digest: null };
   }
 
   verifyLeagueDigest(expectedDigest: string): boolean {
@@ -1139,17 +845,6 @@ export class RoomDraftController {
 
   updateSnapshot(snapshot: SeasonRoomPublicSnapshot): void {
     this.snapshot = snapshot;
-    const withDeadline = snapshot as unknown as {
-      deadlineAt?: string | null;
-      deadlineCursor?: string | null;
-      fallbackPayload?: unknown;
-    };
-    if (withDeadline?.deadlineAt)
-      this.setServerDeadline(
-        withDeadline.deadlineAt,
-        withDeadline.fallbackPayload ?? null,
-        withDeadline.deadlineCursor ?? null,
-      );
   }
 
   // Legacy: classicRollFor is a solo-mode stub; multiplayer uses season draft only (Claim 7)

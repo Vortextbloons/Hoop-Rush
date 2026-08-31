@@ -197,9 +197,8 @@ Deno.serve(async (req: Request) => {
     };
     return json(200, { receipt });
   }
-  // Note: resultDigest currently mirrors room.digest (client-derived draft digest).
-  // Future should derive authoritative result via engine to ensure server validates game rules.
-  // For now we bump revision but do not claim engine execution.
+  // Coordination cursor only: bump room.revision. Do not treat room.digest as an engine-verified
+  // sim hash — clients replay the command log locally (AGENTS.md: Supabase is not the sim host).
   const resultDigest = room.digest;
   const receipt = { roomId, commandId, ordinal, accepted: true, rejectionCode: null, resultDigest };
   const { error: insertError } = await serviceClient.from('season_room_commands').insert({

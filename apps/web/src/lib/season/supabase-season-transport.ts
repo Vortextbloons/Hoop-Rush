@@ -339,7 +339,7 @@ export function createSupabaseSeasonTransport(
         'season-room-create',
         {
           pace: settings.pace,
-          mode: (settings).mode ?? 'season',
+          mode: settings.mode ?? 'season',
           rootSeed,
         },
         config.captchaSiteKey,
@@ -357,8 +357,7 @@ export function createSupabaseSeasonTransport(
       }
       // ensure mode is reflected even if server still returns old shape without mode
       if (!(snap.settings as unknown as { mode?: string }).mode) {
-        (snap.settings as unknown as { mode: string }).mode =
-          (settings).mode ?? 'season';
+        (snap.settings as unknown as { mode: string }).mode = settings.mode ?? 'season';
       }
       return snap;
     },
@@ -434,6 +433,15 @@ export function createSupabaseSeasonTransport(
 
       const start = async () => {
         await ensureAnonAuth(client);
+        let realtimeOk = false;
+        const startPoll = () => {
+          if (pollTimer || closed) return;
+          pollTimer = setInterval(async () => {
+            if (closed) return;
+            const snap = await fetchSnap();
+            if (snap && !closed) handler(snap);
+          }, 5000);
+        };
         try {
           channel = client
             .channel(`season-room-${roomId}`)
@@ -464,19 +472,26 @@ export function createSupabaseSeasonTransport(
             )
             .subscribe((status) => {
               if (status === 'SUBSCRIBED') {
-                // successfully subscribed
+                realtimeOk = true;
+                if (pollTimer) {
+                  clearInterval(pollTimer);
+                  pollTimer = null;
+                }
+              } else if (
+                status === 'CHANNEL_ERROR' ||
+                status === 'TIMED_OUT' ||
+                status === 'CLOSED'
+              ) {
+                realtimeOk = false;
+                startPoll();
               }
             });
         } catch {
-          // realtime not available, rely on poll
+          startPoll();
         }
-
-        // fallback poll every 5s to refetch authoritative snapshot
-        pollTimer = setInterval(async () => {
-          if (closed) return;
-          const snap = await fetchSnap();
-          if (snap && !closed) handler(snap);
-        }, 5000);
+        setTimeout(() => {
+          if (!closed && !realtimeOk) startPoll();
+        }, 3000);
       };
 
       void start();

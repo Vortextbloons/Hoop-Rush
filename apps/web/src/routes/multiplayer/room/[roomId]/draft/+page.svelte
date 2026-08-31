@@ -69,12 +69,8 @@
   let manifest = $state<HoopRushManifest | null>(null);
   let catalog = $state<SeasonDraftCatalog | null>(null);
   let faces = $state<Map<string, SeasonFaceRef>>(new Map());
-  // Claim 8: surface replay integrity failures
   let replayError = $derived.by(() => controller?.getLastReplayError() ?? null);
   let integrityFailed = $derived.by(() => controller?.hasIntegrityFailure() ?? false);
-  // Claim 6: server-authoritative deadline
-  let deadlineAt = $derived.by(() => controller?.getDeadlineAt() ?? null);
-  let deadlineCursor = $derived.by(() => controller?.getDeadlineCursor() ?? null);
 
   async function loadDisplayAssets() {
     const [m, cat, ix] = await Promise.all([
@@ -152,24 +148,11 @@
     const t = (transport ?? undefined) as unknown as SeasonMultiplayerTransport | undefined;
     coordinator = createInMemorySeasonRoomCoordinator({
       transport: t,
+      commandCursor: () => controller?.getLastOrdinal() ?? -1,
       onSnapshot: (s) => {
         snap = s;
         if (!controller) return;
         controller.updateSnapshot(s);
-        const withDeadline = s as unknown as {
-          deadlineAt?: string | null;
-          deadlineCursor?: string | null;
-          fallbackPayload?: unknown;
-        };
-        if (withDeadline?.deadlineAt) {
-          controller.setServerDeadline(
-            withDeadline.deadlineAt,
-            withDeadline.fallbackPayload ?? null,
-            withDeadline.deadlineCursor ?? null,
-          );
-        } else if (s.cursor) {
-          void controller.fetchServerDeadline(s.cursor).catch(() => {});
-        }
       },
       onCommands: async (cmds: SeasonPublicCommandEnvelope[]) => {
         if (!controller) return;
@@ -255,25 +238,10 @@
           snapshot: snap,
           membership,
           catalog,
-          fetchImpl: fetch,
         });
-        // Ensure subscribe is active with controller present (re-subscribe to bind controller)
         try {
           coordinator.subscribe(roomId);
         } catch {}
-        // Claim 6: honor server deadline if snapshot carries it, else try to fetch from season_deadlines
-        const snapWithDeadline = snap as unknown as {
-          deadlineAt?: string | null;
-          deadlineCursor?: string | null;
-          fallbackPayload?: unknown;
-        };
-        if (snapWithDeadline?.deadlineAt)
-          controller.setServerDeadline(
-            snapWithDeadline.deadlineAt,
-            snapWithDeadline.fallbackPayload ?? null,
-            snapWithDeadline.deadlineCursor ?? snap.cursor,
-          );
-        else void controller.fetchServerDeadline(snap.cursor).catch(() => {});
         const state = await controller.restoreFromLog({ full: true });
         if (!state) {
           if (snap.phase === 'drafting') {
@@ -691,25 +659,11 @@
           >
         </div>
       {/if}
-      {#if deadlineAt}
-        <div class="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-xs">
-          <p class="font-semibold text-amber-700 flex items-center gap-1.5">
-            <Clock class="h-3.5 w-3.5" /> Server deadline authoritative · {deadlineCursor ??
-              snap?.cursor} — {new Date(deadlineAt).toLocaleTimeString()} · {secondsRemaining !==
-            null
-              ? `${secondsRemaining}s remaining`
-              : 'expired'}
-          </p>
-          <p class="mt-1 font-mono text-[11px] text-muted-foreground">
-            Fallback digest handled by season_deadlines; local 90s timer is fallback only. Reload
-            does not grant extra time.
-          </p>
-        </div>
-      {:else if snap?.settings.pace === 'live' && isMyTurn && secondsRemaining !== null}
+      {#if snap?.settings.pace === 'live' && isMyTurn && secondsRemaining !== null}
         <div class="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-xs">
           <p class="text-amber-700">
-            Local timer fallback · {secondsRemaining}s remaining — server deadline not yet
-            available, timer persists via sessionStorage and is not reset on reload.
+            Live turn clock · {secondsRemaining}s remaining. Reloading this tab keeps the same start
+            time (session storage).
           </p>
         </div>
       {/if}
@@ -825,16 +779,16 @@
           <div class="mt-3 grid gap-2 sm:grid-cols-2">
             {#each (draftState as any).picks as pick (pick.playerVersionId)}
               {@const candidate = candidateOf(pick.playerVersionId)}
-              <div class="flex min-w-0 items-center gap-2 rounded-lg border border-line-soft bg-card p-2 text-xs">
+              <div
+                class="flex min-w-0 items-center gap-2 rounded-lg border border-line-soft bg-card p-2 text-xs"
+              >
                 {#if manifest && faceOf(pick.playerVersionId)}
-                  <SeasonPlayerFace
-                    face={faceOf(pick.playerVersionId)!}
-                    {manifest}
-                    size="sm"
-                  />
+                  <SeasonPlayerFace face={faceOf(pick.playerVersionId)!} {manifest} size="sm" />
                 {/if}
                 <div class="min-w-0">
-                  <span class="block truncate font-semibold">{playerLabel(pick.playerVersionId)}</span>
+                  <span class="block truncate font-semibold"
+                    >{playerLabel(pick.playerVersionId)}</span
+                  >
                   <span class="text-muted-foreground"
                     >{pick.participantId} · R{pick.round} P{pick.pickOrdinal}{candidate
                       ? ` · ${formatPositions(candidate.positions.playable)}`
@@ -886,16 +840,16 @@
             </p>{/if}
           <div class="mt-3 grid gap-2 sm:grid-cols-2">
             {#each (draftState as any).picks as pick (pick.playerVersionId)}
-              <div class="flex min-w-0 items-center gap-2 rounded-lg border border-line-soft bg-card p-2 text-xs">
+              <div
+                class="flex min-w-0 items-center gap-2 rounded-lg border border-line-soft bg-card p-2 text-xs"
+              >
                 {#if manifest && faceOf(pick.playerVersionId)}
-                  <SeasonPlayerFace
-                    face={faceOf(pick.playerVersionId)!}
-                    {manifest}
-                    size="sm"
-                  />
+                  <SeasonPlayerFace face={faceOf(pick.playerVersionId)!} {manifest} size="sm" />
                 {/if}
                 <div class="min-w-0">
-                  <span class="block truncate font-semibold">{playerLabel(pick.playerVersionId)}</span>
+                  <span class="block truncate font-semibold"
+                    >{playerLabel(pick.playerVersionId)}</span
+                  >
                   <span class="text-muted-foreground">{pick.participantId}</span>
                 </div>
               </div>
@@ -1074,11 +1028,7 @@
                     >{i + 1}</span
                   >
                   {#if manifest && faceOf(pick.playerVersionId)}
-                    <SeasonPlayerFace
-                      face={faceOf(pick.playerVersionId)!}
-                      {manifest}
-                      size="sm"
-                    />
+                    <SeasonPlayerFace face={faceOf(pick.playerVersionId)!} {manifest} size="sm" />
                   {/if}
                   <div class="min-w-0">
                     <span class="block truncate text-sm font-bold"

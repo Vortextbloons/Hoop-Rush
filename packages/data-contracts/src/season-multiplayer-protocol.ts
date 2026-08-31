@@ -113,6 +113,8 @@ export const seasonRoomMembershipSchema = z.object({
 });
 export type SeasonRoomMembership = z.infer<typeof seasonRoomMembershipSchema>;
 
+// Reserved for post-draft coordination (private lock, attestations, direct trades). Draft uses
+// rooms + members + command log only; clients must not treat these as live draft seams.
 export const seasonDeadlineSchema = z.object({
   roomId: idSchema,
   cursor: z.string().min(1).max(64),

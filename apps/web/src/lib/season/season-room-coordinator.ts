@@ -41,6 +41,8 @@ export type SeasonRoomCoordinatorDeps = {
   transport: SeasonMultiplayerTransport;
   onSnapshot: (snap: SeasonRoomPublicSnapshot) => void;
   onCommands: (commands: SeasonPublicCommandEnvelope[]) => void | Promise<void>;
+  /** When set, command refetch uses this cursor (draft controller ordinal) instead of a second local tracker. */
+  commandCursor?: () => number;
 };
 
 export function createSeasonRoomCoordinator(deps: SeasonRoomCoordinatorDeps) {
@@ -60,6 +62,12 @@ export function createSeasonRoomCoordinator(deps: SeasonRoomCoordinatorDeps) {
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   let lastAcceptedOrdinal = -1;
   let uncommittedCandidate: unknown | null = null;
+
+  function afterOrdinal(): number {
+    const fromCursor = deps.commandCursor?.();
+    if (typeof fromCursor === 'number' && Number.isFinite(fromCursor)) return fromCursor;
+    return Number.isFinite(lastAcceptedOrdinal) ? lastAcceptedOrdinal : -1;
+  }
 
   function startHeartbeat(roomId: string) {
     stopHeartbeat();
@@ -308,7 +316,7 @@ export function createSeasonRoomCoordinator(deps: SeasonRoomCoordinatorDeps) {
         // treat Realtime as notification, refetch authoritative commands
         commandSync = commandSync
           .then(async () => {
-            const after = Number.isFinite(lastAcceptedOrdinal) ? lastAcceptedOrdinal : -1;
+            const after = afterOrdinal();
             const cmds = await deps.transport.refetch(roomId, after);
             if (cmds.length > 0) {
               await deps.onCommands(cmds);
@@ -368,7 +376,7 @@ export function createSeasonRoomCoordinator(deps: SeasonRoomCoordinatorDeps) {
       state = { ...state, roomId, connected: false };
       const snap = await deps.transport.resume(roomId);
       state = { ...state, publicSnapshot: snap, connected: true };
-      const after = Number.isFinite(lastAcceptedOrdinal) ? lastAcceptedOrdinal : -1;
+      const after = afterOrdinal();
       const cmds = await deps.transport.refetch(roomId, after);
       return { lastCheckpoint, commands: cmds, snapshot: snap };
     },

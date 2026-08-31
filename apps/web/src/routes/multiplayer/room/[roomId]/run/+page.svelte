@@ -105,6 +105,7 @@
     const t = (transport ?? undefined) as unknown as SeasonMultiplayerTransport | undefined;
     return createInMemorySeasonRoomCoordinator({
       transport: t,
+      commandCursor: () => controller?.getLastOrdinal() ?? -1,
       onSnapshot: (s) => {
         snap = s;
       },
@@ -155,7 +156,6 @@
           roomId,
           snapshot: snap,
           membership,
-          fetchImpl: fetch,
         });
         const state = await controller.restoreFromLog();
         draftState = state ? ({ ...state } as SeasonDraftState) : null;

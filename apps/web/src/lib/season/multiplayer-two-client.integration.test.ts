@@ -446,6 +446,8 @@ describe('multiplayer two-client deterministic flow (claim 11)', () => {
     // reconstruct envelope for that last accepted command (we know ordinal and commandId)
     // To test idempotency without polluting draft, re-submit the same envelope via transport with same commandId/ordinal/payload
     // We need the exact payload that was accepted: lastLog.command
+    const lastActor =
+      (lastState.picks[lastState.picks.length - 1]?.participantId as 'p1' | 'p2') ?? 'p1';
     const idemEnvelope: SeasonPublicCommandEnvelope = {
       schemaVersion: 2,
       roomId,
@@ -453,9 +455,8 @@ describe('multiplayer two-client deterministic flow (claim 11)', () => {
       ordinal: lastOrdinal,
       runId: roomId,
       payload: lastLog.command,
-      actorParticipantId:
-        (lastState.picks[lastState.picks.length - 1]?.participantId as 'p1' | 'p2') ?? 'p1',
-      actorFranchiseId: 'franchise-p1',
+      actorParticipantId: lastActor,
+      actorFranchiseId: lastActor === 'p2' ? 'franchise-p2' : 'franchise-p1',
     };
     const r1 = await transport.submitCommand(idemEnvelope);
     const r2 = await transport.submitCommand(idemEnvelope);
@@ -498,15 +499,17 @@ describe('multiplayer two-client deterministic flow (claim 11)', () => {
     });
     await staleCtrl.ensureDraftCreated();
     const baseOrd = staleCtrl.getLastOrdinal();
+    const staleTurn = staleCtrl.getTurn() as 'p1' | 'p2';
+    const staleFranchise = staleTurn === 'p2' ? 'franchise-p2' : 'franchise-p1';
     const staleEnv: SeasonPublicCommandEnvelope = {
       schemaVersion: 2,
       roomId: staleRoomId,
       commandId: 'stale-wrong-ord',
       ordinal: baseOrd + 5,
       runId: staleRoomId,
-      payload: { kind: 'draw-season-offer', participantId: staleCtrl.getTurn() as 'p1' | 'p2' },
-      actorParticipantId: staleCtrl.getTurn() as 'p1' | 'p2',
-      actorFranchiseId: 'franchise-p1',
+      payload: { kind: 'draw-season-offer', participantId: staleTurn },
+      actorParticipantId: staleTurn,
+      actorFranchiseId: staleFranchise,
     };
     const staleRec = await staleTransport.submitCommand(staleEnv);
     expect(staleRec.accepted).toBe(false);
@@ -661,5 +664,38 @@ describe('multiplayer two-client deterministic flow (claim 11)', () => {
     const misB2 = await transport.publishAttestation(attB2);
     expect((misB2 as { terminal: boolean }).terminal).toBe(true);
     expect(transport.getRoom(roomId)?.phase).toBe('integrity-failed');
+  });
+
+  it('rate-limits join after 100 attempts in an hour (does not truncate the window to 20)', async () => {
+    let now = Date.parse('2026-04-01T00:00:00.000Z');
+    const transport = new InMemorySeasonMultiplayerTransport({ clock: () => now });
+    for (let i = 0; i < 100; i += 1) {
+      if (i > 0 && i % 29 === 0) now += 61_000;
+      await expect(transport.join('9999')).rejects.toMatchObject({ code: 'invalid-code' });
+    }
+    await expect(transport.join('9999')).rejects.toMatchObject({ code: 'rate-limit' });
+    now += 60 * 60 * 1000 + 1;
+    await expect(transport.join('9999')).rejects.toMatchObject({ code: 'invalid-code' });
+  });
+
+  it('rejects impersonated submitCommand when the client is bound to a seat', async () => {
+    const backing = new InMemorySeasonMultiplayerTransport();
+    const created = await backing.create(settingsLiveSeason(), ROOT_SEED);
+    const roomId = created.roomId;
+    const code = (created as unknown as { code: string }).code;
+    await backing.join(code);
+    const p1 = backing.asActor('p1');
+    await expect(
+      p1.submitCommand({
+        schemaVersion: 2,
+        roomId,
+        commandId: 'impersonate-p2',
+        ordinal: 0,
+        runId: roomId,
+        payload: { kind: 'draw-season-offer', participantId: 'p2' },
+        actorParticipantId: 'p2',
+        actorFranchiseId: 'franchise-p2',
+      }),
+    ).rejects.toMatchObject({ code: 'authorization' });
   });
 });

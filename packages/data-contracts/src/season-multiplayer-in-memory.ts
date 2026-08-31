@@ -88,6 +88,26 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     this.codeExpiryMs = options.codeExpiryMs ?? 15 * 60 * 1000;
   }
 
+  /** Per-client view that rejects impersonation the way the Edge Function binds uid → seat. */
+  asActor(participantId: 'p1' | 'p2'): SeasonMultiplayerTransport {
+    const backing = this;
+    return new Proxy(backing, {
+      get(target, property, receiver) {
+        if (property === 'submitCommand') {
+          return (envelope: SeasonPublicCommandEnvelope) => {
+            if (envelope.actorParticipantId !== participantId) {
+              return Promise.reject(
+                Object.assign(new Error('authorization'), { code: 'authorization' }),
+              );
+            }
+            return target.submitCommand(envelope);
+          };
+        }
+        return Reflect.get(target, property, receiver);
+      },
+    }) as SeasonMultiplayerTransport;
+  }
+
   private nextRoomId(): string {
     this.roomCounter += 1;
     return `room-${String(this.roomCounter).padStart(8, '0')}`;
@@ -260,7 +280,7 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     if (recentHour.length >= 100)
       throw Object.assign(new Error('rate-limit'), { code: 'rate-limit' });
     recentMin.push(now);
-    this.joinAttempts.set(key, [...recentHour, now].slice(-20));
+    this.joinAttempts.set(key, [...recentHour, now]);
 
     const roomId = this.codeToRoom.get(code);
     if (!roomId) throw Object.assign(new Error('invalid-code'), { code: 'invalid-code' });
@@ -492,6 +512,10 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     if (!room) throw Object.assign(new Error('membership'), { code: 'membership' });
     this.assertNotOutdated(room);
     if (!room.members.has(envelope.actorParticipantId)) {
+      throw Object.assign(new Error('authorization'), { code: 'authorization' });
+    }
+    const actor = room.members.get(envelope.actorParticipantId);
+    if (actor && actor.franchiseId !== envelope.actorFranchiseId) {
       throw Object.assign(new Error('authorization'), { code: 'authorization' });
     }
     const existing = room.receipts.get(envelope.commandId);
