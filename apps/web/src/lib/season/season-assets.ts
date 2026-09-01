@@ -39,7 +39,6 @@ async function fetchVerified<T>(
     label: 'season asset',
     expectedHash: contentHash,
     parse,
-    init: { cache: 'no-store' },
   });
 }
 export function loadSeasonLeague(): Promise<SeasonLeague> {

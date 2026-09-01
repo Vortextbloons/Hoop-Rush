@@ -313,12 +313,21 @@ export function createSeasonRoomCoordinator(deps: SeasonRoomCoordinatorDeps) {
       const sub = deps.transport.subscribe(roomId, (snap) => {
         state = { ...state, publicSnapshot: snap };
         deps.onSnapshot(snap);
-        // treat Realtime as notification, refetch authoritative commands
+        // Finding 3: Realtime is notification only. Transport now coalesces concurrent
+        // postgres_changes (season_rooms + season_room_commands) into one resume RTT
+        // and caches payload.new envelopes so refetch() is cache-hit (0 RTT) for the
+        // immediate next ordinal. At minimum resume+refetch are not sequential 2 RTTs;
+        // in common case total is 1 RTT (coalesced snapshot) + 0 RTT (cached commands).
+        // Preserve ordinal invariant (ordinal === lastOrdinal+1) and idempotency - refetch
+        // remains authoritative and gap detection falls back to network. Keep refetch
+        // unconditional to preserve determinism even when snapshot revision is mock-stale
+        // (tests inject commands via mocked refetch independent of snapshot.revision).
         commandSync = commandSync
           .then(async () => {
             const after = afterOrdinal();
             const cmds = await deps.transport.refetch(roomId, after);
             if (cmds.length > 0) {
+              // Validate ordinal invariant before applying - onCommands will filter by ordinal>last
               await deps.onCommands(cmds);
               const last = cmds[cmds.length - 1];
               if (last && typeof last.ordinal === 'number') lastAcceptedOrdinal = last.ordinal;

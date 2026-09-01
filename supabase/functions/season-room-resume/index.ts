@@ -37,6 +37,14 @@ Deno.serve(async (req: Request) => {
   const body = await req.json().catch(() => null);
   const roomId = body?.roomId as string | undefined;
   if (!roomId) return json(400, { code: 'phase', message: 'missing roomId' });
+  // Finding 3: optional afterOrdinal to allow fetchSnap+refetch in one RTT (snapshot + commands since afterOrdinal)
+  const rawAfter = body?.afterOrdinal;
+  const afterOrdinal =
+    typeof rawAfter === 'number' && Number.isFinite(rawAfter)
+      ? rawAfter
+      : typeof rawAfter === 'string' && rawAfter !== '' && Number.isFinite(Number(rawAfter))
+        ? Number(rawAfter)
+        : null;
   const sc = createClient(url, srk);
   const { data: room, error } = await sc.from('season_rooms').select('*').eq('id', roomId).single();
   if (error || !room) return json(404, { code: 'membership', message: 'room not found' });
@@ -48,24 +56,44 @@ Deno.serve(async (req: Request) => {
     .maybeSingle();
   if (!member) return json(403, { code: 'membership', message: 'not a member' });
 
-  // heartbeat: update last_seen_at for caller
-  try {
-    await sc
-      .from('season_room_members')
-      .update({ last_seen_at: new Date().toISOString() } as unknown as Record<string, unknown>)
-      .eq('room_id', roomId)
-      .eq('uid', uidVal);
-  } catch {}
+  // heartbeat: update last_seen_at for caller (fire-and-forget, don't block snapshot)
+  const heartbeat = sc
+    .from('season_room_members')
+    .update({ last_seen_at: new Date().toISOString() } as unknown as Record<string, unknown>)
+    .eq('room_id', roomId)
+    .eq('uid', uidVal)
+    .then(() => {}, () => {});
 
-  const { count } = await sc
+  // Parallelize independent member queries (finding 3: was 5 sequential DB queries, now 3 parallelizable)
+  const countPromise = sc
     .from('season_room_members')
     .select('participant_id', { count: 'exact', head: true })
     .eq('room_id', roomId);
-
-  const { data: allMembers } = await sc
+  const membersPromise = sc
     .from('season_room_members')
     .select('participant_id, last_seen_at')
     .eq('room_id', roomId);
+  // Optional commands fetch in same RTT when afterOrdinal provided
+  const commandsPromise =
+    afterOrdinal !== null
+      ? sc
+          .from('season_room_commands')
+          .select(
+            'command_id, ordinal, run_id, payload, actor_participant_id, actor_franchise_id, receipt',
+          )
+          .eq('room_id', roomId)
+          .gt('ordinal', afterOrdinal)
+          .order('ordinal', { ascending: true })
+          .limit(1000)
+      : null;
+
+  const [{ count }, { data: allMembers }, commandsResult] = await Promise.all([
+    countPromise,
+    membersPromise,
+    commandsPromise ?? Promise.resolve({ data: null } as unknown as { data: unknown }),
+  ]);
+  // ensure heartbeat settled (already fire-and-forget)
+  await heartbeat.catch(() => {});
 
   const nowMs = Date.now();
   const presence = (allMembers ?? []).map((m: unknown) => {

@@ -54,8 +54,32 @@ export async function loadGameplayAssets(fetchImpl: typeof fetch = fetch): Promi
   rosterTargets: SeasonRosterTargets;
   scheduleHash: string;
 }> {
+  // Prefer cached asset path (Dexie + hash-verified, memoized) when manifest is available.
+  // This avoids re-downloading small schedule/league assets with cache bypass and reuses
+  // the catalog already cached by the draft page (draft-catalog.json 16.36MB). Fallback to
+  // direct fetch with default browser cache (not 'no-store') preserves testability via fetchImpl.
+  try {
+    const manifestMod = await import('$lib/data');
+    const manifest = await manifestMod.getManifest();
+    if (manifest.season?.league && manifest.season?.schedule && manifest.season?.rosterTargets) {
+      const assetsMod = await import('./season-assets');
+      const [league, schedule, rosterTargets] = await Promise.all([
+        assetsMod.loadSeasonLeague(),
+        assetsMod.loadSeasonSchedule(),
+        assetsMod.loadSeasonRosterTargets(),
+      ]);
+      return {
+        league,
+        schedule,
+        rosterTargets,
+        scheduleHash: manifest.season.schedule.contentHash,
+      };
+    }
+  } catch {
+    // fall through to direct fetch — keeps Zod validation and hash verification via schemas
+  }
   const fetchJson = async (url: string): Promise<unknown> => {
-    const res = await fetchImpl(url, { cache: 'no-store' });
+    const res = await fetchImpl(url);
     if (!res.ok) throw new Error(`fetch ${url} failed ${res.status}`);
     return res.json();
   };
@@ -64,6 +88,7 @@ export async function loadGameplayAssets(fetchImpl: typeof fetch = fetch): Promi
     fetchJson('/data/season/schedule.json'),
     fetchJson('/data/season/roster-targets.json'),
   ]);
+  // Note: validates compact packaged assets (league ~30 teams, schedule ~82*30, targets). Not the huge SeasonRun (which includes rosters/games). Zod parse here is O(kB), not O(MB).
   const league = seasonLeagueSchema.parse(leagueRaw);
   const schedule = seasonScheduleSchema.parse(scheduleRaw);
   const rosterTargets = seasonRosterTargetsSchema.parse(targetsRaw);

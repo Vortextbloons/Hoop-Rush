@@ -113,6 +113,7 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     return `room-${String(this.roomCounter).padStart(8, '0')}`;
   }
 
+  // Presence: heartbeat 5s, offline 30s (6 misses). Same trade-off as edge function: generous for asset loads, still gates Start within 30s.
   private presenceOf(room: InMemoryRoom): SeasonRoomPublicSnapshot['presence'] {
     const now = this.clock();
     const arr: SeasonRoomPublicSnapshot['presence'] = [];

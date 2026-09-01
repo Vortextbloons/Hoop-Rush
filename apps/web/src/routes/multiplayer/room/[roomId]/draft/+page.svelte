@@ -44,6 +44,7 @@
     type SeasonFaceRef,
   } from '$lib/season/season-branding';
   import { RoomDraftController } from '$lib/season/room-draft-controller';
+  import { catalogCandidateMap } from '$lib/season/season-catalog-index';
 
   let roomId = $derived($page.params.roomId as string);
 
@@ -93,8 +94,14 @@
     );
   }
 
+  // Memoized O(1) lookup via WeakMap cache; previous find was O(C≈3k) per card/pick per render, magnified by tick
+  let candidateMap = $derived.by(() => {
+    if (!catalog) return new Map<string, SeasonDraftCandidate>();
+    return catalogCandidateMap(catalog);
+  });
   function candidateOf(playerVersionId: string): SeasonDraftCandidate | null {
-    return catalog?.candidates.find((c) => c.playerVersionId === playerVersionId) ?? null;
+    if (!catalog) return null;
+    return candidateMap.get(playerVersionId) ?? null;
   }
 
   function faceOf(playerVersionId: string): SeasonFaceRef | null {
@@ -209,19 +216,23 @@
       try {
         coordinator.subscribe(roomId);
       } catch {}
-      await loadDisplayAssets();
       const stored = loadMembership(roomId);
       const t = transport as unknown as SeasonMultiplayerTransport | null;
-      let res: SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership };
-      if (t) {
-        res = (await t.resume(roomId)) as SeasonRoomPublicSnapshot & {
-          membership?: SeasonRoomMembership;
-        };
-      } else if (coordinator) {
-        res = (await coordinator.refresh(roomId)) as unknown as SeasonRoomPublicSnapshot & {
-          membership?: SeasonRoomMembership;
-        };
-      } else throw new Error('Multiplayer not configured');
+      // Parallelize independent I/O: catalog/manifest parsing (IDB/static fetch) and
+      // network resume (RTT) have no dependency. restoreFromLog still waits for both.
+      const assetsPromise = loadDisplayAssets();
+      const resumePromise: Promise<
+        SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership }
+      > = t
+        ? (t.resume(roomId) as Promise<
+            SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership }
+          >)
+        : coordinator
+          ? (coordinator.refresh(roomId) as Promise<unknown> as Promise<
+              SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership }
+            >)
+          : Promise.reject(new Error('Multiplayer not configured'));
+      const [, res] = await Promise.all([assetsPromise, resumePromise]);
       snap = res as SeasonRoomPublicSnapshot;
       if ((res as unknown as { membership?: SeasonRoomMembership }).membership) {
         const m = (res as unknown as { membership: SeasonRoomMembership }).membership;
@@ -460,9 +471,8 @@
   let myOffer = $derived.by(() => {
     if (!controller || !membership || !draftState) return null;
     const viewer = membership.participantId;
-    const offer = controller.currentOfferFor(viewer);
-    void tick;
-    return offer as SeasonDraftOffer | null;
+    // No void tick: offer is derived from draftState/command stream, not timer. Removes 1s recomputations that triggered candidateOf scans.
+    return controller.currentOfferFor(viewer) as SeasonDraftOffer | null;
   });
   let secondsRemaining = $derived.by(() => {
     void tick;

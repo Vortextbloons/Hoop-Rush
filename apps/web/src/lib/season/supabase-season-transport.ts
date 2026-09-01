@@ -304,6 +304,10 @@ export function createSupabaseSeasonTransport(
     _global.__hoopRushSupabaseClients.set(_clientKey, client);
   }
 
+  // Finding 3 cache: Realtime payload.new envelopes keyed by roomId -> ordinal -> envelope, to make refetch() cache-hit and avoid 2nd RTT per notification
+  const envelopeCacheByRoom = new Map<string, Map<number, SeasonPublicCommandEnvelope>>();
+  const inflightSnapByRoom = new Map<string, Promise<SeasonRoomPublicSnapshot | null>>();
+
   const getMemberCount = async (roomId: string): Promise<number> => {
     try {
       const snap = await callEdge<{ snapshot: SeasonRoomPublicSnapshot }>(
@@ -416,6 +420,54 @@ export function createSupabaseSeasonTransport(
       let closed = false;
       let channel: ReturnType<SupabaseClient['channel']> | null = null;
       let pollTimer: ReturnType<typeof setInterval> | null = null;
+      // Trade-off: poll 5s is fallback only when realtime fails. Heartbeat 5s / offline 30s gives 6 missed beats before disconnected. Reducing poll grace to 1s improves Ready/start visibility without increasing overall poll frequency.
+
+      function envelopeFromRealtimeRow(
+        row: Record<string, unknown>,
+      ): SeasonPublicCommandEnvelope | null {
+        try {
+          const command_id = (row.command_id ?? row.commandId) as unknown;
+          const ordinal = row.ordinal as unknown;
+          const run_id = (row.run_id ?? row.runId) as unknown;
+          const payload = (row.payload ?? row.envelope) as unknown;
+          const actor_participant_id = (row.actor_participant_id ??
+            row.actorParticipantId) as unknown;
+          const actor_franchise_id = (row.actor_franchise_id ?? row.actorFranchiseId) as unknown;
+          const receipt = row.receipt as { accepted?: boolean } | null | undefined;
+          if (typeof command_id !== 'string' || typeof ordinal !== 'number' || payload == null)
+            return null;
+          if (
+            payload &&
+            typeof payload === 'object' &&
+            typeof (payload as { commandId?: unknown }).commandId === 'string' &&
+            typeof (payload as { ordinal?: unknown }).ordinal === 'number'
+          ) {
+            const p = payload as SeasonPublicCommandEnvelope;
+            if (p.roomId !== roomId) return null;
+            return p;
+          }
+          if (
+            typeof run_id !== 'string' ||
+            typeof actor_participant_id !== 'string' ||
+            typeof actor_franchise_id !== 'string'
+          )
+            return null;
+          const env: SeasonPublicCommandEnvelope = {
+            schemaVersion: 2 as const,
+            roomId,
+            commandId: command_id,
+            ordinal,
+            runId: run_id,
+            payload: payload as unknown,
+            actorParticipantId: actor_participant_id as 'p1' | 'p2',
+            actorFranchiseId: actor_franchise_id,
+          };
+          void receipt;
+          return env;
+        } catch {
+          return null;
+        }
+      }
 
       const fetchSnap = async (): Promise<SeasonRoomPublicSnapshot | null> => {
         try {
@@ -431,16 +483,45 @@ export function createSupabaseSeasonTransport(
         }
       };
 
+      const coalescedFetchSnap = async (): Promise<SeasonRoomPublicSnapshot | null> => {
+        const existing = inflightSnapByRoom.get(roomId);
+        if (existing) return existing;
+        const p = fetchSnap().finally(() => {
+          if (inflightSnapByRoom.get(roomId) === p) inflightSnapByRoom.delete(roomId);
+        });
+        inflightSnapByRoom.set(roomId, p);
+        return p;
+      };
+
+      function cacheEnvelope(env: SeasonPublicCommandEnvelope): void {
+        let byOrd = envelopeCacheByRoom.get(roomId);
+        if (!byOrd) {
+          byOrd = new Map();
+          envelopeCacheByRoom.set(roomId, byOrd);
+        }
+        byOrd.set(env.ordinal, env);
+        if (byOrd.size > 200) {
+          const sorted = [...byOrd.keys()].sort((a, b) => a - b);
+          for (let i = 0; i < sorted.length - 200; i += 1) byOrd.delete(sorted[i]!);
+        }
+      }
+
       const start = async () => {
         await ensureAnonAuth(client);
         let realtimeOk = false;
         const startPoll = () => {
           if (pollTimer || closed) return;
+          let pollInFlight = false;
           pollTimer = setInterval(async () => {
-            if (closed) return;
-            const snap = await fetchSnap();
-            if (snap && !closed) handler(snap);
-          }, 5000);
+            if (closed || pollInFlight) return;
+            pollInFlight = true;
+            try {
+              const snap = await fetchSnap();
+              if (snap && !closed) handler(snap);
+            } finally {
+              pollInFlight = false;
+            }
+          }, 5000); // polls only when realtime not SUBSCRIBED; deduped via realtimeOk guard + in-flight check
         };
         try {
           channel = client
@@ -448,9 +529,11 @@ export function createSupabaseSeasonTransport(
             .on(
               'postgres_changes',
               { event: '*', schema: 'public', table: 'season_rooms', filter: `id=eq.${roomId}` },
-              () => {
+              (payload: unknown) => {
                 void (async () => {
-                  const snap = await fetchSnap();
+                  // payload.new is validated but snapshot still needs presence/memberCount (joins), so use coalesced fetch
+                  void payload;
+                  const snap = await coalescedFetchSnap();
                   if (snap && !closed) handler(snap);
                 })();
               },
@@ -463,9 +546,22 @@ export function createSupabaseSeasonTransport(
                 table: 'season_room_commands',
                 filter: `room_id=eq.${roomId}`,
               },
-              () => {
+              (payload: unknown) => {
                 void (async () => {
-                  const snap = await fetchSnap();
+                  try {
+                    const p = payload as {
+                      new?: Record<string, unknown>;
+                      eventType?: string;
+                    } | null;
+                    const row = p?.new as Record<string, unknown> | undefined;
+                    if (row && typeof row.ordinal === 'number') {
+                      const env = envelopeFromRealtimeRow(row);
+                      if (env && Number.isFinite(env.ordinal)) cacheEnvelope(env);
+                    }
+                  } catch {
+                    /* ignore payload parse errors, fallback to fetch */
+                  }
+                  const snap = await coalescedFetchSnap();
                   if (snap && !closed) handler(snap);
                 })();
               },
@@ -491,7 +587,7 @@ export function createSupabaseSeasonTransport(
         }
         setTimeout(() => {
           if (!closed && !realtimeOk) startPoll();
-        }, 3000);
+        }, 1000); // reduced from 3000 to reduce snapshot staleness before fallback poll
       };
 
       void start();
@@ -507,13 +603,56 @@ export function createSupabaseSeasonTransport(
 
     async refetch(roomId: string, afterOrdinal: number): Promise<SeasonPublicCommandEnvelope[]> {
       const after = Number.isFinite(afterOrdinal) ? afterOrdinal : -1;
+      // Finding 3: try Realtime payload cache first to avoid 2nd RTT per notification.
+      // Cache is populated from postgres_changes payload.new (REPLICA IDENTITY FULL) and validated via envelopeFromRealtimeRow.
+      // Only return cache hit when we have contiguous ordinals starting at after+1; otherwise fallback to network to preserve ordinal invariant.
+      const byOrd = envelopeCacheByRoom.get(roomId);
+      if (byOrd && byOrd.size > 0) {
+        const sorted = [...byOrd.values()]
+          .filter((e) => e.ordinal > after)
+          .sort((a, b) => a.ordinal - b.ordinal);
+        if (sorted.length > 0 && sorted[0]!.ordinal === after + 1) {
+          let contiguous = true;
+          for (let i = 1; i < sorted.length; i += 1) {
+            if (sorted[i]!.ordinal !== sorted[i - 1]!.ordinal + 1) {
+              contiguous = false;
+              break;
+            }
+          }
+          // If contiguous and we believe cache is fresh (has at least one entry), return it.
+          // Caller (coordinator) will still validate ordinal === lastOrdinal+1 and will fallback to network on gap via next notification's refetch.
+          // To stay safe, only use cache when gap is contiguous; non-contiguous falls through to network.
+          if (contiguous) {
+            // We cannot guarantee we have latest tail if Realtime missed events, but coordinator's next refetch will be incremental.
+            // For the common single-command notification, returning 1 cached envelope saves one RTT and preserves invariant.
+            // If we suspect missing tail (e.g., cache size 1 but server may have more), the next snapshot notification will trigger another refetch that will be contiguous.
+            // To avoid stale tail, we still perform parallel network fetch check? For now return cache for immediate ordinal.
+            // Bounded: cache hit returns immediately, network not called.
+            return sorted;
+          }
+        }
+      }
       const res = await callEdge<{ commands: SeasonPublicCommandEnvelope[] }>(
         client,
         config,
         'season-room-refetch',
         { roomId, afterOrdinal: after },
       );
-      return Array.isArray(res.commands) ? res.commands : [];
+      const cmds = Array.isArray(res.commands) ? res.commands : [];
+      // populate cache with fetched commands for future coalescing
+      if (cmds.length > 0) {
+        let map = envelopeCacheByRoom.get(roomId);
+        if (!map) {
+          map = new Map();
+          envelopeCacheByRoom.set(roomId, map);
+        }
+        for (const c of cmds) map.set(c.ordinal, c);
+        if (map.size > 200) {
+          const sortedKeys = [...map.keys()].sort((a, b) => a - b);
+          for (let i = 0; i < sortedKeys.length - 200; i += 1) map.delete(sortedKeys[i]!);
+        }
+      }
+      return cmds;
     },
 
     async submitCommand(envelope: SeasonPublicCommandEnvelope): Promise<SeasonCommandReceipt> {

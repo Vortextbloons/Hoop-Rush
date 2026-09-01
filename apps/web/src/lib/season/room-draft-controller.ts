@@ -32,6 +32,28 @@ import {
 } from '@hoop-rush/engine';
 import { loadSeasonDraftCatalog, loadSeasonLeague, loadSeasonRosterTargets } from './season-assets';
 import { draftCommandId, envelopeToDraftCommand } from './season-draft-command-log';
+import { runOneShotWorker } from '$lib/one-shot-worker';
+import {
+  GENERATION_WORKER_WIRE_SCHEMA_VERSION,
+  type GenerationWorkerRequest,
+  type GenerationWorkerResponse,
+} from './season-generation-wire';
+
+// WeakMap cache for candidate lookups: catalog instance -> versionId map
+const catalogCandidateMapCache = new WeakMap<
+  SeasonDraftCatalog,
+  Map<string, SeasonDraftCatalog['candidates'][number]>
+>();
+function getCatalogCandidateMap(
+  catalog: SeasonDraftCatalog,
+): Map<string, SeasonDraftCatalog['candidates'][number]> {
+  let map = catalogCandidateMapCache.get(catalog);
+  if (map === undefined) {
+    map = new Map(catalog.candidates.map((candidate) => [candidate.playerVersionId, candidate]));
+    catalogCandidateMapCache.set(catalog, map);
+  }
+  return map;
+}
 
 export type RoomDraftMode = SeasonRoomPublicSnapshot['mode'];
 
@@ -206,6 +228,72 @@ export class RoomDraftController {
     };
   }
 
+  private engineGenerationDepsWithPrecomputed(precomputed: SeasonLeagueGenerationResult | null): {
+    generate: (
+      input: Omit<import('@hoop-rush/engine').SeasonAiGenerationInput, 'targets'>,
+    ) => SeasonLeagueGenerationResult;
+  } {
+    if (precomputed !== null) {
+      return { generate: () => precomputed };
+    }
+    return this.generationDeps();
+  }
+
+  private buildGenerationInput(
+    state: SeasonDraftState,
+  ): Omit<import('@hoop-rush/engine').SeasonAiGenerationInput, 'targets'> {
+    if (!this.catalog) throw new Error('catalog not loaded');
+    return {
+      seed: state.rootSeed,
+      catalog: this.catalog,
+      league: state.league,
+      humanFranchiseIds: state.participants.map((participant) => participant.franchiseId),
+      humanRosters: state.participants.map((participant) => ({
+        franchiseId: participant.franchiseId,
+        playerVersionIds: state.picks
+          .filter((pick) => pick.participantId === participant.participantId)
+          .map((pick) => pick.playerVersionId),
+      })),
+    };
+  }
+
+  private async runGenerationInWorker(
+    input: Omit<import('@hoop-rush/engine').SeasonAiGenerationInput, 'targets'>,
+  ): Promise<SeasonLeagueGenerationResult> {
+    const targets = this.rosterTargets;
+    if (targets === null || targets === undefined) {
+      throw new Error('worker generation requires roster targets');
+    }
+    // Use injected RNG via worker; engine bans Math.random/Date.now are preserved
+    const request: GenerationWorkerRequest = {
+      schemaVersion: GENERATION_WORKER_WIRE_SCHEMA_VERSION,
+      type: 'generate',
+      requestId: `gen-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+      input,
+      targets,
+    };
+    // Fallback requestId using crypto if available for determinism of id only
+    try {
+      if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        request.requestId = crypto.randomUUID();
+      }
+    } catch {}
+    return runOneShotWorker<
+      GenerationWorkerRequest,
+      GenerationWorkerResponse,
+      SeasonLeagueGenerationResult
+    >({
+      createWorker: () =>
+        new Worker(new URL('../../workers/season-draft-generation-worker.ts', import.meta.url), {
+          type: 'module',
+        }),
+      request,
+      resultOf: (message) => (message.type === 'complete' ? message.generation : null),
+      errorOf: (message) => (message.type === 'error' ? message.message : null),
+      errorFallback: 'AI league generation worker failed',
+    });
+  }
+
   private async ensureAssets(): Promise<void> {
     if (this.catalog && this.league && this.rosterTargets) return;
     const [catalog, league, rosterTargets] = await Promise.all([
@@ -231,9 +319,14 @@ export class RoomDraftController {
     state: SeasonDraftState | null,
     command: SeasonDraftCommand,
     actorParticipantId: 'p1' | 'p2',
+    depsOverride?: {
+      generate: (
+        input: Omit<import('@hoop-rush/engine').SeasonAiGenerationInput, 'targets'>,
+      ) => SeasonLeagueGenerationResult;
+    },
   ): Promise<{ receipt: SeasonCommandReceipt; record: SeasonDraftCommandRecord | null }> {
     if (!this.catalog) throw new Error('catalog not loaded');
-    const deps = this.generationDeps();
+    const deps = depsOverride ?? this.generationDeps();
     const preview = applySeasonDraftCommand(state, this.catalog, command, deps);
     if (preview.record.status === 'rejected') {
       throw Object.assign(new Error(preview.record.message), {
@@ -334,10 +427,10 @@ export class RoomDraftController {
     return this.replayEnvelopes(envelopes, { resetIntegrity: true, full });
   }
 
-  private replayEnvelopes(
+  private async replayEnvelopes(
     envelopes: SeasonPublicCommandEnvelope[],
     options: { resetIntegrity: boolean; full?: boolean },
-  ): SeasonDraftState | null {
+  ): Promise<SeasonDraftState | null> {
     const catalog = this.catalog!;
     const deps = this.generationDeps();
     envelopes.sort((a, b) => a.ordinal - b.ordinal);
@@ -347,7 +440,8 @@ export class RoomDraftController {
     if (options.resetIntegrity) {
       let skipped = 0;
       let applyFailures = 0;
-      for (const env of envelopes) {
+      for (let idx = 0; idx < envelopes.length; idx += 1) {
+        const env = envelopes[idx]!;
         lastOrdinal = Math.max(lastOrdinal, env.ordinal);
         const command = envelopeToDraftCommand(env, state);
         if (!command) {
@@ -357,6 +451,7 @@ export class RoomDraftController {
             commandId: env.commandId,
             raw: env.payload,
           });
+          if (idx % 5 === 4) await new Promise<void>((r) => setTimeout(r, 0));
           continue;
         }
         try {
@@ -373,8 +468,10 @@ export class RoomDraftController {
           });
           this.lastReplayError = `replay failed at ordinal ${env.ordinal} (${env.commandId}): ${msg}`;
           this.integrityFailed = true;
+          if (idx % 5 === 4) await new Promise<void>((r) => setTimeout(r, 0));
           continue;
         }
+        if (idx % 5 === 4) await new Promise<void>((r) => setTimeout(r, 0));
       }
       if (skipped > 0) {
         this.skippedCommands = skipped;
@@ -415,10 +512,14 @@ export class RoomDraftController {
         }
       }
     } else {
-      for (const env of envelopes) {
+      for (let idx = 0; idx < envelopes.length; idx += 1) {
+        const env = envelopes[idx]!;
         lastOrdinal = Math.max(lastOrdinal, env.ordinal);
         const command = envelopeToDraftCommand(env, state);
-        if (!command) continue;
+        if (!command) {
+          if (idx % 5 === 4) await new Promise<void>((r) => setTimeout(r, 0));
+          continue;
+        }
         try {
           const result = applySeasonDraftCommand(state, catalog, command, deps);
           state = result.state;
@@ -434,6 +535,7 @@ export class RoomDraftController {
           this.integrityFailed = true;
           break;
         }
+        if (idx % 5 === 4) await new Promise<void>((r) => setTimeout(r, 0));
       }
     }
     this.state = state;
@@ -606,13 +708,11 @@ export class RoomDraftController {
       });
     }
     if (this.catalog && state.participants.length > 1) {
-      const candidate = this.catalog.candidates.find((c) => c.playerVersionId === playerVersionId);
+      const map = getCatalogCandidateMap(this.catalog);
+      const candidate = map.get(playerVersionId) ?? null;
       if (candidate) {
-        const byVersion = new Map(
-          this.catalog.candidates.map((entry) => [entry.playerVersionId, entry]),
-        );
         const ownedIdentity = state.picks.some((pick) => {
-          const owned = byVersion.get(pick.playerVersionId);
+          const owned = map.get(pick.playerVersionId);
           return owned?.playerId === candidate.playerId;
         });
         if (ownedIdentity) {
@@ -765,7 +865,23 @@ export class RoomDraftController {
       expectedRevision: state.revision,
       payload: { kind: 'generate-ai-league' },
     };
-    const { receipt } = await this.submitAndApply(state, command, this.actorId());
+    // Try worker path first to keep main thread responsive; fallback to sync if Worker unsupported
+    let precomputed: SeasonLeagueGenerationResult | null = null;
+    let workerFailed = false;
+    if (this.rosterTargets && typeof Worker !== 'undefined') {
+      try {
+        const input = this.buildGenerationInput(state);
+        precomputed = await this.runGenerationInWorker(input);
+      } catch (e) {
+        workerFailed = true;
+        console.warn('[room-draft-controller] worker generation failed, falling back to sync', e);
+        precomputed = null;
+      }
+    }
+    const depsOverride = this.engineGenerationDepsWithPrecomputed(precomputed);
+    // Yield to main thread before heavy sync fallback to avoid jank if worker not used
+    if (workerFailed) await new Promise<void>((r) => setTimeout(r, 0));
+    const { receipt } = await this.submitAndApply(state, command, this.actorId(), depsOverride);
     if (!receipt.accepted) {
       if (receipt.rejectionCode === 'stale-revision') {
         await this.restoreFromLog();

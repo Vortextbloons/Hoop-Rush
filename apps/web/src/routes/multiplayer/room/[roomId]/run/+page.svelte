@@ -151,13 +151,31 @@
       if (snap && membership) {
         coordinator.subscribe(roomId);
         const tr = getTransport();
+        // Warm Dexie-cached season assets in parallel with log replay. The draft page
+        // already cached the 16.36MB catalog via readCachedAsset; warming here ensures
+        // controller.ensureAssets hits the memoized/Dexie cache and avoids a second
+        // synchronous parse blocking on the main thread. Hash verification is retained
+        // (season-assets verifies contentHash, bootstrap uses cached path, no 'no-store').
+        const warmAssets = import('$lib/season/season-assets')
+          .then(async (m) => {
+            try {
+              await m.loadSeasonDraftCatalog();
+            } catch {}
+            try {
+              await m.loadSeasonLeague();
+            } catch {}
+            try {
+              await m.loadSeasonRosterTargets();
+            } catch {}
+          })
+          .catch(() => {});
         controller = new RoomDraftController({
           transport: tr,
           roomId,
           snapshot: snap,
           membership,
         });
-        const state = await controller.restoreFromLog();
+        const [, state] = await Promise.all([warmAssets, controller.restoreFromLog()]);
         draftState = state ? ({ ...state } as SeasonDraftState) : null;
         generation = controller.getGeneration();
         if (!draftState) {

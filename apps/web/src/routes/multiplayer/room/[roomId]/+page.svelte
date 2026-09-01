@@ -103,6 +103,7 @@
     if (snap.phase !== 'waiting') return null;
     if (snap.memberCount < 2) return 'Waiting for opponent to join';
     if (!guestReady) return 'Waiting for Ready — guest must confirm settings';
+    // Gated by presence (30s offline) + guestReady. Heartbeat 5s provides freshness; 30s slack avoids flake during asset loads. Not tick-dependent.
     if (!bothPresent) return 'Opponent disconnected — waiting for reconnection';
     return null;
   });
@@ -138,8 +139,7 @@
         if (s.guestReady && isGuest) liveMessage = 'You are Ready';
         if (s.phase === 'drafting') {
           liveMessage = 'Draft starting — entering arena';
-          // auto-navigate both clients to draft with brief transition
-          setTimeout(() => goto(`/multiplayer/room/${roomId}/draft`), 400);
+          void goto(resolve('/multiplayer/room/[roomId]/draft', { roomId }));
         }
         // update stored code presence: codeActive indicates still visible
         if (s.codeActive) {
@@ -168,6 +168,10 @@
         coordinator.hydrateFromStorage(roomId);
       } catch {}
       storedMembership = loadMembership(roomId) ?? storedMembership;
+      // Subscribe early before resume so Realtime events between resume fetch and
+      // channel SUBSCRIBED are not missed; resume provides authoritative snapshot.
+      coordinator.subscribe(roomId);
+      unsubscribe = () => coordinator?.disconnect();
       const t = transport as unknown as
         import('@hoop-rush/data-contracts').SeasonMultiplayerTransport | null;
       let res: SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership };
@@ -197,12 +201,9 @@
       if ((snap as unknown as { isOutdated?: boolean }).isOutdated) outdated = true;
       lastSettingsRevision =
         (snap as unknown as { settingsRevision?: number }).settingsRevision ?? null;
-      // treat resume as refresh for presence
-      coordinator.subscribe(roomId);
-      unsubscribe = () => coordinator?.disconnect();
       // if already drafting, auto-navigate (reconnecting client resumes there)
       if (snap.phase === 'drafting') {
-        setTimeout(() => goto(`/multiplayer/room/${roomId}/draft`), 400);
+        void goto(resolve('/multiplayer/room/[roomId]/draft', { roomId }));
       }
     } catch (e) {
       const code = (e as { code?: string })?.code;
@@ -255,7 +256,7 @@
       const res = await coordinator.startDraft(roomId);
       snap = res;
       liveMessage = 'Draft starting';
-      setTimeout(() => goto(`/multiplayer/room/${roomId}/draft`), 400);
+      void goto(resolve('/multiplayer/room/[roomId]/draft', { roomId }));
     } catch (e) {
       startError = friendlyJoinError(e);
     } finally {
@@ -874,7 +875,7 @@
             </p>
             <button
               type="button"
-              onclick={() => goto(`/multiplayer/room/${roomId}/draft`)}
+              onclick={() => goto(resolve('/multiplayer/room/[roomId]/draft', { roomId }))}
               class="mt-4 w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground"
               >Enter draft →</button
             >

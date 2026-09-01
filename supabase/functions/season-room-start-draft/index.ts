@@ -86,7 +86,8 @@ Deno.serve(async (req: Request) => {
     'season-multiplayer-v2';
   if (isV2Guest && guestReadyRaw === false)
     return json(400, { code: 'not-ready', message: 'guest not ready' });
-  // presence gating: both must be online within 30s - only for v2 with last_seen_at
+  // presence gating: both must be online within 30s (6× heartbeat) - only for v2 with last_seen_at
+  // Trade-off: 30s generous for tab throttling/asset loads; start refreshes caller's last_seen_at first so host not gated by own staleness. Poll 5s + grace 1s ensures snapshot reflects presence within ~6s if realtime lags.
   const nowMs = Date.now();
   const hasPresenceColumn = (allMembers ?? []).some(
     (m) => (m as unknown as { last_seen_at?: string | null }).last_seen_at !== undefined,

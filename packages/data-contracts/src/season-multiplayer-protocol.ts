@@ -55,6 +55,7 @@ export const seasonRoomSettingsV1Schema = z.object({
 });
 
 export const PRESENCE_OFFLINE_AFTER_MS = 30_000;
+// Trade-off: 30s offline = 6× heartbeat (5s) missed. Generous slack for asset loads / tab throttling (~1s tick) while still gating Start within 30s of genuine disconnect. Reducing would flake on slow devices; increasing would let host Start with ghost guest.
 
 export const seasonRoomPublicSnapshotSchema = z.object({
   roomId: idSchema,
