@@ -32,28 +32,13 @@ import {
 } from '@hoop-rush/engine';
 import { loadSeasonDraftCatalog, loadSeasonLeague, loadSeasonRosterTargets } from './season-assets';
 import { draftCommandId, envelopeToDraftCommand } from './season-draft-command-log';
+import { catalogCandidateMap } from './season-catalog-index';
 import { runOneShotWorker } from '$lib/one-shot-worker';
 import {
   GENERATION_WORKER_WIRE_SCHEMA_VERSION,
   type GenerationWorkerRequest,
   type GenerationWorkerResponse,
 } from './season-generation-wire';
-
-// WeakMap cache for candidate lookups: catalog instance -> versionId map
-const catalogCandidateMapCache = new WeakMap<
-  SeasonDraftCatalog,
-  Map<string, SeasonDraftCatalog['candidates'][number]>
->();
-function getCatalogCandidateMap(
-  catalog: SeasonDraftCatalog,
-): Map<string, SeasonDraftCatalog['candidates'][number]> {
-  let map = catalogCandidateMapCache.get(catalog);
-  if (map === undefined) {
-    map = new Map(catalog.candidates.map((candidate) => [candidate.playerVersionId, candidate]));
-    catalogCandidateMapCache.set(catalog, map);
-  }
-  return map;
-}
 
 export type RoomDraftMode = SeasonRoomPublicSnapshot['mode'];
 
@@ -708,7 +693,7 @@ export class RoomDraftController {
       });
     }
     if (this.catalog && state.participants.length > 1) {
-      const map = getCatalogCandidateMap(this.catalog);
+      const map = catalogCandidateMap(this.catalog);
       const candidate = map.get(playerVersionId) ?? null;
       if (candidate) {
         const ownedIdentity = state.picks.some((pick) => {

@@ -390,15 +390,33 @@ export function createSupabaseSeasonTransport(
 
     async resume(
       roomId: string,
-    ): Promise<SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership }> {
+      afterOrdinal?: number,
+    ): Promise<SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership; commands?: SeasonPublicCommandEnvelope[] }> {
+      const body: Record<string, unknown> = { roomId };
+      if (typeof afterOrdinal === 'number' && Number.isFinite(afterOrdinal)) body.afterOrdinal = afterOrdinal;
       const res = await callEdge<{
         snapshot: SeasonRoomPublicSnapshot;
         membership?: SeasonRoomMembership;
-      }>(client, config, 'season-room-resume', { roomId });
+        commands?: SeasonPublicCommandEnvelope[];
+      }>(client, config, 'season-room-resume', body);
       // edge may return membership for retain-private-membership requirement; preserve it on snapshot
-      const snap = res.snapshot as SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership };
+      const snap = res.snapshot as SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership; commands?: SeasonPublicCommandEnvelope[] };
       if (res.membership)
         (snap as unknown as { membership?: SeasonRoomMembership }).membership = res.membership;
+      // Wire up afterOrdinal scaffolding: if edge returned commands, populate realtime cache so next refetch is 0 RTT
+      if (Array.isArray(res.commands) && res.commands.length > 0) {
+        let byOrd = envelopeCacheByRoom.get(roomId);
+        if (!byOrd) {
+          byOrd = new Map();
+          envelopeCacheByRoom.set(roomId, byOrd);
+        }
+        for (const c of res.commands) byOrd.set(c.ordinal, c as SeasonPublicCommandEnvelope);
+        if (byOrd.size > 200) {
+          const sortedKeys = [...byOrd.keys()].sort((a, b) => a - b);
+          for (let i = 0; i < sortedKeys.length - 200; i += 1) byOrd.delete(sortedKeys[i]!);
+        }
+        (snap as unknown as { commands?: SeasonPublicCommandEnvelope[] }).commands = res.commands as SeasonPublicCommandEnvelope[];
+      }
       return snap;
     },
 
@@ -409,10 +427,14 @@ export function createSupabaseSeasonTransport(
       const res = await callEdge<{
         snapshot: SeasonRoomPublicSnapshot;
         membership?: SeasonRoomMembership;
+        commands?: SeasonPublicCommandEnvelope[];
       }>(client, config, 'season-room-resume', { roomId });
-      const snap = res.snapshot as SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership };
+      const snap = res.snapshot as SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership; commands?: SeasonPublicCommandEnvelope[] };
       if (res.membership)
         (snap as unknown as { membership?: SeasonRoomMembership }).membership = res.membership;
+      if (Array.isArray(res.commands) && res.commands.length > 0) {
+        (snap as unknown as { commands?: SeasonPublicCommandEnvelope[] }).commands = res.commands as SeasonPublicCommandEnvelope[];
+      }
       return snap;
     },
 
@@ -471,12 +493,25 @@ export function createSupabaseSeasonTransport(
 
       const fetchSnap = async (): Promise<SeasonRoomPublicSnapshot | null> => {
         try {
-          const res = await callEdge<{ snapshot: SeasonRoomPublicSnapshot }>(
+          // Include afterOrdinal when cache has entries so edge can return tail commands in same RTT
+          const byOrd = envelopeCacheByRoom.get(roomId);
+          const body: Record<string, unknown> = { roomId };
+          if (byOrd && byOrd.size > 0) {
+            const maxOrdinal = Math.max(...byOrd.keys());
+            if (Number.isFinite(maxOrdinal)) body.afterOrdinal = maxOrdinal;
+          }
+          const res = await callEdge<{ snapshot: SeasonRoomPublicSnapshot; commands?: SeasonPublicCommandEnvelope[] }>(
             client,
             config,
             'season-room-resume',
-            { roomId },
+            body,
           );
+          // Cache any commands returned with snapshot so refetch is 0 RTT
+          if (Array.isArray(res.commands)) {
+            for (const c of res.commands) {
+              if (c && typeof c.ordinal === 'number') cacheEnvelope(c as SeasonPublicCommandEnvelope);
+            }
+          }
           return res.snapshot;
         } catch {
           return null;
@@ -606,6 +641,7 @@ export function createSupabaseSeasonTransport(
       // Finding 3: try Realtime payload cache first to avoid 2nd RTT per notification.
       // Cache is populated from postgres_changes payload.new (REPLICA IDENTITY FULL) and validated via envelopeFromRealtimeRow.
       // Only return cache hit when we have contiguous ordinals starting at after+1; otherwise fallback to network to preserve ordinal invariant.
+      // Monitor in real two-client testing: if gaps appear (cache non-contiguous), fallback ensures correctness; log when fallback triggers for observability.
       const byOrd = envelopeCacheByRoom.get(roomId);
       if (byOrd && byOrd.size > 0) {
         const sorted = [...byOrd.values()]

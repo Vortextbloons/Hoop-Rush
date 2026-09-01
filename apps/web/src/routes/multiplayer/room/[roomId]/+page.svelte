@@ -139,6 +139,7 @@
         if (s.guestReady && isGuest) liveMessage = 'You are Ready';
         if (s.phase === 'drafting') {
           liveMessage = 'Draft starting — entering arena';
+          // Immediate navigation (perf): replaces prior 400ms setTimeout. If a visual transition is desired, add CSS enter animation on the draft page rather than delaying routing.
           void goto(resolve('/multiplayer/room/[roomId]/draft', { roomId }));
         }
         // update stored code presence: codeActive indicates still visible
@@ -201,7 +202,7 @@
       if ((snap as unknown as { isOutdated?: boolean }).isOutdated) outdated = true;
       lastSettingsRevision =
         (snap as unknown as { settingsRevision?: number }).settingsRevision ?? null;
-      // if already drafting, auto-navigate (reconnecting client resumes there)
+      // if already drafting, auto-navigate (reconnecting client resumes there) — immediate, no 400ms delay; target page handles any enter motion via CSS
       if (snap.phase === 'drafting') {
         void goto(resolve('/multiplayer/room/[roomId]/draft', { roomId }));
       }
@@ -256,6 +257,7 @@
       const res = await coordinator.startDraft(roomId);
       snap = res;
       liveMessage = 'Draft starting';
+      // Immediate navigation replaces 400ms transition delay; CSS can provide non-blocking motion on draft entry if needed
       void goto(resolve('/multiplayer/room/[roomId]/draft', { roomId }));
     } catch (e) {
       startError = friendlyJoinError(e);

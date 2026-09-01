@@ -95,6 +95,41 @@ Deno.serve(async (req: Request) => {
   // ensure heartbeat settled (already fire-and-forget)
   await heartbeat.catch(() => {});
 
+  // Transform fetched commands to envelope shape (same as season-room-refetch)
+  let commands: unknown[] | undefined;
+  if (afterOrdinal !== null && commandsResult && Array.isArray((commandsResult as { data?: unknown }).data)) {
+    const rows = (commandsResult as { data: unknown[] }).data as Array<{
+      command_id: string;
+      ordinal: number;
+      run_id: string;
+      payload: unknown;
+      actor_participant_id: 'p1' | 'p2';
+      actor_franchise_id: string;
+      receipt?: { accepted?: boolean } | null;
+    }>;
+    commands = rows.map((row) => {
+      const p = row.payload;
+      if (
+        p && typeof p === 'object' &&
+        typeof (p as { ordinal?: unknown }).ordinal === 'number' &&
+        typeof (p as { commandId?: unknown }).commandId === 'string'
+      ) {
+        return { ...(p as Record<string, unknown>), accepted: row.receipt?.accepted !== false };
+      }
+      return {
+        schemaVersion: 2,
+        roomId,
+        commandId: row.command_id,
+        ordinal: row.ordinal,
+        runId: row.run_id,
+        payload: row.payload,
+        actorParticipantId: row.actor_participant_id,
+        actorFranchiseId: row.actor_franchise_id,
+        accepted: row.receipt?.accepted !== false,
+      };
+    });
+  }
+
   const nowMs = Date.now();
   const presence = (allMembers ?? []).map((m: unknown) => {
     const row = m as { participant_id: string; last_seen_at: string | null };
@@ -149,5 +184,5 @@ Deno.serve(async (req: Request) => {
     seat: member.seat as 'p1' | 'p2',
   };
 
-  return json(200, { snapshot: snap, membership });
+  return json(200, { snapshot: snap, membership, ...(commands !== undefined ? { commands } : {}) });
 });
