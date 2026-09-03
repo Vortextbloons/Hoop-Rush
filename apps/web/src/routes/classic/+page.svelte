@@ -15,7 +15,7 @@
   import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
   import { classic, createEngineContext } from '@hoop-rush/engine';
   import { Dialog } from 'bits-ui';
-  import { getManifest, getPlayersIndex } from '$lib/data';
+  import { clearDataLoaderCaches, getManifest, getPlayersIndex } from '$lib/data';
   import {
     buildClassicCatalog,
     classicDraftSeed,
@@ -41,6 +41,7 @@
   import DraftValuePanel from '$lib/components/DraftValuePanel.svelte';
   import DraftPoolBrowser from '$lib/components/draft/DraftPoolBrowser.svelte';
   import ClassicRollReel from '$lib/components/classic/ClassicRollReel.svelte';
+  import AsyncState from '$lib/components/AsyncState.svelte';
   let slotPickerModule: Promise<
     typeof import('$lib/components/draft/SlotPickerDialog.svelte')
   > | null = null;
@@ -63,6 +64,8 @@
   let setupError: string | null = $state(null);
   let actionError: string | null = $state(null);
   let pickerPlayer = $state<IndexRow | null>(null);
+  let pickerTrigger = $state<HTMLElement | null>(null);
+  let pickerFallbackId = $state<string | null>(null);
   let spinning = $state(false);
   let spinKey = $state(0);
   let reelAxis = $state<'both' | 'franchise' | 'era'>('both');
@@ -92,7 +95,14 @@
       unregister = null;
     };
   });
-  $effect(() => {
+  function loadClassicData() {
+    manifestError = null;
+    indexError = null;
+    draftError = null;
+    manifest = null;
+    index = null;
+    draft = null;
+    draftLoaded = false;
     let cancelled = false;
     getManifest().then(
       (m) => {
@@ -127,7 +137,12 @@
     return () => {
       cancelled = true;
     };
-  });
+  }
+  $effect(() => loadClassicData());
+  function retryClassicData() {
+    clearDataLoaderCaches();
+    loadClassicData();
+  }
   const catalog = $derived.by(() =>
     manifest && index ? buildClassicCatalog(manifest, index) : [],
   );
@@ -147,13 +162,13 @@
   const rollRows = $derived(index && roll ? classicPoolRows(index, roll, presentation) : []);
   const poolHeading = $derived(
     roll && rollFranchise && rollEra && rollIdentity
-      ? `${rollIdentity.abbreviationLabel ?? franchiseAbbreviation(rollFranchise.franchiseId)} Â· ${rollEra.label}`
+      ? `${rollIdentity.abbreviationLabel ?? franchiseAbbreviation(rollFranchise.franchiseId)} · ${rollEra.label}`
       : 'Draft pool',
   );
-  const countLabel = $derived(`${rollRows.length} players Â· ${poolSortLabel(presentation)}`);
+  const countLabel = $derived(`${rollRows.length} players · ${poolSortLabel(presentation)}`);
   const reelAnnouncement = $derived(
     roll
-      ? `Round ${draft!.round} of 5 Â· ${rollIdentity?.displayLabel ?? rollFranchise?.displayName ?? roll.franchiseId} Â· ${rollEra?.label ?? roll.eraId}`
+      ? `Round ${draft!.round} of 5 · ${rollIdentity?.displayLabel ?? rollFranchise?.displayName ?? roll.franchiseId} · ${rollEra?.label ?? roll.eraId}`
       : '',
   );
   const rowByPickKey = $derived(
@@ -274,7 +289,25 @@
     }
   }
   function openPicker(player: IndexRow) {
+    pickerTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    pickerFallbackId = pickerTrigger?.closest<HTMLElement>('[id^="court-slot-"]')?.id ?? null;
     pickerPlayer = player;
+  }
+  function closePicker() {
+    if (!mounted) return;
+    pickerPlayer = null;
+    const trigger = pickerTrigger;
+    const fallback = pickerFallbackId;
+    pickerTrigger = null;
+    pickerFallbackId = null;
+    queueMicrotask(() => {
+      if (!mounted) return;
+      if (trigger?.isConnected) {
+        trigger.focus();
+      } else if (fallback) {
+        document.getElementById(fallback)?.focus();
+      }
+    });
   }
   async function placePlayer(player: IndexRow, slotIndex: number) {
     if (!draft || catalog.length === 0 || spinning || starting) return;
@@ -294,13 +327,13 @@
           );
       if (next.status === 'complete' && !alreadyDrafted) {
         starting = true;
-        pickerPlayer = null;
+        closePicker();
         draft = await persist(next);
         if (!mounted) return;
         void launchRun(next);
       } else {
         spinning = true;
-        pickerPlayer = null;
+        closePicker();
         await applyRoll(next, 'both');
       }
     } catch (error) {
@@ -331,68 +364,91 @@
 </script>
 
 <svelte:head>
-  <title>Classic â€” Hoop Rush</title>
+  <title>Classic — Hoop Rush</title>
 </svelte:head>
 
-<section class="mx-auto w-full max-w-6xl px-0 py-4 sm:px-6 sm:py-10">
-  <div class="flex items-start justify-between gap-3 px-3 sm:px-0">
-    <div class="min-w-0 flex-1">
-      <p class="font-mono text-[10px] tracking-[0.16em] text-primary uppercase sm:text-xs">
-        Classic
-      </p>
+<section class="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
+  <div class="flex items-end justify-between gap-4">
+    <div>
+      <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">Classic</p>
       {#if draft}
         <h1
-          class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase sm:mt-2 sm:text-4xl md:text-5xl"
+          class="font-display mt-2 text-3xl font-extrabold tracking-tight uppercase sm:text-4xl md:text-5xl"
         >
-          Classic Â· {variantLabel(draft.variant)}
+          Classic · {variantLabel(draft.variant)}
         </h1>
+        <p class="mt-3 max-w-xl text-sm text-muted-foreground">
+          Five rounds, one franchise and decade per round. One franchise reroll and one era reroll.
+        </p>
       {:else}
         <h1
-          class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase sm:mt-2 sm:text-4xl md:text-5xl"
+          class="font-display mt-2 text-3xl font-extrabold tracking-tight uppercase sm:text-4xl md:text-5xl"
         >
           Five draft rounds
         </h1>
+        <p class="mt-3 max-w-xl text-sm text-muted-foreground">
+          Five rounds, one franchise and decade per round. Choose how you see players.
+        </p>
       {/if}
     </div>
     <a
       href={resolve('/')}
-      class="shrink-0 pt-1 font-mono text-xs text-muted-foreground underline-offset-4 hover:underline"
+      class="shrink-0 font-mono text-xs text-muted-foreground underline-offset-4 hover:underline"
     >
       Back
     </a>
   </div>
 
   {#if manifestError}
-    <p class="mt-8 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
-      Failed to load data: {manifestError}
-    </p>
+    <div class="mt-8">
+      <AsyncState
+        kind="error"
+        title="Data unavailable"
+        message="Couldn’t load data. Try again."
+        retry={retryClassicData}
+      />
+    </div>
   {:else if !manifest}
-    <p class="mt-8 font-mono text-sm text-muted-foreground">Loading dataâ€¦</p>
+    <div class="mt-8">
+      <AsyncState kind="loading" title="Loading…" message="Loading…" />
+    </div>
   {:else}
     {#if indexError}
-      <p class="mt-8 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
-        Failed to load players: {indexError}
-      </p>
+      <div class="mt-8">
+        <AsyncState
+          kind="error"
+          title="Players unavailable"
+          message="Couldn’t load data. Try again."
+          retry={retryClassicData}
+        />
+      </div>
     {:else if !index}
-      <p class="mt-8 font-mono text-sm text-muted-foreground">Loading playersâ€¦</p>
+      <div class="mt-8">
+        <AsyncState kind="loading" title="Loading…" message="Loading…" />
+      </div>
     {:else if draftError}
-      <p class="mt-8 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
-        Failed to load draft: {draftError}
-      </p>
+      <div class="mt-8">
+        <AsyncState
+          kind="error"
+          title="Draft unavailable"
+          message={draftError}
+          retry={retryClassicData}
+        />
+      </div>
     {:else if !draftLoaded}
-      <p class="mt-8 font-mono text-sm text-muted-foreground">Loading draftâ€¦</p>
+      <div class="mt-8">
+        <AsyncState kind="loading" title="Loading…" message="Loading…" />
+      </div>
     {:else if !draft}
-      <div class="mt-6 flex flex-col gap-4 pb-32 sm:mt-10 sm:gap-6">
-        <div class="px-3 sm:px-0">
-          <h2 class="font-mono text-[11px] tracking-[0.14em] text-muted-foreground uppercase">
-            Choose a variant
-          </h2>
+      <div class="mt-10 flex flex-col gap-6 pb-32">
+        <div>
+          <span class="text-label text-muted-foreground"> Choose a variant </span>
         </div>
-        <div class="grid gap-3 px-3 sm:grid-cols-2 sm:gap-4 sm:px-0">
+        <div class="grid gap-3 sm:grid-cols-2 sm:gap-4">
           <button
             type="button"
             onclick={() => startDraft('ratings')}
-            class="group flex h-full flex-col rounded-xl bg-card p-6 text-left outline-none transition-colors hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring sm:p-7"
+            class="group flex h-full flex-col rounded-xl border border-border bg-card p-6 text-left outline-none transition-colors hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring sm:p-7"
           >
             <h3 class="font-display text-4xl font-extrabold tracking-tight uppercase">Ratings</h3>
             <p class="mt-3 flex-1 text-sm leading-relaxed text-muted-foreground">
@@ -410,7 +466,7 @@
           <button
             type="button"
             onclick={() => startDraft('ball-knowledge')}
-            class="group flex h-full flex-col rounded-xl bg-card p-6 text-left outline-none transition-colors hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring sm:p-7"
+            class="group flex h-full flex-col rounded-xl border border-border bg-card p-6 text-left outline-none transition-colors hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring sm:p-7"
           >
             <h3 class="font-display text-4xl font-extrabold tracking-tight uppercase">
               Ball Knowledge
@@ -437,9 +493,9 @@
         {/if}
       </div>
     {:else}
-      <div class="mt-6 flex flex-col gap-4 pb-32 sm:mt-10 sm:gap-6">
+      <div class="mt-10 flex flex-col gap-6 pb-32">
         {#if draft.status === 'drafting' && roll}
-          <div class="rounded-none bg-surface-1 sm:rounded-xl">
+          <div class="rounded-xl bg-surface-1">
             <div
               class="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3"
             >
@@ -464,7 +520,7 @@
             <div class="flex flex-col gap-2 px-3 pb-3 sm:gap-3 sm:px-4 sm:pb-4">
               <div
                 class="grid w-full grid-cols-2 gap-2"
-                aria-label={`Round ${draft.round} of 5 Â· ${rollIdentity?.displayLabel ?? rollFranchise?.displayName ?? roll.franchiseId} Â· ${rollEra?.label ?? roll.eraId}`}
+                aria-label={`Round ${draft.round} of 5 · ${rollIdentity?.displayLabel ?? rollFranchise?.displayName ?? roll.franchiseId} · ${rollEra?.label ?? roll.eraId}`}
               >
                 <span
                   class="flex min-w-0 items-center gap-2 rounded-lg bg-surface-2 px-2.5 py-2 sm:px-3"
@@ -589,7 +645,7 @@
               {actionError}
             </p>
           {/if}
-          <div class="rounded-none bg-surface-1 sm:rounded-xl">
+          <div class="rounded-xl bg-surface-1">
             <div class="px-3 py-3 sm:px-4">
               <h3 class="font-display text-lg font-extrabold tracking-tight uppercase">
                 Your five
@@ -615,7 +671,7 @@
                       {row.displayName}
                     </span>
                     <span class="shrink-0 font-mono text-[10px] text-muted-foreground">
-                      {row.seasonKey} Â· {formatPositions(row.positionsPlayable)} Â·
+                      {row.seasonKey} · {formatPositions(row.positionsPlayable)} ·
                       {resolveEraTeamIdentity(manifest!, row.franchiseId, row.eraId)
                         .abbreviationLabel ?? franchiseAbbreviation(row.franchiseId)}
                     </span>
@@ -628,7 +684,7 @@
               {/each}
             </ul>
           </div>
-          <div class="px-3 sm:px-0">
+          <div>
             <button
               type="button"
               onclick={() => launchRun(completeDraft)}
@@ -657,7 +713,7 @@
 
   {#if pickerPlayer}
     {#await loadSlotPickerDialog() then { default: SlotPickerDialog }}
-      <p class="px-4 py-3 font-mono text-xs text-muted-foreground">Loadingâ€¦</p>
+      <p class="px-4 py-3 font-mono text-xs text-muted-foreground">Loading…</p>
       <SlotPickerDialog
         player={pickerPlayer}
         {slots}
@@ -665,9 +721,7 @@
         {presentation}
         allowDisplacement
         onplace={placePlayer}
-        onclose={() => {
-          if (mounted) pickerPlayer = null;
-        }}
+        onclose={closePicker}
       />
     {/await}
   {/if}

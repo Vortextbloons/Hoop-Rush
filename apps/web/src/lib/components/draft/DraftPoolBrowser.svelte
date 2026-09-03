@@ -202,7 +202,7 @@
             disabled={cardState === 'blocked'}
             aria-disabled={cardState === 'blocked' ? 'true' : undefined}
             onclick={() => onpick(player)}
-            class="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left {cardState ===
+            class="flex w-full items-center gap-3 rounded-lg py-2.5 pr-5 pl-3 text-left {cardState ===
             'lineup'
               ? 'bg-primary/10 opacity-60'
               : cardState === 'displace'
@@ -218,15 +218,28 @@
               fallbackInitials={player.firstName[0]! + player.lastName[0]!}
             />
             <span class="min-w-0 flex-1">
-              <span class="block truncate text-sm font-bold">{player.displayName}</span>
-              <span class="block font-mono text-[10px] text-muted-foreground">
-                {player.seasonKey} · {teamLabelFor(player)} · {eraLabel.get(player.eraId) ??
-                  player.eraId} · {formatPositions(player.positionsPlayable)}
+              <span class="block truncate text-sm font-bold leading-tight"
+                >{player.displayName}</span
+              >
+              <span
+                class="block truncate font-mono text-[10px] leading-tight text-muted-foreground"
+              >
+                {player.seasonKey} · {teamLabelFor(player)}
+              </span>
+              <span
+                class="block truncate font-mono text-[10px] leading-tight text-muted-foreground"
+              >
+                {eraLabel.get(player.eraId) ?? player.eraId} · {formatPositions(
+                  player.positionsPlayable,
+                )}
               </span>
             </span>
-            <span class="flex shrink-0 gap-1 font-mono text-[10px]">
+            <span class="ml-1 flex shrink-0 gap-1 font-mono text-[10px]">
               {#each ratingBadges(player, presentation) as badge (badge.label)}
-                <span class="rounded bg-surface-3 px-1.5 py-0.5" title={BADGE_TITLES[badge.label]}>
+                <span
+                  class="rounded-full bg-surface-3 px-1.5 py-0.5 sm:px-2"
+                  title={BADGE_TITLES[badge.label]}
+                >
                   {`${badge.label} ${badge.value}`}
                 </span>
               {/each}

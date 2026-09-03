@@ -298,7 +298,7 @@
     </div>
     <a
       href={resolve('/')}
-      class="font-mono text-xs text-muted-foreground underline-offset-4 hover:underline"
+      class="shrink-0 font-mono text-xs text-muted-foreground underline-offset-4 hover:underline"
     >
       Back
     </a>
@@ -333,167 +333,157 @@
       </div>
     {:else}
       <div class="mt-10 flex flex-col gap-6 pb-32">
-        <div class="grid gap-4 sm:grid-cols-2">
-          <div>
-            <h2
-              id="sandbox-team-label"
-              class="font-mono text-[11px] tracking-[0.14em] text-muted-foreground uppercase"
-            >
-              Team
-            </h2>
-            <Select.Root
-              type="single"
-              value={franchiseFilter}
-              onValueChange={selectFranchise}
-              items={franchiseItems}
-            >
-              <Select.Trigger
-                aria-labelledby="sandbox-team-label"
-                class="mt-2 flex h-11 w-full items-center justify-between gap-3 rounded-lg border border-input bg-card px-3.5 text-sm font-semibold text-foreground outline-none transition-colors hover:border-line-strong focus-visible:ring-2 focus-visible:ring-ring"
+        <div class="rounded-xl bg-surface-1 p-3 sm:p-4">
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div>
+              <h2
+                id="sandbox-team-label"
+                class="font-mono text-[11px] tracking-[0.14em] text-muted-foreground uppercase"
               >
-                <Select.Value placeholder="Any team…">
-                  {#snippet children(props)}
-                    {#if franchise}
-                      <span class="flex min-w-0 items-center gap-2.5">
-                        <TeamLogo
-                          manifest={manifest!}
-                          franchiseId={franchise.franchiseId}
-                          teamExternalId={franchise.teamExternalId}
-                          logoCandidates={eraIdentity?.logoCandidates ?? []}
-                        />
-                        <span
-                          class="truncate"
-                          title={eraIdentity?.displayLabel ?? franchise.displayName}
-                        >
-                          {eraIdentity?.abbreviationLabel ??
-                            franchiseAbbreviation(franchise.franchiseId)}
-                        </span>
-                      </span>
-                    {:else}
-                      <span class="font-normal text-muted-foreground">{props.placeholder}</span>
-                    {/if}
-                  {/snippet}
-                </Select.Value>
-                <ChevronDown class="h-4 w-4 shrink-0 text-muted-foreground" />
-              </Select.Trigger>
-              <Select.Portal>
-                <Select.Content
-                  side="bottom"
-                  sideOffset={6}
-                  align="start"
-                  collisionPadding={12}
-                  class="z-50 min-w-64 max-w-[calc(100vw-1.5rem)] rounded-lg border border-border bg-popover p-1 shadow-2xl shadow-black/30"
+                Team
+              </h2>
+              <Select.Root
+                type="single"
+                value={franchiseFilter}
+                onValueChange={selectFranchise}
+                items={franchiseItems}
+              >
+                <Select.Trigger
+                  aria-labelledby="sandbox-team-label"
+                  class="mt-2 flex h-11 w-full items-center justify-between gap-3 rounded-lg border border-input bg-card px-3.5 text-sm font-semibold text-foreground outline-none transition-colors hover:border-line-strong focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <Select.Viewport
-                    class="max-h-[min(20rem,55vh)] overflow-y-auto overscroll-contain p-0.5"
-                  >
-                    <Select.Item
-                      value=""
-                      label="Any team"
-                      aria-label="Any team"
-                      class="cursor-pointer select-none rounded-md outline-none transition-colors data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40 data-[highlighted]:bg-surface-3 data-[selected]:bg-primary/10"
-                    >
-                      {#snippet children({ selected })}
-                        <span class="flex w-full items-center gap-2.5 py-1 pr-1 pl-0.5">
-                          <span class="min-w-0 flex-1 truncate text-sm font-semibold">Any team</span
+                  <Select.Value placeholder="Any team…">
+                    {#snippet children(props)}
+                      {#if franchise}
+                        <span class="flex min-w-0 items-center gap-2.5">
+                          <TeamLogo
+                            manifest={manifest!}
+                            franchiseId={franchise.franchiseId}
+                            teamExternalId={franchise.teamExternalId}
+                            logoCandidates={eraIdentity?.logoCandidates ?? []}
+                          />
+                          <span
+                            class="truncate"
+                            title={eraIdentity?.displayLabel ?? franchise.displayName}
                           >
-                          {#if selected}
-                            <Check class="h-4 w-4 shrink-0 text-primary" />
-                          {/if}
+                            {eraIdentity?.abbreviationLabel ??
+                              franchiseAbbreviation(franchise.franchiseId)}
+                          </span>
                         </span>
-                      {/snippet}
-                    </Select.Item>
-                    {#each manifest.modernFranchiseSlots as entry (entry.franchiseId)}
+                      {:else}
+                        <span class="font-normal text-muted-foreground">{props.placeholder}</span>
+                      {/if}
+                    {/snippet}
+                  </Select.Value>
+                  <ChevronDown class="h-4 w-4 shrink-0 text-muted-foreground" />
+                </Select.Trigger>
+                <Select.Portal>
+                  <Select.Content
+                    side="bottom"
+                    sideOffset={6}
+                    align="start"
+                    collisionPadding={12}
+                    class="z-50 min-w-64 max-w-[calc(100vw-1.5rem)] rounded-lg border border-border bg-popover p-1 shadow-2xl shadow-black/30"
+                  >
+                    <Select.Viewport
+                      class="max-h-[min(20rem,55vh)] overflow-y-auto overscroll-contain p-0.5"
+                    >
                       <Select.Item
-                        value={entry.franchiseId}
-                        label={entry.displayName}
-                        aria-label={`${franchiseAbbreviation(entry.franchiseId)} — ${entry.displayName}`}
+                        value=""
+                        label="Any team"
+                        aria-label="Any team"
                         class="cursor-pointer select-none rounded-md outline-none transition-colors data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40 data-[highlighted]:bg-surface-3 data-[selected]:bg-primary/10"
                       >
                         {#snippet children({ selected })}
                           <span class="flex w-full items-center gap-2.5 py-1 pr-1 pl-0.5">
-                            <TeamLogo
-                              manifest={manifest!}
-                              franchiseId={entry.franchiseId}
-                              teamExternalId={entry.teamExternalId}
-                            />
-                            <span class="min-w-0 flex-1 truncate text-sm font-semibold">
-                              {franchiseAbbreviation(entry.franchiseId)}
-                            </span>
+                            <span class="min-w-0 flex-1 truncate text-sm font-semibold"
+                              >Any team</span
+                            >
                             {#if selected}
                               <Check class="h-4 w-4 shrink-0 text-primary" />
                             {/if}
                           </span>
                         {/snippet}
                       </Select.Item>
-                    {/each}
-                  </Select.Viewport>
-                </Select.Content>
-              </Select.Portal>
-            </Select.Root>
-          </div>
+                      {#each manifest.modernFranchiseSlots as entry (entry.franchiseId)}
+                        <Select.Item
+                          value={entry.franchiseId}
+                          label={entry.displayName}
+                          aria-label={`${franchiseAbbreviation(entry.franchiseId)} — ${entry.displayName}`}
+                          class="cursor-pointer select-none rounded-md outline-none transition-colors data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40 data-[highlighted]:bg-surface-3 data-[selected]:bg-primary/10"
+                        >
+                          {#snippet children({ selected })}
+                            <span class="flex w-full items-center gap-2.5 py-1 pr-1 pl-0.5">
+                              <TeamLogo
+                                manifest={manifest!}
+                                franchiseId={entry.franchiseId}
+                                teamExternalId={entry.teamExternalId}
+                              />
+                              <span class="min-w-0 flex-1 truncate text-sm font-semibold">
+                                {franchiseAbbreviation(entry.franchiseId)}
+                              </span>
+                              {#if selected}
+                                <Check class="h-4 w-4 shrink-0 text-primary" />
+                              {/if}
+                            </span>
+                          {/snippet}
+                        </Select.Item>
+                      {/each}
+                    </Select.Viewport>
+                  </Select.Content>
+                </Select.Portal>
+              </Select.Root>
+            </div>
 
-          <div>
-            <h2
-              id="sandbox-decade-label"
-              class="font-mono text-[11px] tracking-[0.14em] text-muted-foreground uppercase"
-            >
-              Decade
-            </h2>
-            <Select.Root type="single" value={eraFilter} onValueChange={selectEra} items={eraItems}>
-              <Select.Trigger
-                aria-labelledby="sandbox-decade-label"
-                class="mt-2 flex h-11 w-full items-center justify-between gap-3 rounded-lg border border-input bg-card px-3.5 text-sm font-semibold text-foreground outline-none transition-colors hover:border-line-strong focus-visible:ring-2 focus-visible:ring-ring"
+            <div>
+              <h2
+                id="sandbox-decade-label"
+                class="font-mono text-[11px] tracking-[0.14em] text-muted-foreground uppercase"
               >
-                <Select.Value placeholder="Any decade…">
-                  {#snippet children(props)}
-                    {#if era}
-                      <span class="truncate font-mono">{era.label}</span>
-                    {:else}
-                      <span class="font-normal text-muted-foreground">{props.placeholder}</span>
-                    {/if}
-                  {/snippet}
-                </Select.Value>
-                <ChevronDown class="h-4 w-4 shrink-0 text-muted-foreground" />
-              </Select.Trigger>
-              <Select.Portal>
-                <Select.Content
-                  side="bottom"
-                  sideOffset={6}
-                  align="start"
-                  collisionPadding={12}
-                  class="z-50 min-w-48 max-w-[calc(100vw-1.5rem)] rounded-lg border border-border bg-popover p-1 shadow-2xl shadow-black/30"
+                Decade
+              </h2>
+              <Select.Root
+                type="single"
+                value={eraFilter}
+                onValueChange={selectEra}
+                items={eraItems}
+              >
+                <Select.Trigger
+                  aria-labelledby="sandbox-decade-label"
+                  class="mt-2 flex h-11 w-full items-center justify-between gap-3 rounded-lg border border-input bg-card px-3.5 text-sm font-semibold text-foreground outline-none transition-colors hover:border-line-strong focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <Select.Viewport
-                    class="max-h-[min(20rem,55vh)] overflow-y-auto overscroll-contain p-0.5"
+                  <Select.Value placeholder="Any decade…">
+                    {#snippet children(props)}
+                      {#if era}
+                        <span class="truncate font-mono">{era.label}</span>
+                      {:else}
+                        <span class="font-normal text-muted-foreground">{props.placeholder}</span>
+                      {/if}
+                    {/snippet}
+                  </Select.Value>
+                  <ChevronDown class="h-4 w-4 shrink-0 text-muted-foreground" />
+                </Select.Trigger>
+                <Select.Portal>
+                  <Select.Content
+                    side="bottom"
+                    sideOffset={6}
+                    align="start"
+                    collisionPadding={12}
+                    class="z-50 min-w-48 max-w-[calc(100vw-1.5rem)] rounded-lg border border-border bg-popover p-1 shadow-2xl shadow-black/30"
                   >
-                    <Select.Item
-                      value=""
-                      label="Any decade"
-                      aria-label="Any decade"
-                      class="cursor-pointer select-none rounded-md outline-none transition-colors data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40 data-[highlighted]:bg-surface-3 data-[selected]:bg-primary/10"
+                    <Select.Viewport
+                      class="max-h-[min(20rem,55vh)] overflow-y-auto overscroll-contain p-0.5"
                     >
-                      {#snippet children({ selected })}
-                        <span class="flex w-full items-center gap-2.5 py-1 pr-1 pl-0.5">
-                          <span class="min-w-0 flex-1 truncate font-mono text-sm font-semibold">
-                            Any decade
-                          </span>
-                          {#if selected}
-                            <Check class="h-4 w-4 shrink-0 text-primary" />
-                          {/if}
-                        </span>
-                      {/snippet}
-                    </Select.Item>
-                    {#each manifest.eras as e (e.eraId)}
                       <Select.Item
-                        value={e.eraId}
-                        label={e.label}
+                        value=""
+                        label="Any decade"
+                        aria-label="Any decade"
                         class="cursor-pointer select-none rounded-md outline-none transition-colors data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40 data-[highlighted]:bg-surface-3 data-[selected]:bg-primary/10"
                       >
                         {#snippet children({ selected })}
                           <span class="flex w-full items-center gap-2.5 py-1 pr-1 pl-0.5">
                             <span class="min-w-0 flex-1 truncate font-mono text-sm font-semibold">
-                              {e.label}
+                              Any decade
                             </span>
                             {#if selected}
                               <Check class="h-4 w-4 shrink-0 text-primary" />
@@ -501,11 +491,29 @@
                           </span>
                         {/snippet}
                       </Select.Item>
-                    {/each}
-                  </Select.Viewport>
-                </Select.Content>
-              </Select.Portal>
-            </Select.Root>
+                      {#each manifest.eras as e (e.eraId)}
+                        <Select.Item
+                          value={e.eraId}
+                          label={e.label}
+                          class="cursor-pointer select-none rounded-md outline-none transition-colors data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40 data-[highlighted]:bg-surface-3 data-[selected]:bg-primary/10"
+                        >
+                          {#snippet children({ selected })}
+                            <span class="flex w-full items-center gap-2.5 py-1 pr-1 pl-0.5">
+                              <span class="min-w-0 flex-1 truncate font-mono text-sm font-semibold">
+                                {e.label}
+                              </span>
+                              {#if selected}
+                                <Check class="h-4 w-4 shrink-0 text-primary" />
+                              {/if}
+                            </span>
+                          {/snippet}
+                        </Select.Item>
+                      {/each}
+                    </Select.Viewport>
+                  </Select.Content>
+                </Select.Portal>
+              </Select.Root>
+            </div>
           </div>
         </div>
 
@@ -541,7 +549,7 @@
         />
         <DraftValuePanel players={resolvedDraftPlayers} />
         {#if ready}
-          <div class="mt-4">
+          <div>
             <button
               type="button"
               onclick={play82}
