@@ -1,31 +1,50 @@
-<script lang="ts">import type { BracketOpponent, ContextualPlayerValue, PeakPlayerSeason, } from '@hoop-rush/data-contracts';
-import { evaluateContextualPlayerValue, evaluateLineupMatchup, toSimulationPlayer, } from '@hoop-rush/engine';
-let { players, opponent = null, }: {
+<script lang="ts">
+  import type {
+    BracketOpponent,
+    ContextualPlayerValue,
+    PeakPlayerSeason,
+  } from '@hoop-rush/data-contracts';
+  import {
+    evaluateContextualPlayerValue,
+    evaluateLineupMatchup,
+    toSimulationPlayer,
+  } from '@hoop-rush/engine';
+  let {
+    players,
+    opponent = null,
+  }: {
     players: PeakPlayerSeason[];
     opponent?: BracketOpponent | null;
-} = $props();
-const values = $derived.by((): ContextualPlayerValue[] => {
+  } = $props();
+  const values = $derived.by((): ContextualPlayerValue[] => {
     const simulationPlayers = players.map(toSimulationPlayer);
-    return simulationPlayers.map((player, index) => evaluateContextualPlayerValue(player, simulationPlayers.filter((_, teammateIndex) => teammateIndex !== index), opponent
-        ? {
-            teamId: opponent.teamId,
-            displayName: opponent.displayName,
-            players: opponent.players,
-        }
-        : undefined));
-});
-const lineupMatchup = $derived.by(() => {
-    if (!opponent || players.length !== 5)
-        return null;
+    return simulationPlayers.map((player, index) =>
+      evaluateContextualPlayerValue(
+        player,
+        simulationPlayers.filter((_, teammateIndex) => teammateIndex !== index),
+        opponent
+          ? {
+              teamId: opponent.teamId,
+              displayName: opponent.displayName,
+              players: opponent.players,
+            }
+          : undefined,
+      ),
+    );
+  });
+  const lineupMatchup = $derived.by(() => {
+    if (!opponent || players.length !== 5) return null;
     const simulationPlayers = players.map(toSimulationPlayer);
     const first = simulationPlayers[0];
-    if (!first)
-        return null;
-    return evaluateLineupMatchup({ teamId: 'draft', displayName: 'Your five', players: simulationPlayers }, { teamId: opponent.teamId, displayName: opponent.displayName, players: opponent.players });
-});
-function delta(value: number): string {
+    if (!first) return null;
+    return evaluateLineupMatchup(
+      { teamId: 'draft', displayName: 'Your five', players: simulationPlayers },
+      { teamId: opponent.teamId, displayName: opponent.displayName, players: opponent.players },
+    );
+  });
+  function delta(value: number): string {
     return value > 0 ? `+${String(value)}` : String(value);
-}
+  }
 </script>
 
 <section class="rounded-none bg-surface-1 sm:rounded-xl" aria-labelledby="draft-value-heading">

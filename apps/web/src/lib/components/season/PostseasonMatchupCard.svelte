@@ -1,42 +1,58 @@
-<script lang="ts">import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-import type { PlayInGameCardViewModel, SeriesCardViewModel, } from '$lib/season/season-postseason-presentation';
-import SeasonTeamLogo from './SeasonTeamLogo.svelte';
-import { franchiseIdentityOf } from '$lib/season/season-branding';
-let { series = null, playInCard = null, franchiseName, franchiseAbbrev, manifest, humanFranchiseId, }: {
+<script lang="ts">
+  import type { HoopRushManifest } from '@hoop-rush/data-contracts';
+  import type {
+    PlayInGameCardViewModel,
+    SeriesCardViewModel,
+  } from '$lib/season/season-postseason-presentation';
+  import SeasonTeamLogo from './SeasonTeamLogo.svelte';
+  import { franchiseIdentityOf } from '$lib/season/season-branding';
+  let {
+    series = null,
+    playInCard = null,
+    franchiseName,
+    franchiseAbbrev,
+    manifest,
+    humanFranchiseId,
+  }: {
     series?: SeriesCardViewModel | null;
     playInCard?: PlayInGameCardViewModel | null;
     franchiseName: (franchiseId: string) => string;
     franchiseAbbrev: (franchiseId: string) => string;
     manifest: HoopRushManifest | null;
     humanFranchiseId: string | null;
-} = $props();
-const homeFranchiseId = $derived(series?.homeFranchiseId ?? playInCard?.homeFranchiseId ?? null);
-const awayFranchiseId = $derived(series?.awayFranchiseId ?? playInCard?.awayFranchiseId ?? null);
-const identityOf = (franchiseId: string | null) => manifest && franchiseId ? franchiseIdentityOf(manifest, franchiseId) : null;
-const roundChip = $derived(series !== null
-    ? `${series.conference === 'west' ? 'W' : 'E'} · ${series.label}`
-    : playInCard !== null
+  } = $props();
+  const homeFranchiseId = $derived(series?.homeFranchiseId ?? playInCard?.homeFranchiseId ?? null);
+  const awayFranchiseId = $derived(series?.awayFranchiseId ?? playInCard?.awayFranchiseId ?? null);
+  const identityOf = (franchiseId: string | null) =>
+    manifest && franchiseId ? franchiseIdentityOf(manifest, franchiseId) : null;
+  const roundChip = $derived(
+    series !== null
+      ? `${series.conference === 'west' ? 'W' : 'E'} · ${series.label}`
+      : playInCard !== null
         ? `${playInCard.conference === 'west' ? 'W' : 'E'} · Play-In ${playInCard.matchupLabel}`
-        : 'Postseason');
-const scoreText = $derived(series !== null
-    ? `${String(series.homeWins)}–${String(series.awayWins)}`
-    : playInCard !== null && playInCard.status !== 'scheduled'
+        : 'Postseason',
+  );
+  const scoreText = $derived(
+    series !== null
+      ? `${String(series.homeWins)}–${String(series.awayWins)}`
+      : playInCard !== null && playInCard.status !== 'scheduled'
         ? playInCard.status === 'forfeit'
-            ? '2–0'
-            : `${String(playInCard.homeScore ?? 0)}–${String(playInCard.awayScore ?? 0)}`
-        : '—');
-const footerText = $derived.by(() => {
+          ? '2–0'
+          : `${String(playInCard.homeScore ?? 0)}–${String(playInCard.awayScore ?? 0)}`
+        : '—',
+  );
+  const footerText = $derived.by(() => {
     if (series !== null) {
-        if (series.status === 'complete' && series.winnerFranchiseId !== null) {
-            return `${franchiseName(series.winnerFranchiseId)} wins the series ${String(series.homeWins)}–${String(series.awayWins)}`;
-        }
-        if (series.nextGame !== null) {
-            return `Next: Game ${String(series.nextGame.gameNumber)} · at ${franchiseName(series.nextGame.homeFranchiseId)}`;
-        }
-        return 'Series scheduled';
+      if (series.status === 'complete' && series.winnerFranchiseId !== null) {
+        return `${franchiseName(series.winnerFranchiseId)} wins the series ${String(series.homeWins)}–${String(series.awayWins)}`;
+      }
+      if (series.nextGame !== null) {
+        return `Next: Game ${String(series.nextGame.gameNumber)} · at ${franchiseName(series.nextGame.homeFranchiseId)}`;
+      }
+      return 'Series scheduled';
     }
     return playInCard?.consequence ?? '';
-});
+  });
 </script>
 
 <section

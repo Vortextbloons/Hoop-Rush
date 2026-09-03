@@ -1,10 +1,26 @@
-<script lang="ts">import { ChevronDown, Trophy, X } from '@lucide/svelte';
-import type { HoopRushManifest, SeasonFreeAgencyWindowState } from '@hoop-rush/data-contracts';
-import type { SeasonFreeAgencyTraceStep } from '@hoop-rush/data-contracts';
-import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
-import type { SeasonFaceRef } from '$lib/season/season-branding';
-import { CRITERION_LABEL, FREE_AGENCY_BAND_LABEL, humanSigningOf, ROLE_EXPECTATION_LABEL, } from './free-agency-view';
-let { window, humanFranchiseId, franchiseName, playerName, manifest = null, faceOf = null, signingCount, seasonSpend, resolvedInThisSession = false, }: {
+<script lang="ts">
+  import { ChevronDown, Trophy, X } from '@lucide/svelte';
+  import type { HoopRushManifest, SeasonFreeAgencyWindowState } from '@hoop-rush/data-contracts';
+  import type { SeasonFreeAgencyTraceStep } from '@hoop-rush/data-contracts';
+  import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
+  import type { SeasonFaceRef } from '$lib/season/season-branding';
+  import {
+    CRITERION_LABEL,
+    FREE_AGENCY_BAND_LABEL,
+    humanSigningOf,
+    ROLE_EXPECTATION_LABEL,
+  } from './free-agency-view';
+  let {
+    window,
+    humanFranchiseId,
+    franchiseName,
+    playerName,
+    manifest = null,
+    faceOf = null,
+    signingCount,
+    seasonSpend,
+    resolvedInThisSession = false,
+  }: {
     window: SeasonFreeAgencyWindowState;
     humanFranchiseId: string | null;
     franchiseName: (franchiseId: string) => string;
@@ -14,22 +30,22 @@ let { window, humanFranchiseId, franchiseName, playerName, manifest = null, face
     signingCount: number;
     seasonSpend: number;
     resolvedInThisSession?: boolean;
-} = $props();
-const humanSigning = $derived(humanSigningOf(window, humanFranchiseId ?? null) ?? null);
-const traceGroups = $derived.by(() => {
+  } = $props();
+  const humanSigning = $derived(humanSigningOf(window, humanFranchiseId ?? null) ?? null);
+  const traceGroups = $derived.by(() => {
     const groups: Record<string, SeasonFreeAgencyTraceStep[]> = {};
     for (const trace of window.traces) {
-        for (const step of trace.steps) {
-            const list = groups[step.candidatePlayerVersionId] ?? [];
-            list.push(step);
-            groups[step.candidatePlayerVersionId] = list;
-        }
+      for (const step of trace.steps) {
+        const list = groups[step.candidatePlayerVersionId] ?? [];
+        list.push(step);
+        groups[step.candidatePlayerVersionId] = list;
+      }
     }
     return Object.entries(groups).map(([playerVersionId, steps]) => ({
-        playerVersionId,
-        steps,
+      playerVersionId,
+      steps,
     }));
-});
+  });
 </script>
 
 <section

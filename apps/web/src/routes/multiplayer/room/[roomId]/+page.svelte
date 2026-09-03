@@ -1,134 +1,153 @@
-<script lang="ts">import { onMount } from 'svelte';
-import { page } from '$app/stores';
-import { resolve } from '$app/paths';
-import { goto } from '$app/navigation';
-import { Crown, Clock, Copy, Check, RefreshCw, Wifi, WifiOff, AlertTriangle, Link as LinkIcon, LogOut, UserMinus, } from '@lucide/svelte';
-import { createInMemorySeasonRoomCoordinator } from '$lib/season/season-room-coordinator';
-import { createSupabaseSeasonTransport, isSupabaseConfigured, } from '$lib/season/supabase-season-transport';
-import { loadMembership, loadCode, inviteLinkForCode, clearMembership, clearCode, } from '$lib/season/season-room-identity';
-import { friendlyJoinError } from '$lib/season/season-room-identity';
-import type { SeasonRoomPublicSnapshot, SeasonRoomMembership } from '@hoop-rush/data-contracts';
-let roomId = $derived($page.params.roomId as string);
-let snap = $state<SeasonRoomPublicSnapshot | null>(null);
-let loading = $state(true);
-let error = $state<string | null>(null);
-let outdated = $state(false);
-let copiedInvite = $state(false);
-let copiedCode = $state(false);
-let tick = $state(0);
-let coordinator: ReturnType<typeof createInMemorySeasonRoomCoordinator> | null = null;
-let unsubscribe: (() => void) | null = null;
-let storedMembership = $state<SeasonRoomMembership | null>(null);
-let storedCode = $state<string | null>(null);
-let starting = $state(false);
-let startError = $state<string | null>(null);
-let readyBusy = $state(false);
-let readyError = $state<string | null>(null);
-let settingsBusy = $state(false);
-let settingsError = $state<string | null>(null);
-let showLeaveConfirm = $state(false);
-let showRemoveConfirm = $state(false);
-let lastSettingsRevision = $state<number | null>(null);
-let settingsChangedBanner = $state(false);
-let liveMessage = $state('');
-let countdown = $derived.by(() => {
-    if (!snap?.expiresAt)
-        return null;
+<script lang="ts">
+  import { onMount } from 'svelte';
+  import { page } from '$app/stores';
+  import { resolve } from '$app/paths';
+  import { goto } from '$app/navigation';
+  import {
+    Crown,
+    Clock,
+    Copy,
+    Check,
+    RefreshCw,
+    Wifi,
+    WifiOff,
+    AlertTriangle,
+    Link as LinkIcon,
+    LogOut,
+    UserMinus,
+  } from '@lucide/svelte';
+  import { createInMemorySeasonRoomCoordinator } from '$lib/season/season-room-coordinator';
+  import {
+    createSupabaseSeasonTransport,
+    isSupabaseConfigured,
+  } from '$lib/season/supabase-season-transport';
+  import {
+    loadMembership,
+    loadCode,
+    inviteLinkForCode,
+    clearMembership,
+    clearCode,
+  } from '$lib/season/season-room-identity';
+  import { friendlyJoinError } from '$lib/season/season-room-identity';
+  import type { SeasonRoomPublicSnapshot, SeasonRoomMembership } from '@hoop-rush/data-contracts';
+  let roomId = $derived($page.params.roomId as string);
+  let snap = $state<SeasonRoomPublicSnapshot | null>(null);
+  let loading = $state(true);
+  let error = $state<string | null>(null);
+  let outdated = $state(false);
+  let copiedInvite = $state(false);
+  let copiedCode = $state(false);
+  let tick = $state(0);
+  let coordinator: ReturnType<typeof createInMemorySeasonRoomCoordinator> | null = null;
+  let unsubscribe: (() => void) | null = null;
+  let storedMembership = $state<SeasonRoomMembership | null>(null);
+  let storedCode = $state<string | null>(null);
+  let starting = $state(false);
+  let startError = $state<string | null>(null);
+  let readyBusy = $state(false);
+  let readyError = $state<string | null>(null);
+  let settingsBusy = $state(false);
+  let settingsError = $state<string | null>(null);
+  let showLeaveConfirm = $state(false);
+  let showRemoveConfirm = $state(false);
+  let lastSettingsRevision = $state<number | null>(null);
+  let settingsChangedBanner = $state(false);
+  let liveMessage = $state('');
+  let countdown = $derived.by(() => {
+    if (!snap?.expiresAt) return null;
     void tick;
     const ms = new Date(snap.expiresAt).getTime() - Date.now();
-    if (ms <= 0)
-        return 'expired';
+    if (ms <= 0) return 'expired';
     const m = Math.floor(ms / 60000);
     const s = Math.floor((ms % 60000) / 1000);
     return `${m}:${String(s).padStart(2, '0')}`;
-});
-let isHost = $derived(storedMembership?.participantId === 'p1');
-let isGuest = $derived(storedMembership?.participantId === 'p2');
-let youLabel = $derived(isHost ? 'You · Host' : isGuest ? 'You · Guest' : 'Viewing lobby');
-let modeLabel = $derived.by(() => {
-    const raw = (snap?.settings as unknown as {
-        mode?: string;
-    })?.mode ?? snap?.mode ?? 'season';
-    if (raw === 'classic')
-        return 'Classic';
-    if (raw === 'sandbox')
-        return 'Sandbox';
+  });
+  let isHost = $derived(storedMembership?.participantId === 'p1');
+  let isGuest = $derived(storedMembership?.participantId === 'p2');
+  let youLabel = $derived(isHost ? 'You · Host' : isGuest ? 'You · Guest' : 'Viewing lobby');
+  let modeLabel = $derived.by(() => {
+    const raw =
+      (
+        snap?.settings as unknown as {
+          mode?: string;
+        }
+      )?.mode ??
+      snap?.mode ??
+      'season';
+    if (raw === 'classic') return 'Classic';
+    if (raw === 'sandbox') return 'Sandbox';
     return 'Season Run';
-});
-let paceLabel = $derived.by(() => {
-    if (!snap)
-        return '';
+  });
+  let paceLabel = $derived.by(() => {
+    if (!snap) return '';
     return snap.settings.pace === 'live'
-        ? 'Live — 90s draft · 5 min decisions'
-        : 'Async — 24h draft · 12h decisions';
-});
-let paceShort = $derived(snap?.settings.pace === 'live' ? 'Live' : 'Async');
-let hostPresence = $derived(snap?.presence?.find((p) => p.participantId === 'p1') ?? null);
-let guestPresence = $derived(snap?.presence?.find((p) => p.participantId === 'p2') ?? null);
-let hostOnline = $derived(hostPresence?.online ?? (snap ? snap.memberCount >= 1 : false));
-let guestOnline = $derived(guestPresence?.online ?? (snap ? snap.memberCount >= 2 : false));
-let bothPresent = $derived(hostOnline && guestOnline);
-let guestReady = $derived(snap?.guestReady ?? false);
-let settingsRevision = $derived(snap?.settingsRevision ?? 0);
-let disableReason = $derived.by(() => {
-    if (starting)
-        return 'Request in progress…';
-    if (!snap)
-        return null;
-    if (snap.phase !== 'waiting')
-        return null;
-    if (snap.memberCount < 2)
-        return 'Waiting for opponent to join';
-    if (!guestReady)
-        return 'Waiting for Ready — guest must confirm settings';
-    if (!bothPresent)
-        return 'Opponent disconnected — waiting for reconnection';
+      ? 'Live — 90s draft · 5 min decisions'
+      : 'Async — 24h draft · 12h decisions';
+  });
+  let paceShort = $derived(snap?.settings.pace === 'live' ? 'Live' : 'Async');
+  let hostPresence = $derived(snap?.presence?.find((p) => p.participantId === 'p1') ?? null);
+  let guestPresence = $derived(snap?.presence?.find((p) => p.participantId === 'p2') ?? null);
+  let hostOnline = $derived(hostPresence?.online ?? (snap ? snap.memberCount >= 1 : false));
+  let guestOnline = $derived(guestPresence?.online ?? (snap ? snap.memberCount >= 2 : false));
+  let bothPresent = $derived(hostOnline && guestOnline);
+  let guestReady = $derived(snap?.guestReady ?? false);
+  let settingsRevision = $derived(snap?.settingsRevision ?? 0);
+  let disableReason = $derived.by(() => {
+    if (starting) return 'Request in progress…';
+    if (!snap) return null;
+    if (snap.phase !== 'waiting') return null;
+    if (snap.memberCount < 2) return 'Waiting for opponent to join';
+    if (!guestReady) return 'Waiting for Ready — guest must confirm settings';
+    if (!bothPresent) return 'Opponent disconnected — waiting for reconnection';
     return null;
-});
-let canStart = $derived(disableReason === null && isHost && snap?.phase === 'waiting');
-let transport: ReturnType<typeof createSupabaseSeasonTransport> | null = null;
-function getCoordinator() {
+  });
+  let canStart = $derived(disableReason === null && isHost && snap?.phase === 'waiting');
+  let transport: ReturnType<typeof createSupabaseSeasonTransport> | null = null;
+  function getCoordinator() {
     const useSupabase = isSupabaseConfigured();
     transport = useSupabase
-        ? createSupabaseSeasonTransport({
-            url: (import.meta as unknown as {
+      ? createSupabaseSeasonTransport({
+          url:
+            (
+              import.meta as unknown as {
                 env: Record<string, string>;
-            }).env.VITE_SUPABASE_URL ?? '',
-            publishableKey: (import.meta as unknown as {
+              }
+            ).env.VITE_SUPABASE_URL ?? '',
+          publishableKey:
+            (
+              import.meta as unknown as {
                 env: Record<string, string>;
-            }).env
-                .VITE_SUPABASE_PUBLISHABLE_KEY ?? '',
+              }
+            ).env.VITE_SUPABASE_PUBLISHABLE_KEY ?? '',
         })
-        : null;
-    const t = (transport ?? undefined) as unknown as import('@hoop-rush/data-contracts').SeasonMultiplayerTransport | undefined;
+      : null;
+    const t = (transport ?? undefined) as unknown as
+      import('@hoop-rush/data-contracts').SeasonMultiplayerTransport | undefined;
     return createInMemorySeasonRoomCoordinator({
-        transport: t,
-        onSnapshot: (s) => {
-            const prevRev = lastSettingsRevision;
-            snap = s;
-            if (prevRev !== null && s.settingsRevision !== prevRev && isGuest) {
-                settingsChangedBanner = true;
-                liveMessage = 'Host changed settings — please Ready again';
-                setTimeout(() => (settingsChangedBanner = false), 6000);
-            }
-            lastSettingsRevision = s.settingsRevision;
-            if (s.guestReady && isGuest)
-                liveMessage = 'You are Ready';
-            if (s.phase === 'drafting') {
-                liveMessage = 'Draft starting — entering arena';
-                void goto(resolve('/multiplayer/room/[roomId]/draft', { roomId }));
-            }
-            if (s.codeActive) {
-            }
-            else {
-            }
-            if (s.isOutdated)
-                outdated = true;
-        },
-        onCommands: () => { },
+      transport: t,
+      onSnapshot: (s) => {
+        const prevRev = lastSettingsRevision;
+        snap = s;
+        if (prevRev !== null && s.settingsRevision !== prevRev && isGuest) {
+          settingsChangedBanner = true;
+          liveMessage = 'Host changed settings — please Ready again';
+          setTimeout(() => (settingsChangedBanner = false), 6000);
+        }
+        lastSettingsRevision = s.settingsRevision;
+        if (s.guestReady && isGuest) liveMessage = 'You are Ready';
+        if (s.phase === 'drafting') {
+          liveMessage = 'Draft starting — entering arena';
+          void goto(resolve('/multiplayer/room/[roomId]/draft', { roomId }));
+        }
+        if (s.codeActive) {
+        } else {
+        }
+        if (s.isOutdated) outdated = true;
+      },
+      onCommands: () => {},
     });
-}
-async function load() {
+  }
+  async function load() {
     loading = true;
     error = null;
     outdated = false;
@@ -136,256 +155,258 @@ async function load() {
     readyError = null;
     settingsError = null;
     try {
-        coordinator = getCoordinator();
-        storedMembership = loadMembership(roomId);
-        storedCode = loadCode(roomId);
-        try {
-            coordinator.hydrateFromStorage(roomId);
-        }
-        catch { }
-        storedMembership = loadMembership(roomId) ?? storedMembership;
-        coordinator.subscribe(roomId);
-        unsubscribe = () => coordinator?.disconnect();
-        const t = transport as unknown as import('@hoop-rush/data-contracts').SeasonMultiplayerTransport | null;
-        let res: SeasonRoomPublicSnapshot & {
-            membership?: SeasonRoomMembership;
+      coordinator = getCoordinator();
+      storedMembership = loadMembership(roomId);
+      storedCode = loadCode(roomId);
+      try {
+        coordinator.hydrateFromStorage(roomId);
+      } catch {}
+      storedMembership = loadMembership(roomId) ?? storedMembership;
+      coordinator.subscribe(roomId);
+      unsubscribe = () => coordinator?.disconnect();
+      const t = transport as unknown as
+        import('@hoop-rush/data-contracts').SeasonMultiplayerTransport | null;
+      let res: SeasonRoomPublicSnapshot & {
+        membership?: SeasonRoomMembership;
+      };
+      if (t) {
+        res = await t.resume(roomId);
+      } else if (coordinator) {
+        res = (await coordinator.refresh(roomId)) as SeasonRoomPublicSnapshot & {
+          membership?: SeasonRoomMembership;
         };
-        if (t) {
-            res = await t.resume(roomId);
-        }
-        else if (coordinator) {
-            res = (await coordinator.refresh(roomId)) as SeasonRoomPublicSnapshot & {
-                membership?: SeasonRoomMembership;
-            };
-        }
-        else {
-            throw new Error('Multiplayer not configured');
-        }
-        snap = res as SeasonRoomPublicSnapshot;
-        if ((res as unknown as {
+      } else {
+        throw new Error('Multiplayer not configured');
+      }
+      snap = res as SeasonRoomPublicSnapshot;
+      if (
+        (
+          res as unknown as {
             membership?: SeasonRoomMembership;
-        }).membership) {
-            const m = (res as unknown as {
-                membership: SeasonRoomMembership;
-            }).membership;
-            const { saveMembership } = await import('$lib/season/season-room-identity');
-            saveMembership(m);
-            storedMembership = m;
-        }
-        if (snap && snap.codeActive && !storedCode) {
-            const extra = snap as unknown as {
-                code?: string;
-            };
-            if (extra.code)
-                storedCode = extra.code;
-        }
-        if ((snap as unknown as {
+          }
+        ).membership
+      ) {
+        const m = (
+          res as unknown as {
+            membership: SeasonRoomMembership;
+          }
+        ).membership;
+        const { saveMembership } = await import('$lib/season/season-room-identity');
+        saveMembership(m);
+        storedMembership = m;
+      }
+      if (snap && snap.codeActive && !storedCode) {
+        const extra = snap as unknown as {
+          code?: string;
+        };
+        if (extra.code) storedCode = extra.code;
+      }
+      if (
+        (
+          snap as unknown as {
             isOutdated?: boolean;
-        }).isOutdated)
-            outdated = true;
-        lastSettingsRevision =
-            (snap as unknown as {
-                settingsRevision?: number;
-            }).settingsRevision ?? null;
-        if (snap.phase === 'drafting') {
-            void goto(resolve('/multiplayer/room/[roomId]/draft', { roomId }));
+          }
+        ).isOutdated
+      )
+        outdated = true;
+      lastSettingsRevision =
+        (
+          snap as unknown as {
+            settingsRevision?: number;
+          }
+        ).settingsRevision ?? null;
+      if (snap.phase === 'drafting') {
+        void goto(resolve('/multiplayer/room/[roomId]/draft', { roomId }));
+      }
+    } catch (e) {
+      const code = (
+        e as {
+          code?: string;
         }
+      )?.code;
+      if (code === 'outdated-room') {
+        outdated = true;
+        error = null;
+      } else {
+        error = e instanceof Error ? friendlyJoinError(e) : String(e);
+      }
+    } finally {
+      loading = false;
     }
-    catch (e) {
-        const code = (e as {
-            code?: string;
-        })?.code;
-        if (code === 'outdated-room') {
-            outdated = true;
-            error = null;
-        }
-        else {
-            error = e instanceof Error ? friendlyJoinError(e) : String(e);
-        }
-    }
-    finally {
-        loading = false;
-    }
-}
-function warmDraftAssetsFireAndForget() {
+  }
+  function warmDraftAssetsFireAndForget() {
     const warm = () => {
-        import('$lib/season/season-assets')
-            .then(async (m) => {
-            try {
-                await m.loadSeasonDraftCatalog();
-            }
-            catch { }
-            try {
-                await m.loadSeasonLeague();
-            }
-            catch { }
-            try {
-                await m.loadSeasonRosterTargets();
-            }
-            catch { }
+      import('$lib/season/season-assets')
+        .then(async (m) => {
+          try {
+            await m.loadSeasonDraftCatalog();
+          } catch {}
+          try {
+            await m.loadSeasonLeague();
+          } catch {}
+          try {
+            await m.loadSeasonRosterTargets();
+          } catch {}
         })
-            .catch(() => { });
-        import('$lib/data')
-            .then(async (m) => {
-            try {
-                await m.getPlayersIndex();
-            }
-            catch { }
+        .catch(() => {});
+      import('$lib/data')
+        .then(async (m) => {
+          try {
+            await m.getPlayersIndex();
+          } catch {}
         })
-            .catch(() => { });
+        .catch(() => {});
     };
     if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-        (window as unknown as {
-            requestIdleCallback: (cb: () => void) => number;
-        }).requestIdleCallback(warm);
+      (
+        window as unknown as {
+          requestIdleCallback: (cb: () => void) => number;
+        }
+      ).requestIdleCallback(warm);
+    } else {
+      setTimeout(warm, 500);
     }
-    else {
-        setTimeout(warm, 500);
-    }
-}
-onMount(() => {
+  }
+  onMount(() => {
     load();
     const iv = setInterval(() => tick++, 1000);
     return () => {
-        clearInterval(iv);
-        unsubscribe?.();
-        coordinator?.destroy();
+      clearInterval(iv);
+      unsubscribe?.();
+      coordinator?.destroy();
     };
-});
-$effect(() => {
+  });
+  $effect(() => {
     if (snap && (snap.phase === 'waiting' || snap.phase === 'drafting') && snap.memberCount >= 2) {
-        warmDraftAssetsFireAndForget();
+      warmDraftAssetsFireAndForget();
     }
-});
-async function copyInvite() {
-    const codeToCopy = storedCode ?? (snap as unknown as {
-        code?: string;
-    })?.code ?? null;
+  });
+  async function copyInvite() {
+    const codeToCopy =
+      storedCode ??
+      (
+        snap as unknown as {
+          code?: string;
+        }
+      )?.code ??
+      null;
     const link = codeToCopy ? inviteLinkForCode(codeToCopy) : null;
-    if (!link)
-        return;
+    if (!link) return;
     try {
-        await navigator.clipboard.writeText(link);
-        copiedInvite = true;
-        setTimeout(() => (copiedInvite = false), 1500);
-    }
-    catch { }
-}
-async function copyCodeOnly() {
-    const toCopy = storedCode ?? (snap as unknown as {
-        code?: string;
-    })?.code ?? null;
-    if (!toCopy)
-        return;
+      await navigator.clipboard.writeText(link);
+      copiedInvite = true;
+      setTimeout(() => (copiedInvite = false), 1500);
+    } catch {}
+  }
+  async function copyCodeOnly() {
+    const toCopy =
+      storedCode ??
+      (
+        snap as unknown as {
+          code?: string;
+        }
+      )?.code ??
+      null;
+    if (!toCopy) return;
     try {
-        await navigator.clipboard.writeText(toCopy);
-        copiedCode = true;
-        setTimeout(() => (copiedCode = false), 1500);
-    }
-    catch { }
-}
-async function handleStartDraft() {
-    if (!coordinator)
-        return;
+      await navigator.clipboard.writeText(toCopy);
+      copiedCode = true;
+      setTimeout(() => (copiedCode = false), 1500);
+    } catch {}
+  }
+  async function handleStartDraft() {
+    if (!coordinator) return;
     starting = true;
     startError = null;
     try {
-        const res = await coordinator.startDraft(roomId);
-        snap = res;
-        liveMessage = 'Draft starting';
-        void goto(resolve('/multiplayer/room/[roomId]/draft', { roomId }));
+      const res = await coordinator.startDraft(roomId);
+      snap = res;
+      liveMessage = 'Draft starting';
+      void goto(resolve('/multiplayer/room/[roomId]/draft', { roomId }));
+    } catch (e) {
+      startError = friendlyJoinError(e);
+    } finally {
+      starting = false;
     }
-    catch (e) {
-        startError = friendlyJoinError(e);
-    }
-    finally {
-        starting = false;
-    }
-}
-async function handleSetReady(ready: boolean) {
-    if (!coordinator)
-        return;
+  }
+  async function handleSetReady(ready: boolean) {
+    if (!coordinator) return;
     readyBusy = true;
     readyError = null;
     try {
-        const res = await coordinator.setReady(roomId, ready);
-        snap = res;
-        settingsChangedBanner = false;
-        liveMessage = ready ? 'You are Ready' : 'Ready cleared';
+      const res = await coordinator.setReady(roomId, ready);
+      snap = res;
+      settingsChangedBanner = false;
+      liveMessage = ready ? 'You are Ready' : 'Ready cleared';
+    } catch (e) {
+      readyError = friendlyJoinError(e);
+    } finally {
+      readyBusy = false;
     }
-    catch (e) {
-        readyError = friendlyJoinError(e);
-    }
-    finally {
-        readyBusy = false;
-    }
-}
-async function handleUpdateSettings(newMode: 'season' | 'classic' | 'sandbox', newPace: 'live' | 'async') {
-    if (!coordinator || !isHost)
-        return;
+  }
+  async function handleUpdateSettings(
+    newMode: 'season' | 'classic' | 'sandbox',
+    newPace: 'live' | 'async',
+  ) {
+    if (!coordinator || !isHost) return;
     settingsBusy = true;
     settingsError = null;
     try {
-        const res = await coordinator.updateSettings(roomId, newMode, newPace);
-        snap = res;
-        liveMessage = `Settings updated to ${newMode} · ${newPace}`;
+      const res = await coordinator.updateSettings(roomId, newMode, newPace);
+      snap = res;
+      liveMessage = `Settings updated to ${newMode} · ${newPace}`;
+    } catch (e) {
+      settingsError = friendlyJoinError(e);
+    } finally {
+      settingsBusy = false;
     }
-    catch (e) {
-        settingsError = friendlyJoinError(e);
-    }
-    finally {
-        settingsBusy = false;
-    }
-}
-async function handleRemoveGuest() {
-    if (!coordinator)
-        return;
+  }
+  async function handleRemoveGuest() {
+    if (!coordinator) return;
     try {
-        const t = transport as unknown as {
-            preDraftRemoval?: (id: string, pid: 'p1' | 'p2') => Promise<string>;
-        } | null;
-        let newCode: string | null = null;
-        if (t?.preDraftRemoval) {
-            newCode = await t.preDraftRemoval(roomId, 'p2');
-        }
-        else {
-            const anyTransport = coordinator as unknown as {
-                transport?: {
-                    preDraftRemoval: (id: string, pid: string) => Promise<string>;
-                };
+      const t = transport as unknown as {
+        preDraftRemoval?: (id: string, pid: 'p1' | 'p2') => Promise<string>;
+      } | null;
+      let newCode: string | null = null;
+      if (t?.preDraftRemoval) {
+        newCode = await t.preDraftRemoval(roomId, 'p2');
+      } else {
+        const anyTransport = coordinator as unknown as {
+          transport?: {
+            preDraftRemoval: (id: string, pid: string) => Promise<string>;
+          };
+        };
+        newCode = await (
+          coordinator as unknown as {
+            transport: {
+              preDraftRemoval: (id: string, pid: string) => Promise<string>;
             };
-            newCode = await (coordinator as unknown as {
-                transport: {
-                    preDraftRemoval: (id: string, pid: string) => Promise<string>;
-                };
-            }).transport.preDraftRemoval(roomId, 'p2');
-        }
-        if (newCode) {
-            const { saveCode } = await import('$lib/season/season-room-identity');
-            saveCode(roomId, newCode as unknown as import('@hoop-rush/data-contracts').SeasonRoomCode);
-            storedCode = newCode;
-            await load();
-        }
-        showRemoveConfirm = false;
+          }
+        ).transport.preDraftRemoval(roomId, 'p2');
+      }
+      if (newCode) {
+        const { saveCode } = await import('$lib/season/season-room-identity');
+        saveCode(roomId, newCode as unknown as import('@hoop-rush/data-contracts').SeasonRoomCode);
+        storedCode = newCode;
+        await load();
+      }
+      showRemoveConfirm = false;
+    } catch (e) {
+      startError = friendlyJoinError(e);
+      showRemoveConfirm = false;
     }
-    catch (e) {
-        startError = friendlyJoinError(e);
-        showRemoveConfirm = false;
-    }
-}
-async function handleLeave() {
-    if (!coordinator)
-        return;
+  }
+  async function handleLeave() {
+    if (!coordinator) return;
     try {
-        await coordinator.leave(roomId);
-        clearMembership(roomId);
-        clearCode(roomId);
-        await goto(resolve('/multiplayer'));
+      await coordinator.leave(roomId);
+      clearMembership(roomId);
+      clearCode(roomId);
+      await goto(resolve('/multiplayer'));
+    } catch (e) {
+      error = friendlyJoinError(e);
     }
-    catch (e) {
-        error = friendlyJoinError(e);
-    }
-}
+  }
 </script>
 
 <svelte:head><title>Room {roomId.slice(0, 8)} — Hoop Rush</title></svelte:head>
@@ -423,7 +444,9 @@ async function handleLeave() {
       <div class="flex items-center gap-2 font-semibold text-amber-700">
         <AlertTriangle class="h-4 w-4" />Outdated room — create a new one
       </div>
-      <p class="mt-2 text-sm text-muted-foreground">This room has expired. Please create a new one.</p>
+      <p class="mt-2 text-sm text-muted-foreground">
+        This room has expired. Please create a new one.
+      </p>
       <div class="mt-4 flex gap-2">
         <a
           href={resolve('/multiplayer')}
@@ -577,15 +600,11 @@ async function handleLeave() {
       </div>
     {/if}
 
-    
-
-
     <div class="mt-6 grid gap-6 lg:grid-cols-5">
       <div class="space-y-6 lg:col-span-3">
         <div class="rounded-xl bg-surface-1 p-6">
           <h2 class="font-display text-sm font-extrabold tracking-widest uppercase">Players</h2>
           <div class="mt-4 grid gap-3 sm:grid-cols-2">
-            
             <div
               class="rounded-xl border p-4 {isHost
                 ? 'border-primary/40 bg-primary/10 ring-1 ring-primary'
@@ -618,7 +637,7 @@ async function handleLeave() {
                 {hostOnline ? 'Online' : 'Offline'}
               </p>
             </div>
-            
+
             <div
               class="rounded-xl border p-4 {isGuest
                 ? 'border-primary/40 bg-primary/10 ring-1 ring-primary'
@@ -730,7 +749,6 @@ async function handleLeave() {
                 {#if copiedCode}Copied!{:else}Copy code{/if}</button
               >
             </div>
-
           {:else}
             <p class="mt-3 text-xs text-muted-foreground">
               Code cleared after both joined. Invite regenerates if host removes guest.
@@ -875,8 +893,6 @@ async function handleLeave() {
             >
           </div>
         </div>
-
-
       </div>
     </div>
 

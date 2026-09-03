@@ -1,11 +1,27 @@
-<script lang="ts">import type { HoopRushManifest, SeasonDraftCatalog } from '@hoop-rush/data-contracts';
-import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
-import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
-import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
-import { eraIdentityOf, type SeasonFaceRef } from '$lib/season/season-branding';
-import { COVERAGE_TARGETS, coverageNeeds, SOLO_PARTICIPANT_ID, type SeasonDraftFlowState, } from '$lib/season/season-draft-flow';
-import { formatPositions } from '$lib/player-positions';
-let { flow, catalog, manifest, faces, busy, error, onDraw, onPick, onFinalize, }: {
+<script lang="ts">
+  import type { HoopRushManifest, SeasonDraftCatalog } from '@hoop-rush/data-contracts';
+  import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
+  import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
+  import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
+  import { eraIdentityOf, type SeasonFaceRef } from '$lib/season/season-branding';
+  import {
+    COVERAGE_TARGETS,
+    coverageNeeds,
+    SOLO_PARTICIPANT_ID,
+    type SeasonDraftFlowState,
+  } from '$lib/season/season-draft-flow';
+  import { formatPositions } from '$lib/player-positions';
+  let {
+    flow,
+    catalog,
+    manifest,
+    faces,
+    busy,
+    error,
+    onDraw,
+    onPick,
+    onFinalize,
+  }: {
     flow: SeasonDraftFlowState;
     catalog: SeasonDraftCatalog;
     manifest: HoopRushManifest;
@@ -15,31 +31,41 @@ let { flow, catalog, manifest, faces, busy, error, onDraw, onPick, onFinalize, }
     onDraw: () => void;
     onPick: (playerVersionId: string) => void;
     onFinalize: () => void;
-} = $props();
-const draft = $derived(flow.draft);
-const participant = $derived(draft?.participants.find((p) => p.participantId === SOLO_PARTICIPANT_ID) ?? null);
-const eraLabel = (eraId: string): string => manifest.eras.find((e) => e.eraId === eraId)?.label ?? eraId;
-const franchiseLabel = (franchiseId: string): string => manifest.modernFranchiseSlots.find((s) => s.franchiseId === franchiseId)?.displayName ??
+  } = $props();
+  const draft = $derived(flow.draft);
+  const participant = $derived(
+    draft?.participants.find((p) => p.participantId === SOLO_PARTICIPANT_ID) ?? null,
+  );
+  const eraLabel = (eraId: string): string =>
+    manifest.eras.find((e) => e.eraId === eraId)?.label ?? eraId;
+  const franchiseLabel = (franchiseId: string): string =>
+    manifest.modernFranchiseSlots.find((s) => s.franchiseId === franchiseId)?.displayName ??
     franchiseId;
-const picks = $derived(draft ? draft.picks.filter((p) => p.participantId === SOLO_PARTICIPANT_ID) : []);
-const needs = $derived(draft ? coverageNeeds(picks, catalog) : { guards: 0, forwards: 0, centers: 0 });
-const offer = $derived(draft?.currentOffer ?? null);
-const canDraw = $derived(!busy &&
-    draft !== null &&
-    draft.status === 'drafting' &&
-    draft.currentTurnParticipantId !== null &&
-    offer === null);
-const isFinalRoundDone = $derived(picks.length >= 10);
-const canFinalize = $derived(!busy && isFinalRoundDone && draft?.status === 'drafting');
-function candidateOf(playerVersionId: string) {
+  const picks = $derived(
+    draft ? draft.picks.filter((p) => p.participantId === SOLO_PARTICIPANT_ID) : [],
+  );
+  const needs = $derived(
+    draft ? coverageNeeds(picks, catalog) : { guards: 0, forwards: 0, centers: 0 },
+  );
+  const offer = $derived(draft?.currentOffer ?? null);
+  const canDraw = $derived(
+    !busy &&
+      draft !== null &&
+      draft.status === 'drafting' &&
+      draft.currentTurnParticipantId !== null &&
+      offer === null,
+  );
+  const isFinalRoundDone = $derived(picks.length >= 10);
+  const canFinalize = $derived(!busy && isFinalRoundDone && draft?.status === 'drafting');
+  function candidateOf(playerVersionId: string) {
     return catalog.candidates.find((c) => c.playerVersionId === playerVersionId) ?? null;
-}
-function faceOf(playerVersionId: string): SeasonFaceRef | null {
+  }
+  function faceOf(playerVersionId: string): SeasonFaceRef | null {
     return faces.get(playerVersionId) ?? null;
-}
-function pickRoundLabel(pickOrdinal: number): string {
+  }
+  function pickRoundLabel(pickOrdinal: number): string {
     return `R${String(pickOrdinal)}`;
-}
+  }
 </script>
 
 <div class="flex min-w-0 flex-col gap-6">

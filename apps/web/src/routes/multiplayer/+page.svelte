@@ -1,113 +1,131 @@
-﻿<script lang="ts">import { onMount } from 'svelte';
-import { goto } from '$app/navigation';
-import { resolve } from '$app/paths';
-import { Users, Swords, Trophy, Clock, Zap, ArrowLeft, Copy, Check, LogIn, Plus, Link as LinkIcon, } from '@lucide/svelte';
-import { createInMemorySeasonRoomCoordinator } from '$lib/season/season-room-coordinator';
-import { createSupabaseSeasonTransport, isSupabaseConfigured } from '$lib/season/supabase-season-transport';
-import { seasonRootSeed } from '$lib/season/season-ids';
-import { friendlyJoinError, inviteLinkForCode } from '$lib/season/season-room-identity';
-type Mode = 'season' | 'classic' | 'sandbox';
-type Pace = 'live' | 'async';
-type View = 'choose' | 'create' | 'join';
-let view = $state<View>('choose');
-let selectedMode = $state<Mode>('classic');
-let pace = $state<Pace>('live');
-let code = $state('');
-let busy = $state(false);
-let error = $state<string | null>(null);
-let preview = $state<{
+﻿<script lang="ts">
+  import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
+  import { resolve } from '$app/paths';
+  import {
+    Users,
+    Swords,
+    Trophy,
+    Clock,
+    Zap,
+    ArrowLeft,
+    Copy,
+    Check,
+    LogIn,
+    Plus,
+    Link as LinkIcon,
+  } from '@lucide/svelte';
+  import { createInMemorySeasonRoomCoordinator } from '$lib/season/season-room-coordinator';
+  import {
+    createSupabaseSeasonTransport,
+    isSupabaseConfigured,
+  } from '$lib/season/supabase-season-transport';
+  import { seasonRootSeed } from '$lib/season/season-ids';
+  import { friendlyJoinError, inviteLinkForCode } from '$lib/season/season-room-identity';
+  type Mode = 'season' | 'classic' | 'sandbox';
+  type Pace = 'live' | 'async';
+  type View = 'choose' | 'create' | 'join';
+  let view = $state<View>('choose');
+  let selectedMode = $state<Mode>('classic');
+  let pace = $state<Pace>('live');
+  let code = $state('');
+  let busy = $state(false);
+  let error = $state<string | null>(null);
+  let preview = $state<{
     mode: string;
     pace: string;
     detail: string;
-} | null>(null);
-let createdCode = $state<string | null>(null);
-let createdRoomId = $state<string | null>(null);
-let expiresAt = $state<string | null>(null);
-let copiedInvite = $state(false);
-let copiedCode = $state(false);
-let tick = $state(0);
-let countdown = $derived.by(() => {
-    if (!expiresAt)
-        return null;
+  } | null>(null);
+  let createdCode = $state<string | null>(null);
+  let createdRoomId = $state<string | null>(null);
+  let expiresAt = $state<string | null>(null);
+  let copiedInvite = $state(false);
+  let copiedCode = $state(false);
+  let tick = $state(0);
+  let countdown = $derived.by(() => {
+    if (!expiresAt) return null;
     void tick;
     const ms = new Date(expiresAt).getTime() - Date.now();
-    if (ms <= 0)
-        return 'expired';
+    if (ms <= 0) return 'expired';
     const m = Math.floor(ms / 60000);
     const s = Math.floor((ms % 60000) / 1000);
     return `${m}:${String(s).padStart(2, '0')}`;
-});
-onMount(() => {
+  });
+  onMount(() => {
     const iv = setInterval(() => tick++, 1000);
     try {
-        const params = new URLSearchParams(window.location.search);
-        const codeParam = params.get('code');
-        if (codeParam && /^[0-9]{4}$/.test(codeParam)) {
-            code = codeParam;
-            view = 'join';
-            void doPreview();
-        }
-    }
-    catch { }
+      const params = new URLSearchParams(window.location.search);
+      const codeParam = params.get('code');
+      if (codeParam && /^[0-9]{4}$/.test(codeParam)) {
+        code = codeParam;
+        view = 'join';
+        void doPreview();
+      }
+    } catch {}
     return () => clearInterval(iv);
-});
-const modes = [
+  });
+  const modes = [
     {
-        id: 'season' as const,
-        name: 'Season Run — Solo only',
-        desc: 'Solo only — available at /season',
-        detail: 'Season Run is solo-only for now.',
-        icon: Trophy,
-        disabled: true,
+      id: 'season' as const,
+      name: 'Season Run — Solo only',
+      desc: 'Solo only — available at /season',
+      detail: 'Season Run is solo-only for now.',
+      icon: Trophy,
+      disabled: true,
     },
     {
-        id: 'classic' as const,
-        name: 'Classic',
-        desc: '5 rounds · franchise era · 82-0 — head-to-head or vs AI',
-        detail: 'Shared 82 or Duel. Picks use Classic roll draft, same pool per player.',
-        icon: Swords,
-        disabled: false,
+      id: 'classic' as const,
+      name: 'Classic',
+      desc: '5 rounds · franchise era · 82-0 — head-to-head or vs AI',
+      detail: 'Shared 82 or Duel. Picks use Classic roll draft, same pool per player.',
+      icon: Swords,
+      disabled: false,
     },
     {
-        id: 'sandbox' as const,
-        name: 'Sandbox',
-        desc: 'Any 5 peak seasons — free pick, head-to-head or vs AI',
-        detail: 'Shared 82 or Duel. Draft any 5 peaks, no rolls.',
-        icon: Zap,
-        disabled: false,
+      id: 'sandbox' as const,
+      name: 'Sandbox',
+      desc: 'Any 5 peak seasons — free pick, head-to-head or vs AI',
+      detail: 'Shared 82 or Duel. Draft any 5 peaks, no rolls.',
+      icon: Zap,
+      disabled: false,
     },
-] as const;
-const paceOptions: {
+  ] as const;
+  const paceOptions: {
     id: Pace;
     label: string;
     detail: string;
-}[] = [
+  }[] = [
     { id: 'live', label: 'Live', detail: '90s draft · 5m decisions' },
     { id: 'async', label: 'Async', detail: '24h draft · 12h decisions' },
-];
-function getCoordinator() {
+  ];
+  function getCoordinator() {
     const useSupabase = isSupabaseConfigured();
     const transport = useSupabase
-        ? createSupabaseSeasonTransport({
-            url: (import.meta as unknown as {
+      ? createSupabaseSeasonTransport({
+          url:
+            (
+              import.meta as unknown as {
                 env: Record<string, string>;
-            }).env.VITE_SUPABASE_URL ?? '',
-            publishableKey: (import.meta as unknown as {
+              }
+            ).env.VITE_SUPABASE_URL ?? '',
+          publishableKey:
+            (
+              import.meta as unknown as {
                 env: Record<string, string>;
-            }).env
-                .VITE_SUPABASE_PUBLISHABLE_KEY ?? '',
+              }
+            ).env.VITE_SUPABASE_PUBLISHABLE_KEY ?? '',
         })
-        : undefined;
+      : undefined;
     return createInMemorySeasonRoomCoordinator({
-        transport,
-        onSnapshot: () => { },
-        onCommands: () => { },
+      transport,
+      onSnapshot: () => {},
+      onCommands: () => {},
     });
-}
-async function startCreate() {
+  }
+  async function startCreate() {
     if (selectedMode === 'season') {
-        error = 'Season Run is solo-only. Choose Classic or Sandbox.';
-        return;
+      error = 'Season Run is solo-only. Choose Classic or Sandbox.';
+      return;
     }
     busy = true;
     error = null;
@@ -115,111 +133,112 @@ async function startCreate() {
     createdRoomId = null;
     expiresAt = null;
     try {
-        const coordinator = getCoordinator();
-        const snap = await coordinator.createRoom(pace, seasonRootSeed(), selectedMode);
-        const c = (snap as unknown as {
+      const coordinator = getCoordinator();
+      const snap = await coordinator.createRoom(pace, seasonRootSeed(), selectedMode);
+      const c =
+        (
+          snap as unknown as {
             code?: string;
-        }).code ?? null;
-        createdCode = c;
-        createdRoomId = snap.roomId;
-        expiresAt = (snap as unknown as {
+          }
+        ).code ?? null;
+      createdCode = c;
+      createdRoomId = snap.roomId;
+      expiresAt =
+        (
+          snap as unknown as {
             expiresAt?: string;
-        }).expiresAt ?? snap.expiresAt ?? null;
-        if (!expiresAt) {
-            expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-        }
+          }
+        ).expiresAt ??
+        snap.expiresAt ??
+        null;
+      if (!expiresAt) {
+        expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+      }
+    } catch (e) {
+      error = friendlyJoinError(e);
+      if (!isSupabaseConfigured())
+        error = 'Multiplayer is offline right now. You can still play solo Classic/Sandbox.';
+    } finally {
+      busy = false;
     }
-    catch (e) {
-        error = friendlyJoinError(e);
-        if (!isSupabaseConfigured())
-            error = 'Multiplayer is offline right now. You can still play solo Classic/Sandbox.';
-    }
-    finally {
-        busy = false;
-    }
-}
-async function doPreview() {
+  }
+  async function doPreview() {
     if (!code || code.length !== 4) {
-        error = 'Enter a 4-digit code';
-        return;
+      error = 'Enter a 4-digit code';
+      return;
     }
     busy = true;
     error = null;
     try {
-        const coordinator = getCoordinator();
-        const snap = await coordinator.previewRoom(code);
-        const mode = (snap.settings as unknown as {
+      const coordinator = getCoordinator();
+      const snap = await coordinator.previewRoom(code);
+      const mode =
+        (
+          snap.settings as unknown as {
             mode?: string;
-        }).mode ?? 'season';
-        const paceLabel = snap.settings.pace === 'live'
-            ? 'Live — 90s draft · 5 min decisions'
-            : 'Async — 24h draft · 12h decisions';
-        const modeLabel = mode === 'season' ? 'Season Run' : mode === 'classic' ? 'Classic' : 'Sandbox';
-        preview = { mode: modeLabel, pace: snap.settings.pace, detail: paceLabel };
+          }
+        ).mode ?? 'season';
+      const paceLabel =
+        snap.settings.pace === 'live'
+          ? 'Live — 90s draft · 5 min decisions'
+          : 'Async — 24h draft · 12h decisions';
+      const modeLabel =
+        mode === 'season' ? 'Season Run' : mode === 'classic' ? 'Classic' : 'Sandbox';
+      preview = { mode: modeLabel, pace: snap.settings.pace, detail: paceLabel };
+    } catch (e) {
+      error = friendlyJoinError(e);
+      preview = null;
+    } finally {
+      busy = false;
     }
-    catch (e) {
-        error = friendlyJoinError(e);
-        preview = null;
-    }
-    finally {
-        busy = false;
-    }
-}
-async function doJoin() {
+  }
+  async function doJoin() {
     if (!code || code.length !== 4) {
-        error = 'Enter a 4-digit code';
-        return;
+      error = 'Enter a 4-digit code';
+      return;
     }
     busy = true;
     error = null;
     try {
-        const coordinator = getCoordinator();
-        const { snap } = await coordinator.joinRoom(code);
-        await goto(resolve('/multiplayer/room/[roomId]', { roomId: snap.roomId }));
+      const coordinator = getCoordinator();
+      const { snap } = await coordinator.joinRoom(code);
+      await goto(resolve('/multiplayer/room/[roomId]', { roomId: snap.roomId }));
+    } catch (e) {
+      error = friendlyJoinError(e);
+    } finally {
+      busy = false;
     }
-    catch (e) {
-        error = friendlyJoinError(e);
-    }
-    finally {
-        busy = false;
-    }
-}
-async function copyInviteLink() {
+  }
+  async function copyInviteLink() {
     const toCopy = createdCode ? inviteLinkForCode(createdCode) : null;
-    if (!toCopy)
-        return;
+    if (!toCopy) return;
     try {
-        await navigator.clipboard.writeText(toCopy);
-        copiedInvite = true;
-        setTimeout(() => (copiedInvite = false), 1500);
-    }
-    catch { }
-}
-async function copyCode() {
-    if (!createdCode)
-        return;
+      await navigator.clipboard.writeText(toCopy);
+      copiedInvite = true;
+      setTimeout(() => (copiedInvite = false), 1500);
+    } catch {}
+  }
+  async function copyCode() {
+    if (!createdCode) return;
     try {
-        await navigator.clipboard.writeText(createdCode);
-        copiedCode = true;
-        setTimeout(() => (copiedCode = false), 1500);
-    }
-    catch { }
-}
-function goToRoom() {
-    if (createdRoomId)
-        goto(resolve('/multiplayer/room/[roomId]', { roomId: createdRoomId }));
-}
-function backToChoose() {
+      await navigator.clipboard.writeText(createdCode);
+      copiedCode = true;
+      setTimeout(() => (copiedCode = false), 1500);
+    } catch {}
+  }
+  function goToRoom() {
+    if (createdRoomId) goto(resolve('/multiplayer/room/[roomId]', { roomId: createdRoomId }));
+  }
+  function backToChoose() {
     view = 'choose';
     error = null;
     preview = null;
-    if (!new URLSearchParams(window.location.search).get('code'))
-        code = '';
-}
-function backFromCreate() {
+    if (!new URLSearchParams(window.location.search).get('code')) code = '';
+  }
+  function backFromCreate() {
     view = 'choose';
     error = null;
-}
+  }
 </script>
 
 <svelte:head>

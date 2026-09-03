@@ -1,13 +1,49 @@
-<script lang="ts">import type { SeasonDraftCatalog, SeasonHealthState, SeasonInfluenceState, SeasonRoster, SeasonRun, SeasonTradeBoardTeamProfile, SeasonTradeNegotiation, SeasonTradeValueTrend, SeasonTradeWindowState, } from '@hoop-rush/data-contracts';
-import { formatPositions } from '$lib/player-positions';
-import { competitorInterestLabel, formatTradeNeeds, formatTradePriority, inquiryCounterLabel, } from '$lib/season/season-presentation';
-import PackageBuilder from './PackageBuilder.svelte';
-import NegotiationTranscript from './NegotiationTranscript.svelte';
-import ValueTrendCell from './ValueTrendCell.svelte';
-import SeasonTeamLogo from './SeasonTeamLogo.svelte';
-import { franchiseIdentityOf } from '$lib/season/season-branding';
-import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-let { run, catalog, manifest, windowState, boardProfiles, negotiations, valueTrends, humanFranchiseId, humanBalance, onOpenInquiry, onSubmitProposal, onRespond, onWalkAway, onPurchaseInquiry, commandError = null, busy = false, playerName = (id: string) => id, playableOf = (id: string) => [] as readonly string[], availableOf = (id: string) => true, }: {
+<script lang="ts">
+  import type {
+    SeasonDraftCatalog,
+    SeasonHealthState,
+    SeasonInfluenceState,
+    SeasonRoster,
+    SeasonRun,
+    SeasonTradeBoardTeamProfile,
+    SeasonTradeNegotiation,
+    SeasonTradeValueTrend,
+    SeasonTradeWindowState,
+  } from '@hoop-rush/data-contracts';
+  import { formatPositions } from '$lib/player-positions';
+  import {
+    competitorInterestLabel,
+    formatTradeNeeds,
+    formatTradePriority,
+    inquiryCounterLabel,
+  } from '$lib/season/season-presentation';
+  import PackageBuilder from './PackageBuilder.svelte';
+  import NegotiationTranscript from './NegotiationTranscript.svelte';
+  import ValueTrendCell from './ValueTrendCell.svelte';
+  import SeasonTeamLogo from './SeasonTeamLogo.svelte';
+  import { franchiseIdentityOf } from '$lib/season/season-branding';
+  import type { HoopRushManifest } from '@hoop-rush/data-contracts';
+  let {
+    run,
+    catalog,
+    manifest,
+    windowState,
+    boardProfiles,
+    negotiations,
+    valueTrends,
+    humanFranchiseId,
+    humanBalance,
+    onOpenInquiry,
+    onSubmitProposal,
+    onRespond,
+    onWalkAway,
+    onPurchaseInquiry,
+    commandError = null,
+    busy = false,
+    playerName = (id: string) => id,
+    playableOf = (id: string) => [] as readonly string[],
+    availableOf = (id: string) => true,
+  }: {
     run: SeasonRun | null;
     catalog: SeasonDraftCatalog | null;
     manifest: HoopRushManifest | null;
@@ -19,16 +55,13 @@ let { run, catalog, manifest, windowState, boardProfiles, negotiations, valueTre
     humanBalance: number;
     onOpenInquiry: (toFranchiseId: string) => void;
     onSubmitProposal: (payload: {
-        toFranchiseId: string;
-        outgoing: string[];
-        incoming: string[];
-        influenceAmount: number;
-        influenceFromSender: string | null;
+      toFranchiseId: string;
+      outgoing: string[];
+      incoming: string[];
+      influenceAmount: number;
+      influenceFromSender: string | null;
     }) => void;
-    onRespond: (input: {
-        inquiryId: string;
-        accept: boolean;
-    }) => void;
+    onRespond: (input: { inquiryId: string; accept: boolean }) => void;
     onWalkAway: (inquiryId: string) => void;
     onPurchaseInquiry: () => void;
     commandError?: string | null;
@@ -36,60 +69,70 @@ let { run, catalog, manifest, windowState, boardProfiles, negotiations, valueTre
     playerName?: (playerVersionId: string) => string;
     playableOf?: (playerVersionId: string) => readonly string[];
     availableOf?: (playerVersionId: string) => boolean;
-} = $props();
-let selectedFranchiseId: string | null = $state(null);
-let mobileTab: 'board' | 'build' | 'negotiate' = $state('board');
-let announcement: string = $state('');
-const humanRoster = $derived(run?.rosters.find((r) => r.franchiseId === humanFranchiseId) ?? null);
-const targetRoster = $derived(selectedFranchiseId
-    ? (run?.rosters.find((r) => r.franchiseId === selectedFranchiseId) ?? null)
-    : null);
-const activeNegotiation = $derived(windowState?.activeInquiryId
-    ? (negotiations.find((n) => n.inquiryId === windowState.activeInquiryId) ?? null)
-    : null);
-const inquiryAllowance = $derived(windowState?.inquiryAllowance ?? 3);
-const inquiriesUsed = $derived(negotiations.length);
-const purchasedUsed = $derived(windowState?.purchasedInquiryUsed ?? false);
-const earnedUsed = $derived(windowState?.earnedInquiryUsed ?? false);
-const canPurchase = $derived(!purchasedUsed && inquiryAllowance < 5 && humanBalance >= 1);
-const selectedProfile = $derived(boardProfiles.find((p) => p.franchiseId === selectedFranchiseId) ?? null);
-const humanTrends = $derived(valueTrends
-    .filter((t) => humanRoster?.players.some((p) => p.playerVersionId === t.playerVersionId) ?? false)
-    .slice(0, 6));
-const closedWindows = $derived(run?.trade?.windows.filter((w) => w.status === 'closed') ?? []);
-function selectTeam(franchiseId: string): void {
+  } = $props();
+  let selectedFranchiseId: string | null = $state(null);
+  let mobileTab: 'board' | 'build' | 'negotiate' = $state('board');
+  let announcement: string = $state('');
+  const humanRoster = $derived(
+    run?.rosters.find((r) => r.franchiseId === humanFranchiseId) ?? null,
+  );
+  const targetRoster = $derived(
+    selectedFranchiseId
+      ? (run?.rosters.find((r) => r.franchiseId === selectedFranchiseId) ?? null)
+      : null,
+  );
+  const activeNegotiation = $derived(
+    windowState?.activeInquiryId
+      ? (negotiations.find((n) => n.inquiryId === windowState.activeInquiryId) ?? null)
+      : null,
+  );
+  const inquiryAllowance = $derived(windowState?.inquiryAllowance ?? 3);
+  const inquiriesUsed = $derived(negotiations.length);
+  const purchasedUsed = $derived(windowState?.purchasedInquiryUsed ?? false);
+  const earnedUsed = $derived(windowState?.earnedInquiryUsed ?? false);
+  const canPurchase = $derived(!purchasedUsed && inquiryAllowance < 5 && humanBalance >= 1);
+  const selectedProfile = $derived(
+    boardProfiles.find((p) => p.franchiseId === selectedFranchiseId) ?? null,
+  );
+  const humanTrends = $derived(
+    valueTrends
+      .filter(
+        (t) => humanRoster?.players.some((p) => p.playerVersionId === t.playerVersionId) ?? false,
+      )
+      .slice(0, 6),
+  );
+  const closedWindows = $derived(run?.trade?.windows.filter((w) => w.status === 'closed') ?? []);
+  function selectTeam(franchiseId: string): void {
     selectedFranchiseId = franchiseId;
     mobileTab = 'build';
-}
-function handlePurchase(): void {
-    if (!canPurchase || busy)
-        return;
+  }
+  function handlePurchase(): void {
+    if (!canPurchase || busy) return;
     onPurchaseInquiry();
-}
-function handleSubmit(payload: {
+  }
+  function handleSubmit(payload: {
     outgoing: string[];
     incoming: string[];
     influenceAmount: number;
     influenceFromSender: string | null;
-}): void {
-    if (selectedFranchiseId === null)
-        return;
+  }): void {
+    if (selectedFranchiseId === null) return;
     onSubmitProposal({ toFranchiseId: selectedFranchiseId, ...payload });
     mobileTab = 'negotiate';
-}
-$effect(() => {
+  }
+  $effect(() => {
     if (commandError !== null) {
-        announcement = `Rejected: ${commandError}`;
+      announcement = `Rejected: ${commandError}`;
     }
-});
-$effect(() => {
+  });
+  $effect(() => {
     if (activeNegotiation?.status === 'accepted')
-        announcement = 'Negotiation accepted — announced, focus stays';
+      announcement = 'Negotiation accepted — announced, focus stays';
     if (activeNegotiation?.status === 'declined')
-        announcement = 'Negotiation declined — announced, focus stays';
+      announcement = 'Negotiation declined — announced, focus stays';
     if (activeNegotiation?.status === 'walked-away')
-        announcement = 'Walked away — no penalty — announced, focus stays';
-});
+      announcement = 'Walked away — no penalty — announced, focus stays';
+  });
 </script>
 
 <section

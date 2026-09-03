@@ -1,565 +1,622 @@
-﻿<script lang="ts">import { onMount } from 'svelte';
-import { page } from '$app/stores';
-import { resolve } from '$app/paths';
-import { goto } from '$app/navigation';
-import { Trophy, Users, ArrowLeft, RefreshCw, AlertTriangle, Clock, Wifi, WifiOff, Lock, Check, Loader2, } from '@lucide/svelte';
-import { createInMemorySeasonRoomCoordinator } from '$lib/season/season-room-coordinator';
-import { createSupabaseSeasonTransport, isSupabaseConfigured, } from '$lib/season/supabase-season-transport';
-import { loadMembership, saveMembership } from '$lib/season/season-room-identity';
-import type { SeasonRoomPublicSnapshot, SeasonRoomMembership, SeasonMultiplayerTransport, SeasonDraftOffer, SeasonPublicCommandEnvelope, HoopRushManifest, SeasonDraftCatalog, SeasonDraftCandidate, } from '@hoop-rush/data-contracts';
-import { SEASON_DRAFT_OFFER_SIZE, SEASON_DRAFT_SAFE_MINIMUM } from '@hoop-rush/data-contracts';
-import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
-import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
-import { getManifest, getPlayersIndex } from '$lib/data';
-import { formatPositions } from '$lib/player-positions';
-import { loadSeasonDraftCatalog } from '$lib/season/season-assets';
-import { buildVersionFaceIndex, eraIdentityOf, type SeasonFaceRef, } from '$lib/season/season-branding';
-import { RoomDraftController } from '$lib/season/room-draft-controller';
-import { catalogCandidateMap } from '$lib/season/season-catalog-index';
-let roomId = $derived($page.params.roomId as string);
-let snap = $state<SeasonRoomPublicSnapshot | null>(null);
-let membership = $state<SeasonRoomMembership | null>(null);
-let loading = $state(true);
-let error = $state<string | null>(null);
-let coordinator: ReturnType<typeof createInMemorySeasonRoomCoordinator> | null = null;
-let transport: ReturnType<typeof createSupabaseSeasonTransport> | null = null;
-let controller: RoomDraftController | null = $state(null);
-let draftState: import('@hoop-rush/data-contracts').SeasonDraftState | null = $state(null);
-let generation: import('@hoop-rush/data-contracts').SeasonLeagueGenerationResult | null = $state(null);
-let picking = $state(false);
-let drawing = $state(false);
-let autoPickAttemptKey: string | null = null;
-let pickError = $state<string | null>(null);
-let finalizeBusy = $state(false);
-let generateBusy = $state(false);
-let leagueDigest: string | null = $state(null);
-let verification: {
+﻿<script lang="ts">
+  import { onMount } from 'svelte';
+  import { page } from '$app/stores';
+  import { resolve } from '$app/paths';
+  import { goto } from '$app/navigation';
+  import {
+    Trophy,
+    Users,
+    ArrowLeft,
+    RefreshCw,
+    AlertTriangle,
+    Clock,
+    Wifi,
+    WifiOff,
+    Lock,
+    Check,
+    Loader2,
+  } from '@lucide/svelte';
+  import { createInMemorySeasonRoomCoordinator } from '$lib/season/season-room-coordinator';
+  import {
+    createSupabaseSeasonTransport,
+    isSupabaseConfigured,
+  } from '$lib/season/supabase-season-transport';
+  import { loadMembership, saveMembership } from '$lib/season/season-room-identity';
+  import type {
+    SeasonRoomPublicSnapshot,
+    SeasonRoomMembership,
+    SeasonMultiplayerTransport,
+    SeasonDraftOffer,
+    SeasonPublicCommandEnvelope,
+    HoopRushManifest,
+    SeasonDraftCatalog,
+    SeasonDraftCandidate,
+  } from '@hoop-rush/data-contracts';
+  import { SEASON_DRAFT_OFFER_SIZE, SEASON_DRAFT_SAFE_MINIMUM } from '@hoop-rush/data-contracts';
+  import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
+  import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
+  import { getManifest, getPlayersIndex } from '$lib/data';
+  import { formatPositions } from '$lib/player-positions';
+  import { loadSeasonDraftCatalog } from '$lib/season/season-assets';
+  import {
+    buildVersionFaceIndex,
+    eraIdentityOf,
+    type SeasonFaceRef,
+  } from '$lib/season/season-branding';
+  import { RoomDraftController } from '$lib/season/room-draft-controller';
+  import { catalogCandidateMap } from '$lib/season/season-catalog-index';
+  let roomId = $derived($page.params.roomId as string);
+  let snap = $state<SeasonRoomPublicSnapshot | null>(null);
+  let membership = $state<SeasonRoomMembership | null>(null);
+  let loading = $state(true);
+  let error = $state<string | null>(null);
+  let coordinator: ReturnType<typeof createInMemorySeasonRoomCoordinator> | null = null;
+  let transport: ReturnType<typeof createSupabaseSeasonTransport> | null = null;
+  let controller: RoomDraftController | null = $state(null);
+  let draftState: import('@hoop-rush/data-contracts').SeasonDraftState | null = $state(null);
+  let generation: import('@hoop-rush/data-contracts').SeasonLeagueGenerationResult | null =
+    $state(null);
+  let picking = $state(false);
+  let drawing = $state(false);
+  let autoPickAttemptKey: string | null = null;
+  let pickError = $state<string | null>(null);
+  let finalizeBusy = $state(false);
+  let generateBusy = $state(false);
+  let leagueDigest: string | null = $state(null);
+  let verification: {
     ok: boolean;
     msg: string;
-} | null = $state(null);
-let tick = $state(0);
-let manifest = $state<HoopRushManifest | null>(null);
-let catalog = $state<SeasonDraftCatalog | null>(null);
-let faces = $state<Map<string, SeasonFaceRef>>(new Map());
-let replayError = $derived.by(() => controller?.getLastReplayError() ?? null);
-let integrityFailed = $derived.by(() => controller?.hasIntegrityFailure() ?? false);
-async function loadCriticalAssets() {
+  } | null = $state(null);
+  let tick = $state(0);
+  let manifest = $state<HoopRushManifest | null>(null);
+  let catalog = $state<SeasonDraftCatalog | null>(null);
+  let faces = $state<Map<string, SeasonFaceRef>>(new Map());
+  let replayError = $derived.by(() => controller?.getLastReplayError() ?? null);
+  let integrityFailed = $derived.by(() => controller?.hasIntegrityFailure() ?? false);
+  async function loadCriticalAssets() {
     const [m, cat] = await Promise.all([getManifest(), loadSeasonDraftCatalog()]);
     manifest = m;
     catalog = cat;
-}
-async function loadFacesLazy() {
+  }
+  async function loadFacesLazy() {
     try {
-        const ix = await getPlayersIndex();
-        if (!catalog)
-            return;
-        faces = buildVersionFaceIndex(ix.players, catalog.candidates.map((candidate) => ({
-            playerVersionId: candidate.playerVersionId,
-            playerId: candidate.playerId,
-            franchiseId: candidate.franchiseId,
-            eraId: candidate.eraId,
-            seasonKey: candidate.seasonKey,
-            displayName: candidate.displayName,
-        })));
-    }
-    catch { }
-}
-async function loadDisplayAssets() {
+      const ix = await getPlayersIndex();
+      if (!catalog) return;
+      faces = buildVersionFaceIndex(
+        ix.players,
+        catalog.candidates.map((candidate) => ({
+          playerVersionId: candidate.playerVersionId,
+          playerId: candidate.playerId,
+          franchiseId: candidate.franchiseId,
+          eraId: candidate.eraId,
+          seasonKey: candidate.seasonKey,
+          displayName: candidate.displayName,
+        })),
+      );
+    } catch {}
+  }
+  async function loadDisplayAssets() {
     await loadCriticalAssets();
     await loadFacesLazy();
-}
-let candidateMap = $derived.by(() => {
-    if (!catalog)
-        return new Map<string, SeasonDraftCandidate>();
+  }
+  let candidateMap = $derived.by(() => {
+    if (!catalog) return new Map<string, SeasonDraftCandidate>();
     return catalogCandidateMap(catalog);
-});
-function candidateOf(playerVersionId: string): SeasonDraftCandidate | null {
-    if (!catalog)
-        return null;
+  });
+  function candidateOf(playerVersionId: string): SeasonDraftCandidate | null {
+    if (!catalog) return null;
     return candidateMap.get(playerVersionId) ?? null;
-}
-function faceOf(playerVersionId: string): SeasonFaceRef | null {
+  }
+  function faceOf(playerVersionId: string): SeasonFaceRef | null {
     return faces.get(playerVersionId) ?? null;
-}
-function playerLabel(playerVersionId: string): string {
+  }
+  function playerLabel(playerVersionId: string): string {
     return candidateOf(playerVersionId)?.displayName ?? playerVersionId;
-}
-function eraLabel(eraId: string): string {
+  }
+  function eraLabel(eraId: string): string {
     return manifest?.eras.find((e) => e.eraId === eraId)?.label ?? eraId;
-}
-function franchiseLabel(franchiseId: string): string {
-    return (manifest?.modernFranchiseSlots.find((s) => s.franchiseId === franchiseId)?.displayName ??
-        franchiseId);
-}
-function syncDraftFromController(state: typeof draftState) {
+  }
+  function franchiseLabel(franchiseId: string): string {
+    return (
+      manifest?.modernFranchiseSlots.find((s) => s.franchiseId === franchiseId)?.displayName ??
+      franchiseId
+    );
+  }
+  function syncDraftFromController(state: typeof draftState) {
     draftState = state ? ({ ...state } as typeof draftState) : null;
     generation = controller?.getGeneration() ?? null;
-}
-function maybeDrawOnTurn(state: typeof draftState) {
-    if (state &&
-        membership &&
-        state.currentTurnParticipantId === membership.participantId &&
-        !state.currentOffer &&
-        state.status === 'drafting') {
-        void handleDraw();
+  }
+  function maybeDrawOnTurn(state: typeof draftState) {
+    if (
+      state &&
+      membership &&
+      state.currentTurnParticipantId === membership.participantId &&
+      !state.currentOffer &&
+      state.status === 'drafting'
+    ) {
+      void handleDraw();
     }
-}
-function ensureCoordinator() {
-    if (coordinator)
-        return coordinator;
+  }
+  function ensureCoordinator() {
+    if (coordinator) return coordinator;
     const useSupabase = isSupabaseConfigured();
     transport = useSupabase
-        ? createSupabaseSeasonTransport({
-            url: (import.meta as unknown as {
+      ? createSupabaseSeasonTransport({
+          url:
+            (
+              import.meta as unknown as {
                 env: Record<string, string>;
-            }).env.VITE_SUPABASE_URL ?? '',
-            publishableKey: (import.meta as unknown as {
+              }
+            ).env.VITE_SUPABASE_URL ?? '',
+          publishableKey:
+            (
+              import.meta as unknown as {
                 env: Record<string, string>;
-            }).env
-                .VITE_SUPABASE_PUBLISHABLE_KEY ?? '',
+              }
+            ).env.VITE_SUPABASE_PUBLISHABLE_KEY ?? '',
         })
-        : null;
+      : null;
     const t = (transport ?? undefined) as unknown as SeasonMultiplayerTransport | undefined;
     coordinator = createInMemorySeasonRoomCoordinator({
-        transport: t,
-        commandCursor: () => controller?.getLastOrdinal() ?? -1,
-        onSnapshot: (s) => {
-            snap = s;
-            if (!controller)
-                return;
-            controller.updateSnapshot(s);
-        },
-        onCommands: async (cmds: SeasonPublicCommandEnvelope[]) => {
-            if (!controller)
-                return;
-            const state = await controller.applyIncomingCommands(cmds);
-            syncDraftFromController(state);
-            maybeDrawOnTurn(state);
-            void maybeAutoAdvance();
-        },
+      transport: t,
+      commandCursor: () => controller?.getLastOrdinal() ?? -1,
+      onSnapshot: (s) => {
+        snap = s;
+        if (!controller) return;
+        controller.updateSnapshot(s);
+      },
+      onCommands: async (cmds: SeasonPublicCommandEnvelope[]) => {
+        if (!controller) return;
+        const state = await controller.applyIncomingCommands(cmds);
+        syncDraftFromController(state);
+        maybeDrawOnTurn(state);
+        void maybeAutoAdvance();
+      },
     });
     return coordinator;
-}
-function getCoordinator() {
+  }
+  function getCoordinator() {
     return ensureCoordinator();
-}
-function getTransport(): SeasonMultiplayerTransport {
-    if (transport)
-        return transport as unknown as SeasonMultiplayerTransport;
+  }
+  function getTransport(): SeasonMultiplayerTransport {
+    if (transport) return transport as unknown as SeasonMultiplayerTransport;
     const anyCoord = coordinator as unknown as {
-        transport?: SeasonMultiplayerTransport;
+      transport?: SeasonMultiplayerTransport;
     };
-    if (anyCoord?.transport)
-        return anyCoord.transport;
+    if (anyCoord?.transport) return anyCoord.transport;
     throw new Error('no transport available');
-}
-async function maybeAutoAdvance() {
-    if (!draftState || !controller)
-        return;
+  }
+  async function maybeAutoAdvance() {
+    if (!draftState || !controller) return;
     if ((draftState as any).status === 'complete' && draftState && controller.getGeneration()) {
-        generation = controller.getGeneration();
-        leagueDigest = generation?.digest ?? null;
-        if (leagueDigest) {
-            const ok = controller.verifyLeagueDigest(leagueDigest);
-            verification = ok
-                ? {
-                    ok: true,
-                    msg: 'League digest attested — both clients derived identical 28 AI teams (DUO_BAND_QUOTAS)',
-                }
-                : { ok: false, msg: 'Digest mismatch — rerun required' };
-        }
+      generation = controller.getGeneration();
+      leagueDigest = generation?.digest ?? null;
+      if (leagueDigest) {
+        const ok = controller.verifyLeagueDigest(leagueDigest);
+        verification = ok
+          ? {
+              ok: true,
+              msg: 'League digest attested — both clients derived identical 28 AI teams (DUO_BAND_QUOTAS)',
+            }
+          : { ok: false, msg: 'Digest mismatch — rerun required' };
+      }
     }
-}
-async function load() {
+  }
+  async function load() {
     loading = true;
     error = null;
     let earlyCoordinator: ReturnType<typeof getCoordinator> | null = null;
     try {
-        earlyCoordinator = getCoordinator();
-        coordinator = earlyCoordinator;
-        try {
-            coordinator.hydrateFromStorage(roomId);
+      earlyCoordinator = getCoordinator();
+      coordinator = earlyCoordinator;
+      try {
+        coordinator.hydrateFromStorage(roomId);
+      } catch {}
+      try {
+        coordinator.subscribe(roomId);
+      } catch {}
+      const stored = loadMembership(roomId);
+      const t = transport as unknown as SeasonMultiplayerTransport | null;
+      const criticalAssetsPromise = loadCriticalAssets();
+      const resumePromise: Promise<
+        SeasonRoomPublicSnapshot & {
+          membership?: SeasonRoomMembership;
+          commands?: SeasonPublicCommandEnvelope[];
         }
-        catch { }
-        try {
-            coordinator.subscribe(roomId);
-        }
-        catch { }
-        const stored = loadMembership(roomId);
-        const t = transport as unknown as SeasonMultiplayerTransport | null;
-        const criticalAssetsPromise = loadCriticalAssets();
-        const resumePromise: Promise<SeasonRoomPublicSnapshot & {
-            membership?: SeasonRoomMembership;
-            commands?: SeasonPublicCommandEnvelope[];
-        }> = t
-            ? ((t as unknown as {
-                resume: (id: string, after?: number) => Promise<unknown>;
-            }).resume(roomId, -1) as Promise<SeasonRoomPublicSnapshot & {
+      > = t
+        ? ((
+            t as unknown as {
+              resume: (id: string, after?: number) => Promise<unknown>;
+            }
+          ).resume(roomId, -1) as Promise<
+            SeasonRoomPublicSnapshot & {
+              membership?: SeasonRoomMembership;
+              commands?: SeasonPublicCommandEnvelope[];
+            }
+          >)
+        : coordinator
+          ? (coordinator.refresh(roomId) as Promise<unknown> as Promise<
+              SeasonRoomPublicSnapshot & {
                 membership?: SeasonRoomMembership;
                 commands?: SeasonPublicCommandEnvelope[];
-            }>)
-            : coordinator
-                ? (coordinator.refresh(roomId) as Promise<unknown> as Promise<SeasonRoomPublicSnapshot & {
-                    membership?: SeasonRoomMembership;
-                    commands?: SeasonPublicCommandEnvelope[];
-                }>)
-                : Promise.reject(new Error('Multiplayer not configured'));
-        const [, res] = await Promise.all([criticalAssetsPromise, resumePromise]);
-        void loadFacesLazy();
-        snap = res as SeasonRoomPublicSnapshot;
-        const prefetchedCommands = (res as unknown as {
+              }
+            >)
+          : Promise.reject(new Error('Multiplayer not configured'));
+      const [, res] = await Promise.all([criticalAssetsPromise, resumePromise]);
+      void loadFacesLazy();
+      snap = res as SeasonRoomPublicSnapshot;
+      const prefetchedCommands =
+        (
+          res as unknown as {
             commands?: SeasonPublicCommandEnvelope[];
-        }).commands ?? null;
-        if ((res as unknown as {
+          }
+        ).commands ?? null;
+      if (
+        (
+          res as unknown as {
             membership?: SeasonRoomMembership;
-        }).membership) {
-            const m = (res as unknown as {
-                membership: SeasonRoomMembership;
-            }).membership;
-            saveMembership(m);
-            membership = m;
-        }
-        else {
-            membership = stored ?? loadMembership(roomId);
-        }
-        if (snap && membership) {
-            const mode = (snap as unknown as {
-                mode?: string;
-            }).mode ?? (snap.settings as unknown as {
-                mode?: string;
-            })?.mode ?? 'season';
-            if (mode === 'classic' || mode === 'sandbox') {
-                try {
-                    coordinator.subscribe(roomId);
-                }
-                catch { }
-                draftState = null;
-                generation = null;
+          }
+        ).membership
+      ) {
+        const m = (
+          res as unknown as {
+            membership: SeasonRoomMembership;
+          }
+        ).membership;
+        saveMembership(m);
+        membership = m;
+      } else {
+        membership = stored ?? loadMembership(roomId);
+      }
+      if (snap && membership) {
+        const mode =
+          (
+            snap as unknown as {
+              mode?: string;
             }
-            else {
-                const tr = getTransport();
-                controller = new RoomDraftController({
-                    transport: tr,
-                    roomId,
-                    snapshot: snap,
-                    membership,
-                    catalog,
-                });
-                try {
-                    coordinator.subscribe(roomId);
-                }
-                catch { }
-                let state: typeof draftState | null = null;
-                if (prefetchedCommands && Array.isArray(prefetchedCommands)) {
-                    try {
-                        state = (await (controller as unknown as {
-                            restoreFromLogWithPrefetched: (cmds: unknown, opts: unknown) => Promise<unknown>;
-                        }).restoreFromLogWithPrefetched(prefetchedCommands, { full: true })) as typeof draftState;
-                    }
-                    catch {
-                        state = await controller.restoreFromLog({ full: true });
-                    }
-                }
-                else {
-                    state = await controller.restoreFromLog({ full: true });
-                }
-                if (!state) {
-                    if (snap.phase === 'drafting') {
-                        const created = await controller.ensureDraftCreated();
-                        draftState = created ? ({ ...created } as typeof draftState) : null;
-                        if (!draftState) {
-                            for (let attempt = 0; attempt < 3 && !draftState; attempt += 1) {
-                                await new Promise<void>((r) => setTimeout(r, 300 * (attempt + 1)));
-                                try {
-                                    const retryState = await controller.restoreFromLog({ full: true });
-                                    if (retryState) {
-                                        draftState = { ...retryState } as typeof draftState;
-                                        generation = controller.getGeneration();
-                                        break;
-                                    }
-                                }
-                                catch { }
-                            }
-                        }
-                        else if (draftState &&
-                            (draftState as any).currentTurnParticipantId === membership.participantId &&
-                            !(draftState as any).currentOffer) {
-                            await handleDraw();
-                            draftState = controller.getState() as typeof draftState;
-                        }
-                    }
-                    else {
-                        draftState = state as typeof draftState;
-                    }
-                }
-                else {
-                    draftState = { ...state } as typeof draftState;
-                    generation = controller.getGeneration();
-                    if (draftState &&
-                        (draftState as any).currentTurnParticipantId === membership.participantId &&
-                        !(draftState as any).currentOffer &&
-                        (draftState as any).status === 'drafting') {
-                        await handleDraw();
-                        draftState = controller.getState() as typeof draftState;
-                    }
-                    void maybeAutoAdvance();
-                }
-                leagueDigest = generation?.digest ?? null;
-                if (leagueDigest && controller && controller.verifyLeagueDigest(leagueDigest)) {
-                    verification = { ok: true, msg: 'League digest verified' };
-                }
+          ).mode ??
+          (
+            snap.settings as unknown as {
+              mode?: string;
             }
+          )?.mode ??
+          'season';
+        if (mode === 'classic' || mode === 'sandbox') {
+          try {
+            coordinator.subscribe(roomId);
+          } catch {}
+          draftState = null;
+          generation = null;
+        } else {
+          const tr = getTransport();
+          controller = new RoomDraftController({
+            transport: tr,
+            roomId,
+            snapshot: snap,
+            membership,
+            catalog,
+          });
+          try {
+            coordinator.subscribe(roomId);
+          } catch {}
+          let state: typeof draftState | null = null;
+          if (prefetchedCommands && Array.isArray(prefetchedCommands)) {
+            try {
+              state = (await (
+                controller as unknown as {
+                  restoreFromLogWithPrefetched: (cmds: unknown, opts: unknown) => Promise<unknown>;
+                }
+              ).restoreFromLogWithPrefetched(prefetchedCommands, {
+                full: true,
+              })) as typeof draftState;
+            } catch {
+              state = await controller.restoreFromLog({ full: true });
+            }
+          } else {
+            state = await controller.restoreFromLog({ full: true });
+          }
+          if (!state) {
+            if (snap.phase === 'drafting') {
+              const created = await controller.ensureDraftCreated();
+              draftState = created ? ({ ...created } as typeof draftState) : null;
+              if (!draftState) {
+                for (let attempt = 0; attempt < 3 && !draftState; attempt += 1) {
+                  await new Promise<void>((r) => setTimeout(r, 300 * (attempt + 1)));
+                  try {
+                    const retryState = await controller.restoreFromLog({ full: true });
+                    if (retryState) {
+                      draftState = { ...retryState } as typeof draftState;
+                      generation = controller.getGeneration();
+                      break;
+                    }
+                  } catch {}
+                }
+              } else if (
+                draftState &&
+                (draftState as any).currentTurnParticipantId === membership.participantId &&
+                !(draftState as any).currentOffer
+              ) {
+                await handleDraw();
+                draftState = controller.getState() as typeof draftState;
+              }
+            } else {
+              draftState = state as typeof draftState;
+            }
+          } else {
+            draftState = { ...state } as typeof draftState;
+            generation = controller.getGeneration();
+            if (
+              draftState &&
+              (draftState as any).currentTurnParticipantId === membership.participantId &&
+              !(draftState as any).currentOffer &&
+              (draftState as any).status === 'drafting'
+            ) {
+              await handleDraw();
+              draftState = controller.getState() as typeof draftState;
+            }
+            void maybeAutoAdvance();
+          }
+          leagueDigest = generation?.digest ?? null;
+          if (leagueDigest && controller && controller.verifyLeagueDigest(leagueDigest)) {
+            verification = { ok: true, msg: 'League digest verified' };
+          }
         }
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      const modeFromSnap = (
+        snap as unknown as {
+          mode?: string;
+        } | null
+      )?.mode;
+      if (modeFromSnap === 'classic' || modeFromSnap === 'sandbox') {
+        error = null;
+        draftState = null;
+        generation = null;
+      } else {
+        error = msg;
+      }
+    } finally {
+      loading = false;
     }
-    catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        const modeFromSnap = (snap as unknown as {
-            mode?: string;
-        } | null)?.mode;
-        if (modeFromSnap === 'classic' || modeFromSnap === 'sandbox') {
-            error = null;
-            draftState = null;
-            generation = null;
-        }
-        else {
-            error = msg;
-        }
-    }
-    finally {
-        loading = false;
-    }
-}
-onMount(() => {
+  }
+  onMount(() => {
     load();
     const timerIv = setInterval(() => {
-        tick++;
-        if (controller &&
-            membership &&
-            snap?.settings.pace === 'live' &&
-            draftState?.currentTurnParticipantId === membership.participantId) {
-            const remaining = controller.getSecondsRemaining(Date.now());
-            if (remaining !== null && remaining <= 0) {
-                const attemptKey = `${membership.participantId}:${String(draftState?.revision ?? 0)}`;
-                if (autoPickAttemptKey === attemptKey)
-                    return;
-                autoPickAttemptKey = attemptKey;
-                void controller.autoPickSafe(membership.participantId as 'p1' | 'p2').then((ns) => {
-                    if (ns)
-                        syncDraftFromController(ns);
-                });
-            }
+      tick++;
+      if (
+        controller &&
+        membership &&
+        snap?.settings.pace === 'live' &&
+        draftState?.currentTurnParticipantId === membership.participantId
+      ) {
+        const remaining = controller.getSecondsRemaining(Date.now());
+        if (remaining !== null && remaining <= 0) {
+          const attemptKey = `${membership.participantId}:${String(draftState?.revision ?? 0)}`;
+          if (autoPickAttemptKey === attemptKey) return;
+          autoPickAttemptKey = attemptKey;
+          void controller.autoPickSafe(membership.participantId as 'p1' | 'p2').then((ns) => {
+            if (ns) syncDraftFromController(ns);
+          });
         }
+      }
     }, 1000);
     return () => {
-        clearInterval(timerIv);
-        coordinator?.destroy();
+      clearInterval(timerIv);
+      coordinator?.destroy();
     };
-});
-async function handleDraw() {
-    if (!controller || !membership || drawing)
-        return;
+  });
+  async function handleDraw() {
+    if (!controller || !membership || drawing) return;
     const pid = membership.participantId as 'p1' | 'p2';
-    if ((draftState as any)?.currentTurnParticipantId !== pid)
-        return;
-    if ((draftState as any)?.currentOffer)
-        return;
+    if ((draftState as any)?.currentTurnParticipantId !== pid) return;
+    if ((draftState as any)?.currentOffer) return;
     drawing = true;
     pickError = null;
     try {
-        const record = await controller.drawOffer(pid);
-        draftState = controller.getState() as typeof draftState;
-        void record;
-    }
-    catch (e) {
-        const code = (e as {
+      const record = await controller.drawOffer(pid);
+      draftState = controller.getState() as typeof draftState;
+      void record;
+    } catch (e) {
+      const code =
+        (
+          e as {
             code?: string;
             errorCode?: string;
-        })?.code ??
-            (e as {
-                errorCode?: string;
-            })?.errorCode;
-        if (code === 'WRONG_TURN')
-            pickError = 'Not your turn.';
-        else if (code === 'STALE_REVISION') {
-            pickError = 'Stale revision — replaying log.';
-            const s = await controller.restoreFromLog();
-            draftState = s ? ({ ...s } as typeof draftState) : draftState;
-        }
-        else
-            pickError = e instanceof Error ? e.message : String(e);
+          }
+        )?.code ??
+        (
+          e as {
+            errorCode?: string;
+          }
+        )?.errorCode;
+      if (code === 'WRONG_TURN') pickError = 'Not your turn.';
+      else if (code === 'STALE_REVISION') {
+        pickError = 'Stale revision — replaying log.';
+        const s = await controller.restoreFromLog();
+        draftState = s ? ({ ...s } as typeof draftState) : draftState;
+      } else pickError = e instanceof Error ? e.message : String(e);
+    } finally {
+      drawing = false;
     }
-    finally {
-        drawing = false;
-    }
-}
-async function handlePick(playerVersionId: string) {
-    if (!controller || !membership)
-        return;
+  }
+  async function handlePick(playerVersionId: string) {
+    if (!controller || !membership) return;
     picking = true;
     pickError = null;
     try {
-        const pid = membership.participantId as 'p1' | 'p2';
-        const next = await controller.submitPick(pid, playerVersionId);
-        draftState = { ...next } as typeof draftState;
-        generation = controller.getGeneration();
-        void maybeAutoAdvance();
-    }
-    catch (e) {
-        const code = (e as {
+      const pid = membership.participantId as 'p1' | 'p2';
+      const next = await controller.submitPick(pid, playerVersionId);
+      draftState = { ...next } as typeof draftState;
+      generation = controller.getGeneration();
+      void maybeAutoAdvance();
+    } catch (e) {
+      const code =
+        (
+          e as {
             code?: string;
             errorCode?: string;
-        })?.code ??
-            (e as {
-                errorCode?: string;
-            })?.errorCode;
-        if (code === 'WRONG_TURN')
-            pickError = 'Not your turn — wait for opponent.';
-        else if (code === 'OWNED_VERSION')
-            pickError = 'That player is already owned — duplicate identity or version rejected.';
-        else if (code === 'UNCOMPLETABLE_ROSTER')
-            pickError = 'Unselectable: would make 4G/4F/3C unreachable.';
-        else if (code === 'UNAVAILABLE_POOL')
-            pickError = 'Not in current 8-card offer.';
-        else if (code === 'STALE_REVISION')
-            pickError = 'Stale revision — replaying and retry.';
-        else
-            pickError = e instanceof Error ? e.message : String(e);
-        if (controller) {
-            const state = await controller.restoreFromLog();
-            draftState = state ? ({ ...state } as typeof draftState) : draftState;
-        }
+          }
+        )?.code ??
+        (
+          e as {
+            errorCode?: string;
+          }
+        )?.errorCode;
+      if (code === 'WRONG_TURN') pickError = 'Not your turn — wait for opponent.';
+      else if (code === 'OWNED_VERSION')
+        pickError = 'That player is already owned — duplicate identity or version rejected.';
+      else if (code === 'UNCOMPLETABLE_ROSTER')
+        pickError = 'Unselectable: would make 4G/4F/3C unreachable.';
+      else if (code === 'UNAVAILABLE_POOL') pickError = 'Not in current 8-card offer.';
+      else if (code === 'STALE_REVISION') pickError = 'Stale revision — replaying and retry.';
+      else pickError = e instanceof Error ? e.message : String(e);
+      if (controller) {
+        const state = await controller.restoreFromLog();
+        draftState = state ? ({ ...state } as typeof draftState) : draftState;
+      }
+    } finally {
+      picking = false;
     }
-    finally {
-        picking = false;
-    }
-}
-async function refreshDraft() {
-    if (!controller)
-        return;
+  }
+  async function refreshDraft() {
+    if (!controller) return;
     const state = await controller.restoreFromLog({ full: true });
     syncDraftFromController(state);
     void maybeAutoAdvance();
-}
-async function handleFinalize() {
-    if (!controller || finalizeBusy)
-        return;
+  }
+  async function handleFinalize() {
+    if (!controller || finalizeBusy) return;
     finalizeBusy = true;
     pickError = null;
     try {
-        const rec = await controller.finalizeRosters();
-        draftState = controller.getState() as typeof draftState;
-        void rec;
+      const rec = await controller.finalizeRosters();
+      draftState = controller.getState() as typeof draftState;
+      void rec;
+    } catch (e) {
+      pickError = e instanceof Error ? e.message : String(e);
+      const s = await controller.restoreFromLog();
+      draftState = s ? ({ ...s } as typeof draftState) : draftState;
+    } finally {
+      finalizeBusy = false;
     }
-    catch (e) {
-        pickError = e instanceof Error ? e.message : String(e);
-        const s = await controller.restoreFromLog();
-        draftState = s ? ({ ...s } as typeof draftState) : draftState;
-    }
-    finally {
-        finalizeBusy = false;
-    }
-}
-async function handleGenerate() {
-    if (!controller || generateBusy)
-        return;
+  }
+  async function handleGenerate() {
+    if (!controller || generateBusy) return;
     generateBusy = true;
     pickError = null;
     verification = null;
     try {
-        const res = await controller.generateAiLeague();
-        draftState = res.state ? ({ ...res.state } as typeof draftState) : draftState;
-        generation = res.generation;
-        leagueDigest = res.digest;
-        if (res.digest && res.generation) {
-            const ok = controller.verifyLeagueDigest(res.digest);
-            verification = ok
-                ? {
-                    ok: true,
-                    msg: `League verified — ${res.generation.aiPools.length} AI pools, 28 teams (DUO)`,
-                }
-                : { ok: false, msg: 'Digest mismatch' };
-        }
-    }
-    catch (e) {
-        const code = (e as {
+      const res = await controller.generateAiLeague();
+      draftState = res.state ? ({ ...res.state } as typeof draftState) : draftState;
+      generation = res.generation;
+      leagueDigest = res.digest;
+      if (res.digest && res.generation) {
+        const ok = controller.verifyLeagueDigest(res.digest);
+        verification = ok
+          ? {
+              ok: true,
+              msg: `League verified — ${res.generation.aiPools.length} AI pools, 28 teams (DUO)`,
+            }
+          : { ok: false, msg: 'Digest mismatch' };
+      }
+    } catch (e) {
+      const code =
+        (
+          e as {
             code?: string;
             errorCode?: string;
-        })?.code ??
-            (e as {
-                errorCode?: string;
-            })?.errorCode;
-        if (code === 'GENERATION_EXHAUSTED')
-            pickError = 'AI generation exhausted — retry with new seed.';
-        else if (code === 'OWNED_VERSION')
-            pickError =
-                'Rosters claim the same player twice — create a new room and re-draft. Duplicate identities are no longer allowed.';
-        else
-            pickError = e instanceof Error ? e.message : String(e);
-        const s = await controller.restoreFromLog();
-        draftState = s ? ({ ...s } as typeof draftState) : draftState;
+          }
+        )?.code ??
+        (
+          e as {
+            errorCode?: string;
+          }
+        )?.errorCode;
+      if (code === 'GENERATION_EXHAUSTED')
+        pickError = 'AI generation exhausted — retry with new seed.';
+      else if (code === 'OWNED_VERSION')
+        pickError =
+          'Rosters claim the same player twice — create a new room and re-draft. Duplicate identities are no longer allowed.';
+      else pickError = e instanceof Error ? e.message : String(e);
+      const s = await controller.restoreFromLog();
+      draftState = s ? ({ ...s } as typeof draftState) : draftState;
+    } finally {
+      generateBusy = false;
     }
-    finally {
-        generateBusy = false;
-    }
-}
-let modeLabel = $derived.by(() => {
-    const raw = (snap as unknown as {
-        mode?: string;
-    })?.mode ??
-        (snap?.settings as unknown as {
-            mode?: string;
-        })?.mode ??
-        'season';
-    if (raw === 'classic')
-        return 'Classic';
-    if (raw === 'sandbox')
-        return 'Sandbox';
+  }
+  let modeLabel = $derived.by(() => {
+    const raw =
+      (
+        snap as unknown as {
+          mode?: string;
+        }
+      )?.mode ??
+      (
+        snap?.settings as unknown as {
+          mode?: string;
+        }
+      )?.mode ??
+      'season';
+    if (raw === 'classic') return 'Classic';
+    if (raw === 'sandbox') return 'Sandbox';
     return 'Season Run';
-});
-let isMyTurn = $derived((draftState as any)?.currentTurnParticipantId === membership?.participantId);
-let opponentTurn = $derived(((draftState as any)?.currentTurnParticipantId ?? null) !== null &&
-    (draftState as any)?.currentTurnParticipantId !== membership?.participantId);
-let picksByParticipant = $derived.by(() => {
-    if (!draftState)
-        return { p1: [], p2: [] } as Record<string, unknown[]>;
+  });
+  let isMyTurn = $derived(
+    (draftState as any)?.currentTurnParticipantId === membership?.participantId,
+  );
+  let opponentTurn = $derived(
+    ((draftState as any)?.currentTurnParticipantId ?? null) !== null &&
+      (draftState as any)?.currentTurnParticipantId !== membership?.participantId,
+  );
+  let picksByParticipant = $derived.by(() => {
+    if (!draftState) return { p1: [], p2: [] } as Record<string, unknown[]>;
     return {
-        p1: (draftState as any).picks.filter((p: any) => p.participantId === 'p1'),
-        p2: (draftState as any).picks.filter((p: any) => p.participantId === 'p2'),
+      p1: (draftState as any).picks.filter((p: any) => p.participantId === 'p1'),
+      p2: (draftState as any).picks.filter((p: any) => p.participantId === 'p2'),
     };
-});
-let totalTarget = $derived(20);
-let progress = $derived(draftState
-    ? `${String((draftState as any).picks.length)}/${String(totalTarget)} picks · ${String((draftState as any).picks.filter((p: unknown) => (p as {
-        participantId: string;
-    }).participantId === membership?.participantId).length)}/10 you`
-    : '');
-let myOffer = $derived.by(() => {
-    if (!controller || !membership || !draftState)
-        return null;
+  });
+  let totalTarget = $derived(20);
+  let progress = $derived(
+    draftState
+      ? `${String((draftState as any).picks.length)}/${String(totalTarget)} picks · ${String(
+          (draftState as any).picks.filter(
+            (p: unknown) =>
+              (
+                p as {
+                  participantId: string;
+                }
+              ).participantId === membership?.participantId,
+          ).length,
+        )}/10 you`
+      : '',
+  );
+  let myOffer = $derived.by(() => {
+    if (!controller || !membership || !draftState) return null;
     const viewer = membership.participantId;
     return controller.currentOfferFor(viewer) as SeasonDraftOffer | null;
-});
-let secondsRemaining = $derived.by(() => {
+  });
+  let secondsRemaining = $derived.by(() => {
     void tick;
-    if (!controller || !membership || !draftState)
-        return null;
-    if (snap?.settings.pace !== 'live')
-        return null;
-    if (!isMyTurn)
-        return null;
+    if (!controller || !membership || !draftState) return null;
+    if (snap?.settings.pace !== 'live') return null;
+    if (!isMyTurn) return null;
     return controller.getSecondsRemaining(Date.now());
-});
-let opponentPresence = $derived.by(() => {
-    if (!snap || !membership)
-        return null;
+  });
+  let opponentPresence = $derived.by(() => {
+    if (!snap || !membership) return null;
     const opp = membership.participantId === 'p1' ? 'p2' : 'p1';
     return snap.presence?.find((p) => p.participantId === opp) ?? null;
-});
-let opponentOnline = $derived(opponentPresence?.online ?? (snap ? snap.memberCount >= 2 : false));
-let isLocked = $derived((draftState as any)?.status === 'complete' || (draftState as any)?.status === 'finalized');
-let canFinalize = $derived((draftState as any)?.picks.length === 20 && (draftState as any)?.status === 'drafting');
-let canGenerate = $derived((draftState as any)?.status === 'finalized');
-let canEnterRun = $derived((draftState as any)?.status === 'complete' && generation !== null);
+  });
+  let opponentOnline = $derived(opponentPresence?.online ?? (snap ? snap.memberCount >= 2 : false));
+  let isLocked = $derived(
+    (draftState as any)?.status === 'complete' || (draftState as any)?.status === 'finalized',
+  );
+  let canFinalize = $derived(
+    (draftState as any)?.picks.length === 20 && (draftState as any)?.status === 'drafting',
+  );
+  let canGenerate = $derived((draftState as any)?.status === 'finalized');
+  let canEnterRun = $derived((draftState as any)?.status === 'complete' && generation !== null);
 </script>
 
 <svelte:head><title>Draft · Room {roomId.slice(0, 8)} — Hoop Rush</title></svelte:head>
@@ -636,16 +693,38 @@ let canEnterRun = $derived((draftState as any)?.status === 'complete' && generat
     </div>
   {:else if snap && (snap.mode === 'classic' || snap.mode === 'sandbox')}
     <div class="rounded-xl border border-primary/20 bg-primary/5 p-8 text-center">
-      <p class="text-label tracking-[0.16em] text-primary">{modeLabel} · Multiplayer — simpler 5-pick system</p>
-      <h2 class="font-display mt-2 text-2xl font-extrabold uppercase">{modeLabel} Shared Draft — coming online</h2>
+      <p class="text-label tracking-[0.16em] text-primary">
+        {modeLabel} · Multiplayer — simpler 5-pick system
+      </p>
+      <h2 class="font-display mt-2 text-2xl font-extrabold uppercase">
+        {modeLabel} Shared Draft — coming online
+      </h2>
       <p class="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-        Room lobby works (4-digit code, {snap.settings.pace === 'live' ? 'Live 90s / 5m' : 'Async 24h'}). The simpler 5-pick draft (Classic roll / Sandbox free pick) and head-to-head simulation are being wired now. Solo {modeLabel} still at <a href={modeLabel === 'Classic' ? resolve('/classic') : resolve('/sandbox')} class="underline">{modeLabel === 'Classic' ? '/classic' : '/sandbox'}</a>. Season Run multiplayer stays archived — code kept.
+        Room lobby works (4-digit code, {snap.settings.pace === 'live'
+          ? 'Live 90s / 5m'
+          : 'Async 24h'}). The simpler 5-pick draft (Classic roll / Sandbox free pick) and
+        head-to-head simulation are being wired now. Solo {modeLabel} still at
+        <a
+          href={modeLabel === 'Classic' ? resolve('/classic') : resolve('/sandbox')}
+          class="underline">{modeLabel === 'Classic' ? '/classic' : '/sandbox'}</a
+        >. Season Run multiplayer stays archived — code kept.
       </p>
       <div class="mt-4 flex justify-center gap-2">
-        <a href={`/multiplayer/room/${roomId}`} class="rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground">Back to lobby →</a>
-        <a href={modeLabel === 'Classic' ? resolve('/classic') : resolve('/sandbox')} class="rounded-xl border border-line-soft bg-card px-6 py-3 text-sm font-semibold">Play solo {modeLabel} →</a>
+        <a
+          href={`/multiplayer/room/${roomId}`}
+          class="rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground"
+          >Back to lobby →</a
+        >
+        <a
+          href={modeLabel === 'Classic' ? resolve('/classic') : resolve('/sandbox')}
+          class="rounded-xl border border-line-soft bg-card px-6 py-3 text-sm font-semibold"
+          >Play solo {modeLabel} →</a
+        >
       </div>
-      <p class="mt-3 text-xs text-muted-foreground">Room {roomId.slice(0,8)}… · {membership.participantId} · {snap.phase} · Classic/Sandbox rooms reuse same 4-digit code + pace system.</p>
+      <p class="mt-3 text-xs text-muted-foreground">
+        Room {roomId.slice(0, 8)}… · {membership.participantId} · {snap.phase} · Classic/Sandbox rooms
+        reuse same 4-digit code + pace system.
+      </p>
     </div>
   {:else if draftState}
     <div class="rounded-xl border border-line-soft bg-surface-1 p-6 sm:p-7">
@@ -722,9 +801,7 @@ let canEnterRun = $derived((draftState as any)?.status === 'complete' && generat
       {/if}
 
       <div class="mt-4 rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs">
-        <p class="font-semibold">
-          10 rounds · 8 cards (≥3 safe) · 4G/4F/3C
-        </p>
+        <p class="font-semibold">10 rounds · 8 cards (≥3 safe) · 4G/4F/3C</p>
       </div>
 
       <div class="mt-6 grid gap-3 sm:grid-cols-3">
@@ -830,7 +907,6 @@ let canEnterRun = $derived((draftState as any)?.status === 'complete' && generat
               >Back to lobby</a
             >
           </div>
-
         </div>
       {:else if (draftState as any).status === 'finalized'}
         <div class="mt-4 rounded-lg border border-primary/30 bg-primary/10 p-4">
@@ -891,7 +967,11 @@ let canEnterRun = $derived((draftState as any)?.status === 'complete' && generat
       {:else if (draftState as any).status === 'drafting' && myOffer}
         <div class="mt-4">
           <p class="text-xs text-muted-foreground">
-            Your offer · Round {myOffer.round} · {secondsRemaining !== null ? `${secondsRemaining}s` : snap?.settings.pace === 'live' ? '90s' : '24h'}
+            Your offer · Round {myOffer.round} · {secondsRemaining !== null
+              ? `${secondsRemaining}s`
+              : snap?.settings.pace === 'live'
+                ? '90s'
+                : '24h'}
           </p>
           {#if secondsRemaining !== null && secondsRemaining <= 15}<p
               class="mt-1 text-xs font-bold text-amber-600"
@@ -1086,7 +1166,6 @@ let canEnterRun = $derived((draftState as any)?.status === 'complete' && generat
         >
       </div>
     </div>
-
   {:else}
     <div class="rounded-xl bg-surface-1 p-6">
       <h2 class="font-display text-sm font-extrabold tracking-widest uppercase">

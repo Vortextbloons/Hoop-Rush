@@ -1,10 +1,23 @@
-<script lang="ts">import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
-import { eraIdentityOf, type SeasonFaceRef } from '$lib/season/season-branding';
-import type { SeasonPlayerStatsMeasure, SeasonPlayerStatsRow, SeasonPlayerStatsSortKey, } from '$lib/season/season-player-stats-view';
-import { formatPositions } from '$lib/player-positions';
-import { oneDecimal, percentOneDecimal } from '$lib/format';
-let { rows, measure, sortKey, sortDir, onSort, faceOf, manifest, }: {
+<script lang="ts">
+  import type { HoopRushManifest } from '@hoop-rush/data-contracts';
+  import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
+  import { eraIdentityOf, type SeasonFaceRef } from '$lib/season/season-branding';
+  import type {
+    SeasonPlayerStatsMeasure,
+    SeasonPlayerStatsRow,
+    SeasonPlayerStatsSortKey,
+  } from '$lib/season/season-player-stats-view';
+  import { formatPositions } from '$lib/player-positions';
+  import { oneDecimal, percentOneDecimal } from '$lib/format';
+  let {
+    rows,
+    measure,
+    sortKey,
+    sortDir,
+    onSort,
+    faceOf,
+    manifest,
+  }: {
     rows: SeasonPlayerStatsRow[];
     measure: SeasonPlayerStatsMeasure;
     sortKey: SeasonPlayerStatsSortKey;
@@ -12,12 +25,12 @@ let { rows, measure, sortKey, sortDir, onSort, faceOf, manifest, }: {
     onSort: (key: SeasonPlayerStatsSortKey) => void;
     faceOf: (playerVersionId: string) => SeasonFaceRef | null;
     manifest: HoopRushManifest;
-} = $props();
-const statColumns: ReadonlyArray<{
+  } = $props();
+  const statColumns: ReadonlyArray<{
     key: SeasonPlayerStatsSortKey;
     label: string;
     measure: SeasonPlayerStatsMeasure | 'both';
-}> = [
+  }> = [
     { key: 'minutesPerGame', label: 'MPG', measure: 'perGame' },
     { key: 'pointsPerGame', label: 'PPG', measure: 'perGame' },
     { key: 'reboundsPerGame', label: 'RPG', measure: 'perGame' },
@@ -36,32 +49,29 @@ const statColumns: ReadonlyArray<{
     { key: 'fieldGoalPct', label: 'FG%', measure: 'both' },
     { key: 'threePointPct', label: '3P%', measure: 'both' },
     { key: 'freeThrowPct', label: 'FT%', measure: 'both' },
-];
-const columns = $derived(statColumns.filter((column) => column.measure === 'both' || column.measure === measure));
-function ariaSort(key: SeasonPlayerStatsSortKey): 'ascending' | 'descending' | 'none' {
-    if (key !== sortKey)
-        return 'none';
+  ];
+  const columns = $derived(
+    statColumns.filter((column) => column.measure === 'both' || column.measure === measure),
+  );
+  function ariaSort(key: SeasonPlayerStatsSortKey): 'ascending' | 'descending' | 'none' {
+    if (key !== sortKey) return 'none';
     return sortDir === 'desc' ? 'descending' : 'ascending';
-}
-function formatValue(row: SeasonPlayerStatsRow, key: SeasonPlayerStatsSortKey): string {
-    if (key === 'gamesPlayed')
-        return String(row.gamesPlayed);
-    if (key === 'minutes')
-        return String(Math.round(row.minutes));
+  }
+  function formatValue(row: SeasonPlayerStatsRow, key: SeasonPlayerStatsSortKey): string {
+    if (key === 'gamesPlayed') return String(row.gamesPlayed);
+    if (key === 'minutes') return String(Math.round(row.minutes));
     if (key === 'fieldGoalPct' || key === 'threePointPct' || key === 'freeThrowPct') {
-        const value = row[key];
-        if (value === null)
-            return '—';
-        if (value === 0)
-            return '0%';
-        return percentOneDecimal(value);
+      const value = row[key];
+      if (value === null) return '—';
+      if (value === 0) return '0%';
+      return percentOneDecimal(value);
     }
     const value = row[key];
     return typeof value === 'number' ? oneDecimal(value) : '—';
-}
-function eraLabelOf(playerVersionId: string, franchiseId: string, eraId: string) {
+  }
+  function eraLabelOf(playerVersionId: string, franchiseId: string, eraId: string) {
     return eraIdentityOf(manifest, franchiseId, eraId).displayLabel;
-}
+  }
 </script>
 
 <table class="w-full min-w-[44rem] text-sm">

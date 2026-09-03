@@ -1,88 +1,101 @@
-﻿<script lang="ts">import { browser } from '$app/environment';
-import { goto } from '$app/navigation';
-import { resolve } from '$app/paths';
-import type { ChallengeRun, EraSimulationProfile, HoopRushManifest, PeakPlayerSeason, } from '@hoop-rush/data-contracts';
-import type { RouteId } from '$app/types';
-import { clearDataLoaderCaches, getEraSimulationProfile, getManifest } from '$lib/data';
-import { challengeRepository } from '$lib/challenge-repo';
-import { ChallengeRunner, type RunnerPhase } from '$lib/challenge-runner';
-import { loadRunPlayersById } from '$lib/sandbox-lineup';
-import ChallengeOverlay from './ChallengeOverlay.svelte';
-import AsyncState from './AsyncState.svelte';
-let { mode, modeLabelFor, }: {
+﻿<script lang="ts">
+  import { browser } from '$app/environment';
+  import { goto } from '$app/navigation';
+  import { resolve } from '$app/paths';
+  import type {
+    ChallengeRun,
+    EraSimulationProfile,
+    HoopRushManifest,
+    PeakPlayerSeason,
+  } from '@hoop-rush/data-contracts';
+  import type { RouteId } from '$app/types';
+  import { clearDataLoaderCaches, getEraSimulationProfile, getManifest } from '$lib/data';
+  import { challengeRepository } from '$lib/challenge-repo';
+  import { ChallengeRunner, type RunnerPhase } from '$lib/challenge-runner';
+  import { loadRunPlayersById } from '$lib/sandbox-lineup';
+  import ChallengeOverlay from './ChallengeOverlay.svelte';
+  import AsyncState from './AsyncState.svelte';
+  let {
+    mode,
+    modeLabelFor,
+  }: {
     mode: 'sandbox' | 'classic';
     modeLabelFor: (run: ChallengeRun | null) => string;
-} = $props();
-let manifest = $state.raw<HoopRushManifest | null>(null);
-let profile = $state.raw<EraSimulationProfile | null>(null);
-let run = $state.raw<ChallengeRun | null>(null);
-let loadError = $state<string | null>(null);
-let byId = $state<Map<string, PeakPlayerSeason> | null>(null);
-let phase = $state<RunnerPhase>('idle');
-let runnerError = $state<string | null>(null);
-let retryCount = $state(0);
-let announcedCount = 0;
-const ANNOUNCEMENT_EVERY = 10;
-$effect(() => {
-    if (!browser)
-        return;
+  } = $props();
+  let manifest = $state.raw<HoopRushManifest | null>(null);
+  let profile = $state.raw<EraSimulationProfile | null>(null);
+  let run = $state.raw<ChallengeRun | null>(null);
+  let loadError = $state<string | null>(null);
+  let byId = $state<Map<string, PeakPlayerSeason> | null>(null);
+  let phase = $state<RunnerPhase>('idle');
+  let runnerError = $state<string | null>(null);
+  let retryCount = $state(0);
+  let announcedCount = 0;
+  const ANNOUNCEMENT_EVERY = 10;
+  $effect(() => {
+    if (!browser) return;
     void retryCount;
     let cancelled = false;
-    getManifest().then((m) => {
-        if (cancelled)
-            return;
+    getManifest().then(
+      (m) => {
+        if (cancelled) return;
         manifest = m;
-    }, () => {
-        if (!cancelled)
-            loadError = 'Data unavailable. Try again.';
-    });
-    challengeRepository.loadActiveRun().then((record) => {
-        if (cancelled)
-            return;
+      },
+      () => {
+        if (!cancelled) loadError = 'Data unavailable. Try again.';
+      },
+    );
+    challengeRepository.loadActiveRun().then(
+      (record) => {
+        if (cancelled) return;
         const active = record?.run;
         if (!active) {
-            loadError = 'No active challenge. Start one from the draft.';
-            return;
+          loadError = 'No active challenge. Start one from the draft.';
+          return;
         }
         if (active.status === 'finished') {
-            void goto(resolve(resultHrefFor(active) as any));
-            return;
+          void goto(resolve(resultHrefFor(active) as any));
+          return;
         }
         if (active.status !== 'active') {
-            loadError = 'This challenge is no longer active.';
-            return;
+          loadError = 'This challenge is no longer active.';
+          return;
         }
         run = active;
-        getManifest().then((m) => {
-            if (cancelled)
-                return;
+        getManifest().then(
+          (m) => {
+            if (cancelled) return;
             const entry = m.eraSimulationProfiles.find((p) => p.eraId === active.eraId);
             if (!entry) {
-                loadError = 'The decade simulation profile is unavailable.';
-                return;
+              loadError = 'The decade simulation profile is unavailable.';
+              return;
             }
-            getEraSimulationProfile(entry).then((p) => {
+            getEraSimulationProfile(entry).then(
+              (p) => {
                 if (!cancelled) {
-                    profile = p;
-                    session = { run: active, profile: p };
+                  profile = p;
+                  session = { run: active, profile: p };
                 }
-            }, () => {
-                if (!cancelled)
-                    loadError = 'The decade simulation profile is unavailable.';
-            });
-        }, () => {
-            if (!cancelled)
-                loadError = 'Data unavailable. Try again.';
-        });
-    }, (e: unknown) => {
-        if (!cancelled)
-            loadError = e instanceof Error ? e.message : String(e);
-    });
+              },
+              () => {
+                if (!cancelled) loadError = 'The decade simulation profile is unavailable.';
+              },
+            );
+          },
+          () => {
+            if (!cancelled) loadError = 'Data unavailable. Try again.';
+          },
+        );
+      },
+      (e: unknown) => {
+        if (!cancelled) loadError = e instanceof Error ? e.message : String(e);
+      },
+    );
     return () => {
-        cancelled = true;
+      cancelled = true;
     };
-});
-function retryChallenge() {
+  });
+  function retryChallenge() {
     clearDataLoaderCaches();
     manifest = null;
     profile = null;
@@ -92,93 +105,90 @@ function retryChallenge() {
     runnerError = null;
     phase = 'idle';
     retryCount += 1;
-}
-let runner: ChallengeRunner | null = null;
-let session = $state.raw<{
+  }
+  let runner: ChallengeRunner | null = null;
+  let session = $state.raw<{
     run: ChallengeRun;
     profile: EraSimulationProfile;
-} | null>(null);
-$effect(() => {
+  } | null>(null);
+  $effect(() => {
     const active = session;
-    if (!browser || !active || runner !== null)
-        return;
-    const reducedMotion = typeof window.matchMedia === 'function' &&
-        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!browser || !active || runner !== null) return;
+    const reducedMotion =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const instance = new ChallengeRunner(challengeRepository, {
-        onReveal(_result, nextRun) {
-            run = nextRun;
-            announcedCount += 1;
-            if (announcedCount % ANNOUNCEMENT_EVERY === 0) {
-                announceProgress(nextRun);
-            }
-        },
-        onFinished() {
-            void goto(resolve(resultHrefFor(active.run) as any));
-        },
-        onPaused() {
-            phase = 'paused';
-        },
-        onError(message) {
-            phase = 'error';
-            runnerError = message;
-        },
+      onReveal(_result, nextRun) {
+        run = nextRun;
+        announcedCount += 1;
+        if (announcedCount % ANNOUNCEMENT_EVERY === 0) {
+          announceProgress(nextRun);
+        }
+      },
+      onFinished() {
+        void goto(resolve(resultHrefFor(active.run) as any));
+      },
+      onPaused() {
+        phase = 'paused';
+      },
+      onError(message) {
+        phase = 'error';
+        runnerError = message;
+      },
     });
     runner = instance;
     phase = 'running';
     instance.start(active.run, active.profile, { reducedMotion });
     return () => {
-        instance.dispose();
-        if (runner === instance)
-            runner = null;
+      instance.dispose();
+      if (runner === instance) runner = null;
     };
-});
-function announceProgress(current: ChallengeRun): void {
+  });
+  function announceProgress(current: ChallengeRun): void {
     const record = current.aggregates.team;
     const live = document.getElementById('challenge-announcer');
-    if (!live)
-        return;
+    if (!live) return;
     live.textContent = `Game ${current.games.length} of 82: record ${record.wins}-${record.losses}.`;
-}
-$effect(() => {
+  }
+  $effect(() => {
     const currentRun = run;
     const m = manifest;
-    if (!browser || !currentRun || !m)
-        return;
-    if (byId !== null)
-        return;
+    if (!browser || !currentRun || !m) return;
+    if (byId !== null) return;
     let cancelled = false;
-    loadRunPlayersById(currentRun, m).then((map) => {
-        if (!cancelled)
-            byId = map;
-    }, () => {
-        if (!cancelled)
-            byId = new Map();
-    });
+    loadRunPlayersById(currentRun, m).then(
+      (map) => {
+        if (!cancelled) byId = map;
+      },
+      () => {
+        if (!cancelled) byId = new Map();
+      },
+    );
     return () => {
-        cancelled = true;
+      cancelled = true;
     };
-});
-function cancel() {
+  });
+  function cancel() {
     runner?.cancel();
-}
-function resume() {
-    if (!runner || !run || !profile)
-        return;
+  }
+  function resume() {
+    if (!runner || !run || !profile) return;
     runnerError = null;
     runner.start(run, profile, {
-        reducedMotion: typeof window.matchMedia === 'function' &&
-            window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+      reducedMotion:
+        typeof window.matchMedia === 'function' &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches,
     });
-}
-function resultHrefFor(current: ChallengeRun): RouteId {
+  }
+  function resultHrefFor(current: ChallengeRun): RouteId {
     const runId = encodeURIComponent(current.runId);
     return mode === 'sandbox'
-        ? (`/sandbox/result?runId=${runId}` as any)
-        : (`/classic/result?runId=${runId}` as any);
-}
-const draftPath = $derived((mode === 'sandbox' ? '/sandbox' : '/classic') as any);
-const modeLabel = $derived(modeLabelFor(run));
-const resultHref = $derived(run ? resultHrefFor(run) : null);
+      ? (`/sandbox/result?runId=${runId}` as any)
+      : (`/classic/result?runId=${runId}` as any);
+  }
+  const draftPath = $derived((mode === 'sandbox' ? '/sandbox' : '/classic') as any);
+  const modeLabel = $derived(modeLabelFor(run));
+  const resultHref = $derived(run ? resultHrefFor(run) : null);
 </script>
 
 <p id="challenge-announcer" class="sr-only" aria-live="polite"></p>

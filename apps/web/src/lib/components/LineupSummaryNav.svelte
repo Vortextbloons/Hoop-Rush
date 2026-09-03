@@ -1,13 +1,18 @@
-<script lang="ts">import { SLOT_LABELS, SLOT_NAMES } from '$lib/player-positions';
-let { slots, pickedCount, countLabel = null, }: {
+<script lang="ts">
+  import { SLOT_LABELS, SLOT_NAMES } from '$lib/player-positions';
+  let {
+    slots,
+    pickedCount,
+    countLabel = null,
+  }: {
     slots: ({
-        displayName: string;
+      displayName: string;
     } | null)[];
     pickedCount: number;
     countLabel?: string | null;
-} = $props();
-const mobileCount = $derived(countLabel ?? `${pickedCount}/5`);
-const desktopCount = $derived(countLabel ?? `Picked ${pickedCount} of 5`);
+  } = $props();
+  const mobileCount = $derived(countLabel ?? `${pickedCount}/5`);
+  const desktopCount = $derived(countLabel ?? `Picked ${pickedCount} of 5`);
 </script>
 
 <nav

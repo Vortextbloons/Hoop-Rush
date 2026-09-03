@@ -1,32 +1,41 @@
-<script lang="ts">import { untrack } from 'svelte';
-import type { ChallengeRun, GameResult } from '@hoop-rush/data-contracts';
-let { run, games, compact = false, }: {
+<script lang="ts">
+  import { untrack } from 'svelte';
+  import type { ChallengeRun, GameResult } from '@hoop-rush/data-contracts';
+  let {
+    run,
+    games,
+    compact = false,
+  }: {
     run: ChallengeRun;
     games: GameResult[];
     compact?: boolean;
-} = $props();
-const firstLoss = $derived(run.firstLossGameNumber);
-const opponentNames = $derived(untrack(() => new Map(run.bracket.opponents.map((o) => [o.opponentId, o.displayName]))));
-const cells = $derived.by(() => {
+  } = $props();
+  const firstLoss = $derived(run.firstLossGameNumber);
+  const opponentNames = $derived(
+    untrack(() => new Map(run.bracket.opponents.map((o) => [o.opponentId, o.displayName]))),
+  );
+  const cells = $derived.by(() => {
     const byGame = new Map(games.map((g) => [g.gameNumber, g]));
     return Array.from({ length: 82 }, (_, index) => {
-        const gameNumber = index + 1;
-        const result = byGame.get(gameNumber);
-        return {
-            gameNumber,
-            result,
-            won: result?.winner === 'home',
-            lost: result?.winner === 'away',
-            isFirstLoss: result !== undefined && firstLoss !== null && gameNumber === firstLoss,
-        };
+      const gameNumber = index + 1;
+      const result = byGame.get(gameNumber);
+      return {
+        gameNumber,
+        result,
+        won: result?.winner === 'home',
+        lost: result?.winner === 'away',
+        isFirstLoss: result !== undefined && firstLoss !== null && gameNumber === firstLoss,
+      };
     });
-});
-function opponentName(gameNumber: number): string {
+  });
+  function opponentName(gameNumber: number): string {
     const opponentId = run.bracket.schedule[gameNumber - 1]?.opponentId;
-    return ((opponentId === undefined ? undefined : opponentNames.get(opponentId)) ??
-        opponentId ??
-        'Unknown');
-}
+    return (
+      (opponentId === undefined ? undefined : opponentNames.get(opponentId)) ??
+      opponentId ??
+      'Unknown'
+    );
+  }
 </script>
 
 <ol
