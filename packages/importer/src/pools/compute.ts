@@ -220,9 +220,7 @@ export function loadManifest(): Manifest {
   const raw = readJsonLoose(manifestPath()) as unknown;
   const parsed = poolManifestSchema.safeParse(raw);
   if (!parsed.success) {
-    throw new Error(
-      `invalid manifest: ${parsed.error.issues[0]?.message ?? 'unknown'}`,
-    );
+    throw new Error(`invalid manifest: ${parsed.error.issues[0]?.message ?? 'unknown'}`);
   }
   return parsed.data;
 }
@@ -341,7 +339,13 @@ function loadFallbackRosterPlayers(): Map<string, RosterInput> {
       for (const value of parsed.data.players) {
         const playerExternalId = str(value.playerExternalId);
         if (!playerExternalId) continue;
-        const positionsRaw = value.positions as { primary?: unknown; secondary?: unknown } | undefined;
+        const positionsParsed = z
+          .looseObject({
+            primary: z.unknown().optional(),
+            secondary: z.unknown().optional(),
+          })
+          .safeParse(value.positions);
+        const positionsRaw = positionsParsed.success ? positionsParsed.data : undefined;
         const primary = typeof positionsRaw?.primary === 'string' ? positionsRaw.primary : 'F';
         const secondaryPositions = Array.isArray(positionsRaw?.secondary)
           ? positionsRaw.secondary.filter(
@@ -349,7 +353,6 @@ function loadFallbackRosterPlayers(): Map<string, RosterInput> {
             )
           : [];
         const candidate: RosterInput = {
-          ...(value as RosterInput),
           externalId: playerExternalId,
           firstName: value.firstName,
           lastName: value.lastName,
@@ -362,6 +365,7 @@ function loadFallbackRosterPlayers(): Map<string, RosterInput> {
           summaryRatings: value.summaryRatings,
           anchors: value.anchors,
           provenance: value.provenance,
+          selectionScore: value.selectionScore,
         };
         const previous = byPlayer.get(playerExternalId);
         if (
@@ -527,7 +531,9 @@ export function sanitizeAnchors<T extends RawAnchors>(anchors: T): T {
   simulationAnchorsSchema.partial().safeParse(out);
   return out;
 }
-export type SummaryRatingsRaw = Pick<SummaryRatings, 'overallRating' | 'offenseRating' | 'defenseRating'>;
+export type SummaryRatingsRaw = Partial<
+  Pick<SummaryRatings, 'overallRating' | 'offenseRating' | 'defenseRating'>
+>;
 const overallScoreProfileSchema = z.looseObject({
   rawOverallScore: z.unknown().optional(),
   canonicalOverall: z.unknown().optional(),
@@ -621,7 +627,10 @@ export function compareSelectionKeys(a: readonly number[], b: readonly number[])
   }
   return 0;
 }
-export type PoolOverallRow = Pick<PeakPlayerSeason, 'playerId' | 'franchiseId' | 'seasonKey'> & {
+export type PoolOverallRow = {
+  playerId: string;
+  franchiseId: string;
+  seasonKey: string;
   summaryRatings: SummaryRatings;
   ratingProfile?: {
     rawOverallScore?: number | null;
@@ -736,14 +745,33 @@ export function loadExistingAssetAltIds(
   }
   try {
     const raw = readJsonLoose(path) as unknown;
-    const parsed = franchiseEraPoolSchema.safeParse(raw);
-    if (!parsed.success) return new Map();
-    const pool = parsed.data;
+    const previousPoolPlayerSchema = z.looseObject({
+      playerExternalId: z.string(),
+      altIds: z.unknown().optional(),
+    });
+    const previousPoolFileSchema = z.looseObject({
+      players: z.array(previousPoolPlayerSchema).optional(),
+    });
+    const previousAltIdsSchema = z.looseObject({
+      nbaHeadshotAvailable: z.boolean().optional(),
+      photoUrl: z.union([z.string(), z.null()]).optional(),
+    });
+    const parsed = previousPoolFileSchema.safeParse(raw);
+    if (!parsed.success || !Array.isArray(parsed.data.players)) return new Map();
     const byExternalId = new Map<string, NonNullable<PeakPlayerSeason['altIds']>>();
-    for (const player of pool.players) {
-      if (player.altIds !== null && typeof player.altIds === 'object') {
-        byExternalId.set(player.playerExternalId, player.altIds);
+    for (const player of parsed.data.players) {
+      const altIdsParsed = previousAltIdsSchema.safeParse(player.altIds);
+      if (!altIdsParsed.success) continue;
+      const data = altIdsParsed.data;
+      if (data.nbaHeadshotAvailable === undefined && data.photoUrl === undefined) continue;
+      const out: NonNullable<PeakPlayerSeason['altIds']> = {};
+      if (data.nbaHeadshotAvailable !== undefined) {
+        out.nbaHeadshotAvailable = data.nbaHeadshotAvailable;
       }
+      if (data.photoUrl !== undefined) {
+        out.photoUrl = data.photoUrl;
+      }
+      byExternalId.set(player.playerExternalId, out);
     }
     return byExternalId;
   } catch (error) {
@@ -753,8 +781,69 @@ export function loadExistingAssetAltIds(
     return new Map();
   }
 }
-export type PoolPlayer = PeakPlayerSeason;
-export type Pool = FranchiseEraPool;
+export type PoolPlayer = {
+  schemaVersion: number;
+  playerId: string;
+  franchiseId: string;
+  eraId: string;
+  seasonKey: string;
+  firstName: string;
+  lastName: string;
+  displayName: string;
+  playerExternalId: string;
+  altIds: Pick<
+    NonNullable<PeakPlayerSeason['altIds']>,
+    'bbref' | 'nbaHeadshotAvailable' | 'photoUrl'
+  > | null;
+  positions: Pick<
+    PeakPlayerSeason['positions'],
+    'primary' | 'secondary' | 'playable' | 'sourceLabels' | 'normalizationVersion'
+  >;
+  heightInches: PeakPlayerSeason['heightInches'];
+  weightLbs: PeakPlayerSeason['weightLbs'];
+  eligibility: Pick<
+    PeakPlayerSeason['eligibility'],
+    'minimumTeamGames' | 'teamGames' | 'teamMinutes'
+  >;
+  selectionScore: number;
+  selectionScoreVersion: string;
+  stats: PlayerSeasonStats;
+  historicalTeamIdentity: {
+    teamId: string;
+    displayName: string;
+    city: string;
+    abbreviation: string | null;
+    seasonKey: string;
+    lineageRuleVersion: string;
+  };
+  summaryRatings: SummaryRatings;
+  ratingProfile?: RatingProfile;
+  detailedRatings: SimulationRatings;
+  tendencies: SimulationTendencies;
+  anchors: SimulationAnchors;
+  provenance: ProvenanceMap;
+  source: Pick<
+    PeakPlayerSeason['source'],
+    | 'dataVersion'
+    | 'ratingsVersion'
+    | 'selectionScoreVersion'
+    | 'sourceVersion'
+    | 'derivationMethodVersion'
+    | 'lineageRuleVersion'
+  >;
+  reconstructedThreePoint?: PeakPlayerSeason['reconstructedThreePoint'];
+};
+export type Pool = {
+  schemaVersion: number;
+  dataVersion: string;
+  franchiseId: string;
+  eraId: string;
+  eligibility: {
+    minimumTeamGames: number;
+  };
+  coverageSummary: CoverageSummary;
+  players: PoolPlayer[];
+};
 export type PoolBuildFailure = {
   reason: UnavailabilityReason;
   detail: string;
@@ -1089,7 +1178,8 @@ export function computePool(
       }
     }
     const anchorsParsed = rawAnchorsSchema.safeParse(player.anchors);
-    const anchorsOut = sanitizeAnchors(anchorsParsed.success ? anchorsParsed.data : {});
+    const anchorsSanitized = sanitizeAnchors(anchorsParsed.success ? anchorsParsed.data : {});
+    const anchorsOut = simulationAnchorsSchema.parse(anchorsSanitized);
     const provenanceParsed = provenanceMapSchema.safeParse(player.provenance ?? {});
     const provenanceOut: ProvenanceMap = provenanceParsed.success ? provenanceParsed.data : {};
     if (identityFailures.length > failureStart) {
@@ -1435,6 +1525,9 @@ export async function run(
   updateManifest([...entriesByKey.values()]);
   recordCoverageReport(results.map((result) => result.coverage));
   refreshPlayersIndexInManifest();
+}
+export function coverageReportPath(): string {
+  return join(PUBLIC_DATA, 'coverage-report.json');
 }
 const coverageReportEntrySchema = z.object({
   franchiseId: z.string(),

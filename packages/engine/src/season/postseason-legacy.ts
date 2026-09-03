@@ -1,7 +1,9 @@
 import {
   SEASON_POSTSEASON_LEGACY_VERSION as SEASON_POSTSEASON_VERSION,
+  franchiseIdSchema,
   seasonPostseasonStateV1Schema as seasonPostseasonStateSchema,
   type ConferenceId,
+  type FranchiseId,
   type PlayInGameV1 as PlayInGame,
   type PlayInGameIdV1 as PlayInGameId,
   type PlayoffBracketV1 as PlayoffBracket,
@@ -50,8 +52,8 @@ function isNonNegativeInteger(value: number): boolean {
 }
 function resolvePlayInGame(
   game: PlayInGame,
-  home: string,
-  away: string,
+  home: FranchiseId,
+  away: FranchiseId,
   result: PlayInGameResult,
 ): PlayInGame {
   if (game.status !== 'scheduled') {
@@ -79,7 +81,7 @@ function resolvePlayInGame(
       awayScore: result.awayScore,
     };
   }
-  const loser = result.loserFranchiseId;
+  const loser = franchiseIdSchema.parse(result.loserFranchiseId);
   if (loser !== home && loser !== away) {
     throw new Error(`play-in forfeit loser ${loser} is not a participant of ${game.gameId}`);
   }
@@ -128,7 +130,7 @@ export function setPlayInRankings(
     if (current.ranking !== null) {
       throw new Error(`${conference} play-in rankings are already set`);
     }
-    const ids = [...rankings[conference]];
+    const ids = [...rankings[conference]].map((id) => franchiseIdSchema.parse(id));
     if (ids.length !== 10 || new Set(ids).size !== 10) {
       throw new Error(`${conference} rankings must contain exactly ten unique teams`);
     }
@@ -164,24 +166,26 @@ export function submitPlayInGame(
   }
   const sevenDone = playIn.games.sevenEight.status !== 'scheduled';
   const nineDone = playIn.games.nineTen.status !== 'scheduled';
-  let home: string;
-  let away: string;
+  let homeRaw: string;
+  let awayRaw: string;
   if (gameId === 'seven-eight') {
-    home = ranking[6] ?? '';
-    away = ranking[7] ?? '';
+    homeRaw = ranking[6] ?? '';
+    awayRaw = ranking[7] ?? '';
   } else if (gameId === 'nine-ten') {
-    home = ranking[8] ?? '';
-    away = ranking[9] ?? '';
+    homeRaw = ranking[8] ?? '';
+    awayRaw = ranking[9] ?? '';
   } else {
     if (!sevenDone || !nineDone) {
       throw new Error(`${conference} play-in final requires the 7/8 and 9/10 games first`);
     }
-    home = playIn.games.sevenEight.loserFranchiseId ?? '';
-    away = playIn.games.nineTen.winnerFranchiseId ?? '';
+    homeRaw = playIn.games.sevenEight.loserFranchiseId ?? '';
+    awayRaw = playIn.games.nineTen.winnerFranchiseId ?? '';
   }
-  if (home === '' || away === '') {
+  if (homeRaw === '' || awayRaw === '') {
     throw new Error(`${conference} play-in game ${gameId} has no derived matchup`);
   }
+  const home = franchiseIdSchema.parse(homeRaw);
+  const away = franchiseIdSchema.parse(awayRaw);
   const resolved = resolvePlayInGame(playIn.games[key], home, away, result);
   const updated = advanceConferencePlayIn({
     ...playIn,
@@ -193,8 +197,8 @@ function seededSeries(
   seriesId: string,
   round: PlayoffRound,
   conference: ConferenceId,
-  homeCourtFranchiseId: string | null,
-  challengerFranchiseId: string | null,
+  homeCourtFranchiseId: FranchiseId | string | null,
+  challengerFranchiseId: FranchiseId | string | null,
   higherSeed: number | null,
   lowerSeed: number | null,
 ): PlayoffSeries {
@@ -204,8 +208,10 @@ function seededSeries(
     conference,
     higherSeed,
     lowerSeed,
-    homeCourtFranchiseId,
-    challengerFranchiseId,
+    homeCourtFranchiseId:
+      homeCourtFranchiseId === null ? null : franchiseIdSchema.parse(homeCourtFranchiseId),
+    challengerFranchiseId:
+      challengerFranchiseId === null ? null : franchiseIdSchema.parse(challengerFranchiseId),
     homeCourtWins: 0,
     challengerWins: 0,
     games: [],
@@ -221,7 +227,7 @@ function pendingSeries(
 }
 function buildConferenceBracket(
   conference: ConferenceId,
-  seeds: readonly string[],
+  seeds: readonly FranchiseId[],
 ): PlayoffConferenceBracket {
   const firstRound = FIRST_ROUND_PAIRS.map(([higherIndex, lowerIndex], index) => {
     const higherSeed = higherIndex + 1;
@@ -261,9 +267,10 @@ export function createPlayoffBracket(
   if (eastSeeds === null || westSeeds === null) {
     throw new Error('both conferences must complete the Play-In before the bracket is created');
   }
+  const homeCourtId = franchiseIdSchema.parse(finalsHomeCourtFranchiseId);
   const playoffTeams = new Set([...eastSeeds, ...westSeeds]);
-  if (!playoffTeams.has(finalsHomeCourtFranchiseId)) {
-    throw new Error(`finals home-court team ${finalsHomeCourtFranchiseId} is not a playoff team`);
+  if (!playoffTeams.has(homeCourtId)) {
+    throw new Error(`finals home-court team ${homeCourtId} is not a playoff team`);
   }
   const east = buildConferenceBracket('east', eastSeeds);
   const west = buildConferenceBracket('west', westSeeds);
@@ -273,7 +280,7 @@ export function createPlayoffBracket(
     conference: null,
     higherSeed: null,
     lowerSeed: null,
-    homeCourtFranchiseId: finalsHomeCourtFranchiseId,
+    homeCourtFranchiseId: homeCourtId,
     challengerFranchiseId: null,
     homeCourtWins: 0,
     challengerWins: 0,
@@ -369,11 +376,11 @@ function winnerSeedOf(series: PlayoffSeries): number | null {
 function pairSeries(
   slot: PlayoffSeries,
   sideA: {
-    team: string;
+    team: FranchiseId;
     seed: number | null;
   },
   sideB: {
-    team: string;
+    team: FranchiseId;
     seed: number | null;
   },
 ): PlayoffSeries {
@@ -389,6 +396,7 @@ function pairSeries(
   };
 }
 function advanceWinner(bracket: PlayoffBracket, seriesId: string, winner: string): PlayoffBracket {
+  const winnerId = franchiseIdSchema.parse(winner);
   const conference = seriesId.startsWith('east-') ? 'east' : 'west';
   const confBracket = conference === 'east' ? bracket.east : bracket.west;
   if (seriesId.startsWith(`${conference}-first-round-`)) {
@@ -400,18 +408,18 @@ function advanceWinner(bracket: PlayoffBracket, seriesId: string, winner: string
     const side = index % 2 === 0 ? 'home' : 'away';
     const nextSlot: PlayoffSeries =
       side === 'home'
-        ? { ...semifinal, homeCourtFranchiseId: winner }
-        : { ...semifinal, challengerFranchiseId: winner };
+        ? { ...semifinal, homeCourtFranchiseId: winnerId }
+        : { ...semifinal, challengerFranchiseId: winnerId };
     const otherIndex = index % 2 === 0 ? index + 1 : index - 1;
     const other = confBracket.firstRound[otherIndex];
     let paired = nextSlot;
     if (nextSlot.homeCourtFranchiseId !== null && nextSlot.challengerFranchiseId !== null) {
       if (other === undefined || feed === undefined || other.winnerFranchiseId === null) {
-        throw new Error(`first-round winner ${winner} cannot pair a semifinal`);
+        throw new Error(`first-round winner ${winnerId} cannot pair a semifinal`);
       }
       paired = pairSeries(
         nextSlot,
-        { team: winner, seed: winnerSeedOf(feed) },
+        { team: winnerId, seed: winnerSeedOf(feed) },
         {
           team: other.winnerFranchiseId,
           seed: winnerSeedOf(other),
@@ -433,19 +441,19 @@ function advanceWinner(bracket: PlayoffBracket, seriesId: string, winner: string
     const side = index === 0 ? 'home' : 'away';
     const nextSlot: PlayoffSeries =
       side === 'home'
-        ? { ...confBracket.conferenceFinal, homeCourtFranchiseId: winner }
-        : { ...confBracket.conferenceFinal, challengerFranchiseId: winner };
+        ? { ...confBracket.conferenceFinal, homeCourtFranchiseId: winnerId }
+        : { ...confBracket.conferenceFinal, challengerFranchiseId: winnerId };
     const otherIndex = index === 0 ? 1 : 0;
     const other = confBracket.semifinals[otherIndex];
     const current = confBracket.semifinals[index];
     let paired = nextSlot;
     if (nextSlot.homeCourtFranchiseId !== null && nextSlot.challengerFranchiseId !== null) {
       if (other === undefined || current === undefined || other.winnerFranchiseId === null) {
-        throw new Error(`semifinal winner ${winner} cannot pair the conference final`);
+        throw new Error(`semifinal winner ${winnerId} cannot pair the conference final`);
       }
       paired = pairSeries(
         nextSlot,
-        { team: winner, seed: winnerSeedOf(current) },
+        { team: winnerId, seed: winnerSeedOf(current) },
         {
           team: other.winnerFranchiseId,
           seed: winnerSeedOf(other),
@@ -459,18 +467,19 @@ function advanceWinner(bracket: PlayoffBracket, seriesId: string, winner: string
   }
   if (seriesId === `${conference}-conference-final`) {
     const finals = bracket.finals;
-    const homeIsEast = bracket.east.seeds.includes(finals.homeCourtFranchiseId ?? '');
+    const finalsHome = finals.homeCourtFranchiseId;
+    const homeIsEast = finalsHome !== null && bracket.east.seeds.includes(finalsHome);
     let paired: PlayoffSeries;
     if (homeIsEast) {
       paired =
         conference === 'east'
-          ? { ...finals, homeCourtFranchiseId: winner }
-          : { ...finals, challengerFranchiseId: winner };
+          ? { ...finals, homeCourtFranchiseId: winnerId }
+          : { ...finals, challengerFranchiseId: winnerId };
     } else {
       paired =
         conference === 'east'
-          ? { ...finals, challengerFranchiseId: winner }
-          : { ...finals, homeCourtFranchiseId: winner };
+          ? { ...finals, challengerFranchiseId: winnerId }
+          : { ...finals, homeCourtFranchiseId: winnerId };
     }
     const otherConference = conference === 'east' ? 'west' : 'east';
     const otherWinner = (otherConference === 'east' ? bracket.east : bracket.west).conferenceFinal
@@ -516,7 +525,7 @@ export function submitPlayoffGame(
   }
   const home = HOME_COURT_GAMES.has(gameNumber) ? homeCourt : challenger;
   const away = home === homeCourt ? challenger : homeCourt;
-  let winner: string;
+  let winner: FranchiseId;
   let game: PlayoffSeriesGame;
   if (result.status === 'final') {
     if (!isNonNegativeInteger(result.homeScore) || !isNonNegativeInteger(result.awayScore)) {
@@ -536,10 +545,11 @@ export function submitPlayoffGame(
       winnerFranchiseId: winner,
     };
   } else {
-    winner = result.winnerFranchiseId;
-    if (winner !== homeCourt && winner !== challenger) {
+    const forfeitWinner = franchiseIdSchema.parse(result.winnerFranchiseId);
+    if (forfeitWinner !== homeCourt && forfeitWinner !== challenger) {
       throw new Error(`series ${seriesId} forfeit winner must be a participant`);
     }
+    winner = forfeitWinner;
     game = {
       gameNumber,
       homeFranchiseId: home,

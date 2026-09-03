@@ -11,8 +11,9 @@ import {
   type FixedFiveWorkerComplete,
   type FixedFiveWorkerError,
   type FixedFiveWorkerProgress,
+  type FixedFiveWorkerResultEntry,
+  type FixedFiveWorkerResults,
 } from '@hoop-rush/data-contracts';
-import type { GameResult } from '@hoop-rush/data-contracts';
 import {
   fixedFiveDuelGameSeed,
   fixedFiveH2HSeed,
@@ -25,7 +26,11 @@ let requestToken = 0;
 let lastProgressAt = 0;
 
 function post(
-  message: FixedFiveWorkerProgress | FixedFiveWorkerComplete | FixedFiveWorkerError,
+  message:
+    | FixedFiveWorkerProgress
+    | FixedFiveWorkerResults
+    | FixedFiveWorkerComplete
+    | FixedFiveWorkerError,
 ): void {
   fixedFiveWorkerMessageSchema.parse(message);
   self.postMessage(message);
@@ -75,6 +80,16 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
   lastProgressAt = 0;
   const context: EngineContext = createEngineContext({ engineVersion: request.engineVersion });
   void (async () => {
+    const pending: FixedFiveWorkerResultEntry[] = [];
+    function flush(requestId: string): void {
+      if (pending.length === 0) return;
+      post({
+        schemaVersion: FIXED_FIVE_WORKER_WIRE_VERSION,
+        type: 'fixed-five-results',
+        requestId,
+        entries: pending.splice(0, pending.length),
+      });
+    }
     try {
       if (request.type === 'fixed-five-duel') {
         let p1Wins = 0;
@@ -104,6 +119,8 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
           if ((result.winner === 'home') === homeIsP1) p1Wins += 1;
           else p2Wins += 1;
           delivered += 1;
+          pending.push({ tag: 'duel', game: result });
+          if (pending.length >= BATCH) flush(request.requestId);
           maybeProgress(
             request.requestId,
             delivered,
@@ -113,6 +130,7 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
           await new Promise((resolve) => setTimeout(resolve, 0));
         }
         if (token !== requestToken) return;
+        flush(request.requestId);
         post({
           schemaVersion: FIXED_FIVE_WORKER_WIRE_VERSION,
           type: 'fixed-five-complete',
@@ -129,7 +147,6 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
       }
       const total = 82 + 82 - h2hSet.size;
       let delivered = 0;
-      const results: GameResult[] = [];
       for (
         let gameNumber = request.startGameNumber;
         gameNumber <= 82 && token === requestToken;
@@ -154,7 +171,7 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
           const failures = checkGameResult(result);
           if (failures.length > 0)
             throw new Error(`H2H game ${String(gameNumber)} failed invariants`);
-          results.push(result);
+          pending.push({ tag: 'h2h', game: result });
           delivered += 1;
         } else {
           const opponent = request.bracket.opponents.find((o) => o.opponentId === entry.opponentId);
@@ -182,15 +199,16 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
             const failures = checkGameResult(result);
             if (failures.length > 0)
               throw new Error(`shared82 game ${String(gameNumber)} failed invariants`);
-            results.push(result);
+            pending.push({ tag: participant, game: result });
             delivered += 1;
-            if (results.length >= BATCH) results.splice(0, results.length);
           }
         }
+        if (pending.length >= BATCH) flush(request.requestId);
         maybeProgress(request.requestId, delivered, total);
         if (gameNumber % BATCH === 0) await new Promise((resolve) => setTimeout(resolve, 0));
       }
       if (token !== requestToken) return;
+      flush(request.requestId);
       maybeProgress(request.requestId, delivered, total, true);
       post({
         schemaVersion: FIXED_FIVE_WORKER_WIRE_VERSION,

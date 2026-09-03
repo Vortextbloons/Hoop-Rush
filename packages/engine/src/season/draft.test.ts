@@ -5,9 +5,14 @@ import {
   SEASON_DRAFT_SAFE_MINIMUM,
   SEASON_ROSTER_TARGETS_VERSION,
   SEASON_ROTATION_VERSION,
+  eraIdSchema,
+  franchiseIdSchema,
+  playerIdSchema,
+  positionSchema,
   seasonDraftStateSchema,
   seasonLeagueGenerationResultSchema,
   seasonNamespaceSeed,
+  seedSchema,
   seasonDigestHex,
   type SeasonDraftCandidate,
   type SeasonDraftCatalog,
@@ -21,6 +26,7 @@ import {
   type SeasonGenerationDiagnostics,
   type SeasonLeague,
   type SeasonLeagueGenerationResult,
+  type Seed,
 } from '@hoop-rush/data-contracts';
 import {
   buildSeasonAiAssignments,
@@ -46,7 +52,7 @@ const FULL_CATALOG = buildSeasonDraftCatalog({
   playersPerPool: 40,
 });
 const LEAGUE = buildSeasonLeague();
-const SEED = seedFromString('draft-test-seed');
+const SEED = seedSchema.parse(seedFromString('draft-test-seed'));
 function cmd(
   commandId: string,
   expectedRevision: number,
@@ -195,7 +201,7 @@ function buildFakeGeneration(input: FakeGenerationInput): SeasonLeagueGeneration
 function createSolo(
   catalog: SeasonDraftCatalog = CATALOG,
   league: SeasonLeague = LEAGUE,
-  rootSeed = SEED,
+  rootSeed: Seed | string = SEED,
 ) {
   return applySeasonDraftCommand(
     null,
@@ -203,7 +209,7 @@ function createSolo(
     cmd('c-create', 0, {
       kind: 'create-season-draft',
       runId: 'run-1',
-      rootSeed,
+      rootSeed: seedSchema.parse(rootSeed),
       league,
       humanParticipantIds: ['p1'],
       catalogVersion: 'season-draft-v2',
@@ -214,7 +220,7 @@ function createSolo(
 function createDuo(
   catalog: SeasonDraftCatalog = FULL_CATALOG,
   league: SeasonLeague = LEAGUE,
-  rootSeed = SEED,
+  rootSeed: Seed | string = SEED,
 ) {
   return applySeasonDraftCommand(
     null,
@@ -222,7 +228,7 @@ function createDuo(
     cmd('c-create', 0, {
       kind: 'create-season-draft',
       runId: 'run-1',
-      rootSeed,
+      rootSeed: seedSchema.parse(rootSeed),
       league,
       humanParticipantIds: ['p1', 'p2'],
       catalogVersion: 'season-draft-v2',
@@ -248,13 +254,15 @@ function pickBestSelectable(
         a.playerVersionId.localeCompare(b.playerVersionId),
     );
   if (candidates.length === 0) throw new Error('no selectable card in the offer');
+  const first = candidates[0];
+  if (first === undefined) throw new Error('no selectable card in the offer');
   const result = applySeasonDraftCommand(
     state,
     catalog,
     cmd(commandId, state.revision, {
       kind: 'select-draft-player',
       participantId: offer.participantId,
-      playerVersionId: candidates[0]?.playerVersionId as string,
+      playerVersionId: first.playerVersionId,
     }),
     fakeDeps(),
   );
@@ -297,7 +305,7 @@ function drawAndPick(
 function playToFinalized(
   catalog: SeasonDraftCatalog,
   league: SeasonLeague,
-  rootSeed: string,
+  rootSeed: Seed | string,
   deps: SeasonAiGenerationDeps,
   ids: string[],
   commandIdPrefix: string,
@@ -308,7 +316,7 @@ function playToFinalized(
     cmd(`${commandIdPrefix}-create`, 0, {
       kind: 'create-season-draft',
       runId: 'run-1',
-      rootSeed,
+      rootSeed: seedSchema.parse(rootSeed),
       league,
       humanParticipantIds: ids,
       catalogVersion: 'season-draft-v2',
@@ -335,7 +343,7 @@ function playToFinalized(
 function playFullDraft(
   catalog: SeasonDraftCatalog,
   league: SeasonLeague,
-  rootSeed: string,
+  rootSeed: Seed | string,
   deps: SeasonAiGenerationDeps,
   ids: string[],
   commandIdPrefix: string,
@@ -353,7 +361,7 @@ function playFullDraft(
   expectAccepted(generated.record);
   return {
     state: requireState(generated.state, 'generate'),
-    generation: generated.generation as SeasonLeagueGenerationResult,
+    generation: seasonLeagueGenerationResultSchema.parse(generated.generation),
   };
 }
 function customCatalog(
@@ -379,22 +387,26 @@ function customCatalog(
         eraId: entry.eraId,
         index: i,
       });
-      candidate.playerId = playerId;
+      candidate.playerId = playerIdSchema.parse(playerId);
       candidate.playerVersionId = `pv-${seasonDigestHex(`cand-${playerId}`)}`;
-      candidate.positions.playable = [...playable] as SeasonDraftCandidate['positions']['playable'];
-      candidate.positions.primary = playable[0] as SeasonDraftCandidate['positions']['primary'];
-      candidate.positions.secondary = playable.slice(
-        1,
-      ) as SeasonDraftCandidate['positions']['secondary'];
+      candidate.positions.playable = playable.map((p) => positionSchema.parse(p));
+      const primary = playable[0];
+      if (primary === undefined) throw new Error('customCatalog missing positions');
+      candidate.positions.primary = positionSchema.parse(primary);
+      candidate.positions.secondary = playable.slice(1).map((p) => positionSchema.parse(p));
       candidates.push(candidate);
       members.push(candidate.playerVersionId);
     }
-    pools.push({ franchiseId: entry.franchiseId, eraId: entry.eraId, playerVersionIds: members });
+    pools.push({
+      franchiseId: franchiseIdSchema.parse(entry.franchiseId),
+      eraId: eraIdSchema.parse(entry.eraId),
+      playerVersionIds: members,
+    });
   }
   return { ...buildSeasonDraftCatalog(), pools, candidates };
 }
-function stateWithNinePicks(catalog: SeasonDraftCatalog, rootSeed: string): SeasonDraftState {
-  const created = createSolo(catalog, LEAGUE, rootSeed);
+function stateWithNinePicks(catalog: SeasonDraftCatalog, rootSeed: Seed | string): SeasonDraftState {
+  const created = createSolo(catalog, LEAGUE, seedSchema.parse(rootSeed));
   expectAccepted(created.record);
   const state = requireState(created.state, 'create');
   const guards = catalog.candidates.filter((c) => c.positions.playable.includes('PG'));
@@ -1149,8 +1161,8 @@ describe('season draft finalize and generation', () => {
       cmd('c-claim', 1, {
         kind: 'claim-draft-pool',
         participantId: 'p1',
-        franchiseId: 'lakers',
-        eraId: '1990s',
+        franchiseId: franchiseIdSchema.parse('lakers'),
+        eraId: eraIdSchema.parse('1990s'),
       }),
       fakeDeps(),
     );
@@ -1192,7 +1204,7 @@ describe('season draft finalize and generation', () => {
             backtracks: 0,
             nodesVisited: 100000,
             nodeBudget: 80000,
-            failedTeams: ['lakers'],
+            failedTeams: [franchiseIdSchema.parse('lakers')],
             unmetConstraints: ['role perimeter-defense on 3 teams'],
           },
           phase: 'pool-fill',

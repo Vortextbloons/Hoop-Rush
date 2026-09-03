@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   baseFiveProjectionSchema,
   RATINGS_VERSION,
+  playerIdSchema,
+  projectionModelArtifactSchema,
   type BaseFiveProjection,
   type ProjectionMatchupArchetype,
   type ProjectionModelArtifact,
@@ -17,7 +19,7 @@ function lineupPlayer(
   tendencies?: Partial<SimulationPlayer['tendencies']>,
 ): SimulationPlayer {
   const player = buildSimulationPlayer({
-    playerId: `p-l${String(index + 1)}`,
+    playerId: playerIdSchema.parse(`p-l${String(index + 1)}`),
     displayName: `L ${String(index + 1)}`,
     positions: POSITIONS[index],
   });
@@ -27,7 +29,7 @@ function lineupPlayer(
 }
 function buildReferencePlayer(index: number): SimulationPlayer {
   return buildSimulationPlayer({
-    playerId: `p-ref-${String(index)}`,
+    playerId: playerIdSchema.parse(`p-ref-${String(index)}`),
     displayName: `Ref ${String(index)}`,
     positions: index === 4 ? ['C'] : index >= 2 ? ['SF'] : ['PG'],
   });
@@ -46,7 +48,7 @@ function buildModel(): ProjectionModelArtifact {
       buildReferencePlayer(5),
     ] as [SimulationPlayer, SimulationPlayer, SimulationPlayer, SimulationPlayer, SimulationPlayer],
   });
-  return {
+  return projectionModelArtifactSchema.parse({
     schemaVersion: 1,
     modelVersion: 'projection-model-v1',
     dataVersion: `m10-${RATINGS_VERSION}`,
@@ -120,7 +122,7 @@ function buildModel(): ProjectionModelArtifact {
         description: 'better shooting must not lower projected eFG%',
       },
     ],
-  };
+  });
 }
 function buildProjectionLineup(
   ratings?: Partial<SimulationPlayer['ratings']>,
@@ -166,7 +168,7 @@ describe('projectBaseFive', () => {
       lineup: [
         {
           player: buildSimulationPlayer({
-            playerId: 'p-l1',
+            playerId: playerIdSchema.parse('p-l1'),
             displayName: 'L 1',
             positions: ['PG'],
             overall: 99,
@@ -175,7 +177,7 @@ describe('projectBaseFive', () => {
         },
         {
           player: buildSimulationPlayer({
-            playerId: 'p-l2',
+            playerId: playerIdSchema.parse('p-l2'),
             displayName: 'L 2',
             positions: ['SG'],
           }),
@@ -183,7 +185,7 @@ describe('projectBaseFive', () => {
         },
         {
           player: buildSimulationPlayer({
-            playerId: 'p-l3',
+            playerId: playerIdSchema.parse('p-l3'),
             displayName: 'L 3',
             positions: ['SF'],
           }),
@@ -191,14 +193,14 @@ describe('projectBaseFive', () => {
         },
         {
           player: buildSimulationPlayer({
-            playerId: 'p-l4',
+            playerId: playerIdSchema.parse('p-l4'),
             displayName: 'L 4',
             positions: ['PF'],
           }),
           slot: 'F2',
         },
         {
-          player: buildSimulationPlayer({ playerId: 'p-l5', displayName: 'L 5', positions: ['C'] }),
+          player: buildSimulationPlayer({ playerId: playerIdSchema.parse('p-l5'), displayName: 'L 5', positions: ['C'] }),
           slot: 'C',
         },
       ],
@@ -215,11 +217,11 @@ describe('projectBaseFive', () => {
       SimulationPlayer,
       SimulationPlayer,
     ] = [
-      buildSimulationPlayer({ playerId: 'p-l1', displayName: 'L 1', positions: ['PG'] }),
-      buildSimulationPlayer({ playerId: 'p-l2', displayName: 'L 2', positions: ['SG'] }),
-      buildSimulationPlayer({ playerId: 'p-l3', displayName: 'L 3', positions: ['SF'] }),
-      buildSimulationPlayer({ playerId: 'p-l4', displayName: 'L 4', positions: ['PF'] }),
-      buildSimulationPlayer({ playerId: 'p-l5', displayName: 'L 5', positions: ['C'] }),
+      buildSimulationPlayer({ playerId: playerIdSchema.parse('p-l1'), displayName: 'L 1', positions: ['PG'] }),
+      buildSimulationPlayer({ playerId: playerIdSchema.parse('p-l2'), displayName: 'L 2', positions: ['SG'] }),
+      buildSimulationPlayer({ playerId: playerIdSchema.parse('p-l3'), displayName: 'L 3', positions: ['SF'] }),
+      buildSimulationPlayer({ playerId: playerIdSchema.parse('p-l4'), displayName: 'L 4', positions: ['PF'] }),
+      buildSimulationPlayer({ playerId: playerIdSchema.parse('p-l5'), displayName: 'L 5', positions: ['C'] }),
     ];
     const input = {
       lineup: [
@@ -262,23 +264,23 @@ describe('projectBaseFive', () => {
       projectBaseFive({
         lineup: [
           {
-            player: buildSimulationPlayer({ playerId: 'p-a', displayName: 'A', positions: ['PG'] }),
+            player: buildSimulationPlayer({ playerId: playerIdSchema.parse('p-a'), displayName: 'A', positions: ['PG'] }),
             slot: 'G1',
           },
           {
-            player: buildSimulationPlayer({ playerId: 'p-b', displayName: 'B', positions: ['SG'] }),
+            player: buildSimulationPlayer({ playerId: playerIdSchema.parse('p-b'), displayName: 'B', positions: ['SG'] }),
             slot: 'G2',
           },
           {
-            player: buildSimulationPlayer({ playerId: 'p-c', displayName: 'C', positions: ['SF'] }),
+            player: buildSimulationPlayer({ playerId: playerIdSchema.parse('p-c'), displayName: 'C', positions: ['SF'] }),
             slot: 'F1',
           },
           {
-            player: buildSimulationPlayer({ playerId: 'p-d', displayName: 'D', positions: ['C'] }),
+            player: buildSimulationPlayer({ playerId: playerIdSchema.parse('p-d'), displayName: 'D', positions: ['C'] }),
             slot: 'F2',
           },
           {
-            player: buildSimulationPlayer({ playerId: 'p-e', displayName: 'E', positions: ['C'] }),
+            player: buildSimulationPlayer({ playerId: playerIdSchema.parse('p-e'), displayName: 'E', positions: ['C'] }),
             slot: 'C',
           },
         ],
@@ -407,7 +409,7 @@ describe('projectBaseFive', () => {
       lineup: [
         {
           player: buildSimulationPlayer({
-            playerId: 'p-l1',
+            playerId: playerIdSchema.parse('p-l1'),
             displayName: 'L 1',
             positions: ['PG'],
           }),
@@ -415,7 +417,7 @@ describe('projectBaseFive', () => {
         },
         {
           player: buildSimulationPlayer({
-            playerId: 'p-l2',
+            playerId: playerIdSchema.parse('p-l2'),
             displayName: 'L 2',
             positions: ['SG'],
           }),
@@ -423,7 +425,7 @@ describe('projectBaseFive', () => {
         },
         {
           player: buildSimulationPlayer({
-            playerId: 'p-l3',
+            playerId: playerIdSchema.parse('p-l3'),
             displayName: 'L 3',
             positions: ['SF'],
           }),
@@ -431,14 +433,14 @@ describe('projectBaseFive', () => {
         },
         {
           player: buildSimulationPlayer({
-            playerId: 'p-l4',
+            playerId: playerIdSchema.parse('p-l4'),
             displayName: 'L 4',
             positions: ['PF'],
           }),
           slot: 'F2',
         },
         {
-          player: buildSimulationPlayer({ playerId: 'p-l5', displayName: 'L 5', positions: ['C'] }),
+          player: buildSimulationPlayer({ playerId: playerIdSchema.parse('p-l5'), displayName: 'L 5', positions: ['C'] }),
           slot: 'C',
         },
       ],
@@ -456,11 +458,11 @@ describe('projectExpectedLedger', () => {
       teamId: 't1',
       displayName: 'T1',
       players: [
-        buildSimulationPlayer({ playerId: 'p-a', displayName: 'A', positions: ['PG'] }),
-        buildSimulationPlayer({ playerId: 'p-b', displayName: 'B', positions: ['SG'] }),
-        buildSimulationPlayer({ playerId: 'p-c', displayName: 'C', positions: ['SF'] }),
-        buildSimulationPlayer({ playerId: 'p-d', displayName: 'D', positions: ['PF'] }),
-        buildSimulationPlayer({ playerId: 'p-e', displayName: 'E', positions: ['C'] }),
+        buildSimulationPlayer({ playerId: playerIdSchema.parse('p-a'), displayName: 'A', positions: ['PG'] }),
+        buildSimulationPlayer({ playerId: playerIdSchema.parse('p-b'), displayName: 'B', positions: ['SG'] }),
+        buildSimulationPlayer({ playerId: playerIdSchema.parse('p-c'), displayName: 'C', positions: ['SF'] }),
+        buildSimulationPlayer({ playerId: playerIdSchema.parse('p-d'), displayName: 'D', positions: ['PF'] }),
+        buildSimulationPlayer({ playerId: playerIdSchema.parse('p-e'), displayName: 'E', positions: ['C'] }),
       ],
     };
     const referenceTeam = {
@@ -535,3 +537,4 @@ describe('ProjectionCache', () => {
     expect(cache.get(key)).toBeUndefined();
   });
 });
+

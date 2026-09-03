@@ -1,12 +1,18 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { z } from 'zod';
 import {
   POSITION_SLOTS,
   PROJECTION_MODEL_VERSION,
   PROJECTION_TARGETS_VERSION,
   fnv1a32,
   parseProjectionModelArtifact,
+  seasonRotationSchema,
   seedFromString,
+  simulationPlayerSchema,
+  simulationRatingsSchema,
+  simulationTeamSchema,
+  simulationTendenciesSchema,
   type BaseFiveProjectionInput,
   type EraSimulationProfile,
   type ProjectionMatchupArchetype,
@@ -92,14 +98,50 @@ function lineupInput(players: readonly SimulationPlayer[]): BaseFiveProjectionIn
   if (players.length !== 5) {
     throw new Error(`projection: need exactly five players, got ${String(players.length)}`);
   }
+  const [g1, g2, f1, f2, c] = players;
+  if (
+    g1 === undefined ||
+    g2 === undefined ||
+    f1 === undefined ||
+    f2 === undefined ||
+    c === undefined
+  ) {
+    throw new Error('projection: lineup is missing a slot');
+  }
   return [
-    { player: players[0] as SimulationPlayer, slot: 'G1' },
-    { player: players[1] as SimulationPlayer, slot: 'G2' },
-    { player: players[2] as SimulationPlayer, slot: 'F1' },
-    { player: players[3] as SimulationPlayer, slot: 'F2' },
-    { player: players[4] as SimulationPlayer, slot: 'C' },
+    { player: g1, slot: 'G1' },
+    { player: g2, slot: 'G2' },
+    { player: f1, slot: 'F1' },
+    { player: f2, slot: 'F2' },
+    { player: c, slot: 'C' },
   ];
 }
+const manifestProjectionSchema = z.looseObject({
+  projection: z
+    .looseObject({
+      model: z
+        .looseObject({
+          url: z.string().optional(),
+          contentHash: z.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+});
+const seasonFixtureSchema = z.looseObject({
+  roster: z.array(simulationPlayerSchema).optional(),
+  rotation: seasonRotationSchema.optional(),
+  players: z.array(simulationPlayerSchema).optional(),
+});
+const baseFixtureSchema = z.looseObject({
+  home: simulationTeamSchema.optional(),
+  away: simulationTeamSchema.optional(),
+  lineup: simulationTeamSchema.optional(),
+});
+const manifestWriteSchema = z.looseObject({
+  projection: z.unknown().optional(),
+  season: z.unknown().optional(),
+});
 function loadModel(
   manifestPath: string | null | undefined,
   modelPath: string | null | undefined,
@@ -108,14 +150,12 @@ function loadModel(
     const value = readJson(modelPath);
     return parseProjectionModelArtifact(value);
   }
-  const manifest = readJson(manifestPath ?? MANIFEST_PATH) as {
-    projection?: {
-      model?: {
-        url?: string;
-        contentHash?: string;
-      };
-    };
-  };
+  const manifestRaw = readJson(manifestPath ?? MANIFEST_PATH) as unknown;
+  const manifestParsed = manifestProjectionSchema.safeParse(manifestRaw);
+  if (!manifestParsed.success) {
+    throw new Error('no projection model entry in the manifest; run `projection build --write`');
+  }
+  const manifest = manifestParsed.data;
   const entry = manifest.projection?.model;
   if (entry?.url === undefined) {
     throw new Error('no projection model entry in the manifest; run `projection build --write`');
@@ -191,7 +231,7 @@ function aggregateReferencePlayer(
   const position = SLOT_POSITIONS[slotIndex]?.[0] ?? 'PG';
   const group = candidates.filter((player) => player.positions.includes(position));
   const pool = group.length > 0 ? group : candidates;
-  const ratings = Object.fromEntries(
+  const ratingsRaw: Record<string, number> = Object.fromEntries(
     Object.keys(pool[0]?.ratings ?? {}).map((key) => [
       key,
       Math.round(
@@ -201,8 +241,15 @@ function aggregateReferencePlayer(
         ),
       ),
     ]),
-  ) as SimulationPlayer['ratings'];
-  const tendencies = Object.fromEntries(
+  );
+  const ratingsParsed = simulationRatingsSchema.safeParse(ratingsRaw);
+  if (!ratingsParsed.success) {
+    throw new Error(
+      `projection: aggregated ratings failed validation: ${ratingsParsed.error.issues[0]?.message ?? 'invalid'}`,
+    );
+  }
+  const ratings: Pick<SimulationPlayer, 'ratings'>['ratings'] = ratingsParsed.data;
+  const tendenciesRaw: Record<string, number> = Object.fromEntries(
     Object.keys(pool[0]?.tendencies ?? {}).map((key) => [
       key,
       Math.round(
@@ -215,7 +262,14 @@ function aggregateReferencePlayer(
         ),
       ),
     ]),
-  ) as SimulationPlayer['tendencies'];
+  );
+  const tendenciesParsed = simulationTendenciesSchema.safeParse(tendenciesRaw);
+  if (!tendenciesParsed.success) {
+    throw new Error(
+      `projection: aggregated tendencies failed validation: ${tendenciesParsed.error.issues[0]?.message ?? 'invalid'}`,
+    );
+  }
+  const tendencies: Pick<SimulationPlayer, 'tendencies'>['tendencies'] = tendenciesParsed.data;
   const anchored = pool.filter((player) => player.anchors !== undefined);
   const anchors: SimulationPlayer['anchors'] =
     anchored.length > 0
@@ -677,11 +731,16 @@ export function projectionSeason(input: {
   const model = loadModel(manifest, modelPath);
   const eraId = era ?? '2010s';
   const profile = data.eraProfile(eraId);
-  const fixtureValue = readJson(fixture) as {
-    roster?: SimulationPlayer[];
-    rotation?: SeasonRotation;
-    players?: SimulationPlayer[];
-  };
+  const fixtureRaw = readJson(fixture) as unknown;
+  const fixtureParsed = seasonFixtureSchema.safeParse(fixtureRaw);
+  if (!fixtureParsed.success) {
+    return makeReport(
+      'projection season',
+      { fixture },
+      { failures: [`fixture ${fixture} is invalid`] },
+    );
+  }
+  const fixtureValue = fixtureParsed.data;
   const roster = fixtureValue.roster ?? fixtureValue.players;
   const rotation = fixtureValue.rotation;
   if (roster === undefined || rotation === undefined) {
@@ -759,12 +818,22 @@ export function projectionBuild(input: {
     const target = out ?? resolve(PROJECTION_DIR, 'projection-model.json');
     writeFileSync(target, content);
     details.push(`wrote ${target} (${String(content.length)} bytes)`);
-    const manifest = readJson(manifestPath ?? MANIFEST_PATH) as {
-      projection?: Record<string, unknown>;
-      season?: Record<string, unknown>;
-    };
+    const manifestRaw = readJson(manifestPath ?? MANIFEST_PATH) as unknown;
+    const manifestParsed = manifestWriteSchema.safeParse(manifestRaw);
+    if (!manifestParsed.success) {
+      return makeReport(
+        'projection build',
+        { manifest: manifestPath ?? 'default', write },
+        { details, failures: ['manifest is invalid'] },
+      );
+    }
+    const manifest = manifestParsed.data;
+    const existingProjection =
+      typeof manifest.projection === 'object' && manifest.projection !== null
+        ? manifest.projection
+        : {};
     manifest.projection = {
-      ...manifest.projection,
+      ...(existingProjection as object),
       model: { url: 'projection/projection-model.json', contentHash: sha256Hex(content) },
     };
     writeFileSync(manifestPath ?? MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
@@ -805,11 +874,16 @@ export function projectionBase(input: {
   }
   let team: SimulationTeam;
   if (fixture !== null && fixture !== undefined) {
-    const fixtureValue = readJson(fixture) as {
-      home?: SimulationTeam;
-      away?: SimulationTeam;
-      lineup?: SimulationTeam;
-    };
+    const fixtureRaw = readJson(fixture) as unknown;
+    const fixtureParsed = baseFixtureSchema.safeParse(fixtureRaw);
+    if (!fixtureParsed.success) {
+      return makeReport(
+        'projection base',
+        { fixture },
+        { failures: [`fixture ${fixture} is invalid`] },
+      );
+    }
+    const fixtureValue = fixtureParsed.data;
     const candidate = fixtureValue.home ?? fixtureValue.lineup ?? fixtureValue.away;
     if (candidate === undefined) {
       return makeReport(
@@ -1001,7 +1075,13 @@ export function buildLineupCohort(
     for (let offset = 1; offset < players.length && legal.size < count * 8; offset += 1) {
       const five: SimulationPlayer[] = [first];
       let cursor = guardIndex;
-      for (const position of [['SG'], ['SF'], ['PF'], ['C']] as SimulationPlayer['positions'][]) {
+      const neededPositions: Array<Pick<SimulationPlayer, 'positions'>['positions']> = [
+        ['SG'],
+        ['SF'],
+        ['PF'],
+        ['C'],
+      ];
+      for (const position of neededPositions) {
         const needed = position[0];
         if (needed === undefined) continue;
         let found: SimulationPlayer | undefined;

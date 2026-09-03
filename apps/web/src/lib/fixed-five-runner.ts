@@ -5,6 +5,7 @@ import {
   type EraSimulationProfile,
   type FixedFiveWorkerMessage,
   type FixedFiveWorkerRequest,
+  type FixedFiveWorkerResultEntry,
   type FixedFiveWorkerTeam,
   type OpponentBracketCore,
   type Seed,
@@ -13,6 +14,7 @@ import { randomUUID } from '$lib/random-id';
 
 export type FixedFiveRunnerEvent =
   | { kind: 'progress'; completedGames: number; totalGames: number }
+  | { kind: 'results'; entries: FixedFiveWorkerResultEntry[] }
   | { kind: 'complete'; gamesDelivered: number }
   | { kind: 'error'; message: string };
 
@@ -113,6 +115,8 @@ export class FixedFiveRunner {
           completedGames: message.completedGames,
           totalGames: message.totalGames,
         });
+      } else if (message.type === 'fixed-five-results') {
+        this.onEvent({ kind: 'results', entries: message.entries });
       } else if (message.type === 'fixed-five-complete') {
         this.onEvent({ kind: 'complete', gamesDelivered: message.gamesDelivered });
       } else {

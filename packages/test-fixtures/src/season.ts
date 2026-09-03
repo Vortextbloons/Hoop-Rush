@@ -49,7 +49,13 @@ import {
   SEASON_TRADE_GRADE_VERSION,
   PLAYER_VERSION_ID_VERSION,
   buildInitialPostseasonState,
+  idSchema,
   playerVersionId,
+  seasonInfluenceStateSchema,
+  seasonLeagueSchema,
+  seasonRosterSchema,
+  seasonRunSchema,
+  seedSchema,
   seasonNamespaceSeed,
   type SeasonGame,
   type SeasonHealthState,
@@ -105,7 +111,7 @@ function initialInfluence(league: SeasonLeague): SeasonInfluenceState {
   for (const team of league.teams) {
     balances[team.franchiseId] = 2;
     ledger.push({
-      entryId: `influence-initial-${team.franchiseId}`,
+      entryId: idSchema.parse(`influence-initial-${team.franchiseId}`),
       franchiseId: team.franchiseId,
       source: 'initial-grant',
       blockIndex: null,
@@ -117,14 +123,14 @@ function initialInfluence(league: SeasonLeague): SeasonInfluenceState {
     });
     windows[team.franchiseId] = [];
   }
-  return {
+  return seasonInfluenceStateSchema.parse({
     schemaVersion: 1,
     influenceVersion: SEASON_INFLUENCE_VERSION,
     balances,
     ledger,
     windows,
     rehabs: {},
-  };
+  });
 }
 export function buildSeasonLeague(
   overrides: Partial<SeasonLeague> = {},
@@ -133,7 +139,7 @@ export function buildSeasonLeague(
   } = {},
 ): SeasonLeague {
   const human = options.humanFranchiseId ?? 'lakers';
-  return {
+  return seasonLeagueSchema.parse({
     schemaVersion: 1,
     leagueVersion: SEASON_LEAGUE_VERSION,
     teams: FRANCHISE_ORDER.map((franchiseId) => {
@@ -147,24 +153,26 @@ export function buildSeasonLeague(
       };
     }),
     ...overrides,
-  };
+  });
 }
 export function buildSeasonRosters(league: SeasonLeague, seed: string): SeasonRoster[] {
   const seeded = seasonNamespaceSeed(seed, SEASON_SEED_NAMESPACES.aiRosters);
-  return league.teams.map((team, teamIndex) => ({
-    franchiseId: team.franchiseId,
-    players: Array.from({ length: SEASON_ROSTER_SIZE }, (_, slot) => {
-      const playerId = `p-synth-${seeded.slice(0, 6)}-${String(teamIndex + 1)}-${String(slot + 1)}`;
-      return {
-        playerVersionId: playerVersionId(playerId, team.franchiseId, '1990s', '1995-96'),
-        playerId,
-        franchiseId: team.franchiseId,
-        eraId: '1990s',
-        seasonKey: '1995-96',
-        displayName: `Fixture ${team.franchiseId} ${String(slot + 1)}`,
-      };
+  return league.teams.map((team, teamIndex) =>
+    seasonRosterSchema.parse({
+      franchiseId: team.franchiseId,
+      players: Array.from({ length: SEASON_ROSTER_SIZE }, (_, slot) => {
+        const playerId = `p-synth-${seeded.slice(0, 6)}-${String(teamIndex + 1)}-${String(slot + 1)}`;
+        return {
+          playerVersionId: playerVersionId(playerId, team.franchiseId, '1990s', '1995-96'),
+          playerId,
+          franchiseId: team.franchiseId,
+          eraId: '1990s',
+          seasonKey: '1995-96',
+          displayName: `Fixture ${team.franchiseId} ${String(slot + 1)}`,
+        };
+      }),
     }),
-  }));
+  );
 }
 function zeroStandings(league: SeasonLeague): SeasonStandings {
   return {
@@ -204,7 +212,7 @@ function scheduledGames(schedule: SeasonSchedule): SeasonGame[] {
   }));
 }
 function emptyPostseason(rootSeed: string): SeasonRun['postseason'] {
-  return buildInitialPostseasonState(rootSeed);
+  return buildInitialPostseasonState(seedSchema.parse(rootSeed));
 }
 export function buildSeasonRunFixture(input: {
   schedule: SeasonSchedule;
@@ -225,7 +233,7 @@ export function buildSeasonRunFixture(input: {
       roster.players.map((player) => player.playerVersionId),
     ),
   );
-  return {
+  return seasonRunSchema.parse({
     schemaVersion: SEASON_RUN_SCHEMA_VERSION,
     runId: 'fixture-season-run-1',
     rootSeed: seed,
@@ -324,5 +332,5 @@ export function buildSeasonRunFixture(input: {
     checkpointState: null,
     stateRevision: 0,
     stateDigest: input.stateDigest ?? '0'.repeat(32),
-  };
+  });
 }

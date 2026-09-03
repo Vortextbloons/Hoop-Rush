@@ -21,9 +21,13 @@ import type {
   SeasonRun,
   SeasonTransactionEntry,
 } from '@hoop-rush/data-contracts';
+import type { CommandId, FranchiseId } from '@hoop-rush/data-contracts';
 import {
   SEASON_ROSTER_MAX_SIZE,
   SEASON_SEED_NAMESPACES,
+  commandIdSchema,
+  franchiseIdSchema,
+  idSchema,
   seasonNamespaceSeed,
 } from '@hoop-rush/data-contracts';
 import type { SeasonRosterTargets } from '@hoop-rush/data-contracts';
@@ -297,17 +301,18 @@ function aiDeclarationOf(
   candidates: SeasonFreeAgencyCandidate[],
 ): SeasonFreeAgencyDeclaration {
   const { run } = context;
+  const fid = franchiseIdSchema.parse(franchiseId);
   const assignment = run.aiAssignments.find((entry) => entry.franchiseId === franchiseId);
   const band = assignment?.band ?? 'average';
   const identity = assignment?.identity ?? 'continuity';
   const bandCap = SEASON_FREE_AGENCY_BAND_SIGNING_CAPS[band] ?? 3;
-  const signingCount = run.freeAgency.signingCounts[franchiseId] ?? 0;
-  const seasonSpend = run.freeAgency.seasonSpend[franchiseId] ?? 0;
+  const signingCount = run.freeAgency.signingCounts[fid] ?? 0;
+  const seasonSpend = run.freeAgency.seasonSpend[fid] ?? 0;
   const roster = run.rosters.find((entry) => entry.franchiseId === franchiseId);
   const rosterSize = roster?.players.length ?? 10;
   if (signingCount >= bandCap || rosterSize >= SEASON_ROSTER_MAX_SIZE || seasonSpend >= 6) {
     return {
-      franchiseId,
+      franchiseId: fid,
       windowIndex,
       commandId: syntheticCommandId(run.rootSeed, windowIndex, franchiseId),
       targets: [],
@@ -324,7 +329,7 @@ function aiDeclarationOf(
   });
   if (allowed.length === 0) {
     return {
-      franchiseId,
+      franchiseId: fid,
       windowIndex,
       commandId: syntheticCommandId(run.rootSeed, windowIndex, franchiseId),
       targets: [],
@@ -375,14 +380,20 @@ function aiDeclarationOf(
     committed += influence;
   }
   return {
-    franchiseId,
+    franchiseId: fid,
     windowIndex,
     commandId: syntheticCommandId(run.rootSeed, windowIndex, franchiseId),
     targets,
   };
 }
-function syntheticCommandId(rootSeed: string, windowIndex: number, franchiseId: string): string {
-  return `fa-ai-${freeAgencySeed(rootSeed, String(windowIndex), 'ai', franchiseId).slice(0, 32)}`;
+function syntheticCommandId(
+  rootSeed: string,
+  windowIndex: number,
+  franchiseId: string,
+): CommandId {
+  return commandIdSchema.parse(
+    `fa-ai-${freeAgencySeed(rootSeed, String(windowIndex), 'ai', franchiseId).slice(0, 32)}`,
+  );
 }
 function supportedExpectationFor(
   context: SeasonFreeAgencyContext,
@@ -470,6 +481,7 @@ function aiWithinStrengthCeiling(
   band: string,
   membership: SeasonRosterMemberInput,
 ): boolean {
+  const fid = franchiseIdSchema.parse(franchiseId);
   const caps = context.targets?.policy.bandPoolScoreCaps ?? FALLBACK_BAND_POOL_SCORE_CAPS;
   const cap = caps[band as keyof typeof caps];
   const maxOutliers =
@@ -486,7 +498,7 @@ function aiWithinStrengthCeiling(
   const candidateOutlier =
     identityScore(roleScoresOf(membershipToMember(membership, context)), identity) > cap;
   if (currentStrength <= cap && !candidateOutlier) return true;
-  const signingCount = context.run.freeAgency.signingCounts[franchiseId] ?? 0;
+  const signingCount = context.run.freeAgency.signingCounts[fid] ?? 0;
   if (signingCount > 0) return false;
   return rosterOutliers + (candidateOutlier ? 1 : 0) <= maxOutliers;
 }
@@ -692,6 +704,8 @@ export function applyFreeAgencyDeclaration(
   commandId: string,
   targets: SeasonFreeAgencyTarget[],
 ): SeasonFreeAgencyState {
+  const fid = franchiseIdSchema.parse(franchiseId);
+  const cid = commandIdSchema.parse(commandId);
   const window = run.freeAgency.windows.find((entry) => entry.windowIndex === windowIndex);
   if (window === undefined) {
     throw new FreeAgencyValidationRejection({
@@ -706,7 +720,7 @@ export function applyFreeAgencyDeclaration(
       windowIndex,
     });
   }
-  if (window.declarations[franchiseId] !== undefined) {
+  if (window.declarations[fid] !== undefined) {
     throw new FreeAgencyValidationRejection({
       code: 'free-agency-already-declared',
       franchiseId,
@@ -765,7 +779,7 @@ export function applyFreeAgencyDeclaration(
         rosterSize: roster.players.length,
       });
     }
-    const signingCount = run.freeAgency.signingCounts[franchiseId] ?? 0;
+    const signingCount = run.freeAgency.signingCounts[fid] ?? 0;
     if (signingCount >= 3) {
       throw new FreeAgencyValidationRejection({
         code: 'free-agency-season-signing-cap',
@@ -773,7 +787,7 @@ export function applyFreeAgencyDeclaration(
         signingCount,
       });
     }
-    const seasonSpend = run.freeAgency.seasonSpend[franchiseId] ?? 0;
+    const seasonSpend = run.freeAgency.seasonSpend[fid] ?? 0;
     const commitment = targets.reduce((sum, target) => sum + target.influence, 0);
     if (seasonSpend + commitment > 6) {
       throw new FreeAgencyValidationRejection({
@@ -782,7 +796,7 @@ export function applyFreeAgencyDeclaration(
         seasonSpend,
       });
     }
-    const balance = run.influence.balances[franchiseId] ?? 0;
+    const balance = run.influence.balances[fid] ?? 0;
     const maximum = Math.max(...targets.map((target) => target.influence));
     if (balance < maximum || balance < SEASON_INFLUENCE_FLOOR + maximum) {
       throw new FreeAgencyValidationRejection({
@@ -794,16 +808,16 @@ export function applyFreeAgencyDeclaration(
     }
   }
   const declaration: SeasonFreeAgencyDeclaration = {
-    franchiseId,
+    franchiseId: fid,
     windowIndex,
-    commandId,
+    commandId: cid,
     targets,
   };
   return {
     ...run.freeAgency,
     windows: run.freeAgency.windows.map((entry) =>
       entry.windowIndex === windowIndex
-        ? { ...entry, declarations: { ...entry.declarations, [franchiseId]: declaration } }
+        ? { ...entry, declarations: { ...entry.declarations, [fid]: declaration } }
         : entry,
     ),
   };
@@ -876,16 +890,20 @@ export function resolveSeasonFreeAgencyWindow(
   const steps: SeasonFreeAgencyTraceStep[] = [];
   const firstWinners: Array<{
     candidatePlayerVersionId: string;
-    winnerFranchiseId: string;
+    winnerFranchiseId: FranchiseId;
   }> = [];
   const secondWinners: Array<{
     candidatePlayerVersionId: string;
-    winnerFranchiseId: string;
+    winnerFranchiseId: FranchiseId;
   }> = [];
-  const firstTargetOf = (franchiseId: string): SeasonFreeAgencyTarget | undefined =>
-    declarations[franchiseId]?.targets[0];
-  const secondTargetOf = (franchiseId: string): SeasonFreeAgencyTarget | undefined =>
-    declarations[franchiseId]?.targets[1];
+  const firstTargetOf = (franchiseId: string): SeasonFreeAgencyTarget | undefined => {
+    const fid = franchiseIdSchema.parse(franchiseId);
+    return declarations[fid]?.targets[0];
+  };
+  const secondTargetOf = (franchiseId: string): SeasonFreeAgencyTarget | undefined => {
+    const fid = franchiseIdSchema.parse(franchiseId);
+    return declarations[fid]?.targets[1];
+  };
   for (const candidate of [...candidates].sort((a, b) =>
     a.playerVersionId < b.playerVersionId ? -1 : 1,
   )) {
@@ -898,7 +916,7 @@ export function resolveSeasonFreeAgencyWindow(
     if (claims.length === 0) continue;
     const winner = pickWinner(context, windowIndex, candidate, claims, steps);
     if (winner !== null) {
-      const declaration = declarations[winner];
+      const declaration = declarations[franchiseIdSchema.parse(winner)];
       const target = firstTargetOf(winner);
       if (declaration !== undefined && target !== undefined) {
         const signing = applySigning(
@@ -915,7 +933,7 @@ export function resolveSeasonFreeAgencyWindow(
         signedFranchises.add(winner);
         firstWinners.push({
           candidatePlayerVersionId: candidate.playerVersionId,
-          winnerFranchiseId: winner,
+          winnerFranchiseId: franchiseIdSchema.parse(winner),
         });
       }
     }
@@ -934,7 +952,7 @@ export function resolveSeasonFreeAgencyWindow(
     if (claims.length === 0) continue;
     const winner = pickWinner(context, windowIndex, candidate, claims, steps);
     if (winner !== null) {
-      const declaration = declarations[winner];
+      const declaration = declarations[franchiseIdSchema.parse(winner)];
       const target = secondTargetOf(winner);
       if (declaration !== undefined && target !== undefined) {
         const signing = applySigning(
@@ -951,7 +969,7 @@ export function resolveSeasonFreeAgencyWindow(
         signedFranchises.add(winner);
         secondWinners.push({
           candidatePlayerVersionId: candidate.playerVersionId,
-          winnerFranchiseId: winner,
+          winnerFranchiseId: franchiseIdSchema.parse(winner),
         });
       }
     }
@@ -1053,6 +1071,7 @@ function claimLegal(
   candidate: SeasonFreeAgencyCandidate,
   steps: SeasonFreeAgencyTraceStep[],
 ): boolean {
+  const fid = franchiseIdSchema.parse(franchiseId);
   const roster = context.run.rosters.find((entry) => entry.franchiseId === franchiseId);
   const reasons: string[] = [];
   if (roster !== undefined && roster.players.length >= SEASON_ROSTER_MAX_SIZE) {
@@ -1072,7 +1091,7 @@ function claimLegal(
   }
   steps.push({
     candidatePlayerVersionId: candidate.playerVersionId,
-    franchiseId,
+    franchiseId: fid,
     criterion: 'legality',
     category: reasons.length === 0 ? 'legal' : 'illegal',
     citedFacts:
@@ -1088,12 +1107,13 @@ function compareClaims(
   b: string,
   steps: SeasonFreeAgencyTraceStep[],
 ): number {
+  const bfid = franchiseIdSchema.parse(b);
   const aLegal = claimLegal(context, a, candidate, steps);
   const bLegal = claimLegal(context, b, candidate, steps);
   if (aLegal !== bLegal) {
     steps.push({
       candidatePlayerVersionId: candidate.playerVersionId,
-      franchiseId: b,
+      franchiseId: bfid,
       criterion: 'legality',
       category: bLegal ? 'legal' : 'illegal',
       citedFacts: [bLegal ? 'claim is legal' : 'claim is illegal'],
@@ -1112,7 +1132,7 @@ function compareClaims(
           : 3;
   steps.push({
     candidatePlayerVersionId: candidate.playerVersionId,
-    franchiseId: b,
+    franchiseId: bfid,
     criterion: 'role-credibility',
     category: bRole,
     citedFacts: [`credibility ${bRole} (opponent ${aRole})`],
@@ -1123,7 +1143,7 @@ function compareClaims(
   const needRank = (tier: string) => (tier === 'high' ? 0 : tier === 'medium' ? 1 : 2);
   steps.push({
     candidatePlayerVersionId: candidate.playerVersionId,
-    franchiseId: b,
+    franchiseId: bfid,
     criterion: 'need',
     category: bNeed,
     citedFacts: [`need tier ${bNeed} (opponent ${aNeed})`],
@@ -1136,7 +1156,7 @@ function compareClaims(
   const fitRank = (fit: string) => (fit === 'fits' ? 0 : fit === 'neutral' ? 1 : 2);
   steps.push({
     candidatePlayerVersionId: candidate.playerVersionId,
-    franchiseId: b,
+    franchiseId: bfid,
     criterion: 'identity-fit',
     category: bFit,
     citedFacts: [`identity fit ${bFit} (opponent ${aFit})`],
@@ -1148,7 +1168,7 @@ function compareClaims(
     opportunity === 'immediate' ? 0 : opportunity === 'available' ? 1 : 2;
   steps.push({
     candidatePlayerVersionId: candidate.playerVersionId,
-    franchiseId: b,
+    franchiseId: bfid,
     criterion: 'opportunity',
     category: bOpportunity,
     citedFacts: [`opportunity ${bOpportunity} (opponent ${aOpportunity})`],
@@ -1160,7 +1180,7 @@ function compareClaims(
   const bCommit = committedInfluenceOf(context, b, candidate);
   steps.push({
     candidatePlayerVersionId: candidate.playerVersionId,
-    franchiseId: b,
+    franchiseId: bfid,
     criterion: 'influence',
     category: String(bCommit),
     citedFacts: [`committed ${String(bCommit)} (opponent ${String(aCommit)})`],
@@ -1182,7 +1202,7 @@ function compareClaims(
   );
   steps.push({
     candidatePlayerVersionId: candidate.playerVersionId,
-    franchiseId: b,
+    franchiseId: bfid,
     criterion: 'draw',
     category: bDraw < aDraw ? 'won' : 'lost',
     citedFacts: [`draw ${bDraw.slice(0, 8)} vs ${aDraw.slice(0, 8)}`],
@@ -1255,6 +1275,8 @@ function applySigning(
   target: SeasonFreeAgencyTarget,
   candidate: SeasonFreeAgencyCandidate,
 ): SeasonFreeAgencySigning {
+  const fid = franchiseIdSchema.parse(franchiseId);
+  const cid = commandIdSchema.parse(commandId);
   const seed = freeAgencySeed(
     context.run.rootSeed,
     String(windowIndex),
@@ -1263,18 +1285,18 @@ function applySigning(
     candidate.playerVersionId,
   );
   return {
-    signingId: `fa-sg-${seed.slice(0, 32)}`,
+    signingId: idSchema.parse(`fa-sg-${seed.slice(0, 32)}`),
     windowIndex,
-    franchiseId,
+    franchiseId: fid,
     playerVersionId: candidate.playerVersionId,
     playerId: candidate.playerId,
     band: candidate.band,
     roleExpectation: target.roleExpectation,
     influenceCost: target.influence,
-    commandId,
+    commandId: cid,
     seedPath: [String(windowIndex), 'resolve'],
-    ledgerEntryId: deriveSeasonInfluenceEntryId(`fa-led-${seed.slice(0, 32)}`),
-    transactionId: deriveSeasonTransactionId(`txn-fa-${seed.slice(0, 32)}`),
+    ledgerEntryId: idSchema.parse(deriveSeasonInfluenceEntryId(`fa-led-${seed.slice(0, 32)}`)),
+    transactionId: idSchema.parse(deriveSeasonTransactionId(`txn-fa-${seed.slice(0, 32)}`)),
     appliedAtStateRevision: context.run.stateRevision + 1,
   };
 }
@@ -1322,7 +1344,7 @@ function applySigningFacts(
     });
   }
   const balanceAfter = balance - signing.influenceCost;
-  const ledgerEntryId = deriveSeasonInfluenceEntryId(signing.ledgerEntryId);
+  const ledgerEntryId = idSchema.parse(deriveSeasonInfluenceEntryId(signing.ledgerEntryId));
   const ledgerEntry = {
     entryId: ledgerEntryId,
     franchiseId: signing.franchiseId,

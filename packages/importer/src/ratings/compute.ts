@@ -370,8 +370,7 @@ export function computeForSeason(season: string, force = false): void {
       player.secondaryPositions = [];
     }
     const stats: RatingsStatsRow = statsById.get(extId) ?? {};
-    const rosterTeamId =
-      typeof player.teamExternalId === 'string' ? player.teamExternalId : null;
+    const rosterTeamId = typeof player.teamExternalId === 'string' ? player.teamExternalId : null;
     const playerWinPct = extId ? (playerWinPctMap.get(extId) ?? null) : null;
     const fallbackTeamWinPct = teamWinPctForPlayer(stats, rosterTeamId, teamWinPctMap);
     const teamWinPct = playerWinPct ?? fallbackTeamWinPct;
@@ -393,7 +392,8 @@ export function computeForSeason(season: string, force = false): void {
     player.tendencies = derived.tendencies;
     player.summaryRatings = derived.summaryRatings;
     player.anchors = derived.anchors;
-    player.reconstructedThreePoint = derived.reconstructedThreePoint as RosterPlayer['reconstructedThreePoint'];
+    player.reconstructedThreePoint =
+      derived.reconstructedThreePoint as RosterPlayer['reconstructedThreePoint'];
     player.provenance = derived.provenance;
     player.unclamped = derived.unclamped;
     player.methods = derived.methods as RosterPlayer['methods'];

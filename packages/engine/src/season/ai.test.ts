@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   seasonLeagueGenerationResultSchema,
   seasonRosterCalibrationRunSchema,
+  seedSchema,
   type SeasonDraftCandidate,
+  type SeasonDraftCatalog,
+  type SeasonLeague,
   type SeasonLeagueGenerationResult,
 } from '@hoop-rush/data-contracts';
 import { buildSeasonDraftCatalog, seedFromString } from '@hoop-rush/test-fixtures';
@@ -23,11 +26,20 @@ import {
   membersOf,
   soloInput,
 } from './ai-test-support.ts';
+function brandedSolo(
+  seed: string,
+  catalog: SeasonDraftCatalog = CATALOG,
+  league: SeasonLeague = LEAGUE,
+  humanFranchiseId = 'lakers',
+) {
+  const base = soloInput(seed, catalog, league, humanFranchiseId);
+  return { ...base, seed: seedSchema.parse(base.seed) };
+}
 
 describe('season AI band and identity assignment', () => {
   it('assigns solo quotas 4/8/10/7 with balanced identities', () => {
     const assignments = assignAiBandsAndIdentities({
-      seed: seedFromString('bands'),
+      seed: seedSchema.parse(seedFromString('bands')),
       league: LEAGUE,
       humanFranchiseIds: ['lakers'],
       targets: buildTestTargets(),
@@ -55,7 +67,7 @@ describe('season AI band and identity assignment', () => {
   });
   it('assigns duo quotas 4/8/9/7 preserving every band', () => {
     const assignments = assignAiBandsAndIdentities({
-      seed: seedFromString('bands-duo'),
+      seed: seedSchema.parse(seedFromString('bands-duo')),
       league: LEAGUE,
       humanFranchiseIds: ['lakers', 'celtics'],
       targets: buildTestTargets(),
@@ -77,7 +89,7 @@ describe('season AI band and identity assignment', () => {
   it('rotates the smaller identity count with the seed', () => {
     const countsOf = (seed: string) => {
       const rows = assignAiBandsAndIdentities({
-        seed,
+        seed: seedSchema.parse(seed),
         league: LEAGUE,
         humanFranchiseIds: ['lakers'],
         targets: buildTestTargets(),
@@ -100,7 +112,7 @@ describe('season AI band and identity assignment', () => {
 });
 describe('season AI league generation', () => {
   it('generates a legal league with unique ownership and valid rotations', () => {
-    const result = generateAiLeague(soloInput(seedFromString('gen-1')));
+    const result = generateAiLeague(brandedSolo(seedFromString('gen-1')));
     expect(seasonLeagueGenerationResultSchema.parse(result)).toBeTruthy();
     expect(result.rosters).toHaveLength(30);
     expect(result.ownership).toHaveLength(300);
@@ -126,7 +138,7 @@ describe('season AI league generation', () => {
     expect(result.digest).toMatch(/^[0-9a-f]{32}$/);
   });
   it('covers all eight basketball roles on every roster', () => {
-    const result = generateAiLeague(soloInput(seedFromString('gen-roles')));
+    const result = generateAiLeague(brandedSolo(seedFromString('gen-roles')));
     for (const evaluation of result.evaluations) {
       expect(evaluation.rolesCovered).toHaveLength(8);
     }
@@ -134,7 +146,7 @@ describe('season AI league generation', () => {
   it('preserves human rosters and never duplicates a human version', () => {
     const human = humanRoster(CATALOG, 'lakers', '1990s');
     const result = generateAiLeague({
-      seed: seedFromString('gen-human'),
+      seed: seedSchema.parse(seedFromString('gen-human')),
       catalog: CATALOG,
       league: LEAGUE,
       humanFranchiseIds: ['lakers'],
@@ -167,7 +179,7 @@ describe('season AI league generation', () => {
     if (first === undefined || second === undefined) throw new Error('candidates missing');
     second.playerId = first.playerId;
     const result = generateAiLeague({
-      seed: seedFromString('same-person-human'),
+      seed: seedSchema.parse(seedFromString('same-person-human')),
       catalog,
       league: LEAGUE,
       humanFranchiseIds: ['lakers'],
@@ -188,7 +200,7 @@ describe('season AI league generation', () => {
     const seeds = ['order-1', 'order-2', 'order-3', 'order-4', 'order-5'];
     const scores = { contender: [] as number[], weaker: [] as number[] };
     for (const s of seeds) {
-      const result = generateAiLeague(soloInput(seedFromString(s)));
+      const result = generateAiLeague(brandedSolo(seedFromString(s)));
       for (const evaluation of result.evaluations) {
         if (evaluation.franchiseId === 'lakers') continue;
         if (evaluation.band === 'contender') scores.contender.push(evaluation.strengthScore);
@@ -205,7 +217,7 @@ describe('season AI league generation', () => {
     const lakersHuman = humanRoster(CATALOG, 'lakers', '1990s');
     const celticsHuman = humanRoster(CATALOG, 'celtics', '1990s');
     const result = generateAiLeague({
-      seed: seedFromString('duo-gen'),
+      seed: seedSchema.parse(seedFromString('duo-gen')),
       catalog: CATALOG,
       league: LEAGUE,
       humanFranchiseIds: ['lakers', 'celtics'],
@@ -246,7 +258,7 @@ describe('season AI league generation', () => {
     }
     expect(keepC.size).toBeGreaterThan(29 * 3);
     const result = generateAiLeague({
-      ...soloInput(seedFromString('scarce'), CATALOG, LEAGUE, 'lakers'),
+      ...brandedSolo(seedFromString('scarce'), CATALOG, LEAGUE, 'lakers'),
       catalog,
     });
     const modifiedMembers = (res: SeasonLeagueGenerationResult, franchiseId: string) => {
@@ -418,7 +430,7 @@ describe('season AI bounded failure and calibration', () => {
     }
     try {
       generateAiLeague({
-        ...soloInput(seedFromString('exhausted'), CATALOG, LEAGUE, 'lakers'),
+        ...brandedSolo(seedFromString('exhausted'), CATALOG, LEAGUE, 'lakers'),
         catalog,
       });
       throw new Error('expected exhaustion');
@@ -432,7 +444,11 @@ describe('season AI bounded failure and calibration', () => {
     }
   });
   it('runs calibration seeds in order with valid rows', () => {
-    const seeds = [seedFromString('cal-1'), seedFromString('cal-2'), seedFromString('cal-3')];
+    const seeds = [
+      seedSchema.parse(seedFromString('cal-1')),
+      seedSchema.parse(seedFromString('cal-2')),
+      seedSchema.parse(seedFromString('cal-3')),
+    ];
     const runs = runSeasonRosterCalibrationSeeds({
       seeds,
       catalog: CATALOG,

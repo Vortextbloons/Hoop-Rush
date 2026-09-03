@@ -5,9 +5,14 @@ import {
   FIXED_FIVE_ROOM_PROTOCOL_VERSION,
   FIXED_FIVE_ROOM_SCHEMA_VERSION,
   FIXED_FIVE_WORKER_WIRE_VERSION,
+  commandIdSchema,
   createInMemoryFixedFiveTransport,
   fixedFiveRoomSettingsSchema,
 } from './index.ts';
+const cmd1 = commandIdSchema.parse('cmd-1');
+const cmd2 = commandIdSchema.parse('cmd-2');
+const p1ReadyCmd = commandIdSchema.parse('p1-ready');
+const p2ReadyCmd = commandIdSchema.parse('p2-ready');
 
 describe('fixed-five contracts', () => {
   it('pins version constants', () => {
@@ -74,7 +79,7 @@ describe('fixed-five contracts', () => {
     const receipt = await transport.submitCommand({
       schemaVersion: 1,
       roomId: created.snapshot.roomId,
-      commandId: 'cmd-1',
+      commandId: cmd1,
       actorParticipantId: 'p1',
       payload: { kind: 'ready', ready: true },
     });
@@ -83,7 +88,7 @@ describe('fixed-five contracts', () => {
     const duplicate = await transport.submitCommand({
       schemaVersion: 1,
       roomId: created.snapshot.roomId,
-      commandId: 'cmd-1',
+      commandId: cmd1,
       actorParticipantId: 'p1',
       payload: { kind: 'ready', ready: true },
     });
@@ -92,7 +97,7 @@ describe('fixed-five contracts', () => {
     const stale = await transport.submitCommand({
       schemaVersion: 1,
       roomId: created.snapshot.roomId,
-      commandId: 'cmd-2',
+      commandId: cmd2,
       ordinal: 99,
       actorParticipantId: 'p1',
       payload: { kind: 'ready', ready: true },
@@ -155,14 +160,14 @@ describe('fixed-five contracts', () => {
     const p1Ready = await transport.submitCommand({
       schemaVersion: 1,
       roomId: created.snapshot.roomId,
-      commandId: 'p1-ready',
+      commandId: p1ReadyCmd,
       actorParticipantId: 'p1',
       payload: { kind: 'ready', ready: true },
     });
     const p2Ready = await transport.submitCommand({
       schemaVersion: 1,
       roomId: created.snapshot.roomId,
-      commandId: 'p2-ready',
+      commandId: p2ReadyCmd,
       actorParticipantId: 'p2',
       payload: { kind: 'ready', ready: true },
     });

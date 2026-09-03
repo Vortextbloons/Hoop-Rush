@@ -1,15 +1,20 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import {
+  commandIdSchema,
   createInMemoryFixedFiveTransport,
   fixedFiveCommandPayloadSchema,
   fixedFiveCommandSchema,
+  fixedFiveRoomCodeSchema,
   fixedFiveRoomSettingsSchema,
+  idSchema,
   type FixedFiveCommandReceipt,
   type FixedFiveMemberSnapshot,
   type FixedFiveMultiplayerTransport,
   type FixedFiveParticipantId,
+  type FixedFiveRoomCode,
   type FixedFiveRoomSettings,
   type FixedFiveRoomSnapshot,
+  type Id,
 } from '@hoop-rush/data-contracts';
 import { randomUUID } from '$lib/random-id';
 
@@ -22,8 +27,8 @@ function supabaseClient(url: string, publishableKey: string): FixedFiveClient {
 }
 
 interface FixedFiveRoomRow {
-  id: string;
-  code: string | null;
+  id: Id;
+  code: FixedFiveRoomCode | null;
   code_active: boolean;
   mode: string;
   source_mode: string;
@@ -31,11 +36,11 @@ interface FixedFiveRoomRow {
   phase: string;
   revision: number;
   command_count: number;
-  digest: string | null;
-  result_digest: string | null;
-  confirmed_digest: string | null;
-  successor_room_id: string | null;
-  root_seed: string;
+  digest: FixedFiveRoomSnapshot['digest'];
+  result_digest: FixedFiveRoomSnapshot['resultDigest'];
+  confirmed_digest: FixedFiveRoomSnapshot['confirmedDigest'];
+  successor_room_id: FixedFiveRoomSnapshot['successorRoomId'];
+  root_seed: NonNullable<FixedFiveRoomSnapshot['rootSeed']>;
   deadline_at: string | null;
   deadline_cursor: string | null;
   deadline_participant: string | null;
@@ -63,7 +68,7 @@ interface FixedFiveCommandRow {
 }
 
 interface RpcRoomPayload {
-  room_id: string;
+  room_id: Id;
   code: string;
   participant_id?: FixedFiveParticipantId;
 }
@@ -77,8 +82,8 @@ function rpcPayload(value: unknown): RpcRoomPayload {
   const record = value as Record<string, unknown>;
   const participantRaw = record['participant_id'];
   return {
-    room_id: stringField(record, 'room_id'),
-    code: stringField(record, 'code'),
+    room_id: idSchema.parse(stringField(record, 'room_id')),
+    code: fixedFiveRoomCodeSchema.parse(stringField(record, 'code')),
     participant_id: participantRaw === 'p1' || participantRaw === 'p2' ? participantRaw : undefined,
   };
 }
@@ -256,10 +261,11 @@ export function createFixedFiveTransport(options?: {
       }
       const payload = rpcPayload(response.data);
       const snapshot = await fetchSnapshot(payload.room_id);
+      const code = fixedFiveRoomCodeSchema.parse(payload.code);
       return {
         snapshot,
-        code: payload.code,
-        membership: { roomId: payload.room_id, participantId: 'p1', code: payload.code },
+        code,
+        membership: { roomId: payload.room_id, participantId: 'p1', code },
       };
     },
     async preview(code) {
@@ -283,8 +289,8 @@ export function createFixedFiveTransport(options?: {
         : 'lobby') as FixedFiveRoomSnapshot['phase'];
       const revision = typeof record['revision'] === 'number' ? record['revision'] : 0;
       return {
-        roomId: stringField(record, 'room_id'),
-        code,
+        roomId: idSchema.parse(stringField(record, 'room_id')),
+        code: fixedFiveRoomCodeSchema.parse(code),
         codeActive: true,
         settings,
         phase,
@@ -309,7 +315,11 @@ export function createFixedFiveTransport(options?: {
       const payload = rpcPayload(response.data);
       const snapshot = await fetchSnapshot(payload.room_id);
       const participantId: FixedFiveParticipantId = payload.participant_id ?? 'p2';
-      return { snapshot, membership: { roomId: payload.room_id, participantId, code } };
+      const membershipCode = fixedFiveRoomCodeSchema.parse(code);
+      return {
+        snapshot,
+        membership: { roomId: payload.room_id, participantId, code: membershipCode },
+      };
     },
     async resume(roomId) {
       await ensureAnonymous(client);
@@ -329,7 +339,14 @@ export function createFixedFiveTransport(options?: {
           if (member.participant_id === 'p2') participantId = 'p2';
         }
       }
-      return { snapshot, membership: { roomId, participantId, code: snapshot.code ?? '0000' } };
+      return {
+        snapshot,
+        membership: {
+          roomId: idSchema.parse(roomId),
+          participantId,
+          code: snapshot.code ?? fixedFiveRoomCodeSchema.parse('0000'),
+        },
+      };
     },
     subscribe(roomId, handler) {
       let record = rooms.get(roomId);
@@ -398,7 +415,7 @@ export function createFixedFiveTransport(options?: {
     },
     async submitCommand(command) {
       await ensureAnonymous(client);
-      const commandId = command.commandId || randomUUID();
+      const commandId = command.commandId || commandIdSchema.parse(randomUUID());
       const withRevision = command as unknown as { expectedRevision?: unknown };
       const expectedRevision =
         typeof withRevision.expectedRevision === 'number' ? withRevision.expectedRevision : null;
@@ -427,8 +444,18 @@ export function createFixedFiveTransport(options?: {
       if (response.error || !response.data) return null;
       const record = response.data as unknown as Record<string, unknown>;
       if (record['resolved'] !== true) return null;
-      const commandId = typeof record['command_id'] === 'string' ? record['command_id'] : 'timeout';
-      return { roomId, commandId, ordinal: -1, accepted: true, rejectionCode: null, revision: 0 };
+      const commandId =
+        typeof record['command_id'] === 'string'
+          ? commandIdSchema.parse(record['command_id'])
+          : commandIdSchema.parse('timeout');
+      return {
+        roomId: idSchema.parse(roomId),
+        commandId,
+        ordinal: -1,
+        accepted: true,
+        rejectionCode: null,
+        revision: 0,
+      };
     },
     async removeGuest(roomId, targetParticipantId) {
       await ensureAnonymous(client);
@@ -451,7 +478,7 @@ export function createFixedFiveTransport(options?: {
         throw new Error(`rematch failed: ${response.error?.message ?? 'unknown'}`);
       const payload = rpcPayload(response.data);
       const snapshot = await fetchSnapshot(payload.room_id);
-      return { snapshot, code: payload.code };
+      return { snapshot, code: fixedFiveRoomCodeSchema.parse(payload.code) };
     },
     async complete(roomId, resultDigest) {
       await ensureAnonymous(client);

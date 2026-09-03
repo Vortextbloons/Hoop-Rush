@@ -125,6 +125,7 @@ import {
   franchiseForParticipant,
   authorityForFranchise,
   playInGameIdOf,
+  seasonRunCommandRejectionSchema,
   type SeasonRunAuthority,
 } from '@hoop-rush/data-contracts';
 import { assertNever } from '../sim/assert-never.ts';
@@ -1231,7 +1232,7 @@ function handleSubmitTradeProposal(
           balance: senderBalance,
           requestedDelta: -amount,
           floor: SEASON_INFLUENCE_FLOOR,
-        } as unknown as SeasonSubmitTradeProposalRejection,
+        },
         run,
       );
     }
@@ -1248,7 +1249,7 @@ function handleSubmitTradeProposal(
           windowIndex: command.windowIndex,
           sent,
           requested: amount,
-        } as unknown as SeasonSubmitTradeProposalRejection,
+        },
         run,
       );
     }
@@ -1295,7 +1296,7 @@ function handleSubmitTradeProposal(
         const w = wins[idx]!;
         const updated = {
           ...w,
-          [field]: ((w as unknown as Record<string, number>)[field] ?? 0) + delta,
+          [field]: (w[field] ?? 0) + delta,
         };
         nextInfluence = {
           ...nextInfluence,
@@ -1305,10 +1306,10 @@ function handleSubmitTradeProposal(
           },
         };
       } else {
-        const nw = {
-          windowIndex: command.windowIndex,
-          [field]: delta,
-        } as unknown as import('@hoop-rush/data-contracts').SeasonInfluenceWindowState;
+        const nw: import('@hoop-rush/data-contracts').SeasonInfluenceWindowState =
+          field === 'tradeCashSent'
+            ? { windowIndex: command.windowIndex, tradeCashSent: delta }
+            : { windowIndex: command.windowIndex, tradeCashReceived: delta };
         nextInfluence = {
           ...nextInfluence,
           windows: { ...nextInfluence.windows, [franchiseId]: [...wins, nw] },
@@ -1386,7 +1387,7 @@ function handleRespondToTradeCounter(
         code: 'window-not-open',
         franchiseId: null,
         windowIndex: command.windowIndex,
-      } as unknown as SeasonRespondToTradeCounterRejection,
+      },
       run,
     );
   }
@@ -1397,7 +1398,7 @@ function handleRespondToTradeCounter(
       {
         code: 'trade-negotiations-closed',
         windowIndex: command.windowIndex,
-      } as unknown as SeasonRespondToTradeCounterRejection,
+      },
       run,
     );
   }
@@ -1409,7 +1410,7 @@ function handleRespondToTradeCounter(
         windowIndex: command.windowIndex,
         inquiryId: command.inquiryId,
         exchangeCount: negotiation.exchangeCount,
-      } as unknown as SeasonRespondToTradeCounterRejection,
+      },
       run,
     );
   }
@@ -1473,7 +1474,7 @@ function handleWalkAwayFromTrade(
         code: 'window-not-open',
         franchiseId: null,
         windowIndex: command.windowIndex,
-      } as unknown as SeasonWalkAwayFromTradeRejection,
+      },
       run,
     );
   }
@@ -1485,7 +1486,7 @@ function handleWalkAwayFromTrade(
         code: 'window-not-open',
         franchiseId: null,
         windowIndex: command.windowIndex,
-      } as unknown as SeasonWalkAwayFromTradeRejection,
+      },
       run,
     );
   }
@@ -1537,7 +1538,7 @@ function handlePurchaseTradeInquiry(
         code: 'window-not-open',
         franchiseId: null,
         windowIndex: command.windowIndex,
-      } as unknown as SeasonPurchaseTradeInquiryRejection,
+      },
       run,
     );
   }
@@ -1548,7 +1549,7 @@ function handlePurchaseTradeInquiry(
         code: 'already-spent',
         franchiseId: context.humanFranchiseId ?? '',
         windowIndex: command.windowIndex,
-      } as unknown as SeasonPurchaseTradeInquiryRejection,
+      },
       run,
     );
   }
@@ -1561,7 +1562,7 @@ function handlePurchaseTradeInquiry(
         windowIndex: command.windowIndex,
         inquiriesUsed: win.negotiations?.length ?? 0,
         allowance,
-      } as unknown as SeasonPurchaseTradeInquiryRejection,
+      },
       run,
     );
   }
@@ -1579,7 +1580,7 @@ function handlePurchaseTradeInquiry(
         balance,
         requestedDelta: -1,
         floor: SEASON_INFLUENCE_FLOOR,
-      } as unknown as SeasonPurchaseTradeInquiryRejection,
+      },
       run,
     );
   }
@@ -2368,10 +2369,14 @@ function handleAdvancePostseason(
     return rejectedAdvance(command, { code: 'integrity-failure', reason: integrityReason }, run);
   }
   const stage = seasonPostseasonStageOf(current.postseason);
+  const championFranchiseId = current.postseason.championFranchiseId;
+  if (stage === 'completed' && championFranchiseId === null) {
+    throw new Error(`postseason completed without champion for ${command.commandId}`);
+  }
   const completion =
-    stage === 'completed'
+    stage === 'completed' && championFranchiseId !== null
       ? {
-          championFranchiseId: current.postseason.championFranchiseId as string,
+          championFranchiseId,
           almanacDigest: POSTSEASON_ALMANAC_DIGEST_PLACEHOLDER,
           finalizedAtStateRevision: run.stateRevision + 1,
         }
@@ -2713,10 +2718,14 @@ function handleSpectatePostseasonGame(
     effects: outcome.nextEffects,
   };
   const stage = seasonPostseasonStageOf(current.postseason);
+  const championFranchiseId = current.postseason.championFranchiseId;
+  if (stage === 'completed' && championFranchiseId === null) {
+    throw new Error(`postseason completed without champion for ${command.commandId}`);
+  }
   const completion =
-    stage === 'completed'
+    stage === 'completed' && championFranchiseId !== null
       ? {
-          championFranchiseId: current.postseason.championFranchiseId as string,
+          championFranchiseId,
           almanacDigest: POSTSEASON_ALMANAC_DIGEST_PLACEHOLDER,
           finalizedAtStateRevision: run.stateRevision + 1,
         }
@@ -2887,7 +2896,13 @@ export class SeasonFreeAgencyFactsError extends Error {
   }
 }
 function freeAgencyRejectionTo(error: FreeAgencyValidationRejection): SeasonRunCommandRejection {
-  return error.rejection as SeasonRunCommandRejection;
+  const parsed = seasonRunCommandRejectionSchema.safeParse(error.rejection);
+  if (!parsed.success) {
+    throw new Error(
+      `invalid free-agency rejection ${String(error.rejection.code)}: ${parsed.error.message}`,
+    );
+  }
+  return parsed.data;
 }
 function rejectedFreeAgency(
   command:
@@ -2899,7 +2914,7 @@ function rejectedFreeAgency(
 ): SeasonRunCommandOutput {
   return {
     result: {
-      command: command.command as DispatchableCommandKind,
+      command: command.command,
       result: { status: 'rejected', commandId: command.commandId, rejection },
     } as SeasonRunCommandResult,
     run,
@@ -3019,7 +3034,7 @@ function handleResolveFreeAgentMarket(
     resolution = resolveSeasonFreeAgencyWindow(
       {
         run: context.run,
-        effects: context.effects as SeasonEffectsState,
+        effects: run.effects,
         catalog: context.catalog,
         index: context.freeAgencyIndex,
         targets: context.freeAgencyTargets,
@@ -3120,5 +3135,9 @@ export function handleSeasonRunCommand(
       return handleWalkAwayFromTrade(command, context);
     case 'purchase-trade-inquiry':
       return handlePurchaseTradeInquiry(command, context);
+    default: {
+      const exhaustive: never = command;
+      return assertNever(exhaustive, `unknown season run command ${JSON.stringify(command).slice(0, 128)}`);
+    }
   }
 }

@@ -9,6 +9,7 @@ import { checkGameResult } from '../../sim/invariants.ts';
 import { simulateGame } from '../../sim/game.ts';
 import type { EngineContext } from '../../sim/context.ts';
 import { fixedFiveDuelGameSeed } from './seeds.ts';
+import { summarizeDuelGames } from './results.ts';
 
 export interface DuelSimulationInput {
   p1Team: SimulationTeam;
@@ -57,25 +58,10 @@ export function simulateDuelSeries(
     if (p1Won) p1Wins += 1;
     else p2Wins += 1;
   }
-  if (p1Wins !== 4 && p2Wins !== 4) {
-    throw new Error(
-      `duel series must end 4-x within seven games (got ${String(p1Wins)}-${String(p2Wins)})`,
-    );
-  }
-  const winner = p1Wins === 4 ? 'p1' : 'p2';
-  const duelGames: FixedFiveDuelResult['games'] = games.map((game, index) => {
-    const gameNumber = index + 1;
-    const homeIsP1 = game.home.teamId === input.p1Team.teamId;
-    const p1Won = (game.winner === 'home') === homeIsP1;
-    return { gameNumber, seed: game.seed, winner: p1Won ? 'p1' : 'p2' };
+  return summarizeDuelGames({
+    games,
+    p1TeamId: input.p1Team.teamId,
+    p2TeamId: input.p2Team.teamId,
+    rootSeed: input.rootSeed,
   });
-  const result: FixedFiveDuelResult = {
-    competition: 'duel',
-    games: duelGames,
-    p1Wins,
-    p2Wins,
-    winner,
-    stoppedAtGame: games.length,
-  };
-  return { result, games };
 }

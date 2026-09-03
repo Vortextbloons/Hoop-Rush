@@ -1,6 +1,7 @@
 import type {
   ClassicDraftCatalog,
   ClassicDraftState,
+  PlayerId,
   Seed,
   SlotIndex,
 } from '@hoop-rush/data-contracts';
@@ -15,7 +16,7 @@ import type { EngineContext } from '../../sim/context.ts';
 
 export type ClassicBuilderCommand =
   | { kind: 'reroll'; axis: 'franchise' | 'era' }
-  | { kind: 'classic-pick'; playerId: string; slotIndex: SlotIndex };
+  | { kind: 'classic-pick'; playerId: PlayerId; slotIndex: SlotIndex };
 
 export type PoolEligibilityPolicy = (entry: ClassicDraftCatalog[number]) => boolean;
 

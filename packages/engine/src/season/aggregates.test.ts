@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   SEASON_LEADER_MIN_GAME_SHARE,
+  franchiseIdSchema,
+  seasonGameIdSchema,
   seasonLeadersSchema,
+  seasonPlayerAggregateSchema,
+  seasonTeamAggregateSchema,
   type SeasonGameSummary,
   type SeasonStandings,
 } from '@hoop-rush/data-contracts';
@@ -13,10 +17,7 @@ import {
   provisionalStandingOrder,
 } from './aggregates.ts';
 function finalSummary(overrides: Partial<SeasonGameSummary> = {}): SeasonGameSummary {
-  const homeLine = (
-    playerVersionId: string,
-    points: number,
-  ): SeasonGameSummary['homePlayers'][number] => ({
+  const homeLine = (playerVersionId: string, points: number) => ({
     playerVersionId,
     seconds: 1440,
     points,
@@ -58,11 +59,13 @@ function finalSummary(overrides: Partial<SeasonGameSummary> = {}): SeasonGameSum
     'pv-a9',
     'pv-a10',
   ].map((id, index) => homeLine(id, 8 + index));
-  const box = (players: typeof homePlayers): SeasonGameSummary['homeBox'] => {
+  const box = (players: typeof homePlayers) => {
     const fgm = players.reduce((sum, line) => sum + line.fieldGoalsMade, 0);
     const fga = players.reduce((sum, line) => sum + line.fieldGoalsAttempted, 0);
     return {
-      franchiseId: players[0]?.playerVersionId.startsWith('pv-h') ? 'lakers' : 'celtics',
+      franchiseId: franchiseIdSchema.parse(
+        players[0]?.playerVersionId.startsWith('pv-h') ? 'lakers' : 'celtics',
+      ),
       points: players.reduce((sum, line) => sum + line.points, 0),
       fieldGoalsMade: fgm,
       fieldGoalsAttempted: fga,
@@ -85,10 +88,10 @@ function finalSummary(overrides: Partial<SeasonGameSummary> = {}): SeasonGameSum
   return {
     schemaVersion: 1,
     summaryVersion: 'season-game-summary-v3',
-    gameId: 's000001',
+    gameId: seasonGameIdSchema.parse('s000001'),
     round: 1,
-    homeFranchiseId: 'lakers',
-    awayFranchiseId: 'celtics',
+    homeFranchiseId: franchiseIdSchema.parse('lakers'),
+    awayFranchiseId: franchiseIdSchema.parse('celtics'),
     status: 'final',
     overtimePeriods: 0,
     homeScore,
@@ -106,17 +109,17 @@ function forfeitSummary(overrides: Partial<SeasonGameSummary> = {}): SeasonGameS
   return {
     schemaVersion: 1,
     summaryVersion: 'season-game-summary-v3',
-    gameId: 's000002',
+    gameId: seasonGameIdSchema.parse('s000002'),
     round: 1,
-    homeFranchiseId: 'celtics',
-    awayFranchiseId: 'lakers',
+    homeFranchiseId: franchiseIdSchema.parse('celtics'),
+    awayFranchiseId: franchiseIdSchema.parse('lakers'),
     status: 'forfeit',
     overtimePeriods: 0,
     homeScore: 2,
     awayScore: 0,
-    forfeitLoserFranchiseId: 'lakers',
+    forfeitLoserFranchiseId: franchiseIdSchema.parse('lakers'),
     homeBox: {
-      franchiseId: 'celtics',
+      franchiseId: franchiseIdSchema.parse('celtics'),
       points: 0,
       fieldGoalsMade: 0,
       fieldGoalsAttempted: 0,
@@ -134,7 +137,7 @@ function forfeitSummary(overrides: Partial<SeasonGameSummary> = {}): SeasonGameS
       possessions: 0,
     },
     awayBox: {
-      franchiseId: 'lakers',
+      franchiseId: franchiseIdSchema.parse('lakers'),
       points: 0,
       fieldGoalsMade: 0,
       fieldGoalsAttempted: 0,
@@ -158,7 +161,7 @@ function forfeitSummary(overrides: Partial<SeasonGameSummary> = {}): SeasonGameS
   };
 }
 function standingsOf(summaries: readonly SeasonGameSummary[]): SeasonStandings {
-  const franchiseIds = ['lakers', 'celtics'];
+  const franchiseIds = [franchiseIdSchema.parse('lakers'), franchiseIdSchema.parse('celtics')];
   return {
     schemaVersion: 1,
     standingsVersion: 'standings-v1',
@@ -243,7 +246,7 @@ describe('season aggregate folding (M2.3)', () => {
 });
 describe('season leaders (M2.3)', () => {
   it('derives leaders with eligibility, depth, and the frozen tie-break', () => {
-    const teams = [
+    const teams = seasonTeamAggregateSchema.array().parse([
       {
         franchiseId: 'lakers',
         gamesPlayed: 10,
@@ -265,8 +268,8 @@ describe('season leaders (M2.3)', () => {
         fouls: 0,
         possessions: 0,
       },
-    ];
-    const players = [
+    ]);
+    const players = seasonPlayerAggregateSchema.array().parse([
       {
         playerVersionId: 'pv-00000000000000000000000000000001',
         franchiseId: 'lakers',
@@ -311,7 +314,7 @@ describe('season leaders (M2.3)', () => {
         turnovers: 0,
         fouls: 0,
       },
-    ];
+    ]);
     const leaders = deriveSeasonLeaders(teams, players);
     expect(seasonLeadersSchema.safeParse(leaders).success).toBe(true);
     expect(leaders.categories.points.map((entry) => entry.playerVersionId)).toEqual([
@@ -324,7 +327,7 @@ describe('season leaders (M2.3)', () => {
     expect(leaders.categories.rebounds[0]?.value).toBe(40);
   });
   it('breaks ties by per-game rate, then total, then version id', () => {
-    const teams = [
+    const teams = seasonTeamAggregateSchema.array().parse([
       {
         franchiseId: 'lakers',
         gamesPlayed: 10,
@@ -346,8 +349,8 @@ describe('season leaders (M2.3)', () => {
         fouls: 0,
         possessions: 0,
       },
-    ];
-    const players = [
+    ]);
+    const players = seasonPlayerAggregateSchema.array().parse([
       {
         playerVersionId: 'pv-00000000000000000000000000000004',
         franchiseId: 'lakers',
@@ -414,7 +417,7 @@ describe('season leaders (M2.3)', () => {
         turnovers: 0,
         fouls: 0,
       },
-    ];
+    ]);
     const leaders = deriveSeasonLeaders(teams, players);
     expect(leaders.categories.points.map((entry) => entry.playerVersionId)).toEqual([
       'pv-00000000000000000000000000000005',
@@ -431,7 +434,7 @@ describe('season provisional standing order (M2.3)', () => {
       standingsVersion: 'standings-v1',
       rows: [
         {
-          franchiseId: 'b',
+          franchiseId: franchiseIdSchema.parse('b'),
           wins: 8,
           losses: 2,
           gamesPlayed: 10,
@@ -448,7 +451,7 @@ describe('season provisional standing order (M2.3)', () => {
           headToHead: [],
         },
         {
-          franchiseId: 'a',
+          franchiseId: franchiseIdSchema.parse('a'),
           wins: 9,
           losses: 1,
           gamesPlayed: 10,
@@ -465,7 +468,7 @@ describe('season provisional standing order (M2.3)', () => {
           headToHead: [],
         },
         {
-          franchiseId: 'c',
+          franchiseId: franchiseIdSchema.parse('c'),
           wins: 9,
           losses: 1,
           gamesPlayed: 10,

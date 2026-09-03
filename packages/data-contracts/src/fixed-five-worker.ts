@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { seedSchema } from './ids.ts';
 import { eraSimulationProfileSchema } from './era-sim-profile.ts';
+import { gameResultSchema } from './result.ts';
 import { simulationPlayerSchema } from './simulation.ts';
 import { opponentBracketCoreSchema } from './bracket.ts';
 import { FIXED_FIVE_WORKER_WIRE_VERSION } from './fixed-five-versions.ts';
@@ -63,6 +64,23 @@ export const fixedFiveWorkerProgressSchema = z.object({
 });
 export type FixedFiveWorkerProgress = z.infer<typeof fixedFiveWorkerProgressSchema>;
 
+export const fixedFiveWorkerResultTagSchema = z.enum(['p1', 'p2', 'h2h', 'duel']);
+export type FixedFiveWorkerResultTag = z.infer<typeof fixedFiveWorkerResultTagSchema>;
+
+export const fixedFiveWorkerResultEntrySchema = z.object({
+  tag: fixedFiveWorkerResultTagSchema,
+  game: gameResultSchema,
+});
+export type FixedFiveWorkerResultEntry = z.infer<typeof fixedFiveWorkerResultEntrySchema>;
+
+export const fixedFiveWorkerResultsSchema = z.object({
+  schemaVersion: z.literal(FIXED_FIVE_WORKER_WIRE_VERSION),
+  type: z.literal('fixed-five-results'),
+  requestId: z.string().min(1).max(64),
+  entries: z.array(fixedFiveWorkerResultEntrySchema).min(1).max(8),
+});
+export type FixedFiveWorkerResults = z.infer<typeof fixedFiveWorkerResultsSchema>;
+
 export const fixedFiveWorkerCompleteSchema = z.object({
   schemaVersion: z.literal(FIXED_FIVE_WORKER_WIRE_VERSION),
   type: z.literal('fixed-five-complete'),
@@ -82,6 +100,7 @@ export type FixedFiveWorkerError = z.infer<typeof fixedFiveWorkerErrorSchema>;
 
 export const fixedFiveWorkerMessageSchema = z.discriminatedUnion('type', [
   fixedFiveWorkerProgressSchema,
+  fixedFiveWorkerResultsSchema,
   fixedFiveWorkerCompleteSchema,
   fixedFiveWorkerErrorSchema,
 ]);

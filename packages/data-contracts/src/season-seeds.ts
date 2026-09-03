@@ -20,7 +20,7 @@ export const SEASON_SEED_NAMESPACES = {
 } as const;
 export type SeasonSeedNamespace = keyof typeof SEASON_SEED_NAMESPACES;
 export function seasonNamespaceSeed(
-  rootSeed: z.infer<typeof seedSchema>,
+  rootSeed: string,
   namespace: string,
   ...keys: string[]
 ): z.infer<typeof seedSchema> {

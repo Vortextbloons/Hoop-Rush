@@ -4,7 +4,23 @@ import {
   buildLegalSimulationTeam,
   seedFromString,
 } from '@hoop-rush/test-fixtures';
-import type { ClassicDraftCatalog, EraSimulationProfile } from '@hoop-rush/data-contracts';
+import type {
+  ClassicDraftCatalog,
+  EraId,
+  EraSimulationProfile,
+  FranchiseId,
+  PlayerId,
+  Position,
+} from '@hoop-rush/data-contracts';
+import {
+  eraIdSchema,
+  franchiseIdSchema,
+  playerIdSchema,
+  seedSchema,
+} from '@hoop-rush/data-contracts';
+const pid = (value: string): PlayerId => playerIdSchema.parse(value);
+const fid = (value: string): FranchiseId => franchiseIdSchema.parse(value);
+const eid = (value: string): EraId => eraIdSchema.parse(value);
 import { DEFAULT_ERA_SIM_PROFILE } from '@hoop-rush/test-fixtures';
 import { createEngineContext } from '../../sim/context.ts';
 import { createClassicDraft } from '../classic/draft.ts';
@@ -44,7 +60,7 @@ import { simulateDuelSeries } from './duel-sim.ts';
 import { fixedFiveResultDigest } from './digest.ts';
 
 const context = createEngineContext();
-const ROOT = seedFromString('fixed-five-golden');
+const ROOT = seedSchema.parse(seedFromString('fixed-five-golden'));
 
 function candidatePool(): FixedFiveCandidate[] {
   const defs: Array<{
@@ -54,8 +70,8 @@ function candidatePool(): FixedFiveCandidate[] {
     franchiseId: string;
     eraId: string;
   }> = [
-    { playerId: 'p-g1', positions: ['PG'], score: 90, franchiseId: 'lakers', eraId: '1990s' },
-    { playerId: 'p-g2', positions: ['SG'], score: 88, franchiseId: 'lakers', eraId: '1990s' },
+    { playerId: pid(`p-g1`), positions: ['PG'], score: 90, franchiseId: 'lakers', eraId: '1990s' },
+    { playerId: pid(`p-g2`), positions: ['SG'], score: 88, franchiseId: 'lakers', eraId: '1990s' },
     {
       playerId: 'p-g3',
       positions: ['PG', 'SG'],
@@ -63,57 +79,50 @@ function candidatePool(): FixedFiveCandidate[] {
       franchiseId: 'celtics',
       eraId: '1990s',
     },
-    { playerId: 'p-f1', positions: ['SF'], score: 87, franchiseId: 'bulls', eraId: '1990s' },
-    { playerId: 'p-f2', positions: ['PF'], score: 86, franchiseId: 'bulls', eraId: '1990s' },
+    { playerId: pid(`p-f1`), positions: ['SF'], score: 87, franchiseId: 'bulls', eraId: '1990s' },
+    { playerId: pid(`p-f2`), positions: ['PF'], score: 86, franchiseId: 'bulls', eraId: '1990s' },
     { playerId: 'p-f3', positions: ['SF', 'PF'], score: 84, franchiseId: 'heat', eraId: '2000s' },
-    { playerId: 'p-c1', positions: ['C'], score: 89, franchiseId: 'celtics', eraId: '1990s' },
+    { playerId: pid(`p-c1`), positions: ['C'], score: 89, franchiseId: 'celtics', eraId: '1990s' },
     { playerId: 'p-c2', positions: ['PF', 'C'], score: 83, franchiseId: 'heat', eraId: '2000s' },
   ];
   return defs.map((d) => ({
-    playerId: d.playerId,
+    playerId: pid(d.playerId),
     playerVersionId: `pv-${d.playerId}`,
     positions: d.positions,
     selectionScore: d.score,
-    franchiseId: d.franchiseId,
-    eraId: d.eraId,
+    franchiseId: fid(d.franchiseId),
+    eraId: eid(d.eraId),
   }));
 }
 
 function classicCatalog(): ClassicDraftCatalog {
+  const entry = (
+    franchiseId: string,
+    eraId: string,
+    players: Array<{ playerId: string; positions: Position[] }>,
+  ): ClassicDraftCatalog[number] => ({
+    franchiseId: fid(franchiseId),
+    eraId: eid(eraId),
+    players: players.map((p) => ({ playerId: pid(p.playerId), positions: p.positions })),
+  });
   return [
-    {
-      franchiseId: 'bulls',
-      eraId: '1990s',
-      players: [
-        { playerId: 'p-f1', positions: ['SF'] },
-        { playerId: 'p-f2', positions: ['PF'] },
-      ],
-    },
-    {
-      franchiseId: 'celtics',
-      eraId: '1990s',
-      players: [
-        { playerId: 'p-g3', positions: ['PG', 'SG'] },
-        { playerId: 'p-c1', positions: ['C'] },
-      ],
-    },
-    {
-      franchiseId: 'heat',
-      eraId: '2000s',
-      players: [
-        { playerId: 'p-f3', positions: ['SF', 'PF'] },
-        { playerId: 'p-c2', positions: ['PF', 'C'] },
-      ],
-    },
-    {
-      franchiseId: 'lakers',
-      eraId: '1990s',
-      players: [
-        { playerId: 'p-g1', positions: ['PG'] },
-        { playerId: 'p-g2', positions: ['SG'] },
-      ],
-    },
-    { franchiseId: 'lakers', eraId: '2010s', players: [{ playerId: 'p-g4', positions: ['SG'] }] },
+    entry('bulls', '1990s', [
+      { playerId: pid(`p-f1`), positions: ['SF'] },
+      { playerId: pid(`p-f2`), positions: ['PF'] },
+    ]),
+    entry('celtics', '1990s', [
+      { playerId: 'p-g3', positions: ['PG', 'SG'] },
+      { playerId: pid(`p-c1`), positions: ['C'] },
+    ]),
+    entry('heat', '2000s', [
+      { playerId: 'p-f3', positions: ['SF', 'PF'] },
+      { playerId: 'p-c2', positions: ['PF', 'C'] },
+    ]),
+    entry('lakers', '1990s', [
+      { playerId: pid(`p-g1`), positions: ['PG'] },
+      { playerId: pid(`p-g2`), positions: ['SG'] },
+    ]),
+    entry('lakers', '2010s', [{ playerId: 'p-g4', positions: ['SG'] }]),
   ];
 }
 
@@ -126,14 +135,14 @@ function duelCatalog(): ClassicDraftCatalog {
     for (const eraId of eras) {
       n += 1;
       catalog.push({
-        franchiseId,
-        eraId,
+        franchiseId: fid(franchiseId),
+        eraId: eid(eraId),
         players: [
-          { playerId: `d-g-${String(n)}`, positions: ['PG'] },
-          { playerId: `d-f-${String(n)}`, positions: ['SF'] },
-          { playerId: `d-c-${String(n)}`, positions: ['C'] },
-          { playerId: `d-g2-${String(n)}`, positions: ['SG'] },
-          { playerId: `d-f2-${String(n)}`, positions: ['PF'] },
+          { playerId: pid(`d-g-${String(n)}`), positions: ['PG'] },
+          { playerId: pid(`d-f-${String(n)}`), positions: ['SF'] },
+          { playerId: pid(`d-c-${String(n)}`), positions: ['C'] },
+          { playerId: pid(`d-g2-${String(n)}`), positions: ['SG'] },
+          { playerId: pid(`d-f2-${String(n)}`), positions: ['PF'] },
         ],
       });
     }
@@ -146,7 +155,7 @@ function duelPool(): { pool: FixedFiveCandidate[]; byId: Map<string, FixedFiveCa
   for (let n = 1; n <= 12; n += 1) {
     pool.push(
       {
-        playerId: `d-g-${String(n)}`,
+        playerId: pid(`d-g-${String(n)}`),
         playerVersionId: `pv-d-g-${String(n)}`,
         positions: ['PG'],
         selectionScore: 80 + (n % 5),
@@ -154,7 +163,7 @@ function duelPool(): { pool: FixedFiveCandidate[]; byId: Map<string, FixedFiveCa
         eraId: 'y',
       },
       {
-        playerId: `d-f-${String(n)}`,
+        playerId: pid(`d-f-${String(n)}`),
         playerVersionId: `pv-d-f-${String(n)}`,
         positions: ['SF'],
         selectionScore: 79 + (n % 5),
@@ -162,7 +171,7 @@ function duelPool(): { pool: FixedFiveCandidate[]; byId: Map<string, FixedFiveCa
         eraId: 'y',
       },
       {
-        playerId: `d-c-${String(n)}`,
+        playerId: pid(`d-c-${String(n)}`),
         playerVersionId: `pv-d-c-${String(n)}`,
         positions: ['C'],
         selectionScore: 78 + (n % 5),
@@ -170,7 +179,7 @@ function duelPool(): { pool: FixedFiveCandidate[]; byId: Map<string, FixedFiveCa
         eraId: 'y',
       },
       {
-        playerId: `d-g2-${String(n)}`,
+        playerId: pid(`d-g2-${String(n)}`),
         playerVersionId: `pv-d-g2-${String(n)}`,
         positions: ['SG'],
         selectionScore: 77 + (n % 5),
@@ -178,7 +187,7 @@ function duelPool(): { pool: FixedFiveCandidate[]; byId: Map<string, FixedFiveCa
         eraId: 'y',
       },
       {
-        playerId: `d-f2-${String(n)}`,
+        playerId: pid(`d-f2-${String(n)}`),
         playerVersionId: `pv-d-f2-${String(n)}`,
         positions: ['PF'],
         selectionScore: 76 + (n % 5),
@@ -235,27 +244,27 @@ describe('sandbox builder', () => {
     let state = createSandboxBuilder();
     state = applySandboxBuilderCommand(state, pool, {
       kind: 'sandbox-place',
-      playerId: 'p-g1',
+      playerId: pid(`p-g1`),
       slotIndex: 0,
     });
     state = applySandboxBuilderCommand(state, pool, {
       kind: 'sandbox-place',
-      playerId: 'p-g2',
+      playerId: pid(`p-g2`),
       slotIndex: 1,
     });
     state = applySandboxBuilderCommand(state, pool, {
       kind: 'sandbox-place',
-      playerId: 'p-f1',
+      playerId: pid(`p-f1`),
       slotIndex: 2,
     });
     state = applySandboxBuilderCommand(state, pool, {
       kind: 'sandbox-place',
-      playerId: 'p-f2',
+      playerId: pid(`p-f2`),
       slotIndex: 3,
     });
     state = applySandboxBuilderCommand(state, pool, {
       kind: 'sandbox-place',
-      playerId: 'p-c1',
+      playerId: pid(`p-c1`),
       slotIndex: 4,
     });
     state = applySandboxBuilderCommand(state, pool, { kind: 'sandbox-lock' });
@@ -267,7 +276,7 @@ describe('sandbox builder', () => {
     expect(() =>
       applySandboxBuilderCommand(state, pool, {
         kind: 'sandbox-place',
-        playerId: 'p-c1',
+        playerId: pid(`p-c1`),
         slotIndex: 0,
       }),
     ).toThrow();
@@ -371,15 +380,15 @@ describe('duel draft', () => {
         }
       });
       expect(option).toBeDefined();
-      const candidate = byId.get(option?.playerId ?? '');
-      const positions =
-        candidate?.positions ?? option?.positions ?? (['PG'] as FixedFiveCandidate['positions']);
+      if (!option) throw new Error('duel test found no claimable player');
+      const candidate = byId.get(option.playerId);
+      const positions = candidate?.positions ?? option.positions;
       const slot = slotForPosition(positions, used);
       state = claimDuelPlayer(
         state,
         catalog,
         byId,
-        { playerId: option?.playerId ?? '', slotIndex: slot, actor: picker },
+        { playerId: option.playerId, slotIndex: slot, actor: picker },
         context,
       );
     }
@@ -405,20 +414,20 @@ describe('duel draft', () => {
 describe('timeout autopick', () => {
   it('ranks by selectionScore desc, versionId asc, slot asc and draws from top eight', () => {
     const single = [
-      { playerId: 'c', playerVersionId: 'pv-c', slotIndex: 0 as const, selectionScore: 90 },
+      { playerId: pid('c'), playerVersionId: 'pv-c', slotIndex: 0 as const, selectionScore: 90 },
     ];
     expect(chooseAutopick(ROOT, 'duel', 'p1', 0, single).playerId).toBe('c');
     const candidates = [
-      { playerId: 'a', playerVersionId: 'pv-b', slotIndex: 1 as const, selectionScore: 80 },
-      { playerId: 'b', playerVersionId: 'pv-a', slotIndex: 0 as const, selectionScore: 80 },
-      { playerId: 'c', playerVersionId: 'pv-c', slotIndex: 0 as const, selectionScore: 90 },
+      { playerId: pid('a'), playerVersionId: 'pv-b', slotIndex: 1 as const, selectionScore: 80 },
+      { playerId: pid('b'), playerVersionId: 'pv-a', slotIndex: 0 as const, selectionScore: 80 },
+      { playerId: pid('c'), playerVersionId: 'pv-c', slotIndex: 0 as const, selectionScore: 90 },
     ];
     const first = chooseAutopick(ROOT, 'duel', 'p1', 0, candidates);
     const second = chooseAutopick(ROOT, 'duel', 'p1', 0, candidates);
     expect(first).toEqual(second);
     expect(['a', 'b', 'c']).toContain(first.playerId);
     const many = Array.from({ length: 10 }, (_, i) => ({
-      playerId: `p-${String(i)}`,
+      playerId: pid(`p-${String(i)}`),
       playerVersionId: `pv-${String(i).padStart(2, '0')}`,
       slotIndex: 0 as const,
       selectionScore: 100 - i,
@@ -453,7 +462,12 @@ describe('timeout autopick', () => {
   });
   it('uses the rootSeed/timeout-autopick/mode/participant/pickOrdinal path', () => {
     const candidates = [
-      { playerId: 'p-g1', playerVersionId: 'pv-p-g1', slotIndex: 0 as const, selectionScore: 90 },
+      {
+        playerId: pid('p-g1'),
+        playerVersionId: 'pv-p-g1',
+        slotIndex: 0 as const,
+        selectionScore: 90,
+      },
     ];
     const pick = chooseAutopick(ROOT, 'classic-shared-82', 'p2', 3, candidates);
     expect(pick.seedPath).toBe('rootSeed/timeout-autopick/classic-shared-82/p2/3');
@@ -604,7 +618,7 @@ describe('classic safe moves', () => {
   it('enumerates feasible classic picks', () => {
     const catalog = classicCatalog();
     const byId = poolById(candidatePool());
-    const seed = seedFromString('classic-safe');
+    const seed = seedSchema.parse(seedFromString('classic-safe'));
     const state = createClassicDraft(
       { draftId: 'd', variant: 'ratings', seed, dataVersion: 'data-v1', catalog },
       context,

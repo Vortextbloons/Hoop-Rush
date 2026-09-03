@@ -2,7 +2,23 @@ import {
   POSITION_SLOTS,
   SIMULATION_RATINGS,
   SIMULATION_TENDENCIES,
+  bracketOpponentSchema,
+  challengeRunSchema,
+  eraIdSchema,
+  eraSimulationProfileSchema,
+  franchiseEraPoolSchema,
+  franchiseIdSchema,
+  gameSimulationInputSchema,
+  hoopRushManifestSchema,
+  opponentBracketSchema,
+  opponentTeamSchema,
+  peakPlayerSeasonSchema,
+  playerIdSchema,
+  seasonKeySchema,
   seedFromString,
+  seedSchema,
+  simulationPlayerSchema,
+  simulationTeamSchema,
 } from '@hoop-rush/data-contracts';
 import type {
   BracketOpponent,
@@ -94,7 +110,7 @@ function fullProvenance(): PeakPlayerSeason['provenance'] {
   return provenance;
 }
 export function buildPlayerSeason(overrides: Partial<PeakPlayerSeason> = {}): PeakPlayerSeason {
-  return {
+  return peakPlayerSeasonSchema.parse({
     schemaVersion: 3,
     playerId: 'p-1',
     franchiseId: 'lakers',
@@ -152,13 +168,13 @@ export function buildPlayerSeason(overrides: Partial<PeakPlayerSeason> = {}): Pe
       lineageRuleVersion: 'lineage-v1',
     },
     ...overrides,
-  };
+  });
 }
 export function buildPool(
   players: PeakPlayerSeason[],
   overrides: Partial<FranchiseEraPool> = {},
 ): FranchiseEraPool {
-  return {
+  return franchiseEraPoolSchema.parse({
     schemaVersion: 3,
     dataVersion: 'data-v1',
     franchiseId: players[0]?.franchiseId ?? 'lakers',
@@ -175,7 +191,7 @@ export function buildPool(
     },
     players,
     ...overrides,
-  };
+  });
 }
 const DEFAULT_DIFFICULTY: DifficultyProfile = {
   profileVersion: 'm3-medium-v3',
@@ -224,7 +240,10 @@ const ALL_FRANCHISE_SLOTS: ReadonlyArray<{
   { franchiseId: 'wizards', displayName: 'Washington Wizards', teamExternalId: '1610612764' },
 ];
 function buildModernFranchiseSlots(): ModernFranchiseSlot[] {
-  return ALL_FRANCHISE_SLOTS.map((slot) => ({ ...slot }));
+  return ALL_FRANCHISE_SLOTS.map((slot) => ({
+    ...slot,
+    franchiseId: franchiseIdSchema.parse(slot.franchiseId),
+  }));
 }
 function unavailableMatrix(): HoopRushManifest['availability'] {
   const rows: HoopRushManifest['availability'] = [];
@@ -239,8 +258,8 @@ function unavailableMatrix(): HoopRushManifest['availability'] {
       { eraId: '2020s', from: '2020-21' },
     ]) {
       rows.push({
-        franchiseId: slot.franchiseId,
-        eraId: era.eraId,
+        franchiseId: franchiseIdSchema.parse(slot.franchiseId),
+        eraId: eraIdSchema.parse(era.eraId),
         status: 'unavailable',
         reason: 'source-incomplete',
       });
@@ -249,7 +268,7 @@ function unavailableMatrix(): HoopRushManifest['availability'] {
   return rows;
 }
 export function buildManifest(overrides: Partial<HoopRushManifest> = {}): HoopRushManifest {
-  return {
+  return hoopRushManifestSchema.parse({
     schemaVersion: 3,
     dataVersion: 'data-v1',
     modernFranchiseSlots: buildModernFranchiseSlots(),
@@ -358,12 +377,12 @@ export function buildManifest(overrides: Partial<HoopRushManifest> = {}): HoopRu
       cacheVersion: '2026-07-01',
     },
     ...overrides,
-  };
+  });
 }
 export function buildChallengeRun(overrides: Partial<ChallengeRun> = {}): ChallengeRun {
   const bracket = buildFixtureBracket();
   const players = buildUserTeam().players;
-  return {
+  return challengeRunSchema.parse({
     schemaVersion: 2,
     runId: 'run-1',
     mode: 'sandbox',
@@ -404,14 +423,16 @@ export function buildChallengeRun(overrides: Partial<ChallengeRun> = {}): Challe
     games: [],
     aggregates: zeroAggregates(players),
     ...overrides,
-  };
+  });
 }
 export function buildUserTeam(): SimulationTeam {
-  return buildLegalSimulationTeam({
-    teamId: 'user',
-    displayName: 'Los Angeles Lakers',
-    players: legalFive('p-'),
-  });
+  return simulationTeamSchema.parse(
+    buildLegalSimulationTeam({
+      teamId: 'user',
+      displayName: 'Los Angeles Lakers',
+      players: legalFive('p-'),
+    }),
+  );
 }
 function zeroAggregates(players: readonly SimulationPlayer[]): RunAggregates {
   const zero = () => ({ made: 0, attempted: 0 });
@@ -458,12 +479,12 @@ function buildBracketOpponent(
   const positions: SimulationPlayer['positions'][] = POSITION_SLOTS.map((position) => [position]);
   const players = positions.map((position, slot) =>
     buildSimulationPlayer({
-      playerId: `p-opp-${String(index)}-${String(slot)}`,
+      playerId: playerIdSchema.parse(`p-opp-${String(index)}-${String(slot)}`),
       displayName: `Opponent ${String(index)} ${String(slot)}`,
       positions: position,
     }),
   );
-  return {
+  return bracketOpponentSchema.parse({
     schemaVersion: 2,
     opponentId,
     bracketVersion: 'bracket-v1',
@@ -488,7 +509,7 @@ function buildBracketOpponent(
       percentile: 0.5,
     },
     ...overrides,
-  };
+  });
 }
 function buildFixtureSchedule(opponentIds: readonly string[]): BracketScheduleEntry[] {
   if (opponentIds.length !== 30) {
@@ -515,7 +536,7 @@ export function buildFixtureBracket(overrides: Partial<OpponentBracket> = {}): O
     ),
   );
   const opponentIds = opponents.map((o) => o.opponentId);
-  const bracket: OpponentBracket = {
+  const bracket: OpponentBracket = opponentBracketSchema.parse({
     schemaVersion: 1,
     bracketVersion: 'bracket-v1',
     scheduleVersion: 'schedule-v1',
@@ -532,13 +553,13 @@ export function buildFixtureBracket(overrides: Partial<OpponentBracket> = {}): O
     opponents,
     schedule: buildFixtureSchedule(opponentIds),
     ...overrides,
-  };
+  });
   return bracket;
 }
 const DEFAULT_SIM_RATINGS: SimulationRatings = { ...SIMULATION_RATINGS };
 const DEFAULT_SIM_TENDENCIES = { ...SIMULATION_TENDENCIES };
 export function buildSimulationPlayer(overrides: Partial<SimulationPlayer> = {}): SimulationPlayer {
-  return {
+  return simulationPlayerSchema.parse({
     playerId: 'p-1',
     displayName: 'Test Player',
     positions: ['SG'],
@@ -547,13 +568,13 @@ export function buildSimulationPlayer(overrides: Partial<SimulationPlayer> = {})
     ratings: { ...DEFAULT_SIM_RATINGS },
     tendencies: { ...DEFAULT_SIM_TENDENCIES },
     ...overrides,
-  };
+  });
 }
 function legalFive(prefix: string, centerInteriorDefense?: number): SimulationPlayer[] {
   const positions: SimulationPlayer['positions'][] = POSITION_SLOTS.map((position) => [position]);
   return positions.map((position, i) =>
     buildSimulationPlayer({
-      playerId: `${prefix}${String(i + 1)}`,
+      playerId: playerIdSchema.parse(`${prefix}${String(i + 1)}`),
       displayName: `Fixture ${String(i + 1)}`,
       positions: position,
       ...(centerInteriorDefense !== undefined
@@ -568,17 +589,17 @@ function legalFive(prefix: string, centerInteriorDefense?: number): SimulationPl
   );
 }
 export function buildLegalSimulationTeam(overrides: Partial<SimulationTeam> = {}): SimulationTeam {
-  return {
+  return simulationTeamSchema.parse({
     teamId: 'fixture-home',
     displayName: 'Fixture Home',
     players: legalFive('p-fixture-', 75),
     ...overrides,
-  };
+  });
 }
 export function buildRolesTeam(overrides: Partial<SimulationTeam> = {}): SimulationTeam {
   const players: SimulationPlayer[] = [
     buildSimulationPlayer({
-      playerId: 'p-roles-creator',
+      playerId: playerIdSchema.parse('p-roles-creator'),
       displayName: 'Primary Creator',
       positions: ['PG'],
       ratings: {
@@ -600,7 +621,7 @@ export function buildRolesTeam(overrides: Partial<SimulationTeam> = {}): Simulat
       },
     }),
     buildSimulationPlayer({
-      playerId: 'p-roles-spacer',
+      playerId: playerIdSchema.parse('p-roles-spacer'),
       displayName: 'Floor Spacer',
       positions: ['SG'],
       ratings: { ...DEFAULT_SIM_RATINGS, threePoint: 84 },
@@ -616,7 +637,7 @@ export function buildRolesTeam(overrides: Partial<SimulationTeam> = {}): Simulat
       },
     }),
     buildSimulationPlayer({
-      playerId: 'p-roles-secondary',
+      playerId: playerIdSchema.parse('p-roles-secondary'),
       displayName: 'Secondary Creator',
       positions: ['SF'],
       ratings: {
@@ -636,7 +657,7 @@ export function buildRolesTeam(overrides: Partial<SimulationTeam> = {}): Simulat
       },
     }),
     buildSimulationPlayer({
-      playerId: 'p-roles-post',
+      playerId: playerIdSchema.parse('p-roles-post'),
       displayName: 'Post Presence',
       positions: ['PF'],
       ratings: { ...DEFAULT_SIM_RATINGS, insideScoring: 82, closeShot: 74, offensiveRebound: 78 },
@@ -651,7 +672,7 @@ export function buildRolesTeam(overrides: Partial<SimulationTeam> = {}): Simulat
       },
     }),
     buildSimulationPlayer({
-      playerId: 'p-roles-rim',
+      playerId: playerIdSchema.parse('p-roles-rim'),
       displayName: 'Rim Runner',
       positions: ['C'],
       ratings: {
@@ -687,7 +708,7 @@ export function buildRolesTeam(overrides: Partial<SimulationTeam> = {}): Simulat
 export function buildSlotPermutationPlayers(): SimulationPlayer[] {
   return [
     buildSimulationPlayer({
-      playerId: 'p-slot-creator',
+      playerId: playerIdSchema.parse('p-slot-creator'),
       displayName: 'Slot Creator',
       positions: ['PG', 'SG', 'SF', 'PF', 'C'],
       ratings: {
@@ -711,7 +732,7 @@ export function buildSlotPermutationPlayers(): SimulationPlayer[] {
       },
     }),
     buildSimulationPlayer({
-      playerId: 'p-slot-shooter',
+      playerId: playerIdSchema.parse('p-slot-shooter'),
       displayName: 'Slot Shooter',
       positions: ['PG', 'SG', 'SF'],
       ratings: { ...DEFAULT_SIM_RATINGS, threePoint: 84 },
@@ -727,7 +748,7 @@ export function buildSlotPermutationPlayers(): SimulationPlayer[] {
       },
     }),
     buildSimulationPlayer({
-      playerId: 'p-slot-wing',
+      playerId: playerIdSchema.parse('p-slot-wing'),
       displayName: 'Slot Wing',
       positions: ['SG', 'SF', 'PF'],
       ratings: { ...DEFAULT_SIM_RATINGS, threePoint: 74, offensiveIq: 72 },
@@ -741,7 +762,7 @@ export function buildSlotPermutationPlayers(): SimulationPlayer[] {
       },
     }),
     buildSimulationPlayer({
-      playerId: 'p-slot-post',
+      playerId: playerIdSchema.parse('p-slot-post'),
       displayName: 'Slot Post',
       positions: ['PF', 'C'],
       ratings: { ...DEFAULT_SIM_RATINGS, insideScoring: 82, closeShot: 74, offensiveRebound: 78 },
@@ -756,7 +777,7 @@ export function buildSlotPermutationPlayers(): SimulationPlayer[] {
       },
     }),
     buildSimulationPlayer({
-      playerId: 'p-slot-rim',
+      playerId: playerIdSchema.parse('p-slot-rim'),
       displayName: 'Slot Rim',
       positions: ['PF', 'C'],
       ratings: {
@@ -809,7 +830,7 @@ export function buildSlotPermutationTeams(): SimulationTeam[] {
 function fixtureScale(targetCenter: number) {
   return (_element: unknown, index: number): SimulationPlayer => {
     const base = buildSimulationPlayer({
-      playerId: `p-fx-${String(index + 1)}`,
+      playerId: playerIdSchema.parse(`p-fx-${String(index + 1)}`),
       displayName: `Fixture ${String(index + 1)}`,
     });
     const shifted: SimulationRatings = Object.fromEntries(
@@ -923,7 +944,7 @@ function fixtureTargets(): EraSimulationProfile['targets'] {
     ],
   };
 }
-export const DEFAULT_ERA_SIM_PROFILE: EraSimulationProfile = {
+export const DEFAULT_ERA_SIM_PROFILE: EraSimulationProfile = eraSimulationProfileSchema.parse({
   schemaVersion: 1,
   eraId: '1990s',
   profileVersion: 'm2-1990s-fixture-v1',
@@ -965,17 +986,17 @@ export const DEFAULT_ERA_SIM_PROFILE: EraSimulationProfile = {
     source: 'fixture',
   },
   targets: fixtureTargets(),
-};
+});
 export function buildEraSimulationProfile(
   overrides: Partial<EraSimulationProfile> = {},
 ): EraSimulationProfile {
-  return { ...DEFAULT_ERA_SIM_PROFILE, ...overrides };
+  return eraSimulationProfileSchema.parse({ ...DEFAULT_ERA_SIM_PROFILE, ...overrides });
 }
 export function buildGameSimulationInput(
   overrides: Partial<GameSimulationInput> = {},
 ): GameSimulationInput {
   const { home, away } = buildEqualFixture();
-  return {
+  return gameSimulationInputSchema.parse({
     schemaVersion: 2,
     seed: seedFromString('fixture-game'),
     gameNumber: 1,
@@ -984,10 +1005,10 @@ export function buildGameSimulationInput(
     home,
     away,
     ...overrides,
-  };
+  });
 }
 export function buildOpeningOpponent(overrides: Partial<OpponentTeam> = {}): OpponentTeam {
-  return {
+  return opponentTeamSchema.parse({
     schemaVersion: 2,
     opponentId: 'lakers-1990s-opening',
     bracketVersion: 'bracket-m3-preview-v1',
@@ -1007,33 +1028,33 @@ export function buildOpeningOpponent(overrides: Partial<OpponentTeam> = {}): Opp
     },
     players: [
       buildSimulationPlayer({
-        playerId: 'p-89',
+        playerId: playerIdSchema.parse('p-89'),
         displayName: 'Nick Van Exel',
         positions: ['PG'],
       }),
       buildSimulationPlayer({
-        playerId: 'p-9',
+        playerId: playerIdSchema.parse('p-9'),
         displayName: 'Sedale Threatt',
         positions: ['SG'],
       }),
       buildSimulationPlayer({
-        playerId: 'p-920',
+        playerId: playerIdSchema.parse('p-920'),
         displayName: 'A.C. Green',
         positions: ['SF'],
       }),
       buildSimulationPlayer({
-        playerId: 'p-109',
+        playerId: playerIdSchema.parse('p-109'),
         displayName: 'Robert Horry',
         positions: ['PF'],
       }),
       buildSimulationPlayer({
-        playerId: 'p-124',
+        playerId: playerIdSchema.parse('p-124'),
         displayName: 'Vlade Divac',
         positions: ['C'],
       }),
     ],
     ...overrides,
-  };
+  });
 }
 export * from './classic.ts';
 export * from './season.ts';

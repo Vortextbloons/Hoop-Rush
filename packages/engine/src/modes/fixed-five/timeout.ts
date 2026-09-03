@@ -2,6 +2,7 @@ import type {
   ClassicDraftCatalog,
   ClassicDraftState,
   FixedFiveRoomMode,
+  PlayerId,
   Seed,
   SlotIndex,
 } from '@hoop-rush/data-contracts';
@@ -19,7 +20,7 @@ import type { DuelDraftState } from './duel.ts';
 import { duelRollCandidates } from './duel.ts';
 
 export interface ClassicSafeMove {
-  playerId: string;
+  playerId: PlayerId;
   playerVersionId: string;
   slotIndex: SlotIndex;
   selectionScore: number;
@@ -133,7 +134,7 @@ export function rankSandboxSafeMoves(
 }
 
 export interface AutopickSelection {
-  playerId: string;
+  playerId: PlayerId;
   playerVersionId: string;
   slotIndex: SlotIndex;
   seedPath: string;
@@ -146,7 +147,7 @@ export function chooseAutopick(
   participantId: 'p1' | 'p2',
   pickOrdinal: number,
   candidates: Array<{
-    playerId: string;
+    playerId: PlayerId;
     playerVersionId: string;
     slotIndex: SlotIndex;
     selectionScore: number;

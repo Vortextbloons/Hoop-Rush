@@ -1,0 +1,120 @@
+import { describe, expect, it } from 'vitest';
+import { commandIdSchema, idSchema, seedSchema } from '@hoop-rush/data-contracts';
+import type { FixedFiveCommand } from '@hoop-rush/data-contracts';
+import {
+  deriveEffectivePhase,
+  isDraftComplete,
+  roomLogFacts,
+  type DraftReplay,
+} from '$lib/fixed-five-room-state';
+
+const ROOM = idSchema.parse('room-1');
+const ROOT = seedSchema.parse('0123456789abcdef0123456789abcdef');
+
+function duelReplay(overrides: Partial<Extract<DraftReplay, { mode: 'duel' }>> = {}): DraftReplay {
+  return {
+    mode: 'duel',
+    hasStart: true,
+    skipped: 0,
+    state: {
+      rootSeed: ROOT,
+      firstPicker: 'p1',
+      pickOrdinal: 0,
+      currentRoll: { franchiseId: 'bulls', eraId: '1990s' },
+      picks: [],
+      claimedPairs: [],
+      claimedVersionIds: [],
+      rerolls: {
+        p1: { franchiseSpent: false, eraSpent: false },
+        p2: { franchiseSpent: false, eraSpent: false },
+      },
+      status: 'drafting',
+      ...overrides.state,
+    },
+    ...overrides,
+  };
+}
+
+function command(
+  ordinal: number,
+  actor: 'p1' | 'p2',
+  payload: FixedFiveCommand['payload'],
+): FixedFiveCommand {
+  return {
+    schemaVersion: 1,
+    roomId: ROOM,
+    commandId: commandIdSchema.parse(`cmd-${String(ordinal)}`),
+    ordinal,
+    actorParticipantId: actor,
+    payload,
+  };
+}
+
+describe('roomLogFacts', () => {
+  it('tracks ready, rematch, proposals, and confirmations in ordinal order', () => {
+    const facts = roomLogFacts([
+      command(0, 'p1', { kind: 'ready', ready: true }),
+      command(1, 'p2', { kind: 'ready', ready: false }),
+      command(2, 'p1', { kind: 'rematch-request' }),
+      command(3, 'p2', { kind: 'rematch-confirm' }),
+    ]);
+    expect(facts.ready).toEqual({ p1: true, p2: false });
+    expect(facts.rematchRequested.p1).toBe(true);
+    expect(facts.rematchConfirmed.p2).toBe(true);
+    expect(facts.proposals).toEqual([]);
+  });
+});
+
+describe('deriveEffectivePhase', () => {
+  it('keeps server terminal phases untouched', () => {
+    const replay = duelReplay({ hasStart: false });
+    expect(deriveEffectivePhase('completed', replay, false)).toBe('completed');
+    expect(deriveEffectivePhase('integrity-failed', replay, false)).toBe('integrity-failed');
+    expect(deriveEffectivePhase('expired', replay, false)).toBe('expired');
+  });
+  it('walks lobby, drafting, simulating, and awaiting-confirmation from the log', () => {
+    const completeState = {
+      rootSeed: ROOT,
+      firstPicker: 'p1' as const,
+      pickOrdinal: 10,
+      currentRoll: null,
+      picks: [],
+      claimedPairs: [] as string[],
+      claimedVersionIds: [] as string[],
+      rerolls: {
+        p1: { franchiseSpent: false, eraSpent: false },
+        p2: { franchiseSpent: false, eraSpent: false },
+      },
+      status: 'complete' as const,
+    };
+    expect(deriveEffectivePhase('lobby', duelReplay({ hasStart: false }), false)).toBe('lobby');
+    expect(deriveEffectivePhase('lobby', duelReplay(), false)).toBe('drafting');
+    expect(deriveEffectivePhase('lobby', duelReplay({ state: completeState }), false)).toBe(
+      'simulating',
+    );
+    expect(deriveEffectivePhase('lobby', duelReplay({ state: completeState }), true)).toBe(
+      'awaiting-confirmation',
+    );
+  });
+  it('reports draft completion from duel state', () => {
+    const drafting = duelReplay();
+    expect(isDraftComplete(drafting)).toBe(false);
+    const done = duelReplay({
+      state: {
+        rootSeed: ROOT,
+        firstPicker: 'p1',
+        pickOrdinal: 10,
+        currentRoll: null,
+        picks: [],
+        claimedPairs: [],
+        claimedVersionIds: [],
+        rerolls: {
+          p1: { franchiseSpent: false, eraSpent: false },
+          p2: { franchiseSpent: false, eraSpent: false },
+        },
+        status: 'complete',
+      },
+    });
+    expect(isDraftComplete(done)).toBe(true);
+  });
+});

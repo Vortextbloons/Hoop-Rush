@@ -1,4 +1,4 @@
-import type { ClassicDraftCatalog, Seed, SlotIndex } from '@hoop-rush/data-contracts';
+import type { ClassicDraftCatalog, PlayerId, Seed, SlotIndex } from '@hoop-rush/data-contracts';
 import { CLASSIC_ROLL_VERSION, slotGroupOf } from '@hoop-rush/data-contracts';
 import { canPlay } from '../../domain/positions.ts';
 import { slotRequirement } from '../../domain/lineup.ts';
@@ -10,7 +10,7 @@ import type { FixedFiveCandidate } from './sandbox-builder.ts';
 export interface DuelDraftPick {
   pickOrdinal: number;
   participantId: 'p1' | 'p2';
-  playerId: string;
+  playerId: PlayerId;
   playerVersionId: string;
   franchiseId: string;
   eraId: string;
@@ -101,7 +101,7 @@ function rollPair(
     throw new Error(`no eligible duel pool for pick ${String(pickOrdinal)}`);
   }
   const seedMaterial = classicRollSeed(
-    `${rootSeed}:duel:${String(pickOrdinal)}`,
+    `${rootSeed}:duel:${String(pickOrdinal)}` as Seed,
     CLASSIC_ROLL_VERSION,
     kind === 'initial' ? 'initial' : kind,
     (pickOrdinal % 5) + 1,
@@ -172,7 +172,7 @@ export function rerollDuel(
 }
 
 export interface DuelClaimInput {
-  playerId: string;
+  playerId: PlayerId;
   slotIndex: SlotIndex;
   actor: 'p1' | 'p2';
 }

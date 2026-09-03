@@ -5,6 +5,9 @@ import {
   SEASON_INFLUENCE_FLOOR,
   blockRoundRange,
   buildEmptyCampaignState,
+  commandIdSchema,
+  franchiseIdSchema,
+  idSchema,
   seasonCampaignStateSchema,
   seasonNamespaceSeed,
   type SeasonCampaignCondition,
@@ -178,7 +181,7 @@ const CAMPAIGN_TEMPLATES: readonly CampaignTemplate[] = [
       comparisonOperator: 'gte',
       threshold: 2,
       window: 'block',
-      opponentFranchiseId: 'celtics',
+      opponentFranchiseId: franchiseIdSchema.parse('celtics'),
     },
     completedReward: {
       rewardId: rewardId('campaign-catalog-v1', 'marquee-win-over-higher', 'completed'),
@@ -228,14 +231,14 @@ const CAMPAIGN_TEMPLATES: readonly CampaignTemplate[] = [
       comparisonOperator: 'gte',
       threshold: 1,
       window: 'block',
-      opponentFranchiseId: 'celtics',
+      opponentFranchiseId: franchiseIdSchema.parse('celtics'),
     },
     breakthrough: {
       kind: 'sweep-opponent',
       comparisonOperator: 'gte',
       threshold: 2,
       window: 'block',
-      opponentFranchiseId: 'celtics',
+      opponentFranchiseId: franchiseIdSchema.parse('celtics'),
     },
     completedReward: {
       rewardId: rewardId('campaign-catalog-v1', 'marquee-sweep', 'completed'),
@@ -1140,16 +1143,17 @@ export function generateSeasonCampaignOffers(
       }
     }
     if (candidate.opponentFranchiseId !== null) {
+      const opponentFid = franchiseIdSchema.parse(candidate.opponentFranchiseId);
       if ('opponentFranchiseId' in target) {
         target = {
           ...target,
-          opponentFranchiseId: candidate.opponentFranchiseId,
+          opponentFranchiseId: opponentFid,
         };
       }
       if (breakthrough !== null && 'opponentFranchiseId' in breakthrough) {
         breakthrough = {
           ...breakthrough,
-          opponentFranchiseId: candidate.opponentFranchiseId,
+          opponentFranchiseId: opponentFid,
         };
       }
     }
@@ -1272,7 +1276,8 @@ function evaluateCondition(
             (a.franchiseId < b.franchiseId ? -1 : 1),
         )
         .map((r) => r.franchiseId);
-      const pos = order.indexOf(human) + 1;
+      const humanFidTopSix = franchiseIdSchema.parse(human);
+      const pos = order.indexOf(humanFidTopSix) + 1;
       const isTopSix = pos <= 6 ? 1 : 0;
       const metTopSix = compare(isTopSix, condition.comparisonOperator, condition.threshold);
       return { met: metTopSix, factValue: pos, facts: { position: pos, topSix: pos <= 6 } };
@@ -1287,7 +1292,8 @@ function evaluateCondition(
             (a.franchiseId < b.franchiseId ? -1 : 1),
         )
         .map((r) => r.franchiseId);
-      const pos = order.indexOf(human) + 1;
+      const humanFidPlayIn = franchiseIdSchema.parse(human);
+      const pos = order.indexOf(humanFidPlayIn) + 1;
       const inPlayIn = pos >= 7 && pos <= 10;
       const metPlayIn = compare(
         inPlayIn ? 1 : 0,
@@ -1716,7 +1722,9 @@ function applyInfluenceReward(
   influence: SeasonInfluenceState;
   entry: SeasonInfluenceState['ledger'][number];
 } {
-  const balanceBefore = influence.balances[franchiseId] ?? 0;
+  const fid = franchiseIdSchema.parse(franchiseId);
+  const parsedCommandId = commandId === null ? null : commandIdSchema.parse(commandId);
+  const balanceBefore = influence.balances[fid] ?? 0;
   let appliedDelta = requestedDelta;
   if (balanceBefore + requestedDelta > SEASON_INFLUENCE_CAP) {
     appliedDelta = Math.max(0, SEASON_INFLUENCE_CAP - balanceBefore);
@@ -1726,19 +1734,21 @@ function applyInfluenceReward(
   }
   const balanceAfter = balanceBefore + appliedDelta;
   const entry = {
-    entryId: deriveSeasonInfluenceEntryId(
-      `influence-campaign-${String(blockIndex)}-${franchiseId}-${rewardId}`,
+    entryId: idSchema.parse(
+      deriveSeasonInfluenceEntryId(
+        `influence-campaign-${String(blockIndex)}-${franchiseId}-${rewardId}`,
+      ),
     ),
-    franchiseId,
+    franchiseId: fid,
     source: 'campaign-reward' as const,
     blockIndex,
-    commandId,
+    commandId: parsedCommandId,
     requestedDelta,
     appliedDelta,
     balanceAfter,
     explanation,
   };
-  const balances = { ...influence.balances, [franchiseId]: balanceAfter };
+  const balances = { ...influence.balances, [fid]: balanceAfter };
   const ledger = [...influence.ledger, entry];
   return { influence: { ...influence, balances, ledger }, entry };
 }
@@ -1830,7 +1840,7 @@ export function applySeasonCampaignReward(
         newBranchState = { ...newBranchState, [opportunity.branchId]: 'open' as const };
         break;
       default: {
-        const exhaustive: never = reward;
+        const exhaustive: never = reward.type;
         throw assertNever(exhaustive, `unknown campaign reward type`);
       }
     }
@@ -1979,7 +1989,7 @@ export function applySeasonCampaignEvolutionSelection(
       kind: offer.kind,
       resultingIdentity: offer.resultingIdentity,
       resultingFocus: offer.resultingFocus,
-      selectedByCommandId: input.commandId,
+      selectedByCommandId: commandIdSchema.parse(input.commandId),
     },
   };
 }

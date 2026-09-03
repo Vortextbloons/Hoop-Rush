@@ -19,6 +19,24 @@ import { buildInitialPostseasonState } from './season-postseason.ts';
 import { SEASON_OBJECTIVE_CATALOG } from './season-objective.ts';
 import { SEASON_ALIGNMENT } from './season-alignment.ts';
 import { SEASON_FREE_AGENCY_VERSION, SEASON_RUN_SCHEMA_VERSION } from './season-versions.ts';
+import {
+  commandIdSchema,
+  contentHashSchema,
+  eraIdSchema,
+  franchiseIdSchema,
+  idSchema,
+  playerIdSchema,
+  seasonGameIdSchema,
+  seasonKeySchema,
+  seedSchema,
+} from './ids.ts';
+import { seasonLeagueSchema } from './season-league.ts';
+import { seasonRosterSchema } from './season-roster.ts';
+import { classicDraftCatalogSchema } from './classic.ts';
+import { peakPlayerSeasonSchema } from './player-season.ts';
+import { seasonScheduleSchema } from './season-schedule.ts';
+import { seasonRunSchema } from './season-run.ts';
+import { seasonGameSummarySchema } from './season-game-summary.ts';
 export const CONFERENCE_TEAMS: Record<'east' | 'west', string[]> = {
   east: SEASON_ALIGNMENT.filter((entry) => entry.conference === 'east').map(
     (entry) => entry.franchiseId,
@@ -32,7 +50,7 @@ export const DIVISION_OF: Record<string, string> = Object.fromEntries(
 );
 export const SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
 export function buildLeague(): SeasonLeague {
-  return {
+  return seasonLeagueSchema.parse({
     schemaVersion: 1,
     leagueVersion: 'league-v1',
     teams: [...CONFERENCE_TEAMS.east, ...CONFERENCE_TEAMS.west].map((franchiseId, index) => ({
@@ -41,7 +59,7 @@ export function buildLeague(): SeasonLeague {
       conference: index < 15 ? ('east' as const) : ('west' as const),
       division: DIVISION_OF[franchiseId] as SeasonLeague['teams'][number]['division'],
     })),
-  };
+  });
 }
 export function buildSchedule(): SeasonSchedule {
   const games: SeasonSchedule['games'] = [];
@@ -54,14 +72,14 @@ export function buildSchedule(): SeasonSchedule {
       if (home === undefined || away === undefined) throw new Error('fixture teams out of range');
       sequence += 1;
       games.push({
-        gameId: `s${String(sequence).padStart(6, '0')}`,
+        gameId: seasonGameIdSchema.parse(`s${String(sequence).padStart(6, '0')}`),
         round,
-        homeFranchiseId: home,
-        awayFranchiseId: away,
+        homeFranchiseId: franchiseIdSchema.parse(home),
+        awayFranchiseId: franchiseIdSchema.parse(away),
       });
     }
   }
-  return {
+  return seasonScheduleSchema.parse({
     schemaVersion: 1,
     scheduleVersion: 'schedule-v1',
     formulaVersion: 'schedule-formula-v1',
@@ -69,7 +87,7 @@ export function buildSchedule(): SeasonSchedule {
     generationSeed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a',
     rounds: 82,
     games,
-  };
+  });
 }
 export function buildGames(schedule: SeasonSchedule): SeasonGame[] {
   return schedule.games.map((game) => ({
@@ -81,7 +99,7 @@ export function buildGames(schedule: SeasonSchedule): SeasonGame[] {
   }));
 }
 export function buildPostseason(seed: string): SeasonRun['postseason'] {
-  return buildInitialPostseasonState(seed);
+  return buildInitialPostseasonState(seedSchema.parse(seed));
 }
 export function buildEmptyHealth(): SeasonHealthState {
   return {
@@ -129,8 +147,8 @@ export function buildInitialInfluence(): SeasonInfluenceState {
     influenceVersion: 'season-influence-v2',
     balances: Object.fromEntries(franchises.map((franchiseId) => [franchiseId, 2])),
     ledger: franchises.map((franchiseId) => ({
-      entryId: `influence-initial-${franchiseId}`,
-      franchiseId,
+      entryId: idSchema.parse(`influence-initial-${franchiseId}`),
+      franchiseId: franchiseIdSchema.parse(franchiseId),
       source: 'initial-grant' as const,
       blockIndex: null,
       commandId: null,
@@ -146,21 +164,23 @@ export function buildInitialInfluence(): SeasonInfluenceState {
 export function buildRun(): SeasonRun {
   const league = buildLeague();
   const schedule = buildSchedule();
-  const rosters = league.teams.map((team, teamIndex) => ({
-    franchiseId: team.franchiseId,
-    players: Array.from({ length: 10 }, (_, slot) => ({
-      playerVersionId:
-        `pv-${String(teamIndex).padStart(2, '0')}${String(slot).padStart(2, '0')}`.padEnd(
-          3 + 32,
-          '0',
-        ),
-      playerId: `p-synth-${String(teamIndex + 1)}-${String(slot + 1)}`,
+  const rosters = league.teams.map((team, teamIndex) =>
+    seasonRosterSchema.parse({
       franchiseId: team.franchiseId,
-      eraId: '1990s',
-      seasonKey: '1995-96',
-      displayName: `Synthetic ${String(slot + 1)}`,
-    })),
-  }));
+      players: Array.from({ length: 10 }, (_, slot) => ({
+        playerVersionId:
+          `pv-${String(teamIndex).padStart(2, '0')}${String(slot).padStart(2, '0')}`.padEnd(
+            3 + 32,
+            '0',
+          ),
+        playerId: `p-synth-${String(teamIndex + 1)}-${String(slot + 1)}`,
+        franchiseId: team.franchiseId,
+        eraId: '1990s',
+        seasonKey: '1995-96',
+        displayName: `Synthetic ${String(slot + 1)}`,
+      })),
+    }),
+  );
   const aiAssignments = league.teams.map((team, index) => ({
     franchiseId: team.franchiseId,
     band:
@@ -184,7 +204,7 @@ export function buildRun(): SeasonRun {
                 ? ('continuity' as const)
                 : ('active-trader' as const),
   }));
-  return {
+  return seasonRunSchema.parse({
     schemaVersion: SEASON_RUN_SCHEMA_VERSION,
     runId: 'fixture-run-1',
     rootSeed: SEED,
@@ -428,7 +448,7 @@ export function buildRun(): SeasonRun {
     checkpointState: null,
     stateRevision: 0,
     stateDigest: '0'.repeat(32),
-  };
+  });
 }
 function buildFixtureAiPools(
   league: SeasonLeague,
@@ -523,7 +543,7 @@ export function buildFixturePlayerLine(
 }
 export function buildFixtureTeamBox(franchiseId: string): SeasonGameSummary['homeBox'] {
   return {
-    franchiseId,
+    franchiseId: franchiseIdSchema.parse(franchiseId),
     points: 0,
     fieldGoalsMade: 0,
     fieldGoalsAttempted: 0,
@@ -542,7 +562,7 @@ export function buildFixtureTeamBox(franchiseId: string): SeasonGameSummary['hom
   };
 }
 export function buildSummaryFixture(): SeasonGameSummary {
-  return {
+  return seasonGameSummarySchema.parse({
     schemaVersion: 1,
     summaryVersion: 'season-game-summary-v3',
     gameId: 's000001',
@@ -563,11 +583,11 @@ export function buildSummaryFixture(): SeasonGameSummary {
       buildFixturePlayerLine(fixturePlayerId(10 + index)),
     ),
     injuryEvents: [],
-  };
+  });
 }
 function buildTeamAggregateRows(): SeasonTeamAggregate[] {
   return [...CONFERENCE_TEAMS.east, ...CONFERENCE_TEAMS.west].map((franchiseId) => ({
-    franchiseId,
+    franchiseId: franchiseIdSchema.parse(franchiseId),
     gamesPlayed: 0,
     wins: 0,
     losses: 0,
@@ -591,7 +611,7 @@ function buildTeamAggregateRows(): SeasonTeamAggregate[] {
 function buildPlayerAggregateRows(): SeasonPlayerAggregate[] {
   return Array.from({ length: 300 }, (_, index) => ({
     playerVersionId: fixturePlayerId(index),
-    franchiseId: 'lakers',
+    franchiseId: franchiseIdSchema.parse('lakers'),
     gamesPlayed: 0,
     appearances: 0,
     started: 0,
@@ -733,14 +753,14 @@ export function buildPendingBlockFixture(): SeasonPendingBlockCandidate {
     schemaVersion: 1,
     blockVersion: 'season-block-v6',
     runId: run.runId,
-    commandId: 'submit-b0',
+    commandId: commandIdSchema.parse('submit-b0'),
     blockIndex: 0,
     expectedRevision: 0,
     expectedStateRevision: 0,
     expectedStateDigest: '0'.repeat(32),
     objectiveId: null,
     campaignOpportunityId: null,
-    nextGameId: 's000001',
+    nextGameId: seasonGameIdSchema.parse('s000001'),
     summaries: [],
     retainedDetails: [],
     effects: buildEffectsStateFixture(),

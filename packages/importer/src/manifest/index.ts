@@ -14,11 +14,7 @@ import {
   RATING_MODEL_VERSION,
 } from '@hoop-rush/data-contracts';
 import { LINEAGE_SEGMENTS, MODERN_SLOTS } from '../lineage.ts';
-import {
-  classifyUnattempted,
-  loadCoverageReport,
-  loadManifest,
-} from '../pools/compute.ts';
+import { classifyUnattempted, loadCoverageReport, loadManifest } from '../pools/compute.ts';
 const manifestEraSchema = z.looseObject({
   eraId: z.string(),
   label: z.string().optional(),
@@ -73,10 +69,12 @@ const importerManifestSchema = z.looseObject({
   playersIndex: manifestAssetRefSchema.optional(),
   rosterDetails: manifestAssetRefSchema.optional(),
   season: seasonArtifactsSchema.optional(),
-  assets: z.looseObject({
-    source: z.string().optional(),
-    cacheVersion: z.string().optional(),
-  }).optional(),
+  assets: z
+    .looseObject({
+      source: z.string().optional(),
+      cacheVersion: z.string().optional(),
+    })
+    .optional(),
 });
 export type Manifest = z.infer<typeof importerManifestSchema>;
 export const MANIFEST_PATH = join(PUBLIC_DATA, 'manifest.json');

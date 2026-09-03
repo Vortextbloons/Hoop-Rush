@@ -1,6 +1,9 @@
 import {
   SEASON_INFLUENCE_CAP,
   SEASON_INFLUENCE_FLOOR,
+  commandIdSchema,
+  franchiseIdSchema,
+  idSchema,
   type SeasonInfluenceLedgerEntry,
   type SeasonInfluenceState,
   type SeasonTransactionEntry,
@@ -19,10 +22,11 @@ export function createInitialSeasonInfluenceState(
     }[]
   > = {};
   for (const franchiseId of franchiseIds) {
-    balances[franchiseId] = 2;
+    const fid = franchiseIdSchema.parse(franchiseId);
+    balances[fid] = 2;
     ledger.push({
-      entryId: `influence-initial-${franchiseId}`,
-      franchiseId,
+      entryId: idSchema.parse(`influence-initial-${franchiseId}`),
+      franchiseId: fid,
       source: 'initial-grant',
       blockIndex: null,
       commandId: null,
@@ -31,7 +35,7 @@ export function createInitialSeasonInfluenceState(
       balanceAfter: 2,
       explanation: 'Initial +2 Influence grant at run creation',
     });
-    windows[franchiseId] = [];
+    windows[fid] = [];
   }
   return {
     schemaVersion: 1,
@@ -64,13 +68,14 @@ export function applySeasonBlockInfluenceGrants(
   const ledger: SeasonInfluenceLedgerEntry[] = [...influence.ledger];
   const capReachedFranchiseIds: string[] = [];
   for (const franchiseId of Object.keys(balances)) {
+    const fid = franchiseIdSchema.parse(franchiseId);
     const requestedDelta = 1;
     const appliedDelta = (balances[franchiseId] ?? 0) < SEASON_INFLUENCE_CAP ? 1 : 0;
     if (appliedDelta === 0) capReachedFranchiseIds.push(franchiseId);
     balances[franchiseId] = (balances[franchiseId] ?? 0) + appliedDelta;
     ledger.push({
-      entryId: `influence-block-${String(blockIndex)}-${franchiseId}`,
-      franchiseId,
+      entryId: idSchema.parse(`influence-block-${String(blockIndex)}-${franchiseId}`),
+      franchiseId: fid,
       source: 'block-grant',
       blockIndex,
       commandId: null,
@@ -85,8 +90,8 @@ export function applySeasonBlockInfluenceGrants(
   }
   const entries: SeasonTransactionEntry[] = [
     seasonTransactionEntry({
-      transactionId: `txn-block-grant-${String(blockIndex)}`,
-      commandId: `sys-block-grant-${String(blockIndex)}`,
+      transactionId: idSchema.parse(`txn-block-grant-${String(blockIndex)}`),
+      commandId: commandIdSchema.parse(`sys-block-grant-${String(blockIndex)}`),
       franchiseId: null,
       type: 'block-grant',
       blockIndex,
@@ -107,14 +112,15 @@ export function applySeasonBlockInfluenceGrants(
     input.objectiveSuccessByFranchise ??
     (humanFranchiseId && objectiveSuccess !== null ? { [humanFranchiseId]: objectiveSuccess } : {});
   for (const pid of participantIds) {
+    const fid = franchiseIdSchema.parse(pid);
     const success = successMap[pid] ?? (pid === humanFranchiseId ? objectiveSuccess : null);
     if (success === true) {
       const requestedDelta = 1;
       const appliedDelta = (balances[pid] ?? 0) < SEASON_INFLUENCE_CAP ? 1 : 0;
       balances[pid] = (balances[pid] ?? 0) + appliedDelta;
       ledger.push({
-        entryId: `influence-objective-${String(blockIndex)}-${pid}`,
-        franchiseId: pid,
+        entryId: idSchema.parse(`influence-objective-${String(blockIndex)}-${pid}`),
+        franchiseId: fid,
         source: 'objective-reward',
         blockIndex,
         commandId: null,
@@ -128,9 +134,9 @@ export function applySeasonBlockInfluenceGrants(
       });
       entries.push(
         seasonTransactionEntry({
-          transactionId: `txn-objective-reward-${String(blockIndex)}-${pid}`,
-          commandId: `sys-objective-reward-${String(blockIndex)}-${pid}`,
-          franchiseId: pid,
+          transactionId: idSchema.parse(`txn-objective-reward-${String(blockIndex)}-${pid}`),
+          commandId: commandIdSchema.parse(`sys-objective-reward-${String(blockIndex)}-${pid}`),
+          franchiseId: fid,
           type: 'objective-reward',
           blockIndex,
           appliedAtStateRevision,
@@ -180,42 +186,41 @@ export function applySeasonInfluenceSpend(input: SeasonInfluenceSpendInput): {
 } {
   const { influence, franchiseId, source, requestedDelta, blockIndex, commandId, explanation } =
     input;
-  const balanceBefore = influence.balances[franchiseId] ?? 0;
+  const fid = franchiseIdSchema.parse(franchiseId);
+  const cid = commandId === null ? null : commandIdSchema.parse(commandId);
+  const balanceBefore = influence.balances[fid] ?? 0;
   if (balanceBefore + requestedDelta < SEASON_INFLUENCE_FLOOR) {
     throw new SeasonInfluenceFloorError({ franchiseId, balance: balanceBefore, requestedDelta });
   }
   const balanceAfter = balanceBefore + requestedDelta;
   const entry: SeasonInfluenceLedgerEntry = {
-    entryId: deriveSeasonInfluenceEntryId(`influence-spend-${commandId ?? 'system'}`),
-    franchiseId,
+    entryId: idSchema.parse(deriveSeasonInfluenceEntryId(`influence-spend-${commandId ?? 'system'}`)),
+    franchiseId: fid,
     source,
     blockIndex,
-    commandId,
+    commandId: cid,
     requestedDelta,
     appliedDelta: requestedDelta,
     balanceAfter,
     explanation,
   };
-  const balances: Record<string, number> = { ...influence.balances, [franchiseId]: balanceAfter };
+  const balances: Record<string, number> = { ...influence.balances, [fid]: balanceAfter };
   const ledger: SeasonInfluenceLedgerEntry[] = [...influence.ledger, entry];
   let windows = influence.windows;
   let rehabs = influence.rehabs;
   if (input.windowIndex !== undefined && source === 'extra-trade-offer') {
     windows = {
       ...windows,
-      [franchiseId]: [
-        ...(windows[franchiseId] ?? []),
-        { windowIndex: input.windowIndex, extraOfferSpent: true },
-      ],
+      [fid]: [...(windows[fid] ?? []), { windowIndex: input.windowIndex, extraOfferSpent: true }],
     };
   }
   if (input.injuryId !== undefined && source === 'risky-rehab') {
     rehabs = {
       ...rehabs,
       [input.injuryId]: {
-        franchiseId,
+        franchiseId: fid,
         outcome: input.rehabOutcome ?? 'pending',
-        commandId: commandId ?? 'system',
+        commandId: commandIdSchema.parse(commandId ?? 'system'),
       },
     };
   }

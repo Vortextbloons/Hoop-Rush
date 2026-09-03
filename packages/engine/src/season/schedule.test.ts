@@ -4,6 +4,7 @@ import {
   SEASON_GAME_COUNT,
   SEASON_ROUND_COUNT,
   seasonScheduleSchema,
+  seedSchema,
 } from '@hoop-rush/data-contracts';
 import { buildSeasonLeague, seedFromString } from '@hoop-rush/test-fixtures';
 import { auditSeasonSchedule, generateSeasonSchedule } from './schedule.ts';
@@ -12,11 +13,17 @@ import {
   divisionOpponentsOf,
   oppositeConferenceOpponentsOf,
 } from './league.ts';
-const SEEDS = [SEASON_COMMITTED_SCHEDULE_SEED, seedFromString('schedule-test-1')];
+const SEEDS = [
+  seedSchema.parse(SEASON_COMMITTED_SCHEDULE_SEED),
+  seedSchema.parse(seedFromString('schedule-test-1')),
+];
 describe('generateSeasonSchedule', () => {
   it('generates the committed schedule with the committed seed', () => {
     const league = buildSeasonLeague();
-    const schedule = generateSeasonSchedule({ league, seed: SEASON_COMMITTED_SCHEDULE_SEED });
+    const schedule = generateSeasonSchedule({
+      league,
+      seed: seedSchema.parse(SEASON_COMMITTED_SCHEDULE_SEED),
+    });
     expect(seasonScheduleSchema.safeParse(schedule).success).toBe(true);
     expect(auditSeasonSchedule(schedule, league)).toEqual([]);
     expect(schedule.games).toHaveLength(SEASON_GAME_COUNT);
@@ -34,7 +41,10 @@ describe('generateSeasonSchedule', () => {
   });
   it('keeps every franchise at 82 games with 41 home and 41 away', () => {
     const league = buildSeasonLeague();
-    const schedule = generateSeasonSchedule({ league, seed: SEASON_COMMITTED_SCHEDULE_SEED });
+    const schedule = generateSeasonSchedule({
+      league,
+      seed: seedSchema.parse(SEASON_COMMITTED_SCHEDULE_SEED),
+    });
     const home = new Map<string, number>();
     const away = new Map<string, number>();
     for (const game of schedule.games) {
@@ -48,7 +58,10 @@ describe('generateSeasonSchedule', () => {
   });
   it('structures every round as 15 games', () => {
     const league = buildSeasonLeague();
-    const schedule = generateSeasonSchedule({ league, seed: SEASON_COMMITTED_SCHEDULE_SEED });
+    const schedule = generateSeasonSchedule({
+      league,
+      seed: seedSchema.parse(SEASON_COMMITTED_SCHEDULE_SEED),
+    });
     for (let round = 1; round <= SEASON_ROUND_COUNT; round += 1) {
       const games = schedule.games.filter((game) => game.round === round);
       expect(games).toHaveLength(15);
@@ -56,7 +69,10 @@ describe('generateSeasonSchedule', () => {
   });
   it('applies the frozen frequency formula per team', () => {
     const league = buildSeasonLeague();
-    const schedule = generateSeasonSchedule({ league, seed: SEASON_COMMITTED_SCHEDULE_SEED });
+    const schedule = generateSeasonSchedule({
+      league,
+      seed: seedSchema.parse(SEASON_COMMITTED_SCHEDULE_SEED),
+    });
     const opponentCounts = new Map<string, Map<string, number>>();
     for (const team of league.teams) opponentCounts.set(team.franchiseId, new Map());
     for (const game of schedule.games) {
@@ -90,7 +106,10 @@ describe('generateSeasonSchedule', () => {
   });
   it('balances three-game pairings to six home games per team', () => {
     const league = buildSeasonLeague();
-    const schedule = generateSeasonSchedule({ league, seed: SEASON_COMMITTED_SCHEDULE_SEED });
+    const schedule = generateSeasonSchedule({
+      league,
+      seed: seedSchema.parse(SEASON_COMMITTED_SCHEDULE_SEED),
+    });
     const homeVersus = new Map<string, Map<string, number>>();
     const opponentCounts = new Map<string, Map<string, number>>();
     for (const team of league.teams) {
@@ -129,7 +148,7 @@ describe('generateSeasonSchedule', () => {
   it('generates valid schedules across many seeds', () => {
     const league = buildSeasonLeague();
     for (let i = 0; i < 3; i += 1) {
-      const seed = seedFromString(`schedule-batch-${String(i)}`);
+      const seed = seedSchema.parse(seedFromString(`schedule-batch-${String(i)}`));
       const schedule = generateSeasonSchedule({ league, seed });
       expect(auditSeasonSchedule(schedule, league)).toEqual([]);
       expect(seasonScheduleSchema.safeParse(schedule).success).toBe(true);
@@ -145,14 +164,17 @@ describe('generateSeasonSchedule', () => {
         return team;
       }),
     };
-    const schedule = generateSeasonSchedule({ league: altered, seed: seedFromString('altered') });
+    const schedule = generateSeasonSchedule({
+      league: altered,
+      seed: seedSchema.parse(seedFromString('altered')),
+    });
     expect(auditSeasonSchedule(schedule, altered)).toEqual([]);
   });
   it('supports different generation versions', () => {
     const league = buildSeasonLeague();
     const schedule = generateSeasonSchedule({
       league,
-      seed: seedFromString('gen-version'),
+      seed: seedSchema.parse(seedFromString('gen-version')),
       generationVersion: 'schedule-gen-v2-test',
     });
     expect(auditSeasonSchedule(schedule, league)).toEqual([]);
@@ -161,14 +183,17 @@ describe('generateSeasonSchedule', () => {
     const league = buildSeasonLeague();
     const short = { ...league, teams: league.teams.slice(0, 29) };
     expect(() =>
-      generateSeasonSchedule({ league: short, seed: seedFromString('short') }),
+      generateSeasonSchedule({ league: short, seed: seedSchema.parse(seedFromString('short')) }),
     ).toThrow();
   });
 });
 describe('auditSeasonSchedule', () => {
   it('detects a swapped pairing', () => {
     const league = buildSeasonLeague();
-    const schedule = generateSeasonSchedule({ league, seed: seedFromString('audit-swap') });
+    const schedule = generateSeasonSchedule({
+      league,
+      seed: seedSchema.parse(seedFromString('audit-swap')),
+    });
     const games = schedule.games.map((game) => ({ ...game }));
     const first = games[0];
     if (!first) throw new Error('no games');
@@ -182,7 +207,10 @@ describe('auditSeasonSchedule', () => {
   });
   it('detects a changed round and a duplicated game', () => {
     const league = buildSeasonLeague();
-    const schedule = generateSeasonSchedule({ league, seed: seedFromString('audit-round') });
+    const schedule = generateSeasonSchedule({
+      league,
+      seed: seedSchema.parse(seedFromString('audit-round')),
+    });
     const games = schedule.games.map((game) => ({ ...game }));
     const first = games[0];
     if (!first) throw new Error('no games');
@@ -195,7 +223,10 @@ describe('auditSeasonSchedule', () => {
   });
   it('detects a removed game and a self-game', () => {
     const league = buildSeasonLeague();
-    const schedule = generateSeasonSchedule({ league, seed: seedFromString('audit-missing') });
+    const schedule = generateSeasonSchedule({
+      league,
+      seed: seedSchema.parse(seedFromString('audit-missing')),
+    });
     const removed = schedule.games.slice(1);
     expect(auditSeasonSchedule({ ...schedule, games: removed }, league).length).toBeGreaterThan(0);
     const games = schedule.games.map((game) => ({ ...game }));
@@ -206,10 +237,14 @@ describe('auditSeasonSchedule', () => {
   });
   it('flags a league mismatch', () => {
     const league = buildSeasonLeague();
-    const schedule = generateSeasonSchedule({ league, seed: seedFromString('audit-league') });
-    const other = buildSeasonLeague({
-      teams: league.teams.filter((team) => team.franchiseId !== 'celtics'),
+    const schedule = generateSeasonSchedule({
+      league,
+      seed: seedSchema.parse(seedFromString('audit-league')),
     });
+    const other = {
+      ...league,
+      teams: league.teams.filter((team) => team.franchiseId !== 'celtics'),
+    };
     expect(auditSeasonSchedule(schedule, other).length).toBeGreaterThan(0);
   });
 });

@@ -4,16 +4,21 @@ import {
   SEASON_POSTSEASON_VERSION,
   SEASON_ROUND_COUNT,
   SEASON_SEED_NAMESPACES,
+  franchiseIdSchema,
+  idSchema,
   parsePlayoffGameId,
   playoffGameIdOf,
   playInGameIdOf,
   postseasonPhaseOfGameId,
   seasonDigestHex,
+  seasonGameIdSchema,
   seasonNamespaceSeed,
   seasonPostseasonSummaryDigest,
   seasonPostseasonSummarySchema,
+  seedSchema,
   type ConferenceId,
   type EraSimulationProfile,
+  type FranchiseId,
   type PlayInGame,
   type PlayInMatchupId,
   type PlayInState,
@@ -76,9 +81,13 @@ function parsePlayInGameId(gameId: string): {
 } | null {
   const match = /^pi-(east|west)-(seven-eight|nine-ten|final)$/.exec(gameId);
   if (match === null) return null;
+  const conference = match[1];
+  const matchup = match[2];
+  if ((conference !== 'east' && conference !== 'west') || matchup === undefined) return null;
+  if (matchup !== 'seven-eight' && matchup !== 'nine-ten' && matchup !== 'final') return null;
   return {
-    conference: match[1] as ConferenceId,
-    matchup: match[2] as PlayInMatchupId,
+    conference,
+    matchup,
   };
 }
 const FIRST_ROUND_PAIRS: ReadonlyArray<readonly [number, number]> = [
@@ -160,7 +169,7 @@ export function seasonPostseasonSetRankings(
     if (current.ranking !== null) {
       throw new SeasonPostseasonInvariantError(`${conference} play-in rankings are already set`);
     }
-    const ids = [...rankings[conference]];
+    const ids = [...rankings[conference]].map((id) => franchiseIdSchema.parse(id));
     if (ids.length !== 10 || new Set(ids).size !== 10) {
       throw new SeasonPostseasonInvariantError(
         `${conference} rankings must contain exactly ten unique teams`,
@@ -337,34 +346,32 @@ export function seasonPostseasonHumanEliminated(
   state: SeasonPostseasonState,
   humanFranchiseId: string,
 ): boolean {
+  const humanId = franchiseIdSchema.parse(humanFranchiseId);
   if (state.bracket === null) {
     for (const conference of CONFERENCES) {
       const playIn = state.playIn[conference];
       const ranking = playIn.ranking;
       if (ranking === null) continue;
-      const position = ranking.indexOf(humanFranchiseId);
+      const position = ranking.indexOf(humanId);
       if (position === -1) continue;
       if (position < 6) return false;
       const sevenEight = playIn.games.sevenEight;
       const nineTen = playIn.games.nineTen;
       const final = playIn.games.final;
       const wonAny = [sevenEight, nineTen, final].some(
-        (game) => game.status !== 'scheduled' && game.winnerFranchiseId === humanFranchiseId,
+        (game) => game.status !== 'scheduled' && game.winnerFranchiseId === humanId,
       );
       if (wonAny) return false;
       for (const game of [sevenEight, nineTen, final]) {
         if (game.status !== 'scheduled') continue;
         const teams = seasonPostseasonGameTeamsOf(state, game.gameId);
-        if (
-          teams !== null &&
-          (teams.home === humanFranchiseId || teams.away === humanFranchiseId)
-        ) {
+        if (teams !== null && (teams.home === humanId || teams.away === humanId)) {
           return false;
         }
       }
       if (
         sevenEight.status !== 'scheduled' &&
-        sevenEight.loserFranchiseId === humanFranchiseId &&
+        sevenEight.loserFranchiseId === humanId &&
         final.status === 'scheduled'
       ) {
         return false;
@@ -374,10 +381,7 @@ export function seasonPostseasonHumanEliminated(
   }
   for (const series of bracketSeriesOrder(state.bracket)) {
     if (series.winnerFranchiseId !== null) continue;
-    if (
-      series.homeCourtFranchiseId === humanFranchiseId ||
-      series.challengerFranchiseId === humanFranchiseId
-    ) {
+    if (series.homeCourtFranchiseId === humanId || series.challengerFranchiseId === humanId) {
       return false;
     }
   }
@@ -434,14 +438,14 @@ function applyPlayInGameResult(
   if (ranking === null) {
     throw new SeasonPostseasonInvariantError(`${conference} play-in has no ranking`);
   }
-  let home: string;
-  let away: string;
+  let homeRaw: string;
+  let awayRaw: string;
   if (matchup === 'seven-eight') {
-    home = ranking[6] ?? '';
-    away = ranking[7] ?? '';
+    homeRaw = ranking[6] ?? '';
+    awayRaw = ranking[7] ?? '';
   } else if (matchup === 'nine-ten') {
-    home = ranking[8] ?? '';
-    away = ranking[9] ?? '';
+    homeRaw = ranking[8] ?? '';
+    awayRaw = ranking[9] ?? '';
   } else {
     const sevenDone = playIn.games.sevenEight.status !== 'scheduled';
     const nineDone = playIn.games.nineTen.status !== 'scheduled';
@@ -450,12 +454,14 @@ function applyPlayInGameResult(
         `${conference} play-in final requires the 7/8 and 9/10 games first`,
       );
     }
-    home = playIn.games.sevenEight.loserFranchiseId ?? '';
-    away = playIn.games.nineTen.winnerFranchiseId ?? '';
+    homeRaw = playIn.games.sevenEight.loserFranchiseId ?? '';
+    awayRaw = playIn.games.nineTen.winnerFranchiseId ?? '';
   }
-  if (home === '' || away === '') {
+  if (homeRaw === '' || awayRaw === '') {
     throw new SeasonPostseasonInvariantError(`${facts.gameId} has no derived matchup`);
   }
+  const home = franchiseIdSchema.parse(homeRaw);
+  const away = franchiseIdSchema.parse(awayRaw);
   const resolved = resolvePlayInGame(playIn.games[key], home, away, facts);
   const updated = advanceConferencePlayIn({
     ...playIn,
@@ -465,17 +471,19 @@ function applyPlayInGameResult(
 }
 function resolvePlayInGame(
   game: PlayInGame,
-  home: string,
-  away: string,
+  home: FranchiseId,
+  away: FranchiseId,
   facts: SeasonPostseasonGameFacts,
 ): PlayInGame {
+  const winnerFranchiseId = franchiseIdSchema.parse(facts.winnerFranchiseId);
+  const loserFranchiseId = franchiseIdSchema.parse(facts.loserFranchiseId);
   const teams = [home, away];
   if (home === away) {
     throw new SeasonPostseasonInvariantError(
       `play-in game ${facts.gameId} cannot pair a team with itself`,
     );
   }
-  if (!teams.includes(facts.winnerFranchiseId) || !teams.includes(facts.loserFranchiseId)) {
+  if (!teams.includes(winnerFranchiseId) || !teams.includes(loserFranchiseId)) {
     throw new SeasonPostseasonInvariantError(
       `play-in game ${facts.gameId} winner/loser must be participants`,
     );
@@ -490,7 +498,7 @@ function resolvePlayInGame(
     }
     const homeWon = homeScore > awayScore;
     const expectedWinner = homeWon ? home : away;
-    if (facts.winnerFranchiseId !== expectedWinner) {
+    if (winnerFranchiseId !== expectedWinner) {
       throw new SeasonPostseasonInvariantError(
         `play-in game ${facts.gameId} winner must match the score`,
       );
@@ -500,8 +508,8 @@ function resolvePlayInGame(
       status: 'final',
       homeFranchiseId: home,
       awayFranchiseId: away,
-      winnerFranchiseId: facts.winnerFranchiseId,
-      loserFranchiseId: facts.loserFranchiseId,
+      winnerFranchiseId,
+      loserFranchiseId,
       homeScore,
       awayScore,
     };
@@ -516,8 +524,8 @@ function resolvePlayInGame(
     status: 'forfeit',
     homeFranchiseId: home,
     awayFranchiseId: away,
-    winnerFranchiseId: facts.winnerFranchiseId,
-    loserFranchiseId: facts.loserFranchiseId,
+    winnerFranchiseId,
+    loserFranchiseId,
     homeScore: null,
     awayScore: null,
   };
@@ -542,7 +550,7 @@ function advanceConferencePlayIn(playIn: PlayInState): PlayInState {
 }
 function buildConferenceBracket(
   conference: ConferenceId,
-  seeds: readonly string[],
+  seeds: readonly FranchiseId[],
 ): PlayoffConferenceBracket {
   const firstRound = FIRST_ROUND_PAIRS.map(([higherIndex, lowerIndex], index) => {
     const higherSeed = higherIndex + 1;
@@ -576,19 +584,21 @@ function seededSeries(
   seriesId: string,
   round: PlayoffRound,
   conference: ConferenceId,
-  homeCourtFranchiseId: string | null,
-  challengerFranchiseId: string | null,
+  homeCourtFranchiseId: FranchiseId | string | null,
+  challengerFranchiseId: FranchiseId | string | null,
   higherSeed: number | null,
   lowerSeed: number | null,
 ): PlayoffSeries {
   return {
-    seriesId,
+    seriesId: idSchema.parse(seriesId),
     round,
     conference,
     higherSeed,
     lowerSeed,
-    homeCourtFranchiseId,
-    challengerFranchiseId,
+    homeCourtFranchiseId:
+      homeCourtFranchiseId === null ? null : franchiseIdSchema.parse(homeCourtFranchiseId),
+    challengerFranchiseId:
+      challengerFranchiseId === null ? null : franchiseIdSchema.parse(challengerFranchiseId),
     homeCourtWins: 0,
     challengerWins: 0,
     games: [],
@@ -616,7 +626,7 @@ function createSeasonPlayoffBracket(state: SeasonPostseasonState): SeasonPostsea
     east: buildConferenceBracket('east', eastSeeds),
     west: buildConferenceBracket('west', westSeeds),
     finals: {
-      seriesId: 'finals',
+      seriesId: idSchema.parse('finals'),
       round: 'finals',
       conference: null,
       higherSeed: null,
@@ -701,11 +711,11 @@ function winnerSeedOf(series: PlayoffSeries): number | null {
 function pairSeededSeries(
   slot: PlayoffSeries,
   sideA: {
-    team: string;
+    team: FranchiseId;
     seed: number | null;
   },
   sideB: {
-    team: string;
+    team: FranchiseId;
     seed: number | null;
   },
 ): PlayoffSeries {
@@ -725,6 +735,7 @@ function advanceSeriesWinner(
   seriesId: string,
   winner: string,
 ): PlayoffBracket {
+  const winnerId = franchiseIdSchema.parse(winner);
   const conference = seriesId.startsWith('east-') ? 'east' : 'west';
   const confBracket = conference === 'east' ? bracket.east : bracket.west;
   if (seriesId.startsWith(`${conference}-first-round-`)) {
@@ -741,20 +752,20 @@ function advanceSeriesWinner(
     const side = index % 2 === 0 ? 'home' : 'away';
     const nextSlot: PlayoffSeries =
       side === 'home'
-        ? { ...semifinal, homeCourtFranchiseId: winner }
-        : { ...semifinal, challengerFranchiseId: winner };
+        ? { ...semifinal, homeCourtFranchiseId: winnerId }
+        : { ...semifinal, challengerFranchiseId: winnerId };
     const otherIndex = index % 2 === 0 ? index + 1 : index - 1;
     const other = confBracket.firstRound[otherIndex];
     let paired = nextSlot;
     if (nextSlot.homeCourtFranchiseId !== null && nextSlot.challengerFranchiseId !== null) {
       if (other === undefined || other.winnerFranchiseId === null) {
         throw new SeasonPostseasonInvariantError(
-          `first-round winner ${winner} cannot pair a semifinal`,
+          `first-round winner ${winnerId} cannot pair a semifinal`,
         );
       }
       paired = pairSeededSeries(
         nextSlot,
-        { team: winner, seed: winnerSeedOf(feed) },
+        { team: winnerId, seed: winnerSeedOf(feed) },
         { team: other.winnerFranchiseId, seed: winnerSeedOf(other) },
       );
     }
@@ -781,18 +792,18 @@ function advanceSeriesWinner(
     const side = index === 0 ? 'home' : 'away';
     const nextSlot: PlayoffSeries =
       side === 'home'
-        ? { ...confBracket.conferenceFinal, homeCourtFranchiseId: winner }
-        : { ...confBracket.conferenceFinal, challengerFranchiseId: winner };
+        ? { ...confBracket.conferenceFinal, homeCourtFranchiseId: winnerId }
+        : { ...confBracket.conferenceFinal, challengerFranchiseId: winnerId };
     let paired = nextSlot;
     if (nextSlot.homeCourtFranchiseId !== null && nextSlot.challengerFranchiseId !== null) {
       if (other.winnerFranchiseId === null) {
         throw new SeasonPostseasonInvariantError(
-          `semifinal winner ${winner} cannot pair the conference final`,
+          `semifinal winner ${winnerId} cannot pair the conference final`,
         );
       }
       paired = pairSeededSeries(
         nextSlot,
-        { team: winner, seed: winnerSeedOf(current) },
+        { team: winnerId, seed: winnerSeedOf(current) },
         { team: other.winnerFranchiseId, seed: winnerSeedOf(other) },
       );
     }
@@ -817,9 +828,9 @@ export function decideSeasonFinalsHomeCourt(input: {
   resolution: SeasonTiebreakResolution;
 } {
   const { league, standings } = input;
-  const east = input.eastChampionFranchiseId;
-  const west = input.westChampionFranchiseId;
-  const rowOf = (franchiseId: string) =>
+  const east = franchiseIdSchema.parse(input.eastChampionFranchiseId);
+  const west = franchiseIdSchema.parse(input.westChampionFranchiseId);
+  const rowOf = (franchiseId: FranchiseId) =>
     standings.rows.find((row) => row.franchiseId === franchiseId);
   const eastRow = rowOf(east);
   const westRow = rowOf(west);
@@ -828,7 +839,7 @@ export function decideSeasonFinalsHomeCourt(input: {
       'finals home-court decision requires standings rows for both champions',
     );
   }
-  let homeCourtFranchiseId: string;
+  let homeCourtFranchiseId: FranchiseId;
   let rule: 'overall-record' | 'head-to-head' | 'points-differential' | 'random-draw';
   let evidence: SeasonTiebreakResolution['evidence'];
   const crossProduct = eastRow.wins * westRow.losses - westRow.wins * eastRow.losses;
@@ -896,14 +907,16 @@ export function decideSeasonFinalsHomeCourt(input: {
   }
   const challenger = homeCourtFranchiseId === east ? west : east;
   const resolution: SeasonTiebreakResolution = {
-    resolutionId: `tb-finals-home-court-${seasonDigestHex([east, west, input.drawSeed, rule].join('\u0000'))}`,
+    resolutionId: idSchema.parse(
+      `tb-finals-home-court-${seasonDigestHex([east, west, input.drawSeed, rule].join(' '))}`,
+    ),
     conference: conferenceOf(league, homeCourtFranchiseId),
     kind: 'finals-home-court',
     rule,
     teams: [homeCourtFranchiseId, challenger],
     slots: [1],
     evidence,
-    drawSeed: rule === 'random-draw' ? input.drawSeed : null,
+    drawSeed: rule === 'random-draw' ? seedSchema.parse(input.drawSeed) : null,
   };
   return { homeCourtFranchiseId, resolution };
 }
@@ -931,13 +944,14 @@ function pairFinals(
     westChampionFranchiseId: westChamp,
     drawSeed,
   });
-  const challenger = decision.homeCourtFranchiseId === eastChamp ? westChamp : eastChamp;
+  const homeCourtId = franchiseIdSchema.parse(decision.homeCourtFranchiseId);
+  const challenger = homeCourtId === eastChamp ? westChamp : eastChamp;
   return {
     bracket: {
       ...bracket,
       finals: {
         ...bracket.finals,
-        homeCourtFranchiseId: decision.homeCourtFranchiseId,
+        homeCourtFranchiseId: homeCourtId,
         challengerFranchiseId: challenger,
       },
     },
@@ -986,8 +1000,10 @@ function applyPlayoffGameResult(
   if (home === away) {
     throw new SeasonPostseasonInvariantError(`series ${seriesId} cannot pair a team with itself`);
   }
+  const winnerFranchiseId = franchiseIdSchema.parse(facts.winnerFranchiseId);
+  const loserFranchiseId = franchiseIdSchema.parse(facts.loserFranchiseId);
   const teams = [home, away];
-  if (!teams.includes(facts.winnerFranchiseId) || !teams.includes(facts.loserFranchiseId)) {
+  if (!teams.includes(winnerFranchiseId) || !teams.includes(loserFranchiseId)) {
     throw new SeasonPostseasonInvariantError(
       `series ${seriesId} winner/loser must be participants`,
     );
@@ -1002,7 +1018,7 @@ function applyPlayoffGameResult(
     }
     const homeWon = homeScore > awayScore;
     const expectedWinner = homeWon ? home : away;
-    if (facts.winnerFranchiseId !== expectedWinner) {
+    if (winnerFranchiseId !== expectedWinner) {
       throw new SeasonPostseasonInvariantError(
         `series ${seriesId} game ${String(gameNumber)} winner must match the score`,
       );
@@ -1018,22 +1034,22 @@ function applyPlayoffGameResult(
     status: facts.status,
     homeScore: facts.status === 'final' ? facts.homeScore : null,
     awayScore: facts.status === 'final' ? facts.awayScore : null,
-    winnerFranchiseId: facts.winnerFranchiseId,
+    winnerFranchiseId,
   };
-  const homeCourtWins = series.homeCourtWins + (facts.winnerFranchiseId === homeCourt ? 1 : 0);
-  const challengerWins = series.challengerWins + (facts.winnerFranchiseId === challenger ? 1 : 0);
+  const homeCourtWins = series.homeCourtWins + (winnerFranchiseId === homeCourt ? 1 : 0);
+  const challengerWins = series.challengerWins + (winnerFranchiseId === challenger ? 1 : 0);
   const completed = homeCourtWins === 4 || challengerWins === 4;
   const updatedSeries: PlayoffSeries = {
     ...series,
     homeCourtWins,
     challengerWins,
     games: [...series.games, game],
-    winnerFranchiseId: completed ? facts.winnerFranchiseId : null,
+    winnerFranchiseId: completed ? winnerFranchiseId : null,
   };
   let updatedBracket = replaceSeries(bracket, seriesId, updatedSeries);
   let resolutions = state.tiebreakResolutions;
   if (completed && seriesId !== 'finals') {
-    updatedBracket = advanceSeriesWinner(updatedBracket, seriesId, facts.winnerFranchiseId);
+    updatedBracket = advanceSeriesWinner(updatedBracket, seriesId, winnerFranchiseId);
     if (series.round === 'conference-final') {
       const eastChamp = updatedBracket.east.conferenceFinal.winnerFranchiseId;
       const westChamp = updatedBracket.west.conferenceFinal.winnerFranchiseId;
@@ -1049,9 +1065,7 @@ function applyPlayoffGameResult(
     }
   }
   const champion =
-    completed && seriesId === 'finals'
-      ? facts.winnerFranchiseId
-      : updatedBracket.championFranchiseId;
+    completed && seriesId === 'finals' ? winnerFranchiseId : updatedBracket.championFranchiseId;
   return {
     ...state,
     tiebreakResolutions: resolutions,
@@ -1171,7 +1185,7 @@ export function rollPostseasonInjuryForPlayer(
   const injury: SeasonInjuryRecord = {
     injuryId: seasonInjuryIdOf(seedPath),
     playerVersionId: input.playerVersionId,
-    franchiseId: input.franchiseId,
+    franchiseId: franchiseIdSchema.parse(input.franchiseId),
     gameId: input.gameId,
     type,
     severity,
@@ -1260,7 +1274,8 @@ function postseasonGameHealthSeam(input: {
   }[] = [];
   const newInjuries: SeasonInjuryRecord[] = [];
   for (const franchiseId of [input.homeFranchiseId, input.awayFranchiseId]) {
-    const roster = rosterByFranchise.get(franchiseId);
+    const franchiseKey = franchiseIdSchema.parse(franchiseId);
+    const roster = rosterByFranchise.get(franchiseKey);
     if (roster === undefined) {
       throw new SeasonPostseasonInvariantError(
         `game ${input.gameId} references roster ${franchiseId}`,
@@ -1471,8 +1486,18 @@ export function simulateSeasonPostseasonGame(
     gameNumber: ordinal,
     dataVersion: catalog.dataVersion,
     profile,
-    home: { teamId: homeId, displayName: homeId, franchiseId: homeId, players: homePlayers },
-    away: { teamId: awayId, displayName: awayId, franchiseId: awayId, players: awayPlayers },
+    home: {
+      teamId: homeId,
+      displayName: homeId,
+      franchiseId: franchiseIdSchema.parse(homeId),
+      players: homePlayers,
+    },
+    away: {
+      teamId: awayId,
+      displayName: awayId,
+      franchiseId: franchiseIdSchema.parse(awayId),
+      players: awayPlayers,
+    },
     homeRotation,
     awayRotation,
     availability: [...homePlayers, ...awayPlayers].map((player) => ({
@@ -1731,32 +1756,36 @@ export function seasonPostseasonSummaryFromGame(input: {
   result: SeasonGameSimulationResult;
   injuryEvents: readonly SeasonCompactInjuryEvent[];
 }): SeasonPostseasonSummary {
+  const homeId = franchiseIdSchema.parse(input.homeFranchiseId);
+  const awayId = franchiseIdSchema.parse(input.awayFranchiseId);
   const seasonSummary = seasonGameSummaryFromResult(
     input.result,
     {
-      gameId: input.gameId,
+      gameId: seasonGameIdSchema.parse('s000001'),
       round: 1,
-      homeFranchiseId: input.homeFranchiseId,
-      awayFranchiseId: input.awayFranchiseId,
+      homeFranchiseId: homeId,
+      awayFranchiseId: awayId,
     },
     undefined,
     input.injuryEvents,
   );
   const homeWon = seasonSummary.homeScore > seasonSummary.awayScore;
-  const winnerFranchiseId =
+  const winnerRaw =
     seasonSummary.status === 'forfeit'
-      ? seasonSummary.forfeitLoserFranchiseId === input.homeFranchiseId
+      ? seasonSummary.forfeitLoserFranchiseId === homeId
         ? input.awayFranchiseId
         : input.homeFranchiseId
       : homeWon
         ? input.homeFranchiseId
         : input.awayFranchiseId;
-  const loserFranchiseId =
+  const loserRaw =
     seasonSummary.status === 'forfeit'
-      ? (seasonSummary.forfeitLoserFranchiseId ?? winnerFranchiseId)
+      ? (seasonSummary.forfeitLoserFranchiseId ?? winnerRaw)
       : homeWon
         ? input.awayFranchiseId
         : input.homeFranchiseId;
+  const winnerFranchiseId = franchiseIdSchema.parse(winnerRaw);
+  const loserFranchiseId = franchiseIdSchema.parse(loserRaw);
   const homeSubstitutions =
     input.result.outcome === 'completed'
       ? input.result.substitutions.filter((sub) => sub.side === 'home').length
@@ -1775,8 +1804,8 @@ export function seasonPostseasonSummaryFromGame(input: {
     seriesId: input.seriesId,
     gameNumber: input.gameNumber,
     conference: input.conference,
-    homeFranchiseId: input.homeFranchiseId,
-    awayFranchiseId: input.awayFranchiseId,
+    homeFranchiseId: homeId,
+    awayFranchiseId: awayId,
     winnerFranchiseId,
     loserFranchiseId,
     status: seasonSummary.status,

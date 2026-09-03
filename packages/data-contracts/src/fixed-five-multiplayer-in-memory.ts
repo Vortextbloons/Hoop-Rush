@@ -15,7 +15,8 @@ import {
   type FixedFiveRoomSettings,
   type FixedFiveRoomSnapshot,
 } from './fixed-five-multiplayer.ts';
-import { canonicalJson, seasonDigestHex } from './season-hash.ts';
+import { canonicalJson } from './season-hash.ts';
+import { commandIdSchema, contentHashSchema, idSchema, seedSchema } from './ids.ts';
 
 function fnv1a32Seed(input: string): number {
   let h = 0x811c9dc5;
@@ -104,17 +105,6 @@ interface RoomRecord {
   subscribers: Set<(snapshot: FixedFiveRoomSnapshot) => void>;
 }
 
-function snapshotDigest(snapshot: FixedFiveRoomSnapshot): string {
-  return seasonDigestHex(
-    canonicalJson({
-      roomId: snapshot.roomId,
-      revision: snapshot.revision,
-      phase: snapshot.phase,
-      commandCount: snapshot.commandCount,
-    }),
-  );
-}
-
 export function createInMemoryFixedFiveTransport(options?: {
   clock?: () => number;
   seed?: string;
@@ -179,10 +169,10 @@ export function createInMemoryFixedFiveTransport(options?: {
         ...settingsInput,
         versions: settingsInput.versions,
       };
-      const roomId = randomRoomIdWith(rng, useCrypto);
+      const roomId = idSchema.parse(randomRoomIdWith(rng, useCrypto));
       const codes = new Set(codeIndex.keys());
       const code = randomCodeWith(codes, rng);
-      const rootSeed = randomSeedWith(rng, useCrypto);
+      const rootSeed = seedSchema.parse(randomSeedWith(rng, useCrypto));
       const timeoutMs = fixedFiveTimeoutMsForMode(settings.mode);
       const createdAt = new Date(now).toISOString();
       const expiresAt = new Date(now + 24 * 60 * 60 * 1000).toISOString();
@@ -214,7 +204,7 @@ export function createInMemoryFixedFiveTransport(options?: {
             lastSeenAt: null,
           },
         ],
-        rootSeed: null,
+        rootSeed,
         deadline: {
           roomId,
           cursor: 'lobby',
@@ -229,7 +219,6 @@ export function createInMemoryFixedFiveTransport(options?: {
         expiresAt,
         createdAt,
       };
-      void rootSeed;
       const record: RoomRecord = {
         snapshot,
         commands: [],
@@ -278,7 +267,7 @@ export function createInMemoryFixedFiveTransport(options?: {
       emit(record);
       return {
         snapshot: record.snapshot,
-        membership: { roomId, participantId: 'p2', code: record.code },
+        membership: { roomId: record.snapshot.roomId, participantId: 'p2', code: record.code },
       };
     },
     async resume(roomId) {
@@ -291,7 +280,7 @@ export function createInMemoryFixedFiveTransport(options?: {
         });
       return {
         snapshot: record.snapshot,
-        membership: { roomId, participantId: 'p1', code: record.code },
+        membership: { roomId: record.snapshot.roomId, participantId: 'p1', code: record.code },
       };
     },
     subscribe(roomId, handler) {
@@ -375,11 +364,7 @@ export function createInMemoryFixedFiveTransport(options?: {
         ...record.snapshot,
         commandCount: record.commands.length,
         revision: record.snapshot.revision + 1,
-        digest: snapshotDigest({
-          ...record.snapshot,
-          revision: record.snapshot.revision + 1,
-          commandCount: record.commands.length,
-        }),
+        digest: null,
       };
       touchDeadline(record);
       emit(record);
@@ -402,8 +387,8 @@ export function createInMemoryFixedFiveTransport(options?: {
       if (record.commandIds.has(commandId)) return null;
       const receipt = await this.submitCommand({
         schemaVersion: 1,
-        roomId,
-        commandId,
+        roomId: record.snapshot.roomId,
+        commandId: commandIdSchema.parse(commandId),
         actorParticipantId: deadline.participantId,
         payload: deadline.fallback,
       });
@@ -486,15 +471,16 @@ export function createInMemoryFixedFiveTransport(options?: {
       const confirmed = record.commands.some(
         (c) =>
           c.payload.kind === 'confirm-result' &&
-          c.payload.verified === true &&
+          c.payload.verified &&
           c.payload.resultDigest === resultDigest,
       );
       if (!proposed || !confirmed) return { completed: false, phase: record.snapshot.phase };
+      const digest = contentHashSchema.parse(resultDigest);
       record.snapshot = {
         ...record.snapshot,
         phase: 'completed',
-        resultDigest,
-        confirmedDigest: resultDigest,
+        resultDigest: digest,
+        confirmedDigest: digest,
         code: null,
         codeActive: false,
         revision: record.snapshot.revision + 1,
@@ -520,7 +506,7 @@ export function createInMemoryFixedFiveTransport(options?: {
           .map((c) => (c.payload.kind === 'propose-result' ? c.payload.resultDigest : '')),
       );
       const denied = record.commands.some(
-        (c) => c.payload.kind === 'confirm-result' && c.payload.verified === false,
+        (c) => c.payload.kind === 'confirm-result' && !c.payload.verified,
       );
       if (digests.size < 2 || !denied) return { failed: false, phase: record.snapshot.phase };
       record.snapshot = {

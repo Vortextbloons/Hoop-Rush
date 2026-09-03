@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   SEASON_MINUTE_POLICY_VERSION,
   seasonDigestHex,
+  seedSchema,
   type SeasonDraftCatalog,
   type SeasonDraftCandidate,
+  type SeasonLeague,
   type SeasonLeagueGenerationResult,
   type SeasonRosterTargets,
   type SeasonRotation,
@@ -49,6 +51,15 @@ import {
   membersOf,
   soloInput,
 } from './ai-test-support.ts';
+function brandedSolo(
+  seed: string,
+  catalog: SeasonDraftCatalog = CATALOG,
+  league: SeasonLeague = LEAGUE,
+  humanFranchiseId = 'lakers',
+) {
+  const base = soloInput(seed, catalog, league, humanFranchiseId);
+  return { ...base, seed: seedSchema.parse(base.seed) };
+}
 function canonicalFacts(result: SeasonLeagueGenerationResult): string {
   const rosters = [...result.rosters]
     .sort((a, b) => (a.franchiseId < b.franchiseId ? -1 : 1))
@@ -109,18 +120,18 @@ describe('v2 percentile tiering', () => {
       candidate.summaryRatings.overallRating =
         (candidate.summaryRatings.overallRating * 7 + 13) % 100;
     }
-    const a = generateAiLeague(soloInput(seedFromString('overall-a')));
-    const b = generateAiLeague(soloInput(seedFromString('overall-a'), clone));
+    const a = generateAiLeague(brandedSolo(seedFromString('overall-a')));
+    const b = generateAiLeague(brandedSolo(seedFromString('overall-a'), clone));
     expect(a.digest).toBe(b.digest);
     expect(canonicalFacts(a)).toBe(canonicalFacts(b));
   });
 });
 describe('v2 league-wide private pools', () => {
   it('produces 29 exclusive pools solo and 28 in a duo league', () => {
-    const solo = generateAiLeague(soloInput(seedFromString('pools-solo')));
+    const solo = generateAiLeague(brandedSolo(seedFromString('pools-solo')));
     expect(solo.aiPools).toHaveLength(29);
     const duo = generateAiLeague({
-      ...soloInput(seedFromString('pools-duo')),
+      ...brandedSolo(seedFromString('pools-duo')),
       humanFranchiseIds: ['lakers', 'celtics'],
       humanRosters: [
         { franchiseId: 'lakers', playerVersionIds: humanRoster(CATALOG, 'lakers', '1990s') },
@@ -130,7 +141,7 @@ describe('v2 league-wide private pools', () => {
     expect(duo.aiPools).toHaveLength(28);
   });
   it('keeps every pool at 20 distinct ids containing its ten selections', () => {
-    const result = generateAiLeague(soloInput(seedFromString('pools-shape')));
+    const result = generateAiLeague(brandedSolo(seedFromString('pools-shape')));
     const allPoolIds = new Set<string>();
     for (const pool of result.aiPools) {
       expect(pool.playerVersionIds).toHaveLength(20);
@@ -150,7 +161,7 @@ describe('v2 league-wide private pools', () => {
     expect(result.aiPools.length).toBe(29);
   });
   it('gives contenders two qualifying anchors and playoffs one', () => {
-    const result = generateAiLeague(soloInput(seedFromString('pools-anchors')));
+    const result = generateAiLeague(brandedSolo(seedFromString('pools-anchors')));
     const byBand = new Map(result.aiPools.map((pool) => [pool.franchiseId, pool]));
     for (const assignment of result.aiAssignments) {
       if (assignment.franchiseId === 'lakers') continue;
@@ -171,7 +182,7 @@ describe('v2 league-wide private pools', () => {
     const seeds = 8;
     let extraCount = 0;
     for (let i = 0; i < seeds; i += 1) {
-      const result = generateAiLeague(soloInput(seasonDigestHex(`extra-${String(i)}`)));
+      const result = generateAiLeague(brandedSolo(seasonDigestHex(`extra-${String(i)}`)));
       for (const pool of result.aiPools) {
         if (pool.anchors.some((anchor) => anchor.seedPath.includes('extra-elite'))) {
           extraCount += 1;
@@ -185,7 +196,7 @@ describe('v2 league-wide private pools', () => {
 });
 describe('v2 roster legality', () => {
   it('every selected roster passes every legality contract', () => {
-    const result = generateAiLeague(soloInput(seedFromString('legality')));
+    const result = generateAiLeague(brandedSolo(seedFromString('legality')));
     for (const roster of result.rosters) {
       const members = membersOf(result, roster.franchiseId, CATALOG);
       expect(validateSeasonRoster(members)).toEqual([]);
@@ -216,7 +227,7 @@ describe('v2 roster legality', () => {
     expect(rotation.targetMinutes.length).toBe(10);
   });
   it('every pool admits a legal ten (4/4/3 completion and a legal five)', () => {
-    const result = generateAiLeague(soloInput(seedFromString('legality-pools')));
+    const result = generateAiLeague(brandedSolo(seedFromString('legality-pools')));
     for (const pool of result.aiPools) {
       const members = pool.playerVersionIds.map((id) => {
         const candidate = CATALOG.candidates.find((c) => c.playerVersionId === id);
@@ -244,8 +255,8 @@ describe('v2 roster legality', () => {
 });
 describe('v2 determinism', () => {
   it('is rerun-identical for pools, selections, repairs, diagnostics, and the full result', () => {
-    const a = generateAiLeague(soloInput(seedFromString('rerun')));
-    const b = generateAiLeague(soloInput(seedFromString('rerun')));
+    const a = generateAiLeague(brandedSolo(seedFromString('rerun')));
+    const b = generateAiLeague(brandedSolo(seedFromString('rerun')));
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
     expect(JSON.stringify(a.aiPools)).toBe(JSON.stringify(b.aiPools));
     expect(JSON.stringify(a.diagnostics)).toBe(JSON.stringify(b.diagnostics));
@@ -262,17 +273,17 @@ describe('v2 determinism', () => {
       teams: [...LEAGUE.teams].reverse(),
     };
     const human = humanRoster(CATALOG, 'lakers', '1990s');
-    const a = generateAiLeague(soloInput(seedFromString('order-invariance')));
+    const a = generateAiLeague(brandedSolo(seedFromString('order-invariance')));
     const b = generateAiLeague({
-      ...soloInput(seedFromString('order-invariance'), reversedCatalog, reversedLeague),
+      ...brandedSolo(seedFromString('order-invariance'), reversedCatalog, reversedLeague),
       humanRosters: [{ franchiseId: 'lakers', playerVersionIds: human }],
     });
     expect(a.digest).toBe(b.digest);
     expect(canonicalFacts(a)).toBe(canonicalFacts(b));
   });
   it('produces meaningful variation across seeds', () => {
-    const first = generateAiLeague(soloInput(seedFromString('variation-1')));
-    const second = generateAiLeague(soloInput(seedFromString('variation-2')));
+    const first = generateAiLeague(brandedSolo(seedFromString('variation-1')));
+    const second = generateAiLeague(brandedSolo(seedFromString('variation-2')));
     const byTeam = (result: SeasonLeagueGenerationResult) =>
       new Map(result.aiPools.map((pool) => [pool.franchiseId, new Set(pool.playerVersionIds)]));
     const mapA = byTeam(first);
@@ -321,7 +332,7 @@ describe('v2 scarcity and failure', () => {
     });
     let error: unknown = null;
     try {
-      generateAiLeague(soloInput(seedFromString('anchors-scarce'), catalog));
+      generateAiLeague(brandedSolo(seedFromString('anchors-scarce'), catalog));
     } catch (caught) {
       error = caught;
     }
@@ -358,7 +369,7 @@ describe('v2 scarcity and failure', () => {
     }
     let error: unknown = null;
     try {
-      generateAiLeague(soloInput(seedFromString('pool-scarce'), catalog));
+      generateAiLeague(brandedSolo(seedFromString('pool-scarce'), catalog));
     } catch (caught) {
       error = caught;
     }
@@ -395,7 +406,7 @@ describe('v2 scarcity and failure', () => {
         },
       } as unknown as SeasonRosterTargets;
       try {
-        generateAiLeague({ ...soloInput(seedFromString(seed)), targets });
+        generateAiLeague({ ...brandedSolo(seedFromString(seed)), targets });
         throw new Error('expected budget exhaustion');
       } catch (error) {
         if (!(error instanceof SeasonAiGenerationError)) throw error;
@@ -407,7 +418,7 @@ describe('v2 scarcity and failure', () => {
   it('rejects null or mismatched targets before any allocation', () => {
     expect(() =>
       generateAiLeague({
-        ...soloInput(seedFromString('null-targets')),
+        ...brandedSolo(seedFromString('null-targets')),
         targets: undefined as unknown as SeasonRosterTargets,
       }),
     ).toThrow(SeasonAiTargetsError);
@@ -423,7 +434,7 @@ function zeroScores(): Record<(typeof ROSTER_ROLES)[number], number> {
 }
 describe('v2 minute-policy rotations (projection milestone)', () => {
   it('different AI teams can select different strategies', () => {
-    const result = generateAiLeague(soloInput(seedFromString('minute-strategies')));
+    const result = generateAiLeague(brandedSolo(seedFromString('minute-strategies')));
     const strategies = result.evaluations.map(
       (evaluation) => evaluation.minutePlanSummary?.strategy,
     );
@@ -446,7 +457,7 @@ describe('v2 minute-policy rotations (projection milestone)', () => {
     }
   });
   it('rotations carry the minute policy matching the evaluation summary per franchise', () => {
-    const result = generateAiLeague(soloInput(seedFromString('minute-policy-match')));
+    const result = generateAiLeague(brandedSolo(seedFromString('minute-policy-match')));
     expect(result.rotations).toHaveLength(30);
     for (const evaluation of result.evaluations) {
       const summary = evaluation.minutePlanSummary;
@@ -473,14 +484,14 @@ describe('v2 minute-policy rotations (projection milestone)', () => {
     }
   });
   it('is deterministic for rotations and evaluations across identical seeds', () => {
-    const a = generateAiLeague(soloInput(seedFromString('minute-rerun')));
-    const b = generateAiLeague(soloInput(seedFromString('minute-rerun')));
+    const a = generateAiLeague(brandedSolo(seedFromString('minute-rerun')));
+    const b = generateAiLeague(brandedSolo(seedFromString('minute-rerun')));
     expect(b.rotations).toEqual(a.rotations);
     expect(b.evaluations).toEqual(a.evaluations);
     expect(b.digest).toBe(a.digest);
   });
   it('every generated rotation passes the rotation audit and totals 240 minutes', () => {
-    const result = generateAiLeague(soloInput(seedFromString('minute-legality')));
+    const result = generateAiLeague(brandedSolo(seedFromString('minute-legality')));
     expect(result.rotations).toHaveLength(30);
     for (const rotation of result.rotations) {
       const playable = new Map(
@@ -496,7 +507,7 @@ describe('v2 minute-policy rotations (projection milestone)', () => {
     }
   });
   it('target minutes are dynamic, never the flat 32/16 template', () => {
-    const result = generateAiLeague(soloInput(seedFromString('minute-dynamic')));
+    const result = generateAiLeague(brandedSolo(seedFromString('minute-dynamic')));
     for (const rotation of result.rotations) {
       expect(rotation.targetMinutes).toHaveLength(10);
       expect(rotationTargetMinutes(rotation)).toBe(240);
@@ -518,7 +529,7 @@ describe('v2 minute-policy rotations (projection milestone)', () => {
       candidate.durability.rating = rating;
     });
     const result = generateAiLeague({
-      ...soloInput(seedFromString('minute-skewed'), skewed),
+      ...brandedSolo(seedFromString('minute-skewed'), skewed),
       catalog: skewed,
     });
     for (const evaluation of result.evaluations) {

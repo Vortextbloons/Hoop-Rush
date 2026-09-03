@@ -5,6 +5,7 @@ import type {
   OpponentBracket,
   Seed,
 } from '@hoop-rush/data-contracts';
+import { seedSchema } from '@hoop-rush/data-contracts';
 import { checkGameResult } from '../../sim/invariants.ts';
 import {
   FIXED_FIVE_TIEBREAK_PATH,
@@ -189,7 +190,11 @@ export function summarizeDuelGames(group: DuelGameGroup): {
       games: games.map((game) => {
         const homeIsP1 = game.home.teamId === group.p1TeamId;
         const p1Won = (game.winner === 'home') === homeIsP1;
-        return { gameNumber: game.gameNumber, seed: game.seed, winner: p1Won ? 'p1' : 'p2' };
+        return {
+          gameNumber: game.gameNumber,
+          seed: seedSchema.parse(game.seed),
+          winner: p1Won ? 'p1' : 'p2',
+        };
       }),
       p1Wins,
       p2Wins,

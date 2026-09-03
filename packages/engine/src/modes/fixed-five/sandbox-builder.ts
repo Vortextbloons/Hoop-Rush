@@ -1,9 +1,9 @@
-import type { Position, SlotIndex } from '@hoop-rush/data-contracts';
+import type { PlayerId, Position, SlotIndex } from '@hoop-rush/data-contracts';
 import { canPlay } from '../../domain/positions.ts';
 import { slotRequirement, validateLineup } from '../../domain/lineup.ts';
 
 export interface FixedFiveCandidate {
-  playerId: string;
+  playerId: PlayerId;
   playerVersionId: string;
   positions: Position[];
   selectionScore: number;
@@ -12,12 +12,12 @@ export interface FixedFiveCandidate {
 }
 
 export interface SandboxBuilderState {
-  placements: Array<{ playerId: string; slotIndex: SlotIndex }>;
+  placements: Array<{ playerId: PlayerId; slotIndex: SlotIndex }>;
   locked: boolean;
 }
 
 export type SandboxBuilderCommand =
-  | { kind: 'sandbox-place'; playerId: string; slotIndex: SlotIndex }
+  | { kind: 'sandbox-place'; playerId: PlayerId; slotIndex: SlotIndex }
   | { kind: 'sandbox-remove'; slotIndex: SlotIndex }
   | { kind: 'sandbox-lock' };
 
@@ -29,7 +29,7 @@ export function createSandboxBuilder(): SandboxBuilderState {
 
 function candidateById(
   pool: readonly FixedFiveCandidate[],
-  playerId: string,
+  playerId: PlayerId,
 ): FixedFiveCandidate | null {
   return pool.find((c) => c.playerId === playerId) ?? null;
 }
@@ -45,7 +45,7 @@ function openSlots(state: SandboxBuilderState): SlotIndex[] {
 
 export function selectionKeepsFeasibility(
   pool: readonly FixedFiveCandidate[],
-  placed: ReadonlyArray<{ playerId: string; slotIndex: SlotIndex }>,
+  placed: ReadonlyArray<{ playerId: PlayerId; slotIndex: SlotIndex }>,
 ): boolean {
   const byId = new Map(pool.map((c) => [c.playerId, c]));
   const usedIds = new Set<string>();
@@ -72,7 +72,7 @@ export function selectionKeepsFeasibility(
   const open = ([0, 1, 2, 3, 4] as SlotIndex[]).filter((s) => !occupiedSlots.has(s));
   const tryFill = (slotIdx: number, chosen: FixedFiveCandidate[]): boolean => {
     if (slotIdx === open.length) {
-      const full: Array<{ playerId: string; slotIndex: SlotIndex }> = [];
+      const full: Array<{ playerId: PlayerId; slotIndex: SlotIndex }> = [];
       for (const p of placed) full.push(p);
       for (const c of chosen) {
         const slotAt = open[chosen.indexOf(c)];
@@ -110,13 +110,13 @@ export function selectionKeepsFeasibility(
 
 function assignLineupFeasible(
   pool: readonly FixedFiveCandidate[],
-  placed: ReadonlyArray<{ playerId: string; slotIndex: SlotIndex }>,
+  placed: ReadonlyArray<{ playerId: PlayerId; slotIndex: SlotIndex }>,
 ): boolean {
   const byId = new Map(pool.map((c) => [c.playerId, c]));
   const occupied = new Set(placed.map((p) => p.slotIndex));
   const open = ([0, 1, 2, 3, 4] as SlotIndex[]).filter((s) => !occupied.has(s));
   const remaining = pool.filter((c) => ![...placed].some((p) => p.playerId === c.playerId));
-  const backtrack = (index: number, used: Set<string>): boolean => {
+  const backtrack = (index: number, used: Set<PlayerId>): boolean => {
     if (index === open.length) return true;
     const slot = open[index];
     if (slot === undefined) return false;
@@ -202,7 +202,7 @@ export function listSandboxOpenSlots(state: SandboxBuilderState): SlotIndex[] {
 }
 
 export interface SandboxSafeMove {
-  playerId: string;
+  playerId: PlayerId;
   playerVersionId: string;
   slotIndex: SlotIndex;
   selectionScore: number;

@@ -526,6 +526,13 @@ export {
   type DuelSimulationOutput,
 } from './modes/fixed-five/duel-sim.ts';
 export {
+  summarizeShared82Games,
+  summarizeDuelGames,
+  type Shared82GameGroups,
+  type Shared82Summary,
+  type DuelGameGroup,
+} from './modes/fixed-five/results.ts';
+export {
   fixedFiveResultDigest,
   verifyFixedFiveDigest,
   canonicalFixedFiveDigestPayload,

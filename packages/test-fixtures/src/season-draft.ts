@@ -11,8 +11,16 @@ import {
   SEASON_ROSTER_TARGETS_VERSION,
   SEASON_ROTATION_VERSION,
   SEASON_STAMINA_VERSION,
+  eraIdSchema,
+  franchiseIdSchema,
+  playerIdSchema,
   playerVersionId,
   seasonDigestHex,
+  seasonDraftCatalogSchema,
+  seasonDraftStateSchema,
+  seasonRotationSchema,
+  seedSchema,
+  seasonKeySchema,
   type SeasonAiAssignment,
   type SeasonAiPool,
   type SeasonDraftCatalog,
@@ -82,10 +90,10 @@ export function buildSeasonDraftCandidate(input: {
   const seasonKey = '1995-96';
   return {
     playerVersionId: versionId,
-    playerId,
-    franchiseId,
-    eraId,
-    seasonKey,
+    playerId: playerIdSchema.parse(playerId),
+    franchiseId: franchiseIdSchema.parse(franchiseId),
+    eraId: eraIdSchema.parse(eraId),
+    seasonKey: seasonKeySchema.parse(seasonKey),
     displayName: `Fixture ${franchiseId} ${String(index)}`,
     playerExternalId: '101',
     positions: {
@@ -210,10 +218,14 @@ export function buildSeasonDraftCatalog(
         candidates.push(candidate);
         members.push(candidate.playerVersionId);
       }
-      pools.push({ franchiseId, eraId, playerVersionIds: members });
+      pools.push({
+        franchiseId: franchiseIdSchema.parse(franchiseId),
+        eraId: eraIdSchema.parse(eraId),
+        playerVersionIds: members,
+      });
     }
   }
-  return {
+  return seasonDraftCatalogSchema.parse({
     schemaVersion: 1,
     catalogVersion: SEASON_DRAFT_CATALOG_VERSION,
     dataVersion: `m10-${RATINGS_VERSION}`,
@@ -224,7 +236,7 @@ export function buildSeasonDraftCatalog(
     durabilityVersion: SEASON_DURABILITY_VERSION,
     pools,
     candidates,
-  };
+  });
 }
 export function buildSeasonRotation(
   franchiseId: string,
@@ -233,7 +245,7 @@ export function buildSeasonRotation(
   if (playerVersionIds.length !== 10) throw new Error('rotation needs ten players');
   const starters = playerVersionIds.slice(0, 5);
   const bench = playerVersionIds.slice(5);
-  return {
+  return seasonRotationSchema.parse({
     franchiseId,
     starters,
     benchOrder: bench,
@@ -244,7 +256,7 @@ export function buildSeasonRotation(
     closingFive: starters,
     minutePolicy: { policyVersion: SEASON_MINUTE_POLICY_VERSION, strategy: 'balanced' },
     rotationVersion: SEASON_ROTATION_VERSION,
-  };
+  });
 }
 const BAND_CYCLE: Array<SeasonAiAssignment['band']> = [
   'contender',
@@ -324,7 +336,7 @@ export function buildFixtureSeasonDraftFacts(): SeasonRun['draft'] {
     participants: [
       {
         participantId: 'fixture-human',
-        franchiseId: 'lakers',
+        franchiseId: franchiseIdSchema.parse('lakers'),
         offers: [
           {
             round: 1,
@@ -379,8 +391,8 @@ export function buildFixtureSeasonDraftFacts(): SeasonRun['draft'] {
           {
             round: 1,
             playerVersionId: `pv-${'1'.repeat(32)}`,
-            franchiseId: 'lakers',
-            eraId: '1990s',
+            franchiseId: franchiseIdSchema.parse('lakers'),
+            eraId: eraIdSchema.parse('1990s'),
             seedPath: ['draft', 'offer', 'fixture-human', '1', '1', 'safe-order', 'sample-order'],
           },
         ],
@@ -531,7 +543,7 @@ export function buildFixtureRosterTargets(): SeasonRosterTargets {
 }
 export function buildFixtureGenerationAudit(seed: string): SeasonRun['generationAudit'] {
   return {
-    seed,
+    seed: seedSchema.parse(seed),
     aiVersion: SEASON_AI_VERSION,
     rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
     rotationVersion: SEASON_ROTATION_VERSION,
@@ -539,7 +551,7 @@ export function buildFixtureGenerationAudit(seed: string): SeasonRun['generation
     rosterTargetsVersion: SEASON_ROSTER_TARGETS_VERSION,
     digest: fixtureGenerationDigest(`fixture-${seed}`),
     diagnostics: {
-      seed,
+      seed: seedSchema.parse(seed),
       aiVersion: SEASON_AI_VERSION,
       rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
       teamsGenerated: 29,
@@ -610,16 +622,16 @@ export function buildSeasonDraftState(
   ];
   const rootSeed = overrides.rootSeed ?? 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
   const league = buildSeasonLeague();
-  return {
+  return seasonDraftStateSchema.parse({
     schemaVersion: 2,
     draftVersion: SEASON_DRAFT_VERSION,
     runId: 'fixture-draft-1',
-    rootSeed,
+    rootSeed: seedSchema.parse(rootSeed),
     league,
     catalogVersion: SEASON_DRAFT_VERSION,
     participants: [
-      { participantId: 'human-1', franchiseId: 'lakers' },
-      { participantId: 'human-2', franchiseId: 'celtics' },
+      { participantId: 'human-1', franchiseId: franchiseIdSchema.parse('lakers') },
+      { participantId: 'human-2', franchiseId: franchiseIdSchema.parse('celtics') },
     ],
     firstPickParticipantId: 'human-1',
     round: 2,
@@ -648,8 +660,8 @@ export function buildSeasonDraftState(
         round: 1,
         pickOrdinal: 1,
         playerVersionId: `pv-${'1'.repeat(32)}`,
-        franchiseId: 'lakers',
-        eraId: '1990s',
+        franchiseId: franchiseIdSchema.parse('lakers'),
+        eraId: eraIdSchema.parse('1990s'),
         seedPath,
       },
     ],
@@ -666,7 +678,7 @@ export function buildSeasonDraftState(
           payload: {
             kind: 'create-season-draft',
             runId: 'fixture-draft-1',
-            rootSeed,
+            rootSeed: seedSchema.parse(rootSeed),
             league,
             humanParticipantIds: ['human-1', 'human-2'],
             catalogVersion: SEASON_DRAFT_VERSION,
@@ -703,5 +715,5 @@ export function buildSeasonDraftState(
       },
     ],
     ...overrides,
-  };
+  });
 }

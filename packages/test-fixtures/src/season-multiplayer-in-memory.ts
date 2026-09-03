@@ -4,6 +4,10 @@ import {
   SEASON_ROOM_PROTOCOL_SCHEMA_VERSION,
   SEASON_ROOM_PROTOCOL_SCHEMA_VERSION_V1,
   SEASON_TIMER_POLICY_VERSION,
+  franchiseIdSchema,
+  idSchema,
+  seasonCheckpointDigestSchema,
+  seedSchema,
 } from '@hoop-rush/data-contracts';
 import type {
   SeasonAcceptedCheckpoint,
@@ -176,12 +180,12 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
       };
     })();
     const snap: SeasonRoomPublicSnapshot = {
-      roomId: room.roomId,
+      roomId: idSchema.parse(room.roomId),
       settings: room.settings,
       phase: room.phase,
       cursor: room.cursor,
       revision: room.revision,
-      digest: room.digest,
+      digest: seasonCheckpointDigestSchema.parse(room.digest),
       memberCount: room.members.size,
       codeActive:
         room.code !== null && room.codeExpiresAt !== null && room.codeExpiresAt > this.clock(),
@@ -190,7 +194,9 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
       settingsRevision: room.settingsRevision,
       guestReady: room.guestReady,
       presence: this.presenceOf(room),
-      seed: room.rootSeed,
+      seed: seedSchema.safeParse(room.rootSeed).success
+        ? seedSchema.parse(room.rootSeed)
+        : null,
       isOutdated: outdated || undefined,
       locks,
       attestationSummary,
@@ -267,9 +273,9 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
       p2FranchiseId: null,
     };
     const membership: SeasonRoomMembership = {
-      roomId,
+      roomId: idSchema.parse(roomId),
       participantId: 'p1',
-      franchiseId: 'franchise-p1',
+      franchiseId: franchiseIdSchema.parse('franchise-p1'),
       uid: `uid-p1-${roomId}`,
       seat: 'p1',
     };
@@ -327,10 +333,12 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     if (room.members.size >= 2) throw Object.assign(new Error('room-full'), { code: 'room-full' });
     if (room.phase !== 'waiting') throw Object.assign(new Error('phase'), { code: 'phase' });
     const participantId = room.members.size === 0 ? 'p1' : 'p2';
-    const franchiseId = participantId === 'p1' ? 'franchise-p1' : 'franchise-p2';
+    const franchiseId = franchiseIdSchema.parse(
+      participantId === 'p1' ? 'franchise-p1' : 'franchise-p2',
+    );
     const seat = participantId;
     const membership: SeasonRoomMembership = {
-      roomId,
+      roomId: idSchema.parse(roomId),
       participantId,
       franchiseId,
       uid: `uid-${participantId}-${roomId}`,
@@ -759,9 +767,9 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
       isOutdated: true,
     };
     const membership: SeasonRoomMembership = {
-      roomId,
+      roomId: idSchema.parse(roomId),
       participantId: 'p1',
-      franchiseId: 'franchise-p1',
+      franchiseId: franchiseIdSchema.parse('franchise-p1'),
       uid: `uid-p1-${roomId}`,
       seat: 'p1',
     };

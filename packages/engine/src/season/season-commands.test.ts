@@ -1,8 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   SEASON_RUN_SCHEMA_VERSION,
+  commandIdSchema,
+  franchiseIdSchema,
+  idSchema,
   playoffGameIdOf,
+  seasonGameIdSchema,
   seasonRunSchema,
+  type FranchiseId,
   type SeasonDraftCatalog,
   type SeasonEffectsState,
   type SeasonGameEffectsTransition,
@@ -71,13 +76,13 @@ vi.mock('./health.ts', async (importOriginal) => {
       humanFranchiseId: string,
     ): SeasonGameSummary => {
       const game = run.games.find((entry) => entry.gameId === gameId);
-      const homeFranchiseId = game?.homeFranchiseId ?? 'lakers';
-      const awayFranchiseId = game?.awayFranchiseId ?? 'celtics';
+      const homeFranchiseId = game?.homeFranchiseId ?? franchiseIdSchema.parse('lakers');
+      const awayFranchiseId = game?.awayFranchiseId ?? franchiseIdSchema.parse('celtics');
       const humanIsHome = homeFranchiseId === humanFranchiseId;
       return {
         schemaVersion: 1,
         summaryVersion: 'season-game-summary-v3',
-        gameId,
+        gameId: seasonGameIdSchema.parse(gameId),
         round: game?.round ?? 1,
         homeFranchiseId,
         awayFranchiseId,
@@ -85,7 +90,7 @@ vi.mock('./health.ts', async (importOriginal) => {
         overtimePeriods: 0,
         homeScore: humanIsHome ? 0 : 2,
         awayScore: humanIsHome ? 2 : 0,
-        forfeitLoserFranchiseId: humanFranchiseId,
+        forfeitLoserFranchiseId: franchiseIdSchema.parse(humanFranchiseId),
         homeBox: {
           franchiseId: homeFranchiseId,
           points: 0,
@@ -132,11 +137,11 @@ vi.mock('./health.ts', async (importOriginal) => {
       forfeitedGameId: string,
     ): SeasonPendingBlockCandidate => ({
       ...pending,
-      nextGameId: nextGameIdOf(forfeitedGameId),
+      nextGameId: seasonGameIdSchema.parse(nextGameIdOf(forfeitedGameId)),
     }),
   };
 });
-const HUMAN = 'lakers';
+const HUMAN = franchiseIdSchema.parse('lakers');
 const TEST_SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
 function windowedFixture(seed = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a'): {
   run: SeasonRun;
@@ -220,13 +225,13 @@ function pendingOf(
     schemaVersion: 1,
     blockVersion: 'season-block-v6',
     runId: run.runId,
-    commandId: 'block-3-command',
+    commandId: commandIdSchema.parse('block-3-command'),
     blockIndex: 3,
     expectedRevision: 3,
     expectedStateRevision: run.stateRevision,
     expectedStateDigest: run.stateDigest,
     objectiveId: 'win-six',
-    nextGameId: 's000301',
+    nextGameId: seasonGameIdSchema.parse('s000301'),
     summaries: [],
     retainedDetails: [],
     effects: zeroEffectsOf(run),
@@ -244,7 +249,7 @@ describe('select-block-objective command', () => {
     const offered = seasonObjectiveChoicesForBlock(run.rootSeed, 0);
     const command = commandOf(run, {
       command: 'select-block-objective',
-      commandId: 'select-obj-0',
+      commandId: commandIdSchema.parse('select-obj-0'),
       blockIndex: 0,
       objectiveId: offered[0] ?? 'win-six',
     });
@@ -260,7 +265,7 @@ describe('select-block-objective command', () => {
     expect(output.run.stateDigest).not.toBe(run.stateDigest);
     expect(output.run.objectives.selections[0]).toEqual({
       objectiveId: offered[0],
-      selectedByCommandId: 'select-obj-0',
+      selectedByCommandId: commandIdSchema.parse('select-obj-0'),
       success: null,
     });
   });
@@ -271,11 +276,11 @@ describe('select-block-objective command', () => {
       {
         ...commandOf(run, {
           command: 'select-block-objective',
-          commandId: 'cmd-rm',
+          commandId: commandIdSchema.parse('cmd-rm'),
           blockIndex: 0,
           objectiveId: offered,
         }),
-        runId: 'other-run',
+        runId: idSchema.parse('other-run'),
       },
       context,
     );
@@ -289,7 +294,7 @@ describe('select-block-objective command', () => {
     const duplicate = handleSeasonRunCommand(
       commandOf(run, {
         command: 'select-block-objective',
-        commandId: transactionCommandId ?? 'missing',
+        commandId: transactionCommandId ?? commandIdSchema.parse('missing'),
         blockIndex: 0,
         objectiveId: offered,
       }),
@@ -304,7 +309,7 @@ describe('select-block-objective command', () => {
     const ledgerDuplicate = handleSeasonRunCommand(
       commandOf(run, {
         command: 'select-block-objective',
-        commandId: ledgerCommandId ?? 'missing',
+        commandId: ledgerCommandId ?? commandIdSchema.parse('missing'),
         blockIndex: 0,
         objectiveId: offered,
       }),
@@ -316,7 +321,7 @@ describe('select-block-objective command', () => {
       {
         ...commandOf(run, {
           command: 'select-block-objective',
-          commandId: 'cmd-stale',
+          commandId: commandIdSchema.parse('cmd-stale'),
           blockIndex: 0,
           objectiveId: offered,
         }),
@@ -330,7 +335,7 @@ describe('select-block-objective command', () => {
       {
         ...commandOf(run, {
           command: 'select-block-objective',
-          commandId: 'cmd-stale-2',
+          commandId: commandIdSchema.parse('cmd-stale-2'),
           blockIndex: 0,
           objectiveId: offered,
         }),
@@ -347,7 +352,7 @@ describe('select-block-objective command', () => {
     const first = handleSeasonRunCommand(
       commandOf(run, {
         command: 'select-block-objective',
-        commandId: 'select-obj-again',
+        commandId: commandIdSchema.parse('select-obj-again'),
         blockIndex: 0,
         objectiveId: offered,
       }),
@@ -357,7 +362,7 @@ describe('select-block-objective command', () => {
     const replay = handleSeasonRunCommand(
       commandOf(first.run, {
         command: 'select-block-objective',
-        commandId: 'select-obj-again',
+        commandId: commandIdSchema.parse('select-obj-again'),
         blockIndex: 0,
         objectiveId: offered,
       }),
@@ -372,7 +377,7 @@ describe('select-block-objective command', () => {
     const notAtBoundary = handleSeasonRunCommand(
       commandOf(run, {
         command: 'select-block-objective',
-        commandId: 'cmd-boundary',
+        commandId: commandIdSchema.parse('cmd-boundary'),
         blockIndex: 2,
         objectiveId: 'win-six',
       }),
@@ -394,7 +399,7 @@ describe('select-block-objective command', () => {
     const notOffered = handleSeasonRunCommand(
       commandOf(run, {
         command: 'select-block-objective',
-        commandId: 'cmd-not-offered',
+        commandId: commandIdSchema.parse('cmd-not-offered'),
         blockIndex: 0,
         objectiveId: notOfferedId ?? 'win-six',
       }),
@@ -409,7 +414,7 @@ describe('select-block-objective command', () => {
     const first = handleSeasonRunCommand(
       commandOf(run, {
         command: 'select-block-objective',
-        commandId: 'select-obj-0',
+        commandId: commandIdSchema.parse('select-obj-0'),
         blockIndex: 0,
         objectiveId: offered,
       }),
@@ -420,7 +425,7 @@ describe('select-block-objective command', () => {
     const again = handleSeasonRunCommand(
       commandOf(current, {
         command: 'select-block-objective',
-        commandId: 'select-obj-0-again',
+        commandId: commandIdSchema.parse('select-obj-0-again'),
         blockIndex: 0,
         objectiveId: offered,
       }),
@@ -432,7 +437,7 @@ describe('select-block-objective command', () => {
     const futureBlock = handleSeasonRunCommand(
       commandOf(current, {
         command: 'select-block-objective',
-        commandId: 'select-obj-1',
+        commandId: commandIdSchema.parse('select-obj-1'),
         blockIndex: 1,
         objectiveId: seasonObjectiveChoicesForBlock(current.rootSeed, 1)[0] ?? 'win-six',
       }),
@@ -448,7 +453,7 @@ describe('spend-influence command', () => {
     const { run, context } = windowedFixture();
     const command = commandOf(run, {
       command: 'spend-influence',
-      commandId: 'spend-extra-1',
+      commandId: commandIdSchema.parse('spend-extra-1'),
       franchiseId: HUMAN,
       purpose: 'extra-trade-offer',
       windowIndex: 0,
@@ -490,7 +495,7 @@ describe('spend-influence command', () => {
     const insufficient = handleSeasonRunCommand(
       commandOf(atFloor, {
         command: 'spend-influence',
-        commandId: 'spend-insufficient',
+        commandId: commandIdSchema.parse('spend-insufficient'),
         franchiseId: HUMAN,
         purpose: 'extra-trade-offer',
         windowIndex: 0,
@@ -502,7 +507,7 @@ describe('spend-influence command', () => {
     const notOpen = handleSeasonRunCommand(
       commandOf(run, {
         command: 'spend-influence',
-        commandId: 'spend-not-open',
+        commandId: commandIdSchema.parse('spend-not-open'),
         franchiseId: HUMAN,
         purpose: 'extra-trade-offer',
         windowIndex: 1,
@@ -514,7 +519,7 @@ describe('spend-influence command', () => {
     const first = handleSeasonRunCommand(
       commandOf(run, {
         command: 'spend-influence',
-        commandId: 'spend-twice-1',
+        commandId: commandIdSchema.parse('spend-twice-1'),
         franchiseId: HUMAN,
         purpose: 'extra-trade-offer',
         windowIndex: 0,
@@ -525,7 +530,7 @@ describe('spend-influence command', () => {
     const second = handleSeasonRunCommand(
       commandOf(first.run, {
         command: 'spend-influence',
-        commandId: 'spend-twice-2',
+        commandId: commandIdSchema.parse('spend-twice-2'),
         franchiseId: HUMAN,
         purpose: 'extra-trade-offer',
         windowIndex: 0,
@@ -553,7 +558,7 @@ describe('spend-influence command', () => {
     const noWindow = handleSeasonRunCommand(
       commandOf(noWindowRun, {
         command: 'spend-influence',
-        commandId: 'spend-no-window',
+        commandId: commandIdSchema.parse('spend-no-window'),
         franchiseId: HUMAN,
         purpose: 'extra-trade-offer',
         windowIndex: 0,
@@ -573,7 +578,7 @@ describe('spend-influence command', () => {
       injuryId,
       playerVersionId: version,
       franchiseId: HUMAN,
-      gameId: 's000001',
+      gameId: seasonGameIdSchema.parse('s000001'),
       type: 'soft-tissue',
       severity: 'moderate',
       occurredBeforeHalftime: false,
@@ -590,7 +595,7 @@ describe('spend-influence command', () => {
     const output = handleSeasonRunCommand(
       commandOf(injured, {
         command: 'spend-influence',
-        commandId: 'spend-rehab-1',
+        commandId: commandIdSchema.parse('spend-rehab-1'),
         franchiseId: HUMAN,
         purpose: 'risky-rehab',
         injuryId,
@@ -615,7 +620,7 @@ describe('spend-influence command', () => {
     const notActive = handleSeasonRunCommand(
       commandOf(run, {
         command: 'spend-influence',
-        commandId: 'spend-not-active',
+        commandId: commandIdSchema.parse('spend-not-active'),
         franchiseId: HUMAN,
         purpose: 'risky-rehab',
         injuryId: injuryIdOf('missing-injury'),
@@ -632,7 +637,7 @@ describe('spend-influence command', () => {
       injuryId,
       playerVersionId: version,
       franchiseId: HUMAN,
-      gameId: 's000001',
+      gameId: seasonGameIdSchema.parse('s000001'),
       type: 'soft-tissue',
       severity: 'minor',
       occurredBeforeHalftime: false,
@@ -652,14 +657,14 @@ describe('spend-influence command', () => {
         ...injured.influence,
         rehabs: {
           ...injured.influence.rehabs,
-          [injuryId]: { franchiseId: HUMAN, outcome: 'pending', commandId: 'previous-rehab' },
+          [injuryId]: { franchiseId: HUMAN, outcome: 'pending', commandId: commandIdSchema.parse('previous-rehab') },
         },
       },
     };
     const output = handleSeasonRunCommand(
       commandOf(already, {
         command: 'spend-influence',
-        commandId: 'spend-rehab-again',
+        commandId: commandIdSchema.parse('spend-rehab-again'),
         franchiseId: HUMAN,
         purpose: 'risky-rehab',
         injuryId,
@@ -676,7 +681,7 @@ describe('accept-trade-offer command', () => {
     const offer = baseOfferOf(run);
     const command = commandOf(run, {
       command: 'accept-trade-offer',
-      commandId: 'accept-offer-1',
+      commandId: commandIdSchema.parse('accept-offer-1'),
       windowIndex: 0,
       offerId: offer.offerId,
     });
@@ -705,7 +710,7 @@ describe('accept-trade-offer command', () => {
     const unknown = handleSeasonRunCommand(
       commandOf(run, {
         command: 'accept-trade-offer',
-        commandId: 'accept-unknown',
+        commandId: commandIdSchema.parse('accept-unknown'),
         windowIndex: 0,
         offerId: 'off-' + 'f'.repeat(32),
       }),
@@ -717,7 +722,7 @@ describe('accept-trade-offer command', () => {
     const notOpen = handleSeasonRunCommand(
       commandOf(closedTrade, {
         command: 'accept-trade-offer',
-        commandId: 'accept-not-open',
+        commandId: commandIdSchema.parse('accept-not-open'),
         windowIndex: 0,
         offerId: offer.offerId,
       }),
@@ -728,7 +733,7 @@ describe('accept-trade-offer command', () => {
     const declined = handleSeasonRunCommand(
       commandOf(run, {
         command: 'decline-trade-offer',
-        commandId: 'decline-first',
+        commandId: commandIdSchema.parse('decline-first'),
         windowIndex: 0,
         offerId: offer.offerId,
       }),
@@ -738,7 +743,7 @@ describe('accept-trade-offer command', () => {
     const acceptAfterDecline = handleSeasonRunCommand(
       commandOf(declined.run, {
         command: 'accept-trade-offer',
-        commandId: 'accept-after-decline',
+        commandId: commandIdSchema.parse('accept-after-decline'),
         windowIndex: 0,
         offerId: offer.offerId,
       }),
@@ -755,13 +760,13 @@ describe('accept-trade-offer command', () => {
     const tampered: SeasonRun = {
       ...run,
       ownership: run.ownership.map((row) =>
-        row.playerVersionId === conflictingVersion ? { ...row, ownerFranchiseId: 'celtics' } : row,
+        row.playerVersionId === conflictingVersion ? { ...row, ownerFranchiseId: franchiseIdSchema.parse('celtics') } : row,
       ),
     };
     const output = handleSeasonRunCommand(
       commandOf(tampered, {
         command: 'accept-trade-offer',
-        commandId: 'accept-conflict',
+        commandId: commandIdSchema.parse('accept-conflict'),
         windowIndex: 0,
         offerId: offer.offerId,
       }),
@@ -794,7 +799,7 @@ describe('accept-trade-offer command', () => {
       windowIndex: 0,
       seedPath: ['window', '0', 'offer', '9'],
       toFranchiseId: HUMAN,
-      fromFranchiseId: 'celtics',
+      fromFranchiseId: franchiseIdSchema.parse('celtics'),
       outgoingPlayerVersionIds: outgoing,
       incomingPlayerVersionIds: incoming,
       outgoingHealth: outgoing.map(() => ({ available: true, activeInjuryIds: [] })),
@@ -820,7 +825,7 @@ describe('accept-trade-offer command', () => {
     const output = handleSeasonRunCommand(
       commandOf(withOffer, {
         command: 'accept-trade-offer',
-        commandId: 'accept-illegal',
+        commandId: commandIdSchema.parse('accept-illegal'),
         windowIndex: 0,
         offerId: illegalOffer.offerId,
       }),
@@ -837,7 +842,7 @@ describe('decline-trade-offer command', () => {
     const output = handleSeasonRunCommand(
       commandOf(run, {
         command: 'decline-trade-offer',
-        commandId: 'decline-1',
+        commandId: commandIdSchema.parse('decline-1'),
         windowIndex: 0,
         offerId: offer.offerId,
       }),
@@ -862,7 +867,7 @@ describe('decline-trade-offer command', () => {
     const unknown = handleSeasonRunCommand(
       commandOf(run, {
         command: 'decline-trade-offer',
-        commandId: 'decline-unknown',
+        commandId: commandIdSchema.parse('decline-unknown'),
         windowIndex: 0,
         offerId: 'off-' + 'd'.repeat(32),
       }),
@@ -874,7 +879,7 @@ describe('decline-trade-offer command', () => {
     const notOpen = handleSeasonRunCommand(
       commandOf(closedTrade, {
         command: 'decline-trade-offer',
-        commandId: 'decline-not-open',
+        commandId: commandIdSchema.parse('decline-not-open'),
         windowIndex: 0,
         offerId: offer.offerId,
       }),
@@ -885,7 +890,7 @@ describe('decline-trade-offer command', () => {
     const first = handleSeasonRunCommand(
       commandOf(run, {
         command: 'decline-trade-offer',
-        commandId: 'decline-twice-1',
+        commandId: commandIdSchema.parse('decline-twice-1'),
         windowIndex: 0,
         offerId: offer.offerId,
       }),
@@ -895,7 +900,7 @@ describe('decline-trade-offer command', () => {
     const second = handleSeasonRunCommand(
       commandOf(first.run, {
         command: 'decline-trade-offer',
-        commandId: 'decline-twice-2',
+        commandId: commandIdSchema.parse('decline-twice-2'),
         windowIndex: 0,
         offerId: offer.offerId,
       }),
@@ -912,7 +917,7 @@ describe('resume-season-block command', () => {
     const output = handleSeasonRunCommand(
       commandOf(run, {
         command: 'resume-season-block',
-        commandId: 'resume-1',
+        commandId: commandIdSchema.parse('resume-1'),
         blockIndex: 3,
         rotationDigest: '0'.repeat(32),
       }),
@@ -933,7 +938,7 @@ describe('resume-season-block command', () => {
     const noPending = handleSeasonRunCommand(
       commandOf(run, {
         command: 'resume-season-block',
-        commandId: 'resume-nopending',
+        commandId: commandIdSchema.parse('resume-nopending'),
         blockIndex: 3,
         rotationDigest: '0'.repeat(32),
       }),
@@ -944,7 +949,7 @@ describe('resume-season-block command', () => {
     const mismatch = handleSeasonRunCommand(
       commandOf(run, {
         command: 'resume-season-block',
-        commandId: 'resume-mismatch',
+        commandId: commandIdSchema.parse('resume-mismatch'),
         blockIndex: 4,
         rotationDigest: '0'.repeat(32),
       }),
@@ -955,7 +960,7 @@ describe('resume-season-block command', () => {
     const digestMismatch = handleSeasonRunCommand(
       commandOf(run, {
         command: 'resume-season-block',
-        commandId: 'resume-digest',
+        commandId: commandIdSchema.parse('resume-digest'),
         blockIndex: 3,
         rotationDigest: '1'.repeat(32),
       }),
@@ -972,9 +977,9 @@ describe('forfeit-interrupted-game command', () => {
     const output = handleSeasonRunCommand(
       commandOf(run, {
         command: 'forfeit-interrupted-game',
-        commandId: 'forfeit-1',
+        commandId: commandIdSchema.parse('forfeit-1'),
         blockIndex: 3,
-        nextGameId: 's000301',
+        nextGameId: seasonGameIdSchema.parse('s000301'),
       }),
       { ...context, run, pending },
     );
@@ -995,9 +1000,9 @@ describe('forfeit-interrupted-game command', () => {
     const noPending = handleSeasonRunCommand(
       commandOf(run, {
         command: 'forfeit-interrupted-game',
-        commandId: 'forfeit-nopending',
+        commandId: commandIdSchema.parse('forfeit-nopending'),
         blockIndex: 3,
-        nextGameId: 's000301',
+        nextGameId: seasonGameIdSchema.parse('s000301'),
       }),
       context,
     );
@@ -1006,9 +1011,9 @@ describe('forfeit-interrupted-game command', () => {
     const mismatch = handleSeasonRunCommand(
       commandOf(run, {
         command: 'forfeit-interrupted-game',
-        commandId: 'forfeit-mismatch',
+        commandId: commandIdSchema.parse('forfeit-mismatch'),
         blockIndex: 4,
-        nextGameId: 's000301',
+        nextGameId: seasonGameIdSchema.parse('s000301'),
       }),
       { ...context, run, pending },
     );
@@ -1017,9 +1022,9 @@ describe('forfeit-interrupted-game command', () => {
     const gameMismatch = handleSeasonRunCommand(
       commandOf(run, {
         command: 'forfeit-interrupted-game',
-        commandId: 'forfeit-gamemismatch',
+        commandId: commandIdSchema.parse('forfeit-gamemismatch'),
         blockIndex: 3,
-        nextGameId: 's000999',
+        nextGameId: seasonGameIdSchema.parse('s000999'),
       }),
       { ...context, run, pending },
     );
@@ -1033,7 +1038,7 @@ describe('command replay determinism', () => {
     const offer = baseOfferOf(run);
     const accept = commandOf(run, {
       command: 'accept-trade-offer',
-      commandId: 'replay-accept',
+      commandId: commandIdSchema.parse('replay-accept'),
       windowIndex: 0,
       offerId: offer.offerId,
     });
@@ -1043,7 +1048,7 @@ describe('command replay determinism', () => {
     expect(first.run).toEqual(second.run);
     const declineCommand = commandOf(run, {
       command: 'decline-trade-offer',
-      commandId: 'replay-decline',
+      commandId: commandIdSchema.parse('replay-decline'),
       windowIndex: 0,
       offerId: offer.offerId,
     });
@@ -1057,7 +1062,7 @@ describe('command replay determinism', () => {
     const offer = baseOfferOf(run);
     const command = commandOf(run, {
       command: 'accept-trade-offer',
-      commandId: 'replay-rejected',
+      commandId: commandIdSchema.parse('replay-rejected'),
       windowIndex: 0,
       offerId: 'off-' + '9'.repeat(32),
     });
@@ -1239,7 +1244,7 @@ function postseasonFixture(
 }
 function regularSeasonSummariesOf(run: SeasonRun): SeasonGameSummary[] {
   const rosterByFranchise = new Map(run.rosters.map((roster) => [roster.franchiseId, roster]));
-  const linesOf = (franchiseId: string) => {
+  const linesOf = (franchiseId: FranchiseId) => {
     const roster = rosterByFranchise.get(franchiseId);
     if (roster === undefined) throw new Error(`no roster for ${franchiseId}`);
     return roster.players.map((player, index) => ({
@@ -1267,7 +1272,7 @@ function regularSeasonSummariesOf(run: SeasonRun): SeasonGameSummary[] {
     .map((game) => {
       const homePlayers = linesOf(game.homeFranchiseId);
       const awayPlayers = linesOf(game.awayFranchiseId);
-      const boxOf = (franchiseId: string, players: ReturnType<typeof linesOf>) => ({
+      const boxOf = (franchiseId: FranchiseId, players: ReturnType<typeof linesOf>) => ({
         franchiseId,
         points: players.reduce((sum, line) => sum + line.points, 0),
         fieldGoalsMade: players.reduce((sum, line) => sum + line.fieldGoalsMade, 0),
@@ -1366,7 +1371,7 @@ describe('start-postseason command', () => {
   it('accepts from a completed regular season and moves to the play-in stage', () => {
     const context = postseasonFixture();
     const output = handleSeasonRunCommand(
-      commandOf(context.run, { command: 'start-postseason', commandId: 'start-1' }),
+      commandOf(context.run, { command: 'start-postseason', commandId: commandIdSchema.parse('start-1') }),
       context,
     );
     const outputResult = output.result;
@@ -1389,18 +1394,18 @@ describe('start-postseason command', () => {
       cursor: { schemaVersion: 1 as const, completedRounds: 80 },
     };
     const incompleteOutput = handleSeasonRunCommand(
-      commandOf(incomplete, { command: 'start-postseason', commandId: 'start-incomplete' }),
+      commandOf(incomplete, { command: 'start-postseason', commandId: commandIdSchema.parse('start-incomplete') }),
       { ...context, run: incomplete },
     );
     if (incompleteOutput.result.result.status !== 'rejected') throw new Error('expected rejection');
     expect(incompleteOutput.result.result.rejection.code).toBe('invalid-stage');
     const started = handleSeasonRunCommand(
-      commandOf(context.run, { command: 'start-postseason', commandId: 'start-1' }),
+      commandOf(context.run, { command: 'start-postseason', commandId: commandIdSchema.parse('start-1') }),
       context,
     );
     if (started.result.result.status !== 'accepted') throw new Error('expected acceptance');
     const again = handleSeasonRunCommand(
-      commandOf(started.run, { command: 'start-postseason', commandId: 'start-2' }),
+      commandOf(started.run, { command: 'start-postseason', commandId: commandIdSchema.parse('start-2') }),
       { ...context, run: started.run },
     );
     if (again.result.result.status !== 'rejected') throw new Error('expected rejection');
@@ -1415,7 +1420,7 @@ describe('start-postseason command', () => {
       }),
     });
     const output = handleSeasonRunCommand(
-      commandOf(context.run, { command: 'start-postseason', commandId: 'start-bad' }),
+      commandOf(context.run, { command: 'start-postseason', commandId: commandIdSchema.parse('start-bad') }),
       badRankings,
     );
     if (output.result.result.status !== 'rejected') throw new Error('expected rejection');
@@ -1423,7 +1428,7 @@ describe('start-postseason command', () => {
     const stale = handleSeasonRunCommand(
       commandOf(
         { ...context.run, stateRevision: context.run.stateRevision + 5 },
-        { command: 'start-postseason', commandId: 'start-stale' },
+        { command: 'start-postseason', commandId: commandIdSchema.parse('start-stale') },
       ),
       context,
     );
@@ -1434,7 +1439,7 @@ describe('start-postseason command', () => {
     const context = postseasonFixture();
     const other = buildEconomyTestRun({ runId: 'other-run' }).run;
     const mismatch = handleSeasonRunCommand(
-      commandOf(other, { command: 'start-postseason', commandId: 'start-mismatch' }),
+      commandOf(other, { command: 'start-postseason', commandId: commandIdSchema.parse('start-mismatch') }),
       context,
     );
     if (mismatch.result.result.status !== 'rejected') throw new Error('expected rejection');
@@ -1448,12 +1453,12 @@ describe('advance-postseason command', () => {
       resolver: forcedPostseasonResolver(humanWinsEveryGame),
     });
     const start = handleSeasonRunCommand(
-      commandOf(context.run, { command: 'start-postseason', commandId: 'start-1' }),
+      commandOf(context.run, { command: 'start-postseason', commandId: commandIdSchema.parse('start-1') }),
       context,
     );
     if (start.result.result.status !== 'accepted') throw new Error('expected acceptance');
     const output = handleSeasonRunCommand(
-      commandOf(start.run, { command: 'advance-postseason', commandId: 'adv-1' }),
+      commandOf(start.run, { command: 'advance-postseason', commandId: commandIdSchema.parse('adv-1') }),
       { ...context, run: start.run },
     );
     const outputResult = output.result;
@@ -1475,12 +1480,12 @@ describe('advance-postseason command', () => {
       regularSeasonSummaries: regularSeasonSummariesOf(postseasonFixture().run),
     });
     const start = handleSeasonRunCommand(
-      commandOf(context.run, { command: 'start-postseason', commandId: 'start-1' }),
+      commandOf(context.run, { command: 'start-postseason', commandId: commandIdSchema.parse('start-1') }),
       context,
     );
     if (start.result.result.status !== 'accepted') throw new Error('expected acceptance');
     const output = handleSeasonRunCommand(
-      commandOf(start.run, { command: 'advance-postseason', commandId: 'adv-1' }),
+      commandOf(start.run, { command: 'advance-postseason', commandId: commandIdSchema.parse('adv-1') }),
       { ...context, run: start.run },
     );
     const outputResult = output.result;
@@ -1493,14 +1498,14 @@ describe('advance-postseason command', () => {
     expect(awards?.runId).toBe(output.run.runId);
     expect(awards?.allLeagueFirstTeam).toHaveLength(5);
     const leagueFranchises = new Set(output.run.league.teams.map((team) => team.franchiseId));
-    expect(leagueFranchises.has(awards?.mvp.franchiseId ?? '')).toBe(true);
+    expect(leagueFranchises.has(awards?.mvp.franchiseId ?? HUMAN)).toBe(true);
     expect(output.run.completion?.championFranchiseId).toBe(HUMAN);
     expectSchemaValidRun(output.run);
   });
   it('stops at a human game whose rotation plans minutes for injured players', () => {
     const context = postseasonFixture({ resolver: forcedPostseasonResolver(humanWinsEveryGame) });
     const start = handleSeasonRunCommand(
-      commandOf(context.run, { command: 'start-postseason', commandId: 'start-1' }),
+      commandOf(context.run, { command: 'start-postseason', commandId: commandIdSchema.parse('start-1') }),
       context,
     );
     if (start.result.result.status !== 'accepted') throw new Error('expected acceptance');
@@ -1510,7 +1515,7 @@ describe('advance-postseason command', () => {
       injuryId: `inj-${'9'.repeat(31)}${String(index)}`,
       playerVersionId: player.playerVersionId,
       franchiseId: HUMAN,
-      gameId: 's000001',
+      gameId: seasonGameIdSchema.parse('s000001'),
       type: 'lower-body' as const,
       severity: 'season-ending' as const,
       occurredBeforeHalftime: true,
@@ -1526,7 +1531,7 @@ describe('advance-postseason command', () => {
     }));
     const injured = { ...start.run, health: { ...start.run.health, injuries } };
     const output = handleSeasonRunCommand(
-      commandOf(injured, { command: 'advance-postseason', commandId: 'adv-1' }),
+      commandOf(injured, { command: 'advance-postseason', commandId: commandIdSchema.parse('adv-1') }),
       { ...context, run: injured },
     );
     const outputResult = output.result;
@@ -1545,14 +1550,14 @@ describe('advance-postseason command', () => {
   it('rejects wrong-game targets, invalid stages, and stale states', () => {
     const context = postseasonFixture();
     const start = handleSeasonRunCommand(
-      commandOf(context.run, { command: 'start-postseason', commandId: 'start-1' }),
+      commandOf(context.run, { command: 'start-postseason', commandId: commandIdSchema.parse('start-1') }),
       context,
     );
     if (start.result.result.status !== 'accepted') throw new Error('expected acceptance');
     const firstAdvance = handleSeasonRunCommand(
       commandOf(start.run, {
         command: 'advance-postseason',
-        commandId: 'adv-first',
+        commandId: commandIdSchema.parse('adv-first'),
         targetGameId: 'pi-east-nine-ten',
       }),
       { ...context, run: start.run },
@@ -1561,7 +1566,7 @@ describe('advance-postseason command', () => {
     const wrongGame = handleSeasonRunCommand(
       commandOf(firstAdvance.run, {
         command: 'advance-postseason',
-        commandId: 'adv-wrong',
+        commandId: commandIdSchema.parse('adv-wrong'),
         targetGameId: 'pi-east-seven-eight',
       }),
       { ...context, run: firstAdvance.run },
@@ -1571,7 +1576,7 @@ describe('advance-postseason command', () => {
     if (wrongGame.result.result.rejection.code !== 'wrong-game') throw new Error('unexpected');
     expect(wrongGame.result.result.rejection.nextGameId).toBe('pi-east-final');
     const wrongStage = handleSeasonRunCommand(
-      commandOf(context.run, { command: 'advance-postseason', commandId: 'adv-stage' }),
+      commandOf(context.run, { command: 'advance-postseason', commandId: commandIdSchema.parse('adv-stage') }),
       context,
     );
     if (wrongStage.result.result.status !== 'rejected') throw new Error('expected rejection');
@@ -1579,7 +1584,7 @@ describe('advance-postseason command', () => {
     const stale = handleSeasonRunCommand(
       commandOf(
         { ...start.run, stateRevision: start.run.stateRevision + 3 },
-        { command: 'advance-postseason', commandId: 'adv-stale' },
+        { command: 'advance-postseason', commandId: commandIdSchema.parse('adv-stale') },
       ),
       { ...context, run: start.run },
     );
@@ -1595,7 +1600,7 @@ describe('submit-postseason-rotation command', () => {
       injuryId: `inj-${'7'.repeat(31)}${String(index)}`,
       playerVersionId: player.playerVersionId,
       franchiseId: HUMAN,
-      gameId: 's000001',
+      gameId: seasonGameIdSchema.parse('s000001'),
       type: 'lower-body' as const,
       severity: 'season-ending' as const,
       occurredBeforeHalftime: true,
@@ -1619,13 +1624,13 @@ describe('submit-postseason-rotation command', () => {
   } {
     const context = postseasonFixture({ resolver: forcedPostseasonResolver(humanWinsEveryGame) });
     const start = handleSeasonRunCommand(
-      commandOf(context.run, { command: 'start-postseason', commandId: 'start-1' }),
+      commandOf(context.run, { command: 'start-postseason', commandId: commandIdSchema.parse('start-1') }),
       context,
     );
     if (start.result.result.status !== 'accepted') throw new Error('expected acceptance');
     const injured = humanInjuredRun({ ...context, run: start.run });
     const advance = handleSeasonRunCommand(
-      commandOf(injured, { command: 'advance-postseason', commandId: 'adv-1' }),
+      commandOf(injured, { command: 'advance-postseason', commandId: commandIdSchema.parse('adv-1') }),
       { ...context, run: injured },
     );
     const advanceResult = advance.result;
@@ -1645,7 +1650,7 @@ describe('submit-postseason-rotation command', () => {
     const output = handleSeasonRunCommand(
       commandOf(run, {
         command: 'submit-postseason-rotation',
-        commandId: 'sub-1',
+        commandId: commandIdSchema.parse('sub-1'),
         targetGameId: 'pi-west-seven-eight',
         rotation: { franchiseId: HUMAN, rotation },
       }),
@@ -1675,7 +1680,7 @@ describe('submit-postseason-rotation command', () => {
       injuryId,
       playerVersionId: player.playerVersionId,
       franchiseId: HUMAN,
-      gameId: 's000001',
+      gameId: seasonGameIdSchema.parse('s000001'),
       type: 'lower-body',
       severity: 'moderate',
       occurredBeforeHalftime: true,
@@ -1697,7 +1702,7 @@ describe('submit-postseason-rotation command', () => {
     const output = handleSeasonRunCommand(
       commandOf(withInjuryRun, {
         command: 'submit-postseason-rotation',
-        commandId: 'sub-rehab',
+        commandId: commandIdSchema.parse('sub-rehab'),
         targetGameId: 'pi-west-seven-eight',
         rotation: { franchiseId: HUMAN, rotation, riskyRehabInjuryId: injuryId },
       }),
@@ -1726,7 +1731,7 @@ describe('submit-postseason-rotation command', () => {
     const wrongTarget = handleSeasonRunCommand(
       commandOf(run, {
         command: 'submit-postseason-rotation',
-        commandId: 'sub-wrongtarget',
+        commandId: commandIdSchema.parse('sub-wrongtarget'),
         targetGameId: 'pi-east-final',
         rotation: { franchiseId: HUMAN, rotation },
       }),
@@ -1745,7 +1750,7 @@ describe('submit-postseason-rotation command', () => {
     const invalidRotation = handleSeasonRunCommand(
       commandOf(run, {
         command: 'submit-postseason-rotation',
-        commandId: 'sub-invalid',
+        commandId: commandIdSchema.parse('sub-invalid'),
         targetGameId: 'pi-west-seven-eight',
         rotation: { franchiseId: HUMAN, rotation: broken },
       }),
@@ -1761,7 +1766,7 @@ describe('submit-postseason-rotation command', () => {
       injuryId: injuryIdOf('postseason-unavailable'),
       playerVersionId: player.playerVersionId,
       franchiseId: HUMAN,
-      gameId: 's000001',
+      gameId: seasonGameIdSchema.parse('s000001'),
       type: 'lower-body',
       severity: 'moderate',
       occurredBeforeHalftime: true,
@@ -1785,7 +1790,7 @@ describe('submit-postseason-rotation command', () => {
     const unavailable = handleSeasonRunCommand(
       commandOf(withInjuryRun, {
         command: 'submit-postseason-rotation',
-        commandId: 'sub-unavailable',
+        commandId: commandIdSchema.parse('sub-unavailable'),
         targetGameId: 'pi-west-seven-eight',
         rotation: { franchiseId: HUMAN, rotation: saved },
       }),
@@ -1803,7 +1808,7 @@ describe('submit-postseason-rotation command', () => {
     const insufficient = handleSeasonRunCommand(
       commandOf(poor, {
         command: 'submit-postseason-rotation',
-        commandId: 'sub-poor',
+        commandId: commandIdSchema.parse('sub-poor'),
         targetGameId: 'pi-west-seven-eight',
         rotation: {
           franchiseId: HUMAN,
@@ -1820,7 +1825,7 @@ describe('submit-postseason-rotation command', () => {
       injuryId: injuryIdOf('postseason-duplicate'),
       playerVersionId: player.playerVersionId,
       franchiseId: HUMAN,
-      gameId: 's000001',
+      gameId: seasonGameIdSchema.parse('s000001'),
       type: 'lower-body',
       severity: 'moderate',
       occurredBeforeHalftime: true,
@@ -1841,7 +1846,7 @@ describe('submit-postseason-rotation command', () => {
     });
     const rehabCommand = commandOf(rehabRun, {
       command: 'submit-postseason-rotation',
-      commandId: 'sub-duplicate',
+      commandId: commandIdSchema.parse('sub-duplicate'),
       targetGameId: 'pi-west-seven-eight',
       rotation: {
         franchiseId: HUMAN,
@@ -1866,14 +1871,14 @@ describe('spectate-postseason-game command', () => {
       }),
     });
     const start = handleSeasonRunCommand(
-      commandOf(context.run, { command: 'start-postseason', commandId: 'start-1' }),
+      commandOf(context.run, { command: 'start-postseason', commandId: commandIdSchema.parse('start-1') }),
       context,
     );
     if (start.result.result.status !== 'accepted') throw new Error('expected acceptance');
     const advance = handleSeasonRunCommand(
       commandOf(start.run, {
         command: 'advance-postseason',
-        commandId: 'adv-1',
+        commandId: commandIdSchema.parse('adv-1'),
         targetGameId: 'po-west-first-round-1-g1',
       }),
       { ...context, run: start.run },
@@ -1884,7 +1889,7 @@ describe('spectate-postseason-game command', () => {
     const wrongTarget = handleSeasonRunCommand(
       commandOf(advance.run, {
         command: 'spectate-postseason-game',
-        commandId: 'spec-wrong',
+        commandId: commandIdSchema.parse('spec-wrong'),
         targetGameId: 'po-west-first-round-1-g5',
       }),
       { ...context, run: advance.run },
@@ -1894,7 +1899,7 @@ describe('spectate-postseason-game command', () => {
     const output = handleSeasonRunCommand(
       commandOf(advance.run, {
         command: 'spectate-postseason-game',
-        commandId: 'spec-1',
+        commandId: commandIdSchema.parse('spec-1'),
         targetGameId: 'po-west-first-round-1-g2',
       }),
       { ...context, run: advance.run },
@@ -1913,7 +1918,7 @@ describe('spectate-postseason-game command', () => {
     const wrongStage = handleSeasonRunCommand(
       commandOf(context.run, {
         command: 'spectate-postseason-game',
-        commandId: 'spec-stage',
+        commandId: commandIdSchema.parse('spec-stage'),
         targetGameId: 'pi-east-seven-eight',
       }),
       context,
@@ -1925,7 +1930,7 @@ describe('spectate-postseason-game command', () => {
         { ...context.run, stateRevision: context.run.stateRevision + 1 },
         {
           command: 'spectate-postseason-game',
-          commandId: 'spec-stale',
+          commandId: commandIdSchema.parse('spec-stale'),
           targetGameId: 'pi-east-seven-eight',
         },
       ),
@@ -1949,12 +1954,12 @@ describe('fast-forward-postseason command', () => {
       }),
     });
     const start = handleSeasonRunCommand(
-      commandOf(context.run, { command: 'start-postseason', commandId: 'start-1' }),
+      commandOf(context.run, { command: 'start-postseason', commandId: commandIdSchema.parse('start-1') }),
       context,
     );
     if (start.result.result.status !== 'accepted') throw new Error('expected acceptance');
     const output = handleSeasonRunCommand(
-      commandOf(start.run, { command: 'fast-forward-postseason', commandId: 'ff-1' }),
+      commandOf(start.run, { command: 'fast-forward-postseason', commandId: commandIdSchema.parse('ff-1') }),
       { ...context, run: start.run },
     );
     const outputResult = output.result;
@@ -1974,14 +1979,14 @@ describe('fast-forward-postseason command', () => {
   it('rejects an active human, an invalid stage, and a bad target', () => {
     const context = postseasonFixture({ resolver: forcedPostseasonResolver(humanWinsEveryGame) });
     const activeStart = handleSeasonRunCommand(
-      commandOf(context.run, { command: 'start-postseason', commandId: 'start-1' }),
+      commandOf(context.run, { command: 'start-postseason', commandId: commandIdSchema.parse('start-1') }),
       context,
     );
     if (activeStart.result.result.status !== 'accepted') throw new Error('expected acceptance');
     const activeHuman = handleSeasonRunCommand(
       commandOf(activeStart.run, {
         command: 'fast-forward-postseason',
-        commandId: 'ff-active',
+        commandId: commandIdSchema.parse('ff-active'),
         targetGameId: 'po-east-first-round-1-g1',
       }),
       { ...context, run: activeStart.run },
@@ -1989,7 +1994,7 @@ describe('fast-forward-postseason command', () => {
     if (activeHuman.result.result.status !== 'rejected') throw new Error('expected rejection');
     expect(activeHuman.result.result.rejection.code).toBe('integrity-failure');
     const wrongStage = handleSeasonRunCommand(
-      commandOf(context.run, { command: 'fast-forward-postseason', commandId: 'ff-stage' }),
+      commandOf(context.run, { command: 'fast-forward-postseason', commandId: commandIdSchema.parse('ff-stage') }),
       context,
     );
     if (wrongStage.result.result.status !== 'rejected') throw new Error('expected rejection');
@@ -2001,14 +2006,14 @@ describe('fast-forward-postseason command', () => {
       }),
     });
     const start = handleSeasonRunCommand(
-      commandOf(aiOnly.run, { command: 'start-postseason', commandId: 'start-1' }),
+      commandOf(aiOnly.run, { command: 'start-postseason', commandId: commandIdSchema.parse('start-1') }),
       aiOnly,
     );
     if (start.result.result.status !== 'accepted') throw new Error('expected acceptance');
     const advance = handleSeasonRunCommand(
       commandOf(start.run, {
         command: 'advance-postseason',
-        commandId: 'adv-1',
+        commandId: commandIdSchema.parse('adv-1'),
         targetGameId: 'pi-west-nine-ten',
       }),
       { ...aiOnly, run: start.run },
@@ -2017,7 +2022,7 @@ describe('fast-forward-postseason command', () => {
     const badTarget = handleSeasonRunCommand(
       commandOf(advance.run, {
         command: 'fast-forward-postseason',
-        commandId: 'ff-badtarget',
+        commandId: commandIdSchema.parse('ff-badtarget'),
         targetGameId: 'pi-east-seven-eight',
       }),
       { ...aiOnly, run: advance.run },
@@ -2049,7 +2054,7 @@ describe('campaign commands', () => {
     const output = handleSeasonRunCommand(
       commandOf(context.run, {
         command: 'select-gm-identity',
-        commandId: 'gm-1',
+        commandId: commandIdSchema.parse('gm-1'),
         identity: 'team-identity',
         focus: 'defense',
       }),
@@ -2062,3 +2067,9 @@ describe('campaign commands', () => {
     expect(campaign.offers[0]).toHaveLength(2);
   });
 });
+
+
+
+
+
+

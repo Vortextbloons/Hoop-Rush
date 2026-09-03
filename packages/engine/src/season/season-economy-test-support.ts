@@ -48,8 +48,13 @@ import {
   SEASON_TRADE_GRADE_VERSION,
   PLAYER_VERSION_ID_VERSION,
   buildInitialPostseasonState,
+  contentHashSchema,
+  franchiseIdSchema,
+  idSchema,
+  seasonGameIdSchema,
   seasonNamespaceSeed,
   seasonRunSchema,
+  seedSchema,
   type SeasonDraftCatalog,
   type SeasonEffectsState,
   type SeasonGameSummary,
@@ -130,7 +135,8 @@ function patternIndexOf(franchiseId: string): number {
   return Number.parseInt(hash.slice(0, 8), 16) % LEGAL_ROSTER_PATTERNS.length;
 }
 function rosterOf(catalog: SeasonDraftCatalog, franchiseId: string): SeasonRosterEntry[] {
-  const pool = catalog.pools.find((entry) => entry.franchiseId === franchiseId);
+  const franchiseKey = franchiseIdSchema.parse(franchiseId);
+  const pool = catalog.pools.find((entry) => entry.franchiseId === franchiseKey);
   if (pool === undefined) throw new Error(`no catalog pool for ${franchiseId}`);
   const pattern = LEGAL_ROSTER_PATTERNS[patternIndexOf(franchiseId)];
   if (pattern === undefined) throw new Error(`no pattern for ${franchiseId}`);
@@ -146,7 +152,7 @@ function rosterOf(catalog: SeasonDraftCatalog, franchiseId: string): SeasonRoste
     return {
       playerVersionId: candidate.playerVersionId,
       playerId: candidate.playerId,
-      franchiseId,
+      franchiseId: franchiseKey,
       eraId: candidate.eraId,
       seasonKey: candidate.seasonKey,
       displayName: candidate.displayName,
@@ -204,10 +210,10 @@ export function buildEconomyTestRun(
   run: SeasonRun;
   catalog: SeasonDraftCatalog;
 } {
-  const seed = input.seed ?? ECONOMY_TEST_SEED;
+  const seed = seedSchema.parse(input.seed ?? ECONOMY_TEST_SEED);
   const catalog = input.catalog ?? economyTestCatalog();
-  const humanFranchiseId = input.humanFranchiseId ?? 'lakers';
-  const runId = input.runId ?? 'economy-test-run-1';
+  const humanFranchiseId = franchiseIdSchema.parse(input.humanFranchiseId ?? 'lakers');
+  const runId = idSchema.parse(input.runId ?? 'economy-test-run-1');
   const league = buildSeasonLeague({}, { humanFranchiseId });
   const rosterRows: SeasonRoster[] = league.teams.map((team) => ({
     franchiseId: team.franchiseId,
@@ -248,10 +254,10 @@ export function buildEconomyTestRun(
     const home = league.teams[gameNumber % league.teams.length];
     const away = league.teams[(gameNumber * 7 + 11) % league.teams.length];
     return {
-      gameId: `s${String(gameNumber).padStart(6, '0')}`,
+      gameId: seasonGameIdSchema.parse(`s${String(gameNumber).padStart(6, '0')}`),
       round: Math.floor(index / 15) + 1,
-      homeFranchiseId: home?.franchiseId ?? 'lakers',
-      awayFranchiseId: away?.franchiseId ?? 'celtics',
+      homeFranchiseId: home?.franchiseId ?? franchiseIdSchema.parse('lakers'),
+      awayFranchiseId: away?.franchiseId ?? franchiseIdSchema.parse('celtics'),
       status: 'scheduled' as const,
       homeScore: null,
       awayScore: null,
@@ -301,7 +307,7 @@ export function buildEconomyTestRun(
       scheduleVersion: SEASON_SCHEDULE_VERSION,
       formulaVersion: SEASON_SCHEDULE_FORMULA_VERSION,
       generationSeed: seed,
-      contentHash: '0'.repeat(64),
+      contentHash: contentHashSchema.parse('0'.repeat(64)),
     },
     games,
     standings,
@@ -412,7 +418,7 @@ export function fixtureSummary(
     points: number,
     overrides: Partial<SeasonGameSummary['homeBox']> = {},
   ): SeasonGameSummary['homeBox'] => ({
-    franchiseId,
+    franchiseId: franchiseIdSchema.parse(franchiseId),
     points,
     fieldGoalsMade: 0,
     fieldGoalsAttempted: 0,
@@ -433,10 +439,10 @@ export function fixtureSummary(
   return {
     schemaVersion: 1,
     summaryVersion: SEASON_GAME_SUMMARY_VERSION,
-    gameId,
+    gameId: seasonGameIdSchema.parse(gameId),
     round: 1,
-    homeFranchiseId,
-    awayFranchiseId,
+    homeFranchiseId: franchiseIdSchema.parse(homeFranchiseId),
+    awayFranchiseId: franchiseIdSchema.parse(awayFranchiseId),
     status: 'final',
     overtimePeriods: 0,
     homeScore,

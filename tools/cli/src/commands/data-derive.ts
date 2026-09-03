@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { z } from 'zod';
 import {
   DERIVATION_METHOD_VERSION,
   LINEAGE_RULE_VERSION,
@@ -17,7 +18,24 @@ export const DATA_DERIVE_OPTIONS: Record<string, boolean> = {
   format: true,
   verbose: false,
 };
-interface DeriveTracePayload {
+const stintRowSchema = z.looseObject({
+  playerExternalId: z.unknown().optional(),
+  teamExternalId: z.unknown().optional(),
+  gamesPlayed: z.unknown().optional(),
+  minutes: z.unknown().optional(),
+});
+type StintRow = z.infer<typeof stintRowSchema>;
+const seasonStatsRowSchema = z.looseObject({
+  playerExternalId: z.unknown().optional(),
+});
+type SeasonStatsRow = z.infer<typeof seasonStatsRowSchema>;
+const rosterRowSchema = z.looseObject({
+  externalId: z.unknown().optional(),
+  position: z.unknown().optional(),
+  heightInches: z.unknown().optional(),
+});
+type RosterRow = z.infer<typeof rosterRowSchema>;
+type DeriveTracePayload = {
   playerExternalId: string;
   season: string;
   franchiseId: string;
@@ -35,17 +53,15 @@ interface DeriveTracePayload {
     lineageRuleVersion: string;
   };
   seasonContext: ratings.SeasonContext;
-  inputs: Record<string, unknown>;
-  methods: Record<string, string>;
-  unclamped: Record<string, number>;
-  final: {
-    ratings: Record<string, number>;
-    tendencies: Record<string, number>;
-    anchors: Record<string, unknown>;
-    summaryRatings: Record<string, number>;
+  inputs: {
+    stint: Pick<StintRow, 'gamesPlayed' | 'minutes' | 'teamExternalId'>;
+    seasonStats: SeasonStatsRow;
   };
-  provenance: Record<string, unknown>;
-}
+  methods: ratings.DerivedRecord['methods'];
+  unclamped: ratings.DerivedRecord['unclamped'];
+  final: Pick<ratings.DerivedRecord, 'ratings' | 'tendencies' | 'anchors' | 'summaryRatings'>;
+  provenance: ratings.DerivedRecord['provenance'];
+};
 export function dataDerive(args: {
   player?: string | null;
   season?: string | null;
@@ -76,15 +92,23 @@ export function dataDerive(args: {
     );
   }
   const seasonDir = join(NBA_ROOT, season);
-  let stints: Array<Record<string, unknown>> = [];
-  let statsRows: Array<Record<string, unknown>> = [];
+  let stints: StintRow[] = [];
+  let statsRows: SeasonStatsRow[] = [];
   try {
-    stints = JSON.parse(readFileSync(join(seasonDir, 'stints.json'), 'utf8')) as Array<
-      Record<string, unknown>
-    >;
-    statsRows = JSON.parse(readFileSync(join(seasonDir, 'season-stats.json'), 'utf8')) as Array<
-      Record<string, unknown>
-    >;
+    const stintsRaw = JSON.parse(readFileSync(join(seasonDir, 'stints.json'), 'utf8')) as unknown;
+    const stintsParsed = z.array(stintRowSchema).safeParse(stintsRaw);
+    if (!stintsParsed.success) {
+      throw new Error(stintsParsed.error.issues[0]?.message ?? 'invalid stints');
+    }
+    stints = stintsParsed.data;
+    const statsRaw = JSON.parse(
+      readFileSync(join(seasonDir, 'season-stats.json'), 'utf8'),
+    ) as unknown;
+    const statsParsed = z.array(seasonStatsRowSchema).safeParse(statsRaw);
+    if (!statsParsed.success) {
+      throw new Error(statsParsed.error.issues[0]?.message ?? 'invalid season-stats');
+    }
+    statsRows = statsParsed.data;
   } catch (error) {
     return makeReport(
       'data derive',
@@ -95,9 +119,19 @@ export function dataDerive(args: {
       },
     );
   }
-  const rosterRows = JSON.parse(readFileSync(join(seasonDir, 'roster.json'), 'utf8')) as Array<
-    Record<string, unknown>
-  >;
+  const rosterRaw = JSON.parse(readFileSync(join(seasonDir, 'roster.json'), 'utf8')) as unknown;
+  const rosterParsed = z.array(rosterRowSchema).safeParse(rosterRaw);
+  if (!rosterParsed.success) {
+    return makeReport(
+      'data derive',
+      { player, season, franchise },
+      {
+        failures: [`cached source data unreadable for ${season}: roster invalid`],
+        exitCode: EXIT_USAGE_OR_DATA_ERROR,
+      },
+    );
+  }
+  const rosterRows: RosterRow[] = rosterParsed.data;
   const roster = rosterRows.find((row) => String(row.externalId) === player);
   const stint = stints.find(
     (row) =>

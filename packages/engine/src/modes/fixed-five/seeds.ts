@@ -1,4 +1,5 @@
 import type { FixedFiveParticipantId, FixedFiveRoomMode, Seed } from '@hoop-rush/data-contracts';
+import { seedSchema } from '@hoop-rush/data-contracts';
 import { FNV_OFFSET_32, fnv1a32, hex32 } from '../../sim/rng.ts';
 import { createRng } from '../../sim/rng.ts';
 
@@ -7,7 +8,7 @@ export const FIXED_FIVE_SEED_VERSION = 'fixed-five-v1';
 function hexSeed(material: string): Seed {
   const high = fnv1a32(material);
   const low = fnv1a32(`${material}:tail`, FNV_OFFSET_32 ^ high);
-  return `${hex32(high)}${hex32(low)}`;
+  return seedSchema.parse(`${hex32(high)}${hex32(low)}`);
 }
 
 export function fixedFiveParticipantSeed(
@@ -62,7 +63,7 @@ export function fixedFiveAutopickSeed(
   mode: FixedFiveRoomMode,
   participantId: FixedFiveParticipantId,
   pickOrdinal: number,
-): Seed {
+): string {
   if (!Number.isInteger(pickOrdinal) || pickOrdinal < 0) {
     throw new Error(`pickOrdinal must be a nonnegative integer (got ${String(pickOrdinal)})`);
   }

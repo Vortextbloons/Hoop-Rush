@@ -1,11 +1,12 @@
 import type {
+  ContentHash,
   FixedFiveCommand,
   FixedFiveCompetitionResult,
   FixedFiveLineupEntry,
   FixedFiveVersionLocks,
   Seed,
 } from '@hoop-rush/data-contracts';
-import { canonicalJson, seasonDigestHex } from '@hoop-rush/data-contracts';
+import { canonicalJson, contentHashSchema, seasonDigestHex } from '@hoop-rush/data-contracts';
 
 export interface FixedFiveDigestInput {
   rootSeed: Seed;
@@ -29,8 +30,11 @@ export function canonicalFixedFiveDigestPayload(
   };
 }
 
-export function fixedFiveResultDigest(input: FixedFiveDigestInput): string {
-  return seasonDigestHex(canonicalJson(canonicalFixedFiveDigestPayload(input)));
+export function fixedFiveResultDigest(input: FixedFiveDigestInput): ContentHash {
+  const material = canonicalJson(canonicalFixedFiveDigestPayload(input));
+  return contentHashSchema.parse(
+    `${seasonDigestHex(`fixed-five-digest-v1:${material}`)}${seasonDigestHex(`fixed-five-digest-v2:${material}`)}`,
+  );
 }
 
 export function verifyFixedFiveDigest(
