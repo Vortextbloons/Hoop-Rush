@@ -1,37 +1,23 @@
-<script lang="ts">
-  import type {
-    HoopRushManifest,
-    SeasonEffectsState,
-    SeasonGameSummary,
-    SeasonRoster,
-  } from '@hoop-rush/data-contracts';
-  import SeasonPlayerStats from '$lib/components/season/SeasonPlayerStats.svelte';
-  import SeasonRosterList from '$lib/components/season/SeasonRosterList.svelte';
-  import type { SeasonPlayerStatsView } from '$lib/season/season-player-stats-view';
-  import type { SeasonRunShellData } from '$lib/season/season-shell-context';
-  type RosterPanelView = 'roster' | 'stats';
-  let {
-    roster,
-    manifest,
-    shell,
-    roleOf,
-    effects,
-    summaries,
-    statsView,
-  }: {
+<script lang="ts">import type { HoopRushManifest, SeasonEffectsState, SeasonGameSummary, SeasonRoster, } from '@hoop-rush/data-contracts';
+import SeasonPlayerStats from '$lib/components/season/SeasonPlayerStats.svelte';
+import SeasonRosterList from '$lib/components/season/SeasonRosterList.svelte';
+import type { SeasonPlayerStatsView } from '$lib/season/season-player-stats-view';
+import type { SeasonRunShellData } from '$lib/season/season-shell-context';
+type RosterPanelView = 'roster' | 'stats';
+let { roster, manifest, shell, roleOf, effects, summaries, statsView, }: {
     roster: SeasonRoster;
     manifest: HoopRushManifest;
     shell: SeasonRunShellData;
     roleOf: (playerVersionId: string) => {
-      role: string;
-      minutes: number | string;
+        role: string;
+        minutes: number | string;
     };
     effects: SeasonEffectsState | null;
     summaries: SeasonGameSummary[];
     statsView: SeasonPlayerStatsView;
-  } = $props();
-  let view = $state<RosterPanelView>('roster');
-  const inactiveCount = $derived(shell.editor?.inactiveMembers().length ?? 0);
+} = $props();
+let view = $state<RosterPanelView>('roster');
+const inactiveCount = $derived(shell.editor?.inactiveMembers().length ?? 0);
 </script>
 
 <section aria-labelledby="roster-panel-heading" class="min-w-0" data-team-roster-panel>

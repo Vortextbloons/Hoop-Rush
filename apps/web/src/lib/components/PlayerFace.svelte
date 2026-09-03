@@ -1,63 +1,51 @@
-<script lang="ts">
-  import {
-    resolveHeadshotUrls,
-    shouldStallTimeoutHeadshot,
-    type HoopRushManifest,
-  } from '@hoop-rush/data-contracts';
-  import type { PeakPlayerSeason } from '@hoop-rush/data-contracts';
-  type HeadshotPlayer = Pick<PeakPlayerSeason, 'playerId' | 'playerExternalId' | 'altIds'>;
-  const HEADSHOT_TIMEOUT_MS = 15000;
-  let {
-    player,
-    manifest,
-    size = 'md',
-    eager = false,
-    fallbackInitials,
-  }: {
+<script lang="ts">import { resolveHeadshotUrls, shouldStallTimeoutHeadshot, type HoopRushManifest, } from '@hoop-rush/data-contracts';
+import type { PeakPlayerSeason } from '@hoop-rush/data-contracts';
+type HeadshotPlayer = Pick<PeakPlayerSeason, 'playerId' | 'playerExternalId' | 'altIds'>;
+const HEADSHOT_TIMEOUT_MS = 15000;
+let { player, manifest, size = 'md', eager = false, fallbackInitials, }: {
     player: HeadshotPlayer;
     manifest: HoopRushManifest;
     size?: 'sm' | 'md' | 'court';
     eager?: boolean;
     fallbackInitials: string;
-  } = $props();
-  const urls = $derived(resolveHeadshotUrls(manifest, player));
-  let attempt = $state(0);
-  let imgEl = $state<HTMLImageElement | null>(null);
-  const candidateKey = $derived(`${player.playerId}\0${urls.join('\0')}`);
-  let lastCandidateKey = '';
-  $effect(() => {
+} = $props();
+const urls = $derived(resolveHeadshotUrls(manifest, player));
+let attempt = $state(0);
+let imgEl = $state<HTMLImageElement | null>(null);
+const candidateKey = $derived(`${player.playerId}\0${urls.join('\0')}`);
+let lastCandidateKey = '';
+$effect(() => {
     if (candidateKey !== lastCandidateKey) {
-      lastCandidateKey = candidateKey;
-      attempt = 0;
+        lastCandidateKey = candidateKey;
+        attempt = 0;
     }
-  });
-  const src = $derived(urls[attempt] ?? '');
-  const showInitials = $derived(!src || attempt >= urls.length);
-  const applyStallTimeout = $derived(shouldStallTimeoutHeadshot(src, urls, attempt, player));
-  $effect(() => {
+});
+const src = $derived(urls[attempt] ?? '');
+const showInitials = $derived(!src || attempt >= urls.length);
+const applyStallTimeout = $derived(shouldStallTimeoutHeadshot(src, urls, attempt, player));
+$effect(() => {
     const current = src;
-    if (!eager || !current || !applyStallTimeout) return;
+    if (!eager || !current || !applyStallTimeout)
+        return;
     const timer = setTimeout(() => {
-      if (imgEl && !imgEl.complete && imgEl.naturalWidth === 0) {
-        onError();
-      }
+        if (imgEl && !imgEl.complete && imgEl.naturalWidth === 0) {
+            onError();
+        }
     }, HEADSHOT_TIMEOUT_MS);
     return () => clearTimeout(timer);
-  });
-  function onError() {
+});
+function onError() {
     if (attempt < urls.length - 1) {
-      attempt += 1;
-      return;
+        attempt += 1;
+        return;
     }
     attempt = urls.length;
-  }
-  const faceClass = $derived(
-    size === 'sm'
-      ? 'h-9 w-9 rounded-md text-xs'
-      : size === 'court'
+}
+const faceClass = $derived(size === 'sm'
+    ? 'h-9 w-9 rounded-md text-xs'
+    : size === 'court'
         ? 'h-12 w-12 rounded-full text-xs lg:h-14 lg:w-14 lg:text-sm'
-        : 'h-12 w-12 rounded-lg text-sm',
-  );
+        : 'h-12 w-12 rounded-lg text-sm');
 </script>
 
 <div class="relative shrink-0 overflow-hidden bg-surface-3 {faceClass}">

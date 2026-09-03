@@ -1,124 +1,100 @@
-﻿<script lang="ts">
-  import { getContext } from 'svelte';
-  import { SvelteMap } from 'svelte/reactivity';
-  import { resolve } from '$app/paths';
-  import type { RouteId } from '$app/types';
-  import type { SeasonTeamAggregate } from '@hoop-rush/data-contracts';
-  import StandingsTable from '$lib/components/season/StandingsTable.svelte';
-  import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
-  import TiebreakExplanations from '$lib/components/season/TiebreakExplanations.svelte';
-  import {
-    SEASON_RUN_SHELL_CONTEXT,
-    type SeasonRunShellData,
-  } from '$lib/season/season-shell-context';
-  import {
-    foldSeasonAggregates,
-    franchiseStreaks,
-    pointDifferential,
-  } from '$lib/season/season-presentation';
-  import {
-    postseasonRankingsOf,
-    rankedEntriesOf,
-  } from '$lib/season/season-postseason-presentation';
-  import { franchiseIdentityOf } from '$lib/season/season-branding';
-  import { oneDecimal } from '$lib/format';
-  const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
-  type LeagueView = 'standings' | 'stats';
-  let view = $state<LeagueView>('standings');
-  let conference = $state<'east' | 'west'>(
-    shell.humanTeam?.conference === 'west' ? 'west' : 'east',
-  );
-  const humanFranchiseId = $derived(shell.humanFranchiseId);
-  const manifest = $derived(shell.manifest);
-  const run = $derived(shell.run);
-  const standings = $derived(run?.standings ?? null);
-  const rankings = $derived(run !== null ? postseasonRankingsOf(run) : null);
-  const rankedEntries = $derived(
-    rankings !== null && standings !== null ? rankedEntriesOf(rankings, standings) : null,
-  );
-  const tiebreakResolutions = $derived.by(() => {
+﻿<script lang="ts">import { getContext } from 'svelte';
+import { SvelteMap } from 'svelte/reactivity';
+import { resolve } from '$app/paths';
+import type { RouteId } from '$app/types';
+import type { SeasonTeamAggregate } from '@hoop-rush/data-contracts';
+import StandingsTable from '$lib/components/season/StandingsTable.svelte';
+import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
+import TiebreakExplanations from '$lib/components/season/TiebreakExplanations.svelte';
+import { SEASON_RUN_SHELL_CONTEXT, type SeasonRunShellData, } from '$lib/season/season-shell-context';
+import { foldSeasonAggregates, franchiseStreaks, pointDifferential, } from '$lib/season/season-presentation';
+import { postseasonRankingsOf, rankedEntriesOf, } from '$lib/season/season-postseason-presentation';
+import { franchiseIdentityOf } from '$lib/season/season-branding';
+import { oneDecimal } from '$lib/format';
+const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
+type LeagueView = 'standings' | 'stats';
+let view = $state<LeagueView>('standings');
+let conference = $state<'east' | 'west'>(shell.humanTeam?.conference === 'west' ? 'west' : 'east');
+const humanFranchiseId = $derived(shell.humanFranchiseId);
+const manifest = $derived(shell.manifest);
+const run = $derived(shell.run);
+const standings = $derived(run?.standings ?? null);
+const rankings = $derived(run !== null ? postseasonRankingsOf(run) : null);
+const rankedEntries = $derived(rankings !== null && standings !== null ? rankedEntriesOf(rankings, standings) : null);
+const tiebreakResolutions = $derived.by(() => {
     const recorded = run?.postseason.tiebreakResolutions ?? [];
-    if (recorded.length > 0) return recorded;
+    if (recorded.length > 0)
+        return recorded;
     return rankings !== null ? [...rankings.east.resolutions, ...rankings.west.resolutions] : [];
-  });
-  const streaksByFranchise = $derived.by(() => {
+});
+const streaksByFranchise = $derived.by(() => {
     const summaries = shell.snapshot?.summaries ?? [];
     const rows = shell.run?.standings.rows ?? [];
-    return new SvelteMap(
-      franchiseStreaks(
-        summaries,
-        rows.map((row) => row.franchiseId),
-      ),
-    );
-  });
-  const streakOf = (
-    franchiseId: string,
-  ): {
+    return new SvelteMap(franchiseStreaks(summaries, rows.map((row) => row.franchiseId)));
+});
+const streakOf = (franchiseId: string): {
     kind: 'wins' | 'losses';
     length: number;
-  } | null => streaksByFranchise.get(franchiseId) ?? null;
-  const aggregates = $derived(
-    shell.snapshot ? foldSeasonAggregates(shell.snapshot.summaries) : null,
-  );
-  const teamStats = $derived.by(() => {
-    if (!aggregates || !standings) return [];
+} | null => streaksByFranchise.get(franchiseId) ?? null;
+const aggregates = $derived(shell.snapshot ? foldSeasonAggregates(shell.snapshot.summaries) : null);
+const teamStats = $derived.by(() => {
+    if (!aggregates || !standings)
+        return [];
     const byId = new SvelteMap(standings.rows.map((row) => [row.franchiseId, row]));
     const rows: Array<{
-      franchiseId: string;
-      gamesPlayed: number;
-      wins: number;
-      diff: number;
-      ppg: number;
-      rpg: number;
-      apg: number;
-      spg: number;
-      bpg: number;
-      topg: number;
+        franchiseId: string;
+        gamesPlayed: number;
+        wins: number;
+        diff: number;
+        ppg: number;
+        rpg: number;
+        apg: number;
+        spg: number;
+        bpg: number;
+        topg: number;
     }> = aggregates.teams.map((team: SeasonTeamAggregate) => {
-      const gp = Math.max(1, team.gamesPlayed);
-      const row = byId.get(team.franchiseId);
-      return {
-        franchiseId: team.franchiseId,
-        gamesPlayed: team.gamesPlayed,
-        wins: row?.wins ?? 0,
-        diff: row ? pointDifferential(row) : 0,
-        ppg: team.points / gp,
-        rpg: (team.offensiveRebounds + team.defensiveRebounds) / gp,
-        apg: team.assists / gp,
-        spg: team.steals / gp,
-        bpg: team.blocks / gp,
-        topg: team.turnovers / gp,
-      };
+        const gp = Math.max(1, team.gamesPlayed);
+        const row = byId.get(team.franchiseId);
+        return {
+            franchiseId: team.franchiseId,
+            gamesPlayed: team.gamesPlayed,
+            wins: row?.wins ?? 0,
+            diff: row ? pointDifferential(row) : 0,
+            ppg: team.points / gp,
+            rpg: (team.offensiveRebounds + team.defensiveRebounds) / gp,
+            apg: team.assists / gp,
+            spg: team.steals / gp,
+            bpg: team.blocks / gp,
+            topg: team.turnovers / gp,
+        };
     });
-    rows.sort(
-      (a, b) => b.wins - a.wins || b.diff - a.diff || a.franchiseId.localeCompare(b.franchiseId),
-    );
+    rows.sort((a, b) => b.wins - a.wins || b.diff - a.diff || a.franchiseId.localeCompare(b.franchiseId));
     return rows;
-  });
-  const identityOf = (franchiseId: string) =>
-    manifest ? franchiseIdentityOf(manifest, franchiseId) : null;
-  const statCells: ReadonlyArray<{
+});
+const identityOf = (franchiseId: string) => manifest ? franchiseIdentityOf(manifest, franchiseId) : null;
+const statCells: ReadonlyArray<{
     key: keyof Omit<(typeof teamStats)[number], 'franchiseId' | 'gamesPlayed' | 'wins'>;
     label: string;
-  }> = [
+}> = [
     { key: 'ppg', label: 'PPG' },
     { key: 'rpg', label: 'RPG' },
     { key: 'apg', label: 'APG' },
     { key: 'spg', label: 'SPG' },
     { key: 'bpg', label: 'BPG' },
     { key: 'topg', label: 'TOPG' },
-  ];
-  let desktopViewport = $state<boolean | null>(null);
-  $effect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+];
+let desktopViewport = $state<boolean | null>(null);
+$effect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function')
+        return;
     const media = window.matchMedia('(min-width: 768px)');
     const update = () => {
-      desktopViewport = media.matches;
+        desktopViewport = media.matches;
     };
     update();
     media.addEventListener('change', update);
     return () => media.removeEventListener('change', update);
-  });
+});
 </script>
 
 <svelte:head>

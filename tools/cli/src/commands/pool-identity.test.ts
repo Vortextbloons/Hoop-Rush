@@ -6,55 +6,53 @@ import { franchiseEraPoolSchema, type FranchiseEraPool } from '@hoop-rush/data-c
 import { dataValidate, DEFAULT_MANIFEST } from './data-validate.ts';
 import { EXIT_OK } from '../report.ts';
 const EXPECTED_PEAKS: Record<string, string> = {
-  'Magic Johnson': '1990-91',
-  "Shaquille O'Neal": '1999-00',
-  'Kobe Bryant': '1999-00',
-  'Vlade Divac': '1994-95',
-  'Eddie Jones': '1996-97',
-  'James Worthy': '1990-91',
-  'Nick Van Exel': '1994-95',
-  'A.C. Green': '1992-93',
-  'Derek Fisher': '1997-98',
-  'Robert Horry': '1997-98',
-  'Elden Campbell': '1995-96',
+    'Magic Johnson': '1990-91',
+    "Shaquille O'Neal": '1999-00',
+    'Kobe Bryant': '1999-00',
+    'Vlade Divac': '1994-95',
+    'Eddie Jones': '1996-97',
+    'James Worthy': '1990-91',
+    'Nick Van Exel': '1994-95',
+    'A.C. Green': '1992-93',
+    'Derek Fisher': '1997-98',
+    'Robert Horry': '1997-98',
+    'Elden Campbell': '1995-96',
 };
 function loadShippedPool(): FranchiseEraPool {
-  const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../');
-  const raw = readFileSync(
-    resolve(repoRoot, 'apps/web/static/data/pools/lakers-1990s.json'),
-    'utf8',
-  );
-  return franchiseEraPoolSchema.parse(JSON.parse(raw) as unknown);
+    const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../');
+    const raw = readFileSync(resolve(repoRoot, 'apps/web/static/data/pools/lakers-1990s.json'), 'utf8');
+    return franchiseEraPoolSchema.parse(JSON.parse(raw) as unknown);
 }
 describe('shipped Lakers 1990s pool', () => {
-  it('passes the full data validation gate', async () => {
-    const report = await dataValidate(DEFAULT_MANIFEST, false);
-    expect(report.failures).toEqual([]);
-    expect(report.exitCode).toBe(EXIT_OK);
-  });
-  it('contains curated stars at their expected peak seasons', () => {
-    const pool = loadShippedPool();
-    const byName = new Map(pool.players.map((p) => [p.displayName, p]));
-    for (const [name, season] of Object.entries(EXPECTED_PEAKS)) {
-      const player = byName.get(name);
-      expect(player, `expected ${name} in the pool`).toBeDefined();
-      if (player === undefined) continue;
-      expect(player.seasonKey, `${name} peak season`).toBe(season);
-    }
-  });
-  it('keeps every eligibility record at or above 40 team games', () => {
-    const pool = loadShippedPool();
-    for (const player of pool.players) {
-      expect(player.eligibility.teamGames, player.displayName).toBeGreaterThanOrEqual(40);
-    }
-  });
-  it('contains only detailed positions from the five-position vocabulary', () => {
-    const pool = loadShippedPool();
-    for (const player of pool.players) {
-      for (const position of player.positions.playable) {
-        expect(['PG', 'SG', 'SF', 'PF', 'C']).toContain(position);
-      }
-      expect(player.positions.playable.length).toBeGreaterThan(0);
-    }
-  });
+    it('passes the full data validation gate', async () => {
+        const report = await dataValidate(DEFAULT_MANIFEST, false);
+        expect(report.failures).toEqual([]);
+        expect(report.exitCode).toBe(EXIT_OK);
+    });
+    it('contains curated stars at their expected peak seasons', () => {
+        const pool = loadShippedPool();
+        const byName = new Map(pool.players.map((p) => [p.displayName, p]));
+        for (const [name, season] of Object.entries(EXPECTED_PEAKS)) {
+            const player = byName.get(name);
+            expect(player, `expected ${name} in the pool`).toBeDefined();
+            if (player === undefined)
+                continue;
+            expect(player.seasonKey, `${name} peak season`).toBe(season);
+        }
+    });
+    it('keeps every eligibility record at or above 40 team games', () => {
+        const pool = loadShippedPool();
+        for (const player of pool.players) {
+            expect(player.eligibility.teamGames, player.displayName).toBeGreaterThanOrEqual(40);
+        }
+    });
+    it('contains only detailed positions from the five-position vocabulary', () => {
+        const pool = loadShippedPool();
+        for (const player of pool.players) {
+            for (const position of player.positions.playable) {
+                expect(['PG', 'SG', 'SF', 'PF', 'C']).toContain(position);
+            }
+            expect(player.positions.playable.length).toBeGreaterThan(0);
+        }
+    });
 });

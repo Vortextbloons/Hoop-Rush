@@ -1,37 +1,16 @@
-<script lang="ts">
-  import { RotateCcw, Pencil, RefreshCw } from '@lucide/svelte';
-  import type {
-    ChallengeRun,
-    ExplanationFact,
-    GameResult,
-    HoopRushManifest,
-    MadeAttempted,
-    PeakPlayerSeason,
-    PlayerSeasonAggregate,
-    PlayersIndexEntry,
-    RunAggregates,
-  } from '@hoop-rush/data-contracts';
-  import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
-  import type { SandboxHref } from '$lib/sandbox-url';
-  import { explainSeason, leagueMvp, perGamePlayer } from '@hoop-rush/engine';
-  import { resolve } from '$app/paths';
-  import GameStrip from '$lib/components/GameStrip.svelte';
-  import PlayerFace from '$lib/components/PlayerFace.svelte';
-  import SeasonTierBadge from '$lib/components/SeasonTierBadge.svelte';
-  import { oneDecimal, percentOneDecimal } from '$lib/format';
-  import { SLOT_LABELS } from '$lib/player-positions';
-  type PeakPlayer = PeakPlayerSeason;
-  let {
-    manifest,
-    run,
-    byId,
-    indexById,
-    modeLabel,
-    running,
-    onRunAgain,
-    onRetrySameTeam = null,
-    editTeamHref = null,
-  }: {
+<script lang="ts">import { RotateCcw, Pencil, RefreshCw } from '@lucide/svelte';
+import type { ChallengeRun, ExplanationFact, GameResult, HoopRushManifest, MadeAttempted, PeakPlayerSeason, PlayerSeasonAggregate, PlayersIndexEntry, RunAggregates, } from '@hoop-rush/data-contracts';
+import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
+import type { SandboxHref } from '$lib/sandbox-url';
+import { explainSeason, leagueMvp, perGamePlayer } from '@hoop-rush/engine';
+import { resolve } from '$app/paths';
+import GameStrip from '$lib/components/GameStrip.svelte';
+import PlayerFace from '$lib/components/PlayerFace.svelte';
+import SeasonTierBadge from '$lib/components/SeasonTierBadge.svelte';
+import { oneDecimal, percentOneDecimal } from '$lib/format';
+import { SLOT_LABELS } from '$lib/player-positions';
+type PeakPlayer = PeakPlayerSeason;
+let { manifest, run, byId, indexById, modeLabel, running, onRunAgain, onRetrySameTeam = null, editTeamHref = null, }: {
     manifest: HoopRushManifest | null;
     run: ChallengeRun;
     byId: Map<string, PeakPlayerSeason> | null;
@@ -41,171 +20,160 @@
     onRunAgain: () => void;
     onRetrySameTeam?: (() => void) | null;
     editTeamHref?: SandboxHref | null;
-  } = $props();
-  let totalsMode = $state(false);
-  function franchiseLabel(franchiseId: string | null): string {
+} = $props();
+let totalsMode = $state(false);
+function franchiseLabel(franchiseId: string | null): string {
     return franchiseId ? franchiseAbbreviation(franchiseId) : 'Mixed';
-  }
-  const era = $derived(manifest?.eras.find((e) => e.eraId === run.eraId) ?? null);
-  const aggregates = $derived(run.aggregates ?? null);
-  const record = $derived(aggregates?.team ?? null);
-  const mvp = $derived(run.games.length > 0 ? leagueMvp(run) : null);
-  const mvpFace = $derived.by(() => {
+}
+const era = $derived(manifest?.eras.find((e) => e.eraId === run.eraId) ?? null);
+const aggregates = $derived(run.aggregates ?? null);
+const record = $derived(aggregates?.team ?? null);
+const mvp = $derived(run.games.length > 0 ? leagueMvp(run) : null);
+const mvpFace = $derived.by(() => {
     const current = mvp;
-    if (!current) return null;
+    if (!current)
+        return null;
     const record = byId?.get(current.playerId) ?? indexById?.get(current.playerId);
-    if (record) return record;
+    if (record)
+        return record;
     return {
-      playerId: current.playerId,
-      playerExternalId: '',
-      altIds: null,
+        playerId: current.playerId,
+        playerExternalId: '',
+        altIds: null,
     } satisfies Pick<PeakPlayerSeason, 'playerId' | 'playerExternalId' | 'altIds'>;
-  });
-  const seasonTable = $derived.by(() => {
+});
+const seasonTable = $derived.by(() => {
     if (!byId) {
-      return [] as Array<{
-        player: PeakPlayer;
-        aggregate: PlayerSeasonAggregate;
-      }>;
+        return [] as Array<{
+            player: PeakPlayer;
+            aggregate: PlayerSeasonAggregate;
+        }>;
     }
     const playersById = byId;
     return run.players
-      .map((snapshot) => {
+        .map((snapshot) => {
         const aggregate = run.aggregates.players.find((p) => p.playerId === snapshot.playerId);
         const player = playersById.get(snapshot.playerId);
-        if (!aggregate || !player) return null;
+        if (!aggregate || !player)
+            return null;
         return { player, aggregate };
-      })
-      .filter(
-        (
-          row,
-        ): row is {
-          player: PeakPlayer;
-          aggregate: PlayerSeasonAggregate;
-        } => row !== null,
-      );
-  });
-  const displayAggregates = $derived.by(() => {
-    if (!aggregates) return null;
+    })
+        .filter((row): row is {
+        player: PeakPlayer;
+        aggregate: PlayerSeasonAggregate;
+    } => row !== null);
+});
+const displayAggregates = $derived.by(() => {
+    if (!aggregates)
+        return null;
     return {
-      team: aggregates.team,
-      players: aggregates.players.map((p) => (totalsMode ? p : perGamePlayer(p))),
+        team: aggregates.team,
+        players: aggregates.players.map((p) => (totalsMode ? p : perGamePlayer(p))),
     } satisfies RunAggregates;
-  });
-  const gamesPlayed = $derived(Math.max(1, record?.gamesPlayed ?? run.games.length));
-  const opponentPoints = $derived(
-    run.games.reduce((total, game) => total + game.away.box.points, 0),
-  );
-  const opponentPointsPerGame = $derived(opponentPoints / gamesPlayed);
-  const pointDifferential = $derived((record?.points ?? 0) - opponentPoints);
-  const explanation = $derived(explainSeason(run));
-  const firstLoss = $derived.by(
-    (): {
-      game: GameResult;
-      opponentName: string;
-    } | null => {
-      const gameNumber = run.firstLossGameNumber;
-      if (gameNumber === null) return null;
-      const game = run.games.find((candidate) => candidate.gameNumber === gameNumber);
-      if (!game) return null;
-      const scheduled = run.bracket.schedule[gameNumber - 1];
-      const opponent = run.bracket.opponents.find(
-        (candidate) => candidate.opponentId === scheduled?.opponentId,
-      );
-      return { game, opponentName: opponent?.displayName ?? game.away.displayName };
-    },
-  );
-  function teamName(teamId: string, opponentName: string): string {
+});
+const gamesPlayed = $derived(Math.max(1, record?.gamesPlayed ?? run.games.length));
+const opponentPoints = $derived(run.games.reduce((total, game) => total + game.away.box.points, 0));
+const opponentPointsPerGame = $derived(opponentPoints / gamesPlayed);
+const pointDifferential = $derived((record?.points ?? 0) - opponentPoints);
+const explanation = $derived(explainSeason(run));
+const firstLoss = $derived.by((): {
+    game: GameResult;
+    opponentName: string;
+} | null => {
+    const gameNumber = run.firstLossGameNumber;
+    if (gameNumber === null)
+        return null;
+    const game = run.games.find((candidate) => candidate.gameNumber === gameNumber);
+    if (!game)
+        return null;
+    const scheduled = run.bracket.schedule[gameNumber - 1];
+    const opponent = run.bracket.opponents.find((candidate) => candidate.opponentId === scheduled?.opponentId);
+    return { game, opponentName: opponent?.displayName ?? game.away.displayName };
+});
+function teamName(teamId: string, opponentName: string): string {
     return teamId === 'user' ? 'Your five' : opponentName;
-  }
-  function factCopy(fact: ExplanationFact, opponentName: string, game: GameResult): string {
+}
+function factCopy(fact: ExplanationFact, opponentName: string, game: GameResult): string {
     const team = teamName(fact.teamId, opponentName);
     const evidence = fact.evidence;
     switch (fact.kind) {
-      case 'turnoverMargin':
-        return `${team} won the turnover margin ${String(evidence.margin)} (${String(evidence.teamTurnovers)}–${String(evidence.opponentTurnovers)}).`;
-      case 'shotEfficiency':
-        return `${team} led effective FG% ${percentOneDecimal(Number(evidence.efgPct))}–${percentOneDecimal(Number(evidence.opponentEfgPct))}.`;
-      case 'offensiveRebounds':
-        return `${team} won offensive rebounds ${String(evidence.teamOffensiveRebounds)}–${String(evidence.opponentOffensiveRebounds)}.`;
-      case 'freeThrows':
-        return `${team} had ${String(evidence.teamFreeThrowAttempts)} free-throw attempts to ${String(evidence.opponentFreeThrowAttempts)}.`;
-      case 'usage': {
-        const player = game[fact.teamId === 'user' ? 'home' : 'away'].players.find(
-          (candidate) => candidate.playerId === fact.playerIds[0],
-        );
-        const playerName = seasonTable.find((row) => row.aggregate.playerId === player?.playerId)
-          ?.player.displayName;
-        return player
-          ? `${playerName ?? player.playerId} consumed ${Math.round(Number(evidence.usageShare) * 100)}% of ${team}'s estimated usage (${String(evidence.playerUsage)} of ${String(evidence.teamUsage)}).`
-          : `${team} concentrated ${Math.round(Number(evidence.usageShare) * 100)}% of estimated usage in one player.`;
-      }
-      case 'overtime':
-        return `${team} won the overtime period ${String(evidence.homeOvertimePoints)}–${String(evidence.awayOvertimePoints)}.`;
+        case 'turnoverMargin':
+            return `${team} won the turnover margin ${String(evidence.margin)} (${String(evidence.teamTurnovers)}–${String(evidence.opponentTurnovers)}).`;
+        case 'shotEfficiency':
+            return `${team} led effective FG% ${percentOneDecimal(Number(evidence.efgPct))}–${percentOneDecimal(Number(evidence.opponentEfgPct))}.`;
+        case 'offensiveRebounds':
+            return `${team} won offensive rebounds ${String(evidence.teamOffensiveRebounds)}–${String(evidence.opponentOffensiveRebounds)}.`;
+        case 'freeThrows':
+            return `${team} had ${String(evidence.teamFreeThrowAttempts)} free-throw attempts to ${String(evidence.opponentFreeThrowAttempts)}.`;
+        case 'usage': {
+            const player = game[fact.teamId === 'user' ? 'home' : 'away'].players.find((candidate) => candidate.playerId === fact.playerIds[0]);
+            const playerName = seasonTable.find((row) => row.aggregate.playerId === player?.playerId)
+                ?.player.displayName;
+            return player
+                ? `${playerName ?? player.playerId} consumed ${Math.round(Number(evidence.usageShare) * 100)}% of ${team}'s estimated usage (${String(evidence.playerUsage)} of ${String(evidence.teamUsage)}).`
+                : `${team} concentrated ${Math.round(Number(evidence.usageShare) * 100)}% of estimated usage in one player.`;
+        }
+        case 'overtime':
+            return `${team} won the overtime period ${String(evidence.homeOvertimePoints)}–${String(evidence.awayOvertimePoints)}.`;
     }
-  }
-  function pct(made: number, attempted: number): string {
+}
+function pct(made: number, attempted: number): string {
     return attempted === 0 ? '—' : percentOneDecimal(made / attempted);
-  }
-  const netRatingLabel = $derived(
-    explanation.netRatingPer100 >= 0
-      ? `+${oneDecimal(explanation.netRatingPer100)}`
-      : oneDecimal(explanation.netRatingPer100),
-  );
-  const usageLeaderName = $derived.by(() => {
+}
+const netRatingLabel = $derived(explanation.netRatingPer100 >= 0
+    ? `+${oneDecimal(explanation.netRatingPer100)}`
+    : oneDecimal(explanation.netRatingPer100));
+const usageLeaderName = $derived.by(() => {
     const leader = explanation.usageLeader;
-    if (!leader) return '';
+    if (!leader)
+        return '';
     const row = seasonTable.find((candidate) => candidate.aggregate.playerId === leader.playerId);
     return row?.player.displayName ?? leader.playerId;
-  });
-  const ZONE_NAMES: Readonly<
-    Record<
-      string,
-      {
-        label: string;
-        noun: string;
-      }
-    >
-  > = {
+});
+const ZONE_NAMES: Readonly<Record<string, {
+    label: string;
+    noun: string;
+}>> = {
     rim: { label: 'at the rim', noun: 'rim' },
     shortMid: { label: 'from short mid-range', noun: 'short mid-range' },
     longMid: { label: 'from long mid-range', noun: 'long mid-range' },
     cornerThree: { label: 'from the corner three', noun: 'corner-three' },
     aboveBreakThree: { label: 'from above the break', noun: 'above-the-break three' },
-  };
-  function zoneName(zone: string): string {
+};
+function zoneName(zone: string): string {
     return ZONE_NAMES[zone]?.label ?? 'by shot zone';
-  }
-  function zoneNoun(zone: string): string {
+}
+function zoneNoun(zone: string): string {
     return ZONE_NAMES[zone]?.noun ?? 'shot';
-  }
-  function zonePctLabel(rate: number): string {
+}
+function zonePctLabel(rate: number): string {
     return percentOneDecimal(rate);
-  }
-  function trueShootingPct(points: number, fga: number, fta: number): string {
+}
+function trueShootingPct(points: number, fga: number, fta: number): string {
     const denominator = 2 * (fga + 0.44 * fta);
     return denominator <= 0 ? '—' : percentOneDecimal(points / denominator);
-  }
-  function usagePct(raw: PlayerSeasonAggregate, team: RunAggregates['team']): string {
+}
+function usagePct(raw: PlayerSeasonAggregate, team: RunAggregates['team']): string {
     const possessionEstimate = (p: {
-      fieldGoals: MadeAttempted;
-      freeThrows: MadeAttempted;
-      turnovers: number;
+        fieldGoals: MadeAttempted;
+        freeThrows: MadeAttempted;
+        turnovers: number;
     }) => p.fieldGoals.attempted + 0.44 * p.freeThrows.attempted + p.turnovers;
     const player = possessionEstimate(raw);
     const teamTotal = possessionEstimate(team);
-    if (teamTotal <= 0) return '—';
+    if (teamTotal <= 0)
+        return '—';
     return percentOneDecimal(player / teamTotal);
-  }
-  function perGameValue(value: number, games: number, decimals = 1): string {
+}
+function perGameValue(value: number, games: number, decimals = 1): string {
     return (value / Math.max(1, games)).toFixed(decimals);
-  }
-  function formatAggregateStat(value: number): string {
+}
+function formatAggregateStat(value: number): string {
     return totalsMode ? String(value) : oneDecimal(value);
-  }
-  function toggleMode() {
+}
+function toggleMode() {
     totalsMode = !totalsMode;
-  }
+}
 </script>
 
 <div

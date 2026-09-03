@@ -1,60 +1,31 @@
-﻿<script lang="ts">
-  import { onMount } from 'svelte';
-  import { page } from '$app/stores';
-  import { resolve } from '$app/paths';
-  import { goto } from '$app/navigation';
-  import {
-    ArrowLeft,
-    RefreshCw,
-    AlertTriangle,
-    Trophy,
-    Users,
-    Lock,
-    Check,
-    Clock,
-    Wifi,
-    WifiOff,
-    Play,
-  } from '@lucide/svelte';
-  import { createInMemorySeasonRoomCoordinator } from '$lib/season/season-room-coordinator';
-  import {
-    createSupabaseSeasonTransport,
-    isSupabaseConfigured,
-  } from '$lib/season/supabase-season-transport';
-  import { loadMembership, saveMembership } from '$lib/season/season-room-identity';
-  import { RoomDraftController } from '$lib/season/room-draft-controller';
-  import { createGameplayTransport } from '$lib/season/season-gameplay-transport';
-  import {
-    deriveGameplayState,
-    type MultiplayerGameplayState,
-  } from '$lib/season/season-gameplay-state';
-  import type { GameplayBootstrapResult } from '$lib/season/season-gameplay-bootstrap';
-  import type {
-    SeasonRoomPublicSnapshot,
-    SeasonRoomMembership,
-    SeasonMultiplayerTransport,
-    SeasonRun,
-    SeasonDraftState,
-    SeasonLeagueGenerationResult,
-  } from '@hoop-rush/data-contracts';
-
-  let roomId = $derived($page.params.roomId as string);
-
-  let snap = $state<SeasonRoomPublicSnapshot | null>(null);
-  let membership = $state<SeasonRoomMembership | null>(null);
-  let loading = $state(true);
-  let error = $state<string | null>(null);
-  let coordinator: ReturnType<typeof createInMemorySeasonRoomCoordinator> | null = null;
-  let transport: ReturnType<typeof createSupabaseSeasonTransport> | null = null;
-  let controller: RoomDraftController | null = $state(null);
-  let draftState: SeasonDraftState | null = $state(null);
-  let generation: SeasonLeagueGenerationResult | null = $state(null);
-  let gameplay: MultiplayerGameplayState | null = $state(null);
-  let run: SeasonRun | null = $state(null);
-  let bootstrapping = $state(false);
-  let phase: MultiplayerGameplayState['phase'] | null = $state(null);
-
-  const FRANCHISE_DISPLAY: Record<string, string> = {
+﻿<script lang="ts">import { onMount } from 'svelte';
+import { page } from '$app/stores';
+import { resolve } from '$app/paths';
+import { goto } from '$app/navigation';
+import { ArrowLeft, RefreshCw, AlertTriangle, Trophy, Users, Lock, Check, Clock, Wifi, WifiOff, Play, } from '@lucide/svelte';
+import { createInMemorySeasonRoomCoordinator } from '$lib/season/season-room-coordinator';
+import { createSupabaseSeasonTransport, isSupabaseConfigured, } from '$lib/season/supabase-season-transport';
+import { loadMembership, saveMembership } from '$lib/season/season-room-identity';
+import { RoomDraftController } from '$lib/season/room-draft-controller';
+import { createGameplayTransport } from '$lib/season/season-gameplay-transport';
+import { deriveGameplayState, type MultiplayerGameplayState, } from '$lib/season/season-gameplay-state';
+import type { GameplayBootstrapResult } from '$lib/season/season-gameplay-bootstrap';
+import type { SeasonRoomPublicSnapshot, SeasonRoomMembership, SeasonMultiplayerTransport, SeasonRun, SeasonDraftState, SeasonLeagueGenerationResult, } from '@hoop-rush/data-contracts';
+let roomId = $derived($page.params.roomId as string);
+let snap = $state<SeasonRoomPublicSnapshot | null>(null);
+let membership = $state<SeasonRoomMembership | null>(null);
+let loading = $state(true);
+let error = $state<string | null>(null);
+let coordinator: ReturnType<typeof createInMemorySeasonRoomCoordinator> | null = null;
+let transport: ReturnType<typeof createSupabaseSeasonTransport> | null = null;
+let controller: RoomDraftController | null = $state(null);
+let draftState: SeasonDraftState | null = $state(null);
+let generation: SeasonLeagueGenerationResult | null = $state(null);
+let gameplay: MultiplayerGameplayState | null = $state(null);
+let run: SeasonRun | null = $state(null);
+let bootstrapping = $state(false);
+let phase: MultiplayerGameplayState['phase'] | null = $state(null);
+const FRANCHISE_DISPLAY: Record<string, string> = {
     hawks: 'Atlanta Hawks',
     celtics: 'Boston Celtics',
     nets: 'Brooklyn Nets',
@@ -85,252 +56,273 @@
     raptors: 'Toronto Raptors',
     jazz: 'Utah Jazz',
     wizards: 'Washington Wizards',
-  };
-
-  function franchiseDisplayName(id: string | null | undefined): string {
-    if (!id) return '—';
+};
+function franchiseDisplayName(id: string | null | undefined): string {
+    if (!id)
+        return '—';
     return FRANCHISE_DISPLAY[id] ?? id.charAt(0).toUpperCase() + id.slice(1);
-  }
-
-  // keep bootstrap result so live snap can re-derive gameplay without re-bootstrapping
-  let latestBootstrap: GameplayBootstrapResult | null = null;
-
-  function getCoordinator() {
+}
+let latestBootstrap: GameplayBootstrapResult | null = null;
+function getCoordinator() {
     const useSupabase = isSupabaseConfigured();
     transport = useSupabase
-      ? createSupabaseSeasonTransport({
-          url:
-            (import.meta as unknown as { env: Record<string, string> }).env.VITE_SUPABASE_URL ?? '',
-          publishableKey:
-            (import.meta as unknown as { env: Record<string, string> }).env
-              .VITE_SUPABASE_PUBLISHABLE_KEY ?? '',
+        ? createSupabaseSeasonTransport({
+            url: (import.meta as unknown as {
+                env: Record<string, string>;
+            }).env.VITE_SUPABASE_URL ?? '',
+            publishableKey: (import.meta as unknown as {
+                env: Record<string, string>;
+            }).env
+                .VITE_SUPABASE_PUBLISHABLE_KEY ?? '',
         })
-      : null;
+        : null;
     const t = (transport ?? undefined) as unknown as SeasonMultiplayerTransport | undefined;
     return createInMemorySeasonRoomCoordinator({
-      transport: t,
-      commandCursor: () => controller?.getLastOrdinal() ?? -1,
-      onSnapshot: (s) => {
-        snap = s;
-        // live re-derive gameplay so locks/phase/attestation auto-refresh without manual Refresh
-        if (draftState && generation && latestBootstrap) {
-          gameplay = deriveGameplayState(draftState, generation, latestBootstrap, s);
-          phase = gameplay.phase;
-        } else if (draftState && generation) {
-          // bootstrap not yet done: try to re-derive when snap arrives early
-          try {
-            gameplay = deriveGameplayState(draftState, generation, latestBootstrap, s);
-            phase = gameplay?.phase ?? phase;
-          } catch {}
-        }
-      },
-      onCommands: async (cmds) => {
-        if (!controller) return;
-        try {
-          const state = await controller.applyIncomingCommands(cmds);
-          if (state) {
-            draftState = state as SeasonDraftState;
-            generation = controller.getGeneration();
+        transport: t,
+        commandCursor: () => controller?.getLastOrdinal() ?? -1,
+        onSnapshot: (s) => {
+            snap = s;
             if (draftState && generation && latestBootstrap) {
-              gameplay = deriveGameplayState(draftState, generation, latestBootstrap, snap);
-              phase = gameplay.phase;
-            } else if (draftState && generation) {
-              // generation newly available via command stream — bootstrap incrementally
-              await bootstrapRun();
+                gameplay = deriveGameplayState(draftState, generation, latestBootstrap, s);
+                phase = gameplay.phase;
             }
-          }
-        } catch {}
-      },
+            else if (draftState && generation) {
+                try {
+                    gameplay = deriveGameplayState(draftState, generation, latestBootstrap, s);
+                    phase = gameplay?.phase ?? phase;
+                }
+                catch { }
+            }
+        },
+        onCommands: async (cmds) => {
+            if (!controller)
+                return;
+            try {
+                const state = await controller.applyIncomingCommands(cmds);
+                if (state) {
+                    draftState = state as SeasonDraftState;
+                    generation = controller.getGeneration();
+                    if (draftState && generation && latestBootstrap) {
+                        gameplay = deriveGameplayState(draftState, generation, latestBootstrap, snap);
+                        phase = gameplay.phase;
+                    }
+                    else if (draftState && generation) {
+                        await bootstrapRun();
+                    }
+                }
+            }
+            catch { }
+        },
     });
-  }
-
-  function getTransport(): SeasonMultiplayerTransport {
-    if (transport) return transport as unknown as SeasonMultiplayerTransport;
-    const anyCoord = coordinator as unknown as { transport?: SeasonMultiplayerTransport };
-    if (anyCoord?.transport) return anyCoord.transport;
+}
+function getTransport(): SeasonMultiplayerTransport {
+    if (transport)
+        return transport as unknown as SeasonMultiplayerTransport;
+    const anyCoord = coordinator as unknown as {
+        transport?: SeasonMultiplayerTransport;
+    };
+    if (anyCoord?.transport)
+        return anyCoord.transport;
     throw new Error('no transport');
-  }
-
-  async function load() {
+}
+async function load() {
     loading = true;
     error = null;
     try {
-      coordinator = getCoordinator();
-      const stored = loadMembership(roomId);
-      try {
-        coordinator.hydrateFromStorage(roomId);
-      } catch {}
-      const t = transport as unknown as SeasonMultiplayerTransport | null;
-      let res: SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership };
-      if (t) {
-        res = (await t.resume(roomId)) as SeasonRoomPublicSnapshot & {
-          membership?: SeasonRoomMembership;
-        };
-      } else if (coordinator) {
-        res = (await coordinator.refresh(roomId)) as unknown as SeasonRoomPublicSnapshot & {
-          membership?: SeasonRoomMembership;
-        };
-      } else throw new Error('Multiplayer not configured');
-      snap = res as SeasonRoomPublicSnapshot;
-      if ((res as unknown as { membership?: SeasonRoomMembership }).membership) {
-        const m = (res as unknown as { membership: SeasonRoomMembership }).membership;
-        saveMembership(m);
-        membership = m;
-      } else {
-        membership = stored ?? loadMembership(roomId);
-      }
-      if (snap && membership) {
-        coordinator.subscribe(roomId);
-        const tr = getTransport();
-        // Warm Dexie-cached season assets in parallel with log replay. The draft page
-        // already cached the 16.36MB catalog via readCachedAsset; warming here ensures
-        // controller.ensureAssets hits the memoized/Dexie cache and avoids a second
-        // synchronous parse blocking on the main thread. Hash verification is retained
-        // (season-assets verifies contentHash, bootstrap uses cached path, no 'no-store').
-        const warmAssets = import('$lib/season/season-assets')
-          .then(async (m) => {
-            try {
-              await m.loadSeasonDraftCatalog();
-            } catch {}
-            try {
-              await m.loadSeasonLeague();
-            } catch {}
-            try {
-              await m.loadSeasonRosterTargets();
-            } catch {}
-          })
-          .catch(() => {});
-        controller = new RoomDraftController({
-          transport: tr,
-          roomId,
-          snapshot: snap,
-          membership,
-        });
-        const [, state] = await Promise.all([warmAssets, controller.restoreFromLog()]);
-        draftState = state ? ({ ...state } as SeasonDraftState) : null;
-        generation = controller.getGeneration();
-        if (!draftState) {
-          if (snap.phase === 'drafting') {
-            await controller.ensureDraftCreated();
-            draftState = controller.getState();
-            generation = controller.getGeneration();
-          }
+        coordinator = getCoordinator();
+        const stored = loadMembership(roomId);
+        try {
+            coordinator.hydrateFromStorage(roomId);
         }
-        if (draftState && generation) {
-          await bootstrapRun();
-        } else if (draftState && (draftState as any).status === 'complete' && !generation) {
-          generation = controller.getGeneration();
-          if (generation) await bootstrapRun();
+        catch { }
+        const t = transport as unknown as SeasonMultiplayerTransport | null;
+        let res: SeasonRoomPublicSnapshot & {
+            membership?: SeasonRoomMembership;
+        };
+        if (t) {
+            res = (await t.resume(roomId)) as SeasonRoomPublicSnapshot & {
+                membership?: SeasonRoomMembership;
+            };
         }
-      }
-    } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
-    } finally {
-      loading = false;
+        else if (coordinator) {
+            res = (await coordinator.refresh(roomId)) as unknown as SeasonRoomPublicSnapshot & {
+                membership?: SeasonRoomMembership;
+            };
+        }
+        else
+            throw new Error('Multiplayer not configured');
+        snap = res as SeasonRoomPublicSnapshot;
+        if ((res as unknown as {
+            membership?: SeasonRoomMembership;
+        }).membership) {
+            const m = (res as unknown as {
+                membership: SeasonRoomMembership;
+            }).membership;
+            saveMembership(m);
+            membership = m;
+        }
+        else {
+            membership = stored ?? loadMembership(roomId);
+        }
+        if (snap && membership) {
+            const mode = (snap as unknown as {
+                mode?: string;
+            }).mode ?? (snap.settings as unknown as {
+                mode?: string;
+            })?.mode ?? 'season';
+            if (mode === 'classic' || mode === 'sandbox') {
+                coordinator.subscribe(roomId);
+            }
+            else {
+                coordinator.subscribe(roomId);
+                const tr = getTransport();
+                const warmAssets = import('$lib/season/season-assets')
+                    .then(async (m) => {
+                    try {
+                        await m.loadSeasonDraftCatalog();
+                    }
+                    catch { }
+                    try {
+                        await m.loadSeasonLeague();
+                    }
+                    catch { }
+                    try {
+                        await m.loadSeasonRosterTargets();
+                    }
+                    catch { }
+                })
+                    .catch(() => { });
+                controller = new RoomDraftController({
+                    transport: tr,
+                    roomId,
+                    snapshot: snap,
+                    membership,
+                });
+                const [, state] = await Promise.all([warmAssets, controller.restoreFromLog()]);
+                draftState = state ? ({ ...state } as SeasonDraftState) : null;
+                generation = controller.getGeneration();
+                if (!draftState) {
+                    if (snap.phase === 'drafting') {
+                        await controller.ensureDraftCreated();
+                        draftState = controller.getState();
+                        generation = controller.getGeneration();
+                    }
+                }
+                if (draftState && generation) {
+                    await bootstrapRun();
+                }
+                else if (draftState && (draftState as any).status === 'complete' && !generation) {
+                    generation = controller.getGeneration();
+                    if (generation)
+                        await bootstrapRun();
+                }
+            }
+        }
     }
-  }
-
-  async function bootstrapRun() {
-    if (!draftState || !generation || !controller) return;
+    catch (e) {
+        error = e instanceof Error ? e.message : String(e);
+    }
+    finally {
+        loading = false;
+    }
+}
+async function bootstrapRun() {
+    if (!draftState || !generation || !controller)
+        return;
     bootstrapping = true;
     try {
-      const gt = createGameplayTransport();
-      const result = await gt.loadBootstrap(roomId, getTransport(), draftState, generation);
-      latestBootstrap = result;
-      run = result.run;
-      gameplay = deriveGameplayState(draftState, generation, result, snap);
-      phase = gameplay.phase;
-    } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
-    } finally {
-      bootstrapping = false;
+        const gt = createGameplayTransport();
+        const result = await gt.loadBootstrap(roomId, getTransport(), draftState, generation);
+        latestBootstrap = result;
+        run = result.run;
+        gameplay = deriveGameplayState(draftState, generation, result, snap);
+        phase = gameplay.phase;
     }
-  }
-
-  onMount(() => {
+    catch (e) {
+        error = e instanceof Error ? e.message : String(e);
+    }
+    finally {
+        bootstrapping = false;
+    }
+}
+onMount(() => {
     load();
     return () => coordinator?.destroy();
-  });
-
-  let modeLabel = $derived.by(() => {
-    const raw =
-      (snap as unknown as { mode?: string })?.mode ??
-      (snap?.settings as unknown as { mode?: string })?.mode ??
-      'season';
-    if (raw === 'classic') return 'Classic';
-    if (raw === 'sandbox') return 'Sandbox';
+});
+let modeLabel = $derived.by(() => {
+    const raw = (snap as unknown as {
+        mode?: string;
+    })?.mode ??
+        (snap?.settings as unknown as {
+            mode?: string;
+        })?.mode ??
+        'season';
+    if (raw === 'classic')
+        return 'Classic';
+    if (raw === 'sandbox')
+        return 'Sandbox';
     return 'Season Run';
-  });
-
-  let myFranchiseId = $derived(membership?.franchiseId ?? null);
-  let oppFranchiseId = $derived(
-    (draftState as any)?.participants.find(
-      (p: any) => p.participantId !== membership?.participantId,
-    )?.franchiseId ?? null,
-  );
-  let myFranchiseName = $derived(franchiseDisplayName(myFranchiseId));
-  let oppFranchiseName = $derived(franchiseDisplayName(oppFranchiseId));
-  let p1FranchiseName = $derived.by(() => {
-    const p1 =
-      (draftState as any)?.participants.find((p: any) => p.participantId === 'p1')?.franchiseId ??
-      null;
+});
+let myFranchiseId = $derived(membership?.franchiseId ?? null);
+let oppFranchiseId = $derived((draftState as any)?.participants.find((p: any) => p.participantId !== membership?.participantId)?.franchiseId ?? null);
+let myFranchiseName = $derived(franchiseDisplayName(myFranchiseId));
+let oppFranchiseName = $derived(franchiseDisplayName(oppFranchiseId));
+let p1FranchiseName = $derived.by(() => {
+    const p1 = (draftState as any)?.participants.find((p: any) => p.participantId === 'p1')?.franchiseId ??
+        null;
     return franchiseDisplayName(p1);
-  });
-  let p2FranchiseName = $derived.by(() => {
-    const p2 =
-      (draftState as any)?.participants.find((p: any) => p.participantId === 'p2')?.franchiseId ??
-      null;
+});
+let p2FranchiseName = $derived.by(() => {
+    const p2 = (draftState as any)?.participants.find((p: any) => p.participantId === 'p2')?.franchiseId ??
+        null;
     return franchiseDisplayName(p2);
-  });
-  let opponentOnline = $derived.by(() => {
-    if (!snap || !membership) return false;
+});
+let opponentOnline = $derived.by(() => {
+    if (!snap || !membership)
+        return false;
     const opp = membership.participantId === 'p1' ? 'p2' : 'p1';
-    return (
-      snap.presence?.find((p: any) => p.participantId === opp)?.online ?? snap.memberCount >= 2
-    );
-  });
-  let isPrivateLock = $derived(phase === 'private-lock');
-  let isSimulation = $derived(phase === 'simulation');
-  let isHashVerification = $derived(phase === 'hash-verification');
-  let isComplete = $derived(phase === 'complete');
-
-  // Roster helpers for basketball-forward display
-  let playerNameLookup = $derived.by(() => {
+    return (snap.presence?.find((p: any) => p.participantId === opp)?.online ?? snap.memberCount >= 2);
+});
+let isPrivateLock = $derived(phase === 'private-lock');
+let isSimulation = $derived(phase === 'simulation');
+let isHashVerification = $derived(phase === 'hash-verification');
+let isComplete = $derived(phase === 'complete');
+let playerNameLookup = $derived.by(() => {
     const map = new Map<string, string>();
-    if (!run) return map;
+    if (!run)
+        return map;
     for (const roster of run.rosters) {
-      for (const p of roster.players) {
-        map.set(p.playerVersionId, p.displayName);
-      }
+        for (const p of roster.players) {
+            map.set(p.playerVersionId, p.displayName);
+        }
     }
     return map;
-  });
-  let myRoster = $derived.by(() => {
-    if (!run || !myFranchiseId) return null;
+});
+let myRoster = $derived.by(() => {
+    if (!run || !myFranchiseId)
+        return null;
     return run.rosters.find((r) => r.franchiseId === myFranchiseId) ?? null;
-  });
-  let oppRoster = $derived.by(() => {
-    if (!run || !oppFranchiseId) return null;
+});
+let oppRoster = $derived.by(() => {
+    if (!run || !oppFranchiseId)
+        return null;
     return run.rosters.find((r) => r.franchiseId === oppFranchiseId) ?? null;
-  });
-  let myNextOpponentName = $derived.by(() => {
-    if (!run || !myRoster) return 'TBD';
-    // Find next scheduled game for my franchise that hasn't been played (standings 0-0 so all future)
-    const next = run.games.find(
-      (g) => g.homeFranchiseId === myFranchiseId || g.awayFranchiseId === myFranchiseId,
-    );
-    if (!next) return 'TBD';
-    const oppId =
-      next.homeFranchiseId === myFranchiseId ? next.awayFranchiseId : next.homeFranchiseId;
+});
+let myNextOpponentName = $derived.by(() => {
+    if (!run || !myRoster)
+        return 'TBD';
+    const next = run.games.find((g) => g.homeFranchiseId === myFranchiseId || g.awayFranchiseId === myFranchiseId);
+    if (!next)
+        return 'TBD';
+    const oppId = next.homeFranchiseId === myFranchiseId ? next.awayFranchiseId : next.homeFranchiseId;
     return franchiseDisplayName(oppId);
-  });
-
-  function picksFor(participantId: string) {
+});
+function picksFor(participantId: string) {
     return (draftState as any)?.picks.filter((p: any) => p.participantId === participantId) ?? [];
-  }
-  function displayPlayerName(versionId: string): string {
+}
+function displayPlayerName(versionId: string): string {
     return playerNameLookup.get(versionId) ?? versionId;
-  }
+}
 </script>
 
 <svelte:head
@@ -394,6 +386,19 @@
         class="mt-4 inline-flex rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
         >Go to Multiplayer entry</a
       >
+    </div>
+  {:else if snap && (snap.mode === 'classic' || snap.mode === 'sandbox')}
+    <div class="rounded-xl border border-primary/20 bg-primary/5 p-8 text-center">
+      <p class="text-label tracking-[0.16em] text-primary">{modeLabel} · Multiplayer — simpler system</p>
+      <h2 class="font-display mt-2 text-2xl font-extrabold uppercase">{modeLabel} Room — simpler multiplayer</h2>
+      <p class="mt-2 text-sm text-muted-foreground">
+        This room is <strong>{modeLabel}</strong> ({snap.settings.pace === 'live' ? 'Live 90s / 5m' : 'Async 24h'}). The simpler 5-pick head-to-head (Classic roll / Sandbox free pick) and single-client 82-game simulation are being wired. Room lobby works now (code, presence, Ready/Start). Season Hub is Season-only and stays archived.
+      </p>
+      <div class="mt-4 flex justify-center gap-2">
+        <a href={`/multiplayer/room/${roomId}`} class="rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground">Back to lobby →</a>
+        <a href={`/multiplayer/room/${roomId}/draft`} class="rounded-xl border border-line-soft bg-card px-6 py-3 text-sm font-semibold">Go to draft →</a>
+      </div>
+      <p class="mt-3 text-xs text-muted-foreground">Solo {modeLabel} still at {modeLabel === 'Classic' ? '/classic' : '/sandbox'} · Room {roomId.slice(0,8)}… · {snap.phase}</p>
     </div>
   {:else if !draftState}
     <div class="rounded-xl bg-surface-1 p-8 text-center">

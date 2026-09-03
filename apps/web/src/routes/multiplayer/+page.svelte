@@ -1,129 +1,114 @@
-﻿<script lang="ts">
-  import { onMount } from 'svelte';
-  import { goto } from '$app/navigation';
-  import { resolve } from '$app/paths';
-  import {
-    Users,
-    Swords,
-    Trophy,
-    Clock,
-    Shield,
-    Zap,
-    ArrowLeft,
-    Copy,
-    Check,
-    LogIn,
-    Plus,
-    Link as LinkIcon,
-  } from '@lucide/svelte';
-  import { createInMemorySeasonRoomCoordinator } from '$lib/season/season-room-coordinator';
-  import {
-    createSupabaseSeasonTransport,
-    isSupabaseConfigured,
-    multiplayerDisabledMessage,
-  } from '$lib/season/supabase-season-transport';
-  import { seasonRootSeed } from '$lib/season/season-ids';
-  import { friendlyJoinError, inviteLinkForCode } from '$lib/season/season-room-identity';
-
-  type Mode = 'season' | 'classic' | 'sandbox';
-  type Pace = 'live' | 'async';
-  type View = 'choose' | 'create' | 'join';
-
-  let view = $state<View>('choose');
-  let selectedMode = $state<Mode>('season');
-  let pace = $state<Pace>('live');
-  let code = $state('');
-  let busy = $state(false);
-  let error = $state<string | null>(null);
-  let preview = $state<{ mode: string; pace: string; detail: string } | null>(null);
-  let createdCode = $state<string | null>(null);
-  let createdRoomId = $state<string | null>(null);
-  let expiresAt = $state<string | null>(null);
-  let copiedInvite = $state(false);
-  let copiedCode = $state(false);
-  let tick = $state(0);
-
-  let countdown = $derived.by(() => {
-    if (!expiresAt) return null;
+﻿<script lang="ts">import { onMount } from 'svelte';
+import { goto } from '$app/navigation';
+import { resolve } from '$app/paths';
+import { Users, Swords, Trophy, Clock, Shield, Zap, ArrowLeft, Copy, Check, LogIn, Plus, Link as LinkIcon, } from '@lucide/svelte';
+import { createInMemorySeasonRoomCoordinator } from '$lib/season/season-room-coordinator';
+import { createSupabaseSeasonTransport, isSupabaseConfigured, multiplayerDisabledMessage, } from '$lib/season/supabase-season-transport';
+import { seasonRootSeed } from '$lib/season/season-ids';
+import { friendlyJoinError, inviteLinkForCode } from '$lib/season/season-room-identity';
+type Mode = 'season' | 'classic' | 'sandbox';
+type Pace = 'live' | 'async';
+type View = 'choose' | 'create' | 'join';
+let view = $state<View>('choose');
+let selectedMode = $state<Mode>('classic');
+let pace = $state<Pace>('live');
+let code = $state('');
+let busy = $state(false);
+let error = $state<string | null>(null);
+let preview = $state<{
+    mode: string;
+    pace: string;
+    detail: string;
+} | null>(null);
+let createdCode = $state<string | null>(null);
+let createdRoomId = $state<string | null>(null);
+let expiresAt = $state<string | null>(null);
+let copiedInvite = $state(false);
+let copiedCode = $state(false);
+let tick = $state(0);
+let countdown = $derived.by(() => {
+    if (!expiresAt)
+        return null;
     void tick;
     const ms = new Date(expiresAt).getTime() - Date.now();
-    if (ms <= 0) return 'expired';
+    if (ms <= 0)
+        return 'expired';
     const m = Math.floor(ms / 60000);
     const s = Math.floor((ms % 60000) / 1000);
     return `${m}:${String(s).padStart(2, '0')}`;
-  });
-
-  onMount(() => {
+});
+onMount(() => {
     const iv = setInterval(() => tick++, 1000);
-    // prefill from invite link ?code=0042
     try {
-      const params = new URLSearchParams(window.location.search);
-      const codeParam = params.get('code');
-      if (codeParam && /^[0-9]{4}$/.test(codeParam)) {
-        code = codeParam;
-        view = 'join';
-        // auto preview
-        void doPreview();
-      }
-    } catch {}
+        const params = new URLSearchParams(window.location.search);
+        const codeParam = params.get('code');
+        if (codeParam && /^[0-9]{4}$/.test(codeParam)) {
+            code = codeParam;
+            view = 'join';
+            void doPreview();
+        }
+    }
+    catch { }
     return () => clearInterval(iv);
-  });
-
-  const modes = [
+});
+const modes = [
     {
-      id: 'season' as const,
-      name: 'Season Run',
-      desc: '10 rounds · 30 teams · 82 games',
-      detail: 'Full league, private locks, hash-verified.',
-      icon: Trophy,
-      disabled: false,
+        id: 'season' as const,
+        name: 'Season Run (Archived)',
+        desc: 'Archived — solo Season Run still available via /season',
+        detail: 'Season Run multiplayer is archived for now. Code is kept and will return. Solo league remains fully playable.',
+        icon: Trophy,
+        disabled: true,
     },
     {
-      id: 'classic' as const,
-      name: 'Classic (Coming soon)',
-      desc: '5 rounds · franchise era · 82-0 — multiplayer not yet available',
-      detail: 'Franchise + era, one reroll each. Solo only for now.',
-      icon: Swords,
-      disabled: true,
+        id: 'classic' as const,
+        name: 'Classic',
+        desc: '5 rounds · franchise era · 82-0 — head-to-head or vs AI',
+        detail: 'Shared 82 or Duel. Picks use Classic roll draft, same pool per player.',
+        icon: Swords,
+        disabled: false,
     },
     {
-      id: 'sandbox' as const,
-      name: 'Sandbox (Coming soon)',
-      desc: 'Any 5 peak seasons — multiplayer not yet available',
-      detail: 'Best-of-2, fast. Solo only for now.',
-      icon: Zap,
-      disabled: true,
+        id: 'sandbox' as const,
+        name: 'Sandbox',
+        desc: 'Any 5 peak seasons — free pick, head-to-head or vs AI',
+        detail: 'Shared 82 or Duel. Draft any 5 peaks, no rolls.',
+        icon: Zap,
+        disabled: false,
     },
-  ] as const;
-
-  const paceOptions: { id: Pace; label: string; detail: string }[] = [
+] as const;
+const paceOptions: {
+    id: Pace;
+    label: string;
+    detail: string;
+}[] = [
     { id: 'live', label: 'Live', detail: '90s draft · 5m decisions' },
     { id: 'async', label: 'Async', detail: '24h draft · 12h decisions' },
-  ];
-
-  function getCoordinator() {
+];
+function getCoordinator() {
     const useSupabase = isSupabaseConfigured();
     const transport = useSupabase
-      ? createSupabaseSeasonTransport({
-          url:
-            (import.meta as unknown as { env: Record<string, string> }).env.VITE_SUPABASE_URL ?? '',
-          publishableKey:
-            (import.meta as unknown as { env: Record<string, string> }).env
-              .VITE_SUPABASE_PUBLISHABLE_KEY ?? '',
+        ? createSupabaseSeasonTransport({
+            url: (import.meta as unknown as {
+                env: Record<string, string>;
+            }).env.VITE_SUPABASE_URL ?? '',
+            publishableKey: (import.meta as unknown as {
+                env: Record<string, string>;
+            }).env
+                .VITE_SUPABASE_PUBLISHABLE_KEY ?? '',
         })
-      : undefined;
+        : undefined;
     return createInMemorySeasonRoomCoordinator({
-      transport,
-      onSnapshot: () => {},
-      onCommands: () => {},
+        transport,
+        onSnapshot: () => { },
+        onCommands: () => { },
     });
-  }
-
-  async function startCreate() {
-    if (selectedMode !== 'season') {
-      error =
-        'Classic/Sandbox draft not yet available for multiplayer — Season Run only. Solo play remains available via /classic and /sandbox.';
-      return;
+}
+async function startCreate() {
+    if (selectedMode === 'season') {
+        error =
+            'Season Run multiplayer is archived for now. Solo Season Run is still available via /season. Multiplayer code is kept and will return. Please choose Classic or Sandbox.';
+        return;
     }
     busy = true;
     error = null;
@@ -131,101 +116,111 @@
     createdRoomId = null;
     expiresAt = null;
     try {
-      const coordinator = getCoordinator();
-      const snap = await coordinator.createRoom(pace, seasonRootSeed(), selectedMode);
-      const c = (snap as unknown as { code?: string }).code ?? null;
-      createdCode = c;
-      createdRoomId = snap.roomId;
-      expiresAt = (snap as unknown as { expiresAt?: string }).expiresAt ?? snap.expiresAt ?? null;
-      if (!expiresAt) {
-        expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-      }
-    } catch (e) {
-      error = friendlyJoinError(e);
-      if (!isSupabaseConfigured()) error = multiplayerDisabledMessage();
-    } finally {
-      busy = false;
+        const coordinator = getCoordinator();
+        const snap = await coordinator.createRoom(pace, seasonRootSeed(), selectedMode);
+        const c = (snap as unknown as {
+            code?: string;
+        }).code ?? null;
+        createdCode = c;
+        createdRoomId = snap.roomId;
+        expiresAt = (snap as unknown as {
+            expiresAt?: string;
+        }).expiresAt ?? snap.expiresAt ?? null;
+        if (!expiresAt) {
+            expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+        }
     }
-  }
-
-  async function doPreview() {
+    catch (e) {
+        error = friendlyJoinError(e);
+        if (!isSupabaseConfigured())
+            error = multiplayerDisabledMessage();
+    }
+    finally {
+        busy = false;
+    }
+}
+async function doPreview() {
     if (!code || code.length !== 4) {
-      error = 'Enter a 4-digit code';
-      return;
+        error = 'Enter a 4-digit code';
+        return;
     }
     busy = true;
     error = null;
     try {
-      const coordinator = getCoordinator();
-      const snap = await coordinator.previewRoom(code);
-      const mode = (snap.settings as unknown as { mode?: string }).mode ?? 'season';
-      const paceLabel =
-        snap.settings.pace === 'live'
-          ? 'Live — 90s draft · 5 min decisions'
-          : 'Async — 24h draft · 12h decisions';
-      const modeLabel =
-        mode === 'season' ? 'Season Run' : mode === 'classic' ? 'Classic' : 'Sandbox';
-      preview = { mode: modeLabel, pace: snap.settings.pace, detail: paceLabel };
-    } catch (e) {
-      error = friendlyJoinError(e);
-      preview = null;
-    } finally {
-      busy = false;
+        const coordinator = getCoordinator();
+        const snap = await coordinator.previewRoom(code);
+        const mode = (snap.settings as unknown as {
+            mode?: string;
+        }).mode ?? 'season';
+        const paceLabel = snap.settings.pace === 'live'
+            ? 'Live — 90s draft · 5 min decisions'
+            : 'Async — 24h draft · 12h decisions';
+        const modeLabel = mode === 'season' ? 'Season Run' : mode === 'classic' ? 'Classic' : 'Sandbox';
+        preview = { mode: modeLabel, pace: snap.settings.pace, detail: paceLabel };
     }
-  }
-
-  async function doJoin() {
+    catch (e) {
+        error = friendlyJoinError(e);
+        preview = null;
+    }
+    finally {
+        busy = false;
+    }
+}
+async function doJoin() {
     if (!code || code.length !== 4) {
-      error = 'Enter a 4-digit code';
-      return;
+        error = 'Enter a 4-digit code';
+        return;
     }
     busy = true;
     error = null;
     try {
-      const coordinator = getCoordinator();
-      const { snap } = await coordinator.joinRoom(code);
-      await goto(resolve('/multiplayer/room/[roomId]', { roomId: snap.roomId }));
-    } catch (e) {
-      error = friendlyJoinError(e);
-    } finally {
-      busy = false;
+        const coordinator = getCoordinator();
+        const { snap } = await coordinator.joinRoom(code);
+        await goto(resolve('/multiplayer/room/[roomId]', { roomId: snap.roomId }));
     }
-  }
-
-  async function copyInviteLink() {
+    catch (e) {
+        error = friendlyJoinError(e);
+    }
+    finally {
+        busy = false;
+    }
+}
+async function copyInviteLink() {
     const toCopy = createdCode ? inviteLinkForCode(createdCode) : null;
-    if (!toCopy) return;
+    if (!toCopy)
+        return;
     try {
-      await navigator.clipboard.writeText(toCopy);
-      copiedInvite = true;
-      setTimeout(() => (copiedInvite = false), 1500);
-    } catch {}
-  }
-  async function copyCode() {
-    if (!createdCode) return;
+        await navigator.clipboard.writeText(toCopy);
+        copiedInvite = true;
+        setTimeout(() => (copiedInvite = false), 1500);
+    }
+    catch { }
+}
+async function copyCode() {
+    if (!createdCode)
+        return;
     try {
-      await navigator.clipboard.writeText(createdCode);
-      copiedCode = true;
-      setTimeout(() => (copiedCode = false), 1500);
-    } catch {}
-  }
-
-  function goToRoom() {
-    if (createdRoomId) goto(resolve('/multiplayer/room/[roomId]', { roomId: createdRoomId }));
-  }
-
-  function backToChoose() {
+        await navigator.clipboard.writeText(createdCode);
+        copiedCode = true;
+        setTimeout(() => (copiedCode = false), 1500);
+    }
+    catch { }
+}
+function goToRoom() {
+    if (createdRoomId)
+        goto(resolve('/multiplayer/room/[roomId]', { roomId: createdRoomId }));
+}
+function backToChoose() {
     view = 'choose';
     error = null;
     preview = null;
-    // keep code if prefilled via invite link? clear only if not from URL? Keep for UX but prefill stays
-    if (!new URLSearchParams(window.location.search).get('code')) code = '';
-  }
-
-  function backFromCreate() {
+    if (!new URLSearchParams(window.location.search).get('code'))
+        code = '';
+}
+function backFromCreate() {
     view = 'choose';
     error = null;
-  }
+}
 </script>
 
 <svelte:head>
@@ -248,6 +243,13 @@
       <p class="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">
         Rooms are temporary — code, presence, and checkpoint hashes only. Simulation stays local.
       </p>
+      <div class="mt-4 rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm">
+        <p class="font-semibold text-foreground">Multiplayer now: Classic & Sandbox · Season Run archived</p>
+        <p class="mt-1 text-muted-foreground">
+          Season Run multiplayer is archived (solo at <a href={resolve('/season')} class="underline">/season</a> — code kept). Multiplayer now uses the simpler 5-pick system:
+          <strong>Classic</strong> (franchise-era rolls) and <strong>Sandbox</strong> (free 5 picks). Classic / Sandbox rooms work with the same 4-digit code + Live/Async pace.
+        </p>
+      </div>
     </div>
   </div>
 
@@ -409,7 +411,9 @@
               type="button"
               disabled={m.disabled}
               title={m.disabled
-                ? 'Multiplayer draft for this mode is not yet available — Season Run only'
+                ? m.id === 'season'
+                  ? 'Season Run multiplayer is archived — code kept, will return. Use Classic or Sandbox.'
+                  : 'Unavailable'
                 : undefined}
               onclick={() => {
                 if (!m.disabled) selectedMode = m.id;

@@ -1,304 +1,313 @@
-<script lang="ts">
-  import { browser } from '$app/environment';
-  import { goto } from '$app/navigation';
-  import { resolve } from '$app/paths';
-  import { Dialog } from 'bits-ui';
-  import type {
-    HoopRushManifest,
-    PlayersIndex,
-    SeasonDraftCatalog,
-    SeasonLeague,
-    SeasonRosterTargets,
-    SeasonRun,
-    SeasonSchedule,
-  } from '@hoop-rush/data-contracts';
-  import type { SeasonRunPlayerSliceEntry } from '@hoop-rush/persistence';
-  import SeasonDraftBoard from '$lib/components/season/SeasonDraftBoard.svelte';
-  import type { SeasonDraftFlow, SeasonDraftFlowState } from '$lib/season/season-draft-flow';
-  import { buildVersionFaceIndex, type SeasonFaceRef } from '$lib/season/season-branding';
-  import {
-    loadSeasonDraftCatalog,
-    loadSeasonLeague,
-    loadSeasonRosterTargets,
-    loadSeasonSchedule,
-  } from '$lib/season/season-assets';
-  import { getManifest, getPlayersIndex } from '$lib/data';
-  import { DexieSeasonDraftRepository } from '@hoop-rush/persistence';
-  import { isSeasonRunIncompatibleError } from '@hoop-rush/persistence';
-  import { getSeasonRunRepository } from '$lib/season/season-repo';
-  import { clearAllSeasonData } from '$lib/season/season-data-recovery';
-  import { seasonRootSeed } from '$lib/season/season-ids';
-  import { buildSeasonRunFromGeneration, sha256Hex } from '$lib/season/season-run-builder';
-  let manifest = $state<HoopRushManifest | null>(null);
-  let league = $state<SeasonLeague | null>(null);
-  let schedule = $state<SeasonSchedule | null>(null);
-  let playersIndex = $state.raw<PlayersIndex | null>(null);
-  let assetsError: string | null = $state(null);
-  let loaded = $state(false);
-  let busy = $state(false);
-  let board = $state<SeasonDraftFlowState | null>(null);
-  let flow = $state.raw<SeasonDraftFlow | null>(null);
-  let started = $state(false);
-  let actionError = $state<string | null>(null);
-  let generationError: string | null = $state(null);
-  let promoting = $state(false);
-  let promoteError: string | null = $state(null);
-  let resumeHref: string | null = $state(null);
-  let brokenRunError: string | null = $state(null);
-  let hasDraft = $state(false);
-  let faces = $state<Map<string, SeasonFaceRef>>(new Map());
-  let clearOpen = $state(false);
-  let clearing = $state(false);
-  let clearError: string | null = $state(null);
-  async function confirmClearSeasonData(): Promise<void> {
-    if (clearing) return;
+<script lang="ts">import { browser } from '$app/environment';
+import { goto } from '$app/navigation';
+import { resolve } from '$app/paths';
+import { Dialog } from 'bits-ui';
+import type { HoopRushManifest, PlayersIndex, SeasonDraftCatalog, SeasonLeague, SeasonRosterTargets, SeasonRun, SeasonSchedule, } from '@hoop-rush/data-contracts';
+import type { SeasonRunPlayerSliceEntry } from '@hoop-rush/persistence';
+import SeasonDraftBoard from '$lib/components/season/SeasonDraftBoard.svelte';
+import type { SeasonDraftFlow, SeasonDraftFlowState } from '$lib/season/season-draft-flow';
+import { buildVersionFaceIndex, type SeasonFaceRef } from '$lib/season/season-branding';
+import { loadSeasonDraftCatalog, loadSeasonLeague, loadSeasonRosterTargets, loadSeasonSchedule, } from '$lib/season/season-assets';
+import { getManifest, getPlayersIndex } from '$lib/data';
+import { DexieSeasonDraftRepository } from '@hoop-rush/persistence';
+import { isSeasonRunIncompatibleError } from '@hoop-rush/persistence';
+import { getSeasonRunRepository } from '$lib/season/season-repo';
+import { clearAllSeasonData } from '$lib/season/season-data-recovery';
+import { seasonRootSeed } from '$lib/season/season-ids';
+import { buildSeasonRunFromGeneration, sha256Hex } from '$lib/season/season-run-builder';
+let manifest = $state<HoopRushManifest | null>(null);
+let league = $state<SeasonLeague | null>(null);
+let schedule = $state<SeasonSchedule | null>(null);
+let playersIndex = $state.raw<PlayersIndex | null>(null);
+let assetsError: string | null = $state(null);
+let loaded = $state(false);
+let busy = $state(false);
+let board = $state<SeasonDraftFlowState | null>(null);
+let flow = $state.raw<SeasonDraftFlow | null>(null);
+let started = $state(false);
+let actionError = $state<string | null>(null);
+let generationError: string | null = $state(null);
+let promoting = $state(false);
+let promoteError: string | null = $state(null);
+let resumeHref: string | null = $state(null);
+let brokenRunError: string | null = $state(null);
+let hasDraft = $state(false);
+let faces = $state<Map<string, SeasonFaceRef>>(new Map());
+let clearOpen = $state(false);
+let clearing = $state(false);
+let clearError: string | null = $state(null);
+async function confirmClearSeasonData(): Promise<void> {
+    if (clearing)
+        return;
     clearing = true;
     clearError = null;
     try {
-      await clearAllSeasonData();
-      clearOpen = false;
-      resumeHref = null;
-      brokenRunError = null;
-      if (flow !== null) {
-        hasDraft = false;
-        started = false;
-        board = flow.state();
-      }
-    } catch (error) {
-      clearError = error instanceof Error ? error.message : String(error);
-    } finally {
-      clearing = false;
+        await clearAllSeasonData();
+        clearOpen = false;
+        resumeHref = null;
+        brokenRunError = null;
+        if (flow !== null) {
+            hasDraft = false;
+            started = false;
+            board = flow.state();
+        }
     }
-  }
-  $effect(() => {
-    if (!browser) return;
+    catch (error) {
+        clearError = error instanceof Error ? error.message : String(error);
+    }
+    finally {
+        clearing = false;
+    }
+}
+$effect(() => {
+    if (!browser)
+        return;
     let cancelled = false;
     Promise.all([
-      getManifest(),
-      loadSeasonLeague(),
-      loadSeasonSchedule(),
-      loadSeasonRosterTargets(),
-      getPlayersIndex(),
+        getManifest(),
+        loadSeasonLeague(),
+        loadSeasonSchedule(),
+        loadSeasonRosterTargets(),
+        getPlayersIndex(),
     ])
-      .then(async ([m, seasonLeague, seasonSchedule, rosterTargets, ix]) => {
-        if (cancelled) return;
+        .then(async ([m, seasonLeague, seasonSchedule, rosterTargets, ix]) => {
+        if (cancelled)
+            return;
         manifest = m;
         league = seasonLeague;
         schedule = seasonSchedule;
         playersIndex = ix;
         const draftRepo = new DexieSeasonDraftRepository();
         const storedDraft = await draftRepo.loadSeasonDraft();
-        if (cancelled) return;
+        if (cancelled)
+            return;
         if (storedDraft !== null) {
-          await ensureFlow(rosterTargets);
-          if (cancelled) return;
-          if (flow !== null) {
-            hasDraft = await flow.load();
-            board = flow.state();
-          }
-        } else {
-          hasDraft = false;
+            await ensureFlow(rosterTargets);
+            if (cancelled)
+                return;
+            if (flow !== null) {
+                hasDraft = await flow.load();
+                board = flow.state();
+            }
+        }
+        else {
+            hasDraft = false;
         }
         try {
-          const repo = await getSeasonRunRepository(seasonSchedule);
-          const index = await repo.loadActiveRunIndex();
-          if (!cancelled && index) {
-            try {
-              const snapshot = await repo.loadActiveRun();
-              if (snapshot !== null) {
-                resumeHref = resolve('/season/run');
-              } else {
-                brokenRunError =
-                  'A saved season was found but its checkpoint is missing. Clear the broken save to start over.';
-              }
-            } catch (error) {
-              if (isSeasonRunIncompatibleError(error)) {
-                resumeHref = resolve('/season/run');
-              } else {
-                brokenRunError =
-                  error instanceof Error ? error.message : 'The saved season could not be loaded.';
-              }
+            const repo = await getSeasonRunRepository(seasonSchedule);
+            const index = await repo.loadActiveRunIndex();
+            if (!cancelled && index) {
+                try {
+                    const snapshot = await repo.loadActiveRun();
+                    if (snapshot !== null) {
+                        resumeHref = resolve('/season/run');
+                    }
+                    else {
+                        brokenRunError =
+                            'A saved season was found but its checkpoint is missing. Clear the broken save to start over.';
+                    }
+                }
+                catch (error) {
+                    if (isSeasonRunIncompatibleError(error)) {
+                        resumeHref = resolve('/season/run');
+                    }
+                    else {
+                        brokenRunError =
+                            error instanceof Error ? error.message : 'The saved season could not be loaded.';
+                    }
+                }
             }
-          }
-        } catch {}
-        loaded = true;
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) {
-          assetsError = error instanceof Error ? error.message : String(error);
-          loaded = true;
         }
-      });
+        catch { }
+        loaded = true;
+    })
+        .catch((error: unknown) => {
+        if (!cancelled) {
+            assetsError = error instanceof Error ? error.message : String(error);
+            loaded = true;
+        }
+    });
     return () => {
-      cancelled = true;
+        cancelled = true;
     };
-  });
-  async function ensureFlow(rosterTargets?: SeasonRosterTargets): Promise<SeasonDraftFlow | null> {
-    if (flow !== null) return flow;
+});
+async function ensureFlow(rosterTargets?: SeasonRosterTargets): Promise<SeasonDraftFlow | null> {
+    if (flow !== null)
+        return flow;
     const catalog = await loadSeasonDraftCatalog();
     const targets = rosterTargets ?? (await loadSeasonRosterTargets());
     const { SeasonDraftFlow } = await import('$lib/season/season-draft-flow');
     const instance = new SeasonDraftFlow(new DexieSeasonDraftRepository(), catalog, targets);
     instance.onPhaseChange = () => {
-      if (flow !== null) board = flow.state();
+        if (flow !== null)
+            board = flow.state();
     };
     if (playersIndex !== null) {
-      faces = buildVersionFaceIndex(
-        playersIndex.players,
-        catalog.candidates.map((candidate) => ({
-          playerVersionId: candidate.playerVersionId,
-          playerId: candidate.playerId,
-          franchiseId: candidate.franchiseId,
-          eraId: candidate.eraId,
-          seasonKey: candidate.seasonKey,
-          displayName: candidate.displayName,
-        })),
-      );
+        faces = buildVersionFaceIndex(playersIndex.players, catalog.candidates.map((candidate) => ({
+            playerVersionId: candidate.playerVersionId,
+            playerId: candidate.playerId,
+            franchiseId: candidate.franchiseId,
+            eraId: candidate.eraId,
+            seasonKey: candidate.seasonKey,
+            displayName: candidate.displayName,
+        })));
     }
     flow = instance;
     return instance;
-  }
-  const franchiseName = (franchiseId: string): string =>
-    manifest?.modernFranchiseSlots.find((slot) => slot.franchiseId === franchiseId)?.displayName ??
+}
+const franchiseName = (franchiseId: string): string => manifest?.modernFranchiseSlots.find((slot) => slot.franchiseId === franchiseId)?.displayName ??
     franchiseId;
-  async function startDraft() {
-    if (!league) return;
+async function startDraft() {
+    if (!league)
+        return;
     busy = true;
     actionError = null;
     try {
-      const instance = await ensureFlow();
-      if (instance === null) return;
-      const record = await instance.create({ rootSeed: seasonRootSeed(), league });
-      if (record.status === 'rejected') {
-        actionError = record.message;
-      } else {
-        started = true;
-      }
-    } catch (error) {
-      actionError = error instanceof Error ? error.message : String(error);
-    } finally {
-      if (flow !== null) board = flow.state();
-      busy = false;
+        const instance = await ensureFlow();
+        if (instance === null)
+            return;
+        const record = await instance.create({ rootSeed: seasonRootSeed(), league });
+        if (record.status === 'rejected') {
+            actionError = record.message;
+        }
+        else {
+            started = true;
+        }
     }
-  }
-  async function runCommand(
-    command: () => Promise<{
-      status: string;
-    }>,
-  ) {
-    if (!flow) return;
+    catch (error) {
+        actionError = error instanceof Error ? error.message : String(error);
+    }
+    finally {
+        if (flow !== null)
+            board = flow.state();
+        busy = false;
+    }
+}
+async function runCommand(command: () => Promise<{
+    status: string;
+}>) {
+    if (!flow)
+        return;
     busy = true;
     actionError = null;
     generationError = null;
     try {
-      const record = await command();
-      if (record.status === 'rejected') {
-        actionError = flow.error ?? 'The draft rejected that action.';
-      }
-    } catch (error) {
-      actionError = error instanceof Error ? error.message : String(error);
-    } finally {
-      board = flow.state();
-      busy = false;
+        const record = await command();
+        if (record.status === 'rejected') {
+            actionError = flow.error ?? 'The draft rejected that action.';
+        }
     }
-  }
-  function onDraw() {
+    catch (error) {
+        actionError = error instanceof Error ? error.message : String(error);
+    }
+    finally {
+        board = flow.state();
+        busy = false;
+    }
+}
+function onDraw() {
     void runCommand(() => flow!.draw());
-  }
-  function onPick(playerVersionId: string) {
+}
+function onPick(playerVersionId: string) {
     void runCommand(() => flow!.pick('human', playerVersionId));
-  }
-  function onFinalize() {
+}
+function onFinalize() {
     void runCommand(() => flow!.finalize());
-  }
-  async function generateLeague() {
-    if (!flow) return;
+}
+async function generateLeague() {
+    if (!flow)
+        return;
     busy = true;
     actionError = null;
     generationError = null;
     try {
-      const generation = await flow.generate();
-      if (generation === null && flow.error !== null) {
-        generationError = flow.error;
-      }
-    } catch (error) {
-      generationError = flow.error ?? (error instanceof Error ? error.message : String(error));
-    } finally {
-      board = flow.state();
-      busy = false;
+        const generation = await flow.generate();
+        if (generation === null && flow.error !== null) {
+            generationError = flow.error;
+        }
     }
-  }
-  async function promote() {
-    if (!flow || !flow.draft || !flow.generation || !schedule) return;
+    catch (error) {
+        generationError = flow.error ?? (error instanceof Error ? error.message : String(error));
+    }
+    finally {
+        board = flow.state();
+        busy = false;
+    }
+}
+async function promote() {
+    if (!flow || !flow.draft || !flow.generation || !schedule)
+        return;
     promoting = true;
     promoteError = null;
     try {
-      const repo = await getSeasonRunRepository();
-      const draftRepo = new DexieSeasonDraftRepository();
-      const stored = await draftRepo.loadSeasonDraft();
-      if (!stored) throw new Error('The completed draft record is missing.');
-      const scheduleContentHash =
-        (await sha256Hex(`${JSON.stringify(schedule)}\n`)) ??
-        manifest?.season?.schedule?.contentHash;
-      if (!scheduleContentHash) {
-        throw new Error('Unable to determine the schedule content hash.');
-      }
-      const run = buildSeasonRunFromGeneration({
-        runId: flow.draft.runId,
-        rootSeed: flow.draft.rootSeed,
-        league: flow.draft.league,
-        schedule,
-        scheduleContentHash,
-        draft: flow.draft,
-        generation: flow.generation,
-      });
-      const slice = buildPlayerSlice(run, flow.catalog);
-      await repo.promoteSeasonDraftToRun(stored, run, slice);
-      await goto(resolve('/season/run'));
-    } catch (error) {
-      promoteError = error instanceof Error ? error.message : String(error);
-    } finally {
-      promoting = false;
+        const repo = await getSeasonRunRepository();
+        const draftRepo = new DexieSeasonDraftRepository();
+        const stored = await draftRepo.loadSeasonDraft();
+        if (!stored)
+            throw new Error('The completed draft record is missing.');
+        const scheduleContentHash = (await sha256Hex(`${JSON.stringify(schedule)}\n`)) ??
+            manifest?.season?.schedule?.contentHash;
+        if (!scheduleContentHash) {
+            throw new Error('Unable to determine the schedule content hash.');
+        }
+        const run = buildSeasonRunFromGeneration({
+            runId: flow.draft.runId,
+            rootSeed: flow.draft.rootSeed,
+            league: flow.draft.league,
+            schedule,
+            scheduleContentHash,
+            draft: flow.draft,
+            generation: flow.generation,
+        });
+        const slice = buildPlayerSlice(run, flow.catalog);
+        await repo.promoteSeasonDraftToRun(stored, run, slice);
+        await goto(resolve('/season/run'));
     }
-  }
-  async function discardDraft() {
-    if (!flow) return;
+    catch (error) {
+        promoteError = error instanceof Error ? error.message : String(error);
+    }
+    finally {
+        promoting = false;
+    }
+}
+async function discardDraft() {
+    if (!flow)
+        return;
     busy = true;
     try {
-      await flow.clear();
-      started = false;
-      hasDraft = false;
-      board = flow.state();
-    } finally {
-      busy = false;
+        await flow.clear();
+        started = false;
+        hasDraft = false;
+        board = flow.state();
     }
-  }
-  function buildPlayerSlice(
-    run: SeasonRun,
-    catalog: SeasonDraftCatalog,
-  ): SeasonRunPlayerSliceEntry[] {
+    finally {
+        busy = false;
+    }
+}
+function buildPlayerSlice(run: SeasonRun, catalog: SeasonDraftCatalog): SeasonRunPlayerSliceEntry[] {
     const byVersion = new Map(catalog.candidates.map((c) => [c.playerVersionId, c]));
     const entries: SeasonRunPlayerSliceEntry[] = [];
     for (const roster of run.rosters) {
-      for (const entry of roster.players) {
-        const candidate = byVersion.get(entry.playerVersionId);
-        if (candidate === undefined) continue;
-        entries.push({
-          playerVersionId: entry.playerVersionId,
-          playerId: entry.playerId,
-          franchiseId: entry.franchiseId,
-          eraId: entry.eraId,
-          seasonKey: entry.seasonKey,
-          displayName: entry.displayName,
-          positionsPlayable: [...candidate.positions.playable],
-          summaryRatings: { ...candidate.summaryRatings },
-          staminaRating: candidate.stamina.rating,
-          durabilityRating: candidate.durability.rating,
-        });
-      }
+        for (const entry of roster.players) {
+            const candidate = byVersion.get(entry.playerVersionId);
+            if (candidate === undefined)
+                continue;
+            entries.push({
+                playerVersionId: entry.playerVersionId,
+                playerId: entry.playerId,
+                franchiseId: entry.franchiseId,
+                eraId: entry.eraId,
+                seasonKey: entry.seasonKey,
+                displayName: entry.displayName,
+                positionsPlayable: [...candidate.positions.playable],
+                summaryRatings: { ...candidate.summaryRatings },
+                staminaRating: candidate.stamina.rating,
+                durabilityRating: candidate.durability.rating,
+            });
+        }
     }
     return entries;
-  }
+}
 </script>
 
 <svelte:head>
@@ -422,30 +431,8 @@
         {/if}
       </div>
 
-      <a
-        href={resolve('/multiplayer')}
-        class="group flex flex-col rounded-xl border border-primary/30 bg-primary/10 p-6 transition-colors hover:bg-primary/15"
-      >
-        <div class="flex items-center justify-between gap-3">
-          <h2 class="font-display text-lg font-extrabold tracking-tight uppercase">
-            Play with a Friend
-          </h2>
-          <span
-            class="rounded-full bg-primary px-2.5 py-0.5 font-mono text-[10px] font-bold tracking-widest text-primary-foreground uppercase"
-            >New</span
-          >
-        </div>
-        <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
-          Multiplayer now has its own lobby. Create a room, share the 4-digit code, and pick Season,
-          Classic, or Sandbox together. Private until both lock, hash-verified.
-        </p>
-        <span class="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-primary"
-          >Open multiplayer →<span
-            aria-hidden="true"
-            class="transition-transform group-hover:translate-x-0.5">→</span
-          ></span
-        >
-      </a>
+      
+      
 
       {#if league && manifest}
         <section

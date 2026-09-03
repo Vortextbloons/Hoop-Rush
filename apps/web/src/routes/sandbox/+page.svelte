@@ -1,282 +1,263 @@
-<script lang="ts">
-  import { resolve } from '$app/paths';
-  import { ArrowRight, Check, ChevronDown } from '@lucide/svelte';
-  import { Select } from 'bits-ui';
-  import type {
-    HoopRushManifest,
-    PeakPlayerSeason,
-    PlayersIndex,
-    PlayersIndexEntry,
-  } from '@hoop-rush/data-contracts';
-  import {
-    franchiseAbbreviation,
-    resolveEraTeamIdentity,
-    LINEUP_STRUCTURE,
-  } from '@hoop-rush/data-contracts';
-  import { validateLineup } from '@hoop-rush/engine';
-  import { clearDataLoaderCaches, getManifest, getPlayersIndex, getPool } from '$lib/data';
-  import { resolvePlayerRefs } from '$lib/player-refs';
-  import { generateSeed, parseSandboxUrl } from '$lib/sandbox-url';
-  import { startSandboxRun } from '$lib/sandbox-run';
-  import { poolSortLabel, sortDraftRows } from '$lib/draft-presentation';
-  import TeamLogo from '$lib/components/TeamLogo.svelte';
-  import LineupCourt from '$lib/components/LineupCourt.svelte';
-  import LineupSummaryNav from '$lib/components/LineupSummaryNav.svelte';
-  import DraftValuePanel from '$lib/components/DraftValuePanel.svelte';
-  import DraftPoolBrowser from '$lib/components/draft/DraftPoolBrowser.svelte';
-  import AsyncState from '$lib/components/AsyncState.svelte';
-  let slotPickerModule: Promise<
-    typeof import('$lib/components/draft/SlotPickerDialog.svelte')
-  > | null = null;
-  function loadSlotPickerDialog(): Promise<
-    typeof import('$lib/components/draft/SlotPickerDialog.svelte')
-  > {
+<script lang="ts">import { resolve } from '$app/paths';
+import { ArrowRight, Check, ChevronDown } from '@lucide/svelte';
+import { Select } from 'bits-ui';
+import type { HoopRushManifest, PeakPlayerSeason, PlayersIndex, PlayersIndexEntry, } from '@hoop-rush/data-contracts';
+import { franchiseAbbreviation, resolveEraTeamIdentity, LINEUP_STRUCTURE, } from '@hoop-rush/data-contracts';
+import { validateLineup } from '@hoop-rush/engine';
+import { clearDataLoaderCaches, getManifest, getPlayersIndex, getPool } from '$lib/data';
+import { resolvePlayerRefs } from '$lib/player-refs';
+import { generateSeed, parseSandboxUrl } from '$lib/sandbox-url';
+import { startSandboxRun } from '$lib/sandbox-run';
+import { poolSortLabel, sortDraftRows } from '$lib/draft-presentation';
+import TeamLogo from '$lib/components/TeamLogo.svelte';
+import LineupCourt from '$lib/components/LineupCourt.svelte';
+import LineupSummaryNav from '$lib/components/LineupSummaryNav.svelte';
+import DraftValuePanel from '$lib/components/DraftValuePanel.svelte';
+import DraftPoolBrowser from '$lib/components/draft/DraftPoolBrowser.svelte';
+import AsyncState from '$lib/components/AsyncState.svelte';
+let slotPickerModule: Promise<typeof import('$lib/components/draft/SlotPickerDialog.svelte')> | null = null;
+function loadSlotPickerDialog(): Promise<typeof import('$lib/components/draft/SlotPickerDialog.svelte')> {
     slotPickerModule ??= import('$lib/components/draft/SlotPickerDialog.svelte');
     return slotPickerModule;
-  }
-  import {
-    SLOT_INDEXES,
-    SLOT_LABELS,
-    SLOT_NAMES,
-    canFillSlot,
-    displacementTargetFor,
-  } from '$lib/draft-slots';
-  type IndexRow = PlayersIndexEntry;
-  type SlotRef = {
+}
+import { SLOT_INDEXES, SLOT_LABELS, SLOT_NAMES, canFillSlot, displacementTargetFor, } from '$lib/draft-slots';
+type IndexRow = PlayersIndexEntry;
+type SlotRef = {
     playerId: string;
     franchiseId: string;
     eraId: string;
-  };
-  let manifest = $state.raw<HoopRushManifest | null>(null);
-  let manifestError: string | null = $state(null);
-  let index = $state.raw<PlayersIndex | null>(null);
-  let indexError: string | null = $state(null);
-  let runError: string | null = $state(null);
-  let starting = $state(false);
-  let mounted = true;
-  $effect(() => {
+};
+let manifest = $state.raw<HoopRushManifest | null>(null);
+let manifestError: string | null = $state(null);
+let index = $state.raw<PlayersIndex | null>(null);
+let indexError: string | null = $state(null);
+let runError: string | null = $state(null);
+let starting = $state(false);
+let mounted = true;
+$effect(() => {
     mounted = true;
     return () => {
-      mounted = false;
+        mounted = false;
     };
-  });
-  let slots = $state<(IndexRow | null)[]>([null, null, null, null, null]);
-  let resolvedDraftPlayers = $state.raw<PeakPlayerSeason[]>([]);
-  let pickerPlayer = $state<IndexRow | null>(null);
-  let pickerTrigger = $state<HTMLElement | null>(null);
-  let pickerFallbackId = $state<string | null>(null);
-  let franchiseFilter = $state('');
-  let eraFilter = $state('');
-  function loadSandboxData() {
+});
+let slots = $state<(IndexRow | null)[]>([null, null, null, null, null]);
+let resolvedDraftPlayers = $state.raw<PeakPlayerSeason[]>([]);
+let pickerPlayer = $state<IndexRow | null>(null);
+let pickerTrigger = $state<HTMLElement | null>(null);
+let pickerFallbackId = $state<string | null>(null);
+let franchiseFilter = $state('');
+let eraFilter = $state('');
+function loadSandboxData() {
     manifestError = null;
     indexError = null;
     manifest = null;
     index = null;
     let cancelled = false;
-    getManifest().then(
-      (m) => {
-        if (cancelled) return;
+    getManifest().then((m) => {
+        if (cancelled)
+            return;
         manifest = m;
-        getPlayersIndex().then(
-          (ix) => {
-            if (cancelled) return;
+        getPlayersIndex().then((ix) => {
+            if (cancelled)
+                return;
             index = ix;
             restoreUrlState(m, ix);
-          },
-          (error: unknown) => {
-            if (!cancelled) indexError = error instanceof Error ? error.message : String(error);
-          },
-        );
-      },
-      (error: unknown) => {
-        if (!cancelled) manifestError = error instanceof Error ? error.message : String(error);
-      },
-    );
+        }, (error: unknown) => {
+            if (!cancelled)
+                indexError = error instanceof Error ? error.message : String(error);
+        });
+    }, (error: unknown) => {
+        if (!cancelled)
+            manifestError = error instanceof Error ? error.message : String(error);
+    });
     return () => {
-      cancelled = true;
+        cancelled = true;
     };
-  }
-  $effect(() => loadSandboxData());
-  $effect(() => {
+}
+$effect(() => loadSandboxData());
+$effect(() => {
     const m = manifest;
     const refs = slots
-      .filter((player): player is IndexRow => player !== null)
-      .map((player) => ({
+        .filter((player): player is IndexRow => player !== null)
+        .map((player) => ({
         playerId: player.playerId,
         franchiseId: player.franchiseId,
         eraId: player.eraId,
-      }));
+    }));
     if (!m || refs.length === 0) {
-      resolvedDraftPlayers = [];
-      return;
+        resolvedDraftPlayers = [];
+        return;
     }
     let cancelled = false;
-    resolvePlayerRefs(refs, m).then(
-      (players) => {
-        if (!cancelled) resolvedDraftPlayers = players;
-      },
-      () => {
-        if (!cancelled) resolvedDraftPlayers = [];
-      },
-    );
+    resolvePlayerRefs(refs, m).then((players) => {
+        if (!cancelled)
+            resolvedDraftPlayers = players;
+    }, () => {
+        if (!cancelled)
+            resolvedDraftPlayers = [];
+    });
     return () => {
-      cancelled = true;
+        cancelled = true;
     };
-  });
-  function retrySandboxData() {
+});
+function retrySandboxData() {
     clearDataLoaderCaches();
     loadSandboxData();
-  }
-  function restoreUrlState(m: HoopRushManifest, ix: PlayersIndex) {
-    if (slots.some((p) => p !== null)) return;
-    if (typeof window === 'undefined') return;
+}
+function restoreUrlState(m: HoopRushManifest, ix: PlayersIndex) {
+    if (slots.some((p) => p !== null))
+        return;
+    if (typeof window === 'undefined')
+        return;
     const result = parseSandboxUrl(new URL(window.location.href), m, ix);
-    if (!result.ok || !result.state) return;
-    const rows = result.state.slots.map((sel) =>
-      ix.players.find(
-        (p) =>
-          p.playerId === sel.playerId && p.franchiseId === sel.franchiseId && p.eraId === sel.eraId,
-      ),
-    );
-    if (rows.some((row) => row === undefined)) return;
+    if (!result.ok || !result.state)
+        return;
+    const rows = result.state.slots.map((sel) => ix.players.find((p) => p.playerId === sel.playerId && p.franchiseId === sel.franchiseId && p.eraId === sel.eraId));
+    if (rows.some((row) => row === undefined))
+        return;
     const filled = rows.filter((row): row is IndexRow => row !== undefined);
-    resolveRefsToPlayers(result.state.slots).then(
-      () => {
-        if (!mounted) return;
+    resolveRefsToPlayers(result.state.slots).then(() => {
+        if (!mounted)
+            return;
         slots = filled;
         pickerPlayer = null;
-      },
-      () => {},
-    );
-  }
-  const franchise = $derived(
-    manifest?.modernFranchiseSlots.find((e) => e.franchiseId === franchiseFilter) ?? null,
-  );
-  const era = $derived(manifest?.eras.find((e) => e.eraId === eraFilter) ?? null);
-  const eraIdentity = $derived(
-    manifest && franchise && era
-      ? resolveEraTeamIdentity(manifest, franchise.franchiseId, era.eraId)
-      : null,
-  );
-  const franchiseItems = $derived([
+    }, () => { });
+}
+const franchise = $derived(manifest?.modernFranchiseSlots.find((e) => e.franchiseId === franchiseFilter) ?? null);
+const era = $derived(manifest?.eras.find((e) => e.eraId === eraFilter) ?? null);
+const eraIdentity = $derived(manifest && franchise && era
+    ? resolveEraTeamIdentity(manifest, franchise.franchiseId, era.eraId)
+    : null);
+const franchiseItems = $derived([
     { value: '', label: 'Any team' },
     ...(manifest?.modernFranchiseSlots ?? []).map((entry) => ({
-      value: entry.franchiseId,
-      label: entry.displayName,
+        value: entry.franchiseId,
+        label: entry.displayName,
     })),
-  ]);
-  const eraItems = $derived([
+]);
+const eraItems = $derived([
     { value: '', label: 'Any decade' },
     ...(manifest?.eras ?? []).map((e) => ({
-      value: e.eraId,
-      label: e.label,
+        value: e.eraId,
+        label: e.label,
     })),
-  ]);
-  const poolRows = $derived.by(() => {
+]);
+const poolRows = $derived.by(() => {
     let list = index?.players ?? [];
-    if (franchiseFilter) list = list.filter((p) => p.franchiseId === franchiseFilter);
-    if (eraFilter) list = list.filter((p) => p.eraId === eraFilter);
+    if (franchiseFilter)
+        list = list.filter((p) => p.franchiseId === franchiseFilter);
+    if (eraFilter)
+        list = list.filter((p) => p.eraId === eraFilter);
     return list;
-  });
-  const sortedRows = $derived(sortDraftRows(poolRows, 'sandbox'));
-  const poolHeading = $derived(
-    franchise && era && eraIdentity
-      ? `${eraIdentity.abbreviationLabel ?? franchiseAbbreviation(franchise.franchiseId)} · ${era.label}`
-      : franchise
+});
+const sortedRows = $derived(sortDraftRows(poolRows, 'sandbox'));
+const poolHeading = $derived(franchise && era && eraIdentity
+    ? `${eraIdentity.abbreviationLabel ?? franchiseAbbreviation(franchise.franchiseId)} · ${era.label}`
+    : franchise
         ? franchiseAbbreviation(franchise.franchiseId)
         : era
-          ? era.label
-          : 'All players',
-  );
-  const countLabel = $derived(`${poolRows.length} players · ${poolSortLabel('sandbox')}`);
-  function selectFranchise(id: string) {
+            ? era.label
+            : 'All players');
+const countLabel = $derived(`${poolRows.length} players · ${poolSortLabel('sandbox')}`);
+function selectFranchise(id: string) {
     franchiseFilter = id;
-  }
-  function selectEra(id: string) {
+}
+function selectEra(id: string) {
     eraFilter = id;
-  }
-  function placePlayer(subject: IndexRow, slotIndex: number) {
+}
+function placePlayer(subject: IndexRow, slotIndex: number) {
     const subjectSlot = slots.findIndex((p) => p !== null && p.playerId === subject.playerId);
     const incumbent = slots[slotIndex];
     if (incumbent && incumbent.playerId !== subject.playerId) {
-      const target = displacementTargetFor(slots, incumbent, slotIndex, subjectSlot);
-      if (target === null) return;
-      slots[target] = incumbent;
+        const target = displacementTargetFor(slots, incumbent, slotIndex, subjectSlot);
+        if (target === null)
+            return;
+        slots[target] = incumbent;
     }
     slots[slotIndex] = subject;
-    if (subjectSlot !== -1 && subjectSlot !== slotIndex) slots[subjectSlot] = null;
+    if (subjectSlot !== -1 && subjectSlot !== slotIndex)
+        slots[subjectSlot] = null;
     if (manifest) {
-      const entry = manifest.pools.find(
-        (p) => p.franchiseId === subject.franchiseId && p.eraId === subject.eraId,
-      );
-      if (entry) void getPool(entry).catch(() => {});
+        const entry = manifest.pools.find((p) => p.franchiseId === subject.franchiseId && p.eraId === subject.eraId);
+        if (entry)
+            void getPool(entry).catch(() => { });
     }
     closePicker();
-  }
-  function openPicker(player: IndexRow) {
+}
+function openPicker(player: IndexRow) {
     pickerTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     pickerFallbackId = pickerTrigger?.closest<HTMLElement>('[id^="court-slot-"]')?.id ?? null;
     pickerPlayer = player;
-  }
-  function closePicker() {
-    if (!mounted) return;
+}
+function closePicker() {
+    if (!mounted)
+        return;
     pickerPlayer = null;
     const trigger = pickerTrigger;
     const fallback = pickerFallbackId;
     pickerTrigger = null;
     pickerFallbackId = null;
     queueMicrotask(() => {
-      if (!mounted) return;
-      if (trigger?.isConnected) {
-        trigger.focus();
-      } else if (fallback) {
-        document.getElementById(fallback)?.focus();
-      }
+        if (!mounted)
+            return;
+        if (trigger?.isConnected) {
+            trigger.focus();
+        }
+        else if (fallback) {
+            document.getElementById(fallback)?.focus();
+        }
     });
-  }
-  function removePlayer(slotIndex: number) {
+}
+function removePlayer(slotIndex: number) {
     slots[slotIndex] = null;
     queueMicrotask(() => document.getElementById(`court-slot-${String(slotIndex)}`)?.focus());
-  }
-  const pickedCount = $derived(slots.filter((p) => p !== null).length);
-  const lineupIsLegal = $derived.by(() => {
-    if (slots.some((p) => p === null)) return false;
+}
+const pickedCount = $derived(slots.filter((p) => p !== null).length);
+const lineupIsLegal = $derived.by(() => {
+    if (slots.some((p) => p === null))
+        return false;
     return validateLineup({
-      structure: [...LINEUP_STRUCTURE],
-      assignments: slots.map((player, slotIndex) => ({
-        slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4,
-        playerId: player!.playerId,
-        positions: player!.positionsPlayable,
-      })),
+        structure: [...LINEUP_STRUCTURE],
+        assignments: slots.map((player, slotIndex) => ({
+            slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4,
+            playerId: player!.playerId,
+            positions: player!.positionsPlayable,
+        })),
     }).ok;
-  });
-  const ready = $derived(lineupIsLegal && manifest !== null && index !== null);
-  async function resolveRefsToPlayers(refs: SlotRef[]): Promise<PeakPlayerSeason[]> {
+});
+const ready = $derived(lineupIsLegal && manifest !== null && index !== null);
+async function resolveRefsToPlayers(refs: SlotRef[]): Promise<PeakPlayerSeason[]> {
     const m = manifest;
-    if (!m) throw new Error('The manifest is unavailable.');
+    if (!m)
+        throw new Error('The manifest is unavailable.');
     return resolvePlayerRefs(refs, m);
-  }
-  async function play82() {
-    if (!ready || !index || !manifest) return;
+}
+async function play82() {
+    if (!ready || !index || !manifest)
+        return;
     starting = true;
     runError = null;
     try {
-      const picked = slots.filter((p): p is IndexRow => p !== null);
-      const refs = picked.map((p) => ({
-        playerId: p.playerId,
-        franchiseId: p.franchiseId,
-        eraId: p.eraId,
-      }));
-      const resolved = await resolveRefsToPlayers(refs);
-      if (!mounted) return;
-      await startSandboxRun(resolved, generateSeed());
-      if (!mounted) return;
-    } catch (e) {
-      if (!mounted) return;
-      runError = e instanceof Error ? e.message : String(e);
-      starting = false;
+        const picked = slots.filter((p): p is IndexRow => p !== null);
+        const refs = picked.map((p) => ({
+            playerId: p.playerId,
+            franchiseId: p.franchiseId,
+            eraId: p.eraId,
+        }));
+        const resolved = await resolveRefsToPlayers(refs);
+        if (!mounted)
+            return;
+        await startSandboxRun(resolved, generateSeed());
+        if (!mounted)
+            return;
     }
-  }
+    catch (e) {
+        if (!mounted)
+            return;
+        runError = e instanceof Error ? e.message : String(e);
+        starting = false;
+    }
+}
 </script>
 
 <svelte:head>

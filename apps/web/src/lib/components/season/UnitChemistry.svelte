@@ -1,39 +1,23 @@
-<script lang="ts">
-  import type { SeasonEffectsState, SeasonRoster } from '@hoop-rush/data-contracts';
-  import type { SeasonRunShellData } from '$lib/season/season-shell-context';
-  import {
-    activeLineupChemistryBp,
-    strongestAndWeakestPairs,
-  } from '$lib/season/season-effects-view';
-  let {
-    roster,
-    effects,
-    shell,
-  }: {
+<script lang="ts">import type { SeasonEffectsState, SeasonRoster } from '@hoop-rush/data-contracts';
+import type { SeasonRunShellData } from '$lib/season/season-shell-context';
+import { activeLineupChemistryBp, strongestAndWeakestPairs, } from '$lib/season/season-effects-view';
+let { roster, effects, shell, }: {
     roster: SeasonRoster;
     effects: SeasonEffectsState | null;
     shell: SeasonRunShellData;
-  } = $props();
-  const rosterVersions = $derived(roster.players.map((entry) => entry.playerVersionId));
-  const pendingUnit = $derived(shell.editor?.rows() ?? []);
-  const pendingStarters = $derived(
-    pendingUnit
-      .filter((row) => row.role.startsWith('Starter'))
-      .map((row) => row.member.playerVersionId),
-  );
-  const pendingStartersFive = $derived(
-    pendingStarters.length === 5 ? pendingStarters : rosterVersions.slice(0, 5),
-  );
-  const lineupChemistry = $derived(
-    effects === null ? null : activeLineupChemistryBp(effects, pendingStartersFive),
-  );
-  const pairs = $derived(
-    effects === null ? null : strongestAndWeakestPairs(effects, rosterVersions),
-  );
-  function nameOf(playerVersionId: string): string {
+} = $props();
+const rosterVersions = $derived(roster.players.map((entry) => entry.playerVersionId));
+const pendingUnit = $derived(shell.editor?.rows() ?? []);
+const pendingStarters = $derived(pendingUnit
+    .filter((row) => row.role.startsWith('Starter'))
+    .map((row) => row.member.playerVersionId));
+const pendingStartersFive = $derived(pendingStarters.length === 5 ? pendingStarters : rosterVersions.slice(0, 5));
+const lineupChemistry = $derived(effects === null ? null : activeLineupChemistryBp(effects, pendingStartersFive));
+const pairs = $derived(effects === null ? null : strongestAndWeakestPairs(effects, rosterVersions));
+function nameOf(playerVersionId: string): string {
     const entry = roster.players.find((p) => p.playerVersionId === playerVersionId);
     return entry?.displayName ?? playerVersionId;
-  }
+}
 </script>
 
 {#if effects !== null}

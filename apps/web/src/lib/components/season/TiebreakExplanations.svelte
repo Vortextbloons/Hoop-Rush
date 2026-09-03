@@ -1,37 +1,32 @@
-<script lang="ts">
-  import type { SeasonTiebreakResolution } from '@hoop-rush/data-contracts';
-  import { tiebreakResolutionViewModel } from '$lib/season/season-postseason-presentation';
-  let {
-    resolutions,
-    franchiseName,
-    conference = null,
-  }: {
+<script lang="ts">import type { SeasonTiebreakResolution } from '@hoop-rush/data-contracts';
+import { tiebreakResolutionViewModel } from '$lib/season/season-postseason-presentation';
+let { resolutions, franchiseName, conference = null, }: {
     resolutions: readonly SeasonTiebreakResolution[];
     franchiseName: (franchiseId: string) => string;
     conference?: 'east' | 'west' | null;
-  } = $props();
-  const groups = $derived.by(() => {
+} = $props();
+const groups = $derived.by(() => {
     const east = resolutions.filter((resolution) => resolution.conference === 'east');
     const west = resolutions.filter((resolution) => resolution.conference === 'west');
     const sections: Array<{
-      conference: 'east' | 'west';
-      entries: ReturnType<typeof tiebreakResolutionViewModel>[];
+        conference: 'east' | 'west';
+        entries: ReturnType<typeof tiebreakResolutionViewModel>[];
     }> = [];
     if (conference === null || conference === 'east') {
-      sections.push({
-        conference: 'east',
-        entries: east.map((resolution) => tiebreakResolutionViewModel(resolution, franchiseName)),
-      });
+        sections.push({
+            conference: 'east',
+            entries: east.map((resolution) => tiebreakResolutionViewModel(resolution, franchiseName)),
+        });
     }
     if (conference === null || conference === 'west') {
-      sections.push({
-        conference: 'west',
-        entries: west.map((resolution) => tiebreakResolutionViewModel(resolution, franchiseName)),
-      });
+        sections.push({
+            conference: 'west',
+            entries: west.map((resolution) => tiebreakResolutionViewModel(resolution, franchiseName)),
+        });
     }
     return sections;
-  });
-  const total = $derived(resolutions.length);
+});
+const total = $derived(resolutions.length);
 </script>
 
 <section

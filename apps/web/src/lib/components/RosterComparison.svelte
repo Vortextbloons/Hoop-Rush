@@ -1,21 +1,12 @@
-<script lang="ts">
-  import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-  import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
-  import type { RosterDetailRow } from '$lib/roster-browser';
-  import { formatPositions } from '$lib/player-positions';
-  import { oneDecimal, percentOneDecimal } from '$lib/format';
-  import { X } from '@lucide/svelte';
-  import { Dialog } from 'bits-ui';
-  import PlayerFace from './PlayerFace.svelte';
-  let {
-    selected,
-    manifest,
-    franchiseName,
-    eraLabel,
-    oncompare,
-    onremove,
-    onclear,
-  }: {
+<script lang="ts">import type { HoopRushManifest } from '@hoop-rush/data-contracts';
+import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
+import type { RosterDetailRow } from '$lib/roster-browser';
+import { formatPositions } from '$lib/player-positions';
+import { oneDecimal, percentOneDecimal } from '$lib/format';
+import { X } from '@lucide/svelte';
+import { Dialog } from 'bits-ui';
+import PlayerFace from './PlayerFace.svelte';
+let { selected, manifest, franchiseName, eraLabel, oncompare, onremove, onclear, }: {
     selected: RosterDetailRow[];
     manifest: HoopRushManifest;
     franchiseName: Map<string, string>;
@@ -23,97 +14,94 @@
     oncompare: (player: RosterDetailRow) => void;
     onremove: (playerId: string) => void;
     onclear: () => void;
-  } = $props();
-  let open = $state(false);
-  let compareButton = $state<HTMLButtonElement | undefined>(undefined);
-  let lastTrigger = $state<HTMLElement | null>(null);
-  const ready = $derived(selected.length === 2);
-  function selectionKey(player: RosterDetailRow): string {
+} = $props();
+let open = $state(false);
+let compareButton = $state<HTMLButtonElement | undefined>(undefined);
+let lastTrigger = $state<HTMLElement | null>(null);
+const ready = $derived(selected.length === 2);
+function selectionKey(player: RosterDetailRow): string {
     return `${player.franchiseId}/${player.eraId}/${player.playerId}`;
-  }
-  function openComparison() {
+}
+function openComparison() {
     lastTrigger =
-      document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : (compareButton ?? null);
+        document.activeElement instanceof HTMLElement
+            ? document.activeElement
+            : (compareButton ?? null);
     open = true;
-  }
-  function restoreFocus() {
+}
+function restoreFocus() {
     const target = lastTrigger ?? compareButton;
     lastTrigger = null;
     queueMicrotask(() => target?.focus());
-  }
-  function displayName(player: RosterDetailRow): string {
+}
+function displayName(player: RosterDetailRow): string {
     return player.displayName || `${player.firstName} ${player.lastName}`;
-  }
-  function isSelected(player: RosterDetailRow): boolean {
+}
+function isSelected(player: RosterDetailRow): boolean {
     return selected.some((entry) => entry.playerId === player.playerId);
-  }
-  function teamLabelFor(player: RosterDetailRow): string {
+}
+function teamLabelFor(player: RosterDetailRow): string {
     const identity = resolveEraTeamIdentity(manifest, player.franchiseId, player.eraId);
     return identity.abbreviationLabel ?? franchiseAbbreviation(player.franchiseId);
-  }
-  function teamNameFor(player: RosterDetailRow): string {
+}
+function teamNameFor(player: RosterDetailRow): string {
     const identity = resolveEraTeamIdentity(manifest, player.franchiseId, player.eraId);
     return identity.displayLabel ?? franchiseName.get(player.franchiseId) ?? player.franchiseId;
-  }
-  function optional(value: number | null | undefined, digits = 1): string {
+}
+function optional(value: number | null | undefined, digits = 1): string {
     return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(digits) : '—';
-  }
-  function ratio(made: number | null, attempted: number | null): string {
-    if (made === null || attempted === null || attempted <= 0) return '—';
+}
+function ratio(made: number | null, attempted: number | null): string {
+    if (made === null || attempted === null || attempted <= 0)
+        return '—';
     return percentOneDecimal(made / attempted);
-  }
-  function perGame(
-    player: RosterDetailRow,
-    key: 'minutes' | 'points' | 'rebounds' | 'assists' | 'steals' | 'blocks',
-  ): string {
+}
+function perGame(player: RosterDetailRow, key: 'minutes' | 'points' | 'rebounds' | 'assists' | 'steals' | 'blocks'): string {
     const value = player.stats[key];
-    if (typeof value !== 'number' || player.stats.gamesPlayed <= 0) return '—';
+    if (typeof value !== 'number' || player.stats.gamesPlayed <= 0)
+        return '—';
     return oneDecimal(value / player.stats.gamesPlayed);
-  }
-  function countValue(
-    player: RosterDetailRow,
-    key: 'minutes' | 'points' | 'rebounds' | 'assists' | 'steals' | 'blocks',
-  ): string {
+}
+function countValue(player: RosterDetailRow, key: 'minutes' | 'points' | 'rebounds' | 'assists' | 'steals' | 'blocks'): string {
     const value = player.stats[key];
-    if (typeof value !== 'number') return '—';
+    if (typeof value !== 'number')
+        return '—';
     return `${value.toLocaleString()} (${perGame(player, key)}/g)`;
-  }
-  function metricValue(player: RosterDetailRow, metric: string): string {
+}
+function metricValue(player: RosterDetailRow, metric: string): string {
     const stats = player.stats;
     switch (metric) {
-      case 'Games':
-        return stats.gamesPlayed.toLocaleString();
-      case 'Minutes':
-        return countValue(player, 'minutes');
-      case 'Points':
-        return countValue(player, 'points');
-      case 'Rebounds':
-        return countValue(player, 'rebounds');
-      case 'Assists':
-        return countValue(player, 'assists');
-      case 'Steals':
-        return countValue(player, 'steals');
-      case 'Blocks':
-        return countValue(player, 'blocks');
-      case 'FG%':
-        return ratio(stats.fieldGoalsMade, stats.fieldGoalsAttempted);
-      case '3P%':
-        return ratio(stats.threesMade, stats.threesAttempted);
-      case 'FT%':
-        return ratio(stats.freeThrowsMade, stats.freeThrowsAttempted);
-      case 'TS%':
-        return stats.tsPct === null ? '—' : percentOneDecimal(stats.tsPct);
-      case 'PER':
-        return optional(stats.per);
-      case 'Usage':
-        return stats.usageRate === null ? '—' : percentOneDecimal(stats.usageRate);
-      default:
-        return '—';
+        case 'Games':
+            return stats.gamesPlayed.toLocaleString();
+        case 'Minutes':
+            return countValue(player, 'minutes');
+        case 'Points':
+            return countValue(player, 'points');
+        case 'Rebounds':
+            return countValue(player, 'rebounds');
+        case 'Assists':
+            return countValue(player, 'assists');
+        case 'Steals':
+            return countValue(player, 'steals');
+        case 'Blocks':
+            return countValue(player, 'blocks');
+        case 'FG%':
+            return ratio(stats.fieldGoalsMade, stats.fieldGoalsAttempted);
+        case '3P%':
+            return ratio(stats.threesMade, stats.threesAttempted);
+        case 'FT%':
+            return ratio(stats.freeThrowsMade, stats.freeThrowsAttempted);
+        case 'TS%':
+            return stats.tsPct === null ? '—' : percentOneDecimal(stats.tsPct);
+        case 'PER':
+            return optional(stats.per);
+        case 'Usage':
+            return stats.usageRate === null ? '—' : percentOneDecimal(stats.usageRate);
+        default:
+            return '—';
     }
-  }
-  const metrics = [
+}
+const metrics = [
     'Games',
     'Minutes',
     'Points',
@@ -127,7 +115,7 @@
     'TS%',
     'PER',
     'Usage',
-  ];
+];
 </script>
 
 {#if selected.length > 0}

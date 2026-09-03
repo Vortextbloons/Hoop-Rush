@@ -1,59 +1,49 @@
-<script lang="ts">
-  import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-  import SeasonPlayerStatsMobileList from '$lib/components/season/SeasonPlayerStatsMobileList.svelte';
-  import SeasonPlayerStatsTable from '$lib/components/season/SeasonPlayerStatsTable.svelte';
-  import type {
-    SeasonPlayerStatsMeasure,
-    SeasonPlayerStatsSortKey,
-    SeasonPlayerStatsView,
-  } from '$lib/season/season-player-stats-view';
-  import type { SeasonRunShellData } from '$lib/season/season-shell-context';
-  let {
-    view,
-    manifest,
-    shell,
-    embedded = false,
-  }: {
+<script lang="ts">import type { HoopRushManifest } from '@hoop-rush/data-contracts';
+import SeasonPlayerStatsMobileList from '$lib/components/season/SeasonPlayerStatsMobileList.svelte';
+import SeasonPlayerStatsTable from '$lib/components/season/SeasonPlayerStatsTable.svelte';
+import type { SeasonPlayerStatsMeasure, SeasonPlayerStatsSortKey, SeasonPlayerStatsView, } from '$lib/season/season-player-stats-view';
+import type { SeasonRunShellData } from '$lib/season/season-shell-context';
+let { view, manifest, shell, embedded = false, }: {
     view: SeasonPlayerStatsView;
     manifest: HoopRushManifest;
     shell: SeasonRunShellData;
     embedded?: boolean;
-  } = $props();
-  let measure = $state<SeasonPlayerStatsMeasure>('perGame');
-  let sortKey = $state<SeasonPlayerStatsSortKey>('pointsPerGame');
-  let sortDir = $state<'asc' | 'desc'>('desc');
-  function toggleSort(key: SeasonPlayerStatsSortKey): void {
+} = $props();
+let measure = $state<SeasonPlayerStatsMeasure>('perGame');
+let sortKey = $state<SeasonPlayerStatsSortKey>('pointsPerGame');
+let sortDir = $state<'asc' | 'desc'>('desc');
+function toggleSort(key: SeasonPlayerStatsSortKey): void {
     if (key === sortKey) {
-      sortDir = sortDir === 'desc' ? 'asc' : 'desc';
-    } else {
-      sortKey = key;
-      sortDir = key === 'displayName' ? 'asc' : 'desc';
+        sortDir = sortDir === 'desc' ? 'asc' : 'desc';
     }
-  }
-  const sortedRows = $derived.by(() => {
+    else {
+        sortKey = key;
+        sortDir = key === 'displayName' ? 'asc' : 'desc';
+    }
+}
+const sortedRows = $derived.by(() => {
     const rows = [...view.rows];
     const dir = sortDir === 'desc' ? -1 : 1;
     rows.sort((a, b) => {
-      const av = sortValueOf(a, sortKey);
-      const bv = sortValueOf(b, sortKey);
-      if (av === bv) return a.displayName.localeCompare(b.displayName);
-      if (typeof av === 'string' || typeof bv === 'string') {
-        return String(av).localeCompare(String(bv)) * dir;
-      }
-      return (av - bv) * dir;
+        const av = sortValueOf(a, sortKey);
+        const bv = sortValueOf(b, sortKey);
+        if (av === bv)
+            return a.displayName.localeCompare(b.displayName);
+        if (typeof av === 'string' || typeof bv === 'string') {
+            return String(av).localeCompare(String(bv)) * dir;
+        }
+        return (av - bv) * dir;
     });
     return rows;
-  });
-  function sortValueOf(
-    row: SeasonPlayerStatsView['rows'][number],
-    key: SeasonPlayerStatsSortKey,
-  ): number | string {
-    if (key === 'displayName') return row.displayName;
+});
+function sortValueOf(row: SeasonPlayerStatsView['rows'][number], key: SeasonPlayerStatsSortKey): number | string {
+    if (key === 'displayName')
+        return row.displayName;
     const value = row[key];
     return value === null ? -1 : value;
-  }
-  const faceOf = (playerVersionId: string) => shell.facesByVersion.get(playerVersionId) ?? null;
-  const tableProps = $derived({
+}
+const faceOf = (playerVersionId: string) => shell.facesByVersion.get(playerVersionId) ?? null;
+const tableProps = $derived({
     rows: sortedRows,
     measure,
     sortKey,
@@ -61,7 +51,7 @@
     onSort: toggleSort,
     faceOf,
     manifest,
-  });
+});
 </script>
 
 <section

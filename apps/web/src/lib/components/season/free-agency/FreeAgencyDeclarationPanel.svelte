@@ -1,22 +1,7 @@
-<script lang="ts">
-  import type { SeasonFreeAgencyCandidate } from '@hoop-rush/data-contracts';
-  import type { DeclarationDraftTarget } from './free-agency-view';
-  import {
-    FREE_AGENCY_SIGNING_CAP,
-    FREE_AGENCY_SPEND_CAP,
-    ROLE_EXPECTATION_LABEL,
-  } from './free-agency-view';
-  let {
-    candidates,
-    targets,
-    balance,
-    seasonSpend,
-    signingCount,
-    failures = [],
-    busy = false,
-    onSubmit,
-    onSkip,
-  }: {
+<script lang="ts">import type { SeasonFreeAgencyCandidate } from '@hoop-rush/data-contracts';
+import type { DeclarationDraftTarget } from './free-agency-view';
+import { FREE_AGENCY_SIGNING_CAP, FREE_AGENCY_SPEND_CAP, ROLE_EXPECTATION_LABEL, } from './free-agency-view';
+let { candidates, targets, balance, seasonSpend, signingCount, failures = [], busy = false, onSubmit, onSkip, }: {
     candidates: readonly SeasonFreeAgencyCandidate[];
     targets: readonly DeclarationDraftTarget[];
     balance: number;
@@ -26,15 +11,11 @@
     busy?: boolean;
     onSubmit: () => void;
     onSkip: () => void;
-  } = $props();
-  const names = $derived(
-    new Map(
-      candidates.map((candidate) => [candidate.playerVersionId, candidate.displayName] as const),
-    ),
-  );
-  const committed = $derived(targets.reduce((sum, target) => sum + target.influence, 0));
-  const remainingBudget = $derived(FREE_AGENCY_SPEND_CAP - seasonSpend);
-  const atSigningCap = $derived(signingCount >= FREE_AGENCY_SIGNING_CAP);
+} = $props();
+const names = $derived(new Map(candidates.map((candidate) => [candidate.playerVersionId, candidate.displayName] as const)));
+const committed = $derived(targets.reduce((sum, target) => sum + target.influence, 0));
+const remainingBudget = $derived(FREE_AGENCY_SPEND_CAP - seasonSpend);
+const atSigningCap = $derived(signingCount >= FREE_AGENCY_SIGNING_CAP);
 </script>
 
 <section

@@ -1,100 +1,96 @@
-﻿<script lang="ts">
-  import { browser } from '$app/environment';
-  import { resolve } from '$app/paths';
-  import type { RouteId } from '$app/types';
-  import type { ClassicDraftState, HoopRushManifest } from '@hoop-rush/data-contracts';
-  import type { SeasonActiveRunIndex } from '@hoop-rush/data-contracts';
-  import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
-  import { getManifest, warmPlayersIndex } from '$lib/data';
-  import { challengeRepository } from '$lib/challenge-repo';
-  import { variantLabel } from '$lib/draft-presentation';
-  import SeasonTierBadge from '$lib/components/SeasonTierBadge.svelte';
-  import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persistence';
-  const sandboxHref = resolve('/sandbox');
-  const historyHref = resolve('/sandbox/history');
-  const road = Array.from({ length: 82 }, (_, i) => i);
-  const modes = [
+﻿<script lang="ts">import { browser } from '$app/environment';
+import { resolve } from '$app/paths';
+import type { RouteId } from '$app/types';
+import type { ClassicDraftState, HoopRushManifest } from '@hoop-rush/data-contracts';
+import type { SeasonActiveRunIndex } from '@hoop-rush/data-contracts';
+import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
+import { getManifest, warmPlayersIndex } from '$lib/data';
+import { challengeRepository } from '$lib/challenge-repo';
+import { variantLabel } from '$lib/draft-presentation';
+import SeasonTierBadge from '$lib/components/SeasonTierBadge.svelte';
+import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persistence';
+const sandboxHref = resolve('/sandbox');
+const historyHref = resolve('/sandbox/history');
+const road = Array.from({ length: 82 }, (_, i) => i);
+const modes = [
     {
-      code: '01',
-      name: 'Classic',
-      line: 'Five draft rounds. Each round rolls a franchise and an era. One franchise reroll and one era reroll, then live with the board. Ratings or Ball Knowledge.',
-      status: 'available',
-      cta: 'Start classic',
-      href: '/classic' as any,
+        code: '01',
+        name: 'Classic',
+        line: 'Five draft rounds. Each round rolls a franchise and an era. One franchise reroll and one era reroll, then live with the board. Ratings or Ball Knowledge.',
+        status: 'available',
+        cta: 'Start classic',
+        href: '/classic' as any,
     },
     {
-      code: '02',
-      name: 'Sandbox',
-      line: 'Draft any five peak seasons from any franchise and any era, then face all 30 teams on a fixed schedule.',
-      status: 'available',
-      cta: 'Start sandbox',
-      href: '/sandbox' as any,
+        code: '02',
+        name: 'Sandbox',
+        line: 'Draft any five peak seasons from any franchise and any era, then face all 30 teams on a fixed schedule.',
+        status: 'available',
+        cta: 'Start sandbox',
+        href: '/sandbox' as any,
     },
     {
-      code: '03',
-      name: 'Season Run',
-      line: 'Ten-round draft, a 30-team league, and nine season checkpoints. Roll your franchise, build your ten, and run the full 82-game regular season.',
-      status: 'available',
-      cta: 'Start season run',
-      href: '/season' as any,
+        code: '03',
+        name: 'Season Run',
+        line: 'Ten-round draft, a 30-team league, and nine season checkpoints. Roll your franchise, build your ten, and run the full 82-game regular season.',
+        status: 'available',
+        cta: 'Start season run',
+        href: '/season' as any,
     },
-  ] as const;
-  let manifest = $state<HoopRushManifest | null>(null);
-  let active = $state.raw<ActiveRunCheckpoint | null>(null);
-  let classicDraft = $state.raw<ClassicDraftState | null>(null);
-  let recent = $state.raw<CompletedRunIndex[]>([]);
-  let seasonRun = $state.raw<SeasonActiveRunIndex | null>(null);
-  function warmPlayersIndexDuringIdle(): void {
+] as const;
+let manifest = $state<HoopRushManifest | null>(null);
+let active = $state.raw<ActiveRunCheckpoint | null>(null);
+let classicDraft = $state.raw<ClassicDraftState | null>(null);
+let recent = $state.raw<CompletedRunIndex[]>([]);
+let seasonRun = $state.raw<SeasonActiveRunIndex | null>(null);
+function warmPlayersIndexDuringIdle(): void {
     const idle = window.requestIdleCallback;
     if (typeof idle === 'function') {
-      idle(() => warmPlayersIndex());
-    } else {
-      setTimeout(() => warmPlayersIndex(), 0);
+        idle(() => warmPlayersIndex());
     }
-  }
-  $effect(() => {
-    if (!browser) return;
+    else {
+        setTimeout(() => warmPlayersIndex(), 0);
+    }
+}
+$effect(() => {
+    if (!browser)
+        return;
     let cancelled = false;
-    getManifest().then(
-      (m) => {
-        if (!cancelled) manifest = m;
-      },
-      () => {},
-    );
+    getManifest().then((m) => {
+        if (!cancelled)
+            manifest = m;
+    }, () => { });
     Promise.all([
-      challengeRepository.loadActiveRunCheckpoint(),
-      challengeRepository.listCompletedRuns(),
-      challengeRepository.loadClassicDraft(),
-    ]).then(
-      ([activeCheckpoint, rows, savedDraft]) => {
-        if (cancelled) return;
+        challengeRepository.loadActiveRunCheckpoint(),
+        challengeRepository.listCompletedRuns(),
+        challengeRepository.loadClassicDraft(),
+    ]).then(([activeCheckpoint, rows, savedDraft]) => {
+        if (cancelled)
+            return;
         active = activeCheckpoint;
         recent = rows.slice(0, 3);
         classicDraft = savedDraft?.draft ?? null;
-      },
-      () => {},
-    );
+    }, () => { });
     import('$lib/season/season-repo')
-      .then(({ getSeasonRunRepository }) => getSeasonRunRepository())
-      .then((repo) => repo.loadActiveRunIndex())
-      .then((index) => {
-        if (!cancelled) seasonRun = index;
-      })
-      .catch(() => {});
+        .then(({ getSeasonRunRepository }) => getSeasonRunRepository())
+        .then((repo) => repo.loadActiveRunIndex())
+        .then((index) => {
+        if (!cancelled)
+            seasonRun = index;
+    })
+        .catch(() => { });
     warmPlayersIndexDuringIdle();
     return () => {
-      cancelled = true;
+        cancelled = true;
     };
-  });
-  function franchiseName(franchiseId: string): string {
-    return (
-      manifest?.modernFranchiseSlots.find((e) => e.franchiseId === franchiseId)?.displayName ??
-      franchiseId
-    );
-  }
-  function eraName(eraId: string): string {
+});
+function franchiseName(franchiseId: string): string {
+    return (manifest?.modernFranchiseSlots.find((e) => e.franchiseId === franchiseId)?.displayName ??
+        franchiseId);
+}
+function eraName(eraId: string): string {
     return manifest?.eras.find((e) => e.eraId === eraId)?.label ?? eraId;
-  }
+}
 </script>
 
 <section class="mx-auto w-full max-w-4xl px-4 pb-24 sm:px-6 md:pb-10">

@@ -1,160 +1,145 @@
-<script lang="ts">
-  import { browser } from '$app/environment';
-  import { resolve } from '$app/paths';
-  import { SvelteMap } from 'svelte/reactivity';
-  import type {
-    HoopRushManifest,
-    SeasonDraftCatalog,
-    SeasonGameSummary,
-  } from '@hoop-rush/data-contracts';
-  import { humanFranchiseIdOf } from '@hoop-rush/data-contracts';
-  import CheckpointRecap from '$lib/components/season/CheckpointRecap.svelte';
-  import {
-    loadSeasonDraftCatalog,
-    loadSeasonLeague,
-    loadSeasonSchedule,
-  } from '$lib/season/season-assets';
-  import { getManifest } from '$lib/data';
-  import { SeasonHubState } from '$lib/season/season-hub-state';
-  import type { SeasonRunSnapshot } from '@hoop-rush/persistence';
-  import { getSeasonBlockRunner, getSeasonRunRepository } from '$lib/season/season-repo';
-  import { boxScoreFromSummary, deriveBlockRecap, ordinal } from '$lib/season/season-presentation';
-  let manifest = $state<HoopRushManifest | null>(null);
-  let catalog = $state<SeasonDraftCatalog | null>(null);
-  let loadError: string | null = $state(null);
-  let hub = $state.raw<SeasonHubState | null>(null);
-  let blockSummaries = $state<SeasonGameSummary[]>([]);
-  let retainedGameIds = $state<string[]>([]);
-  let snapshot = $state<SeasonRunSnapshot | null>(null);
-  let openedBoxScores = $state.raw(new Set<string>());
-  function onBoxScoreToggle(event: Event, gameId: string) {
-    if (!(event.currentTarget instanceof HTMLDetailsElement)) return;
-    if (!event.currentTarget.open || openedBoxScores.has(gameId)) return;
+<script lang="ts">import { browser } from '$app/environment';
+import { resolve } from '$app/paths';
+import { SvelteMap } from 'svelte/reactivity';
+import type { HoopRushManifest, SeasonDraftCatalog, SeasonGameSummary, } from '@hoop-rush/data-contracts';
+import { humanFranchiseIdOf } from '@hoop-rush/data-contracts';
+import CheckpointRecap from '$lib/components/season/CheckpointRecap.svelte';
+import { loadSeasonDraftCatalog, loadSeasonLeague, loadSeasonSchedule, } from '$lib/season/season-assets';
+import { getManifest } from '$lib/data';
+import { SeasonHubState } from '$lib/season/season-hub-state';
+import type { SeasonRunSnapshot } from '@hoop-rush/persistence';
+import { getSeasonBlockRunner, getSeasonRunRepository } from '$lib/season/season-repo';
+import { boxScoreFromSummary, deriveBlockRecap, ordinal } from '$lib/season/season-presentation';
+let manifest = $state<HoopRushManifest | null>(null);
+let catalog = $state<SeasonDraftCatalog | null>(null);
+let loadError: string | null = $state(null);
+let hub = $state.raw<SeasonHubState | null>(null);
+let blockSummaries = $state<SeasonGameSummary[]>([]);
+let retainedGameIds = $state<string[]>([]);
+let snapshot = $state<SeasonRunSnapshot | null>(null);
+let openedBoxScores = $state.raw(new Set<string>());
+function onBoxScoreToggle(event: Event, gameId: string) {
+    if (!(event.currentTarget instanceof HTMLDetailsElement))
+        return;
+    if (!event.currentTarget.open || openedBoxScores.has(gameId))
+        return;
     openedBoxScores = new Set([...openedBoxScores, gameId]);
-  }
-  let boxScoreModule: Promise<typeof import('$lib/components/season/BoxScore.svelte')> | null =
-    null;
-  function loadBoxScore(): Promise<typeof import('$lib/components/season/BoxScore.svelte')> {
+}
+let boxScoreModule: Promise<typeof import('$lib/components/season/BoxScore.svelte')> | null = null;
+function loadBoxScore(): Promise<typeof import('$lib/components/season/BoxScore.svelte')> {
     boxScoreModule ??= import('$lib/components/season/BoxScore.svelte');
     return boxScoreModule;
-  }
-  $effect(() => {
-    if (!browser) return;
+}
+$effect(() => {
+    if (!browser)
+        return;
     let cancelled = false;
     Promise.all([
-      getManifest(),
-      loadSeasonLeague(),
-      loadSeasonDraftCatalog(),
-      loadSeasonSchedule(),
-    ]).then(
-      async ([m, , cat, seasonSchedule]) => {
-        if (cancelled) return;
+        getManifest(),
+        loadSeasonLeague(),
+        loadSeasonDraftCatalog(),
+        loadSeasonSchedule(),
+    ]).then(async ([m, , cat, seasonSchedule]) => {
+        if (cancelled)
+            return;
         manifest = m;
         catalog = cat;
         try {
-          const [repo, runner] = await Promise.all([
-            getSeasonRunRepository(seasonSchedule),
-            getSeasonBlockRunner(),
-          ]);
-          if (cancelled) return;
-          hub = new SeasonHubState(repo, runner);
-          hub.subscribe(() => {
-            snapshot = hub!.snapshot;
-          });
-          await hub.refresh();
-          const s = hub.snapshot;
-          const last = s?.acceptedBlocks[s.acceptedBlocks.length - 1];
-          if (s && last) {
-            const [summaries, details] = await Promise.all([
-              hub.loadBlockSummaries(s.run.runId, last.blockIndex),
-              hub.loadRetainedDetails(s.run.runId),
+            const [repo, runner] = await Promise.all([
+                getSeasonRunRepository(seasonSchedule),
+                getSeasonBlockRunner(),
             ]);
-            blockSummaries = summaries;
-            retainedGameIds = details
-              .filter(
-                (detail) =>
-                  detail.round > last.blockIndex * 10 &&
-                  detail.round <= (last.blockIndex === 8 ? 82 : (last.blockIndex + 1) * 10),
-              )
-              .map((detail) => detail.gameId);
-          }
-        } catch (error) {
-          if (!cancelled) loadError = error instanceof Error ? error.message : String(error);
+            if (cancelled)
+                return;
+            hub = new SeasonHubState(repo, runner);
+            hub.subscribe(() => {
+                snapshot = hub!.snapshot;
+            });
+            await hub.refresh();
+            const s = hub.snapshot;
+            const last = s?.acceptedBlocks[s.acceptedBlocks.length - 1];
+            if (s && last) {
+                const [summaries, details] = await Promise.all([
+                    hub.loadBlockSummaries(s.run.runId, last.blockIndex),
+                    hub.loadRetainedDetails(s.run.runId),
+                ]);
+                blockSummaries = summaries;
+                retainedGameIds = details
+                    .filter((detail) => detail.round > last.blockIndex * 10 &&
+                    detail.round <= (last.blockIndex === 8 ? 82 : (last.blockIndex + 1) * 10))
+                    .map((detail) => detail.gameId);
+            }
         }
-      },
-      (error: unknown) => {
-        if (!cancelled) loadError = error instanceof Error ? error.message : String(error);
-      },
-    );
+        catch (error) {
+            if (!cancelled)
+                loadError = error instanceof Error ? error.message : String(error);
+        }
+    }, (error: unknown) => {
+        if (!cancelled)
+            loadError = error instanceof Error ? error.message : String(error);
+    });
     return () => {
-      cancelled = true;
-      hub?.destroy();
-      hub = null;
+        cancelled = true;
+        hub?.destroy();
+        hub = null;
     };
-  });
-  const run = $derived(snapshot?.run ?? null);
-  const humanFranchiseId = $derived(run ? humanFranchiseIdOf(run.league) : null);
-  const lastBlock = $derived(
-    snapshot && snapshot.acceptedBlocks.length > 0
-      ? snapshot.acceptedBlocks[snapshot.acceptedBlocks.length - 1]!
-      : null,
-  );
-  const humanGames = $derived(
-    blockSummaries.filter(
-      (summary) =>
-        summary.homeFranchiseId === humanFranchiseId ||
-        summary.awayFranchiseId === humanFranchiseId,
-    ),
-  );
-  const playerNames = $derived.by(() => {
+});
+const run = $derived(snapshot?.run ?? null);
+const humanFranchiseId = $derived(run ? humanFranchiseIdOf(run.league) : null);
+const lastBlock = $derived(snapshot && snapshot.acceptedBlocks.length > 0
+    ? snapshot.acceptedBlocks[snapshot.acceptedBlocks.length - 1]!
+    : null);
+const humanGames = $derived(blockSummaries.filter((summary) => summary.homeFranchiseId === humanFranchiseId ||
+    summary.awayFranchiseId === humanFranchiseId));
+const playerNames = $derived.by(() => {
     const map = new SvelteMap<string, string>();
     for (const roster of run?.rosters ?? []) {
-      for (const entry of roster.players) map.set(entry.playerVersionId, entry.displayName);
+        for (const entry of roster.players)
+            map.set(entry.playerVersionId, entry.displayName);
     }
     return map;
-  });
-  const playerPlayable = $derived.by(() => {
+});
+const playerPlayable = $derived.by(() => {
     const map = new SvelteMap<string, string[]>();
     for (const candidate of catalog?.candidates ?? []) {
-      map.set(candidate.playerVersionId, candidate.positions.playable);
+        map.set(candidate.playerVersionId, candidate.positions.playable);
     }
     return map;
-  });
-  const playerName = (playerVersionId: string): string =>
-    playerNames.get(playerVersionId) ?? playerVersionId;
-  const franchiseName = (franchiseId: string): string =>
-    manifest?.modernFranchiseSlots.find((slot) => slot.franchiseId === franchiseId)?.displayName ??
+});
+const playerName = (playerVersionId: string): string => playerNames.get(playerVersionId) ?? playerVersionId;
+const franchiseName = (franchiseId: string): string => manifest?.modernFranchiseSlots.find((slot) => slot.franchiseId === franchiseId)?.displayName ??
     franchiseId;
-  const recap = $derived.by(() => {
-    if (!run || !humanFranchiseId || !lastBlock || !snapshot) return null;
+const recap = $derived.by(() => {
+    if (!run || !humanFranchiseId || !lastBlock || !snapshot)
+        return null;
     return deriveBlockRecap({
-      runId: run.runId,
-      blockIndex: lastBlock.blockIndex,
-      completedRounds: lastBlock.completedRounds,
-      standings: run.standings,
-      league: run.league,
-      blockSummaries,
-      allSummaries: snapshot.summaries,
-      rosters: run.rosters.flatMap((roster) => roster.players),
-      games: run.games,
-      humanFranchiseId,
-      run,
+        runId: run.runId,
+        blockIndex: lastBlock.blockIndex,
+        completedRounds: lastBlock.completedRounds,
+        standings: run.standings,
+        league: run.league,
+        blockSummaries,
+        allSummaries: snapshot.summaries,
+        rosters: run.rosters.flatMap((roster) => roster.players),
+        games: run.games,
+        humanFranchiseId,
+        run,
     });
-  });
-  function boxFor(summary: SeasonGameSummary) {
-    if (!humanFranchiseId) return null;
+});
+function boxFor(summary: SeasonGameSummary) {
+    if (!humanFranchiseId)
+        return null;
     return boxScoreFromSummary(summary, humanFranchiseId, playerNames, playerPlayable);
-  }
-  function resultLabel(summary: SeasonGameSummary): string {
+}
+function resultLabel(summary: SeasonGameSummary): string {
     if (summary.status === 'forfeit') {
-      return summary.forfeitLoserFranchiseId === humanFranchiseId ? 'L · forfeit' : 'W · forfeit';
+        return summary.forfeitLoserFranchiseId === humanFranchiseId ? 'L · forfeit' : 'W · forfeit';
     }
-    const won =
-      summary.homeFranchiseId === humanFranchiseId
+    const won = summary.homeFranchiseId === humanFranchiseId
         ? summary.homeScore > summary.awayScore
         : summary.awayScore > summary.homeScore;
     return won ? 'W' : 'L';
-  }
+}
 </script>
 
 <svelte:head>

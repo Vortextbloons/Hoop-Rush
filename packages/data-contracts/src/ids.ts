@@ -1,9 +1,9 @@
 import { z } from 'zod';
 const id = z
-  .string()
-  .min(1)
-  .max(64)
-  .regex(/^[a-z0-9][a-z0-9._:-]*$/);
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z0-9][a-z0-9._:-]*$/);
 export const idSchema = id;
 export type Id = z.infer<typeof idSchema>;
 export const commandIdSchema = id;

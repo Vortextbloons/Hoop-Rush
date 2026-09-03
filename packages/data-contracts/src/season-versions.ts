@@ -5,19 +5,16 @@ export const SEASON_ROOM_PROTOCOL_SCHEMA_VERSION = 2;
 export const SEASON_ROOM_PROTOCOL_SCHEMA_VERSION_V1 = 1;
 export const SEASON_MULTIPLAYER_VERSION = 'season-multiplayer-v2';
 export const SEASON_MULTIPLAYER_VERSION_V1 = 'season-multiplayer-v1';
-
 export function isSeasonRoomProtocolOutdated(row: {
-  multiplayerVersion?: string | null;
-  roomProtocolVersion?: number | string | null;
-  multiplayer_version?: string | null;
-  room_protocol_version?: number | string | null;
+    multiplayerVersion?: string | null;
+    roomProtocolVersion?: number | string | null;
+    multiplayer_version?: string | null;
+    room_protocol_version?: number | string | null;
 }): boolean {
-  const multiplayerVersion = row.multiplayerVersion ?? row.multiplayer_version;
-  const roomProtocolVersion = row.roomProtocolVersion ?? row.room_protocol_version;
-  return (
-    multiplayerVersion !== SEASON_MULTIPLAYER_VERSION ||
-    Number(roomProtocolVersion) !== SEASON_ROOM_PROTOCOL_SCHEMA_VERSION
-  );
+    const multiplayerVersion = row.multiplayerVersion ?? row.multiplayer_version;
+    const roomProtocolVersion = row.roomProtocolVersion ?? row.room_protocol_version;
+    return (multiplayerVersion !== SEASON_MULTIPLAYER_VERSION ||
+        Number(roomProtocolVersion) !== SEASON_ROOM_PROTOCOL_SCHEMA_VERSION);
 }
 export const SEASON_TIMER_POLICY_VERSION = 'season-timers-v1';
 export const SEASON_AUTHORITY_VERSION = 'season-authority-v1';

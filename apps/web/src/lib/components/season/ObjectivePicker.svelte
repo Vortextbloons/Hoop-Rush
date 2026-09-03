@@ -1,25 +1,16 @@
-<script lang="ts">
-  import type { SeasonObjectiveId } from '@hoop-rush/data-contracts';
-  import type { ObjectiveChoiceViewModel } from '$lib/season/season-influence-view';
-  let {
-    blockIndex,
-    choices,
-    selectedObjectiveId,
-    busy = false,
-    onSelect,
-  }: {
+<script lang="ts">import type { SeasonObjectiveId } from '@hoop-rush/data-contracts';
+import type { ObjectiveChoiceViewModel } from '$lib/season/season-influence-view';
+let { blockIndex, choices, selectedObjectiveId, busy = false, onSelect, }: {
     blockIndex: number | null;
     choices: ObjectiveChoiceViewModel[];
     selectedObjectiveId: SeasonObjectiveId | null;
     busy?: boolean;
     onSelect: (objectiveId: SeasonObjectiveId) => void;
-  } = $props();
-  const finalBlock = $derived(blockIndex !== null && blockIndex >= 8);
-  const summary = $derived(
-    selectedObjectiveId !== null
-      ? `Objective selected for block ${String((blockIndex ?? 0) + 1)}`
-      : `Pick the block objective (${String(choices.length)} offered)`,
-  );
+} = $props();
+const finalBlock = $derived(blockIndex !== null && blockIndex >= 8);
+const summary = $derived(selectedObjectiveId !== null
+    ? `Objective selected for block ${String((blockIndex ?? 0) + 1)}`
+    : `Pick the block objective (${String(choices.length)} offered)`);
 </script>
 
 <section

@@ -4,155 +4,140 @@ import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.
 import { REPO_ROOT } from './data-loader.ts';
 import { UsageError } from '../args.ts';
 export const COMBINE_DOCS_OPTIONS: Record<string, boolean> = {
-  input: true,
-  output: true,
-  exceptions: true,
-  format: true,
+    input: true,
+    output: true,
+    exceptions: true,
+    format: true,
 };
 export const DEFAULT_DOCS_DIR = resolve(REPO_ROOT, 'Docs');
 export const DEFAULT_EXCEPTIONS_FILE = 'combine-exceptions.txt';
 export const DEFAULT_COMBINED_OUTPUT = 'combined.md';
 function toSlashPath(path: string): string {
-  return path.replaceAll('\\', '/');
+    return path.replaceAll('\\', '/');
 }
-export function rewriteLinksForRoot(
-  content: string,
-  sourceRelDir: string,
-  docsDir: string,
-): string {
-  const lines = content.split('\n');
-  let inFence = false;
-  const rewritten: string[] = [];
-  for (const line of lines) {
-    if (/^\s*(```+|~~~+)/.test(line)) {
-      inFence = !inFence;
-      rewritten.push(line);
-      continue;
-    }
-    if (inFence) {
-      rewritten.push(line);
-      continue;
-    }
-    const transformed = line.replace(
-      /\[([^\]]*)\]\(([^)]+)\)/g,
-      (_match, text: string | undefined, target: string | undefined) => {
-        if (text === undefined || target === undefined) return _match;
-        const hashIndex = target.indexOf('#');
-        const pathPart = hashIndex === -1 ? target : target.slice(0, hashIndex);
-        const fragment = hashIndex === -1 ? '' : target.slice(hashIndex);
-        if (pathPart === '' || /^(https?:|mailto:|#)/.test(pathPart)) {
-          return `[${text}](${target})`;
+export function rewriteLinksForRoot(content: string, sourceRelDir: string, docsDir: string): string {
+    const lines = content.split('\n');
+    let inFence = false;
+    const rewritten: string[] = [];
+    for (const line of lines) {
+        if (/^\s*(```+|~~~+)/.test(line)) {
+            inFence = !inFence;
+            rewritten.push(line);
+            continue;
         }
-        const abs = resolve(docsDir, sourceRelDir, pathPart);
-        const rewrittenLink = toSlashPath(relative(docsDir, abs));
-        return `[${text}](${rewrittenLink}${fragment})`;
-      },
-    );
-    rewritten.push(transformed);
-  }
-  return rewritten.join('\n');
+        if (inFence) {
+            rewritten.push(line);
+            continue;
+        }
+        const transformed = line.replace(/\[([^\]]*)\]\(([^)]+)\)/g, (_match, text: string | undefined, target: string | undefined) => {
+            if (text === undefined || target === undefined)
+                return _match;
+            const hashIndex = target.indexOf('#');
+            const pathPart = hashIndex === -1 ? target : target.slice(0, hashIndex);
+            const fragment = hashIndex === -1 ? '' : target.slice(hashIndex);
+            if (pathPart === '' || /^(https?:|mailto:|#)/.test(pathPart)) {
+                return `[${text}](${target})`;
+            }
+            const abs = resolve(docsDir, sourceRelDir, pathPart);
+            const rewrittenLink = toSlashPath(relative(docsDir, abs));
+            return `[${text}](${rewrittenLink}${fragment})`;
+        });
+        rewritten.push(transformed);
+    }
+    return rewritten.join('\n');
 }
 export function readExceptionList(path: string): string[] {
-  if (!existsSync(path)) return [];
-  return [
-    ...new Set(
-      readFileSync(path, 'utf8')
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter((line) => line.length > 0 && !line.startsWith('#'))
-        .map(toSlashPath),
-    ),
-  ];
+    if (!existsSync(path))
+        return [];
+    return [
+        ...new Set(readFileSync(path, 'utf8')
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0 && !line.startsWith('#'))
+            .map(toSlashPath)),
+    ];
 }
 function collectMarkdownFiles(dir: string): string[] {
-  const out: string[] = [];
-  const walk = (current: string): void => {
-    for (const entry of readdirSync(current, { withFileTypes: true })) {
-      const child = join(current, entry.name);
-      if (entry.isDirectory()) walk(child);
-      else if (entry.isFile() && entry.name.endsWith('.md')) out.push(child);
-    }
-  };
-  walk(dir);
-  return out;
+    const out: string[] = [];
+    const walk = (current: string): void => {
+        for (const entry of readdirSync(current, { withFileTypes: true })) {
+            const child = join(current, entry.name);
+            if (entry.isDirectory())
+                walk(child);
+            else if (entry.isFile() && entry.name.endsWith('.md'))
+                out.push(child);
+        }
+    };
+    walk(dir);
+    return out;
 }
 function isExcluded(relPath: string, exceptions: readonly string[]): boolean {
-  return exceptions.some((entry) => {
-    const normalized = entry.replace(/\/+$/, '');
-    return relPath === normalized || relPath.startsWith(`${normalized}/`);
-  });
+    return exceptions.some((entry) => {
+        const normalized = entry.replace(/\/+$/, '');
+        return relPath === normalized || relPath.startsWith(`${normalized}/`);
+    });
 }
 export function combineDocs(args: {
-  input?: string;
-  output?: string;
-  exceptions?: string;
+    input?: string;
+    output?: string;
+    exceptions?: string;
 }): CliReport {
-  const docsDir = resolve(args.input ?? DEFAULT_DOCS_DIR);
-  if (!existsSync(docsDir) || !statSync(docsDir).isDirectory()) {
-    throw new UsageError(`docs directory does not exist: ${docsDir}`);
-  }
-  const exceptionsPath = resolve(args.exceptions ?? join(docsDir, DEFAULT_EXCEPTIONS_FILE));
-  const outputPath = resolve(args.output ?? join(docsDir, DEFAULT_COMBINED_OUTPUT));
-  const exceptions = readExceptionList(exceptionsPath);
-  const outputRel = toSlashPath(relative(docsDir, outputPath));
-  if (!isAbsolute(outputRel) && !outputRel.startsWith('..')) exceptions.push(outputRel);
-  const uniqueExceptions = [...new Set(exceptions)];
-  const files = collectMarkdownFiles(docsDir)
-    .map((path) => ({ path, rel: toSlashPath(relative(docsDir, path)) }))
-    .filter(({ rel }) => !isExcluded(rel, uniqueExceptions))
-    .sort((a, b) => (a.rel < b.rel ? -1 : a.rel > b.rel ? 1 : 0));
-  if (files.length === 0) {
-    return makeReport(
-      'combine docs',
-      { input: docsDir, output: outputPath },
-      {
-        failures: ['no markdown files found (all were excluded or the directory is empty)'],
-        exitCode: EXIT_USAGE_OR_DATA_ERROR,
-      },
-    );
-  }
-  const sections = files.map(({ rel, path }) => {
-    const content = readFileSync(path, 'utf8').trimEnd();
-    const relDir = rel.includes('/') ? dirname(rel) : '.';
-    const rewritten = rewriteLinksForRoot(content, relDir, docsDir);
-    return `## ${rel}\n\n${rewritten}`;
-  });
-  const combined = [
-    '# Hoop Rush Docs — Combined',
-    '',
-    '> Auto-generated by `pnpm hoop-rush combine docs`. Edit the source files',
-    '> under their subfolders and regenerate; do not edit this file directly.',
-    '',
-    '## Contents',
-    '',
-    ...files.map(({ rel }) => `- \`${rel}\``),
-    '',
-    '---',
-    '',
-    sections.join('\n\n---\n\n'),
-    '',
-  ].join('\n');
-  try {
-    writeFileSync(outputPath, combined);
-  } catch (error) {
-    return makeReport(
-      'combine docs',
-      { input: docsDir, output: outputPath },
-      {
-        failures: [`cannot write ${outputPath}: ${(error as Error).message}`],
-        exitCode: EXIT_USAGE_OR_DATA_ERROR,
-      },
-    );
-  }
-  return makeReport(
-    'combine docs',
-    { input: docsDir, output: outputPath, exceptions: exceptionsPath },
-    {
-      details: [
-        `combined ${String(files.length)} markdown files into ${outputPath}`,
-        `exceptions file: ${exceptionsPath} (${String(uniqueExceptions.length)} entries)`,
-        `excluded: ${uniqueExceptions.join(', ') || '(none)'}`,
-      ],
-    },
-  );
+    const docsDir = resolve(args.input ?? DEFAULT_DOCS_DIR);
+    if (!existsSync(docsDir) || !statSync(docsDir).isDirectory()) {
+        throw new UsageError(`docs directory does not exist: ${docsDir}`);
+    }
+    const exceptionsPath = resolve(args.exceptions ?? join(docsDir, DEFAULT_EXCEPTIONS_FILE));
+    const outputPath = resolve(args.output ?? join(docsDir, DEFAULT_COMBINED_OUTPUT));
+    const exceptions = readExceptionList(exceptionsPath);
+    const outputRel = toSlashPath(relative(docsDir, outputPath));
+    if (!isAbsolute(outputRel) && !outputRel.startsWith('..'))
+        exceptions.push(outputRel);
+    const uniqueExceptions = [...new Set(exceptions)];
+    const files = collectMarkdownFiles(docsDir)
+        .map((path) => ({ path, rel: toSlashPath(relative(docsDir, path)) }))
+        .filter(({ rel }) => !isExcluded(rel, uniqueExceptions))
+        .sort((a, b) => (a.rel < b.rel ? -1 : a.rel > b.rel ? 1 : 0));
+    if (files.length === 0) {
+        return makeReport('combine docs', { input: docsDir, output: outputPath }, {
+            failures: ['no markdown files found (all were excluded or the directory is empty)'],
+            exitCode: EXIT_USAGE_OR_DATA_ERROR,
+        });
+    }
+    const sections = files.map(({ rel, path }) => {
+        const content = readFileSync(path, 'utf8').trimEnd();
+        const relDir = rel.includes('/') ? dirname(rel) : '.';
+        const rewritten = rewriteLinksForRoot(content, relDir, docsDir);
+        return `## ${rel}\n\n${rewritten}`;
+    });
+    const combined = [
+        '# Hoop Rush Docs — Combined',
+        '',
+        '> Auto-generated by `pnpm hoop-rush combine docs`. Edit the source files',
+        '> under their subfolders and regenerate; do not edit this file directly.',
+        '',
+        '## Contents',
+        '',
+        ...files.map(({ rel }) => `- \`${rel}\``),
+        '',
+        '---',
+        '',
+        sections.join('\n\n---\n\n'),
+        '',
+    ].join('\n');
+    try {
+        writeFileSync(outputPath, combined);
+    }
+    catch (error) {
+        return makeReport('combine docs', { input: docsDir, output: outputPath }, {
+            failures: [`cannot write ${outputPath}: ${(error as Error).message}`],
+            exitCode: EXIT_USAGE_OR_DATA_ERROR,
+        });
+    }
+    return makeReport('combine docs', { input: docsDir, output: outputPath, exceptions: exceptionsPath }, {
+        details: [
+            `combined ${String(files.length)} markdown files into ${outputPath}`,
+            `exceptions file: ${exceptionsPath} (${String(uniqueExceptions.length)} entries)`,
+            `excluded: ${uniqueExceptions.join(', ') || '(none)'}`,
+        ],
+    });
 }

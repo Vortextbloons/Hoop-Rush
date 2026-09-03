@@ -1,69 +1,58 @@
 <script
   lang="ts"
   generics="T extends Pick<PeakPlayerSeason, 'playerId' | 'displayName' | 'firstName' | 'lastName' | 'playerExternalId' | 'altIds'>"
->
-  import type { HoopRushManifest, PeakPlayerSeason } from '@hoop-rush/data-contracts';
-  import PlayerFace from './PlayerFace.svelte';
-  import { SLOT_LABELS, SLOT_INDEXES } from '$lib/player-positions';
-  const SLOT_POSITIONS = [
+    >
+;
+import type { HoopRushManifest, PeakPlayerSeason } from '@hoop-rush/data-contracts';
+import PlayerFace from './PlayerFace.svelte';
+import { SLOT_LABELS, SLOT_INDEXES } from '$lib/player-positions';
+const SLOT_POSITIONS = [
     { left: 50, top: 77 },
     { left: 22, top: 55 },
     { left: 78, top: 55 },
     { left: 34, top: 29 },
     { left: 66, top: 29 },
-  ] as const;
-  let {
-    slots,
-    manifest,
-    ready,
-    allowRemove = true,
-    onmove,
-    onremove,
-  }: {
+] as const;
+let { slots, manifest, ready, allowRemove = true, onmove, onremove, }: {
     slots: (T | null)[];
     manifest: HoopRushManifest;
     ready: boolean;
     allowRemove?: boolean;
     onmove: (player: T) => void;
     onremove: (index: number) => void;
-  } = $props();
-  const filledCount = $derived(slots.filter((p) => p !== null).length);
-  let announcement = $state('');
-  let previousSlots: (string | null)[] | null = null;
-  $effect(() => {
+} = $props();
+const filledCount = $derived(slots.filter((p) => p !== null).length);
+let announcement = $state('');
+let previousSlots: (string | null)[] | null = null;
+$effect(() => {
     const current = slots.map((player) => (player ? player.playerId : null));
     if (previousSlots === null) {
-      previousSlots = current;
-      return;
+        previousSlots = current;
+        return;
     }
-    const moved = current.findIndex(
-      (playerId, index) =>
-        playerId !== null &&
+    const moved = current.findIndex((playerId, index) => playerId !== null &&
         playerId !== previousSlots![index] &&
-        previousSlots!.includes(playerId),
-    );
+        previousSlots!.includes(playerId));
     if (moved >= 0) {
-      const playerId = current[moved]!;
-      const from = previousSlots.indexOf(playerId);
-      const player = slots[moved];
-      if (player && from >= 0) {
-        announcement = `Moved ${player.displayName} from ${SLOT_LABELS[from]} to ${SLOT_LABELS[moved]}.`;
-      }
-    } else {
-      const added = current.findIndex(
-        (playerId, index) => playerId !== null && previousSlots![index] === null,
-      );
-      const removed = previousSlots.findIndex(
-        (playerId, index) => playerId !== null && current[index] === null,
-      );
-      if (added >= 0 && slots[added]) {
-        announcement = `Placed ${slots[added]!.displayName} at ${SLOT_LABELS[added]}.`;
-      } else if (removed >= 0) {
-        announcement = `Removed player from ${SLOT_LABELS[removed]}.`;
-      }
+        const playerId = current[moved]!;
+        const from = previousSlots.indexOf(playerId);
+        const player = slots[moved];
+        if (player && from >= 0) {
+            announcement = `Moved ${player.displayName} from ${SLOT_LABELS[from]} to ${SLOT_LABELS[moved]}.`;
+        }
+    }
+    else {
+        const added = current.findIndex((playerId, index) => playerId !== null && previousSlots![index] === null);
+        const removed = previousSlots.findIndex((playerId, index) => playerId !== null && current[index] === null);
+        if (added >= 0 && slots[added]) {
+            announcement = `Placed ${slots[added]!.displayName} at ${SLOT_LABELS[added]}.`;
+        }
+        else if (removed >= 0) {
+            announcement = `Removed player from ${SLOT_LABELS[removed]}.`;
+        }
     }
     previousSlots = current;
-  });
+});
 </script>
 
 <div id="your-five" class="scroll-mt-4 px-0 sm:px-0">

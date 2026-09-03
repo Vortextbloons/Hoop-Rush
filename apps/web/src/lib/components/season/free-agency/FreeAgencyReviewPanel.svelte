@@ -1,21 +1,10 @@
-<script lang="ts">
-  import { ShieldCheck } from '@lucide/svelte';
-  import type { HoopRushManifest, SeasonFreeAgencyCandidate } from '@hoop-rush/data-contracts';
-  import type { SeasonFreeAgencyDeclaration } from '@hoop-rush/data-contracts';
-  import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
-  import type { SeasonFaceRef } from '$lib/season/season-branding';
-  import { ROLE_EXPECTATION_LABEL } from './free-agency-view';
-  let {
-    windowIndex,
-    declaration,
-    candidates,
-    manifest = null,
-    faceOf = null,
-    overallOf = null,
-    busy = false,
-    onSubmit,
-    onGoBackToMarket = null,
-  }: {
+<script lang="ts">import { ShieldCheck } from '@lucide/svelte';
+import type { HoopRushManifest, SeasonFreeAgencyCandidate } from '@hoop-rush/data-contracts';
+import type { SeasonFreeAgencyDeclaration } from '@hoop-rush/data-contracts';
+import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
+import type { SeasonFaceRef } from '$lib/season/season-branding';
+import { ROLE_EXPECTATION_LABEL } from './free-agency-view';
+let { windowIndex, declaration, candidates, manifest = null, faceOf = null, overallOf = null, busy = false, onSubmit, onGoBackToMarket = null, }: {
     windowIndex: number;
     declaration: SeasonFreeAgencyDeclaration;
     candidates: readonly SeasonFreeAgencyCandidate[];
@@ -25,13 +14,9 @@
     busy?: boolean;
     onSubmit: () => void;
     onGoBackToMarket?: (() => void) | null;
-  } = $props();
-  const skipped = $derived(declaration.targets.length === 0);
-  const names = $derived(
-    new Map(
-      candidates.map((candidate) => [candidate.playerVersionId, candidate.displayName] as const),
-    ),
-  );
+} = $props();
+const skipped = $derived(declaration.targets.length === 0);
+const names = $derived(new Map(candidates.map((candidate) => [candidate.playerVersionId, candidate.displayName] as const)));
 </script>
 
 <section
