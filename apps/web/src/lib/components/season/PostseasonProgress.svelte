@@ -1,17 +1,21 @@
-<script lang="ts">import type { HubPostseasonProgress } from '$lib/season/season-postseason-presentation';
-let { progress, onCancel, onRetry, label, }: {
+<script lang="ts">
+  import type { HubPostseasonProgress } from '$lib/season/season-postseason-presentation';
+  let {
+    progress,
+    onCancel,
+    onRetry,
+    label,
+  }: {
     progress: HubPostseasonProgress;
     onCancel: () => void;
     onRetry: () => void;
     label: string;
-} = $props();
-const percent = $derived(progress.gamesTotal > 0
-    ? Math.min(100, Math.round((progress.gamesCompleted / progress.gamesTotal) * 100))
-    : 0);
-const latest = $derived(progress.latestResult);
-const latestText = $derived(latest
-    ? `${latest.homeFranchiseId} ${String(latest.homeScore)} – ${String(latest.awayScore)} ${latest.awayFranchiseId}`
-    : '');
+  } = $props();
+  const percent = $derived(
+    progress.gamesTotal > 0
+      ? Math.min(100, Math.round((progress.gamesCompleted / progress.gamesTotal) * 100))
+      : 0,
+  );
 </script>
 
 {#if progress.phase === 'running' || progress.phase === 'cancelled' || progress.phase === 'failed' || progress.phase === 'complete'}
@@ -59,8 +63,6 @@ const latestText = $derived(latest
         ></div>
       </div>
     </div>
-
-
 
     {#if progress.phase === 'running'}
       <div class="mt-3 flex flex-wrap items-center gap-2">

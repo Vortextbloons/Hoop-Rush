@@ -1,17 +1,21 @@
-<script lang="ts">import type { BlockRunState } from '$lib/season/season-hub-state';
-let { block, onCancel, onRetry, label, }: {
+<script lang="ts">
+  import type { BlockRunState } from '$lib/season/season-hub-state';
+  let {
+    block,
+    onCancel,
+    onRetry,
+    label,
+  }: {
     block: BlockRunState;
     onCancel: () => void;
     onRetry: () => void;
     label: string;
-} = $props();
-const percent = $derived(block.gamesTotal > 0
-    ? Math.min(100, Math.round((block.gamesCompleted / block.gamesTotal) * 100))
-    : 0);
-const latest = $derived(block.latestResult);
-const latestText = $derived(latest
-    ? `${latest.homeFranchiseId} ${String(latest.homeScore)} – ${String(latest.awayScore)} ${latest.awayFranchiseId}`
-    : '');
+  } = $props();
+  const percent = $derived(
+    block.gamesTotal > 0
+      ? Math.min(100, Math.round((block.gamesCompleted / block.gamesTotal) * 100))
+      : 0,
+  );
 </script>
 
 {#if block.phase === 'running' || block.phase === 'complete' || block.phase === 'cancelled' || block.phase === 'failed'}
@@ -55,8 +59,6 @@ const latestText = $derived(latest
       </div>
     </div>
 
-
-
     {#if block.phase === 'running'}
       <div class="mt-3 flex flex-wrap items-center gap-2">
         <button
@@ -99,8 +101,6 @@ const latestText = $derived(latest
         </button>
       </div>
     {/if}
-
-
 
     <p class="sr-only" role="status" aria-live="polite">
       {block.phase === 'running'
