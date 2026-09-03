@@ -19,7 +19,18 @@ import {
   PRESENCE_OFFLINE_AFTER_MS,
   SEASON_MULTIPLAYER_VERSION,
   SEASON_ROOM_PROTOCOL_SCHEMA_VERSION,
+  SEASON_TIMER_POLICY_VERSION,
   isSeasonRoomProtocolOutdated,
+  seasonRoomPublicSnapshotSchema,
+  seasonRoomMembershipSchema,
+  seasonPublicCommandEnvelopeSchema,
+  seasonCommandReceiptSchema,
+  seasonRoomCodeSchema,
+  seasonRoomPaceSchema,
+  seasonRoomPhaseSchema,
+  seasonRoomModeSchema,
+  seasonAcceptedCheckpointSchema,
+  seasonIntegrityFailureSchema2,
 } from '@hoop-rush/data-contracts';
 export type SupabaseSeasonTransportConfig = {
   url: string;
@@ -31,15 +42,59 @@ type SupabaseSeasonTransportState = {
   config: SupabaseSeasonTransportConfig;
 };
 function getErrorCode(err: unknown): string | undefined {
-  if (err && typeof err === 'object' && 'code' in err)
-    return String(
-      (
-        err as {
-          code: string;
-        }
-      ).code,
-    );
+  if (typeof err === 'object' && err !== null && 'code' in err) {
+    const code: unknown = err.code;
+    if (typeof code === 'string' && code.length > 0) return code;
+    if (typeof code === 'number') return String(code);
+  }
   return undefined;
+}
+type EdgeParseSuccess<T> = { success: true; data: T };
+type EdgeParseFailure = { success: false; error: unknown };
+type EdgeResponseSchema<T> = {
+  safeParse(value: unknown): EdgeParseSuccess<T> | EdgeParseFailure;
+};
+type EdgeErrorShape =
+  | { tag: 'code-and-message'; code: string; message: string }
+  | { tag: 'code-only'; code: string }
+  | { tag: 'message-only'; message: string }
+  | { tag: 'empty' };
+function parseEdgeErrorShape(raw: unknown): EdgeErrorShape {
+  if (typeof raw === 'object' && raw !== null) {
+    let code: string | undefined;
+    let message: string | undefined;
+    if ('code' in raw) {
+      const candidate: unknown = raw.code;
+      if (typeof candidate === 'string' && candidate.length > 0) code = candidate;
+    }
+    if ('message' in raw) {
+      const candidate: unknown = raw.message;
+      if (typeof candidate === 'string' && candidate.length > 0) message = candidate;
+    }
+    if (code !== undefined && message !== undefined)
+      return { tag: 'code-and-message', code, message };
+    if (code !== undefined) return { tag: 'code-only', code };
+    if (message !== undefined) return { tag: 'message-only', message };
+  } else if (typeof raw === 'string' && raw.length > 0) {
+    return { tag: 'message-only', message: raw };
+  }
+  return { tag: 'empty' };
+}
+function edgeErrorFromShape(
+  shape: EdgeErrorShape,
+  fallbackText: string,
+  status: number,
+): { code: string; message: string } {
+  switch (shape.tag) {
+    case 'code-and-message':
+      return { code: shape.code, message: shape.message };
+    case 'code-only':
+      return { code: shape.code, message: fallbackText || `request failed ${status}` };
+    case 'message-only':
+      return { code: 'authorization', message: shape.message };
+    case 'empty':
+      return { code: 'authorization', message: fallbackText || `request failed ${status}` };
+  }
 }
 let _memoDevUid: string | null = null;
 let heartbeatFnMissing = false;
@@ -69,17 +124,22 @@ async function ensureAnonAuth(client: SupabaseClient): Promise<void> {
   if (data.session) return;
   const { error } = await client.auth.signInAnonymously();
   if (!error) return;
-  const code =
-    (
-      error as {
-        code?: string;
-      }
-    ).code ?? '';
-  const msg = String(error.message ?? '');
+  let code = '';
+  if (typeof error === 'object' && error !== null && 'code' in error) {
+    const candidate: unknown = error.code;
+    if (typeof candidate === 'string') code = candidate;
+  }
+  const message =
+    typeof error === 'object' &&
+    error !== null &&
+    'message' in error &&
+    typeof error.message === 'string'
+      ? error.message
+      : 'anonymous sign-in failed';
   const isAnonDisabled =
-    code === 'anonymous_provider_disabled' || msg.toLowerCase().includes('anonymous');
+    code === 'anonymous_provider_disabled' || message.toLowerCase().includes('anonymous');
   if (!isAnonDisabled)
-    throw Object.assign(new Error(`anonymous sign-in failed: ${error.message}`), {
+    throw Object.assign(new Error(`anonymous sign-in failed: ${message}`), {
       code: 'authorization',
     });
   getOrCreateDevUid();
@@ -89,6 +149,7 @@ async function callEdge<T>(
   config: SupabaseSeasonTransportConfig,
   fn: string,
   body: unknown,
+  schema: EdgeResponseSchema<T>,
   captchaSiteKey?: string,
 ): Promise<T> {
   await ensureAnonAuth(client);
@@ -122,30 +183,208 @@ async function callEdge<T>(
     body: JSON.stringify(body ?? {}),
   });
   const text = await res.text();
-  let json: unknown = null;
+  let raw: unknown = null;
   try {
-    json = text ? JSON.parse(text) : null;
+    raw = text ? (JSON.parse(text) as unknown) : null;
   } catch {
-    json = { message: text };
+    raw = text ? { message: text } : null;
   }
   if (!res.ok) {
-    const code =
-      (
-        json as {
-          code?: string;
-        }
-      )?.code ?? 'authorization';
-    const message =
-      (
-        json as {
-          message?: string;
-        }
-      )?.message ??
-      text ??
-      `request failed ${res.status}`;
-    throw Object.assign(new Error(message), { code, status: res.status, body: json });
+    const shape = parseEdgeErrorShape(raw);
+    const { code, message } = edgeErrorFromShape(shape, text, res.status);
+    throw Object.assign(new Error(message), { code, status: res.status, body: raw });
   }
-  return json as T;
+  const checked = schema.safeParse(raw);
+  if (!checked.success) {
+    throw Object.assign(new Error(`invalid ${fn} response`), {
+      code: 'authorization',
+      status: res.status,
+      body: raw,
+    });
+  }
+  return checked.data;
+}
+function parseEnvelopeList(raw: unknown): SeasonPublicCommandEnvelope[] | null {
+  if (!Array.isArray(raw)) return null;
+  const out: SeasonPublicCommandEnvelope[] = [];
+  for (const item of raw) {
+    const parsed = seasonPublicCommandEnvelopeSchema.safeParse(item);
+    if (parsed.success) out.push(parsed.data);
+  }
+  return out;
+}
+type SnapshotOnlyResponse = { snapshot: SeasonRoomPublicSnapshot };
+const snapshotOnlySchema: EdgeResponseSchema<SnapshotOnlyResponse> = {
+  safeParse(value: unknown) {
+    if (typeof value !== 'object' || value === null || !('snapshot' in value))
+      return { success: false, error: new Error('missing snapshot') };
+    const parsed = seasonRoomPublicSnapshotSchema.safeParse(value.snapshot);
+    if (!parsed.success) return { success: false, error: parsed.error };
+    return { success: true, data: { snapshot: parsed.data } };
+  },
+};
+type MembershipOnlyResponse = { membership: SeasonRoomMembership };
+const membershipOnlySchema: EdgeResponseSchema<MembershipOnlyResponse> = {
+  safeParse(value: unknown) {
+    if (typeof value !== 'object' || value === null || !('membership' in value))
+      return { success: false, error: new Error('missing membership') };
+    const parsed = seasonRoomMembershipSchema.safeParse(value.membership);
+    if (!parsed.success) return { success: false, error: parsed.error };
+    return { success: true, data: { membership: parsed.data } };
+  },
+};
+type CreateResponse = {
+  snapshot: SeasonRoomPublicSnapshot;
+  code: string;
+  roomId: string;
+  membership?: SeasonRoomMembership;
+};
+const createResponseSchema: EdgeResponseSchema<CreateResponse> = {
+  safeParse(value: unknown) {
+    if (typeof value !== 'object' || value === null)
+      return { success: false, error: new Error('invalid create response') };
+    if (!('snapshot' in value) || !('code' in value) || !('roomId' in value))
+      return { success: false, error: new Error('missing create fields') };
+    const snapshot = seasonRoomPublicSnapshotSchema.safeParse(value.snapshot);
+    if (!snapshot.success) return { success: false, error: snapshot.error };
+    const code = seasonRoomCodeSchema.safeParse(value.code);
+    if (!code.success) return { success: false, error: code.error };
+    const roomId: unknown = value.roomId;
+    if (typeof roomId !== 'string' || roomId.length === 0)
+      return { success: false, error: new Error('invalid roomId') };
+    if ('membership' in value && value.membership !== undefined) {
+      const membership = seasonRoomMembershipSchema.safeParse(value.membership);
+      if (!membership.success) return { success: false, error: membership.error };
+      return {
+        success: true,
+        data: { snapshot: snapshot.data, code: code.data, roomId, membership: membership.data },
+      };
+    }
+    return { success: true, data: { snapshot: snapshot.data, code: code.data, roomId } };
+  },
+};
+type ResumeResponse = {
+  snapshot: SeasonRoomPublicSnapshot;
+  membership?: SeasonRoomMembership;
+  commands?: SeasonPublicCommandEnvelope[];
+};
+const resumeResponseSchema: EdgeResponseSchema<ResumeResponse> = {
+  safeParse(value: unknown) {
+    if (typeof value !== 'object' || value === null || !('snapshot' in value))
+      return { success: false, error: new Error('missing snapshot') };
+    const snapshot = seasonRoomPublicSnapshotSchema.safeParse(value.snapshot);
+    if (!snapshot.success) return { success: false, error: snapshot.error };
+    const out: ResumeResponse = { snapshot: snapshot.data };
+    if ('membership' in value && value.membership !== undefined) {
+      const membership = seasonRoomMembershipSchema.safeParse(value.membership);
+      if (!membership.success) return { success: false, error: membership.error };
+      out.membership = membership.data;
+    }
+    if ('commands' in value && value.commands !== undefined) {
+      const commands = parseEnvelopeList(value.commands);
+      if (commands === null) return { success: false, error: new Error('invalid commands') };
+      out.commands = commands;
+    }
+    return { success: true, data: out };
+  },
+};
+type RefetchResponse = { commands: SeasonPublicCommandEnvelope[] };
+const refetchResponseSchema: EdgeResponseSchema<RefetchResponse> = {
+  safeParse(value: unknown) {
+    if (typeof value !== 'object' || value === null || !('commands' in value))
+      return { success: false, error: new Error('missing commands') };
+    const commands = parseEnvelopeList(value.commands);
+    if (commands === null) return { success: false, error: new Error('invalid commands') };
+    return { success: true, data: { commands } };
+  },
+};
+type ReceiptResponse = { receipt: SeasonCommandReceipt };
+const receiptResponseSchema: EdgeResponseSchema<ReceiptResponse> = {
+  safeParse(value: unknown) {
+    if (typeof value !== 'object' || value === null || !('receipt' in value))
+      return { success: false, error: new Error('missing receipt') };
+    const parsed = seasonCommandReceiptSchema.safeParse(value.receipt);
+    if (!parsed.success) return { success: false, error: parsed.error };
+    return { success: true, data: { receipt: parsed.data } };
+  },
+};
+type LockedResponse = { locked: boolean };
+const lockedResponseSchema: EdgeResponseSchema<LockedResponse> = {
+  safeParse(value: unknown) {
+    if (typeof value !== 'object' || value === null || !('locked' in value))
+      return { success: false, error: new Error('missing locked') };
+    const locked: unknown = value.locked;
+    if (typeof locked !== 'boolean') return { success: false, error: new Error('invalid locked') };
+    return { success: true, data: { locked } };
+  },
+};
+type OkResponse = { ok: boolean };
+const okResponseSchema: EdgeResponseSchema<OkResponse> = {
+  safeParse(value: unknown) {
+    if (typeof value !== 'object' || value === null || !('ok' in value))
+      return { success: false, error: new Error('missing ok') };
+    const ok: unknown = value.ok;
+    if (typeof ok !== 'boolean') return { success: false, error: new Error('invalid ok') };
+    return { success: true, data: { ok } };
+  },
+};
+type CodeResponse = { code: SeasonRoomCode };
+const codeResponseSchema: EdgeResponseSchema<CodeResponse> = {
+  safeParse(value: unknown) {
+    if (typeof value !== 'object' || value === null || !('code' in value))
+      return { success: false, error: new Error('missing code') };
+    const parsed = seasonRoomCodeSchema.safeParse(value.code);
+    if (!parsed.success) return { success: false, error: parsed.error };
+    return { success: true, data: { code: parsed.data } };
+  },
+};
+type AttestResponse =
+  | { kind: 'accepted'; accepted: SeasonAcceptedCheckpoint }
+  | { kind: 'rerun'; reason: string; attempt: number }
+  | { kind: 'integrity-failed'; failure: SeasonIntegrityFailure2 };
+const attestResponseSchema: EdgeResponseSchema<AttestResponse> = {
+  safeParse(value: unknown) {
+    if (typeof value !== 'object' || value === null || !('kind' in value))
+      return { success: false, error: new Error('missing kind') };
+    const kind: unknown = value.kind;
+    switch (kind) {
+      case 'accepted': {
+        if (!('accepted' in value)) return { success: false, error: new Error('missing accepted') };
+        const parsed = seasonAcceptedCheckpointSchema.safeParse(value.accepted);
+        if (!parsed.success) return { success: false, error: parsed.error };
+        return { success: true, data: { kind: 'accepted', accepted: parsed.data } };
+      }
+      case 'rerun': {
+        if (!('reason' in value) || !('attempt' in value))
+          return { success: false, error: new Error('missing rerun fields') };
+        const reason: unknown = value.reason;
+        const attempt: unknown = value.attempt;
+        if (typeof reason !== 'string' || typeof attempt !== 'number' || !Number.isFinite(attempt))
+          return { success: false, error: new Error('invalid rerun fields') };
+        return { success: true, data: { kind: 'rerun', reason, attempt } };
+      }
+      case 'integrity-failed': {
+        if (!('failure' in value)) return { success: false, error: new Error('missing failure') };
+        const parsed = seasonIntegrityFailureSchema2.safeParse(value.failure);
+        if (!parsed.success) return { success: false, error: parsed.error };
+        return { success: true, data: { kind: 'integrity-failed', failure: parsed.data } };
+      }
+      default:
+        return { success: false, error: new Error('unknown attest kind') };
+    }
+  },
+};
+const unknownPassthroughSchema: EdgeResponseSchema<unknown> = {
+  safeParse(value: unknown) {
+    return { success: true, data: value };
+  },
+};
+function realtimeNewRow(payload: unknown): Record<string, unknown> | null {
+  if (typeof payload !== 'object' || payload === null) return null;
+  if (!('new' in payload)) return null;
+  const raw: unknown = payload.new;
+  if (typeof raw !== 'object' || raw === null) return null;
+  return Object.fromEntries(Object.entries(raw));
 }
 function toPublicSnapshot(
   row: {
@@ -182,41 +421,44 @@ function toPublicSnapshot(
   const isOutdated = isSeasonRoomProtocolOutdated(row);
   let presence: SeasonRoomPublicSnapshot['presence'] = [];
   if (row.presence) {
-    presence = row.presence;
+    presence = row.presence.filter(
+      (entry): entry is SeasonRoomPublicSnapshot['presence'][number] =>
+        (entry.participantId === 'p1' || entry.participantId === 'p2') &&
+        typeof entry.online === 'boolean' &&
+        typeof entry.lastSeenAt === 'string',
+    );
   } else if (row.members) {
     const now = Date.now();
-    presence = row.members.map((m) => {
+    for (const m of row.members) {
+      if (m.participant_id !== 'p1' && m.participant_id !== 'p2') continue;
+      const lastSeenAt =
+        typeof m.last_seen_at === 'string' ? m.last_seen_at : new Date(now).toISOString();
       const lastSeen = m.last_seen_at ? new Date(m.last_seen_at).getTime() : now;
-      return {
-        participantId: m.participant_id as 'p1' | 'p2',
+      presence.push({
+        participantId: m.participant_id,
         online: now - lastSeen <= PRESENCE_OFFLINE_AFTER_MS,
-        lastSeenAt: m.last_seen_at ?? new Date(now).toISOString(),
-      };
-    });
+        lastSeenAt,
+      });
+    }
   }
-  const seed =
-    (
-      row as unknown as {
-        root_seed?: string;
-      }
-    ).root_seed ??
-    (
-      row as unknown as {
-        seed?: string;
-      }
-    ).seed ??
-    null;
+  const seed = row.root_seed ?? row.seed ?? null;
+  const pace = seasonRoomPaceSchema.safeParse(row.pace);
+  if (!pace.success) throw new Error('invalid room pace');
+  const mode = seasonRoomModeSchema.safeParse(row.mode ?? 'season');
+  if (!mode.success) throw new Error('invalid room mode');
+  const phase = seasonRoomPhaseSchema.safeParse(row.phase);
+  if (!phase.success) throw new Error('invalid room phase');
   return {
     roomId: row.id,
     settings: {
       schemaVersion: SEASON_ROOM_PROTOCOL_SCHEMA_VERSION,
-      pace: row.pace as 'live' | 'async',
-      mode: (row.mode as 'season' | 'classic' | 'sandbox' | null) ?? 'season',
-      roomProtocolVersion: row.room_protocol_version as unknown as 2,
-      multiplayerVersion: row.multiplayer_version as unknown as 'season-multiplayer-v2',
-      timerPolicyVersion: row.timer_policy_version as 'season-timers-v1',
+      pace: pace.data,
+      mode: mode.data,
+      roomProtocolVersion: SEASON_ROOM_PROTOCOL_SCHEMA_VERSION,
+      multiplayerVersion: SEASON_MULTIPLAYER_VERSION,
+      timerPolicyVersion: SEASON_TIMER_POLICY_VERSION,
     },
-    phase: row.phase as SeasonRoomPublicSnapshot['phase'],
+    phase: phase.data,
     cursor: row.cursor,
     revision: row.revision,
     digest: row.digest,
@@ -224,9 +466,12 @@ function toPublicSnapshot(
     codeActive:
       !!row.code && !!row.code_expires_at && new Date(row.code_expires_at).getTime() > Date.now(),
     expiresAt: row.code_expires_at,
-    mode: (row.mode as SeasonRoomMode | null) ?? 'season',
-    settingsRevision: (row.settings_revision as number | null) ?? 0,
-    guestReady: !!(row.guest_ready as boolean | null),
+    mode: mode.data,
+    settingsRevision:
+      typeof row.settings_revision === 'number' && Number.isFinite(row.settings_revision)
+        ? row.settings_revision
+        : 0,
+    guestReady: row.guest_ready === true,
     presence,
     seed: seed,
     isOutdated: isOutdated || undefined,
@@ -310,7 +555,8 @@ export function createSupabaseSeasonTransport(
   const _global = globalThis as unknown as {
     __hoopRushSupabaseClients?: Map<string, SupabaseClient>;
   };
-  if (!_global.__hoopRushSupabaseClients) _global.__hoopRushSupabaseClients = new Map();
+  if (!(_global.__hoopRushSupabaseClients instanceof Map))
+    _global.__hoopRushSupabaseClients = new Map();
   let client = _global.__hoopRushSupabaseClients.get(_clientKey);
   if (!client) {
     client = createClient(config.url, config.publishableKey, {
@@ -326,9 +572,13 @@ export function createSupabaseSeasonTransport(
   const inflightSnapByRoom = new Map<string, Promise<SeasonRoomPublicSnapshot | null>>();
   const getMemberCount = async (roomId: string): Promise<number> => {
     try {
-      const snap = await callEdge<{
-        snapshot: SeasonRoomPublicSnapshot;
-      }>(client, config, 'season-room-resume', { roomId });
+      const snap = await callEdge(
+        client,
+        config,
+        'season-room-resume',
+        { roomId },
+        snapshotOnlySchema,
+      );
       return snap.snapshot.memberCount ?? 0;
     } catch {
       await ensureAnonAuth(client);
@@ -349,12 +599,7 @@ export function createSupabaseSeasonTransport(
         membership?: SeasonRoomMembership;
       }
     > {
-      const res = await callEdge<{
-        snapshot: SeasonRoomPublicSnapshot;
-        code: string;
-        roomId: string;
-        membership?: SeasonRoomMembership;
-      }>(
+      const res = await callEdge(
         client,
         config,
         'season-room-create',
@@ -363,50 +608,39 @@ export function createSupabaseSeasonTransport(
           mode: settings.mode ?? 'season',
           rootSeed,
         },
+        createResponseSchema,
         config.captchaSiteKey,
       );
-      const snap = res.snapshot as SeasonRoomPublicSnapshot & {
+      const snap: SeasonRoomPublicSnapshot & {
         code?: string;
         membership?: SeasonRoomMembership;
-      };
-      (
-        snap as unknown as {
-          code?: string;
-        }
-      ).code = res.code;
-      if (res.membership)
-        (
-          snap as unknown as {
-            membership?: SeasonRoomMembership;
-          }
-        ).membership = res.membership;
-      else {
-      }
-      if (
-        !(
-          snap.settings as unknown as {
-            mode?: string;
-          }
-        ).mode
-      ) {
-        (
-          snap.settings as unknown as {
-            mode: string;
-          }
-        ).mode = settings.mode ?? 'season';
+      } = { ...res.snapshot, code: res.code };
+      if (res.membership) snap.membership = res.membership;
+      if (!snap.settings.mode) {
+        snap.settings = { ...snap.settings, mode: settings.mode ?? 'season' };
       }
       return snap;
     },
     async preview(code: string): Promise<SeasonRoomPublicSnapshot> {
-      const res = await callEdge<{
-        snapshot: SeasonRoomPublicSnapshot;
-      }>(client, config, 'season-room-preview', { code }, config.captchaSiteKey);
+      const res = await callEdge(
+        client,
+        config,
+        'season-room-preview',
+        { code },
+        snapshotOnlySchema,
+        config.captchaSiteKey,
+      );
       return res.snapshot;
     },
     async join(code: string): Promise<SeasonRoomMembership> {
-      const res = await callEdge<{
-        membership: SeasonRoomMembership;
-      }>(client, config, 'season-room-join', { code }, config.captchaSiteKey);
+      const res = await callEdge(
+        client,
+        config,
+        'season-room-join',
+        { code },
+        membershipOnlySchema,
+        config.captchaSiteKey,
+      );
       return res.membership;
     },
     async resume(
@@ -421,37 +655,24 @@ export function createSupabaseSeasonTransport(
       const body: Record<string, unknown> = { roomId };
       if (typeof afterOrdinal === 'number' && Number.isFinite(afterOrdinal))
         body.afterOrdinal = afterOrdinal;
-      const res = await callEdge<{
-        snapshot: SeasonRoomPublicSnapshot;
+      const res = await callEdge(client, config, 'season-room-resume', body, resumeResponseSchema);
+      const snap: SeasonRoomPublicSnapshot & {
         membership?: SeasonRoomMembership;
         commands?: SeasonPublicCommandEnvelope[];
-      }>(client, config, 'season-room-resume', body);
-      const snap = res.snapshot as SeasonRoomPublicSnapshot & {
-        membership?: SeasonRoomMembership;
-        commands?: SeasonPublicCommandEnvelope[];
-      };
-      if (res.membership)
-        (
-          snap as unknown as {
-            membership?: SeasonRoomMembership;
-          }
-        ).membership = res.membership;
+      } = { ...res.snapshot };
+      if (res.membership) snap.membership = res.membership;
       if (Array.isArray(res.commands) && res.commands.length > 0) {
         let byOrd = envelopeCacheByRoom.get(roomId);
         if (!byOrd) {
           byOrd = new Map();
           envelopeCacheByRoom.set(roomId, byOrd);
         }
-        for (const c of res.commands) byOrd.set(c.ordinal, c as SeasonPublicCommandEnvelope);
+        for (const c of res.commands) byOrd.set(c.ordinal, c);
         if (byOrd.size > 200) {
           const sortedKeys = [...byOrd.keys()].sort((a, b) => a - b);
           for (let i = 0; i < sortedKeys.length - 200; i += 1) byOrd.delete(sortedKeys[i]!);
         }
-        (
-          snap as unknown as {
-            commands?: SeasonPublicCommandEnvelope[];
-          }
-        ).commands = res.commands as SeasonPublicCommandEnvelope[];
+        snap.commands = res.commands;
       }
       return snap;
     },
@@ -460,27 +681,20 @@ export function createSupabaseSeasonTransport(
         membership?: SeasonRoomMembership;
       }
     > {
-      const res = await callEdge<{
-        snapshot: SeasonRoomPublicSnapshot;
+      const res = await callEdge(
+        client,
+        config,
+        'season-room-resume',
+        { roomId },
+        resumeResponseSchema,
+      );
+      const snap: SeasonRoomPublicSnapshot & {
         membership?: SeasonRoomMembership;
         commands?: SeasonPublicCommandEnvelope[];
-      }>(client, config, 'season-room-resume', { roomId });
-      const snap = res.snapshot as SeasonRoomPublicSnapshot & {
-        membership?: SeasonRoomMembership;
-        commands?: SeasonPublicCommandEnvelope[];
-      };
-      if (res.membership)
-        (
-          snap as unknown as {
-            membership?: SeasonRoomMembership;
-          }
-        ).membership = res.membership;
+      } = { ...res.snapshot };
+      if (res.membership) snap.membership = res.membership;
       if (Array.isArray(res.commands) && res.commands.length > 0) {
-        (
-          snap as unknown as {
-            commands?: SeasonPublicCommandEnvelope[];
-          }
-        ).commands = res.commands as SeasonPublicCommandEnvelope[];
+        snap.commands = res.commands;
       }
       return snap;
     },
@@ -494,57 +708,49 @@ export function createSupabaseSeasonTransport(
         row: Record<string, unknown>,
       ): SeasonPublicCommandEnvelope | null {
         try {
-          const command_id = (row.command_id ?? row.commandId) as unknown;
-          const ordinal = row.ordinal as unknown;
-          const run_id = (row.run_id ?? row.runId) as unknown;
-          const payload = (row.payload ?? row.envelope) as unknown;
-          const actor_participant_id = (row.actor_participant_id ??
-            row.actorParticipantId) as unknown;
-          const actor_franchise_id = (row.actor_franchise_id ?? row.actorFranchiseId) as unknown;
-          const receipt = row.receipt as
-            | {
-                accepted?: boolean;
-              }
-            | null
-            | undefined;
-          if (typeof command_id !== 'string' || typeof ordinal !== 'number' || payload == null)
+          const commandId: unknown = row['command_id'] ?? row['commandId'];
+          const ordinal: unknown = row['ordinal'];
+          const runId: unknown = row['run_id'] ?? row['runId'];
+          const payload: unknown = row['payload'] ?? row['envelope'];
+          const actorParticipantId: unknown =
+            row['actor_participant_id'] ?? row['actorParticipantId'];
+          const actorFranchiseId: unknown = row['actor_franchise_id'] ?? row['actorFranchiseId'];
+          if (typeof commandId !== 'string' || typeof ordinal !== 'number' || payload == null)
             return null;
           if (
-            payload &&
             typeof payload === 'object' &&
-            typeof (
-              payload as {
-                commandId?: unknown;
-              }
-            ).commandId === 'string' &&
-            typeof (
-              payload as {
-                ordinal?: unknown;
-              }
-            ).ordinal === 'number'
+            payload !== null &&
+            'commandId' in payload &&
+            'ordinal' in payload
           ) {
-            const p = payload as SeasonPublicCommandEnvelope;
-            if (p.roomId !== roomId) return null;
-            return p;
+            const nestedCommandId: unknown = payload.commandId;
+            const nestedOrdinal: unknown = payload.ordinal;
+            if (typeof nestedCommandId === 'string' && typeof nestedOrdinal === 'number') {
+              const parsed = seasonPublicCommandEnvelopeSchema.safeParse(payload);
+              if (!parsed.success) return null;
+              if (parsed.data.roomId !== roomId) return null;
+              return parsed.data;
+            }
           }
           if (
-            typeof run_id !== 'string' ||
-            typeof actor_participant_id !== 'string' ||
-            typeof actor_franchise_id !== 'string'
+            typeof runId !== 'string' ||
+            (actorParticipantId !== 'p1' && actorParticipantId !== 'p2') ||
+            typeof actorFranchiseId !== 'string'
           )
             return null;
-          const env: SeasonPublicCommandEnvelope = {
-            schemaVersion: 2 as const,
+          const candidate: unknown = {
+            schemaVersion: SEASON_ROOM_PROTOCOL_SCHEMA_VERSION,
             roomId,
-            commandId: command_id,
+            commandId,
             ordinal,
-            runId: run_id,
-            payload: payload as unknown,
-            actorParticipantId: actor_participant_id as 'p1' | 'p2',
-            actorFranchiseId: actor_franchise_id,
+            runId,
+            payload,
+            actorParticipantId,
+            actorFranchiseId,
           };
-          void receipt;
-          return env;
+          const parsed = seasonPublicCommandEnvelopeSchema.safeParse(candidate);
+          if (!parsed.success) return null;
+          return parsed.data;
         } catch {
           return null;
         }
@@ -557,14 +763,16 @@ export function createSupabaseSeasonTransport(
             const maxOrdinal = Math.max(...byOrd.keys());
             if (Number.isFinite(maxOrdinal)) body.afterOrdinal = maxOrdinal;
           }
-          const res = await callEdge<{
-            snapshot: SeasonRoomPublicSnapshot;
-            commands?: SeasonPublicCommandEnvelope[];
-          }>(client, config, 'season-room-resume', body);
+          const res = await callEdge(
+            client,
+            config,
+            'season-room-resume',
+            body,
+            resumeResponseSchema,
+          );
           if (Array.isArray(res.commands)) {
             for (const c of res.commands) {
-              if (c && typeof c.ordinal === 'number')
-                cacheEnvelope(c as SeasonPublicCommandEnvelope);
+              cacheEnvelope(c);
             }
           }
           if (res.snapshot) lastSnap = res.snapshot;
@@ -577,60 +785,137 @@ export function createSupabaseSeasonTransport(
         row: Record<string, unknown>,
       ): SeasonRoomPublicSnapshot | null {
         try {
-          if (typeof row.id !== 'string' || typeof row.phase !== 'string') return null;
+          const id: unknown = row['id'];
+          const phase: unknown = row['phase'];
+          if (typeof id !== 'string' || typeof phase !== 'string') return null;
           const mc = lastSnap?.memberCount ?? 0;
+          const paceRaw: unknown = 'pace' in row ? row['pace'] : lastSnap?.settings.pace;
+          const pace = typeof paceRaw === 'string' ? paceRaw : 'live';
+          const modeRaw: unknown = 'mode' in row ? row['mode'] : lastSnap?.mode;
+          const mode = typeof modeRaw === 'string' ? modeRaw : 'season';
+          const protocolRaw: unknown =
+            'room_protocol_version' in row
+              ? row['room_protocol_version']
+              : lastSnap?.settings.roomProtocolVersion;
+          const roomProtocolVersion =
+            typeof protocolRaw === 'number' && Number.isFinite(protocolRaw) ? protocolRaw : 2;
+          const mpRaw: unknown =
+            'multiplayer_version' in row
+              ? row['multiplayer_version']
+              : lastSnap?.settings.multiplayerVersion;
+          const multiplayerVersion = typeof mpRaw === 'string' ? mpRaw : 'season-multiplayer-v2';
+          const timerRaw: unknown =
+            'timer_policy_version' in row
+              ? row['timer_policy_version']
+              : lastSnap?.settings.timerPolicyVersion;
+          const timerPolicyVersion = typeof timerRaw === 'string' ? timerRaw : 'season-timers-v1';
+          const cursorRaw: unknown = 'cursor' in row ? row['cursor'] : lastSnap?.cursor;
+          const cursor = typeof cursorRaw === 'string' ? cursorRaw : 'draft-0';
+          const revisionRaw: unknown = 'revision' in row ? row['revision'] : lastSnap?.revision;
+          const revision =
+            typeof revisionRaw === 'number' && Number.isFinite(revisionRaw) ? revisionRaw : 0;
+          const digestRaw: unknown = 'digest' in row ? row['digest'] : lastSnap?.digest;
+          const digest = typeof digestRaw === 'string' ? digestRaw : '0'.repeat(64);
+          const codeRaw: unknown = 'code' in row ? row['code'] : null;
+          const code = typeof codeRaw === 'string' ? codeRaw : null;
+          const expiresRaw: unknown =
+            'code_expires_at' in row ? row['code_expires_at'] : lastSnap?.expiresAt;
+          const codeExpiresAt = typeof expiresRaw === 'string' ? expiresRaw : null;
+          const guestRaw: unknown =
+            'guest_ready' in row ? row['guest_ready'] : lastSnap?.guestReady;
+          const guestReady = guestRaw === true;
+          const settingsRevRaw: unknown =
+            'settings_revision' in row ? row['settings_revision'] : lastSnap?.settingsRevision;
+          const settingsRevision =
+            typeof settingsRevRaw === 'number' && Number.isFinite(settingsRevRaw)
+              ? settingsRevRaw
+              : 0;
+          const rootSeedRaw: unknown = 'root_seed' in row ? row['root_seed'] : lastSnap?.seed;
+          const rootSeed = typeof rootSeedRaw === 'string' ? rootSeedRaw : null;
+          const seedRaw: unknown = 'seed' in row ? row['seed'] : lastSnap?.seed;
+          const seed = typeof seedRaw === 'string' ? seedRaw : rootSeed;
+          const locksRaw: unknown = 'locks' in row ? row['locks'] : lastSnap?.locks;
+          let locks: SeasonRoomPublicSnapshot['locks'] = lastSnap?.locks;
+          if (typeof locksRaw === 'object' && locksRaw !== null) {
+            if (
+              'p1Locked' in locksRaw &&
+              'p2Locked' in locksRaw &&
+              'revealed' in locksRaw &&
+              'cursor' in locksRaw
+            ) {
+              const p1: unknown = locksRaw.p1Locked;
+              const p2: unknown = locksRaw.p2Locked;
+              const revealed: unknown = locksRaw.revealed;
+              const lockCursor: unknown = locksRaw.cursor;
+              if (
+                typeof p1 === 'boolean' &&
+                typeof p2 === 'boolean' &&
+                typeof revealed === 'boolean' &&
+                typeof lockCursor === 'string'
+              ) {
+                locks = { p1Locked: p1, p2Locked: p2, revealed, cursor: lockCursor };
+              }
+            }
+          }
+          const attestationRaw: unknown =
+            'attestationSummary' in row ? row['attestationSummary'] : lastSnap?.attestationSummary;
+          let attestationSummary: SeasonRoomPublicSnapshot['attestationSummary'] =
+            lastSnap?.attestationSummary;
+          if (typeof attestationRaw === 'object' && attestationRaw !== null) {
+            if (
+              'cursor' in attestationRaw &&
+              'attempt' in attestationRaw &&
+              'count' in attestationRaw &&
+              'verified' in attestationRaw
+            ) {
+              const aCursor: unknown = attestationRaw.cursor;
+              const aAttempt: unknown = attestationRaw.attempt;
+              const aCount: unknown = attestationRaw.count;
+              const aVerified: unknown = attestationRaw.verified;
+              if (
+                typeof aCursor === 'string' &&
+                typeof aAttempt === 'number' &&
+                Number.isFinite(aAttempt) &&
+                typeof aCount === 'number' &&
+                Number.isFinite(aCount) &&
+                (typeof aVerified === 'boolean' || aVerified === null)
+              ) {
+                const aInput: unknown =
+                  'inputDigest' in attestationRaw ? attestationRaw.inputDigest : null;
+                const aResult: unknown =
+                  'resultDigest' in attestationRaw ? attestationRaw.resultDigest : null;
+                attestationSummary = {
+                  cursor: aCursor,
+                  attempt: aAttempt,
+                  count: aCount,
+                  verified: aVerified,
+                  inputDigest: typeof aInput === 'string' ? aInput : null,
+                  resultDigest: typeof aResult === 'string' ? aResult : null,
+                };
+              }
+            }
+          }
           const snap = toPublicSnapshot(
             {
-              id: row.id as string,
-              pace: (row.pace as string) ?? lastSnap?.settings.pace ?? 'live',
-              mode: (row.mode as string) ?? (lastSnap?.mode as string) ?? 'season',
-              room_protocol_version:
-                (row.room_protocol_version as number) ??
-                (lastSnap?.settings.roomProtocolVersion as number) ??
-                2,
-              multiplayer_version:
-                (row.multiplayer_version as string) ??
-                (lastSnap?.settings.multiplayerVersion as string) ??
-                'season-multiplayer-v2',
-              timer_policy_version:
-                (row.timer_policy_version as string) ??
-                (lastSnap?.settings.timerPolicyVersion as string) ??
-                'season-timers-v1',
-              phase: row.phase as string,
-              cursor: (row.cursor as string) ?? (lastSnap?.cursor as string) ?? 'draft-0',
-              revision: (row.revision as number) ?? (lastSnap?.revision as number) ?? 0,
-              digest:
-                (row.digest as string) ??
-                (lastSnap?.digest as string) ??
-                lastSnap?.digest ??
-                '0'.repeat(64),
-              code: (row.code as string | null) ?? null,
-              code_expires_at:
-                (row.code_expires_at as string | null) ??
-                (lastSnap?.expiresAt as string | null) ??
-                null,
-              guest_ready:
-                (row.guest_ready as boolean | null) ?? (lastSnap?.guestReady as boolean) ?? false,
-              settings_revision:
-                (row.settings_revision as number | null) ??
-                (lastSnap?.settingsRevision as number) ??
-                0,
-              root_seed:
-                (row.root_seed as string | null) ?? (lastSnap?.seed as string | null) ?? null,
-              seed: (row.seed as string | null) ?? (lastSnap?.seed as string | null) ?? null,
+              id,
+              pace,
+              mode,
+              room_protocol_version: roomProtocolVersion,
+              multiplayer_version: multiplayerVersion,
+              timer_policy_version: timerPolicyVersion,
+              phase,
+              cursor,
+              revision,
+              digest,
+              code,
+              code_expires_at: codeExpiresAt,
+              guest_ready: guestReady,
+              settings_revision: settingsRevision,
+              root_seed: rootSeed,
+              seed,
               presence: lastSnap?.presence ?? undefined,
-              locks:
-                (
-                  row as unknown as {
-                    locks?: SeasonRoomPublicSnapshot['locks'];
-                  }
-                ).locks ?? lastSnap?.locks,
-              attestationSummary:
-                (
-                  row as unknown as {
-                    attestationSummary?: SeasonRoomPublicSnapshot['attestationSummary'];
-                  }
-                ).attestationSummary ?? lastSnap?.attestationSummary,
+              locks,
+              attestationSummary,
             },
             mc,
           );
@@ -647,12 +932,13 @@ export function createSupabaseSeasonTransport(
         row: Record<string, unknown>,
       ): SeasonRoomPublicSnapshot | null {
         if (!lastSnap) return null;
-        const pid = (row.participant_id ?? row.participantId) as string | undefined;
-        const cursor = (row.cursor as string) ?? lastSnap.cursor;
-        if (pid !== 'p1' && pid !== 'p2') return null;
+        const pidRaw: unknown = row['participant_id'] ?? row['participantId'];
+        if (pidRaw !== 'p1' && pidRaw !== 'p2') return null;
+        const cursorRaw: unknown = row['cursor'];
+        const cursor = typeof cursorRaw === 'string' ? cursorRaw : lastSnap.cursor;
         const existing = lastSnap.locks;
-        const p1Locked = existing?.p1Locked || pid === 'p1';
-        const p2Locked = existing?.p2Locked || pid === 'p2';
+        const p1Locked = existing?.p1Locked || pidRaw === 'p1';
+        const p2Locked = existing?.p2Locked || pidRaw === 'p2';
         const revealed = p1Locked && p2Locked ? true : (existing?.revealed ?? false);
         const next: SeasonRoomPublicSnapshot = {
           ...lastSnap,
@@ -669,11 +955,18 @@ export function createSupabaseSeasonTransport(
         row: Record<string, unknown>,
       ): SeasonRoomPublicSnapshot | null {
         if (!lastSnap) return null;
-        const attempt = (row.attempt as number) ?? 1;
-        const pid = (row.participant_id ?? row.participantId) as string | undefined;
-        if (pid !== 'p1' && pid !== 'p2') return null;
+        const attemptRaw: unknown = row['attempt'];
+        const attempt =
+          typeof attemptRaw === 'number' && Number.isFinite(attemptRaw) ? attemptRaw : 1;
+        const pidRaw: unknown = row['participant_id'] ?? row['participantId'];
+        if (pidRaw !== 'p1' && pidRaw !== 'p2') return null;
         const prev = lastSnap.attestationSummary;
-        const cursor = (row.cursor as string) ?? lastSnap.cursor;
+        const cursorRaw: unknown = row['cursor'];
+        const cursor = typeof cursorRaw === 'string' ? cursorRaw : lastSnap.cursor;
+        const inputRaw: unknown = row['input_digest'];
+        const inputDigest = typeof inputRaw === 'string' ? inputRaw : null;
+        const resultRaw: unknown = row['result_digest'];
+        const resultDigest = typeof resultRaw === 'string' ? resultRaw : null;
         let nextSummary: SeasonRoomPublicSnapshot['attestationSummary'];
         if (!prev || prev.cursor !== cursor || prev.attempt !== attempt) {
           nextSummary = {
@@ -681,15 +974,15 @@ export function createSupabaseSeasonTransport(
             attempt,
             count: 1,
             verified: null,
-            inputDigest: (row.input_digest as string) ?? null,
-            resultDigest: (row.result_digest as string) ?? null,
+            inputDigest,
+            resultDigest,
           };
         } else {
           const count = 2;
           const aDigest = prev.inputDigest;
-          const bDigest = (row.input_digest as string) ?? null;
+          const bDigest = inputDigest;
           const aRes = prev.resultDigest;
-          const bRes = (row.result_digest as string) ?? null;
+          const bRes = resultDigest;
           const verified =
             aDigest && bDigest && aRes && bRes ? aDigest === bDigest && aRes === bRes : null;
           nextSummary = {
@@ -788,10 +1081,7 @@ export function createSupabaseSeasonTransport(
               (payload: unknown) => {
                 void (async () => {
                   try {
-                    const p = payload as {
-                      new?: Record<string, unknown>;
-                    } | null;
-                    const row = p?.new as Record<string, unknown> | undefined;
+                    const row = realtimeNewRow(payload);
                     if (row) {
                       const optimistic = synthesizeRoomsSnapshot(row);
                       if (optimistic && !closed) {
@@ -820,12 +1110,8 @@ export function createSupabaseSeasonTransport(
                 void (async () => {
                   let cachedEnv: SeasonPublicCommandEnvelope | null = null;
                   try {
-                    const p = payload as {
-                      new?: Record<string, unknown>;
-                      eventType?: string;
-                    } | null;
-                    const row = p?.new as Record<string, unknown> | undefined;
-                    if (row && typeof row.ordinal === 'number') {
+                    const row = realtimeNewRow(payload);
+                    if (row && typeof row['ordinal'] === 'number') {
                       const env = envelopeFromRealtimeRow(row);
                       if (env && Number.isFinite(env.ordinal)) {
                         cacheEnvelope(env);
@@ -857,10 +1143,7 @@ export function createSupabaseSeasonTransport(
               (payload: unknown) => {
                 void (async () => {
                   try {
-                    const p = payload as {
-                      new?: Record<string, unknown>;
-                    } | null;
-                    const row = p?.new as Record<string, unknown> | undefined;
+                    const row = realtimeNewRow(payload);
                     if (row) {
                       const optimistic = patchLocksFromDecision(row);
                       if (optimistic && !closed) handler(optimistic);
@@ -882,10 +1165,7 @@ export function createSupabaseSeasonTransport(
               (payload: unknown) => {
                 void (async () => {
                   try {
-                    const p = payload as {
-                      new?: Record<string, unknown>;
-                    } | null;
-                    const row = p?.new as Record<string, unknown> | undefined;
+                    const row = realtimeNewRow(payload);
                     if (row) {
                       const optimistic = patchAttestationFromRow(row);
                       if (optimistic && !closed) handler(optimistic);
@@ -958,9 +1238,13 @@ export function createSupabaseSeasonTransport(
           }
         }
       }
-      const res = await callEdge<{
-        commands: SeasonPublicCommandEnvelope[];
-      }>(client, config, 'season-room-refetch', { roomId, afterOrdinal: after });
+      const res = await callEdge(
+        client,
+        config,
+        'season-room-refetch',
+        { roomId, afterOrdinal: after },
+        refetchResponseSchema,
+      );
       const cmds = Array.isArray(res.commands) ? res.commands : [];
       if (cmds.length > 0) {
         let map = envelopeCacheByRoom.get(roomId);
@@ -977,104 +1261,101 @@ export function createSupabaseSeasonTransport(
       return cmds;
     },
     async submitCommand(envelope: SeasonPublicCommandEnvelope): Promise<SeasonCommandReceipt> {
-      const res = await callEdge<{
-        receipt: SeasonCommandReceipt;
-      }>(client, config, 'season-room-command', { envelope });
+      const res = await callEdge(
+        client,
+        config,
+        'season-room-command',
+        { envelope },
+        receiptResponseSchema,
+      );
       return res.receipt;
     },
     async submitPrivateDecision(submission: SeasonPrivateDecisionSubmission): Promise<{
       locked: boolean;
     }> {
-      const res = await callEdge<{
-        locked: boolean;
-      }>(client, config, 'season-private-decision', {
-        submission,
-      });
+      const res = await callEdge(
+        client,
+        config,
+        'season-private-decision',
+        {
+          submission,
+        },
+        lockedResponseSchema,
+      );
       return res;
     },
     async publishAttestation(
       attestation: SeasonCheckpointAttestation,
     ): Promise<SeasonAcceptedCheckpoint | SeasonRerunRequest | SeasonIntegrityFailure2> {
-      const res = await callEdge<
-        | {
-            kind: 'accepted';
-            accepted: SeasonAcceptedCheckpoint;
-          }
-        | {
-            kind: 'rerun';
-            reason: string;
-            attempt: number;
-          }
-        | {
-            kind: 'integrity-failed';
-            failure: SeasonIntegrityFailure2;
-          }
-      >(client, config, 'season-checkpoint-attest', { attestation });
-      if ('kind' in res) {
-        if (res.kind === 'accepted')
-          return (
-            res as {
-              accepted: SeasonAcceptedCheckpoint;
-            }
-          ).accepted;
-        if (res.kind === 'rerun')
+      const res = await callEdge(
+        client,
+        config,
+        'season-checkpoint-attest',
+        { attestation },
+        attestResponseSchema,
+      );
+      switch (res.kind) {
+        case 'accepted':
+          return res.accepted;
+        case 'rerun':
           return {
             roomId: attestation.roomId,
             cursor: attestation.cursor,
-            reason: (
-              res as {
-                reason: string;
-              }
-            ).reason,
-            attempt: (
-              res as {
-                attempt: number;
-              }
-            ).attempt,
+            reason: res.reason,
+            attempt: res.attempt,
           };
-        if (res.kind === 'integrity-failed')
-          return (
-            res as {
-              failure: SeasonIntegrityFailure2;
-            }
-          ).failure;
+        case 'integrity-failed':
+          return res.failure;
       }
-      return res;
     },
     async requestReclaim(roomId: string, participantId: 'p1' | 'p2'): Promise<void> {
-      await callEdge<{
-        ok: boolean;
-      }>(client, config, 'season-room-reclaim', {
-        roomId,
-        participantId,
-      });
+      await callEdge(
+        client,
+        config,
+        'season-room-reclaim',
+        {
+          roomId,
+          participantId,
+        },
+        okResponseSchema,
+      );
     },
     async surrender(roomId: string, participantId: 'p1' | 'p2'): Promise<void> {
-      await callEdge<{
-        ok: boolean;
-      }>(client, config, 'season-room-surrender', {
-        roomId,
-        participantId,
-      });
+      await callEdge(
+        client,
+        config,
+        'season-room-surrender',
+        {
+          roomId,
+          participantId,
+        },
+        okResponseSchema,
+      );
     },
     async preDraftRemoval(
       roomId: string,
       targetParticipantId: 'p1' | 'p2',
     ): Promise<SeasonRoomCode> {
-      const res = await callEdge<{
-        code: SeasonRoomCode;
-      }>(client, config, 'season-room-pre-draft-removal', { roomId, targetParticipantId });
+      const res = await callEdge(
+        client,
+        config,
+        'season-room-pre-draft-removal',
+        { roomId, targetParticipantId },
+        codeResponseSchema,
+      );
       return res.code;
     },
     async close(roomId: string): Promise<void> {
-      await callEdge<{
-        ok: boolean;
-      }>(client, config, 'season-room-close', { roomId });
+      await callEdge(client, config, 'season-room-close', { roomId }, okResponseSchema);
     },
     async startDraft(roomId: string): Promise<SeasonRoomPublicSnapshot> {
-      const res = await callEdge<{
-        snapshot: SeasonRoomPublicSnapshot;
-      }>(client, config, 'season-room-start-draft', { roomId });
+      const res = await callEdge(
+        client,
+        config,
+        'season-room-start-draft',
+        { roomId },
+        snapshotOnlySchema,
+      );
       return res.snapshot;
     },
     async updateSettings(
@@ -1086,21 +1367,21 @@ export function createSupabaseSeasonTransport(
       expectedSettingsRevision?: number,
     ): Promise<SeasonRoomPublicSnapshot> {
       try {
-        const res = await callEdge<{
-          snapshot: SeasonRoomPublicSnapshot;
-        }>(client, config, 'season-room-update-settings', {
-          roomId,
-          mode: settings.mode,
-          pace: settings.pace,
-          expectedSettingsRevision,
-        });
+        const res = await callEdge(
+          client,
+          config,
+          'season-room-update-settings',
+          {
+            roomId,
+            mode: settings.mode,
+            pace: settings.pace,
+            expectedSettingsRevision,
+          },
+          snapshotOnlySchema,
+        );
         return res.snapshot;
       } catch (err) {
-        const code = (
-          err as {
-            code?: string;
-          }
-        )?.code;
+        const code = getErrorCode(err);
         if (code === 'outdated-room' || code === 'authorization' || code === 'stale-revision')
           throw err;
         throw err;
@@ -1112,65 +1393,78 @@ export function createSupabaseSeasonTransport(
       ready: boolean,
       expectedSettingsRevision?: number,
     ): Promise<SeasonRoomPublicSnapshot> {
-      const res = await callEdge<{
-        snapshot: SeasonRoomPublicSnapshot;
-      }>(client, config, 'season-room-set-ready', {
-        roomId,
-        participantId,
-        ready,
-        expectedSettingsRevision,
-      });
+      const res = await callEdge(
+        client,
+        config,
+        'season-room-set-ready',
+        {
+          roomId,
+          participantId,
+          ready,
+          expectedSettingsRevision,
+        },
+        snapshotOnlySchema,
+      );
       return res.snapshot;
     },
     async heartbeat(roomId: string, participantId: 'p1' | 'p2'): Promise<void> {
       if (heartbeatFnMissing) {
-        await callEdge(client, config, 'season-room-resume', { roomId }).catch(() => {});
+        await callEdge(
+          client,
+          config,
+          'season-room-resume',
+          { roomId },
+          unknownPassthroughSchema,
+        ).catch(() => {});
         return;
       }
       try {
-        await callEdge<{
-          ok: boolean;
-        }>(client, config, 'season-room-heartbeat', {
-          roomId,
-          participantId,
-        });
+        await callEdge(
+          client,
+          config,
+          'season-room-heartbeat',
+          {
+            roomId,
+            participantId,
+          },
+          okResponseSchema,
+        );
       } catch (err) {
-        const status = (
-          err as {
-            status?: number;
-          }
-        ).status;
+        let status: number | undefined;
+        if (typeof err === 'object' && err !== null && 'status' in err) {
+          const candidate: unknown = err.status;
+          if (typeof candidate === 'number' && Number.isFinite(candidate)) status = candidate;
+        }
         if (status && status !== 404) return;
         heartbeatFnMissing = true;
-        await callEdge(client, config, 'season-room-resume', { roomId }).catch(() => {});
+        await callEdge(
+          client,
+          config,
+          'season-room-resume',
+          { roomId },
+          unknownPassthroughSchema,
+        ).catch(() => {});
       }
     },
     async leave(roomId: string, participantId: 'p1' | 'p2'): Promise<void> {
-      await callEdge<{
-        ok: boolean;
-      }>(client, config, 'season-room-leave', {
-        roomId,
-        participantId,
-      });
+      await callEdge(
+        client,
+        config,
+        'season-room-leave',
+        {
+          roomId,
+          participantId,
+        },
+        okResponseSchema,
+      );
     },
   };
 }
 export function isSupabaseConfigured(): boolean {
-  const url = (
-    import.meta as unknown as {
-      env: Record<string, string | undefined>;
-    }
-  ).env?.VITE_SUPABASE_URL;
-  const key = (
-    import.meta as unknown as {
-      env: Record<string, string | undefined>;
-    }
-  ).env?.VITE_SUPABASE_PUBLISHABLE_KEY;
-  const flag = (
-    import.meta as unknown as {
-      env: Record<string, string | undefined>;
-    }
-  ).env?.VITE_ENABLE_MULTIPLAYER;
+  const env = import.meta.env;
+  const url = env?.VITE_SUPABASE_URL;
+  const key = env?.VITE_SUPABASE_PUBLISHABLE_KEY;
+  const flag = env?.VITE_ENABLE_MULTIPLAYER;
   return Boolean(url && key && flag !== 'false');
 }
 export function multiplayerDisabledMessage(): string {

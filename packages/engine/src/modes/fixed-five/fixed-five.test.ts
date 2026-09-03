@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildFixtureBracket, buildLegalSimulationTeam, seedFromString } from '@hoop-rush/test-fixtures';
+import {
+  buildFixtureBracket,
+  buildLegalSimulationTeam,
+  seedFromString,
+} from '@hoop-rush/test-fixtures';
 import type { ClassicDraftCatalog, EraSimulationProfile } from '@hoop-rush/data-contracts';
 import { DEFAULT_ERA_SIM_PROFILE } from '@hoop-rush/test-fixtures';
 import { createEngineContext } from '../../sim/context.ts';
@@ -15,10 +19,26 @@ import {
   fixedFiveSharedGameSeed,
   fixedFiveTiebreakWinner,
 } from './seeds.ts';
-import { applySandboxBuilderCommand, createSandboxBuilder, enumerateSandboxSafeMoves, type FixedFiveCandidate } from './sandbox-builder.ts';
+import {
+  applySandboxBuilderCommand,
+  createSandboxBuilder,
+  enumerateSandboxSafeMoves,
+  type FixedFiveCandidate,
+} from './sandbox-builder.ts';
 import { applyClassicBuilderCommand, createParticipantClassicDraft } from './classic-reducer.ts';
-import { claimDuelPlayer, createDuelDraft, duelAlternationHolds, duelCurrentPicker, isDuelComplete, rerollDuel } from './duel.ts';
-import { chooseAutopick, chooseSandboxAutopicksUntilFull, enumerateClassicSafeMoves } from './timeout.ts';
+import {
+  claimDuelPlayer,
+  createDuelDraft,
+  duelAlternationHolds,
+  duelCurrentPicker,
+  isDuelComplete,
+  rerollDuel,
+} from './duel.ts';
+import {
+  chooseAutopick,
+  chooseSandboxAutopicksUntilFull,
+  enumerateClassicSafeMoves,
+} from './timeout.ts';
 import { findWeakestOpponent, h2hGameNumbersFor, simulateShared82 } from './shared82.ts';
 import { simulateDuelSeries } from './duel-sim.ts';
 import { fixedFiveResultDigest } from './digest.ts';
@@ -27,10 +47,22 @@ const context = createEngineContext();
 const ROOT = seedFromString('fixed-five-golden');
 
 function candidatePool(): FixedFiveCandidate[] {
-  const defs: Array<{ playerId: string; positions: FixedFiveCandidate['positions']; score: number; franchiseId: string; eraId: string }> = [
+  const defs: Array<{
+    playerId: string;
+    positions: FixedFiveCandidate['positions'];
+    score: number;
+    franchiseId: string;
+    eraId: string;
+  }> = [
     { playerId: 'p-g1', positions: ['PG'], score: 90, franchiseId: 'lakers', eraId: '1990s' },
     { playerId: 'p-g2', positions: ['SG'], score: 88, franchiseId: 'lakers', eraId: '1990s' },
-    { playerId: 'p-g3', positions: ['PG', 'SG'], score: 85, franchiseId: 'celtics', eraId: '1990s' },
+    {
+      playerId: 'p-g3',
+      positions: ['PG', 'SG'],
+      score: 85,
+      franchiseId: 'celtics',
+      eraId: '1990s',
+    },
     { playerId: 'p-f1', positions: ['SF'], score: 87, franchiseId: 'bulls', eraId: '1990s' },
     { playerId: 'p-f2', positions: ['PF'], score: 86, franchiseId: 'bulls', eraId: '1990s' },
     { playerId: 'p-f3', positions: ['SF', 'PF'], score: 84, franchiseId: 'heat', eraId: '2000s' },
@@ -49,10 +81,38 @@ function candidatePool(): FixedFiveCandidate[] {
 
 function classicCatalog(): ClassicDraftCatalog {
   return [
-    { franchiseId: 'bulls', eraId: '1990s', players: [{ playerId: 'p-f1', positions: ['SF'] }, { playerId: 'p-f2', positions: ['PF'] }] },
-    { franchiseId: 'celtics', eraId: '1990s', players: [{ playerId: 'p-g3', positions: ['PG', 'SG'] }, { playerId: 'p-c1', positions: ['C'] }] },
-    { franchiseId: 'heat', eraId: '2000s', players: [{ playerId: 'p-f3', positions: ['SF', 'PF'] }, { playerId: 'p-c2', positions: ['PF', 'C'] }] },
-    { franchiseId: 'lakers', eraId: '1990s', players: [{ playerId: 'p-g1', positions: ['PG'] }, { playerId: 'p-g2', positions: ['SG'] }] },
+    {
+      franchiseId: 'bulls',
+      eraId: '1990s',
+      players: [
+        { playerId: 'p-f1', positions: ['SF'] },
+        { playerId: 'p-f2', positions: ['PF'] },
+      ],
+    },
+    {
+      franchiseId: 'celtics',
+      eraId: '1990s',
+      players: [
+        { playerId: 'p-g3', positions: ['PG', 'SG'] },
+        { playerId: 'p-c1', positions: ['C'] },
+      ],
+    },
+    {
+      franchiseId: 'heat',
+      eraId: '2000s',
+      players: [
+        { playerId: 'p-f3', positions: ['SF', 'PF'] },
+        { playerId: 'p-c2', positions: ['PF', 'C'] },
+      ],
+    },
+    {
+      franchiseId: 'lakers',
+      eraId: '1990s',
+      players: [
+        { playerId: 'p-g1', positions: ['PG'] },
+        { playerId: 'p-g2', positions: ['SG'] },
+      ],
+    },
     { franchiseId: 'lakers', eraId: '2010s', players: [{ playerId: 'p-g4', positions: ['SG'] }] },
   ];
 }
@@ -85,21 +145,61 @@ function duelPool(): { pool: FixedFiveCandidate[]; byId: Map<string, FixedFiveCa
   const pool: FixedFiveCandidate[] = [];
   for (let n = 1; n <= 12; n += 1) {
     pool.push(
-      { playerId: `d-g-${String(n)}`, playerVersionId: `pv-d-g-${String(n)}`, positions: ['PG'], selectionScore: 80 + (n % 5), franchiseId: 'x', eraId: 'y' },
-      { playerId: `d-f-${String(n)}`, playerVersionId: `pv-d-f-${String(n)}`, positions: ['SF'], selectionScore: 79 + (n % 5), franchiseId: 'x', eraId: 'y' },
-      { playerId: `d-c-${String(n)}`, playerVersionId: `pv-d-c-${String(n)}`, positions: ['C'], selectionScore: 78 + (n % 5), franchiseId: 'x', eraId: 'y' },
-      { playerId: `d-g2-${String(n)}`, playerVersionId: `pv-d-g2-${String(n)}`, positions: ['SG'], selectionScore: 77 + (n % 5), franchiseId: 'x', eraId: 'y' },
-      { playerId: `d-f2-${String(n)}`, playerVersionId: `pv-d-f2-${String(n)}`, positions: ['PF'], selectionScore: 76 + (n % 5), franchiseId: 'x', eraId: 'y' },
+      {
+        playerId: `d-g-${String(n)}`,
+        playerVersionId: `pv-d-g-${String(n)}`,
+        positions: ['PG'],
+        selectionScore: 80 + (n % 5),
+        franchiseId: 'x',
+        eraId: 'y',
+      },
+      {
+        playerId: `d-f-${String(n)}`,
+        playerVersionId: `pv-d-f-${String(n)}`,
+        positions: ['SF'],
+        selectionScore: 79 + (n % 5),
+        franchiseId: 'x',
+        eraId: 'y',
+      },
+      {
+        playerId: `d-c-${String(n)}`,
+        playerVersionId: `pv-d-c-${String(n)}`,
+        positions: ['C'],
+        selectionScore: 78 + (n % 5),
+        franchiseId: 'x',
+        eraId: 'y',
+      },
+      {
+        playerId: `d-g2-${String(n)}`,
+        playerVersionId: `pv-d-g2-${String(n)}`,
+        positions: ['SG'],
+        selectionScore: 77 + (n % 5),
+        franchiseId: 'x',
+        eraId: 'y',
+      },
+      {
+        playerId: `d-f2-${String(n)}`,
+        playerVersionId: `pv-d-f2-${String(n)}`,
+        positions: ['PF'],
+        selectionScore: 76 + (n % 5),
+        franchiseId: 'x',
+        eraId: 'y',
+      },
     );
   }
   return { pool, byId: new Map(pool.map((c) => [c.playerId, c])) };
 }
 
-function slotForPosition(positions: FixedFiveCandidate['positions'], used: Set<number>): 0 | 1 | 2 | 3 | 4 {
+function slotForPosition(
+  positions: FixedFiveCandidate['positions'],
+  used: Set<number>,
+): 0 | 1 | 2 | 3 | 4 {
   for (const s of [0, 1, 2, 3, 4] as const) {
     if (used.has(s)) continue;
     const req = s <= 1 ? 'G' : s <= 3 ? 'F' : 'C';
-    const groups = positions.map((pos) => (pos === 'PG' || pos === 'SG' ? 'G' : pos === 'C' ? 'C' : 'F'));
+    const groups = positions.map((pos) =>
+      pos === 'PG' || pos === 'SG' ? 'G' : pos === 'C' ? 'C' : 'F',
+    );
     if (groups.includes(req)) return s;
   }
   throw new Error('no legal slot');
@@ -133,18 +233,44 @@ describe('sandbox builder', () => {
   it('places five through the pure G/G/F/F/C path and locks', () => {
     const pool = candidatePool();
     let state = createSandboxBuilder();
-    state = applySandboxBuilderCommand(state, pool, { kind: 'sandbox-place', playerId: 'p-g1', slotIndex: 0 });
-    state = applySandboxBuilderCommand(state, pool, { kind: 'sandbox-place', playerId: 'p-g2', slotIndex: 1 });
-    state = applySandboxBuilderCommand(state, pool, { kind: 'sandbox-place', playerId: 'p-f1', slotIndex: 2 });
-    state = applySandboxBuilderCommand(state, pool, { kind: 'sandbox-place', playerId: 'p-f2', slotIndex: 3 });
-    state = applySandboxBuilderCommand(state, pool, { kind: 'sandbox-place', playerId: 'p-c1', slotIndex: 4 });
+    state = applySandboxBuilderCommand(state, pool, {
+      kind: 'sandbox-place',
+      playerId: 'p-g1',
+      slotIndex: 0,
+    });
+    state = applySandboxBuilderCommand(state, pool, {
+      kind: 'sandbox-place',
+      playerId: 'p-g2',
+      slotIndex: 1,
+    });
+    state = applySandboxBuilderCommand(state, pool, {
+      kind: 'sandbox-place',
+      playerId: 'p-f1',
+      slotIndex: 2,
+    });
+    state = applySandboxBuilderCommand(state, pool, {
+      kind: 'sandbox-place',
+      playerId: 'p-f2',
+      slotIndex: 3,
+    });
+    state = applySandboxBuilderCommand(state, pool, {
+      kind: 'sandbox-place',
+      playerId: 'p-c1',
+      slotIndex: 4,
+    });
     state = applySandboxBuilderCommand(state, pool, { kind: 'sandbox-lock' });
     expect(state.locked).toBe(true);
   });
   it('rejects illegal slot assignments on the same path solo and multiplayer share', () => {
     const pool = candidatePool();
     const state = createSandboxBuilder();
-    expect(() => applySandboxBuilderCommand(state, pool, { kind: 'sandbox-place', playerId: 'p-c1', slotIndex: 0 })).toThrow();
+    expect(() =>
+      applySandboxBuilderCommand(state, pool, {
+        kind: 'sandbox-place',
+        playerId: 'p-c1',
+        slotIndex: 0,
+      }),
+    ).toThrow();
   });
   it('enumerates only feasible safe moves', () => {
     const pool = candidatePool();
@@ -161,21 +287,55 @@ describe('classic reducer', () => {
   it('wraps solo draft functions without changing default behavior', () => {
     const catalog = classicCatalog();
     const seed = fixedFiveDraftSeed(ROOT, 'p1');
-    const solo = createParticipantClassicDraft('draft-p1', 'ratings', seed, 'data-v1', catalog, context);
+    const solo = createParticipantClassicDraft(
+      'draft-p1',
+      'ratings',
+      seed,
+      'data-v1',
+      catalog,
+      context,
+    );
     expect(solo.roll).not.toBeNull();
     expect(solo.seed).toBe(seed);
   });
   it('supports an optional eligibility policy', () => {
     const catalog = classicCatalog();
     const seed = fixedFiveDraftSeed(ROOT, 'p1');
-    const state = createParticipantClassicDraft('draft-p1', 'ratings', seed, 'data-v1', catalog, context);
-    const rerolled = applyClassicBuilderCommand(state, catalog, { kind: 'reroll', axis: 'franchise' }, context, (entry) => entry.franchiseId !== 'xxx');
+    const state = createParticipantClassicDraft(
+      'draft-p1',
+      'ratings',
+      seed,
+      'data-v1',
+      catalog,
+      context,
+    );
+    const rerolled = applyClassicBuilderCommand(
+      state,
+      catalog,
+      { kind: 'reroll', axis: 'franchise' },
+      context,
+      (entry) => entry.franchiseId !== 'xxx',
+    );
     expect(rerolled.rerolls.franchiseSpent).toBe(true);
   });
   it('derives independent participant seeds', () => {
     const catalog = classicCatalog();
-    const p1 = createParticipantClassicDraft('d1', 'ratings', fixedFiveDraftSeed(ROOT, 'p1'), 'data-v1', catalog, context);
-    const p2 = createParticipantClassicDraft('d2', 'ratings', fixedFiveDraftSeed(ROOT, 'p2'), 'data-v1', catalog, context);
+    const p1 = createParticipantClassicDraft(
+      'd1',
+      'ratings',
+      fixedFiveDraftSeed(ROOT, 'p1'),
+      'data-v1',
+      catalog,
+      context,
+    );
+    const p2 = createParticipantClassicDraft(
+      'd2',
+      'ratings',
+      fixedFiveDraftSeed(ROOT, 'p2'),
+      'data-v1',
+      catalog,
+      context,
+    );
     expect(p1.seed).not.toBe(p2.seed);
   });
 });
@@ -190,9 +350,13 @@ describe('duel draft', () => {
       const picker = duelCurrentPicker(state);
       const roll = state.currentRoll;
       if (!roll) throw new Error('duel draft is missing its roll');
-      const entry = catalog.find((e) => e.franchiseId === roll.franchiseId && e.eraId === roll.eraId);
+      const entry = catalog.find(
+        (e) => e.franchiseId === roll.franchiseId && e.eraId === roll.eraId,
+      );
       expect(entry).toBeDefined();
-      const used = new Set<number>(state.picks.filter((p) => p.participantId === picker).map((p) => p.slotIndex));
+      const used = new Set<number>(
+        state.picks.filter((p) => p.participantId === picker).map((p) => p.slotIndex),
+      );
       const claimed = new Set(state.claimedVersionIds);
       const option = entry?.players.find((p) => {
         const candidate = byId.get(p.playerId);
@@ -208,9 +372,16 @@ describe('duel draft', () => {
       });
       expect(option).toBeDefined();
       const candidate = byId.get(option?.playerId ?? '');
-      const positions = candidate?.positions ?? option?.positions ?? (['PG'] as FixedFiveCandidate['positions']);
+      const positions =
+        candidate?.positions ?? option?.positions ?? (['PG'] as FixedFiveCandidate['positions']);
       const slot = slotForPosition(positions, used);
-      state = claimDuelPlayer(state, catalog, byId, { playerId: option?.playerId ?? '', slotIndex: slot, actor: picker }, context);
+      state = claimDuelPlayer(
+        state,
+        catalog,
+        byId,
+        { playerId: option?.playerId ?? '', slotIndex: slot, actor: picker },
+        context,
+      );
     }
     expect(isDuelComplete(state)).toBe(true);
     expect(duelAlternationHolds(state)).toBe(true);
@@ -225,13 +396,17 @@ describe('duel draft', () => {
     let state = createDuelDraft(ROOT, catalog, byId, context, 'p1');
     const picker = duelCurrentPicker(state);
     state = rerollDuel(state, catalog, byId, 'franchise', picker, context);
-    expect(() => rerollDuel(state, catalog, byId, 'franchise', duelCurrentPicker(state), context)).toThrow();
+    expect(() =>
+      rerollDuel(state, catalog, byId, 'franchise', duelCurrentPicker(state), context),
+    ).toThrow();
   });
 });
 
 describe('timeout autopick', () => {
   it('ranks by selectionScore desc, versionId asc, slot asc and draws from top eight', () => {
-    const single = [{ playerId: 'c', playerVersionId: 'pv-c', slotIndex: 0 as const, selectionScore: 90 }];
+    const single = [
+      { playerId: 'c', playerVersionId: 'pv-c', slotIndex: 0 as const, selectionScore: 90 },
+    ];
     expect(chooseAutopick(ROOT, 'duel', 'p1', 0, single).playerId).toBe('c');
     const candidates = [
       { playerId: 'a', playerVersionId: 'pv-b', slotIndex: 1 as const, selectionScore: 80 },
@@ -256,17 +431,30 @@ describe('timeout autopick', () => {
   });
   it('repeats sandbox autopicks until full then locks', () => {
     const pool = candidatePool();
-    const picks = chooseSandboxAutopicksUntilFull(ROOT, 'sandbox-shared-82', 'p1', 0, pool, createSandboxBuilder());
+    const picks = chooseSandboxAutopicksUntilFull(
+      ROOT,
+      'sandbox-shared-82',
+      'p1',
+      0,
+      pool,
+      createSandboxBuilder(),
+    );
     expect(picks.length).toBe(5);
     let state = createSandboxBuilder();
     for (const pick of picks) {
-      state = applySandboxBuilderCommand(state, pool, { kind: 'sandbox-place', playerId: pick.playerId, slotIndex: pick.slotIndex });
+      state = applySandboxBuilderCommand(state, pool, {
+        kind: 'sandbox-place',
+        playerId: pick.playerId,
+        slotIndex: pick.slotIndex,
+      });
     }
     state = applySandboxBuilderCommand(state, pool, { kind: 'sandbox-lock' });
     expect(state.locked).toBe(true);
   });
   it('uses the rootSeed/timeout-autopick/mode/participant/pickOrdinal path', () => {
-    const candidates = [{ playerId: 'p-g1', playerVersionId: 'pv-p-g1', slotIndex: 0 as const, selectionScore: 90 }];
+    const candidates = [
+      { playerId: 'p-g1', playerVersionId: 'pv-p-g1', slotIndex: 0 as const, selectionScore: 90 },
+    ];
     const pick = chooseAutopick(ROOT, 'classic-shared-82', 'p2', 3, candidates);
     expect(pick.seedPath).toBe('rootSeed/timeout-autopick/classic-shared-82/p2/3');
   });
@@ -281,14 +469,19 @@ describe('shared82 linked gauntlets', () => {
     const p1Team = buildLegalSimulationTeam({ teamId: 'p1', displayName: 'P1' });
     const p2Team = buildLegalSimulationTeam({ teamId: 'p2', displayName: 'P2' });
     const profile: EraSimulationProfile = DEFAULT_ERA_SIM_PROFILE;
-    const out = simulateShared82({ p1Team, p2Team, bracket, profile, rootSeed: ROOT, dataVersion: 'data-v1' }, context);
+    const out = simulateShared82(
+      { p1Team, p2Team, bracket, profile, rootSeed: ROOT, dataVersion: 'data-v1' },
+      context,
+    );
     expect(out.p1Games.length).toBe(82);
     expect(out.p2Games.length).toBe(82);
     expect(out.result.gamesPerParticipant).toBe(82);
     expect(out.uniqueSimulations).toBe(82 + 82 - h2h.length);
     expect(out.result.h2hGameNumbers).toEqual(h2h);
     expect(out.result.weakestReplacedOpponentId).toBe(weakest.opponentId);
-    const remaining = bracket.opponents.map((o) => o.opponentId).filter((id) => id !== weakest.opponentId);
+    const remaining = bracket.opponents
+      .map((o) => o.opponentId)
+      .filter((id) => id !== weakest.opponentId);
     expect(remaining.length).toBe(29);
     for (const game of out.p1Games) {
       if (h2h.includes(game.gameNumber)) {
@@ -306,8 +499,14 @@ describe('shared82 linked gauntlets', () => {
     const p1Team = buildLegalSimulationTeam({ teamId: 'p1', displayName: 'P1' });
     const p2Team = buildLegalSimulationTeam({ teamId: 'p2', displayName: 'P2' });
     const profile: EraSimulationProfile = DEFAULT_ERA_SIM_PROFILE;
-    const first = simulateShared82({ p1Team, p2Team, bracket, profile, rootSeed: ROOT, dataVersion: 'data-v1' }, context);
-    const second = simulateShared82({ p1Team, p2Team, bracket, profile, rootSeed: ROOT, dataVersion: 'data-v1' }, context);
+    const first = simulateShared82(
+      { p1Team, p2Team, bracket, profile, rootSeed: ROOT, dataVersion: 'data-v1' },
+      context,
+    );
+    const second = simulateShared82(
+      { p1Team, p2Team, bracket, profile, rootSeed: ROOT, dataVersion: 'data-v1' },
+      context,
+    );
     expect(JSON.stringify(first.result)).toBe(JSON.stringify(second.result));
   });
 });
@@ -316,7 +515,10 @@ describe('duel series', () => {
   it('stops immediately at four wins and derives seeds per game', () => {
     const p1Team = buildLegalSimulationTeam({ teamId: 'p1', displayName: 'P1' });
     const p2Team = buildLegalSimulationTeam({ teamId: 'p2', displayName: 'P2' });
-    const out = simulateDuelSeries({ p1Team, p2Team, profile: DEFAULT_ERA_SIM_PROFILE, rootSeed: ROOT, dataVersion: 'data-v1' }, context);
+    const out = simulateDuelSeries(
+      { p1Team, p2Team, profile: DEFAULT_ERA_SIM_PROFILE, rootSeed: ROOT, dataVersion: 'data-v1' },
+      context,
+    );
     expect(out.result.games.length).toBeGreaterThanOrEqual(4);
     expect(out.result.games.length).toBeLessThanOrEqual(7);
     expect([out.result.p1Wins, out.result.p2Wins].includes(4)).toBe(true);
@@ -324,7 +526,10 @@ describe('duel series', () => {
     for (const game of out.result.games) {
       expect(game.seed).toBe(fixedFiveDuelGameSeed(ROOT, game.gameNumber));
     }
-    const again = simulateDuelSeries({ p1Team, p2Team, profile: DEFAULT_ERA_SIM_PROFILE, rootSeed: ROOT, dataVersion: 'data-v1' }, context);
+    const again = simulateDuelSeries(
+      { p1Team, p2Team, profile: DEFAULT_ERA_SIM_PROFILE, rootSeed: ROOT, dataVersion: 'data-v1' },
+      context,
+    );
     expect(JSON.stringify(out.result)).toBe(JSON.stringify(again.result));
   });
 });
@@ -334,8 +539,28 @@ describe('result digest', () => {
     const p1Players = buildLegalSimulationTeam({ teamId: 'p1', displayName: 'P1' }).players;
     const p2Players = buildLegalSimulationTeam({ teamId: 'p2', displayName: 'P2' }).players;
     const lineups = {
-      p1: { lineup: { structure: ['G', 'G', 'F', 'F', 'C'] as ['G', 'G', 'F', 'F', 'C'], assignments: p1Players.map((p, slotIndex) => ({ slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4, playerId: p.playerId, positions: p.positions })) }, players: p1Players },
-      p2: { lineup: { structure: ['G', 'G', 'F', 'F', 'C'] as ['G', 'G', 'F', 'F', 'C'], assignments: p2Players.map((p, slotIndex) => ({ slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4, playerId: p.playerId, positions: p.positions })) }, players: p2Players },
+      p1: {
+        lineup: {
+          structure: ['G', 'G', 'F', 'F', 'C'] as ['G', 'G', 'F', 'F', 'C'],
+          assignments: p1Players.map((p, slotIndex) => ({
+            slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4,
+            playerId: p.playerId,
+            positions: p.positions,
+          })),
+        },
+        players: p1Players,
+      },
+      p2: {
+        lineup: {
+          structure: ['G', 'G', 'F', 'F', 'C'] as ['G', 'G', 'F', 'F', 'C'],
+          assignments: p2Players.map((p, slotIndex) => ({
+            slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4,
+            playerId: p.playerId,
+            positions: p.positions,
+          })),
+        },
+        players: p2Players,
+      },
     };
     const versions = {
       dataVersion: 'data-v1',
@@ -380,7 +605,10 @@ describe('classic safe moves', () => {
     const catalog = classicCatalog();
     const byId = poolById(candidatePool());
     const seed = seedFromString('classic-safe');
-    const state = createClassicDraft({ draftId: 'd', variant: 'ratings', seed, dataVersion: 'data-v1', catalog }, context);
+    const state = createClassicDraft(
+      { draftId: 'd', variant: 'ratings', seed, dataVersion: 'data-v1', catalog },
+      context,
+    );
     const moves = enumerateClassicSafeMoves(catalog, byId, state);
     expect(moves.length).toBeGreaterThan(0);
   });

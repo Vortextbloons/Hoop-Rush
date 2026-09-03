@@ -21,15 +21,6 @@ import { availabilityStripRows, humanInjuryTimeline } from '$lib/season/season-h
 import { influenceViewModel, type InfluenceViewModel } from '$lib/season/season-influence-view';
 import { tradeOfferViewModel } from '$lib/season/season-trade-view';
 import { buildManifest } from '@hoop-rush/test-fixtures';
-vi.mock('@hoop-rush/engine', () => ({
-  seasonObjectiveChoicesForBlock: () => ['win-six', 'defense-108', 'turnover-130'] as const,
-  fatigueBandOf: (fatigueBasisPoints: number) => {
-    if (fatigueBasisPoints < 1500) return 'fresh';
-    if (fatigueBasisPoints < 3500) return 'ready';
-    if (fatigueBasisPoints < 6000) return 'tired';
-    return 'heavy';
-  },
-}));
 mockSvelteKitApp();
 const PLAYER_A = 'pv-00000000000000000000000000000000';
 const PLAYER_B = 'pv-11111111111111111111111111111111';
@@ -284,7 +275,7 @@ describe('InfluencePanel', () => {
     });
     const text = document.body.textContent;
     expect(text).toContain('3');
-    expect(text).toContain('cap 8 · floor 0');
+    expect(text).toContain('spendable this window');
     expect(text).toContain('Extra trade offer');
     expect(text).toContain('Risky rehab');
     const spendButton = screen.getByRole('button', { name: /Spend 1/ });
@@ -498,9 +489,9 @@ describe('CheckpointRecap (M2.5)', () => {
     expect(text).toContain('Out');
     expect(text).toContain('Recurrence risk');
     expect(text).toContain('Injuries this block');
-    expect(text).toContain('3 injuries');
+    expect(text).toContain('Injuries: 3 this block');
     expect(text).toContain('win-six');
     expect(text).toContain('Success · +1 Influence');
-    expect(text).toContain('your Influence delta: +1');
+    expect(text).toContain('Influence +1 (now 4)');
   });
 });

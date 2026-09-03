@@ -17,28 +17,76 @@ import {
 } from './fixed-five-multiplayer.ts';
 import { canonicalJson, seasonDigestHex } from './season-hash.ts';
 
-function nowIso(): string {
-  return new Date().toISOString();
+function fnv1a32Seed(input: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < input.length; i += 1) {
+    h ^= input.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
 }
 
-function randomSeed(): string {
+function mulberry32Seed(seed: number): () => number {
+  let a = seed | 0;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function createSeededRng(seed: string): () => number {
+  return mulberry32Seed(fnv1a32Seed(seed));
+}
+
+function cryptoRng(): number {
+  const word = new Uint32Array(1);
+  crypto.getRandomValues(word);
+  return (word[0] as number) / 4294967296;
+}
+
+function nowIsoWith(clock: () => number): string {
+  return new Date(clock()).toISOString();
+}
+
+function randomSeedWith(rng: () => number, useCrypto: boolean): string {
+  if (useCrypto) {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+  }
   const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
+  for (let i = 0; i < bytes.length; i += 1) {
+    bytes[i] = Math.floor(rng() * 256);
+  }
   return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-function randomCode(existing: Set<string>): FixedFiveRoomCode {
+function randomCodeWith(existing: Set<string>, rng: () => number): FixedFiveRoomCode {
   for (let attempt = 0; attempt < 2000; attempt += 1) {
-    const n = Math.floor(Math.random() * 10000);
+    const n = Math.floor(rng() * 10000);
     const code = String(n).padStart(4, '0');
     if (!existing.has(code)) return code;
   }
   throw new Error('in-memory fixed-five: code space exhausted');
 }
 
-function randomRoomId(): string {
+function randomRoomIdWith(rng: () => number, useCrypto: boolean): string {
+  if (useCrypto) {
+    const bytes = new Uint8Array(12);
+    crypto.getRandomValues(bytes);
+    return `ff-${[...bytes]
+      .map((b) => b.toString(36))
+      .join('')
+      .slice(0, 12)}`
+      .toLowerCase()
+      .replace(/[^a-z0-9._:-]/g, 'a');
+  }
   const bytes = new Uint8Array(12);
-  crypto.getRandomValues(bytes);
+  for (let i = 0; i < bytes.length; i += 1) {
+    bytes[i] = Math.floor(rng() * 256);
+  }
   return `ff-${[...bytes]
     .map((b) => b.toString(36))
     .join('')
@@ -69,8 +117,13 @@ function snapshotDigest(snapshot: FixedFiveRoomSnapshot): string {
 
 export function createInMemoryFixedFiveTransport(options?: {
   clock?: () => number;
+  seed?: string;
+  rng?: () => number;
 }): FixedFiveMultiplayerTransport {
   const clock = options?.clock ?? Date.now;
+  const seededRng = options?.seed !== undefined ? createSeededRng(options.seed) : null;
+  const rng = options?.rng ?? seededRng ?? cryptoRng;
+  const useCrypto = options?.rng === undefined && options?.seed === undefined;
   const rooms = new Map<string, RoomRecord>();
   const codeIndex = new Map<string, string>();
   const createTimestamps: number[] = [];
@@ -126,10 +179,10 @@ export function createInMemoryFixedFiveTransport(options?: {
         ...settingsInput,
         versions: settingsInput.versions,
       };
-      const roomId = randomRoomId();
+      const roomId = randomRoomIdWith(rng, useCrypto);
       const codes = new Set(codeIndex.keys());
-      const code = randomCode(codes);
-      const rootSeed = randomSeed();
+      const code = randomCodeWith(codes, rng);
+      const rootSeed = randomSeedWith(rng, useCrypto);
       const timeoutMs = fixedFiveTimeoutMsForMode(settings.mode);
       const createdAt = new Date(now).toISOString();
       const expiresAt = new Date(now + 24 * 60 * 60 * 1000).toISOString();
@@ -214,7 +267,7 @@ export function createInMemoryFixedFiveTransport(options?: {
         throw Object.assign(new Error('code-expired'), { code: 'code-expired', retryable: false });
       const p2 = record.snapshot.members.find((m) => m.participantId === 'p2');
       const updated = record.snapshot.members.map((m) =>
-        m.participantId === 'p2' ? { ...m, online: true, lastSeenAt: nowIso() } : m,
+        m.participantId === 'p2' ? { ...m, online: true, lastSeenAt: nowIsoWith(clock) } : m,
       );
       void p2;
       record.snapshot = {
@@ -369,7 +422,7 @@ export function createInMemoryFixedFiveTransport(options?: {
       if (targetParticipantId !== 'p2')
         throw Object.assign(new Error('membership'), { code: 'membership', retryable: false });
       const codes = new Set([...codeIndex.keys()].filter((c) => c !== record.code));
-      const nextCode = randomCode(codes);
+      const nextCode = randomCodeWith(codes, rng);
       codeIndex.delete(record.code);
       codeIndex.set(nextCode, roomId);
       record.code = nextCode;
@@ -414,6 +467,71 @@ export function createInMemoryFixedFiveTransport(options?: {
       record.snapshot = { ...record.snapshot, successorRoomId: created.snapshot.roomId };
       emit(record);
       return { snapshot: created.snapshot, code: created.code };
+    },
+    async complete(roomId, resultDigest) {
+      await Promise.resolve();
+      const record = rooms.get(roomId);
+      if (!record)
+        throw Object.assign(new Error('authorization'), {
+          code: 'authorization',
+          retryable: false,
+        });
+      if (record.snapshot.phase === 'completed')
+        return { completed: true, phase: record.snapshot.phase };
+      if (record.snapshot.phase === 'integrity-failed' || record.snapshot.phase === 'expired')
+        return { completed: false, phase: record.snapshot.phase };
+      const proposed = record.commands.some(
+        (c) => c.payload.kind === 'propose-result' && c.payload.resultDigest === resultDigest,
+      );
+      const confirmed = record.commands.some(
+        (c) =>
+          c.payload.kind === 'confirm-result' &&
+          c.payload.verified === true &&
+          c.payload.resultDigest === resultDigest,
+      );
+      if (!proposed || !confirmed) return { completed: false, phase: record.snapshot.phase };
+      record.snapshot = {
+        ...record.snapshot,
+        phase: 'completed',
+        resultDigest,
+        confirmedDigest: resultDigest,
+        code: null,
+        codeActive: false,
+        revision: record.snapshot.revision + 1,
+      };
+      emit(record);
+      return { completed: true, phase: record.snapshot.phase };
+    },
+    async fail(roomId) {
+      await Promise.resolve();
+      const record = rooms.get(roomId);
+      if (!record)
+        throw Object.assign(new Error('authorization'), {
+          code: 'authorization',
+          retryable: false,
+        });
+      if (record.snapshot.phase === 'integrity-failed')
+        return { failed: true, phase: record.snapshot.phase };
+      if (record.snapshot.phase === 'completed' || record.snapshot.phase === 'expired')
+        return { failed: false, phase: record.snapshot.phase };
+      const digests = new Set(
+        record.commands
+          .filter((c) => c.payload.kind === 'propose-result')
+          .map((c) => (c.payload.kind === 'propose-result' ? c.payload.resultDigest : '')),
+      );
+      const denied = record.commands.some(
+        (c) => c.payload.kind === 'confirm-result' && c.payload.verified === false,
+      );
+      if (digests.size < 2 || !denied) return { failed: false, phase: record.snapshot.phase };
+      record.snapshot = {
+        ...record.snapshot,
+        phase: 'integrity-failed',
+        code: null,
+        codeActive: false,
+        revision: record.snapshot.revision + 1,
+      };
+      emit(record);
+      return { failed: true, phase: record.snapshot.phase };
     },
   };
 }

@@ -60,7 +60,12 @@ describe('fixed-five contracts', () => {
       multiplayerVersion: 'fixed-five-multiplayer-v1',
       autopickVersion: 'fixed-five-autopick-v1',
     };
-    const created = await transport.create({ mode: 'duel', sourceMode: 'classic', variant: 'ratings', versions });
+    const created = await transport.create({
+      mode: 'duel',
+      sourceMode: 'classic',
+      variant: 'ratings',
+      versions,
+    });
     expect(created.code).toMatch(/^[0-9]{4}$/);
     const previewed = await transport.preview(created.code);
     expect(previewed.roomId).toBe(created.snapshot.roomId);
@@ -139,7 +144,12 @@ describe('fixed-five contracts', () => {
       multiplayerVersion: 'fixed-five-multiplayer-v1',
       autopickVersion: 'fixed-five-autopick-v1',
     };
-    const created = await transport.create({ mode: 'classic-shared-82', sourceMode: 'classic', variant: 'ratings', versions });
+    const created = await transport.create({
+      mode: 'classic-shared-82',
+      sourceMode: 'classic',
+      variant: 'ratings',
+      versions,
+    });
     const joined = await transport.join(created.code);
     expect(joined.membership.participantId).toBe('p2');
     const p1Ready = await transport.submitCommand({

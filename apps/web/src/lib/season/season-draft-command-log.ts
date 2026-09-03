@@ -3,72 +3,74 @@ import type {
   SeasonDraftState,
   SeasonPublicCommandEnvelope,
 } from '@hoop-rush/data-contracts';
-import { seasonDigestHex, seasonNamespaceSeed } from '@hoop-rush/data-contracts';
-const DRAFT_PAYLOAD_KINDS = new Set([
-  'create-season-draft',
-  'draw-season-offer',
-  'select-draft-player',
-  'finalize-human-rosters',
-  'generate-ai-league',
-  'reveal-draft-roll',
-  'claim-draft-pool',
-]);
+import {
+  seasonDigestHex,
+  seasonNamespaceSeed,
+  seasonDraftCommandSchema,
+  seasonDraftCommandPayloadSchema,
+} from '@hoop-rush/data-contracts';
+function isDraftCommand(value: unknown): value is SeasonDraftCommand {
+  return seasonDraftCommandSchema.safeParse(value).success;
+}
 export function draftCommandId(rootSeed: string, kind: string, ...parts: string[]): string {
   const seed = seasonNamespaceSeed(rootSeed, 'draft', kind, ...parts);
   const hex = seasonDigestHex(seed);
   return `${kind}-${hex.slice(0, 16)}`.slice(0, 64);
 }
-function isDraftCommand(value: unknown): value is SeasonDraftCommand {
-  if (!value || typeof value !== 'object') return false;
-  const v = value as Record<string, unknown>;
-  return (
-    typeof v.commandId === 'string' &&
-    typeof v.expectedRevision === 'number' &&
-    v.payload !== null &&
-    typeof v.payload === 'object' &&
-    typeof (v.payload as Record<string, unknown>).kind === 'string'
-  );
-}
 export function envelopeToDraftCommand(
   env: SeasonPublicCommandEnvelope,
   state: SeasonDraftState | null,
 ): SeasonDraftCommand | null {
-  if (
-    (
-      env as SeasonPublicCommandEnvelope & {
-        accepted?: boolean;
-      }
-    ).accepted === false
-  ) {
+  if ('accepted' in env && env.accepted === false) {
     return null;
   }
-  const raw = env.payload;
+  const raw: unknown = env.payload;
   if (isDraftCommand(raw)) return raw;
-  if (!raw || typeof raw !== 'object' || !('kind' in (raw as Record<string, unknown>))) {
-    return null;
-  }
-  const payload = raw as SeasonDraftCommand['payload'];
-  if (DRAFT_PAYLOAD_KINDS.has(payload.kind)) {
-    return {
-      commandId: env.commandId,
-      expectedRevision: state?.revision ?? 0,
-      payload,
-    };
-  }
-  if ((payload as unknown as Record<string, unknown>).kind === 'room-draft-pick') {
-    const p = payload as unknown as {
-      participantId: string;
-      playerVersionId: string;
-    };
-    return {
-      commandId: env.commandId,
-      expectedRevision: state?.revision ?? 0,
-      payload: {
+  if (typeof raw !== 'object' || raw === null) return null;
+  if (!('kind' in raw)) return null;
+  const kind: unknown = raw.kind;
+  if (typeof kind !== 'string') return null;
+  switch (kind) {
+    case 'create-season-draft':
+    case 'draw-season-offer':
+    case 'select-draft-player':
+    case 'finalize-human-rosters':
+    case 'generate-ai-league':
+    case 'reveal-draft-roll':
+    case 'claim-draft-pool': {
+      const parsed = seasonDraftCommandPayloadSchema.safeParse(raw);
+      if (!parsed.success) return null;
+      return {
+        commandId: env.commandId,
+        expectedRevision: state?.revision ?? 0,
+        payload: parsed.data,
+      };
+    }
+    case 'room-draft-pick': {
+      if (!('participantId' in raw) || !('playerVersionId' in raw)) return null;
+      const participantId: unknown = raw.participantId;
+      const playerVersionId: unknown = raw.playerVersionId;
+      if (
+        (participantId !== 'p1' && participantId !== 'p2') ||
+        typeof playerVersionId !== 'string'
+      ) {
+        return null;
+      }
+      const mapped: unknown = {
         kind: 'select-draft-player',
-        participantId: p.participantId as 'p1' | 'p2',
-        playerVersionId: p.playerVersionId,
-      },
-    };
+        participantId,
+        playerVersionId,
+      };
+      const parsed = seasonDraftCommandPayloadSchema.safeParse(mapped);
+      if (!parsed.success) return null;
+      if (parsed.data.kind !== 'select-draft-player') return null;
+      return {
+        commandId: env.commandId,
+        expectedRevision: state?.revision ?? 0,
+        payload: parsed.data,
+      };
+    }
+    default:
+      return null;
   }
-  return null;
 }

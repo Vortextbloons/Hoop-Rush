@@ -50,7 +50,7 @@ import {
   type SeasonRunSnapshot,
   type SeasonWindowOpenResult,
 } from '@hoop-rush/persistence';
-import { completeSeasonBlockCommit } from '@hoop-rush/engine';
+import { completeSeasonBlockCommit, type simulateSeasonBlock } from '@hoop-rush/engine';
 import type { SeasonFreeAgencyIndex, SeasonRosterTargets } from '@hoop-rush/data-contracts';
 import { assembleCommittedSnapshot } from '$lib/season/season-block-runner';
 import type {
@@ -61,6 +61,27 @@ import type {
 } from '$lib/season/season-block-runner';
 import { getSeasonRunRepository } from '$lib/season/season-repo';
 import { gamesToLockForBlock } from '$lib/season/season-lock-preview';
+type EngineSimulateBlockOutput = ReturnType<typeof simulateSeasonBlock>;
+type EngineSimulateBlockInput = Parameters<typeof simulateSeasonBlock>[0];
+type EngineCommitOutput = ReturnType<typeof completeSeasonBlockCommit>;
+type EngineCommitInput = Parameters<typeof completeSeasonBlockCommit>[0];
+type FakeCommitOutput = Pick<
+  EngineCommitOutput,
+  'checkpointState' | 'stateRevision' | 'stateDigest' | 'window' | 'freeAgency'
+>;
+type _FakeSimulateInputParity = EngineSimulateBlockInput extends {
+  command: { blockIndex: number };
+}
+  ? true
+  : never;
+type _FakeCommitInputParity = EngineCommitInput extends {
+  commandId: string;
+  candidate: EngineSimulateBlockOutput;
+}
+  ? true
+  : never;
+const _fakeSimulateInputParity: _FakeSimulateInputParity = true;
+const _fakeCommitInputParity: _FakeCommitInputParity = true;
 const PROGRESS_STEP_MS = 40;
 const GAMES_PER_STEP = 15;
 function deterministicPoints(gameId: string, base: number): number {
@@ -770,19 +791,13 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
   }
   private committedFacts(
     input: SeasonBlockStartInput,
-    checkpoint: SeasonCandidateCheckpoint,
+    checkpoint: EngineSimulateBlockOutput,
     commandId: string,
     freeAgencyAssets?: {
       freeAgencyIndex?: SeasonFreeAgencyIndex;
       freeAgencyTargets?: SeasonRosterTargets;
     },
-  ): {
-    checkpointState: SeasonCheckpointState;
-    stateRevision: number;
-    stateDigest: string;
-    window: SeasonWindowOpenResult | null;
-    freeAgency: SeasonFreeAgencyState;
-  } {
+  ): FakeCommitOutput {
     return completeSeasonBlockCommit({
       run: { ...input.run, rotations: input.rotations },
       candidate: checkpoint,

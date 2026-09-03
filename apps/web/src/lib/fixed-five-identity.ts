@@ -1,3 +1,8 @@
+import {
+  fixedFiveRoomMembershipSchema,
+  type FixedFiveRoomMembership,
+} from '@hoop-rush/data-contracts';
+
 export function inviteLinkForFixedFiveCode(code: string): string {
   return `/multiplayer?code=${code}`;
 }
@@ -18,11 +23,7 @@ export function friendlyFixedFiveJoinError(error: unknown): string {
 const MEMBERSHIP_PREFIX = 'hoop-rush:fixed-five:membership:';
 const LAST_ROOM_KEY = 'hoop-rush:fixed-five:last-room';
 
-export interface StoredFixedFiveMembership {
-  roomId: string;
-  participantId: 'p1' | 'p2';
-  code: string;
-}
+export type StoredFixedFiveMembership = FixedFiveRoomMembership;
 
 export function saveFixedFiveMembership(membership: StoredFixedFiveMembership): void {
   try {
@@ -37,9 +38,11 @@ export function loadFixedFiveMembership(roomId: string): StoredFixedFiveMembersh
   try {
     const raw = localStorage.getItem(`${MEMBERSHIP_PREFIX}${roomId}`);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as StoredFixedFiveMembership;
-    if (parsed.roomId !== roomId) return null;
-    return parsed;
+    const parsed: unknown = JSON.parse(raw);
+    const result = fixedFiveRoomMembershipSchema.safeParse(parsed);
+    if (!result.success) return null;
+    if (result.data.roomId !== roomId) return null;
+    return result.data;
   } catch {
     return null;
   }

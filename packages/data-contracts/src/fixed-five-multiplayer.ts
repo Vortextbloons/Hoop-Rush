@@ -379,6 +379,8 @@ export interface FixedFiveMultiplayerTransport {
   ): Promise<FixedFiveRoomSnapshot>;
   leave(roomId: string, participantId: FixedFiveParticipantId): Promise<void>;
   rematch(roomId: string): Promise<{ snapshot: FixedFiveRoomSnapshot; code: FixedFiveRoomCode }>;
+  complete(roomId: string, resultDigest: string): Promise<{ completed: boolean; phase: FixedFiveRoomPhase }>;
+  fail(roomId: string): Promise<{ failed: boolean; phase: FixedFiveRoomPhase }>;
 }
 
 export function fixedFiveTimeoutMsForMode(mode: FixedFiveRoomMode): number {

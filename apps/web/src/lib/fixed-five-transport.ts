@@ -1,8 +1,11 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import {
   createInMemoryFixedFiveTransport,
+  fixedFiveCommandPayloadSchema,
   fixedFiveCommandSchema,
+  fixedFiveRoomSettingsSchema,
   type FixedFiveCommandReceipt,
+  type FixedFiveMemberSnapshot,
   type FixedFiveMultiplayerTransport,
   type FixedFiveParticipantId,
   type FixedFiveRoomSettings,
@@ -32,10 +35,24 @@ interface FixedFiveRoomRow {
   result_digest: string | null;
   confirmed_digest: string | null;
   successor_room_id: string | null;
+  root_seed: string;
+  deadline_at: string | null;
+  deadline_cursor: string | null;
+  deadline_participant: string | null;
+  deadline_fallback: unknown;
+  deadline_pick_ordinal: number | null;
   expires_at: string;
   created_at: string;
   settings: FixedFiveRoomSnapshot['settings'];
-  members?: FixedFiveRoomSnapshot['members'];
+}
+
+interface FixedFiveMemberRow {
+  participant_id: string;
+  online: boolean;
+  ready: boolean;
+  picks_committed: number;
+  locked: boolean;
+  last_seen_at: string | null;
 }
 
 interface FixedFiveCommandRow {
@@ -78,7 +95,8 @@ function commandPayload(value: unknown): RpcCommandPayload {
   const accepted = record['accepted'] === true;
   const ordinal = typeof record['ordinal'] === 'number' ? record['ordinal'] : undefined;
   const revision = typeof record['revision'] === 'number' ? record['revision'] : undefined;
-  const rejection = typeof record['rejection_code'] === 'string' ? record['rejection_code'] : undefined;
+  const rejection =
+    typeof record['rejection_code'] === 'string' ? record['rejection_code'] : undefined;
   return { accepted, ordinal, revision, rejection_code: rejection };
 }
 
@@ -113,12 +131,57 @@ export function createFixedFiveTransport(options?: {
     }
   >();
 
-  function roomRowToSnapshot(row: FixedFiveRoomRow): FixedFiveRoomSnapshot {
-    const fallbackMembers: FixedFiveRoomSnapshot['members'] = [
-      { participantId: 'p1', online: true, ready: false, picksCommitted: 0, locked: false, lastSeenAt: null },
-      { participantId: 'p2', online: false, ready: false, picksCommitted: 0, locked: false, lastSeenAt: null },
+  function memberFallback(participantId: FixedFiveParticipantId): FixedFiveMemberSnapshot {
+    return {
+      participantId,
+      online: false,
+      ready: false,
+      picksCommitted: 0,
+      locked: false,
+      lastSeenAt: null,
+    };
+  }
+
+  function memberFromRow(row: FixedFiveMemberRow): FixedFiveMemberSnapshot | null {
+    if (row.participant_id !== 'p1' && row.participant_id !== 'p2') return null;
+    return {
+      participantId: row.participant_id,
+      online: row.online,
+      ready: row.ready,
+      picksCommitted: row.picks_committed,
+      locked: row.locked,
+      lastSeenAt: row.last_seen_at,
+    };
+  }
+
+  function roomRowToSnapshot(
+    row: FixedFiveRoomRow,
+    memberRows: FixedFiveMemberRow[],
+  ): FixedFiveRoomSnapshot {
+    const byId = new Map<FixedFiveParticipantId, FixedFiveMemberSnapshot>();
+    for (const memberRow of memberRows) {
+      const member = memberFromRow(memberRow);
+      if (member) byId.set(member.participantId, member);
+    }
+    const members: FixedFiveRoomSnapshot['members'] = [
+      byId.get('p1') ?? memberFallback('p1'),
+      byId.get('p2') ?? memberFallback('p2'),
     ];
     const phase = row.phase as FixedFiveRoomSnapshot['phase'];
+    let deadline: FixedFiveRoomSnapshot['deadline'] = null;
+    if (row.deadline_at) {
+      const fallback = fixedFiveCommandPayloadSchema.safeParse(row.deadline_fallback);
+      if (fallback.success) {
+        deadline = {
+          roomId: row.id,
+          cursor: row.deadline_cursor ?? 'lobby',
+          participantId: row.deadline_participant === 'p2' ? 'p2' : 'p1',
+          deadlineAt: row.deadline_at,
+          fallback: fallback.data,
+          pickOrdinal: row.deadline_pick_ordinal ?? 0,
+        };
+      }
+    }
     return {
       roomId: row.id,
       code: row.code,
@@ -128,9 +191,9 @@ export function createFixedFiveTransport(options?: {
       revision: row.revision,
       commandCount: row.command_count,
       digest: row.digest,
-      members: row.members ?? fallbackMembers,
-      rootSeed: null,
-      deadline: null,
+      members,
+      rootSeed: row.root_seed,
+      deadline,
       resultDigest: row.result_digest,
       confirmedDigest: row.confirmed_digest,
       successorRoomId: row.successor_room_id,
@@ -140,10 +203,21 @@ export function createFixedFiveTransport(options?: {
   }
 
   async function fetchSnapshot(roomId: string): Promise<FixedFiveRoomSnapshot> {
-    const response = await client.from('fixed_five_rooms').select('*').eq('id', roomId).single();
-    if (response.error || !response.data) throw new Error('authorization: cannot read room');
-    const row = response.data as unknown as FixedFiveRoomRow;
-    return roomRowToSnapshot(row);
+    const roomResponse = await client
+      .from('fixed_five_rooms')
+      .select('*')
+      .eq('id', roomId)
+      .single();
+    if (roomResponse.error || !roomResponse.data)
+      throw new Error('authorization: cannot read room');
+    const memberResponse = await client
+      .from('fixed_five_room_members')
+      .select('*')
+      .eq('room_id', roomId);
+    if (memberResponse.error) throw new Error(`members failed: ${memberResponse.error.message}`);
+    const row = roomResponse.data as unknown as FixedFiveRoomRow;
+    const memberRows = memberResponse.data as unknown as FixedFiveMemberRow[];
+    return roomRowToSnapshot(row, memberRows);
   }
 
   function emit(roomId: string, snapshot: FixedFiveRoomSnapshot): void {
@@ -191,14 +265,47 @@ export function createFixedFiveTransport(options?: {
     async preview(code) {
       await ensureAnonymous(client);
       const response = await client.rpc('fixed_five_room_preview', { p_code: code });
-      if (response.error || !response.data) throw new Error(`invalid-code: ${response.error?.message ?? code}`);
-      const payload = rpcPayload(response.data);
-      return fetchSnapshot(payload.room_id);
+      if (response.error || !response.data)
+        throw new Error(`invalid-code: ${response.error?.message ?? code}`);
+      // Preview runs before membership exists, so RLS reads are denied by design.
+      // Build a display-only snapshot from the RPC payload instead of fetching rows.
+      const record = response.data as unknown as Record<string, unknown>;
+      const settings = fixedFiveRoomSettingsSchema.parse({
+        schemaVersion: 1,
+        mode: record['mode'],
+        sourceMode: record['source_mode'],
+        variant: record['variant'],
+        timerPolicyVersion: 'fixed-five-autopick-v1',
+        versions: record['versions'],
+      });
+      const phase = (typeof record['phase'] === 'string'
+        ? record['phase']
+        : 'lobby') as FixedFiveRoomSnapshot['phase'];
+      const revision = typeof record['revision'] === 'number' ? record['revision'] : 0;
+      return {
+        roomId: stringField(record, 'room_id'),
+        code,
+        codeActive: true,
+        settings,
+        phase,
+        revision,
+        commandCount: 0,
+        digest: null,
+        members: [memberFallback('p1'), memberFallback('p2')],
+        rootSeed: null,
+        deadline: null,
+        resultDigest: null,
+        confirmedDigest: null,
+        successorRoomId: null,
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        createdAt: new Date().toISOString(),
+      };
     },
     async join(code) {
       await ensureAnonymous(client);
       const response = await client.rpc('fixed_five_room_join', { p_code: code });
-      if (response.error || !response.data) throw new Error(`join failed: ${response.error?.message ?? code}`);
+      if (response.error || !response.data)
+        throw new Error(`join failed: ${response.error?.message ?? code}`);
       const payload = rpcPayload(response.data);
       const snapshot = await fetchSnapshot(payload.room_id);
       const participantId: FixedFiveParticipantId = payload.participant_id ?? 'p2';
@@ -207,16 +314,20 @@ export function createFixedFiveTransport(options?: {
     async resume(roomId) {
       await ensureAnonymous(client);
       const snapshot = await fetchSnapshot(roomId);
-      const memberResponse = await client
-        .from('fixed_five_room_members')
-        .select('participant_id')
-        .eq('room_id', roomId)
-        .limit(1)
-        .single();
+      const user = await client.auth.getUser();
+      const uid = user.data.user?.id;
       let participantId: FixedFiveParticipantId = 'p1';
-      if (!memberResponse.error) {
-        const member = memberResponse.data as unknown as { participant_id?: unknown };
-        if (member.participant_id === 'p2') participantId = 'p2';
+      if (uid) {
+        const memberResponse = await client
+          .from('fixed_five_room_members')
+          .select('participant_id')
+          .eq('room_id', roomId)
+          .eq('uid', uid)
+          .single();
+        if (!memberResponse.error) {
+          const member = memberResponse.data as unknown as { participant_id?: unknown };
+          if (member.participant_id === 'p2') participantId = 'p2';
+        }
       }
       return { snapshot, membership: { roomId, participantId, code: snapshot.code ?? '0000' } };
     },
@@ -239,7 +350,12 @@ export function createFixedFiveTransport(options?: {
           )
           .on(
             'postgres_changes',
-            { event: 'INSERT', schema: 'public', table: 'fixed_five_room_commands', filter: `room_id=eq.${roomId}` },
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'fixed_five_room_commands',
+              filter: `room_id=eq.${roomId}`,
+            },
             () => {
               void refresh(roomId);
             },
@@ -284,7 +400,8 @@ export function createFixedFiveTransport(options?: {
       await ensureAnonymous(client);
       const commandId = command.commandId || randomUUID();
       const withRevision = command as unknown as { expectedRevision?: unknown };
-      const expectedRevision = typeof withRevision.expectedRevision === 'number' ? withRevision.expectedRevision : null;
+      const expectedRevision =
+        typeof withRevision.expectedRevision === 'number' ? withRevision.expectedRevision : null;
       const response = await client.rpc('fixed_five_command_submit', {
         p_room_id: command.roomId,
         p_command_id: commandId,
@@ -315,7 +432,10 @@ export function createFixedFiveTransport(options?: {
     },
     async removeGuest(roomId, targetParticipantId) {
       await ensureAnonymous(client);
-      const response = await client.rpc('fixed_five_guest_remove', { p_room_id: roomId, p_target: targetParticipantId });
+      const response = await client.rpc('fixed_five_guest_remove', {
+        p_room_id: roomId,
+        p_target: targetParticipantId,
+      });
       if (response.error) throw new Error(`remove-guest failed: ${response.error.message}`);
       return fetchSnapshot(roomId);
     },
@@ -327,10 +447,36 @@ export function createFixedFiveTransport(options?: {
     async rematch(roomId) {
       await ensureAnonymous(client);
       const response = await client.rpc('fixed_five_rematch', { p_room_id: roomId });
-      if (response.error || !response.data) throw new Error(`rematch failed: ${response.error?.message ?? 'unknown'}`);
+      if (response.error || !response.data)
+        throw new Error(`rematch failed: ${response.error?.message ?? 'unknown'}`);
       const payload = rpcPayload(response.data);
       const snapshot = await fetchSnapshot(payload.room_id);
       return { snapshot, code: payload.code };
+    },
+    async complete(roomId, resultDigest) {
+      await ensureAnonymous(client);
+      const response = await client.rpc('fixed_five_complete', {
+        p_room_id: roomId,
+        p_result_digest: resultDigest,
+      });
+      if (response.error || !response.data)
+        throw new Error(`complete failed: ${response.error?.message ?? 'unknown'}`);
+      const record = response.data as unknown as Record<string, unknown>;
+      const phase = (typeof record['phase'] === 'string'
+        ? record['phase']
+        : 'awaiting-confirmation') as FixedFiveRoomSnapshot['phase'];
+      return { completed: record['completed'] === true, phase };
+    },
+    async fail(roomId) {
+      await ensureAnonymous(client);
+      const response = await client.rpc('fixed_five_fail', { p_room_id: roomId });
+      if (response.error || !response.data)
+        throw new Error(`fail failed: ${response.error?.message ?? 'unknown'}`);
+      const record = response.data as unknown as Record<string, unknown>;
+      const phase = (typeof record['phase'] === 'string'
+        ? record['phase']
+        : 'awaiting-confirmation') as FixedFiveRoomSnapshot['phase'];
+      return { failed: record['failed'] === true, phase };
     },
   };
 }

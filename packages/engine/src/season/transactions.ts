@@ -1,1 +1,7 @@
-export { deriveSeasonInfluenceEntryId, deriveSeasonTransactionId, normalizeSeasonTransactionEntry, seasonTransactionEntry, type SeasonTransactionEntryInput, } from '@hoop-rush/data-contracts';
+export {
+  deriveSeasonInfluenceEntryId,
+  deriveSeasonTransactionId,
+  normalizeSeasonTransactionEntry,
+  seasonTransactionEntry,
+  type SeasonTransactionEntryInput,
+} from '@hoop-rush/data-contracts';

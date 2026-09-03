@@ -20,6 +20,7 @@ import {
   SEASON_ROOM_PROTOCOL_SCHEMA_VERSION,
   seasonNamespaceSeed,
   seasonDigestHex,
+  seasonPublicCommandEnvelopeSchema,
 } from '@hoop-rush/data-contracts';
 import {
   applySeasonDraftCommand,
@@ -144,11 +145,12 @@ export class RoomDraftController {
       if (typeof window === 'undefined') return null;
       const raw = window.sessionStorage?.getItem(this.storageKey()) ?? null;
       if (!raw) return null;
-      const parsed = JSON.parse(raw) as {
-        turnStartedAt?: number;
-      };
-      if (typeof parsed.turnStartedAt === 'number' && Number.isFinite(parsed.turnStartedAt)) {
-        return parsed.turnStartedAt;
+      const parsed: unknown = JSON.parse(raw);
+      if (typeof parsed === 'object' && parsed !== null && 'turnStartedAt' in parsed) {
+        const turnStartedAt: unknown = parsed.turnStartedAt;
+        if (typeof turnStartedAt === 'number' && Number.isFinite(turnStartedAt)) {
+          return turnStartedAt;
+        }
       }
     } catch {}
     return null;
@@ -404,10 +406,21 @@ export class RoomDraftController {
       console.error('[room-draft-controller] refetch failed', e);
       this.lastReplayError = `refetch failed: ${msg}`;
       this.integrityFailed = true;
-      return [] as SeasonPublicCommandEnvelope[];
+      return [];
     });
     const [, envelopesRaw] = await Promise.all([assetsPromise, refetchPromise]);
-    const envelopes = (envelopesRaw ?? []) as SeasonPublicCommandEnvelope[];
+    const rawList: unknown = envelopesRaw ?? [];
+    const envelopes: SeasonPublicCommandEnvelope[] = [];
+    if (Array.isArray(rawList)) {
+      for (const item of rawList) {
+        const parsed = seasonPublicCommandEnvelopeSchema.safeParse(item);
+        if (parsed.success) {
+          envelopes.push(parsed.data);
+        } else {
+          console.warn('[room-draft-controller] dropping invalid envelope', parsed.error);
+        }
+      }
+    }
     if (!this.catalog || !this.league) throw new Error('catalog or league not loaded');
     if (envelopes.length === 0 && this.state !== null && !full) return this.state;
     return this.replayEnvelopes(envelopes, { resetIntegrity: true, full });

@@ -1,4 +1,8 @@
-import type { SeasonRoomMembership, SeasonRoomCode } from '@hoop-rush/data-contracts';
+import {
+  seasonRoomMembershipSchema,
+  type SeasonRoomMembership,
+  type SeasonRoomCode,
+} from '@hoop-rush/data-contracts';
 const MEMBERSHIP_PREFIX = 'hoop-rush:season-room-membership:';
 const CODE_PREFIX = 'hoop-rush:season-room-code:';
 function isBrowser(): boolean {
@@ -21,9 +25,11 @@ export function loadMembership(roomId: string): SeasonRoomMembership | null {
   try {
     const raw = localStorage.getItem(membershipKey(roomId));
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as SeasonRoomMembership;
-    if (parsed?.roomId && parsed?.participantId && parsed?.franchiseId) return parsed;
-    return null;
+    const parsed: unknown = JSON.parse(raw);
+    const result = seasonRoomMembershipSchema.safeParse(parsed);
+    if (!result.success) return null;
+    if (result.data.roomId !== roomId) return null;
+    return result.data;
   } catch {
     return null;
   }
@@ -71,14 +77,33 @@ export function loadLastRoomId(): string | null {
     return null;
   }
 }
+function joinErrorFields(err: unknown): { code: string; message: string; status?: number } {
+  let code = '';
+  let message = '';
+  let status: number | undefined;
+  if (typeof err === 'object' && err !== null) {
+    if ('code' in err) {
+      const rawCode: unknown = err.code;
+      if (typeof rawCode === 'string') code = rawCode;
+      else if (typeof rawCode === 'number') code = String(rawCode);
+    }
+    if ('message' in err) {
+      const rawMessage: unknown = err.message;
+      if (typeof rawMessage === 'string') message = rawMessage;
+    }
+    if ('status' in err) {
+      const rawStatus: unknown = err.status;
+      if (typeof rawStatus === 'number' && Number.isFinite(rawStatus)) status = rawStatus;
+    }
+  } else if (typeof err === 'string') {
+    message = err;
+  }
+  return { code, message, status };
+}
 export function friendlyJoinError(err: unknown): string {
-  const e = err as {
-    code?: string;
-    message?: string;
-    status?: number;
-  };
-  const code = String(e?.code ?? '').toLowerCase();
-  const msg = String(e?.message ?? '').toLowerCase();
+  const { code: rawCode, message: rawMessage, status } = joinErrorFields(err);
+  const code = rawCode.toLowerCase();
+  const msg = rawMessage.toLowerCase();
   if (code === 'outdated-room' || msg.includes('outdated'))
     return 'Outdated room — create a new one.';
   if (code === 'opponent-disconnected' || msg.includes('disconnected'))
@@ -96,8 +121,7 @@ export function friendlyJoinError(err: unknown): string {
   if (code === 'invalid-code' || msg.includes('invalid'))
     return 'Invalid code — check the 4 digits (including leading zeros like 0042).';
   if (code === 'phase' || msg.includes('waiting')) return 'Room no longer accepts joins.';
-  if (code === 'authorization' || e?.status === 401)
-    return 'Not authorized — refresh and try again.';
+  if (code === 'authorization' || status === 401) return 'Not authorized — refresh and try again.';
   return 'Could not join — check the code or ask the host for a fresh one.';
 }
 export function inviteLinkForCode(code: string): string {

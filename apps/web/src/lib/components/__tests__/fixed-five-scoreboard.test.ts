@@ -33,8 +33,22 @@ function snapshot(): FixedFiveRoomSnapshot {
     commandCount: 3,
     digest: null,
     members: [
-      { participantId: 'p1', online: true, ready: true, picksCommitted: 3, locked: false, lastSeenAt: null },
-      { participantId: 'p2', online: false, ready: false, picksCommitted: 1, locked: false, lastSeenAt: null },
+      {
+        participantId: 'p1',
+        online: true,
+        ready: true,
+        picksCommitted: 3,
+        locked: false,
+        lastSeenAt: null,
+      },
+      {
+        participantId: 'p2',
+        online: false,
+        ready: false,
+        picksCommitted: 1,
+        locked: false,
+        lastSeenAt: null,
+      },
     ],
     rootSeed: null,
     deadline: null,
@@ -48,7 +62,9 @@ function snapshot(): FixedFiveRoomSnapshot {
 
 describe('FixedFiveScoreboard', () => {
   it('renders one lane per participant with connection and roster progress', () => {
-    const { getByText } = render(FixedFiveScoreboard, { props: { snapshot: snapshot(), selfId: 'p1' } });
+    const { getByText } = render(FixedFiveScoreboard, {
+      props: { snapshot: snapshot(), selfId: 'p1' },
+    });
     expect(getByText(/You · P1/)).toBeTruthy();
     expect(getByText(/Opponent · P2/)).toBeTruthy();
     expect(getByText(/3\/5 picks/)).toBeTruthy();

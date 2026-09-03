@@ -86,6 +86,11 @@ alter table public.fixed_five_room_commands enable row level security;
 alter table public.fixed_five_join_attempts enable row level security;
 
 -- Deny direct client writes: only SELECT for members. Knowing a code never grants access.
+-- (DROP guards keep `supabase db push` idempotent alongside the already-applied remote migration.)
+drop policy if exists "ff members read their room" on public.fixed_five_rooms;
+drop policy if exists "ff members read their commands" on public.fixed_five_room_commands;
+drop policy if exists "ff members read their membership" on public.fixed_five_room_members;
+drop policy if exists "ff members read room membership" on public.fixed_five_room_members;
 create policy "ff members read their room"
   on public.fixed_five_rooms for select to authenticated
   using (exists (select 1 from public.fixed_five_room_members m where m.room_id = fixed_five_rooms.id and m.uid = auth.uid()));
@@ -94,10 +99,9 @@ create policy "ff members read their commands"
   on public.fixed_five_room_commands for select to authenticated
   using (exists (select 1 from public.fixed_five_room_members m where m.room_id = fixed_five_room_commands.room_id and m.uid = auth.uid()));
 
-create policy "ff members read their membership"
+create policy "ff members read room membership"
   on public.fixed_five_room_members for select to authenticated
-  using (uid = auth.uid());
-
+  using (exists (select 1 from public.fixed_five_room_members m where m.room_id = fixed_five_room_members.room_id and m.uid = auth.uid()));
 -- Realtime: one room subscription covering room and command changes (Postgres Changes).
 do $$
 begin
@@ -207,7 +211,8 @@ begin
   end if;
   return jsonb_build_object(
     'room_id', v_room.id, 'mode', v_room.mode, 'source_mode', v_room.source_mode,
-    'variant', v_room.variant, 'phase', v_room.phase, 'revision', v_room.revision);
+    'variant', v_room.variant, 'phase', v_room.phase, 'revision', v_room.revision,
+    'versions', v_room.versions);
 end;
 $$;
 revoke all on function public.fixed_five_room_preview(text) from public;
