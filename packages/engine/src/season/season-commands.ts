@@ -502,7 +502,7 @@ function baseValidation(
         return rejectedWith({
           code: 'run-mismatch',
           expectedRunId: run.runId,
-        } as unknown as SeasonRunCommandRejection);
+        });
       }
     } else {
       if (
@@ -513,7 +513,7 @@ function baseValidation(
         return rejectedWith({
           code: 'run-mismatch',
           expectedRunId: run.runId,
-        } as unknown as SeasonRunCommandRejection);
+        });
       }
       const directFid =
         'franchiseId' in command && typeof command.franchiseId === 'string'
@@ -523,21 +523,19 @@ function baseValidation(
         return rejectedWith({
           code: 'run-mismatch',
           expectedRunId: run.runId,
-        } as unknown as SeasonRunCommandRejection);
+        });
       }
     }
   } else if (context?.actorFranchiseId) {
     const targetFranchiseId =
-      (
-        command as unknown as {
-          franchiseId?: string;
-        }
-      ).franchiseId ?? null;
+      'franchiseId' in command && typeof command.franchiseId === 'string'
+        ? command.franchiseId
+        : null;
     if (targetFranchiseId !== null && targetFranchiseId !== context.actorFranchiseId) {
       return rejectedWith({
         code: 'run-mismatch',
         expectedRunId: run.runId,
-      } as unknown as SeasonRunCommandRejection);
+      });
     }
   }
   return null;
@@ -610,19 +608,15 @@ function handleSelectBlockObjective(
   if (isMulti && effectiveFid) {
     const franchiseSelections = { ...(run.objectives.franchiseSelections ?? {}) };
     const per = {
-      ...((franchiseSelections[effectiveFid] as
-        Record<number, import('@hoop-rush/data-contracts').SeasonObjectiveSelection> | undefined) ??
-        {}),
+      ...(franchiseSelections[effectiveFid] ?? {}),
     };
-    (per as Record<number, import('@hoop-rush/data-contracts').SeasonObjectiveSelection>)[
-      command.blockIndex
-    ] = {
+    per[command.blockIndex] = {
       objectiveId: command.objectiveId,
       selectedByCommandId: command.commandId,
       success: null,
     };
-    franchiseSelections[effectiveFid] = per as unknown as typeof per;
-    nextObjectives = { ...run.objectives, franchiseSelections } as typeof run.objectives;
+    franchiseSelections[effectiveFid] = per;
+    nextObjectives = { ...run.objectives, franchiseSelections };
   } else {
     nextObjectives = {
       ...run.objectives,
@@ -862,7 +856,7 @@ function handleSelectCampaignOpportunity(
       {
         code: 'campaign-evolution-required',
         afterBlockIndex: 4,
-      } as unknown as SeasonSelectCampaignOpportunityRejection,
+      },
       run,
     );
   }
@@ -928,16 +922,12 @@ function handleEvolveGmCampaign(
   const run = economy;
   const campaign = normalizeCampaignState(run.campaign);
   if (campaign.startingIdentity === null) {
-    return rejectedEvolveGmCampaign(
-      command,
-      { code: 'campaign-identity-required' } as unknown as SeasonEvolveGmCampaignRejection,
-      run,
-    );
+    return rejectedEvolveGmCampaign(command, { code: 'campaign-identity-required' }, run);
   }
   if (campaign.evolutionSelection !== null) {
     return rejectedEvolveGmCampaign(
       command,
-      { code: 'campaign-evolution-already-selected' } as unknown as SeasonEvolveGmCampaignRejection,
+      { code: 'campaign-evolution-already-selected' },
       run,
     );
   }
@@ -950,7 +940,7 @@ function handleEvolveGmCampaign(
       {
         code: 'campaign-evolution-not-offered',
         offerId: command.offerId,
-      } as unknown as SeasonEvolveGmCampaignRejection,
+      },
       run,
     );
   }
@@ -1020,11 +1010,8 @@ function handleOpenTradeInquiry(
   }
   const result = openTradeInquiry(run, command.windowIndex, command.toFranchiseId);
   if ('error' in result) {
-    const code = result.error as unknown as SeasonOpenTradeInquiryRejection['code'];
-    return rejectedOpenTradeInquiry(
-      command,
-      { code } as unknown as SeasonOpenTradeInquiryRejection,
-      run,
+    throw new Error(
+      `open-trade-inquiry failed after validation: ${result.error} window ${String(command.windowIndex)}`,
     );
   }
   const next = advanceRunState({
@@ -1060,7 +1047,7 @@ function handleSubmitTradeProposal(
         code: 'window-not-open',
         franchiseId: null,
         windowIndex: command.windowIndex,
-      } as unknown as SeasonSubmitTradeProposalRejection,
+      },
       run,
     );
   }
@@ -1072,7 +1059,7 @@ function handleSubmitTradeProposal(
         code: 'window-not-open',
         franchiseId: command.toFranchiseId,
         windowIndex: command.windowIndex,
-      } as unknown as SeasonSubmitTradeProposalRejection,
+      },
       run,
     );
   }
@@ -1093,12 +1080,29 @@ function handleSubmitTradeProposal(
     rootSeed: run.rootSeed,
   });
   if (!evalResult.ok) {
-    const code = evalResult.code as unknown as SeasonSubmitTradeProposalRejection['code'];
-    return rejectedSubmitTradeProposal(
-      command,
-      { code, reason: evalResult.reason } as unknown as SeasonSubmitTradeProposalRejection,
-      run,
-    );
+    const reason = evalResult.reason;
+    switch (evalResult.code) {
+      case 'trade-wrong-fit':
+        return rejectedSubmitTradeProposal(command, { code: 'trade-wrong-fit', reason }, run);
+      case 'trade-insufficient-talent':
+        return rejectedSubmitTradeProposal(
+          command,
+          { code: 'trade-insufficient-talent', reason },
+          run,
+        );
+      case 'window-not-open':
+        return rejectedSubmitTradeProposal(
+          command,
+          {
+            code: 'window-not-open',
+            franchiseId: command.toFranchiseId,
+            windowIndex: command.windowIndex,
+          },
+          run,
+        );
+      default:
+        return rejectedSubmitTradeProposal(command, { code: 'trade-wrong-fit', reason }, run);
+    }
   }
   const fingerprint = evalResult.proposal.fingerprint;
   const duplicate = win.negotiations?.some((n) =>
@@ -1110,7 +1114,7 @@ function handleSubmitTradeProposal(
       {
         code: 'trade-duplicate-proposal',
         fingerprint,
-      } as unknown as SeasonSubmitTradeProposalRejection,
+      },
       run,
     );
   }
@@ -1125,7 +1129,7 @@ function handleSubmitTradeProposal(
         windowIndex: command.windowIndex,
         inquiriesUsed: used,
         allowance,
-      } as unknown as SeasonSubmitTradeProposalRejection,
+      },
       run,
     );
   }
@@ -1134,10 +1138,8 @@ function handleSubmitTradeProposal(
   if (!inquiryId) {
     const opened = openTradeInquiry(run, command.windowIndex, command.toFranchiseId);
     if ('error' in opened) {
-      return rejectedSubmitTradeProposal(
-        command,
-        { code: opened.error } as unknown as SeasonSubmitTradeProposalRejection,
-        run,
+      throw new Error(
+        `submit-trade-proposal open inquiry failed after validation: ${opened.error} window ${String(command.windowIndex)}`,
       );
     }
     inquiryId = opened.inquiryId;
@@ -1155,7 +1157,7 @@ function handleSubmitTradeProposal(
           windowIndex: command.windowIndex,
           inquiryId,
           exchangeCount: existingForUpdate.exchangeCount,
-        } as unknown as SeasonSubmitTradeProposalRejection,
+        },
         run,
       );
     }

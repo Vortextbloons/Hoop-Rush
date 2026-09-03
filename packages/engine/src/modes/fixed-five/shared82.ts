@@ -1,7 +1,6 @@
 import type {
   BracketOpponent,
   EraSimulationProfile,
-  FixedFiveShared82Result,
   GameResult,
   OpponentBracket,
   Seed,
@@ -10,12 +9,8 @@ import type {
 import { checkGameResult } from '../../sim/invariants.ts';
 import { simulateGame } from '../../sim/game.ts';
 import type { EngineContext } from '../../sim/context.ts';
-import {
-  fixedFiveH2HSeed,
-  fixedFiveSharedGameSeed,
-  fixedFiveTiebreakWinner,
-  FIXED_FIVE_TIEBREAK_PATH,
-} from './seeds.ts';
+import { fixedFiveH2HSeed, fixedFiveSharedGameSeed } from './seeds.ts';
+import { summarizeShared82Games, type Shared82Summary } from './results.ts';
 
 export function findWeakestOpponent(bracket: OpponentBracket): BracketOpponent {
   if (bracket.opponents.length === 0) throw new Error('bracket has no opponents');
@@ -46,11 +41,7 @@ export interface Shared82SimulationInput {
   dataVersion: string;
 }
 
-export interface Shared82SimulationOutput {
-  result: FixedFiveShared82Result;
-  p1Games: GameResult[];
-  p2Games: GameResult[];
-  h2hResults: GameResult[];
+export interface Shared82SimulationOutput extends Shared82Summary {
   uniqueSimulations: number;
   weakestReplacedOpponentId: string;
 }
@@ -72,17 +63,9 @@ export function simulateShared82(
   const weakest = findWeakestOpponent(input.bracket);
   const h2hNumbers = h2hGameNumbersFor(input.bracket, weakest.opponentId);
   const h2hSet = new Set(h2hNumbers);
-  const p1Games: GameResult[] = [];
-  const p2Games: GameResult[] = [];
-  const h2hResults: GameResult[] = [];
-  let p1Wins = 0;
-  let p2Wins = 0;
-  let p1Diff = 0;
-  let p2Diff = 0;
-  let p1H2hWins = 0;
-  let p2H2hWins = 0;
-
-  const h2hIndexByGame = new Map(h2hNumbers.map((gameNumber, index) => [gameNumber, index]));
+  const h2h: GameResult[] = [];
+  const p1NonH2h: GameResult[] = [];
+  const p2NonH2h: GameResult[] = [];
 
   for (let gameNumber = 1; gameNumber <= 82; gameNumber += 1) {
     const entry = input.bracket.schedule[gameNumber - 1];

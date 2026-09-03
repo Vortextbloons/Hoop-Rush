@@ -13,12 +13,16 @@ import {
   SELECTION_SCORE_VERSION,
   SOURCE_VERSION,
   franchiseEraPoolSchema,
+  coverageSummarySchema,
   playerSeasonStatsSchema,
   provenanceMapSchema,
+  ratingProfileSchema,
+  reconstructedThreePointProfileSchema,
   simulationAnchorsSchema,
   simulationRatingsSchema,
   simulationTendenciesSchema,
   summaryRatingsSchema,
+  unavailabilityReasonSchema,
   type Confidence,
   type CoverageSummary,
   type FranchiseEraPool,
@@ -999,7 +1003,10 @@ export function computePool(
     const player = best.player;
     const stint = best.stint;
     const stats = best.stats;
-    const summary = player.summaryRatings as SummaryRatingsRaw | undefined;
+    const summaryParsed = summaryRatingsSchema.safeParse(player.summaryRatings);
+    const summary: SummaryRatingsRaw | undefined = summaryParsed.success
+      ? summaryParsed.data
+      : undefined;
     const peakPrimary = str(player.position);
     const peakSecondary = Array.isArray(player.secondaryPositions)
       ? player.secondaryPositions.filter(
@@ -1026,17 +1033,22 @@ export function computePool(
       identityFailures.push(`${pid} ${best.season}`);
       continue;
     }
-    const teamGames = Math.trunc(num(stint, 'gamesPlayed'));
-    const teamMinutes = Math.trunc(num(stint, 'minutes'));
-    const ratings = (player.ratings ?? {}) as Record<string, unknown>;
-    const tendencies = (player.tendencies ?? {}) as Record<string, unknown>;
-    const detailedRatings: Record<string, number> = {};
-    for (const [key, value] of Object.entries(ratings)) {
+    const teamGames = Math.trunc(numFrom(stint.gamesPlayed));
+    const teamMinutes = Math.trunc(numFrom(stint.minutes));
+    const ratingsPartial = simulationRatingsSchema.partial().safeParse(player.ratings ?? {});
+    const ratingsRaw = ratingsPartial.success ? ratingsPartial.data : {};
+    const tendenciesPartial = simulationTendenciesSchema
+      .partial()
+      .safeParse(player.tendencies ?? {});
+    const tendenciesRaw = tendenciesPartial.success ? tendenciesPartial.data : {};
+    const detailedRatingsPartial: Partial<SimulationRatings> = {};
+    for (const key of REQUIRED_RATING_KEYS) {
+      const value = ratingsRaw[key];
       if (typeof value === 'number') {
-        detailedRatings[key] = Math.trunc(value);
+        detailedRatingsPartial[key] = Math.trunc(value);
       }
     }
-    const requiredTendencyKeys = [
+    const requiredTendencyKeys: Array<keyof SimulationTendencies> = [
       'usageRate',
       'passRate',
       'shotRate',
@@ -1062,25 +1074,29 @@ export function computePool(
       'crashOffensiveGlassRate',
     ];
     for (const key of REQUIRED_RATING_KEYS) {
-      if (!(key in detailedRatings)) {
+      if (!(key in detailedRatingsPartial)) {
         identityFailures.push(`${pid} missing rating ${key} in ${best.season}`);
       }
     }
-    const tendenciesOut: Record<string, number> = {};
+    const tendenciesOutPartial: Partial<SimulationTendencies> = {};
     for (const key of requiredTendencyKeys) {
-      const value = tendencies[key];
+      const value = tendenciesRaw[key];
       const n = Number(value);
-      if (Number.isNaN(n)) {
+      if (typeof value === 'undefined' || Number.isNaN(n)) {
         identityFailures.push(`${pid} missing tendency ${key} in ${best.season}`);
       } else {
-        tendenciesOut[key] = n;
+        tendenciesOutPartial[key] = n;
       }
     }
-    const anchorsOut = sanitizeAnchors(player.anchors as Record<string, unknown>);
-    const provenanceOut = (player.provenance ?? {}) as Record<string, HistoricalValueProvenance>;
+    const anchorsParsed = rawAnchorsSchema.safeParse(player.anchors);
+    const anchorsOut = sanitizeAnchors(anchorsParsed.success ? anchorsParsed.data : {});
+    const provenanceParsed = provenanceMapSchema.safeParse(player.provenance ?? {});
+    const provenanceOut: ProvenanceMap = provenanceParsed.success ? provenanceParsed.data : {};
     if (identityFailures.length > failureStart) {
       continue;
     }
+    const detailedRatings = simulationRatingsSchema.parse(detailedRatingsPartial);
+    const tendenciesOut = simulationTendenciesSchema.parse(tendenciesOutPartial);
     const [firstName, lastName] = canonicalPlayerName(
       pid,
       str(player.firstName),
@@ -1095,8 +1111,8 @@ export function computePool(
       if (typeof previous.nbaHeadshotAvailable === 'boolean') {
         altIds.nbaHeadshotAvailable = previous.nbaHeadshotAvailable;
       }
-      if (Object.hasOwn(previous, 'photoUrl')) {
-        altIds.photoUrl = previous.photoUrl as string | null;
+      if (previous.photoUrl !== undefined) {
+        altIds.photoUrl = previous.photoUrl;
       }
     }
     playersOut.push({
@@ -1128,7 +1144,7 @@ export function computePool(
         rawOverallScoreFor(player, summary),
         safeFloat(summary?.offenseRating),
         safeFloat(summary?.defenseRating),
-        nullableValue(stats, 'usageRate'),
+        nullableFrom(stats.usageRate),
         teamMinutes,
         teamGames,
       ),
@@ -1147,14 +1163,22 @@ export function computePool(
         offenseRating: safeInt(summary?.offenseRating),
         defenseRating: safeInt(summary?.defenseRating),
       },
-      ...(player.ratingProfile != null
-        ? { ratingProfile: player.ratingProfile as RatingProfile }
+      ...(player.ratingProfile != null &&
+      ratingProfileSchema.safeParse(player.ratingProfile).success
+        ? {
+            ratingProfile: ratingProfileSchema.parse(player.ratingProfile),
+          }
         : {}),
       detailedRatings,
       tendencies: tendenciesOut,
       anchors: anchorsOut,
-      ...(player.reconstructedThreePoint != null
-        ? { reconstructedThreePoint: player.reconstructedThreePoint }
+      ...(player.reconstructedThreePoint != null &&
+      reconstructedThreePointProfileSchema.safeParse(player.reconstructedThreePoint).success
+        ? {
+            reconstructedThreePoint: reconstructedThreePointProfileSchema.parse(
+              player.reconstructedThreePoint,
+            ),
+          }
         : {}),
       provenance: provenanceOut,
       source: {
@@ -1332,7 +1356,10 @@ function applyOverallCohortNormalization(): Array<{
     const [franchiseId, eraId] = name.slice(0, -5).split('-', 2);
     if (franchiseId === undefined || eraId === undefined) continue;
     try {
-      const pool = readJsonLoose(join(poolDir(), name)) as Pool;
+      const raw = readJsonLoose(join(poolDir(), name)) as unknown;
+      const parsed = franchiseEraPoolSchema.safeParse(raw);
+      if (!parsed.success) continue;
+      const pool = parsed.data;
       if (!Array.isArray(pool.players) || pool.players.length === 0) continue;
       pools.push(pool);
     } catch {}
@@ -1409,22 +1436,23 @@ export async function run(
   recordCoverageReport(results.map((result) => result.coverage));
   refreshPlayersIndexInManifest();
 }
-export interface CoverageReportEntry {
-  franchiseId: string;
-  eraId: string;
-  status: 'available' | 'unavailable';
-  reason?: UnavailabilityReason;
-  detail?: string;
-  firstSupportedSeason?: string;
-  playerCount?: number;
-  coverageSummary?: CoverageSummary;
-}
-export function coverageReportPath(): string {
-  return join(PUBLIC_DATA, 'coverage-report.json');
-}
+const coverageReportEntrySchema = z.object({
+  franchiseId: z.string(),
+  eraId: z.string(),
+  status: z.enum(['available', 'unavailable']),
+  reason: unavailabilityReasonSchema.optional(),
+  detail: z.string().optional(),
+  firstSupportedSeason: z.string().optional(),
+  playerCount: z.number().optional(),
+  coverageSummary: coverageSummarySchema.optional(),
+});
+export type CoverageReportEntry = z.infer<typeof coverageReportEntrySchema>;
 export function loadCoverageReport(): CoverageReportEntry[] {
   if (!fileExists(coverageReportPath())) return [];
-  return readJsonLoose(coverageReportPath()) as CoverageReportEntry[];
+  const raw = readJsonLoose(coverageReportPath()) as unknown;
+  const parsed = z.array(coverageReportEntrySchema).safeParse(raw);
+  if (!parsed.success) return [];
+  return parsed.data;
 }
 export function recordCoverageReport(entries: CoverageReportEntry[]): void {
   const existing = new Map(
