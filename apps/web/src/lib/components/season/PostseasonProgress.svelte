@@ -60,11 +60,7 @@ const latestText = $derived(latest
       </div>
     </div>
 
-    {#if progress.phase === 'running' && latestText}
-      <p class="mt-3 text-sm">
-        Latest: <span class="font-semibold">{latestText}</span>
-      </p>
-    {/if}
+
 
     {#if progress.phase === 'running'}
       <div class="mt-3 flex flex-wrap items-center gap-2">
@@ -75,9 +71,6 @@ const latestText = $derived(latest
         >
           Cancel
         </button>
-        <span class="font-mono text-[10px] text-muted-foreground">
-          Nothing saved is lost — you can run it again.
-        </span>
       </div>
     {/if}
 
@@ -102,7 +95,7 @@ const latestText = $derived(latest
         role="alert"
         class="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
       >
-        <p class="font-semibold">The postseason simulation failed ({progress.error.code}).</p>
+        <p class="font-semibold">The postseason simulation failed.</p>
         <p class="mt-1 text-muted-foreground">{progress.error.message}</p>
         <button
           type="button"

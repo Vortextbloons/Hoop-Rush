@@ -40,9 +40,7 @@ const awards = $derived(shell.run?.awards ?? null);
         >
           Leaders
         </h1>
-        <p class="mt-1 font-mono text-[10px] text-muted-foreground">
-          Rate categories require a 70% game share · ordered per-game, then value
-        </p>
+        <p class="mt-1 font-mono text-[10px] text-muted-foreground">Rate stats: 70% games required.</p>
       </div>
       <div
         role="group"
@@ -111,9 +109,6 @@ const awards = $derived(shell.run?.awards ?? null);
       </div>
     {/if}
 
-    <p class="mt-6 font-mono text-[10px] text-muted-foreground">
-      Identity is the player-season version: each row is one distinct season of one player, with its
-      historical source logo and season. Eligibility: at least 70% of the team's games.
-    </p>
+
   </section>
 {/if}

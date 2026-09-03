@@ -8,7 +8,7 @@ import { clearDataLoaderCaches, getManifest, getPlayersIndex, getPool } from '$l
 import { resolvePlayerRefs } from '$lib/player-refs';
 import { generateSeed, parseSandboxUrl } from '$lib/sandbox-url';
 import { startSandboxRun } from '$lib/sandbox-run';
-import { poolSortLabel, sortDraftRows } from '$lib/draft-presentation';
+import { sortDraftRows } from '$lib/draft-presentation';
 import TeamLogo from '$lib/components/TeamLogo.svelte';
 import LineupCourt from '$lib/components/LineupCourt.svelte';
 import LineupSummaryNav from '$lib/components/LineupSummaryNav.svelte';
@@ -158,7 +158,7 @@ const poolHeading = $derived(franchise && era && eraIdentity
         : era
             ? era.label
             : 'All players');
-const countLabel = $derived(`${poolRows.length} players · ${poolSortLabel('sandbox')}`);
+const countLabel = $derived(`${poolRows.length} players`);
 function selectFranchise(id: string) {
     franchiseFilter = id;
 }
@@ -274,8 +274,7 @@ async function play82() {
         Draft any five
       </h1>
       <p class="mt-3 max-w-xl text-sm text-muted-foreground">
-        Five players, any franchise, any era. Build a lineup from every peak player-season and take
-        it 82-0.
+        Five players, any team, any era. Build your five and chase 82–0.
       </p>
     </div>
     <a
@@ -291,17 +290,13 @@ async function play82() {
       <AsyncState
         kind="error"
         title="Data unavailable"
-        message={`Failed to load data: ${manifestError}`}
+        message="Couldn’t load data. Try again."
         retry={retrySandboxData}
       />
     </div>
   {:else if !manifest}
     <div class="mt-8">
-      <AsyncState
-        kind="loading"
-        title="Loading sandbox data"
-        message="Preparing the player index…"
-      />
+      <AsyncState kind="loading" title="Loading…" message="Loading…" />
     </div>
   {:else}
     {#if indexError}
@@ -309,13 +304,13 @@ async function play82() {
         <AsyncState
           kind="error"
           title="Players unavailable"
-          message={`Failed to load players: ${indexError}`}
+          message="Couldn’t load data. Try again."
           retry={retrySandboxData}
         />
       </div>
     {:else if !index}
       <div class="mt-8">
-        <AsyncState kind="loading" title="Loading player index" message="One moment…" />
+        <AsyncState kind="loading" title="Loading…" message="Loading…" />
       </div>
     {:else}
       <div class="mt-10 flex flex-col gap-6 pb-32">

@@ -233,15 +233,13 @@ const columns: RosterColumn[] = [
 >
   <div class="flex items-end justify-between gap-4">
     <div>
-      <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">Roster</p>
       <h1
         class="font-display mt-2 text-3xl font-extrabold tracking-tight uppercase sm:text-4xl md:text-5xl"
       >
         Player database
       </h1>
       <p class="mt-3 max-w-xl text-sm text-muted-foreground">
-        Every eligible peak player-season in the league. Browse by franchise, decade, rating, and
-        stats — then take your favorites to the sandbox.
+        Browse every peak season by team, decade and stats.
       </p>
     </div>
     <a
@@ -257,17 +255,13 @@ const columns: RosterColumn[] = [
       <AsyncState
         kind="error"
         title="Data unavailable"
-        message={`Failed to load data: ${manifestError}`}
+        message="Couldn’t load data. Try again."
         retry={retryRosterData}
       />
     </div>
   {:else if !manifest}
     <div class="mt-8">
-      <AsyncState
-        kind="loading"
-        title="Loading roster data"
-        message="Preparing the player index…"
-      />
+      <AsyncState kind="loading" title="Loading…" message="Loading…" />
     </div>
   {:else}
     <div class="mt-8 grid gap-6 sm:grid-cols-2">
@@ -458,7 +452,7 @@ const columns: RosterColumn[] = [
       </div>
     {:else if !index || !details}
       <div class="mt-8">
-        <AsyncState kind="loading" title="Loading player index" message="One moment…" />
+        <AsyncState kind="loading" title="Loading…" message="Loading…" />
       </div>
     {:else}
       <div class="mt-8 flex flex-col gap-4 rounded-xl bg-surface-1 p-2 sm:p-3">

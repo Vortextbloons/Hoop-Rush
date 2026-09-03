@@ -2,7 +2,7 @@
 import { page } from '$app/stores';
 import { resolve } from '$app/paths';
 import { goto } from '$app/navigation';
-import { Users, Crown, Clock, Trophy, Zap, Swords, Copy, Check, RefreshCw, Wifi, WifiOff, AlertTriangle, Link as LinkIcon, LogOut, UserMinus, } from '@lucide/svelte';
+import { Crown, Clock, Copy, Check, RefreshCw, Wifi, WifiOff, AlertTriangle, Link as LinkIcon, LogOut, UserMinus, } from '@lucide/svelte';
 import { createInMemorySeasonRoomCoordinator } from '$lib/season/season-room-coordinator';
 import { createSupabaseSeasonTransport, isSupabaseConfigured, } from '$lib/season/supabase-season-transport';
 import { loadMembership, loadCode, inviteLinkForCode, clearMembership, clearCode, } from '$lib/season/season-room-identity';
@@ -417,17 +417,13 @@ async function handleLeave() {
   {#if loading}
     <div class="rounded-xl bg-surface-1 p-10 text-center">
       <p class="font-mono text-sm text-muted-foreground">Loading room…</p>
-      <p class="mt-2 font-mono text-xs text-muted-foreground/60">{roomId.slice(0, 8)}…</p>
     </div>
   {:else if outdated}
     <div class="rounded-xl border border-amber-500/30 bg-amber-500/10 p-6">
       <div class="flex items-center gap-2 font-semibold text-amber-700">
         <AlertTriangle class="h-4 w-4" />Outdated room — create a new one
       </div>
-      <p class="mt-2 text-sm text-muted-foreground">
-        This room was created with an old protocol (v1). Rooms are temporary — please create a new
-        room. Your draft progress is still saved locally if you started.
-      </p>
+      <p class="mt-2 text-sm text-muted-foreground">This room has expired. Please create a new one.</p>
       <div class="mt-4 flex gap-2">
         <a
           href={resolve('/multiplayer')}
@@ -499,10 +495,7 @@ async function handleLeave() {
                   /> Copy code{/if}
               </button>
             </div>
-            <p class="mt-2 text-xs text-muted-foreground">
-              Invite link: <code class="font-mono">/multiplayer?code={storedCode}</code> — prefill & preview
-              for guest.
-            </p>
+
             <p class="mt-1 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
               <Clock class="h-3.5 w-3.5" />
               {#if countdown && countdown !== 'expired'}expires in {countdown}{:else if countdown === 'expired'}expired
@@ -585,84 +578,7 @@ async function handleLeave() {
     {/if}
 
     
-    <div class="mt-4 grid gap-3 sm:grid-cols-3">
-      <div class="rounded-lg border border-line-soft bg-card p-4">
-        <p class="text-label text-muted-foreground">Mode</p>
-        {#if isHost && snap && snap.phase === 'waiting'}
-          <div class="mt-2 grid gap-1.5">
-            {#each ['season', 'classic', 'sandbox'] as m (m)}
-              <button
-                type="button"
-                onclick={() =>
-                  handleUpdateSettings(m as 'season' | 'classic' | 'sandbox', snap!.settings.pace)}
-                disabled={settingsBusy}
-                class="rounded-lg border px-3 py-2 text-left text-sm font-semibold {snap!.mode === m
-                  ? 'border-primary bg-primary/10'
-                  : 'border-line-soft bg-surface-1 hover:border-line-strong'} disabled:opacity-50"
-                >{m === 'season' ? 'Season Run' : m === 'classic' ? 'Classic' : 'Sandbox'}
-                {snap!.mode === m ? '✓' : ''}</button
-              >
-            {/each}
-          </div>
-          {#if settingsError}<p role="alert" class="mt-2 text-xs text-destructive">
-              {settingsError}
-            </p>{/if}
-        {:else}
-          <p class="mt-1 text-sm font-bold">{modeLabel}</p>
-          <p class="mt-1 text-xs text-muted-foreground">
-            Host chose before creation — both see same.
-          </p>
-        {/if}
-      </div>
-      <div class="rounded-lg border border-line-soft bg-card p-4">
-        <p class="text-label text-muted-foreground">Pace</p>
-        {#if isHost && snap && snap.phase === 'waiting'}
-          <div class="mt-2 grid gap-1.5">
-            {#each ['live', 'async'] as p (p)}
-              <button
-                type="button"
-                onclick={() =>
-                  handleUpdateSettings(
-                    snap!.mode as 'season' | 'classic' | 'sandbox',
-                    p as 'live' | 'async',
-                  )}
-                disabled={settingsBusy}
-                class="rounded-lg border px-3 py-2 text-left text-sm font-semibold {snap!.settings
-                  .pace === p
-                  ? 'border-primary bg-primary/10'
-                  : 'border-line-soft bg-surface-1 hover:border-line-strong'} disabled:opacity-50"
-                >{p === 'live' ? 'Live — 90s / 5m' : 'Async — 24h / 12h'}
-                {snap!.settings.pace === p ? '✓' : ''}</button
-              >
-            {/each}
-          </div>
-          {#if settingsBusy}<p class="mt-2 text-xs text-muted-foreground">Updating…</p>{/if}
-        {:else}
-          <p class="mt-1 text-sm font-bold">{paceLabel}</p>
-          <p class="mt-1 text-xs text-muted-foreground">
-            {paceShort === 'Live' ? '90s draft · 5m decisions' : '24h draft · 12h decisions'}
-          </p>
-        {/if}
-      </div>
-      <div class="rounded-lg border border-line-soft bg-card p-4">
-        <p class="text-label text-muted-foreground">You</p>
-        <p class="mt-1 text-sm font-bold">{youLabel}</p>
-        <p
-          class="mt-1 text-xs {isHost
-            ? 'text-primary font-semibold'
-            : isGuest
-              ? 'text-positive font-semibold'
-              : 'text-muted-foreground'}"
-        >
-          {isHost ? 'Host controls Start' : isGuest ? 'Guest — Ready to confirm' : 'Spectator'}
-        </p>
-        {#if (snap as unknown as { settingsRevision?: number }).settingsRevision !== undefined}<p
-            class="mt-1 text-xs text-muted-foreground"
-          >
-            Settings rev {(snap as unknown as { settingsRevision?: number }).settingsRevision}
-          </p>{/if}
-      </div>
-    </div>
+
 
     <div class="mt-6 grid gap-6 lg:grid-cols-5">
       <div class="space-y-6 lg:col-span-3">
@@ -699,7 +615,7 @@ async function handleLeave() {
               <p class="mt-1 inline-flex items-center gap-1.5 text-xs">
                 <span class="h-2 w-2 rounded-full {hostOnline ? 'bg-positive' : 'bg-amber-500'}"
                 ></span>
-                {hostOnline ? 'Heartbeat fresh' : 'No heartbeat — 30s offline'}
+                {hostOnline ? 'Online' : 'Offline'}
               </p>
             </div>
             
@@ -742,7 +658,7 @@ async function handleLeave() {
                 <p class="mt-1 inline-flex items-center gap-1.5 text-xs">
                   <span class="h-2 w-2 rounded-full {guestOnline ? 'bg-positive' : 'bg-amber-500'}"
                   ></span>
-                  {guestOnline ? 'Heartbeat fresh' : 'Offline — waiting for reconnection'}
+                  {guestOnline ? 'Online' : 'Offline'}
                 </p>
                 <p
                   class="mt-1 text-xs font-semibold {guestReady
@@ -759,10 +675,7 @@ async function handleLeave() {
             <div
               class="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs leading-relaxed text-muted-foreground"
             >
-              Waiting for opponent — share the invite link (<code class="font-mono"
-                >/multiplayer?code={storedCode ?? '----'}</code
-              >) or 4-digit code. Code stays visible until they join. Keep this lobby open — it
-              updates live.
+              Waiting for opponent — share the code or invite link.
             </div>
           {:else if snap.phase === 'waiting' && snap.memberCount === 2 && !guestReady}
             <div class="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs">
@@ -778,8 +691,7 @@ async function handleLeave() {
             <div
               class="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive"
             >
-              Opponent disconnected — presence offline after 30s without heartbeat. Preserving
-              membership; Start unavailable until reconnection.
+              Opponent disconnected — waiting to reconnect.
             </div>
           {:else if snap.phase === 'drafting'}
             <div class="mt-4 rounded-lg border border-positive/30 bg-positive/10 p-3 text-xs">
@@ -818,10 +730,7 @@ async function handleLeave() {
                 {#if copiedCode}Copied!{:else}Copy code{/if}</button
               >
             </div>
-            <p class="mt-2 text-xs text-muted-foreground">
-              Link pre-fills code via <code class="font-mono">/multiplayer?code={storedCode}</code> and
-              shows preview before join.
-            </p>
+
           {:else}
             <p class="mt-3 text-xs text-muted-foreground">
               Code cleared after both joined. Invite regenerates if host removes guest.
@@ -927,7 +836,7 @@ async function handleLeave() {
             <div
               class="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
             >
-              Integrity failed — hashes diverged twice. Room frozen. Create new room.
+              Something went wrong — please create a new room.
             </div>
             <a
               href={resolve('/multiplayer')}
@@ -938,7 +847,7 @@ async function handleLeave() {
             <div
               class="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
             >
-              Expired — 24h grace without verified fallback.
+              Expired — please create a new room.
             </div>
           {:else}
             <p class="mt-2 text-sm text-muted-foreground">
@@ -967,75 +876,7 @@ async function handleLeave() {
           </div>
         </div>
 
-        <div
-          class="rounded-xl border border-line-soft bg-card p-4 text-xs leading-relaxed text-muted-foreground"
-        >
-          <p class="font-semibold text-foreground">Room fact summary</p>
-          <div class="mt-2 space-y-1">
-            <div class="flex justify-between">
-              <span>mode</span><span class="font-medium text-foreground">{modeLabel}</span>
-            </div>
-            <div class="flex justify-between">
-              <span>pace</span><span class="font-medium text-foreground">{paceShort}</span>
-            </div>
-            <div class="flex justify-between">
-              <span>members</span><span>{snap.memberCount}/2</span>
-            </div>
-            <div class="flex justify-between">
-              <span>ready</span><span
-                class={guestReady ? 'text-positive font-semibold' : 'text-amber-600'}
-                >{guestReady ? 'Guest ready ✓' : 'Not ready'}</span
-              >
-            </div>
-            <div class="flex justify-between">
-              <span>presence</span><span class={bothPresent ? 'text-positive' : 'text-amber-600'}
-                >{bothPresent ? 'Both online' : 'Offline'}</span
-              >
-            </div>
-          </div>
-        </div>
 
-        {#if isHost || isGuest}
-          
-          {#if typeof window !== 'undefined' && (window as unknown as { __HOOP_RUSH_DEV?: boolean }).__HOOP_RUSH_DEV}
-            <details class="rounded-xl border border-line-soft bg-card p-4">
-              <summary class="cursor-pointer text-xs font-semibold">Diagnostics (dev only)</summary>
-              <div class="mt-3 space-y-1 font-mono text-xs break-all">
-                <div>room {roomId}</div>
-                <div>revision {snap.revision} · digest {snap.digest.slice(0, 12)}…</div>
-                <div>
-                  cursor {snap.cursor} · settings rev {(
-                    snap as unknown as { settingsRevision?: number }
-                  ).settingsRevision}
-                </div>
-                <div>
-                  protocol v{snap.settings.roomProtocolVersion} · multiplayer {snap.settings
-                    .multiplayerVersion}
-                </div>
-                <div>
-                  presence {JSON.stringify((snap as unknown as { presence?: unknown }).presence)}
-                </div>
-                <div>
-                  seed {(snap as unknown as { seed?: string | null }).seed
-                    ? (snap as unknown as { seed?: string | null }).seed!.slice(0, 12) + '…'
-                    : 'null'}
-                </div>
-              </div>
-            </details>
-          {:else}
-            <details class="rounded-xl border border-line-soft bg-card p-4">
-              <summary class="cursor-pointer text-xs font-semibold">Details</summary>
-              <div class="mt-3 space-y-1 text-xs">
-                <div>Room {roomId.slice(0, 8)}… · {modeLabel} · {paceShort}</div>
-                <div>
-                  {snap.memberCount}/2 players · {guestReady ? 'Ready' : 'Not ready'} · {bothPresent
-                    ? 'Both connected'
-                    : 'Reconnecting'}
-                </div>
-              </div>
-            </details>
-          {/if}
-        {/if}
       </div>
     </div>
 

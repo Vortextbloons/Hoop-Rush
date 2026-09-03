@@ -148,7 +148,7 @@ const postseasonPlayed = $derived(postseasonRows.length);
           Schedule
         </h1>
         <p class="mt-1 font-mono text-xs text-muted-foreground">
-          {playedCount} of 82 played · nine checkpoints
+          {playedCount} of 82 played · 9 blocks
         </p>
       </div>
       <div
@@ -197,7 +197,7 @@ const postseasonPlayed = $derived(postseasonRows.length);
                   href={resolve(`/season/run/checkpoint/?block=${String(group.blockIndex)}` as any)}
                   class="font-mono text-xs text-primary underline-offset-4 hover:underline"
                 >
-                  Checkpoint recap
+                  Block recap
                 </a>
               {/if}
             </div>
@@ -467,8 +467,6 @@ const postseasonPlayed = $derived(postseasonRows.length);
       </section>
     {/if}
 
-    <p class="mt-6 px-3 font-mono text-xs text-muted-foreground sm:px-0">
-      Results update as checkpoints complete; scheduled games carry no prediction.
-    </p>
+
   </section>
 {/if}

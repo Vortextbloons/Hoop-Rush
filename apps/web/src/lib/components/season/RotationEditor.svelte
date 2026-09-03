@@ -301,9 +301,7 @@ function highlightOf(playerVersionId: string): string {
     <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
       <div>
         <h2 class="font-display text-base font-extrabold uppercase tracking-tight">Rotation</h2>
-        <p class="mt-0.5 text-xs text-muted-foreground">
-          Only the active 10 enter games. Inactive depth stays rostered and available to swap in.
-        </p>
+        <p class="mt-0.5 text-xs text-muted-foreground">Only 10 play. Inactives can be swapped in.</p>
       </div>
       <div
         class="grid shrink-0 grid-cols-2 overflow-hidden rounded-lg border border-border bg-surface-1"
@@ -348,17 +346,12 @@ function highlightOf(playerVersionId: string): string {
 
   <div class="flex flex-col gap-2">
     <p class="text-sm break-words text-muted-foreground">
-      Target minutes
-      <strong class="text-foreground">{minutesTotal}</strong>
-      of 240
+      {minutesTotal} / 240 min
       {#if minutesRemaining !== 0}
-        <span class="text-destructive">— {minutesRemaining} to assign</span>
+        <span class="text-destructive">· {Math.abs(minutesRemaining)} left</span>
       {:else}
         <span class="text-positive">· complete</span>
       {/if}
-      <span class="hidden sm:inline">
-        · Starters are ordered PG, SG, SF, PF, C; the closing five is an independent legal five.
-      </span>
     </p>
     <div
       class="h-2 overflow-hidden rounded-full bg-surface-2"

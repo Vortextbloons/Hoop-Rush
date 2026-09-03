@@ -160,20 +160,18 @@ const hubHref = resolve('/season/run' as any);
 </script>
 
 <svelte:head>
-  <title>Season Run — checkpoint — Hoop Rush</title>
+  <title>Season Run — Block — Hoop Rush</title>
 </svelte:head>
 
 {#if !shell.ready || !shell.snapshot || !run || !humanFranchiseId || !manifest}
-  <p class="py-10 font-mono text-sm text-muted-foreground">Loading the checkpoint…</p>
+  <p class="py-10 font-mono text-sm text-muted-foreground">Loading block…</p>
 {:else if loadError}
   <p class="mt-8 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
-    Failed to load the checkpoint: {loadError}
+    Failed to load block: {loadError}
   </p>
 {:else if acceptedBlocks.length === 0}
   <div class="mt-10 flex flex-col gap-4">
-    <p class="font-mono text-sm text-muted-foreground">
-      No checkpoint yet — submit the first block from the Hub.
-    </p>
+    <p class="font-mono text-sm text-muted-foreground">No block yet — submit the first block.</p>
     <a
       href={hubHref}
       class="inline-flex w-fit items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
@@ -183,7 +181,7 @@ const hubHref = resolve('/season/run' as any);
   </div>
 {:else if requestedOutOfRange}
   <div class="mt-10 flex flex-col gap-4">
-    <p class="font-mono text-sm text-muted-foreground">That checkpoint doesn't exist.</p>
+    <p class="font-mono text-sm text-muted-foreground">That block doesn't exist.</p>
     <a
       href={hubHref}
       class="inline-flex w-fit items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
@@ -193,7 +191,7 @@ const hubHref = resolve('/season/run' as any);
   </div>
 {:else if requestedNotAccepted}
   <div class="mt-10 flex flex-col gap-4">
-    <p class="font-mono text-sm text-muted-foreground">That checkpoint hasn't been reached yet.</p>
+    <p class="font-mono text-sm text-muted-foreground">That block hasn't been reached yet.</p>
     <a
       href={hubHref}
       class="inline-flex w-fit items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
@@ -210,7 +208,7 @@ const hubHref = resolve('/season/run' as any);
     <div class="flex items-end justify-between gap-4 px-3 sm:px-0">
       <div>
         <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">
-          Season Run · checkpoint
+          Season Run · Block
         </p>
         <h1
           id="checkpoint-heading"
@@ -219,8 +217,7 @@ const hubHref = resolve('/season/run' as any);
           Block {displayBlock + 1} recap
         </h1>
         <p class="mt-1 font-mono text-[10px] text-muted-foreground">
-          {progressLabel(recap.completedRounds)} · {ordinal(recap.completedRounds)} rounds · recap of
-          this checkpoint
+          {progressLabel(recap.completedRounds)} · {ordinal(recap.completedRounds)} rounds
         </p>
       </div>
       <a
@@ -325,5 +322,5 @@ const hubHref = resolve('/season/run' as any);
     </div>
   </section>
 {:else}
-  <p class="py-10 font-mono text-sm text-muted-foreground">Loading the checkpoint…</p>
+  <p class="py-10 font-mono text-sm text-muted-foreground">Loading block…</p>
 {/if}

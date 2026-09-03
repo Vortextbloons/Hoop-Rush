@@ -50,9 +50,7 @@ $effect(() => {
         >
           Completed seasons
         </h1>
-        <p class="mt-1 font-mono text-[10px] text-muted-foreground">
-          Every promoted champion run saved on this device
-        </p>
+        <p class="mt-1 font-mono text-[10px] text-muted-foreground">Champions on this device</p>
       </div>
     </div>
 
@@ -64,9 +62,7 @@ $effect(() => {
         <h2 class="font-display text-lg font-extrabold uppercase tracking-tight">
           History could not load
         </h2>
-        <p class="mt-1 text-sm text-muted-foreground">
-          A stored completed season failed validation. It stays on this device; nothing was deleted.
-        </p>
+
         <p class="mt-2 font-mono text-xs text-destructive">{loadError}</p>
         <button
           type="button"
@@ -111,7 +107,7 @@ $effect(() => {
                   <span class="font-normal text-muted-foreground">champion</span>
                 </span>
                 <span class="block font-mono text-[10px] text-muted-foreground">
-                  {shell.franchiseName(entry.humanFranchiseId)} · seed {entry.rootSeed.slice(0, 8)}…
+                  {shell.franchiseName(entry.humanFranchiseId)}
                 </span>
               </span>
               <span class="shrink-0 font-mono text-[10px] text-muted-foreground">
@@ -126,9 +122,7 @@ $effect(() => {
           </li>
         {/each}
       </ul>
-      <p class="mt-4 font-mono text-[10px] text-muted-foreground">
-        Completed seasons live in this browser's local storage — nothing leaves this device.
-      </p>
+
     {/if}
   </section>
 {/if}

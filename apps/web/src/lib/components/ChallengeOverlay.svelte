@@ -48,15 +48,15 @@ $effect(() => {
 >
   <div class="mx-auto flex w-full max-w-4xl flex-col px-4 py-8 sm:px-6 sm:py-10">
     <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">
-      {modeLabel} · {franchiseLabel(run.franchiseId)} · {run.eraId}
+      {modeLabel} · {franchiseLabel(run.franchiseId)}
     </p>
     <h1 class="font-display mt-2 text-2xl font-extrabold tracking-tight uppercase sm:text-3xl">
       {#if phase === 'paused'}
-        Challenge paused
+        Paused
       {:else if phase === 'error'}
-        Challenge stopped
+        Stopped
       {:else}
-        Playing the season
+        Playing
       {/if}
     </h1>
 
@@ -82,7 +82,7 @@ $effect(() => {
             {run.homeDisplayName}
           </p>
           <p class="font-mono text-[10px] text-muted-foreground">
-            {franchiseLabel(run.franchiseId)} · {run.eraId}
+            {franchiseLabel(run.franchiseId)}
           </p>
         </div>
       </div>
@@ -109,10 +109,7 @@ $effect(() => {
         <p
           class="min-w-[11rem] rounded-full border border-border px-3 py-0.5 text-center font-mono text-[10px] tabular-nums uppercase"
         >
-          Game {run.games.length}<span class={run.games.length === 82 ? '' : 'invisible'}>
-            · final</span
-          >
-          · {record?.wins ?? 0}-{record?.losses ?? 0}
+          Game {run.games.length} · {record?.wins ?? 0}–{record?.losses ?? 0}
         </p>
       </div>
       <div class="flex min-w-0 items-center justify-end gap-2 sm:gap-3">
@@ -142,33 +139,8 @@ $effect(() => {
 
     <div class="mt-6 rounded-xl border border-border bg-card p-4 sm:p-5">
       <GameStrip {run} games={run.games} />
-      <div class="mt-3 flex flex-wrap items-center gap-4 font-mono text-[10px] uppercase">
-        <span class="flex items-center gap-1.5 text-muted-foreground">
-          <span class="h-2 w-2 rounded-sm bg-primary/80" aria-hidden="true"></span>
-          Win
-        </span>
-        <span class="flex items-center gap-1.5 text-muted-foreground">
-          <span class="h-2 w-2 rounded-sm bg-destructive/70" aria-hidden="true"></span>
-          Loss
-        </span>
-        <span
-          class="flex items-center gap-1.5 text-muted-foreground {run.firstLossGameNumber !==
-            null && run.firstLossGameNumber <= run.games.length
-            ? ''
-            : 'invisible'}"
-          aria-hidden={!(
-            run.firstLossGameNumber !== null && run.firstLossGameNumber <= run.games.length
-          )}
-        >
-          <span
-            class="h-2 w-2 rounded-sm bg-destructive ring-2 ring-destructive/80"
-            aria-hidden="true"
-          ></span>
-          First loss
-        </span>
-        <span class="ml-auto tabular-nums text-muted-foreground">
-          {run.games.length}/82 committed
-        </span>
+      <div class="mt-3 flex justify-end font-mono text-[10px] tabular-nums text-muted-foreground">
+        {run.games.length}/82
       </div>
     </div>
 
@@ -212,7 +184,7 @@ $effect(() => {
         </a>
       {/if}
       {#if phase === 'error' && error}
-        <p class="w-full text-sm text-destructive">{error}</p>
+        <p class="w-full text-sm text-destructive">Couldn’t finish the run. Try again.</p>
       {/if}
     </div>
   </div>

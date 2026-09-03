@@ -246,8 +246,7 @@ async function submitBlock() {
           Rotation workspace
         </h2>
         <p class="mt-1 font-mono text-[10px] text-muted-foreground">
-          Ten active players · role, minutes, fatigue, and availability resolve here · inactive
-          roster depth can be promoted to the rotation · the rotation locks when the block submits
+          10 play. Swap inactives in. Locks when block starts.
         </p>
       </div>
 
@@ -327,12 +326,9 @@ async function submitBlock() {
             </dd>
           </div>
         </dl>
-        <p class="mt-1 font-mono text-[9px] text-muted-foreground/70">
-          1–100 vs the league · star-heavy minute weighting
-          {#if overallDelta !== null || offenseDelta !== null || defenseDelta !== null}
-            · deltas vs last locked rotation
-          {/if}
-        </p>
+        {#if overallDelta !== null || offenseDelta !== null || defenseDelta !== null}
+          <p class="mt-1 font-mono text-[9px] text-muted-foreground/70">Change vs last rotation</p>
+        {/if}
       {/if}
 
       <UnitChemistry {roster} {effects} {shell} />

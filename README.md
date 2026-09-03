@@ -59,6 +59,11 @@ pnpm dev
 # 3. Open http://localhost:5173 and draft your lineup
 ```
 
+## M3 — What shipped
+
+- **m3-engine-v13** balance pass — wider star separation, shooting skill matters more, `overall-cohort-v2` era fairness (`Docs/decisions/decisions.md#engine-v12-to-v13`).
+- **M3 UI presentation pass (2026-09-03)** — 36 files, copy-only: shorter mode cards (`5 rounds. Each assigns a franchise + decade.`), no `Available`/`01` pills, no `82 games` legends, humanized loading/errors, no `seed`/`digest`/`heartbeat`/`checkpoint hashes` leakage, collapsed `How trades work` and duplicate block/standings footers. No engine or version bump, `pnpm --filter @hoop-rush/web build` passes. See `Docs/decisions/decisions.md#m3-ui-presentation-pass-2026-09-03`.
+
 ## Common Commands
 
 | Command | Purpose |

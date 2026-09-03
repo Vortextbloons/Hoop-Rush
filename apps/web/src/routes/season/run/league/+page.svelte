@@ -120,7 +120,7 @@ $effect(() => {
           {shell.snapshot.acceptedBlocks.length * 10 > 82
             ? 82
             : shell.snapshot.acceptedBlocks.length * 10}
-          team games accepted{shell.seasonComplete ? ' (final)' : ''}
+          games played
         </p>
       </div>
       <div class="flex shrink-0 flex-col items-start gap-2 sm:items-end">
@@ -208,7 +208,7 @@ $effect(() => {
     {:else}
       {#if teamStats.length === 0}
         <p class="mt-8 rounded-xl bg-surface-1 p-6 text-sm text-muted-foreground">
-          No team stats yet — accept a block to fold game summaries.
+          Play a block to see team stats.
         </p>
       {:else}
         {#if desktopViewport !== true}
@@ -353,10 +353,7 @@ $effect(() => {
             </table>
           </div>
         {/if}
-        <p class="mt-2 font-mono text-[10px] text-muted-foreground">
-          Folded from accepted game summaries; rates are per team game played. Diff is total point
-          differential (all games, no tiebreak).
-        </p>
+
       {/if}
     {/if}
   </section>

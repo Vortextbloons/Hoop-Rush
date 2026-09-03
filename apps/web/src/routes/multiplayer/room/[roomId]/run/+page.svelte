@@ -2,7 +2,7 @@
 import { page } from '$app/stores';
 import { resolve } from '$app/paths';
 import { goto } from '$app/navigation';
-import { ArrowLeft, RefreshCw, AlertTriangle, Trophy, Users, Lock, Check, Clock, Wifi, WifiOff, Play, } from '@lucide/svelte';
+import { ArrowLeft, RefreshCw, AlertTriangle, Trophy, Users, Lock, Check, Clock, Wifi, WifiOff, } from '@lucide/svelte';
 import { createInMemorySeasonRoomCoordinator } from '$lib/season/season-room-coordinator';
 import { createSupabaseSeasonTransport, isSupabaseConfigured, } from '$lib/season/supabase-season-transport';
 import { loadMembership, saveMembership } from '$lib/season/season-room-identity';
@@ -392,7 +392,7 @@ function displayPlayerName(versionId: string): string {
       <p class="text-label tracking-[0.16em] text-primary">{modeLabel} · Multiplayer — simpler system</p>
       <h2 class="font-display mt-2 text-2xl font-extrabold uppercase">{modeLabel} Room — simpler multiplayer</h2>
       <p class="mt-2 text-sm text-muted-foreground">
-        This room is <strong>{modeLabel}</strong> ({snap.settings.pace === 'live' ? 'Live 90s / 5m' : 'Async 24h'}). The simpler 5-pick head-to-head (Classic roll / Sandbox free pick) and single-client 82-game simulation are being wired. Room lobby works now (code, presence, Ready/Start). Season Hub is Season-only and stays archived.
+        This is a Season Run room. Solo Classic/Sandbox at <a href={resolve('/classic')} class="underline underline-offset-4">/classic</a> · <a href={resolve('/sandbox')} class="underline underline-offset-4">/sandbox</a>.
       </p>
       <div class="mt-4 flex justify-center gap-2">
         <a href={`/multiplayer/room/${roomId}`} class="rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground">Back to lobby →</a>
@@ -480,7 +480,7 @@ function displayPlayerName(versionId: string): string {
             {modeLabel} · {myFranchiseName} vs {oppFranchiseName}
           </p>
           <h1 class="font-display mt-2 text-2xl font-extrabold tracking-tight uppercase">
-            Season Hub — Draft Complete, Awaiting Block Simulation
+            Season Hub — Ready for Block 1
           </h1>
           <p class="mt-1 text-sm text-muted-foreground">
             {myFranchiseName} ({myRoster?.players.length ?? 10} players) vs {oppFranchiseName} ({oppRoster
@@ -532,60 +532,18 @@ function displayPlayerName(versionId: string): string {
           review your campaign opportunity, and declare free agency before you lock. Both teams lock
           privately, then the block simulates together.
         </p>
-        <div class="mt-3 grid gap-2 sm:grid-cols-3 lg:grid-cols-5">
+        <p
+          class="mt-3 rounded-lg border border-line-soft bg-card px-3 py-2 text-xs text-muted-foreground"
+        >
+          Rotation, objective, campaign & free agency tools ship next update.
+        </p>
+        <div class="mt-3">
           <button
             type="button"
             disabled
-            class="rounded-lg border border-line-soft bg-card px-3 py-2.5 text-left opacity-60"
+            class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground opacity-60"
           >
-            <span class="block text-xs font-bold uppercase tracking-wide">Set Rotation</span>
-            <span class="mt-1 block text-xs text-muted-foreground">Minutes & health</span>
-            <span class="mt-1 block text-[11px] font-semibold text-muted-foreground"
-              >Coming in next update</span
-            >
-          </button>
-          <button
-            type="button"
-            disabled
-            class="rounded-lg border border-line-soft bg-card px-3 py-2.5 text-left opacity-60"
-          >
-            <span class="block text-xs font-bold uppercase tracking-wide">Season Objective</span>
-            <span class="mt-1 block text-xs text-muted-foreground">Choose your goal</span>
-            <span class="mt-1 block text-[11px] font-semibold text-muted-foreground"
-              >Coming in next update</span
-            >
-          </button>
-          <button
-            type="button"
-            disabled
-            class="rounded-lg border border-line-soft bg-card px-3 py-2.5 text-left opacity-60"
-          >
-            <span class="block text-xs font-bold uppercase tracking-wide">Campaign</span>
-            <span class="mt-1 block text-xs text-muted-foreground">Review opportunity</span>
-            <span class="mt-1 block text-[11px] font-semibold text-muted-foreground"
-              >Coming in next update</span
-            >
-          </button>
-          <button
-            type="button"
-            disabled
-            class="rounded-lg border border-line-soft bg-card px-3 py-2.5 text-left opacity-60"
-          >
-            <span class="block text-xs font-bold uppercase tracking-wide">Free Agency</span>
-            <span class="mt-1 block text-xs text-muted-foreground">Declare or skip</span>
-            <span class="mt-1 block text-[11px] font-semibold text-muted-foreground"
-              >Coming in next update</span
-            >
-          </button>
-          <button
-            type="button"
-            disabled
-            class="flex flex-col items-center justify-center rounded-lg bg-primary px-3 py-2.5 text-primary-foreground opacity-60"
-          >
-            <span class="flex items-center gap-1 text-xs font-bold uppercase tracking-wide"
-              ><Lock class="h-3.5 w-3.5" /> Lock for Block 1</span
-            >
-            <span class="mt-1 text-[11px]">Coming in next update</span>
+            <Lock class="h-3.5 w-3.5" /> Lock for Block 1 — coming soon
           </button>
         </div>
         <p class="mt-3 text-xs text-muted-foreground">
@@ -595,100 +553,18 @@ function displayPlayerName(versionId: string): string {
       </div>
     </div>
 
-    <div class="mt-6 grid gap-3 sm:grid-cols-3">
-      <div
-        class="rounded-xl border p-4 {isPrivateLock
-          ? 'border-primary/40 bg-primary/5'
-          : 'border-line-soft bg-card'}"
-      >
-        <div class="flex items-center gap-1.5 font-semibold text-xs tracking-widest uppercase">
-          <Lock class="h-3.5 w-3.5" /> Lock decisions
-        </div>
-        <p class="mt-1 text-xs text-muted-foreground">
-          Rotation, objective, campaign choice and free-agency plan. Both teams lock privately, then
-          reveal together.
-        </p>
-        <p
-          class="mt-2 text-xs font-semibold {gameplay?.p1Locked && gameplay?.p2Locked
-            ? 'text-positive'
-            : 'text-amber-600'}"
-        >
-          {gameplay?.p1Locked && gameplay?.p2Locked
-            ? 'Both teams locked ✓'
-            : 'Waiting for both teams to lock'}
-        </p>
-        <div class="mt-2 flex flex-wrap gap-1.5">
-          <span
-            class="inline-flex rounded-full border px-2 py-1 text-xs {gameplay?.p1Locked
-              ? 'border-positive bg-positive/10 text-positive'
-              : 'border-amber-500/30 bg-amber-500/5 text-amber-700'}"
-            >{p1FranchiseName} {gameplay?.p1Locked ? '✓' : '…'}</span
-          >
-          <span
-            class="inline-flex rounded-full border px-2 py-1 text-xs {gameplay?.p2Locked
-              ? 'border-positive bg-positive/10 text-positive'
-              : 'border-amber-500/30 bg-amber-500/5 text-amber-700'}"
-            >{p2FranchiseName} {gameplay?.p2Locked ? '✓' : '…'}</span
-          >
-        </div>
-        <p class="mt-2 text-xs text-muted-foreground">
-          Your franchise: <span class="font-semibold text-foreground">{myFranchiseName}</span> · Waiting
-          on honest lock state.
-        </p>
+    <div class="mt-6 rounded-xl border border-line-soft bg-card px-4 py-3">
+      <div class="flex flex-wrap items-center gap-2 text-xs font-semibold tracking-widest uppercase">
+        <span class={isPrivateLock ? 'text-primary' : 'text-muted-foreground'}>1. Lock</span>
+        <span class="text-muted-foreground">→</span>
+        <span class={isSimulation ? 'text-primary' : 'text-muted-foreground'}>2. Simulate</span>
+        <span class="text-muted-foreground">→</span>
+        <span class={isHashVerification || isComplete ? 'text-primary' : 'text-muted-foreground'}>3. Verify</span>
       </div>
-      <div
-        class="rounded-xl border p-4 {isSimulation
-          ? 'border-primary bg-primary/10'
-          : 'border-line-soft bg-card'}"
-      >
-        <div class="flex items-center gap-1.5 font-semibold text-xs tracking-widest uppercase">
-          <Play class="h-3.5 w-3.5" /> Simulate Block 1
-        </div>
-        <p class="mt-1 text-xs text-muted-foreground">
-          Once both teams lock, the league simulates. You'll see live progress here.
-        </p>
-        {#if gameplay?.simulationProgress}
-          <p class="mt-2 text-xs">
-            {gameplay.simulationProgress.completed}/{gameplay.simulationProgress.total} games · {gameplay
-              .simulationProgress.latestGameId ?? ''}
-          </p>
-          <div class="mt-2 h-1.5 w-full rounded-full bg-line-soft">
-            <div
-              class="h-1.5 rounded-full bg-primary"
-              style={`width:${(gameplay.simulationProgress.completed / Math.max(1, gameplay.simulationProgress.total)) * 100}%`}
-            ></div>
-          </div>
-        {:else}
-          <p class="mt-2 text-xs text-muted-foreground">Awaiting locks — no games simulated yet.</p>
-        {/if}
-      </div>
-      <div
-        class="rounded-xl border p-4 {isHashVerification
-          ? 'border-primary bg-primary/10'
-          : 'border-line-soft bg-card'}"
-      >
-        <div class="flex items-center gap-1.5 font-semibold text-xs tracking-widest uppercase">
-          <Trophy class="h-3.5 w-3.5" /> Results & verification
-        </div>
-        <p class="mt-1 text-xs text-muted-foreground">
-          Results are verified before standings update. Both sides confirm the same outcome before
-          it counts.
-        </p>
-        {#if gameplay?.attestation}
-          <p
-            class="mt-2 text-xs {gameplay.attestation.verified
-              ? 'text-positive font-semibold'
-              : 'text-destructive'}"
-          >
-            {gameplay.attestation.verified ? 'Verified ✓' : 'Awaiting verification'}
-          </p>
-        {:else}
-          <p class="mt-2 text-xs text-muted-foreground">No results yet — awaiting simulation.</p>
-        {/if}
-        <p class="mt-2 text-xs text-muted-foreground">
-          Standings stay 0–0 until Block 1 is verified.
-        </p>
-      </div>
+      <p class="mt-2 text-xs font-semibold {gameplay?.p1Locked && gameplay?.p2Locked ? 'text-positive' : 'text-amber-600'}">
+        {#if gameplay?.p1Locked && gameplay?.p2Locked}Both teams locked ✓{:else if gameplay?.simulationProgress}Simulating {gameplay.simulationProgress.completed}/{gameplay.simulationProgress.total}{:else if gameplay?.attestation?.verified}Verified ✓{:else}Waiting for both to lock{/if}
+      </p>
+      <p class="mt-1 text-xs text-muted-foreground">Both teams lock privately, then reveal together.</p>
     </div>
 
     {#if bootstrapping}
@@ -790,15 +666,7 @@ function displayPlayerName(versionId: string): string {
           </div>
           <div class="mt-4 rounded-lg border border-line-soft bg-card p-3 text-xs">
             <p class="font-semibold text-foreground">Season matchup</p>
-            <p class="mt-1 text-muted-foreground">
-              Your next head-to-head vs <span class="font-semibold text-foreground"
-                >{oppFranchiseName}</span
-              > is scheduled in Block 1. Rivalry record is provisional 0–0 until games are simulated.
-            </p>
-            <p class="mt-1 text-muted-foreground">
-              Health & minutes needs will surface here once rotation tooling ships — keep your
-              starters fresh for the opening block.
-            </p>
+            <p class="mt-1 text-muted-foreground">Keep your starters fresh for the opening block.</p>
           </div>
         </div>
 
@@ -811,21 +679,10 @@ function displayPlayerName(versionId: string): string {
           </p>
           <div class="mt-3 rounded-lg border border-line-soft bg-card p-3">
             <p class="text-label text-muted-foreground">Rosters (30 teams)</p>
-            <p class="mt-1 text-xs">
-              <span class="font-semibold">{myFranchiseName}</span>
-              {myRoster?.players.length ?? 0} players ·
-              <span class="font-semibold">{oppFranchiseName}</span>
-              {oppRoster?.players.length ?? 0} players · 28 AI opponents complete the league
-            </p>
-            <p class="mt-1 text-xs text-muted-foreground">
-              Each franchise carries 10 draft picks plus 28 AI-built rosters.
-            </p>
+            <p class="mt-1 text-xs text-muted-foreground">30 teams · 28 AI opponents</p>
           </div>
           <div class="mt-3 rounded-lg border border-line-soft bg-card p-3">
             <p class="text-label text-muted-foreground">Standings — provisional 0–0</p>
-            <p class="mt-1 text-xs text-muted-foreground">
-              No games simulated yet. Preseason rank shown until Block 1 verifies.
-            </p>
             <div class="mt-2 space-y-1 max-h-48 overflow-auto">
               {#each run.standings.rows.slice(0, 8) as row (row.franchiseId)}
                 <div class="flex justify-between text-xs">
@@ -838,52 +695,19 @@ function displayPlayerName(versionId: string): string {
                 </div>
               {/each}
             </div>
-            <p class="mt-2 text-xs text-muted-foreground">
-              Next games: vs {myNextOpponentName} and 6 more in Block 1. Full schedule unlocks after lock.
-            </p>
           </div>
-          <div class="mt-3 flex gap-2">
+          <div class="mt-3">
             <button
               type="button"
               onclick={() => goto(`/multiplayer/room/${roomId}/draft`)}
-              class="flex-1 rounded-lg border border-line-soft bg-card px-4 py-2 text-sm font-semibold"
+              class="w-full rounded-lg border border-line-soft bg-card px-4 py-2 text-sm font-semibold"
               >Back to draft</button
             >
-            <button
-              type="button"
-              disabled
-              class="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground opacity-60"
-              >Lock for Block 1</button
-            >
           </div>
-          <p class="mt-2 text-center text-[11px] text-muted-foreground">
-            Locking opens with rotation & objective tools — coming in next update.
-          </p>
         </div>
       </div>
 
-      <details class="mt-6 rounded-xl border border-line-soft bg-card">
-        <summary
-          class="cursor-pointer list-none px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
-          >Debug — digests & transport details</summary
-        >
-        <div
-          class="border-t border-line-soft px-4 py-3 text-xs leading-relaxed text-muted-foreground"
-        >
-          <p class="font-mono break-all">Run {run.runId} · stateRevision {run.stateRevision}</p>
-          <p class="font-mono break-all">League digest {generation?.digest ?? '—'}</p>
-          <p class="font-mono break-all">State digest {run.stateDigest}</p>
-          <p class="mt-1">Phase {phase} · room phase {snap?.phase} · pace {snap?.settings.pace}</p>
-          <p class="mt-1">
-            Stage {run.stage} · completedRounds {run.cursor.completedRounds} · AI pools {generation
-              ?.aiPools.length ?? 0}
-          </p>
-          <p class="mt-1">
-            Transport: Supabase room coordination (discovery, presence, locks, attestations) —
-            simulation stays local.
-          </p>
-        </div>
-      </details>
+
     {:else}
       <div class="mt-6 rounded-xl border border-amber-500/30 bg-amber-500/10 p-6">
         <p class="text-sm font-semibold">Run not yet bootstrapped</p>

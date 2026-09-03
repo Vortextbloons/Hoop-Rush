@@ -325,8 +325,7 @@ function buildPlayerSlice(run: SeasonRun, catalog: SeasonDraftCatalog): SeasonRu
       </h1>
       {#if !(started && board?.draft)}
         <p class="mt-3 max-w-xl text-sm text-muted-foreground">
-          Your franchise is picked at random. Each round draws eight player cards; safe picks keep
-          the 4 PG/SG / 4 SF/PF / 3 C lineup targets reachable, and disabled cards say why.
+          8 cards per round. Build toward 4 guards, 4 wings, 3 bigs.
         </p>
       {/if}
     </div>
@@ -409,10 +408,7 @@ function buildPlayerSlice(run: SeasonRun, catalog: SeasonDraftCatalog): SeasonRu
         <h2 class="font-display text-xl font-extrabold uppercase tracking-tight">
           Start a Season Run
         </h2>
-        <p class="mt-2 max-w-xl text-sm text-muted-foreground">
-          Your draft saves automatically in this browser — close the tab and pick up right where you
-          left off.
-        </p>
+        <p class="mt-2 max-w-xl text-sm text-muted-foreground">Draft auto-saves.</p>
         <button
           type="button"
           onclick={startDraft}
@@ -445,10 +441,7 @@ function buildPlayerSlice(run: SeasonRun, catalog: SeasonDraftCatalog): SeasonRu
           >
             The league
           </h2>
-          <p class="mt-2 text-sm text-muted-foreground">
-            30 franchises · 82 rounds · nine ten-game blocks plus a final two-game block. One
-            franchise is yours; the rest are AI-controlled.
-          </p>
+          <p class="mt-2 text-sm text-muted-foreground">30 teams · 82 games · You control one.</p>
         </section>
       {/if}
     </div>
@@ -480,10 +473,7 @@ function buildPlayerSlice(run: SeasonRun, catalog: SeasonDraftCatalog): SeasonRu
           <h2 class="font-display text-base font-extrabold uppercase tracking-tight">
             Generate the AI league
           </h2>
-          <p class="mt-2 text-sm text-muted-foreground">
-            The remaining 29 teams are filled out automatically, keeping each team's strength and
-            lineup needs in line.
-          </p>
+          <p class="mt-2 text-sm text-muted-foreground">AI fills the other 29 teams.</p>
           <button
             type="button"
             onclick={generateLeague}
@@ -492,11 +482,7 @@ function buildPlayerSlice(run: SeasonRun, catalog: SeasonDraftCatalog): SeasonRu
           >
             {board.phase === 'generating' ? 'Generating…' : 'Generate AI league'}
           </button>
-          {#if board.phase === 'generating'}
-            <p class="mt-3 font-mono text-xs text-muted-foreground">
-              Generating the league — the board stays responsive while it works.
-            </p>
-          {/if}
+
           {#if generationError}
             <div
               role="alert"
@@ -518,17 +504,14 @@ function buildPlayerSlice(run: SeasonRun, catalog: SeasonDraftCatalog): SeasonRu
         <h2 class="font-display text-xl font-extrabold uppercase tracking-tight">
           League generated
         </h2>
-        <p class="mt-2 text-sm text-muted-foreground">
-          All 30 teams are set and ready. Promoting moves the draft into an active run and opens the
-          season hub.
-        </p>
+        <p class="mt-2 text-sm text-muted-foreground">League ready. Start your season.</p>
         <button
           type="button"
           onclick={promote}
           disabled={promoting}
           class="mt-5 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {promoting ? 'Promoting…' : 'Open the league hub'}
+          {promoting ? 'Starting…' : 'Open the league hub'}
         </button>
         {#if promoteError}
           <div

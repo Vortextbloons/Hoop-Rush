@@ -578,12 +578,6 @@ let canEnterRun = $derived((draftState as any)?.status === 'complete' && generat
         class="inline-flex items-center gap-1.5 rounded-lg border border-line-soft bg-card px-3 py-1.5 text-xs font-semibold hover:border-line-strong"
         ><RefreshCw class="h-3.5 w-3.5" />Refresh</button
       >
-      {#if draftState}<button
-          type="button"
-          onclick={refreshDraft}
-          class="inline-flex items-center gap-1.5 rounded-lg border border-line-soft bg-card px-3 py-1.5 text-xs font-semibold"
-          >Reload picks</button
-        >{/if}
     </div>
   </div>
 
@@ -614,8 +608,7 @@ let canEnterRun = $derived((draftState as any)?.status === 'complete' && generat
     <div class="rounded-xl border border-amber-500/30 bg-amber-500/10 p-6">
       <h2 class="font-display text-lg font-extrabold uppercase">No seat found</h2>
       <p class="mt-2 text-sm text-muted-foreground">
-        No authenticated membership. Refresh restores via server (loadMembership + refresh), not
-        localStorage trust. Re-join with 4-digit code.
+        No seat found. Re-join with the 4-digit code.
       </p>
       <a
         href={resolve('/multiplayer')}
@@ -659,7 +652,7 @@ let canEnterRun = $derived((draftState as any)?.status === 'complete' && generat
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p class="text-label tracking-[0.16em] text-primary">
-            Multiplayer draft · {roomId.slice(0, 8)}… · {modeLabel}
+            Multiplayer draft · {modeLabel}
           </p>
           <h1 class="font-display mt-2 text-2xl font-extrabold tracking-tight uppercase">
             {modeLabel} shared draft
@@ -668,30 +661,17 @@ let canEnterRun = $derived((draftState as any)?.status === 'complete' && generat
             {membership.participantId === 'p1' ? 'P1 · Host' : 'P2 · Guest'} · {membership.franchiseId}
             · {snap?.settings.pace === 'live' ? 'Live — 90s per pick' : 'Async — 24h per pick'} · {progress}
           </p>
-          <p class="mt-1 text-xs text-muted-foreground">
-            Digest {controller?.getDigest()?.slice(0, 12) ?? '—'}… · rev {(draftState as any)
-              .revision} · turn
-            {(draftState as any).currentTurnParticipantId ?? '—'} · {isLocked
-              ? 'locked'
-              : isMyTurn
-                ? 'your turn'
-                : opponentTurn
-                  ? 'opponent turn'
-                  : '—'}
-            {secondsRemaining !== null ? `· ${secondsRemaining}s remaining` : ''}
-          </p>
           {#if !opponentOnline}
             <p
               class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-700"
             >
-              <WifiOff class="h-3 w-3" /> Opponent disconnected — waiting for reconnection · presence
-              offline after 30s
+              <WifiOff class="h-3 w-3" /> Opponent offline — waiting to reconnect
             </p>
           {:else}
             <p
               class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-positive/30 bg-positive/10 px-2.5 py-1 text-xs text-positive"
             >
-              <Wifi class="h-3 w-3" /> Opponent online · both clients replay log on reconnect
+              <Wifi class="h-3 w-3" /> Opponent online
             </p>
           {/if}
           {#if isLocked}
@@ -729,49 +709,21 @@ let canEnterRun = $derived((draftState as any)?.status === 'complete' && generat
           class="mt-4 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs"
         >
           <div class="flex items-center gap-1.5 font-semibold text-destructive">
-            <AlertTriangle class="h-3.5 w-3.5" /> Replay integrity issue {integrityFailed
-              ? '· integrity-failed'
-              : ''}
+            <AlertTriangle class="h-3.5 w-3.5" /> Something went wrong with the draft. Reload.
           </div>
-          <p class="mt-1 font-mono break-all text-destructive/90">{replayError}</p>
-          <p class="mt-1 text-muted-foreground">
-            Log replay skipped invalid commands or failed to apply — check command stream. {controller?.getSkippedCommandCount()
-              ? `Skipped ${controller?.getSkippedCommandCount()} invalid`
-              : ''}
-          </p>
-          <button
-            type="button"
-            onclick={refreshDraft}
-            class="mt-2 inline-flex rounded-lg border border-line-soft bg-card px-3 py-1.5 text-xs font-semibold"
-            >Reload picks · re-replay log</button
-          >
         </div>
       {/if}
       {#if snap?.settings.pace === 'live' && isMyTurn && secondsRemaining !== null}
         <div class="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-xs">
           <p class="text-amber-700">
-            Live turn clock · {secondsRemaining}s remaining. Reloading this tab keeps the same start
-            time (session storage).
+            Live turn clock · {secondsRemaining}s remaining.
           </p>
         </div>
       {/if}
 
       <div class="mt-4 rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs">
         <p class="font-semibold">
-          Season Run: 10 rounds · snake order · 8 cards (≥3 safe) · 4G/4F/3C targets ·
-          DUO_BAND_QUOTAS 4/8/9/7
-        </p>
-        <p class="mt-1 text-muted-foreground">
-          Deterministic via room seed + settingsRevision + draft cursor. Offers drawn via
-          drawGlobalOffer; picks via applySeasonDraftCommand with idempotent commandId +
-          expectedRevision. Neither client uses solo /season flow.
-        </p>
-        <p class="mt-1 font-mono text-[11px]">
-          Size {SEASON_DRAFT_OFFER_SIZE} · Safe min {SEASON_DRAFT_SAFE_MINIMUM} · Seed {(
-            snap as unknown as { seed?: string | null }
-          )?.seed?.slice(0, 12) ?? '—'}… · cursor {snap?.cursor} · digest {controller
-            ?.getDigest()
-            ?.slice(0, 16) ?? '—'}…
+          10 rounds · 8 cards (≥3 safe) · 4G/4F/3C
         </p>
       </div>
 
@@ -798,21 +750,8 @@ let canEnterRun = $derived((draftState as any)?.status === 'complete' && generat
           <p class="text-label text-muted-foreground">Mode & pace (shared fact)</p>
           <p class="mt-1 text-sm font-semibold">{modeLabel} · {snap?.settings.pace}</p>
           <p class="mt-1 text-xs text-muted-foreground">
-            Seed {(snap as unknown as { seed?: string | null })?.seed?.slice(0, 12) ?? '—'}… · rev {(
-              draftState as any
-            ).revision}
-            · {snap?.settings.pace === 'live' ? '90s per pick' : '24h per pick'}
+            {snap?.settings.pace === 'live' ? 'Live · 90s per pick' : 'Async · 24h per pick'}
           </p>
-          {#if opponentPresence}<p
-              class="mt-1 text-xs {opponentOnline ? 'text-positive' : 'text-amber-600'}"
-            >
-              {opponentOnline
-                ? 'Opponent online'
-                : 'Opponent disconnected — timer paused? live still 90s'} · lastSeen {opponentPresence.lastSeenAt.slice(
-                11,
-                19,
-              )}
-            </p>{/if}
         </div>
         <div class="rounded-lg border border-line-soft bg-card p-3">
           <p class="text-label text-muted-foreground">Picks</p>
@@ -850,14 +789,7 @@ let canEnterRun = $derived((draftState as any)?.status === 'complete' && generat
       {#if (draftState as any).status === 'complete' && generation}
         <div class="mt-4 rounded-lg border border-positive/30 bg-positive/10 p-4">
           <p class="font-semibold text-positive flex items-center gap-1.5">
-            <Trophy class="h-4 w-4" /> Draft complete — league verified
-          </p>
-          <p class="mt-1 text-xs text-muted-foreground">
-            Both clients independently derived 28 AI teams (DUO_BAND_QUOTAS) and attested league
-            digest. Duplicate ownership rejected. Identical local Season runs ready.
-          </p>
-          <p class="mt-2 font-mono text-xs break-all">
-            Digest {leagueDigest?.slice(0, 32) ?? controller?.getDigest()?.slice(0, 32)}…
+            <Trophy class="h-4 w-4" /> Draft complete — league ready. Enter Season Hub.
           </p>
           {#if verification}<p
               class="mt-1 text-xs {verification.ok ? 'text-positive' : 'text-destructive'}"
@@ -898,10 +830,7 @@ let canEnterRun = $derived((draftState as any)?.status === 'complete' && generat
               >Back to lobby</a
             >
           </div>
-          <p class="mt-2 text-xs text-muted-foreground">
-            Next: private-lock → simulation → hash-verification skeleton with worker (see run
-            shell). No solo /season flow used.
-          </p>
+
         </div>
       {:else if (draftState as any).status === 'finalized'}
         <div class="mt-4 rounded-lg border border-primary/30 bg-primary/10 p-4">
@@ -948,8 +877,7 @@ let canEnterRun = $derived((draftState as any)?.status === 'complete' && generat
         <div class="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
           <p class="font-semibold">20 picks complete — finalize rosters</p>
           <p class="mt-1 text-xs text-muted-foreground">
-            10 per participant, snake order verified. Finalize checks 4G/4F/3C and
-            legalFiveAfterAnyRemoval.
+            10 per participant, snake order verified. Finalize checks 4G/4F/3C and valid rosters.
           </p>
           <button
             type="button"
@@ -963,11 +891,7 @@ let canEnterRun = $derived((draftState as any)?.status === 'complete' && generat
       {:else if (draftState as any).status === 'drafting' && myOffer}
         <div class="mt-4">
           <p class="text-xs text-muted-foreground">
-            Offer for {myOffer.participantId} · Round {myOffer.round} · Pick {myOffer.pickOrdinal} — {SEASON_DRAFT_OFFER_SIZE}
-            cards, ≥{SEASON_DRAFT_SAFE_MINIMUM} safe (private until pick). {snap?.settings.pace ===
-            'live'
-              ? `· ${secondsRemaining ?? 90}s remaining`
-              : '· Async 24h'}
+            Your offer · Round {myOffer.round} · {secondsRemaining !== null ? `${secondsRemaining}s` : snap?.settings.pace === 'live' ? '90s' : '24h'}
           </p>
           {#if secondsRemaining !== null && secondsRemaining <= 15}<p
               class="mt-1 text-xs font-bold text-amber-600"
@@ -1041,17 +965,13 @@ let canEnterRun = $derived((draftState as any)?.status === 'complete' && generat
             {/each}
           </div>
           <p class="mt-2 text-xs text-muted-foreground">
-            Private offer: opponent cannot see these 8 cards until you lock. Reconnect replays via
-            refetch.
+            Private offer: opponent cannot see these 8 cards until you lock.
           </p>
           {#if pickError}<p role="alert" class="mt-3 text-xs text-destructive">{pickError}</p>{/if}
         </div>
       {:else if (draftState as any).status === 'drafting' && isMyTurn && !myOffer}
         <div class="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
           <p class="text-sm font-semibold">Your turn — drawing 8-card offer…</p>
-          <p class="mt-1 text-xs text-muted-foreground">
-            Deterministic via drawGlobalOffer (seasonNamespaceSeed + createRng). ≥3 safe required.
-          </p>
           <button
             type="button"
             onclick={handleDraw}
@@ -1074,7 +994,7 @@ let canEnterRun = $derived((draftState as any)?.status === 'complete' && generat
               lock.
             </p>{/if}
           {#if !opponentOnline}<p class="mt-2 text-xs font-semibold text-amber-700">
-              <WifiOff class="h-3 w-3 inline" /> Opponent disconnected — presence offline
+              <WifiOff class="h-3 w-3 inline" /> Opponent offline — waiting to reconnect
             </p>{/if}
           <div
             class="mt-3 inline-flex items-center gap-1.5 rounded-full bg-line-soft px-3 py-1.5 text-xs"
@@ -1097,8 +1017,7 @@ let canEnterRun = $derived((draftState as any)?.status === 'complete' && generat
 
       <div class="mt-6">
         <h3 class="text-label tracking-[0.12em] text-muted-foreground">
-          Accepted picks ({(draftState as any).picks.length}/20) — preserved through refresh · snake
-          reversal each round
+          Accepted picks ({(draftState as any).picks.length}/20)
         </h3>
         {#if (draftState as any).picks.length === 0}
           <p class="mt-2 text-xs text-muted-foreground">
@@ -1163,35 +1082,11 @@ let canEnterRun = $derived((draftState as any)?.status === 'complete' && generat
         <span
           class="inline-flex items-center gap-1.5 rounded-full border border-line-soft bg-card px-3 py-2 text-xs"
           ><Clock class="h-3 w-3" />
-          {snap?.settings.pace === 'live' ? 'Live 90s' : 'Async 24h'} · timer {secondsRemaining ??
-            '—'}s</span
+          {snap?.settings.pace === 'live' ? 'Live 90s' : 'Async 24h'}</span
         >
       </div>
     </div>
 
-    <div
-      class="mt-6 rounded-xl border border-line-soft bg-card p-4 text-xs leading-relaxed text-muted-foreground"
-    >
-      <p class="font-semibold text-foreground">Authoritative facts — replayable</p>
-      <p class="mt-1">
-        Room {roomId.slice(0, 8)}… · Mode {modeLabel} · Seed {(
-          snap as unknown as { seed?: string | null }
-        )?.seed?.slice(0, 16) ?? '—'}… · Rev {(draftState as any).revision} · Cursor {snap?.cursor} ·
-        Turn {(draftState as any).currentTurnParticipantId ?? 'complete'} — same via deterministic seed
-        + command stream.
-      </p>
-      <p class="mt-1">
-        Uses real engine: applySeasonDraftCommand, drawGlobalOffer, seasonDraftStateDigest,
-        seasonDigestHex, createRng/seasonNamespaceSeed. Enforces WRONG_TURN, OWNED_VERSION,
-        UNCOMPLETABLE_ROSTER, idempotent commandId, expectedRevision via last ordinal. No solo
-        /season flow.
-      </p>
-      <p class="mt-1">
-        After both rosters finalize, independently derive 28 AI teams (DUO_BAND_QUOTAS), attest
-        league digest, reject duplicate ownership, create identical local Season runs → /run shows
-        both participants.
-      </p>
-    </div>
   {:else}
     <div class="rounded-xl bg-surface-1 p-6">
       <h2 class="font-display text-sm font-extrabold tracking-widest uppercase">

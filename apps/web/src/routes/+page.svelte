@@ -16,7 +16,7 @@ const modes = [
     {
         code: '01',
         name: 'Classic',
-        line: 'Five draft rounds. Each round rolls a franchise and an era. One franchise reroll and one era reroll, then live with the board. Ratings or Ball Knowledge.',
+        line: '5 rounds. Each assigns a franchise + decade. One reroll each, then build.',
         status: 'available',
         cta: 'Start classic',
         href: '/classic' as any,
@@ -24,7 +24,7 @@ const modes = [
     {
         code: '02',
         name: 'Sandbox',
-        line: 'Draft any five peak seasons from any franchise and any era, then face all 30 teams on a fixed schedule.',
+        line: 'Pick any 5 peak seasons, then play all 30 teams.',
         status: 'available',
         cta: 'Start sandbox',
         href: '/sandbox' as any,
@@ -32,7 +32,7 @@ const modes = [
     {
         code: '03',
         name: 'Season Run',
-        line: 'Ten-round draft, a 30-team league, and nine season checkpoints. Roll your franchise, build your ten, and run the full 82-game regular season.',
+        line: '10-round draft. Build 10, then play 82 games.',
         status: 'available',
         cta: 'Start season run',
         href: '/season' as any,
@@ -96,7 +96,6 @@ function eraName(eraId: string): string {
 <section class="mx-auto w-full max-w-4xl px-4 pb-24 sm:px-6 md:pb-10">
   <div class="flex flex-col items-center gap-8 py-16 text-center md:py-24">
     <div>
-      <p class="text-label text-primary">Pick a mode · Chase the run</p>
       <h1
         class="font-display mt-4 max-w-3xl text-4xl leading-[0.95] font-extrabold tracking-tight uppercase sm:text-5xl md:text-6xl"
       >
@@ -108,11 +107,7 @@ function eraName(eraId: string): string {
       Build five players, face all 30 teams, and do not lose a single game.
     </p>
     <div class="road-strip w-full max-w-lg" aria-hidden="true">
-      <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <span class="text-label text-muted-foreground">82 games</span>
-        <span class="text-label text-muted-foreground">30 opponents · 0 losses allowed</span>
-      </div>
-      <div class="mt-2 flex flex-wrap justify-center gap-[3px]">
+      <div class="flex flex-wrap justify-center gap-[3px]">
         {#each road as i (i)}
           <span
             class="h-2 w-2 rounded-[2px] {i === 20
@@ -131,15 +126,14 @@ function eraName(eraId: string): string {
           : resolve('/sandbox/challenge')}
         class="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-6 py-3 font-semibold transition-colors hover:border-line-strong"
       >
-        Continue: game {(active.gamesPlayed ?? 0) + 1} of 82 · {active.aggregates.team.wins}-
-        {active.aggregates.team.losses}
+        Continue · Game {(active.gamesPlayed ?? 0) + 1} · {active.aggregates.team.wins}–{active.aggregates.team.losses}
       </a>
     {:else if classicDraft && classicDraft.status === 'drafting'}
       <a
         href={resolve('/classic')}
         class="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-6 py-3 font-semibold transition-colors hover:border-line-strong"
       >
-        Continue draft · round {classicDraft.round} of 5
+        Continue draft · R{classicDraft.round}/5
       </a>
     {/if}
     {#if seasonRun}
@@ -147,8 +141,7 @@ function eraName(eraId: string): string {
         href={resolve('/season/run')}
         class="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-6 py-3 font-semibold transition-colors hover:border-line-strong"
       >
-        Continue season · {seasonRun.humanWins}–{seasonRun.humanLosses} · through
-        {seasonRun.completedRounds} rounds
+        Continue season · {seasonRun.humanWins}–{seasonRun.humanLosses}
       </a>
     {/if}
   </div>
@@ -163,14 +156,7 @@ function eraName(eraId: string): string {
           ontouchstart={() => warmPlayersIndex()}
           class="group flex h-full flex-col rounded-xl bg-card p-6 outline-none transition-colors hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring sm:p-7"
         >
-          <div class="flex items-center justify-between gap-3">
-            <span class="font-display text-sm font-extrabold text-accent">{mode.code}</span>
-            <span
-              class="rounded-full border border-primary/40 bg-primary/10 px-2.5 py-0.5 font-mono text-[10px] font-bold tracking-[0.14em] text-primary uppercase"
-            >
-              Available
-            </span>
-          </div>
+
           <h2 class="font-display mt-5 text-4xl font-extrabold tracking-tight uppercase">
             {mode.name}
           </h2>
@@ -186,14 +172,6 @@ function eraName(eraId: string): string {
         </a>
       {:else}
         <div class="flex h-full flex-col rounded-xl bg-surface-1 p-6 sm:p-7" aria-disabled="true">
-          <div class="flex items-center justify-between gap-3">
-            <span class="font-display text-sm font-extrabold text-accent/50">{mode.code}</span>
-            <span
-              class="rounded-full border border-line-soft px-2.5 py-0.5 font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
-            >
-              Coming soon
-            </span>
-          </div>
           <h2
             class="font-display mt-5 text-4xl font-extrabold tracking-tight text-muted-foreground uppercase"
           >

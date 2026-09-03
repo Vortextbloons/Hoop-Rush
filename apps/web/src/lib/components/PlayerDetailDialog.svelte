@@ -4,7 +4,6 @@ import { Dialog } from 'bits-ui';
 import { X } from '@lucide/svelte';
 import { formatDecimal, formatPct, formatPerGame, perGame, shotPct, type RosterDetailRow, } from '$lib/roster-browser';
 import { formatPositions } from '$lib/player-positions';
-import { percentOneDecimal } from '$lib/format';
 import PlayerFace from './PlayerFace.svelte';
 let { player, manifest, franchiseName, eraLabel, onClose, }: {
     player: RosterDetailRow | null;
@@ -76,23 +75,23 @@ const sections = $derived.by(() => {
         {
             title: 'Shooting',
             items: [
-                ['Field goal', formatPct(s.fgPct)],
-                ['Three point', formatPct(s.threePct)],
-                ['Free throw', formatPct(s.ftPct)],
-                ['Effective FG', formatPct(s.efg)],
-                ['True shooting', formatPct(s.ts)],
+                ['FG%', formatPct(s.fgPct)],
+                ['3P%', formatPct(s.threePct)],
+                ['FT%', formatPct(s.ftPct)],
+                ['eFG%', formatPct(s.efg)],
+                ['TS%', formatPct(s.ts)],
             ],
         },
         {
             title: 'Advanced',
             items: [
                 ['PER', formatDecimal(s.per)],
-                ['Box plus/minus', formatDecimal(s.bpm)],
-                ['Usage rate', formatDecimal(s.usage)],
+                ['BPM', formatDecimal(s.bpm)],
+                ['USG%', formatDecimal(s.usage)],
             ],
         },
         {
-            title: 'Context',
+            title: 'Info',
             items: [
                 ['Games', String(subject.stats.gamesPlayed)],
                 ['Minutes', String(subject.stats.minutes)],
@@ -117,7 +116,6 @@ const sections = $derived.by(() => {
     >
       {#if player}
         {@const subject = player}
-        {@const line = statLine(subject)}
         <div class="flex items-start justify-between gap-3">
           <div class="flex min-w-0 items-center gap-3">
             <PlayerFace
@@ -183,10 +181,7 @@ const sections = $derived.by(() => {
           {/each}
         </div>
 
-        <p class="mt-4 font-mono text-[10px] text-muted-foreground">
-          Peak season by selection score · {percentOneDecimal(line.usage)} usage ·
-          {formatPerGame(line.mpg)} minutes per game
-        </p>
+
       {/if}
     </Dialog.Content>
   </Dialog.Portal>

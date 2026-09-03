@@ -4,7 +4,7 @@ import { untrack } from 'svelte';
 import { Search } from '@lucide/svelte';
 import { lowercaseName } from '$lib/roster-browser';
 import { ratingBadges, type DraftPresentation, type RatingBadgeLabel, } from '$lib/draft-presentation';
-import { SLOT_INDEXES, SLOT_LABELS, SLOT_NAMES, canFillSlot, displacementTargetFor, } from '$lib/draft-slots';
+import { SLOT_INDEXES, SLOT_LABELS, canFillSlot, displacementTargetFor } from '$lib/draft-slots';
 import { formatPositions } from '$lib/player-positions';
 import PlayerFace from '$lib/components/PlayerFace.svelte';
 type IndexRow = PlayersIndexEntry;
@@ -161,9 +161,7 @@ const poolCardInfo = $derived.by((): ReadonlyMap<string, PoolCardInfo> => new Ma
             {SLOT_LABELS[i]}
           </button>
         {/each}
-        <span class="ml-auto shrink-0 pl-1 text-xs text-muted-foreground">
-          {filteredRows.length}/{rows.length}
-        </span>
+
       </div>
     </div>
   {/if}
@@ -222,32 +220,13 @@ const poolCardInfo = $derived.by((): ReadonlyMap<string, PoolCardInfo> => new Ma
                   {`${badge.label} ${badge.value}`}
                 </span>
               {/each}
-              {#if cardState === 'displace' && card.displace}
-                <span
-                  class="rounded bg-accent/25 px-1.5 py-0.5 font-bold text-accent"
-                  title={`Moves ${card.displace.incumbent.displayName} to ${SLOT_NAMES[card.displace.targetSlot]}`}
-                >
-                  Moves {card.displace.incumbent.displayName.split(' ').pop()}
-                </span>
-              {:else if cardState === 'blocked'}
-                <span
-                  class="rounded bg-surface-3 px-1.5 py-0.5 text-muted-foreground"
-                  title="No open or movable position"
-                >
-                  No slot
-                </span>
-              {/if}
             </span>
           </button>
         </li>
       {/each}
     </ul>
     {#if hasMore}
-      <div class="flex items-center justify-between gap-3 px-1 pb-1">
-        <span class="font-mono text-[10px] text-muted-foreground">
-          Showing {visiblePlayers.toLocaleString()} of
-          {filteredRows.length.toLocaleString()} players
-        </span>
+      <div class="flex justify-end gap-3 px-1 pb-1">
         <button
           type="button"
           onclick={() => (visibleCount += PAGE_SIZE)}

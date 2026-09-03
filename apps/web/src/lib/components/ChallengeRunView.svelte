@@ -34,7 +34,7 @@ $effect(() => {
         manifest = m;
     }, () => {
         if (!cancelled)
-            loadError = 'The manifest is unavailable.';
+            loadError = 'Data unavailable. Try again.';
     });
     challengeRepository.loadActiveRun().then((record) => {
         if (cancelled)
@@ -72,7 +72,7 @@ $effect(() => {
             });
         }, () => {
             if (!cancelled)
-                loadError = 'The manifest is unavailable.';
+                loadError = 'Data unavailable. Try again.';
         });
     }, (e: unknown) => {
         if (!cancelled)
@@ -201,15 +201,11 @@ const resultHref = $derived(run ? resultHrefFor(run) : null);
     </div>
   {:else if !run}
     <div class="mt-8">
-      <AsyncState kind="loading" title="Loading challenge" message="Restoring the active run…" />
+      <AsyncState kind="loading" title="Loading…" message="Loading…" />
     </div>
   {:else if phase === 'starting'}
     <div class="mt-8">
-      <AsyncState
-        kind="loading"
-        title="Running simulations…"
-        message="Playing two full seasons to pick the best one to reveal."
-      />
+      <AsyncState kind="loading" title="Running simulations…" message="Simulating…" />
     </div>
   {:else}
     <ChallengeOverlay

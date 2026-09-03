@@ -138,32 +138,6 @@ function playerNameOf(playerVersionId: string): string {
   />
 
   <div class="mt-6 rounded-xl border border-border bg-surface-1 p-4 sm:p-5">
-    <h3 class="font-display text-sm font-extrabold uppercase tracking-tight">How trades work</h3>
-    <ul class="mt-2 list-disc pl-5 text-sm text-muted-foreground space-y-1">
-      <li>
-        One active negotiation at a time · up to 3 exchanges (1 initial, 2 counter, 3 final accept /
-        revision / walk-away). Walking away has no penalty.
-      </li>
-      <li>
-        Duplicate fingerprints are rejected without consuming an exchange — the UI shows the
-        rejection without moving focus.
-      </li>
-      <li>
-        Rosters 10–15, rotations ten, chemistry 45 active pairs per team (1,350 league). Details
-        shown before submission.
-      </li>
-      <li>
-        Influence 1–2 from one side, never both, never alone, 5% per point / 10% max, floor 0 —
-        spends reject instead of clamping.
-      </li>
-      <li>
-        Reload / cross-tab preserves negotiation; after an accepted trade the remaining board
-        revalidates.
-      </li>
-      <li>
-        Skip the board to submit the block — AI transactions still resolve at commit, and
-        closed-window history stays browseable.
-      </li>
-    </ul>
+    <p class="text-sm text-muted-foreground">One negotiation at a time, up to 3 exchanges.</p>
   </div>
 </div>

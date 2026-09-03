@@ -241,12 +241,4 @@ $effect(() => {
   </section>
 {/each}
 
-<p class="mt-2 font-mono text-[10px] text-muted-foreground">
-  {#if authoritative}
-    Official NBA tiebreak sequence: head-to-head, division, conference, and league-wide criteria in
-    published order; ties resolve with recorded evidence.
-  {:else}
-    Provisional ordering only: wins, point differential, franchise id. The M2.6 postseason tiebreak
-    is not applied.
-  {/if}
-</p>
+<p class="mt-2 font-mono text-[10px] text-muted-foreground">Tiebreaks finalized at playoffs.</p>

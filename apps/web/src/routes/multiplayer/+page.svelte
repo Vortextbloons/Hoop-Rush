@@ -1,9 +1,9 @@
 ﻿<script lang="ts">import { onMount } from 'svelte';
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
-import { Users, Swords, Trophy, Clock, Shield, Zap, ArrowLeft, Copy, Check, LogIn, Plus, Link as LinkIcon, } from '@lucide/svelte';
+import { Users, Swords, Trophy, Clock, Zap, ArrowLeft, Copy, Check, LogIn, Plus, Link as LinkIcon, } from '@lucide/svelte';
 import { createInMemorySeasonRoomCoordinator } from '$lib/season/season-room-coordinator';
-import { createSupabaseSeasonTransport, isSupabaseConfigured, multiplayerDisabledMessage, } from '$lib/season/supabase-season-transport';
+import { createSupabaseSeasonTransport, isSupabaseConfigured } from '$lib/season/supabase-season-transport';
 import { seasonRootSeed } from '$lib/season/season-ids';
 import { friendlyJoinError, inviteLinkForCode } from '$lib/season/season-room-identity';
 type Mode = 'season' | 'classic' | 'sandbox';
@@ -54,9 +54,9 @@ onMount(() => {
 const modes = [
     {
         id: 'season' as const,
-        name: 'Season Run (Archived)',
-        desc: 'Archived — solo Season Run still available via /season',
-        detail: 'Season Run multiplayer is archived for now. Code is kept and will return. Solo league remains fully playable.',
+        name: 'Season Run — Solo only',
+        desc: 'Solo only — available at /season',
+        detail: 'Season Run is solo-only for now.',
         icon: Trophy,
         disabled: true,
     },
@@ -106,8 +106,7 @@ function getCoordinator() {
 }
 async function startCreate() {
     if (selectedMode === 'season') {
-        error =
-            'Season Run multiplayer is archived for now. Solo Season Run is still available via /season. Multiplayer code is kept and will return. Please choose Classic or Sandbox.';
+        error = 'Season Run is solo-only. Choose Classic or Sandbox.';
         return;
     }
     busy = true;
@@ -133,7 +132,7 @@ async function startCreate() {
     catch (e) {
         error = friendlyJoinError(e);
         if (!isSupabaseConfigured())
-            error = multiplayerDisabledMessage();
+            error = 'Multiplayer is offline right now. You can still play solo Classic/Sandbox.';
     }
     finally {
         busy = false;
@@ -240,14 +239,12 @@ function backFromCreate() {
       <h1 class="font-display mt-2 text-4xl font-extrabold tracking-tight uppercase sm:text-5xl">
         Two humans.<br /><span class="text-primary">One league.</span>
       </h1>
-      <p class="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">
-        Rooms are temporary — code, presence, and checkpoint hashes only. Simulation stays local.
-      </p>
       <div class="mt-4 rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm">
-        <p class="font-semibold text-foreground">Multiplayer now: Classic & Sandbox · Season Run archived</p>
-        <p class="mt-1 text-muted-foreground">
-          Season Run multiplayer is archived (solo at <a href={resolve('/season')} class="underline">/season</a> — code kept). Multiplayer now uses the simpler 5-pick system:
-          <strong>Classic</strong> (franchise-era rolls) and <strong>Sandbox</strong> (free 5 picks). Classic / Sandbox rooms work with the same 4-digit code + Live/Async pace.
+        <p class="font-semibold text-foreground">
+          Multiplayer: Classic & Sandbox. Season Run is solo at <a
+            href={resolve('/season')}
+            class="underline">/season</a
+          >.
         </p>
       </div>
     </div>
@@ -256,7 +253,9 @@ function backFromCreate() {
   {#if !isSupabaseConfigured()}
     <div class="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm">
       <p class="font-semibold text-amber-600">Multiplayer not configured</p>
-      <p class="mt-1 text-muted-foreground">{multiplayerDisabledMessage()}</p>
+      <p class="mt-1 text-muted-foreground">
+        Multiplayer is offline right now. You can still play solo Classic/Sandbox.
+      </p>
     </div>
   {/if}
 
@@ -324,65 +323,9 @@ function backFromCreate() {
     >
       <span
         class="inline-flex items-center gap-1.5 rounded-full border border-line-soft bg-card px-3 py-1"
-        ><Shield class="h-3 w-3" />Private until both lock</span
-      >
-      <span
-        class="inline-flex items-center gap-1.5 rounded-full border border-line-soft bg-card px-3 py-1"
-        ><Users class="h-3 w-3" />2 humans + 28 AI</span
-      >
-      <span
-        class="inline-flex items-center gap-1.5 rounded-full border border-line-soft bg-card px-3 py-1"
-        ><Trophy class="h-3 w-3" />One table</span
+        ><Users class="h-3 w-3" />2 players</span
       >
     </div>
-
-    {#if createdCode && createdRoomId}
-      <div
-        class="mt-6 rounded-2xl border-2 border-dashed border-primary/40 bg-primary/10 p-6 sm:p-8"
-      >
-        <p class="text-label tracking-[0.16em] text-primary">Your last room — still active</p>
-        <div class="mt-3 flex flex-wrap items-center gap-3">
-          <div class="flex gap-1.5">
-            {#each createdCode.split('') as d, i (i)}
-              <span
-                class="inline-flex h-14 w-12 items-center justify-center rounded-xl border-2 border-primary/40 bg-card font-mono text-3xl font-black tracking-widest sm:h-16 sm:w-14 sm:text-4xl"
-                >{d}</span
-              >
-            {/each}
-          </div>
-          <button
-            type="button"
-            onclick={copyInviteLink}
-            class="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
-          >
-            {#if copiedInvite}<Check class="h-4 w-4" /> Copied link!{:else}<LinkIcon
-                class="h-4 w-4"
-              /> Copy invite link{/if}
-          </button>
-          <button
-            type="button"
-            onclick={copyCode}
-            class="inline-flex items-center gap-1.5 rounded-xl bg-card px-4 py-2.5 text-sm font-semibold shadow-sm hover:bg-surface-2"
-          >
-            {#if copiedCode}<Check class="h-4 w-4 text-positive" /> Copied!{:else}<Copy
-                class="h-4 w-4"
-              /> Copy code{/if}
-          </button>
-          <button
-            type="button"
-            onclick={goToRoom}
-            class="inline-flex items-center gap-1.5 rounded-xl bg-card border border-line-soft px-4 py-2.5 text-sm font-semibold hover:border-line-strong"
-            >Enter lobby →</button
-          >
-        </div>
-        <p class="mt-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Clock class="h-3.5 w-3.5" />
-          {#if countdown && countdown !== 'expired'}expires in {countdown}{:else if countdown === 'expired'}expired
-            — create a new room{:else}expires in 15 minutes{/if}
-          · code stays visible in lobby until opponent joins · invite link: /multiplayer?code={createdCode}
-        </p>
-      </div>
-    {/if}
   {:else if view === 'create'}
     {#if !createdCode}
       <div class="rounded-2xl bg-surface-1 p-6 sm:p-7">
@@ -412,7 +355,7 @@ function backFromCreate() {
               disabled={m.disabled}
               title={m.disabled
                 ? m.id === 'season'
-                  ? 'Season Run multiplayer is archived — code kept, will return. Use Classic or Sandbox.'
+                  ? 'Season Run is solo-only — play at /season'
                   : 'Unavailable'
                 : undefined}
               onclick={() => {
@@ -463,9 +406,6 @@ function backFromCreate() {
               </button>
             {/each}
           </div>
-          <p class="mt-2 text-xs text-muted-foreground">
-            Pace applies to Season, Classic, and Sandbox identically.
-          </p>
         </div>
 
         <button
@@ -525,7 +465,7 @@ function backFromCreate() {
               <Clock class="h-3.5 w-3.5" />
               {#if countdown && countdown !== 'expired'}expires in {countdown}{:else if countdown === 'expired'}expired
                 — create a new room{:else}expires in 15 minutes{/if}
-              · invite link: /multiplayer?code={createdCode} · stays visible until opponent joins
+              · Codes expire in 15 min. Invite link fills it automatically.
             </p>
           </div>
           <button
@@ -658,8 +598,7 @@ function backFromCreate() {
       {/if}
 
       <p class="mt-6 text-center text-xs leading-relaxed text-muted-foreground">
-        Codes include leading zeros (<code class="font-mono">0042</code>) and expire in 15 minutes.
-        Invite links prefill the code via <code class="font-mono">/multiplayer?code=0042</code>.
+        Codes expire in 15 min. Invite link fills it automatically.
       </p>
     </div>
   {/if}

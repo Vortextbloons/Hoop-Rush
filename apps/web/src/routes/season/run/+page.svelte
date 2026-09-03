@@ -416,10 +416,7 @@ const humanWonChampionship = $derived(championFranchiseId !== null && championFr
         >
           Regular season complete
         </h2>
-        <p class="text-sm text-muted-foreground">
-          All nine checkpoints are accepted. Qualification and seeding ties resolve through the
-          official NBA tiebreak sequence when the postseason starts.
-        </p>
+
         <div class="flex flex-wrap items-center gap-2">
           <a
             href={resolve('/season/run/checkpoint/?block=8' as any)}
@@ -499,7 +496,7 @@ const humanWonChampionship = $derived(championFranchiseId !== null && championFr
             <span class="font-mono text-[10px] text-muted-foreground">
               {nextBlockIndex === null
                 ? '—'
-                : `${String(nextBlockIndex)} of 9 checkpoints accepted.`}
+                : `${String(nextBlockIndex)} of 9 blocks complete.`}
             </span>
           </div>
 
@@ -636,43 +633,7 @@ const humanWonChampionship = $derived(championFranchiseId !== null && championFr
               </a>
             </div>
 
-            {#if preview !== null && preview.fatigueProjections.length > 0}
-              <div class="rounded-lg bg-surface-2 p-3">
-                <h3
-                  class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-                >
-                  Fatigue risk after {preview.gamesToLock === 1
-                    ? '1 game'
-                    : `${String(preview.gamesToLock)} games`}
-                </h3>
-                <ul class="mt-2 flex flex-col gap-1">
-                  {#each preview.fatigueProjections.slice(0, 5) as projection (projection.playerVersionId)}
-                    <li class="flex items-center justify-between gap-2 text-sm">
-                      <span class="min-w-0 truncate font-semibold">{projection.displayName}</span>
-                      <span class="shrink-0 font-mono text-[10px] text-muted-foreground">
-                        {projection.bandNow}
-                        <span aria-hidden="true">&rarr;</span>
-                        <span
-                          class={projection.bandAfterBlock === 'Heavy' ||
-                          projection.bandAfterBlock === 'Tired'
-                            ? 'font-bold text-amber-600 dark:text-amber-400'
-                            : 'font-bold text-foreground'}
-                        >
-                          {projection.bandAfterBlock}
-                        </span>
-                        {#if !projection.continuous}
-                          <span class="ml-1 text-foreground">· continuity change</span>
-                        {/if}
-                      </span>
-                    </li>
-                  {/each}
-                </ul>
-                <p class="mt-2 font-mono text-[9px] text-muted-foreground/70">
-                  Projected from the pending rotation's minutes and the recorded load; shared play
-                  and workload history change the actual outcome.
-                </p>
-              </div>
-            {/if}
+
 
             <div class="rounded-lg bg-surface-2 p-3">
               <h3
@@ -684,11 +645,9 @@ const humanWonChampionship = $derived(championFranchiseId !== null && championFr
                 <p class="mt-2 text-sm text-muted-foreground">Preparing…</p>
               {:else}
                 <p class="mt-2 text-sm text-muted-foreground">
-                  Submitting locks the rotation set for
-                  <strong class="text-foreground">
-                    {preview.gamesToLock === 1 ? '1 game' : `${String(preview.gamesToLock)} games`}
-                  </strong>
-                  (rounds {preview.roundRange.fromRound}–{preview.roundRange.toRound}).
+                  Locks rotation for the next {preview.gamesToLock === 1
+                    ? '1 game'
+                    : `${String(preview.gamesToLock)} games`}.
                 </p>
                 {#if preview.objective !== null}
                   <p class="mt-1 text-sm">
@@ -770,9 +729,7 @@ const humanWonChampionship = $derived(championFranchiseId !== null && championFr
                   ? 'Preparing block…'
                   : 'Lock rotation and simulate block'}
             </button>
-            <p class="hidden font-mono text-[10px] text-muted-foreground sm:block">
-              Nothing is saved until the block completes.
-            </p>
+
           </div>
 
           <BlockProgress
@@ -817,30 +774,21 @@ const humanWonChampionship = $derived(championFranchiseId !== null && championFr
         </section>
       {/if}
 
-      {#if openWindow !== null && shell.manifest !== null}
-        {#await loadTradeOffersPanel() then { default: TradeOffersPanel }}
-          <p class="px-3 py-3 font-mono text-xs text-muted-foreground sm:px-0">
-            Loading trade offers…
+      {#if openWindow !== null}
+        <section class="rounded-none border border-border bg-surface-1 p-4 sm:rounded-xl">
+          <h2 class="font-display text-base font-extrabold uppercase tracking-tight">
+            Trade window open
+          </h2>
+          <p class="mt-1 text-sm text-muted-foreground">
+            {tradeOffers.length} offer{tradeOffers.length === 1 ? '' : 's'} waiting.
           </p>
-          <TradeOffersPanel
-            windowIndex={openWindow.windowIndex}
-            offers={tradeOffers}
-            manifest={shell.manifest}
-            catalog={shell.catalog}
-            summaries={snapshot?.summaries ?? []}
-            faceOf={(playerVersionId) => shell.facesByVersion.get(playerVersionId) ?? null}
-            commandError={commandError !== null &&
-            (commandError.command === 'accept-trade-offer' ||
-              commandError.command === 'decline-trade-offer')
-              ? commandError.message
-              : null}
-            busy={block.phase === 'running'}
-            onAccept={(offerId) =>
-              shell.acceptTradeOffer({ windowIndex: openWindow.windowIndex, offerId })}
-            onDecline={(offerId) =>
-              shell.declineTradeOffer({ windowIndex: openWindow.windowIndex, offerId })}
-          />
-        {/await}
+          <a
+            href={resolve('/season/run/trades' as any)}
+            class="mt-3 inline-flex w-fit items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+          >
+            Open trades
+          </a>
+        </section>
       {/if}
 
       {#if influenceVm !== null}
@@ -869,7 +817,7 @@ const humanWonChampionship = $derived(championFranchiseId !== null && championFr
             id="recent-recaps-heading"
             class="font-display text-base font-extrabold uppercase tracking-tight"
           >
-            Recent checkpoints
+            Recent blocks
           </h2>
           <ul class="mt-2 flex flex-col gap-0 sm:gap-2">
             {#each recentBlocks as entry (entry.accepted.blockIndex)}
@@ -928,10 +876,9 @@ const humanWonChampionship = $derived(championFranchiseId !== null && championFr
           class="mt-3 rounded-none border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm sm:rounded-xl"
         >
           <span class="font-bold text-amber-700 dark:text-amber-300">Eliminated.</span>
-          <span class="text-amber-700/80 dark:text-amber-300/80">
-            Your season is over — spectate the rest of the tournament, or fast-forward to the
-            champion. Results stay saved either way.
-          </span>
+            <span class="text-amber-700/80 dark:text-amber-300/80">
+              Your season is over — spectate or fast-forward to the champion.
+            </span>
         </div>
       {/if}
 
@@ -940,8 +887,7 @@ const humanWonChampionship = $derived(championFranchiseId !== null && championFr
           role="alert"
           class="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
         >
-          The postseason state cannot schedule the next game ({nextGame.reason}). Refresh the run;
-          if this persists, your save is intact but unrecoverable in the UI.
+          Something went wrong scheduling the next game. Refresh to try again.
         </div>
       {:else}
         <div class="mt-4">
@@ -1060,9 +1006,7 @@ const humanWonChampionship = $derived(championFranchiseId !== null && championFr
           </button>
         </section>
       {:else if nextGame?.kind === 'complete'}
-        <p class="mt-4 text-sm text-muted-foreground">
-          The tournament is decided — the hub switches to the champion summary.
-        </p>
+        <p class="mt-4 text-sm text-muted-foreground">Tournament complete.</p>
       {/if}
 
       <div class="mt-4">
@@ -1093,7 +1037,7 @@ const humanWonChampionship = $derived(championFranchiseId !== null && championFr
       {#if recentBlocks.length > 0}
         <div class="mt-6">
           <h2 class="font-display text-base font-extrabold uppercase tracking-tight">
-            Regular-season checkpoints
+            Regular-season blocks
           </h2>
           <ul class="mt-2 flex flex-col gap-0 sm:gap-2">
             {#each recentBlocks as entry (entry.accepted.blockIndex)}

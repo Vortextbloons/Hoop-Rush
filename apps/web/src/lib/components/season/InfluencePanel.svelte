@@ -65,9 +65,6 @@ const deltaLabel = (delta: number): string => (delta >= 0 ? `+${String(delta)}` 
     >
       Influence
     </h2>
-    <span class="font-mono text-[10px] text-muted-foreground">
-      cap {cap} · floor {floor}
-    </span>
   </div>
 
   <div class="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -103,8 +100,8 @@ const deltaLabel = (delta: number): string => (delta >= 0 ? `+${String(delta)}` 
             </p>
             <p class="font-mono text-[10px] text-muted-foreground">
               {affordance.purpose === 'extra-trade-offer'
-                ? 'Generates a fourth human offer this window (1 Influence)'
-                : 'Risky rehab: 60% cuts one game off absence (1 → 0); 40% leaves estimate unchanged. Success adds +60 bp rehab premium for 10 games after return (100 bp total with base 40 bp). Floor 0 — spends reject, never clamp.'}
+                ? 'Extra trade offer: Get a 4th offer this window.'
+                : 'Risky rehab: chance to return sooner.'}
             </p>
           </div>
           <button
@@ -157,9 +154,6 @@ const deltaLabel = (delta: number): string => (delta >= 0 ? `+${String(delta)}` 
           <li class="flex flex-wrap items-center gap-x-3 gap-y-0.5 py-1.5 text-sm">
             <span class="min-w-0 flex-1 truncate text-muted-foreground">
               {SOURCE_LABEL[entry.source]}
-            </span>
-            <span class="shrink-0 font-mono text-[10px] text-muted-foreground">
-              {entry.explanation}
             </span>
             <span class="shrink-0 font-mono text-[10px] font-bold tabular-nums">
               {deltaLabel(entry.appliedDelta)} → {entry.balanceAfter}

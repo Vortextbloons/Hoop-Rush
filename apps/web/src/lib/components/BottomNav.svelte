@@ -24,18 +24,7 @@ function intent(itemId: string): void {
   >
     {#each items as item (item.id)}
       {@const active = isNavItemActive(item, routeId)}
-      {#if item.href === null}
-        <span
-          aria-disabled="true"
-          title="Coming soon"
-          class="flex min-w-0 flex-1 cursor-default flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-2 text-[10px] font-semibold leading-none text-muted-foreground/60"
-        >
-          <span aria-hidden="true" class="contents">
-            <item.icon class="h-5 w-5 shrink-0" />
-          </span>
-          <span class="max-w-full truncate">{item.label}</span>
-        </span>
-      {:else}
+      {#if item.href !== null}
         <a
           href={resolve(item.href as any)}
           aria-current={active ? 'page' : undefined}

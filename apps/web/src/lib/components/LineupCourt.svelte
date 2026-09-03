@@ -116,11 +116,7 @@ $effect(() => {
       {/each}
     </div>
   </div>
-  {#if ready}
-    <div class="px-1 py-3">
-      <p class="text-xs text-muted-foreground">Lineup ready.</p>
-    </div>
-  {/if}
+
 </div>
 
 <style>

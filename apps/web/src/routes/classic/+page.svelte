@@ -311,10 +311,7 @@ async function discardAndLeave() {
           Five draft rounds
         </h1>
       {/if}
-      <p class="mt-2 hidden max-w-xl text-sm text-muted-foreground sm:mt-3 sm:block">
-        Each round rolls a franchise and an era. One franchise reroll and one era reroll, then live
-        with the board.
-      </p>
+
     </div>
     <a
       href={resolve('/')}
@@ -349,10 +346,6 @@ async function discardAndLeave() {
           <h2 class="font-mono text-[11px] tracking-[0.14em] text-muted-foreground uppercase">
             Choose a variant
           </h2>
-          <p class="mt-2 max-w-xl text-sm text-muted-foreground">
-            The variant is fixed for the whole draft. Both play the same rolls, rerolls, pools, and
-            lineup rules.
-          </p>
         </div>
         <div class="grid gap-3 px-3 sm:grid-cols-2 sm:gap-4 sm:px-0">
           <button
@@ -362,7 +355,7 @@ async function discardAndLeave() {
           >
             <h3 class="font-display text-4xl font-extrabold tracking-tight uppercase">Ratings</h3>
             <p class="mt-3 flex-1 text-sm leading-relaxed text-muted-foreground">
-              Peak season with Overall. Draft on the numbers.
+              Draft by ratings.
             </p>
             <span class="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-primary">
               Start Ratings draft
@@ -382,8 +375,7 @@ async function discardAndLeave() {
               Ball Knowledge
             </h3>
             <p class="mt-3 flex-1 text-sm leading-relaxed text-muted-foreground">
-              The same draft with every rating badge hidden and the pool sorted by name. Draft on
-              reputation.
+              Ratings hidden. Draft on memory.
             </p>
             <span class="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-primary">
               Start Ball Knowledge draft
@@ -542,9 +534,7 @@ async function discardAndLeave() {
           />
         {:else if draft.status === 'complete'}
           {@const completeDraft = draft}
-          {#if starting}
-            <p class="font-mono text-xs text-muted-foreground">Starting the seasonâ€¦</p>
-          {/if}
+
           {#if launchError}
             <div class="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
               <p class="font-semibold">The season could not start</p>
@@ -666,8 +656,7 @@ async function discardAndLeave() {
           </Dialog.Close>
         </div>
         <p class="mt-2 text-sm text-muted-foreground">
-          Leaving now discards this draft and its rerolls. Refresh or closing the tab keeps it for
-          later.
+          Leaving now discards this draft and its rerolls.
         </p>
         <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
           <button

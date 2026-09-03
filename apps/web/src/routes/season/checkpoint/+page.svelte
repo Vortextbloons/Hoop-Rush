@@ -143,21 +143,21 @@ function resultLabel(summary: SeasonGameSummary): string {
 </script>
 
 <svelte:head>
-  <title>Season Run — checkpoint — Hoop Rush</title>
+  <title>Season Run — Block — Hoop Rush</title>
 </svelte:head>
 
 <section class="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
   <div class="flex items-end justify-between gap-4">
     <div>
       <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">
-        Season Run · checkpoint
+        Season Run · Block
       </p>
       <h1 class="font-display mt-2 text-3xl font-extrabold tracking-tight uppercase sm:text-4xl">
         Block {lastBlock ? String(lastBlock.blockIndex + 1) : '—'} recap
       </h1>
       {#if recap}
         <p class="mt-2 text-sm text-muted-foreground">
-          {ordinal(recap.completedRounds)} rounds complete · recap of the last checkpoint
+          {ordinal(recap.completedRounds)} rounds complete
         </p>
       {/if}
     </div>
@@ -179,11 +179,11 @@ function resultLabel(summary: SeasonGameSummary): string {
 
   {#if loadError}
     <p class="mt-8 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
-      Failed to load the checkpoint: {loadError}
+      Failed to load block: {loadError}
     </p>
   {/if}
   {#if !snapshot}
-    <p class="mt-8 font-mono text-sm text-muted-foreground">Loading the checkpoint…</p>
+    <p class="mt-8 font-mono text-sm text-muted-foreground">Loading block…</p>
   {:else if !lastBlock}
     <div class="mt-10 flex flex-col gap-4">
       <p class="font-mono text-sm text-muted-foreground">

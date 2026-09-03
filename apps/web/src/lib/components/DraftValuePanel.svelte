@@ -64,7 +64,7 @@ function delta(value: number): string {
               </span>
             </span>
             <span class="max-w-full text-right text-xs text-muted-foreground">
-              {value.fitReasons[0]?.label ?? 'Balanced marginal contribution'}
+              {value.fitReasons[0]?.label ?? 'Balanced fit'}
             </span>
           </li>
         {/if}
@@ -73,8 +73,6 @@ function delta(value: number): string {
     {#if lineupMatchup && lineupMatchup.reasons[0]}
       <p class="border-t border-border/60 px-4 py-3 text-xs text-muted-foreground">
         <span class="font-semibold text-foreground">{lineupMatchup.reasons[0].label}.</span>
-        Measured {lineupMatchup.reasons[0].measuredValue.toFixed(0)} vs
-        {lineupMatchup.reasons[0].comparisonValue.toFixed(0)}.
       </p>
     {/if}
   {/if}

@@ -20,7 +20,7 @@ let { recap, humanRecord, franchiseName, playerName, manifest = null, faces = ne
 const movementLabel = (movement: SeasonRecordMovement): string => `${movement.winsBefore}–${movement.lossesBefore} → ${movement.winsAfter}–${movement.lossesAfter} (${movement.positionBefore !== movement.positionAfter
     ? `${ordinal(movement.positionBefore)} → ${ordinal(movement.positionAfter)}`
     : `${ordinal(movement.positionAfter)} in conference`})`;
-const injurySummary = $derived(`${String(recap.injuryEvidence.injuries)} ${recap.injuryEvidence.injuries === 1 ? 'injury' : 'injuries'} across the league · ${String(recap.injuryEvidence.sameGameReturns)} same-game return${recap.injuryEvidence.sameGameReturns === 1 ? '' : 's'} · ${String(recap.injuryEvidence.returnedThisBlock)} returned · ${String(recap.injuryEvidence.activeAtBlockEnd)} still out at block end.`);
+const injurySummary = $derived(`Injuries: ${String(recap.injuryEvidence.injuries)} this block (${String(recap.injuryEvidence.returnedThisBlock)} returned). Influence ${recap.tradeEvidence.influenceDelta >= 0 ? '+' : ''}${String(recap.tradeEvidence.influenceDelta)} (now ${String(recap.influenceBalance.humanBalance)}). Trades: ${String(recap.tradeEvidence.tradesAccepted)}`);
 const franchiseIdentity = (franchiseId: string) => manifest ? franchiseIdentityOf(manifest, franchiseId) : null;
 function versionSource(playerVersionId: string): {
     teamExternalId: string;
@@ -303,9 +303,7 @@ function versionSource(playerVersionId: string): {
       >
         Stamina and chemistry
       </h2>
-      <p class="mt-1 text-sm text-muted-foreground">
-        How your {effectsEvidence.length === 1 ? 'game' : 'games'} this block went for stamina and chemistry.
-      </p>
+      <p class="mt-1 text-sm text-muted-foreground">Stamina & chemistry this block</p>
       <ul class="mt-3 flex flex-col gap-2">
         {#each effectsEvidence as row (row.mechanism + row.side)}
           <li class="flex flex-col gap-0.5 rounded-lg bg-surface-2 p-3">
@@ -359,13 +357,7 @@ function versionSource(playerVersionId: string): {
             </span>
           </p>
         {/if}
-        <p class="mt-1 font-mono text-[10px] text-muted-foreground">
-          Trades accepted this block: {recap.tradeEvidence.tradesAccepted} · your Influence delta: {recap
-            .tradeEvidence.influenceDelta >= 0
-            ? '+'
-            : ''}{recap.tradeEvidence.influenceDelta} · balance at block end: {recap
-            .influenceBalance.humanBalance}
-        </p>
+
       </section>
     {/if}
   {/if}
@@ -382,22 +374,9 @@ function versionSource(playerVersionId: string): {
       >
         Free agency
       </h2>
-      <p class="mt-1 text-sm">
-        <span class="text-muted-foreground">
-          Window {recap.freeAgencyEvidence.windowIndex + 1} resolved with
-          {recap.freeAgencyEvidence.signings.length} signing
-          {recap.freeAgencyEvidence.signings.length === 1 ? '' : 's'}
-          {#if recap.freeAgencyEvidence.signings.length > 0}
-            —
-            {recap.freeAgencyEvidence.signings
-              .map((signing) => `${franchiseName(signing.franchiseId)} (${signing.band})`)
-              .join(', ')}
-          {/if}
-        </span>
-        <span class="ml-2 font-mono text-[10px] text-muted-foreground">
-          · season: {recap.freeAgencyEvidence.seasonSignings}/3 signings,
-          {recap.freeAgencyEvidence.seasonSpend}/6 Influence
-        </span>
+      <p class="mt-1 text-sm text-muted-foreground">
+        Window {recap.freeAgencyEvidence.windowIndex + 1} · {recap.freeAgencyEvidence.signings
+          .length} signing{recap.freeAgencyEvidence.signings.length === 1 ? '' : 's'}
       </p>
     </section>
   {/if}

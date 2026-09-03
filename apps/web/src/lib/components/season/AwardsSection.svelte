@@ -21,8 +21,7 @@ const faceOf = (playerVersionId: string): SeasonFaceRef | null => {
     Season awards
   </h2>
   <p class="mt-1 font-mono text-[10px] text-muted-foreground">
-    Derived from recorded regular-season facts at postseason qualification · eligibility at 70% of
-    games
+    Regular season only · 70% games required.
   </p>
 
   <ul class="mt-3 grid gap-3 sm:grid-cols-3">
@@ -42,7 +41,7 @@ const faceOf = (playerVersionId: string): SeasonFaceRef | null => {
             </span>
           </span>
         </div>
-        <p class="mt-2 text-xs leading-relaxed text-muted-foreground">{award.explanation}</p>
+
       </li>
     {/each}
   </ul>
@@ -69,8 +68,6 @@ const faceOf = (playerVersionId: string): SeasonFaceRef | null => {
         </li>
       {/each}
     </ol>
-    <p class="mt-2 text-xs leading-relaxed text-muted-foreground">
-      {view.firstTeam[0]?.explanation ?? ''}
-    </p>
+
   </div>
 </section>

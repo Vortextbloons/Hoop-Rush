@@ -261,7 +261,7 @@ function toggleMode() {
       </p>
       <SeasonTierBadge wins={record!.wins} size="large" />
       <p class="mt-2 font-mono text-[10px] text-muted-foreground">
-        {franchiseLabel(run.franchiseId)} · {era?.label ?? run.eraId} · five players, no bench
+        {franchiseLabel(run.franchiseId)} · {era?.label ?? run.eraId}
       </p>
     </div>
   </div>
@@ -281,9 +281,7 @@ function toggleMode() {
       >
         Season snapshot
       </h2>
-      <span class="font-mono text-[10px] text-muted-foreground"
-        >Recorded over {gamesPlayed} games</span
-      >
+      <span class="font-mono text-[10px] text-muted-foreground">{gamesPlayed} games</span>
     </div>
     <dl class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
       <div class="rounded-lg border border-border bg-card p-3">
@@ -366,9 +364,7 @@ function toggleMode() {
           {/each}
         </ul>
       {:else}
-        <p class="mt-3 text-xs text-muted-foreground">
-          No thresholded deciding factor was recorded for this game.
-        </p>
+        <p class="mt-3 text-xs text-muted-foreground">No clear factor recorded.</p>
       {/if}
     </section>
   {/if}
@@ -414,11 +410,7 @@ function toggleMode() {
     <li class="rounded-lg border border-border bg-surface-1 p-3">
       <span class="font-semibold">{explanation.turnoverBattleWins} of {run.games.length} games</span
       >
-      <span class="text-muted-foreground">
-        &nbsp;you won the turnover battle{explanation.turnoverBattleLosses > 0
-          ? ` (${explanation.turnoverBattleLosses} went the other way)`
-          : ''}.
-      </span>
+      <span class="text-muted-foreground"> &nbsp;you won the turnover battle.</span>
     </li>
     <li class="rounded-lg border border-border bg-surface-1 p-3">
       <span class="font-semibold">{netRatingLabel}</span>
@@ -455,10 +447,6 @@ function toggleMode() {
       </li>
     {/if}
   </ul>
-  <p class="mt-3 font-mono text-[10px] text-muted-foreground">
-    Turnovers, possessions, zone splits, rebounds, and usage come from recorded game diagnostics;
-    usage is FGA + 0.44 × FTA + turnovers.
-  </p>
 </section>
 
 <section
@@ -708,91 +696,4 @@ function toggleMode() {
   {/if}
 </section>
 
-<div class="mt-6">
-  <section aria-labelledby="facts-heading" class="rounded-xl border border-border bg-card p-5">
-    <h2 id="facts-heading" class="font-display text-xl font-extrabold tracking-tight uppercase">
-      Season facts
-    </h2>
-    <dl class="mt-4 flex flex-col gap-3 text-sm">
-      <div class="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
-        <dt
-          class="shrink-0 font-mono text-[10px] tracking-[0.12em] text-muted-foreground uppercase"
-        >
-          Field goal
-        </dt>
-        <dd class="min-w-0 font-mono sm:text-right">
-          {pct(record!.fieldGoals.made, record!.fieldGoals.attempted)} · {record!.fieldGoals.made}/
-          {record!.fieldGoals.attempted}
-        </dd>
-      </div>
-      <div class="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
-        <dt
-          class="shrink-0 font-mono text-[10px] tracking-[0.12em] text-muted-foreground uppercase"
-        >
-          Three-point
-        </dt>
-        <dd class="min-w-0 font-mono sm:text-right">
-          {pct(record!.threes.made, record!.threes.attempted)} · {record!.threes.made}/
-          {record!.threes.attempted}
-        </dd>
-      </div>
-      <div class="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
-        <dt
-          class="shrink-0 font-mono text-[10px] tracking-[0.12em] text-muted-foreground uppercase"
-        >
-          Free throws
-        </dt>
-        <dd class="min-w-0 font-mono sm:text-right">
-          {pct(record!.freeThrows.made, record!.freeThrows.attempted)} · {record!.freeThrows.made}/
-          {record!.freeThrows.attempted}
-        </dd>
-      </div>
-      <div class="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
-        <dt
-          class="shrink-0 font-mono text-[10px] tracking-[0.12em] text-muted-foreground uppercase"
-        >
-          Turnovers
-        </dt>
-        <dd class="min-w-0 font-mono sm:text-right">
-          {perGameValue(record!.turnovers, record!.gamesPlayed)} per game · {record!.turnovers} total
-        </dd>
-      </div>
-      <div class="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
-        <dt
-          class="shrink-0 font-mono text-[10px] tracking-[0.12em] text-muted-foreground uppercase"
-        >
-          Rebounds
-        </dt>
-        <dd class="min-w-0 font-mono sm:text-right">
-          <span class="block sm:inline"
-            >{perGameValue(record!.rebounds.total, record!.gamesPlayed)} per game</span
-          >
-          <span class="block text-muted-foreground sm:inline">
-            <span class="hidden sm:inline"> · </span>
-            {record!.rebounds.offensive} offensive · {record!.rebounds.defensive} defensive
-          </span>
-        </dd>
-      </div>
-      <div class="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
-        <dt
-          class="shrink-0 font-mono text-[10px] tracking-[0.12em] text-muted-foreground uppercase"
-        >
-          Assists
-        </dt>
-        <dd class="min-w-0 font-mono sm:text-right">
-          {perGameValue(record!.assists, record!.gamesPlayed)} per game · {record!.assists} total
-        </dd>
-      </div>
-      <div class="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
-        <dt
-          class="shrink-0 font-mono text-[10px] tracking-[0.12em] text-muted-foreground uppercase"
-        >
-          Possessions
-        </dt>
-        <dd class="min-w-0 font-mono sm:text-right">
-          {perGameValue(record!.possessions, record!.gamesPlayed)} per game · {record!.possessions} total
-        </dd>
-      </div>
-    </dl>
-  </section>
-</div>
+

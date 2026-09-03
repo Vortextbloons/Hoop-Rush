@@ -98,7 +98,7 @@ const champion = $derived(run?.postseason.championFranchiseId ?? null);
 
     <p class="mt-6 px-3 font-mono text-[10px] text-muted-foreground sm:px-0">
       Every series is best of seven; the home-court side plays games 1, 2, 5, and 7. Play-In games
-      are single elimination. Facts come from the saved postseason state — no predictions.
+      are single elimination.
     </p>
   </section>
 {/if}

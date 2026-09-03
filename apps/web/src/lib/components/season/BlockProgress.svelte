@@ -36,13 +36,13 @@ const latestText = $derived(latest
       aria-valuemax={block.gamesTotal || 1}
       aria-valuenow={block.gamesCompleted}
       aria-valuetext={block.gamesTotal > 0
-        ? `${String(block.gamesCompleted)} of ${String(block.gamesTotal)} league games`
+        ? `${String(block.gamesCompleted)} of ${String(block.gamesTotal)} games`
         : 'starting'}
     >
       <div class="flex items-center justify-between font-mono text-[10px] text-muted-foreground">
         <span>
           {block.gamesTotal > 0
-            ? `${String(block.gamesCompleted)} / ${String(block.gamesTotal)} league games`
+            ? `${String(block.gamesCompleted)} / ${String(block.gamesTotal)} games`
             : 'Starting…'}
         </span>
         <span>{percent}%</span>
@@ -55,11 +55,7 @@ const latestText = $derived(latest
       </div>
     </div>
 
-    {#if block.phase === 'running' && latestText}
-      <p class="mt-3 text-sm">
-        Latest: <span class="font-semibold">{latestText}</span>
-      </p>
-    {/if}
+
 
     {#if block.phase === 'running'}
       <div class="mt-3 flex flex-wrap items-center gap-2">
@@ -70,18 +66,13 @@ const latestText = $derived(latest
         >
           Cancel
         </button>
-        <span class="font-mono text-[10px] text-muted-foreground">
-          Nothing saved is lost — you can run the block again.
-        </span>
       </div>
     {/if}
 
     {#if block.phase === 'cancelled'}
       <div class="mt-3 rounded-lg bg-surface-2 p-3 text-sm">
         <p class="font-semibold">Block cancelled between games.</p>
-        <p class="mt-1 text-muted-foreground">
-          The block didn't finish. Retry runs it again from your last checkpoint.
-        </p>
+        <p class="mt-1 text-muted-foreground">Cancelled. Retry from last block.</p>
         <button
           type="button"
           onclick={onRetry}
@@ -97,7 +88,7 @@ const latestText = $derived(latest
         role="alert"
         class="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
       >
-        <p class="font-semibold">The block failed ({block.error.code}).</p>
+        <p class="font-semibold">The block failed.</p>
         <p class="mt-1 text-muted-foreground">{block.error.message}</p>
         <button
           type="button"
@@ -109,11 +100,7 @@ const latestText = $derived(latest
       </div>
     {/if}
 
-    {#if block.phase === 'complete'}
-      <p class="mt-3 text-sm">
-        <span class="font-semibold text-primary">Block complete.</span> Standings and summaries are updated.
-      </p>
-    {/if}
+
 
     <p class="sr-only" role="status" aria-live="polite">
       {block.phase === 'running'

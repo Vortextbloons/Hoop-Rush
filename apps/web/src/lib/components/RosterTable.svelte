@@ -90,7 +90,6 @@ function rowActionTarget(target: EventTarget | null): boolean {
 
 {#if desktopViewport !== false}
   <div class="hidden sm:block" aria-label={heading}>
-    <p class="mb-2 text-xs text-muted-foreground lg:hidden">Scroll horizontally for more stats</p>
     <div
       class="overflow-x-auto overscroll-x-contain [scrollbar-gutter:stable]"
       style="scrollbar-gutter: stable;"

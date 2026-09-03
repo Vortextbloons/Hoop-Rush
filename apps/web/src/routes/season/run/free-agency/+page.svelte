@@ -224,8 +224,7 @@ async function resolveMarket() {
       Free Agency
     </h1>
     <p class="mt-1 font-mono text-[10px] text-muted-foreground">
-      Markets open after Blocks 2, 4, and 6 · up to two ordered targets · resolve before the next
-      block can submit
+      Up to 2 targets per window. Resolve to continue.
     </p>
   </header>
 
@@ -241,11 +240,7 @@ async function resolveMarket() {
       >
         No market open yet
       </h2>
-      <p class="mt-2 text-sm text-muted-foreground">
-        The first free-agency window opens after Block 2 is accepted. When it does, this screen
-        becomes your market: candidate cards, a declaration of up to two targets (or a skip), and
-        the resolution results.
-      </p>
+      <p class="mt-2 text-sm text-muted-foreground">No market open. First window after Block 2.</p>
     </section>
   {:else}
     {#if openWindow !== null}
@@ -287,9 +282,7 @@ async function resolveMarket() {
             class="mt-3 rounded-none border border-positive/30 bg-positive/10 px-4 py-2.5 text-sm text-positive sm:rounded-xl"
             data-fa-resolve-notice
           >
-            {skipped
-              ? 'Your skip is recorded. Resolve the market to finish this window.'
-              : 'Your declaration is recorded and immutable. Resolve the market to finish this window.'}
+            Locked in. Resolve window.
           </p>
         {/if}
 
