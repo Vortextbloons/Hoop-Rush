@@ -11,4 +11,6 @@ export * from './season/engine-seam.ts';
 export * from './season/engine-seam-types.ts';
 export * from './season/audit.ts';
 export * from './schemas/season-room-state.ts';
+export * from './schemas/fixed-five-record.ts';
+export * from './repositories/fixed-five.ts';
 export * from './benchmark/season-run.ts';

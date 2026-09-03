@@ -1,951 +1,428 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
-  import { resolve } from '$app/paths';
   import { goto } from '$app/navigation';
+  import { resolve } from '$app/paths';
+  import type { FixedFiveRoomSnapshot } from '@hoop-rush/data-contracts';
+  import { createFixedFiveTransport } from '$lib/fixed-five-transport';
   import {
-    Crown,
-    Clock,
-    Copy,
-    Check,
-    RefreshCw,
-    Wifi,
-    WifiOff,
-    AlertTriangle,
-    Link as LinkIcon,
-    LogOut,
-    UserMinus,
-  } from '@lucide/svelte';
-  import { createInMemorySeasonRoomCoordinator } from '$lib/season/season-room-coordinator';
-  import {
-    createSupabaseSeasonTransport,
-    isSupabaseConfigured,
-  } from '$lib/season/supabase-season-transport';
-  import {
-    loadMembership,
-    loadCode,
-    inviteLinkForCode,
-    clearMembership,
-    clearCode,
-  } from '$lib/season/season-room-identity';
-  import { friendlyJoinError } from '$lib/season/season-room-identity';
-  import type { SeasonRoomPublicSnapshot, SeasonRoomMembership } from '@hoop-rush/data-contracts';
+    friendlyFixedFiveJoinError,
+    loadFixedFiveMembership,
+    saveFixedFiveMembership,
+  } from '$lib/fixed-five-identity';
+  import { fixedFiveRepository } from '$lib/fixed-five-repo';
+  import FixedFiveScoreboard from '$lib/components/FixedFiveScoreboard.svelte';
+
   let roomId = $derived($page.params.roomId as string);
-  let snap = $state<SeasonRoomPublicSnapshot | null>(null);
+  let snapshot = $state<FixedFiveRoomSnapshot | null>(null);
   let loading = $state(true);
   let error = $state<string | null>(null);
-  let outdated = $state(false);
-  let copiedInvite = $state(false);
-  let copiedCode = $state(false);
-  let tick = $state(0);
-  let coordinator: ReturnType<typeof createInMemorySeasonRoomCoordinator> | null = null;
-  let unsubscribe: (() => void) | null = null;
-  let storedMembership = $state<SeasonRoomMembership | null>(null);
-  let storedCode = $state<string | null>(null);
-  let starting = $state(false);
-  let startError = $state<string | null>(null);
-  let readyBusy = $state(false);
-  let readyError = $state<string | null>(null);
-  let settingsBusy = $state(false);
-  let settingsError = $state<string | null>(null);
-  let showLeaveConfirm = $state(false);
-  let showRemoveConfirm = $state(false);
-  let lastSettingsRevision = $state<number | null>(null);
-  let settingsChangedBanner = $state(false);
-  let liveMessage = $state('');
-  let countdown = $derived.by(() => {
-    if (!snap?.expiresAt) return null;
-    void tick;
-    const ms = new Date(snap.expiresAt).getTime() - Date.now();
-    if (ms <= 0) return 'expired';
-    const m = Math.floor(ms / 60000);
-    const s = Math.floor((ms % 60000) / 1000);
-    return `${m}:${String(s).padStart(2, '0')}`;
-  });
-  let isHost = $derived(storedMembership?.participantId === 'p1');
-  let isGuest = $derived(storedMembership?.participantId === 'p2');
-  let youLabel = $derived(isHost ? 'You · Host' : isGuest ? 'You · Guest' : 'Viewing lobby');
-  let modeLabel = $derived.by(() => {
-    const raw =
-      (
-        snap?.settings as unknown as {
-          mode?: string;
-        }
-      )?.mode ??
-      snap?.mode ??
-      'season';
-    if (raw === 'classic') return 'Classic';
-    if (raw === 'sandbox') return 'Sandbox';
-    return 'Season Run';
-  });
-  let paceLabel = $derived.by(() => {
-    if (!snap) return '';
-    return snap.settings.pace === 'live'
-      ? 'Live — 90s draft · 5 min decisions'
-      : 'Async — 24h draft · 12h decisions';
-  });
-  let paceShort = $derived(snap?.settings.pace === 'live' ? 'Live' : 'Async');
-  let hostPresence = $derived(snap?.presence?.find((p) => p.participantId === 'p1') ?? null);
-  let guestPresence = $derived(snap?.presence?.find((p) => p.participantId === 'p2') ?? null);
-  let hostOnline = $derived(hostPresence?.online ?? (snap ? snap.memberCount >= 1 : false));
-  let guestOnline = $derived(guestPresence?.online ?? (snap ? snap.memberCount >= 2 : false));
-  let bothPresent = $derived(hostOnline && guestOnline);
-  let guestReady = $derived(snap?.guestReady ?? false);
-  let settingsRevision = $derived(snap?.settingsRevision ?? 0);
-  let disableReason = $derived.by(() => {
-    if (starting) return 'Request in progress…';
-    if (!snap) return null;
-    if (snap.phase !== 'waiting') return null;
-    if (snap.memberCount < 2) return 'Waiting for opponent to join';
-    if (!guestReady) return 'Waiting for Ready — guest must confirm settings';
-    if (!bothPresent) return 'Opponent disconnected — waiting for reconnection';
-    return null;
-  });
-  let canStart = $derived(disableReason === null && isHost && snap?.phase === 'waiting');
-  let transport: ReturnType<typeof createSupabaseSeasonTransport> | null = null;
-  function getCoordinator() {
-    const useSupabase = isSupabaseConfigured();
-    transport = useSupabase
-      ? createSupabaseSeasonTransport({
-          url:
-            (
-              import.meta as unknown as {
-                env: Record<string, string>;
-              }
-            ).env.VITE_SUPABASE_URL ?? '',
-          publishableKey:
-            (
-              import.meta as unknown as {
-                env: Record<string, string>;
-              }
-            ).env.VITE_SUPABASE_PUBLISHABLE_KEY ?? '',
-        })
-      : null;
-    const t = (transport ?? undefined) as unknown as
-      import('@hoop-rush/data-contracts').SeasonMultiplayerTransport | undefined;
-    return createInMemorySeasonRoomCoordinator({
-      transport: t,
-      onSnapshot: (s) => {
-        const prevRev = lastSettingsRevision;
-        snap = s;
-        if (prevRev !== null && s.settingsRevision !== prevRev && isGuest) {
-          settingsChangedBanner = true;
-          liveMessage = 'Host changed settings — please Ready again';
-          setTimeout(() => (settingsChangedBanner = false), 6000);
-        }
-        lastSettingsRevision = s.settingsRevision;
-        if (s.guestReady && isGuest) liveMessage = 'You are Ready';
-        if (s.phase === 'drafting') {
-          liveMessage = 'Draft starting — entering arena';
-          void goto(resolve('/multiplayer/room/[roomId]/draft', { roomId }));
-        }
-        if (s.codeActive) {
-        } else {
-        }
-        if (s.isOutdated) outdated = true;
-      },
-      onCommands: () => {},
+  let notice = $state<string | null>(null);
+  let reconnecting = $state(false);
+  let syncing = $state(false);
+  let lastOrdinal = $state(-1);
+  let selfId = $state<'p1' | 'p2'>('p1');
+  let progress = $state<{ completed: number; total: number } | null>(null);
+  let rematchBusy = $state(false);
+  let leaveBusy = $state(false);
+  let mounted = true;
+
+  function transport() {
+    const env = import.meta as unknown as { env: Record<string, string> };
+    return createFixedFiveTransport({
+      url: env.env.VITE_SUPABASE_URL,
+      publishableKey: env.env.VITE_SUPABASE_PUBLISHABLE_KEY,
     });
   }
-  async function load() {
-    loading = true;
+
+  async function sync(afterOrdinal: number): Promise<void> {
+    if (!snapshot) return;
+    syncing = true;
+    try {
+      const commands = await transport().refetch(roomId, afterOrdinal);
+      if (!mounted) return;
+      if (commands.length > 0) {
+        lastOrdinal = Math.max(...commands.map((c) => c.ordinal));
+        for (const command of commands) {
+          try {
+            await fixedFiveRepository.appendCommand(command);
+          } catch {}
+        }
+        notice = `Synced ${commands.length} command${commands.length === 1 ? '' : 's'} after a stale revision.`;
+      }
+      await fixedFiveRepository.saveActiveSnapshot(snapshot, lastOrdinal + 1);
+    } catch (e) {
+      if (mounted) error = friendlyFixedFiveJoinError(e);
+    } finally {
+      if (mounted) syncing = false;
+    }
+  }
+
+  async function sendCommand(
+    payload: FixedFiveRoomSnapshot extends never
+      ? never
+      : import('@hoop-rush/data-contracts').FixedFiveCommandPayload,
+  ): Promise<void> {
     error = null;
-    outdated = false;
-    startError = null;
-    readyError = null;
-    settingsError = null;
     try {
-      coordinator = getCoordinator();
-      storedMembership = loadMembership(roomId);
-      storedCode = loadCode(roomId);
-      try {
-        coordinator.hydrateFromStorage(roomId);
-      } catch {}
-      storedMembership = loadMembership(roomId) ?? storedMembership;
-      coordinator.subscribe(roomId);
-      unsubscribe = () => coordinator?.disconnect();
-      const t = transport as unknown as
-        import('@hoop-rush/data-contracts').SeasonMultiplayerTransport | null;
-      let res: SeasonRoomPublicSnapshot & {
-        membership?: SeasonRoomMembership;
-      };
-      if (t) {
-        res = await t.resume(roomId);
-      } else if (coordinator) {
-        res = (await coordinator.refresh(roomId)) as SeasonRoomPublicSnapshot & {
-          membership?: SeasonRoomMembership;
-        };
-      } else {
-        throw new Error('Multiplayer not configured');
-      }
-      snap = res as SeasonRoomPublicSnapshot;
-      if (
-        (
-          res as unknown as {
-            membership?: SeasonRoomMembership;
-          }
-        ).membership
-      ) {
-        const m = (
-          res as unknown as {
-            membership: SeasonRoomMembership;
-          }
-        ).membership;
-        const { saveMembership } = await import('$lib/season/season-room-identity');
-        saveMembership(m);
-        storedMembership = m;
-      }
-      if (snap && snap.codeActive && !storedCode) {
-        const extra = snap as unknown as {
-          code?: string;
-        };
-        if (extra.code) storedCode = extra.code;
-      }
-      if (
-        (
-          snap as unknown as {
-            isOutdated?: boolean;
-          }
-        ).isOutdated
-      )
-        outdated = true;
-      lastSettingsRevision =
-        (
-          snap as unknown as {
-            settingsRevision?: number;
-          }
-        ).settingsRevision ?? null;
-      if (snap.phase === 'drafting') {
-        void goto(resolve('/multiplayer/room/[roomId]/draft', { roomId }));
+      const receipt = await transport().submitCommand({
+        schemaVersion: 1,
+        roomId,
+        commandId: crypto.randomUUID(),
+        actorParticipantId: selfId,
+        payload,
+        expectedRevision: snapshot?.revision,
+      });
+      if (!receipt.accepted && receipt.rejectionCode === 'stale-revision') {
+        notice = 'Stale command — resyncing once before retry.';
+        await sync(lastOrdinal);
+      } else if (!receipt.accepted) {
+        error = `Command rejected: ${receipt.rejectionCode ?? 'unknown'}`;
       }
     } catch (e) {
-      const code = (
-        e as {
-          code?: string;
-        }
-      )?.code;
-      if (code === 'outdated-room') {
-        outdated = true;
-        error = null;
-      } else {
-        error = e instanceof Error ? friendlyJoinError(e) : String(e);
-      }
-    } finally {
-      loading = false;
+      error = friendlyFixedFiveJoinError(e);
     }
   }
-  function warmDraftAssetsFireAndForget() {
-    const warm = () => {
-      import('$lib/season/season-assets')
-        .then(async (m) => {
-          try {
-            await m.loadSeasonDraftCatalog();
-          } catch {}
-          try {
-            await m.loadSeasonLeague();
-          } catch {}
-          try {
-            await m.loadSeasonRosterTargets();
-          } catch {}
-        })
-        .catch(() => {});
-      import('$lib/data')
-        .then(async (m) => {
-          try {
-            await m.getPlayersIndex();
-          } catch {}
-        })
-        .catch(() => {});
-    };
-    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-      (
-        window as unknown as {
-          requestIdleCallback: (cb: () => void) => number;
-        }
-      ).requestIdleCallback(warm);
-    } else {
-      setTimeout(warm, 500);
+
+  async function resolveTimeout(): Promise<void> {
+    try {
+      await transport().resolveTimeout(roomId);
+      await sync(lastOrdinal);
+      notice = 'Overdue fallback resolved. Timeout never spends a reroll.';
+    } catch (e) {
+      error = friendlyFixedFiveJoinError(e);
     }
   }
+
   onMount(() => {
-    load();
-    const iv = setInterval(() => tick++, 1000);
+    mounted = true;
+    const membership = loadFixedFiveMembership(roomId);
+    if (membership) selfId = membership.participantId;
+    let unsubscribe: (() => void) | null = null;
+    let resyncTimer: ReturnType<typeof setInterval> | null = null;
+
+    async function boot(): Promise<void> {
+      loading = true;
+      try {
+        const t = transport();
+        const { snapshot: snap, membership: resumed } = await t.resume(roomId);
+        if (!mounted) return;
+        snapshot = snap;
+        selfId = resumed.participantId;
+        saveFixedFiveMembership({ ...resumed, code: snap.code ?? resumed.code });
+        const stored = await fixedFiveRepository.loadActive(roomId).catch(() => null);
+        lastOrdinal =
+          stored?.commandCursor != null ? stored.commandCursor - 1 : snap.commandCount - 1;
+        await fixedFiveRepository.saveActiveSnapshot(snap, lastOrdinal + 1).catch(() => {});
+        unsubscribe = t.subscribe(roomId, (next) => {
+          if (!mounted) return;
+          snapshot = next;
+          reconnecting = false;
+        }).unsubscribe;
+        await sync(lastOrdinal);
+      } catch (e) {
+        if (mounted) error = friendlyFixedFiveJoinError(e);
+      } finally {
+        if (mounted) loading = false;
+      }
+    }
+
+    void boot();
+
+    const onFocus = () => {
+      reconnecting = true;
+      void sync(lastOrdinal).finally(() => {
+        if (mounted) reconnecting = false;
+      });
+    };
+    const onOnline = () => {
+      reconnecting = true;
+      void sync(lastOrdinal).finally(() => {
+        if (mounted) reconnecting = false;
+      });
+    };
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('online', onOnline);
+    resyncTimer = setInterval(() => {
+      void resolveTimeout();
+    }, 15000);
+
     return () => {
-      clearInterval(iv);
+      mounted = false;
       unsubscribe?.();
-      coordinator?.destroy();
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('online', onOnline);
+      if (resyncTimer) clearInterval(resyncTimer);
     };
   });
-  $effect(() => {
-    if (snap && (snap.phase === 'waiting' || snap.phase === 'drafting') && snap.memberCount >= 2) {
-      warmDraftAssetsFireAndForget();
-    }
-  });
-  async function copyInvite() {
-    const codeToCopy =
-      storedCode ??
-      (
-        snap as unknown as {
-          code?: string;
-        }
-      )?.code ??
-      null;
-    const link = codeToCopy ? inviteLinkForCode(codeToCopy) : null;
-    if (!link) return;
+
+  async function doLeave(): Promise<void> {
+    leaveBusy = true;
     try {
-      await navigator.clipboard.writeText(link);
-      copiedInvite = true;
-      setTimeout(() => (copiedInvite = false), 1500);
-    } catch {}
-  }
-  async function copyCodeOnly() {
-    const toCopy =
-      storedCode ??
-      (
-        snap as unknown as {
-          code?: string;
-        }
-      )?.code ??
-      null;
-    if (!toCopy) return;
-    try {
-      await navigator.clipboard.writeText(toCopy);
-      copiedCode = true;
-      setTimeout(() => (copiedCode = false), 1500);
-    } catch {}
-  }
-  async function handleStartDraft() {
-    if (!coordinator) return;
-    starting = true;
-    startError = null;
-    try {
-      const res = await coordinator.startDraft(roomId);
-      snap = res;
-      liveMessage = 'Draft starting';
-      void goto(resolve('/multiplayer/room/[roomId]/draft', { roomId }));
-    } catch (e) {
-      startError = friendlyJoinError(e);
-    } finally {
-      starting = false;
-    }
-  }
-  async function handleSetReady(ready: boolean) {
-    if (!coordinator) return;
-    readyBusy = true;
-    readyError = null;
-    try {
-      const res = await coordinator.setReady(roomId, ready);
-      snap = res;
-      settingsChangedBanner = false;
-      liveMessage = ready ? 'You are Ready' : 'Ready cleared';
-    } catch (e) {
-      readyError = friendlyJoinError(e);
-    } finally {
-      readyBusy = false;
-    }
-  }
-  async function handleUpdateSettings(
-    newMode: 'season' | 'classic' | 'sandbox',
-    newPace: 'live' | 'async',
-  ) {
-    if (!coordinator || !isHost) return;
-    settingsBusy = true;
-    settingsError = null;
-    try {
-      const res = await coordinator.updateSettings(roomId, newMode, newPace);
-      snap = res;
-      liveMessage = `Settings updated to ${newMode} · ${newPace}`;
-    } catch (e) {
-      settingsError = friendlyJoinError(e);
-    } finally {
-      settingsBusy = false;
-    }
-  }
-  async function handleRemoveGuest() {
-    if (!coordinator) return;
-    try {
-      const t = transport as unknown as {
-        preDraftRemoval?: (id: string, pid: 'p1' | 'p2') => Promise<string>;
-      } | null;
-      let newCode: string | null = null;
-      if (t?.preDraftRemoval) {
-        newCode = await t.preDraftRemoval(roomId, 'p2');
-      } else {
-        const anyTransport = coordinator as unknown as {
-          transport?: {
-            preDraftRemoval: (id: string, pid: string) => Promise<string>;
-          };
-        };
-        newCode = await (
-          coordinator as unknown as {
-            transport: {
-              preDraftRemoval: (id: string, pid: string) => Promise<string>;
-            };
-          }
-        ).transport.preDraftRemoval(roomId, 'p2');
-      }
-      if (newCode) {
-        const { saveCode } = await import('$lib/season/season-room-identity');
-        saveCode(roomId, newCode as unknown as import('@hoop-rush/data-contracts').SeasonRoomCode);
-        storedCode = newCode;
-        await load();
-      }
-      showRemoveConfirm = false;
-    } catch (e) {
-      startError = friendlyJoinError(e);
-      showRemoveConfirm = false;
-    }
-  }
-  async function handleLeave() {
-    if (!coordinator) return;
-    try {
-      await coordinator.leave(roomId);
-      clearMembership(roomId);
-      clearCode(roomId);
+      await transport().leave(roomId, selfId);
       await goto(resolve('/multiplayer'));
     } catch (e) {
-      error = friendlyJoinError(e);
+      error = friendlyFixedFiveJoinError(e);
+    } finally {
+      leaveBusy = false;
     }
   }
+
+  async function doRematch(): Promise<void> {
+    rematchBusy = true;
+    error = null;
+    try {
+      const { snapshot: next, code } = await transport().rematch(roomId);
+      saveFixedFiveMembership({ roomId: next.roomId, participantId: selfId, code });
+      await goto(resolve('/multiplayer/room/[roomId]', { roomId: next.roomId }));
+    } catch (e) {
+      error = friendlyFixedFiveJoinError(e);
+    } finally {
+      rematchBusy = false;
+    }
+  }
+
+  let phase = $derived(snapshot?.phase ?? 'lobby');
+  let opponent = $derived(snapshot?.members.find((m) => m.participantId !== selfId) ?? null);
 </script>
 
-<svelte:head><title>Room {roomId.slice(0, 8)} — Hoop Rush</title></svelte:head>
+<svelte:head>
+  <title>Room — Hoop Rush Multiplayer</title>
+</svelte:head>
 
 <section class="mx-auto w-full max-w-5xl px-4 pb-24 sm:px-6 md:pb-10">
-  <div class="flex items-center justify-between gap-3 py-6">
-    <a
-      href={resolve('/multiplayer')}
-      class="text-label inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
-      >← Multiplayer</a
-    >
-    <div class="flex items-center gap-2">
-      <button
-        type="button"
-        onclick={load}
-        class="inline-flex items-center gap-1.5 rounded-lg border border-line-soft bg-card px-3 py-1.5 text-xs font-semibold hover:border-line-strong"
-        ><RefreshCw class="h-3.5 w-3.5" />Refresh</button
-      >
-      <a
-        href={resolve('/')}
-        class="hidden text-xs text-muted-foreground underline-offset-4 hover:underline sm:inline"
-        >Home</a
-      >
-    </div>
-  </div>
-
-  <div aria-live="polite" aria-atomic="true" class="sr-only">{liveMessage}</div>
+  <a
+    href={resolve('/multiplayer')}
+    class="text-label mt-6 inline-flex items-center gap-1.5 self-start text-muted-foreground hover:text-foreground"
+  >
+    <span aria-hidden="true">←</span> All rooms
+  </a>
 
   {#if loading}
-    <div class="rounded-xl bg-surface-1 p-10 text-center">
-      <p class="font-mono text-sm text-muted-foreground">Loading room…</p>
+    <p class="mt-8 text-sm text-muted-foreground" role="status">Loading room…</p>
+  {:else if error && !snapshot}
+    <p
+      role="alert"
+      class="mt-8 rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm"
+    >
+      {error}
+    </p>
+  {:else if snapshot}
+    <div class="mt-4">
+      <p class="text-label text-primary">Fixed-five · {snapshot.settings.mode} · {phase}</p>
+      <h1 class="font-display mt-2 text-3xl font-extrabold tracking-tight uppercase">
+        Room {snapshot.code ?? '····'}
+      </h1>
     </div>
-  {:else if outdated}
-    <div class="rounded-xl border border-amber-500/30 bg-amber-500/10 p-6">
-      <div class="flex items-center gap-2 font-semibold text-amber-700">
-        <AlertTriangle class="h-4 w-4" />Outdated room — create a new one
-      </div>
-      <p class="mt-2 text-sm text-muted-foreground">
-        This room has expired. Please create a new one.
-      </p>
-      <div class="mt-4 flex gap-2">
-        <a
-          href={resolve('/multiplayer')}
-          onclick={() => {
-            clearMembership(roomId);
-            clearCode(roomId);
-          }}
-          class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
-          >Create new room</a
-        >
-        <button
-          type="button"
-          onclick={handleLeave}
-          class="rounded-lg border border-line-soft bg-card px-4 py-2 text-sm font-semibold"
-          >Leave room</button
-        >
-      </div>
-    </div>
-  {:else if error}
-    <div class="rounded-xl border border-destructive/30 bg-destructive/10 p-6">
-      <div class="flex items-center gap-2 font-semibold text-destructive">
-        <AlertTriangle class="h-4 w-4" />Could not load room
-      </div>
-      <p class="mt-2 text-sm text-muted-foreground">{error}</p>
-      <div class="mt-4 flex gap-2">
-        <button
-          type="button"
-          onclick={load}
-          class="rounded-lg bg-card px-4 py-2 text-sm font-semibold">Retry</button
-        >
-        <a
-          href={resolve('/multiplayer')}
-          class="rounded-lg border border-line-soft px-4 py-2 text-sm font-semibold"
-          >Back to lobby</a
-        >
-      </div>
-    </div>
-  {:else if snap}
-    {#if storedCode && snap.codeActive}
-      <div class="rounded-2xl border-2 border-dashed border-primary/40 bg-primary/10 p-6 sm:p-8">
-        <div class="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p class="text-label tracking-[0.16em] text-primary">Invite — share with opponent</p>
-            <div class="mt-3 flex flex-wrap items-center gap-3">
-              <div class="flex gap-1.5">
-                {#each storedCode.split('') as d, i (i)}
-                  <span
-                    class="inline-flex h-14 w-12 items-center justify-center rounded-xl border-2 border-primary/40 bg-card font-mono text-3xl font-black tracking-widest sm:h-16 sm:w-14 sm:text-4xl"
-                    >{d}</span
-                  >
-                {/each}
-              </div>
-              <button
-                type="button"
-                onclick={copyInvite}
-                class="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
-              >
-                {#if copiedInvite}<Check class="h-4 w-4" /> Copied link!{:else}<LinkIcon
-                    class="h-4 w-4"
-                  /> Copy invite link{/if}
-              </button>
-              <button
-                type="button"
-                onclick={copyCodeOnly}
-                class="inline-flex items-center gap-1.5 rounded-xl bg-card px-4 py-2.5 text-sm font-semibold shadow-sm hover:bg-surface-2"
-              >
-                {#if copiedCode}<Check class="h-4 w-4 text-positive" /> Copied!{:else}<Copy
-                    class="h-4 w-4"
-                  /> Copy code{/if}
-              </button>
-            </div>
 
-            <p class="mt-1 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Clock class="h-3.5 w-3.5" />
-              {#if countdown && countdown !== 'expired'}expires in {countdown}{:else if countdown === 'expired'}expired
-                — create a new room{:else}expires in 15 minutes{/if}
-              · visible until opponent joins
-            </p>
-          </div>
-          <div class="flex flex-col items-end gap-2">
-            <span
-              class="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 font-mono text-[11px] font-bold tracking-widest uppercase text-primary"
-              >{snap.phase}</span
-            >
-            <span
-              class="inline-flex items-center gap-1.5 rounded-full border border-line-soft bg-card px-2.5 py-1 text-xs"
-            >
-              <Wifi class="h-3 w-3 text-positive" /> code live
-            </span>
-          </div>
-        </div>
-      </div>
-    {:else}
-      <div class="rounded-xl border border-line-soft bg-surface-1 p-6 sm:p-7">
-        <div class="flex flex-wrap items-start justify-between gap-4">
-          <div class="min-w-0">
-            <div class="flex flex-wrap items-center gap-2">
-              <span
-                class="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 font-mono text-[11px] font-bold tracking-widest uppercase text-primary"
-                >{snap.phase}</span
-              >
-              <span
-                class="inline-flex items-center gap-1 rounded-full bg-card px-2.5 py-1 text-xs font-medium"
-                >{snap.memberCount}/2 players</span
-              >
-              {#if snap.codeActive}<span
-                  class="inline-flex items-center gap-1.5 rounded-full border border-line-soft bg-card px-2.5 py-1 text-xs"
-                  ><Wifi class="h-3 w-3 text-positive" /> code live</span
-                >{:else}<span
-                  class="inline-flex items-center gap-1.5 rounded-full border border-line-soft bg-card px-2.5 py-1 text-xs"
-                  ><WifiOff class="h-3 w-3 text-muted-foreground" /> code cleared</span
-                >{/if}
-            </div>
-            <h1
-              class="font-display mt-3 text-2xl font-extrabold tracking-tight uppercase sm:text-3xl"
-            >
-              Room lobby
-            </h1>
-            <p class="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
-              {modeLabel} · {paceLabel} · You: {youLabel}
-            </p>
-          </div>
-          <div class="flex flex-col items-end gap-2">
-            {#if storedCode && !snap.codeActive}
-              <span
-                class="inline-flex items-center gap-1.5 rounded-full bg-card px-3 py-1 text-xs font-mono"
-                >Code cleared — both joined</span
-              >
-            {:else if snap.codeActive && !storedCode}
-              <span class="inline-flex items-center gap-1.5 rounded-full bg-card px-3 py-1 text-xs"
-                >Code active — ask host</span
-              >
-            {/if}
-            {#if snap.expiresAt && snap.codeActive}
-              <span class="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
-                ><Clock class="h-3 w-3" />expires {countdown}</span
-              >
-            {/if}
-          </div>
-        </div>
-      </div>
-    {/if}
+    <div class="mt-4">
+      <FixedFiveScoreboard {snapshot} {selfId} />
+    </div>
 
-    {#if settingsChangedBanner && isGuest}
-      <div
+    {#if reconnecting}<p class="mt-3 text-xs text-muted-foreground" role="status">
+        Reconnecting… syncing after wake-up hint.
+      </p>{/if}
+    {#if syncing}<p class="mt-1 text-xs text-muted-foreground" role="status">
+        Syncing commands after last accepted ordinal…
+      </p>{/if}
+    {#if notice}<p
+        class="mt-3 rounded-lg border border-line-soft bg-card p-3 text-xs"
         role="status"
-        class="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-800"
       >
-        Host changed {modeLabel} / {paceShort} — please Ready again.
-        <span class="font-semibold">Ready required again.</span>
+        {notice}
+      </p>{/if}
+    {#if error}<p
+        class="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
+        role="alert"
+      >
+        {error}
+      </p>{/if}
+    {#if opponent && !opponent.online}<p class="mt-3 text-xs text-amber-600" role="status">
+        Opponent offline — presence is display-only and never decides validity.
+      </p>{/if}
+
+    {#if phase === 'lobby'}
+      <div class="mt-6 rounded-2xl bg-surface-1 p-6">
+        <h2 class="font-display text-sm font-extrabold uppercase">Lobby — waiting & ready</h2>
+        <p class="mt-1 text-xs text-muted-foreground">
+          Variant frozen: {snapshot.settings.variant}. Codes expire after 15 minutes; rooms after 24
+          hours.
+        </p>
+        <div class="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onclick={() => sendCommand({ kind: 'ready', ready: true })}
+            class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+            >Ready</button
+          >
+          <button
+            type="button"
+            onclick={() => sendCommand({ kind: 'start' })}
+            class="rounded-xl border border-line-soft bg-card px-4 py-2 text-sm font-semibold"
+            >Start draft</button
+          >
+          {#if selfId === 'p1'}
+            <button
+              type="button"
+              onclick={() =>
+                transport()
+                  .removeGuest(roomId, 'p2')
+                  .then((s) => (snapshot = s))}
+              class="rounded-xl border border-line-soft bg-card px-4 py-2 text-sm font-semibold"
+              >Remove guest (pre-draft)</button
+            >
+          {/if}
+          <button
+            type="button"
+            onclick={doLeave}
+            disabled={leaveBusy}
+            class="rounded-xl border border-line-soft bg-card px-4 py-2 text-sm font-semibold disabled:opacity-40"
+            >Leave</button
+          >
+        </div>
+      </div>
+    {:else if phase === 'drafting'}
+      <div class="mt-6 rounded-2xl bg-surface-1 p-6">
+        <h2 class="font-display text-sm font-extrabold uppercase">
+          Drafting — simultaneous Shared 82 · alternating Duel
+        </h2>
+        <p class="mt-1 text-xs text-muted-foreground">
+          Classic & Duel: 90s per required pick. Sandbox: five minutes to build and lock. A timeout
+          never spends a reroll; safe moves preserve a legal G/G/F/F/C completion and draw from the
+          top eight via rootSeed/timeout-autopick/mode/participant/pickOrdinal.
+        </p>
+        <div class="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onclick={() => sendCommand({ kind: 'reroll', axis: 'franchise' })}
+            class="rounded-xl border border-line-soft bg-card px-4 py-2 text-sm font-semibold"
+            >Reroll franchise</button
+          >
+          <button
+            type="button"
+            onclick={() => sendCommand({ kind: 'reroll', axis: 'era' })}
+            class="rounded-xl border border-line-soft bg-card px-4 py-2 text-sm font-semibold"
+            >Reroll era</button
+          >
+          <button
+            type="button"
+            onclick={resolveTimeout}
+            class="rounded-xl border border-line-soft bg-card px-4 py-2 text-sm font-semibold"
+            >Resolve overdue fallback</button
+          >
+        </div>
+        {#if snapshot.deadline}
+          <p class="mt-3 text-xs text-muted-foreground">
+            Pending command cursor {snapshot.deadline.cursor} · pick ordinal {snapshot.deadline
+              .pickOrdinal}. Reconnect resolves overdue fallbacks immediately.
+          </p>
+        {/if}
+      </div>
+    {:else if phase === 'simulating'}
+      <div class="mt-6 rounded-2xl bg-surface-1 p-6">
+        <h2 class="font-display text-sm font-extrabold uppercase">Simulating locally</h2>
+        {#if progress}
+          <p class="mt-2 text-sm" role="status">{progress.completed}/{progress.total} games</p>
+          <div class="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+            <div
+              class="h-full bg-primary"
+              style={`width: ${(progress.completed / Math.max(1, progress.total)) * 100}%`}
+            ></div>
+          </div>
+        {:else}
+          <p class="mt-2 text-sm text-muted-foreground" role="status">
+            Warming the bounded worker… progress capped at four updates per second.
+          </p>
+        {/if}
+        <p class="mt-2 text-xs text-muted-foreground">
+          Every game validated with checkGameResult. H2H occurrences simulate once and mirror into
+          both records.
+        </p>
+      </div>
+    {:else if phase === 'awaiting-confirmation'}
+      <div class="mt-6 rounded-2xl bg-surface-1 p-6">
+        <h2 class="font-display text-sm font-extrabold uppercase">
+          Waiting for result confirmation
+        </h2>
+        <p class="mt-1 text-xs text-muted-foreground">
+          First finished client proposes the final digest; the peer recomputes and confirms. On
+          disagreement both rerun once from the accepted log.
+        </p>
+        <div class="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onclick={() => sendCommand({ kind: 'propose-result', resultDigest: '0'.repeat(64) })}
+            class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+            >Propose digest</button
+          >
+          <button
+            type="button"
+            onclick={() =>
+              sendCommand({ kind: 'confirm-result', resultDigest: '0'.repeat(64), verified: true })}
+            class="rounded-xl border border-line-soft bg-card px-4 py-2 text-sm font-semibold"
+            >Confirm digest</button
+          >
+        </div>
+      </div>
+    {:else if phase === 'completed'}
+      <div class="mt-6 rounded-2xl bg-surface-1 p-6">
+        <h2 class="font-display text-sm font-extrabold uppercase">
+          Completed — Shared 82 comparison or Duel series
+        </h2>
+        <p class="mt-1 text-xs text-muted-foreground">
+          Ranked by wins, then differential, then the recorded seeded tie-break. Rematch needs both
+          confirmations and never overwrites this run.
+        </p>
+        <div class="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onclick={() => sendCommand({ kind: 'rematch-request' })}
+            class="rounded-xl border border-line-soft bg-card px-4 py-2 text-sm font-semibold"
+            >Request rematch</button
+          >
+          <button
+            type="button"
+            onclick={() => sendCommand({ kind: 'rematch-confirm' })}
+            class="rounded-xl border border-line-soft bg-card px-4 py-2 text-sm font-semibold"
+            >Confirm rematch</button
+          >
+          <button
+            type="button"
+            onclick={doRematch}
+            disabled={rematchBusy}
+            class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-40"
+          >
+            {rematchBusy ? 'Creating…' : 'New successor room →'}
+          </button>
+        </div>
+      </div>
+    {:else if phase === 'integrity-failed'}
+      <div class="mt-6 rounded-2xl border border-destructive/40 bg-destructive/10 p-6" role="alert">
+        <h2 class="font-display text-sm font-extrabold uppercase">
+          Integrity failure — mismatch rerun failed
+        </h2>
+        <p class="mt-1 text-xs">
+          Both clients reran once from the accepted log and still disagreed. Neither result is
+          accepted.
+        </p>
+      </div>
+    {:else if phase === 'expired'}
+      <div class="mt-6 rounded-2xl bg-surface-1 p-6">
+        <h2 class="font-display text-sm font-extrabold uppercase">Expired</h2>
+        <p class="mt-1 text-xs text-muted-foreground">
+          Local saves are kept. Start a fresh room from the hub.
+        </p>
       </div>
     {/if}
 
-    <div class="mt-6 grid gap-6 lg:grid-cols-5">
-      <div class="space-y-6 lg:col-span-3">
-        <div class="rounded-xl bg-surface-1 p-6">
-          <h2 class="font-display text-sm font-extrabold tracking-widest uppercase">Players</h2>
-          <div class="mt-4 grid gap-3 sm:grid-cols-2">
-            <div
-              class="rounded-xl border p-4 {isHost
-                ? 'border-primary/40 bg-primary/10 ring-1 ring-primary'
-                : 'border-line-soft bg-card'}"
-            >
-              <div class="flex items-center justify-between">
-                <span
-                  class="font-mono text-xs font-bold tracking-widest uppercase flex items-center gap-1.5"
-                  ><Crown class="h-3.5 w-3.5 text-primary" />P1 · Host {#if isHost}<span
-                      class="rounded-full bg-primary px-1.5 py-0.5 text-[10px] text-primary-foreground"
-                      >YOU</span
-                    >{/if}</span
-                >
-                <span
-                  class="inline-flex items-center gap-1 text-xs {hostOnline
-                    ? 'text-positive'
-                    : 'text-amber-600'}"
-                  >{#if hostOnline}<Wifi class="h-3 w-3" /> connected{:else}<WifiOff
-                      class="h-3 w-3"
-                    /> offline{/if}</span
-                >
-              </div>
-              <p class="mt-2 font-display text-base font-extrabold uppercase">Host</p>
-              <p class="text-xs text-muted-foreground">
-                {snap.memberCount >= 1 ? 'Joined' : 'Waiting'}
-              </p>
-              <p class="mt-1 inline-flex items-center gap-1.5 text-xs">
-                <span class="h-2 w-2 rounded-full {hostOnline ? 'bg-positive' : 'bg-amber-500'}"
-                ></span>
-                {hostOnline ? 'Online' : 'Offline'}
-              </p>
-            </div>
-
-            <div
-              class="rounded-xl border p-4 {isGuest
-                ? 'border-primary/40 bg-primary/10 ring-1 ring-primary'
-                : snap.memberCount >= 2
-                  ? 'border-positive/30 bg-positive/10'
-                  : 'border-dashed border-line-soft bg-card/50'}"
-            >
-              <div class="flex items-center justify-between">
-                <span class="font-mono text-xs font-bold tracking-widest uppercase"
-                  >P2 · Guest {#if isGuest}<span
-                      class="rounded-full bg-primary px-1.5 py-0.5 text-[10px] text-primary-foreground"
-                      >YOU</span
-                    >{/if}</span
-                >
-                <span
-                  class="inline-flex items-center gap-1 text-xs {snap.memberCount >= 2
-                    ? guestOnline
-                      ? 'text-positive'
-                      : 'text-amber-600'
-                    : 'text-muted-foreground'}"
-                  >{#if snap.memberCount >= 2}{#if guestOnline}<Wifi class="h-3 w-3" /> connected{:else}<WifiOff
-                        class="h-3 w-3"
-                      /> offline{/if}{:else}waiting{/if}</span
-                >
-              </div>
-              <p class="mt-2 font-display text-base font-extrabold uppercase">
-                {snap.memberCount >= 2 ? 'Guest' : 'Open'}
-              </p>
-              <p class="text-xs text-muted-foreground">
-                {snap.memberCount >= 2
-                  ? guestReady
-                    ? 'Ready ✓'
-                    : 'Not ready'
-                  : 'Share invite link to fill'}
-              </p>
-              {#if snap.memberCount >= 2}
-                <p class="mt-1 inline-flex items-center gap-1.5 text-xs">
-                  <span class="h-2 w-2 rounded-full {guestOnline ? 'bg-positive' : 'bg-amber-500'}"
-                  ></span>
-                  {guestOnline ? 'Online' : 'Offline'}
-                </p>
-                <p
-                  class="mt-1 text-xs font-semibold {guestReady
-                    ? 'text-positive'
-                    : 'text-amber-600'}"
-                >
-                  {guestReady ? 'Confirmed current settings' : 'Must Ready before Start'}
-                </p>
-              {/if}
-            </div>
-          </div>
-
-          {#if snap.phase === 'waiting' && snap.memberCount < 2}
-            <div
-              class="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs leading-relaxed text-muted-foreground"
-            >
-              Waiting for opponent — share the code or invite link.
-            </div>
-          {:else if snap.phase === 'waiting' && snap.memberCount === 2 && !guestReady}
-            <div class="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs">
-              Guest must press Ready to confirm <span class="font-semibold"
-                >{modeLabel} · {paceShort}</span
-              >. If host changes mode/pace, Ready resets.
-            </div>
-          {:else if snap.phase === 'waiting' && snap.memberCount === 2 && guestReady && bothPresent}
-            <div class="mt-4 rounded-lg border border-positive/30 bg-positive/10 p-3 text-xs">
-              Both players here and Ready. Host can Start.
-            </div>
-          {:else if snap.phase === 'waiting' && !bothPresent}
-            <div
-              class="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive"
-            >
-              Opponent disconnected — waiting to reconnect.
-            </div>
-          {:else if snap.phase === 'drafting'}
-            <div class="mt-4 rounded-lg border border-positive/30 bg-positive/10 p-3 text-xs">
-              Draft is live — redirecting to shared draft…
-            </div>
-          {/if}
-
-          {#if isHost && snap.phase === 'waiting' && snap.memberCount === 2}
-            <div class="mt-4 flex gap-2">
-              <button
-                type="button"
-                onclick={() => (showRemoveConfirm = true)}
-                class="inline-flex items-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive hover:bg-destructive/20"
-                ><UserMinus class="h-3.5 w-3.5" /> Remove guest & regenerate code</button
-              >
-            </div>
-          {/if}
-        </div>
-
-        <div class="rounded-xl bg-surface-1 p-6">
-          <h2 class="font-display text-sm font-extrabold tracking-widest uppercase">Invite</h2>
-          {#if storedCode}
-            <div class="mt-3 flex gap-2">
-              <button
-                type="button"
-                onclick={copyInvite}
-                class="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
-                ><LinkIcon class="h-4 w-4" />
-                {#if copiedInvite}Copied!{:else}Copy invite link{/if}</button
-              >
-              <button
-                type="button"
-                onclick={copyCodeOnly}
-                class="inline-flex items-center gap-1.5 rounded-lg border border-line-soft bg-card px-4 py-2.5 text-sm font-semibold hover:border-line-strong"
-                ><Copy class="h-4 w-4" />
-                {#if copiedCode}Copied!{:else}Copy code{/if}</button
-              >
-            </div>
-          {:else}
-            <p class="mt-3 text-xs text-muted-foreground">
-              Code cleared after both joined. Invite regenerates if host removes guest.
-            </p>
-          {/if}
-        </div>
-      </div>
-
-      <div class="space-y-6 lg:col-span-2">
-        <div class="rounded-xl bg-surface-1 p-6">
-          <h2 class="font-display text-sm font-extrabold tracking-widest uppercase">Next step</h2>
-          {#if snap.phase === 'waiting' && snap.memberCount < 2}
-            <p class="mt-2 text-sm text-muted-foreground">
-              Waiting for opponent. {storedCode
-                ? 'Your invite link is above — share it.'
-                : 'Ask host for invite.'} Lobby updates live.
-            </p>
-            <div class="mt-4 flex gap-2">
-              <a
-                href={resolve('/multiplayer')}
-                class="flex-1 rounded-lg border border-line-soft bg-card px-4 py-2 text-center text-sm font-semibold hover:border-line-strong"
-                >Back</a
-              >
-              <button
-                type="button"
-                onclick={load}
-                class="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
-                >Refresh</button
-              >
-            </div>
-          {:else if snap.phase === 'waiting' && snap.memberCount === 2}
-            {#if isHost}
-              <p class="mt-2 text-sm text-muted-foreground">
-                Both players in. You’re host — Start when Ready and presence are green.
-              </p>
-              <button
-                type="button"
-                onclick={handleStartDraft}
-                disabled={!canStart}
-                class="mt-4 w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
-                >{starting ? 'Starting…' : 'Start draft →'}</button
-              >
-              {#if disableReason}<p
-                  class="mt-2 text-xs font-medium {canStart ? 'text-positive' : 'text-amber-700'}"
-                >
-                  {disableReason}
-                </p>{/if}
-              {#if startError}<p role="alert" class="mt-2 text-xs text-destructive">
-                  {startError}
-                </p>{/if}
-              <p class="mt-2 text-xs text-muted-foreground">
-                Guest sees waiting for host. Changing mode/pace clears Ready.
-              </p>
-            {:else if isGuest}
-              <p class="mt-2 text-sm text-muted-foreground">
-                Host will Start when both are Ready and connected.
-              </p>
-              <button
-                type="button"
-                onclick={() => handleSetReady(!guestReady)}
-                disabled={readyBusy}
-                class="mt-4 w-full rounded-xl border-2 px-4 py-3 text-sm font-extrabold tracking-wide uppercase {guestReady
-                  ? 'border-positive bg-positive/10 text-positive'
-                  : 'border-primary bg-primary text-primary-foreground hover:opacity-90'} disabled:opacity-50"
-              >
-                {readyBusy
-                  ? 'Updating…'
-                  : guestReady
-                    ? '✓ Ready — tap to unready'
-                    : 'Ready → confirm settings'}
-              </button>
-              {#if readyError}<p role="alert" class="mt-2 text-xs text-destructive">
-                  {readyError}
-                </p>{/if}
-              <p class="mt-2 text-xs text-muted-foreground">
-                Visible to host. Host changing {modeLabel}/{paceShort} requires Ready again.
-              </p>
-            {:else}
-              <p class="mt-2 text-sm text-muted-foreground">Waiting for host to start.</p>
-              <button
-                type="button"
-                onclick={load}
-                class="mt-4 w-full rounded-lg border border-line-soft bg-card px-4 py-3 text-sm font-semibold"
-                >Refresh status</button
-              >
-            {/if}
-          {:else if snap.phase === 'drafting'}
-            <p class="mt-2 text-sm text-muted-foreground">
-              Draft is live — both clients auto-navigate to <code class="font-mono text-xs"
-                >/multiplayer/room/{roomId.slice(0, 8)}…/draft</code
-              >.
-            </p>
-            <button
-              type="button"
-              onclick={() => goto(resolve('/multiplayer/room/[roomId]/draft', { roomId }))}
-              class="mt-4 w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground"
-              >Enter draft →</button
-            >
-            <p class="mt-2 text-xs text-muted-foreground">
-              Reconnecting clients resume there. Mode: {modeLabel} · {paceShort}
-            </p>
-          {:else if snap.phase === 'integrity-failed'}
-            <div
-              class="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
-            >
-              Something went wrong — please create a new room.
-            </div>
-            <a
-              href={resolve('/multiplayer')}
-              class="mt-3 inline-flex w-full justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
-              >New room</a
-            >
-          {:else if snap.phase === 'expired'}
-            <div
-              class="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
-            >
-              Expired — please create a new room.
-            </div>
-          {:else}
-            <p class="mt-2 text-sm text-muted-foreground">
-              Phase <code class="font-mono text-xs">{snap.phase}</code>
-            </p>
-            <button
-              type="button"
-              onclick={load}
-              class="mt-3 w-full rounded-lg border border-line-soft bg-card px-4 py-2 text-sm font-semibold"
-              >Refresh lobby</button
-            >
-          {/if}
-
-          <div class="mt-6 flex gap-2">
-            <button
-              type="button"
-              onclick={() => (showLeaveConfirm = true)}
-              class="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-line-soft bg-card px-3 py-2 text-xs font-semibold hover:border-line-strong"
-              ><LogOut class="h-3.5 w-3.5" /> Leave room</button
-            >
-            <a
-              href={resolve('/multiplayer')}
-              class="flex-1 rounded-lg bg-card border border-line-soft px-3 py-2 text-xs font-semibold text-center hover:border-line-strong"
-              >Multiplayer entry</a
-            >
-          </div>
-        </div>
-      </div>
+    <div class="mt-6 flex gap-2">
+      <button
+        type="button"
+        onclick={doLeave}
+        disabled={leaveBusy}
+        class="rounded-xl border border-line-soft bg-card px-4 py-2 text-sm font-semibold disabled:opacity-40"
+        >Leave room</button
+      >
     </div>
-
-    {#if showLeaveConfirm}
-      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-        <div class="w-full max-w-sm rounded-xl bg-card p-6">
-          <h3 class="font-display text-sm font-extrabold tracking-widest uppercase">Leave room?</h3>
-          <p class="mt-2 text-sm text-muted-foreground">
-            You’ll be removed from this room. Your draft progress (if any) stays local. You’ll need
-            a new invite to rejoin before Start.
-          </p>
-          <div class="mt-4 flex gap-2">
-            <button
-              type="button"
-              onclick={() => (showLeaveConfirm = false)}
-              class="flex-1 rounded-lg border border-line-soft bg-card px-4 py-2 text-sm font-semibold"
-              >Cancel</button
-            >
-            <button
-              type="button"
-              onclick={handleLeave}
-              class="flex-1 rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground"
-              >Leave</button
-            >
-          </div>
-        </div>
-      </div>
-    {/if}
-    {#if showRemoveConfirm}
-      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-        <div class="w-full max-w-sm rounded-xl bg-card p-6">
-          <h3 class="font-display text-sm font-extrabold tracking-widest uppercase">
-            Remove guest?
-          </h3>
-          <p class="mt-2 text-sm text-muted-foreground">
-            Host will remove guest and regenerate invite code. New invite link required.
-          </p>
-          <div class="mt-4 flex gap-2">
-            <button
-              type="button"
-              onclick={() => (showRemoveConfirm = false)}
-              class="flex-1 rounded-lg border border-line-soft bg-card px-4 py-2 text-sm font-semibold"
-              >Cancel</button
-            >
-            <button
-              type="button"
-              onclick={handleRemoveGuest}
-              class="flex-1 rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground"
-              >Remove & regen code</button
-            >
-          </div>
-        </div>
-      </div>
-    {/if}
   {/if}
 </section>

@@ -1,4 +1,4 @@
-# Supabase local development config for Hoop Rush M2.7
+# Supabase local development config for Hoop Rush M2.8 (M2.7 Season Run archived; fixed-five live only)
 # See https://supabase.com/docs/guides/local-development/cli/config
 
 [api]
@@ -50,110 +50,111 @@ file_size_limit = "50MiB"
 import_path = "./storage"
 
 [functions.season-room-create]
-enabled = true
+enabled = false  # M2.7 archived in M2.8
 verify_jwt = false
 import_map = "./functions/deno.json"
 entrypoint = "./functions/season-room-create/index.ts"
 
 [functions.season-room-join]
-enabled = true
+enabled = false  # M2.7 archived in M2.8
 verify_jwt = false
 import_map = "./functions/deno.json"
 entrypoint = "./functions/season-room-join/index.ts"
 
 [functions.season-room-command]
-enabled = true
+enabled = false  # M2.7 archived in M2.8
 verify_jwt = false
 import_map = "./functions/deno.json"
 entrypoint = "./functions/season-room-command/index.ts"
 
 [functions.season-private-decision]
-enabled = true
+enabled = false  # M2.7 archived in M2.8
 verify_jwt = false
 import_map = "./functions/deno.json"
 entrypoint = "./functions/season-private-decision/index.ts"
 
 [functions.season-checkpoint-attest]
-enabled = true
+enabled = false  # M2.7 archived in M2.8
 verify_jwt = false
 import_map = "./functions/deno.json"
 entrypoint = "./functions/season-checkpoint-attest/index.ts"
 
 [functions.season-room-preview]
-enabled = true
+enabled = false  # M2.7 archived in M2.8
 verify_jwt = false
 import_map = "./functions/deno.json"
 entrypoint = "./functions/season-room-preview/index.ts"
 
 [functions.season-room-reclaim]
-enabled = true
+enabled = false  # M2.7 archived in M2.8
 verify_jwt = false
 import_map = "./functions/deno.json"
 entrypoint = "./functions/season-room-reclaim/index.ts"
 
 [functions.season-room-surrender]
-enabled = true
+enabled = false  # M2.7 archived in M2.8
 verify_jwt = false
 import_map = "./functions/deno.json"
 entrypoint = "./functions/season-room-surrender/index.ts"
 
 [functions.season-room-pre-draft-removal]
-enabled = true
+enabled = false  # M2.7 archived in M2.8
 verify_jwt = false
 import_map = "./functions/deno.json"
 entrypoint = "./functions/season-room-pre-draft-removal/index.ts"
 
 [functions.season-room-close]
-enabled = true
+enabled = false  # M2.7 archived in M2.8
 verify_jwt = false
 import_map = "./functions/deno.json"
 entrypoint = "./functions/season-room-close/index.ts"
 
 [functions.season-room-resume]
-enabled = true
+enabled = false  # M2.7 archived in M2.8
 verify_jwt = false
 import_map = "./functions/deno.json"
 entrypoint = "./functions/season-room-resume/index.ts"
 
 [functions.season-room-refetch]
-enabled = true
+enabled = false  # M2.7 archived in M2.8
 verify_jwt = false
 import_map = "./functions/deno.json"
 entrypoint = "./functions/season-room-refetch/index.ts"
 
 [functions.season-room-start-draft]
-enabled = true
+enabled = false  # M2.7 archived in M2.8
 verify_jwt = false
 import_map = "./functions/deno.json"
 entrypoint = "./functions/season-room-start-draft/index.ts"
 
 [functions.season-room-update-settings]
-enabled = true
+enabled = false  # M2.7 archived in M2.8
 verify_jwt = false
 import_map = "./functions/deno.json"
 entrypoint = "./functions/season-room-update-settings/index.ts"
 
 [functions.season-room-set-ready]
-enabled = true
+enabled = false  # M2.7 archived in M2.8
 verify_jwt = false
 import_map = "./functions/deno.json"
 entrypoint = "./functions/season-room-set-ready/index.ts"
 
 [functions.season-room-heartbeat]
-enabled = true
+enabled = false  # M2.7 archived in M2.8
 verify_jwt = false
 import_map = "./functions/deno.json"
 entrypoint = "./functions/season-room-heartbeat/index.ts"
 
 [functions.season-room-leave]
-enabled = true
+enabled = false  # M2.7 archived in M2.8
 verify_jwt = false
 import_map = "./functions/deno.json"
 entrypoint = "./functions/season-room-leave/index.ts"
 
 [functions.season-cron]
-enabled = true
+enabled = false  # M2.7 archived in M2.8
 verify_jwt = false
 import_map = "./functions/deno.json"
 entrypoint = "./functions/season-cron/index.ts"
 schedule = "* * * * *"
+

@@ -76,3 +76,11 @@ export const classic = Object.freeze({
     createClassicChallenge,
 });
 export { projectBaseFive, projectExpectedLedger, expectedStealShare, neutralReference, archetypeReference, archetypeReferences, resolveReference, identifyWeaknesses, weaknessPenalty, ProjectionCache, projectSeasonRoster, projectedQualityWeights, optimizeSeasonRotation, traceRotationNormal, traceRotationClose, rankCandidates, searchRosterRotationCandidates, buildHumanSeasonRoster, SEARCH_LENSES, type ProjectionCacheStats, type RankedCandidate, type SearchLens, type RosterRotationSearchInput, type RosterRotationSearchResult, type HumanRosterBuildInput, type HumanRosterBuildResult, type MinutePlanOptimizationResult, type OptimizedMinutePlan, } from './projection/index.ts';
+export { FIXED_FIVE_SEED_VERSION, fixedFiveParticipantSeed, fixedFiveDraftSeed, fixedFiveFirstPicker, fixedFiveDuelGameSeed, fixedFiveSharedGameSeed, fixedFiveH2HSeed, fixedFiveAutopickSeed, fixedFiveAutopickSeedPath, FIXED_FIVE_TIEBREAK_PATH, fixedFiveTiebreakWinner, } from './modes/fixed-five/seeds.ts';
+export { createSandboxBuilder, applySandboxBuilderCommand, isSandboxBuilderComplete, enumerateSandboxSafeMoves, type FixedFiveCandidate, type SandboxBuilderState, type SandboxBuilderCommand, } from './modes/fixed-five/sandbox-builder.ts';
+export { applyClassicBuilderCommand, createParticipantClassicDraft, type ClassicBuilderCommand, type PoolEligibilityPolicy, } from './modes/fixed-five/classic-reducer.ts';
+export { createDuelDraft, rerollDuel, claimDuelPlayer, duelPicksFor, isDuelComplete, duelAlternationHolds, duelCurrentPicker, type DuelDraftState, type DuelDraftPick, } from './modes/fixed-five/duel.ts';
+export { enumerateClassicSafeMoves, enumerateDuelSafeMoves, chooseAutopick, chooseSandboxAutopicksUntilFull, type AutopickSelection, } from './modes/fixed-five/timeout.ts';
+export { findWeakestOpponent, h2hGameNumbersFor, displayHomeForH2hIndex, simulateShared82, type Shared82SimulationInput, type Shared82SimulationOutput, } from './modes/fixed-five/shared82.ts';
+export { simulateDuelSeries, type DuelSimulationInput, type DuelSimulationOutput, } from './modes/fixed-five/duel-sim.ts';
+export { fixedFiveResultDigest, verifyFixedFiveDigest, canonicalFixedFiveDigestPayload, } from './modes/fixed-five/digest.ts';

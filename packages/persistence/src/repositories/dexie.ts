@@ -5,6 +5,7 @@ import { activeGameRowSchema, activeRunCheckpointSchema, checkpointFromRun, comp
 import type { StoredSeasonDraft } from '../schemas/season-draft-record.ts';
 import type { StoredSeasonAcceptedBlockRow, StoredSeasonActiveRunIndex, StoredSeasonAlmanacRow, StoredSeasonCommandLogRow, StoredSeasonCompletedIndex, StoredSeasonCompletedRunRow, StoredSeasonDetailRow, StoredSeasonPendingBlockRow, StoredSeasonPlayerSliceRow, StoredSeasonPostseasonDetailRow, StoredSeasonPostseasonSummaryRow, StoredSeasonRunRecord, StoredSeasonSummaryRow, } from '../schemas/season-run-record.ts';
 import type { StoredSeasonRoomState } from '../schemas/season-room-state.ts';
+import type { StoredFixedFiveActive, StoredFixedFiveCommandRow, StoredFixedFiveCompleted, StoredFixedFiveHistoryIndex, StoredFixedFivePendingResult } from '../schemas/fixed-five-record.ts';
 const ACTIVE_RECORD_ID = 'active';
 const CLASSIC_DRAFT_RECORD_ID = 'classic-draft';
 const V2_MIGRATED_CHECKPOINT_SAVE_SCHEMA_VERSION = 3;
@@ -59,6 +60,11 @@ export class HoopRushDatabase extends Dexie {
     seasonCompletedIndex!: EntityTable<StoredSeasonCompletedIndex, 'recordId'>;
     seasonRunPlayerSlices!: EntityTable<StoredSeasonPlayerSliceRow, 'runId'>;
     seasonRoomStates!: EntityTable<StoredSeasonRoomState, 'roomId'>;
+    fixedFiveActive!: EntityTable<StoredFixedFiveActive, 'roomId'>;
+    fixedFiveCommands!: Table<StoredFixedFiveCommandRow, [string, number]>;
+    fixedFivePendingResults!: EntityTable<StoredFixedFivePendingResult, 'roomId'>;
+    fixedFiveCompleted!: EntityTable<StoredFixedFiveCompleted, 'roomId'>;
+    fixedFiveHistory!: EntityTable<StoredFixedFiveHistoryIndex, 'recordId'>;
     constructor(name = 'hoop-rush-saves') {
         super(name);
         this.version(1).stores({
@@ -223,6 +229,27 @@ export class HoopRushDatabase extends Dexie {
             seasonCompletedIndex: 'recordId, completedAtIso',
             seasonRunPlayerSlices: 'runId',
             seasonRoomStates: 'roomId',
+        });
+        this.version(14).stores({
+            seasonRuns: 'recordId',
+            seasonRunSummaries: '[runId+gameId], [runId+blockIndex], runId, blockIndex',
+            seasonRunDetails: '[runId+gameId], runId',
+            seasonRunBlocks: '[runId+blockIndex], runId',
+            seasonRunIndex: 'recordId',
+            seasonPendingBlocks: 'runId',
+            seasonPostseasonSummaries: '[runId+gameId], runId',
+            seasonPostseasonDetails: '[runId+gameId], runId',
+            seasonCommandLog: '[runId+ordinal], runId',
+            seasonAlmanacs: 'runId',
+            seasonCompletedRuns: 'runId',
+            seasonCompletedIndex: 'recordId, completedAtIso',
+            seasonRunPlayerSlices: 'runId',
+            seasonRoomStates: 'roomId',
+            fixedFiveActive: 'roomId',
+            fixedFiveCommands: '[roomId+ordinal], roomId',
+            fixedFivePendingResults: 'roomId',
+            fixedFiveCompleted: 'roomId',
+            fixedFiveHistory: 'recordId, completedAtIso',
         });
     }
 }

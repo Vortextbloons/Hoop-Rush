@@ -391,12 +391,20 @@
         </p>
       {/if}
     </div>
-    <a
-      href={resolve('/')}
-      class="shrink-0 font-mono text-xs text-muted-foreground underline-offset-4 hover:underline"
-    >
-      Back
-    </a>
+    <div class="flex shrink-0 items-center gap-3">
+      <a
+        href={resolve('/multiplayer')}
+        class="rounded-lg bg-primary px-3 py-1.5 font-mono text-xs font-bold text-primary-foreground hover:opacity-90"
+      >
+        Play online →
+      </a>
+      <a
+        href={resolve('/')}
+        class="shrink-0 font-mono text-xs text-muted-foreground underline-offset-4 hover:underline"
+      >
+        Back
+      </a>
+    </div>
   </div>
 
   {#if manifestError}
