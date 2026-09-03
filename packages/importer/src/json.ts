@@ -15,25 +15,53 @@ export function writeJson(path: string, value: unknown, newline = false): void {
   const text = JSON.stringify(value, null, 2) + (newline ? '\n' : '');
   writeFileSync(path, text, 'utf8');
 }
+function retrySync<T>(fn: () => T, attempts = 12): T {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return fn();
+    } catch (error) {
+      if (attempt === attempts - 1) throw error;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 200 * (attempt + 1));
+    }
+  }
+  throw new Error('unreachable retrySync');
+}
+
 export function writeJsonRetry(path: string, value: unknown, newline = false): void {
   ensureDir(dirname(path));
   const text = JSON.stringify(value, null, 2) + (newline ? '\n' : '');
-  for (let attempt = 0; attempt < 12; attempt += 1) {
-    try {
-      writeFileSync(path, text, 'utf8');
-      return;
-    } catch (error) {
-      if (attempt === 11) throw error;
-      const wait = 200 * (attempt + 1);
-      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, wait);
-    }
-  }
+  retrySync(() => {
+    writeFileSync(path, text, 'utf8');
+  });
 }
 export function sha256Hex(data: string | Uint8Array): string {
   return createHash('sha256').update(data).digest('hex');
 }
 export function sha256File(path: string): string {
   return sha256Hex(readFileSync(path));
+}
+
+export function sha256FileWithRetry(path: string): string {
+  return retrySync(() => sha256File(path));
+}
+
+export function parseJsonLoose(text: string): unknown {
+  try {
+    return JSON.parse(text) as unknown;
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      return JSON.parse(text.replace(/\bNaN\b(?=\s*[,}\]])/g, 'null')) as unknown;
+    }
+    throw error;
+  }
+}
+
+export function readJsonLoose(path: string): unknown {
+  return parseJsonLoose(readFileSync(path, 'utf8'));
+}
+
+export function readJsonTolerant(path: string): unknown {
+  return readJsonLoose(path);
 }
 export function safeFloat(value: unknown, fallback = 0): number {
   if (value === null || value === undefined || value === '') return fallback;

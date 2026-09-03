@@ -1,5 +1,5 @@
 import { rosterDetailsSchema, type RosterDetails } from '../player-season.ts';
-import { loadJsonAsset } from './load-json.ts';
+import { loadAsset } from './index.ts';
 export function parseRosterDetails(value: unknown): RosterDetails {
   return rosterDetailsSchema.parse(value);
 }
@@ -8,10 +8,5 @@ export function loadRosterDetails(
   expectedHash?: string,
   init?: RequestInit,
 ): Promise<RosterDetails> {
-  return loadJsonAsset(url, {
-    label: 'roster details',
-    expectedHash,
-    parse: parseRosterDetails,
-    init,
-  });
+  return loadAsset(url, rosterDetailsSchema, 'roster details', expectedHash, init);
 }

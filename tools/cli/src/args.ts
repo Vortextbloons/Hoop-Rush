@@ -101,3 +101,7 @@ export function getOptionString(args: ParsedArgs, name: string): string | null {
 export function hasOption(args: ParsedArgs, name: string): boolean {
   return args.options.has(name);
 }
+export function parseOption(args: ParsedArgs, name: string, fallback: string): string {
+  const value = args.options.get(name);
+  return typeof value === 'string' ? value : fallback;
+}

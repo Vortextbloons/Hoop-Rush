@@ -1,5 +1,6 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { sortedJsonFiles } from '../shared/manifest.ts';
 import { PUBLIC_DATA } from '../config.ts';
 import { fileExists, readJson, sha256File, sha256Hex, writeJsonRetry } from '../json.ts';
 import {
@@ -51,15 +52,7 @@ function peakPlayerToRosterDetails(player: ReturnType<typeof parsePool>['players
     stats: player.stats,
   };
 }
-function sortedJsonFiles(dir: string): string[] {
-  try {
-    return readdirSync(dir)
-      .filter((name) => name.endsWith('.json'))
-      .sort();
-  } catch {
-    return [];
-  }
-}
+
 export function rebuildPlayersIndex(
   dataDir = PUBLIC_DATA,
   preloaded?: ReadonlyMap<string, unknown>,

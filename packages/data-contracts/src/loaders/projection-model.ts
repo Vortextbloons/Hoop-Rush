@@ -1,5 +1,5 @@
 import { projectionModelArtifactSchema, type ProjectionModelArtifact } from '../projection.ts';
-import { loadJsonAsset } from './load-json.ts';
+import { loadAsset } from './index.ts';
 export function parseProjectionModelArtifact(value: unknown): ProjectionModelArtifact {
   return projectionModelArtifactSchema.parse(value);
 }
@@ -8,10 +8,5 @@ export function loadProjectionModelArtifact(
   expectedHash?: string,
   init?: RequestInit,
 ): Promise<ProjectionModelArtifact> {
-  return loadJsonAsset(url, {
-    label: 'projection model',
-    expectedHash,
-    parse: parseProjectionModelArtifact,
-    init,
-  });
+  return loadAsset(url, projectionModelArtifactSchema, 'projection model', expectedHash, init);
 }

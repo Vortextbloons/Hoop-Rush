@@ -1,8 +1,7 @@
 import { readFileSync } from 'node:fs';
-import { availableParallelism } from 'node:os';
-import { Worker } from 'node:worker_threads';
 import { DEFAULT_SEASONS, RAW_CACHE, ensureOutputDir } from '../config.ts';
-import { clamp, fileExists, readJson, safeFloat, writeJsonRetry } from '../json.ts';
+import { clamp, fileExists, parseJsonLoose, readJson, safeFloat, writeJsonRetry } from '../json.ts';
+import { chunkList, defaultWorkerCount, runWorker } from '../shared/worker-pool.ts';
 import { join } from 'node:path';
 import { deriveTraits } from './traits.ts';
 import { deriveContract } from './contracts.ts';
@@ -45,16 +44,7 @@ export interface RosterPlayer extends Record<string, unknown> {
     lastUpdated: string;
   };
 }
-export function parseJsonLoose(text: string): unknown {
-  try {
-    return JSON.parse(text) as unknown;
-  } catch (error) {
-    if (error instanceof SyntaxError) {
-      return JSON.parse(text.replace(/\bNaN\b/g, 'null')) as unknown;
-    }
-    throw error;
-  }
-}
+export { parseJsonLoose };
 export function readJsonLoose(path: string): unknown {
   return parseJsonLoose(readFileSync(path, 'utf8'));
 }
@@ -87,15 +77,14 @@ function loadPlayerWinPctMap(season: string): Map<string, number> {
   for (const path of candidates) {
     if (!fileExists(path)) continue;
     try {
-      const data = readJson(path) as unknown;
+      const data = readJson(path);
       const rows: Array<Record<string, unknown>> = Array.isArray((data as { rows?: unknown }).rows)
-        ? ((data as { rows: Array<Record<string, unknown>> }).rows as Array<
-            Record<string, unknown>
-          >)
+        ? (data as { rows: Array<Record<string, unknown>> }).rows
         : Array.isArray(data)
           ? (data as Array<Record<string, unknown>>)
           : [];
       for (const row of rows) {
+        // eslint-disable-next-line @typescript-eslint/no-base-to-string
         const pid = String(row['PLAYER_ID'] ?? row['playerExternalId'] ?? '');
         if (!pid) continue;
         const wPctRaw = row['W_PCT'] ?? row['wPct'] ?? row['winPct'];
@@ -119,7 +108,7 @@ export function estimateTeamWinPctMap(statsList: readonly StatsRow[]): Map<strin
     { weightedBpm: number; totalMinutes: number; perSum: number; perCount: number }
   >();
   for (const s of statsList) {
-    const teamId = typeof s['teamExternalId'] === 'string' ? (s['teamExternalId'] as string) : '';
+    const teamId = typeof s['teamExternalId'] === 'string' ? s['teamExternalId'] : '';
     if (!teamId) continue;
     let bucket = teamBuckets.get(teamId);
     if (!bucket) {
@@ -160,8 +149,7 @@ function teamWinPctForPlayer(
   rosterTeamId: string | null,
   winMap: Map<string, number>,
 ): number | null {
-  const statTeam =
-    typeof stats['teamExternalId'] === 'string' ? (stats['teamExternalId'] as string) : null;
+  const statTeam = typeof stats['teamExternalId'] === 'string' ? stats['teamExternalId'] : null;
   const key = statTeam ?? rosterTeamId;
   if (!key) return null;
   return winMap.get(key) ?? null;
@@ -370,43 +358,13 @@ export function computeForSeason(season: string, force = false): void {
   console.log(`  [OK] computed ratings for ${String(computed)} players in ${season}`);
 }
 export function defaultRatingsWorkers(): number {
-  if (process.env.NODE_ENV === 'test') return 1;
-  return Math.min(8, availableParallelism());
-}
-function chunkList<T>(items: readonly T[], workers: number): T[][] {
-  const count = Math.max(1, Math.trunc(workers));
-  if (count <= 1 || items.length <= 1) {
-    return [[...items]];
-  }
-  const size = Math.ceil(items.length / count);
-  const chunks: T[][] = [];
-  for (let start = 0; start < items.length; start += size) {
-    chunks.push(items.slice(start, start + size));
-  }
-  return chunks;
+  return defaultWorkerCount(8);
 }
 function runRatingsChunk(seasons: readonly string[], force: boolean): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const worker = new Worker(new URL('./ratings-worker.ts', import.meta.url), {
-      workerData: { seasons: [...seasons], force },
-    });
-    let settled = false;
-    worker.once('message', () => {
-      settled = true;
-      void worker.terminate();
-      resolve();
-    });
-    worker.once('error', (error) => {
-      if (settled) return;
-      settled = true;
-      void worker.terminate();
-      reject(error instanceof Error ? error : new Error(String(error)));
-    });
-    worker.once('exit', (code) => {
-      if (settled || code === 0) return;
-      settled = true;
-      reject(new Error(`ratings worker exited with code ${String(code)}`));
-    });
+  // eslint-disable-next-line @typescript-eslint/no-invalid-void-type
+  return runWorker<void>(new URL('./ratings-worker.ts', import.meta.url), {
+    seasons: [...seasons],
+    force,
   });
 }
 export async function run(seasons?: string[], force = false, workers?: number): Promise<void> {

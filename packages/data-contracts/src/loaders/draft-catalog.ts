@@ -1,5 +1,5 @@
 import { seasonDraftCatalogSchema, type SeasonDraftCatalog } from '../season-draft-catalog.ts';
-import { loadJsonAsset } from './load-json.ts';
+import { loadAsset } from './index.ts';
 export function parseSeasonDraftCatalog(value: unknown): SeasonDraftCatalog {
   return seasonDraftCatalogSchema.parse(value);
 }
@@ -8,10 +8,5 @@ export function loadSeasonDraftCatalog(
   expectedHash?: string,
   init?: RequestInit,
 ): Promise<SeasonDraftCatalog> {
-  return loadJsonAsset(url, {
-    label: 'draft catalog',
-    expectedHash,
-    parse: parseSeasonDraftCatalog,
-    init,
-  });
+  return loadAsset(url, seasonDraftCatalogSchema, 'draft catalog', expectedHash, init);
 }

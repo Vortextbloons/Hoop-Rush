@@ -107,18 +107,3 @@ export const completedRunIndexSchema = z.object({
   completedAtIso: z.iso.datetime(),
 });
 export type CompletedRunIndex = z.infer<typeof completedRunIndexSchema>;
-export interface ChallengeRepository {
-  saveActiveRun(record: StoredRunRecord): Promise<void>;
-  appendActiveGame(input: ActiveGameAppend): Promise<void>;
-  loadActiveRun(): Promise<StoredRunRecord | null>;
-  loadActiveRunCheckpoint(): Promise<ActiveRunCheckpoint | null>;
-  clearActiveRun(): Promise<void>;
-  promoteActiveToCompleted(completed: StoredRunRecord, index: CompletedRunIndex): Promise<void>;
-  listCompletedRuns(): Promise<CompletedRunIndex[]>;
-  loadCompletedRun(runId: string): Promise<StoredRunRecord | null>;
-  clearHistory(): Promise<void>;
-  saveClassicDraft(record: StoredClassicDraft): Promise<void>;
-  loadClassicDraft(): Promise<StoredClassicDraft | null>;
-  clearClassicDraft(): Promise<void>;
-  promoteClassicDraftToRun(record: StoredRunRecord, draftId: string): Promise<void>;
-}

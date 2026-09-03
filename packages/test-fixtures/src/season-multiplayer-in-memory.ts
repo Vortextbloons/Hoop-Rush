@@ -1,9 +1,3 @@
-/**
- * @deprecated — import from `@hoop-rush/test-fixtures` instead.
- * Re-export shim retained for one release for backward compatibility.
- * Authoritative implementation now lives in `packages/test-fixtures/src/season-multiplayer-in-memory.ts`.
- * This file will be removed in the next release. New code must import from `@hoop-rush/test-fixtures`.
- */
 /* eslint-disable @typescript-eslint/no-this-alias, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-unnecessary-condition, @typescript-eslint/require-await, @typescript-eslint/no-unused-vars */
 import {
   SEASON_MULTIPLAYER_VERSION,
@@ -11,7 +5,7 @@ import {
   SEASON_ROOM_PROTOCOL_SCHEMA_VERSION,
   SEASON_ROOM_PROTOCOL_SCHEMA_VERSION_V1,
   SEASON_TIMER_POLICY_VERSION,
-} from './season-versions.ts';
+} from '@hoop-rush/data-contracts';
 import type {
   SeasonAcceptedCheckpoint,
   SeasonCheckpointAttestation,
@@ -27,9 +21,9 @@ import type {
   SeasonRoomPublicSnapshot,
   SeasonRoomSettings,
   SeasonMultiplayerTransport,
-} from './season-multiplayer-protocol.ts';
-import { PRESENCE_OFFLINE_AFTER_MS } from './season-multiplayer-protocol.ts';
-import { canonicalJson, seasonDigestHex } from './season-hash.ts';
+} from '@hoop-rush/data-contracts';
+import { PRESENCE_OFFLINE_AFTER_MS } from '@hoop-rush/data-contracts';
+import { canonicalJson, seasonDigestHex } from '@hoop-rush/data-contracts';
 
 type RoomPhase = SeasonRoomPublicSnapshot['phase'];
 
@@ -48,10 +42,9 @@ interface InMemoryRoom {
     string,
     { control: 'human' | 'ai-takeover' | 'surrendered'; missStreak: number }
   >;
-  // v2 additions
   settingsRevision: number;
   guestReady: boolean;
-  presence: Map<string, number>; // participantId -> lastSeenAt ms
+  presence: Map<string, number>;
   commands: SeasonPublicCommandEnvelope[];
   receipts: Map<string, SeasonCommandReceipt>;
   privateDecisions: Map<string, Map<string, SeasonPrivateDecisionSubmission>>;
@@ -120,7 +113,6 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     return `room-${String(this.roomCounter).padStart(8, '0')}`;
   }
 
-  // Presence: heartbeat 5s, offline 30s (6 misses). Same trade-off as edge function: generous for asset loads, still gates Start within 30s.
   private presenceOf(room: InMemoryRoom): SeasonRoomPublicSnapshot['presence'] {
     const now = this.clock();
     const arr: SeasonRoomPublicSnapshot['presence'] = [];
@@ -273,7 +265,6 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     ) {
       throw Object.assign(new Error('invalid-code'), { code: 'invalid-code' });
     }
-    // allow preview even for outdated but mark it
     return this.publicSnapshotOf(room);
   }
 
@@ -294,7 +285,6 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     if (!roomId) throw Object.assign(new Error('invalid-code'), { code: 'invalid-code' });
     const room = this.rooms.get(roomId);
     if (!room || room.code !== code || (room.codeExpiresAt !== null && room.codeExpiresAt <= now)) {
-      // check if code expired but room exists -> code-expired
       if (room && room.codeExpiresAt !== null && room.codeExpiresAt <= now) {
         throw Object.assign(new Error('code-expired'), { code: 'code-expired' });
       }
@@ -337,18 +327,12 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     if (!room) throw Object.assign(new Error('membership'), { code: 'membership' });
     this.assertNotOutdated(room);
     if (room.phase !== 'waiting') throw Object.assign(new Error('phase'), { code: 'phase' });
-    // host-only: require caller is p1; for parity we check presence of p1 but allow if method called from host context.
-    // We enforce by requiring that p1 is member and caller is host – here we assume host caller.
-    // If a test wants to simulate guest calling, it should pass participantId via overloaded helper; we expose alternative check via expectedSettingsRevision misuse?
-    // For now, we don't have caller identity; we will enforce guest cannot call by checking a flag: if expectedSettingsRevision is not undefined and caller is guest, they'd pass wrong revision? Better to add explicit guard for tests via a separate method _updateSettingsAs.
-    // To support authorization test, we check if settings.mode/pace are being updated by guest, we throw if guest tries to bypass readiness? We can't distinguish, so we provide helper.
     if (
       expectedSettingsRevision !== undefined &&
       expectedSettingsRevision !== room.settingsRevision
     ) {
       throw Object.assign(new Error('stale-settings'), { code: 'stale-revision' });
     }
-    // pace applies to all modes; we allow any combination per spec (though Spectrum: Season is live-only historically, now allow pace for all)
     room.settings = {
       schemaVersion: SEASON_ROOM_PROTOCOL_SCHEMA_VERSION,
       pace: settings.pace,
@@ -358,7 +342,7 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
       timerPolicyVersion: SEASON_TIMER_POLICY_VERSION,
     };
     room.settingsRevision += 1;
-    room.guestReady = false; // reset guest readiness whenever host changes mode or pace
+    room.guestReady = false;
     room.digest = digestOf({
       rootSeed: room.rootSeed,
       settings: room.settings,
@@ -368,10 +352,9 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     return this.publicSnapshotOf(room);
   }
 
-  // helper for testing guest authorization: attempt updateSettings as guest should fail
   async _updateSettingsAsGuest(
     roomId: string,
-    settings: { mode: SeasonRoomMode; pace: SeasonRoomPace },
+    _settings: { mode: SeasonRoomMode; pace: SeasonRoomPace },
   ): Promise<SeasonRoomPublicSnapshot> {
     const room = this.rooms.get(roomId);
     if (!room) throw Object.assign(new Error('membership'), { code: 'membership' });
@@ -390,7 +373,6 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     if (room.phase !== 'waiting') throw Object.assign(new Error('phase'), { code: 'phase' });
     if (!room.members.has(participantId))
       throw Object.assign(new Error('membership'), { code: 'membership' });
-    // guest-authorized only: p1 cannot set ready
     if (participantId === 'p1') {
       throw Object.assign(new Error('only guest can set ready'), { code: 'authorization' });
     }
@@ -412,7 +394,6 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     if (!room.members.has(participantId))
       throw Object.assign(new Error('membership'), { code: 'membership' });
     room.presence.set(participantId, this.clock());
-    // no notify needed for heartbeat unless presence flips, but we notify for simplicity
     this.notify(room);
   }
 
@@ -426,7 +407,6 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     room.presence.delete(participantId);
     room.guestReady = false;
     if (room.phase === 'waiting') {
-      // regenerate code if at least one member remains, else keep room but no code?
       if (room.members.size === 1) {
         const newCode = randomCode(this.counter++);
         room.code = newCode;
@@ -449,10 +429,8 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     if (room.members.size !== 2)
       throw Object.assign(new Error('waiting for opponent'), { code: 'phase' });
     if (!room.guestReady) throw Object.assign(new Error('guest not ready'), { code: 'not-ready' });
-    // Refresh host presence before gating (mirrors edge: ensures caller not considered offline)
     const now = this.clock();
     if (room.members.has('p1')) room.presence.set('p1', now);
-    // presence gating: both must be online (within 30s)
     for (const pid of ['p1', 'p2'] as const) {
       const lastSeen = room.presence.get(pid);
       if (lastSeen === undefined || now - lastSeen > PRESENCE_OFFLINE_AFTER_MS) {
@@ -460,12 +438,10 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
       }
     }
     room.phase = 'drafting';
-    // keep seed and settingsRevision as start event; we already store them
     this.notify(room);
     return this.publicSnapshotOf(room);
   }
 
-  // optional startDraft with actor check for guest auth test
   async _startDraftAs(
     roomId: string,
     participantId: 'p1' | 'p2',
@@ -483,8 +459,6 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     const snap = this.publicSnapshotOf(room) as SeasonRoomPublicSnapshot & {
       membership?: SeasonRoomMembership;
     };
-    // retain private membership: try to find any member for this transport instance; for in-memory we return host if exists else first
-    // In real usage, coordinator will have stored membership; we mimic by returning first membership if present
     const anyMember = room.members.get('p1') ?? room.members.get('p2') ?? null;
     if (anyMember) snap.membership = anyMember;
     return snap;
@@ -686,7 +660,6 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     if (!room) throw Object.assign(new Error('membership'), { code: 'membership' });
     this.assertNotOutdated(room);
     if (room.phase !== 'waiting') throw Object.assign(new Error('phase'), { code: 'phase' });
-    // only host can remove guest – we assume caller is host; if trying to remove host as guest, would be auth error. For now allow only removing p2.
     if (targetParticipantId === 'p1') {
       throw Object.assign(new Error('cannot remove host'), { code: 'authorization' });
     }
@@ -709,7 +682,6 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     this.rooms.delete(roomId);
   }
 
-  // test helpers
   getRoom(roomId: string): InMemoryRoom | undefined {
     return this.rooms.get(roomId);
   }
@@ -718,7 +690,6 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     return this.rooms.get(roomId)?.code ?? null;
   }
 
-  // inject an outdated v1 room for testing v1 rejection
   injectOutdatedRoom(
     roomId: string,
     settings: Partial<SeasonRoomSettings> = {},

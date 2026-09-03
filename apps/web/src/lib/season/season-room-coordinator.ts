@@ -1,4 +1,4 @@
-import { InMemorySeasonMultiplayerTransport } from '@hoop-rush/data-contracts';
+import { InMemorySeasonMultiplayerTransport } from '@hoop-rush/test-fixtures';
 import type {
   SeasonMultiplayerTransport,
   SeasonRoomPublicSnapshot,

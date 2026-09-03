@@ -28,6 +28,7 @@ export * from './loaders/draft-catalog.ts';
 export * from './loaders/projection-model.ts';
 export { sha256Hex, verifySha256 } from './loaders/verify-hash.ts';
 export { loadJsonAsset, type LoadJsonAssetOptions } from './loaders/load-json.ts';
+export { loadAsset } from './loaders/index.ts';
 export * from './ratings-model.ts';
 export * from './three-point-reconstruction.ts';
 export * from './contextual-value.ts';

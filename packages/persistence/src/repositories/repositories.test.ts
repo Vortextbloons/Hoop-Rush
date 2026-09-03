@@ -8,14 +8,9 @@ import {
   buildCompletedDraftState,
 } from '@hoop-rush/test-fixtures';
 import type { GameResult, RunAggregates } from '@hoop-rush/data-contracts';
-import { DexieChallengeRepository } from './dexie.ts';
+import { DexieChallengeRepository, type ChallengeRepository } from './dexie.ts';
 import type { StoredClassicDraft } from '../schemas/classic-draft-record.ts';
-import type {
-  ActiveGameAppend,
-  ChallengeRepository,
-  CompletedRunIndex,
-  StoredRunRecord,
-} from '../schemas/run-record.ts';
+import type { ActiveGameAppend, CompletedRunIndex, StoredRunRecord } from '../schemas/run-record.ts';
 import {
   TestDatabase,
   resetIndexedDb,

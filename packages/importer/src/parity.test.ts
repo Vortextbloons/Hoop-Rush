@@ -32,6 +32,7 @@ const PARAM_KEYS = [
   'assistRate',
   'foulsPerPossession',
 ] as const;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function topFive(players: CommittedPoolPlayer[]): string[] {
   return [...players]
     .sort((a, b) => b.selectionScore - a.selectionScore)

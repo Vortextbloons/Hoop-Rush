@@ -18,7 +18,6 @@ import {
   type ActiveGameAppend,
   type ActiveRunCheckpoint,
   type ActiveGameRow,
-  type ChallengeRepository,
   type CompletedRunIndex,
   type StoredRunRecord,
 } from '../schemas/run-record.ts';
@@ -74,8 +73,8 @@ export class HoopRushDatabase extends Dexie {
   seasonCompletedIndex!: EntityTable<StoredSeasonCompletedIndex, 'recordId'>;
   seasonRunPlayerSlices!: EntityTable<StoredSeasonPlayerSliceRow, 'runId'>;
   seasonRoomStates!: EntityTable<StoredSeasonRoomState, 'roomId'>;
-  constructor() {
-    super('hoop-rush-saves');
+  constructor(name = 'hoop-rush-saves') {
+    super(name);
     this.version(1).stores({
       active: 'recordId',
       completed: 'recordId',
@@ -242,7 +241,7 @@ export class HoopRushDatabase extends Dexie {
     });
   }
 }
-export class DexieChallengeRepository implements ChallengeRepository {
+export class DexieChallengeRepository {
   private readonly db: HoopRushDatabase;
   constructor(db: HoopRushDatabase = new HoopRushDatabase()) {
     this.db = db;
@@ -418,3 +417,6 @@ export class DexieChallengeRepository implements ChallengeRepository {
     );
   }
 }
+// Compatibility alias – new code should use DexieChallengeRepository directly.
+// Keeps `import { ChallengeRepository } from '@hoop-rush/persistence'` working for 1 release.
+export type ChallengeRepository = DexieChallengeRepository;

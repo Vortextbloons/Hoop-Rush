@@ -1038,3 +1038,4 @@ export function buildOpeningOpponent(overrides: Partial<OpponentTeam> = {}): Opp
 export * from './classic.ts';
 export * from './season.ts';
 export * from './season-draft.ts';
+export * from './season-multiplayer-in-memory.ts';

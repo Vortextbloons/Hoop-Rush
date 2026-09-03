@@ -1,10 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import {
-  InMemorySeasonMultiplayerTransport,
-  canonicalJson,
-  seasonDigestHex,
-} from '@hoop-rush/data-contracts';
+import { canonicalJson, seasonDigestHex } from '@hoop-rush/data-contracts';
+import { InMemorySeasonMultiplayerTransport } from '@hoop-rush/test-fixtures';
 import type {
   SeasonPrivateDecisionSubmission,
   SeasonCheckpointAttestation,

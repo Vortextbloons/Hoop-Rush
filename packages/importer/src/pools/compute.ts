@@ -1,7 +1,5 @@
-import { readdirSync, readFileSync } from 'node:fs';
-import { availableParallelism } from 'node:os';
+import { readdirSync } from 'node:fs';
 import { basename, join } from 'node:path';
-import { Worker } from 'node:worker_threads';
 import { parsePool } from '@hoop-rush/data-contracts';
 import {
   COHORT_NORMALIZATION_VERSION,
@@ -24,15 +22,18 @@ import { playableSlotGroups } from '@hoop-rush/data-contracts';
 import { NBA_ROOT, PUBLIC_DATA, RAW_CACHE } from '../config.ts';
 import { refreshPlayersIndexInManifest } from '../manifest/index.ts';
 import {
-  fileExists,
-  safeFloat,
-  safeInt,
-  sha256File,
-  writeJson,
-  writeJsonRetry,
   clamp,
   clampUnitInterval,
+  fileExists,
+  readJsonLoose,
+  safeFloat,
+  safeInt,
+  sha256FileWithRetry,
+  writeJson,
+  writeJsonRetry,
 } from '../json.ts';
+import { defaultWorkerCount, runWorker } from '../shared/worker-pool.ts';
+import { sortedJsonFiles } from '../shared/manifest.ts';
 import { buildPlayerPositions } from './positions.ts';
 import { positionOverrideFor } from '../positions/overrides.ts';
 import { canonicalPlayerName } from '../identity.ts';
@@ -46,17 +47,7 @@ import {
   firstSupportedSeason,
   resolveHistoricalIdentity,
 } from '../lineage.ts';
-function readJsonLoose(path: string): unknown {
-  const text = readFileSync(path, 'utf8');
-  try {
-    return JSON.parse(text) as unknown;
-  } catch (error) {
-    if (error instanceof SyntaxError) {
-      return JSON.parse(text.replace(/\bNaN\b(?=\s*[,}\]])/g, 'null')) as unknown;
-    }
-    throw error;
-  }
-}
+
 function str(value: unknown): string {
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
     return String(value);
@@ -271,18 +262,9 @@ function loadFallbackRosterPlayers(): Map<string, Record<string, unknown>> {
   fallbackRosterCache = byPlayer;
   return byPlayer;
 }
-function sortedJsonFiles(dir: string): string[] {
-  try {
-    return readdirSync(dir)
-      .filter((name) => name.endsWith('.json'))
-      .sort();
-  } catch {
-    return [];
-  }
-}
+
 export function defaultPoolWorkers(): number {
-  if (process.env.NODE_ENV === 'test') return 1;
-  return Math.min(7, availableParallelism());
+  return defaultWorkerCount(7);
 }
 export interface PoolWorkerResult {
   results: TargetBuildResult[];
@@ -339,36 +321,15 @@ function runPoolChunk(
   careerLabels: Map<string, Set<string>>,
   withAssets: boolean,
 ): Promise<PoolWorkerResult> {
-  return new Promise((resolve, reject) => {
-    const worker = new Worker(new URL('./pool-worker.ts', import.meta.url), {
-      workerData: {
-        targets: chunk,
-        manifest,
-        bbrefIds,
-        careerLabels: [...careerLabels.entries()].map(
-          ([pid, labels]) => [pid, [...labels]] as [string, string[]],
-        ),
-        withAssets,
-      } satisfies PoolWorkerData,
-    });
-    let settled = false;
-    worker.once('message', (result: PoolWorkerResult) => {
-      settled = true;
-      void worker.terminate();
-      resolve(result);
-    });
-    worker.once('error', (error) => {
-      if (settled) return;
-      settled = true;
-      void worker.terminate();
-      reject(error instanceof Error ? error : new Error(String(error)));
-    });
-    worker.once('exit', (code) => {
-      if (settled || code === 0) return;
-      settled = true;
-      reject(new Error(`pool worker exited with code ${String(code)}`));
-    });
-  });
+  return runWorker<PoolWorkerResult>(new URL('./pool-worker.ts', import.meta.url), {
+    targets: chunk,
+    manifest,
+    bbrefIds,
+    careerLabels: [...careerLabels.entries()].map(
+      ([pid, labels]) => [pid, [...labels]] as [string, string[]],
+    ),
+    withAssets,
+  } satisfies PoolWorkerData);
 }
 function num(row: Record<string, unknown>, key: string, fallback = 0): number {
   return safeFloat(row[key], fallback);
@@ -631,7 +592,6 @@ export function normalizePoolOveralls(rows: PoolOverallRow[]): PoolOverallDiagno
   // Era-adjusted blending to reduce cross-era inflation (2020s vs 1960s).
   // Keep global hierarchy but blend 65% global percentile with 35% era percentile.
   const eraCounts = new Map<string, number>();
-  const eraRank = new Map<string, number>();
   for (const row of rows) {
     const eraId = (row as unknown as { eraId?: string }).eraId ?? 'unknown';
     eraCounts.set(eraId, (eraCounts.get(eraId) ?? 0) + 1);
@@ -1237,17 +1197,7 @@ export function logPoolValidation(pool: Pool): void {
 export function writePool(pool: Pool): string {
   const path = join(poolDir(), `${pool.franchiseId}-${pool.eraId}.json`);
   writeJsonRetry(path, pool);
-  let digest = '';
-  for (let attempt = 0; attempt < 12; attempt += 1) {
-    try {
-      digest = sha256File(path);
-      break;
-    } catch (error) {
-      if (attempt === 11) throw error;
-      const wait = 200 * (attempt + 1);
-      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, wait);
-    }
-  }
+  const digest = sha256FileWithRetry(path);
   console.log(
     `  [OK] wrote ${basename(path)} (${String(pool.players.length)} players, ${digest.slice(0, 12)}...)`,
   );
