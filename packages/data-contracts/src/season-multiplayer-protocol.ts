@@ -80,6 +80,25 @@ export const seasonRoomPublicSnapshotSchema = z.object({
   ),
   seed: seedSchema.nullable(),
   isOutdated: z.boolean().optional(),
+  // live lock/attestation summary for auto-refresh without manual reload
+  locks: z
+    .object({
+      p1Locked: z.boolean(),
+      p2Locked: z.boolean(),
+      revealed: z.boolean(),
+      cursor: z.string().min(1).max(64),
+    })
+    .optional(),
+  attestationSummary: z
+    .object({
+      cursor: z.string().min(1).max(64),
+      attempt: z.number().int().min(1).max(3),
+      count: z.number().int().min(0).max(2),
+      verified: z.boolean().nullable(),
+      inputDigest: seasonCheckpointDigestSchema.nullable().optional(),
+      resultDigest: seasonCheckpointDigestSchema.nullable().optional(),
+    })
+    .optional(),
 });
 export type SeasonRoomPublicSnapshot = z.infer<typeof seasonRoomPublicSnapshotSchema>;
 

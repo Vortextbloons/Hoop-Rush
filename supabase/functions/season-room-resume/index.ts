@@ -86,12 +86,26 @@ Deno.serve(async (req: Request) => {
           .order('ordinal', { ascending: true })
           .limit(1000)
       : null;
+  // locks + attestations for current cursor (auto-refresh without manual reload)
+  const locksPromise = sc
+    .from('season_private_decisions')
+    .select('participant_id, revealed, cursor')
+    .eq('room_id', roomId)
+    .eq('cursor', (room as unknown as { cursor?: string }).cursor ?? room.cursor ?? '');
+  const attestPromise = sc
+    .from('season_checkpoint_attestations')
+    .select('participant_id, attempt, input_digest, result_digest')
+    .eq('room_id', roomId)
+    .eq('cursor', (room as unknown as { cursor?: string }).cursor ?? room.cursor ?? '');
 
-  const [{ count }, { data: allMembers }, commandsResult] = await Promise.all([
-    countPromise,
-    membersPromise,
-    commandsPromise ?? Promise.resolve({ data: null } as unknown as { data: unknown }),
-  ]);
+  const [{ count }, { data: allMembers }, commandsResult, { data: locksRows }, { data: attestRows }] =
+    await Promise.all([
+      countPromise,
+      membersPromise,
+      commandsPromise ?? Promise.resolve({ data: null } as unknown as { data: unknown }),
+      locksPromise,
+      attestPromise,
+    ]);
   // ensure heartbeat settled (already fire-and-forget)
   await heartbeat.catch(() => {});
 
@@ -148,6 +162,40 @@ Deno.serve(async (req: Request) => {
       (room as unknown as { room_protocol_version?: number | string }).room_protocol_version,
     ) !== 2;
 
+  const locks = (() => {
+    const rows = (locksRows ?? []) as Array<{ participant_id: string; revealed?: boolean; cursor: string }>;
+    const p1 = rows.some((r) => r.participant_id === 'p1');
+    const p2 = rows.some((r) => r.participant_id === 'p2');
+    const revealed = rows.length > 0 ? rows.every((r) => r.revealed === true) || rows.length === 2 : false;
+    const cursor = (room as unknown as { cursor?: string }).cursor ?? room.cursor ?? '';
+    if (!p1 && !p2) return undefined;
+    return { p1Locked: p1, p2Locked: p2, revealed, cursor };
+  })();
+  const attestationSummary = (() => {
+    const rows = (attestRows ?? []) as Array<{
+      participant_id: string;
+      attempt: number;
+      input_digest: string | null;
+      result_digest: string | null;
+    }>;
+    if (rows.length === 0) return undefined;
+    const attempt = Math.max(...rows.map((r) => r.attempt ?? 1));
+    const attemptRows = rows.filter((r) => r.attempt === attempt);
+    const verified =
+      attemptRows.length === 2 && attemptRows[0]!.input_digest && attemptRows[0]!.result_digest
+        ? attemptRows[0]!.input_digest === attemptRows[1]!.input_digest &&
+          attemptRows[0]!.result_digest === attemptRows[1]!.result_digest
+        : null;
+    return {
+      cursor: (room as unknown as { cursor?: string }).cursor ?? room.cursor ?? '',
+      attempt,
+      count: attemptRows.length,
+      verified,
+      inputDigest: attemptRows[0]?.input_digest ?? null,
+      resultDigest: attemptRows[0]?.result_digest ?? null,
+    };
+  })();
+
   const snap = {
     roomId: room.id,
     settings: {
@@ -174,6 +222,8 @@ Deno.serve(async (req: Request) => {
     presence,
     seed: (room as unknown as { root_seed?: string }).root_seed ?? null,
     isOutdated: isOutdated || undefined,
+    locks,
+    attestationSummary,
   };
 
   const membership = {

@@ -163,6 +163,8 @@ function toPublicSnapshot(
     seed?: string | null;
     presence?: Array<{ participantId: 'p1' | 'p2'; online: boolean; lastSeenAt: string }> | null;
     members?: Array<{ participant_id: string; last_seen_at?: string | null }>;
+    locks?: SeasonRoomPublicSnapshot['locks'];
+    attestationSummary?: SeasonRoomPublicSnapshot['attestationSummary'];
   },
   memberCount = 0,
 ): SeasonRoomPublicSnapshot {
@@ -210,6 +212,8 @@ function toPublicSnapshot(
     presence,
     seed: seed,
     isOutdated: isOutdated || undefined,
+    locks: row.locks,
+    attestationSummary: row.attestationSummary,
   };
 }
 
@@ -442,7 +446,10 @@ export function createSupabaseSeasonTransport(
       let closed = false;
       let channel: ReturnType<SupabaseClient['channel']> | null = null;
       let pollTimer: ReturnType<typeof setInterval> | null = null;
+      let backgroundPollTimer: ReturnType<typeof setInterval> | null = null;
+      let lastSnap: SeasonRoomPublicSnapshot | null = null;
       // Trade-off: poll 5s is fallback only when realtime fails. Heartbeat 5s / offline 30s gives 6 missed beats before disconnected. Reducing poll grace to 1s improves Ready/start visibility without increasing overall poll frequency.
+      // Background poll runs even when SUBSCRIBED to cover presence/locks that haven't bumped rooms yet (1/2 lock, heartbeat offline). Drafting/waiting uses 5s for snappy presence; other phases 10s.
 
       function envelopeFromRealtimeRow(
         row: Record<string, unknown>,
@@ -512,11 +519,121 @@ export function createSupabaseSeasonTransport(
               if (c && typeof c.ordinal === 'number') cacheEnvelope(c as SeasonPublicCommandEnvelope);
             }
           }
+          if (res.snapshot) lastSnap = res.snapshot;
           return res.snapshot;
         } catch {
           return null;
         }
       };
+
+      function synthesizeRoomsSnapshot(
+        row: Record<string, unknown>,
+      ): SeasonRoomPublicSnapshot | null {
+        try {
+          // minimal validation: must look like season_rooms row
+          if (typeof row.id !== 'string' || typeof row.phase !== 'string') return null;
+          // Try to use toPublicSnapshot with row; memberCount/presence fallback to lastSnap
+          const mc = lastSnap?.memberCount ?? 0;
+          const snap = toPublicSnapshot(
+            {
+              id: row.id as string,
+              pace: (row.pace as string) ?? lastSnap?.settings.pace ?? 'live',
+              mode: (row.mode as string) ?? (lastSnap?.mode as string) ?? 'season',
+              room_protocol_version: (row.room_protocol_version as number) ?? (lastSnap?.settings.roomProtocolVersion as number) ?? 2,
+              multiplayer_version: (row.multiplayer_version as string) ?? (lastSnap?.settings.multiplayerVersion as string) ?? 'season-multiplayer-v2',
+              timer_policy_version: (row.timer_policy_version as string) ?? (lastSnap?.settings.timerPolicyVersion as string) ?? 'season-timers-v1',
+              phase: row.phase as string,
+              cursor: (row.cursor as string) ?? (lastSnap?.cursor as string) ?? 'draft-0',
+              revision: (row.revision as number) ?? (lastSnap?.revision as number) ?? 0,
+              digest: (row.digest as string) ?? (lastSnap?.digest as string) ?? lastSnap?.digest ?? '0'.repeat(64),
+              code: (row.code as string | null) ?? null,
+              code_expires_at: (row.code_expires_at as string | null) ?? (lastSnap?.expiresAt as string | null) ?? null,
+              guest_ready: (row.guest_ready as boolean | null) ?? (lastSnap?.guestReady as boolean) ?? false,
+              settings_revision: (row.settings_revision as number | null) ?? (lastSnap?.settingsRevision as number) ?? 0,
+              root_seed: (row.root_seed as string | null) ?? (lastSnap?.seed as string | null) ?? null,
+              seed: (row.seed as string | null) ?? (lastSnap?.seed as string | null) ?? null,
+              presence: lastSnap?.presence ?? undefined,
+              locks: (row as unknown as { locks?: SeasonRoomPublicSnapshot['locks'] }).locks ?? lastSnap?.locks,
+              attestationSummary: (row as unknown as { attestationSummary?: SeasonRoomPublicSnapshot['attestationSummary'] }).attestationSummary ?? lastSnap?.attestationSummary,
+            },
+            mc,
+          );
+          // patch presence/locks from lastSnap if missing (optimistic)
+          if (!row.presence && lastSnap?.presence) snap.presence = lastSnap.presence;
+          if (!snap.locks && lastSnap?.locks) snap.locks = lastSnap.locks;
+          if (!snap.attestationSummary && lastSnap?.attestationSummary) snap.attestationSummary = lastSnap.attestationSummary;
+          // ensure mode/pace from lastSnap if row missing
+          return snap;
+        } catch {
+          return null;
+        }
+      }
+
+      function patchLocksFromDecision(
+        row: Record<string, unknown>,
+      ): SeasonRoomPublicSnapshot | null {
+        if (!lastSnap) return null;
+        const pid = (row.participant_id ?? row.participantId) as string | undefined;
+        const cursor = (row.cursor as string) ?? lastSnap.cursor;
+        if (pid !== 'p1' && pid !== 'p2') return null;
+        const existing = lastSnap.locks;
+        const p1Locked = existing?.p1Locked || pid === 'p1';
+        const p2Locked = existing?.p2Locked || pid === 'p2';
+        // if already both locked, keep revealed true
+        const revealed = p1Locked && p2Locked ? true : (existing?.revealed ?? false);
+        const next: SeasonRoomPublicSnapshot = {
+          ...lastSnap,
+          revision: (lastSnap.revision ?? 0) + 1,
+          locks: { p1Locked, p2Locked, revealed, cursor },
+        };
+        // also patch phase optimistically if both locked
+        if (p1Locked && p2Locked && lastSnap.phase !== 'simulation') {
+          next.phase = 'simulation';
+        }
+        lastSnap = next;
+        return next;
+      }
+
+      function patchAttestationFromRow(
+        row: Record<string, unknown>,
+      ): SeasonRoomPublicSnapshot | null {
+        if (!lastSnap) return null;
+        const attempt = (row.attempt as number) ?? 1;
+        const pid = (row.participant_id ?? row.participantId) as string | undefined;
+        if (pid !== 'p1' && pid !== 'p2') return null;
+        const prev = lastSnap.attestationSummary;
+        const cursor = (row.cursor as string) ?? lastSnap.cursor;
+        let nextSummary: SeasonRoomPublicSnapshot['attestationSummary'];
+        if (!prev || prev.cursor !== cursor || prev.attempt !== attempt) {
+          nextSummary = {
+            cursor,
+            attempt,
+            count: 1,
+            verified: null,
+            inputDigest: (row.input_digest as string) ?? null,
+            resultDigest: (row.result_digest as string) ?? null,
+          };
+        } else {
+          // second attest for same cursor+attempt
+          const count = 2;
+          const aDigest = prev.inputDigest;
+          const bDigest = (row.input_digest as string) ?? null;
+          const aRes = prev.resultDigest;
+          const bRes = (row.result_digest as string) ?? null;
+          const verified = aDigest && bDigest && aRes && bRes ? aDigest === bDigest && aRes === bRes : null;
+          nextSummary = {
+            cursor,
+            attempt,
+            count,
+            verified,
+            inputDigest: prev.inputDigest,
+            resultDigest: prev.resultDigest,
+          };
+        }
+        const next: SeasonRoomPublicSnapshot = { ...lastSnap, attestationSummary: nextSummary, revision: (lastSnap.revision ?? 0) + 1 };
+        lastSnap = next;
+        return next;
+      }
 
       const coalescedFetchSnap = async (): Promise<SeasonRoomPublicSnapshot | null> => {
         const existing = inflightSnapByRoom.get(roomId);
@@ -558,6 +675,38 @@ export function createSupabaseSeasonTransport(
             }
           }, 5000); // polls only when realtime not SUBSCRIBED; deduped via realtimeOk guard + in-flight check
         };
+        const startBackgroundPoll = () => {
+          if (backgroundPollTimer || closed) return;
+          let bgInFlight = false;
+          const intervalMs = (() => {
+            const phase = lastSnap?.phase;
+            if (phase === 'waiting' || phase === 'drafting') return 5_000;
+            return 10_000;
+          })();
+          backgroundPollTimer = setInterval(async () => {
+            if (closed || bgInFlight) return;
+            bgInFlight = true;
+            try {
+              const snap = await fetchSnap();
+              if (snap && !closed) handler(snap);
+            } finally {
+              bgInFlight = false;
+            }
+          }, intervalMs);
+        };
+        const restartBackgroundPoll = () => {
+          if (backgroundPollTimer) {
+            clearInterval(backgroundPollTimer);
+            backgroundPollTimer = null;
+          }
+          startBackgroundPoll();
+        };
+        const stopBackgroundPoll = () => {
+          if (backgroundPollTimer) {
+            clearInterval(backgroundPollTimer);
+            backgroundPollTimer = null;
+          }
+        };
         try {
           channel = client
             .channel(`season-room-${roomId}`)
@@ -566,10 +715,23 @@ export function createSupabaseSeasonTransport(
               { event: '*', schema: 'public', table: 'season_rooms', filter: `id=eq.${roomId}` },
               (payload: unknown) => {
                 void (async () => {
-                  // payload.new is validated but snapshot still needs presence/memberCount (joins), so use coalesced fetch
-                  void payload;
+                  // optimistic: synthesize snapshot from payload.new for instant UI, then reconcile with authoritative fetch
+                  try {
+                    const p = payload as { new?: Record<string, unknown> } | null;
+                    const row = p?.new as Record<string, unknown> | undefined;
+                    if (row) {
+                      const optimistic = synthesizeRoomsSnapshot(row);
+                      if (optimistic && !closed) {
+                        lastSnap = optimistic;
+                        handler(optimistic);
+                      }
+                    }
+                  } catch {}
                   const snap = await coalescedFetchSnap();
-                  if (snap && !closed) handler(snap);
+                  if (snap && !closed) {
+                    handler(snap);
+                    restartBackgroundPoll();
+                  }
                 })();
               },
             )
@@ -583,6 +745,7 @@ export function createSupabaseSeasonTransport(
               },
               (payload: unknown) => {
                 void (async () => {
+                  let cachedEnv: SeasonPublicCommandEnvelope | null = null;
                   try {
                     const p = payload as {
                       new?: Record<string, unknown>;
@@ -591,11 +754,70 @@ export function createSupabaseSeasonTransport(
                     const row = p?.new as Record<string, unknown> | undefined;
                     if (row && typeof row.ordinal === 'number') {
                       const env = envelopeFromRealtimeRow(row);
-                      if (env && Number.isFinite(env.ordinal)) cacheEnvelope(env);
+                      if (env && Number.isFinite(env.ordinal)) {
+                        cacheEnvelope(env);
+                        cachedEnv = env;
+                      }
                     }
                   } catch {
                     /* ignore payload parse errors, fallback to fetch */
                   }
+                  // if we have lastSnap, bump revision optimistically so UI knows something changed
+                  if (cachedEnv && lastSnap && !closed) {
+                    const optimisticSnap: SeasonRoomPublicSnapshot = {
+                      ...lastSnap,
+                      revision: (lastSnap.revision ?? 0) + 1,
+                    };
+                    lastSnap = optimisticSnap;
+                    // still notify with snapshot (even if revision bump only) so coordinator triggers refetch cache-hit
+                    handler(optimisticSnap);
+                  }
+                  const snap = await coalescedFetchSnap();
+                  if (snap && !closed) handler(snap);
+                })();
+              },
+            )
+            .on(
+              'postgres_changes',
+              {
+                event: '*',
+                schema: 'public',
+                table: 'season_private_decisions',
+                filter: `room_id=eq.${roomId}`,
+              },
+              (payload: unknown) => {
+                void (async () => {
+                  try {
+                    const p = payload as { new?: Record<string, unknown> } | null;
+                    const row = p?.new as Record<string, unknown> | undefined;
+                    if (row) {
+                      const optimistic = patchLocksFromDecision(row);
+                      if (optimistic && !closed) handler(optimistic);
+                    }
+                  } catch {}
+                  const snap = await coalescedFetchSnap();
+                  if (snap && !closed) handler(snap);
+                })();
+              },
+            )
+            .on(
+              'postgres_changes',
+              {
+                event: '*',
+                schema: 'public',
+                table: 'season_checkpoint_attestations',
+                filter: `room_id=eq.${roomId}`,
+              },
+              (payload: unknown) => {
+                void (async () => {
+                  try {
+                    const p = payload as { new?: Record<string, unknown> } | null;
+                    const row = p?.new as Record<string, unknown> | undefined;
+                    if (row) {
+                      const optimistic = patchAttestationFromRow(row);
+                      if (optimistic && !closed) handler(optimistic);
+                    }
+                  } catch {}
                   const snap = await coalescedFetchSnap();
                   if (snap && !closed) handler(snap);
                 })();
@@ -608,21 +830,33 @@ export function createSupabaseSeasonTransport(
                   clearInterval(pollTimer);
                   pollTimer = null;
                 }
+                restartBackgroundPoll();
               } else if (
                 status === 'CHANNEL_ERROR' ||
                 status === 'TIMED_OUT' ||
                 status === 'CLOSED'
               ) {
                 realtimeOk = false;
+                stopBackgroundPoll();
                 startPoll();
               }
             });
+          // also start background poll optimistically; SUBSCRIBED will dedup
+          startBackgroundPoll();
         } catch {
           startPoll();
+          startBackgroundPoll();
         }
         setTimeout(() => {
           if (!closed && !realtimeOk) startPoll();
         }, 1000); // reduced from 3000 to reduce snapshot staleness before fallback poll
+
+        // seed lastSnap with an initial fetch so optimistic patches have base
+        void fetchSnap()
+          .then((s) => {
+            if (s && !closed) handler(s);
+          })
+          .catch(() => {});
       };
 
       void start();
@@ -632,6 +866,7 @@ export function createSupabaseSeasonTransport(
           closed = true;
           if (channel) void client.removeChannel(channel);
           if (pollTimer) clearInterval(pollTimer);
+          if (backgroundPollTimer) clearInterval(backgroundPollTimer);
         },
       };
     },

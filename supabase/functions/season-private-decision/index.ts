@@ -126,7 +126,17 @@ Deno.serve(async (req: Request) => {
       .eq('cursor', sub.cursor);
     await serviceClient
       .from('season_rooms')
-      .update({ phase: 'simulation', updated_at: new Date().toISOString() })
+      .update({
+        phase: 'simulation',
+        revision: (room.revision ?? 0) + 1,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', sub.roomId);
+  } else {
+    // bump rooms.revision so live Realtime notifies peer of 1/2 lock without revealing payload
+    await serviceClient
+      .from('season_rooms')
+      .update({ revision: (room.revision ?? 0) + 1, updated_at: new Date().toISOString() })
       .eq('id', sub.roomId);
   }
   return json(200, { locked });

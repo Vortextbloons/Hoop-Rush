@@ -28,6 +28,7 @@
     deriveGameplayState,
     type MultiplayerGameplayState,
   } from '$lib/season/season-gameplay-state';
+  import type { GameplayBootstrapResult } from '$lib/season/season-gameplay-bootstrap';
   import type {
     SeasonRoomPublicSnapshot,
     SeasonRoomMembership,
@@ -91,6 +92,9 @@
     return FRANCHISE_DISPLAY[id] ?? id.charAt(0).toUpperCase() + id.slice(1);
   }
 
+  // keep bootstrap result so live snap can re-derive gameplay without re-bootstrapping
+  let latestBootstrap: GameplayBootstrapResult | null = null;
+
   function getCoordinator() {
     const useSupabase = isSupabaseConfigured();
     transport = useSupabase
@@ -108,8 +112,35 @@
       commandCursor: () => controller?.getLastOrdinal() ?? -1,
       onSnapshot: (s) => {
         snap = s;
+        // live re-derive gameplay so locks/phase/attestation auto-refresh without manual Refresh
+        if (draftState && generation && latestBootstrap) {
+          gameplay = deriveGameplayState(draftState, generation, latestBootstrap, s);
+          phase = gameplay.phase;
+        } else if (draftState && generation) {
+          // bootstrap not yet done: try to re-derive when snap arrives early
+          try {
+            gameplay = deriveGameplayState(draftState, generation, latestBootstrap, s);
+            phase = gameplay?.phase ?? phase;
+          } catch {}
+        }
       },
-      onCommands: () => {},
+      onCommands: async (cmds) => {
+        if (!controller) return;
+        try {
+          const state = await controller.applyIncomingCommands(cmds);
+          if (state) {
+            draftState = state as SeasonDraftState;
+            generation = controller.getGeneration();
+            if (draftState && generation && latestBootstrap) {
+              gameplay = deriveGameplayState(draftState, generation, latestBootstrap, snap);
+              phase = gameplay.phase;
+            } else if (draftState && generation) {
+              // generation newly available via command stream — bootstrap incrementally
+              await bootstrapRun();
+            }
+          }
+        } catch {}
+      },
     });
   }
 
@@ -205,8 +236,9 @@
     try {
       const gt = createGameplayTransport();
       const result = await gt.loadBootstrap(roomId, getTransport(), draftState, generation);
+      latestBootstrap = result;
       run = result.run;
-      gameplay = deriveGameplayState(draftState, generation, result);
+      gameplay = deriveGameplayState(draftState, generation, result, snap);
       phase = gameplay.phase;
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);

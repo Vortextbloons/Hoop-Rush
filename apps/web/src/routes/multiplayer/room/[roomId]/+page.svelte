@@ -219,6 +219,39 @@
     }
   }
 
+  function warmDraftAssetsFireAndForget() {
+    // Pre-warm 17MB draft catalog while user waits in lobby so P2 draft load is cache-hit
+    // Do not block load(); fire after idle or next tick
+    const warm = () => {
+      import('$lib/season/season-assets')
+        .then(async (m) => {
+          try {
+            await m.loadSeasonDraftCatalog();
+          } catch {}
+          try {
+            await m.loadSeasonLeague();
+          } catch {}
+          try {
+            await m.loadSeasonRosterTargets();
+          } catch {}
+        })
+        .catch(() => {});
+      // also warm players index off main thread? faces are 4.6MB but lower priority
+      import('$lib/data')
+        .then(async (m) => {
+          try {
+            await m.getPlayersIndex();
+          } catch {}
+        })
+        .catch(() => {});
+    };
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      (window as unknown as { requestIdleCallback: (cb: () => void) => number }).requestIdleCallback(warm);
+    } else {
+      setTimeout(warm, 500);
+    }
+  }
+
   onMount(() => {
     load();
     const iv = setInterval(() => tick++, 1000);
@@ -227,6 +260,13 @@
       unsubscribe?.();
       coordinator?.destroy();
     };
+  });
+
+  // lobby prewarm: when snap indicates waiting+2 players or drafting, warm catalog ahead of /draft navigation
+  $effect(() => {
+    if (snap && (snap.phase === 'waiting' || snap.phase === 'drafting') && snap.memberCount >= 2) {
+      warmDraftAssetsFireAndForget();
+    }
   });
 
   async function copyInvite() {

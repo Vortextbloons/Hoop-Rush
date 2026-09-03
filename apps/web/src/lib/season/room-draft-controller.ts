@@ -394,20 +394,51 @@ export class RoomDraftController {
     return this.replayEnvelopes(fresh, { resetIntegrity: false });
   }
 
+  /**
+   * Restore from log, optionally seeded with commands already fetched via resume.
+   * If `prefetched` is provided, avoids second RTT (resume already returned tail).
+   */
+  async restoreFromLogWithPrefetched(
+    prefetched: SeasonPublicCommandEnvelope[] | null,
+    options?: { full?: boolean },
+  ): Promise<SeasonDraftState | null> {
+    if (prefetched && prefetched.length >= 0) {
+      // ensure assets in parallel with replay preparation; if assets needed, we still gain by not refetching
+      try {
+        await this.ensureAssets();
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error('[room-draft-controller] ensureAssets failed (prefetched)', e);
+        this.lastReplayError = `ensureAssets failed: ${msg}`;
+        this.integrityFailed = true;
+      }
+      if (!this.catalog || !this.league) throw new Error('catalog or league not loaded');
+      if (prefetched.length === 0 && this.state !== null && !options?.full) return this.state;
+      return this.replayEnvelopes(prefetched, { resetIntegrity: true, full: options?.full ?? true });
+    }
+    return this.restoreFromLog(options);
+  }
+
   private async restoreFromLogInner(full: boolean): Promise<SeasonDraftState | null> {
-    await this.ensureAssets();
-    if (!this.catalog || !this.league) throw new Error('catalog or league not loaded');
-    let envelopes: SeasonPublicCommandEnvelope[] = [];
+    // Parallelize league/targets fetch with command log fetch to hide network latency
     const afterOrdinal = full || this.state === null ? -1 : this.lastOrdinal;
-    try {
-      envelopes = await this.transport.refetch(this.roomId, afterOrdinal);
-    } catch (e) {
+    const assetsPromise = this.ensureAssets().catch((e) => {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('[room-draft-controller] ensureAssets failed', e);
+      this.lastReplayError = `ensureAssets failed: ${msg}`;
+      this.integrityFailed = true;
+      throw e;
+    });
+    const refetchPromise = this.transport.refetch(this.roomId, afterOrdinal).catch((e) => {
       const msg = e instanceof Error ? e.message : String(e);
       console.error('[room-draft-controller] refetch failed', e);
       this.lastReplayError = `refetch failed: ${msg}`;
       this.integrityFailed = true;
-      envelopes = [];
-    }
+      return [] as SeasonPublicCommandEnvelope[];
+    });
+    const [, envelopesRaw] = await Promise.all([assetsPromise, refetchPromise]);
+    const envelopes = (envelopesRaw ?? []) as SeasonPublicCommandEnvelope[];
+    if (!this.catalog || !this.league) throw new Error('catalog or league not loaded');
     if (envelopes.length === 0 && this.state !== null && !full) return this.state;
     return this.replayEnvelopes(envelopes, { resetIntegrity: true, full });
   }

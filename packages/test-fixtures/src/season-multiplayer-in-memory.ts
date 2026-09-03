@@ -139,6 +139,41 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
 
   private publicSnapshotOf(room: InMemoryRoom): SeasonRoomPublicSnapshot {
     const outdated = this.isOutdatedRoom(room);
+    const locks = (() => {
+      // collect locks for current cursor (mirrors season-room-resume)
+      const cur = room.cursor;
+      const map = room.privateDecisions.get(cur);
+      if (!map || map.size === 0) return undefined;
+      const p1 = map.has('p1');
+      const p2 = map.has('p2');
+      const revealed = map.size === 2;
+      return { p1Locked: p1, p2Locked: p2, revealed, cursor: cur };
+    })();
+    const attestationSummary = (() => {
+      const cur = room.cursor;
+      let best: { attempt: number; count: number } | null = null;
+      let verified: boolean | null = null;
+      let inputDigest: string | null = null;
+      let resultDigest: string | null = null;
+      for (const [key, list] of room.attestations.entries()) {
+        const [c, aStr] = key.split(':');
+        if (c !== cur) continue;
+        const attempt = Number(aStr);
+        if (!Number.isFinite(attempt)) continue;
+        if (!best || attempt > best.attempt) best = { attempt, count: list.length };
+        if (list.length === 2 && list[0]!.inputDigest === list[1]!.inputDigest && list[0]!.resultDigest === list[1]!.resultDigest) {
+          verified = true;
+          inputDigest = list[0]!.inputDigest;
+          resultDigest = list[0]!.resultDigest;
+        } else if (list.length > 0 && best?.attempt === attempt) {
+          verified = list.length === 2 ? false : null;
+          inputDigest = list[0]?.inputDigest ?? null;
+          resultDigest = list[0]?.resultDigest ?? null;
+        }
+      }
+      if (!best) return undefined;
+      return { cursor: cur, attempt: best.attempt, count: best.count, verified, inputDigest, resultDigest };
+    })();
     const snap: SeasonRoomPublicSnapshot = {
       roomId: room.roomId,
       settings: room.settings,
@@ -156,6 +191,8 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
       presence: this.presenceOf(room),
       seed: room.rootSeed,
       isOutdated: outdated || undefined,
+      locks,
+      attestationSummary,
     };
     return snap;
   }
@@ -552,6 +589,10 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     const locked = map.size === 2;
     if (locked) {
       room.phase = 'simulation';
+      room.revision += 1;
+      this.notify(room);
+    } else {
+      room.revision += 1;
       this.notify(room);
     }
     return { locked };
@@ -599,9 +640,12 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
         room.cursor = attestation.cursor;
         room.revision += 1;
         room.digest = a.resultDigest;
+        this.notify(room);
         return accepted;
       }
       if (attestation.attempt === 1) {
+        room.revision += 1;
+        this.notify(room);
         const rerun: SeasonRerunRequest = {
           roomId: attestation.roomId,
           cursor: attestation.cursor,
@@ -622,10 +666,13 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
         terminal: true,
       };
       room.phase = 'integrity-failed';
+      room.revision += 1;
       this.notify(room);
       return failure;
     }
 
+    room.revision += 1;
+    this.notify(room);
     const rerun: SeasonRerunRequest = {
       roomId: attestation.roomId,
       cursor: attestation.cursor,

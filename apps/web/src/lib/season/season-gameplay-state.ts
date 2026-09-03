@@ -40,6 +40,15 @@ export function deriveGameplayState(
   draft: SeasonDraftState,
   generation: SeasonLeagueGenerationResult | null,
   bootstrap: GameplayBootstrapResult | null,
+  snapshot?: {
+    phase?: string;
+    locks?: { p1Locked: boolean; p2Locked: boolean; revealed?: boolean };
+    attestationSummary?: {
+      verified: boolean | null;
+      inputDigest?: string | null;
+      resultDigest?: string | null;
+    } | null;
+  } | null,
 ): MultiplayerGameplayState {
   const base = createInitialGameplayState();
   base.draft = draft;
@@ -47,11 +56,43 @@ export function deriveGameplayState(
   base.bootstrap = bootstrap;
   if (draft.status === 'complete' && generation && bootstrap) {
     base.run = bootstrap.run;
-    base.phase = 'private-lock';
-    base.p1Locked = false;
-    base.p2Locked = false;
+    // derive lock state from live snapshot when available
+    if (snapshot?.locks) {
+      base.p1Locked = snapshot.locks.p1Locked;
+      base.p2Locked = snapshot.locks.p2Locked;
+      if (snapshot.locks.p1Locked && snapshot.locks.p2Locked) {
+        base.phase = 'simulation';
+      } else {
+        base.phase = 'private-lock';
+      }
+    } else {
+      base.phase = 'private-lock';
+      base.p1Locked = false;
+      base.p2Locked = false;
+    }
+    // map attestation summary to verified state
+    if (snapshot?.attestationSummary?.verified === true) {
+      base.attestation = {
+        inputDigest: snapshot.attestationSummary.inputDigest ?? '',
+        resultDigest: snapshot.attestationSummary.resultDigest ?? '',
+        verified: true,
+      };
+      base.phase = 'hash-verification';
+    } else if (snapshot?.attestationSummary?.verified === false) {
+      base.attestation = {
+        inputDigest: snapshot.attestationSummary.inputDigest ?? '',
+        resultDigest: snapshot.attestationSummary.resultDigest ?? '',
+        verified: false,
+      };
+    } else {
+      base.attestation = null;
+    }
+    // phase from rooms is authoritative for simulation/hash-verification transitions
+    if (snapshot?.phase === 'simulation') base.phase = 'simulation';
+    if (snapshot?.phase === 'hash-verification' || snapshot?.phase === 'checkpoint-setup')
+      base.phase = 'hash-verification';
+    if (snapshot?.phase === 'integrity-failed') base.phase = 'hash-verification';
     base.simulationProgress = null;
-    base.attestation = null;
   } else if (draft.status === 'finalized') {
     base.phase = 'league-verification';
   } else {

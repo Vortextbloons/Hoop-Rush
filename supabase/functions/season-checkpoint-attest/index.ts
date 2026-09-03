@@ -131,8 +131,14 @@ Deno.serve(async (req: Request) => {
     .eq('room_id', att.roomId)
     .eq('cursor', att.cursor)
     .eq('attempt', att.attempt);
-  if (!list || list.length < 2)
+  if (!list || list.length < 2) {
+    // bump revision so peer's Realtime `season_rooms` channel notifies even on 1/2 attest
+    await serviceClient
+      .from('season_rooms')
+      .update({ revision: (room.revision ?? 0) + 1, updated_at: new Date().toISOString() })
+      .eq('id', att.roomId);
     return json(200, { kind: 'rerun', reason: 'awaiting peer attestation', attempt: att.attempt });
+  }
   const [a, b] = list as Array<{ input_digest: string; result_digest: string }>;
   if (a.input_digest === b.input_digest && a.result_digest === b.result_digest) {
     await serviceClient
@@ -156,15 +162,24 @@ Deno.serve(async (req: Request) => {
       },
     });
   }
-  if (att.attempt === 1)
+  if (att.attempt === 1) {
+    await serviceClient
+      .from('season_rooms')
+      .update({ revision: (room.revision ?? 0) + 1, updated_at: new Date().toISOString() })
+      .eq('id', att.roomId);
     return json(200, {
       kind: 'rerun',
       reason: 'hash mismatch, rerun from last checkpoint',
       attempt: 2,
     });
+  }
   await serviceClient
     .from('season_rooms')
-    .update({ phase: 'integrity-failed', updated_at: new Date().toISOString() })
+    .update({
+      phase: 'integrity-failed',
+      revision: (room.revision ?? 0) + 1,
+      updated_at: new Date().toISOString(),
+    })
     .eq('id', att.roomId);
   return json(200, {
     kind: 'integrity-failed',

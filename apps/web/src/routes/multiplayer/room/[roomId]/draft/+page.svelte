@@ -73,25 +73,34 @@
   let replayError = $derived.by(() => controller?.getLastReplayError() ?? null);
   let integrityFailed = $derived.by(() => controller?.hasIntegrityFailure() ?? false);
 
-  async function loadDisplayAssets() {
-    const [m, cat, ix] = await Promise.all([
-      getManifest(),
-      loadSeasonDraftCatalog(),
-      getPlayersIndex(),
-    ]);
+  async function loadCriticalAssets() {
+    const [m, cat] = await Promise.all([getManifest(), loadSeasonDraftCatalog()]);
     manifest = m;
     catalog = cat;
-    faces = buildVersionFaceIndex(
-      ix.players,
-      cat.candidates.map((candidate) => ({
-        playerVersionId: candidate.playerVersionId,
-        playerId: candidate.playerId,
-        franchiseId: candidate.franchiseId,
-        eraId: candidate.eraId,
-        seasonKey: candidate.seasonKey,
-        displayName: candidate.displayName,
-      })),
-    );
+  }
+
+  async function loadFacesLazy() {
+    try {
+      const ix = await getPlayersIndex();
+      if (!catalog) return;
+      faces = buildVersionFaceIndex(
+        ix.players,
+        catalog.candidates.map((candidate) => ({
+          playerVersionId: candidate.playerVersionId,
+          playerId: candidate.playerId,
+          franchiseId: candidate.franchiseId,
+          eraId: candidate.eraId,
+          seasonKey: candidate.seasonKey,
+          displayName: candidate.displayName,
+        })),
+      );
+    } catch {}
+  }
+
+  // legacy: kept for non-critical callers, but no longer blocks draft interactive
+  async function loadDisplayAssets() {
+    await loadCriticalAssets();
+    await loadFacesLazy();
   }
 
   // Memoized O(1) lookup via WeakMap cache; previous find was O(C≈3k) per card/pick per render, magnified by tick
@@ -218,22 +227,25 @@
       } catch {}
       const stored = loadMembership(roomId);
       const t = transport as unknown as SeasonMultiplayerTransport | null;
-      // Parallelize independent I/O: catalog/manifest parsing (IDB/static fetch) and
-      // network resume (RTT) have no dependency. restoreFromLog still waits for both.
-      const assetsPromise = loadDisplayAssets();
+      // Critical assets (manifest 0.2MB + catalog 16MB) + resume in parallel; faces (4.6MB) deferred
+      const criticalAssetsPromise = loadCriticalAssets();
+      // Use afterOrdinal:-1 to coalesce resume + commands in 1 RTT (saves 100-300ms double RTT)
       const resumePromise: Promise<
-        SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership }
+        SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership; commands?: SeasonPublicCommandEnvelope[] }
       > = t
-        ? (t.resume(roomId) as Promise<
-            SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership }
+        ? ((t as unknown as { resume: (id: string, after?: number) => Promise<unknown> }).resume(roomId, -1) as Promise<
+            SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership; commands?: SeasonPublicCommandEnvelope[] }
           >)
         : coordinator
           ? (coordinator.refresh(roomId) as Promise<unknown> as Promise<
-              SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership }
+              SeasonRoomPublicSnapshot & { membership?: SeasonRoomMembership; commands?: SeasonPublicCommandEnvelope[] }
             >)
           : Promise.reject(new Error('Multiplayer not configured'));
-      const [, res] = await Promise.all([assetsPromise, resumePromise]);
+      const [, res] = await Promise.all([criticalAssetsPromise, resumePromise]);
+      // fire-and-forget faces (display-only) so draft board becomes interactive 150-400ms sooner
+      void loadFacesLazy();
       snap = res as SeasonRoomPublicSnapshot;
+      const prefetchedCommands = (res as unknown as { commands?: SeasonPublicCommandEnvelope[] }).commands ?? null;
       if ((res as unknown as { membership?: SeasonRoomMembership }).membership) {
         const m = (res as unknown as { membership: SeasonRoomMembership }).membership;
         saveMembership(m);
@@ -253,12 +265,36 @@
         try {
           coordinator.subscribe(roomId);
         } catch {}
-        const state = await controller.restoreFromLog({ full: true });
+        // Use prefetched commands if resume already returned them (1 RTT), else fallback to controller's own refetch (parallelized with league/targets inside)
+        let state: typeof draftState | null = null;
+        if (prefetchedCommands && Array.isArray(prefetchedCommands)) {
+          try {
+            state = (await (controller as unknown as { restoreFromLogWithPrefetched: (cmds: unknown, opts: unknown) => Promise<unknown> }).restoreFromLogWithPrefetched(prefetchedCommands, { full: true })) as typeof draftState;
+          } catch {
+            state = await controller.restoreFromLog({ full: true });
+          }
+        } else {
+          state = await controller.restoreFromLog({ full: true });
+        }
         if (!state) {
           if (snap.phase === 'drafting') {
+            // Guest race: host create-season-draft may not have replicated yet (50-400ms). Retry briefly before giving up.
             const created = await controller.ensureDraftCreated();
             draftState = created ? ({ ...created } as typeof draftState) : null;
-            if (
+            if (!draftState) {
+              // retry restore 2-3 times with backoff; realtime will also push, but this covers poll gap without spinner flicker
+              for (let attempt = 0; attempt < 3 && !draftState; attempt += 1) {
+                await new Promise<void>((r) => setTimeout(r, 300 * (attempt + 1)));
+                try {
+                  const retryState = await controller.restoreFromLog({ full: true });
+                  if (retryState) {
+                    draftState = { ...retryState } as typeof draftState;
+                    generation = controller.getGeneration();
+                    break;
+                  }
+                } catch {}
+              }
+            } else if (
               draftState &&
               (draftState as any).currentTurnParticipantId === membership.participantId &&
               !(draftState as any).currentOffer
