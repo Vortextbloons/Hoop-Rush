@@ -24,7 +24,7 @@ function run(seed: string) {
 describe('game determinism and golden replay', () => {
   it('is stable across identical inputs (golden digest)', () => {
     const result = run('golden-1');
-    expect(fnv1a32(gameResultDigest(result))).toBe(GOLDEN_EQUAL_FIXTURE_V11_HASH);
+    expect(fnv1a32(gameResultDigest(result))).toBe(GOLDEN_EQUAL_FIXTURE_V14_HASH);
   });
   it('is stable for the strong-vs-weak fixture (golden digest)', () => {
     const { strong, weak } = buildStrongWeakFixture();
@@ -33,7 +33,7 @@ describe('game determinism and golden replay', () => {
       home: strong,
       away: weak,
     });
-    expect(fnv1a32(gameResultDigest(simulateGame(input, ctx)))).toBe(GOLDEN_STRONG_WEAK_V11_HASH);
+    expect(fnv1a32(gameResultDigest(simulateGame(input, ctx)))).toBe(GOLDEN_STRONG_WEAK_V14_HASH);
   });
   it('a mirror matchup (same player on both teams) keeps accounting separate', () => {
     const shared = buildSimulationPlayer({

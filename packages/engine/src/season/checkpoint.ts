@@ -78,7 +78,7 @@ function standingsCanonical(candidate: SeasonCheckpointFacts): unknown {
     rows: [...candidate.standings.rows].sort((a, b) => (a.franchiseId < b.franchiseId ? -1 : 1)),
   };
 }
-function authorityCanonical(authority: SeasonRunAuthority): unknown {
+export function authorityCanonical(authority: SeasonRunAuthority): unknown {
   if (authority.kind === 'local-solo') {
     return {
       kind: authority.kind,

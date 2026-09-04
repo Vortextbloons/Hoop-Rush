@@ -333,6 +333,19 @@ export function createInMemoryFixedFiveTransport(options?: {
           revision: record.snapshot.revision,
         };
       }
+      if (
+        command.expectedRevision !== undefined &&
+        command.expectedRevision !== record.snapshot.revision
+      ) {
+        return {
+          roomId: command.roomId,
+          commandId: command.commandId,
+          ordinal: -1,
+          accepted: false,
+          rejectionCode: 'stale-revision',
+          revision: record.snapshot.revision,
+        };
+      }
       const expectedOrdinal = record.commands.length;
       const ordinal = command.ordinal ?? expectedOrdinal;
       if (ordinal !== expectedOrdinal) {

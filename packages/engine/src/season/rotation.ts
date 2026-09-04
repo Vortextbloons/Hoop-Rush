@@ -14,7 +14,7 @@ import type { Position } from '@hoop-rush/data-contracts';
 import { legalFiveExists, type SeasonRosterMemberInput } from './roster-rules.ts';
 import { canPlay } from '../domain/positions.ts';
 import { minuteStrategyOfPreset } from './minute-plan.ts';
-const STARTING_SLOTS: Array<'G' | 'F' | 'C'> = ['G', 'G', 'F', 'F', 'C'];
+import { enumerateLegalFives, STARTING_SLOTS } from './rotation-planner.ts';
 function canonicalOrder(a: SeasonRosterMemberInput, b: SeasonRosterMemberInput): number {
   return a.playerVersionId < b.playerVersionId ? -1 : a.playerVersionId > b.playerVersionId ? 1 : 0;
 }
@@ -24,26 +24,20 @@ export function matchStartingFive(
 ): SeasonRosterMemberInput[] | null {
   const ordered = [...members].sort(order ?? canonicalOrder);
   if (!legalFiveExists(ordered)) return null;
-  const used = new Set<number>();
+  const plannerMembers = ordered.map((member) => ({
+    playerVersionId: member.playerVersionId,
+    playable: member.playable,
+  }));
+  const available = new Set(ordered.map((member) => member.playerVersionId));
+  const first = enumerateLegalFives(plannerMembers, available)[0];
+  if (first === undefined) return null;
+  const byId = new Map(ordered.map((member) => [member.playerVersionId, member]));
   const result: SeasonRosterMemberInput[] = [];
-  const solve = (slot: number): boolean => {
-    if (slot >= STARTING_SLOTS.length) return true;
-    const requirement = STARTING_SLOTS[slot];
-    if (requirement === undefined) return false;
-    for (let i = 0; i < ordered.length; i += 1) {
-      const member = ordered[i];
-      if (member === undefined) continue;
-      if (used.has(i)) continue;
-      if (!canPlay(member.playable, requirement)) continue;
-      used.add(i);
-      result.push(member);
-      if (solve(slot + 1)) return true;
-      result.pop();
-      used.delete(i);
-    }
-    return false;
-  };
-  if (!solve(0)) return null;
+  for (const playerVersionId of first) {
+    const member = byId.get(playerVersionId);
+    if (member === undefined) return null;
+    result.push(member);
+  }
   return result;
 }
 export function buildMinimalRotation(input: {

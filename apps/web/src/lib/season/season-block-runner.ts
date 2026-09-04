@@ -577,7 +577,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     } else {
       priorSummaries = summaries;
     }
-    const plainRotations = cloneForWorker(state.rotations);
+    const plainRotations = state.rotations;
     const plainCommon = {
       requestId,
       runId: state.input.run.runId,
@@ -590,23 +590,23 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       catalogHash: artifacts.catalogHash,
       profileUrl: artifacts.profileUrl,
       profileHash: artifacts.profileHash,
-      ...(priorSummaries !== undefined ? { priorSummaries: cloneForWorker(priorSummaries) } : {}),
-      ...(newSummaries !== undefined ? { newSummaries: cloneForWorker(newSummaries) } : {}),
+      ...(priorSummaries !== undefined ? { priorSummaries } : {}),
+      ...(newSummaries !== undefined ? { newSummaries } : {}),
       ...(state.resumePending !== null
-        ? { priorEffects: cloneForWorker(state.resumePending.effects) }
+        ? { priorEffects: state.resumePending.effects }
         : priorSummaries !== undefined
-          ? { priorEffects: cloneForWorker(state.input.effects) }
+          ? { priorEffects: state.input.effects }
           : {}),
       ...(state.resumePending !== null
-        ? { priorHealth: cloneForWorker(state.resumePending.health) }
+        ? { priorHealth: state.resumePending.health }
         : priorSummaries !== undefined
-          ? { priorHealth: cloneForWorker(state.input.run.health) }
+          ? { priorHealth: state.input.run.health }
           : {}),
       startGameId: state.resumePending?.nextGameId ?? null,
       objectiveId: state.input.objectiveId,
       campaignOpportunityId: state.input.campaignOpportunityId ?? null,
-      priorInfluence: cloneForWorker(state.input.run.influence),
-      priorTransactions: cloneForWorker(state.input.run.transactions),
+      priorInfluence: state.input.run.influence,
+      priorTransactions: state.input.run.transactions,
       expectedStateRevision: state.input.run.stateRevision,
       expectedStateDigest: state.input.run.stateDigest,
       humanFranchiseId: state.input.humanFranchiseId,
@@ -622,7 +622,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     return seasonWorkerStartRequestSchema.parse({
       schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
       type: 'season-block-start',
-      run: cloneForWorker({
+      run: {
         schemaVersion: state.input.run.schemaVersion,
         runId: state.input.run.runId,
         rootSeed: state.input.run.rootSeed,
@@ -631,9 +631,9 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         rosters: state.input.run.rosters,
         rotations: state.rotations,
         cursor: state.input.run.cursor,
-      }),
-      schedule: cloneForWorker(schedule),
-      homeCourt: cloneForWorker(state.input.homeCourt),
+      },
+      schedule,
+      homeCourt: state.input.homeCourt,
       ...plainCommon,
     });
   }
@@ -1010,41 +1010,6 @@ function objectivesWithSuccess(
       [checkpoint.blockIndex]: { ...selection, success: checkpoint.objective.success },
     },
   };
-}
-function cloneForWorker<T>(value: T): T {
-  try {
-    return structuredClone(value);
-  } catch (error) {
-    if (!(error instanceof Error) || error.name !== 'DataCloneError') throw error;
-    return clonePlain(value);
-  }
-}
-function clonePlain<T>(value: T): T {
-  if (value instanceof Date) return new Date(value.getTime()) as T;
-  if (Array.isArray(value)) {
-    return (value as unknown as readonly unknown[]).map((item) => clonePlain(item)) as unknown as T;
-  }
-  if (value instanceof Map) {
-    return new Map(
-      [...(value as unknown as ReadonlyMap<unknown, unknown>).entries()].map(([key, item]) => [
-        clonePlain(key),
-        clonePlain(item),
-      ]),
-    ) as unknown as T;
-  }
-  if (value instanceof Set) {
-    return new Set(
-      [...(value as unknown as ReadonlySet<unknown>)].map((item) => clonePlain(item)),
-    ) as unknown as T;
-  }
-  if (value !== null && typeof value === 'object') {
-    const out: Record<string, unknown> = {};
-    for (const key of Object.keys(value)) {
-      out[key] = clonePlain((value as Record<string, unknown>)[key]);
-    }
-    return out as T;
-  }
-  return value;
 }
 export function getSeasonBlockRunner(): SeasonBlockRunner {
   if (typeof window !== 'undefined' && window.__HOOP_RUSH_SEASON_BLOCK_RUNNER__) {

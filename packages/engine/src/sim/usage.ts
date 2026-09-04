@@ -46,7 +46,7 @@ export function initiatorWeight(
 ): number {
   const usage = Math.max(0.5, player.tendencies.usageRate);
   const usagePower = Math.pow(usage / 10, ENGINE_CONSTANTS.usageExponent);
-  const creationMod = 0.75 + 0.5 * creationScore(player);
+  const creationMod = 0.65 + 0.7 * creationScore(player);
   return usagePower * creationMod * creationBurden(player, team) * modifiers.initiation;
 }
 export function creationBurden(player: SimulationPlayer, team: SimulationTeam): number {
@@ -77,7 +77,7 @@ export function spacingWeight(player: SimulationPlayer): number {
   return 0.55 + 0.9 * spacingScore(player);
 }
 export function usagePull(player: SimulationPlayer): number {
-  return 0.8 + 0.2 * Math.min(1, player.tendencies.usageRate / 36);
+  return 0.65 + 0.35 * Math.min(1, player.tendencies.usageRate / 36);
 }
 export function actionWeights(
   initiator: SimulationPlayer,
@@ -119,13 +119,13 @@ export function passProbability(initiator: SimulationPlayer, action: ActionType)
       : action === 'pickAndRollRoll'
         ? 0.78
         : action === 'pickAndRoll'
-          ? 0.62
+          ? 0.53
           : action === 'postUp'
-            ? 0.28
-            : 0.2;
+            ? 0.35
+            : 0.17;
   const passingFactor =
     0.65 + initiator.tendencies.passRate / 100 + creationScore(initiator) * 0.15;
-  const creationFactor = 1.1 - initiator.tendencies.usageRate / 200;
+  const creationFactor = 1.15 - initiator.tendencies.usageRate / 150;
   return Math.min(
     0.97,
     Math.max(0.05, actionBase * 1.2 * passingFactor * Math.max(0.7, creationFactor)),

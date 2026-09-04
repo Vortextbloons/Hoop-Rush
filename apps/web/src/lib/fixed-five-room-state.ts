@@ -1,4 +1,5 @@
 import {
+  canonicalJson,
   contentHashSchema,
   fixedFiveTimeoutMsForMode,
   idSchema,
@@ -331,6 +332,33 @@ export interface RoomLogFacts {
   rematchConfirmed: Record<FixedFiveParticipantId, boolean>;
   proposals: Array<{ actor: FixedFiveParticipantId; digest: ContentHash }>;
   confirms: Array<{ actor: FixedFiveParticipantId; digest: ContentHash; verified: boolean }>;
+}
+
+export function mergeFixedFiveCommands(
+  existing: FixedFiveCommand[],
+  incoming: FixedFiveCommand[],
+): FixedFiveCommand[] {
+  const byOrdinal = new Map<number, FixedFiveCommand>();
+  const ordinalByCommandId = new Map<string, number>();
+  for (const command of [...existing, ...incoming]) {
+    const knownOrdinal = ordinalByCommandId.get(command.commandId);
+    if (knownOrdinal !== undefined && knownOrdinal !== command.ordinal) {
+      throw new Error(`fixed-five command ${command.commandId} changed ordinal`);
+    }
+    const atOrdinal = byOrdinal.get(command.ordinal);
+    if (atOrdinal) {
+      if (
+        atOrdinal.commandId !== command.commandId ||
+        canonicalJson(atOrdinal) !== canonicalJson(command)
+      ) {
+        throw new Error(`fixed-five command log conflicts at ordinal ${String(command.ordinal)}`);
+      }
+      continue;
+    }
+    ordinalByCommandId.set(command.commandId, command.ordinal);
+    byOrdinal.set(command.ordinal, command);
+  }
+  return [...byOrdinal.values()].sort((a, b) => a.ordinal - b.ordinal);
 }
 
 export function roomLogFacts(commands: FixedFiveCommand[]): RoomLogFacts {

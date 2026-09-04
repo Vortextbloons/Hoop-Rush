@@ -166,7 +166,7 @@ export function plannerCandidates(
   );
   return enumerateLegalFives(members, available);
 }
-const STARTING_SLOTS = ['G', 'G', 'F', 'F', 'C'] as const;
+export const STARTING_SLOTS = ['G', 'G', 'F', 'F', 'C'] as const;
 function orderedPlannerMembers(context: PlannerRotationContext): PlannerMember[] {
   const starters = [...context.rotation.starters].sort();
   const order = [...starters, ...context.rotation.benchOrder];

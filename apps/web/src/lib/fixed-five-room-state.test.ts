@@ -11,6 +11,7 @@ import type { DuelDraftState } from '@hoop-rush/engine';
 import {
   deriveEffectivePhase,
   isDraftComplete,
+  mergeFixedFiveCommands,
   roomLogFacts,
   type DraftReplay,
 } from '$lib/fixed-five-room-state';
@@ -72,6 +73,30 @@ describe('roomLogFacts', () => {
     expect(facts.rematchRequested.p1).toBe(true);
     expect(facts.rematchConfirmed.p2).toBe(true);
     expect(facts.proposals).toEqual([]);
+  });
+});
+
+describe('mergeFixedFiveCommands', () => {
+  it('keeps one local copy when overlapping resyncs return the same accepted commands', () => {
+    const first = command(4, 'p1', { kind: 'ready', ready: true });
+    const second = command(5, 'p2', { kind: 'ready', ready: true });
+
+    const afterFirstSync = mergeFixedFiveCommands([], [first, second]);
+    const afterOverlappingSync = mergeFixedFiveCommands(afterFirstSync, [first, second]);
+
+    expect(afterOverlappingSync).toEqual([first, second]);
+  });
+
+  it('rejects contradictory commands at the same accepted ordinal', () => {
+    const first = command(4, 'p1', { kind: 'ready', ready: true });
+    const conflict = {
+      ...command(4, 'p2', { kind: 'ready', ready: true }),
+      commandId: commandIdSchema.parse('cmd-conflict'),
+    };
+
+    expect(() => mergeFixedFiveCommands([first], [conflict])).toThrow(
+      'fixed-five command log conflicts at ordinal 4',
+    );
   });
 });
 

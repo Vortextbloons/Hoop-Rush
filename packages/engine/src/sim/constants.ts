@@ -1,7 +1,7 @@
 import type { ShotZone, SlotGroup } from '@hoop-rush/data-contracts';
 import type { PositionResponsibilityModifiers } from './position-responsibilities.ts';
 import type { ActionType } from './usage.ts';
-export const ENGINE_VERSION = 'm3-engine-v13';
+export const ENGINE_VERSION = 'm3-engine-v14';
 export const ENGINE_CONSTANTS = {
   version: ENGINE_VERSION,
   zoneBaseMake: {
@@ -77,7 +77,7 @@ export const ENGINE_CONSTANTS = {
   threePointLowVolumeCap: 0.08,
   threePointLowVolumeEraPull: 0.05,
   threePointEraPull: 0.3,
-  usageExponent: 1.35,
+  usageExponent: 1.45,
   twoPointAnchorMin: 0.82,
   twoPointAnchorMax: 1.18,
   twoPointAnchorSkillScale: 0.3,

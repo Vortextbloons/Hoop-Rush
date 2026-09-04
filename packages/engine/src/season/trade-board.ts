@@ -11,7 +11,12 @@ import {
   type SeasonTradeWindowState,
 } from '@hoop-rush/data-contracts';
 import { slotGroupOf } from '../domain/positions.ts';
-import { seasonTradeCatalogFactsOf, seasonTradePlayerValue } from './trades.ts';
+import {
+  seasonTradeCatalogFactsOf,
+  seasonTradePlayerValue,
+  TRADE_BAND_1V1,
+  TRADE_BAND_DEFAULT,
+} from './trades.ts';
 import { drawHexInt } from './season-seeds.ts';
 export const TRADE_BOARD_SIZE = 8;
 export const TRADE_INQUIRY_BASE = 3;
@@ -22,7 +27,6 @@ export const TRADE_CASH_MAX_PER_WINDOW = 2;
 export const TRADE_CASH_PCT_PER_POINT = 5;
 export const TRADE_CASH_PCT_MAX = 10;
 export const TRADE_MIN_TALENT_RATIO = 800;
-export const TRADE_EXTENDED_RATIO = 750;
 function deriveNeeds(
   rosterIds: readonly string[],
   catalog: ReturnType<typeof seasonTradeCatalogFactsOf>,
@@ -289,14 +293,11 @@ export function evaluateTradeProposal(input: {
     return {
       ok: false,
       code: 'trade-insufficient-talent',
-      reason: `ratio ${String(rawRatio)} < 800`,
+      reason: `ratio ${String(rawRatio)} < ${String(TRADE_MIN_TALENT_RATIO)}`,
     };
   }
-  if (rawRatio < TRADE_EXTENDED_RATIO) {
-    return { ok: false, code: 'trade-insufficient-talent', reason: `extended band` };
-  }
   const is1v1 = outgoingPlayerVersionIds.length === 1 && incomingPlayerVersionIds.length === 1;
-  const band = is1v1 ? { lower: 850, upper: 1150 } : { lower: 800, upper: 1200 };
+  const band = is1v1 ? TRADE_BAND_1V1 : TRADE_BAND_DEFAULT;
   const withinBand = rawRatio >= band.lower && rawRatio <= band.upper;
   let adjusted = rawRatio;
   if (influenceAmount > 0) {

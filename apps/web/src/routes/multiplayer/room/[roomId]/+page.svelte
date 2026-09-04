@@ -18,6 +18,7 @@
   } from '@hoop-rush/data-contracts';
   import { commandIdSchema, fixedFiveTimeoutMsForMode, idSchema } from '@hoop-rush/data-contracts';
   import { createConfiguredFixedFiveTransport } from '$lib/fixed-five-transport';
+  import { submitFixedFiveCommand } from '$lib/fixed-five-command-submit';
   import {
     friendlyFixedFiveJoinError,
     loadFixedFiveMembership,
@@ -36,6 +37,7 @@
     isDraftComplete,
     loadActivityAt,
     loadFixedFiveAssets,
+    mergeFixedFiveCommands,
     overlaySnapshotProgress,
     pickOrdinalOf,
     refsForParticipant,
@@ -166,8 +168,8 @@
       if (!mounted) return;
       if (fresh.length > 0) {
         lastOrdinal = Math.max(...fresh.map((c) => c.ordinal));
+        commands = mergeFixedFiveCommands(commands, fresh);
         for (const command of fresh) {
-          commands = [...commands, command];
           try {
             await fixedFiveRepository.appendCommand(command);
           } catch {
@@ -185,15 +187,6 @@
     }
   }
 
-  const REVERSIBLE_KINDS = new Set([
-    'ready',
-    'reroll',
-    'classic-pick',
-    'duel-claim',
-    'sandbox-place',
-    'sandbox-remove',
-  ]);
-
   async function sendCommand(
     payload: FixedFiveCommandPayload,
     options?: { actor?: 'p1' | 'p2'; commandId?: string; retry?: boolean },
@@ -201,32 +194,50 @@
     error = null;
     const commandId = newCommandId(options?.commandId);
     try {
-      const receipt = await transport().submitCommand({
-        schemaVersion: 1,
+      const result = await submitFixedFiveCommand({
+        submitCommand: (command) => transport().submitCommand(command),
         roomId: brandedRoomId(),
         commandId,
         actorParticipantId: options?.actor ?? selfId,
         payload,
         expectedRevision: snapshot?.revision,
+        resync: () => sync(lastOrdinal),
+        retry: options?.retry,
+        retryAfterResync: () => {
+          if (payload.kind === 'propose-result') {
+            return localResult?.digest === payload.resultDigest;
+          }
+          if (payload.kind !== 'confirm-result' || !localResult) return false;
+          const freshForeign = roomLogFacts(commands).proposals.filter(
+            (proposal) => proposal.actor !== selfId,
+          );
+          if (payload.verified) {
+            return (
+              localResult.digest === payload.resultDigest &&
+              freshForeign.some((proposal) => proposal.digest === payload.resultDigest)
+            );
+          }
+          return (
+            reranMismatch &&
+            localResult.digest !== payload.resultDigest &&
+            freshForeign.some((proposal) => proposal.digest === payload.resultDigest) &&
+            !freshForeign.some((proposal) => proposal.digest === localResult.digest)
+          );
+        },
       });
+      const receipt = result.receipt;
+      if (snapshot && receipt.revision > snapshot.revision) {
+        snapshot = { ...snapshot, revision: receipt.revision };
+      }
+      if (result.retried && receipt.accepted) {
+        notice = 'Room changed while sending — resynced and recovered.';
+      }
       if (!receipt.accepted && receipt.rejectionCode === 'stale-revision') {
         notice = 'Stale command — resyncing once before a single retry.';
-        await sync(lastOrdinal);
-        if (options?.retry !== false && REVERSIBLE_KINDS.has(payload.kind) && mounted) {
-          const retry = await transport().submitCommand({
-            schemaVersion: 1,
-            roomId: brandedRoomId(),
-            commandId,
-            actorParticipantId: options?.actor ?? selfId,
-            payload,
-            expectedRevision: snapshot?.revision,
-          });
-          if (!retry.accepted) {
-            error = `Command rejected: ${retry.rejectionCode ?? 'unknown'}`;
-            return false;
-          }
-        } else if (mounted) {
-          error = 'Command rejected as stale; not retried because it is irreversible.';
+        if (mounted) {
+          error = result.retried
+            ? 'The room changed again during the retry. The command was not applied.'
+            : 'The room changed and invalidated this command. It was not applied.';
           return false;
         }
       } else if (!receipt.accepted) {

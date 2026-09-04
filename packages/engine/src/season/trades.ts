@@ -35,8 +35,8 @@ export const WINDOW_BLOCK_INDEX_TO_INDEX: Readonly<Record<number, number>> = {
   4: 1,
   5: 2,
 };
-const BAND_85_115 = { lower: 850, upper: 1150 } as const;
-const BAND_80_120 = { lower: 800, upper: 1200 } as const;
+export const TRADE_BAND_1V1 = { lower: 850, upper: 1150 } as const;
+export const TRADE_BAND_DEFAULT = { lower: 800, upper: 1200 } as const;
 const RATIO_SCHEMA_BOUNDS = { lower: 800, upper: 1200 } as const;
 export type SeasonTradePackageKind = '1-1' | '2-2' | '1-2' | '2-1';
 function packageKindOf(seed: string): SeasonTradePackageKind {
@@ -230,7 +230,7 @@ export function seasonTradeValueBandFor(input: {
     RATIO_SCHEMA_BOUNDS.upper,
     Math.max(RATIO_SCHEMA_BOUNDS.lower, raw),
   );
-  const bounds = input.kind === '1-1' ? BAND_85_115 : BAND_80_120;
+  const bounds = input.kind === '1-1' ? TRADE_BAND_1V1 : TRADE_BAND_DEFAULT;
   const qualified = ratioBasisPoints >= bounds.lower && ratioBasisPoints <= bounds.upper;
   return {
     ratioBasisPoints,
@@ -242,7 +242,7 @@ export function ratioMutuallyWithinBand(
   ratioBasisPoints: number,
   kind: SeasonTradePackageKind,
 ): boolean {
-  const bounds = kind === '1-1' ? BAND_85_115 : BAND_80_120;
+  const bounds = kind === '1-1' ? TRADE_BAND_1V1 : TRADE_BAND_DEFAULT;
   if (ratioBasisPoints < bounds.lower || ratioBasisPoints > bounds.upper) return false;
   const reciprocal = Math.ceil(1000000 / ratioBasisPoints);
   return reciprocal >= bounds.lower && reciprocal <= bounds.upper;

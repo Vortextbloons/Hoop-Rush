@@ -18,7 +18,7 @@ import {
   type SeasonTransactionEntry,
   type SeasonRunAuthority,
 } from '@hoop-rush/data-contracts';
-import { canonicalJson } from './checkpoint.ts';
+import { authorityCanonical, canonicalJson } from './checkpoint.ts';
 export interface SeasonRunStateDigestFacts {
   stateRevision: number;
   stage: SeasonRunStage;
@@ -56,40 +56,6 @@ function postseasonCanonical(postseason: SeasonPostseasonState): unknown {
     playIn: postseason.playIn,
     bracket: postseason.bracket,
     championFranchiseId: postseason.championFranchiseId,
-  };
-}
-function authorityCanonical(authority: SeasonRunAuthority): unknown {
-  if (authority.kind === 'local-solo') {
-    return {
-      kind: authority.kind,
-      soloFranchiseId: authority.soloFranchiseId,
-      authorityVersion: authority.authorityVersion,
-    };
-  }
-  return {
-    kind: authority.kind,
-    p1: authority.p1,
-    p2: authority.p2,
-    pace: authority.pace,
-    timerPolicyVersion: authority.timerPolicyVersion,
-    authorityVersion: authority.authorityVersion,
-    multiplayerVersion: authority.multiplayerVersion,
-    control: Object.fromEntries(
-      Object.entries(authority.control).sort(([a], [b]) => (a < b ? -1 : 1)),
-    ),
-    missStreak: Object.fromEntries(
-      Object.entries(authority.missStreak).sort(([a], [b]) => (a < b ? -1 : 1)),
-    ),
-    reclaimRequests: Object.fromEntries(
-      Object.entries(authority.reclaimRequests).sort(([a], [b]) => (a < b ? -1 : 1)),
-    ),
-    timeoutEvents: [...authority.timeoutEvents].sort((a, b) => {
-      if (a.participantId !== b.participantId) return a.participantId < b.participantId ? -1 : 1;
-      return a.atRevision - b.atRevision;
-    }),
-    checkpointVerification: authority.checkpointVerification,
-    integrityFailure: authority.integrityFailure,
-    createdAtRevision: authority.createdAtRevision,
   };
 }
 export function seasonRunStateDigest(facts: SeasonRunStateDigestFacts): string {

@@ -6,6 +6,7 @@ import {
   FIXED_FIVE_ROOM_SCHEMA_VERSION,
   FIXED_FIVE_WORKER_WIRE_VERSION,
   commandIdSchema,
+  contentHashSchema,
   createInMemoryFixedFiveTransport,
   fixedFiveRoomSettingsSchema,
 } from './index.ts';
@@ -85,6 +86,21 @@ describe('fixed-five contracts', () => {
     });
     expect(receipt.accepted).toBe(true);
     expect(receipt.ordinal).toBe(0);
+    const staleRevision = await transport.submitCommand({
+      schemaVersion: 1,
+      roomId: created.snapshot.roomId,
+      commandId: commandIdSchema.parse('cmd-stale-revision'),
+      actorParticipantId: 'p1',
+      payload: {
+        kind: 'confirm-result',
+        resultDigest: contentHashSchema.parse('a'.repeat(64)),
+        verified: false,
+      },
+      expectedRevision: receipt.revision - 1,
+    });
+    expect(staleRevision.accepted).toBe(false);
+    expect(staleRevision.rejectionCode).toBe('stale-revision');
+    expect(staleRevision.revision).toBe(receipt.revision);
     const duplicate = await transport.submitCommand({
       schemaVersion: 1,
       roomId: created.snapshot.roomId,
