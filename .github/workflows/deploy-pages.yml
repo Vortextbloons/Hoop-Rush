@@ -24,7 +24,12 @@ jobs:
       - name: Build site
         env:
           BASE_PATH: /${{ github.event.repository.name }}
-        run: pnpm build
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          test -n "$VITE_SUPABASE_URL"
+          test -n "$VITE_SUPABASE_PUBLISHABLE_KEY"
+          pnpm build
 
       - name: Add GitHub Pages SPA fallback
         run: cp apps/web/build/index.html apps/web/build/404.html
