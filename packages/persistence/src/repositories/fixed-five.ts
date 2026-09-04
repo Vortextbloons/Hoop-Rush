@@ -91,6 +91,10 @@ export class DexieFixedFiveRepository {
     return storedFixedFivePendingResultSchema.parse(record);
   }
 
+  async clearPendingResult(roomId: string): Promise<void> {
+    await this.db.fixedFivePendingResults.delete(roomId);
+  }
+
   async promoteToCompleted(roomId: string, run: FixedFiveCompetitionRun): Promise<void> {
     const completedAtIso = new Date().toISOString();
     const completed: StoredFixedFiveCompleted = storedFixedFiveCompletedSchema.parse({

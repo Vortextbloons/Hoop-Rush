@@ -106,7 +106,11 @@ export function identityPriorityRolesOf(
   targets: SeasonRosterTargets,
   identity: SeasonAiIdentity,
 ): readonly SeasonRosterRole[] {
-  const roles = targets.policy.identityPriorityRoles[identity];
+  const roles = (
+    targets.policy.identityPriorityRoles as Partial<
+      Record<SeasonAiIdentity, readonly SeasonRosterRole[]>
+    >
+  )[identity];
   if (roles !== undefined && roles.length > 0) return roles;
   return DEFAULT_IDENTITY_PRIORITY_ROLES[identity];
 }
@@ -118,30 +122,35 @@ export class SeasonAiTargetsError extends Error {
     this.name = 'SeasonAiTargetsError';
   }
 }
-export function validateSeasonRosterTargets(targets: SeasonRosterTargets): void {
+export function validateSeasonRosterTargets(targets: SeasonRosterTargets | undefined): void {
   if (!targets) throw new SeasonAiTargetsError('roster targets missing');
-  if (targets.schemaVersion !== 2) {
+  const schemaVersion: number = targets.schemaVersion;
+  if (schemaVersion !== 2) {
     throw new SeasonAiTargetsError(
-      `roster targets schemaVersion must be 2 (got ${String(targets.schemaVersion)})`,
+      `roster targets schemaVersion must be 2 (got ${String(schemaVersion)})`,
     );
   }
   if (targets.targetsVersion !== SEASON_ROSTER_TARGETS_VERSION) {
     throw new SeasonAiTargetsError(
-      `roster targets version mismatch: expected ${SEASON_ROSTER_TARGETS_VERSION}, got ${String(targets.targetsVersion)}`,
+      `roster targets version mismatch: expected ${SEASON_ROSTER_TARGETS_VERSION}, got ${targets.targetsVersion}`,
     );
   }
   if (targets.calibration.aiVersion !== SEASON_AI_VERSION) {
     throw new SeasonAiTargetsError(
-      `targets aiVersion mismatch: expected ${SEASON_AI_VERSION}, got ${String(targets.calibration.aiVersion)}`,
+      `targets aiVersion mismatch: expected ${SEASON_AI_VERSION}, got ${targets.calibration.aiVersion}`,
     );
   }
   if (targets.calibration.rosterGenerationVersion !== SEASON_ROSTER_GENERATION_VERSION) {
     throw new SeasonAiTargetsError(
-      `targets rosterGenerationVersion mismatch: expected ${SEASON_ROSTER_GENERATION_VERSION}, got ${String(targets.calibration.rosterGenerationVersion)}`,
+      `targets rosterGenerationVersion mismatch: expected ${SEASON_ROSTER_GENERATION_VERSION}, got ${targets.calibration.rosterGenerationVersion}`,
     );
   }
   for (const identity of IDENTITIES) {
-    const roles = targets.policy.identityPriorityRoles[identity];
+    const roles = (
+      targets.policy.identityPriorityRoles as Partial<
+        Record<SeasonAiIdentity, readonly import('@hoop-rush/data-contracts').SeasonRosterRole[]>
+      >
+    )[identity];
     if (roles === undefined || roles.length === 0) {
       throw new SeasonAiTargetsError(`targets lack priority roles for identity ${identity}`);
     }

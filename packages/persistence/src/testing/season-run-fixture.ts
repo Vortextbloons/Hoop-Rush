@@ -1163,6 +1163,13 @@ const _foldTeamReturnParity: FixtureFoldTeamReturnParity extends EngineFoldTeamR
 const _foldPlayerReturnParity: FixtureFoldPlayerReturnParity extends EngineFoldPlayerReturnParity
   ? true
   : never = true;
+void _digestFactsParity;
+void _digestReturnParity;
+void _reconstructParamsParity;
+void _rotationDigestParamsParity;
+void _createInfluenceParamsParity;
+void _foldTeamReturnParity;
+void _foldPlayerReturnParity;
 export function buildFixtureStateDigest(
   run: SeasonRun,
   overrides: Partial<SeasonRunStateDigestFacts> = {},

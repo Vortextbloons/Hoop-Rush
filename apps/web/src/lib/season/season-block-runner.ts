@@ -1033,7 +1033,9 @@ function clonePlain<T>(value: T): T {
     ) as unknown as T;
   }
   if (value instanceof Set) {
-    return new Set([...(value as unknown as ReadonlySet<unknown>)].map((item) => clonePlain(item))) as unknown as T;
+    return new Set(
+      [...(value as unknown as ReadonlySet<unknown>)].map((item) => clonePlain(item)),
+    ) as unknown as T;
   }
   if (value !== null && typeof value === 'object') {
     const out: Record<string, unknown> = {};

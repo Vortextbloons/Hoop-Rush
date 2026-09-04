@@ -97,8 +97,7 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     }
   }
   asActor(participantId: 'p1' | 'p2'): SeasonMultiplayerTransport {
-    const backing = this;
-    return new Proxy(backing, {
+    return new Proxy(this, {
       get(target, property, receiver) {
         if (property === 'submitCommand') {
           return (envelope: SeasonPublicCommandEnvelope) => {
@@ -112,7 +111,7 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
         }
         return Reflect.get(target, property, receiver);
       },
-    }) as SeasonMultiplayerTransport;
+    });
   }
   private nextRoomId(): string {
     this.roomCounter += 1;
@@ -134,9 +133,13 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     return arr;
   }
   private isOutdatedRoom(room: InMemoryRoom): boolean {
+    const settings = room.settings as unknown as {
+      multiplayerVersion: string;
+      roomProtocolVersion: number;
+    };
     return (
-      room.settings.multiplayerVersion !== SEASON_MULTIPLAYER_VERSION ||
-      room.settings.roomProtocolVersion !== SEASON_ROOM_PROTOCOL_SCHEMA_VERSION ||
+      settings.multiplayerVersion !== SEASON_MULTIPLAYER_VERSION ||
+      settings.roomProtocolVersion !== SEASON_ROOM_PROTOCOL_SCHEMA_VERSION ||
       !!room.isOutdated
     );
   }
@@ -153,7 +156,7 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
       codeActive:
         room.code !== null && room.codeExpiresAt !== null && room.codeExpiresAt > this.clock(),
       expiresAt: room.codeExpiresAt ? new Date(room.codeExpiresAt).toISOString() : null,
-      mode: room.settings.mode as SeasonRoomMode,
+      mode: room.settings.mode,
       settingsRevision: room.settingsRevision,
       guestReady: room.guestReady,
       presence: this.presenceOf(room),
@@ -173,7 +176,7 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
       throw Object.assign(new Error('outdated room—create a new one'), { code: 'outdated-room' });
     }
   }
-  async create(
+  create(
     settings: SeasonRoomSettings,
     rootSeed: string,
   ): Promise<
@@ -199,10 +202,11 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
       if (tries > 100) throw new Error('code collision retry exhausted');
     } while (this.codeToRoom.has(code));
     const roomId = this.nextRoomId();
+    const incomingMode = (settings as unknown as { mode?: SeasonRoomMode }).mode ?? 'season';
     const normalizedSettings: SeasonRoomSettings = {
       schemaVersion: SEASON_ROOM_PROTOCOL_SCHEMA_VERSION,
       pace: settings.pace,
-      mode: (settings as SeasonRoomSettings).mode ?? 'season',
+      mode: incomingMode,
       roomProtocolVersion: SEASON_ROOM_PROTOCOL_SCHEMA_VERSION,
       multiplayerVersion: SEASON_MULTIPLAYER_VERSION,
       timerPolicyVersion: SEASON_TIMER_POLICY_VERSION,
@@ -248,11 +252,11 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
       code: SeasonRoomCode;
       membership: SeasonRoomMembership;
     };
-    snap.code = code as SeasonRoomCode;
+    snap.code = code;
     snap.membership = membership;
-    return snap;
+    return Promise.resolve(snap);
   }
-  async preview(code: string): Promise<SeasonRoomPublicSnapshot> {
+  preview(code: string): Promise<SeasonRoomPublicSnapshot> {
     const roomId = this.codeToRoom.get(code);
     if (!roomId) {
       throw Object.assign(new Error('invalid-code'), { code: 'invalid-code' });
@@ -265,9 +269,9 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     ) {
       throw Object.assign(new Error('invalid-code'), { code: 'invalid-code' });
     }
-    return this.publicSnapshotOf(room);
+    return Promise.resolve(this.publicSnapshotOf(room));
   }
-  async join(code: string): Promise<SeasonRoomMembership> {
+  join(code: string): Promise<SeasonRoomMembership> {
     const now = this.clock();
     const key = `join:${code}`;
     const attempts = this.joinAttempts.get(key) ?? [];
@@ -311,9 +315,9 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
       room.codeExpiresAt = null;
     }
     this.notify(room);
-    return membership;
+    return Promise.resolve(membership);
   }
-  async updateSettings(
+  updateSettings(
     roomId: string,
     settings: {
       mode: SeasonRoomMode;
@@ -347,20 +351,21 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
       settingsRevision: room.settingsRevision,
     });
     this.notify(room);
-    return this.publicSnapshotOf(room);
+    return Promise.resolve(this.publicSnapshotOf(room));
   }
-  async _updateSettingsAsGuest(
+  _updateSettingsAsGuest(
     roomId: string,
-    settings: {
+    _settings: {
       mode: SeasonRoomMode;
       pace: SeasonRoomPace;
     },
   ): Promise<SeasonRoomPublicSnapshot> {
+    void _settings;
     const room = this.rooms.get(roomId);
     if (!room) throw Object.assign(new Error('membership'), { code: 'membership' });
     throw Object.assign(new Error('only host can update settings'), { code: 'authorization' });
   }
-  async setReady(
+  setReady(
     roomId: string,
     participantId: 'p1' | 'p2',
     ready: boolean,
@@ -384,19 +389,20 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     room.guestReady = ready;
     room.presence.set(participantId, this.clock());
     this.notify(room);
-    return this.publicSnapshotOf(room);
+    return Promise.resolve(this.publicSnapshotOf(room));
   }
-  async heartbeat(roomId: string, participantId: 'p1' | 'p2'): Promise<void> {
+  heartbeat(roomId: string, participantId: 'p1' | 'p2'): Promise<void> {
     const room = this.rooms.get(roomId);
     if (!room) throw Object.assign(new Error('membership'), { code: 'membership' });
     if (!room.members.has(participantId))
       throw Object.assign(new Error('membership'), { code: 'membership' });
     room.presence.set(participantId, this.clock());
     this.notify(room);
+    return Promise.resolve();
   }
-  async leave(roomId: string, participantId: 'p1' | 'p2'): Promise<void> {
+  leave(roomId: string, participantId: 'p1' | 'p2'): Promise<void> {
     const room = this.rooms.get(roomId);
-    if (!room) return;
+    if (!room) return Promise.resolve();
     if (!room.members.has(participantId))
       throw Object.assign(new Error('membership'), { code: 'membership' });
     room.members.delete(participantId);
@@ -416,8 +422,9 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
       }
     }
     this.notify(room);
+    return Promise.resolve();
   }
-  async startDraft(roomId: string): Promise<SeasonRoomPublicSnapshot> {
+  startDraft(roomId: string): Promise<SeasonRoomPublicSnapshot> {
     const room = this.rooms.get(roomId);
     if (!room) throw Object.assign(new Error('membership'), { code: 'membership' });
     this.assertNotOutdated(room);
@@ -435,17 +442,14 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     }
     room.phase = 'drafting';
     this.notify(room);
-    return this.publicSnapshotOf(room);
+    return Promise.resolve(this.publicSnapshotOf(room));
   }
-  async _startDraftAs(
-    roomId: string,
-    participantId: 'p1' | 'p2',
-  ): Promise<SeasonRoomPublicSnapshot> {
+  _startDraftAs(roomId: string, participantId: 'p1' | 'p2'): Promise<SeasonRoomPublicSnapshot> {
     if (participantId !== 'p1')
       throw Object.assign(new Error('only host can start draft'), { code: 'authorization' });
     return this.startDraft(roomId);
   }
-  async resume(roomId: string): Promise<
+  resume(roomId: string): Promise<
     SeasonRoomPublicSnapshot & {
       membership?: SeasonRoomMembership;
     }
@@ -457,9 +461,9 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     };
     const anyMember = room.members.get('p1') ?? room.members.get('p2') ?? null;
     if (anyMember) snap.membership = anyMember;
-    return snap;
+    return Promise.resolve(snap);
   }
-  async refresh(roomId: string): Promise<
+  refresh(roomId: string): Promise<
     SeasonRoomPublicSnapshot & {
       membership?: SeasonRoomMembership;
     }
@@ -479,13 +483,13 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
       unsubscribe: () => room.subscribers.delete(handler),
     };
   }
-  async refetch(roomId: string, afterOrdinal: number): Promise<SeasonPublicCommandEnvelope[]> {
+  refetch(roomId: string, afterOrdinal: number): Promise<SeasonPublicCommandEnvelope[]> {
     const room = this.rooms.get(roomId);
     if (!room) throw Object.assign(new Error('membership'), { code: 'membership' });
     this.assertNotOutdated(room);
-    return room.commands.filter((c) => c.ordinal > afterOrdinal);
+    return Promise.resolve(room.commands.filter((c) => c.ordinal > afterOrdinal));
   }
-  async submitCommand(envelope: SeasonPublicCommandEnvelope): Promise<SeasonCommandReceipt> {
+  submitCommand(envelope: SeasonPublicCommandEnvelope): Promise<SeasonCommandReceipt> {
     const room = this.rooms.get(envelope.roomId);
     if (!room) throw Object.assign(new Error('membership'), { code: 'membership' });
     this.assertNotOutdated(room);
@@ -497,7 +501,7 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
       throw Object.assign(new Error('authorization'), { code: 'authorization' });
     }
     const existing = room.receipts.get(envelope.commandId);
-    if (existing) return existing;
+    if (existing) return Promise.resolve(existing);
     const ordinal = room.commands.length;
     if (envelope.ordinal !== ordinal) {
       const receipt: SeasonCommandReceipt = {
@@ -509,7 +513,7 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
         resultDigest: null,
       };
       room.receipts.set(envelope.commandId, receipt);
-      return receipt;
+      return Promise.resolve(receipt);
     }
     room.commands.push(envelope);
     room.revision += 1;
@@ -524,9 +528,9 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     };
     room.receipts.set(envelope.commandId, receipt);
     this.notify(room);
-    return receipt;
+    return Promise.resolve(receipt);
   }
-  async submitPrivateDecision(submission: SeasonPrivateDecisionSubmission): Promise<{
+  submitPrivateDecision(submission: SeasonPrivateDecisionSubmission): Promise<{
     locked: boolean;
   }> {
     const room = this.rooms.get(submission.roomId);
@@ -547,9 +551,9 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
       room.phase = 'simulation';
       this.notify(room);
     }
-    return { locked };
+    return Promise.resolve({ locked });
   }
-  async publishAttestation(
+  publishAttestation(
     attestation: SeasonCheckpointAttestation,
   ): Promise<SeasonAcceptedCheckpoint | SeasonRerunRequest | SeasonIntegrityFailure2> {
     const room = this.rooms.get(attestation.roomId);
@@ -589,7 +593,7 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
         room.cursor = attestation.cursor;
         room.revision += 1;
         room.digest = a.resultDigest;
-        return accepted;
+        return Promise.resolve(accepted);
       }
       if (attestation.attempt === 1) {
         const rerun: SeasonRerunRequest = {
@@ -598,22 +602,19 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
           reason: 'hash mismatch, rerun from last checkpoint',
           attempt: 2,
         };
-        return rerun;
+        return Promise.resolve(rerun);
       }
       const failure: SeasonIntegrityFailure2 = {
         roomId: attestation.roomId,
         cursor: attestation.cursor,
         expectedInputDigest: a.inputDigest,
         expectedResultDigest: a.resultDigest,
-        attestations: list.slice(0, 2) as [
-          SeasonCheckpointAttestation,
-          SeasonCheckpointAttestation,
-        ],
+        attestations: [a, b],
         terminal: true,
       };
       room.phase = 'integrity-failed';
       this.notify(room);
-      return failure;
+      return Promise.resolve(failure);
     }
     const rerun: SeasonRerunRequest = {
       roomId: attestation.roomId,
@@ -621,9 +622,9 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
       reason: 'awaiting peer attestation',
       attempt: attestation.attempt,
     };
-    return rerun;
+    return Promise.resolve(rerun);
   }
-  async requestReclaim(roomId: string, participantId: 'p1' | 'p2'): Promise<void> {
+  requestReclaim(roomId: string, participantId: 'p1' | 'p2'): Promise<void> {
     const room = this.rooms.get(roomId);
     if (!room) throw Object.assign(new Error('membership'), { code: 'membership' });
     this.assertNotOutdated(room);
@@ -631,8 +632,9 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     if (!priv) throw Object.assign(new Error('membership'), { code: 'membership' });
     if (priv.control === 'surrendered')
       throw Object.assign(new Error('authorization'), { code: 'authorization' });
+    return Promise.resolve();
   }
-  async surrender(roomId: string, participantId: 'p1' | 'p2'): Promise<void> {
+  surrender(roomId: string, participantId: 'p1' | 'p2'): Promise<void> {
     const room = this.rooms.get(roomId);
     if (!room) throw Object.assign(new Error('membership'), { code: 'membership' });
     this.assertNotOutdated(room);
@@ -640,8 +642,9 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     if (!priv) throw Object.assign(new Error('membership'), { code: 'membership' });
     priv.control = 'surrendered';
     this.notify(room);
+    return Promise.resolve();
   }
-  async preDraftRemoval(roomId: string, targetParticipantId: 'p1' | 'p2'): Promise<SeasonRoomCode> {
+  preDraftRemoval(roomId: string, targetParticipantId: 'p1' | 'p2'): Promise<SeasonRoomCode> {
     const room = this.rooms.get(roomId);
     if (!room) throw Object.assign(new Error('membership'), { code: 'membership' });
     this.assertNotOutdated(room);
@@ -658,13 +661,14 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     room.codeExpiresAt = this.clock() + this.codeExpiryMs;
     this.codeToRoom.set(newCode, roomId);
     this.notify(room);
-    return newCode as SeasonRoomCode;
+    return Promise.resolve(newCode);
   }
-  async close(roomId: string): Promise<void> {
+  close(roomId: string): Promise<void> {
     const room = this.rooms.get(roomId);
-    if (!room) return;
+    if (!room) return Promise.resolve();
     if (room.code) this.codeToRoom.delete(room.code);
     this.rooms.delete(roomId);
+    return Promise.resolve();
   }
   getRoom(roomId: string): InMemoryRoom | undefined {
     return this.rooms.get(roomId);
@@ -683,7 +687,7 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
       schemaVersion: SEASON_ROOM_PROTOCOL_SCHEMA_VERSION_V1 as unknown as 2,
       pace: 'live',
       mode: 'season',
-      roomProtocolVersion: SEASON_ROOM_PROTOCOL_SCHEMA_VERSION_V1 as unknown as 1,
+      roomProtocolVersion: SEASON_ROOM_PROTOCOL_SCHEMA_VERSION_V1,
       multiplayerVersion: SEASON_MULTIPLAYER_VERSION_V1 as unknown as 'season-multiplayer-v2',
       timerPolicyVersion: SEASON_TIMER_POLICY_VERSION,
       ...settings,

@@ -4,7 +4,7 @@ export function randomBytes(bytes: number): Uint8Array {
     crypto.getRandomValues(buffer);
     return buffer;
   }
-  return new Uint8Array(bytes);
+  throw new Error('Secure random number generation is unavailable.');
 }
 export function bytesToHex(bytes: Uint8Array): string {
   return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');

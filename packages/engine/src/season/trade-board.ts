@@ -1,12 +1,8 @@
 import {
   SEASON_INFLUENCE_FLOOR,
-  SEASON_TRADE_VERSION,
   franchiseIdSchema,
   seasonNamespaceSeed,
   type SeasonDraftCatalog,
-  type SeasonHealthState,
-  type SeasonInfluenceState,
-  type SeasonRoster,
   type SeasonRun,
   type SeasonTradeBoardTeamProfile,
   type SeasonTradeNegotiation,
@@ -16,7 +12,6 @@ import {
 } from '@hoop-rush/data-contracts';
 import { slotGroupOf } from '../domain/positions.ts';
 import { seasonTradeCatalogFactsOf, seasonTradePlayerValue } from './trades.ts';
-import { validateSeasonRoster } from './roster-rules.ts';
 import { drawHexInt } from './season-seeds.ts';
 export const TRADE_BOARD_SIZE = 8;
 export const TRADE_INQUIRY_BASE = 3;
@@ -315,7 +310,10 @@ export function evaluateTradeProposal(input: {
       return { ok: false, code: 'trade-cash-cap', reason: 'cash >2 per proposal' };
     }
     if (influenceAmount > 0) {
-      const senderFid = franchiseIdSchema.parse(influenceFromSender!);
+      if (influenceFromSender === null) {
+        throw new Error('trade proposal with Influence amount requires a sender');
+      }
+      const senderFid = franchiseIdSchema.parse(influenceFromSender);
       const senderWindows = run.influence.windows[senderFid] ?? [];
       const senderWin = senderWindows.find((w) => w.windowIndex === windowIndex);
       const sent = senderWin?.tradeCashSent ?? 0;
@@ -408,9 +406,13 @@ export function openTradeInquiry(
     activeInquiryId: inquiryId,
     negotiations: [...(win.negotiations ?? []), negotiation],
   };
+  const trade = run.trade;
+  if (trade === null || trade === undefined) {
+    throw new Error('trade inquiry requires an open trade window');
+  }
   const nextTrade: SeasonTradeState = {
-    ...run.trade!,
-    windows: run.trade!.windows.map((w) => (w.windowIndex === windowIndex ? nextWin : w)),
+    ...trade,
+    windows: trade.windows.map((w) => (w.windowIndex === windowIndex ? nextWin : w)),
   };
   return { inquiryId, run: { ...run, trade: nextTrade } };
 }

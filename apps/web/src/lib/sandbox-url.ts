@@ -8,6 +8,7 @@ import type {
 import {
   eraIdSchema,
   franchiseIdSchema,
+  LINEUP_STRUCTURE,
   playerIdSchema,
   seedSchema,
 } from '@hoop-rush/data-contracts';
@@ -95,7 +96,7 @@ export function parseSandboxUrl(
       rows.push(entry);
     }
     const validation = validateLineup({
-      structure: ['G', 'G', 'F', 'F', 'C'],
+      structure: [...LINEUP_STRUCTURE],
       assignments: rows.map((row, slotIndex) => ({
         slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4,
         playerId: row.playerId,

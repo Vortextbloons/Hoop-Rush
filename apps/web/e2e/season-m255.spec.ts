@@ -1,12 +1,15 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { DraftPlanner, draftOneRound } from './season-helpers';
 
 const planner = new DraftPlanner();
 
-async function clearSaves(page) {
+async function clearSaves(page: Page): Promise<void> {
   await page.goto('/season');
   await page.evaluate(async () => {
-    const dbs = await indexedDB.databases?.();
+    const databases = (
+      indexedDB as unknown as { databases?: () => Promise<Array<{ name?: string }>> }
+    ).databases;
+    const dbs = databases === undefined ? undefined : await databases();
     if (dbs) {
       for (const db of dbs) {
         if (db.name) indexedDB.deleteDatabase(db.name);
@@ -20,16 +23,16 @@ async function clearSaves(page) {
   await page.reload();
 }
 
-async function draftFull(page) {
+async function draftFull(page: Page): Promise<void> {
   planner.reset();
   for (let round = 1; round <= 10; round += 1) {
     // draw
     const drawBtn = page.getByRole('button', {
-      name: new RegExp(`Draw round ${round} offer`, 'i'),
+      name: new RegExp(`Draw round ${String(round)} offer`, 'i'),
     });
     if (await drawBtn.isVisible()) {
       await drawBtn.click();
-      await expect(page.getByText(new RegExp(`Offer · pick ${round}`, 'i'))).toBeVisible({
+      await expect(page.getByText(new RegExp(`Offer · pick ${String(round)}`, 'i'))).toBeVisible({
         timeout: 8000,
       });
     }

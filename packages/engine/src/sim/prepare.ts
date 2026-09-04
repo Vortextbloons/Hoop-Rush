@@ -106,6 +106,4 @@ export function prepareTeam(team: SimulationTeam, profile: EraSimulationProfile)
     passP: passPByPlayer,
   };
 }
-export function prepareTeamCached(team: SimulationTeam, profile: EraSimulationProfile): TeamPrep {
-  return prepareTeam(team, profile);
-}
+

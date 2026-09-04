@@ -10,7 +10,6 @@ import { meanTripSeconds, sampleTripSeconds } from './timing.ts';
 import {
   pickAction,
   pickDefender,
-  pickInitiator,
   pickAssister,
   pickShot,
   pickZone,
@@ -19,18 +18,16 @@ import {
   type ActionType,
   type PossessionStartType,
 } from './usage.ts';
-import { eraPossEstimatePerTrip, isSteal, pickStealer, turnoverProbability } from './security.ts';
+import { eraPossEstimatePerTrip, isSteal, turnoverProbability } from './security.ts';
 import { blockProbability, makeProbability, type ShotPrep } from './shooting.ts';
 import {
   freeThrowsForZone,
   freeThrowProbability,
   nonShootingFoulProbability,
-  pickFouler,
-  pickFreeThrowShooter,
   shootingFoulProbability,
 } from './fouls.ts';
-import { pickRebounder, resolveRebound } from './rebounding.ts';
-import { prepareTeamCached, enginePlayerKey, type TeamPrep } from './prepare.ts';
+import { resolveRebound } from './rebounding.ts';
+import { prepareTeam, enginePlayerKey, type TeamPrep } from './prepare.ts';
 import { ENGINE_CONSTANTS } from './constants.ts';
 import { creationScore } from '../domain/archetypes.ts';
 import type { SeasonHomeCourtMechanisms } from '../season/home-court.ts';
@@ -82,7 +79,7 @@ export function createTripContext(
     profile,
     teams,
     teamUnits: [unitVersionIdsOf(teams[0]), unitVersionIdsOf(teams[1])],
-    preps: [prepareTeamCached(teams[0], profile), prepareTeamCached(teams[1], profile)],
+    preps: [prepareTeam(teams[0], profile), prepareTeam(teams[1], profile)],
     meanTripSeconds: meanTripSeconds(profile),
     eraPossEstimatePerTrip: eraPossEstimatePerTrip(profile) ?? 1,
     passingAnchorFactor: 0.5 + (profile.parameters.assistAnchorRating - 50) / 100,
@@ -165,7 +162,7 @@ export class PossessionStepper {
     const team = teams[offense];
     const teamPrep = preps[offense];
     const defensePrep = preps[defense];
-    const handler = pickInitiator(team, teamPrep.initiatorWeights, rng);
+    const handler = rng.weightedPick(team.players, teamPrep.initiatorWeights);
     const handlerSlot = teamPrep.slotByPlayerId.get(enginePlayerKey(handler)) ?? -1;
     this.handlerVersion = handler.playerVersionId;
     const awayTurnoverPressure =
@@ -189,7 +186,7 @@ export class PossessionStepper {
     ) {
       recorder.turnover(offense, handlerSlot >= 0 ? handlerSlot : 0);
       if (isSteal(rng, defensePrep.stealAbility, this.ctx.profile)) {
-        const stealer = pickStealer(teams[defense].players, defensePrep.stealerWeights, rng);
+        const stealer = rng.weightedPick(teams[defense].players, defensePrep.stealerWeights);
         const stealerSlot = defensePrep.slotByPlayerId.get(enginePlayerKey(stealer)) ?? -1;
         recorder.steal(defense, stealerSlot >= 0 ? stealerSlot : 0);
       }
@@ -216,7 +213,7 @@ export class PossessionStepper {
     if (rng.chance(ENGINE_CONSTANTS.offensiveFoulShare)) {
       const offenseTeam = teams[offense];
       const offensePrep = preps[offense];
-      const fouler = pickFouler(offenseTeam.players, offensePrep.foulerWeights, rng);
+      const fouler = rng.weightedPick(offenseTeam.players, offensePrep.foulerWeights);
       const foulerSlot = offensePrep.slotByPlayerId.get(enginePlayerKey(fouler)) ?? -1;
       recorder.foul(offense, foulerSlot >= 0 ? foulerSlot : 0);
       recorder.turnover(offense, foulerSlot >= 0 ? foulerSlot : 0);
@@ -227,14 +224,14 @@ export class PossessionStepper {
     }
     const defenseTeam = teams[defense];
     const defensePrep = preps[defense];
-    const fouler = pickFouler(defenseTeam.players, defensePrep.foulerWeights, rng);
+    const fouler = rng.weightedPick(defenseTeam.players, defensePrep.foulerWeights);
     const foulerSlot = defensePrep.slotByPlayerId.get(enginePlayerKey(fouler)) ?? -1;
     recorder.foul(defense, foulerSlot >= 0 ? foulerSlot : 0);
     state.periodFouls[defense] += 1;
     if (teamInBonus(state.periodFouls[defense], state.periodIndex >= 4)) {
       const team = teams[offense];
       const teamPrep = preps[offense];
-      const shooter = pickFreeThrowShooter(team.players, teamPrep.freeThrowShooterWeights, rng);
+      const shooter = rng.weightedPick(team.players, teamPrep.freeThrowShooterWeights);
       const shooterSlot = teamPrep.slotByPlayerId.get(enginePlayerKey(shooter)) ?? -1;
       resolveFreeThrows(
         this.ctx,
@@ -474,7 +471,7 @@ function reboundFromMissedFreeThrow(
   const side = offensive ? offenseSide : defenseSide;
   const team = ctx.teams[side];
   const prep = ctx.preps[side];
-  const rebounder = pickRebounder(team.players, prep.rebounderWeights[offensive ? 0 : 1], ctx.rng);
+  const rebounder = ctx.rng.weightedPick(team.players, prep.rebounderWeights[offensive ? 0 : 1]);
   const slot = prep.slotByPlayerId.get(enginePlayerKey(rebounder)) ?? -1;
   if (offensive) {
     ctx.recorder.offensiveRebound(offenseSide, slot >= 0 ? slot : 0);
@@ -529,7 +526,7 @@ function resolveShot(
   const teamPrep = ctx.preps[offenseSide];
   const defense = ctx.teams[defenseSide];
   const defensePrep = ctx.preps[defenseSide];
-  const initiator = pickInitiator(team, teamPrep.initiatorWeights, rng);
+  const initiator = rng.weightedPick(team.players, teamPrep.initiatorWeights);
   const actionWeights = teamPrep.actionWeights.get(enginePlayerKey(initiator));
   if (actionWeights === undefined) {
     throw new Error(`possession: no action weights for ${initiator.playerId}`);
@@ -695,7 +692,7 @@ function reboundAfterMiss(
   }
   if (result.offensive) {
     const prep = ctx.preps[offenseSide];
-    const rebounder = pickRebounder(ctx.teams[offenseSide].players, prep.rebounderWeights[0], rng);
+    const rebounder = rng.weightedPick(ctx.teams[offenseSide].players, prep.rebounderWeights[0]);
     const slot = prep.slotByPlayerId.get(enginePlayerKey(rebounder)) ?? -1;
     recorder.offensiveRebound(offenseSide, slot >= 0 ? slot : 0);
     ctx.possessionStart = 'offensiveRebound';
@@ -707,7 +704,7 @@ function reboundAfterMiss(
     };
   }
   const prep = ctx.preps[defenseSide];
-  const rebounder = pickRebounder(ctx.teams[defenseSide].players, prep.rebounderWeights[1], rng);
+  const rebounder = rng.weightedPick(ctx.teams[defenseSide].players, prep.rebounderWeights[1]);
   const slot = prep.slotByPlayerId.get(enginePlayerKey(rebounder)) ?? -1;
   recorder.defensiveRebound(defenseSide, slot >= 0 ? slot : 0);
   ctx.possessionStart = 'defensiveRebound';

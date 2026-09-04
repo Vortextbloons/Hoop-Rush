@@ -74,10 +74,4 @@ export function rebounderWeights(
     );
   });
 }
-export function pickRebounder(
-  players: readonly SimulationPlayer[],
-  weights: readonly number[],
-  rng: Rng,
-): SimulationPlayer {
-  return rng.weightedPick(players, weights);
-}
+

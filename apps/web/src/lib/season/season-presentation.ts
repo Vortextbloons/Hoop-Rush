@@ -4,7 +4,6 @@ import {
   SEASON_RECAP_VERSION,
   SEASON_ROSTER_MAX_SIZE,
   SEASON_ROSTER_MIN_SIZE,
-  SEASON_ROTATION_SIZE,
   SEASON_ROUND_COUNT,
   blockRoundRange,
   franchiseIdSchema,
@@ -35,8 +34,6 @@ import {
   type SeasonStreak,
   type SeasonTeamAggregate,
   type SeasonTeamBox,
-  type SeasonTradeBoardTeamProfile,
-  type SeasonTradeNegotiation,
   type SeasonTradeValueTrend,
   type SeasonUpcomingHumanGame,
   type SeasonVersionSpotlight,
@@ -1001,7 +998,7 @@ export function formatCampaignCondition(condition: SeasonCampaignCondition): str
     case 'beat-conference-leader':
       return `Beat the conference leader`;
     case 'sweep-opponent':
-      return `Sweep ${condition.opponentFranchiseId ?? 'opponent'} ${op}${String(condition.threshold)}`;
+      return `Sweep ${condition.opponentFranchiseId} ${op}${String(condition.threshold)}`;
     case 'defensive-efficiency':
       return `Allow ${op}${String(condition.threshold)} pts / game (defensive efficiency)`;
     case 'three-point-volume':
@@ -1044,7 +1041,7 @@ export function formatCampaignCondition(condition: SeasonCampaignCondition): str
   }
 }
 export function formatCampaignReward(reward: SeasonCampaignReward): string {
-  const label = CAMPAIGN_REWARD_LABELS[reward.type] ?? reward.type;
+  const label = CAMPAIGN_REWARD_LABELS[reward.type];
   return `+${String(reward.amount)} ${label} · ${reward.rewardId}`;
 }
 export function campaignRewardSummary(
@@ -1107,9 +1104,9 @@ export function campaignTimelineViewModel(
     },
     appliedRewardIds: [],
   };
-  const evaluations = campaign.evaluations ?? [];
-  const priorEvaluation = evaluations.length > 0 ? evaluations[evaluations.length - 1]! : null;
-  const branchEntries = Object.entries(campaign.branchState ?? {}).map(([branchId, state]) => ({
+  const evaluations = campaign.evaluations;
+  const priorEvaluation = evaluations.at(-1) ?? null;
+  const branchEntries = Object.entries(campaign.branchState).map(([branchId, state]) => ({
     branchId,
     state,
   }));
@@ -1122,10 +1119,8 @@ export function campaignTimelineViewModel(
     campaign.evolutionSelection === null;
   const isBlock8NoOpportunity = targetBlock === 8;
   const offersForBlock =
-    targetBlock !== null && targetBlock >= 0 && targetBlock < 8
-      ? (campaign.offers[targetBlock] ?? [])
-      : [];
-  const selections = campaign.selections ?? {};
+    targetBlock >= 0 && targetBlock < 8 ? (campaign.offers[targetBlock] ?? []) : [];
+  const selections = campaign.selections;
   const currentOffers: CampaignCardViewModel[] = offersForBlock.map((opp) => {
     const isSelected = selections[targetBlock]?.opportunityId === opp.opportunityId;
     return {
@@ -1269,7 +1264,7 @@ export function packageConsequenceFacts(input: {
   const influenceNote =
     input.influenceAmount === 0
       ? 'No Influence attached'
-      : `${String(input.influenceAmount)} Influence from ${input.influenceFromSender === input.humanFranchiseId ? 'you' : input.influenceFromSender === input.toFranchiseId ? 'them' : input.influenceFromSender} · never alone, 1–2 max, capped at 5% per point (10% total)`;
+      : `${String(input.influenceAmount)} Influence from ${input.influenceFromSender === input.humanFranchiseId ? 'you' : input.influenceFromSender === input.toFranchiseId ? 'them' : (input.influenceFromSender ?? 'unknown')} · never alone, 1–2 max, capped at 5% per point (10% total)`;
   return {
     fromRosterSize: input.fromRosterSize,
     toRosterSize: input.toRosterSize,
@@ -1297,7 +1292,7 @@ export function valueTrendToneLabel(trend: SeasonTradeValueTrend['trend']): stri
       return 'Stable';
   }
 }
-export function rehabPresentationFacts(balance: number): {
+export function rehabPresentationFacts(): {
   floor: number;
   cap: number;
   cost: number;

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, waitFor, within } from '@testing-library/svelte';
+import { fireEvent, render, waitFor } from '@testing-library/svelte';
 import {
   SEASON_DRAFT_CATALOG_V3,
   SEASON_DURABILITY_VERSION,
@@ -192,7 +192,7 @@ function fixtureRun(): SeasonRun {
   return { ...base, freeAgency: opened.freeAgency };
 }
 function windowOf(freeAgency: SeasonFreeAgencyState): SeasonFreeAgencyWindowState {
-  const window = freeAgency.windows[0]!;
+  const window = freeAgency.windows[0];
   if (window === undefined) throw new Error('fixture has no open window');
   return window;
 }

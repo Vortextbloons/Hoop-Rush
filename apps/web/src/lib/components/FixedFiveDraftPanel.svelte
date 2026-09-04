@@ -6,10 +6,7 @@
     PlayerId,
     SlotIndex,
   } from '@hoop-rush/data-contracts';
-  import {
-    franchiseAbbreviation,
-    resolveEraTeamIdentity,
-  } from '@hoop-rush/data-contracts';
+  import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
   import ClassicRollReel from '$lib/components/classic/ClassicRollReel.svelte';
   import DraftPoolBrowser from '$lib/components/draft/DraftPoolBrowser.svelte';
   import LineupCourt from '$lib/components/LineupCourt.svelte';
@@ -17,10 +14,7 @@
   import DraftValuePanel from '$lib/components/DraftValuePanel.svelte';
   import LineupSummaryNav from '$lib/components/LineupSummaryNav.svelte';
   import { classicPoolRows } from '$lib/classic-draft';
-  import {
-    poolSortLabel,
-    type DraftPresentation,
-  } from '$lib/draft-presentation';
+  import { poolSortLabel, type DraftPresentation } from '$lib/draft-presentation';
   import { displacementTargetFor } from '$lib/draft-slots';
   import { resolvePlayerRefs } from '$lib/player-refs';
   import type { PeakPlayerSeason } from '@hoop-rush/data-contracts';
@@ -159,8 +153,7 @@
       rerollEraSpent: tokens.eraSpent,
       complete: false,
       turn: picker === selfId,
-      turnText:
-        picker === selfId ? 'Your pick — alternating draft.' : 'Opponent is picking…',
+      turnText: picker === selfId ? 'Your pick — alternating draft.' : 'Opponent is picking…',
     };
   });
 
@@ -225,14 +218,10 @@
     return rows;
   });
   const sandboxLocked = $derived(
-    replay.mode === 'sandbox-shared-82'
-      ? (selfId === 'p1' ? replay.p1 : replay.p2).locked
-      : false,
+    replay.mode === 'sandbox-shared-82' ? (selfId === 'p1' ? replay.p1 : replay.p2).locked : false,
   );
 
-  const activeCourtRows = $derived(
-    mode === 'sandbox-shared-82' ? courtRows : myCourtRows,
-  );
+  const activeCourtRows = $derived(mode === 'sandbox-shared-82' ? courtRows : myCourtRows);
   const pickedCount = $derived(activeCourtRows.filter((p) => p !== null).length);
   const allowDisplacement = $derived(mode !== 'duel');
 
@@ -240,7 +229,7 @@
   const rollFranchise = $derived(
     rollView && !rollView.complete
       ? (rollManifest.modernFranchiseSlots.find((e) => e.franchiseId === rollView.franchiseId) ??
-        null)
+          null)
       : null,
   );
   const rollEra = $derived(
@@ -258,9 +247,7 @@
       ? `${rollIdentity.abbreviationLabel ?? franchiseAbbreviation(rollFranchise.franchiseId)} · ${rollEra.label}`
       : (rollView?.label ?? 'Draft pool'),
   );
-  const poolCountLabel = $derived(
-    `${rollRows.length} players · ${poolSortLabel(presentation)}`,
-  );
+  const poolCountLabel = $derived(`${rollRows.length} players · ${poolSortLabel(presentation)}`);
 
   $effect(() => {
     const rows = activeCourtRows;
@@ -347,7 +334,10 @@
     </p>
   {/if}
   {#if error}
-    <p class="mt-2 rounded-lg border border-destructive/40 bg-destructive/10 p-2 text-xs" role="alert">
+    <p
+      class="mt-2 rounded-lg border border-destructive/40 bg-destructive/10 p-2 text-xs"
+      role="alert"
+    >
       {error}
     </p>
   {/if}
@@ -477,7 +467,7 @@
         manifest={assets.manifest}
         {presentation}
         filtersEditable={true}
-        allowDisplacement={allowDisplacement}
+        {allowDisplacement}
         error={null}
         emptyMessage="No players in this pool."
         onpick={openPicker}
@@ -528,7 +518,7 @@
       countLabel={`${sandboxRows.length} players`}
       filtersEditable={true}
       manifest={assets.manifest}
-      presentation={presentation}
+      {presentation}
       error={null}
       emptyMessage="No players match."
       allowDisplacement={true}
@@ -566,7 +556,7 @@
       slots={activeCourtRows}
       manifest={assets.manifest}
       {presentation}
-      allowDisplacement={allowDisplacement}
+      {allowDisplacement}
       onplace={placeWithDisplacement}
       onclose={closePicker}
     />

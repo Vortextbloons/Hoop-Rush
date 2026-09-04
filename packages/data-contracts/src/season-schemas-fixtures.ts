@@ -21,19 +21,13 @@ import { SEASON_ALIGNMENT } from './season-alignment.ts';
 import { SEASON_FREE_AGENCY_VERSION, SEASON_RUN_SCHEMA_VERSION } from './season-versions.ts';
 import {
   commandIdSchema,
-  contentHashSchema,
-  eraIdSchema,
   franchiseIdSchema,
   idSchema,
-  playerIdSchema,
   seasonGameIdSchema,
-  seasonKeySchema,
   seedSchema,
 } from './ids.ts';
 import { seasonLeagueSchema } from './season-league.ts';
 import { seasonRosterSchema } from './season-roster.ts';
-import { classicDraftCatalogSchema } from './classic.ts';
-import { peakPlayerSeasonSchema } from './player-season.ts';
 import { seasonScheduleSchema } from './season-schedule.ts';
 import { seasonRunSchema } from './season-run.ts';
 import { seasonGameSummarySchema } from './season-game-summary.ts';

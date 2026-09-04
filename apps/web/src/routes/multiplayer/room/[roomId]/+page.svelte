@@ -85,6 +85,7 @@
   let submittedPropose = $state<ContentHash | null>(null);
   let confirmedFor = $state<ContentHash | null>(null);
   let reranMismatch = $state(false);
+  let mismatchReported = $state(false);
   let completedSent = $state(false);
   let failSent = $state(false);
   let busyAction = $state<string | null>(null);
@@ -256,8 +257,7 @@
       }
       const builder = selfId === 'p1' ? replay.p1 : replay.p2;
       const incumbent = builder.placements.find((p) => p.slotIndex === slot) ?? null;
-      const subjectOld =
-        builder.placements.find((p) => p.playerId === playerId)?.slotIndex ?? null;
+      const subjectOld = builder.placements.find((p) => p.playerId === playerId)?.slotIndex ?? null;
       if (!incumbent || incumbent.playerId === playerId) {
         await sendCommand({ kind: 'sandbox-place', playerId, slotIndex: slot });
         return;
@@ -593,33 +593,60 @@
     }
   });
 
+  async function rerunSimulation(): Promise<void> {
+    try {
+      runner?.dispose();
+      runner = null;
+      await fixedFiveRepository.clearPendingResult(roomId).catch(() => {});
+      simStarted = false;
+      simDone = false;
+      localResult = null;
+      simEntries = [];
+      progress = null;
+      simError = null;
+      await sync(lastOrdinal);
+      if (mounted) void startSim();
+    } catch (e) {
+      if (mounted) simError = e instanceof Error ? e.message : String(e);
+    }
+  }
+
   $effect(() => {
     if (!mounted || !localResult || !snapshot) return;
     if (snapshot.phase !== 'lobby') return;
     const myDigest = localResult.digest;
     const foreign = facts.proposals.filter((p) => p.actor !== selfId);
-    if (facts.proposals.length === 0 && !submittedPropose) {
-      void proposeDigest(myDigest);
+    if (foreign.length === 0) {
+      if (submittedPropose !== myDigest) void proposeDigest(myDigest);
       return;
     }
-    if (foreign.length === 0) return;
     const match = foreign.some((p) => p.digest === myDigest);
     if (match && confirmedFor !== myDigest) {
       void confirmDigest(myDigest, true);
       return;
     }
     if (!match && !reranMismatch) {
+      // Genuine rerun: resync to the tip and re-simulate from the accepted
+      // log before concluding anything. A transient lag (simulating before
+      // the last pick arrived) heals here; anything else stays divergent.
       reranMismatch = true;
-      const first = foreign[0];
-      if (first && !submittedPropose) {
-        void (async () => {
-          await proposeDigest(myDigest);
-          await confirmDigest(first.digest, false);
-        })();
-      } else if (first) {
-        void confirmDigest(first.digest, false);
-      }
+      void rerunSimulation();
     }
+  });
+
+  $effect(() => {
+    if (!mounted || !localResult || !snapshot || !reranMismatch || mismatchReported) return;
+    if (snapshot.phase !== 'lobby') return;
+    const myDigest = localResult.digest;
+    const foreign = facts.proposals.filter((p) => p.actor !== selfId);
+    if (foreign.some((p) => p.digest === myDigest)) return;
+    if (foreign.length === 0) return;
+    mismatchReported = true;
+    const first = foreign[0];
+    void (async () => {
+      if (submittedPropose !== myDigest) await proposeDigest(myDigest);
+      if (first) await confirmDigest(first.digest, false);
+    })();
   });
 
   $effect(() => {

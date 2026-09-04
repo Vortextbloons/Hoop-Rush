@@ -622,16 +622,15 @@ export function campaignEvaluationFailures(run: SeasonRun): string[] {
   ).campaign;
   if (!campaign) return failures;
   for (const ev of campaign.evaluations) {
-    if (!ev.opportunityId)
-      failures.push(`evaluation ${ev.opportunityId} missing outcome`);
+    if (!ev.opportunityId) failures.push(`evaluation ${ev.opportunityId} missing outcome`);
     if (!['missed', 'completed', 'breakthrough'].includes(ev.outcome))
       failures.push(`evaluation ${ev.opportunityId} has invalid outcome`);
     if (ev.appliedRewardIds.length > 2)
       failures.push(`evaluation ${ev.opportunityId} applies too many rewards`);
   }
   for (const [branchId, state] of Object.entries(campaign.branchState)) {
-    if (!['open', 'completed', 'missed', 'locked'].includes(state as string)) {
-      failures.push(`branch ${branchId} has invalid state ${String(state)}`);
+    if (!['open', 'completed', 'missed', 'locked'].includes(state)) {
+      failures.push(`branch ${branchId} has invalid state ${state}`);
     }
   }
   return failures;
@@ -696,7 +695,7 @@ export function aiResponseFailures(run: SeasonRun): string[] {
       ).negotiations ?? [];
     for (const neg of negotiations) {
       if (neg.exchangeCount > 3)
-        failures.push(`negotiation ${neg.exchangeCount} exceeds 3 exchanges`);
+        failures.push(`negotiation ${String(neg.exchangeCount)} exceeds 3 exchanges`);
       if (neg.exchanges && neg.exchanges.length !== neg.exchangeCount)
         failures.push('exchangeCount mismatches exchanges length');
     }

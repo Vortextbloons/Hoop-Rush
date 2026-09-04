@@ -7,7 +7,6 @@ import {
   seasonNamespaceSeed,
   seedSchema,
 } from '@hoop-rush/data-contracts';
-import { createRng } from '../sim/rng.ts';
 import {
   applySeasonCampaignEvolutionSelection,
   applySeasonCampaignReward,
@@ -29,15 +28,17 @@ function standingsFor(
   return {
     schemaVersion: 1 as const,
     standingsVersion: 'standings-v1' as const,
-    rows: run.league.teams.map((team) => ({
-      franchiseId: team.franchiseId,
-      wins: winMap?.[team.franchiseId] ?? (team.franchiseId === HUMAN ? 5 : 3),
-      losses:
-        winMap?.[team.franchiseId] !== undefined
-          ? 10 - (winMap?.[team.franchiseId] ?? 0)
-          : team.franchiseId === HUMAN
-            ? 5
-            : 7,
+    rows: run.league.teams.map((team) => {
+      const mappedWins = winMap?.[team.franchiseId];
+      return {
+        franchiseId: team.franchiseId,
+        wins: mappedWins ?? (team.franchiseId === HUMAN ? 5 : 3),
+        losses:
+          mappedWins !== undefined
+            ? 10 - mappedWins
+            : team.franchiseId === HUMAN
+              ? 5
+              : 7,
       gamesPlayed: 10,
       homeWins: 0,
       homeLosses: 0,
@@ -52,7 +53,8 @@ function standingsFor(
       headToHead: run.league.teams
         .filter((other) => other.franchiseId !== team.franchiseId)
         .map((other) => ({ franchiseId: other.franchiseId, wins: 0, losses: 0 })),
-    })),
+      };
+    }),
   };
 }
 function generationInput(
@@ -235,13 +237,9 @@ describe('season campaign generation (M2.5.5)', () => {
     const base = generationInput();
     base.campaignState.startingIdentity = 'win-now';
     const winNowOffers = generateSeasonCampaignOffers(base);
-    const winNowResults = winNowOffers.filter(
-      (o) => o.family === 'results' || o.family === 'marquee',
-    ).length;
     const dev = generationInput();
     dev.campaignState.startingIdentity = 'player-development';
     const devOffers = generateSeasonCampaignOffers(dev);
-    const devPlayer = devOffers.filter((o) => o.family === 'player-role').length;
     expect(winNowOffers).toHaveLength(2);
     expect(devOffers).toHaveLength(2);
     for (const opp of [...winNowOffers, ...devOffers]) {
@@ -298,9 +296,13 @@ describe('season campaign evaluation', () => {
     });
     if (targetOffer.breakthrough) {
       expect(evalBreakthrough.outcome).toBe('breakthrough');
+      const breakthroughReward = targetOffer.breakthroughReward;
+      if (breakthroughReward === null) {
+        throw new Error('fixture breakthrough reward missing');
+      }
       expect(evalBreakthrough.appliedRewardIds).toEqual([
         targetOffer.completedReward.rewardId,
-        targetOffer.breakthroughReward!.rewardId,
+        breakthroughReward.rewardId,
       ]);
     }
     const summaries2 = blockSummariesForWins(2);
@@ -313,7 +315,11 @@ describe('season campaign evaluation', () => {
   it('reads only saved summaries, standings, rotations, transactions, health', () => {
     const input = generationInput();
     const offers = generateSeasonCampaignOffers(input);
-    const opp = offers[0]!;
+    const firstOffer = offers[0];
+    if (firstOffer === undefined) {
+      throw new Error('expected campaign offers');
+    }
+    const opp = firstOffer;
     const lowWins = blockSummariesForWins(1);
     const highWins = blockSummariesForWins(9);
     const evLow = evaluateSeasonCampaignOpportunity({
@@ -410,7 +416,11 @@ describe('campaign branching', () => {
   it('completed unlocks normal follow-up', () => {
     const input = generationInput({ blockIndex: 0 });
     const offers0 = generateSeasonCampaignOffers(input);
-    const branchToTest = offers0.find((o) => o.family === 'results') ?? offers0[0]!;
+    const fallbackOffer = offers0[0];
+    if (fallbackOffer === undefined) {
+      throw new Error('expected campaign offers');
+    }
+    const branchToTest = offers0.find((o) => o.family === 'results') ?? fallbackOffer;
     const summariesWin = blockSummariesForWins(7);
     const evaluationCompleted = evaluateSeasonCampaignOpportunity({
       opportunity: branchToTest,
@@ -449,7 +459,6 @@ describe('campaign branching', () => {
     const nextInput = generationInput({ blockIndex: 1, campaignState: after.campaignState });
     const offers1 = generateSeasonCampaignOffers(nextInput);
     expect(offers1).toHaveLength(2);
-    const hasFollowUp = offers1.some((o) => o.branchId === branchToTest.branchId);
     expect(after.campaignState.branchState[branchToTest.branchId]).toBe('open');
   });
   it('breakthrough may unlock ambitious follow-up recorded on offer', () => {
@@ -472,6 +481,10 @@ describe('campaign branching', () => {
     });
     expect(evaluation.outcome).toBe('breakthrough');
     const influence = createInitialSeasonInfluenceState(input.rosters.map((r) => r.franchiseId));
+    const breakthroughReward = withBreakthrough.breakthroughReward;
+    if (breakthroughReward === null) {
+      throw new Error('fixture breakthrough reward missing');
+    }
     const after = applySeasonCampaignReward({
       evaluation,
       opportunity: withBreakthrough,
@@ -491,7 +504,7 @@ describe('campaign branching', () => {
       commandId: 'cmd-1',
     });
     expect(after.campaignState.rewardEntitlements.followUpUnlocks).toContain(
-      withBreakthrough.breakthroughReward!.rewardId,
+      breakthroughReward.rewardId,
     );
     expect(after.campaignState.branchState[withBreakthrough.branchId]).toBe('completed');
   });
@@ -534,20 +547,30 @@ describe('campaign evolution', () => {
       summaries: [],
     });
     expect(offers).toEqual(second);
+    const firstEvolutionOffer = offers[0];
+    if (firstEvolutionOffer === undefined) {
+      throw new Error('expected evolution offers');
+    }
     const evolved = applySeasonCampaignEvolutionSelection({
       campaignState: { ...campaignState, evolutionOffers: offers },
-      offerId: offers[0]!.offerId,
+      offerId: firstEvolutionOffer.offerId,
       commandId: 'cmd-evo-1',
     });
-    expect(evolved.evolutionSelection?.selectedOfferId).toBe(offers[0]!.offerId);
-    expect(evolved.evolutionSelection?.resultingIdentity).toBe(offers[0]!.resultingIdentity);
+    expect(evolved.evolutionSelection?.selectedOfferId).toBe(firstEvolutionOffer.offerId);
+    expect(evolved.evolutionSelection?.resultingIdentity).toBe(
+      firstEvolutionOffer.resultingIdentity,
+    );
   });
 });
 describe('campaign reward cap', () => {
   it('caps Influence at 8 and records requested vs applied delta', () => {
     const input = generationInput();
     const offers = generateSeasonCampaignOffers(input);
-    const opp = offers.find((o) => o.completedReward.type === 'influence') ?? offers[0]!;
+    const fallbackOpp = offers[0];
+    if (fallbackOpp === undefined) {
+      throw new Error('expected campaign offers');
+    }
+    const opp = offers.find((o) => o.completedReward.type === 'influence') ?? fallbackOpp;
     const summaries = blockSummariesForWins(7);
     const evaluation = evaluateSeasonCampaignOpportunity({
       opportunity: opp,
@@ -617,9 +640,11 @@ describe('campaign reward cap', () => {
       expect(afterBreak.campaignState.appliedRewardIds).toContain(
         withBreakthrough.completedReward.rewardId,
       );
-      expect(afterBreak.campaignState.appliedRewardIds).toContain(
-        withBreakthrough.breakthroughReward!.rewardId,
-      );
+      const breakthroughReward = withBreakthrough.breakthroughReward;
+      if (breakthroughReward === null) {
+        throw new Error('fixture breakthrough reward missing');
+      }
+      expect(afterBreak.campaignState.appliedRewardIds).toContain(breakthroughReward.rewardId);
       const entries = afterBreak.influence.ledger.filter(
         (e) => e.blockIndex === 0 && e.franchiseId === HUMAN && e.source === 'campaign-reward',
       );

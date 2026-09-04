@@ -517,7 +517,7 @@ export function inquiryExchangeFailuresOf(season: SeasonM25SeasonFacts): {
 } {
   let inquiry = 0;
   let exchange = 0;
-  let duplicateQuota = 0;
+  const duplicateQuota = 0;
   for (const window of season.windows) {
     if (window.result === null) continue;
     const win = window.result.trade.windows.at(-1);
@@ -581,7 +581,7 @@ export function cashReconciliationFailuresOf(season: SeasonM25SeasonFacts): numb
     const rec = receivedByTxn.get(txn) ?? 0;
     if (Math.abs(sent) !== Math.abs(rec)) failures += 1;
   }
-  for (const [txn, rec] of receivedByTxn) {
+  for (const [txn] of receivedByTxn) {
     if (!sentByTxn.has(txn)) failures += 1;
   }
   return failures;
@@ -624,9 +624,6 @@ export function evaluateTradeGates(args: {
   );
   const deterministicOffers = c.length > 0;
   const influenceOnlyFailures = c.reduce((sum, s) => sum + influenceOnlyFailuresOf(s), 0);
-  const cashPerProposalFailures =
-    c.reduce((sum, s) => sum + influenceOnlyFailuresOf(s), 0) * 0 +
-    c.reduce((sum, s) => sum + cashPerWindowFailuresOf(s), 0) * 0;
   let cashProposal = 0;
   let cashWindow = 0;
   let negativeBal = 0;

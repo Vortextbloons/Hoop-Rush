@@ -66,10 +66,4 @@ export function stealerWeights(defense: SimulationTeam): number[] {
     Math.max(0.5, d.ratings.steal * (0.6 + d.tendencies.stealAttemptRate / 20)),
   );
 }
-export function pickStealer(
-  players: readonly SimulationPlayer[],
-  weights: readonly number[],
-  rng: Rng,
-): SimulationPlayer {
-  return rng.weightedPick(players, weights);
-}
+

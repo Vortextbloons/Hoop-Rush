@@ -3,14 +3,11 @@ export { slotRequirement, validateLineup } from './domain/lineup.ts';
 export { classifyArchetype } from './domain/archetypes.ts';
 export { createEngineContext, type EngineContext } from './sim/context.ts';
 export { fnv1a32, hex32, createRng, type Rng, shuffle, swapAt } from './sim/rng.ts';
-export { usageOf } from './sim/recorder.ts';
 export { simulateGame } from './sim/game.ts';
 export { checkGameResult, gameResultDigest } from './sim/invariants.ts';
 export { evaluateLineupStrength } from './challenge/lineup-eval.ts';
 export {
   evaluateContextualPlayerValue,
-  evaluateLineupFit,
-  evaluateMatchup,
   evaluateLineupMatchup,
 } from './challenge/contextual-value.ts';
 export { explainSeason } from './challenge/explain.ts';
@@ -390,20 +387,6 @@ import {
   repositionClassicPlayer,
   createClassicChallenge,
 } from './modes/classic/draft.ts';
-export {
-  classicRollSeed,
-  sortClassicCatalog,
-  classicRollCandidates,
-  classicRerollAvailable,
-  rollClassicPair,
-  createClassicDraft,
-  rerollClassicFranchise,
-  rerollClassicEra,
-  draftClassicPlayer,
-  repositionClassicPlayer,
-  createClassicChallenge,
-} from './modes/classic/draft.ts';
-export { classicSlotRequirement };
 export type {
   ClassicRollKind,
   ClassicDraftInput,
@@ -525,4 +508,6 @@ export {
   fixedFiveResultDigest,
   verifyFixedFiveDigest,
   canonicalFixedFiveDigestPayload,
+  isFixedFiveGameInputCommand,
+  gameInputCommands,
 } from './modes/fixed-five/digest.ts';

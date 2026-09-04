@@ -99,26 +99,10 @@ import type {
   SeasonPurchaseTradeInquiryCommand,
   SeasonPurchaseTradeInquiryRejection,
   SeasonPurchaseTradeInquiryResult,
-  SeasonCampaignIdentityAlreadySelectedRejection,
-  SeasonCampaignIdentityRequiredRejection,
   SeasonCampaignAlreadySelectedRejection,
   SeasonCampaignOpportunityNotOfferedRejection,
-  SeasonCampaignEvolutionAlreadySelectedRejection,
-  SeasonCampaignEvolutionNotOfferedRejection,
   SeasonTradeActiveNegotiationRejection,
   SeasonTradeInquiryCapRejection,
-  SeasonTradeDuplicateProposalRejection,
-  SeasonTradeProtectedPlayerRejection,
-  SeasonTradeExchangeLimitRejection,
-  SeasonTradeCashCapRejection,
-  SeasonTradeNegotiationsClosedRejection,
-  SeasonTradeAvailabilityRiskRejection,
-  SeasonTradeWrongFitRejection,
-  SeasonTradeInsufficientTalentRejection,
-  SeasonCampaignState,
-  SeasonCampaignOpportunity,
-  SeasonTradeProposal,
-  SeasonTradeNegotiation,
 } from '@hoop-rush/data-contracts';
 import {
   SEASON_ROUND_COUNT,
@@ -179,7 +163,6 @@ import {
   type SeasonEconomyRun,
 } from './trades.ts';
 import {
-  buildEmptyCampaignState,
   generateSeasonCampaignOffers,
   normalizeCampaignState,
 } from './campaign.ts';
@@ -312,29 +295,6 @@ export class SeasonRunCommandNotImplementedError extends Error {
     this.command = command;
   }
 }
-type DispatchableCommandKind =
-  | 'select-block-objective'
-  | 'spend-influence'
-  | 'accept-trade-offer'
-  | 'decline-trade-offer'
-  | 'resume-season-block'
-  | 'forfeit-interrupted-game'
-  | 'start-postseason'
-  | 'advance-postseason'
-  | 'submit-postseason-rotation'
-  | 'spectate-postseason-game'
-  | 'fast-forward-postseason'
-  | 'declare-free-agent-interest'
-  | 'skip-free-agent-market'
-  | 'resolve-free-agent-market'
-  | 'select-gm-identity'
-  | 'select-campaign-opportunity'
-  | 'evolve-gm-campaign'
-  | 'open-trade-inquiry'
-  | 'submit-trade-proposal'
-  | 'respond-to-trade-counter'
-  | 'walk-away-from-trade'
-  | 'purchase-trade-inquiry';
 function economyRunOf(context: SeasonRunCommandContext): SeasonEconomyRun {
   return seasonEconomyRunOf(context.run, context.effects);
 }
@@ -365,23 +325,9 @@ function authorityOfContext(
   run: SeasonRun,
 ): SeasonRunAuthority | null {
   if (context?.authority) return context.authority;
-  const runAuthority: SeasonRunAuthority | undefined = run.authority;
+  const runAuthority = (run as { authority?: SeasonRunAuthority }).authority;
   if (runAuthority) return runAuthority;
   return null;
-}
-function participantFranchiseIdsOfContext(
-  context: SeasonRunCommandContext,
-  run: SeasonRun,
-): string[] {
-  if (context.participantFranchiseIds && context.participantFranchiseIds.length > 0)
-    return [...context.participantFranchiseIds];
-  const auth = authorityOfContext(context, run);
-  if (auth) {
-    if (auth.kind === 'local-solo') return auth.soloFranchiseId ? [auth.soloFranchiseId] : [];
-    return [auth.p1.franchiseId, auth.p2.franchiseId];
-  }
-  if (context.humanFranchiseId) return [context.humanFranchiseId];
-  return [];
 }
 function effectiveFranchiseIdOf(context: SeasonRunCommandContext): string | null {
   return context.actorFranchiseId ?? context.humanFranchiseId ?? null;
@@ -800,9 +746,6 @@ function handleSelectGmIdentity(
   const run = economy;
   const campaign = normalizeCampaignState(run.campaign);
   if (campaign.startingIdentity !== null) {
-    const rejection: SeasonCampaignIdentityAlreadySelectedRejection = {
-      code: 'campaign-identity-already-selected',
-    };
     return rejectedSelectGmIdentity(command, { code: 'campaign-identity-already-selected' }, run);
   }
   let nextCampaign: import('@hoop-rush/data-contracts').SeasonCampaignState = {
@@ -839,9 +782,6 @@ function handleSelectCampaignOpportunity(
   const run = economy;
   const campaign = normalizeCampaignState(run.campaign);
   if (campaign.startingIdentity === null) {
-    const rejection: SeasonCampaignIdentityRequiredRejection = {
-      code: 'campaign-identity-required',
-    };
     return rejectedSelectCampaignOpportunity(command, { code: 'campaign-identity-required' }, run);
   }
   const completedBlocks = Math.ceil(run.cursor.completedRounds / 10);
@@ -850,9 +790,6 @@ function handleSelectCampaignOpportunity(
     campaign.evolutionOffers !== null &&
     campaign.evolutionSelection === null
   ) {
-    const rejection: SeasonCampaignIdentityRequiredRejection = {
-      code: 'campaign-identity-required',
-    };
     return rejectedSelectCampaignOpportunity(
       command,
       {
@@ -942,7 +879,10 @@ function handleEvolveGmCampaign(
       run,
     );
   }
-  const offer = campaign.evolutionOffers.find((o) => o.offerId === command.offerId)!;
+  const offer = campaign.evolutionOffers.find((o) => o.offerId === command.offerId);
+  if (offer === undefined) {
+    throw new Error(`campaign evolution offer ${command.offerId} missing after validation`);
+  }
   let nextCampaign: import('@hoop-rush/data-contracts').SeasonCampaignState = {
     ...campaign,
     evolutionSelection: {
@@ -986,7 +926,12 @@ function handleOpenTradeInquiry(
     };
     return rejectedOpenTradeInquiry(command, rejection, run);
   }
-  const win = run.trade.windows.find((w) => w.windowIndex === command.windowIndex)!;
+  const win = run.trade.windows.find((w) => w.windowIndex === command.windowIndex);
+  if (win === undefined) {
+    throw new Error(
+      `trade window ${String(command.windowIndex)} missing after validation`,
+    );
+  }
   if (win.activeInquiryId) {
     const rejection: SeasonTradeActiveNegotiationRejection = {
       code: 'trade-active-negotiation',
@@ -1141,7 +1086,16 @@ function handleSubmitTradeProposal(
       );
     }
     inquiryId = opened.inquiryId;
-    const openedWin = opened.run.trade!.windows.find((w) => w.windowIndex === command.windowIndex)!;
+    const openedTrade = opened.run.trade;
+    if (!openedTrade) {
+      throw new Error('trade inquiry result missing trade state');
+    }
+    const openedWin = openedTrade.windows.find((w) => w.windowIndex === command.windowIndex);
+    if (openedWin === undefined) {
+      throw new Error(
+        `trade window ${String(command.windowIndex)} missing after inquiry open`,
+      );
+    }
     nextWin = openedWin;
   }
   const existingForUpdate = nextWin.negotiations?.find((n) => n.inquiryId === inquiryId) ?? null;
@@ -1234,7 +1188,6 @@ function handleSubmitTradeProposal(
         run,
       );
     }
-    const winState = nextWin;
     const sent =
       (run.influence.windows[sender] ?? []).find((w) => w.windowIndex === command.windowIndex)
         ?.tradeCashSent ?? 0;
@@ -1261,12 +1214,6 @@ function handleSubmitTradeProposal(
       explanation: `Trade cash sent ${String(amount)} from ${sender} to ${command.toFranchiseId}`,
     });
     nextInfluence = spendResult.influence;
-    const receiver =
-      sender === nextWin.negotiations?.find((n) => n.inquiryId === inquiryId)?.fromFranchiseId
-        ? command.toFranchiseId
-        : sender === command.toFranchiseId
-          ? (context.humanFranchiseId ?? '')
-          : command.toFranchiseId;
     const creditTo =
       sender === (context.humanFranchiseId ?? '')
         ? command.toFranchiseId
@@ -1292,7 +1239,10 @@ function handleSubmitTradeProposal(
       const wins = nextInfluence.windows[fid] ?? [];
       const idx = wins.findIndex((w) => w.windowIndex === command.windowIndex);
       if (idx >= 0) {
-        const w = wins[idx]!;
+        const w = wins[idx];
+        if (w === undefined) {
+          throw new Error('influence window missing after index check');
+        }
         const updated = {
           ...w,
           [field]: (w[field] ?? 0) + delta,
@@ -1344,9 +1294,13 @@ function handleSubmitTradeProposal(
       );
     }
   }
+  const tradeState = run.trade;
+  if (!tradeState) {
+    throw new Error('trade command requires an open trade window');
+  }
   const nextTrade: import('@hoop-rush/data-contracts').SeasonTradeState = {
-    ...run.trade!,
-    windows: run.trade!.windows.map((w) => (w.windowIndex === command.windowIndex ? nextWin : w)),
+    ...tradeState,
+    windows: tradeState.windows.map((w) => (w.windowIndex === command.windowIndex ? nextWin : w)),
   };
   const nextRunBase = {
     ...run,
@@ -1438,9 +1392,13 @@ function handleRespondToTradeCounter(
       n.inquiryId === command.inquiryId ? nextNegotiation : n,
     ),
   };
+  const tradeState = run.trade;
+  if (!tradeState) {
+    throw new Error('trade command requires an open trade window');
+  }
   const nextTrade: import('@hoop-rush/data-contracts').SeasonTradeState = {
-    ...run.trade!,
-    windows: run.trade!.windows.map((w) => (w.windowIndex === command.windowIndex ? nextWin : w)),
+    ...tradeState,
+    windows: tradeState.windows.map((w) => (w.windowIndex === command.windowIndex ? nextWin : w)),
   };
   const next = advanceRunState({ ...run, trade: nextTrade });
   return {
@@ -1502,9 +1460,13 @@ function handleWalkAwayFromTrade(
       n.inquiryId === command.inquiryId ? nextNegotiation : n,
     ),
   };
+  const tradeState = run.trade;
+  if (!tradeState) {
+    throw new Error('trade command requires an open trade window');
+  }
   const nextTrade: import('@hoop-rush/data-contracts').SeasonTradeState = {
-    ...run.trade!,
-    windows: run.trade!.windows.map((w) => (w.windowIndex === command.windowIndex ? nextWin : w)),
+    ...tradeState,
+    windows: tradeState.windows.map((w) => (w.windowIndex === command.windowIndex ? nextWin : w)),
   };
   const next = advanceRunState({ ...run, trade: nextTrade });
   return {
@@ -1598,9 +1560,13 @@ function handlePurchaseTradeInquiry(
     inquiryAllowance: allowance + 1,
     purchasedInquiryUsed: true,
   };
+  const tradeState = run.trade;
+  if (!tradeState) {
+    throw new Error('trade command requires an open trade window');
+  }
   const nextTrade: import('@hoop-rush/data-contracts').SeasonTradeState = {
-    ...run.trade!,
-    windows: run.trade!.windows.map((w) => (w.windowIndex === command.windowIndex ? nextWin : w)),
+    ...tradeState,
+    windows: tradeState.windows.map((w) => (w.windowIndex === command.windowIndex ? nextWin : w)),
   };
   const nextRunBase = {
     ...run,
@@ -2900,7 +2866,7 @@ function freeAgencyRejectionTo(error: FreeAgencyValidationRejection): SeasonRunC
   const parsed = seasonRunCommandRejectionSchema.safeParse(error.rejection);
   if (!parsed.success) {
     throw new Error(
-      `invalid free-agency rejection ${String(error.rejection.code)}: ${parsed.error.message}`,
+      `invalid free-agency rejection ${error.rejection.code}: ${parsed.error.message}`,
     );
   }
   return parsed.data;

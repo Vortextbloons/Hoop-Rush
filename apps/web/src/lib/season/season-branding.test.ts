@@ -164,9 +164,10 @@ describe('freeAgencyVersionTuples', () => {
         },
       ],
     };
+    const candidate = freeAgency.windows[0]?.candidates[0];
+    if (candidate === undefined) throw new Error('fixture has no candidate');
     expect(
-      catalogCandidateOfFreeAgency(catalog as never, freeAgency.windows[0]!.candidates[0] as never)
-        ?.playerVersionId,
+      catalogCandidateOfFreeAgency(catalog as never, candidate as never)?.playerVersionId,
     ).toBe('pv-fa-1');
   });
 });

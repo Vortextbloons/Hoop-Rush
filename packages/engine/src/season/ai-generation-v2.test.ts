@@ -423,7 +423,7 @@ describe('v2 scarcity and failure', () => {
       }),
     ).toThrow(SeasonAiTargetsError);
     expect(() => {
-      validateSeasonRosterTargets(undefined as unknown as SeasonRosterTargets);
+      validateSeasonRosterTargets(undefined);
     }).toThrow(SeasonAiTargetsError);
   });
 });

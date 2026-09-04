@@ -32,7 +32,7 @@
       ([m, history, activeCheckpoint]) => {
         if (cancelled) return;
         manifest = m;
-        rows = history;
+        rows = history.filter((r) => r.mode === mode);
         active = activeCheckpoint;
         loading = false;
       },
@@ -56,13 +56,7 @@
     retryCount += 1;
   }
   const modeLabel = $derived(mode === 'sandbox' ? 'Sandbox' : 'Classic');
-  const continueHref = $derived(
-    mode === 'sandbox'
-      ? '/sandbox/challenge'
-      : active?.mode === 'classic'
-        ? '/classic/challenge'
-        : null,
-  );
+  const continueHref = $derived(active?.mode === mode ? `/${mode}/challenge` : null);
   const resultHrefFor = $derived(
     (runId: string) => `/${mode}/result?runId=${encodeURIComponent(runId)}`,
   );

@@ -17,6 +17,38 @@ export interface FixedFiveDigestInput {
   aggregates?: unknown;
 }
 
+/**
+ * Command kinds that can change the game itself. Everything else (ready,
+ * start, result proposals/confirmations, rematch negotiation, leave,
+ * guest removal) is room governance: it orders the log but carries no
+ * game information.
+ *
+ * The digest covers ONLY game inputs. Including governance commands broke
+ * agreement in production (room d71f): the second proposer's digest input
+ * necessarily contained the first proposer's propose command, so two
+ * correct clients could never match. Governance still travels in
+ * `acceptedCommands` for replay and audit; it just does not bind the digest.
+ */
+const DIGESTED_COMMAND_KINDS: ReadonlySet<FixedFiveCommand['payload']['kind']> = new Set([
+  'reroll',
+  'classic-pick',
+  'duel-claim',
+  'sandbox-place',
+  'sandbox-remove',
+  'sandbox-lock',
+  'timeout-autopick',
+]);
+
+export function isFixedFiveGameInputCommand(command: FixedFiveCommand): boolean {
+  return DIGESTED_COMMAND_KINDS.has(command.payload.kind);
+}
+
+export function gameInputCommands(commands: FixedFiveCommand[]): FixedFiveCommand[] {
+  return [...commands]
+    .sort((a, b) => a.ordinal - b.ordinal)
+    .filter((command) => isFixedFiveGameInputCommand(command));
+}
+
 export function canonicalFixedFiveDigestPayload(
   input: FixedFiveDigestInput,
 ): Record<string, unknown> {
@@ -24,7 +56,7 @@ export function canonicalFixedFiveDigestPayload(
     rootSeed: input.rootSeed,
     versions: input.versions,
     lineups: input.lineups,
-    acceptedCommands: input.acceptedCommands,
+    acceptedCommands: gameInputCommands(input.acceptedCommands),
     result: input.result,
     aggregates: input.aggregates ?? null,
   };

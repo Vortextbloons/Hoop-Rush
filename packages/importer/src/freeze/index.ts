@@ -113,7 +113,7 @@ export function freezeTargets(reportPath: string, eraId = '1990s', profilePath?:
   }
   const observed = new Map<string, number>();
   for (const metric of payload.metrics) observed.set(metric.key, metric.observed);
-  const profileRaw = readJson(resolved) as unknown;
+  const profileRaw = readJson(resolved);
   const profileParsed = frozenProfileSchema.safeParse(profileRaw);
   if (!profileParsed.success) {
     throw new Error(

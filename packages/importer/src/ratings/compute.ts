@@ -138,9 +138,7 @@ function loadPlayerWinPctMap(season: string): Map<string, number> {
       for (const row of rows) {
         const rawId = row.PLAYER_ID ?? row.playerExternalId ?? '';
         const pid =
-          typeof rawId === 'string' ||
-          typeof rawId === 'number' ||
-          typeof rawId === 'boolean'
+          typeof rawId === 'string' || typeof rawId === 'number' || typeof rawId === 'boolean'
             ? String(rawId)
             : '';
         if (!pid) continue;
@@ -297,9 +295,9 @@ export function computeForSeason(season: string, force = false): void {
     console.log(`  [SKIP] ${season}: ratings already computed (use --force to recompute)`);
     return;
   }
-  const rosterRaw = parseJsonLoose(rosterText) as unknown;
+  const rosterRaw = parseJsonLoose(rosterText);
   const rosterParsed = z.array(rosterPlayerSchema).safeParse(rosterRaw);
-  const statsRaw = readJson(statsPath) as unknown;
+  const statsRaw = readJson(statsPath);
   const statsParsed = z.array(ratingsStatsRowSchema).safeParse(statsRaw);
   const roster = rosterParsed.success ? rosterParsed.data : [];
   const statsList = statsParsed.success ? statsParsed.data : [];
@@ -398,13 +396,12 @@ export function computeForSeason(season: string, force = false): void {
     player.tendencies = derived.tendencies;
     player.summaryRatings = derived.summaryRatings;
     player.anchors = derived.anchors;
-    player.reconstructedThreePoint =
-      derived.reconstructedThreePoint as RosterPlayer['reconstructedThreePoint'];
+    player.reconstructedThreePoint = derived.reconstructedThreePoint;
     player.provenance = derived.provenance;
     player.unclamped = derived.unclamped;
-    player.methods = derived.methods as RosterPlayer['methods'];
+    player.methods = derived.methods;
     player.ratingProfile = derived.ratingProfile;
-    player.traits = deriveTraits(player.ratings, stats, pos) as RosterPlayer['traits'];
+    player.traits = deriveTraits(player.ratings, stats, pos);
     const age = safeFloat(stats.age ?? player.age, 25) || 25;
     player.contract = deriveContract(player.summaryRatings.overallRating, Math.trunc(age));
     player.importMeta = {
@@ -421,7 +418,7 @@ export function defaultRatingsWorkers(): number {
   return defaultWorkerCount(8);
 }
 function runRatingsChunk(seasons: readonly string[], force: boolean): Promise<void> {
-  return runWorker<void>(new URL('./ratings-worker.ts', import.meta.url), {
+  return runWorker<undefined>(new URL('./ratings-worker.ts', import.meta.url), {
     seasons: [...seasons],
     force,
   });

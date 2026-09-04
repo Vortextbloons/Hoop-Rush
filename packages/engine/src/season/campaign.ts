@@ -721,7 +721,7 @@ export function normalizeCampaignState(state: unknown): SeasonCampaignState {
   if (state === undefined || state === null) return buildEmptyCampaignState();
   const parsed = seasonCampaignStateSchema.safeParse(state);
   if (!parsed.success) return buildEmptyCampaignState();
-  if (parsed.data.campaignVersion === SEASON_CAMPAIGN_VERSION && parsed.data.schemaVersion === 1) {
+  if (parsed.data.campaignVersion === SEASON_CAMPAIGN_VERSION) {
     return parsed.data;
   }
   return buildEmptyCampaignState();
@@ -1767,9 +1767,7 @@ export function applySeasonCampaignReward(
     return { influence, campaignState, transactions, ledgerEntries };
   }
   const rewardsToApply: SeasonCampaignReward[] = [];
-  if (evaluation.outcome === 'completed' || evaluation.outcome === 'breakthrough') {
-    rewardsToApply.push(opportunity.completedReward);
-  }
+  rewardsToApply.push(opportunity.completedReward);
   if (evaluation.outcome === 'breakthrough' && opportunity.breakthroughReward) {
     rewardsToApply.push(opportunity.breakthroughReward);
   }
@@ -1838,13 +1836,13 @@ export function applySeasonCampaignReward(
         break;
       default: {
         const exhaustive: never = reward.type;
-        throw assertNever(exhaustive, `unknown campaign reward type`);
+        assertNever(exhaustive, `unknown campaign reward type`);
       }
     }
   }
   if (evaluation.outcome === 'completed') {
     newBranchState = { ...newBranchState, [opportunity.branchId]: 'open' as const };
-  } else if (evaluation.outcome === 'breakthrough') {
+  } else {
     newBranchState = { ...newBranchState, [opportunity.branchId]: 'completed' as const };
   }
   campaignState = {

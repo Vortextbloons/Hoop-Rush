@@ -34,7 +34,6 @@ import {
   type SeasonObjectiveId,
   type SeasonObjectiveState,
   type SeasonCampaignState,
-  type SeasonCampaignOpportunity,
   type SeasonPendingBlockCandidate,
   type SeasonRemovalEvent,
   type SeasonResumeSeasonBlockCommand,
@@ -81,7 +80,6 @@ import { evaluateSeasonBlockObjective, seasonObjectiveChoicesForBlock } from './
 import {
   SEASON_CAMPAIGN_TARGETS_VERSION,
   SEASON_CAMPAIGN_VERSION,
-  buildEmptyCampaignState,
   evaluateSeasonCampaignOpportunity,
   generateSeasonCampaignOffers,
   normalizeCampaignState,
@@ -620,7 +618,6 @@ export function simulateSeasonBlockGame(
   const positions = options.positions ?? positionsOf(input);
   const participantFranchiseIds =
     input.participantFranchiseIds ?? (input.humanFranchiseId ? [input.humanFranchiseId] : []);
-  const humanFranchiseId = input.humanFranchiseId;
   const humanPlays = participantFranchiseIds.some(
     (id) => game.homeFranchiseId === id || game.awayFranchiseId === id,
   );
@@ -1036,7 +1033,6 @@ export function assembleSeasonBlockCandidate(
     string,
     import('@hoop-rush/data-contracts').SeasonCampaignEvaluation
   > = {};
-  let campaignStateForNext: import('@hoop-rush/data-contracts').SeasonCampaignState | null = null;
   if (input.campaignState !== undefined) {
     const campaignState = normalizeCampaignState(input.campaignState);
     const primaryOppId =
@@ -1066,7 +1062,6 @@ export function assembleSeasonBlockCandidate(
           outcome: evalResult.outcome,
           evaluation: evalResult,
         };
-        campaignStateForNext = campaignState;
         if (primaryFranchiseId) campaignEvaluations[primaryFranchiseId] = evalResult;
       }
     }
@@ -1286,7 +1281,7 @@ function campaignWithBlockEvaluation(
   if (bId) {
     if (evalResult.outcome === 'missed') nextBranchState[bId] = 'missed';
     else if (evalResult.outcome === 'completed') nextBranchState[bId] = 'open';
-    else if (evalResult.outcome === 'breakthrough') nextBranchState[bId] = 'completed';
+    else nextBranchState[bId] = 'completed';
   }
   const applied = [...base.appliedRewardIds];
   let influenceEarned = base.rewardEntitlements.influenceEarned;
@@ -1307,17 +1302,10 @@ function campaignWithBlockEvaluation(
       if (reward) {
         if (reward.type === 'influence') {
           const requested = reward.amount;
-          const appliedDelta = Math.min(
-            requested,
-            8 -
-              (base.rewardEntitlements.influenceEarned +
-                influenceEarned -
-                base.rewardEntitlements.influenceEarned),
-          );
           influenceEarned = Math.min(8, influenceEarned + requested);
         } else if (reward.type === 'trade-inquiry-credit') inquiryCredits += reward.amount;
         else if (reward.type === 'trade-board-information') informationBenefits += reward.amount;
-        else if (reward.type === 'follow-up-unlock') followUpUnlocks.push(rid);
+        else followUpUnlocks.push(rid);
       }
     }
   }

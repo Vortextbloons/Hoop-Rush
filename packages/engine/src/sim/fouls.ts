@@ -4,7 +4,6 @@ import type {
   SimulationPlayer,
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
-import type { Rng } from './rng.ts';
 import { ENGINE_CONSTANTS } from './constants.ts';
 import { isThreePointZone } from './usage.ts';
 export function shootingFoulProbability(
@@ -43,24 +42,10 @@ export function foulerWeights(defense: SimulationTeam): number[] {
     ),
   );
 }
-export function pickFouler(
-  players: readonly SimulationPlayer[],
-  weights: readonly number[],
-  rng: Rng,
-): SimulationPlayer {
-  return rng.weightedPick(players, weights);
-}
 export function freeThrowShooterWeights(team: SimulationTeam): number[] {
   return team.players.map(
     (p) => Math.max(0.5, p.tendencies.freeThrowRate) * (0.6 + 0.8 * (p.ratings.freeThrow / 100)),
   );
-}
-export function pickFreeThrowShooter(
-  players: readonly SimulationPlayer[],
-  weights: readonly number[],
-  rng: Rng,
-): SimulationPlayer {
-  return rng.weightedPick(players, weights);
 }
 export function freeThrowsForZone(zone: ShotZone): number {
   return isThreePointZone(zone) ? 3 : 2;

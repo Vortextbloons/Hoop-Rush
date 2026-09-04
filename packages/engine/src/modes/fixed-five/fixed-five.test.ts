@@ -13,11 +13,14 @@ import type {
   Position,
 } from '@hoop-rush/data-contracts';
 import {
+  commandIdSchema,
   eraIdSchema,
   franchiseIdSchema,
+  idSchema,
   playerIdSchema,
   seedSchema,
 } from '@hoop-rush/data-contracts';
+import type { FixedFiveCommand } from '@hoop-rush/data-contracts';
 const pid = (value: string): PlayerId => playerIdSchema.parse(value);
 const fid = (value: string): FranchiseId => franchiseIdSchema.parse(value);
 const eid = (value: string): EraId => eraIdSchema.parse(value);
@@ -611,6 +614,95 @@ describe('result digest', () => {
       },
     };
     expect(fixedFiveResultDigest(payload)).toBe(fixedFiveResultDigest(payload));
+  });
+
+  it('ignores governance commands so a late proposer still agrees (room d71f)', () => {
+    const roomId = idSchema.parse('room-d71f');
+    const draft: FixedFiveCommand[] = [
+      { schemaVersion: 1, roomId, commandId: commandIdSchema.parse('cmd-start'), ordinal: 0, actorParticipantId: 'p2', payload: { kind: 'start' } },
+      { schemaVersion: 1, roomId, commandId: commandIdSchema.parse('cmd-p1'), ordinal: 1, actorParticipantId: 'p2', payload: { kind: 'classic-pick', playerId: pid('p-g1'), slotIndex: 0 } },
+      { schemaVersion: 1, roomId, commandId: commandIdSchema.parse('cmd-p2'), ordinal: 2, actorParticipantId: 'p2', payload: { kind: 'timeout-autopick', playerId: pid('p-g2'), slotIndex: 1, pickOrdinal: 1, seedPath: 'rootSeed/timeout-autopick/classic-shared-82/p2/1' } },
+      { schemaVersion: 1, roomId, commandId: commandIdSchema.parse('cmd-p3'), ordinal: 3, actorParticipantId: 'p1', payload: { kind: 'reroll', axis: 'franchise' } },
+      { schemaVersion: 1, roomId, commandId: commandIdSchema.parse('cmd-p4'), ordinal: 4, actorParticipantId: 'p1', payload: { kind: 'classic-pick', playerId: pid('p-f1'), slotIndex: 2 } },
+    ];
+    const governance: FixedFiveCommand[] = [
+      { schemaVersion: 1, roomId, commandId: commandIdSchema.parse('cmd-ready'), ordinal: 5, actorParticipantId: 'p1', payload: { kind: 'ready', ready: true } },
+      { schemaVersion: 1, roomId, commandId: commandIdSchema.parse('cmd-propose'), ordinal: 6, actorParticipantId: 'p2', payload: { kind: 'propose-result', resultDigest: '0'.repeat(64) } },
+      { schemaVersion: 1, roomId, commandId: commandIdSchema.parse('cmd-confirm'), ordinal: 7, actorParticipantId: 'p1', payload: { kind: 'confirm-result', resultDigest: '0'.repeat(64), verified: true } },
+      { schemaVersion: 1, roomId, commandId: commandIdSchema.parse('cmd-rematch'), ordinal: 8, actorParticipantId: 'p1', payload: { kind: 'rematch-request' } },
+      { schemaVersion: 1, roomId, commandId: commandIdSchema.parse('cmd-leave'), ordinal: 9, actorParticipantId: 'p2', payload: { kind: 'leave' } },
+      { schemaVersion: 1, roomId, commandId: commandIdSchema.parse('cmd-remove'), ordinal: 10, actorParticipantId: 'p1', payload: { kind: 'remove-guest', targetParticipantId: 'p2' } },
+    ];
+    const p1Players = buildLegalSimulationTeam({ teamId: 'p1', displayName: 'P1' }).players;
+    const digestOf = (acceptedCommands: FixedFiveCommand[]) =>
+      fixedFiveResultDigest({
+        rootSeed: ROOT,
+        versions: {
+          dataVersion: 'data-v1',
+          ratingVersion: 'ratings-v1',
+          positionNormalizationVersion: 'position-v3',
+          engineVersion: 'engine-v1',
+          bracketVersion: 'bracket-v1',
+          scheduleVersion: 'schedule-v1',
+          seedDerivationVersion: 'seed-v1',
+          classicRollVersion: 'classic-roll-v1',
+          profileVersion: 'profile-v1',
+          multiplayerVersion: 'fixed-five-multiplayer-v1',
+          autopickVersion: 'fixed-five-autopick-v1',
+        },
+        lineups: {
+          p1: {
+            lineup: {
+              structure: ['G', 'G', 'F', 'F', 'C'] as ['G', 'G', 'F', 'F', 'C'],
+              assignments: p1Players.map((p, slotIndex) => ({
+                slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4,
+                playerId: p.playerId,
+                positions: p.positions,
+              })),
+            },
+            players: p1Players,
+          },
+          p2: {
+            lineup: {
+              structure: ['G', 'G', 'F', 'F', 'C'] as ['G', 'G', 'F', 'F', 'C'],
+              assignments: p1Players.map((p, slotIndex) => ({
+                slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4,
+                playerId: p.playerId,
+                positions: p.positions,
+              })),
+            },
+            players: p1Players,
+          },
+        },
+        acceptedCommands,
+        result: {
+          competition: 'shared-82' as const,
+          gamesPerParticipant: 82 as const,
+          uniqueSimulations: 161,
+          weakestReplacedOpponentId: 'bracket-magic',
+          h2hGameNumbers: [17, 72, 82],
+          participants: [
+            { participantId: 'p1' as const, wins: 60, losses: 22, differential: 100, h2hWins: 2 },
+            { participantId: 'p2' as const, wins: 55, losses: 27, differential: 50, h2hWins: 1 },
+          ],
+          ranking: ['p1', 'p2'] as ['p1', 'p2'],
+          tiebreakPath: FIXED_FIVE_TIEBREAK_PATH,
+        },
+      });
+    expect(digestOf(draft)).toBe(digestOf([...draft, ...governance]));
+    const tampered: FixedFiveCommand[] = draft.map((command) =>
+      command.ordinal === 4
+        ? {
+            schemaVersion: 1 as const,
+            roomId,
+            commandId: commandIdSchema.parse('cmd-p4'),
+            ordinal: 4,
+            actorParticipantId: 'p1' as const,
+            payload: { kind: 'classic-pick' as const, playerId: pid('p-c1'), slotIndex: 2 },
+          }
+        : command,
+    );
+    expect(digestOf(draft)).not.toBe(digestOf(tampered));
   });
 });
 

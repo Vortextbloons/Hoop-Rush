@@ -73,13 +73,6 @@ export const identityModifiers: PositionResponsibilityModifiers = {
   rebounding: 1,
   rimProtection: 1,
 };
-export function pickInitiator(
-  team: SimulationTeam,
-  weights: readonly number[],
-  rng: Rng,
-): SimulationPlayer {
-  return rng.weightedPick(team.players, weights);
-}
 export function spacingWeight(player: SimulationPlayer): number {
   return 0.55 + 0.9 * spacingScore(player);
 }

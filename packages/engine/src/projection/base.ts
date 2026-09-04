@@ -14,7 +14,7 @@ import type {
 } from '@hoop-rush/data-contracts';
 import { PROJECTION_SCHEMA_VERSION, seasonDigestHex } from '@hoop-rush/data-contracts';
 import { canPlay } from '../domain/positions.ts';
-import { prepareTeam, prepareTeamCached, type TeamPrep } from '../sim/prepare.ts';
+import { prepareTeam, type TeamPrep } from '../sim/prepare.ts';
 import { projectExpectedLedger, type LedgerSide } from './expected-ledger.ts';
 import { resolveReference } from './reference-lineups.ts';
 import { identifyWeaknesses } from './weaknesses.ts';
@@ -310,7 +310,7 @@ export function projectBaseFive(input: BaseFiveProjectionInput): BaseFiveProject
   const reference = resolveReference(input.model, input.eraProfile.eraId, input.referenceId);
   const referenceTeam = referenceTeamOf(reference);
   const prep = prepareTeam(team, input.eraProfile);
-  const referencePrep = prepareTeamCached(referenceTeam, input.eraProfile);
+  const referencePrep = prepareTeam(referenceTeam, input.eraProfile);
   const expected = projectExpectedLedger({
     team,
     prep,

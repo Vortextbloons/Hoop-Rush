@@ -52,7 +52,6 @@ const cohortStatsRowSchema = z.object({
   weightLbs: z.unknown().optional(),
   age: z.unknown().optional(),
 });
-type CohortStatsRow = z.infer<typeof cohortStatsRowSchema>;
 export const reconstructionRowSchema = z.object({
   playerExternalId: z.string(),
   season: z.string(),
@@ -213,8 +212,8 @@ export function loadCohortRows(
   for (let s = 0; s < seasons.length; s += 1) {
     const season = seasons[s] as string;
     const dir = join(NBA_ROOT, season);
-    const rosterRaw = readJson(join(dir, 'roster.json')) as unknown;
-    const statsListRaw = readJson(join(dir, 'season-stats.json')) as unknown;
+    const rosterRaw = readJson(join(dir, 'roster.json'));
+    const statsListRaw = readJson(join(dir, 'season-stats.json'));
     const rosterParsed = z.array(cohortRosterRowSchema).safeParse(rosterRaw);
     const statsParsed = z.array(cohortStatsRowSchema).safeParse(statsListRaw);
     const roster = rosterParsed.success ? rosterParsed.data : [];

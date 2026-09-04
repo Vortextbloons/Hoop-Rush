@@ -1,15 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/svelte';
+import { fireEvent, render, screen } from '@testing-library/svelte';
 import type {
   SeasonCampaignOpportunity,
   SeasonCampaignReward,
   SeasonCampaignState,
-  SeasonHealthState,
-  SeasonInfluenceState,
   SeasonRun,
   SeasonTradeBoardTeamProfile,
   SeasonTradeNegotiation,
-  SeasonTradeValueTrend,
 } from '@hoop-rush/data-contracts';
 import { mockSvelteKitApp } from '../../../test/svelte-testing';
 import CampaignPanel from '$lib/components/season/CampaignPanel.svelte';
@@ -181,9 +178,11 @@ describe('GmIdentityPicker', () => {
     expect(screen.getByRole('radio', { name: /Team identity/ })).toBeTruthy();
     await fireEvent.click(screen.getByRole('radio', { name: /Team identity/ }));
     expect(screen.getByText(/Pick a style focus/)).toBeTruthy();
-    expect((screen.getByTestId('gm-identity-submit') as HTMLButtonElement).disabled).toBe(true);
+    const identitySubmit = screen.getByTestId('gm-identity-submit');
+    if (!(identitySubmit instanceof HTMLButtonElement)) throw new Error('expected submit button');
+    expect(identitySubmit.disabled).toBe(true);
     await fireEvent.click(screen.getByLabelText('Defense'));
-    expect((screen.getByTestId('gm-identity-submit') as HTMLButtonElement).disabled).toBe(false);
+    expect(identitySubmit.disabled).toBe(false);
     await fireEvent.click(screen.getByTestId('gm-identity-submit'));
     expect(onSelect).toHaveBeenCalledWith({ identity: 'team-identity', focus: 'defense' });
   });
@@ -233,7 +232,7 @@ describe('EvolutionPicker', () => {
   });
 });
 describe('CampaignPanel', () => {
-  it('shows prior outcome with evidence, reward id, branch state, and 2 cards', async () => {
+  it('shows prior outcome with evidence, reward id, branch state, and 2 cards', () => {
     const state = campaignState({
       startingIdentity: 'win-now',
       startingFocus: null,
@@ -416,7 +415,9 @@ describe('PackageBuilder', () => {
     expect(screen.getByText(/Inquiry: 2\/4 used/)).toBeTruthy();
     await fireEvent.click(screen.getByRole('option', { name: /You One/ }));
     await fireEvent.click(screen.getByRole('option', { name: /Them One/ }));
-    expect((screen.getByTestId('package-submit') as HTMLButtonElement).disabled).toBe(false);
+    const packageSubmit = screen.getByTestId('package-submit');
+    if (!(packageSubmit instanceof HTMLButtonElement)) throw new Error('expected package submit');
+    expect(packageSubmit.disabled).toBe(false);
     expect(screen.queryByText('Both sides send')).toBeNull();
     await fireEvent.click(screen.getByLabelText('You send 1'));
     expect(screen.getByText(/You 12 → 12/)).toBeTruthy();
@@ -509,7 +510,7 @@ describe('NegotiationTranscript', () => {
     const { container: c2 } = render(NegotiationTranscript, {
       props: { negotiation: walked, inquiryAllowance: 4 },
     });
-    expect(c2.textContent?.toLowerCase()).toContain('walked away');
+    expect(c2.textContent.toLowerCase()).toContain('walked away');
   });
   it('announces accepted/rejected without moving focus', () => {
     const negotiation: SeasonTradeNegotiation = {
@@ -646,7 +647,7 @@ describe('TradeBoardWorkspace distinctive design & a11y', () => {
     expect(screen.getAllByText(/Listed:/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Protected:/).length).toBeGreaterThan(0);
     expect(screen.getByText(/Hard constraints/)).toBeTruthy();
-    expect(document.body.textContent?.toLowerCase()).toContain('possible');
+    expect(document.body.textContent.toLowerCase()).toContain('possible');
     expect(screen.getByText(/Your value trends/)).toBeTruthy();
     expect(screen.getByText('Rising')).toBeTruthy();
     expect(screen.getByText(/0\/4 used/)).toBeTruthy();
@@ -684,7 +685,7 @@ describe('TradeBoardWorkspace distinctive design & a11y', () => {
           status: 'open',
           offers: [],
           boardProfiles: profiles,
-        } as unknown as any,
+        },
         boardProfiles: profiles,
         negotiations: [],
         valueTrends: [],

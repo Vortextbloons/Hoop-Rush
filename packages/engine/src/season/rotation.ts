@@ -230,114 +230,26 @@ function firstRotationRejection(
   code: SeasonRotationRejectionCode;
   message: string;
 } | null {
-  const partition = [...rotation.starters, ...rotation.benchOrder];
-  const partitionSet = new Set(partition);
-  const minuteIds = rotation.targetMinutes.map((entry) => entry.playerVersionId);
-  if (partitionSet.size !== partition.length) {
-    return { code: 'DUPLICATE_PLAYER_VERSION', message: 'rotation references duplicate players' };
+  const failures = validateSeasonRotation(rotation, memberPlayable);
+  const message = failures[0];
+  if (message === undefined) return null;
+  if (message.includes('duplicate')) {
+    return { code: 'DUPLICATE_PLAYER_VERSION', message };
   }
-  if (new Set(minuteIds).size !== minuteIds.length) {
-    return {
-      code: 'DUPLICATE_PLAYER_VERSION',
-      message: 'target minutes reference duplicate players',
-    };
+  if (message.includes('closing')) {
+    return { code: 'ILLEGAL_CLOSING_FIVE', message };
   }
-  if (rotation.starters.length !== 5 || rotation.benchOrder.length !== 5) {
-    return {
-      code: 'ROSTER_MISMATCH',
-      message: `rotation must reference exactly ten players (got ${String(rotation.starters.length)} starters and ${String(rotation.benchOrder.length)} bench)`,
-    };
+  if (message.includes('starter')) {
+    return { code: 'ILLEGAL_STARTERS', message };
   }
-  for (const playerVersionId of partition) {
-    if (!memberPlayable.has(playerVersionId)) {
-      return {
-        code: 'ROSTER_MISMATCH',
-        message: `rotation references an unrostered player ${playerVersionId}`,
-      };
-    }
+  if (
+    message.includes('target minute') ||
+    message.includes('total 240') ||
+    message.includes('integer')
+  ) {
+    return { code: 'INVALID_TARGETS', message };
   }
-  for (const playerVersionId of memberPlayable.keys()) {
-    if (!partitionSet.has(playerVersionId)) {
-      return {
-        code: 'ROSTER_MISMATCH',
-        message: `rotation omits rostered player ${playerVersionId}`,
-      };
-    }
-  }
-  if (rotation.targetMinutes.length !== 10) {
-    return {
-      code: 'ROSTER_MISMATCH',
-      message: `rotation must have exactly ten target-minute entries (got ${String(rotation.targetMinutes.length)})`,
-    };
-  }
-  for (const entry of rotation.targetMinutes) {
-    if (!partitionSet.has(entry.playerVersionId)) {
-      return {
-        code: 'ROSTER_MISMATCH',
-        message: `target minutes reference an unrostered player ${entry.playerVersionId}`,
-      };
-    }
-  }
-  for (const playerVersionId of partition) {
-    if (!minuteIds.includes(playerVersionId)) {
-      return {
-        code: 'ROSTER_MISMATCH',
-        message: `no target minutes for rostered player ${playerVersionId}`,
-      };
-    }
-  }
-  for (const playerVersionId of rotation.closingFive) {
-    if (!partitionSet.has(playerVersionId)) {
-      return {
-        code: 'ROSTER_MISMATCH',
-        message: `closing five references an unrostered player ${playerVersionId}`,
-      };
-    }
-  }
-  for (const entry of rotation.targetMinutes) {
-    if (!Number.isInteger(entry.minutes) || entry.minutes < 0 || entry.minutes > 48) {
-      return {
-        code: 'INVALID_TARGETS',
-        message: `target minutes for ${entry.playerVersionId} must be an integer from 0-48 (got ${String(entry.minutes)})`,
-      };
-    }
-  }
-  const total = rotationTargetMinutes(rotation);
-  if (total !== 240) {
-    return {
-      code: 'INVALID_TARGETS',
-      message: `target minutes must total 240 (got ${String(total)})`,
-    };
-  }
-  for (const starterId of rotation.starters) {
-    const playable = memberPlayable.get(starterId);
-    const slotIndex = rotation.starters.indexOf(starterId);
-    const requirement = STARTING_SLOTS[slotIndex];
-    if (playable === undefined || requirement === undefined || !canPlay(playable, requirement)) {
-      return {
-        code: 'ILLEGAL_STARTERS',
-        message: `starter ${starterId} cannot play slot ${String(slotIndex)}`,
-      };
-    }
-  }
-  if (rotation.closingFive.length !== 5 || new Set(rotation.closingFive).size !== 5) {
-    return {
-      code: 'ILLEGAL_CLOSING_FIVE',
-      message: 'closing five must be five distinct players',
-    };
-  }
-  for (const closingId of rotation.closingFive) {
-    const playable = memberPlayable.get(closingId);
-    const slotIndex = rotation.closingFive.indexOf(closingId);
-    const requirement = STARTING_SLOTS[slotIndex];
-    if (playable === undefined || requirement === undefined || !canPlay(playable, requirement)) {
-      return {
-        code: 'ILLEGAL_CLOSING_FIVE',
-        message: `closing-five player ${closingId} cannot play slot ${String(slotIndex)}`,
-      };
-    }
-  }
-  return null;
+  return { code: 'ROSTER_MISMATCH', message };
 }
 export function handleSetSeasonRotationCommand(
   command: SetSeasonRotationCommand,
