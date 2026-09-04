@@ -4,6 +4,7 @@ import {
   SEASON_BLOCK_COUNT,
   SEASON_BLOCK_VERSION,
   SEASON_RUN_SCHEMA_VERSION,
+  commandIdSchema,
   seasonCandidateCheckpointSchema,
   seasonRunSchema,
   seasonScheduleSchema,
@@ -164,7 +165,9 @@ export function runnerBlockCommand(
     schemaVersion: SEASON_RUN_SCHEMA_VERSION,
     blockVersion: SEASON_BLOCK_VERSION,
     command: 'submit-season-block',
-    commandId: `season-block-${String(blockIndex)}-${String(state.acceptedCommandIds.length)}`,
+    commandId: commandIdSchema.parse(
+      `season-block-${String(blockIndex)}-${String(state.acceptedCommandIds.length)}`,
+    ),
     runId: state.run.runId,
     expectedRevision: state.acceptedCommandIds.length,
     blockIndex,

@@ -7,8 +7,12 @@ import {
   SEASON_DRAFT_CATALOG_VERSION,
   SEASON_DURABILITY_VERSION,
   SEASON_STAMINA_VERSION,
+  eraIdSchema,
+  franchiseIdSchema,
+  playerIdSchema,
   playerVersionId,
   seasonDraftCatalogSchema,
+  seasonKeySchema,
   type SeasonDraftCandidate,
   type SeasonDraftCandidateDurability,
 } from '@hoop-rush/data-contracts';
@@ -133,10 +137,10 @@ function main(): void {
       const staminaRating = Math.round(Math.min(95, Math.max(45, 45 + 1.25 * historicalMpg)));
       const record: SeasonDraftCandidate = {
         playerVersionId: versionId,
-        playerId: player.playerId,
-        franchiseId: player.franchiseId,
-        eraId: player.eraId,
-        seasonKey: player.seasonKey,
+        playerId: playerIdSchema.parse(player.playerId),
+        franchiseId: franchiseIdSchema.parse(player.franchiseId),
+        eraId: eraIdSchema.parse(player.eraId),
+        seasonKey: seasonKeySchema.parse(player.seasonKey),
         displayName: player.displayName,
         playerExternalId: player.playerExternalId,
         positions: {

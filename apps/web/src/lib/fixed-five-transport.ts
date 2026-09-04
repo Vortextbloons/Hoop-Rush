@@ -22,10 +22,26 @@ import { randomUUID } from '$lib/random-id';
 
 type FixedFiveClient = SupabaseClient;
 
+const sharedClients = new Map<string, FixedFiveClient>();
+
 function supabaseClient(url: string, publishableKey: string): FixedFiveClient {
-  return createClient(url, publishableKey, {
+  const key = `${url}${publishableKey}`;
+  const existing = sharedClients.get(key);
+  if (existing) return existing;
+  const client = createClient(url, publishableKey, {
     auth: { persistSession: true, autoRefreshToken: true },
   }) as FixedFiveClient;
+  sharedClients.set(key, client);
+  return client;
+}
+
+function parseRoomCode(code: string): FixedFiveRoomCode {
+  const clean = code.replace(/\D/g, '').slice(0, 4);
+  const parsed = fixedFiveRoomCodeSchema.safeParse(clean);
+  if (!parsed.success) {
+    throw new Error(`invalid-code: expected the host's 4-digit code (got ${code})`);
+  }
+  return parsed.data;
 }
 
 interface FixedFiveRoomRow {
@@ -316,7 +332,7 @@ export function createFixedFiveTransport(options?: {
       const revision = typeof record['revision'] === 'number' ? record['revision'] : 0;
       return {
         roomId: idSchema.parse(stringField(record, 'room_id')),
-        code: fixedFiveRoomCodeSchema.parse(code),
+        code: parseRoomCode(code),
         codeActive: true,
         settings,
         phase,
@@ -341,7 +357,7 @@ export function createFixedFiveTransport(options?: {
       const payload = rpcPayload(response.data);
       const snapshot = await fetchSnapshot(payload.room_id);
       const participantId: FixedFiveParticipantId = payload.participant_id ?? 'p2';
-      const membershipCode = fixedFiveRoomCodeSchema.parse(code);
+      const membershipCode = parseRoomCode(code);
       return {
         snapshot,
         membership: { roomId: payload.room_id, participantId, code: membershipCode },

@@ -6,6 +6,9 @@ import {
   SEASON_GAME_TARGETS_VERSION,
   SEASON_GAME_VERSION,
   buildEmptyCampaignState,
+  commandIdSchema,
+  franchiseIdSchema,
+  type Seed,
 } from '@hoop-rush/data-contracts';
 import {
   createEngineContext,
@@ -170,7 +173,7 @@ export interface CampaignCohortFacts {
   breakthroughShare: number;
   evaluations: number;
 }
-function auditOffersForSeed(rootSeed: string): {
+function auditOffersForSeed(rootSeed: Seed): {
   eligibleCheckpoints: number;
   offersGenerated: number;
   offerPerCheckpointFailures: number;
@@ -370,7 +373,7 @@ function auditOffersForSeed(rootSeed: string): {
           ...campaignState.selections,
           [blockIndex]: {
             opportunityId: first.opportunityId,
-            selectedByCommandId: `cal-cmd-${rootSeed}-${String(blockIndex)}`,
+            selectedByCommandId: commandIdSchema.parse(`cal-cmd-${rootSeed}-${String(blockIndex)}`),
           },
         },
       };

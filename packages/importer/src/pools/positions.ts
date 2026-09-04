@@ -19,14 +19,14 @@ export const POSITION_LABEL_MAP: Readonly<Record<string, readonly Position[]>> =
   '': [],
 };
 export interface NormalizedPositionLabels {
-  detailed: string[];
+  detailed: Position[];
   sourceLabels: string[];
   unknownLabels: string[];
 }
 export function normalizePositionLabels(
   labels: ReadonlySet<string> | readonly string[],
 ): NormalizedPositionLabels {
-  const detailed = new Set<string>();
+  const detailed = new Set<Position>();
   const unknownLabels: string[] = [];
   const sourceLabels = [...new Set([...labels].map(String))].sort();
   for (const label of sourceLabels) {
@@ -125,7 +125,7 @@ export function buildPlayerPositions(input: {
       secondary.push(position);
     }
   }
-  const careerUnion = normalizePositionLabels(careerLabels).detailed as Position[];
+  const careerUnion = normalizePositionLabels(careerLabels).detailed;
   const playable = [...new Set([...careerUnion, primary, ...secondary])].sort();
   if (playable.length === 0) {
     throw new Error('empty playable positions for packaged player');

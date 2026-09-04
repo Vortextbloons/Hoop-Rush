@@ -1451,7 +1451,13 @@ function applyOverallCohortNormalization(): Array<{
       if (!parsed.success) continue;
       const pool = parsed.data;
       if (!Array.isArray(pool.players) || pool.players.length === 0) continue;
-      pools.push(pool);
+      pools.push({
+        ...pool,
+        players: pool.players.map((player) => ({
+          ...player,
+          altIds: player.altIds ?? null,
+        })),
+      });
     } catch {}
   }
   const diagnostics = normalizePoolOveralls(pools.flatMap((pool) => pool.players));

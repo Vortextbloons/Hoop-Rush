@@ -17,6 +17,7 @@ import {
   SEASON_ROSTER_GENERATION_VERSION,
   SEASON_ROTATION_VERSION,
   seasonDraftStateSchema,
+  seedSchema,
   type SeasonDraftCommandRecord,
   type SeasonLeagueGenerationResult,
 } from '@hoop-rush/data-contracts';
@@ -63,8 +64,9 @@ function classicRecord(draftId = 'classic-draft-a'): StoredClassicDraft {
   };
 }
 function generationResult(seed: string): SeasonLeagueGenerationResult {
+  const parsedSeed = seedSchema.parse(seed);
   const league = buildSeasonLeague();
-  const rosters = buildSeasonRosters(league, seed);
+  const rosters = buildSeasonRosters(league, parsedSeed);
   const aiAssignments = buildSeasonAiAssignments(league);
   const rotations = rosters.map((roster) =>
     buildSeasonRotation(
@@ -74,7 +76,7 @@ function generationResult(seed: string): SeasonLeagueGenerationResult {
   );
   return {
     schemaVersion: 2,
-    seed,
+    seed: parsedSeed,
     aiVersion: SEASON_AI_VERSION,
     rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
     rotationVersion: SEASON_ROTATION_VERSION,
@@ -90,7 +92,7 @@ function generationResult(seed: string): SeasonLeagueGenerationResult {
     aiPools: buildSeasonAiPools(aiAssignments, 'lakers'),
     evaluations: buildFixtureEvaluations(rosters, aiAssignments),
     diagnostics: {
-      seed,
+      seed: parsedSeed,
       aiVersion: SEASON_AI_VERSION,
       rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
       teamsGenerated: 30,

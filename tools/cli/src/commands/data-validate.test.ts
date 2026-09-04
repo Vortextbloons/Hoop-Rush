@@ -4,7 +4,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { PeakPlayerSeason } from '@hoop-rush/data-contracts';
-import { POSITION_NORMALIZATION_VERSION } from '@hoop-rush/data-contracts';
+import {
+  POSITION_NORMALIZATION_VERSION,
+  contentHashSchema,
+  eraIdSchema,
+  franchiseIdSchema,
+  playerIdSchema,
+  seasonKeySchema,
+} from '@hoop-rush/data-contracts';
 import { buildManifest, buildPlayerSeason, buildPool } from '@hoop-rush/test-fixtures';
 import { dataValidate } from './data-validate.ts';
 import { EXIT_CHECKS_FAILED, EXIT_OK, EXIT_USAGE_OR_DATA_ERROR } from '../report.ts';
@@ -33,7 +40,7 @@ function legalPool(altIds: PeakPlayerSeason['altIds'] = null): ReturnType<typeof
       const primary = positions[0];
       if (primary === undefined) throw new Error('fixture position label missing');
       return buildPlayerSeason({
-        playerId: `p-fixture-${String(index + 1)}`,
+        playerId: playerIdSchema.parse(`p-fixture-${String(index + 1)}`),
         displayName: `Fixture ${String(index + 1)}`,
         positions: {
           primary,
@@ -79,10 +86,10 @@ describe('dataValidate', () => {
     const manifest = buildManifest({
       franchiseLineage: [
         {
-          modernFranchiseId: 'lakers',
+          modernFranchiseId: franchiseIdSchema.parse('lakers'),
           historicalTeamId: '1610612747',
-          validFromSeasonKey: '1960-61',
-          validThroughSeasonKey: '1974-75',
+          validFromSeasonKey: seasonKeySchema.parse('1960-61'),
+          validThroughSeasonKey: seasonKeySchema.parse('1974-75'),
           displayName: 'Los Angeles Lakers',
           city: 'Los Angeles',
           abbreviation: 'LAL',
@@ -90,9 +97,9 @@ describe('dataValidate', () => {
           lineageRuleVersion: 'lineage-v1',
         },
         {
-          modernFranchiseId: 'lakers',
+          modernFranchiseId: franchiseIdSchema.parse('lakers'),
           historicalTeamId: '1610612747',
-          validFromSeasonKey: '1970-71',
+          validFromSeasonKey: seasonKeySchema.parse('1970-71'),
           displayName: 'Los Angeles Lakers',
           city: 'Los Angeles',
           abbreviation: 'LAL',
@@ -101,9 +108,24 @@ describe('dataValidate', () => {
         },
       ],
       eras: [
-        { eraId: '1960s', label: '1960s', fromSeasonKey: '1960-61', toSeasonKey: '1969-70' },
-        { eraId: '1970s', label: '1970s', fromSeasonKey: '1970-71', toSeasonKey: '1979-80' },
-        { eraId: '1970s-dup', label: 'dup', fromSeasonKey: '1975-76', toSeasonKey: '1984-85' },
+        {
+          eraId: eraIdSchema.parse('1960s'),
+          label: '1960s',
+          fromSeasonKey: seasonKeySchema.parse('1960-61'),
+          toSeasonKey: seasonKeySchema.parse('1969-70'),
+        },
+        {
+          eraId: eraIdSchema.parse('1970s'),
+          label: '1970s',
+          fromSeasonKey: seasonKeySchema.parse('1970-71'),
+          toSeasonKey: seasonKeySchema.parse('1979-80'),
+        },
+        {
+          eraId: eraIdSchema.parse('1970s-dup'),
+          label: 'dup',
+          fromSeasonKey: seasonKeySchema.parse('1975-76'),
+          toSeasonKey: seasonKeySchema.parse('1984-85'),
+        },
       ],
     });
     const path = await writeManifest(manifest);
@@ -121,12 +143,17 @@ describe('dataValidate', () => {
     const contentHash = createHash('sha256').update(asset).digest('hex');
     const manifest = buildManifest({
       pools: [
-        { franchiseId: 'lakers', eraId: '1990s', url: 'pools/lakers-1990s.json', contentHash },
         {
-          franchiseId: 'lakers',
-          eraId: '2000s',
+          franchiseId: franchiseIdSchema.parse('lakers'),
+          eraId: eraIdSchema.parse('1990s'),
+          url: 'pools/lakers-1990s.json',
+          contentHash: contentHashSchema.parse(contentHash),
+        },
+        {
+          franchiseId: franchiseIdSchema.parse('lakers'),
+          eraId: eraIdSchema.parse('2000s'),
           url: 'pools/missing.json',
-          contentHash: 'a'.repeat(64),
+          contentHash: contentHashSchema.parse('a'.repeat(64)),
         },
       ],
     });
@@ -146,7 +173,12 @@ describe('dataValidate', () => {
     const contentHash = createHash('sha256').update(asset).digest('hex');
     const manifest = buildManifest({
       pools: [
-        { franchiseId: 'lakers', eraId: '1990s', url: 'pools/lakers-1990s.json', contentHash },
+        {
+          franchiseId: franchiseIdSchema.parse('lakers'),
+          eraId: eraIdSchema.parse('1990s'),
+          url: 'pools/lakers-1990s.json',
+          contentHash: contentHashSchema.parse(contentHash),
+        },
       ],
     });
     const path = await writeManifest(manifest);
@@ -164,7 +196,12 @@ describe('dataValidate', () => {
     const contentHash = createHash('sha256').update(asset).digest('hex');
     const manifest = buildManifest({
       pools: [
-        { franchiseId: 'lakers', eraId: '1990s', url: 'pools/lakers-1990s.json', contentHash },
+        {
+          franchiseId: franchiseIdSchema.parse('lakers'),
+          eraId: eraIdSchema.parse('1990s'),
+          url: 'pools/lakers-1990s.json',
+          contentHash: contentHashSchema.parse(contentHash),
+        },
       ],
     });
     const path = await writeManifest(manifest);
@@ -174,7 +211,7 @@ describe('dataValidate', () => {
 });
 describe('dataValidate season free-agency index audit', () => {
   const versionId = `pv-${'a'.repeat(32)}`;
-  const playerId = 'p-fixture-1';
+  const playerId = playerIdSchema.parse('p-fixture-1');
   function minimalIndex(catalogHash: string): unknown {
     return {
       schemaVersion: 1,
@@ -227,16 +264,25 @@ describe('dataValidate season free-agency index audit', () => {
     return writeManifest(
       buildManifest({
         season: {
-          league: { url: 'season/league.json', contentHash: 'a'.repeat(64) },
-          schedule: { url: 'season/schedule.json', contentHash: 'b'.repeat(64) },
+          league: {
+            url: 'season/league.json',
+            contentHash: contentHashSchema.parse('a'.repeat(64)),
+          },
+          schedule: {
+            url: 'season/schedule.json',
+            contentHash: contentHashSchema.parse('b'.repeat(64)),
+          },
           draftCatalog: {
             url: 'season/draft-catalog.json',
-            contentHash: catalogHash,
+            contentHash: contentHashSchema.parse(catalogHash),
           },
-          rosterTargets: { url: 'season/roster-targets.json', contentHash: 'c'.repeat(64) },
+          rosterTargets: {
+            url: 'season/roster-targets.json',
+            contentHash: contentHashSchema.parse('c'.repeat(64)),
+          },
           freeAgencyIndex: {
             url: 'season/free-agency-index.json',
-            contentHash: indexHash,
+            contentHash: contentHashSchema.parse(indexHash),
           },
         },
       }),
@@ -281,11 +327,26 @@ describe('dataValidate season free-agency index audit', () => {
     const path = await writeManifest(
       buildManifest({
         season: {
-          league: { url: 'season/league.json', contentHash: 'a'.repeat(64) },
-          schedule: { url: 'season/schedule.json', contentHash: 'b'.repeat(64) },
-          draftCatalog: { url: 'season/draft-catalog.json', contentHash: catalogHash },
-          rosterTargets: { url: 'season/roster-targets.json', contentHash: 'c'.repeat(64) },
-          freeAgencyIndex: { url: 'season/free-agency-index.json', contentHash: indexHash },
+          league: {
+            url: 'season/league.json',
+            contentHash: contentHashSchema.parse('a'.repeat(64)),
+          },
+          schedule: {
+            url: 'season/schedule.json',
+            contentHash: contentHashSchema.parse('b'.repeat(64)),
+          },
+          draftCatalog: {
+            url: 'season/draft-catalog.json',
+            contentHash: contentHashSchema.parse(catalogHash),
+          },
+          rosterTargets: {
+            url: 'season/roster-targets.json',
+            contentHash: contentHashSchema.parse('c'.repeat(64)),
+          },
+          freeAgencyIndex: {
+            url: 'season/free-agency-index.json',
+            contentHash: contentHashSchema.parse(indexHash),
+          },
         },
       }),
     );

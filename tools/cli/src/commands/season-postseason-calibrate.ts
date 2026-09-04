@@ -3,10 +3,13 @@ import { z } from 'zod';
 import {
   SEASON_POSTSEASON_TARGETS_VERSION,
   SEASON_RUN_SCHEMA_VERSION,
+  commandIdSchema,
+  type FranchiseId,
   type SeasonAdvancePostseasonCommand,
   type SeasonPostseasonSummary,
   type SeasonRun,
   type SeasonStartPostseasonCommand,
+  type Seed,
 } from '@hoop-rush/data-contracts';
 import { createEngineContext, deriveSeasonAwards, handleSeasonRunCommand } from '@hoop-rush/engine';
 import { makeReport, type CliReport } from '../report.ts';
@@ -112,7 +115,7 @@ export interface SeasonPostseasonSeasonFacts {
   gamesPlayed: number;
   seriesCompleted: number;
 }
-export type SeasonPostseasonSeasonRunner = (rootSeed: string) => SeasonPostseasonSeasonFacts;
+export type SeasonPostseasonSeasonRunner = (rootSeed: Seed) => SeasonPostseasonSeasonFacts;
 export interface SeasonPostseasonCohortFacts extends SeasonPostseasonMeasured {
   awardWinners: number;
   upsetSeries: number;
@@ -245,7 +248,7 @@ export function seasonPostseasonGates(cohort: SeasonPostseasonCohortFacts): M25G
   ];
 }
 export function simulateSeasonPostseasonFacts(
-  rootSeed: string,
+  rootSeed: Seed,
   options: {
     runPath?: string | null;
     manifestPath?: string | null;
@@ -272,7 +275,7 @@ export function simulateSeasonPostseasonFacts(
   const startCommand: SeasonStartPostseasonCommand = {
     schemaVersion: SEASON_RUN_SCHEMA_VERSION,
     command: 'start-postseason',
-    commandId: `cal-start-${rootSeed}`,
+    commandId: commandIdSchema.parse(`cal-start-${rootSeed}`),
     runId: run.runId,
     expectedStateRevision: run.stateRevision,
     expectedStateDigest: run.stateDigest,
@@ -303,7 +306,7 @@ export function simulateSeasonPostseasonFacts(
     const command: SeasonAdvancePostseasonCommand = {
       schemaVersion: SEASON_RUN_SCHEMA_VERSION,
       command: 'advance-postseason',
-      commandId: `cal-adv-${rootSeed}-${String(guard)}`,
+      commandId: commandIdSchema.parse(`cal-adv-${rootSeed}-${String(guard)}`),
       runId: run.runId,
       expectedStateRevision: run.stateRevision,
       expectedStateDigest: run.stateDigest,
@@ -348,7 +351,7 @@ export function seasonPostseasonFactsOf(
     upset: boolean;
     strength: boolean;
   }> = [];
-  const bracketTeams = new Map<string, Set<string>>();
+  const bracketTeams = new Map<string, Set<FranchiseId>>();
   if (bracket !== null) {
     const allSeries = [
       ...bracket.east.firstRound,
@@ -364,11 +367,11 @@ export function seasonPostseasonFactsOf(
       seriesLengths.push(bracketSeries.games.length);
       const teams = new Set(
         [bracketSeries.homeCourtFranchiseId, bracketSeries.challengerFranchiseId].filter(
-          (team): team is string => team !== null,
+          (team): team is FranchiseId => team !== null,
         ),
       );
       const conference = bracketSeries.conference ?? 'finals';
-      const existing = bracketTeams.get(conference) ?? new Set<string>();
+      const existing = bracketTeams.get(conference) ?? new Set<FranchiseId>();
       for (const team of teams) existing.add(team);
       bracketTeams.set(conference, existing);
       if (
@@ -400,10 +403,10 @@ export function seasonPostseasonFactsOf(
   const duplicateTeamFailures = 0;
   let missingTeamFailures = 0;
   for (const conference of ['east', 'west'] as const) {
-    const teams = bracketTeams.get(conference) ?? new Set<string>();
+    const teams = bracketTeams.get(conference) ?? new Set<FranchiseId>();
     if (teams.size !== 8) missingTeamFailures += 1;
   }
-  const finalsTeams = bracketTeams.get('finals') ?? new Set<string>();
+  const finalsTeams = bracketTeams.get('finals') ?? new Set<FranchiseId>();
   if (finalsTeams.size !== 0 && finalsTeams.size !== 2) missingTeamFailures += 1;
   let awardWinnersInPostseason = 0;
   let awardWinners = 0;
@@ -413,7 +416,7 @@ export function seasonPostseasonFactsOf(
       rosters: run.rosters,
       summaries: season.summaries,
     });
-    const postseasonTeams = new Set<string>();
+    const postseasonTeams = new Set<FranchiseId>();
     for (const teams of bracketTeams.values()) {
       for (const team of teams) postseasonTeams.add(team);
     }
@@ -482,7 +485,7 @@ export function seasonPostseasonCalibrate(
   const manifestPath = args.manifest ?? DEFAULT_MANIFEST;
   const runSeason =
     deps.runSeason ??
-    ((rootSeed: string) => simulateSeasonPostseasonFacts(rootSeed, { manifestPath }));
+    ((rootSeed: Seed) => simulateSeasonPostseasonFacts(rootSeed, { manifestPath }));
   const { from, to } = parseSeedRange(
     args,
     SEASON_POSTSEASON_CALIBRATION_SEED_COUNT + SEASON_POSTSEASON_VALIDATION_SEED_COUNT - 1,

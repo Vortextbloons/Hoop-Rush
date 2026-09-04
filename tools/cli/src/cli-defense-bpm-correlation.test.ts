@@ -2,6 +2,12 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildManifest, buildPlayerSeason, buildPool } from '@hoop-rush/test-fixtures';
+import {
+  contentHashSchema,
+  eraIdSchema,
+  franchiseIdSchema,
+  playerIdSchema,
+} from '@hoop-rush/data-contracts';
 import { pearsonCorrelation } from './commands/data-defense-bpm-correlation.ts';
 import { defenseBpmCorrelationReportSchema } from './report-schemas.ts';
 import {
@@ -34,7 +40,7 @@ function writeDefenseFixture(dataRoot: string, count: number): string {
       buildPool(
         rows.map((row) =>
           buildPlayerSeason({
-            playerId: `p-${row.playerExternalId}`,
+            playerId: playerIdSchema.parse(`p-${row.playerExternalId}`),
             playerExternalId: row.playerExternalId,
             summaryRatings: {
               overallRating: row.defense,
@@ -54,10 +60,10 @@ function writeDefenseFixture(dataRoot: string, count: number): string {
       buildManifest({
         pools: [
           {
-            franchiseId: 'lakers',
-            eraId: '1990s',
+            franchiseId: franchiseIdSchema.parse('lakers'),
+            eraId: eraIdSchema.parse('1990s'),
             url: 'pools/lakers-1990s.json',
-            contentHash: 'a'.repeat(64),
+            contentHash: contentHashSchema.parse('a'.repeat(64)),
           },
         ],
       }),

@@ -2,6 +2,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   playerVersionId,
   SEASON_RUN_SAVE_SCHEMA_VERSION,
+  commandIdSchema,
+  eraIdSchema,
+  franchiseIdSchema,
+  idSchema,
+  playerIdSchema,
+  seasonGameIdSchema,
+  seasonKeySchema,
+  seasonRunCommandSchema,
   seasonCommandLogDigest,
   seasonFreeAgencyStateSchema,
   type SeasonFreeAgencyCandidate,
@@ -31,11 +39,11 @@ import {
 } from '../testing/season-run-fixture.ts';
 const FA_LAKERS = {
   playerVersionId: playerVersionId('p-synth-fa-lakers', 'lakers', '1990s', '1995-96'),
-  playerId: 'p-synth-fa-lakers',
+  playerId: playerIdSchema.parse('p-synth-fa-lakers'),
 };
 const FA_CELTICS = {
   playerVersionId: playerVersionId('p-synth-fa-celtics', 'celtics', '1990s', '1995-96'),
-  playerId: 'p-synth-fa-celtics',
+  playerId: playerIdSchema.parse('p-synth-fa-celtics'),
 };
 interface Adapters {
   db: TestDatabase;
@@ -110,7 +118,7 @@ function faCandidate(
 ): SeasonFreeAgencyCandidate {
   return {
     playerVersionId: versionId,
-    playerId,
+    playerId: playerIdSchema.parse(playerId),
     displayName: `FA ${playerId}`,
     positions: {
       primary: 'SG',
@@ -145,7 +153,7 @@ function declarationsOf(
       {
         franchiseId: team.franchiseId,
         windowIndex,
-        commandId: `cmd-fa-ai-${team.franchiseId}`,
+        commandId: commandIdSchema.parse(`cmd-fa-ai-${team.franchiseId}`),
         targets: [],
       },
     ]),
@@ -180,33 +188,40 @@ function resolvedWindowState(
   franchiseIds: readonly string[] = ['lakers', 'celtics'],
 ): SeasonFreeAgencyState {
   const open = openWindowState(run);
+  const parsedCommandId = commandIdSchema.parse(commandId);
   const signingOf = (franchiseId: 'lakers' | 'celtics'): SeasonFreeAgencySigning | null => {
     const facts = franchiseId === 'lakers' ? FA_LAKERS : FA_CELTICS;
     if (!franchiseIds.includes(franchiseId)) return null;
+    const parsedFranchiseId = franchiseIdSchema.parse(franchiseId);
     return {
-      signingId: `signing-fa-${franchiseId}`,
+      signingId: idSchema.parse(`signing-fa-${franchiseId}`),
       windowIndex: 0,
-      franchiseId,
+      franchiseId: parsedFranchiseId,
       playerVersionId: facts.playerVersionId,
       playerId: facts.playerId,
       band: 'role',
       roleExpectation: 'rotation',
       influenceCost: 2,
-      commandId,
+      commandId: parsedCommandId,
       seedPath: ['free-agency', '0', 'resolve', 'draw'],
-      ledgerEntryId: `influence-fa-${franchiseId}`,
-      transactionId: `tx-fa-${franchiseId}`,
+      ledgerEntryId: idSchema.parse(`influence-fa-${franchiseId}`),
+      transactionId: idSchema.parse(`tx-fa-${franchiseId}`),
       appliedAtStateRevision: 4,
     };
   };
   const signings = ['lakers', 'celtics']
-    .map((franchiseId) => signingOf(franchiseId as 'lakers' | 'celtics'))
+    .map((franchiseId) => {
+      const parsed = franchiseIdSchema.parse(franchiseId);
+      const key = parsed === franchiseIdSchema.parse('lakers') ? 'lakers' : 'celtics';
+      return signingOf(key);
+    })
     .filter((signing): signing is SeasonFreeAgencySigning => signing !== null);
   const signingCounts = { ...open.signingCounts };
   const seasonSpend = { ...open.seasonSpend };
   for (const franchiseId of franchiseIds) {
-    signingCounts[franchiseId] = 1;
-    seasonSpend[franchiseId] = 2;
+    const parsedFid = franchiseIdSchema.parse(franchiseId);
+    signingCounts[parsedFid] = 1;
+    seasonSpend[parsedFid] = 2;
   }
   return seasonFreeAgencyStateSchema.parse({
     ...open,
@@ -228,11 +243,11 @@ function faLedgerEntry(
   balanceAfter: number,
 ): SeasonInfluenceState['ledger'][number] {
   return {
-    entryId,
-    franchiseId,
+    entryId: idSchema.parse(entryId),
+    franchiseId: franchiseIdSchema.parse(franchiseId),
     source: 'free-agent-signing',
     blockIndex: null,
-    commandId,
+    commandId: commandIdSchema.parse(commandId),
     requestedDelta: -2,
     appliedDelta: -2,
     balanceAfter,
@@ -247,9 +262,9 @@ function faTransaction(
   appliedAtStateRevision: number,
 ): SeasonTransactionEntry {
   return {
-    transactionId,
-    commandId,
-    franchiseId,
+    transactionId: idSchema.parse(transactionId),
+    commandId: commandIdSchema.parse(commandId),
+    franchiseId: franchiseIdSchema.parse(franchiseId),
     type: 'free-agent-signing',
     blockIndex: null,
     appliedAtStateRevision,
@@ -269,16 +284,16 @@ function resolveCommand(
     effects: block2.effects,
     freeAgency: openWindowState(adapters.run),
   });
-  return {
+  return seasonRunCommandSchema.parse({
     schemaVersion: 11,
     command: 'resolve-free-agent-market',
-    commandId: 'cmd-resolve-fa-0',
+    commandId: commandIdSchema.parse('cmd-resolve-fa-0'),
     runId: adapters.run.runId,
     expectedStateRevision: 3,
     expectedStateDigest: block2Digest,
     windowIndex: 0,
     ...overrides,
-  } as SeasonRunCommand;
+  });
 }
 interface ResolutionContext {
   openState: SeasonFreeAgencyState;
@@ -313,9 +328,11 @@ async function setupResolution(adapters: Adapters): Promise<ResolutionContext> {
     faLedgerEntry('lakers', 'influence-fa-lakers', commandId, 0),
     faLedgerEntry('celtics', 'influence-fa-celtics', commandId, 0),
   ];
+  const lakersBalanceKey = franchiseIdSchema.parse('lakers');
+  const celticsBalanceKey = franchiseIdSchema.parse('celtics');
   const influence: SeasonInfluenceState = {
     ...run.influence,
-    balances: { ...run.influence.balances, lakers: 0, celtics: 0 },
+    balances: { ...run.influence.balances, [lakersBalanceKey]: 0, [celticsBalanceKey]: 0 },
     ledger,
   };
   const transactions = [
@@ -323,7 +340,7 @@ async function setupResolution(adapters: Adapters): Promise<ResolutionContext> {
     faTransaction('celtics', 'tx-fa-celtics', commandId, FA_CELTICS.playerVersionId, 4),
   ];
   const rosters = run.rosters.map((roster) => {
-    if (roster.franchiseId === 'lakers') {
+    if (roster.franchiseId === lakersBalanceKey) {
       return {
         ...roster,
         players: [
@@ -331,15 +348,15 @@ async function setupResolution(adapters: Adapters): Promise<ResolutionContext> {
           {
             playerVersionId: FA_LAKERS.playerVersionId,
             playerId: FA_LAKERS.playerId,
-            franchiseId: 'lakers',
-            eraId: '1990s',
-            seasonKey: '1995-96',
+            franchiseId: lakersBalanceKey,
+            eraId: eraIdSchema.parse('1990s'),
+            seasonKey: seasonKeySchema.parse('1995-96'),
             displayName: 'FA Lakers',
           },
         ],
       };
     }
-    if (roster.franchiseId === 'celtics') {
+    if (roster.franchiseId === celticsBalanceKey) {
       return {
         ...roster,
         players: [
@@ -347,9 +364,9 @@ async function setupResolution(adapters: Adapters): Promise<ResolutionContext> {
           {
             playerVersionId: FA_CELTICS.playerVersionId,
             playerId: FA_CELTICS.playerId,
-            franchiseId: 'celtics',
-            eraId: '1990s',
-            seasonKey: '1995-96',
+            franchiseId: celticsBalanceKey,
+            eraId: eraIdSchema.parse('1990s'),
+            seasonKey: seasonKeySchema.parse('1995-96'),
             displayName: 'FA Celtics',
           },
         ],
@@ -359,8 +376,8 @@ async function setupResolution(adapters: Adapters): Promise<ResolutionContext> {
   });
   const ownership = [
     ...run.ownership,
-    { playerVersionId: FA_LAKERS.playerVersionId, ownerFranchiseId: 'lakers' },
-    { playerVersionId: FA_CELTICS.playerVersionId, ownerFranchiseId: 'celtics' },
+    { playerVersionId: FA_LAKERS.playerVersionId, ownerFranchiseId: lakersBalanceKey },
+    { playerVersionId: FA_CELTICS.playerVersionId, ownerFranchiseId: celticsBalanceKey },
   ];
   const stateRevision = 4;
   const stateDigest = buildFixtureStateDigest(run, {
@@ -417,8 +434,10 @@ describe('season run free-agency persistence (M2.6.5)', () => {
     const stored = await db.seasonRuns.get(SEASON_RUN_RECORD_ID);
     expect(stored?.saveSchemaVersion).toBe(SEASON_RUN_SAVE_SCHEMA_VERSION);
     expect(stored?.run.freeAgency.windows[0]?.status).toBe('resolved');
-    expect(stored?.run.freeAgency.signingCounts.lakers).toBe(1);
-    expect(stored?.run.freeAgency.seasonSpend.celtics).toBe(2);
+    const storedLakersKey = franchiseIdSchema.parse('lakers');
+    const storedCelticsKey = franchiseIdSchema.parse('celtics');
+    expect(stored?.run.freeAgency.signingCounts[storedLakersKey]).toBe(1);
+    expect(stored?.run.freeAgency.seasonSpend[storedCelticsKey]).toBe(2);
     const snapshot = await repo.loadActiveRun();
     expect(snapshot?.run.freeAgency).toEqual(stored?.run.freeAgency);
   });
@@ -431,7 +450,10 @@ describe('season run free-agency persistence (M2.6.5)', () => {
     const opened = openWindowState(run);
     const window = opened.windows[0];
     if (window === undefined) throw new Error('expected an open window');
-    const { lakers: _human, ...aiDeclarations } = window.declarations;
+    const lakersDeclKey = franchiseIdSchema.parse('lakers');
+    const aiDeclarations: typeof window.declarations = Object.fromEntries(
+      Object.entries(window.declarations).filter(([key]) => key !== lakersDeclKey),
+    );
     const pendingHuman = {
       ...opened,
       windows: [{ ...window, declarations: aiDeclarations }],
@@ -450,7 +472,9 @@ describe('season run free-agency persistence (M2.6.5)', () => {
     });
     const snapshot = await repo.loadActiveRun();
     expect(snapshot?.run.freeAgency.windows[0]?.status).toBe('open');
-    expect(snapshot?.run.freeAgency.windows[0]?.declarations.lakers).toBeUndefined();
+    expect(
+      snapshot?.run.freeAgency.windows[0]?.declarations[franchiseIdSchema.parse('lakers')],
+    ).toBeUndefined();
   });
   it('reports a stored save-schema-6 row as typed incompatible and preserves it', async () => {
     const adapters = makeAdapters();
@@ -500,8 +524,8 @@ describe('season run free-agency persistence (M2.6.5)', () => {
     expect(lakersRoster?.players).toHaveLength(11);
     expect(celticsRoster?.players).toHaveLength(11);
     expect(stored.run.ownership).toHaveLength(302);
-    expect(stored.influence.balances.lakers).toBe(0);
-    expect(stored.influence.balances.celtics).toBe(0);
+    expect(stored.influence.balances[franchiseIdSchema.parse('lakers')]).toBe(0);
+    expect(stored.influence.balances[franchiseIdSchema.parse('celtics')]).toBe(0);
     expect(
       stored.influence.ledger.filter((entry) => entry.source === 'free-agent-signing'),
     ).toHaveLength(2);
@@ -509,8 +533,8 @@ describe('season run free-agency persistence (M2.6.5)', () => {
       2,
     );
     expect(stored.run.freeAgency.windows[0]?.signings).toHaveLength(2);
-    expect(stored.run.freeAgency.signingCounts.lakers).toBe(1);
-    expect(stored.run.freeAgency.seasonSpend.lakers).toBe(2);
+    expect(stored.run.freeAgency.signingCounts[franchiseIdSchema.parse('lakers')]).toBe(1);
+    expect(stored.run.freeAgency.seasonSpend[franchiseIdSchema.parse('lakers')]).toBe(2);
     expect(stored.stateRevision).toBe(4);
     expect(stored.stateDigest).toBe(context.run.stateDigest);
     expect(stored.checkpointState?.revision).toBe(3);
@@ -629,7 +653,7 @@ describe('season run free-agency persistence (M2.6.5)', () => {
     expect(after?.transactions.filter((entry) => entry.type === 'free-agent-signing')).toHaveLength(
       0,
     );
-    expect(after?.influence.balances.lakers).toBe(2);
+    expect(after?.influence.balances[franchiseIdSchema.parse('lakers')]).toBe(2);
     expect(
       after?.influence.ledger.filter((entry) => entry.source === 'free-agent-signing'),
     ).toHaveLength(0);
@@ -690,10 +714,10 @@ describe('season run free-agency persistence (M2.6.5)', () => {
           ...(open.windows[0] as NonNullable<SeasonFreeAgencyState['windows'][number]>),
           declarations: {
             ...open.windows[0]?.declarations,
-            lakers: {
-              franchiseId: 'lakers',
+            [franchiseIdSchema.parse('lakers')]: {
+              franchiseId: franchiseIdSchema.parse('lakers'),
               windowIndex: 0,
-              commandId: 'cmd-declare-fa-0',
+              commandId: commandIdSchema.parse('cmd-declare-fa-0'),
               targets: [
                 {
                   playerVersionId: FA_LAKERS.playerVersionId,
@@ -707,19 +731,19 @@ describe('season run free-agency persistence (M2.6.5)', () => {
       ],
     };
     const declareDigest = await apply({
-      command: {
+      command: seasonRunCommandSchema.parse({
         schemaVersion: 11,
         command: 'declare-free-agent-interest',
-        commandId: 'cmd-declare-fa-0',
+        commandId: commandIdSchema.parse('cmd-declare-fa-0'),
         runId: run.runId,
         expectedStateRevision: 3,
         expectedStateDigest: block2Digest,
-        franchiseId: 'lakers',
+        franchiseId: franchiseIdSchema.parse('lakers'),
         windowIndex: 0,
         targets: [
           { playerVersionId: FA_LAKERS.playerVersionId, roleExpectation: 'rotation', influence: 2 },
         ],
-      },
+      }),
       freeAgency: declared,
       stateRevision: 4,
     });
@@ -730,10 +754,10 @@ describe('season run free-agency persistence (M2.6.5)', () => {
           ...(declared.windows[0] as NonNullable<SeasonFreeAgencyState['windows'][number]>),
           declarations: {
             ...declared.windows[0]?.declarations,
-            celtics: {
-              franchiseId: 'celtics',
+            [franchiseIdSchema.parse('celtics')]: {
+              franchiseId: franchiseIdSchema.parse('celtics'),
               windowIndex: 0,
-              commandId: 'cmd-skip-fa-0',
+              commandId: commandIdSchema.parse('cmd-skip-fa-0'),
               targets: [],
             },
           },
@@ -741,16 +765,16 @@ describe('season run free-agency persistence (M2.6.5)', () => {
       ],
     };
     const skipDigest = await apply({
-      command: {
+      command: seasonRunCommandSchema.parse({
         schemaVersion: 11,
         command: 'skip-free-agent-market',
-        commandId: 'cmd-skip-fa-0',
+        commandId: commandIdSchema.parse('cmd-skip-fa-0'),
         runId: run.runId,
         expectedStateRevision: 4,
         expectedStateDigest: declareDigest,
-        franchiseId: 'celtics',
+        franchiseId: franchiseIdSchema.parse('celtics'),
         windowIndex: 0,
-      },
+      }),
       freeAgency: skipped,
       stateRevision: 5,
     });
@@ -759,16 +783,17 @@ describe('season run free-agency persistence (M2.6.5)', () => {
       ...run.influence.ledger,
       faLedgerEntry('lakers', 'influence-fa-lakers', 'cmd-resolve-fa-0', 0),
     ];
+    const faLakersKey = franchiseIdSchema.parse('lakers');
     const influence: SeasonInfluenceState = {
       ...run.influence,
-      balances: { ...run.influence.balances, lakers: 0 },
+      balances: { ...run.influence.balances, [faLakersKey]: 0 },
       ledger,
     };
     const transactions = [
       faTransaction('lakers', 'tx-fa-lakers', 'cmd-resolve-fa-0', FA_LAKERS.playerVersionId, 6),
     ];
     const rosters = run.rosters.map((roster) =>
-      roster.franchiseId === 'lakers'
+      roster.franchiseId === faLakersKey
         ? {
             ...roster,
             players: [
@@ -776,9 +801,9 @@ describe('season run free-agency persistence (M2.6.5)', () => {
               {
                 playerVersionId: FA_LAKERS.playerVersionId,
                 playerId: FA_LAKERS.playerId,
-                franchiseId: 'lakers',
-                eraId: '1990s',
-                seasonKey: '1995-96',
+                franchiseId: faLakersKey,
+                eraId: eraIdSchema.parse('1990s'),
+                seasonKey: seasonKeySchema.parse('1995-96'),
                 displayName: 'FA Lakers',
               },
             ],
@@ -787,7 +812,7 @@ describe('season run free-agency persistence (M2.6.5)', () => {
     );
     const ownership = [
       ...run.ownership,
-      { playerVersionId: FA_LAKERS.playerVersionId, ownerFranchiseId: 'lakers' },
+      { playerVersionId: FA_LAKERS.playerVersionId, ownerFranchiseId: faLakersKey },
     ];
     const resolveDigest = buildFixtureStateDigest(run, {
       stateRevision: 6,
@@ -801,15 +826,15 @@ describe('season run free-agency persistence (M2.6.5)', () => {
     });
     await repo.applySeasonRunCommand({
       runId: run.runId,
-      command: {
+      command: seasonRunCommandSchema.parse({
         schemaVersion: 11,
         command: 'resolve-free-agent-market',
-        commandId: 'cmd-resolve-fa-0',
+        commandId: commandIdSchema.parse('cmd-resolve-fa-0'),
         runId: run.runId,
         expectedStateRevision: 5,
         expectedStateDigest: skipDigest,
         windowIndex: 0,
-      },
+      }),
       run: {
         ...run,
         rosters,
@@ -895,7 +920,7 @@ describe('season run free-agency persistence (M2.6.5)', () => {
       pending: null,
     });
     expect(await db.seasonCommandLog.where('runId').equals(run.runId).count()).toBe(1);
-    const secondRun = { ...sharedDataset.run, runId: 'replacement-free-agency-run' };
+    const secondRun = { ...sharedDataset.run, runId: idSchema.parse('replacement-free-agency-run') };
     await repo.promoteSeasonDraftToRun(buildFixtureStoredDraft(secondRun), secondRun);
     expect(await db.seasonRuns.count()).toBe(1);
     const row = await db.seasonRuns.get(SEASON_RUN_RECORD_ID);
@@ -1010,7 +1035,7 @@ describe('season run free-agency persistence (M2.6.5)', () => {
           ...row.run.ownership,
           {
             playerVersionId: playerVersionId('p-synth-fa-ghost', 'lakers', '1990s', '1995-96'),
-            ownerFranchiseId: 'lakers',
+            ownerFranchiseId: franchiseIdSchema.parse('lakers'),
           },
         ],
       },

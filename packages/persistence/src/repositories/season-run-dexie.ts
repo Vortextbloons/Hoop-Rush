@@ -1209,10 +1209,8 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
         rootSeed: validatedRun.rootSeed,
         humanFranchiseId,
         participantFranchiseIds:
-          participantFranchiseIds.length > 0
-            ? (participantFranchiseIds as [string, ...string[]])
-            : undefined,
-        authorityKind: authorityKind as 'local-solo' | 'season-multiplayer',
+          participantFranchiseIds.length > 0 ? [...participantFranchiseIds] : undefined,
+        authorityKind,
         completedRounds: 0,
         revision: 0,
         humanWins: 0,

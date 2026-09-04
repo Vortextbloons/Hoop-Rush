@@ -3,6 +3,10 @@ import { join } from 'node:path';
 import {
   SEASON_EMPTY_COMMAND_LOG_DIGEST,
   buildSeasonRunReplayExport,
+  commandIdSchema,
+  contentHashSchema,
+  eraIdSchema,
+  franchiseIdSchema,
   humanFranchiseIdOf,
   seasonCommandLogDigest,
   seasonCommandLogEntrySchema,
@@ -60,17 +64,19 @@ export function loadManifestHashes(): SeasonRunReplayExportInput['assetHashes'] 
   };
   const eraProfile =
     manifest.eraSimulationProfiles?.find((entry) => entry.eraId === '1990s')?.contentHash ?? '';
+  const parseHash = (value: string): import('@hoop-rush/data-contracts').ContentHash =>
+    contentHashSchema.parse(value);
   return {
-    league: manifest.season?.league?.contentHash ?? '',
-    schedule: manifest.season?.schedule?.contentHash ?? '',
-    draftCatalog: manifest.season?.draftCatalog?.contentHash ?? '',
-    eraProfile,
+    league: parseHash(manifest.season?.league?.contentHash ?? ''),
+    schedule: parseHash(manifest.season?.schedule?.contentHash ?? ''),
+    draftCatalog: parseHash(manifest.season?.draftCatalog?.contentHash ?? ''),
+    eraProfile: parseHash(eraProfile),
     ...(manifest.season?.freeAgencyIndex?.contentHash === undefined
       ? {}
-      : { freeAgencyIndex: manifest.season.freeAgencyIndex.contentHash }),
+      : { freeAgencyIndex: parseHash(manifest.season.freeAgencyIndex.contentHash) }),
     ...(manifest.season?.freeAgencyTargets?.contentHash === undefined
       ? {}
-      : { freeAgencyTargets: manifest.season.freeAgencyTargets.contentHash }),
+      : { freeAgencyTargets: parseHash(manifest.season.freeAgencyTargets.contentHash) }),
   };
 }
 export function replayDeps(): {
@@ -208,7 +214,7 @@ export function buildReplayedRun(): ReplayedRun {
     {
       schemaVersion: 11,
       command: 'accept-trade-offer',
-      commandId: 'repro-accept-1',
+      commandId: commandIdSchema.parse('repro-accept-1'),
       runId: run.runId,
       expectedStateRevision: window.stateRevision,
       expectedStateDigest: window.stateDigest,
@@ -223,7 +229,7 @@ export function buildReplayedRun(): ReplayedRun {
     {
       schemaVersion: 11,
       command: 'select-block-objective',
-      commandId: 'repro-select-1',
+      commandId: commandIdSchema.parse('repro-select-1'),
       runId: run.runId,
       expectedStateRevision: acceptOutput.run.stateRevision,
       expectedStateDigest: acceptOutput.run.stateDigest,
@@ -240,7 +246,7 @@ export function buildReplayedRun(): ReplayedRun {
       {
         schemaVersion: 11,
         command: 'decline-trade-offer',
-        commandId: 'repro-decline-1',
+        commandId: commandIdSchema.parse('repro-decline-1'),
         runId: run.runId,
         expectedStateRevision: selectOutput.run.stateRevision,
         expectedStateDigest: selectOutput.run.stateDigest,
@@ -258,7 +264,7 @@ export function buildReplayedRun(): ReplayedRun {
     almanacVersion: 'almanac-v1',
     runId: run.runId,
     rootSeed: run.rootSeed,
-    championFranchiseId: 'lakers',
+    championFranchiseId: franchiseIdSchema.parse('lakers'),
     postseasonDigest: DIGEST_32,
     commandLogDigest: seasonCommandLogDigest(commandLog.entries),
     awardsDigest: DIGEST_32,
@@ -268,7 +274,7 @@ export function buildReplayedRun(): ReplayedRun {
   const exportInput: SeasonRunReplayExportInput = {
     runId: run.runId,
     rootSeed: run.rootSeed,
-    eraId: '1990s',
+    eraId: eraIdSchema.parse('1990s'),
     versions: run.versions,
     assetHashes: loadManifestHashes(),
     initialRun: windowedRun,
@@ -276,7 +282,7 @@ export function buildReplayedRun(): ReplayedRun {
     commandLog,
     postseasonSummaries: [],
     almanac,
-    championFranchiseId: 'lakers',
+    championFranchiseId: franchiseIdSchema.parse('lakers'),
     finalStateDigest,
   };
   return { exportInput, exportArtifact: buildSeasonRunReplayExport(exportInput) };
@@ -367,11 +373,11 @@ export function buildFreeAgencyReplayedRun(
     {
       schemaVersion: 11,
       command: 'skip-free-agent-market',
-      commandId: 'repro-fa-skip-1',
+      commandId: commandIdSchema.parse('repro-fa-skip-1'),
       runId: run.runId,
       expectedStateRevision: initialRun.stateRevision,
       expectedStateDigest: initialRun.stateDigest,
-      franchiseId: humanFranchiseId,
+      franchiseId: franchiseIdSchema.parse(humanFranchiseId),
       windowIndex: 0,
     },
     initialRun,
@@ -381,7 +387,7 @@ export function buildFreeAgencyReplayedRun(
     {
       schemaVersion: 11,
       command: 'resolve-free-agent-market',
-      commandId: 'repro-fa-resolve-1',
+      commandId: commandIdSchema.parse('repro-fa-resolve-1'),
       runId: run.runId,
       expectedStateRevision: skipOutput.run.stateRevision,
       expectedStateDigest: skipOutput.run.stateDigest,
@@ -397,7 +403,7 @@ export function buildFreeAgencyReplayedRun(
     almanacVersion: 'almanac-v1',
     runId: run.runId,
     rootSeed: run.rootSeed,
-    championFranchiseId: 'lakers',
+    championFranchiseId: franchiseIdSchema.parse('lakers'),
     postseasonDigest: DIGEST_32,
     commandLogDigest: seasonCommandLogDigest(commandLog.entries),
     awardsDigest: DIGEST_32,
@@ -407,7 +413,7 @@ export function buildFreeAgencyReplayedRun(
   const exportInput: SeasonRunReplayExportInput = {
     runId: run.runId,
     rootSeed: run.rootSeed,
-    eraId: '1990s',
+    eraId: eraIdSchema.parse('1990s'),
     versions: run.versions,
     assetHashes: loadManifestHashes(),
     initialRun,
@@ -415,7 +421,7 @@ export function buildFreeAgencyReplayedRun(
     commandLog,
     postseasonSummaries: [],
     almanac,
-    championFranchiseId: 'lakers',
+    championFranchiseId: franchiseIdSchema.parse('lakers'),
     finalStateDigest,
   };
   return { exportInput, exportArtifact: buildSeasonRunReplayExport(exportInput) };

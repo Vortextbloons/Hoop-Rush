@@ -5,8 +5,11 @@ import {
   seasonDraftCatalogSchema,
   seasonLeagueSchema,
   seasonRosterTargetsSchema,
+  franchiseIdSchema,
+  seedSchema,
   type SeasonRosterTargets,
   type SeasonStrengthBand,
+  type Seed,
 } from '@hoop-rush/data-contracts';
 import { generateAiLeague } from '@hoop-rush/engine';
 import {
@@ -29,7 +32,7 @@ const DRAFT_FINALIZED = join(REPO_ROOT, 'tools/cli/src/fixtures/season-draft-fin
 const MANIFEST = join(REPO_ROOT, 'apps/web/static/data/manifest.json');
 const CATALOG = join(REPO_ROOT, 'apps/web/static/data/season/draft-catalog.json');
 const LEAGUE = join(REPO_ROOT, 'apps/web/static/data/season/league.json');
-const SEED = 'd00d2026a1b2c3d4e5f60718293a4b5c6';
+const SEED = seedSchema.parse('d00d2026a1b2c3d4e5f60718293a4b5c6');
 const BAND_SCORES: Record<SeasonStrengthBand, number> = {
   contender: 90,
   playoff: 80,
@@ -44,7 +47,7 @@ const IDENTITIES = [
   'continuity',
   'active-trader',
 ] as const;
-function fakeLeagueRun(seed: string): RosterCalibrationWorkerRun {
+function fakeLeagueRun(seed: Seed): RosterCalibrationWorkerRun {
   const bands: SeasonStrengthBand[] = [];
   const quotas: Array<[SeasonStrengthBand, number]> = [
     ['contender', 4],
@@ -83,7 +86,7 @@ function fakeLeagueRun(seed: string): RosterCalibrationWorkerRun {
     },
   };
 }
-function failedRun(seed: string): RosterCalibrationWorkerRun {
+function failedRun(seed: Seed): RosterCalibrationWorkerRun {
   return {
     seed,
     teams: [],
@@ -248,12 +251,13 @@ describe('cli: season rosters audit (roster-generation-v2)', () => {
     const catalog = seasonDraftCatalogSchema.parse(JSON.parse(readFileSync(CATALOG, 'utf8')));
     const league = seasonLeagueSchema.parse(JSON.parse(readFileSync(LEAGUE, 'utf8')));
     const humanRoster = fixtureHumanRoster(catalog);
+    const lakers = franchiseIdSchema.parse('lakers');
     const result = generateAiLeague({
       seed: SEED,
       catalog,
       league,
-      humanFranchiseIds: ['lakers'],
-      humanRosters: [{ franchiseId: 'lakers', playerVersionIds: humanRoster }],
+      humanFranchiseIds: [lakers],
+      humanRosters: [{ franchiseId: lakers, playerVersionIds: humanRoster }],
       targets,
     });
     resultPath = join(TMP, 'generated-league.json');

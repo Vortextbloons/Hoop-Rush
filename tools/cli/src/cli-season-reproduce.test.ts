@@ -3,6 +3,8 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   buildSeasonRunReplayExport,
+  contentHashSchema,
+  franchiseIdSchema,
   seasonCommandLogDigest,
   seasonRunReplayExportSchema,
   type SeasonAlmanac,
@@ -84,7 +86,10 @@ describe('season run reproduce (replay-export-v1)', () => {
     const { exportInput } = buildReplayedRun();
     const exportArtifact = buildSeasonRunReplayExport({
       ...exportInput,
-      assetHashes: { ...exportInput.assetHashes, draftCatalog: 'f'.repeat(64) },
+      assetHashes: {
+        ...exportInput.assetHashes,
+        draftCatalog: contentHashSchema.parse('f'.repeat(64)),
+      },
     });
     const { divergence } = replaySeasonRunExport(exportArtifact, {
       ...cachedReplayDeps(),
@@ -230,7 +235,8 @@ describe('season run reproduce free-agency divergence (M2.6.5)', () => {
   });
   it('reports a free-agency divergence when a recorded signing count is tampered', () => {
     const { exportInput } = buildFreeAgencyReplayedRun((freeAgency) => {
-      freeAgency.signingCounts = { ...freeAgency.signingCounts, lakers: 1 };
+      const lakers = franchiseIdSchema.parse('lakers');
+      freeAgency.signingCounts = { ...freeAgency.signingCounts, [lakers]: 1 };
     });
     const { divergence } = replaySeasonRunExport(
       buildSeasonRunReplayExport(exportInput),

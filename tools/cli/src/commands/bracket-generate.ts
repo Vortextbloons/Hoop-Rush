@@ -8,7 +8,9 @@ import {
 } from '@hoop-rush/engine';
 import {
   REQUIRED_RATING_KEYS,
+  contentHashSchema,
   opponentTeamSchema,
+  seedSchema,
   type DifficultyProfile,
   type HoopRushManifest,
   type OpponentBracket,
@@ -34,7 +36,7 @@ export const BRACKET_GENERATE_OPTIONS: Record<string, boolean> = {
   format: true,
   verbose: false,
 };
-const COMMITTED_GENERATION_SEED: Seed = '8f2c1d4e6a9b7c3d8f2c1d4e6a9b7c3d';
+const COMMITTED_GENERATION_SEED: Seed = seedSchema.parse('8f2c1d4e6a9b7c3d8f2c1d4e6a9b7c3d');
 const GENERATION_VERSION = 'bracket-m3-v3';
 const MIN_BRACKET_SAMPLES = 32;
 const NBA_ROOT = resolve(REPO_ROOT, 'raw-data/nba');
@@ -394,10 +396,12 @@ export function bracketGenerate(args: {
   'data-version'?: string;
   verbose?: boolean;
 }): CliReport {
-  const seed = args.seed ?? COMMITTED_GENERATION_SEED;
-  if (!/^[0-9a-f]{16,64}$/.test(seed)) {
-    throw new UsageError(`--seed must be hex (got "${seed}")`);
+  const rawSeed = args.seed ?? COMMITTED_GENERATION_SEED;
+  const parsedSeed = seedSchema.safeParse(rawSeed);
+  if (!parsedSeed.success) {
+    throw new UsageError(`--seed must be hex (got "${rawSeed}")`);
   }
+  const seed = parsedSeed.data;
   const proposals = parseCount(args.proposals, '--proposals', 32);
   const samples = parseCount(args.samples, '--samples', MIN_BRACKET_SAMPLES);
   if (samples < MIN_BRACKET_SAMPLES) {
@@ -459,7 +463,7 @@ export function bracketGenerate(args: {
   }
   const outPath = resolve(OPPONENTS_DIR, 'bracket.json');
   writeFileSync(outPath, `${JSON.stringify(bracket, null, 2)}\n`, 'utf8');
-  const contentHash = sha256Hex(readFileSync(outPath));
+  const contentHash = contentHashSchema.parse(sha256Hex(readFileSync(outPath)));
   const manifestPath = MANIFEST_PATH;
   const nextManifest = { ...manifest } as HoopRushManifest & {
     opponents?: unknown;

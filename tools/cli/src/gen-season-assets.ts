@@ -14,6 +14,9 @@ import {
   SEASON_COMMAND_LOG_VERSION,
   SEASON_COMMITTED_DRAFT_SEED,
   SEASON_COMMITTED_SCHEDULE_SEED,
+  contentHashSchema,
+  idSchema,
+  seedSchema,
   SEASON_DRAFT_VERSION,
   SEASON_EFFECT_TARGETS_VERSION,
   SEASON_FREE_AGENCY_INDEX_VERSION,
@@ -66,6 +69,7 @@ import {
 import {
   applySeasonDraftCommand,
   buildEmptyCampaignState,
+  buildLocalSoloAuthority,
   createInitialSeasonInfluenceState,
   createSeasonEffectsState,
   expandSeasonRunRosters,
@@ -119,7 +123,7 @@ function playCommittedDraft(
     cmd('fixture-create', 0, {
       kind: 'create-season-draft',
       runId: 'fixture-season-run-1',
-      rootSeed: SEASON_COMMITTED_DRAFT_SEED,
+      rootSeed: seedSchema.parse(SEASON_COMMITTED_DRAFT_SEED),
       league,
       humanParticipantIds: ['fixture-human'],
       catalogVersion: SEASON_DRAFT_VERSION,
@@ -153,7 +157,7 @@ function playCommittedDraft(
       .map((pick) => pick.playerVersionId),
   }));
   const generation = generateAiLeague({
-    seed: SEASON_COMMITTED_DRAFT_SEED,
+    seed: seedSchema.parse(SEASON_COMMITTED_DRAFT_SEED),
     catalog,
     league,
     humanFranchiseIds: humanRosters.map((roster) => roster.franchiseId),
@@ -187,8 +191,9 @@ function buildRun(
   });
   const run: SeasonRun = {
     schemaVersion: SEASON_RUN_SCHEMA_VERSION,
-    runId: 'fixture-season-run-1',
-    rootSeed: SEASON_COMMITTED_DRAFT_SEED,
+    runId: idSchema.parse('fixture-season-run-1'),
+    rootSeed: seedSchema.parse(SEASON_COMMITTED_DRAFT_SEED),
+    authority: buildLocalSoloAuthority(null),
     versions: {
       runSchemaVersion: SEASON_RUN_SCHEMA_VERSION,
       leagueVersion: league.leagueVersion,
@@ -247,7 +252,7 @@ function buildRun(
       scheduleVersion: schedule.scheduleVersion,
       formulaVersion: schedule.formulaVersion,
       generationSeed: schedule.generationSeed,
-      contentHash: sha256Hex(`${JSON.stringify(schedule)}\n`),
+      contentHash: contentHashSchema.parse(sha256Hex(`${JSON.stringify(schedule)}\n`)),
     },
     games: schedule.games.map((game) => ({
       gameId: game.gameId,
@@ -284,7 +289,7 @@ function buildRun(
     },
     cursor: { schemaVersion: 1, completedRounds: 0 },
     stage: 'regular-season',
-    postseason: buildInitialPostseasonState(SEASON_COMMITTED_DRAFT_SEED),
+    postseason: buildInitialPostseasonState(seedSchema.parse(SEASON_COMMITTED_DRAFT_SEED)),
     awards: null,
     completion: null,
     draft: {
@@ -319,7 +324,7 @@ function buildRun(
     aiPools: generation.aiPools,
     rotations: generation.rotations,
     generationAudit: {
-      seed: SEASON_COMMITTED_DRAFT_SEED,
+      seed: seedSchema.parse(SEASON_COMMITTED_DRAFT_SEED),
       aiVersion: SEASON_AI_VERSION,
       rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
       rotationVersion: SEASON_ROTATION_VERSION,

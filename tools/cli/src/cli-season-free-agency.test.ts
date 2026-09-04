@@ -3,6 +3,8 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   SEASON_FREE_AGENCY_TARGETS_VERSION,
+  franchiseIdSchema,
+  seasonRunSchema,
   type SeasonFreeAgencyState,
 } from '@hoop-rush/data-contracts';
 import { jsonPayload, REPO_ROOT, runCli, withTmpDir } from './cli-test-helpers.ts';
@@ -35,14 +37,16 @@ describe('season free-agency audit (recorded facts)', () => {
   });
   it('flags inflated signing counts that do not reconcile from signings', () => {
     const run = loadSeasonRunFixture(RUN_FIXTURE);
-    run.freeAgency.signingCounts = { ...run.freeAgency.signingCounts, lakers: 1 };
+    const lakers = franchiseIdSchema.parse('lakers');
+    run.freeAgency.signingCounts = { ...run.freeAgency.signingCounts, [lakers]: 1 };
     const { failures, counts } = auditSeasonFreeAgencyFacts(run);
     expect(counts.signingCapFailures).toBeGreaterThanOrEqual(1);
     expect(failures.join(' ')).toContain('signingCounts records 1, signings reconcile 0');
   });
   it('flags a season spend above the six-point cap', () => {
     const run = loadSeasonRunFixture(RUN_FIXTURE);
-    run.freeAgency.seasonSpend = { ...run.freeAgency.seasonSpend, lakers: 7 };
+    const lakers = franchiseIdSchema.parse('lakers');
+    run.freeAgency.seasonSpend = { ...run.freeAgency.seasonSpend, [lakers]: 7 };
     const { failures, counts } = auditSeasonFreeAgencyFacts(run);
     expect(counts.spendCapFailures).toBeGreaterThanOrEqual(1);
     expect(failures.join(' ')).toContain('signings reconcile 0');
@@ -65,10 +69,13 @@ describe('season free-agency audit CLI', () => {
       expect(payload.pass).toBe(true);
       expect(payload.windows).toBe(0);
       const tamperedPath = join(dir, 'tampered-run.json');
-      const raw = JSON.parse(readFileSync(RUN_FIXTURE, 'utf8')) as {
-        freeAgency: SeasonFreeAgencyState;
-      };
-      raw.freeAgency.signingCounts = { ...raw.freeAgency.signingCounts, lakers: 3 };
+      const rawParsed = seasonRunSchema.safeParse(
+        JSON.parse(readFileSync(RUN_FIXTURE, 'utf8')) as unknown,
+      );
+      if (!rawParsed.success) throw new Error('fixture run fails validation');
+      const raw = rawParsed.data;
+      const lakersTamper = franchiseIdSchema.parse('lakers');
+      raw.freeAgency.signingCounts = { ...raw.freeAgency.signingCounts, [lakersTamper]: 3 };
       writeFileSync(tamperedPath, `${JSON.stringify(raw, null, 2)}\n`);
       const bad = await runCli([
         'season',

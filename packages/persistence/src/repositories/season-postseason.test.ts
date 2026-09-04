@@ -1,8 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   SEASON_EMPTY_COMMAND_LOG_DIGEST,
+  commandIdSchema,
+  franchiseIdSchema,
+  idSchema,
   seasonAlmanacDigest,
   seasonCommandLogDigest,
+  seasonRunCommandSchema,
   type PlayoffRound,
   type PlayoffSeries,
   type SeasonAlmanac,
@@ -55,11 +59,11 @@ function advancedRun(adapters: Adapters, stage: SeasonRun['stage']): SeasonRun {
       ...adapters.run.postseason,
       tiebreakResolutions: [
         {
-          resolutionId: 'tie-resolve-1',
+          resolutionId: idSchema.parse('tie-resolve-1'),
           conference: 'east',
           kind: 'qualification',
           rule: 'head-to-head',
-          teams: ['lakers', 'celtics'],
+          teams: [franchiseIdSchema.parse('lakers'), franchiseIdSchema.parse('celtics')],
           slots: [7, 8],
           evidence: [{ label: 'h2h', value: 2 }],
           drawSeed: null,
@@ -95,6 +99,7 @@ function stateDigestOf(adapters: Adapters, run: SeasonRun): string {
   });
 }
 function completedPostseasonOf(adapters: Adapters, champion: string): SeasonRun['postseason'] {
+  const parsedChampion = franchiseIdSchema.parse(champion);
   const east = adapters.run.league.teams
     .filter((team) => team.conference === 'east')
     .map((team) => team.franchiseId)
@@ -109,7 +114,7 @@ function completedPostseasonOf(adapters: Adapters, champion: string): SeasonRun[
     round: PlayoffRound,
     conference: 'east' | 'west',
   ): PlayoffSeries => ({
-    seriesId,
+    seriesId: idSchema.parse(seriesId),
     round,
     conference,
     higherSeed: null,
@@ -121,7 +126,10 @@ function completedPostseasonOf(adapters: Adapters, champion: string): SeasonRun[
     games: [],
     winnerFranchiseId: null,
   });
-  const conferenceBracket = (conference: 'east' | 'west', seeds: string[]) => ({
+  const conferenceBracket = (
+    conference: 'east' | 'west',
+    seeds: ReturnType<typeof franchiseIdSchema.parse>[],
+  ) => ({
     conference,
     seeds,
     firstRound: [1, 2, 3, 4].map((n) =>
@@ -132,18 +140,23 @@ function completedPostseasonOf(adapters: Adapters, champion: string): SeasonRun[
     ),
     conferenceFinal: pending(`${conference}-conference-final`, 'conference-final', conference),
   });
-  const homeIsEast = east.includes(champion);
-  const challenger = homeIsEast ? (west[0] ?? '') : (east[0] ?? '');
-  const game = (gameNumber: number, atChallenger: boolean, winner: string) => ({
-    gameId: `po-finals-g${String(gameNumber)}`,
-    gameNumber,
-    homeFranchiseId: atChallenger ? challenger : champion,
-    awayFranchiseId: atChallenger ? champion : challenger,
-    status: 'final' as const,
-    homeScore: 100,
-    awayScore: 90,
-    winnerFranchiseId: winner,
-  });
+  const homeIsEast = east.includes(parsedChampion);
+  const challengerRaw = homeIsEast ? west[0] : east[0];
+  if (challengerRaw === undefined) throw new Error('missing challenger seed');
+  const challenger = challengerRaw;
+  const game = (gameNumber: number, atChallenger: boolean, winner: string) => {
+    const parsedWinner = franchiseIdSchema.parse(winner);
+    return {
+      gameId: `po-finals-g${String(gameNumber)}`,
+      gameNumber,
+      homeFranchiseId: atChallenger ? challenger : parsedChampion,
+      awayFranchiseId: atChallenger ? parsedChampion : challenger,
+      status: 'final' as const,
+      homeScore: 100,
+      awayScore: 90,
+      winnerFranchiseId: parsedWinner,
+    };
+  };
   return {
     ...adapters.run.postseason,
     playIn: {
@@ -156,12 +169,12 @@ function completedPostseasonOf(adapters: Adapters, champion: string): SeasonRun[
       east: conferenceBracket('east', east),
       west: conferenceBracket('west', west),
       finals: {
-        seriesId: 'finals',
+        seriesId: idSchema.parse('finals'),
         round: 'finals' as const,
         conference: null,
         higherSeed: null,
         lowerSeed: null,
-        homeCourtFranchiseId: champion,
+        homeCourtFranchiseId: parsedChampion,
         challengerFranchiseId: challenger,
         homeCourtWins: 4,
         challengerWins: 2,
@@ -173,21 +186,22 @@ function completedPostseasonOf(adapters: Adapters, champion: string): SeasonRun[
           game(5, false, champion),
           game(6, true, champion),
         ],
-        winnerFranchiseId: champion,
+        winnerFranchiseId: parsedChampion,
       },
-      championFranchiseId: champion,
+      championFranchiseId: parsedChampion,
     },
-    championFranchiseId: champion,
+    championFranchiseId: parsedChampion,
   };
 }
 function completedRunOf(adapters: Adapters, stateRevision: number): SeasonRun {
-  const champion = adapters.run.rosters[0]?.franchiseId ?? 'lakers';
+  const parsedChampion =
+    adapters.run.rosters[0]?.franchiseId ?? franchiseIdSchema.parse('lakers');
   const base: SeasonRun = {
     ...adapters.run,
     stage: 'completed',
-    postseason: completedPostseasonOf(adapters, champion),
+    postseason: completedPostseasonOf(adapters, parsedChampion),
     completion: {
-      championFranchiseId: champion,
+      championFranchiseId: parsedChampion,
       almanacDigest: 'a'.repeat(32),
       finalizedAtStateRevision: stateRevision,
     },
@@ -201,12 +215,13 @@ function buildAlmanac(
   champion: string,
   commandLogDigestValue: string,
 ): SeasonAlmanac {
+  const parsedChampion = franchiseIdSchema.parse(champion);
   const base = {
     schemaVersion: 1 as const,
     almanacVersion: 'almanac-v1' as const,
     runId: run.runId,
     rootSeed: run.rootSeed,
-    championFranchiseId: champion,
+    championFranchiseId: parsedChampion,
     postseasonDigest: 'd'.repeat(32),
     commandLogDigest: commandLogDigestValue,
     awardsDigest: 'e'.repeat(32),
@@ -230,14 +245,14 @@ function commandOf(
   >['command'],
   commandId: string,
 ): SeasonRunCommand {
-  return {
+  return seasonRunCommandSchema.parse({
     schemaVersion: 13,
     command,
-    commandId,
+    commandId: commandIdSchema.parse(commandId),
     runId: run.runId,
     expectedStateRevision: run.stateRevision,
     expectedStateDigest: run.stateDigest,
-  } as SeasonRunCommand;
+  });
 }
 function basePostseasonSummary(adapters: Adapters): SeasonPostseasonSummary {
   const players = adapters.run.rosters[0]?.players.slice(0, 10).map((player) => ({
@@ -259,8 +274,12 @@ function basePostseasonSummary(adapters: Adapters): SeasonPostseasonSummary {
     fouls: 2,
   }));
   if (players === undefined) throw new Error('no fixture players');
+  const homeFallback =
+    adapters.run.rosters[0]?.franchiseId ?? franchiseIdSchema.parse('lakers');
+  const awayFallback =
+    adapters.run.rosters[1]?.franchiseId ?? franchiseIdSchema.parse('celtics');
   const box = (franchiseId: string) => ({
-    franchiseId,
+    franchiseId: franchiseIdSchema.parse(franchiseId),
     points: 100,
     fieldGoalsMade: 40,
     fieldGoalsAttempted: 90,
@@ -287,16 +306,16 @@ function basePostseasonSummary(adapters: Adapters): SeasonPostseasonSummary {
     seriesId: null,
     gameNumber: 1,
     conference: 'east',
-    homeFranchiseId: adapters.run.rosters[0]?.franchiseId ?? 'lakers',
-    awayFranchiseId: adapters.run.rosters[1]?.franchiseId ?? 'celtics',
-    winnerFranchiseId: adapters.run.rosters[0]?.franchiseId ?? 'lakers',
-    loserFranchiseId: adapters.run.rosters[1]?.franchiseId ?? 'celtics',
+    homeFranchiseId: homeFallback,
+    awayFranchiseId: awayFallback,
+    winnerFranchiseId: homeFallback,
+    loserFranchiseId: awayFallback,
     status: 'final',
     homeScore: 104,
     awayScore: 99,
     forfeitLoserFranchiseId: null,
-    homeBox: box(adapters.run.rosters[0]?.franchiseId ?? 'lakers'),
-    awayBox: box(adapters.run.rosters[1]?.franchiseId ?? 'celtics'),
+    homeBox: box(homeFallback),
+    awayBox: box(awayFallback),
     homePlayers: players,
     awayPlayers: players,
     rotationEvidence: {
@@ -424,7 +443,7 @@ describe('season postseason repository (M2.6)', () => {
         advancementInput(adapters, again, basePostseasonSummary(adapters), adapters.run),
       ),
     ).rejects.toBeInstanceOf(SeasonRunCommandDuplicateError);
-    const otherRun: SeasonRunCommand = { ...command, runId: 'other-run' };
+    const otherRun: SeasonRunCommand = { ...command, runId: idSchema.parse('other-run') };
     await expect(
       adapters.repo.commitPostseasonAdvancement(
         advancementInput(adapters, otherRun, basePostseasonSummary(adapters), adapters.run),

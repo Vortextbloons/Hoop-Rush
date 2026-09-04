@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   SEASON_FREE_AGENCY_INDEX_VERSION,
+  contentHashSchema,
   seasonDraftCatalogSchema,
   seasonFreeAgencyIndexSchema,
   seasonRosterRoleSchema,
@@ -363,7 +364,7 @@ export function deriveFreeAgencyIndex(
     dataVersion: catalog.dataVersion,
     catalogRef: {
       catalogVersion: catalog.catalogVersion,
-      contentHash: catalogContentHash,
+      contentHash: contentHashSchema.parse(catalogContentHash),
       candidateCount: catalog.candidates.length,
     },
     candidates,

@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import Dexie from 'dexie';
-import { SEASON_ALMANAC_VERSION, seasonAlmanacSchema } from '@hoop-rush/data-contracts';
+import {
+  SEASON_ALMANAC_VERSION,
+  franchiseIdSchema,
+  seasonAlmanacSchema,
+  seasonGameIdSchema,
+} from '@hoop-rush/data-contracts';
 import {
   buildFixtureCheckpointRow,
   buildFixtureEffectsState,
@@ -156,8 +161,8 @@ describe('Season Run performance pass (dexie v9)', () => {
             fouls: 18,
             possessions: 96,
           },
-          awayBox: {
-            franchiseId: 'celtics',
+        awayBox: {
+          franchiseId: 'celtics',
             points: 90,
             fieldGoalsMade: 36,
             fieldGoalsAttempted: 84,
@@ -431,8 +436,9 @@ describe('Season Run performance pass (dexie v9)', () => {
         {
           injuryId: 'inj-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
           playerVersionId: run.rosters[0]?.players[0]?.playerVersionId ?? 'pv-x',
-          franchiseId: run.rosters[0]?.franchiseId ?? 'lakers',
-          gameId: 's000001',
+          franchiseId:
+            run.rosters[0]?.franchiseId ?? franchiseIdSchema.parse('lakers'),
+          gameId: seasonGameIdSchema.parse('s000001'),
           type: 'soft-tissue',
           severity: 'moderate',
           occurredBeforeHalftime: false,
@@ -876,6 +882,8 @@ describe('Season Run performance pass (dexie v9)', () => {
     await repo.clearSeasonRun(run.runId);
     await expectAllEmpty();
     await repo.promoteSeasonDraftToRun(buildFixtureStoredDraft(run), run);
+    const lakersFid = franchiseIdSchema.parse('lakers');
+    const celticsFid = franchiseIdSchema.parse('celtics');
     await db.seasonRunSummaries.put({
       runId: run.runId,
       gameId: 's000002',
@@ -884,17 +892,17 @@ describe('Season Run performance pass (dexie v9)', () => {
       summary: {
         schemaVersion: 1,
         summaryVersion: 'season-game-summary-v3',
-        gameId: 's000002',
+        gameId: seasonGameIdSchema.parse('s000002'),
         round: 1,
-        homeFranchiseId: 'lakers',
-        awayFranchiseId: 'celtics',
+        homeFranchiseId: lakersFid,
+        awayFranchiseId: celticsFid,
         status: 'final',
         overtimePeriods: 0,
         homeScore: 100,
         awayScore: 90,
         forfeitLoserFranchiseId: null,
         homeBox: {
-          franchiseId: 'lakers',
+          franchiseId: lakersFid,
           points: 100,
           fieldGoalsMade: 40,
           fieldGoalsAttempted: 88,
@@ -912,7 +920,7 @@ describe('Season Run performance pass (dexie v9)', () => {
           possessions: 96,
         },
         awayBox: {
-          franchiseId: 'celtics',
+          franchiseId: celticsFid,
           points: 90,
           fieldGoalsMade: 36,
           fieldGoalsAttempted: 84,
@@ -925,9 +933,9 @@ describe('Season Run performance pass (dexie v9)', () => {
           assists: 22,
           steals: 6,
           blocks: 5,
-          turnovers: 14,
-          fouls: 20,
-          possessions: 95,
+          turnovers: 12,
+          fouls: 18,
+          possessions: 96,
         },
         homePlayers: [],
         awayPlayers: [],
@@ -946,17 +954,17 @@ describe('Season Run performance pass (dexie v9)', () => {
       summary: {
         schemaVersion: 1,
         summaryVersion: 'season-game-summary-v3',
-        gameId: 's000003',
+        gameId: seasonGameIdSchema.parse('s000003'),
         round: 1,
-        homeFranchiseId: 'lakers',
-        awayFranchiseId: 'celtics',
+        homeFranchiseId: lakersFid,
+        awayFranchiseId: celticsFid,
         status: 'final',
         overtimePeriods: 0,
         homeScore: 100,
         awayScore: 90,
         forfeitLoserFranchiseId: null,
         homeBox: {
-          franchiseId: 'lakers',
+          franchiseId: lakersFid,
           points: 100,
           fieldGoalsMade: 40,
           fieldGoalsAttempted: 88,
@@ -974,7 +982,7 @@ describe('Season Run performance pass (dexie v9)', () => {
           possessions: 96,
         },
         awayBox: {
-          franchiseId: 'celtics',
+          franchiseId: celticsFid,
           points: 90,
           fieldGoalsMade: 36,
           fieldGoalsAttempted: 84,

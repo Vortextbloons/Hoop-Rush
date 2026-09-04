@@ -141,7 +141,7 @@ export function simDiagnose(args: {
   let teamPoints = 0;
   let teamMisses = 0;
   for (let i = 0; i < samples; i += 1) {
-    const input = buildInput(fixture, profile, fixtureSeed(fixtureId, i), false);
+    const input = buildInput({ fixture, profile, seed: fixtureSeed(fixtureId, i), variant: false });
     const { result } = runSingleGame(input);
     for (const side of ['home', 'away'] as const) {
       const team = result[side];
@@ -265,7 +265,12 @@ export function simSeason(args: {
   for (let s = 0; s < seasonSamples; s += 1) {
     const players = new Map<string, SeasonPlayer>();
     for (let g = 0; g < 82; g += 1) {
-      const input = buildInput(fixture, profile, fixtureSeed(fixtureId, s * 1000 + g), false);
+      const input = buildInput({
+        fixture,
+        profile,
+        seed: fixtureSeed(fixtureId, s * 1000 + g),
+        variant: false,
+      });
       const { result } = runSingleGame(input);
       for (const box of result.home.players) {
         const acc = players.get(box.playerId) ?? {

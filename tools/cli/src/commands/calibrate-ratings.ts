@@ -11,6 +11,7 @@ import type {
 import {
   POSITION_SLOTS,
   playableSlotGroups,
+  playerIdSchema,
   RATINGS_VERSION,
   RATING_MODEL_VERSION,
   ratingsModelArtifactSchema,
@@ -48,8 +49,8 @@ function newAccumulator(): PairAccumulator {
     shotQuality: 0,
   };
 }
-function seedFor(playerId: string, context: string, index: number): string {
-  return fixtureSeed(`${RATINGS_VERSION}|${playerId}|${context}`, index);
+function seedFor(args: { playerId: string; context: string; index: number }): import('@hoop-rush/data-contracts').Seed {
+  return fixtureSeed(`${RATINGS_VERSION}|${args.playerId}|${args.context}`, args.index);
 }
 export function calibrationConfidence(samples: number, confidenceTarget: number): number {
   return Math.min(1, samples / confidenceTarget);
@@ -176,20 +177,21 @@ function replacementLineup(pool: FranchiseEraPool, candidateId: string): Simulat
     }),
   };
 }
-function pairImpact(
-  candidate: SimulationTeam,
-  replacement: SimulationTeam,
-  benchmark: SimulationTeam,
-  profile: EraSimulationProfile,
-  samples: number,
-  playerId: string,
-  context: string,
-): PairAccumulator {
+function pairImpact(args: {
+  candidate: SimulationTeam;
+  replacement: SimulationTeam;
+  benchmark: SimulationTeam;
+  profile: EraSimulationProfile;
+  samples: number;
+  playerId: string;
+  context: string;
+}): PairAccumulator {
+  const { candidate, replacement, benchmark, profile, samples, playerId, context } = args;
   const candidateAcc = newAccumulator();
   const replacementAcc = newAccumulator();
   const engineContext = createEngineContext();
   for (let index = 0; index < samples; index += 1) {
-    const seed = seedFor(playerId, context, index);
+    const seed = seedFor({ playerId, context, index });
     const homeFirst = index % 2 === 0;
     const base = {
       schemaVersion: 2 as const,
@@ -314,15 +316,15 @@ export function calibrateRatings(args: {
           context === 'weak' ? weak : context === 'strong' ? strong : average,
           context,
         );
-        return pairImpact(
+        return pairImpact({
           candidate,
           replacement,
           benchmark,
-          data.eraProfile(pool.eraId),
+          profile: data.eraProfile(pool.eraId),
           samples,
-          player.playerId,
+          playerId: player.playerId,
           context,
-        );
+        });
       });
       const meanMetric = (key: keyof PairAccumulator) => mean(totals.map((value) => value[key]));
       const winProbability =
@@ -384,7 +386,7 @@ function leagueAverage(pool: FranchiseEraPool): SimulationTeam {
       return {
         ...toSimulationPlayer(source),
         positions,
-        playerId: `ratings-average-${String(index)}`,
+        playerId: playerIdSchema.parse(`ratings-average-${String(index)}`),
       };
     }),
   };
@@ -409,7 +411,11 @@ function poolStrength(pool: FranchiseEraPool): {
         source[index] ??
         source.at(0);
       if (!player) throw new Error('cannot build a benchmark from an empty pool');
-      return { ...toSimulationPlayer(player), positions, playerId: `benchmark-${String(index)}` };
+      return {
+        ...toSimulationPlayer(player),
+        positions,
+        playerId: playerIdSchema.parse(`benchmark-${String(index)}`),
+      };
     }),
   });
   return { strong: make(sorted), weak: make([...sorted].reverse()) };

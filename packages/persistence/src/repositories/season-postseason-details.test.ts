@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  commandIdSchema,
+  franchiseIdSchema,
+  idSchema,
   seasonCommandLogDigest,
+  seasonRunCommandSchema,
   type SeasonPostseasonSummary,
   type SeasonRun,
   type SeasonRunCommand,
@@ -53,11 +57,11 @@ function advancedRun(adapters: Adapters, stage: SeasonRun['stage']): SeasonRun {
       ...adapters.run.postseason,
       tiebreakResolutions: [
         {
-          resolutionId: 'tie-resolve-1',
+          resolutionId: idSchema.parse('tie-resolve-1'),
           conference: 'east',
           kind: 'qualification',
           rule: 'head-to-head',
-          teams: ['lakers', 'celtics'],
+          teams: [franchiseIdSchema.parse('lakers'), franchiseIdSchema.parse('celtics')],
           slots: [7, 8],
           evidence: [{ label: 'h2h', value: 2 }],
           drawSeed: null,
@@ -102,14 +106,14 @@ function commandOf(
   >['command'],
   commandId: string,
 ): SeasonRunCommand {
-  return {
+  return seasonRunCommandSchema.parse({
     schemaVersion: 13,
     command,
-    commandId,
+    commandId: commandIdSchema.parse(commandId),
     runId: run.runId,
     expectedStateRevision: run.stateRevision,
     expectedStateDigest: run.stateDigest,
-  } as SeasonRunCommand;
+  });
 }
 function basePostseasonSummary(
   adapters: Adapters,
@@ -142,8 +146,12 @@ function basePostseasonSummary(
     fouls: 2,
   }));
   if (players === undefined) throw new Error('no fixture players');
+  const lakersFallback = franchiseIdSchema.parse('lakers');
+  const celticsFallback = franchiseIdSchema.parse('celtics');
+  const homeFallback = adapters.run.rosters[0]?.franchiseId ?? lakersFallback;
+  const awayFallback = adapters.run.rosters[1]?.franchiseId ?? celticsFallback;
   const box = (franchiseId: string) => ({
-    franchiseId,
+    franchiseId: franchiseIdSchema.parse(franchiseId),
     points: 100,
     fieldGoalsMade: 40,
     fieldGoalsAttempted: 90,
@@ -170,16 +178,16 @@ function basePostseasonSummary(
     seriesId: options.seriesId ?? null,
     gameNumber: options.gameNumber ?? 1,
     conference: options.conference ?? 'east',
-    homeFranchiseId: adapters.run.rosters[0]?.franchiseId ?? 'lakers',
-    awayFranchiseId: adapters.run.rosters[1]?.franchiseId ?? 'celtics',
-    winnerFranchiseId: adapters.run.rosters[0]?.franchiseId ?? 'lakers',
-    loserFranchiseId: adapters.run.rosters[1]?.franchiseId ?? 'celtics',
+    homeFranchiseId: homeFallback,
+    awayFranchiseId: awayFallback,
+    winnerFranchiseId: homeFallback,
+    loserFranchiseId: awayFallback,
     status: 'final',
     homeScore: 104,
     awayScore: 99,
     forfeitLoserFranchiseId: null,
-    homeBox: box(adapters.run.rosters[0]?.franchiseId ?? 'lakers'),
-    awayBox: box(adapters.run.rosters[1]?.franchiseId ?? 'celtics'),
+    homeBox: box(homeFallback),
+    awayBox: box(awayFallback),
     homePlayers: players,
     awayPlayers: players,
     rotationEvidence: {

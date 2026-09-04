@@ -13,6 +13,7 @@ import {
   type SeasonLeagueGenerationResult,
   type SeasonRosterTargets,
   type SeasonStrengthBand,
+  type Seed,
 } from '@hoop-rush/data-contracts';
 import {
   SeasonAiGenerationError,
@@ -94,17 +95,19 @@ export function seasonRostersGenerate(args: {
   out: string | null;
   manifest: string | null;
 }): CliReport {
-  const seed = args.seed;
-  if (seed === null) {
+  const rawSeed = args.seed;
+  if (rawSeed === null) {
     throw new Error('season rosters generate requires --seed <hex>');
   }
-  if (!seedSchema.safeParse(seed).success) {
+  const parsedSeed = seedSchema.safeParse(rawSeed);
+  if (!parsedSeed.success) {
     return makeReport(
       'season rosters generate',
-      { seed, draft: args.draft },
-      { failures: [`--seed must be a hex seed (got "${seed}")`], exitCode: 2 },
+      { seed: rawSeed, draft: args.draft },
+      { failures: [`--seed must be a hex seed (got "${rawSeed}")`], exitCode: 2 },
     );
   }
+  const seed = parsedSeed.data;
   if (args.draft === null) {
     throw new Error('season rosters generate requires --draft <draft.json>');
   }
@@ -606,7 +609,7 @@ function distribution(values: readonly number[]): {
   };
 }
 async function runCalibrationChunks(args: {
-  seeds: string[];
+  seeds: Seed[];
   catalogPath: string;
   leaguePath: string;
   humanRosters: Array<{
@@ -616,7 +619,7 @@ async function runCalibrationChunks(args: {
   workers: number;
   targets: SeasonRosterTargets;
 }): Promise<RosterCalibrationWorkerRun[]> {
-  return runWorkerChunks<string, RosterCalibrationWorkerRun>({
+  return runWorkerChunks<Seed, RosterCalibrationWorkerRun>({
     workerUrl: new URL('./rosters-calibration-worker.ts', import.meta.url),
     workerData: (seeds) => ({ ...args, seeds, variant: 'roster' }),
     items: args.seeds,
@@ -625,7 +628,7 @@ async function runCalibrationChunks(args: {
   });
 }
 async function runOrderInvarianceChunk(args: {
-  seeds: string[];
+  seeds: Seed[];
   catalogPath: string;
   leaguePath: string;
   humanRosters: Array<{
@@ -635,13 +638,13 @@ async function runOrderInvarianceChunk(args: {
   targets: SeasonRosterTargets;
 }): Promise<
   Array<{
-    seed: string;
+    seed: Seed;
     digests: string[];
   }>
 > {
   return runWorkerChunk<
     Array<{
-      seed: string;
+      seed: Seed;
       digests: string[];
     }>
   >({
@@ -652,7 +655,7 @@ async function runOrderInvarianceChunk(args: {
 }
 export interface SeasonRostersCalibrateDeps {
   runCohort?: (args: {
-    seeds: string[];
+    seeds: Seed[];
     catalogPath: string;
     leaguePath: string;
     humanRosters: Array<{
@@ -663,7 +666,7 @@ export interface SeasonRostersCalibrateDeps {
     targets: SeasonRosterTargets;
   }) => Promise<RosterCalibrationWorkerRun[]>;
   runOrderInvariance?: (args: {
-    seeds: string[];
+    seeds: Seed[];
     catalogPath: string;
     leaguePath: string;
     humanRosters: Array<{
@@ -673,7 +676,7 @@ export interface SeasonRostersCalibrateDeps {
     targets: SeasonRosterTargets;
   }) => Promise<
     Array<{
-      seed: string;
+      seed: Seed;
       digests: string[];
     }>
   >;

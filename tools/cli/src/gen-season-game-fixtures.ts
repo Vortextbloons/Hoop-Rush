@@ -5,7 +5,12 @@ import {
   SEASON_MINUTE_POLICY_VERSION,
   SEASON_ROTATION_PRESET_TARGETS,
   SEASON_ROTATION_VERSION,
+  eraIdSchema,
+  franchiseIdSchema,
+  playerIdSchema,
   playerVersionId,
+  seasonKeySchema,
+  seedSchema,
   type Position,
   type SeasonGameAvailability,
   type SeasonGamePlayerInput,
@@ -48,9 +53,11 @@ function buildTeam(
     shift?: number;
   } = {},
 ): SeasonGameTeamInput {
-  const franchiseId = side === 'home' ? 'lakers' : 'celtics';
+  const franchiseId = franchiseIdSchema.parse(side === 'home' ? 'lakers' : 'celtics');
+  const eraId = eraIdSchema.parse('1990s');
+  const seasonKey = seasonKeySchema.parse('1995-96');
   const players: SeasonGamePlayerInput[] = POSITION_PLAN.map((positions, index) => {
-    const playerId = `p-sg-${side}-${String(index + 1)}`;
+    const playerId = playerIdSchema.parse(`p-sg-${side}-${String(index + 1)}`);
     const base = buildSimulationPlayer();
     const shift = options.shift ?? (index < 5 ? 8 : 0);
     const tendencies = { ...base.tendencies };
@@ -60,7 +67,7 @@ function buildTeam(
       tendencies.foulRate = 3;
     }
     return {
-      playerVersionId: playerVersionId(playerId, franchiseId, '1990s', '1995-96'),
+      playerVersionId: playerVersionId(playerId, franchiseId, eraId, seasonKey),
       playerId,
       displayName: `${side} player ${String(index + 1)}`,
       positions: [...positions],
@@ -108,7 +115,7 @@ function buildInput(options: {
   home: SeasonGameTeamInput;
   away: SeasonGameTeamInput;
   preset: SeasonRotationPreset | null;
-  seed?: string;
+  seed?: import('@hoop-rush/data-contracts').Seed;
   availableIds?: Set<string>;
   removals?: SeasonRemoval[];
 }): SeasonGameSimulationInput {
@@ -120,7 +127,7 @@ function buildInput(options: {
   }));
   return {
     schemaVersion: 1,
-    seed: options.seed ?? PLACEHOLDER_SEED,
+    seed: options.seed ?? seedSchema.parse(PLACEHOLDER_SEED),
     gameNumber: 1,
     dataVersion: 'data-v1',
     profile: buildEraSimulationProfile(),
@@ -181,7 +188,7 @@ function scenarios(): Scenario[] {
         home: buildTeam('home', { foulProne: true }),
         away: buildTeam('away', { foulProne: true }),
         preset: null,
-        seed: FOUL_PRESSURE_SEED,
+        seed: seedSchema.parse(FOUL_PRESSURE_SEED),
       }),
     },
     {
@@ -225,7 +232,7 @@ function scenarios(): Scenario[] {
     {
       fixtureId: 'season-game-overtime',
       description: 'Verified overtime scenario: the embedded seed reaches two overtime periods.',
-      input: buildInput({ ...balanced, preset: null, seed: OVERTIME_SEED }),
+      input: buildInput({ ...balanced, preset: null, seed: seedSchema.parse(OVERTIME_SEED) }),
     },
     {
       fixtureId: 'season-game-no-legal-five',

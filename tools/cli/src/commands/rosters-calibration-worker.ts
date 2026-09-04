@@ -9,6 +9,8 @@ import {
 import {
   seasonDraftCatalogSchema,
   seasonLeagueSchema,
+  seedSchema,
+  type Seed,
   type SeasonDraftCatalog,
   type SeasonLeague,
   type SeasonRosterTargets,
@@ -16,7 +18,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import { poolLegalFailuresOf, roleTierThresholdsOf, tierOfPool } from './season-data.ts';
 export interface RosterCalibrationWorkerRun {
-  seed: string;
+  seed: Seed;
   teams: Array<{
     franchiseId: string;
     band: SeasonStrengthBand;
@@ -62,7 +64,7 @@ type WorkerOutput =
     }
   | {
       orderInvariance: Array<{
-        seed: string;
+        seed: Seed;
         digests: string[];
       }>;
     };
@@ -122,7 +124,8 @@ function runRosterSeeds(input: WorkerInput): RosterCalibrationWorkerRun[] {
   const humanFranchiseIds = input.humanRosters.map((roster) => roster.franchiseId);
   const humanVersionIds = new Set(input.humanRosters.flatMap((roster) => roster.playerVersionIds));
   const thresholds = roleTierThresholdsOf(catalog, humanVersionIds);
-  return input.seeds.map((seed) => {
+  return input.seeds.map((rawSeed) => {
+    const seed = seedSchema.parse(rawSeed);
     let generation: ReturnType<typeof generateAiLeague>;
     try {
       generation = generateAiLeague({
@@ -209,7 +212,7 @@ function runRosterSeeds(input: WorkerInput): RosterCalibrationWorkerRun[] {
   });
 }
 function runOrderInvarianceSeeds(input: WorkerInput): Array<{
-  seed: string;
+  seed: Seed;
   digests: string[];
 }> {
   const catalog = seasonDraftCatalogSchema.parse(readJson(input.catalogPath));
@@ -220,7 +223,8 @@ function runOrderInvarianceSeeds(input: WorkerInput): Array<{
     { ...league, teams: [...league.teams].reverse() },
     { ...league, teams: [...league.teams.slice(15), ...league.teams.slice(0, 15)] },
   ];
-  return input.seeds.map((seed) => {
+  return input.seeds.map((rawSeed) => {
+    const seed = seedSchema.parse(rawSeed);
     const digests: string[] = [];
     for (const variant of variants) {
       try {

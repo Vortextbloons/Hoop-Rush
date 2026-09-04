@@ -11,6 +11,9 @@ import type { SimulationPlayer } from '@hoop-rush/data-contracts';
 import {
   DEFAULT_ERA_ID,
   POSITION_SLOTS,
+  franchiseIdSchema,
+  idSchema,
+  playerIdSchema,
   type EraSimulationProfile,
   type FranchiseEraPool,
   type GameResult,
@@ -132,7 +135,7 @@ export function leagueAverageTeam(pool: FranchiseEraPool): SimulationTeam {
     teamId: 'league-average',
     displayName: 'League Average',
     players: slots.map((positions, i) => ({
-      playerId: `avg-${String(i)}`,
+      playerId: playerIdSchema.parse(`avg-${String(i)}`),
       displayName: 'League Average',
       positions,
       heightInches: sample.heightInches,
@@ -370,18 +373,19 @@ export function calibrateRun(args: {
   const userLineup = lineupForTeam(strong);
   const samplePlayer = pool.players[0];
   let perfectRuns = 0;
+  const calibrateFranchiseId = franchiseIdSchema.parse('lakers');
   for (let i = 0; i < challengeSamples; i += 1) {
     const run = createChallenge({
-      runId: `calibrate-run-${String(i)}`,
+      runId: idSchema.parse(`calibrate-run-${String(i)}`),
       mode: 'sandbox',
-      franchiseId: 'lakers',
+      franchiseId: calibrateFranchiseId,
       eraId: profile.eraId,
       homeDisplayName: 'User Lineup',
       lineup: userLineup.lineup,
       players: userLineup.players,
       selections: userLineup.players.map((player) => ({
         playerId: player.playerId,
-        franchiseId: 'lakers',
+        franchiseId: calibrateFranchiseId,
         eraId: profile.eraId,
       })),
       runSeed: fixtureSeed('calibrate-run82', i),
@@ -571,7 +575,7 @@ function buildRoleMetrics(
     opponentMisses: 0,
   })) as RoleAccumulator[];
   for (let i = 0; i < roleSamples; i += 1) {
-    const input = buildInput(fixture, profile, fixtureSeed('roles', i), false);
+    const input = buildInput({ fixture, profile, seed: fixtureSeed('roles', i), variant: false });
     const { result } = runSingleGame(input);
     for (const side of [result.home, result.away] as const) {
       const opponent = side === result.home ? result.away : result.home;
@@ -685,7 +689,7 @@ function sampleMetric(
 ): number {
   let total = 0;
   for (let i = 0; i < samples; i += 1) {
-    const input = buildInput(fixture, profile, fixtureSeed(fixtureId, i), variant);
+    const input = buildInput({ fixture, profile, seed: fixtureSeed(fixtureId, i), variant });
     const { result } = runSingleGame(input);
     total += metricValue(fixtureId, result.home, result.away);
   }

@@ -8,6 +8,12 @@ import {
   buildCompletedDraftState,
 } from '@hoop-rush/test-fixtures';
 import type { GameResult, RunAggregates } from '@hoop-rush/data-contracts';
+import {
+  eraIdSchema,
+  franchiseIdSchema,
+  playerIdSchema,
+  seedSchema,
+} from '@hoop-rush/data-contracts';
 import { DexieChallengeRepository, type ChallengeRepository } from './dexie.ts';
 import type { StoredClassicDraft } from '../schemas/classic-draft-record.ts';
 import type {
@@ -49,8 +55,14 @@ function indexFor(runId = 'run-1'): CompletedRunIndex {
     mode: 'sandbox',
     franchiseId: 'lakers',
     eraId: '1990s',
-    playerIds: ['p-1', 'p-2', 'p-3', 'p-4', 'p-5'],
-    runSeed: 'abcd1234abcd1234abcd1234abcd1234',
+    playerIds: [
+      playerIdSchema.parse('p-1'),
+      playerIdSchema.parse('p-2'),
+      playerIdSchema.parse('p-3'),
+      playerIdSchema.parse('p-4'),
+      playerIdSchema.parse('p-5'),
+    ],
+    runSeed: seedSchema.parse('abcd1234abcd1234abcd1234abcd1234'),
     wins: 82,
     losses: 0,
     gamesPlayed: 82,
@@ -77,7 +89,7 @@ function buildGameResult(gameNumber: number): GameResult {
       possessions: 96,
     },
     players: Array.from({ length: 5 }, (_, i) => ({
-      playerId: `p-${String(i + 1)}`,
+      playerId: playerIdSchema.parse(`p-${String(i + 1)}`),
       minutes: 48,
       points: 20,
       fieldGoals: { made: 8, attempted: 17 },
@@ -133,7 +145,7 @@ function aggregatesFor(gamesPlayed: number, wins: number, losses: number): RunAg
       possessions: 0,
     },
     players: Array.from({ length: 5 }, (_, i) => ({
-      playerId: `p-${String(i + 1)}`,
+      playerId: playerIdSchema.parse(`p-${String(i + 1)}`),
       gamesPlayed,
       minutes: 0,
       points: 0,
@@ -278,6 +290,8 @@ describe('challenge repository (dexie)', () => {
     'promotes and lists a completed run with its selected franchise ($franchiseId/$eraId)',
     async ({ franchiseId, eraId }) => {
       const { repo } = makeAdapter();
+      const parsedFranchiseId = franchiseIdSchema.parse(franchiseId);
+      const parsedEraId = eraIdSchema.parse(eraId);
       const record = {
         ...finishedRecord('run-free'),
         run: buildChallengeRun({
@@ -285,15 +299,15 @@ describe('challenge repository (dexie)', () => {
           status: 'finished',
           outcome: 'perfect',
           firstLossGameNumber: null,
-          franchiseId,
-          eraId,
+          franchiseId: parsedFranchiseId,
+          eraId: parsedEraId,
         }),
       };
       await repo.saveActiveRun(record);
       await repo.promoteActiveToCompleted(record, {
         ...indexFor('run-free'),
-        franchiseId,
-        eraId,
+        franchiseId: parsedFranchiseId,
+        eraId: parsedEraId,
       });
       const loaded = await repo.loadCompletedRun('run-free');
       expect(loaded?.run.franchiseId).toBe(franchiseId);
@@ -380,7 +394,7 @@ describe('challenge repository (dexie)', () => {
     const draft = buildClassicDraftState({
       draftId: 'draft-partial',
       round: 2,
-      picks: [buildClassicPick({ round: 1, playerId: 'p-lal-g' })],
+      picks: [buildClassicPick({ round: 1, playerId: playerIdSchema.parse('p-lal-g') })],
       rerolls: { franchiseSpent: true, franchiseRound: 1, eraSpent: false },
     });
     await repo.saveClassicDraft(draftRecord(draft));

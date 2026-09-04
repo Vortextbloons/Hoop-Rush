@@ -3,6 +3,7 @@ import {
   seasonDraftCatalogSchema,
   seasonLeagueSchema,
   seasonRosterTargetsSchema,
+  seedSchema,
 } from '@hoop-rush/data-contracts';
 import { readFileSync } from 'node:fs';
 import { runSeasonDraftCalibrationSeeds } from './season-draft-calibrate.ts';
@@ -22,8 +23,9 @@ function main(): void {
   const targets = seasonRosterTargetsSchema.parse(
     typeof input.targets === 'string' ? JSON.parse(input.targets) : input.targets,
   );
+  const seeds = input.seeds.map((seed) => seedSchema.parse(seed));
   const runs = runSeasonDraftCalibrationSeeds({
-    seeds: input.seeds,
+    seeds,
     catalog,
     league,
     targets,

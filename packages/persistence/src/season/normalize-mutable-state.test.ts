@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   deriveSeasonTransactionId,
+  seedSchema,
   seasonTransactionEntrySchema,
-  type SeasonTransactionEntry,
+  type SeasonTransactionEntryInput,
 } from '@hoop-rush/data-contracts';
 import {
   normalizeSeasonRunForPersistence,
@@ -13,7 +14,7 @@ import { buildFixtureEffectsState, buildFixtureRun } from '../testing/season-run
 describe('normalizeSeasonTransactions', () => {
   it('shortens overlong transaction ids before checkpoint validation', () => {
     const commandId = `c${'a'.repeat(63)}`;
-    const overlong: SeasonTransactionEntry = {
+    const overlong: SeasonTransactionEntryInput = {
       transactionId: `txn-trade-cash-sent-${commandId}`,
       commandId,
       franchiseId: 'lakers',
@@ -33,7 +34,7 @@ describe('normalizeSeasonTransactions', () => {
 });
 describe('normalizeSeasonRunForPersistence', () => {
   it('repairs legacy transaction logs and recomputes stateDigest', () => {
-    const baseRun = buildFixtureRun({ seed: 'abc1234567890abcd' });
+    const baseRun = buildFixtureRun({ seed: seedSchema.parse('abc1234567890abcd') });
     const effects = buildFixtureEffectsState(baseRun.rosters);
     const commandId = `c${'b'.repeat(63)}`;
     const overlongId = `txn-trade-inquiry-purchase-${commandId}`;

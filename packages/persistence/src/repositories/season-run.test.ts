@@ -2,6 +2,11 @@ import { afterEach, describe, expect, it } from 'vitest';
 import Dexie from 'dexie';
 import {
   SEASON_RUN_SAVE_SCHEMA_VERSION,
+  commandIdSchema,
+  franchiseIdSchema,
+  idSchema,
+  seasonGameIdSchema,
+  seasonRunCommandSchema,
   type SeasonEffectsState,
   type SeasonPendingBlockCandidate,
   type SeasonRun,
@@ -292,7 +297,7 @@ describe('season run repository (dexie)', () => {
     if (firstSummary === undefined) throw new Error('expected a fixture summary');
     const invalid = {
       ...input,
-      summaries: [{ ...firstSummary, gameId: 'not-a-game-id' }],
+      summaries: [{ ...firstSummary, round: 999 }],
     };
     await expect(repo.commitSeasonBlock(invalid)).rejects.toThrow();
     expect(await db.seasonRunSummaries.count()).toBe(0);
@@ -906,7 +911,7 @@ describe('season run M2.5 pending blocks (v5)', () => {
       ),
     ).rejects.toThrow(SeasonPendingBlockRejectedError);
     await expect(
-      repo.savePendingBlock({ ...pendingFor(adapters), runId: 'other-run' }, interruption),
+      repo.savePendingBlock({ ...pendingFor(adapters), runId: idSchema.parse('other-run') }, interruption),
     ).rejects.toThrow(SeasonPendingBlockRejectedError);
   });
   it('a pending block survives a full validated reload', async () => {
@@ -1029,24 +1034,28 @@ describe('season run M2.5 command application (v5)', () => {
     adapters: Adapters,
     overrides: Partial<SeasonRunCommand> = {},
   ): SeasonRunCommand {
-    return {
+    return seasonRunCommandSchema.parse({
       schemaVersion: 11,
       command: 'select-block-objective',
-      commandId: 'cmd-select-0',
+      commandId: commandIdSchema.parse('cmd-select-0'),
       runId: adapters.run.runId,
       expectedStateRevision: 0,
       expectedStateDigest: adapters.run.stateDigest,
       blockIndex: 0,
       objectiveId: 'win-six',
       ...overrides,
-    } as SeasonRunCommand;
+    });
   }
   function postCommandRun(adapters: Adapters): SeasonRun {
     const { run } = adapters;
     const objectives = {
       ...run.objectives,
       selections: {
-        0: { objectiveId: 'win-six' as const, selectedByCommandId: 'cmd-select-0', success: null },
+        0: {
+          objectiveId: 'win-six' as const,
+          selectedByCommandId: commandIdSchema.parse('cmd-select-0'),
+          success: null,
+        },
       },
     };
     return {
@@ -1135,7 +1144,7 @@ describe('season run M2.5 command application (v5)', () => {
       repo.applySeasonRunCommand({
         runId: run.runId,
         command: selectObjectiveCommand(adapters, {
-          commandId: 'command-0',
+          commandId: commandIdSchema.parse('command-0'),
           expectedStateRevision: 1,
           expectedStateDigest: blocks[0]?.stateDigest ?? '0'.repeat(32),
         }),
@@ -1168,7 +1177,7 @@ describe('season run M2.5 command application (v5)', () => {
         unavailablePlayerVersionIds: ['pv-' + '1'.repeat(32)],
       }),
     );
-    const advanced = { ...pending, nextGameId: 's000017' };
+    const advanced = { ...pending, nextGameId: seasonGameIdSchema.parse('s000017') };
     await repo.applySeasonRunCommand({
       runId: run.runId,
       command: selectObjectiveCommand(adapters),
@@ -1476,9 +1485,10 @@ describe('season run M2.5 reload audit (v5)', () => {
     const { db, repo } = adapters;
     await promote(adapters);
     const row = await currentRow(adapters);
+    const lakersBalanceKey = franchiseIdSchema.parse('lakers');
     await db.seasonRuns.put({
       ...row,
-      influence: { ...row.influence, balances: { ...row.influence.balances, lakers: 3 } },
+      influence: { ...row.influence, balances: { ...row.influence.balances, [lakersBalanceKey]: 3 } },
     });
     await expect(repo.loadActiveRun()).rejects.toThrow(/recomputes/);
   });
@@ -1501,8 +1511,8 @@ describe('season run M2.5 reload audit (v5)', () => {
     const injury = {
       injuryId: 'inj-' + 'a'.repeat(32),
       playerVersionId: 'pv-' + 'f'.repeat(32),
-      franchiseId: 'lakers',
-      gameId: 's000001',
+      franchiseId: franchiseIdSchema.parse('lakers'),
+      gameId: seasonGameIdSchema.parse('s000001'),
       type: 'lower-body' as const,
       severity: 'minor' as const,
       occurredBeforeHalftime: false,
@@ -1528,7 +1538,7 @@ describe('season run M2.5 reload audit (v5)', () => {
       ...row,
       transactions: [
         {
-          transactionId: 'tx-fake',
+          transactionId: idSchema.parse('tx-fake'),
           commandId: null,
           franchiseId: null,
           type: 'initial-grant',
@@ -1576,9 +1586,9 @@ describe('season run M2.5 reload audit (v5)', () => {
         code: 'invalid-roster',
         runId: run.runId,
         blockIndex: 0,
-        commandId: 'command-0',
-        nextGameId: 's000016',
-        humanFranchiseId: 'lakers',
+        commandId: commandIdSchema.parse('command-0'),
+        nextGameId: seasonGameIdSchema.parse('s000016'),
+        humanFranchiseId: franchiseIdSchema.parse('lakers'),
         unavailablePlayerVersionIds: ['pv-' + '1'.repeat(32)],
       },
     });

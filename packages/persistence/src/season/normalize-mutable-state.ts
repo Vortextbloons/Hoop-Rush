@@ -1,26 +1,28 @@
 import {
   deriveSeasonInfluenceEntryId,
   deriveSeasonTransactionId,
-  normalizeSeasonTransactionEntry,
+  idSchema,
+  seasonTransactionEntry,
   type SeasonEffectsState,
   type SeasonFreeAgencyState,
   type SeasonInfluenceState,
   type SeasonRun,
   type SeasonTransactionEntry,
+  type SeasonTransactionEntryInput,
 } from '@hoop-rush/data-contracts';
 import { seasonRunEngineSeam } from './engine-seam.ts';
 import type { SeasonRunStateDigestFacts } from './engine-seam-types.ts';
 export function normalizeSeasonTransactions(
-  transactions: readonly SeasonTransactionEntry[],
+  transactions: readonly SeasonTransactionEntryInput[],
 ): SeasonTransactionEntry[] {
-  return transactions.map(normalizeSeasonTransactionEntry);
+  return transactions.map((entry) => seasonTransactionEntry(entry));
 }
 export function normalizeSeasonInfluenceState(state: SeasonInfluenceState): SeasonInfluenceState {
   return {
     ...state,
     ledger: state.ledger.map((entry) => ({
       ...entry,
-      entryId: deriveSeasonInfluenceEntryId(entry.entryId),
+      entryId: idSchema.parse(deriveSeasonInfluenceEntryId(entry.entryId)),
     })),
   };
 }
@@ -33,13 +35,16 @@ export function normalizeSeasonFreeAgencyState(
       ...window,
       signings: window.signings.map((signing) => ({
         ...signing,
-        transactionId: deriveSeasonTransactionId(signing.transactionId),
-        ledgerEntryId: deriveSeasonInfluenceEntryId(signing.ledgerEntryId),
+        transactionId: idSchema.parse(deriveSeasonTransactionId(signing.transactionId)),
+        ledgerEntryId: idSchema.parse(deriveSeasonInfluenceEntryId(signing.ledgerEntryId)),
       })),
     })),
   };
 }
-export function normalizeSeasonRunMutableSnapshot(run: SeasonRun): SeasonRun {
+type MutableSnapshotInput = Omit<SeasonRun, 'transactions'> & {
+  transactions: readonly SeasonTransactionEntryInput[];
+};
+export function normalizeSeasonRunMutableSnapshot(run: MutableSnapshotInput): SeasonRun {
   return {
     ...run,
     transactions: normalizeSeasonTransactions(run.transactions),
@@ -48,7 +53,7 @@ export function normalizeSeasonRunMutableSnapshot(run: SeasonRun): SeasonRun {
   };
 }
 export function normalizeSeasonRunForPersistence(
-  run: SeasonRun,
+  run: MutableSnapshotInput,
   effects: SeasonEffectsState,
 ): SeasonRun {
   const normalized = normalizeSeasonRunMutableSnapshot(run);

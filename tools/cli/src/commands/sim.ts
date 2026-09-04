@@ -12,6 +12,7 @@ import {
   type EraSimulationProfile,
   type GameResult,
   type GameSimulationInput,
+  type Seed,
 } from '@hoop-rush/data-contracts';
 import { makeReport, type CliReport } from '../report.ts';
 import { simBatchReportSchema, simGameReportSchema } from '../report-schemas.ts';
@@ -66,8 +67,8 @@ export function listFixtureIds(): string[] {
     'sens-shot-mix',
   ];
 }
-export function fixtureSeed(fixtureId: string, index: number): string {
-  return hex32(fnv1a32(`${fixtureId}-${String(index)}`)).repeat(4);
+export function fixtureSeed(fixtureId: string, index: number): Seed {
+  return seedSchema.parse(hex32(fnv1a32(`${fixtureId}-${String(index)}`)).repeat(4));
 }
 export function chunkRange(
   from: number,
@@ -87,12 +88,13 @@ export function chunkRange(
   }
   return chunks;
 }
-export function buildInput(
-  fixture: SimFixture,
-  profile: EraSimulationProfile,
-  seed: string,
-  variant: boolean,
-): GameSimulationInput {
+export function buildInput(args: {
+  fixture: SimFixture;
+  profile: EraSimulationProfile;
+  seed: Seed;
+  variant: boolean;
+}): GameSimulationInput {
+  const { fixture, profile, seed, variant } = args;
   const variantProfile =
     variant && fixture.variantParameters
       ? {
@@ -124,16 +126,17 @@ export function runSingleGame(input: GameSimulationInput): {
 export function simGame(args: { input?: string; seed?: string; profile?: string }): CliReport {
   const fixtureId = args.input;
   if (!fixtureId) throw new UsageError('sim game requires --input <fixture-id>');
-  const seed = args.seed;
-  if (seed === undefined) throw new UsageError('sim game requires --seed <hex>');
-  if (!seedSchema.safeParse(seed).success)
-    throw new UsageError(`--seed must be hex (got "${seed}")`);
+  const rawSeed = args.seed;
+  if (rawSeed === undefined) throw new UsageError('sim game requires --seed <hex>');
+  const parsedSeed = seedSchema.safeParse(rawSeed);
+  if (!parsedSeed.success) throw new UsageError(`--seed must be hex (got "${rawSeed}")`);
+  const seed = parsedSeed.data;
   const fixture = loadFixture(fixtureId);
   const packaged = loadPackagedData();
   const profile = args.profile
     ? loadProfileFile(args.profile)
     : new PackagedData(packaged.manifest, packaged.dir).eraProfile();
-  const input = buildInput(fixture, profile, seed, false);
+  const input = buildInput({ fixture, profile, seed, variant: false });
   const { result, timingMs } = runSingleGame(input);
   const invariants = checkGameResult(result);
   const payload = simGameReportSchema.parse({
@@ -194,7 +197,12 @@ export async function simBatch(args: {
   await Promise.all(
     chunks.map(async (chunk) => {
       for (let i = chunk.from; i <= chunk.to; i += 1) {
-        const input = buildInput(fixture, profile, fixtureSeed(fixtureId, i), false);
+        const input = buildInput({
+          fixture,
+          profile,
+          seed: fixtureSeed(fixtureId, i),
+          variant: false,
+        });
         const { result } = runSingleGame(input);
         aggregate.games += 1;
         if (result.winner === 'home') aggregate.homeWins += 1;

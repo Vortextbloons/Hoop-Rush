@@ -3,6 +3,7 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildManifest, buildPlayerSeason, buildPool } from '@hoop-rush/test-fixtures';
+import { contentHashSchema, playerIdSchema } from '@hoop-rush/data-contracts';
 import { dataOveralls } from './data-overalls.ts';
 import { EXIT_OK, EXIT_USAGE_OR_DATA_ERROR } from '../report.ts';
 describe('dataOveralls', () => {
@@ -14,7 +15,7 @@ describe('dataOveralls', () => {
         buildPlayerSeason(),
         {
           ...buildPlayerSeason(),
-          playerId: 'p-shaq',
+          playerId: playerIdSchema.parse('p-shaq'),
           displayName: "Shaquille O'Neal",
           summaryRatings: { overallRating: 77, offenseRating: 68, defenseRating: 89 },
           selectionScore: 79.056,
@@ -31,7 +32,7 @@ describe('dataOveralls', () => {
                 franchiseId: pool.franchiseId,
                 eraId: pool.eraId,
                 url: 'pool.json',
-                contentHash: 'a'.repeat(64),
+                contentHash: contentHashSchema.parse('a'.repeat(64)),
               },
             ],
           }),

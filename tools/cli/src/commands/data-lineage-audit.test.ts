@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HoopRushManifest } from '@hoop-rush/data-contracts';
+import { franchiseIdSchema, seasonKeySchema } from '@hoop-rush/data-contracts';
 import { buildManifest } from '@hoop-rush/test-fixtures';
 import { dataLineageAudit } from './data-lineage-audit.ts';
 import { EXIT_CHECKS_FAILED, EXIT_OK } from '../report.ts';
@@ -37,9 +38,9 @@ describe('dataLineageAudit logo metadata', () => {
     const manifest = buildManifest({
       franchiseLineage: [
         {
-          modernFranchiseId: 'lakers',
+          modernFranchiseId: franchiseIdSchema.parse('lakers'),
           historicalTeamId: '1610612747',
-          validFromSeasonKey: '1960-61',
+          validFromSeasonKey: seasonKeySchema.parse('1960-61'),
           displayName: 'Los Angeles Lakers',
           city: 'Los Angeles',
           abbreviation: 'LAL',

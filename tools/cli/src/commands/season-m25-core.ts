@@ -4,8 +4,11 @@ import {
   SEASON_OBJECTIVE_CATALOG,
   SEASON_OBJECTIVE_VERSION,
   buildInitialPostseasonState,
+  commandIdSchema,
   seasonHealthStateSchema,
   seasonObjectiveStateSchema,
+  type FranchiseId,
+  type Seed,
   type SeasonCandidateCheckpoint,
   type SeasonCheckpointState,
   type SeasonDraftCatalog,
@@ -46,7 +49,9 @@ export function m25InitialObjectivesState(): SeasonObjectiveState {
     selections: {},
   });
 }
-export function m25InitialInfluenceState(franchiseIds: readonly string[]): SeasonInfluenceState {
+export function m25InitialInfluenceState(
+  franchiseIds: readonly FranchiseId[],
+): SeasonInfluenceState {
   return createInitialSeasonInfluenceState(franchiseIds);
 }
 export interface SeasonM25RunStateFacts {
@@ -90,12 +95,13 @@ export function m25RunStateFacts(
     effects,
   };
 }
-export function m25FreshRun(
-  base: SeasonRun,
-  rootSeed: string,
-  franchiseIds: readonly string[],
-  effects: SeasonEffectsState,
-): SeasonRun {
+export function m25FreshRun(args: {
+  base: SeasonRun;
+  rootSeed: Seed;
+  franchiseIds: readonly FranchiseId[];
+  effects: SeasonEffectsState;
+}): SeasonRun {
+  const { base, rootSeed, franchiseIds, effects } = args;
   const fresh: SeasonRun = {
     ...base,
     rootSeed,
@@ -119,7 +125,7 @@ export interface SeasonM25WindowOpen {
   result: SeasonWindowOpenResult | null;
 }
 export interface SeasonM25SeasonFacts {
-  rootSeed: string;
+  rootSeed: Seed;
   run: SeasonRun;
   checkpoints: SeasonCandidateCheckpoint[];
   postBlock: Array<{
@@ -136,7 +142,7 @@ export interface SeasonM25DriverOptions {
   runPath?: string | null;
   manifestPath?: string | null;
   profileEra?: string | null;
-  rootSeed: string;
+  rootSeed: Seed;
   driveWindows: boolean;
   pickObjectives: boolean;
   probeWindow?: boolean;
@@ -149,7 +155,12 @@ export function runSeasonM25(options: SeasonM25DriverOptions): SeasonM25SeasonFa
     profileEra: options.profileEra,
   });
   const franchiseIds = state.run.league.teams.map((team) => team.franchiseId);
-  const run = m25FreshRun(state.run, options.rootSeed, franchiseIds, state.effects);
+  const run = m25FreshRun({
+    base: state.run,
+    rootSeed: options.rootSeed,
+    franchiseIds,
+    effects: state.effects,
+  });
   state.run = run;
   state.health = run.health;
   state.objectiveId = null;
@@ -192,7 +203,9 @@ export function runSeasonM25(options: SeasonM25DriverOptions): SeasonM25SeasonFa
             ...state.run.objectives.selections,
             [blockIndex]: {
               objectiveId: state.objectiveId,
-              selectedByCommandId: `season-block-${String(blockIndex)}-${String(state.acceptedCommandIds.length)}`,
+              selectedByCommandId: commandIdSchema.parse(
+                `season-block-${String(blockIndex)}-${String(state.acceptedCommandIds.length)}`,
+              ),
               success: checkpoint.objective.success,
             },
           },

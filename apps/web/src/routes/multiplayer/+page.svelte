@@ -99,7 +99,13 @@
     }
   }
 
+  function cleanCode(): void {
+    const clean = code.replace(/\D/g, '').slice(0, 4);
+    if (clean !== code) code = clean;
+  }
+
   async function doPreview() {
+    cleanCode();
     if (code.length !== 4) {
       error = 'Enter a 4-digit code';
       return;
@@ -118,6 +124,7 @@
   }
 
   async function doJoin() {
+    cleanCode();
     if (code.length !== 4) {
       error = 'Enter a 4-digit code';
       return;
@@ -126,7 +133,7 @@
     error = null;
     try {
       const { snapshot, membership } = await transport().join(code);
-      saveFixedFiveMembership({ ...membership, code });
+      saveFixedFiveMembership(membership);
       await goto(resolve('/multiplayer/room/[roomId]', { roomId: snapshot.roomId }));
     } catch (e) {
       error = friendlyFixedFiveJoinError(e);
@@ -430,9 +437,11 @@
         id="join-code"
         type="text"
         inputmode="numeric"
+        autocomplete="one-time-code"
         maxlength={4}
         placeholder="0000"
         bind:value={code}
+        oninput={cleanCode}
         class="w-full rounded-xl border-2 border-line-soft bg-card px-4 py-3 text-center font-mono text-lg font-bold tracking-[0.5em] focus:border-primary focus:outline-none"
       />
       <div class="mt-3 flex gap-2">

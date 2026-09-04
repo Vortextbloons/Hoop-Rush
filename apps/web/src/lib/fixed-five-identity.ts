@@ -21,6 +21,14 @@ export function friendlyFixedFiveJoinError(error: unknown): string {
   if (message.includes('authorization') || message.includes('membership'))
     return 'You are not a member of that room.';
   if (message.includes('stale-revision')) return 'The room changed. Syncing and retrying once.';
+  // Never leak raw schema internals (e.g. Zod JSON) into the UI.
+  if (
+    message.trimStart().startsWith('[') ||
+    message.includes('invalid_format') ||
+    message.includes('invalid_type')
+  ) {
+    return 'Enter the 4-digit code from the host.';
+  }
   return message.slice(0, 240) || 'Something went wrong joining the room.';
 }
 

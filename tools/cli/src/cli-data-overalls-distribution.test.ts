@@ -2,6 +2,13 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildManifest, buildPlayerSeason, buildPool } from '@hoop-rush/test-fixtures';
+import {
+  contentHashSchema,
+  eraIdSchema,
+  franchiseIdSchema,
+  playerIdSchema,
+  seasonKeySchema,
+} from '@hoop-rush/data-contracts';
 import { overallsDistributionReportSchema } from './report-schemas.ts';
 import {
   expectExit2CleanManifestReport,
@@ -31,18 +38,26 @@ function writeOverallsFixture(dataRoot: string, pools: FixturePool[]): string {
         buildPool(
           players.map(({ overall, externalId, seasonKey }) =>
             buildPlayerSeason({
-              playerId: `p-${externalId}`,
+              playerId: playerIdSchema.parse(`p-${externalId}`),
               playerExternalId: externalId,
-              eraId,
-              seasonKey,
+              eraId: eraIdSchema.parse(eraId),
+              seasonKey: seasonKeySchema.parse(seasonKey),
               summaryRatings: { overallRating: overall, offenseRating: 60, defenseRating: 60 },
             }),
           ),
-          { franchiseId, eraId },
+          {
+            franchiseId: franchiseIdSchema.parse(franchiseId),
+            eraId: eraIdSchema.parse(eraId),
+          },
         ),
       ),
     );
-    return { franchiseId, eraId, url, contentHash: 'a'.repeat(64) };
+    return {
+      franchiseId: franchiseIdSchema.parse(franchiseId),
+      eraId: eraIdSchema.parse(eraId),
+      url,
+      contentHash: contentHashSchema.parse('a'.repeat(64)),
+    };
   });
   const manifestPath = join(dataDir, 'manifest.json');
   writeFileSync(manifestPath, JSON.stringify(buildManifest({ pools: refs })));

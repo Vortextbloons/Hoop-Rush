@@ -1,6 +1,8 @@
 import {
   blockIndexForRound,
+  franchiseIdSchema,
   postseasonGameIdSchema,
+  seasonGameIdSchema,
   SEASON_GAMES_PER_ROUND,
   SEASON_INFLUENCE_CAP,
   SEASON_ENDING_MISSED_GAMES_SENTINEL,
@@ -560,8 +562,17 @@ export function auditSeasonRunState(
       );
     }
     if (
-      scheduleById.get(injury.gameId) === undefined &&
-      !postseasonGameIdSchema.safeParse(injury.gameId).success
+      (() => {
+        const seasonGameParse = seasonGameIdSchema.safeParse(injury.gameId);
+        const scheduled =
+          seasonGameParse.success === true
+            ? scheduleById.get(seasonGameParse.data)
+            : undefined;
+        return (
+          scheduled === undefined &&
+          !postseasonGameIdSchema.safeParse(injury.gameId).success
+        );
+      })()
     ) {
       failures.push(`injury ${injury.injuryId} occurrence game ${injury.gameId} is not scheduled`);
     }
@@ -623,21 +634,22 @@ export function auditSeasonRunState(
       failures.push(`influence rehab state references unknown injury ${rehabInjuryId}`);
     }
   }
-  for (const [franchiseId, windowStates] of Object.entries(influence.windows)) {
-    if (!leagueFranchiseIds.has(franchiseId)) {
-      failures.push(`influence windows reference unknown franchise ${franchiseId}`);
+  for (const [rawFranchiseId, windowStates] of Object.entries(influence.windows)) {
+    const parsedFranchiseId = franchiseIdSchema.parse(rawFranchiseId);
+    if (!leagueFranchiseIds.has(parsedFranchiseId)) {
+      failures.push(`influence windows reference unknown franchise ${rawFranchiseId}`);
     }
     const seen = new Set<number>();
     for (const windowState of windowStates) {
       if (seen.has(windowState.windowIndex)) {
         failures.push(
-          `influence window spend ${franchiseId}/${String(windowState.windowIndex)} recorded twice`,
+          `influence window spend ${rawFranchiseId}/${String(windowState.windowIndex)} recorded twice`,
         );
       }
       seen.add(windowState.windowIndex);
       if (windowState.windowIndex < 0 || windowState.windowIndex > 2) {
         failures.push(
-          `influence window spend ${franchiseId} carries out-of-range windowIndex ${String(windowState.windowIndex)}`,
+          `influence window spend ${rawFranchiseId} carries out-of-range windowIndex ${String(windowState.windowIndex)}`,
         );
       }
     }

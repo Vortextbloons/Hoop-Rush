@@ -280,10 +280,11 @@ export function simChallenge(args: {
       'sim challenge requires --lineup <playerId[,playerId@franchise/era] or Name[,Name@Franchise/era]>',
     );
   }
-  const seed = args.seed;
-  if (seed === undefined) throw new UsageError('sim challenge requires --seed <hex>');
-  if (!seedSchema.safeParse(seed).success)
-    throw new UsageError(`--seed must be hex (got "${seed}")`);
+  const rawSeed = args.seed;
+  if (rawSeed === undefined) throw new UsageError('sim challenge requires --seed <hex>');
+  const parsedSeed = seedSchema.safeParse(rawSeed);
+  if (!parsedSeed.success) throw new UsageError(`--seed must be hex (got "${rawSeed}")`);
+  const seed = parsedSeed.data;
   const reruns = parseCount(args.reruns, '--reruns', BEST_OF_ATTEMPTS);
   if (reruns < 1) throw new UsageError('--reruns must be >= 1');
   const eraId = args.era ?? FIXED_SANDBOX_ERA;
@@ -373,7 +374,9 @@ export function simChallenge(args: {
     timingMs: Math.round(timingMs * 1000) / 1000,
     invariantFailures: 0,
   });
-  const displayName = new Map(run.players.map((player) => [player.playerId, player.displayName]));
+  const displayName = new Map<string, string>(
+    run.players.map((player) => [player.playerId, player.displayName]),
+  );
   const nameWidth = Math.max(
     6,
     ...payload.playerTotals.map((p) => (displayName.get(p.playerId) ?? p.playerId).length),

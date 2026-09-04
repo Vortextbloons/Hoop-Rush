@@ -1,5 +1,14 @@
 import {
   playerVersionId,
+  commandIdSchema,
+  contentHashSchema,
+  eraIdSchema,
+  franchiseIdSchema,
+  idSchema,
+  playerIdSchema,
+  seasonGameIdSchema,
+  seasonKeySchema,
+  seedSchema,
   SEASON_ALIGNMENT,
   SEASON_AI_VERSION,
   SEASON_AUTHORITY_VERSION,
@@ -113,16 +122,16 @@ import type { SeasonRunEngineSeam } from '../season/engine-seam-types.ts';
 import { SEASON_RUN_RECORD_ID, type StoredSeasonRunRecord } from '../schemas/season-run-record.ts';
 import { SEASON_DRAFT_RECORD_ID, type StoredSeasonDraft } from '../schemas/season-draft-record.ts';
 const ALIGNMENT = SEASON_ALIGNMENT;
-const FRANCHISE_ORDER = SEASON_ALIGNMENT.map((entry) => entry.franchiseId);
-export function fixtureSeedFromString(value: string): string {
-  return seedFromString(value);
+const FRANCHISE_ORDER = SEASON_ALIGNMENT.map((entry) => franchiseIdSchema.parse(entry.franchiseId));
+export function fixtureSeedFromString(value: string): ReturnType<typeof seedSchema.parse> {
+  return seedSchema.parse(seedFromString(value));
 }
 export function buildFixtureLeague(humanFranchiseId = 'lakers'): SeasonLeague {
   return {
     schemaVersion: 1,
     leagueVersion: SEASON_LEAGUE_VERSION,
     teams: ALIGNMENT.map((entry) => ({
-      franchiseId: entry.franchiseId,
+      franchiseId: franchiseIdSchema.parse(entry.franchiseId),
       control: entry.franchiseId === humanFranchiseId ? ('human' as const) : ('ai' as const),
       conference: entry.conference,
       division: entry.division,
@@ -149,7 +158,7 @@ export function buildFixtureInfluenceState(league: SeasonLeague): SeasonInfluenc
   for (const team of league.teams) {
     balances[team.franchiseId] = 2;
     ledger.push({
-      entryId: `influence-initial-${team.franchiseId}`,
+      entryId: idSchema.parse(`influence-initial-${team.franchiseId}`),
       franchiseId: team.franchiseId,
       source: 'initial-grant',
       blockIndex: null,
@@ -179,7 +188,8 @@ export function buildFixtureObjectiveState(): SeasonObjectiveState {
   });
 }
 export function buildFixtureSchedule(seed: string): SeasonSchedule {
-  const offset = fnv1a32(`schedule-${seed}`) % 30;
+  const parsedSeed = seedSchema.parse(seed);
+  const offset = fnv1a32(`schedule-${parsedSeed}`) % 30;
   const games = [];
   for (let round = 1; round <= 82; round += 1) {
     for (let g = 0; g < 15; g += 1) {
@@ -194,7 +204,7 @@ export function buildFixtureSchedule(seed: string): SeasonSchedule {
       const homeTeam = round % 2 === 1 ? home : away;
       const awayTeam = round % 2 === 1 ? away : home;
       games.push({
-        gameId: `s${String(gameNumber).padStart(6, '0')}`,
+        gameId: seasonGameIdSchema.parse(`s${String(gameNumber).padStart(6, '0')}`),
         round,
         homeFranchiseId: homeTeam,
         awayFranchiseId: awayTeam,
@@ -209,7 +219,7 @@ export function buildFixtureSchedule(seed: string): SeasonSchedule {
     scheduleVersion: SEASON_SCHEDULE_VERSION,
     formulaVersion: SEASON_SCHEDULE_FORMULA_VERSION,
     leagueVersion: SEASON_LEAGUE_VERSION,
-    generationSeed: seed,
+    generationSeed: parsedSeed,
     rounds: 82,
     games,
   };
@@ -218,13 +228,16 @@ export function buildFixtureRosters(league: SeasonLeague): SeasonRoster[] {
   return league.teams.map((team) => ({
     franchiseId: team.franchiseId,
     players: Array.from({ length: SEASON_ROSTER_SIZE }, (_, slot) => {
-      const playerId = `p-synth-${String(slot + 1)}-${team.franchiseId}`;
+      const rawPlayerId = `p-synth-${String(slot + 1)}-${team.franchiseId}`;
+      const parsedPlayerId = playerIdSchema.parse(rawPlayerId);
+      const parsedEraId = eraIdSchema.parse('1990s');
+      const parsedSeasonKey = seasonKeySchema.parse('1995-96');
       return {
-        playerVersionId: playerVersionId(playerId, team.franchiseId, '1990s', '1995-96'),
-        playerId,
+        playerVersionId: playerVersionId(rawPlayerId, team.franchiseId, '1990s', '1995-96'),
+        playerId: parsedPlayerId,
         franchiseId: team.franchiseId,
-        eraId: '1990s',
-        seasonKey: '1995-96',
+        eraId: parsedEraId,
+        seasonKey: parsedSeasonKey,
         displayName: `Fixture ${team.franchiseId} ${String(slot + 1)}`,
       };
     }),
@@ -371,7 +384,7 @@ function fixtureAiPools(league: SeasonLeague): SeasonRun['aiPools'] {
     });
 }
 function emptyPostseason(seed: string): SeasonRun['postseason'] {
-  return buildInitialPostseasonState(seed);
+  return buildInitialPostseasonState(seedSchema.parse(seed));
 }
 function scheduledGames(schedule: SeasonSchedule): SeasonGame[] {
   return schedule.games.map((game) => ({
@@ -391,14 +404,17 @@ export function buildFixtureRun(input: {
   schedule?: SeasonSchedule;
   runId?: string;
 }): SeasonRun {
-  const seed = input.seed ?? fixtureSeedFromString('fixture-season-run');
+  const rawSeed = input.seed ?? fixtureSeedFromString('fixture-season-run');
+  const parsedSeed = seedSchema.parse(rawSeed);
+  const rawRunId = input.runId ?? 'fixture-season-run-1';
+  const parsedRunId = idSchema.parse(rawRunId);
   const league = buildFixtureLeague(input.humanFranchiseId);
-  const schedule = input.schedule ?? buildFixtureSchedule(seed);
+  const schedule = input.schedule ?? buildFixtureSchedule(parsedSeed);
   const rosters = buildFixtureRosters(league);
   const run: SeasonRun = {
     schemaVersion: SEASON_RUN_SCHEMA_VERSION,
-    runId: input.runId ?? 'fixture-season-run-1',
-    rootSeed: seed,
+    runId: parsedRunId,
+    rootSeed: parsedSeed,
     versions: {
       runSchemaVersion: SEASON_RUN_SCHEMA_VERSION,
       leagueVersion: SEASON_LEAGUE_VERSION,
@@ -467,29 +483,29 @@ export function buildFixtureRun(input: {
       scheduleVersion: schedule.scheduleVersion,
       formulaVersion: schedule.formulaVersion,
       generationSeed: schedule.generationSeed,
-      contentHash: '0'.repeat(64),
+      contentHash: contentHashSchema.parse('0'.repeat(64)),
     },
     games: scheduledGames(schedule),
     standings: zeroStandings(league),
     cursor: { schemaVersion: 1, completedRounds: 0 },
     stage: 'regular-season',
-    postseason: emptyPostseason(fixtureSeedFromString(`${seed}:postseason`)),
+    postseason: emptyPostseason(fixtureSeedFromString(`${parsedSeed}:postseason`)),
     awards: null,
     completion: null,
-    draft: buildFixtureSeasonDraftFacts(seed),
+    draft: buildFixtureSeasonDraftFacts(parsedSeed),
     aiAssignments: fixtureAiAssignments(league),
     aiPools: fixtureAiPools(league),
     rotations: rosters.map(fixtureRotation),
     generationAudit: {
-      seed,
+      seed: parsedSeed,
       aiVersion: SEASON_AI_VERSION,
       rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
       rotationVersion: SEASON_ROTATION_VERSION,
       minutePolicyVersion: SEASON_MINUTE_POLICY_VERSION,
       rosterTargetsVersion: SEASON_ROSTER_TARGETS_VERSION,
-      digest: fnv1a32(`generation-${seed}`).toString(16).padStart(8, '0').repeat(4),
+      digest: fnv1a32(`generation-${parsedSeed}`).toString(16).padStart(8, '0').repeat(4),
       diagnostics: {
-        seed,
+        seed: parsedSeed,
         aiVersion: SEASON_AI_VERSION,
         rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
         teamsGenerated: 30,
@@ -639,7 +655,7 @@ function boxOfLines(
   const sum = (pick: (line: SeasonCompactPlayerLine) => number) =>
     lines.reduce((total, line) => total + pick(line), 0);
   return {
-    franchiseId,
+    franchiseId: franchiseIdSchema.parse(franchiseId),
     points: sum((line) => line.points),
     fieldGoalsMade: sum((line) => line.fieldGoalsMade),
     fieldGoalsAttempted: sum((line) => line.fieldGoalsAttempted),
@@ -778,7 +794,7 @@ export function foldTeamAggregatesFixture(
   summaries: readonly SeasonGameSummary[],
 ): SeasonTeamAggregate[] {
   const zeroRow = (franchiseId: string): SeasonTeamAggregate => ({
-    franchiseId,
+    franchiseId: franchiseIdSchema.parse(franchiseId),
     gamesPlayed: 0,
     wins: 0,
     losses: 0,
@@ -838,28 +854,33 @@ export function foldPlayerAggregatesFixture(
       roster.players.map((player) => [player.playerVersionId, roster.franchiseId] as const),
     ),
   );
-  const zeroRow = (playerVersionIdValue: string): SeasonPlayerAggregate => ({
-    playerVersionId: playerVersionIdValue,
-    franchiseId: ownerOf.get(playerVersionIdValue) ?? 'lakers',
-    gamesPlayed: 0,
-    appearances: 0,
-    started: 0,
-    seconds: 0,
-    points: 0,
-    fieldGoalsMade: 0,
-    fieldGoalsAttempted: 0,
-    threePointersMade: 0,
-    threePointersAttempted: 0,
-    freeThrowsMade: 0,
-    freeThrowsAttempted: 0,
-    offensiveRebounds: 0,
-    defensiveRebounds: 0,
-    assists: 0,
-    steals: 0,
-    blocks: 0,
-    turnovers: 0,
-    fouls: 0,
-  });
+  const zeroRow = (playerVersionIdValue: string): SeasonPlayerAggregate => {
+    const ownerRaw = ownerOf.get(playerVersionIdValue);
+    const parsedOwner =
+      ownerRaw === undefined ? franchiseIdSchema.parse('lakers') : ownerRaw;
+    return {
+      playerVersionId: playerVersionIdValue,
+      franchiseId: parsedOwner,
+      gamesPlayed: 0,
+      appearances: 0,
+      started: 0,
+      seconds: 0,
+      points: 0,
+      fieldGoalsMade: 0,
+      fieldGoalsAttempted: 0,
+      threePointersMade: 0,
+      threePointersAttempted: 0,
+      freeThrowsMade: 0,
+      freeThrowsAttempted: 0,
+      offensiveRebounds: 0,
+      defensiveRebounds: 0,
+      assists: 0,
+      steals: 0,
+      blocks: 0,
+      turnovers: 0,
+      fouls: 0,
+    };
+  };
   const totals = new Map(
     rosters.flatMap((roster) =>
       roster.players.map(
@@ -912,9 +933,11 @@ export function buildFixtureRetainedDetail(input: {
       const rosterEntry = roster?.players.find(
         (player) => player.playerVersionId === line.playerVersionId,
       );
+      const parsedPlayerId =
+        rosterEntry?.playerId ?? playerIdSchema.parse(line.playerVersionId);
       return {
         playerVersionId: line.playerVersionId,
-        playerId: rosterEntry?.playerId ?? line.playerVersionId,
+        playerId: parsedPlayerId,
         minutes: line.seconds / 60,
         seconds: line.seconds,
         points: line.points,
@@ -1051,10 +1074,11 @@ export function buildFixtureInfluenceStateFromIds(
   const ledger: SeasonInfluenceState['ledger'] = [];
   const windows: SeasonInfluenceState['windows'] = {};
   for (const franchiseId of franchiseIds) {
-    balances[franchiseId] = 2;
+    const fid = franchiseIdSchema.parse(franchiseId);
+    balances[fid] = 2;
     ledger.push({
-      entryId: `influence-initial-${franchiseId}`,
-      franchiseId,
+      entryId: idSchema.parse(`influence-initial-${franchiseId}`),
+      franchiseId: fid,
       source: 'initial-grant',
       blockIndex: null,
       commandId: null,
@@ -1063,7 +1087,7 @@ export function buildFixtureInfluenceStateFromIds(
       balanceAfter: 2,
       explanation: 'Initial +2 Influence grant at run creation',
     });
-    windows[franchiseId] = [];
+    windows[fid] = [];
   }
   return {
     schemaVersion: 1,
@@ -1195,11 +1219,11 @@ export function buildFixtureInterruption(input: {
 }): SeasonInvalidRosterInterruption {
   return {
     code: 'invalid-roster',
-    runId: input.runId,
+    runId: idSchema.parse(input.runId),
     blockIndex: input.blockIndex,
-    commandId: input.commandId,
-    nextGameId: input.nextGameId,
-    humanFranchiseId: input.humanFranchiseId ?? 'lakers',
+    commandId: commandIdSchema.parse(input.commandId),
+    nextGameId: seasonGameIdSchema.parse(input.nextGameId),
+    humanFranchiseId: franchiseIdSchema.parse(input.humanFranchiseId ?? 'lakers'),
     unavailablePlayerVersionIds: input.unavailablePlayerVersionIds ?? [`pv-${'1'.repeat(32)}`],
   };
 }
@@ -1229,13 +1253,13 @@ export function buildFixturePendingBlock(input: {
     schemaVersion: 1,
     blockVersion: SEASON_BLOCK_VERSION,
     runId: input.run.runId,
-    commandId: input.commandId,
+    commandId: commandIdSchema.parse(input.commandId),
     blockIndex: input.blockIndex,
     expectedRevision: input.expectedRevision,
     expectedStateRevision: input.expectedStateRevision,
     expectedStateDigest: input.expectedStateDigest,
     objectiveId: input.objectiveId ?? null,
-    nextGameId: input.nextGameId,
+    nextGameId: seasonGameIdSchema.parse(input.nextGameId),
     summaries: [...summaries],
     retainedDetails: [...retainedDetails],
     effects: input.effects ?? buildFixtureEffectsState(input.run.rosters),
@@ -1299,7 +1323,7 @@ export function buildFixtureSeasonDraftFacts(seed: string): SeasonRun['draft'] {
     participants: [
       {
         participantId: 'human-1',
-        franchiseId: 'lakers',
+        franchiseId: franchiseIdSchema.parse('lakers'),
         offers: [
           {
             round: 1,
@@ -1312,15 +1336,15 @@ export function buildFixtureSeasonDraftFacts(seed: string): SeasonRun['draft'] {
           {
             round: 1,
             playerVersionId: `pv-${'1'.padStart(32, '0')}`,
-            franchiseId: 'lakers',
-            eraId: '1990s',
+            franchiseId: franchiseIdSchema.parse('lakers'),
+            eraId: eraIdSchema.parse('1990s'),
             seedPath: seedPath('human-1', 1, 1),
           },
         ],
       },
       {
         participantId: 'human-2',
-        franchiseId: 'celtics',
+        franchiseId: franchiseIdSchema.parse('celtics'),
         offers: [],
         picks: [],
       },
@@ -1354,13 +1378,13 @@ export function buildSeasonDraftState(
   return {
     schemaVersion: 2,
     draftVersion: SEASON_DRAFT_VERSION,
-    runId: 'fixture-draft-1',
+    runId: idSchema.parse('fixture-draft-1'),
     rootSeed,
     league,
     catalogVersion: SEASON_DRAFT_VERSION,
     participants: [
-      { participantId: 'human-1', franchiseId: 'lakers' },
-      { participantId: 'human-2', franchiseId: 'celtics' },
+      { participantId: 'human-1', franchiseId: franchiseIdSchema.parse('lakers') },
+      { participantId: 'human-2', franchiseId: franchiseIdSchema.parse('celtics') },
     ],
     firstPickParticipantId: 'human-1',
     round: 2,
@@ -1389,8 +1413,8 @@ export function buildSeasonDraftState(
         round: 1,
         pickOrdinal: 1,
         playerVersionId: `pv-${'1'.padStart(32, '0')}`,
-        franchiseId: 'lakers',
-        eraId: '1990s',
+        franchiseId: franchiseIdSchema.parse('lakers'),
+        eraId: eraIdSchema.parse('1990s'),
         seedPath: seedPath('human-1', 1, 1),
       },
     ],

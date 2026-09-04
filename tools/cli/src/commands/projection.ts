@@ -5,10 +5,15 @@ import {
   POSITION_SLOTS,
   PROJECTION_MODEL_VERSION,
   PROJECTION_TARGETS_VERSION,
+  contentHashSchema,
+  eraIdSchema,
   fnv1a32,
+  franchiseIdSchema,
   parseProjectionModelArtifact,
+  playerIdSchema,
   seasonRotationSchema,
   seedFromString,
+  seedSchema,
   simulationPlayerSchema,
   simulationRatingsSchema,
   simulationTeamSchema,
@@ -385,7 +390,7 @@ function aggregateReferencePlayer(
         }
       : undefined;
   return {
-    playerId: `ref-${label.toLowerCase().replaceAll(' ', '-')}-s${String(slotIndex + 1)}`,
+    playerId: playerIdSchema.parse(`ref-${label.toLowerCase().replaceAll(' ', '-')}-s${String(slotIndex + 1)}`),
     displayName: label,
     positions: SLOT_POSITIONS[slotIndex] ?? ['PG'],
     heightInches: Math.round(meanOf(pool.map((p) => p.heightInches ?? 0))),
@@ -415,11 +420,12 @@ function deriveReferenceFive(
     aggregateReferencePlayer(population, slotIndex, labels[slotIndex] ?? 'Reference'),
   ) as [SimulationPlayer, SimulationPlayer, SimulationPlayer, SimulationPlayer, SimulationPlayer];
   const referenceId = `ref-${eraId}-${archetype}`;
+  const parsedEraId = eraIdSchema.parse(eraId);
   return {
     referenceId,
     archetype,
-    eraId,
-    referenceHash: sha256Hex(JSON.stringify(five)),
+    eraId: parsedEraId,
+    referenceHash: contentHashSchema.parse(sha256Hex(JSON.stringify(five))),
     players: five,
   };
 }
@@ -523,12 +529,12 @@ export function deriveProjectionModel(data: PackagedData): {
       calibrationGames: 2048,
       validationGames: 1024,
       heldOutGames: 2048,
-      calibrationSeedFrom: '00000000000000000000000000000000',
-      calibrationSeedTo: '000000000000000000000000000007ff',
-      validationSeedFrom: '00000000000000000000000000000800',
-      validationSeedTo: '00000000000000000000000000000bff',
-      heldOutSeedFrom: '00000000000000000000000000000c00',
-      heldOutSeedTo: '000000000000000000000000000013ff',
+      calibrationSeedFrom: seedSchema.parse('00000000000000000000000000000000'),
+      calibrationSeedTo: seedSchema.parse('000000000000000000000000000007ff'),
+      validationSeedFrom: seedSchema.parse('00000000000000000000000000000800'),
+      validationSeedTo: seedSchema.parse('00000000000000000000000000000bff'),
+      heldOutSeedFrom: seedSchema.parse('00000000000000000000000000000c00'),
+      heldOutSeedTo: seedSchema.parse('000000000000000000000000000013ff'),
     },
     monotonicGates: [
       {
@@ -574,12 +580,12 @@ export function buildProjectionTargets(): ProjectionTargets {
       validationLineups: 8,
       heldOutLineups: 16,
       gamesPerLineup: 128,
-      calibrationSeedFrom: '00000000000000000000000000000000',
-      calibrationSeedTo: '000000000000000000000000000007ff',
-      validationSeedFrom: '00000000000000000000000000000800',
-      validationSeedTo: '00000000000000000000000000000bff',
-      heldOutSeedFrom: '00000000000000000000000000000c00',
-      heldOutSeedTo: '000000000000000000000000000013ff',
+      calibrationSeedFrom: seedSchema.parse('00000000000000000000000000000000'),
+      calibrationSeedTo: seedSchema.parse('000000000000000000000000000007ff'),
+      validationSeedFrom: seedSchema.parse('00000000000000000000000000000800'),
+      validationSeedTo: seedSchema.parse('00000000000000000000000000000bff'),
+      heldOutSeedFrom: seedSchema.parse('00000000000000000000000000000c00'),
+      heldOutSeedTo: seedSchema.parse('000000000000000000000000000013ff'),
     },
     gates: {
       offensiveRatingMaeMax: 6,
@@ -629,9 +635,10 @@ export function projectionAiShadow(input: {
   const { manifest, model: modelPath, era, seed } = input;
   const data = loadData(manifest);
   const model = loadModel(manifest, modelPath);
-  const eraId = era ?? '2010s';
-  const profile = data.eraProfile(eraId);
-  const runSeed = seed ?? 'd00d2026a1b2c3d4e5f60718293a4b5c6';
+  const rawEraId = era ?? '2010s';
+  const eraId = eraIdSchema.parse(rawEraId);
+  const profile = data.eraProfile(rawEraId);
+  const runSeed = seedSchema.parse(seed ?? 'd00d2026a1b2c3d4e5f60718293a4b5c6');
   const manifestPath = manifest ?? DEFAULT_MANIFEST;
   let catalog: import('@hoop-rush/data-contracts').SeasonDraftCatalog;
   try {
@@ -663,14 +670,17 @@ export function projectionAiShadow(input: {
       { failures: [(error as Error).message] },
     );
   }
-  const humanRosters = [{ franchiseId: 'lakers', playerVersionIds: fixtureHumanRoster(catalog) }];
+  const lakersFranchiseId = franchiseIdSchema.parse('lakers');
+  const humanRosters = [
+    { franchiseId: lakersFranchiseId, playerVersionIds: fixtureHumanRoster(catalog) },
+  ];
   let generation: import('@hoop-rush/data-contracts').SeasonLeagueGenerationResult;
   try {
     generation = generateAiLeague({
       seed: runSeed,
       catalog,
       league,
-      humanFranchiseIds: ['lakers'],
+      humanFranchiseIds: [lakersFranchiseId],
       humanRosters,
       targets,
       projection: { eraProfile: profile, model },
@@ -862,8 +872,9 @@ export function projectionBase(input: {
   const { fixture, manifest, model: modelPath, era, reference, verbose } = input;
   const data = loadData(manifest);
   const model = loadModel(manifest, modelPath);
-  const eraId = era ?? '2010s';
-  const profile = data.eraProfile(eraId);
+  const rawEraId = era ?? '2010s';
+  const eraId = eraIdSchema.parse(rawEraId);
+  const profile = data.eraProfile(rawEraId);
   const referenceSet = model.references[eraId];
   if (referenceSet === undefined) {
     return makeReport(
@@ -1016,7 +1027,7 @@ function projectSimulateLineup(input: {
   let opponentPoints = 0;
   let opponentPoss = 0;
   for (let index = 0; index < games; index += 1) {
-    const seed = seedFromString(`${seedBase}-${String(index)}`);
+    const seed = seedSchema.parse(seedFromString(`${seedBase}-${String(index)}`));
     const homeIsLineup = index % 2 === 0;
     const result = simulateGame(
       {
@@ -1138,8 +1149,9 @@ export function projectionCalibrateBase(input: {
   void parseWorkers({ workers: input.workers ?? null }, 1);
   const data = loadData(manifest);
   const model = loadModel(manifest, modelPath);
-  const eraId = era ?? '2010s';
-  const profile = data.eraProfile(eraId);
+  const rawEraId = era ?? '2010s';
+  const eraId = eraIdSchema.parse(rawEraId);
+  const profile = data.eraProfile(rawEraId);
   const referenceSet = model.references[eraId];
   if (referenceSet === undefined) {
     return makeReport(
@@ -1273,8 +1285,9 @@ export function projectionBenchmark(input: {
   const samples = parseCount(input.samples ?? undefined, '--samples', 500);
   const data = loadData(manifest);
   const model = loadModel(manifest, modelPath);
-  const eraId = era ?? '2010s';
-  const profile = data.eraProfile(eraId);
+  const rawEraId = era ?? '2010s';
+  const eraId = eraIdSchema.parse(rawEraId);
+  const profile = data.eraProfile(rawEraId);
   const referenceSet = model.references[eraId];
   if (referenceSet === undefined) {
     return makeReport(

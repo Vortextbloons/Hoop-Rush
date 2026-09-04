@@ -6,6 +6,9 @@ import {
   SEASON_GAME_TARGETS_VERSION,
   SEASON_GAME_VERSION,
   SEASON_RUN_SCHEMA_VERSION,
+  commandIdSchema,
+  franchiseIdSchema,
+  type FranchiseId,
   type Position,
   type SeasonCandidateCheckpoint,
   type SeasonEffectsState,
@@ -19,6 +22,7 @@ import {
   type SeasonRosterTargets,
   type SeasonSkipFreeAgentMarketCommand,
   type SeasonSubmitBlockCommand,
+  type Seed,
 } from '@hoop-rush/data-contracts';
 import {
   SEASON_FREE_AGENCY_WINDOW_BLOCK_INDEXES,
@@ -107,7 +111,7 @@ export interface SeasonFreeAgencyOpenedWindow {
   window: SeasonFreeAgencyWindowState;
 }
 export interface SeasonFreeAgencySeasonFacts {
-  rootSeed: string;
+  rootSeed: Seed;
   run: SeasonRun;
   effects: SeasonEffectsState;
   catalog: SeasonFreeAgencyFactsCatalog;
@@ -127,7 +131,7 @@ export function simulateSeasonFreeAgencyFacts(options: {
   runPath?: string | null;
   manifestPath?: string | null;
   profileEra?: string | null;
-  rootSeed: string;
+  rootSeed: Seed;
   driveFreeAgency: boolean;
   probeWindow?: boolean;
 }): SeasonFreeAgencySeasonFacts {
@@ -140,7 +144,12 @@ export function simulateSeasonFreeAgencyFacts(options: {
   const freeAgencyIndex = loadSeasonFreeAgencyIndex(manifestPath);
   const freeAgencyTargets = loadSeasonRosterTargets(manifestPath);
   const franchiseIds = state.run.league.teams.map((team) => team.franchiseId);
-  const run = m25FreshRun(state.run, options.rootSeed, franchiseIds, state.effects);
+  const run = m25FreshRun({
+    base: state.run,
+    rootSeed: options.rootSeed,
+    franchiseIds,
+    effects: state.effects,
+  });
   state.run = run;
   state.health = run.health;
   state.objectiveId = null;
@@ -511,7 +520,7 @@ function runFreeAgencyCommands(
   state: SeasonBlockRunnerState,
   windowIndex: number,
   deps: {
-    rootSeed: string;
+    rootSeed: Seed;
     freeAgencyIndex: SeasonFreeAgencyIndex;
     freeAgencyTargets: SeasonRosterTargets;
   },
@@ -526,14 +535,15 @@ function runFreeAgencyCommands(
     freeAgencyTargets: deps.freeAgencyTargets,
   };
   if (state.humanFranchiseId !== null) {
+    const humanFranchiseId = franchiseIdSchema.parse(state.humanFranchiseId);
     const skipCommand: SeasonSkipFreeAgentMarketCommand = {
       schemaVersion: SEASON_RUN_SCHEMA_VERSION,
       command: 'skip-free-agent-market',
-      commandId: `fa-skip-${deps.rootSeed}-${String(windowIndex)}`,
+      commandId: commandIdSchema.parse(`fa-skip-${deps.rootSeed}-${String(windowIndex)}`),
       runId: state.run.runId,
       expectedStateRevision: state.stateRevision,
       expectedStateDigest: state.stateDigest,
-      franchiseId: state.humanFranchiseId,
+      franchiseId: humanFranchiseId,
       windowIndex,
     };
     const skipped = handleSeasonRunCommand(skipCommand, commandContext);
@@ -555,7 +565,7 @@ function runFreeAgencyCommands(
   const resolveCommand: SeasonResolveFreeAgentMarketCommand = {
     schemaVersion: SEASON_RUN_SCHEMA_VERSION,
     command: 'resolve-free-agent-market',
-    commandId: `fa-resolve-${deps.rootSeed}-${String(windowIndex)}`,
+    commandId: commandIdSchema.parse(`fa-resolve-${deps.rootSeed}-${String(windowIndex)}`),
     runId: state.run.runId,
     expectedStateRevision: state.stateRevision,
     expectedStateDigest: state.stateDigest,
@@ -751,9 +761,10 @@ export function seasonFreeAgencyFactsOf(
       const winner = trace.firstPriorityWinners
         .concat(trace.secondPriorityWinners)
         .find((entry) => entry.candidatePlayerVersionId === candidatePlayerVersionId);
-      const influenceOf = (franchiseId: string): number =>
+      const influenceOf = (franchiseId: FranchiseId): number =>
         window.declarations[franchiseId]?.targets.find(
-          (target) => target.playerVersionId === candidatePlayerVersionId,
+          (target: { playerVersionId: string; influence: number }) =>
+            target.playerVersionId === candidatePlayerVersionId,
         )?.influence ?? 0;
       const steps = trace.steps.filter(
         (step) => step.candidatePlayerVersionId === candidatePlayerVersionId,
@@ -1371,7 +1382,7 @@ export function validateSeasonFreeAgencyTargets(
   });
 }
 export type SeasonFreeAgencySeasonRunner = (
-  rootSeed: string,
+  rootSeed: Seed,
   options: {
     driveFreeAgency: boolean;
     probeWindow: boolean;

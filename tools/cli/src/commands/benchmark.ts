@@ -2,6 +2,11 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { cpus } from 'node:os';
 import { isAbsolute, resolve } from 'node:path';
 import { createChallenge, createEngineContext, simulateChallenge } from '@hoop-rush/engine';
+import {
+  eraIdSchema,
+  franchiseIdSchema,
+  idSchema,
+} from '@hoop-rush/data-contracts';
 import { EXIT_USAGE_OR_DATA_ERROR, makeReport, type CliReport } from '../report.ts';
 import { benchmarkReportSchema, type BenchmarkReport } from '../report-schemas.ts';
 import { loadPackagedData, PackagedData, REPO_ROOT } from './data-loader.ts';
@@ -148,12 +153,19 @@ export function benchmark(args: {
     poolCachedSamples.push(performance.now() - started);
   }
   for (let i = 0; i < 20; i += 1) {
-    void runSingleGame(buildInput(fixture, profile, fixtureSeed('bench-warm', i), false));
+    void runSingleGame(
+      buildInput({ fixture, profile, seed: fixtureSeed('bench-warm', i), variant: false }),
+    );
   }
   const singleSamples: number[] = [];
   for (const chunk of chunkRange(seedFrom, seedFrom + samples - 1, workers)) {
     for (let i = chunk.from; i <= chunk.to; i += 1) {
-      const input = buildInput(fixture, profile, fixtureSeed('bench-game', i), false);
+      const input = buildInput({
+        fixture,
+        profile,
+        seed: fixtureSeed('bench-game', i),
+        variant: false,
+      });
       const started = performance.now();
       runSingleGame(input);
       singleSamples.push(performance.now() - started);
@@ -164,20 +176,22 @@ export function benchmark(args: {
   const pool = data.pool('lakers', '1990s');
   const samplePlayer = pool.players[0];
   const challengeSamples: number[] = [];
+  const benchFranchiseId = franchiseIdSchema.parse('lakers');
+  const benchEraId = eraIdSchema.parse('1990s');
   for (let i = 0; i < samples; i += 1) {
     const started = performance.now();
     const run = createChallenge({
-      runId: `bench-${String(i)}`,
+      runId: idSchema.parse(`bench-${String(i)}`),
       mode: 'sandbox',
-      franchiseId: 'lakers',
-      eraId: '1990s',
+      franchiseId: benchFranchiseId,
+      eraId: benchEraId,
       homeDisplayName: userTeam.displayName,
       lineup,
       players,
       selections: players.map((player) => ({
         playerId: player.playerId,
-        franchiseId: 'lakers',
-        eraId: '1990s',
+        franchiseId: benchFranchiseId,
+        eraId: benchEraId,
       })),
       runSeed: fixtureSeed('bench-challenge', i),
       dataVersion: profile.dataVersion,

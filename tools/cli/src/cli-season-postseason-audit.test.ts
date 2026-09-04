@@ -4,11 +4,16 @@ import { describe, expect, it } from 'vitest';
 import {
   SEASON_EMPTY_COMMAND_LOG_DIGEST,
   buildSeasonRunReplayExport,
+  contentHashSchema,
+  eraIdSchema,
+  franchiseIdSchema,
+  idSchema,
   seasonCommandLogDigest,
   seasonCommandLogEntrySchema,
   seasonCommandLogSchema,
   seasonPostseasonSummaryDigest,
   seasonPostseasonSummarySchema,
+  type FranchiseId,
   type SeasonPostseasonSummary,
 } from '@hoop-rush/data-contracts';
 import { jsonPayload, REPO_ROOT, runCli, withTmpDir } from './cli-test-helpers.ts';
@@ -315,19 +320,20 @@ function validPostseason(): SeasonPostseasonSummary[] {
   summaries.push(...sweep('finals', 'finals', 'east', 'lakers', 'warriors', 'lakers'));
   return summaries;
 }
-function runWithChampion(champion: string) {
+function runWithChampion(championRaw: string) {
+  const champion = franchiseIdSchema.parse(championRaw);
   const run = loadSeasonRunFixture(join(REPO_ROOT, 'tools/cli/src/fixtures/season-run.json'));
-  const opponent = champion === 'lakers' ? 'warriors' : 'lakers';
-  const eastSeeds = [...EAST.seeds.slice(0, 8)];
-  const westSeeds = [...WEST.seeds.slice(0, 8)];
+  const opponent = franchiseIdSchema.parse(championRaw === 'lakers' ? 'warriors' : 'lakers');
+  const eastSeeds = [...EAST.seeds.slice(0, 8)].map((seed) => franchiseIdSchema.parse(seed));
+  const westSeeds = [...WEST.seeds.slice(0, 8)].map((seed) => franchiseIdSchema.parse(seed));
   const emptySeries = (
-    seriesId: string,
+    seriesIdRaw: string,
     round: 'first-round' | 'conference-semifinal' | 'conference-final' | 'finals',
     conference: 'east' | 'west' | null,
     higherSeed: number | null,
     lowerSeed: number | null,
   ) => ({
-    seriesId,
+    seriesId: idSchema.parse(seriesIdRaw),
     round,
     conference,
     higherSeed,
@@ -354,7 +360,7 @@ function runWithChampion(champion: string) {
       winnerFranchiseId: home === champion ? champion : opponent,
     };
   });
-  const conferenceBracket = (conference: 'east' | 'west', seeds: string[]) => {
+  const conferenceBracket = (conference: 'east' | 'west', seeds: FranchiseId[]) => {
     const letter = conference === 'east' ? 'e' : 'w';
     return {
       conference,
@@ -386,7 +392,7 @@ function runWithChampion(champion: string) {
     east: conferenceBracket('east', eastSeeds),
     west: conferenceBracket('west', westSeeds),
     finals: {
-      seriesId: 'finals',
+      seriesId: idSchema.parse('finals'),
       round: 'finals' as const,
       conference: null,
       higherSeed: null,
@@ -420,11 +426,12 @@ function runWithChampion(champion: string) {
     },
   };
 }
-function auditOf(summaries: SeasonPostseasonSummary[], champion = 'lakers') {
+function auditOf(summaries: SeasonPostseasonSummary[], championRaw = 'lakers') {
+  const champion = franchiseIdSchema.parse(championRaw);
   return auditSeasonPostseasonFacts({
     summaries,
     championFranchiseId: champion,
-    run: runWithChampion(champion),
+    run: runWithChampion(championRaw),
   });
 }
 describe('season postseason audit (postseason-v2)', () => {
@@ -447,7 +454,7 @@ describe('season postseason audit (postseason-v2)', () => {
     const index = summaries.findIndex((summary) => summary.gameId === 'po-efr2-g1');
     summaries[index] = {
       ...(summaries[index] as SeasonPostseasonSummary),
-      homeFranchiseId: 'lakers',
+      homeFranchiseId: franchiseIdSchema.parse('lakers'),
     };
     const { failures, counts } = auditOf(summaries);
     expect(counts.duplicateTeams).toBeGreaterThan(0);
@@ -486,13 +493,13 @@ describe('season postseason audit (postseason-v2)', () => {
     const exportArtifact = buildSeasonRunReplayExport({
       runId: run.runId,
       rootSeed: run.rootSeed,
-      eraId: '1990s',
+      eraId: eraIdSchema.parse('1990s'),
       versions: run.versions,
       assetHashes: {
-        league: '0'.repeat(64),
-        schedule: '0'.repeat(64),
-        draftCatalog: '0'.repeat(64),
-        eraProfile: '0'.repeat(64),
+        league: contentHashSchema.parse('0'.repeat(64)),
+        schedule: contentHashSchema.parse('0'.repeat(64)),
+        draftCatalog: contentHashSchema.parse('0'.repeat(64)),
+        eraProfile: contentHashSchema.parse('0'.repeat(64)),
       },
       commandLog: log,
       postseasonSummaries: summaries,
@@ -501,14 +508,14 @@ describe('season postseason audit (postseason-v2)', () => {
         almanacVersion: 'almanac-v1',
         runId: run.runId,
         rootSeed: run.rootSeed,
-        championFranchiseId: 'lakers',
+        championFranchiseId: franchiseIdSchema.parse('lakers'),
         postseasonDigest: '0'.repeat(32),
         commandLogDigest: seasonCommandLogDigest(log.entries),
         awardsDigest: '0'.repeat(32),
         tradeGradesDigest: '0'.repeat(32),
         digest: '0'.repeat(32),
       },
-      championFranchiseId: 'lakers',
+      championFranchiseId: franchiseIdSchema.parse('lakers'),
       finalStateDigest: '1'.repeat(32),
     });
     const { failures, counts } = auditSeasonPostseasonFacts({
@@ -518,10 +525,11 @@ describe('season postseason audit (postseason-v2)', () => {
     });
     expect(failures).toEqual([]);
     expect(counts.championCompletionMismatch).toBe(0);
+    const warriors = franchiseIdSchema.parse('warriors');
     const mismatched = auditSeasonPostseasonFacts({
       summaries,
-      championFranchiseId: 'warriors',
-      exportArtifact: { ...exportArtifact, championFranchiseId: 'warriors' },
+      championFranchiseId: warriors,
+      exportArtifact: { ...exportArtifact, championFranchiseId: warriors },
     });
     expect(mismatched.counts.championCompletionMismatch).toBeGreaterThan(0);
   });
@@ -540,7 +548,8 @@ describe('season postseason audit (postseason-v2)', () => {
     const index = summaries.findIndex((summary) => summary.gameId === 'pi-east-final');
     const final = summaries[index];
     if (final === undefined) throw new Error('missing final');
-    summaries[index] = { ...final, awayFranchiseId: 'hornets', loserFranchiseId: 'hornets' };
+    const hornets = franchiseIdSchema.parse('hornets');
+    summaries[index] = { ...final, awayFranchiseId: hornets, loserFranchiseId: hornets };
     const { failures, counts } = auditOf(summaries);
     expect(counts.invalidFeeders).toBeGreaterThan(0);
     expect(failures.some((failure) => failure.includes('must pair the seven-eight loser'))).toBe(
@@ -555,7 +564,10 @@ describe('season postseason audit (postseason-v2)', () => {
     const index = summaries.findIndex((summary) => summary.gameId === 'pi-west-final');
     const final = summaries[index];
     if (final === undefined) throw new Error('missing final');
-    summaries[index] = { ...final, homeFranchiseId: 'timberwolves' };
+    summaries[index] = {
+      ...final,
+      homeFranchiseId: franchiseIdSchema.parse('timberwolves'),
+    };
     const { failures, counts } = auditOf(summaries);
     expect(counts.incorrectHomeCourt).toBeGreaterThan(0);
     expect(
@@ -567,7 +579,11 @@ describe('season postseason audit (postseason-v2)', () => {
     const index = summaries.findIndex((summary) => summary.gameId === 'po-efr1-g3');
     const game = summaries[index];
     if (game === undefined) throw new Error('missing game');
-    summaries[index] = { ...game, homeFranchiseId: 'lakers', awayFranchiseId: 'pistons' };
+    summaries[index] = {
+      ...game,
+      homeFranchiseId: franchiseIdSchema.parse('lakers'),
+      awayFranchiseId: franchiseIdSchema.parse('pistons'),
+    };
     const { failures, counts } = auditOf(summaries);
     expect(counts.incorrectHomeCourt).toBeGreaterThan(0);
     expect(failures.some((failure) => failure.includes('2-2-1-1-1'))).toBe(true);
@@ -617,9 +633,11 @@ describe('season postseason audit (postseason-v2)', () => {
   });
   it('detects champion/completion mismatches (fixture and export paths)', () => {
     const summaries = validPostseason();
+    const warriors = franchiseIdSchema.parse('warriors');
+    const lakers = franchiseIdSchema.parse('lakers');
     const fixture = auditSeasonPostseasonFacts({
       summaries,
-      championFranchiseId: 'warriors',
+      championFranchiseId: warriors,
       run: runWithChampion('warriors'),
     });
     expect(fixture.counts.championCompletionMismatch).toBeGreaterThan(0);
@@ -630,11 +648,11 @@ describe('season postseason audit (postseason-v2)', () => {
     ).toBe(true);
     const stateMismatch = auditSeasonPostseasonFacts({
       summaries,
-      championFranchiseId: 'lakers',
+      championFranchiseId: lakers,
       run: {
         ...runWithChampion('lakers'),
         completion: {
-          championFranchiseId: 'warriors',
+          championFranchiseId: warriors,
           almanacDigest: '0'.repeat(32),
           finalizedAtStateRevision: 0,
         },

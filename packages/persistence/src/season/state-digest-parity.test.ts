@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { handleSeasonRunCommand, seasonRunStateDigest } from '@hoop-rush/engine';
+import { commandIdSchema } from '@hoop-rush/data-contracts';
 import { seasonRunEngineSeam } from './engine-seam.ts';
 import type { SeasonRunStateDigestFacts } from './engine-seam-types.ts';
 import {
@@ -75,7 +76,7 @@ describe('seasonRunEngineSeam state digest parity', () => {
       {
         schemaVersion: 11,
         command: 'select-gm-identity',
-        commandId: 'gm-digest-parity',
+        commandId: commandIdSchema.parse('gm-digest-parity'),
         runId: run.runId,
         expectedStateRevision: run.stateRevision,
         expectedStateDigest: run.stateDigest,

@@ -13,6 +13,7 @@ import {
   type SeasonLeague,
   type SeasonLeagueGenerationResult,
   type SeasonRosterTargets,
+  type Seed,
 } from '@hoop-rush/data-contracts';
 import { applySeasonDraftCommand, generateAiLeague } from '@hoop-rush/engine';
 import { makeReport, type CliReport } from '../report.ts';
@@ -37,7 +38,7 @@ export const SEASON_DRAFT_CALIBRATE_OPTIONS: Record<string, boolean> = {
 };
 export const DEFAULT_OFFER_TARGETS = resolve(DEFAULT_SEASON_DIR, 'offer-targets.json');
 export interface SeasonDraftCalibrationRun {
-  seed: string;
+  seed: Seed;
   variety: number;
   minSafePerOffer: number;
   selectableGroupCoverageShare: number;
@@ -129,12 +130,13 @@ function measureDraft(
     duplicateVersion,
   };
 }
-export function playSeasonDraftCalibrationSeed(
-  seed: string,
-  catalog: SeasonDraftCatalog,
-  league: SeasonLeague,
-  targets: SeasonRosterTargets,
-): SeasonDraftCalibrationRun {
+export function playSeasonDraftCalibrationSeed(args: {
+  seed: Seed;
+  catalog: SeasonDraftCatalog;
+  league: SeasonLeague;
+  targets: SeasonRosterTargets;
+}): SeasonDraftCalibrationRun {
+  const { seed, catalog, league, targets } = args;
   const empty = {
     variety: 0,
     minSafePerOffer: 0,
@@ -273,13 +275,13 @@ export function playSeasonDraftCalibrationSeed(
   };
 }
 export function runSeasonDraftCalibrationSeeds(args: {
-  seeds: string[];
+  seeds: Seed[];
   catalog: SeasonDraftCatalog;
   league: SeasonLeague;
   targets: SeasonRosterTargets;
 }): SeasonDraftCalibrationRun[] {
   return args.seeds.map((seed) =>
-    playSeasonDraftCalibrationSeed(seed, args.catalog, args.league, args.targets),
+    playSeasonDraftCalibrationSeed({ seed, catalog: args.catalog, league: args.league, targets: args.targets }),
   );
 }
 function median(values: readonly number[]): number {
@@ -346,13 +348,13 @@ const offerTargetsSchema = z.object({
 });
 export type SeasonOfferTargets = z.infer<typeof offerTargetsSchema>;
 async function runCalibrationChunks(args: {
-  seeds: string[];
+  seeds: Seed[];
   catalogPath: string;
   leaguePath: string;
   workers: number;
   targets: SeasonRosterTargets;
 }): Promise<SeasonDraftCalibrationRun[]> {
-  return runWorkerChunks<string, SeasonDraftCalibrationRun>({
+  return runWorkerChunks<Seed, SeasonDraftCalibrationRun>({
     workerUrl: new URL('./draft-calibration-worker.ts', import.meta.url),
     workerData: (seeds) => ({ ...args, seeds }),
     items: args.seeds,

@@ -10,11 +10,15 @@ import {
   SIMULATION_TENDENCIES,
   PLAYER_VERSION_ID_VERSION,
   canonicalJson,
+  commandIdSchema,
+  eraIdSchema,
+  franchiseIdSchema,
   seasonAlmanacDigest,
   seasonCommandLogDigest,
   seasonDigestHex,
   seasonHealthStateSchema,
   seasonPostseasonSummarySchema,
+  seasonRunCommandSchema,
   type Position,
   type SeasonDraftCandidate,
   type SeasonDraftCatalog,
@@ -162,7 +166,7 @@ function catalogOf(rosters: ReturnType<typeof buildFixtureRosters>): SeasonDraft
   );
   const pools = rosters.map((roster) => ({
     franchiseId: roster.franchiseId,
-    eraId: '1990s',
+    eraId: eraIdSchema.parse('1990s'),
     playerVersionIds: roster.players.map((player) => player.playerVersionId),
   }));
   return {
@@ -194,15 +198,16 @@ function commandOf(
   commandId: string,
   extra: Record<string, unknown> = {},
 ): SeasonRunCommand {
-  return {
+  const parsedCommandId = commandIdSchema.parse(commandId);
+  return seasonRunCommandSchema.parse({
     schemaVersion: SEASON_RUN_SCHEMA_VERSION,
-    commandId,
+    commandId: parsedCommandId,
     runId: run.runId,
     expectedStateRevision: run.stateRevision,
     expectedStateDigest: run.stateDigest,
     command,
     ...extra,
-  } as SeasonRunCommand;
+  });
 }
 function forcedCompletedResult(
   gameInput: SeasonGameSimulationInput,
@@ -394,8 +399,10 @@ describe('cross-track postseason integration (M2.6)', () => {
     const { db, repo, run: initial, catalog, effects } = await makeFlow();
     let run = initial;
     const rankings = rankSeasonPostseason(run.league, run.standings, run.rootSeed);
+    const clippersId = franchiseIdSchema.parse('clippers');
+    const humanId = franchiseIdSchema.parse(HUMAN);
     const westTie = rankings.west.resolutions.find(
-      (entry) => entry.teams.includes('clippers') && entry.teams.includes(HUMAN),
+      (entry) => entry.teams.includes(clippersId) && entry.teams.includes(humanId),
     );
     expect(westTie).toBeDefined();
     expect(westTie?.rule).toBe('head-to-head');
@@ -480,7 +487,8 @@ describe('cross-track postseason integration (M2.6)', () => {
     for (let index = 0; index < commandLog.entries.length; index += 1) {
       expect(commandLog.entries[index]?.ordinal).toBe(index);
     }
-    const championId = champion ?? '';
+    if (champion === null) throw new Error('expected champion');
+    const championId = champion;
     const almanacFacts = {
       schemaVersion: 1 as const,
       almanacVersion: 'almanac-v1' as const,

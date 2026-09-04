@@ -876,9 +876,10 @@
         </p>
         <div class="mt-4 flex flex-wrap gap-2">
           {#if localResult}
+            {@const confirmed = localResult}
             <button
               type="button"
-              onclick={() => proposeDigest(localResult.digest)}
+              onclick={() => proposeDigest(confirmed.digest)}
               disabled={busyAction !== null}
               class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-40"
             >
@@ -886,7 +887,7 @@
             </button>
             <button
               type="button"
-              onclick={() => confirmDigest(localResult.digest, true)}
+              onclick={() => confirmDigest(confirmed.digest, true)}
               disabled={busyAction !== null}
               class="rounded-xl border border-line-soft bg-card px-4 py-2 text-sm font-semibold disabled:opacity-40"
             >
@@ -894,7 +895,7 @@
             </button>
             <button
               type="button"
-              onclick={() => attemptComplete(localResult.digest)}
+              onclick={() => attemptComplete(confirmed.digest)}
               disabled={busyAction !== null}
               class="rounded-xl border border-line-soft bg-card px-4 py-2 text-sm font-semibold disabled:opacity-40"
             >

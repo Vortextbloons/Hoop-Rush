@@ -4,6 +4,7 @@ import {
   SEASON_GAME_VERSION,
   SEASON_GAME_TARGETS_VERSION,
   SEASON_INJURY_TARGETS_VERSION,
+  type FranchiseId,
   type SeasonInjuryRecord,
   type SeasonRun,
 } from '@hoop-rush/data-contracts';
@@ -173,7 +174,7 @@ export const seasonInjuryTargetsSchema = z.object({
   generatedAtIso: z.string().min(1),
 });
 export type SeasonInjuryTargets = z.infer<typeof seasonInjuryTargetsSchema>;
-function franchiseExposures(run: SeasonRun, franchiseId: string): number {
+function franchiseExposures(run: SeasonRun, franchiseId: FranchiseId): number {
   const rotation = run.rotations.find((entry) => entry.franchiseId === franchiseId);
   if (rotation === undefined) return 0;
   const exposed = rotation.targetMinutes.filter((entry) => entry.minutes > 0).length;
@@ -182,16 +183,16 @@ function franchiseExposures(run: SeasonRun, franchiseId: string): number {
 export interface SeasonHealthFacts {
   exposures: number;
   injuries: SeasonInjuryRecord[];
-  injuriesByFranchise: Map<string, number>;
-  exposuresByFranchise: Map<string, number>;
+  injuriesByFranchise: Map<FranchiseId, number>;
+  exposuresByFranchise: Map<FranchiseId, number>;
 }
 export function seasonHealthFactsOf(
   run: SeasonRun,
   facts: SeasonM25SeasonFacts,
 ): SeasonHealthFacts {
   const injuries = facts.checkpoints[facts.checkpoints.length - 1]?.health.injuries ?? [];
-  const exposuresByFranchise = new Map<string, number>();
-  const injuriesByFranchise = new Map<string, number>();
+  const exposuresByFranchise = new Map<FranchiseId, number>();
+  const injuriesByFranchise = new Map<FranchiseId, number>();
   let exposures = 0;
   for (const team of run.league.teams) {
     const count = franchiseExposures(run, team.franchiseId);
@@ -249,11 +250,12 @@ export function sameGameReturnRateOf(injuries: readonly SeasonInjuryRecord[]): n
   );
   return share(eligible.filter((injury) => injury.sameGameReturn).length, eligible.length);
 }
-export function runInjuryRollProbe(
-  rootSeed: string,
-  input: Omit<SeasonInjuryRollInput, 'rootSeed' | 'gameId' | 'playerVersionId' | 'franchiseId'>,
-  exposures: number,
-): number {
+export function runInjuryRollProbe(args: {
+  rootSeed: import('@hoop-rush/data-contracts').Seed;
+  input: Omit<SeasonInjuryRollInput, 'rootSeed' | 'gameId' | 'playerVersionId' | 'franchiseId'>;
+  exposures: number;
+}): number {
+  const { rootSeed, input, exposures } = args;
   let occurred = 0;
   for (let i = 0; i < exposures; i += 1) {
     const result = rollSeasonInjuryForPlayer({
@@ -524,7 +526,7 @@ export interface SeasonHealthArgs {
 export function runSeasonHealthCohort(
   args: SeasonHealthArgs,
   seedIndices: number[],
-  probeRootSeed: string,
+  probeRootSeed: import('@hoop-rush/data-contracts').Seed,
 ): {
   seasons: SeasonM25SeasonFacts[];
   probes: {
@@ -560,7 +562,7 @@ export function runSeasonHealthCohort(
   const low = (
     input: Omit<SeasonInjuryRollInput, 'rootSeed' | 'gameId' | 'playerVersionId' | 'franchiseId'>,
     exposures: number,
-  ): number => runInjuryRollProbe(probeRootSeed, input, exposures);
+  ): number => runInjuryRollProbe({ rootSeed: probeRootSeed, input, exposures });
   const exposures = SEASON_HEALTH_PROBE_EXPOSURES;
   const minutesLow = low(
     {

@@ -57,17 +57,19 @@ export function seasonScheduleGenerate(args: {
   seed: string | null;
 }): CliReport {
   const leaguePath = args.league ?? DEFAULT_SEASON_LEAGUE;
-  const seed = args.seed ?? SEASON_COMMITTED_SCHEDULE_SEED;
-  if (!seedSchema.safeParse(seed).success) {
+  const rawSeed = args.seed ?? SEASON_COMMITTED_SCHEDULE_SEED;
+  const parsedSeed = seedSchema.safeParse(rawSeed);
+  if (!parsedSeed.success) {
     return makeReport(
       'season schedule generate',
-      { out: args.out, league: leaguePath, seed },
+      { out: args.out, league: leaguePath, seed: rawSeed },
       {
-        failures: [`--seed must be a hex seed (got "${seed}")`],
+        failures: [`--seed must be a hex seed (got "${rawSeed}")`],
         exitCode: EXIT_USAGE_OR_DATA_ERROR,
       },
     );
   }
+  const seed = parsedSeed.data;
   let league: SeasonLeague;
   try {
     league = loadLeague(leaguePath);

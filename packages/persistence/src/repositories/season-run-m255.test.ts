@@ -10,7 +10,11 @@ import {
   SEASON_INFLUENCE_VERSION,
   SEASON_HEALTH_VERSION,
   buildEmptyCampaignState,
+  commandIdSchema,
+  franchiseIdSchema,
+  idSchema,
   seasonCampaignStateSchema,
+  seasonRunCommandSchema,
   seasonTradeStateSchema,
 } from '@hoop-rush/data-contracts';
 import { SEASON_RUN_RECORD_ID } from '../schemas/season-run-record.ts';
@@ -148,16 +152,16 @@ describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompati
         campaign: nextCampaign,
       }),
     };
-    const command: SeasonRunCommand = {
+    const command: SeasonRunCommand = seasonRunCommandSchema.parse({
       schemaVersion: SEASON_RUN_SCHEMA_VERSION,
       command: 'select-gm-identity',
-      commandId: 'cmd-campaign-1',
+      commandId: commandIdSchema.parse('cmd-campaign-1'),
       runId: adapters.run.runId,
       expectedStateRevision: 0,
       expectedStateDigest: adapters.run.stateDigest,
       identity: 'win-now',
       focus: 'defense',
-    } as unknown as SeasonRunCommand;
+    });
     await adapters.repo.applySeasonRunCommand({
       runId: adapters.run.runId,
       command,
@@ -173,12 +177,12 @@ describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompati
       .toArray();
     expect(log).toHaveLength(1);
     expect(log[0]?.entry.command.commandId).toBe('cmd-campaign-1');
-    const staleCommand = {
+    const staleCommand = seasonRunCommandSchema.parse({
       ...command,
-      commandId: 'cmd-stale',
+      commandId: commandIdSchema.parse('cmd-stale'),
       expectedStateRevision: 0,
       expectedStateDigest: adapters.run.stateDigest,
-    } as unknown as SeasonRunCommand;
+    });
     await expect(
       adapters.repo.applySeasonRunCommand({
         runId: adapters.run.runId,
@@ -194,16 +198,16 @@ describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompati
   it('rejected/duplicate/stale/expired writes nothing', async () => {
     const adapters = makeAdapters();
     await promote(adapters);
-    const command: SeasonRunCommand = {
+    const command: SeasonRunCommand = seasonRunCommandSchema.parse({
       schemaVersion: SEASON_RUN_SCHEMA_VERSION,
       command: 'select-gm-identity',
-      commandId: 'cmd-dup',
+      commandId: commandIdSchema.parse('cmd-dup'),
       runId: adapters.run.runId,
       expectedStateRevision: 0,
       expectedStateDigest: adapters.run.stateDigest,
       identity: 'win-now',
       focus: null,
-    } as unknown as SeasonRunCommand;
+    });
     const nextRun = {
       ...adapters.run,
       campaign: seasonCampaignStateSchema.parse({
@@ -227,11 +231,11 @@ describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompati
       run: nextRun,
       pending: null,
     });
-    const duplicateCommand: SeasonRunCommand = {
+    const duplicateCommand: SeasonRunCommand = seasonRunCommandSchema.parse({
       ...command,
       expectedStateRevision: 1,
       expectedStateDigest: nextRun.stateDigest,
-    } as unknown as SeasonRunCommand;
+    });
     await expect(
       adapters.repo.applySeasonRunCommand({
         runId: adapters.run.runId,
@@ -267,22 +271,24 @@ describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompati
       ...adapters.run.ownership.filter(
         (o) => o.playerVersionId !== outId && o.playerVersionId !== inId,
       ),
-      { playerVersionId: outId, ownerFranchiseId: 'celtics' },
-      { playerVersionId: inId, ownerFranchiseId: 'lakers' },
+      { playerVersionId: outId, ownerFranchiseId: franchiseIdSchema.parse('celtics') },
+      { playerVersionId: inId, ownerFranchiseId: franchiseIdSchema.parse('lakers') },
     ];
     const nextEffects = adapters.seam.zeroSeasonEffectsState(nextRosters);
     const nextHealth = { ...adapters.run.health, injuries: [] };
+    const lakersFid = franchiseIdSchema.parse('lakers');
+    const celticsFid = franchiseIdSchema.parse('celtics');
     const nextInfluence = {
       ...adapters.run.influence,
-      balances: { ...adapters.run.influence.balances, lakers: 1, celtics: 1 },
+      balances: { ...adapters.run.influence.balances, [lakersFid]: 1, [celticsFid]: 1 },
       ledger: [
         ...adapters.run.influence.ledger,
         {
-          entryId: 'influence-trade-cash-lakers',
-          franchiseId: 'lakers',
+          entryId: idSchema.parse('influence-trade-cash-lakers'),
+          franchiseId: lakersFid,
           source: 'trade-cash-sent' as const,
           blockIndex: null,
-          commandId: 'cmd-trade-1',
+          commandId: commandIdSchema.parse('cmd-trade-1'),
           requestedDelta: -1,
           appliedDelta: -1,
           balanceAfter: 1,
@@ -293,9 +299,9 @@ describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompati
     const nextTransactions = [
       ...adapters.run.transactions,
       {
-        transactionId: 'txn-trade-1',
-        commandId: 'cmd-trade-1',
-        franchiseId: 'lakers',
+        transactionId: idSchema.parse('txn-trade-1'),
+        commandId: commandIdSchema.parse('cmd-trade-1'),
+        franchiseId: lakersFid,
         type: 'trade' as const,
         blockIndex: null,
         appliedAtStateRevision: 1,
@@ -360,20 +366,20 @@ describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompati
         trade: nextTrade,
       }),
     };
-    const command: SeasonRunCommand = {
+    const command: SeasonRunCommand = seasonRunCommandSchema.parse({
       schemaVersion: SEASON_RUN_SCHEMA_VERSION,
       command: 'submit-trade-proposal',
-      commandId: 'cmd-trade-1',
+      commandId: commandIdSchema.parse('cmd-trade-1'),
       runId: adapters.run.runId,
       expectedStateRevision: 0,
       expectedStateDigest: adapters.run.stateDigest,
       windowIndex: 0,
-      toFranchiseId: 'celtics',
+      toFranchiseId: franchiseIdSchema.parse('celtics'),
       outgoingPlayerVersionIds: [outId],
       incomingPlayerVersionIds: [inId],
       influenceAmount: 1,
-      influenceFromSender: 'lakers',
-    } as unknown as SeasonRunCommand;
+      influenceFromSender: franchiseIdSchema.parse('lakers'),
+    });
     await adapters.repo.applySeasonRunCommand({
       runId: adapters.run.runId,
       command,
@@ -425,11 +431,11 @@ describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompati
           trade: nextTrade,
         }),
       };
-      const freshCommand = {
+      const freshCommand = seasonRunCommandSchema.parse({
         ...command,
         runId: fresh.run.runId,
         expectedStateDigest: fresh.run.stateDigest,
-      } as unknown as SeasonRunCommand;
+      });
       const before = await fresh.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
       inject(fresh.db);
       await expect(
@@ -516,16 +522,16 @@ describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompati
   it('cross-tab reload cancels stale work, reloads snapshot, never repeats exchange/transaction', async () => {
     const adapters = makeAdapters();
     await promote(adapters);
-    const command: SeasonRunCommand = {
+    const command: SeasonRunCommand = seasonRunCommandSchema.parse({
       schemaVersion: SEASON_RUN_SCHEMA_VERSION,
       command: 'select-gm-identity',
-      commandId: 'cmd-xtab-1',
+      commandId: commandIdSchema.parse('cmd-xtab-1'),
       runId: adapters.run.runId,
       expectedStateRevision: 0,
       expectedStateDigest: adapters.run.stateDigest,
       identity: 'win-now',
       focus: 'defense',
-    } as unknown as SeasonRunCommand;
+    });
     const nextCampaign = seasonCampaignStateSchema.parse({
       ...buildEmptyCampaignState(),
       startingIdentity: 'win-now',
@@ -561,11 +567,11 @@ describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompati
         pending: null,
       }),
     ).rejects.toMatchObject({ name: 'SeasonRunCommandStaleStateError' });
-    const duplicateCommand: SeasonRunCommand = {
+    const duplicateCommand: SeasonRunCommand = seasonRunCommandSchema.parse({
       ...command,
       expectedStateRevision: 1,
       expectedStateDigest: nextRun.stateDigest,
-    } as unknown as SeasonRunCommand;
+    });
     await expect(
       tab2.applySeasonRunCommand({
         runId: adapters.run.runId,

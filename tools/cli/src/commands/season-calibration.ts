@@ -1,3 +1,4 @@
+import { seedSchema, type Seed } from '@hoop-rush/data-contracts';
 export type M25GateStatus = 'pass' | 'fail' | 'skippedInsufficientSample';
 export interface M25Gate {
   key: string;
@@ -116,11 +117,11 @@ export function share(count: number, total: number): number {
 export function rateBasisPoints(count: number, total: number): number {
   return total <= 0 ? 0 : (count / total) * 10000;
 }
-export function seasonCalibrationSeed(index: number): string {
+export function seasonCalibrationSeed(index: number): Seed {
   if (!Number.isInteger(index) || index < 0) {
     throw new Error(`calibration seed index must be a nonnegative integer (got ${String(index)})`);
   }
-  return index.toString(16).padStart(32, '0');
+  return seedSchema.parse(index.toString(16).padStart(32, '0'));
 }
 export function seedIndexRange(from: number, to: number): number[] {
   const indices: number[] = [];
