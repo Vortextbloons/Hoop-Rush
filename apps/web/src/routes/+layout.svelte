@@ -1,4 +1,5 @@
-﻿<script lang="ts">import { asset, resolve } from '$app/paths';
+﻿<script lang="ts">import { browser } from '$app/environment';
+import { resolve } from '$app/paths';
 import { page } from '$app/state';
 import type { RouteId } from '$app/types';
 import { Home, Users, Swords } from '@lucide/svelte';
@@ -7,7 +8,7 @@ import { ModeWatcher } from 'mode-watcher';
 import { Toaster } from 'svelte-sonner';
 import BottomNav from '$lib/components/BottomNav.svelte';
 import { isNavItemActive, type NavItem } from '$lib/nav-items';
-import { warmPlayersIndex } from '$lib/data';
+import { warmManifest, warmPlayersIndex } from '$lib/data';
 let { children } = $props();
 const homeHref = resolve('/');
 const navItems: NavItem[] = [
@@ -16,7 +17,13 @@ const navItems: NavItem[] = [
     { id: 'multiplayer', label: 'Multiplayer', href: '/multiplayer', icon: Swords },
 ];
 const routeId = $derived(page.route.id);
+const isMultiplayerLobby = $derived(routeId === '/multiplayer');
 const showBottomNav = $derived(routeId === '/' || routeId === '/roster' || routeId === '/multiplayer');
+$effect(() => {
+    if (!browser || isMultiplayerLobby)
+        return;
+    warmManifest();
+});
 function isActive(item: NavItem): boolean {
     return isNavItemActive(item, routeId);
 }

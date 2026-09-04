@@ -8,6 +8,7 @@ export { checkGameResult, gameResultDigest } from './sim/invariants.ts';
 export { evaluateLineupStrength } from './challenge/lineup-eval.ts';
 export { evaluateContextualPlayerValue, evaluateLineupMatchup, } from './challenge/contextual-value.ts';
 export { explainSeason } from './challenge/explain.ts';
+export { selectMemorableGames } from './challenge/memorable.ts';
 export { leagueMvp } from './challenge/mvp.ts';
 export { perGamePlayer } from './challenge/aggregates.ts';
 export { acceptGameResult, createChallenge, createGameInput, simulateChallenge, validateBracketContent, type ChallengeCreation, } from './challenge/commands.ts';

@@ -10,11 +10,18 @@
     <link rel="icon" href="%sveltekit.assets%/favicon-32.png" sizes="32x32" />
     <link rel="icon" href="%sveltekit.assets%/favicon-16.png" sizes="16x16" />
     <link rel="apple-touch-icon" sizes="180x180" href="%sveltekit.assets%/apple-touch-icon.png" />
-    <!-- Preload the packaged data manifest: the first fetch() on any route
-         reuses this request instead of issuing a second download. The
-         crossorigin attribute makes the preload a CORS-enabled request, so
-         the app's own fetch() can reuse the cached response. -->
-    <link rel="preload" href="%sveltekit.assets%/data/manifest.json" as="fetch" crossorigin />
+    <script>
+      (function () {
+        var path = location.pathname.replace(/\/+$/, '');
+        if (/\/multiplayer$/.test(path)) return;
+        var link = document.createElement('link');
+        link.rel = 'preload';
+        link.href = '%sveltekit.assets%/data/manifest.json';
+        link.as = 'fetch';
+        link.crossOrigin = '';
+        document.head.appendChild(link);
+      })();
+    </script>
     <link rel="preload" href="%sveltekit.assets%/fonts/fonts.css" as="style" />
     <link
       rel="preload"

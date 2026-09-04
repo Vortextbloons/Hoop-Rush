@@ -2,7 +2,7 @@
 import type { ChallengeRun, ExplanationFact, GameResult, HoopRushManifest, MadeAttempted, PeakPlayerSeason, PlayerSeasonAggregate, PlayersIndexEntry, RunAggregates, } from '@hoop-rush/data-contracts';
 import { franchiseAbbreviation, playerIdSchema } from '@hoop-rush/data-contracts';
 import type { SandboxHref } from '$lib/sandbox-url';
-import { explainSeason, leagueMvp, perGamePlayer } from '@hoop-rush/engine';
+import { explainSeason, leagueMvp, perGamePlayer, selectMemorableGames } from '@hoop-rush/engine';
 import { resolve } from '$app/paths';
 import GameStrip from '$lib/components/GameStrip.svelte';
 import PlayerFace from '$lib/components/PlayerFace.svelte';
@@ -96,7 +96,7 @@ const opponentTotals = $derived.by(() => {
     }
     return { points, fgm, fga, tpm, tpa, reb, tov };
 });
-const lastGames = $derived(run.games.slice(-4));
+const lastGames = $derived(selectMemorableGames(run));
 const heroNote = $derived(run.outcome === 'perfect'
     ? 'Perfect season'
     : run.firstLossGameNumber !== null
@@ -233,7 +233,7 @@ function viewSeasonStats() {
   </div>
 
   {#if lastGames.length > 0}
-    <div class="grid grid-cols-2 gap-3 px-4 py-4 sm:grid-cols-4 sm:px-6" aria-label="Closing games">
+    <div class="grid grid-cols-2 gap-3 px-4 py-4 sm:grid-cols-4 sm:px-6" aria-label="Standout games">
       {#each lastGames as game (game.gameNumber)}
         {@const won = game.winner === 'home'}
         <div class="rounded-xl border border-primary/25 bg-surface-1 p-3 text-center sm:p-4">

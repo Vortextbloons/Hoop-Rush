@@ -162,6 +162,11 @@ export function getPlayersIndex(): Promise<PlayersIndex> {
     }
     return playersIndexPromise;
 }
+export function warmManifest(): void {
+    if (typeof window === 'undefined')
+        return;
+    void getManifest().catch(() => { });
+}
 export function warmPlayersIndex(): void {
     if (typeof window === 'undefined')
         return;
