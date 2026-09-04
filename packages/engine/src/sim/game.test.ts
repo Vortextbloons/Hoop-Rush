@@ -68,7 +68,7 @@ describe('game determinism and golden replay', () => {
 });
 describe('game invariants over many seeds', () => {
   it('reports overtime facts on the golden overtime game', () => {
-    const found = run('ot-v13-55');
+    const found = run('ot-v14-30');
     expect(found.overtimePeriods).toBeGreaterThan(0);
     expect(found.periodScores.home.length).toBe(4 + found.overtimePeriods);
     expect(checkGameResult(found)).toEqual([]);
@@ -166,8 +166,8 @@ describe('lineup strength across fixtures', () => {
     assert(homeWins, awayWins);
   });
 });
-const GOLDEN_EQUAL_FIXTURE_V11_HASH = 162770398;
-const GOLDEN_STRONG_WEAK_V11_HASH = 4074642603;
+const GOLDEN_EQUAL_FIXTURE_V14_HASH = 1861299245;
+const GOLDEN_STRONG_WEAK_V14_HASH = 827787984;
 const GOLDEN_EQUAL_FIXTURE =
   '{"seed":"45ca740e45ca740e45ca740e45ca740e","winner":"home","overtimePeriods":1,"homeScore":131,"awayScore":120,"periodScores":{"home":[30,22,26,33,20],"away":[17,30,22,42,9]},"homeBox":["54/94","8/15","15/20","18+32+5","31","2","0","14","24","95"],"awayBox":["50/100","7/21","13/16","16+20+7","33","2","1","9","28","95"],"homePlayers":[["p-fixture-1","53","32","13/23","2/3","4/6","0+12","10","1","0","3","5"],["p-fixture-2","53","24","9/18","1/2","5/8","6+1","5","0","0","0","5"],["p-fixture-3","53","20","8/16","1/3","3/3","3+6","5","0","0","3","4"],["p-fixture-4","53","13","6/13","0/2","1/1","5+4","7","0","0","5","5"],["p-fixture-5","53","42","18/24","4/5","2/2","4+9","4","1","0","3","5"]],"awayPlayers":[["p-fixture-1","53","25","9/17","3/4","4/4","3+4","5","0","0","3","8"],["p-fixture-2","53","26","12/21","1/4","1/1","2+6","4","0","0","0","5"],["p-fixture-3","53","13","6/23","0/7","1/2","3+5","6","0","1","2","3"],["p-fixture-4","53","25","11/20","1/2","2/3","3+3","11","0","0","0","5"],["p-fixture-5","53","31","12/19","2/4","5/6","5+2","7","2","0","4","7"]]}';
 const GOLDEN_STRONG_WEAK =

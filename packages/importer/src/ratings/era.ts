@@ -71,7 +71,7 @@ export const ERA_CONFIGS: Record<string, EraConfig> = {
   '2023-24': { leaguePpg: 114.9, league3PARate: 0.4, pace: 99.0 },
   '2024-25': { leaguePpg: 114.7, league3PARate: 0.39, pace: 99.2 },
 };
-export const DEFAULT_ERA: EraConfig = { leaguePpg: 114.7, league3PARate: 0.39, pace: 99.2 };
+export const DEFAULT_ERA: EraConfig = { leaguePpg: 114.7, league3PARate: 0.39, pace: 99.8 };
 export function getEra(season: string): EraConfig {
   return ERA_CONFIGS[season] ?? DEFAULT_ERA;
 }

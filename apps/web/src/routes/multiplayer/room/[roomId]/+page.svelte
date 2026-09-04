@@ -26,6 +26,10 @@
   } from '$lib/fixed-five-identity';
   import { fixedFiveRepository } from '$lib/fixed-five-repo';
   import { FixedFiveRunner } from '$lib/fixed-five-runner';
+  import {
+    FixedFiveSimulationGate,
+    type FixedFiveSimulationReason,
+  } from '$lib/fixed-five-simulation-gate';
   import FixedFiveScoreboard from '$lib/components/FixedFiveScoreboard.svelte';
   import FixedFiveDraftPanel from '$lib/components/FixedFiveDraftPanel.svelte';
   import {
@@ -75,6 +79,8 @@
   let simError = $state<string | null>(null);
   let simEntries = $state<FixedFiveWorkerResultEntry[]>([]);
   let runner: FixedFiveRunner | null = null;
+  const simulationGate = new FixedFiveSimulationGate();
+  let simulationReason: FixedFiveSimulationReason = 'initial';
 
   interface LocalResult {
     result: FixedFiveCompetitionResult;
@@ -167,8 +173,10 @@
       const fresh = await transport().refetch(roomId, afterOrdinal);
       if (!mounted) return;
       if (fresh.length > 0) {
-        lastOrdinal = Math.max(...fresh.map((c) => c.ordinal));
-        commands = mergeFixedFiveCommands(commands, fresh);
+        lastOrdinal = Math.max(lastOrdinal, ...fresh.map((c) => c.ordinal));
+        const merged = mergeFixedFiveCommands(commands, fresh);
+        const addedCount = merged.length - commands.length;
+        commands = merged;
         for (const command of fresh) {
           try {
             await fixedFiveRepository.appendCommand(command);
@@ -177,7 +185,9 @@
           }
         }
         saveActivityNow(roomId);
-        notice = `Synced ${fresh.length} command${fresh.length === 1 ? '' : 's'} after the last accepted ordinal.`;
+        if (addedCount > 0) {
+          notice = `Synced ${String(addedCount)} command${addedCount === 1 ? '' : 's'} after the last accepted ordinal.`;
+        }
       }
       await fixedFiveRepository.saveActiveSnapshot(snapshot, lastOrdinal + 1).catch(() => {});
     } catch (e) {
@@ -207,21 +217,22 @@
           if (payload.kind === 'propose-result') {
             return localResult?.digest === payload.resultDigest;
           }
-          if (payload.kind !== 'confirm-result' || !localResult) return false;
+          const currentResult = localResult;
+          if (payload.kind !== 'confirm-result' || !currentResult) return false;
           const freshForeign = roomLogFacts(commands).proposals.filter(
             (proposal) => proposal.actor !== selfId,
           );
           if (payload.verified) {
             return (
-              localResult.digest === payload.resultDigest &&
+              currentResult.digest === payload.resultDigest &&
               freshForeign.some((proposal) => proposal.digest === payload.resultDigest)
             );
           }
           return (
             reranMismatch &&
-            localResult.digest !== payload.resultDigest &&
+            currentResult.digest !== payload.resultDigest &&
             freshForeign.some((proposal) => proposal.digest === payload.resultDigest) &&
-            !freshForeign.some((proposal) => proposal.digest === localResult.digest)
+            !freshForeign.some((proposal) => proposal.digest === currentResult.digest)
           );
         },
       });
@@ -341,8 +352,9 @@
     }
   }
 
-  async function startSim(): Promise<void> {
+  async function startSim(reason: FixedFiveSimulationReason): Promise<void> {
     if (simStarted || !snapshot || !assets || !snapshot.rootSeed || !replay) return;
+    if (!simulationGate.tryStart(reason)) return;
     simStarted = true;
     simError = null;
     try {
@@ -373,6 +385,7 @@
           p2: { refs: p2Refs, players: [...p2Team.players] },
           weakestReplacedOpponentId: pending.run.authorityFacts.weakestReplacedOpponentId,
         };
+        simulationGate.finish();
         simDone = true;
         return;
       }
@@ -388,6 +401,7 @@
         } else if (event.kind === 'complete') {
           void finalizeSim();
         } else {
+          simulationGate.fail();
           simError = event.message;
         }
       });
@@ -454,12 +468,15 @@
             p2: { refs: p2Refs, players: [...p2Team.players] },
             weakestReplacedOpponentId: summary.weakestReplacedOpponentId,
           };
+          simulationGate.finish();
           simDone = true;
         } catch (e) {
+          simulationGate.fail();
           if (mounted) simError = e instanceof Error ? e.message : String(e);
         }
       }
     } catch (e) {
+      simulationGate.fail();
       simError = e instanceof Error ? e.message : String(e);
       simStarted = false;
     }
@@ -600,12 +617,14 @@
   $effect(() => {
     if (!mounted || !snapshot || !replay) return;
     if (phase === 'simulating' && !simStarted && !simError && snapshot.rootSeed) {
-      void startSim();
+      void startSim(simulationReason);
     }
   });
 
   async function rerunSimulation(): Promise<void> {
     try {
+      simulationReason = 'mismatch-rerun';
+      if (!simulationGate.canStart(simulationReason)) return;
       runner?.dispose();
       runner = null;
       await fixedFiveRepository.clearPendingResult(roomId).catch(() => {});
@@ -616,7 +635,7 @@
       progress = null;
       simError = null;
       await sync(lastOrdinal);
-      if (mounted) void startSim();
+      if (mounted) void startSim(simulationReason);
     } catch (e) {
       if (mounted) simError = e instanceof Error ? e.message : String(e);
     }

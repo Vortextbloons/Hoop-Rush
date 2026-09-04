@@ -50,7 +50,7 @@
       dataVersion: 'data-v1',
       ratingVersion: 'ratings-v3.8',
       positionNormalizationVersion: 'position-v3',
-      engineVersion: 'm3-engine-v13',
+      engineVersion: 'm3-engine-v14',
       bracketVersion: 'bracket-m3-v3',
       scheduleVersion: 'schedule-v1',
       seedDerivationVersion: 'seed-v1',

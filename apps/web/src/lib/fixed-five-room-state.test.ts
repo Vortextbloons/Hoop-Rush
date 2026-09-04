@@ -4,6 +4,7 @@ import {
   eraIdSchema,
   franchiseIdSchema,
   idSchema,
+  playerIdSchema,
   seedSchema,
 } from '@hoop-rush/data-contracts';
 import type { FixedFiveCommand } from '@hoop-rush/data-contracts';
@@ -78,8 +79,16 @@ describe('roomLogFacts', () => {
 
 describe('mergeFixedFiveCommands', () => {
   it('keeps one local copy when overlapping resyncs return the same accepted commands', () => {
-    const first = command(4, 'p1', { kind: 'ready', ready: true });
-    const second = command(5, 'p2', { kind: 'ready', ready: true });
+    const first = command(4, 'p1', {
+      kind: 'sandbox-place',
+      playerId: playerIdSchema.parse('player-1'),
+      slotIndex: 0,
+    });
+    const second = command(5, 'p2', {
+      kind: 'sandbox-place',
+      playerId: playerIdSchema.parse('player-2'),
+      slotIndex: 0,
+    });
 
     const afterFirstSync = mergeFixedFiveCommands([], [first, second]);
     const afterOverlappingSync = mergeFixedFiveCommands(afterFirstSync, [first, second]);
