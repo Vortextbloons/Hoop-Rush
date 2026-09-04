@@ -9,7 +9,6 @@ import {
   eraIdSchema,
   seasonKeySchema,
   playerIdSchema,
-  seedSchema,
   contentHashSchema,
   idSchema,
 } from '@hoop-rush/data-contracts';

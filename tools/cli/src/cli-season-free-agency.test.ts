@@ -5,7 +5,6 @@ import {
   SEASON_FREE_AGENCY_TARGETS_VERSION,
   franchiseIdSchema,
   seasonRunSchema,
-  type SeasonFreeAgencyState,
 } from '@hoop-rush/data-contracts';
 import { jsonPayload, REPO_ROOT, runCli, withTmpDir } from './cli-test-helpers.ts';
 import {

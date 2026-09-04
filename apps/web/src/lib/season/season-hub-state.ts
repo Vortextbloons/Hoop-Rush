@@ -1,7 +1,6 @@
 import {
   humanFranchiseIdOf,
   SEASON_RUN_SCHEMA_VERSION,
-  commandIdSchema,
   franchiseIdSchema,
   postseasonGameIdSchema,
   seasonSubmitBlockCommandSchema,
@@ -1408,9 +1407,7 @@ export function campaignViewModel(
     targetBlock < 8 &&
     campaign.selections[targetBlock] === undefined;
   const nextOffers =
-    targetBlock !== null && targetBlock >= 0 && targetBlock < 8
-      ? (campaign.offers[targetBlock] ?? null)
-      : null;
+    targetBlock >= 0 && targetBlock < 8 ? (campaign.offers[targetBlock] ?? null) : null;
   return {
     startingIdentity: campaign.startingIdentity,
     startingFocus: campaign.startingFocus,

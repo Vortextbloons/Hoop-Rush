@@ -385,7 +385,7 @@ describe('campaign branching', () => {
       influence,
       campaignState: {
         ...input.campaignState,
-        offers: { 0: offers0 as [(typeof offers0)[0], (typeof offers0)[1]] },
+        offers: { 0: offers0 },
         selections: {
           0: {
             opportunityId: chosen.opportunityId,
@@ -433,7 +433,7 @@ describe('campaign branching', () => {
       influence,
       campaignState: {
         ...input.campaignState,
-        offers: { 0: offers0 as [(typeof offers0)[0], (typeof offers0)[1]] },
+        offers: { 0: offers0 },
         selections: {
           0: {
             opportunityId: branchToTest.opportunityId,
@@ -478,7 +478,7 @@ describe('campaign branching', () => {
       influence,
       campaignState: {
         ...input.campaignState,
-        offers: { 0: offers as [(typeof offers)[0], (typeof offers)[1]] },
+        offers: { 0: offers },
         selections: {
           0: {
             opportunityId: withBreakthrough.opportunityId,

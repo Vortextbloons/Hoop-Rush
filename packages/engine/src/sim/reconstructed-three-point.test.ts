@@ -16,8 +16,8 @@ import {
 } from '@hoop-rush/test-fixtures';
 import { createEngineContext } from './context.ts';
 import { simulateGame } from './game.ts';
-import { ENGINE_CONSTANTS, ENGINE_VERSION } from './constants.ts';
-import { contestPenalty, makeProbability } from './shooting.ts';
+import { ENGINE_VERSION } from './constants.ts';
+import { makeProbability } from './shooting.ts';
 import { threePointTarget } from './usage.ts';
 const context = createEngineContext();
 const nullThreeAnchors: SimulationAnchors = {

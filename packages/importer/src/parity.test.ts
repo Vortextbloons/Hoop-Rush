@@ -32,12 +32,6 @@ const PARAM_KEYS = [
   'assistRate',
   'foulsPerPossession',
 ] as const;
-function topFive(players: CommittedPoolPlayer[]): string[] {
-  return [...players]
-    .sort((a, b) => b.selectionScore - a.selectionScore)
-    .slice(0, 5)
-    .map((p) => `${p.playerExternalId} ${p.seasonKey} ${String(p.selectionScore)}`);
-}
 describe('parity: pools vs committed artifacts', () => {
   for (const [franchiseId, eraId] of TARGETS) {
     it(`${franchiseId}/${eraId} eligibility and top-5 selection match`, { timeout: 30000 }, () => {

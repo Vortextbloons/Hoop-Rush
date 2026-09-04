@@ -357,8 +357,8 @@ describe('free-agency resolution', () => {
       HUMAN,
       'cmd-s',
     );
-    const resolved = resolveSeasonFreeAgencyWindow(
-      { ...context, run: { ...run, freeAgency: skipped } },
+    resolveSeasonFreeAgencyWindow(
+      { ...context, run: { ...run, freeAgency: declared } },
       0,
       'cmd-r',
     );

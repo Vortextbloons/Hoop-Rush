@@ -565,7 +565,7 @@ export function auditSeasonRunState(
       (() => {
         const seasonGameParse = seasonGameIdSchema.safeParse(injury.gameId);
         const scheduled =
-          seasonGameParse.success === true ? scheduleById.get(seasonGameParse.data) : undefined;
+          seasonGameParse.success ? scheduleById.get(seasonGameParse.data) : undefined;
         return scheduled === undefined && !postseasonGameIdSchema.safeParse(injury.gameId).success;
       })()
     ) {

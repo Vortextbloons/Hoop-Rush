@@ -7,7 +7,6 @@ import {
   franchiseIdSchema,
   idSchema,
   playerIdSchema,
-  seasonGameIdSchema,
   seasonKeySchema,
   seasonRunCommandSchema,
   seasonCommandLogDigest,

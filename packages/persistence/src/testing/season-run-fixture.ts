@@ -116,7 +116,6 @@ import type {
   seasonRotationSetDigest as engineSeasonRotationSetDigest,
   seasonRunStateDigest as engineSeasonRunStateDigestFn,
 } from '@hoop-rush/engine';
-import { canonicalJson } from '@hoop-rush/data-contracts';
 import type { SeasonRunStateDigestFacts } from '../season/engine-seam-types.ts';
 import type { SeasonRunEngineSeam } from '../season/engine-seam-types.ts';
 import { SEASON_RUN_RECORD_ID, type StoredSeasonRunRecord } from '../schemas/season-run-record.ts';

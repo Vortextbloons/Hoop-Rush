@@ -18,7 +18,6 @@ import {
   seasonDraftCatalogSchema,
   seasonProjectionSchema,
   seasonProjectionTargetsSchema,
-  seedSchema,
   seasonKeySchema,
   type BaseFiveProjection,
   type ProjectionMatchupArchetype,
@@ -299,7 +298,7 @@ describe('projection model artifact schema', () => {
   });
   it('rejects a missing neutral reference era', () => {
     const model = buildModel();
-    delete model.references[era1990s];
+    Reflect.deleteProperty(model.references, era1990s);
     expect(() => projectionModelArtifactSchema.parse(model)).toThrow();
   });
   it('rejects a model without any references', () => {

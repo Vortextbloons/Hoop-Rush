@@ -21,7 +21,6 @@ const manifestEraSchema = z.looseObject({
   fromSeasonKey: z.string(),
   toSeasonKey: z.string(),
 });
-type ManifestEra = z.infer<typeof manifestEraSchema>;
 const manifestPoolEntrySchema = z.looseObject({
   franchiseId: z.string(),
   eraId: z.string(),
@@ -32,7 +31,6 @@ const manifestAssetRefSchema = z.looseObject({
   url: z.string(),
   contentHash: z.string(),
 });
-type ManifestAssetRef = z.infer<typeof manifestAssetRefSchema>;
 const manifestPoolFileSchema = z.looseObject({
   players: z.array(z.unknown()).optional(),
   coverageSummary: z.unknown().optional(),
@@ -41,12 +39,11 @@ type ManifestPoolFile = z.infer<typeof manifestPoolFileSchema>;
 const manifestSimProfileSchema = z.looseObject({
   eraId: z.string(),
 });
-const manifestSimIndexEntrySchema = z.object({
-  eraId: z.string(),
-  url: z.string(),
-  contentHash: z.string(),
-});
-type ManifestSimIndexEntry = z.infer<typeof manifestSimIndexEntrySchema>;
+type ManifestSimIndexEntry = {
+  eraId: string;
+  url: string;
+  contentHash: string;
+};
 const seasonArtifactsSchema = z.object({
   league: manifestAssetRefSchema.optional(),
   schedule: manifestAssetRefSchema.optional(),
@@ -183,7 +180,7 @@ export function refreshPlayersIndexInManifest(dataDir = PUBLIC_DATA): void {
   if (entry === null && detailsEntry === null) return;
   const manifestPath = join(dataDir, 'manifest.json');
   if (!fileExists(manifestPath)) return;
-  const manifestRaw = readJson(manifestPath) as unknown;
+  const manifestRaw = readJson(manifestPath);
   const manifestParsed = importerManifestSchema.safeParse(manifestRaw);
   if (!manifestParsed.success) return;
   const manifest = manifestParsed.data;
@@ -197,7 +194,7 @@ export function refreshPlayersIndexInManifest(dataDir = PUBLIC_DATA): void {
 export const ASSET_CACHE_VERSION = '2026-08-03-historical-logos-v1';
 export function run(dataDir = PUBLIC_DATA): void {
   const manifestPath = join(dataDir, 'manifest.json');
-  const previousRaw = fileExists(manifestPath) ? (readJson(manifestPath) as unknown) : null;
+  const previousRaw = fileExists(manifestPath) ? readJson(manifestPath) : null;
   const previousParsed =
     previousRaw === null ? null : importerManifestSchema.safeParse(previousRaw);
   const previous = previousParsed?.success === true ? previousParsed.data : null;
@@ -276,7 +273,7 @@ export function run(dataDir = PUBLIC_DATA): void {
   );
   const availability: unknown[] = [];
   for (const slot of MODERN_SLOTS) {
-    for (const era of manifest.eras ?? []) {
+    for (const era of manifest.eras) {
       const key = `${slot.franchiseId}/${era.eraId}`;
       const pool = poolByKey.get(key) ?? null;
       if (pool !== null) {
@@ -313,7 +310,7 @@ export function run(dataDir = PUBLIC_DATA): void {
   const profiles: ManifestSimIndexEntry[] = [];
   const simDir = join(dataDir, 'era-sim');
   for (const name of sortedJsonFiles(simDir)) {
-    const profileRaw = readJson(join(simDir, name)) as unknown;
+    const profileRaw = readJson(join(simDir, name));
     const profileParsed = manifestSimProfileSchema.safeParse(profileRaw);
     if (!profileParsed.success) continue;
     profiles.push({

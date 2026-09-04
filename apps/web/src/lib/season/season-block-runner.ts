@@ -1021,13 +1021,20 @@ function cloneForWorker<T>(value: T): T {
 }
 function clonePlain<T>(value: T): T {
   if (value instanceof Date) return new Date(value.getTime()) as T;
-  if (Array.isArray(value)) return value.map((item) => clonePlain(item)) as T;
+  if (Array.isArray(value)) {
+    return (value as unknown as readonly unknown[]).map((item) => clonePlain(item)) as unknown as T;
+  }
   if (value instanceof Map) {
     return new Map(
-      [...value.entries()].map(([key, item]) => [clonePlain(key), clonePlain(item)]),
-    ) as T;
+      [...(value as unknown as ReadonlyMap<unknown, unknown>).entries()].map(([key, item]) => [
+        clonePlain(key),
+        clonePlain(item),
+      ]),
+    ) as unknown as T;
   }
-  if (value instanceof Set) return new Set([...value].map((item) => clonePlain(item))) as T;
+  if (value instanceof Set) {
+    return new Set([...(value as unknown as ReadonlySet<unknown>)].map((item) => clonePlain(item))) as unknown as T;
+  }
   if (value !== null && typeof value === 'object') {
     const out: Record<string, unknown> = {};
     for (const key of Object.keys(value)) {

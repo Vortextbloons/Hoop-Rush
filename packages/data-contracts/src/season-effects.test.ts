@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  commandIdSchema,
-  contentHashSchema,
-  franchiseIdSchema,
   seasonBlockRecapSchema,
   seasonCandidateCheckpointSchema,
   seasonCheckpointVersionsSchema,
@@ -18,7 +15,6 @@ import {
   seasonRunSchema,
   seasonStaminaInputSchema,
   seasonWorkerStartRequestSchema,
-  seasonGameIdSchema,
   SEASON_NEUTRAL_HOME_COURT,
   SEASON_FREE_AGENCY_VERSION,
   SEASON_WORKER_WIRE_SCHEMA_VERSION,

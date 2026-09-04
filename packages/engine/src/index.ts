@@ -51,17 +51,6 @@ export {
 } from './season/schedule.ts';
 export { reduceSeasonStandings, auditSeasonStandings } from './season/standings.ts';
 export {
-  setPlayInRankings,
-  submitPlayInGame,
-  createPlayoffBracket,
-  submitPlayoffGame,
-  currentSeriesId,
-  auditSeasonPostseason,
-  type PostseasonRankings,
-  type PlayInGameResult,
-  type PlayoffGameResult,
-} from './season/postseason-legacy.ts';
-export {
   rankSeasonPostseason,
   type SeasonConferenceRanking,
   type SeasonPostseasonRankings,

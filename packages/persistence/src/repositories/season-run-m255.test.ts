@@ -21,14 +21,12 @@ import { SEASON_RUN_RECORD_ID } from '../schemas/season-run-record.ts';
 import { DexieSeasonRunRepository, SeasonRunIncompatibleError } from './season-run-dexie.ts';
 import { TestDatabase, testDatabaseName } from '../testing/repo-test-support.ts';
 import {
-  buildFixtureCheckpointRow,
   buildFixtureRun,
   buildFixtureSchedule,
   buildFixtureStateDigest,
   buildFixtureStoredDraft,
   buildStubSeasonEngineSeam,
 } from '../testing/season-run-fixture.ts';
-import { buildFullSeasonDataset } from '../benchmark/season-run.ts';
 import type { SeasonRunCommand } from '@hoop-rush/data-contracts';
 function makeAdapters() {
   const db = new TestDatabase(testDatabaseName('season-m255'));
@@ -42,7 +40,7 @@ async function promote(adapters: ReturnType<typeof makeAdapters>) {
   await adapters.repo.promoteSeasonDraftToRun(buildFixtureStoredDraft(adapters.run), adapters.run);
 }
 describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompatibility', () => {
-  afterEach(async () => {
+  afterEach(() => {
     vi.restoreAllMocks();
   });
   it('promoted run is saveSchema 10 with schema-13, v6 checkpoint/recap, campaign, trade-v3, influence-v2, health-v2', async () => {
@@ -109,11 +107,13 @@ describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompati
     const completedRunId = 'completed-preserved-run';
     const almanacDigest = 'a'.repeat(32);
     const commandLogDigest = 'b'.repeat(32);
+    const checkpointRow = await adapters.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
+    if (checkpointRow === undefined) throw new Error('expected row');
     await adapters.db.seasonCompletedRuns.put({
       runId: completedRunId,
-      run: (await adapters.db.seasonRuns.get(SEASON_RUN_RECORD_ID))!.run,
+      run: checkpointRow.run,
       updatedAtIso: new Date().toISOString(),
-    } as never);
+    });
     await adapters.db.seasonCompletedIndex.put({
       recordId: completedRunId,
       runId: completedRunId,
@@ -123,7 +123,7 @@ describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompati
       almanacDigest,
       commandLogDigest,
       completedAtIso: new Date().toISOString(),
-    } as never);
+    });
     expect(await adapters.db.seasonCompletedRuns.count()).toBe(1);
     await adapters.repo.clearSeasonRun(activeRunId);
     expect(await adapters.db.seasonCompletedRuns.count()).toBe(1);
@@ -256,14 +256,17 @@ describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompati
     const lakersRoster = adapters.run.rosters.find((r) => r.franchiseId === 'lakers');
     const celticsRoster = adapters.run.rosters.find((r) => r.franchiseId === 'celtics');
     if (!lakersRoster || !celticsRoster) throw new Error('no rosters');
-    const outId = lakersRoster.players[0]!.playerVersionId;
-    const inId = celticsRoster.players[0]!.playerVersionId;
+    const lakersFirst = lakersRoster.players[0];
+    const celticsFirst = celticsRoster.players[0];
+    if (lakersFirst === undefined || celticsFirst === undefined) throw new Error('no players');
+    const outId = lakersFirst.playerVersionId;
+    const inId = celticsFirst.playerVersionId;
     const nextRosters = adapters.run.rosters.map((r) => {
       if (r.franchiseId === 'lakers') {
-        return { ...r, players: [celticsRoster.players[0]!, ...r.players.slice(1)] };
+        return { ...r, players: [celticsFirst, ...r.players.slice(1)] };
       }
       if (r.franchiseId === 'celtics') {
-        return { ...r, players: [lakersRoster.players[0]!, ...r.players.slice(1)] };
+        return { ...r, players: [lakersFirst, ...r.players.slice(1)] };
       }
       return r;
     });
@@ -274,7 +277,6 @@ describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompati
       { playerVersionId: outId, ownerFranchiseId: franchiseIdSchema.parse('celtics') },
       { playerVersionId: inId, ownerFranchiseId: franchiseIdSchema.parse('lakers') },
     ];
-    const nextEffects = adapters.seam.zeroSeasonEffectsState(nextRosters);
     const nextHealth = { ...adapters.run.health, injuries: [] };
     const lakersFid = franchiseIdSchema.parse('lakers');
     const celticsFid = franchiseIdSchema.parse('celtics');
@@ -463,13 +465,17 @@ describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompati
     const row = await adapters.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
     if (!row) throw new Error('no row');
     const { auditReplayDivergences } = await import('../season/replay.ts');
+    const firstRoster = row.run.rosters[0];
+    if (firstRoster === undefined) throw new Error('no roster');
+    const firstPlayer = firstRoster.players[0];
+    if (firstPlayer === undefined) throw new Error('no player');
     const tamperedHealth = {
       ...row.health,
       injuries: [
         {
           injuryId: 'inj-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-          playerVersionId: row.run.rosters[0]!.players[0]!.playerVersionId,
-          franchiseId: row.run.rosters[0]!.franchiseId,
+          playerVersionId: firstPlayer.playerVersionId,
+          franchiseId: firstRoster.franchiseId,
           gameId: 's000001',
           type: 'soft-tissue' as const,
           severity: 'moderate' as const,
@@ -587,13 +593,14 @@ describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompati
     expect(adapters.db.verno).toBe(13);
     await promote(adapters);
     const row = await adapters.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
+    if (row === undefined) throw new Error('expected row');
     const legacy = {
-      ...row!,
+      ...row,
       saveSchemaVersion: 7,
       run: {
-        ...row!.run,
+        ...row.run,
         schemaVersion: 10,
-        versions: { ...row!.run.versions, runSchemaVersion: 10 },
+        versions: { ...row.run.versions, runSchemaVersion: 10 },
       },
     };
     await adapters.db.seasonRuns.put(legacy as never);

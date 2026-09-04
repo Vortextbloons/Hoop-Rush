@@ -158,7 +158,7 @@ function anchorsFromStats(
   };
 }
 function playablePositions(labels: ReadonlySet<string>): PositionUnion {
-  return pools.normalizePositionLabels(labels).detailed as PositionUnion;
+  return pools.normalizePositionLabels(labels).detailed;
 }
 export function buildCandidateCatalog(
   manifest: HoopRushManifest,

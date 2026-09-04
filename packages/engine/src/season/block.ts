@@ -209,7 +209,7 @@ export function seasonRunStateDigestFactsOf(
     ownership: next.ownership,
     rotations: next.rotations,
     effects,
-    authority: (next as SeasonRun).authority,
+    authority: (next).authority,
   };
 }
 export interface SeasonBlockSimulationOptions {
@@ -1254,7 +1254,7 @@ function objectivesWithBlockSuccess(
     ...objectives,
     selections: {
       ...objectives.selections,
-      [candidate.blockIndex]: { ...selection, success: candidate.objective!.success },
+      [candidate.blockIndex]: { ...selection, success: candidate.objective.success },
     },
   };
 }
@@ -1263,10 +1263,9 @@ function campaignWithBlockEvaluation(
   candidate: SeasonCandidateCheckpoint,
 ): import('@hoop-rush/data-contracts').SeasonCampaignState | undefined {
   if (!candidate.campaign || !candidate.campaign.evaluation)
-    return campaignState as unknown as
-      import('@hoop-rush/data-contracts').SeasonCampaignState | undefined;
+    return campaignState;
   const base = normalizeCampaignState(
-    campaignState as unknown as import('@hoop-rush/data-contracts').SeasonCampaignState,
+    campaignState,
   );
   const evalResult = candidate.campaign.evaluation;
   const existing = base.evaluations.some(
@@ -1293,7 +1292,7 @@ function campaignWithBlockEvaluation(
   let influenceEarned = base.rewardEntitlements.influenceEarned;
   let inquiryCredits = base.rewardEntitlements.inquiryCredits;
   let informationBenefits = base.rewardEntitlements.informationBenefits;
-  let followUpUnlocks = [...base.rewardEntitlements.followUpUnlocks];
+  const followUpUnlocks = [...base.rewardEntitlements.followUpUnlocks];
   for (const rid of evalResult.appliedRewardIds) {
     if (!applied.includes(rid)) {
       applied.push(rid);
@@ -1352,7 +1351,7 @@ export function deriveSeasonPostBlockState(input: {
       input.run as {
         campaign?: import('@hoop-rush/data-contracts').SeasonCampaignState;
       }
-    ).campaign as unknown as import('@hoop-rush/data-contracts').SeasonCampaignState | undefined,
+    ).campaign,
     input.candidate,
   );
   const checkpointState: SeasonCheckpointState = {
@@ -1378,12 +1377,12 @@ export function deriveSeasonPostBlockState(input: {
     trade: input.run.trade,
     freeAgency: input.candidate.freeAgency,
     objectives,
-    campaign: campaign as never,
+    campaign: campaign,
     rosters: input.run.rosters,
     ownership: input.run.ownership,
     rotations: input.run.rotations,
     effects: input.candidate.effects,
-    authority: (input.run as SeasonRun).authority,
+    authority: (input.run).authority,
   });
   return { checkpointState, stateRevision, stateDigest };
 }
@@ -1413,11 +1412,11 @@ export function completeSeasonBlockCommit(input: {
       input.run as {
         campaign?: import('@hoop-rush/data-contracts').SeasonCampaignState;
       }
-    ).campaign as unknown as import('@hoop-rush/data-contracts').SeasonCampaignState | undefined,
+    ).campaign,
     input.candidate,
   );
   const derived = deriveSeasonPostBlockState({
-    run: { ...input.run, objectives, campaign: campaign as unknown as SeasonRun['campaign'] },
+    run: { ...input.run, objectives, campaign: campaign },
     candidate: input.candidate,
     commandId: input.commandId,
     rotationDigest: input.rotationDigest,
@@ -1434,7 +1433,7 @@ export function completeSeasonBlockCommit(input: {
     transactions: input.candidate.transactions,
     freeAgency: input.candidate.freeAgency,
     objectives,
-    campaign: campaign as unknown as SeasonRun['campaign'],
+    campaign: campaign,
     checkpointState: derived.checkpointState,
     stateRevision: derived.stateRevision,
     stateDigest: derived.stateDigest,
@@ -1443,12 +1442,11 @@ export function completeSeasonBlockCommit(input: {
   if (
     nextBlockIdxForCampaign <= 7 &&
     (
-      postBlockRun.campaign as unknown as
-        import('@hoop-rush/data-contracts').SeasonCampaignState | undefined
+      postBlockRun.campaign
     )?.startingIdentity
   ) {
     const nextCampaignState =
-      postBlockRun.campaign as unknown as import('@hoop-rush/data-contracts').SeasonCampaignState;
+      postBlockRun.campaign;
     if (!nextCampaignState.offers[nextBlockIdxForCampaign]) {
       const needsEvolution =
         input.candidate.blockIndex === 4 && !nextCampaignState.evolutionSelection;
@@ -1479,7 +1477,7 @@ export function completeSeasonBlockCommit(input: {
         };
         postBlockRun = {
           ...postBlockRun,
-          campaign: updatedCampaign as unknown as SeasonRun['campaign'],
+          campaign: updatedCampaign,
         };
         postBlockRun = {
           ...postBlockRun,
@@ -1564,8 +1562,7 @@ export function completeSeasonBlockCommit(input: {
       stateDigest: seasonRunStateDigest(seasonRunStateDigestFactsOf(next, postWindowEffects)),
     };
   }
-  const finalCampaign = (runAfterTrade.campaign ?? campaign ?? null) as
-    import('@hoop-rush/data-contracts').SeasonCampaignState | null;
+  const finalCampaign = (runAfterTrade.campaign ?? campaign ?? null);
   if (window === null && freeAgencyWindow === null) {
     return {
       checkpointState: derived.checkpointState,
@@ -1759,9 +1756,9 @@ export function auditSeasonBlock(
       rosterPlayerIds: input.rosterPlayerIds,
       health: candidate.health,
       objective: {
-        objectiveId: candidate.objective!.objectiveId,
-        success: candidate.objective!.success,
-        evaluation: candidate.objective!.evaluation,
+        objectiveId: candidate.objective.objectiveId,
+        success: candidate.objective.success,
+        evaluation: candidate.objective.evaluation,
       },
       transactions: candidate.transactions,
       influence: candidate.influence,
@@ -1832,20 +1829,20 @@ export function auditSeasonBlock(
       failures.push(`injury ${record.injuryId} same-game return must carry zero missed games`);
     }
   }
-  if (candidate.objective!.objectiveId !== command.objectiveId) {
+  if (candidate.objective.objectiveId !== command.objectiveId) {
     failures.push(
-      `candidate objective ${String(candidate.objective!.objectiveId)} does not match the command ${String(command.objectiveId)}`,
+      `candidate objective ${String(candidate.objective.objectiveId)} does not match the command ${String(command.objectiveId)}`,
     );
   }
-  if (candidate.objective!.objectiveId !== null) {
-    if (candidate.objective!.evaluation.blockIndex !== command.blockIndex) {
+  if (candidate.objective.objectiveId !== null) {
+    if (candidate.objective.evaluation.blockIndex !== command.blockIndex) {
       failures.push('candidate objective evaluation blockIndex does not match the command');
     }
-    if (candidate.objective!.success !== candidate.objective!.evaluation.success) {
+    if (candidate.objective.success !== candidate.objective.evaluation.success) {
       failures.push('candidate objective success does not match its evaluation');
     }
   }
-  if (command.blockIndex === 8 && candidate.objective!.objectiveId !== null) {
+  if (command.blockIndex === 8 && candidate.objective.objectiveId !== null) {
     failures.push('the final two-game block must carry a null objective');
   }
   if (candidate.expectedStateRevision !== command.expectedStateRevision) {

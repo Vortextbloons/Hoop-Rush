@@ -7,7 +7,6 @@ import {
   franchiseIdSchema,
   playoffGameIdOf,
   playInGameIdOf,
-  seasonGameIdSchema,
   seasonNamespaceSeed,
   seasonPostseasonSummarySchema,
   seasonRunSchema,

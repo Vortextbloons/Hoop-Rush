@@ -16,7 +16,6 @@ import type {
   ProjectionRotationOptimizeRequest,
   ProjectionRosterBuildRequest,
   ProjectionWorkerRequest,
-  ProjectionWorkerResponse,
 } from './season-projection-wire';
 export interface ProjectionRunnerDeps {
   workerUrl?: string;

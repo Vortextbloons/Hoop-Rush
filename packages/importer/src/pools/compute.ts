@@ -25,11 +25,8 @@ import {
   unavailabilityReasonSchema,
   type Confidence,
   type CoverageSummary,
-  type FranchiseEraPool,
-  type HistoricalValueProvenance,
   type PeakPlayerSeason,
   type PlayerSeasonStats,
-  type Position,
   type ProvenanceMap,
   type RatingProfile,
   type SimulationAnchors,
@@ -169,7 +166,7 @@ export {
 export function loadCareerPositionLabels(): Map<string, Set<string>> {
   const cachePath = join(RAW_CACHE, 'career-position-labels-v5.json');
   if (fileExists(cachePath)) {
-    const raw = readJsonLoose(cachePath) as unknown;
+    const raw = readJsonLoose(cachePath);
     const parsed = careerLabelsSchema.safeParse(raw);
     if (parsed.success) {
       return new Map(Object.entries(parsed.data).map(([pid, labels]) => [pid, new Set(labels)]));
@@ -182,7 +179,7 @@ export function loadCareerPositionLabels(): Map<string, Set<string>> {
     if (!fileExists(rosterPath)) {
       continue;
     }
-    const rosterRaw = readJsonLoose(rosterPath) as unknown;
+    const rosterRaw = readJsonLoose(rosterPath);
     const rosterParsed = z.array(careerRosterRowSchema).safeParse(rosterRaw);
     for (const player of rosterParsed.success ? rosterParsed.data : []) {
       const pid = str(player.externalId);
@@ -217,7 +214,7 @@ export type Manifest = z.infer<typeof poolManifestSchema>;
 const careerLabelsSchema = z.record(z.string(), z.array(z.string()));
 const bbrefIdsSchema = z.record(z.string(), z.string());
 export function loadManifest(): Manifest {
-  const raw = readJsonLoose(manifestPath()) as unknown;
+  const raw = readJsonLoose(manifestPath());
   const parsed = poolManifestSchema.safeParse(raw);
   if (!parsed.success) {
     throw new Error(`invalid manifest: ${parsed.error.issues[0]?.message ?? 'unknown'}`);
@@ -294,7 +291,7 @@ export function loadSeasonData(season: string): SeasonData {
   const rosterByExtId: Record<string, RosterInput> = {};
   const rosterPath = join(seasonDir, 'roster.json');
   if (fileExists(rosterPath)) {
-    const rosterRaw = readJsonLoose(rosterPath) as unknown;
+    const rosterRaw = readJsonLoose(rosterPath);
     const rosterParsed = z.array(rosterInputSchema).safeParse(rosterRaw);
     for (const player of rosterParsed.success ? rosterParsed.data : []) {
       rosterByExtId[str(player.externalId)] = player;
@@ -303,7 +300,7 @@ export function loadSeasonData(season: string): SeasonData {
   const stintsByTeam: Record<string, StintInput[]> = {};
   const stintsPath = join(seasonDir, 'stints.json');
   if (fileExists(stintsPath)) {
-    const stintsRaw = readJsonLoose(stintsPath) as unknown;
+    const stintsRaw = readJsonLoose(stintsPath);
     const stintsParsed = z.array(stintInputSchema).safeParse(stintsRaw);
     for (const stint of stintsParsed.success ? stintsParsed.data : []) {
       const teamId = str(stint.teamExternalId);
@@ -318,7 +315,7 @@ export function loadSeasonData(season: string): SeasonData {
   const statsByPlayer: Record<string, SeasonStatsInput> = {};
   const statsPath = join(seasonDir, 'season-stats.json');
   if (fileExists(statsPath)) {
-    const statsRaw = readJsonLoose(statsPath) as unknown;
+    const statsRaw = readJsonLoose(statsPath);
     const statsParsed = z.array(seasonStatsInputSchema).safeParse(statsRaw);
     for (const row of statsParsed.success ? statsParsed.data : []) {
       statsByPlayer[str(row.playerExternalId)] = row;
@@ -333,7 +330,7 @@ function loadFallbackRosterPlayers(): Map<string, RosterInput> {
   const byPlayer = new Map<string, RosterInput>();
   for (const file of sortedJsonFiles(poolDir())) {
     try {
-      const raw = readJsonLoose(join(poolDir(), file)) as unknown;
+      const raw = readJsonLoose(join(poolDir(), file));
       const parsed = fallbackPoolFileSchema.safeParse(raw);
       if (!parsed.success || !Array.isArray(parsed.data.players)) continue;
       for (const value of parsed.data.players) {
@@ -525,7 +522,7 @@ export function sanitizeAnchors<T extends RawAnchors>(anchors: T): T {
   for (const field of ANCHOR_UNIT_FIELDS) {
     const value = out[field];
     if (typeof value === 'number' && Number.isFinite(value)) {
-      out[field] = clamp(value, 0, 1) as T[typeof field];
+      out[field] = clamp(value, 0, 1);
     }
   }
   simulationAnchorsSchema.partial().safeParse(out);
@@ -731,7 +728,7 @@ export function loadBbrefIds(): Record<string, string> {
     console.log('  [WARN] bbref_ids.json missing; run fetch_bbref_ids or run_all (no altIds)');
     return {};
   }
-  const raw = readJsonLoose(path) as unknown;
+  const raw = readJsonLoose(path);
   const parsed = bbrefIdsSchema.safeParse(raw);
   return parsed.success ? parsed.data : {};
 }
@@ -744,7 +741,7 @@ export function loadExistingAssetAltIds(
     return new Map();
   }
   try {
-    const raw = readJsonLoose(path) as unknown;
+    const raw = readJsonLoose(path);
     const previousPoolPlayerSchema = z.looseObject({
       playerExternalId: z.string(),
       altIds: z.unknown().optional(),
@@ -871,7 +868,7 @@ export function coverageBandForSeasons(
 }
 export function legalLineupCovered(players: readonly PoolPlayer[]): boolean {
   const slotGroupsOf = (player: PoolPlayer): readonly string[] =>
-    playableSlotGroups(player.positions.playable as Position[]);
+    playableSlotGroups(player.positions.playable);
   const guards = players.filter((p) => slotGroupsOf(p).includes('G'));
   const forwards = players.filter((p) => slotGroupsOf(p).includes('F'));
   const centers = players.filter((p) => slotGroupsOf(p).includes('C'));
@@ -1055,7 +1052,7 @@ export function computePool(
           : refreshedFallbackPlayer(sourcePlayer, season, stats, pid);
       const summaryParsed = summaryRatingsSchema.safeParse(player.summaryRatings);
       const summary = summaryParsed.success ? summaryParsed.data : undefined;
-      if (summary === null || summary === undefined) {
+      if (summary === undefined) {
         console.log(`  ! ${pid} missing summaryRatings in ${season}; re-run compute_ratings`);
         continue;
       }
@@ -1446,7 +1443,7 @@ function applyOverallCohortNormalization(): Array<{
     const [franchiseId, eraId] = name.slice(0, -5).split('-', 2);
     if (franchiseId === undefined || eraId === undefined) continue;
     try {
-      const raw = readJsonLoose(join(poolDir(), name)) as unknown;
+      const raw = readJsonLoose(join(poolDir(), name));
       const parsed = franchiseEraPoolSchema.safeParse(raw);
       if (!parsed.success) continue;
       const pool = parsed.data;
@@ -1548,7 +1545,7 @@ const coverageReportEntrySchema = z.object({
 export type CoverageReportEntry = z.infer<typeof coverageReportEntrySchema>;
 export function loadCoverageReport(): CoverageReportEntry[] {
   if (!fileExists(coverageReportPath())) return [];
-  const raw = readJsonLoose(coverageReportPath()) as unknown;
+  const raw = readJsonLoose(coverageReportPath());
   const parsed = z.array(coverageReportEntrySchema).safeParse(raw);
   if (!parsed.success) return [];
   return parsed.data;

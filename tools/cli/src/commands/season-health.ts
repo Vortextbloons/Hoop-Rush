@@ -9,10 +9,8 @@ import {
   type SeasonRun,
 } from '@hoop-rush/data-contracts';
 import {
-  applyRiskyRehabOutcome,
   createEngineContext,
   rollSeasonInjuryForPlayer,
-  seasonInjuryRiskBasisPoints,
   type SeasonInjuryRollInput,
 } from '@hoop-rush/engine';
 import { makeReport, type CliReport } from '../report.ts';

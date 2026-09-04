@@ -19,7 +19,6 @@ import {
   seasonRunCommandSchema,
   seasonRunSchema,
   seasonScheduleSchema,
-  SEASON_CAMPAIGN_VERSION,
   SEASON_COMMAND_LOG_VERSION,
   SEASON_OBJECTIVE_CATALOG,
   SEASON_OBJECTIVE_VERSION,

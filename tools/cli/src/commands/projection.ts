@@ -47,7 +47,7 @@ import {
   loadSeasonLeague,
   loadSeasonRosterTargets,
 } from './season-data.ts';
-import type { SeasonProjection, SeasonRotation } from '@hoop-rush/data-contracts';
+import type { SeasonProjection } from '@hoop-rush/data-contracts';
 export const PROJECTION_BASE_OPTIONS = {
   fixture: true,
   'seed-from': true,
@@ -155,7 +155,7 @@ function loadModel(
     const value = readJson(modelPath);
     return parseProjectionModelArtifact(value);
   }
-  const manifestRaw = readJson(manifestPath ?? MANIFEST_PATH) as unknown;
+  const manifestRaw = readJson(manifestPath ?? MANIFEST_PATH);
   const manifestParsed = manifestProjectionSchema.safeParse(manifestRaw);
   if (!manifestParsed.success) {
     throw new Error('no projection model entry in the manifest; run `projection build --write`');
@@ -743,7 +743,7 @@ export function projectionSeason(input: {
   const model = loadModel(manifest, modelPath);
   const eraId = era ?? '2010s';
   const profile = data.eraProfile(eraId);
-  const fixtureRaw = readJson(fixture) as unknown;
+  const fixtureRaw = readJson(fixture);
   const fixtureParsed = seasonFixtureSchema.safeParse(fixtureRaw);
   if (!fixtureParsed.success) {
     return makeReport(
@@ -830,7 +830,7 @@ export function projectionBuild(input: {
     const target = out ?? resolve(PROJECTION_DIR, 'projection-model.json');
     writeFileSync(target, content);
     details.push(`wrote ${target} (${String(content.length)} bytes)`);
-    const manifestRaw = readJson(manifestPath ?? MANIFEST_PATH) as unknown;
+    const manifestRaw = readJson(manifestPath ?? MANIFEST_PATH);
     const manifestParsed = manifestWriteSchema.safeParse(manifestRaw);
     if (!manifestParsed.success) {
       return makeReport(
@@ -845,7 +845,7 @@ export function projectionBuild(input: {
         ? manifest.projection
         : {};
     manifest.projection = {
-      ...(existingProjection as object),
+      ...existingProjection,
       model: { url: 'projection/projection-model.json', contentHash: sha256Hex(content) },
     };
     writeFileSync(manifestPath ?? MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
@@ -887,7 +887,7 @@ export function projectionBase(input: {
   }
   let team: SimulationTeam;
   if (fixture !== null && fixture !== undefined) {
-    const fixtureRaw = readJson(fixture) as unknown;
+    const fixtureRaw = readJson(fixture);
     const fixtureParsed = baseFixtureSchema.safeParse(fixtureRaw);
     if (!fixtureParsed.success) {
       return makeReport(

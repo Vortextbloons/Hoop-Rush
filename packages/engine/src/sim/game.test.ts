@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { performance } from 'node:perf_hooks';
 import type { SimulationPlayer, SimulationTeam } from '@hoop-rush/data-contracts';
 import { playerIdSchema, seedSchema } from '@hoop-rush/data-contracts';
 import {
@@ -20,9 +21,6 @@ const ctx = createEngineContext();
 function run(seed: string) {
   const input = buildGameSimulationInput({ seed: seedSchema.parse(seedFromString(seed)) });
   return simulateGame(input, ctx);
-}
-function runMany(seedPrefix: string, count: number) {
-  return Array.from({ length: count }, (_, i) => run(`${seedPrefix}-${String(i)}`));
 }
 describe('game determinism and golden replay', () => {
   it('is stable across identical inputs (golden digest)', () => {

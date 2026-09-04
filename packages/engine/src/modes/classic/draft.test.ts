@@ -26,7 +26,6 @@ import { createChallenge } from '../../challenge/commands.ts';
 import {
   classicRerollAvailable,
   classicRollCandidates,
-  classicRollSeed,
   createClassicChallenge,
   createClassicDraft,
   draftClassicPlayer,
@@ -34,7 +33,6 @@ import {
   rerollClassicEra,
   rerollClassicFranchise,
   slotRequirement,
-  sortClassicCatalog,
   type ClassicChallengeEnvironment,
 } from './draft.ts';
 const context = createEngineContext();

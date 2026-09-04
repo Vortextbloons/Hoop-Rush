@@ -241,12 +241,47 @@
     }
   }
 
-  async function sendPick(playerId: PlayerId, slot: SlotIndex): Promise<void> {
+  async function sendPick(
+    playerId: PlayerId,
+    slot: SlotIndex,
+    moveTarget?: SlotIndex | null,
+  ): Promise<void> {
     draftError = null;
     if (!snapshot || !replay) return;
     const mode = snapshot.settings.mode;
     if (mode === 'sandbox-shared-82') {
-      await sendCommand({ kind: 'sandbox-place', playerId, slotIndex: slot });
+      if (moveTarget == null || replay.mode !== 'sandbox-shared-82') {
+        await sendCommand({ kind: 'sandbox-place', playerId, slotIndex: slot });
+        return;
+      }
+      const builder = selfId === 'p1' ? replay.p1 : replay.p2;
+      const incumbent = builder.placements.find((p) => p.slotIndex === slot) ?? null;
+      const subjectOld =
+        builder.placements.find((p) => p.playerId === playerId)?.slotIndex ?? null;
+      if (!incumbent || incumbent.playerId === playerId) {
+        await sendCommand({ kind: 'sandbox-place', playerId, slotIndex: slot });
+        return;
+      }
+      if (subjectOld !== null) {
+        const freed = await sendCommand({ kind: 'sandbox-remove', slotIndex: subjectOld });
+        if (!freed) {
+          draftError = 'Move was rejected — resync and try again.';
+          return;
+        }
+      }
+      const placed = await sendCommand({ kind: 'sandbox-place', playerId, slotIndex: slot });
+      if (!placed) {
+        draftError = 'Displacement pick was rejected — it may already be spent.';
+        return;
+      }
+      const restored = await sendCommand({
+        kind: 'sandbox-place',
+        playerId: incumbent.playerId,
+        slotIndex: moveTarget,
+      });
+      if (!restored) {
+        draftError = 'Placed your pick but could not move the displaced player back.';
+      }
       return;
     }
     if (mode === 'duel') {
@@ -656,7 +691,7 @@
   <title>Room — Hoop Rush Multiplayer</title>
 </svelte:head>
 
-<section class="mx-auto w-full max-w-5xl px-4 pb-24 sm:px-6 md:pb-10">
+<section class="mx-auto w-full max-w-6xl px-4 pb-24 sm:px-6 md:pb-10">
   <a
     href={resolve('/multiplayer')}
     class="text-label mt-6 inline-flex items-center gap-1.5 self-start text-muted-foreground hover:text-foreground"
@@ -775,9 +810,9 @@
             deadlineText={clockText}
             {lastAutopick}
             error={draftError}
-            onPick={(playerId, slot) => {
+            onPick={(playerId, slot, moveTarget) => {
               draftError = null;
-              void sendPick(playerId, slot).catch((e: unknown) => {
+              void sendPick(playerId, slot, moveTarget).catch((e: unknown) => {
                 draftError = e instanceof Error ? e.message : String(e);
               });
             }}

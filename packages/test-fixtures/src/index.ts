@@ -14,9 +14,7 @@ import {
   opponentTeamSchema,
   peakPlayerSeasonSchema,
   playerIdSchema,
-  seasonKeySchema,
   seedFromString,
-  seedSchema,
   simulationPlayerSchema,
   simulationTeamSchema,
 } from '@hoop-rush/data-contracts';

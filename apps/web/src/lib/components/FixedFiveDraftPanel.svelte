@@ -1,26 +1,30 @@
 <script lang="ts">
-  import { canPlay } from '@hoop-rush/engine';
   import type {
     FixedFiveParticipantId,
     FixedFiveRoomMode,
     PlayersIndexEntry,
     PlayerId,
-    SlotGroup,
     SlotIndex,
+  } from '@hoop-rush/data-contracts';
+  import {
+    franchiseAbbreviation,
+    resolveEraTeamIdentity,
   } from '@hoop-rush/data-contracts';
   import ClassicRollReel from '$lib/components/classic/ClassicRollReel.svelte';
   import DraftPoolBrowser from '$lib/components/draft/DraftPoolBrowser.svelte';
   import LineupCourt from '$lib/components/LineupCourt.svelte';
-  import PlayerFace from '$lib/components/PlayerFace.svelte';
+  import TeamLogo from '$lib/components/TeamLogo.svelte';
+  import DraftValuePanel from '$lib/components/DraftValuePanel.svelte';
+  import LineupSummaryNav from '$lib/components/LineupSummaryNav.svelte';
   import { classicPoolRows } from '$lib/classic-draft';
-  import type { DraftPresentation } from '$lib/draft-presentation';
+  import {
+    poolSortLabel,
+    type DraftPresentation,
+  } from '$lib/draft-presentation';
+  import { displacementTargetFor } from '$lib/draft-slots';
+  import { resolvePlayerRefs } from '$lib/player-refs';
+  import type { PeakPlayerSeason } from '@hoop-rush/data-contracts';
   import type { DraftReplay, FixedFiveAssets } from '$lib/fixed-five-room-state';
-
-  function slotRequirementOf(slot: SlotIndex): SlotGroup {
-    if (slot <= 1) return 'G';
-    if (slot <= 3) return 'F';
-    return 'C';
-  }
 
   let {
     mode,
@@ -46,11 +50,28 @@
     deadlineText?: string | null;
     lastAutopick?: { displayName: string; seedPath: string } | null;
     error?: string | null;
-    onPick: (playerId: PlayerId, slotIndex: SlotIndex) => void;
+    onPick: (playerId: PlayerId, slotIndex: SlotIndex, moveTarget?: SlotIndex | null) => void;
     onReroll: (axis: 'franchise' | 'era') => void;
     onRemove: (slotIndex: SlotIndex) => void;
     onLock: () => void;
   } = $props();
+
+  const ROUNDS = [0, 1, 2, 3, 4] as const;
+
+  let slotPickerModule: Promise<
+    typeof import('$lib/components/draft/SlotPickerDialog.svelte')
+  > | null = null;
+  function loadSlotPickerDialog(): Promise<
+    typeof import('$lib/components/draft/SlotPickerDialog.svelte')
+  > {
+    slotPickerModule ??= import('$lib/components/draft/SlotPickerDialog.svelte');
+    return slotPickerModule;
+  }
+
+  let pickerPlayer = $state<PlayersIndexEntry | null>(null);
+  let pickerTrigger = $state<HTMLElement | null>(null);
+  let pickerFallbackId = $state<string | null>(null);
+  let resolvedLineupPlayers = $state.raw<PeakPlayerSeason[]>([]);
 
   const indexById = $derived(new Map(assets.index.players.map((p) => [p.playerId, p])));
   const catalogPairs = $derived(
@@ -63,6 +84,7 @@
     franchiseId: string;
     eraId: string;
     label: string;
+    round: number;
     spinKey: number;
     mySlotsUsed: Set<SlotIndex>;
     rerollFranchiseSpent: boolean;
@@ -82,6 +104,7 @@
           franchiseId: '',
           eraId: '',
           label: 'Draft complete',
+          round: 5,
           spinKey: 5,
           mySlotsUsed: new Set(draft.picks.map((p) => p.slotIndex)),
           rerollFranchiseSpent: true,
@@ -95,6 +118,7 @@
         franchiseId: draft.roll.franchiseId,
         eraId: draft.roll.eraId,
         label: `Round ${draft.round} of 5`,
+        round: draft.round,
         spinKey: draft.round,
         mySlotsUsed: new Set(draft.picks.map((p) => p.slotIndex)),
         rerollFranchiseSpent: draft.rerolls.franchiseSpent,
@@ -113,6 +137,7 @@
         franchiseId: '',
         eraId: '',
         label: 'Duel draft complete',
+        round: 5,
         spinKey: 10,
         mySlotsUsed: new Set(mine),
         rerollFranchiseSpent: true,
@@ -127,13 +152,15 @@
       franchiseId: duel.currentRoll.franchiseId,
       eraId: duel.currentRoll.eraId,
       label: `Pick ${duel.pickOrdinal + 1} of 10`,
+      round: Math.min(5, Math.floor(duel.pickOrdinal / 2) + 1),
       spinKey: duel.pickOrdinal,
       mySlotsUsed: new Set(mine),
       rerollFranchiseSpent: tokens.franchiseSpent,
       rerollEraSpent: tokens.eraSpent,
       complete: false,
       turn: picker === selfId,
-      turnText: picker === selfId ? 'Your pick — alternating draft.' : 'Opponent is picking…',
+      turnText:
+        picker === selfId ? 'Your pick — alternating draft.' : 'Opponent is picking…',
     };
   });
 
@@ -160,19 +187,6 @@
     return rows;
   });
 
-  function legalSlotsFor(playerId: PlayerId): SlotIndex[] {
-    const candidate = assets.poolById.get(playerId);
-    const positions = candidate?.positions ?? [];
-    const used = rollView?.mySlotsUsed ?? new Set<SlotIndex>();
-    const open: SlotIndex[] = [];
-    for (const slot of [0, 1, 2, 3, 4] as SlotIndex[]) {
-      if (used.has(slot)) continue;
-      if (positions.length > 0 && !canPlay(positions, slotRequirementOf(slot))) continue;
-      open.push(slot);
-    }
-    return open;
-  }
-
   const myPicks = $derived.by((): Array<{ playerId: PlayerId; slotIndex: SlotIndex }> => {
     if (replay.mode === 'duel') {
       return replay.state.picks
@@ -185,6 +199,15 @@
     }
     const draft = selfId === 'p1' ? replay.p1 : replay.p2;
     return draft.picks.map((p) => ({ playerId: p.playerId, slotIndex: p.slotIndex }));
+  });
+
+  const myCourtRows = $derived.by((): (PlayersIndexEntry | null)[] => {
+    if (replay.mode === 'sandbox-shared-82') return courtRows;
+    const rows: (PlayersIndexEntry | null)[] = [null, null, null, null, null];
+    for (const pick of myPicks) {
+      rows[pick.slotIndex] = indexById.get(pick.playerId) ?? null;
+    }
+    return rows;
   });
 
   function displayNameOf(playerId: PlayerId): string {
@@ -202,11 +225,118 @@
     return rows;
   });
   const sandboxLocked = $derived(
-    replay.mode === 'sandbox-shared-82' ? (selfId === 'p1' ? replay.p1 : replay.p2).locked : false,
+    replay.mode === 'sandbox-shared-82'
+      ? (selfId === 'p1' ? replay.p1 : replay.p2).locked
+      : false,
   );
+
+  const activeCourtRows = $derived(
+    mode === 'sandbox-shared-82' ? courtRows : myCourtRows,
+  );
+  const pickedCount = $derived(activeCourtRows.filter((p) => p !== null).length);
+  const allowDisplacement = $derived(mode !== 'duel');
+
+  const rollManifest = $derived(assets.manifest);
+  const rollFranchise = $derived(
+    rollView && !rollView.complete
+      ? (rollManifest.modernFranchiseSlots.find((e) => e.franchiseId === rollView.franchiseId) ??
+        null)
+      : null,
+  );
+  const rollEra = $derived(
+    rollView && !rollView.complete
+      ? (rollManifest.eras.find((e) => e.eraId === rollView.eraId) ?? null)
+      : null,
+  );
+  const rollIdentity = $derived(
+    rollView && !rollView.complete
+      ? resolveEraTeamIdentity(rollManifest, rollView.franchiseId, rollView.eraId)
+      : null,
+  );
+  const poolHeading = $derived(
+    rollView && !rollView.complete && rollFranchise && rollEra && rollIdentity
+      ? `${rollIdentity.abbreviationLabel ?? franchiseAbbreviation(rollFranchise.franchiseId)} · ${rollEra.label}`
+      : (rollView?.label ?? 'Draft pool'),
+  );
+  const poolCountLabel = $derived(
+    `${rollRows.length} players · ${poolSortLabel(presentation)}`,
+  );
+
+  $effect(() => {
+    const rows = activeCourtRows;
+    const manifest = assets.manifest;
+    const refs = rows
+      .filter((player): player is PlayersIndexEntry => player !== null)
+      .map((player) => ({
+        playerId: player.playerId,
+        franchiseId: player.franchiseId,
+        eraId: player.eraId,
+      }));
+    if (refs.length === 0) {
+      resolvedLineupPlayers = [];
+      return;
+    }
+    let cancelled = false;
+    resolvePlayerRefs(refs, manifest).then(
+      (players) => {
+        if (!cancelled) resolvedLineupPlayers = players;
+      },
+      () => {
+        if (!cancelled) resolvedLineupPlayers = [];
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  });
+
+  function openPicker(player: PlayersIndexEntry) {
+    pickerTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    pickerFallbackId = pickerTrigger?.closest<HTMLElement>('[id^="court-slot-"]')?.id ?? null;
+    pickerPlayer = player;
+  }
+
+  function closePicker() {
+    pickerPlayer = null;
+    const trigger = pickerTrigger;
+    const fallback = pickerFallbackId;
+    pickerTrigger = null;
+    pickerFallbackId = null;
+    queueMicrotask(() => {
+      if (trigger?.isConnected) {
+        trigger.focus();
+      } else if (fallback) {
+        document.getElementById(fallback)?.focus();
+      }
+    });
+  }
+
+  function placeWithDisplacement(player: PlayersIndexEntry, slotIndex: number) {
+    const slots = activeCourtRows;
+    const subjectSlot = slots.findIndex((p) => p !== null && p.playerId === player.playerId);
+    const incumbent = slots[slotIndex] ?? null;
+    let moveTarget: SlotIndex | null = null;
+    if (incumbent && incumbent.playerId !== player.playerId && allowDisplacement) {
+      moveTarget = displacementTargetFor(
+        slots,
+        incumbent,
+        slotIndex,
+        subjectSlot,
+      ) as SlotIndex | null;
+    }
+    closePicker();
+    onPick(player.playerId, slotIndex as SlotIndex, moveTarget);
+  }
+
+  function openPickerForCourt(player: PlayersIndexEntry) {
+    if (mode === 'sandbox-shared-82') {
+      openPicker(player);
+      return;
+    }
+  }
 </script>
 
-<div class="mt-2">
+<div class="mt-2 flex flex-col gap-6 pb-24">
   {#if deadlineText}
     <p class="text-xs text-muted-foreground" role="status">{deadlineText}</p>
   {/if}
@@ -217,145 +347,228 @@
     </p>
   {/if}
   {#if error}
-    <p
-      class="mt-2 rounded-lg border border-destructive/40 bg-destructive/10 p-2 text-xs"
-      role="alert"
-    >
+    <p class="mt-2 rounded-lg border border-destructive/40 bg-destructive/10 p-2 text-xs" role="alert">
       {error}
     </p>
   {/if}
 
   {#if mode !== 'sandbox-shared-82' && rollView}
-    <div class="mt-3 rounded-xl border border-line-soft bg-card p-4">
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <h3 class="font-display text-sm font-extrabold uppercase">{rollView.label}</h3>
-        <p class="text-xs text-muted-foreground" aria-live="polite">{rollView.turnText}</p>
+    {#if !rollView.complete}
+      <div class="rounded-xl bg-surface-1">
+        <div
+          class="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3"
+        >
+          <span class="font-display text-base font-extrabold tracking-tight uppercase sm:text-lg">
+            {rollView.label}
+          </span>
+          <span class="flex gap-1.5" aria-hidden="true">
+            {#each ROUNDS as i (i)}
+              <span
+                class="h-2 w-2 rounded-full {i < rollView.round - 1
+                  ? 'bg-primary'
+                  : i === rollView.round - 1
+                    ? 'bg-accent'
+                    : 'border border-border'}"
+              ></span>
+            {/each}
+          </span>
+        </div>
+        <p class="px-3 text-xs text-muted-foreground sm:px-4" aria-live="polite">
+          {rollView.turnText}
+        </p>
+        <div class="flex flex-col gap-2 px-3 pb-3 sm:gap-3 sm:px-4 sm:pb-4">
+          <div
+            class="grid w-full grid-cols-2 gap-2"
+            aria-label={rollFranchise && rollEra
+              ? `${rollView.label} · ${rollIdentity?.displayLabel ?? rollFranchise.displayName} · ${rollEra.label}`
+              : rollView.label}
+          >
+            <span
+              class="flex min-w-0 items-center gap-2 rounded-lg bg-surface-2 px-2.5 py-2 sm:px-3"
+              data-indicator="franchise"
+            >
+              {#if rollFranchise}
+                <TeamLogo
+                  manifest={rollManifest}
+                  franchiseId={rollFranchise.franchiseId}
+                  teamExternalId={rollFranchise.teamExternalId}
+                  logoCandidates={rollIdentity?.logoCandidates ?? []}
+                />
+              {/if}
+              <span class="min-w-0">
+                <span class="block font-mono text-[10px] font-bold tracking-[0.12em] uppercase">
+                  {rollFranchise
+                    ? (rollIdentity?.abbreviationLabel ??
+                      franchiseAbbreviation(rollFranchise.franchiseId))
+                    : rollView.franchiseId}
+                </span>
+                {#if rollFranchise}
+                  <span class="block truncate text-sm font-bold">
+                    {rollIdentity?.displayLabel ?? rollFranchise.displayName}
+                  </span>
+                {/if}
+              </span>
+            </span>
+            <span
+              class="flex items-center justify-center rounded-lg bg-surface-2 px-2.5 py-2 sm:px-3"
+              data-indicator="era"
+            >
+              <span class="font-display text-sm font-extrabold tracking-tight">
+                {rollEra?.label ?? rollView.eraId}
+              </span>
+            </span>
+          </div>
+          <div class="grid w-full grid-cols-2 gap-2">
+            <button
+              type="button"
+              disabled={disabled || rollView.rerollFranchiseSpent || !rollView.turn}
+              title={rollView.rerollFranchiseSpent ? 'Already used' : 'Roll a different franchise'}
+              onclick={() => onReroll('franchise')}
+              class="flex min-h-11 min-w-0 flex-col items-center justify-center rounded-lg bg-surface-2 px-2 py-2 text-center transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-40 sm:flex-row sm:gap-2 sm:px-3"
+            >
+              <span class="text-[11px] font-semibold leading-tight sm:text-sm"
+                >Reroll franchise</span
+              >
+              {#if rollView.rerollFranchiseSpent}
+                <span
+                  class="mt-0.5 font-mono text-[9px] font-bold tracking-[0.12em] text-muted-foreground uppercase sm:mt-0"
+                >
+                  Used
+                </span>
+              {/if}
+            </button>
+            <button
+              type="button"
+              disabled={disabled || rollView.rerollEraSpent || !rollView.turn}
+              title={rollView.rerollEraSpent ? 'Already used' : 'Roll a different era'}
+              onclick={() => onReroll('era')}
+              class="flex min-h-11 min-w-0 flex-col items-center justify-center rounded-lg bg-surface-2 px-2 py-2 text-center transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-40 sm:flex-row sm:gap-2 sm:px-3"
+            >
+              <span class="text-[11px] font-semibold leading-tight sm:text-sm">Reroll era</span>
+              {#if rollView.rerollEraSpent}
+                <span
+                  class="mt-0.5 font-mono text-[9px] font-bold tracking-[0.12em] text-muted-foreground uppercase sm:mt-0"
+                >
+                  Used
+                </span>
+              {/if}
+            </button>
+          </div>
+        </div>
       </div>
-      {#if !rollView.complete}
-        <div class="mt-3">
-          <ClassicRollReel
-            manifest={assets.manifest}
-            franchiseId={rollView.franchiseId}
-            eraId={rollView.eraId}
-            {franchiseOptions}
-            {eraOptions}
-            spinKey={rollView.spinKey}
-            announceText={`${rollView.label}: ${rollView.franchiseId} ${rollView.eraId}`}
-            onSettled={() => {}}
-          />
+      <ClassicRollReel
+        manifest={assets.manifest}
+        franchiseId={rollView.franchiseId}
+        eraId={rollView.eraId}
+        {franchiseOptions}
+        {eraOptions}
+        spinKey={rollView.spinKey}
+        announceText={`${rollView.label}: ${rollView.franchiseId} ${rollView.eraId}`}
+        roundLabel={rollView.label}
+        onSettled={() => {}}
+      />
+    {/if}
+    {#if !rollView.complete}
+      <DraftPoolBrowser
+        heading={poolHeading}
+        rows={rollRows}
+        slots={myCourtRows}
+        countLabel={poolCountLabel}
+        manifest={assets.manifest}
+        {presentation}
+        filtersEditable={true}
+        allowDisplacement={allowDisplacement}
+        error={null}
+        emptyMessage="No players in this pool."
+        onpick={openPicker}
+      />
+    {:else}
+      <div class="rounded-xl bg-surface-1">
+        <div class="px-3 py-3 sm:px-4">
+          <h3 class="font-display text-lg font-extrabold tracking-tight uppercase">Your five</h3>
         </div>
-        <div class="mt-3 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onclick={() => onReroll('franchise')}
-            disabled={disabled || rollView.rerollFranchiseSpent || !rollView.turn}
-            class="rounded-lg border border-line-soft bg-surface-1 px-3 py-1.5 text-xs font-semibold disabled:opacity-40"
-          >
-            Reroll franchise{rollView.rerollFranchiseSpent ? ' (spent)' : ''}
-          </button>
-          <button
-            type="button"
-            onclick={() => onReroll('era')}
-            disabled={disabled || rollView.rerollEraSpent || !rollView.turn}
-            class="rounded-lg border border-line-soft bg-surface-1 px-3 py-1.5 text-xs font-semibold disabled:opacity-40"
-          >
-            Reroll era{rollView.rerollEraSpent ? ' (spent)' : ''}
-          </button>
-        </div>
-        <ul class="mt-3 space-y-2" aria-label="Rolled players">
-          {#each rollRows as row (row.playerId)}
-            {@const slots = legalSlotsFor(row.playerId)}
-            <li class="flex items-center gap-3 rounded-xl border border-line-soft p-2">
-              <PlayerFace
-                player={row}
-                manifest={assets.manifest}
-                size="sm"
-                fallbackInitials={row.displayName.slice(0, 2)}
-              />
-              <div class="min-w-0 flex-1">
-                <p class="truncate text-sm font-semibold">{row.displayName}</p>
-                <p class="text-xs text-muted-foreground">
-                  {row.positionsPlayable.join('/')} · score {row.selectionScore.toFixed(1)}
-                </p>
-              </div>
-              <div class="flex flex-wrap gap-1">
-                {#each slots as slot (slot)}
-                  <button
-                    type="button"
-                    onclick={() => onPick(row.playerId, slot)}
-                    disabled={disabled || !rollView.turn}
-                    aria-label={`Draft ${row.displayName} into slot ${slot + 1}`}
-                    class="rounded-lg bg-primary px-2.5 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-40"
-                  >
-                    S{slot + 1}
-                  </button>
-                {:else}
-                  <span class="text-xs text-muted-foreground">No open slot</span>
-                {/each}
-              </div>
+        <ul class="flex flex-col divide-y divide-border/60">
+          {#each myPicks as pick (pick.playerId)}
+            <li class="flex items-center gap-3 px-3 py-3 sm:px-4">
+              <span class="min-w-0 flex-1 truncate text-sm font-bold">
+                {displayNameOf(pick.playerId)}
+              </span>
+              <span class="shrink-0 font-mono text-[10px] text-muted-foreground">
+                Slot {pick.slotIndex + 1}
+              </span>
             </li>
           {/each}
         </ul>
-      {:else}
-        <ul class="mt-3 space-y-1 text-sm">
-          {#each myPicks as pick (pick.playerId)}
-            <li>Slot {pick.slotIndex + 1}: {displayNameOf(pick.playerId)}</li>
-          {/each}
-        </ul>
-      {/if}
-    </div>
+      </div>
+    {/if}
+    <LineupCourt
+      slots={myCourtRows}
+      manifest={assets.manifest}
+      ready={rollView.complete}
+      allowRemove={false}
+      onmove={openPickerForCourt}
+      onremove={() => undefined}
+    />
+    <DraftValuePanel players={resolvedLineupPlayers} />
+    <LineupSummaryNav slots={myCourtRows} {pickedCount} />
   {/if}
 
   {#if mode === 'sandbox-shared-82'}
-    <div class="mt-3 rounded-xl border border-line-soft bg-card p-4">
+    <div class="rounded-xl bg-surface-1 p-3 sm:p-4">
       <h3 class="font-display text-sm font-extrabold uppercase">Build your five</h3>
       <p class="mt-1 text-xs text-muted-foreground">
         Same player may appear on both teams. Five minutes to build and lock; timeouts auto-fill
         from safe moves and then lock.
       </p>
-      <div class="mt-3">
-        <LineupCourt
-          slots={courtRows}
-          manifest={assets.manifest}
-          ready={sandboxLocked}
-          allowRemove={!sandboxLocked}
-          onmove={(player) => {
-            const at = courtRows.findIndex((row) => row?.playerId === player.playerId);
-            if (at >= 0) onRemove(at as SlotIndex);
-          }}
-          onremove={(index) => onRemove(index as SlotIndex)}
-        />
-      </div>
-      <div class="mt-3">
-        <DraftPoolBrowser
-          heading="Global pool"
-          rows={sandboxRows}
-          slots={courtRows}
-          countLabel={`${sandboxRows.length} players`}
-          filtersEditable={true}
-          manifest={assets.manifest}
-          {presentation}
-          error={null}
-          emptyMessage="No players match."
-          onpick={(player) => {
-            const used = new Set(courtRows.flatMap((row, i) => (row ? [i as SlotIndex] : [])));
-            for (const slot of [0, 1, 2, 3, 4] as SlotIndex[]) {
-              if (used.has(slot)) continue;
-              if (!canPlay(player.positionsPlayable, slotRequirementOf(slot))) continue;
-              onPick(player.playerId, slot);
-              return;
-            }
-          }}
-        />
-      </div>
-      <button
-        type="button"
-        onclick={onLock}
-        disabled={disabled || sandboxLocked}
-        class="mt-3 w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-40"
-      >
-        {sandboxLocked ? 'Locked' : 'Lock my five'}
-      </button>
     </div>
+    <DraftPoolBrowser
+      heading="Global pool"
+      rows={sandboxRows}
+      slots={courtRows}
+      countLabel={`${sandboxRows.length} players`}
+      filtersEditable={true}
+      manifest={assets.manifest}
+      presentation={presentation}
+      error={null}
+      emptyMessage="No players match."
+      allowDisplacement={true}
+      onpick={openPicker}
+    />
+    <LineupCourt
+      slots={courtRows}
+      manifest={assets.manifest}
+      ready={sandboxLocked}
+      allowRemove={!sandboxLocked}
+      onmove={openPicker}
+      onremove={(index) => onRemove(index as SlotIndex)}
+    />
+    <DraftValuePanel players={resolvedLineupPlayers} />
+    {#if !sandboxLocked}
+      <div>
+        <button
+          type="button"
+          onclick={onLock}
+          disabled={disabled || sandboxLocked}
+          class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          Lock my five
+        </button>
+      </div>
+    {/if}
+    <LineupSummaryNav slots={courtRows} {pickedCount} />
   {/if}
 </div>
+
+{#if pickerPlayer}
+  {#await loadSlotPickerDialog() then { default: SlotPickerDialog }}
+    <SlotPickerDialog
+      player={pickerPlayer}
+      slots={activeCourtRows}
+      manifest={assets.manifest}
+      {presentation}
+      allowDisplacement={allowDisplacement}
+      onplace={placeWithDisplacement}
+      onclose={closePicker}
+    />
+  {/await}
+{/if}

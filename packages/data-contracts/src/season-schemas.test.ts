@@ -1833,7 +1833,7 @@ describe('season influence family (M2.5, season-influence-v2)', () => {
   it('rejects missing franchises, wrong versions, and out-of-range balances', () => {
     const state = buildInitialInfluence();
     const balances = { ...state.balances };
-    delete balances[franchiseIdSchema.parse('lakers')];
+    Reflect.deleteProperty(balances, franchiseIdSchema.parse('lakers'));
     expect(() => seasonInfluenceStateSchema.parse({ ...state, balances })).toThrow();
     expect(() =>
       seasonInfluenceStateSchema.parse({ ...state, influenceVersion: 'season-influence-v1' }),

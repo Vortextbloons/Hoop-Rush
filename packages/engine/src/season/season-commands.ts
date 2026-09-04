@@ -1182,7 +1182,7 @@ function handleSubmitTradeProposal(
     );
   } else {
     const newNegotiation: import('@hoop-rush/data-contracts').SeasonTradeNegotiation = {
-      inquiryId: inquiryId!,
+      inquiryId: inquiryId,
       windowIndex: command.windowIndex,
       fromFranchiseId: franchiseIdSchema.parse(
         context.humanFranchiseId ??

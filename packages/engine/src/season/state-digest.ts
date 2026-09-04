@@ -173,7 +173,7 @@ export function seasonRunStateDigest(facts: SeasonRunStateDigestFacts): string {
                 .map(([blockIndex, offers]) => [
                   blockIndex,
                   sortedBy(
-                    offers as import('@hoop-rush/data-contracts').SeasonCampaignOpportunity[],
+                    offers,
                     (o) => o.opportunityId,
                   ),
                 ]),
@@ -208,12 +208,12 @@ export function seasonRunStateDigest(facts: SeasonRunStateDigestFacts): string {
       ),
     }),
     authority: authorityCanonical(
-      (facts.authority as SeasonRunAuthority | undefined) ??
+      (facts.authority) ??
         ({
           kind: 'local-solo',
           soloFranchiseId: null,
           authorityVersion: 'season-authority-v1',
-        } as SeasonRunAuthority),
+        }),
     ),
   });
   return seasonDigestHex(canonical);

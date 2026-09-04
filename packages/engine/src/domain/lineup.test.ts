@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Lineup, LineupAssignment, PositionUnion } from '@hoop-rush/data-contracts';
 import { LINEUP_STRUCTURE, playerIdSchema } from '@hoop-rush/data-contracts';
-import { assignLineup, canFillSlot, slotRequirement, validateLineup } from './lineup.ts';
+import { assignLineup, validateLineup } from './lineup.ts';
 const structure = { structure: LINEUP_STRUCTURE };
 function assignment(
   slotIndex: number,

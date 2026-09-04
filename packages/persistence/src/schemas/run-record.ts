@@ -16,7 +16,6 @@ import {
   type GameResult,
   type RunAggregates,
 } from '@hoop-rush/data-contracts';
-import type { StoredClassicDraft } from './classic-draft-record.ts';
 export const storedRunRecordSchema = z.object({
   recordId: z.string().min(1).max(64),
   saveSchemaVersion: z.literal(SAVE_SCHEMA_VERSION),

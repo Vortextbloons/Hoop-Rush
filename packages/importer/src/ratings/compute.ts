@@ -126,7 +126,7 @@ function loadPlayerWinPctMap(season: string): Map<string, number> {
   for (const path of candidates) {
     if (!fileExists(path)) continue;
     try {
-      const data = readJson(path) as unknown;
+      const data = readJson(path);
       const fileParsed = winPctFileSchema.safeParse(data);
       let rows: z.infer<typeof winPctRowSchema>[] = [];
       if (fileParsed.success && Array.isArray(fileParsed.data.rows)) {
@@ -136,7 +136,13 @@ function loadPlayerWinPctMap(season: string): Map<string, number> {
         if (arrayParsed.success) rows = arrayParsed.data;
       }
       for (const row of rows) {
-        const pid = String(row.PLAYER_ID ?? row.playerExternalId ?? '');
+        const rawId = row.PLAYER_ID ?? row.playerExternalId ?? '';
+        const pid =
+          typeof rawId === 'string' ||
+          typeof rawId === 'number' ||
+          typeof rawId === 'boolean'
+            ? String(rawId)
+            : '';
         if (!pid) continue;
         const wPctRaw = row.W_PCT ?? row.wPct ?? row.winPct;
         const wPct = typeof wPctRaw === 'number' && Number.isFinite(wPctRaw) ? wPctRaw : null;

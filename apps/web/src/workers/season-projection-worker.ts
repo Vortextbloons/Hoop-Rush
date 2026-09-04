@@ -10,7 +10,6 @@ import {
 import type {
   ProjectionRotationOptimizeRequest,
   ProjectionRosterBuildRequest,
-  ProjectionWorkerRequest,
   ProjectionWorkerResponse,
 } from '../lib/season/season-projection-wire.ts';
 function candidateToSimulationPlayer(candidate: SeasonDraftCandidate): SimulationPlayer {

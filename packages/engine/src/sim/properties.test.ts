@@ -2,17 +2,11 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import type { SimulationPlayer, SimulationTeam } from '@hoop-rush/data-contracts';
 import { playerIdSchema, seedSchema } from '@hoop-rush/data-contracts';
-import {
-  buildEraSimulationProfile,
-  buildGameSimulationInput,
-  buildSimulationPlayer,
-  seedFromString,
-} from '@hoop-rush/test-fixtures';
+import { buildGameSimulationInput, seedFromString } from '@hoop-rush/test-fixtures';
 import { simulateGame } from './game.ts';
 import { checkGameResult, gameResultDigest } from './invariants.ts';
 import { createEngineContext } from './context.ts';
 const ctx = createEngineContext();
-const profile = buildEraSimulationProfile();
 const ratingArb = fc.integer({ min: 40, max: 95 });
 const ratingsArb = fc.record({
   insideScoring: ratingArb,

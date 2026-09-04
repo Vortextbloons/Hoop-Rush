@@ -5,7 +5,6 @@ import {
   seasonAwardsDigest,
   seasonTradeGradeLogDigest,
   humanFranchiseIdOf,
-  type SeasonCampaignOpportunity,
   type SeasonEffectsState,
   type SeasonFreeAgencyIndex,
   type SeasonGameSummary,
@@ -604,7 +603,7 @@ export function campaignOfferFailures(run: SeasonRun): string[] {
     const ids = new Set(offers.map((o) => o.opportunityId));
     if (ids.size !== 2) failures.push(`block ${String(blockIndex)} offers not unique`);
     for (const offer of offers) {
-      if (!offer.feasibilityFacts || Object.keys(offer.feasibilityFacts).length === 0) {
+      if (Object.keys(offer.feasibilityFacts).length === 0) {
         failures.push(`offer ${offer.opportunityId} has unsupported feasibility facts`);
       }
     }
@@ -623,7 +622,7 @@ export function campaignEvaluationFailures(run: SeasonRun): string[] {
   ).campaign;
   if (!campaign) return failures;
   for (const ev of campaign.evaluations) {
-    if (!ev.opportunityId || !ev.outcome)
+    if (!ev.opportunityId)
       failures.push(`evaluation ${ev.opportunityId} missing outcome`);
     if (!['missed', 'completed', 'breakthrough'].includes(ev.outcome))
       failures.push(`evaluation ${ev.opportunityId} has invalid outcome`);

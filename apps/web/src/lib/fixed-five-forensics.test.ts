@@ -31,9 +31,17 @@ import {
   applyClassicBuilderCommand,
   simulateShared82,
   toSimulationPlayer,
+  canonicalFixedFiveDigestPayload,
   type EngineContext,
 } from '@hoop-rush/engine';
 import { buildClassicCatalog } from '$lib/classic-draft';
+import {
+  lineupEntryFor,
+  refsForParticipant,
+  replayFixedFiveLog,
+} from '$lib/fixed-five-room-state';
+import { playerVersionId } from '@hoop-rush/data-contracts';
+import type { FixedFiveCandidate } from '@hoop-rush/data-contracts';
 
 const LIVE = process.env.FIXED_FIVE_FORENSICS === '1';
 const ROOM_ID = 'd71f646b-a586-49f7-b8ea-47bd76b95cb3';
@@ -205,6 +213,57 @@ describe.skipIf(!LIVE)('fixed-five forensics: third-client recomputation of room
     const p2 = replay('p2');
     expect(p1.picks).toHaveLength(5);
     expect(p2.picks).toHaveLength(5);
+    // eslint-disable-next-line no-console
+    console.log(
+      `p1 picks: ${p1.picks.map((p) => `${p.playerId}@${p.franchiseId}/${p.eraId}/s${String(p.slotIndex)}`).join(' ')}`,
+    );
+    // eslint-disable-next-line no-console
+    console.log(
+      `p2 picks: ${p2.picks.map((p) => `${p.playerId}@${p.franchiseId}/${p.eraId}/s${String(p.slotIndex)}`).join(' ')}`,
+    );
+
+    // Cross-check with the exact client replay path.
+    const pool: FixedFiveCandidate[] = index.players.map((entry) => ({
+      playerId: entry.playerId,
+      playerVersionId: playerVersionId(
+        entry.playerId,
+        entry.franchiseId,
+        entry.eraId,
+        entry.seasonKey,
+      ),
+      positions: [...entry.positionsPlayable],
+      selectionScore: entry.selectionScore,
+      franchiseId: entry.franchiseId,
+      eraId: entry.eraId,
+    }));
+    const assets = {
+      manifest,
+      profile,
+      bracket,
+      index,
+      catalog,
+      pool,
+      poolById: new Map(pool.map((c) => [c.playerId, c])),
+      context,
+    };
+    const clientReplay = replayFixedFiveLog(
+      'classic-shared-82',
+      ROOM_ID,
+      ROOT,
+      'data-v1',
+      'ratings',
+      assets,
+      commands,
+    );
+    if (clientReplay.mode !== 'classic-shared-82') throw new Error('wrong replay mode');
+    const refs1 = refsForParticipant(clientReplay, assets, 'p1');
+    const refs2 = refsForParticipant(clientReplay, assets, 'p2');
+    expect(refs1.map((r) => `${r.playerId}@s${String(r.slotIndex)}`).join(' ')).toBe(
+      p1.picks.map((p) => `${p.playerId}@s${String(p.slotIndex)}`).join(' '),
+    );
+    expect(refs2.map((r) => `${r.playerId}@s${String(r.slotIndex)}`).join(' ')).toBe(
+      p2.picks.map((p) => `${p.playerId}@s${String(p.slotIndex)}`).join(' '),
+    );
 
     const poolCache = new Map<string, PeakPlayerSeason[]>();
     function peakFor(franchiseId: string, eraId: string, playerId: string): PeakPlayerSeason {
@@ -250,30 +309,17 @@ describe.skipIf(!LIVE)('fixed-five forensics: third-client recomputation of room
     );
     expect(out.p1Games).toHaveLength(82);
     expect(out.result.h2hGameNumbers.length).toBeGreaterThan(0);
+    // eslint-disable-next-line no-console
+    console.log(
+      `summary: weakest=${out.result.weakestReplacedOpponentId} h2h=${out.result.h2hGameNumbers.join(',')} ` +
+        `p1=${String(out.result.participants[0]?.wins)}-${String(out.result.participants[0]?.losses)}:${String(out.result.participants[0]?.differential)} ` +
+        `p2=${String(out.result.participants[1]?.wins)}-${String(out.result.participants[1]?.losses)}:${String(out.result.participants[1]?.differential)} ` +
+        `rank=${out.result.ranking.join('>')}`,
+    );
 
     const lineups = {
-      p1: {
-        lineup: {
-          structure: ['G', 'G', 'F', 'F', 'C'] as ['G', 'G', 'F', 'F', 'C'],
-          assignments: p1.picks.map((p) => ({
-            slotIndex: p.slotIndex,
-            playerId: p.playerId,
-            positions: p1Team.players.find((sp) => sp.playerId === p.playerId)?.positions ?? ['PG'],
-          })),
-        },
-        players: p1Team.players,
-      },
-      p2: {
-        lineup: {
-          structure: ['G', 'G', 'F', 'F', 'C'] as ['G', 'G', 'F', 'F', 'C'],
-          assignments: p2.picks.map((p) => ({
-            slotIndex: p.slotIndex,
-            playerId: p.playerId,
-            positions: p2Team.players.find((sp) => sp.playerId === p.playerId)?.positions ?? ['PG'],
-          })),
-        },
-        players: p2Team.players,
-      },
+      p1: lineupEntryFor(refs1, p1Team.players),
+      p2: lineupEntryFor(refs2, p2Team.players),
     };
     const versions = {
       dataVersion: 'data-v1',
@@ -288,21 +334,17 @@ describe.skipIf(!LIVE)('fixed-five forensics: third-client recomputation of room
       multiplayerVersion: 'fixed-five-multiplayer-v1',
       autopickVersion: 'fixed-five-autopick-v1',
     };
-    const base = {
-      rootSeed: ROOT,
-      versions,
-      lineups: lineups as unknown as {
-        p1: FixedFiveLineupEntry;
-        p2: FixedFiveLineupEntry;
-      },
-      result: out.result as FixedFiveCompetitionResult,
-      aggregates: null,
-    };
     const digestOver = (ordinals: number[]): string =>
-      oldDigest({
-        ...base,
-        acceptedCommands: commands.filter((c) => ordinals.includes(c.ordinal)),
-      });
+      oldDigest(
+        canonicalFixedFiveDigestPayload({
+          rootSeed: ROOT,
+          versions,
+          lineups,
+          acceptedCommands: commands.filter((c) => ordinals.includes(c.ordinal)),
+          result: out.result,
+          aggregates: null,
+        }),
+      );
     const d10 = digestOver([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     const d11 = digestOver([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
     // eslint-disable-next-line no-console

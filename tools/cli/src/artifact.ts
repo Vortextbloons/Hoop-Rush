@@ -102,7 +102,7 @@ export function runWorkerChunk<TResult>(args: {
       resolvePromise((message as Record<string, TResult>)[args.payloadKey] as TResult);
       void worker.terminate().catch(() => {});
     });
-    worker.on('error', (error) => {
+    worker.on('error', (error: Error) => {
       if (settled) return;
       settled = true;
       rejectPromise(error);

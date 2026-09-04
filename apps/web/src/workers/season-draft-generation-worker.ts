@@ -8,7 +8,7 @@ self.addEventListener('message', (event: MessageEvent<unknown>) => {
   const parsed = generationWorkerRequestSchema.safeParse(event.data);
   if (!parsed.success) return;
   const request = parsed.data as unknown as GenerationWorkerRequest;
-  if (request.type !== 'generate') return;
+  if ((request as unknown as { type: string }).type !== 'generate') return;
   const respond = (response: GenerationWorkerResponse): void => {
     self.postMessage(response);
   };

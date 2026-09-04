@@ -21,9 +21,6 @@ export interface ReplayDivergence {
   kind: ReplayDivergenceKind;
   message: string;
 }
-function deepEqual(a: unknown, b: unknown): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
-}
 export function auditReplayDivergences(
   stored: StoredSeasonRunRecord,
   recomputedDigest: string | null,
@@ -44,7 +41,7 @@ export function auditReplayDivergences(
         transactions: stored.transactions,
         trade: stored.trade,
         objectives: stored.objectives,
-        campaign: undefined as unknown as never,
+        campaign: undefined,
         rosters: stored.run.rosters,
         ownership: stored.run.ownership,
         rotations: stored.run.rotations,
@@ -68,7 +65,7 @@ export function auditReplayDivergences(
   }
   if (stored.campaign !== undefined) {
     const campaign = stored.campaign;
-    for (const [blockKey, offers] of Object.entries(campaign.offers ?? {})) {
+    for (const [blockKey, offers] of Object.entries(campaign.offers)) {
       if (!Array.isArray(offers) || offers.length !== 2) {
         divergences.push({
           kind: 'campaign-offers',
@@ -84,7 +81,7 @@ export function auditReplayDivergences(
         }
       }
     }
-    for (const evaluation of campaign.evaluations ?? []) {
+    for (const evaluation of campaign.evaluations) {
       const selection = campaign.selections[evaluation.blockIndex];
       if (!selection || selection.opportunityId !== evaluation.opportunityId) {
         divergences.push({
@@ -93,15 +90,15 @@ export function auditReplayDivergences(
         });
       }
     }
-    for (const [branchId, state] of Object.entries(campaign.branchState ?? {})) {
-      if (!['open', 'completed', 'missed', 'locked'].includes(state as string)) {
+    for (const [branchId, state] of Object.entries(campaign.branchState)) {
+      if (!['open', 'completed', 'missed', 'locked'].includes(state)) {
         divergences.push({
           kind: 'campaign-branch-state',
-          message: `campaign branch ${branchId} has invalid state ${String(state)}`,
+          message: `campaign branch ${branchId} has invalid state ${state}`,
         });
       }
     }
-    if (campaign.evolutionSelection !== null && campaign.evolutionSelection !== undefined) {
+    if (campaign.evolutionSelection !== null) {
       if (!campaign.evolutionOffers || campaign.evolutionOffers.length === 0) {
         divergences.push({
           kind: 'campaign-evolution',
@@ -222,7 +219,9 @@ export function replayDivergenceMessage(kind: ReplayDivergenceKind): string {
       return 'State digest does not recompute';
     case 'command-log-digest':
       return 'Command log digest does not recompute';
-    default:
-      return `replay divergence: ${kind}`;
+    default: {
+      const message: string = kind;
+      return `replay divergence: ${message}`;
+    }
   }
 }

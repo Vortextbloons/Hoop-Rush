@@ -6,7 +6,6 @@ import type {
 } from '@hoop-rush/persistence';
 import {
   SEASON_NEUTRAL_HOME_COURT,
-  SEASON_FREE_AGENCY_VERSION,
   seasonCandidateCheckpointSchema,
   seasonWorkerCancelRequestSchema,
   seasonWorkerContinueRequestSchema,

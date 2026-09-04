@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fireEvent, render } from '@testing-library/svelte';
+import { render } from '@testing-library/svelte';
 import { buildManifest, buildSeasonLeague } from '@hoop-rush/test-fixtures';
 import type {
   HoopRushManifest,

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { franchiseIdSchema, idSchema } from './ids.ts';
+import { franchiseIdSchema } from './ids.ts';
 import { seasonCheckpointDigestSchema } from './season-digests.ts';
 import {
   SEASON_AUTHORITY_VERSION,

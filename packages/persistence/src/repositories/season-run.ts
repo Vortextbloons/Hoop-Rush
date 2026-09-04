@@ -24,7 +24,6 @@ import type {
   SeasonTradeState,
   SeasonTransactionEntry,
 } from '@hoop-rush/data-contracts';
-import { SEASON_RUN_SAVE_SCHEMA_VERSION } from '@hoop-rush/data-contracts';
 import type { StoredSeasonDraft } from '../schemas/season-draft-record.ts';
 import type { SeasonWindowOpenResult } from '../season/engine-seam-types.ts';
 import type { SeasonRunPlayerSliceEntry } from '../schemas/season-run-record.ts';

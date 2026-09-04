@@ -2,12 +2,10 @@ import { resolve } from 'node:path';
 import { z } from 'zod';
 import {
   SEASON_CAMPAIGN_TARGETS_VERSION,
-  SEASON_CAMPAIGN_VERSION,
   SEASON_GAME_TARGETS_VERSION,
   SEASON_GAME_VERSION,
   buildEmptyCampaignState,
   commandIdSchema,
-  franchiseIdSchema,
   type Seed,
 } from '@hoop-rush/data-contracts';
 import {
@@ -27,8 +25,6 @@ import {
   gateValue,
   gateSummary,
   m25ToleranceGate,
-  m25RangeGate,
-  mean,
   seasonCalibrationSeed,
   seedIndexRange,
   type M25Gate,
@@ -189,7 +185,7 @@ function auditOffersForSeed(rootSeed: Seed): {
 } {
   let eligibleCheckpoints = 0;
   let offersGenerated = 0;
-  let offerPerCheckpointFailures = 0;
+  const offerPerCheckpointFailures = 0;
   let unsupportedFactFailures = 0;
   let duplicateRewardFailures = 0;
   let branchViolations = 0;
@@ -212,7 +208,6 @@ function auditOffersForSeed(rootSeed: Seed): {
     );
   }
   const run = baselineFacts.run;
-  const catalog = baselineFacts.catalog;
   const schedule = generateSeasonSchedule({
     league: run.league,
     seed: run.schedule.generationSeed,
@@ -224,7 +219,6 @@ function auditOffersForSeed(rootSeed: Seed): {
   let campaignState = buildEmptyCampaignState();
   campaignState.startingIdentity = 'win-now';
   campaignState.startingFocus = 'defense';
-  const allRewardIds = new Set<string>();
   for (let blockIndex = 0; blockIndex <= 7; blockIndex += 1) {
     eligibleCheckpoints += 1;
     if (blockIndex === 5 && campaignState.evolutionSelection === null) {
@@ -272,7 +266,7 @@ function auditOffersForSeed(rootSeed: Seed): {
       throw new Error(
         `campaign generation failed for seed ${rootSeed} block ${String(blockIndex)}: ${(e as Error).message} audit ${JSON.stringify(
           (
-            e as unknown as {
+            e as {
               audit?: unknown;
             }
           ).audit ?? [],
@@ -293,7 +287,7 @@ function auditOffersForSeed(rootSeed: Seed): {
       );
     }
     for (const offer of offers) {
-      if (!offer.feasibilityFacts || Object.keys(offer.feasibilityFacts).length === 0) {
+      if (Object.keys(offer.feasibilityFacts).length === 0) {
         unsupportedFactFailures += 1;
       }
       if (offer.seedPath[0] !== 'campaign' || offer.seedPath[1] !== String(blockIndex)) {
@@ -368,7 +362,7 @@ function auditOffersForSeed(rootSeed: Seed): {
       const first = offers[0];
       campaignState = {
         ...campaignState,
-        offers: { ...campaignState.offers, [blockIndex]: offers as [typeof first, typeof first] },
+        offers: { ...campaignState.offers, [blockIndex]: offers },
         selections: {
           ...campaignState.selections,
           [blockIndex]: {
@@ -563,7 +557,6 @@ export function validateSeasonCampaignTargets(
     command: 'season campaign calibrate --validate',
     extraChecks: (parsed) => {
       const failures: string[] = [];
-      if (parsed.policy.offersPerCheckpoint !== 2) failures.push('offersPerCheckpoint must be 2');
       if (Object.keys(parsed.measured.calibration).length === 0)
         failures.push('missing calibration measured');
       return {

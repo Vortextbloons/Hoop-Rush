@@ -49,7 +49,6 @@ export * from './season-game.ts';
 export * from './season-standings.ts';
 export * from './season-cursor.ts';
 export * from './season-postseason.ts';
-export * from './season-postseason-legacy.ts';
 export * from './season-postseason-summary.ts';
 export * from './season-awards.ts';
 export * from './season-trade-grade.ts';

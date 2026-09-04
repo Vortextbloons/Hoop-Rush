@@ -253,7 +253,7 @@ export function rosterPlayerVersionIdsOf(run: SeasonRun, franchiseId: string): s
   return roster.players.map((player) => player.playerVersionId);
 }
 function aiFranchiseIdsOf(run: SeasonRun, humanFranchiseId: string): string[] {
-  const authority = (run as SeasonRun).authority;
+  const authority = (run).authority;
   if (authority?.kind === 'season-multiplayer') {
     const excluded = new Set([authority.p1.franchiseId, authority.p2.franchiseId]);
     return run.league.teams

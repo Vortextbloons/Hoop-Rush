@@ -43,23 +43,31 @@ export default tseslint.config(
     },
   },
   {
-    files: ['src/season/**'],
+    files: [
+      'src/season/**',
+      'src/sim/**',
+      'src/domain/**',
+      'src/projection/**',
+      'src/modes/**',
+      'src/bracket/**',
+      'src/challenge/**',
+    ],
     rules: {
       'no-restricted-imports': [
         'error',
         {
           patterns: [
-            { group: ['*svelte*'], message: 'Season Run domain must not import Svelte' },
-            { group: ['*dexie*'], message: 'Season Run domain must not import persistence' },
-            { group: ['node:*'], message: 'Season Run domain must not import Node APIs' },
-            { group: ['*worker*'], message: 'Season Run domain must not import workers' },
+            { group: ['*svelte*'], message: 'Engine domain must not import Svelte' },
+            { group: ['*dexie*'], message: 'Engine domain must not import persistence' },
+            { group: ['node:*'], message: 'Engine domain must not import Node APIs' },
+            { group: ['*worker*'], message: 'Engine domain must not import workers' },
             {
               group: ['*supabase*'],
-              message: 'Season Run domain must not import network services',
+              message: 'Engine domain must not import network services',
             },
             {
               group: ['*fetch*', '*browser*'],
-              message: 'Season Run domain must not import network/browser APIs',
+              message: 'Engine domain must not import network/browser APIs',
             },
           ],
         },

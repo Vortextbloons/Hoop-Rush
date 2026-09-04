@@ -25,7 +25,9 @@ describe('normalizeSeasonTransactions', () => {
       explanation: 'Trade cash sent 1',
     };
     expect(() => seasonTransactionEntrySchema.parse(overlong)).toThrow();
-    const normalized = normalizeSeasonTransactions([overlong])[0]!;
+    const normalizedEntries = normalizeSeasonTransactions([overlong]);
+    const normalized = normalizedEntries[0];
+    if (normalized === undefined) throw new Error('expected a normalized transaction');
     expect(normalized.transactionId.length).toBeLessThanOrEqual(64);
     expect(seasonTransactionEntrySchema.parse(normalized).transactionId).toBe(
       deriveSeasonTransactionId(overlong.transactionId),

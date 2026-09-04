@@ -1,13 +1,10 @@
-import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { seasonCandidateCheckpointSchema } from '@hoop-rush/data-contracts';
 import {
-  seasonBlockAuditReportSchema,
   seasonBlockSimulateReportSchema,
   seasonFullSimulateReportSchema,
 } from './report-schemas.ts';
-import { jsonPayload, REPO_ROOT, runCli, TMP } from './cli-test-helpers.ts';
+import { jsonPayload, REPO_ROOT, runCli } from './cli-test-helpers.ts';
 const SEASON_RUN = join(REPO_ROOT, 'tools/cli/src/fixtures/season-run.json');
 const BLOCK_ZERO_DIGEST = 'b4a56279ab857e9567e8a0f3f4c7d749';
 describe('cli: season block simulate', () => {
@@ -56,16 +53,3 @@ describe('cli: season full simulate', () => {
     expect(report.blockDigests[8]?.digest).toBe(report.finalDigest);
   }, 300000);
 });
-async function produceBlockZeroCheckpoint(): Promise<
-  ReturnType<typeof seasonCandidateCheckpointSchema.parse>
-> {
-  const { seasonRunSchema } = await import('@hoop-rush/data-contracts');
-  const { createSeasonBlockRunner, rollForwardTo, runBlockThroughHandler } =
-    await import('../src/commands/season-block.ts');
-  const state = createSeasonBlockRunner({ runPath: SEASON_RUN });
-  rollForwardTo(state, 0);
-  const checkpoint = runBlockThroughHandler(state, 0);
-  const parsed = seasonRunSchema.safeParse(JSON.parse(readFileSync(SEASON_RUN, 'utf8')));
-  expect(parsed.success).toBe(true);
-  return seasonCandidateCheckpointSchema.parse(checkpoint);
-}

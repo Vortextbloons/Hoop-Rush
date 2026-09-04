@@ -85,8 +85,8 @@ type _FakeCommitInputParity = EngineCommitInput extends {
 }
   ? true
   : never;
-const _fakeSimulateInputParity: _FakeSimulateInputParity = true;
-const _fakeCommitInputParity: _FakeCommitInputParity = true;
+export const _fakeSimulateInputParity: _FakeSimulateInputParity = true;
+export const _fakeCommitInputParity: _FakeCommitInputParity = true;
 const PROGRESS_STEP_MS = 40;
 const GAMES_PER_STEP = 15;
 function deterministicPoints(gameId: string, base: number): number {

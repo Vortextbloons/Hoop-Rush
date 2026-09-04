@@ -32,7 +32,6 @@ const frozenTargetLeafSchema = z.object({
   tolerance: z.number().optional(),
   minimumSample: z.number().optional(),
 });
-type FrozenTargetLeaf = z.infer<typeof frozenTargetLeafSchema>;
 const frozenTargetsSchema = z.looseObject({
   possessionsPerGame: frozenTargetLeafSchema.optional(),
   pointsPerGame: frozenTargetLeafSchema.optional(),
@@ -88,7 +87,7 @@ export function extractCalibrationPayload(raw: string): CalibrationPayload {
   if (end < 0) {
     throw new Error('report JSON payload is not closed');
   }
-  const parsed = reportEnvelopeSchema.safeParse(JSON.parse(raw.slice(start, end)) as unknown);
+  const parsed = reportEnvelopeSchema.safeParse(JSON.parse(raw.slice(start, end)));
   if (!parsed.success) {
     throw new Error(
       `expected a calibrate run report, got (missing payload): ${parsed.error.issues[0]?.message ?? 'invalid'}`,
@@ -142,7 +141,7 @@ export function freezeTargets(reportPath: string, eraId = '1990s', profilePath?:
       throw new Error(`profile has no target ${path}`);
     }
     Reflect.set(node, 'value', round4(value));
-    const existingSample = Reflect.get(node, 'minimumSample');
+    const existingSample: unknown = Reflect.get(node, 'minimumSample');
     Reflect.set(
       node,
       'minimumSample',
