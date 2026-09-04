@@ -3,6 +3,7 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
+  import { Check, Copy } from '@lucide/svelte';
   import type {
     CommandId,
     ContentHash,
@@ -21,6 +22,7 @@
   import { submitFixedFiveCommand } from '$lib/fixed-five-command-submit';
   import {
     friendlyFixedFiveJoinError,
+    inviteLinkForFixedFiveCode,
     loadFixedFiveMembership,
     saveFixedFiveMembership,
   } from '$lib/fixed-five-identity';
@@ -100,6 +102,8 @@
   let leaveBusy = $state(false);
   let rematchBusy = $state(false);
   let submittedTimeouts = $state<Set<string>>(new Set());
+  let copiedInvite = $state(false);
+  let copiedCode = $state(false);
 
   const replay = $derived.by((): DraftReplay | null => {
     if (!snapshot || !assets || !snapshot.rootSeed) return null;
@@ -156,6 +160,26 @@
 
   function transport() {
     return createConfiguredFixedFiveTransport();
+  }
+
+  async function copyInviteLink() {
+    if (!snapshot?.code) return;
+    try {
+      await navigator.clipboard.writeText(
+        `${window.location.origin}${inviteLinkForFixedFiveCode(snapshot.code)}`,
+      );
+      copiedInvite = true;
+      setTimeout(() => (copiedInvite = false), 1500);
+    } catch {}
+  }
+
+  async function copyRoomCode() {
+    if (!snapshot?.code) return;
+    try {
+      await navigator.clipboard.writeText(snapshot.code);
+      copiedCode = true;
+      setTimeout(() => (copiedCode = false), 1500);
+    } catch {}
   }
 
   function brandedRoomId(): Id {
@@ -529,6 +553,16 @@
     }
   }
 
+  async function startDraft(): Promise<void> {
+    if (selfId !== 'p1' || busyAction !== null) return;
+    busyAction = 'start';
+    try {
+      await sendCommand({ kind: 'start' });
+    } finally {
+      if (mounted) busyAction = null;
+    }
+  }
+
   onMount(() => {
     mounted = true;
     const membership = loadFixedFiveMembership(roomId);
@@ -767,8 +801,10 @@
     </p>
   {:else if snapshot && display}
     <div class="mt-4">
-      <p class="text-label text-primary">Fixed-five · {snapshot.settings.mode} · {phase}</p>
-      <h1 class="font-display mt-2 text-3xl font-extrabold tracking-tight uppercase">
+      <p class="text-label text-primary break-words">
+        Fixed-five · {snapshot.settings.mode} · {phase}
+      </p>
+      <h1 class="font-display mt-2 text-2xl font-extrabold tracking-tight uppercase sm:text-3xl">
         Room {snapshot.code ?? '····'}
       </h1>
     </div>
@@ -806,44 +842,101 @@
       </p>{/if}
 
     {#if phase === 'lobby'}
-      <div class="mt-6 rounded-2xl bg-surface-1 p-6">
-        <h2 class="font-display text-sm font-extrabold uppercase">Lobby — waiting & ready</h2>
+      <div class="mt-6 rounded-2xl bg-surface-1 p-4 sm:p-6">
+        <h2 class="font-display text-sm font-extrabold uppercase">
+          {selfId === 'p1' ? 'Lobby — start when your opponent joins' : 'Lobby — waiting for host'}
+        </h2>
         <p class="mt-1 text-xs text-muted-foreground">
           Variant frozen: {snapshot.settings.variant}. Codes expire after 15 minutes; rooms after 24
           hours.
         </p>
-        <div class="mt-4 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onclick={() => sendCommand({ kind: 'ready', ready: true })}
-            class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
-            >Ready</button
-          >
-          <button
-            type="button"
-            onclick={() => sendCommand({ kind: 'start' })}
-            class="rounded-xl border border-line-soft bg-card px-4 py-2 text-sm font-semibold"
-            >Start draft</button
-          >
-          {#if selfId === 'p1'}
+        {#if selfId === 'p1'}
+          {#if snapshot.code}
+            <div class="mt-4 rounded-xl border border-primary/30 bg-primary/5 p-4">
+              <p class="text-label text-primary">Share with your opponent</p>
+              <div class="mt-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+                <div class="flex justify-center gap-1.5 sm:justify-start">
+                  {#each snapshot.code.split('') as digit, i (i)}
+                    <span
+                      class="inline-flex h-12 w-10 items-center justify-center rounded-xl border-2 border-primary/40 bg-card font-mono text-2xl font-black sm:h-14 sm:w-12 sm:text-3xl"
+                      >{digit}</span
+                    >
+                  {/each}
+                </div>
+                <div class="grid gap-2 sm:flex sm:flex-wrap">
+                  <button
+                    type="button"
+                    onclick={copyRoomCode}
+                    class="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-line-soft bg-card px-4 py-2.5 text-sm font-semibold sm:w-auto"
+                  >
+                    {#if copiedCode}<Check class="h-4 w-4" /> Copied!{:else}<Copy class="h-4 w-4" /> Copy
+                      code{/if}
+                  </button>
+                  <button
+                    type="button"
+                    onclick={copyInviteLink}
+                    class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground sm:w-auto"
+                  >
+                    {#if copiedInvite}<Check class="h-4 w-4" /> Copied!{:else}Copy invite link{/if}
+                  </button>
+                </div>
+              </div>
+            </div>
+          {/if}
+          {#if opponent?.online}
+            <p class="mt-4 text-sm font-semibold text-positive" role="status">
+              Opponent joined — start the draft for both players.
+            </p>
+          {:else}
+            <p class="mt-4 text-sm text-muted-foreground" role="status">
+              Waiting for opponent to join… Share the code above. Start unlocks once they join.
+            </p>
+          {/if}
+          <div class="mt-4 grid gap-2 sm:flex sm:flex-wrap">
+            <button
+              type="button"
+              onclick={startDraft}
+              disabled={busyAction !== null || !opponent?.online}
+              title={!opponent?.online
+                ? 'Waiting for opponent to join'
+                : 'Start the draft for both'}
+              class="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-40 sm:py-2"
+              >{busyAction === 'start' ? 'Starting…' : 'Start'}</button
+            >
             <button
               type="button"
               onclick={() =>
                 transport()
                   .removeGuest(roomId, 'p2')
                   .then((s) => (snapshot = s))}
-              class="rounded-xl border border-line-soft bg-card px-4 py-2 text-sm font-semibold"
+              class="rounded-xl border border-line-soft bg-card px-4 py-2.5 text-sm font-semibold sm:py-2"
               >Remove guest (pre-draft)</button
             >
-          {/if}
-          <button
-            type="button"
-            onclick={doLeave}
-            disabled={leaveBusy}
-            class="rounded-xl border border-line-soft bg-card px-4 py-2 text-sm font-semibold disabled:opacity-40"
-            >Leave</button
-          >
-        </div>
+            <button
+              type="button"
+              onclick={doLeave}
+              disabled={leaveBusy}
+              class="rounded-xl border border-line-soft bg-card px-4 py-2.5 text-sm font-semibold disabled:opacity-40 sm:py-2"
+              >Leave</button
+            >
+          </div>
+        {:else}
+          <div class="mt-4 rounded-xl border border-line-soft bg-card p-4" role="status">
+            <p class="text-sm font-semibold">Joined ✓ Waiting for the host to start the draft…</p>
+            <p class="mt-1 text-xs text-muted-foreground">
+              No action needed — the draft opens here automatically once the host starts it.
+            </p>
+          </div>
+          <div class="mt-4 grid gap-2 sm:flex sm:flex-wrap">
+            <button
+              type="button"
+              onclick={doLeave}
+              disabled={leaveBusy}
+              class="rounded-xl border border-line-soft bg-card px-4 py-2.5 text-sm font-semibold disabled:opacity-40 sm:py-2"
+              >Leave</button
+            >
+          </div>
+        {/if}
       </div>
     {:else if phase === 'drafting' && replay && assets}
       <div class="mt-6 rounded-2xl bg-surface-1 p-6">

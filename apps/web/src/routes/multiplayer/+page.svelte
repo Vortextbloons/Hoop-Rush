@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import { Swords, Zap, Trophy, Plus, LogIn, ArrowLeft, Copy, Check, Clock } from '@lucide/svelte';
+  import { Swords, Zap, Trophy, Plus, LogIn, ArrowLeft } from '@lucide/svelte';
   import type { FixedFiveRoomMode, FixedFiveSourceMode } from '@hoop-rush/data-contracts';
   import {
     createConfiguredFixedFiveTransport,
@@ -10,7 +10,6 @@
   } from '$lib/fixed-five-transport';
   import {
     friendlyFixedFiveJoinError,
-    inviteLinkForFixedFiveCode,
     loadLastFixedFiveRoomId,
     saveFixedFiveMembership,
   } from '$lib/fixed-five-identity';
@@ -24,22 +23,7 @@
   let busy = $state(false);
   let error = $state<string | null>(null);
   let preview = $state<string | null>(null);
-  let createdCode = $state<string | null>(null);
-  let createdRoomId = $state<string | null>(null);
-  let expiresAt = $state<string | null>(null);
-  let copiedInvite = $state(false);
-  let copiedCode = $state(false);
   let lastRoomId = $state<string | null>(null);
-  let tick = $state(0);
-  let countdown = $derived.by(() => {
-    if (!expiresAt) return null;
-    void tick;
-    const ms = new Date(expiresAt).getTime() - Date.now();
-    if (ms <= 0) return 'expired';
-    const m = Math.floor(ms / 60000);
-    const s = Math.floor((ms % 60000) / 1000);
-    return `${m}:${String(s).padStart(2, '0')}`;
-  });
 
   function transport() {
     return createConfiguredFixedFiveTransport();
@@ -62,7 +46,6 @@
   }
 
   onMount(() => {
-    const iv = setInterval(() => (tick += 1), 1000);
     try {
       lastRoomId = loadLastFixedFiveRoomId();
       const params = new URLSearchParams(window.location.search);
@@ -73,23 +56,20 @@
         void doPreview();
       }
     } catch {}
-    return () => clearInterval(iv);
   });
 
   async function startCreate() {
     busy = true;
     error = null;
-    createdCode = null;
-    createdRoomId = null;
     try {
       const t = transport();
       const source: FixedFiveSourceMode =
         mode === 'duel' ? sourceMode : mode === 'classic-shared-82' ? 'classic' : 'sandbox';
       const created = await t.create({ mode, sourceMode: source, variant, versions: versions() });
-      createdCode = created.code;
-      createdRoomId = created.snapshot.roomId;
-      expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
       saveFixedFiveMembership({ ...created.membership, code: created.code });
+      await goto(
+        resolve('/multiplayer/room/[roomId]', { roomId: created.snapshot.roomId }),
+      );
     } catch (e) {
       error = friendlyFixedFiveJoinError(e);
       if (!isFixedFiveSupabaseConfigured())
@@ -147,25 +127,6 @@
     await goto(resolve('/multiplayer/room/[roomId]', { roomId: lastRoomId }));
   }
 
-  async function copyInvite() {
-    if (!createdCode) return;
-    try {
-      await navigator.clipboard.writeText(
-        `${window.location.origin}${inviteLinkForFixedFiveCode(createdCode)}`,
-      );
-      copiedInvite = true;
-      setTimeout(() => (copiedInvite = false), 1500);
-    } catch {}
-  }
-
-  async function copyCode() {
-    if (!createdCode) return;
-    try {
-      await navigator.clipboard.writeText(createdCode);
-      copiedCode = true;
-      setTimeout(() => (copiedCode = false), 1500);
-    } catch {}
-  }
 </script>
 
 <svelte:head>
@@ -183,7 +144,7 @@
     <div>
       <p class="text-label text-primary">Multiplayer · Fixed-five live rooms</p>
       <h1 class="font-display mt-2 text-4xl font-extrabold tracking-tight uppercase sm:text-5xl">
-        Two humans.<br /><span class="text-primary">One fixed five.</span>
+        Play head to head
       </h1>
       <p class="mt-3 max-w-2xl text-sm text-muted-foreground">
         Live rooms only. Classic Shared 82, Sandbox Shared 82, and Duel. Both clients simulate
@@ -262,7 +223,6 @@
       >
     </div>
   {:else if view === 'create'}
-    {#if !createdCode}
       <div class="rounded-2xl bg-surface-1 p-6 sm:p-7">
         <div class="flex items-center justify-between">
           <h3 class="font-display text-sm font-extrabold tracking-widest uppercase">
@@ -378,48 +338,6 @@
             {error}
           </p>{/if}
       </div>
-    {:else}
-      <div class="rounded-2xl border-2 border-dashed border-primary/40 bg-primary/10 p-6 sm:p-8">
-        <p class="text-label tracking-[0.16em] text-primary">Room code — share it</p>
-        <div class="mt-3 flex flex-wrap items-center gap-3">
-          <div class="flex gap-1.5">
-            {#each createdCode.split('') as d, i (i)}
-              <span
-                class="inline-flex h-14 w-12 items-center justify-center rounded-xl border-2 border-primary/40 bg-card font-mono text-3xl font-black"
-                >{d}</span
-              >
-            {/each}
-          </div>
-          <button
-            type="button"
-            onclick={copyInvite}
-            class="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground"
-          >
-            {#if copiedInvite}<Check class="h-4 w-4" /> Copied!{:else}Copy invite link{/if}
-          </button>
-          <button
-            type="button"
-            onclick={copyCode}
-            class="rounded-xl bg-card px-4 py-2.5 text-sm font-semibold"
-          >
-            {#if copiedCode}<Check class="h-4 w-4" /> Copied!{:else}<Copy class="h-4 w-4" /> Copy code{/if}
-          </button>
-        </div>
-        <p class="mt-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Clock class="h-3.5 w-3.5" />
-          {#if countdown && countdown !== 'expired'}expires in {countdown}{:else}expires in 15
-            minutes{/if}
-        </p>
-        <button
-          type="button"
-          onclick={() =>
-            createdRoomId && goto(resolve('/multiplayer/room/[roomId]', { roomId: createdRoomId }))}
-          class="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground"
-        >
-          Enter lobby →
-        </button>
-      </div>
-    {/if}
   {:else}
     <div class="mx-auto max-w-md rounded-2xl bg-surface-1 p-6 sm:p-8">
       <button

@@ -80,13 +80,15 @@ function team(
       contestedShots: 30,
     },
   };
-  const zones = overrides.zones ?? [
+  const zoneTemplate = [
     { zone: 'rim' as const, attempts: 0, makes: 0 },
     { zone: 'shortMid' as const, attempts: 0, makes: 0 },
     { zone: 'longMid' as const, attempts: 0, makes: 0 },
     { zone: 'cornerThree' as const, attempts: 0, makes: 0 },
     { zone: 'aboveBreakThree' as const, attempts: 0, makes: 0 },
   ];
+  const zoneOverrides = new Map((overrides.zones ?? []).map((zone) => [zone.zone, zone]));
+  const zones = zoneTemplate.map((template) => zoneOverrides.get(template.zone) ?? template);
   return { teamId, displayName: teamId, box, players, shotZones: zones };
 }
 function game(home: TeamResult, away: TeamResult, winner: 'home' | 'away'): GameResult {

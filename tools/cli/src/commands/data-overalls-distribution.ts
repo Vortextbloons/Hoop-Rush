@@ -1,6 +1,7 @@
 import { dirname, isAbsolute, resolve } from 'node:path';
 import {
   COHORT_NORMALIZATION_VERSION,
+  OVERALL_BANDS,
   franchiseEraPoolSchema,
   hoopRushManifestSchema,
   type PeakPlayerSeason,
@@ -20,13 +21,12 @@ const BANDS: ReadonlyArray<{
   min: number;
   max: number;
   targetPercent: number;
-}> = [
-  { label: '95-99', min: 95, max: 99, targetPercent: 0.5 },
-  { label: '90-94', min: 90, max: 94, targetPercent: 4.5 },
-  { label: '85-89', min: 85, max: 89, targetPercent: 14 },
-  { label: '72-84', min: 72, max: 84, targetPercent: 61 },
-  { label: '40-71', min: 40, max: 71, targetPercent: 20 },
-];
+}> = OVERALL_BANDS.map((band) => ({
+  label: band.label,
+  min: band.min,
+  max: band.max,
+  targetPercent: Math.round(band.share * 1000) / 10,
+}));
 function median(values: readonly number[]): number | null {
   if (values.length === 0) return null;
   const sorted = [...values].sort((a, b) => a - b);

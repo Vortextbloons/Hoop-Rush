@@ -193,22 +193,34 @@ function productionEvidence(stats: StatsRow): ProductionEvidence {
   const bpm = safeFloat(stats.boxPlusMinus, 0);
   const usage = safeFloat(stats.usageRate, 18);
   const ts = safeFloat(stats.tsPct, 0.52);
+  const efg = safeFloat(stats.efgPct, 0.5);
   const evidence = confidenceFor(stats);
+  const stocks =
+    stats.steals == null || stats.blocks == null || games <= 0
+      ? 0
+      : Math.max(
+          0,
+          safeFloat(stats.steals) / games + safeFloat(stats.blocks) / games - 2.0,
+        ) * 1.2;
   const score = clamp(
     50 +
-      (ppg - 15) * 0.85 +
-      (rpg - 5) * 0.32 +
-      (apg - 3) * 0.55 +
-      (per - 15) * 1.2 +
-      bpm * 1.15 +
-      (usage - 20) * 0.18 +
-      (ts - 0.54) * 70,
+      (ppg - 15) * 0.6 +
+      (rpg - 5) * 0.25 +
+      (apg - 3) * 0.4 +
+      (per - 15) * 1.0 +
+      bpm * 1.3 +
+      (usage - 20) * 0.1 -
+      Math.max(0, usage - 30) * 0.22 +
+      (ts - 0.54) * 85 +
+      (efg - 0.5) * 45 +
+      stocks,
     0,
     100,
   );
+  const capped = score > 86 ? 86 + (score - 86) * 0.55 : score;
   const shrinkage = clamp((minutes / (minutes + 1500)) * (games / (games + 40)), 0, 1);
   return {
-    score,
+    score: capped,
     weight: clamp(0.38 * shrinkage * evidence.factor, 0, 0.38),
     confidence: evidence.label,
     sampleGames: games,
@@ -291,9 +303,13 @@ function deriveNonlinear(
   const primaryRole =
     memberships.primaryCreator + memberships.secondaryCreator + memberships.scoringGuard;
   const rebounding = mean([skill(ratings, 'offensiveRebound'), skill(ratings, 'defensiveRebound')]);
+  const apg =
+    Math.max(0, Math.trunc(safeFloat(stats.gamesPlayed))) > 0
+      ? safeFloat(stats.assists) / Math.max(1, Math.trunc(safeFloat(stats.gamesPlayed)))
+      : 0;
   const weaknesses = {
     turnoverLiability: clamp(
-      Math.max(0, tendencies.turnoverRate - 12) * (0.7 + 0.8 * primaryRole),
+      (Math.max(0, tendencies.turnoverRate - 12) * (0.7 + 0.8 * primaryRole)) / (1 + apg / 12),
       0,
       6,
     ),
@@ -314,7 +330,8 @@ function deriveNonlinear(
       6,
     ),
     spacingLimitation: clamp(
-      (Math.max(0, 58 - shootingGravity) * (0.8 + primaryRole * 0.8)) / 8,
+      ((Math.max(0, 58 - shootingGravity) * (0.8 + primaryRole * 0.8)) / 8) *
+        (1 - bigRole * 0.65),
       0,
       6,
     ),
@@ -411,6 +428,44 @@ function historicalDefenseEvidenceLift(input: RatingProfileInput): number {
   const reboundLift = clamp((reboundsPerGame - 12) * 0.55, 0, 6);
   const anchorLift = clamp((skill(input.ratings, 'interiorDefense') - 80) / 10, 0, 2);
   return reboundLift + anchorLift;
+}
+export function defenseCreditFor(defenseRating: number): number {
+  return clamp((defenseRating - 66) * 0.5, -2.5, 3);
+}
+export function eliteEvidenceLiftFor(input: {
+  production: ProductionEvidence;
+  points: number | null;
+  tsPct: number | null;
+  boxPlusMinus: number | null;
+  creation: number;
+  defenseRating: number;
+  teamWinPct: number | null | undefined;
+}): number {
+  const games = input.production.sampleGames;
+  const ppg = safeFloat(input.points) / Math.max(1, games);
+  const ts = safeFloat(input.tsPct, 0);
+  const bpm = safeFloat(input.boxPlusMinus, 0);
+  const winOk = input.teamWinPct == null || input.teamWinPct >= 0.7;
+  const eliteScoringEvidence =
+    winOk &&
+    input.production.score >= 87 &&
+    games >= 55 &&
+    ppg >= 28 &&
+    ts >= 0.6 &&
+    bpm >= 3;
+  const completeEliteEvidence =
+    winOk &&
+    input.production.score >= 86 &&
+    games >= 65 &&
+    ppg >= 25 &&
+    ts >= 0.62 &&
+    bpm >= 4 &&
+    input.creation >= 82 &&
+    input.defenseRating >= 70;
+  if (completeEliteEvidence) return 4;
+  if (eliteScoringEvidence) return 3;
+  if (input.production.score >= 80 && games >= 50) return 1;
+  return 0;
 }
 export function teamContextAdjustment(
   stats: StatsRow,
@@ -528,34 +583,25 @@ export function deriveRatingProfile(input: RatingProfileInput): DerivedRatingPro
     artifactVersion: input.artifact.modelVersion,
   };
   const summary = computeOffenseDefense(input.ratings, input.tendencies);
-  const eliteScoringEvidence =
-    production.score >= 88 &&
-    production.sampleGames >= 55 &&
-    safeFloat(input.stats.points) / Math.max(1, production.sampleGames) >= 28 &&
-    safeFloat(input.stats.tsPct, 0) >= 0.6 &&
-    safeFloat(input.stats.boxPlusMinus, 0) >= 3;
-  const completeEliteEvidence =
-    production.score >= 86 &&
-    production.sampleGames >= 65 &&
-    safeFloat(input.stats.points) / Math.max(1, production.sampleGames) >= 25 &&
-    safeFloat(input.stats.tsPct, 0) >= 0.62 &&
-    safeFloat(input.stats.boxPlusMinus, 0) >= 4 &&
-    nonlinear.creation >= 85 &&
-    summary.defenseRating >= 72;
-  const eliteEvidenceLift = completeEliteEvidence
-    ? 4
-    : eliteScoringEvidence
-      ? 3
-      : production.score >= 82 && production.sampleGames >= 50
-        ? 1
-        : 0;
+  const eliteEvidenceLift = eliteEvidenceLiftFor({
+    production,
+    points: input.stats.points == null ? null : safeFloat(input.stats.points),
+    tsPct: input.stats.tsPct == null ? null : safeFloat(input.stats.tsPct),
+    boxPlusMinus: input.stats.boxPlusMinus == null ? null : safeFloat(input.stats.boxPlusMinus),
+    creation: nonlinear.creation,
+    defenseRating: summary.defenseRating,
+    teamWinPct: input.teamWinPct,
+  });
   const teamDelta = teamContextAdjustment(input.stats, input.teamWinPct, summary.defenseRating);
+  const defenseCredit = defenseCreditFor(summary.defenseRating);
+  // Display raw excludes the sim-calibration adjustment by design: it records
+  // engine compensation evidence, not historical greatness.
   const raw =
     baseScore * (1 - production.weight) +
     production.score * production.weight +
-    calibratedImpact.adjustment +
     eliteEvidenceLift +
-    teamDelta;
+    teamDelta +
+    defenseCredit;
   const canonicalOverall = canonicalCurve(raw);
   const profile: RatingProfile = {
     schemaVersion: 2,

@@ -39,13 +39,14 @@ describe('storedRunRecordSchema', () => {
     expect(storedRunRecordSchema.safeParse(record).success).toBe(false);
   });
   it('rejects a run with the wrong player count', () => {
-    const run = buildChallengeRun({
-      playerIds: [playerIdSchema.parse('p-1'), playerIdSchema.parse('p-2')],
-    });
+    const run = buildChallengeRun();
     const record = {
       recordId: 'record-4',
       saveSchemaVersion: 2,
-      run,
+      run: {
+        ...run,
+        playerIds: [playerIdSchema.parse('p-1'), playerIdSchema.parse('p-2')],
+      },
     };
     expect(storedRunRecordSchema.safeParse(record).success).toBe(false);
   });

@@ -7,9 +7,10 @@ test.describe('fixed-five join: guest sees the room', () => {
 
   async function createRoom(page: Page): Promise<string> {
     await page.goto('/multiplayer');
-    await expect(page.getByRole('heading', { name: /Two humans/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Play head to head/i })).toBeVisible();
     await page.getByRole('button', { name: /Start a room/i }).click();
     await page.getByRole('button', { name: /Create room/i }).click();
+    await expect(page).toHaveURL(/\/multiplayer\/room\//, { timeout: 15_000 });
     const digitSpans = page.locator('span.font-mono').filter({ hasText: /^[0-9]$/ });
     await expect(digitSpans.first()).toBeVisible({ timeout: 15_000 });
     let code = '';
@@ -18,7 +19,6 @@ test.describe('fixed-five join: guest sees the room', () => {
       code += (await digitSpans.nth(i).innerText()).trim();
     }
     expect(code).toMatch(/^[0-9]{4}$/);
-    await page.getByRole('button', { name: /Enter lobby/i }).click();
     await expect(page.getByRole('heading', { name: new RegExp(`room ${code}`, 'i') })).toBeVisible({
       timeout: 15_000,
     });
@@ -30,7 +30,7 @@ test.describe('fixed-five join: guest sees the room', () => {
 
   async function joinAsGuest(page: Page, rawCode: string, typeIt = false): Promise<void> {
     await page.goto('/multiplayer');
-    await expect(page.getByRole('heading', { name: /Two humans/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Play head to head/i })).toBeVisible();
     await page.getByRole('button', { name: /Join a room/i }).click();
     if (typeIt) {
       await page.locator('#join-code').click();

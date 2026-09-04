@@ -590,7 +590,7 @@ describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompati
   });
   it('Dexie v11 preserves saveSchema 8 and does not auto-migrate saveSchema 7', async () => {
     const adapters = makeAdapters();
-    expect(adapters.db.verno).toBe(13);
+    expect(adapters.db.verno).toBe(14);
     await promote(adapters);
     const row = await adapters.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
     if (row === undefined) throw new Error('expected row');

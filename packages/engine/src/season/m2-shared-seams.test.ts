@@ -210,6 +210,7 @@ describe('season rotation (season-rotation-v2)', () => {
 describe('season generation digest', () => {
   it('is canonical regardless of input order', () => {
     const seed = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
+    const versionId = (n: number): string => `pv-${String(n).padStart(2, '0')}${'0'.repeat(30)}`;
     const poolOf = (id: string) => {
       const playerVersionIds = Array.from({ length: 20 }, (_, i) => {
         const hex = `${String(i).padStart(2, '0')}0`.padEnd(32, '0');
@@ -248,7 +249,7 @@ describe('season generation digest', () => {
       franchiseId: franchiseIdSchema.parse(id),
       players: [
         {
-          playerVersionId: 'pv-1',
+          playerVersionId: versionId(1),
           playerId: playerIdSchema.parse('p-1'),
           franchiseId: franchiseIdSchema.parse(id),
           eraId: eraIdSchema.parse('1990s'),
@@ -256,7 +257,7 @@ describe('season generation digest', () => {
           displayName: 'A',
         },
         {
-          playerVersionId: 'pv-2',
+          playerVersionId: versionId(2),
           playerId: playerIdSchema.parse('p-2'),
           franchiseId: franchiseIdSchema.parse(id),
           eraId: eraIdSchema.parse('1990s'),
@@ -264,7 +265,7 @@ describe('season generation digest', () => {
           displayName: 'B',
         },
         {
-          playerVersionId: 'pv-3',
+          playerVersionId: versionId(3),
           playerId: playerIdSchema.parse('p-3'),
           franchiseId: franchiseIdSchema.parse(id),
           eraId: eraIdSchema.parse('1990s'),
@@ -272,7 +273,7 @@ describe('season generation digest', () => {
           displayName: 'C',
         },
         {
-          playerVersionId: 'pv-4',
+          playerVersionId: versionId(4),
           playerId: playerIdSchema.parse('p-4'),
           franchiseId: franchiseIdSchema.parse(id),
           eraId: eraIdSchema.parse('1990s'),
@@ -280,7 +281,7 @@ describe('season generation digest', () => {
           displayName: 'D',
         },
         {
-          playerVersionId: 'pv-5',
+          playerVersionId: versionId(5),
           playerId: playerIdSchema.parse('p-5'),
           franchiseId: franchiseIdSchema.parse(id),
           eraId: eraIdSchema.parse('1990s'),
@@ -288,7 +289,7 @@ describe('season generation digest', () => {
           displayName: 'E',
         },
         {
-          playerVersionId: 'pv-6',
+          playerVersionId: versionId(6),
           playerId: playerIdSchema.parse('p-6'),
           franchiseId: franchiseIdSchema.parse(id),
           eraId: eraIdSchema.parse('1990s'),
@@ -296,7 +297,7 @@ describe('season generation digest', () => {
           displayName: 'F',
         },
         {
-          playerVersionId: 'pv-7',
+          playerVersionId: versionId(7),
           playerId: playerIdSchema.parse('p-7'),
           franchiseId: franchiseIdSchema.parse(id),
           eraId: eraIdSchema.parse('1990s'),
@@ -304,7 +305,7 @@ describe('season generation digest', () => {
           displayName: 'G',
         },
         {
-          playerVersionId: 'pv-8',
+          playerVersionId: versionId(8),
           playerId: playerIdSchema.parse('p-8'),
           franchiseId: franchiseIdSchema.parse(id),
           eraId: eraIdSchema.parse('1990s'),
@@ -312,7 +313,7 @@ describe('season generation digest', () => {
           displayName: 'H',
         },
         {
-          playerVersionId: 'pv-9',
+          playerVersionId: versionId(9),
           playerId: playerIdSchema.parse('p-9'),
           franchiseId: franchiseIdSchema.parse(id),
           eraId: eraIdSchema.parse('1990s'),
@@ -320,7 +321,7 @@ describe('season generation digest', () => {
           displayName: 'I',
         },
         {
-          playerVersionId: 'pv-10',
+          playerVersionId: versionId(10),
           playerId: playerIdSchema.parse('p-10'),
           franchiseId: franchiseIdSchema.parse(id),
           eraId: eraIdSchema.parse('1990s'),
@@ -332,7 +333,7 @@ describe('season generation digest', () => {
     const rotation = (id: string) =>
       buildSeasonRotation(
         id,
-        Array.from({ length: 10 }, (_, i) => `pv-${String(i + 1)}`),
+        Array.from({ length: 10 }, (_, i) => versionId(i + 1)),
       );
     const base = {
       seed: seedSchema.parse(seed),
@@ -342,8 +343,8 @@ describe('season generation digest', () => {
       targetsVersion: 'roster-targets-v2',
       rosters: [roster('lakers'), roster('celtics')],
       ownership: [
-        { playerVersionId: 'pv-2', ownerFranchiseId: franchiseIdSchema.parse('lakers') },
-        { playerVersionId: 'pv-1', ownerFranchiseId: franchiseIdSchema.parse('lakers') },
+        { playerVersionId: versionId(2), ownerFranchiseId: franchiseIdSchema.parse('lakers') },
+        { playerVersionId: versionId(1), ownerFranchiseId: franchiseIdSchema.parse('lakers') },
       ],
       rotations: [rotation('celtics'), rotation('lakers')],
       aiAssignments: [
@@ -365,8 +366,8 @@ describe('season generation digest', () => {
       ...base,
       rosters: [roster('celtics'), roster('lakers')],
       ownership: [
-        { playerVersionId: 'pv-1', ownerFranchiseId: franchiseIdSchema.parse('lakers') },
-        { playerVersionId: 'pv-2', ownerFranchiseId: franchiseIdSchema.parse('lakers') },
+        { playerVersionId: versionId(1), ownerFranchiseId: franchiseIdSchema.parse('lakers') },
+        { playerVersionId: versionId(2), ownerFranchiseId: franchiseIdSchema.parse('lakers') },
       ],
       rotations: [rotation('lakers'), rotation('celtics')],
       aiAssignments: [

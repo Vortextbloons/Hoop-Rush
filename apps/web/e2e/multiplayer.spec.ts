@@ -35,9 +35,7 @@ test.describe('season run multiplayer: two-client journey', () => {
 
     await p1.getByRole('button', { name: /Create room/ }).click();
 
-    // Code should appear: 4 digit spans
-    // The creation shows "Room code — share it" and 4 boxes
-    await expect(p1.getByText(/Room code — share it/i).first()).toBeVisible({ timeout: 10_000 });
+    await expect(p1).toHaveURL(/\/multiplayer\/room\//, { timeout: 10_000 });
 
     let code = '';
     try {
@@ -59,7 +57,6 @@ test.describe('season run multiplayer: two-client journey', () => {
         body.match(/Invite link:.*?code=([0-9]{4})/) ?? body.match(/code[^0-9]*([0-9]{4})/i);
       if (m?.[1]) code = m[1];
     }
-    // fallback: read from invite link copy button's nearby text
     if (!/^[0-9]{4}$/.test(code)) {
       const inviteText = await p1
         .getByText(/\/multiplayer\?code=/)
@@ -71,13 +68,9 @@ test.describe('season run multiplayer: two-client journey', () => {
     }
     expect(code).toMatch(/^[0-9]{4}$/);
 
-    // Enter lobby
-    const enterLobbyBtn = p1.getByRole('button', { name: /Enter lobby/ }).first();
-    await expect(enterLobbyBtn).toBeVisible();
-    await enterLobbyBtn.click();
-    await expect(p1).toHaveURL(/\/multiplayer\/room\//);
-    await expect(p1.getByText(/You · Host/i)).toBeVisible({ timeout: 10_000 });
-    await expect(p1.getByText(/Host controls Start/i)).toBeVisible();
+    await expect(p1.getByRole('heading', { name: new RegExp(`room ${code}`, 'i') })).toBeVisible({
+      timeout: 10_000,
+    });
     const p1Url = p1.url();
     const roomId = p1Url.split('/multiplayer/room/')[1]?.split('/')[0]?.split('?')[0] ?? '';
     expect(roomId).toBeTruthy();

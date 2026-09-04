@@ -241,7 +241,7 @@ describe('derivePlayerRecord (field-method registry)', () => {
       ),
     );
     expect(curryLike.summaryRatings.overallRating).toBeGreaterThanOrEqual(95);
-    expect(curryLike.summaryRatings.overallRating).toBeLessThanOrEqual(98);
+    expect(curryLike.summaryRatings.overallRating).toBeLessThanOrEqual(99);
     expect(computeProductionImpact(starterStats())).toBeLessThan(99);
   });
   it('recognizes complete elite seasons without requiring 28 points per game', () => {

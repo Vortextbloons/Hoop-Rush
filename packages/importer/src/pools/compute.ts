@@ -12,6 +12,7 @@ import {
   REQUIRED_RATING_KEYS,
   SELECTION_SCORE_VERSION,
   SOURCE_VERSION,
+  overallBandForPercentile,
   franchiseEraPoolSchema,
   coverageSummarySchema,
   playerSeasonStatsSchema,
@@ -149,13 +150,12 @@ const poolManifestSchema = z.looseObject({
 });
 export function poolDir(): string {
   return join(PUBLIC_DATA, 'pools');
-}
-export function manifestPath(): string {
+}export function manifestPath(): string {
   return join(PUBLIC_DATA, 'manifest.json');
 }
 export const SCHEMA_VERSION = POOL_SCHEMA_VERSION;
 export const MIN_TEAM_GAMES = 40;
-export const DATA_VERSION = 'm10-ratings-v3.8';
+export const DATA_VERSION = 'm11-ratings-v3.9';
 export const CONFIDENCE_POLICY_VERSION = 'policy-v1';
 export const MAX_LOW_CONFIDENCE_SHARE = 0.4;
 export {
@@ -643,21 +643,7 @@ export interface PoolOverallDiagnostics {
   totalRowCount: number;
   rowsWithoutRawOverall: number;
 }
-export function overallBandForPercentile(p: number): number {
-  let value: number;
-  if (p < 0.005) {
-    value = 99 - (p / 0.005) * 4;
-  } else if (p < 0.05) {
-    value = 94 - ((p - 0.005) / 0.045) * 4;
-  } else if (p < 0.19) {
-    value = 89 - ((p - 0.05) / 0.14) * 4;
-  } else if (p < 0.8) {
-    value = 84 - ((p - 0.19) / 0.61) * 12;
-  } else {
-    value = 71 - ((p - 0.8) / 0.2) * 31;
-  }
-  return clamp(Math.round(value), 40, 99);
-}
+export { overallBandForPercentile } from '@hoop-rush/data-contracts';
 function hasRawOverallScore(row: PoolOverallRow): boolean {
   const raw = row.ratingProfile?.rawOverallScore;
   return typeof raw === 'number' && Number.isFinite(raw);

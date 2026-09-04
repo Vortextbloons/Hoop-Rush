@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_RATINGS_MODEL_ARTIFACT } from './artifact.ts';
 import { derivePlayerRecord } from './v2.ts';
 import { computeSummaryRatings } from './summary.ts';
+import {
+  defenseCreditFor,
+  eliteEvidenceLiftFor,
+  teamContextAdjustment,
+} from './v3.ts';
 import { starterStats } from './ratings-test-support.ts';
 const stats = starterStats();
 function recordFor(statsOver: Record<string, unknown> = {}) {
@@ -73,16 +78,28 @@ describe('Ratings v3 profile', () => {
       era: { leaguePpg: 114.7, league3PARate: 0.39, pace: 99 },
       artifact: DEFAULT_RATINGS_MODEL_ARTIFACT,
     });
-    expect(record.summaryRatings.overallRating).toBeGreaterThanOrEqual(87);
+    expect(record.summaryRatings.overallRating).toBeGreaterThanOrEqual(86);
   });
   it('persists schemaVersion 2 and the pre-percentile raw overall score', () => {
     const record = recordFor();
     const profile = record.ratingProfile;
     expect(profile.schemaVersion).toBe(2);
+    const line = starterStats();
+    const num = (value: unknown): number | null => (typeof value === 'number' ? value : null);
     const recomputed =
       profile.baseScore * (1 - profile.production.weight) +
       profile.production.score * profile.production.weight +
-      profile.calibratedImpact.adjustment;
+      eliteEvidenceLiftFor({
+        production: profile.production,
+        points: num(line.points),
+        tsPct: num(line.tsPct),
+        boxPlusMinus: num(line.boxPlusMinus),
+        creation: profile.nonlinear.creation,
+        defenseRating: profile.defenseRating,
+        teamWinPct: undefined,
+      }) +
+      teamContextAdjustment(line, undefined, profile.defenseRating) +
+      defenseCreditFor(profile.defenseRating);
     expect(profile.rawOverallScore).toBe(Math.round(recomputed * 100) / 100);
     expect(profile.rawOverallScore).not.toBe(profile.canonicalOverall);
   });
