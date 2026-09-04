@@ -1,16 +1,6 @@
-<script lang="ts">
-  import type { SeasonTradeNegotiation } from '@hoop-rush/data-contracts';
-  import { responseCauseLabel } from '$lib/season/season-presentation';
-  let {
-    negotiation,
-    inquiryAllowance,
-    exchangeMax = 3,
-    onAccept,
-    onDecline,
-    onRevision,
-    onWalkAway,
-    busy = false,
-  }: {
+<script lang="ts">import type { SeasonTradeNegotiation } from '@hoop-rush/data-contracts';
+import { responseCauseLabel } from '$lib/season/season-presentation';
+let { negotiation, inquiryAllowance, exchangeMax = 3, onAccept, onDecline, onRevision, onWalkAway, busy = false, }: {
     negotiation: SeasonTradeNegotiation | null;
     inquiryAllowance: number;
     exchangeMax?: number;
@@ -19,34 +9,30 @@
     onRevision?: (inquiryId: string) => void;
     onWalkAway?: (inquiryId: string) => void;
     busy?: boolean;
-  } = $props();
-  const exchanges = $derived(negotiation?.exchanges ?? []);
-  const exchangeCount = $derived(negotiation?.exchangeCount ?? 0);
-  const canAct = $derived(
-    negotiation !== null &&
-      (negotiation.status === 'active' || negotiation.status === 'countered') &&
-      exchangeCount < exchangeMax,
-  );
-  const isFinal = $derived(
-    negotiation?.status === 'accepted' ||
-      negotiation?.status === 'declined' ||
-      negotiation?.status === 'walked-away' ||
-      negotiation?.status === 'expired',
-  );
-  function kindLabel(kind: string): string {
+} = $props();
+const exchanges = $derived(negotiation?.exchanges ?? []);
+const exchangeCount = $derived(negotiation?.exchangeCount ?? 0);
+const canAct = $derived(negotiation !== null &&
+    (negotiation.status === 'active' || negotiation.status === 'countered') &&
+    exchangeCount < exchangeMax);
+const isFinal = $derived(negotiation?.status === 'accepted' ||
+    negotiation?.status === 'declined' ||
+    negotiation?.status === 'walked-away' ||
+    negotiation?.status === 'expired');
+function kindLabel(kind: string): string {
     switch (kind) {
-      case 'human-proposal':
-        return 'You proposed';
-      case 'ai-counter':
-        return 'They countered';
-      case 'human-revision':
-        return 'You revised';
-      case 'ai-final':
-        return 'Final';
-      default:
-        return kind;
+        case 'human-proposal':
+            return 'You proposed';
+        case 'ai-counter':
+            return 'They countered';
+        case 'human-revision':
+            return 'You revised';
+        case 'ai-final':
+            return 'Final';
+        default:
+            return kind;
     }
-  }
+}
 </script>
 
 <section

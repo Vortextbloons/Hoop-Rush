@@ -1,47 +1,10 @@
-<script lang="ts">
-  import {
-    ArrowRight,
-    Calendar,
-    ChevronDown,
-    Clock,
-    Gamepad2,
-    ShieldCheck,
-    Trophy,
-  } from '@lucide/svelte';
-  import type {
-    FixedFiveCompetitionResult,
-    FixedFiveRoomMode,
-    FixedFiveWorkerResultEntry,
-    HoopRushManifest,
-    PlayersIndexEntry,
-  } from '@hoop-rush/data-contracts';
-  import PlayerFace from '$lib/components/PlayerFace.svelte';
-  import { formatPositions } from '$lib/player-positions';
-  import type { DraftPresentation } from '$lib/draft-presentation';
-  import type { FixedFivePlayerStats } from '$lib/fixed-five-player-stats';
-
-  let {
-    mode,
-    result,
-    selfId = 'p1',
-    manifest,
-    p1Rows = [],
-    p2Rows = [],
-    presentation = 'ratings',
-    digest = null,
-    stats = null,
-    statsState = 'empty',
-    onRebuildStats = null,
-    entries = [],
-    roomCode = null,
-    createdAt = null,
-    verified = false,
-    modeDetail = null,
-    onRematch = null,
-    onNewRoom = null,
-    rematchBusy = false,
-    canNewRoom = true,
-  }: {
+<script lang="ts">import { ArrowRight, Calendar, ChevronDown, Clock, Gamepad2, ShieldCheck, Trophy, } from '@lucide/svelte';
+import type { FixedFiveCompetitionResult, FixedFiveRoomMode, FixedFiveWorkerResultEntry, HoopRushManifest, PlayersIndexEntry, } from '@hoop-rush/data-contracts';
+import PlayerFace from '$lib/components/PlayerFace.svelte';
+import { formatPositions } from '$lib/player-positions';
+import type { DraftPresentation } from '$lib/draft-presentation';
+import type { FixedFivePlayerStats } from '$lib/fixed-five-player-stats';
+let { mode, result, selfId = 'p1', manifest, p1Rows = [], p2Rows = [], presentation = 'ratings', digest = null, stats = null, statsState = 'empty', onRebuildStats = null, entries = [], roomCode = null, createdAt = null, verified = false, modeDetail = null, onRematch = null, onNewRoom = null, rematchBusy = false, canNewRoom = true, }: {
     mode: FixedFiveRoomMode;
     result: FixedFiveCompetitionResult;
     selfId?: 'p1' | 'p2';
@@ -62,185 +25,164 @@
     onNewRoom?: (() => void) | null;
     rematchBusy?: boolean;
     canNewRoom?: boolean;
-  } = $props();
-
-  let tab = $state<'overview' | 'games' | 'players' | 'team'>('overview');
-  let statsSide = $state<'you' | 'opp'>('you');
-  let statsTotals = $state(false);
-  const statsPid = $derived<'p1' | 'p2'>(
-    statsSide === 'you' ? selfId : selfId === 'p1' ? 'p2' : 'p1',
-  );
-  const statsRows = $derived(statsPid === 'p1' ? p1Rows : p2Rows);
-  const statsLines = $derived.by(() => {
+} = $props();
+let tab = $state<'overview' | 'games' | 'players' | 'team'>('overview');
+let statsSide = $state<'you' | 'opp'>('you');
+let statsTotals = $state(false);
+const statsPid = $derived<'p1' | 'p2'>(statsSide === 'you' ? selfId : selfId === 'p1' ? 'p2' : 'p1');
+const statsRows = $derived(statsPid === 'p1' ? p1Rows : p2Rows);
+const statsLines = $derived.by(() => {
     const lines = stats ? (statsPid === 'p1' ? stats.p1 : stats.p2) : [];
     return new Map(lines.map((line) => [line.playerId, line]));
-  });
-
-  function perGame(value: number, games: number): string {
+});
+function perGame(value: number, games: number): string {
     return (value / Math.max(1, games)).toFixed(1);
-  }
-  function statValue(value: number, games: number): string {
+}
+function statValue(value: number, games: number): string {
     return statsTotals ? String(value) : perGame(value, games);
-  }
-  function pctStr(made: number, attempted: number): string {
-    if (attempted <= 0) return '—';
+}
+function pctStr(made: number, attempted: number): string {
+    if (attempted <= 0)
+        return '—';
     return `${((made / attempted) * 100).toFixed(1)}%`;
-  }
-
-  const modeLabel = $derived(
-    mode === 'duel'
-      ? 'Duel · Best of 7'
-      : mode === 'sandbox-shared-82'
+}
+const modeLabel = $derived(mode === 'duel'
+    ? 'Duel · Best of 7'
+    : mode === 'sandbox-shared-82'
         ? 'Sandbox · Shared 82'
-        : 'Classic · Shared 82',
-  );
-  const modeDetailLabel = $derived(modeDetail ?? `Fixed-Five · ${modeLabel}`);
-  const youWon = $derived(
-    result.competition === 'duel' ? result.winner === selfId : result.ranking[0] === selfId,
-  );
-  const shared = $derived(result.competition === 'shared-82' ? result : null);
-  const duel = $derived(result.competition === 'duel' ? result : null);
-  const youShared = $derived(shared?.participants.find((p) => p.participantId === selfId) ?? null);
-  const oppShared = $derived(shared?.participants.find((p) => p.participantId !== selfId) ?? null);
-  const showRatings = $derived(presentation !== 'ball-knowledge');
-
-  function laneName(id: 'p1' | 'p2'): string {
+        : 'Classic · Shared 82');
+const modeDetailLabel = $derived(modeDetail ?? `Fixed-Five · ${modeLabel}`);
+const youWon = $derived(result.competition === 'duel' ? result.winner === selfId : result.ranking[0] === selfId);
+const shared = $derived(result.competition === 'shared-82' ? result : null);
+const duel = $derived(result.competition === 'duel' ? result : null);
+const youShared = $derived(shared?.participants.find((p) => p.participantId === selfId) ?? null);
+const oppShared = $derived(shared?.participants.find((p) => p.participantId !== selfId) ?? null);
+const showRatings = $derived(presentation !== 'ball-knowledge');
+function laneName(id: 'p1' | 'p2'): string {
     return id === selfId ? 'You' : 'Opponent';
-  }
-
-  const duelScores = $derived.by(
-    (): Array<{
-      gameNumber: number;
-      youScore: number | null;
-      oppScore: number | null;
-      won: boolean;
-    }> => {
-      if (!duel) return [];
-      const duelEntries = entries
+}
+const duelScores = $derived.by((): Array<{
+    gameNumber: number;
+    youScore: number | null;
+    oppScore: number | null;
+    won: boolean;
+}> => {
+    if (!duel)
+        return [];
+    const duelEntries = entries
         .filter((e) => e.tag === 'duel')
         .slice()
         .sort((a, b) => a.game.gameNumber - b.game.gameNumber);
-      return duel.games.map((g) => {
+    return duel.games.map((g) => {
         const entry = duelEntries.find((e) => e.game.gameNumber === g.gameNumber);
         let youScore: number | null = null;
         let oppScore: number | null = null;
         if (entry) {
-          const homeIsSelf = entry.game.home.teamId === selfId;
-          youScore = homeIsSelf ? entry.game.home.box.points : entry.game.away.box.points;
-          oppScore = homeIsSelf ? entry.game.away.box.points : entry.game.home.box.points;
+            const homeIsSelf = entry.game.home.teamId === selfId;
+            youScore = homeIsSelf ? entry.game.home.box.points : entry.game.away.box.points;
+            oppScore = homeIsSelf ? entry.game.away.box.points : entry.game.home.box.points;
         }
         return { gameNumber: g.gameNumber, youScore, oppScore, won: g.winner === selfId };
-      });
-    },
-  );
-
-  const h2hScores = $derived.by(
-    (): Array<{
-      gameNumber: number;
-      youScore: number | null;
-      oppScore: number | null;
-      won: boolean;
-    }> => {
-      if (!shared) return [];
-      const h2hEntries = entries
+    });
+});
+const h2hScores = $derived.by((): Array<{
+    gameNumber: number;
+    youScore: number | null;
+    oppScore: number | null;
+    won: boolean;
+}> => {
+    if (!shared)
+        return [];
+    const h2hEntries = entries
         .filter((e) => e.tag === 'h2h')
         .slice()
         .sort((a, b) => a.game.gameNumber - b.game.gameNumber);
-      return h2hEntries.map((entry) => {
+    return h2hEntries.map((entry) => {
         const homeIsSelf = selfId === 'p1';
         const youScore = homeIsSelf ? entry.game.home.box.points : entry.game.away.box.points;
         const oppScore = homeIsSelf ? entry.game.away.box.points : entry.game.home.box.points;
         const won = homeIsSelf ? entry.game.winner === 'home' : entry.game.winner === 'away';
         return { gameNumber: entry.game.gameNumber, youScore, oppScore, won };
-      });
-    },
-  );
-
-  const youWins = $derived(
-    duel ? (selfId === 'p1' ? duel.p1Wins : duel.p2Wins) : (youShared?.wins ?? 0),
-  );
-  const oppWins = $derived(
-    duel ? (selfId === 'p1' ? duel.p2Wins : duel.p1Wins) : (oppShared?.wins ?? 0),
-  );
-  const gamesPlayedLabel = $derived(
-    duel
-      ? `after ${duel.stoppedAtGame} game${duel.stoppedAtGame === 1 ? '' : 's'}`
-      : 'after 82 games',
-  );
-  const seriesNote = $derived(
-    duel
-      ? Math.max(duel.p1Wins, duel.p2Wins) === 4 && Math.min(duel.p1Wins, duel.p2Wins) === 0
+    });
+});
+const youWins = $derived(duel ? (selfId === 'p1' ? duel.p1Wins : duel.p2Wins) : (youShared?.wins ?? 0));
+const oppWins = $derived(duel ? (selfId === 'p1' ? duel.p2Wins : duel.p1Wins) : (oppShared?.wins ?? 0));
+const gamesPlayedLabel = $derived(duel
+    ? `after ${duel.stoppedAtGame} game${duel.stoppedAtGame === 1 ? '' : 's'}`
+    : 'after 82 games');
+const seriesNote = $derived(duel
+    ? Math.max(duel.p1Wins, duel.p2Wins) === 4 && Math.min(duel.p1Wins, duel.p2Wins) === 0
         ? 'Series sweep'
         : 'Series decided'
-      : 'H2H mirrored',
-  );
-
-  const ppgByPlayerId = $derived.by(() => {
+    : 'H2H mirrored');
+const ppgByPlayerId = $derived.by(() => {
     const map = new Map<string, number>();
-    if (!stats) return map;
+    if (!stats)
+        return map;
     for (const line of [...stats.p1, ...stats.p2]) {
-      if (line.games > 0) map.set(line.playerId, line.points / line.games);
+        if (line.games > 0)
+            map.set(line.playerId, line.points / line.games);
     }
     return map;
-  });
-
-  const mvp = $derived.by(() => {
-    if (!stats) return null;
+});
+const mvp = $derived.by(() => {
+    if (!stats)
+        return null;
     const all = [
-      ...stats.p1.map((l) => ({ line: l, pid: 'p1' as const })),
-      ...stats.p2.map((l) => ({ line: l, pid: 'p2' as const })),
+        ...stats.p1.map((l) => ({ line: l, pid: 'p1' as const })),
+        ...stats.p2.map((l) => ({ line: l, pid: 'p2' as const })),
     ].filter((c) => c.line.games > 0);
-    if (all.length === 0) return null;
+    if (all.length === 0)
+        return null;
     all.sort((a, b) => b.line.points / b.line.games - a.line.points / a.line.games);
     const top = all[0]!;
     const rows = top.pid === 'p1' ? p1Rows : p2Rows;
     const entry = rows.find((r) => r?.playerId === top.line.playerId) ?? null;
     return { ...top, entry };
-  });
-
-  const comparison = $derived.by(() => {
-    if (!stats) return null;
+});
+const comparison = $derived.by(() => {
+    if (!stats)
+        return null;
     const games = duel ? duel.stoppedAtGame : 82;
     function totals(pid: 'p1' | 'p2') {
-      const lines = pid === 'p1' ? stats!.p1 : stats!.p2;
-      let points = 0;
-      let fgm = 0;
-      let fga = 0;
-      let tpm = 0;
-      let tpa = 0;
-      let reb = 0;
-      let tov = 0;
-      for (const l of lines) {
-        points += l.points;
-        fgm += l.fieldGoalsMade;
-        fga += l.fieldGoalsAttempted;
-        tpm += l.threesMade;
-        tpa += l.threesAttempted;
-        reb += l.rebounds;
-        tov += l.turnovers;
-      }
-      return { points, fgm, fga, tpm, tpa, reb, tov };
+        const lines = pid === 'p1' ? stats!.p1 : stats!.p2;
+        let points = 0;
+        let fgm = 0;
+        let fga = 0;
+        let tpm = 0;
+        let tpa = 0;
+        let reb = 0;
+        let tov = 0;
+        for (const l of lines) {
+            points += l.points;
+            fgm += l.fieldGoalsMade;
+            fga += l.fieldGoalsAttempted;
+            tpm += l.threesMade;
+            tpa += l.threesAttempted;
+            reb += l.rebounds;
+            tov += l.turnovers;
+        }
+        return { points, fgm, fga, tpm, tpa, reb, tov };
     }
     const youPid = selfId;
     const oppPid = selfId === 'p1' ? 'p2' : 'p1';
     const you = totals(youPid);
     const opp = totals(oppPid);
     return { games, you, opp };
-  });
-
-  const summaryDate = $derived.by(() => {
-    if (!createdAt) return '—';
+});
+const summaryDate = $derived.by(() => {
+    if (!createdAt)
+        return '—';
     const d = new Date(createdAt);
-    if (Number.isNaN(d.getTime())) return '—';
+    if (Number.isNaN(d.getTime()))
+        return '—';
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  });
-
-  const heroEyebrow = $derived(duel ? 'Series complete' : 'Shared 82 complete');
-
-  function viewMatchStats() {
+});
+const heroEyebrow = $derived(duel ? 'Series complete' : 'Shared 82 complete');
+function viewMatchStats() {
     tab = 'team';
     document.getElementById('fixed-five-match-tabs')?.scrollIntoView({ behavior: 'smooth' });
-  }
+}
 </script>
 
 <div

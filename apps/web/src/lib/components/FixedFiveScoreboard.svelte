@@ -1,11 +1,13 @@
-<script lang="ts">
-  import type { FixedFiveRoomSnapshot } from '@hoop-rush/data-contracts';
-  let { snapshot, selfId = 'p1' }: { snapshot: FixedFiveRoomSnapshot; selfId?: 'p1' | 'p2' } =
-    $props();
-  function laneLabel(id: 'p1' | 'p2'): string {
-    if (id === selfId) return id === 'p1' ? 'You · P1' : 'You · P2';
+<script lang="ts">import type { FixedFiveRoomSnapshot } from '@hoop-rush/data-contracts';
+let { snapshot, selfId = 'p1' }: {
+    snapshot: FixedFiveRoomSnapshot;
+    selfId?: 'p1' | 'p2';
+} = $props();
+function laneLabel(id: 'p1' | 'p2'): string {
+    if (id === selfId)
+        return id === 'p1' ? 'You · P1' : 'You · P2';
     return id === 'p1' ? 'Opponent · P1' : 'Opponent · P2';
-  }
+}
 </script>
 
 <div class="grid gap-2 sm:grid-cols-2" role="status" aria-label="Room scoreboard">

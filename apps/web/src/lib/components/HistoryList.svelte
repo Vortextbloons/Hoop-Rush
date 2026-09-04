@@ -1,24 +1,13 @@
-﻿<script lang="ts">
-  import { resolve } from '$app/paths';
-  import type { RouteId } from '$app/types';
-  import { Trophy } from '@lucide/svelte';
-  import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persistence';
-  import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-  import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
-  import { variantLabel } from '$lib/draft-presentation';
-  import SeasonTierBadge from '$lib/components/SeasonTierBadge.svelte';
-  import { seasonTierFromWins } from '$lib/season-tier';
-  let {
-    manifest,
-    rows,
-    active,
-    modeLabel,
-    emptyTitle,
-    emptyHref,
-    emptyCta,
-    continueHref,
-    resultHrefFor,
-  }: {
+﻿<script lang="ts">import { resolve } from '$app/paths';
+import type { RouteId } from '$app/types';
+import { Trophy } from '@lucide/svelte';
+import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persistence';
+import type { HoopRushManifest } from '@hoop-rush/data-contracts';
+import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
+import { variantLabel } from '$lib/draft-presentation';
+import SeasonTierBadge from '$lib/components/SeasonTierBadge.svelte';
+import { seasonTierFromWins } from '$lib/season-tier';
+let { manifest, rows, active, modeLabel, emptyTitle, emptyHref, emptyCta, continueHref, resultHrefFor, }: {
     manifest: HoopRushManifest | null;
     rows: CompletedRunIndex[];
     active: ActiveRunCheckpoint | null;
@@ -28,24 +17,23 @@
     emptyCta: string;
     continueHref: string | null;
     resultHrefFor: (runId: string) => string;
-  } = $props();
-  function franchiseName(franchiseId: string | null): string {
-    if (!franchiseId) return 'Mixed lineup';
-    return (
-      manifest?.modernFranchiseSlots.find((e) => e.franchiseId === franchiseId)?.displayName ??
-      franchiseId
-    );
-  }
-  function franchiseLabel(franchiseId: string | null): string {
+} = $props();
+function franchiseName(franchiseId: string | null): string {
+    if (!franchiseId)
+        return 'Mixed lineup';
+    return (manifest?.modernFranchiseSlots.find((e) => e.franchiseId === franchiseId)?.displayName ??
+        franchiseId);
+}
+function franchiseLabel(franchiseId: string | null): string {
     return franchiseId ? franchiseAbbreviation(franchiseId) : 'Mixed';
-  }
-  function eraName(eraId: string): string {
+}
+function eraName(eraId: string): string {
     return manifest?.eras.find((e) => e.eraId === eraId)?.label ?? eraId;
-  }
-  function formatTime(iso: string): string {
+}
+function formatTime(iso: string): string {
     const date = new Date(iso);
     return Number.isNaN(date.getTime()) ? iso : date.toLocaleString();
-  }
+}
 </script>
 
 {#if rows.length === 0 && !active}

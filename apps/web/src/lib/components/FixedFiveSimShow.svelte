@@ -1,87 +1,76 @@
-<script lang="ts">
-  import type { FixedFiveRoomMode, FixedFiveWorkerResultEntry } from '@hoop-rush/data-contracts';
-
-  const SHOW_TICK_MS = 120;
-  const DUEL_REVEAL_EVERY = 4;
-  const SHARED_REVEAL_DIVISOR = 25;
-
-  let {
-    mode,
-    progress = null,
-    entries = [],
-    selfId = 'p1',
-  }: {
+<script lang="ts">import type { FixedFiveRoomMode, FixedFiveWorkerResultEntry } from '@hoop-rush/data-contracts';
+const SHOW_TICK_MS = 120;
+const DUEL_REVEAL_EVERY = 4;
+const SHARED_REVEAL_DIVISOR = 25;
+let { mode, progress = null, entries = [], selfId = 'p1', }: {
     mode: FixedFiveRoomMode;
-    progress?: { completed: number; total: number } | null;
+    progress?: {
+        completed: number;
+        total: number;
+    } | null;
     entries?: FixedFiveWorkerResultEntry[];
     selfId?: 'p1' | 'p2';
-  } = $props();
-
-  const isDuel = $derived(mode === 'duel');
-  const total = $derived(progress?.total ?? (isDuel ? 7 : 161));
-
-  let shownCount = $state(0);
-  let spot = $state<'p1' | 'p2'>('p1');
-  let duelTick = $state(0);
-
-  $effect(() => {
+} = $props();
+const isDuel = $derived(mode === 'duel');
+const total = $derived(progress?.total ?? (isDuel ? 7 : 161));
+let shownCount = $state(0);
+let spot = $state<'p1' | 'p2'>('p1');
+let duelTick = $state(0);
+$effect(() => {
     shownCount = 0;
     duelTick = 0;
-  });
-
-  $effect(() => {
+});
+$effect(() => {
     const target = entries.length;
-    if (shownCount >= target) return;
+    if (shownCount >= target)
+        return;
     const step = isDuel
-      ? 1
-      : Math.max(2, Math.ceil(Math.max(target, total) / SHARED_REVEAL_DIVISOR));
+        ? 1
+        : Math.max(2, Math.ceil(Math.max(target, total) / SHARED_REVEAL_DIVISOR));
     const timer = setInterval(() => {
-      duelTick += 1;
-      shownCount = Math.min(
-        target,
-        shownCount + (isDuel && duelTick % DUEL_REVEAL_EVERY !== 0 ? 0 : step),
-      );
-      if (shownCount >= entries.length) clearInterval(timer);
+        duelTick += 1;
+        shownCount = Math.min(target, shownCount + (isDuel && duelTick % DUEL_REVEAL_EVERY !== 0 ? 0 : step));
+        if (shownCount >= entries.length)
+            clearInterval(timer);
     }, SHOW_TICK_MS);
     return () => clearInterval(timer);
-  });
-
-  $effect(() => {
+});
+$effect(() => {
     const timer = setInterval(() => {
-      spot = spot === 'p1' ? 'p2' : 'p1';
+        spot = spot === 'p1' ? 'p2' : 'p1';
     }, 700);
     return () => clearInterval(timer);
-  });
-
-  const visible = $derived(entries.slice(0, shownCount));
-  const completed = $derived(shownCount);
-  const pct = $derived(Math.min(100, (completed / Math.max(1, total)) * 100));
-
-  interface DuelDot {
+});
+const visible = $derived(entries.slice(0, shownCount));
+const completed = $derived(shownCount);
+const pct = $derived(Math.min(100, (completed / Math.max(1, total)) * 100));
+interface DuelDot {
     winner: 'p1' | 'p2' | null;
-  }
-  const duelDots = $derived.by((): DuelDot[] => {
+}
+const duelDots = $derived.by((): DuelDot[] => {
     const dots: DuelDot[] = Array.from({ length: 7 }, () => ({ winner: null }));
     visible.forEach((entry, i) => {
-      if (entry.tag !== 'duel' || i >= 7) return;
-      const game = entry.game;
-      const homeIsP1 = game.home.teamId === 'p1';
-      const p1Won = (game.winner === 'home') === homeIsP1;
-      dots[i] = { winner: p1Won ? 'p1' : 'p2' };
+        if (entry.tag !== 'duel' || i >= 7)
+            return;
+        const game = entry.game;
+        const homeIsP1 = game.home.teamId === 'p1';
+        const p1Won = (game.winner === 'home') === homeIsP1;
+        dots[i] = { winner: p1Won ? 'p1' : 'p2' };
     });
     return dots;
-  });
-  const duelScore = $derived.by(() => {
+});
+const duelScore = $derived.by(() => {
     let p1 = 0;
     let p2 = 0;
     for (const d of duelDots) {
-      if (d.winner === 'p1') p1 += 1;
-      if (d.winner === 'p2') p2 += 1;
+        if (d.winner === 'p1')
+            p1 += 1;
+        if (d.winner === 'p2')
+            p2 += 1;
     }
     return { p1, p2 };
-  });
-
-  const sharedLive = $derived.by(() => {
+});
+const sharedLive = $derived.by(() => {
     let p1Wins = 0;
     let p2Wins = 0;
     let p1Diff = 0;
@@ -89,64 +78,69 @@
     let h2hP1 = 0;
     let h2hP2 = 0;
     for (const entry of visible) {
-      const g = entry.game;
-      const diff = g.home.box.points - g.away.box.points;
-      if (entry.tag === 'p1') {
-        if (g.winner === 'home') p1Wins += 1;
-        p1Diff += diff;
-      } else if (entry.tag === 'p2') {
-        if (g.winner === 'home') p2Wins += 1;
-        p2Diff += diff;
-      } else if (entry.tag === 'h2h') {
-        if (g.winner === 'home') {
-          p1Wins += 1;
-          h2hP1 += 1;
-        } else {
-          p2Wins += 1;
-          h2hP2 += 1;
+        const g = entry.game;
+        const diff = g.home.box.points - g.away.box.points;
+        if (entry.tag === 'p1') {
+            if (g.winner === 'home')
+                p1Wins += 1;
+            p1Diff += diff;
         }
-        p1Diff += diff;
-        p2Diff -= diff;
-      }
+        else if (entry.tag === 'p2') {
+            if (g.winner === 'home')
+                p2Wins += 1;
+            p2Diff += diff;
+        }
+        else if (entry.tag === 'h2h') {
+            if (g.winner === 'home') {
+                p1Wins += 1;
+                h2hP1 += 1;
+            }
+            else {
+                p2Wins += 1;
+                h2hP2 += 1;
+            }
+            p1Diff += diff;
+            p2Diff -= diff;
+        }
     }
     return { p1Wins, p2Wins, p1Diff, p2Diff, h2hP1, h2hP2 };
-  });
-
-  const ticker = $derived.by(() => {
+});
+const ticker = $derived.by(() => {
     return [...visible]
-      .slice(-3)
-      .reverse()
-      .map((entry) => {
+        .slice(-3)
+        .reverse()
+        .map((entry) => {
         const g = entry.game;
         const home = g.home.box.points;
         const away = g.away.box.points;
         let youWon: boolean | null = null;
         let label = '';
         if (entry.tag === 'h2h') {
-          youWon = selfId === 'p1' ? g.winner === 'home' : g.winner === 'away';
-          label = `H2H G${g.gameNumber}`;
-        } else if (entry.tag === 'p1' || entry.tag === 'p2') {
-          const mine = entry.tag === selfId;
-          youWon = mine ? g.winner === 'home' : null;
-          label = mine ? `G${g.gameNumber}` : `OPP G${g.gameNumber}`;
-        } else {
-          youWon = null;
-          label = `G${g.gameNumber}`;
+            youWon = selfId === 'p1' ? g.winner === 'home' : g.winner === 'away';
+            label = `H2H G${g.gameNumber}`;
+        }
+        else if (entry.tag === 'p1' || entry.tag === 'p2') {
+            const mine = entry.tag === selfId;
+            youWon = mine ? g.winner === 'home' : null;
+            label = mine ? `G${g.gameNumber}` : `OPP G${g.gameNumber}`;
+        }
+        else {
+            youWon = null;
+            label = `G${g.gameNumber}`;
         }
         const opponent = entry.tag === 'h2h' ? 'H2H' : (g.away.displayName ?? 'OPP');
         return {
-          label,
-          score: `${home}–${away}`,
-          youWon,
-          opponent,
-          key: `${entry.tag}-${g.gameNumber}`,
+            label,
+            score: `${home}–${away}`,
+            youWon,
+            opponent,
+            key: `${entry.tag}-${g.gameNumber}`,
         };
-      });
-  });
-
-  function laneName(id: 'p1' | 'p2'): string {
+    });
+});
+function laneName(id: 'p1' | 'p2'): string {
     return id === selfId ? 'YOU' : 'OPP';
-  }
+}
 </script>
 
 <div

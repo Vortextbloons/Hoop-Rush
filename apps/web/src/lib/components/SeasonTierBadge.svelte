@@ -1,13 +1,12 @@
-<script lang="ts">
-  import { Trophy } from '@lucide/svelte';
-  import { seasonTierFromWins } from '$lib/season-tier';
-  interface Props {
+<script lang="ts">import { Trophy } from '@lucide/svelte';
+import { seasonTierFromWins } from '$lib/season-tier';
+interface Props {
     wins: number;
     size?: 'default' | 'large';
-  }
-  let { wins, size = 'default' }: Props = $props();
-  const tier = $derived(seasonTierFromWins(wins));
-  const large = $derived(size === 'large');
+}
+let { wins, size = 'default' }: Props = $props();
+const tier = $derived(seasonTierFromWins(wins));
+const large = $derived(size === 'large');
 </script>
 
 <p

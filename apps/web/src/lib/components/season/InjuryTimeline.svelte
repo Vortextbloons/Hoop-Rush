@@ -1,18 +1,9 @@
-<script lang="ts">
-  import {
-    INJURY_SEVERITY_BADGE,
-    INJURY_TYPE_LABEL,
-    type InjuryTimelinePlayer,
-  } from '$lib/season/season-health-view';
-  let {
-    players,
-  }: {
+<script lang="ts">import { INJURY_SEVERITY_BADGE, INJURY_TYPE_LABEL, type InjuryTimelinePlayer, } from '$lib/season/season-health-view';
+let { players, }: {
     players: InjuryTimelinePlayer[];
-  } = $props();
-  const injuredCount = $derived(players.length);
-  const summary = $derived(
-    `${String(injuredCount)} player${injuredCount === 1 ? '' : 's'} with recorded injuries`,
-  );
+} = $props();
+const injuredCount = $derived(players.length);
+const summary = $derived(`${String(injuredCount)} player${injuredCount === 1 ? '' : 's'} with recorded injuries`);
 </script>
 
 <section

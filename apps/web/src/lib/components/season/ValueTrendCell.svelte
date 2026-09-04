@@ -1,23 +1,16 @@
-<script lang="ts">
-  import type { SeasonTradeValueTrend } from '@hoop-rush/data-contracts';
-  import { valueTrendToneLabel } from '$lib/season/season-presentation';
-  let {
-    trend,
-    basis,
-    playerName = null,
-  }: {
+<script lang="ts">import type { SeasonTradeValueTrend } from '@hoop-rush/data-contracts';
+import { valueTrendToneLabel } from '$lib/season/season-presentation';
+let { trend, basis, playerName = null, }: {
     trend: SeasonTradeValueTrend;
     basis: string;
     playerName?: string | null;
-  } = $props();
-  const tone = $derived(valueTrendToneLabel(trend.trend));
-  const accent = $derived(
-    trend.trend === 'rising'
-      ? 'text-positive border-positive/30 bg-positive/10'
-      : trend.trend === 'falling'
+} = $props();
+const tone = $derived(valueTrendToneLabel(trend.trend));
+const accent = $derived(trend.trend === 'rising'
+    ? 'text-positive border-positive/30 bg-positive/10'
+    : trend.trend === 'falling'
         ? 'text-destructive border-destructive/30 bg-destructive/10'
-        : 'text-muted-foreground border-border bg-surface-2',
-  );
+        : 'text-muted-foreground border-border bg-surface-2');
 </script>
 
 <div

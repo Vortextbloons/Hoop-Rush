@@ -1,21 +1,15 @@
-<script lang="ts">
-  import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-  import { franchiseIdentityOf } from '$lib/season/season-branding';
-  import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
-  let {
-    manifest,
-    franchiseId,
-    recordLabel,
-    positionLabel,
-  }: {
+<script lang="ts">import type { HoopRushManifest } from '@hoop-rush/data-contracts';
+import { franchiseIdentityOf } from '$lib/season/season-branding';
+import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
+let { manifest, franchiseId, recordLabel, positionLabel, }: {
     manifest: HoopRushManifest | null;
     franchiseId: string;
     recordLabel: string;
     positionLabel: string;
-  } = $props();
-  const identity = $derived(manifest === null ? null : franchiseIdentityOf(manifest, franchiseId));
-  const displayName = $derived(identity?.displayName ?? franchiseId);
-  const teamExternalId = $derived(identity?.teamExternalId ?? '');
+} = $props();
+const identity = $derived(manifest === null ? null : franchiseIdentityOf(manifest, franchiseId));
+const displayName = $derived(identity?.displayName ?? franchiseId);
+const teamExternalId = $derived(identity?.teamExternalId ?? '');
 </script>
 
 <header class="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">

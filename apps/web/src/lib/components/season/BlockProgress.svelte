@@ -1,21 +1,13 @@
-<script lang="ts">
-  import type { BlockRunState } from '$lib/season/season-hub-state';
-  let {
-    block,
-    onCancel,
-    onRetry,
-    label,
-  }: {
+<script lang="ts">import type { BlockRunState } from '$lib/season/season-hub-state';
+let { block, onCancel, onRetry, label, }: {
     block: BlockRunState;
     onCancel: () => void;
     onRetry: () => void;
     label: string;
-  } = $props();
-  const percent = $derived(
-    block.gamesTotal > 0
-      ? Math.min(100, Math.round((block.gamesCompleted / block.gamesTotal) * 100))
-      : 0,
-  );
+} = $props();
+const percent = $derived(block.gamesTotal > 0
+    ? Math.min(100, Math.round((block.gamesCompleted / block.gamesTotal) * 100))
+    : 0);
 </script>
 
 {#if block.phase === 'running' || block.phase === 'complete' || block.phase === 'cancelled' || block.phase === 'failed'}

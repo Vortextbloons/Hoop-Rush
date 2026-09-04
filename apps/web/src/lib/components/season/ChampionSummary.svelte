@@ -1,23 +1,15 @@
-﻿<script lang="ts">
-  import { resolve } from '$app/paths';
-  import type { RouteId } from '$app/types';
-  import type { HoopRushManifest, SeasonRunCompletion } from '@hoop-rush/data-contracts';
-  import { postseasonStageLabel } from '$lib/season/season-postseason-presentation';
-  let {
-    championFranchiseId,
-    franchiseName,
-    franchiseAbbrev,
-    manifest,
-    completion,
-    humanWon,
-  }: {
+﻿<script lang="ts">import { resolve } from '$app/paths';
+import type { RouteId } from '$app/types';
+import type { HoopRushManifest, SeasonRunCompletion } from '@hoop-rush/data-contracts';
+import { postseasonStageLabel } from '$lib/season/season-postseason-presentation';
+let { championFranchiseId, franchiseName, franchiseAbbrev, manifest, completion, humanWon, }: {
     championFranchiseId: string | null;
     franchiseName: (franchiseId: string) => string;
     franchiseAbbrev: (franchiseId: string) => string;
     manifest: HoopRushManifest | null;
     completion: SeasonRunCompletion | null;
     humanWon: boolean;
-  } = $props();
+} = $props();
 </script>
 
 <section

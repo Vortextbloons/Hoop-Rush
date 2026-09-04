@@ -1,36 +1,10 @@
-<script lang="ts">
-  import type {
-    HoopRushManifest,
-    SeasonEffectsState,
-    SeasonGameSummary,
-    SeasonRotation,
-  } from '@hoop-rush/data-contracts';
-  import type { RotationEditor as RotationEditorType } from '$lib/season/season-rotation-editor';
-  import type { RiskyRehabOption } from '$lib/season/season-postseason-presentation';
-  import type { SeasonFaceRef } from '$lib/season/season-branding';
-  import { INJURY_SEVERITY_LABEL } from '$lib/season/season-health-view';
-  import RotationEditor from './RotationEditor.svelte';
-  let {
-    editor,
-    disabled,
-    onchange,
-    faces = null,
-    manifest = null,
-    effects = null,
-    summaries = [],
-    targetGameId,
-    matchupLabel,
-    matchupDetail = null,
-    rehabOptions,
-    selectedRehabInjuryId,
-    onRehabSelect,
-    failures,
-    rejectionMessage,
-    balance,
-    submitting,
-    canSubmit,
-    onSubmit,
-  }: {
+<script lang="ts">import type { HoopRushManifest, SeasonEffectsState, SeasonGameSummary, SeasonRotation, } from '@hoop-rush/data-contracts';
+import type { RotationEditor as RotationEditorType } from '$lib/season/season-rotation-editor';
+import type { RiskyRehabOption } from '$lib/season/season-postseason-presentation';
+import type { SeasonFaceRef } from '$lib/season/season-branding';
+import { INJURY_SEVERITY_LABEL } from '$lib/season/season-health-view';
+import RotationEditor from './RotationEditor.svelte';
+let { editor, disabled, onchange, faces = null, manifest = null, effects = null, summaries = [], targetGameId, matchupLabel, matchupDetail = null, rehabOptions, selectedRehabInjuryId, onRehabSelect, failures, rejectionMessage, balance, submitting, canSubmit, onSubmit, }: {
     editor: RotationEditorType;
     disabled: boolean;
     onchange: (rotation: SeasonRotation, failures: string[]) => void;
@@ -50,10 +24,8 @@
     submitting: boolean;
     canSubmit: boolean;
     onSubmit: () => void;
-  } = $props();
-  const rehabInjuredPlayerCount = $derived(
-    rehabOptions.filter((option) => !option.alreadyRehabbed).length,
-  );
+} = $props();
+const rehabInjuredPlayerCount = $derived(rehabOptions.filter((option) => !option.alreadyRehabbed).length);
 </script>
 
 <section

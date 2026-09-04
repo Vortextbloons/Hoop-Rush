@@ -1,270 +1,223 @@
-<script lang="ts">
-  import { getContext } from 'svelte';
-  import type {
-    HoopRushManifest,
-    SeasonFreeAgencyCandidate,
-    SeasonFreeAgencyRoleExpectation,
-  } from '@hoop-rush/data-contracts';
-  import { franchiseIdSchema } from '@hoop-rush/data-contracts';
-  import FreeAgencyDeclarationPanel from '$lib/components/season/free-agency/FreeAgencyDeclarationPanel.svelte';
-  import FreeAgencyMarketOverview, {
-    type FreeAgencyCardView,
-  } from '$lib/components/season/free-agency/FreeAgencyMarketOverview.svelte';
-  import FreeAgencyResolvedPanel from '$lib/components/season/free-agency/FreeAgencyResolvedPanel.svelte';
-  import FreeAgencyReviewPanel from '$lib/components/season/free-agency/FreeAgencyReviewPanel.svelte';
-  import {
-    bestFitOrder,
-    candidateFitFacts,
-    humanDeclarationOf,
-    humanSkipped,
-    interestedTeamsOf,
-    nextFreePriority,
-    openFreeAgencyWindowOf,
-    validateDeclaration,
-  } from '$lib/components/season/free-agency/free-agency-view';
-  import { overallRatingOf } from '$lib/season/season-catalog-index';
-  import { mergeFreeAgencyFaces } from '$lib/season/season-branding';
-  import { describeCommandRejection } from '$lib/season/season-hub-state';
-  import {
-    SEASON_RUN_SHELL_CONTEXT,
-    type SeasonRunShellData,
-  } from '$lib/season/season-shell-context';
-  const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
-  const freeAgency = $derived(shell.freeAgency);
-  const run = $derived(shell.run);
-  const humanFranchiseId = $derived(shell.humanFranchiseId);
-  const openWindow = $derived(openFreeAgencyWindowOf(freeAgency));
-  const resolvedWindows = $derived(
-    (freeAgency?.windows ?? []).filter((window) => window.status === 'resolved'),
-  );
-  const humanFranchiseKey = $derived.by(() => {
-    if (humanFranchiseId === null) return null;
+<script lang="ts">import { getContext } from 'svelte';
+import type { HoopRushManifest, SeasonFreeAgencyCandidate, SeasonFreeAgencyRoleExpectation, } from '@hoop-rush/data-contracts';
+import { franchiseIdSchema } from '@hoop-rush/data-contracts';
+import FreeAgencyDeclarationPanel from '$lib/components/season/free-agency/FreeAgencyDeclarationPanel.svelte';
+import FreeAgencyMarketOverview, { type FreeAgencyCardView, } from '$lib/components/season/free-agency/FreeAgencyMarketOverview.svelte';
+import FreeAgencyResolvedPanel from '$lib/components/season/free-agency/FreeAgencyResolvedPanel.svelte';
+import FreeAgencyReviewPanel from '$lib/components/season/free-agency/FreeAgencyReviewPanel.svelte';
+import { bestFitOrder, candidateFitFacts, humanDeclarationOf, humanSkipped, interestedTeamsOf, nextFreePriority, openFreeAgencyWindowOf, validateDeclaration, } from '$lib/components/season/free-agency/free-agency-view';
+import { overallRatingOf } from '$lib/season/season-catalog-index';
+import { mergeFreeAgencyFaces } from '$lib/season/season-branding';
+import { describeCommandRejection } from '$lib/season/season-hub-state';
+import { SEASON_RUN_SHELL_CONTEXT, type SeasonRunShellData, } from '$lib/season/season-shell-context';
+const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
+const freeAgency = $derived(shell.freeAgency);
+const run = $derived(shell.run);
+const humanFranchiseId = $derived(shell.humanFranchiseId);
+const openWindow = $derived(openFreeAgencyWindowOf(freeAgency));
+const resolvedWindows = $derived((freeAgency?.windows ?? []).filter((window) => window.status === 'resolved'));
+const humanFranchiseKey = $derived.by(() => {
+    if (humanFranchiseId === null)
+        return null;
     const parsed = franchiseIdSchema.safeParse(humanFranchiseId);
     return parsed.success ? parsed.data : null;
-  });
-  const balance = $derived(
-    run === null || humanFranchiseKey === null
-      ? 0
-      : (run.influence.balances[humanFranchiseKey] ?? 0),
-  );
-  const seasonSpend = $derived(
-    freeAgency === null || humanFranchiseKey === null
-      ? 0
-      : (freeAgency.seasonSpend[humanFranchiseKey] ?? 0),
-  );
-  const signingCount = $derived(
-    freeAgency === null || humanFranchiseKey === null
-      ? 0
-      : (freeAgency.signingCounts[humanFranchiseKey] ?? 0),
-  );
-  let draft = $state<
-    Record<
-      string,
-      {
-        priority: 1 | 2;
-        role: SeasonFreeAgencyRoleExpectation;
-        influence: number;
-      }
-    >
-  >({});
-  let submitting = $state(false);
-  let resolvedThisSession = $state<number | null>(null);
-  const candidateById = $derived(
-    new Map<string, SeasonFreeAgencyCandidate>(
-      (openWindow?.candidates ?? []).map((candidate) => [candidate.playerVersionId, candidate]),
-    ),
-  );
-  function assignPriority(
-    playerVersionId: string,
-    priority: 0 | 1 | 2,
-  ): Record<
-    string,
-    {
-      priority: 1 | 2;
-      role: SeasonFreeAgencyRoleExpectation;
-      influence: number;
-    }
-  > {
+});
+const balance = $derived(run === null || humanFranchiseKey === null
+    ? 0
+    : (run.influence.balances[humanFranchiseKey] ?? 0));
+const seasonSpend = $derived(freeAgency === null || humanFranchiseKey === null
+    ? 0
+    : (freeAgency.seasonSpend[humanFranchiseKey] ?? 0));
+const signingCount = $derived(freeAgency === null || humanFranchiseKey === null
+    ? 0
+    : (freeAgency.signingCounts[humanFranchiseKey] ?? 0));
+let draft = $state<Record<string, {
+    priority: 1 | 2;
+    role: SeasonFreeAgencyRoleExpectation;
+    influence: number;
+}>>({});
+let submitting = $state(false);
+let resolvedThisSession = $state<number | null>(null);
+const candidateById = $derived(new Map<string, SeasonFreeAgencyCandidate>((openWindow?.candidates ?? []).map((candidate) => [candidate.playerVersionId, candidate])));
+function assignPriority(playerVersionId: string, priority: 0 | 1 | 2): Record<string, {
+    priority: 1 | 2;
+    role: SeasonFreeAgencyRoleExpectation;
+    influence: number;
+}> {
     const next = { ...draft };
     const candidate = candidateById.get(playerVersionId);
-    if (candidate === undefined) return next;
+    if (candidate === undefined)
+        return next;
     if (priority === 0) {
-      delete next[playerVersionId];
-      return next;
+        delete next[playerVersionId];
+        return next;
     }
-    const holder = Object.entries(next).find(
-      ([id, entry]) => entry.priority === priority && id !== playerVersionId,
-    );
+    const holder = Object.entries(next).find(([id, entry]) => entry.priority === priority && id !== playerVersionId);
     if (holder !== undefined) {
-      const otherPriority = priority === 1 ? 2 : 1;
-      const otherHolder = Object.entries(next).find(
-        ([id, entry]) =>
-          entry.priority === otherPriority && id !== playerVersionId && id !== holder[0],
-      );
-      if (otherHolder === undefined) {
-        next[holder[0]] = { ...holder[1], priority: otherPriority };
-      } else {
-        delete next[holder[0]];
-      }
+        const otherPriority = priority === 1 ? 2 : 1;
+        const otherHolder = Object.entries(next).find(([id, entry]) => entry.priority === otherPriority && id !== playerVersionId && id !== holder[0]);
+        if (otherHolder === undefined) {
+            next[holder[0]] = { ...holder[1], priority: otherPriority };
+        }
+        else {
+            delete next[holder[0]];
+        }
     }
     const previous = next[playerVersionId];
     next[playerVersionId] = {
-      priority,
-      role: previous?.role ?? candidate.supportedRoles[0] ?? 'depth',
-      influence: previous?.influence ?? candidate.minimumInfluence,
+        priority,
+        role: previous?.role ?? candidate.supportedRoles[0] ?? 'depth',
+        influence: previous?.influence ?? candidate.minimumInfluence,
     };
     return next;
-  }
-  function setPriority(playerVersionId: string, priority: 0 | 1 | 2) {
-    if (submitting) return;
+}
+function setPriority(playerVersionId: string, priority: 0 | 1 | 2) {
+    if (submitting)
+        return;
     draft = assignPriority(playerVersionId, priority);
-  }
-  function toggleTarget(playerVersionId: string) {
-    if (submitting) return;
+}
+function toggleTarget(playerVersionId: string) {
+    if (submitting)
+        return;
     if (draft[playerVersionId] !== undefined) {
-      draft = assignPriority(playerVersionId, 0);
-      return;
+        draft = assignPriority(playerVersionId, 0);
+        return;
     }
     const next = nextFreePriority(Object.values(draft));
-    if (next === null) return;
+    if (next === null)
+        return;
     draft = assignPriority(playerVersionId, next);
-  }
-  function setRole(playerVersionId: string, role: SeasonFreeAgencyRoleExpectation) {
-    if (submitting) return;
+}
+function setRole(playerVersionId: string, role: SeasonFreeAgencyRoleExpectation) {
+    if (submitting)
+        return;
     const entry = draft[playerVersionId];
-    if (entry === undefined) return;
+    if (entry === undefined)
+        return;
     draft = { ...draft, [playerVersionId]: { ...entry, role } };
-  }
-  function setInfluence(playerVersionId: string, influence: number) {
-    if (submitting) return;
+}
+function setInfluence(playerVersionId: string, influence: number) {
+    if (submitting)
+        return;
     const entry = draft[playerVersionId];
-    if (entry === undefined) return;
+    if (entry === undefined)
+        return;
     const candidate = candidateById.get(playerVersionId);
-    if (candidate === undefined) return;
-    const clamped = Math.max(
-      candidate.minimumInfluence,
-      Math.min(3, Number.isFinite(influence) ? Math.round(influence) : candidate.minimumInfluence),
-    );
+    if (candidate === undefined)
+        return;
+    const clamped = Math.max(candidate.minimumInfluence, Math.min(3, Number.isFinite(influence) ? Math.round(influence) : candidate.minimumInfluence));
     draft = { ...draft, [playerVersionId]: { ...entry, influence: clamped } };
-  }
-  const orderedTargets = $derived.by(() =>
-    Object.entries(draft)
-      .map(([playerVersionId, entry]) => ({
-        playerVersionId,
-        priority: entry.priority,
-        roleExpectation: entry.role,
-        influence: entry.influence,
-      }))
-      .sort((a, b) => a.priority - b.priority),
-  );
-  const localFailures = $derived.by(() => {
-    if (openWindow === null) return [];
+}
+const orderedTargets = $derived.by(() => Object.entries(draft)
+    .map(([playerVersionId, entry]) => ({
+    playerVersionId,
+    priority: entry.priority,
+    roleExpectation: entry.role,
+    influence: entry.influence,
+}))
+    .sort((a, b) => a.priority - b.priority));
+const localFailures = $derived.by(() => {
+    if (openWindow === null)
+        return [];
     return validateDeclaration({
-      candidates: openWindow.candidates,
-      targets: orderedTargets,
-      balance,
-      seasonSpend,
+        candidates: openWindow.candidates,
+        targets: orderedTargets,
+        balance,
+        seasonSpend,
     });
-  });
-  const activeRotationIds = $derived(shell.editor?.activeMemberIds() ?? []);
-  const manifest = $derived(shell.manifest);
-  const marketFaces = $derived.by(() =>
-    mergeFreeAgencyFaces(shell.playersIndex, shell.catalog, shell.freeAgency, shell.facesByVersion),
-  );
-  const faceOf = (playerVersionId: string) => marketFaces.get(playerVersionId) ?? null;
-  const cards: FreeAgencyCardView[] = $derived.by(() => {
+});
+const activeRotationIds = $derived(shell.editor?.activeMemberIds() ?? []);
+const manifest = $derived(shell.manifest);
+const marketFaces = $derived.by(() => mergeFreeAgencyFaces(shell.playersIndex, shell.catalog, shell.freeAgency, shell.facesByVersion));
+const faceOf = (playerVersionId: string) => marketFaces.get(playerVersionId) ?? null;
+const cards: FreeAgencyCardView[] = $derived.by(() => {
     const window = openWindow;
-    if (window === null) return [];
+    if (window === null)
+        return [];
     const fitOf = (candidate: SeasonFreeAgencyCandidate) => {
-      const others = interestedTeamsOf(window, candidate.playerVersionId, humanFranchiseId).filter(
-        (team) => !team.human,
-      ).length;
-      return candidateFitFacts(
-        candidate,
-        activeRotationIds,
-        (playerVersionId) => shell.playablePositions(playerVersionId),
-        others,
-      );
+        const others = interestedTeamsOf(window, candidate.playerVersionId, humanFranchiseId).filter((team) => !team.human).length;
+        return candidateFitFacts(candidate, activeRotationIds, (playerVersionId) => shell.playablePositions(playerVersionId), others);
     };
     const best = new Set(bestFitOrder(window.candidates, fitOf));
     return window.candidates.map((candidate) => {
-      const entry = draft[candidate.playerVersionId];
-      return {
-        candidate,
-        fit: fitOf(candidate),
-        isBestFit: best.has(candidate.playerVersionId),
-        interested: interestedTeamsOf(window, candidate.playerVersionId, humanFranchiseId),
-        priority: (entry?.priority ?? 0) as 0 | 1 | 2,
-        role: entry?.role ?? null,
-        influence: entry?.influence ?? null,
-        face: faceOf(candidate.playerVersionId),
-        overallRating: overallRatingOf(shell.catalog, candidate.playerVersionId),
-      };
+        const entry = draft[candidate.playerVersionId];
+        return {
+            candidate,
+            fit: fitOf(candidate),
+            isBestFit: best.has(candidate.playerVersionId),
+            interested: interestedTeamsOf(window, candidate.playerVersionId, humanFranchiseId),
+            priority: (entry?.priority ?? 0) as 0 | 1 | 2,
+            role: entry?.role ?? null,
+            influence: entry?.influence ?? null,
+            face: faceOf(candidate.playerVersionId),
+            overallRating: overallRatingOf(shell.catalog, candidate.playerVersionId),
+        };
     });
-  });
-  const declaration = $derived(
-    openWindow === null ? null : humanDeclarationOf(openWindow, humanFranchiseId),
-  );
-  const skipped = $derived(declaration !== null && humanSkipped(openWindow!, humanFranchiseId));
-  const editable = $derived(
-    openWindow !== null && declaration === null && humanFranchiseId !== null,
-  );
-  const freeAgencyCommandError = $derived.by(() => {
+});
+const declaration = $derived(openWindow === null ? null : humanDeclarationOf(openWindow, humanFranchiseId));
+const skipped = $derived(declaration !== null && humanSkipped(openWindow!, humanFranchiseId));
+const editable = $derived(openWindow !== null && declaration === null && humanFranchiseId !== null);
+const freeAgencyCommandError = $derived.by(() => {
     const error = shell.commandError;
-    if (error === null) return null;
+    if (error === null)
+        return null;
     const commands = new Set([
-      'declare-free-agent-interest',
-      'skip-free-agent-market',
-      'resolve-free-agent-market',
+        'declare-free-agent-interest',
+        'skip-free-agent-market',
+        'resolve-free-agent-market',
     ]);
-    if (!commands.has(error.command)) return null;
+    if (!commands.has(error.command))
+        return null;
     return error.rejection !== null
-      ? describeCommandRejection(error.command, error.rejection)
-      : error.message;
-  });
-  async function submitDeclaration() {
-    if (
-      openWindow === null ||
-      submitting ||
-      orderedTargets.length === 0 ||
-      localFailures.length > 0
-    )
-      return;
+        ? describeCommandRejection(error.command, error.rejection)
+        : error.message;
+});
+async function submitDeclaration() {
+    if (openWindow === null ||
+        submitting ||
+        orderedTargets.length === 0 ||
+        localFailures.length > 0)
+        return;
     submitting = true;
     try {
-      await shell.declareFreeAgentInterest({
-        windowIndex: openWindow.windowIndex,
-        targets: orderedTargets.map(({ playerVersionId, roleExpectation, influence }) => ({
-          playerVersionId,
-          roleExpectation,
-          influence,
-        })),
-      });
-      draft = {};
-    } finally {
-      submitting = false;
+        await shell.declareFreeAgentInterest({
+            windowIndex: openWindow.windowIndex,
+            targets: orderedTargets.map(({ playerVersionId, roleExpectation, influence }) => ({
+                playerVersionId,
+                roleExpectation,
+                influence,
+            })),
+        });
+        draft = {};
     }
-  }
-  async function skipMarket() {
-    if (openWindow === null || submitting) return;
+    finally {
+        submitting = false;
+    }
+}
+async function skipMarket() {
+    if (openWindow === null || submitting)
+        return;
     submitting = true;
     try {
-      await shell.skipFreeAgentMarket({ windowIndex: openWindow.windowIndex });
-      draft = {};
-    } finally {
-      submitting = false;
+        await shell.skipFreeAgentMarket({ windowIndex: openWindow.windowIndex });
+        draft = {};
     }
-  }
-  async function resolveMarket() {
-    if (openWindow === null || submitting) return;
+    finally {
+        submitting = false;
+    }
+}
+async function resolveMarket() {
+    if (openWindow === null || submitting)
+        return;
     submitting = true;
     try {
-      resolvedThisSession = openWindow.windowIndex;
-      await shell.resolveFreeAgentMarket({ windowIndex: openWindow.windowIndex });
-    } finally {
-      submitting = false;
+        resolvedThisSession = openWindow.windowIndex;
+        await shell.resolveFreeAgentMarket({ windowIndex: openWindow.windowIndex });
     }
-  }
+    finally {
+        submitting = false;
+    }
+}
 </script>
 
 <svelte:head>

@@ -1,257 +1,227 @@
-<script lang="ts">
-  import { getContext } from 'svelte';
-  import { SvelteMap } from 'svelte/reactivity';
-  import {
-    SEASON_BLOCK_COUNT,
-    seasonDigestHex,
-    type SeasonGameSummary,
-    type SeasonRotation,
-  } from '@hoop-rush/data-contracts';
-  import { minutePlanHorizonGames } from '@hoop-rush/engine';
-  import InjuryTimeline from '$lib/components/season/InjuryTimeline.svelte';
-  import RotationEditor from '$lib/components/season/RotationEditor.svelte';
-  import TeamRosterPanel from '$lib/components/season/TeamRosterPanel.svelte';
-  import UnitChemistry from '$lib/components/season/UnitChemistry.svelte';
-  import {
-    blockPhaseAllowsSubmit,
-    buildSubmitBlockEnvelope,
-  } from '$lib/season/season-block-submit';
-  import { gamesToLockForBlock } from '$lib/season/season-lock-preview';
-  import { createProjectionRunner } from '$lib/season/season-projection-runner';
-  import {
-    buildLeagueProjectionBaselines,
-    normalizeTeamProjection,
-    rawSeasonTeamRatings,
-    seasonLeagueTeamProjections,
-  } from '$lib/season/season-team-detail-view';
-  import {
-    SEASON_RUN_SHELL_CONTEXT,
-    type SeasonRunShellData,
-  } from '$lib/season/season-shell-context';
-  import { humanInjuryTimeline } from '$lib/season/season-health-view';
-  import { humanSeasonPlayerStats } from '$lib/season/season-player-stats-view';
-  import {
-    durabilityRatingOfSlice,
-    overallRatingOfSlice,
-    playablePositionsOfSlice,
-    staminaRatingOfSlice,
-    summaryRatingsOfSlice,
-  } from '$lib/season/season-player-slice';
-  const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
-  function seasonGamesRemaining(nextBlockIndex: number): number {
+<script lang="ts">import { getContext } from 'svelte';
+import { SvelteMap } from 'svelte/reactivity';
+import { SEASON_BLOCK_COUNT, seasonDigestHex, type SeasonGameSummary, type SeasonRotation, } from '@hoop-rush/data-contracts';
+import { minutePlanHorizonGames } from '@hoop-rush/engine';
+import InjuryTimeline from '$lib/components/season/InjuryTimeline.svelte';
+import RotationEditor from '$lib/components/season/RotationEditor.svelte';
+import TeamRosterPanel from '$lib/components/season/TeamRosterPanel.svelte';
+import UnitChemistry from '$lib/components/season/UnitChemistry.svelte';
+import { blockPhaseAllowsSubmit, buildSubmitBlockEnvelope, } from '$lib/season/season-block-submit';
+import { gamesToLockForBlock } from '$lib/season/season-lock-preview';
+import { createProjectionRunner } from '$lib/season/season-projection-runner';
+import { buildLeagueProjectionBaselines, normalizeTeamProjection, rawSeasonTeamRatings, seasonLeagueTeamProjections, } from '$lib/season/season-team-detail-view';
+import { SEASON_RUN_SHELL_CONTEXT, type SeasonRunShellData, } from '$lib/season/season-shell-context';
+import { humanInjuryTimeline } from '$lib/season/season-health-view';
+import { humanSeasonPlayerStats } from '$lib/season/season-player-stats-view';
+import { durabilityRatingOfSlice, overallRatingOfSlice, playablePositionsOfSlice, staminaRatingOfSlice, summaryRatingsOfSlice, } from '$lib/season/season-player-slice';
+const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
+function seasonGamesRemaining(nextBlockIndex: number): number {
     let remaining = 0;
     for (let block = nextBlockIndex; block < SEASON_BLOCK_COUNT; block += 1) {
-      remaining += gamesToLockForBlock(block);
+        remaining += gamesToLockForBlock(block);
     }
     return remaining;
-  }
-  const manifest = $derived(shell.manifest);
-  const run = $derived(shell.run);
-  const humanFranchiseId = $derived(shell.humanFranchiseId);
-  const effects = $derived(shell.snapshot?.effects ?? null);
-  const health = $derived(shell.health);
-  const failures = $derived(shell.editor?.validate() ?? []);
-  const canSubmit = $derived(
-    shell.snapshot !== null &&
-      shell.editor !== null &&
-      shell.nextBlockIndex !== null &&
-      !shell.seasonComplete &&
-      failures.length === 0 &&
-      blockPhaseAllowsSubmit(shell.block.phase) &&
-      shell.block.phase !== 'running',
-  );
-  const overallByVersion = $derived.by(() => {
+}
+const manifest = $derived(shell.manifest);
+const run = $derived(shell.run);
+const humanFranchiseId = $derived(shell.humanFranchiseId);
+const effects = $derived(shell.snapshot?.effects ?? null);
+const health = $derived(shell.health);
+const failures = $derived(shell.editor?.validate() ?? []);
+const canSubmit = $derived(shell.snapshot !== null &&
+    shell.editor !== null &&
+    shell.nextBlockIndex !== null &&
+    !shell.seasonComplete &&
+    failures.length === 0 &&
+    blockPhaseAllowsSubmit(shell.block.phase) &&
+    shell.block.phase !== 'running');
+const overallByVersion = $derived.by(() => {
     const slice = shell.playerSlice;
-    if (shell.playerSliceReady && slice.size === 0) return new SvelteMap<string, number>();
+    if (shell.playerSliceReady && slice.size === 0)
+        return new SvelteMap<string, number>();
     const map = new SvelteMap<string, number>();
     for (const entry of slice.values()) {
-      map.set(entry.playerVersionId, entry.summaryRatings.overallRating);
+        map.set(entry.playerVersionId, entry.summaryRatings.overallRating);
     }
     return map;
-  });
-  const roster = $derived(
-    run !== null && humanFranchiseId !== null
-      ? (run.rosters.find((r) => r.franchiseId === humanFranchiseId) ?? null)
-      : null,
-  );
-  const optimizeLoad = $derived.by(() => {
+});
+const roster = $derived(run !== null && humanFranchiseId !== null
+    ? (run.rosters.find((r) => r.franchiseId === humanFranchiseId) ?? null)
+    : null);
+const optimizeLoad = $derived.by(() => {
     const slice = shell.playerSlice;
     const editor = shell.editor;
-    if (!shell.playerSliceReady || editor === null) return null;
-    const loadByVersion = new SvelteMap(
-      (shell.snapshot?.effects?.playerStates ?? []).map((state) => [state.playerVersionId, state]),
-    );
+    if (!shell.playerSliceReady || editor === null)
+        return null;
+    const loadByVersion = new SvelteMap((shell.snapshot?.effects?.playerStates ?? []).map((state) => [state.playerVersionId, state]));
     return [...editor.rotation.starters, ...editor.rotation.benchOrder].map((playerVersionId) => {
-      const load = loadByVersion.get(playerVersionId);
-      return {
-        playerVersionId,
-        staminaRating: staminaRatingOfSlice(slice, playerVersionId) ?? 70,
-        durability: durabilityRatingOfSlice(slice, playerVersionId) ?? 70,
-        fatigueBasisPoints: load?.fatigueBasisPoints ?? 0,
-        recentLoadBasisPoints: load?.recentLoadBasisPoints ?? 0,
-      };
+        const load = loadByVersion.get(playerVersionId);
+        return {
+            playerVersionId,
+            staminaRating: staminaRatingOfSlice(slice, playerVersionId) ?? 70,
+            durability: durabilityRatingOfSlice(slice, playerVersionId) ?? 70,
+            fatigueBasisPoints: load?.fatigueBasisPoints ?? 0,
+            recentLoadBasisPoints: load?.recentLoadBasisPoints ?? 0,
+        };
     });
-  });
-  const optimizeHorizon = $derived(
-    shell.nextBlockIndex === null
-      ? 0
-      : minutePlanHorizonGames(seasonGamesRemaining(shell.nextBlockIndex)),
-  );
-  const optimizeSeed = $derived(
-    shell.snapshot === null || shell.nextBlockIndex === null
-      ? null
-      : seasonDigestHex(
-          `${shell.snapshot.run.runId}\u0000optimize-rotation\u0000${String(shell.nextBlockIndex)}`,
-        ),
-  );
-  let optimizing = $state(false);
-  let optimizeError: string | null = $state(null);
-  const optimize = $derived.by(() => {
+});
+const optimizeHorizon = $derived(shell.nextBlockIndex === null
+    ? 0
+    : minutePlanHorizonGames(seasonGamesRemaining(shell.nextBlockIndex)));
+const optimizeSeed = $derived(shell.snapshot === null || shell.nextBlockIndex === null
+    ? null
+    : seasonDigestHex(`${shell.snapshot.run.runId}\u0000optimize-rotation\u0000${String(shell.nextBlockIndex)}`));
+let optimizing = $state(false);
+let optimizeError: string | null = $state(null);
+const optimize = $derived.by(() => {
     const editor = shell.editor;
     if (editor === null || optimizeLoad === null || optimizeHorizon <= 0 || optimizeSeed === null) {
-      return null;
+        return null;
     }
     return {
-      busy: optimizing,
-      error: optimizeError,
-      run: async (rotation: SeasonRotation) => {
-        if (optimizing) throw new Error('an optimization is already running');
-        optimizing = true;
-        optimizeError = null;
-        try {
-          return await createProjectionRunner().optimizeRotation({
-            roster: [...rotation.starters, ...rotation.benchOrder],
-            structure: rotation,
-            load: optimizeLoad,
-            horizon: optimizeHorizon,
-            seed: optimizeSeed,
-          });
-        } catch (error) {
-          optimizeError = error instanceof Error ? error.message : String(error);
-          throw error;
-        } finally {
-          optimizing = false;
-        }
-      },
+        busy: optimizing,
+        error: optimizeError,
+        run: async (rotation: SeasonRotation) => {
+            if (optimizing)
+                throw new Error('an optimization is already running');
+            optimizing = true;
+            optimizeError = null;
+            try {
+                return await createProjectionRunner().optimizeRotation({
+                    roster: [...rotation.starters, ...rotation.benchOrder],
+                    structure: rotation,
+                    load: optimizeLoad,
+                    horizon: optimizeHorizon,
+                    seed: optimizeSeed,
+                });
+            }
+            catch (error) {
+                optimizeError = error instanceof Error ? error.message : String(error);
+                throw error;
+            }
+            finally {
+                optimizing = false;
+            }
+        },
     };
-  });
-  let summaries: SeasonGameSummary[] = $state([]);
-  let rotationRevision = $state(0);
-  const ratingsOf = (playerVersionId: string) =>
-    summaryRatingsOfSlice(shell.playerSlice, playerVersionId);
-  const leagueProjectionBaselines = $derived.by(() => {
+});
+let summaries: SeasonGameSummary[] = $state([]);
+let rotationRevision = $state(0);
+const ratingsOf = (playerVersionId: string) => summaryRatingsOfSlice(shell.playerSlice, playerVersionId);
+const leagueProjectionBaselines = $derived.by(() => {
     const run = shell.run;
-    if (run === null || !shell.playerSliceReady) return null;
+    if (run === null || !shell.playerSliceReady)
+        return null;
     return buildLeagueProjectionBaselines({
-      rosters: run.rosters,
-      rotations: run.rotations,
-      summaryRatingsOf: ratingsOf,
+        rosters: run.rosters,
+        rotations: run.rotations,
+        summaryRatingsOf: ratingsOf,
     });
-  });
-  const lockedTeamProjection = $derived.by(() => {
+});
+const lockedTeamProjection = $derived.by(() => {
     const run = shell.run;
     const humanId = shell.humanFranchiseId;
     const baselines = leagueProjectionBaselines;
-    if (run === null || humanId === null || baselines === null) return null;
+    if (run === null || humanId === null || baselines === null)
+        return null;
     const lockedRoster = run.rosters.find((entry) => entry.franchiseId === humanId);
     const lockedRotation = run.rotations.find((entry) => entry.franchiseId === humanId);
-    if (lockedRoster === undefined || lockedRotation === undefined) return null;
+    if (lockedRoster === undefined || lockedRotation === undefined)
+        return null;
     const raw = rawSeasonTeamRatings({
-      roster: lockedRoster,
-      rotation: lockedRotation,
-      summaryRatingsOf: ratingsOf,
+        roster: lockedRoster,
+        rotation: lockedRotation,
+        summaryRatingsOf: ratingsOf,
     });
     return raw === null ? null : normalizeTeamProjection(raw, baselines);
-  });
-  const teamProjection = $derived.by(() => {
+});
+const teamProjection = $derived.by(() => {
     void rotationRevision;
     const run = shell.run;
     const humanId = shell.humanFranchiseId;
     const editor = shell.editor;
     if (run === null || humanId === null || editor === null || !shell.playerSliceReady) {
-      return null;
+        return null;
     }
-    return (
-      seasonLeagueTeamProjections({
+    return (seasonLeagueTeamProjections({
         rosters: run.rosters,
         rotations: run.rotations,
         summaryRatingsOf: ratingsOf,
         rotationOverrides: new Map([[humanId, editor.rotation]]),
-      }).get(humanId) ?? null
-    );
-  });
-  function projectionDelta(pending: number, locked: number | undefined): number | null {
-    if (locked === undefined || pending === locked) return null;
+    }).get(humanId) ?? null);
+});
+function projectionDelta(pending: number, locked: number | undefined): number | null {
+    if (locked === undefined || pending === locked)
+        return null;
     return pending - locked;
-  }
-  $effect(() => {
+}
+$effect(() => {
     const hub = shell.hub;
     const activeRunId = shell.snapshot?.run.runId ?? null;
     const accepted = shell.snapshot?.acceptedBlocks ?? [];
     if (hub === null || activeRunId === null || accepted.length === 0) {
-      summaries = [];
-      return;
+        summaries = [];
+        return;
     }
     const lastBlock = accepted[accepted.length - 1];
     if (lastBlock === undefined) {
-      summaries = [];
-      return;
+        summaries = [];
+        return;
     }
     void hub.loadBlockSummaries(activeRunId, lastBlock.blockIndex).then((rows) => {
-      summaries = rows;
+        summaries = rows;
     });
-  });
-  const injuryTimeline = $derived(
-    run !== null && roster !== null && humanFranchiseId !== null && health !== null
-      ? humanInjuryTimeline(health, roster, humanFranchiseId, summaries)
-      : [],
-  );
-  const statsView = $derived.by(() => {
-    if (roster === null || humanFranchiseId === null) return null;
+});
+const injuryTimeline = $derived(run !== null && roster !== null && humanFranchiseId !== null && health !== null
+    ? humanInjuryTimeline(health, roster, humanFranchiseId, summaries)
+    : []);
+const statsView = $derived.by(() => {
+    if (roster === null || humanFranchiseId === null)
+        return null;
     const slice = shell.playerSlice;
     return humanSeasonPlayerStats({
-      roster,
-      summaries: shell.snapshot?.summaries ?? [],
-      overallRatingOf: (playerVersionId) => overallRatingOfSlice(slice, playerVersionId),
-      playablePositions: (playerVersionId) => playablePositionsOfSlice(slice, playerVersionId),
+        roster,
+        summaries: shell.snapshot?.summaries ?? [],
+        overallRatingOf: (playerVersionId) => overallRatingOfSlice(slice, playerVersionId),
+        playablePositions: (playerVersionId) => playablePositionsOfSlice(slice, playerVersionId),
     });
-  });
-  const roleByVersion = $derived.by(() => {
+});
+const roleByVersion = $derived.by(() => {
     void rotationRevision;
     const editor = shell.editor;
-    if (editor === null) return null;
-    const map = new SvelteMap<
-      string,
-      {
+    if (editor === null)
+        return null;
+    const map = new SvelteMap<string, {
         role: string;
         minutes: number | string;
-      }
-    >();
+    }>();
     for (const row of editor.rows()) {
-      map.set(row.member.playerVersionId, {
-        role: row.role,
-        minutes: editor.isActive(row.member.playerVersionId) ? row.minutes : '—',
-      });
+        map.set(row.member.playerVersionId, {
+            role: row.role,
+            minutes: editor.isActive(row.member.playerVersionId) ? row.minutes : '—',
+        });
     }
     return map;
-  });
-  let submitting = $state(false);
-  let submitError: string | null = $state(null);
-  async function submitBlock() {
-    if (!canSubmit || submitting) return;
+});
+let submitting = $state(false);
+let submitError: string | null = $state(null);
+async function submitBlock() {
+    if (!canSubmit || submitting)
+        return;
     submitting = true;
     submitError = null;
     try {
-      const result = await buildSubmitBlockEnvelope(shell);
-      if (!result.ok) {
-        submitError = result.error.message;
-        return;
-      }
-      shell.hub?.startBlock(result.envelope);
-    } finally {
-      submitting = false;
+        const result = await buildSubmitBlockEnvelope(shell);
+        if (!result.ok) {
+            submitError = result.error.message;
+            return;
+        }
+        shell.hub?.startBlock(result.envelope);
     }
-  }
+    finally {
+        submitting = false;
+    }
+}
 </script>
 
 <svelte:head>

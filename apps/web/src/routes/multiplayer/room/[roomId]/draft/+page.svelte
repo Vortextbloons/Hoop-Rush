@@ -1,14 +1,11 @@
-﻿<script lang="ts">
-  import { page } from '$app/stores';
-  import { resolve } from '$app/paths';
-  import { goto } from '$app/navigation';
-  import { onMount } from 'svelte';
-  // M2.8 compatibility redirect: the phase-driven room screen lives at /multiplayer/room/[roomId].
-  // Archived M2.7 draft flow remains in git history and is unreferenced.
-  let roomId = $derived($page.params.roomId as string);
-  onMount(() => {
+﻿<script lang="ts">import { page } from '$app/stores';
+import { resolve } from '$app/paths';
+import { goto } from '$app/navigation';
+import { onMount } from 'svelte';
+let roomId = $derived($page.params.roomId as string);
+onMount(() => {
     void goto(resolve('/multiplayer/room/[roomId]', { roomId }));
-  });
+});
 </script>
 
 <p class="p-6 text-sm text-muted-foreground" role="status">

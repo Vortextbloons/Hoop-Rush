@@ -1,65 +1,59 @@
-<script lang="ts">
-  import { browser } from '$app/environment';
-  import { resolve } from '$app/paths';
-  import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persistence';
-  import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-  import { clearDataLoaderCaches, getManifest } from '$lib/data';
-  import { challengeRepository } from '$lib/challenge-repo';
-  import AsyncState from './AsyncState.svelte';
-  import HistoryList from './HistoryList.svelte';
-  let {
-    mode,
-    eyebrow,
-  }: {
+<script lang="ts">import { browser } from '$app/environment';
+import { resolve } from '$app/paths';
+import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persistence';
+import type { HoopRushManifest } from '@hoop-rush/data-contracts';
+import { clearDataLoaderCaches, getManifest } from '$lib/data';
+import { challengeRepository } from '$lib/challenge-repo';
+import AsyncState from './AsyncState.svelte';
+import HistoryList from './HistoryList.svelte';
+let { mode, eyebrow, }: {
     mode: 'sandbox' | 'classic';
     eyebrow: string;
-  } = $props();
-  let manifest = $state<HoopRushManifest | null>(null);
-  let rows = $state.raw<CompletedRunIndex[]>([]);
-  let active = $state.raw<ActiveRunCheckpoint | null>(null);
-  let error = $state<string | null>(null);
-  let loading = $state(true);
-  let retryCount = $state(0);
-  function loadHistory() {
+} = $props();
+let manifest = $state<HoopRushManifest | null>(null);
+let rows = $state.raw<CompletedRunIndex[]>([]);
+let active = $state.raw<ActiveRunCheckpoint | null>(null);
+let error = $state<string | null>(null);
+let loading = $state(true);
+let retryCount = $state(0);
+function loadHistory() {
     loading = true;
     error = null;
     let cancelled = false;
     Promise.all([
-      getManifest(),
-      challengeRepository.listCompletedRuns(),
-      challengeRepository.loadActiveRunCheckpoint(),
-    ]).then(
-      ([m, history, activeCheckpoint]) => {
-        if (cancelled) return;
+        getManifest(),
+        challengeRepository.listCompletedRuns(),
+        challengeRepository.loadActiveRunCheckpoint(),
+    ]).then(([m, history, activeCheckpoint]) => {
+        if (cancelled)
+            return;
         manifest = m;
         rows = history.filter((r) => r.mode === mode);
         active = activeCheckpoint;
         loading = false;
-      },
-      (e: unknown) => {
-        if (cancelled) return;
+    }, (e: unknown) => {
+        if (cancelled)
+            return;
         error = e instanceof Error ? e.message : String(e);
         loading = false;
-      },
-    );
+    });
     return () => {
-      cancelled = true;
+        cancelled = true;
     };
-  }
-  $effect(() => {
-    if (!browser) return;
+}
+$effect(() => {
+    if (!browser)
+        return;
     void retryCount;
     return loadHistory();
-  });
-  function retryHistory() {
+});
+function retryHistory() {
     clearDataLoaderCaches();
     retryCount += 1;
-  }
-  const modeLabel = $derived(mode === 'sandbox' ? 'Sandbox' : 'Classic');
-  const continueHref = $derived(active?.mode === mode ? `/${mode}/challenge` : null);
-  const resultHrefFor = $derived(
-    (runId: string) => `/${mode}/result?runId=${encodeURIComponent(runId)}`,
-  );
+}
+const modeLabel = $derived(mode === 'sandbox' ? 'Sandbox' : 'Classic');
+const continueHref = $derived(active?.mode === mode ? `/${mode}/challenge` : null);
+const resultHrefFor = $derived((runId: string) => `/${mode}/result?runId=${encodeURIComponent(runId)}`);
 </script>
 
 <section class="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">

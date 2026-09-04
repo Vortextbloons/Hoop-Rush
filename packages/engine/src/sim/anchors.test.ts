@@ -1,346 +1,295 @@
 import { describe, expect, it } from 'vitest';
-import type {
-  SimulationAnchors,
-  SimulationPlayer,
-  SimulationTeam,
-} from '@hoop-rush/data-contracts';
+import type { SimulationAnchors, SimulationPlayer, SimulationTeam, } from '@hoop-rush/data-contracts';
 import { playerIdSchema, seedSchema } from '@hoop-rush/data-contracts';
-import {
-  buildEraSimulationProfile,
-  buildGameSimulationInput,
-  buildLegalSimulationTeam,
-  buildSimulationPlayer,
-  seedFromString,
-} from '@hoop-rush/test-fixtures';
+import { buildEraSimulationProfile, buildGameSimulationInput, buildLegalSimulationTeam, buildSimulationPlayer, seedFromString, } from '@hoop-rush/test-fixtures';
 import { createEngineContext } from './context.ts';
 import { simulateGame } from './game.ts';
 import { freeThrowProbability } from './fouls.ts';
 import { makeProbability, teamSpacing } from './shooting.ts';
 const context = createEngineContext();
 const shaquilleAnchors: SimulationAnchors = {
-  gamesPlayed: 79,
-  minutesPerGame: 40.1,
-  pointsPerGame: 29.7,
-  reboundsPerGame: 13.6,
-  offensiveReboundsPerGame: 3.8,
-  defensiveReboundsPerGame: 9.8,
-  assistsPerGame: 3.8,
-  stealsPerGame: 0.5,
-  blocksPerGame: 3,
-  turnoversPerGame: 2.8,
-  fieldGoalPct: 0.573,
-  threePointPct: null,
-  freeThrowPct: 0.529,
-  threePointAttemptRate: 0,
-  freeThrowAttemptRate: 0.493,
+    gamesPlayed: 79,
+    minutesPerGame: 40.1,
+    pointsPerGame: 29.7,
+    reboundsPerGame: 13.6,
+    offensiveReboundsPerGame: 3.8,
+    defensiveReboundsPerGame: 9.8,
+    assistsPerGame: 3.8,
+    stealsPerGame: 0.5,
+    blocksPerGame: 3,
+    turnoversPerGame: 2.8,
+    fieldGoalPct: 0.573,
+    threePointPct: null,
+    freeThrowPct: 0.529,
+    threePointAttemptRate: 0,
+    freeThrowAttemptRate: 0.493,
 };
 function anchoredCenterTeam(): SimulationTeam {
-  const base = buildLegalSimulationTeam();
-  const players = base.players.map((player, index) =>
-    index === 4
-      ? buildSimulationPlayer({
-          playerId: playerIdSchema.parse('shaquille-anchor'),
-          displayName: 'Anchor Center',
-          positions: ['C'],
-          heightInches: 85,
-          weightLbs: 325,
-          ratings: {
-            ...player.ratings,
-            insideScoring: 96,
-            freeThrow: 54,
-            offensiveRebound: 88,
-            defensiveRebound: 96,
-            interiorDefense: 92,
-            strength: 98,
-            block: 90,
-          },
-          tendencies: {
-            ...player.tendencies,
-            usageRate: 31,
-            passRate: 14,
-            shotRate: 43,
-            rimFrequency: 46,
-            shortMidFrequency: 18,
-            longMidFrequency: 7,
-            cornerThreeFrequency: 0,
-            aboveBreakThreeFrequency: 0,
-            threePointRate: 0,
-            freeThrowRate: 49,
-            postUpRate: 30,
-            pickAndRollRollManRate: 30,
-          },
-          anchors: shaquilleAnchors,
+    const base = buildLegalSimulationTeam();
+    const players = base.players.map((player, index) => index === 4
+        ? buildSimulationPlayer({
+            playerId: playerIdSchema.parse('shaquille-anchor'),
+            displayName: 'Anchor Center',
+            positions: ['C'],
+            heightInches: 85,
+            weightLbs: 325,
+            ratings: {
+                ...player.ratings,
+                insideScoring: 96,
+                freeThrow: 54,
+                offensiveRebound: 88,
+                defensiveRebound: 96,
+                interiorDefense: 92,
+                strength: 98,
+                block: 90,
+            },
+            tendencies: {
+                ...player.tendencies,
+                usageRate: 31,
+                passRate: 14,
+                shotRate: 43,
+                rimFrequency: 46,
+                shortMidFrequency: 18,
+                longMidFrequency: 7,
+                cornerThreeFrequency: 0,
+                aboveBreakThreeFrequency: 0,
+                threePointRate: 0,
+                freeThrowRate: 49,
+                postUpRate: 30,
+                pickAndRollRollManRate: 30,
+            },
+            anchors: shaquilleAnchors,
         })
-      : player,
-  );
-  return { ...base, players };
+        : player);
+    return { ...base, players };
 }
 describe('observed player anchors', () => {
-  it('keep low free-throw shooters in a realistic probability band', () => {
-    const center = anchoredCenterTeam().players[4];
-    if (center === undefined) {
-      throw new Error('anchored fixture team requires five players');
-    }
-    const probability = freeThrowProbability(center, buildEraSimulationProfile());
-    expect(probability).toBeGreaterThan(0.45);
-    expect(probability).toBeLessThan(0.65);
-  });
-  it('produce realistic aggregate lines without player-specific rules', () => {
-    const home = anchoredCenterTeam();
-    const away = anchoredCenterTeam();
-    let freeThrowsMade = 0;
-    let freeThrowsAttempted = 0;
-    let rebounds = 0;
-    let assists = 0;
-    let threePointAttempts = 0;
-    const samples = 240;
-    for (let index = 0; index < samples; index += 1) {
-      const result = simulateGame(
-        buildGameSimulationInput({
-          seed: seedSchema.parse(seedFromString(`anchor-${String(index)}`)),
-          home,
-          away,
-        }),
-        context,
-      );
-      const player = result.home.players.find(
-        (candidate) => candidate.playerId === 'shaquille-anchor',
-      );
-      if (player === undefined) {
-        throw new Error('anchored center missing from the home box');
-      }
-      freeThrowsMade += player.freeThrows.made;
-      freeThrowsAttempted += player.freeThrows.attempted;
-      rebounds += player.rebounds.total;
-      assists += player.assists;
-      threePointAttempts += player.threes.attempted;
-    }
-    const freeThrowPct = freeThrowsMade / Math.max(1, freeThrowsAttempted);
-    expect(freeThrowPct).toBeGreaterThan(0.45);
-    expect(freeThrowPct).toBeLessThan(0.65);
-    expect(rebounds / samples).toBeGreaterThan(10);
-    expect(assists / samples).toBeGreaterThan(1.5);
-    expect(assists / samples).toBeLessThan(6);
-    expect(threePointAttempts / samples).toBeLessThan(1);
-  });
-  it('keeps observed wing three-point accuracy below the inflated-rating failure mode', () => {
-    const profile = buildEraSimulationProfile();
-    const defender = buildSimulationPlayer({
-      ratings: { ...buildSimulationPlayer().ratings, perimeterDefense: 62 },
+    it('keep low free-throw shooters in a realistic probability band', () => {
+        const center = anchoredCenterTeam().players[4];
+        if (center === undefined) {
+            throw new Error('anchored fixture team requires five players');
+        }
+        const probability = freeThrowProbability(center, buildEraSimulationProfile());
+        expect(probability).toBeGreaterThan(0.45);
+        expect(probability).toBeLessThan(0.65);
     });
-    const kobeLike = buildSimulationPlayer({
-      ratings: { ...buildSimulationPlayer().ratings, threePoint: 66 },
-      anchors: { ...shaquilleAnchors, threePointPct: 0.317, threePointAttemptRate: 0.123 },
+    it('produce realistic aggregate lines without player-specific rules', () => {
+        const home = anchoredCenterTeam();
+        const away = anchoredCenterTeam();
+        let freeThrowsMade = 0;
+        let freeThrowsAttempted = 0;
+        let rebounds = 0;
+        let assists = 0;
+        let threePointAttempts = 0;
+        const samples = 240;
+        for (let index = 0; index < samples; index += 1) {
+            const result = simulateGame(buildGameSimulationInput({
+                seed: seedSchema.parse(seedFromString(`anchor-${String(index)}`)),
+                home,
+                away,
+            }), context);
+            const player = result.home.players.find((candidate) => candidate.playerId === 'shaquille-anchor');
+            if (player === undefined) {
+                throw new Error('anchored center missing from the home box');
+            }
+            freeThrowsMade += player.freeThrows.made;
+            freeThrowsAttempted += player.freeThrows.attempted;
+            rebounds += player.rebounds.total;
+            assists += player.assists;
+            threePointAttempts += player.threes.attempted;
+        }
+        const freeThrowPct = freeThrowsMade / Math.max(1, freeThrowsAttempted);
+        expect(freeThrowPct).toBeGreaterThan(0.45);
+        expect(freeThrowPct).toBeLessThan(0.65);
+        expect(rebounds / samples).toBeGreaterThan(10);
+        expect(assists / samples).toBeGreaterThan(1.5);
+        expect(assists / samples).toBeLessThan(6);
+        expect(threePointAttempts / samples).toBeLessThan(1);
     });
-    const ceballosLike = buildSimulationPlayer({
-      ratings: { ...buildSimulationPlayer().ratings, threePoint: 76 },
-      anchors: { ...shaquilleAnchors, threePointPct: 0.397, threePointAttemptRate: 0.149 },
+    it('keeps observed wing three-point accuracy below the inflated-rating failure mode', () => {
+        const profile = buildEraSimulationProfile();
+        const defender = buildSimulationPlayer({
+            ratings: { ...buildSimulationPlayer().ratings, perimeterDefense: 62 },
+        });
+        const kobeLike = buildSimulationPlayer({
+            ratings: { ...buildSimulationPlayer().ratings, threePoint: 66 },
+            anchors: { ...shaquilleAnchors, threePointPct: 0.317, threePointAttemptRate: 0.123 },
+        });
+        const ceballosLike = buildSimulationPlayer({
+            ratings: { ...buildSimulationPlayer().ratings, threePoint: 76 },
+            anchors: { ...shaquilleAnchors, threePointPct: 0.397, threePointAttemptRate: 0.149 },
+        });
+        const teamOf = (shooter: ReturnType<typeof buildSimulationPlayer>) => ({
+            teamId: 'anchor-team',
+            displayName: 'Anchor Team',
+            players: [shooter, shooter, shooter, shooter, shooter],
+        });
+        const kobeProbability = makeProbability(kobeLike, defender, profile, 'aboveBreakThree', 'spotUp', 300, { spacing: teamSpacing(teamOf(kobeLike)), twoPointAnchor: null });
+        const ceballosProbability = makeProbability(ceballosLike, defender, profile, 'aboveBreakThree', 'spotUp', 300, { spacing: teamSpacing(teamOf(ceballosLike)), twoPointAnchor: null });
+        expect(kobeProbability).toBeGreaterThan(0.28);
+        expect(kobeProbability).toBeLessThan(0.4);
+        expect(ceballosProbability).toBeGreaterThan(0.34);
+        expect(ceballosProbability).toBeLessThan(0.46);
     });
-    const teamOf = (shooter: ReturnType<typeof buildSimulationPlayer>) => ({
-      teamId: 'anchor-team',
-      displayName: 'Anchor Team',
-      players: [shooter, shooter, shooter, shooter, shooter],
+    it('keeps deterministic results when anchors are present', () => {
+        const team = anchoredCenterTeam();
+        const input = buildGameSimulationInput({
+            seed: seedSchema.parse(seedFromString('anchor-determinism')),
+            home: team,
+            away: team,
+        });
+        expect(simulateGame(input, context)).toEqual(simulateGame(input, context));
     });
-    const kobeProbability = makeProbability(
-      kobeLike,
-      defender,
-      profile,
-      'aboveBreakThree',
-      'spotUp',
-      300,
-      { spacing: teamSpacing(teamOf(kobeLike)), twoPointAnchor: null },
-    );
-    const ceballosProbability = makeProbability(
-      ceballosLike,
-      defender,
-      profile,
-      'aboveBreakThree',
-      'spotUp',
-      300,
-      { spacing: teamSpacing(teamOf(ceballosLike)), twoPointAnchor: null },
-    );
-    expect(kobeProbability).toBeGreaterThan(0.28);
-    expect(kobeProbability).toBeLessThan(0.4);
-    expect(ceballosProbability).toBeGreaterThan(0.34);
-    expect(ceballosProbability).toBeLessThan(0.46);
-  });
-  it('keeps deterministic results when anchors are present', () => {
-    const team = anchoredCenterTeam();
-    const input = buildGameSimulationInput({
-      seed: seedSchema.parse(seedFromString('anchor-determinism')),
-      home: team,
-      away: team,
-    });
-    expect(simulateGame(input, context)).toEqual(simulateGame(input, context));
-  });
 });
 function averageDefenseTeam(): SimulationTeam {
-  const base = buildLegalSimulationTeam();
-  const first = base.players[0];
-  if (first === undefined) {
-    throw new Error('fixture team requires five players');
-  }
-  const slots: SimulationPlayer['positions'][] = [['PG'], ['SG'], ['SF'], ['PF'], ['C']];
-  const ratings = {} as SimulationPlayer['ratings'];
-  for (const key of Object.keys(first.ratings) as Array<keyof SimulationPlayer['ratings']>) {
-    ratings[key] = 66;
-  }
-  return {
-    teamId: 'average-defense',
-    displayName: 'Average Defense',
-    players: slots.map((positions, index) => {
-      const basePlayer = base.players[index];
-      if (basePlayer === undefined) {
-        throw new Error('fixture team requires five players');
-      }
-      return {
-        ...basePlayer,
-        playerId: playerIdSchema.parse(`avg-def-${String(index)}`),
-        displayName: `Avg Def ${String(index)}`,
-        positions,
-        ratings,
-      };
-    }),
-  };
-}
-function sampleFieldGoalPct(
-  playerId: string,
-  home: SimulationTeam,
-  away: SimulationTeam,
-  games: number,
-): {
-  fieldGoalPct: number;
-  threePointPct: number;
-  freeThrowPct: number;
-  turnoverRate: number;
-} {
-  let fgm = 0;
-  let fga = 0;
-  let tpm = 0;
-  let tpa = 0;
-  let ftm = 0;
-  let fta = 0;
-  let tov = 0;
-  let tovPossessionEstimate = 0;
-  for (let index = 0; index < games; index += 1) {
-    const result = simulateGame(
-      buildGameSimulationInput({
-        seed: seedSchema.parse(seedFromString(`anchor-pin-${playerId}-${String(index)}`)),
-        home,
-        away,
-      }),
-      context,
-    );
-    const box = result.home.players.find((p) => p.playerId === playerId);
-    if (box === undefined) {
-      throw new Error(`anchored player ${playerId} missing from the home box`);
-    }
-    fgm += box.fieldGoals.made;
-    fga += box.fieldGoals.attempted;
-    tpm += box.threes.made;
-    tpa += box.threes.attempted;
-    ftm += box.freeThrows.made;
-    fta += box.freeThrows.attempted;
-    tov += box.turnovers;
-    tovPossessionEstimate +=
-      box.fieldGoals.attempted + 0.44 * box.freeThrows.attempted + box.turnovers;
-  }
-  return {
-    fieldGoalPct: fgm / Math.max(1, fga),
-    threePointPct: tpm / Math.max(1, tpa),
-    freeThrowPct: ftm / Math.max(1, fta),
-    turnoverRate: tov / Math.max(1, tovPossessionEstimate),
-  };
-}
-describe('observed player anchors pin efficiency (m3-engine-v5)', () => {
-  it('pins a rim-reliant interior scorer to his observed two-point percentage', () => {
-    const team = anchoredCenterTeam();
-    const { fieldGoalPct } = sampleFieldGoalPct(
-      'shaquille-anchor',
-      team,
-      averageDefenseTeam(),
-      300,
-    );
-    expect(fieldGoalPct).toBeGreaterThan(0.545);
-    expect(fieldGoalPct).toBeLessThan(0.59);
-  });
-  it('pins a perimeter star to observed field-goal, three-point, and free-throw rates', () => {
-    const mjAnchors: SimulationAnchors = {
-      gamesPlayed: 82,
-      minutesPerGame: 37.9,
-      pointsPerGame: 29.6,
-      reboundsPerGame: 6.9,
-      offensiveReboundsPerGame: 1.1,
-      defensiveReboundsPerGame: 5.8,
-      assistsPerGame: 4.3,
-      stealsPerGame: 1.7,
-      blocksPerGame: 0.6,
-      turnoversPerGame: 2.6,
-      fieldGoalPct: 0.486,
-      threePointPct: 0.374,
-      freeThrowPct: 0.833,
-      threePointAttemptRate: 0.158,
-      freeThrowAttemptRate: 0.379,
-    };
     const base = buildLegalSimulationTeam();
     const first = base.players[0];
     if (first === undefined) {
-      throw new Error('fixture team requires five players');
+        throw new Error('fixture team requires five players');
     }
     const slots: SimulationPlayer['positions'][] = [['PG'], ['SG'], ['SF'], ['PF'], ['C']];
-    const star = buildSimulationPlayer({
-      playerId: playerIdSchema.parse('mj-anchor'),
-      displayName: 'Anchor Star',
-      positions: ['PG'],
-      ratings: {
-        ...first.ratings,
-        insideScoring: 90,
-        closeShot: 80,
-        midrange: 85,
-        threePoint: 80,
-        ballHandling: 90,
-        passing: 80,
-      },
-      tendencies: {
-        ...first.tendencies,
-        usageRate: 33,
-        shotRate: 35,
-        rimFrequency: 40,
-        shortMidFrequency: 22,
-        longMidFrequency: 22,
-        cornerThreeFrequency: 5,
-        aboveBreakThreeFrequency: 11,
-        threePointRate: 16,
-        freeThrowRate: 38,
-        turnoverRate: 9,
-      },
-      anchors: mjAnchors,
-    });
-    const buildSide = (): SimulationTeam => ({
-      ...base,
-      players: slots.map((positions, index) => {
-        const basePlayer = base.players[index];
-        if (basePlayer === undefined) {
-          throw new Error('fixture team requires five players');
+    const ratings = {} as SimulationPlayer['ratings'];
+    for (const key of Object.keys(first.ratings) as Array<keyof SimulationPlayer['ratings']>) {
+        ratings[key] = 66;
+    }
+    return {
+        teamId: 'average-defense',
+        displayName: 'Average Defense',
+        players: slots.map((positions, index) => {
+            const basePlayer = base.players[index];
+            if (basePlayer === undefined) {
+                throw new Error('fixture team requires five players');
+            }
+            return {
+                ...basePlayer,
+                playerId: playerIdSchema.parse(`avg-def-${String(index)}`),
+                displayName: `Avg Def ${String(index)}`,
+                positions,
+                ratings,
+            };
+        }),
+    };
+}
+function sampleFieldGoalPct(playerId: string, home: SimulationTeam, away: SimulationTeam, games: number): {
+    fieldGoalPct: number;
+    threePointPct: number;
+    freeThrowPct: number;
+    turnoverRate: number;
+} {
+    let fgm = 0;
+    let fga = 0;
+    let tpm = 0;
+    let tpa = 0;
+    let ftm = 0;
+    let fta = 0;
+    let tov = 0;
+    let tovPossessionEstimate = 0;
+    for (let index = 0; index < games; index += 1) {
+        const result = simulateGame(buildGameSimulationInput({
+            seed: seedSchema.parse(seedFromString(`anchor-pin-${playerId}-${String(index)}`)),
+            home,
+            away,
+        }), context);
+        const box = result.home.players.find((p) => p.playerId === playerId);
+        if (box === undefined) {
+            throw new Error(`anchored player ${playerId} missing from the home box`);
         }
-        return index === 0 ? { ...star, positions } : { ...basePlayer, positions };
-      }),
+        fgm += box.fieldGoals.made;
+        fga += box.fieldGoals.attempted;
+        tpm += box.threes.made;
+        tpa += box.threes.attempted;
+        ftm += box.freeThrows.made;
+        fta += box.freeThrows.attempted;
+        tov += box.turnovers;
+        tovPossessionEstimate +=
+            box.fieldGoals.attempted + 0.44 * box.freeThrows.attempted + box.turnovers;
+    }
+    return {
+        fieldGoalPct: fgm / Math.max(1, fga),
+        threePointPct: tpm / Math.max(1, tpa),
+        freeThrowPct: ftm / Math.max(1, fta),
+        turnoverRate: tov / Math.max(1, tovPossessionEstimate),
+    };
+}
+describe('observed player anchors pin efficiency (m3-engine-v5)', () => {
+    it('pins a rim-reliant interior scorer to his observed two-point percentage', () => {
+        const team = anchoredCenterTeam();
+        const { fieldGoalPct } = sampleFieldGoalPct('shaquille-anchor', team, averageDefenseTeam(), 300);
+        expect(fieldGoalPct).toBeGreaterThan(0.545);
+        expect(fieldGoalPct).toBeLessThan(0.59);
     });
-    const home = buildSide();
-    const away = buildSide();
-    const { fieldGoalPct, threePointPct, freeThrowPct, turnoverRate } = sampleFieldGoalPct(
-      'mj-anchor',
-      home,
-      away,
-      300,
-    );
-    expect(fieldGoalPct).toBeGreaterThan(0.451);
-    expect(fieldGoalPct).toBeLessThan(0.521);
-    expect(threePointPct).toBeGreaterThan(0.334);
-    expect(threePointPct).toBeLessThan(0.414);
-    expect(freeThrowPct).toBeGreaterThan(0.8);
-    expect(freeThrowPct).toBeLessThan(0.88);
-    expect(turnoverRate).toBeLessThan(0.1);
-    expect(turnoverRate).toBeGreaterThan(0.04);
-  });
+    it('pins a perimeter star to observed field-goal, three-point, and free-throw rates', () => {
+        const mjAnchors: SimulationAnchors = {
+            gamesPlayed: 82,
+            minutesPerGame: 37.9,
+            pointsPerGame: 29.6,
+            reboundsPerGame: 6.9,
+            offensiveReboundsPerGame: 1.1,
+            defensiveReboundsPerGame: 5.8,
+            assistsPerGame: 4.3,
+            stealsPerGame: 1.7,
+            blocksPerGame: 0.6,
+            turnoversPerGame: 2.6,
+            fieldGoalPct: 0.486,
+            threePointPct: 0.374,
+            freeThrowPct: 0.833,
+            threePointAttemptRate: 0.158,
+            freeThrowAttemptRate: 0.379,
+        };
+        const base = buildLegalSimulationTeam();
+        const first = base.players[0];
+        if (first === undefined) {
+            throw new Error('fixture team requires five players');
+        }
+        const slots: SimulationPlayer['positions'][] = [['PG'], ['SG'], ['SF'], ['PF'], ['C']];
+        const star = buildSimulationPlayer({
+            playerId: playerIdSchema.parse('mj-anchor'),
+            displayName: 'Anchor Star',
+            positions: ['PG'],
+            ratings: {
+                ...first.ratings,
+                insideScoring: 90,
+                closeShot: 80,
+                midrange: 85,
+                threePoint: 80,
+                ballHandling: 90,
+                passing: 80,
+            },
+            tendencies: {
+                ...first.tendencies,
+                usageRate: 33,
+                shotRate: 35,
+                rimFrequency: 40,
+                shortMidFrequency: 22,
+                longMidFrequency: 22,
+                cornerThreeFrequency: 5,
+                aboveBreakThreeFrequency: 11,
+                threePointRate: 16,
+                freeThrowRate: 38,
+                turnoverRate: 9,
+            },
+            anchors: mjAnchors,
+        });
+        const buildSide = (): SimulationTeam => ({
+            ...base,
+            players: slots.map((positions, index) => {
+                const basePlayer = base.players[index];
+                if (basePlayer === undefined) {
+                    throw new Error('fixture team requires five players');
+                }
+                return index === 0 ? { ...star, positions } : { ...basePlayer, positions };
+            }),
+        });
+        const home = buildSide();
+        const away = buildSide();
+        const { fieldGoalPct, threePointPct, freeThrowPct, turnoverRate } = sampleFieldGoalPct('mj-anchor', home, away, 300);
+        expect(fieldGoalPct).toBeGreaterThan(0.451);
+        expect(fieldGoalPct).toBeLessThan(0.521);
+        expect(threePointPct).toBeGreaterThan(0.334);
+        expect(threePointPct).toBeLessThan(0.414);
+        expect(freeThrowPct).toBeGreaterThan(0.8);
+        expect(freeThrowPct).toBeLessThan(0.88);
+        expect(turnoverRate).toBeLessThan(0.1);
+        expect(turnoverRate).toBeGreaterThan(0.04);
+    });
 });

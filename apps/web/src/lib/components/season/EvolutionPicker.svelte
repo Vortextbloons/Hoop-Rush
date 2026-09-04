@@ -1,42 +1,36 @@
-<script lang="ts">
-  import type { SeasonCampaignEvolutionOffer } from '@hoop-rush/data-contracts';
-  let {
-    offers,
-    busy = false,
-    commandError = null,
-    onSelect,
-  }: {
+<script lang="ts">import type { SeasonCampaignEvolutionOffer } from '@hoop-rush/data-contracts';
+let { offers, busy = false, commandError = null, onSelect, }: {
     offers: readonly SeasonCampaignEvolutionOffer[];
     busy?: boolean;
     commandError?: string | null;
     onSelect: (offerId: string) => void;
-  } = $props();
-  let selectedOfferId: string | null = $state(null);
-  const selectedOffer = $derived(offers.find((o) => o.offerId === selectedOfferId) ?? null);
-  function kindLabel(kind: string): string {
+} = $props();
+let selectedOfferId: string | null = $state(null);
+const selectedOffer = $derived(offers.find((o) => o.offerId === selectedOfferId) ?? null);
+function kindLabel(kind: string): string {
     switch (kind) {
-      case 'double-down':
-        return 'Double down';
-      case 'adapt':
-        return 'Adapt';
-      case 'pivot':
-        return 'Pivot';
-      default:
-        return kind;
+        case 'double-down':
+            return 'Double down';
+        case 'adapt':
+            return 'Adapt';
+        case 'pivot':
+            return 'Pivot';
+        default:
+            return kind;
     }
-  }
-  function kindAccent(kind: string): string {
+}
+function kindAccent(kind: string): string {
     switch (kind) {
-      case 'double-down':
-        return 'border-primary bg-primary/5';
-      case 'adapt':
-        return 'border-sky-500/50 bg-sky-500/5';
-      case 'pivot':
-        return 'border-amber-500/50 bg-amber-500/5';
-      default:
-        return 'border-border';
+        case 'double-down':
+            return 'border-primary bg-primary/5';
+        case 'adapt':
+            return 'border-sky-500/50 bg-sky-500/5';
+        case 'pivot':
+            return 'border-amber-500/50 bg-amber-500/5';
+        default:
+            return 'border-border';
     }
-  }
+}
 </script>
 
 <section
