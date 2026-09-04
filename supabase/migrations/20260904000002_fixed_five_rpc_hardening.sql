@@ -241,7 +241,7 @@ begin
   if p_command_id is null or octet_length(p_command_id) < 1 or octet_length(p_command_id) > 128 then
     return jsonb_build_object('accepted', false, 'rejection_code', 'illegal-move');
   end if;
-  if p_actor not in ('p1', 'p2') then
+  if p_actor is null or p_actor not in ('p1', 'p2') then
     return jsonb_build_object('accepted', false, 'rejection_code', 'membership');
   end if;
   v_kind := p_payload->>'kind';
@@ -258,13 +258,16 @@ begin
   -- Shape checks so junk payloads cannot consume ordinals. Slot/ordinal
   -- fields are guarded by a digit regex before casting so malformed text
   -- rejects as illegal-move instead of raising into a 500.
+  -- NULL-safe: every check uses IS DISTINCT FROM / IS NULL semantics so a
+  -- missing field rejects instead of slipping through a three-valued NULL.
   case v_kind
     when 'ready' then
-      if jsonb_typeof(p_payload->'ready') <> 'boolean' then
+      if jsonb_typeof(p_payload->'ready') is distinct from 'boolean' then
         return jsonb_build_object('accepted', false, 'rejection_code', 'illegal-move');
       end if;
     when 'reroll' then
-      if not (p_payload->>'axis' in ('franchise', 'era')) then
+      if p_payload->>'axis' is distinct from 'franchise'
+        and p_payload->>'axis' is distinct from 'era' then
         return jsonb_build_object('accepted', false, 'rejection_code', 'illegal-move');
       end if;
     when 'classic-pick' then
@@ -306,11 +309,11 @@ begin
       end if;
     when 'confirm-result' then
       if p_payload->>'resultDigest' is null
-        or jsonb_typeof(p_payload->'verified') <> 'boolean' then
+        or jsonb_typeof(p_payload->'verified') is distinct from 'boolean' then
         return jsonb_build_object('accepted', false, 'rejection_code', 'illegal-move');
       end if;
     when 'remove-guest' then
-      if p_payload->>'targetParticipantId' <> 'p2' then
+      if p_payload->>'targetParticipantId' is distinct from 'p2' then
         return jsonb_build_object('accepted', false, 'rejection_code', 'illegal-move');
       end if;
     else

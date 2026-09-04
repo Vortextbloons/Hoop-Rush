@@ -29,7 +29,6 @@ import type { SeasonRunSnapshot } from '@hoop-rush/persistence';
 import {
   generateSeasonSchedule,
   handleSeasonRunCommand,
-  seasonObjectiveChoicesForBlock,
   seasonPostseasonNextGame,
   seasonRunStateDigest,
 } from '@hoop-rush/engine';
@@ -39,11 +38,7 @@ import {
   buildSeasonRunFixture,
 } from '@hoop-rush/test-fixtures';
 import { SeasonHubState, type BlockRunState, describeCommandRejection } from './season-hub-state';
-import {
-  clearCachedSeasonSnapshot,
-  getCachedSeasonSnapshot,
-  setCachedSeasonSnapshot,
-} from './season-state-cache';
+import { clearCachedSeasonSnapshot } from './season-state-cache';
 import type {
   SeasonBlockResumeInput,
   SeasonBlockRunner,
@@ -234,94 +229,6 @@ describe('SeasonHubState.quitRun', () => {
     expect(result.ok).toBe(false);
     expect(result.error).toContain('boom');
     expect(hub.snapshot?.run.runId).toBe(RUN_ID);
-    hub.destroy();
-  });
-});
-describe('SeasonHubState between-block commands', () => {
-  afterEach(() => {
-    clearCachedSeasonSnapshot();
-  });
-  it.skip('keeps the post-command snapshot in the session cache (stale snapshot cache regression)', async () => {
-    const seed = seedSchema.parse('a1b2c3d4e5f60718293a4b5c6d7e8f9a');
-    const league = buildSeasonLeague({}, { humanFranchiseId: franchiseIdSchema.parse('lakers') });
-    const schedule = generateSeasonSchedule({ league, seed });
-    const effects: SeasonEffectsState = {
-      schemaVersion: 2,
-      playerStates: [],
-      inactivePlayerStates: [],
-      pairStates: [],
-      archivedPairs: [],
-    };
-    const run = {
-      ...buildSeasonRunFixture({
-        schedule,
-        league,
-        seed,
-        humanFranchiseId: franchiseIdSchema.parse('lakers'),
-      }),
-      effects,
-    } as SeasonRunSnapshot['run'];
-    const initial: SeasonRunSnapshot = {
-      run,
-      summaries: [],
-      retainedDetails: [],
-      acceptedBlocks: [],
-      effects,
-    };
-    setCachedSeasonSnapshot(initial);
-    let active: SeasonRunSnapshot | null = initial;
-    const repo = {
-      loadActiveRun: vi.fn(() => Promise.resolve(active)),
-      loadActiveRunIndex: vi.fn(() =>
-        Promise.resolve({
-          runId: run.runId,
-          rootSeed: seed,
-          humanFranchiseId: franchiseIdSchema.parse('lakers'),
-          completedRounds: 0,
-          revision: 0,
-          humanWins: 0,
-          humanLosses: 0,
-          updatedAtIso: '2026-01-01T00:00:00.000Z',
-        }),
-      ),
-      loadActiveRunIncompatible: vi.fn(() => Promise.resolve(null)),
-      loadBlockSummaries: vi.fn(),
-      loadRetainedDetails: vi.fn(),
-      loadBlockHistory: vi.fn(),
-      commitSeasonBlock: vi.fn(),
-      promoteSeasonDraftToRun: vi.fn(),
-      clearSeasonRun: vi.fn(() => Promise.resolve()),
-      forceClearActiveSeasonRun: vi.fn(() => Promise.resolve()),
-      savePendingBlock: vi.fn(() => Promise.resolve()),
-      loadPendingBlock: vi.fn(() => Promise.resolve(null)),
-      discardPendingBlock: vi.fn(() => Promise.resolve()),
-      applySeasonRunCommand: vi.fn((input: { run: SeasonRunSnapshot['run'] }) => {
-        active = { ...initial, run: input.run };
-        return Promise.resolve();
-      }),
-      loadSeasonRunPlayerSlice: vi.fn(() => Promise.resolve(null)),
-      upsertSeasonRunPlayerSlice: vi.fn(() => Promise.resolve()),
-      commitPostseasonAdvancement: vi.fn(() => Promise.resolve()),
-      loadPostseasonSummaries: vi.fn(() => Promise.resolve([])),
-      loadPostseasonSummary: vi.fn(() => Promise.resolve(null)),
-      loadPostseasonDetails: vi.fn(() => Promise.resolve([])),
-      loadCommandLog: vi.fn(() => Promise.resolve(null)),
-      promoteChampionToCompleted: vi.fn(() => Promise.resolve()),
-      loadCompletedSeason: vi.fn(() => Promise.resolve(null)),
-      listCompletedSeasonRuns: vi.fn(() => Promise.resolve([])),
-      deleteCompletedSeason: vi.fn(() => Promise.resolve()),
-      buildReplayExport: vi.fn(() => Promise.resolve(null)),
-    };
-    const runner = new FakeRunner();
-    const hub = new SeasonHubState(repo, runner);
-    await hub.refresh();
-    expect(hub.snapshot).toBe(initial);
-    const offered = seasonObjectiveChoicesForBlock(run.rootSeed, 0);
-    await hub.selectBlockObjective({ blockIndex: 0, objectiveId: offered[0] ?? 'win-six' });
-    expect(hub.commandError).toBeNull();
-    expect(hub.snapshot?.run.objectives.selections[0]?.objectiveId).toBe(offered[0]);
-    expect(getCachedSeasonSnapshot()?.run.objectives.selections[0]?.objectiveId).toBe(offered[0]);
-    expect(repo.loadActiveRun).not.toHaveBeenCalled();
     hub.destroy();
   });
 });

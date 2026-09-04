@@ -17,7 +17,6 @@ import {
   type SandboxBuilderState,
 } from './sandbox-builder.ts';
 import type { DuelDraftState } from './duel.ts';
-import { duelRollCandidates } from './duel.ts';
 
 export interface ClassicSafeMove {
   playerId: PlayerId;
@@ -37,22 +36,12 @@ export function enumerateClassicSafeMoves(
   if (!entry) return [];
   const drafted = new Set(state.picks.map((p) => p.playerId));
   const occupied = new Set(state.picks.map((p) => p.slotIndex));
-  const moves: ClassicSafeMove[] = [];
-  for (const catalogPlayer of entry.players) {
-    if (drafted.has(catalogPlayer.playerId)) continue;
-    const candidate = poolById.get(catalogPlayer.playerId);
-    const positions = candidate?.positions ?? catalogPlayer.positions;
-    for (const slot of [0, 1, 2, 3, 4] as SlotIndex[]) {
-      if (occupied.has(slot)) continue;
-      if (!canPlay(positions, slotRequirement(slot))) continue;
-      moves.push({
-        playerId: catalogPlayer.playerId,
-        playerVersionId: candidate?.playerVersionId ?? catalogPlayer.playerId,
-        slotIndex: slot,
-        selectionScore: candidate?.selectionScore ?? 0,
-      });
-    }
-  }
+  const moves = enumerateRolledPoolMoves(
+    entry.players,
+    poolById,
+    (playerId) => drafted.has(playerId),
+    occupied,
+  );
   const feasible = moves.filter((move) => {
     const trial = [
       ...state.picks,
@@ -95,11 +84,26 @@ export function enumerateDuelSafeMoves(
     state.picks.filter((p) => p.participantId === picker).map((p) => p.slotIndex),
   );
   const claimed = new Set(state.claimedVersionIds);
+  const moves = enumerateRolledPoolMoves(
+    entry.players,
+    poolById,
+    (playerId, versionId) => claimed.has(versionId) || claimed.has(playerId),
+    usedSlots,
+  );
+  return rankAutopickMoves(moves);
+}
+
+function enumerateRolledPoolMoves(
+  players: ClassicDraftCatalog[number]['players'],
+  poolById: ReadonlyMap<string, FixedFiveCandidate>,
+  isClaimed: (playerId: PlayerId, versionId: string) => boolean,
+  usedSlots: ReadonlySet<SlotIndex>,
+): ClassicSafeMove[] {
   const moves: ClassicSafeMove[] = [];
-  for (const catalogPlayer of entry.players) {
+  for (const catalogPlayer of players) {
     const candidate = poolById.get(catalogPlayer.playerId);
     const versionId = candidate?.playerVersionId ?? catalogPlayer.playerId;
-    if (claimed.has(versionId) || claimed.has(catalogPlayer.playerId)) continue;
+    if (isClaimed(catalogPlayer.playerId, versionId)) continue;
     const positions = candidate?.positions ?? catalogPlayer.positions;
     for (const slot of [0, 1, 2, 3, 4] as SlotIndex[]) {
       if (usedSlots.has(slot)) continue;
@@ -112,8 +116,7 @@ export function enumerateDuelSafeMoves(
       });
     }
   }
-  void duelRollCandidates;
-  return rankAutopickMoves(moves);
+  return moves;
 }
 
 function rankAutopickMoves<
@@ -125,12 +128,6 @@ function rankAutopickMoves<
       return a.playerVersionId < b.playerVersionId ? -1 : 1;
     return a.slotIndex - b.slotIndex;
   });
-}
-
-export function rankSandboxSafeMoves(
-  moves: ReturnType<typeof enumerateSandboxSafeMoves>,
-): ReturnType<typeof enumerateSandboxSafeMoves> {
-  return rankAutopickMoves(moves);
 }
 
 export interface AutopickSelection {

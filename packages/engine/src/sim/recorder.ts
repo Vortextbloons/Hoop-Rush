@@ -401,9 +401,10 @@ function playerDiagnostics(p: RecorderPlayer): PlayerDiagnostics {
     contestedShots: p.contestedShots,
   };
 }
-function playerBoxBase(
-  p: RecorderPlayer,
-): Omit<PlayerBoxScore, 'playerId' | 'minutes' | 'diagnostics'> & {
+function playerBoxBase(p: RecorderPlayer): Omit<
+  PlayerBoxScore,
+  'playerId' | 'minutes' | 'diagnostics'
+> & {
   diagnostics: PlayerDiagnostics;
 } {
   return {

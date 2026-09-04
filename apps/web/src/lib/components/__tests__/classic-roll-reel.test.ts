@@ -21,6 +21,7 @@ interface ReelProps {
   eraOptions: string[];
   axis?: 'both' | 'franchise' | 'era';
   spinKey?: number;
+  spotlight?: 'you' | 'rival' | null;
   announceText: string;
   roundLabel?: string;
   reducedMotion?: boolean;
@@ -200,6 +201,35 @@ describe('ClassicRollReel', () => {
     expect(container.querySelector(OVERLAY)).toBeNull();
     expect(onSettled).toHaveBeenCalledTimes(1);
   });
+  it.each([
+    { spotlight: 'you' as const, text: 'Your roll', stageClass: 'roll-stage--you' },
+    { spotlight: 'rival' as const, text: "Rival's roll", stageClass: 'roll-stage--rival' },
+  ])(
+    'spotlight="$spotlight" frames the stage for that picker',
+    async ({ spotlight, text, stageClass }) => {
+      const { container, rerender } = renderReel({ spinKey: 1, spotlight });
+      expect(container.querySelector('.roll-spot')?.textContent).toBe(text);
+      expect(container.querySelector('.roll-stage')?.classList.contains(stageClass)).toBe(true);
+      await rerender({ spinKey: 1 });
+      await vi.advanceTimersByTimeAsync(2000);
+    },
+  );
+  it('renders no spotlight pill without the spotlight prop', () => {
+    const { container } = renderReel({ spinKey: 1 });
+    expect(container.querySelector('.roll-spot')).toBeNull();
+  });
+  it.each(['franchise', 'era'] as const)(
+    'marks the settled result with roll-result--%s',
+    async (axis) => {
+      const { container, rerender } = renderReel({ axis });
+      await rerender({ spinKey: 1 });
+      await vi.advanceTimersByTimeAsync(950);
+      expect(container.querySelector(RESULT)?.classList.contains(`roll-result--${axis}`)).toBe(
+        true,
+      );
+      await vi.advanceTimersByTimeAsync(850);
+    },
+  );
   it('shows the historical crossover identity for a relocated franchise era', async () => {
     const { container, rerender, onSettled } = renderReel({
       franchiseId: 'thunder',

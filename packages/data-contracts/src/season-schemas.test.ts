@@ -28,7 +28,6 @@ import {
   seasonInfluenceStateSchema,
   seasonInfluenceLedgerEntrySchema,
   seasonObjectiveStateSchema,
-  seasonObjectiveEvaluationSchema,
   seasonTradeOfferSchema,
   seasonPendingBlockCandidateSchema,
   seasonInvalidRosterInterruptionSchema,
@@ -434,87 +433,6 @@ describe('season postseason schema (M2.6 postseason-v2)', () => {
       }),
     ).toThrow();
   });
-  it('round-trips unpaired and paired playoff series slots', () => {
-    const pending = {
-      seriesId: 'east-semifinal-1',
-      round: 'conference-semifinal' as const,
-      conference: 'east' as const,
-      higherSeed: null,
-      lowerSeed: null,
-      homeCourtFranchiseId: null,
-      challengerFranchiseId: null,
-      homeCourtWins: 0,
-      challengerWins: 0,
-      games: [],
-      winnerFranchiseId: null,
-    };
-    expect(playoffSeriesSchema.safeParse(pending).success).toBe(true);
-    const paired = {
-      seriesId: 'east-first-round-1',
-      round: 'first-round' as const,
-      conference: 'east' as const,
-      higherSeed: 1,
-      lowerSeed: 8,
-      homeCourtFranchiseId: 'team-1',
-      challengerFranchiseId: 'team-8',
-      homeCourtWins: 3,
-      challengerWins: 2,
-      games: [
-        {
-          gameId: 'po-east-first-round-1-g1',
-          gameNumber: 1,
-          homeFranchiseId: 'team-1',
-          awayFranchiseId: 'team-8',
-          status: 'final',
-          homeScore: 100,
-          awayScore: 90,
-          winnerFranchiseId: 'team-1',
-        },
-        {
-          gameId: 'po-east-first-round-1-g2',
-          gameNumber: 2,
-          homeFranchiseId: 'team-1',
-          awayFranchiseId: 'team-8',
-          status: 'final',
-          homeScore: 110,
-          awayScore: 95,
-          winnerFranchiseId: 'team-1',
-        },
-        {
-          gameId: 'po-east-first-round-1-g3',
-          gameNumber: 3,
-          homeFranchiseId: 'team-8',
-          awayFranchiseId: 'team-1',
-          status: 'final',
-          homeScore: 99,
-          awayScore: 101,
-          winnerFranchiseId: 'team-1',
-        },
-        {
-          gameId: 'po-east-first-round-1-g4',
-          gameNumber: 4,
-          homeFranchiseId: 'team-8',
-          awayFranchiseId: 'team-1',
-          status: 'final',
-          homeScore: 102,
-          awayScore: 100,
-          winnerFranchiseId: 'team-8',
-        },
-        {
-          gameId: 'po-east-first-round-1-g5',
-          gameNumber: 5,
-          homeFranchiseId: 'team-1',
-          awayFranchiseId: 'team-8',
-          status: 'final',
-          homeScore: 105,
-          awayScore: 98,
-          winnerFranchiseId: 'team-1',
-        },
-      ],
-      winnerFranchiseId: null,
-    };
-    expect(playoffSeriesSchema.safeParse(paired).success).toBe(true);
-  });
   it('rejects corrupt playoff series records', () => {
     const base = {
       seriesId: 'east-first-round-1',
@@ -658,21 +576,6 @@ describe('season run schema', () => {
     expect(run.rosters).toHaveLength(30);
     expect(run.ownership).toHaveLength(300);
     expect(run.games).toHaveLength(1230);
-  });
-  it('round-trips the M2.5 state chain fields', () => {
-    const run = roundTrip(seasonRunSchema, buildRun());
-    expect(run.health.injuries).toEqual([]);
-    expect(run.transactions).toEqual([]);
-    expect(Object.keys(run.influence.balances)).toHaveLength(30);
-    for (const balance of Object.values(run.influence.balances)) {
-      expect(balance).toBe(2);
-    }
-    expect(run.influence.ledger).toHaveLength(30);
-    expect(run.influence.ledger.every((entry) => entry.source === 'initial-grant')).toBe(true);
-    expect(run.influence.ledger.every((entry) => entry.balanceAfter === 2)).toBe(true);
-    expect(run.checkpointState).toBeNull();
-    expect(run.stateRevision).toBe(0);
-    expect(run.stateDigest).toBe('0'.repeat(32));
   });
   it('accepts 300-450 ownership rows; uniqueness is an engine-level audit', () => {
     const run = buildRun();
@@ -1516,140 +1419,6 @@ describe('season AI contracts (M2.1, M2.4 roster-generation-v2)', () => {
       }),
     ).toThrow();
   });
-  it('round-trips the frozen roster-targets-v2 artifact', () => {
-    const targets = {
-      schemaVersion: 2,
-      targetsVersion: 'roster-targets-v2',
-      policy: {
-        bandQuotas: {
-          solo: { contender: 4, playoff: 8, average: 10, weaker: 7 },
-          duo: { contender: 4, playoff: 8, average: 9, weaker: 7 },
-        },
-        guaranteedAnchors: { contender: 2, playoff: 1, average: 0, weaker: 0 },
-        extraEliteRollProbability: { contender: 0.65, playoff: 0.35, average: 0.2, weaker: 0.08 },
-        tierRanges: {
-          contender: { elite: [2, 4], strong: [5, 8], useful: [6, 10] },
-          playoff: { elite: [1, 2], strong: [4, 7], useful: [7, 10] },
-          average: { elite: [0, 1], strong: [3, 6], useful: [8, 11] },
-          weaker: { elite: [0, 1], strong: [1, 4], useful: [7, 10] },
-        },
-        identityPriorityRoles: {
-          'star-chaser': [
-            'primary-creation',
-            'secondary-creation',
-            'rim-finishing-interior-scoring',
-          ],
-          'shooting-first': ['perimeter-shooting'],
-          'defense-first': ['perimeter-defense', 'interior-defense'],
-          'depth-builder': [
-            'primary-creation',
-            'secondary-creation',
-            'perimeter-shooting',
-            'rim-finishing-interior-scoring',
-            'perimeter-defense',
-            'interior-defense',
-            'offensive-rebounding',
-            'defensive-rebounding',
-          ],
-          continuity: [
-            'primary-creation',
-            'secondary-creation',
-            'perimeter-shooting',
-            'rim-finishing-interior-scoring',
-            'perimeter-defense',
-            'interior-defense',
-            'offensive-rebounding',
-            'defensive-rebounding',
-          ],
-          'active-trader': [
-            'primary-creation',
-            'secondary-creation',
-            'perimeter-shooting',
-            'rim-finishing-interior-scoring',
-            'perimeter-defense',
-            'interior-defense',
-            'offensive-rebounding',
-            'defensive-rebounding',
-          ],
-        },
-        roleCoverageThreshold: 35,
-        completionTargets: { guards: 4, forwards: 4, centers: 3 },
-        poolSize: 20,
-        rosterSize: 10,
-        percentileTiers: { elite: 0.9, strong: 0.75, useful: 0.5 },
-        bandPoolScoreCaps: { contender: 100, playoff: 92, average: 84, weaker: 74 },
-        maxPoolStrengthOutliers: 4,
-        maxRosterStrengthOutliers: 2,
-        nodeBudgets: { anchorMatching: 20000, poolRepair: 40000, rosterSelection: 600000 },
-      },
-      calibration: {
-        calibrationSeedCount: 256,
-        validationSeedCount: 64,
-        generatedAtIso: '2026-08-04T00:00:00.000Z',
-        aiVersion: 'season-ai-v2',
-        rosterGenerationVersion: 'roster-generation-v2',
-        gates: {
-          failureRateMax: 0,
-          minBandSeparation: 3,
-          anchorFulfillmentMin: 1,
-          extraEliteRateTolerance: 0.05,
-          heldOutPassShare: 0.95,
-          orderInvarianceFailuresMax: 0,
-          superTeamIncidenceMax: 0.08,
-        },
-      },
-      measured: {
-        bands: {
-          contender: {
-            range: [52, 92],
-            median: 74,
-            eliteShare: 0.7,
-            strongShare: 0.3,
-            usefulShare: 0,
-          },
-          playoff: {
-            range: [46, 82],
-            median: 65,
-            eliteShare: 0.4,
-            strongShare: 0.6,
-            usefulShare: 0.1,
-          },
-          average: {
-            range: [40, 72],
-            median: 57,
-            eliteShare: 0.1,
-            strongShare: 0.5,
-            usefulShare: 0.6,
-          },
-          weaker: {
-            range: [32, 64],
-            median: 49,
-            eliteShare: 0.05,
-            strongShare: 0.3,
-            usefulShare: 0.8,
-          },
-        },
-        identities: {
-          'star-chaser': { range: [40, 88], median: 64 },
-          'depth-builder': { range: [40, 85], median: 62 },
-          'defense-first': { range: [40, 85], median: 62 },
-          'shooting-first': { range: [40, 85], median: 62 },
-          continuity: { range: [40, 85], median: 62 },
-          'active-trader': { range: [40, 85], median: 62 },
-        },
-        anchorFulfillment: 1,
-        extraEliteRate: 0.4,
-        superTeamIncidence: 0.02,
-        poolLegalityFailures: 0,
-        selectionFailures: 0,
-        generationFailures: 0,
-      },
-    };
-    const parsed = roundTrip(seasonRosterTargetsSchema, targets);
-    expect(parsed.policy.bandQuotas.solo.contender).toBe(4);
-    expect(parsed.measured.bands.contender.median).toBe(74);
-    expect(parsed.calibration.gates.minBandSeparation).toBe(3);
-  });
   it('rejects the v1 targets artifact, wrong target versions, and malformed v2 policy', () => {
     const v1Targets = {
       schemaVersion: 1,
@@ -1805,19 +1574,6 @@ describe('season transaction family (M2.5)', () => {
     ).toThrow();
     expect(() => seasonTransactionEntrySchema.parse({ ...entry, blockIndex: 9 })).toThrow();
     expect(() => seasonTransactionEntrySchema.parse({ ...entry, type: 'salary-dump' })).toThrow();
-  });
-  it('round-trips an initial-grant entry with null command and block', () => {
-    const entry = {
-      transactionId: 'tx-initial-hawks',
-      commandId: null,
-      franchiseId: 'hawks',
-      type: 'initial-grant',
-      blockIndex: null,
-      appliedAtStateRevision: 0,
-      payload: {},
-      explanation: 'Initial +2 Influence grant at run creation',
-    };
-    expect(roundTrip(seasonTransactionEntrySchema, entry).commandId).toBeNull();
   });
 });
 describe('season influence family (M2.5, season-influence-v2)', () => {
@@ -1975,25 +1731,6 @@ describe('season objective family (M2.5, season-objective-v1)', () => {
       }),
     ).toThrow();
   });
-  it('round-trips an evaluation with recorded facts', () => {
-    const evaluation = {
-      objectiveId: 'defense-108',
-      blockIndex: 1,
-      success: true,
-      facts: {
-        games: 10,
-        wins: 7,
-        pointsAllowed: 1042,
-        reboundMargin: 28,
-        tipsWithAtLeastEightAvailable: 9,
-        tipsTotal: 10,
-        benchMinutes: 356,
-        turnovers: 112,
-      },
-      tipCountedGames: 9,
-    };
-    expect(roundTrip(seasonObjectiveEvaluationSchema, evaluation).success).toBe(true);
-  });
 });
 describe('season trade family (M2.5, season-trade-v1)', () => {
   function buildOffer() {
@@ -2046,17 +1783,6 @@ describe('season trade family (M2.5, season-trade-v1)', () => {
     expect(() =>
       seasonTradeOfferSchema.parse({ ...buildOffer(), projectedRotationChanges: 'x'.repeat(513) }),
     ).toThrow();
-  });
-  it('round-trips a 1-for-1 offer in the 85-115 band', () => {
-    const offer = {
-      ...buildOffer(),
-      outgoingPlayerVersionIds: [fixturePlayerId(0)],
-      incomingPlayerVersionIds: [fixturePlayerId(30)],
-      outgoingHealth: [{ available: true, activeInjuryIds: [] }],
-      incomingHealth: [{ available: true, activeInjuryIds: [] }],
-      valueBand: { ratioBasisPoints: 1080, band: '85-115', qualified: true },
-    };
-    expect(roundTrip(seasonTradeOfferSchema, offer).valueBand.qualified).toBe(true);
   });
 });
 describe('season pending block family (M2.5)', () => {

@@ -18,10 +18,7 @@
   ];
   const routeId = $derived(page.route.id);
   const showBottomNav = $derived(
-    routeId === '/' ||
-      routeId === '/roster' ||
-      routeId === '/multiplayer' ||
-      routeId?.startsWith('/multiplayer') === true,
+    routeId === '/' || routeId === '/roster' || routeId === '/multiplayer',
   );
   function isActive(item: NavItem): boolean {
     return isNavItemActive(item, routeId);

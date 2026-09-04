@@ -14,9 +14,9 @@ import { franchiseIdSchema } from '@hoop-rush/data-contracts';
 import type { SideIndex } from '../sim/recorder.ts';
 import {
   canonicalRosterPairs,
+  pairChemistryBasisPoints,
   seasonPairIsCanonical,
   seasonPairKey,
-  unitChemistryFromShared,
   unitPairs,
 } from './chemistry.ts';
 import { offCourtRecoveryBp, onCourtFatigueBp, recentLoadAfterGame } from './stamina.ts';
@@ -39,6 +39,11 @@ export const SEASON_EFFECTS_MECHANISM_CAPS: Record<SeasonMechanism, number> = {
 };
 function ppDeltaMillionths(pp: number, fraction: number): number {
   return Math.round(pp * PP_TO_MILLIONTHS * fraction);
+}
+function pairKeysOf(unit: readonly string[]): Array<{ a: string; b: string; key: string }> {
+  const out: Array<{ a: string; b: string; key: string }> = [];
+  for (const [a, b] of unitPairs(unit)) out.push({ a, b, key: seasonPairKey(a, b) });
+  return out;
 }
 export interface SeasonEffectsTripFacts {
   homeUnit: readonly string[];
@@ -106,6 +111,8 @@ class EffectsBufferImpl implements SeasonEffectsBuffer {
   private readonly evidence = new Map<string, EvidenceRow>();
   private homeUnit: readonly string[] = [];
   private awayUnit: readonly string[] = [];
+  private homePairKeys: Array<{ a: string; b: string; key: string }> = [];
+  private awayPairKeys: Array<{ a: string; b: string; key: string }> = [];
   private halftimeApplied = false;
   private finished = false;
   constructor(
@@ -214,18 +221,24 @@ class EffectsBufferImpl implements SeasonEffectsBuffer {
       return delta;
     },
     setActiveUnits: (homeUnit, awayUnit) => {
-      this.homeUnit = [...homeUnit];
-      this.awayUnit = [...awayUnit];
+      this.syncUnit(0, homeUnit);
+      this.syncUnit(1, awayUnit);
     },
     recordStintSeconds: (side, seconds, activeVersions) => {
       const roster = side === 0 ? this.homeRoster : this.awayRoster;
-      const active = new Set(activeVersions);
       for (const version of roster) {
         const state = this.game.get(version);
         if (state === undefined) continue;
         const rating = this.stamina.get(version);
         if (rating === undefined) continue;
-        if (active.has(version)) {
+        let onCourt = false;
+        for (let i = 0; i < activeVersions.length; i += 1) {
+          if (activeVersions[i] === version) {
+            onCourt = true;
+            break;
+          }
+        }
+        if (onCourt) {
           state.stintSeconds = Math.min(720, state.stintSeconds + seconds);
           state.fatigue += onCourtFatigueBp(seconds, rating, state.stintSeconds, state.recentLoad);
         } else {
@@ -237,19 +250,17 @@ class EffectsBufferImpl implements SeasonEffectsBuffer {
     },
     recordTrip: (facts) => {
       const { homeUnit, awayUnit, handler, shooter, defender, reboundContestCounts } = facts;
-      this.homeUnit = [...homeUnit];
-      this.awayUnit = [...awayUnit];
+      this.syncUnit(0, homeUnit);
+      this.syncUnit(1, awayUnit);
       this.applyRoleBonuses(0, homeUnit, handler, shooter, defender, reboundContestCounts[0]);
       this.applyRoleBonuses(1, awayUnit, handler, shooter, defender, reboundContestCounts[1]);
-      for (const [a, b] of unitPairs(homeUnit)) {
-        const key = seasonPairKey(a, b);
-        this.increments.set(key, (this.increments.get(key) ?? 0) + 1);
-        this.homePairs.set(key, (this.homePairs.get(key) ?? 0) + 1);
+      for (const entry of this.homePairKeys) {
+        this.increments.set(entry.key, (this.increments.get(entry.key) ?? 0) + 1);
+        this.homePairs.set(entry.key, (this.homePairs.get(entry.key) ?? 0) + 1);
       }
-      for (const [a, b] of unitPairs(awayUnit)) {
-        const key = seasonPairKey(a, b);
-        this.increments.set(key, (this.increments.get(key) ?? 0) + 1);
-        this.awayPairs.set(key, (this.awayPairs.get(key) ?? 0) + 1);
+      for (const entry of this.awayPairKeys) {
+        this.increments.set(entry.key, (this.increments.get(entry.key) ?? 0) + 1);
+        this.awayPairs.set(entry.key, (this.awayPairs.get(entry.key) ?? 0) + 1);
       }
     },
     halftime: () => {
@@ -257,14 +268,37 @@ class EffectsBufferImpl implements SeasonEffectsBuffer {
         throw new Error('season effects: halftime recovery applied more than once');
       }
       this.halftimeApplied = true;
-      for (const version of [...this.homeRoster, ...this.awayRoster]) {
-        const state = this.game.get(version);
-        const rating = this.stamina.get(version);
-        if (state === undefined || rating === undefined) continue;
-        state.fatigue = Math.max(0, state.fatigue - halftimeRemovalBp(rating));
+      for (const roster of [this.homeRoster, this.awayRoster]) {
+        for (const version of roster) {
+          const state = this.game.get(version);
+          const rating = this.stamina.get(version);
+          if (state === undefined || rating === undefined) continue;
+          state.fatigue = Math.max(0, state.fatigue - halftimeRemovalBp(rating));
+        }
       }
     },
   };
+  private syncUnit(side: SideIndex, unit: readonly string[]): void {
+    const current = side === 0 ? this.homeUnit : this.awayUnit;
+    if (current.length === unit.length) {
+      let same = true;
+      for (let i = 0; i < unit.length; i += 1) {
+        if (current[i] !== unit[i]) {
+          same = false;
+          break;
+        }
+      }
+      if (same) return;
+    }
+    const copy = [...unit];
+    if (side === 0) {
+      this.homeUnit = copy;
+      this.homePairKeys = pairKeysOf(unit);
+    } else {
+      this.awayUnit = copy;
+      this.awayPairKeys = pairKeysOf(unit);
+    }
+  }
   private applyRoleBonuses(
     side: SideIndex,
     unit: readonly string[],
@@ -302,10 +336,14 @@ class EffectsBufferImpl implements SeasonEffectsBuffer {
     return sum / unit.length;
   }
   private unitChemistry(side: SideIndex): number {
-    const unit = side === 0 ? this.homeUnit : this.awayUnit;
-    if (unit.length === 0) return 0;
+    const pairKeys = side === 0 ? this.homePairKeys : this.awayPairKeys;
+    if (pairKeys.length === 0) return 0;
     const pairs = side === 0 ? this.homePairs : this.awayPairs;
-    return unitChemistryFromShared(unit, (a, b) => pairs.get(seasonPairKey(a, b)) ?? 0);
+    let sum = 0;
+    for (const entry of pairKeys) {
+      sum += pairChemistryBasisPoints(pairs.get(entry.key) ?? 0);
+    }
+    return Math.round(sum / 10);
   }
   private record(
     mechanism: SeasonMechanism,

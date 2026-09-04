@@ -6,8 +6,6 @@ import {
   SEASON_ROSTER_MIN_SIZE,
   SEASON_ROUND_COUNT,
   blockRoundRange,
-  franchiseIdSchema,
-  seasonGameIdSchema,
   seasonUpcomingHumanGameSchema,
   type FranchiseId,
   type SeasonGameId,
@@ -345,7 +343,7 @@ export function foldSeasonAggregates(summaries: readonly SeasonGameSummary[]): {
     const existing = teams.get(franchiseId);
     if (existing) return existing;
     const zero: SeasonTeamAggregate = {
-      franchiseId: franchiseIdSchema.parse(franchiseId),
+      franchiseId,
       gamesPlayed: 0,
       wins: 0,
       losses: 0,
@@ -376,7 +374,7 @@ export function foldSeasonAggregates(summaries: readonly SeasonGameSummary[]): {
     if (existing) return existing;
     const zero: SeasonPlayerAggregate = {
       playerVersionId,
-      franchiseId: franchiseIdSchema.parse(franchiseId),
+      franchiseId,
       gamesPlayed: 0,
       appearances: 0,
       started: 0,
@@ -504,7 +502,7 @@ export function rebaseStandingsBefore(
       pointsAgainst?: number;
     },
   ): void => {
-    const row = byId.get(franchiseIdSchema.parse(franchiseId));
+    const row = byId.get(franchiseId);
     if (!row) return;
     row.wins += delta.wins ?? 0;
     row.losses += delta.losses ?? 0;
@@ -527,7 +525,7 @@ export function rebaseStandingsBefore(
     wins: number;
     losses: number;
   } => {
-    const row = byId.get(franchiseIdSchema.parse(franchiseId));
+    const row = byId.get(franchiseId);
     const record = row?.headToHead.find((h) => h.franchiseId === opponentId);
     return { wins: record?.wins ?? 0, losses: record?.losses ?? 0 };
   };
@@ -744,15 +742,54 @@ export function deriveBlockRecap(input: {
     run,
   } = input;
   const before = rebaseStandingsBefore(standings, league, blockSummaries);
+  const conferenceByFranchise = new Map(
+    league.teams.map((team) => [team.franchiseId, team.conference]),
+  );
+  const sortedByConference = new Map<string, SeasonStandingsRow[]>();
+  const sortedBeforeByConference = new Map<string, SeasonStandingsRow[]>();
+  for (const row of standings.rows) {
+    const conference = conferenceByFranchise.get(row.franchiseId) ?? 'east';
+    const list = sortedByConference.get(conference);
+    if (list) list.push(row);
+    else sortedByConference.set(conference, [row]);
+  }
+  for (const list of sortedByConference.values())
+    list.sort(
+      (a, b) =>
+        b.wins - a.wins ||
+        pointDifferential(b) - pointDifferential(a) ||
+        a.franchiseId.localeCompare(b.franchiseId),
+    );
+  for (const row of before.rows) {
+    const conference = conferenceByFranchise.get(row.franchiseId) ?? 'east';
+    const list = sortedBeforeByConference.get(conference);
+    if (list) list.push(row);
+    else sortedBeforeByConference.set(conference, [row]);
+  }
+  for (const list of sortedBeforeByConference.values())
+    list.sort(
+      (a, b) =>
+        b.wins - a.wins ||
+        pointDifferential(b) - pointDifferential(a) ||
+        a.franchiseId.localeCompare(b.franchiseId),
+    );
   const rankOf = (rows: SeasonStandingsRow[], franchiseId: string, conference: string): number => {
-    const sorted = [...rows]
-      .filter((row) => conferenceOfLeague(league, row.franchiseId) === conference)
-      .sort(
-        (a, b) =>
-          b.wins - a.wins ||
-          pointDifferential(b) - pointDifferential(a) ||
-          a.franchiseId.localeCompare(b.franchiseId),
-      );
+    const cached =
+      rows === standings.rows
+        ? sortedByConference.get(conference)
+        : rows === before.rows
+          ? sortedBeforeByConference.get(conference)
+          : null;
+    const sorted =
+      cached ??
+      [...rows]
+        .filter((row) => conferenceOfLeague(league, row.franchiseId) === conference)
+        .sort(
+          (a, b) =>
+            b.wins - a.wins ||
+            pointDifferential(b) - pointDifferential(a) ||
+            a.franchiseId.localeCompare(b.franchiseId),
+        );
     const index = sorted.findIndex((row) => row.franchiseId === franchiseId);
     return index === -1 ? 1 : index + 1;
   };
@@ -761,7 +798,7 @@ export function deriveBlockRecap(input: {
     const beforeRow = before.rows.find((row) => row.franchiseId === franchiseId);
     const conference = conferenceOfLeague(league, franchiseId);
     return {
-      franchiseId: franchiseIdSchema.parse(franchiseId),
+      franchiseId,
       winsBefore: beforeRow?.wins ?? 0,
       lossesBefore: beforeRow?.losses ?? 0,
       winsAfter: after?.wins ?? 0,
@@ -783,7 +820,7 @@ export function deriveBlockRecap(input: {
   }
   streaks.sort((a, b) => b.length - a.length || a.franchiseId.localeCompare(b.franchiseId));
   const nextBlockIndex = blockIndex + 1;
-  const parsedHumanForRecap = franchiseIdSchema.parse(humanFranchiseId);
+  const parsedHumanForRecap = humanFranchiseId as FranchiseId;
   const upcomingHumanGames: SeasonUpcomingHumanGame[] =
     nextBlockIndex <= 8 ? humanUpcomingGamesFromGames(games, humanFranchiseId, nextBlockIndex) : [];
   return {
@@ -843,7 +880,7 @@ export function blockFreeAgencyEvidenceOf(input: {
     (window) => window.blockIndex === input.blockIndex && window.status === 'resolved',
   );
   const parsedHuman =
-    input.humanFranchiseId === null ? null : franchiseIdSchema.parse(input.humanFranchiseId);
+    input.humanFranchiseId === null ? null : (input.humanFranchiseId as FranchiseId);
   const humanDelta = parsedHuman === null ? 0 : (freeAgency.seasonSpend[parsedHuman] ?? 0);
   return {
     windowIndex: resolvedWindow?.windowIndex ?? null,
@@ -863,7 +900,7 @@ export function humanBalanceAtBlockEnd(
   humanFranchiseId: string,
   blockIndex: number,
 ): number {
-  const fid = franchiseIdSchema.parse(humanFranchiseId);
+  const fid = humanFranchiseId as FranchiseId;
   const current = run.influence.balances[fid] ?? 0;
   const laterDelta = run.influence.ledger
     .filter(
@@ -884,7 +921,7 @@ export function deriveBlockInjuryEvidence(input: {
 }): SeasonBlockInjuryEvidence {
   const { blockSummaries, health, games, blockIndex, humanFranchiseId } = input;
   const { fromRound, toRound } = blockRoundRange(blockIndex);
-  const roundOfGame = new Map(games.map((game) => [game.gameId, game.round]));
+  const roundOfGame = new Map<string, number>(games.map((game) => [game.gameId, game.round]));
   const bySeverity: SeasonBlockInjuryEvidence['bySeverity'] = {
     minor: 0,
     moderate: 0,
@@ -918,8 +955,7 @@ export function deriveBlockInjuryEvidence(input: {
   ).length;
   const activeAtBlockEnd = health.injuries.filter((record) => {
     if (record.missedGamesRemaining <= 0) return false;
-    const parsedGameId = seasonGameIdSchema.parse(record.gameId);
-    const occurrenceRound = roundOfGame.get(parsedGameId) ?? 0;
+    const occurrenceRound = roundOfGame.get(record.gameId) ?? 0;
     return occurrenceRound <= toRound;
   }).length;
   return {

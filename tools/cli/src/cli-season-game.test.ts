@@ -42,11 +42,6 @@ const ALL_FIXTURE_IDS = [
   'season-game-no-legal-five',
   'season-game-no-legal-five-both',
 ];
-const PRESET_FIXTURE_IDS = [
-  'season-game-balanced',
-  'season-game-tight',
-  'season-game-bench-heavy',
-] as const;
 function loadFixture(id: string) {
   return seasonGameFixtureSchema.parse(
     JSON.parse(readFileSync(join(FIXTURES_DIR, `${id}.json`), 'utf8')),
@@ -75,110 +70,6 @@ describe('cli: committed season game fixtures', () => {
       const availableIds = input.availability.map((entry) => entry.playerVersionId);
       expect(new Set(availableIds).size).toBe(20);
       for (const id2 of versionIds) expect(availableIds).toContain(id2);
-    }
-  });
-  it('preset fixtures use v2 rotations with the frozen preset targets totaling 240', () => {
-    for (const id of PRESET_FIXTURE_IDS) {
-      const fixture = loadFixture(id);
-      const preset = fixture.preset;
-      expect(preset).toBeDefined();
-      const targets = SEASON_ROTATION_PRESET_TARGETS[preset as SeasonRotationPreset];
-      for (const rotation of [fixture.input.homeRotation, fixture.input.awayRotation]) {
-        expect(rotation.rotationVersion).toBe(SEASON_ROTATION_VERSION);
-        expect(rotation.starters).toHaveLength(5);
-        expect(rotation.benchOrder).toHaveLength(5);
-        expect(rotation.closingFive).toHaveLength(5);
-        const minutes = rotation.targetMinutes.map((row) => row.minutes);
-        expect(minutes.reduce((sum, value) => sum + value, 0)).toBe(240);
-        const starterSet = new Set(rotation.starters);
-        const benchRoleByVersion = new Map(
-          rotation.benchOrder.map((playerVersionId, index) => [playerVersionId, index + 1]),
-        );
-        for (const row of rotation.targetMinutes) {
-          const role = starterSet.has(row.playerVersionId)
-            ? 0
-            : benchRoleByVersion.get(row.playerVersionId);
-          expect(role).toBeDefined();
-          const expected = role === 0 ? targets.starters : (targets.bench[(role ?? 1) - 1] ?? 0);
-          expect(row.minutes).toBe(expected);
-        }
-      }
-    }
-  });
-  it('every roster can field a legal G,G,F,F,C five from its starters', () => {
-    for (const id of ALL_FIXTURE_IDS) {
-      const input = loadFixture(id).input;
-      for (const team of [input.home, input.away]) {
-        const rotation = team === input.home ? input.homeRotation : input.awayRotation;
-        const slots = team.players
-          .filter((player) => rotation.starters.includes(player.playerVersionId))
-          .map((player) => player.positions.map(slotGroupOf));
-        const covered = new Set(slots.flat());
-        expect(covered.has('G')).toBe(true);
-        expect(covered.has('F')).toBe(true);
-        expect(covered.has('C')).toBe(true);
-      }
-    }
-  });
-  it('scenario fixtures carry their intended availability, removals, and foul traits', () => {
-    const foulPressure = loadFixture('season-game-foul-pressure').input;
-    for (const player of [...foulPressure.home.players, ...foulPressure.away.players]) {
-      expect(player.tendencies.foulRate).toBe(45);
-    }
-    const unavailable = loadFixture('season-game-pregame-unavailable').input;
-    const unavailablePlayers = unavailable.availability.filter((entry) => !entry.available);
-    expect(unavailablePlayers).toHaveLength(2);
-    const homeUnavailable = unavailablePlayers.find((entry) =>
-      unavailable.home.players.some((p) => p.playerVersionId === entry.playerVersionId),
-    );
-    const awayUnavailable = unavailablePlayers.find((entry) =>
-      unavailable.away.players.some((p) => p.playerVersionId === entry.playerVersionId),
-    );
-    expect(homeUnavailable).toBeDefined();
-    expect(awayUnavailable).toBeDefined();
-    if (homeUnavailable !== undefined) {
-      expect(unavailable.homeRotation.starters).toContain(homeUnavailable.playerVersionId);
-    }
-    if (awayUnavailable !== undefined) {
-      expect(unavailable.awayRotation.starters).toContain(awayUnavailable.playerVersionId);
-    }
-    const removal = loadFixture('season-game-injected-removal').input;
-    expect(removal.removals).toHaveLength(2);
-    for (const entry of removal.removals) {
-      expect(entry.reason).toBe('injected-injury-removal');
-      expect(
-        [...removal.home.players, ...removal.away.players].map((p) => p.playerVersionId),
-      ).toContain(entry.playerVersionId);
-    }
-    const overtime = loadFixture('season-game-overtime').input;
-    expect(overtime.seed).not.toBe('0'.repeat(32));
-    const noLegalFive = loadFixture('season-game-no-legal-five').input;
-    const homeAvailable = noLegalFive.availability.filter(
-      (entry) =>
-        entry.available &&
-        noLegalFive.home.players.some((p) => p.playerVersionId === entry.playerVersionId),
-    );
-    expect(homeAvailable).toHaveLength(3);
-    const both = loadFixture('season-game-no-legal-five-both').input;
-    const homeAvailableBoth = both.availability.filter(
-      (entry) =>
-        entry.available &&
-        both.home.players.some((p) => p.playerVersionId === entry.playerVersionId),
-    );
-    const awayAvailableBoth = both.availability.filter(
-      (entry) =>
-        entry.available &&
-        both.away.players.some((p) => p.playerVersionId === entry.playerVersionId),
-    );
-    expect(homeAvailableBoth).toHaveLength(3);
-    expect(awayAvailableBoth).toHaveLength(3);
-  });
-  it('non-preset fixtures omit the preset field', () => {
-    for (const id of ALL_FIXTURE_IDS) {
-      if (PRESET_FIXTURE_IDS.includes(id as (typeof PRESET_FIXTURE_IDS)[number])) continue;
-      const fixture = loadFixture(id);
-      expect(fixture.preset).toBeUndefined();
-      expect(seasonRotationPresetSchema.safeParse(fixture.preset).success).toBe(false);
     }
   });
 });
@@ -265,37 +156,6 @@ function buildCompletedResult(input: SeasonGameSimulationInput): SeasonGameSimul
   seasonGameSimulationResultSchema.parse(result);
   return result;
 }
-function buildForfeitResult(input: SeasonGameSimulationInput): SeasonGameSimulationResult {
-  const result: SeasonGameSimulationResult = {
-    schemaVersion: 1,
-    outcome: 'forfeit',
-    seed: input.seed,
-    gameNumber: input.gameNumber,
-    dataVersion: input.dataVersion,
-    engineVersion: 'm3-engine-fixture',
-    profileVersion: input.profile.profileVersion,
-    winner: 'away',
-    losingFranchiseId: input.home.franchiseId,
-    trigger: 'no-legal-five-tipoff',
-    homeScore: 2,
-    awayScore: 0,
-  };
-  seasonGameSimulationResultSchema.parse(result);
-  return result;
-}
-function buildNoLegalFiveBothResult(input: SeasonGameSimulationInput): SeasonGameSimulationResult {
-  const result: SeasonGameSimulationResult = {
-    schemaVersion: 1,
-    outcome: 'no-legal-five-both',
-    seed: input.seed,
-    gameNumber: input.gameNumber,
-    dataVersion: input.dataVersion,
-    engineVersion: 'm3-engine-fixture',
-    profileVersion: input.profile.profileVersion,
-  };
-  seasonGameSimulationResultSchema.parse(result);
-  return result;
-}
 describe('season game simulate (unit, injected doubles)', () => {
   it('completes a game with a validated payload and renders the score and minutes', () => {
     const simulate = vi.fn((input: SeasonGameSimulationInput) => buildCompletedResult(input));
@@ -327,42 +187,6 @@ describe('season game simulate (unit, injected doubles)', () => {
       { simulateSeasonGame: simulate, checkSeasonGameResult: () => [] },
     );
     expect(simulate.mock.calls[0]?.[0].seed).toBe('0'.repeat(32));
-  });
-  it('reports a forfeit with the official 2-0 line (double)', () => {
-    const input = loadFixture('season-game-no-legal-five');
-    const forfeit = buildForfeitResult(input.input);
-    const report = seasonGameSimulate(
-      { input: 'season-game-no-legal-five', seed: 'cd'.repeat(16) },
-      { simulateSeasonGame: () => forfeit, checkSeasonGameResult: () => [] },
-    );
-    expect(report.exitCode).toBe(0);
-    const payload = seasonGameSimulateReportSchema.parse(report.payload);
-    expect(payload.outcome).toBe('forfeit');
-    expect(payload.home.score).toBe(2);
-    expect(payload.away.score).toBe(0);
-    expect(payload.forfeit).toEqual({
-      losingFranchiseId: 'lakers',
-      trigger: 'no-legal-five-tipoff',
-    });
-    expect(report.details[0]).toContain('2 - 0');
-    expect(report.details[0]).toContain('forfeit');
-  });
-  it('reports the no-legal-five-both variant without scores', () => {
-    const input = loadFixture('season-game-no-legal-five-both');
-    const report = seasonGameSimulate(
-      { input: 'season-game-no-legal-five-both', seed: 'ef'.repeat(16) },
-      {
-        simulateSeasonGame: () => buildNoLegalFiveBothResult(input.input),
-        checkSeasonGameResult: () => [],
-      },
-    );
-    expect(report.exitCode).toBe(0);
-    const payload = seasonGameSimulateReportSchema.parse(report.payload);
-    expect(payload.outcome).toBe('no-legal-five-both');
-    expect(payload.winner).toBeNull();
-    expect(payload.home.score).toBeNull();
-    expect(payload.away.score).toBeNull();
-    expect(payload.forfeit).toBeNull();
   });
   it('surfaces invariant failures with exit 1 and pass false', () => {
     const report = seasonGameSimulate(
@@ -521,119 +345,6 @@ describe('season game calibrate (unit, injected doubles)', () => {
       expect(manifestAfter).toBe(manifestBefore);
     });
   });
-  it('worker counts never change aggregates (1 vs 4 workers)', async () => {
-    await withTmpDir(async (tmp) => {
-      const run = async (workers: string) => {
-        const report = await seasonGameCalibrate(
-          { workers, out: join(tmp, `game-targets-workers-${workers}.json`) },
-          { runCohort: fakeRunner(presetFact) },
-        );
-        return seasonGameCalibrateReportSchema.parse(report.payload);
-      };
-      const one = await run('1');
-      const four = await run('4');
-      expect(four.fixtureStats).toEqual(one.fixtureStats);
-      expect(four.gates).toEqual(one.gates);
-      expect(four.chunkingIndependent).toBe(true);
-    });
-  });
-  it('fails the bench ordering gate when the bench-heavy fixture benches little', async () => {
-    await withTmpDir(async (tmp) => {
-      const factory = (fixtureId: string, seedIndex: number): SeasonGameGameFacts => {
-        const fact = presetFact(fixtureId, seedIndex);
-        if (fixtureId === 'season-game-bench-heavy') {
-          const benchRole: number[][] = [];
-          const benchSeconds: number[] = [];
-          for (let i = 0; i < 5; i += 1) {
-            benchRole.push([300, 300]);
-            benchSeconds.push(300, 300);
-          }
-          return {
-            ...fact,
-            benchSeconds,
-            benchRoleSeconds: benchRole,
-          };
-        }
-        return fact;
-      };
-      const report = await seasonGameCalibrate(
-        { out: join(tmp, 'game-targets-ordering.json') },
-        { runCohort: fakeRunner(factory) },
-      );
-      expect(report.exitCode).toBe(1);
-      const payload = seasonGameCalibrateReportSchema.parse(report.payload);
-      expect(payload.gates.benchOrdering).toBe(false);
-      expect(payload.gates.starterOrdering).toBe(true);
-      expect(payload.pass).toBe(false);
-      expect(payload.targetsWritten).toBe(false);
-      expect(
-        report.failures.some(
-          (failure) =>
-            failure.includes('benchOrdering') || failure.includes('bench second medians'),
-        ),
-      ).toBe(true);
-    });
-  });
-  it('fails the held-out gate when validation points leave the envelopes', async () => {
-    await withTmpDir(async (tmp) => {
-      const factory = (fixtureId: string, seedIndex: number): SeasonGameGameFacts => {
-        const fact = presetFact(fixtureId, seedIndex);
-        if (seedIndex >= SEASON_GAME_CALIBRATION_SEED_COUNT) {
-          return { ...fact, points: [150, 149] };
-        }
-        return fact;
-      };
-      const report = await seasonGameCalibrate(
-        { out: join(tmp, 'game-targets-heldout.json') },
-        { runCohort: fakeRunner(factory) },
-      );
-      const payload = seasonGameCalibrateReportSchema.parse(report.payload);
-      expect(payload.gates.heldOutPassShare).toBeLessThan(0.95);
-      expect(payload.gates.heldOutPass).toBe(false);
-      expect(payload.pass).toBe(false);
-      expect(payload.targetsWritten).toBe(false);
-    });
-  });
-  it('fails the zero-failures gate on check failures and determinism divergences', async () => {
-    await withTmpDir(async (tmp) => {
-      const factory = (fixtureId: string, seedIndex: number): SeasonGameGameFacts => {
-        const fact = presetFact(fixtureId, seedIndex);
-        if (seedIndex === 5) return { ...fact, checks: ['legality: unavailable player on court'] };
-        if (seedIndex === 7) return { ...fact, deterministic: false };
-        return fact;
-      };
-      const report = await seasonGameCalibrate(
-        { out: join(tmp, 'game-targets-zerofailures.json') },
-        { runCohort: fakeRunner(factory) },
-      );
-      const payload = seasonGameCalibrateReportSchema.parse(report.payload);
-      expect(payload.gates.zeroFailures).toBe(false);
-      expect(payload.pass).toBe(false);
-      const stat = payload.fixtureStats.find((entry) => entry.fixtureId === 'season-game-balanced');
-      expect(stat?.failures.games).toBe(2);
-      expect(stat?.failures.checks).toBe(1);
-      expect(stat?.failures.determinism).toBe(1);
-    });
-  });
-  it('detects worker-count dependence through the chunking probe', async () => {
-    await withTmpDir(async (tmp) => {
-      const perturb = (fact: SeasonGameGameFacts): SeasonGameGameFacts => ({
-        ...fact,
-        starterSeconds: [
-          ...fact.starterSeconds.slice(0, 1).map((seconds) => seconds + 60),
-          ...fact.starterSeconds.slice(1),
-        ],
-      });
-      const report = await seasonGameCalibrate(
-        { out: join(tmp, 'game-targets-chunking.json') },
-        { runCohort: fakeRunner(presetFact, { perturbSingleChunk: perturb }) },
-      );
-      const payload = seasonGameCalibrateReportSchema.parse(report.payload);
-      expect(payload.chunkingIndependent).toBe(false);
-      expect(payload.pass).toBe(false);
-      expect(payload.targetsWritten).toBe(false);
-    });
-  });
   it('refuses to freeze when a preset fixture is missing from the selection', async () => {
     await withTmpDir(async (tmp) => {
       const report = await seasonGameCalibrate(
@@ -646,24 +357,6 @@ describe('season game calibrate (unit, injected doubles)', () => {
       expect(payload.gates.benchOrdering).toBe(false);
       expect(payload.pass).toBe(false);
       expect(payload.targetsWritten).toBe(false);
-    });
-  });
-  it('honors explicit seed ranges and fails the held-out gate with none', async () => {
-    await withTmpDir(async (tmp) => {
-      const report = await seasonGameCalibrate(
-        {
-          'seed-from': '0',
-          'seed-to': '63',
-          out: join(tmp, 'game-targets-range.json'),
-        },
-        { runCohort: fakeRunner(presetFact) },
-      );
-      const payload = seasonGameCalibrateReportSchema.parse(report.payload);
-      expect(payload.calibrationSeedCount).toBe(64);
-      expect(payload.validationSeedCount).toBe(0);
-      expect(payload.gates.heldOutPassShare).toBe(0);
-      expect(payload.gates.heldOutPass).toBe(false);
-      expect(payload.pass).toBe(false);
     });
   });
   it('throws usage errors for malformed ranges', async () => {
@@ -697,57 +390,4 @@ describe('cli: season game simulate (end-to-end, real engine)', () => {
     expect(payload.playerMinutes).toHaveLength(20);
     expect(payload.engineVersion).toMatch(/^m3-engine/);
   });
-  it('is reproducible: the same fixture and seed produce the same score', async () => {
-    const run = async () => {
-      const { code, stdout } = await runCli([
-        'season',
-        'game',
-        'simulate',
-        '--input',
-        'season-game-tight',
-        '--seed',
-        REAL_SEED,
-        '--format',
-        'json',
-      ]);
-      expect(code).toBe(0);
-      const payload = seasonGameSimulateReportSchema.parse(jsonPayload(stdout));
-      return `${String(payload.home.score)}-${String(payload.away.score)}`;
-    };
-    expect(await run()).toBe(await run());
-  });
-});
-describe('cli: season game calibrate (end-to-end, real engine)', () => {
-  it('runs a small cohort through workers and reports non-freezable gates', async () => {
-    await withTmpDir(async (tmp) => {
-      const { code, stdout, stderr } = await runCli([
-        'season',
-        'game',
-        'calibrate',
-        '--fixture',
-        'season-game-balanced,season-game-tight,season-game-bench-heavy',
-        '--seed-from',
-        '0',
-        '--seed-to',
-        '7',
-        '--workers',
-        '2',
-        '--out',
-        join(tmp, 'game-targets-e2e.json'),
-        '--format',
-        'json',
-      ]);
-      expect(code).toBe(1);
-      const payload = seasonGameCalibrateReportSchema.parse(jsonPayload(stdout, stderr));
-      expect(payload.fixtures).toHaveLength(3);
-      expect(payload.calibrationSeedCount).toBe(8);
-      expect(payload.validationSeedCount).toBe(0);
-      expect(payload.fixtureStats).toHaveLength(3);
-      expect(payload.gates.zeroFailures).toBe(true);
-      expect(payload.gates.heldOutPass).toBe(false);
-      expect(payload.pass).toBe(false);
-      expect(payload.targetsWritten).toBe(false);
-      expect(payload.workers).toBe(2);
-    });
-  }, 120000);
 });

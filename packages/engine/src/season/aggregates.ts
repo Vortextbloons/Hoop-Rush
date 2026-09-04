@@ -142,10 +142,12 @@ export function auditSeasonAggregates(input: {
   players: readonly SeasonPlayerAggregate[];
   summaries: readonly SeasonGameSummary[];
   standings: SeasonStandings;
+  freshTeams?: readonly SeasonTeamAggregate[];
+  freshPlayers?: readonly SeasonPlayerAggregate[];
 }): string[] {
   const failures: string[] = [];
-  const freshTeams = foldSeasonTeamAggregates(input.summaries);
-  const freshPlayers = foldSeasonPlayerAggregates(input.summaries);
+  const freshTeams = input.freshTeams ?? foldSeasonTeamAggregates(input.summaries);
+  const freshPlayers = input.freshPlayers ?? foldSeasonPlayerAggregates(input.summaries);
   const teamFields: ReadonlyArray<keyof Omit<SeasonTeamAggregate, 'franchiseId'>> = [
     'gamesPlayed',
     'wins',
@@ -235,8 +237,9 @@ export function auditSeasonAggregates(input: {
       failures.push(`stored player aggregate ${row.playerVersionId} does not appear in the fold`);
     }
   }
+  const storedPlayerIds = new Set(input.players.map((stored) => stored.playerVersionId));
   for (const row of freshPlayers) {
-    if (!input.players.some((stored) => stored.playerVersionId === row.playerVersionId)) {
+    if (!storedPlayerIds.has(row.playerVersionId)) {
       failures.push(
         `player ${row.playerVersionId} played games but is missing from the stored table`,
       );

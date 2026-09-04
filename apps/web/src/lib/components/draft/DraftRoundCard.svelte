@@ -7,6 +7,7 @@
     round,
     totalRounds = 5,
     turnText = null,
+    turnPill = null,
     ariaLabel,
     manifest,
     franchiseId,
@@ -27,6 +28,7 @@
     round: number;
     totalRounds?: number;
     turnText?: string | null;
+    turnPill?: 'you' | 'rival' | null;
     ariaLabel: string;
     manifest: HoopRushManifest;
     franchiseId: string;
@@ -71,6 +73,16 @@
     >
       {label}
     </span>
+    {#if turnPill}
+      <span
+        class="shrink-0 rounded-full px-2.5 py-1 font-mono text-[10px] font-extrabold tracking-[0.14em] uppercase {turnPill ===
+        'you'
+          ? 'bg-primary text-primary-foreground'
+          : 'bg-destructive/15 text-destructive'}"
+      >
+        {turnPill === 'you' ? 'Your pick' : "Rival's pick"}
+      </span>
+    {/if}
     <span class="flex shrink-0 gap-1.5" aria-hidden="true">
       {#each dots as i (i)}
         <span

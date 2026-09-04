@@ -21,10 +21,7 @@ import {
   seasonRotationSetDigest,
   seasonRunStateDigest as engineSeasonRunStateDigest,
 } from '@hoop-rush/engine';
-import type { SeasonRunEngineSeam, SeasonRunStateDigestFacts } from './engine-seam-types.ts';
-function wrappedSeasonRunStateDigest(facts: SeasonRunStateDigestFacts): string {
-  return engineSeasonRunStateDigest(facts);
-}
+import type { SeasonRunEngineSeam } from './engine-seam-types.ts';
 export const seasonRunEngineSeam: SeasonRunEngineSeam = {
   reconstructSeasonGames,
   foldSeasonTeamAggregates: paddedTeamAggregates,
@@ -36,7 +33,7 @@ export const seasonRunEngineSeam: SeasonRunEngineSeam = {
   zeroSeasonEffectsState,
   seasonPairKey,
   seasonPairIsCanonical,
-  seasonRunStateDigest: wrappedSeasonRunStateDigest,
+  seasonRunStateDigest: engineSeasonRunStateDigest,
   createInitialSeasonInfluenceState,
   windowBlockIndexToIndex: WINDOW_BLOCK_INDEX_TO_INDEX,
 };

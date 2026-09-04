@@ -1,9 +1,7 @@
-import type { SeasonGameSummary, SeasonRoster } from '@hoop-rush/data-contracts';
-import {
-  eraIdSchema,
-  franchiseIdSchema,
-  playerIdSchema,
-  seasonKeySchema,
+import type {
+  SeasonGameSummary,
+  SeasonPlayerAggregate,
+  SeasonRoster,
 } from '@hoop-rush/data-contracts';
 import { foldSeasonAggregates } from './season-presentation';
 export interface SeasonPlayerStatsRow {
@@ -75,11 +73,11 @@ export function humanSeasonPlayerStats(input: {
   summaries: readonly SeasonGameSummary[];
   overallRatingOf: (playerVersionId: string) => number | null;
   playablePositions: (playerVersionId: string) => readonly string[];
+  playerAggregates?: readonly SeasonPlayerAggregate[];
 }): SeasonPlayerStatsView {
   const { roster, summaries } = input;
-  const byVersion = new Map(
-    foldSeasonAggregates(summaries).players.map((player) => [player.playerVersionId, player]),
-  );
+  const players = input.playerAggregates ?? foldSeasonAggregates(summaries).players;
+  const byVersion = new Map(players.map((player) => [player.playerVersionId, player]));
   const rows: SeasonPlayerStatsRow[] = roster.players.map((entry) => {
     const aggregate = byVersion.get(entry.playerVersionId) ?? null;
     const games = aggregate?.gamesPlayed ?? 0;
@@ -139,24 +137,81 @@ export function playerSeasonStatsRow(input: {
   overallRatingOf: (playerVersionId: string) => number | null;
   playablePositions: (playerVersionId: string) => readonly string[];
 }): SeasonPlayerStatsRow | null {
-  const view = humanSeasonPlayerStats({
-    roster: {
-      franchiseId: franchiseIdSchema.parse(input.franchiseId),
-      players: [
-        {
-          playerVersionId: input.playerVersionId,
-          playerId: playerIdSchema.parse('p-trade-detail'),
-          franchiseId: franchiseIdSchema.parse(input.franchiseId),
-          eraId: eraIdSchema.parse(input.eraId),
-          seasonKey: seasonKeySchema.parse(input.seasonKey),
-          displayName: input.displayName,
-        },
-      ],
-    },
-    summaries: input.summaries,
-    overallRatingOf: input.overallRatingOf,
-    playablePositions: input.playablePositions,
-  });
-  const row = view.rows[0];
-  return row !== undefined && row.gamesPlayed > 0 ? row : null;
+  let gamesPlayed = 0;
+  let seconds = 0;
+  let points = 0;
+  let offensiveRebounds = 0;
+  let defensiveRebounds = 0;
+  let assists = 0;
+  let steals = 0;
+  let blocks = 0;
+  let turnovers = 0;
+  let fouls = 0;
+  let fieldGoalsMade = 0;
+  let fieldGoalsAttempted = 0;
+  let threePointersMade = 0;
+  let threePointersAttempted = 0;
+  let freeThrowsMade = 0;
+  let freeThrowsAttempted = 0;
+  for (const summary of input.summaries) {
+    if (summary.status === 'forfeit') continue;
+    for (const lines of [summary.homePlayers, summary.awayPlayers]) {
+      for (const line of lines) {
+        if (line.playerVersionId !== input.playerVersionId) continue;
+        gamesPlayed += 1;
+        seconds += line.seconds;
+        points += line.points;
+        offensiveRebounds += line.offensiveRebounds;
+        defensiveRebounds += line.defensiveRebounds;
+        assists += line.assists;
+        steals += line.steals;
+        blocks += line.blocks;
+        turnovers += line.turnovers;
+        fouls += line.fouls;
+        fieldGoalsMade += line.fieldGoalsMade;
+        fieldGoalsAttempted += line.fieldGoalsAttempted;
+        threePointersMade += line.threePointersMade;
+        threePointersAttempted += line.threePointersAttempted;
+        freeThrowsMade += line.freeThrowsMade;
+        freeThrowsAttempted += line.freeThrowsAttempted;
+      }
+    }
+  }
+  if (gamesPlayed === 0) return null;
+  const rate = (value: number): number => value / gamesPlayed;
+  const rebounds = offensiveRebounds + defensiveRebounds;
+  return {
+    playerVersionId: input.playerVersionId,
+    displayName: input.displayName,
+    seasonKey: input.seasonKey,
+    eraId: input.eraId,
+    franchiseId: input.franchiseId,
+    positions: input.playablePositions(input.playerVersionId),
+    overallRating: input.overallRatingOf(input.playerVersionId),
+    gamesPlayed,
+    minutes: seconds / 60,
+    points,
+    rebounds,
+    assists,
+    steals,
+    blocks,
+    turnovers,
+    fouls,
+    fieldGoalsMade,
+    fieldGoalsAttempted,
+    threePointersMade,
+    threePointersAttempted,
+    freeThrowsMade,
+    freeThrowsAttempted,
+    minutesPerGame: rate(seconds) / 60,
+    pointsPerGame: rate(points),
+    reboundsPerGame: rate(rebounds),
+    assistsPerGame: rate(assists),
+    stealsPerGame: rate(steals),
+    blocksPerGame: rate(blocks),
+    turnoversPerGame: rate(turnovers),
+    fieldGoalPct: pct(fieldGoalsMade, fieldGoalsAttempted),
+    threePointPct: pct(threePointersMade, threePointersAttempted),
+    freeThrowPct: pct(freeThrowsMade, freeThrowsAttempted),
+  };
 }

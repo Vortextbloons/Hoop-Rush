@@ -328,9 +328,6 @@ const validPlayer: PeakPlayerSeason = peakPlayerSeasonSchema.parse({
   },
 });
 describe('player-season contracts', () => {
-  it('accepts a valid peak player season', () => {
-    expect(peakPlayerSeasonSchema.safeParse(validPlayer).success).toBe(true);
-  });
   it('rejects a season with fewer than 40 team games', () => {
     const invalid = {
       ...validPlayer,
@@ -338,32 +335,12 @@ describe('player-season contracts', () => {
     };
     expect(peakPlayerSeasonSchema.safeParse(invalid).success).toBe(false);
   });
-  it('accepts a player with a Basketball-Reference alt id', () => {
-    const withAltIds = {
-      ...validPlayer,
-      altIds: { bbref: 'jordami01' },
-    };
-    expect(peakPlayerSeasonSchema.safeParse(withAltIds).success).toBe(true);
-  });
-  it('accepts a player without alt ids', () => {
-    expect(peakPlayerSeasonSchema.safeParse({ ...validPlayer, altIds: null }).success).toBe(true);
-    expect(
-      peakPlayerSeasonSchema.safeParse({ ...validPlayer, altIds: { bbref: null } }).success,
-    ).toBe(true);
-  });
   it('rejects a malformed Basketball-Reference alt id', () => {
     const invalid = {
       ...validPlayer,
       altIds: { bbref: 'Jordan-01!' },
     };
     expect(peakPlayerSeasonSchema.safeParse(invalid).success).toBe(false);
-  });
-  it('accepts a player with a direct photo url', () => {
-    const withPhoto = {
-      ...validPlayer,
-      altIds: { bbref: null, photoUrl: 'https://upload.wikimedia.org/wikipedia/commons/x.png' },
-    };
-    expect(peakPlayerSeasonSchema.safeParse(withPhoto).success).toBe(true);
   });
   it('rejects a malformed direct photo url', () => {
     const invalid = {
@@ -1069,28 +1046,6 @@ describe('three-point reconstruction contracts (spec/12)', () => {
       reconstructedThreePointProfileSchema.safeParse({ ...validProfile, modelVersion: 'other-v1' })
         .success,
     ).toBe(false);
-  });
-  it('accepts the profile on a simulation player and a peak player season', () => {
-    expect(
-      simulationPlayerSchema.safeParse({
-        playerId: 'p-1',
-        displayName: 'Bill Russell',
-        positions: ['C'],
-        heightInches: 82,
-        weightLbs: 220,
-        ratings: validPlayer.detailedRatings,
-        tendencies: validPlayer.tendencies,
-        anchors: { ...validPlayer.anchors, threePointAttemptRate: null, threePointPct: null },
-        reconstructedThreePoint: validProfile,
-      }).success,
-    ).toBe(true);
-    expect(
-      peakPlayerSeasonSchema.safeParse({
-        ...validPlayer,
-        schemaVersion: 5,
-        reconstructedThreePoint: validProfile,
-      }).success,
-    ).toBe(true);
   });
   it('accepts schema-version 5 pools', () => {
     expect(

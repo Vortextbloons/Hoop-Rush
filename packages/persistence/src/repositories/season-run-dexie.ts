@@ -455,24 +455,6 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
     await this.db.seasonCompletedIndex.delete(runId);
     await this.db.seasonRunPlayerSlices.delete(runId);
   }
-  private async clearDevelopmentRow(): Promise<void> {
-    await this.db.transaction('rw', SEASON_RUN_SCOPED_TABLES(this.db), async () => {
-      const checkpoint = await this.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
-      if (checkpoint === undefined) return;
-      await this.db.seasonRuns.delete(SEASON_RUN_RECORD_ID);
-      await this.db.seasonRunIndex.delete(SEASON_RUN_RECORD_ID);
-      const runId = (
-        checkpoint as {
-          run?: {
-            runId?: unknown;
-          };
-        }
-      ).run?.runId;
-      if (typeof runId === 'string') {
-        await this.deleteRunRows(runId);
-      }
-    });
-  }
   private async loadValidated(
     checkpoint: unknown,
     schedule: SeasonSchedule,

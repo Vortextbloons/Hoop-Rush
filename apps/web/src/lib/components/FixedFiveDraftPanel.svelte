@@ -14,8 +14,10 @@
   import PlayerFace from '$lib/components/PlayerFace.svelte';
   import DraftValuePanel from '$lib/components/DraftValuePanel.svelte';
   import LineupSummaryNav from '$lib/components/LineupSummaryNav.svelte';
+  import TeamLogo from '$lib/components/TeamLogo.svelte';
   import { classicPoolRows } from '$lib/classic-draft';
   import { poolSortLabel, sortDraftRows, type DraftPresentation } from '$lib/draft-presentation';
+  import type { RollAnimationAxis } from '$lib/fixed-five-roll-animation';
   import { displacementTargetFor } from '$lib/draft-slots';
   import { formatPositions } from '$lib/player-positions';
   import { resolvePlayerRefs } from '$lib/player-refs';
@@ -32,6 +34,8 @@
     replay,
     assets,
     presentation,
+    rollAxis = 'both',
+    rollNonce = 0,
     disabled = false,
     deadlineText = null,
     lastAutopick = null,
@@ -46,6 +50,8 @@
     replay: DraftReplay;
     assets: FixedFiveAssets;
     presentation: DraftPresentation;
+    rollAxis?: RollAnimationAxis;
+    rollNonce?: number;
     disabled?: boolean;
     deadlineText?: string | null;
     lastAutopick?: { displayName: string; seedPath: string } | null;
@@ -366,6 +372,7 @@
         label={rollView.label}
         round={rollView.round}
         turnText={rollView.turnText}
+        turnPill={mode === 'duel' ? (rollView.turn ? 'you' : 'rival') : null}
         ariaLabel={rollFranchise && rollEra
           ? `${rollView.label} · ${rollIdentity?.displayLabel ?? rollFranchise.displayName} · ${rollEra.label}`
           : rollView.label}
@@ -384,17 +391,48 @@
         onRerollFranchise={() => onReroll('franchise')}
         onRerollEra={() => onReroll('era')}
       />
-      <ClassicRollReel
-        manifest={assets.manifest}
-        franchiseId={rollView.franchiseId}
-        eraId={rollView.eraId}
-        {franchiseOptions}
-        {eraOptions}
-        spinKey={rollView.spinKey}
-        announceText={`${rollView.label}: ${rollView.franchiseId} ${rollView.eraId}`}
-        roundLabel={rollView.label}
-        onSettled={() => {}}
-      />
+      {#if mode === 'duel' && !rollView.turn}
+        <div
+          class="rival-roll"
+          role="status"
+          aria-label={`Rival's roll: ${rollView.label}, ${rollFranchiseDisplayName ?? rollView.franchiseId}, ${rollEraLabel}`}
+        >
+          <span class="rival-roll-pill">Rival's roll</span>
+          <span class="rival-roll-main">
+            {#if rollFranchise}
+              <TeamLogo
+                manifest={rollManifest}
+                franchiseId={rollView.franchiseId}
+                teamExternalId={rollFranchise.teamExternalId}
+                logoCandidates={rollIdentity?.logoCandidates ?? []}
+              />
+            {/if}
+            <span class="rival-roll-text">
+              <span class="rival-roll-label">{rollView.label}</span>
+              <span class="rival-roll-pair">
+                {rollFranchiseAbbreviation} · {rollEraLabel}
+              </span>
+            </span>
+          </span>
+          <span class="rival-roll-hint">Your rival is picking — your pool opens on your turn.</span>
+        </div>
+      {:else}
+        <ClassicRollReel
+          manifest={assets.manifest}
+          franchiseId={rollView.franchiseId}
+          eraId={rollView.eraId}
+          {franchiseOptions}
+          {eraOptions}
+          axis={rollAxis}
+          spinKey={rollNonce}
+          spotlight={mode === 'duel' ? 'you' : null}
+          announceText={mode === 'duel'
+            ? `Your roll: ${rollView.label}, ${rollFranchiseDisplayName ?? rollView.franchiseId}, ${rollEraLabel}`
+            : `${rollView.label}: ${rollView.franchiseId} ${rollView.eraId}`}
+          roundLabel={mode === 'duel' ? `Your roll · ${rollView.label}` : rollView.label}
+          onSettled={() => {}}
+        />
+      {/if}
     {/if}
     {#if !rollView.complete}
       <DraftPoolBrowser
@@ -523,3 +561,53 @@
     />
   {/await}
 {/if}
+
+<style>
+  .rival-roll {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+    border-radius: 0.875rem;
+    border: 1px dashed color-mix(in srgb, var(--color-destructive) 45%, transparent);
+    background: color-mix(in srgb, var(--color-destructive) 6%, transparent);
+    padding: 0.875rem 1rem;
+  }
+  .rival-roll-pill {
+    align-self: flex-start;
+    border-radius: 999px;
+    background: var(--color-destructive);
+    color: white;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    padding: 0.25rem 0.65rem;
+  }
+  .rival-roll-main {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+  }
+  .rival-roll-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .rival-roll-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-muted-foreground);
+  }
+  .rival-roll-pair {
+    font-family: var(--font-display);
+    font-size: 1.125rem;
+    font-weight: 800;
+  }
+  .rival-roll-hint {
+    font-size: 11px;
+    color: var(--color-muted-foreground);
+  }
+</style>

@@ -44,19 +44,16 @@ export function normalizeSeasonFreeAgencyState(
 type MutableSnapshotInput = Omit<SeasonRun, 'transactions'> & {
   transactions: readonly SeasonTransactionEntryInput[];
 };
-export function normalizeSeasonRunMutableSnapshot(run: MutableSnapshotInput): SeasonRun {
-  return {
+export function normalizeSeasonRunForPersistence(
+  run: MutableSnapshotInput,
+  effects: SeasonEffectsState,
+): SeasonRun {
+  const normalized: SeasonRun = {
     ...run,
     transactions: normalizeSeasonTransactions(run.transactions),
     influence: normalizeSeasonInfluenceState(run.influence),
     freeAgency: normalizeSeasonFreeAgencyState(run.freeAgency),
   };
-}
-export function normalizeSeasonRunForPersistence(
-  run: MutableSnapshotInput,
-  effects: SeasonEffectsState,
-): SeasonRun {
-  const normalized = normalizeSeasonRunMutableSnapshot(run);
   const facts: SeasonRunStateDigestFacts = {
     stateRevision: normalized.stateRevision,
     stage: normalized.stage,

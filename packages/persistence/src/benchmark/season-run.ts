@@ -36,7 +36,6 @@ import {
   buildFixtureSchedule,
   buildFixtureStateDigest,
   buildFixtureStoredDraft,
-  buildStubSeasonEngineSeam,
   fixtureSeedFromString,
 } from '../testing/season-run-fixture.ts';
 export const SEASON_RUN_BUDGET_COMMIT_P95_MS = 300;
@@ -383,8 +382,3 @@ export async function benchmarkSeasonRunPersistence(
     },
   };
 }
-export function buildStubSeamBenchmarkDataset(): ReturnType<typeof buildFullSeasonDataset> {
-  return buildFullSeasonDataset({ seam: buildStubSeasonEngineSeam() });
-}
-export const SEASON_SUMMARIES_PER_BLOCK = 150;
-export const SEASON_SUMMARIES_FINAL_BLOCK = 30;

@@ -4,17 +4,6 @@ import { REGULATION_TOTAL_SECONDS } from '../sim/periods.ts';
 export const SEASON_STAMINA_RATING_FLOOR = 45;
 export const SEASON_STAMINA_RATING_CEIL = 95;
 export const SEASON_STAMINA_RATING_PER_MPG = 1.25;
-export const SEASON_STAMINA_HISTORICAL_MPG_CAP = 60;
-export function staminaRatingFromMpg(historicalMpg: number): number {
-  const raw = SEASON_STAMINA_RATING_FLOOR + SEASON_STAMINA_RATING_PER_MPG * historicalMpg;
-  return Math.round(
-    Math.min(SEASON_STAMINA_RATING_CEIL, Math.max(SEASON_STAMINA_RATING_FLOOR, raw)),
-  );
-}
-export function historicalMpgOf(minutes: number | null, gamesPlayed: number | null): number {
-  const gp = Math.max(1, gamesPlayed ?? 0);
-  return Math.min(SEASON_STAMINA_HISTORICAL_MPG_CAP, (minutes ?? 0) / gp);
-}
 export const SEASON_STAMINA_BASIS_POINT_SCALE = 10000;
 export const SEASON_STAMINA_ON_COURT_BASE = 120;
 export const SEASON_STAMINA_OFF_COURT_BASE = 3;

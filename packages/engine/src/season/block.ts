@@ -683,7 +683,7 @@ export function simulateSeasonBlockGame(
       if (input.collectedTipAvailability === undefined) {
         input.collectedTipAvailability = [nextEntry];
       } else {
-        input.collectedTipAvailability = [...input.collectedTipAvailability, nextEntry];
+        input.collectedTipAvailability.push(nextEntry);
       }
     }
   }
@@ -1122,6 +1122,8 @@ export function assembleSeasonBlockCandidate(
     players,
     summaries: allSummaries,
     standings,
+    freshTeams: teams,
+    freshPlayers: players,
   });
   const recapFailures = auditSeasonBlockRecap(recap, recapInput);
   if (aggregateFailures.length > 0 || recapFailures.length > 0) {

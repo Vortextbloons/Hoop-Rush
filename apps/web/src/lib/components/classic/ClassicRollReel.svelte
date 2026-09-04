@@ -7,8 +7,10 @@
   import { untrack } from 'svelte';
   import TeamLogo from '../TeamLogo.svelte';
   const ROW_HEIGHT_PX = 72;
+  const WALL_CARD_PX = 108;
   const OPTION_REPEATS = 3;
   const SPIN_MS = 900;
+  const SINGLE_SPIN_MS = 600;
   const RESULT_MS = 800;
   const FADE_MS = 250;
   let {
@@ -19,6 +21,7 @@
     eraOptions,
     axis = 'both',
     spinKey = 0,
+    spotlight = null,
     announceText,
     roundLabel = '',
     reducedMotion,
@@ -32,6 +35,7 @@
     eraOptions: string[];
     axis?: 'both' | 'franchise' | 'era';
     spinKey?: number;
+    spotlight?: 'you' | 'rival' | null;
     announceText: string;
     roundLabel?: string;
     reducedMotion?: boolean;
@@ -82,6 +86,10 @@
     const travelRows = optionCount * OPTION_REPEATS - 1 + jitterFor(key);
     return -(travelRows * ROW_HEIGHT_PX);
   }
+  function wallStartPx(optionCount: number, key: number): number {
+    const travelCards = optionCount * OPTION_REPEATS - 1 + jitterFor(key);
+    return -(travelCards * WALL_CARD_PX);
+  }
   function clearTimers() {
     if (spinTimer !== null) {
       clearTimeout(spinTimer);
@@ -104,7 +112,7 @@
     const eraActive = params.axis === 'both' || params.axis === 'era';
     const franchiseMoves = franchiseActive && params.franchiseOptions.length > 0;
     const eraMoves = eraActive && params.eraOptions.length > 0;
-    franchiseStartPx = franchiseMoves ? spinStartPx(params.franchiseOptions.length, key) : 0;
+    franchiseStartPx = franchiseMoves ? wallStartPx(params.franchiseOptions.length, key) : 0;
     eraStartPx = eraMoves ? spinStartPx(params.eraOptions.length, key) : 0;
     const franchiseStrip = franchiseMoves && !params.reduced;
     const eraStrip = eraMoves && !params.reduced;
@@ -118,7 +126,7 @@
     const duration =
       params.reduced || (!franchiseStrip && !eraStrip)
         ? FADE_MS
-        : (params.spinDurationMs ?? SPIN_MS);
+        : (params.spinDurationMs ?? (params.axis === 'both' ? SPIN_MS : SINGLE_SPIN_MS));
     spinTimer = setTimeout(settle, duration);
   }
   function settle() {
@@ -168,7 +176,12 @@
       }
     }}
   >
-    <div class="roll-stage">
+    <div class="roll-stage {spotlight ? `roll-stage--${spotlight}` : ''}">
+      {#if spotlight}
+        <p class="roll-spot roll-spot--{spotlight}">
+          {spotlight === 'you' ? 'Your roll' : "Rival's roll"}
+        </p>
+      {/if}
       <p class="roll-round">{roundLabel}</p>
       {#if phase === 'spinning'}
         <div class="reels">
@@ -228,7 +241,7 @@
         </div>
         <p class="roll-caption">Rolling…</p>
       {:else}
-        <div class="roll-result" aria-hidden="true">
+        <div class="roll-result roll-result--{axis}" aria-hidden="true">
           <div class="reel-lock reel-lock--active">
             {@render franchiseRow(franchiseId)}
             <span class="roll-result-divider" aria-hidden="true"></span>
@@ -419,8 +432,60 @@
     white-space: nowrap;
   }
 
+  .reel[data-axis='franchise'] .reel-strip {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+  }
+
+  .reel[data-axis='franchise'] .reel-strip.reel-spinning {
+    animation: wall-slide 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
   .reel[data-axis='franchise'] .reel-row {
-    justify-content: flex-start;
+    width: 108px;
+    flex-shrink: 0;
+    flex-direction: column;
+    justify-content: center;
+    gap: 6px;
+    padding: 0 8px;
+  }
+
+  .reel[data-axis='franchise'] .reel-franchise {
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    text-align: center;
+  }
+
+  .reel[data-axis='franchise'] .reel-franchise-text {
+    align-items: center;
+  }
+
+  .reel[data-axis='era'] .reel-row--option {
+    position: relative;
+  }
+
+  .reel[data-axis='era'] .reel-row--option::before {
+    content: '';
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    width: 8px;
+    height: 2px;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.35);
+  }
+
+  .reel[data-axis='era'] .reel-row--option::after {
+    content: '';
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    width: 8px;
+    height: 2px;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.35);
   }
 
   .reel-franchise {
@@ -551,6 +616,52 @@
     width: 1px;
     height: 34px;
     background: rgba(255, 255, 255, 0.18);
+  }
+
+  .roll-result--franchise {
+    border-color: color-mix(in srgb, var(--color-primary) 55%, transparent);
+    box-shadow: 0 0 48px color-mix(in srgb, var(--color-primary) 35%, transparent);
+  }
+
+  .roll-result--franchise .reel-lock--active {
+    animation: wall-slam 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+
+  .roll-result--era {
+    border-style: dashed;
+    transform: rotate(-0.5deg);
+  }
+
+  .roll-spot {
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    margin-bottom: 0.375rem;
+  }
+
+  .roll-spot--you {
+    color: var(--color-primary);
+  }
+
+  .roll-spot--rival {
+    color: var(--color-destructive);
+  }
+
+  .roll-stage--you {
+    border-color: color-mix(in srgb, var(--color-primary) 55%, transparent);
+    box-shadow:
+      0 0 60px color-mix(in srgb, var(--color-primary) 25%, transparent),
+      0 24px 60px rgba(0, 0, 0, 0.5);
+  }
+
+  .roll-stage--rival {
+    border-color: color-mix(in srgb, var(--color-destructive) 55%, transparent);
+    box-shadow:
+      0 0 60px color-mix(in srgb, var(--color-destructive) 22%, transparent),
+      0 24px 60px rgba(0, 0, 0, 0.5);
   }
 
   .roll-caption {
@@ -692,6 +803,26 @@
     }
     to {
       transform: translateY(var(--spin-settle, 0));
+    }
+  }
+
+  @keyframes wall-slide {
+    from {
+      transform: translateX(var(--spin-start, 0));
+    }
+    to {
+      transform: translateX(var(--spin-settle, 0));
+    }
+  }
+
+  @keyframes wall-slam {
+    0% {
+      transform: scale(1.12) rotate(-1deg);
+      filter: brightness(1.6);
+    }
+    100% {
+      transform: scale(1) rotate(0deg);
+      filter: brightness(1);
     }
   }
 

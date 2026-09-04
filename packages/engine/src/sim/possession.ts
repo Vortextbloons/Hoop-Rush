@@ -399,24 +399,6 @@ export function assistProbabilityPure(
     ),
   );
 }
-function assistProbability(
-  ctx: TripContext,
-  passer: SimulationPlayer,
-  action: ActionType,
-  zone: ShotZone,
-  shooter: SimulationPlayer,
-  effectsAdjustment = 0,
-): number {
-  return assistProbabilityPure(
-    ctx.profile,
-    ctx.passingAnchorFactor,
-    passer,
-    action,
-    zone,
-    shooter,
-    effectsAdjustment,
-  );
-}
 function creditAssist(
   ctx: TripContext,
   offenseSide: SideIndex,

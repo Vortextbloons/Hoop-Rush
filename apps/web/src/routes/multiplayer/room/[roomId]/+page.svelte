@@ -40,6 +40,7 @@
     aggregateFixedFivePlayerStats,
     type FixedFivePlayerStats,
   } from '$lib/fixed-five-player-stats';
+  import { rollAnimationFor } from '$lib/fixed-five-roll-animation';
   import {
     assembleCompetitionRun,
     buildSimulationTeam,
@@ -137,6 +138,9 @@
     }
   });
   const facts = $derived(roomLogFacts(commands));
+  const rollAnimation = $derived(
+    rollAnimationFor(commands, snapshot?.settings.mode ?? 'classic-shared-82'),
+  );
   const phase = $derived(
     snapshot && replay ? deriveEffectivePhase(snapshot.phase, replay, simDone) : 'lobby',
   );
@@ -1117,6 +1121,8 @@
             {replay}
             {assets}
             {presentation}
+            rollAxis={rollAnimation.axis}
+            rollNonce={rollAnimation.nonce}
             disabled={syncing}
             deadlineText={clockText}
             {lastAutopick}

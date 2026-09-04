@@ -106,11 +106,30 @@ export function pickAction(
   rng: Rng,
   start: PossessionStartType = 'neutral',
 ): ActionType {
-  const contextual = [...weights];
   const transitionIndex = ACTION_INDEX.transition;
-  contextual[transitionIndex] =
-    (contextual[transitionIndex] ?? 0) * ENGINE_CONSTANTS.transitionStartMultiplier[start];
-  return rng.weightedPick(ACTION_TYPES, contextual);
+  const scale = ENGINE_CONSTANTS.transitionStartMultiplier[start];
+  let total = 0;
+  for (let i = 0; i < ACTION_TYPES.length; i += 1) {
+    const raw = weights[i] ?? 0;
+    const scaled = i === transitionIndex ? raw * scale : raw;
+    total += Math.max(0, scaled);
+  }
+  if (total <= 0) return rng.pick(ACTION_TYPES);
+  let roll = rng.next() * total;
+  for (let i = 0; i < ACTION_TYPES.length; i += 1) {
+    const raw = weights[i] ?? 0;
+    const scaled = i === transitionIndex ? raw * scale : raw;
+    const w = Math.max(0, scaled);
+    if (roll < w) {
+      const action = ACTION_TYPES[i];
+      if (action === undefined) throw new Error('pickAction: index out of range');
+      return action;
+    }
+    roll -= w;
+  }
+  const last = ACTION_TYPES[ACTION_TYPES.length - 1];
+  if (last === undefined) throw new Error('pickAction: index out of range');
+  return last;
 }
 export function passProbability(initiator: SimulationPlayer, action: ActionType): number {
   const actionBase =
@@ -195,6 +214,17 @@ export function assisterWeights(
     return roleWeight * passingWeight * creationMod * initiatorBonus;
   });
 }
+function assisterWeightOf(p: SimulationPlayer, initiator: SimulationPlayer): number {
+  const observedCreation = p.anchors?.assistsPerGame;
+  const roleWeight =
+    observedCreation === undefined
+      ? Math.max(0.5, p.tendencies.passRate / 5)
+      : Math.max(0.5, observedCreation + 1);
+  const passingWeight = 0.7 + p.ratings.passing / 100;
+  const creationMod = 0.75 + 0.5 * creationScore(p);
+  const initiatorBonus = p.playerId === initiator.playerId ? 1.35 : 1;
+  return roleWeight * passingWeight * creationMod * initiatorBonus;
+}
 export function pickAssister(
   team: SimulationTeam,
   shooter: SimulationPlayer,
@@ -203,7 +233,8 @@ export function pickAssister(
 ): SimulationPlayer | null {
   const candidates = team.players.filter((p) => p.playerId !== shooter.playerId);
   if (candidates.length === 0) return null;
-  return rng.weightedPick(candidates, assisterWeights(team, shooter, initiator));
+  const weights = candidates.map((p) => assisterWeightOf(p, initiator));
+  return rng.weightedPick(candidates, weights);
 }
 function defenderWeight(defender: SimulationPlayer, zone: ShotZone): number {
   const zoneRating =
@@ -245,13 +276,28 @@ export function pickDefender(
   const interior = zone === 'rim' || zone === 'shortMid';
   const zoneIndex = ZONE_INDEX[zone];
   const zoneWeights = base.weights[zoneIndex] ?? [];
-  const weights = new Array<number>(team.players.length);
-  for (let slot = 0; slot < team.players.length; slot += 1) {
+  const count = team.players.length;
+  const weightOf = (slot: number): number => {
     const match = base.matchMatrix[slot]?.[shooterSlot] ?? 1;
     const rim = interior ? (base.rimProtection[slot] ?? 1) : 1;
-    weights[slot] = (zoneWeights[slot] ?? 0) * match * rim;
+    return (zoneWeights[slot] ?? 0) * match * rim;
+  };
+  let total = 0;
+  for (let slot = 0; slot < count; slot += 1) total += Math.max(0, weightOf(slot));
+  if (total <= 0) return rng.pick(team.players);
+  let roll = rng.next() * total;
+  for (let slot = 0; slot < count; slot += 1) {
+    const w = Math.max(0, weightOf(slot));
+    if (roll < w) {
+      const player = team.players[slot];
+      if (player === undefined) throw new Error(`pickDefender: no player at slot ${String(slot)}`);
+      return player;
+    }
+    roll -= w;
   }
-  return rng.weightedPick(team.players, weights);
+  const last = team.players[count - 1];
+  if (last === undefined) throw new Error('pickDefender: index out of range');
+  return last;
 }
 const ZONE_INDEX = Object.fromEntries(SHOT_ZONES.map((zone, index) => [zone, index])) as Record<
   ShotZone,
@@ -374,8 +420,41 @@ export function applyZonePulls(
   weights[1] = (weights[1] ?? 0) * (action === 'postUp' ? 1.05 : 1);
   return weights;
 }
+function scaledZoneWeight(
+  index: number,
+  base: readonly number[],
+  action: ActionType,
+  driveRate: number,
+): number {
+  if (index === 0) {
+    let w = (base[0] ?? 0) * (action === 'transition' ? 1.1 : action === 'postUp' ? 1.02 : 1);
+    if (action === 'isolation' || action === 'pickAndRoll') {
+      w = w * (0.9 + Math.min(40, driveRate) / 100);
+    }
+    return w;
+  }
+  if (index === 1) return (base[1] ?? 0) * (action === 'postUp' ? 1.05 : 1);
+  return base[index] ?? 0;
+}
 export function pickZone(action: ActionType, prep: ZonePrep, rng: Rng): ShotZone {
-  return rng.weightedPick(SHOT_ZONES, applyZonePulls(action, prep.base, prep.driveRate));
+  let total = 0;
+  for (let i = 0; i < SHOT_ZONES.length; i += 1) {
+    total += Math.max(0, scaledZoneWeight(i, prep.base, action, prep.driveRate));
+  }
+  if (total <= 0) return rng.pick(SHOT_ZONES);
+  let roll = rng.next() * total;
+  for (let i = 0; i < SHOT_ZONES.length; i += 1) {
+    const w = Math.max(0, scaledZoneWeight(i, prep.base, action, prep.driveRate));
+    if (roll < w) {
+      const zone = SHOT_ZONES[i];
+      if (zone === undefined) throw new Error('pickZone: index out of range');
+      return zone;
+    }
+    roll -= w;
+  }
+  const last = SHOT_ZONES[SHOT_ZONES.length - 1];
+  if (last === undefined) throw new Error('pickZone: index out of range');
+  return last;
 }
 export function isThreePointZone(zone: ShotZone): boolean {
   return zone === 'cornerThree' || zone === 'aboveBreakThree';

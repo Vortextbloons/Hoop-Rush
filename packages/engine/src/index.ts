@@ -178,14 +178,11 @@ export {
   seasonRetainedDetailFromResult,
   auditSeasonGameSummary,
   seasonEffectsRollupFromEvidence,
-  seasonEffectsEvidenceOf,
 } from './season/game-summary.ts';
 export {
   SEASON_STAMINA_RATING_FLOOR,
   SEASON_STAMINA_RATING_CEIL,
   SEASON_STAMINA_RATING_PER_MPG,
-  staminaRatingFromMpg,
-  historicalMpgOf,
   onCourtFatigueBp,
   offCourtRecoveryBp,
   halftimeRemovalBp,
@@ -202,7 +199,6 @@ export {
   unitPairs,
   pairChemistryBasisPoints,
   unitChemistryBasisPoints,
-  unitSharedPossessions,
 } from './season/chemistry.ts';
 export {
   SEASON_EFFECTS_SHOOTER_FATIGUE_MAX_PP,
@@ -236,7 +232,6 @@ export {
   auditSeasonBlockRecap,
   seasonBlockGameCount,
   seasonBlockRecapCanonical,
-  seasonBlockRecapDigest,
   type SeasonBlockRecapInput,
 } from './season/recap.ts';
 export {

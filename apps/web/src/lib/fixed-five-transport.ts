@@ -287,15 +287,17 @@ export function createFixedFiveTransport(options?: {
       )
       .eq('id', roomId)
       .single();
-    if (roomResponse.error || !roomResponse.data)
-      throw new Error('authorization: cannot read room');
+    if (roomResponse.error) throw new Error('authorization: cannot read room');
+    const roomData: unknown = roomResponse.data;
+    if (roomData == null) throw new Error('authorization: cannot read room');
     const memberResponse = await client
       .from('fixed_five_room_members')
       .select('participant_id, online, ready, picks_committed, locked, last_seen_at')
       .eq('room_id', roomId);
     if (memberResponse.error) throw new Error(`members failed: ${memberResponse.error.message}`);
-    const row = roomResponse.data as unknown as FixedFiveRoomRow;
-    const memberRows = memberResponse.data as unknown as FixedFiveMemberRow[];
+    const row = roomData as FixedFiveRoomRow;
+    const memberData: unknown = memberResponse.data;
+    const memberRows = (Array.isArray(memberData) ? memberData : []) as FixedFiveMemberRow[];
     return roomRowToSnapshot(row, memberRows);
   }
 
@@ -408,10 +410,14 @@ export function createFixedFiveTransport(options?: {
         .eq('room_id', roomId)
         .eq('uid', uid)
         .single();
-      if (memberResponse.error || !memberResponse.data) {
+      if (memberResponse.error) {
         throw new Error('membership: no seat in this room');
       }
-      const member = memberResponse.data as unknown as { participant_id?: unknown };
+      const seatData: unknown = memberResponse.data;
+      if (seatData == null) {
+        throw new Error('membership: no seat in this room');
+      }
+      const member = seatData as { participant_id?: unknown };
       if (member.participant_id !== 'p1' && member.participant_id !== 'p2') {
         throw new Error('membership: no seat in this room');
       }

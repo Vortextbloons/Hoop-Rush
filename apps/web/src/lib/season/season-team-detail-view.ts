@@ -230,6 +230,7 @@ export function seasonTeamDetail(input: {
   overallRatingOf: (playerVersionId: string) => number | null;
   summaryRatingsOf: (playerVersionId: string) => SeasonSummaryRatings | null;
   playablePositions: (playerVersionId: string) => readonly string[];
+  playerAggregates?: readonly SeasonPlayerAggregate[];
 }): SeasonTeamDetail | null {
   const { roster, rotation, rosters, rotations, standings, league, summaries } = input;
   const standingsRow = standings.rows.find((row) => row.franchiseId === roster.franchiseId);
@@ -237,7 +238,7 @@ export function seasonTeamDetail(input: {
   const conference =
     league.teams.find((team) => team.franchiseId === roster.franchiseId)?.conference ?? 'east';
   const aggregates = new Map<string, SeasonPlayerAggregate>();
-  for (const player of foldSeasonAggregates(summaries).players) {
+  for (const player of input.playerAggregates ?? foldSeasonAggregates(summaries).players) {
     aggregates.set(player.playerVersionId, player);
   }
   const minutesOf = new Map(
