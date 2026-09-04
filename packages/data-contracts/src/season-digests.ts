@@ -1,5 +1,6 @@
 import { z } from 'zod';
-export const seasonCheckpointDigestSchema = z.string().regex(/^[0-9a-f]{32}$/);
+const hex32Digest = z.string().regex(/^[0-9a-f]{32}$/);
+export const seasonCheckpointDigestSchema = hex32Digest;
 export type SeasonCheckpointDigest = z.infer<typeof seasonCheckpointDigestSchema>;
-export const seasonRotationSetDigestSchema = z.string().regex(/^[0-9a-f]{32}$/);
+export const seasonRotationSetDigestSchema = hex32Digest;
 export type SeasonRotationSetDigest = z.infer<typeof seasonRotationSetDigestSchema>;

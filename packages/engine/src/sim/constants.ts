@@ -57,7 +57,6 @@ export const ENGINE_CONSTANTS = {
   minimumStartSeconds: 0.5,
   threePointRateWeight: 0.35,
   eraZoneMixBlend: 0.55,
-  paceDeadBallAdjustment: 0,
   transitionStartMultiplier: {
     neutral: 1,
     madeBasket: 0.45,
@@ -124,5 +123,4 @@ export const ENGINE_CONSTANTS = {
   } as const satisfies Record<SlotGroup, PositionResponsibilityModifiers>,
   positionResponsibilityBound: 0.12,
   positionMatchBonus: 1.35,
-  blockedShotMiss: true,
 } as const;

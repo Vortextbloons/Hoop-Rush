@@ -5,16 +5,13 @@ import {
   seasonRosterTargetsSchema,
   seedSchema,
 } from '@hoop-rush/data-contracts';
-import { readFileSync } from 'node:fs';
 import { runSeasonDraftCalibrationSeeds } from './season-draft-calibrate.ts';
+import { readJson } from '../io.ts';
 interface WorkerInput {
   catalogPath: string;
   leaguePath: string;
   seeds: string[];
   targets: string | Record<string, unknown>;
-}
-function readJson(path: string): unknown {
-  return JSON.parse(readFileSync(path, 'utf8')) as unknown;
 }
 function main(): void {
   const input = workerData as WorkerInput;

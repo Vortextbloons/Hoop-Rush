@@ -84,8 +84,8 @@ export function createRecorderSide(): RecorderSide {
     possessions: 0,
     freeThrowTrips: 0,
     periodPoints: [0],
-    zoneAttempts: { rim: 0, shortMid: 0, longMid: 0, cornerThree: 0, aboveBreakThree: 0 },
-    zoneMakes: { rim: 0, shortMid: 0, longMid: 0, cornerThree: 0, aboveBreakThree: 0 },
+    zoneAttempts: createZoneCounters(),
+    zoneMakes: createZoneCounters(),
     assistedFieldGoals: 0,
     unassistedFieldGoals: 0,
   };

@@ -6,7 +6,7 @@ export function meanTripSeconds(profile: EraSimulationProfile): number {
   const tripsPerTeamGame = profile.parameters.pace * ENGINE_CONSTANTS.estimateToTripsFactor;
   return Math.max(
     ENGINE_CONSTANTS.minimumTripSeconds,
-    REGULATION_TOTAL_SECONDS / (2 * tripsPerTeamGame) - ENGINE_CONSTANTS.paceDeadBallAdjustment,
+    REGULATION_TOTAL_SECONDS / (2 * tripsPerTeamGame),
   );
 }
 export function sampleTripSeconds(

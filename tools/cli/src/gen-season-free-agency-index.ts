@@ -22,7 +22,7 @@ import {
   type PercentileTier,
   type RoleThresholds,
 } from '@hoop-rush/engine';
-import { sha256Hex } from './io.ts';
+import { sha256Hex, readJson } from './io.ts';
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../');
 const STATIC_DATA = resolve(REPO_ROOT, 'apps/web/static/data');
 const SEASON_DIR = resolve(STATIC_DATA, 'season');
@@ -48,9 +48,6 @@ export interface FreeAgencyIndexStats {
   excludedCount: number;
   bandCounts: Record<SeasonFreeAgencyBand, number>;
   bytes: number;
-}
-function readJson(path: string): unknown {
-  return JSON.parse(readFileSync(path, 'utf8')) as unknown;
 }
 function roleScoresOf(candidate: SeasonDraftCandidate): Record<SeasonRosterRole, number> {
   return evaluateSeasonRoster({

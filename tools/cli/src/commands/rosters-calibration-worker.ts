@@ -1,5 +1,5 @@
 import { parentPort, workerData } from 'node:worker_threads';
-import { readFileSync } from 'node:fs';
+import { readJson } from '../io.ts';
 import {
   SeasonAiGenerationError,
   completionTargetsMet,
@@ -68,9 +68,6 @@ type WorkerOutput =
         digests: string[];
       }>;
     };
-function readJson(path: string): unknown {
-  return JSON.parse(readFileSync(path, 'utf8')) as unknown;
-}
 function selectionFailuresOf(
   catalog: SeasonDraftCatalog,
   league: SeasonLeague,

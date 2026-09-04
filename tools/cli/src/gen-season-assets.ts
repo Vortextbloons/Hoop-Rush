@@ -79,15 +79,12 @@ import {
 } from '@hoop-rush/engine';
 import { buildSeasonRunFixture } from '@hoop-rush/test-fixtures';
 import { pickBestSelectable } from './commands/season-data.ts';
-import { sha256Hex } from './io.ts';
+import { readJson, sha256Hex } from './io.ts';
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../');
 const STATIC_DATA = resolve(REPO_ROOT, 'apps/web/static/data');
 const SEASON_DIR = resolve(STATIC_DATA, 'season');
 const FIXTURES_DIR = resolve(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 const MANIFEST_PATH = resolve(STATIC_DATA, 'manifest.json');
-function readJson(path: string): unknown {
-  return JSON.parse(readFileSync(path, 'utf8')) as unknown;
-}
 function cmd(
   commandId: string,
   expectedRevision: number,

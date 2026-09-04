@@ -2,20 +2,26 @@ import type { HoopRushManifest } from '../manifest.ts';
 import type { PlayerExternalId, TeamExternalId } from '../ids.ts';
 import type { PeakPlayerSeason } from '../player-season.ts';
 import { franchiseLogoSlug } from '../franchise.ts';
+function applyTemplate(
+  template: string | null | undefined,
+  token: string,
+  value: string,
+): string | null {
+  return template ? template.replace(token, value) : null;
+}
 export function resolveHeadshotUrl(
   manifest: HoopRushManifest,
   playerExternalId: PlayerExternalId,
 ): string | null {
-  const template = manifest.assets.headshotUrlTemplate;
-  return template ? template.replace('{playerExternalId}', playerExternalId) : null;
+  return applyTemplate(manifest.assets.headshotUrlTemplate, '{playerExternalId}', playerExternalId);
 }
 export function resolveSecondaryHeadshotUrl(
   manifest: HoopRushManifest,
   player: Pick<PeakPlayerSeason, 'playerExternalId' | 'altIds'>,
 ): string | null {
-  const template = manifest.assets.headshotUrlTemplateSecondary;
   const bbrefId = player.altIds?.bbref ?? null;
-  return template && bbrefId ? template.replace('{altIds.bbref}', bbrefId) : null;
+  if (!bbrefId) return null;
+  return applyTemplate(manifest.assets.headshotUrlTemplateSecondary, '{altIds.bbref}', bbrefId);
 }
 export function resolveHeadshotUrls(
   manifest: HoopRushManifest,
@@ -49,16 +55,17 @@ export function resolveLogoUrl(
   manifest: HoopRushManifest,
   teamExternalId: TeamExternalId,
 ): string | null {
-  const template = manifest.assets.logoUrlTemplate;
-  return template ? template.replace('{teamExternalId}', teamExternalId) : null;
+  return applyTemplate(manifest.assets.logoUrlTemplate, '{teamExternalId}', teamExternalId);
 }
 export function resolveSecondaryLogoUrl(
   manifest: HoopRushManifest,
   franchiseId: string,
 ): string | null {
-  const template = manifest.assets.logoUrlTemplateSecondary;
-  if (!template) return null;
-  return template.replace('{teamAbbreviation}', franchiseLogoSlug(franchiseId));
+  return applyTemplate(
+    manifest.assets.logoUrlTemplateSecondary,
+    '{teamAbbreviation}',
+    franchiseLogoSlug(franchiseId),
+  );
 }
 export function resolveLogoUrls(
   manifest: HoopRushManifest,

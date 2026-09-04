@@ -1,43 +1,27 @@
 import { z } from 'zod';
-export const idSchema = z
-  .string()
-  .min(1)
-  .max(64)
-  .regex(/^[a-z0-9][a-z0-9._:-]*$/)
-  .brand<'Id'>();
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- helper preserves distinct brands while sharing the regex chain
+function makeIdSchema<B extends string>() {
+  return z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z0-9][a-z0-9._:-]*$/)
+    .brand<B>();
+}
+export const idSchema = makeIdSchema<'Id'>();
 export type Id = z.infer<typeof idSchema>;
-export const commandIdSchema = z
-  .string()
-  .min(1)
-  .max(64)
-  .regex(/^[a-z0-9][a-z0-9._:-]*$/)
-  .brand<'CommandId'>();
+export const commandIdSchema = makeIdSchema<'CommandId'>();
 export type CommandId = z.infer<typeof commandIdSchema>;
 export const seasonGameIdSchema = z
   .string()
   .regex(/^s[0-9]{6}$/)
   .brand<'SeasonGameId'>();
 export type SeasonGameId = z.infer<typeof seasonGameIdSchema>;
-export const playerIdSchema = z
-  .string()
-  .min(1)
-  .max(64)
-  .regex(/^[a-z0-9][a-z0-9._:-]*$/)
-  .brand<'PlayerId'>();
+export const playerIdSchema = makeIdSchema<'PlayerId'>();
 export type PlayerId = z.infer<typeof playerIdSchema>;
-export const franchiseIdSchema = z
-  .string()
-  .min(1)
-  .max(64)
-  .regex(/^[a-z0-9][a-z0-9._:-]*$/)
-  .brand<'FranchiseId'>();
+export const franchiseIdSchema = makeIdSchema<'FranchiseId'>();
 export type FranchiseId = z.infer<typeof franchiseIdSchema>;
-export const eraIdSchema = z
-  .string()
-  .min(1)
-  .max(64)
-  .regex(/^[a-z0-9][a-z0-9._:-]*$/)
-  .brand<'EraId'>();
+export const eraIdSchema = makeIdSchema<'EraId'>();
 export type EraId = z.infer<typeof eraIdSchema>;
 export const seasonKeySchema = z
   .string()

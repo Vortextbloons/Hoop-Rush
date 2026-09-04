@@ -34,6 +34,8 @@
   } from '$lib/fixed-five-simulation-gate';
   import FixedFiveScoreboard from '$lib/components/FixedFiveScoreboard.svelte';
   import FixedFiveDraftPanel from '$lib/components/FixedFiveDraftPanel.svelte';
+  import FixedFiveSimShow from '$lib/components/FixedFiveSimShow.svelte';
+  import FixedFiveResults from '$lib/components/FixedFiveResults.svelte';
   import {
     assembleCompetitionRun,
     buildSimulationTeam,
@@ -59,7 +61,7 @@
   } from '$lib/fixed-five-room-state';
   import { presentationForVariant } from '$lib/draft-presentation';
   import type { SimulationPlayer } from '@hoop-rush/data-contracts';
-  import type { FixedFiveWorkerTeam } from '@hoop-rush/data-contracts';
+  import type { FixedFiveWorkerTeam, PlayersIndexEntry } from '@hoop-rush/data-contracts';
 
   let roomId = $derived($page.params.roomId as string);
   let snapshot = $state<FixedFiveRoomSnapshot | null>(null);
@@ -131,6 +133,31 @@
     snapshot && replay ? overlaySnapshotProgress(snapshot, replay, facts) : snapshot,
   );
   const presentation = $derived(presentationForVariant(snapshot?.settings.variant ?? 'ratings'));
+  const indexById = $derived(
+    assets
+      ? new Map<string, PlayersIndexEntry>(
+          assets.index.players.map((p) => [p.playerId as string, p]),
+        )
+      : new Map<string, PlayersIndexEntry>(),
+  );
+  const p1ResultRows = $derived.by((): (PlayersIndexEntry | null)[] => {
+    const rows: (PlayersIndexEntry | null)[] = [null, null, null, null, null];
+    if (!localResult) return rows;
+    for (const ref of localResult.p1.refs) {
+      if (ref.slotIndex >= 0 && ref.slotIndex < 5)
+        rows[ref.slotIndex] = indexById.get(ref.playerId as string) ?? null;
+    }
+    return rows;
+  });
+  const p2ResultRows = $derived.by((): (PlayersIndexEntry | null)[] => {
+    const rows: (PlayersIndexEntry | null)[] = [null, null, null, null, null];
+    if (!localResult) return rows;
+    for (const ref of localResult.p2.refs) {
+      if (ref.slotIndex >= 0 && ref.slotIndex < 5)
+        rows[ref.slotIndex] = indexById.get(ref.playerId as string) ?? null;
+    }
+    return rows;
+  });
   const opponent = $derived(display?.members.find((m) => m.participantId !== selfId) ?? null);
   const timeoutMs = $derived(
     snapshot ? fixedFiveTimeoutMsForMode(snapshot.settings.mode) : 90 * 1000,
@@ -989,74 +1016,54 @@
         {/if}
       </div>
     {:else if phase === 'simulating'}
-      <div class="mt-6 rounded-2xl bg-surface-1 p-6">
-        <h2 class="font-display text-sm font-extrabold uppercase">Simulating locally</h2>
+      <div class="mt-6">
         {#if simError}
-          <p class="mt-2 text-sm text-destructive" role="alert">{simError}</p>
-          <button
-            type="button"
-            onclick={() => {
-              simStarted = false;
-              simError = null;
-            }}
-            class="mt-3 rounded-xl border border-line-soft bg-card px-4 py-2 text-sm font-semibold"
-          >
-            Retry simulation
-          </button>
-        {:else if progress}
-          <p class="mt-2 text-sm" role="status">{progress.completed}/{progress.total} games</p>
-          <div class="mt-2 h-2 overflow-hidden rounded-full bg-muted">
-            <div
-              class="h-full bg-primary"
-              style={`width: ${(progress.completed / Math.max(1, progress.total)) * 100}%`}
-            ></div>
+          <div class="rounded-2xl bg-surface-1 p-6">
+            <h2 class="font-display text-sm font-extrabold uppercase">Simulating locally</h2>
+            <p class="mt-2 text-sm text-destructive" role="alert">{simError}</p>
+            <button
+              type="button"
+              onclick={() => {
+                simStarted = false;
+                simError = null;
+              }}
+              class="mt-3 rounded-xl border border-line-soft bg-card px-4 py-2 text-sm font-semibold"
+            >
+              Retry simulation
+            </button>
           </div>
-        {:else}
-          <p class="mt-2 text-sm text-muted-foreground" role="status">
-            Warming the bounded worker… progress capped at four updates per second.
-          </p>
+        {:else if snapshot}
+          <FixedFiveSimShow
+            mode={snapshot.settings.mode}
+            {progress}
+            entries={simEntries}
+            {selfId}
+          />
         {/if}
-        <p class="mt-2 text-xs text-muted-foreground">
-          Every game validated with checkGameResult. H2H occurrences simulate once and mirror into
-          both records.
-        </p>
       </div>
     {:else if phase === 'awaiting-confirmation'}
-      <div class="mt-6 rounded-2xl bg-surface-1 p-6">
-        <h2 class="font-display text-sm font-extrabold uppercase">
-          Waiting for result confirmation
-        </h2>
-        {#if localResult}
-          <p class="mt-2 font-mono text-xs break-all" aria-label="Result digest">
-            {localResult.digest.slice(0, 16)}…{localResult.digest.slice(-8)}
-          </p>
-          {#if localResult.result.competition === 'shared-82'}
-            <div class="mt-3 grid gap-2 sm:grid-cols-2">
-              {#each localResult.result.participants as participant (participant.participantId)}
-                <div class="rounded-xl border border-line-soft bg-card p-3 text-sm">
-                  <p class="font-bold">
-                    {participant.participantId === selfId ? 'You' : 'Opponent'} · {participant.wins}–{participant.losses}
-                  </p>
-                  <p class="text-xs text-muted-foreground">
-                    Diff {participant.differential >= 0 ? '+' : ''}{participant.differential} · H2H
-                    {participant.h2hWins}
-                  </p>
-                </div>
-              {/each}
-            </div>
-          {:else}
-            <ul class="mt-3 space-y-1 text-sm">
-              {#each localResult.result.games as game (game.gameNumber)}
-                <li>
-                  Game {game.gameNumber}: {game.winner === selfId ? 'You' : 'Opponent'}
-                </li>
-              {/each}
-            </ul>
+      <div class="mt-6 flex flex-col gap-4">
+        <div class="rounded-2xl bg-surface-1 p-4 sm:p-5">
+          <h2 class="font-display text-sm font-extrabold uppercase">
+            Waiting for result confirmation
+          </h2>
+          {#if !localResult}
+            <p class="mt-2 text-sm text-muted-foreground" role="status">
+              Recomputing the shared result from the accepted command log…
+            </p>
           {/if}
-        {:else}
-          <p class="mt-2 text-sm text-muted-foreground" role="status">
-            Recomputing the shared result from the accepted command log…
-          </p>
+        </div>
+        {#if localResult && snapshot && assets}
+          <FixedFiveResults
+            mode={snapshot.settings.mode}
+            result={localResult.result}
+            {selfId}
+            manifest={assets.manifest}
+            p1Rows={p1ResultRows}
+            p2Rows={p2ResultRows}
+            {presentation}
+            digest={localResult.digest}
+          />
         {/if}
         <p class="mt-2 text-xs text-muted-foreground">
           Proposals {facts.proposals.length} · confirmations {facts.confirms.length}{reranMismatch
@@ -1102,54 +1109,51 @@
         </div>
       </div>
     {:else if phase === 'completed' && localResult}
-      <div class="mt-6 rounded-2xl bg-surface-1 p-6">
-        <h2 class="font-display text-sm font-extrabold uppercase">
-          Completed — {localResult.result.competition === 'duel'
-            ? 'duel series'
-            : 'shared 82 comparison'}
-        </h2>
-        {#if localResult.result.competition === 'shared-82'}
-          <p class="mt-2 text-sm">
-            Winner: {localResult.result.ranking[0] === selfId ? 'You' : 'Opponent'} (wins, then differential,
-            then seeded tie-break)
-          </p>
-        {:else}
-          <p class="mt-2 text-sm">
-            Winner: {localResult.result.winner === selfId ? 'You' : 'Opponent'} ·
-            {localResult.result.p1Wins}–{localResult.result.p2Wins} after
-            {localResult.result.stoppedAtGame} games
-          </p>
+      <div class="mt-6 flex flex-col gap-4">
+        {#if snapshot && assets}
+          <FixedFiveResults
+            mode={snapshot.settings.mode}
+            result={localResult.result}
+            {selfId}
+            manifest={assets.manifest}
+            p1Rows={p1ResultRows}
+            p2Rows={p2ResultRows}
+            {presentation}
+            digest={localResult.digest}
+          />
         {/if}
-        <div class="mt-4 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onclick={() => sendCommand({ kind: 'rematch-request' })}
-            class="rounded-xl border border-line-soft bg-card px-4 py-2 text-sm font-semibold"
-          >
-            Request rematch
-          </button>
-          <button
-            type="button"
-            onclick={() => sendCommand({ kind: 'rematch-confirm' })}
-            class="rounded-xl border border-line-soft bg-card px-4 py-2 text-sm font-semibold"
-          >
-            Confirm rematch
-          </button>
-          <button
-            type="button"
-            onclick={doRematch}
-            disabled={rematchBusy || !canRematch}
-            title={canRematch ? 'Create the successor room' : 'Needs both confirmations first'}
-            class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-40"
-          >
-            {rematchBusy ? 'Creating…' : 'New successor room →'}
-          </button>
+        <div class="rounded-2xl bg-surface-1 p-6">
+          <div class="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onclick={() => sendCommand({ kind: 'rematch-request' })}
+              class="rounded-xl border border-line-soft bg-card px-4 py-2 text-sm font-semibold"
+            >
+              Request rematch
+            </button>
+            <button
+              type="button"
+              onclick={() => sendCommand({ kind: 'rematch-confirm' })}
+              class="rounded-xl border border-line-soft bg-card px-4 py-2 text-sm font-semibold"
+            >
+              Confirm rematch
+            </button>
+            <button
+              type="button"
+              onclick={doRematch}
+              disabled={rematchBusy || !canRematch}
+              title={canRematch ? 'Create the successor room' : 'Needs both confirmations first'}
+              class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-40"
+            >
+              {rematchBusy ? 'Creating…' : 'New successor room →'}
+            </button>
+          </div>
+          {#if !canRematch}
+            <p class="mt-2 text-xs text-muted-foreground">
+              Rematch needs both confirmations and a completed room; it never overwrites this run.
+            </p>
+          {/if}
         </div>
-        {#if !canRematch}
-          <p class="mt-2 text-xs text-muted-foreground">
-            Rematch needs both confirmations and a completed room; it never overwrites this run.
-          </p>
-        {/if}
       </div>
     {:else if phase === 'completed'}
       <div class="mt-6 rounded-2xl bg-surface-1 p-6">

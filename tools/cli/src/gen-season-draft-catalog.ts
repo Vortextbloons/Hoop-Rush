@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -16,7 +16,7 @@ import {
   type SeasonDraftCandidate,
   type SeasonDraftCandidateDurability,
 } from '@hoop-rush/data-contracts';
-import { sha256Hex } from './io.ts';
+import { sha256Hex, readJson } from './io.ts';
 function atomicWriteFileSync(target: string, content: string): void {
   const tmp = `${target}.tmp-${String(Date.now())}-${String(Math.random()).slice(2)}`;
   writeFileSync(tmp, content);
@@ -26,9 +26,6 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../');
 const STATIC_DATA = resolve(REPO_ROOT, 'apps/web/static/data');
 const SEASON_DIR = resolve(STATIC_DATA, 'season');
 const MANIFEST_PATH = resolve(STATIC_DATA, 'manifest.json');
-function readJson(path: string): unknown {
-  return JSON.parse(readFileSync(path, 'utf8')) as unknown;
-}
 interface PoolEntry {
   franchiseId: string;
   eraId: string;
