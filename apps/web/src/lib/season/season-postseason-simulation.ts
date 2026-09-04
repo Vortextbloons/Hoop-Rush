@@ -3,7 +3,10 @@ import {
   canonicalJson,
   seasonDigestHex,
   seasonPostseasonWorkerStartRequestSchema,
+  type CommandId,
   type EraSimulationProfile,
+  type FranchiseId,
+  type Id,
   type SeasonAdvancePostseasonCommand,
   type SeasonAdvancePostseasonRejection,
   type SeasonDraftCatalog,
@@ -12,7 +15,9 @@ import {
   type SeasonPostseasonSummary,
   type SeasonRun,
   type SeasonRunStage,
-  type SeasonScoreline,
+  type PostseasonGameId,
+  type Seed,
+  type SeasonPostseasonScoreline,
   type SeasonPostseasonWorkerStartRequest,
 } from '@hoop-rush/data-contracts';
 import {
@@ -21,12 +26,12 @@ import {
   type SeasonPostseasonGameResolver,
 } from '@hoop-rush/engine';
 export interface SeasonPostseasonSimulationRequest {
-  commandId: string;
-  runId: string;
+  commandId: CommandId;
+  runId: Id;
   expectedStateRevision: number;
   expectedStateDigest: string;
-  targetGameId: string;
-  humanFranchiseId: string | null;
+  targetGameId: PostseasonGameId;
+  humanFranchiseId: FranchiseId | null;
   catalog: SeasonDraftCatalog;
   profile: EraSimulationProfile;
   run: SeasonRun;
@@ -37,11 +42,11 @@ export interface SeasonPostseasonSimulationRequest {
 export interface SeasonPostseasonSimulationAccepted {
   run: SeasonRun;
   summaries: SeasonPostseasonSummary[];
-  advancedGameIds: string[];
+  advancedGameIds: PostseasonGameId[];
   stage: SeasonRunStage;
   nextDecision: 'rotation' | 'none';
-  nextGameId: string | null;
-  aiNextGameId: string | null;
+  nextGameId: PostseasonGameId | null;
+  aiNextGameId: PostseasonGameId | null;
 }
 export type SeasonPostseasonSimulationOutcome =
   | {
@@ -50,7 +55,7 @@ export type SeasonPostseasonSimulationOutcome =
     }
   | {
       kind: 'rejected';
-      commandId: string;
+      commandId: CommandId;
       rejection: SeasonAdvancePostseasonRejection;
     };
 export { SeasonPostseasonInvariantError };
@@ -98,7 +103,7 @@ export function simulateSeasonPostseasonCommand(
     },
   };
 }
-export function seasonPostseasonScorelineOf(summary: SeasonPostseasonSummary): SeasonScoreline {
+export function seasonPostseasonScorelineOf(summary: SeasonPostseasonSummary): SeasonPostseasonScoreline {
   return {
     gameId: summary.gameId,
     homeFranchiseId: summary.homeFranchiseId,
@@ -137,7 +142,7 @@ export function seasonPostseasonTransactionIdsOf(run: SeasonRun, commandId: stri
 export function seasonPostseasonWireRequestOf(
   request: Omit<SeasonPostseasonSimulationRequest, 'catalog' | 'profile'> & {
     requestId: string;
-    rootSeed: string;
+    rootSeed: Seed;
     catalogUrl: string;
     catalogHash: string;
     profileUrl: string;

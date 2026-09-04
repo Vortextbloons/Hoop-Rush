@@ -5,6 +5,7 @@ import type {
   SimulationPlayer,
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
+import { seedSchema } from '@hoop-rush/data-contracts';
 import {
   buildEraSimulationProfile,
   buildGameSimulationInput,
@@ -61,7 +62,7 @@ function compareMany(
   const baseTotals = Array.from({ length: selectors.length }, () => 0);
   const changedTotals = Array.from({ length: selectors.length }, () => 0);
   for (let i = 0; i < SEEDS; i += 1) {
-    const seed = seedFromString(`sens-${name}-${String(i)}`);
+    const seed = seedSchema.parse(seedFromString(`sens-${name}-${String(i)}`));
     const baseInput = buildGameSimulationInput({ seed, home: baseTeam, away: baseTeam });
     const changedInput = buildGameSimulationInput({ seed, home: changedTeam, away: changedTeam });
     const baseResult = simulateGame(baseInput, ctx);
@@ -244,7 +245,7 @@ describe('sensitivity: era pace and shot mix', () => {
     let fastTotal = 0;
     let slowTotal = 0;
     for (let i = 0; i < SEEDS; i += 1) {
-      const seed = seedFromString(`sens-pace-${String(i)}`);
+      const seed = seedSchema.parse(seedFromString(`sens-pace-${String(i)}`));
       fastTotal += simulateGame(
         buildGameSimulationInput({ seed, profile: fast, home: baseTeam, away: baseTeam }),
         ctx,
@@ -264,7 +265,7 @@ describe('sensitivity: era pace and shot mix', () => {
     let heavyShare = 0;
     let lightShare = 0;
     for (let i = 0; i < SEEDS; i += 1) {
-      const seed = seedFromString(`sens-mix-${String(i)}`);
+      const seed = seedSchema.parse(seedFromString(`sens-mix-${String(i)}`));
       const pickShare = (input: ReturnType<typeof buildGameSimulationInput>) => {
         const r = simulateGame(input, ctx);
         const b = r.home.box;

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GameResult, SimulationTeam } from '@hoop-rush/data-contracts';
+import { playerIdSchema, seedSchema } from '@hoop-rush/data-contracts';
 import {
   DEFAULT_ERA_SIM_PROFILE,
   buildGameSimulationInput,
@@ -27,7 +28,7 @@ function measureRoles(team: SimulationTeam): Map<string, RoleAccumulator> {
   const players = new Map<string, RoleAccumulator>();
   for (let i = 0; i < SEEDS; i += 1) {
     const input = buildGameSimulationInput({
-      seed: seedFromString(`roles-gate-${String(i)}`),
+      seed: seedSchema.parse(seedFromString(`roles-gate-${String(i)}`)),
       profile: DEFAULT_ERA_SIM_PROFILE,
       home: team,
       away: { ...team, teamId: 'roles-away' },
@@ -101,9 +102,9 @@ describe('player-role behavior (roles lineup)', () => {
   it('classifies the five role players into distinct archetypes', () => {
     const archetypes = team.players.map((p) => [p.playerId, classifyArchetype(p)] as const);
     const names = new Map(archetypes.map(([pid, a]) => [pid, a]));
-    expect(names.get('p-roles-creator')).toBe('primaryCreator');
-    expect(names.get('p-roles-spacer')).toBe('floorSpacer');
-    expect(names.get('p-roles-rim')).not.toBe('primaryCreator');
+    expect(names.get(playerIdSchema.parse('p-roles-creator'))).toBe('primaryCreator');
+    expect(names.get(playerIdSchema.parse('p-roles-spacer'))).toBe('floorSpacer');
+    expect(names.get(playerIdSchema.parse('p-roles-rim'))).not.toBe('primaryCreator');
     expect(new Set(archetypes.map(([, a]) => a)).size).toBeGreaterThanOrEqual(4);
   });
   it('produces a clear usage hierarchy ordered by usage tendency', () => {

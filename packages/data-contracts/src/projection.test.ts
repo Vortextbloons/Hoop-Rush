@@ -10,10 +10,16 @@ import {
   SIMULATION_RATINGS,
   SIMULATION_TENDENCIES,
   baseFiveProjectionSchema,
+  contentHashSchema,
+  eraIdSchema,
+  franchiseIdSchema,
+  playerIdSchema,
   projectionModelArtifactSchema,
   seasonDraftCatalogSchema,
   seasonProjectionSchema,
   seasonProjectionTargetsSchema,
+  seedSchema,
+  seasonKeySchema,
   type BaseFiveProjection,
   type ProjectionMatchupArchetype,
   type ProjectionModelArtifact,
@@ -31,7 +37,7 @@ function buildPlayer(
   displayName = `Player ${String(index)}`,
 ): SimulationPlayer {
   return {
-    playerId: `p-proj-${String(index)}`,
+    playerId: playerIdSchema.parse(`p-proj-${String(index)}`),
     playerVersionId: `pv-${String(index).padStart(32, '0')}`,
     displayName,
     positions,
@@ -62,7 +68,7 @@ const SLOTS: Array<'G1' | 'G2' | 'F1' | 'F2' | 'C'> = ['G1', 'G2', 'F1', 'F2', '
 function buildContributions(): ProjectionPlayerContribution[] {
   return SLOTS.map((slot, index) => ({
     slot,
-    playerId: `p-proj-${String(index + 1)}`,
+    playerId: playerIdSchema.parse(`p-proj-${String(index + 1)}`),
     playerVersionId: `pv-${String(index + 1).padStart(32, '0')}`,
     displayName: `Player ${String(index + 1)}`,
     usageShare: 0.2,
@@ -159,8 +165,8 @@ function buildBase(offensePoints = 108, defensePoints = 104): BaseFiveProjection
     schemaVersion: 1,
     modelVersion: PROJECTION_MODEL_VERSION,
     referenceId: 'ref-1990s-neutral',
-    referenceHash: 'a'.repeat(64),
-    eraId: '1990s',
+    referenceHash: contentHashSchema.parse('a'.repeat(64)),
+    eraId: eraIdSchema.parse('1990s'),
     eraProfileVersion: 'era-1990s-v4',
     dataVersion: `m10-${RATINGS_VERSION}`,
     normalizationVersion: PROJECTION_SCHEMA_VERSION,
@@ -168,7 +174,7 @@ function buildBase(offensePoints = 108, defensePoints = 104): BaseFiveProjection
     digest: 'c'.repeat(32),
     lineup: SLOTS.map((slot, index) => ({
       slot,
-      playerId: `p-proj-${String(index + 1)}`,
+      playerId: playerIdSchema.parse(`p-proj-${String(index + 1)}`),
       playerVersionId: `pv-${String(index + 1).padStart(32, '0')}`,
       displayName: `Player ${String(index + 1)}`,
       positions: index === 4 ? ['C'] : index >= 2 ? ['SF'] : ['PG'],
@@ -196,8 +202,8 @@ function buildReference(eraId: string, archetype: ProjectionMatchupArchetype) {
   return {
     referenceId: `ref-${eraId}-${archetype}`,
     archetype,
-    eraId,
-    referenceHash: 'd'.repeat(64),
+    eraId: eraIdSchema.parse(eraId),
+    referenceHash: contentHashSchema.parse('d'.repeat(64)),
     players: [
       buildPlayer(1, ['PG']),
       buildPlayer(2, ['SG']),
@@ -208,7 +214,7 @@ function buildReference(eraId: string, archetype: ProjectionMatchupArchetype) {
   };
 }
 function buildModel(): ProjectionModelArtifact {
-  return {
+  return projectionModelArtifactSchema.parse({
     schemaVersion: 1,
     modelVersion: PROJECTION_MODEL_VERSION,
     dataVersion: `m10-${RATINGS_VERSION}`,
@@ -276,13 +282,14 @@ function buildModel(): ProjectionModelArtifact {
         description: 'better shooting must not lower projected eFG%',
       },
     ],
-  };
+  });
 }
 describe('projection model artifact schema', () => {
+  const era1990s = eraIdSchema.parse('1990s');
   it('round-trips a valid model', () => {
     const model = roundTrip(projectionModelArtifactSchema, buildModel());
     expect(model.modelVersion).toBe(PROJECTION_MODEL_VERSION);
-    expect(model.references['1990s']?.archetypes).toHaveLength(4);
+    expect(model.references[era1990s]?.archetypes).toHaveLength(4);
     expect(model.search.closeScenarioWeight).toBe(0.2);
   });
   it('rejects wrong model versions', () => {
@@ -292,7 +299,7 @@ describe('projection model artifact schema', () => {
   });
   it('rejects a missing neutral reference era', () => {
     const model = buildModel();
-    delete model.references['1990s'];
+    delete model.references[era1990s];
     expect(() => projectionModelArtifactSchema.parse(model)).toThrow();
   });
   it('rejects a model without any references', () => {
@@ -302,7 +309,7 @@ describe('projection model artifact schema', () => {
   });
   it('requires all matchup archetypes except neutral', () => {
     const model = buildModel();
-    const referenceSet = model.references['1990s'];
+    const referenceSet = model.references[era1990s];
     if (referenceSet === undefined) {
       throw new Error('projection fixture is missing its 1990s reference set');
     }
@@ -354,7 +361,7 @@ describe('season projection schema', () => {
       schemaVersion: 1,
       version: SEASON_PROJECTION_VERSION,
       modelVersion: PROJECTION_MODEL_VERSION,
-      eraId: '1990s',
+      eraId: eraIdSchema.parse('1990s'),
       eraProfileVersion: 'era-1990s-v4',
       dataVersion: `m10-${RATINGS_VERSION}`,
       inputDigest: 'b'.repeat(32),
@@ -474,10 +481,10 @@ describe('season draft catalog v4', () => {
   function buildCatalog(): SeasonDraftCatalog {
     const candidate = (n: number, positions: [Position, ...Position[]]): SeasonDraftCandidate => ({
       playerVersionId: `pv-${String(n).padStart(32, '0')}`,
-      playerId: `p-${String(n)}`,
-      franchiseId: 'lakers',
-      eraId: '1990s',
-      seasonKey: '1995-96',
+      playerId: playerIdSchema.parse(`p-${String(n)}`),
+      franchiseId: franchiseIdSchema.parse('lakers'),
+      eraId: eraIdSchema.parse('1990s'),
+      seasonKey: seasonKeySchema.parse('1995-96'),
       displayName: `Candidate ${String(n)}`,
       playerExternalId: '101',
       positions: {
@@ -523,8 +530,8 @@ describe('season draft catalog v4', () => {
       durabilityVersion: 'durability-v1',
       pools: [
         {
-          franchiseId: 'lakers',
-          eraId: '1990s',
+          franchiseId: franchiseIdSchema.parse('lakers'),
+          eraId: eraIdSchema.parse('1990s'),
           playerVersionIds: candidates.map((c) => c.playerVersionId),
         },
       ],

@@ -6,6 +6,7 @@ import type {
   SlotIndex,
 } from '@hoop-rush/data-contracts';
 import { LINEUP_STRUCTURE } from '@hoop-rush/data-contracts';
+import { playerIdSchema } from '@hoop-rush/data-contracts';
 import { canPlay } from './positions.ts';
 export function slotRequirement(slotIndex: SlotIndex): SlotGroup {
   const requirement = LINEUP_STRUCTURE[slotIndex];
@@ -99,7 +100,7 @@ export function assignLineup(
         if (assigned === undefined) {
           throw new Error(`lineup: missing player ${playerId}`);
         }
-        return { slotIndex, playerId, positions: assigned.positions };
+        return { slotIndex, playerId: playerIdSchema.parse(playerId), positions: assigned.positions };
       });
     }
     const player = players[index];

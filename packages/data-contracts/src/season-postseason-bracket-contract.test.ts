@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   SEASON_POSTSEASON_VERSION,
   fnv1a32,
+  franchiseIdSchema,
+  idSchema,
   parsePlayoffGameId,
   playInGameIdOf,
   playInStateSchema,
@@ -69,10 +71,10 @@ export function resultPlayInGame(
   return {
     gameId,
     status: outcome.status,
-    homeFranchiseId: home,
-    awayFranchiseId: away,
-    winnerFranchiseId: winner,
-    loserFranchiseId: loser,
+    homeFranchiseId: franchiseIdSchema.parse(home),
+    awayFranchiseId: franchiseIdSchema.parse(away),
+    winnerFranchiseId: franchiseIdSchema.parse(winner),
+    loserFranchiseId: franchiseIdSchema.parse(loser),
     homeScore: outcome.status === 'final' ? (winner === home ? 100 : 90) : null,
     awayScore: outcome.status === 'final' ? (winner === away ? 100 : 90) : null,
   };
@@ -96,6 +98,7 @@ export function buildPlayInState(
   }
   const seed = (position: number): string =>
     must(ranking[position - 1], `play-in ranking missing seed ${String(position)}`);
+  const parsedRanking = ranking.map((franchiseId) => franchiseIdSchema.parse(franchiseId));
   const games = {
     sevenEight:
       sevenEight === undefined
@@ -122,13 +125,13 @@ export function buildPlayInState(
     finalOutcome === undefined
       ? null
       : [
-          ...ranking.slice(0, 6),
+          ...parsedRanking.slice(0, 6),
           must(games.sevenEight.winnerFranchiseId, 'seven-eight winner unresolved'),
           must(final.winnerFranchiseId, 'final winner unresolved'),
         ];
   return {
     conference,
-    ranking,
+    ranking: parsedRanking,
     games: { sevenEight: games.sevenEight, nineTen: games.nineTen, final },
     playoffSeeds,
   };
@@ -190,12 +193,12 @@ export function buildSeriesGames(
     return {
       gameId: playoffGameIdOf(seriesId, gameNumber),
       gameNumber,
-      homeFranchiseId,
-      awayFranchiseId,
+      homeFranchiseId: franchiseIdSchema.parse(homeFranchiseId),
+      awayFranchiseId: franchiseIdSchema.parse(awayFranchiseId),
       status: 'final',
       homeScore: homeFranchiseId === winnerFranchiseId ? 100 : 90,
       awayScore: awayFranchiseId === winnerFranchiseId ? 100 : 90,
-      winnerFranchiseId,
+      winnerFranchiseId: franchiseIdSchema.parse(winnerFranchiseId),
     };
   });
 }
@@ -212,17 +215,19 @@ export function buildSeriesFromMask(
     throw new Error('a completed series mask must include four wins for one side');
   }
   return {
-    seriesId,
+    seriesId: idSchema.parse(seriesId),
     round: opts.round ?? 'first-round',
     conference: opts.conference ?? null,
     higherSeed: opts.higherSeed ?? null,
     lowerSeed: opts.lowerSeed ?? null,
-    homeCourtFranchiseId,
-    challengerFranchiseId,
+    homeCourtFranchiseId: franchiseIdSchema.parse(homeCourtFranchiseId),
+    challengerFranchiseId: franchiseIdSchema.parse(challengerFranchiseId),
     homeCourtWins,
     challengerWins,
     games: buildSeriesGames(seriesId, homeCourtFranchiseId, challengerFranchiseId, mask),
-    winnerFranchiseId: homeCourtWins === 4 ? homeCourtFranchiseId : challengerFranchiseId,
+    winnerFranchiseId: franchiseIdSchema.parse(
+      homeCourtWins === 4 ? homeCourtFranchiseId : challengerFranchiseId,
+    ),
   };
 }
 export function buildCompletedSeries(
@@ -255,18 +260,18 @@ export function buildSeriesPrefix(
   const challengerWins = prefix.length - homeCourtWins;
   const winnerFranchiseId =
     homeCourtWins === 4
-      ? homeCourtFranchiseId
+      ? franchiseIdSchema.parse(homeCourtFranchiseId)
       : challengerWins === 4
-        ? challengerFranchiseId
+        ? franchiseIdSchema.parse(challengerFranchiseId)
         : null;
   return {
-    seriesId,
+    seriesId: idSchema.parse(seriesId),
     round: opts.round ?? 'first-round',
     conference: opts.conference ?? null,
     higherSeed: opts.higherSeed ?? null,
     lowerSeed: opts.lowerSeed ?? null,
-    homeCourtFranchiseId,
-    challengerFranchiseId,
+    homeCourtFranchiseId: franchiseIdSchema.parse(homeCourtFranchiseId),
+    challengerFranchiseId: franchiseIdSchema.parse(challengerFranchiseId),
     homeCourtWins,
     challengerWins,
     games: buildSeriesGames(seriesId, homeCourtFranchiseId, challengerFranchiseId, prefix),
@@ -366,7 +371,7 @@ export function buildConferenceBracket(
   );
   return {
     conference,
-    seeds,
+    seeds: seeds.map((franchiseId) => franchiseIdSchema.parse(franchiseId)),
     firstRound: firstRoundSeries,
     semifinals: semifinalSeries,
     conferenceFinal,
@@ -408,7 +413,7 @@ export function buildFullBracket(
     east,
     west,
     finals,
-    championFranchiseId: seriesWinner(finals),
+    championFranchiseId: franchiseIdSchema.parse(seriesWinner(finals)),
   };
 }
 export interface CompletedPostseasonOptions {

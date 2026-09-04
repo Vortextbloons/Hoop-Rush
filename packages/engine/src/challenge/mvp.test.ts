@@ -6,10 +6,11 @@ import type {
   PlayerBoxScore,
   TeamResult,
 } from '@hoop-rush/data-contracts';
+import { playerIdSchema } from '@hoop-rush/data-contracts';
 import { gameScore, leagueMvp, mvpValue } from './mvp.ts';
 function playerBox(overrides: Partial<PlayerBoxScore> = {}): PlayerBoxScore {
   return {
-    playerId: 'p-1',
+    playerId: playerIdSchema.parse('p-1'),
     minutes: 36,
     points: 25,
     fieldGoals: { made: 10, attempted: 20 },
@@ -24,9 +25,9 @@ function playerBox(overrides: Partial<PlayerBoxScore> = {}): PlayerBoxScore {
     ...overrides,
   };
 }
-function scoringBox(points: number, playerId = 'p-1'): PlayerBoxScore {
+function scoringBox(points: number, playerId: string = 'p-1'): PlayerBoxScore {
   return playerBox({
-    playerId,
+    playerId: playerIdSchema.parse(playerId),
     minutes: 30,
     points,
     fieldGoals: { made: 0, attempted: 0 },
@@ -221,7 +222,7 @@ describe('league mvp', () => {
         homePlayers: [
           scoringBox(20, 'p-1'),
           playerBox({
-            playerId: 'p-2',
+            playerId: playerIdSchema.parse('p-2'),
             minutes: 30,
             points: 24,
             fieldGoals: { made: 0, attempted: 0 },
@@ -251,7 +252,7 @@ describe('league mvp', () => {
         homePlayers: [
           scoringBox(20, 'p-1'),
           playerBox({
-            playerId: 'p-2',
+            playerId: playerIdSchema.parse('p-2'),
             minutes: 30,
             points: 20,
             fieldGoals: { made: 0, attempted: 0 },
@@ -347,7 +348,7 @@ describe('mvp composite', () => {
         awayTeamId: 'celtics',
         homePlayers: [
           playerBox({
-            playerId: 'p-1',
+            playerId: playerIdSchema.parse('p-1'),
             minutes: 36,
             points: 24,
             fieldGoals: { made: 10, attempted: 15 },
@@ -361,7 +362,7 @@ describe('mvp composite', () => {
             fouls: 0,
           }),
           playerBox({
-            playerId: 'p-2',
+            playerId: playerIdSchema.parse('p-2'),
             minutes: 36,
             points: 24,
             fieldGoals: { made: 12, attempted: 30 },
@@ -390,7 +391,7 @@ describe('mvp composite', () => {
         homePlayers: [
           scoringBox(22, 'p-1'),
           playerBox({
-            playerId: 'p-2',
+            playerId: playerIdSchema.parse('p-2'),
             minutes: 36,
             points: 20,
             fieldGoals: { made: 8, attempted: 16 },
@@ -406,7 +407,7 @@ describe('mvp composite', () => {
         ],
         awayPlayers: [
           playerBox({
-            playerId: 'p-opp-1-0',
+            playerId: playerIdSchema.parse('p-opp-1-0'),
             minutes: 36,
             points: 8,
             fieldGoals: { made: 4, attempted: 16 },
@@ -460,7 +461,7 @@ describe('mvp composite', () => {
           awayTeamId: 'celtics',
           homePlayers: [
             playerBox({
-              playerId: 'p-1',
+              playerId: playerIdSchema.parse('p-1'),
               minutes: 36,
               points: 20,
               fieldGoals: { made: 8, attempted: 16 },
@@ -481,7 +482,7 @@ describe('mvp composite', () => {
     const efficientLeague = buildRun(scoringBox(0, 'p-opp-1-0'));
     const inefficientLeague = buildRun(
       playerBox({
-        playerId: 'p-opp-1-0',
+        playerId: playerIdSchema.parse('p-opp-1-0'),
         minutes: 36,
         points: 10,
         fieldGoals: { made: 5, attempted: 20 },

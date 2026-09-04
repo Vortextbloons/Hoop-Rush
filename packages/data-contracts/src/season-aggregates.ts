@@ -32,7 +32,7 @@ export const seasonTeamAggregateSchema = z.object({
 export type SeasonTeamAggregate = z.infer<typeof seasonTeamAggregateSchema>;
 export function emptySeasonTeamAggregate(franchiseId: string): SeasonTeamAggregate {
   return {
-    franchiseId,
+    franchiseId: franchiseIdSchema.parse(franchiseId),
     gamesPlayed: 0,
     wins: 0,
     losses: 0,
@@ -82,7 +82,7 @@ export function emptySeasonPlayerAggregate(
 ): SeasonPlayerAggregate {
   return {
     playerVersionId,
-    franchiseId,
+    franchiseId: franchiseIdSchema.parse(franchiseId),
     gamesPlayed: 0,
     appearances: 0,
     started: 0,

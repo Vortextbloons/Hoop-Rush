@@ -1,4 +1,5 @@
 import type { ChallengeRun, PlayerBoxScore } from '@hoop-rush/data-contracts';
+import { franchiseIdSchema, playerIdSchema } from '@hoop-rush/data-contracts';
 const DEFENSE_WEIGHTS = {
   steal: 0.6,
   block: 0.6,
@@ -171,12 +172,12 @@ function buildPlayerNameLookup(run: ChallengeRun): (teamId: string, playerId: st
   const perTeamCache = new Map<string, Map<string, string>>();
   return (teamId, playerId) => {
     if (teamId === 'user') {
-      return userNames.get(playerId) ?? playerId;
+      return userNames.get(playerIdSchema.parse(playerId)) ?? playerId;
     }
     let names = perTeamCache.get(teamId);
     if (!names) {
       names = new Map<string, string>();
-      const opponent = opponentsByTeamId.get(teamId);
+      const opponent = opponentsByTeamId.get(franchiseIdSchema.parse(teamId));
       if (opponent) {
         for (const p of opponent.players) names.set(p.playerId, p.displayName);
       }

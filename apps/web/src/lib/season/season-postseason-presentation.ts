@@ -1,4 +1,4 @@
-import {
+﻿import {
   SEASON_POSTSEASON_RISKY_REHAB_COST,
   rankSeasonPostseason,
   seasonPostseasonGameTeamsOf,
@@ -23,6 +23,7 @@ import {
   type SeasonStandings,
   type SeasonStandingsRow,
   type SeasonTiebreakResolution,
+  franchiseIdSchema,
 } from '@hoop-rush/data-contracts';
 import { describeCommandRejection, type SeasonPostseasonProgress } from './season-hub-state';
 export type HubPostseasonPhase = SeasonPostseasonProgress['phase'];
@@ -56,7 +57,7 @@ export function hasPostseasonHubMethods(hub: {
   return typeof hub.startPostseason === 'function' && hub.postseason !== undefined;
 }
 export const POSTSEASON_ORCHESTRATION_UNAVAILABLE =
-  'Postseason simulation is not available in this build yet. Save your run — it is safe — and update the app to continue.';
+  'Postseason simulation is not available in this build yet. Save your run â€” it is safe â€” and update the app to continue.';
 export function postseasonStageLabel(stage: SeasonRun['stage']): string {
   switch (stage) {
     case 'regular-season':
@@ -90,8 +91,9 @@ export function rankedEntriesOf(
     const ranking = rankings[conference];
     for (let index = 0; index < ranking.ranked.length; index += 1) {
       const franchiseId = ranking.ranked[index];
-      const row = byId.get(franchiseId ?? '');
-      if (franchiseId !== undefined && row !== undefined) {
+      if (franchiseId === undefined) continue;
+      const row = byId.get(franchiseIdSchema.parse(franchiseId));
+      if (row !== undefined) {
         entries.push({ row, rank: index + 1, conference });
       }
     }
@@ -167,7 +169,7 @@ export function tiebreakKindLabel(kind: SeasonTiebreakResolution['kind']): strin
 export function tiebreakSlotsLabel(slots: readonly number[]): string {
   return slots.length === 1
     ? `slot ${String(slots[0])}`
-    : `slots ${slots.map((slot) => String(slot)).join('–')}`;
+    : `slots ${slots.map((slot) => String(slot)).join('â€“')}`;
 }
 export interface TiebreakResolutionViewModel {
   resolution: SeasonTiebreakResolution;
@@ -191,7 +193,7 @@ export function tiebreakResolutionViewModel(
     kindLabel,
     slotsLabel,
     teamLabels,
-    summary: `${ruleLabel} · ${kindLabel} · ${slotsLabel}`,
+    summary: `${ruleLabel} Â· ${kindLabel} Â· ${slotsLabel}`,
   };
 }
 export interface SeriesGameResultViewModel {
@@ -349,15 +351,16 @@ export function playInGameCardViewModel(
   const awayFranchiseId = game.awayFranchiseId ?? engineTeams?.away ?? null;
   const seedOf = (franchiseId: string | null): number | null => {
     if (franchiseId === null || ranking === null) return null;
-    const position = ranking.indexOf(franchiseId);
+    const parsed = franchiseIdSchema.parse(franchiseId);
+    const position = ranking.indexOf(parsed);
     return position === -1 ? null : position + 1;
   };
   const consequence =
     matchup === 'seven-eight'
-      ? 'Winner takes seed 7 · loser hosts the final'
+      ? 'Winner takes seed 7 Â· loser hosts the final'
       : matchup === 'nine-ten'
-        ? 'Loser eliminated · winner travels to the final'
-        : 'Winner takes seed 8 · loser eliminated';
+        ? 'Loser eliminated Â· winner travels to the final'
+        : 'Winner takes seed 8 Â· loser eliminated';
   return {
     gameId: game.gameId,
     matchup,
@@ -419,7 +422,7 @@ export function bracketColumnsOf(
   const playInColumn: BracketColumnViewModel = {
     key: 'play-in',
     title: 'Play-In',
-    subtitle: 'Seeds 7–10 · win or go home',
+    subtitle: 'Seeds 7â€“10 Â· win or go home',
     playIn: (['east', 'west'] as const).map((conference) =>
       playInColumnViewModel(state, conference, humanFranchiseId),
     ),
@@ -532,8 +535,8 @@ export function postseasonSummaryRow(
     roundLabel: roundLabelText,
     scoreLabel:
       summary.status === 'forfeit'
-        ? '2–0 · forfeit'
-        : `${String(summary.homeScore)}–${String(summary.awayScore)}`,
+        ? '2â€“0 Â· forfeit'
+        : `${String(summary.homeScore)}â€“${String(summary.awayScore)}`,
     humanWon,
     humanGame,
   };
@@ -550,7 +553,7 @@ export interface AwardViewModel {
 export const AWARD_EXPLANATIONS = {
   mvp: 'Highest MVP composite: game score plus efficiency, defense, and playmaking bonuses and the game-result share, availability-adjusted over the regular season.',
   dpoy: 'Highest defensive composite: steals, blocks, and defensive rebounds plus the team defensive-rating advantage, availability-adjusted.',
-  'sixth-man': 'MVP composite among bench-qualified players — more bench games than starts.',
+  'sixth-man': 'MVP composite among bench-qualified players â€” more bench games than starts.',
   firstTeam: 'The five highest eligible players by the MVP composite, positionless.',
 } as const;
 export function awardsViewModel(
@@ -606,7 +609,8 @@ export function riskyRehabOptionsOf(
   humanFranchiseId: string,
   playerName: (playerVersionId: string) => string,
 ): RiskyRehabOption[] {
-  const balance = run.influence.balances[humanFranchiseId] ?? 0;
+  const fid = franchiseIdSchema.parse(humanFranchiseId);
+  const balance = run.influence.balances[fid] ?? 0;
   const rehabs = run.influence.rehabs;
   return run.health.injuries
     .filter((record) => record.franchiseId === humanFranchiseId && record.missedGamesRemaining > 0)
@@ -636,7 +640,7 @@ export function describePostseasonRejection(
       return `The lineup is not legal: ${rejection.reasons.join('; ')}`;
     case 'unavailable-player':
       return rejection.reason === 'injured'
-        ? 'A player in the lineup is injured and cannot play this game — move them out or spend Influence on a risky rehab roll.'
+        ? 'A player in the lineup is injured and cannot play this game â€” move them out or spend Influence on a risky rehab roll.'
         : 'A player in the lineup is no longer on the roster.';
     case 'insufficient-rehab-resources':
       return `Risky rehab needs ${String(rejection.required)} Influence; your balance is ${String(rejection.balance)}.`;

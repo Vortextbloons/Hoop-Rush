@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import fc from 'fast-check';
 import { seedFromString } from '@hoop-rush/test-fixtures';
+import { franchiseIdSchema } from '@hoop-rush/data-contracts';
 import type {
   Position,
   SeasonDraftCatalog,
@@ -227,7 +228,7 @@ describe('season trade window opening', () => {
     const run = withInjury(base, {
       injuryId,
       playerVersionId: injuredVersion,
-      franchiseId: HUMAN,
+      franchiseId: franchiseIdSchema.parse(HUMAN),
       gameId: 's000001',
       type: 'lower-body',
       severity: 'moderate',
@@ -321,7 +322,9 @@ describe('season trade window opening', () => {
       );
     }
     for (const franchiseId of Object.keys(result.influence.balances)) {
-      expect(result.influence.balances[franchiseId] ?? 0).toBeGreaterThanOrEqual(0);
+      expect(
+        result.influence.balances[franchiseIdSchema.parse(franchiseId)] ?? 0,
+      ).toBeGreaterThanOrEqual(0);
     }
   });
   it('bumps stateRevision by one and recomputes a fresh stateDigest', () => {
@@ -467,8 +470,8 @@ describe('season applySeasonTrade', () => {
       offerId: 'off-' + 'a'.repeat(32),
       windowIndex: 0,
       seedPath: ['window', '0', 'offer', '0'],
-      toFranchiseId: HUMAN,
-      fromFranchiseId: 'celtics',
+      toFranchiseId: franchiseIdSchema.parse(HUMAN),
+      fromFranchiseId: franchiseIdSchema.parse('celtics'),
       outgoingPlayerVersionIds: [outgoingId],
       incomingPlayerVersionIds: [incomingId],
       outgoingHealth: [{ available: true, activeInjuryIds: [] }],
@@ -571,7 +574,7 @@ describe('season applySeasonTrade', () => {
     const run = withInjury(base, {
       injuryId,
       playerVersionId: movedId,
-      franchiseId: 'celtics',
+      franchiseId: franchiseIdSchema.parse('celtics'),
       gameId: 's000001',
       type: 'soft-tissue',
       severity: 'minor',
@@ -593,8 +596,8 @@ describe('season applySeasonTrade', () => {
       offerId: 'off-' + 'b'.repeat(32),
       windowIndex: 0,
       seedPath: ['window', '0', 'offer', '0'],
-      toFranchiseId: HUMAN,
-      fromFranchiseId: 'celtics',
+      toFranchiseId: franchiseIdSchema.parse(HUMAN),
+      fromFranchiseId: franchiseIdSchema.parse('celtics'),
       outgoingPlayerVersionIds: [outgoingId],
       incomingPlayerVersionIds: [movedId],
       outgoingHealth: [{ available: true, activeInjuryIds: [] }],
@@ -625,8 +628,8 @@ describe('season applySeasonTrade', () => {
       offerId: 'off-' + 'c'.repeat(32),
       windowIndex: 0,
       seedPath: ['window', '0', 'offer', '0'],
-      toFranchiseId: HUMAN,
-      fromFranchiseId: 'celtics',
+      toFranchiseId: franchiseIdSchema.parse(HUMAN),
+      fromFranchiseId: franchiseIdSchema.parse('celtics'),
       outgoingPlayerVersionIds: [outgoingId],
       incomingPlayerVersionIds: [incomingId],
       outgoingHealth: [{ available: true, activeInjuryIds: [] }],
@@ -649,7 +652,11 @@ describe('season applySeasonTrade', () => {
     expect(() =>
       applySeasonTrade(
         { ...run, effects },
-        { ...baseOffer, toFranchiseId: 'celtics', fromFranchiseId: 'celtics' },
+        {
+          ...baseOffer,
+          toFranchiseId: franchiseIdSchema.parse('celtics'),
+          fromFranchiseId: franchiseIdSchema.parse('celtics'),
+        },
         catalog,
       ),
     ).toThrow(SeasonTradeInvariantError);
@@ -781,7 +788,7 @@ describe('season contextual player value', () => {
       ...withInjury(run, {
         injuryId,
         playerVersionId: version,
-        franchiseId: HUMAN,
+        franchiseId: franchiseIdSchema.parse(HUMAN),
         gameId: 's000001',
         type: 'lower-body',
         severity: 'moderate',

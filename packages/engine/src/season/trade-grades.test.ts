@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  franchiseIdSchema,
+  seasonGameIdSchema,
   seasonTradeGradeLogSchema,
   type SeasonCompactPlayerLine,
   type SeasonGameSummary,
@@ -58,7 +60,7 @@ function boxOf(franchiseId: string, lines: readonly SeasonCompactPlayerLine[]): 
   const sum = (pick: (entry: SeasonCompactPlayerLine) => number) =>
     lines.reduce((total, entry) => total + pick(entry), 0);
   return {
-    franchiseId,
+    franchiseId: franchiseIdSchema.parse(franchiseId),
     points: sum((entry) => entry.points),
     fieldGoalsMade: sum((entry) => entry.fieldGoalsMade),
     fieldGoalsAttempted: sum((entry) => entry.fieldGoalsAttempted),
@@ -108,10 +110,10 @@ function summary(round: number, spec: GameSpec = {}): SeasonGameSummary {
   return {
     schemaVersion: 1,
     summaryVersion: 'season-game-summary-v3',
-    gameId: `s${String(round).padStart(6, '0')}`,
+    gameId: seasonGameIdSchema.parse(`s${String(round).padStart(6, '0')}`),
     round,
-    homeFranchiseId: LAKERS,
-    awayFranchiseId: CELTICS,
+    homeFranchiseId: franchiseIdSchema.parse(LAKERS),
+    awayFranchiseId: franchiseIdSchema.parse(CELTICS),
     status: 'final',
     overtimePeriods: 0,
     homeScore,
@@ -158,10 +160,10 @@ function postseasonSummary(gameId: string, spec: GameSpec = {}): SeasonPostseaso
     seriesId: 'finals',
     gameNumber: 1,
     conference: 'east',
-    homeFranchiseId: LAKERS,
-    awayFranchiseId: CELTICS,
-    winnerFranchiseId: homeWon ? LAKERS : CELTICS,
-    loserFranchiseId: homeWon ? CELTICS : LAKERS,
+    homeFranchiseId: franchiseIdSchema.parse(LAKERS),
+    awayFranchiseId: franchiseIdSchema.parse(CELTICS),
+    winnerFranchiseId: franchiseIdSchema.parse(homeWon ? LAKERS : CELTICS),
+    loserFranchiseId: franchiseIdSchema.parse(homeWon ? CELTICS : LAKERS),
     status: 'final',
     homeScore,
     awayScore,
@@ -212,8 +214,8 @@ function offer(
     offerId,
     windowIndex,
     seedPath: ['window', String(windowIndex), 'offer', '0'],
-    toFranchiseId,
-    fromFranchiseId,
+    toFranchiseId: franchiseIdSchema.parse(toFranchiseId),
+    fromFranchiseId: franchiseIdSchema.parse(fromFranchiseId),
     outgoingPlayerVersionIds: outgoing,
     incomingPlayerVersionIds: incoming,
     outgoingHealth: outgoing.map(() => ({ available: true, activeInjuryIds: [] })),

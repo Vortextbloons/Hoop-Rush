@@ -124,6 +124,7 @@ import {
   SEASON_ROUND_COUNT,
   franchiseForParticipant,
   authorityForFranchise,
+  franchiseIdSchema,
   playInGameIdOf,
   seasonRunCommandRejectionSchema,
   type SeasonRunAuthority,
@@ -1187,10 +1188,11 @@ function handleSubmitTradeProposal(
     const newNegotiation: import('@hoop-rush/data-contracts').SeasonTradeNegotiation = {
       inquiryId: inquiryId!,
       windowIndex: command.windowIndex,
-      fromFranchiseId:
+      fromFranchiseId: franchiseIdSchema.parse(
         context.humanFranchiseId ??
-        run.league.teams.find((t) => t.control === 'human')?.franchiseId ??
-        '',
+          run.league.teams.find((t) => t.control === 'human')?.franchiseId ??
+          '',
+      ),
       toFranchiseId: command.toFranchiseId,
       status: 'active',
       exchangeCount: 1,
@@ -1290,7 +1292,8 @@ function handleSubmitTradeProposal(
       field: 'tradeCashSent' | 'tradeCashReceived',
       delta: number,
     ) => {
-      const wins = nextInfluence.windows[franchiseId] ?? [];
+      const fid = franchiseIdSchema.parse(franchiseId);
+      const wins = nextInfluence.windows[fid] ?? [];
       const idx = wins.findIndex((w) => w.windowIndex === command.windowIndex);
       if (idx >= 0) {
         const w = wins[idx]!;
@@ -1302,7 +1305,7 @@ function handleSubmitTradeProposal(
           ...nextInfluence,
           windows: {
             ...nextInfluence.windows,
-            [franchiseId]: [...wins.slice(0, idx), updated, ...wins.slice(idx + 1)],
+            [fid]: [...wins.slice(0, idx), updated, ...wins.slice(idx + 1)],
           },
         };
       } else {
@@ -1312,7 +1315,7 @@ function handleSubmitTradeProposal(
             : { windowIndex: command.windowIndex, tradeCashReceived: delta };
         nextInfluence = {
           ...nextInfluence,
-          windows: { ...nextInfluence.windows, [franchiseId]: [...wins, nw] },
+          windows: { ...nextInfluence.windows, [fid]: [...wins, nw] },
         };
       }
     };
@@ -1547,7 +1550,7 @@ function handlePurchaseTradeInquiry(
       command,
       {
         code: 'already-spent',
-        franchiseId: context.humanFranchiseId ?? '',
+        franchiseId: franchiseIdSchema.parse(context.humanFranchiseId ?? ''),
         windowIndex: command.windowIndex,
       },
       run,
@@ -1570,13 +1573,14 @@ function handlePurchaseTradeInquiry(
     context.humanFranchiseId ??
     run.league.teams.find((t) => t.control === 'human')?.franchiseId ??
     '';
-  const balance = run.influence.balances[human] ?? 0;
+  const humanFid = franchiseIdSchema.parse(human);
+  const balance = run.influence.balances[humanFid] ?? 0;
   if (balance - 1 < SEASON_INFLUENCE_FLOOR) {
     return rejectedPurchaseTradeInquiry(
       command,
       {
         code: 'insufficient-balance',
-        franchiseId: human,
+        franchiseId: humanFid,
         balance,
         requestedDelta: -1,
         floor: SEASON_INFLUENCE_FLOOR,
@@ -1586,7 +1590,7 @@ function handlePurchaseTradeInquiry(
   }
   const spend = applySeasonInfluenceSpend({
     influence: run.influence,
-    franchiseId: human,
+    franchiseId: humanFid,
     source: 'trade-inquiry-purchase',
     requestedDelta: -1,
     blockIndex: null,
@@ -1655,7 +1659,7 @@ function insufficientBalanceOf(
 ): SeasonInsufficientBalanceRejection {
   return {
     code: 'insufficient-balance',
-    franchiseId,
+    franchiseId: franchiseIdSchema.parse(franchiseId),
     balance,
     requestedDelta,
     floor: SEASON_INFLUENCE_FLOOR,
@@ -2573,11 +2577,12 @@ function handleSubmitPostseasonRotation(
         run,
       );
     }
-    const balance = run.influence.balances[humanFranchiseId] ?? 0;
+    const humanFidRehab = franchiseIdSchema.parse(humanFranchiseId);
+    const balance = run.influence.balances[humanFidRehab] ?? 0;
     if (balance < SEASON_INFLUENCE_FLOOR + SEASON_POSTSEASON_RISKY_REHAB_COST) {
       const rejection: SeasonInsufficientRehabResourcesRejection = {
         code: 'insufficient-rehab-resources',
-        franchiseId: humanFranchiseId,
+        franchiseId: humanFidRehab,
         balance,
         required: SEASON_POSTSEASON_RISKY_REHAB_COST,
       };

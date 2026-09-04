@@ -1,4 +1,5 @@
-import type { EraSimulationProfile, GameResult, SimulationTeam } from '@hoop-rush/data-contracts';
+import type { EraSimulationProfile, GameResult, Seed, SimulationTeam } from '@hoop-rush/data-contracts';
+import { seedSchema } from '@hoop-rush/data-contracts';
 import type { EngineContext } from '../sim/context.ts';
 import { simulateGame } from '../sim/game.ts';
 import { seedFromString } from './seeds.ts';
@@ -110,6 +111,6 @@ export function evaluateLineupStrength(
   }
   return { winRate: weightedWins, gamesPlayed: totalGames, byBenchmark };
 }
-export function strengthSeed(seedBase: string, benchmarkId: string, index: number): string {
-  return seedFromString(`${seedBase}|${benchmarkId}|${String(index)}`);
+export function strengthSeed(seedBase: string, benchmarkId: string, index: number): Seed {
+  return seedSchema.parse(seedFromString(`${seedBase}|${benchmarkId}|${String(index)}`));
 }

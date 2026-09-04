@@ -27,6 +27,11 @@ import {
   SEASON_TRADE_VERSION,
   blockIndexForRound,
   blockRoundRange,
+  commandIdSchema,
+  franchiseIdSchema,
+  idSchema,
+  seasonGameIdSchema,
+  seedSchema,
   seasonDigestHex,
   type SeasonBlockRecap,
   type SeasonCandidateCheckpoint,
@@ -139,8 +144,9 @@ function freeAgencyEvidenceOf(input: {
   const resolvedWindow = freeAgency.windows.find(
     (window) => window.blockIndex === input.blockIndex && window.status === 'resolved',
   );
-  const humanDelta =
-    input.humanFranchiseId === null ? 0 : (freeAgency.seasonSpend[input.humanFranchiseId] ?? 0);
+  const parsedHuman =
+    input.humanFranchiseId === null ? null : franchiseIdSchema.parse(input.humanFranchiseId);
+  const humanDelta = parsedHuman === null ? 0 : (freeAgency.seasonSpend[parsedHuman] ?? 0);
   return {
     windowIndex: resolvedWindow?.windowIndex ?? null,
     signings: (resolvedWindow?.signings ?? []).map((signing) => ({
@@ -150,8 +156,7 @@ function freeAgencyEvidenceOf(input: {
       influenceCost: signing.influenceCost,
     })),
     influenceDelta: -humanDelta,
-    seasonSignings:
-      input.humanFranchiseId === null ? 0 : (freeAgency.signingCounts[input.humanFranchiseId] ?? 0),
+    seasonSignings: parsedHuman === null ? 0 : (freeAgency.signingCounts[parsedHuman] ?? 0),
     seasonSpend: humanDelta,
   };
 }
@@ -376,13 +381,16 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
     const repo = await getSeasonRunRepository();
     const humanRotation =
       input.rotations.find((rotation) => rotation.franchiseId === input.humanFranchiseId) ?? null;
+    if (input.humanFranchiseId === null) {
+      throw new Error('invalid-roster interruption without a human franchise');
+    }
     const interruption: SeasonInvalidRosterInterruption = {
       code: 'invalid-roster',
       runId: input.run.runId,
       blockIndex: input.blockIndex,
       commandId: pending.commandId,
       nextGameId: pending.nextGameId,
-      humanFranchiseId: input.humanFranchiseId ?? '',
+      humanFranchiseId: franchiseIdSchema.parse(input.humanFranchiseId),
       unavailablePlayerVersionIds: [...(humanRotation?.starters ?? [])],
     };
     await repo.savePendingBlock(pending, interruption);
@@ -422,7 +430,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       expectedStateRevision: input.run.stateRevision,
       expectedStateDigest: input.run.stateDigest,
       objectiveId: null,
-      nextGameId: nextHumanGame?.gameId ?? 's000001',
+      nextGameId: nextHumanGame?.gameId ?? seasonGameIdSchema.parse('s000001'),
       summaries: [],
       retainedDetails: [],
       effects: seasonRunEngineSeam.zeroSeasonEffectsState(input.run.rosters),
@@ -442,7 +450,13 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
     awayFranchiseId: string,
   ): SeasonScoreline {
     const { homeScore, awayScore } = deterministicScores(gameId);
-    return { gameId, homeFranchiseId, homeScore, awayScore, awayFranchiseId };
+    return {
+      gameId: seasonGameIdSchema.parse(gameId),
+      homeFranchiseId: franchiseIdSchema.parse(homeFranchiseId),
+      homeScore,
+      awayScore,
+      awayFranchiseId: franchiseIdSchema.parse(awayFranchiseId),
+    };
   }
   private summaryFor(
     input: SeasonBlockStartInput,
@@ -452,6 +466,9 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
     awayFranchiseId: string,
   ): SeasonGameSummary {
     const { homeScore, awayScore } = deterministicScores(gameId);
+    const parsedGameId = seasonGameIdSchema.parse(gameId);
+    const parsedHome = franchiseIdSchema.parse(homeFranchiseId);
+    const parsedAway = franchiseIdSchema.parse(awayFranchiseId);
     const homeRoster =
       input.run.rosters.find((roster) => roster.franchiseId === homeFranchiseId)?.players ?? [];
     const awayRoster =
@@ -469,17 +486,17 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
     return {
       schemaVersion: 1,
       summaryVersion: SEASON_GAME_SUMMARY_VERSION,
-      gameId,
+      gameId: parsedGameId,
       round,
-      homeFranchiseId,
-      awayFranchiseId,
+      homeFranchiseId: parsedHome,
+      awayFranchiseId: parsedAway,
       status: 'final',
       overtimePeriods: 0,
       homeScore,
       awayScore,
       forfeitLoserFranchiseId: null,
       homeBox: {
-        franchiseId: homeFranchiseId,
+        franchiseId: parsedHome,
         points: homeScore,
         fieldGoalsMade: 40,
         fieldGoalsAttempted: 88,
@@ -497,7 +514,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
         possessions: 96,
       },
       awayBox: {
-        franchiseId: awayFranchiseId,
+        franchiseId: parsedAway,
         points: awayScore,
         fieldGoalsMade: 38,
         fieldGoalsAttempted: 86,
@@ -575,7 +592,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
   private committedSnapshot(
     input: SeasonBlockStartInput,
     checkpoint: SeasonCandidateCheckpoint,
-    commandId: string,
+    commandId: import('@hoop-rush/data-contracts').CommandId,
     committed: {
       checkpointState: SeasonCheckpointState;
       stateRevision: number;
@@ -675,8 +692,10 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       }),
       influenceBalance: {
         humanBalance:
-          this.fakeInfluenceFor(input, input.blockIndex).balances[input.humanFranchiseId ?? ''] ??
-          0,
+          input.humanFranchiseId === null
+            ? 0
+            : (this.fakeInfluenceFor(input, input.blockIndex).balances[input.humanFranchiseId] ??
+              0),
       },
     };
     const effects =
@@ -755,7 +774,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
   }
   private async commitCheckpoint(
     input: SeasonBlockStartInput,
-    commandId: string,
+    commandId: import('@hoop-rush/data-contracts').CommandId,
     checkpoint: SeasonCandidateCheckpoint,
     m25: FakeM25CommitInput,
   ): Promise<void> {
@@ -792,7 +811,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
   private committedFacts(
     input: SeasonBlockStartInput,
     checkpoint: EngineSimulateBlockOutput,
-    commandId: string,
+    commandId: import('@hoop-rush/data-contracts').CommandId,
     freeAgencyAssets?: {
       freeAgencyIndex?: SeasonFreeAgencyIndex;
       freeAgencyTargets?: SeasonRosterTargets;
@@ -816,6 +835,10 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
     const activePlayer = humanRoster[0]?.playerVersionId ?? 'pv-unknown';
     const returnedPlayer = humanRoster[1]?.playerVersionId ?? 'pv-unknown';
     const { toRound } = blockRoundRange(input.blockIndex);
+    if (input.humanFranchiseId === null) {
+      return { schemaVersion: 1, healthVersion: SEASON_HEALTH_VERSION, injuries: [] };
+    }
+    const fid = franchiseIdSchema.parse(input.humanFranchiseId);
     return {
       schemaVersion: 1,
       healthVersion: SEASON_HEALTH_VERSION,
@@ -823,8 +846,8 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
         {
           injuryId: 'inj-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
           playerVersionId: activePlayer,
-          franchiseId: input.humanFranchiseId ?? '',
-          gameId: 's000001',
+          franchiseId: fid,
+          gameId: seasonGameIdSchema.parse('s000001'),
           type: 'soft-tissue',
           severity: 'moderate',
           occurredBeforeHalftime: false,
@@ -841,8 +864,8 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
         {
           injuryId: 'inj-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
           playerVersionId: returnedPlayer,
-          franchiseId: input.humanFranchiseId ?? '',
-          gameId: 's000002',
+          franchiseId: fid,
+          gameId: seasonGameIdSchema.parse('s000002'),
           type: 'upper-body',
           severity: 'minor',
           occurredBeforeHalftime: true,
@@ -867,11 +890,15 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       input.rotations.find((rotation) => rotation.franchiseId === input.humanFranchiseId) ?? null;
     const starters =
       humanRotation?.starters ?? humanRoster.slice(0, 5).map((p) => p.playerVersionId);
+    if (input.humanFranchiseId === null) {
+      return { schemaVersion: 1, healthVersion: SEASON_HEALTH_VERSION, injuries: [] };
+    }
+    const fid = franchiseIdSchema.parse(input.humanFranchiseId);
     const injuries = starters.map((playerVersionId, index) => ({
       injuryId: `inj-${String(index).padStart(31, 'c')}`,
       playerVersionId,
-      franchiseId: input.humanFranchiseId ?? '',
-      gameId: 's000001',
+      franchiseId: fid,
+      gameId: seasonGameIdSchema.parse('s000001'),
       type: 'lower-body' as const,
       severity: 'major' as const,
       occurredBeforeHalftime: false,
@@ -897,7 +924,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
     const ledger: SeasonInfluenceState['ledger'] = [];
     for (const franchiseId of franchiseIds) {
       ledger.push({
-        entryId: `influence-initial-${franchiseId}`,
+        entryId: idSchema.parse(`influence-initial-${franchiseId}`),
         franchiseId,
         source: 'initial-grant',
         blockIndex: null,
@@ -909,11 +936,11 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       });
       for (let block = 0; block <= blockIndex; block += 1) {
         ledger.push({
-          entryId: `influence-block-${String(block)}-${franchiseId}`,
+          entryId: idSchema.parse(`influence-block-${String(block)}-${franchiseId}`),
           franchiseId,
           source: 'block-grant',
           blockIndex: block,
-          commandId: `grant-${String(block)}`,
+          commandId: commandIdSchema.parse(`grant-${String(block)}`),
           requestedDelta: 1,
           appliedDelta: 1,
           balanceAfter: 3 + block,
@@ -934,8 +961,8 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
     const transactions: SeasonTransactionEntry[] = [];
     for (let block = 0; block <= blockIndex; block += 1) {
       transactions.push({
-        transactionId: `tx-grant-${String(block)}`,
-        commandId: `grant-${String(block)}`,
+        transactionId: idSchema.parse(`tx-grant-${String(block)}`),
+        commandId: commandIdSchema.parse(`grant-${String(block)}`),
         franchiseId: null,
         type: 'block-grant',
         blockIndex: block,
@@ -952,7 +979,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       scheduleVersion: SEASON_SCHEDULE_VERSION,
       formulaVersion: SEASON_SCHEDULE_FORMULA_VERSION,
       leagueVersion: SEASON_LEAGUE_VERSION,
-      generationSeed: '0'.repeat(32),
+      generationSeed: seedSchema.parse('0'.repeat(32)),
       rounds: 82,
       games: input.run.games.map((game) => ({
         gameId: game.gameId,

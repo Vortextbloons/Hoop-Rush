@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  playerIdSchema,
+  projectionModelArtifactSchema,
   seasonProjectionSchema,
   RATINGS_VERSION,
   type ProjectionMatchupArchetype,
@@ -18,7 +20,7 @@ import {
 import { validateSeasonRotation } from '../season/rotation.ts';
 function buildModel(): ProjectionModelArtifact {
   const player = (index: number, positions: string[]): SimulationPlayer => ({
-    playerId: `p-ref-${String(index)}`,
+    playerId: playerIdSchema.parse(`p-ref-${String(index)}`),
     displayName: `Ref ${String(index)}`,
     positions: positions as SimulationPlayer['positions'],
     heightInches: 78,
@@ -82,7 +84,7 @@ function buildModel(): ProjectionModelArtifact {
       player(5, ['C']),
     ] as [SimulationPlayer, SimulationPlayer, SimulationPlayer, SimulationPlayer, SimulationPlayer],
   });
-  return {
+  return projectionModelArtifactSchema.parse({
     schemaVersion: 1,
     modelVersion: 'projection-model-v1',
     dataVersion: `m10-${RATINGS_VERSION}`,
@@ -143,7 +145,7 @@ function buildModel(): ProjectionModelArtifact {
         description: 'better shooting must not lower projected eFG%',
       },
     ],
-  };
+  });
 }
 describe('rotation trace', () => {
   it('covers exactly 48 regulation minutes across legal units', () => {

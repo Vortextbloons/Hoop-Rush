@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest';
+﻿import { describe, expect, it } from 'vitest';
 import {
   buildCompletedSeasonRunReplayExport,
   seasonReplayAssetHashesOf,
 } from './season-completed-export';
 import type { HoopRushManifest } from '@hoop-rush/data-contracts';
+import { franchiseIdSchema, eraIdSchema, seasonKeySchema, playerIdSchema, seedSchema, contentHashSchema, idSchema } from '@hoop-rush/data-contracts';
 import type { SeasonCompletedSeason } from '@hoop-rush/persistence';
 import {
   SEASON_EMPTY_COMMAND_LOG_DIGEST,
@@ -20,19 +21,19 @@ function manifest(): HoopRushManifest {
       teamExternalId: `team-${String(index)}`,
     })),
     franchiseLineage: [],
-    eras: [{ eraId: '1990s', label: '1990s', fromSeasonKey: '1990-91', toSeasonKey: '1999-00' }],
+    eras: [{ eraId: eraIdSchema.parse('1990s'), label: '1990s', fromSeasonKey: seasonKeySchema.parse('1990-91'), toSeasonKey: seasonKeySchema.parse('1999-00') }],
     pools: [],
     availability: [],
     eraSimulationProfiles: [
-      { eraId: '1990s', url: 'era-sim/1990s.json', contentHash: 'a'.repeat(64) },
+      { eraId: eraIdSchema.parse('1990s'), url: 'era-sim/1990s.json', contentHash: contentHashSchema.parse('a').repeat(64) },
     ],
     season: {
-      league: { url: 'season/league.json', contentHash: 'b'.repeat(64) },
-      schedule: { url: 'season/schedule.json', contentHash: 'c'.repeat(64) },
-      draftCatalog: { url: 'season/draft-catalog.json', contentHash: 'd'.repeat(64) },
-      rosterTargets: { url: 'season/roster-targets.json', contentHash: 'e'.repeat(64) },
-      freeAgencyIndex: { url: 'season/free-agency-index.json', contentHash: 'f'.repeat(64) },
-      freeAgencyTargets: { url: 'season/free-agency-targets.json', contentHash: '1'.repeat(64) },
+      league: { url: 'season/league.json', contentHash: contentHashSchema.parse('b').repeat(64) },
+      schedule: { url: 'season/schedule.json', contentHash: contentHashSchema.parse('c').repeat(64) },
+      draftCatalog: { url: 'season/draft-catalog.json', contentHash: contentHashSchema.parse('d').repeat(64) },
+      rosterTargets: { url: 'season/roster-targets.json', contentHash: contentHashSchema.parse('e').repeat(64) },
+      freeAgencyIndex: { url: 'season/free-agency-index.json', contentHash: contentHashSchema.parse('f').repeat(64) },
+      freeAgencyTargets: { url: 'season/free-agency-targets.json', contentHash: contentHashSchema.parse('1').repeat(64) },
     },
     assets: {
       headshotUrlTemplate: null,
@@ -48,7 +49,7 @@ function completedSeason(): SeasonCompletedSeason {
   const season = {
     run: {
       schemaVersion: SEASON_RUN_SCHEMA_VERSION,
-      runId: 'run-1',
+      runId: idSchema.parse('run-1'),
       rootSeed: 'a'.repeat(32),
       versions: {
         runSchemaVersion: SEASON_RUN_SCHEMA_VERSION,
@@ -116,14 +117,14 @@ function completedSeason(): SeasonCompletedSeason {
       stateDigest: '2'.repeat(32),
       rosters: [
         {
-          franchiseId: 'lakers',
+          franchiseId: franchiseIdSchema.parse('lakers'),
           players: [
             {
               playerVersionId: 'pv-1',
-              playerId: 'p-1',
-              franchiseId: 'lakers',
-              eraId: '1990s',
-              seasonKey: '1990-91',
+              playerId: playerIdSchema.parse('p-1'),
+              franchiseId: franchiseIdSchema.parse('lakers'),
+              eraId: eraIdSchema.parse('1990s'),
+              seasonKey: seasonKeySchema.parse('1990-91'),
               displayName: 'Test Player',
               positionsPlayable: ['PG'],
             },
@@ -174,7 +175,7 @@ function completedSeason(): SeasonCompletedSeason {
     almanac: {
       schemaVersion: 1,
       almanacVersion: 'almanac-v1',
-      runId: 'run-1',
+      runId: idSchema.parse('run-1'),
       rootSeed: 'a'.repeat(32),
       championFranchiseId: 'lakers',
       postseasonDigest: '0'.repeat(32),
@@ -186,7 +187,7 @@ function completedSeason(): SeasonCompletedSeason {
     commandLog: {
       schemaVersion: 1,
       commandLogVersion: 'command-log-v1',
-      runId: 'run-1',
+      runId: idSchema.parse('run-1'),
       entries: [],
     },
     summaries: [],

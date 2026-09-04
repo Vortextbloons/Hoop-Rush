@@ -5,6 +5,7 @@ import type {
   SimulationPlayer,
   TeamAggregate,
 } from '@hoop-rush/data-contracts';
+import { playerIdSchema } from '@hoop-rush/data-contracts';
 function zeroMadeAttempted() {
   return { made: 0, attempted: 0 };
 }
@@ -16,7 +17,7 @@ function zeroTeamRebounds() {
 }
 function zeroPlayerAggregate(playerId: string): PlayerSeasonAggregate {
   return {
-    playerId,
+    playerId: playerIdSchema.parse(playerId),
     gamesPlayed: 0,
     minutes: 0,
     points: 0,

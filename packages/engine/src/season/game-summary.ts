@@ -1,5 +1,6 @@
 import {
   SEASON_GAME_SUMMARY_VERSION,
+  franchiseIdSchema,
   type SeasonCompactInjuryEvent,
   type SeasonCompactPlayerLine,
   type SeasonEffectsRollup,
@@ -90,7 +91,7 @@ function teamBoxOf(side: {
 }): SeasonTeamBox {
   const box = side.box;
   return {
-    franchiseId: side.franchiseId,
+    franchiseId: franchiseIdSchema.parse(side.franchiseId),
     points: box.points,
     fieldGoalsMade: box.fieldGoals.made,
     fieldGoalsAttempted: box.fieldGoals.attempted,
@@ -115,7 +116,7 @@ function sortedLines(lines: readonly SeasonCompactPlayerLine[]): SeasonCompactPl
 }
 function zeroTeamBox(franchiseId: string): SeasonTeamBox {
   return {
-    franchiseId,
+    franchiseId: franchiseIdSchema.parse(franchiseId),
     points: 0,
     fieldGoalsMade: 0,
     fieldGoalsAttempted: 0,

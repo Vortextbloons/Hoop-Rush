@@ -10,6 +10,7 @@ import type {
   SeasonRotation,
   SeasonStaminaInput,
 } from '@hoop-rush/data-contracts';
+import { franchiseIdSchema } from '@hoop-rush/data-contracts';
 import type { SideIndex } from '../sim/recorder.ts';
 import {
   canonicalRosterPairs,
@@ -652,7 +653,7 @@ export function reconcileSeasonEffects(input: SeasonEffectsReconcileInput): Seas
     if (archivedKeys.has(key)) continue;
     archivedKeys.add(key);
     archivedPairs.push({
-      franchiseId: franchiseA,
+      franchiseId: franchiseIdSchema.parse(franchiseA),
       a: pair.a,
       b: pair.b,
       sharedPossessions: pair.sharedPossessions,

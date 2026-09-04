@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { HoopRushManifest, FranchiseLineageEntry } from './index.ts';
+import {
+  eraIdSchema,
+  franchiseIdSchema,
+  franchiseLineageEntrySchema,
+  seasonKeySchema,
+} from './index.ts';
 import { resolveEraTeamIdentity, resolveHistoricalIdentitySpans } from './historical-identity.ts';
 const logo = (url: string) => ({ url, source: 'sportslogos' });
 const cdn = (id: string) => ({
@@ -14,18 +20,18 @@ function segment(
   to?: string,
   logos = [cdn('1610610000')],
 ): FranchiseLineageEntry {
-  return {
-    modernFranchiseId,
+  return franchiseLineageEntrySchema.parse({
+    modernFranchiseId: franchiseIdSchema.parse(modernFranchiseId),
     historicalTeamId: '1610610000',
-    validFromSeasonKey: from,
-    ...(to !== undefined ? { validThroughSeasonKey: to } : {}),
+    validFromSeasonKey: seasonKeySchema.parse(from),
+    ...(to !== undefined ? { validThroughSeasonKey: seasonKeySchema.parse(to) } : {}),
     displayName,
     city: displayName.split(' ')[0] ?? '',
     abbreviation,
     sourceIdentityIds: ['1610610000'],
     lineageRuleVersion: 'lineage-v1',
     logoCandidates: logos,
-  };
+  });
 }
 function manifest(lineage: FranchiseLineageEntry[]): HoopRushManifest {
   return {
@@ -33,25 +39,80 @@ function manifest(lineage: FranchiseLineageEntry[]): HoopRushManifest {
     dataVersion: 'test-v1',
     modernFranchiseSlots: [
       {
-        franchiseId: 'thunder',
+        franchiseId: franchiseIdSchema.parse('thunder'),
         displayName: 'Oklahoma City Thunder',
         teamExternalId: '1610612760',
       },
-      { franchiseId: 'celtics', displayName: 'Boston Celtics', teamExternalId: '1610612738' },
-      { franchiseId: 'grizzlies', displayName: 'Memphis Grizzlies', teamExternalId: '1610612763' },
-      { franchiseId: 'kings', displayName: 'Sacramento Kings', teamExternalId: '1610612758' },
-      { franchiseId: 'hornets', displayName: 'Charlotte Hornets', teamExternalId: '1610612766' },
-      { franchiseId: 'raptors', displayName: 'Toronto Raptors', teamExternalId: '1610612761' },
+      {
+        franchiseId: franchiseIdSchema.parse('celtics'),
+        displayName: 'Boston Celtics',
+        teamExternalId: '1610612738',
+      },
+      {
+        franchiseId: franchiseIdSchema.parse('grizzlies'),
+        displayName: 'Memphis Grizzlies',
+        teamExternalId: '1610612763',
+      },
+      {
+        franchiseId: franchiseIdSchema.parse('kings'),
+        displayName: 'Sacramento Kings',
+        teamExternalId: '1610612758',
+      },
+      {
+        franchiseId: franchiseIdSchema.parse('hornets'),
+        displayName: 'Charlotte Hornets',
+        teamExternalId: '1610612766',
+      },
+      {
+        franchiseId: franchiseIdSchema.parse('raptors'),
+        displayName: 'Toronto Raptors',
+        teamExternalId: '1610612761',
+      },
     ],
     franchiseLineage: lineage,
     eras: [
-      { eraId: '1960s', label: '1960s', fromSeasonKey: '1960-61', toSeasonKey: '1969-70' },
-      { eraId: '1970s', label: '1970s', fromSeasonKey: '1970-71', toSeasonKey: '1979-80' },
-      { eraId: '1980s', label: '1980s', fromSeasonKey: '1980-81', toSeasonKey: '1989-90' },
-      { eraId: '1990s', label: '1990s', fromSeasonKey: '1990-91', toSeasonKey: '1999-00' },
-      { eraId: '2000s', label: '2000s', fromSeasonKey: '2000-01', toSeasonKey: '2009-10' },
-      { eraId: '2010s', label: '2010s', fromSeasonKey: '2010-11', toSeasonKey: '2019-20' },
-      { eraId: '2020s', label: '2020s', fromSeasonKey: '2020-21', toSeasonKey: '2029-30' },
+      {
+        eraId: eraIdSchema.parse('1960s'),
+        label: '1960s',
+        fromSeasonKey: seasonKeySchema.parse('1960-61'),
+        toSeasonKey: seasonKeySchema.parse('1969-70'),
+      },
+      {
+        eraId: eraIdSchema.parse('1970s'),
+        label: '1970s',
+        fromSeasonKey: seasonKeySchema.parse('1970-71'),
+        toSeasonKey: seasonKeySchema.parse('1979-80'),
+      },
+      {
+        eraId: eraIdSchema.parse('1980s'),
+        label: '1980s',
+        fromSeasonKey: seasonKeySchema.parse('1980-81'),
+        toSeasonKey: seasonKeySchema.parse('1989-90'),
+      },
+      {
+        eraId: eraIdSchema.parse('1990s'),
+        label: '1990s',
+        fromSeasonKey: seasonKeySchema.parse('1990-91'),
+        toSeasonKey: seasonKeySchema.parse('1999-00'),
+      },
+      {
+        eraId: eraIdSchema.parse('2000s'),
+        label: '2000s',
+        fromSeasonKey: seasonKeySchema.parse('2000-01'),
+        toSeasonKey: seasonKeySchema.parse('2009-10'),
+      },
+      {
+        eraId: eraIdSchema.parse('2010s'),
+        label: '2010s',
+        fromSeasonKey: seasonKeySchema.parse('2010-11'),
+        toSeasonKey: seasonKeySchema.parse('2019-20'),
+      },
+      {
+        eraId: eraIdSchema.parse('2020s'),
+        label: '2020s',
+        fromSeasonKey: seasonKeySchema.parse('2020-21'),
+        toSeasonKey: seasonKeySchema.parse('2029-30'),
+      },
     ],
     pools: [],
     availability: [],

@@ -1,12 +1,13 @@
-import { describe, expect, it } from 'vitest';
+﻿import { describe, expect, it } from 'vitest';
 import { generateSeasonSchedule } from '@hoop-rush/engine';
 import { buildSeasonLeague, buildSeasonRunFixture } from '@hoop-rush/test-fixtures';
 import type { SeasonGameSummary, SeasonRoster } from '@hoop-rush/data-contracts';
+import { franchiseIdSchema, seedSchema, seasonGameIdSchema } from '@hoop-rush/data-contracts';
 import { humanSeasonPlayerStats, type SeasonPlayerStatsView } from './season-player-stats-view';
-const SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
-const league = buildSeasonLeague({}, { humanFranchiseId: 'lakers' });
+const SEED = seedSchema.parse('a1b2c3d4e5f60718293a4b5c6d7e8f9a');
+const league = buildSeasonLeague({}, { humanFranchiseId: franchiseIdSchema.parse('lakers') });
 const schedule = generateSeasonSchedule({ league, seed: SEED });
-const run = buildSeasonRunFixture({ schedule, league, seed: SEED, humanFranchiseId: 'lakers' });
+const run = buildSeasonRunFixture({ schedule, league, seed: SEED, humanFranchiseId: franchiseIdSchema.parse('lakers') });
 const rosterOf = (franchiseId: string): SeasonRoster => {
   const roster = run.rosters.find((r) => r.franchiseId === franchiseId);
   if (roster === undefined) throw new Error(`no roster for ${franchiseId}`);
@@ -63,7 +64,7 @@ function summary(home: SeasonRoster, away: SeasonRoster): SeasonGameSummary {
   return {
     schemaVersion: 1,
     summaryVersion: run.versions.summaryVersion,
-    gameId: 's000001',
+    gameId: seasonGameIdSchema.parse('s000001'),
     round: 1,
     homeFranchiseId: home.franchiseId,
     awayFranchiseId: away.franchiseId,
@@ -164,7 +165,7 @@ describe('humanSeasonPlayerStats', () => {
       },
       {
         ...summary(home, away),
-        gameId: 's000002',
+        gameId: seasonGameIdSchema.parse('s000002'),
         homePlayers: home.players.map((_, index) => lineOf(home, index, zeroAttempts)),
       },
     ];
@@ -183,9 +184,9 @@ describe('humanSeasonPlayerStats', () => {
     const summary1 = summary(roster, away);
     const summary2 = {
       ...summary(roster, away),
-      gameId: 's000002',
-      homeFranchiseId: 'celtics',
-      awayFranchiseId: 'lakers',
+      gameId: seasonGameIdSchema.parse('s000002'),
+      homeFranchiseId: franchiseIdSchema.parse('celtics'),
+      awayFranchiseId: franchiseIdSchema.parse('lakers'),
     };
     const view = viewOf({ ...input, summaries: [summary1, summary2] });
     expect(view.rows).toHaveLength(10);

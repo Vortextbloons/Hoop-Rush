@@ -4,8 +4,11 @@ import {
   SEASON_NEUTRAL_HOME_COURT,
   SEASON_ROTATION_PRESET_TARGETS,
   SEASON_ROTATION_VERSION,
+  franchiseIdSchema,
+  playerIdSchema,
   seasonGameSimulationResultSchema,
   playerVersionId,
+  seedSchema,
   type Position,
   type SeasonGameSimulationInput,
   type SeasonGameTeamInput,
@@ -40,7 +43,7 @@ function buildSeasonTeam(
 ): SeasonGameTeamInput {
   const franchiseId = side === 'home' ? 'lakers' : 'celtics';
   const players = POSITION_PLAN.map((positions, index) => {
-    const playerId = `p-sg-${side}-${String(index + 1)}`;
+    const playerId = playerIdSchema.parse(`p-sg-${side}-${String(index + 1)}`);
     const base = buildSimulationPlayer();
     return {
       playerVersionId: playerVersionId(playerId, franchiseId, '1990s', '1995-96'),
@@ -56,7 +59,7 @@ function buildSeasonTeam(
   return {
     teamId: side === 'home' ? 'home-team' : 'away-team',
     displayName: side === 'home' ? 'Home Team' : 'Away Team',
-    franchiseId,
+    franchiseId: franchiseIdSchema.parse(franchiseId),
     players,
     ...overrides,
   };
@@ -92,7 +95,7 @@ function buildSeasonGameInput(
   const away = buildSeasonTeam('away');
   return {
     schemaVersion: 1,
-    seed: seedFromString('season-game-1'),
+    seed: seedSchema.parse(seedFromString('season-game-1')),
     gameNumber: 1,
     dataVersion: 'data-v1',
     profile: buildEraSimulationProfile(),
@@ -111,7 +114,10 @@ function buildSeasonGameInput(
   };
 }
 function run(seed = 'season-game-1', overrides: Partial<SeasonGameSimulationInput> = {}) {
-  const input = buildSeasonGameInput({ seed: seedFromString(seed), ...overrides });
+  const input = buildSeasonGameInput({
+    seed: seedSchema.parse(seedFromString(seed)),
+    ...overrides,
+  });
   return { input, result: simulateSeasonGame(input, ctx) };
 }
 describe('season game controller (M2.2)', () => {
@@ -391,7 +397,7 @@ describe('season game controller (M2.2)', () => {
   });
   it('two historical versions of one person stay separate on one roster', () => {
     const home = buildSeasonTeam('home');
-    const sharedPlayerId = 'p-shared-person';
+    const sharedPlayerId = playerIdSchema.parse('p-shared-person');
     const twin0 = {
       ...(home.players[0] as NonNullable<SeasonGameTeamInput['players'][number]>),
       playerId: sharedPlayerId,

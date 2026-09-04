@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+﻿import { describe, expect, it } from 'vitest';
 import { generateSeasonSchedule } from '@hoop-rush/engine';
 import { buildSeasonLeague, buildSeasonRunFixture } from '@hoop-rush/test-fixtures';
 import type { SeasonGameSummary, SeasonRoster, SeasonRotation } from '@hoop-rush/data-contracts';
+import { franchiseIdSchema, seedSchema, seasonGameIdSchema } from '@hoop-rush/data-contracts';
 import {
   normalizeTeamProjection,
   rawSeasonTeamRatings,
@@ -9,10 +10,10 @@ import {
   seasonTeamDetail,
   type SeasonTeamDetail,
 } from './season-team-detail-view';
-const SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
-const league = buildSeasonLeague({}, { humanFranchiseId: 'lakers' });
+const SEED = seedSchema.parse('a1b2c3d4e5f60718293a4b5c6d7e8f9a');
+const league = buildSeasonLeague({}, { humanFranchiseId: franchiseIdSchema.parse('lakers') });
 const schedule = generateSeasonSchedule({ league, seed: SEED });
-const run = buildSeasonRunFixture({ schedule, league, seed: SEED, humanFranchiseId: 'lakers' });
+const run = buildSeasonRunFixture({ schedule, league, seed: SEED, humanFranchiseId: franchiseIdSchema.parse('lakers') });
 function zeroRawProjection() {
   return { overall: 0, offense: 0, defense: 0 };
 }
@@ -73,7 +74,7 @@ function summary(home: SeasonRoster, away: SeasonRoster): SeasonGameSummary {
   return {
     schemaVersion: 1,
     summaryVersion: run.versions.summaryVersion,
-    gameId: 's000001',
+    gameId: seasonGameIdSchema.parse('s000001'),
     round: 1,
     homeFranchiseId: home.franchiseId,
     awayFranchiseId: away.franchiseId,
@@ -191,7 +192,7 @@ describe('seasonTeamDetail', () => {
     expect(
       seasonTeamDetail({
         ...input,
-        roster: { ...input.roster, franchiseId: 'nonexistent' },
+        roster: { ...input.roster, franchiseId: franchiseIdSchema.parse('nonexistent') },
       }),
     ).toBeNull();
   });

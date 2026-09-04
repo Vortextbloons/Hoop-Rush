@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { franchiseIdSchema, seasonGameIdSchema } from '@hoop-rush/data-contracts';
 import { seasonRunStateDigest, type SeasonRunStateDigestFacts } from './state-digest.ts';
 import { buildTestRun, pipelineInput } from './block-test-support.ts';
 function baseFacts(): SeasonRunStateDigestFacts {
@@ -74,8 +75,8 @@ describe('seasonRunStateDigest', () => {
                 {
                   injuryId: 'injury-x',
                   playerVersionId: 'pv-x',
-                  franchiseId: 'lakers',
-                  gameId: 's000001',
+                  franchiseId: franchiseIdSchema.parse('lakers'),
+                  gameId: seasonGameIdSchema.parse('s000001'),
                   type: 'lower-body',
                   severity: 'minor',
                   occurredBeforeHalftime: false,

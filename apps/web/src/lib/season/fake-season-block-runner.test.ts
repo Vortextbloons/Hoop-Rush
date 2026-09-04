@@ -1,3 +1,4 @@
+﻿import { franchiseIdSchema, commandIdSchema, seedSchema } from '@hoop-rush/data-contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildSeasonLeague, buildSeasonRunFixture } from '@hoop-rush/test-fixtures';
 import { generateSeasonSchedule, seasonRotationSetDigest } from '@hoop-rush/engine';
@@ -15,8 +16,8 @@ vi.mock('@hoop-rush/persistence', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@hoop-rush/persistence')>()),
   loadActiveRunWithSchedule: vi.fn(() => null),
 }));
-const LEAGUE = buildSeasonLeague({}, { humanFranchiseId: 'lakers' });
-const SCHEDULE = generateSeasonSchedule({ league: LEAGUE, seed: 'a'.repeat(32) });
+const LEAGUE = buildSeasonLeague({}, { humanFranchiseId: franchiseIdSchema.parse('lakers') });
+const SCHEDULE = generateSeasonSchedule({ league: LEAGUE, seed: seedSchema.parse('a'.repeat(32)) });
 function minimalInput(): SeasonBlockStartInput {
   const run = buildSeasonRunFixture({ schedule: SCHEDULE, stateDigest: '0'.repeat(32) });
   return {
@@ -32,8 +33,8 @@ function minimalInput(): SeasonBlockStartInput {
     blockIndex: 0,
     expectedRevision: 0,
     rotationDigest: seasonRotationSetDigest(run.rotations),
-    commandId: 'blk-fake-1',
-    humanFranchiseId: 'lakers',
+    commandId: commandIdSchema.parse('blk-fake-1'),
+    humanFranchiseId: franchiseIdSchema.parse('lakers'),
     objectiveId: null,
     homeCourt: {
       schemaVersion: 1,

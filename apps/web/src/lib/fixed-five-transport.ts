@@ -5,7 +5,9 @@ import {
   fixedFiveCommandPayloadSchema,
   fixedFiveCommandSchema,
   fixedFiveRoomCodeSchema,
+  fixedFiveRoomPhaseSchema,
   fixedFiveRoomSettingsSchema,
+  fixedFiveRoomSnapshotSchema,
   idSchema,
   type FixedFiveCommandReceipt,
   type FixedFiveMemberSnapshot,
@@ -30,9 +32,10 @@ interface FixedFiveRoomRow {
   id: Id;
   code: FixedFiveRoomCode | null;
   code_active: boolean;
-  mode: string;
-  source_mode: string;
-  variant: string;
+  mode: unknown;
+  source_mode: unknown;
+  variant: unknown;
+  versions: unknown;
   phase: string;
   revision: number;
   command_count: number;
@@ -48,7 +51,6 @@ interface FixedFiveRoomRow {
   deadline_pick_ordinal: number | null;
   expires_at: string;
   created_at: string;
-  settings: FixedFiveRoomSnapshot['settings'];
 }
 
 interface FixedFiveMemberRow {
@@ -105,11 +107,24 @@ function commandPayload(value: unknown): RpcCommandPayload {
   return { accepted, ordinal, revision, rejection_code: rejection };
 }
 
+function supabaseEnv(): { url?: string; publishableKey?: string } {
+  const env = import.meta.env as Record<string, unknown>;
+  const url = env['VITE_SUPABASE_URL'];
+  const publishableKey = env['VITE_SUPABASE_PUBLISHABLE_KEY'];
+  return {
+    url: typeof url === 'string' ? url : undefined,
+    publishableKey: typeof publishableKey === 'string' ? publishableKey : undefined,
+  };
+}
+
 export function isFixedFiveSupabaseConfigured(): boolean {
-  const env = import.meta as unknown as { env?: Record<string, string | undefined> };
-  const url = env.env?.VITE_SUPABASE_URL;
-  const key = env.env?.VITE_SUPABASE_PUBLISHABLE_KEY;
-  return Boolean(url && key);
+  const { url, publishableKey } = supabaseEnv();
+  return Boolean(url && publishableKey);
+}
+
+export function createConfiguredFixedFiveTransport(): FixedFiveMultiplayerTransport {
+  const { url, publishableKey } = supabaseEnv();
+  return createFixedFiveTransport({ url, publishableKey });
 }
 
 async function ensureAnonymous(client: FixedFiveClient): Promise<void> {
@@ -172,7 +187,7 @@ export function createFixedFiveTransport(options?: {
       byId.get('p1') ?? memberFallback('p1'),
       byId.get('p2') ?? memberFallback('p2'),
     ];
-    const phase = row.phase as FixedFiveRoomSnapshot['phase'];
+    const phase = fixedFiveRoomPhaseSchema.parse(row.phase);
     let deadline: FixedFiveRoomSnapshot['deadline'] = null;
     if (row.deadline_at) {
       const fallback = fixedFiveCommandPayloadSchema.safeParse(row.deadline_fallback);
@@ -187,11 +202,22 @@ export function createFixedFiveTransport(options?: {
         };
       }
     }
-    return {
+    // The rooms table stores settings as separate columns (mode, source_mode,
+    // variant, versions) — never as a nested object. Rebuild + validate here so
+    // a malformed row fails fast instead of crashing the template on .settings.
+    const settings = fixedFiveRoomSettingsSchema.parse({
+      schemaVersion: 1,
+      mode: row.mode,
+      sourceMode: row.source_mode,
+      variant: row.variant,
+      timerPolicyVersion: 'fixed-five-autopick-v1',
+      versions: row.versions,
+    });
+    return fixedFiveRoomSnapshotSchema.parse({
       roomId: row.id,
       code: row.code,
       codeActive: row.code_active,
-      settings: row.settings,
+      settings,
       phase,
       revision: row.revision,
       commandCount: row.command_count,
@@ -204,7 +230,7 @@ export function createFixedFiveTransport(options?: {
       successorRoomId: row.successor_room_id,
       expiresAt: row.expires_at,
       createdAt: row.created_at,
-    };
+    });
   }
 
   async function fetchSnapshot(roomId: string): Promise<FixedFiveRoomSnapshot> {
@@ -284,9 +310,9 @@ export function createFixedFiveTransport(options?: {
         timerPolicyVersion: 'fixed-five-autopick-v1',
         versions: record['versions'],
       });
-      const phase = (typeof record['phase'] === 'string'
-        ? record['phase']
-        : 'lobby') as FixedFiveRoomSnapshot['phase'];
+      const phase = fixedFiveRoomPhaseSchema.parse(
+        typeof record['phase'] === 'string' ? record['phase'] : 'lobby',
+      );
       const revision = typeof record['revision'] === 'number' ? record['revision'] : 0;
       return {
         roomId: idSchema.parse(stringField(record, 'room_id')),
@@ -394,10 +420,11 @@ export function createFixedFiveTransport(options?: {
     },
     async refetch(roomId, afterOrdinal) {
       await ensureAnonymous(client);
+      const parsedRoomId = idSchema.parse(roomId);
       const response = await client
         .from('fixed_five_room_commands')
         .select('*')
-        .eq('room_id', roomId)
+        .eq('room_id', parsedRoomId)
         .gt('ordinal', afterOrdinal)
         .order('ordinal', { ascending: true });
       if (response.error) throw new Error(`refetch failed: ${response.error.message}`);
@@ -405,7 +432,7 @@ export function createFixedFiveTransport(options?: {
       return rows.map((row) =>
         fixedFiveCommandSchema.parse({
           schemaVersion: 1,
-          roomId,
+          roomId: parsedRoomId,
           commandId: row.command_id,
           ordinal: row.ordinal,
           actorParticipantId: row.actor_participant_id,
@@ -489,9 +516,9 @@ export function createFixedFiveTransport(options?: {
       if (response.error || !response.data)
         throw new Error(`complete failed: ${response.error?.message ?? 'unknown'}`);
       const record = response.data as unknown as Record<string, unknown>;
-      const phase = (typeof record['phase'] === 'string'
-        ? record['phase']
-        : 'awaiting-confirmation') as FixedFiveRoomSnapshot['phase'];
+      const phase = fixedFiveRoomPhaseSchema.parse(
+        typeof record['phase'] === 'string' ? record['phase'] : 'awaiting-confirmation',
+      );
       return { completed: record['completed'] === true, phase };
     },
     async fail(roomId) {
@@ -500,9 +527,9 @@ export function createFixedFiveTransport(options?: {
       if (response.error || !response.data)
         throw new Error(`fail failed: ${response.error?.message ?? 'unknown'}`);
       const record = response.data as unknown as Record<string, unknown>;
-      const phase = (typeof record['phase'] === 'string'
-        ? record['phase']
-        : 'awaiting-confirmation') as FixedFiveRoomSnapshot['phase'];
+      const phase = fixedFiveRoomPhaseSchema.parse(
+        typeof record['phase'] === 'string' ? record['phase'] : 'awaiting-confirmation',
+      );
       return { failed: record['failed'] === true, phase };
     },
   };

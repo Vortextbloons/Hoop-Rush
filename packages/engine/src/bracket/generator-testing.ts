@@ -1,4 +1,5 @@
 import type { OpponentBracket, SimulationPlayer } from '@hoop-rush/data-contracts';
+import { playerIdSchema, seedSchema } from '@hoop-rush/data-contracts';
 import {
   buildEraSimulationProfile,
   buildFixtureBracket,
@@ -20,7 +21,7 @@ function candidatePlayer(
   score: number,
 ): BracketCandidatePlayer {
   const sim = buildSimulationPlayer({
-    playerId: `p-${franchiseId}-${String(index)}`,
+    playerId: playerIdSchema.parse(`p-${franchiseId}-${String(index)}`),
     displayName: `${franchiseId} ${String(index)}`,
     positions,
   });
@@ -118,7 +119,7 @@ export function generationOptions(
   const difficulty = buildFixtureBracket().difficulty;
   const opening = buildOpeningOpponent();
   return {
-    seed: seedFromString('fixture-bracket'),
+    seed: seedSchema.parse(seedFromString('fixture-bracket')),
     dataVersion: 'data-v1',
     generationVersion: 'bracket-m3-v1',
     profile: buildEraSimulationProfile(),

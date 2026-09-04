@@ -15,8 +15,11 @@ export function seasonReplayAssetHashesOf(
   if (season === undefined) {
     throw new Error('manifest is missing the season artifact index');
   }
-  const eraProfile =
-    manifest.eraSimulationProfiles.find((entry) => entry.eraId === eraId)?.contentHash ?? '';
+  const eraProfileEntry = manifest.eraSimulationProfiles.find((entry) => entry.eraId === eraId);
+  if (eraProfileEntry === undefined) {
+    throw new Error(`manifest is missing the era profile for ${eraId}`);
+  }
+  const eraProfile = eraProfileEntry.contentHash;
   return {
     league: season.league.contentHash,
     schedule: season.schedule.contentHash,

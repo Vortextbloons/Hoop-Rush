@@ -1,3 +1,4 @@
+﻿import { franchiseIdSchema, seasonGameIdSchema } from '@hoop-rush/data-contracts';
 import { describe, expect, it } from 'vitest';
 import type { SeasonGame, SeasonRotation } from '@hoop-rush/data-contracts';
 import { buildSeasonDraftCatalog, buildSeasonRotation } from '@hoop-rush/test-fixtures';
@@ -34,10 +35,10 @@ const NAMES = new Map<string, string>(
 );
 function games(): SeasonGame[] {
   const make = (gameId: string, round: number, home: string, away: string): SeasonGame => ({
-    gameId,
+    gameId: seasonGameIdSchema.parse(gameId),
     round,
-    homeFranchiseId: home,
-    awayFranchiseId: away,
+    homeFranchiseId: franchiseIdSchema.parse(home),
+    awayFranchiseId: franchiseIdSchema.parse(away),
     status: 'scheduled',
     homeScore: null,
     awayScore: null,
@@ -98,7 +99,7 @@ describe('buildLockPreview', () => {
     blockIndex: 0,
     names: NAMES,
     games: games(),
-    humanFranchiseId: 'lakers',
+    humanFranchiseId: franchiseIdSchema.parse('lakers'),
   };
   it('shows no changes and ten locked games on a fresh block', () => {
     const preview = buildLockPreview({

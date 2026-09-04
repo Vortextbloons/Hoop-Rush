@@ -1,5 +1,6 @@
 import {
   SEASON_STANDINGS_VERSION,
+  franchiseIdSchema,
   type SeasonGame,
   type SeasonLeague,
   type SeasonStandings,
@@ -67,7 +68,7 @@ export function reduceSeasonStandings(
   const franchiseIds = league.teams.map((team) => team.franchiseId);
   function emptyRow(franchiseId: string): SeasonStandingsRow {
     return {
-      franchiseId,
+      franchiseId: franchiseIdSchema.parse(franchiseId),
       wins: 0,
       losses: 0,
       gamesPlayed: 0,

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+﻿import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   SEASON_DRAFT_CATALOG_V3,
   SEASON_DURABILITY_VERSION,
@@ -17,6 +17,7 @@ import {
   type SeasonRun,
   type SeasonRosterTargets,
 } from '@hoop-rush/data-contracts';
+import { franchiseIdSchema, eraIdSchema, seasonKeySchema, playerIdSchema, commandIdSchema, seedSchema, contentHashSchema } from '@hoop-rush/data-contracts';
 import type { SeasonRunRepository } from '@hoop-rush/persistence';
 import type { SeasonRunCommandApplication, SeasonRunSnapshot } from '@hoop-rush/persistence';
 import { buildSeasonLeague, buildSeasonRunFixture } from '@hoop-rush/test-fixtures';
@@ -30,8 +31,8 @@ import { clearCachedSeasonSnapshot } from './season-state-cache';
 import type { SeasonBlockRunner, SeasonRunnerEvent } from './season-block-runner';
 import { buildSubmitBlockEnvelope } from './season-block-submit';
 import type { SeasonRunShellData } from './season-shell-context';
-const SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
-const HUMAN = 'lakers';
+const SEED = seedSchema.parse('a1b2c3d4e5f60718293a4b5c6d7e8f9a');
+const HUMAN = franchiseIdSchema.parse('lakers');
 const SLOT_POSITIONS: ReadonlyArray<readonly Position[]> = [
   ['PG'],
   ['SG'],
@@ -76,7 +77,7 @@ function fixtureCatalog(run: SeasonRun): SeasonDraftCatalog {
     durabilityVersion: SEASON_DURABILITY_VERSION,
     pools: run.rosters.map((roster) => ({
       franchiseId: roster.franchiseId,
-      eraId: '1990s',
+      eraId: eraIdSchema.parse('1990s'),
       playerVersionIds: roster.players.map((player) => player.playerVersionId),
     })),
     candidates,
@@ -92,9 +93,9 @@ function catalogCandidate(
   return {
     playerVersionId,
     playerId,
-    franchiseId: 'lakers',
-    eraId: '1990s',
-    seasonKey: '1994-95',
+    franchiseId: franchiseIdSchema.parse('lakers'),
+    eraId: eraIdSchema.parse('1990s'),
+    seasonKey: seasonKeySchema.parse('1994-95'),
     displayName: playerId,
     playerExternalId: '101',
     positions: {
@@ -152,7 +153,7 @@ function fixtureIndex(catalog: SeasonDraftCatalog): SeasonFreeAgencyIndex {
     dataVersion: 'fixture',
     catalogRef: {
       catalogVersion: catalog.catalogVersion,
-      contentHash: '0'.repeat(64),
+      contentHash: contentHashSchema.parse('0').repeat(64),
       candidateCount: catalog.candidates.length,
     },
     candidates,
@@ -575,7 +576,7 @@ describe('SeasonHubState free-agency commands (M2.6.5)', () => {
       {
         schemaVersion: SEASON_RUN_SCHEMA_VERSION,
         command: 'declare-free-agent-interest',
-        commandId: 'cmd-stale-engine',
+        commandId: commandIdSchema.parse('cmd-stale-engine'),
         runId: authoritative.runId,
         expectedStateRevision: 1,
         expectedStateDigest: fixture.run.stateDigest,
@@ -618,7 +619,7 @@ describe('SeasonHubState free-agency commands (M2.6.5)', () => {
         case 'free-agency-target-ineligible':
           return { windowIndex: 0, playerVersionId: 'pv-extra-00' };
         case 'free-agency-duplicate-identity':
-          return { playerId: 'p-extra-00', playerVersionId: 'pv-extra-00' };
+          return { playerId: playerIdSchema.parse('p-extra-00'), playerVersionId: 'pv-extra-00' };
         case 'free-agency-invalid-priority':
           return { playerVersionId: 'pv-extra-00' };
         case 'free-agency-unsupported-role':
@@ -686,7 +687,7 @@ describe('block-submit gating (free-agency-unresolved)', () => {
       objectives: {
         ...base.objectives,
         selections: {
-          3: { objectiveId: 'win-six' as const, selectedByCommandId: 'cmd-obj-3', success: null },
+          3: { objectiveId: 'win-six' as const, selectedByCommandId: commandIdSchema.parse('cmd-obj-3'), success: null },
         },
       },
     };

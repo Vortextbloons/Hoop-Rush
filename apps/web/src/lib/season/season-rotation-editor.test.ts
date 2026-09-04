@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+﻿import { describe, expect, it } from 'vitest';
 import {
   canPlay,
   SEASON_MINUTE_POLICY_VERSION,
@@ -6,6 +6,7 @@ import {
   type Position,
   type SeasonRotation,
 } from '@hoop-rush/data-contracts';
+import { franchiseIdSchema } from '@hoop-rush/data-contracts';
 import {
   ROTATION_PRESETS,
   createRotationEditor,
@@ -324,7 +325,7 @@ describe('RotationEditor.toggleClosing', () => {
     ];
     const e = createRotationEditor(
       {
-        franchiseId: 'lakers',
+        franchiseId: franchiseIdSchema.parse('lakers'),
         starters: ['g1', 'g2', 'f1', 'f2', 'c1'],
         benchOrder: ['g3', 'g4', 'f3', 'f4', 'c2'],
         targetMinutes: players.map((p) => ({ playerVersionId: p.playerVersionId, minutes: 24 })),

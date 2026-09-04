@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Lineup, LineupAssignment, PositionUnion } from '@hoop-rush/data-contracts';
-import { LINEUP_STRUCTURE } from '@hoop-rush/data-contracts';
+import { LINEUP_STRUCTURE, playerIdSchema } from '@hoop-rush/data-contracts';
 import { assignLineup, canFillSlot, slotRequirement, validateLineup } from './lineup.ts';
 const structure = { structure: LINEUP_STRUCTURE };
 function assignment(
@@ -8,7 +8,7 @@ function assignment(
   playerId: string,
   positions: PositionUnion,
 ): LineupAssignment {
-  return { slotIndex: slotIndex, playerId, positions };
+  return { slotIndex: slotIndex, playerId: playerIdSchema.parse(playerId), positions };
 }
 function lineup(assignments: LineupAssignment[]): Lineup {
   return { ...structure, assignments };

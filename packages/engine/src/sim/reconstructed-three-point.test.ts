@@ -5,6 +5,7 @@ import type {
   SimulationPlayer,
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
+import { seedSchema } from '@hoop-rush/data-contracts';
 import {
   DEFAULT_ERA_SIM_PROFILE,
   buildEraSimulationProfile,
@@ -171,7 +172,7 @@ describe('reconstructed team end-to-end (spec/12)', () => {
     for (let index = 0; index < games; index += 1) {
       const result = simulateGame(
         buildGameSimulationInput({
-          seed: seedFromString(`reconstructed-${String(index)}`),
+          seed: seedSchema.parse(seedFromString(`reconstructed-${String(index)}`)),
           home: team,
           away: team,
           profile: zeroThreeEra,
@@ -203,7 +204,7 @@ describe('reconstructed team end-to-end (spec/12)', () => {
   it('keeps deterministic results for a reconstructed team', () => {
     const team = reconstructedTeam();
     const input = buildGameSimulationInput({
-      seed: seedFromString('reconstructed-determinism'),
+      seed: seedSchema.parse(seedFromString('reconstructed-determinism')),
       home: team,
       away: team,
     });

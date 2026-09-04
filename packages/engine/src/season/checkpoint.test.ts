@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { type SeasonGameSummary, type SeasonSchedule } from '@hoop-rush/data-contracts';
+import {
+  franchiseIdSchema,
+  seasonGameIdSchema,
+  type SeasonGameSummary,
+  type SeasonSchedule,
+} from '@hoop-rush/data-contracts';
 import { reconstructSeasonGames } from './checkpoint.ts';
 import { buildTestRun, scheduleOf } from './block-test-support.ts';
 function tinySchedule(): SeasonSchedule {
@@ -16,17 +21,17 @@ function summaryOf(
   return {
     schemaVersion: 1,
     summaryVersion: 'season-game-summary-v3',
-    gameId,
+    gameId: seasonGameIdSchema.parse(gameId),
     round,
-    homeFranchiseId,
-    awayFranchiseId,
+    homeFranchiseId: franchiseIdSchema.parse(homeFranchiseId),
+    awayFranchiseId: franchiseIdSchema.parse(awayFranchiseId),
     status: 'final',
     overtimePeriods: 0,
     homeScore,
     awayScore,
     forfeitLoserFranchiseId: null,
     homeBox: {
-      franchiseId: homeFranchiseId,
+      franchiseId: franchiseIdSchema.parse(homeFranchiseId),
       points: homeScore,
       fieldGoalsMade: 40,
       fieldGoalsAttempted: 90,
@@ -44,7 +49,7 @@ function summaryOf(
       possessions: 100,
     },
     awayBox: {
-      franchiseId: awayFranchiseId,
+      franchiseId: franchiseIdSchema.parse(awayFranchiseId),
       points: awayScore,
       fieldGoalsMade: 38,
       fieldGoalsAttempted: 88,

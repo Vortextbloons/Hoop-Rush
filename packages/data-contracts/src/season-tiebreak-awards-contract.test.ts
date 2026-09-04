@@ -3,6 +3,8 @@ import {
   SEASON_SEED_NAMESPACES,
   SEASON_TIEBREAK_VERSION,
   buildInitialPostseasonState,
+  franchiseIdSchema,
+  idSchema,
   playoffGameIdOf,
   seasonAwardsDigest,
   seasonAwardsSchema,
@@ -11,6 +13,7 @@ import {
   seasonRunCompletionSchema,
   seasonRunSchema,
   seasonTiebreakResolutionSchema,
+  seedSchema,
   type SeasonAwards,
   type SeasonPostseasonState,
   type SeasonRun,
@@ -23,11 +26,15 @@ export function buildTiebreakResolution(
   overrides: Partial<SeasonTiebreakResolution> = {},
 ): SeasonTiebreakResolution {
   return {
-    resolutionId: 'tb-east-playin-seeds',
+    resolutionId: idSchema.parse('tb-east-playin-seeds'),
     conference: 'east',
     kind: 'qualification',
     rule: 'head-to-head',
-    teams: ['team-7', 'team-8', 'team-9'],
+    teams: [
+      franchiseIdSchema.parse('team-7'),
+      franchiseIdSchema.parse('team-8'),
+      franchiseIdSchema.parse('team-9'),
+    ],
     slots: [7, 8, 9],
     evidence: [{ label: 'head-to-head record', value: 2 }],
     drawSeed: null,
@@ -38,38 +45,38 @@ export function buildFinalsHomeCourtResolutions(): SeasonTiebreakResolution[] {
   const drawSeed = buildPostseason(SEED).finalsHomeCourtDrawSeed;
   return [
     buildTiebreakResolution({
-      resolutionId: 'tb-finals-overall-record',
+      resolutionId: idSchema.parse('tb-finals-overall-record'),
       conference: 'west',
       kind: 'finals-home-court',
       rule: 'overall-record',
-      teams: ['lakers', 'celtics'],
+      teams: [franchiseIdSchema.parse('lakers'), franchiseIdSchema.parse('celtics')],
       slots: [1],
       evidence: [{ label: 'overall record', value: '57-25 vs 55-27' }],
     }),
     buildTiebreakResolution({
-      resolutionId: 'tb-finals-head-to-head',
+      resolutionId: idSchema.parse('tb-finals-head-to-head'),
       conference: 'west',
       kind: 'finals-home-court',
       rule: 'head-to-head',
-      teams: ['lakers', 'celtics'],
+      teams: [franchiseIdSchema.parse('lakers'), franchiseIdSchema.parse('celtics')],
       slots: [1],
       evidence: [{ label: 'head-to-head record', value: '2-1' }],
     }),
     buildTiebreakResolution({
-      resolutionId: 'tb-finals-points-differential',
+      resolutionId: idSchema.parse('tb-finals-points-differential'),
       conference: 'west',
       kind: 'finals-home-court',
       rule: 'points-differential',
-      teams: ['lakers', 'celtics'],
+      teams: [franchiseIdSchema.parse('lakers'), franchiseIdSchema.parse('celtics')],
       slots: [1],
       evidence: [{ label: 'points differential', value: 8.4 }],
     }),
     buildTiebreakResolution({
-      resolutionId: 'tb-finals-random-draw',
+      resolutionId: idSchema.parse('tb-finals-random-draw'),
       conference: 'west',
       kind: 'finals-home-court',
       rule: 'random-draw',
-      teams: ['lakers', 'celtics'],
+      teams: [franchiseIdSchema.parse('lakers'), franchiseIdSchema.parse('celtics')],
       slots: [1],
       evidence: [{ label: 'deciding rule', value: 'random-draw' }],
       drawSeed,
@@ -80,8 +87,10 @@ export function buildCompletedBracket(
   champion: string,
 ): NonNullable<SeasonPostseasonState['bracket']> {
   const challenger = champion === 'lakers' ? 'celtics' : 'lakers';
+  const parsedChampion = franchiseIdSchema.parse(champion);
+  const parsedChallenger = franchiseIdSchema.parse(challenger);
   const pending = (seriesId: string, round: PlayoffRound, conference: 'east' | 'west') => ({
-    seriesId,
+    seriesId: idSchema.parse(seriesId),
     round,
     conference,
     higherSeed: null,
@@ -95,7 +104,9 @@ export function buildCompletedBracket(
   });
   const conferenceBracket = (conference: 'east' | 'west') => ({
     conference,
-    seeds: Array.from({ length: 8 }, (_, i) => `team-${String(i + 1)}`),
+    seeds: Array.from({ length: 8 }, (_, i) =>
+      franchiseIdSchema.parse(`team-${String(i + 1)}`),
+    ),
     firstRound: [1, 2, 3, 4].map((n) =>
       pending(`${conference}-first-round-${String(n)}`, 'first-round', conference),
     ),
@@ -110,13 +121,13 @@ export function buildCompletedBracket(
     east: conferenceBracket('east'),
     west: conferenceBracket('west'),
     finals: {
-      seriesId: 'finals',
+      seriesId: idSchema.parse('finals'),
       round: 'finals',
       conference: null,
       higherSeed: null,
       lowerSeed: null,
-      homeCourtFranchiseId: champion,
-      challengerFranchiseId: challenger,
+      homeCourtFranchiseId: parsedChampion,
+      challengerFranchiseId: parsedChallenger,
       homeCourtWins: 4,
       challengerWins: 2,
       games: [1, 2, 3, 4, 5, 6].map((gameNumber) => {
@@ -124,17 +135,17 @@ export function buildCompletedBracket(
         return {
           gameId: playoffGameIdOf('finals', gameNumber),
           gameNumber,
-          homeFranchiseId: championHome ? champion : challenger,
-          awayFranchiseId: championHome ? challenger : champion,
+          homeFranchiseId: championHome ? parsedChampion : parsedChallenger,
+          awayFranchiseId: championHome ? parsedChallenger : parsedChampion,
           status: 'final' as const,
           homeScore: championHome ? 104 : 99,
           awayScore: championHome ? 99 : 104,
-          winnerFranchiseId: champion,
+          winnerFranchiseId: parsedChampion,
         };
       }),
-      winnerFranchiseId: champion,
+      winnerFranchiseId: parsedChampion,
     },
-    championFranchiseId: champion,
+    championFranchiseId: parsedChampion,
   };
 }
 export function buildCompletedPostseason(
@@ -143,7 +154,10 @@ export function buildCompletedPostseason(
   resolutions: SeasonTiebreakResolution[] = buildFinalsHomeCourtResolutions(),
 ): SeasonPostseasonState {
   const base = buildPostseason(seed);
-  const seeds = Array.from({ length: 8 }, (_, i) => `team-${String(i + 1)}`);
+  const seeds = Array.from({ length: 8 }, (_, i) =>
+    franchiseIdSchema.parse(`team-${String(i + 1)}`),
+  );
+  const parsedChampion = franchiseIdSchema.parse(champion);
   return {
     ...base,
     tiebreakResolutions: resolutions,
@@ -152,7 +166,7 @@ export function buildCompletedPostseason(
       west: { ...base.playIn.west, playoffSeeds: seeds },
     },
     bracket: buildCompletedBracket(champion),
-    championFranchiseId: champion,
+    championFranchiseId: parsedChampion,
   };
 }
 function rosterOf(run: SeasonRun, index: number): SeasonRun['rosters'][number] {
@@ -203,10 +217,21 @@ export function buildCompletedRunWithAwards(champion = 'lakers'): SeasonRun {
 describe('tiebreak resolution contract (M2.6, tiebreaker-v1)', () => {
   it('enforces teams (2-3), slots (1-10, 1-3 entries), and evidence bounds', () => {
     const schema = seasonTiebreakResolutionSchema;
-    expect(schema.safeParse(buildTiebreakResolution({ teams: ['team-7'] })).success).toBe(false);
     expect(
       schema.safeParse(
-        buildTiebreakResolution({ teams: ['team-7', 'team-8', 'team-9', 'team-10'] }),
+        buildTiebreakResolution({ teams: [franchiseIdSchema.parse('team-7')] }),
+      ).success,
+    ).toBe(false);
+    expect(
+      schema.safeParse(
+        buildTiebreakResolution({
+          teams: [
+            franchiseIdSchema.parse('team-7'),
+            franchiseIdSchema.parse('team-8'),
+            franchiseIdSchema.parse('team-9'),
+            franchiseIdSchema.parse('team-10'),
+          ],
+        }),
       ).success,
     ).toBe(false);
     expect(schema.safeParse(buildTiebreakResolution({ slots: [] })).success).toBe(false);
@@ -237,9 +262,9 @@ describe('tiebreak resolution contract (M2.6, tiebreaker-v1)', () => {
   });
   it('enforces identity, conference, and drawSeed shapes', () => {
     const schema = seasonTiebreakResolutionSchema;
-    expect(schema.safeParse(buildTiebreakResolution({ resolutionId: 'Bad id!' })).success).toBe(
-      false,
-    );
+    expect(
+      schema.safeParse({ ...buildTiebreakResolution(), resolutionId: 'Bad id!' }).success,
+    ).toBe(false);
     expect(schema.safeParse({ ...buildTiebreakResolution(), conference: 'central' }).success).toBe(
       false,
     );
@@ -249,13 +274,15 @@ describe('tiebreak resolution contract (M2.6, tiebreaker-v1)', () => {
     expect(schema.safeParse({ ...buildTiebreakResolution(), rule: 'coin-flip' }).success).toBe(
       false,
     );
-    expect(schema.safeParse(buildTiebreakResolution({ drawSeed: 'zzz' })).success).toBe(false);
+    expect(schema.safeParse({ ...buildTiebreakResolution(), drawSeed: 'zzz' }).success).toBe(
+      false,
+    );
     expect(schema.safeParse(buildTiebreakResolution({ drawSeed: null })).success).toBe(true);
   });
   it('enforces the drawSeed/rule coupling at parse time', () => {
     expect(
       seasonTiebreakResolutionSchema.safeParse(
-        buildTiebreakResolution({ rule: 'head-to-head', drawSeed: SEED }),
+        buildTiebreakResolution({ rule: 'head-to-head', drawSeed: seedSchema.parse(SEED) }),
       ).success,
     ).toBe(false);
     expect(
@@ -265,7 +292,7 @@ describe('tiebreak resolution contract (M2.6, tiebreaker-v1)', () => {
     ).toBe(false);
     expect(
       seasonTiebreakResolutionSchema.safeParse(
-        buildTiebreakResolution({ rule: 'random-draw', drawSeed: SEED }),
+        buildTiebreakResolution({ rule: 'random-draw', drawSeed: seedSchema.parse(SEED) }),
       ).success,
     ).toBe(true);
   });
@@ -287,8 +314,8 @@ describe('finals home court representability (M2.6)', () => {
     }
   });
   it('derives finalsHomeCourtDrawSeed deterministically as a pure function of the root seed', () => {
-    const first = buildInitialPostseasonState(SEED);
-    const second = buildInitialPostseasonState(SEED);
+    const first = buildInitialPostseasonState(seedSchema.parse(SEED));
+    const second = buildInitialPostseasonState(seedSchema.parse(SEED));
     expect(second.finalsHomeCourtDrawSeed).toBe(first.finalsHomeCourtDrawSeed);
     expect(first.finalsHomeCourtDrawSeed).toMatch(/^[0-9a-f]{32}$/);
     const tiesSeed = seasonNamespaceSeed(SEED, SEASON_SEED_NAMESPACES.postseasonTies);
@@ -297,19 +324,19 @@ describe('finals home court representability (M2.6)', () => {
       seasonNamespaceSeed(tiesSeed, SEASON_SEED_NAMESPACES.postseasonDraws, 'finals-home-court'),
     );
     expect(buildPostseason(SEED).finalsHomeCourtDrawSeed).toBe(first.finalsHomeCourtDrawSeed);
-    expect(buildInitialPostseasonState('f'.repeat(32)).finalsHomeCourtDrawSeed).not.toBe(
-      first.finalsHomeCourtDrawSeed,
-    );
+    expect(
+      buildInitialPostseasonState(seedSchema.parse('f'.repeat(32))).finalsHomeCourtDrawSeed,
+    ).not.toBe(first.finalsHomeCourtDrawSeed);
     expect(first.tiebreakVersion).toBe(SEASON_TIEBREAK_VERSION);
   });
   it('records the saved finals draw seed on a random-draw resolution inside a state', () => {
     const state = buildPostseason(SEED);
     const resolution = buildTiebreakResolution({
-      resolutionId: 'tb-finals-draw',
+      resolutionId: idSchema.parse('tb-finals-draw'),
       conference: 'west',
       kind: 'finals-home-court',
       rule: 'random-draw',
-      teams: ['lakers', 'celtics'],
+      teams: [franchiseIdSchema.parse('lakers'), franchiseIdSchema.parse('celtics')],
       slots: [1],
       evidence: [{ label: 'deciding rule', value: 'random-draw' }],
       drawSeed: state.finalsHomeCourtDrawSeed,
@@ -368,7 +395,10 @@ describe('season awards contract (M2.6, awards-v1)', () => {
     expect(seasonAwardsDigest({ ...parsed, digest: 'f'.repeat(32) })).toBe(digest);
     const differentRecipient = {
       ...parsed,
-      mvp: { playerVersionId: fixturePlayerId(99), franchiseId: 'celtics' },
+      mvp: {
+        playerVersionId: fixturePlayerId(99),
+        franchiseId: franchiseIdSchema.parse('celtics'),
+      },
     };
     expect(seasonAwardsDigest(differentRecipient)).not.toBe(digest);
   });

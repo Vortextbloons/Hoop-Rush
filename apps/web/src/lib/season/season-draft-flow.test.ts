@@ -4,6 +4,7 @@ import {
   SEASON_DRAFT_VERSION,
   SEASON_ROSTER_GENERATION_VERSION,
   SEASON_ROTATION_VERSION,
+  seedSchema,
   type SeasonDraftState,
   type SeasonLeagueGenerationResult,
 } from '@hoop-rush/data-contracts';
@@ -34,7 +35,7 @@ class InMemorySeasonDraftRepository implements SeasonDraftRepository {
 }
 const LEAGUE = buildSeasonLeague({}, { humanFranchiseId: 'lakers' });
 const CATALOG = buildSeasonDraftCatalog();
-const ROOT_SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
+const ROOT_SEED = seedSchema.parse('a1b2c3d4e5f60718293a4b5c6d7e8f9a');
 function fakeGeneration(): SeasonLeagueGenerationResult {
   const seed = ROOT_SEED;
   const rosters = buildSeasonRosters(LEAGUE, seed);

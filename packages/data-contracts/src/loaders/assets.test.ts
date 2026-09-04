@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { HoopRushManifest, PeakPlayerSeason } from '../index.ts';
 import {
+  eraIdSchema,
+  franchiseIdSchema,
+  peakPlayerSeasonSchema,
+  playerIdSchema,
+  seasonKeySchema,
+} from '../index.ts';
+import {
   isNbaCdnHeadshotUrl,
   resolveHeadshotUrl,
   resolveHeadshotUrls,
@@ -24,7 +31,11 @@ const manifest = (assetOverrides: Partial<typeof assets> = {}): HoopRushManifest
   schemaVersion: 3,
   dataVersion: 'data-v1',
   modernFranchiseSlots: [
-    { franchiseId: 'lakers', displayName: 'Los Angeles Lakers', teamExternalId: '1610612747' },
+    {
+      franchiseId: franchiseIdSchema.parse('lakers'),
+      displayName: 'Los Angeles Lakers',
+      teamExternalId: '1610612747',
+    },
   ],
   franchiseLineage: [],
   eras: [],
@@ -33,12 +44,13 @@ const manifest = (assetOverrides: Partial<typeof assets> = {}): HoopRushManifest
   eraSimulationProfiles: [],
   assets: { ...assets, ...assetOverrides },
 });
-const player = (overrides: Partial<PeakPlayerSeason> = {}): PeakPlayerSeason => ({
-  schemaVersion: 3,
-  playerId: 'p-1',
-  franchiseId: 'lakers',
-  eraId: '1990s',
-  seasonKey: '1996-97',
+const player = (overrides: Partial<PeakPlayerSeason> = {}): PeakPlayerSeason =>
+  peakPlayerSeasonSchema.parse({
+    schemaVersion: 3,
+    playerId: playerIdSchema.parse('p-1'),
+    franchiseId: franchiseIdSchema.parse('lakers'),
+    eraId: eraIdSchema.parse('1990s'),
+    seasonKey: seasonKeySchema.parse('1996-97'),
   firstName: 'Test',
   lastName: 'Player',
   displayName: 'Test Player',
@@ -83,7 +95,7 @@ const player = (overrides: Partial<PeakPlayerSeason> = {}): PeakPlayerSeason => 
     displayName: 'Los Angeles Lakers',
     city: 'Los Angeles',
     abbreviation: 'LAL',
-    seasonKey: '1996-97',
+    seasonKey: seasonKeySchema.parse('1996-97'),
     lineageRuleVersion: 'lineage-v1',
   },
   summaryRatings: { overallRating: 90, offenseRating: 92, defenseRating: 84 },

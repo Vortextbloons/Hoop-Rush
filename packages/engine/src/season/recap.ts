@@ -1,7 +1,10 @@
 import {
   SEASON_HEALTH_VERSION,
   SEASON_RECAP_VERSION,
+  franchiseIdSchema,
   seasonDigestHex,
+  seasonGameIdSchema,
+  type FranchiseId,
   type SeasonBlockInjuryEvidence,
   type SeasonBlockRecap,
   type SeasonCompactInjuryEvent,
@@ -82,7 +85,7 @@ function movementOf(
     throw new Error(`recap: no standings row for ${franchiseId}`);
   }
   return {
-    franchiseId,
+    franchiseId: franchiseIdSchema.parse(franchiseId),
     winsBefore: before.wins,
     lossesBefore: before.losses,
     winsAfter: after.wins,
@@ -151,7 +154,7 @@ function streaksOf(summaries: readonly SeasonGameSummary[]): SeasonStreak[] {
   }
   return [...current.entries()]
     .filter(([, streak]) => streak.length >= 2)
-    .map(([franchiseId, streak]) => ({ franchiseId, kind: streak.kind, length: streak.length }))
+    .map(([franchiseId, streak]) => ({ franchiseId: franchiseIdSchema.parse(franchiseId), kind: streak.kind, length: streak.length }))
     .sort(
       (a, b) =>
         b.length - a.length ||
@@ -322,7 +325,8 @@ export function blockInjuryEvidenceOf(input: {
   ).length;
   const activeAtBlockEnd = health.injuries.filter((record) => {
     if (record.missedGamesRemaining <= 0) return false;
-    const occurrenceRound = roundOfGame.get(record.gameId) ?? 0;
+    const parsedGameId = seasonGameIdSchema.safeParse(record.gameId);
+    const occurrenceRound = parsedGameId.success ? (roundOfGame.get(parsedGameId.data) ?? 0) : 0;
     return occurrenceRound <= toRound;
   }).length;
   return {
@@ -342,7 +346,7 @@ export function blockFreeAgencyEvidenceOf(input: {
 }): {
   windowIndex: number | null;
   signings: Array<{
-    franchiseId: string;
+    franchiseId: FranchiseId;
     playerVersionId: string;
     band: SeasonFreeAgencyBand;
     influenceCost: number;
@@ -366,19 +370,19 @@ export function blockFreeAgencyEvidenceOf(input: {
   );
   let humanDelta = 0;
   if (input.humanFranchiseId !== null) {
-    humanDelta = freeAgency.seasonSpend[input.humanFranchiseId] ?? 0;
+    humanDelta = freeAgency.seasonSpend[franchiseIdSchema.parse(input.humanFranchiseId)] ?? 0;
   }
   return {
     windowIndex: resolvedWindow?.windowIndex ?? null,
     signings: (resolvedWindow?.signings ?? []).map((signing) => ({
-      franchiseId: signing.franchiseId,
+      franchiseId: franchiseIdSchema.parse(signing.franchiseId),
       playerVersionId: signing.playerVersionId,
       band: signing.band,
       influenceCost: signing.influenceCost,
     })),
     influenceDelta: -humanDelta,
     seasonSignings:
-      input.humanFranchiseId === null ? 0 : (freeAgency.signingCounts[input.humanFranchiseId] ?? 0),
+      input.humanFranchiseId === null ? 0 : (freeAgency.signingCounts[franchiseIdSchema.parse(input.humanFranchiseId)] ?? 0),
     seasonSpend: humanDelta,
   };
 }
@@ -412,7 +416,7 @@ export function humanInfluenceBalanceAtBlockEnd(
   blockIndex: number,
 ): number {
   if (humanFranchiseId === null) return 0;
-  const current = influence.balances[humanFranchiseId] ?? 0;
+  const current = influence.balances[franchiseIdSchema.parse(humanFranchiseId)] ?? 0;
   const laterDelta = influence.ledger
     .filter(
       (entry) =>

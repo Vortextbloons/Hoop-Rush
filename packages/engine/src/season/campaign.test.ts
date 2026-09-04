@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   SEASON_CAMPAIGN_VERSION,
   buildEmptyCampaignState,
+  commandIdSchema,
+  franchiseIdSchema,
   seasonNamespaceSeed,
+  seedSchema,
 } from '@hoop-rush/data-contracts';
 import { createRng } from '../sim/rng.ts';
 import {
@@ -56,7 +59,10 @@ function generationInput(
   overrides: Partial<Parameters<typeof generateSeasonCampaignOffers>[0]> = {},
 ) {
   const { run } = buildEconomyTestRun({ seed: ROOT_SEED, humanFranchiseId: HUMAN });
-  const schedule = generateSeasonSchedule({ league: run.league, seed: ROOT_SEED });
+  const schedule = generateSeasonSchedule({
+    league: run.league,
+    seed: seedSchema.parse(ROOT_SEED),
+  });
   const standings = standingsFor(run);
   const campaignState = buildEmptyCampaignState();
   campaignState.startingIdentity = 'win-now';
@@ -121,7 +127,7 @@ function blockSummariesForWins(count: number, total = 10): ReturnType<typeof fix
           fouls: 0,
         })),
         homeBox: {
-          franchiseId: HUMAN,
+          franchiseId: franchiseIdSchema.parse(HUMAN),
           points: homeScore,
           fieldGoalsMade: 0,
           fieldGoalsAttempted: 0,
@@ -139,7 +145,7 @@ function blockSummariesForWins(count: number, total = 10): ReturnType<typeof fix
           possessions: 100,
         },
         awayBox: {
-          franchiseId: 'celtics',
+          franchiseId: franchiseIdSchema.parse('celtics'),
           points: awayScore,
           fieldGoalsMade: 0,
           fieldGoalsAttempted: 0,
@@ -380,7 +386,12 @@ describe('campaign branching', () => {
       campaignState: {
         ...input.campaignState,
         offers: { 0: offers0 as [(typeof offers0)[0], (typeof offers0)[1]] },
-        selections: { 0: { opportunityId: chosen.opportunityId, selectedByCommandId: 'cmd-1' } },
+        selections: {
+          0: {
+            opportunityId: chosen.opportunityId,
+            selectedByCommandId: commandIdSchema.parse('cmd-1'),
+          },
+        },
       },
       humanFranchiseId: HUMAN,
       blockIndex: 0,
@@ -424,7 +435,10 @@ describe('campaign branching', () => {
         ...input.campaignState,
         offers: { 0: offers0 as [(typeof offers0)[0], (typeof offers0)[1]] },
         selections: {
-          0: { opportunityId: branchToTest.opportunityId, selectedByCommandId: 'cmd-1' },
+          0: {
+            opportunityId: branchToTest.opportunityId,
+            selectedByCommandId: commandIdSchema.parse('cmd-1'),
+          },
         },
       },
       humanFranchiseId: HUMAN,
@@ -466,7 +480,10 @@ describe('campaign branching', () => {
         ...input.campaignState,
         offers: { 0: offers as [(typeof offers)[0], (typeof offers)[1]] },
         selections: {
-          0: { opportunityId: withBreakthrough.opportunityId, selectedByCommandId: 'cmd-1' },
+          0: {
+            opportunityId: withBreakthrough.opportunityId,
+            selectedByCommandId: commandIdSchema.parse('cmd-1'),
+          },
         },
       },
       humanFranchiseId: HUMAN,
@@ -550,7 +567,7 @@ describe('campaign reward cap', () => {
     const influenceAtCap = createInitialSeasonInfluenceState(
       input.rosters.map((r) => r.franchiseId),
     );
-    influenceAtCap.balances[HUMAN] = 8;
+    influenceAtCap.balances[franchiseIdSchema.parse(HUMAN)] = 8;
     const atCap = applySeasonCampaignReward({
       evaluation: forcedEval,
       opportunity: opp,
@@ -560,7 +577,7 @@ describe('campaign reward cap', () => {
       blockIndex: 0,
       commandId: 'cmd-cap',
     });
-    expect(atCap.influence.balances[HUMAN]).toBe(8);
+    expect(atCap.influence.balances[franchiseIdSchema.parse(HUMAN)]).toBe(8);
     const ledger = atCap.influence.ledger.find((e) =>
       e.entryId.includes(opp.completedReward.rewardId),
     );
@@ -586,7 +603,7 @@ describe('campaign reward cap', () => {
       });
       expect(evalBreak.outcome).toBe('breakthrough');
       const influence7 = createInitialSeasonInfluenceState(input.rosters.map((r) => r.franchiseId));
-      influence7.balances[HUMAN] = 7;
+      influence7.balances[franchiseIdSchema.parse(HUMAN)] = 7;
       const afterBreak = applySeasonCampaignReward({
         evaluation: evalBreak,
         opportunity: withBreakthrough,
@@ -596,7 +613,7 @@ describe('campaign reward cap', () => {
         blockIndex: 0,
         commandId: 'cmd-break',
       });
-      expect(afterBreak.influence.balances[HUMAN]).toBe(8);
+      expect(afterBreak.influence.balances[franchiseIdSchema.parse(HUMAN)]).toBe(8);
       expect(afterBreak.campaignState.appliedRewardIds).toContain(
         withBreakthrough.completedReward.rewardId,
       );

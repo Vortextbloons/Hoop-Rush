@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+﻿import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   CommitSeasonBlockInput,
   SeasonRunRepository,
@@ -19,9 +19,10 @@ import {
   type SeasonSchedule,
   type SeasonStandings,
 } from '@hoop-rush/data-contracts';
+import { franchiseIdSchema, idSchema, playerIdSchema, commandIdSchema, seedSchema, seasonGameIdSchema } from '@hoop-rush/data-contracts';
 import { buildSeasonLeague, buildSeasonRunFixture } from '@hoop-rush/test-fixtures';
 import { createSeasonBlockRunner, type SeasonBlockStartInput } from './season-block-runner';
-const LEAGUE = buildSeasonLeague({}, { humanFranchiseId: 'lakers' });
+const LEAGUE = buildSeasonLeague({}, { humanFranchiseId: franchiseIdSchema.parse('lakers') });
 vi.mock('@hoop-rush/engine', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@hoop-rush/engine')>()),
   completeSeasonBlockCommit: vi.fn(
@@ -96,7 +97,7 @@ function makeRun(): SeasonRun {
     objectives: {
       ...base.objectives,
       selections: {
-        0: { objectiveId: 'win-six' as const, selectedByCommandId: 'cmd-select-0', success: null },
+        0: { objectiveId: 'win-six' as const, selectedByCommandId: commandIdSchema.parse('cmd-select-0'), success: null },
       },
     },
   };
@@ -211,8 +212,8 @@ function startInput(
     blockIndex: 0,
     expectedRevision: 0,
     rotationDigest: rotationDigest(run),
-    commandId: 'cmd-1',
-    humanFranchiseId: 'lakers',
+    commandId: commandIdSchema.parse('cmd-1'),
+    humanFranchiseId: franchiseIdSchema.parse('lakers'),
     objectiveId: 'win-six',
     homeCourt: SEASON_NEUTRAL_HOME_COURT,
     catalogUrl: 'https://example.test/season/draft-catalog.json',
@@ -268,7 +269,7 @@ function makeCandidate(
   const gameSummary: SeasonGameSummary = {
     schemaVersion: 1,
     summaryVersion: 'season-game-summary-v3',
-    gameId: 's000001',
+    gameId: seasonGameIdSchema.parse('s000001'),
     round: 1,
     homeFranchiseId: home.franchiseId,
     awayFranchiseId: away.franchiseId,
@@ -438,7 +439,7 @@ function makePending(run: SeasonRun, nextGameId = 's000016'): SeasonPendingBlock
     schemaVersion: 1,
     blockVersion: 'season-block-v5',
     runId: run.runId,
-    commandId: 'cmd-1',
+    commandId: commandIdSchema.parse('cmd-1'),
     blockIndex: 0,
     expectedRevision: 0,
     expectedStateRevision: 0,
@@ -545,9 +546,9 @@ describe('season block runner (M2.5 wire)', () => {
       ...base,
       transactions: [
         {
-          transactionId: 'txn-initial-proxy',
+          transactionId: idSchema.parse('txn-initial-proxy'),
           commandId: null,
-          franchiseId: 'lakers',
+          franchiseId: franchiseIdSchema.parse('lakers'),
           type: 'initial-grant',
           blockIndex: null,
           appliedAtStateRevision: 0,
@@ -587,9 +588,9 @@ describe('season block runner (M2.5 wire)', () => {
       blockIndex: 0,
       expectedRevision: 0,
       rotationDigest: rotationDigest(run),
-      commandId: 'cmd-1',
+      commandId: commandIdSchema.parse('cmd-1'),
       rotations: run.rotations,
-      humanFranchiseId: 'lakers',
+      humanFranchiseId: franchiseIdSchema.parse('lakers'),
       homeCourt: SEASON_NEUTRAL_HOME_COURT,
       catalogUrl: 'u',
       catalogHash: '0'.repeat(64),
@@ -710,7 +711,7 @@ describe('season block runner (M2.5 wire)', () => {
     });
     await flush();
     expect(events.some((event) => event.type === 'complete')).toBe(true);
-    runner.startBlock(startInput(run, { commandId: 'cmd-2' }));
+    runner.startBlock(startInput(run, { commandId: commandIdSchema.parse('cmd-2') }));
     await flush();
     expect(events.filter((event) => event.type === 'started')).toHaveLength(2);
     expect(events.some((event) => event.type === 'error')).toBe(false);
@@ -750,7 +751,7 @@ describe('season block runner (M2.5 wire)', () => {
     expect(input).toMatchObject({
       runId: run.runId,
       revision: 1,
-      commandId: 'cmd-1',
+      commandId: commandIdSchema.parse('cmd-1'),
       rotationDigest: rotationDigest(run),
       expectedStateRevision: run.stateRevision,
       expectedStateDigest: run.stateDigest,
@@ -773,7 +774,7 @@ describe('season block runner (M2.5 wire)', () => {
         windows: [],
         canonicalCandidates: {
           'p-magic': {
-            playerId: 'p-magic',
+            playerId: playerIdSchema.parse('p-magic'),
             playerVersionId: 'pv-11111111111111111111111111111111',
             band: 'featured' as const,
             admittedWindowIndex: 0,
@@ -920,7 +921,7 @@ describe('season block runner (M2.5 wire)', () => {
     });
     await flush();
     expect(events.some((event) => event.type === 'complete')).toBe(true);
-    runner.startBlock(startInput(run, { blockIndex: 1, expectedRevision: 1, commandId: 'cmd-2' }));
+    runner.startBlock(startInput(run, { blockIndex: 1, expectedRevision: 1, commandId: commandIdSchema.parse('cmd-2') }));
     await flush();
     const continuation = seasonWorkerContinueRequestSchema.parse(worker?.posted[1]);
     expect(continuation.type).toBe('season-block-continue');
@@ -972,7 +973,7 @@ describe('season block runner (M2.5 wire)', () => {
         effects: changedEffects,
         blockIndex: 1,
         expectedRevision: 1,
-        commandId: 'cmd-2',
+        commandId: commandIdSchema.parse('cmd-2'),
       }),
     );
     await flush();
@@ -1061,8 +1062,8 @@ describe('season block runner (M2.5 wire)', () => {
       code: 'invalid-roster',
       runId: run.runId,
       blockIndex: 0,
-      nextGameId: 's000016',
-      humanFranchiseId: 'lakers',
+      nextGameId: seasonGameIdSchema.parse('s000016'),
+      humanFranchiseId: franchiseIdSchema.parse('lakers'),
     });
     expect(interruption.unavailablePlayerVersionIds).toEqual(['pv-' + '1'.repeat(32)]);
     const interrupted = events.find((event) => event.type === 'interrupted');

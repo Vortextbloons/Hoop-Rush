@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  franchiseIdSchema,
+  seasonGameIdSchema,
   seasonStandingsSchema,
   type SeasonGame,
   type SeasonStandings,
@@ -18,10 +20,10 @@ function finalGame(
   round = (index % 82) + 1,
 ): SeasonGame {
   return {
-    gameId: `s${String(index + 1).padStart(6, '0')}`,
+    gameId: seasonGameIdSchema.parse(`s${String(index + 1).padStart(6, '0')}`),
     round,
-    homeFranchiseId,
-    awayFranchiseId,
+    homeFranchiseId: franchiseIdSchema.parse(homeFranchiseId),
+    awayFranchiseId: franchiseIdSchema.parse(awayFranchiseId),
     status: 'final',
     homeScore,
     awayScore,
@@ -35,14 +37,14 @@ function forfeitGame(
   forfeitLoserFranchiseId: string,
 ): SeasonGame {
   return {
-    gameId: `s${String(index + 1).padStart(6, '0')}`,
+    gameId: seasonGameIdSchema.parse(`s${String(index + 1).padStart(6, '0')}`),
     round: (index % 82) + 1,
-    homeFranchiseId,
-    awayFranchiseId,
+    homeFranchiseId: franchiseIdSchema.parse(homeFranchiseId),
+    awayFranchiseId: franchiseIdSchema.parse(awayFranchiseId),
     status: 'forfeit',
     homeScore: null,
     awayScore: null,
-    forfeitLoserFranchiseId,
+    forfeitLoserFranchiseId: franchiseIdSchema.parse(forfeitLoserFranchiseId),
   };
 }
 function scheduledGame(
@@ -51,10 +53,10 @@ function scheduledGame(
   awayFranchiseId: string,
 ): SeasonGame {
   return {
-    gameId: `s${String(index + 1).padStart(6, '0')}`,
+    gameId: seasonGameIdSchema.parse(`s${String(index + 1).padStart(6, '0')}`),
     round: (index % 82) + 1,
-    homeFranchiseId,
-    awayFranchiseId,
+    homeFranchiseId: franchiseIdSchema.parse(homeFranchiseId),
+    awayFranchiseId: franchiseIdSchema.parse(awayFranchiseId),
     status: 'scheduled',
     homeScore: null,
     awayScore: null,

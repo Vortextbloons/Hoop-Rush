@@ -1,6 +1,7 @@
 import {
   SEASON_SEED_NAMESPACES,
   SEASON_TRADE_VERSION,
+  franchiseIdSchema,
   seasonNamespaceSeed,
   type Position,
   type SeasonDraftCatalog,
@@ -582,8 +583,8 @@ function assembleHumanOffer(
     offerId,
     windowIndex,
     seedPath,
-    toFranchiseId: humanFranchiseId,
-    fromFranchiseId: candidate.aiFranchiseId,
+    toFranchiseId: franchiseIdSchema.parse(humanFranchiseId),
+    fromFranchiseId: franchiseIdSchema.parse(candidate.aiFranchiseId),
     outgoingPlayerVersionIds: candidate.outgoing,
     incomingPlayerVersionIds: candidate.incoming,
     outgoingHealth,
@@ -790,8 +791,8 @@ function assembleAiOffer(
     offerId,
     windowIndex,
     seedPath,
-    toFranchiseId: candidate.b,
-    fromFranchiseId: candidate.a,
+    toFranchiseId: franchiseIdSchema.parse(candidate.b),
+    fromFranchiseId: franchiseIdSchema.parse(candidate.a),
     outgoingPlayerVersionIds: candidate.incoming,
     incomingPlayerVersionIds: candidate.outgoing,
     outgoingHealth,
@@ -854,10 +855,11 @@ function applyAiInfluenceSpends(
       'extra-offer',
     );
     const wantExtra = seedInt(extraSeed, 100) < AI_EXTRA_OFFER_WILLINGNESS_PERCENT;
-    const spentExtra = (influence.windows[franchiseId] ?? []).some(
+    const fid = franchiseIdSchema.parse(franchiseId);
+    const spentExtra = (influence.windows[fid] ?? []).some(
       (window) => window.windowIndex === windowIndex && window.extraOfferSpent,
     );
-    const balance = influence.balances[franchiseId] ?? 0;
+    const balance = influence.balances[fid] ?? 0;
     if (wantExtra && !spentExtra && balance >= 1) {
       const commandId = `ai-window-${String(windowIndex)}-${franchiseId}-extra-offer`;
       const result = applySeasonInfluenceSpend({
@@ -916,7 +918,7 @@ function applyAiInfluenceSpends(
         'rehab',
       );
       const wantRehab = seedInt(rehabSeed, 100) < AI_REHAB_WILLINGNESS_PERCENT;
-      const currentBalance = influence.balances[franchiseId] ?? 0;
+      const currentBalance = influence.balances[franchiseIdSchema.parse(franchiseId)] ?? 0;
       if (
         pick !== undefined &&
         wantRehab &&

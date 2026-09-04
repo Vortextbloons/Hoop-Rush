@@ -17,7 +17,7 @@ export function normalizeSeasonTransactionEntry(
 ): SeasonTransactionEntry {
   return {
     ...entry,
-    transactionId: deriveSeasonTransactionId(entry.transactionId),
+    transactionId: idSchema.parse(deriveSeasonTransactionId(entry.transactionId)),
   };
 }
 export interface SeasonTransactionEntryInput {

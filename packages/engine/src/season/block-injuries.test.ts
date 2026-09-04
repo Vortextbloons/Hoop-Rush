@@ -1,6 +1,9 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
   SEASON_OBJECTIVE_CATALOG,
+  commandIdSchema,
+  franchiseIdSchema,
+  seasonGameIdSchema,
   type SeasonGameSummary,
   type SeasonHealthState,
   type SeasonInjuryRecord,
@@ -25,8 +28,8 @@ function blockedHealthOf(run: SeasonBlockSimulationInput['run']): SeasonHealthSt
   const injuries: SeasonInjuryRecord[] = roster.players.map((player, index) => ({
     injuryId: `inj-${String(index).padStart(32, '0')}`,
     playerVersionId: player.playerVersionId,
-    franchiseId: 'lakers',
-    gameId: 's000001',
+    franchiseId: franchiseIdSchema.parse('lakers'),
+    gameId: seasonGameIdSchema.parse('s000001'),
     type: 'lower-body',
     severity: 'major',
     occurredBeforeHalftime: false,
@@ -98,7 +101,11 @@ describe('M2.5 block pipeline with injuries', () => {
       objectiveVersion: 'season-objective-v1',
       catalog: [...SEASON_OBJECTIVE_CATALOG],
       selections: {
-        0: { objectiveId: offered, selectedByCommandId: 'cmd-select-0', success: null },
+        0: {
+          objectiveId: offered,
+          selectedByCommandId: commandIdSchema.parse('cmd-select-0'),
+          success: null,
+        },
       },
     };
     const withObjective: SeasonBlockSimulationInput = {
@@ -124,7 +131,7 @@ describe('M2.5 block pipeline with injuries', () => {
     expect(humanDelta).toBe(candidate.objective!.success ? 2 : 1);
     expect(candidate.recap.tradeEvidence.influenceDelta).toBe(humanDelta);
     expect(candidate.recap.influenceBalance.humanBalance).toBe(
-      candidate.influence.balances['lakers'] ?? 0,
+      candidate.influence.balances[franchiseIdSchema.parse('lakers')] ?? 0,
     );
     expect(candidate.transactions.some((entry) => entry.type === 'block-grant')).toBe(true);
     expect(candidate.transactions.filter((entry) => entry.type === 'objective-reward').length).toBe(
@@ -145,7 +152,11 @@ describe('M2.5 block pipeline with injuries', () => {
       objectiveVersion: 'season-objective-v1',
       catalog: [...SEASON_OBJECTIVE_CATALOG],
       selections: {
-        0: { objectiveId: offered, selectedByCommandId: 'cmd-select-0', success: null },
+        0: {
+          objectiveId: offered,
+          selectedByCommandId: commandIdSchema.parse('cmd-select-0'),
+          success: null,
+        },
       },
     };
     const base = { ...pipelineInput(run, catalog, 0), objectives };

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   SEASON_MINUTE_POLICY_VERSION,
   SEASON_ROTATION_VERSION,
+  franchiseIdSchema,
   type SeasonRotation,
 } from '@hoop-rush/data-contracts';
 import {
@@ -13,7 +14,7 @@ import { fixtureSummary } from './season-economy-test-support.ts';
 const HUMAN = 'lakers';
 const BLOCK = 3;
 const ROTATION: SeasonRotation = {
-  franchiseId: HUMAN,
+  franchiseId: franchiseIdSchema.parse(HUMAN),
   starters: ['pv-a', 'pv-b', 'pv-c', 'pv-d', 'pv-e'],
   benchOrder: ['pv-f', 'pv-g', 'pv-h', 'pv-i', 'pv-j'],
   targetMinutes: [
@@ -94,7 +95,7 @@ function game(
   });
   const awayLines = OPPONENT_VERSIONS.map((version) => opponentLine(version));
   const homeBox = {
-    franchiseId: HUMAN,
+    franchiseId: franchiseIdSchema.parse(HUMAN),
     points: homeScore,
     fieldGoalsMade: 0,
     fieldGoalsAttempted: 0,
@@ -112,7 +113,7 @@ function game(
     possessions: 0,
   };
   const awayBox = {
-    franchiseId: 'celtics',
+    franchiseId: franchiseIdSchema.parse('celtics'),
     points: awayScore,
     fieldGoalsMade: 0,
     fieldGoalsAttempted: 0,
@@ -222,14 +223,14 @@ describe('season objective measures', () => {
       status: 'forfeit' as const,
       homeScore: 0,
       awayScore: 2,
-      forfeitLoserFranchiseId: HUMAN,
+      forfeitLoserFranchiseId: franchiseIdSchema.parse(HUMAN),
     };
     const humanWonForfeit = {
       ...game('s000008', 2, 0),
       status: 'forfeit' as const,
       homeScore: 2,
       awayScore: 0,
-      forfeitLoserFranchiseId: 'celtics',
+      forfeitLoserFranchiseId: franchiseIdSchema.parse('celtics'),
     };
     const result = evaluate(
       'win-six',
@@ -290,7 +291,7 @@ describe('season objective measures', () => {
       status: 'forfeit' as const,
       homeScore: 0,
       awayScore: 2,
-      forfeitLoserFranchiseId: HUMAN,
+      forfeitLoserFranchiseId: franchiseIdSchema.parse(HUMAN),
     };
     const withForfeit = summaries.map((summary, index) => (index === 2 ? forfeitSummary : summary));
     const tipsWithoutForfeit = TEN_TIPS.filter((tip) => tip.gameId !== 's000003');

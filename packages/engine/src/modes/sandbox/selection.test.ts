@@ -6,6 +6,11 @@ import {
   seedFromString,
 } from '@hoop-rush/test-fixtures';
 import type { ChallengeRun } from '@hoop-rush/data-contracts';
+import {
+  eraIdSchema,
+  franchiseIdSchema,
+  seedSchema,
+} from '@hoop-rush/data-contracts';
 import { createEngineContext } from '../../sim/context.ts';
 import {
   createChallenge,
@@ -42,10 +47,10 @@ function fixtureCreation(overrides: Partial<ChallengeCreationBase> = {}): Challe
     players: team.players,
     selections: team.players.map((player) => ({
       playerId: player.playerId,
-      franchiseId: 'lakers',
-      eraId: '1990s',
+      franchiseId: franchiseIdSchema.parse('lakers'),
+      eraId: eraIdSchema.parse('1990s'),
     })),
-    runSeed: seedFromString('selection-run'),
+    runSeed: seedSchema.parse(seedFromString('selection-run')),
     dataVersion: 'data-v1',
     ratingVersion: 'ratings-v1',
     positionNormalizationVersion: 'position-v1',

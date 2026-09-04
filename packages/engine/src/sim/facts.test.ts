@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { GameResult, PlayerBoxScore, TeamResult } from '@hoop-rush/data-contracts';
+import { playerIdSchema } from '@hoop-rush/data-contracts';
 import { buildFacts } from './facts.ts';
 function player(overrides: Partial<PlayerBoxScore> = {}): PlayerBoxScore {
   return {
-    playerId: 'p-x',
+    playerId: playerIdSchema.parse('p-x'),
     minutes: 36,
     points: 0,
     fieldGoals: { made: 0, attempted: 0 },
@@ -91,7 +92,7 @@ function usageDiag(usage: number): PlayerBoxScore['diagnostics'] {
 describe('buildFacts usage fact', () => {
   it('picks the highest-usage player, not the top scorer', () => {
     const scorer = player({
-      playerId: 'p-scorer',
+      playerId: playerIdSchema.parse('p-scorer'),
       points: 30,
       fieldGoals: { made: 10, attempted: 20 },
       turnovers: 2,
@@ -99,7 +100,7 @@ describe('buildFacts usage fact', () => {
       diagnostics: usageDiag(10),
     });
     const workhorse = player({
-      playerId: 'p-workhorse',
+      playerId: playerIdSchema.parse('p-workhorse'),
       points: 8,
       fieldGoals: { made: 3, attempted: 18 },
       turnovers: 6,
@@ -107,13 +108,20 @@ describe('buildFacts usage fact', () => {
       diagnostics: usageDiag(25),
     });
     const rest = Array.from({ length: 3 }, (_, i) =>
-      player({ playerId: `p-rest-${String(i)}`, points: 4, diagnostics: usageDiag(0) }),
+      player({
+        playerId: playerIdSchema.parse(`p-rest-${String(i)}`),
+        points: 4,
+        diagnostics: usageDiag(0),
+      }),
     );
     const home = team('user', [scorer, workhorse, ...rest], 50);
     const away = team(
       'away',
       Array.from({ length: 5 }, (_, i) =>
-        player({ playerId: `p-away-${String(i)}`, diagnostics: usageDiag(1) }),
+        player({
+          playerId: playerIdSchema.parse(`p-away-${String(i)}`),
+          diagnostics: usageDiag(1),
+        }),
       ),
       40,
     );
@@ -127,13 +135,20 @@ describe('buildFacts usage fact', () => {
   });
   it('emits no usage fact below the share threshold', () => {
     const players = Array.from({ length: 5 }, (_, i) =>
-      player({ playerId: `p-${String(i)}`, points: 10, diagnostics: usageDiag(7) }),
+      player({
+        playerId: playerIdSchema.parse(`p-${String(i)}`),
+        points: 10,
+        diagnostics: usageDiag(7),
+      }),
     );
     const home = team('user', players, 50);
     const away = team(
       'away',
       Array.from({ length: 5 }, (_, i) =>
-        player({ playerId: `p-away-${String(i)}`, diagnostics: usageDiag(7) }),
+        player({
+          playerId: playerIdSchema.parse(`p-away-${String(i)}`),
+          diagnostics: usageDiag(7),
+        }),
       ),
       40,
     );
@@ -142,7 +157,7 @@ describe('buildFacts usage fact', () => {
   });
   it('falls back to the usage formula for legacy records without diagnostics', () => {
     const workhorse = player({
-      playerId: 'p-legacy',
+      playerId: playerIdSchema.parse('p-legacy'),
       points: 8,
       fieldGoals: { made: 3, attempted: 16 },
       freeThrows: { made: 2, attempted: 5 },
@@ -150,13 +165,17 @@ describe('buildFacts usage fact', () => {
       diagnostics: undefined,
     });
     const rest = Array.from({ length: 4 }, (_, i) =>
-      player({ playerId: `p-rest-${String(i)}`, points: 6, diagnostics: undefined }),
+      player({
+        playerId: playerIdSchema.parse(`p-rest-${String(i)}`),
+        points: 6,
+        diagnostics: undefined,
+      }),
     );
     const home = team('user', [workhorse, ...rest], 32);
     const away = team(
       'away',
       Array.from({ length: 5 }, (_, i) =>
-        player({ playerId: `p-away-${String(i)}`, diagnostics: undefined }),
+        player({ playerId: playerIdSchema.parse(`p-away-${String(i)}`), diagnostics: undefined }),
       ),
       30,
     );

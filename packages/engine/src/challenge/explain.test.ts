@@ -5,11 +5,12 @@ import type {
   PlayerBoxScore,
   TeamResult,
 } from '@hoop-rush/data-contracts';
+import { playerIdSchema } from '@hoop-rush/data-contracts';
 import { buildChallengeRun } from '@hoop-rush/test-fixtures';
 import { EXPLAIN_THRESHOLDS, explainSeason, opponentSeasonTotals } from './explain.ts';
 function player(overrides: Partial<PlayerBoxScore> = {}): PlayerBoxScore {
   return {
-    playerId: 'p-x',
+    playerId: playerIdSchema.parse('p-x'),
     minutes: 36,
     points: 0,
     fieldGoals: { made: 0, attempted: 0 },
@@ -49,7 +50,7 @@ function team(
 ): TeamResult {
   const players = Array.from({ length: 5 }, (_, i) =>
     player({
-      playerId: `${teamId}-${String(i)}`,
+      playerId: playerIdSchema.parse(`${teamId}-${String(i)}`),
       fieldGoals: overrides.fieldGoals ?? { made: 0, attempted: 0 },
       turnovers: overrides.turnovers ?? 0,
     }),
@@ -158,7 +159,7 @@ function threeGameRun(): ChallengeRun {
       },
       players: [
         {
-          playerId: 'p-1',
+          playerId: playerIdSchema.parse('p-1'),
           gamesPlayed: 3,
           minutes: 120,
           points: 130,
@@ -173,7 +174,7 @@ function threeGameRun(): ChallengeRun {
           fouls: 3,
         },
         ...Array.from({ length: 4 }, (_, i) => ({
-          playerId: `p-${String(i + 2)}`,
+          playerId: playerIdSchema.parse(`p-${String(i + 2)}`),
           gamesPlayed: 3,
           minutes: 120,
           points: 45,

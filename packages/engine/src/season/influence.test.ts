@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   SEASON_INFLUENCE_CAP,
   SEASON_INFLUENCE_FLOOR,
+  franchiseIdSchema,
   seasonBlockRunContextSchema,
   type SeasonInfluenceState,
   type SeasonRun,
@@ -38,7 +39,7 @@ describe('season influence creation', () => {
     const state = run.influence;
     expect(Object.keys(state.balances)).toHaveLength(30);
     for (const franchiseId of Object.keys(state.balances)) {
-      expect(state.balances[franchiseId]).toBe(2);
+      expect(state.balances[franchiseIdSchema.parse(franchiseId)]).toBe(2);
       const entries = state.ledger.filter((entry) => entry.franchiseId === franchiseId);
       expect(entries).toHaveLength(1);
       expect(entries[0]?.source).toBe('initial-grant');
@@ -61,7 +62,7 @@ describe('season influence block grants', () => {
       objectiveSuccess: true,
     });
     for (const franchiseId of Object.keys(outcome.influence.balances)) {
-      expect(outcome.influence.balances[franchiseId]).toBe(
+      expect(outcome.influence.balances[franchiseIdSchema.parse(franchiseId)]).toBe(
         franchiseId === humanFranchiseId ? 4 : 3,
       );
     }
@@ -103,8 +104,12 @@ describe('season influence block grants', () => {
     }).influence;
     const fromLedger = ledgerBalancesOf(second);
     for (const franchiseId of Object.keys(second.balances)) {
-      expect(second.balances[franchiseId]).toBe(fromLedger.get(franchiseId));
-      expect(second.balances[franchiseId]).toBe(2 + (franchiseId === humanFranchiseId ? 3 : 2));
+      expect(second.balances[franchiseIdSchema.parse(franchiseId)]).toBe(
+        fromLedger.get(franchiseId),
+      );
+      expect(second.balances[franchiseIdSchema.parse(franchiseId)]).toBe(
+        2 + (franchiseId === humanFranchiseId ? 3 : 2),
+      );
     }
   });
   it('cap-applies a grant at +8: appliedDelta 0 with the cap-reached explanation', () => {
@@ -118,14 +123,18 @@ describe('season influence block grants', () => {
         objectiveSuccess: false,
       }).influence;
     }
-    expect(influence.balances[humanFranchiseId]).toBe(SEASON_INFLUENCE_CAP);
+    expect(influence.balances[franchiseIdSchema.parse(humanFranchiseId)]).toBe(
+      SEASON_INFLUENCE_CAP,
+    );
     const atCap = applySeasonBlockInfluenceGrants({
       influence,
       blockIndex: 4,
       humanFranchiseId,
       objectiveSuccess: false,
     });
-    expect(atCap.influence.balances[humanFranchiseId]).toBe(SEASON_INFLUENCE_CAP);
+    expect(atCap.influence.balances[franchiseIdSchema.parse(humanFranchiseId)]).toBe(
+      SEASON_INFLUENCE_CAP,
+    );
     const capped = atCap.influence.ledger.filter(
       (entry) => entry.franchiseId === humanFranchiseId && entry.source === 'block-grant',
     );
@@ -181,8 +190,8 @@ describe('season influence spends', () => {
     expect(result.entry.appliedDelta).toBe(-1);
     expect(result.entry.balanceAfter).toBe(1);
     expect(result.entry.commandId).toBe('cmd-spend-1');
-    expect(result.influence.balances[humanFranchiseId]).toBe(1);
-    expect(result.influence.windows[humanFranchiseId]).toEqual([
+    expect(result.influence.balances[franchiseIdSchema.parse(humanFranchiseId)]).toBe(1);
+    expect(result.influence.windows[franchiseIdSchema.parse(humanFranchiseId)]).toEqual([
       { windowIndex: 0, extraOfferSpent: true },
     ]);
     expect(ledgerBalancesOf(result.influence).get(humanFranchiseId)).toBe(1);
@@ -201,7 +210,7 @@ describe('season influence spends', () => {
       injuryId,
       rehabOutcome: 'failure',
     });
-    expect(result.influence.balances[humanFranchiseId]).toBe(0);
+    expect(result.influence.balances[franchiseIdSchema.parse(humanFranchiseId)]).toBe(0);
     expect(result.influence.rehabs[injuryId]).toEqual({
       franchiseId: humanFranchiseId,
       outcome: 'failure',
@@ -231,7 +240,9 @@ describe('season influence spends', () => {
       explanation: 'b',
       windowIndex: 0,
     }).influence;
-    expect(influence.balances[humanFranchiseId]).toBe(SEASON_INFLUENCE_FLOOR);
+    expect(influence.balances[franchiseIdSchema.parse(humanFranchiseId)]).toBe(
+      SEASON_INFLUENCE_FLOOR,
+    );
     expect(() =>
       applySeasonInfluenceSpend({
         influence,
@@ -244,11 +255,13 @@ describe('season influence spends', () => {
         windowIndex: 0,
       }),
     ).toThrow(SeasonInfluenceFloorError);
-    expect(influence.balances[humanFranchiseId]).toBe(SEASON_INFLUENCE_FLOOR);
+    expect(influence.balances[franchiseIdSchema.parse(humanFranchiseId)]).toBe(
+      SEASON_INFLUENCE_FLOOR,
+    );
   });
   it('spends never exceed the floor and never clamp silently', () => {
     const { run, humanFranchiseId } = fixture();
-    const balance = run.influence.balances[humanFranchiseId] ?? 0;
+    const balance = run.influence.balances[franchiseIdSchema.parse(humanFranchiseId)] ?? 0;
     expect(SEASON_INFLUENCE_FLOOR).toBe(0);
     expect(balance + -6).toBeLessThan(SEASON_INFLUENCE_FLOOR);
     expect(() =>

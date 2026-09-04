@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+﻿import { describe, expect, it } from 'vitest';
 import { generateSeasonSchedule } from '@hoop-rush/engine';
 import { buildSeasonLeague, buildSeasonRunFixture } from '@hoop-rush/test-fixtures';
 import {
@@ -7,6 +7,7 @@ import {
   type SeasonPostseasonState,
   type SeasonRun,
 } from '@hoop-rush/data-contracts';
+import { franchiseIdSchema, commandIdSchema, seedSchema, seasonGameIdSchema, idSchema } from '@hoop-rush/data-contracts';
 import {
   awardsViewModel,
   bracketColumnsOf,
@@ -25,11 +26,11 @@ import {
   tiebreakRuleLabel,
   tiebreakSlotsLabel,
 } from './season-postseason-presentation';
-const SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
+const SEED = seedSchema.parse('a1b2c3d4e5f60718293a4b5c6d7e8f9a');
 function fixtureRun(): SeasonRun {
-  const league = buildSeasonLeague({}, { humanFranchiseId: 'lakers' });
+  const league = buildSeasonLeague({}, { humanFranchiseId: franchiseIdSchema.parse('lakers') });
   const schedule = generateSeasonSchedule({ league, seed: SEED });
-  return buildSeasonRunFixture({ schedule, league, seed: SEED, humanFranchiseId: 'lakers' });
+  return buildSeasonRunFixture({ schedule, league, seed: SEED, humanFranchiseId: franchiseIdSchema.parse('lakers') });
 }
 function series(
   seriesId: string,
@@ -105,10 +106,10 @@ function decidedPostseason(humanFranchiseId: string): SeasonPostseasonState {
     const game = (gameId: string) => ({
       gameId,
       status: 'final' as const,
-      homeFranchiseId: 'west7',
-      awayFranchiseId: 'west8',
-      winnerFranchiseId: 'west7',
-      loserFranchiseId: 'west8',
+      homeFranchiseId: franchiseIdSchema.parse('west7'),
+      awayFranchiseId: franchiseIdSchema.parse('west8'),
+      winnerFranchiseId: franchiseIdSchema.parse('west7'),
+      loserFranchiseId: franchiseIdSchema.parse('west8'),
       homeScore: 110,
       awayScore: 99,
     });
@@ -269,7 +270,7 @@ describe('tiebreak copy', () => {
     expect(tiebreakRuleLabel('random-draw')).toBe('Random draw');
     expect(tiebreakKindLabel('qualification')).toBe('Qualification');
     expect(tiebreakKindLabel('finals-home-court')).toBe('Finals home court');
-    expect(tiebreakSlotsLabel([7, 8])).toBe('slots 7–8');
+    expect(tiebreakSlotsLabel([7, 8])).toBe('slots 7â€“8');
     expect(tiebreakSlotsLabel([1])).toBe('slot 1');
   });
 });
@@ -400,23 +401,23 @@ describe('postseason summary rows', () => {
       {
         schemaVersion: 1,
         summaryVersion: 'postseason-summary-v1',
-        runId: 'run-1',
+        runId: idSchema.parse('run-1'),
         gameId: summary.gameId,
         phase: 'play-in',
         round: 'seven-eight',
         seriesId: null,
         gameNumber: 1,
         conference: 'east',
-        homeFranchiseId: 'west7',
-        awayFranchiseId: 'west8',
-        winnerFranchiseId: 'west7',
-        loserFranchiseId: 'west8',
+        homeFranchiseId: franchiseIdSchema.parse('west7'),
+        awayFranchiseId: franchiseIdSchema.parse('west8'),
+        winnerFranchiseId: franchiseIdSchema.parse('west7'),
+        loserFranchiseId: franchiseIdSchema.parse('west8'),
         status: 'final',
         homeScore: 110,
         awayScore: 99,
         forfeitLoserFranchiseId: null,
         homeBox: {
-          franchiseId: 'west7',
+          franchiseId: franchiseIdSchema.parse('west7'),
           points: 110,
           fieldGoalsMade: 40,
           fieldGoalsAttempted: 88,
@@ -434,7 +435,7 @@ describe('postseason summary rows', () => {
           possessions: 96,
         },
         awayBox: {
-          franchiseId: 'west8',
+          franchiseId: franchiseIdSchema.parse('west8'),
           points: 99,
           fieldGoalsMade: 38,
           fieldGoalsAttempted: 86,
@@ -464,7 +465,7 @@ describe('postseason summary rows', () => {
     );
     expect(row.phaseLabel).toBe('Play-In');
     expect(row.roundLabel).toBe('7 vs 8');
-    expect(row.scoreLabel).toBe('110–99');
+    expect(row.scoreLabel).toBe('110â€“99');
     expect(row.humanWon).toBe(true);
     expect(row.humanGame).toBe(true);
   });
@@ -475,16 +476,16 @@ describe('awards view model', () => {
       {
         schemaVersion: 1,
         awardsVersion: 'awards-v1',
-        runId: 'run-1',
-        mvp: { playerVersionId: 'pv-a', franchiseId: 'f-a' },
-        defensivePlayerOfYear: { playerVersionId: 'pv-b', franchiseId: 'f-b' },
-        sixthManOfYear: { playerVersionId: 'pv-c', franchiseId: 'f-c' },
+        runId: idSchema.parse('run-1'),
+        mvp: { playerVersionId: 'pv-a', franchiseId: franchiseIdSchema.parse('f-a') },
+        defensivePlayerOfYear: { playerVersionId: 'pv-b', franchiseId: franchiseIdSchema.parse('f-b') },
+        sixthManOfYear: { playerVersionId: 'pv-c', franchiseId: franchiseIdSchema.parse('f-c') },
         allLeagueFirstTeam: [
-          { playerVersionId: 'pv-1', franchiseId: 'f-1' },
-          { playerVersionId: 'pv-2', franchiseId: 'f-2' },
-          { playerVersionId: 'pv-3', franchiseId: 'f-3' },
-          { playerVersionId: 'pv-4', franchiseId: 'f-4' },
-          { playerVersionId: 'pv-5', franchiseId: 'f-5' },
+          { playerVersionId: 'pv-1', franchiseId: franchiseIdSchema.parse('f-1') },
+          { playerVersionId: 'pv-2', franchiseId: franchiseIdSchema.parse('f-2') },
+          { playerVersionId: 'pv-3', franchiseId: franchiseIdSchema.parse('f-3') },
+          { playerVersionId: 'pv-4', franchiseId: franchiseIdSchema.parse('f-4') },
+          { playerVersionId: 'pv-5', franchiseId: franchiseIdSchema.parse('f-5') },
         ],
         digest: '0'.repeat(32),
       },
@@ -513,8 +514,8 @@ describe('risky rehab options', () => {
         {
           injuryId: 'inj-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
           playerVersionId: 'pv-injured',
-          franchiseId: 'lakers',
-          gameId: 's000001',
+          franchiseId: franchiseIdSchema.parse('lakers'),
+          gameId: seasonGameIdSchema.parse('s000001'),
           type: 'soft-tissue',
           severity: 'moderate',
           occurredBeforeHalftime: false,
@@ -531,8 +532,8 @@ describe('risky rehab options', () => {
         {
           injuryId: 'inj-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
           playerVersionId: 'pv-returned',
-          franchiseId: 'lakers',
-          gameId: 's000002',
+          franchiseId: franchiseIdSchema.parse('lakers'),
+          gameId: seasonGameIdSchema.parse('s000002'),
           type: 'upper-body',
           severity: 'minor',
           occurredBeforeHalftime: true,
@@ -549,8 +550,8 @@ describe('risky rehab options', () => {
         {
           injuryId: 'inj-cccccccccccccccccccccccccccccccc',
           playerVersionId: 'pv-other',
-          franchiseId: 'celtics',
-          gameId: 's000003',
+          franchiseId: franchiseIdSchema.parse('celtics'),
+          gameId: seasonGameIdSchema.parse('s000003'),
           type: 'lower-body',
           severity: 'major',
           occurredBeforeHalftime: false,
@@ -578,9 +579,9 @@ describe('risky rehab options', () => {
     expect(option?.displayName).toBe('Name pv-injured');
     run.influence.balances.lakers = 3;
     run.influence.rehabs['inj-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'] = {
-      franchiseId: 'lakers',
+      franchiseId: franchiseIdSchema.parse('lakers'),
       outcome: 'pending',
-      commandId: 'cmd-1',
+      commandId: commandIdSchema.parse('cmd-1'),
     };
     const after = riskyRehabOptionsOf(run, 'lakers', (id) => `Name ${id}`);
     expect(after[0]?.available).toBe(true);
@@ -606,7 +607,7 @@ describe('typed rejection copy', () => {
     expect(
       describePostseasonRejection('submit-postseason-rotation', {
         code: 'invalid-rotation',
-        franchiseId: 'lakers',
+        franchiseId: franchiseIdSchema.parse('lakers'),
         reasons: ['starter PG cannot play slot'],
       }),
     ).toContain('starter PG cannot play slot');
@@ -620,7 +621,7 @@ describe('typed rejection copy', () => {
     expect(
       describePostseasonRejection('submit-postseason-rotation', {
         code: 'insufficient-rehab-resources',
-        franchiseId: 'lakers',
+        franchiseId: franchiseIdSchema.parse('lakers'),
         balance: 1,
         required: 2,
       }),

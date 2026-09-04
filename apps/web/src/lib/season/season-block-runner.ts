@@ -20,6 +20,7 @@ import type {
 } from '@hoop-rush/data-contracts';
 import {
   SEASON_WORKER_WIRE_SCHEMA_VERSION,
+  franchiseIdSchema,
   seasonAcceptedBlockSchema,
   seasonWorkerCancelRequestSchema,
   seasonWorkerContinueRequestSchema,
@@ -96,8 +97,8 @@ export interface SeasonBlockStartInput {
   blockIndex: number;
   expectedRevision: number;
   rotationDigest: string;
-  commandId: string;
-  humanFranchiseId: string | null;
+  commandId: import('@hoop-rush/data-contracts').CommandId;
+  humanFranchiseId: import('@hoop-rush/data-contracts').FranchiseId | null;
   objectiveId: SeasonObjectiveId | null;
   campaignOpportunityId?: string | null;
   homeCourt: SeasonHomeCourtProfile;
@@ -107,13 +108,13 @@ export interface SeasonBlockStartInput {
   profileHash: string;
 }
 export interface SeasonBlockResumeInput {
-  runId: string;
+  runId: import('@hoop-rush/data-contracts').Id;
   blockIndex: number;
   expectedRevision: number;
   rotationDigest: string;
-  commandId: string;
+  commandId: import('@hoop-rush/data-contracts').CommandId;
   rotations: SeasonRotation[];
-  humanFranchiseId: string | null;
+  humanFranchiseId: import('@hoop-rush/data-contracts').FranchiseId | null;
   homeCourt: SeasonHomeCourtProfile;
   catalogUrl: string;
   catalogHash: string;
@@ -519,7 +520,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         blockIndex: pending.blockIndex,
         commandId: pending.commandId,
         nextGameId: pending.nextGameId,
-        humanFranchiseId: state.input.humanFranchiseId,
+        humanFranchiseId: franchiseIdSchema.parse(state.input.humanFranchiseId),
         unavailablePlayerVersionIds: availability.unavailablePlayerVersionIds,
       };
       const repository = await resolveRepository();

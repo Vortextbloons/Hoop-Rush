@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SimulationPlayer, SimulationTeam } from '@hoop-rush/data-contracts';
+import { playerIdSchema, seedSchema } from '@hoop-rush/data-contracts';
 import {
   buildGameSimulationInput,
   buildLegalSimulationTeam,
@@ -17,7 +18,7 @@ declare const process: {
 };
 const ctx = createEngineContext();
 function run(seed: string) {
-  const input = buildGameSimulationInput({ seed: seedFromString(seed) });
+  const input = buildGameSimulationInput({ seed: seedSchema.parse(seedFromString(seed)) });
   return simulateGame(input, ctx);
 }
 function runMany(seedPrefix: string, count: number) {
@@ -31,14 +32,17 @@ describe('game determinism and golden replay', () => {
   it('is stable for the strong-vs-weak fixture (golden digest)', () => {
     const { strong, weak } = buildStrongWeakFixture();
     const input = buildGameSimulationInput({
-      seed: seedFromString('golden-svsw'),
+      seed: seedSchema.parse(seedFromString('golden-svsw')),
       home: strong,
       away: weak,
     });
     expect(fnv1a32(gameResultDigest(simulateGame(input, ctx)))).toBe(GOLDEN_STRONG_WEAK_V11_HASH);
   });
   it('a mirror matchup (same player on both teams) keeps accounting separate', () => {
-    const shared = buildSimulationPlayer({ playerId: 'p-mirror', displayName: 'Mirror' });
+    const shared = buildSimulationPlayer({
+      playerId: playerIdSchema.parse('p-mirror'),
+      displayName: 'Mirror',
+    });
     const home = buildLegalSimulationTeam({
       teamId: 'home',
       players: [shared, ...buildLegalSimulationTeam().players.slice(1)],
@@ -47,7 +51,11 @@ describe('game determinism and golden replay', () => {
       teamId: 'away',
       players: [shared, ...buildLegalSimulationTeam().players.slice(1)],
     });
-    const input = buildGameSimulationInput({ seed: seedFromString('mirror-1'), home, away });
+    const input = buildGameSimulationInput({
+      seed: seedSchema.parse(seedFromString('mirror-1')),
+      home,
+      away,
+    });
     const result = simulateGame(input, ctx);
     const homeMirror = result.home.players.find((p) => p.playerId === 'p-mirror');
     const awayMirror = result.away.players.find((p) => p.playerId === 'p-mirror');
@@ -74,7 +82,7 @@ describe('game invariants over many seeds', () => {
 });
 describe.skipIf(process.env.HOOP_RUSH_PERF_STRICT !== '1')('game performance goal', () => {
   it('simulates a game well under the 10 ms desktop goal', () => {
-    const input = buildGameSimulationInput({ seed: seedFromString('perf-1') });
+    const input = buildGameSimulationInput({ seed: seedSchema.parse(seedFromString('perf-1')) });
     simulateGame(input, ctx);
     const samples: number[] = [];
     for (let i = 0; i < 100; i += 1) {
@@ -101,7 +109,7 @@ function ratingFixture(ratings: Partial<SimulationPlayer['ratings']>): Simulatio
         throw new Error('fixture slots require five positions');
       }
       return buildSimulationPlayer({
-        playerId: `p-r-${String(i + 1)}`,
+        playerId: playerIdSchema.parse(`p-r-${String(i + 1)}`),
         positions,
         ratings: { ...buildSimulationPlayer().ratings, ...ratings },
       });
@@ -150,7 +158,7 @@ describe('lineup strength across fixtures', () => {
     let awayWins = 0;
     for (let i = 0; i < runs; i += 1) {
       const input = buildGameSimulationInput({
-        seed: seedFromString(`${seedPrefix}-${String(i)}`),
+        seed: seedSchema.parse(seedFromString(`${seedPrefix}-${String(i)}`)),
         home,
         away,
       });

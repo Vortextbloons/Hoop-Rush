@@ -1,4 +1,4 @@
-import {
+﻿import {
   blockIndexForRound,
   blockRoundRange,
   loadEraSimulationProfile,
@@ -7,11 +7,15 @@ import {
   seasonWorkerMessageSchema,
   seasonWorkerRequestSchema,
   SEASON_HEALTH_VERSION,
+  seasonGameIdSchema,
+  seedSchema,
   SEASON_RUN_SCHEMA_VERSION,
   type EraSimulationProfile,
+  type FranchiseId,
   type SeasonBlockRunContext,
   type SeasonDraftCatalog,
   type SeasonEffectsState,
+  type SeasonGameId,
   type SeasonGamePlayerInput,
   type SeasonGameSummary,
   type SeasonHealthState,
@@ -26,6 +30,7 @@ import {
   type SeasonWorkerProgressMessage,
   type SeasonWorkerStartRequest,
   type SeasonWorkerWarmAckMessage,
+  type Seed,
 } from '@hoop-rush/data-contracts';
 import {
   assembleSeasonBlockCandidate,
@@ -53,7 +58,7 @@ interface WorkerRunContext {
   run: SeasonBlockRunContext;
   schedule: SeasonSchedule;
   homeCourt: SeasonHomeCourtProfile;
-  humanFranchiseId: string | null;
+  humanFranchiseId: FranchiseId | null;
 }
 const contextByRunId = new Map<string, WorkerRunContext>();
 function synthesizeStart(request: SeasonWorkerContinueRequest): SeasonWorkerStartRequest | null {
@@ -90,8 +95,8 @@ function postError(
   code: 'invariant-failure' | 'cancelled' | 'internal',
   message: string,
   diagnostics: {
-    seed?: string | null;
-    gameId?: string | null;
+    seed?: Seed | null;
+    gameId?: SeasonGameId | null;
     blockIndex?: number | null;
   } = {},
 ): void {
@@ -501,8 +506,8 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
     }
     if (error instanceof SeasonBlockInvariantError) {
       postError(request.requestId, 'invariant-failure', error.message, {
-        seed: error.diagnostics.seed ?? request.rootSeed,
-        gameId: error.diagnostics.gameId ?? null,
+        seed: error.diagnostics.seed !== undefined ? seedSchema.parse(error.diagnostics.seed) : request.rootSeed,
+        gameId: error.diagnostics.gameId !== undefined ? seasonGameIdSchema.parse(error.diagnostics.gameId) : null,
         blockIndex: error.diagnostics.blockIndex ?? request.blockIndex,
       });
       return;

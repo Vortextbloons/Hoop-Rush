@@ -48,6 +48,8 @@ import {
   buildInitialPostseasonState,
   seasonRunSchema,
   sha256Hex as sha256Bytes,
+  contentHashSchema,
+  idSchema,
   type SeasonDraftState,
   type SeasonLeague,
   type SeasonLeagueGenerationResult,
@@ -93,7 +95,7 @@ export function buildSeasonRunFromGeneration(input: BuildSeasonRunInput): Season
   };
   const run: SeasonRun = {
     schemaVersion: SEASON_RUN_SCHEMA_VERSION,
-    runId,
+    runId: idSchema.parse(runId),
     rootSeed,
     authority: {
       kind: 'local-solo',
@@ -156,7 +158,7 @@ export function buildSeasonRunFromGeneration(input: BuildSeasonRunInput): Season
       scheduleVersion: schedule.scheduleVersion,
       formulaVersion: schedule.formulaVersion,
       generationSeed: schedule.generationSeed,
-      contentHash: scheduleContentHash,
+      contentHash: contentHashSchema.parse(scheduleContentHash),
     },
     games: schedule.games.map((game) => ({
       gameId: game.gameId,

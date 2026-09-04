@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+﻿import { describe, expect, it } from 'vitest';
 import {
   SEASON_GAME_SUMMARY_VERSION,
   type SeasonGame,
@@ -6,6 +6,7 @@ import {
   type SeasonLeague,
   type SeasonStandings,
 } from '@hoop-rush/data-contracts';
+import { franchiseIdSchema, eraIdSchema, seasonKeySchema, playerIdSchema, seasonGameIdSchema, idSchema } from '@hoop-rush/data-contracts';
 import { buildSeasonLeague } from '@hoop-rush/test-fixtures';
 import {
   boxScoreFromSummary,
@@ -22,7 +23,7 @@ import {
   streakLabel,
   winPct,
 } from './season-presentation';
-const LEAGUE = buildSeasonLeague({}, { humanFranchiseId: 'lakers' });
+const LEAGUE = buildSeasonLeague({}, { humanFranchiseId: franchiseIdSchema.parse('lakers') });
 function playerLine(
   playerVersionId: string,
   points: number,
@@ -61,8 +62,8 @@ function summary(
   return {
     schemaVersion: 1,
     summaryVersion: SEASON_GAME_SUMMARY_VERSION,
-    homeFranchiseId: 'lakers',
-    awayFranchiseId: 'celtics',
+    homeFranchiseId: franchiseIdSchema.parse('lakers'),
+    awayFranchiseId: franchiseIdSchema.parse('celtics'),
     status: 'final',
     overtimePeriods: 0,
     homeScore: 110,
@@ -70,7 +71,7 @@ function summary(
     forfeitLoserFranchiseId: null,
     injuryEvents: [],
     homeBox: {
-      franchiseId: 'lakers',
+      franchiseId: franchiseIdSchema.parse('lakers'),
       points: 110,
       fieldGoalsMade: 42,
       fieldGoalsAttempted: 88,
@@ -88,7 +89,7 @@ function summary(
       possessions: 95,
     },
     awayBox: {
-      franchiseId: 'celtics',
+      franchiseId: franchiseIdSchema.parse('celtics'),
       points: 104,
       fieldGoalsMade: 40,
       fieldGoalsAttempted: 87,
@@ -163,10 +164,10 @@ function teamAggregateOf(
 }
 describe('formatting helpers', () => {
   it('formats records, streaks, ordinals, and win percentage', () => {
-    expect(recordLabel(23, 18)).toBe('23–18');
+    expect(recordLabel(23, 18)).toBe('23â€“18');
     expect(streakLabel('wins', 4)).toBe('4 W');
     expect(streakLabel('losses', 3)).toBe('3 L');
-    expect(streakLabel('wins', 1)).toBe('—');
+    expect(streakLabel('wins', 1)).toBe('â€”');
     expect(ordinal(1)).toBe('1st');
     expect(ordinal(2)).toBe('2nd');
     expect(ordinal(3)).toBe('3rd');
@@ -207,9 +208,9 @@ describe('provisionalRanking', () => {
 describe('franchiseStreak', () => {
   it('walks ordered summaries backward for the current streak', () => {
     const summaries = [
-      summary({ gameId: 's000001', round: 1, homeScore: 90, awayScore: 100 }),
-      summary({ gameId: 's000002', round: 2 }),
-      summary({ gameId: 's000003', round: 3 }),
+      summary({ gameId: seasonGameIdSchema.parse('s000001'), round: 1, homeScore: 90, awayScore: 100 }),
+      summary({ gameId: seasonGameIdSchema.parse('s000002'), round: 2 }),
+      summary({ gameId: seasonGameIdSchema.parse('s000003'), round: 3 }),
     ];
     expect(franchiseStreak(summaries, 'lakers')).toEqual({ kind: 'wins', length: 2 });
     expect(franchiseStreak(summaries, 'celtics')).toEqual({ kind: 'losses', length: 2 });
@@ -221,10 +222,10 @@ describe('franchiseStreak', () => {
 describe('franchiseStreaks', () => {
   it('matches franchiseStreak per franchise in one pass', () => {
     const summaries = [
-      summary({ gameId: 's000001', round: 1, homeScore: 90, awayScore: 100 }),
-      summary({ gameId: 's000002', round: 2 }),
-      summary({ gameId: 's000003', round: 3 }),
-      summary({ gameId: 's000004', round: 4, homeScore: 90, awayScore: 100 }),
+      summary({ gameId: seasonGameIdSchema.parse('s000001'), round: 1, homeScore: 90, awayScore: 100 }),
+      summary({ gameId: seasonGameIdSchema.parse('s000002'), round: 2 }),
+      summary({ gameId: seasonGameIdSchema.parse('s000003'), round: 3 }),
+      summary({ gameId: seasonGameIdSchema.parse('s000004'), round: 4, homeScore: 90, awayScore: 100 }),
     ];
     const franchiseIds = ['lakers', 'celtics', 'warriors', 'not-a-team'];
     const batched = franchiseStreaks(summaries, franchiseIds);
@@ -234,9 +235,9 @@ describe('franchiseStreaks', () => {
   });
   it('handles games out of round order identically to the per-team sort', () => {
     const summaries = [
-      summary({ gameId: 's000003', round: 3 }),
-      summary({ gameId: 's000001', round: 1, homeScore: 90, awayScore: 100 }),
-      summary({ gameId: 's000002', round: 2 }),
+      summary({ gameId: seasonGameIdSchema.parse('s000003'), round: 3 }),
+      summary({ gameId: seasonGameIdSchema.parse('s000001'), round: 1, homeScore: 90, awayScore: 100 }),
+      summary({ gameId: seasonGameIdSchema.parse('s000002'), round: 2 }),
     ];
     const batched = franchiseStreaks(summaries, ['lakers', 'celtics']);
     expect(batched.get('lakers')).toEqual(franchiseStreak(summaries, 'lakers'));
@@ -250,7 +251,7 @@ describe('franchiseStreaks', () => {
 });
 describe('foldSeasonAggregates', () => {
   it('folds team and player totals from one summary', () => {
-    const { teams, players } = foldSeasonAggregates([summary({ gameId: 's000001', round: 1 })]);
+    const { teams, players } = foldSeasonAggregates([summary({ gameId: seasonGameIdSchema.parse('s000001'), round: 1 })]);
     const lakers = teamAggregateOf(teams, 'lakers');
     const celtics = teamAggregateOf(teams, 'celtics');
     expect(lakers.wins).toBe(1);
@@ -266,7 +267,7 @@ describe('foldSeasonAggregates', () => {
   });
   it('counts a forfeit as the official 2-0 record without stats', () => {
     const forfeit = summary({
-      gameId: 's000009',
+      gameId: seasonGameIdSchema.parse('s000009'),
       round: 9,
       status: 'forfeit',
       homeScore: 2,
@@ -306,7 +307,7 @@ describe('rebaseStandingsBefore', () => {
     celtics.conferenceLosses = 1;
     celtics.pointsFor = 104;
     celtics.pointsAgainst = 110;
-    const before = rebaseStandingsBefore(after, LEAGUE, [summary({ gameId: 's000001', round: 1 })]);
+    const before = rebaseStandingsBefore(after, LEAGUE, [summary({ gameId: seasonGameIdSchema.parse('s000001'), round: 1 })]);
     const beforeLakers = standingsRow(before, 'lakers');
     const beforeCeltics = standingsRow(before, 'celtics');
     expect(beforeLakers.wins).toBe(0);
@@ -325,17 +326,17 @@ describe('finalizeGameRecords + humanScheduleRows', () => {
   it('merges summary results into scheduled games', () => {
     const scheduled: SeasonGame[] = [
       {
-        gameId: 's000001',
+        gameId: seasonGameIdSchema.parse('s000001'),
         round: 1,
-        homeFranchiseId: 'lakers',
-        awayFranchiseId: 'celtics',
+        homeFranchiseId: franchiseIdSchema.parse('lakers'),
+        awayFranchiseId: franchiseIdSchema.parse('celtics'),
         status: 'scheduled',
         homeScore: null,
         awayScore: null,
         forfeitLoserFranchiseId: null,
       },
     ];
-    const merged = finalizeGameRecords(scheduled, [summary({ gameId: 's000001', round: 1 })]);
+    const merged = finalizeGameRecords(scheduled, [summary({ gameId: seasonGameIdSchema.parse('s000001'), round: 1 })]);
     const game = merged[0];
     if (game === undefined) {
       throw new Error('expected merged game records');
@@ -363,7 +364,7 @@ describe('boxScoreFromSummary', () => {
       ['pv-away-0', ['SG']],
     ]);
     const box = boxScoreFromSummary(
-      summary({ gameId: 's000001', round: 1 }),
+      summary({ gameId: seasonGameIdSchema.parse('s000001'), round: 1 }),
       'lakers',
       names,
       playable,
@@ -383,7 +384,7 @@ describe('boxScoreFromSummary', () => {
   });
   it('returns null for an unrelated franchise', () => {
     const box = boxScoreFromSummary(
-      summary({ gameId: 's000001', round: 1 }),
+      summary({ gameId: seasonGameIdSchema.parse('s000001'), round: 1 }),
       'nuggets',
       new Map(),
       new Map(),
@@ -394,11 +395,11 @@ describe('boxScoreFromSummary', () => {
 describe('deriveBlockRecap', () => {
   it('derives a recap-shaped presentation from recorded facts', () => {
     const summaries = [
-      summary({ gameId: 's000001', round: 1 }),
+      summary({ gameId: seasonGameIdSchema.parse('s000001'), round: 1 }),
       summary({
-        gameId: 's000002',
+        gameId: seasonGameIdSchema.parse('s000002'),
         round: 2,
-        awayFranchiseId: 'bulls',
+        awayFranchiseId: franchiseIdSchema.parse('bulls'),
         homeScore: 101,
         awayScore: 105,
       }),
@@ -406,15 +407,15 @@ describe('deriveBlockRecap', () => {
     const rosters = [
       {
         playerVersionId: 'pv-home-0',
-        playerId: 'person-1',
-        franchiseId: 'lakers',
-        eraId: '1990s',
-        seasonKey: '1995-96',
+        playerId: playerIdSchema.parse('person-1'),
+        franchiseId: franchiseIdSchema.parse('lakers'),
+        eraId: eraIdSchema.parse('1990s'),
+        seasonKey: seasonKeySchema.parse('1995-96'),
         displayName: 'Home Star',
       },
     ];
     const recap = deriveBlockRecap({
-      runId: 'run-1',
+      runId: idSchema.parse('run-1'),
       blockIndex: 0,
       completedRounds: 10,
       standings: zeroStandings(LEAGUE),
@@ -424,17 +425,17 @@ describe('deriveBlockRecap', () => {
       rosters,
       games: [
         {
-          gameId: 's000011',
+          gameId: seasonGameIdSchema.parse('s000011'),
           round: 11,
-          homeFranchiseId: 'lakers',
-          awayFranchiseId: 'heat',
+          homeFranchiseId: franchiseIdSchema.parse('lakers'),
+          awayFranchiseId: franchiseIdSchema.parse('heat'),
           status: 'scheduled',
           homeScore: null,
           awayScore: null,
           forfeitLoserFranchiseId: null,
         },
       ],
-      humanFranchiseId: 'lakers',
+      humanFranchiseId: franchiseIdSchema.parse('lakers'),
       run: {
         health: {
           schemaVersion: 1,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SEASON_ALIGNMENT } from '@hoop-rush/data-contracts';
+import { SEASON_ALIGNMENT, seedSchema } from '@hoop-rush/data-contracts';
 import { buildFixtureBracket, seedFromString } from '@hoop-rush/test-fixtures';
 import { generateSchedule, scheduleInvariants, SCHEDULE_GENERATION_VERSION } from './schedule.ts';
 const ALL_FRANCHISES = SEASON_ALIGNMENT.map((entry) => entry.franchiseId);
@@ -14,7 +14,7 @@ describe('generateSchedule (spec/01 fixed schedule)', () => {
     const schedule = generateSchedule(
       ids,
       'lakers-1990s-opening',
-      seedFromString('fixture-schedule'),
+      seedSchema.parse(seedFromString('fixture-schedule')),
     );
     expect(schedule).toHaveLength(82);
     expect(schedule[0]?.opponentId).toBe('lakers-1990s-opening');
@@ -24,7 +24,7 @@ describe('generateSchedule (spec/01 fixed schedule)', () => {
     const schedule = generateSchedule(
       opponentIds(),
       'lakers-1990s-opening',
-      seedFromString('fixture-schedule'),
+      seedSchema.parse(seedFromString('fixture-schedule')),
     );
     const counts = new Map<string, number>();
     for (const entry of schedule) {
@@ -35,7 +35,7 @@ describe('generateSchedule (spec/01 fixed schedule)', () => {
   });
   it('avoids immediate repeats in every generated schedule', () => {
     for (const seed of ['a'.repeat(32), 'b'.repeat(32), 'c'.repeat(32), 'd'.repeat(32)]) {
-      const schedule = generateSchedule(opponentIds(), 'lakers-1990s-opening', seed);
+      const schedule = generateSchedule(opponentIds(), 'lakers-1990s-opening', seedSchema.parse(seed));
       for (let i = 1; i < schedule.length; i += 1) {
         expect(schedule[i]?.opponentId).not.toBe(schedule[i - 1]?.opponentId);
       }
@@ -45,12 +45,12 @@ describe('generateSchedule (spec/01 fixed schedule)', () => {
     const a = generateSchedule(
       opponentIds(),
       'lakers-1990s-opening',
-      seedFromString('fixture-schedule'),
+      seedSchema.parse(seedFromString('fixture-schedule')),
     );
     const b = generateSchedule(
       opponentIds(),
       'lakers-1990s-opening',
-      seedFromString('fixture-schedule'),
+      seedSchema.parse(seedFromString('fixture-schedule')),
     );
     expect(a).toEqual(b);
   });
@@ -58,25 +58,25 @@ describe('generateSchedule (spec/01 fixed schedule)', () => {
     const a = generateSchedule(
       opponentIds(),
       'lakers-1990s-opening',
-      seedFromString('fixture-schedule'),
+      seedSchema.parse(seedFromString('fixture-schedule')),
     );
     const b = generateSchedule(
       opponentIds(),
       'lakers-1990s-opening',
-      seedFromString('other-schedule'),
+      seedSchema.parse(seedFromString('other-schedule')),
     );
     expect(JSON.stringify(a)).not.toBe(JSON.stringify(b));
   });
   it('rejects wrong-sized opponent sets', () => {
     expect(() =>
-      generateSchedule(opponentIds().slice(0, 29), 'lakers-1990s-opening', seedFromString('x')),
+      generateSchedule(opponentIds().slice(0, 29), 'lakers-1990s-opening', seedSchema.parse(seedFromString('x'))),
     ).toThrow(/exactly 30/);
     expect(() =>
-      generateSchedule([...opponentIds(), 'extra'], 'lakers-1990s-opening', seedFromString('x')),
+      generateSchedule([...opponentIds(), 'extra'], 'lakers-1990s-opening', seedSchema.parse(seedFromString('x'))),
     ).toThrow(/exactly 30/);
   });
   it('rejects an opening opponent outside the bracket', () => {
-    expect(() => generateSchedule(opponentIds(), 'nope', seedFromString('x'))).toThrow(
+    expect(() => generateSchedule(opponentIds(), 'nope', seedSchema.parse(seedFromString('x')))).toThrow(
       /not in the bracket/,
     );
   });

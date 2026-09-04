@@ -6,7 +6,12 @@ import {
   seedFromString,
 } from '@hoop-rush/test-fixtures';
 import type { GameResult, RunPlayerSelection, SimulationPlayer } from '@hoop-rush/data-contracts';
-import { challengeRunSchema } from '@hoop-rush/data-contracts';
+import {
+  challengeRunSchema,
+  eraIdSchema,
+  franchiseIdSchema,
+  seedSchema,
+} from '@hoop-rush/data-contracts';
 import { createEngineContext } from '../sim/context.ts';
 import { simulateGame } from '../sim/game.ts';
 import {
@@ -30,8 +35,8 @@ function defaultSelections(
 ): RunPlayerSelection[] {
   return players.map((player) => ({
     playerId: player.playerId,
-    franchiseId,
-    eraId,
+    franchiseId: franchiseIdSchema.parse(franchiseId),
+    eraId: eraIdSchema.parse(eraId),
   }));
 }
 function fixtureCreation(overrides: Partial<ChallengeCreationBase> = {}): ChallengeCreation {
@@ -53,7 +58,7 @@ function fixtureCreation(overrides: Partial<ChallengeCreationBase> = {}): Challe
     },
     players: team.players,
     selections: defaultSelections(team.players),
-    runSeed: seedFromString('fixture-run-1'),
+    runSeed: seedSchema.parse(seedFromString('fixture-run-1')),
     dataVersion: 'data-v1',
     ratingVersion: 'ratings-v1',
     positionNormalizationVersion: 'position-v1',

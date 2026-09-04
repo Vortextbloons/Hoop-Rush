@@ -3,11 +3,12 @@ import type {
   ProjectionModelArtifact,
   ProjectionReferenceFive,
 } from '@hoop-rush/data-contracts';
+import { eraIdSchema } from '@hoop-rush/data-contracts';
 export function neutralReference(
   model: ProjectionModelArtifact,
   eraId: string,
 ): ProjectionReferenceFive {
-  const set = model.references[eraId];
+  const set = model.references[eraIdSchema.parse(eraId)];
   if (set === undefined) {
     throw new Error(`projection: no reference set for era ${eraId}`);
   }
@@ -18,7 +19,7 @@ export function archetypeReference(
   eraId: string,
   archetype: Exclude<ProjectionMatchupArchetype, 'neutral'>,
 ): ProjectionReferenceFive {
-  const set = model.references[eraId];
+  const set = model.references[eraIdSchema.parse(eraId)];
   if (set === undefined) {
     throw new Error(`projection: no reference set for era ${eraId}`);
   }
@@ -32,7 +33,7 @@ export function archetypeReferences(
   model: ProjectionModelArtifact,
   eraId: string,
 ): ProjectionReferenceFive[] {
-  const set = model.references[eraId];
+  const set = model.references[eraIdSchema.parse(eraId)];
   if (set === undefined) {
     throw new Error(`projection: no reference set for era ${eraId}`);
   }
@@ -44,7 +45,7 @@ export function resolveReference(
   referenceId?: string,
 ): ProjectionReferenceFive {
   if (referenceId === undefined) return neutralReference(model, eraId);
-  const set = model.references[eraId];
+  const set = model.references[eraIdSchema.parse(eraId)];
   if (set !== undefined && set.neutral.referenceId === referenceId) return set.neutral;
   const found = set?.archetypes.find((reference) => reference.referenceId === referenceId);
   if (found === undefined) {

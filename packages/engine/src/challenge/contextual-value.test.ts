@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { playerIdSchema } from '@hoop-rush/data-contracts';
 import { buildLegalSimulationTeam, buildSimulationPlayer } from '@hoop-rush/test-fixtures';
 import {
   evaluateContextualPlayerValue,
@@ -8,7 +9,7 @@ import {
 describe('contextual lineup value', () => {
   it('rewards a missing creator without changing the player base overall', () => {
     const creator = buildSimulationPlayer({
-      playerId: 'creator',
+      playerId: playerIdSchema.parse('creator'),
       overall: 82,
       ratings: {
         ...buildSimulationPlayer().ratings,
@@ -32,7 +33,7 @@ describe('contextual lineup value', () => {
     });
     const teammates = [0, 1, 2, 3].map((index) =>
       buildSimulationPlayer({
-        playerId: `redundant-${String(index)}`,
+        playerId: playerIdSchema.parse(`redundant-${String(index)}`),
         ratings: { ...buildSimulationPlayer().ratings, threePoint: 38 },
         tendencies: { ...buildSimulationPlayer().tendencies, usageRate: 25 },
       }),

@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+﻿import { describe, expect, it } from 'vitest';
 import type { PlayersIndexEntry } from '@hoop-rush/data-contracts';
+import { eraIdSchema, franchiseIdSchema, playerIdSchema, seasonKeySchema } from '@hoop-rush/data-contracts';
 import {
   buildVersionFaceIndex,
   catalogCandidateOfFreeAgency,
@@ -12,16 +13,16 @@ describe('versionTupleOfRosterEntry', () => {
     const tuple = versionTupleOfRosterEntry(
       {
         playerVersionId: 'pv-lebron',
-        playerId: 'p-lebron',
-        franchiseId: 'lakers',
-        eraId: '2000s',
-        seasonKey: '2009-10',
+        playerId: playerIdSchema.parse('p-lebron'),
+        franchiseId: franchiseIdSchema.parse('lakers'),
+        eraId: eraIdSchema.parse('2000s'),
+        seasonKey: seasonKeySchema.parse('2009-10'),
         displayName: 'LeBron James',
       },
       {
-        franchiseId: 'cavaliers',
-        eraId: '2000s',
-        seasonKey: '2009-10',
+        franchiseId: franchiseIdSchema.parse('cavaliers'),
+        eraId: eraIdSchema.parse('2000s'),
+        seasonKey: seasonKeySchema.parse('2009-10'),
       },
     );
     expect(tuple.franchiseId).toBe('cavaliers');
@@ -30,10 +31,10 @@ describe('versionTupleOfRosterEntry', () => {
 describe('buildVersionFaceIndex', () => {
   const playersIndex: PlayersIndexEntry[] = [
     {
-      playerId: 'p-lebron',
-      franchiseId: 'cavaliers',
-      eraId: '2000s',
-      seasonKey: '2009-10',
+      playerId: playerIdSchema.parse('p-lebron'),
+      franchiseId: franchiseIdSchema.parse('cavaliers'),
+      eraId: eraIdSchema.parse('2000s'),
+      seasonKey: seasonKeySchema.parse('2009-10'),
       firstName: 'LeBron',
       lastName: 'James',
       displayName: 'LeBron James',
@@ -51,16 +52,16 @@ describe('buildVersionFaceIndex', () => {
       versionTupleOfRosterEntry(
         {
           playerVersionId: 'pv-lebron',
-          playerId: 'p-lebron',
-          franchiseId: 'lakers',
-          eraId: '2000s',
-          seasonKey: '2009-10',
+          playerId: playerIdSchema.parse('p-lebron'),
+          franchiseId: franchiseIdSchema.parse('lakers'),
+          eraId: eraIdSchema.parse('2000s'),
+          seasonKey: seasonKeySchema.parse('2009-10'),
           displayName: 'LeBron James',
         },
         {
-          franchiseId: 'cavaliers',
-          eraId: '2000s',
-          seasonKey: '2009-10',
+          franchiseId: franchiseIdSchema.parse('cavaliers'),
+          eraId: eraIdSchema.parse('2000s'),
+          seasonKey: seasonKeySchema.parse('2009-10'),
         },
       ),
     ]);
@@ -70,10 +71,10 @@ describe('buildVersionFaceIndex', () => {
     const faces = buildVersionFaceIndex(playersIndex, [
       {
         playerVersionId: 'pv-lebron',
-        playerId: 'p-lebron',
-        franchiseId: 'lakers',
-        eraId: '2000s',
-        seasonKey: '2009-10',
+        playerId: playerIdSchema.parse('p-lebron'),
+        franchiseId: franchiseIdSchema.parse('lakers'),
+        eraId: eraIdSchema.parse('2000s'),
+        seasonKey: seasonKeySchema.parse('2009-10'),
         displayName: 'LeBron James',
       },
     ]);
@@ -89,10 +90,10 @@ describe('freeAgencyVersionTuples', () => {
       candidates: [
         {
           playerVersionId: 'pv-fa-1',
-          playerId: 'p-fa-1',
-          franchiseId: 'knicks',
-          eraId: '2010s',
-          seasonKey: '2012-13',
+          playerId: playerIdSchema.parse('p-fa-1'),
+          franchiseId: franchiseIdSchema.parse('knicks'),
+          eraId: eraIdSchema.parse('2010s'),
+          seasonKey: seasonKeySchema.parse('2012-13'),
           displayName: 'Test Player',
         },
       ],
@@ -103,7 +104,7 @@ describe('freeAgencyVersionTuples', () => {
           candidates: [
             {
               playerVersionId: 'pv-fa-1',
-              playerId: 'p-fa-1',
+              playerId: playerIdSchema.parse('p-fa-1'),
               catalogRef: {
                 catalogVersion: 'season-draft-catalog-v4',
                 dataVersion: 'm10-ratings-v3.6',
@@ -118,10 +119,10 @@ describe('freeAgencyVersionTuples', () => {
     expect(tuples).toEqual([
       {
         playerVersionId: 'pv-fa-1',
-        playerId: 'p-fa-1',
-        franchiseId: 'knicks',
-        eraId: '2010s',
-        seasonKey: '2012-13',
+        playerId: playerIdSchema.parse('p-fa-1'),
+        franchiseId: franchiseIdSchema.parse('knicks'),
+        eraId: eraIdSchema.parse('2010s'),
+        seasonKey: seasonKeySchema.parse('2012-13'),
         displayName: 'Test Player',
       },
     ]);
@@ -133,10 +134,10 @@ describe('freeAgencyVersionTuples', () => {
       candidates: [
         {
           playerVersionId: 'pv-fa-1',
-          playerId: 'p-fa-1',
-          franchiseId: 'knicks',
-          eraId: '2010s',
-          seasonKey: '2012-13',
+          playerId: playerIdSchema.parse('p-fa-1'),
+          franchiseId: franchiseIdSchema.parse('knicks'),
+          eraId: eraIdSchema.parse('2010s'),
+          seasonKey: seasonKeySchema.parse('2012-13'),
           displayName: 'Test Player',
         },
       ],
@@ -147,7 +148,7 @@ describe('freeAgencyVersionTuples', () => {
           candidates: [
             {
               playerVersionId: 'pv-fa-1',
-              playerId: 'p-fa-1',
+              playerId: playerIdSchema.parse('p-fa-1'),
               catalogRef: {
                 catalogVersion: 'season-draft-catalog-v4',
                 dataVersion: 'm10-ratings-v3.6',
@@ -167,10 +168,10 @@ describe('freeAgencyVersionTuples', () => {
 describe('mergeFreeAgencyFaces', () => {
   const playersIndex: PlayersIndexEntry[] = [
     {
-      playerId: 'p-fa-1',
-      franchiseId: 'knicks',
-      eraId: '2010s',
-      seasonKey: '2012-13',
+      playerId: playerIdSchema.parse('p-fa-1'),
+      franchiseId: franchiseIdSchema.parse('knicks'),
+      eraId: eraIdSchema.parse('2010s'),
+      seasonKey: seasonKeySchema.parse('2012-13'),
       firstName: 'Test',
       lastName: 'Player',
       displayName: 'Test Player',
@@ -188,7 +189,7 @@ describe('mergeFreeAgencyFaces', () => {
       [
         'pv-roster',
         {
-          playerId: 'p-roster',
+          playerId: playerIdSchema.parse('p-roster'),
           playerExternalId: 'roster-headshot',
           altIds: null,
           initials: 'RR',
@@ -201,10 +202,10 @@ describe('mergeFreeAgencyFaces', () => {
       candidates: [
         {
           playerVersionId: 'pv-fa-1',
-          playerId: 'p-fa-1',
-          franchiseId: 'knicks',
-          eraId: '2010s',
-          seasonKey: '2012-13',
+          playerId: playerIdSchema.parse('p-fa-1'),
+          franchiseId: franchiseIdSchema.parse('knicks'),
+          eraId: eraIdSchema.parse('2010s'),
+          seasonKey: seasonKeySchema.parse('2012-13'),
           displayName: 'Test Player',
         },
       ],
@@ -215,7 +216,7 @@ describe('mergeFreeAgencyFaces', () => {
           candidates: [
             {
               playerVersionId: 'pv-fa-1',
-              playerId: 'p-fa-1',
+              playerId: playerIdSchema.parse('p-fa-1'),
               catalogRef: {
                 catalogVersion: 'season-draft-catalog-v4',
                 dataVersion: 'm10-ratings-v3.6',

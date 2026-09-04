@@ -5,7 +5,10 @@ import {
   SEASON_ROTATION_PRESET_TARGETS,
   SEASON_ROTATION_VERSION,
   SEASON_STAMINA_VERSION,
+  franchiseIdSchema,
+  playerIdSchema,
   playerVersionId,
+  seedSchema,
   type Position,
   type SeasonEffectsState,
   type SeasonGameSimulationInput,
@@ -51,7 +54,7 @@ const POSITION_PLAN: ReadonlyArray<readonly Position[]> = [
 function buildStaminaRoster(side: 'home' | 'away', offset = 0): StaminaRoster {
   const franchiseId = side === 'home' ? 'lakers' : 'celtics';
   const players = POSITION_PLAN.map((positions, index) => {
-    const playerId = `p-ef-${side}-${String(index + 1 + offset)}`;
+    const playerId = playerIdSchema.parse(`p-ef-${side}-${String(index + 1 + offset)}`);
     const base = buildSimulationPlayer();
     return {
       playerVersionId: playerVersionId(playerId, franchiseId, '1990s', '1995-96'),
@@ -74,7 +77,7 @@ function buildStaminaRoster(side: 'home' | 'away', offset = 0): StaminaRoster {
   return {
     teamId: side === 'home' ? 'home-team' : 'away-team',
     displayName: side === 'home' ? 'Home Team' : 'Away Team',
-    franchiseId,
+    franchiseId: franchiseIdSchema.parse(franchiseId),
     players: players.map((player, index) => ({
       ...player,
       stamina: staminaInputs[index],
@@ -113,7 +116,7 @@ function buildGameInput(
 ): SeasonGameSimulationInput {
   return {
     schemaVersion: 1,
-    seed: seedFromString(seed),
+    seed: seedSchema.parse(seedFromString(seed)),
     gameNumber: 1,
     dataVersion: 'data-v1',
     profile: buildEraSimulationProfile(),

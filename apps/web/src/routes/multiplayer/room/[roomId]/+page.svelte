@@ -4,17 +4,24 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import type {
+    CommandId,
+    ContentHash,
     FixedFiveCommand,
     FixedFiveCommandPayload,
     FixedFiveCompetitionResult,
     FixedFiveRoomSnapshot,
     FixedFiveWorkerResultEntry,
+    Id,
     PlayerId,
     Seed,
     SlotIndex,
   } from '@hoop-rush/data-contracts';
-  import { fixedFiveTimeoutMsForMode } from '@hoop-rush/data-contracts';
-  import { createFixedFiveTransport } from '$lib/fixed-five-transport';
+  import {
+    commandIdSchema,
+    fixedFiveTimeoutMsForMode,
+    idSchema,
+  } from '@hoop-rush/data-contracts';
+  import { createConfiguredFixedFiveTransport } from '$lib/fixed-five-transport';
   import {
     friendlyFixedFiveJoinError,
     loadFixedFiveMembership,
@@ -73,14 +80,14 @@
 
   interface LocalResult {
     result: FixedFiveCompetitionResult;
-    digest: string;
+    digest: ContentHash;
     p1: { refs: PickRef[]; players: SimulationPlayer[] };
     p2: { refs: PickRef[]; players: SimulationPlayer[] };
     weakestReplacedOpponentId: string | null;
   }
   let localResult = $state<LocalResult | null>(null);
-  let submittedPropose = $state<string | null>(null);
-  let confirmedFor = $state<string | null>(null);
+  let submittedPropose = $state<ContentHash | null>(null);
+  let confirmedFor = $state<ContentHash | null>(null);
   let reranMismatch = $state(false);
   let completedSent = $state(false);
   let failSent = $state(false);
@@ -134,23 +141,26 @@
     return `Pick clock: ${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
   });
   const lastAutopick = $derived.by((): { displayName: string; seedPath: string } | null => {
+    if (!assets) return null;
     const timeouts = commands.filter((c) => c.payload.kind === 'timeout-autopick');
     const last = timeouts[timeouts.length - 1];
-    if (!last || last.payload.kind !== 'timeout-autopick' || !assets) return null;
-    const row = assets.index.players.find((p) => p.playerId === last.payload.playerId);
-    return {
-      displayName:
-        row?.displayName ?? (last.payload.kind === 'timeout-autopick' ? last.payload.playerId : '?'),
-      seedPath: last.payload.kind === 'timeout-autopick' ? last.payload.seedPath : '',
-    };
+    if (!last) return null;
+    const payload = last.payload;
+    if (payload.kind !== 'timeout-autopick') return null;
+    const row = assets.index.players.find((p) => p.playerId === payload.playerId);
+    return { displayName: row?.displayName ?? payload.playerId, seedPath: payload.seedPath };
   });
 
   function transport() {
-    const env = import.meta as unknown as { env?: Record<string, string | undefined> };
-    return createFixedFiveTransport({
-      url: env.env?.VITE_SUPABASE_URL,
-      publishableKey: env.env?.VITE_SUPABASE_PUBLISHABLE_KEY,
-    });
+    return createConfiguredFixedFiveTransport();
+  }
+
+  function brandedRoomId(): Id {
+    return idSchema.parse(roomId);
+  }
+
+  function newCommandId(provided?: string): CommandId {
+    return provided ? commandIdSchema.parse(provided) : commandIdSchema.parse(crypto.randomUUID());
   }
 
   async function sync(afterOrdinal: number): Promise<void> {
@@ -194,11 +204,11 @@
     options?: { actor?: 'p1' | 'p2'; commandId?: string; retry?: boolean },
   ): Promise<boolean> {
     error = null;
-    const commandId = options?.commandId ?? crypto.randomUUID();
+    const commandId = newCommandId(options?.commandId);
     try {
       const receipt = await transport().submitCommand({
         schemaVersion: 1,
-        roomId,
+        roomId: brandedRoomId(),
         commandId,
         actorParticipantId: options?.actor ?? selfId,
         payload,
@@ -210,7 +220,7 @@
         if (options?.retry !== false && REVERSIBLE_KINDS.has(payload.kind) && mounted) {
           const retry = await transport().submitCommand({
             schemaVersion: 1,
-            roomId,
+            roomId: brandedRoomId(),
             commandId,
             actorParticipantId: options?.actor ?? selfId,
             payload,
@@ -415,7 +425,7 @@
     }
   }
 
-  async function proposeDigest(digest: string): Promise<void> {
+  async function proposeDigest(digest: ContentHash): Promise<void> {
     busyAction = 'propose';
     try {
       const ok = await sendCommand({ kind: 'propose-result', resultDigest: digest });
@@ -425,7 +435,7 @@
     }
   }
 
-  async function confirmDigest(digest: string, verified: boolean): Promise<void> {
+  async function confirmDigest(digest: ContentHash, verified: boolean): Promise<void> {
     busyAction = 'confirm';
     try {
       const ok = await sendCommand({ kind: 'confirm-result', resultDigest: digest, verified });
@@ -435,7 +445,7 @@
     }
   }
 
-  async function attemptComplete(digest: string): Promise<void> {
+  async function attemptComplete(digest: ContentHash): Promise<void> {
     busyAction = 'complete';
     try {
       const out = await transport().complete(roomId, digest);

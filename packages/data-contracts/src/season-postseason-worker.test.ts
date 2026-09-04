@@ -10,8 +10,9 @@ import {
   type SeasonPostseasonWorkerCompleteMessage,
   type SeasonPostseasonWorkerStartRequest,
 } from './season-postseason-worker.ts';
+import { commandIdSchema } from './ids.ts';
 const SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
-const COMMAND_ID = 'adv-0123456789abcdef';
+const COMMAND_ID = commandIdSchema.parse('adv-0123456789abcdef');
 const TARGET = 'pi-east-seven-eight';
 function fixtureEffects(run: ReturnType<typeof buildRun>): SeasonEffectsState {
   const playerStates = run.rosters.flatMap((roster) =>

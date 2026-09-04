@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  eraIdSchema,
+  franchiseIdSchema,
+  playerIdSchema,
+  seasonGameIdSchema,
+  seasonKeySchema,
   seasonAwardsDigest,
   seasonAwardsSchema,
   type SeasonCompactPlayerLine,
@@ -56,7 +61,7 @@ function boxOf(franchiseId: string, lines: readonly SeasonCompactPlayerLine[]): 
   const sum = (pick: (entry: SeasonCompactPlayerLine) => number) =>
     lines.reduce((total, entry) => total + pick(entry), 0);
   return {
-    franchiseId,
+    franchiseId: franchiseIdSchema.parse(franchiseId),
     points: sum((entry) => entry.points),
     fieldGoalsMade: sum((entry) => entry.fieldGoalsMade),
     fieldGoalsAttempted: sum((entry) => entry.fieldGoalsAttempted),
@@ -82,14 +87,14 @@ function fillerOf(franchiseId: string, startIndex: number): string[] {
 function rostersOf(): SeasonRoster[] {
   const entry = (franchiseId: string, versionId: string, index: number) => ({
     playerVersionId: versionId,
-    playerId: `p-${franchiseId}-${String(index)}`,
-    franchiseId,
-    eraId: 'modern',
-    seasonKey: '2024-25',
+    playerId: playerIdSchema.parse(`p-${franchiseId}-${String(index)}`),
+    franchiseId: franchiseIdSchema.parse(franchiseId),
+    eraId: eraIdSchema.parse('modern'),
+    seasonKey: seasonKeySchema.parse('2024-25'),
     displayName: `Player ${versionId.slice(-4)}`,
   });
   return [LAKERS, CELTICS].map((franchiseId, teamIndex) => ({
-    franchiseId,
+    franchiseId: franchiseIdSchema.parse(franchiseId),
     players: fillerOf(franchiseId, teamIndex === 0 ? 50 : 70).map((versionId, index) =>
       entry(franchiseId, versionId, index),
     ),
@@ -128,20 +133,20 @@ function summary(round: number, spec: GameSpec = {}): SeasonGameSummary {
   if (homeScore === awayScore) {
     throw new Error('fixture game cannot be tied');
   }
-  const gameId = `s${String(round).padStart(6, '0')}`;
+  const gameId = seasonGameIdSchema.parse(`s${String(round).padStart(6, '0')}`);
   if (spec.forfeit === true) {
     return {
       schemaVersion: 1,
       summaryVersion: 'season-game-summary-v3',
       gameId,
       round,
-      homeFranchiseId: LAKERS,
-      awayFranchiseId: CELTICS,
+      homeFranchiseId: franchiseIdSchema.parse(LAKERS),
+      awayFranchiseId: franchiseIdSchema.parse(CELTICS),
       status: 'forfeit',
       overtimePeriods: 0,
       homeScore: 2,
       awayScore: 0,
-      forfeitLoserFranchiseId: CELTICS,
+      forfeitLoserFranchiseId: franchiseIdSchema.parse(CELTICS),
       homeBox: { ...homeBox, points: 0 },
       awayBox: { ...awayBox, points: 0 },
       homePlayers: [],
@@ -154,8 +159,8 @@ function summary(round: number, spec: GameSpec = {}): SeasonGameSummary {
     summaryVersion: 'season-game-summary-v3',
     gameId,
     round,
-    homeFranchiseId: LAKERS,
-    awayFranchiseId: CELTICS,
+    homeFranchiseId: franchiseIdSchema.parse(LAKERS),
+    awayFranchiseId: franchiseIdSchema.parse(CELTICS),
     status: 'final',
     overtimePeriods: 0,
     homeScore,

@@ -1,10 +1,14 @@
 import {
+  fixedFiveRoomCodeSchema,
   fixedFiveRoomMembershipSchema,
+  idSchema,
   type FixedFiveRoomMembership,
+  type Id,
 } from '@hoop-rush/data-contracts';
 
 export function inviteLinkForFixedFiveCode(code: string): string {
-  return `/multiplayer?code=${code}`;
+  const parsed = fixedFiveRoomCodeSchema.parse(code);
+  return `/multiplayer?code=${parsed}`;
 }
 
 export function friendlyFixedFiveJoinError(error: unknown): string {
@@ -36,21 +40,27 @@ export function saveFixedFiveMembership(membership: StoredFixedFiveMembership): 
 
 export function loadFixedFiveMembership(roomId: string): StoredFixedFiveMembership | null {
   try {
-    const raw = localStorage.getItem(`${MEMBERSHIP_PREFIX}${roomId}`);
+    const parsedRoomId = idSchema.safeParse(roomId);
+    if (!parsedRoomId.success) return null;
+    const raw = localStorage.getItem(`${MEMBERSHIP_PREFIX}${parsedRoomId.data}`);
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
     const result = fixedFiveRoomMembershipSchema.safeParse(parsed);
     if (!result.success) return null;
-    if (result.data.roomId !== roomId) return null;
+    if (result.data.roomId !== parsedRoomId.data) return null;
     return result.data;
   } catch {
     return null;
   }
 }
 
-export function loadLastFixedFiveRoomId(): string | null {
+export function loadLastFixedFiveRoomId(): Id | null {
   try {
-    return localStorage.getItem(LAST_ROOM_KEY);
+    const raw = localStorage.getItem(LAST_ROOM_KEY);
+    if (!raw) return null;
+    const parsed = idSchema.safeParse(raw);
+    if (!parsed.success) return null;
+    return parsed.data;
   } catch {
     return null;
   }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildLeague,
+  franchiseIdSchema,
   seasonNamespaceSeed,
   seasonTiebreakResolutionSchema,
   SEASON_SEED_NAMESPACES,
@@ -310,7 +311,9 @@ describe('tiebreak ranking (M2.6, tiebreaker-v1)', () => {
     expect(ranking.playInSeeds[0]).toBe(seed7);
     expect(ranking.playInSeeds[1]).toBe(seed8);
     expect(ranking.directSeeds).not.toContain(seed7);
-    const resolution = ranking.resolutions.find((entry) => entry.teams.includes(seed7));
+    const resolution = ranking.resolutions.find((entry) =>
+      entry.teams.includes(franchiseIdSchema.parse(seed7)),
+    );
     expect(resolution?.kind).toBe('qualification');
     expect(resolution?.slots).toEqual([7, 8]);
   });
@@ -323,7 +326,9 @@ describe('tiebreak ranking (M2.6, tiebreaker-v1)', () => {
       [b]: { h2h: { [a]: 1 } },
     });
     const ranking = eastRanking(spec);
-    const resolution = ranking.resolutions.find((entry) => entry.teams.includes(a));
+    const resolution = ranking.resolutions.find((entry) =>
+      entry.teams.includes(franchiseIdSchema.parse(a)),
+    );
     expect(resolution?.kind).toBe('seeding');
     expect(resolution?.slots).toEqual([1, 2]);
   });

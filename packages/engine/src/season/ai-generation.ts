@@ -4,6 +4,7 @@ import {
   SEASON_ROSTER_GENERATION_VERSION,
   SEASON_ROSTER_TARGETS_VERSION,
   SEASON_ROTATION_VERSION,
+  franchiseIdSchema,
   seasonDigestHex,
   seasonLeagueGenerationResultSchema,
   seasonLeagueSchema,
@@ -118,6 +119,7 @@ export class SeasonAiTargetsError extends Error {
   }
 }
 export function validateSeasonRosterTargets(targets: SeasonRosterTargets): void {
+  if (!targets) throw new SeasonAiTargetsError('roster targets missing');
   if (targets.schemaVersion !== 2) {
     throw new SeasonAiTargetsError(
       `roster targets schemaVersion must be 2 (got ${String(targets.schemaVersion)})`,
@@ -185,7 +187,7 @@ export function evaluateSeasonRoster(input: {
   }
   const rolesCovered = ROSTER_ROLES.filter((role) => roleScores[role] >= ROLE_COVERAGE_THRESHOLD);
   return {
-    franchiseId: input.franchiseId,
+    franchiseId: franchiseIdSchema.parse(input.franchiseId),
     band: input.band,
     identity: input.identity,
     strengthScore: identityScore(roleScores, input.identity),
@@ -1034,7 +1036,7 @@ function exhausted(
       backtracks: state.backtracks,
       nodesVisited: state.nodes,
       nodeBudget: nodeBudgetOf(state.targets),
-      failedTeams,
+      failedTeams: failedTeams.map((team) => franchiseIdSchema.parse(team)),
       unmetConstraints,
     },
     phase,
@@ -2341,7 +2343,7 @@ function selectRosters(state: GenerationState): void {
 function toSeasonAiPool(state: GenerationState, team: PoolTeam): SeasonAiPool {
   const selections = [...(team.selections ?? [])].sort();
   return {
-    franchiseId: team.franchiseId,
+    franchiseId: franchiseIdSchema.parse(team.franchiseId),
     band: team.band,
     identity: team.identity,
     playerVersionIds: [...team.pool].sort(),

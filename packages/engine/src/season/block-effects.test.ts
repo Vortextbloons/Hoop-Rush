@@ -24,7 +24,14 @@ import {
   SEASON_STAMINA_VERSION,
   SEASON_STANDINGS_VERSION,
   buildInitialPostseasonState,
+  contentHashSchema,
+  eraIdSchema,
+  franchiseIdSchema,
+  idSchema,
+  playerIdSchema,
+  seasonKeySchema,
   seasonRunSchema,
+  seedSchema,
   type SeasonAiPool,
   type SeasonCandidateCheckpoint,
   type SeasonDraftCatalog,
@@ -129,17 +136,17 @@ function buildSynthesizedRun(): {
     eras: ['1990s'],
     playersPerPool: 40,
   });
-  const schedule = generateSeasonSchedule({ league, seed: TEST_SEED });
+  const schedule = generateSeasonSchedule({ league, seed: seedSchema.parse(TEST_SEED) });
   const rosters = ALL_FRANCHISES.map((franchiseId) => {
     const members = synthesizeRoster(catalog, franchiseId);
     return {
-      franchiseId,
+      franchiseId: franchiseIdSchema.parse(franchiseId),
       players: members.map((member) => ({
         playerVersionId: member.playerVersionId,
-        playerId: member.playerId,
-        franchiseId: member.franchiseId,
-        eraId: member.eraId,
-        seasonKey: member.seasonKey,
+        playerId: playerIdSchema.parse(member.playerId),
+        franchiseId: franchiseIdSchema.parse(member.franchiseId),
+        eraId: eraIdSchema.parse(member.eraId),
+        seasonKey: seasonKeySchema.parse(member.seasonKey),
         displayName: member.displayName,
       })),
     };
@@ -147,7 +154,7 @@ function buildSynthesizedRun(): {
   const ownership = rosters.flatMap((roster) =>
     roster.players.map((player) => ({
       playerVersionId: player.playerVersionId,
-      ownerFranchiseId: roster.franchiseId,
+      ownerFranchiseId: franchiseIdSchema.parse(roster.franchiseId),
     })),
   );
   const bandCycle = ['contender', 'playoff', 'average', 'weaker'] as const;
@@ -160,12 +167,12 @@ function buildSynthesizedRun(): {
     'active-trader',
   ] as const;
   const aiAssignments = ALL_FRANCHISES.map((franchiseId, index) => ({
-    franchiseId,
+    franchiseId: franchiseIdSchema.parse(franchiseId),
     band: bandCycle[index % 4] ?? 'average',
     identity: identityCycle[index % 6] ?? 'continuity',
   }));
   const evaluations: SeasonRosterEvaluation[] = aiAssignments.map((assignment) => ({
-    franchiseId: assignment.franchiseId,
+    franchiseId: franchiseIdSchema.parse(assignment.franchiseId),
     band: assignment.band,
     identity: assignment.identity,
     strengthScore: 60 + (ALL_FRANCHISES.indexOf(assignment.franchiseId) % 20),
@@ -227,8 +234,8 @@ function buildSynthesizedRun(): {
     });
   const run: SeasonRun = {
     schemaVersion: SEASON_RUN_SCHEMA_VERSION,
-    runId: 'block-effects-test-run',
-    rootSeed: TEST_SEED,
+    runId: idSchema.parse('block-effects-test-run'),
+    rootSeed: seedSchema.parse(TEST_SEED),
     versions: {
       runSchemaVersion: SEASON_RUN_SCHEMA_VERSION,
       leagueVersion: SEASON_LEAGUE_VERSION,
@@ -280,7 +287,7 @@ function buildSynthesizedRun(): {
     league,
     authority: {
       kind: 'local-solo',
-      soloFranchiseId: 'lakers',
+      soloFranchiseId: franchiseIdSchema.parse('lakers'),
       authorityVersion: SEASON_AUTHORITY_VERSION,
     },
     rosters,
@@ -290,7 +297,7 @@ function buildSynthesizedRun(): {
       scheduleVersion: SEASON_SCHEDULE_VERSION,
       formulaVersion: SEASON_SCHEDULE_FORMULA_VERSION,
       generationSeed: schedule.generationSeed,
-      contentHash: '0'.repeat(64),
+      contentHash: contentHashSchema.parse('0'.repeat(64)),
     },
     games: schedule.games.map((game) => ({
       gameId: game.gameId,
@@ -327,7 +334,7 @@ function buildSynthesizedRun(): {
     },
     cursor: { schemaVersion: 1, completedRounds: 0 },
     stage: 'regular-season',
-    postseason: buildInitialPostseasonState(TEST_SEED),
+    postseason: buildInitialPostseasonState(seedSchema.parse(TEST_SEED)),
     awards: null,
     completion: null,
     draft: buildFixtureSeasonDraftFacts(),

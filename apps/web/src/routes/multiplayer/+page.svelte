@@ -5,7 +5,7 @@
   import { Swords, Zap, Trophy, Plus, LogIn, ArrowLeft, Copy, Check, Clock } from '@lucide/svelte';
   import type { FixedFiveRoomMode, FixedFiveSourceMode } from '@hoop-rush/data-contracts';
   import {
-    createFixedFiveTransport,
+    createConfiguredFixedFiveTransport,
     isFixedFiveSupabaseConfigured,
   } from '$lib/fixed-five-transport';
   import {
@@ -42,11 +42,7 @@
   });
 
   function transport() {
-    const env = import.meta as unknown as { env: Record<string, string> };
-    return createFixedFiveTransport({
-      url: env.env.VITE_SUPABASE_URL,
-      publishableKey: env.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-    });
+    return createConfiguredFixedFiveTransport();
   }
 
   function versions() {

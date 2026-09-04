@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+﻿import { describe, expect, it } from 'vitest';
 import type { SeasonRun, SeasonTradeOffer, SeasonTradeState } from '@hoop-rush/data-contracts';
+import { franchiseIdSchema, eraIdSchema, seasonKeySchema, playerIdSchema } from '@hoop-rush/data-contracts';
 import {
   humanTradeOffersOf,
   openWindowOf,
@@ -13,7 +14,7 @@ function offer(overrides: Partial<SeasonTradeOffer> = {}): SeasonTradeOffer {
     offerId: OFFER_ID,
     windowIndex: 0,
     seedPath: ['test', 'trades'],
-    toFranchiseId: 'lakers',
+    toFranchiseId: franchiseIdSchema.parse('lakers'),
     fromFranchiseId: 'celtics',
     outgoingPlayerVersionIds: ['pv-00000000000000000000000000000000'],
     incomingPlayerVersionIds: ['pv-11111111111111111111111111111111'],
@@ -37,27 +38,27 @@ function offer(overrides: Partial<SeasonTradeOffer> = {}): SeasonTradeOffer {
 function runWithRosters(): SeasonRun {
   const rosters = [
     {
-      franchiseId: 'lakers',
+      franchiseId: franchiseIdSchema.parse('lakers'),
       players: [
         {
           playerVersionId: 'pv-00000000000000000000000000000000',
-          playerId: 'p-1',
-          franchiseId: 'lakers',
-          eraId: '1990s',
-          seasonKey: '1995-96',
+          playerId: playerIdSchema.parse('p-1'),
+          franchiseId: franchiseIdSchema.parse('lakers'),
+          eraId: eraIdSchema.parse('1990s'),
+          seasonKey: seasonKeySchema.parse('1995-96'),
           displayName: 'Magic',
         },
       ],
     },
     {
-      franchiseId: 'celtics',
+      franchiseId: franchiseIdSchema.parse('celtics'),
       players: [
         {
           playerVersionId: 'pv-11111111111111111111111111111111',
-          playerId: 'p-2',
-          franchiseId: 'celtics',
-          eraId: '1980s',
-          seasonKey: '1985-86',
+          playerId: playerIdSchema.parse('p-2'),
+          franchiseId: franchiseIdSchema.parse('celtics'),
+          eraId: eraIdSchema.parse('1980s'),
+          seasonKey: seasonKeySchema.parse('1985-86'),
           displayName: 'Larry',
         },
       ],
@@ -67,7 +68,7 @@ function runWithRosters(): SeasonRun {
     rosters,
     rotations: [
       {
-        franchiseId: 'lakers',
+        franchiseId: franchiseIdSchema.parse('lakers'),
         starters: Array.from({ length: 5 }, () => 'pv-00000000000000000000000000000000'),
         benchOrder: Array.from({ length: 5 }, () => 'pv-00000000000000000000000000000000'),
         targetMinutes: [
@@ -171,7 +172,7 @@ describe('humanTradeOffersOf', () => {
             offer({ offerId: 'off-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }),
             offer({
               offerId: 'off-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-              toFranchiseId: 'celtics',
+              toFranchiseId: franchiseIdSchema.parse('celtics'),
               fromFranchiseId: 'lakers',
               status: 'accepted',
             }),

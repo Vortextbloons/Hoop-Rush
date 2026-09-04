@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { RATINGS_VERSION } from '@hoop-rush/data-contracts';
+import { RATINGS_VERSION, projectionModelArtifactSchema } from '@hoop-rush/data-contracts';
 import type {
   BaseFiveProjectionInput,
+  EraId,
   ProjectionModelArtifact,
   SimulationPlayer,
 } from '@hoop-rush/data-contracts';
@@ -11,7 +12,7 @@ import { auditSeasonRotation } from '../season/rotation.ts';
 import { buildInput } from './season.test-helpers.ts';
 import { optimizeSeasonRotation, projectedQualityWeights } from './minute-plan-quality.ts';
 function smallModel(): ProjectionModelArtifact {
-  return {
+  return projectionModelArtifactSchema.parse({
     schemaVersion: 1,
     modelVersion: 'projection-model-v1',
     dataVersion: `m10-${RATINGS_VERSION}`,
@@ -75,7 +76,7 @@ function smallModel(): ProjectionModelArtifact {
               blockAttemptRate: 10,
               crashOffensiveGlassRate: 12,
             },
-          })) as unknown as ProjectionModelArtifact['references']['1990s']['neutral']['players'],
+          })) as unknown as ProjectionModelArtifact['references'][EraId]['neutral']['players'],
         },
         archetypes: [],
       },
@@ -120,7 +121,7 @@ function smallModel(): ProjectionModelArtifact {
         description: 'better shooting must not lower projected eFG%',
       },
     ],
-  };
+  });
 }
 function rosterOf(players: readonly SimulationPlayer[]) {
   return players.map((player) => ({ player }));

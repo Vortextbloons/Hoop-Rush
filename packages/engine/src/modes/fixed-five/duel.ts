@@ -1,4 +1,11 @@
-import type { ClassicDraftCatalog, PlayerId, Seed, SlotIndex } from '@hoop-rush/data-contracts';
+import type {
+  ClassicDraftCatalog,
+  EraId,
+  FranchiseId,
+  PlayerId,
+  Seed,
+  SlotIndex,
+} from '@hoop-rush/data-contracts';
 import { CLASSIC_ROLL_VERSION, slotGroupOf } from '@hoop-rush/data-contracts';
 import { canPlay } from '../../domain/positions.ts';
 import { slotRequirement } from '../../domain/lineup.ts';
@@ -12,8 +19,8 @@ export interface DuelDraftPick {
   participantId: 'p1' | 'p2';
   playerId: PlayerId;
   playerVersionId: string;
-  franchiseId: string;
-  eraId: string;
+  franchiseId: FranchiseId;
+  eraId: EraId;
   slotIndex: SlotIndex;
 }
 
@@ -21,7 +28,7 @@ export interface DuelDraftState {
   rootSeed: Seed;
   firstPicker: 'p1' | 'p2';
   pickOrdinal: number;
-  currentRoll: { franchiseId: string; eraId: string } | null;
+  currentRoll: { franchiseId: FranchiseId; eraId: EraId } | null;
   picks: DuelDraftPick[];
   claimedPairs: string[];
   claimedVersionIds: string[];
@@ -96,7 +103,7 @@ function rollPair(
   kind: 'initial' | 'franchise-reroll' | 'era-reroll',
   candidates: ClassicDraftCatalog[number][],
   context: EngineContext,
-): { franchiseId: string; eraId: string } {
+): { franchiseId: FranchiseId; eraId: EraId } {
   if (candidates.length === 0) {
     throw new Error(`no eligible duel pool for pick ${String(pickOrdinal)}`);
   }

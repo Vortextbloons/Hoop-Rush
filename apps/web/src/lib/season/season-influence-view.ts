@@ -2,6 +2,7 @@ import {
   SEASON_INFLUENCE_CAP,
   SEASON_INFLUENCE_FLOOR,
   SEASON_OBJECTIVE_CATALOG,
+  franchiseIdSchema,
   type SeasonHealthState,
   type SeasonInfluenceLedgerEntry,
   type SeasonInfluenceRehabOutcome,
@@ -37,13 +38,14 @@ export function influenceViewModel(
   health: SeasonHealthState | null = null,
   openWindow: SeasonTradeWindowState | null = null,
 ): InfluenceViewModel {
-  const balance = state.balances[humanFranchiseId] ?? 0;
+  const fid = franchiseIdSchema.parse(humanFranchiseId);
+  const balance = state.balances[fid] ?? 0;
   const recentEntries = state.ledger
     .filter((entry) => entry.franchiseId === humanFranchiseId)
     .slice(-5)
     .reverse();
   const windowSpends = new Map(
-    (state.windows[humanFranchiseId] ?? []).map((window) => [
+    (state.windows[fid] ?? []).map((window: { windowIndex: number; extraOfferSpent?: boolean }) => [
       window.windowIndex,
       window.extraOfferSpent,
     ]),

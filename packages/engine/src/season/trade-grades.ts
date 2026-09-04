@@ -1,5 +1,6 @@
 import {
   canonicalJson,
+  idSchema,
   seasonDigestHex,
   seasonTradeGradeLogSchema,
   type SeasonGameSummary,
@@ -374,7 +375,9 @@ export function deriveSeasonTradeGrades(input: SeasonTradeGradesInput): SeasonTr
               `team trend ${String(components.trend)}/100 (post-trade win rate ${(postWinRate * 100).toFixed(0)}% vs pre-trade ${(preWinRate * 100).toFixed(0)}%)`,
             ];
         grades.push({
-          gradeId: gradeIdOf(input.runId, window.windowIndex, offer.offerId, side.franchiseId),
+          gradeId: idSchema.parse(
+            gradeIdOf(input.runId, window.windowIndex, offer.offerId, side.franchiseId),
+          ),
           windowIndex: window.windowIndex,
           offerId: offer.offerId,
           franchiseId: side.franchiseId,

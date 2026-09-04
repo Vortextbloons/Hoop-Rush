@@ -4,6 +4,7 @@ import type {
   SimulationPlayer,
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
+import { playerIdSchema, seedSchema } from '@hoop-rush/data-contracts';
 import {
   buildEraSimulationProfile,
   buildGameSimulationInput,
@@ -38,7 +39,7 @@ function anchoredCenterTeam(): SimulationTeam {
   const players = base.players.map((player, index) =>
     index === 4
       ? buildSimulationPlayer({
-          playerId: 'shaquille-anchor',
+          playerId: playerIdSchema.parse('shaquille-anchor'),
           displayName: 'Anchor Center',
           positions: ['C'],
           heightInches: 85,
@@ -96,7 +97,7 @@ describe('observed player anchors', () => {
     for (let index = 0; index < samples; index += 1) {
       const result = simulateGame(
         buildGameSimulationInput({
-          seed: seedFromString(`anchor-${String(index)}`),
+          seed: seedSchema.parse(seedFromString(`anchor-${String(index)}`)),
           home,
           away,
         }),
@@ -166,7 +167,7 @@ describe('observed player anchors', () => {
   it('keeps deterministic results when anchors are present', () => {
     const team = anchoredCenterTeam();
     const input = buildGameSimulationInput({
-      seed: seedFromString('anchor-determinism'),
+      seed: seedSchema.parse(seedFromString('anchor-determinism')),
       home: team,
       away: team,
     });
@@ -194,7 +195,7 @@ function averageDefenseTeam(): SimulationTeam {
       }
       return {
         ...basePlayer,
-        playerId: `avg-def-${String(index)}`,
+        playerId: playerIdSchema.parse(`avg-def-${String(index)}`),
         displayName: `Avg Def ${String(index)}`,
         positions,
         ratings,
@@ -224,7 +225,7 @@ function sampleFieldGoalPct(
   for (let index = 0; index < games; index += 1) {
     const result = simulateGame(
       buildGameSimulationInput({
-        seed: seedFromString(`anchor-pin-${playerId}-${String(index)}`),
+        seed: seedSchema.parse(seedFromString(`anchor-pin-${playerId}-${String(index)}`)),
         home,
         away,
       }),
@@ -288,7 +289,7 @@ describe('observed player anchors pin efficiency (m3-engine-v5)', () => {
     }
     const slots: SimulationPlayer['positions'][] = [['PG'], ['SG'], ['SF'], ['PF'], ['C']];
     const star = buildSimulationPlayer({
-      playerId: 'mj-anchor',
+      playerId: playerIdSchema.parse('mj-anchor'),
       displayName: 'Anchor Star',
       positions: ['PG'],
       ratings: {

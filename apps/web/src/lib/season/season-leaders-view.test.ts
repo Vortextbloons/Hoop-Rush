@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { SeasonPlayerAggregate, SeasonTeamAggregate } from '@hoop-rush/data-contracts';
+import { franchiseIdSchema } from '@hoop-rush/data-contracts';
 import { deriveSeasonLeaders } from '@hoop-rush/engine';
 import { engineOrderLeaderTables, LEADER_CATEGORIES } from './season-leaders-view';
 function team(franchiseId: string, gamesPlayed: number): SeasonTeamAggregate {
   return {
-    franchiseId,
+    franchiseId: franchiseIdSchema.parse(franchiseId),
     gamesPlayed,
     wins: 0,
     losses: 0,
@@ -33,7 +34,7 @@ function player(
 ): SeasonPlayerAggregate {
   return {
     playerVersionId,
-    franchiseId,
+    franchiseId: franchiseIdSchema.parse(franchiseId),
     gamesPlayed,
     appearances: gamesPlayed,
     started: gamesPlayed,

@@ -1,8 +1,13 @@
 import {
   humanFranchiseIdOf,
   SEASON_RUN_SCHEMA_VERSION,
+  commandIdSchema,
+  franchiseIdSchema,
+  postseasonGameIdSchema,
   seasonSubmitBlockCommandSchema,
   type EraSimulationProfile,
+  type FranchiseId,
+  type Id,
   type SeasonActiveRunIndex,
   type SeasonCampaignOpportunity,
   type SeasonCampaignState,
@@ -15,6 +20,7 @@ import {
   type SeasonObjectiveId,
   type SeasonPendingBlockCandidate,
   type SeasonPostseasonRotationPayload,
+  type SeasonPostseasonScoreline,
   type SeasonPostseasonSummary,
   type SeasonRetainedGameDetail,
   type SeasonRosterTargets,
@@ -106,7 +112,7 @@ export interface SeasonPostseasonProgress {
   gamesCompleted: number;
   gamesTotal: number;
   latestGameId: string | null;
-  latestResult: SeasonScoreline | null;
+  latestResult: SeasonPostseasonScoreline | null;
   error: {
     code: string;
     message: string;
@@ -494,6 +500,7 @@ export class SeasonHubState {
         import('./season-assets').then((module) => module.loadSeasonHomeCourtProfile()),
         import('./season-assets').then((module) => module.seasonArtifactUrls()),
       ]);
+      const rawHumanResume = humanFranchiseIdOf(run.league);
       input = {
         runId: run.runId,
         blockIndex: pending.blockIndex,
@@ -501,7 +508,7 @@ export class SeasonHubState {
         rotationDigest: pending.rotationDigest,
         commandId: pending.commandId,
         rotations: run.rotations,
-        humanFranchiseId: humanFranchiseIdOf(run.league),
+        humanFranchiseId: rawHumanResume === null ? null : franchiseIdSchema.parse(rawHumanResume),
         homeCourt,
         catalogUrl: urls.catalogUrl,
         catalogHash: urls.catalogHash,
@@ -596,7 +603,7 @@ export class SeasonHubState {
       expectedStateRevision: this.requiredStateRevision(),
       expectedStateDigest: this.requiredStateDigest(),
       windowIndex: input.windowIndex,
-      toFranchiseId: input.toFranchiseId,
+      toFranchiseId: franchiseIdSchema.parse(input.toFranchiseId),
     };
     await this.dispatch(command);
   }
@@ -627,7 +634,7 @@ export class SeasonHubState {
       expectedStateRevision: this.requiredStateRevision(),
       expectedStateDigest: this.requiredStateDigest(),
       windowIndex: input.windowIndex,
-      toFranchiseId: input.toFranchiseId,
+      toFranchiseId: franchiseIdSchema.parse(input.toFranchiseId),
       outgoingPlayerVersionIds: input.outgoingPlayerVersionIds,
       incomingPlayerVersionIds: input.incomingPlayerVersionIds,
       influenceAmount: input.influenceAmount,
@@ -859,11 +866,14 @@ export class SeasonHubState {
     const command: SeasonRunCommand['command'] = 'advance-postseason';
     if (!this.requirePostseasonStage(command)) return;
     const runner = await this.resolvePostseasonRunner();
+    const rawHuman = this.humanFranchiseId();
     this.postseasonRequestId = runner.advancePostseason({
       runId: this.requiredRunId(),
       commandId: newSeasonId('adv'),
-      ...(input?.targetGameId !== undefined ? { targetGameId: input.targetGameId } : {}),
-      humanFranchiseId: this.humanFranchiseId(),
+      ...(input?.targetGameId !== undefined
+        ? { targetGameId: postseasonGameIdSchema.parse(input.targetGameId) }
+        : {}),
+      humanFranchiseId: rawHuman === null ? null : franchiseIdSchema.parse(rawHuman),
     });
   }
   async submitPostseasonRotation(input: {
@@ -877,7 +887,7 @@ export class SeasonHubState {
       runId: this.requiredRunId(),
       expectedStateRevision: this.requiredStateRevision(),
       expectedStateDigest: this.requiredStateDigest(),
-      targetGameId: input.targetGameId,
+      targetGameId: postseasonGameIdSchema.parse(input.targetGameId),
       rotation: input.rotation,
     };
     await this.dispatchPostseason(command);
@@ -886,22 +896,26 @@ export class SeasonHubState {
     const command: SeasonRunCommand['command'] = 'spectate-postseason-game';
     if (!this.requirePostseasonStage(command)) return;
     const runner = await this.resolvePostseasonRunner();
+    const rawHumanSpectate = this.humanFranchiseId();
     this.postseasonRequestId = runner.spectatePostseasonGame({
       runId: this.requiredRunId(),
       commandId: newSeasonId('spc'),
-      targetGameId: input.targetGameId,
-      humanFranchiseId: this.humanFranchiseId(),
+      targetGameId: postseasonGameIdSchema.parse(input.targetGameId),
+      humanFranchiseId: rawHumanSpectate === null ? null : franchiseIdSchema.parse(rawHumanSpectate),
     });
   }
   async fastForwardPostseason(input?: { targetGameId?: string }): Promise<void> {
     const command: SeasonRunCommand['command'] = 'fast-forward-postseason';
     if (!this.requirePostseasonStage(command)) return;
     const runner = await this.resolvePostseasonRunner();
+    const rawHumanFf = this.humanFranchiseId();
     this.postseasonRequestId = runner.fastForwardPostseason({
       runId: this.requiredRunId(),
       commandId: newSeasonId('ff'),
-      ...(input?.targetGameId !== undefined ? { targetGameId: input.targetGameId } : {}),
-      humanFranchiseId: this.humanFranchiseId(),
+      ...(input?.targetGameId !== undefined
+        ? { targetGameId: postseasonGameIdSchema.parse(input.targetGameId) }
+        : {}),
+      humanFranchiseId: rawHumanFf === null ? null : franchiseIdSchema.parse(rawHumanFf),
     });
   }
   cancelPostseason(): void {
@@ -1210,7 +1224,7 @@ export class SeasonHubState {
       this.emit();
     }
   }
-  private requiredRunId(): string {
+  private requiredRunId(): Id {
     const runId = this.snapshot?.run.runId;
     if (runId === undefined) throw new Error('no active season run to command');
     return runId;
@@ -1223,11 +1237,11 @@ export class SeasonHubState {
     if (this.snapshot === null) throw new Error('no active season run to command');
     return this.snapshot.run.stateDigest;
   }
-  private requiredHumanFranchiseId(): string {
+  private requiredHumanFranchiseId(): FranchiseId {
     const franchiseId =
       this.snapshot === null ? null : humanFranchiseIdOf(this.snapshot.run.league);
     if (franchiseId === null) throw new Error('the active run has no human franchise');
-    return franchiseId;
+    return franchiseIdSchema.parse(franchiseId);
   }
   private humanFranchiseId(): string | null {
     return this.snapshot === null ? null : humanFranchiseIdOf(this.snapshot.run.league);
@@ -1304,16 +1318,21 @@ function indexAfterCommit(
   snapshot: SeasonRunSnapshot,
   now: () => number,
 ): SeasonActiveRunIndex | null {
-  const humanFranchiseId = humanFranchiseIdOf(snapshot.run.league);
+  const rawHuman = humanFranchiseIdOf(snapshot.run.league);
+  const parsedHuman = rawHuman === null ? null : franchiseIdSchema.parse(rawHuman);
+  const humanFranchiseId = parsedHuman;
   const humanRow =
     humanFranchiseId === null
       ? null
       : (snapshot.run.standings.rows.find((row) => row.franchiseId === humanFranchiseId) ?? null);
   if (index === null) {
+    if (humanFranchiseId === null) {
+      throw new Error('the committed run has no human franchise');
+    }
     return {
       runId: snapshot.run.runId,
       rootSeed: snapshot.run.rootSeed,
-      humanFranchiseId: humanFranchiseId ?? '',
+      humanFranchiseId,
       completedRounds: snapshot.run.cursor.completedRounds,
       revision: snapshot.acceptedBlocks.length,
       humanWins: humanRow?.wins ?? 0,

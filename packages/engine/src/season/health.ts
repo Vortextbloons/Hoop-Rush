@@ -1,5 +1,8 @@
 import {
   SEASON_GAME_SUMMARY_VERSION,
+  commandIdSchema,
+  franchiseIdSchema,
+  seasonGameIdSchema,
   type Position,
   type SeasonEffectsState,
   type SeasonGameSummary,
@@ -156,7 +159,7 @@ export function seasonGameHealthSeam(
   }[] = [];
   const newInjuries: SeasonInjuryRecord[] = [];
   for (const franchiseId of [input.homeFranchiseId, input.awayFranchiseId]) {
-    const roster = rosterByFranchise.get(franchiseId);
+    const roster = rosterByFranchise.get(franchiseIdSchema.parse(franchiseId));
     if (roster === undefined) {
       throw new Error(`season health: game ${input.gameId} references roster ${franchiseId}`);
     }
@@ -231,7 +234,7 @@ export function assembleSeasonPendingBlock(input: {
     schemaVersion: 1,
     blockVersion: run.versions.blockVersion,
     runId: run.runId,
-    commandId: input.commandId,
+    commandId: commandIdSchema.parse(input.commandId),
     blockIndex: input.blockIndex,
     expectedRevision: input.expectedRevision,
     expectedStateRevision: input.expectedStateRevision,
@@ -243,7 +246,7 @@ export function assembleSeasonPendingBlock(input: {
           campaignOpportunityId?: string | null;
         }
       ).campaignOpportunityId ?? null,
-    nextGameId: input.nextGameId,
+    nextGameId: seasonGameIdSchema.parse(input.nextGameId),
     summaries: [...input.summaries],
     retainedDetails: [...input.retainedDetails],
     effects: input.effects,
@@ -256,7 +259,7 @@ export function assembleSeasonPendingBlock(input: {
 }
 function zeroTeamBox(franchiseId: string): SeasonTeamBox {
   return {
-    franchiseId,
+    franchiseId: franchiseIdSchema.parse(franchiseId),
     points: 0,
     fieldGoalsMade: 0,
     fieldGoalsAttempted: 0,
@@ -295,7 +298,7 @@ export function seasonForfeitSummaryForGame(
     overtimePeriods: 0,
     homeScore: humanIsHome ? 0 : 2,
     awayScore: humanIsHome ? 2 : 0,
-    forfeitLoserFranchiseId: humanFranchiseId,
+    forfeitLoserFranchiseId: franchiseIdSchema.parse(humanFranchiseId),
     homeBox: zeroTeamBox(game.homeFranchiseId),
     awayBox: zeroTeamBox(game.awayFranchiseId),
     homePlayers: [],
@@ -322,6 +325,6 @@ export function advancePendingAfterForfeit(
     ...pending,
     summaries: [...pending.summaries],
     retainedDetails: [...pending.retainedDetails],
-    nextGameId: `s${String(nextNumber).padStart(6, '0')}`,
+    nextGameId: seasonGameIdSchema.parse(`s${String(nextNumber).padStart(6, '0')}`),
   };
 }

@@ -12,7 +12,7 @@ import type {
   SimulationTeam,
   SimulationTendencies,
 } from '@hoop-rush/data-contracts';
-import { opponentBracketSchema } from '@hoop-rush/data-contracts';
+import { franchiseIdSchema, opponentBracketSchema, playerIdSchema, seasonKeySchema } from '@hoop-rush/data-contracts';
 import type { EngineContext } from '../sim/context.ts';
 import { createRng, shuffle } from '../sim/rng.ts';
 import { validateBracketContent } from '../challenge/commands.ts';
@@ -63,7 +63,7 @@ interface Proposal {
 }
 function toSimulationPlayer(player: BracketCandidatePlayer): SimulationPlayer {
   return {
-    playerId: player.playerId,
+    playerId: playerIdSchema.parse(player.playerId),
     displayName: player.displayName,
     positions: player.positions,
     heightInches: player.heightInches,
@@ -384,30 +384,30 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
     if (top === undefined) {
       throw new Error(`bracket: proposal has no players for ${franchiseId}`);
     }
-    const seasonKey = top.seasonKey;
+    const seasonKey = seasonKeySchema.parse(top.seasonKey);
     const opponentId = `bracket-${franchiseId}`;
     const lineup: BracketOpponent['lineup'] = {
       structure: ['G', 'G', 'F', 'F', 'C'],
       assignments: proposal.players.map((player, slotIndex) => ({
         slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4,
-        playerId: player.playerId,
+        playerId: playerIdSchema.parse(player.playerId),
         positions: player.positions,
       })),
     };
     for (const player of proposal.players) {
-      if (usedInBracket.has(player.playerId)) {
+      if (usedInBracket.has(playerIdSchema.parse(player.playerId))) {
         throw new Error(
           `player ${player.playerId} appears in more than one opponent (${franchiseId})`,
         );
       }
-      usedInBracket.add(player.playerId);
+      usedInBracket.add(playerIdSchema.parse(player.playerId));
     }
     const entry: BracketOpponent = {
       schemaVersion: 2,
       opponentId,
       bracketVersion: options.generationVersion,
       difficultyBand: 'medium',
-      teamId: franchiseId,
+      teamId: franchiseIdSchema.parse(franchiseId),
       displayName: candidates.displayName,
       seasonKey,
       lineup,

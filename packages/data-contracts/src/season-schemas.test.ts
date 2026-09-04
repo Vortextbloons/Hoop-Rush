@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  franchiseIdSchema,
   seasonCursorSchema,
   seasonGameSchema,
   seasonLeagueSchema,
@@ -165,8 +166,12 @@ describe('season schedule schema', () => {
     expect(() => seasonScheduleSchema.parse({ ...schedule, games })).not.toThrow();
     games[0] = { ...first, round: 83 };
     expect(() => seasonScheduleSchema.parse({ ...schedule, games })).toThrow();
-    games[0] = { ...first, gameId: 's-00001' };
-    expect(() => seasonScheduleSchema.parse({ ...schedule, games })).toThrow();
+    expect(() =>
+      seasonScheduleSchema.parse({
+        ...schedule,
+        games: [{ ...first, gameId: 's-00001' }, ...schedule.games.slice(1)],
+      }),
+    ).toThrow();
   });
 });
 describe('season game schema', () => {
@@ -1828,7 +1833,7 @@ describe('season influence family (M2.5, season-influence-v2)', () => {
   it('rejects missing franchises, wrong versions, and out-of-range balances', () => {
     const state = buildInitialInfluence();
     const balances = { ...state.balances };
-    delete balances.lakers;
+    delete balances[franchiseIdSchema.parse('lakers')];
     expect(() => seasonInfluenceStateSchema.parse({ ...state, balances })).toThrow();
     expect(() =>
       seasonInfluenceStateSchema.parse({ ...state, influenceVersion: 'season-influence-v1' }),
@@ -1860,7 +1865,7 @@ describe('season influence family (M2.5, season-influence-v2)', () => {
       },
     };
     const parsed = roundTrip(seasonInfluenceStateSchema, withSpends);
-    expect(parsed.windows.lakers?.[0]?.extraOfferSpent).toBe(true);
+    expect(parsed.windows[franchiseIdSchema.parse('lakers')]?.[0]?.extraOfferSpent).toBe(true);
     expect(parsed.rehabs[`inj-${'b'.repeat(32)}`]?.outcome).toBe('success');
     expect(() =>
       seasonInfluenceStateSchema.parse({

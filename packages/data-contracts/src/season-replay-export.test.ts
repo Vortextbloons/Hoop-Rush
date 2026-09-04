@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildRun,
+  contentHashSchema,
+  eraIdSchema,
+  franchiseIdSchema,
+  idSchema,
+  seasonAlmanacSchema,
   seasonCommandLogEntrySchema,
   seasonCommandLogSchema,
   seasonPostseasonSummarySchema,
   seasonReplayExportSchema,
   seasonRunReplayExportSchema,
+  seedSchema,
   type SeasonAlmanac,
   type SeasonCommandLog,
   type SeasonCommandLogEntry,
@@ -162,7 +168,7 @@ function postseasonSummary(): SeasonPostseasonSummary {
   });
 }
 function almanac(commandLogDigest: string): SeasonAlmanac {
-  return {
+  return seasonAlmanacSchema.parse({
     schemaVersion: 1,
     almanacVersion: 'almanac-v1',
     runId: 'fixture-run-1',
@@ -173,7 +179,7 @@ function almanac(commandLogDigest: string): SeasonAlmanac {
     awardsDigest: '5'.repeat(32),
     tradeGradesDigest: '6'.repeat(32),
     digest: DIGEST_32,
-  };
+  });
 }
 function exportInput(): SeasonRunReplayExportInput {
   const run = buildRun();
@@ -181,13 +187,13 @@ function exportInput(): SeasonRunReplayExportInput {
   return {
     runId: run.runId,
     rootSeed: run.rootSeed,
-    eraId: '1990s',
+    eraId: eraIdSchema.parse('1990s'),
     versions: run.versions,
     assetHashes: {
-      league: HASH_64,
+      league: contentHashSchema.parse(HASH_64),
       schedule: run.schedule.contentHash,
-      draftCatalog: HASH_64,
-      eraProfile: HASH_64,
+      draftCatalog: contentHashSchema.parse(HASH_64),
+      eraProfile: contentHashSchema.parse(HASH_64),
     },
     initialRun: run,
     commandLog: log,
@@ -224,14 +230,14 @@ describe('full-run replay export (replay-export-v1)', () => {
     const withOtherChampion = buildSeasonRunReplayExport({
       ...input,
       championFranchiseId: 'celtics',
-      almanac: { ...input.almanac, championFranchiseId: 'celtics' },
+      almanac: { ...input.almanac, championFranchiseId: franchiseIdSchema.parse('celtics') },
     });
     expect(withOtherChampion.digest).not.toBe(base.digest);
     const withOtherRootSeed = buildSeasonRunReplayExport({
       ...input,
       rootSeed: '1'.repeat(32),
       initialRun: undefined,
-      almanac: { ...input.almanac, rootSeed: '1'.repeat(32) },
+      almanac: { ...input.almanac, rootSeed: seedSchema.parse('1'.repeat(32)) },
     });
     expect(withOtherRootSeed.digest).not.toBe(base.digest);
     const log = commandLog();
@@ -255,7 +261,7 @@ describe('full-run replay export (replay-export-v1)', () => {
       buildSeasonRunReplayExport({
         ...input,
         championFranchiseId: 'celtics',
-        almanac: { ...input.almanac, championFranchiseId: 'lakers' },
+        almanac: { ...input.almanac, championFranchiseId: franchiseIdSchema.parse('lakers') },
       }),
     ).toThrow(/almanac champion disagrees/);
     const log = commandLog();
@@ -273,7 +279,7 @@ describe('full-run replay export (replay-export-v1)', () => {
     expect(() =>
       buildSeasonRunReplayExport({
         ...input,
-        initialRun: { ...buildRun(), runId: 'other-run' },
+        initialRun: { ...buildRun(), runId: idSchema.parse('other-run') },
       }),
     ).toThrow(/initialRun targets a different run/);
     expect(() =>

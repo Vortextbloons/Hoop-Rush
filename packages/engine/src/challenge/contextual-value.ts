@@ -6,6 +6,7 @@ import type {
   SimulationPlayer,
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
+import { playerIdSchema } from '@hoop-rush/data-contracts';
 import { clamp } from '../domain/math.ts';
 type ReasonDraft = Omit<ContextualReason, 'priority'> & {
   priority: number;
@@ -329,7 +330,7 @@ export function evaluateLineupMatchup(
   }
   const averagePlayer: SimulationPlayer = {
     ...firstPlayer,
-    playerId: `${lineup.teamId}-lineup-average`,
+    playerId: playerIdSchema.parse(`${lineup.teamId}-lineup-average`),
     displayName: lineup.displayName,
     overall: Math.round(average(lineup.players.map(overall))),
     ratings: Object.fromEntries(

@@ -4,9 +4,12 @@ import {
   SEASON_NEUTRAL_HOME_COURT,
   SEASON_ROTATION_VERSION,
   SEASON_HOME_WIN_RATE_TARGET,
+  franchiseIdSchema,
+  playerIdSchema,
   seasonGameSimulationInputSchema,
   seasonHomeCourtProfileSchema,
   playerVersionId,
+  seedSchema,
   type Position,
   type SeasonGameSimulationInput,
   type SeasonGameTeamInput,
@@ -42,7 +45,7 @@ const POSITION_PLAN: ReadonlyArray<readonly Position[]> = [
 function buildTeam(side: 'home' | 'away'): SeasonGameTeamInput {
   const franchiseId = side === 'home' ? 'lakers' : 'celtics';
   const players = POSITION_PLAN.map((positions, index) => {
-    const playerId = `p-hc-${side}-${String(index)}`;
+    const playerId = playerIdSchema.parse(`p-hc-${side}-${String(index)}`);
     const base = buildSimulationPlayer();
     return {
       playerVersionId: playerVersionId(playerId, franchiseId, '1990s', '1995-96'),
@@ -55,7 +58,7 @@ function buildTeam(side: 'home' | 'away'): SeasonGameTeamInput {
       tendencies: { ...base.tendencies },
     };
   });
-  return { teamId: side, displayName: side, franchiseId, players };
+  return { teamId: side, displayName: side, franchiseId: franchiseIdSchema.parse(franchiseId), players };
 }
 function rotationOf(team: SeasonGameTeamInput): SeasonRotation {
   const ids = team.players.map((p) => p.playerVersionId);
@@ -83,7 +86,7 @@ function buildInput(
   const away = buildTeam('away');
   return {
     schemaVersion: 1,
-    seed: seedFromString(seed),
+    seed: seedSchema.parse(seedFromString(seed)),
     gameNumber: 1,
     dataVersion: 'data-v1',
     profile: buildEraSimulationProfile(),

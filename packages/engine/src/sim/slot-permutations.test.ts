@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GameResult, PlayerBoxScore, SimulationTeam } from '@hoop-rush/data-contracts';
+import { seedSchema } from '@hoop-rush/data-contracts';
 import {
   buildGameSimulationInput,
   buildSlotPermutationTeams,
@@ -20,7 +21,7 @@ function runPermutation(team: SimulationTeam, seeds: string[]) {
   const games: GameResult[] = seeds.map((seed) =>
     simulateGame(
       buildGameSimulationInput({
-        seed: seedFromString(seed),
+        seed: seedSchema.parse(seedFromString(seed)),
         home: team,
         away: team,
       }),

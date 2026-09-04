@@ -4,6 +4,7 @@ import {
   SEASON_EMPTY_COMMAND_LOG_DIGEST,
   buildRun,
   canonicalJson,
+  franchiseIdSchema,
   playInGameIdOf,
   playoffGameIdOf,
   postseasonPhaseOfGameId,
@@ -24,6 +25,7 @@ import {
   seasonStartPostseasonCommandSchema,
   seasonAdvancePostseasonCommandSchema,
   seasonDigestHex,
+  seedSchema,
   type SeasonAlmanac,
   type SeasonAwards,
   type SeasonCommandLogEntry,
@@ -158,7 +160,7 @@ function baseRun(stage: SeasonRunStage = 'regular-season'): SeasonRun {
   return { ...buildRun(), stage };
 }
 function basePostseasonSummary(
-  overrides: Partial<SeasonPostseasonSummary> = {},
+  overrides: Record<string, unknown> = {},
 ): SeasonPostseasonSummary {
   const players = Array.from({ length: 10 }, (_, i) => ({
     playerVersionId: fixturePlayerId(i),
@@ -196,7 +198,7 @@ function basePostseasonSummary(
     fouls: 18,
     possessions: 100,
   });
-  const base: Omit<SeasonPostseasonSummary, 'resultDigest'> = {
+  const base: Record<string, unknown> = {
     schemaVersion: 1,
     summaryVersion: 'postseason-summary-v1',
     runId: 'fixture-run-1',
@@ -225,7 +227,7 @@ function basePostseasonSummary(
     injuryEvents: [],
     ...overrides,
   };
-  return { ...base, resultDigest: '0'.repeat(32) };
+  return seasonPostseasonSummarySchema.parse({ ...base, resultDigest: '0'.repeat(32) });
 }
 describe('season run stage and completion (M2.6)', () => {
   it('accepts every valid stage and rejects illegal values', () => {
@@ -438,7 +440,7 @@ describe('postseason summaries (M2.6, postseason-summary-v1)', () => {
 });
 describe('awards, almanac, and replay exports (M2.6)', () => {
   function awards(): SeasonAwards {
-    return {
+    return seasonAwardsSchema.parse({
       schemaVersion: 1,
       awardsVersion: 'awards-v1',
       runId: 'fixture-run-1',
@@ -450,7 +452,7 @@ describe('awards, almanac, and replay exports (M2.6)', () => {
         franchiseId: 'lakers',
       })),
       digest: '0'.repeat(32),
-    };
+    });
   }
   it('round-trips awards with a deterministic digest', () => {
     const parsed = seasonAwardsSchema.parse(awards());
@@ -465,7 +467,7 @@ describe('awards, almanac, and replay exports (M2.6)', () => {
     ).toThrow();
   });
   it('round-trips an almanac whose digest reconciles with the run completion', () => {
-    const almanac: SeasonAlmanac = {
+    const almanac: SeasonAlmanac = seasonAlmanacSchema.parse({
       schemaVersion: 1,
       almanacVersion: 'almanac-v1',
       runId: 'fixture-run-1',
@@ -476,7 +478,7 @@ describe('awards, almanac, and replay exports (M2.6)', () => {
       awardsDigest: 'd'.repeat(32),
       tradeGradesDigest: 'e'.repeat(32),
       digest: '0'.repeat(32),
-    };
+    });
     const parsed = seasonAlmanacSchema.parse(almanac);
     const digest = seasonAlmanacDigest(parsed);
     expect(digest).toMatch(/^[0-9a-f]{32}$/);

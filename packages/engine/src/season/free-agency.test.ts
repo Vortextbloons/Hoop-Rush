@@ -8,6 +8,11 @@ import type {
   SeasonRun,
 } from '@hoop-rush/data-contracts';
 import {
+  contentHashSchema,
+  franchiseIdSchema,
+  playerIdSchema,
+} from '@hoop-rush/data-contracts';
+import {
   SEASON_FREE_AGENCY_BAND_SIGNING_CAPS,
   SEASON_FREE_AGENCY_WINDOW_MAX_CANDIDATES,
   applyFreeAgencyDeclaration,
@@ -61,7 +66,7 @@ function fixtureIndex(catalog: SeasonDraftCatalog): SeasonFreeAgencyIndex {
     dataVersion: 'fixture',
     catalogRef: {
       catalogVersion: catalog.catalogVersion,
-      contentHash: '0'.repeat(64),
+      contentHash: contentHashSchema.parse('0'.repeat(64)),
       candidateCount: catalog.candidates.length,
     },
     candidates,
@@ -99,7 +104,7 @@ describe('free-agency universe and canonical selection', () => {
       run.rosters.flatMap((roster) => roster.players.map((p) => p.playerId)),
     );
     for (const [playerId, entries] of universe) {
-      expect(represented.has(playerId)).toBe(false);
+      expect(represented.has(playerIdSchema.parse(playerId))).toBe(false);
       expect(entries.length).toBeGreaterThan(0);
     }
   });
@@ -166,7 +171,9 @@ describe('free-agency declarations', () => {
       'cmd-declare-1',
       [{ playerVersionId: candidate.playerVersionId, roleExpectation: 'rotation', influence: 1 }],
     );
-    expect(declared.windows[0]?.declarations[HUMAN]?.targets).toHaveLength(1);
+    expect(declared.windows[0]?.declarations[franchiseIdSchema.parse(HUMAN)]?.targets).toHaveLength(
+      1,
+    );
     expect(() =>
       applyFreeAgencyDeclaration({ ...run, freeAgency: declared }, 0, HUMAN, 'cmd-declare-2', [
         { playerVersionId: candidate.playerVersionId, roleExpectation: 'rotation', influence: 1 },
@@ -305,8 +312,10 @@ describe('free-agency resolution', () => {
     );
     expect(transaction).toBeDefined();
     expect(transaction?.type).toBe('free-agent-signing');
-    expect(resolved.freeAgency.signingCounts[HUMAN]).toBe(1);
-    expect(resolved.freeAgency.seasonSpend[HUMAN]).toBe(humanSigning.influenceCost);
+    expect(resolved.freeAgency.signingCounts[franchiseIdSchema.parse(HUMAN)]).toBe(1);
+    expect(
+      resolved.freeAgency.seasonSpend[franchiseIdSchema.parse(HUMAN)],
+    ).toBe(humanSigning.influenceCost);
     expect(resolved.freeAgency.windows[0]?.status).toBe('resolved');
   });
   it('appends exactly one transaction per signing without duplicating prior entries', () => {
@@ -435,13 +444,13 @@ describe('effects reconciliation (season-chemistry-v2)', () => {
     );
     if (inactiveId === undefined || inactiveCandidate === undefined) throw new Error('fixture');
     const expandedRoster: SeasonRoster = {
-      franchiseId: HUMAN,
+      franchiseId: franchiseIdSchema.parse(HUMAN),
       players: [
         ...humanRoster.players,
         {
           playerVersionId: inactiveCandidate.playerVersionId,
           playerId: inactiveCandidate.playerId,
-          franchiseId: HUMAN,
+          franchiseId: franchiseIdSchema.parse(HUMAN),
           eraId: inactiveCandidate.eraId,
           seasonKey: inactiveCandidate.seasonKey,
           displayName: inactiveCandidate.displayName,

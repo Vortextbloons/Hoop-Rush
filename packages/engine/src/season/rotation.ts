@@ -2,6 +2,7 @@ import {
   SEASON_MINUTE_POLICY_VERSION,
   SEASON_ROTATION_PRESET_TARGETS,
   SEASON_ROTATION_VERSION,
+  franchiseIdSchema,
   seasonDigestHex,
   type SeasonRotation,
   type SeasonRotationCommandResult,
@@ -68,7 +69,7 @@ export function buildMinimalRotation(input: {
   const starterOrder = starters.map((member) => member.playerVersionId);
   const benchOrder = bench.map((member) => member.playerVersionId);
   return {
-    franchiseId: input.franchiseId,
+    franchiseId: franchiseIdSchema.parse(input.franchiseId),
     starters: starterOrder,
     benchOrder,
     targetMinutes: [

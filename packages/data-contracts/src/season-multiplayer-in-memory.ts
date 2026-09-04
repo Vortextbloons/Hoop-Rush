@@ -1,3 +1,4 @@
+import { franchiseIdSchema, idSchema, seedSchema } from './ids.ts';
 import {
   SEASON_MULTIPLAYER_VERSION,
   SEASON_MULTIPLAYER_VERSION_V1,
@@ -142,7 +143,7 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
   private publicSnapshotOf(room: InMemoryRoom): SeasonRoomPublicSnapshot {
     const outdated = this.isOutdatedRoom(room);
     const snap: SeasonRoomPublicSnapshot = {
-      roomId: room.roomId,
+      roomId: idSchema.parse(room.roomId),
       settings: room.settings,
       phase: room.phase,
       cursor: room.cursor,
@@ -156,7 +157,9 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
       settingsRevision: room.settingsRevision,
       guestReady: room.guestReady,
       presence: this.presenceOf(room),
-      seed: room.rootSeed,
+      seed: seedSchema.safeParse(room.rootSeed).success
+        ? seedSchema.parse(room.rootSeed)
+        : null,
       isOutdated: outdated || undefined,
     };
     return snap;
@@ -231,9 +234,9 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
       p2FranchiseId: null,
     };
     const membership: SeasonRoomMembership = {
-      roomId,
+      roomId: idSchema.parse(roomId),
       participantId: 'p1',
-      franchiseId: 'franchise-p1',
+      franchiseId: franchiseIdSchema.parse('franchise-p1'),
       uid: `uid-p1-${roomId}`,
       seat: 'p1',
     };
@@ -294,9 +297,9 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
     const franchiseId = participantId === 'p1' ? 'franchise-p1' : 'franchise-p2';
     const seat = participantId;
     const membership: SeasonRoomMembership = {
-      roomId,
+      roomId: idSchema.parse(roomId),
       participantId,
-      franchiseId,
+      franchiseId: franchiseIdSchema.parse(franchiseId),
       uid: `uid-${participantId}-${roomId}`,
       seat,
     };
@@ -713,9 +716,9 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
       isOutdated: true,
     };
     const membership: SeasonRoomMembership = {
-      roomId,
+      roomId: idSchema.parse(roomId),
       participantId: 'p1',
-      franchiseId: 'franchise-p1',
+      franchiseId: franchiseIdSchema.parse('franchise-p1'),
       uid: `uid-p1-${roomId}`,
       seat: 'p1',
     };

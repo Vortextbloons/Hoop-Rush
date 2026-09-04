@@ -8,8 +8,11 @@ import {
   SEASON_SEED_NAMESPACES,
   SEASON_TEAM_COUNT,
   blockRoundRange,
+  franchiseIdSchema,
+  seasonGameIdSchema,
   seasonNamespaceSeed,
   type EraSimulationProfile,
+  type FranchiseId,
   type Position,
   type SeasonBlockRunContext,
   type SeasonCandidateCheckpoint,
@@ -398,13 +401,13 @@ export function seasonBlockRejection(
   }
   const computedDigest = seasonRotationSetDigest(run.rotations);
   const franchiseFailures: Array<{
-    franchiseId: string;
+    franchiseId: FranchiseId;
     reasons: string[];
   }> = [];
   if (computedDigest !== command.rotationDigest) {
     for (const rotation of run.rotations) {
       franchiseFailures.push({
-        franchiseId: rotation.franchiseId,
+        franchiseId: franchiseIdSchema.parse(rotation.franchiseId),
         reasons: [
           `rotation set digest ${computedDigest} does not match the submitted lock ${command.rotationDigest}`,
         ],
@@ -425,7 +428,7 @@ export function seasonBlockRejection(
     }
     const reasons = validateSeasonRotation(rotation, memberPlayable);
     if (reasons.length > 0) {
-      franchiseFailures.push({ franchiseId: rotation.franchiseId, reasons });
+      franchiseFailures.push({ franchiseId: franchiseIdSchema.parse(rotation.franchiseId), reasons });
     }
   }
   if (franchiseFailures.length > 0) {
@@ -639,7 +642,7 @@ export function simulateSeasonBlockGame(
           blockIndex: command.blockIndex,
           commandId: command.commandId,
           nextGameId: game.gameId,
-          humanFranchiseId: pid,
+          humanFranchiseId: franchiseIdSchema.parse(pid),
           unavailablePlayerVersionIds: facts.unavailablePlayerVersionIds,
         };
         return { interruption };
@@ -1793,7 +1796,8 @@ export function auditSeasonBlock(
     if (!leagueFranchiseIds.has(record.franchiseId)) {
       failures.push(`injury ${record.injuryId} references a franchise outside the league`);
     }
-    const occurrenceRound = scheduleRoundById.get(record.gameId);
+    const parsedGameId = seasonGameIdSchema.safeParse(record.gameId);
+    const occurrenceRound = parsedGameId.success ? scheduleRoundById.get(parsedGameId.data) : undefined;
     if (occurrenceRound === undefined) {
       failures.push(`injury ${record.injuryId} references an unscheduled game ${record.gameId}`);
     } else if (occurrenceRound > candidate.completedRounds) {

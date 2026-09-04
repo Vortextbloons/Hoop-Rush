@@ -1,6 +1,7 @@
 import {
   SEASON_ENDING_MISSED_GAMES_SENTINEL,
   SEASON_SEED_NAMESPACES,
+  franchiseIdSchema,
   seasonDigestHex,
   seasonNamespaceSeed,
   type SeasonHealthState,
@@ -196,7 +197,7 @@ export function rollSeasonInjuryForPlayer(input: SeasonInjuryRollInput): SeasonI
   const injury: SeasonInjuryRecord = {
     injuryId: seasonInjuryIdOf(seedPath),
     playerVersionId: input.playerVersionId,
-    franchiseId: input.franchiseId,
+    franchiseId: franchiseIdSchema.parse(input.franchiseId),
     gameId: input.gameId,
     type,
     severity,

@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
+﻿import { describe, expect, it, vi } from 'vitest';
 import type { SeasonHealthState, SeasonInfluenceState, SeasonRun } from '@hoop-rush/data-contracts';
+import { commandIdSchema, idSchema, seedSchema, seasonGameIdSchema } from '@hoop-rush/data-contracts';
 vi.mock('@hoop-rush/engine', () => ({
   seasonObjectiveChoicesForBlock: (_rootSeed: string, blockIndex: number) =>
     blockIndex === 0
@@ -20,7 +21,7 @@ function influenceState(overrides: Partial<SeasonInfluenceState> = {}): SeasonIn
     balances: { [FRANCHISE]: 3, celtics: 2 },
     ledger: [
       {
-        entryId: 'e-1',
+        entryId: idSchema.parse('e-1'),
         franchiseId: FRANCHISE,
         source: 'initial-grant',
         blockIndex: null,
@@ -31,11 +32,11 @@ function influenceState(overrides: Partial<SeasonInfluenceState> = {}): SeasonIn
         explanation: 'Initial +2 Influence grant at run creation',
       },
       {
-        entryId: 'e-2',
+        entryId: idSchema.parse('e-2'),
         franchiseId: FRANCHISE,
         source: 'block-grant',
         blockIndex: 0,
-        commandId: 'grant-0',
+        commandId: commandIdSchema.parse('grant-0'),
         requestedDelta: 1,
         appliedDelta: 1,
         balanceAfter: 3,
@@ -56,7 +57,7 @@ function healthWithInjuries(): SeasonHealthState {
         injuryId: 'inj-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
         playerVersionId: 'pv-00000000000000000000000000000000',
         franchiseId: FRANCHISE,
-        gameId: 's000001',
+        gameId: seasonGameIdSchema.parse('s000001'),
         type: 'soft-tissue',
         severity: 'moderate',
         occurredBeforeHalftime: false,
@@ -84,8 +85,8 @@ function runWithObjectives(selections: SeasonRun['objectives']['selections']): S
         {
           objectiveId: 'win-six',
           name: 'Win Six',
-          description: 'Win at least 6 of the block’s team games.',
-          measure: 'wins >= 6 across the block’s team games',
+          description: 'Win at least 6 of the blockâ€™s team games.',
+          measure: 'wins >= 6 across the blockâ€™s team games',
         },
         {
           objectiveId: 'defense-108',
@@ -160,7 +161,7 @@ describe('influenceViewModel', () => {
         'inj-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa': {
           franchiseId: FRANCHISE,
           outcome: 'success',
-          commandId: 'inf-1',
+          commandId: commandIdSchema.parse('inf-1'),
         },
       },
     });
@@ -204,7 +205,7 @@ describe('objectiveChoicesViewModel / currentObjectiveBlock', () => {
   });
   it('keeps the current block after a selection until that block is simulated', () => {
     const run = runWithObjectives({
-      '0': { objectiveId: 'win-six', selectedByCommandId: 'obj-1', success: null },
+      '0': { objectiveId: 'win-six', selectedByCommandId: commandIdSchema.parse('obj-1'), success: null },
     });
     expect(currentObjectiveBlock(run)).toBe(0);
     const vm = objectiveChoicesViewModel(run);
@@ -214,7 +215,7 @@ describe('objectiveChoicesViewModel / currentObjectiveBlock', () => {
   });
   it('advances to the next block after the cursor moves', () => {
     const run = runWithObjectives({
-      '0': { objectiveId: 'win-six', selectedByCommandId: 'obj-1', success: true },
+      '0': { objectiveId: 'win-six', selectedByCommandId: commandIdSchema.parse('obj-1'), success: true },
     });
     run.cursor.completedRounds = 10;
     expect(currentObjectiveBlock(run)).toBe(1);

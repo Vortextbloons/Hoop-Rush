@@ -49,8 +49,13 @@ import {
   PLAYER_VERSION_ID_VERSION,
   SEASON_OBJECTIVE_CATALOG,
   buildInitialPostseasonState,
+  commandIdSchema,
+  contentHashSchema,
+  franchiseIdSchema,
+  idSchema,
   seasonEffectsStateSchema,
   seasonRunSchema,
+  seedSchema,
   type SeasonCheckpointVersions,
   type SeasonDraftCatalog,
   type SeasonEffectsState,
@@ -146,18 +151,18 @@ function buildFreshTestRun(
   if (humanPool === undefined) throw new Error('missing human pool');
   const humanRoster = humanPool.playerVersionIds.slice(0, 10);
   const generation = generateAiLeague({
-    seed: TEST_SEED,
+    seed: seedSchema.parse(TEST_SEED),
     catalog,
     league,
     humanFranchiseIds: [humanFranchiseId],
     humanRosters: [{ franchiseId: humanFranchiseId, playerVersionIds: humanRoster }],
     targets: buildFixtureRosterTargets(),
   });
-  const schedule = generateSeasonSchedule({ league, seed: TEST_SEED });
+  const schedule = generateSeasonSchedule({ league, seed: seedSchema.parse(TEST_SEED) });
   const run: SeasonRun = {
     schemaVersion: SEASON_RUN_SCHEMA_VERSION,
-    runId: 'block-test-run-1',
-    rootSeed: TEST_SEED,
+    runId: idSchema.parse('block-test-run-1'),
+    rootSeed: seedSchema.parse(TEST_SEED),
     versions: {
       runSchemaVersion: SEASON_RUN_SCHEMA_VERSION,
       leagueVersion: SEASON_LEAGUE_VERSION,
@@ -209,7 +214,7 @@ function buildFreshTestRun(
     league,
     authority: {
       kind: 'local-solo',
-      soloFranchiseId: humanFranchiseId,
+      soloFranchiseId: franchiseIdSchema.parse(humanFranchiseId),
       authorityVersion: SEASON_AUTHORITY_VERSION,
     },
     rosters: generation.rosters,
@@ -219,7 +224,7 @@ function buildFreshTestRun(
       scheduleVersion: SEASON_SCHEDULE_VERSION,
       formulaVersion: SEASON_SCHEDULE_FORMULA_VERSION,
       generationSeed: schedule.generationSeed,
-      contentHash: '0'.repeat(64),
+      contentHash: contentHashSchema.parse('0'.repeat(64)),
     },
     games: schedule.games.map((game) => ({
       gameId: game.gameId,
@@ -330,7 +335,7 @@ export function emptyHealthState(): SeasonHealthState {
   };
 }
 function emptyPostseason(rootSeed: string): SeasonRun['postseason'] {
-  return buildInitialPostseasonState(rootSeed);
+  return buildInitialPostseasonState(seedSchema.parse(rootSeed));
 }
 const scheduleByLeague = new WeakMap<
   SeasonRun['league'],
@@ -355,7 +360,7 @@ export function blockCommand(
     schemaVersion: SEASON_RUN_SCHEMA_VERSION,
     blockVersion: SEASON_BLOCK_VERSION,
     command: 'submit-season-block',
-    commandId: `block-${String(blockIndex)}-${String(expectedRevision)}`,
+    commandId: commandIdSchema.parse(`block-${String(blockIndex)}-${String(expectedRevision)}`),
     runId: run.runId,
     expectedRevision,
     blockIndex,

@@ -4,14 +4,18 @@ import {
   classicCompletedDraftSchema,
   classicDraftStateSchema,
   coverageSummarySchema,
+  eraIdSchema,
   franchiseAbbreviation,
   franchiseEraPoolSchema,
+  franchiseIdSchema,
   hoopRushManifestSchema,
   lineupSchema,
   opponentTeamSchema,
   peakPlayerSeasonSchema,
+  playerIdSchema,
   provenanceMapSchema,
   reconstructedThreePointProfileSchema,
+  seasonKeySchema,
   simulationAnchorsSchema,
   simulationPlayerSchema,
   simulationTeamSchema,
@@ -197,12 +201,12 @@ function makeRun() {
     aggregates: zeroAggregates,
   };
 }
-const validPlayer: PeakPlayerSeason = {
+const validPlayer: PeakPlayerSeason = peakPlayerSeasonSchema.parse({
   schemaVersion: 3,
-  playerId: 'p-1',
-  franchiseId: 'lakers',
-  eraId: '1990s',
-  seasonKey: '1996-97',
+  playerId: playerIdSchema.parse('p-1'),
+  franchiseId: franchiseIdSchema.parse('lakers'),
+  eraId: eraIdSchema.parse('1990s'),
+  seasonKey: seasonKeySchema.parse('1996-97'),
   firstName: 'Magic',
   lastName: 'Johnson',
   displayName: 'Magic Johnson',
@@ -247,7 +251,7 @@ const validPlayer: PeakPlayerSeason = {
     displayName: 'Los Angeles Lakers',
     city: 'Los Angeles',
     abbreviation: 'LAL',
-    seasonKey: '1996-97',
+    seasonKey: seasonKeySchema.parse('1996-97'),
     lineageRuleVersion: 'lineage-v1',
   },
   summaryRatings: { overallRating: 96, offenseRating: 98, defenseRating: 86 },
@@ -322,7 +326,7 @@ const validPlayer: PeakPlayerSeason = {
     derivationMethodVersion: 'derive-v1',
     lineageRuleVersion: 'lineage-v1',
   },
-};
+});
 describe('player-season contracts', () => {
   it('accepts a valid peak player season', () => {
     expect(peakPlayerSeasonSchema.safeParse(validPlayer).success).toBe(true);
@@ -383,12 +387,15 @@ describe('player-season contracts', () => {
     expect(peakPlayerSeasonSchema.safeParse(invalid).success).toBe(false);
   });
   it('accepts duplicate player ids inside a pool (uniqueness is a command concern)', () => {
-    const duplicate = [validPlayer, { ...validPlayer, seasonKey: '1997-98', selectionScore: 96 }];
+    const duplicate = [
+      validPlayer,
+      { ...validPlayer, seasonKey: seasonKeySchema.parse('1997-98'), selectionScore: 96 },
+    ];
     const parsed = franchiseEraPoolSchema.safeParse({
       schemaVersion: 3,
       dataVersion: 'data-v1',
-      franchiseId: 'lakers',
-      eraId: '1990s',
+      franchiseId: franchiseIdSchema.parse('lakers'),
+      eraId: eraIdSchema.parse('1990s'),
       eligibility: { minimumTeamGames: 40 },
       coverageSummary: {
         coverageBand: 'complete-box-derived',
@@ -410,7 +417,7 @@ describe('player-season contracts', () => {
 describe('lineup contracts', () => {
   const assignment = (slotIndex: number, playerId: string): LineupAssignment => ({
     slotIndex: slotIndex,
-    playerId,
+    playerId: playerIdSchema.parse(playerId),
     positions: ['PG', 'SG'],
   });
   it('accepts a five-assignment legal lineup', () => {

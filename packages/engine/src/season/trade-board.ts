@@ -1,6 +1,7 @@
 import {
   SEASON_INFLUENCE_FLOOR,
   SEASON_TRADE_VERSION,
+  franchiseIdSchema,
   seasonNamespaceSeed,
   type SeasonDraftCatalog,
   type SeasonHealthState,
@@ -314,7 +315,8 @@ export function evaluateTradeProposal(input: {
       return { ok: false, code: 'trade-cash-cap', reason: 'cash >2 per proposal' };
     }
     if (influenceAmount > 0) {
-      const senderWindows = run.influence.windows[influenceFromSender!] ?? [];
+      const senderFid = franchiseIdSchema.parse(influenceFromSender!);
+      const senderWindows = run.influence.windows[senderFid] ?? [];
       const senderWin = senderWindows.find((w) => w.windowIndex === windowIndex);
       const sent = senderWin?.tradeCashSent ?? 0;
       if (sent + influenceAmount > TRADE_CASH_MAX_PER_WINDOW) {
@@ -324,7 +326,7 @@ export function evaluateTradeProposal(input: {
           reason: `per-window cap ${String(TRADE_CASH_MAX_PER_WINDOW)}`,
         };
       }
-      const senderBalance = run.influence.balances[influenceFromSender!] ?? 0;
+      const senderBalance = run.influence.balances[senderFid] ?? 0;
       if (senderBalance - influenceAmount < SEASON_INFLUENCE_FLOOR) {
         return { ok: false, code: 'insufficient-balance', reason: 'balance' };
       }
@@ -344,11 +346,12 @@ export function evaluateTradeProposal(input: {
   const proposal: SeasonTradeProposal = {
     proposalId: `prop-${boardSeed(rootSeed, windowIndex, 'proposal', fingerprint).slice(0, 32)}`,
     windowIndex,
-    fromFranchiseId: fromFranchiseId,
-    toFranchiseId,
+    fromFranchiseId: franchiseIdSchema.parse(fromFranchiseId),
+    toFranchiseId: franchiseIdSchema.parse(toFranchiseId),
     outgoingPlayerVersionIds: [...outgoingPlayerVersionIds],
     incomingPlayerVersionIds: [...incomingPlayerVersionIds],
-    influenceFromSender: influenceFromSender,
+    influenceFromSender:
+      influenceFromSender === null ? null : franchiseIdSchema.parse(influenceFromSender),
     influenceAmount,
     fingerprint,
     consequenceFacts: {
@@ -387,8 +390,10 @@ export function openTradeInquiry(
   const negotiation: SeasonTradeNegotiation = {
     inquiryId,
     windowIndex,
-    fromFranchiseId: run.league.teams.find((t) => t.control === 'human')?.franchiseId ?? '',
-    toFranchiseId,
+    fromFranchiseId: franchiseIdSchema.parse(
+      run.league.teams.find((t) => t.control === 'human')?.franchiseId ?? '',
+    ),
+    toFranchiseId: franchiseIdSchema.parse(toFranchiseId),
     status: 'draft',
     exchangeCount: 0,
     exchanges: [],

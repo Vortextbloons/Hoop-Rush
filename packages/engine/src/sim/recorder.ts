@@ -7,6 +7,7 @@ import type {
   TeamDiagnostics,
   ShotZoneSummary,
 } from '@hoop-rush/data-contracts';
+import { playerIdSchema } from '@hoop-rush/data-contracts';
 import { SHOT_ZONES } from '../domain/zones.ts';
 export function usageOf(fga: number, fta: number, tov: number): number {
   return fga + fta * 0.44 + tov;
@@ -282,7 +283,7 @@ export class GameRecorder {
   playerBox(side: SideIndex, slot: number): PlayerBoxScore {
     const p = this.playerAt(side, slot);
     return {
-      playerId: `slot-${String(slot)}`,
+      playerId: playerIdSchema.parse(`slot-${String(slot)}`),
       minutes: p.minutes,
       points: p.points,
       fieldGoals: { made: p.fieldGoalMakes, attempted: p.fieldGoalAttempts },

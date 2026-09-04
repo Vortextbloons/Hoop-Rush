@@ -1,6 +1,8 @@
 import {
   SEASON_BLOCK_VERSION,
   SEASON_RUN_SCHEMA_VERSION,
+  commandIdSchema,
+  franchiseIdSchema,
   type SeasonObjectiveId,
   type SeasonRotation,
   type SeasonSubmitBlockCommand,
@@ -138,7 +140,7 @@ export async function buildSubmitBlockEnvelope(
       `The block cannot start because packaged assets are unavailable: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
-  const commandId = newSeasonId('blk');
+  const commandId = commandIdSchema.parse(newSeasonId('blk'));
   const command: SeasonSubmitBlockCommand = {
     schemaVersion: SEASON_RUN_SCHEMA_VERSION,
     blockVersion: SEASON_BLOCK_VERSION,
@@ -161,7 +163,7 @@ export async function buildSubmitBlockEnvelope(
     expectedRevision: blockIndex,
     rotationDigest,
     commandId,
-    humanFranchiseId,
+    humanFranchiseId: franchiseIdSchema.parse(humanFranchiseId),
     objectiveId,
     campaignOpportunityId: campaignOpportunityId,
     homeCourt,

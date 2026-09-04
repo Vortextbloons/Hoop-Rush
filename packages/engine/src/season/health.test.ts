@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  franchiseIdSchema,
+  seasonGameIdSchema,
   seasonPendingBlockCandidateSchema,
   type SeasonGameSummary,
   type SeasonHealthState,
@@ -26,8 +28,8 @@ function injuryRecord(overrides: Partial<SeasonInjuryRecord>): SeasonInjuryRecor
   return {
     injuryId: 'inj-' + 'f'.repeat(32),
     playerVersionId: 'pv-x',
-    franchiseId: 'lakers',
-    gameId: 's000001',
+    franchiseId: franchiseIdSchema.parse('lakers'),
+    gameId: seasonGameIdSchema.parse('s000001'),
     type: 'soft-tissue',
     severity: 'moderate',
     occurredBeforeHalftime: false,

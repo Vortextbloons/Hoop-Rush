@@ -1,6 +1,7 @@
 import {
   SEASON_RUN_SCHEMA_VERSION,
   canonicalJson,
+  commandIdSchema,
   seasonAlmanacDigest,
   seasonCommandLogDigest,
   seasonDigestHex,
@@ -8,17 +9,22 @@ import {
   seasonPostseasonWorkerMessageSchema,
   seasonPostseasonWorkerWarmRequestSchema,
   seasonTradeGradeLogDigest,
+  type CommandId,
+  type FranchiseId,
+  type Id,
+  type PostseasonGameId,
   type SeasonAdvancePostseasonRejection,
   type SeasonAlmanac,
   type SeasonRun,
   type SeasonRunCommand,
   type SeasonRunStage,
-  type SeasonScoreline,
+  type SeasonPostseasonScoreline,
   type SeasonSchedule,
   type SeasonPostseasonWorkerCompleteMessage,
   type SeasonPostseasonWorkerErrorMessage,
   type SeasonPostseasonWorkerProgressMessage,
   type SeasonPostseasonWorkerStartRequest,
+  type Seed,
 } from '@hoop-rush/data-contracts';
 import {
   POSTSEASON_ALMANAC_DIGEST_PLACEHOLDER,
@@ -51,7 +57,7 @@ export type SeasonPostseasonEvent =
       type: 'started';
       requestId: string;
       mode: SeasonPostseasonMode;
-      targetGameId: string | null;
+      targetGameId: PostseasonGameId | null;
       gamesTotal: number;
     }
   | {
@@ -59,25 +65,25 @@ export type SeasonPostseasonEvent =
       requestId: string;
       gamesCompleted: number;
       gamesTotal: number;
-      latestGameId: string | null;
-      latestResult: SeasonScoreline | null;
+      latestGameId: PostseasonGameId | null;
+      latestResult: SeasonPostseasonScoreline | null;
     }
   | {
       type: 'committed';
       requestId: string;
-      runId: string;
-      gameIds: string[];
+      runId: Id;
+      gameIds: PostseasonGameId[];
       snapshot: SeasonRunSnapshot;
     }
   | {
       type: 'complete';
       requestId: string;
-      runId: string;
+      runId: Id;
       snapshot: SeasonRunSnapshot | null;
       stage: SeasonRunStage;
       nextDecision: 'rotation' | 'none';
-      nextGameId: string | null;
-      aiNextGameId: string | null;
+      nextGameId: PostseasonGameId | null;
+      aiNextGameId: PostseasonGameId | null;
       promoted: boolean;
     }
   | {
@@ -96,14 +102,14 @@ export type SeasonPostseasonEvent =
       requestId: string;
       code: 'invariant-failure' | 'cancelled' | 'internal';
       message: string;
-      seed: string | null;
-      gameId: string | null;
+      seed: Seed | null;
+      gameId: PostseasonGameId | null;
     };
 export interface SeasonPostseasonRunInput {
-  runId: string;
-  commandId: string;
-  targetGameId?: string;
-  humanFranchiseId: string | null;
+  runId: Id;
+  commandId: CommandId;
+  targetGameId?: PostseasonGameId;
+  humanFranchiseId: FranchiseId | null;
 }
 export type SeasonPostseasonSimulatorFn = (
   request: SeasonPostseasonWorkerStartRequest,
@@ -258,8 +264,8 @@ export function createSeasonPostseasonRunner(
         targetGameId: input.targetGameId ?? null,
         gamesTotal: 0,
       });
-      let firstCommandId: string | null = input.commandId;
-      let terminalTarget: string | null = input.targetGameId ?? null;
+      let firstCommandId: CommandId | null = input.commandId;
+      let terminalTarget: PostseasonGameId | null = input.targetGameId ?? null;
       let estimatedGamesTotal = 0;
       for (;;) {
         if (requestAborted(requestId)) return;
@@ -313,7 +319,7 @@ export function createSeasonPostseasonRunner(
           return;
         }
         const nextGameId = decision.gameId;
-        let targetGameId: string;
+        let targetGameId: PostseasonGameId;
         if (mode === 'spectate') {
           targetGameId = terminalTarget ?? nextGameId;
         } else if (mode === 'fast-forward') {
@@ -350,7 +356,7 @@ export function createSeasonPostseasonRunner(
         const commandId =
           firstCommandId !== null
             ? firstCommandId
-            : newSeasonId(mode === 'fast-forward' ? 'ff' : 'adv');
+            : commandIdSchema.parse(newSeasonId(mode === 'fast-forward' ? 'ff' : 'adv'));
         firstCommandId = null;
         const wireRequestId = `${requestId}-${String(commitCount)}`;
         commitCount += 1;
@@ -533,7 +539,7 @@ export function createSeasonPostseasonRunner(
     requestId: string,
     code: 'invariant-failure' | 'cancelled' | 'internal',
     message: string,
-    seed: string | null,
+    seed: Seed | null,
   ): void {
     if (cancelled) return;
     emit({
@@ -547,13 +553,13 @@ export function createSeasonPostseasonRunner(
   }
   function emitComplete(
     requestId: string,
-    runId: string,
+    runId: Id,
     snapshot: SeasonRunSnapshot,
     promoted: boolean,
     decision: {
       nextDecision: 'rotation' | 'none';
-      nextGameId: string | null;
-      aiNextGameId: string | null;
+      nextGameId: PostseasonGameId | null;
+      aiNextGameId: PostseasonGameId | null;
     },
   ): void {
     const run = snapshot.run;

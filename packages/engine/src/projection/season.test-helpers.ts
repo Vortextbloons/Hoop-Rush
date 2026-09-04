@@ -2,6 +2,7 @@ import { buildSeasonDraftCatalog } from '@hoop-rush/test-fixtures';
 import {
   SEASON_MINUTE_POLICY_VERSION,
   SEASON_ROTATION_VERSION,
+  franchiseIdSchema,
   type SeasonDraftCandidate,
   type SeasonRotation,
   type SimulationPlayer,
@@ -61,7 +62,7 @@ export function buildInput() {
     pick(forwards, 3),
   ];
   const rotation: SeasonRotation = {
-    franchiseId: 'lakers',
+    franchiseId: franchiseIdSchema.parse('lakers'),
     starters: starters.map((player) => player.playerVersionId ?? ''),
     benchOrder: bench.map((player) => player.playerVersionId ?? ''),
     targetMinutes: [

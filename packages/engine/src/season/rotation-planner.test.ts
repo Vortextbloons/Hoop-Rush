@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import type { Position, SeasonRotation } from '@hoop-rush/data-contracts';
-import { SEASON_MINUTE_POLICY_VERSION, SEASON_ROTATION_VERSION } from '@hoop-rush/data-contracts';
+import {
+  SEASON_MINUTE_POLICY_VERSION,
+  SEASON_ROTATION_VERSION,
+  franchiseIdSchema,
+} from '@hoop-rush/data-contracts';
 import { canPlay } from '../domain/positions.ts';
 import {
   chooseInitialUnit,
@@ -29,7 +33,7 @@ const MEMBERS: PlannerMember[] = [
 ];
 function buildRotation(overrides: Partial<SeasonRotation> = {}): SeasonRotation {
   return {
-    franchiseId: 'lakers',
+    franchiseId: franchiseIdSchema.parse('lakers'),
     starters: [...STARTERS],
     benchOrder: [...BENCH],
     targetMinutes: [

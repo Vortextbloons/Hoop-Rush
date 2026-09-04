@@ -1,4 +1,5 @@
 import {
+  franchiseIdSchema,
   seasonAwardsDigest,
   type SeasonAwards,
   type SeasonGameSummary,
@@ -365,7 +366,7 @@ export function deriveSeasonAwards(input: SeasonAwardsInput): SeasonAwards {
   const firstTeam = [...gatePool].sort(compareCandidates).slice(0, 5);
   const recipientOf = (candidate: AwardCandidate) => ({
     playerVersionId: candidate.row.playerVersionId,
-    franchiseId: candidate.franchiseId,
+    franchiseId: franchiseIdSchema.parse(candidate.franchiseId),
   });
   const awards: SeasonAwards = {
     schemaVersion: 1,

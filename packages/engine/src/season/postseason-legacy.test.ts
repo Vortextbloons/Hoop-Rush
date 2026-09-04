@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   SEASON_POSTSEASON_LEGACY_VERSION as SEASON_POSTSEASON_VERSION,
+  franchiseIdSchema,
+  seedSchema,
   type ConferenceId,
   type PlayoffBracketV1 as PlayoffBracket,
   type PlayoffSeriesV1 as PlayoffSeries,
@@ -45,7 +47,7 @@ function emptyPostseason(): SeasonPostseasonState {
   return {
     schemaVersion: 1,
     postseasonVersion: SEASON_POSTSEASON_VERSION,
-    seed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a',
+    seed: seedSchema.parse('a1b2c3d4e5f60718293a4b5c6d7e8f9a'),
     playIn: { east: emptyPlayIn('east'), west: emptyPlayIn('west') },
     bracket: null,
     championFranchiseId: null,
@@ -479,10 +481,26 @@ describe('full tournament', () => {
     for (const id of eastTeamsInBracket) {
       expect(westTeamsInBracket.has(id)).toBe(false);
     }
-    expect(eastTeamsInBracket.has(bracket.finals.homeCourtFranchiseId ?? '')).toBe(true);
-    expect(westTeamsInBracket.has(bracket.finals.homeCourtFranchiseId ?? '')).toBe(false);
-    expect(eastTeamsInBracket.has(bracket.finals.challengerFranchiseId ?? '')).toBe(false);
-    expect(westTeamsInBracket.has(bracket.finals.challengerFranchiseId ?? '')).toBe(true);
+    expect(
+      eastTeamsInBracket.has(
+        franchiseIdSchema.parse(bracket.finals.homeCourtFranchiseId ?? ''),
+      ),
+    ).toBe(true);
+    expect(
+      westTeamsInBracket.has(
+        franchiseIdSchema.parse(bracket.finals.homeCourtFranchiseId ?? ''),
+      ),
+    ).toBe(false);
+    expect(
+      eastTeamsInBracket.has(
+        franchiseIdSchema.parse(bracket.finals.challengerFranchiseId ?? ''),
+      ),
+    ).toBe(false);
+    expect(
+      westTeamsInBracket.has(
+        franchiseIdSchema.parse(bracket.finals.challengerFranchiseId ?? ''),
+      ),
+    ).toBe(true);
   });
   it('is deterministic across seeded runs and consistent after every game', () => {
     for (const seed of ['postseason-tournament-2', 'postseason-tournament-3']) {
@@ -547,7 +565,10 @@ describe('full tournament', () => {
       ...state,
       bracket: {
         ...bracket,
-        finals: { ...bracket.finals, winnerFranchiseId: eastTeams[0] ?? 'hawks' },
+        finals: {
+          ...bracket.finals,
+          winnerFranchiseId: franchiseIdSchema.parse(eastTeams[0] ?? 'hawks'),
+        },
       },
     };
     expect(auditSeasonPostseason(wrongWinner, league).length).toBeGreaterThan(0);

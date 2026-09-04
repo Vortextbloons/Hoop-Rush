@@ -3,9 +3,13 @@ import {
   SEASON_MINUTE_POLICY_VERSION,
   SEASON_NEUTRAL_HOME_COURT,
   SEASON_ROTATION_VERSION,
+  franchiseIdSchema,
+  playerIdSchema,
   playerVersionId,
+  seasonGameIdSchema,
   seasonGameSummarySchema,
   seasonRetainedGameDetailSchema,
+  seedSchema,
   type Position,
   type SeasonGameSimulationInput,
   type SeasonGameTeamInput,
@@ -40,7 +44,7 @@ const POSITION_PLAN: ReadonlyArray<readonly Position[]> = [
 function buildTeam(side: 'home' | 'away'): SeasonGameTeamInput {
   const franchiseId = side === 'home' ? 'lakers' : 'celtics';
   const players = POSITION_PLAN.map((positions, index) => {
-    const playerId = `p-sum-${side}-${String(index)}`;
+    const playerId = playerIdSchema.parse(`p-sum-${side}-${String(index)}`);
     const base = buildSimulationPlayer();
     return {
       playerVersionId: playerVersionId(playerId, franchiseId, '1990s', '1995-96'),
@@ -53,7 +57,7 @@ function buildTeam(side: 'home' | 'away'): SeasonGameTeamInput {
       tendencies: { ...base.tendencies },
     };
   });
-  return { teamId: side, displayName: side, franchiseId, players };
+  return { teamId: side, displayName: side, franchiseId: franchiseIdSchema.parse(franchiseId), players };
 }
 function rotationOf(team: SeasonGameTeamInput): SeasonRotation {
   const ids = team.players.map((p) => p.playerVersionId);
@@ -77,7 +81,7 @@ function buildInput(seed: string): SeasonGameSimulationInput {
   const away = buildTeam('away');
   return {
     schemaVersion: 1,
-    seed: seedFromString(seed),
+    seed: seedSchema.parse(seedFromString(seed)),
     gameNumber: 1,
     dataVersion: 'data-v1',
     profile: buildEraSimulationProfile(),
@@ -96,7 +100,7 @@ function buildInput(seed: string): SeasonGameSimulationInput {
 }
 function scheduleGameOf(input: SeasonGameSimulationInput): SeasonScheduleGame {
   return {
-    gameId: 's000001',
+    gameId: seasonGameIdSchema.parse('s000001'),
     round: 1,
     homeFranchiseId: input.home.franchiseId,
     awayFranchiseId: input.away.franchiseId,
@@ -183,7 +187,7 @@ describe('season game summaries (M2.3)', () => {
       status: 'forfeit' as const,
       homeScore: 3,
       awayScore: 0,
-      forfeitLoserFranchiseId: 'lakers',
+      forfeitLoserFranchiseId: franchiseIdSchema.parse('lakers'),
       homePlayers: [],
       awayPlayers: [],
     };

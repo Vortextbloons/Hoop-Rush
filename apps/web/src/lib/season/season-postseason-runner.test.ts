@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+﻿import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   SEASON_COMMAND_LOG_VERSION,
   SEASON_DRAFT_CATALOG_V3,
@@ -32,6 +32,7 @@ import {
   type SeasonRunCommand,
   type SeasonStandings,
 } from '@hoop-rush/data-contracts';
+import { eraIdSchema, commandIdSchema, seedSchema, seasonGameIdSchema } from '@hoop-rush/data-contracts';
 import {
   handleSeasonRunCommand,
   seasonRunStateDigest,
@@ -65,7 +66,7 @@ import {
   type SeasonPostseasonRunner,
 } from './season-postseason-runner';
 import { createSeasonPostseasonEngineSimulator } from './fake-season-postseason-runner';
-const SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
+const SEED = seedSchema.parse('a1b2c3d4e5f60718293a4b5c6d7e8f9a');
 const HUMAN = 'lakers';
 interface TeamSpec {
   w: number;
@@ -179,7 +180,7 @@ function catalogOf(run: SeasonRun): SeasonDraftCatalog {
   );
   const pools = run.rosters.map((roster) => ({
     franchiseId: roster.franchiseId,
-    eraId: '1990s',
+    eraId: eraIdSchema.parse('1990s'),
     playerVersionIds: roster.players.map((player) => player.playerVersionId),
   }));
   return {
@@ -264,7 +265,7 @@ function withHumanStarterInjury(run: SeasonRun): SeasonRun {
     injuryId: 'inj-0123456789abcdef0123456789abcdef',
     playerVersionId: starter,
     franchiseId: HUMAN,
-    gameId: 's000001',
+    gameId: seasonGameIdSchema.parse('s000001'),
     type: 'soft-tissue',
     severity: 'moderate',
     occurredBeforeHalftime: false,
@@ -774,7 +775,7 @@ describe('season postseason runner (M2.6 orchestration)', () => {
     const done = collectUntil(runner, 'complete');
     runner.advancePostseason({
       runId: started.runId,
-      commandId: 'adv-session-1',
+      commandId: commandIdSchema.parse('adv-session-1'),
       humanFranchiseId: HUMAN,
     });
     const terminal = await done;
@@ -805,7 +806,7 @@ describe('season postseason runner (M2.6 orchestration)', () => {
     const done = collectUntil(runner, 'complete');
     runner.advancePostseason({
       runId: started.runId,
-      commandId: 'adv-session-2',
+      commandId: commandIdSchema.parse('adv-session-2'),
       humanFranchiseId: HUMAN,
     });
     await done;
@@ -829,7 +830,7 @@ describe('season postseason runner (M2.6 orchestration)', () => {
     const unsub = runner.subscribe((event) => events.push(event));
     const requestId = runner.advancePostseason({
       runId: started.runId,
-      commandId: 'adv-session-cancel',
+      commandId: commandIdSchema.parse('adv-session-cancel'),
       humanFranchiseId: HUMAN,
     });
     await new Promise<void>((resolve) => {
@@ -867,7 +868,7 @@ describe('season postseason runner (M2.6 orchestration)', () => {
     const unsub = runner.subscribe((event) => events.push(event));
     const requestId = runner.fastForwardPostseason({
       runId: eliminated.runId,
-      commandId: 'ff-cancel-chunk',
+      commandId: commandIdSchema.parse('ff-cancel-chunk'),
       humanFranchiseId: HUMAN,
     });
     await new Promise<void>((resolve) => {
@@ -931,7 +932,7 @@ describe('season postseason runner (M2.6 orchestration)', () => {
     const done = collectUntil(runner, 'complete');
     runner.advancePostseason({
       runId: started.runId,
-      commandId: 'adv-session-retry',
+      commandId: commandIdSchema.parse('adv-session-retry'),
       humanFranchiseId: HUMAN,
     });
     const terminal = await done;
@@ -952,7 +953,7 @@ describe('season postseason runner (M2.6 orchestration)', () => {
     const done = collectUntil(runner, 'error');
     runner.advancePostseason({
       runId: started.runId,
-      commandId: 'adv-session-stale',
+      commandId: commandIdSchema.parse('adv-session-stale'),
       humanFranchiseId: HUMAN,
     });
     await new Promise<void>((resolve) => {
@@ -987,7 +988,7 @@ describe('season postseason runner (M2.6 orchestration)', () => {
     const done = collectUntil(runner, 'error');
     runner.advancePostseason({
       runId: started.runId,
-      commandId: 'adv-session-xtab',
+      commandId: commandIdSchema.parse('adv-session-xtab'),
       humanFranchiseId: HUMAN,
     });
     await new Promise<void>((resolve) => {
@@ -1018,7 +1019,7 @@ describe('season postseason runner (M2.6 orchestration)', () => {
     const done1 = collectUntil(first, 'committed');
     first.advancePostseason({
       runId: started.runId,
-      commandId: 'adv-session-reload-1',
+      commandId: commandIdSchema.parse('adv-session-reload-1'),
       humanFranchiseId: HUMAN,
     });
     await done1;
@@ -1027,7 +1028,7 @@ describe('season postseason runner (M2.6 orchestration)', () => {
     const done2 = collectUntil(second, 'complete');
     second.advancePostseason({
       runId: started.runId,
-      commandId: 'adv-session-reload-2',
+      commandId: commandIdSchema.parse('adv-session-reload-2'),
       humanFranchiseId: HUMAN,
     });
     const terminal = await done2;
@@ -1052,7 +1053,7 @@ describe('season postseason runner (M2.6 orchestration)', () => {
     const done = collectUntil(runner, 'complete');
     runner.fastForwardPostseason({
       runId: eliminated.runId,
-      commandId: 'ff-session-1',
+      commandId: commandIdSchema.parse('ff-session-1'),
       humanFranchiseId: HUMAN,
     });
     const events = await done;
@@ -1079,7 +1080,7 @@ describe('season postseason runner (M2.6 orchestration)', () => {
     const done = collectUntil(runner, 'complete');
     runner.fastForwardPostseason({
       runId: eliminated.runId,
-      commandId: 'ff-promote',
+      commandId: commandIdSchema.parse('ff-promote'),
       humanFranchiseId: HUMAN,
     });
     const events = await done;
@@ -1192,7 +1193,7 @@ describe('season postseason runner (M2.6 orchestration)', () => {
     const done = collectUntil(runner, 'error');
     runner.fastForwardPostseason({
       runId: started.runId,
-      commandId: 'ff-active-human',
+      commandId: commandIdSchema.parse('ff-active-human'),
       humanFranchiseId: HUMAN,
     });
     const terminal = await done;
@@ -1223,7 +1224,7 @@ describe('season postseason runner (M2.6 orchestration)', () => {
       const unsub = runner.subscribe((event) => events.push(event));
       const requestId = runner.advancePostseason({
         runId: started.runId,
-        commandId: 'adv-wire-1',
+        commandId: commandIdSchema.parse('adv-wire-1'),
         humanFranchiseId: HUMAN,
       });
       await flush();

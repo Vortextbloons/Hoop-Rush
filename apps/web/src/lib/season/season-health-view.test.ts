@@ -1,8 +1,15 @@
-import { describe, expect, it } from 'vitest';
+﻿import { describe, expect, it } from 'vitest';
 import type {
   SeasonHealthState,
   SeasonInjuryRecord,
   SeasonRoster,
+} from '@hoop-rush/data-contracts';
+import {
+  eraIdSchema,
+  franchiseIdSchema,
+  playerIdSchema,
+  seasonGameIdSchema,
+  seasonKeySchema,
 } from '@hoop-rush/data-contracts';
 import {
   activeInjuriesOf,
@@ -19,8 +26,8 @@ function record(overrides: Partial<SeasonInjuryRecord>): SeasonInjuryRecord {
   return {
     injuryId: INJURY_ID_A,
     playerVersionId: 'pv-00000000000000000000000000000000',
-    franchiseId: 'lakers',
-    gameId: 's000001',
+    franchiseId: franchiseIdSchema.parse('lakers'),
+    gameId: seasonGameIdSchema.parse('s000001'),
     type: 'soft-tissue',
     severity: 'moderate',
     occurredBeforeHalftime: false,
@@ -41,13 +48,13 @@ function health(records: SeasonInjuryRecord[]): SeasonHealthState {
 }
 function roster(ids: string[]): SeasonRoster {
   return {
-    franchiseId: 'lakers',
+    franchiseId: franchiseIdSchema.parse('lakers'),
     players: ids.map((playerVersionId, index) => ({
       playerVersionId,
-      playerId: `p-${String(index)}`,
-      franchiseId: 'lakers',
-      eraId: '1990s',
-      seasonKey: '1995-96',
+      playerId: playerIdSchema.parse(`p-${String(index)}`),
+      franchiseId: franchiseIdSchema.parse('lakers'),
+      eraId: eraIdSchema.parse('1990s'),
+      seasonKey: seasonKeySchema.parse('1995-96'),
       displayName: `Player ${String(index + 1)}`,
     })),
   };
@@ -74,9 +81,9 @@ describe('injuryStatusOf / activeInjuriesOf', () => {
 });
 describe('recoveryEstimate', () => {
   const future = [
-    { gameId: 's000101', round: 11 },
-    { gameId: 's000102', round: 12 },
-    { gameId: 's000103', round: 13 },
+    { gameId: seasonGameIdSchema.parse('s000101'), round: 11 },
+    { gameId: seasonGameIdSchema.parse('s000102'), round: 12 },
+    { gameId: seasonGameIdSchema.parse('s000103'), round: 13 },
   ];
   it('maps the remaining countdown to the round of the remaining-th team game', () => {
     const estimate = recoveryEstimate(record({ missedGamesRemaining: 2 }), future);
@@ -119,10 +126,10 @@ describe('availabilityStripRows', () => {
     'pv-55555555555555555555555555555555',
   ];
   const teamGames = [
-    { gameId: 's000001', round: 1 },
-    { gameId: 's000002', round: 2 },
-    { gameId: 's000101', round: 11 },
-    { gameId: 's000102', round: 12 },
+    { gameId: seasonGameIdSchema.parse('s000001'), round: 1 },
+    { gameId: seasonGameIdSchema.parse('s000002'), round: 2 },
+    { gameId: seasonGameIdSchema.parse('s000101'), round: 11 },
+    { gameId: seasonGameIdSchema.parse('s000102'), round: 12 },
   ];
   it('renders out / returned / available rows with consequences', () => {
     const state = health([
@@ -131,7 +138,7 @@ describe('availabilityStripRows', () => {
         playerVersionId: ids[0],
         missedGamesTotal: 4,
         missedGamesRemaining: 2,
-        gameId: 's000001',
+        gameId: seasonGameIdSchema.parse('s000001'),
       }),
       record({
         injuryId: INJURY_ID_B,
@@ -179,7 +186,7 @@ describe('humanInjuryTimeline', () => {
       record({
         injuryId: INJURY_ID_A,
         playerVersionId: ids[0],
-        gameId: 's000001',
+        gameId: seasonGameIdSchema.parse('s000001'),
         missedGamesTotal: 4,
         missedGamesRemaining: 0,
         actualReturnRound: 12,
@@ -190,7 +197,7 @@ describe('humanInjuryTimeline', () => {
       {
         schemaVersion: 1,
         summaryVersion: 'season-game-summary-v3',
-        gameId: 's000001',
+        gameId: seasonGameIdSchema.parse('s000001'),
         round: 1,
         homeFranchiseId: 'lakers',
         awayFranchiseId: 'celtics',

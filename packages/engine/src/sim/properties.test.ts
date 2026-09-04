@@ -1,6 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import type { SimulationPlayer, SimulationTeam } from '@hoop-rush/data-contracts';
+import { playerIdSchema, seedSchema } from '@hoop-rush/data-contracts';
 import {
   buildEraSimulationProfile,
   buildGameSimulationInput,
@@ -67,7 +68,9 @@ const SLOT_ORDER: readonly SimulationPlayer['positions'][] = [
   ['C'],
 ];
 const playerArb: fc.Arbitrary<SimulationPlayer> = fc.record({
-  playerId: fc.string({ minLength: 3, maxLength: 12 }),
+  playerId: fc
+    .stringMatching(/^[a-z0-9][a-z0-9._:-]{2,11}$/)
+    .map((id) => playerIdSchema.parse(id)),
   displayName: fc.string({ minLength: 3, maxLength: 12 }),
   positions: fc.constantFrom<SimulationPlayer['positions']>(['PG'], ['SG'], ['SF'], ['PF'], ['C']),
   heightInches: fc.constant<number | null>(78),
@@ -85,7 +88,7 @@ const teamArb: fc.Arbitrary<SimulationTeam> = fc
       if (positions === undefined) {
         throw new Error('property: slot order requires five positions');
       }
-      return { ...p, positions, playerId: `${p.playerId}-${String(i)}` };
+      return { ...p, positions, playerId: playerIdSchema.parse(`${p.playerId}-${String(i)}`) };
     }),
   }));
 const inputArb = fc.record({
@@ -98,7 +101,7 @@ describe('property: accounting and determinism', () => {
     fc.assert(
       fc.property(inputArb, (input) => {
         const gameInput = buildGameSimulationInput({
-          seed: seedFromString(`prop-${input.seed}`),
+          seed: seedSchema.parse(seedFromString(`prop-${input.seed}`)),
           home: input.home,
           away: input.away,
         });
@@ -112,7 +115,7 @@ describe('property: accounting and determinism', () => {
     fc.assert(
       fc.property(inputArb, (input) => {
         const gameInput = buildGameSimulationInput({
-          seed: seedFromString(`prop-${input.seed}`),
+          seed: seedSchema.parse(seedFromString(`prop-${input.seed}`)),
           home: input.home,
           away: input.away,
         });
@@ -127,7 +130,7 @@ describe('property: accounting and determinism', () => {
     fc.assert(
       fc.property(inputArb, (input) => {
         const gameInput = buildGameSimulationInput({
-          seed: seedFromString(`prop-${input.seed}`),
+          seed: seedSchema.parse(seedFromString(`prop-${input.seed}`)),
           home: input.home,
           away: input.away,
         });
@@ -146,7 +149,7 @@ describe('property: accounting and determinism', () => {
     fc.assert(
       fc.property(inputArb, (input) => {
         const gameInput = buildGameSimulationInput({
-          seed: seedFromString(`prop-${input.seed}`),
+          seed: seedSchema.parse(seedFromString(`prop-${input.seed}`)),
           home: input.home,
           away: input.away,
         });
@@ -166,7 +169,7 @@ describe('property: accounting and determinism', () => {
     fc.assert(
       fc.property(inputArb, (input) => {
         const gameInput = buildGameSimulationInput({
-          seed: seedFromString(`prop-${input.seed}`),
+          seed: seedSchema.parse(seedFromString(`prop-${input.seed}`)),
           home: input.home,
           away: input.away,
         });

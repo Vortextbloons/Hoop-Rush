@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
+  idSchema,
   seasonSubmitBlockCommandSchema,
   type SeasonCandidateCheckpoint,
 } from '@hoop-rush/data-contracts';
@@ -140,7 +141,7 @@ describe('season block command validation', () => {
     expect(boundary.rejection.submittedBlockIndex).toBe(2);
     const mismatch = handleSubmitSeasonBlockCommand({
       ...pipelineInput(run, catalog, 0),
-      command: { ...blockCommand(run, 0, 0), runId: 'other-run' },
+      command: { ...blockCommand(run, 0, 0), runId: idSchema.parse('other-run') },
       acceptedCommandIds: [],
     });
     expect(mismatch.status).toBe('rejected');

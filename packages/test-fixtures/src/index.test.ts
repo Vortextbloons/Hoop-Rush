@@ -7,6 +7,7 @@ import {
   franchiseEraPoolSchema,
   hoopRushManifestSchema,
   peakPlayerSeasonSchema,
+  playerIdSchema,
 } from '@hoop-rush/data-contracts';
 import {
   buildChallengeRun,
@@ -25,7 +26,7 @@ describe('fixture builders', () => {
     expect(peakPlayerSeasonSchema.safeParse(player).success).toBe(true);
   });
   it('build a schema-valid pool', () => {
-    const pool = buildPool([buildPlayerSeason(), buildPlayerSeason({ playerId: 'p-2' })]);
+    const pool = buildPool([buildPlayerSeason(), buildPlayerSeason({ playerId: playerIdSchema.parse('p-2') })]);
     expect(franchiseEraPoolSchema.safeParse(pool).success).toBe(true);
   });
   it('build a schema-valid manifest', () => {

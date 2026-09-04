@@ -1,4 +1,10 @@
 import type { SeasonGameSummary, SeasonRoster } from '@hoop-rush/data-contracts';
+import {
+  eraIdSchema,
+  franchiseIdSchema,
+  playerIdSchema,
+  seasonKeySchema,
+} from '@hoop-rush/data-contracts';
 import { foldSeasonAggregates } from './season-presentation';
 export interface SeasonPlayerStatsRow {
   playerVersionId: string;
@@ -135,14 +141,14 @@ export function playerSeasonStatsRow(input: {
 }): SeasonPlayerStatsRow | null {
   const view = humanSeasonPlayerStats({
     roster: {
-      franchiseId: input.franchiseId,
+      franchiseId: franchiseIdSchema.parse(input.franchiseId),
       players: [
         {
           playerVersionId: input.playerVersionId,
-          playerId: 'p-trade-detail',
-          franchiseId: input.franchiseId,
-          eraId: input.eraId,
-          seasonKey: input.seasonKey,
+          playerId: playerIdSchema.parse('p-trade-detail'),
+          franchiseId: franchiseIdSchema.parse(input.franchiseId),
+          eraId: eraIdSchema.parse(input.eraId),
+          seasonKey: seasonKeySchema.parse(input.seasonKey),
           displayName: input.displayName,
         },
       ],

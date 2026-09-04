@@ -1,3 +1,4 @@
+﻿import { franchiseIdSchema, seasonGameIdSchema, idSchema } from '@hoop-rush/data-contracts';
 import { describe, expect, it } from 'vitest';
 import {
   aggregateMechanismEvidence,
@@ -31,22 +32,22 @@ describe('M2.4 season effects view', () => {
     const rows = aggregateMechanismEvidence([
       {
         schemaVersion: 1,
-        runId: 'r',
-        gameId: 's000001',
+        runId: idSchema.parse('r'),
+        gameId: seasonGameIdSchema.parse('s000001'),
         round: 1,
-        homeFranchiseId: 'lakers',
-        awayFranchiseId: 'celtics',
+        homeFranchiseId: franchiseIdSchema.parse('lakers'),
+        awayFranchiseId: franchiseIdSchema.parse('celtics'),
         result: {} as never,
         injuryEvents: [],
         mechanismEvidence: [base],
       },
       {
         schemaVersion: 1,
-        runId: 'r',
-        gameId: 's000002',
+        runId: idSchema.parse('r'),
+        gameId: seasonGameIdSchema.parse('s000002'),
         round: 2,
-        homeFranchiseId: 'lakers',
-        awayFranchiseId: 'celtics',
+        homeFranchiseId: franchiseIdSchema.parse('lakers'),
+        awayFranchiseId: franchiseIdSchema.parse('celtics'),
         result: {} as never,
         injuryEvents: [],
         mechanismEvidence: [

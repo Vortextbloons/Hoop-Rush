@@ -2,6 +2,7 @@ import {
   SEASON_MINUTE_POLICY_VERSION,
   SEASON_ROTATION_PRESET_TARGETS,
   SEASON_ROTATION_VERSION,
+  franchiseIdSchema,
   type SeasonMinutePolicyStrategy,
   type SeasonRotation,
 } from '@hoop-rush/data-contracts';
@@ -289,7 +290,7 @@ function rotationOf(
   franchiseId = 'roster',
 ): SeasonRotation {
   return {
-    franchiseId,
+    franchiseId: franchiseIdSchema.parse(franchiseId),
     starters: [...structure.starters],
     benchOrder: [...structure.benchOrder],
     targetMinutes,

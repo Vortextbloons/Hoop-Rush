@@ -5,6 +5,8 @@ import {
   SEASON_SCHEDULE_FORMULA_VERSION,
   SEASON_SCHEDULE_VERSION,
   SEASON_TEAM_COUNT,
+  franchiseIdSchema,
+  seasonGameIdSchema,
   seasonNamespaceSeed,
   seasonScheduleSchema,
   type SeasonLeague,
@@ -290,11 +292,11 @@ function buildScheduleEdges(
   const edges: ExtraEdge[] = [];
   for (let a = 0; a < teamOrder.length; a += 1) {
     const leftId = teamOrder[a];
-    const left = leftId === undefined ? undefined : teamsById.get(leftId);
+    const left = leftId === undefined ? undefined : teamsById.get(franchiseIdSchema.parse(leftId));
     if (leftId === undefined || left === undefined) continue;
     for (let b = a + 1; b < teamOrder.length; b += 1) {
       const rightId = teamOrder[b];
-      const right = rightId === undefined ? undefined : teamsById.get(rightId);
+      const right = rightId === undefined ? undefined : teamsById.get(franchiseIdSchema.parse(rightId));
       if (rightId === undefined || right === undefined) continue;
       let remaining = 2;
       let homeCopies = 1;
@@ -497,10 +499,10 @@ function buildScheduleAttempt(
       a.awayFranchiseId.localeCompare(b.awayFranchiseId),
   );
   const scheduled: SeasonScheduleGame[] = games.map((game, index) => ({
-    gameId: `s${String(index + 1).padStart(6, '0')}`,
+    gameId: seasonGameIdSchema.parse(`s${String(index + 1).padStart(6, '0')}`),
     round: game.round,
-    homeFranchiseId: game.homeFranchiseId,
-    awayFranchiseId: game.awayFranchiseId,
+    homeFranchiseId: franchiseIdSchema.parse(game.homeFranchiseId),
+    awayFranchiseId: franchiseIdSchema.parse(game.awayFranchiseId),
   }));
   const schedule: SeasonSchedule = {
     schemaVersion: 1,

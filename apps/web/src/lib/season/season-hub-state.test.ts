@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+﻿import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   SEASON_DRAFT_CATALOG_V3,
   SEASON_DURABILITY_VERSION,
@@ -19,6 +19,7 @@ import {
   type SeasonRunCommand,
   type SeasonStandings,
 } from '@hoop-rush/data-contracts';
+import { franchiseIdSchema, eraIdSchema, seedSchema } from '@hoop-rush/data-contracts';
 import type { SeasonRunSnapshot } from '@hoop-rush/persistence';
 import {
   generateSeasonSchedule,
@@ -236,8 +237,8 @@ describe('SeasonHubState between-block commands', () => {
     clearCachedSeasonSnapshot();
   });
   it('keeps the post-command snapshot in the session cache (stale snapshot cache regression)', async () => {
-    const seed = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
-    const league = buildSeasonLeague({}, { humanFranchiseId: 'lakers' });
+    const seed = seedSchema.parse('a1b2c3d4e5f60718293a4b5c6d7e8f9a');
+    const league = buildSeasonLeague({}, { humanFranchiseId: franchiseIdSchema.parse('lakers') });
     const schedule = generateSeasonSchedule({ league, seed });
     const effects: SeasonEffectsState = {
       schemaVersion: 2,
@@ -247,7 +248,7 @@ describe('SeasonHubState between-block commands', () => {
       archivedPairs: [],
     };
     const run = {
-      ...buildSeasonRunFixture({ schedule, league, seed, humanFranchiseId: 'lakers' }),
+      ...buildSeasonRunFixture({ schedule, league, seed, humanFranchiseId: franchiseIdSchema.parse('lakers') }),
       effects,
     } as SeasonRunSnapshot['run'];
     const initial: SeasonRunSnapshot = {
@@ -265,7 +266,7 @@ describe('SeasonHubState between-block commands', () => {
         Promise.resolve({
           runId: run.runId,
           rootSeed: seed,
-          humanFranchiseId: 'lakers',
+          humanFranchiseId: franchiseIdSchema.parse('lakers'),
           completedRounds: 0,
           revision: 0,
           humanWins: 0,
@@ -314,8 +315,8 @@ describe('SeasonHubState between-block commands', () => {
     hub.destroy();
   });
 });
-const POSTSEASON_SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
-const POSTSEASON_HUMAN = 'lakers';
+const POSTSEASON_SEED = seedSchema.parse('a1b2c3d4e5f60718293a4b5c6d7e8f9a');
+const POSTSEASON_HUMAN = franchiseIdSchema.parse('lakers');
 const HUB_SLOT_POSITIONS: ReadonlyArray<readonly Position[]> = [
   ['PG'],
   ['SG'],
@@ -361,7 +362,7 @@ function hubCatalogOf(run: SeasonRun): SeasonDraftCatalog {
   );
   const pools = run.rosters.map((roster) => ({
     franchiseId: roster.franchiseId,
-    eraId: '1990s',
+    eraId: eraIdSchema.parse('1990s'),
     playerVersionIds: roster.players.map((player) => player.playerVersionId),
   }));
   return {
@@ -953,11 +954,11 @@ describe('SeasonHubState postseason commands (M2.6)', () => {
         case 'wrong-game':
           return { targetGameId: 'pi-east-seven-eight', nextGameId: 'pi-east-nine-ten' };
         case 'invalid-rotation':
-          return { franchiseId: 'lakers', reasons: ['test reason'] };
+          return { franchiseId: franchiseIdSchema.parse('lakers'), reasons: ['test reason'] };
         case 'unavailable-player':
           return { playerVersionId: 'pv-1', reason: 'injured' };
         case 'insufficient-rehab-resources':
-          return { franchiseId: 'lakers', balance: 0, required: 2 };
+          return { franchiseId: franchiseIdSchema.parse('lakers'), balance: 0, required: 2 };
         case 'invalid-series-state':
           return { seriesId: 'east-first-round-1', reason: 'unpaired' };
         case 'integrity-failure':

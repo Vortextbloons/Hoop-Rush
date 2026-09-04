@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { commandIdSchema, idSchema, seedSchema } from '@hoop-rush/data-contracts';
+import {
+  commandIdSchema,
+  eraIdSchema,
+  franchiseIdSchema,
+  idSchema,
+  seedSchema,
+} from '@hoop-rush/data-contracts';
 import type { FixedFiveCommand } from '@hoop-rush/data-contracts';
+import type { DuelDraftState } from '@hoop-rush/engine';
 import {
   deriveEffectivePhase,
   isDraftComplete,
@@ -20,7 +27,7 @@ function duelReplay(overrides: Partial<Extract<DraftReplay, { mode: 'duel' }>> =
       rootSeed: ROOT,
       firstPicker: 'p1',
       pickOrdinal: 0,
-      currentRoll: { franchiseId: 'bulls', eraId: '1990s' },
+      currentRoll: { franchiseId: franchiseIdSchema.parse('bulls'), eraId: eraIdSchema.parse('1990s') },
       picks: [],
       claimedPairs: [],
       claimedVersionIds: [],
@@ -73,19 +80,19 @@ describe('deriveEffectivePhase', () => {
     expect(deriveEffectivePhase('expired', replay, false)).toBe('expired');
   });
   it('walks lobby, drafting, simulating, and awaiting-confirmation from the log', () => {
-    const completeState = {
+    const completeState: DuelDraftState = {
       rootSeed: ROOT,
-      firstPicker: 'p1' as const,
+      firstPicker: 'p1',
       pickOrdinal: 10,
       currentRoll: null,
       picks: [],
-      claimedPairs: [] as string[],
-      claimedVersionIds: [] as string[],
+      claimedPairs: [],
+      claimedVersionIds: [],
       rerolls: {
         p1: { franchiseSpent: false, eraSpent: false },
         p2: { franchiseSpent: false, eraSpent: false },
       },
-      status: 'complete' as const,
+      status: 'complete',
     };
     expect(deriveEffectivePhase('lobby', duelReplay({ hasStart: false }), false)).toBe('lobby');
     expect(deriveEffectivePhase('lobby', duelReplay(), false)).toBe('drafting');

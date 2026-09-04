@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildGameSimulationInput, seedFromString } from '@hoop-rush/test-fixtures';
+import { seedSchema } from '@hoop-rush/data-contracts';
 import type { GameSimulationInput } from '@hoop-rush/data-contracts';
 import { createEngineContext } from './context.ts';
 import { GameRecorder, type RecorderSide, type SideIndex } from './recorder.ts';
@@ -116,7 +117,7 @@ const GAME_SEEDS = ['golden-1', 'golden-svsw', 'mirror-1', 'inv-sw', 'perf-1', '
 describe('PossessionStepper decomposition', () => {
   it('step-by-step and pausing at boundaries both match resolveTrip', () => {
     for (const seed of GAME_SEEDS) {
-      const input = buildGameSimulationInput({ seed: seedFromString(seed) });
+      const input = buildGameSimulationInput({ seed: seedSchema.parse(seedFromString(seed)) });
       const resolve = driveGame(input, 'resolve');
       const step = driveGame(input, 'step');
       expect(Math.abs(step.trips - resolve.trips), seed).toBeLessThanOrEqual(1);
@@ -130,7 +131,7 @@ describe('PossessionStepper decomposition', () => {
   });
   it('pauses only at legal dead-ball boundaries', () => {
     for (const seed of GAME_SEEDS) {
-      const input = buildGameSimulationInput({ seed: seedFromString(seed) });
+      const input = buildGameSimulationInput({ seed: seedSchema.parse(seedFromString(seed)) });
       const { tripSteps } = driveGame(input, 'pause');
       for (const [tripIndex, steps] of tripSteps.entries()) {
         for (const [index, step] of steps.entries()) {
@@ -153,7 +154,7 @@ describe('PossessionStepper decomposition', () => {
   });
   it('never splits a made basket from its free throw (and-one atomicity)', () => {
     for (const seed of GAME_SEEDS) {
-      const input = buildGameSimulationInput({ seed: seedFromString(seed) });
+      const input = buildGameSimulationInput({ seed: seedSchema.parse(seedFromString(seed)) });
       const { tripSteps, perTripTotals } = driveGame(input, 'pause');
       for (const [tripIndex, totals] of perTripTotals.entries()) {
         const steps = tripSteps[tripIndex];
@@ -175,7 +176,7 @@ describe('PossessionStepper decomposition', () => {
   });
   it('keeps the clock stopped during free throws and counts the foul toward the bonus', () => {
     const input = buildGameSimulationInput({
-      seed: seedFromString('stopped-clock-foul-accounting'),
+      seed: seedSchema.parse(seedFromString('stopped-clock-foul-accounting')),
     });
     const rng = createEngineContext().rngFactory(input.seed);
     const recorder = new GameRecorder();

@@ -1,4 +1,4 @@
-import {
+﻿import {
   loadEraSimulationProfile,
   loadSeasonDraftCatalog,
   seasonPostseasonWorkerMessageSchema,
@@ -10,6 +10,8 @@ import {
   type SeasonPostseasonWorkerProgressMessage,
   type SeasonPostseasonWorkerStartRequest,
   type SeasonPostseasonWorkerWarmAckMessage,
+  type Seed,
+  type PostseasonGameId,
 } from '@hoop-rush/data-contracts';
 import { SeasonPostseasonInvariantError } from '@hoop-rush/engine';
 import {
@@ -48,8 +50,8 @@ function postError(
   code: 'invariant-failure' | 'cancelled' | 'internal',
   message: string,
   diagnostics: {
-    seed?: string | null;
-    gameId?: string | null;
+    seed?: Seed | null;
+    gameId?: PostseasonGameId | null;
   } = {},
 ): void {
   const payload: SeasonPostseasonWorkerErrorMessage = {

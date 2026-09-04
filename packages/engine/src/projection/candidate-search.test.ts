@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { RATINGS_VERSION, type ProjectionModelArtifact } from '@hoop-rush/data-contracts';
+import {
+  RATINGS_VERSION,
+  contentHashSchema,
+  eraIdSchema,
+  playerIdSchema,
+  seedSchema,
+  type EraId,
+  type ProjectionModelArtifact,
+} from '@hoop-rush/data-contracts';
 import { DEFAULT_ERA_SIM_PROFILE } from '@hoop-rush/test-fixtures';
 import {
   buildHumanSeasonRoster,
@@ -10,21 +18,22 @@ import {
 import { buildInput } from './season.test-helpers.ts';
 import { auditSeasonRotation, validateSeasonRotation } from '../season/rotation.ts';
 function smallModel(): ProjectionModelArtifact {
+  const era1990s = eraIdSchema.parse('1990s');
   return {
     schemaVersion: 1,
     modelVersion: 'projection-model-v1',
     dataVersion: `m10-${RATINGS_VERSION}`,
     ratingsVersion: RATINGS_VERSION,
-    eraProfileVersions: { '1990s': DEFAULT_ERA_SIM_PROFILE.profileVersion },
+    eraProfileVersions: { [era1990s]: DEFAULT_ERA_SIM_PROFILE.profileVersion },
     references: {
-      '1990s': {
+      [era1990s]: {
         neutral: {
           referenceId: 'ref-1990s-neutral',
           archetype: 'neutral',
-          eraId: '1990s',
-          referenceHash: 'f'.repeat(64),
+          eraId: era1990s,
+          referenceHash: contentHashSchema.parse('f'.repeat(64)),
           players: [1, 2, 3, 4, 5].map((n) => ({
-            playerId: `p-r-${String(n)}`,
+            playerId: playerIdSchema.parse(`p-r-${String(n)}`),
             displayName: `R ${String(n)}`,
             positions: [n === 5 ? 'C' : n >= 3 ? 'SF' : 'PG'] as string[],
             heightInches: 78,
@@ -74,7 +83,7 @@ function smallModel(): ProjectionModelArtifact {
               blockAttemptRate: 10,
               crashOffensiveGlassRate: 12,
             },
-          })) as unknown as ProjectionModelArtifact['references']['1990s']['neutral']['players'],
+          })) as unknown as ProjectionModelArtifact['references'][EraId]['neutral']['players'],
         },
         archetypes: [],
       },
@@ -104,12 +113,12 @@ function smallModel(): ProjectionModelArtifact {
       calibrationGames: 2048,
       validationGames: 1024,
       heldOutGames: 2048,
-      calibrationSeedFrom: '00000000000000000000000000000000',
-      calibrationSeedTo: '000000000000000000000000000007ff',
-      validationSeedFrom: '00000000000000000000000000000800',
-      validationSeedTo: '00000000000000000000000000000bff',
-      heldOutSeedFrom: '00000000000000000000000000000c00',
-      heldOutSeedTo: '000000000000000000000000000013ff',
+      calibrationSeedFrom: seedSchema.parse('00000000000000000000000000000000'),
+      calibrationSeedTo: seedSchema.parse('000000000000000000000000000007ff'),
+      validationSeedFrom: seedSchema.parse('00000000000000000000000000000800'),
+      validationSeedTo: seedSchema.parse('00000000000000000000000000000bff'),
+      heldOutSeedFrom: seedSchema.parse('00000000000000000000000000000c00'),
+      heldOutSeedTo: seedSchema.parse('000000000000000000000000000013ff'),
     },
     monotonicGates: [
       {

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  commandIdSchema,
+  contentHashSchema,
+  franchiseIdSchema,
   seasonBlockRecapSchema,
   seasonCandidateCheckpointSchema,
   seasonCheckpointVersionsSchema,
@@ -15,6 +18,7 @@ import {
   seasonRunSchema,
   seasonStaminaInputSchema,
   seasonWorkerStartRequestSchema,
+  seasonGameIdSchema,
   SEASON_NEUTRAL_HOME_COURT,
   SEASON_FREE_AGENCY_VERSION,
   SEASON_WORKER_WIRE_SCHEMA_VERSION,
@@ -121,7 +125,7 @@ function buildSummary(): SeasonGameSummary {
     fouls: 0,
     possessions: 0,
   });
-  return {
+  return seasonGameSummarySchema.parse({
     schemaVersion: 1,
     summaryVersion: 'season-game-summary-v3',
     gameId: 's000001',
@@ -138,7 +142,7 @@ function buildSummary(): SeasonGameSummary {
     homePlayers: Array.from({ length: 10 }, (_, index) => zeroLine(playerId(index))),
     awayPlayers: Array.from({ length: 10 }, (_, index) => zeroLine(playerId(10 + index))),
     injuryEvents: [],
-  };
+  });
 }
 function buildCheckpoint(effects: SeasonEffectsState): SeasonCandidateCheckpoint {
   const run = buildRun();
@@ -295,7 +299,7 @@ function buildCheckpoint(effects: SeasonEffectsState): SeasonCandidateCheckpoint
 }
 function buildWorkerRequest(priorEffects: SeasonEffectsState | null): SeasonWorkerStartRequest {
   const run = buildRun();
-  return {
+  return seasonWorkerStartRequestSchema.parse({
     schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
     type: 'season-block-start',
     requestId: 'req-1',
@@ -321,7 +325,7 @@ function buildWorkerRequest(priorEffects: SeasonEffectsState | null): SeasonWork
     priorInfluence: buildInitialInfluence(),
     expectedStateRevision: 0,
     expectedStateDigest: '0'.repeat(32),
-  };
+  });
 }
 describe('season stamina input schema (M2.4)', () => {
   const stamina = {

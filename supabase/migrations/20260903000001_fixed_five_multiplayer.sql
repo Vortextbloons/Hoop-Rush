@@ -161,7 +161,7 @@ begin
   if v_recent >= 3 then
     raise exception 'rate-limit' using errcode = 'P0001';
   end if;
-  v_seed := encode(public.gen_random_bytes(16), 'hex');
+  v_seed := encode(extensions.gen_random_bytes(16), 'hex');
   if p_mode = 'sandbox-shared-82' then
     v_deadline := now() + interval '5 minutes';
   else
@@ -452,7 +452,7 @@ begin
   if v_room.phase <> 'completed' then
     raise exception 'phase' using errcode = 'P0001';
   end if;
-  v_seed := encode(public.gen_random_bytes(16), 'hex');
+  v_seed := encode(extensions.gen_random_bytes(16), 'hex');
   loop
     v_code := lpad((floor(random() * 10000))::text, 4, '0');
     begin

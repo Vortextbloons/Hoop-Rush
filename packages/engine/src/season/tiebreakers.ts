@@ -1,6 +1,9 @@
 import {
   SEASON_SEED_NAMESPACES,
+  franchiseIdSchema,
+  idSchema,
   seasonNamespaceSeed,
+  seedSchema,
   type SeasonLeague,
   type SeasonStandings,
   type SeasonStandingsRow,
@@ -346,14 +349,14 @@ function recordResolution(
   drawSeed: string | null,
 ): void {
   ctx.resolutions.push({
-    resolutionId: `tb-${ctx.conference}-${String(ctx.resolutions.length)}-${rule}`,
+    resolutionId: idSchema.parse(`tb-${ctx.conference}-${String(ctx.resolutions.length)}-${rule}`),
     conference: ctx.conference,
     kind: 'seeding',
     rule,
-    teams: [...teams],
+    teams: teams.map((team) => franchiseIdSchema.parse(team)),
     slots: [],
     evidence: evidence.slice(0, 8).map((entry) => ({ label: entry.label, value: entry.value })),
-    drawSeed,
+    drawSeed: drawSeed === null ? null : seedSchema.parse(drawSeed),
   });
 }
 function partitionByCriterion(

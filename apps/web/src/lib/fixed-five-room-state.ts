@@ -6,6 +6,7 @@ import {
   playerVersionId,
   type ClassicDraftCatalog,
   type ClassicDraftState,
+  type ContentHash,
   type EraSimulationProfile,
   type FixedFiveCommand,
   type FixedFiveCommandPayload,
@@ -328,8 +329,8 @@ export interface RoomLogFacts {
   ready: Record<FixedFiveParticipantId, boolean>;
   rematchRequested: Record<FixedFiveParticipantId, boolean>;
   rematchConfirmed: Record<FixedFiveParticipantId, boolean>;
-  proposals: Array<{ actor: FixedFiveParticipantId; digest: string }>;
-  confirms: Array<{ actor: FixedFiveParticipantId; digest: string; verified: boolean }>;
+  proposals: Array<{ actor: FixedFiveParticipantId; digest: ContentHash }>;
+  confirms: Array<{ actor: FixedFiveParticipantId; digest: ContentHash; verified: boolean }>;
 }
 
 export function roomLogFacts(commands: FixedFiveCommand[]): RoomLogFacts {
@@ -614,7 +615,7 @@ export interface DigestInput {
   result: FixedFiveCompetitionResult;
 }
 
-export function computeCompetitionDigest(input: DigestInput): string {
+export function computeCompetitionDigest(input: DigestInput): ContentHash {
   return fixedFiveResultDigest({
     rootSeed: input.rootSeed,
     versions: input.versions,

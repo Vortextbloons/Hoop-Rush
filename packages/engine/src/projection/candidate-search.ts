@@ -9,6 +9,8 @@ import type {
 import {
   SEASON_MINUTE_POLICY_VERSION,
   SEASON_ROTATION_VERSION,
+  franchiseIdSchema,
+  playerIdSchema,
   seasonDigestHex,
 } from '@hoop-rush/data-contracts';
 import { enumerateLegalFives, type PlannerMember } from '../season/rotation-planner.ts';
@@ -243,7 +245,7 @@ function benchMember(versionId: string): CatalogMember {
     staminaRating: 70,
     durability: 70,
     player: {
-      playerId: versionId,
+      playerId: playerIdSchema.parse(versionId),
       displayName: versionId,
       positions: [],
       heightInches: null,
@@ -345,7 +347,7 @@ function rotationsFor(input: {
         if (new Set([...starter, ...benchOrder]).size !== roster.length) continue;
         const orderedRoster = [...starter, ...benchOrder];
         const structureRotation: SeasonRotation = {
-          franchiseId: 'roster',
+          franchiseId: franchiseIdSchema.parse('roster'),
           starters: starter,
           benchOrder,
           targetMinutes: orderedRoster.map((playerVersionId) => ({

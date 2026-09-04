@@ -3,6 +3,7 @@ import {
   SEASON_MINUTE_POLICY_VERSION,
   SEASON_ROTATION_PRESET_TARGETS,
   SEASON_ROTATION_VERSION,
+  franchiseIdSchema,
   seasonRotationCommandResultSchema,
   type Position,
   type SeasonRotation,
@@ -40,7 +41,7 @@ const BENCH = [pv(6), pv(7), pv(8), pv(9), pv(10)];
 const BALANCED_TARGET_MINUTES = [33, 33, 33, 33, 33, 21, 18, 15, 12, 9] as const;
 function buildRotation(overrides: Partial<SeasonRotation> = {}): SeasonRotation {
   return {
-    franchiseId: 'lakers',
+    franchiseId: franchiseIdSchema.parse('lakers'),
     starters: [...STARTERS],
     benchOrder: [...BENCH],
     targetMinutes: [
@@ -61,7 +62,7 @@ function presetCommand(
     schemaVersion: 1,
     commandType: 'set-season-rotation',
     commandId: 'cmd-rotation-1',
-    franchiseId,
+    franchiseId: franchiseIdSchema.parse(franchiseId),
     preset,
     rotation: null,
   };

@@ -1,5 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
+  franchiseIdSchema,
+  seasonGameIdSchema,
   type SeasonGameSummary,
   type SeasonPlayerAggregate,
   type SeasonRun,
@@ -19,7 +21,7 @@ function emptyStandings(franchiseIds: string[]): SeasonStandings {
     schemaVersion: 1,
     standingsVersion: 'standings-v1',
     rows: franchiseIds.map((franchiseId) => ({
-      franchiseId,
+      franchiseId: franchiseIdSchema.parse(franchiseId),
       wins: 0,
       losses: 0,
       gamesPlayed: 0,
@@ -35,7 +37,11 @@ function emptyStandings(franchiseIds: string[]): SeasonStandings {
       pointsAgainst: 0,
       headToHead: franchiseIds
         .filter((other) => other !== franchiseId)
-        .map((other) => ({ franchiseId: other, wins: 0, losses: 0 })),
+        .map((other) => ({
+          franchiseId: franchiseIdSchema.parse(other),
+          wins: 0,
+          losses: 0,
+        })),
     })),
   };
 }
@@ -100,17 +106,17 @@ describe('season block recap (M2.3)', () => {
     const win = (gameId: string): SeasonGameSummary => ({
       schemaVersion: 1,
       summaryVersion: 'season-game-summary-v3',
-      gameId,
+      gameId: seasonGameIdSchema.parse(gameId),
       round: 1,
-      homeFranchiseId: 'lakers',
-      awayFranchiseId: 'celtics',
+      homeFranchiseId: franchiseIdSchema.parse('lakers'),
+      awayFranchiseId: franchiseIdSchema.parse('celtics'),
       status: 'final',
       overtimePeriods: 0,
       homeScore: 110,
       awayScore: 100,
       forfeitLoserFranchiseId: null,
       homeBox: {
-        franchiseId: 'lakers',
+        franchiseId: franchiseIdSchema.parse('lakers'),
         points: 110,
         fieldGoalsMade: 40,
         fieldGoalsAttempted: 90,
@@ -128,7 +134,7 @@ describe('season block recap (M2.3)', () => {
         possessions: 100,
       },
       awayBox: {
-        franchiseId: 'celtics',
+        franchiseId: franchiseIdSchema.parse('celtics'),
         points: 100,
         fieldGoalsMade: 38,
         fieldGoalsAttempted: 88,
@@ -151,7 +157,7 @@ describe('season block recap (M2.3)', () => {
     });
     const lose = (gameId: string): SeasonGameSummary => ({
       ...win(gameId),
-      gameId,
+      gameId: seasonGameIdSchema.parse(gameId),
       homeScore: 100,
       awayScore: 110,
     });
@@ -159,7 +165,7 @@ describe('season block recap (M2.3)', () => {
     const franchiseIds = ['lakers', 'celtics'];
     const emptyPlayer: SeasonPlayerAggregate = {
       playerVersionId: 'pv-x',
-      franchiseId: 'lakers',
+      franchiseId: franchiseIdSchema.parse('lakers'),
       gamesPlayed: 0,
       appearances: 0,
       started: 0,

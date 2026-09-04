@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   SEASON_ENDING_MISSED_GAMES_SENTINEL,
+  franchiseIdSchema,
   seasonInjuryRecordSchema,
   type SeasonHealthState,
   type SeasonInjuryRecord,
@@ -33,7 +34,7 @@ function rollAt(
     rootSeed,
     gameId,
     playerVersionId,
-    franchiseId: 'lakers',
+    franchiseId: franchiseIdSchema.parse('lakers'),
     durabilityRating: 70,
     fatigueBasisPoints: 0,
     recentLoadBasisPoints: 0,
@@ -307,7 +308,7 @@ describe('season injury recovery and recurrence (M2.5 §5)', () => {
     const record: SeasonInjuryRecord = {
       injuryId: 'inj-' + 'a'.repeat(32),
       playerVersionId: 'pv-1',
-      franchiseId: 'lakers',
+      franchiseId: franchiseIdSchema.parse('lakers'),
       gameId: 's000001',
       type: 'upper-body',
       severity: 'moderate',
@@ -366,7 +367,7 @@ describe('season injury recovery and recurrence (M2.5 §5)', () => {
     const record: SeasonInjuryRecord = {
       injuryId: 'inj-' + 'b'.repeat(32),
       playerVersionId: 'pv-2',
-      franchiseId: 'lakers',
+      franchiseId: franchiseIdSchema.parse('lakers'),
       gameId: 's000001',
       type: 'lower-body',
       severity: 'minor',
@@ -394,7 +395,7 @@ describe('season injury recovery and recurrence (M2.5 §5)', () => {
     const record: SeasonInjuryRecord = {
       injuryId: 'inj-' + 's'.repeat(32),
       playerVersionId: 'pv-season-ending',
-      franchiseId: 'lakers',
+      franchiseId: franchiseIdSchema.parse('lakers'),
       gameId: 's000001',
       type: 'lower-body',
       severity: 'season-ending',
@@ -476,7 +477,7 @@ describe('season injury recovery and recurrence (M2.5 §5)', () => {
     const record: SeasonInjuryRecord = {
       injuryId: 'inj-' + 'c'.repeat(32),
       playerVersionId: 'pv-4',
-      franchiseId: 'lakers',
+      franchiseId: franchiseIdSchema.parse('lakers'),
       gameId: 's000001',
       type: 'illness',
       severity: 'major',
@@ -508,7 +509,7 @@ describe('season injury recovery and recurrence (M2.5 §5)', () => {
     const record: SeasonInjuryRecord = {
       injuryId: 'inj-' + 'r'.repeat(32),
       playerVersionId: 'pv-rehab-season-ending',
-      franchiseId: 'lakers',
+      franchiseId: franchiseIdSchema.parse('lakers'),
       gameId: 's000001',
       type: 'illness',
       severity: 'season-ending',

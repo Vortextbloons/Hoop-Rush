@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { render } from '@testing-library/svelte';
-import { idSchema, type FixedFiveRoomSnapshot } from '@hoop-rush/data-contracts';
+import {
+  fixedFiveRoomCodeSchema,
+  idSchema,
+  type FixedFiveRoomSnapshot,
+} from '@hoop-rush/data-contracts';
 import FixedFiveScoreboard from '$lib/components/FixedFiveScoreboard.svelte';
 
 function snapshot(): FixedFiveRoomSnapshot {
   return {
     roomId: idSchema.parse('room-1'),
-    code: '0042',
+    code: fixedFiveRoomCodeSchema.parse('0042'),
     codeActive: true,
     settings: {
       schemaVersion: 1,

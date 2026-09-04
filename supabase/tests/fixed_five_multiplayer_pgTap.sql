@@ -2,7 +2,7 @@
 -- Run with: supabase test db
 
 begin;
-select plan(24);
+select plan(26);
 
 select has_table('public', 'fixed_five_rooms', 'fixed_five_rooms exists');
 select has_table('public', 'fixed_five_room_members', 'members exists');
@@ -38,6 +38,8 @@ select has_function('public', 'fixed_five_leave', array['uuid'], 'leave exists')
 select has_function('public', 'fixed_five_rematch', array['uuid'], 'rematch exists');
 select has_function('public', 'fixed_five_complete', array['uuid','text'], 'complete exists');
 select has_function('public', 'fixed_five_fail', array['uuid'], 'fail exists');
+select has_function('public', 'fixed_five_is_member', array['uuid'], 'membership helper exists');
+select has_policy('public', 'fixed_five_room_members', 'ff members read room membership');
 
 select * from finish();
 rollback;
