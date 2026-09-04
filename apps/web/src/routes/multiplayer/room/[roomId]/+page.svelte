@@ -48,6 +48,7 @@
     pickOrdinalOf,
     refsForParticipant,
     replayFixedFiveLog,
+    restoreFixedFiveCommandSyncState,
     roomLogFacts,
     saveActivityNow,
     summarizeWorkerEntries,
@@ -584,8 +585,8 @@
           ...resumed.membership,
           code: snap.code ?? resumed.membership.code,
         });
-        const [stored, loadedAssets] = await Promise.all([
-          fixedFiveRepository.loadActive(roomId).catch(() => null),
+        const [storedCommands, loadedAssets] = await Promise.all([
+          fixedFiveRepository.listCommands(roomId).catch(() => []),
           loadFixedFiveAssets().catch((e: unknown) => {
             assetsError = e instanceof Error ? e.message : String(e);
             return null;
@@ -593,8 +594,9 @@
         ]);
         if (!mounted) return;
         assets = loadedAssets;
-        lastOrdinal =
-          stored?.commandCursor != null ? stored.commandCursor - 1 : snap.commandCount - 1;
+        const restored = restoreFixedFiveCommandSyncState(storedCommands);
+        commands = restored.commands;
+        lastOrdinal = restored.lastOrdinal;
         if (!snap.rootSeed && mounted) {
           error = 'Room is missing its server seed — it cannot be simulated.';
         }

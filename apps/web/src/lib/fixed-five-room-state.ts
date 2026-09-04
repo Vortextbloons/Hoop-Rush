@@ -361,6 +361,19 @@ export function mergeFixedFiveCommands(
   return [...byOrdinal.values()].sort((a, b) => a.ordinal - b.ordinal);
 }
 
+export function restoreFixedFiveCommandSyncState(storedCommands: FixedFiveCommand[]): {
+  commands: FixedFiveCommand[];
+  lastOrdinal: number;
+} {
+  const commands = mergeFixedFiveCommands([], storedCommands);
+  let lastOrdinal = -1;
+  for (const command of commands) {
+    if (command.ordinal !== lastOrdinal + 1) break;
+    lastOrdinal = command.ordinal;
+  }
+  return { commands, lastOrdinal };
+}
+
 export function roomLogFacts(commands: FixedFiveCommand[]): RoomLogFacts {
   const facts: RoomLogFacts = {
     ready: { p1: false, p2: false },

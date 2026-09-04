@@ -13,6 +13,7 @@ import {
   deriveEffectivePhase,
   isDraftComplete,
   mergeFixedFiveCommands,
+  restoreFixedFiveCommandSyncState,
   roomLogFacts,
   type DraftReplay,
 } from '$lib/fixed-five-room-state';
@@ -106,6 +107,40 @@ describe('mergeFixedFiveCommands', () => {
     expect(() => mergeFixedFiveCommands([first], [conflict])).toThrow(
       'fixed-five command log conflicts at ordinal 4',
     );
+  });
+});
+
+describe('restoreFixedFiveCommandSyncState', () => {
+  it('restores accepted draft commands before choosing the resume cursor', () => {
+    const start = command(0, 'p1', { kind: 'start' });
+    const firstPick = command(1, 'p1', {
+      kind: 'duel-claim',
+      playerId: playerIdSchema.parse('player-1'),
+      slotIndex: 0,
+      franchiseId: franchiseIdSchema.parse('mavericks'),
+      eraId: eraIdSchema.parse('2010s'),
+    });
+
+    const restored = restoreFixedFiveCommandSyncState([start, firstPick]);
+
+    expect(restored.commands).toEqual([start, firstPick]);
+    expect(restored.lastOrdinal).toBe(1);
+  });
+
+  it('refetches from the first gap instead of skipping missing commands', () => {
+    const start = command(0, 'p1', { kind: 'start' });
+    const laterPick = command(2, 'p1', {
+      kind: 'duel-claim',
+      playerId: playerIdSchema.parse('player-2'),
+      slotIndex: 1,
+      franchiseId: franchiseIdSchema.parse('lakers'),
+      eraId: eraIdSchema.parse('2000s'),
+    });
+
+    const restored = restoreFixedFiveCommandSyncState([laterPick, start]);
+
+    expect(restored.commands).toEqual([start, laterPick]);
+    expect(restored.lastOrdinal).toBe(0);
   });
 });
 
