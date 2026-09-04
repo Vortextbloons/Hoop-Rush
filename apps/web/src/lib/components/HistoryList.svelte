@@ -5,8 +5,6 @@ import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persiste
 import type { HoopRushManifest } from '@hoop-rush/data-contracts';
 import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
 import { variantLabel } from '$lib/draft-presentation';
-import SeasonTierBadge from '$lib/components/SeasonTierBadge.svelte';
-import { seasonTierFromWins } from '$lib/season-tier';
 let { manifest, rows, active, modeLabel, emptyTitle, emptyHref, emptyCta, continueHref, resultHrefFor, }: {
     manifest: HoopRushManifest | null;
     rows: CompletedRunIndex[];
@@ -69,14 +67,13 @@ function formatTime(iso: string): string {
 
   <ul class="mt-8 flex flex-col gap-3">
     {#each rows as row (row.runId)}
-      {@const tier = seasonTierFromWins(row.wins)}
       {@const isClassic = row.mode === 'classic'}
       <li>
         <a
           href={resolve(resultHrefFor(row.runId) as any)}
           class="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-border bg-card p-4 transition-colors hover:border-line-strong"
         >
-          <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg {tier.iconClass}">
+          <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary/15 text-primary">
             <Trophy class="h-5 w-5" />
           </span>
           <span class="min-w-0 flex-1">
@@ -100,7 +97,6 @@ function formatTime(iso: string): string {
           <span class="font-display text-xl font-extrabold tracking-tight">
             {row.wins}<span class="text-muted-foreground">–</span>{row.losses}
           </span>
-          <SeasonTierBadge wins={row.wins} />
           <span class="w-full font-mono text-[10px] text-muted-foreground sm:w-auto">
             {formatTime(row.completedAtIso)}
           </span>

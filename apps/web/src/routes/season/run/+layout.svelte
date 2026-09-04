@@ -64,14 +64,24 @@ setContext(SEASON_RUN_SHELL_CONTEXT, shell);
 const routeId = $derived(page.route.id);
 let playersIndex: PlayersIndexEntry[] | null = null;
 let faceIndexKey = '';
+let lastHeavyMirrorAt = 0;
+let lastHeavySnapshot: unknown = null;
+let lastHeavyBlockPhase: string | null = null;
+let tradeCacheSource: unknown = null;
+let tradeCacheClone: NonNullable<SeasonRunShellData['trade']> | null = null;
 function cloneTradeState(trade: NonNullable<SeasonRunShellData['trade']>) {
-    return {
+    if (trade === tradeCacheSource && tradeCacheClone !== null)
+        return tradeCacheClone;
+    const cloned = {
         ...trade,
         windows: trade.windows.map((window) => ({
             ...window,
             offers: window.offers.map((offer) => ({ ...offer })),
         })),
     };
+    tradeCacheSource = trade;
+    tradeCacheClone = cloned;
+    return cloned;
 }
 function recomputeRunFacts(): void {
     const snapshot = shell.snapshot;
@@ -151,7 +161,7 @@ function rebuildRotationEditor(run: NonNullable<SeasonRunShellData['run']>): {
     }));
     return { editor: createRotationEditor(rotation, members), key };
 }
-function mirrorHub(): void {
+function mirrorHub(forceHeavy = false): void {
     const hub = shell.hub;
     if (hub === null)
         return;
@@ -164,6 +174,16 @@ function mirrorHub(): void {
     shell.commandError = hub.commandError;
     shell.hubError = hub.error;
     shell.externalChange = hub.externalChange;
+    const phase = hub.block.phase;
+    const snapshotChanged = shell.snapshot !== lastHeavySnapshot;
+    const phaseChanged = phase !== lastHeavyBlockPhase;
+    const now = Date.now();
+    const isTerminal = phase !== 'running';
+    if (!forceHeavy && !snapshotChanged && !phaseChanged && !isTerminal && now - lastHeavyMirrorAt < 1000)
+        return;
+    lastHeavyMirrorAt = now;
+    lastHeavySnapshot = shell.snapshot;
+    lastHeavyBlockPhase = phase;
     recomputeRunFacts();
 }
 let unsubscribeHub: (() => void) | null = null;
@@ -250,10 +270,11 @@ async function initShell(): Promise<void> {
         const hub = new SeasonHubState(repo, runner);
         shell.hub = hub;
         unsubscribeHub = hub.subscribe(() => mirrorHub());
+        hub.prewarm();
         await hub.refresh();
-        mirrorHub();
+        mirrorHub(true);
         await loadPlayerSlice();
-        mirrorHub();
+        mirrorHub(true);
         scheduleLazyWork();
     }
     catch (error) {
@@ -532,6 +553,41 @@ shell.franchiseName = (franchiseId: string): string => {
 shell.franchiseAbbrev = (franchiseId: string): string => {
     return franchiseAbbreviation(franchiseId);
 };
+const rankingWeak = new WeakMap<object, ReturnType<typeof provisionalRanking>>();
+const rankingByDigest = new Map<string, ReturnType<typeof provisionalRanking>>();
+function standingsDigest(rows: readonly { franchiseId: string; wins: number; losses: number; pointsFor: number; pointsAgainst: number }[]): string {
+    let hash = 2166136261;
+    const sorted = [...rows].sort((a, b) => (a.franchiseId < b.franchiseId ? -1 : 1));
+    for (const row of sorted) {
+        for (let i = 0; i < row.franchiseId.length; i += 1)
+            hash = Math.imul(hash ^ row.franchiseId.charCodeAt(i), 16777619);
+        hash = Math.imul(hash ^ row.wins, 16777619);
+        hash = Math.imul(hash ^ row.losses, 16777619);
+        hash = Math.imul(hash ^ row.pointsFor, 16777619);
+        hash = Math.imul(hash ^ row.pointsAgainst, 16777619);
+    }
+    return `${String(rows.length)}:${String(hash >>> 0)}`;
+}
+function memoizedRanking(standings: Parameters<typeof provisionalRanking>[0], league: Parameters<typeof provisionalRanking>[1]): ReturnType<typeof provisionalRanking> {
+    const weakHit = rankingWeak.get(standings);
+    if (weakHit !== undefined)
+        return weakHit;
+    const digest = standingsDigest(standings.rows);
+    const digestHit = rankingByDigest.get(digest);
+    if (digestHit !== undefined) {
+        rankingWeak.set(standings, digestHit);
+        return digestHit;
+    }
+    const ranked = provisionalRanking(standings, league);
+    rankingWeak.set(standings, ranked);
+    rankingByDigest.set(digest, ranked);
+    if (rankingByDigest.size > 4) {
+        const oldest = rankingByDigest.keys().next().value;
+        if (oldest !== undefined)
+            rankingByDigest.delete(oldest);
+    }
+    return ranked;
+}
 const mastheadFacts = $derived.by(() => {
     const run = shell.run;
     const franchiseId = shell.humanFranchiseId;
@@ -541,7 +597,7 @@ const mastheadFacts = $derived.by(() => {
     const row = run.standings.rows.find((r) => r.franchiseId === franchiseId);
     if (row === undefined)
         return null;
-    const ranked = provisionalRanking(run.standings, run.league).find((entry) => entry.row.franchiseId === franchiseId);
+    const ranked = memoizedRanking(run.standings, run.league).find((entry) => entry.row.franchiseId === franchiseId);
     return {
         franchiseId,
         record: recordLabel(row.wins, row.losses),

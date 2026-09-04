@@ -120,10 +120,16 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     let workerSummaryRunId: string | null = null;
     let workerSummaryCount = 0;
     let workerRosterKey: string | null = null;
+    const rosterKeyCache = new WeakMap<object, string>();
     function rosterKeyOf(rosters: SeasonRun['rosters']): string {
-        return rosters
+        const cached = rosterKeyCache.get(rosters);
+        if (cached !== undefined)
+            return cached;
+        const key = rosters
             .map((roster) => `${roster.franchiseId}:${roster.players.map((player) => player.playerVersionId).join(',')}`)
             .join('|');
+        rosterKeyCache.set(rosters, key);
+        return key;
     }
     const repositoryPromise = deps.repository !== undefined ? Promise.resolve(deps.repository) : null;
     const schedulePromise = deps.schedule !== undefined ? Promise.resolve(deps.schedule) : null;
@@ -158,32 +164,69 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         hash: string;
         catalog: SeasonDraftCatalog;
     } | null = null;
+    let catalogInflight: Promise<SeasonDraftCatalog | null> | null = null;
     async function resolveCatalog(input: SeasonBlockStartInput): Promise<SeasonDraftCatalog | null> {
         if (catalogCache !== null &&
             catalogCache.url === input.catalogUrl &&
             catalogCache.hash === input.catalogHash) {
             return catalogCache.catalog;
         }
-        try {
-            const { loadSeasonDraftCatalog } = await import('@hoop-rush/data-contracts');
-            const catalog = await loadSeasonDraftCatalog(input.catalogUrl, input.catalogHash);
-            catalogCache = { url: input.catalogUrl, hash: input.catalogHash, catalog };
-            return catalog;
-        }
-        catch {
-            return null;
+        if (catalogInflight !== null)
+            return catalogInflight;
+        catalogInflight = (async () => {
+            try {
+                const { loadSeasonDraftCatalog } = await import('@hoop-rush/data-contracts');
+                const catalog = await loadSeasonDraftCatalog(input.catalogUrl, input.catalogHash);
+                catalogCache = { url: input.catalogUrl, hash: input.catalogHash, catalog };
+                return catalog;
+            }
+            catch {
+                return null;
+            }
+            finally {
+                catalogInflight = null;
+            }
+        })();
+        return catalogInflight;
+    }
+    function prefetchCommitAssets(input: SeasonBlockStartInput): void {
+        void resolveCatalog(input).catch(() => null);
+        if (input.blockIndex === 2 || input.blockIndex === 4 || input.blockIndex === 6) {
+            void resolveFreeAgencyAssets().catch(() => null);
         }
     }
+    let freeAgencyCache: {
+        freeAgencyIndex: SeasonFreeAgencyIndex;
+        freeAgencyTargets: SeasonRosterTargets;
+    } | null = null;
+    let freeAgencyInflight: Promise<{
+        freeAgencyIndex: SeasonFreeAgencyIndex;
+        freeAgencyTargets: SeasonRosterTargets;
+    }> | null = null;
     async function resolveFreeAgencyAssets(): Promise<{
         freeAgencyIndex: SeasonFreeAgencyIndex;
         freeAgencyTargets: SeasonRosterTargets;
     }> {
-        const module = await import('./season-assets');
-        const [freeAgencyIndex, freeAgencyTargets] = await Promise.all([
-            module.loadSeasonFreeAgencyIndex(),
-            module.loadSeasonFreeAgencyTargets(),
-        ]);
-        return { freeAgencyIndex, freeAgencyTargets };
+        if (freeAgencyCache !== null)
+            return freeAgencyCache;
+        if (freeAgencyInflight !== null)
+            return freeAgencyInflight;
+        freeAgencyInflight = (async () => {
+            const module = await import('./season-assets');
+            const [freeAgencyIndex, freeAgencyTargets] = await Promise.all([
+                module.loadSeasonFreeAgencyIndex(),
+                module.loadSeasonFreeAgencyTargets(),
+            ]);
+            freeAgencyCache = { freeAgencyIndex, freeAgencyTargets };
+            return freeAgencyCache;
+        })();
+        try {
+            return await freeAgencyInflight;
+        }
+        catch (error) {
+            freeAgencyInflight = null;
+            throw error;
+        }
     }
     function createWorker(): Worker {
         if (worker !== null)
@@ -197,6 +240,8 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         worker.addEventListener('error', (event) => {
             if (warmRequestId !== null) {
                 warmRequestId = null;
+                if (currentRequestId === null)
+                    warmed = false;
             }
             if (currentRequestId === null || current === null)
                 return;
@@ -215,6 +260,75 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
             current = null;
         });
         worker.addEventListener('message', (event: MessageEvent<unknown>) => {
+            const raw = event.data as {
+                type?: unknown;
+                requestId?: unknown;
+            } | null | undefined;
+            if (typeof raw === 'object' && raw !== null && raw.type === 'season-block-progress') {
+                if (raw.requestId !== currentRequestId) {
+                    console.warn(`[season-block-runner] dropped message for stale requestId ${String(raw.requestId)} (expected ${String(currentRequestId)})`);
+                    return;
+                }
+                if (current === null)
+                    return;
+                const progress = raw as {
+                    requestId: string;
+                    blockIndex: unknown;
+                    gamesCompleted: unknown;
+                    gamesTotal: unknown;
+                    latestGameId: unknown;
+                    latestResult: unknown;
+                };
+                if (typeof progress.blockIndex !== 'number' ||
+                    typeof progress.gamesCompleted !== 'number' ||
+                    typeof progress.gamesTotal !== 'number' ||
+                    progress.blockIndex !== current.blockIndex ||
+                    progress.gamesCompleted < 0 ||
+                    progress.gamesTotal < 1 ||
+                    progress.gamesTotal > 150 ||
+                    progress.gamesCompleted > progress.gamesTotal) {
+                    const parsed = seasonWorkerMessageSchema.safeParse(event.data);
+                    if (!parsed.success || parsed.data.type !== 'season-block-progress') {
+                        console.warn('[season-block-runner] dropped unparsable worker message', event.data);
+                        return;
+                    }
+                    emit({
+                        type: 'progress',
+                        requestId: parsed.data.requestId,
+                        blockIndex: parsed.data.blockIndex,
+                        gamesCompleted: parsed.data.gamesCompleted,
+                        gamesTotal: parsed.data.gamesTotal,
+                        latestGameId: parsed.data.latestGameId,
+                        latestResult: parsed.data.latestResult,
+                    });
+                    return;
+                }
+                emit({
+                    type: 'progress',
+                    requestId: progress.requestId,
+                    blockIndex: progress.blockIndex,
+                    gamesCompleted: progress.gamesCompleted,
+                    gamesTotal: progress.gamesTotal,
+                    latestGameId: (progress.latestGameId as string | null) ?? null,
+                    latestResult: (progress.latestResult as SeasonScoreline | null) ?? null,
+                });
+                return;
+            }
+            if (typeof raw === 'object' && raw !== null && raw.type === 'season-block-warm-ack') {
+                if (raw.requestId === warmRequestId) {
+                    warmRequestId = null;
+                    warmed = true;
+                }
+                return;
+            }
+            if (typeof raw === 'object' &&
+                raw !== null &&
+                raw.type === 'season-block-error' &&
+                raw.requestId === warmRequestId) {
+                warmRequestId = null;
+                warmed = false;
+                return;
+            }
             const parsed = seasonWorkerMessageSchema.safeParse(event.data);
             if (!parsed.success) {
                 console.warn('[season-block-runner] dropped unparsable worker message', event.data);
@@ -334,10 +448,10 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
                 freeAgencyTargets: freeAgencyAssets?.freeAgencyTargets,
             });
             const window: SeasonWindowOpenResult | null = committed.window;
-            const retainedDetails = dedupeByGameId([
+            const retainedDetails = [
                 ...(state.resumePending?.retainedDetails ?? []),
-                ...checkpoint.retainedDetails,
-            ]);
+                ...dedupeNewByGameId(state.resumePending?.retainedDetails ?? [], checkpoint.retainedDetails),
+            ];
             const objectives = objectivesWithSuccess(state.input.run, authoritative);
             const campaign = (committed as unknown as {
                 campaign?: import('@hoop-rush/data-contracts').SeasonCampaignState | null;
@@ -599,6 +713,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
                 input,
                 resumePending: null,
             };
+            prefetchCommitAssets(input);
             void (async () => {
                 try {
                     const [repository, schedule, artifacts] = await Promise.all([
@@ -662,6 +777,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
                     const plainStart = buildRequest(requestId, current, schedule, artifacts);
                     const target = createWorker();
                     target.postMessage(plainStart);
+                    warmed = true;
                     emit({ type: 'started', requestId, blockIndex: input.blockIndex });
                 }
                 catch (error) {
@@ -772,6 +888,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
                     const plainStart = buildRequest(requestId, current, schedule, artifacts);
                     const target = createWorker();
                     target.postMessage(plainStart);
+                    warmed = true;
                     emit({ type: 'started', requestId, blockIndex: input.blockIndex });
                 }
                 catch (error) {
@@ -820,31 +937,35 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
             workerRosterKey = null;
         },
         prewarm(): void {
-            if (currentRequestId !== null || warmed)
+            if (currentRequestId !== null || warmed || warmRequestId !== null)
                 return;
-            warmed = true;
+            const pendingWarmId = `warm-${randomUUID()}`;
+            warmRequestId = pendingWarmId;
             void (async () => {
                 try {
                     const artifacts = deps.artifacts !== undefined
                         ? await deps.artifacts()
                         : await import('./season-assets').then((module) => module.seasonArtifactUrls());
-                    if (requestActive())
+                    if (requestActive()) {
+                        if (warmRequestId === pendingWarmId)
+                            warmRequestId = null;
                         return;
+                    }
                     const target = createWorker();
-                    const requestId = `warm-${randomUUID()}`;
-                    warmRequestId = requestId;
                     target.postMessage(seasonWorkerWarmRequestSchema.parse({
                         schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
                         type: 'season-block-warm',
-                        requestId,
+                        requestId: pendingWarmId,
                         catalogUrl: artifacts.catalogUrl,
                         catalogHash: artifacts.catalogHash,
                         profileUrl: artifacts.profileUrl,
                         profileHash: artifacts.profileHash,
                     }));
+                    warmed = true;
                 }
                 catch {
-                    warmRequestId = null;
+                    if (warmRequestId === pendingWarmId)
+                        warmRequestId = null;
                 }
             })();
         },
@@ -864,6 +985,130 @@ function dedupeByGameId(details: SeasonRetainedGameDetail[]): SeasonRetainedGame
             continue;
         seen.add(detail.gameId);
         result.push(detail);
+    }
+    return result;
+}
+function dedupeNewByGameId(prior: readonly SeasonRetainedGameDetail[], incoming: readonly SeasonRetainedGameDetail[]): SeasonRetainedGameDetail[] {
+    if (prior.length === 0)
+        return dedupeByGameId([...incoming]);
+    const seen = new Set<string>();
+    for (const detail of prior)
+        seen.add(detail.gameId);
+    const result: SeasonRetainedGameDetail[] = [];
+    for (const detail of incoming) {
+        if (seen.has(detail.gameId))
+            continue;
+        seen.add(detail.gameId);
+        result.push(detail);
+    }
+    return result;
+}
+function isSortedByGameId(items: readonly { gameId: string }[]): boolean {
+    for (let i = 1; i < items.length; i += 1) {
+        const prev = items[i - 1];
+        const curr = items[i];
+        if (prev === undefined || curr === undefined)
+            continue;
+        if (prev.gameId > curr.gameId)
+            return false;
+    }
+    return true;
+}
+function mergeSortedSummaries(prior: readonly SeasonGameSummary[], next: readonly SeasonGameSummary[]): SeasonGameSummary[] {
+    if (prior.length === 0)
+        return [...next].sort((a, b) => (a.gameId < b.gameId ? -1 : 1));
+    if (next.length === 0)
+        return [...prior];
+    if (!isSortedByGameId(prior))
+        return [...prior, ...next].sort((a, b) => (a.gameId < b.gameId ? -1 : 1));
+    const sortedNext = [...next].sort((a, b) => (a.gameId < b.gameId ? -1 : 1));
+    const result: SeasonGameSummary[] = [];
+    let i = 0;
+    let j = 0;
+    while (i < prior.length && j < sortedNext.length) {
+        const a = prior[i];
+        const b = sortedNext[j];
+        if (a === undefined || b === undefined)
+            break;
+        if (a.gameId <= b.gameId) {
+            const last = result[result.length - 1];
+            if (last === undefined || last.gameId !== a.gameId)
+                result.push(a);
+            i += 1;
+        }
+        else {
+            const last = result[result.length - 1];
+            if (last === undefined || last.gameId !== b.gameId)
+                result.push(b);
+            j += 1;
+        }
+    }
+    while (i < prior.length) {
+        const a = prior[i];
+        if (a === undefined)
+            break;
+        const last = result[result.length - 1];
+        if (last === undefined || last.gameId !== a.gameId)
+            result.push(a);
+        i += 1;
+    }
+    while (j < sortedNext.length) {
+        const b = sortedNext[j];
+        if (b === undefined)
+            break;
+        const last = result[result.length - 1];
+        if (last === undefined || last.gameId !== b.gameId)
+            result.push(b);
+        j += 1;
+    }
+    return result;
+}
+function mergeSortedDetails(prior: readonly SeasonRetainedGameDetail[], next: readonly SeasonRetainedGameDetail[]): SeasonRetainedGameDetail[] {
+    if (prior.length === 0)
+        return [...next].sort((a, b) => (a.gameId < b.gameId ? -1 : 1));
+    if (next.length === 0)
+        return [...prior];
+    if (!isSortedByGameId(prior))
+        return [...prior, ...next].sort((a, b) => (a.gameId < b.gameId ? -1 : 1));
+    const sortedNext = [...next].sort((a, b) => (a.gameId < b.gameId ? -1 : 1));
+    const result: SeasonRetainedGameDetail[] = [];
+    let i = 0;
+    let j = 0;
+    while (i < prior.length && j < sortedNext.length) {
+        const a = prior[i];
+        const b = sortedNext[j];
+        if (a === undefined || b === undefined)
+            break;
+        if (a.gameId <= b.gameId) {
+            const last = result[result.length - 1];
+            if (last === undefined || last.gameId !== a.gameId)
+                result.push(a);
+            i += 1;
+        }
+        else {
+            const last = result[result.length - 1];
+            if (last === undefined || last.gameId !== b.gameId)
+                result.push(b);
+            j += 1;
+        }
+    }
+    while (i < prior.length) {
+        const a = prior[i];
+        if (a === undefined)
+            break;
+        const last = result[result.length - 1];
+        if (last === undefined || last.gameId !== a.gameId)
+            result.push(a);
+        i += 1;
+    }
+    while (j < sortedNext.length) {
+        const b = sortedNext[j];
+        if (b === undefined)
+            break;
+        const last = result[result.length - 1];
+        if (last === undefined || last.gameId !== b.gameId)
+            result.push(b);
+        j += 1;
     }
     return result;
 }
@@ -911,11 +1156,9 @@ export function assembleCommittedSnapshot(input: {
         stateRevision: input.stateRevision,
         stateDigest: input.stateDigest,
     };
-    const summaries = [...input.priorSummaries, ...checkpoint.gameSummaries];
-    const retainedDetails = dedupeByGameId([
-        ...input.priorRetainedDetails,
-        ...checkpoint.retainedDetails,
-    ]);
+    const newDetails = dedupeNewByGameId(input.priorRetainedDetails, checkpoint.retainedDetails);
+    const summaries = mergeSortedSummaries(input.priorSummaries, checkpoint.gameSummaries);
+    const retainedDetails = mergeSortedDetails(input.priorRetainedDetails, newDetails);
     const acceptedBlock = seasonAcceptedBlockSchema.parse({
         runId: checkpoint.runId,
         blockIndex: checkpoint.blockIndex,
@@ -930,9 +1173,9 @@ export function assembleCommittedSnapshot(input: {
     });
     return {
         run: { ...postCommitRun, games: reconstructSeasonGames(schedule, summaries) },
-        summaries: [...summaries].sort((a, b) => (a.gameId < b.gameId ? -1 : 1)),
-        retainedDetails: retainedDetails.sort((a, b) => (a.gameId < b.gameId ? -1 : 1)),
-        acceptedBlocks: [...input.priorAcceptedBlocks, acceptedBlock].sort((a, b) => a.revision - b.revision),
+        summaries,
+        retainedDetails,
+        acceptedBlocks: [...input.priorAcceptedBlocks, acceptedBlock],
         effects: window !== null ? window.effects : checkpoint.effects,
     };
 }

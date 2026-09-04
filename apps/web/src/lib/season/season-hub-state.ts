@@ -7,7 +7,10 @@ import type { CommitPostseasonAdvancementInput, SeasonPostseasonRepository, Seas
 import { isSeasonRunIncompatibleError, type SeasonRunIncompatibleInfo, } from '@hoop-rush/persistence';
 import { newSeasonId } from './season-ids';
 import { sleep } from '$lib/sleep';
-import { cachedSeasonSnapshotMatches, clearCachedSeasonSnapshot, getCachedSeasonSnapshot, setCachedSeasonSnapshot, } from './season-state-cache';
+import { cachedSeasonSnapshotMatches, clearCachedSeasonSnapshot, getCachedSeasonSnapshot, rosterKeyOfSnapshotRun, setCachedSeasonSnapshot, } from './season-state-cache';
+function rosterKeyOfRun(rosters: SeasonRun['rosters']): string {
+    return rosterKeyOfSnapshotRun(rosters);
+}
 import { createSeasonRunChannel, type SeasonRunChannel, type SeasonRunMutation, } from './season-cross-tab';
 export type BlockPhase = 'idle' | 'running' | 'interrupted' | 'cancelled' | 'failed' | 'complete';
 export interface BlockRunState {
@@ -124,6 +127,7 @@ export class SeasonHubState {
             void this.onExternalMutation(mutation);
         });
     }
+    private lastProgressEmitAt = 0;
     destroy(): void {
         this.unsubscribeRunner?.();
         this.unsubscribeRunner = null;
@@ -132,8 +136,13 @@ export class SeasonHubState {
         this.unsubscribeChannel?.();
         this.unsubscribeChannel = null;
         this.channel.close();
-        this.runner.terminate();
-        this.postseasonRunner?.terminate();
+        if (this.block.phase === 'running' && this.block.requestId !== null) {
+            try {
+                this.runner.cancel(this.block.requestId);
+            }
+            catch {
+            }
+        }
         this.postseasonRunner = null;
         this.postseasonRequestId = null;
         this.listeners.clear();
@@ -1171,6 +1180,7 @@ export class SeasonHubState {
                 this.emit();
                 return;
             }
+            const beforeRosterKey = rosterKeyOfRun(snapshot.run.rosters);
             await this.repo.applySeasonRunCommand({
                 runId: snapshot.run.runId,
                 command,
@@ -1179,6 +1189,9 @@ export class SeasonHubState {
                 pending: output.pending,
             });
             this.commandError = null;
+            this.pending = output.pending;
+            if (output.pending === null)
+                this.interruption = null;
             if (this.snapshot !== null) {
                 const effects = postCommandEffects(output.run, this.snapshot.effects);
                 this.snapshot = { ...this.snapshot, run: output.run, effects };
@@ -1191,6 +1204,8 @@ export class SeasonHubState {
                 });
                 this.emit();
             }
+            if (beforeRosterKey === rosterKeyOfRun(output.run.rosters))
+                return;
             await this.refresh();
         }
         catch (error) {
@@ -1234,15 +1249,22 @@ export class SeasonHubState {
                     break;
                 this.block.requestId = event.requestId;
                 this.block.phase = 'running';
+                this.lastProgressEmitAt = 0;
                 break;
-            case 'progress':
+            case 'progress': {
                 if (this.block.blockIndex !== event.blockIndex)
                     break;
                 this.block.gamesCompleted = event.gamesCompleted;
                 this.block.gamesTotal = event.gamesTotal;
                 this.block.latestGameId = event.latestGameId;
                 this.block.latestResult = event.latestResult;
+                const now = this.now();
+                const isFinal = event.gamesTotal > 0 && event.gamesCompleted >= event.gamesTotal;
+                if (!isFinal && now - this.lastProgressEmitAt < 1000)
+                    return;
+                this.lastProgressEmitAt = now;
                 break;
+            }
             case 'complete': {
                 if (this.block.blockIndex !== event.checkpoint.blockIndex)
                     break;

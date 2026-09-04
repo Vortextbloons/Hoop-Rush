@@ -1,4 +1,4 @@
-import { loadEraSimulationProfile, loadJsonAsset, loadSeasonDraftCatalog as loadPackagedSeasonDraftCatalog, parseProjectionModelArtifact, parseSeasonDraftCatalog, seasonFreeAgencyIndexSchema, seasonLeagueSchema, seasonRosterTargetsSchema, seasonScheduleSchema, type EraSimulationProfile, type ProjectionModelArtifact, type SeasonDraftCatalog, type SeasonFreeAgencyIndex, type SeasonHomeCourtProfile, type SeasonLeague, type SeasonRosterTargets, type SeasonSchedule, } from '@hoop-rush/data-contracts';
+import { loadEraSimulationProfile, loadJsonAsset, loadSeasonDraftCatalog as loadPackagedSeasonDraftCatalog, parseEraSimulationProfile, parseProjectionModelArtifact, parseSeasonDraftCatalog, seasonFreeAgencyIndexSchema, seasonLeagueSchema, seasonRosterTargetsSchema, seasonScheduleSchema, type EraSimulationProfile, type ProjectionModelArtifact, type SeasonDraftCatalog, type SeasonFreeAgencyIndex, type SeasonHomeCourtProfile, type SeasonLeague, type SeasonRosterTargets, type SeasonSchedule, } from '@hoop-rush/data-contracts';
 import { SEASON_HOME_COURT_PROFILE } from '@hoop-rush/engine';
 import { getManifest } from '$lib/data';
 import { clearMemoizedLoaders, memoized, resolveAssetUrl } from '$lib/asset-url';
@@ -25,7 +25,13 @@ export function loadSeasonLeague(): Promise<SeasonLeague> {
         const entry = manifest.season?.league;
         if (!entry)
             throw new Error('The season league artifact is unavailable.');
-        return fetchVerified(resolveAssetUrl(entry.url), entry.contentHash, (value: unknown) => seasonLeagueSchema.parse(value));
+        const parse = (value: unknown) => seasonLeagueSchema.parse(value);
+        const cached = await readCachedAsset(entry.contentHash, parse);
+        if (cached !== null)
+            return cached;
+        const league = await fetchVerified(resolveAssetUrl(entry.url), entry.contentHash, parse);
+        void writeCachedAsset(entry.contentHash, league);
+        return league;
     });
 }
 export function loadSeasonSchedule(): Promise<SeasonSchedule> {
@@ -34,7 +40,13 @@ export function loadSeasonSchedule(): Promise<SeasonSchedule> {
         const entry = manifest.season?.schedule;
         if (!entry)
             throw new Error('The season schedule artifact is unavailable.');
-        return fetchVerified(resolveAssetUrl(entry.url), entry.contentHash, (value: unknown) => seasonScheduleSchema.parse(value));
+        const parse = (value: unknown) => seasonScheduleSchema.parse(value);
+        const cached = await readCachedAsset(entry.contentHash, parse);
+        if (cached !== null)
+            return cached;
+        const schedule = await fetchVerified(resolveAssetUrl(entry.url), entry.contentHash, parse);
+        void writeCachedAsset(entry.contentHash, schedule);
+        return schedule;
     });
 }
 export function loadSeasonDraftCatalog(): Promise<SeasonDraftCatalog> {
@@ -57,7 +69,13 @@ export function loadSeasonRosterTargets(): Promise<SeasonRosterTargets> {
         const entry = manifest.season?.rosterTargets;
         if (!entry)
             throw new Error('The season roster-targets artifact is unavailable.');
-        return fetchVerified(resolveAssetUrl(entry.url), entry.contentHash, (value: unknown) => seasonRosterTargetsSchema.parse(value));
+        const parse = (value: unknown) => seasonRosterTargetsSchema.parse(value);
+        const cached = await readCachedAsset(entry.contentHash, parse);
+        if (cached !== null)
+            return cached;
+        const targets = await fetchVerified(resolveAssetUrl(entry.url), entry.contentHash, parse);
+        void writeCachedAsset(entry.contentHash, targets);
+        return targets;
     });
 }
 export function loadSeasonEraProfile(): Promise<EraSimulationProfile> {
@@ -66,7 +84,12 @@ export function loadSeasonEraProfile(): Promise<EraSimulationProfile> {
         const entry = manifest.eraSimulationProfiles.find((p) => p.eraId === FIXED_SEASON_ERA);
         if (!entry)
             throw new Error('The 2010s era simulation profile is unavailable.');
-        return loadEraSimulationProfile(resolveAssetUrl(entry.url), entry.contentHash);
+        const cached = await readCachedAsset(entry.contentHash, parseEraSimulationProfile);
+        if (cached !== null)
+            return cached;
+        const profile = await loadEraSimulationProfile(resolveAssetUrl(entry.url), entry.contentHash);
+        void writeCachedAsset(entry.contentHash, profile);
+        return profile;
     });
 }
 export function loadSeasonFreeAgencyIndex(): Promise<SeasonFreeAgencyIndex> {
@@ -114,7 +137,12 @@ export function loadSeasonProjectionModel(): Promise<ProjectionModelArtifact> {
         const entry = manifest.projection?.model;
         if (!entry)
             throw new Error('The projection model artifact is unavailable.');
-        return fetchVerified(resolveAssetUrl(entry.url), entry.contentHash, (value: unknown) => parseProjectionModelArtifact(value));
+        const cached = await readCachedAsset(entry.contentHash, parseProjectionModelArtifact);
+        if (cached !== null)
+            return cached;
+        const model = await fetchVerified(resolveAssetUrl(entry.url), entry.contentHash, (value: unknown) => parseProjectionModelArtifact(value));
+        void writeCachedAsset(entry.contentHash, model);
+        return model;
     });
 }
 export function clearSeasonAssetCaches(): void {

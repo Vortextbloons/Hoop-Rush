@@ -1,5 +1,5 @@
 <script lang="ts">import { getContext } from 'svelte';
-import type { SeasonLeaderCategory, SeasonRosterEntry } from '@hoop-rush/data-contracts';
+import type { SeasonGameSummary, SeasonLeaderCategory, SeasonRosterEntry } from '@hoop-rush/data-contracts';
 import AwardsSection from '$lib/components/season/AwardsSection.svelte';
 import LeadersTable from '$lib/components/season/LeadersTable.svelte';
 import { SEASON_RUN_SHELL_CONTEXT, type SeasonRunShellData, } from '$lib/season/season-shell-context';
@@ -7,8 +7,50 @@ import { foldSeasonAggregates, LEADER_CATEGORY_LABELS } from '$lib/season/season
 import { engineOrderLeaderTables, LEADER_CATEGORIES } from '$lib/season/season-leaders-view';
 const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
 let activeCategory = $state<SeasonLeaderCategory>('points');
-const aggregates = $derived(shell.snapshot ? foldSeasonAggregates(shell.snapshot.summaries) : null);
-const leaders = $derived(aggregates ? engineOrderLeaderTables(aggregates.players, aggregates.teams) : null);
+const foldWeak = new WeakMap<readonly SeasonGameSummary[], ReturnType<typeof foldSeasonAggregates>>();
+const foldByDigest = new Map<string, ReturnType<typeof foldSeasonAggregates>>();
+function summariesDigest(summaries: readonly SeasonGameSummary[]): string {
+    let hash = 2166136261;
+    for (const summary of summaries) {
+        const id = summary.gameId;
+        for (let i = 0; i < id.length; i += 1)
+            hash = Math.imul(hash ^ id.charCodeAt(i), 16777619);
+        hash = Math.imul(hash ^ summary.homeScore, 16777619);
+        hash = Math.imul(hash ^ summary.awayScore, 16777619);
+    }
+    return `${String(summaries.length)}:${String(hash >>> 0)}`;
+}
+function memoizedFold(summaries: readonly SeasonGameSummary[]): ReturnType<typeof foldSeasonAggregates> {
+    const weakHit = foldWeak.get(summaries);
+    if (weakHit !== undefined)
+        return weakHit;
+    const digest = summariesDigest(summaries);
+    const digestHit = foldByDigest.get(digest);
+    if (digestHit !== undefined) {
+        foldWeak.set(summaries, digestHit);
+        return digestHit;
+    }
+    const folded = foldSeasonAggregates(summaries);
+    foldWeak.set(summaries, folded);
+    foldByDigest.set(digest, folded);
+    if (foldByDigest.size > 4) {
+        const oldest = foldByDigest.keys().next().value;
+        if (oldest !== undefined)
+            foldByDigest.delete(oldest);
+    }
+    return folded;
+}
+const leadersWeak = new WeakMap<object, ReturnType<typeof engineOrderLeaderTables>>();
+function memoizedLeaders(aggregates: ReturnType<typeof memoizedFold>): ReturnType<typeof engineOrderLeaderTables> {
+    const hit = leadersWeak.get(aggregates);
+    if (hit !== undefined)
+        return hit;
+    const ordered = engineOrderLeaderTables(aggregates.players, aggregates.teams);
+    leadersWeak.set(aggregates, ordered);
+    return ordered;
+}
+const aggregates = $derived(shell.snapshot ? memoizedFold(shell.snapshot.summaries) : null);
+const leaders = $derived(aggregates ? memoizedLeaders(aggregates) : null);
 const rosterByVersion = $derived.by(() => {
     const map = new Map<string, SeasonRosterEntry>();
     for (const roster of shell.run?.rosters ?? []) {

@@ -7,7 +7,6 @@ import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
 import { getManifest, warmPlayersIndex } from '$lib/data';
 import { challengeRepository } from '$lib/challenge-repo';
 import { variantLabel } from '$lib/draft-presentation';
-import SeasonTierBadge from '$lib/components/SeasonTierBadge.svelte';
 import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persistence';
 const sandboxHref = resolve('/sandbox');
 const historyHref = resolve('/sandbox/history');
@@ -234,7 +233,9 @@ function eraName(eraId: string): string {
                 <span class="text-stat text-3xl font-extrabold tracking-tight">
                   {row.wins}<span class="text-muted-foreground">–</span>{row.losses}
                 </span>
-                <SeasonTierBadge wins={row.wins} />
+                {#await import('$lib/components/SeasonTierBadge.svelte') then { default: SeasonTierBadge }}
+                  <SeasonTierBadge wins={row.wins} />
+                {/await}
               </span></a
             >
           </li>

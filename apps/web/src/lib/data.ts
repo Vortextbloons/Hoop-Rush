@@ -1,4 +1,4 @@
-import { loadManifest, loadPool, loadEraSimulationProfile, loadOpponentBracket, loadPlayersIndex, loadRosterDetails, parsePlayersIndex, parseRosterDetails, type HoopRushManifest, type FranchiseEraPool, type PoolIndexEntry, type SimProfileIndexEntry, type OpponentIndexEntry, type EraSimulationProfile, type OpponentBracket, type PlayersIndex, type RosterDetails, } from '@hoop-rush/data-contracts';
+import { loadManifest, loadPool, loadEraSimulationProfile, loadOpponentBracket, loadPlayersIndex, loadRosterDetails, parseEraSimulationProfile, parseOpponentBracket, parsePlayersIndex, parseRosterDetails, type HoopRushManifest, type FranchiseEraPool, type PoolIndexEntry, type SimProfileIndexEntry, type OpponentIndexEntry, type EraSimulationProfile, type OpponentBracket, type PlayersIndex, type RosterDetails, } from '@hoop-rush/data-contracts';
 import { resolveAssetUrl } from './asset-url';
 import { readCachedAsset, readCachedPool, writeCachedAsset, writeCachedPool } from './pool-cache';
 let manifestPromise: Promise<HoopRushManifest> | null = null;
@@ -101,7 +101,7 @@ export function getEraSimulationProfile(entry: SimProfileIndexEntry): Promise<Er
     const key = entry.eraId;
     let promise = profileCache.get(key);
     if (!promise) {
-        promise = loadEraSimulationProfile(resolveAssetUrl(entry.url), entry.contentHash).catch((error: unknown) => retryWithFreshManifest(error, entry.contentHash, (manifest) => manifest.eraSimulationProfiles.find((p) => p.eraId === entry.eraId) ?? null, (url, contentHash) => loadEraSimulationProfile(cacheBustedUrl(resolveAssetUrl(url)), contentHash)));
+        promise = loadProfileFor(entry);
         profileCache.set(key, promise);
         promise.catch(() => {
             profileCache.delete(key);
@@ -109,18 +109,48 @@ export function getEraSimulationProfile(entry: SimProfileIndexEntry): Promise<Er
     }
     return promise;
 }
+async function loadProfileFor(entry: SimProfileIndexEntry): Promise<EraSimulationProfile> {
+    const cached = await readCachedAsset(entry.contentHash, parseEraSimulationProfile);
+    if (cached !== null)
+        return cached;
+    const load = (url: string, contentHash: string, bustCache = false) => loadEraSimulationProfile(bustCache ? cacheBustedUrl(resolveAssetUrl(url)) : resolveAssetUrl(url), contentHash).then((profile) => {
+        void writeCachedAsset(contentHash, profile);
+        return profile;
+    });
+    try {
+        return await load(entry.url, entry.contentHash);
+    }
+    catch (error: unknown) {
+        return retryWithFreshManifest(error, entry.contentHash, (manifest) => manifest.eraSimulationProfiles.find((p) => p.eraId === entry.eraId) ?? null, (url, contentHash) => load(url, contentHash, true));
+    }
+}
 const bracketCache = new Map<string, Promise<OpponentBracket>>();
 export function getBracket(entry: OpponentIndexEntry): Promise<OpponentBracket> {
     const key = entry.url;
     let promise = bracketCache.get(key);
     if (!promise) {
-        promise = loadOpponentBracket(resolveAssetUrl(entry.url), entry.contentHash).catch((error: unknown) => retryWithFreshManifest(error, entry.contentHash, (manifest) => manifest.bracket ?? null, (url, contentHash) => loadOpponentBracket(cacheBustedUrl(resolveAssetUrl(url)), contentHash)));
+        promise = loadBracketFor(entry);
         bracketCache.set(key, promise);
         promise.catch(() => {
             bracketCache.delete(key);
         });
     }
     return promise;
+}
+async function loadBracketFor(entry: OpponentIndexEntry): Promise<OpponentBracket> {
+    const cached = await readCachedAsset(entry.contentHash, parseOpponentBracket);
+    if (cached !== null)
+        return cached;
+    const load = (url: string, contentHash: string, bustCache = false) => loadOpponentBracket(bustCache ? cacheBustedUrl(resolveAssetUrl(url)) : resolveAssetUrl(url), contentHash).then((bracket) => {
+        void writeCachedAsset(contentHash, bracket);
+        return bracket;
+    });
+    try {
+        return await load(entry.url, entry.contentHash);
+    }
+    catch (error: unknown) {
+        return retryWithFreshManifest(error, entry.contentHash, (manifest) => manifest.bracket ?? null, (url, contentHash) => load(url, contentHash, true));
+    }
 }
 let playersIndexPromise: Promise<PlayersIndex> | null = null;
 export function getPlayersIndex(): Promise<PlayersIndex> {

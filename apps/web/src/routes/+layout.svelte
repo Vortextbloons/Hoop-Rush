@@ -45,6 +45,8 @@ function warmForRoster(itemId: string): void {
         class="h-9 w-9 rounded-lg object-contain"
         width="36"
         height="36"
+        fetchpriority="high"
+        decoding="async"
       />
       <span class="font-display text-2xl font-extrabold tracking-tight">
         Hoop <span class="text-primary">Rush</span>

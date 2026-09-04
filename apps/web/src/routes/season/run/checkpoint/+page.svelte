@@ -111,10 +111,36 @@ $effect(() => {
 });
 const humanGames = $derived(blockSummaries.filter((summary) => summary.homeFranchiseId === humanFranchiseId ||
     summary.awayFranchiseId === humanFranchiseId));
+function summariesDigest(summaries: readonly SeasonGameSummary[]): string {
+    let hash = 2166136261;
+    for (const summary of summaries) {
+        const id = summary.gameId;
+        for (let i = 0; i < id.length; i += 1)
+            hash = Math.imul(hash ^ id.charCodeAt(i), 16777619);
+        hash = Math.imul(hash ^ summary.homeScore, 16777619);
+        hash = Math.imul(hash ^ summary.awayScore, 16777619);
+    }
+    return `${String(summaries.length)}:${String(hash >>> 0)}`;
+}
+const recapCache = new Map<string, ReturnType<typeof deriveBlockRecap>>();
+function memoizedRecap(input: Parameters<typeof deriveBlockRecap>[0]): ReturnType<typeof deriveBlockRecap> {
+    const key = `${input.runId}:${String(input.blockIndex)}:${String(input.completedRounds)}:${summariesDigest(input.blockSummaries)}:${summariesDigest(input.allSummaries)}:${input.humanFranchiseId}:${input.run.stateRevision}`;
+    const hit = recapCache.get(key);
+    if (hit !== undefined)
+        return hit;
+    const computed = deriveBlockRecap(input);
+    recapCache.set(key, computed);
+    if (recapCache.size > 4) {
+        const oldest = recapCache.keys().next().value;
+        if (oldest !== undefined)
+            recapCache.delete(oldest);
+    }
+    return computed;
+}
 const recap = $derived.by(() => {
     if (!run || !humanFranchiseId || !acceptedBlock || !shell.snapshot)
         return null;
-    return deriveBlockRecap({
+    return memoizedRecap({
         runId: run.runId,
         blockIndex: acceptedBlock.blockIndex,
         completedRounds: acceptedBlock.completedRounds,

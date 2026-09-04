@@ -186,7 +186,7 @@ function viewMatchStats() {
 </script>
 
 <div
-  class="overflow-hidden rounded-2xl border border-primary/25 bg-card shadow-[0_0_40px_hsl(13_100%_62%/0.12)]"
+  class="rounded-2xl border border-primary/25 bg-card shadow-[0_0_40px_hsl(13_100%_62%/0.12)]"
 >
   <div class="border-b border-border/60 px-4 py-6 text-center sm:px-8 sm:py-8">
     <div
@@ -897,10 +897,10 @@ function viewMatchStats() {
             </tbody>
           </table>
         </div>
-        <div class="mt-4 grid gap-2 sm:hidden">
+        <div class="mt-4 grid min-w-0 gap-2 sm:hidden">
           {#each statsRows as row, i (i)}
             {@const line = row ? statsLines.get(row.playerId) : undefined}
-            <article class="rounded-lg border border-border bg-surface-1 p-3">
+            <article class="min-w-0 rounded-lg border border-border bg-surface-1 px-4 py-3">
               <div class="flex items-start gap-3">
                 {#if row}
                   <PlayerFace
@@ -911,8 +911,8 @@ function viewMatchStats() {
                   />
                 {/if}
                 <div class="min-w-0 flex-1">
-                  <div class="flex items-start justify-between gap-2">
-                    <div class="min-w-0">
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0 flex-1">
                       <p class="truncate text-sm font-bold">
                         {row?.displayName ?? `Slot ${i + 1}`}
                       </p>
@@ -929,53 +929,63 @@ function viewMatchStats() {
                 </div>
               </div>
               {#if line}
-                <table class="mt-3 w-full text-xs">
-                  <tbody class="font-mono tabular-nums">
-                    <tr class="border-b border-border/40">
-                      <td class="py-1.5 pr-2 text-muted-foreground">MIN</td>
-                      <td class="py-1.5 text-right font-semibold text-foreground"
-                        >{statValue(line.minutes, line.games)}</td
+                <div class="mt-3 grid min-w-0 grid-cols-2 gap-x-4 text-xs font-mono tabular-nums">
+                  <div class="min-w-0 divide-y divide-border/40">
+                    <div class="flex items-center justify-between gap-2 py-1.5">
+                      <span class="text-muted-foreground">MIN</span>
+                      <span class="font-semibold text-foreground"
+                        >{statValue(line.minutes, line.games)}</span
                       >
-                      <td class="py-1.5 pr-2 pl-3 text-muted-foreground">REB</td>
-                      <td class="py-1.5 text-right font-semibold text-foreground"
-                        >{statValue(line.rebounds, line.games)}</td
+                    </div>
+                    <div class="flex items-center justify-between gap-2 py-1.5">
+                      <span class="text-muted-foreground">FG%</span>
+                      <span class="font-semibold text-foreground"
+                        >{pctStr(line.fieldGoalsMade, line.fieldGoalsAttempted)}</span
                       >
-                    </tr>
-                    <tr class="border-b border-border/40">
-                      <td class="py-1.5 pr-2 text-muted-foreground">FG%</td>
-                      <td class="py-1.5 text-right font-semibold text-foreground"
-                        >{pctStr(line.fieldGoalsMade, line.fieldGoalsAttempted)}</td
+                    </div>
+                    <div class="flex items-center justify-between gap-2 py-1.5">
+                      <span class="text-muted-foreground">3P%</span>
+                      <span class="font-semibold text-foreground"
+                        >{pctStr(line.threesMade, line.threesAttempted)}</span
                       >
-                      <td class="py-1.5 pr-2 pl-3 text-muted-foreground">AST</td>
-                      <td class="py-1.5 text-right font-semibold text-foreground"
-                        >{statValue(line.assists, line.games)}</td
+                    </div>
+                    <div class="flex items-center justify-between gap-2 py-1.5">
+                      <span class="text-muted-foreground">FT%</span>
+                      <span class="font-semibold text-foreground"
+                        >{pctStr(line.freeThrowsMade, line.freeThrowsAttempted)}</span
                       >
-                    </tr>
-                    <tr class="border-b border-border/40">
-                      <td class="py-1.5 pr-2 text-muted-foreground">3P%</td>
-                      <td class="py-1.5 text-right font-semibold text-foreground"
-                        >{pctStr(line.threesMade, line.threesAttempted)}</td
+                    </div>
+                  </div>
+                  <div class="min-w-0 divide-y divide-border/40">
+                    <div class="flex items-center justify-between gap-2 py-1.5">
+                      <span class="text-muted-foreground">REB</span>
+                      <span class="font-semibold text-foreground"
+                        >{statValue(line.rebounds, line.games)}</span
                       >
-                      <td class="py-1.5 pr-2 pl-3 text-muted-foreground">STL</td>
-                      <td class="py-1.5 text-right font-semibold text-foreground"
-                        >{statValue(line.steals, line.games)}</td
+                    </div>
+                    <div class="flex items-center justify-between gap-2 py-1.5">
+                      <span class="text-muted-foreground">AST</span>
+                      <span class="font-semibold text-foreground"
+                        >{statValue(line.assists, line.games)}</span
                       >
-                    </tr>
-                    <tr>
-                      <td class="py-1.5 pr-2 text-muted-foreground">FT%</td>
-                      <td class="py-1.5 text-right font-semibold text-foreground"
-                        >{pctStr(line.freeThrowsMade, line.freeThrowsAttempted)}</td
+                    </div>
+                    <div class="flex items-center justify-between gap-2 py-1.5">
+                      <span class="text-muted-foreground">STL</span>
+                      <span class="font-semibold text-foreground"
+                        >{statValue(line.steals, line.games)}</span
                       >
-                      <td class="py-1.5 pr-2 pl-3 text-muted-foreground">BLK / TOV</td>
-                      <td class="py-1.5 text-right font-semibold text-foreground">
+                    </div>
+                    <div class="flex items-center justify-between gap-2 py-1.5">
+                      <span class="text-muted-foreground">BLK / TOV</span>
+                      <span class="font-semibold text-foreground">
                         {statValue(line.blocks, line.games)} / {statValue(
                           line.turnovers,
                           line.games,
                         )}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+                      </span>
+                    </div>
+                  </div>
+                </div>
               {/if}
             </article>
           {/each}

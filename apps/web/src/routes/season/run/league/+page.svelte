@@ -2,7 +2,7 @@
 import { SvelteMap } from 'svelte/reactivity';
 import { resolve } from '$app/paths';
 import type { RouteId } from '$app/types';
-import type { SeasonTeamAggregate } from '@hoop-rush/data-contracts';
+import type { SeasonGameSummary, SeasonTeamAggregate } from '@hoop-rush/data-contracts';
 import StandingsTable from '$lib/components/season/StandingsTable.svelte';
 import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
 import TiebreakExplanations from '$lib/components/season/TiebreakExplanations.svelte';
@@ -12,6 +12,61 @@ import { postseasonRankingsOf, rankedEntriesOf, } from '$lib/season/season-posts
 import { franchiseIdentityOf } from '$lib/season/season-branding';
 import { oneDecimal } from '$lib/format';
 const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
+const foldWeak = new WeakMap<readonly SeasonGameSummary[], ReturnType<typeof foldSeasonAggregates>>();
+const foldByDigest = new Map<string, ReturnType<typeof foldSeasonAggregates>>();
+function summariesDigest(summaries: readonly SeasonGameSummary[]): string {
+    let hash = 2166136261;
+    for (const summary of summaries) {
+        const id = summary.gameId;
+        for (let i = 0; i < id.length; i += 1)
+            hash = Math.imul(hash ^ id.charCodeAt(i), 16777619);
+        hash = Math.imul(hash ^ summary.homeScore, 16777619);
+        hash = Math.imul(hash ^ summary.awayScore, 16777619);
+    }
+    return `${String(summaries.length)}:${String(hash >>> 0)}`;
+}
+function memoizedFold(summaries: readonly SeasonGameSummary[]): ReturnType<typeof foldSeasonAggregates> {
+    const weakHit = foldWeak.get(summaries);
+    if (weakHit !== undefined)
+        return weakHit;
+    const digest = summariesDigest(summaries);
+    const digestHit = foldByDigest.get(digest);
+    if (digestHit !== undefined) {
+        foldWeak.set(summaries, digestHit);
+        return digestHit;
+    }
+    const folded = foldSeasonAggregates(summaries);
+    foldWeak.set(summaries, folded);
+    foldByDigest.set(digest, folded);
+    if (foldByDigest.size > 4) {
+        const oldest = foldByDigest.keys().next().value;
+        if (oldest !== undefined)
+            foldByDigest.delete(oldest);
+    }
+    return folded;
+}
+const streaksWeak = new WeakMap<readonly SeasonGameSummary[], Map<string, { kind: 'wins' | 'losses'; length: number } | null>>();
+const streaksByDigest = new Map<string, Map<string, { kind: 'wins' | 'losses'; length: number } | null>>();
+function memoizedStreaks(summaries: readonly SeasonGameSummary[], franchiseIds: readonly string[]): Map<string, { kind: 'wins' | 'losses'; length: number } | null> {
+    const weakHit = streaksWeak.get(summaries);
+    if (weakHit !== undefined && weakHit.size === franchiseIds.length)
+        return weakHit;
+    const digest = `${summariesDigest(summaries)}:${franchiseIds.join(',')}`;
+    const digestHit = streaksByDigest.get(digest);
+    if (digestHit !== undefined) {
+        streaksWeak.set(summaries, digestHit);
+        return digestHit;
+    }
+    const computed = franchiseStreaks(summaries, franchiseIds);
+    streaksWeak.set(summaries, computed);
+    streaksByDigest.set(digest, computed);
+    if (streaksByDigest.size > 4) {
+        const oldest = streaksByDigest.keys().next().value;
+        if (oldest !== undefined)
+            streaksByDigest.delete(oldest);
+    }
+    return computed;
+}
 type LeagueView = 'standings' | 'stats';
 let view = $state<LeagueView>('standings');
 let conference = $state<'east' | 'west'>(shell.humanTeam?.conference === 'west' ? 'west' : 'east');
@@ -30,13 +85,13 @@ const tiebreakResolutions = $derived.by(() => {
 const streaksByFranchise = $derived.by(() => {
     const summaries = shell.snapshot?.summaries ?? [];
     const rows = shell.run?.standings.rows ?? [];
-    return new SvelteMap(franchiseStreaks(summaries, rows.map((row) => row.franchiseId)));
+    return new SvelteMap(memoizedStreaks(summaries, rows.map((row) => row.franchiseId)));
 });
 const streakOf = (franchiseId: string): {
     kind: 'wins' | 'losses';
     length: number;
 } | null => streaksByFranchise.get(franchiseId) ?? null;
-const aggregates = $derived(shell.snapshot ? foldSeasonAggregates(shell.snapshot.summaries) : null);
+const aggregates = $derived(shell.snapshot ? memoizedFold(shell.snapshot.summaries) : null);
 const teamStats = $derived.by(() => {
     if (!aggregates || !standings)
         return [];

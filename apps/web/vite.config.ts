@@ -43,6 +43,18 @@ export default defineConfig({
       'dexie',
     ],
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/@supabase/')) return 'vendor-supabase';
+          if (id.includes('node_modules/bits-ui')) return 'vendor-bits-ui';
+          if (id.includes('node_modules/dexie')) return 'vendor-dexie';
+          if (id.includes('node_modules/@lucide/')) return 'vendor-lucide';
+        },
+      },
+    },
+  },
   server: {
     host: true,
     port: 5173,

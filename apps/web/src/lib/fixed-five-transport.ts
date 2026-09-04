@@ -1,13 +1,20 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { commandIdSchema, createInMemoryFixedFiveTransport, fixedFiveCommandPayloadSchema, fixedFiveCommandSchema, fixedFiveRoomCodeSchema, fixedFiveRoomPhaseSchema, fixedFiveRoomSettingsSchema, fixedFiveRoomSnapshotSchema, idSchema, type FixedFiveCommandReceipt, type FixedFiveMemberSnapshot, type FixedFiveMultiplayerTransport, type FixedFiveParticipantId, type FixedFiveRoomCode, type FixedFiveRoomSettings, type FixedFiveRoomSnapshot, type Id, } from '@hoop-rush/data-contracts';
 import { randomUUID } from '$lib/random-id';
 type FixedFiveClient = SupabaseClient;
 const sharedClients = new Map<string, FixedFiveClient>();
-function supabaseClient(url: string, publishableKey: string, storageKey?: string): FixedFiveClient {
+let supabaseModulePromise: Promise<typeof import('@supabase/supabase-js')> | null = null;
+function loadSupabaseModule(): Promise<typeof import('@supabase/supabase-js')> {
+    if (!supabaseModulePromise)
+        supabaseModulePromise = import('@supabase/supabase-js');
+    return supabaseModulePromise;
+}
+async function supabaseClient(url: string, publishableKey: string, storageKey?: string): Promise<FixedFiveClient> {
     const key = `${url}${publishableKey}${storageKey ?? ''}`;
     const existing = sharedClients.get(key);
     if (existing)
         return existing;
+    const { createClient } = await loadSupabaseModule();
     const client = createClient(url, publishableKey, {
         auth: {
             persistSession: true,
@@ -151,7 +158,15 @@ export function createFixedFiveTransport(options?: {
     if (!options?.url || !options.publishableKey) {
         return createInMemoryFixedFiveTransport();
     }
-    const client: FixedFiveClient = supabaseClient(options.url, options.publishableKey, options.storageKey);
+    let clientPromise: Promise<FixedFiveClient> | null = null;
+    const transportUrl = options.url;
+    const transportPublishableKey = options.publishableKey;
+    const transportStorageKey = options.storageKey;
+    function getClient(): Promise<FixedFiveClient> {
+        if (!clientPromise)
+            clientPromise = supabaseClient(transportUrl, transportPublishableKey, transportStorageKey);
+        return clientPromise;
+    }
     const rooms = new Map<string, {
         handlers: Set<(snapshot: FixedFiveRoomSnapshot) => void>;
         channel: ReturnType<FixedFiveClient['channel']> | null;
@@ -233,6 +248,7 @@ export function createFixedFiveTransport(options?: {
         });
     }
     async function fetchSnapshot(roomId: string): Promise<FixedFiveRoomSnapshot> {
+        const client = await getClient();
         const roomResponse = await client
             .from('fixed_five_rooms')
             .select('id, code, code_active, mode, source_mode, variant, versions, phase, revision, command_count, digest, result_digest, confirmed_digest, successor_room_id, root_seed, deadline_at, deadline_cursor, deadline_participant, deadline_fallback, deadline_pick_ordinal, expires_at, created_at')
@@ -272,6 +288,7 @@ export function createFixedFiveTransport(options?: {
     }
     return {
         async create(settingsInput) {
+            const client = await getClient();
             await ensureAnonymous(client);
             const settings: FixedFiveRoomSettings = {
                 schemaVersion: 1,
@@ -300,6 +317,7 @@ export function createFixedFiveTransport(options?: {
             };
         },
         async preview(code) {
+            const client = await getClient();
             await ensureAnonymous(client);
             const response = await client.rpc('fixed_five_room_preview', { p_code: code });
             if (response.error || !response.data)
@@ -335,6 +353,7 @@ export function createFixedFiveTransport(options?: {
             };
         },
         async join(code) {
+            const client = await getClient();
             await ensureAnonymous(client);
             const response = await client.rpc('fixed_five_room_join', { p_code: code });
             if (response.error || !response.data)
@@ -349,6 +368,7 @@ export function createFixedFiveTransport(options?: {
             };
         },
         async resume(roomId) {
+            const client = await getClient();
             await ensureAnonymous(client);
             const snapshot = await fetchSnapshot(roomId);
             const user = await client.auth.getUser();
@@ -392,21 +412,27 @@ export function createFixedFiveTransport(options?: {
             }
             record.handlers.add(handler);
             if (!record.channel) {
-                const channel = client
-                    .channel(`fixed-five-room-${roomId}`)
-                    .on('postgres_changes', { event: '*', schema: 'public', table: 'fixed_five_rooms', filter: `id=eq.${roomId}` }, () => {
-                    void refresh(roomId);
-                })
-                    .on('postgres_changes', {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'fixed_five_room_commands',
-                    filter: `room_id=eq.${roomId}`,
-                }, () => {
-                    void refresh(roomId);
-                })
-                    .subscribe();
-                record.channel = channel;
+                const target = record;
+                void getClient().then((resolved) => {
+                    const current = rooms.get(roomId);
+                    if (!current || current !== target || current.channel || current.handlers.size === 0)
+                        return;
+                    const channel = resolved
+                        .channel(`fixed-five-room-${roomId}`)
+                        .on('postgres_changes', { event: '*', schema: 'public', table: 'fixed_five_rooms', filter: `id=eq.${roomId}` }, () => {
+                        void refresh(roomId);
+                    })
+                        .on('postgres_changes', {
+                        event: 'INSERT',
+                        schema: 'public',
+                        table: 'fixed_five_room_commands',
+                        filter: `room_id=eq.${roomId}`,
+                    }, () => {
+                        void refresh(roomId);
+                    })
+                        .subscribe();
+                    current.channel = channel;
+                }).catch(() => { });
             }
             return {
                 unsubscribe: () => {
@@ -420,7 +446,7 @@ export function createFixedFiveTransport(options?: {
                         rooms.delete(roomId);
                         if (channel) {
                             void channel.unsubscribe().then(() => {
-                                void client.removeChannel(channel);
+                                void getClient().then((resolved) => resolved.removeChannel(channel)).catch(() => { });
                             });
                         }
                     }
@@ -428,6 +454,7 @@ export function createFixedFiveTransport(options?: {
             };
         },
         async refetch(roomId, afterOrdinal) {
+            const client = await getClient();
             await ensureAnonymous(client);
             const parsedRoomId = idSchema.parse(roomId);
             const response = await client
@@ -449,6 +476,7 @@ export function createFixedFiveTransport(options?: {
             }));
         },
         async submitCommand(command) {
+            const client = await getClient();
             await ensureAnonymous(client);
             const commandId = command.commandId || commandIdSchema.parse(randomUUID());
             const withRevision = command as unknown as {
@@ -476,6 +504,7 @@ export function createFixedFiveTransport(options?: {
             return receipt;
         },
         async resolveTimeout(roomId) {
+            const client = await getClient();
             await ensureAnonymous(client);
             const response = await client.rpc('fixed_five_timeout_resolve', { p_room_id: roomId });
             if (response.error || !response.data)
@@ -496,6 +525,7 @@ export function createFixedFiveTransport(options?: {
             };
         },
         async removeGuest(roomId, targetParticipantId) {
+            const client = await getClient();
             await ensureAnonymous(client);
             const response = await client.rpc('fixed_five_guest_remove', {
                 p_room_id: roomId,
@@ -506,12 +536,14 @@ export function createFixedFiveTransport(options?: {
             return fetchSnapshot(roomId);
         },
         async leave(roomId) {
+            const client = await getClient();
             await ensureAnonymous(client);
             const response = await client.rpc('fixed_five_leave', { p_room_id: roomId });
             if (response.error)
                 throw new Error(`leave failed: ${response.error.message}`);
         },
         async rematch(roomId) {
+            const client = await getClient();
             await ensureAnonymous(client);
             const response = await client.rpc('fixed_five_rematch', { p_room_id: roomId });
             if (response.error || !response.data)
@@ -523,6 +555,7 @@ export function createFixedFiveTransport(options?: {
             return { snapshot, code: payload.code };
         },
         async complete(roomId, resultDigest) {
+            const client = await getClient();
             await ensureAnonymous(client);
             const response = await client.rpc('fixed_five_complete', {
                 p_room_id: roomId,
@@ -535,6 +568,7 @@ export function createFixedFiveTransport(options?: {
             return { completed: record['completed'] === true, phase };
         },
         async fail(roomId) {
+            const client = await getClient();
             await ensureAnonymous(client);
             const response = await client.rpc('fixed_five_fail', { p_room_id: roomId });
             if (response.error || !response.data)

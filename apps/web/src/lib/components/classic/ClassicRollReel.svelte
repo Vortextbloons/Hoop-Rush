@@ -593,7 +593,7 @@ $effect(() => {
       color-mix(in srgb, var(--color-court-rim) 2%, transparent) 70%
     );
     box-shadow: 0 0 34px color-mix(in srgb, var(--color-court-rim) 25%, transparent);
-    padding: 0 16px;
+    padding: 12px 16px;
     animation: roll-result-in 260ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
   }
 
@@ -606,20 +606,28 @@ $effect(() => {
     min-width: 0;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
+    gap: 2px;
     text-align: center;
   }
 
   .roll-result .reel-franchise-text {
     align-items: center;
+    flex: 0 1 auto;
+    gap: 1px;
+    transform: translateY(-3px);
   }
 
   .roll-result .reel-abbrev {
     font-size: 10px;
     color: rgba(255, 255, 255, 0.9);
+    line-height: 1;
   }
 
   .roll-result .reel-name {
     font-size: 18px;
+    line-height: 1.1;
+    transform: translateY(-2px);
   }
 
   .roll-result .reel-era-label {
@@ -775,9 +783,14 @@ $effect(() => {
       height: 1px;
     }
 
+    .roll-result .reel-franchise-text {
+      transform: translateY(-2px);
+    }
+
     .roll-result .reel-name {
       font-size: 15px;
       text-align: center;
+      transform: translateY(-1px);
     }
 
     .roll-result .reel-era-label {
