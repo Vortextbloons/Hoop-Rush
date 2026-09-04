@@ -35,7 +35,11 @@ describe('generateSchedule (spec/01 fixed schedule)', () => {
   });
   it('avoids immediate repeats in every generated schedule', () => {
     for (const seed of ['a'.repeat(32), 'b'.repeat(32), 'c'.repeat(32), 'd'.repeat(32)]) {
-      const schedule = generateSchedule(opponentIds(), 'lakers-1990s-opening', seedSchema.parse(seed));
+      const schedule = generateSchedule(
+        opponentIds(),
+        'lakers-1990s-opening',
+        seedSchema.parse(seed),
+      );
       for (let i = 1; i < schedule.length; i += 1) {
         expect(schedule[i]?.opponentId).not.toBe(schedule[i - 1]?.opponentId);
       }
@@ -69,16 +73,24 @@ describe('generateSchedule (spec/01 fixed schedule)', () => {
   });
   it('rejects wrong-sized opponent sets', () => {
     expect(() =>
-      generateSchedule(opponentIds().slice(0, 29), 'lakers-1990s-opening', seedSchema.parse(seedFromString('x'))),
+      generateSchedule(
+        opponentIds().slice(0, 29),
+        'lakers-1990s-opening',
+        seedSchema.parse(seedFromString('x')),
+      ),
     ).toThrow(/exactly 30/);
     expect(() =>
-      generateSchedule([...opponentIds(), 'extra'], 'lakers-1990s-opening', seedSchema.parse(seedFromString('x'))),
+      generateSchedule(
+        [...opponentIds(), 'extra'],
+        'lakers-1990s-opening',
+        seedSchema.parse(seedFromString('x')),
+      ),
     ).toThrow(/exactly 30/);
   });
   it('rejects an opening opponent outside the bracket', () => {
-    expect(() => generateSchedule(opponentIds(), 'nope', seedSchema.parse(seedFromString('x')))).toThrow(
-      /not in the bracket/,
-    );
+    expect(() =>
+      generateSchedule(opponentIds(), 'nope', seedSchema.parse(seedFromString('x'))),
+    ).toThrow(/not in the bracket/);
   });
   it('the fixture bracket schedule satisfies the invariants', () => {
     const bracket = buildFixtureBracket();

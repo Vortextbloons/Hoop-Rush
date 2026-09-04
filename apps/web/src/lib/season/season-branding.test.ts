@@ -1,6 +1,11 @@
 ﻿import { describe, expect, it } from 'vitest';
 import type { PlayersIndexEntry } from '@hoop-rush/data-contracts';
-import { eraIdSchema, franchiseIdSchema, playerIdSchema, seasonKeySchema } from '@hoop-rush/data-contracts';
+import {
+  eraIdSchema,
+  franchiseIdSchema,
+  playerIdSchema,
+  seasonKeySchema,
+} from '@hoop-rush/data-contracts';
 import {
   buildVersionFaceIndex,
   catalogCandidateOfFreeAgency,

@@ -13,7 +13,12 @@ import {
 const SEED = seedSchema.parse('a1b2c3d4e5f60718293a4b5c6d7e8f9a');
 const league = buildSeasonLeague({}, { humanFranchiseId: franchiseIdSchema.parse('lakers') });
 const schedule = generateSeasonSchedule({ league, seed: SEED });
-const run = buildSeasonRunFixture({ schedule, league, seed: SEED, humanFranchiseId: franchiseIdSchema.parse('lakers') });
+const run = buildSeasonRunFixture({
+  schedule,
+  league,
+  seed: SEED,
+  humanFranchiseId: franchiseIdSchema.parse('lakers'),
+});
 function zeroRawProjection() {
   return { overall: 0, offense: 0, defense: 0 };
 }

@@ -154,7 +154,11 @@ function streaksOf(summaries: readonly SeasonGameSummary[]): SeasonStreak[] {
   }
   return [...current.entries()]
     .filter(([, streak]) => streak.length >= 2)
-    .map(([franchiseId, streak]) => ({ franchiseId: franchiseIdSchema.parse(franchiseId), kind: streak.kind, length: streak.length }))
+    .map(([franchiseId, streak]) => ({
+      franchiseId: franchiseIdSchema.parse(franchiseId),
+      kind: streak.kind,
+      length: streak.length,
+    }))
     .sort(
       (a, b) =>
         b.length - a.length ||
@@ -382,7 +386,9 @@ export function blockFreeAgencyEvidenceOf(input: {
     })),
     influenceDelta: -humanDelta,
     seasonSignings:
-      input.humanFranchiseId === null ? 0 : (freeAgency.signingCounts[franchiseIdSchema.parse(input.humanFranchiseId)] ?? 0),
+      input.humanFranchiseId === null
+        ? 0
+        : (freeAgency.signingCounts[franchiseIdSchema.parse(input.humanFranchiseId)] ?? 0),
     seasonSpend: humanDelta,
   };
 }

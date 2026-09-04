@@ -386,11 +386,7 @@ function aiDeclarationOf(
     targets,
   };
 }
-function syntheticCommandId(
-  rootSeed: string,
-  windowIndex: number,
-  franchiseId: string,
-): CommandId {
+function syntheticCommandId(rootSeed: string, windowIndex: number, franchiseId: string): CommandId {
   return commandIdSchema.parse(
     `fa-ai-${freeAgencySeed(rootSeed, String(windowIndex), 'ai', franchiseId).slice(0, 32)}`,
   );

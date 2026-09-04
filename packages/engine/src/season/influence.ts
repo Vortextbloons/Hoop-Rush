@@ -194,7 +194,9 @@ export function applySeasonInfluenceSpend(input: SeasonInfluenceSpendInput): {
   }
   const balanceAfter = balanceBefore + requestedDelta;
   const entry: SeasonInfluenceLedgerEntry = {
-    entryId: idSchema.parse(deriveSeasonInfluenceEntryId(`influence-spend-${commandId ?? 'system'}`)),
+    entryId: idSchema.parse(
+      deriveSeasonInfluenceEntryId(`influence-spend-${commandId ?? 'system'}`),
+    ),
     franchiseId: fid,
     source,
     blockIndex,

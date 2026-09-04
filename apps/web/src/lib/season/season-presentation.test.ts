@@ -6,7 +6,14 @@ import {
   type SeasonLeague,
   type SeasonStandings,
 } from '@hoop-rush/data-contracts';
-import { franchiseIdSchema, eraIdSchema, seasonKeySchema, playerIdSchema, seasonGameIdSchema, idSchema } from '@hoop-rush/data-contracts';
+import {
+  franchiseIdSchema,
+  eraIdSchema,
+  seasonKeySchema,
+  playerIdSchema,
+  seasonGameIdSchema,
+  idSchema,
+} from '@hoop-rush/data-contracts';
 import { buildSeasonLeague } from '@hoop-rush/test-fixtures';
 import {
   boxScoreFromSummary,
@@ -211,7 +218,12 @@ describe('provisionalRanking', () => {
 describe('franchiseStreak', () => {
   it('walks ordered summaries backward for the current streak', () => {
     const summaries = [
-      summary({ gameId: seasonGameIdSchema.parse('s000001'), round: 1, homeScore: 90, awayScore: 100 }),
+      summary({
+        gameId: seasonGameIdSchema.parse('s000001'),
+        round: 1,
+        homeScore: 90,
+        awayScore: 100,
+      }),
       summary({ gameId: seasonGameIdSchema.parse('s000002'), round: 2 }),
       summary({ gameId: seasonGameIdSchema.parse('s000003'), round: 3 }),
     ];
@@ -225,10 +237,20 @@ describe('franchiseStreak', () => {
 describe('franchiseStreaks', () => {
   it('matches franchiseStreak per franchise in one pass', () => {
     const summaries = [
-      summary({ gameId: seasonGameIdSchema.parse('s000001'), round: 1, homeScore: 90, awayScore: 100 }),
+      summary({
+        gameId: seasonGameIdSchema.parse('s000001'),
+        round: 1,
+        homeScore: 90,
+        awayScore: 100,
+      }),
       summary({ gameId: seasonGameIdSchema.parse('s000002'), round: 2 }),
       summary({ gameId: seasonGameIdSchema.parse('s000003'), round: 3 }),
-      summary({ gameId: seasonGameIdSchema.parse('s000004'), round: 4, homeScore: 90, awayScore: 100 }),
+      summary({
+        gameId: seasonGameIdSchema.parse('s000004'),
+        round: 4,
+        homeScore: 90,
+        awayScore: 100,
+      }),
     ];
     const franchiseIds = ['lakers', 'celtics', 'warriors', 'not-a-team'];
     const batched = franchiseStreaks(summaries, franchiseIds);
@@ -239,7 +261,12 @@ describe('franchiseStreaks', () => {
   it('handles games out of round order identically to the per-team sort', () => {
     const summaries = [
       summary({ gameId: seasonGameIdSchema.parse('s000003'), round: 3 }),
-      summary({ gameId: seasonGameIdSchema.parse('s000001'), round: 1, homeScore: 90, awayScore: 100 }),
+      summary({
+        gameId: seasonGameIdSchema.parse('s000001'),
+        round: 1,
+        homeScore: 90,
+        awayScore: 100,
+      }),
       summary({ gameId: seasonGameIdSchema.parse('s000002'), round: 2 }),
     ];
     const batched = franchiseStreaks(summaries, ['lakers', 'celtics']);
@@ -254,7 +281,9 @@ describe('franchiseStreaks', () => {
 });
 describe('foldSeasonAggregates', () => {
   it('folds team and player totals from one summary', () => {
-    const { teams, players } = foldSeasonAggregates([summary({ gameId: seasonGameIdSchema.parse('s000001'), round: 1 })]);
+    const { teams, players } = foldSeasonAggregates([
+      summary({ gameId: seasonGameIdSchema.parse('s000001'), round: 1 }),
+    ]);
     const lakers = teamAggregateOf(teams, 'lakers');
     const celtics = teamAggregateOf(teams, 'celtics');
     expect(lakers.wins).toBe(1);
@@ -310,7 +339,9 @@ describe('rebaseStandingsBefore', () => {
     celtics.conferenceLosses = 1;
     celtics.pointsFor = 104;
     celtics.pointsAgainst = 110;
-    const before = rebaseStandingsBefore(after, LEAGUE, [summary({ gameId: seasonGameIdSchema.parse('s000001'), round: 1 })]);
+    const before = rebaseStandingsBefore(after, LEAGUE, [
+      summary({ gameId: seasonGameIdSchema.parse('s000001'), round: 1 }),
+    ]);
     const beforeLakers = standingsRow(before, 'lakers');
     const beforeCeltics = standingsRow(before, 'celtics');
     expect(beforeLakers.wins).toBe(0);
@@ -339,7 +370,9 @@ describe('finalizeGameRecords + humanScheduleRows', () => {
         forfeitLoserFranchiseId: null,
       },
     ];
-    const merged = finalizeGameRecords(scheduled, [summary({ gameId: seasonGameIdSchema.parse('s000001'), round: 1 })]);
+    const merged = finalizeGameRecords(scheduled, [
+      summary({ gameId: seasonGameIdSchema.parse('s000001'), round: 1 }),
+    ]);
     const game = merged[0];
     if (game === undefined) {
       throw new Error('expected merged game records');

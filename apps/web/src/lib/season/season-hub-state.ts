@@ -901,7 +901,8 @@ export class SeasonHubState {
       runId: this.requiredRunId(),
       commandId: newSeasonId('spc'),
       targetGameId: postseasonGameIdSchema.parse(input.targetGameId),
-      humanFranchiseId: rawHumanSpectate === null ? null : franchiseIdSchema.parse(rawHumanSpectate),
+      humanFranchiseId:
+        rawHumanSpectate === null ? null : franchiseIdSchema.parse(rawHumanSpectate),
     });
   }
   async fastForwardPostseason(input?: { targetGameId?: string }): Promise<void> {

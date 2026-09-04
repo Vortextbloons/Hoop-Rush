@@ -428,7 +428,10 @@ export function seasonBlockRejection(
     }
     const reasons = validateSeasonRotation(rotation, memberPlayable);
     if (reasons.length > 0) {
-      franchiseFailures.push({ franchiseId: franchiseIdSchema.parse(rotation.franchiseId), reasons });
+      franchiseFailures.push({
+        franchiseId: franchiseIdSchema.parse(rotation.franchiseId),
+        reasons,
+      });
     }
   }
   if (franchiseFailures.length > 0) {
@@ -1797,7 +1800,9 @@ export function auditSeasonBlock(
       failures.push(`injury ${record.injuryId} references a franchise outside the league`);
     }
     const parsedGameId = seasonGameIdSchema.safeParse(record.gameId);
-    const occurrenceRound = parsedGameId.success ? scheduleRoundById.get(parsedGameId.data) : undefined;
+    const occurrenceRound = parsedGameId.success
+      ? scheduleRoundById.get(parsedGameId.data)
+      : undefined;
     if (occurrenceRound === undefined) {
       failures.push(`injury ${record.injuryId} references an unscheduled game ${record.gameId}`);
     } else if (occurrenceRound > candidate.completedRounds) {

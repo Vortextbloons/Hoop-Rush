@@ -12,7 +12,12 @@ import type {
   SimulationTeam,
   SimulationTendencies,
 } from '@hoop-rush/data-contracts';
-import { franchiseIdSchema, opponentBracketSchema, playerIdSchema, seasonKeySchema } from '@hoop-rush/data-contracts';
+import {
+  franchiseIdSchema,
+  opponentBracketSchema,
+  playerIdSchema,
+  seasonKeySchema,
+} from '@hoop-rush/data-contracts';
 import type { EngineContext } from '../sim/context.ts';
 import { createRng, shuffle } from '../sim/rng.ts';
 import { validateBracketContent } from '../challenge/commands.ts';

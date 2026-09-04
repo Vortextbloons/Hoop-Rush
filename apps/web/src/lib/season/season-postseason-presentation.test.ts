@@ -7,7 +7,13 @@ import {
   type SeasonPostseasonState,
   type SeasonRun,
 } from '@hoop-rush/data-contracts';
-import { franchiseIdSchema, commandIdSchema, seedSchema, seasonGameIdSchema, idSchema } from '@hoop-rush/data-contracts';
+import {
+  franchiseIdSchema,
+  commandIdSchema,
+  seedSchema,
+  seasonGameIdSchema,
+  idSchema,
+} from '@hoop-rush/data-contracts';
 import {
   awardsViewModel,
   bracketColumnsOf,
@@ -30,7 +36,12 @@ const SEED = seedSchema.parse('a1b2c3d4e5f60718293a4b5c6d7e8f9a');
 function fixtureRun(): SeasonRun {
   const league = buildSeasonLeague({}, { humanFranchiseId: franchiseIdSchema.parse('lakers') });
   const schedule = generateSeasonSchedule({ league, seed: SEED });
-  return buildSeasonRunFixture({ schedule, league, seed: SEED, humanFranchiseId: franchiseIdSchema.parse('lakers') });
+  return buildSeasonRunFixture({
+    schedule,
+    league,
+    seed: SEED,
+    humanFranchiseId: franchiseIdSchema.parse('lakers'),
+  });
 }
 function series(
   seriesId: string,
@@ -345,11 +356,11 @@ describe('bracket columns', () => {
   });
   it('exposes only the play-in column before the bracket exists', () => {
     const state = buildInitialPostseasonState(SEED);
-    state.playIn.east.ranking = ['e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7', 'e8', 'e9', 'e10'].map((id) =>
-      franchiseIdSchema.parse(id),
+    state.playIn.east.ranking = ['e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7', 'e8', 'e9', 'e10'].map(
+      (id) => franchiseIdSchema.parse(id),
     );
-    state.playIn.west.ranking = ['w1', 'w2', 'w3', 'w4', 'w5', 'w6', 'w7', 'w8', 'w9', 'w10'].map((id) =>
-      franchiseIdSchema.parse(id),
+    state.playIn.west.ranking = ['w1', 'w2', 'w3', 'w4', 'w5', 'w6', 'w7', 'w8', 'w9', 'w10'].map(
+      (id) => franchiseIdSchema.parse(id),
     );
     const columns = bracketColumnsOf(state, 'lakers');
     expect(columns).toHaveLength(1);
@@ -488,7 +499,10 @@ describe('awards view model', () => {
         awardsVersion: 'awards-v1',
         runId: idSchema.parse('run-1'),
         mvp: { playerVersionId: 'pv-a', franchiseId: franchiseIdSchema.parse('f-a') },
-        defensivePlayerOfYear: { playerVersionId: 'pv-b', franchiseId: franchiseIdSchema.parse('f-b') },
+        defensivePlayerOfYear: {
+          playerVersionId: 'pv-b',
+          franchiseId: franchiseIdSchema.parse('f-b'),
+        },
         sixthManOfYear: { playerVersionId: 'pv-c', franchiseId: franchiseIdSchema.parse('f-c') },
         allLeagueFirstTeam: [
           { playerVersionId: 'pv-1', franchiseId: franchiseIdSchema.parse('f-1') },

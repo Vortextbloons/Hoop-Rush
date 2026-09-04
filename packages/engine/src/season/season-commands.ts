@@ -927,11 +927,7 @@ function handleEvolveGmCampaign(
     return rejectedEvolveGmCampaign(command, { code: 'campaign-identity-required' }, run);
   }
   if (campaign.evolutionSelection !== null) {
-    return rejectedEvolveGmCampaign(
-      command,
-      { code: 'campaign-evolution-already-selected' },
-      run,
-    );
+    return rejectedEvolveGmCampaign(command, { code: 'campaign-evolution-already-selected' }, run);
   }
   if (
     !campaign.evolutionOffers ||
@@ -3142,7 +3138,10 @@ export function handleSeasonRunCommand(
       return handlePurchaseTradeInquiry(command, context);
     default: {
       const exhaustive: never = command;
-      return assertNever(exhaustive, `unknown season run command ${JSON.stringify(command).slice(0, 128)}`);
+      return assertNever(
+        exhaustive,
+        `unknown season run command ${JSON.stringify(command).slice(0, 128)}`,
+      );
     }
   }
 }

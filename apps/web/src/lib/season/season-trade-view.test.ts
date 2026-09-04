@@ -1,6 +1,11 @@
 ﻿import { describe, expect, it } from 'vitest';
 import type { SeasonRun, SeasonTradeOffer, SeasonTradeState } from '@hoop-rush/data-contracts';
-import { franchiseIdSchema, eraIdSchema, seasonKeySchema, playerIdSchema } from '@hoop-rush/data-contracts';
+import {
+  franchiseIdSchema,
+  eraIdSchema,
+  seasonKeySchema,
+  playerIdSchema,
+} from '@hoop-rush/data-contracts';
 import {
   humanTradeOffersOf,
   openWindowOf,

@@ -100,7 +100,11 @@ export function assignLineup(
         if (assigned === undefined) {
           throw new Error(`lineup: missing player ${playerId}`);
         }
-        return { slotIndex, playerId: playerIdSchema.parse(playerId), positions: assigned.positions };
+        return {
+          slotIndex,
+          playerId: playerIdSchema.parse(playerId),
+          positions: assigned.positions,
+        };
       });
     }
     const player = players[index];

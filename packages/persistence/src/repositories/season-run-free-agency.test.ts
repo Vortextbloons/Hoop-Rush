@@ -920,7 +920,10 @@ describe('season run free-agency persistence (M2.6.5)', () => {
       pending: null,
     });
     expect(await db.seasonCommandLog.where('runId').equals(run.runId).count()).toBe(1);
-    const secondRun = { ...sharedDataset.run, runId: idSchema.parse('replacement-free-agency-run') };
+    const secondRun = {
+      ...sharedDataset.run,
+      runId: idSchema.parse('replacement-free-agency-run'),
+    };
     await repo.promoteSeasonDraftToRun(buildFixtureStoredDraft(secondRun), secondRun);
     expect(await db.seasonRuns.count()).toBe(1);
     const row = await db.seasonRuns.get(SEASON_RUN_RECORD_ID);

@@ -161,8 +161,8 @@ describe('Season Run performance pass (dexie v9)', () => {
             fouls: 18,
             possessions: 96,
           },
-        awayBox: {
-          franchiseId: 'celtics',
+          awayBox: {
+            franchiseId: 'celtics',
             points: 90,
             fieldGoalsMade: 36,
             fieldGoalsAttempted: 84,
@@ -436,8 +436,7 @@ describe('Season Run performance pass (dexie v9)', () => {
         {
           injuryId: 'inj-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
           playerVersionId: run.rosters[0]?.players[0]?.playerVersionId ?? 'pv-x',
-          franchiseId:
-            run.rosters[0]?.franchiseId ?? franchiseIdSchema.parse('lakers'),
+          franchiseId: run.rosters[0]?.franchiseId ?? franchiseIdSchema.parse('lakers'),
           gameId: seasonGameIdSchema.parse('s000001'),
           type: 'soft-tissue',
           severity: 'moderate',

@@ -49,7 +49,11 @@ function newAccumulator(): PairAccumulator {
     shotQuality: 0,
   };
 }
-function seedFor(args: { playerId: string; context: string; index: number }): import('@hoop-rush/data-contracts').Seed {
+function seedFor(args: {
+  playerId: string;
+  context: string;
+  index: number;
+}): import('@hoop-rush/data-contracts').Seed {
   return fixtureSeed(`${RATINGS_VERSION}|${args.playerId}|${args.context}`, args.index);
 }
 export function calibrationConfidence(samples: number, confidenceTarget: number): number {

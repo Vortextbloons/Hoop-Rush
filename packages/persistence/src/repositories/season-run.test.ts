@@ -911,7 +911,10 @@ describe('season run M2.5 pending blocks (v5)', () => {
       ),
     ).rejects.toThrow(SeasonPendingBlockRejectedError);
     await expect(
-      repo.savePendingBlock({ ...pendingFor(adapters), runId: idSchema.parse('other-run') }, interruption),
+      repo.savePendingBlock(
+        { ...pendingFor(adapters), runId: idSchema.parse('other-run') },
+        interruption,
+      ),
     ).rejects.toThrow(SeasonPendingBlockRejectedError);
   });
   it('a pending block survives a full validated reload', async () => {
@@ -1488,7 +1491,10 @@ describe('season run M2.5 reload audit (v5)', () => {
     const lakersBalanceKey = franchiseIdSchema.parse('lakers');
     await db.seasonRuns.put({
       ...row,
-      influence: { ...row.influence, balances: { ...row.influence.balances, [lakersBalanceKey]: 3 } },
+      influence: {
+        ...row.influence,
+        balances: { ...row.influence.balances, [lakersBalanceKey]: 3 },
+      },
     });
     await expect(repo.loadActiveRun()).rejects.toThrow(/recomputes/);
   });

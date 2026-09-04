@@ -57,7 +57,12 @@ function buildTeam(side: 'home' | 'away'): SeasonGameTeamInput {
       tendencies: { ...base.tendencies },
     };
   });
-  return { teamId: side, displayName: side, franchiseId: franchiseIdSchema.parse(franchiseId), players };
+  return {
+    teamId: side,
+    displayName: side,
+    franchiseId: franchiseIdSchema.parse(franchiseId),
+    players,
+  };
 }
 function rotationOf(team: SeasonGameTeamInput): SeasonRotation {
   const ids = team.players.map((p) => p.playerVersionId);

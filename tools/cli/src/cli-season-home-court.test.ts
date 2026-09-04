@@ -1,10 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import {
-  seasonHomeCourtProfileSchema,
-  type FranchiseId,
-} from '@hoop-rush/data-contracts';
+import { seasonHomeCourtProfileSchema, type FranchiseId } from '@hoop-rush/data-contracts';
 import { SEASON_HOME_COURT_PROFILE, seasonHomeCourtMechanisms } from '@hoop-rush/engine';
 import { seasonHomeCourtCalibrateReportSchema } from './report-schemas.ts';
 import {
@@ -33,11 +30,7 @@ function fakeSimulateSeasonGame(input: SeasonGameSimulationInput): SeasonGameSim
     ? (index * 137 + 3) % 1000 < homeRate * 1000
     : (index * 131 + 500) % 1000 < homeRate * 1000;
   const homeWins = draw;
-  const side = (
-    teamId: string,
-    franchiseId: FranchiseId,
-    score: number,
-  ): SeasonGameSideResult => ({
+  const side = (teamId: string, franchiseId: FranchiseId, score: number): SeasonGameSideResult => ({
     teamId,
     displayName: teamId,
     franchiseId,

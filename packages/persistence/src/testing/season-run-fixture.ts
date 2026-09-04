@@ -856,8 +856,7 @@ export function foldPlayerAggregatesFixture(
   );
   const zeroRow = (playerVersionIdValue: string): SeasonPlayerAggregate => {
     const ownerRaw = ownerOf.get(playerVersionIdValue);
-    const parsedOwner =
-      ownerRaw === undefined ? franchiseIdSchema.parse('lakers') : ownerRaw;
+    const parsedOwner = ownerRaw === undefined ? franchiseIdSchema.parse('lakers') : ownerRaw;
     return {
       playerVersionId: playerVersionIdValue,
       franchiseId: parsedOwner,
@@ -933,8 +932,7 @@ export function buildFixtureRetainedDetail(input: {
       const rosterEntry = roster?.players.find(
         (player) => player.playerVersionId === line.playerVersionId,
       );
-      const parsedPlayerId =
-        rosterEntry?.playerId ?? playerIdSchema.parse(line.playerVersionId);
+      const parsedPlayerId = rosterEntry?.playerId ?? playerIdSchema.parse(line.playerVersionId);
       return {
         playerVersionId: line.playerVersionId,
         playerId: parsedPlayerId,
@@ -1148,8 +1146,9 @@ type EngineFoldPlayerReturnParity = ReturnType<typeof engineFoldSeasonPlayerAggr
 type FixtureFoldPlayerReturnParity = ReturnType<typeof foldPlayerAggregatesFixture>;
 const _digestFactsParity: EngineDigestFactsParity extends FixtureDigestFactsParity ? true : never =
   true;
-const _digestReturnParity: FixtureDigestReturnParity extends EngineDigestReturnParity ? true : never =
-  true;
+const _digestReturnParity: FixtureDigestReturnParity extends EngineDigestReturnParity
+  ? true
+  : never = true;
 const _reconstructParamsParity: EngineReconstructParamsParity extends FixtureReconstructParamsParity
   ? true
   : never = true;

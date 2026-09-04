@@ -56,11 +56,11 @@ function series(
 }
 function fixturePostseason(): SeasonPostseasonState {
   const state = buildInitialPostseasonState(seedSchema.parse('a1b2c3d4e5f60718293a4b5c6d7e8f9a'));
-  state.playIn.east.ranking = ['e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7', 'e8', 'e9', 'e10'].map((id) =>
-    franchiseIdSchema.parse(id),
+  state.playIn.east.ranking = ['e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7', 'e8', 'e9', 'e10'].map(
+    (id) => franchiseIdSchema.parse(id),
   );
-  state.playIn.west.ranking = ['w1', 'w2', 'w3', 'w4', 'w5', 'w6', 'w7', 'w8', 'w9', 'w10'].map((id) =>
-    franchiseIdSchema.parse(id),
+  state.playIn.west.ranking = ['w1', 'w2', 'w3', 'w4', 'w5', 'w6', 'w7', 'w8', 'w9', 'w10'].map(
+    (id) => franchiseIdSchema.parse(id),
   );
   for (const conference of ['east', 'west'] as const) {
     const playIn = state.playIn[conference];

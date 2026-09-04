@@ -40,8 +40,16 @@ import {
 const context = createEngineContext();
 function catalogFixture(): ClassicDraftCatalog {
   return classicDraftCatalogSchema.parse([
-    { franchiseId: franchiseIdSchema.parse('bulls'), eraId: eraIdSchema.parse('1990s'), players: [{ playerId: playerIdSchema.parse('p-7'), positions: ['PG'] }] },
-    { franchiseId: franchiseIdSchema.parse('bulls'), eraId: eraIdSchema.parse('2010s'), players: [{ playerId: playerIdSchema.parse('p-11'), positions: ['SF'] }] },
+    {
+      franchiseId: franchiseIdSchema.parse('bulls'),
+      eraId: eraIdSchema.parse('1990s'),
+      players: [{ playerId: playerIdSchema.parse('p-7'), positions: ['PG'] }],
+    },
+    {
+      franchiseId: franchiseIdSchema.parse('bulls'),
+      eraId: eraIdSchema.parse('2010s'),
+      players: [{ playerId: playerIdSchema.parse('p-11'), positions: ['SF'] }],
+    },
     {
       franchiseId: franchiseIdSchema.parse('celtics'),
       eraId: eraIdSchema.parse('1990s'),
@@ -50,9 +58,21 @@ function catalogFixture(): ClassicDraftCatalog {
         { playerId: playerIdSchema.parse('p-5'), positions: ['C'] },
       ],
     },
-    { franchiseId: franchiseIdSchema.parse('celtics'), eraId: eraIdSchema.parse('2010s'), players: [{ playerId: playerIdSchema.parse('p-10'), positions: ['C'] }] },
-    { franchiseId: franchiseIdSchema.parse('heat'), eraId: eraIdSchema.parse('2000s'), players: [{ playerId: playerIdSchema.parse('p-8'), positions: ['PF', 'C'] }] },
-    { franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1980s'), players: [{ playerId: playerIdSchema.parse('p-6'), positions: ['SF'] }] },
+    {
+      franchiseId: franchiseIdSchema.parse('celtics'),
+      eraId: eraIdSchema.parse('2010s'),
+      players: [{ playerId: playerIdSchema.parse('p-10'), positions: ['C'] }],
+    },
+    {
+      franchiseId: franchiseIdSchema.parse('heat'),
+      eraId: eraIdSchema.parse('2000s'),
+      players: [{ playerId: playerIdSchema.parse('p-8'), positions: ['PF', 'C'] }],
+    },
+    {
+      franchiseId: franchiseIdSchema.parse('lakers'),
+      eraId: eraIdSchema.parse('1980s'),
+      players: [{ playerId: playerIdSchema.parse('p-6'), positions: ['SF'] }],
+    },
     {
       franchiseId: franchiseIdSchema.parse('lakers'),
       eraId: eraIdSchema.parse('1990s'),
@@ -62,7 +82,11 @@ function catalogFixture(): ClassicDraftCatalog {
         { playerId: playerIdSchema.parse('p-3'), positions: ['C'] },
       ],
     },
-    { franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('2010s'), players: [{ playerId: playerIdSchema.parse('p-9'), positions: ['SG'] }] },
+    {
+      franchiseId: franchiseIdSchema.parse('lakers'),
+      eraId: eraIdSchema.parse('2010s'),
+      players: [{ playerId: playerIdSchema.parse('p-9'), positions: ['SG'] }],
+    },
   ]);
 }
 function entryOf(
@@ -162,11 +186,41 @@ function completeFixture(overrides: Partial<ClassicDraftState> = {}): ClassicDra
     status: 'complete',
     roll: null,
     picks: [
-      { round: 1, playerId: playerIdSchema.parse('p-1'), franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s'), slotIndex: 0 },
-      { round: 2, playerId: playerIdSchema.parse('p-4'), franchiseId: franchiseIdSchema.parse('celtics'), eraId: eraIdSchema.parse('1990s'), slotIndex: 1 },
-      { round: 3, playerId: playerIdSchema.parse('p-6'), franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1980s'), slotIndex: 2 },
-      { round: 4, playerId: playerIdSchema.parse('p-11'), franchiseId: franchiseIdSchema.parse('bulls'), eraId: eraIdSchema.parse('2010s'), slotIndex: 3 },
-      { round: 5, playerId: playerIdSchema.parse('p-3'), franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s'), slotIndex: 4 },
+      {
+        round: 1,
+        playerId: playerIdSchema.parse('p-1'),
+        franchiseId: franchiseIdSchema.parse('lakers'),
+        eraId: eraIdSchema.parse('1990s'),
+        slotIndex: 0,
+      },
+      {
+        round: 2,
+        playerId: playerIdSchema.parse('p-4'),
+        franchiseId: franchiseIdSchema.parse('celtics'),
+        eraId: eraIdSchema.parse('1990s'),
+        slotIndex: 1,
+      },
+      {
+        round: 3,
+        playerId: playerIdSchema.parse('p-6'),
+        franchiseId: franchiseIdSchema.parse('lakers'),
+        eraId: eraIdSchema.parse('1980s'),
+        slotIndex: 2,
+      },
+      {
+        round: 4,
+        playerId: playerIdSchema.parse('p-11'),
+        franchiseId: franchiseIdSchema.parse('bulls'),
+        eraId: eraIdSchema.parse('2010s'),
+        slotIndex: 3,
+      },
+      {
+        round: 5,
+        playerId: playerIdSchema.parse('p-3'),
+        franchiseId: franchiseIdSchema.parse('lakers'),
+        eraId: eraIdSchema.parse('1990s'),
+        slotIndex: 4,
+      },
     ],
     ...overrides,
   };
@@ -186,7 +240,9 @@ function decoyFixture(): ClassicDraftCatalog {
     {
       franchiseId: franchiseIdSchema.parse('celtics'),
       eraId: eraIdSchema.parse('1980s'),
-      players: [{ playerId: playerIdSchema.parse('decoy-celtics-1980s'), positions: ['PG', 'SF', 'C'] }],
+      players: [
+        { playerId: playerIdSchema.parse('decoy-celtics-1980s'), positions: ['PG', 'SF', 'C'] },
+      ],
     },
     {
       franchiseId: franchiseIdSchema.parse('celtics'),
@@ -211,7 +267,9 @@ function decoyFixture(): ClassicDraftCatalog {
     {
       franchiseId: franchiseIdSchema.parse('lakers'),
       eraId: eraIdSchema.parse('1990s'),
-      players: [{ playerId: playerIdSchema.parse('decoy-lakers-1990s'), positions: ['PG', 'SF', 'C'] }],
+      players: [
+        { playerId: playerIdSchema.parse('decoy-lakers-1990s'), positions: ['PG', 'SF', 'C'] },
+      ],
     },
     {
       franchiseId: franchiseIdSchema.parse('lakers'),
@@ -221,7 +279,9 @@ function decoyFixture(): ClassicDraftCatalog {
     {
       franchiseId: franchiseIdSchema.parse('spurs'),
       eraId: eraIdSchema.parse('1980s'),
-      players: [{ playerId: playerIdSchema.parse('decoy-spurs-1980s'), positions: ['PG', 'SF', 'C'] }],
+      players: [
+        { playerId: playerIdSchema.parse('decoy-spurs-1980s'), positions: ['PG', 'SF', 'C'] },
+      ],
     },
   ]);
 }
@@ -293,7 +353,10 @@ describe('classic draft rounds', () => {
   it('advances exactly one round per pick and stays drafting below five', () => {
     const state = draftFixture();
     const next = draftClassicPlayer(
-      { ...state, roll: { franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s') } },
+      {
+        ...state,
+        roll: { franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s') },
+      },
       catalogFixture(),
       { playerId: playerIdSchema.parse('p-1'), slotIndex: 0 },
       context,
@@ -323,7 +386,13 @@ describe('classic draft rounds', () => {
           variant: 'ratings',
           seed: seedSchema.parse(seedFromString('bad')),
           dataVersion: 'data-v1',
-          catalog: [{ franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s'), players: [] }],
+          catalog: [
+            {
+              franchiseId: franchiseIdSchema.parse('lakers'),
+              eraId: eraIdSchema.parse('1990s'),
+              players: [],
+            },
+          ],
         },
         context,
       ),
@@ -367,7 +436,10 @@ describe('classic rerolls', () => {
       },
       context,
     );
-    const narrowed = { ...state, roll: { franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s') } };
+    const narrowed = {
+      ...state,
+      roll: { franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s') },
+    };
     const before = narrowed.roll;
     const rolled = rerollClassicFranchise(narrowed, catalog, context);
     expect(rolled.roll?.franchiseId).not.toBe(before.franchiseId);
@@ -411,7 +483,10 @@ describe('classic rerolls', () => {
       },
       context,
     );
-    const narrowed = { ...state, roll: { franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s') } };
+    const narrowed = {
+      ...state,
+      roll: { franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s') },
+    };
     const before = narrowed.roll;
     const rolled = rerollClassicEra(narrowed, catalog, context);
     expect(rolled.roll?.eraId).not.toBe(before.eraId);
@@ -460,7 +535,11 @@ describe('classic rerolls', () => {
           { playerId: playerIdSchema.parse('p-5'), positions: ['C'] },
         ],
       },
-      { franchiseId: franchiseIdSchema.parse('celtics'), eraId: eraIdSchema.parse('1990s'), players: [{ playerId: playerIdSchema.parse('p-4'), positions: ['PG'] }] },
+      {
+        franchiseId: franchiseIdSchema.parse('celtics'),
+        eraId: eraIdSchema.parse('1990s'),
+        players: [{ playerId: playerIdSchema.parse('p-4'), positions: ['PG'] }],
+      },
     ];
     const state = createClassicDraft(
       {
@@ -478,10 +557,34 @@ describe('classic rerolls', () => {
       round: 5,
       status: 'drafting',
       picks: [
-        { round: 1, playerId: playerIdSchema.parse('p-1'), franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s'), slotIndex: 0 },
-        { round: 2, playerId: playerIdSchema.parse('p-4'), franchiseId: franchiseIdSchema.parse('celtics'), eraId: eraIdSchema.parse('1990s'), slotIndex: 1 },
-        { round: 3, playerId: playerIdSchema.parse('p-2'), franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s'), slotIndex: 2 },
-        { round: 4, playerId: playerIdSchema.parse('p-3'), franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s'), slotIndex: 3 },
+        {
+          round: 1,
+          playerId: playerIdSchema.parse('p-1'),
+          franchiseId: franchiseIdSchema.parse('lakers'),
+          eraId: eraIdSchema.parse('1990s'),
+          slotIndex: 0,
+        },
+        {
+          round: 2,
+          playerId: playerIdSchema.parse('p-4'),
+          franchiseId: franchiseIdSchema.parse('celtics'),
+          eraId: eraIdSchema.parse('1990s'),
+          slotIndex: 1,
+        },
+        {
+          round: 3,
+          playerId: playerIdSchema.parse('p-2'),
+          franchiseId: franchiseIdSchema.parse('lakers'),
+          eraId: eraIdSchema.parse('1990s'),
+          slotIndex: 2,
+        },
+        {
+          round: 4,
+          playerId: playerIdSchema.parse('p-3'),
+          franchiseId: franchiseIdSchema.parse('lakers'),
+          eraId: eraIdSchema.parse('1990s'),
+          slotIndex: 3,
+        },
       ],
     };
     expect(() => rerollClassicFranchise(narrowed, catalog, context)).toThrow(
@@ -491,7 +594,10 @@ describe('classic rerolls', () => {
       /no alternative era for franchise lakers in round 5/,
     );
     expect(narrowed.rerolls).toEqual({ franchiseSpent: false, eraSpent: false });
-    expect(narrowed.roll).toEqual({ franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s') });
+    expect(narrowed.roll).toEqual({
+      franchiseId: franchiseIdSchema.parse('lakers'),
+      eraId: eraIdSchema.parse('1990s'),
+    });
   });
   it('can still complete a round when only the C slot is open', () => {
     const catalog: ClassicDraftCatalog = [
@@ -505,7 +611,11 @@ describe('classic rerolls', () => {
           { playerId: playerIdSchema.parse('p-5'), positions: ['C'] },
         ],
       },
-      { franchiseId: franchiseIdSchema.parse('celtics'), eraId: eraIdSchema.parse('1990s'), players: [{ playerId: playerIdSchema.parse('p-4'), positions: ['PG'] }] },
+      {
+        franchiseId: franchiseIdSchema.parse('celtics'),
+        eraId: eraIdSchema.parse('1990s'),
+        players: [{ playerId: playerIdSchema.parse('p-4'), positions: ['PG'] }],
+      },
     ];
     const state = createClassicDraft(
       {
@@ -523,13 +633,42 @@ describe('classic rerolls', () => {
       round: 5,
       status: 'drafting',
       picks: [
-        { round: 1, playerId: playerIdSchema.parse('p-1'), franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s'), slotIndex: 0 },
-        { round: 2, playerId: playerIdSchema.parse('p-4'), franchiseId: franchiseIdSchema.parse('celtics'), eraId: eraIdSchema.parse('1990s'), slotIndex: 1 },
-        { round: 3, playerId: playerIdSchema.parse('p-2'), franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s'), slotIndex: 2 },
-        { round: 4, playerId: playerIdSchema.parse('p-3'), franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s'), slotIndex: 3 },
+        {
+          round: 1,
+          playerId: playerIdSchema.parse('p-1'),
+          franchiseId: franchiseIdSchema.parse('lakers'),
+          eraId: eraIdSchema.parse('1990s'),
+          slotIndex: 0,
+        },
+        {
+          round: 2,
+          playerId: playerIdSchema.parse('p-4'),
+          franchiseId: franchiseIdSchema.parse('celtics'),
+          eraId: eraIdSchema.parse('1990s'),
+          slotIndex: 1,
+        },
+        {
+          round: 3,
+          playerId: playerIdSchema.parse('p-2'),
+          franchiseId: franchiseIdSchema.parse('lakers'),
+          eraId: eraIdSchema.parse('1990s'),
+          slotIndex: 2,
+        },
+        {
+          round: 4,
+          playerId: playerIdSchema.parse('p-3'),
+          franchiseId: franchiseIdSchema.parse('lakers'),
+          eraId: eraIdSchema.parse('1990s'),
+          slotIndex: 3,
+        },
       ],
     };
-    const done = draftClassicPlayer(narrowed, catalog, { playerId: playerIdSchema.parse('p-5'), slotIndex: 4 }, context);
+    const done = draftClassicPlayer(
+      narrowed,
+      catalog,
+      { playerId: playerIdSchema.parse('p-5'), slotIndex: 4 },
+      context,
+    );
     expect(done.status).toBe('complete');
     expect(done.picks).toHaveLength(5);
   });
@@ -538,7 +677,9 @@ describe('classic reroll single-axis candidates', () => {
   it('franchise reroll preserves the era and changes the franchise across seeds', () => {
     const catalog = decoyFixture();
     for (let i = 0; i < 20; i += 1) {
-      const state = decoyState({ seed: seedSchema.parse(seedFromString(`decoy-franchise-${String(i)}`)) });
+      const state = decoyState({
+        seed: seedSchema.parse(seedFromString(`decoy-franchise-${String(i)}`)),
+      });
       const rolled = rerollClassicFranchise(state, catalog, context);
       expect(rolled.roll?.eraId).toBe('1990s');
       expect(rolled.roll?.franchiseId).not.toBe('lakers');
@@ -547,7 +688,9 @@ describe('classic reroll single-axis candidates', () => {
   it('era reroll preserves the franchise and changes the era across seeds', () => {
     const catalog = decoyFixture();
     for (let i = 0; i < 20; i += 1) {
-      const state = decoyState({ seed: seedSchema.parse(seedFromString(`decoy-era-${String(i)}`)) });
+      const state = decoyState({
+        seed: seedSchema.parse(seedFromString(`decoy-era-${String(i)}`)),
+      });
       const rolled = rerollClassicEra(state, catalog, context);
       expect(rolled.roll?.franchiseId).toBe('lakers');
       expect(rolled.roll?.eraId).not.toBe('1990s');
@@ -647,15 +790,21 @@ describe('classic reroll single-axis candidates', () => {
       {
         franchiseId: franchiseIdSchema.parse('knicks'),
         eraId: eraIdSchema.parse('2010s'),
-        players: [{ playerId: playerIdSchema.parse('decoy-knicks-2010s'), positions: ['PG', 'SF', 'C'] }],
+        players: [
+          { playerId: playerIdSchema.parse('decoy-knicks-2010s'), positions: ['PG', 'SF', 'C'] },
+        ],
       },
       {
         franchiseId: franchiseIdSchema.parse('heat'),
         eraId: eraIdSchema.parse('2000s'),
-        players: [{ playerId: playerIdSchema.parse('decoy-heat-2000s'), positions: ['PG', 'SF', 'C'] }],
+        players: [
+          { playerId: playerIdSchema.parse('decoy-heat-2000s'), positions: ['PG', 'SF', 'C'] },
+        ],
       },
     ];
-    const state = decoyState({ roll: { franchiseId: franchiseIdSchema.parse('knicks'), eraId: eraIdSchema.parse('2010s') } });
+    const state = decoyState({
+      roll: { franchiseId: franchiseIdSchema.parse('knicks'), eraId: eraIdSchema.parse('2010s') },
+    });
     expect(classicRerollAvailable(state, 'franchise', catalog)).toBe(false);
     expect(classicRerollAvailable(state, 'era', catalog)).toBe(false);
     expect(() => rerollClassicFranchise(state, catalog, context)).toThrow(
@@ -665,7 +814,10 @@ describe('classic reroll single-axis candidates', () => {
       /no alternative era for franchise knicks in round 1/,
     );
     expect(state.rerolls).toEqual({ franchiseSpent: false, eraSpent: false });
-    expect(state.roll).toEqual({ franchiseId: franchiseIdSchema.parse('knicks'), eraId: eraIdSchema.parse('2010s') });
+    expect(state.roll).toEqual({
+      franchiseId: franchiseIdSchema.parse('knicks'),
+      eraId: eraIdSchema.parse('2010s'),
+    });
   });
   it('reroll candidates respect the open slots of the current round', () => {
     const state = decoyState({
@@ -712,7 +864,10 @@ describe('classic reroll single-axis candidates', () => {
       'lakers/2000s',
     ]);
     const rolled = rerollClassicEra(state, decoyFixture(), context);
-    expect(rolled.roll).toEqual({ franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('2000s') });
+    expect(rolled.roll).toEqual({
+      franchiseId: franchiseIdSchema.parse('lakers'),
+      eraId: eraIdSchema.parse('2000s'),
+    });
     expect(rolled.rerolls.eraSpent).toBe(true);
     expect(rolled.rerolls.franchiseSpent).toBe(false);
   });
@@ -725,10 +880,34 @@ describe('classic candidate filtering and picks', () => {
       status: 'drafting',
       roll: { franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s') },
       picks: [
-        { round: 1, playerId: playerIdSchema.parse('p-1'), franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s'), slotIndex: 0 },
-        { round: 2, playerId: playerIdSchema.parse('p-4'), franchiseId: franchiseIdSchema.parse('celtics'), eraId: eraIdSchema.parse('1990s'), slotIndex: 1 },
-        { round: 3, playerId: playerIdSchema.parse('p-6'), franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1980s'), slotIndex: 2 },
-        { round: 4, playerId: playerIdSchema.parse('p-2'), franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s'), slotIndex: 3 },
+        {
+          round: 1,
+          playerId: playerIdSchema.parse('p-1'),
+          franchiseId: franchiseIdSchema.parse('lakers'),
+          eraId: eraIdSchema.parse('1990s'),
+          slotIndex: 0,
+        },
+        {
+          round: 2,
+          playerId: playerIdSchema.parse('p-4'),
+          franchiseId: franchiseIdSchema.parse('celtics'),
+          eraId: eraIdSchema.parse('1990s'),
+          slotIndex: 1,
+        },
+        {
+          round: 3,
+          playerId: playerIdSchema.parse('p-6'),
+          franchiseId: franchiseIdSchema.parse('lakers'),
+          eraId: eraIdSchema.parse('1980s'),
+          slotIndex: 2,
+        },
+        {
+          round: 4,
+          playerId: playerIdSchema.parse('p-2'),
+          franchiseId: franchiseIdSchema.parse('lakers'),
+          eraId: eraIdSchema.parse('1990s'),
+          slotIndex: 3,
+        },
       ],
     };
     const candidates = classicRollCandidates(catalogFixture(), state, 'initial');
@@ -741,16 +920,32 @@ describe('classic candidate filtering and picks', () => {
     expect(keys.has('heat/2000s')).toBe(true);
   });
   it('rejects a player into a slot their positions cannot fill', () => {
-    const base = { ...draftFixture(), roll: { franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s') } };
+    const base = {
+      ...draftFixture(),
+      roll: { franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s') },
+    };
     expect(() =>
-      draftClassicPlayer(base, catalogFixture(), { playerId: playerIdSchema.parse('p-1'), slotIndex: 4 }, context),
+      draftClassicPlayer(
+        base,
+        catalogFixture(),
+        { playerId: playerIdSchema.parse('p-1'), slotIndex: 4 },
+        context,
+      ),
     ).toThrow(/p-1 cannot play slot 4/);
     expect(() =>
-      draftClassicPlayer(base, catalogFixture(), { playerId: playerIdSchema.parse('p-3'), slotIndex: 0 }, context),
+      draftClassicPlayer(
+        base,
+        catalogFixture(),
+        { playerId: playerIdSchema.parse('p-3'), slotIndex: 0 },
+        context,
+      ),
     ).toThrow(/p-3 cannot play slot 0/);
   });
   it('rejects duplicate players, occupied slots, and unknown players', () => {
-    const base = { ...draftFixture(), roll: { franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s') } };
+    const base = {
+      ...draftFixture(),
+      roll: { franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s') },
+    };
     const one = draftClassicPlayer(
       base,
       catalogFixture(),
@@ -758,12 +953,25 @@ describe('classic candidate filtering and picks', () => {
       context,
     );
     expect(() =>
-      draftClassicPlayer(one, catalogFixture(), { playerId: playerIdSchema.parse('p-1'), slotIndex: 1 }, context),
+      draftClassicPlayer(
+        one,
+        catalogFixture(),
+        { playerId: playerIdSchema.parse('p-1'), slotIndex: 1 },
+        context,
+      ),
     ).toThrow(/p-1 is already drafted/);
     const displacementDraft = {
       ...draftFixture(),
       roll: { franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s') },
-      picks: [{ round: 1, playerId: playerIdSchema.parse('p-1'), franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s'), slotIndex: 0 }],
+      picks: [
+        {
+          round: 1,
+          playerId: playerIdSchema.parse('p-1'),
+          franchiseId: franchiseIdSchema.parse('lakers'),
+          eraId: eraIdSchema.parse('1990s'),
+          slotIndex: 0,
+        },
+      ],
       round: 2,
     };
     const displaced = draftClassicPlayer(
@@ -789,26 +997,55 @@ describe('classic candidate filtering and picks', () => {
     const centerOnly = {
       ...draftFixture(),
       roll: { franchiseId: franchiseIdSchema.parse('celtics'), eraId: eraIdSchema.parse('1990s') },
-      picks: [{ round: 1, playerId: playerIdSchema.parse('p-5'), franchiseId: franchiseIdSchema.parse('celtics'), eraId: eraIdSchema.parse('1990s'), slotIndex: 4 }],
+      picks: [
+        {
+          round: 1,
+          playerId: playerIdSchema.parse('p-5'),
+          franchiseId: franchiseIdSchema.parse('celtics'),
+          eraId: eraIdSchema.parse('1990s'),
+          slotIndex: 4,
+        },
+      ],
       round: 2,
     };
     expect(() =>
-      draftClassicPlayer(centerOnly, twoCenters, { playerId: playerIdSchema.parse('p-10'), slotIndex: 4 }, context),
+      draftClassicPlayer(
+        centerOnly,
+        twoCenters,
+        { playerId: playerIdSchema.parse('p-10'), slotIndex: 4 },
+        context,
+      ),
     ).toThrow(/slot 4 is already filled/);
     expect(() =>
-      draftClassicPlayer(base, catalogFixture(), { playerId: playerIdSchema.parse('p-404'), slotIndex: 0 }, context),
+      draftClassicPlayer(
+        base,
+        catalogFixture(),
+        { playerId: playerIdSchema.parse('p-404'), slotIndex: 0 },
+        context,
+      ),
     ).toThrow(/p-404 is not in the rolled pool/);
   });
   it('rejects a draft whose catalog lacks the current roll pair', () => {
-    const base = { ...draftFixture(), roll: { franchiseId: franchiseIdSchema.parse('spurs'), eraId: eraIdSchema.parse('1990s') } };
+    const base = {
+      ...draftFixture(),
+      roll: { franchiseId: franchiseIdSchema.parse('spurs'), eraId: eraIdSchema.parse('1990s') },
+    };
     expect(() =>
-      draftClassicPlayer(base, catalogFixture(), { playerId: playerIdSchema.parse('p-1'), slotIndex: 0 }, context),
+      draftClassicPlayer(
+        base,
+        catalogFixture(),
+        { playerId: playerIdSchema.parse('p-1'), slotIndex: 0 },
+        context,
+      ),
     ).toThrow(/catalog does not contain the current roll pair/);
   });
 });
 describe('classic repositioning', () => {
   it('moves a drafted player to an open legal slot', () => {
-    const base = { ...draftFixture(), roll: { franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s') } };
+    const base = {
+      ...draftFixture(),
+      roll: { franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s') },
+    };
     const state = draftClassicPlayer(
       base,
       catalogFixture(),
@@ -825,7 +1062,10 @@ describe('classic repositioning', () => {
     expect(moved.status).toBe(state.status);
   });
   it('swaps two picks when both destinations are legal', () => {
-    const base = { ...draftFixture(), roll: { franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s') } };
+    const base = {
+      ...draftFixture(),
+      roll: { franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s') },
+    };
     const one = draftClassicPlayer(
       base,
       catalogFixture(),
@@ -833,7 +1073,10 @@ describe('classic repositioning', () => {
       context,
     );
     const two = draftClassicPlayer(
-      { ...one, roll: { franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s') } },
+      {
+        ...one,
+        roll: { franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s') },
+      },
       catalogFixture(),
       { playerId: playerIdSchema.parse('p-2'), slotIndex: 1 },
       context,
@@ -850,8 +1093,20 @@ describe('classic repositioning', () => {
       ...draftFixture(),
       roll: { franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s') },
       picks: [
-        { round: 1, playerId: playerIdSchema.parse('p-1'), franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s'), slotIndex: 0 },
-        { round: 2, playerId: playerIdSchema.parse('p-2'), franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s'), slotIndex: 3 },
+        {
+          round: 1,
+          playerId: playerIdSchema.parse('p-1'),
+          franchiseId: franchiseIdSchema.parse('lakers'),
+          eraId: eraIdSchema.parse('1990s'),
+          slotIndex: 0,
+        },
+        {
+          round: 2,
+          playerId: playerIdSchema.parse('p-2'),
+          franchiseId: franchiseIdSchema.parse('lakers'),
+          eraId: eraIdSchema.parse('1990s'),
+          slotIndex: 3,
+        },
       ],
       round: 3,
     };
@@ -866,7 +1121,15 @@ describe('classic repositioning', () => {
     const state = {
       ...draftFixture(),
       roll: { franchiseId: franchiseIdSchema.parse('heat'), eraId: eraIdSchema.parse('2000s') },
-      picks: [{ round: 1, playerId: playerIdSchema.parse('p-8'), franchiseId: franchiseIdSchema.parse('heat'), eraId: eraIdSchema.parse('2000s'), slotIndex: 4 }],
+      picks: [
+        {
+          round: 1,
+          playerId: playerIdSchema.parse('p-8'),
+          franchiseId: franchiseIdSchema.parse('heat'),
+          eraId: eraIdSchema.parse('2000s'),
+          slotIndex: 4,
+        },
+      ],
       round: 2,
     };
     const catalog: ClassicDraftCatalog = catalogFixture().map((entry) =>
@@ -880,12 +1143,20 @@ describe('classic repositioning', () => {
           }
         : entry,
     );
-    const next = draftClassicPlayer(state, catalog, { playerId: playerIdSchema.parse('p-12'), slotIndex: 4 }, context);
+    const next = draftClassicPlayer(
+      state,
+      catalog,
+      { playerId: playerIdSchema.parse('p-12'), slotIndex: 4 },
+      context,
+    );
     expect(next.picks.find((p) => p.playerId === 'p-12')?.slotIndex).toBe(4);
     expect(next.picks.find((p) => p.playerId === 'p-8')?.slotIndex).toBe(2);
   });
   it('rejects illegal targets, unknown players, and stuck swaps', () => {
-    const base = { ...draftFixture(), roll: { franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s') } };
+    const base = {
+      ...draftFixture(),
+      roll: { franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s') },
+    };
     const one = draftClassicPlayer(
       base,
       catalogFixture(),
@@ -893,19 +1164,31 @@ describe('classic repositioning', () => {
       context,
     );
     const two = draftClassicPlayer(
-      { ...one, roll: { franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s') } },
+      {
+        ...one,
+        roll: { franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s') },
+      },
       catalogFixture(),
       { playerId: playerIdSchema.parse('p-3'), slotIndex: 4 },
       context,
     );
     expect(() =>
-      repositionClassicPlayer(two, catalogFixture(), { playerId: playerIdSchema.parse('p-1'), slotIndex: 4 }),
+      repositionClassicPlayer(two, catalogFixture(), {
+        playerId: playerIdSchema.parse('p-1'),
+        slotIndex: 4,
+      }),
     ).toThrow(/p-1 cannot play slot 4/);
     expect(() =>
-      repositionClassicPlayer(two, catalogFixture(), { playerId: playerIdSchema.parse('p-3'), slotIndex: 0 }),
+      repositionClassicPlayer(two, catalogFixture(), {
+        playerId: playerIdSchema.parse('p-3'),
+        slotIndex: 0,
+      }),
     ).toThrow(/p-3 cannot play slot 0/);
     expect(() =>
-      repositionClassicPlayer(two, catalogFixture(), { playerId: playerIdSchema.parse('p-404'), slotIndex: 2 }),
+      repositionClassicPlayer(two, catalogFixture(), {
+        playerId: playerIdSchema.parse('p-404'),
+        slotIndex: 2,
+      }),
     ).toThrow(/p-404 is not drafted/);
     const unchanged = repositionClassicPlayer(two, catalogFixture(), {
       playerId: playerIdSchema.parse('p-1'),
@@ -914,14 +1197,20 @@ describe('classic repositioning', () => {
     expect(unchanged).toBe(two);
   });
   it('never changes round, status, roll, or rerolls', () => {
-    const base = { ...draftFixture(), roll: { franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s') } };
+    const base = {
+      ...draftFixture(),
+      roll: { franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s') },
+    };
     const one = draftClassicPlayer(
       base,
       catalogFixture(),
       { playerId: playerIdSchema.parse('p-1'), slotIndex: 0 },
       context,
     );
-    const moved = repositionClassicPlayer(one, catalogFixture(), { playerId: playerIdSchema.parse('p-1'), slotIndex: 1 });
+    const moved = repositionClassicPlayer(one, catalogFixture(), {
+      playerId: playerIdSchema.parse('p-1'),
+      slotIndex: 1,
+    });
     expect(moved.round).toBe(one.round);
     expect(moved.status).toBe(one.status);
     expect(moved.roll).toEqual(one.roll);
@@ -954,11 +1243,41 @@ describe('createClassicChallenge', () => {
   it('rejects duplicate playerIds in the picks', () => {
     const state = completeFixture({
       picks: [
-        { round: 1, playerId: playerIdSchema.parse('p-1'), franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s'), slotIndex: 0 },
-        { round: 2, playerId: playerIdSchema.parse('p-1'), franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s'), slotIndex: 1 },
-        { round: 3, playerId: playerIdSchema.parse('p-6'), franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1980s'), slotIndex: 2 },
-        { round: 4, playerId: playerIdSchema.parse('p-11'), franchiseId: franchiseIdSchema.parse('bulls'), eraId: eraIdSchema.parse('2010s'), slotIndex: 3 },
-        { round: 5, playerId: playerIdSchema.parse('p-3'), franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s'), slotIndex: 4 },
+        {
+          round: 1,
+          playerId: playerIdSchema.parse('p-1'),
+          franchiseId: franchiseIdSchema.parse('lakers'),
+          eraId: eraIdSchema.parse('1990s'),
+          slotIndex: 0,
+        },
+        {
+          round: 2,
+          playerId: playerIdSchema.parse('p-1'),
+          franchiseId: franchiseIdSchema.parse('lakers'),
+          eraId: eraIdSchema.parse('1990s'),
+          slotIndex: 1,
+        },
+        {
+          round: 3,
+          playerId: playerIdSchema.parse('p-6'),
+          franchiseId: franchiseIdSchema.parse('lakers'),
+          eraId: eraIdSchema.parse('1980s'),
+          slotIndex: 2,
+        },
+        {
+          round: 4,
+          playerId: playerIdSchema.parse('p-11'),
+          franchiseId: franchiseIdSchema.parse('bulls'),
+          eraId: eraIdSchema.parse('2010s'),
+          slotIndex: 3,
+        },
+        {
+          round: 5,
+          playerId: playerIdSchema.parse('p-3'),
+          franchiseId: franchiseIdSchema.parse('lakers'),
+          eraId: eraIdSchema.parse('1990s'),
+          slotIndex: 4,
+        },
       ],
     });
     expect(() => createClassicChallenge(state, challengeEnvironment(state))).toThrow(
@@ -977,11 +1296,41 @@ describe('createClassicChallenge', () => {
   it('rejects an illegal lineup built from the picks', () => {
     const state = completeFixture({
       picks: [
-        { round: 1, playerId: playerIdSchema.parse('p-1'), franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1990s'), slotIndex: 0 },
-        { round: 2, playerId: playerIdSchema.parse('p-4'), franchiseId: franchiseIdSchema.parse('celtics'), eraId: eraIdSchema.parse('1990s'), slotIndex: 1 },
-        { round: 3, playerId: playerIdSchema.parse('p-6'), franchiseId: franchiseIdSchema.parse('lakers'), eraId: eraIdSchema.parse('1980s'), slotIndex: 2 },
-        { round: 4, playerId: playerIdSchema.parse('p-11'), franchiseId: franchiseIdSchema.parse('bulls'), eraId: eraIdSchema.parse('2010s'), slotIndex: 3 },
-        { round: 5, playerId: playerIdSchema.parse('p-7'), franchiseId: franchiseIdSchema.parse('bulls'), eraId: eraIdSchema.parse('1990s'), slotIndex: 4 },
+        {
+          round: 1,
+          playerId: playerIdSchema.parse('p-1'),
+          franchiseId: franchiseIdSchema.parse('lakers'),
+          eraId: eraIdSchema.parse('1990s'),
+          slotIndex: 0,
+        },
+        {
+          round: 2,
+          playerId: playerIdSchema.parse('p-4'),
+          franchiseId: franchiseIdSchema.parse('celtics'),
+          eraId: eraIdSchema.parse('1990s'),
+          slotIndex: 1,
+        },
+        {
+          round: 3,
+          playerId: playerIdSchema.parse('p-6'),
+          franchiseId: franchiseIdSchema.parse('lakers'),
+          eraId: eraIdSchema.parse('1980s'),
+          slotIndex: 2,
+        },
+        {
+          round: 4,
+          playerId: playerIdSchema.parse('p-11'),
+          franchiseId: franchiseIdSchema.parse('bulls'),
+          eraId: eraIdSchema.parse('2010s'),
+          slotIndex: 3,
+        },
+        {
+          round: 5,
+          playerId: playerIdSchema.parse('p-7'),
+          franchiseId: franchiseIdSchema.parse('bulls'),
+          eraId: eraIdSchema.parse('1990s'),
+          slotIndex: 4,
+        },
       ],
     });
     expect(() => createClassicChallenge(state, challengeEnvironment(state))).toThrow(
@@ -1099,7 +1448,3 @@ describe('classic draft command sequences (property)', () => {
     );
   });
 });
-
-
-
-

@@ -78,7 +78,16 @@ function playInPostseason(run: SeasonRun): SeasonRun['postseason'] {
   east.games.sevenEight = completed('pi-east-seven-eight', 'east7', 'east8', true);
   east.games.nineTen = completed('pi-east-nine-ten', 'east9', 'east10', true);
   east.games.final = completed('pi-east-final', 'east8', 'east9', true);
-  east.playoffSeeds = fids(['east1', 'east2', 'east3', 'east4', 'east5', 'east6', 'east7', 'east8']);
+  east.playoffSeeds = fids([
+    'east1',
+    'east2',
+    'east3',
+    'east4',
+    'east5',
+    'east6',
+    'east7',
+    'east8',
+  ]);
   return state;
 }
 function activeInjuryRun(run: SeasonRun, playerVersionId: string): SeasonRun {

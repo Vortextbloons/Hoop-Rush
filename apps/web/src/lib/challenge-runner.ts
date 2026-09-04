@@ -166,9 +166,7 @@ export class ChallengeRunner {
     const token = this.pumpToken;
     const chosenSeed = seedSchema.parse(envelope.chosenRunSeed);
     const updatedRun =
-      chosenSeed === run.runSeed
-        ? run
-        : challengeRunSchema.parse({ ...run, runSeed: chosenSeed });
+      chosenSeed === run.runSeed ? run : challengeRunSchema.parse({ ...run, runSeed: chosenSeed });
     if (updatedRun !== run) {
       try {
         await this.repo.saveActiveRun({

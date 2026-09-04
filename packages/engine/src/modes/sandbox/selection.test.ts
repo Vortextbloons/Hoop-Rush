@@ -6,11 +6,7 @@ import {
   seedFromString,
 } from '@hoop-rush/test-fixtures';
 import type { ChallengeRun } from '@hoop-rush/data-contracts';
-import {
-  eraIdSchema,
-  franchiseIdSchema,
-  seedSchema,
-} from '@hoop-rush/data-contracts';
+import { eraIdSchema, franchiseIdSchema, seedSchema } from '@hoop-rush/data-contracts';
 import { createEngineContext } from '../../sim/context.ts';
 import {
   createChallenge,

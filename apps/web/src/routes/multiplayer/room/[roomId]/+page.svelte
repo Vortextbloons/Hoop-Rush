@@ -16,11 +16,7 @@
     Seed,
     SlotIndex,
   } from '@hoop-rush/data-contracts';
-  import {
-    commandIdSchema,
-    fixedFiveTimeoutMsForMode,
-    idSchema,
-  } from '@hoop-rush/data-contracts';
+  import { commandIdSchema, fixedFiveTimeoutMsForMode, idSchema } from '@hoop-rush/data-contracts';
   import { createConfiguredFixedFiveTransport } from '$lib/fixed-five-transport';
   import {
     friendlyFixedFiveJoinError,
@@ -119,9 +115,7 @@
   const display = $derived(
     snapshot && replay ? overlaySnapshotProgress(snapshot, replay, facts) : snapshot,
   );
-  const presentation = $derived(
-    presentationForVariant(snapshot?.settings.variant ?? 'ratings'),
-  );
+  const presentation = $derived(presentationForVariant(snapshot?.settings.variant ?? 'ratings'));
   const opponent = $derived(display?.members.find((m) => m.participantId !== selfId) ?? null);
   const timeoutMs = $derived(
     snapshot ? fixedFiveTimeoutMsForMode(snapshot.settings.mode) : 90 * 1000,
@@ -489,7 +483,10 @@
         const snap = resumed.snapshot;
         snapshot = snap;
         selfId = resumed.membership.participantId;
-        saveFixedFiveMembership({ ...resumed.membership, code: snap.code ?? resumed.membership.code });
+        saveFixedFiveMembership({
+          ...resumed.membership,
+          code: snap.code ?? resumed.membership.code,
+        });
         const [stored, loadedAssets] = await Promise.all([
           fixedFiveRepository.loadActive(roomId).catch(() => null),
           loadFixedFiveAssets().catch((e: unknown) => {
@@ -685,13 +682,13 @@
     </div>
 
     <div class="mt-4">
-      <FixedFiveScoreboard snapshot={display} selfId={selfId} />
+      <FixedFiveScoreboard snapshot={display} {selfId} />
     </div>
 
     {#if replay && replay.skipped > 0}
       <p class="mt-3 text-xs text-amber-600" role="status">
-        {replay.skipped} command{replay.skipped === 1 ? '' : 's'} could not be applied to the draft
-        and {replay.skipped === 1 ? 'was' : 'were'} skipped.
+        {replay.skipped} command{replay.skipped === 1 ? '' : 's'} could not be applied to the draft and
+        {replay.skipped === 1 ? 'was' : 'were'} skipped.
       </p>
     {/if}
     {#if reconnecting}<p class="mt-3 text-xs text-muted-foreground" role="status">
@@ -915,12 +912,14 @@
     {:else if phase === 'completed' && localResult}
       <div class="mt-6 rounded-2xl bg-surface-1 p-6">
         <h2 class="font-display text-sm font-extrabold uppercase">
-          Completed — {localResult.result.competition === 'duel' ? 'duel series' : 'shared 82 comparison'}
+          Completed — {localResult.result.competition === 'duel'
+            ? 'duel series'
+            : 'shared 82 comparison'}
         </h2>
         {#if localResult.result.competition === 'shared-82'}
           <p class="mt-2 text-sm">
-            Winner: {localResult.result.ranking[0] === selfId ? 'You' : 'Opponent'} (wins, then
-            differential, then seeded tie-break)
+            Winner: {localResult.result.ranking[0] === selfId ? 'You' : 'Opponent'} (wins, then differential,
+            then seeded tie-break)
           </p>
         {:else}
           <p class="mt-2 text-sm">

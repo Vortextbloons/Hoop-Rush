@@ -13,65 +13,64 @@ import type {
   ClassicPick,
 } from '@hoop-rush/data-contracts';
 const FIXTURE_CLASSIC_SEED = 'abc123abc123abc123abc123abc123ab' as const;
-const DEFAULT_CLASSIC_CATALOG: readonly ClassicCatalogEntry[] =
-  classicDraftCatalogSchema.parse([
-    {
-      franchiseId: 'lakers',
-      eraId: '1990s',
-      players: [
-        { playerId: 'p-lal-g', positions: ['PG', 'SG'] },
-        { playerId: 'p-lal-gf', positions: ['PG', 'SF'] },
-        { playerId: 'p-lal-c', positions: ['C'] },
-      ],
-    },
-    {
-      franchiseId: 'lakers',
-      eraId: '1980s',
-      players: [{ playerId: 'p-lal-f', positions: ['SF', 'PF'] }],
-    },
-    {
-      franchiseId: 'celtics',
-      eraId: '1990s',
-      players: [
-        { playerId: 'p-bos-g', positions: ['PG', 'SG'] },
-        { playerId: 'p-bos-c', positions: ['C'] },
-      ],
-    },
-    {
-      franchiseId: 'celtics',
-      eraId: '1980s',
-      players: [{ playerId: 'p-bos-c2', positions: ['C'] }],
-    },
-    {
-      franchiseId: 'bulls',
-      eraId: '1990s',
-      players: [
-        { playerId: 'p-chi-f', positions: ['SF', 'PF'] },
-        { playerId: 'p-chi-c', positions: ['C'] },
-      ],
-    },
-    {
-      franchiseId: 'bulls',
-      eraId: '1980s',
-      players: [{ playerId: 'p-chi-g', positions: ['PG', 'SG'] }],
-    },
-    {
-      franchiseId: 'heat',
-      eraId: '2000s',
-      players: [
-        { playerId: 'p-mia-fc', positions: ['PF', 'C'] },
-        { playerId: 'p-mia-g', positions: ['PG', 'SG'] },
-      ],
-    },
-    {
-      franchiseId: 'knicks',
-      eraId: '2010s',
-      players: [
-        { playerId: 'p-nyk-f', positions: ['SF', 'PF'] },
-        { playerId: 'p-nyk-c', positions: ['C'] },
-      ],
-    },
-  ]);
+const DEFAULT_CLASSIC_CATALOG: readonly ClassicCatalogEntry[] = classicDraftCatalogSchema.parse([
+  {
+    franchiseId: 'lakers',
+    eraId: '1990s',
+    players: [
+      { playerId: 'p-lal-g', positions: ['PG', 'SG'] },
+      { playerId: 'p-lal-gf', positions: ['PG', 'SF'] },
+      { playerId: 'p-lal-c', positions: ['C'] },
+    ],
+  },
+  {
+    franchiseId: 'lakers',
+    eraId: '1980s',
+    players: [{ playerId: 'p-lal-f', positions: ['SF', 'PF'] }],
+  },
+  {
+    franchiseId: 'celtics',
+    eraId: '1990s',
+    players: [
+      { playerId: 'p-bos-g', positions: ['PG', 'SG'] },
+      { playerId: 'p-bos-c', positions: ['C'] },
+    ],
+  },
+  {
+    franchiseId: 'celtics',
+    eraId: '1980s',
+    players: [{ playerId: 'p-bos-c2', positions: ['C'] }],
+  },
+  {
+    franchiseId: 'bulls',
+    eraId: '1990s',
+    players: [
+      { playerId: 'p-chi-f', positions: ['SF', 'PF'] },
+      { playerId: 'p-chi-c', positions: ['C'] },
+    ],
+  },
+  {
+    franchiseId: 'bulls',
+    eraId: '1980s',
+    players: [{ playerId: 'p-chi-g', positions: ['PG', 'SG'] }],
+  },
+  {
+    franchiseId: 'heat',
+    eraId: '2000s',
+    players: [
+      { playerId: 'p-mia-fc', positions: ['PF', 'C'] },
+      { playerId: 'p-mia-g', positions: ['PG', 'SG'] },
+    ],
+  },
+  {
+    franchiseId: 'knicks',
+    eraId: '2010s',
+    players: [
+      { playerId: 'p-nyk-f', positions: ['SF', 'PF'] },
+      { playerId: 'p-nyk-c', positions: ['C'] },
+    ],
+  },
+]);
 export function buildClassicCatalog(
   entries: readonly ClassicCatalogEntry[] = DEFAULT_CLASSIC_CATALOG,
 ): ClassicDraftCatalog {

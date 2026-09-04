@@ -21,8 +21,13 @@ function row(
     seasonKey?: string;
   },
 ): PlayersIndexEntry {
-  const { playerId, franchiseId = 'lakers', eraId = '1990s', seasonKey = '1990-91', ...rest } =
-    partial;
+  const {
+    playerId,
+    franchiseId = 'lakers',
+    eraId = '1990s',
+    seasonKey = '1990-91',
+    ...rest
+  } = partial;
   return {
     franchiseId: franchiseIdSchema.parse(franchiseId),
     eraId: eraIdSchema.parse(eraId),

@@ -103,14 +103,10 @@ function rankedState(
   league: SeasonLeague,
   seed: string | Parameters<typeof buildInitialPostseasonState>[0] = TEST_SEED,
 ): SeasonPostseasonState {
-  return seasonPostseasonSetRankings(
-    buildInitialPostseasonState(seedSchema.parse(seed)),
-    league,
-    {
-      east: rankedEast(league),
-      west: rankedWestWithHuman(league),
-    },
-  );
+  return seasonPostseasonSetRankings(buildInitialPostseasonState(seedSchema.parse(seed)), league, {
+    east: rankedEast(league),
+    west: rankedWestWithHuman(league),
+  });
 }
 function finalFacts(
   gameId: string,
@@ -400,7 +396,10 @@ function playThroughCommands(
   let ctx = context;
   const allSummaries: SeasonPostseasonSummary[] = [];
   const start = handleSeasonRunCommand(
-    commandOf(ctx.run, { command: 'start-postseason', commandId: commandIdSchema.parse('start-1') }),
+    commandOf(ctx.run, {
+      command: 'start-postseason',
+      commandId: commandIdSchema.parse('start-1'),
+    }),
     ctx,
   );
   if (start.result.result.status !== 'accepted') {
@@ -409,7 +408,10 @@ function playThroughCommands(
   ctx = { ...ctx, run: start.run };
   for (let index = 1; index < 400; index += 1) {
     const advance = handleSeasonRunCommand(
-      commandOf(ctx.run, { command: 'advance-postseason', commandId: commandIdSchema.parse(`adv-${String(index)}`) }),
+      commandOf(ctx.run, {
+        command: 'advance-postseason',
+        commandId: commandIdSchema.parse(`adv-${String(index)}`),
+      }),
       ctx,
     );
     const advanceOutput = advance.result;
@@ -1195,12 +1197,18 @@ describe('command-driven postseason flow', () => {
   it('simulates human games with the carried rotation when the rotation stays valid', () => {
     const context = postseasonContext(TEST_SEED, forcedResolver(humanAlwaysWins));
     const start = handleSeasonRunCommand(
-      commandOf(context.run, { command: 'start-postseason', commandId: commandIdSchema.parse('start-1') }),
+      commandOf(context.run, {
+        command: 'start-postseason',
+        commandId: commandIdSchema.parse('start-1'),
+      }),
       context,
     );
     if (start.result.result.status !== 'accepted') throw new Error('start rejected');
     const first = handleSeasonRunCommand(
-      commandOf(start.run, { command: 'advance-postseason', commandId: commandIdSchema.parse('adv-1') }),
+      commandOf(start.run, {
+        command: 'advance-postseason',
+        commandId: commandIdSchema.parse('adv-1'),
+      }),
       { ...context, run: start.run },
     );
     const firstResult = first.result;
@@ -1219,7 +1227,10 @@ describe('command-driven postseason flow', () => {
   it('stops at a human game whose rotation is invalid and continues after the repair', () => {
     const context = postseasonContext(TEST_SEED, forcedResolver(humanAlwaysWins));
     const start = handleSeasonRunCommand(
-      commandOf(context.run, { command: 'start-postseason', commandId: commandIdSchema.parse('start-1') }),
+      commandOf(context.run, {
+        command: 'start-postseason',
+        commandId: commandIdSchema.parse('start-1'),
+      }),
       context,
     );
     if (start.result.result.status !== 'accepted') throw new Error('start rejected');
@@ -1228,7 +1239,10 @@ describe('command-driven postseason flow', () => {
       health: { ...start.run.health, injuries: seasonEndingInjuries(start.run, HUMAN, 2, 'd') },
     };
     const advance = handleSeasonRunCommand(
-      commandOf(injured, { command: 'advance-postseason', commandId: commandIdSchema.parse('adv-1') }),
+      commandOf(injured, {
+        command: 'advance-postseason',
+        commandId: commandIdSchema.parse('adv-1'),
+      }),
       { ...context, run: injured },
     );
     const advanceResult = advance.result;
@@ -1253,7 +1267,10 @@ describe('command-driven postseason flow', () => {
     );
     if (submit.result.result.status !== 'accepted') throw new Error('submit rejected');
     const nextAdvance = handleSeasonRunCommand(
-      commandOf(submit.run, { command: 'advance-postseason', commandId: commandIdSchema.parse('adv-2') }),
+      commandOf(submit.run, {
+        command: 'advance-postseason',
+        commandId: commandIdSchema.parse('adv-2'),
+      }),
       { ...context, run: submit.run },
     );
     const nextResult = nextAdvance.result;
@@ -1278,14 +1295,20 @@ describe('command-driven postseason flow', () => {
     const before = aiRotationsOf(context.run);
     let ctx = context;
     const start = handleSeasonRunCommand(
-      commandOf(ctx.run, { command: 'start-postseason', commandId: commandIdSchema.parse('start-1') }),
+      commandOf(ctx.run, {
+        command: 'start-postseason',
+        commandId: commandIdSchema.parse('start-1'),
+      }),
       ctx,
     );
     if (start.result.result.status !== 'accepted') throw new Error('start rejected');
     ctx = { ...ctx, run: start.run };
     for (let index = 1; index < 100; index += 1) {
       const advance = handleSeasonRunCommand(
-        commandOf(ctx.run, { command: 'advance-postseason', commandId: commandIdSchema.parse(`adv-${String(index)}`) }),
+        commandOf(ctx.run, {
+          command: 'advance-postseason',
+          commandId: commandIdSchema.parse(`adv-${String(index)}`),
+        }),
         ctx,
       );
       const advanceOutput = advance.result;
@@ -1315,7 +1338,10 @@ describe('command-driven postseason flow', () => {
   it('returns the typed rotation decision when the human cannot field a legal five', () => {
     const context = postseasonContext(TEST_SEED, forcedResolver(humanAlwaysWins));
     const start = handleSeasonRunCommand(
-      commandOf(context.run, { command: 'start-postseason', commandId: commandIdSchema.parse('start-1') }),
+      commandOf(context.run, {
+        command: 'start-postseason',
+        commandId: commandIdSchema.parse('start-1'),
+      }),
       context,
     );
     if (start.result.result.status !== 'accepted') throw new Error('start rejected');
@@ -1324,7 +1350,10 @@ describe('command-driven postseason flow', () => {
       health: { ...start.run.health, injuries: seasonEndingInjuries(start.run, HUMAN, 6, 'c') },
     };
     const advance = handleSeasonRunCommand(
-      commandOf(injured, { command: 'advance-postseason', commandId: commandIdSchema.parse('adv-1') }),
+      commandOf(injured, {
+        command: 'advance-postseason',
+        commandId: commandIdSchema.parse('adv-1'),
+      }),
       { ...context, run: injured },
     );
     const result = advance.result;
@@ -1369,7 +1398,10 @@ describe('command-driven postseason flow', () => {
   it('spectates after elimination and fast-forwards to the champion', () => {
     const context = postseasonContext(TEST_SEED, forcedResolver(humanLosesEarly));
     const start = handleSeasonRunCommand(
-      commandOf(context.run, { command: 'start-postseason', commandId: commandIdSchema.parse('start-1') }),
+      commandOf(context.run, {
+        command: 'start-postseason',
+        commandId: commandIdSchema.parse('start-1'),
+      }),
       context,
     );
     if (start.result.result.status !== 'accepted') throw new Error('start rejected');
@@ -1417,7 +1449,10 @@ describe('command-driven postseason flow', () => {
     expect(spectateResult.result.status).toBe('accepted');
     expect(spectate.postseasonSummaries?.[0]?.gameId).toBe('po-west-first-round-1-g2');
     const fastForward = handleSeasonRunCommand(
-      commandOf(spectate.run, { command: 'fast-forward-postseason', commandId: commandIdSchema.parse('ff-1') }),
+      commandOf(spectate.run, {
+        command: 'fast-forward-postseason',
+        commandId: commandIdSchema.parse('ff-1'),
+      }),
       { ...context, run: spectate.run },
     );
     const ffResult = fastForward.result;
@@ -1447,7 +1482,10 @@ describe('command-driven postseason flow', () => {
     );
     if (start.result.result.status !== 'accepted') throw new Error('start rejected');
     const fastForward = handleSeasonRunCommand(
-      commandOf(start.run, { command: 'fast-forward-postseason', commandId: commandIdSchema.parse('ff-1') }),
+      commandOf(start.run, {
+        command: 'fast-forward-postseason',
+        commandId: commandIdSchema.parse('ff-1'),
+      }),
       { ...context, run: start.run },
     );
     const ffResult = fastForward.result;
@@ -1602,6 +1640,3 @@ describe('helper consistency', () => {
     expect(seasonPostseasonHumanEliminated(lostFinal, HUMAN)).toBe(true);
   });
 });
-
-
-

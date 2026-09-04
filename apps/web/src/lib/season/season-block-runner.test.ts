@@ -21,7 +21,14 @@ import {
   type SeasonSchedule,
   type SeasonStandings,
 } from '@hoop-rush/data-contracts';
-import { franchiseIdSchema, idSchema, playerIdSchema, commandIdSchema, seedSchema, seasonGameIdSchema } from '@hoop-rush/data-contracts';
+import {
+  franchiseIdSchema,
+  idSchema,
+  playerIdSchema,
+  commandIdSchema,
+  seedSchema,
+  seasonGameIdSchema,
+} from '@hoop-rush/data-contracts';
 import { buildSeasonLeague, buildSeasonRunFixture } from '@hoop-rush/test-fixtures';
 import { createSeasonBlockRunner, type SeasonBlockStartInput } from './season-block-runner';
 const LEAGUE = buildSeasonLeague({}, { humanFranchiseId: franchiseIdSchema.parse('lakers') });
@@ -67,7 +74,11 @@ function makeRun(): SeasonRun {
     objectives: {
       ...base.objectives,
       selections: {
-        0: { objectiveId: 'win-six' as const, selectedByCommandId: commandIdSchema.parse('cmd-select-0'), success: null },
+        0: {
+          objectiveId: 'win-six' as const,
+          selectedByCommandId: commandIdSchema.parse('cmd-select-0'),
+          success: null,
+        },
       },
     },
   };
@@ -380,7 +391,10 @@ function makeCandidate(
   const parsed = seasonCandidateCheckpointSchema.parse(base);
   return { ...parsed, digest: seasonCheckpointDigest(parsed) };
 }
-function makePending(run: SeasonRun, nextGameId = seasonGameIdSchema.parse('s000016')): SeasonPendingBlockCandidate {
+function makePending(
+  run: SeasonRun,
+  nextGameId = seasonGameIdSchema.parse('s000016'),
+): SeasonPendingBlockCandidate {
   return {
     schemaVersion: 1,
     blockVersion: 'season-block-v5',
@@ -862,7 +876,13 @@ describe('season block runner (M2.5 wire)', () => {
     });
     await flush();
     expect(events.some((event) => event.type === 'complete')).toBe(true);
-    runner.startBlock(startInput(run, { blockIndex: 1, expectedRevision: 1, commandId: commandIdSchema.parse('cmd-2') }));
+    runner.startBlock(
+      startInput(run, {
+        blockIndex: 1,
+        expectedRevision: 1,
+        commandId: commandIdSchema.parse('cmd-2'),
+      }),
+    );
     await flush();
     const continuation = seasonWorkerContinueRequestSchema.parse(worker?.posted[1]);
     expect(continuation.type).toBe('season-block-continue');

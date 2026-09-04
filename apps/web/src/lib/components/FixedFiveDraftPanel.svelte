@@ -133,8 +133,7 @@
       rerollEraSpent: tokens.eraSpent,
       complete: false,
       turn: picker === selfId,
-      turnText:
-        picker === selfId ? 'Your pick — alternating draft.' : 'Opponent is picking…',
+      turnText: picker === selfId ? 'Your pick — alternating draft.' : 'Opponent is picking…',
     };
   });
 
@@ -203,9 +202,7 @@
     return rows;
   });
   const sandboxLocked = $derived(
-    replay.mode === 'sandbox-shared-82'
-      ? (selfId === 'p1' ? replay.p1 : replay.p2).locked
-      : false,
+    replay.mode === 'sandbox-shared-82' ? (selfId === 'p1' ? replay.p1 : replay.p2).locked : false,
   );
 </script>
 
@@ -220,7 +217,10 @@
     </p>
   {/if}
   {#if error}
-    <p class="mt-2 rounded-lg border border-destructive/40 bg-destructive/10 p-2 text-xs" role="alert">
+    <p
+      class="mt-2 rounded-lg border border-destructive/40 bg-destructive/10 p-2 text-xs"
+      role="alert"
+    >
       {error}
     </p>
   {/if}
@@ -334,13 +334,11 @@
           countLabel={`${sandboxRows.length} players`}
           filtersEditable={true}
           manifest={assets.manifest}
-          presentation={presentation}
+          {presentation}
           error={null}
           emptyMessage="No players match."
           onpick={(player) => {
-            const used = new Set(
-              courtRows.flatMap((row, i) => (row ? [i as SlotIndex] : [])),
-            );
+            const used = new Set(courtRows.flatMap((row, i) => (row ? [i as SlotIndex] : [])));
             for (const slot of [0, 1, 2, 3, 4] as SlotIndex[]) {
               if (used.has(slot)) continue;
               if (!canPlay(player.positionsPlayable, slotRequirementOf(slot))) continue;

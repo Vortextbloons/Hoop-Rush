@@ -590,12 +590,8 @@ export function summarizeWorkerEntries(input: WorkerSummaryInput): {
     return { result, weakestReplacedOpponentId: null };
   }
   const h2h = input.entries.filter((entry) => entry.tag === 'h2h').map((entry) => entry.game);
-  const p1NonH2h = input.entries
-    .filter((entry) => entry.tag === 'p1')
-    .map((entry) => entry.game);
-  const p2NonH2h = input.entries
-    .filter((entry) => entry.tag === 'p2')
-    .map((entry) => entry.game);
+  const p1NonH2h = input.entries.filter((entry) => entry.tag === 'p1').map((entry) => entry.game);
+  const p2NonH2h = input.entries.filter((entry) => entry.tag === 'p2').map((entry) => entry.game);
   const { result } = summarizeShared82Games({
     bracket: input.bracket,
     rootSeed: input.rootSeed,

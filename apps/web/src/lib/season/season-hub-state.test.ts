@@ -19,7 +19,12 @@ import {
   type SeasonRunCommand,
   type SeasonStandings,
 } from '@hoop-rush/data-contracts';
-import { franchiseIdSchema, eraIdSchema, seedSchema, commandIdSchema } from '@hoop-rush/data-contracts';
+import {
+  franchiseIdSchema,
+  eraIdSchema,
+  seedSchema,
+  commandIdSchema,
+} from '@hoop-rush/data-contracts';
 import type { SeasonRunSnapshot } from '@hoop-rush/persistence';
 import {
   generateSeasonSchedule,
@@ -248,7 +253,12 @@ describe('SeasonHubState between-block commands', () => {
       archivedPairs: [],
     };
     const run = {
-      ...buildSeasonRunFixture({ schedule, league, seed, humanFranchiseId: franchiseIdSchema.parse('lakers') }),
+      ...buildSeasonRunFixture({
+        schedule,
+        league,
+        seed,
+        humanFranchiseId: franchiseIdSchema.parse('lakers'),
+      }),
       effects,
     } as SeasonRunSnapshot['run'];
     const initial: SeasonRunSnapshot = {

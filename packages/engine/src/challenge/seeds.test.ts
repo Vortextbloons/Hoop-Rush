@@ -5,8 +5,9 @@ describe('deriveGameSeed (spec/01 per-game seeds)', () => {
   it('emits schema-valid hex seeds', () => {
     for (let game = 1; game <= 82; game += 1) {
       expect(
-        seedSchema.safeParse(deriveGameSeed(seedSchema.parse('cafe1234cafe1234cafe1234cafe1234'), game))
-          .success,
+        seedSchema.safeParse(
+          deriveGameSeed(seedSchema.parse('cafe1234cafe1234cafe1234cafe1234'), game),
+        ).success,
       ).toBe(true);
     }
   });
@@ -27,7 +28,11 @@ describe('deriveGameSeed (spec/01 per-game seeds)', () => {
   });
   it('rejects game numbers outside 1..82', () => {
     expect(() => deriveGameSeed(seedSchema.parse('abcd1234abcd1234abcd1234abcd1234'), 0)).toThrow();
-    expect(() => deriveGameSeed(seedSchema.parse('abcd1234abcd1234abcd1234abcd1234'), 83)).toThrow();
-    expect(() => deriveGameSeed(seedSchema.parse('abcd1234abcd1234abcd1234abcd1234'), 1.5)).toThrow();
+    expect(() =>
+      deriveGameSeed(seedSchema.parse('abcd1234abcd1234abcd1234abcd1234'), 83),
+    ).toThrow();
+    expect(() =>
+      deriveGameSeed(seedSchema.parse('abcd1234abcd1234abcd1234abcd1234'), 1.5),
+    ).toThrow();
   });
 });

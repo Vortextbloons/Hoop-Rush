@@ -204,7 +204,11 @@ describe('objectiveChoicesViewModel / currentObjectiveBlock', () => {
   });
   it('keeps the current block after a selection until that block is simulated', () => {
     const run = runWithObjectives({
-      '0': { objectiveId: 'bench-320', selectedByCommandId: commandIdSchema.parse('obj-1'), success: null },
+      '0': {
+        objectiveId: 'bench-320',
+        selectedByCommandId: commandIdSchema.parse('obj-1'),
+        success: null,
+      },
     });
     expect(currentObjectiveBlock(run)).toBe(0);
     const vm = objectiveChoicesViewModel(run);
@@ -214,7 +218,11 @@ describe('objectiveChoicesViewModel / currentObjectiveBlock', () => {
   });
   it('advances to the next block after the cursor moves', () => {
     const run = runWithObjectives({
-      '0': { objectiveId: 'bench-320', selectedByCommandId: commandIdSchema.parse('obj-1'), success: true },
+      '0': {
+        objectiveId: 'bench-320',
+        selectedByCommandId: commandIdSchema.parse('obj-1'),
+        success: true,
+      },
     });
     run.cursor.completedRounds = 10;
     expect(currentObjectiveBlock(run)).toBe(1);

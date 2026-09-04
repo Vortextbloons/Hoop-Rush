@@ -7,11 +7,7 @@ import type {
   SeasonRoster,
   SeasonRun,
 } from '@hoop-rush/data-contracts';
-import {
-  contentHashSchema,
-  franchiseIdSchema,
-  playerIdSchema,
-} from '@hoop-rush/data-contracts';
+import { contentHashSchema, franchiseIdSchema, playerIdSchema } from '@hoop-rush/data-contracts';
 import {
   SEASON_FREE_AGENCY_BAND_SIGNING_CAPS,
   SEASON_FREE_AGENCY_WINDOW_MAX_CANDIDATES,
@@ -313,9 +309,9 @@ describe('free-agency resolution', () => {
     expect(transaction).toBeDefined();
     expect(transaction?.type).toBe('free-agent-signing');
     expect(resolved.freeAgency.signingCounts[franchiseIdSchema.parse(HUMAN)]).toBe(1);
-    expect(
-      resolved.freeAgency.seasonSpend[franchiseIdSchema.parse(HUMAN)],
-    ).toBe(humanSigning.influenceCost);
+    expect(resolved.freeAgency.seasonSpend[franchiseIdSchema.parse(HUMAN)]).toBe(
+      humanSigning.influenceCost,
+    );
     expect(resolved.freeAgency.windows[0]?.status).toBe('resolved');
   });
   it('appends exactly one transaction per signing without duplicating prior entries', () => {

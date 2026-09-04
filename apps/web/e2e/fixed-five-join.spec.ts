@@ -19,9 +19,9 @@ test.describe('fixed-five join: guest sees the room', () => {
     }
     expect(code).toMatch(/^[0-9]{4}$/);
     await page.getByRole('button', { name: /Enter lobby/i }).click();
-    await expect(page.getByRole('heading', { name: new RegExp(`room ${code}`, 'i') })).toBeVisible(
-      { timeout: 15_000 },
-    );
+    await expect(page.getByRole('heading', { name: new RegExp(`room ${code}`, 'i') })).toBeVisible({
+      timeout: 15_000,
+    });
     const url = page.url();
     const roomId = url.split('/multiplayer/room/')[1]?.split(/[?#]/)[0] ?? 'unknown';
     console.log(`E2E_ROOM ${roomId}`);
@@ -41,15 +41,12 @@ test.describe('fixed-five join: guest sees the room', () => {
     await page.getByRole('button', { name: /^Join/i }).click();
   }
 
-  async function expectGuestInRoom(
-    guest: Page,
-    code: string,
-  ): Promise<void> {
+  async function expectGuestInRoom(guest: Page, code: string): Promise<void> {
     // The user's exact symptom: stuck on the join screen with the fallback error.
     await expect(guest.getByText(FALLBACK_ERROR)).toHaveCount(0);
-    await expect(
-      guest.getByRole('heading', { name: new RegExp(`room ${code}`, 'i') }),
-    ).toBeVisible({ timeout: 20_000 });
+    await expect(guest.getByRole('heading', { name: new RegExp(`room ${code}`, 'i') })).toBeVisible(
+      { timeout: 20_000 },
+    );
     await expect(guest.getByText(FALLBACK_ERROR)).toHaveCount(0);
   }
 

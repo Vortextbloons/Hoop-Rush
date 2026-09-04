@@ -159,9 +159,7 @@ function completedPostseason(seed: string, champion: string) {
 function baseRun(stage: SeasonRunStage = 'regular-season'): SeasonRun {
   return { ...buildRun(), stage };
 }
-function basePostseasonSummary(
-  overrides: Record<string, unknown> = {},
-): SeasonPostseasonSummary {
+function basePostseasonSummary(overrides: Record<string, unknown> = {}): SeasonPostseasonSummary {
   const players = Array.from({ length: 10 }, (_, i) => ({
     playerVersionId: fixturePlayerId(i),
     seconds: 1800,

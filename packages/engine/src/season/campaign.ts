@@ -721,10 +721,7 @@ export function normalizeCampaignState(state: unknown): SeasonCampaignState {
   if (state === undefined || state === null) return buildEmptyCampaignState();
   const parsed = seasonCampaignStateSchema.safeParse(state);
   if (!parsed.success) return buildEmptyCampaignState();
-  if (
-    parsed.data.campaignVersion === SEASON_CAMPAIGN_VERSION &&
-    parsed.data.schemaVersion === 1
-  ) {
+  if (parsed.data.campaignVersion === SEASON_CAMPAIGN_VERSION && parsed.data.schemaVersion === 1) {
     return parsed.data;
   }
   return buildEmptyCampaignState();

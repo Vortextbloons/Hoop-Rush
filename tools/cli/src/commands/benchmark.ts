@@ -2,11 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { cpus } from 'node:os';
 import { isAbsolute, resolve } from 'node:path';
 import { createChallenge, createEngineContext, simulateChallenge } from '@hoop-rush/engine';
-import {
-  eraIdSchema,
-  franchiseIdSchema,
-  idSchema,
-} from '@hoop-rush/data-contracts';
+import { eraIdSchema, franchiseIdSchema, idSchema } from '@hoop-rush/data-contracts';
 import { EXIT_USAGE_OR_DATA_ERROR, makeReport, type CliReport } from '../report.ts';
 import { benchmarkReportSchema, type BenchmarkReport } from '../report-schemas.ts';
 import { loadPackagedData, PackagedData, REPO_ROOT } from './data-loader.ts';

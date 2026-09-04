@@ -482,24 +482,16 @@ describe('full tournament', () => {
       expect(westTeamsInBracket.has(id)).toBe(false);
     }
     expect(
-      eastTeamsInBracket.has(
-        franchiseIdSchema.parse(bracket.finals.homeCourtFranchiseId ?? ''),
-      ),
+      eastTeamsInBracket.has(franchiseIdSchema.parse(bracket.finals.homeCourtFranchiseId ?? '')),
     ).toBe(true);
     expect(
-      westTeamsInBracket.has(
-        franchiseIdSchema.parse(bracket.finals.homeCourtFranchiseId ?? ''),
-      ),
+      westTeamsInBracket.has(franchiseIdSchema.parse(bracket.finals.homeCourtFranchiseId ?? '')),
     ).toBe(false);
     expect(
-      eastTeamsInBracket.has(
-        franchiseIdSchema.parse(bracket.finals.challengerFranchiseId ?? ''),
-      ),
+      eastTeamsInBracket.has(franchiseIdSchema.parse(bracket.finals.challengerFranchiseId ?? '')),
     ).toBe(false);
     expect(
-      westTeamsInBracket.has(
-        franchiseIdSchema.parse(bracket.finals.challengerFranchiseId ?? ''),
-      ),
+      westTeamsInBracket.has(franchiseIdSchema.parse(bracket.finals.challengerFranchiseId ?? '')),
     ).toBe(true);
   });
   it('is deterministic across seeded runs and consistent after every game', () => {

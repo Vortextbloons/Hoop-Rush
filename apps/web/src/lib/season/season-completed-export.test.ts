@@ -4,7 +4,15 @@ import {
   seasonReplayAssetHashesOf,
 } from './season-completed-export';
 import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-import { franchiseIdSchema, eraIdSchema, seasonKeySchema, playerIdSchema, seedSchema, contentHashSchema, idSchema } from '@hoop-rush/data-contracts';
+import {
+  franchiseIdSchema,
+  eraIdSchema,
+  seasonKeySchema,
+  playerIdSchema,
+  seedSchema,
+  contentHashSchema,
+  idSchema,
+} from '@hoop-rush/data-contracts';
 import type { SeasonCompletedSeason } from '@hoop-rush/persistence';
 import {
   SEASON_EMPTY_COMMAND_LOG_DIGEST,
@@ -21,19 +29,45 @@ function manifest(): HoopRushManifest {
       teamExternalId: `team-${String(index)}`,
     })),
     franchiseLineage: [],
-    eras: [{ eraId: eraIdSchema.parse('1990s'), label: '1990s', fromSeasonKey: seasonKeySchema.parse('1990-91'), toSeasonKey: seasonKeySchema.parse('1999-00') }],
+    eras: [
+      {
+        eraId: eraIdSchema.parse('1990s'),
+        label: '1990s',
+        fromSeasonKey: seasonKeySchema.parse('1990-91'),
+        toSeasonKey: seasonKeySchema.parse('1999-00'),
+      },
+    ],
     pools: [],
     availability: [],
     eraSimulationProfiles: [
-      { eraId: eraIdSchema.parse('1990s'), url: 'era-sim/1990s.json', contentHash: contentHashSchema.parse('a'.repeat(64)) },
+      {
+        eraId: eraIdSchema.parse('1990s'),
+        url: 'era-sim/1990s.json',
+        contentHash: contentHashSchema.parse('a'.repeat(64)),
+      },
     ],
     season: {
       league: { url: 'season/league.json', contentHash: contentHashSchema.parse('b'.repeat(64)) },
-      schedule: { url: 'season/schedule.json', contentHash: contentHashSchema.parse('c'.repeat(64)) },
-      draftCatalog: { url: 'season/draft-catalog.json', contentHash: contentHashSchema.parse('d'.repeat(64)) },
-      rosterTargets: { url: 'season/roster-targets.json', contentHash: contentHashSchema.parse('e'.repeat(64)) },
-      freeAgencyIndex: { url: 'season/free-agency-index.json', contentHash: contentHashSchema.parse('f'.repeat(64)) },
-      freeAgencyTargets: { url: 'season/free-agency-targets.json', contentHash: contentHashSchema.parse('1'.repeat(64)) },
+      schedule: {
+        url: 'season/schedule.json',
+        contentHash: contentHashSchema.parse('c'.repeat(64)),
+      },
+      draftCatalog: {
+        url: 'season/draft-catalog.json',
+        contentHash: contentHashSchema.parse('d'.repeat(64)),
+      },
+      rosterTargets: {
+        url: 'season/roster-targets.json',
+        contentHash: contentHashSchema.parse('e'.repeat(64)),
+      },
+      freeAgencyIndex: {
+        url: 'season/free-agency-index.json',
+        contentHash: contentHashSchema.parse('f'.repeat(64)),
+      },
+      freeAgencyTargets: {
+        url: 'season/free-agency-targets.json',
+        contentHash: contentHashSchema.parse('1'.repeat(64)),
+      },
     },
     assets: {
       headshotUrlTemplate: null,

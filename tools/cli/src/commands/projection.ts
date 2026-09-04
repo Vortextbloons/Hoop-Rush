@@ -390,7 +390,9 @@ function aggregateReferencePlayer(
         }
       : undefined;
   return {
-    playerId: playerIdSchema.parse(`ref-${label.toLowerCase().replaceAll(' ', '-')}-s${String(slotIndex + 1)}`),
+    playerId: playerIdSchema.parse(
+      `ref-${label.toLowerCase().replaceAll(' ', '-')}-s${String(slotIndex + 1)}`,
+    ),
     displayName: label,
     positions: SLOT_POSITIONS[slotIndex] ?? ['PG'],
     heightInches: Math.round(meanOf(pool.map((p) => p.heightInches ?? 0))),

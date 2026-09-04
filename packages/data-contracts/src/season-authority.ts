@@ -96,8 +96,16 @@ export function buildMultiplayerAuthority(input: {
 }): SeasonRunAuthority {
   return {
     kind: 'season-multiplayer',
-    p1: { participantId: 'p1', franchiseId: franchiseIdSchema.parse(input.p1FranchiseId), seat: 'p1' },
-    p2: { participantId: 'p2', franchiseId: franchiseIdSchema.parse(input.p2FranchiseId), seat: 'p2' },
+    p1: {
+      participantId: 'p1',
+      franchiseId: franchiseIdSchema.parse(input.p1FranchiseId),
+      seat: 'p1',
+    },
+    p2: {
+      participantId: 'p2',
+      franchiseId: franchiseIdSchema.parse(input.p2FranchiseId),
+      seat: 'p2',
+    },
     pace: input.pace,
     timerPolicyVersion: SEASON_TIMER_POLICY_VERSION,
     authorityVersion: SEASON_AUTHORITY_VERSION,

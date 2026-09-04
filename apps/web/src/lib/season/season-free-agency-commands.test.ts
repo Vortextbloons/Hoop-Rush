@@ -17,7 +17,15 @@ import {
   type SeasonRun,
   type SeasonRosterTargets,
 } from '@hoop-rush/data-contracts';
-import { franchiseIdSchema, eraIdSchema, seasonKeySchema, playerIdSchema, commandIdSchema, seedSchema, contentHashSchema } from '@hoop-rush/data-contracts';
+import {
+  franchiseIdSchema,
+  eraIdSchema,
+  seasonKeySchema,
+  playerIdSchema,
+  commandIdSchema,
+  seedSchema,
+  contentHashSchema,
+} from '@hoop-rush/data-contracts';
 import type { SeasonRunRepository } from '@hoop-rush/persistence';
 import type { SeasonRunCommandApplication, SeasonRunSnapshot } from '@hoop-rush/persistence';
 import { buildSeasonLeague, buildSeasonRunFixture } from '@hoop-rush/test-fixtures';
@@ -688,7 +696,11 @@ describe('block-submit gating (free-agency-unresolved)', () => {
       objectives: {
         ...base.objectives,
         selections: {
-          3: { objectiveId: 'win-six' as const, selectedByCommandId: commandIdSchema.parse('cmd-obj-3'), success: null },
+          3: {
+            objectiveId: 'win-six' as const,
+            selectedByCommandId: commandIdSchema.parse('cmd-obj-3'),
+            success: null,
+          },
         },
       },
     };

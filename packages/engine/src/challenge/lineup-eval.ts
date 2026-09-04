@@ -1,4 +1,9 @@
-import type { EraSimulationProfile, GameResult, Seed, SimulationTeam } from '@hoop-rush/data-contracts';
+import type {
+  EraSimulationProfile,
+  GameResult,
+  Seed,
+  SimulationTeam,
+} from '@hoop-rush/data-contracts';
 import { seedSchema } from '@hoop-rush/data-contracts';
 import type { EngineContext } from '../sim/context.ts';
 import { simulateGame } from '../sim/game.ts';

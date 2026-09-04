@@ -405,7 +405,10 @@ function customCatalog(
   }
   return { ...buildSeasonDraftCatalog(), pools, candidates };
 }
-function stateWithNinePicks(catalog: SeasonDraftCatalog, rootSeed: Seed | string): SeasonDraftState {
+function stateWithNinePicks(
+  catalog: SeasonDraftCatalog,
+  rootSeed: Seed | string,
+): SeasonDraftState {
   const created = createSolo(catalog, LEAGUE, seedSchema.parse(rootSeed));
   expectAccepted(created.record);
   const state = requireState(created.state, 'create');

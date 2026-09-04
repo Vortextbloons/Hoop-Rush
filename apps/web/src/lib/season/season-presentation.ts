@@ -371,7 +371,10 @@ export function foldSeasonAggregates(summaries: readonly SeasonGameSummary[]): {
     teams.set(franchiseId, zero);
     return zero;
   };
-  const touchPlayer = (playerVersionId: string, franchiseId: FranchiseId): SeasonPlayerAggregate => {
+  const touchPlayer = (
+    playerVersionId: string,
+    franchiseId: FranchiseId,
+  ): SeasonPlayerAggregate => {
     const existing = players.get(playerVersionId);
     if (existing) return existing;
     const zero: SeasonPlayerAggregate = {
@@ -844,8 +847,7 @@ export function blockFreeAgencyEvidenceOf(input: {
   );
   const parsedHuman =
     input.humanFranchiseId === null ? null : franchiseIdSchema.parse(input.humanFranchiseId);
-  const humanDelta =
-    parsedHuman === null ? 0 : (freeAgency.seasonSpend[parsedHuman] ?? 0);
+  const humanDelta = parsedHuman === null ? 0 : (freeAgency.seasonSpend[parsedHuman] ?? 0);
   return {
     windowIndex: resolvedWindow?.windowIndex ?? null,
     signings: (resolvedWindow?.signings ?? []).map((signing) => ({
@@ -855,8 +857,7 @@ export function blockFreeAgencyEvidenceOf(input: {
       influenceCost: signing.influenceCost,
     })),
     influenceDelta: -humanDelta,
-    seasonSignings:
-      parsedHuman === null ? 0 : (freeAgency.signingCounts[parsedHuman] ?? 0),
+    seasonSignings: parsedHuman === null ? 0 : (freeAgency.signingCounts[parsedHuman] ?? 0),
     seasonSpend: humanDelta,
   };
 }

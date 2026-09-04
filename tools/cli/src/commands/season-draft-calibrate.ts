@@ -281,7 +281,12 @@ export function runSeasonDraftCalibrationSeeds(args: {
   targets: SeasonRosterTargets;
 }): SeasonDraftCalibrationRun[] {
   return args.seeds.map((seed) =>
-    playSeasonDraftCalibrationSeed({ seed, catalog: args.catalog, league: args.league, targets: args.targets }),
+    playSeasonDraftCalibrationSeed({
+      seed,
+      catalog: args.catalog,
+      league: args.league,
+      targets: args.targets,
+    }),
   );
 }
 function median(values: readonly number[]): number {

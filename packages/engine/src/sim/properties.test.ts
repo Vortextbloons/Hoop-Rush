@@ -68,9 +68,7 @@ const SLOT_ORDER: readonly SimulationPlayer['positions'][] = [
   ['C'],
 ];
 const playerArb: fc.Arbitrary<SimulationPlayer> = fc.record({
-  playerId: fc
-    .stringMatching(/^[a-z0-9][a-z0-9._:-]{2,11}$/)
-    .map((id) => playerIdSchema.parse(id)),
+  playerId: fc.stringMatching(/^[a-z0-9][a-z0-9._:-]{2,11}$/).map((id) => playerIdSchema.parse(id)),
   displayName: fc.string({ minLength: 3, maxLength: 12 }),
   positions: fc.constantFrom<SimulationPlayer['positions']>(['PG'], ['SG'], ['SF'], ['PF'], ['C']),
   heightInches: fc.constant<number | null>(78),

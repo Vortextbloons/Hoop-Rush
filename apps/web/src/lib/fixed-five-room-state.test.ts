@@ -27,7 +27,10 @@ function duelReplay(overrides: Partial<Extract<DraftReplay, { mode: 'duel' }>> =
       rootSeed: ROOT,
       firstPicker: 'p1',
       pickOrdinal: 0,
-      currentRoll: { franchiseId: franchiseIdSchema.parse('bulls'), eraId: eraIdSchema.parse('1990s') },
+      currentRoll: {
+        franchiseId: franchiseIdSchema.parse('bulls'),
+        eraId: eraIdSchema.parse('1990s'),
+      },
       picks: [],
       claimedPairs: [],
       claimedVersionIds: [],

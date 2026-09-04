@@ -296,7 +296,8 @@ function buildScheduleEdges(
     if (leftId === undefined || left === undefined) continue;
     for (let b = a + 1; b < teamOrder.length; b += 1) {
       const rightId = teamOrder[b];
-      const right = rightId === undefined ? undefined : teamsById.get(franchiseIdSchema.parse(rightId));
+      const right =
+        rightId === undefined ? undefined : teamsById.get(franchiseIdSchema.parse(rightId));
       if (rightId === undefined || right === undefined) continue;
       let remaining = 2;
       let homeCopies = 1;

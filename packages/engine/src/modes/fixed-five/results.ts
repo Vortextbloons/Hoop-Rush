@@ -100,10 +100,14 @@ export function summarizeShared82Games(groups: Shared82GameGroups): Shared82Summ
       throw new Error(`shared82 is missing game ${String(gameNumber)} for a participant`);
     }
     if (p1Result.seed !== fixedFiveSharedGameSeed(groups.rootSeed, 'p1', gameNumber)) {
-      throw new Error(`shared82 p1 game ${String(gameNumber)} seed does not derive from the root seed`);
+      throw new Error(
+        `shared82 p1 game ${String(gameNumber)} seed does not derive from the root seed`,
+      );
     }
     if (p2Result.seed !== fixedFiveSharedGameSeed(groups.rootSeed, 'p2', gameNumber)) {
-      throw new Error(`shared82 p2 game ${String(gameNumber)} seed does not derive from the root seed`);
+      throw new Error(
+        `shared82 p2 game ${String(gameNumber)} seed does not derive from the root seed`,
+      );
     }
     assertClean(p1Result, `shared82 p1 game ${String(gameNumber)}`);
     assertClean(p2Result, `shared82 p2 game ${String(gameNumber)}`);
@@ -130,8 +134,20 @@ export function summarizeShared82Games(groups: Shared82GameGroups): Shared82Summ
     weakestReplacedOpponentId: weakest.opponentId,
     h2hGameNumbers: h2hNumbers,
     participants: [
-      { participantId: 'p1', wins: p1Wins, losses: 82 - p1Wins, differential: p1Diff, h2hWins: p1H2hWins },
-      { participantId: 'p2', wins: p2Wins, losses: 82 - p2Wins, differential: p2Diff, h2hWins: p2H2hWins },
+      {
+        participantId: 'p1',
+        wins: p1Wins,
+        losses: 82 - p1Wins,
+        differential: p1Diff,
+        h2hWins: p1H2hWins,
+      },
+      {
+        participantId: 'p2',
+        wins: p2Wins,
+        losses: 82 - p2Wins,
+        differential: p2Diff,
+        h2hWins: p2H2hWins,
+      },
     ],
     ranking,
     tiebreakPath: FIXED_FIVE_TIEBREAK_PATH,
@@ -164,7 +180,9 @@ export function summarizeDuelGames(group: DuelGameGroup): {
       );
     }
     if (game.seed !== fixedFiveDuelGameSeed(group.rootSeed, game.gameNumber)) {
-      throw new Error(`duel game ${String(game.gameNumber)} seed does not derive from the root seed`);
+      throw new Error(
+        `duel game ${String(game.gameNumber)} seed does not derive from the root seed`,
+      );
     }
     assertClean(game, `duel game ${String(game.gameNumber)}`);
     const homeIsP1 = game.home.teamId === group.p1TeamId;
@@ -175,7 +193,9 @@ export function summarizeDuelGames(group: DuelGameGroup): {
     if (p1Won) p1Wins += 1;
     else p2Wins += 1;
     if ((p1Wins === 4 || p2Wins === 4) && index !== games.length - 1) {
-      throw new Error(`duel series must stop immediately at four wins (extra game ${String(game.gameNumber)})`);
+      throw new Error(
+        `duel series must stop immediately at four wins (extra game ${String(game.gameNumber)})`,
+      );
     }
   });
   if (p1Wins !== 4 && p2Wins !== 4) {

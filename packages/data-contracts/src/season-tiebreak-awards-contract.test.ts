@@ -104,9 +104,7 @@ export function buildCompletedBracket(
   });
   const conferenceBracket = (conference: 'east' | 'west') => ({
     conference,
-    seeds: Array.from({ length: 8 }, (_, i) =>
-      franchiseIdSchema.parse(`team-${String(i + 1)}`),
-    ),
+    seeds: Array.from({ length: 8 }, (_, i) => franchiseIdSchema.parse(`team-${String(i + 1)}`)),
     firstRound: [1, 2, 3, 4].map((n) =>
       pending(`${conference}-first-round-${String(n)}`, 'first-round', conference),
     ),
@@ -218,9 +216,8 @@ describe('tiebreak resolution contract (M2.6, tiebreaker-v1)', () => {
   it('enforces teams (2-3), slots (1-10, 1-3 entries), and evidence bounds', () => {
     const schema = seasonTiebreakResolutionSchema;
     expect(
-      schema.safeParse(
-        buildTiebreakResolution({ teams: [franchiseIdSchema.parse('team-7')] }),
-      ).success,
+      schema.safeParse(buildTiebreakResolution({ teams: [franchiseIdSchema.parse('team-7')] }))
+        .success,
     ).toBe(false);
     expect(
       schema.safeParse(
@@ -274,9 +271,7 @@ describe('tiebreak resolution contract (M2.6, tiebreaker-v1)', () => {
     expect(schema.safeParse({ ...buildTiebreakResolution(), rule: 'coin-flip' }).success).toBe(
       false,
     );
-    expect(schema.safeParse({ ...buildTiebreakResolution(), drawSeed: 'zzz' }).success).toBe(
-      false,
-    );
+    expect(schema.safeParse({ ...buildTiebreakResolution(), drawSeed: 'zzz' }).success).toBe(false);
     expect(schema.safeParse(buildTiebreakResolution({ drawSeed: null })).success).toBe(true);
   });
   it('enforces the drawSeed/rule coupling at parse time', () => {

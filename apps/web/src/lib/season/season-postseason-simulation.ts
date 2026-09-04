@@ -103,7 +103,9 @@ export function simulateSeasonPostseasonCommand(
     },
   };
 }
-export function seasonPostseasonScorelineOf(summary: SeasonPostseasonSummary): SeasonPostseasonScoreline {
+export function seasonPostseasonScorelineOf(
+  summary: SeasonPostseasonSummary,
+): SeasonPostseasonScoreline {
   return {
     gameId: summary.gameId,
     homeFranchiseId: summary.homeFranchiseId,

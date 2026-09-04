@@ -145,10 +145,8 @@ function basePostseasonSummary(adapters: Adapters): SeasonPostseasonSummary {
     fouls: 2,
   }));
   if (players === undefined) throw new Error('no fixture players');
-  const homeFallback =
-    adapters.run.rosters[0]?.franchiseId ?? franchiseIdSchema.parse('lakers');
-  const awayFallback =
-    adapters.run.rosters[1]?.franchiseId ?? franchiseIdSchema.parse('celtics');
+  const homeFallback = adapters.run.rosters[0]?.franchiseId ?? franchiseIdSchema.parse('lakers');
+  const awayFallback = adapters.run.rosters[1]?.franchiseId ?? franchiseIdSchema.parse('celtics');
   const box = (franchiseId: string) => ({
     franchiseId: franchiseIdSchema.parse(franchiseId),
     points: 100,
@@ -323,8 +321,7 @@ function completedRunOf(
   stateRevision: number,
   awards: SeasonAwards | null = null,
 ): SeasonRun {
-  const parsedChampion =
-    adapters.run.rosters[0]?.franchiseId ?? franchiseIdSchema.parse('lakers');
+  const parsedChampion = adapters.run.rosters[0]?.franchiseId ?? franchiseIdSchema.parse('lakers');
   const base: SeasonRun = {
     ...adapters.run,
     stage: 'completed',

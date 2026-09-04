@@ -657,7 +657,11 @@ describe('spend-influence command', () => {
         ...injured.influence,
         rehabs: {
           ...injured.influence.rehabs,
-          [injuryId]: { franchiseId: HUMAN, outcome: 'pending', commandId: commandIdSchema.parse('previous-rehab') },
+          [injuryId]: {
+            franchiseId: HUMAN,
+            outcome: 'pending',
+            commandId: commandIdSchema.parse('previous-rehab'),
+          },
         },
       },
     };
@@ -760,7 +764,9 @@ describe('accept-trade-offer command', () => {
     const tampered: SeasonRun = {
       ...run,
       ownership: run.ownership.map((row) =>
-        row.playerVersionId === conflictingVersion ? { ...row, ownerFranchiseId: franchiseIdSchema.parse('celtics') } : row,
+        row.playerVersionId === conflictingVersion
+          ? { ...row, ownerFranchiseId: franchiseIdSchema.parse('celtics') }
+          : row,
       ),
     };
     const output = handleSeasonRunCommand(
@@ -1371,7 +1377,10 @@ describe('start-postseason command', () => {
   it('accepts from a completed regular season and moves to the play-in stage', () => {
     const context = postseasonFixture();
     const output = handleSeasonRunCommand(
-      commandOf(context.run, { command: 'start-postseason', commandId: commandIdSchema.parse('start-1') }),
+      commandOf(context.run, {
+        command: 'start-postseason',
+        commandId: commandIdSchema.parse('start-1'),
+      }),
       context,
     );
     const outputResult = output.result;
@@ -1394,18 +1403,27 @@ describe('start-postseason command', () => {
       cursor: { schemaVersion: 1 as const, completedRounds: 80 },
     };
     const incompleteOutput = handleSeasonRunCommand(
-      commandOf(incomplete, { command: 'start-postseason', commandId: commandIdSchema.parse('start-incomplete') }),
+      commandOf(incomplete, {
+        command: 'start-postseason',
+        commandId: commandIdSchema.parse('start-incomplete'),
+      }),
       { ...context, run: incomplete },
     );
     if (incompleteOutput.result.result.status !== 'rejected') throw new Error('expected rejection');
     expect(incompleteOutput.result.result.rejection.code).toBe('invalid-stage');
     const started = handleSeasonRunCommand(
-      commandOf(context.run, { command: 'start-postseason', commandId: commandIdSchema.parse('start-1') }),
+      commandOf(context.run, {
+        command: 'start-postseason',
+        commandId: commandIdSchema.parse('start-1'),
+      }),
       context,
     );
     if (started.result.result.status !== 'accepted') throw new Error('expected acceptance');
     const again = handleSeasonRunCommand(
-      commandOf(started.run, { command: 'start-postseason', commandId: commandIdSchema.parse('start-2') }),
+      commandOf(started.run, {
+        command: 'start-postseason',
+        commandId: commandIdSchema.parse('start-2'),
+      }),
       { ...context, run: started.run },
     );
     if (again.result.result.status !== 'rejected') throw new Error('expected rejection');
@@ -1420,7 +1438,10 @@ describe('start-postseason command', () => {
       }),
     });
     const output = handleSeasonRunCommand(
-      commandOf(context.run, { command: 'start-postseason', commandId: commandIdSchema.parse('start-bad') }),
+      commandOf(context.run, {
+        command: 'start-postseason',
+        commandId: commandIdSchema.parse('start-bad'),
+      }),
       badRankings,
     );
     if (output.result.result.status !== 'rejected') throw new Error('expected rejection');
@@ -1439,7 +1460,10 @@ describe('start-postseason command', () => {
     const context = postseasonFixture();
     const other = buildEconomyTestRun({ runId: 'other-run' }).run;
     const mismatch = handleSeasonRunCommand(
-      commandOf(other, { command: 'start-postseason', commandId: commandIdSchema.parse('start-mismatch') }),
+      commandOf(other, {
+        command: 'start-postseason',
+        commandId: commandIdSchema.parse('start-mismatch'),
+      }),
       context,
     );
     if (mismatch.result.result.status !== 'rejected') throw new Error('expected rejection');
@@ -1453,12 +1477,18 @@ describe('advance-postseason command', () => {
       resolver: forcedPostseasonResolver(humanWinsEveryGame),
     });
     const start = handleSeasonRunCommand(
-      commandOf(context.run, { command: 'start-postseason', commandId: commandIdSchema.parse('start-1') }),
+      commandOf(context.run, {
+        command: 'start-postseason',
+        commandId: commandIdSchema.parse('start-1'),
+      }),
       context,
     );
     if (start.result.result.status !== 'accepted') throw new Error('expected acceptance');
     const output = handleSeasonRunCommand(
-      commandOf(start.run, { command: 'advance-postseason', commandId: commandIdSchema.parse('adv-1') }),
+      commandOf(start.run, {
+        command: 'advance-postseason',
+        commandId: commandIdSchema.parse('adv-1'),
+      }),
       { ...context, run: start.run },
     );
     const outputResult = output.result;
@@ -1480,12 +1510,18 @@ describe('advance-postseason command', () => {
       regularSeasonSummaries: regularSeasonSummariesOf(postseasonFixture().run),
     });
     const start = handleSeasonRunCommand(
-      commandOf(context.run, { command: 'start-postseason', commandId: commandIdSchema.parse('start-1') }),
+      commandOf(context.run, {
+        command: 'start-postseason',
+        commandId: commandIdSchema.parse('start-1'),
+      }),
       context,
     );
     if (start.result.result.status !== 'accepted') throw new Error('expected acceptance');
     const output = handleSeasonRunCommand(
-      commandOf(start.run, { command: 'advance-postseason', commandId: commandIdSchema.parse('adv-1') }),
+      commandOf(start.run, {
+        command: 'advance-postseason',
+        commandId: commandIdSchema.parse('adv-1'),
+      }),
       { ...context, run: start.run },
     );
     const outputResult = output.result;
@@ -1505,7 +1541,10 @@ describe('advance-postseason command', () => {
   it('stops at a human game whose rotation plans minutes for injured players', () => {
     const context = postseasonFixture({ resolver: forcedPostseasonResolver(humanWinsEveryGame) });
     const start = handleSeasonRunCommand(
-      commandOf(context.run, { command: 'start-postseason', commandId: commandIdSchema.parse('start-1') }),
+      commandOf(context.run, {
+        command: 'start-postseason',
+        commandId: commandIdSchema.parse('start-1'),
+      }),
       context,
     );
     if (start.result.result.status !== 'accepted') throw new Error('expected acceptance');
@@ -1531,7 +1570,10 @@ describe('advance-postseason command', () => {
     }));
     const injured = { ...start.run, health: { ...start.run.health, injuries } };
     const output = handleSeasonRunCommand(
-      commandOf(injured, { command: 'advance-postseason', commandId: commandIdSchema.parse('adv-1') }),
+      commandOf(injured, {
+        command: 'advance-postseason',
+        commandId: commandIdSchema.parse('adv-1'),
+      }),
       { ...context, run: injured },
     );
     const outputResult = output.result;
@@ -1550,7 +1592,10 @@ describe('advance-postseason command', () => {
   it('rejects wrong-game targets, invalid stages, and stale states', () => {
     const context = postseasonFixture();
     const start = handleSeasonRunCommand(
-      commandOf(context.run, { command: 'start-postseason', commandId: commandIdSchema.parse('start-1') }),
+      commandOf(context.run, {
+        command: 'start-postseason',
+        commandId: commandIdSchema.parse('start-1'),
+      }),
       context,
     );
     if (start.result.result.status !== 'accepted') throw new Error('expected acceptance');
@@ -1576,7 +1621,10 @@ describe('advance-postseason command', () => {
     if (wrongGame.result.result.rejection.code !== 'wrong-game') throw new Error('unexpected');
     expect(wrongGame.result.result.rejection.nextGameId).toBe('pi-east-final');
     const wrongStage = handleSeasonRunCommand(
-      commandOf(context.run, { command: 'advance-postseason', commandId: commandIdSchema.parse('adv-stage') }),
+      commandOf(context.run, {
+        command: 'advance-postseason',
+        commandId: commandIdSchema.parse('adv-stage'),
+      }),
       context,
     );
     if (wrongStage.result.result.status !== 'rejected') throw new Error('expected rejection');
@@ -1624,13 +1672,19 @@ describe('submit-postseason-rotation command', () => {
   } {
     const context = postseasonFixture({ resolver: forcedPostseasonResolver(humanWinsEveryGame) });
     const start = handleSeasonRunCommand(
-      commandOf(context.run, { command: 'start-postseason', commandId: commandIdSchema.parse('start-1') }),
+      commandOf(context.run, {
+        command: 'start-postseason',
+        commandId: commandIdSchema.parse('start-1'),
+      }),
       context,
     );
     if (start.result.result.status !== 'accepted') throw new Error('expected acceptance');
     const injured = humanInjuredRun({ ...context, run: start.run });
     const advance = handleSeasonRunCommand(
-      commandOf(injured, { command: 'advance-postseason', commandId: commandIdSchema.parse('adv-1') }),
+      commandOf(injured, {
+        command: 'advance-postseason',
+        commandId: commandIdSchema.parse('adv-1'),
+      }),
       { ...context, run: injured },
     );
     const advanceResult = advance.result;
@@ -1871,7 +1925,10 @@ describe('spectate-postseason-game command', () => {
       }),
     });
     const start = handleSeasonRunCommand(
-      commandOf(context.run, { command: 'start-postseason', commandId: commandIdSchema.parse('start-1') }),
+      commandOf(context.run, {
+        command: 'start-postseason',
+        commandId: commandIdSchema.parse('start-1'),
+      }),
       context,
     );
     if (start.result.result.status !== 'accepted') throw new Error('expected acceptance');
@@ -1954,12 +2011,18 @@ describe('fast-forward-postseason command', () => {
       }),
     });
     const start = handleSeasonRunCommand(
-      commandOf(context.run, { command: 'start-postseason', commandId: commandIdSchema.parse('start-1') }),
+      commandOf(context.run, {
+        command: 'start-postseason',
+        commandId: commandIdSchema.parse('start-1'),
+      }),
       context,
     );
     if (start.result.result.status !== 'accepted') throw new Error('expected acceptance');
     const output = handleSeasonRunCommand(
-      commandOf(start.run, { command: 'fast-forward-postseason', commandId: commandIdSchema.parse('ff-1') }),
+      commandOf(start.run, {
+        command: 'fast-forward-postseason',
+        commandId: commandIdSchema.parse('ff-1'),
+      }),
       { ...context, run: start.run },
     );
     const outputResult = output.result;
@@ -1979,7 +2042,10 @@ describe('fast-forward-postseason command', () => {
   it('rejects an active human, an invalid stage, and a bad target', () => {
     const context = postseasonFixture({ resolver: forcedPostseasonResolver(humanWinsEveryGame) });
     const activeStart = handleSeasonRunCommand(
-      commandOf(context.run, { command: 'start-postseason', commandId: commandIdSchema.parse('start-1') }),
+      commandOf(context.run, {
+        command: 'start-postseason',
+        commandId: commandIdSchema.parse('start-1'),
+      }),
       context,
     );
     if (activeStart.result.result.status !== 'accepted') throw new Error('expected acceptance');
@@ -1994,7 +2060,10 @@ describe('fast-forward-postseason command', () => {
     if (activeHuman.result.result.status !== 'rejected') throw new Error('expected rejection');
     expect(activeHuman.result.result.rejection.code).toBe('integrity-failure');
     const wrongStage = handleSeasonRunCommand(
-      commandOf(context.run, { command: 'fast-forward-postseason', commandId: commandIdSchema.parse('ff-stage') }),
+      commandOf(context.run, {
+        command: 'fast-forward-postseason',
+        commandId: commandIdSchema.parse('ff-stage'),
+      }),
       context,
     );
     if (wrongStage.result.result.status !== 'rejected') throw new Error('expected rejection');
@@ -2006,7 +2075,10 @@ describe('fast-forward-postseason command', () => {
       }),
     });
     const start = handleSeasonRunCommand(
-      commandOf(aiOnly.run, { command: 'start-postseason', commandId: commandIdSchema.parse('start-1') }),
+      commandOf(aiOnly.run, {
+        command: 'start-postseason',
+        commandId: commandIdSchema.parse('start-1'),
+      }),
       aiOnly,
     );
     if (start.result.result.status !== 'accepted') throw new Error('expected acceptance');
@@ -2067,9 +2139,3 @@ describe('campaign commands', () => {
     expect(campaign.offers[0]).toHaveLength(2);
   });
 });
-
-
-
-
-
-

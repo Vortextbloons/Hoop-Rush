@@ -3,7 +3,13 @@ import { render } from '@testing-library/svelte';
 import { generateSeasonSchedule } from '@hoop-rush/engine';
 import { buildSeasonLeague, buildSeasonRunFixture } from '@hoop-rush/test-fixtures';
 import type { SeasonGameSummary, SeasonRun } from '@hoop-rush/data-contracts';
-import { franchiseIdSchema, idSchema, commandIdSchema, seedSchema, seasonGameIdSchema } from '@hoop-rush/data-contracts';
+import {
+  franchiseIdSchema,
+  idSchema,
+  commandIdSchema,
+  seedSchema,
+  seasonGameIdSchema,
+} from '@hoop-rush/data-contracts';
 import type { SeasonRunSnapshot } from '@hoop-rush/persistence';
 import type { SeasonRunShellData } from '$lib/season/season-shell-context';
 import { initialSeasonRunShellData } from '$lib/season/season-shell-context';

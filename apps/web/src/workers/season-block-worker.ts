@@ -506,8 +506,14 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
     }
     if (error instanceof SeasonBlockInvariantError) {
       postError(request.requestId, 'invariant-failure', error.message, {
-        seed: error.diagnostics.seed !== undefined ? seedSchema.parse(error.diagnostics.seed) : request.rootSeed,
-        gameId: error.diagnostics.gameId !== undefined ? seasonGameIdSchema.parse(error.diagnostics.gameId) : null,
+        seed:
+          error.diagnostics.seed !== undefined
+            ? seedSchema.parse(error.diagnostics.seed)
+            : request.rootSeed,
+        gameId:
+          error.diagnostics.gameId !== undefined
+            ? seasonGameIdSchema.parse(error.diagnostics.gameId)
+            : null,
         blockIndex: error.diagnostics.blockIndex ?? request.blockIndex,
       });
       return;

@@ -157,9 +157,7 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
       settingsRevision: room.settingsRevision,
       guestReady: room.guestReady,
       presence: this.presenceOf(room),
-      seed: seedSchema.safeParse(room.rootSeed).success
-        ? seedSchema.parse(room.rootSeed)
-        : null,
+      seed: seedSchema.safeParse(room.rootSeed).success ? seedSchema.parse(room.rootSeed) : null,
       isOutdated: outdated || undefined,
     };
     return snap;
