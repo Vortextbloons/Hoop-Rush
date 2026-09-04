@@ -1,24 +1,26 @@
-﻿import { describe, expect, it, vi } from 'vitest';
+﻿import { describe, expect, it } from 'vitest';
 import type { SeasonHealthState, SeasonInfluenceState, SeasonRun } from '@hoop-rush/data-contracts';
-import { commandIdSchema, idSchema, seedSchema, seasonGameIdSchema } from '@hoop-rush/data-contracts';
-vi.mock('@hoop-rush/engine', () => ({
-  seasonObjectiveChoicesForBlock: (_rootSeed: string, blockIndex: number) =>
-    blockIndex === 0
-      ? (['win-six', 'defense-108', 'turnover-130'] as const)
-      : (['bench-320', 'rebound-plus-20', 'availability-eight'] as const),
-}));
+import {
+  commandIdSchema,
+  franchiseIdSchema,
+  idSchema,
+  seedSchema,
+  seasonGameIdSchema,
+} from '@hoop-rush/data-contracts';
+import { seasonObjectiveChoicesForBlock } from '@hoop-rush/engine';
 import {
   canAffordSpend,
   currentObjectiveBlock,
   influenceViewModel,
   objectiveChoicesViewModel,
 } from './season-influence-view';
-const FRANCHISE = 'lakers';
+const FRANCHISE = franchiseIdSchema.parse('lakers');
+const CELTICS = franchiseIdSchema.parse('celtics');
 function influenceState(overrides: Partial<SeasonInfluenceState> = {}): SeasonInfluenceState {
   return {
     schemaVersion: 1,
     influenceVersion: 'season-influence-v2',
-    balances: { [FRANCHISE]: 3, celtics: 2 },
+    balances: { [FRANCHISE]: 3, [CELTICS]: 2 },
     ledger: [
       {
         entryId: idSchema.parse('e-1'),
@@ -76,7 +78,7 @@ function healthWithInjuries(): SeasonHealthState {
 }
 function runWithObjectives(selections: SeasonRun['objectives']['selections']): SeasonRun {
   return {
-    rootSeed: 'a'.repeat(32),
+    rootSeed: seedSchema.parse('a'.repeat(32)),
     cursor: { schemaVersion: 1, completedRounds: 0 },
     objectives: {
       schemaVersion: 1,
@@ -172,7 +174,7 @@ describe('influenceViewModel', () => {
     expect(rehab?.rehabOutcome).toBe('success');
   });
   it('rejects an unaffordable spend (floor 0)', () => {
-    const state = influenceState({ balances: { [FRANCHISE]: 0, celtics: 2 } });
+    const state = influenceState({ balances: { [FRANCHISE]: 0, [CELTICS]: 2 } });
     const vm = influenceViewModel(state, FRANCHISE, healthWithInjuries());
     const rehab = vm.affordances.find((a) => a.purpose === 'risky-rehab');
     expect(rehab?.affordable).toBe(false);
@@ -182,40 +184,37 @@ describe('influenceViewModel', () => {
     expect(canAffordSpend(2, 2)).toBe(true);
   });
   it('marks the cap', () => {
-    const state = influenceState({ balances: { [FRANCHISE]: 8, celtics: 2 } });
+    const state = influenceState({ balances: { [FRANCHISE]: 8, [CELTICS]: 2 } });
     const vm = influenceViewModel(state, FRANCHISE);
     expect(vm.atCap).toBe(true);
   });
 });
 describe('objectiveChoicesViewModel / currentObjectiveBlock', () => {
-  it('offers the mocked three-choice set with the catalog names', () => {
-    const vm = objectiveChoicesViewModel(runWithObjectives({}));
+  it('offers the real engine three-choice set with the catalog names', () => {
+    const run = runWithObjectives({});
+    const vm = objectiveChoicesViewModel(run);
+    const expected = seasonObjectiveChoicesForBlock(run.rootSeed, 0);
     expect(vm.blockIndex).toBe(0);
-    expect(vm.choices.map((choice) => choice.objectiveId)).toEqual([
-      'win-six',
-      'defense-108',
-      'turnover-130',
-    ]);
-    expect(vm.choices[0]).toMatchObject({
-      name: 'Win Six',
-      selected: false,
-    });
+    expect(vm.choices.map((choice) => choice.objectiveId)).toEqual(expected);
+    expect(vm.choices[0]?.objectiveId).toBe(expected[0]);
+    expect(vm.choices[0]?.name.length).toBeGreaterThan(0);
+    expect(vm.choices[0]?.selected).toBe(false);
     expect(vm.selectedObjectiveId).toBeNull();
     expect(vm.success).toBeNull();
   });
   it('keeps the current block after a selection until that block is simulated', () => {
     const run = runWithObjectives({
-      '0': { objectiveId: 'win-six', selectedByCommandId: commandIdSchema.parse('obj-1'), success: null },
+      '0': { objectiveId: 'bench-320', selectedByCommandId: commandIdSchema.parse('obj-1'), success: null },
     });
     expect(currentObjectiveBlock(run)).toBe(0);
     const vm = objectiveChoicesViewModel(run);
     expect(vm.blockIndex).toBe(0);
-    expect(vm.selectedObjectiveId).toBe('win-six');
-    expect(vm.choices.find((choice) => choice.objectiveId === 'win-six')?.selected).toBe(true);
+    expect(vm.selectedObjectiveId).toBe('bench-320');
+    expect(vm.choices.find((choice) => choice.objectiveId === 'bench-320')?.selected).toBe(true);
   });
   it('advances to the next block after the cursor moves', () => {
     const run = runWithObjectives({
-      '0': { objectiveId: 'win-six', selectedByCommandId: commandIdSchema.parse('obj-1'), success: true },
+      '0': { objectiveId: 'bench-320', selectedByCommandId: commandIdSchema.parse('obj-1'), success: true },
     });
     run.cursor.completedRounds = 10;
     expect(currentObjectiveBlock(run)).toBe(1);
@@ -224,8 +223,8 @@ describe('objectiveChoicesViewModel / currentObjectiveBlock', () => {
     expect(vm.selectedObjectiveId).toBeNull();
     expect(vm.lastEvaluation).toMatchObject({
       blockIndex: 0,
-      objectiveId: 'win-six',
-      name: 'Win Six',
+      objectiveId: 'bench-320',
+      name: 'Bench 320',
       success: true,
     });
   });

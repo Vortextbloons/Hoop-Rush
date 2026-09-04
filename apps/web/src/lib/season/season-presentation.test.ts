@@ -196,8 +196,11 @@ describe('provisionalRanking', () => {
     clippers.losses = 1;
     const ranked = provisionalRanking(standings, LEAGUE).filter((e) => e.conference === 'west');
     const order = ranked.map((e) => e.row.franchiseId);
-    expect(order.indexOf('lakers')).toBeLessThan(order.indexOf('warriors'));
-    expect(order.indexOf('warriors')).toBeLessThan(order.indexOf('clippers'));
+    const lakersId = franchiseIdSchema.parse('lakers');
+    const warriorsId = franchiseIdSchema.parse('warriors');
+    const clippersId = franchiseIdSchema.parse('clippers');
+    expect(order.indexOf(lakersId)).toBeLessThan(order.indexOf(warriorsId));
+    expect(order.indexOf(warriorsId)).toBeLessThan(order.indexOf(clippersId));
     const top = ranked[0];
     if (top === undefined) {
       throw new Error('expected west conference rankings');
@@ -272,7 +275,7 @@ describe('foldSeasonAggregates', () => {
       status: 'forfeit',
       homeScore: 2,
       awayScore: 0,
-      forfeitLoserFranchiseId: 'lakers',
+      forfeitLoserFranchiseId: franchiseIdSchema.parse('lakers'),
       homePlayers: [],
       awayPlayers: [],
     });

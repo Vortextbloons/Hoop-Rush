@@ -32,7 +32,14 @@ import {
   type SeasonRunCommand,
   type SeasonStandings,
 } from '@hoop-rush/data-contracts';
-import { eraIdSchema, commandIdSchema, seedSchema, seasonGameIdSchema } from '@hoop-rush/data-contracts';
+import {
+  eraIdSchema,
+  commandIdSchema,
+  franchiseIdSchema,
+  idSchema,
+  seedSchema,
+  seasonGameIdSchema,
+} from '@hoop-rush/data-contracts';
 import {
   handleSeasonRunCommand,
   seasonRunStateDigest,
@@ -67,7 +74,7 @@ import {
 } from './season-postseason-runner';
 import { createSeasonPostseasonEngineSimulator } from './fake-season-postseason-runner';
 const SEED = seedSchema.parse('a1b2c3d4e5f60718293a4b5c6d7e8f9a');
-const HUMAN = 'lakers';
+const HUMAN = franchiseIdSchema.parse('lakers');
 interface TeamSpec {
   w: number;
   l: number;
@@ -409,7 +416,7 @@ function commandOf(
 ): SeasonRunCommand {
   return {
     schemaVersion: SEASON_RUN_SCHEMA_VERSION,
-    commandId,
+    commandId: commandIdSchema.parse(commandId),
     runId: run.runId,
     expectedStateRevision: run.stateRevision,
     expectedStateDigest: run.stateDigest,
@@ -468,7 +475,7 @@ class FakePostseasonRepository implements SeasonRunRepository {
       resultDigest: input.resultDigest,
       previousLogDigest: seasonCommandLogDigest(this.logEntries.slice(0, ordinal)),
       relatedGameIds: [...input.relatedGameIds].sort(),
-      transactionIds: [...input.transactionIds].sort(),
+      transactionIds: [...input.transactionIds].sort().map((id) => idSchema.parse(id)),
     });
     this.summaries.push(...input.summaries);
     const effects =

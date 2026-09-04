@@ -16,7 +16,7 @@ function manifest(): HoopRushManifest {
     schemaVersion: 4,
     dataVersion: 'test',
     modernFranchiseSlots: Array.from({ length: 30 }, (_, index) => ({
-      franchiseId: `team-${String(index)}`,
+      franchiseId: franchiseIdSchema.parse(`team-${String(index)}`),
       displayName: `Team ${String(index)}`,
       teamExternalId: `team-${String(index)}`,
     })),
@@ -25,15 +25,15 @@ function manifest(): HoopRushManifest {
     pools: [],
     availability: [],
     eraSimulationProfiles: [
-      { eraId: eraIdSchema.parse('1990s'), url: 'era-sim/1990s.json', contentHash: contentHashSchema.parse('a').repeat(64) },
+      { eraId: eraIdSchema.parse('1990s'), url: 'era-sim/1990s.json', contentHash: contentHashSchema.parse('a'.repeat(64)) },
     ],
     season: {
-      league: { url: 'season/league.json', contentHash: contentHashSchema.parse('b').repeat(64) },
-      schedule: { url: 'season/schedule.json', contentHash: contentHashSchema.parse('c').repeat(64) },
-      draftCatalog: { url: 'season/draft-catalog.json', contentHash: contentHashSchema.parse('d').repeat(64) },
-      rosterTargets: { url: 'season/roster-targets.json', contentHash: contentHashSchema.parse('e').repeat(64) },
-      freeAgencyIndex: { url: 'season/free-agency-index.json', contentHash: contentHashSchema.parse('f').repeat(64) },
-      freeAgencyTargets: { url: 'season/free-agency-targets.json', contentHash: contentHashSchema.parse('1').repeat(64) },
+      league: { url: 'season/league.json', contentHash: contentHashSchema.parse('b'.repeat(64)) },
+      schedule: { url: 'season/schedule.json', contentHash: contentHashSchema.parse('c'.repeat(64)) },
+      draftCatalog: { url: 'season/draft-catalog.json', contentHash: contentHashSchema.parse('d'.repeat(64)) },
+      rosterTargets: { url: 'season/roster-targets.json', contentHash: contentHashSchema.parse('e'.repeat(64)) },
+      freeAgencyIndex: { url: 'season/free-agency-index.json', contentHash: contentHashSchema.parse('f'.repeat(64)) },
+      freeAgencyTargets: { url: 'season/free-agency-targets.json', contentHash: contentHashSchema.parse('1'.repeat(64)) },
     },
     assets: {
       headshotUrlTemplate: null,

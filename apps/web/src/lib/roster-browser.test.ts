@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  eraIdSchema,
+  franchiseIdSchema,
+  playerIdSchema,
+  seasonKeySchema,
+} from '@hoop-rush/data-contracts';
+import {
   defaultDirection,
   filterRoster,
   formatPct,
@@ -14,14 +20,20 @@ import {
   type RosterDetailRow,
 } from './roster-browser';
 function row(
-  partial: Partial<RosterDetailRow> & {
+  partial: Omit<Partial<RosterDetailRow>, 'playerId' | 'franchiseId' | 'eraId' | 'seasonKey'> & {
     playerId: string;
+    franchiseId?: string;
+    eraId?: string;
+    seasonKey?: string;
   },
 ): RosterDetailRow {
+  const { playerId, franchiseId = 'lakers', eraId = '1990s', seasonKey = '1990-91', ...rest } =
+    partial;
   return {
-    franchiseId: 'lakers',
-    eraId: '1990s',
-    seasonKey: '1990-91',
+    franchiseId: franchiseIdSchema.parse(franchiseId),
+    eraId: eraIdSchema.parse(eraId),
+    seasonKey: seasonKeySchema.parse(seasonKey),
+    playerId: playerIdSchema.parse(playerId),
     firstName: 'Test',
     lastName: 'Player',
     displayName: 'Test Player',
@@ -57,7 +69,7 @@ function row(
       tsPct: 0.6,
       efgPct: 0.54,
     },
-    ...partial,
+    ...rest,
   };
 }
 describe('sortRoster', () => {

@@ -28,6 +28,7 @@ import {
   responseCauseLabel,
 } from '$lib/season/season-presentation';
 import { buildManifest } from '@hoop-rush/test-fixtures';
+import { franchiseIdSchema } from '@hoop-rush/data-contracts';
 mockSvelteKitApp();
 function reward(
   type: SeasonCampaignReward['type'],
@@ -180,9 +181,9 @@ describe('GmIdentityPicker', () => {
     expect(screen.getByRole('radio', { name: /Team identity/ })).toBeTruthy();
     await fireEvent.click(screen.getByRole('radio', { name: /Team identity/ }));
     expect(screen.getByText(/Pick a style focus/)).toBeTruthy();
-    expect(screen.getByTestId('gm-identity-submit').disabled).toBe(true);
+    expect((screen.getByTestId('gm-identity-submit') as HTMLButtonElement).disabled).toBe(true);
     await fireEvent.click(screen.getByLabelText('Defense'));
-    expect(screen.getByTestId('gm-identity-submit').disabled).toBe(false);
+    expect((screen.getByTestId('gm-identity-submit') as HTMLButtonElement).disabled).toBe(false);
     await fireEvent.click(screen.getByTestId('gm-identity-submit'));
     expect(onSelect).toHaveBeenCalledWith({ identity: 'team-identity', focus: 'defense' });
   });
@@ -415,7 +416,7 @@ describe('PackageBuilder', () => {
     expect(screen.getByText(/Inquiry: 2\/4 used/)).toBeTruthy();
     await fireEvent.click(screen.getByRole('option', { name: /You One/ }));
     await fireEvent.click(screen.getByRole('option', { name: /Them One/ }));
-    expect(screen.getByTestId('package-submit').disabled).toBe(false);
+    expect((screen.getByTestId('package-submit') as HTMLButtonElement).disabled).toBe(false);
     expect(screen.queryByText('Both sides send')).toBeNull();
     await fireEvent.click(screen.getByLabelText('You send 1'));
     expect(screen.getByText(/You 12 → 12/)).toBeTruthy();
@@ -461,8 +462,8 @@ describe('NegotiationTranscript', () => {
     const negotiation: SeasonTradeNegotiation = {
       inquiryId: 'inq-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       windowIndex: 0,
-      fromFranchiseId: 'lakers',
-      toFranchiseId: 'celtics',
+      fromFranchiseId: franchiseIdSchema.parse('lakers'),
+      toFranchiseId: franchiseIdSchema.parse('celtics'),
       status: 'countered',
       exchangeCount: 2,
       exchanges: [
@@ -514,8 +515,8 @@ describe('NegotiationTranscript', () => {
     const negotiation: SeasonTradeNegotiation = {
       inquiryId: 'inq-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
       windowIndex: 0,
-      fromFranchiseId: 'lakers',
-      toFranchiseId: 'celtics',
+      fromFranchiseId: franchiseIdSchema.parse('lakers'),
+      toFranchiseId: franchiseIdSchema.parse('celtics'),
       status: 'accepted',
       exchangeCount: 1,
       exchanges: [
@@ -593,7 +594,7 @@ describe('TradeBoardWorkspace distinctive design & a11y', () => {
     } as unknown as SeasonRun;
     const profiles: SeasonTradeBoardTeamProfile[] = [
       {
-        franchiseId: 'celtics',
+        franchiseId: franchiseIdSchema.parse('celtics'),
         needs: ['shooting', 'depth'],
         priority: 'fit',
         listedPlayerIds: ['pv-c-1'],
@@ -654,7 +655,7 @@ describe('TradeBoardWorkspace distinctive design & a11y', () => {
   it('keyboard operable and responsive', async () => {
     const profiles: SeasonTradeBoardTeamProfile[] = [
       {
-        franchiseId: 'celtics',
+        franchiseId: franchiseIdSchema.parse('celtics'),
         needs: ['shooting'],
         priority: 'talent',
         listedPlayerIds: ['pv-c-1'],

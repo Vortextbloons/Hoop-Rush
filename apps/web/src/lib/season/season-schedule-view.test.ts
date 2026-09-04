@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   SEASON_GAME_SUMMARY_VERSION,
+  seasonGameSchema,
+  seasonGameSummarySchema,
   type SeasonCompactPlayerLine,
   type SeasonGame,
   type SeasonGameSummary,
@@ -25,7 +27,7 @@ function game(
   },
   forfeitLoserFranchiseId: string | null = null,
 ): SeasonGame {
-  return {
+  return seasonGameSchema.parse({
     gameId,
     round,
     homeFranchiseId,
@@ -34,11 +36,12 @@ function game(
     homeScore: score ? score.home : null,
     awayScore: score ? score.away : null,
     forfeitLoserFranchiseId,
-  };
+  });
 }
 function playerLines(prefix: string): SeasonCompactPlayerLine[] {
+  void prefix;
   return Array.from({ length: 10 }, (_, index) => ({
-    playerVersionId: `${prefix}-${String(index + 1)}`,
+    playerVersionId: `pv-${String(index).padStart(2, '0')}${'a'.repeat(30)}`,
     seconds: 0,
     points: 0,
     fieldGoalsMade: 0,
@@ -67,7 +70,7 @@ function summary(
   forfeitLoserFranchiseId: string | null = null,
 ): SeasonGameSummary {
   const forfeit = status === 'forfeit';
-  return {
+  return seasonGameSummarySchema.parse({
     schemaVersion: 1,
     summaryVersion: SEASON_GAME_SUMMARY_VERSION,
     gameId,
@@ -118,7 +121,7 @@ function summary(
     },
     homePlayers: forfeit ? [] : playerLines(homeFranchiseId),
     awayPlayers: forfeit ? [] : playerLines(awayFranchiseId),
-  };
+  });
 }
 const GAMES: SeasonGame[] = [
   game('s000001', 1, HUMAN, OPPONENT, 'final', { home: 110, away: 99 }),

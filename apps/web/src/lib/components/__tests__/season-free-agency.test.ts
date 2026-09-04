@@ -7,6 +7,14 @@ import {
   SIMULATION_RATINGS,
   SIMULATION_TENDENCIES,
   PLAYER_VERSION_ID_VERSION,
+  eraIdSchema,
+  franchiseIdSchema,
+  commandIdSchema,
+  idSchema,
+  playerIdSchema,
+  seasonKeySchema,
+  seedSchema,
+  contentHashSchema,
   type Position,
   type SeasonDraftCandidate,
   type SeasonDraftCatalog,
@@ -27,8 +35,8 @@ import { describeCommandRejection } from '$lib/season/season-hub-state';
 import { mockSvelteKitApp } from '../../../test/svelte-testing';
 import FreeAgencyRouteWrapper from '../../../test/FreeAgencyRouteWrapper.svelte';
 mockSvelteKitApp();
-const SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
-const HUMAN = 'lakers';
+const SEED = seedSchema.parse('a1b2c3d4e5f60718293a4b5c6d7e8f9a');
+const HUMAN = franchiseIdSchema.parse('lakers');
 const SLOT_POSITIONS: ReadonlyArray<readonly Position[]> = [
   ['PG'],
   ['SG'],
@@ -51,10 +59,10 @@ function catalogCandidate(
   if (primary === undefined) throw new Error('no primary position');
   return {
     playerVersionId,
-    playerId,
-    franchiseId: 'lakers',
-    eraId: '1990s',
-    seasonKey: '1994-95',
+    playerId: playerIdSchema.parse(playerId),
+    franchiseId: franchiseIdSchema.parse('lakers'),
+    eraId: eraIdSchema.parse('1990s'),
+    seasonKey: seasonKeySchema.parse('1994-95'),
     displayName: playerId,
     playerExternalId: '101',
     positions: {
@@ -103,7 +111,7 @@ function fixtureCatalog(run: SeasonRun): SeasonDraftCatalog {
     durabilityVersion: SEASON_DURABILITY_VERSION,
     pools: run.rosters.map((roster) => ({
       franchiseId: roster.franchiseId,
-      eraId: '1990s',
+      eraId: eraIdSchema.parse('1990s'),
       playerVersionIds: roster.players.map((player) => player.playerVersionId),
     })),
     candidates,
@@ -145,7 +153,7 @@ function fixtureIndex(catalog: SeasonDraftCatalog): SeasonFreeAgencyIndex {
     dataVersion: 'fixture',
     catalogRef: {
       catalogVersion: catalog.catalogVersion,
-      contentHash: '0'.repeat(64),
+      contentHash: contentHashSchema.parse('0'.repeat(64)),
       candidateCount: catalog.candidates.length,
     },
     candidates,
@@ -244,7 +252,7 @@ function declaredRun(
       [HUMAN]: {
         franchiseId: HUMAN,
         windowIndex: window.windowIndex,
-        commandId: 'cmd-fa-declare-1',
+        commandId: commandIdSchema.parse('cmd-fa-declare-1'),
         targets,
       },
     },
@@ -259,19 +267,20 @@ function resolvedRun(run: SeasonRun, humanSigned: boolean): SeasonRun {
   if (second === undefined) throw new Error('need two candidates');
   const humanTarget = humanSigned ? first : second;
   const otherTarget = humanSigned ? second : first;
+  const celtics = franchiseIdSchema.parse('celtics');
   const signing = {
-    signingId: 'signing-1',
+    signingId: idSchema.parse('signing-1'),
     windowIndex: window.windowIndex,
-    franchiseId: humanSigned ? HUMAN : 'celtics',
+    franchiseId: humanSigned ? HUMAN : celtics,
     playerVersionId: humanTarget.playerVersionId,
     playerId: humanTarget.playerId,
     band: humanTarget.band,
     roleExpectation: 'rotation' as const,
     influenceCost: 2,
-    commandId: 'cmd-fa-resolve-1',
+    commandId: commandIdSchema.parse('cmd-fa-resolve-1'),
     seedPath: ['free-agency', '0', 'resolve', 'draw'],
-    ledgerEntryId: 'ledger-1',
-    transactionId: 'txn-1',
+    ledgerEntryId: idSchema.parse('ledger-1'),
+    transactionId: idSchema.parse('txn-1'),
     appliedAtStateRevision: 2,
   };
   const resolvedWindow: SeasonFreeAgencyWindowState = {
@@ -282,7 +291,7 @@ function resolvedRun(run: SeasonRun, humanSigned: boolean): SeasonRun {
       [HUMAN]: {
         franchiseId: HUMAN,
         windowIndex: window.windowIndex,
-        commandId: 'cmd-fa-declare-1',
+        commandId: commandIdSchema.parse('cmd-fa-declare-1'),
         targets: [
           {
             playerVersionId: humanTarget.playerVersionId,
@@ -314,7 +323,7 @@ function resolvedRun(run: SeasonRun, humanSigned: boolean): SeasonRun {
           },
           {
             candidatePlayerVersionId: otherTarget.playerVersionId,
-            franchiseId: 'celtics',
+            franchiseId: celtics,
             criterion: 'opportunity',
             category: 'immediate',
             citedFacts: ['no other recorded interest'],

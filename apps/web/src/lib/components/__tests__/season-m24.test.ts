@@ -8,6 +8,7 @@ import type {
   SeasonGameSummary,
   SeasonRoster,
 } from '@hoop-rush/data-contracts';
+import { seasonGameSummarySchema } from '@hoop-rush/data-contracts';
 import UnitChemistry from '$lib/components/season/UnitChemistry.svelte';
 import SeasonRosterList from '$lib/components/season/SeasonRosterList.svelte';
 import CheckpointRecap from '$lib/components/season/CheckpointRecap.svelte';
@@ -114,7 +115,7 @@ function minimalShell(): SeasonRunShellData {
   };
 }
 function summaryFor(seconds: number): SeasonGameSummary {
-  return {
+  return seasonGameSummarySchema.parse({
     schemaVersion: 1,
     summaryVersion: 'season-game-summary-v3',
     gameId: 's000001',
@@ -181,8 +182,25 @@ function summaryFor(seconds: number): SeasonGameSummary {
       turnovers: 1,
       fouls: 2,
     })),
-    awayPlayers: [],
-  };
+    awayPlayers: Array.from({ length: 10 }, (_, index) => ({
+      playerVersionId: `pv-b${String(index).padStart(2, '0')}${'b'.repeat(29)}`,
+      seconds: 480,
+      points: 8,
+      fieldGoalsMade: 3,
+      fieldGoalsAttempted: 8,
+      threePointersMade: 1,
+      threePointersAttempted: 3,
+      freeThrowsMade: 1,
+      freeThrowsAttempted: 2,
+      offensiveRebounds: 1,
+      defensiveRebounds: 2,
+      assists: 2,
+      steals: 1,
+      blocks: 0,
+      turnovers: 1,
+      fouls: 2,
+    })),
+  });
 }
 describe('SeasonRosterList (M2.4)', () => {
   it('renders fatigue bands, workload, and last-game minutes', () => {

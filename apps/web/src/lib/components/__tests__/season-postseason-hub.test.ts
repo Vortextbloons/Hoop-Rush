@@ -3,6 +3,12 @@ import { fireEvent, render } from '@testing-library/svelte';
 import { generateSeasonSchedule } from '@hoop-rush/engine';
 import { buildSeasonLeague, buildSeasonRunFixture } from '@hoop-rush/test-fixtures';
 import { buildInitialPostseasonState, type SeasonRun } from '@hoop-rush/data-contracts';
+import {
+  franchiseIdSchema,
+  idSchema,
+  seasonGameIdSchema,
+  seedSchema,
+} from '@hoop-rush/data-contracts';
 import type { SeasonRunSnapshot } from '@hoop-rush/persistence';
 import type { SeasonRunShellData } from '$lib/season/season-shell-context';
 import { createRotationEditor } from '$lib/season/season-rotation-editor';
@@ -10,7 +16,7 @@ import { legalRotation, rotationMembers } from '$lib/season/season-rotation-test
 import { mockSvelteKitApp } from '../../../test/svelte-testing';
 import SeasonRunShellWrapper from '../../../test/SeasonRunShellWrapper.svelte';
 mockSvelteKitApp();
-const SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
+const SEED = seedSchema.parse('a1b2c3d4e5f60718293a4b5c6d7e8f9a');
 function fixtureRun(): SeasonRun {
   const league = buildSeasonLeague({}, { humanFranchiseId: 'lakers' });
   const schedule = generateSeasonSchedule({ league, seed: SEED });
@@ -33,7 +39,8 @@ function snapshotOf(run: SeasonRun): SeasonRunSnapshot {
 }
 function playInPostseason(run: SeasonRun): SeasonRun['postseason'] {
   const state = buildInitialPostseasonState(run.rootSeed);
-  state.playIn.east.ranking = [
+  const fids = (ids: string[]) => ids.map((id) => franchiseIdSchema.parse(id));
+  state.playIn.east.ranking = fids([
     'east1',
     'east2',
     'east3',
@@ -44,8 +51,8 @@ function playInPostseason(run: SeasonRun): SeasonRun['postseason'] {
     'east8',
     'east9',
     'east10',
-  ];
-  state.playIn.west.ranking = [
+  ]);
+  state.playIn.west.ranking = fids([
     'west1',
     'west2',
     'west3',
@@ -56,14 +63,14 @@ function playInPostseason(run: SeasonRun): SeasonRun['postseason'] {
     'west8',
     'west9',
     'west10',
-  ];
+  ]);
   const completed = (gameId: string, home: string, away: string, homeWon: boolean) => ({
     gameId,
     status: 'final' as const,
-    homeFranchiseId: home,
-    awayFranchiseId: away,
-    winnerFranchiseId: homeWon ? home : away,
-    loserFranchiseId: homeWon ? away : home,
+    homeFranchiseId: franchiseIdSchema.parse(home),
+    awayFranchiseId: franchiseIdSchema.parse(away),
+    winnerFranchiseId: franchiseIdSchema.parse(homeWon ? home : away),
+    loserFranchiseId: franchiseIdSchema.parse(homeWon ? away : home),
     homeScore: homeWon ? 108 : 101,
     awayScore: homeWon ? 101 : 108,
   });
@@ -71,15 +78,15 @@ function playInPostseason(run: SeasonRun): SeasonRun['postseason'] {
   east.games.sevenEight = completed('pi-east-seven-eight', 'east7', 'east8', true);
   east.games.nineTen = completed('pi-east-nine-ten', 'east9', 'east10', true);
   east.games.final = completed('pi-east-final', 'east8', 'east9', true);
-  east.playoffSeeds = ['east1', 'east2', 'east3', 'east4', 'east5', 'east6', 'east7', 'east8'];
+  east.playoffSeeds = fids(['east1', 'east2', 'east3', 'east4', 'east5', 'east6', 'east7', 'east8']);
   return state;
 }
 function activeInjuryRun(run: SeasonRun, playerVersionId: string): SeasonRun {
   run.health.injuries.push({
     injuryId: 'inj-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     playerVersionId,
-    franchiseId: 'lakers',
-    gameId: 's000001',
+    franchiseId: franchiseIdSchema.parse('lakers'),
+    gameId: seasonGameIdSchema.parse('s000001'),
     type: 'soft-tissue',
     severity: 'moderate',
     occurredBeforeHalftime: false,
@@ -235,7 +242,7 @@ describe('hub: play-in stage with the human lineup decision', () => {
       activeInjuryRun(run, 'lakers');
       run.stage = 'play-in';
       run.postseason = playInPostseason(run);
-      run.influence.balances.lakers = 1;
+      run.influence.balances[franchiseIdSchema.parse('lakers')] = 1;
     });
     const { container } = render(SeasonRunShellWrapper, { props: { shell } });
     const option = container.querySelector<HTMLInputElement>('[data-season-rehab-option]');
@@ -252,7 +259,7 @@ describe('hub: play-in stage with the human lineup decision', () => {
       command: 'submit-postseason-rotation',
       rejection: {
         code: 'invalid-rotation',
-        franchiseId: 'lakers',
+        franchiseId: franchiseIdSchema.parse('lakers'),
         reasons: ['starter PG cannot play slot'],
       },
       message: 'default arm',
@@ -296,7 +303,8 @@ describe('hub: eliminated stage', () => {
     if (run === null) throw new Error('fixture run missing');
     run.stage = 'playoffs';
     const postseason = buildInitialPostseasonState(run.rootSeed);
-    postseason.playIn.east.ranking = [
+    const hubFids = (ids: string[]) => ids.map((id) => franchiseIdSchema.parse(id));
+    postseason.playIn.east.ranking = hubFids([
       'east1',
       'east2',
       'east3',
@@ -307,8 +315,8 @@ describe('hub: eliminated stage', () => {
       'east8',
       'east9',
       'east10',
-    ];
-    postseason.playIn.west.ranking = [
+    ]);
+    postseason.playIn.west.ranking = hubFids([
       'west1',
       'west2',
       'west3',
@@ -319,9 +327,9 @@ describe('hub: eliminated stage', () => {
       'west8',
       'west9',
       'west10',
-    ];
+    ]);
     for (const conference of ['east', 'west'] as const) {
-      postseason.playIn[conference].playoffSeeds = [
+      postseason.playIn[conference].playoffSeeds = hubFids([
         `${conference}1`,
         `${conference}2`,
         `${conference}3`,
@@ -330,51 +338,51 @@ describe('hub: eliminated stage', () => {
         `${conference}6`,
         `${conference}7`,
         `${conference}8`,
-      ];
+      ]);
     }
     postseason.bracket = {
       schemaVersion: 1,
       postseasonVersion: 'postseason-v2',
       east: {
         conference: 'east',
-        seeds: ['east1', 'east2', 'east3', 'east4', 'east5', 'east6', 'east7', 'east8'],
+        seeds: hubFids(['east1', 'east2', 'east3', 'east4', 'east5', 'east6', 'east7', 'east8']),
         firstRound: [
           {
-            seriesId: 'east1-8',
+            seriesId: idSchema.parse('east1-8'),
             round: 'first-round',
             conference: 'east',
             higherSeed: 1,
             lowerSeed: 8,
-            homeCourtFranchiseId: 'east1',
-            challengerFranchiseId: 'east8',
+            homeCourtFranchiseId: franchiseIdSchema.parse('east1'),
+            challengerFranchiseId: franchiseIdSchema.parse('east8'),
             homeCourtWins: 1,
             challengerWins: 1,
             games: [
               {
                 gameId: 'po-east1-8-g1',
                 gameNumber: 1,
-                homeFranchiseId: 'east1',
-                awayFranchiseId: 'east8',
+                homeFranchiseId: franchiseIdSchema.parse('east1'),
+                awayFranchiseId: franchiseIdSchema.parse('east8'),
                 status: 'final',
                 homeScore: 101,
                 awayScore: 99,
-                winnerFranchiseId: 'east1',
+                winnerFranchiseId: franchiseIdSchema.parse('east1'),
               },
               {
                 gameId: 'po-east1-8-g2',
                 gameNumber: 2,
-                homeFranchiseId: 'east1',
-                awayFranchiseId: 'east8',
+                homeFranchiseId: franchiseIdSchema.parse('east1'),
+                awayFranchiseId: franchiseIdSchema.parse('east8'),
                 status: 'final',
                 homeScore: 98,
                 awayScore: 102,
-                winnerFranchiseId: 'east8',
+                winnerFranchiseId: franchiseIdSchema.parse('east8'),
               },
             ],
             winnerFranchiseId: null,
           },
           {
-            seriesId: 'po-east4-5',
+            seriesId: idSchema.parse('po-east4-5'),
             round: 'first-round',
             conference: 'east',
             higherSeed: 4,
@@ -387,7 +395,7 @@ describe('hub: eliminated stage', () => {
             winnerFranchiseId: null,
           },
           {
-            seriesId: 'po-east3-6',
+            seriesId: idSchema.parse('po-east3-6'),
             round: 'first-round',
             conference: 'east',
             higherSeed: 3,
@@ -400,7 +408,7 @@ describe('hub: eliminated stage', () => {
             winnerFranchiseId: null,
           },
           {
-            seriesId: 'po-east2-7',
+            seriesId: idSchema.parse('po-east2-7'),
             round: 'first-round',
             conference: 'east',
             higherSeed: 2,
@@ -415,7 +423,7 @@ describe('hub: eliminated stage', () => {
         ],
         semifinals: [],
         conferenceFinal: {
-          seriesId: 'po-east-conf',
+          seriesId: idSchema.parse('po-east-conf'),
           round: 'conference-final',
           conference: 'east',
           higherSeed: null,
@@ -430,10 +438,10 @@ describe('hub: eliminated stage', () => {
       },
       west: {
         conference: 'west',
-        seeds: ['west1', 'west2', 'west3', 'west4', 'west5', 'west6', 'west7', 'west8'],
+        seeds: hubFids(['west1', 'west2', 'west3', 'west4', 'west5', 'west6', 'west7', 'west8']),
         firstRound: [
           {
-            seriesId: 'po-west1-8',
+            seriesId: idSchema.parse('po-west1-8'),
             round: 'first-round',
             conference: 'west',
             higherSeed: 1,
@@ -446,7 +454,7 @@ describe('hub: eliminated stage', () => {
             winnerFranchiseId: null,
           },
           {
-            seriesId: 'po-west4-5',
+            seriesId: idSchema.parse('po-west4-5'),
             round: 'first-round',
             conference: 'west',
             higherSeed: 4,
@@ -459,7 +467,7 @@ describe('hub: eliminated stage', () => {
             winnerFranchiseId: null,
           },
           {
-            seriesId: 'po-west3-6',
+            seriesId: idSchema.parse('po-west3-6'),
             round: 'first-round',
             conference: 'west',
             higherSeed: 3,
@@ -472,7 +480,7 @@ describe('hub: eliminated stage', () => {
             winnerFranchiseId: null,
           },
           {
-            seriesId: 'po-west2-7',
+            seriesId: idSchema.parse('po-west2-7'),
             round: 'first-round',
             conference: 'west',
             higherSeed: 2,
@@ -487,7 +495,7 @@ describe('hub: eliminated stage', () => {
         ],
         semifinals: [],
         conferenceFinal: {
-          seriesId: 'po-west-conf',
+          seriesId: idSchema.parse('po-west-conf'),
           round: 'conference-final',
           conference: 'west',
           higherSeed: null,
@@ -501,7 +509,7 @@ describe('hub: eliminated stage', () => {
         },
       },
       finals: {
-        seriesId: 'po-finals',
+        seriesId: idSchema.parse('po-finals'),
         round: 'finals',
         conference: null,
         higherSeed: null,
@@ -536,8 +544,8 @@ describe('hub: eliminated stage', () => {
       latestGameId: 'po-east1-8-g3',
       latestResult: {
         gameId: 'po-east1-8-g3',
-        homeFranchiseId: 'east8',
-        awayFranchiseId: 'east1',
+        homeFranchiseId: franchiseIdSchema.parse('east8'),
+        awayFranchiseId: franchiseIdSchema.parse('east1'),
         homeScore: 104,
         awayScore: 96,
       },
@@ -563,9 +571,9 @@ describe('hub: completed stage', () => {
     const run = shell.run;
     if (run === null) throw new Error('fixture run missing');
     run.stage = 'completed';
-    run.postseason.championFranchiseId = 'lakers';
+    run.postseason.championFranchiseId = franchiseIdSchema.parse('lakers');
     run.completion = {
-      championFranchiseId: 'lakers',
+      championFranchiseId: franchiseIdSchema.parse('lakers'),
       almanacDigest: '0'.repeat(32),
       finalizedAtStateRevision: 1,
     };

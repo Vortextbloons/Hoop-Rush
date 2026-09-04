@@ -15,7 +15,7 @@ function offer(overrides: Partial<SeasonTradeOffer> = {}): SeasonTradeOffer {
     windowIndex: 0,
     seedPath: ['test', 'trades'],
     toFranchiseId: franchiseIdSchema.parse('lakers'),
-    fromFranchiseId: 'celtics',
+    fromFranchiseId: franchiseIdSchema.parse('celtics'),
     outgoingPlayerVersionIds: ['pv-00000000000000000000000000000000'],
     incomingPlayerVersionIds: ['pv-11111111111111111111111111111111'],
     outgoingHealth: [{ available: true, activeInjuryIds: [] }],
@@ -173,7 +173,7 @@ describe('humanTradeOffersOf', () => {
             offer({
               offerId: 'off-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
               toFranchiseId: franchiseIdSchema.parse('celtics'),
-              fromFranchiseId: 'lakers',
+              fromFranchiseId: franchiseIdSchema.parse('lakers'),
               status: 'accepted',
             }),
           ],

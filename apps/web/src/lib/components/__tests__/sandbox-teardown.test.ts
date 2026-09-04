@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, waitFor } from '@testing-library/svelte';
 import type { HoopRushManifest, PlayersIndex, PlayersIndexEntry } from '@hoop-rush/data-contracts';
+import {
+  contentHashSchema,
+  eraIdSchema,
+  franchiseIdSchema,
+  playersIndexEntrySchema,
+} from '@hoop-rush/data-contracts';
 import { mockSvelteKitApp } from '../../../test/svelte-testing';
 import SandboxPage from '../../../routes/sandbox/+page.svelte';
 mockSvelteKitApp();
@@ -10,30 +16,32 @@ vi.mock('$lib/data', async () => {
   const positions = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
   for (let i = 0; i < 60; i += 1) {
     const position = positions[i % 5] as (typeof positions)[number];
-    entries.push({
-      playerId: `player-${String(i).padStart(3, '0')}`,
-      franchiseId: 'lakers',
-      eraId: '1990s',
-      seasonKey: '1996-97',
-      firstName: `First${String(i)}`,
-      lastName: `Last${String(i)}`,
-      displayName: `First${String(i)} Last${String(i)}`,
-      playerExternalId: String(i),
-      altIds: { nbaHeadshotAvailable: false },
-      positionsPlayable: [position],
-      overall: 50 + (i % 40),
-      offense: 50,
-      defense: 50,
-      selectionScore: 100 - (i % 50),
-    });
+    entries.push(
+      playersIndexEntrySchema.parse({
+        playerId: `player-${String(i).padStart(3, '0')}`,
+        franchiseId: 'lakers',
+        eraId: '1990s',
+        seasonKey: '1996-97',
+        firstName: `First${String(i)}`,
+        lastName: `Last${String(i)}`,
+        displayName: `First${String(i)} Last${String(i)}`,
+        playerExternalId: String(i),
+        altIds: { nbaHeadshotAvailable: false },
+        positionsPlayable: [position],
+        overall: 50 + (i % 40),
+        offense: 50,
+        defense: 50,
+        selectionScore: 100 - (i % 50),
+      }),
+    );
   }
   const manifest: HoopRushManifest = buildManifest({
     pools: [
       {
-        franchiseId: 'lakers',
-        eraId: '1990s',
+        franchiseId: franchiseIdSchema.parse('lakers'),
+        eraId: eraIdSchema.parse('1990s'),
         url: 'pools/lakers-1990s.json',
-        contentHash: 'hash',
+        contentHash: contentHashSchema.parse('a'.repeat(64)),
       },
     ],
   });
@@ -46,7 +54,12 @@ vi.mock('$lib/data', async () => {
     getManifest: () => Promise.resolve(manifest),
     getPlayersIndex: () => Promise.resolve(index),
     getPool: (entry: { franchiseId: string; eraId: string }) =>
-      Promise.resolve(buildPool([], { franchiseId: entry.franchiseId, eraId: entry.eraId })),
+      Promise.resolve(
+        buildPool([], {
+          franchiseId: franchiseIdSchema.parse(entry.franchiseId),
+          eraId: eraIdSchema.parse(entry.eraId),
+        }),
+      ),
     clearDataLoaderCaches: () => {},
   };
 });

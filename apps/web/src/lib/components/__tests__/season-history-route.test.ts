@@ -3,6 +3,14 @@ import { fireEvent, render, waitFor } from '@testing-library/svelte';
 import { generateSeasonSchedule } from '@hoop-rush/engine';
 import { buildSeasonLeague, buildSeasonRunFixture } from '@hoop-rush/test-fixtures';
 import { buildInitialPostseasonState, type SeasonRun } from '@hoop-rush/data-contracts';
+import {
+  contentHashSchema,
+  eraIdSchema,
+  franchiseIdSchema,
+  idSchema,
+  seasonKeySchema,
+  seedSchema,
+} from '@hoop-rush/data-contracts';
 import type { SeasonCompletedRunIndexEntry, SeasonCompletedSeason } from '@hoop-rush/persistence';
 import type { SeasonRunShellData } from '$lib/season/season-shell-context';
 import { mockSvelteKitApp } from '../../../test/svelte-testing';
@@ -42,22 +50,42 @@ function resultShell(): SeasonRunShellData {
       schemaVersion: 4,
       dataVersion: 'test',
       modernFranchiseSlots: Array.from({ length: 30 }, (_, index) => ({
-        franchiseId: index === 0 ? 'lakers' : `team-${String(index)}`,
+        franchiseId: franchiseIdSchema.parse(index === 0 ? 'lakers' : `team-${String(index)}`),
         displayName: `Team ${String(index)}`,
         teamExternalId: `T${String(index)}`,
       })),
       franchiseLineage: [],
-      eras: [{ eraId: '1990s', label: '1990s', fromSeasonKey: '1990-91', toSeasonKey: '1999-00' }],
+      eras: [
+        {
+          eraId: eraIdSchema.parse('1990s'),
+          label: '1990s',
+          fromSeasonKey: seasonKeySchema.parse('1990-91'),
+          toSeasonKey: seasonKeySchema.parse('1999-00'),
+        },
+      ],
       pools: [],
       availability: [],
       eraSimulationProfiles: [
-        { eraId: '1990s', url: 'era-sim/1990s.json', contentHash: 'a'.repeat(64) },
+        {
+          eraId: eraIdSchema.parse('1990s'),
+          url: 'era-sim/1990s.json',
+          contentHash: contentHashSchema.parse('a'.repeat(64)),
+        },
       ],
       season: {
-        league: { url: 'season/league.json', contentHash: 'b'.repeat(64) },
-        schedule: { url: 'season/schedule.json', contentHash: 'c'.repeat(64) },
-        draftCatalog: { url: 'season/draft-catalog.json', contentHash: 'd'.repeat(64) },
-        rosterTargets: { url: 'season/roster-targets.json', contentHash: 'e'.repeat(64) },
+        league: { url: 'season/league.json', contentHash: contentHashSchema.parse('b'.repeat(64)) },
+        schedule: {
+          url: 'season/schedule.json',
+          contentHash: contentHashSchema.parse('c'.repeat(64)),
+        },
+        draftCatalog: {
+          url: 'season/draft-catalog.json',
+          contentHash: contentHashSchema.parse('d'.repeat(64)),
+        },
+        rosterTargets: {
+          url: 'season/roster-targets.json',
+          contentHash: contentHashSchema.parse('e'.repeat(64)),
+        },
       },
       assets: {
         headshotUrlTemplate: null,
@@ -177,7 +205,10 @@ vi.mock('@hoop-rush/persistence', async (importOriginal) => {
 import type { SeasonPostseasonSummary } from '@hoop-rush/data-contracts';
 function fixtureRun(): SeasonRun {
   const league = buildSeasonLeague({}, { humanFranchiseId: 'lakers' });
-  const schedule = generateSeasonSchedule({ league, seed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a' });
+  const schedule = generateSeasonSchedule({
+    league,
+    seed: seedSchema.parse('a1b2c3d4e5f60718293a4b5c6d7e8f9a'),
+  });
   const run = buildSeasonRunFixture({
     schedule,
     league,
@@ -187,70 +218,70 @@ function fixtureRun(): SeasonRun {
   run.stage = 'completed';
   run.postseason = buildInitialPostseasonState(run.rootSeed);
   run.postseason.playIn.east.ranking = [
-    'e1',
-    'e2',
-    'e3',
-    'e4',
-    'e5',
-    'e6',
-    'e7',
-    'e8',
-    'e9',
-    'e10',
+    franchiseIdSchema.parse('e1'),
+    franchiseIdSchema.parse('e2'),
+    franchiseIdSchema.parse('e3'),
+    franchiseIdSchema.parse('e4'),
+    franchiseIdSchema.parse('e5'),
+    franchiseIdSchema.parse('e6'),
+    franchiseIdSchema.parse('e7'),
+    franchiseIdSchema.parse('e8'),
+    franchiseIdSchema.parse('e9'),
+    franchiseIdSchema.parse('e10'),
   ];
   run.postseason.playIn.west.ranking = [
-    'w1',
-    'w2',
-    'w3',
-    'w4',
-    'w5',
-    'w6',
-    'w7',
-    'w8',
-    'w9',
-    'w10',
+    franchiseIdSchema.parse('w1'),
+    franchiseIdSchema.parse('w2'),
+    franchiseIdSchema.parse('w3'),
+    franchiseIdSchema.parse('w4'),
+    franchiseIdSchema.parse('w5'),
+    franchiseIdSchema.parse('w6'),
+    franchiseIdSchema.parse('w7'),
+    franchiseIdSchema.parse('w8'),
+    franchiseIdSchema.parse('w9'),
+    franchiseIdSchema.parse('w10'),
   ];
   for (const conference of ['east', 'west'] as const) {
     const playIn = run.postseason.playIn[conference];
     playIn.games.sevenEight = {
       gameId: `pi-${conference}-seven-eight`,
       status: 'final',
-      homeFranchiseId: `${conference}7`,
-      awayFranchiseId: `${conference}8`,
-      winnerFranchiseId: `${conference}7`,
-      loserFranchiseId: `${conference}8`,
+      homeFranchiseId: franchiseIdSchema.parse(`${conference}7`),
+      awayFranchiseId: franchiseIdSchema.parse(`${conference}8`),
+      winnerFranchiseId: franchiseIdSchema.parse(`${conference}7`),
+      loserFranchiseId: franchiseIdSchema.parse(`${conference}8`),
       homeScore: 112,
       awayScore: 101,
     };
     playIn.games.nineTen = {
       gameId: `pi-${conference}-nine-ten`,
       status: 'final',
-      homeFranchiseId: `${conference}9`,
-      awayFranchiseId: `${conference}10`,
-      winnerFranchiseId: `${conference}9`,
-      loserFranchiseId: `${conference}10`,
+      homeFranchiseId: franchiseIdSchema.parse(`${conference}9`),
+      awayFranchiseId: franchiseIdSchema.parse(`${conference}10`),
+      winnerFranchiseId: franchiseIdSchema.parse(`${conference}9`),
+      loserFranchiseId: franchiseIdSchema.parse(`${conference}10`),
       homeScore: 98,
       awayScore: 91,
     };
     playIn.games.final = {
       gameId: `pi-${conference}-final`,
       status: 'final',
-      homeFranchiseId: `${conference}8`,
-      awayFranchiseId: `${conference}9`,
-      winnerFranchiseId: `${conference}8`,
-      loserFranchiseId: `${conference}9`,
+      homeFranchiseId: franchiseIdSchema.parse(`${conference}8`),
+      awayFranchiseId: franchiseIdSchema.parse(`${conference}9`),
+      winnerFranchiseId: franchiseIdSchema.parse(`${conference}8`),
+      loserFranchiseId: franchiseIdSchema.parse(`${conference}9`),
       homeScore: 104,
       awayScore: 100,
     };
     playIn.playoffSeeds = [
-      `${conference}1`,
-      `${conference}2`,
-      `${conference}3`,
-      `${conference}4`,
-      `${conference}5`,
-      `${conference}6`,
-      `${conference}7`,
-      `${conference}8`,
+      franchiseIdSchema.parse(`${conference}1`),
+      franchiseIdSchema.parse(`${conference}2`),
+      franchiseIdSchema.parse(`${conference}3`),
+      franchiseIdSchema.parse(`${conference}4`),
+      franchiseIdSchema.parse(`${conference}5`),
+      franchiseIdSchema.parse(`${conference}6`),
+      franchiseIdSchema.parse(`${conference}7`),
+      franchiseIdSchema.parse(`${conference}8`),
     ];
   }
   const closedSeries = (
@@ -261,42 +292,47 @@ function fixtureRun(): SeasonRun {
     away: string | null,
     winner: string,
   ) => ({
-    seriesId,
+    seriesId: idSchema.parse(seriesId),
     round,
     conference,
     higherSeed: null,
     lowerSeed: null,
-    homeCourtFranchiseId: home,
-    challengerFranchiseId: away,
+    homeCourtFranchiseId: home === null ? null : franchiseIdSchema.parse(home),
+    challengerFranchiseId: away === null ? null : franchiseIdSchema.parse(away),
     homeCourtWins: 4,
     challengerWins: 2,
     games: [1, 2, 3, 4, 5, 6].map((gameNumber) => {
       const homeIsHomeSide = [1, 2, 5].includes(gameNumber);
+      const gameHome = homeIsHomeSide ? (home ?? 'lakers') : (away ?? 'lakers');
+      const gameAway = homeIsHomeSide ? (away ?? 'lakers') : (home ?? 'lakers');
+      const gameWinner =
+        100 + gameNumber > 95 + gameNumber === homeIsHomeSide
+          ? (home ?? 'lakers')
+          : (away ?? 'lakers');
       return {
         gameId: `po-${seriesId}-g${String(gameNumber)}`,
         gameNumber,
-        homeFranchiseId: homeIsHomeSide ? (home ?? '') : (away ?? ''),
-        awayFranchiseId: homeIsHomeSide ? (away ?? '') : (home ?? ''),
+        homeFranchiseId: franchiseIdSchema.parse(gameHome),
+        awayFranchiseId: franchiseIdSchema.parse(gameAway),
         status: 'final' as const,
         homeScore: 100 + gameNumber,
         awayScore: 95 + gameNumber,
-        winnerFranchiseId:
-          100 + gameNumber > 95 + gameNumber === homeIsHomeSide ? (home ?? '') : (away ?? ''),
+        winnerFranchiseId: franchiseIdSchema.parse(gameWinner),
       };
     }),
-    winnerFranchiseId: winner,
+    winnerFranchiseId: franchiseIdSchema.parse(winner),
   });
   const conferenceBracket = (conference: 'east' | 'west') => ({
     conference,
     seeds: [
-      `${conference}1`,
-      `${conference}2`,
-      `${conference}3`,
-      `${conference}4`,
-      `${conference}5`,
-      `${conference}6`,
-      `${conference}7`,
-      `${conference}8`,
+      franchiseIdSchema.parse(`${conference}1`),
+      franchiseIdSchema.parse(`${conference}2`),
+      franchiseIdSchema.parse(`${conference}3`),
+      franchiseIdSchema.parse(`${conference}4`),
+      franchiseIdSchema.parse(`${conference}5`),
+      franchiseIdSchema.parse(`${conference}6`),
+      franchiseIdSchema.parse(`${conference}7`),
+      franchiseIdSchema.parse(`${conference}8`),
     ],
     firstRound: [
       closedSeries(
@@ -365,27 +401,30 @@ function fixtureRun(): SeasonRun {
     east: conferenceBracket('east'),
     west: conferenceBracket('west'),
     finals: closedSeries('finals', 'finals', null, 'west1', 'east1', 'west1'),
-    championFranchiseId: 'lakers',
+    championFranchiseId: franchiseIdSchema.parse('lakers'),
   };
-  run.postseason.championFranchiseId = 'lakers';
+  run.postseason.championFranchiseId = franchiseIdSchema.parse('lakers');
   run.awards = {
     schemaVersion: 1,
     awardsVersion: 'awards-v1',
     runId: run.runId,
-    mvp: { playerVersionId: 'pv-mvp', franchiseId: 'lakers' },
-    defensivePlayerOfYear: { playerVersionId: 'pv-dpoy', franchiseId: 'lakers' },
-    sixthManOfYear: { playerVersionId: 'pv-sixth', franchiseId: 'lakers' },
+    mvp: { playerVersionId: 'pv-mvp', franchiseId: franchiseIdSchema.parse('lakers') },
+    defensivePlayerOfYear: {
+      playerVersionId: 'pv-dpoy',
+      franchiseId: franchiseIdSchema.parse('lakers'),
+    },
+    sixthManOfYear: { playerVersionId: 'pv-sixth', franchiseId: franchiseIdSchema.parse('lakers') },
     allLeagueFirstTeam: [
-      { playerVersionId: 'pv-1', franchiseId: 'lakers' },
-      { playerVersionId: 'pv-2', franchiseId: 'lakers' },
-      { playerVersionId: 'pv-3', franchiseId: 'lakers' },
-      { playerVersionId: 'pv-4', franchiseId: 'lakers' },
-      { playerVersionId: 'pv-5', franchiseId: 'lakers' },
+      { playerVersionId: 'pv-1', franchiseId: franchiseIdSchema.parse('lakers') },
+      { playerVersionId: 'pv-2', franchiseId: franchiseIdSchema.parse('lakers') },
+      { playerVersionId: 'pv-3', franchiseId: franchiseIdSchema.parse('lakers') },
+      { playerVersionId: 'pv-4', franchiseId: franchiseIdSchema.parse('lakers') },
+      { playerVersionId: 'pv-5', franchiseId: franchiseIdSchema.parse('lakers') },
     ],
     digest: '0'.repeat(32),
   };
   run.completion = {
-    championFranchiseId: 'lakers',
+    championFranchiseId: franchiseIdSchema.parse('lakers'),
     almanacDigest: '0'.repeat(32),
     finalizedAtStateRevision: 12,
   };
@@ -402,16 +441,16 @@ function postseasonSummary(gameId: string): SeasonPostseasonSummary {
     seriesId: null,
     gameNumber: 1,
     conference: 'west',
-    homeFranchiseId: 'lakers',
-    awayFranchiseId: 'kings',
-    winnerFranchiseId: 'lakers',
-    loserFranchiseId: 'kings',
+    homeFranchiseId: franchiseIdSchema.parse('lakers'),
+    awayFranchiseId: franchiseIdSchema.parse('kings'),
+    winnerFranchiseId: franchiseIdSchema.parse('lakers'),
+    loserFranchiseId: franchiseIdSchema.parse('kings'),
     status: 'final',
     homeScore: 112,
     awayScore: 97,
     forfeitLoserFranchiseId: null,
     homeBox: {
-      franchiseId: 'lakers',
+      franchiseId: franchiseIdSchema.parse('lakers'),
       points: 112,
       fieldGoalsMade: 42,
       fieldGoalsAttempted: 90,
@@ -429,7 +468,7 @@ function postseasonSummary(gameId: string): SeasonPostseasonSummary {
       possessions: 98,
     },
     awayBox: {
-      franchiseId: 'kings',
+      franchiseId: franchiseIdSchema.parse('kings'),
       points: 97,
       fieldGoalsMade: 37,
       fieldGoalsAttempted: 88,
@@ -477,7 +516,7 @@ function buildCompletedSeason(): SeasonCompletedSeason {
       almanacVersion: 'almanac-v1',
       runId: run.runId,
       rootSeed: run.rootSeed,
-      championFranchiseId: 'lakers',
+      championFranchiseId: franchiseIdSchema.parse('lakers'),
       postseasonDigest: '0'.repeat(32),
       commandLogDigest: '0'.repeat(32),
       awardsDigest: '0'.repeat(32),

@@ -90,9 +90,10 @@ function catalogCandidate(
 ): SeasonDraftCandidate {
   const primary = playable[0];
   if (primary === undefined) throw new Error('no primary position');
+  const parsedPlayerId = playerIdSchema.parse(playerId);
   return {
     playerVersionId,
-    playerId,
+    playerId: parsedPlayerId,
     franchiseId: franchiseIdSchema.parse('lakers'),
     eraId: eraIdSchema.parse('1990s'),
     seasonKey: seasonKeySchema.parse('1994-95'),
@@ -153,7 +154,7 @@ function fixtureIndex(catalog: SeasonDraftCatalog): SeasonFreeAgencyIndex {
     dataVersion: 'fixture',
     catalogRef: {
       catalogVersion: catalog.catalogVersion,
-      contentHash: contentHashSchema.parse('0').repeat(64),
+      contentHash: contentHashSchema.parse('0'.repeat(64)),
       candidateCount: catalog.candidates.length,
     },
     candidates,

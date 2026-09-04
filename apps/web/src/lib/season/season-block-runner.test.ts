@@ -7,12 +7,14 @@ import type {
 import {
   SEASON_NEUTRAL_HOME_COURT,
   SEASON_FREE_AGENCY_VERSION,
+  seasonCandidateCheckpointSchema,
   seasonWorkerCancelRequestSchema,
   seasonWorkerContinueRequestSchema,
   seasonWorkerStartRequestSchema,
   seasonWorkerWarmRequestSchema,
   type SeasonBlockRecap,
   type SeasonCandidateCheckpoint,
+  type SeasonEffectsState,
   type SeasonGameSummary,
   type SeasonPendingBlockCandidate,
   type SeasonRun,
@@ -23,42 +25,10 @@ import { franchiseIdSchema, idSchema, playerIdSchema, commandIdSchema, seedSchem
 import { buildSeasonLeague, buildSeasonRunFixture } from '@hoop-rush/test-fixtures';
 import { createSeasonBlockRunner, type SeasonBlockStartInput } from './season-block-runner';
 const LEAGUE = buildSeasonLeague({}, { humanFranchiseId: franchiseIdSchema.parse('lakers') });
-vi.mock('@hoop-rush/engine', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@hoop-rush/engine')>()),
-  completeSeasonBlockCommit: vi.fn(
-    (input: {
-      run: SeasonRun;
-      candidate: SeasonCandidateCheckpoint;
-      commandId: string;
-      rotationDigest: string;
-      humanFranchiseId: string | null;
-    }) => ({
-      checkpointState: {
-        runId: input.run.runId,
-        blockIndex: input.candidate.blockIndex,
-        completedRounds: input.candidate.completedRounds,
-        revision: input.candidate.revision,
-        commandId: input.commandId,
-        rotationDigest: input.rotationDigest,
-        checkpointDigest: input.candidate.digest,
-      },
-      stateRevision: input.run.stateRevision + 1,
-      stateDigest: 'c'.repeat(32),
-      window: null,
-      freeAgencyWindow: null,
-      freeAgency: input.candidate.freeAgency,
-    }),
-  ),
-  seasonFranchiseLegalFiveFacts: vi.fn(() => ({
-    legal: false,
-    unavailablePlayerVersionIds: ['pv-' + '1'.repeat(32)],
-  })),
-  seasonCheckpointDigest: vi.fn((candidate: SeasonCandidateCheckpoint) => candidate.digest),
-}));
 import {
   generateSeasonSchedule,
-  completeSeasonBlockCommit,
   seasonCheckpointDigest,
+  seasonFranchiseLegalFiveFacts,
   seasonRotationSetDigest,
 } from '@hoop-rush/engine';
 class FakeWorker {
@@ -102,32 +72,7 @@ function makeRun(): SeasonRun {
     },
   };
 }
-function buildZeroEffects(run: SeasonRun): {
-  schemaVersion: 2;
-  playerStates: Array<{
-    playerVersionId: string;
-    fatigueBasisPoints: number;
-    recentLoadBasisPoints: number;
-    lastCompletedRound: number;
-  }>;
-  inactivePlayerStates: Array<{
-    playerVersionId: string;
-    fatigueBasisPoints: number;
-    recentLoadBasisPoints: number;
-    lastCompletedRound: number;
-  }>;
-  pairStates: Array<{
-    a: string;
-    b: string;
-    sharedPossessions: number;
-  }>;
-  archivedPairs: Array<{
-    franchiseId: string;
-    a: string;
-    b: string;
-    sharedPossessions: number;
-  }>;
-} {
+function buildZeroEffects(run: SeasonRun): SeasonEffectsState {
   const playerStates = run.rosters.flatMap((roster) =>
     roster.players.map((player) => ({
       playerVersionId: player.playerVersionId,
@@ -246,7 +191,7 @@ function makeCandidate(
     fouls: 0,
   });
   const boxOf = (franchiseId: string) => ({
-    franchiseId,
+    franchiseId: franchiseIdSchema.parse(franchiseId),
     points: 0,
     fieldGoalsMade: 0,
     fieldGoalsAttempted: 0,
@@ -432,9 +377,10 @@ function makeCandidate(
     digest: '0'.repeat(32),
     ...partial,
   };
-  return { ...base, digest: seasonCheckpointDigest(base) };
+  const parsed = seasonCandidateCheckpointSchema.parse(base);
+  return { ...parsed, digest: seasonCheckpointDigest(parsed) };
 }
-function makePending(run: SeasonRun, nextGameId = 's000016'): SeasonPendingBlockCandidate {
+function makePending(run: SeasonRun, nextGameId = seasonGameIdSchema.parse('s000016')): SeasonPendingBlockCandidate {
   return {
     schemaVersion: 1,
     blockVersion: 'season-block-v5',
@@ -480,7 +426,7 @@ describe('season block runner (M2.5 wire)', () => {
     FakeWorker.instances = [];
     vi.stubGlobal('Worker', FakeWorker);
     vi.stubGlobal('fetch', () => Promise.reject(new Error('fetch stubbed for runner tests')));
-    schedule = generateSeasonSchedule({ league: LEAGUE, seed: 'a'.repeat(32) });
+    schedule = generateSeasonSchedule({ league: LEAGUE, seed: seedSchema.parse('a'.repeat(32)) });
   });
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -756,9 +702,9 @@ describe('season block runner (M2.5 wire)', () => {
       expectedStateRevision: run.stateRevision,
       expectedStateDigest: run.stateDigest,
       stateRevision: run.stateRevision + 1,
-      stateDigest: 'c'.repeat(32),
       window: null,
     });
+    expect(input.stateDigest).toMatch(/^[0-9a-f]{32}$/);
     expect(input.health).toEqual(candidate.health);
     expect(input.transactions).toEqual([]);
     expect(input.objectives).toBeDefined();
@@ -879,18 +825,13 @@ describe('season block runner (M2.5 wire)', () => {
       },
     });
     await flush();
-    const commit = completeSeasonBlockCommit as unknown as ReturnType<typeof vi.fn>;
-    const commitInput = commit.mock.calls[0]?.[0] as {
-      run: SeasonRun;
-    };
-    expect(commitInput.run.rotations).toEqual(locked);
-    const storedHuman = commitInput.run.rotations.find(
-      (rotation) => rotation.franchiseId === 'lakers',
-    );
-    expect(storedHuman?.targetMinutes).not.toEqual(human.targetMinutes);
     const repositoryInput = repository.commitSeasonBlock.mock.calls[0]?.[0] as
       CommitSeasonBlockInput | undefined;
     expect(repositoryInput?.rotations).toEqual(locked);
+    const storedHuman = repositoryInput?.rotations.find(
+      (rotation) => rotation.franchiseId === 'lakers',
+    );
+    expect(storedHuman?.targetMinutes).not.toEqual(human.targetMinutes);
   });
   it('sends a wire-v5 continuation when the worker already holds the run context', async () => {
     const run = makeRun();
@@ -1065,7 +1006,14 @@ describe('season block runner (M2.5 wire)', () => {
       nextGameId: seasonGameIdSchema.parse('s000016'),
       humanFranchiseId: franchiseIdSchema.parse('lakers'),
     });
-    expect(interruption.unavailablePlayerVersionIds).toEqual(['pv-' + '1'.repeat(32)]);
+    const expectedAvailability = seasonFranchiseLegalFiveFacts(
+      run,
+      franchiseIdSchema.parse('lakers'),
+      pending.health,
+    );
+    expect(interruption.unavailablePlayerVersionIds).toEqual(
+      expectedAvailability.unavailablePlayerVersionIds,
+    );
     const interrupted = events.find((event) => event.type === 'interrupted');
     expect(interrupted).toBeDefined();
     expect(interrupted?.blockIndex).toBe(0);

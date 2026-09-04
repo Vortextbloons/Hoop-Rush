@@ -21,6 +21,15 @@ import { availabilityStripRows, humanInjuryTimeline } from '$lib/season/season-h
 import { influenceViewModel, type InfluenceViewModel } from '$lib/season/season-influence-view';
 import { tradeOfferViewModel } from '$lib/season/season-trade-view';
 import { buildManifest } from '@hoop-rush/test-fixtures';
+import {
+  commandIdSchema,
+  eraIdSchema,
+  franchiseIdSchema,
+  idSchema,
+  playerIdSchema,
+  seasonGameIdSchema,
+  seasonKeySchema,
+} from '@hoop-rush/data-contracts';
 mockSvelteKitApp();
 const PLAYER_A = 'pv-00000000000000000000000000000000';
 const PLAYER_B = 'pv-11111111111111111111111111111111';
@@ -29,8 +38,8 @@ function injuryRecord(overrides: Partial<SeasonInjuryRecord>): SeasonInjuryRecor
   return {
     injuryId: 'inj-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     playerVersionId: PLAYER_A,
-    franchiseId: 'lakers',
-    gameId: 's000001',
+    franchiseId: franchiseIdSchema.parse('lakers'),
+    gameId: seasonGameIdSchema.parse('s000001'),
     type: 'soft-tissue',
     severity: 'moderate',
     occurredBeforeHalftime: false,
@@ -66,36 +75,38 @@ function healthState(): SeasonHealthState {
 }
 function roster() {
   return {
-    franchiseId: 'lakers',
+    franchiseId: franchiseIdSchema.parse('lakers'),
     players: [PLAYER_A, PLAYER_B, PLAYER_C].map((playerVersionId, index) => ({
       playerVersionId,
-      playerId: `p-${String(index)}`,
-      franchiseId: 'lakers',
-      eraId: '1990s',
-      seasonKey: '1995-96',
+      playerId: playerIdSchema.parse(`p-${String(index)}`),
+      franchiseId: franchiseIdSchema.parse('lakers'),
+      eraId: eraIdSchema.parse('1990s'),
+      seasonKey: seasonKeySchema.parse('1995-96'),
       displayName: `Player ${String(index + 1)}`,
     })),
   };
 }
 function influenceState(balance: number): SeasonInfluenceState {
+  const lakers = franchiseIdSchema.parse('lakers');
+  const celtics = franchiseIdSchema.parse('celtics');
   return {
     schemaVersion: 1,
     influenceVersion: 'season-influence-v2',
-    balances: { lakers: balance, celtics: 2 },
+    balances: { [lakers]: balance, [celtics]: 2 },
     ledger: [
       {
-        entryId: 'e-1',
-        franchiseId: 'lakers',
+        entryId: idSchema.parse('e-1'),
+        franchiseId: lakers,
         source: 'block-grant',
         blockIndex: 0,
-        commandId: 'grant-0',
+        commandId: commandIdSchema.parse('grant-0'),
         requestedDelta: 1,
         appliedDelta: 1,
         balanceAfter: balance,
         explanation: '+1 Influence grant for accepted block 1',
       },
     ],
-    windows: { lakers: [{ windowIndex: 0, extraOfferSpent: false }] },
+    windows: { [lakers]: [{ windowIndex: 0, extraOfferSpent: false }] },
     rehabs: {},
   };
 }
@@ -104,8 +115,8 @@ function offer(overrides: Partial<SeasonTradeOffer> = {}): SeasonTradeOffer {
     offerId: 'off-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     windowIndex: 0,
     seedPath: ['test', 'trades'],
-    toFranchiseId: 'lakers',
-    fromFranchiseId: 'celtics',
+    toFranchiseId: franchiseIdSchema.parse('lakers'),
+    fromFranchiseId: franchiseIdSchema.parse('celtics'),
     outgoingPlayerVersionIds: [PLAYER_A],
     incomingPlayerVersionIds: [PLAYER_B],
     outgoingHealth: [{ available: true, activeInjuryIds: [] }],
@@ -153,11 +164,11 @@ function tradeOffers() {
 function interruption(): SeasonInvalidRosterInterruption {
   return {
     code: 'invalid-roster',
-    runId: 'run-1',
+    runId: idSchema.parse('run-1'),
     blockIndex: 1,
-    commandId: 'blk-1',
-    nextGameId: 's000105',
-    humanFranchiseId: 'lakers',
+    commandId: commandIdSchema.parse('blk-1'),
+    nextGameId: seasonGameIdSchema.parse('s000105'),
+    humanFranchiseId: franchiseIdSchema.parse('lakers'),
     unavailablePlayerVersionIds: [PLAYER_A, PLAYER_B],
   };
 }
@@ -165,14 +176,14 @@ function pending(): SeasonPendingBlockCandidate {
   return {
     schemaVersion: 1,
     blockVersion: 'season-block-v5',
-    runId: 'run-1',
-    commandId: 'blk-1',
+    runId: idSchema.parse('run-1'),
+    commandId: commandIdSchema.parse('blk-1'),
     blockIndex: 1,
     expectedRevision: 1,
     expectedStateRevision: 1,
     expectedStateDigest: '0'.repeat(32),
     objectiveId: null,
-    nextGameId: 's000105',
+    nextGameId: seasonGameIdSchema.parse('s000105'),
     summaries: [],
     retainedDetails: [],
     effects: {
@@ -290,9 +301,9 @@ describe('InfluencePanel', () => {
         ...influenceState(1),
         rehabs: {
           'inj-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa': {
-            franchiseId: 'lakers',
+            franchiseId: franchiseIdSchema.parse('lakers'),
             outcome: 'failure',
-            commandId: 'inf-1',
+            commandId: commandIdSchema.parse('inf-1'),
           },
         },
       },

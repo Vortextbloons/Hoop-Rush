@@ -3,12 +3,13 @@ import { fireEvent, render } from '@testing-library/svelte';
 import { generateSeasonSchedule } from '@hoop-rush/engine';
 import { buildManifest, buildSeasonLeague, buildSeasonRunFixture } from '@hoop-rush/test-fixtures';
 import type { HoopRushManifest, SeasonGameSummary, SeasonRoster } from '@hoop-rush/data-contracts';
+import { seasonGameIdSchema, seedSchema } from '@hoop-rush/data-contracts';
 import SeasonPlayerStats from '$lib/components/season/SeasonPlayerStats.svelte';
 import { humanSeasonPlayerStats } from '$lib/season/season-player-stats-view';
 import type { SeasonRunShellData } from '$lib/season/season-shell-context';
 import { mockSvelteKitApp } from '../../../test/svelte-testing';
 mockSvelteKitApp();
-const SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
+const SEED = seedSchema.parse('a1b2c3d4e5f60718293a4b5c6d7e8f9a');
 const MANIFEST: HoopRushManifest = buildManifest();
 const league = buildSeasonLeague({}, { humanFranchiseId: 'lakers' });
 const schedule = generateSeasonSchedule({ league, seed: SEED });
@@ -69,7 +70,7 @@ function summary(home: SeasonRoster, away: SeasonRoster): SeasonGameSummary {
   return {
     schemaVersion: 1,
     summaryVersion: run.versions.summaryVersion,
-    gameId: 's000001',
+    gameId: seasonGameIdSchema.parse('s000001'),
     round: 1,
     homeFranchiseId: home.franchiseId,
     awayFranchiseId: away.franchiseId,

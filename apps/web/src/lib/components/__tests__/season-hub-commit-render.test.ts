@@ -3,6 +3,7 @@ import { render } from '@testing-library/svelte';
 import { generateSeasonSchedule } from '@hoop-rush/engine';
 import { buildSeasonLeague, buildSeasonRunFixture } from '@hoop-rush/test-fixtures';
 import type { SeasonGameSummary, SeasonRun } from '@hoop-rush/data-contracts';
+import { franchiseIdSchema, idSchema, commandIdSchema, seedSchema, seasonGameIdSchema } from '@hoop-rush/data-contracts';
 import type { SeasonRunSnapshot } from '@hoop-rush/persistence';
 import type { SeasonRunShellData } from '$lib/season/season-shell-context';
 import { initialSeasonRunShellData } from '$lib/season/season-shell-context';
@@ -11,11 +12,12 @@ import SeasonRunShellWrapper from '../../../test/SeasonRunShellWrapper.svelte';
 mockSvelteKitApp();
 function runWithCommit(): SeasonRun {
   const league = buildSeasonLeague({}, { humanFranchiseId: 'lakers' });
-  const schedule = generateSeasonSchedule({ league, seed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a' });
+  const seed = seedSchema.parse('a1b2c3d4e5f60718293a4b5c6d7e8f9a');
+  const schedule = generateSeasonSchedule({ league, seed });
   const run = buildSeasonRunFixture({
     schedule,
     league,
-    seed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a',
+    seed,
     humanFranchiseId: 'lakers',
   });
   const summaries: SeasonGameSummary[] = [];
@@ -84,8 +86,8 @@ function runWithCommit(): SeasonRun {
       {
         injuryId: 'inj-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
         playerVersionId: run.rosters[0]?.players[0]?.playerVersionId ?? 'pv-0',
-        franchiseId: 'lakers',
-        gameId: 's000001',
+        franchiseId: franchiseIdSchema.parse('lakers'),
+        gameId: seasonGameIdSchema.parse('s000001'),
         type: 'soft-tissue',
         severity: 'moderate',
         occurredBeforeHalftime: false,
@@ -102,8 +104,8 @@ function runWithCommit(): SeasonRun {
       {
         injuryId: 'inj-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
         playerVersionId: run.rosters[0]?.players[1]?.playerVersionId ?? 'pv-1',
-        franchiseId: 'lakers',
-        gameId: 's000002',
+        franchiseId: franchiseIdSchema.parse('lakers'),
+        gameId: seasonGameIdSchema.parse('s000002'),
         type: 'upper-body',
         severity: 'minor',
         occurredBeforeHalftime: true,
@@ -122,7 +124,7 @@ function runWithCommit(): SeasonRun {
   const ledger: SeasonRun['influence']['ledger'] = [];
   for (const franchiseId of run.league.teams.map((team) => team.franchiseId)) {
     ledger.push({
-      entryId: `influence-initial-${franchiseId}`,
+      entryId: idSchema.parse(`influence-initial-${franchiseId}`),
       franchiseId,
       source: 'initial-grant',
       blockIndex: null,
@@ -133,11 +135,11 @@ function runWithCommit(): SeasonRun {
       explanation: 'Initial +2 Influence grant at run creation',
     });
     ledger.push({
-      entryId: `influence-block-0-${franchiseId}`,
+      entryId: idSchema.parse(`influence-block-0-${franchiseId}`),
       franchiseId,
       source: 'block-grant',
       blockIndex: 0,
-      commandId: 'grant-0',
+      commandId: commandIdSchema.parse('grant-0'),
       requestedDelta: 1,
       appliedDelta: 1,
       balanceAfter: 3,
@@ -167,7 +169,7 @@ function shellWithCommit(): SeasonRunShellData {
         forfeitLoserFranchiseId: null,
         injuryEvents: [],
         homeBox: {
-          franchiseId: '',
+          franchiseId: game.homeFranchiseId,
           points: 0,
           fieldGoalsMade: 0,
           fieldGoalsAttempted: 0,
@@ -185,7 +187,7 @@ function shellWithCommit(): SeasonRunShellData {
           possessions: 0,
         },
         awayBox: {
-          franchiseId: '',
+          franchiseId: game.awayFranchiseId,
           points: 0,
           fieldGoalsMade: 0,
           fieldGoalsAttempted: 0,
@@ -212,7 +214,7 @@ function shellWithCommit(): SeasonRunShellData {
         blockIndex: 0,
         completedRounds: 10,
         revision: 0,
-        commandId: 'cmd-0',
+        commandId: commandIdSchema.parse('cmd-0'),
         rotationDigest: '0'.repeat(32),
         checkpointDigest: '0'.repeat(32),
         summaryCount: 150,

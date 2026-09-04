@@ -1,25 +1,38 @@
 import { describe, expect, it } from 'vitest';
 import type { PlayersIndex, PlayersIndexEntry, PoolIndexEntry } from '@hoop-rush/data-contracts';
-import { classicDraftCatalogSchema } from '@hoop-rush/data-contracts';
+import {
+  classicDraftCatalogSchema,
+  contentHashSchema,
+  eraIdSchema,
+  franchiseIdSchema,
+  playerIdSchema,
+  seasonKeySchema,
+} from '@hoop-rush/data-contracts';
 import { buildClassicCatalog, buildFranchiseEraBuckets, classicPoolRows } from './classic-draft';
 import { buildManifest } from '@hoop-rush/test-fixtures';
 function poolEntry(franchiseId: string, eraId: string): PoolIndexEntry {
   return {
-    franchiseId,
-    eraId,
+    franchiseId: franchiseIdSchema.parse(franchiseId),
+    eraId: eraIdSchema.parse(eraId),
     url: `pools/${franchiseId}-${eraId}.json`,
-    contentHash: 'a'.repeat(64),
+    contentHash: contentHashSchema.parse('a'.repeat(64)),
   };
 }
 function row(
-  partial: Partial<PlayersIndexEntry> & {
+  partial: Omit<Partial<PlayersIndexEntry>, 'playerId' | 'franchiseId' | 'eraId' | 'seasonKey'> & {
     playerId: string;
+    franchiseId?: string;
+    eraId?: string;
+    seasonKey?: string;
   },
 ): PlayersIndexEntry {
+  const { playerId, franchiseId = 'lakers', eraId = '1990s', seasonKey = '1996-97', ...rest } =
+    partial;
   return {
-    franchiseId: 'lakers',
-    eraId: '1990s',
-    seasonKey: '1996-97',
+    franchiseId: franchiseIdSchema.parse(franchiseId),
+    eraId: eraIdSchema.parse(eraId),
+    seasonKey: seasonKeySchema.parse(seasonKey),
+    playerId: playerIdSchema.parse(playerId),
     firstName: 'Test',
     lastName: 'Player',
     displayName: 'Test Player',
@@ -30,7 +43,7 @@ function row(
     offense: 70,
     defense: 70,
     selectionScore: 50,
-    ...partial,
+    ...rest,
   };
 }
 function indexOf(rows: PlayersIndexEntry[]): PlayersIndex {

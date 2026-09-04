@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { render } from '@testing-library/svelte';
 import { buildManifest } from '@hoop-rush/test-fixtures';
 import { buildInitialPostseasonState, type SeasonPostseasonState } from '@hoop-rush/data-contracts';
+import { franchiseIdSchema, idSchema, seedSchema } from '@hoop-rush/data-contracts';
 import PostseasonBracket from '$lib/components/season/PostseasonBracket.svelte';
 import SeriesCard from '$lib/components/season/SeriesCard.svelte';
 import PlayInCard from '$lib/components/season/PlayInCard.svelte';
@@ -22,13 +23,13 @@ function series(
   played: number,
 ): NonNullable<SeasonPostseasonState['bracket']>['finals'] {
   return {
-    seriesId,
+    seriesId: idSchema.parse(seriesId),
     round,
     conference,
     higherSeed,
     lowerSeed,
-    homeCourtFranchiseId: homeCourt,
-    challengerFranchiseId: challenger,
+    homeCourtFranchiseId: homeCourt === null ? null : franchiseIdSchema.parse(homeCourt),
+    challengerFranchiseId: challenger === null ? null : franchiseIdSchema.parse(challenger),
     homeCourtWins: homeWins,
     challengerWins,
     games: Array.from({ length: played }, (_, index) => {
@@ -38,53 +39,58 @@ function series(
       const away = homeIsHomeSide ? (challenger ?? '') : (homeCourt ?? '');
       const homeScore = 100 + gameNumber;
       const awayScore = 90 + gameNumber;
+      const winnerId = homeScore > awayScore ? home : away;
       return {
         gameId: `po-${seriesId}-g${String(gameNumber)}`,
         gameNumber,
-        homeFranchiseId: home,
-        awayFranchiseId: away,
+        homeFranchiseId: franchiseIdSchema.parse(home),
+        awayFranchiseId: franchiseIdSchema.parse(away),
         status: 'final' as const,
         homeScore,
         awayScore,
-        winnerFranchiseId: homeScore > awayScore ? home : away,
+        winnerFranchiseId: franchiseIdSchema.parse(winnerId),
       };
     }),
-    winnerFranchiseId: winner,
+    winnerFranchiseId: winner === null ? null : franchiseIdSchema.parse(winner),
   };
 }
 function fixturePostseason(): SeasonPostseasonState {
-  const state = buildInitialPostseasonState('a1b2c3d4e5f60718293a4b5c6d7e8f9a');
-  state.playIn.east.ranking = ['e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7', 'e8', 'e9', 'e10'];
-  state.playIn.west.ranking = ['w1', 'w2', 'w3', 'w4', 'w5', 'w6', 'w7', 'w8', 'w9', 'w10'];
+  const state = buildInitialPostseasonState(seedSchema.parse('a1b2c3d4e5f60718293a4b5c6d7e8f9a'));
+  state.playIn.east.ranking = ['e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7', 'e8', 'e9', 'e10'].map((id) =>
+    franchiseIdSchema.parse(id),
+  );
+  state.playIn.west.ranking = ['w1', 'w2', 'w3', 'w4', 'w5', 'w6', 'w7', 'w8', 'w9', 'w10'].map((id) =>
+    franchiseIdSchema.parse(id),
+  );
   for (const conference of ['east', 'west'] as const) {
     const playIn = state.playIn[conference];
     playIn.games.sevenEight = {
       gameId: `pi-${conference}-seven-eight`,
       status: 'final',
-      homeFranchiseId: `${conference}7`,
-      awayFranchiseId: `${conference}8`,
-      winnerFranchiseId: `${conference}7`,
-      loserFranchiseId: `${conference}8`,
+      homeFranchiseId: franchiseIdSchema.parse(`${conference}7`),
+      awayFranchiseId: franchiseIdSchema.parse(`${conference}8`),
+      winnerFranchiseId: franchiseIdSchema.parse(`${conference}7`),
+      loserFranchiseId: franchiseIdSchema.parse(`${conference}8`),
       homeScore: 112,
       awayScore: 101,
     };
     playIn.games.nineTen = {
       gameId: `pi-${conference}-nine-ten`,
       status: 'final',
-      homeFranchiseId: `${conference}9`,
-      awayFranchiseId: `${conference}10`,
-      winnerFranchiseId: `${conference}9`,
-      loserFranchiseId: `${conference}10`,
+      homeFranchiseId: franchiseIdSchema.parse(`${conference}9`),
+      awayFranchiseId: franchiseIdSchema.parse(`${conference}10`),
+      winnerFranchiseId: franchiseIdSchema.parse(`${conference}9`),
+      loserFranchiseId: franchiseIdSchema.parse(`${conference}10`),
       homeScore: 98,
       awayScore: 91,
     };
     playIn.games.final = {
       gameId: `pi-${conference}-final`,
       status: 'final',
-      homeFranchiseId: `${conference}8`,
-      awayFranchiseId: `${conference}9`,
-      winnerFranchiseId: `${conference}8`,
-      loserFranchiseId: `${conference}9`,
+      homeFranchiseId: franchiseIdSchema.parse(`${conference}8`),
+      awayFranchiseId: franchiseIdSchema.parse(`${conference}9`),
+      winnerFranchiseId: franchiseIdSchema.parse(`${conference}8`),
+      loserFranchiseId: franchiseIdSchema.parse(`${conference}9`),
       homeScore: 104,
       awayScore: 100,
     };
@@ -97,7 +103,7 @@ function fixturePostseason(): SeasonPostseasonState {
       `${conference}6`,
       `${conference}7`,
       `${conference}8`,
-    ];
+    ].map((id) => franchiseIdSchema.parse(id));
   }
   const conferenceBracket = (conference: 'east' | 'west') => ({
     conference,
@@ -110,7 +116,7 @@ function fixturePostseason(): SeasonPostseasonState {
       `${conference}6`,
       `${conference}7`,
       `${conference}8`,
-    ],
+    ].map((id) => franchiseIdSchema.parse(id)),
     firstRound: [
       series(
         `c${conference}1-8`,
@@ -270,7 +276,7 @@ describe('PostseasonBracket', () => {
     const postseason = fixturePostseason();
     const westSeries = postseason.bracket?.west.firstRound[1];
     if (westSeries === undefined) throw new Error('missing west series');
-    westSeries.homeCourtFranchiseId = 'lakers';
+    westSeries.homeCourtFranchiseId = franchiseIdSchema.parse('lakers');
     const { container } = render(PostseasonBracket, {
       props: {
         postseason,
@@ -387,7 +393,7 @@ describe('PlayInCard accessibility', () => {
           consequence: 'Winner takes seed 7 · loser hosts the final',
           humanGame: true,
           started: true,
-        } as never,
+        },
         franchiseName: NAME,
         franchiseAbbrev: ABBREV,
         manifest: MANIFEST,

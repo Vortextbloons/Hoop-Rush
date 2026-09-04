@@ -8,6 +8,7 @@ import type {
   SeasonFreeAgencyTraceStep,
   SeasonFreeAgencyWindowState,
 } from '@hoop-rush/data-contracts';
+import { franchiseIdSchema } from '@hoop-rush/data-contracts';
 export const FREE_AGENCY_BAND_LABEL: Record<SeasonFreeAgencyBand, string> = {
   featured: 'Featured',
   role: 'Role',
@@ -55,7 +56,8 @@ export function humanDeclarationOf(
   franchiseId: string | null,
 ): SeasonFreeAgencyDeclaration | null {
   if (franchiseId === null) return null;
-  return window.declarations[franchiseId] ?? null;
+  const parsedFranchiseId = franchiseIdSchema.parse(franchiseId);
+  return window.declarations[parsedFranchiseId] ?? null;
 }
 export function humanSkipped(
   window: SeasonFreeAgencyWindowState,

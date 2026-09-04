@@ -46,13 +46,13 @@ function series(
 ): PlayoffSeries {
   const played = homeWins + challengerWins;
   return {
-    seriesId,
+    seriesId: idSchema.parse(seriesId),
     round,
     conference,
     higherSeed,
     lowerSeed,
-    homeCourtFranchiseId: homeCourt,
-    challengerFranchiseId: challenger,
+    homeCourtFranchiseId: homeCourt === null ? null : franchiseIdSchema.parse(homeCourt),
+    challengerFranchiseId: challenger === null ? null : franchiseIdSchema.parse(challenger),
     homeCourtWins: homeWins,
     challengerWins: challengerWins,
     games: Array.from({ length: played }, (_, index) => {
@@ -62,23 +62,25 @@ function series(
       const away = homeIsHomeSide ? (challenger ?? '') : (homeCourt ?? '');
       const homeScore = 100 + gameNumber;
       const awayScore = 90 + gameNumber;
+      const winnerId = homeScore > awayScore ? home : away;
       return {
         gameId: `po-${seriesId}-g${String(gameNumber)}`,
         gameNumber,
-        homeFranchiseId: home,
-        awayFranchiseId: away,
+        homeFranchiseId: franchiseIdSchema.parse(home),
+        awayFranchiseId: franchiseIdSchema.parse(away),
         status: 'final' as const,
         homeScore,
         awayScore,
-        winnerFranchiseId: homeScore > awayScore ? home : away,
+        winnerFranchiseId: franchiseIdSchema.parse(winnerId),
       };
     }),
-    winnerFranchiseId: winner,
+    winnerFranchiseId: winner === null ? null : franchiseIdSchema.parse(winner),
   };
 }
 function decidedPostseason(humanFranchiseId: string): SeasonPostseasonState {
   const state = buildInitialPostseasonState(SEED);
-  state.playIn.east.ranking = [
+  const fids = (ids: string[]) => ids.map((id) => franchiseIdSchema.parse(id));
+  state.playIn.east.ranking = fids([
     'east1',
     'east2',
     'east3',
@@ -89,8 +91,8 @@ function decidedPostseason(humanFranchiseId: string): SeasonPostseasonState {
     'east8',
     'east9',
     'east10',
-  ];
-  state.playIn.west.ranking = [
+  ]);
+  state.playIn.west.ranking = fids([
     'west1',
     'west2',
     'west3',
@@ -101,7 +103,7 @@ function decidedPostseason(humanFranchiseId: string): SeasonPostseasonState {
     'west8',
     'west9',
     'west10',
-  ];
+  ]);
   for (const conference of ['east', 'west'] as const) {
     const game = (gameId: string) => ({
       gameId,
@@ -116,7 +118,7 @@ function decidedPostseason(humanFranchiseId: string): SeasonPostseasonState {
     state.playIn[conference].games.sevenEight = game(`pi-${conference}-seven-eight`);
     state.playIn[conference].games.nineTen = game(`pi-${conference}-nine-ten`);
     state.playIn[conference].games.final = game(`pi-${conference}-final`);
-    state.playIn[conference].playoffSeeds = [
+    state.playIn[conference].playoffSeeds = fids([
       `${conference}1`,
       `${conference}2`,
       `${conference}3`,
@@ -125,11 +127,11 @@ function decidedPostseason(humanFranchiseId: string): SeasonPostseasonState {
       `${conference}6`,
       `${conference}7`,
       `${conference}8`,
-    ];
+    ]);
   }
   const bracket = (conference: 'east' | 'west') => ({
     conference,
-    seeds: [
+    seeds: fids([
       `${conference}1`,
       `${conference}2`,
       `${conference}3`,
@@ -138,7 +140,7 @@ function decidedPostseason(humanFranchiseId: string): SeasonPostseasonState {
       `${conference}6`,
       `${conference}7`,
       `${conference}8`,
-    ],
+    ]),
     firstRound: [
       series(
         `po-${conference}1-8`,
@@ -234,9 +236,9 @@ function decidedPostseason(humanFranchiseId: string): SeasonPostseasonState {
     east: bracket('east'),
     west: bracket('west'),
     finals: series('po-finals', 'finals', null, null, null, 'east1', 'west1', 4, 2, 'east1'),
-    championFranchiseId: 'east1',
+    championFranchiseId: franchiseIdSchema.parse('east1'),
   };
-  state.championFranchiseId = 'east1';
+  state.championFranchiseId = franchiseIdSchema.parse('east1');
   void humanFranchiseId;
   return state;
 }
@@ -343,8 +345,12 @@ describe('bracket columns', () => {
   });
   it('exposes only the play-in column before the bracket exists', () => {
     const state = buildInitialPostseasonState(SEED);
-    state.playIn.east.ranking = ['e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7', 'e8', 'e9', 'e10'];
-    state.playIn.west.ranking = ['w1', 'w2', 'w3', 'w4', 'w5', 'w6', 'w7', 'w8', 'w9', 'w10'];
+    state.playIn.east.ranking = ['e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7', 'e8', 'e9', 'e10'].map((id) =>
+      franchiseIdSchema.parse(id),
+    );
+    state.playIn.west.ranking = ['w1', 'w2', 'w3', 'w4', 'w5', 'w6', 'w7', 'w8', 'w9', 'w10'].map((id) =>
+      franchiseIdSchema.parse(id),
+    );
     const columns = bracketColumnsOf(state, 'lakers');
     expect(columns).toHaveLength(1);
     expect(columns[0]?.key).toBe('play-in');
@@ -372,7 +378,9 @@ describe('bracket columns', () => {
 describe('play-in cards', () => {
   it('maps seeds 7-10 from the ranking', () => {
     const state = buildInitialPostseasonState(SEED);
-    state.playIn.west.ranking = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'];
+    state.playIn.west.ranking = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'].map((id) =>
+      franchiseIdSchema.parse(id),
+    );
     const column = playInColumnViewModel(state, 'west', 'g');
     expect(column.seeds.map((entry) => entry.seed)).toEqual([7, 8, 9, 10]);
     expect(column.seeds[0]?.franchiseId).toBe('g');
@@ -389,7 +397,9 @@ describe('play-in cards', () => {
   });
   it('reports the win-or-go-home consequence of the nine-ten game', () => {
     const state = buildInitialPostseasonState(SEED);
-    state.playIn.east.ranking = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'];
+    state.playIn.east.ranking = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'].map((id) =>
+      franchiseIdSchema.parse(id),
+    );
     const card = playInGameCardViewModel(state, 'east', 'nine-ten', null);
     expect(card.consequence).toContain('Loser eliminated');
   });
@@ -567,7 +577,7 @@ describe('risky rehab options', () => {
         },
       ],
     };
-    run.influence.balances.lakers = 1;
+    run.influence.balances[franchiseIdSchema.parse('lakers')] = 1;
     const options = riskyRehabOptionsOf(run, 'lakers', (id) => `Name ${id}`);
     expect(options).toHaveLength(1);
     const option = options[0];
@@ -577,7 +587,7 @@ describe('risky rehab options', () => {
     expect(option?.available).toBe(false);
     expect(option?.alreadyRehabbed).toBe(false);
     expect(option?.displayName).toBe('Name pv-injured');
-    run.influence.balances.lakers = 3;
+    run.influence.balances[franchiseIdSchema.parse('lakers')] = 3;
     run.influence.rehabs['inj-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'] = {
       franchiseId: franchiseIdSchema.parse('lakers'),
       outcome: 'pending',

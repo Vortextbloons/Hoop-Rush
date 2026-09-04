@@ -3,6 +3,7 @@ import { render } from '@testing-library/svelte';
 import { buildManifest, buildSeasonLeague, buildSeasonRunFixture } from '@hoop-rush/test-fixtures';
 import { generateSeasonSchedule } from '@hoop-rush/engine';
 import type { HoopRushManifest, SeasonRun } from '@hoop-rush/data-contracts';
+import { franchiseIdSchema, seedSchema } from '@hoop-rush/data-contracts';
 import HubPage from '../../../routes/season/run/+page.svelte';
 import { SeasonRunShell } from '$lib/season/season-shell-state.svelte';
 import { SEASON_RUN_SHELL_CONTEXT } from '$lib/season/season-shell-context';
@@ -52,7 +53,7 @@ function shellWithRun(run: SeasonRun): SeasonRunShell {
   shell.index = {
     runId: run.runId,
     rootSeed: run.rootSeed,
-    humanFranchiseId: 'lakers',
+    humanFranchiseId: franchiseIdSchema.parse('lakers'),
     completedRounds: 0,
     revision: 0,
     humanWins: 0,
@@ -87,7 +88,10 @@ function shellWithRun(run: SeasonRun): SeasonRunShell {
 describe('Season Run hub submit gating (performance pass)', () => {
   it('enables the simulate button for a fresh run with the slice loaded', () => {
     const league = buildSeasonLeague({}, { humanFranchiseId: 'lakers' });
-    const schedule = generateSeasonSchedule({ league, seed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a' });
+    const schedule = generateSeasonSchedule({
+      league,
+      seed: seedSchema.parse('a1b2c3d4e5f60718293a4b5c6d7e8f9a'),
+    });
     const run = buildSeasonRunFixture({
       schedule,
       humanFranchiseId: 'lakers',

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render } from '@testing-library/svelte';
 import {
   SEASON_DRAFT_VERSION,
+  seedSchema,
   type SeasonDraftCommandPayload,
   type SeasonDraftState,
 } from '@hoop-rush/data-contracts';
@@ -18,7 +19,7 @@ mockSvelteKitApp();
 const LEAGUE = buildSeasonLeague({}, { humanFranchiseId: 'lakers' });
 const CATALOG = buildSeasonDraftCatalog();
 const MANIFEST = buildManifest();
-const SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
+const SEED = seedSchema.parse('a1b2c3d4e5f60718293a4b5c6d7e8f9a');
 const DEPS = { generate: (() => null) as never };
 let commandCounter = 0;
 function run(

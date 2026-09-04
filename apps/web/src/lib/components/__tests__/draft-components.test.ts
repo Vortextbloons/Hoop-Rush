@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render } from '@testing-library/svelte';
 import type { PlayersIndexEntry } from '@hoop-rush/data-contracts';
+import {
+  eraIdSchema,
+  franchiseIdSchema,
+  playerIdSchema,
+  seasonKeySchema,
+} from '@hoop-rush/data-contracts';
 import { buildManifest } from '@hoop-rush/test-fixtures';
 import DraftPoolBrowser from '$lib/components/draft/DraftPoolBrowser.svelte';
 import SlotPickerDialog from '$lib/components/draft/SlotPickerDialog.svelte';
@@ -8,14 +14,20 @@ import LineupCourt from '$lib/components/LineupCourt.svelte';
 import { mockSvelteKitApp } from '../../../test/svelte-testing';
 mockSvelteKitApp();
 function row(
-  partial: Partial<PlayersIndexEntry> & {
+  partial: Omit<Partial<PlayersIndexEntry>, 'playerId' | 'franchiseId' | 'eraId' | 'seasonKey'> & {
     playerId: string;
+    franchiseId?: string;
+    eraId?: string;
+    seasonKey?: string;
   },
 ): PlayersIndexEntry {
+  const { playerId, franchiseId = 'lakers', eraId = '1990s', seasonKey = '1996-97', ...rest } =
+    partial;
   return {
-    franchiseId: 'lakers',
-    eraId: '1990s',
-    seasonKey: '1996-97',
+    franchiseId: franchiseIdSchema.parse(franchiseId),
+    eraId: eraIdSchema.parse(eraId),
+    seasonKey: seasonKeySchema.parse(seasonKey),
+    playerId: playerIdSchema.parse(playerId),
     firstName: 'Test',
     lastName: 'Player',
     displayName: 'Test Player',
@@ -26,7 +38,7 @@ function row(
     offense: 70,
     defense: 70,
     selectionScore: 50,
-    ...partial,
+    ...rest,
   };
 }
 const EMPTY_SLOTS = [null, null, null, null, null];

@@ -24,12 +24,16 @@ type FixedFiveClient = SupabaseClient;
 
 const sharedClients = new Map<string, FixedFiveClient>();
 
-function supabaseClient(url: string, publishableKey: string): FixedFiveClient {
-  const key = `${url}${publishableKey}`;
+function supabaseClient(url: string, publishableKey: string, storageKey?: string): FixedFiveClient {
+  const key = `${url}${publishableKey}${storageKey ?? ''}`;
   const existing = sharedClients.get(key);
   if (existing) return existing;
   const client = createClient(url, publishableKey, {
-    auth: { persistSession: true, autoRefreshToken: true },
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      ...(storageKey ? { storageKey } : {}),
+    },
   }) as FixedFiveClient;
   sharedClients.set(key, client);
   return client;
@@ -87,7 +91,7 @@ interface FixedFiveCommandRow {
 
 interface RpcRoomPayload {
   room_id: Id;
-  code: string;
+  code: FixedFiveRoomCode | null;
   participant_id?: FixedFiveParticipantId;
 }
 
@@ -99,9 +103,11 @@ function stringField(record: Record<string, unknown>, key: string, fallback = ''
 function rpcPayload(value: unknown): RpcRoomPayload {
   const record = value as Record<string, unknown>;
   const participantRaw = record['participant_id'];
+  const rawCode = record['code'];
   return {
     room_id: idSchema.parse(stringField(record, 'room_id')),
-    code: fixedFiveRoomCodeSchema.parse(stringField(record, 'code')),
+    // Only create/rematch return a code; join returns room_id + seat.
+    code: typeof rawCode === 'string' ? fixedFiveRoomCodeSchema.parse(rawCode) : null,
     participant_id: participantRaw === 'p1' || participantRaw === 'p2' ? participantRaw : undefined,
   };
 }
@@ -153,11 +159,16 @@ async function ensureAnonymous(client: FixedFiveClient): Promise<void> {
 export function createFixedFiveTransport(options?: {
   url?: string;
   publishableKey?: string;
+  storageKey?: string;
 }): FixedFiveMultiplayerTransport {
   if (!options?.url || !options.publishableKey) {
     return createInMemoryFixedFiveTransport();
   }
-  const client: FixedFiveClient = supabaseClient(options.url, options.publishableKey);
+  const client: FixedFiveClient = supabaseClient(
+    options.url,
+    options.publishableKey,
+    options.storageKey,
+  );
   const rooms = new Map<
     string,
     {
@@ -303,7 +314,8 @@ export function createFixedFiveTransport(options?: {
       }
       const payload = rpcPayload(response.data);
       const snapshot = await fetchSnapshot(payload.room_id);
-      const code = fixedFiveRoomCodeSchema.parse(payload.code);
+      if (!payload.code) throw new Error('create failed: room code missing');
+      const code = payload.code;
       return {
         snapshot,
         code,
@@ -521,7 +533,8 @@ export function createFixedFiveTransport(options?: {
         throw new Error(`rematch failed: ${response.error?.message ?? 'unknown'}`);
       const payload = rpcPayload(response.data);
       const snapshot = await fetchSnapshot(payload.room_id);
-      return { snapshot, code: fixedFiveRoomCodeSchema.parse(payload.code) };
+      if (!payload.code) throw new Error('rematch failed: room code missing');
+      return { snapshot, code: payload.code };
     },
     async complete(roomId, resultDigest) {
       await ensureAnonymous(client);

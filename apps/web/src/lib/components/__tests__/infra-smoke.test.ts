@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render } from '@testing-library/svelte';
 import { buildManifest, buildPlayerSeason } from '@hoop-rush/test-fixtures';
+import { playerIdSchema } from '@hoop-rush/data-contracts';
 import PlayerFace from '$lib/components/PlayerFace.svelte';
 import { mockSvelteKitApp } from '../../../test/svelte-testing';
 mockSvelteKitApp();
@@ -8,7 +9,7 @@ describe('PlayerFace infra smoke (jsdom)', () => {
   afterEach(() => vi.useRealTimers());
   it('shows the initials fallback when no headshot candidate resolves', () => {
     const player = buildPlayerSeason({
-      playerId: 'p-lal-g',
+      playerId: playerIdSchema.parse('p-lal-g'),
       firstName: 'Test',
       lastName: 'Player',
       altIds: { nbaHeadshotAvailable: false },
@@ -24,7 +25,7 @@ describe('PlayerFace infra smoke (jsdom)', () => {
     vi.useFakeTimers();
     const photoUrl = 'https://upload.wikimedia.org/player-photo.png';
     const player = buildPlayerSeason({
-      playerId: 'p-lazy-photo',
+      playerId: playerIdSchema.parse('p-lazy-photo'),
       playerExternalId: '999999',
       firstName: 'Lazy',
       lastName: 'Photo',

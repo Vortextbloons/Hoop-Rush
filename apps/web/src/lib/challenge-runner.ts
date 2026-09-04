@@ -1,5 +1,7 @@
 import { acceptGameResult } from '@hoop-rush/engine';
 import {
+  challengeRunSchema,
+  seedSchema,
   workerMessageSchema,
   workerRequestSchema,
   type ChallengeRun,
@@ -162,8 +164,11 @@ export class ChallengeRunner {
     const run = this.run;
     if (!run) return;
     const token = this.pumpToken;
+    const chosenSeed = seedSchema.parse(envelope.chosenRunSeed);
     const updatedRun =
-      envelope.chosenRunSeed === run.runSeed ? run : { ...run, runSeed: envelope.chosenRunSeed };
+      chosenSeed === run.runSeed
+        ? run
+        : challengeRunSchema.parse({ ...run, runSeed: chosenSeed });
     if (updatedRun !== run) {
       try {
         await this.repo.saveActiveRun({

@@ -5,7 +5,7 @@ import type {
   RunPlayerSelection,
   Seed,
 } from '@hoop-rush/data-contracts';
-import { seedSchema } from '@hoop-rush/data-contracts';
+import { eraIdSchema, franchiseIdSchema, playerIdSchema, seedSchema } from '@hoop-rush/data-contracts';
 import { validateLineup } from '@hoop-rush/engine';
 import { randomHex } from '$lib/random-hex';
 export interface SandboxUrlState {
@@ -44,7 +44,11 @@ export function parseSandboxUrl(
     if (!playerId || !franchiseId || !eraId) {
       return { ok: false, state: null, error: `Invalid slot "${part}" in the URL.` };
     }
-    slots.push({ playerId, franchiseId, eraId });
+    slots.push({
+      playerId: playerIdSchema.parse(playerId),
+      franchiseId: franchiseIdSchema.parse(franchiseId),
+      eraId: eraIdSchema.parse(eraId),
+    });
   }
   if (new Set(slots.map((s) => s.playerId)).size !== 5) {
     return { ok: false, state: null, error: 'A lineup cannot repeat a player.' };
@@ -55,7 +59,7 @@ export function parseSandboxUrl(
     if (!seedSchema.safeParse(seedParam).success) {
       return { ok: false, state: null, error: 'The seed in the URL is invalid.' };
     }
-    seed = seedParam;
+    seed = seedSchema.parse(seedParam);
   }
   if (manifest !== null) {
     for (const slot of slots) {
@@ -117,5 +121,5 @@ export function buildSandboxHref(slots: RunPlayerSelection[]): SandboxHref {
   return `/sandbox?${params.toString()}`;
 }
 export function generateSeed(): Seed {
-  return randomHex(16);
+  return seedSchema.parse(randomHex(16));
 }

@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { PlayersIndexEntry } from '@hoop-rush/data-contracts';
 import {
+  eraIdSchema,
+  franchiseIdSchema,
+  playerIdSchema,
+  seasonKeySchema,
+} from '@hoop-rush/data-contracts';
+import {
   poolSortLabel,
   presentationForVariant,
   ratingBadges,
@@ -8,14 +14,20 @@ import {
   variantLabel,
 } from './draft-presentation';
 function row(
-  partial: Partial<PlayersIndexEntry> & {
+  partial: Omit<Partial<PlayersIndexEntry>, 'playerId' | 'franchiseId' | 'eraId' | 'seasonKey'> & {
     playerId: string;
+    franchiseId?: string;
+    eraId?: string;
+    seasonKey?: string;
   },
 ): PlayersIndexEntry {
+  const { playerId, franchiseId = 'lakers', eraId = '1990s', seasonKey = '1990-91', ...rest } =
+    partial;
   return {
-    franchiseId: 'lakers',
-    eraId: '1990s',
-    seasonKey: '1990-91',
+    franchiseId: franchiseIdSchema.parse(franchiseId),
+    eraId: eraIdSchema.parse(eraId),
+    seasonKey: seasonKeySchema.parse(seasonKey),
+    playerId: playerIdSchema.parse(playerId),
     firstName: 'Test',
     lastName: 'Player',
     displayName: 'Test Player',
@@ -26,7 +38,7 @@ function row(
     offense: 70,
     defense: 70,
     selectionScore: 50,
-    ...partial,
+    ...rest,
   };
 }
 describe('sortDraftRows', () => {

@@ -8,6 +8,13 @@ import type {
   PoolIndexEntry,
 } from '@hoop-rush/data-contracts';
 import {
+  contentHashSchema,
+  eraIdSchema,
+  franchiseIdSchema,
+  playerIdSchema,
+  seasonKeySchema,
+} from '@hoop-rush/data-contracts';
+import {
   getPool,
   getPlayersIndex,
   clearDataLoaderCaches,
@@ -72,20 +79,27 @@ describe('data asset loading with a stale manifest', () => {
   ])(
     'recovers a stale pool hash ($playerId, manifest refreshed: $staleManifestRefresh)',
     async ({ playerId, franchiseId, eraId, url, staleManifestRefresh }) => {
-      const player = buildPlayerSeason({ playerId });
-      const poolV1 = buildPool([player], { franchiseId, eraId });
-      const poolV2 = buildPool([player], { franchiseId, eraId, dataVersion: 'data-v2' });
+      const player = buildPlayerSeason({ playerId: playerIdSchema.parse(playerId) });
+      const poolV1 = buildPool([player], {
+        franchiseId: franchiseIdSchema.parse(franchiseId),
+        eraId: eraIdSchema.parse(eraId),
+      });
+      const poolV2 = buildPool([player], {
+        franchiseId: franchiseIdSchema.parse(franchiseId),
+        eraId: eraIdSchema.parse(eraId),
+        dataVersion: 'data-v2',
+      });
       const staleEntry: PoolIndexEntry = {
-        franchiseId,
-        eraId,
+        franchiseId: franchiseIdSchema.parse(franchiseId),
+        eraId: eraIdSchema.parse(eraId),
         url,
-        contentHash: sha256(JSON.stringify(poolV1)),
+        contentHash: contentHashSchema.parse(sha256(JSON.stringify(poolV1))),
       };
       const freshHash = sha256(JSON.stringify(poolV2));
       const staleManifest: HoopRushManifest = buildManifest({ pools: [staleEntry] });
       const freshManifest: HoopRushManifest = buildManifest({
         dataVersion: 'data-v2',
-        pools: [{ ...staleEntry, contentHash: freshHash }],
+        pools: [{ ...staleEntry, contentHash: contentHashSchema.parse(freshHash) }],
       });
       routes.set(`/data/${url}`, JSON.stringify(poolV2));
       routes.set('/data/manifest.json', JSON.stringify(staleManifest));
@@ -100,13 +114,16 @@ describe('data asset loading with a stale manifest', () => {
     },
   );
   it('does not retry when a pool load fails for a non-hash reason', async () => {
-    const player = buildPlayerSeason({ playerId: 'lakers-1990s-a' });
-    const pool = buildPool([player], { franchiseId: 'lakers', eraId: '1990s' });
+    const player = buildPlayerSeason({ playerId: playerIdSchema.parse('lakers-1990s-a') });
+    const pool = buildPool([player], {
+      franchiseId: franchiseIdSchema.parse('lakers'),
+      eraId: eraIdSchema.parse('1990s'),
+    });
     const entry: PoolIndexEntry = {
-      franchiseId: 'lakers',
-      eraId: '1990s',
+      franchiseId: franchiseIdSchema.parse('lakers'),
+      eraId: eraIdSchema.parse('1990s'),
       url: 'pools/lakers-1990s.json',
-      contentHash: sha256(JSON.stringify(pool)),
+      contentHash: contentHashSchema.parse(sha256(JSON.stringify(pool))),
     };
     routes.set('/data/manifest.json', JSON.stringify(buildManifest({ pools: [entry] })));
     routes.set('/data/pools/lakers-1990s.json', '');
@@ -124,19 +141,22 @@ describe('data asset loading with a stale manifest', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
   it('fails when packaged pool bytes cannot be parsed after hash recovery', async () => {
-    const player = buildPlayerSeason({ playerId: 'knicks-2000s-a' });
-    const pool = buildPool([player], { franchiseId: 'knicks', eraId: '2000s' });
+    const player = buildPlayerSeason({ playerId: playerIdSchema.parse('knicks-2000s-a') });
+    const pool = buildPool([player], {
+      franchiseId: franchiseIdSchema.parse('knicks'),
+      eraId: eraIdSchema.parse('2000s'),
+    });
     const entry: PoolIndexEntry = {
-      franchiseId: 'knicks',
-      eraId: '2000s',
+      franchiseId: franchiseIdSchema.parse('knicks'),
+      eraId: eraIdSchema.parse('2000s'),
       url: 'pools/knicks-2000s.json',
-      contentHash: sha256(JSON.stringify(pool)),
+      contentHash: contentHashSchema.parse(sha256(JSON.stringify(pool))),
     };
     const manifest: HoopRushManifest = buildManifest({
       pools: [
         {
-          franchiseId: 'knicks',
-          eraId: '2000s',
+          franchiseId: franchiseIdSchema.parse('knicks'),
+          eraId: eraIdSchema.parse('2000s'),
           url: 'pools/knicks-2000s.json',
           contentHash: entry.contentHash,
         },
@@ -149,13 +169,16 @@ describe('data asset loading with a stale manifest', () => {
     expect(fetchMock).toHaveBeenCalledTimes(4);
   });
   it('serves a pool from the IndexedDB cache when the hash still matches', async () => {
-    const player = buildPlayerSeason({ playerId: 'celtics-1990s-a' });
-    const pool = buildPool([player], { franchiseId: 'celtics', eraId: '1990s' });
+    const player = buildPlayerSeason({ playerId: playerIdSchema.parse('celtics-1990s-a') });
+    const pool = buildPool([player], {
+      franchiseId: franchiseIdSchema.parse('celtics'),
+      eraId: eraIdSchema.parse('1990s'),
+    });
     const entry: PoolIndexEntry = {
-      franchiseId: 'celtics',
-      eraId: '1990s',
+      franchiseId: franchiseIdSchema.parse('celtics'),
+      eraId: eraIdSchema.parse('1990s'),
       url: 'pools/celtics-1990s.json',
-      contentHash: sha256(JSON.stringify(pool)),
+      contentHash: contentHashSchema.parse(sha256(JSON.stringify(pool))),
     };
     const manifest: HoopRushManifest = buildManifest({
       pools: [entry],
@@ -202,10 +225,10 @@ describe('warmPlayersIndex', () => {
       dataVersion: 'data-v1',
       players: [
         {
-          playerId: 'lakers-1990s-a',
-          franchiseId: 'lakers',
-          eraId: '1990s',
-          seasonKey: '1996-97',
+          playerId: playerIdSchema.parse('lakers-1990s-a'),
+          franchiseId: franchiseIdSchema.parse('lakers'),
+          eraId: eraIdSchema.parse('1990s'),
+          seasonKey: seasonKeySchema.parse('1996-97'),
           firstName: 'Test',
           lastName: 'Player',
           displayName: 'Test Player',
@@ -220,7 +243,7 @@ describe('warmPlayersIndex', () => {
     };
     const indexHash = sha256(JSON.stringify(index));
     const manifest: HoopRushManifest = buildManifest({
-      playersIndex: { url: 'players-index.json', contentHash: indexHash },
+      playersIndex: { url: 'players-index.json', contentHash: contentHashSchema.parse(indexHash) },
     });
     routes.set('/data/players-index.json', JSON.stringify(index));
     routes.set('/data/manifest.json', JSON.stringify(manifest));
@@ -234,7 +257,10 @@ describe('warmPlayersIndex', () => {
   });
   it('never throws when the underlying load fails', async () => {
     const manifest: HoopRushManifest = buildManifest({
-      playersIndex: { url: 'players-index.json', contentHash: sha256(JSON.stringify('junk')) },
+      playersIndex: {
+        url: 'players-index.json',
+        contentHash: contentHashSchema.parse(sha256(JSON.stringify('junk'))),
+      },
     });
     routes.set('/data/manifest.json', JSON.stringify(manifest));
     routes.set('/data/players-index.json', 'not json');
@@ -255,10 +281,10 @@ describe('warmPlayersIndex', () => {
       dataVersion: 'data-v1',
       players: [
         {
-          playerId: 'lakers-1990s-a',
-          franchiseId: 'lakers',
-          eraId: '1990s',
-          seasonKey: '1996-97',
+          playerId: playerIdSchema.parse('lakers-1990s-a'),
+          franchiseId: franchiseIdSchema.parse('lakers'),
+          eraId: eraIdSchema.parse('1990s'),
+          seasonKey: seasonKeySchema.parse('1996-97'),
           firstName: 'Test',
           lastName: 'Player',
           displayName: 'Test Player',
@@ -273,7 +299,7 @@ describe('warmPlayersIndex', () => {
     };
     const indexHash = sha256(JSON.stringify(index));
     const manifest: HoopRushManifest = buildManifest({
-      playersIndex: { url: 'players-index.json', contentHash: indexHash },
+      playersIndex: { url: 'players-index.json', contentHash: contentHashSchema.parse(indexHash) },
     });
     routes.set('/data/manifest.json', JSON.stringify(manifest));
     vi.mocked(readCachedAsset).mockResolvedValue(index);

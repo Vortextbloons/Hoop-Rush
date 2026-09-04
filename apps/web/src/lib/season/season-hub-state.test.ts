@@ -19,7 +19,7 @@ import {
   type SeasonRunCommand,
   type SeasonStandings,
 } from '@hoop-rush/data-contracts';
-import { franchiseIdSchema, eraIdSchema, seedSchema } from '@hoop-rush/data-contracts';
+import { franchiseIdSchema, eraIdSchema, seedSchema, commandIdSchema } from '@hoop-rush/data-contracts';
 import type { SeasonRunSnapshot } from '@hoop-rush/persistence';
 import {
   generateSeasonSchedule,
@@ -529,7 +529,7 @@ async function advanceHubRunToHumanGame(
     }
     const command: SeasonRunCommand = {
       schemaVersion: SEASON_RUN_SCHEMA_VERSION,
-      commandId: `hub-adv-${String(guard)}`,
+      commandId: commandIdSchema.parse(`hub-adv-${String(guard)}`),
       runId: current.runId,
       expectedStateRevision: current.stateRevision,
       expectedStateDigest: current.stateDigest,

@@ -7,6 +7,12 @@ import type {
   SeasonRosterEntry,
   SeasonStandings,
 } from '@hoop-rush/data-contracts';
+import {
+  eraIdSchema,
+  franchiseIdSchema,
+  playerIdSchema,
+  seasonKeySchema,
+} from '@hoop-rush/data-contracts';
 import BoxScore from '$lib/components/season/BoxScore.svelte';
 import LeadersTable from '$lib/components/season/LeadersTable.svelte';
 import StandingsTable from '$lib/components/season/StandingsTable.svelte';
@@ -81,7 +87,7 @@ function playerRow(name: string, points: number): BoxScoreRow {
 function makeBox(): BoxScoreData {
   return {
     team: {
-      franchiseId: 'lakers',
+      franchiseId: franchiseIdSchema.parse('lakers'),
       points: 100,
       fieldGoalsMade: 40,
       fieldGoalsAttempted: 88,
@@ -104,12 +110,13 @@ function makeBox(): BoxScoreData {
   };
 }
 function rosterEntry(playerVersionId: string, seasonKey: string): SeasonRosterEntry {
+  const parsedSeasonKey = seasonKeySchema.parse(seasonKey);
   return {
     playerVersionId,
-    playerId: `person-${playerVersionId}`,
-    franchiseId: 'lakers',
-    eraId: '1990s',
-    seasonKey,
+    playerId: playerIdSchema.parse(`person-${playerVersionId}`),
+    franchiseId: franchiseIdSchema.parse('lakers'),
+    eraId: eraIdSchema.parse('1990s'),
+    seasonKey: parsedSeasonKey,
     displayName: playerVersionId,
   };
 }
