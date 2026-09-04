@@ -29,6 +29,7 @@
     error,
     emptyMessage,
     allowDisplacement = true,
+    selectionDisabled = false,
     onpick,
   }: {
     heading: string;
@@ -41,6 +42,7 @@
     error: string | null;
     emptyMessage: string;
     allowDisplacement?: boolean;
+    selectionDisabled?: boolean;
     onpick: (player: IndexRow) => void;
   } = $props();
   let searchInput = $state('');
@@ -201,15 +203,17 @@
         <li class="min-w-0">
           <button
             type="button"
-            disabled={cardState === 'blocked'}
-            aria-disabled={cardState === 'blocked' ? 'true' : undefined}
-            onclick={() => onpick(player)}
+            disabled={selectionDisabled || cardState === 'blocked'}
+            aria-disabled={selectionDisabled || cardState === 'blocked' ? 'true' : undefined}
+            onclick={() => {
+              if (!selectionDisabled) onpick(player);
+            }}
             class="flex w-full items-center gap-2 rounded-lg py-2 pr-2.5 pl-2 text-left sm:gap-3 sm:py-2.5 sm:pr-5 sm:pl-3 {cardState ===
             'lineup'
               ? 'bg-primary/10 opacity-60'
               : cardState === 'displace'
                 ? 'bg-accent/10 opacity-90 shadow-[0_0_8px_hsl(42_91%_61%/0.15)] hover:bg-accent/20 hover:opacity-100'
-                : cardState === 'blocked'
+                : selectionDisabled || cardState === 'blocked'
                   ? 'opacity-40 disabled:cursor-not-allowed'
                   : 'hover:bg-surface-2'}"
           >

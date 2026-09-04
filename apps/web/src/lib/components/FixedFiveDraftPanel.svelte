@@ -15,12 +15,16 @@
   import DraftValuePanel from '$lib/components/DraftValuePanel.svelte';
   import LineupSummaryNav from '$lib/components/LineupSummaryNav.svelte';
   import { classicPoolRows } from '$lib/classic-draft';
-  import { poolSortLabel, type DraftPresentation } from '$lib/draft-presentation';
+  import { poolSortLabel, sortDraftRows, type DraftPresentation } from '$lib/draft-presentation';
   import { displacementTargetFor } from '$lib/draft-slots';
   import { formatPositions } from '$lib/player-positions';
   import { resolvePlayerRefs } from '$lib/player-refs';
   import type { PeakPlayerSeason } from '@hoop-rush/data-contracts';
-  import type { DraftReplay, FixedFiveAssets } from '$lib/fixed-five-room-state';
+  import {
+    isFixedFiveDraftTurn,
+    type DraftReplay,
+    type FixedFiveAssets,
+  } from '$lib/fixed-five-room-state';
 
   let {
     mode,
@@ -123,8 +127,6 @@
       };
     }
     const duel = replay.state;
-    const picker =
-      duel.pickOrdinal % 2 === 0 ? duel.firstPicker : duel.firstPicker === 'p1' ? 'p2' : 'p1';
     const mine = duel.picks.filter((p) => p.participantId === selfId).map((p) => p.slotIndex);
     if (duel.status === 'complete' || !duel.currentRoll) {
       return {
@@ -152,8 +154,10 @@
       rerollFranchiseSpent: tokens.franchiseSpent,
       rerollEraSpent: tokens.eraSpent,
       complete: false,
-      turn: picker === selfId,
-      turnText: picker === selfId ? 'Your pick — alternating draft.' : 'Opponent is picking…',
+      turn: isFixedFiveDraftTurn(replay, selfId),
+      turnText: isFixedFiveDraftTurn(replay, selfId)
+        ? 'Your pick — alternating draft.'
+        : 'Opponent is picking…',
     };
   });
 
@@ -207,7 +211,7 @@
     return indexById.get(playerId)?.displayName ?? playerId;
   }
 
-  const sandboxRows = $derived(assets.index.players);
+  const sandboxRows = $derived(sortDraftRows(assets.index.players, presentation));
   const courtRows = $derived.by((): (PlayersIndexEntry | null)[] => {
     if (replay.mode !== 'sandbox-shared-82') return [null, null, null, null, null];
     const builder = selfId === 'p1' ? replay.p1 : replay.p2;
@@ -402,6 +406,7 @@
         {presentation}
         filtersEditable={true}
         {allowDisplacement}
+        selectionDisabled={disabled || !rollView.turn}
         error={null}
         emptyMessage="No players in this pool."
         onpick={openPicker}
@@ -470,13 +475,14 @@
       heading="Global pool"
       rows={sandboxRows}
       slots={courtRows}
-      countLabel={`${sandboxRows.length} players`}
+      countLabel={`${sandboxRows.length} players · ${poolSortLabel(presentation)}`}
       filtersEditable={true}
       manifest={assets.manifest}
       {presentation}
       error={null}
       emptyMessage="No players match."
       allowDisplacement={true}
+      selectionDisabled={disabled || sandboxLocked}
       onpick={openPicker}
     />
     <LineupCourt

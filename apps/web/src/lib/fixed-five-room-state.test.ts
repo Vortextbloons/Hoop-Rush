@@ -10,12 +10,15 @@ import {
 import type { FixedFiveCommand } from '@hoop-rush/data-contracts';
 import type { DuelDraftState } from '@hoop-rush/engine';
 import {
+  computeDueAutopick,
   deriveEffectivePhase,
   isDraftComplete,
+  isFixedFiveDraftTurn,
   mergeFixedFiveCommands,
   restoreFixedFiveCommandSyncState,
   roomLogFacts,
   type DraftReplay,
+  type FixedFiveAssets,
 } from '$lib/fixed-five-room-state';
 
 const ROOM = idSchema.parse('room-1');
@@ -195,5 +198,18 @@ describe('deriveEffectivePhase', () => {
       },
     });
     expect(isDraftComplete(done)).toBe(true);
+  });
+});
+
+describe('isFixedFiveDraftTurn', () => {
+  it('allows only the current participant to interact with a duel offer', () => {
+    const replay = duelReplay();
+    expect(isFixedFiveDraftTurn(replay, 'p1')).toBe(true);
+    expect(isFixedFiveDraftTurn(replay, 'p2')).toBe(false);
+  });
+
+  it('does not start timeout work for the participant who is waiting', () => {
+    const replay = duelReplay();
+    expect(computeDueAutopick('duel', ROOT, replay, {} as FixedFiveAssets, 'p2')).toBeNull();
   });
 });

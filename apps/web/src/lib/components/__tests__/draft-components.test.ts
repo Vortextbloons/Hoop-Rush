@@ -5,12 +5,15 @@ import {
   eraIdSchema,
   franchiseIdSchema,
   playerIdSchema,
+  seedSchema,
   seasonKeySchema,
 } from '@hoop-rush/data-contracts';
 import { buildManifest } from '@hoop-rush/test-fixtures';
 import DraftPoolBrowser from '$lib/components/draft/DraftPoolBrowser.svelte';
 import SlotPickerDialog from '$lib/components/draft/SlotPickerDialog.svelte';
 import LineupCourt from '$lib/components/LineupCourt.svelte';
+import FixedFiveDraftPanel from '$lib/components/FixedFiveDraftPanel.svelte';
+import type { DraftReplay, FixedFiveAssets } from '$lib/fixed-five-room-state';
 import { mockSvelteKitApp } from '../../../test/svelte-testing';
 mockSvelteKitApp();
 function row(
@@ -52,6 +55,7 @@ function renderPoolBrowser(
     presentation: 'sandbox' | 'ratings' | 'ball-knowledge';
     filtersEditable: boolean;
     allowDisplacement: boolean;
+    selectionDisabled: boolean;
     rows: PlayersIndexEntry[];
   }> = {},
 ) {
@@ -68,6 +72,7 @@ function renderPoolBrowser(
       error: null,
       emptyMessage: 'No players in this pool.',
       allowDisplacement: props.allowDisplacement ?? false,
+      selectionDisabled: props.selectionDisabled ?? false,
       onpick: vi.fn(),
     },
   });
@@ -148,6 +153,32 @@ describe('DraftPoolBrowser parity', () => {
     const { queryByRole } = renderPoolBrowser({ filtersEditable: false });
     expect(queryByRole('searchbox', { name: 'Search players by name' })).toBeNull();
   });
+  it('does not open a pick while selection is disabled for the opponent turn', async () => {
+    const onpick = vi.fn();
+    const manifest = buildManifest();
+    const player = row({ playerId: 'waiting', displayName: 'Waiting Player' });
+    const { container } = render(DraftPoolBrowser, {
+      props: {
+        heading: 'DAL · 2010s',
+        rows: [player],
+        slots: EMPTY_SLOTS,
+        countLabel: '1 player',
+        filtersEditable: true,
+        manifest,
+        presentation: 'ratings',
+        error: null,
+        emptyMessage: 'No players in this pool.',
+        allowDisplacement: false,
+        selectionDisabled: true,
+        onpick,
+      },
+    });
+
+    const card = container.querySelector('li button') as HTMLButtonElement;
+    expect(card.disabled).toBe(true);
+    await fireEvent.click(card);
+    expect(onpick).not.toHaveBeenCalled();
+  });
   it('renders rows in the passed order without re-sorting', () => {
     const zed = row({ playerId: 'z', displayName: 'Zed Zoster', overall: 99 });
     const aaron = row({ playerId: 'a', displayName: 'Aaron Aardvark', overall: 1 });
@@ -215,6 +246,70 @@ describe('DraftPoolBrowser parity', () => {
     const card = container.querySelector('li button') as HTMLButtonElement;
     expect(card.disabled).toBe(false);
     expect(card.textContent).toContain('Moves');
+  });
+});
+
+describe('FixedFiveDraftPanel duel turns', () => {
+  it('disables the rolled pool for the participant who is waiting', () => {
+    const manifest = buildManifest();
+    const player = row({ playerId: 'duel-player', displayName: 'Duel Player' });
+    const candidate = {
+      playerId: player.playerId,
+      playerVersionId: 'duel-player-version',
+      positions: [...player.positionsPlayable],
+      selectionScore: player.selectionScore,
+      franchiseId: player.franchiseId,
+      eraId: player.eraId,
+    };
+    const assets = {
+      manifest,
+      index: { schemaVersion: 5, dataVersion: 'test', players: [player] },
+      catalog: [
+        {
+          franchiseId: player.franchiseId,
+          eraId: player.eraId,
+          players: [{ playerId: player.playerId, positions: [...player.positionsPlayable] }],
+        },
+      ],
+      pool: [candidate],
+      poolById: new Map([[player.playerId, candidate]]),
+    } as unknown as FixedFiveAssets;
+    const replay: DraftReplay = {
+      mode: 'duel',
+      hasStart: true,
+      skipped: 0,
+      state: {
+        rootSeed: seedSchema.parse('0123456789abcdef0123456789abcdef'),
+        firstPicker: 'p1',
+        pickOrdinal: 0,
+        currentRoll: { franchiseId: player.franchiseId, eraId: player.eraId },
+        picks: [],
+        claimedPairs: [],
+        claimedVersionIds: [],
+        rerolls: {
+          p1: { franchiseSpent: false, eraSpent: false },
+          p2: { franchiseSpent: false, eraSpent: false },
+        },
+        status: 'drafting',
+      },
+    };
+
+    const { getByRole, getByText } = render(FixedFiveDraftPanel, {
+      props: {
+        mode: 'duel',
+        selfId: 'p2',
+        replay,
+        assets,
+        presentation: 'ratings',
+        onPick: vi.fn(),
+        onReroll: vi.fn(),
+        onRemove: vi.fn(),
+        onLock: vi.fn(),
+      },
+    });
+
+    expect(getByText('Opponent is picking…')).not.toBeNull();
+    expect((getByRole('button', { name: /Duel Player/ }) as HTMLButtonElement).disabled).toBe(true);
   });
 });
 describe('SlotPickerDialog swap state', () => {

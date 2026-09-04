@@ -38,6 +38,7 @@ import {
   createDuelDraft,
   createEngineContext,
   createParticipantClassicDraft,
+  duelCurrentPicker,
   createSandboxBuilder,
   enumerateClassicSafeMoves,
   enumerateDuelSafeMoves,
@@ -304,6 +305,23 @@ export function isDraftComplete(replay: DraftReplay): boolean {
   if (replay.mode === 'duel') return replay.state.status === 'complete';
   if (replay.mode === 'sandbox-shared-82') return replay.p1.locked && replay.p2.locked;
   return replay.p1.status === 'complete' && replay.p2.status === 'complete';
+}
+
+export function isFixedFiveDraftTurn(
+  replay: DraftReplay,
+  participant: FixedFiveParticipantId,
+): boolean {
+  if (replay.mode === 'duel') {
+    return (
+      replay.state.status === 'drafting' &&
+      replay.state.currentRoll !== null &&
+      duelCurrentPicker(replay.state) === participant
+    );
+  }
+  if (replay.mode === 'sandbox-shared-82') {
+    return !(participant === 'p1' ? replay.p1 : replay.p2).locked;
+  }
+  return (participant === 'p1' ? replay.p1 : replay.p2).status === 'drafting';
 }
 
 export function picksCommittedOf(replay: DraftReplay, participant: FixedFiveParticipantId): number {
@@ -593,6 +611,7 @@ export function computeDueAutopick(
   }
   if (mode === 'duel') {
     if (replay.mode !== 'duel') return null;
+    if (!isFixedFiveDraftTurn(replay, participant)) return null;
     const safe = enumerateDuelSafeMoves(assets.catalog, assets.poolById, replay.state);
     if (safe.length === 0) return null;
     return chooseAutopick(rootSeed, mode, participant, ordinal, safe);

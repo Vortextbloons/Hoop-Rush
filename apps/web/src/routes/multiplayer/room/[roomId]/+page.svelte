@@ -41,6 +41,7 @@
     computeDueAutopick,
     deriveEffectivePhase,
     isDraftComplete,
+    isFixedFiveDraftTurn,
     loadActivityAt,
     loadFixedFiveAssets,
     mergeFixedFiveCommands,
@@ -334,6 +335,10 @@
     if (mode === 'duel') {
       if (replay.mode !== 'duel' || !replay.state.currentRoll) {
         draftError = 'No active duel roll.';
+        return;
+      }
+      if (!isFixedFiveDraftTurn(replay, selfId)) {
+        draftError = 'Wait for your opponent to finish this pick.';
         return;
       }
       const roll = replay.state.currentRoll;
