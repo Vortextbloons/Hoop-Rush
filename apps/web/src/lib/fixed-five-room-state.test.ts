@@ -142,7 +142,7 @@ describe('restoreFixedFiveCommandSyncState', () => {
 
     const restored = restoreFixedFiveCommandSyncState([laterPick, start]);
 
-    expect(restored.commands).toEqual([start, laterPick]);
+    expect(restored.commands).toEqual([start]);
     expect(restored.lastOrdinal).toBe(0);
   });
 });

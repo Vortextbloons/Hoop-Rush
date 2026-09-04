@@ -4,11 +4,12 @@ import {
   MAX_PERIODS_HARD_CAP,
   OVERTIME_PERIOD_SECONDS,
   REGULATION_PERIOD_SECONDS,
+  overtimePeriodsOf,
 } from './periods.ts';
 import { GameRecorder, type SideIndex } from './recorder.ts';
 import { createGameState, createTripContext, resolveTrip } from './possession.ts';
 import { buildFacts } from './facts.ts';
-export function playFixedFivePeriods(
+function playFixedFivePeriods(
   rng: ReturnType<EngineContext['rngFactory']>,
   recorder: GameRecorder,
   state: ReturnType<typeof createGameState>,
@@ -19,13 +20,10 @@ export function playFixedFivePeriods(
 } {
   let offense: SideIndex = rng.chance(0.5) ? 0 : 1;
   let secondsRemaining = REGULATION_PERIOD_SECONDS;
-  state.periodIndex = 0;
   let period = 0;
   for (;;) {
     if (period > 0) {
-      if (period >= 4) {
-        if (recorder.sides[0].points !== recorder.sides[1].points) break;
-      }
+      if (period >= 4 && recorder.sides[0].points !== recorder.sides[1].points) break;
       if (period >= MAX_PERIODS_HARD_CAP) {
         throw new Error(
           `simulation: exceeded hard cap ${String(MAX_PERIODS_HARD_CAP)} periods without a winner (${String(recorder.sides[0].points)}-${String(recorder.sides[1].points)})`,
@@ -47,12 +45,9 @@ export function playFixedFivePeriods(
       }
     }
     period += 1;
-    if (period >= 4 && period < MAX_PERIODS_HARD_CAP) {
-      continue;
-    }
     if (period >= MAX_PERIODS_HARD_CAP) break;
   }
-  const overtimePeriods = Math.max(0, recorder.sides[0].periodPoints.length - 4);
+  const overtimePeriods = overtimePeriodsOf(recorder.sides[0].periodPoints.length);
   recorder.assignMinutes(48 + overtimePeriods * 5);
   const homeScore = recorder.sides[0].points;
   const awayScore = recorder.sides[1].points;

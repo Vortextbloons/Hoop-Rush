@@ -37,7 +37,10 @@
       : Math.max(2, Math.ceil(Math.max(target, total) / SHARED_REVEAL_DIVISOR));
     const timer = setInterval(() => {
       duelTick += 1;
-      shownCount = Math.min(target, shownCount + (isDuel && duelTick % DUEL_REVEAL_EVERY !== 0 ? 0 : step));
+      shownCount = Math.min(
+        target,
+        shownCount + (isDuel && duelTick % DUEL_REVEAL_EVERY !== 0 ? 0 : step),
+      );
       if (shownCount >= entries.length) clearInterval(timer);
     }, SHOW_TICK_MS);
     return () => clearInterval(timer);
@@ -319,7 +322,9 @@
     border-radius: 1rem;
     border: 1px solid transparent;
     padding: 0.5rem 0.25rem;
-    transition: border-color 0.3s ease, background 0.3s ease;
+    transition:
+      border-color 0.3s ease,
+      background 0.3s ease;
   }
   .duel-lane--spot {
     border-color: color-mix(in srgb, var(--color-primary) 55%, transparent);
@@ -336,7 +341,9 @@
     }
   }
   .showdown-lane {
-    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    transition:
+      border-color 0.3s ease,
+      box-shadow 0.3s ease;
   }
   .showdown-lane--spot {
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 45%, transparent);

@@ -8,6 +8,7 @@
   import PlayerFace from '$lib/components/PlayerFace.svelte';
   import { formatPositions } from '$lib/player-positions';
   import type { DraftPresentation } from '$lib/draft-presentation';
+  import type { FixedFivePlayerStats } from '$lib/fixed-five-player-stats';
 
   let {
     mode,
@@ -18,6 +19,9 @@
     p2Rows = [],
     presentation = 'ratings',
     digest = null,
+    stats = null,
+    statsState = 'empty',
+    onRebuildStats = null,
   }: {
     mode: FixedFiveRoomMode;
     result: FixedFiveCompetitionResult;
@@ -27,7 +31,32 @@
     p2Rows?: (PlayersIndexEntry | null)[];
     presentation?: DraftPresentation;
     digest?: string | null;
+    stats?: FixedFivePlayerStats | null;
+    statsState?: 'ready' | 'building' | 'empty';
+    onRebuildStats?: (() => void) | null;
   } = $props();
+
+  let statsSide = $state<'you' | 'opp'>('you');
+  let statsTotals = $state(false);
+  const statsPid = $derived<'p1' | 'p2'>(
+    statsSide === 'you' ? selfId : selfId === 'p1' ? 'p2' : 'p1',
+  );
+  const statsRows = $derived(statsPid === 'p1' ? p1Rows : p2Rows);
+  const statsLines = $derived.by(() => {
+    const lines = stats ? (statsPid === 'p1' ? stats.p1 : stats.p2) : [];
+    return new Map(lines.map((line) => [line.playerId, line]));
+  });
+
+  function perGame(value: number, games: number): string {
+    return (value / Math.max(1, games)).toFixed(1);
+  }
+  function statValue(value: number, games: number): string {
+    return statsTotals ? String(value) : perGame(value, games);
+  }
+  function pctStr(made: number, attempted: number): string {
+    if (attempted <= 0) return '—';
+    return `${((made / attempted) * 100).toFixed(1)}%`;
+  }
 
   const modeLabel = $derived(
     mode === 'duel'
@@ -203,4 +232,256 @@
       </div>
     {/each}
   </div>
+
+  <section
+    aria-labelledby="fixed-five-stats-heading"
+    class="border-t border-border/60 px-4 py-4 sm:px-6"
+  >
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <h3
+        id="fixed-five-stats-heading"
+        class="font-display text-lg font-extrabold tracking-tight uppercase"
+      >
+        Player stats · both fives
+      </h3>
+      <div class="flex flex-wrap items-center gap-2">
+        <div
+          class="flex rounded-lg border border-border p-0.5"
+          role="group"
+          aria-label="Stats side"
+        >
+          <button
+            type="button"
+            aria-pressed={statsSide === 'you'}
+            onclick={() => (statsSide = 'you')}
+            class="rounded-md px-3 py-1 font-mono text-xs font-semibold {statsSide === 'you'
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground'}"
+          >
+            You
+          </button>
+          <button
+            type="button"
+            aria-pressed={statsSide === 'opp'}
+            onclick={() => (statsSide = 'opp')}
+            class="rounded-md px-3 py-1 font-mono text-xs font-semibold {statsSide === 'opp'
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground'}"
+          >
+            Opponent
+          </button>
+        </div>
+        <div
+          class="flex rounded-lg border border-border p-0.5"
+          role="group"
+          aria-label="Stats values"
+        >
+          <button
+            type="button"
+            aria-pressed={!statsTotals}
+            onclick={() => (statsTotals = false)}
+            class="rounded-md px-3 py-1 font-mono text-xs font-semibold {!statsTotals
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground'}"
+          >
+            Per game
+          </button>
+          <button
+            type="button"
+            aria-pressed={statsTotals}
+            onclick={() => (statsTotals = true)}
+            class="rounded-md px-3 py-1 font-mono text-xs font-semibold {statsTotals
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground'}"
+          >
+            Totals
+          </button>
+        </div>
+      </div>
+    </div>
+
+    {#if statsState === 'building'}
+      <p class="mt-3 animate-pulse text-sm text-muted-foreground" role="status">
+        Building player stats from the simulated games…
+      </p>
+    {:else if statsState !== 'ready' || !stats}
+      <div class="mt-3 flex flex-wrap items-center gap-3">
+        <p class="text-sm text-muted-foreground">
+          Stats need the simulated games, which are not on this device.
+        </p>
+        {#if onRebuildStats}
+          <button
+            type="button"
+            onclick={onRebuildStats}
+            class="rounded-lg border border-border bg-surface-1 px-4 py-2 text-sm font-semibold transition-colors hover:border-line-strong"
+          >
+            Build player stats
+          </button>
+        {/if}
+      </div>
+    {:else}
+      <div class="mt-4 hidden overflow-x-auto sm:block">
+        <table class="w-full min-w-[760px] border-collapse text-sm">
+          <thead>
+            <tr
+              class="border-b border-border font-mono text-[10px] tracking-[0.12em] text-muted-foreground uppercase"
+            >
+              <th scope="col" class="py-2 pr-3 text-left">Player</th>
+              <th scope="col" class="px-2 py-2 text-right">Min</th>
+              <th scope="col" class="px-2 py-2 text-right">PTS</th>
+              <th scope="col" class="px-2 py-2 text-right">FG%</th>
+              <th scope="col" class="px-2 py-2 text-right">3P%</th>
+              <th scope="col" class="px-2 py-2 text-right">FT%</th>
+              <th scope="col" class="px-2 py-2 text-right">REB</th>
+              <th scope="col" class="px-2 py-2 text-right">AST</th>
+              <th scope="col" class="px-2 py-2 text-right">STL</th>
+              <th scope="col" class="px-2 py-2 text-right">BLK</th>
+              <th scope="col" class="px-2 py-2 text-right">TOV</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each statsRows as row, i (i)}
+              {@const line = row ? statsLines.get(row.playerId) : undefined}
+              <tr class="border-b border-border/50 last:border-0">
+                <th scope="row" class="py-2 pr-3 text-left">
+                  <span class="flex items-center gap-2">
+                    {#if row}
+                      <PlayerFace
+                        player={row}
+                        {manifest}
+                        size="sm"
+                        fallbackInitials={row.firstName[0]! + row.lastName[0]!}
+                      />
+                      <span class="min-w-0">
+                        <span class="block truncate font-semibold">{row.displayName}</span>
+                        <span class="block font-mono text-[10px] text-muted-foreground">
+                          {line ? `${line.games} games` : 'no games'}
+                        </span>
+                      </span>
+                    {:else}
+                      <span class="font-mono text-xs">Slot {i + 1}</span>
+                    {/if}
+                  </span>
+                </th>
+                {#if line}
+                  <td class="px-2 py-2 text-right font-mono"
+                    >{statValue(line.minutes, line.games)}</td
+                  >
+                  <td class="px-2 py-2 text-right font-mono font-bold">
+                    {statValue(line.points, line.games)}
+                  </td>
+                  <td class="px-2 py-2 text-right font-mono">
+                    {pctStr(line.fieldGoalsMade, line.fieldGoalsAttempted)}
+                  </td>
+                  <td class="px-2 py-2 text-right font-mono">
+                    {pctStr(line.threesMade, line.threesAttempted)}
+                  </td>
+                  <td class="px-2 py-2 text-right font-mono">
+                    {pctStr(line.freeThrowsMade, line.freeThrowsAttempted)}
+                  </td>
+                  <td class="px-2 py-2 text-right font-mono"
+                    >{statValue(line.rebounds, line.games)}</td
+                  >
+                  <td class="px-2 py-2 text-right font-mono"
+                    >{statValue(line.assists, line.games)}</td
+                  >
+                  <td class="px-2 py-2 text-right font-mono"
+                    >{statValue(line.steals, line.games)}</td
+                  >
+                  <td class="px-2 py-2 text-right font-mono"
+                    >{statValue(line.blocks, line.games)}</td
+                  >
+                  <td class="px-2 py-2 text-right font-mono">
+                    {statValue(line.turnovers, line.games)}
+                  </td>
+                {:else}
+                  <td colspan="10" class="px-2 py-2 text-right font-mono text-muted-foreground"
+                    >—</td
+                  >
+                {/if}
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+      <div class="mt-4 grid gap-2 sm:hidden">
+        {#each statsRows as row, i (i)}
+          {@const line = row ? statsLines.get(row.playerId) : undefined}
+          <article class="rounded-lg border border-border bg-surface-1 p-3">
+            <div class="flex items-start gap-3">
+              {#if row}
+                <PlayerFace
+                  player={row}
+                  {manifest}
+                  size="sm"
+                  fallbackInitials={row.firstName[0]! + row.lastName[0]!}
+                />
+              {/if}
+              <div class="min-w-0 flex-1">
+                <div class="flex items-start justify-between gap-2">
+                  <div class="min-w-0">
+                    <p class="truncate text-sm font-bold">{row?.displayName ?? `Slot ${i + 1}`}</p>
+                    <p class="font-mono text-[10px] text-muted-foreground">
+                      {line ? `${line.games} games` : 'no games'}
+                    </p>
+                  </div>
+                  {#if line}
+                    <p class="shrink-0 font-mono text-sm font-bold tabular-nums">
+                      {statValue(line.points, line.games)} PTS
+                    </p>
+                  {/if}
+                </div>
+              </div>
+            </div>
+            {#if line}
+              <table class="mt-3 w-full text-xs">
+                <tbody class="font-mono tabular-nums">
+                  <tr class="border-b border-border/40">
+                    <td class="py-1.5 pr-2 text-muted-foreground">MIN</td>
+                    <td class="py-1.5 text-right font-semibold text-foreground">
+                      {statValue(line.minutes, line.games)}
+                    </td>
+                    <td class="py-1.5 pr-2 pl-3 text-muted-foreground">REB</td>
+                    <td class="py-1.5 text-right font-semibold text-foreground">
+                      {statValue(line.rebounds, line.games)}
+                    </td>
+                  </tr>
+                  <tr class="border-b border-border/40">
+                    <td class="py-1.5 pr-2 text-muted-foreground">FG%</td>
+                    <td class="py-1.5 text-right font-semibold text-foreground">
+                      {pctStr(line.fieldGoalsMade, line.fieldGoalsAttempted)}
+                    </td>
+                    <td class="py-1.5 pr-2 pl-3 text-muted-foreground">AST</td>
+                    <td class="py-1.5 text-right font-semibold text-foreground">
+                      {statValue(line.assists, line.games)}
+                    </td>
+                  </tr>
+                  <tr class="border-b border-border/40">
+                    <td class="py-1.5 pr-2 text-muted-foreground">3P%</td>
+                    <td class="py-1.5 text-right font-semibold text-foreground">
+                      {pctStr(line.threesMade, line.threesAttempted)}
+                    </td>
+                    <td class="py-1.5 pr-2 pl-3 text-muted-foreground">STL</td>
+                    <td class="py-1.5 text-right font-semibold text-foreground">
+                      {statValue(line.steals, line.games)}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="py-1.5 pr-2 text-muted-foreground">FT%</td>
+                    <td class="py-1.5 text-right font-semibold text-foreground">
+                      {pctStr(line.freeThrowsMade, line.freeThrowsAttempted)}
+                    </td>
+                    <td class="py-1.5 pr-2 pl-3 text-muted-foreground">BLK / TOV</td>
+                    <td class="py-1.5 text-right font-semibold text-foreground">
+                      {statValue(line.blocks, line.games)} / {statValue(line.turnovers, line.games)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            {/if}
+          </article>
+        {/each}
+      </div>
+    {/if}
+  </section>
 </div>

@@ -4,21 +4,17 @@ import {
   seasonNamespaceSeed,
   type SeasonDraftCatalog,
   type SeasonRun,
-  type SeasonTradeBoardTeamProfile,
   type SeasonTradeNegotiation,
   type SeasonTradeProposal,
   type SeasonTradeState,
   type SeasonTradeWindowState,
 } from '@hoop-rush/data-contracts';
-import { slotGroupOf } from '../domain/positions.ts';
 import {
   seasonTradeCatalogFactsOf,
   seasonTradePlayerValue,
   TRADE_BAND_1V1,
   TRADE_BAND_DEFAULT,
 } from './trades.ts';
-import { drawHexInt } from './season-seeds.ts';
-export const TRADE_BOARD_SIZE = 8;
 export const TRADE_INQUIRY_BASE = 3;
 export const TRADE_INQUIRY_MAX = 5;
 export const TRADE_EXCHANGE_MAX = 3;
@@ -27,95 +23,8 @@ export const TRADE_CASH_MAX_PER_WINDOW = 2;
 export const TRADE_CASH_PCT_PER_POINT = 5;
 export const TRADE_CASH_PCT_MAX = 10;
 export const TRADE_MIN_TALENT_RATIO = 800;
-function deriveNeeds(
-  rosterIds: readonly string[],
-  catalog: ReturnType<typeof seasonTradeCatalogFactsOf>,
-): import('@hoop-rush/data-contracts').SeasonTradeNeed[] {
-  const counts: Record<string, number> = { G: 0, F: 0, C: 0 };
-  for (const id of rosterIds) {
-    const playable = catalog.playable.get(id);
-    if (!playable) continue;
-    for (const pos of playable) {
-      const g = slotGroupOf(pos);
-      counts[g] = (counts[g] ?? 0) + 1;
-    }
-  }
-  const needs: import('@hoop-rush/data-contracts').SeasonTradeNeed[] = [];
-  if ((counts['G'] ?? 0) < 4) needs.push('ball-handling');
-  if ((counts['F'] ?? 0) < 4) needs.push('rebounding');
-  if ((counts['C'] ?? 0) < 3) needs.push('interior-defense');
-  if (needs.length === 0) needs.push('depth');
-  if (needs.length === 1) {
-    needs.push('shooting');
-  }
-  return needs.slice(0, 2);
-}
 function boardSeed(rootSeed: string, windowIndex: number, ...keys: string[]): string {
   return seasonNamespaceSeed(rootSeed, 'trades', 'window', String(windowIndex), ...keys);
-}
-export function generateTradeBoardProfiles(input: {
-  run: SeasonRun;
-  windowIndex: number;
-  rootSeed: string;
-  catalog: SeasonDraftCatalog;
-  humanFranchiseId: string;
-}): SeasonTradeBoardTeamProfile[] {
-  const { run, windowIndex, rootSeed, catalog, humanFranchiseId } = input;
-  const catalogFacts = seasonTradeCatalogFactsOf(catalog);
-  const allProfiles: SeasonTradeBoardTeamProfile[] = [];
-  for (const team of run.league.teams) {
-    if (team.franchiseId === humanFranchiseId) continue;
-    const roster = run.rosters.find((r) => r.franchiseId === team.franchiseId);
-    if (!roster) continue;
-    const rosterIds = roster.players.map((p) => p.playerVersionId);
-    const needs = deriveNeeds(rosterIds, catalogFacts);
-    const prioritySeed = boardSeed(rootSeed, windowIndex, 'priority', team.franchiseId);
-    const priorities: import('@hoop-rush/data-contracts').SeasonTradePriority[] = [
-      'talent',
-      'fit',
-      'availability',
-      'depth',
-      'influence',
-    ];
-    const priority = priorities[
-      drawHexInt(prioritySeed) % priorities.length
-    ] as import('@hoop-rush/data-contracts').SeasonTradePriority;
-    const valued = [...rosterIds].sort((a, b) => {
-      const va = seasonTradePlayerValue(a, {
-        run: run as unknown as import('./trades.ts').SeasonEconomyRun,
-        catalogFacts,
-        receivingFranchiseId: team.franchiseId,
-      });
-      const vb = seasonTradePlayerValue(b, {
-        run: run as unknown as import('./trades.ts').SeasonEconomyRun,
-        catalogFacts,
-        receivingFranchiseId: team.franchiseId,
-      });
-      return vb - va;
-    });
-    const protectedIds = valued.slice(0, 2);
-    const discussable = valued.slice(2, 6);
-    const listed = valued.slice(2, 4);
-    allProfiles.push({
-      franchiseId: team.franchiseId,
-      needs,
-      priority,
-      listedPlayerIds: listed,
-      discussablePlayerIds: discussable,
-      protectedPlayerIds: protectedIds,
-      hardConstraints: [`Roster must stay 10-15`, `Protected: ${protectedIds.join(',')}`],
-      rationale: `Needs ${needs.join('/')} based on roster gaps; priority ${priority}`,
-      competitorInterest: undefined,
-    });
-  }
-  const canonical = [...allProfiles].sort((a, b) => (a.franchiseId < b.franchiseId ? -1 : 1));
-  const ranked = [...canonical].sort((a, b) => {
-    const sa = boardSeed(rootSeed, windowIndex, 'board', a.franchiseId);
-    const sb = boardSeed(rootSeed, windowIndex, 'board', b.franchiseId);
-    return sa < sb ? -1 : 1;
-  });
-  const selected = ranked.slice(0, Math.min(TRADE_BOARD_SIZE, ranked.length));
-  return selected.sort((a, b) => (a.franchiseId < b.franchiseId ? -1 : 1));
 }
 function fingerprintOf(outgoing: readonly string[], incoming: readonly string[]): string {
   const o = [...outgoing].sort().join(',');

@@ -149,6 +149,25 @@ export function createConfiguredFixedFiveTransport(): FixedFiveMultiplayerTransp
   return createFixedFiveTransport({ url, publishableKey });
 }
 
+const configuredTransportCache = new Map<string, FixedFiveMultiplayerTransport>();
+
+export function getFixedFiveTransport(options?: {
+  url?: string;
+  publishableKey?: string;
+  storageKey?: string;
+}): FixedFiveMultiplayerTransport {
+  const env = supabaseEnv();
+  const url = options?.url ?? env.url;
+  const publishableKey = options?.publishableKey ?? env.publishableKey;
+  const storageKey = options?.storageKey ?? '';
+  const key = `${url ?? 'memory'}${publishableKey ?? ''}${storageKey}`;
+  const existing = configuredTransportCache.get(key);
+  if (existing) return existing;
+  const created = createFixedFiveTransport({ url, publishableKey, storageKey });
+  configuredTransportCache.set(key, created);
+  return created;
+}
+
 async function ensureAnonymous(client: FixedFiveClient): Promise<void> {
   const session = await client.auth.getSession();
   if (session.data.session) return;
@@ -263,14 +282,16 @@ export function createFixedFiveTransport(options?: {
   async function fetchSnapshot(roomId: string): Promise<FixedFiveRoomSnapshot> {
     const roomResponse = await client
       .from('fixed_five_rooms')
-      .select('*')
+      .select(
+        'id, code, code_active, mode, source_mode, variant, versions, phase, revision, command_count, digest, result_digest, confirmed_digest, successor_room_id, root_seed, deadline_at, deadline_cursor, deadline_participant, deadline_fallback, deadline_pick_ordinal, expires_at, created_at',
+      )
       .eq('id', roomId)
       .single();
     if (roomResponse.error || !roomResponse.data)
       throw new Error('authorization: cannot read room');
     const memberResponse = await client
       .from('fixed_five_room_members')
-      .select('*')
+      .select('participant_id, online, ready, picks_committed, locked, last_seen_at')
       .eq('room_id', roomId);
     if (memberResponse.error) throw new Error(`members failed: ${memberResponse.error.message}`);
     const row = roomResponse.data as unknown as FixedFiveRoomRow;
@@ -380,19 +401,21 @@ export function createFixedFiveTransport(options?: {
       const snapshot = await fetchSnapshot(roomId);
       const user = await client.auth.getUser();
       const uid = user.data.user?.id;
-      let participantId: FixedFiveParticipantId = 'p1';
-      if (uid) {
-        const memberResponse = await client
-          .from('fixed_five_room_members')
-          .select('participant_id')
-          .eq('room_id', roomId)
-          .eq('uid', uid)
-          .single();
-        if (!memberResponse.error) {
-          const member = memberResponse.data as unknown as { participant_id?: unknown };
-          if (member.participant_id === 'p2') participantId = 'p2';
-        }
+      if (!uid) throw new Error('membership: not signed in');
+      const memberResponse = await client
+        .from('fixed_five_room_members')
+        .select('participant_id')
+        .eq('room_id', roomId)
+        .eq('uid', uid)
+        .single();
+      if (memberResponse.error || !memberResponse.data) {
+        throw new Error('membership: no seat in this room');
       }
+      const member = memberResponse.data as unknown as { participant_id?: unknown };
+      if (member.participant_id !== 'p1' && member.participant_id !== 'p2') {
+        throw new Error('membership: no seat in this room');
+      }
+      const participantId: FixedFiveParticipantId = member.participant_id;
       return {
         snapshot,
         membership: {
@@ -440,8 +463,14 @@ export function createFixedFiveTransport(options?: {
           if (!existing) return;
           existing.handlers.delete(handler);
           if (existing.handlers.size === 0) {
-            if (existing.channel) void existing.channel.unsubscribe();
+            const channel = existing.channel;
+            existing.channel = null;
             rooms.delete(roomId);
+            if (channel) {
+              void channel.unsubscribe().then(() => {
+                void client.removeChannel(channel);
+              });
+            }
           }
         },
       };
@@ -451,7 +480,7 @@ export function createFixedFiveTransport(options?: {
       const parsedRoomId = idSchema.parse(roomId);
       const response = await client
         .from('fixed_five_room_commands')
-        .select('*')
+        .select('command_id, ordinal, actor_participant_id, payload')
         .eq('room_id', parsedRoomId)
         .gt('ordinal', afterOrdinal)
         .order('ordinal', { ascending: true });

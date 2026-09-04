@@ -1,5 +1,10 @@
 import type { GameResult, PlayerBoxScore, TeamBoxScore } from '@hoop-rush/data-contracts';
 import { auditSideAccounting } from './accounting-core.ts';
+function missesOf(box: TeamBoxScore): number {
+  return (
+    box.fieldGoals.attempted - box.fieldGoals.made + box.freeThrows.attempted - box.freeThrows.made
+  );
+}
 export function checkGameResult(result: GameResult): string[] {
   const failures: string[] = [];
   const checkSide = (side: 'home' | 'away'): void => {
@@ -7,6 +12,7 @@ export function checkGameResult(result: GameResult): string[] {
     const box = team.box;
     const players = team.players;
     const other = side === 'home' ? 'away' : 'home';
+    const otherBox = result[other].box;
     if (players.length !== 5) {
       failures.push(`${side}: expected exactly five players, got ${String(players.length)}`);
       return;
@@ -53,11 +59,7 @@ export function checkGameResult(result: GameResult): string[] {
     }
     if (box.diagnostics) {
       const d = box.diagnostics;
-      const misses =
-        box.fieldGoals.attempted -
-        box.fieldGoals.made +
-        box.freeThrows.attempted -
-        box.freeThrows.made;
+      const misses = missesOf(box);
       if (!accounting.reboundOpportunitiesOk) {
         failures.push(
           `${side}: rebound opportunities (${String(d.reboundOpportunities)}) != misses (${String(misses)})`,
@@ -76,7 +78,7 @@ export function checkGameResult(result: GameResult): string[] {
           `${side}: player offensive-rebound chances != 5 * team rebound opportunities`,
         );
       }
-      const otherDiagnostics = result[other].box.diagnostics;
+      const otherDiagnostics = otherBox.diagnostics;
       if (
         otherDiagnostics &&
         players.reduce(
@@ -102,40 +104,25 @@ export function checkGameResult(result: GameResult): string[] {
         );
       }
     }
-    const violationCount = Math.max(
-      accounting.usageViolations.length,
-      accounting.assistOpportunityViolations.length,
-    );
-    for (let i = 0; i < violationCount; i += 1) {
-      const usage = accounting.usageViolations[i];
-      if (usage !== undefined) {
-        failures.push(
-          `${side}: usage ${usage.usage.toFixed(2)} != fga + 0.44*fta + tov (${usage.identity.toFixed(2)})`,
-        );
-      }
-      const assist = accounting.assistOpportunityViolations[i];
-      if (assist !== undefined) {
-        failures.push(
-          `${side}: assist opportunities (${String(assist.assistOpportunities)}) < assists (${String(assist.assists)})`,
-        );
-      }
+    for (const usage of accounting.usageViolations) {
+      failures.push(
+        `${side}: usage ${usage.usage.toFixed(2)} != fga + 0.44*fta + tov (${usage.identity.toFixed(2)})`,
+      );
     }
-    const otherBox = result[other].box;
+    for (const assist of accounting.assistOpportunityViolations) {
+      failures.push(
+        `${side}: assist opportunities (${String(assist.assistOpportunities)}) < assists (${String(assist.assists)})`,
+      );
+    }
     const rebounds = box.rebounds;
-    const misses =
-      box.fieldGoals.attempted -
-      box.fieldGoals.made +
-      (box.freeThrows.attempted - box.freeThrows.made);
+    const misses = missesOf(box);
     const claimed = rebounds.offensive + otherBox.rebounds.defensive + otherBox.rebounds.team;
     if (misses !== claimed) {
       failures.push(
         `${side}: misses (${String(misses)}) != own OReb + opponent DREB/team (${String(claimed)})`,
       );
     }
-    const opponentMisses =
-      otherBox.fieldGoals.attempted -
-      otherBox.fieldGoals.made +
-      (otherBox.freeThrows.attempted - otherBox.freeThrows.made);
+    const opponentMisses = missesOf(otherBox);
     const opponentRecoveries = otherBox.rebounds.offensive + rebounds.defensive + rebounds.team;
     if (opponentRecoveries !== opponentMisses) {
       failures.push(

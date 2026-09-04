@@ -151,32 +151,7 @@ export function buildFixtureFreeAgencyState(): SeasonRun['freeAgency'] {
   });
 }
 export function buildFixtureInfluenceState(league: SeasonLeague): SeasonInfluenceState {
-  const balances: Record<string, number> = {};
-  const ledger: SeasonInfluenceState['ledger'] = [];
-  const windows: SeasonInfluenceState['windows'] = {};
-  for (const team of league.teams) {
-    balances[team.franchiseId] = 2;
-    ledger.push({
-      entryId: idSchema.parse(`influence-initial-${team.franchiseId}`),
-      franchiseId: team.franchiseId,
-      source: 'initial-grant',
-      blockIndex: null,
-      commandId: null,
-      requestedDelta: 2,
-      appliedDelta: 2,
-      balanceAfter: 2,
-      explanation: 'Initial +2 Influence grant at run creation',
-    });
-    windows[team.franchiseId] = [];
-  }
-  return {
-    schemaVersion: 1,
-    influenceVersion: SEASON_INFLUENCE_VERSION,
-    balances,
-    ledger,
-    windows,
-    rehabs: {},
-  };
+  return buildFixtureInfluenceStateFromIds(league.teams.map((team) => team.franchiseId));
 }
 export function buildFixtureObjectiveState(): SeasonObjectiveState {
   return seasonObjectiveStateSchema.parse({

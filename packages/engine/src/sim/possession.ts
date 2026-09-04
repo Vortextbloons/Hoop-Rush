@@ -94,6 +94,13 @@ export interface PossessionStep {
   periodEnded: boolean;
   finished: boolean;
 }
+function slotOf(prep: TeamPrep, player: SimulationPlayer): number {
+  return prep.slotByPlayerId.get(enginePlayerKey(player)) ?? -1;
+}
+function slotOrZero(prep: TeamPrep, player: SimulationPlayer): number {
+  const slot = slotOf(prep, player);
+  return slot >= 0 ? slot : 0;
+}
 export class PossessionStepper {
   private phase: 'sample' | 'security' | 'foul' | 'inbound' | 'shot' | 'continuation' | 'done' =
     'sample';
@@ -163,7 +170,7 @@ export class PossessionStepper {
     const teamPrep = preps[offense];
     const defensePrep = preps[defense];
     const handler = rng.weightedPick(team.players, teamPrep.initiatorWeights);
-    const handlerSlot = teamPrep.slotByPlayerId.get(enginePlayerKey(handler)) ?? -1;
+    const handlerSlot = slotOf(teamPrep, handler);
     this.handlerVersion = handler.playerVersionId;
     const awayTurnoverPressure =
       this.offenseSide === 1 ? (this.ctx.homeCourt?.awayTurnoverPressureAdjustment ?? 0) : 0;
@@ -187,7 +194,7 @@ export class PossessionStepper {
       recorder.turnover(offense, handlerSlot >= 0 ? handlerSlot : 0);
       if (isSteal(rng, defensePrep.stealAbility, this.ctx.profile)) {
         const stealer = rng.weightedPick(teams[defense].players, defensePrep.stealerWeights);
-        const stealerSlot = defensePrep.slotByPlayerId.get(enginePlayerKey(stealer)) ?? -1;
+        const stealerSlot = slotOf(defensePrep, stealer);
         recorder.steal(defense, stealerSlot >= 0 ? stealerSlot : 0);
       }
       this.ctx.possessionStart = 'liveTurnover';
@@ -214,7 +221,7 @@ export class PossessionStepper {
       const offenseTeam = teams[offense];
       const offensePrep = preps[offense];
       const fouler = rng.weightedPick(offenseTeam.players, offensePrep.foulerWeights);
-      const foulerSlot = offensePrep.slotByPlayerId.get(enginePlayerKey(fouler)) ?? -1;
+      const foulerSlot = slotOf(offensePrep, fouler);
       recorder.foul(offense, foulerSlot >= 0 ? foulerSlot : 0);
       recorder.turnover(offense, foulerSlot >= 0 ? foulerSlot : 0);
       state.periodFouls[offense] += 1;
@@ -225,14 +232,14 @@ export class PossessionStepper {
     const defenseTeam = teams[defense];
     const defensePrep = preps[defense];
     const fouler = rng.weightedPick(defenseTeam.players, defensePrep.foulerWeights);
-    const foulerSlot = defensePrep.slotByPlayerId.get(enginePlayerKey(fouler)) ?? -1;
+    const foulerSlot = slotOf(defensePrep, fouler);
     recorder.foul(defense, foulerSlot >= 0 ? foulerSlot : 0);
     state.periodFouls[defense] += 1;
     if (teamInBonus(state.periodFouls[defense], state.periodIndex >= 4)) {
       const team = teams[offense];
       const teamPrep = preps[offense];
       const shooter = rng.weightedPick(team.players, teamPrep.freeThrowShooterWeights);
-      const shooterSlot = teamPrep.slotByPlayerId.get(enginePlayerKey(shooter)) ?? -1;
+      const shooterSlot = slotOf(teamPrep, shooter);
       resolveFreeThrows(
         this.ctx,
         offense,
@@ -423,13 +430,21 @@ function creditAssist(
   if (!passed) return;
   const passer = pickAssister(team, shooter, initiator, ctx.rng);
   if (!passer) return;
-  const slot = ctx.preps[offenseSide].slotByPlayerId.get(enginePlayerKey(passer)) ?? -1;
+  const slot = slotOf(ctx.preps[offenseSide], passer);
   if (slot < 0) return;
   ctx.recorder.assistOpportunity(offenseSide, slot);
   const effectsAdjustment = ctx.effects?.assistAdjustment({ offenseSide }) ?? 0;
   if (
     !ctx.rng.chance(
-      assistProbability(ctx, passer, action, zone, shooter, effectsAdjustment / 1000000),
+      assistProbabilityPure(
+        ctx.profile,
+        ctx.passingAnchorFactor,
+        passer,
+        action,
+        zone,
+        shooter,
+        effectsAdjustment / 1000000,
+      ),
     )
   ) {
     return;
@@ -472,11 +487,11 @@ function reboundFromMissedFreeThrow(
   const team = ctx.teams[side];
   const prep = ctx.preps[side];
   const rebounder = ctx.rng.weightedPick(team.players, prep.rebounderWeights[offensive ? 0 : 1]);
-  const slot = prep.slotByPlayerId.get(enginePlayerKey(rebounder)) ?? -1;
+  const slot = slotOrZero(prep, rebounder);
   if (offensive) {
-    ctx.recorder.offensiveRebound(offenseSide, slot >= 0 ? slot : 0);
+    ctx.recorder.offensiveRebound(offenseSide, slot);
   } else {
-    ctx.recorder.defensiveRebound(defenseSide, slot >= 0 ? slot : 0);
+    ctx.recorder.defensiveRebound(defenseSide, slot);
   }
 }
 function resolveFreeThrows(
@@ -549,10 +564,10 @@ function resolveShot(
     throw new Error(`possession: no zone preparation for ${shooter.playerId}`);
   }
   const zone = pickZone(action, zonePrep, rng);
-  const shooterSlot = teamPrep.slotByPlayerId.get(enginePlayerKey(shooter)) ?? -1;
+  const shooterSlot = slotOf(teamPrep, shooter);
   const defender = pickDefender(defense, zone, rng, defensePrep.defenderBase, shooterSlot);
   const three = isThreePointZone(zone);
-  const defenderSlot = defensePrep.slotByPlayerId.get(enginePlayerKey(defender)) ?? -1;
+  const defenderSlot = slotOf(defensePrep, defender);
   if (defenderSlot >= 0) recorder.contest(defenseSide, defenderSlot);
   const shotPrep: ShotPrep = {
     spacing: teamPrep.spacing,
@@ -693,8 +708,7 @@ function reboundAfterMiss(
   if (result.offensive) {
     const prep = ctx.preps[offenseSide];
     const rebounder = rng.weightedPick(ctx.teams[offenseSide].players, prep.rebounderWeights[0]);
-    const slot = prep.slotByPlayerId.get(enginePlayerKey(rebounder)) ?? -1;
-    recorder.offensiveRebound(offenseSide, slot >= 0 ? slot : 0);
+    recorder.offensiveRebound(offenseSide, slotOrZero(prep, rebounder));
     ctx.possessionStart = 'offensiveRebound';
     return {
       continues: true,
@@ -705,8 +719,7 @@ function reboundAfterMiss(
   }
   const prep = ctx.preps[defenseSide];
   const rebounder = rng.weightedPick(ctx.teams[defenseSide].players, prep.rebounderWeights[1]);
-  const slot = prep.slotByPlayerId.get(enginePlayerKey(rebounder)) ?? -1;
-  recorder.defensiveRebound(defenseSide, slot >= 0 ? slot : 0);
+  recorder.defensiveRebound(defenseSide, slotOrZero(prep, rebounder));
   ctx.possessionStart = 'defensiveRebound';
   return {
     continues: false,

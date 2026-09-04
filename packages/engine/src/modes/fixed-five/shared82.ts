@@ -12,7 +12,12 @@ import type { EngineContext } from '../../sim/context.ts';
 import { fixedFiveH2HSeed, fixedFiveSharedGameSeed } from './seeds.ts';
 import { summarizeShared82Games, type Shared82Summary } from './results.ts';
 
-export function findWeakestOpponent(bracket: OpponentBracket): BracketOpponent {
+export function findWeakestOpponent<
+  T extends {
+    opponentId: string;
+    strength: { percentile: number; winRate: number };
+  },
+>(bracket: { opponents: readonly T[] }): T {
   if (bracket.opponents.length === 0) throw new Error('bracket has no opponents');
   const sorted = [...bracket.opponents].sort((a, b) => {
     if (a.strength.percentile !== b.strength.percentile)

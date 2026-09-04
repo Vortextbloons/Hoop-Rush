@@ -5,7 +5,7 @@
   import { Swords, Zap, Trophy, Plus, LogIn, ArrowLeft } from '@lucide/svelte';
   import type { FixedFiveRoomMode, FixedFiveSourceMode } from '@hoop-rush/data-contracts';
   import {
-    createConfiguredFixedFiveTransport,
+    getFixedFiveTransport,
     isFixedFiveSupabaseConfigured,
   } from '$lib/fixed-five-transport';
   import {
@@ -26,7 +26,7 @@
   let lastRoomId = $state<string | null>(null);
 
   function transport() {
-    return createConfiguredFixedFiveTransport();
+    return getFixedFiveTransport();
   }
 
   function versions() {

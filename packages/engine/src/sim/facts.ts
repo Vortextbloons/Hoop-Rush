@@ -7,12 +7,6 @@ export const FACT_THRESHOLDS = {
   freeThrowAttemptDiff: 4,
   usageShare: 0.28,
 } as const;
-function winnerTeam(result: GameResult): TeamResult {
-  return result.winner === 'home' ? result.home : result.away;
-}
-function loserTeam(result: GameResult): TeamResult {
-  return result.winner === 'home' ? result.away : result.home;
-}
 function efg(team: TeamResult): number {
   const fg = team.box.fieldGoals;
   const three = team.box.threes;
@@ -20,8 +14,8 @@ function efg(team: TeamResult): number {
 }
 export function buildFacts(result: GameResult): ExplanationFact[] {
   const facts: ExplanationFact[] = [];
-  const winner = winnerTeam(result);
-  const loser = loserTeam(result);
+  const winner = result[result.winner];
+  const loser = result[result.winner === 'home' ? 'away' : 'home'];
   const t = FACT_THRESHOLDS;
   const turnoverDiff = loser.box.turnovers - winner.box.turnovers;
   if (turnoverDiff >= t.turnoverMargin) {
@@ -37,15 +31,17 @@ export function buildFacts(result: GameResult): ExplanationFact[] {
       playerIds: [],
     });
   }
-  const efgDiff = efg(winner) - efg(loser);
+  const winnerEfg = efg(winner);
+  const loserEfg = efg(loser);
+  const efgDiff = winnerEfg - loserEfg;
   if (efgDiff >= t.shotEfficiencyEfgDiff) {
     facts.push({
       kind: 'shotEfficiency',
       teamId: winner.teamId,
       magnitude: efgDiff * 100,
       evidence: {
-        efgPct: efg(winner),
-        opponentEfgPct: efg(loser),
+        efgPct: winnerEfg,
+        opponentEfgPct: loserEfg,
         efgDiff,
         madeFieldGoals: winner.box.fieldGoals.made,
         attemptedFieldGoals: winner.box.fieldGoals.attempted,

@@ -383,10 +383,15 @@ export function restoreFixedFiveCommandSyncState(storedCommands: FixedFiveComman
   commands: FixedFiveCommand[];
   lastOrdinal: number;
 } {
-  const commands = mergeFixedFiveCommands([], storedCommands);
+  const merged = mergeFixedFiveCommands([], storedCommands);
+  // Truncate to the contiguous prefix: post-gap commands must not feed
+  // replay/digest until the hole heals via refetch, or a stale suffix would
+  // silently fork the local simulation from the authoritative log.
+  const commands: FixedFiveCommand[] = [];
   let lastOrdinal = -1;
-  for (const command of commands) {
+  for (const command of merged) {
     if (command.ordinal !== lastOrdinal + 1) break;
+    commands.push(command);
     lastOrdinal = command.ordinal;
   }
   return { commands, lastOrdinal };

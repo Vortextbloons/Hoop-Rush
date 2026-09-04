@@ -242,11 +242,6 @@ export function seasonEffectsRollupFromEvidence(
     deltaTotal: row.deltaTotals,
   }));
 }
-export function seasonEffectsEvidenceOf(
-  transition: SeasonGameEffectsTransition,
-): SeasonMechanismEvidence[] {
-  return transition.evidence;
-}
 export function auditSeasonGameSummary(summary: SeasonGameSummary): string[] {
   const failures: string[] = [];
   const sides = ['home', 'away'] as const;

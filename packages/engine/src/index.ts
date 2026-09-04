@@ -94,7 +94,6 @@ export {
   completionTargetsMet,
   validateSeasonRoster,
   rosterFeasible,
-  anyMemberPlays,
   type SeasonRosterMemberInput,
 } from './season/roster-rules.ts';
 export {

@@ -501,9 +501,26 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
       throw Object.assign(new Error('authorization'), { code: 'authorization' });
     }
     const existing = room.receipts.get(envelope.commandId);
-    if (existing) return Promise.resolve(existing);
+    if (existing) {
+      const stored = room.commands.find((c) => c.commandId === envelope.commandId);
+      if (stored && canonicalJson(stored) !== canonicalJson(envelope)) {
+        return Promise.resolve({
+          roomId: envelope.roomId,
+          commandId: envelope.commandId,
+          ordinal: stored.ordinal,
+          accepted: false,
+          rejectionCode: 'duplicate-command',
+          resultDigest: null,
+        });
+      }
+      return Promise.resolve(existing);
+    }
     const ordinal = room.commands.length;
     if (envelope.ordinal !== ordinal) {
+      // Ephemeral rejection: never cache it. A retry with the same commandId
+      // and the corrected ordinal must be accepted; caching the rejection
+      // would poison idempotency forever. Mirrors the server, which returns
+      // stale-revision receipts without persisting them.
       const receipt: SeasonCommandReceipt = {
         roomId: envelope.roomId,
         commandId: envelope.commandId,
@@ -512,7 +529,6 @@ export class InMemorySeasonMultiplayerTransport implements SeasonMultiplayerTran
         rejectionCode: 'stale-revision',
         resultDigest: null,
       };
-      room.receipts.set(envelope.commandId, receipt);
       return Promise.resolve(receipt);
     }
     room.commands.push(envelope);

@@ -18,6 +18,7 @@ import {
   fixedFiveDuelGameSeed,
   fixedFiveH2HSeed,
   fixedFiveSharedGameSeed,
+  findWeakestOpponent,
 } from '@hoop-rush/engine';
 
 const BATCH = 4;
@@ -141,7 +142,7 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
         return;
       }
       const h2hSet = new Set<number>();
-      const weakestId = weakestOpponentId(request.bracket);
+      const weakestId = findWeakestOpponent(request.bracket).opponentId;
       for (const entry of request.bracket.schedule) {
         if (entry.opponentId === weakestId) h2hSet.add(entry.gameNumber);
       }
@@ -223,25 +224,5 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
     }
   })();
 };
-
-function weakestOpponentId(bracket: {
-  opponents: Array<{ opponentId: string; strength?: { percentile: number; winRate: number } }>;
-  schedule: unknown;
-}): string {
-  const opponents = (
-    bracket as {
-      opponents: Array<{ opponentId: string; strength: { percentile: number; winRate: number } }>;
-    }
-  ).opponents;
-  const sorted = [...opponents].sort((a, b) => {
-    if (a.strength.percentile !== b.strength.percentile)
-      return a.strength.percentile - b.strength.percentile;
-    if (a.strength.winRate !== b.strength.winRate) return a.strength.winRate - b.strength.winRate;
-    return a.opponentId < b.opponentId ? -1 : 1;
-  });
-  const weakest = sorted[0];
-  if (!weakest) throw new Error('bracket has no opponents');
-  return weakest.opponentId;
-}
 
 export {};

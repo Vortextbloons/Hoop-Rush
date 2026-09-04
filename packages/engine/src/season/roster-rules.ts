@@ -1,5 +1,5 @@
 import type { Position } from '@hoop-rush/data-contracts';
-import { canPlay, slotGroupOf } from '../domain/positions.ts';
+import { slotGroupOf } from '../domain/positions.ts';
 import { SEASON_ROSTER_RULES_VERSION } from '@hoop-rush/data-contracts';
 export const SEASON_ROSTER_RULES = {
   version: SEASON_ROSTER_RULES_VERSION,
@@ -177,10 +177,4 @@ export function rosterFeasible(
     if (mask !== 0) maskCounts[mask] = (maskCounts[mask] ?? 0) + 1;
   }
   return rosterFeasibleFromCounts(ownedCounts, maskCounts, remainingPicks);
-}
-export function anyMemberPlays(
-  members: readonly SeasonRosterMemberInput[],
-  slot: 'G' | 'F' | 'C',
-): boolean {
-  return members.some((member) => canPlay(member.playable, slot));
 }

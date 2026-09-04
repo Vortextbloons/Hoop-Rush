@@ -2,7 +2,6 @@ import {
   SEASON_HEALTH_VERSION,
   SEASON_RECAP_VERSION,
   franchiseIdSchema,
-  seasonDigestHex,
   seasonGameIdSchema,
   type FranchiseId,
   type SeasonBlockInjuryEvidence,
@@ -546,9 +545,6 @@ export function seasonBlockRecapCanonical(recap: SeasonBlockRecap): string {
       ),
     },
   });
-}
-export function seasonBlockRecapDigest(recap: SeasonBlockRecap): string {
-  return seasonDigestHex(seasonBlockRecapCanonical(recap));
 }
 export function auditSeasonBlockRecap(
   recap: SeasonBlockRecap,

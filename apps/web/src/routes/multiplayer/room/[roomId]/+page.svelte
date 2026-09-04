@@ -18,7 +18,7 @@
     SlotIndex,
   } from '@hoop-rush/data-contracts';
   import { commandIdSchema, fixedFiveTimeoutMsForMode, idSchema } from '@hoop-rush/data-contracts';
-  import { createConfiguredFixedFiveTransport } from '$lib/fixed-five-transport';
+  import { getFixedFiveTransport } from '$lib/fixed-five-transport';
   import { submitFixedFiveCommand } from '$lib/fixed-five-command-submit';
   import {
     friendlyFixedFiveJoinError,
@@ -36,6 +36,10 @@
   import FixedFiveDraftPanel from '$lib/components/FixedFiveDraftPanel.svelte';
   import FixedFiveSimShow from '$lib/components/FixedFiveSimShow.svelte';
   import FixedFiveResults from '$lib/components/FixedFiveResults.svelte';
+  import {
+    aggregateFixedFivePlayerStats,
+    type FixedFivePlayerStats,
+  } from '$lib/fixed-five-player-stats';
   import {
     assembleCompetitionRun,
     buildSimulationTeam,
@@ -79,12 +83,19 @@
   let mounted = true;
   let tick = $state(0);
 
+  const SIM_SHOWDOWN_MIN_MS = 3000;
+  const SIM_SHOWDOWN_REDUCED_MS = 400;
   let progress = $state<{ completed: number; total: number } | null>(null);
   let simStarted = $state(false);
+  let simStartAt = $state(0);
   let simDone = $state(false);
   let simError = $state<string | null>(null);
   let simEntries = $state<FixedFiveWorkerResultEntry[]>([]);
+  let statsEntries = $state<FixedFiveWorkerResultEntry[]>([]);
+  let statsBuilding = $state(false);
+  let statsRebuildStarted = $state(false);
   let runner: FixedFiveRunner | null = null;
+  let statsRunner: FixedFiveRunner | null = null;
   const simulationGate = new FixedFiveSimulationGate();
   let simulationReason: FixedFiveSimulationReason = 'initial';
 
@@ -158,6 +169,18 @@
     }
     return rows;
   });
+  const statsSource = $derived(statsEntries.length > 0 ? statsEntries : simEntries);
+  const playerStats = $derived.by((): FixedFivePlayerStats | null => {
+    if (!snapshot || statsSource.length === 0) return null;
+    try {
+      return aggregateFixedFivePlayerStats(snapshot.settings.mode, statsSource, 'p1', 'p2');
+    } catch {
+      return null;
+    }
+  });
+  const statsState = $derived<'ready' | 'building' | 'empty'>(
+    playerStats ? 'ready' : statsBuilding ? 'building' : 'empty',
+  );
   const opponent = $derived(display?.members.find((m) => m.participantId !== selfId) ?? null);
   const timeoutMs = $derived(
     snapshot ? fixedFiveTimeoutMsForMode(snapshot.settings.mode) : 90 * 1000,
@@ -188,7 +211,7 @@
   });
 
   function transport() {
-    return createConfiguredFixedFiveTransport();
+    return getFixedFiveTransport();
   }
 
   async function copyInviteLink() {
@@ -226,10 +249,13 @@
       const fresh = await transport().refetch(roomId, afterOrdinal);
       if (!mounted) return;
       if (fresh.length > 0) {
-        lastOrdinal = Math.max(lastOrdinal, ...fresh.map((c) => c.ordinal));
         const merged = mergeFixedFiveCommands(commands, fresh);
         const addedCount = merged.length - commands.length;
         commands = merged;
+        const byOrdinal = new Map(merged.map((c) => [c.ordinal, c] as const));
+        let contiguous = lastOrdinal;
+        while (byOrdinal.has(contiguous + 1)) contiguous += 1;
+        lastOrdinal = contiguous;
         for (const command of fresh) {
           try {
             await fixedFiveRepository.appendCommand(command);
@@ -448,6 +474,7 @@
       }
       simEntries = [];
       progress = { completed: 0, total: snapshot.settings.mode === 'duel' ? 7 : 161 };
+      simStartAt = Date.now();
       const active = new FixedFiveRunner((event) => {
         if (!mounted) return;
         if (event.kind === 'progress') {
@@ -518,6 +545,19 @@
             weakestReplacedOpponentId: summary.weakestReplacedOpponentId,
           });
           await fixedFiveRepository.savePendingResult(roomId, run, selfId);
+          let reducedMotion = false;
+          try {
+            reducedMotion =
+              typeof window !== 'undefined' &&
+              typeof window.matchMedia === 'function' &&
+              window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          } catch {
+            reducedMotion = false;
+          }
+          const minShow = reducedMotion ? SIM_SHOWDOWN_REDUCED_MS : SIM_SHOWDOWN_MIN_MS;
+          const waitMs = Math.max(0, simStartAt + minShow - Date.now());
+          if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs));
+          if (!mounted) return;
           localResult = {
             result: summary.result,
             digest,
@@ -675,6 +715,8 @@
       unsubscribe?.();
       runner?.dispose();
       runner = null;
+      statsRunner?.dispose();
+      statsRunner = null;
       window.removeEventListener('focus', onFocus);
       window.removeEventListener('online', onOnline);
       if (resyncTimer) clearInterval(resyncTimer);
@@ -689,17 +731,30 @@
     }
   });
 
+  $effect(() => {
+    if (!mounted || !snapshot || !replay || !localResult) return;
+    if (phase !== 'awaiting-confirmation' && phase !== 'completed') return;
+    if (statsSource.length > 0 || statsBuilding || statsRebuildStarted) return;
+    statsRebuildStarted = true;
+    void rebuildStatsEntries();
+  });
+
   async function rerunSimulation(): Promise<void> {
     try {
       simulationReason = 'mismatch-rerun';
       if (!simulationGate.canStart(simulationReason)) return;
       runner?.dispose();
       runner = null;
+      statsRunner?.dispose();
+      statsRunner = null;
       await fixedFiveRepository.clearPendingResult(roomId).catch(() => {});
       simStarted = false;
       simDone = false;
       localResult = null;
       simEntries = [];
+      statsEntries = [];
+      statsBuilding = false;
+      statsRebuildStarted = false;
       progress = null;
       simError = null;
       await sync(lastOrdinal);
@@ -707,6 +762,78 @@
     } catch (e) {
       if (mounted) simError = e instanceof Error ? e.message : String(e);
     }
+  }
+
+  async function rebuildStatsEntries(): Promise<void> {
+    if (statsBuilding || !snapshot || !assets || !snapshot.rootSeed || !replay || !localResult) {
+      return;
+    }
+    statsBuilding = true;
+    try {
+      const rootSeed: Seed = snapshot.rootSeed;
+      const p1Team: FixedFiveWorkerTeam = await buildSimulationTeam(
+        assets.manifest,
+        'p1',
+        'Player 1',
+        localResult.p1.refs,
+      );
+      const p2Team: FixedFiveWorkerTeam = await buildSimulationTeam(
+        assets.manifest,
+        'p2',
+        'Player 2',
+        localResult.p2.refs,
+      );
+      if (!mounted) {
+        statsBuilding = false;
+        return;
+      }
+      statsRunner?.dispose();
+      const collected: FixedFiveWorkerResultEntry[] = [];
+      const active = new FixedFiveRunner((event) => {
+        if (!mounted) return;
+        if (event.kind === 'results') {
+          for (const entry of event.entries) collected.push(entry);
+        } else if (event.kind === 'complete') {
+          statsEntries = collected;
+          statsBuilding = false;
+          statsRunner?.dispose();
+          statsRunner = null;
+        } else if (event.kind === 'error') {
+          statsBuilding = false;
+          statsRunner?.dispose();
+          statsRunner = null;
+        }
+      });
+      statsRunner = active;
+      const versions = snapshot.settings.versions;
+      if (snapshot.settings.mode === 'duel') {
+        active.runDuel({
+          rootSeed,
+          p1Team,
+          p2Team,
+          profile: assets.profile,
+          dataVersion: versions.dataVersion,
+          engineVersion: versions.engineVersion,
+        });
+      } else {
+        active.runShared82({
+          rootSeed,
+          p1Team,
+          p2Team,
+          bracket: assets.bracket,
+          profile: assets.profile,
+          dataVersion: versions.dataVersion,
+          engineVersion: versions.engineVersion,
+        });
+      }
+    } catch {
+      if (mounted) statsBuilding = false;
+    }
+  }
+
+  function requestStatsRebuild(): void {
+    statsRebuildStarted = true;
+    void rebuildStatsEntries();
   }
 
   $effect(() => {
@@ -1063,6 +1190,9 @@
             p2Rows={p2ResultRows}
             {presentation}
             digest={localResult.digest}
+            stats={playerStats}
+            {statsState}
+            onRebuildStats={requestStatsRebuild}
           />
         {/if}
         <p class="mt-2 text-xs text-muted-foreground">
@@ -1075,37 +1205,13 @@
             {@const confirmed = localResult}
             <button
               type="button"
-              onclick={() => proposeDigest(confirmed.digest)}
-              disabled={busyAction !== null}
-              class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-40"
-            >
-              Propose digest
-            </button>
-            <button
-              type="button"
-              onclick={() => confirmDigest(confirmed.digest, true)}
-              disabled={busyAction !== null}
-              class="rounded-xl border border-line-soft bg-card px-4 py-2 text-sm font-semibold disabled:opacity-40"
-            >
-              Confirm digest
-            </button>
-            <button
-              type="button"
               onclick={() => attemptComplete(confirmed.digest)}
               disabled={busyAction !== null}
-              class="rounded-xl border border-line-soft bg-card px-4 py-2 text-sm font-semibold disabled:opacity-40"
+              class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-40"
             >
               Complete room
             </button>
           {/if}
-          <button
-            type="button"
-            onclick={() => attemptFail()}
-            disabled={busyAction !== null}
-            class="rounded-xl border border-line-soft bg-card px-4 py-2 text-sm font-semibold disabled:opacity-40"
-          >
-            Report mismatch
-          </button>
         </div>
       </div>
     {:else if phase === 'completed' && localResult}
@@ -1120,6 +1226,9 @@
             p2Rows={p2ResultRows}
             {presentation}
             digest={localResult.digest}
+            stats={playerStats}
+            {statsState}
+            onRebuildStats={requestStatsRebuild}
           />
         {/if}
         <div class="rounded-2xl bg-surface-1 p-6">

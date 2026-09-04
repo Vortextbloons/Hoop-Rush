@@ -12,16 +12,7 @@ export function canonicalPlayerPairs(players: readonly string[]): Array<[string,
   if (new Set(players).size !== players.length) {
     throw new Error('season chemistry: player versions must be distinct');
   }
-  const sorted = [...players].sort();
-  const pairs: Array<[string, string]> = [];
-  for (let i = 0; i < sorted.length; i += 1) {
-    for (let j = i + 1; j < sorted.length; j += 1) {
-      const a = sorted[i];
-      const b = sorted[j];
-      if (a !== undefined && b !== undefined) pairs.push([a, b]);
-    }
-  }
-  return pairs;
+  return canonicalPairs([...players].sort());
 }
 export function canonicalRosterPairs(roster: readonly string[]): Array<[string, string]> {
   if (roster.length !== SEASON_ROSTER_SIZE || new Set(roster).size !== SEASON_ROSTER_SIZE) {
@@ -37,7 +28,9 @@ export function unitPairs(unit: readonly string[]): Array<[string, string]> {
       `season chemistry: unit must be five distinct versions (got ${String(unit.length)})`,
     );
   }
-  const sorted = [...unit].sort();
+  return canonicalPairs([...unit].sort());
+}
+function canonicalPairs(sorted: readonly string[]): Array<[string, string]> {
   const pairs: Array<[string, string]> = [];
   for (let i = 0; i < sorted.length; i += 1) {
     for (let j = i + 1; j < sorted.length; j += 1) {
@@ -75,19 +68,4 @@ export function unitChemistryBasisPoints(
     }
     return pair.sharedPossessions;
   });
-}
-export function unitSharedPossessions(
-  pairStates: readonly SeasonPairChemistryState[],
-  unit: readonly string[],
-): Map<string, number> {
-  const byKey = new Map(pairStates.map((pair) => [seasonPairKey(pair.a, pair.b), pair]));
-  const totals = new Map<string, number>();
-  for (const [a, b] of unitPairs(unit)) {
-    const pair = byKey.get(seasonPairKey(a, b));
-    if (pair === undefined) {
-      throw new Error(`season chemistry: unit pair ${a}-${b} is not a tracked pair`);
-    }
-    totals.set(seasonPairKey(a, b), pair.sharedPossessions);
-  }
-  return totals;
 }
