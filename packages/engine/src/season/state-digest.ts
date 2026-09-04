@@ -172,10 +172,7 @@ export function seasonRunStateDigest(facts: SeasonRunStateDigestFacts): string {
                 .sort(([a], [b]) => Number(a) - Number(b))
                 .map(([blockIndex, offers]) => [
                   blockIndex,
-                  sortedBy(
-                    offers,
-                    (o) => o.opportunityId,
-                  ),
+                  sortedBy(offers, (o) => o.opportunityId),
                 ]),
             ),
             selections: Object.fromEntries(
@@ -208,12 +205,11 @@ export function seasonRunStateDigest(facts: SeasonRunStateDigestFacts): string {
       ),
     }),
     authority: authorityCanonical(
-      (facts.authority) ??
-        ({
-          kind: 'local-solo',
-          soloFranchiseId: null,
-          authorityVersion: 'season-authority-v1',
-        }),
+      facts.authority ?? {
+        kind: 'local-solo',
+        soloFranchiseId: null,
+        authorityVersion: 'season-authority-v1',
+      },
     ),
   });
   return seasonDigestHex(canonical);

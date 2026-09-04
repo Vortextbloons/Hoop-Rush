@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, within } from '@testing-library/svelte';
 import type { Position, SeasonRotation } from '@hoop-rush/data-contracts';
+import {
+  eraIdSchema,
+  franchiseIdSchema,
+  playerIdSchema,
+  seasonKeySchema,
+} from '@hoop-rush/data-contracts';
 import { buildMinimalRotation } from '@hoop-rush/engine';
 import RotationEditor from '$lib/components/season/RotationEditor.svelte';
 import SeasonRosterList from '$lib/components/season/SeasonRosterList.svelte';
@@ -190,13 +196,13 @@ describe('roster list: active/inactive presentation (M2.6.5)', () => {
     const { container } = render(SeasonRosterList, {
       props: {
         roster: {
-          franchiseId: 'lakers',
+          franchiseId: franchiseIdSchema.parse('lakers'),
           players: roster.map((member) => ({
             playerVersionId: member.id,
-            playerId: member.id,
-            franchiseId: 'lakers',
-            eraId: '1990s',
-            seasonKey: '1994-95',
+            playerId: playerIdSchema.parse(member.id),
+            franchiseId: franchiseIdSchema.parse('lakers'),
+            eraId: eraIdSchema.parse('1990s'),
+            seasonKey: seasonKeySchema.parse('1994-95'),
             displayName: `Player ${member.id}`,
           })),
         },

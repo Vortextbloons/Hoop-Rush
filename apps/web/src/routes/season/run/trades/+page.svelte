@@ -1,5 +1,6 @@
 <script lang="ts">
   import { getContext } from 'svelte';
+  import { franchiseIdSchema } from '@hoop-rush/data-contracts';
   import {
     SEASON_RUN_SHELL_CONTEXT,
     type SeasonRunShellData,
@@ -40,8 +41,15 @@
   const boardProfiles = $derived(tradeVm.boardProfiles);
   const negotiations = $derived(tradeVm.negotiations);
   const valueTrends = $derived(tradeVm.valueTrends);
+  const humanFranchiseKey = $derived.by(() => {
+    if (!humanFranchiseId) return null;
+    const parsed = franchiseIdSchema.safeParse(humanFranchiseId);
+    return parsed.success ? parsed.data : null;
+  });
   const humanBalance = $derived(
-    influence !== null && humanFranchiseId ? (influence.balances[humanFranchiseId] ?? 0) : 0,
+    influence !== null && humanFranchiseKey !== null
+      ? (influence.balances[humanFranchiseKey] ?? 0)
+      : 0,
   );
   const commandError = $derived.by(() => {
     const e = shell.commandError;

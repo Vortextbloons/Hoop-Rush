@@ -14,6 +14,7 @@ import type {
 } from '@hoop-rush/data-contracts';
 import {
   commandIdSchema,
+  contentHashSchema,
   eraIdSchema,
   franchiseIdSchema,
   idSchema,
@@ -619,19 +620,106 @@ describe('result digest', () => {
   it('ignores governance commands so a late proposer still agrees (room d71f)', () => {
     const roomId = idSchema.parse('room-d71f');
     const draft: FixedFiveCommand[] = [
-      { schemaVersion: 1, roomId, commandId: commandIdSchema.parse('cmd-start'), ordinal: 0, actorParticipantId: 'p2', payload: { kind: 'start' } },
-      { schemaVersion: 1, roomId, commandId: commandIdSchema.parse('cmd-p1'), ordinal: 1, actorParticipantId: 'p2', payload: { kind: 'classic-pick', playerId: pid('p-g1'), slotIndex: 0 } },
-      { schemaVersion: 1, roomId, commandId: commandIdSchema.parse('cmd-p2'), ordinal: 2, actorParticipantId: 'p2', payload: { kind: 'timeout-autopick', playerId: pid('p-g2'), slotIndex: 1, pickOrdinal: 1, seedPath: 'rootSeed/timeout-autopick/classic-shared-82/p2/1' } },
-      { schemaVersion: 1, roomId, commandId: commandIdSchema.parse('cmd-p3'), ordinal: 3, actorParticipantId: 'p1', payload: { kind: 'reroll', axis: 'franchise' } },
-      { schemaVersion: 1, roomId, commandId: commandIdSchema.parse('cmd-p4'), ordinal: 4, actorParticipantId: 'p1', payload: { kind: 'classic-pick', playerId: pid('p-f1'), slotIndex: 2 } },
+      {
+        schemaVersion: 1,
+        roomId,
+        commandId: commandIdSchema.parse('cmd-start'),
+        ordinal: 0,
+        actorParticipantId: 'p2',
+        payload: { kind: 'start' },
+      },
+      {
+        schemaVersion: 1,
+        roomId,
+        commandId: commandIdSchema.parse('cmd-p1'),
+        ordinal: 1,
+        actorParticipantId: 'p2',
+        payload: { kind: 'classic-pick', playerId: pid('p-g1'), slotIndex: 0 },
+      },
+      {
+        schemaVersion: 1,
+        roomId,
+        commandId: commandIdSchema.parse('cmd-p2'),
+        ordinal: 2,
+        actorParticipantId: 'p2',
+        payload: {
+          kind: 'timeout-autopick',
+          playerId: pid('p-g2'),
+          slotIndex: 1,
+          pickOrdinal: 1,
+          seedPath: 'rootSeed/timeout-autopick/classic-shared-82/p2/1',
+        },
+      },
+      {
+        schemaVersion: 1,
+        roomId,
+        commandId: commandIdSchema.parse('cmd-p3'),
+        ordinal: 3,
+        actorParticipantId: 'p1',
+        payload: { kind: 'reroll', axis: 'franchise' },
+      },
+      {
+        schemaVersion: 1,
+        roomId,
+        commandId: commandIdSchema.parse('cmd-p4'),
+        ordinal: 4,
+        actorParticipantId: 'p1',
+        payload: { kind: 'classic-pick', playerId: pid('p-f1'), slotIndex: 2 },
+      },
     ];
     const governance: FixedFiveCommand[] = [
-      { schemaVersion: 1, roomId, commandId: commandIdSchema.parse('cmd-ready'), ordinal: 5, actorParticipantId: 'p1', payload: { kind: 'ready', ready: true } },
-      { schemaVersion: 1, roomId, commandId: commandIdSchema.parse('cmd-propose'), ordinal: 6, actorParticipantId: 'p2', payload: { kind: 'propose-result', resultDigest: '0'.repeat(64) } },
-      { schemaVersion: 1, roomId, commandId: commandIdSchema.parse('cmd-confirm'), ordinal: 7, actorParticipantId: 'p1', payload: { kind: 'confirm-result', resultDigest: '0'.repeat(64), verified: true } },
-      { schemaVersion: 1, roomId, commandId: commandIdSchema.parse('cmd-rematch'), ordinal: 8, actorParticipantId: 'p1', payload: { kind: 'rematch-request' } },
-      { schemaVersion: 1, roomId, commandId: commandIdSchema.parse('cmd-leave'), ordinal: 9, actorParticipantId: 'p2', payload: { kind: 'leave' } },
-      { schemaVersion: 1, roomId, commandId: commandIdSchema.parse('cmd-remove'), ordinal: 10, actorParticipantId: 'p1', payload: { kind: 'remove-guest', targetParticipantId: 'p2' } },
+      {
+        schemaVersion: 1,
+        roomId,
+        commandId: commandIdSchema.parse('cmd-ready'),
+        ordinal: 5,
+        actorParticipantId: 'p1',
+        payload: { kind: 'ready', ready: true },
+      },
+      {
+        schemaVersion: 1,
+        roomId,
+        commandId: commandIdSchema.parse('cmd-propose'),
+        ordinal: 6,
+        actorParticipantId: 'p2',
+        payload: { kind: 'propose-result', resultDigest: contentHashSchema.parse('0'.repeat(64)) },
+      },
+      {
+        schemaVersion: 1,
+        roomId,
+        commandId: commandIdSchema.parse('cmd-confirm'),
+        ordinal: 7,
+        actorParticipantId: 'p1',
+        payload: {
+          kind: 'confirm-result',
+          resultDigest: contentHashSchema.parse('0'.repeat(64)),
+          verified: true,
+        },
+      },
+      {
+        schemaVersion: 1,
+        roomId,
+        commandId: commandIdSchema.parse('cmd-rematch'),
+        ordinal: 8,
+        actorParticipantId: 'p1',
+        payload: { kind: 'rematch-request' },
+      },
+      {
+        schemaVersion: 1,
+        roomId,
+        commandId: commandIdSchema.parse('cmd-leave'),
+        ordinal: 9,
+        actorParticipantId: 'p2',
+        payload: { kind: 'leave' },
+      },
+      {
+        schemaVersion: 1,
+        roomId,
+        commandId: commandIdSchema.parse('cmd-remove'),
+        ordinal: 10,
+        actorParticipantId: 'p1',
+        payload: { kind: 'remove-guest', targetParticipantId: 'p2' },
+      },
     ];
     const p1Players = buildLegalSimulationTeam({ teamId: 'p1', displayName: 'P1' }).players;
     const digestOf = (acceptedCommands: FixedFiveCommand[]) =>

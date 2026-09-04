@@ -5,6 +5,7 @@
     SeasonFreeAgencyCandidate,
     SeasonFreeAgencyRoleExpectation,
   } from '@hoop-rush/data-contracts';
+  import { franchiseIdSchema } from '@hoop-rush/data-contracts';
   import FreeAgencyDeclarationPanel from '$lib/components/season/free-agency/FreeAgencyDeclarationPanel.svelte';
   import FreeAgencyMarketOverview, {
     type FreeAgencyCardView,
@@ -36,18 +37,25 @@
   const resolvedWindows = $derived(
     (freeAgency?.windows ?? []).filter((window) => window.status === 'resolved'),
   );
+  const humanFranchiseKey = $derived.by(() => {
+    if (humanFranchiseId === null) return null;
+    const parsed = franchiseIdSchema.safeParse(humanFranchiseId);
+    return parsed.success ? parsed.data : null;
+  });
   const balance = $derived(
-    run === null || humanFranchiseId === null ? 0 : (run.influence.balances[humanFranchiseId] ?? 0),
+    run === null || humanFranchiseKey === null
+      ? 0
+      : (run.influence.balances[humanFranchiseKey] ?? 0),
   );
   const seasonSpend = $derived(
-    freeAgency === null || humanFranchiseId === null
+    freeAgency === null || humanFranchiseKey === null
       ? 0
-      : (freeAgency.seasonSpend[humanFranchiseId] ?? 0),
+      : (freeAgency.seasonSpend[humanFranchiseKey] ?? 0),
   );
   const signingCount = $derived(
-    freeAgency === null || humanFranchiseId === null
+    freeAgency === null || humanFranchiseKey === null
       ? 0
-      : (freeAgency.signingCounts[humanFranchiseId] ?? 0),
+      : (freeAgency.signingCounts[humanFranchiseKey] ?? 0),
   );
   let draft = $state<
     Record<

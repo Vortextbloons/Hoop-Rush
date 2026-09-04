@@ -407,7 +407,7 @@ export function openTradeInquiry(
     negotiations: [...(win.negotiations ?? []), negotiation],
   };
   const trade = run.trade;
-  if (trade === null || trade === undefined) {
+  if (!trade) {
     throw new Error('trade inquiry requires an open trade window');
   }
   const nextTrade: SeasonTradeState = {

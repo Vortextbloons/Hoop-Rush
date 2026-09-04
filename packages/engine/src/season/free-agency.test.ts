@@ -357,8 +357,8 @@ describe('free-agency resolution', () => {
       HUMAN,
       'cmd-s',
     );
-    resolveSeasonFreeAgencyWindow(
-      { ...context, run: { ...run, freeAgency: declared } },
+    const resolved = resolveSeasonFreeAgencyWindow(
+      { ...context, run: { ...run, freeAgency: skipped } },
       0,
       'cmd-r',
     );
@@ -595,7 +595,7 @@ describe('effects reconciliation (season-chemistry-v2)', () => {
       'cmd-d',
       [{ playerVersionId: target.playerVersionId, roleExpectation: 'depth', influence: 1 }],
     );
-    const resolved = resolveSeasonFreeAgencyWindow(
+    resolveSeasonFreeAgencyWindow(
       { ...context, run: { ...run, freeAgency: declared } },
       0,
       'cmd-r',

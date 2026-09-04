@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { performance } from 'node:perf_hooks';
 import type { SimulationPlayer, SimulationTeam } from '@hoop-rush/data-contracts';
 import { playerIdSchema, seedSchema } from '@hoop-rush/data-contracts';
 import {
@@ -84,9 +83,9 @@ describe.skipIf(process.env.HOOP_RUSH_PERF_STRICT !== '1')('game performance goa
     simulateGame(input, ctx);
     const samples: number[] = [];
     for (let i = 0; i < 100; i += 1) {
-      const start = performance.now();
+      const start = globalThis.performance.now();
       simulateGame(input, ctx);
-      samples.push(performance.now() - start);
+      samples.push(globalThis.performance.now() - start);
     }
     samples.sort((a, b) => a - b);
     const median = samples[50];

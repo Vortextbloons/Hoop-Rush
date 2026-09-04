@@ -11,7 +11,7 @@
     PlayersIndexEntry,
     RunAggregates,
   } from '@hoop-rush/data-contracts';
-  import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
+  import { franchiseAbbreviation, playerIdSchema } from '@hoop-rush/data-contracts';
   import type { SandboxHref } from '$lib/sandbox-url';
   import { explainSeason, leagueMvp, perGamePlayer } from '@hoop-rush/engine';
   import { resolve } from '$app/paths';
@@ -56,7 +56,7 @@
     const record = byId?.get(current.playerId) ?? indexById?.get(current.playerId);
     if (record) return record;
     return {
-      playerId: current.playerId,
+      playerId: playerIdSchema.parse(current.playerId),
       playerExternalId: '',
       altIds: null,
     } satisfies Pick<PeakPlayerSeason, 'playerId' | 'playerExternalId' | 'altIds'>;

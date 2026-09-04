@@ -1,5 +1,9 @@
 <script lang="ts">
-  import { resolveHeadshotUrls, type HoopRushManifest } from '@hoop-rush/data-contracts';
+  import {
+    playerIdSchema,
+    resolveHeadshotUrls,
+    type HoopRushManifest,
+  } from '@hoop-rush/data-contracts';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
   import type { SeasonFaceRef } from '$lib/season/season-branding';
   let {
@@ -15,10 +19,15 @@
   } = $props();
   const hasPrimaryId = $derived(face.playerExternalId.length > 0);
   const urls = $derived(hasPrimaryId ? resolveHeadshotUrls(manifest, face) : []);
+  const headshotPlayer = $derived({
+    playerId: playerIdSchema.parse(face.playerId),
+    playerExternalId: face.playerExternalId,
+    altIds: face.altIds,
+  });
 </script>
 
 {#if urls.length > 0}
-  <PlayerFace {manifest} player={face} {size} {eager} fallbackInitials={face.initials} />
+  <PlayerFace {manifest} player={headshotPlayer} {size} {eager} fallbackInitials={face.initials} />
 {:else}
   <div
     class="relative grid shrink-0 place-items-center overflow-hidden bg-surface-3 font-display font-extrabold text-muted-foreground {size ===

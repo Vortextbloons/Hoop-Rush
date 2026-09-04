@@ -207,7 +207,7 @@ export function seasonRunStateDigestFactsOf(
     ownership: next.ownership,
     rotations: next.rotations,
     effects,
-    authority: (next).authority,
+    authority: next.authority,
   };
 }
 export interface SeasonBlockSimulationOptions {
@@ -1257,11 +1257,8 @@ function campaignWithBlockEvaluation(
   campaignState: import('@hoop-rush/data-contracts').SeasonCampaignState | undefined,
   candidate: SeasonCandidateCheckpoint,
 ): import('@hoop-rush/data-contracts').SeasonCampaignState | undefined {
-  if (!candidate.campaign || !candidate.campaign.evaluation)
-    return campaignState;
-  const base = normalizeCampaignState(
-    campaignState,
-  );
+  if (!candidate.campaign || !candidate.campaign.evaluation) return campaignState;
+  const base = normalizeCampaignState(campaignState);
   const evalResult = candidate.campaign.evaluation;
   const existing = base.evaluations.some(
     (e) => e.blockIndex === evalResult.blockIndex && e.opportunityId === evalResult.opportunityId,
@@ -1370,7 +1367,7 @@ export function deriveSeasonPostBlockState(input: {
     ownership: input.run.ownership,
     rotations: input.run.rotations,
     effects: input.candidate.effects,
-    authority: (input.run).authority,
+    authority: input.run.authority,
   });
   return { checkpointState, stateRevision, stateDigest };
 }
@@ -1427,14 +1424,8 @@ export function completeSeasonBlockCommit(input: {
     stateDigest: derived.stateDigest,
   };
   const nextBlockIdxForCampaign = input.candidate.blockIndex + 1;
-  if (
-    nextBlockIdxForCampaign <= 7 &&
-    (
-      postBlockRun.campaign
-    )?.startingIdentity
-  ) {
-    const nextCampaignState =
-      postBlockRun.campaign;
+  if (nextBlockIdxForCampaign <= 7 && postBlockRun.campaign?.startingIdentity) {
+    const nextCampaignState = postBlockRun.campaign;
     if (!nextCampaignState.offers[nextBlockIdxForCampaign]) {
       const needsEvolution =
         input.candidate.blockIndex === 4 && !nextCampaignState.evolutionSelection;
@@ -1550,7 +1541,7 @@ export function completeSeasonBlockCommit(input: {
       stateDigest: seasonRunStateDigest(seasonRunStateDigestFactsOf(next, postWindowEffects)),
     };
   }
-  const finalCampaign = (runAfterTrade.campaign ?? campaign ?? null);
+  const finalCampaign = runAfterTrade.campaign ?? campaign ?? null;
   if (window === null && freeAgencyWindow === null) {
     return {
       checkpointState: derived.checkpointState,

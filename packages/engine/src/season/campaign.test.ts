@@ -33,26 +33,21 @@ function standingsFor(
       return {
         franchiseId: team.franchiseId,
         wins: mappedWins ?? (team.franchiseId === HUMAN ? 5 : 3),
-        losses:
-          mappedWins !== undefined
-            ? 10 - mappedWins
-            : team.franchiseId === HUMAN
-              ? 5
-              : 7,
-      gamesPlayed: 10,
-      homeWins: 0,
-      homeLosses: 0,
-      awayWins: 0,
-      awayLosses: 0,
-      conferenceWins: 0,
-      conferenceLosses: 0,
-      divisionWins: 0,
-      divisionLosses: 0,
-      pointsFor: 1000,
-      pointsAgainst: 1000,
-      headToHead: run.league.teams
-        .filter((other) => other.franchiseId !== team.franchiseId)
-        .map((other) => ({ franchiseId: other.franchiseId, wins: 0, losses: 0 })),
+        losses: mappedWins !== undefined ? 10 - mappedWins : team.franchiseId === HUMAN ? 5 : 7,
+        gamesPlayed: 10,
+        homeWins: 0,
+        homeLosses: 0,
+        awayWins: 0,
+        awayLosses: 0,
+        conferenceWins: 0,
+        conferenceLosses: 0,
+        divisionWins: 0,
+        divisionLosses: 0,
+        pointsFor: 1000,
+        pointsAgainst: 1000,
+        headToHead: run.league.teams
+          .filter((other) => other.franchiseId !== team.franchiseId)
+          .map((other) => ({ franchiseId: other.franchiseId, wins: 0, losses: 0 })),
       };
     }),
   };

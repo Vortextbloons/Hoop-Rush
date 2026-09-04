@@ -129,10 +129,34 @@ function face(playerVersionId: string): SeasonFaceRef {
   };
 }
 const LEADER_ENTRIES = [
-  { playerVersionId: 'v-star', franchiseId: 'lakers', gamesPlayed: 10, value: 250, perGame: 25 },
-  { playerVersionId: 'v-second', franchiseId: 'celtics', gamesPlayed: 10, value: 240, perGame: 24 },
-  { playerVersionId: 'v-third', franchiseId: 'hawks', gamesPlayed: 10, value: 230, perGame: 23 },
-  { playerVersionId: 'v-fourth', franchiseId: 'bulls', gamesPlayed: 10, value: 220, perGame: 22 },
+  {
+    playerVersionId: 'v-star',
+    franchiseId: franchiseIdSchema.parse('lakers'),
+    gamesPlayed: 10,
+    value: 250,
+    perGame: 25,
+  },
+  {
+    playerVersionId: 'v-second',
+    franchiseId: franchiseIdSchema.parse('celtics'),
+    gamesPlayed: 10,
+    value: 240,
+    perGame: 24,
+  },
+  {
+    playerVersionId: 'v-third',
+    franchiseId: franchiseIdSchema.parse('hawks'),
+    gamesPlayed: 10,
+    value: 230,
+    perGame: 23,
+  },
+  {
+    playerVersionId: 'v-fourth',
+    franchiseId: franchiseIdSchema.parse('bulls'),
+    gamesPlayed: 10,
+    value: 220,
+    perGame: 22,
+  },
 ];
 function renderLeaders() {
   return render(LeadersTable, {

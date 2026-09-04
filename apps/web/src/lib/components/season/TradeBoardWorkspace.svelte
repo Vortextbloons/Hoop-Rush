@@ -23,6 +23,7 @@
   import SeasonTeamLogo from './SeasonTeamLogo.svelte';
   import { franchiseIdentityOf } from '$lib/season/season-branding';
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
+  import { franchiseIdSchema } from '@hoop-rush/data-contracts';
   let {
     run,
     catalog,
@@ -502,13 +503,16 @@
           available: availableOf(p.playerVersionId),
         }))}
         {@const safeTargetId = selectedFranchiseId ?? ''}
+        {@const safeTargetKey = franchiseIdSchema.safeParse(safeTargetId)}
         <PackageBuilder
           yourPlayers={yourLites}
           theirPlayers={theirLites}
           yourRosterSize={humanRoster.players.length}
           theirRosterSize={targetRoster.players.length}
           yourBalance={humanBalance}
-          theirBalance={run?.influence.balances[safeTargetId] ?? 2}
+          theirBalance={safeTargetKey.success
+            ? (run?.influence.balances[safeTargetKey.data] ?? 2)
+            : 2}
           {humanFranchiseId}
           targetFranchiseId={safeTargetId}
           targetFranchiseName={manifest

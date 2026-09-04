@@ -162,10 +162,7 @@ import {
   generatedExtraOfferForSpend,
   type SeasonEconomyRun,
 } from './trades.ts';
-import {
-  generateSeasonCampaignOffers,
-  normalizeCampaignState,
-} from './campaign.ts';
+import { generateSeasonCampaignOffers, normalizeCampaignState } from './campaign.ts';
 import { generateSeasonSchedule } from './schedule.ts';
 import { evaluateTradeProposal, openTradeInquiry } from './trade-board.ts';
 import {
@@ -928,9 +925,7 @@ function handleOpenTradeInquiry(
   }
   const win = run.trade.windows.find((w) => w.windowIndex === command.windowIndex);
   if (win === undefined) {
-    throw new Error(
-      `trade window ${String(command.windowIndex)} missing after validation`,
-    );
+    throw new Error(`trade window ${String(command.windowIndex)} missing after validation`);
   }
   if (win.activeInquiryId) {
     const rejection: SeasonTradeActiveNegotiationRejection = {
@@ -1092,9 +1087,7 @@ function handleSubmitTradeProposal(
     }
     const openedWin = openedTrade.windows.find((w) => w.windowIndex === command.windowIndex);
     if (openedWin === undefined) {
-      throw new Error(
-        `trade window ${String(command.windowIndex)} missing after inquiry open`,
-      );
+      throw new Error(`trade window ${String(command.windowIndex)} missing after inquiry open`);
     }
     nextWin = openedWin;
   }

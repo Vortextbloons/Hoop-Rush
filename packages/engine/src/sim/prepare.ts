@@ -106,4 +106,3 @@ export function prepareTeam(team: SimulationTeam, profile: EraSimulationProfile)
     passP: passPByPlayer,
   };
 }
-

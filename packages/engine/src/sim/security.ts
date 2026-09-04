@@ -66,4 +66,3 @@ export function stealerWeights(defense: SimulationTeam): number[] {
     Math.max(0.5, d.ratings.steal * (0.6 + d.tendencies.stealAttemptRate / 20)),
   );
 }
-
