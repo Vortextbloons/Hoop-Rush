@@ -34,12 +34,12 @@
   import { resolvePlayerRefs } from '$lib/player-refs';
   import { poolSortLabel, presentationForVariant, variantLabel } from '$lib/draft-presentation';
   import { formatPositions } from '$lib/player-positions';
-  import TeamLogo from '$lib/components/TeamLogo.svelte';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
   import LineupCourt from '$lib/components/LineupCourt.svelte';
   import LineupSummaryNav from '$lib/components/LineupSummaryNav.svelte';
   import DraftValuePanel from '$lib/components/DraftValuePanel.svelte';
   import DraftPoolBrowser from '$lib/components/draft/DraftPoolBrowser.svelte';
+  import DraftRoundCard from '$lib/components/draft/DraftRoundCard.svelte';
   import ClassicRollReel from '$lib/components/classic/ClassicRollReel.svelte';
   import AsyncState from '$lib/components/AsyncState.svelte';
   let slotPickerModule: Promise<
@@ -53,7 +53,6 @@
   }
   type IndexRow = PlayersIndexEntry;
   type Variant = 'ratings' | 'ball-knowledge';
-  const ROUNDS = [0, 1, 2, 3, 4] as const;
   let manifest = $state.raw<HoopRushManifest | null>(null);
   let manifestError: string | null = $state(null);
   let index = $state.raw<PlayersIndex | null>(null);
@@ -503,111 +502,28 @@
     {:else}
       <div class="mt-10 flex flex-col gap-6 pb-32">
         {#if draft.status === 'drafting' && roll}
-          <div class="rounded-xl bg-surface-1">
-            <div
-              class="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3"
-            >
-              <span
-                data-round-heading
-                class="font-display text-base font-extrabold tracking-tight uppercase sm:text-lg"
-              >
-                Round {draft.round} of 5
-              </span>
-              <span class="flex gap-1.5" aria-hidden="true">
-                {#each ROUNDS as i (i)}
-                  <span
-                    class="h-2 w-2 rounded-full {i < draft.round - 1
-                      ? 'bg-primary'
-                      : i === draft.round - 1
-                        ? 'bg-accent'
-                        : 'border border-border'}"
-                  ></span>
-                {/each}
-              </span>
-            </div>
-            <div class="flex flex-col gap-2 px-3 pb-3 sm:gap-3 sm:px-4 sm:pb-4">
-              <div
-                class="grid w-full grid-cols-2 gap-2"
-                aria-label={`Round ${draft.round} of 5 · ${rollIdentity?.displayLabel ?? rollFranchise?.displayName ?? roll.franchiseId} · ${rollEra?.label ?? roll.eraId}`}
-              >
-                <span
-                  class="flex min-w-0 items-center gap-2 rounded-lg bg-surface-2 px-2.5 py-2 sm:px-3"
-                  data-indicator="franchise"
-                >
-                  {#if rollFranchise}
-                    <TeamLogo
-                      {manifest}
-                      franchiseId={rollFranchise.franchiseId}
-                      teamExternalId={rollFranchise.teamExternalId}
-                      logoCandidates={rollIdentity?.logoCandidates ?? []}
-                    />
-                  {/if}
-                  <span class="min-w-0">
-                    <span class="block font-mono text-[10px] font-bold tracking-[0.12em] uppercase">
-                      {rollIdentity?.abbreviationLabel ?? franchiseAbbreviation(roll.franchiseId)}
-                    </span>
-                    {#if rollFranchise}
-                      <span class="block truncate text-sm font-bold">
-                        {rollIdentity?.displayLabel ?? rollFranchise.displayName}
-                      </span>
-                    {/if}
-                  </span>
-                </span>
-                <span
-                  class="flex items-center justify-center rounded-lg bg-surface-2 px-2.5 py-2 sm:px-3"
-                  data-indicator="era"
-                >
-                  <span class="font-display text-sm font-extrabold tracking-tight">
-                    {rollEra?.label ?? roll.eraId}
-                  </span>
-                </span>
-              </div>
-              <div class="grid w-full grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  disabled={spinning || starting || !franchiseRerollAvailable}
-                  title={franchiseRerollAvailable
-                    ? 'Roll a different franchise'
-                    : draft.rerolls.franchiseSpent
-                      ? 'Already used'
-                      : 'No alternative'}
-                  onclick={rerollFranchise}
-                  class="flex min-h-11 min-w-0 flex-col items-center justify-center rounded-lg bg-surface-2 px-2 py-2 text-center transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-40 sm:flex-row sm:gap-2 sm:px-3"
-                >
-                  <span class="text-[11px] font-semibold leading-tight sm:text-sm"
-                    >Reroll franchise</span
-                  >
-                  {#if draft.rerolls.franchiseSpent}
-                    <span
-                      class="mt-0.5 font-mono text-[9px] font-bold tracking-[0.12em] text-muted-foreground uppercase sm:mt-0"
-                    >
-                      Used
-                    </span>
-                  {/if}
-                </button>
-                <button
-                  type="button"
-                  disabled={spinning || starting || !eraRerollAvailable}
-                  title={eraRerollAvailable
-                    ? 'Roll a different era'
-                    : draft.rerolls.eraSpent
-                      ? 'Already used'
-                      : 'No alternative'}
-                  onclick={rerollEra}
-                  class="flex min-h-11 min-w-0 flex-col items-center justify-center rounded-lg bg-surface-2 px-2 py-2 text-center transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-40 sm:flex-row sm:gap-2 sm:px-3"
-                >
-                  <span class="text-[11px] font-semibold leading-tight sm:text-sm">Reroll era</span>
-                  {#if draft.rerolls.eraSpent}
-                    <span
-                      class="mt-0.5 font-mono text-[9px] font-bold tracking-[0.12em] text-muted-foreground uppercase sm:mt-0"
-                    >
-                      Used
-                    </span>
-                  {/if}
-                </button>
-              </div>
-            </div>
-          </div>
+          {#if rollFranchise && rollEra}
+            <DraftRoundCard
+              label={`Round ${draft.round} of 5`}
+              round={draft.round}
+              ariaLabel={`Round ${draft.round} of 5 · ${rollIdentity?.displayLabel ?? rollFranchise.displayName} · ${rollEra.label}`}
+              {manifest}
+              franchiseId={roll.franchiseId}
+              teamExternalId={rollFranchise.teamExternalId}
+              logoCandidates={rollIdentity?.logoCandidates ?? []}
+              franchiseAbbreviation={rollIdentity?.abbreviationLabel ??
+                franchiseAbbreviation(roll.franchiseId)}
+              franchiseDisplayName={rollIdentity?.displayLabel ?? rollFranchise.displayName}
+              eraLabel={rollEra.label}
+              {franchiseRerollAvailable}
+              franchiseRerollSpent={draft.rerolls.franchiseSpent}
+              {eraRerollAvailable}
+              eraRerollSpent={draft.rerolls.eraSpent}
+              controlsDisabled={spinning || starting}
+              onRerollFranchise={rerollFranchise}
+              onRerollEra={rerollEra}
+            />
+          {/if}
           <ClassicRollReel
             {manifest}
             franchiseId={roll.franchiseId}

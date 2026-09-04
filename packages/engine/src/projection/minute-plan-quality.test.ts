@@ -13,7 +13,7 @@ import { buildInput } from './season.test-helpers.ts';
 import { optimizeSeasonRotation, projectedQualityWeights } from './minute-plan-quality.ts';
 function smallModel(): ProjectionModelArtifact {
   const referencePlayers = () =>
-    ([1, 2, 3, 4, 5].map((n) => ({
+    [1, 2, 3, 4, 5].map((n) => ({
       playerId: `p-r-${String(n)}`,
       displayName: `R ${String(n)}`,
       positions: [n === 5 ? 'C' : n >= 3 ? 'SF' : 'PG'] as string[],
@@ -64,8 +64,10 @@ function smallModel(): ProjectionModelArtifact {
         blockAttemptRate: 10,
         crashOffensiveGlassRate: 12,
       },
-    })) as unknown as ProjectionModelArtifact['references'][EraId]['neutral']['players']);
-  const referenceFive = (archetype: 'neutral' | 'perimeter' | 'interior' | 'pressure' | 'size-switch') => ({
+    })) as unknown as ProjectionModelArtifact['references'][EraId]['neutral']['players'];
+  const referenceFive = (
+    archetype: 'neutral' | 'perimeter' | 'interior' | 'pressure' | 'size-switch',
+  ) => ({
     referenceId: `ref-1990s-${archetype}`,
     archetype,
     eraId: '1990s',

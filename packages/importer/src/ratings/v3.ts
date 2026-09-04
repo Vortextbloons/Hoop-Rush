@@ -198,10 +198,7 @@ function productionEvidence(stats: StatsRow): ProductionEvidence {
   const stocks =
     stats.steals == null || stats.blocks == null || games <= 0
       ? 0
-      : Math.max(
-          0,
-          safeFloat(stats.steals) / games + safeFloat(stats.blocks) / games - 2.0,
-        ) * 1.2;
+      : Math.max(0, safeFloat(stats.steals) / games + safeFloat(stats.blocks) / games - 2.0) * 1.2;
   const score = clamp(
     50 +
       (ppg - 15) * 0.6 +
@@ -330,8 +327,7 @@ function deriveNonlinear(
       6,
     ),
     spacingLimitation: clamp(
-      ((Math.max(0, 58 - shootingGravity) * (0.8 + primaryRole * 0.8)) / 8) *
-        (1 - bigRole * 0.65),
+      ((Math.max(0, 58 - shootingGravity) * (0.8 + primaryRole * 0.8)) / 8) * (1 - bigRole * 0.65),
       0,
       6,
     ),
@@ -447,12 +443,7 @@ export function eliteEvidenceLiftFor(input: {
   const bpm = safeFloat(input.boxPlusMinus, 0);
   const winOk = input.teamWinPct == null || input.teamWinPct >= 0.7;
   const eliteScoringEvidence =
-    winOk &&
-    input.production.score >= 87 &&
-    games >= 55 &&
-    ppg >= 28 &&
-    ts >= 0.6 &&
-    bpm >= 3;
+    winOk && input.production.score >= 87 && games >= 55 && ppg >= 28 && ts >= 0.6 && bpm >= 3;
   const completeEliteEvidence =
     winOk &&
     input.production.score >= 86 &&

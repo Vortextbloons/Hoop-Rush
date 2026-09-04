@@ -150,7 +150,8 @@ const poolManifestSchema = z.looseObject({
 });
 export function poolDir(): string {
   return join(PUBLIC_DATA, 'pools');
-}export function manifestPath(): string {
+}
+export function manifestPath(): string {
   return join(PUBLIC_DATA, 'manifest.json');
 }
 export const SCHEMA_VERSION = POOL_SCHEMA_VERSION;

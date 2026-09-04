@@ -9,13 +9,15 @@
   import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
   import ClassicRollReel from '$lib/components/classic/ClassicRollReel.svelte';
   import DraftPoolBrowser from '$lib/components/draft/DraftPoolBrowser.svelte';
+  import DraftRoundCard from '$lib/components/draft/DraftRoundCard.svelte';
   import LineupCourt from '$lib/components/LineupCourt.svelte';
-  import TeamLogo from '$lib/components/TeamLogo.svelte';
+  import PlayerFace from '$lib/components/PlayerFace.svelte';
   import DraftValuePanel from '$lib/components/DraftValuePanel.svelte';
   import LineupSummaryNav from '$lib/components/LineupSummaryNav.svelte';
   import { classicPoolRows } from '$lib/classic-draft';
   import { poolSortLabel, type DraftPresentation } from '$lib/draft-presentation';
   import { displacementTargetFor } from '$lib/draft-slots';
+  import { formatPositions } from '$lib/player-positions';
   import { resolvePlayerRefs } from '$lib/player-refs';
   import type { PeakPlayerSeason } from '@hoop-rush/data-contracts';
   import type { DraftReplay, FixedFiveAssets } from '$lib/fixed-five-room-state';
@@ -49,8 +51,6 @@
     onRemove: (slotIndex: SlotIndex) => void;
     onLock: () => void;
   } = $props();
-
-  const ROUNDS = [0, 1, 2, 3, 4] as const;
 
   let slotPickerModule: Promise<
     typeof import('$lib/components/draft/SlotPickerDialog.svelte')
@@ -242,6 +242,20 @@
       ? resolveEraTeamIdentity(rollManifest, rollView.franchiseId, rollView.eraId)
       : null,
   );
+  const rollFranchiseAbbreviation = $derived(
+    rollView && !rollView.complete
+      ? (rollIdentity?.abbreviationLabel ??
+          (rollFranchise ? franchiseAbbreviation(rollFranchise.franchiseId) : rollView.franchiseId))
+      : '',
+  );
+  const rollFranchiseDisplayName = $derived(
+    rollView && !rollView.complete
+      ? (rollIdentity?.displayLabel ?? rollFranchise?.displayName ?? null)
+      : null,
+  );
+  const rollEraLabel = $derived(
+    rollView && !rollView.complete ? (rollEra?.label ?? rollView.eraId) : '',
+  );
   const poolHeading = $derived(
     rollView && !rollView.complete && rollFranchise && rollEra && rollIdentity
       ? `${rollIdentity.abbreviationLabel ?? franchiseAbbreviation(rollFranchise.franchiseId)} · ${rollEra.label}`
@@ -323,7 +337,7 @@
   }
 </script>
 
-<div class="mt-2 flex flex-col gap-6 pb-24">
+<div class="mt-2 flex min-w-0 flex-col gap-6 pb-24">
   {#if deadlineText}
     <p class="text-xs text-muted-foreground" role="status">{deadlineText}</p>
   {/if}
@@ -344,108 +358,28 @@
 
   {#if mode !== 'sandbox-shared-82' && rollView}
     {#if !rollView.complete}
-      <div class="rounded-xl bg-surface-1">
-        <div
-          class="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3"
-        >
-          <span class="font-display text-base font-extrabold tracking-tight uppercase sm:text-lg">
-            {rollView.label}
-          </span>
-          <span class="flex gap-1.5" aria-hidden="true">
-            {#each ROUNDS as i (i)}
-              <span
-                class="h-2 w-2 rounded-full {i < rollView.round - 1
-                  ? 'bg-primary'
-                  : i === rollView.round - 1
-                    ? 'bg-accent'
-                    : 'border border-border'}"
-              ></span>
-            {/each}
-          </span>
-        </div>
-        <p class="px-3 text-xs text-muted-foreground sm:px-4" aria-live="polite">
-          {rollView.turnText}
-        </p>
-        <div class="flex flex-col gap-2 px-3 pb-3 sm:gap-3 sm:px-4 sm:pb-4">
-          <div
-            class="grid w-full grid-cols-2 gap-2"
-            aria-label={rollFranchise && rollEra
-              ? `${rollView.label} · ${rollIdentity?.displayLabel ?? rollFranchise.displayName} · ${rollEra.label}`
-              : rollView.label}
-          >
-            <span
-              class="flex min-w-0 items-center gap-2 rounded-lg bg-surface-2 px-2.5 py-2 sm:px-3"
-              data-indicator="franchise"
-            >
-              {#if rollFranchise}
-                <TeamLogo
-                  manifest={rollManifest}
-                  franchiseId={rollFranchise.franchiseId}
-                  teamExternalId={rollFranchise.teamExternalId}
-                  logoCandidates={rollIdentity?.logoCandidates ?? []}
-                />
-              {/if}
-              <span class="min-w-0">
-                <span class="block font-mono text-[10px] font-bold tracking-[0.12em] uppercase">
-                  {rollFranchise
-                    ? (rollIdentity?.abbreviationLabel ??
-                      franchiseAbbreviation(rollFranchise.franchiseId))
-                    : rollView.franchiseId}
-                </span>
-                {#if rollFranchise}
-                  <span class="block truncate text-sm font-bold">
-                    {rollIdentity?.displayLabel ?? rollFranchise.displayName}
-                  </span>
-                {/if}
-              </span>
-            </span>
-            <span
-              class="flex items-center justify-center rounded-lg bg-surface-2 px-2.5 py-2 sm:px-3"
-              data-indicator="era"
-            >
-              <span class="font-display text-sm font-extrabold tracking-tight">
-                {rollEra?.label ?? rollView.eraId}
-              </span>
-            </span>
-          </div>
-          <div class="grid w-full grid-cols-2 gap-2">
-            <button
-              type="button"
-              disabled={disabled || rollView.rerollFranchiseSpent || !rollView.turn}
-              title={rollView.rerollFranchiseSpent ? 'Already used' : 'Roll a different franchise'}
-              onclick={() => onReroll('franchise')}
-              class="flex min-h-11 min-w-0 flex-col items-center justify-center rounded-lg bg-surface-2 px-2 py-2 text-center transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-40 sm:flex-row sm:gap-2 sm:px-3"
-            >
-              <span class="text-[11px] font-semibold leading-tight sm:text-sm"
-                >Reroll franchise</span
-              >
-              {#if rollView.rerollFranchiseSpent}
-                <span
-                  class="mt-0.5 font-mono text-[9px] font-bold tracking-[0.12em] text-muted-foreground uppercase sm:mt-0"
-                >
-                  Used
-                </span>
-              {/if}
-            </button>
-            <button
-              type="button"
-              disabled={disabled || rollView.rerollEraSpent || !rollView.turn}
-              title={rollView.rerollEraSpent ? 'Already used' : 'Roll a different era'}
-              onclick={() => onReroll('era')}
-              class="flex min-h-11 min-w-0 flex-col items-center justify-center rounded-lg bg-surface-2 px-2 py-2 text-center transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-40 sm:flex-row sm:gap-2 sm:px-3"
-            >
-              <span class="text-[11px] font-semibold leading-tight sm:text-sm">Reroll era</span>
-              {#if rollView.rerollEraSpent}
-                <span
-                  class="mt-0.5 font-mono text-[9px] font-bold tracking-[0.12em] text-muted-foreground uppercase sm:mt-0"
-                >
-                  Used
-                </span>
-              {/if}
-            </button>
-          </div>
-        </div>
-      </div>
+      <DraftRoundCard
+        label={rollView.label}
+        round={rollView.round}
+        turnText={rollView.turnText}
+        ariaLabel={rollFranchise && rollEra
+          ? `${rollView.label} · ${rollIdentity?.displayLabel ?? rollFranchise.displayName} · ${rollEra.label}`
+          : rollView.label}
+        manifest={rollManifest}
+        franchiseId={rollView.franchiseId}
+        teamExternalId={rollFranchise?.teamExternalId ?? ''}
+        logoCandidates={rollIdentity?.logoCandidates ?? []}
+        franchiseAbbreviation={rollFranchiseAbbreviation}
+        franchiseDisplayName={rollFranchiseDisplayName}
+        eraLabel={rollEraLabel}
+        franchiseRerollAvailable={!rollView.rerollFranchiseSpent}
+        franchiseRerollSpent={rollView.rerollFranchiseSpent}
+        eraRerollAvailable={!rollView.rerollEraSpent}
+        eraRerollSpent={rollView.rerollEraSpent}
+        controlsDisabled={disabled || !rollView.turn}
+        onRerollFranchise={() => onReroll('franchise')}
+        onRerollEra={() => onReroll('era')}
+      />
       <ClassicRollReel
         manifest={assets.manifest}
         franchiseId={rollView.franchiseId}
@@ -479,13 +413,34 @@
         </div>
         <ul class="flex flex-col divide-y divide-border/60">
           {#each myPicks as pick (pick.playerId)}
-            <li class="flex items-center gap-3 px-3 py-3 sm:px-4">
-              <span class="min-w-0 flex-1 truncate text-sm font-bold">
-                {displayNameOf(pick.playerId)}
-              </span>
-              <span class="shrink-0 font-mono text-[10px] text-muted-foreground">
-                Slot {pick.slotIndex + 1}
-              </span>
+            {@const row = indexById.get(pick.playerId) ?? null}
+            <li class="flex min-w-0 items-center gap-3 px-3 py-3 sm:px-4">
+              {#if row}
+                <PlayerFace
+                  player={row}
+                  manifest={rollManifest}
+                  size="sm"
+                  fallbackInitials={row.firstName[0]! + row.lastName[0]!}
+                />
+                <span class="min-w-0 flex-1 truncate text-sm font-bold">
+                  {row.displayName}
+                </span>
+                <span
+                  class="shrink-0 truncate font-mono text-[10px] text-muted-foreground"
+                  title={`Slot ${pick.slotIndex + 1}`}
+                >
+                  {row.seasonKey} · {formatPositions(row.positionsPlayable)} ·
+                  {resolveEraTeamIdentity(rollManifest, row.franchiseId, row.eraId)
+                    .abbreviationLabel ?? franchiseAbbreviation(row.franchiseId)}
+                </span>
+              {:else}
+                <span class="min-w-0 flex-1 truncate text-sm font-bold">
+                  {displayNameOf(pick.playerId)}
+                </span>
+                <span class="shrink-0 font-mono text-[10px] text-muted-foreground">
+                  Slot {pick.slotIndex + 1}
+                </span>
+              {/if}
             </li>
           {/each}
         </ul>
@@ -504,7 +459,7 @@
   {/if}
 
   {#if mode === 'sandbox-shared-82'}
-    <div class="rounded-xl bg-surface-1 p-3 sm:p-4">
+    <div class="min-w-0 rounded-xl bg-surface-1 p-3 sm:p-4">
       <h3 class="font-display text-sm font-extrabold uppercase">Build your five</h3>
       <p class="mt-1 text-xs text-muted-foreground">
         Same player may appear on both teams. Five minutes to build and lock; timeouts auto-fill

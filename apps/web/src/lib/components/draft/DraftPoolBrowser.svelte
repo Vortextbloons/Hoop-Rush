@@ -117,7 +117,7 @@
   );
 </script>
 
-<div class="rounded-none bg-surface-1 sm:rounded-xl">
+<div class="min-w-0 overflow-x-clip rounded-none bg-surface-1 sm:rounded-xl">
   <div class="flex min-w-0 items-center justify-between gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3">
     <h2
       class="min-w-0 truncate font-display text-base font-extrabold tracking-tight uppercase sm:text-lg"
@@ -125,13 +125,15 @@
     >
       {heading}
     </h2>
-    <span class="shrink-0 text-[10px] text-muted-foreground sm:text-label">
+    <span
+      class="max-w-[46%] shrink-0 truncate text-right text-[10px] text-muted-foreground sm:text-label"
+    >
       {countLabel}
     </span>
   </div>
   {#if filtersEditable}
-    <div class="flex flex-col gap-2 px-2 pb-2 sm:px-2">
-      <div class="relative">
+    <div class="flex min-w-0 flex-col gap-2 px-2 pb-2 sm:px-2">
+      <div class="relative min-w-0">
         <Search
           class="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
         />
@@ -144,7 +146,7 @@
         />
       </div>
       <div
-        class="flex items-center gap-1 overflow-x-auto pb-0.5"
+        class="flex min-w-0 items-center gap-1 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         role="group"
         aria-label="Filter by position"
       >
@@ -188,7 +190,7 @@
     <p class="p-6 text-center font-mono text-xs text-muted-foreground">{emptyMessage}</p>
   {:else}
     <ul
-      class="grid max-h-[55vh] gap-1 overflow-y-auto p-1.5 sm:max-h-[560px] sm:grid-cols-2 sm:p-2 xl:grid-cols-3"
+      class="grid max-h-[55vh] min-w-0 gap-1 overflow-x-hidden overflow-y-auto p-1.5 sm:max-h-[560px] sm:grid-cols-2 sm:p-2 xl:grid-cols-3"
     >
       {#each visibleRows as player (player.franchiseId + '/' + player.eraId + '/' + player.playerId)}
         {@const card = poolCardInfo.get(player.playerId) ?? {
@@ -196,13 +198,13 @@
           displace: null,
         }}
         {@const cardState = card.state}
-        <li>
+        <li class="min-w-0">
           <button
             type="button"
             disabled={cardState === 'blocked'}
             aria-disabled={cardState === 'blocked' ? 'true' : undefined}
             onclick={() => onpick(player)}
-            class="flex w-full items-center gap-3 rounded-lg py-2.5 pr-5 pl-3 text-left {cardState ===
+            class="flex w-full items-center gap-2 rounded-lg py-2 pr-2.5 pl-2 text-left sm:gap-3 sm:py-2.5 sm:pr-5 sm:pl-3 {cardState ===
             'lineup'
               ? 'bg-primary/10 opacity-60'
               : cardState === 'displace'
@@ -249,7 +251,7 @@
       {/each}
     </ul>
     {#if hasMore}
-      <div class="flex justify-end gap-3 px-1 pb-1">
+      <div class="flex justify-center gap-3 p-2 sm:justify-end">
         <button
           type="button"
           onclick={() => (visibleCount += PAGE_SIZE)}

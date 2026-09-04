@@ -939,8 +939,8 @@
         {/if}
       </div>
     {:else if phase === 'drafting' && replay && assets}
-      <div class="mt-6 rounded-2xl bg-surface-1 p-6">
-        <h2 class="font-display text-sm font-extrabold uppercase">
+      <div class="mt-4 min-w-0 overflow-x-clip rounded-2xl bg-surface-1 p-3 sm:mt-6 sm:p-6">
+        <h2 class="font-display text-sm font-extrabold break-words uppercase">
           Drafting — {snapshot.settings.mode === 'duel'
             ? 'alternating duel draft'
             : snapshot.settings.mode === 'sandbox-shared-82'

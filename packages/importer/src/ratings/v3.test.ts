@@ -2,11 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_RATINGS_MODEL_ARTIFACT } from './artifact.ts';
 import { derivePlayerRecord } from './v2.ts';
 import { computeSummaryRatings } from './summary.ts';
-import {
-  defenseCreditFor,
-  eliteEvidenceLiftFor,
-  teamContextAdjustment,
-} from './v3.ts';
+import { defenseCreditFor, eliteEvidenceLiftFor, teamContextAdjustment } from './v3.ts';
 import { starterStats } from './ratings-test-support.ts';
 const stats = starterStats();
 function recordFor(statsOver: Record<string, unknown> = {}) {

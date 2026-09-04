@@ -13,7 +13,7 @@ test.describe('season run multiplayer: two-client journey', () => {
 
     // p1 creates room via UI: goto /multiplayer, click Create, select Season Live, create
     await p1.goto('/multiplayer');
-    await expect(p1.getByRole('heading', { name: /Two humans/i })).toBeVisible();
+    await expect(p1.getByRole('heading', { name: /Play head to head/i })).toBeVisible();
 
     // Classic/Sandbox should be disabled, Season Run enabled (claim 7)
     await expect(p1.getByRole('button', { name: /Classic \(Coming soon\)/i })).toBeDisabled();

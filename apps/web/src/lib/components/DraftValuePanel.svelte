@@ -74,7 +74,7 @@
         {@const value = values[index]}
         {#if value}
           <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
-            <span class="min-w-36 flex-1">
+            <span class="min-w-0 flex-1 sm:min-w-36">
               <span class="block text-sm font-bold">{player.displayName}</span>
               <span class="font-mono text-[10px] text-muted-foreground">
                 OVR {value.baseOverall} · FIT {delta(value.fitDelta)}
