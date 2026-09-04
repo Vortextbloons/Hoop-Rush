@@ -13,28 +13,28 @@ describe('fixed-five command submission', () => {
     const commandId = commandIdSchema.parse('confirm-1');
     const digest = contentHashSchema.parse('a'.repeat(64));
     const revisions: Array<number | undefined> = [];
-    const submitCommand = async (command: {
+    const submitCommand = (command: {
       expectedRevision?: number;
     }): Promise<FixedFiveCommandReceipt> => {
       revisions.push(command.expectedRevision);
       if (command.expectedRevision !== 8) {
-        return {
+        return Promise.resolve({
           roomId,
           commandId,
           ordinal: -1,
           accepted: false,
           rejectionCode: 'stale-revision',
           revision: 8,
-        };
+        });
       }
-      return {
+      return Promise.resolve({
         roomId,
         commandId,
         ordinal: 12,
         accepted: true,
         rejectionCode: null,
         revision: 9,
-      };
+      });
     };
 
     const result = await submitFixedFiveCommand({

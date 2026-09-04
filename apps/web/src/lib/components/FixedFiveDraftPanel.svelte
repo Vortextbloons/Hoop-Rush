@@ -101,6 +101,7 @@
   const rollView = $derived.by((): RollView | null => {
     if (mode === 'sandbox-shared-82') return null;
     if (replay.mode === 'sandbox-shared-82') return null;
+    if (replay.mode === 'sandbox-duel') return null;
     if (replay.mode === 'classic-shared-82') {
       const draft = selfId === 'p1' ? replay.p1 : replay.p2;
       if (draft.status === 'complete' || !draft.roll) {
@@ -167,6 +168,47 @@
     };
   });
 
+  interface SandboxDuelView {
+    label: string;
+    pickOrdinal: number;
+    complete: boolean;
+    turn: boolean;
+    turnText: string;
+    myClaimed: Set<PlayerId>;
+  }
+
+  const sandboxDuelView = $derived.by((): SandboxDuelView | null => {
+    if (mode !== 'duel' || replay.mode !== 'sandbox-duel') return null;
+    const turn = isFixedFiveDraftTurn(replay, selfId);
+    const complete = replay.state.status === 'complete';
+    return {
+      label: `Pick ${Math.min(10, replay.state.pickOrdinal + 1)} of 10`,
+      pickOrdinal: replay.state.pickOrdinal,
+      complete,
+      turn,
+      turnText: complete
+        ? 'Both fives are set.'
+        : turn
+          ? 'Your pick — claim any player.'
+          : 'Opponent is picking…',
+      myClaimed: new Set(
+        replay.state.picks.filter((p) => p.participantId === selfId).map((p) => p.playerId),
+      ),
+    };
+  });
+
+  const sandboxDuelRows = $derived.by((): PlayersIndexEntry[] => {
+    if (!sandboxDuelView || sandboxDuelView.complete) return [];
+    return sortDraftRows(
+      assets.index.players.filter((p) => !sandboxDuelView.myClaimed.has(p.playerId)),
+      presentation,
+    );
+  });
+
+  const sandboxDuelCountLabel = $derived(
+    `${sandboxDuelRows.length} players · ${poolSortLabel(presentation)}`,
+  );
+
   const rollRows = $derived.by((): PlayersIndexEntry[] => {
     if (!rollView || rollView.complete) return [];
     const rows = classicPoolRows(
@@ -192,6 +234,11 @@
 
   const myPicks = $derived.by((): Array<{ playerId: PlayerId; slotIndex: SlotIndex }> => {
     if (replay.mode === 'duel') {
+      return replay.state.picks
+        .filter((p) => p.participantId === selfId)
+        .map((p) => ({ playerId: p.playerId, slotIndex: p.slotIndex }));
+    }
+    if (replay.mode === 'sandbox-duel') {
       return replay.state.picks
         .filter((p) => p.participantId === selfId)
         .map((p) => ({ playerId: p.playerId, slotIndex: p.slotIndex }));
@@ -497,7 +544,49 @@
       onmove={openPickerForCourt}
       onremove={() => undefined}
     />
-    <DraftValuePanel players={resolvedLineupPlayers} />
+    <DraftValuePanel players={resolvedLineupPlayers} {presentation} />
+    <LineupSummaryNav slots={myCourtRows} {pickedCount} />
+  {/if}
+
+  {#if mode === 'duel' && sandboxDuelView && !sandboxDuelView.complete}
+    <div class="min-w-0 rounded-xl bg-surface-1 p-3 sm:p-4">
+      <div class="flex items-center justify-between gap-2">
+        <h3 class="font-display text-sm font-extrabold uppercase">Duel · alternating free picks</h3>
+        <span
+          class="shrink-0 rounded-full px-2.5 py-1 font-mono text-[10px] font-extrabold tracking-[0.14em] uppercase {sandboxDuelView.turn
+            ? 'bg-primary text-primary-foreground'
+            : 'bg-destructive/15 text-destructive'}"
+        >
+          {sandboxDuelView.turn ? 'Your pick' : "Rival's pick"}
+        </span>
+      </div>
+      <p class="mt-1 text-xs text-muted-foreground" role="status">
+        {sandboxDuelView.label} · {sandboxDuelView.turnText} Same player may appear on both teams.
+      </p>
+    </div>
+    <DraftPoolBrowser
+      heading="Global pool"
+      rows={sandboxDuelRows}
+      slots={myCourtRows}
+      countLabel={sandboxDuelCountLabel}
+      filtersEditable={true}
+      manifest={assets.manifest}
+      {presentation}
+      error={null}
+      emptyMessage="No players match."
+      allowDisplacement={false}
+      selectionDisabled={disabled || !sandboxDuelView.turn}
+      onpick={openPicker}
+    />
+    <LineupCourt
+      slots={myCourtRows}
+      manifest={assets.manifest}
+      ready={false}
+      allowRemove={false}
+      onmove={openPickerForCourt}
+      onremove={() => undefined}
+    />
+    <DraftValuePanel players={resolvedLineupPlayers} {presentation} />
     <LineupSummaryNav slots={myCourtRows} {pickedCount} />
   {/if}
 
@@ -531,7 +620,7 @@
       onmove={openPicker}
       onremove={(index) => onRemove(index as SlotIndex)}
     />
-    <DraftValuePanel players={resolvedLineupPlayers} />
+    <DraftValuePanel players={resolvedLineupPlayers} {presentation} />
     {#if !sandboxLocked}
       <div>
         <button

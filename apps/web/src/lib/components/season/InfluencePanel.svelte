@@ -7,16 +7,16 @@
   } from '@hoop-rush/data-contracts';
   import type { InfluenceSpendAffordance } from '$lib/season/season-influence-view';
   const SOURCE_LABEL: Record<SeasonInfluenceSource, string> = {
-    'initial-grant': 'Initial grant',
-    'block-grant': 'Block grant',
-    'objective-reward': 'Objective reward',
-    'campaign-reward': 'Campaign reward',
+    'initial-grant': 'Starting Influence',
+    'block-grant': 'Played block',
+    'objective-reward': 'Goal reward',
+    'campaign-reward': 'Story reward',
     'extra-trade-offer': 'Extra trade offer',
     'trade-inquiry-purchase': 'Trade inquiry',
-    'trade-cash-sent': 'Trade cash sent',
-    'trade-cash-received': 'Trade cash received',
-    'risky-rehab': 'Risky rehab',
-    'free-agent-signing': 'Free-agent signing',
+    'trade-cash-sent': 'Trade Influence sent',
+    'trade-cash-received': 'Trade Influence received',
+    'risky-rehab': 'Injury rehab',
+    'free-agent-signing': 'Signed free agent',
   };
   let {
     balance,
@@ -57,8 +57,8 @@
   }
   function affordanceLabel(affordance: InfluenceSpendAffordance): string {
     return affordance.purpose === 'extra-trade-offer'
-      ? `Buy the extra trade offer (window ${String((affordance.windowIndex ?? 0) + 1)}) for 1 Influence`
-      : 'Run a risky rehab for 2 Influence';
+      ? `Open one more trade talk (window ${String((affordance.windowIndex ?? 0) + 1)}) for 1 Influence`
+      : 'Try to bring an injured player back sooner for 2 Influence';
   }
   const recordedOutcomes = $derived(
     affordances.filter(
@@ -87,39 +87,39 @@
 
   <div class="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
     <p class="text-2xl font-extrabold tabular-nums">{balance}</p>
-    <p class="font-mono text-[10px] text-muted-foreground">
+    <p class="text-xs text-muted-foreground">
       {atCap
-        ? 'at the +8 cap — grants apply 0'
+        ? 'Maxed out — win goals to keep earning after you spend'
         : atFloor
-          ? 'at the 0 floor — spends are rejected'
-          : 'spendable this window'}
+          ? 'Empty — play blocks and hit goals to earn more'
+          : 'Earn it with wins and goals. Spend it on trades and rehab.'}
     </p>
   </div>
 
   {#if affordances.some((affordance) => !affordance.spent)}
     <div class="mt-3 flex flex-col gap-2">
       <p class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-        Spend
+        Use Influence
       </p>
       {#each affordances.filter((affordance) => !affordance.spent) as affordance (affordance.purpose + (affordance.injuryId ?? affordance.windowIndex))}
         <div class="flex flex-wrap items-center justify-between gap-2">
           <div class="min-w-0">
             <p class="text-sm font-semibold">
               {#if affordance.purpose === 'extra-trade-offer'}
-                Extra trade offer
+                Extra trade talk
               {:else if playerName !== null && affordance.playerVersionId !== null}
-                Risky rehab — {playerName(affordance.playerVersionId)}
+                Bring back {playerName(affordance.playerVersionId)}
               {:else}
-                Risky rehab
+                Injury rehab
               {/if}
-              <span class="ml-1 font-mono text-[10px] font-normal text-muted-foreground">
-                cost {affordance.cost} · balance {balance} → {balance - affordance.cost}
+              <span class="ml-1 text-xs font-normal text-muted-foreground">
+                {affordance.cost} Influence
               </span>
             </p>
-            <p class="font-mono text-[10px] text-muted-foreground">
+            <p class="text-xs text-muted-foreground">
               {affordance.purpose === 'extra-trade-offer'
-                ? 'Extra trade offer: Get a 4th offer this window.'
-                : 'Risky rehab: chance to return sooner.'}
+                ? 'Talk to one more team this window.'
+                : 'Chance to return sooner — but it can backfire.'}
             </p>
           </div>
           <button
@@ -128,7 +128,7 @@
             disabled={!affordance.affordable || busy}
             class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {affordance.affordable ? `Spend ${affordance.cost}` : 'Cannot afford'}
+            {affordance.affordable ? `Use ${affordance.cost}` : 'Need more'}
           </button>
         </div>
       {/each}
@@ -138,7 +138,7 @@
   {#if recordedOutcomes.length > 0}
     <div class="mt-4">
       <p class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-        Recorded rehab outcomes
+        Rehab results
       </p>
       <ul class="mt-1 flex flex-col gap-1">
         {#each recordedOutcomes as affordance (affordance.injuryId)}
@@ -146,7 +146,7 @@
             <span class="min-w-0 flex-1 truncate font-semibold">
               {playerName !== null && affordance.playerVersionId !== null
                 ? playerName(affordance.playerVersionId)
-                : 'Risky rehab'}
+                : 'Injury rehab'}
             </span>
             <span
               class="shrink-0 rounded-full px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] {affordance.rehabOutcome ===
@@ -154,7 +154,7 @@
                 ? 'bg-positive/15 text-positive'
                 : 'bg-destructive/15 text-destructive'}"
             >
-              Outcome: {affordance.rehabOutcome}
+              {affordance.rehabOutcome === 'success' ? 'Back sooner' : 'Setback'}
             </span>
           </li>
         {/each}
@@ -165,7 +165,7 @@
   {#if entries.length > 0}
     <div class="mt-4">
       <p class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-        Recent ledger
+        Recent
       </p>
       <ul class="mt-1 flex flex-col divide-y divide-border/50">
         {#each entries as entry (entry.entryId)}
@@ -182,7 +182,7 @@
     </div>
   {/if}
   <p class="sr-only" role="status" aria-live="polite">
-    Influence balance {balance}; {entries.length} recent ledger entries.
+    Influence balance {balance}; {entries.length} recent entries.
   </p>
 </section>
 
@@ -203,8 +203,8 @@
             class="font-display truncate text-lg font-extrabold tracking-tight uppercase"
           >
             {pendingSpend.purpose === 'extra-trade-offer'
-              ? 'Buy the extra trade offer?'
-              : 'Run a risky rehab?'}
+              ? 'Open one more trade talk?'
+              : 'Try to bring them back sooner?'}
           </Dialog.Title>
           <Dialog.Close
             aria-label="Cancel"
@@ -214,8 +214,8 @@
           </Dialog.Close>
         </div>
         <p class="mt-2 text-sm text-muted-foreground">
-          {affordanceLabel(pendingSpend)}. The balance would move to
-          <strong class="text-foreground"> {balance - pendingSpend.cost}</strong> (floor 0).
+          {affordanceLabel(pendingSpend)}. You’ll have
+          <strong class="text-foreground"> {balance - pendingSpend.cost}</strong> left.
         </p>
         <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
           <button
@@ -232,7 +232,7 @@
             disabled={busy}
             class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Confirm spend
+            Confirm
           </button>
         </div>
       </Dialog.Content>

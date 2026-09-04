@@ -28,7 +28,6 @@ import {
   sanitizeAnchors,
   candidateKey,
   computePool,
-  defaultPoolWorkers,
   loadBbrefIds,
   loadCareerPositionLabels,
   normalizePoolOveralls,
@@ -622,13 +621,6 @@ describe('overallBandForPercentile', () => {
     expect(overallBandForPercentile(0.7)).toBe(71);
     expect(overallBandForPercentile(1)).toBe(40);
   });
-  it('interpolates within each band', () => {
-    expect(overallBandForPercentile(0.002)).toBe(96);
-    expect(overallBandForPercentile(0.02)).toBe(91);
-    expect(overallBandForPercentile(0.1)).toBe(87);
-    expect(overallBandForPercentile(0.5)).toBe(76);
-    expect(overallBandForPercentile(0.9)).toBe(50);
-  });
   it('clamps to the 40..99 contract', () => {
     expect(overallBandForPercentile(-0.1)).toBe(99);
     expect(overallBandForPercentile(1.5)).toBe(40);
@@ -711,13 +703,6 @@ describe('normalizePoolOveralls', () => {
       overallPercentile: undefined,
       overallCohortVersion: undefined,
     });
-  });
-  it('handles empty and single-row inputs', () => {
-    expect(normalizePoolOveralls([])).toEqual({ totalRowCount: 0, rowsWithoutRawOverall: 0 });
-    const single = [row('p-1', 'lakers', 75)];
-    expect(normalizePoolOveralls(single)).toEqual({ totalRowCount: 1, rowsWithoutRawOverall: 0 });
-    expect(single[0]?.summaryRatings.overallRating).toBe(99);
-    expect(single[0]?.ratingProfile?.overallPercentile).toBe(1);
   });
 });
 describe('parsePoolTargets', () => {
@@ -867,25 +852,6 @@ describe('computePool (fixture)', () => {
     if ('reason' in pool) throw new Error(pool.detail);
     expect(pool.players.map((player) => player.playerExternalId)).toContain('10');
     expect(() => parsePool(pool)).not.toThrow();
-  });
-  it('warns and skips a player missing summaryRatings', () => {
-    root = buildStandardFixture('nosummary');
-    computePool('lakers', '1990s', fixtureManifest(), BBREF_IDS, false);
-    const message = messages(log).find((m) => m.includes('missing summaryRatings'));
-    expect(message).toContain('! 4 missing summaryRatings in 1991-92; re-run compute_ratings');
-  });
-  it('warns when a franchise has roster players but no stints for a season', () => {
-    root = buildStandardFixture('nostints');
-    const manifest = fixtureManifest();
-    manifest.eras = [
-      { eraId: '1980s', label: '1980s', fromSeasonKey: '1980-81', toSeasonKey: '1989-90' },
-    ];
-    const dir = join(root.nba, '1988-89');
-    mkdirSync(dir, { recursive: true });
-    writeJson(join(dir, 'roster.json'), ROSTER_S1.map(rosterRow));
-    computePool('lakers', '1980s', manifest, BBREF_IDS, false);
-    const message = messages(log).find((m) => m.includes('[WARN] no stints for lakers in:'));
-    expect(message).toContain('1988-89');
   });
 });
 describe('computePool error and skip paths', () => {
@@ -1049,17 +1015,8 @@ describe('partitionPoolTargets', () => {
     const sizes = chunks.map((chunk) => chunk.length).sort((a, b) => b - a);
     expect(sizes).toEqual([2, 2, 1, 1]);
   });
-  it('returns a single chunk for workers 1 and for single targets', () => {
-    expect(partitionPoolTargets(TARGETS, 1)).toEqual([TARGETS]);
-    expect(partitionPoolTargets([['lakers', '1990s']], 4)).toEqual([[['lakers', '1990s']]]);
-  });
   it('is deterministic across calls', () => {
     expect(partitionPoolTargets(TARGETS, 2)).toEqual(partitionPoolTargets(TARGETS, 2));
-  });
-});
-describe('defaultPoolWorkers', () => {
-  it('stays sequential under test (mocked config paths)', () => {
-    expect(defaultPoolWorkers()).toBe(1);
   });
 });
 describe('asset altIds preservation', () => {

@@ -188,7 +188,7 @@
 </svelte:head>
 
 {#if !shell.ready || !shell.snapshot || !run || !humanFranchiseId || !manifest}
-  <p class="py-10 font-mono text-sm text-muted-foreground">Loading block…</p>
+  <p class="py-10 font-mono text-sm text-muted-foreground">Loading Block…</p>
 {:else if loadError}
   <p class="mt-8 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
     Failed to load block: {loadError}
@@ -231,7 +231,7 @@
   >
     <div class="flex items-end justify-between gap-4 px-3 sm:px-0">
       <div>
-        <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">Season Run · Block</p>
+        <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">Season Run</p>
         <h1
           id="checkpoint-heading"
           class="font-display mt-1 text-3xl font-extrabold tracking-tight uppercase"
@@ -314,9 +314,7 @@
                   {#if box}
                     {#if openedBoxScores.has(summary.gameId)}
                       {#await loadBoxScore() then { default: BoxScore }}
-                        <p class="py-2 font-mono text-xs text-muted-foreground">
-                          Loading box score…
-                        </p>
+                        <p class="py-2 text-xs text-muted-foreground">Opening box score…</p>
                         <BoxScore
                           {box}
                           opponentName={shell.franchiseName(opponentId)}
@@ -326,11 +324,6 @@
                           opponentFranchiseId={opponentId}
                         />
                       {/await}
-                      {#if retainedGameIds.includes(summary.gameId)}
-                        <p class="mt-2 font-mono text-[10px] text-muted-foreground">
-                          Full game detail available.
-                        </p>
-                      {/if}
                     {/if}
                   {:else}
                     <p class="text-sm text-muted-foreground">Box score unavailable.</p>
@@ -344,5 +337,5 @@
     </div>
   </section>
 {:else}
-  <p class="py-10 font-mono text-sm text-muted-foreground">Loading block…</p>
+  <p class="py-10 font-mono text-sm text-muted-foreground">Loading Block…</p>
 {/if}

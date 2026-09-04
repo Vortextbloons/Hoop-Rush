@@ -328,11 +328,11 @@ describe('CheckpointRecap (M2.4)', () => {
       },
     });
     const text = container.textContent;
-    expect(text).toContain('Stamina and chemistry');
+    expect(text).toContain('Why it happened');
     expect(text).toContain('Fatigued shooters converted at a lower rate');
-    expect(text).toContain('90 opportunities');
-    expect(text).toContain('Fatigue · swing');
-    expect(text).toContain('-25.00pp');
+    expect(text).toContain('90 plays');
+    expect(text).toContain('Tired legs');
+    expect(text).toContain('pts per 100');
     expect(text).toContain('Chemistry converted passes into assists');
   });
   it('omits the section when no evidence is recorded', () => {
@@ -377,6 +377,6 @@ describe('CheckpointRecap (M2.4)', () => {
         effectsEvidence: [],
       },
     });
-    expect(container.textContent).not.toContain('Stamina and chemistry');
+    expect(container.textContent).not.toContain('Why it happened');
   });
 });

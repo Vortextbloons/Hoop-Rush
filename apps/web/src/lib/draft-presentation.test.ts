@@ -7,11 +7,9 @@ import {
   seasonKeySchema,
 } from '@hoop-rush/data-contracts';
 import {
-  poolSortLabel,
   presentationForVariant,
   ratingBadges,
   sortDraftRows,
-  variantLabel,
 } from './draft-presentation';
 function row(
   partial: Omit<Partial<PlayersIndexEntry>, 'playerId' | 'franchiseId' | 'eraId' | 'seasonKey'> & {
@@ -54,12 +52,6 @@ describe('sortDraftRows', () => {
     const tieB = row({ playerId: 'tie-b', displayName: 'Bob Tie', overall: 80 });
     const sorted = sortDraftRows([low, tieB, high, tieA], 'sandbox');
     expect(sorted.map((r) => r.playerId)).toEqual(['high', 'tie-a', 'tie-b', 'low']);
-  });
-  it('sorts ratings pools exactly like sandbox', () => {
-    const low = row({ playerId: 'low', displayName: 'Aaron Low', overall: 60 });
-    const high = row({ playerId: 'high', displayName: 'Zed High', overall: 92 });
-    const sorted = sortDraftRows([low, high], 'ratings');
-    expect(sorted.map((r) => r.playerId)).toEqual(['high', 'low']);
   });
   it('sorts ball-knowledge pools alphabetically by normalized display name', () => {
     const zed = row({ playerId: 'zed', displayName: 'Zed Zoster', overall: 99 });
@@ -124,19 +116,6 @@ describe('ratingBadges', () => {
     expect(snapshot.offense).toBe(55);
     expect(snapshot.defense).toBe(44);
     expect(ratingBadges(pristine, 'ratings')).toEqual([{ label: 'O', value: 71 }]);
-  });
-});
-describe('poolSortLabel', () => {
-  it('describes the pool sort in the count line', () => {
-    expect(poolSortLabel('sandbox')).toBe('sorted by OVER');
-    expect(poolSortLabel('ratings')).toBe('sorted by OVER');
-    expect(poolSortLabel('ball-knowledge')).toBe('sorted by NAME');
-  });
-});
-describe('variantLabel', () => {
-  it('names the Classic information variants', () => {
-    expect(variantLabel('ratings')).toBe('Ratings');
-    expect(variantLabel('ball-knowledge')).toBe('Ball Knowledge');
   });
 });
 describe('presentationForVariant', () => {

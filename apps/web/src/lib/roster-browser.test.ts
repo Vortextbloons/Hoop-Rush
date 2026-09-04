@@ -8,14 +8,10 @@ import {
 import {
   defaultDirection,
   filterRoster,
-  formatPct,
-  formatPerGame,
   groupRoster,
   lowercaseName,
   paginateGroupedRows,
   paginateItems,
-  perGame,
-  shotPct,
   sortRoster,
   type RosterDetailRow,
 } from './roster-browser';
@@ -291,26 +287,6 @@ describe('paginateGroupedRows', () => {
       { type: 'group', franchiseId: 'bulls', eraId: '1990s', count: 3 },
       { type: 'player', player: rows[2] },
     ]);
-  });
-});
-describe('stat helpers', () => {
-  it('computes per-game values and guards zero games', () => {
-    expect(perGame(row({ playerId: 'a' }).stats, 'points')).toBe(20);
-    expect(
-      perGame(
-        row({ playerId: 'a', stats: { ...row({ playerId: 'x' }).stats, gamesPlayed: 0 } }).stats,
-        'points',
-      ),
-    ).toBe(0);
-  });
-  it('computes shot percentages and guards zero attempts', () => {
-    expect(shotPct(600, 1200)).toBe(0.5);
-    expect(shotPct(0, 0)).toBe(0);
-  });
-  it('formats percentages and per-game values', () => {
-    expect(formatPct(0.5)).toBe('50.0%');
-    expect(formatPct(0)).toBe('0%');
-    expect(formatPerGame(20.55)).toBe('20.6');
   });
 });
 describe('defaultDirection', () => {

@@ -273,9 +273,7 @@
 
 <div class="flex min-w-0 flex-col gap-6 pt-6">
   <header class="px-3 sm:px-0">
-    <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">
-      Season Run · free agency
-    </p>
+    <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">Season Run</p>
     <h1 class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase sm:text-3xl">
       Free Agency
     </h1>

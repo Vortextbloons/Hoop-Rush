@@ -268,15 +268,15 @@
   {:else}
     <section aria-labelledby="workspace-heading" class="flex min-w-0 flex-col gap-6 px-3 sm:px-0">
       <div>
-        <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">Season Run · team</p>
+        <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">Your team</p>
         <h2
           id="workspace-heading"
           class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase sm:text-3xl"
         >
-          Rotation workspace
+          Lineup
         </h2>
-        <p class="mt-1 font-mono text-[10px] text-muted-foreground">
-          10 play. Swap inactives in. Locks when block starts.
+        <p class="mt-1 text-xs text-muted-foreground">
+          10 play. Changes save here and play from the Hub.
         </p>
       </div>
 
@@ -403,13 +403,13 @@
       >
         <p class="min-w-0 text-sm" aria-live="polite">
           {#if failures.length === 0}
-            <span class="font-semibold text-positive">Rotation valid</span>
+            <span class="font-semibold text-positive">Lineup ready</span>
             <span class="ml-2 hidden text-muted-foreground sm:inline">
-              Locks when the next block submits.
+              Playing uses this lineup.
             </span>
           {:else}
             <span class="font-semibold text-destructive">
-              Rotation invalid — {failures.length} issue{failures.length === 1 ? '' : 's'}
+              Lineup needs work — {failures.length} issue{failures.length === 1 ? '' : 's'}
             </span>
           {/if}
         </p>
@@ -423,10 +423,12 @@
           class="inline-flex w-full min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
         >
           {shell.block.phase === 'running'
-            ? 'Simulating block…'
+            ? 'Playing block…'
             : submitting
-              ? 'Preparing block…'
-              : 'Lock & simulate block'}
+              ? 'Getting ready…'
+              : shell.nextBlockIndex === null
+                ? 'Play block'
+                : `Play Block ${String(shell.nextBlockIndex + 1)}`}
         </button>
       </div>
     </div>

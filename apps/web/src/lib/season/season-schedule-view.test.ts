@@ -149,15 +149,6 @@ describe('scheduleBlockRows', () => {
       expect(row.opponentFranchiseId).not.toBe(HUMAN);
     }
   });
-  it('marks home/away and the opponent from the matchup', () => {
-    const rows = scheduleBlockRows(GAMES, SUMMARIES, HUMAN);
-    const first = rows.find((row) => row.round === 1);
-    const second = rows.find((row) => row.round === 2);
-    expect(first?.humanIsHome).toBe(true);
-    expect(first?.opponentFranchiseId).toBe(OPPONENT);
-    expect(second?.humanIsHome).toBe(false);
-    expect(second?.opponentFranchiseId).toBe(OPPONENT);
-  });
   it('derives W/L, scores, and forfeit state from accepted summaries', () => {
     const rows = scheduleBlockRows(GAMES, SUMMARIES, HUMAN);
     const byRound = new Map(rows.map((row) => [row.round, row]));

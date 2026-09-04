@@ -8,13 +8,17 @@ import {
   seedSchema,
 } from '@hoop-rush/data-contracts';
 import type { FixedFiveCommand } from '@hoop-rush/data-contracts';
-import type { DuelDraftState } from '@hoop-rush/engine';
+import { createEngineContext, type DuelDraftState } from '@hoop-rush/engine';
 import {
   computeDueAutopick,
   deriveEffectivePhase,
   isDraftComplete,
   isFixedFiveDraftTurn,
   mergeFixedFiveCommands,
+  pickOrdinalOf,
+  picksCommittedOf,
+  refsForParticipant,
+  replayFixedFiveLog,
   restoreFixedFiveCommandSyncState,
   roomLogFacts,
   type DraftReplay,
@@ -198,6 +202,125 @@ describe('deriveEffectivePhase', () => {
       },
     });
     expect(isDraftComplete(done)).toBe(true);
+  });
+});
+
+describe('sandbox duel replay', () => {
+  function poolAssets(): FixedFiveAssets {
+    const defs: Array<{ playerId: string; positions: Array<'PG' | 'SG' | 'SF' | 'PF' | 'C'> }> = [
+      { playerId: 'player-g1', positions: ['PG'] },
+      { playerId: 'player-g2', positions: ['SG'] },
+      { playerId: 'player-g3', positions: ['PG', 'SG'] },
+      { playerId: 'player-f1', positions: ['SF'] },
+      { playerId: 'player-f2', positions: ['PF'] },
+      { playerId: 'player-f3', positions: ['SF', 'PF'] },
+      { playerId: 'player-c1', positions: ['C'] },
+      { playerId: 'player-c2', positions: ['PF', 'C'] },
+    ];
+    const pool = defs.map((d, index) => ({
+      playerId: playerIdSchema.parse(d.playerId),
+      playerVersionId: `pv-${d.playerId}`,
+      positions: d.positions,
+      selectionScore: 80 - index,
+      franchiseId: franchiseIdSchema.parse('lakers'),
+      eraId: eraIdSchema.parse('1990s'),
+    }));
+    return {
+      pool,
+      poolById: new Map(pool.map((c) => [c.playerId, c])),
+      catalog: [
+        {
+          franchiseId: franchiseIdSchema.parse('lakers'),
+          eraId: eraIdSchema.parse('1990s'),
+          players: pool.map((c) => ({ playerId: c.playerId, positions: [...c.positions] })),
+        },
+      ],
+      context: createEngineContext(),
+    } as unknown as FixedFiveAssets;
+  }
+
+  function place(ordinal: number, actor: 'p1' | 'p2', playerId: string, slotIndex: number) {
+    return command(ordinal, actor, {
+      kind: 'sandbox-place',
+      playerId: playerIdSchema.parse(playerId),
+      slotIndex,
+    });
+  }
+
+  it('replays alternating free picks from sandbox-place commands', () => {
+    const replay = replayFixedFiveLog(
+      'duel',
+      ROOM,
+      ROOT,
+      'data-v1',
+      'ratings',
+      poolAssets(),
+      [
+        command(0, 'p1', { kind: 'start' }),
+        place(1, 'p1', 'player-g1', 0),
+        place(2, 'p2', 'player-g2', 1),
+      ],
+      'sandbox',
+    );
+    expect(replay.mode).toBe('sandbox-duel');
+    if (replay.mode !== 'sandbox-duel') return;
+    expect(replay.skipped).toBe(0);
+    expect(replay.state.picks.map((p) => [p.participantId, p.playerId])).toEqual([
+      ['p1', playerIdSchema.parse('player-g1')],
+      ['p2', playerIdSchema.parse('player-g2')],
+    ]);
+    expect(isDraftComplete(replay)).toBe(false);
+    expect(isFixedFiveDraftTurn(replay, 'p1')).toBe(true);
+    expect(isFixedFiveDraftTurn(replay, 'p2')).toBe(false);
+    expect(picksCommittedOf(replay, 'p1')).toBe(1);
+    expect(pickOrdinalOf(replay, 'p1')).toBe(2);
+  });
+
+  it('lets both duelists share a star, ignores roll-era commands, and counts illegal claims', () => {
+    const replay = replayFixedFiveLog(
+      'duel',
+      ROOM,
+      ROOT,
+      'data-v1',
+      'ratings',
+      poolAssets(),
+      [
+        command(0, 'p1', { kind: 'start' }),
+        place(1, 'p1', 'player-g1', 0),
+        place(2, 'p2', 'player-g1', 0),
+        command(3, 'p2', { kind: 'reroll', axis: 'franchise' }),
+        command(4, 'p1', {
+          kind: 'duel-claim',
+          playerId: playerIdSchema.parse('player-g2'),
+          slotIndex: 1,
+          franchiseId: franchiseIdSchema.parse('lakers'),
+          eraId: eraIdSchema.parse('1990s'),
+        }),
+        place(5, 'p1', 'player-g1', 1),
+      ],
+      'sandbox',
+    );
+    expect(replay.mode).toBe('sandbox-duel');
+    if (replay.mode !== 'sandbox-duel') return;
+    expect(replay.skipped).toBe(1);
+    expect(replay.state.picks).toHaveLength(2);
+    const refs = refsForParticipant(replay, poolAssets(), 'p2');
+    expect(refs).toHaveLength(1);
+    expect(refs[0]?.slotIndex).toBe(0);
+  });
+
+  it('keeps classic-sourced duels on the roll draft', () => {
+    const replay = replayFixedFiveLog(
+      'duel',
+      ROOM,
+      ROOT,
+      'data-v1',
+      'ratings',
+      poolAssets(),
+      [command(0, 'p1', { kind: 'start' }), place(1, 'p1', 'player-g1', 0)],
+      'classic',
+    );
+    expect(replay.mode).toBe('duel');
   });
 });
 

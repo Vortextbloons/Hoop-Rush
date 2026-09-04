@@ -12,6 +12,8 @@ const FRANCHISE_STRIP = '[data-axis="franchise"] .reel-strip';
 const ERA_STRIP = '[data-axis="era"] .reel-strip';
 const LIVE_REGION = '[aria-live="polite"]';
 const ANNOUNCE_TEXT = 'Round 3 of 5 · Los Angeles Lakers · 1990s';
+const SPIN_SETTLE_MS = 2100;
+const FULL_CYCLE_MS = SPIN_SETTLE_MS + 850;
 const MANIFEST = buildManifest();
 interface ReelProps {
   manifest: HoopRushManifest;
@@ -66,7 +68,7 @@ describe('ClassicRollReel', () => {
     expect(franchiseStrip?.classList.contains('reel-spinning')).toBe(true);
     expect(eraStrip?.classList.contains('reel-spinning')).toBe(true);
     expect(container.querySelector(LIVE_REGION)?.textContent).toBe('');
-    await vi.advanceTimersByTimeAsync(950);
+    await vi.advanceTimersByTimeAsync(SPIN_SETTLE_MS);
     expect(container.querySelector(FRANCHISE_STRIP)).toBeNull();
     expect(container.querySelector(RESULT)).not.toBeNull();
     expect(container.querySelector(RESULT)?.textContent).toContain('Los Angeles Lakers');
@@ -94,7 +96,7 @@ describe('ClassicRollReel', () => {
       expect(container.querySelector(spinning)?.classList.contains('reel-spinning')).toBe(true);
       expect(container.querySelector(idle)?.classList.contains('reel-spinning')).toBe(false);
       expect(container.querySelector(idle)?.textContent).toContain(idleText);
-      await vi.advanceTimersByTimeAsync(950);
+      await vi.advanceTimersByTimeAsync(SPIN_SETTLE_MS);
       expect(container.querySelector(RESULT)).not.toBeNull();
       await vi.advanceTimersByTimeAsync(850);
       expect(onSettled).toHaveBeenCalledTimes(1);
@@ -105,7 +107,7 @@ describe('ClassicRollReel', () => {
     await rerender({ spinKey: 1 });
     const liveRegion = container.querySelector(LIVE_REGION);
     expect(liveRegion?.textContent).toBe('');
-    await vi.advanceTimersByTimeAsync(950);
+    await vi.advanceTimersByTimeAsync(SPIN_SETTLE_MS);
     expect(liveRegion?.textContent).toBe(ANNOUNCE_TEXT);
     await vi.advanceTimersByTimeAsync(5000);
     expect(liveRegion?.textContent).toBe(ANNOUNCE_TEXT);
@@ -113,10 +115,10 @@ describe('ClassicRollReel', () => {
   it('fires onSettled exactly once per spin', async () => {
     const { rerender, onSettled } = renderReel();
     await rerender({ spinKey: 1 });
-    await vi.advanceTimersByTimeAsync(1800);
+    await vi.advanceTimersByTimeAsync(FULL_CYCLE_MS);
     expect(onSettled).toHaveBeenCalledTimes(1);
     await rerender({ spinKey: 2 });
-    await vi.advanceTimersByTimeAsync(1800);
+    await vi.advanceTimersByTimeAsync(FULL_CYCLE_MS);
     expect(onSettled).toHaveBeenCalledTimes(2);
   });
   it('reduced motion fades to the result and closes without strip motion', async () => {
@@ -156,7 +158,7 @@ describe('ClassicRollReel', () => {
   it('closes immediately when the settled overlay is clicked', async () => {
     const { container, rerender, onSettled } = renderReel();
     await rerender({ spinKey: 1 });
-    await vi.advanceTimersByTimeAsync(950);
+    await vi.advanceTimersByTimeAsync(SPIN_SETTLE_MS);
     const overlay = container.querySelector(OVERLAY);
     expect(overlay).not.toBeNull();
     expect(container.querySelector('.roll-continue')).not.toBeNull();
@@ -173,7 +175,7 @@ describe('ClassicRollReel', () => {
   it('closes when the Continue button is clicked', async () => {
     const { container, rerender, onSettled } = renderReel();
     await rerender({ spinKey: 1 });
-    await vi.advanceTimersByTimeAsync(950);
+    await vi.advanceTimersByTimeAsync(SPIN_SETTLE_MS);
     const button = container.querySelector('.roll-continue');
     expect(button).not.toBeNull();
     expect(onSettled).not.toHaveBeenCalled();
@@ -193,7 +195,7 @@ describe('ClassicRollReel', () => {
     expect(franchiseStrip?.classList.contains('reel-fade')).toBe(true);
     expect(franchiseStrip?.textContent).toContain('Los Angeles Lakers');
     expect(eraStrip?.classList.contains('reel-spinning')).toBe(true);
-    await vi.advanceTimersByTimeAsync(950);
+    await vi.advanceTimersByTimeAsync(SPIN_SETTLE_MS);
     expect(container.querySelector(RESULT)).not.toBeNull();
     expect(container.querySelector(LIVE_REGION)?.textContent).toBe(ANNOUNCE_TEXT);
     expect(onSettled).not.toHaveBeenCalled();
@@ -211,7 +213,7 @@ describe('ClassicRollReel', () => {
       expect(container.querySelector('.roll-spot')?.textContent).toBe(text);
       expect(container.querySelector('.roll-stage')?.classList.contains(stageClass)).toBe(true);
       await rerender({ spinKey: 1 });
-      await vi.advanceTimersByTimeAsync(2000);
+      await vi.advanceTimersByTimeAsync(FULL_CYCLE_MS);
     },
   );
   it('renders no spotlight pill without the spotlight prop', () => {
@@ -223,7 +225,7 @@ describe('ClassicRollReel', () => {
     async (axis) => {
       const { container, rerender } = renderReel({ axis });
       await rerender({ spinKey: 1 });
-      await vi.advanceTimersByTimeAsync(950);
+      await vi.advanceTimersByTimeAsync(SPIN_SETTLE_MS);
       expect(container.querySelector(RESULT)?.classList.contains(`roll-result--${axis}`)).toBe(
         true,
       );
@@ -240,7 +242,7 @@ describe('ClassicRollReel', () => {
     const franchiseStrip = container.querySelector(FRANCHISE_STRIP);
     expect(franchiseStrip?.textContent).toContain('SEA → OKC');
     expect(franchiseStrip?.textContent).toContain('Seattle SuperSonics → Oklahoma City Thunder');
-    await vi.advanceTimersByTimeAsync(950);
+    await vi.advanceTimersByTimeAsync(SPIN_SETTLE_MS);
     const result = container.querySelector(RESULT);
     expect(result?.textContent).toContain('SEA → OKC');
     expect(result?.textContent).toContain('Seattle SuperSonics → Oklahoma City Thunder');

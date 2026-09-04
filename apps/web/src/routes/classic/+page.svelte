@@ -392,12 +392,6 @@
     </div>
     <div class="flex shrink-0 items-center gap-3">
       <a
-        href={resolve('/multiplayer')}
-        class="rounded-lg bg-primary px-3 py-1.5 font-mono text-xs font-bold text-primary-foreground hover:opacity-90"
-      >
-        Play online →
-      </a>
-      <a
         href={resolve('/')}
         class="shrink-0 font-mono text-xs text-muted-foreground underline-offset-4 hover:underline"
       >
@@ -417,7 +411,7 @@
     </div>
   {:else if !manifest}
     <div class="mt-8">
-      <AsyncState kind="loading" title="Loading…" message="Loading…" />
+      <AsyncState kind="loading" title="Loading players…" message="Getting rosters ready." />
     </div>
   {:else}
     {#if indexError}
@@ -431,7 +425,7 @@
       </div>
     {:else if !index}
       <div class="mt-8">
-        <AsyncState kind="loading" title="Loading…" message="Loading…" />
+        <AsyncState kind="loading" title="Loading players…" message="Getting rosters ready." />
       </div>
     {:else if draftError}
       <div class="mt-8">
@@ -444,7 +438,7 @@
       </div>
     {:else if !draftLoaded}
       <div class="mt-8">
-        <AsyncState kind="loading" title="Loading…" message="Loading…" />
+        <AsyncState kind="loading" title="Loading draft…" message="Picking up your picks." />
       </div>
     {:else if !draft}
       <div class="mt-10 flex flex-col gap-6 pb-32">
@@ -534,7 +528,6 @@
             {spinKey}
             announceText={reelAnnouncement}
             roundLabel={`Round ${draft.round} of 5`}
-            spinDurationMs={draft.round === 1 ? undefined : 500}
             onSettled={onReelSettled}
           />
         {/if}
@@ -615,7 +608,7 @@
               disabled={starting}
               class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              Retry starting the simulation
+              {starting ? 'Starting…' : launchError ? 'Try again' : 'Start season'}
             </button>
           </div>
         {/if}
@@ -628,7 +621,7 @@
           onmove={openPicker}
           onremove={() => undefined}
         />
-        <DraftValuePanel players={resolvedDraftPlayers} />
+        <DraftValuePanel players={resolvedDraftPlayers} {presentation} />
 
         <LineupSummaryNav {slots} {pickedCount} />
       </div>
@@ -637,7 +630,7 @@
 
   {#if pickerPlayer}
     {#await loadSlotPickerDialog() then { default: SlotPickerDialog }}
-      <p class="px-4 py-3 font-mono text-xs text-muted-foreground">Loading…</p>
+      <p class="px-4 py-3 font-mono text-xs text-muted-foreground">Opening lineup picker…</p>
       <SlotPickerDialog
         player={pickerPlayer}
         {slots}

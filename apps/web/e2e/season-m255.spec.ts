@@ -58,14 +58,14 @@ test.describe('season m2.5.5: campaign and trade board', () => {
 
       await draftFull(page);
 
-      // after 10 picks, finalize is auto? Check for Generate AI league
-      const genBtn = page.getByRole('button', { name: /Generate AI league/ });
+      // after 10 picks, finalize is auto? Check for Build league
+      const genBtn = page.getByRole('button', { name: /Build league/ });
       if (await genBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
         await genBtn.click();
-        await expect(page.getByRole('button', { name: /Open the league hub/ })).toBeVisible({
+        await expect(page.getByRole('button', { name: /Start season/ })).toBeVisible({
           timeout: 20000,
         });
-        await page.getByRole('button', { name: /Open the league hub/ }).click();
+        await page.getByRole('button', { name: /Start season/ }).click();
       } else {
         // already on hub?
         await page.goto('/season/run');
@@ -92,11 +92,11 @@ test.describe('season m2.5.5: campaign and trade board', () => {
       await expect(firstOpp).toContainText('Selected', { timeout: 5000 });
 
       // Submit block
-      const submitBtn = page.getByRole('button', { name: /Lock rotation and simulate block/ });
+      const submitBtn = page.getByRole('button', { name: /Play Block/ });
       await expect(submitBtn).toBeEnabled({ timeout: 5000 });
       await submitBtn.click();
       // wait for block complete — progress or recap
-      await expect(page.getByText(/Simulating block/))
+      await expect(page.getByText(/Playing block/))
         .toBeVisible({ timeout: 5000 })
         .catch(() => {});
       await expect(page.locator('[data-season-checkpoint-block="0"]'))
@@ -158,10 +158,10 @@ test.describe('season m2.5.5: campaign and trade board', () => {
         await page.getByRole('link', { name: /Start season run/ }).click();
         await page.getByRole('button', { name: 'Start draft' }).click();
         await draftFull(page);
-        const genBtn2 = page.getByRole('button', { name: /Generate AI league/ });
+        const genBtn2 = page.getByRole('button', { name: /Build league/ });
         if (await genBtn2.isVisible({ timeout: 5000 }).catch(() => false)) {
           await genBtn2.click();
-          await page.getByRole('button', { name: /Open the league hub/ }).click();
+          await page.getByRole('button', { name: /Start season/ }).click();
         }
         await page.waitForURL(/\/season\/run/);
         const idPicker = page.getByTestId('gm-identity-picker');

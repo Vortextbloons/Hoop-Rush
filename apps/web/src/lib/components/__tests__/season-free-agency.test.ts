@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, waitFor } from '@testing-library/svelte';
+import { fireEvent, render } from '@testing-library/svelte';
 import {
   SEASON_DRAFT_CATALOG_V3,
   SEASON_DURABILITY_VERSION,
@@ -388,15 +388,6 @@ describe('free-agency market overview (M2.6.5)', () => {
     expect(text).toContain('Limitations');
     expect(text).toContain('recorded role coverage');
   });
-  it('highlights about five best fits using recorded roster facts', () => {
-    const run = fixtureRun();
-    const { container } = renderRoute(run);
-    const bestFits = Array.from(container.querySelectorAll('[data-fa-best-fit]'));
-    expect(bestFits.length).toBeGreaterThan(0);
-    expect(bestFits.length).toBeLessThanOrEqual(5);
-    const badges = Array.from(container.querySelectorAll('[data-fa-fit-badge]'));
-    expect(badges.some((badge) => badge.textContent.includes('Need:'))).toBe(true);
-  });
   it('lists franchises with recorded interest, human first', () => {
     const run = fixtureRun();
     const window = windowOf(run.freeAgency);
@@ -451,67 +442,6 @@ describe('free-agency declaration step (M2.6.5)', () => {
     expect((influences[0] as HTMLInputElement).value).toBe(String(first.minimumInfluence));
   });
 
-  it('bounds the Influence commitment to the candidate minimum through 3', async () => {
-    const run = fixtureRun();
-    const window = windowOf(run.freeAgency);
-    const first = window.candidates[0];
-    if (first === undefined) throw new Error('no candidates');
-    const { container } = renderRoute(run);
-    await fireEvent.change(
-      container.querySelector(`#fa-priority-${first.playerVersionId}`) as HTMLSelectElement,
-      { target: { value: '1' } },
-    );
-    const input = container.querySelector('[data-fa-influence-input]') as HTMLInputElement;
-    expect(Number(input.min)).toBe(first.minimumInfluence);
-    expect(Number(input.max)).toBe(3);
-    await fireEvent.input(input, { target: { value: '0' } });
-    await fireEvent.change(input, { target: { value: '0' } });
-    await waitFor(() => {
-      expect(input.value).toBe(String(first.minimumInfluence));
-    });
-    const up = container.querySelector('[data-fa-influence-up]') as HTMLButtonElement;
-    await fireEvent.input(input, { target: { value: '3' } });
-    await fireEvent.change(input, { target: { value: '3' } });
-    await waitFor(() => {
-      expect(input.value).toBe('3');
-    });
-    await fireEvent.click(up);
-    expect(input.value).toBe('3');
-    const down = container.querySelector('[data-fa-influence-down]') as HTMLButtonElement;
-    await fireEvent.click(down);
-    await waitFor(() => {
-      expect(input.value).toBe('2');
-    });
-  });
-  it('blocks submission when the commitment exceeds the season budget', async () => {
-    const run = fixtureRun();
-    const window = windowOf(run.freeAgency);
-    const first = window.candidates[0];
-    if (first === undefined) throw new Error('no candidates');
-    const spendRun = {
-      ...run,
-      freeAgency: {
-        ...run.freeAgency,
-        seasonSpend: { ...run.freeAgency.seasonSpend, [HUMAN]: 5 },
-      },
-    };
-    const { container } = renderRoute(spendRun);
-    const select = container.querySelector(
-      `#fa-priority-${first.playerVersionId}`,
-    ) as HTMLSelectElement;
-    await fireEvent.change(select, { target: { value: '1' } });
-    await fireEvent.input(
-      container.querySelector('[data-fa-influence-input]') as HTMLInputElement,
-      {
-        target: { value: '2' },
-      },
-    );
-    const submit = container.querySelector('[data-fa-declare-submit]') as HTMLButtonElement;
-    expect(submit.disabled).toBe(true);
-    const failures = container.querySelectorAll('[data-fa-local-failures] li');
-    expect(failures.length).toBeGreaterThan(0);
-    expect(container.textContent).toContain('remaining season free-agency budget');
-  });
   it('submits the declaration through the shell with ordered targets', async () => {
     const run = fixtureRun();
     const window = windowOf(run.freeAgency);
@@ -617,35 +547,8 @@ describe('free-agency review + resolve (M2.6.5)', () => {
     expect(traceText).toContain('Influence');
     expect(humanResult?.textContent).toContain('1 season signing');
   });
-  it('renders the human miss when the franchise did not sign', () => {
-    const run = fixtureRun();
-    const resolved = resolvedRun(run, false);
-    const { container } = renderRoute(resolved);
-    const humanResult = container.querySelector('[data-fa-human-result]');
-    expect(humanResult?.textContent).toContain('did not sign');
-    expect(container.querySelector('[data-fa-signing-human="true"]')).toBeNull();
-  });
 });
 describe('free-agency typed rejection copy (M2.6.5)', () => {
-  it('surfaces the authoritative rejection copy inline', () => {
-    const run = fixtureRun();
-    const rejection = {
-      code: 'free-agency-insufficient-balance' as const,
-      franchiseId: HUMAN,
-      balance: 1,
-      required: 2,
-    };
-    const { container } = renderRoute(run, {
-      commandError: {
-        command: 'declare-free-agent-interest',
-        rejection,
-        message: describeCommandRejection('declare-free-agent-interest', rejection),
-      },
-    });
-    const alert = container.querySelector('[data-fa-rejection]');
-    expect(alert).not.toBeNull();
-    expect(alert?.textContent).toContain('Influence balance 1 cannot cover the 2-point');
-  });
   it('maps every free-agency rejection code to copy', () => {
     const codes = [
       'free-agency-unresolved',

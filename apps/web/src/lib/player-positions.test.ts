@@ -13,13 +13,4 @@ describe('formatPositions', () => {
   it('never collapses coarse groups', () => {
     expect(formatPositions(['F', 'G'])).toBe('F/G');
   });
-  it('memoizes by the positions array identity with identical output', () => {
-    const positions = ['PG', 'SG'] as const;
-    const first = formatPositions(positions);
-    const second = formatPositions(positions);
-    expect(second).toBe(first);
-    expect(second).toBe('PG/SG');
-    const other = formatPositions(['PG', 'SG']);
-    expect(other).toBe('PG/SG');
-  });
 });

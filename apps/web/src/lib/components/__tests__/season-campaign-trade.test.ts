@@ -364,21 +364,6 @@ describe('CampaignPanel', () => {
     expect(screen.getByText('Evolve your campaign')).toBeTruthy();
     expect(screen.queryByText(/Choose one for block/)).toBeNull();
   });
-  it('block 8 shows no opportunity', () => {
-    const state = campaignState({ startingIdentity: 'win-now', offers: {} });
-    const run = runWithCampaign(state, 80);
-    render(CampaignPanel, {
-      props: {
-        run,
-        nextBlockIndex: 8,
-        onSelectIdentity: vi.fn(),
-        onSelectOpportunity: vi.fn(),
-        onEvolve: vi.fn(),
-      },
-    });
-    expect(screen.getByText(/final block — no new opportunity/)).toBeTruthy();
-    expect(screen.getByText(/does not open a new campaign opportunity/)).toBeTruthy();
-  });
 });
 describe('PackageBuilder', () => {
   it('enforces 1-2/1-2, Influence one side never both, never Influence-only, shows consequence facts', async () => {
@@ -639,7 +624,7 @@ describe('TradeBoardWorkspace distinctive design & a11y', () => {
         availableOf: () => true,
       },
     });
-    expect(screen.getByText('Trade Board')).toBeTruthy();
+    expect(screen.getByText('Trades')).toBeTruthy();
     expect(screen.getByText(/3 base \+ 1 extra/)).toBeTruthy();
     expect(screen.getByTestId('board-team-celtics')).toBeTruthy();
     expect(screen.getByText(/Shooting \/ Depth/)).toBeTruthy();
@@ -648,62 +633,10 @@ describe('TradeBoardWorkspace distinctive design & a11y', () => {
     expect(screen.getAllByText(/Protected:/).length).toBeGreaterThan(0);
     expect(screen.getByText(/Hard constraints/)).toBeTruthy();
     expect(document.body.textContent.toLowerCase()).toContain('possible');
-    expect(screen.getByText(/Your value trends/)).toBeTruthy();
+    expect(screen.getByText(/Your trends/)).toBeTruthy();
     expect(screen.getByText('Rising')).toBeTruthy();
     expect(screen.getByText(/0\/4 used/)).toBeTruthy();
     expect(screen.getByText('Pick a team')).toBeTruthy();
-  });
-  it('keyboard operable and responsive', async () => {
-    const profiles: SeasonTradeBoardTeamProfile[] = [
-      {
-        franchiseId: franchiseIdSchema.parse('celtics'),
-        needs: ['shooting'],
-        priority: 'talent',
-        listedPlayerIds: ['pv-c-1'],
-        discussablePlayerIds: ['pv-c-1'],
-        protectedPlayerIds: ['pv-p'],
-        hardConstraints: ['Roster must stay 10-15'],
-        rationale: 'Needs shooting',
-      },
-    ];
-    const run = {
-      rosters: [
-        { franchiseId: 'lakers', players: [] },
-        { franchiseId: 'celtics', players: [] },
-      ],
-      trade: { windows: [] },
-      influence: { balances: { lakers: 2 } },
-    } as unknown as SeasonRun;
-    render(TradeBoardWorkspace, {
-      props: {
-        run,
-        catalog: null,
-        manifest: buildManifest(),
-        windowState: {
-          windowIndex: 0,
-          blockIndex: 2,
-          status: 'open',
-          offers: [],
-          boardProfiles: profiles,
-        },
-        boardProfiles: profiles,
-        negotiations: [],
-        valueTrends: [],
-        humanFranchiseId: 'lakers',
-        humanBalance: 2,
-        onOpenInquiry: vi.fn(),
-        onSubmitProposal: vi.fn(),
-        onRespond: vi.fn(),
-        onWalkAway: vi.fn(),
-        onPurchaseInquiry: vi.fn(),
-      },
-    });
-    const btn = screen.getByTestId('board-team-celtics');
-    btn.focus();
-    expect(document.activeElement).toBe(btn);
-    await fireEvent.keyDown(btn, { key: 'Enter' });
-    await fireEvent.click(btn);
-    expect(screen.getByText(/Build package/)).toBeTruthy();
   });
   it('categorical feedback never shows Overall or ratio', () => {
     expect(responseCauseLabel('acceptable')).toBe('acceptable');

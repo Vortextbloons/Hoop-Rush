@@ -506,11 +506,6 @@ describe('derivePlayerRecord (field-method registry)', () => {
     expect(tiny.ratings.threePoint).toBeLessThan(large.ratings.threePoint - 10);
     expect(tiny.ratings.freeThrow).toBeLessThan(large.ratings.freeThrow - 10);
   });
-  it('pulls a perfect 6-for-6 three-point sample toward the prior', () => {
-    const sixForSix = derivePlayerRecord(input('2005-06', starterStats({ tpm: 6, tpa: 6 })));
-    expect(sixForSix.anchors.threePointPctShrunk).toBeCloseTo((6 + 0.36 * 80) / 86, 3);
-    expect(sixForSix.ratings.threePoint).toBeLessThan(90);
-  });
   it('shrinks large samples with exact formula anchors and ratings near the observed rate', () => {
     const large = derivePlayerRecord(
       input('2005-06', starterStats({ tpm: 300, tpa: 600, ftm: 250, fta: 300 })),

@@ -298,12 +298,6 @@
     </div>
     <div class="flex shrink-0 items-center gap-3">
       <a
-        href={resolve('/multiplayer')}
-        class="rounded-lg bg-primary px-3 py-1.5 font-mono text-xs font-bold text-primary-foreground hover:opacity-90"
-      >
-        Play online →
-      </a>
-      <a
         href={resolve('/')}
         class="shrink-0 font-mono text-xs text-muted-foreground underline-offset-4 hover:underline"
       >
@@ -323,7 +317,7 @@
     </div>
   {:else if !manifest}
     <div class="mt-8">
-      <AsyncState kind="loading" title="Loading…" message="Loading…" />
+      <AsyncState kind="loading" title="Loading players…" message="Getting rosters ready." />
     </div>
   {:else}
     {#if indexError}
@@ -337,7 +331,7 @@
       </div>
     {:else if !index}
       <div class="mt-8">
-        <AsyncState kind="loading" title="Loading…" message="Loading…" />
+        <AsyncState kind="loading" title="Loading players…" message="Getting rosters ready." />
       </div>
     {:else}
       <div class="mt-10 flex flex-col gap-6 pb-32">
@@ -555,7 +549,7 @@
           onmove={openPicker}
           onremove={removePlayer}
         />
-        <DraftValuePanel players={resolvedDraftPlayers} />
+        <DraftValuePanel players={resolvedDraftPlayers} presentation="sandbox" />
         {#if ready}
           <div>
             <button
@@ -577,7 +571,7 @@
 
   {#if pickerPlayer}
     {#await loadSlotPickerDialog() then { default: SlotPickerDialog }}
-      <p class="px-4 py-3 font-mono text-xs text-muted-foreground">Loading…</p>
+      <p class="px-4 py-3 font-mono text-xs text-muted-foreground">Opening lineup picker…</p>
       <SlotPickerDialog
         player={pickerPlayer}
         {slots}

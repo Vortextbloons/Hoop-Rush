@@ -211,11 +211,11 @@
     </div>
   {:else if !run}
     <div class="mt-8">
-      <AsyncState kind="loading" title="Loading…" message="Loading…" />
+      <AsyncState kind="loading" title="Loading season…" message="Getting your run ready." />
     </div>
   {:else if phase === 'starting'}
     <div class="mt-8">
-      <AsyncState kind="loading" title="Running simulations…" message="Simulating…" />
+      <AsyncState kind="loading" title="Warming up…" message="Simulating games." />
     </div>
   {:else}
     <ChallengeOverlay

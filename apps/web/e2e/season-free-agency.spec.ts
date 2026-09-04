@@ -6,10 +6,8 @@ const planner = new DraftPlanner();
 async function simulateNextBlock(page: import('@playwright/test').Page): Promise<void> {
   const phase = page.locator('[data-block-phase]');
   await expect(phase).toHaveAttribute('data-block-phase', 'ready', { timeout: 30_000 });
-  await expect(
-    page.getByRole('button', { name: 'Lock rotation and simulate block' }),
-  ).toBeEnabled();
-  await page.getByRole('button', { name: 'Lock rotation and simulate block' }).click();
+  await expect(page.getByRole('button', { name: /Play Block/ })).toBeEnabled();
+  await page.getByRole('button', { name: /Play Block/ }).click();
   await expect(phase).not.toHaveAttribute('data-block-phase', 'ready', { timeout: 30_000 });
   await expect(phase).toHaveAttribute('data-block-phase', 'ready', { timeout: 300_000 });
 }
@@ -42,8 +40,8 @@ test.describe('season run: free agency market', () => {
       await expect(page.getByText('10 of 10 picked')).toBeVisible();
 
       await page.getByRole('button', { name: 'Finalize my roster' }).click();
-      await expect(page.getByRole('button', { name: /Generate AI league/ })).toBeVisible();
-      await page.getByRole('button', { name: /Generate AI league/ }).click();
+      await expect(page.getByRole('button', { name: /Build league/ })).toBeVisible();
+      await page.getByRole('button', { name: /Build league/ }).click();
       await expect(page).toHaveURL(/\/season\/run\/?$/);
       await expect(page.locator('[data-block-phase]')).toBeVisible({ timeout: 30_000 });
 
@@ -95,9 +93,7 @@ test.describe('season run: free agency market', () => {
           timeout: 30_000,
         },
       );
-      await expect(
-        page.getByRole('button', { name: 'Lock rotation and simulate block' }),
-      ).toBeEnabled();
+      await expect(page.getByRole('button', { name: /Play Block/ })).toBeEnabled();
     },
   );
 
@@ -117,7 +113,7 @@ test.describe('season run: free agency market', () => {
         await draftOneRound(page, planner);
       }
       await expect(page.getByText('10 of 10 picked')).toBeVisible();
-      await page.getByRole('button', { name: /Generate AI league/ }).click();
+      await page.getByRole('button', { name: /Build league/ }).click();
       await expect(page).toHaveURL(/\/season\/run\/?$/);
       await expect(page.locator('[data-block-phase]')).toBeVisible({ timeout: 30_000 });
 
@@ -141,9 +137,7 @@ test.describe('season run: free agency market', () => {
           timeout: 30_000,
         },
       );
-      await expect(
-        page.getByRole('button', { name: 'Lock rotation and simulate block' }),
-      ).toBeEnabled();
+      await expect(page.getByRole('button', { name: /Play Block/ })).toBeEnabled();
     },
   );
 });

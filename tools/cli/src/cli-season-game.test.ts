@@ -2,12 +2,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
-  SEASON_ROTATION_PRESET_TARGETS,
-  SEASON_ROTATION_VERSION,
   seasonGameSimulationResultSchema,
   seasonGameTargetsSchema,
-  seasonRotationPresetSchema,
-  slotGroupOf,
   type SeasonGameSimulationInput,
   type SeasonGameSimulationResult,
   type SeasonGameTeamInput,

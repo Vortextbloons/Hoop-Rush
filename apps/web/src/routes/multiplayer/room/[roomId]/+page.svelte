@@ -132,6 +132,7 @@
         snapshot.settings.variant,
         assets,
         commands,
+        snapshot.settings.sourceMode,
       );
     } catch {
       return null;
@@ -139,7 +140,7 @@
   });
   const facts = $derived(roomLogFacts(commands));
   const rollAnimation = $derived(
-    rollAnimationFor(commands, snapshot?.settings.mode ?? 'classic-shared-82'),
+    rollAnimationFor(commands, snapshot?.settings.mode ?? 'classic-shared-82', selfId),
   );
   const phase = $derived(
     snapshot && replay ? deriveEffectivePhase(snapshot.phase, replay, simDone) : 'lobby',
@@ -390,6 +391,14 @@
       return;
     }
     if (mode === 'duel') {
+      if (replay.mode === 'sandbox-duel') {
+        if (!isFixedFiveDraftTurn(replay, selfId)) {
+          draftError = 'Wait for your opponent to finish this pick.';
+          return;
+        }
+        await sendCommand({ kind: 'sandbox-place', playerId, slotIndex: slot });
+        return;
+      }
       if (replay.mode !== 'duel' || !replay.state.currentRoll) {
         draftError = 'No active duel roll.';
         return;
@@ -941,6 +950,44 @@
       facts.rematchConfirmed.p2 &&
       snapshot?.phase === 'completed',
   );
+
+  const modeDetailLabel = $derived.by((): string => {
+    const current = snapshot;
+    if (!current) return 'Fixed-Five';
+    if (current.settings.mode === 'duel') return 'Fixed-Five · Duel · Best of 7';
+    if (current.settings.mode === 'sandbox-shared-82') return 'Fixed-Five · Sandbox · Shared 82';
+    return 'Fixed-Five · Classic · Shared 82';
+  });
+
+  const resultVerified = $derived.by((): boolean => {
+    if (!snapshot || !localResult) return false;
+    if (snapshot.phase === 'completed') return true;
+    return snapshot.confirmedDigest === localResult.digest;
+  });
+
+  async function doRematchAction(): Promise<void> {
+    if (rematchBusy) return;
+    rematchBusy = true;
+    error = null;
+    try {
+      const other = selfId === 'p1' ? 'p2' : 'p1';
+      if (!facts.rematchRequested[selfId]) {
+        await sendCommand({ kind: 'rematch-request' });
+      }
+      if (facts.rematchRequested[other] && !facts.rematchConfirmed[selfId]) {
+        await sendCommand({ kind: 'rematch-confirm' });
+      }
+      if (canRematch) {
+        await doRematch();
+      } else {
+        notice = 'Rematch requested — it starts once your opponent hits rematch too.';
+      }
+    } catch (e) {
+      error = friendlyFixedFiveJoinError(e);
+    } finally {
+      rematchBusy = false;
+    }
+  }
 </script>
 
 <svelte:head>
@@ -965,17 +1012,29 @@
       {error}
     </p>
   {:else if snapshot && display}
-    <div class="mt-4">
-      <p class="text-label text-primary break-words">
-        Fixed-five · {snapshot.settings.mode} · {phase}
-      </p>
-      <h1 class="font-display mt-2 text-2xl font-extrabold tracking-tight uppercase sm:text-3xl">
-        Room {snapshot.code ?? '····'}
-      </h1>
+    <div class="mt-4 flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <p class="text-label text-primary break-words">
+          {modeDetailLabel} · {phase}
+        </p>
+        <h1 class="font-display mt-2 text-2xl font-extrabold tracking-tight uppercase sm:text-3xl">
+          Room {snapshot.code ?? '····'}
+        </h1>
+      </div>
+      {#if resultVerified}
+        <p
+          class="inline-flex items-center gap-1.5 rounded-full border border-positive/40 bg-positive/10 px-3 py-1 font-mono text-[11px] font-bold text-positive"
+        >
+          <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full bg-current"></span>
+          Result verified
+        </p>
+      {/if}
     </div>
 
     <div class="mt-4">
-      <FixedFiveScoreboard snapshot={display} {selfId} />
+      {#if phase !== 'completed' && phase !== 'awaiting-confirmation' && phase !== 'integrity-failed'}
+        <FixedFiveScoreboard snapshot={display} {selfId} />
+      {/if}
     </div>
 
     {#if replay && replay.skipped > 0}
@@ -1199,6 +1258,11 @@
             stats={playerStats}
             {statsState}
             onRebuildStats={requestStatsRebuild}
+            entries={statsSource}
+            roomCode={snapshot.code}
+            createdAt={snapshot.createdAt}
+            verified={resultVerified}
+            modeDetail={modeDetailLabel}
           />
         {/if}
         <p class="mt-2 text-xs text-muted-foreground">
@@ -1235,40 +1299,23 @@
             stats={playerStats}
             {statsState}
             onRebuildStats={requestStatsRebuild}
+            entries={statsSource}
+            roomCode={snapshot.code}
+            createdAt={snapshot.createdAt}
+            verified={resultVerified}
+            modeDetail={modeDetailLabel}
+            onRematch={doRematchAction}
+            onNewRoom={doRematch}
+            {rematchBusy}
+            canNewRoom={canRematch}
           />
         {/if}
-        <div class="rounded-2xl bg-surface-1 p-6">
-          <div class="mt-4 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onclick={() => sendCommand({ kind: 'rematch-request' })}
-              class="rounded-xl border border-line-soft bg-card px-4 py-2 text-sm font-semibold"
-            >
-              Request rematch
-            </button>
-            <button
-              type="button"
-              onclick={() => sendCommand({ kind: 'rematch-confirm' })}
-              class="rounded-xl border border-line-soft bg-card px-4 py-2 text-sm font-semibold"
-            >
-              Confirm rematch
-            </button>
-            <button
-              type="button"
-              onclick={doRematch}
-              disabled={rematchBusy || !canRematch}
-              title={canRematch ? 'Create the successor room' : 'Needs both confirmations first'}
-              class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-40"
-            >
-              {rematchBusy ? 'Creating…' : 'New successor room →'}
-            </button>
-          </div>
-          {#if !canRematch}
-            <p class="mt-2 text-xs text-muted-foreground">
-              Rematch needs both confirmations and a completed room; it never overwrites this run.
-            </p>
-          {/if}
-        </div>
+        {#if !canRematch}
+          <p class="text-xs text-muted-foreground">
+            Rematch needs both players to hit rematch in this completed room; it never overwrites
+            this run.
+          </p>
+        {/if}
       </div>
     {:else if phase === 'completed'}
       <div class="mt-6 rounded-2xl bg-surface-1 p-6">

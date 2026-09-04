@@ -47,9 +47,23 @@
         ? `${ordinal(movement.positionBefore)} → ${ordinal(movement.positionAfter)}`
         : `${ordinal(movement.positionAfter)} in conference`
     })`;
-  const injurySummary = $derived(
-    `Injuries: ${String(recap.injuryEvidence.injuries)} this block (${String(recap.injuryEvidence.returnedThisBlock)} returned). Influence ${recap.tradeEvidence.influenceDelta >= 0 ? '+' : ''}${String(recap.tradeEvidence.influenceDelta)} (now ${String(recap.influenceBalance.humanBalance)}). Trades: ${String(recap.tradeEvidence.tradesAccepted)}`,
-  );
+  const injurySummary = $derived.by(() => {
+    const parts: string[] = [];
+    if (recap.injuryEvidence.injuries > 0) {
+      parts.push(
+        `${String(recap.injuryEvidence.injuries)} injur${recap.injuryEvidence.injuries === 1 ? 'y' : 'ies'} (${String(recap.injuryEvidence.returnedThisBlock)} back)`,
+      );
+    } else {
+      parts.push('No new injuries');
+    }
+    if (recap.tradeEvidence.tradesAccepted > 0) {
+      parts.push(
+        `${String(recap.tradeEvidence.tradesAccepted)} trade${recap.tradeEvidence.tradesAccepted === 1 ? '' : 's'}`,
+      );
+    }
+    parts.push(`Influence ${String(recap.influenceBalance.humanBalance)}`);
+    return parts.join(' · ');
+  });
   const franchiseIdentity = (franchiseId: string) =>
     manifest ? franchiseIdentityOf(manifest, franchiseId) : null;
   function versionSource(playerVersionId: string): {
@@ -96,7 +110,7 @@
           {recordLabel(humanRecord.winsAfter, humanRecord.lossesAfter)}
           <span class="ml-2 font-mono text-xs font-normal text-muted-foreground">
             from {recordLabel(humanRecord.winsBefore, humanRecord.lossesBefore)} ·
-            {ordinal(humanRecord.positionAfter)} in conference (provisional)
+            {ordinal(humanRecord.positionAfter)} in conference
           </span>
         </p>
       </div>
@@ -242,7 +256,7 @@
         id="recap-spotlights-heading"
         class="font-display text-base font-extrabold uppercase tracking-tight"
       >
-        Version vs version
+        Head to head
       </h2>
       <ul class="mt-2 flex flex-col divide-y divide-border/50">
         {#each recap.versionSpotlights as spotlight (spotlight.versionA + spotlight.versionB)}
@@ -329,27 +343,26 @@
         id="recap-effects-heading"
         class="font-display text-base font-extrabold uppercase tracking-tight"
       >
-        Stamina and chemistry
+        Why it happened
       </h2>
-      <p class="mt-1 text-sm text-muted-foreground">Stamina & chemistry this block</p>
       <ul class="mt-3 flex flex-col gap-2">
         {#each effectsEvidence as row (row.mechanism + row.side)}
           <li class="flex flex-col gap-0.5 rounded-lg bg-surface-2 p-3">
             <div class="flex flex-wrap items-baseline justify-between gap-2">
               <p class="text-sm font-semibold">{MECHANISM_LABEL[row.mechanism]}</p>
-              <p class="shrink-0 font-mono text-[10px] text-muted-foreground">
-                {row.side} · {row.opportunities} opportunities
+              <p class="shrink-0 text-xs text-muted-foreground">
+                {row.side} · {row.opportunities} plays
               </p>
             </div>
-            <p class="font-mono text-[10px] text-muted-foreground">
+            <p class="text-xs text-muted-foreground">
               {#if row.mechanism === 'assist-conversion' || row.mechanism === 'turnover-security' || row.mechanism === 'help-defense'}
-                Unit chemistry
+                Lineup chemistry
               {:else}
-                Fatigue
+                Tired legs
               {/if}
-              · swing
+              · about
               {deltaToPp(row.deltaTotals) >= 0 ? '+' : ''}
-              {deltaToPp(row.deltaTotals).toFixed(2)}pp
+              {deltaToPp(row.deltaTotals).toFixed(1)} pts per 100
             </p>
           </li>
         {/each}
@@ -368,12 +381,12 @@
           id="recap-injury-heading"
           class="font-display text-base font-extrabold uppercase tracking-tight"
         >
-          Injuries this block
+          Health
         </h2>
         <p class="mt-1 text-sm text-muted-foreground">{injurySummary}</p>
         {#if recap.objectiveEvidence! !== null}
           <p class="mt-1 text-sm">
-            <strong class="text-foreground">Objective:</strong>
+            <strong class="text-foreground">Goal:</strong>
             <span class="ml-1">{recap.objectiveEvidence!.objectiveId}</span>
             <span
               class="ml-2 rounded-full px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] {recap
@@ -381,7 +394,7 @@
                 ? 'bg-positive/15 text-positive'
                 : 'bg-destructive/15 text-destructive'}"
             >
-              {recap.objectiveEvidence!.success ? 'Success · +1 Influence' : 'Missed'}
+              {recap.objectiveEvidence!.success ? 'Hit · +1 Influence' : 'Missed'}
             </span>
           </p>
         {/if}

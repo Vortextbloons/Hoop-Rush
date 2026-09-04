@@ -9,13 +9,17 @@
     evaluateLineupMatchup,
     toSimulationPlayer,
   } from '@hoop-rush/engine';
+  import type { DraftPresentation } from '$lib/draft-presentation';
   let {
     players,
     opponent = null,
+    presentation = 'ratings',
   }: {
     players: PeakPlayerSeason[];
     opponent?: BracketOpponent | null;
+    presentation?: DraftPresentation;
   } = $props();
+  const hideRatings = $derived(presentation === 'ball-knowledge');
   const values = $derived.by((): ContextualPlayerValue[] => {
     const simulationPlayers = players.map(toSimulationPlayer);
     return simulationPlayers.map((player, index) =>
@@ -58,7 +62,7 @@
         Lineup fit
       </h2>
     </div>
-    {#if lineupMatchup}
+    {#if lineupMatchup && !hideRatings}
       <span class="font-mono text-[10px] text-muted-foreground">
         next: {opponent?.displayName} · MATCHUP {delta(lineupMatchup.matchupDelta)}
       </span>
@@ -67,6 +71,20 @@
   {#if players.length < 2}
     <p class="px-3 py-3 text-sm text-muted-foreground sm:p-4">
       Choose at least two players to see marginal fit.
+    </p>
+  {:else if hideRatings}
+    <ul class="divide-y divide-border/60">
+      {#each players as player (player.playerId)}
+        <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+          <span class="min-w-0 flex-1 sm:min-w-36">
+            <span class="block text-sm font-bold">{player.displayName}</span>
+            <span class="font-mono text-[10px] text-muted-foreground">Ratings hidden</span>
+          </span>
+        </li>
+      {/each}
+    </ul>
+    <p class="border-t border-border/60 px-4 py-3 text-xs text-muted-foreground">
+      Ratings hidden in Ball Knowledge — draft on memory.
     </p>
   {:else}
     <ul class="divide-y divide-border/60">

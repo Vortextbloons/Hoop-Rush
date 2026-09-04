@@ -6,11 +6,9 @@
   } from '@hoop-rush/data-contracts';
   import { untrack } from 'svelte';
   import TeamLogo from '../TeamLogo.svelte';
-  const ROW_HEIGHT_PX = 72;
-  const WALL_CARD_PX = 108;
+  const REEL_ROW_HEIGHT_PX = 108;
   const OPTION_REPEATS = 3;
-  const SPIN_MS = 900;
-  const SINGLE_SPIN_MS = 600;
+  const SPIN_MS = 2000;
   const RESULT_MS = 800;
   const FADE_MS = 250;
   let {
@@ -50,6 +48,7 @@
   let eraFading = $state(false);
   let franchiseStartPx = $state(0);
   let eraStartPx = $state(0);
+  let activeSpinDurationMs = $state(SPIN_MS);
   let announced = $state('');
   let pulseKey = $state(0);
   let spinTimer: ReturnType<typeof setTimeout> | null = null;
@@ -82,13 +81,9 @@
     const frac = key * 0.6180339887498949;
     return frac - Math.floor(frac);
   }
-  function spinStartPx(optionCount: number, key: number): number {
+  function spinStartPx(optionCount: number, key: number, rowHeightPx: number): number {
     const travelRows = optionCount * OPTION_REPEATS - 1 + jitterFor(key);
-    return -(travelRows * ROW_HEIGHT_PX);
-  }
-  function wallStartPx(optionCount: number, key: number): number {
-    const travelCards = optionCount * OPTION_REPEATS - 1 + jitterFor(key);
-    return -(travelCards * WALL_CARD_PX);
+    return -(travelRows * rowHeightPx);
   }
   function clearTimers() {
     if (spinTimer !== null) {
@@ -112,8 +107,12 @@
     const eraActive = params.axis === 'both' || params.axis === 'era';
     const franchiseMoves = franchiseActive && params.franchiseOptions.length > 0;
     const eraMoves = eraActive && params.eraOptions.length > 0;
-    franchiseStartPx = franchiseMoves ? wallStartPx(params.franchiseOptions.length, key) : 0;
-    eraStartPx = eraMoves ? spinStartPx(params.eraOptions.length, key) : 0;
+    franchiseStartPx = franchiseMoves
+      ? spinStartPx(params.franchiseOptions.length, key, REEL_ROW_HEIGHT_PX)
+      : 0;
+    eraStartPx = eraMoves
+      ? spinStartPx(params.eraOptions.length, key, REEL_ROW_HEIGHT_PX)
+      : 0;
     const franchiseStrip = franchiseMoves && !params.reduced;
     const eraStrip = eraMoves && !params.reduced;
     clearTimers();
@@ -123,10 +122,13 @@
     franchiseFading = franchiseActive && !franchiseStrip;
     eraFading = eraActive && !eraStrip;
     announced = '';
+    activeSpinDurationMs = params.spinDurationMs ?? SPIN_MS;
+    const franchiseDuration = franchiseStrip ? activeSpinDurationMs : 0;
+    const eraDuration = eraStrip ? activeSpinDurationMs : 0;
     const duration =
       params.reduced || (!franchiseStrip && !eraStrip)
         ? FADE_MS
-        : (params.spinDurationMs ?? (params.axis === 'both' ? SPIN_MS : SINGLE_SPIN_MS));
+        : Math.max(franchiseDuration, eraDuration);
     spinTimer = setTimeout(settle, duration);
   }
   function settle() {
@@ -197,7 +199,7 @@
                   ? 'reel-fade'
                   : ''}"
                 style={franchiseSpinning
-                  ? `--spin-start: ${franchiseStartPx}px; --spin-settle: 0px;`
+                  ? `--spin-start: ${franchiseStartPx}px; --spin-settle: 0px; --spin-duration: ${activeSpinDurationMs}ms;`
                   : undefined}
               >
                 <div class="reel-row reel-row--final">
@@ -222,7 +224,7 @@
                   ? 'reel-fade'
                   : ''}"
                 style={eraSpinning
-                  ? `--spin-start: ${eraStartPx}px; --spin-settle: 0px;`
+                  ? `--spin-start: ${eraStartPx}px; --spin-settle: 0px; --spin-duration: ${activeSpinDurationMs}ms;`
                   : undefined}
               >
                 <div class="reel-row reel-row--final">
@@ -341,7 +343,7 @@
   }
 
   .reel {
-    --reel-row-h: 72px;
+    --reel-row-h: 108px;
     position: relative;
     min-width: 0;
   }
@@ -411,7 +413,7 @@
   }
 
   .reel-strip.reel-spinning {
-    animation: reel-spin 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: reel-spin var(--spin-duration, 2000ms) cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
   .reel-strip.reel-fade {
@@ -434,32 +436,51 @@
 
   .reel[data-axis='franchise'] .reel-strip {
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     align-items: stretch;
   }
 
   .reel[data-axis='franchise'] .reel-strip.reel-spinning {
-    animation: wall-slide 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: reel-spin var(--spin-duration, 2000ms) cubic-bezier(0.12, 0.92, 0.22, 1) both;
   }
 
   .reel[data-axis='franchise'] .reel-row {
-    width: 108px;
+    width: auto;
     flex-shrink: 0;
     flex-direction: column;
     justify-content: center;
-    gap: 6px;
-    padding: 0 8px;
+    gap: 4px;
+    padding: 0 10px;
+    overflow: hidden;
   }
 
   .reel[data-axis='franchise'] .reel-franchise {
     flex-direction: column;
     align-items: center;
-    gap: 6px;
+    justify-content: center;
+    gap: 4px;
     text-align: center;
+    width: 100%;
+    min-height: 0;
   }
 
   .reel[data-axis='franchise'] .reel-franchise-text {
     align-items: center;
+    flex: 0 1 auto;
+    width: 100%;
+  }
+
+  .reel[data-axis='franchise'] :global(.reel-franchise-logo) {
+    height: 2rem;
+    width: 2rem;
+  }
+
+  .reel[data-axis='franchise'] .reel-name {
+    font-size: 13px;
+  }
+
+  .reel[data-axis='franchise'] .reel-row--final .reel-name {
+    font-size: 14px;
   }
 
   .reel[data-axis='era'] .reel-row--option {
@@ -518,6 +539,12 @@
     gap: 12px;
     width: 100%;
     min-width: 0;
+    min-height: 0;
+  }
+
+  .reel[data-axis='franchise'] .reel-lock {
+    flex-direction: column;
+    gap: 4px;
   }
 
   .reel-lock--active {
@@ -597,6 +624,13 @@
   .roll-result .reel-franchise {
     flex: 1;
     min-width: 0;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .roll-result .reel-franchise-text {
+    align-items: center;
   }
 
   .roll-result .reel-abbrev {
@@ -803,15 +837,6 @@
     }
     to {
       transform: translateY(var(--spin-settle, 0));
-    }
-  }
-
-  @keyframes wall-slide {
-    from {
-      transform: translateX(var(--spin-start, 0));
-    }
-    to {
-      transform: translateX(var(--spin-settle, 0));
     }
   }
 

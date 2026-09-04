@@ -10,7 +10,7 @@ describe('raw dump', () => {
         season: c.season,
         position: c.position,
         heightInches: c.height,
-        stats: c.stats as never,
+        stats: c.stats,
         era: getEra(c.season),
         artifact: DEFAULT_RATINGS_MODEL_ARTIFACT,
         teamWinPct: c.winPct,

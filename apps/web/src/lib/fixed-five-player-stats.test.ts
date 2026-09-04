@@ -39,11 +39,6 @@ function entry(
 }
 
 describe('aggregateFixedFivePlayerStats', () => {
-  it('returns empty lines for no entries', () => {
-    expect(aggregateFixedFivePlayerStats('classic-shared-82', [])).toEqual({ p1: [], p2: [] });
-    expect(aggregateFixedFivePlayerStats('duel', [])).toEqual({ p1: [], p2: [] });
-  });
-
   it('attributes shared-82 tags: p1 and h2h-home to p1, p2 and h2h-away to p2', () => {
     const entries = [
       entry('p1', 'p1', [box('a1', 20)], 'opp-1', [box('o1', 99)]),

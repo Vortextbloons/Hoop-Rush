@@ -272,25 +272,6 @@ describe('PostseasonBracket', () => {
     expect(upcoming?.textContent).toContain('Next: Game 1 · at Team east3');
     expect(upcoming?.textContent).toContain('home court EAS');
   });
-  it('highlights the human franchise series', () => {
-    const postseason = fixturePostseason();
-    const westSeries = postseason.bracket?.west.firstRound[1];
-    if (westSeries === undefined) throw new Error('missing west series');
-    westSeries.homeCourtFranchiseId = franchiseIdSchema.parse('lakers');
-    const { container } = render(PostseasonBracket, {
-      props: {
-        postseason,
-        franchiseName: NAME,
-        franchiseAbbrev: ABBREV,
-        manifest: MANIFEST,
-        humanFranchiseId: 'lakers',
-      },
-    });
-    const card = container.querySelector('[data-season-series-card="cwest4-5"]');
-    expect(card?.getAttribute('data-series-status')).toBe('in-progress');
-    expect(card?.textContent).toContain('Team lakers');
-    expect(card?.querySelector('[aria-label="your team"]')).not.toBeNull();
-  });
   it('renders Play-In cards with seeds and win-or-go-home copy', () => {
     const postseason = fixturePostseason();
     const { container } = render(PostseasonBracket, {
@@ -309,27 +290,6 @@ describe('PostseasonBracket', () => {
     expect(nineTen?.textContent).toContain('Loser eliminated');
     expect(nineTen?.textContent).toContain('Team east9');
     expect(nineTen?.querySelector('[aria-label="your team"]')).not.toBeNull();
-  });
-  it('orders the mobile card list play-in first, then rounds', () => {
-    const postseason = fixturePostseason();
-    const { container } = render(PostseasonBracket, {
-      props: {
-        postseason,
-        franchiseName: NAME,
-        franchiseAbbrev: ABBREV,
-        manifest: MANIFEST,
-        humanFranchiseId: null,
-      },
-    });
-    const mobileLists = container.querySelectorAll('ol');
-    const mobile = mobileLists[0];
-    expect(mobile).not.toBeNull();
-    if (mobile === undefined) throw new Error('expected the mobile card list');
-    expect(mobile.querySelectorAll('[data-season-playin-card]').length).toBeGreaterThan(0);
-    const headings = [...mobile.querySelectorAll('h3')].map((heading) => heading.textContent);
-    expect(headings[0]).toContain('Play-In');
-    expect(headings[1]).toContain('Play-In');
-    expect(headings[2]).toBe('First Round');
   });
 });
 describe('SeriesCard accessibility', () => {

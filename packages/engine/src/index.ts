@@ -472,8 +472,19 @@ export {
   type DuelDraftPick,
 } from './modes/fixed-five/duel.ts';
 export {
+  createSandboxDuelDraft,
+  claimSandboxDuelPlayer,
+  sandboxDuelPicksFor,
+  isSandboxDuelComplete,
+  sandboxDuelAlternationHolds,
+  sandboxDuelPicker,
+  type SandboxDuelState,
+  type SandboxDuelPick,
+} from './modes/fixed-five/sandbox-duel.ts';
+export {
   enumerateClassicSafeMoves,
   enumerateDuelSafeMoves,
+  enumerateSandboxDuelSafeMoves,
   chooseAutopick,
   chooseSandboxAutopicksUntilFull,
   type AutopickSelection,

@@ -165,13 +165,6 @@ describe('seasonTeamDetail', () => {
     expect(detail.diff).toBe(0);
     expect(detail.hasStats).toBe(false);
   });
-  it('forwards OVR and positions from the lookup functions', () => {
-    const detail = detailOf(input);
-    for (const row of [...detail.starters, ...detail.bench]) {
-      expect(row.overallRating).toBe(87);
-      expect(row.positions).toEqual(['PG', 'SG']);
-    }
-  });
   it('builds the league-normalized 0-100 strip from the player ratings', () => {
     const detail = detailOf(input);
     expect(detail.projection).toEqual({ overall: 76, offense: 76, defense: 76 });

@@ -35,7 +35,6 @@
   } = $props();
   let forfeitOpen = $state(false);
   const unavailablePlayers = $derived(interruption?.unavailablePlayerVersionIds ?? []);
-  const nextGameLabel = $derived(pending === null ? '' : `game ${pending.nextGameId}`);
 </script>
 
 <section
@@ -49,22 +48,21 @@
       id="interruption-heading"
       class="font-display text-base font-extrabold uppercase tracking-tight text-destructive"
     >
-      Block paused — no legal five
+      Not enough healthy players
     </h2>
     <span class="font-mono text-[10px] text-muted-foreground">
-      block {pending === null ? '—' : pending.blockIndex + 1} of 9 · {nextGameLabel}
+      Block {pending === null ? '—' : pending.blockIndex + 1} of 9
     </span>
   </div>
   <p class="mt-2 text-sm text-muted-foreground">
-    The block stopped because your roster cannot field five legal players at the next game's tipoff
-    from health availability. Nothing was accepted and nothing was lost — the completed games stay
-    saved and the block resumes from {nextGameLabel} without replaying.
+    You don’t have 5 healthy players for the next game. Played games still count — fix your lineup
+    and pick up where you stopped.
   </p>
 
   {#if unavailablePlayers.length > 0}
     <div class="mt-3">
       <p class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-        Unavailable at the next tipoff
+        Out for the next game
       </p>
       <ul class="mt-1 flex flex-wrap gap-1.5">
         {#each unavailablePlayers as playerVersionId (playerVersionId)}
@@ -78,15 +76,12 @@
 
   <div class="mt-4 flex flex-col gap-2">
     <p class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-      Three ways forward
+      Your options
     </p>
     <ol class="flex flex-col gap-2 text-sm">
       <li class="rounded-lg bg-surface-2 p-3">
-        <p class="font-semibold">1 · Repair the rotation</p>
-        <p class="mt-1 text-muted-foreground">
-          Move an available player into the rotation on the Rotation tab. The editor re-validates
-          before the block can resume.
-        </p>
+        <p class="font-semibold">Fix your lineup</p>
+        <p class="mt-1 text-muted-foreground">Swap a healthy player in on the Rotation tab.</p>
         <a
           href={resolve('/season/run/team')}
           class="mt-2 inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong"
@@ -96,10 +91,9 @@
         </a>
       </li>
       <li class="rounded-lg bg-surface-2 p-3">
-        <p class="font-semibold">2 · Risky rehab (2 Influence)</p>
+        <p class="font-semibold">Try rehab (2 Influence)</p>
         <p class="mt-1 text-muted-foreground">
-          Speed one injured player back: 60% to cut one game off the recovery, 40% to lengthen it
-          and open the recurrence window. Needs balance at or above −1.
+          A chance to bring someone back sooner — but it can also set them back.
         </p>
         {#if rehabAffordances.length === 0}
           <p class="mt-2 font-mono text-[10px] text-muted-foreground">
@@ -123,18 +117,15 @@
         {/if}
       </li>
       <li class="rounded-lg bg-surface-2 p-3">
-        <p class="font-semibold">3 · Forfeit the next game</p>
-        <p class="mt-1 text-muted-foreground">
-          Officially forfeit {nextGameLabel} 2-0 with no player statistics, then the block checks the
-          following game.
-        </p>
+        <p class="font-semibold">Skip the game (loss)</p>
+        <p class="mt-1 text-muted-foreground">Take the loss and move to the next game.</p>
         <button
           type="button"
           onclick={() => (forfeitOpen = true)}
           disabled={busy}
           class="mt-2 inline-flex items-center justify-center rounded-lg border border-destructive/50 px-3 py-1.5 text-sm font-semibold text-destructive outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          Forfeit {nextGameLabel}
+          Skip game
         </button>
       </li>
     </ol>
@@ -153,15 +144,13 @@
       disabled={busy || pending === null}
       class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
     >
-      Resume block
+      Play on
     </button>
-    <span class="font-mono text-[10px] text-muted-foreground">
-      Resuming re-validates the pending block and simulates from {nextGameLabel} forward.
-    </span>
+    <span class="font-mono text-[10px] text-muted-foreground"> Picks up where you stopped. </span>
   </div>
 
   <p class="sr-only" role="status" aria-live="polite">
-    Block paused with an invalid roster at {nextGameLabel}. The pending block is preserved.
+    Not enough healthy players. Fix your lineup to play on.
   </p>
 </section>
 
@@ -178,7 +167,7 @@
     >
       <div class="flex items-start justify-between gap-3">
         <Dialog.Title class="font-display truncate text-lg font-extrabold tracking-tight uppercase">
-          Forfeit {nextGameLabel}?
+          Skip this game?
         </Dialog.Title>
         <Dialog.Close
           aria-label="Cancel"
@@ -188,8 +177,7 @@
         </Dialog.Close>
       </div>
       <p class="mt-2 text-sm text-muted-foreground">
-        The game records as an official 2-0 forfeit with no player statistics. The block then checks
-        the next game in block order; if your roster is still short of five, the pause repeats.
+        It counts as a loss and the block moves to the next game.
       </p>
       <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
         <button
@@ -209,7 +197,7 @@
           disabled={busy}
           class="inline-flex items-center justify-center gap-2 rounded-lg border border-destructive/50 px-4 py-2 text-sm font-semibold text-destructive transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          Forfeit the game
+          Skip game
         </button>
       </div>
     </Dialog.Content>

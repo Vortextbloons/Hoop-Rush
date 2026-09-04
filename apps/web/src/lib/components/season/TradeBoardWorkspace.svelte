@@ -151,34 +151,29 @@
           id="trade-board-heading"
           class="font-display text-2xl font-extrabold uppercase tracking-tight"
         >
-          Trade Board
+          Trades
         </h2>
-        <span
-          class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-        >
-          {#if windowState !== null}Window {windowState.windowIndex + 1} of 3 · block {windowState.blockIndex +
-              1} opens{/if}
-          {#if windowState === null && closedWindows.length > 0}History — {closedWindows.length} closed
-            windows{/if}
-          {#if windowState === null && closedWindows.length === 0}No window open — skip without
-            penalty{/if}
+        <span class="text-xs text-muted-foreground">
+          {#if windowState !== null}Window {windowState.windowIndex + 1} of 3{/if}
+          {#if windowState === null && closedWindows.length > 0}Past windows: {closedWindows.length}{/if}
+          {#if windowState === null && closedWindows.length === 0}No trades right now{/if}
         </span>
       </div>
 
       <div class="flex flex-wrap items-center gap-2 text-xs">
         <span
-          class="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-primary"
+          class="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary"
         >
           {inquiryCounterLabel(inquiryAllowance, inquiriesUsed, purchasedUsed, earnedUsed)}
         </span>
         <span
-          class="rounded-full border border-border bg-surface-2 px-3 py-1 font-mono text-[11px] text-muted-foreground"
+          class="rounded-full border border-border bg-surface-2 px-3 py-1 text-xs text-muted-foreground"
         >
-          Active 1 at a time · 3 exchanges max · duplicate rejected no increment
+          1 deal at a time · up to 3 offers
         </span>
         <span
-          class="rounded-full border border-border bg-surface-2 px-3 py-1 font-mono text-[11px] text-muted-foreground"
-          >Influence you {humanBalance} · floor 0 · never clamps</span
+          class="rounded-full border border-border bg-surface-2 px-3 py-1 text-xs text-muted-foreground"
+          >Your Influence: {humanBalance}</span
         >
       </div>
 
@@ -191,7 +186,11 @@
             data-testid="purchase-inquiry"
             class="inline-flex h-11 items-center justify-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-40"
           >
-            +1 inquiry for 1 Influence {purchasedUsed ? '(used)' : canPurchase ? '' : '(needs 1)'}
+            {purchasedUsed
+              ? 'Extra talk used'
+              : canPurchase
+                ? '+1 trade talk · 1 Influence'
+                : 'Need 1 Influence for extra talk'}
           </button>
           {#if commandError !== null}
             <span
@@ -202,26 +201,16 @@
           {/if}
         </div>
       {/if}
-    </div>
-
-    <div class="border-t border-border bg-surface-2/60 overflow-hidden">
-      <div
-        class="flex animate-[marquee_22s_linear_infinite] motion-safe:animate-[marquee_22s_linear_infinite] motion-reduce:animate-none gap-6 whitespace-nowrap py-2 min-h-11 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-        aria-hidden="true"
-      >
-        <span class="shrink-0">acceptable</span><span class="text-primary">·</span><span
-          class="shrink-0">close needs more value</span
-        ><span class="text-primary">·</span><span class="shrink-0">wrong roster fit</span><span
-          class="text-primary">·</span
-        ><span class="shrink-0">unacceptable injury/availability risk</span><span
-          class="text-primary">·</span
-        ><span class="shrink-0">protected player</span><span class="text-primary">·</span><span
-          class="shrink-0">illegal roster/rotation</span
-        ><span class="text-primary">·</span><span class="shrink-0">negotiations closed</span>
-        <span class="shrink-0">acceptable</span><span class="text-primary">·</span><span
-          class="shrink-0">close needs more value</span
-        ><span class="text-primary">·</span><span class="shrink-0">wrong roster fit</span>
-      </div>
+      <details class="rounded-lg bg-surface-2 px-3 py-2 text-xs text-muted-foreground">
+        <summary
+          class="cursor-pointer font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >How trades work</summary
+        >
+        <p class="mt-1">
+          Pick a team, offer 1–2 players for 1–2 back. You can add Influence on one side. Protected
+          players can’t move. Browsing is free — a talk starts when you send the first offer.
+        </p>
+      </details>
     </div>
   </div>
 
@@ -261,17 +250,16 @@
           <h3
             class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
           >
-            Board · 8 teams
+            Teams
           </h3>
-          <span class="font-mono text-[10px] text-muted-foreground">Tap to browse — free</span>
+          <span class="text-xs text-muted-foreground">Browsing is free</span>
         </div>
         {#if windowState === null}
           <p class="p-4 text-sm text-muted-foreground">
-            No board this window. You may skip to next block; AI transactions still resolve. History
-            below.
+            No trades right now. Play the next block — past deals are below.
           </p>
         {:else if boardProfiles.length === 0}
-          <p class="p-4 text-sm text-muted-foreground">Board is assembling…</p>
+          <p class="p-4 text-sm text-muted-foreground">Finding trade partners…</p>
         {:else}
           <ul
             class="flex flex-col divide-y divide-border/60 max-h-[640px] overflow-auto overscroll-contain p-2"
@@ -399,27 +387,17 @@
             <h4
               class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
             >
-              Closed-window history
+              Past windows
             </h4>
             <ul class="mt-2 flex flex-col gap-2">
               {#each closedWindows as win (win.windowIndex)}
                 <li class="rounded-lg border border-border bg-card p-2.5">
-                  <p class="font-mono text-[10px] font-bold">
-                    Window {win.windowIndex + 1} · block {win.blockIndex + 1} · {win.status}
+                  <p class="text-xs font-semibold">
+                    Window {win.windowIndex + 1}
                   </p>
                   <p class="mt-1 text-xs text-muted-foreground">
-                    {win.negotiations?.length ?? 0} inquiries · {win.offers.length} offers · {win
-                      .boardProfiles?.length ?? 0} board teams
+                    {win.negotiations?.length ?? 0} talks · {win.offers.length} offers
                   </p>
-                  {#if win.negotiations && win.negotiations.length > 0}
-                    <ul class="mt-1.5 flex flex-col gap-1">
-                      {#each win.negotiations.slice(0, 3) as n (n.inquiryId)}
-                        <li class="font-mono text-[10px] text-muted-foreground">
-                          {n.toFranchiseId} — {n.status} · {n.exchangeCount}/3
-                        </li>
-                      {/each}
-                    </ul>
-                  {/if}
                 </li>
               {/each}
             </ul>
@@ -431,11 +409,10 @@
         <h4
           class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
         >
-          Your value trends
+          Your trends
         </h4>
-        <p class="mt-1 font-mono text-[10px] text-muted-foreground">
-          Categorical movement from saved production, workload, role, availability — never a precise
-          trade-value number.
+        <p class="mt-1 text-xs text-muted-foreground">
+          Who’s rising or falling — not an exact trade score.
         </p>
         {#if humanTrends.length === 0}
           <p class="mt-3 rounded-lg bg-surface-2 p-3 text-sm text-muted-foreground">
@@ -466,28 +443,19 @@
       {#if windowState === null}
         <div class="rounded-xl border border-dashed border-border bg-surface-1 p-6 text-center">
           <p class="font-display text-base font-extrabold uppercase tracking-tight">
-            No active window
+            No trades right now
           </p>
           <p class="mt-1 text-sm text-muted-foreground">
-            Skip the board and submit the block. Campaign and block progression continue. History
-            remains browseable.
-          </p>
-          <p class="mt-3 font-mono text-[10px] text-muted-foreground">
-            Teams 29 · Rosters 10–15 · Rotation 10 · Chemistry 45 pairs (1,350 league) · these facts
-            travel with the trade.
+            Play the next block. Past deals stay below.
           </p>
         </div>
       {:else if selectedProfile === null || targetRoster === null || humanRoster === null}
         <div class="rounded-xl border border-border bg-card p-6">
           <p class="font-display text-lg font-extrabold uppercase tracking-tight">Pick a team</p>
           <p class="mt-1 text-sm text-muted-foreground">
-            Choose a board team on the left. Browsing is free — an inquiry is opened only when you
-            submit the first proposal. One active negotiation at a time.
+            Choose a team to start a deal. Browsing is free — the talk starts when you send the
+            first offer.
           </p>
-          <div class="mt-4 rounded-lg bg-surface-2 p-3 font-mono text-[10px] text-muted-foreground">
-            Legal: 1–2 + 1–2 players · 1–2 Influence from one side never both · never Influence-only
-            · canvases show after pick · inquiry shown before submit.
-          </div>
         </div>
       {:else}
         {@const yourLites = humanRoster.players.map((p) => ({
@@ -534,8 +502,7 @@
         <p
           class="rounded-lg border border-border bg-surface-2 px-3 py-2 min-h-11 font-mono text-[10px] text-muted-foreground"
         >
-          Tip: Protected players are hard gates. Unacceptable availability risk and illegal roster
-          reject before talent/close checks. Cash consideration only helps within the band (≤10%).
+          Tip: Protected players can’t move. Injured players are harder to trade.
         </p>
       {/if}
     </div>
@@ -566,7 +533,7 @@
           <h4
             class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
           >
-            All inquiries this window
+            Your talks
           </h4>
           <ul class="mt-2 flex flex-col gap-1.5 max-h-[320px] overflow-auto">
             {#each negotiations as n (n.inquiryId)}
@@ -585,23 +552,19 @@
                   <span class="min-w-0 flex-1 truncate font-medium"
                     >{n.toFranchiseId} · {n.status}</span
                   >
-                  <span class="shrink-0 font-mono text-[10px] text-muted-foreground"
-                    >{n.exchangeCount}/3 · {n.inquiryId.slice(4, 10)}</span
+                  <span class="shrink-0 text-xs text-muted-foreground"
+                    >Offer {n.exchangeCount} of 3</span
                   >
                 </button>
               </li>
             {/each}
           </ul>
-          <p class="mt-2 font-mono text-[10px] text-muted-foreground">
-            Reload/cross-tab preserves negotiation; AI transactions revalidate remaining board after
-            any accepted trade.
-          </p>
         </div>
       {/if}
 
       {#if windowState !== null && activeNegotiation === null && negotiations.length > 0}
         <p class="rounded-lg bg-surface-2 p-3 text-sm text-muted-foreground" role="status">
-          Closed or walked-away inquiries remain in history (browseable, never reopens this window).
+          Finished talks stay here for reference.
         </p>
       {/if}
     </div>
@@ -609,19 +572,3 @@
 
   <p class="sr-only" role="status" aria-live="polite">{announcement}</p>
 </section>
-
-<style>
-  @keyframes marquee {
-    from {
-      transform: translateX(0);
-    }
-    to {
-      transform: translateX(-50%);
-    }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .group {
-      transition: none !important;
-    }
-  }
-</style>

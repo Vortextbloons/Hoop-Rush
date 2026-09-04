@@ -29,8 +29,7 @@ jobs:
       - name: Quick unit and integration tests
         run: pnpm test:quick
 
-  # The full suite (block determinism, property tests, CLI integration)
-  # runs on push to main and nightly; per-commit gates stay fast.
+  # Full suite and data validation run on push to main; PRs stay on test:quick.
   tests:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest

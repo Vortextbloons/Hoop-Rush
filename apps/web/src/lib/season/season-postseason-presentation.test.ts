@@ -21,16 +21,11 @@ import {
   humanSeriesOf,
   mobileBracketCardsOf,
   playInColumnViewModel,
-  playInGameCardViewModel,
   postseasonRankingsOf,
-  postseasonSummaryRow,
   rankedEntriesOf,
   riskyRehabOptionsOf,
   roundLabel,
   seriesCardViewModel,
-  tiebreakKindLabel,
-  tiebreakRuleLabel,
-  tiebreakSlotsLabel,
 } from './season-postseason-presentation';
 const SEED = seedSchema.parse('a1b2c3d4e5f60718293a4b5c6d7e8f9a');
 function fixtureRun(): SeasonRun {
@@ -277,16 +272,6 @@ describe('postseasonRankingsOf / rankedEntriesOf', () => {
     expect(postseasonRankingsOf(run)).toEqual(postseasonRankingsOf(run));
   });
 });
-describe('tiebreak copy', () => {
-  it('labels every rule, kind, and slot set', () => {
-    expect(tiebreakRuleLabel('head-to-head')).toContain('Head-to-head');
-    expect(tiebreakRuleLabel('random-draw')).toBe('Random draw');
-    expect(tiebreakKindLabel('qualification')).toBe('Qualification');
-    expect(tiebreakKindLabel('finals-home-court')).toBe('Finals home court');
-    expect(tiebreakSlotsLabel([7, 8])).toBe('slots 7â€“8');
-    expect(tiebreakSlotsLabel([1])).toBe('slot 1');
-  });
-});
 describe('series card view models', () => {
   it('reports score, winner, and status', () => {
     const card = seriesCardViewModel(
@@ -405,90 +390,6 @@ describe('play-in cards', () => {
     expect(sevenEight?.status).toBe('scheduled');
     const final = column.games[2];
     expect(final?.consequence).toContain('seed 8');
-  });
-  it('reports the win-or-go-home consequence of the nine-ten game', () => {
-    const state = buildInitialPostseasonState(SEED);
-    state.playIn.east.ranking = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'].map((id) =>
-      franchiseIdSchema.parse(id),
-    );
-    const card = playInGameCardViewModel(state, 'east', 'nine-ten', null);
-    expect(card.consequence).toContain('Loser eliminated');
-  });
-});
-describe('postseason summary rows', () => {
-  it('labels phases, rounds, scores, and the human result', () => {
-    const summary = decidedPostseason('east1').playIn.east.games.sevenEight;
-    const row = postseasonSummaryRow(
-      {
-        schemaVersion: 1,
-        summaryVersion: 'postseason-summary-v1',
-        runId: idSchema.parse('run-1'),
-        gameId: summary.gameId,
-        phase: 'play-in',
-        round: 'seven-eight',
-        seriesId: null,
-        gameNumber: 1,
-        conference: 'east',
-        homeFranchiseId: franchiseIdSchema.parse('west7'),
-        awayFranchiseId: franchiseIdSchema.parse('west8'),
-        winnerFranchiseId: franchiseIdSchema.parse('west7'),
-        loserFranchiseId: franchiseIdSchema.parse('west8'),
-        status: 'final',
-        homeScore: 110,
-        awayScore: 99,
-        forfeitLoserFranchiseId: null,
-        homeBox: {
-          franchiseId: franchiseIdSchema.parse('west7'),
-          points: 110,
-          fieldGoalsMade: 40,
-          fieldGoalsAttempted: 88,
-          threePointersMade: 10,
-          threePointersAttempted: 30,
-          freeThrowsMade: 20,
-          freeThrowsAttempted: 26,
-          offensiveRebounds: 10,
-          defensiveRebounds: 30,
-          assists: 24,
-          steals: 7,
-          blocks: 5,
-          turnovers: 13,
-          fouls: 19,
-          possessions: 96,
-        },
-        awayBox: {
-          franchiseId: franchiseIdSchema.parse('west8'),
-          points: 99,
-          fieldGoalsMade: 38,
-          fieldGoalsAttempted: 86,
-          threePointersMade: 9,
-          threePointersAttempted: 28,
-          freeThrowsMade: 19,
-          freeThrowsAttempted: 25,
-          offensiveRebounds: 9,
-          defensiveRebounds: 29,
-          assists: 22,
-          steals: 8,
-          blocks: 4,
-          turnovers: 15,
-          fouls: 21,
-          possessions: 94,
-        },
-        homePlayers: [],
-        awayPlayers: [],
-        rotationEvidence: {
-          home: { playersUsed: 0, substitutions: 0 },
-          away: { playersUsed: 0, substitutions: 0 },
-        },
-        injuryEvents: [],
-        resultDigest: '0'.repeat(32),
-      },
-      'west7',
-    );
-    expect(row.phaseLabel).toBe('Play-In');
-    expect(row.roundLabel).toBe('7 vs 8');
-    expect(row.scoreLabel).toBe('110â€“99');
-    expect(row.humanWon).toBe(true);
-    expect(row.humanGame).toBe(true);
   });
 });
 describe('awards view model', () => {

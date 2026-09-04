@@ -308,7 +308,7 @@
 <section class="mx-auto w-full min-w-0 max-w-6xl overflow-x-clip py-6 sm:px-6 sm:py-10">
   <div class="flex flex-col gap-3 px-3 sm:flex-row sm:items-end sm:justify-between sm:px-0">
     <div class="min-w-0">
-      <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">Season Run · 2.0</p>
+      <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">Season Run</p>
       <h1
         class="font-display mt-2 text-2xl font-extrabold tracking-tight break-words uppercase sm:text-3xl md:text-4xl lg:text-5xl"
       >
@@ -316,7 +316,7 @@
       </h1>
       {#if !(started && board?.draft)}
         <p class="mt-3 max-w-xl text-sm text-muted-foreground">
-          8 cards per round. Build toward 4 guards, 4 wings, 3 bigs.
+          1 · Pick your team. 2 · Draft 10 players. 3 · Play 82 games.
         </p>
       {/if}
     </div>
@@ -335,7 +335,7 @@
       Failed to load season data: {assetsError}
     </p>
   {:else if !loaded}
-    <p class="mt-8 px-3 font-mono text-sm text-muted-foreground sm:px-0">Loading season data…</p>
+    <p class="mt-8 px-3 font-mono text-sm text-muted-foreground sm:px-0">Loading your season…</p>
   {:else if brokenRunError}
     <div class="mt-10 rounded-none bg-surface-1 sm:rounded-xl p-6">
       <h2 class="font-display text-xl font-extrabold uppercase tracking-tight">
@@ -358,14 +358,14 @@
   {:else if resumeHref}
     <div class="mt-10 rounded-none bg-surface-1 sm:rounded-xl p-6">
       <h2 class="font-display text-xl font-extrabold uppercase tracking-tight">
-        An active season run exists
+        Back to your season
       </h2>
       <p class="mt-2 text-sm text-muted-foreground">Pick up right where you left off.</p>
       <a
         href={resolve('/season/run')}
         class="mt-4 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
       >
-        Resume season
+        Continue season
       </a>
     </div>
   {:else if hasDraft && !started && board?.draft}
@@ -397,16 +397,18 @@
     <div class="mt-10 flex flex-col gap-6">
       <div class="rounded-none bg-surface-1 sm:rounded-xl p-6">
         <h2 class="font-display text-xl font-extrabold uppercase tracking-tight">
-          Start a Season Run
+          Start your draft
         </h2>
-        <p class="mt-2 max-w-xl text-sm text-muted-foreground">Draft auto-saves.</p>
+        <p class="mt-2 max-w-xl text-sm text-muted-foreground">
+          Pick 10 players, then play 82 games. Your progress saves as you go.
+        </p>
         <button
           type="button"
           onclick={startDraft}
           disabled={busy}
           class="mt-4 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          Start draft
+          {busy ? 'Starting…' : 'Start draft'}
         </button>
         {#if actionError}
           <p
@@ -437,8 +439,8 @@
     <div class="mt-8 flex flex-col gap-6 pb-[max(6rem,env(safe-area-inset-bottom))] sm:mt-10">
       {#if flow && manifest && board.draft}
         <div class="rounded-none bg-surface-1 sm:rounded-xl px-4 py-3">
-          <p class="font-mono text-[10px] break-words text-muted-foreground">
-            Your franchise:
+          <p class="text-sm text-muted-foreground">
+            Coaching
             <span class="font-bold text-foreground">
               {franchiseName(board.draft.participants[0]?.franchiseId ?? '—')}
             </span>
@@ -459,16 +461,16 @@
       {#if board.draft?.status === 'finalized'}
         <div class="rounded-none bg-surface-1 sm:rounded-xl p-6">
           <h2 class="font-display text-base font-extrabold uppercase tracking-tight">
-            Generate the AI league
+            Build the league
           </h2>
-          <p class="mt-2 text-sm text-muted-foreground">AI fills the other 29 teams.</p>
+          <p class="mt-2 text-sm text-muted-foreground">Fill the other 29 teams, then play.</p>
           <button
             type="button"
             onclick={generateLeague}
             disabled={busy || promoting}
             class="mt-4 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {board.phase === 'generating' ? 'Generating…' : 'Generate AI league'}
+            {board.phase === 'generating' ? 'Building…' : 'Build league'}
           </button>
 
           {#if generationError}
@@ -476,11 +478,9 @@
               role="alert"
               class="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
             >
-              <p class="font-semibold">Generation exhausted</p>
+              <p class="font-semibold">League setup hit a snag</p>
               <p class="mt-1 text-muted-foreground">{generationError}</p>
-              <p class="mt-1 font-mono text-[10px] text-muted-foreground">
-                Try regenerating — it may succeed.
-              </p>
+              <p class="mt-1 text-sm text-muted-foreground">Your draft is saved — try again.</p>
             </div>
           {/if}
         </div>
@@ -489,28 +489,24 @@
   {:else if board.draft?.status === 'complete' && board.generation}
     <div class="mt-10 flex max-w-2xl flex-col gap-6 pb-32">
       <div class="rounded-none bg-surface-1 sm:rounded-xl p-6">
-        <h2 class="font-display text-xl font-extrabold uppercase tracking-tight">
-          League generated
-        </h2>
-        <p class="mt-2 text-sm text-muted-foreground">League ready. Start your season.</p>
+        <h2 class="font-display text-xl font-extrabold uppercase tracking-tight">League ready</h2>
+        <p class="mt-2 text-sm text-muted-foreground">Your 10 are set. Time to play 82.</p>
         <button
           type="button"
           onclick={promote}
           disabled={promoting}
           class="mt-5 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {promoting ? 'Starting…' : 'Open the league hub'}
+          {promoting ? 'Starting…' : 'Start season'}
         </button>
         {#if promoteError}
           <div
             role="alert"
             class="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
           >
-            <p class="font-semibold">Could not promote the draft</p>
+            <p class="font-semibold">Couldn’t start the season</p>
             <p class="mt-1 text-muted-foreground">{promoteError}</p>
-            <p class="mt-1 font-mono text-[10px] text-muted-foreground">
-              The draft record stays intact; retry promotion.
-            </p>
+            <p class="mt-1 text-sm text-muted-foreground">Your draft is saved — try again.</p>
           </div>
         {/if}
       </div>

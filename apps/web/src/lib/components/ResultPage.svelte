@@ -152,11 +152,6 @@
 
 <section class="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
   <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">{eyebrow}</p>
-  <h1
-    class="font-display mt-2 text-3xl font-extrabold tracking-tight uppercase sm:text-4xl md:text-5xl"
-  >
-    Season report
-  </h1>
 
   {#if error}
     <div class="mt-8 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">

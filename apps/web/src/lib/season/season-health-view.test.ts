@@ -15,7 +15,6 @@ import {
   activeInjuriesOf,
   availabilityStripRows,
   humanInjuryTimeline,
-  injuryBandOf,
   injuryStatusOf,
   recoveryEstimate,
   recurrenceOf,
@@ -230,14 +229,5 @@ describe('humanInjuryTimeline', () => {
     expect(entry?.actualReturnRound).toBe(12);
     expect(entry?.recurrence).toBe(true);
     expect(entry?.removedClock).toEqual({ period: 2, seconds: 540 });
-  });
-});
-describe('injuryBandOf', () => {
-  it('labels every severity with a badge class', () => {
-    expect(injuryBandOf('minor').label).toBe('Minor');
-    expect(injuryBandOf('moderate').label).toBe('Moderate');
-    expect(injuryBandOf('major').label).toBe('Major');
-    expect(injuryBandOf('season-ending').label).toBe('Season-ending');
-    expect(injuryBandOf('minor').badge).toContain('bg-');
   });
 });

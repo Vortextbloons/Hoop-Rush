@@ -13,10 +13,12 @@ import { createRng } from '../../sim/rng.ts';
 import { fixedFiveAutopickSeed, fixedFiveAutopickSeedPath } from './seeds.ts';
 import {
   enumerateSandboxSafeMoves,
+  selectionKeepsFeasibility,
   type FixedFiveCandidate,
   type SandboxBuilderState,
 } from './sandbox-builder.ts';
 import type { DuelDraftState } from './duel.ts';
+import { sandboxDuelPicker, type SandboxDuelState } from './sandbox-duel.ts';
 
 export interface ClassicSafeMove {
   playerId: PlayerId;
@@ -90,6 +92,37 @@ export function enumerateDuelSafeMoves(
     (playerId, versionId) => claimed.has(versionId) || claimed.has(playerId),
     usedSlots,
   );
+  return rankAutopickMoves(moves);
+}
+
+export function enumerateSandboxDuelSafeMoves(
+  pool: readonly FixedFiveCandidate[],
+  state: SandboxDuelState,
+): ClassicSafeMove[] {
+  if (state.status !== 'drafting') return [];
+  const picker = sandboxDuelPicker(state);
+  const own = state.picks.filter((p) => p.participantId === picker);
+  const usedIds = new Set(own.map((p) => p.playerId));
+  const usedSlots = new Set(own.map((p) => p.slotIndex));
+  const moves: ClassicSafeMove[] = [];
+  for (const candidate of pool) {
+    if (usedIds.has(candidate.playerId)) continue;
+    for (const slot of [0, 1, 2, 3, 4] as SlotIndex[]) {
+      if (usedSlots.has(slot)) continue;
+      if (!canPlay(candidate.positions, slotRequirement(slot))) continue;
+      const trial = [
+        ...own.map((p) => ({ playerId: p.playerId, slotIndex: p.slotIndex })),
+        { playerId: candidate.playerId, slotIndex: slot },
+      ];
+      if (!selectionKeepsFeasibility(pool, trial)) continue;
+      moves.push({
+        playerId: candidate.playerId,
+        playerVersionId: candidate.playerVersionId,
+        slotIndex: slot,
+        selectionScore: candidate.selectionScore,
+      });
+    }
+  }
   return rankAutopickMoves(moves);
 }
 

@@ -455,18 +455,6 @@
         </h2>
 
         <div class="flex flex-wrap items-center gap-2">
-          <a
-            href={resolve('/season/run/checkpoint/?block=8' as any)}
-            class="inline-flex w-fit items-center justify-center gap-2 rounded-lg border border-border px-5 py-3 text-sm font-semibold text-muted-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground"
-          >
-            Review final block recap
-          </a>
-          <a
-            href={resolve('/season/run/league' as any)}
-            class="inline-flex w-fit items-center justify-center gap-2 rounded-lg border border-border px-5 py-3 text-sm font-semibold text-muted-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground"
-          >
-            Final standings
-          </a>
           <button
             type="button"
             data-season-start-postseason-button
@@ -475,11 +463,23 @@
             class="inline-flex w-fit items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {postseasonBusy
-              ? 'Starting postseason…'
+              ? 'Starting playoffs…'
               : postseasonSubmitting
                 ? 'Starting…'
-                : 'Start the postseason'}
+                : 'Start playoffs'}
           </button>
+          <a
+            href={resolve('/season/run/league' as any)}
+            class="inline-flex w-fit items-center justify-center gap-2 rounded-lg border border-border px-5 py-3 text-sm font-semibold text-muted-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground"
+          >
+            Final standings
+          </a>
+          <a
+            href={resolve('/season/run/checkpoint/?block=8' as any)}
+            class="inline-flex w-fit items-center justify-center gap-2 rounded-lg border border-border px-5 py-3 text-sm font-semibold text-muted-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground"
+          >
+            Last Block recap
+          </a>
         </div>
         {#if postseasonCommandError !== null}
           <p
@@ -528,10 +528,12 @@
               id="next-decision-heading"
               class="font-display text-lg font-extrabold uppercase tracking-tight"
             >
-              Next decision
+              {nextBlockIndex === null
+                ? 'Next block'
+                : `Play Block ${String(nextBlockIndex + 1)} of 9`}
             </h2>
-            <span class="font-mono text-[10px] text-muted-foreground">
-              {nextBlockIndex === null ? '—' : `${String(nextBlockIndex)} of 9 blocks complete.`}
+            <span class="text-xs text-muted-foreground">
+              {nextBlockIndex === null ? '—' : `${String(nextBlockIndex)} of 9 played.`}
             </span>
           </div>
 
@@ -588,7 +590,7 @@
                 Up next
               </h3>
               {#if nextOpponents.length === 0}
-                <p class="mt-2 text-sm text-muted-foreground">No human games in this block.</p>
+                <p class="mt-2 text-sm text-muted-foreground">No games for you in this block.</p>
               {:else}
                 <ol class="mt-2 flex flex-col gap-2">
                   {#each nextOpponents as game (game.gameId)}
@@ -624,18 +626,12 @@
               <h3
                 class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
               >
-                Pending rotation changes
+                Lineup
               </h3>
               {#if preview === null}
-                <p class="mt-2 text-sm text-muted-foreground">Preparing the lock preview…</p>
-              {:else if preview.unchangedSinceLastLock}
-                <p class="mt-2 text-sm text-muted-foreground">
-                  No rotation changes since the last checkpoint.
-                </p>
-              {:else if preview.changes.length === 0}
-                <p class="mt-2 text-sm text-muted-foreground">
-                  No changes from the saved baseline rotation.
-                </p>
+                <p class="mt-2 text-sm text-muted-foreground">Checking your lineup…</p>
+              {:else if preview.unchangedSinceLastLock || preview.changes.length === 0}
+                <p class="mt-2 text-sm text-muted-foreground">Lineup unchanged — ready to play.</p>
               {:else}
                 <p class="mt-2 text-sm">
                   <strong class="text-foreground">{preview.changes.length}</strong>
@@ -663,7 +659,7 @@
                 href={resolve('/season/run/team/' as any)}
                 class="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-primary underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring hover:underline"
               >
-                Adjust rotation
+                Change lineup
                 <span aria-hidden="true">&rarr;</span>
               </a>
             </div>
@@ -672,50 +668,30 @@
               <h3
                 class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
               >
-                What locks
+                This block
               </h3>
               {#if preview === null}
-                <p class="mt-2 text-sm text-muted-foreground">Preparing…</p>
+                <p class="mt-2 text-sm text-muted-foreground">Checking schedule…</p>
               {:else}
                 <p class="mt-2 text-sm text-muted-foreground">
-                  Locks rotation for the next {preview.gamesToLock === 1
+                  Plays {preview.gamesToLock === 1
                     ? '1 game'
-                    : `${String(preview.gamesToLock)} games`}.
+                    : `${String(preview.gamesToLock)} games`} with this lineup.
                 </p>
                 {#if preview.objective !== null}
                   <p class="mt-1 text-sm">
-                    Objective:
+                    Goal:
                     <strong class="text-foreground">{preview.objective.name}</strong>
-                    <span class="ml-1 font-mono text-[10px] text-muted-foreground">
-                      locks into this block
-                    </span>
                   </p>
                 {:else if nextBlockIndex !== null && nextBlockIndex < 8}
                   <p class="mt-1 text-sm text-amber-600 dark:text-amber-400">
-                    No objective selected yet — pick one above before submitting.
+                    Pick a goal above, then play.
                   </p>
                 {/if}
                 {#if preview.upcomingGames.length === 0}
-                  <p class="mt-2 text-sm text-muted-foreground">No human games scheduled.</p>
+                  <p class="mt-2 text-sm text-muted-foreground">No games for you in this block.</p>
                 {:else}
-                  <ol class="mt-1 flex flex-col gap-0.5">
-                    {#each preview.upcomingGames.slice(0, 4) as game (game.gameId)}
-                      <li class="flex items-center gap-2 text-sm">
-                        <span class="w-10 shrink-0 font-mono text-[10px] text-muted-foreground">
-                          R{game.round}
-                        </span>
-                        <span class="min-w-0 flex-1 truncate">
-                          {game.humanIsHome ? 'vs' : 'at'}
-                          {shell.franchiseName(game.opponentFranchiseId)}
-                        </span>
-                      </li>
-                    {/each}
-                  </ol>
-                  {#if preview.upcomingGames.length > 4}
-                    <p class="mt-1 font-mono text-[10px] text-muted-foreground">
-                      +{preview.upcomingGames.length - 4} more in this block
-                    </p>
-                  {/if}
+                  <p class="mt-2 text-sm text-muted-foreground">See opponents under Up next.</p>
                 {/if}
               {/if}
             </div>
@@ -727,8 +703,7 @@
                 role="alert"
                 class="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
               >
-                The rotation is invalid — fix the highlighted issues on the Rotation tab before
-                submitting.
+                Your lineup needs a fix — see the highlighted issues on the Rotation tab.
               </p>
             {/if}
             {#if submitError}
@@ -757,10 +732,12 @@
               class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 sm:text-base"
             >
               {block.phase === 'running'
-                ? 'Simulating block…'
+                ? 'Playing block…'
                 : submitting
-                  ? 'Preparing block…'
-                  : 'Lock rotation and simulate block'}
+                  ? 'Getting ready…'
+                  : nextBlockIndex === null
+                    ? 'Play block'
+                    : `Play Block ${String(nextBlockIndex + 1)}`}
             </button>
           </div>
 
@@ -1034,11 +1011,11 @@
             disabled={postseasonBusy || postseasonSubmitting}
             class="mt-3 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {postseasonBusy ? 'Simulating…' : 'Simulate to my next decision'}
+            {postseasonBusy ? 'Playing…' : 'Play to my next game'}
           </button>
         </section>
       {:else if nextGame?.kind === 'complete'}
-        <p class="mt-4 text-sm text-muted-foreground">Tournament complete.</p>
+        <p class="mt-4 text-sm text-muted-foreground">Season complete — see the champion above.</p>
       {/if}
 
       <div class="mt-4">

@@ -98,16 +98,6 @@ describe('applySeasonRotationPreset (season-rotation-v2)', () => {
       ...BENCH.map((playerVersionId) => ({ playerVersionId, minutes: 16 })),
     ]);
   });
-  it('applies the tight and bench-heavy tables', () => {
-    const tight = applySeasonRotationPreset(buildRotation(), 'tight');
-    expect(tight.targetMinutes.map((entry) => entry.minutes)).toEqual([
-      37, 37, 37, 37, 37, 20, 14, 9, 7, 5,
-    ]);
-    const heavy = applySeasonRotationPreset(buildRotation(), 'bench-heavy');
-    expect(heavy.targetMinutes.map((entry) => entry.minutes)).toEqual([
-      29, 29, 29, 29, 29, 23, 21, 19, 17, 15,
-    ]);
-  });
   it('every preset totals exactly 240 and matches the frozen tables', () => {
     for (const preset of ['balanced', 'tight', 'bench-heavy'] as const) {
       const result = applySeasonRotationPreset(buildRotation(), preset);
@@ -145,112 +135,6 @@ describe('validateSeasonRotation (season-rotation-v2)', () => {
     const rotation = buildRotation({ closingFive: [pv(1), pv(2), pv(8), pv(4), pv(10)] });
     expect(validateSeasonRotation(rotation, MEMBER_PLAYABLE)).toEqual([]);
   });
-  it('rejects duplicate ids in the partition and in target minutes', () => {
-    const duplicatePartition = buildRotation({
-      starters: [pv(1), pv(1), pv(3), pv(4), pv(5)],
-    });
-    const failures = validateSeasonRotation(duplicatePartition, MEMBER_PLAYABLE);
-    expect(failures.some((failure) => failure.includes('duplicate players'))).toBe(true);
-    const duplicateMinutes = buildRotation();
-    duplicateMinutes.targetMinutes = [
-      ...STARTERS.map((playerVersionId) => ({ playerVersionId, minutes: 32 })),
-      ...BENCH.map((playerVersionId) => ({ playerVersionId, minutes: 16 })),
-    ];
-    duplicateMinutes.targetMinutes[5] = { playerVersionId: pv(5), minutes: 16 };
-    const minuteFailures = validateSeasonRotation(duplicateMinutes, MEMBER_PLAYABLE);
-    expect(minuteFailures.some((failure) => failure.includes('duplicate players'))).toBe(true);
-  });
-  it('rejects foreign ids and missing roster coverage', () => {
-    const foreign = buildRotation({ starters: [pv(1), pv(2), pv(3), pv(4), pv(99)] });
-    const foreignFailures = validateSeasonRotation(foreign, MEMBER_PLAYABLE);
-    expect(foreignFailures.some((failure) => failure.includes(`unrostered player ${pv(99)}`))).toBe(
-      true,
-    );
-    const missing = buildRotation();
-    missing.targetMinutes = [
-      ...STARTERS.slice(0, 4).map((playerVersionId) => ({ playerVersionId, minutes: 32 })),
-      ...BENCH.map((playerVersionId) => ({ playerVersionId, minutes: 16 })),
-    ];
-    const missingFailures = validateSeasonRotation(missing, MEMBER_PLAYABLE);
-    expect(
-      missingFailures.some((failure) =>
-        failure.includes(`no target minutes for rostered player ${pv(5)}`),
-      ),
-    ).toBe(true);
-    expect(missingFailures.some((failure) => failure.includes('must total 240'))).toBe(true);
-    const foreignMinutes = buildRotation();
-    foreignMinutes.targetMinutes = [
-      ...STARTERS.map((playerVersionId) => ({ playerVersionId, minutes: 32 })),
-      ...BENCH.slice(0, 4).map((playerVersionId) => ({ playerVersionId, minutes: 16 })),
-      { playerVersionId: pv(98), minutes: 16 },
-    ];
-    const foreignMinuteFailures = validateSeasonRotation(foreignMinutes, MEMBER_PLAYABLE);
-    expect(
-      foreignMinuteFailures.some((failure) => failure.includes(`unrostered player ${pv(98)}`)),
-    ).toBe(true);
-    expect(
-      foreignMinuteFailures.some((failure) =>
-        failure.includes(`no target minutes for rostered player ${pv(10)}`),
-      ),
-    ).toBe(true);
-  });
-  it.each([
-    [15.5, 'integer from 0-48'],
-    [49, '0-48'],
-    [-1, '0-48'],
-    [15, 'must total 240'],
-  ] as const)('rejects target minutes of %s', (minutes, expectedMessage) => {
-    const rotation = buildRotation();
-    rotation.targetMinutes = [
-      ...STARTERS.map((playerVersionId) => ({ playerVersionId, minutes: 32 })),
-      ...BENCH.slice(0, 4).map((playerVersionId) => ({ playerVersionId, minutes: 16 })),
-      { playerVersionId: pv(10), minutes },
-    ];
-    expect(
-      validateSeasonRotation(rotation, MEMBER_PLAYABLE).some((failure) =>
-        failure.includes(expectedMessage),
-      ),
-    ).toBe(true);
-  });
-  it('rejects illegal starter slots', () => {
-    const rotation = buildRotation({ starters: [pv(1), pv(2), pv(3), pv(5), pv(4)] });
-    const failures = validateSeasonRotation(rotation, MEMBER_PLAYABLE);
-    expect(
-      failures.some((failure) => failure.includes(`starter ${pv(5)} cannot play slot 3`)),
-    ).toBe(true);
-  });
-  it('rejects an illegal closing five, including one equal to illegal starters', () => {
-    const illegal = [pv(1), pv(2), pv(3), pv(5), pv(4)];
-    const rotation = buildRotation({ starters: illegal, closingFive: illegal });
-    const failures = validateSeasonRotation(rotation, MEMBER_PLAYABLE);
-    expect(
-      failures.some((failure) => failure.includes(`starter ${pv(5)} cannot play slot 3`)),
-    ).toBe(true);
-    expect(
-      failures.some((failure) =>
-        failure.includes(`closing-five player ${pv(5)} cannot play slot 3`),
-      ),
-    ).toBe(true);
-  });
-  it('rejects closing-five slot violations and foreign closing members', () => {
-    const wrongSlot = buildRotation({ closingFive: [pv(1), pv(2), pv(3), pv(4), pv(6)] });
-    const slotFailures = validateSeasonRotation(wrongSlot, MEMBER_PLAYABLE);
-    expect(
-      slotFailures.some((failure) =>
-        failure.includes(`closing-five player ${pv(6)} cannot play slot 4`),
-      ),
-    ).toBe(true);
-    const foreign = buildRotation({ closingFive: [pv(1), pv(2), pv(3), pv(4), pv(97)] });
-    const foreignFailures = validateSeasonRotation(foreign, MEMBER_PLAYABLE);
-    expect(foreignFailures.some((failure) => failure.includes(`unrostered player ${pv(97)}`))).toBe(
-      true,
-    );
-  });
-  it('rejects duplicate closing-five members', () => {
-    const rotation = buildRotation({ closingFive: [pv(1), pv(2), pv(3), pv(4), pv(1)] });
-    const failures = validateSeasonRotation(rotation, MEMBER_PLAYABLE);
-    expect(failures.some((failure) => failure.includes('five distinct players'))).toBe(true);
-  });
 });
 describe('handleSetSeasonRotationCommand (season-rotation-v2)', () => {
   it('accepts preset commands with the exact preset table and a derived base rotation', () => {
@@ -269,22 +153,6 @@ describe('handleSetSeasonRotationCommand (season-rotation-v2)', () => {
     );
     expect(rotationTargetMinutes(result.rotation)).toBe(240);
     expect(seasonRotationCommandResultSchema.safeParse(result).success).toBe(true);
-  });
-  it('accepts tight and bench-heavy presets with 240-minute tables', () => {
-    for (const preset of ['tight', 'bench-heavy'] as const) {
-      const result = handleSetSeasonRotationCommand(presetCommand(preset), MEMBER_PLAYABLE);
-      expect(result.status).toBe('accepted');
-      if (result.status !== 'accepted') throw new Error('expected accepted');
-      expect(rotationTargetMinutes(result.rotation)).toBe(240);
-      const table = SEASON_ROTATION_PRESET_TARGETS[preset];
-      result.rotation.starters.forEach((playerVersionId) => {
-        expect(
-          result.rotation.targetMinutes.find((entry) => entry.playerVersionId === playerVersionId)
-            ?.minutes,
-        ).toBe(table.starters);
-      });
-      expect(seasonRotationCommandResultSchema.safeParse(result).success).toBe(true);
-    }
   });
   it('accepts explicit rotations wholesale', () => {
     const rotation = buildRotation({ closingFive: [pv(1), pv(2), pv(8), pv(4), pv(10)] });

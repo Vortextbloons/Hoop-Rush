@@ -131,9 +131,7 @@
   <section aria-labelledby="league-heading" class="min-w-0 pt-6">
     <div class="flex flex-col gap-3 px-3 sm:flex-row sm:items-end sm:justify-between sm:px-0">
       <div class="min-w-0">
-        <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">
-          Season Run · league
-        </p>
+        <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">Season Run</p>
         <h1
           id="league-heading"
           class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase sm:text-3xl"

@@ -147,6 +147,6 @@
   />
 
   <div class="mt-6 rounded-xl border border-border bg-surface-1 p-4 sm:p-5">
-    <p class="text-sm text-muted-foreground">One negotiation at a time, up to 3 exchanges.</p>
+    <p class="text-sm text-muted-foreground">One deal at a time, up to 3 offers each.</p>
   </div>
 </div>

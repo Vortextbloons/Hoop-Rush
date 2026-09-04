@@ -213,7 +213,7 @@ describe('hub: regular-season stage', () => {
     const { container } = render(SeasonRunShellWrapper, { props: { shell: baseShell() } });
     const submit = container.querySelector('button[data-can-submit]');
     expect(submit).not.toBeNull();
-    expect(submit?.textContent).toContain('Lock rotation and simulate block');
+    expect(submit?.textContent).toContain('Play Block');
     expect(container.querySelector('[data-season-start-postseason]')).toBeNull();
   });
   it('offers the Start-postseason action once the regular season completes', async () => {

@@ -286,12 +286,12 @@ describe('InfluencePanel', () => {
     });
     const text = document.body.textContent;
     expect(text).toContain('3');
-    expect(text).toContain('spendable this window');
-    expect(text).toContain('Extra trade offer');
-    expect(text).toContain('Risky rehab');
-    const spendButton = screen.getByRole('button', { name: /Spend 1/ });
+    expect(text).toContain('Earn it with wins and goals');
+    expect(text).toContain('Extra trade talk');
+    expect(text).toContain('Injury rehab');
+    const spendButton = screen.getByRole('button', { name: /Use 1/ });
     await fireEvent.click(spendButton);
-    await fireEvent.click(screen.getByRole('button', { name: 'Confirm spend' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
     expect(onSpend).toHaveBeenCalledTimes(1);
     expect(onSpend.mock.calls[0]?.[0]).toMatchObject({ purpose: 'extra-trade-offer', cost: 1 });
   });
@@ -323,7 +323,7 @@ describe('InfluencePanel', () => {
       },
     });
     const text = document.body.textContent;
-    expect(text).toContain('Outcome: failure');
+    expect(text).toContain('Setback');
   });
 });
 function tradePanelProps(
@@ -403,18 +403,19 @@ describe('InterruptionPanel', () => {
       },
     });
     const text = document.body.textContent;
-    expect(text).toContain('no legal five');
+    expect(text).toContain('Not enough healthy players');
     expect(text).toContain('Player 1');
     expect(text).toContain('Player 2');
-    expect(text).toContain('1 · Repair the rotation');
-    expect(text).toContain('2 · Risky rehab');
-    expect(text).toContain('3 · Forfeit the next game');
+    expect(text).toContain('Fix your lineup');
+    expect(text).toContain('Try rehab');
+    expect(text).toContain('Skip the game');
     expect(screen.getByRole('link', { name: /Open Rotation/ })).toBeTruthy();
-    await fireEvent.click(screen.getByRole('button', { name: /Forfeit game s000105/ }));
-    expect(screen.getByRole('heading', { name: /Forfeit game s000105\?/ })).toBeTruthy();
-    await fireEvent.click(screen.getByRole('button', { name: 'Forfeit the game' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Skip game' }));
+    expect(screen.getByRole('heading', { name: /Skip this game\?/ })).toBeTruthy();
+    const skipButtons = screen.getAllByRole('button', { name: 'Skip game' });
+    await fireEvent.click(skipButtons[skipButtons.length - 1] as HTMLElement);
     expect(onForfeit).toHaveBeenCalledTimes(1);
-    await fireEvent.click(screen.getByRole('button', { name: 'Resume block' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Play on' }));
     expect(onResume).toHaveBeenCalledTimes(1);
   });
   it('renders after a reload without the typed interruption', () => {
@@ -432,8 +433,7 @@ describe('InterruptionPanel', () => {
       },
     });
     const text = document.body.textContent;
-    expect(text).toContain('Block paused');
-    expect(text).toContain('s000105');
+    expect(text).toContain('Not enough healthy players');
   });
 });
 describe('CheckpointRecap (M2.5)', () => {
@@ -499,10 +499,9 @@ describe('CheckpointRecap (M2.5)', () => {
     expect(text).toContain('Health');
     expect(text).toContain('Out');
     expect(text).toContain('Recurrence risk');
-    expect(text).toContain('Injuries this block');
-    expect(text).toContain('Injuries: 3 this block');
+    expect(text).toContain('3 injuries');
     expect(text).toContain('win-six');
-    expect(text).toContain('Success · +1 Influence');
-    expect(text).toContain('Influence +1 (now 4)');
+    expect(text).toContain('Hit · +1 Influence');
+    expect(text).toContain('Influence 4');
   });
 });

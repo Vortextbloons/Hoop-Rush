@@ -29,13 +29,23 @@ function isRollAffecting(
 export function rollAnimationFor(
   commands: FixedFiveCommand[],
   mode: FixedFiveRoomMode,
+  viewer: 'p1' | 'p2' | null = null,
 ): RollAnimation {
   let nonce = 0;
   let axis: RollAnimationAxis = 'both';
   for (const command of commands) {
     if (!isRollAffecting(mode, command.payload.kind)) continue;
-    if (command.ordinal < nonce) continue;
-    nonce = command.ordinal;
+    if (
+      mode === 'classic-shared-82' &&
+      viewer !== null &&
+      command.payload.kind !== 'start' &&
+      command.actorParticipantId !== viewer
+    ) {
+      continue;
+    }
+    const candidate = command.ordinal + 1;
+    if (candidate < nonce) continue;
+    nonce = candidate;
     axis = command.payload.kind === 'reroll' ? command.payload.axis : 'both';
   }
   return { nonce, axis };

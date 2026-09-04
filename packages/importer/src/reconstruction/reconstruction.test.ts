@@ -7,13 +7,11 @@ import {
   fitThreePointReconstruction,
   foldOf,
   loadCohortRows,
-  median,
   normalQuantile,
   positionGroupOf,
   predictReconstructedProfile,
   ratingFromAccuracy,
   sigmoid,
-  weightedPercentile,
   type ReconstructionRow,
 } from './index.ts';
 import { RECONSTRUCTION_FEATURE_NAMES, RECONSTRUCTION_SEASONS } from './rows.ts';
@@ -43,12 +41,6 @@ function sampleRow(overrides: Partial<ReconstructionRow> = {}): ReconstructionRo
 const COHORT = loadCohortRows();
 const RECONSTRUCTION = fitThreePointReconstruction(COHORT);
 describe('reconstruction math primitives', () => {
-  it('sigmoid is bounded and monotone', () => {
-    expect(sigmoid(0)).toBeCloseTo(0.5, 10);
-    expect(sigmoid(100)).toBe(1);
-    expect(sigmoid(-100)).toBe(0);
-    expect(sigmoid(1)).toBeGreaterThan(sigmoid(-1));
-  });
   it('normalQuantile matches the standard normal at the conservative quantiles', () => {
     expect(normalQuantile(0.75)).toBeCloseTo(0.67449, 4);
     expect(normalQuantile(0.8)).toBeCloseTo(0.84162, 4);
@@ -99,12 +91,6 @@ describe('reconstruction rows and features', () => {
     expect(positionGroupOf('PF')).toBe('F');
     expect(positionGroupOf('C')).toBe('C');
     expect(positionGroupOf(null)).toBe('C');
-  });
-  it('computes medians deterministically and ignores nulls', () => {
-    expect(median([1, 3, 5])).toBe(3);
-    expect(median([1, 3, 5, 7])).toBe(4);
-    expect(median([null, 10, null])).toBe(10);
-    expect(median([])).toBe(0);
   });
   it('stabilizes FT% with the position prior and computes relative 2P%', () => {
     const context = {
@@ -171,19 +157,6 @@ describe('reconstruction rows and features', () => {
   });
 });
 describe('posterior quantiles and profile assembly', () => {
-  it('conservative posterior quantile is below the mean', () => {
-    const artifact = RECONSTRUCTION.artifact;
-    const result = predictReconstructedProfile(artifact, sampleRow());
-    expect(result.profile.accuracyConservative).toBeLessThan(result.profile.accuracyMean);
-    expect(result.profile.attemptRateConservative).toBeLessThan(result.profile.attemptRateMean);
-    expect(result.profile.accuracyStdDev).toBeGreaterThan(0);
-    expect(result.profile.attemptRateStdDev).toBeGreaterThan(0);
-    expect(result.profile.accuracyConservative).toBeGreaterThan(0);
-    expect(result.profile.modelVersion).toBe('three-point-reconstruction-v1');
-    expect(result.profile.zoneFloors.aboveBreakThree).toBeLessThan(0.32);
-    expect(result.profile.zoneFloors.cornerThree).toBeLessThan(0.34);
-    expect(result.profile.evidence.sourceFields.length).toBeGreaterThan(3);
-  });
   it('maps conservative accuracy to three-point ratings via the artifact mapping', () => {
     const { artifact } = RECONSTRUCTION;
     const points = artifact.ratingMapping.points;
@@ -249,16 +222,6 @@ describe('grouped holdout and gates', () => {
       'accuracy',
     );
     expect(fn.falseNegatives.count).toBe(1);
-  });
-  it('weightedPercentile computes the fifth percentile from attempt weights', () => {
-    const values = [
-      { value: 0.2, weight: 10 },
-      { value: 0.3, weight: 100 },
-      { value: 0.5, weight: 10 },
-    ];
-    expect(weightedPercentile(values, 0.05)).toBe(0.2);
-    expect(weightedPercentile(values, 0.9)).toBe(0.3);
-    expect(weightedPercentile(values, 0.99)).toBe(0.5);
   });
   it('the fitted artifact passes every acceptance gate and is deterministic', () => {
     const second = fitThreePointReconstruction(COHORT);

@@ -35,14 +35,18 @@ import {
   applySandboxBuilderCommand,
   chooseAutopick,
   claimDuelPlayer,
+  claimSandboxDuelPlayer,
   createDuelDraft,
   createEngineContext,
   createParticipantClassicDraft,
+  createSandboxDuelDraft,
   duelCurrentPicker,
   createSandboxBuilder,
   enumerateClassicSafeMoves,
   enumerateDuelSafeMoves,
+  enumerateSandboxDuelSafeMoves,
   enumerateSandboxSafeMoves,
+  sandboxDuelPicker,
   fixedFiveDraftSeed,
   fixedFiveResultDigest,
   fixedFiveTiebreakWinner,
@@ -56,6 +60,7 @@ import {
   type EngineContext,
   type FixedFiveCandidate,
   type SandboxBuilderState,
+  type SandboxDuelState,
 } from '@hoop-rush/engine';
 import { buildClassicCatalog } from '$lib/classic-draft';
 import { getPlayersIndex } from '$lib/data';
@@ -129,10 +134,17 @@ export interface DuelDraftReplay {
   skipped: number;
 }
 
+export interface SandboxDuelDraftReplay {
+  hasStart: boolean;
+  state: SandboxDuelState;
+  skipped: number;
+}
+
 export type DraftReplay =
   | ({ mode: 'classic-shared-82' } & ClassicDraftReplay)
   | ({ mode: 'sandbox-shared-82' } & SandboxDraftReplay)
-  | ({ mode: 'duel' } & DuelDraftReplay);
+  | ({ mode: 'duel' } & DuelDraftReplay)
+  | ({ mode: 'sandbox-duel' } & SandboxDuelDraftReplay);
 
 function draftIdFor(roomId: string, participant: FixedFiveParticipantId): string {
   return `${roomId.slice(0, 48)}:${participant}`;
@@ -207,8 +219,31 @@ function applyDuelPayload(
   return state;
 }
 
-function isDraftPayload(mode: FixedFiveRoomMode, kind: FixedFiveCommandPayload['kind']): boolean {
+function applySandboxDuelPayload(
+  state: SandboxDuelState,
+  assets: FixedFiveAssets,
+  command: FixedFiveCommand,
+): SandboxDuelState {
+  const payload = command.payload;
+  if (payload.kind === 'sandbox-place' || payload.kind === 'timeout-autopick') {
+    return claimSandboxDuelPlayer(state, assets.pool, {
+      playerId: payload.playerId,
+      slotIndex: payload.slotIndex,
+      actor: command.actorParticipantId,
+    });
+  }
+  return state;
+}
+
+function isDraftPayload(
+  mode: FixedFiveRoomMode,
+  kind: FixedFiveCommandPayload['kind'],
+  sandboxDuel = false,
+): boolean {
   if (mode === 'duel') {
+    if (sandboxDuel) {
+      return kind === 'sandbox-place' || kind === 'timeout-autopick';
+    }
     return (
       kind === 'reroll' ||
       kind === 'duel-claim' ||
@@ -235,9 +270,23 @@ export function replayFixedFiveLog(
   variant: FixedFiveRoomSettings['variant'],
   assets: FixedFiveAssets,
   commands: FixedFiveCommand[],
+  sourceMode: FixedFiveRoomSettings['sourceMode'] = 'classic',
 ): DraftReplay {
   const ordered = [...commands].sort((a, b) => a.ordinal - b.ordinal);
   const hasStart = ordered.some((c) => c.payload.kind === 'start');
+  if (mode === 'duel' && sourceMode === 'sandbox') {
+    let state = createSandboxDuelDraft(rootSeed);
+    let skipped = 0;
+    for (const command of ordered) {
+      if (!isDraftPayload(mode, command.payload.kind, true)) continue;
+      try {
+        state = applySandboxDuelPayload(state, assets, command);
+      } catch {
+        skipped += 1;
+      }
+    }
+    return { mode: 'sandbox-duel', hasStart, state, skipped };
+  }
   if (mode === 'duel') {
     let state = createDuelDraft(rootSeed, assets.catalog, assets.poolById, assets.context);
     let skipped = 0;
@@ -303,6 +352,7 @@ export function replayFixedFiveLog(
 
 export function isDraftComplete(replay: DraftReplay): boolean {
   if (replay.mode === 'duel') return replay.state.status === 'complete';
+  if (replay.mode === 'sandbox-duel') return replay.state.status === 'complete';
   if (replay.mode === 'sandbox-shared-82') return replay.p1.locked && replay.p2.locked;
   return replay.p1.status === 'complete' && replay.p2.status === 'complete';
 }
@@ -318,6 +368,9 @@ export function isFixedFiveDraftTurn(
       duelCurrentPicker(replay.state) === participant
     );
   }
+  if (replay.mode === 'sandbox-duel') {
+    return replay.state.status === 'drafting' && sandboxDuelPicker(replay.state) === participant;
+  }
   if (replay.mode === 'sandbox-shared-82') {
     return !(participant === 'p1' ? replay.p1 : replay.p2).locked;
   }
@@ -326,6 +379,9 @@ export function isFixedFiveDraftTurn(
 
 export function picksCommittedOf(replay: DraftReplay, participant: FixedFiveParticipantId): number {
   if (replay.mode === 'duel') {
+    return replay.state.picks.filter((p) => p.participantId === participant).length;
+  }
+  if (replay.mode === 'sandbox-duel') {
     return replay.state.picks.filter((p) => p.participantId === participant).length;
   }
   if (replay.mode === 'sandbox-shared-82') {
@@ -338,6 +394,7 @@ export function picksCommittedOf(replay: DraftReplay, participant: FixedFivePart
 
 export function lockedOf(replay: DraftReplay, participant: FixedFiveParticipantId): boolean {
   if (replay.mode === 'duel') return replay.state.status === 'complete';
+  if (replay.mode === 'sandbox-duel') return replay.state.status === 'complete';
   if (replay.mode === 'sandbox-shared-82') {
     return (participant === 'p1' ? replay.p1 : replay.p2).locked;
   }
@@ -471,6 +528,20 @@ export function refsForParticipant(
         slotIndex: p.slotIndex,
       }));
   }
+  if (replay.mode === 'sandbox-duel') {
+    return replay.state.picks
+      .filter((p) => p.participantId === participant)
+      .map((pick) => {
+        const candidate = assets.poolById.get(pick.playerId);
+        if (!candidate) throw new Error(`sandbox duel pick ${pick.playerId} has no pool record`);
+        return {
+          playerId: pick.playerId,
+          franchiseId: candidate.franchiseId,
+          eraId: candidate.eraId,
+          slotIndex: pick.slotIndex,
+        };
+      });
+  }
   if (replay.mode === 'sandbox-shared-82') {
     const builder = participant === 'p1' ? replay.p1 : replay.p2;
     return builder.placements.map((placement) => {
@@ -587,6 +658,7 @@ export function saveActivityNow(roomId: string): void {
 
 export function pickOrdinalOf(replay: DraftReplay, participant: FixedFiveParticipantId): number {
   if (replay.mode === 'duel') return replay.state.pickOrdinal;
+  if (replay.mode === 'sandbox-duel') return replay.state.pickOrdinal;
   if (replay.mode === 'sandbox-shared-82') {
     return (participant === 'p1' ? replay.p1 : replay.p2).placements.length;
   }
@@ -615,6 +687,12 @@ export function computeDueAutopick(
     return chooseAutopick(rootSeed, mode, participant, ordinal, safe);
   }
   if (mode === 'duel') {
+    if (replay.mode === 'sandbox-duel') {
+      if (!isFixedFiveDraftTurn(replay, participant)) return null;
+      const safe = enumerateSandboxDuelSafeMoves(assets.pool, replay.state);
+      if (safe.length === 0) return null;
+      return chooseAutopick(rootSeed, mode, participant, ordinal, safe);
+    }
     if (replay.mode !== 'duel') return null;
     if (!isFixedFiveDraftTurn(replay, participant)) return null;
     const safe = enumerateDuelSafeMoves(assets.catalog, assets.poolById, replay.state);

@@ -4,10 +4,7 @@
   import { resolve } from '$app/paths';
   import { Swords, Zap, Trophy, Plus, LogIn, ArrowLeft } from '@lucide/svelte';
   import type { FixedFiveRoomMode, FixedFiveSourceMode } from '@hoop-rush/data-contracts';
-  import {
-    getFixedFiveTransport,
-    isFixedFiveSupabaseConfigured,
-  } from '$lib/fixed-five-transport';
+  import { getFixedFiveTransport, isFixedFiveSupabaseConfigured } from '$lib/fixed-five-transport';
   import {
     friendlyFixedFiveJoinError,
     loadLastFixedFiveRoomId,
@@ -67,9 +64,7 @@
         mode === 'duel' ? sourceMode : mode === 'classic-shared-82' ? 'classic' : 'sandbox';
       const created = await t.create({ mode, sourceMode: source, variant, versions: versions() });
       saveFixedFiveMembership({ ...created.membership, code: created.code });
-      await goto(
-        resolve('/multiplayer/room/[roomId]', { roomId: created.snapshot.roomId }),
-      );
+      await goto(resolve('/multiplayer/room/[roomId]', { roomId: created.snapshot.roomId }));
     } catch (e) {
       error = friendlyFixedFiveJoinError(e);
       if (!isFixedFiveSupabaseConfigured())
@@ -94,7 +89,21 @@
     error = null;
     try {
       const snap = await transport().preview(code);
-      preview = `${snap.settings.mode} · ${snap.phase}`;
+      const modeName =
+        snap.settings.mode === 'duel'
+          ? 'Duel'
+          : snap.settings.mode === 'sandbox-shared-82'
+            ? 'Sandbox Season'
+            : 'Shared Season';
+      const phaseName =
+        snap.phase === 'lobby'
+          ? 'waiting to start'
+          : snap.phase === 'drafting'
+            ? 'drafting now'
+            : snap.phase === 'completed'
+              ? 'finished'
+              : 'playing';
+      preview = `${modeName} · ${phaseName}`;
     } catch (e) {
       error = friendlyFixedFiveJoinError(e);
       preview = null;
@@ -126,7 +135,6 @@
     if (!lastRoomId) return;
     await goto(resolve('/multiplayer/room/[roomId]', { roomId: lastRoomId }));
   }
-
 </script>
 
 <svelte:head>
@@ -142,22 +150,21 @@
       <span aria-hidden="true">←</span> Home
     </a>
     <div>
-      <p class="text-label text-primary">Multiplayer · Fixed-five live rooms</p>
+      <p class="text-label text-primary">Multiplayer · Live rooms</p>
       <h1 class="font-display mt-2 text-4xl font-extrabold tracking-tight uppercase sm:text-5xl">
         Play head to head
       </h1>
       <p class="mt-3 max-w-2xl text-sm text-muted-foreground">
-        Live rooms only. Classic Shared 82, Sandbox Shared 82, and Duel. Both clients simulate
-        locally; the first publishes a digest and the peer confirms it.
+        Same draft, same season, head-to-head. Shared Season, Sandbox Season, and Duel — best of 7.
       </p>
     </div>
   </div>
 
   {#if !isFixedFiveSupabaseConfigured()}
     <div class="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm">
-      <p class="font-semibold text-amber-600">Multiplayer not configured</p>
+      <p class="font-semibold text-amber-600">Online play is offline</p>
       <p class="mt-1 text-muted-foreground">
-        Running with a local test transport. Solo Classic/Sandbox still work.
+        Couldn’t reach the lobby. Solo Classic and Sandbox still work.
       </p>
     </div>
   {/if}
@@ -193,7 +200,7 @@
           Start a room
         </h2>
         <p class="mt-2 text-sm text-muted-foreground">
-          Pick a fixed-five mode, freeze the variant, share a 4-digit code.
+          Pick a mode and ratings, share a 4-digit code.
         </p>
       </button>
       <button
@@ -209,9 +216,7 @@
         <h2 class="font-display mt-5 text-2xl font-extrabold tracking-tight uppercase">
           Join a room
         </h2>
-        <p class="mt-2 text-sm text-muted-foreground">
-          Enter 4 digits or open an invite link (/multiplayer?code=0042).
-        </p>
+        <p class="mt-2 text-sm text-muted-foreground">Enter the 4-digit code from your opponent.</p>
       </button>
     </div>
     <div class="mt-6 flex flex-wrap justify-center gap-2 text-xs text-muted-foreground">
@@ -223,121 +228,119 @@
       >
     </div>
   {:else if view === 'create'}
-      <div class="rounded-2xl bg-surface-1 p-6 sm:p-7">
-        <div class="flex items-center justify-between">
-          <h3 class="font-display text-sm font-extrabold tracking-widest uppercase">
-            Pick your battle
-          </h3>
-          <button
-            type="button"
-            onclick={() => (view = 'choose')}
-            class="inline-flex items-center gap-1.5 rounded-lg border border-line-soft bg-card px-3 py-1.5 text-xs font-semibold"
-          >
-            <ArrowLeft class="h-3.5 w-3.5" /> Back
-          </button>
-        </div>
-        <div class="mt-4 grid gap-3 sm:grid-cols-3">
-          <button
-            type="button"
-            onclick={() => (mode = 'classic-shared-82')}
-            class="rounded-xl border p-4 text-left {mode === 'classic-shared-82'
-              ? 'border-primary bg-primary/10 ring-1 ring-primary'
-              : 'border-line-soft bg-card'}"
-          >
-            <Swords class="h-5 w-5 text-muted-foreground" />
-            <p class="font-display mt-3 text-sm font-extrabold uppercase">Classic Shared 82</p>
-            <p class="mt-1 text-xs text-muted-foreground">
-              Linked 82-game gauntlets · H2H mirrored · 90s picks
-            </p>
-          </button>
-          <button
-            type="button"
-            onclick={() => (mode = 'sandbox-shared-82')}
-            class="rounded-xl border p-4 text-left {mode === 'sandbox-shared-82'
-              ? 'border-primary bg-primary/10 ring-1 ring-primary'
-              : 'border-line-soft bg-card'}"
-          >
-            <Zap class="h-5 w-5 text-muted-foreground" />
-            <p class="font-display mt-3 text-sm font-extrabold uppercase">Sandbox Shared 82</p>
-            <p class="mt-1 text-xs text-muted-foreground">
-              Free-pick five · same player legal on both teams · 5m build
-            </p>
-          </button>
-          <button
-            type="button"
-            onclick={() => (mode = 'duel')}
-            class="rounded-xl border p-4 text-left {mode === 'duel'
-              ? 'border-primary bg-primary/10 ring-1 ring-primary'
-              : 'border-line-soft bg-card'}"
-          >
-            <Trophy class="h-5 w-5 text-muted-foreground" />
-            <p class="font-display mt-3 text-sm font-extrabold uppercase">Duel</p>
-            <p class="mt-1 text-xs text-muted-foreground">
-              Best-of-seven · alternating Classic roll draft · 90s picks
-            </p>
-          </button>
-        </div>
-        {#if mode === 'duel'}
-          <div class="mt-4 grid gap-2 sm:grid-cols-2">
-            <button
-              type="button"
-              onclick={() => (sourceMode = 'classic')}
-              class="rounded-xl border p-4 text-left {sourceMode === 'classic'
-                ? 'border-primary bg-primary/10'
-                : 'border-line-soft bg-card'}"
-            >
-              <p class="text-sm font-bold">From Classic</p>
-              <p class="text-xs text-muted-foreground">History labels this duel Classic</p>
-            </button>
-            <button
-              type="button"
-              onclick={() => (sourceMode = 'sandbox')}
-              class="rounded-xl border p-4 text-left {sourceMode === 'sandbox'
-                ? 'border-primary bg-primary/10'
-                : 'border-line-soft bg-card'}"
-            >
-              <p class="text-sm font-bold">From Sandbox</p>
-              <p class="text-xs text-muted-foreground">History labels this duel Sandbox</p>
-            </button>
-          </div>
-        {/if}
+    <div class="rounded-2xl bg-surface-1 p-6 sm:p-7">
+      <div class="flex items-center justify-between">
+        <h3 class="font-display text-sm font-extrabold tracking-widest uppercase">
+          Pick your battle
+        </h3>
+        <button
+          type="button"
+          onclick={() => (view = 'choose')}
+          class="inline-flex items-center gap-1.5 rounded-lg border border-line-soft bg-card px-3 py-1.5 text-xs font-semibold"
+        >
+          <ArrowLeft class="h-3.5 w-3.5" /> Back
+        </button>
+      </div>
+      <div class="mt-4 grid gap-3 sm:grid-cols-3">
+        <button
+          type="button"
+          onclick={() => (mode = 'classic-shared-82')}
+          class="rounded-xl border p-4 text-left {mode === 'classic-shared-82'
+            ? 'border-primary bg-primary/10 ring-1 ring-primary'
+            : 'border-line-soft bg-card'}"
+        >
+          <Swords class="h-5 w-5 text-muted-foreground" />
+          <p class="font-display mt-3 text-sm font-extrabold uppercase">Shared Season</p>
+          <p class="mt-1 text-xs text-muted-foreground">Same 82 games, head-to-head · 90s picks</p>
+        </button>
+        <button
+          type="button"
+          onclick={() => (mode = 'sandbox-shared-82')}
+          class="rounded-xl border p-4 text-left {mode === 'sandbox-shared-82'
+            ? 'border-primary bg-primary/10 ring-1 ring-primary'
+            : 'border-line-soft bg-card'}"
+        >
+          <Zap class="h-5 w-5 text-muted-foreground" />
+          <p class="font-display mt-3 text-sm font-extrabold uppercase">Sandbox Season</p>
+          <p class="mt-1 text-xs text-muted-foreground">
+            Pick any five · both teams can share players
+          </p>
+        </button>
+        <button
+          type="button"
+          onclick={() => (mode = 'duel')}
+          class="rounded-xl border p-4 text-left {mode === 'duel'
+            ? 'border-primary bg-primary/10 ring-1 ring-primary'
+            : 'border-line-soft bg-card'}"
+        >
+          <Trophy class="h-5 w-5 text-muted-foreground" />
+          <p class="font-display mt-3 text-sm font-extrabold uppercase">Duel</p>
+          <p class="mt-1 text-xs text-muted-foreground">Best of 7 · take turns drafting</p>
+        </button>
+      </div>
+      {#if mode === 'duel'}
         <div class="mt-4 grid gap-2 sm:grid-cols-2">
           <button
             type="button"
-            onclick={() => (variant = 'ratings')}
-            class="rounded-xl border p-4 text-left {variant === 'ratings'
+            onclick={() => (sourceMode = 'classic')}
+            class="rounded-xl border p-4 text-left {sourceMode === 'classic'
               ? 'border-primary bg-primary/10'
               : 'border-line-soft bg-card'}"
           >
-            <p class="text-sm font-bold">Ratings</p>
-            <p class="text-xs text-muted-foreground">Frozen for both players</p>
+            <p class="text-sm font-bold">From Classic</p>
+            <p class="text-xs text-muted-foreground">Franchise & decade roll draft</p>
           </button>
           <button
             type="button"
-            onclick={() => (variant = 'ball-knowledge')}
-            class="rounded-xl border p-4 text-left {variant === 'ball-knowledge'
+            onclick={() => (sourceMode = 'sandbox')}
+            class="rounded-xl border p-4 text-left {sourceMode === 'sandbox'
               ? 'border-primary bg-primary/10'
               : 'border-line-soft bg-card'}"
           >
-            <p class="text-sm font-bold">Ball Knowledge</p>
-            <p class="text-xs text-muted-foreground">Frozen for both players</p>
+            <p class="text-sm font-bold">From Sandbox</p>
+            <p class="text-xs text-muted-foreground">
+              Free-pick duel — any player, stars can repeat
+            </p>
           </button>
         </div>
+      {/if}
+      <div class="mt-4 grid gap-2 sm:grid-cols-2">
         <button
           type="button"
-          onclick={startCreate}
-          disabled={busy}
-          class="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground disabled:opacity-40"
+          onclick={() => (variant = 'ratings')}
+          class="rounded-xl border p-4 text-left {variant === 'ratings'
+            ? 'border-primary bg-primary/10'
+            : 'border-line-soft bg-card'}"
         >
-          {busy ? 'Creating…' : 'Create room →'}
+          <p class="text-sm font-bold">Ratings</p>
+          <p class="text-xs text-muted-foreground">Same ratings for both players</p>
         </button>
-        {#if error}<p
-            role="alert"
-            class="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
-          >
-            {error}
-          </p>{/if}
+        <button
+          type="button"
+          onclick={() => (variant = 'ball-knowledge')}
+          class="rounded-xl border p-4 text-left {variant === 'ball-knowledge'
+            ? 'border-primary bg-primary/10'
+            : 'border-line-soft bg-card'}"
+        >
+          <p class="text-sm font-bold">Ball Knowledge</p>
+          <p class="text-xs text-muted-foreground">No ratings — draft on memory</p>
+        </button>
       </div>
+      <button
+        type="button"
+        onclick={startCreate}
+        disabled={busy}
+        class="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground disabled:opacity-40"
+      >
+        {busy ? 'Creating…' : 'Create room →'}
+      </button>
+      {#if error}<p
+          role="alert"
+          class="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
+        >
+          {error}
+        </p>{/if}
+    </div>
   {:else}
     <div class="mx-auto max-w-md rounded-2xl bg-surface-1 p-6 sm:p-8">
       <button

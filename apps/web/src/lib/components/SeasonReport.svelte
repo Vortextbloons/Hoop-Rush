@@ -1,5 +1,15 @@
 <script lang="ts">
-  import { RotateCcw, Pencil, RefreshCw } from '@lucide/svelte';
+  import {
+    ArrowRight,
+    Calendar,
+    ChevronDown,
+    Gamepad2,
+    Pencil,
+    RefreshCw,
+    RotateCcw,
+    ShieldCheck,
+    Trophy,
+  } from '@lucide/svelte';
   import type {
     ChallengeRun,
     ExplanationFact,
@@ -43,6 +53,7 @@
     editTeamHref?: SandboxHref | null;
   } = $props();
   let totalsMode = $state(false);
+  let tab = $state<'overview' | 'games' | 'players' | 'team'>('overview');
   function franchiseLabel(franchiseId: string | null): string {
     return franchiseId ? franchiseAbbreviation(franchiseId) : 'Mixed';
   }
@@ -98,6 +109,34 @@
   );
   const opponentPointsPerGame = $derived(opponentPoints / gamesPlayed);
   const pointDifferential = $derived((record?.points ?? 0) - opponentPoints);
+  const opponentTotals = $derived.by(() => {
+    let points = 0;
+    let fgm = 0;
+    let fga = 0;
+    let tpm = 0;
+    let tpa = 0;
+    let reb = 0;
+    let tov = 0;
+    for (const game of run.games) {
+      const box = game.away.box;
+      points += box.points;
+      fgm += box.fieldGoals.made;
+      fga += box.fieldGoals.attempted;
+      tpm += box.threes.made;
+      tpa += box.threes.attempted;
+      reb += box.rebounds.total;
+      tov += box.turnovers;
+    }
+    return { points, fgm, fga, tpm, tpa, reb, tov };
+  });
+  const lastGames = $derived(run.games.slice(-4));
+  const heroNote = $derived(
+    run.outcome === 'perfect'
+      ? 'Perfect season'
+      : run.firstLossGameNumber !== null
+        ? `First loss · game ${run.firstLossGameNumber}`
+        : `after ${gamesPlayed} game${gamesPlayed === 1 ? '' : 's'}`,
+  );
   const explanation = $derived(explainSeason(run));
   const firstLoss = $derived.by(
     (): {
@@ -206,24 +245,192 @@
   function toggleMode() {
     totalsMode = !totalsMode;
   }
+  function viewSeasonStats() {
+    tab = 'team';
+    document.getElementById('season-report-tabs')?.scrollIntoView({ behavior: 'smooth' });
+  }
 </script>
 
 <div
-  class="mt-8 rounded-2xl border border-line-strong bg-card p-6 shadow-[0_0_24px_hsl(13_100%_62%/0.12)] sm:p-8"
+  class="mt-8 overflow-hidden rounded-2xl border border-primary/25 bg-card shadow-[0_0_40px_hsl(13_100%_62%/0.12)]"
   title={modeLabel}
 >
-  <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">{modeLabel}</p>
-  <div class="mt-4 flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-    <div class="min-w-0 flex-1">
-      {#if mvp}
-        <section aria-labelledby="mvp-heading">
-          <div class="flex items-center gap-2">
-            <h2
-              id="mvp-heading"
-              class="font-mono text-[10px] tracking-[0.16em] text-accent uppercase"
+  <div class="border-b border-border/60 px-4 py-6 text-center sm:px-8 sm:py-8">
+    <p class="font-mono text-[11px] tracking-[0.18em] text-primary uppercase">Season complete</p>
+    {#if record}
+      <p
+        class="font-display mt-3 text-5xl font-extrabold tracking-tight tabular-nums sm:text-6xl"
+        aria-label={`Final record ${record.wins} wins and ${record.losses} losses`}
+      >
+        {record.wins}<span class="mx-2 text-muted-foreground">–</span>{record.losses}
+      </p>
+      <div class="mt-2 flex justify-center">
+        <SeasonTierBadge wins={record.wins} size="large" />
+      </div>
+    {/if}
+    <p class="mt-2 font-mono text-[11px] tracking-[0.3em] text-muted-foreground uppercase">
+      {heroNote}
+    </p>
+    <p class="mt-1 font-mono text-[11px] text-muted-foreground">
+      {modeLabel} · {franchiseLabel(run.franchiseId)} · {era?.label ?? run.eraId}
+    </p>
+  </div>
+
+  {#if lastGames.length > 0}
+    <div class="grid grid-cols-2 gap-3 px-4 py-4 sm:grid-cols-4 sm:px-6" aria-label="Closing games">
+      {#each lastGames as game (game.gameNumber)}
+        {@const won = game.winner === 'home'}
+        <div class="rounded-xl border border-primary/25 bg-surface-1 p-3 text-center sm:p-4">
+          <div class="flex items-center justify-between">
+            <span class="font-mono text-[11px] text-muted-foreground">G{game.gameNumber}</span>
+            <span
+              class="font-mono text-[11px] font-bold tracking-widest uppercase {won
+                ? 'text-positive'
+                : 'text-primary'}">{won ? 'Win' : 'Loss'}</span
             >
-              League MVP
-            </h2>
+          </div>
+          <p class="font-display mt-2 text-2xl font-extrabold tabular-nums">
+            {game.home.box.points} <span class="text-muted-foreground">-</span>
+            {game.away.box.points}
+          </p>
+          <p class="mt-1 font-mono text-[10px] text-muted-foreground uppercase">You · Opp</p>
+          <p class="font-mono text-[10px] text-muted-foreground">Final</p>
+        </div>
+      {/each}
+    </div>
+  {/if}
+
+  <div class="flex flex-col gap-2 px-4 pb-4 sm:flex-row sm:items-center sm:px-6">
+    <button
+      type="button"
+      onclick={onRunAgain}
+      disabled={running}
+      class="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-bold tracking-widest uppercase text-primary-foreground disabled:opacity-50"
+    >
+      <RotateCcw class="h-4 w-4" />
+      Run again
+    </button>
+    {#if onRetrySameTeam}
+      <button
+        type="button"
+        onclick={onRetrySameTeam}
+        disabled={running || byId === null}
+        class="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-line-soft bg-surface-1 px-6 py-3 text-sm font-bold tracking-widest uppercase disabled:opacity-50"
+      >
+        <RefreshCw class="h-4 w-4" />
+        Retry same team
+      </button>
+    {/if}
+    <button
+      type="button"
+      onclick={viewSeasonStats}
+      class="inline-flex items-center justify-center gap-1.5 px-4 py-3 font-mono text-xs font-bold tracking-widest uppercase text-muted-foreground hover:text-foreground sm:ml-auto"
+    >
+      View season stats <ArrowRight class="h-4 w-4" />
+    </button>
+  </div>
+  {#if editTeamHref}
+    <div class="px-4 pb-4 sm:px-6 sm:pb-0">
+      <a
+        href={resolve(editTeamHref)}
+        class="inline-flex items-center gap-2 rounded-lg border border-border bg-surface-1 px-4 py-2 text-sm font-semibold transition-colors hover:border-line-strong outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <Pencil class="h-4 w-4" />
+        Edit team
+      </a>
+    </div>
+  {/if}
+
+  <div
+    id="season-report-tabs"
+    class="flex gap-6 overflow-x-auto border-y border-border/60 px-4 sm:px-6"
+    role="tablist"
+    aria-label="Season sections"
+  >
+    {#each [['overview', 'Overview'], ['games', 'Games'], ['players', 'Players'], ['team', 'Team stats']] as [id, label] (id)}
+      <button
+        type="button"
+        role="tab"
+        aria-selected={tab === id}
+        onclick={() => (tab = id as typeof tab)}
+        class="border-b-2 py-3 font-mono text-xs font-bold tracking-widest uppercase {tab === id
+          ? 'border-primary text-primary'
+          : 'border-transparent text-muted-foreground hover:text-foreground'}"
+      >
+        {label}
+      </button>
+    {/each}
+  </div>
+
+  {#if tab === 'overview'}
+    <div class="p-4 sm:p-6">
+      <section aria-label="Your five" class="rounded-xl border border-line-soft bg-surface-1 p-4">
+        <h3 class="font-mono text-[11px] font-bold tracking-[0.16em] text-primary uppercase">
+          Your five
+        </h3>
+        {#if seasonTable.length > 0}
+          <ul class="mt-2 flex flex-col divide-y divide-border/60">
+            {#each seasonTable as row, index (row.aggregate.playerId)}
+              <li class="flex min-w-0 items-center gap-3 py-2.5">
+                {#if manifest}
+                  <PlayerFace
+                    player={row.player}
+                    {manifest}
+                    size="sm"
+                    fallbackInitials={row.player.firstName[0]! + row.player.lastName[0]!}
+                  />
+                {/if}
+                <span class="min-w-0 flex-1">
+                  <span class="block truncate text-sm font-bold">{row.player.displayName}</span>
+                  <span class="block truncate font-mono text-[10px] text-muted-foreground">
+                    {SLOT_LABELS[index] ?? `Slot ${index + 1}`} · {row.aggregate.gamesPlayed} games
+                  </span>
+                </span>
+                <span class="flex shrink-0 items-center gap-2">
+                  <span class="font-mono text-sm font-bold tabular-nums">
+                    {perGameValue(row.aggregate.points, row.aggregate.gamesPlayed)}
+                    <span class="text-[10px] font-normal text-muted-foreground">PPG</span>
+                  </span>
+                  <span class="flex items-end gap-[2px]" aria-hidden="true">
+                    <span
+                      class="inline-block w-[3px] rounded-sm bg-muted-foreground/60"
+                      style="height: 5px"
+                    ></span>
+                    <span
+                      class="inline-block w-[3px] rounded-sm bg-muted-foreground/60"
+                      style="height: 8px"
+                    ></span>
+                    <span
+                      class="inline-block w-[3px] rounded-sm bg-muted-foreground/60"
+                      style="height: 11px"
+                    ></span>
+                    <span
+                      class="inline-block w-[3px] rounded-sm bg-muted-foreground/60"
+                      style="height: 14px"
+                    ></span>
+                  </span>
+                </span>
+              </li>
+            {/each}
+          </ul>
+        {:else}
+          <p class="mt-3 animate-pulse text-sm text-muted-foreground">Loading player details…</p>
+        {/if}
+      </section>
+    </div>
+
+    <div class="grid gap-4 px-4 pb-4 sm:px-6 sm:pb-6 lg:grid-cols-3">
+      <section
+        aria-label="League MVP"
+        class="rounded-xl border border-line-soft bg-surface-1 p-4 text-center"
+      >
+        <h3
+          class="text-left font-mono text-[11px] font-bold tracking-[0.16em] text-primary uppercase"
+        >
+          League MVP
+        </h3>
+        {#if mvp}
+          <div class="mt-2 flex items-center justify-center gap-2">
             <span
               class="rounded-full border px-2 py-0.5 font-mono text-[10px] font-bold tracking-[0.12em] uppercase {mvp.isUserTeam
                 ? 'border-primary/40 bg-primary/10 text-primary'
@@ -232,498 +439,592 @@
               {mvp.isUserTeam ? 'Your five' : 'Opponent'}
             </span>
           </div>
-          <div class="mt-3 flex items-center gap-3">
-            {#if mvpFace}
+          <div class="mt-2 flex items-center justify-center">
+            {#if mvpFace && manifest}
               <PlayerFace
                 player={mvpFace}
-                manifest={manifest!}
+                {manifest}
                 size="md"
                 fallbackInitials={mvp.playerName.slice(0, 2).toUpperCase()}
               />
             {/if}
-            <div class="min-w-0">
-              <p class="font-display truncate text-xl font-extrabold tracking-tight uppercase">
-                {mvp.playerName}
+          </div>
+          <p class="font-display mt-2 text-xl font-extrabold">{mvp.playerName}</p>
+          <p class="font-mono text-[11px] text-muted-foreground">
+            {mvp.teamName} · {mvp.appearances} games
+          </p>
+          <div class="mt-3 grid grid-cols-3 divide-x divide-border/60">
+            <div>
+              <p class="font-display text-2xl font-extrabold text-primary tabular-nums">
+                {oneDecimal(mvp.averagePoints)}
               </p>
-              <p class="font-mono text-[10px] text-muted-foreground">
-                {mvp.teamName} · {mvp.appearances} games
+              <p class="font-mono text-[10px] text-muted-foreground uppercase">PPG</p>
+            </div>
+            <div>
+              <p class="font-display text-2xl font-extrabold text-primary tabular-nums">
+                {oneDecimal(mvp.averageRebounds)}
               </p>
+              <p class="font-mono text-[10px] text-muted-foreground uppercase">REB</p>
+            </div>
+            <div>
+              <p class="font-display text-2xl font-extrabold text-primary tabular-nums">
+                {oneDecimal(mvp.averageAssists)}
+              </p>
+              <p class="font-mono text-[10px] text-muted-foreground uppercase">AST</p>
             </div>
           </div>
-          <dl class="mt-3 flex flex-wrap gap-x-5 gap-y-1 font-mono text-xs text-muted-foreground">
-            <div>
-              <dt class="text-[9px] tracking-[0.14em] uppercase">MVP score</dt>
-              <dd class="font-bold text-foreground">{oneDecimal(mvp.mvpScore)}</dd>
-            </div>
-            <div>
-              <dt class="text-[9px] tracking-[0.14em] uppercase">PTS</dt>
-              <dd class="font-bold text-foreground">{oneDecimal(mvp.averagePoints)}</dd>
-            </div>
-            <div>
-              <dt class="text-[9px] tracking-[0.14em] uppercase">TS%</dt>
-              <dd class="font-bold text-foreground">{percentOneDecimal(mvp.averageEfficiency)}</dd>
-            </div>
-            <div>
-              <dt class="text-[9px] tracking-[0.14em] uppercase">REB</dt>
-              <dd class="font-bold text-foreground">{oneDecimal(mvp.averageRebounds)}</dd>
-            </div>
-            <div>
-              <dt class="text-[9px] tracking-[0.14em] uppercase">AST</dt>
-              <dd class="font-bold text-foreground">{oneDecimal(mvp.averageAssists)}</dd>
-            </div>
-            <div>
-              <dt class="text-[9px] tracking-[0.14em] uppercase">STL</dt>
-              <dd class="font-bold text-foreground">{oneDecimal(mvp.averageSteals)}</dd>
-            </div>
-            <div>
-              <dt class="text-[9px] tracking-[0.14em] uppercase">BLK</dt>
-              <dd class="font-bold text-foreground">{oneDecimal(mvp.averageBlocks)}</dd>
-            </div>
-            <div>
-              <dt class="text-[9px] tracking-[0.14em] uppercase">Consistency</dt>
-              <dd class="font-bold text-foreground">{oneDecimal(mvp.consistency)}</dd>
-            </div>
-          </dl>
-        </section>
-      {/if}
-    </div>
-    <div class="shrink-0 text-center sm:text-right">
-      <p class="font-display text-5xl font-extrabold tracking-tight sm:text-6xl">
-        {record!.wins}<span class="text-muted-foreground">–</span>{record!.losses}
-      </p>
-      <SeasonTierBadge wins={record!.wins} size="large" />
-      <p class="mt-2 font-mono text-[10px] text-muted-foreground">
-        {franchiseLabel(run.franchiseId)} · {era?.label ?? run.eraId}
-      </p>
-    </div>
-  </div>
+        {:else}
+          <p class="mt-3 text-sm text-muted-foreground">No games recorded yet.</p>
+        {/if}
+      </section>
 
-  <div class="mt-6 rounded-xl border border-border bg-surface-1 p-3 sm:p-4">
-    <GameStrip {run} games={run.games} compact />
-  </div>
-
-  <section
-    aria-labelledby="season-snapshot-heading"
-    class="mt-5 rounded-xl border border-border bg-surface-1 p-4 sm:p-5"
-  >
-    <div class="flex flex-wrap items-baseline justify-between gap-2">
-      <h2
-        id="season-snapshot-heading"
-        class="font-display text-xl font-extrabold tracking-tight uppercase"
+      <section
+        aria-label="Season comparison"
+        class="rounded-xl border border-line-soft bg-surface-1 p-4"
       >
-        Season snapshot
-      </h2>
-      <span class="font-mono text-[10px] text-muted-foreground">{gamesPlayed} games</span>
-    </div>
-    <dl class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
-      <div class="rounded-lg border border-border bg-card p-3">
-        <dt class="font-mono text-[10px] text-muted-foreground uppercase">Your PPG</dt>
-        <dd class="mt-1 font-display text-xl font-extrabold">
-          {perGameValue(record!.points, gamesPlayed)}
-        </dd>
-      </div>
-      <div class="rounded-lg border border-border bg-card p-3">
-        <dt class="font-mono text-[10px] text-muted-foreground uppercase">Opponent PPG</dt>
-        <dd class="mt-1 font-display text-xl font-extrabold">
-          {oneDecimal(opponentPointsPerGame)}
-        </dd>
-      </div>
-      <div class="rounded-lg border border-border bg-card p-3">
-        <dt class="font-mono text-[10px] text-muted-foreground uppercase">Point diff</dt>
-        <dd class="mt-1 font-display text-xl font-extrabold">
-          {pointDifferential >= 0 ? '+' : ''}{perGameValue(pointDifferential, gamesPlayed)}
-        </dd>
-      </div>
-      <div class="rounded-lg border border-border bg-card p-3">
-        <dt class="font-mono text-[10px] text-muted-foreground uppercase">Pace</dt>
-        <dd class="mt-1 font-display text-xl font-extrabold">
-          {perGameValue(record!.possessions, gamesPlayed)}
-        </dd>
-      </div>
-      <div class="rounded-lg border border-border bg-card p-3">
-        <dt class="font-mono text-[10px] text-muted-foreground uppercase">Rebounds/G</dt>
-        <dd class="mt-1 font-display text-xl font-extrabold">
-          {perGameValue(record!.rebounds.total, gamesPlayed)}
-        </dd>
-      </div>
-    </dl>
-    <div class="mt-3 grid gap-2 font-mono text-xs sm:grid-cols-4">
-      <p>
-        <span class="text-muted-foreground">FG</span>
-        {pct(record!.fieldGoals.made, record!.fieldGoals.attempted)}
-      </p>
-      <p>
-        <span class="text-muted-foreground">3P</span>
-        {pct(record!.threes.made, record!.threes.attempted)}
-      </p>
-      <p>
-        <span class="text-muted-foreground">FT</span>
-        {pct(record!.freeThrows.made, record!.freeThrows.attempted)}
-      </p>
-      <p>
-        <span class="text-muted-foreground">TOV/G</span>
-        {perGameValue(record!.turnovers, gamesPlayed)}
-      </p>
-    </div>
-  </section>
-
-  {#if firstLoss}
-    <section
-      aria-labelledby="first-loss-heading"
-      class="mt-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4 sm:p-5"
-    >
-      <div class="flex flex-wrap items-baseline justify-between gap-2">
-        <h2
-          id="first-loss-heading"
-          class="font-display text-xl font-extrabold tracking-tight uppercase"
-        >
-          First loss
-        </h2>
-        <span class="font-mono text-[10px] text-muted-foreground"
-          >Game {firstLoss.game.gameNumber}</span
-        >
-      </div>
-      <p class="mt-2 text-sm font-semibold">
-        {firstLoss.opponentName} won {firstLoss.game.away.box.points}–{firstLoss.game.home.box
-          .points}.
-      </p>
-      {#if firstLoss.game.facts.length > 0}
-        <ul class="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-          {#each firstLoss.game.facts as fact (fact.kind)}
-            <li class="rounded-lg border border-border bg-card p-3">
-              {factCopy(fact, firstLoss.opponentName, firstLoss.game)}
-            </li>
-          {/each}
-        </ul>
-      {:else}
-        <p class="mt-3 text-xs text-muted-foreground">No clear factor recorded.</p>
-      {/if}
-    </section>
-  {/if}
-
-  <div class="mt-5 flex flex-wrap items-center gap-2">
-    {#if onRetrySameTeam}
-      <button
-        type="button"
-        onclick={onRetrySameTeam}
-        disabled={running || byId === null}
-        class="inline-flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition-colors hover:border-primary/60 outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-      >
-        <RefreshCw class="h-4 w-4" />
-        Retry with same team
-      </button>
-    {/if}
-    <button
-      type="button"
-      onclick={onRunAgain}
-      disabled={running}
-      class="inline-flex items-center gap-2 rounded-lg border border-border bg-surface-1 px-4 py-2 text-sm font-semibold transition-colors hover:border-line-strong outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-    >
-      <RotateCcw class="h-4 w-4" />
-      Run again
-    </button>
-    {#if editTeamHref}
-      <a
-        href={resolve(editTeamHref)}
-        class="inline-flex items-center gap-2 rounded-lg border border-border bg-surface-1 px-4 py-2 text-sm font-semibold transition-colors hover:border-line-strong outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        <Pencil class="h-4 w-4" />
-        Edit team
-      </a>
-    {/if}
-  </div>
-</div>
-
-<section aria-labelledby="how-won-heading" class="mt-6 rounded-xl border border-border bg-card p-5">
-  <h2 id="how-won-heading" class="font-display text-xl font-extrabold tracking-tight uppercase">
-    How your five won
-  </h2>
-  <ul class="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-    <li class="rounded-lg border border-border bg-surface-1 p-3">
-      <span class="font-semibold">{explanation.turnoverBattleWins} of {run.games.length} games</span
-      >
-      <span class="text-muted-foreground"> &nbsp;you won the turnover battle.</span>
-    </li>
-    <li class="rounded-lg border border-border bg-surface-1 p-3">
-      <span class="font-semibold">{netRatingLabel}</span>
-      <span class="text-muted-foreground"> net points per 100 possessions.</span>
-    </li>
-    {#if explanation.zoneAdvantage}
-      <li class="rounded-lg border border-border bg-surface-1 p-3">
-        <span class="font-semibold"
-          >Your advantage came primarily {zoneName(explanation.zoneAdvantage.zone)}.</span
-        >
-        <span class="text-muted-foreground">
-          &nbsp;You shot {zonePctLabel(explanation.zoneAdvantage.pct)} to your opponents'
-          {zonePctLabel(explanation.zoneAdvantage.opponentPct)} on {explanation.zoneAdvantage.attempts.toLocaleString()}
-          {zoneNoun(explanation.zoneAdvantage.zone)} attempts.
-        </span>
-      </li>
-    {/if}
-    {#if explanation.opponentOffensiveReboundRate >= 0.3}
-      <li class="rounded-lg border border-border bg-surface-1 p-3">
-        <span class="font-semibold">This lineup was weak on the defensive glass.</span>
-        <span class="text-muted-foreground">
-          &nbsp;Opponents grabbed {percentOneDecimal(explanation.opponentOffensiveReboundRate)} of their
-          own misses.
-        </span>
-      </li>
-    {/if}
-    {#if explanation.usageLeader}
-      <li class="rounded-lg border border-border bg-surface-1 p-3">
-        <span class="font-semibold">{usageLeaderName}</span>
-        <span class="text-muted-foreground">
-          &nbsp;consumed {(explanation.usageLeader.usageShare * 100).toFixed(0)}% of estimated
-          usage.
-        </span>
-      </li>
-    {/if}
-  </ul>
-</section>
-
-<section
-  aria-labelledby="season-table-heading"
-  class="mt-6 rounded-xl border border-border bg-card p-5"
->
-  <div class="flex flex-wrap items-center justify-between gap-3">
-    <h2
-      id="season-table-heading"
-      class="font-display text-xl font-extrabold tracking-tight uppercase"
-    >
-      Your five · season
-    </h2>
-    <div class="flex rounded-lg border border-border p-0.5" role="group" aria-label="Season values">
-      <button
-        type="button"
-        aria-pressed={!totalsMode}
-        onclick={toggleMode}
-        class="rounded-md px-3 py-1 font-mono text-xs font-semibold {!totalsMode
-          ? 'bg-primary text-primary-foreground'
-          : 'text-muted-foreground'}"
-      >
-        Per game
-      </button>
-      <button
-        type="button"
-        aria-pressed={totalsMode}
-        onclick={toggleMode}
-        class="rounded-md px-3 py-1 font-mono text-xs font-semibold {totalsMode
-          ? 'bg-primary text-primary-foreground'
-          : 'text-muted-foreground'}"
-      >
-        Totals
-      </button>
-    </div>
-  </div>
-  {#if displayAggregates}
-    <div class="mt-4 hidden overflow-x-auto sm:block">
-      <table class="w-full min-w-[1080px] border-collapse text-sm">
-        <thead>
-          <tr
-            class="border-b border-border font-mono text-[10px] tracking-[0.12em] text-muted-foreground uppercase"
-          >
-            <th scope="col" class="py-2 pr-3 text-left">Player</th>
-            <th scope="col" class="px-2 py-2 text-right">PTS</th>
-            <th scope="col" class="px-2 py-2 text-right">FGA</th>
-            <th scope="col" class="px-2 py-2 text-right">FG%</th>
-            <th scope="col" class="px-2 py-2 text-right">3PA</th>
-            <th scope="col" class="px-2 py-2 text-right">3P%</th>
-            <th scope="col" class="px-2 py-2 text-right">FTA</th>
-            <th scope="col" class="px-2 py-2 text-right">FT%</th>
-            <th scope="col" class="px-2 py-2 text-right">TS%</th>
-            <th scope="col" class="px-2 py-2 text-right">USG%</th>
-            <th scope="col" class="px-2 py-2 text-right">REB</th>
-            <th scope="col" class="px-2 py-2 text-right">AST</th>
-            <th scope="col" class="px-2 py-2 text-right">STL</th>
-            <th scope="col" class="px-2 py-2 text-right">BLK</th>
-            <th scope="col" class="px-2 py-2 text-right">TOV</th>
-            <th scope="col" class="px-2 py-2 text-right">3PA/G</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each displayAggregates.players as aggregate, index (aggregate.playerId)}
-            {@const row = seasonTable[index]}
-            {@const raw = aggregates!.players.find((p) => p.playerId === aggregate.playerId)!}
-            <tr class="border-b border-border/50 last:border-0">
-              <th scope="row" class="py-2 pr-3 text-left">
-                <span class="flex items-center gap-2">
-                  {#if row}
-                    <PlayerFace
-                      player={row.player}
-                      manifest={manifest!}
-                      size="sm"
-                      fallbackInitials={row.player.firstName[0]! + row.player.lastName[0]!}
-                    />
-                    <span class="min-w-0">
-                      <span class="block truncate font-semibold">
-                        {row.player.displayName}
-                      </span>
-                      <span class="block font-mono text-[10px] text-muted-foreground">
-                        {SLOT_LABELS[index]}
-                      </span>
-                    </span>
-                  {:else}
-                    <span class="font-mono text-xs">{aggregate.playerId}</span>
-                  {/if}
-                </span>
-              </th>
-              <td class="px-2 py-2 text-right font-mono font-bold">
-                {formatAggregateStat(aggregate.points)}
-              </td>
-              <td class="px-2 py-2 text-right font-mono">
-                {formatAggregateStat(aggregate.fieldGoals.attempted)}
-              </td>
-              <td class="px-2 py-2 text-right font-mono">
-                {pct(raw.fieldGoals.made, raw.fieldGoals.attempted)}
-              </td>
-              <td class="px-2 py-2 text-right font-mono">
-                {formatAggregateStat(aggregate.threes.attempted)}
-              </td>
-              <td class="px-2 py-2 text-right font-mono">
-                {pct(raw.threes.made, raw.threes.attempted)}
-              </td>
-              <td class="px-2 py-2 text-right font-mono">
-                {formatAggregateStat(aggregate.freeThrows.attempted)}
-              </td>
-              <td class="px-2 py-2 text-right font-mono">
-                {pct(raw.freeThrows.made, raw.freeThrows.attempted)}
-              </td>
-              <td class="px-2 py-2 text-right font-mono">
-                {trueShootingPct(raw.points, raw.fieldGoals.attempted, raw.freeThrows.attempted)}
-              </td>
-              <td class="px-2 py-2 text-right font-mono">
-                {usagePct(raw, aggregates!.team)}
-              </td>
-              <td class="px-2 py-2 text-right font-mono">
-                {formatAggregateStat(aggregate.rebounds.total)}
-              </td>
-              <td class="px-2 py-2 text-right font-mono">
-                {formatAggregateStat(aggregate.assists)}
-              </td>
-              <td class="px-2 py-2 text-right font-mono">
-                {formatAggregateStat(aggregate.steals)}
-              </td>
-              <td class="px-2 py-2 text-right font-mono">
-                {formatAggregateStat(aggregate.blocks)}
-              </td>
-              <td class="px-2 py-2 text-right font-mono">
-                {formatAggregateStat(aggregate.turnovers)}
-              </td>
-              <td class="px-2 py-2 text-right font-mono">
-                {perGameValue(raw.threes.attempted, raw.gamesPlayed)}
-              </td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-    </div>
-    <div class="mt-4 grid gap-2 sm:hidden">
-      {#each displayAggregates.players as aggregate, index (aggregate.playerId)}
-        {@const row = seasonTable[index]}
-        {@const raw = aggregates!.players.find((p) => p.playerId === aggregate.playerId)!}
-        <article class="rounded-lg border border-border bg-surface-1 p-3">
-          <div class="flex items-start gap-3">
-            {#if row}
-              <PlayerFace
-                player={row.player}
-                manifest={manifest!}
-                size="sm"
-                fallbackInitials={row.player.firstName[0]! + row.player.lastName[0]!}
-              />
-            {/if}
-            <div class="min-w-0 flex-1">
-              <div class="flex items-start justify-between gap-2">
-                <div class="min-w-0">
-                  <p class="truncate text-sm font-bold">
-                    {row?.player.displayName ?? aggregate.playerId}
-                  </p>
-                  <p class="font-mono text-[10px] text-muted-foreground">
-                    {SLOT_LABELS[index]} · {aggregate.gamesPlayed} games
-                  </p>
-                </div>
-                <p class="shrink-0 font-mono text-sm font-bold tabular-nums">
-                  {formatAggregateStat(aggregate.points)} PTS
-                </p>
-              </div>
-            </div>
-          </div>
-          <table class="mt-3 w-full text-xs">
-            <tbody class="font-mono tabular-nums">
-              <tr class="border-b border-border/40">
-                <td class="py-1.5 pr-2 text-muted-foreground">FGA</td>
-                <td class="py-1.5 text-right font-semibold text-foreground">
-                  {formatAggregateStat(aggregate.fieldGoals.attempted)}
-                </td>
-                <td class="py-1.5 pr-2 pl-3 text-muted-foreground">FG%</td>
-                <td class="py-1.5 text-right font-semibold text-foreground">
-                  {pct(raw.fieldGoals.made, raw.fieldGoals.attempted)}
-                </td>
+        <h3 class="font-mono text-[11px] font-bold tracking-[0.16em] text-primary uppercase">
+          Season comparison
+        </h3>
+        {#if record}
+          <table class="mt-2 w-full text-sm">
+            <thead>
+              <tr class="font-mono text-[10px] tracking-widest text-muted-foreground uppercase">
+                <th scope="col" class="py-1 text-left">You</th>
+                <th scope="col" class="py-1 text-center">Stat</th>
+                <th scope="col" class="py-1 text-right">Opp avg</th>
               </tr>
-              <tr class="border-b border-border/40">
-                <td class="py-1.5 pr-2 text-muted-foreground">3PA</td>
-                <td class="py-1.5 text-right font-semibold text-foreground">
-                  {formatAggregateStat(aggregate.threes.attempted)}
-                </td>
-                <td class="py-1.5 pr-2 pl-3 text-muted-foreground">3P%</td>
-                <td class="py-1.5 text-right font-semibold text-foreground">
-                  {pct(raw.threes.made, raw.threes.attempted)}
-                </td>
-              </tr>
-              <tr class="border-b border-border/40">
-                <td class="py-1.5 pr-2 text-muted-foreground">FTA</td>
-                <td class="py-1.5 text-right font-semibold text-foreground">
-                  {formatAggregateStat(aggregate.freeThrows.attempted)}
-                </td>
-                <td class="py-1.5 pr-2 pl-3 text-muted-foreground">FT%</td>
-                <td class="py-1.5 text-right font-semibold text-foreground">
-                  {pct(raw.freeThrows.made, raw.freeThrows.attempted)}
-                </td>
-              </tr>
-              <tr class="border-b border-border/40">
-                <td class="py-1.5 pr-2 text-muted-foreground">TS%</td>
-                <td class="py-1.5 text-right font-semibold text-foreground">
-                  {trueShootingPct(raw.points, raw.fieldGoals.attempted, raw.freeThrows.attempted)}
-                </td>
-                <td class="py-1.5 pr-2 pl-3 text-muted-foreground">USG%</td>
-                <td class="py-1.5 text-right font-semibold text-foreground">
-                  {usagePct(raw, aggregates!.team)}
-                </td>
-              </tr>
-              <tr class="border-b border-border/40">
-                <td class="py-1.5 pr-2 text-muted-foreground">REB</td>
-                <td class="py-1.5 text-right font-semibold text-foreground">
-                  {formatAggregateStat(aggregate.rebounds.total)}
-                </td>
-                <td class="py-1.5 pr-2 pl-3 text-muted-foreground">AST</td>
-                <td class="py-1.5 text-right font-semibold text-foreground">
-                  {formatAggregateStat(aggregate.assists)}
-                </td>
-              </tr>
-              <tr class="border-b border-border/40">
-                <td class="py-1.5 pr-2 text-muted-foreground">STL</td>
-                <td class="py-1.5 text-right font-semibold text-foreground">
-                  {formatAggregateStat(aggregate.steals)}
-                </td>
-                <td class="py-1.5 pr-2 pl-3 text-muted-foreground">BLK</td>
-                <td class="py-1.5 text-right font-semibold text-foreground">
-                  {formatAggregateStat(aggregate.blocks)}
-                </td>
+            </thead>
+            <tbody class="divide-y divide-border/50 tabular-nums">
+              <tr>
+                <td class="py-2 text-left font-bold">{perGameValue(record.points, gamesPlayed)}</td>
+                <td class="py-2 text-center text-xs text-muted-foreground">Points per game</td>
+                <td class="py-2 text-right font-bold">{oneDecimal(opponentPointsPerGame)}</td>
               </tr>
               <tr>
-                <td class="py-1.5 pr-2 text-muted-foreground">TOV</td>
-                <td class="py-1.5 text-right font-semibold text-foreground" colspan="3">
-                  {formatAggregateStat(aggregate.turnovers)}
-                </td>
+                <td class="py-2 text-left font-bold"
+                  >{pct(record.fieldGoals.made, record.fieldGoals.attempted)}</td
+                >
+                <td class="py-2 text-center text-xs text-muted-foreground">FG%</td>
+                <td class="py-2 text-right font-bold"
+                  >{pct(opponentTotals.fgm, opponentTotals.fga)}</td
+                >
+              </tr>
+              <tr>
+                <td class="py-2 text-left font-bold"
+                  >{pct(record.threes.made, record.threes.attempted)}</td
+                >
+                <td class="py-2 text-center text-xs text-muted-foreground">3P%</td>
+                <td class="py-2 text-right font-bold"
+                  >{pct(opponentTotals.tpm, opponentTotals.tpa)}</td
+                >
+              </tr>
+              <tr>
+                <td class="py-2 text-left font-bold"
+                  >{perGameValue(record.rebounds.total, gamesPlayed)}</td
+                >
+                <td class="py-2 text-center text-xs text-muted-foreground">Rebounds per game</td>
+                <td class="py-2 text-right font-bold"
+                  >{perGameValue(opponentTotals.reb, gamesPlayed)}</td
+                >
+              </tr>
+              <tr>
+                <td class="py-2 text-left font-bold"
+                  >{perGameValue(record.turnovers, gamesPlayed)}</td
+                >
+                <td class="py-2 text-center text-xs text-muted-foreground">Turnovers per game</td>
+                <td class="py-2 text-right font-bold"
+                  >{perGameValue(opponentTotals.tov, gamesPlayed)}</td
+                >
               </tr>
             </tbody>
           </table>
-        </article>
-      {/each}
+        {/if}
+      </section>
+
+      <section
+        aria-label="Season summary"
+        class="rounded-xl border border-line-soft bg-surface-1 p-4"
+      >
+        <h3 class="font-mono text-[11px] font-bold tracking-[0.16em] text-primary uppercase">
+          Season summary
+        </h3>
+        <ul class="mt-3 flex flex-col gap-3 text-sm">
+          <li class="flex items-center gap-3">
+            <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-3"
+              ><Gamepad2 class="h-4 w-4 text-muted-foreground" /></span
+            >
+            <span
+              ><span class="block font-mono text-[10px] text-muted-foreground uppercase">Mode</span
+              ><span class="font-semibold">{modeLabel}</span></span
+            >
+          </li>
+          <li class="flex items-center gap-3">
+            <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-3"
+              ><Calendar class="h-4 w-4 text-muted-foreground" /></span
+            >
+            <span
+              ><span class="block font-mono text-[10px] text-muted-foreground uppercase"
+                >Season</span
+              ><span class="font-semibold"
+                >{franchiseLabel(run.franchiseId)} · {era?.label ?? run.eraId}</span
+              ></span
+            >
+          </li>
+          <li class="flex items-center gap-3">
+            <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-3"
+              ><ShieldCheck class="h-4 w-4 text-muted-foreground" /></span
+            >
+            <span
+              ><span class="block font-mono text-[10px] text-muted-foreground uppercase">Games</span
+              ><span class="font-semibold">{gamesPlayed} played</span></span
+            >
+          </li>
+          <li class="flex items-center gap-3">
+            <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-3"
+              ><Trophy class="h-4 w-4 text-muted-foreground" /></span
+            >
+            <span
+              ><span class="block font-mono text-[10px] text-muted-foreground uppercase"
+                >Record</span
+              ><span class="font-semibold"
+                >{#if record}{record.wins}–{record.losses}{run.outcome === 'perfect'
+                    ? ' · perfect'
+                    : ''}{:else}—{/if}</span
+              ></span
+            >
+          </li>
+        </ul>
+      </section>
     </div>
-    {#if byId === null}
-      <p class="mt-3 animate-pulse text-sm text-muted-foreground">Loading player details…</p>
-    {/if}
+
+    <div class="px-4 pb-4 sm:px-6 sm:pb-6">
+      <details class="rounded-xl border border-line-soft bg-surface-1">
+        <summary
+          class="flex cursor-pointer list-none items-center gap-3 p-4 [&::-webkit-details-marker]:hidden"
+        >
+          <ShieldCheck class="h-5 w-5 text-muted-foreground" />
+          <span class="font-mono text-xs font-bold tracking-widest uppercase">Season details</span>
+          <span class="text-xs text-muted-foreground">Click to view technical details</span>
+          <ChevronDown class="ml-auto h-4 w-4 text-muted-foreground" />
+        </summary>
+        <div class="border-t border-border/60 p-4">
+          <p class="truncate font-mono text-[11px] text-muted-foreground" title={run.runSeed}>
+            Seed: {run.runSeed.slice(0, 16)}…{run.runSeed.slice(-8)}
+          </p>
+          <p class="mt-1 break-all font-mono text-[11px] text-muted-foreground">{run.runSeed}</p>
+          <p class="mt-2 font-mono text-[11px] text-muted-foreground">
+            Data {run.versions.dataVersion} · Engine {run.versions.engineVersion} · Bracket {run
+              .versions.bracketVersion}
+          </p>
+        </div>
+      </details>
+    </div>
+  {:else if tab === 'games'}
+    <div class="p-4 sm:p-6">
+      <div class="rounded-xl border border-border bg-surface-1 p-3 sm:p-4">
+        <GameStrip {run} games={run.games} compact />
+      </div>
+      {#if firstLoss}
+        <section
+          aria-labelledby="first-loss-heading"
+          class="mt-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4 sm:p-5"
+        >
+          <div class="flex flex-wrap items-baseline justify-between gap-2">
+            <h2
+              id="first-loss-heading"
+              class="font-display text-xl font-extrabold tracking-tight uppercase"
+            >
+              First loss
+            </h2>
+            <span class="font-mono text-[10px] text-muted-foreground"
+              >Game {firstLoss.game.gameNumber}</span
+            >
+          </div>
+          <p class="mt-2 text-sm font-semibold">
+            {firstLoss.opponentName} won {firstLoss.game.away.box.points}–{firstLoss.game.home.box
+              .points}.
+          </p>
+          {#if firstLoss.game.facts.length > 0}
+            <ul class="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+              {#each firstLoss.game.facts as fact (fact.kind)}
+                <li class="rounded-lg border border-border bg-card p-3">
+                  {factCopy(fact, firstLoss.opponentName, firstLoss.game)}
+                </li>
+              {/each}
+            </ul>
+          {:else}
+            <p class="mt-3 text-xs text-muted-foreground">No clear factor recorded.</p>
+          {/if}
+        </section>
+      {/if}
+    </div>
+  {:else if tab === 'players'}
+    <section aria-label="Your five, season table" class="p-4 sm:p-6">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h2 class="font-display text-xl font-extrabold tracking-tight uppercase">
+          Your five · season
+        </h2>
+        <div
+          class="flex rounded-lg border border-border p-0.5"
+          role="group"
+          aria-label="Season values"
+        >
+          <button
+            type="button"
+            aria-pressed={!totalsMode}
+            onclick={toggleMode}
+            class="rounded-md px-3 py-1 font-mono text-xs font-semibold {!totalsMode
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground'}"
+          >
+            Per game
+          </button>
+          <button
+            type="button"
+            aria-pressed={totalsMode}
+            onclick={toggleMode}
+            class="rounded-md px-3 py-1 font-mono text-xs font-semibold {totalsMode
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground'}"
+          >
+            Totals
+          </button>
+        </div>
+      </div>
+      {#if displayAggregates}
+        <div class="mt-4 hidden overflow-x-auto sm:block">
+          <table class="w-full min-w-[1080px] border-collapse text-sm">
+            <thead>
+              <tr
+                class="border-b border-border font-mono text-[10px] tracking-[0.12em] text-muted-foreground uppercase"
+              >
+                <th scope="col" class="py-2 pr-3 text-left">Player</th>
+                <th scope="col" class="px-2 py-2 text-right">PTS</th>
+                <th scope="col" class="px-2 py-2 text-right">FGA</th>
+                <th scope="col" class="px-2 py-2 text-right">FG%</th>
+                <th scope="col" class="px-2 py-2 text-right">3PA</th>
+                <th scope="col" class="px-2 py-2 text-right">3P%</th>
+                <th scope="col" class="px-2 py-2 text-right">FTA</th>
+                <th scope="col" class="px-2 py-2 text-right">FT%</th>
+                <th scope="col" class="px-2 py-2 text-right">TS%</th>
+                <th scope="col" class="px-2 py-2 text-right">USG%</th>
+                <th scope="col" class="px-2 py-2 text-right">REB</th>
+                <th scope="col" class="px-2 py-2 text-right">AST</th>
+                <th scope="col" class="px-2 py-2 text-right">STL</th>
+                <th scope="col" class="px-2 py-2 text-right">BLK</th>
+                <th scope="col" class="px-2 py-2 text-right">TOV</th>
+                <th scope="col" class="px-2 py-2 text-right">3PA/G</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each displayAggregates.players as aggregate, index (aggregate.playerId)}
+                {@const row = seasonTable[index]}
+                {@const raw = aggregates!.players.find((p) => p.playerId === aggregate.playerId)!}
+                <tr class="border-b border-border/50 last:border-0">
+                  <th scope="row" class="py-2 pr-3 text-left">
+                    <span class="flex items-center gap-2">
+                      {#if row}
+                        <PlayerFace
+                          player={row.player}
+                          manifest={manifest!}
+                          size="sm"
+                          fallbackInitials={row.player.firstName[0]! + row.player.lastName[0]!}
+                        />
+                        <span class="min-w-0">
+                          <span class="block truncate font-semibold">
+                            {row.player.displayName}
+                          </span>
+                          <span class="block font-mono text-[10px] text-muted-foreground">
+                            {SLOT_LABELS[index]}
+                          </span>
+                        </span>
+                      {:else}
+                        <span class="font-mono text-xs">{aggregate.playerId}</span>
+                      {/if}
+                    </span>
+                  </th>
+                  <td class="px-2 py-2 text-right font-mono font-bold">
+                    {formatAggregateStat(aggregate.points)}
+                  </td>
+                  <td class="px-2 py-2 text-right font-mono">
+                    {formatAggregateStat(aggregate.fieldGoals.attempted)}
+                  </td>
+                  <td class="px-2 py-2 text-right font-mono">
+                    {pct(raw.fieldGoals.made, raw.fieldGoals.attempted)}
+                  </td>
+                  <td class="px-2 py-2 text-right font-mono">
+                    {formatAggregateStat(aggregate.threes.attempted)}
+                  </td>
+                  <td class="px-2 py-2 text-right font-mono">
+                    {pct(raw.threes.made, raw.threes.attempted)}
+                  </td>
+                  <td class="px-2 py-2 text-right font-mono">
+                    {formatAggregateStat(aggregate.freeThrows.attempted)}
+                  </td>
+                  <td class="px-2 py-2 text-right font-mono">
+                    {pct(raw.freeThrows.made, raw.freeThrows.attempted)}
+                  </td>
+                  <td class="px-2 py-2 text-right font-mono">
+                    {trueShootingPct(
+                      raw.points,
+                      raw.fieldGoals.attempted,
+                      raw.freeThrows.attempted,
+                    )}
+                  </td>
+                  <td class="px-2 py-2 text-right font-mono">
+                    {usagePct(raw, aggregates!.team)}
+                  </td>
+                  <td class="px-2 py-2 text-right font-mono">
+                    {formatAggregateStat(aggregate.rebounds.total)}
+                  </td>
+                  <td class="px-2 py-2 text-right font-mono">
+                    {formatAggregateStat(aggregate.assists)}
+                  </td>
+                  <td class="px-2 py-2 text-right font-mono">
+                    {formatAggregateStat(aggregate.steals)}
+                  </td>
+                  <td class="px-2 py-2 text-right font-mono">
+                    {formatAggregateStat(aggregate.blocks)}
+                  </td>
+                  <td class="px-2 py-2 text-right font-mono">
+                    {formatAggregateStat(aggregate.turnovers)}
+                  </td>
+                  <td class="px-2 py-2 text-right font-mono">
+                    {perGameValue(raw.threes.attempted, raw.gamesPlayed)}
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-4 grid gap-2 sm:hidden">
+          {#each displayAggregates.players as aggregate, index (aggregate.playerId)}
+            {@const row = seasonTable[index]}
+            {@const raw = aggregates!.players.find((p) => p.playerId === aggregate.playerId)!}
+            <article class="rounded-lg border border-border bg-surface-1 p-3">
+              <div class="flex items-start gap-3">
+                {#if row}
+                  <PlayerFace
+                    player={row.player}
+                    manifest={manifest!}
+                    size="sm"
+                    fallbackInitials={row.player.firstName[0]! + row.player.lastName[0]!}
+                  />
+                {/if}
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-start justify-between gap-2">
+                    <div class="min-w-0">
+                      <p class="truncate text-sm font-bold">
+                        {row?.player.displayName ?? aggregate.playerId}
+                      </p>
+                      <p class="font-mono text-[10px] text-muted-foreground">
+                        {SLOT_LABELS[index]} · {aggregate.gamesPlayed} games
+                      </p>
+                    </div>
+                    <p class="shrink-0 font-mono text-sm font-bold tabular-nums">
+                      {formatAggregateStat(aggregate.points)} PTS
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <table class="mt-3 w-full text-xs">
+                <tbody class="font-mono tabular-nums">
+                  <tr class="border-b border-border/40">
+                    <td class="py-1.5 pr-2 text-muted-foreground">FGA</td>
+                    <td class="py-1.5 text-right font-semibold text-foreground">
+                      {formatAggregateStat(aggregate.fieldGoals.attempted)}
+                    </td>
+                    <td class="py-1.5 pr-2 pl-3 text-muted-foreground">FG%</td>
+                    <td class="py-1.5 text-right font-semibold text-foreground">
+                      {pct(raw.fieldGoals.made, raw.fieldGoals.attempted)}
+                    </td>
+                  </tr>
+                  <tr class="border-b border-border/40">
+                    <td class="py-1.5 pr-2 text-muted-foreground">3PA</td>
+                    <td class="py-1.5 text-right font-semibold text-foreground">
+                      {formatAggregateStat(aggregate.threes.attempted)}
+                    </td>
+                    <td class="py-1.5 pr-2 pl-3 text-muted-foreground">3P%</td>
+                    <td class="py-1.5 text-right font-semibold text-foreground">
+                      {pct(raw.threes.made, raw.threes.attempted)}
+                    </td>
+                  </tr>
+                  <tr class="border-b border-border/40">
+                    <td class="py-1.5 pr-2 text-muted-foreground">FTA</td>
+                    <td class="py-1.5 text-right font-semibold text-foreground">
+                      {formatAggregateStat(aggregate.freeThrows.attempted)}
+                    </td>
+                    <td class="py-1.5 pr-2 pl-3 text-muted-foreground">FT%</td>
+                    <td class="py-1.5 text-right font-semibold text-foreground">
+                      {pct(raw.freeThrows.made, raw.freeThrows.attempted)}
+                    </td>
+                  </tr>
+                  <tr class="border-b border-border/40">
+                    <td class="py-1.5 pr-2 text-muted-foreground">TS%</td>
+                    <td class="py-1.5 text-right font-semibold text-foreground">
+                      {trueShootingPct(
+                        raw.points,
+                        raw.fieldGoals.attempted,
+                        raw.freeThrows.attempted,
+                      )}
+                    </td>
+                    <td class="py-1.5 pr-2 pl-3 text-muted-foreground">USG%</td>
+                    <td class="py-1.5 text-right font-semibold text-foreground">
+                      {usagePct(raw, aggregates!.team)}
+                    </td>
+                  </tr>
+                  <tr class="border-b border-border/40">
+                    <td class="py-1.5 pr-2 text-muted-foreground">REB</td>
+                    <td class="py-1.5 text-right font-semibold text-foreground">
+                      {formatAggregateStat(aggregate.rebounds.total)}
+                    </td>
+                    <td class="py-1.5 pr-2 pl-3 text-muted-foreground">AST</td>
+                    <td class="py-1.5 text-right font-semibold text-foreground">
+                      {formatAggregateStat(aggregate.assists)}
+                    </td>
+                  </tr>
+                  <tr class="border-b border-border/40">
+                    <td class="py-1.5 pr-2 text-muted-foreground">STL</td>
+                    <td class="py-1.5 text-right font-semibold text-foreground">
+                      {formatAggregateStat(aggregate.steals)}
+                    </td>
+                    <td class="py-1.5 pr-2 pl-3 text-muted-foreground">BLK</td>
+                    <td class="py-1.5 text-right font-semibold text-foreground">
+                      {formatAggregateStat(aggregate.blocks)}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="py-1.5 pr-2 text-muted-foreground">TOV</td>
+                    <td class="py-1.5 text-right font-semibold text-foreground" colspan="3">
+                      {formatAggregateStat(aggregate.turnovers)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </article>
+          {/each}
+        </div>
+        {#if byId === null}
+          <p class="mt-3 animate-pulse text-sm text-muted-foreground">Loading player details…</p>
+        {/if}
+      {:else}
+        <p class="mt-4 animate-pulse text-sm text-muted-foreground">Loading season table…</p>
+      {/if}
+    </section>
   {:else}
-    <p class="mt-4 animate-pulse text-sm text-muted-foreground">Loading season table…</p>
+    <div class="flex flex-col gap-4 p-4 sm:p-6">
+      {#if record}
+        <section
+          aria-label="Season snapshot"
+          class="rounded-xl border border-border bg-surface-1 p-4 sm:p-5"
+        >
+          <div class="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 class="font-display text-xl font-extrabold tracking-tight uppercase">
+              Season snapshot
+            </h2>
+            <span class="font-mono text-[10px] text-muted-foreground">{gamesPlayed} games</span>
+          </div>
+          <dl class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
+            <div class="rounded-lg border border-border bg-card p-3">
+              <dt class="font-mono text-[10px] text-muted-foreground uppercase">Your PPG</dt>
+              <dd class="mt-1 font-display text-xl font-extrabold">
+                {perGameValue(record.points, gamesPlayed)}
+              </dd>
+            </div>
+            <div class="rounded-lg border border-border bg-card p-3">
+              <dt class="font-mono text-[10px] text-muted-foreground uppercase">Opponent PPG</dt>
+              <dd class="mt-1 font-display text-xl font-extrabold">
+                {oneDecimal(opponentPointsPerGame)}
+              </dd>
+            </div>
+            <div class="rounded-lg border border-border bg-card p-3">
+              <dt class="font-mono text-[10px] text-muted-foreground uppercase">Point diff</dt>
+              <dd class="mt-1 font-display text-xl font-extrabold">
+                {pointDifferential >= 0 ? '+' : ''}{perGameValue(pointDifferential, gamesPlayed)}
+              </dd>
+            </div>
+            <div class="rounded-lg border border-border bg-card p-3">
+              <dt class="font-mono text-[10px] text-muted-foreground uppercase">Pace</dt>
+              <dd class="mt-1 font-display text-xl font-extrabold">
+                {perGameValue(record.possessions, gamesPlayed)}
+              </dd>
+            </div>
+            <div class="rounded-lg border border-border bg-card p-3">
+              <dt class="font-mono text-[10px] text-muted-foreground uppercase">Rebounds/G</dt>
+              <dd class="mt-1 font-display text-xl font-extrabold">
+                {perGameValue(record.rebounds.total, gamesPlayed)}
+              </dd>
+            </div>
+          </dl>
+          <div class="mt-3 grid gap-2 font-mono text-xs sm:grid-cols-4">
+            <p>
+              <span class="text-muted-foreground">FG</span>
+              {pct(record.fieldGoals.made, record.fieldGoals.attempted)}
+            </p>
+            <p>
+              <span class="text-muted-foreground">3P</span>
+              {pct(record.threes.made, record.threes.attempted)}
+            </p>
+            <p>
+              <span class="text-muted-foreground">FT</span>
+              {pct(record.freeThrows.made, record.freeThrows.attempted)}
+            </p>
+            <p>
+              <span class="text-muted-foreground">TOV/G</span>
+              {perGameValue(record.turnovers, gamesPlayed)}
+            </p>
+          </div>
+        </section>
+      {/if}
+
+      <section aria-label="How your five won" class="rounded-xl border border-border bg-card p-5">
+        <h2 class="font-display text-xl font-extrabold tracking-tight uppercase">
+          How your five won
+        </h2>
+        <ul class="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+          <li class="rounded-lg border border-border bg-surface-1 p-3">
+            <span class="font-semibold"
+              >{explanation.turnoverBattleWins} of {run.games.length} games</span
+            >
+            <span class="text-muted-foreground"> &nbsp;you won the turnover battle.</span>
+          </li>
+          <li class="rounded-lg border border-border bg-surface-1 p-3">
+            <span class="font-semibold">{netRatingLabel}</span>
+            <span class="text-muted-foreground"> net points per 100 possessions.</span>
+          </li>
+          {#if explanation.zoneAdvantage}
+            <li class="rounded-lg border border-border bg-surface-1 p-3">
+              <span class="font-semibold"
+                >Your advantage came primarily {zoneName(explanation.zoneAdvantage.zone)}.</span
+              >
+              <span class="text-muted-foreground">
+                &nbsp;You shot {zonePctLabel(explanation.zoneAdvantage.pct)} to your opponents'
+                {zonePctLabel(explanation.zoneAdvantage.opponentPct)} on {explanation.zoneAdvantage.attempts.toLocaleString()}
+                {zoneNoun(explanation.zoneAdvantage.zone)} attempts.
+              </span>
+            </li>
+          {/if}
+          {#if explanation.opponentOffensiveReboundRate >= 0.3}
+            <li class="rounded-lg border border-border bg-surface-1 p-3">
+              <span class="font-semibold">This lineup was weak on the defensive glass.</span>
+              <span class="text-muted-foreground">
+                &nbsp;Opponents grabbed {percentOneDecimal(
+                  explanation.opponentOffensiveReboundRate,
+                )} of their own misses.
+              </span>
+            </li>
+          {/if}
+          {#if explanation.usageLeader}
+            <li class="rounded-lg border border-border bg-surface-1 p-3">
+              <span class="font-semibold">{usageLeaderName}</span>
+              <span class="text-muted-foreground">
+                &nbsp;consumed {(explanation.usageLeader.usageShare * 100).toFixed(0)}% of estimated
+                usage.
+              </span>
+            </li>
+          {/if}
+        </ul>
+      </section>
+    </div>
   {/if}
-</section>
+</div>

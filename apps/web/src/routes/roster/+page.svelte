@@ -488,7 +488,7 @@
       </div>
     {:else if !index || !details}
       <div class="mt-8">
-        <AsyncState kind="loading" title="Loading…" message="Loading…" />
+        <AsyncState kind="loading" title="Loading players…" message="Getting rosters ready." />
       </div>
     {:else}
       <div class="mt-8 flex flex-col gap-4 rounded-xl bg-surface-1 p-2 sm:p-3">
@@ -611,7 +611,7 @@
 
   {#if dialogPlayer}
     {#await loadPlayerDetailDialog() then { default: PlayerDetailDialog }}
-      <p class="px-4 py-3 font-mono text-xs text-muted-foreground">Loading…</p>
+      <p class="px-4 py-3 font-mono text-xs text-muted-foreground">Opening player details…</p>
       <PlayerDetailDialog
         player={dialogPlayer}
         manifest={manifest!}
