@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { LockPreview } from '$lib/season/season-lock-preview';
+  import RuleBadge from './RuleBadge.svelte';
   let {
     preview,
     franchiseName,
@@ -86,6 +87,7 @@
             {game.humanIsHome ? 'vs' : 'at'}
             {franchiseName(game.opponentFranchiseId)}
           </span>
+          <RuleBadge rule={game.homeRule} compact />
         </li>
       {/each}
     </ol>

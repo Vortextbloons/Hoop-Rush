@@ -33,6 +33,8 @@ export interface RecorderPlayer {
   blocks: number;
   turnovers: number;
   fouls: number;
+  deepMakes: number;
+  deepAttempts: number;
   zoneAttempts: Record<ShotZone, number>;
   zoneMakes: Record<ShotZone, number>;
   assistOpportunities: number;
@@ -56,6 +58,9 @@ export interface RecorderSide {
   blocks: number;
   turnovers: number;
   fouls: number;
+  deepMakes: number;
+  deepAttempts: number;
+  shotClockViolations: number;
   possessions: number;
   freeThrowTrips: number;
   periodPoints: number[];
@@ -82,6 +87,9 @@ export function createRecorderSide(): RecorderSide {
     turnovers: 0,
     fouls: 0,
     possessions: 0,
+    deepMakes: 0,
+    deepAttempts: 0,
+    shotClockViolations: 0,
     freeThrowTrips: 0,
     periodPoints: [0],
     zoneAttempts: createZoneCounters(),
@@ -115,6 +123,8 @@ export class GameRecorder {
         blocks: 0,
         turnovers: 0,
         fouls: 0,
+        deepMakes: 0,
+        deepAttempts: 0,
         zoneAttempts: createZoneCounters(),
         zoneMakes: createZoneCounters(),
         assistOpportunities: 0,
@@ -169,6 +179,7 @@ export class GameRecorder {
     made: boolean,
     three: boolean,
     assisted: boolean,
+    deep = false,
   ): void {
     const player = this.playerAt(side, slot);
     const team = this.sides[side];
@@ -183,13 +194,21 @@ export class GameRecorder {
       team.zoneMakes[zone] += 1;
       if (assisted) team.assistedFieldGoals += 1;
       else team.unassistedFieldGoals += 1;
-      const points = three ? 3 : 2;
+      const points = deep ? 4 : three ? 3 : 2;
       player.points += points;
       team.points += points;
       const lastPeriod = team.periodPoints.length - 1;
       team.periodPoints[lastPeriod] = (team.periodPoints[lastPeriod] ?? 0) + points;
     }
-    if (three) {
+    if (deep) {
+      player.deepAttempts += 1;
+      team.deepAttempts += 1;
+      if (made) {
+        player.deepMakes += 1;
+        team.deepMakes += 1;
+      }
+    }
+    if (three && !deep) {
       player.threeAttempts += 1;
       team.threeAttempts += 1;
       if (made) {
@@ -211,6 +230,10 @@ export class GameRecorder {
       const lastPeriod = team.periodPoints.length - 1;
       team.periodPoints[lastPeriod] = (team.periodPoints[lastPeriod] ?? 0) + 1;
     }
+  }
+  shotClockViolation(side: SideIndex, slot: number): void {
+    this.addToPlayerAndTeam(side, slot, 'turnovers', 'turnovers');
+    this.sides[side].shotClockViolations += 1;
   }
   private addToPlayerAndTeam(
     side: SideIndex,
@@ -323,24 +346,34 @@ export class GameRecorder {
     blocks: number;
     turnovers: number;
     fouls: number;
+    deepFours?: { made: number; attempted: number };
     diagnostics: PlayerDiagnostics;
   } {
     const p = this.playerAtRosterIndex(side, rosterIndex);
+    const base = playerBoxBase(p);
     return {
       seconds: p.seconds,
       minutes: p.seconds / 60,
-      ...playerBoxBase(p),
+      ...base,
+      ...(p.deepAttempts > 0 || p.deepMakes > 0
+        ? { deepFours: { made: p.deepMakes, attempted: p.deepAttempts } }
+        : {}),
     };
   }
   seasonTeamBox(
     side: SideIndex,
     teamId: string,
   ): Omit<TeamBoxScore, 'diagnostics'> & {
+    deepFours?: { made: number; attempted: number };
     diagnostics: TeamDiagnostics;
   } {
+    const t = this.sides[side];
     return {
-      ...buildTeamBoxBase(this.sides[side], teamId),
-      diagnostics: teamDiagnostics(this.sides[side], this.players[side]),
+      ...buildTeamBoxBase(t, teamId),
+      ...(t.deepAttempts > 0 || t.deepMakes > 0
+        ? { deepFours: { made: t.deepMakes, attempted: t.deepAttempts } }
+        : {}),
+      diagnostics: teamDiagnostics(t, this.players[side]),
     };
   }
   teamBox(side: SideIndex, teamId: string): TeamBoxScore {

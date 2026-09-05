@@ -73,6 +73,8 @@ function playerRow(name: string, points: number): BoxScoreRow {
     fieldGoalsAttempted: 9,
     threePointersMade: 1,
     threePointersAttempted: 3,
+    fourPointersMade: 0,
+    fourPointersAttempted: 0,
     freeThrowsMade: 2,
     freeThrowsAttempted: 2,
     offensiveRebounds: 1,

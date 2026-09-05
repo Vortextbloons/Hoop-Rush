@@ -1,4 +1,4 @@
-﻿<script lang="ts">
+<script lang="ts">
   import { setContext } from 'svelte';
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
@@ -108,7 +108,57 @@
       ...trade,
       windows: trade.windows.map((window) => ({
         ...window,
-        offers: window.offers.map((offer) => ({ ...offer })),
+        offers: window.offers.map((offer) => ({
+          ...offer,
+          seedPath: [...offer.seedPath],
+          outgoingPlayerVersionIds: [...offer.outgoingPlayerVersionIds],
+          incomingPlayerVersionIds: [...offer.incomingPlayerVersionIds],
+          outgoingHealth: offer.outgoingHealth.map((entry) => ({
+            ...entry,
+            activeInjuryIds: [...entry.activeInjuryIds],
+          })),
+          incomingHealth: offer.incomingHealth.map((entry) => ({
+            ...entry,
+            activeInjuryIds: [...entry.activeInjuryIds],
+          })),
+          valueBand: { ...offer.valueBand },
+          roleFit: {
+            ...offer.roleFit,
+            outgoingRoles: [...offer.roleFit.outgoingRoles],
+            incomingRoles: [...offer.roleFit.incomingRoles],
+          },
+          rosterNeedFacts: { ...offer.rosterNeedFacts },
+          projectedChemistryDisruption: { ...offer.projectedChemistryDisruption },
+        })),
+        boardProfiles: window.boardProfiles?.map((profile) => ({
+          ...profile,
+          needs: [...profile.needs],
+          listedPlayerIds: [...profile.listedPlayerIds],
+          discussablePlayerIds: [...profile.discussablePlayerIds],
+          protectedPlayerIds: [...profile.protectedPlayerIds],
+          hardConstraints: [...profile.hardConstraints],
+          competitorInterest:
+            profile.competitorInterest === undefined
+              ? undefined
+              : { ...profile.competitorInterest },
+        })),
+        canonicalTeamOrder:
+          window.canonicalTeamOrder === undefined ? undefined : [...window.canonicalTeamOrder],
+        negotiations: window.negotiations?.map((negotiation) => ({
+          ...negotiation,
+          exchanges: negotiation.exchanges.map((exchange) => ({ ...exchange })),
+          rejectedPlayerVersionIds: [...negotiation.rejectedPlayerVersionIds],
+          expressedInterests: [...negotiation.expressedInterests],
+        })),
+        valueTrends: window.valueTrends?.map((trend) => ({ ...trend })),
+      })),
+      humanDirectNegotiations: trade.humanDirectNegotiations?.map((negotiation) => ({
+        ...negotiation,
+        confirmations: { ...negotiation.confirmations },
+        currentProposal:
+          negotiation.currentProposal === null ? null : { ...negotiation.currentProposal },
+        counterProposal:
+          negotiation.counterProposal === null ? null : { ...negotiation.counterProposal },
       })),
     };
     tradeCacheSource = trade;
@@ -487,6 +537,14 @@
     mirrorHub();
   };
   shell.evolveGmCampaign = async (input) => {
+    shell.selectFrontOffice = async (input) => {
+      await shell.hub?.selectFrontOffice(input);
+      mirrorHub();
+    };
+    shell.selectCourtInnovation = async (input) => {
+      await shell.hub?.selectCourtInnovation(input);
+      mirrorHub();
+    };
     await shell.hub?.evolveGmCampaign(input);
     mirrorHub();
   };
@@ -578,7 +636,7 @@
       const entry = roster.players.find((p) => p.playerVersionId === playerVersionId);
       if (entry !== undefined) return entry.displayName;
     }
-    return '—';
+    return '�';
   };
   shell.playablePositions = (playerVersionId: string): readonly string[] =>
     playablePositionsOfSlice(shell.playerSlice, playerVersionId);
@@ -648,7 +706,7 @@
     return {
       franchiseId,
       record: recordLabel(row.wins, row.losses),
-      position: ranked === undefined ? '—' : `${ordinal(ranked.rank)} in the ${ranked.conference}`,
+      position: ranked === undefined ? '�' : `${ordinal(ranked.rank)} in the ${ranked.conference}`,
     };
   });
   const seasonLoadError = $derived(shell.error ?? shell.hubError ?? null);
@@ -692,7 +750,7 @@
 </script>
 
 <svelte:head>
-  <title>Season Run — Hoop Rush</title>
+  <title>Season Run � Hoop Rush</title>
 </svelte:head>
 
 {#if seasonLoadError !== null || showBrokenResume}
@@ -750,7 +808,7 @@
           disabled={clearing}
           class="inline-flex items-center justify-center rounded-xl bg-destructive px-4 py-2 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {clearing ? 'Clearing…' : 'Yes, clear everything'}
+          {clearing ? 'Clearing�' : 'Yes, clear everything'}
         </button>
       </div>
     </Dialog.Content>
@@ -758,7 +816,7 @@
 {:else if !shell.ready}
   <div class="mx-auto mt-16 w-full max-w-xl px-4 sm:px-6">
     <div class="scoreboard-panel p-6" aria-live="polite">
-      <p class="font-mono text-sm text-muted-foreground">Loading your season…</p>
+      <p class="font-mono text-sm text-muted-foreground">Loading your season�</p>
     </div>
   </div>
 {:else if incompatible !== null}
@@ -815,7 +873,7 @@
           disabled={discarding}
           class="inline-flex items-center justify-center rounded-xl bg-destructive px-4 py-2 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {discarding ? 'Discarding…' : 'Yes, discard the season'}
+          {discarding ? 'Discarding�' : 'Yes, discard the season'}
         </button>
       </div>
     </Dialog.Content>
@@ -968,7 +1026,7 @@
             disabled={quitting}
             class="inline-flex items-center justify-center gap-2 rounded-lg border border-destructive/50 px-4 py-2 text-sm font-semibold text-destructive transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {quitting ? 'Quitting…' : 'Quit and delete'}
+            {quitting ? 'Quitting�' : 'Quit and delete'}
           </button>
         </div>
       </Dialog.Content>

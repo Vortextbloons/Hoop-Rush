@@ -6,7 +6,7 @@
     SeasonGameSummary,
     SeasonRotation,
   } from '@hoop-rush/data-contracts';
-  import { minuteStrategyOfPreset, type MinutePlanOptimizationResult } from '@hoop-rush/engine';
+  import type { MinutePlanOptimizationResult } from '@hoop-rush/engine';
   import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
   import type { SeasonFaceRef } from '$lib/season/season-branding';
   import { eraIdentityOf } from '$lib/season/season-branding';
@@ -250,33 +250,24 @@
       rejection = `That roster move is rejected: ${failuresAfter[0]}`;
     }
   }
-  async function applyPreset(preset: (typeof ROTATION_PRESETS)[number]) {
+  function applyPreset(preset: (typeof ROTATION_PRESETS)[number]) {
     if (disabled) return;
     rejection = null;
-    if (optimize !== null && !optimize.busy && optimizingPreset === null) {
-      optimizingPreset = preset;
-      try {
-        const result = await optimize.run(editor.rotation);
-        const plan = result.plans.find(
-          (candidate) => candidate.strategy === minuteStrategyOfPreset(preset),
-        );
-        if (plan !== undefined) {
-          try {
-            editor.applyRotation(plan.rotation);
-          } catch (error) {
-            rejection = `That plan is rejected: ${error instanceof Error ? error.message : String(error)}`;
-            return;
-          }
-          revision += 1;
-          emit();
-          return;
-        }
-      } catch {
-      } finally {
-        optimizingPreset = null;
-      }
+    const failures = editor.applyPreset(preset);
+    revision += 1;
+    if (failures.length > 0) {
+      rejection = `That preset is rejected: ${failures[0]}`;
+      return;
     }
-    commit(editor.applyPreset(preset));
+    emit();
+    if (optimize === null || optimize.busy) return;
+    optimizingPreset = preset;
+    void optimize
+      .run(editor.rotation)
+      .catch(() => undefined)
+      .finally(() => {
+        if (optimizingPreset === preset) optimizingPreset = null;
+      });
   }
   function faceOf(playerVersionId: string): SeasonFaceRef | null {
     return faces?.get(playerVersionId) ?? null;
@@ -339,8 +330,8 @@
       {#each ROTATION_PRESETS as preset (preset)}
         <button
           type="button"
-          onclick={() => void applyPreset(preset)}
-          disabled={disabled || optimizingPreset !== null}
+          onclick={() => applyPreset(preset)}
+          {disabled}
           aria-busy={optimizingPreset === preset ? 'true' : undefined}
           class="min-h-11 rounded-lg bg-surface-2 px-2 py-1.5 text-xs font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-40 sm:text-sm md:min-h-0"
         >

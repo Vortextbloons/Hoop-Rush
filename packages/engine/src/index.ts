@@ -249,6 +249,8 @@ export {
   handleSubmitSeasonBlockCommand,
   completeSeasonBlockCommit,
   deriveSeasonPostBlockState,
+  buildEvolutionDataSource,
+  evolutionSelectionGate,
   resumeSeasonBlockFromPending,
   SeasonBlockValidationError,
   SeasonBlockInvariantError,
@@ -302,6 +304,21 @@ export {
   type SeasonInjuryRollResult,
 } from './season/injuries.ts';
 export { createInitialSeasonInfluenceState } from './season/influence.ts';
+export {
+  rehabPriceOf,
+  purchasedInquiryCostOf,
+  baseInquiryAllowanceOf,
+} from './season/evolution.ts';
+export { campaignBonusOf } from './season/evolution.ts';
+export { wrapSponsorshipsForBlock, createEvolutionDiscovery } from './season/evolution.ts';
+export { selectAiCourtInnovation, resolveHomeGameRule } from './season/evolution.ts';
+export {
+  evolutionWithBlockCommit,
+  resolveAiCourtInnovations,
+  srsRuleScorerFor,
+  type AiSelectionDataSource,
+} from './season/evolution.ts';
+export { projectGameWithRule, estimateFirstToSevenRace } from './projection/index.ts';
 export { seasonObjectiveChoicesForBlock } from './season/objectives.ts';
 export {
   handleSeasonRunCommand,

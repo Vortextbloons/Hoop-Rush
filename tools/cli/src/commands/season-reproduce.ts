@@ -17,6 +17,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import {
   createSeasonEffectsState,
+  buildEvolutionDataSource,
   defaultSeasonPostseasonGameResolver,
   deriveSeasonAwards,
   deriveSeasonPostBlockState,
@@ -866,6 +867,7 @@ function replayBlock(
     };
   }
   const checkpoint = result.checkpoint;
+  const priorSummaries = state.summaries;
   state.summaries = [...state.summaries, ...checkpoint.gameSummaries];
   state.acceptedCommandIds = [...state.acceptedCommandIds, command.commandId];
   state.effects = checkpoint.effects;
@@ -874,9 +876,17 @@ function replayBlock(
     candidate: checkpoint,
     commandId: command.commandId,
     rotationDigest: command.rotationDigest,
+    humanFranchiseId,
+    evolutionData: buildEvolutionDataSource({
+      run: state.run,
+      candidate: checkpoint,
+      priorSummaries,
+      schedule,
+    }),
   });
   state.run = {
     ...state.run,
+    evolution: stateFacts.evolution,
     cursor: { schemaVersion: 1, completedRounds: checkpoint.completedRounds },
     standings: checkpoint.standings,
     health: checkpoint.health,

@@ -1,5 +1,17 @@
 @import 'tailwindcss';
 
+@property --spin-start {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --spin-settle {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
 @theme {
   --color-background: hsl(222 22% 6%);
   --color-foreground: hsl(40 20% 94%);

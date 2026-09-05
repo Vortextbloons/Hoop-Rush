@@ -1,7 +1,7 @@
 import type { SeasonRunSnapshot } from '@hoop-rush/persistence';
 const CACHE_LIMIT = 4;
-function cacheKeyOf(runId: string, revision: number): string {
-  return `${runId}:${String(revision)}`;
+function cacheKeyOf(runId: string, acceptedCount: number, stateRevision: number): string {
+  return `${runId}:${String(acceptedCount)}:${String(stateRevision)}`;
 }
 export function rosterKeyOfSnapshotRun(rosters: SeasonRunSnapshot['run']['rosters']): string {
   return rosters
@@ -22,26 +22,45 @@ export function getCachedSeasonSnapshot(): SeasonRunSnapshot | null {
 }
 export function getCachedSeasonSnapshotFor(
   runId: string,
-  revision: number,
+  acceptedCount: number,
+  stateRevision: number,
 ): SeasonRunSnapshot | null {
-  const entry = snapshotsByKey.get(cacheKeyOf(runId, revision));
+  const entry = snapshotsByKey.get(cacheKeyOf(runId, acceptedCount, stateRevision));
   if (entry === undefined) return null;
-  latestKey = cacheKeyOf(runId, revision);
+  latestKey = cacheKeyOf(runId, acceptedCount, stateRevision);
   return entry.snapshot;
 }
-export function cachedSeasonSnapshotMatches(runId: string, revision: number): boolean {
-  const key = cacheKeyOf(runId, revision);
+export function cachedSeasonSnapshotMatches(
+  runId: string,
+  acceptedCount: number,
+  stateRevision: number,
+): boolean {
+  const key = cacheKeyOf(runId, acceptedCount, stateRevision);
   if (snapshotsByKey.has(key)) {
     latestKey = key;
     return true;
   }
   return false;
 }
-export function cachedSeasonSnapshotRosterKey(runId: string, revision: number): string | null {
-  return snapshotsByKey.get(cacheKeyOf(runId, revision))?.rosterKey ?? null;
+export function cachedSeasonSnapshotRosterKey(
+  runId: string,
+  acceptedCount: number,
+  stateRevision: number,
+): string | null {
+  return snapshotsByKey.get(cacheKeyOf(runId, acceptedCount, stateRevision))?.rosterKey ?? null;
 }
 export function setCachedSeasonSnapshot(snapshot: SeasonRunSnapshot): void {
-  const key = cacheKeyOf(snapshot.run.runId, snapshot.acceptedBlocks.length);
+  const key = cacheKeyOf(
+    snapshot.run.runId,
+    snapshot.acceptedBlocks.length,
+    snapshot.run.stateRevision,
+  );
+  for (const existing of [...snapshotsByKey.keys()]) {
+    const prefix = `${snapshot.run.runId}:${String(snapshot.acceptedBlocks.length)}:`;
+    if (existing !== key && existing.startsWith(prefix)) {
+      snapshotsByKey.delete(existing);
+    }
+  }
   snapshotsByKey.set(key, { snapshot, rosterKey: rosterKeyOfSnapshot(snapshot) });
   latestKey = key;
   while (snapshotsByKey.size > CACHE_LIMIT) {

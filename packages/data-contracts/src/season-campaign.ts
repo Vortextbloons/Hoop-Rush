@@ -169,6 +169,13 @@ export const seasonCampaignOpportunitySchema = z.object({
   breakthroughReward: seasonCampaignRewardSchema.nullable(),
   feasibilityFacts: z.record(z.string(), z.unknown()),
   seedPath: z.array(z.string()).min(1),
+  sponsor: z
+    .object({
+      sponsorId: z.enum(['baseline-supply', 'second-wind', 'cityline-sports']),
+      contentVersion: z.string().min(1).max(64),
+      seedPath: z.array(z.string()).min(1),
+    })
+    .optional(),
 });
 export type SeasonCampaignOpportunity = z.infer<typeof seasonCampaignOpportunitySchema>;
 export const seasonCampaignOutcomeSchema = z.enum(['missed', 'completed', 'breakthrough']);

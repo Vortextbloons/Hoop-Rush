@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { PeakPlayerSeason } from '@hoop-rush/data-contracts';
 import {
   POSITION_NORMALIZATION_VERSION,
+  SEASON_ROTATION_V2,
+  SEASON_ROTATION_VERSION,
   contentHashSchema,
   eraIdSchema,
   franchiseIdSchema,
@@ -357,6 +359,63 @@ describe('dataValidate season free-agency index audit', () => {
     ).toBe(true);
   });
   it('passes when no free-agency index is packaged', async () => {
+    const path = await writeManifest(buildManifest());
+    const report = await dataValidate(path, false);
+    expect(report.ok).toBe(true);
+  });
+});
+describe('dataValidate season game targets audit', () => {
+  function minimalGameTargets(rotationVersion: string): unknown {
+    return {
+      schemaVersion: 1,
+      targetsVersion: 'season-game-targets-v4',
+      gameVersion: 'season-game-v4',
+      plannerVersion: 'rotation-planner-v1',
+      rotationVersion,
+      calibration: {
+        calibrationSeedCount: 1024,
+        validationSeedCount: 256,
+        generatedAtIso: '2026-08-06T23:48:44.853Z',
+      },
+      fixtures: [],
+      gates: {
+        zeroFailures: true,
+        starterOrdering: true,
+        benchOrdering: true,
+        benchRoleNonIncreasing: true,
+        heldOutPassShare: 1,
+        heldOutPass: true,
+      },
+    };
+  }
+  async function writeTargetsManifest(rotationVersion: string): Promise<string> {
+    const seasonDir = join(dir, 'season');
+    await mkdir(seasonDir, { recursive: true });
+    await writeFile(
+      join(seasonDir, 'game-targets.json'),
+      JSON.stringify(minimalGameTargets(rotationVersion)),
+    );
+    return writeManifest(buildManifest());
+  }
+  it('fails packaged game targets pinned to the stale rotation version', async () => {
+    const path = await writeTargetsManifest(SEASON_ROTATION_V2);
+    const report = await dataValidate(path, false);
+    expect(report.ok).toBe(false);
+    expect(
+      report.failures.some((f) =>
+        f.includes(
+          `game-targets: rotationVersion ${SEASON_ROTATION_V2} != ${SEASON_ROTATION_VERSION}`,
+        ),
+      ),
+    ).toBe(true);
+  });
+  it('accepts packaged game targets pinned to the current rotation version', async () => {
+    const path = await writeTargetsManifest(SEASON_ROTATION_VERSION);
+    const report = await dataValidate(path, false);
+    expect(report.failures).toEqual([]);
+    expect(report.ok).toBe(true);
+  });
+  it('passes when no game targets are packaged', async () => {
     const path = await writeManifest(buildManifest());
     const report = await dataValidate(path, false);
     expect(report.ok).toBe(true);

@@ -4,7 +4,10 @@ import { playerVersionIdSchema } from './season-identity.ts';
 import { seasonCompactInjuryEventSchema } from './season-health.ts';
 import { seasonGameSimulationResultSchema } from './season-game-simulation.ts';
 import { seasonEffectsRollupSchema, seasonMechanismEvidenceSchema } from './season-effects.ts';
-import { SEASON_GAME_SUMMARY_VERSION } from './season-versions.ts';
+import {
+  SEASON_GAME_SUMMARY_LEGACY_VERSION,
+  SEASON_GAME_SUMMARY_VERSION,
+} from './season-versions.ts';
 export const seasonCompactPlayerLineSchema = z.object({
   playerVersionId: playerVersionIdSchema,
   seconds: z.number().int().min(0),
@@ -23,6 +26,8 @@ export const seasonCompactPlayerLineSchema = z.object({
   blocks: z.number().int().min(0),
   turnovers: z.number().int().min(0),
   fouls: z.number().int().min(0),
+  fourPointersMade: z.number().int().min(0).optional(),
+  fourPointersAttempted: z.number().int().min(0).optional(),
 });
 export type SeasonCompactPlayerLine = z.infer<typeof seasonCompactPlayerLineSchema>;
 export const seasonTeamBoxSchema = z.object({
@@ -42,12 +47,17 @@ export const seasonTeamBoxSchema = z.object({
   turnovers: z.number().int().nonnegative(),
   fouls: z.number().int().nonnegative(),
   possessions: z.number().int().nonnegative(),
+  fourPointersMade: z.number().int().nonnegative().optional(),
+  fourPointersAttempted: z.number().int().nonnegative().optional(),
 });
 export type SeasonTeamBox = z.infer<typeof seasonTeamBoxSchema>;
 export const seasonGameSummarySchema = z
   .object({
     schemaVersion: z.literal(1),
-    summaryVersion: z.literal(SEASON_GAME_SUMMARY_VERSION),
+    summaryVersion: z.union([
+      z.literal(SEASON_GAME_SUMMARY_VERSION),
+      z.literal(SEASON_GAME_SUMMARY_LEGACY_VERSION),
+    ]),
     gameId: seasonGameIdSchema,
     round: z.number().int().min(1).max(82),
     homeFranchiseId: franchiseIdSchema,
@@ -63,6 +73,17 @@ export const seasonGameSummarySchema = z
     awayPlayers: z.array(seasonCompactPlayerLineSchema),
     effectsRollup: z.array(seasonEffectsRollupSchema).max(12).optional(),
     injuryEvents: z.array(seasonCompactInjuryEventSchema),
+    gameRule: z
+      .enum(['standard', 'deep-four', 'twenty-second-clock', 'first-to-seven-overtime'])
+      .optional(),
+    ruleVersion: z.string().min(1).max(64).optional(),
+    overtimeRace: z
+      .object({
+        target: z.literal(7),
+        homePoints: z.number().int().nonnegative(),
+        awayPoints: z.number().int().nonnegative(),
+      })
+      .optional(),
   })
   .superRefine((summary, ctx) => {
     if (summary.status === 'forfeit') {

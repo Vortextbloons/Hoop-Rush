@@ -59,14 +59,14 @@ test.describe('classic: reel draft and auto-launch smoke', () => {
       await expect(page.locator('.roll-overlay')).toBeVisible();
       await expect(page.locator('[data-axis="franchise"]')).toBeVisible();
       await expect(page.locator('[data-axis="era"]')).toBeVisible();
-      await expect(page.locator('.roll-overlay')).not.toBeVisible({ timeout: 5000 });
+      await expect(page.locator('.roll-overlay')).not.toBeVisible({ timeout: 6000 });
 
       await expect(page.locator('[data-indicator="franchise"]')).toBeVisible();
       await expect(page.locator('[data-indicator="era"]')).toBeVisible();
 
       await pickOne(page);
       await expect(page.locator('.roll-overlay')).toBeVisible();
-      await expect(page.locator('.roll-overlay')).not.toBeVisible({ timeout: 5000 });
+      await expect(page.locator('.roll-overlay')).not.toBeVisible({ timeout: 6000 });
       await expect(roundHeading(page, 2)).toBeVisible();
 
       await draftRounds(page, 2);

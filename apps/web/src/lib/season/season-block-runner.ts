@@ -45,6 +45,7 @@ import type {
   SeasonWindowOpenResult,
 } from '@hoop-rush/persistence';
 import type { SeasonSchedule } from '@hoop-rush/data-contracts';
+import type { EraSimulationProfile } from '@hoop-rush/data-contracts';
 import type { SeasonArtifactUrls } from './season-assets';
 import { randomUUID } from '$lib/random-id';
 export type SeasonRunnerEvent =
@@ -210,8 +211,8 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     hash: string;
     catalog: SeasonDraftCatalog;
   } | null = null;
-  let catalogInflight: Promise<SeasonDraftCatalog | null> | null = null;
-  async function resolveCatalog(input: SeasonBlockStartInput): Promise<SeasonDraftCatalog | null> {
+  let catalogInflight: Promise<SeasonDraftCatalog> | null = null;
+  async function resolveCatalog(input: SeasonBlockStartInput): Promise<SeasonDraftCatalog> {
     if (
       catalogCache !== null &&
       catalogCache.url === input.catalogUrl &&
@@ -226,8 +227,10 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         const catalog = await loadSeasonDraftCatalog(input.catalogUrl, input.catalogHash);
         catalogCache = { url: input.catalogUrl, hash: input.catalogHash, catalog };
         return catalog;
-      } catch {
-        return null;
+      } catch (error) {
+        throw new Error(
+          `season block catalog load failed for ${input.catalogUrl}: ${error instanceof Error ? error.message : String(error)}`,
+        );
       } finally {
         catalogInflight = null;
       }
@@ -238,6 +241,9 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     void resolveCatalog(input).catch(() => null);
     if (input.blockIndex === 2 || input.blockIndex === 4 || input.blockIndex === 6) {
       void resolveFreeAgencyAssets().catch(() => null);
+    }
+    if (input.blockIndex === 3) {
+      void resolveEvolutionAssets().catch(() => null);
     }
   }
   let freeAgencyCache: {
@@ -267,6 +273,36 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       return await freeAgencyInflight;
     } catch (error) {
       freeAgencyInflight = null;
+      throw error;
+    }
+  }
+  let evolutionCache: {
+    profile: EraSimulationProfile;
+    schedule: SeasonSchedule;
+  } | null = null;
+  let evolutionInflight: Promise<{
+    profile: EraSimulationProfile;
+    schedule: SeasonSchedule;
+  }> | null = null;
+  async function resolveEvolutionAssets(): Promise<{
+    profile: EraSimulationProfile;
+    schedule: SeasonSchedule;
+  }> {
+    if (evolutionCache !== null) return evolutionCache;
+    if (evolutionInflight !== null) return evolutionInflight;
+    evolutionInflight = (async () => {
+      const module = await import('./season-assets');
+      const [profile, schedule] = await Promise.all([
+        module.loadSeasonEraProfile(),
+        resolveSchedule(),
+      ]);
+      evolutionCache = { profile, schedule };
+      return evolutionCache;
+    })();
+    try {
+      return await evolutionInflight;
+    } catch (error) {
+      evolutionInflight = null;
       throw error;
     }
   }
@@ -481,21 +517,48 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     try {
       const repository = await resolveRepository();
       const authoritative = { ...checkpoint, freeAgency: state.input.run.freeAgency };
-      const catalog = await resolveCatalog(state.input);
+      const scheduleForSnapshot = await resolveSchedule();
+      const needsCatalog =
+        state.blockIndex === 2 ||
+        state.blockIndex === 4 ||
+        state.blockIndex === 5 ||
+        state.blockIndex === 6;
+      let catalog: SeasonDraftCatalog | undefined;
+      try {
+        catalog = await resolveCatalog(state.input);
+      } catch (error) {
+        if (needsCatalog) {
+          throw new Error(
+            `season block ${String(state.blockIndex)} requires the packaged draft catalog: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+        catalog = undefined;
+      }
       const freeAgencyAssets =
         state.blockIndex === 2 || state.blockIndex === 4 || state.blockIndex === 6
           ? await resolveFreeAgencyAssets()
           : null;
+      const evolutionAssets =
+        state.blockIndex === 3 ? await resolveEvolutionAssets().catch(() => null) : null;
+      const candidateGameIds = new Set(authoritative.gameSummaries.map((summary) => summary.gameId));
+      const knownSummaries =
+        runState !== null && runState.runId === state.input.run.runId ? runState.summaries : [];
+      const evolutionPriorSummaries = knownSummaries.filter(
+        (summary) => !candidateGameIds.has(summary.gameId),
+      );
       const committed = completeSeasonBlockCommit({
         run: { ...state.input.run, rotations: state.rotations },
         candidate: authoritative,
         commandId: state.commandId,
         rotationDigest: state.rotationDigest,
         humanFranchiseId: state.input.humanFranchiseId,
-        catalog: catalog ?? undefined,
+        catalog,
         effects: checkpoint.effects,
         freeAgencyIndex: freeAgencyAssets?.freeAgencyIndex,
         freeAgencyTargets: freeAgencyAssets?.freeAgencyTargets,
+        profile: evolutionAssets?.profile,
+        schedule: evolutionAssets?.schedule,
+        priorSummaries: evolutionPriorSummaries,
       });
       const window: SeasonWindowOpenResult | null = committed.window;
       const retainedDetails = [
@@ -525,7 +588,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         summaries: authoritative.gameSummaries,
         retainedDetails,
         recap: authoritative.recap,
-        rotations: state.rotations,
+        rotations: window !== null ? window.rotations : state.rotations,
         effects: window !== null ? window.effects : authoritative.effects,
         freeAgency: committed.freeAgency,
         health: authoritative.health,
@@ -534,6 +597,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         trade: window !== null ? window.trade : state.input.run.trade,
         objectives,
         campaign,
+        evolution: committed.evolution,
         checkpointState: committed.checkpointState,
         stateRevision: committed.stateRevision,
         stateDigest: committed.stateDigest,
@@ -580,16 +644,18 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         window,
         freeAgency: committed.freeAgency,
         campaign,
+        evolution: committed.evolution,
         checkpointState: committed.checkpointState,
         stateRevision: committed.stateRevision,
         stateDigest: committed.stateDigest,
-        schedule: await resolveSchedule(),
+        schedule: scheduleForSnapshot,
         priorSummaries,
         priorAcceptedBlocks,
         priorRetainedDetails,
       });
       emit({ type: 'complete', requestId, checkpoint: authoritative, snapshot });
     } catch (error) {
+      console.error('[season-block-runner] checkpoint commit failed', error);
       emit({
         type: 'error',
         requestId,
@@ -749,6 +815,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         rosters: state.input.run.rosters,
         rotations: state.rotations,
         cursor: state.input.run.cursor,
+        evolution: state.input.run.evolution,
       },
       schedule,
       homeCourt: state.input.homeCourt,
@@ -1161,6 +1228,7 @@ export function assembleCommittedSnapshot(input: {
   window: SeasonWindowOpenResult | null;
   freeAgency: SeasonFreeAgencyState;
   campaign?: import('@hoop-rush/data-contracts').SeasonCampaignState | null;
+  evolution?: import('@hoop-rush/data-contracts').SeasonEvolutionState | null;
   checkpointState: SeasonCheckpointState;
   stateRevision: number;
   stateDigest: string;
@@ -1197,6 +1265,7 @@ export function assembleCommittedSnapshot(input: {
     freeAgency: input.freeAgency,
     objectives,
     campaign: campaign as unknown as SeasonRun['campaign'],
+    evolution: input.evolution ?? run.evolution,
     checkpointState: input.checkpointState,
     stateRevision: input.stateRevision,
     stateDigest: input.stateDigest,

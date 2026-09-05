@@ -77,6 +77,9 @@ export function foldSeasonTeamAggregates(
       row.fieldGoalsAttempted += box.fieldGoalsAttempted;
       row.threePointersMade += box.threePointersMade;
       row.threePointersAttempted += box.threePointersAttempted;
+      row.fourPointersMade = (row.fourPointersMade ?? 0) + (box.fourPointersMade ?? 0);
+      row.fourPointersAttempted =
+        (row.fourPointersAttempted ?? 0) + (box.fourPointersAttempted ?? 0);
       row.freeThrowsMade += box.freeThrowsMade;
       row.freeThrowsAttempted += box.freeThrowsAttempted;
       row.offensiveRebounds += box.offensiveRebounds;
@@ -121,6 +124,9 @@ export function foldSeasonPlayerAggregates(
         row.fieldGoalsAttempted += line.fieldGoalsAttempted;
         row.threePointersMade += line.threePointersMade;
         row.threePointersAttempted += line.threePointersAttempted;
+        row.fourPointersMade = (row.fourPointersMade ?? 0) + (line.fourPointersMade ?? 0);
+        row.fourPointersAttempted =
+          (row.fourPointersAttempted ?? 0) + (line.fourPointersAttempted ?? 0);
         row.freeThrowsMade += line.freeThrowsMade;
         row.freeThrowsAttempted += line.freeThrowsAttempted;
         row.offensiveRebounds += line.offensiveRebounds;
@@ -182,6 +188,13 @@ export function auditSeasonAggregates(input: {
         );
       }
     }
+    for (const field of ['fourPointersMade', 'fourPointersAttempted'] as const) {
+      if ((row[field] ?? 0) !== (want[field] ?? 0)) {
+        failures.push(
+          `team ${row.franchiseId} ${field}: stored ${String(row[field])} != fold ${String(want[field])}`,
+        );
+      }
+    }
   }
   const freshTeamIds = new Set(freshTeams.map((row) => row.franchiseId));
   for (const row of input.teams) {
@@ -225,6 +238,13 @@ export function auditSeasonAggregates(input: {
     }
     for (const field of playerFields) {
       if (row[field] !== want[field]) {
+        failures.push(
+          `player ${row.playerVersionId} ${field}: stored ${String(row[field])} != fold ${String(want[field])}`,
+        );
+      }
+    }
+    for (const field of ['fourPointersMade', 'fourPointersAttempted'] as const) {
+      if ((row[field] ?? 0) !== (want[field] ?? 0)) {
         failures.push(
           `player ${row.playerVersionId} ${field}: stored ${String(row[field])} != fold ${String(want[field])}`,
         );

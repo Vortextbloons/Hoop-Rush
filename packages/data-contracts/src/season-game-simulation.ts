@@ -11,6 +11,7 @@ import { playerVersionIdSchema } from './season-identity.ts';
 import { ratingProfileSchema } from './ratings-model.ts';
 import { seasonStaminaInputSchema } from './season-effects.ts';
 import { seasonRotationSchema } from './season-rotation.ts';
+import { seasonGameRuleSchema } from './season-evolution.ts';
 import { seasonHomeCourtProfileSchema, SEASON_NEUTRAL_HOME_COURT } from './season-home-court.ts';
 import {
   SEASON_GAME_TARGETS_VERSION,
@@ -90,6 +91,9 @@ export const seasonRemovalSchema = z.object({
   period: z.number().int().min(1).max(12),
   secondsRemaining: z.number().int().min(0).max(720),
   reason: seasonRemovalReasonSchema,
+  clockKind: z.enum(['timed', 'untimed']).optional(),
+  elapsedSeconds: z.number().int().nonnegative().optional(),
+  eventOrder: z.number().int().nonnegative().optional(),
 });
 export type SeasonRemoval = z.infer<typeof seasonRemovalSchema>;
 export const seasonReturnReasonSchema = z.enum(['injury-return']);
@@ -100,6 +104,9 @@ export const seasonReturnSchema = z.object({
   period: z.number().int().min(1).max(12),
   secondsRemaining: z.number().int().min(0).max(720),
   reason: seasonReturnReasonSchema,
+  clockKind: z.enum(['timed', 'untimed']).optional(),
+  elapsedSeconds: z.number().int().nonnegative().optional(),
+  eventOrder: z.number().int().nonnegative().optional(),
 });
 export type SeasonReturn = z.infer<typeof seasonReturnSchema>;
 export const seasonGamePlayerInputSchema = z
@@ -141,6 +148,8 @@ export const seasonGameSimulationInputSchema = z
     removals: z.array(seasonRemovalSchema).default([]),
     returns: z.array(seasonReturnSchema).default([]),
     homeCourt: seasonHomeCourtProfileSchema.default(() => SEASON_NEUTRAL_HOME_COURT),
+    gameRule: seasonGameRuleSchema.optional(),
+    ruleVersion: z.string().min(1).max(64).optional(),
   })
   .superRefine((input, ctx) => {
     const ids = new Set<string>();
@@ -206,6 +215,9 @@ export const seasonSubstitutionSchema = z.object({
   playerOut: playerVersionIdSchema,
   reason: seasonSubstitutionReasonSchema,
   unit: z.array(playerVersionIdSchema).length(5),
+  clockKind: z.enum(['timed', 'untimed']).optional(),
+  elapsedSeconds: z.number().int().nonnegative().optional(),
+  eventOrder: z.number().int().nonnegative().optional(),
 });
 export type SeasonSubstitution = z.infer<typeof seasonSubstitutionSchema>;
 export const seasonUnitStintSchema = z.object({
@@ -215,6 +227,10 @@ export const seasonUnitStintSchema = z.object({
   endSecondsRemaining: z.number().int().min(0).max(720),
   durationSeconds: z.number().int().min(0),
   players: z.array(playerVersionIdSchema).length(5),
+  clockKind: z.enum(['timed', 'untimed']).optional(),
+  elapsedStartSeconds: z.number().int().nonnegative().optional(),
+  elapsedEndSeconds: z.number().int().nonnegative().optional(),
+  eventOrder: z.number().int().nonnegative().optional(),
 });
 export type SeasonUnitStint = z.infer<typeof seasonUnitStintSchema>;
 export const seasonRotationDeviationReasonSchema = z.enum([
@@ -240,6 +256,9 @@ export const seasonFoulOutSchema = z.object({
   playerVersionId: playerVersionIdSchema,
   period: z.number().int().min(1).max(12),
   secondsRemaining: z.number().int().min(0).max(720),
+  clockKind: z.enum(['timed', 'untimed']).optional(),
+  elapsedSeconds: z.number().int().nonnegative().optional(),
+  eventOrder: z.number().int().nonnegative().optional(),
 });
 export type SeasonFoulOut = z.infer<typeof seasonFoulOutSchema>;
 export const seasonRemovalEventSchema = z.object({
@@ -247,6 +266,9 @@ export const seasonRemovalEventSchema = z.object({
   playerVersionId: playerVersionIdSchema,
   period: z.number().int().min(1).max(12),
   secondsRemaining: z.number().int().min(0).max(720),
+  clockKind: z.enum(['timed', 'untimed']).optional(),
+  elapsedSeconds: z.number().int().nonnegative().optional(),
+  eventOrder: z.number().int().nonnegative().optional(),
   reason: seasonRemovalReasonSchema,
 });
 export type SeasonRemovalEvent = z.infer<typeof seasonRemovalEventSchema>;
@@ -255,6 +277,9 @@ export const seasonReturnEventSchema = z.object({
   playerVersionId: playerVersionIdSchema,
   period: z.number().int().min(1).max(12),
   secondsRemaining: z.number().int().min(0).max(720),
+  clockKind: z.enum(['timed', 'untimed']).optional(),
+  elapsedSeconds: z.number().int().nonnegative().optional(),
+  eventOrder: z.number().int().nonnegative().optional(),
   reason: seasonReturnReasonSchema,
 });
 export type SeasonReturnEvent = z.infer<typeof seasonReturnEventSchema>;
@@ -263,6 +288,9 @@ export const seasonGamePlayerResultSchema = z.object({
   playerId: playerIdSchema,
   seconds: z.number().int().min(0),
   minutes: z.number().nonnegative(),
+  deepFours: z
+    .object({ made: z.number().int().nonnegative(), attempted: z.number().int().nonnegative() })
+    .optional(),
   points: z.number().int().nonnegative(),
   fieldGoals: z.object({
     made: z.number().int().nonnegative(),
@@ -334,6 +362,9 @@ export const seasonGameSideResultSchema = z.object({
     turnovers: z.number().int().nonnegative(),
     fouls: z.number().int().nonnegative(),
     possessions: z.number().int().nonnegative(),
+    deepFours: z
+      .object({ made: z.number().int().nonnegative(), attempted: z.number().int().nonnegative() })
+      .optional(),
     diagnostics: z.object({
       assistedFieldGoals: z.number().int().nonnegative(),
       unassistedFieldGoals: z.number().int().nonnegative(),
@@ -360,6 +391,8 @@ const seasonGameResultBaseSchema = z.object({
   engineVersion: z.string().min(1).max(64),
   profileVersion: z.string().min(1).max(64),
   winner: z.enum(['home', 'away']),
+  gameRule: seasonGameRuleSchema.optional(),
+  ruleVersion: z.string().min(1).max(64).optional(),
 });
 export const seasonForfeitTriggerSchema = z.enum([
   'no-legal-five-tipoff',
@@ -371,6 +404,14 @@ export const seasonGameSimulationResultSchema = z.discriminatedUnion('outcome', 
   seasonGameResultBaseSchema.extend({
     outcome: z.literal('completed'),
     overtimePeriods: z.number().int().min(0),
+    overtimeRace: z
+      .object({
+        target: z.literal(7),
+        homePoints: z.number().int().nonnegative(),
+        awayPoints: z.number().int().nonnegative(),
+        possessions: z.number().int().nonnegative(),
+      })
+      .optional(),
     home: seasonGameSideResultSchema,
     away: seasonGameSideResultSchema,
     substitutions: z.array(seasonSubstitutionSchema),

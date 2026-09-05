@@ -222,8 +222,8 @@ export function buildRun(): SeasonRun {
       gameTargetsVersion: 'season-game-targets-v4',
       rosterTargetsVersion: 'roster-targets-v2',
       blockVersion: 'season-block-v6',
-      summaryVersion: 'season-game-summary-v3',
-      aggregatesVersion: 'season-aggregates-v2',
+      summaryVersion: 'season-game-summary-v4',
+      aggregatesVersion: 'season-aggregates-v3',
       recapVersion: 'season-recap-v5',
       leadersVersion: 'season-leaders-v1',
       homeCourtVersion: 'season-home-court-v1',
@@ -558,7 +558,7 @@ export function buildFixtureTeamBox(franchiseId: string): SeasonGameSummary['hom
 export function buildSummaryFixture(): SeasonGameSummary {
   return seasonGameSummarySchema.parse({
     schemaVersion: 1,
-    summaryVersion: 'season-game-summary-v3',
+    summaryVersion: 'season-game-summary-v4',
     gameId: 's000001',
     round: 1,
     homeFranchiseId: 'lakers',
@@ -670,8 +670,8 @@ export function buildCheckpointFixture(): SeasonCandidateCheckpoint {
     rootSeed: run.rootSeed,
     versions: {
       blockVersion: 'season-block-v6',
-      summaryVersion: 'season-game-summary-v3',
-      aggregatesVersion: 'season-aggregates-v2',
+      summaryVersion: 'season-game-summary-v4',
+      aggregatesVersion: 'season-aggregates-v3',
       recapVersion: 'season-recap-v5',
       leadersVersion: 'season-leaders-v1',
       homeCourtVersion: 'season-home-court-v1',

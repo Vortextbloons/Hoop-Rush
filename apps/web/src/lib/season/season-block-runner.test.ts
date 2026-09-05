@@ -462,7 +462,7 @@ describe('season block runner (M2.5 wire)', () => {
     const raw = FakeWorker.instances[0]?.posted[0];
     expect(raw).toBeDefined();
     const start = seasonWorkerStartRequestSchema.parse(raw);
-    expect(start.schemaVersion).toBe(7);
+    expect(start.schemaVersion).toBe(8);
     expect(start.runId).toBe(run.runId);
     expect(start.objectiveId).toBe('win-six');
     expect(start.startGameId).toBeNull();
@@ -559,7 +559,7 @@ describe('season block runner (M2.5 wire)', () => {
     await flush();
     expect(FakeWorker.instances).toHaveLength(1);
     const start = seasonWorkerStartRequestSchema.parse(FakeWorker.instances[0]?.posted[0]);
-    expect(start.schemaVersion).toBe(7);
+    expect(start.schemaVersion).toBe(8);
     expect(start.startGameId).toBe('s000016');
     expect(start.objectiveId).toBe('win-six');
     expect(start.priorHealth).toEqual(pending.health);
@@ -579,7 +579,7 @@ describe('season block runner (M2.5 wire)', () => {
     const cancelRaw = FakeWorker.instances[0]?.posted[1];
     expect(cancelRaw).toBeDefined();
     const cancel = seasonWorkerCancelRequestSchema.parse(cancelRaw);
-    expect(cancel.schemaVersion).toBe(7);
+    expect(cancel.schemaVersion).toBe(8);
     expect(cancel.requestId).toBe(requestId);
   });
   it('cancels while artifacts are loading before creating a worker', async () => {
@@ -663,7 +663,7 @@ describe('season block runner (M2.5 wire)', () => {
     const started = events.find((event) => event.type === 'started');
     const requestId = started?.requestId ?? 'sb-1';
     worker?.emit({
-      schemaVersion: 7,
+      schemaVersion: 8,
       type: 'season-block-complete',
       requestId,
       result: { status: 'committed', checkpoint: makeCandidate(run) },
@@ -698,7 +698,7 @@ describe('season block runner (M2.5 wire)', () => {
     const requestId = started?.requestId ?? 'sb-1';
     const candidate = makeCandidate(run);
     worker?.emit({
-      schemaVersion: 7,
+      schemaVersion: 8,
       type: 'season-block-complete',
       requestId,
       result: { status: 'committed', checkpoint: candidate },
@@ -774,7 +774,7 @@ describe('season block runner (M2.5 wire)', () => {
       },
     });
     worker?.emit({
-      schemaVersion: 7,
+      schemaVersion: 8,
       type: 'season-block-complete',
       requestId,
       result: { status: 'committed', checkpoint: candidate },
@@ -829,7 +829,7 @@ describe('season block runner (M2.5 wire)', () => {
     const started = events.find((event) => event.type === 'started');
     const requestId = started?.requestId ?? 'sb-1';
     worker?.emit({
-      schemaVersion: 7,
+      schemaVersion: 8,
       type: 'season-block-complete',
       requestId,
       result: {
@@ -868,7 +868,7 @@ describe('season block runner (M2.5 wire)', () => {
     const requestId = started?.requestId ?? 'sb-1';
     const candidate = makeCandidate(run);
     worker?.emit({
-      schemaVersion: 7,
+      schemaVersion: 8,
       type: 'season-block-complete',
       requestId,
       result: { status: 'committed', checkpoint: candidate },
@@ -913,7 +913,7 @@ describe('season block runner (M2.5 wire)', () => {
     const worker = FakeWorker.instances[0];
     const requestId = events.find((event) => event.type === 'started')?.requestId ?? 'sb-1';
     worker?.emit({
-      schemaVersion: 7,
+      schemaVersion: 8,
       type: 'season-block-complete',
       requestId,
       result: { status: 'committed', checkpoint: makeCandidate(run) },
@@ -965,7 +965,7 @@ describe('season block runner (M2.5 wire)', () => {
     const requestId = started?.requestId ?? 'sb-1';
     const candidate = makeCandidate(run, { expectedStateRevision: 5 });
     worker?.emit({
-      schemaVersion: 7,
+      schemaVersion: 8,
       type: 'season-block-complete',
       requestId,
       result: { status: 'committed', checkpoint: candidate },
@@ -998,7 +998,7 @@ describe('season block runner (M2.5 wire)', () => {
     const requestId = started?.requestId ?? 'sb-1';
     const pending = makePending(run);
     worker?.emit({
-      schemaVersion: 7,
+      schemaVersion: 8,
       type: 'season-block-complete',
       requestId,
       result: { status: 'interrupted', pending },

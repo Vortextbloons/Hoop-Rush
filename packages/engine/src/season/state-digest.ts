@@ -17,6 +17,7 @@ import {
   type SeasonTradeState,
   type SeasonTransactionEntry,
   type SeasonRunAuthority,
+  normalizeEvolutionState,
 } from '@hoop-rush/data-contracts';
 import { authorityCanonical, canonicalJson } from './checkpoint.ts';
 export interface SeasonRunStateDigestFacts {
@@ -33,6 +34,7 @@ export interface SeasonRunStateDigestFacts {
   freeAgency: SeasonFreeAgencyState;
   objectives: SeasonObjectiveState;
   campaign?: SeasonCampaignState | null;
+  evolution?: import('@hoop-rush/data-contracts').SeasonEvolutionState | null;
   rosters: readonly SeasonRoster[];
   ownership: readonly SeasonOwnership[];
   rotations: readonly SeasonRotation[];
@@ -126,6 +128,7 @@ export function seasonRunStateDigest(facts: SeasonRunStateDigestFacts): string {
       seasonSpend: facts.freeAgency.seasonSpend,
     },
     objectives: facts.objectives,
+    evolution: normalizeEvolutionState(facts.evolution),
     ...(facts.campaign !== undefined && facts.campaign !== null
       ? {
           campaign: {

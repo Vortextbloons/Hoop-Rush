@@ -686,6 +686,7 @@ export function auditSeasonRunState(
       trade: stored.trade,
       objectives: stored.objectives,
       campaign: stored.campaign ?? null,
+      evolution: stored.run.evolution ?? stored.evolution ?? null,
       rosters: stored.run.rosters,
       ownership: stored.run.ownership,
       rotations: stored.run.rotations,

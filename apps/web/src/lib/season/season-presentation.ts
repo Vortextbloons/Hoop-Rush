@@ -227,6 +227,8 @@ export interface BoxScoreRow {
   fieldGoalsAttempted: number;
   threePointersMade: number;
   threePointersAttempted: number;
+  fourPointersMade: number;
+  fourPointersAttempted: number;
   freeThrowsMade: number;
   freeThrowsAttempted: number;
   offensiveRebounds: number;
@@ -268,6 +270,8 @@ export function boxScoreFromSummary(
       fieldGoalsAttempted: line.fieldGoalsAttempted,
       threePointersMade: line.threePointersMade,
       threePointersAttempted: line.threePointersAttempted,
+      fourPointersMade: line.fourPointersMade ?? 0,
+      fourPointersAttempted: line.fourPointersAttempted ?? 0,
       freeThrowsMade: line.freeThrowsMade,
       freeThrowsAttempted: line.freeThrowsAttempted,
       offensiveRebounds: line.offensiveRebounds,

@@ -8,6 +8,7 @@
     box,
     opponentName,
     resultLabel,
+    note = null,
     manifest = null,
     teamFranchiseId = null,
     opponentFranchiseId = null,
@@ -15,6 +16,7 @@
     box: BoxScore;
     opponentName: string;
     resultLabel: string;
+    note?: string | null;
     manifest?: HoopRushManifest | null;
     teamFranchiseId?: string | null;
     opponentFranchiseId?: string | null;
@@ -39,6 +41,10 @@
   const opponentIdentity = $derived(
     manifest && opponentFranchiseId ? franchiseIdentityOf(manifest, opponentFranchiseId) : null,
   );
+  const hasDeep = $derived(
+    (box.team.fourPointersAttempted ?? 0) > 0 ||
+      box.players.some((player) => player.fourPointersAttempted > 0),
+  );
 </script>
 
 <div class="rounded-xl bg-surface-1" data-season-box-score>
@@ -58,6 +64,9 @@
       <h3 class="font-display text-base font-extrabold uppercase tracking-tight">
         {resultLabel}
       </h3>
+      {#if note}
+        <span class="font-mono text-[10px] text-muted-foreground">{note}</span>
+      {/if}
     </div>
     <p class="flex items-center gap-2 text-sm text-muted-foreground">
       <span class="font-mono text-sm text-foreground">
@@ -137,6 +146,9 @@
               <th scope="col" class="px-3 py-2 text-right font-medium">Pts</th>
               <th scope="col" class="px-3 py-2 text-right font-medium">FG</th>
               <th scope="col" class="px-3 py-2 text-right font-medium">3PT</th>
+              {#if hasDeep}
+                <th scope="col" class="px-3 py-2 text-right font-medium">4PT</th>
+              {/if}
               <th scope="col" class="px-3 py-2 text-right font-medium">FT</th>
               <th scope="col" class="px-3 py-2 text-right font-medium">Reb</th>
               <th scope="col" class="px-3 py-2 text-right font-medium">Ast</th>
@@ -165,6 +177,11 @@
                 <td class="px-3 py-1.5 text-right font-mono text-[10px]">
                   {player.threePointersMade}/{player.threePointersAttempted}
                 </td>
+                {#if hasDeep}
+                  <td class="px-3 py-1.5 text-right font-mono text-[10px]">
+                    {player.fourPointersMade}/{player.fourPointersAttempted}
+                  </td>
+                {/if}
                 <td class="px-3 py-1.5 text-right font-mono text-[10px]">
                   {player.freeThrowsMade}/{player.freeThrowsAttempted}
                 </td>
@@ -191,6 +208,11 @@
               <td class="px-3 py-2 text-right">
                 {box.team.threePointersMade}/{box.team.threePointersAttempted}
               </td>
+              {#if hasDeep}
+                <td class="px-3 py-2 text-right"
+                  >{box.team.fourPointersMade ?? 0}/{box.team.fourPointersAttempted ?? 0}</td
+                >
+              {/if}
               <td class="px-3 py-2 text-right">
                 {box.team.freeThrowsMade}/{box.team.freeThrowsAttempted}
               </td>
@@ -221,6 +243,9 @@
           <th scope="col" class="px-3 py-2 text-right font-medium">Pts</th>
           <th scope="col" class="px-3 py-2 text-right font-medium">FG</th>
           <th scope="col" class="px-3 py-2 text-right font-medium">3PT</th>
+          {#if hasDeep}
+            <th scope="col" class="px-3 py-2 text-right font-medium">4PT</th>
+          {/if}
           <th scope="col" class="px-3 py-2 text-right font-medium">FT</th>
           <th scope="col" class="px-3 py-2 text-right font-medium">Reb</th>
           <th scope="col" class="px-3 py-2 text-right font-medium">Ast</th>
@@ -249,6 +274,11 @@
             <td class="px-3 py-1.5 text-right font-mono text-[10px]">
               {player.threePointersMade}/{player.threePointersAttempted}
             </td>
+            {#if hasDeep}
+              <td class="px-3 py-1.5 text-right font-mono text-[10px]">
+                {player.fourPointersMade}/{player.fourPointersAttempted}
+              </td>
+            {/if}
             <td class="px-3 py-1.5 text-right font-mono text-[10px]">
               {player.freeThrowsMade}/{player.freeThrowsAttempted}
             </td>
@@ -275,6 +305,11 @@
           <td class="px-3 py-2 text-right">
             {box.team.threePointersMade}/{box.team.threePointersAttempted}
           </td>
+          {#if hasDeep}
+            <td class="px-3 py-2 text-right"
+              >{box.team.fourPointersMade ?? 0}/{box.team.fourPointersAttempted ?? 0}</td
+            >
+          {/if}
           <td class="px-3 py-2 text-right">
             {box.team.freeThrowsMade}/{box.team.freeThrowsAttempted}
           </td>

@@ -108,6 +108,8 @@ export interface SeasonRunShellData {
     opportunityId: string;
   }) => Promise<void>;
   evolveGmCampaign?: (input: { offerId: string }) => Promise<void>;
+  selectFrontOffice?: (input: { executiveId: string }) => Promise<void>;
+  selectCourtInnovation?: (input: { innovationId: string }) => Promise<void>;
   openTradeInquiry?: (input: { windowIndex: number; toFranchiseId: string }) => Promise<void>;
   submitTradeProposal?: (input: {
     windowIndex: number;
@@ -202,6 +204,8 @@ export function initialSeasonRunShellData(): SeasonRunShellData {
     selectGmIdentity: () => Promise.resolve(),
     selectCampaignOpportunity: () => Promise.resolve(),
     evolveGmCampaign: () => Promise.resolve(),
+    selectFrontOffice: () => Promise.resolve(),
+    selectCourtInnovation: () => Promise.resolve(),
     openTradeInquiry: () => Promise.resolve(),
     submitTradeProposal: () => Promise.resolve(),
     respondToTradeCounter: () => Promise.resolve(),

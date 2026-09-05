@@ -8,7 +8,7 @@
   import TeamLogo from '../TeamLogo.svelte';
   const REEL_ROW_HEIGHT_PX = 108;
   const OPTION_REPEATS = 3;
-  const SPIN_MS = 2000;
+  const SPIN_MS = 2600;
   const RESULT_MS = 800;
   const FADE_MS = 250;
   let {
@@ -84,6 +84,9 @@
   function spinStartPx(optionCount: number, key: number, rowHeightPx: number): number {
     const travelRows = optionCount * OPTION_REPEATS - 1 + jitterFor(key);
     return -(travelRows * rowHeightPx);
+  }
+  function spinVars(startPx: number): string {
+    return `--spin-start: ${startPx}px; --spin-settle: 0px; --spin-duration: ${activeSpinDurationMs}ms;`;
   }
   function clearTimers() {
     if (spinTimer !== null) {
@@ -196,9 +199,7 @@
                 class="reel-strip {franchiseSpinning ? 'reel-spinning' : ''} {franchiseFading
                   ? 'reel-fade'
                   : ''}"
-                style={franchiseSpinning
-                  ? `--spin-start: ${franchiseStartPx}px; --spin-settle: 0px; --spin-duration: ${activeSpinDurationMs}ms;`
-                  : undefined}
+                style={franchiseSpinning ? spinVars(franchiseStartPx) : undefined}
               >
                 <div class="reel-row reel-row--final">
                   {#key pulseKey}
@@ -221,9 +222,7 @@
                 class="reel-strip {eraSpinning ? 'reel-spinning' : ''} {eraFading
                   ? 'reel-fade'
                   : ''}"
-                style={eraSpinning
-                  ? `--spin-start: ${eraStartPx}px; --spin-settle: 0px; --spin-duration: ${activeSpinDurationMs}ms;`
-                  : undefined}
+                style={eraSpinning ? spinVars(eraStartPx) : undefined}
               >
                 <div class="reel-row reel-row--final">
                   {#key pulseKey}
@@ -408,18 +407,36 @@
 
   .reel-strip {
     will-change: transform;
+    --reel-spin-ease: cubic-bezier(0.12, 0.62, 0.18, 1);
+  }
+
+  @supports (animation-timing-function: linear(0, 1)) {
+    .reel-strip {
+      --reel-spin-ease: linear(
+        0,
+        0.2 9%,
+        0.4 19%,
+        0.55 28%,
+        0.66 37%,
+        0.75 48%,
+        0.825 58%,
+        0.88 67%,
+        0.92 75%,
+        0.948 82%,
+        0.97 88%,
+        0.984 93%,
+        0.993 97%,
+        1
+      );
+    }
   }
 
   .reel-strip.reel-spinning {
-    animation: reel-spin var(--spin-duration, 2000ms) cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: reel-spin var(--spin-duration, 2600ms) var(--reel-spin-ease) both;
   }
 
   .reel-strip.reel-fade {
     animation: reel-fade 250ms ease-out both;
-  }
-
-  .reel-spinning .reel-row {
-    filter: blur(1.5px);
   }
 
   .reel-row {
@@ -439,7 +456,7 @@
   }
 
   .reel[data-axis='franchise'] .reel-strip.reel-spinning {
-    animation: reel-spin var(--spin-duration, 2000ms) cubic-bezier(0.12, 0.92, 0.22, 1) both;
+    animation: reel-spin var(--spin-duration, 2600ms) var(--reel-spin-ease) both;
   }
 
   .reel[data-axis='franchise'] .reel-row {
@@ -844,10 +861,10 @@
 
   @keyframes reel-spin {
     from {
-      transform: translateY(var(--spin-start, 0));
+      transform: translate3d(0, var(--spin-start, 0px), 0);
     }
     to {
-      transform: translateY(var(--spin-settle, 0));
+      transform: translate3d(0, var(--spin-settle, 0px), 0);
     }
   }
 

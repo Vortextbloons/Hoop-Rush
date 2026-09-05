@@ -68,6 +68,7 @@ export function normalizeSeasonRunForPersistence(
     freeAgency: normalized.freeAgency,
     objectives: normalized.objectives,
     campaign: normalized.campaign ?? null,
+    evolution: normalized.evolution ?? null,
     rosters: normalized.rosters,
     ownership: normalized.ownership,
     rotations: normalized.rotations,

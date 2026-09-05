@@ -25,6 +25,7 @@ export type SubmitBlockFailureCode =
   | 'asset-unavailable'
   | 'objective-not-selected'
   | 'campaign-not-selected'
+  | 'evolution-not-selected'
   | 'free-agency-unresolved';
 export interface SubmitBlockFailure {
   code: SubmitBlockFailureCode;
@@ -122,6 +123,24 @@ export async function buildSubmitBlockEnvelope(
     );
   }
   const pendingHumanRotation = editor.rotation;
+  const evolution = (
+    run as unknown as {
+      evolution?: import('@hoop-rush/data-contracts').SeasonEvolutionState | null;
+    }
+  ).evolution;
+  const evolutionState = evolution ?? null;
+  if (
+    nextBlockIndex >= 3 &&
+    evolutionState !== null &&
+    evolutionState.discovery !== null &&
+    (evolutionState.selections as unknown as Record<string, unknown>)[humanFranchiseId] ===
+      undefined
+  ) {
+    return fail(
+      'evolution-not-selected',
+      'Choose a Court Innovation first — the home rule locks before block 4.',
+    );
+  }
   const blockIndex = nextBlockIndex;
   const rotations: SeasonRotation[] = run.rotations.map((rotation) =>
     rotation.franchiseId === humanFranchiseId ? pendingHumanRotation : rotation,

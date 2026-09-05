@@ -147,6 +147,16 @@ export class SeasonDraftFlow {
     this.error = null;
     return this.apply({ kind: 'draw-season-offer', participantId }, this.revision());
   }
+  async selectFrontOffice(
+    executiveId: import('@hoop-rush/data-contracts').SeasonFrontOfficeId,
+    participantId: string = SOLO_PARTICIPANT_ID,
+  ): Promise<SeasonDraftCommandRecord> {
+    this.error = null;
+    return this.apply(
+      { kind: 'select-draft-front-office', participantId, executiveId },
+      this.revision(),
+    );
+  }
   async pick(
     participantId: string,
     playerVersionId: PlayerVersionId,

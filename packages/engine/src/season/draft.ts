@@ -1,6 +1,7 @@
 import {
   SEASON_DRAFT_OFFER_SIZE,
   SEASON_DRAFT_VERSION,
+  SEASON_FRONT_OFFICE_VERSION,
   seasonDraftStateSchema,
   seasonLeagueSchema,
   seasonNamespaceSeed,
@@ -94,6 +95,7 @@ export function seasonDraftStateCanonical(state: SeasonDraftState): string {
       `${a.participantId}:${String(a.round)}` < `${b.participantId}:${String(b.round)}` ? -1 : 1,
     ),
     commandLog: state.commandLog,
+    frontOffice: state.frontOffice ?? null,
   });
 }
 function rejectedRecord(
@@ -190,6 +192,7 @@ function createDraft(command: SeasonDraftCommand, catalog: SeasonDraftCatalog): 
     currentOffer: null,
     offers: [],
     picks: [],
+    frontOffice: null,
     commandLog: [],
   };
   const record = acceptedAgainst(bareState, command, 0);
@@ -289,6 +292,35 @@ function drawOffer(
     ...state,
     currentOffer: offer,
     offers: [...state.offers, offer],
+    revision: state.revision + 1,
+  };
+  const record = acceptedAgainst(nextState, command, state.revision);
+  return { state: withLog(nextState, record), record, generation: null };
+}
+function selectFrontOffice(state: SeasonDraftState, command: SeasonDraftCommand): CommandResult {
+  const payload = command.payload;
+  if (payload.kind !== 'select-draft-front-office') {
+    throw new Error('selectFrontOffice requires a select-draft-front-office payload');
+  }
+  if (state.frontOffice !== null && state.frontOffice !== undefined) {
+    return {
+      state,
+      record: rejectedRecord(
+        state,
+        command,
+        'INVALID_FRONT_OFFICE',
+        'a front office is already selected and cannot be replaced',
+      ),
+      generation: null,
+    };
+  }
+  const nextState: SeasonDraftState = {
+    ...state,
+    frontOffice: {
+      executiveId: payload.executiveId,
+      version: SEASON_FRONT_OFFICE_VERSION,
+      selectedByCommandId: command.commandId,
+    },
     revision: state.revision + 1,
   };
   const record = acceptedAgainst(nextState, command, state.revision);
@@ -703,6 +735,8 @@ export function applySeasonDraftCommand(
       return drawOffer(validatedState, validatedCatalog, command);
     case 'select-draft-player':
       return selectPlayer(validatedState, validatedCatalog, command);
+    case 'select-draft-front-office':
+      return selectFrontOffice(validatedState, command);
     case 'finalize-human-rosters':
       return finalizeRosters(validatedState, validatedCatalog, command);
     case 'generate-ai-league':

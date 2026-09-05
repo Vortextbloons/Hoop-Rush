@@ -56,6 +56,17 @@ export const seasonPostseasonSummarySchema = z
     }),
     injuryEvents: z.array(seasonCompactInjuryEventSchema),
     resultDigest: seasonCheckpointDigestSchema,
+    gameRule: z
+      .enum(['standard', 'deep-four', 'twenty-second-clock', 'first-to-seven-overtime'])
+      .optional(),
+    ruleVersion: z.string().min(1).max(64).optional(),
+    overtimeRace: z
+      .object({
+        target: z.literal(7),
+        homePoints: z.number().int().nonnegative(),
+        awayPoints: z.number().int().nonnegative(),
+      })
+      .optional(),
   })
   .superRefine((summary, ctx) => {
     const teams = [summary.homeFranchiseId, summary.awayFranchiseId];

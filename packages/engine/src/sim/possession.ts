@@ -27,6 +27,7 @@ import {
   shootingFoulProbability,
 } from './fouls.ts';
 import { resolveRebound } from './rebounding.ts';
+import { twentySecondClockPressure } from './evolution-rules.ts';
 import { prepareTeam, enginePlayerKey, type TeamPrep } from './prepare.ts';
 import { ENGINE_CONSTANTS } from './constants.ts';
 import { creationScore } from '../domain/archetypes.ts';
@@ -60,6 +61,9 @@ export interface TripContext {
   eraPossEstimatePerTrip: number;
   passingAnchorFactor: number;
   possessionStart: PossessionStartType;
+  gameRule?: import('@hoop-rush/data-contracts').SeasonGameRule;
+  shotClock?: { remaining: number };
+  race?: { home: number; away: number; target: number; decided: 'home' | 'away' | null };
   homeCourt?: SeasonHomeCourtMechanisms;
   effects?: SeasonEffectsHook;
 }
@@ -119,6 +123,7 @@ export class PossessionStepper {
     this.ctx = ctx;
     this.offenseSide = offenseSide;
     this.startedRemaining = ctx.state.secondsRemaining;
+    if (ctx.gameRule === 'twenty-second-clock') ctx.shotClock = { remaining: 20 };
   }
   step(): PossessionStep {
     if (this.phase === 'done') {
@@ -136,6 +141,7 @@ export class PossessionStepper {
         return this.stepFoulCheck();
       case 'inbound': {
         consumeTime(this.ctx.state, ENGINE_CONSTANTS.inboundConsumption);
+        if (this.ctx.shotClock) this.ctx.shotClock.remaining -= ENGINE_CONSTANTS.inboundConsumption;
         this.phase = 'foul';
         return { ended: false, pause: false, periodEnded: false, finished: false };
       }
@@ -148,6 +154,9 @@ export class PossessionStepper {
   }
   private stepSample(): PossessionStep {
     const { rng, state, profile } = this.ctx;
+    if (this.ctx.gameRule === 'twenty-second-clock' && this.ctx.shotClock) {
+      return this.stepSampleTwentySecond();
+    }
     const sampled = sampleTripSeconds(
       rng,
       profile,
@@ -159,6 +168,41 @@ export class PossessionStepper {
     }
     const consumedBase = consumeTime(state, sampled);
     this.deadBall = consumedBase >= this.startedRemaining - ENGINE_CONSTANTS.minimumStartSeconds;
+    this.phase = 'security';
+    return { ended: false, pause: false, periodEnded: false, finished: false };
+  }
+  private stepSampleTwentySecond(): PossessionStep {
+    const { rng, state, recorder, teams, preps } = this.ctx;
+    const clock = this.ctx.shotClock;
+    if (clock === undefined) {
+      this.phase = 'security';
+      return { ended: false, pause: false, periodEnded: false, finished: false };
+    }
+    if (state.secondsRemaining < ENGINE_CONSTANTS.minimumStartSeconds) {
+      return this.finish({ ended: false, pause: true, periodEnded: true });
+    }
+    const raw = this.ctx.meanTripSeconds * (0.6 + rng.next() * 0.8);
+    const planned = Math.max((raw * 20) / 24, ENGINE_CONSTANTS.minimumTripSeconds);
+    if (planned > clock.remaining && planned <= state.secondsRemaining) {
+      const offense = this.offenseSide;
+      const team = teams[offense];
+      const teamPrep = preps[offense];
+      const handler = rng.weightedPick(team.players, teamPrep.initiatorWeights);
+      const handlerSlot = slotOf(teamPrep, handler);
+      this.handlerVersion = handler.playerVersionId;
+      consumeTime(state, Math.min(clock.remaining, state.secondsRemaining));
+      clock.remaining = 0;
+      recorder.shotClockViolation(offense, handlerSlot >= 0 ? handlerSlot : 0);
+      recorder.possession(offense);
+      this.ctx.possessionStart = 'deadBall';
+      return this.endedStep(true);
+    }
+    const consumed = consumeTime(state, Math.min(planned, state.secondsRemaining));
+    clock.remaining = Math.max(0, clock.remaining - consumed);
+    if (state.secondsRemaining <= 0) {
+      return this.finish({ ended: false, pause: true, periodEnded: true });
+    }
+    this.deadBall = consumed >= this.startedRemaining - ENGINE_CONSTANTS.minimumStartSeconds;
     this.phase = 'security';
     return { ended: false, pause: false, periodEnded: false, finished: false };
   }
@@ -254,6 +298,9 @@ export class PossessionStepper {
       return this.endedStep(true);
     }
     this.phase = 'inbound';
+    if (this.ctx.shotClock) {
+      this.ctx.shotClock.remaining = Math.max(this.ctx.shotClock.remaining, 14);
+    }
     return { ended: false, pause: true, periodEnded: false, finished: false };
   }
   private stepShot(): PossessionStep {
@@ -279,6 +326,12 @@ export class PossessionStepper {
     const offense = this.offenseSide;
     this.continuations += 1;
     consumeTime(state, ENGINE_CONSTANTS.continuationConsumption);
+    if (this.ctx.shotClock) {
+      this.ctx.shotClock.remaining = Math.max(
+        0,
+        this.ctx.shotClock.remaining - ENGINE_CONSTANTS.continuationConsumption,
+      );
+    }
     if (state.secondsRemaining < ENGINE_CONSTANTS.minimumStartSeconds) {
       recorder.possession(offense);
       this.recordTrip();
@@ -491,11 +544,13 @@ function resolveFreeThrows(
     throw new Error(`possession: no player at slot ${String(shooterSlot)}`);
   }
   for (let i = 0; i < attempts; i += 1) {
+    if (ctx.race?.decided) break;
     const last = i === attempts - 1;
     const p =
       ctx.preps[offenseSide].freeThrowP[shooterSlot] ?? freeThrowProbability(shooter, ctx.profile);
     const made = rng.chance(p);
     recorder.freeThrow(offenseSide, shooterSlot, made);
+    if (made) raceRecordPoints(ctx, offenseSide, 1);
     if (last && !made) {
       reboundFromMissedFreeThrow(ctx, offenseSide, defenseSide, deadBall, reboundCounter);
     } else if (!made) {
@@ -546,6 +601,9 @@ function resolveShot(
     throw new Error(`possession: no zone preparation for ${shooter.playerId}`);
   }
   const zone = pickZone(action, zonePrep, rng);
+  const deep = ctx.gameRule === 'deep-four' && zone === 'aboveBreakThree' && rng.chance(0.2);
+  const ruleMakeScale =
+    (deep ? 0.75 : 1) * (ctx.shotClock ? twentySecondClockPressure(ctx.shotClock.remaining) : 1);
   const shooterSlot = slotOf(teamPrep, shooter);
   const defender = pickDefender(defense, zone, rng, defensePrep.defenderBase, shooterSlot);
   const three = isThreePointZone(zone);
@@ -580,8 +638,18 @@ function resolveShot(
         homeDefenseAdjustment,
         effectsAdjustmentFraction,
       ) * ENGINE_CONSTANTS.fouledShotMakeScale;
-    const made = rng.chance(shotP);
-    recorder.fieldGoalAttempt(offenseSide, shooterSlot, zone, made, three, shot.passed);
+    const made = rng.chance(shotP * ruleMakeScale);
+    recorder.fieldGoalAttempt(offenseSide, shooterSlot, zone, made, three, shot.passed, deep);
+    if (made) raceRecordPoints(ctx, offenseSide, deep ? 4 : three ? 3 : 2);
+    if (ctx.race?.decided) {
+      ctx.possessionStart = 'deadBall';
+      return {
+        continues: false,
+        liveReboundEnd: false,
+        shooterVersion: shooter.playerVersionId,
+        defenderVersion: defender.playerVersionId,
+      };
+    }
     if (made) {
       creditAssist(ctx, offenseSide, team, shooter, initiator, action, zone, shot.passed);
       resolveFreeThrows(ctx, offenseSide, defenseSide, shooterSlot, 1, false, reboundCounter);
@@ -593,7 +661,7 @@ function resolveShot(
         offenseSide,
         defenseSide,
         shooterSlot,
-        freeThrowsForZone(zone),
+        deep ? 4 : freeThrowsForZone(zone),
         deadBall,
         reboundCounter,
       );
@@ -609,7 +677,7 @@ function resolveShot(
   const blockP = blockProbability(defender, zone, action);
   if (rng.chance(blockP)) {
     recorder.block(defenseSide, defenderSlot >= 0 ? defenderSlot : 0);
-    recorder.fieldGoalAttempt(offenseSide, shooterSlot, zone, false, three, shot.passed);
+    recorder.fieldGoalAttempt(offenseSide, shooterSlot, zone, false, three, shot.passed, deep);
     return reboundAfterMiss(
       ctx,
       offenseSide,
@@ -634,8 +702,9 @@ function resolveShot(
     homeDefenseAdjustment,
     effectsAdjustmentFraction,
   );
-  const made = rng.chance(shotP);
-  recorder.fieldGoalAttempt(offenseSide, shooterSlot, zone, made, three, shot.passed);
+  const made = rng.chance(shotP * ruleMakeScale);
+  recorder.fieldGoalAttempt(offenseSide, shooterSlot, zone, made, three, shot.passed, deep);
+  if (made) raceRecordPoints(ctx, offenseSide, deep ? 4 : three ? 3 : 2);
   if (made) {
     creditAssist(ctx, offenseSide, team, shooter, initiator, action, zone, shot.passed);
     ctx.possessionStart = 'madeBasket';
@@ -692,6 +761,7 @@ function reboundAfterMiss(
     const rebounder = rng.weightedPick(ctx.teams[offenseSide].players, prep.rebounderWeights[0]);
     recorder.offensiveRebound(offenseSide, slotOrZero(prep, rebounder));
     ctx.possessionStart = 'offensiveRebound';
+    if (ctx.shotClock) ctx.shotClock.remaining = 14;
     return {
       continues: true,
       liveReboundEnd: false,
@@ -709,6 +779,14 @@ function reboundAfterMiss(
     ...(shooterVersion !== undefined ? { shooterVersion } : {}),
     ...(defenderVersion !== undefined ? { defenderVersion } : {}),
   };
+}
+function raceRecordPoints(ctx: TripContext, side: SideIndex, points: number): void {
+  const race = ctx.race;
+  if (!race || race.decided) return;
+  if (side === 0) race.home += points;
+  else race.away += points;
+  if (race.home >= race.target) race.decided = 'home';
+  else if (race.away >= race.target) race.decided = 'away';
 }
 function teamInBonus(foulsInPeriod: number, overtime: boolean): boolean {
   const limit = overtime

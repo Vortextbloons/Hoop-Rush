@@ -13,6 +13,10 @@ import type {
   SeasonDeclineTradeOfferRejection,
   SeasonDeclineTradeOfferResult,
   SeasonDraftCatalog,
+  SeasonSelectFrontOfficeCommand,
+  SeasonSelectFrontOfficeResult,
+  SeasonSelectCourtInnovationCommand,
+  SeasonSelectCourtInnovationResult,
   SeasonDuplicateCommandRejection,
   SeasonEffectsState,
   SeasonFastForwardPostseasonCommand,
@@ -130,7 +134,6 @@ import { applySeasonInfluenceSpend, SEASON_INFLUENCE_FLOOR } from './influence.t
 import { seasonObjectiveChoicesForBlock } from './objectives.ts';
 import {
   POSTSEASON_ALMANAC_DIGEST_PLACEHOLDER,
-  SEASON_POSTSEASON_RISKY_REHAB_COST,
   SeasonPostseasonContextError,
   SeasonPostseasonInvariantError,
   rollPostseasonRehabOutcome,
@@ -163,8 +166,10 @@ import {
   type SeasonEconomyRun,
 } from './trades.ts';
 import { generateSeasonCampaignOffers, normalizeCampaignState } from './campaign.ts';
+import { normalizeEvolutionState } from '@hoop-rush/data-contracts';
 import { generateSeasonSchedule } from './schedule.ts';
 import { evaluateTradeProposal, openTradeInquiry } from './trade-board.ts';
+import { rehabPriceOf, purchasedInquiryCostOf, baseInquiryAllowanceOf } from './evolution.ts';
 import {
   FreeAgencyValidationRejection,
   applyFreeAgencyDeclaration,
@@ -277,6 +282,14 @@ export type SeasonRunCommandResult =
   | {
       command: 'purchase-trade-inquiry';
       result: SeasonPurchaseTradeInquiryResult;
+    }
+  | {
+      command: 'select-front-office';
+      result: SeasonSelectFrontOfficeResult;
+    }
+  | {
+      command: 'select-court-innovation';
+      result: SeasonSelectCourtInnovationResult;
     };
 export interface SeasonRunCommandOutput {
   result: SeasonRunCommandResult;
@@ -309,6 +322,9 @@ function runStateDigestFactsOf(run: SeasonEconomyRun): Parameters<typeof seasonR
     trade: run.trade,
     objectives: run.objectives,
     campaign: run.campaign ?? null,
+    evolution:
+      (run as { evolution?: import('@hoop-rush/data-contracts').SeasonEvolutionState | null })
+        .evolution ?? null,
     rosters: run.rosters,
     ownership: run.ownership,
     rotations: run.rotations,
@@ -372,6 +388,12 @@ function commandAlreadyRecorded(run: SeasonRun, commandId: string): boolean {
   for (const selection of Object.values(run.objectives.selections)) {
     if (selection.selectedByCommandId === commandId) return true;
   }
+  const evo = (
+    run as { evolution?: import('@hoop-rush/data-contracts').SeasonEvolutionState | null }
+  ).evolution;
+  if (evo?.frontOffice?.selectedByCommandId === commandId) return true;
+  if (evo && Object.values(evo.selections).some((s) => s.selectedByCommandId === commandId))
+    return true;
   return false;
 }
 function baseValidation(
@@ -939,7 +961,12 @@ function handleOpenTradeInquiry(
     };
     return rejectedOpenTradeInquiry(command, rejection, run);
   }
-  const allowance = win.inquiryAllowance ?? 3;
+  const allowance =
+    win.inquiryAllowance ??
+    baseInquiryAllowanceOf(
+      normalizeEvolutionState((run as { evolution?: unknown }).evolution).frontOffice
+        ?.executiveId ?? null,
+    );
   const used = win.negotiations?.length ?? 0;
   if (used >= allowance) {
     const rejection: SeasonTradeInquiryCapRejection = {
@@ -1061,7 +1088,12 @@ function handleSubmitTradeProposal(
     );
   }
   const isNewInquiry = !win.activeInquiryId;
-  const allowance = win.inquiryAllowance ?? 3;
+  const allowance =
+    win.inquiryAllowance ??
+    baseInquiryAllowanceOf(
+      normalizeEvolutionState((run as { evolution?: unknown }).evolution).frontOffice
+        ?.executiveId ?? null,
+    );
   const used = win.negotiations?.length ?? 0;
   if (isNewInquiry && used >= allowance) {
     return rejectedSubmitTradeProposal(
@@ -1511,7 +1543,12 @@ function handlePurchaseTradeInquiry(
       run,
     );
   }
-  const allowance = win.inquiryAllowance ?? 3;
+  const allowance =
+    win.inquiryAllowance ??
+    baseInquiryAllowanceOf(
+      normalizeEvolutionState((run as { evolution?: unknown }).evolution).frontOffice
+        ?.executiveId ?? null,
+    );
   if (allowance >= 5) {
     return rejectedPurchaseTradeInquiry(
       command,
@@ -1529,15 +1566,19 @@ function handlePurchaseTradeInquiry(
     run.league.teams.find((t) => t.control === 'human')?.franchiseId ??
     '';
   const humanFid = franchiseIdSchema.parse(human);
+  const evoExec =
+    normalizeEvolutionState((run as { evolution?: unknown }).evolution).frontOffice?.executiveId ??
+    null;
+  const purchaseCost = purchasedInquiryCostOf(evoExec);
   const balance = run.influence.balances[humanFid] ?? 0;
-  if (balance - 1 < SEASON_INFLUENCE_FLOOR) {
+  if (balance - purchaseCost < SEASON_INFLUENCE_FLOOR) {
     return rejectedPurchaseTradeInquiry(
       command,
       {
         code: 'insufficient-balance',
         franchiseId: humanFid,
         balance,
-        requestedDelta: -1,
+        requestedDelta: -purchaseCost,
         floor: SEASON_INFLUENCE_FLOOR,
       },
       run,
@@ -1547,7 +1588,7 @@ function handlePurchaseTradeInquiry(
     influence: run.influence,
     franchiseId: humanFid,
     source: 'trade-inquiry-purchase',
-    requestedDelta: -1,
+    requestedDelta: -purchaseCost,
     blockIndex: null,
     commandId: command.commandId,
     explanation: `Purchase trade inquiry window ${String(command.windowIndex)}`,
@@ -1591,6 +1632,180 @@ function handlePurchaseTradeInquiry(
         status: 'accepted',
         commandId: command.commandId,
         windowIndex: command.windowIndex,
+      },
+    },
+    run: next,
+    pending: null,
+  };
+}
+function handleSelectFrontOffice(
+  command: SeasonSelectFrontOfficeCommand,
+  context: SeasonRunCommandContext,
+): SeasonRunCommandOutput {
+  const base = baseValidation(command, context.run, context.pending, context);
+  if (base !== null) return base;
+  const run = economyRunOf(context);
+  const evo = normalizeEvolutionState((run as unknown as { evolution?: unknown }).evolution);
+  if (evo.frontOffice !== null) {
+    return {
+      result: {
+        command: 'select-front-office',
+        result: {
+          status: 'rejected',
+          commandId: command.commandId,
+          rejection: { code: 'front-office-already-selected' },
+        },
+      },
+      run,
+      pending: null,
+    };
+  }
+  if (run.cursor.completedRounds !== 0) {
+    return {
+      result: {
+        command: 'select-front-office',
+        result: {
+          status: 'rejected',
+          commandId: command.commandId,
+          rejection: { code: 'front-office-too-late', completedRounds: run.cursor.completedRounds },
+        },
+      },
+      run,
+      pending: null,
+    };
+  }
+  if (
+    !(['morgan-vale', 'alex-chen', 'jordan-ellis'] as readonly string[]).includes(
+      command.executiveId,
+    )
+  ) {
+    return {
+      result: {
+        command: 'select-front-office',
+        result: {
+          status: 'rejected',
+          commandId: command.commandId,
+          rejection: {
+            code: 'front-office-invalid',
+            executiveId: String((command as { executiveId?: unknown }).executiveId),
+          },
+        },
+      },
+      run,
+      pending: null,
+    };
+  }
+  const nextEvo = {
+    ...evo,
+    frontOffice: {
+      executiveId: command.executiveId,
+      version: 'season-front-office-v1' as const,
+      selectedByCommandId: command.commandId,
+      selectedAtStateRevision: run.stateRevision + 1,
+    },
+  };
+  const next = advanceRunState({ ...run, evolution: nextEvo });
+  return {
+    result: {
+      command: 'select-front-office',
+      result: {
+        status: 'accepted',
+        commandId: command.commandId,
+        executiveId: command.executiveId,
+      },
+    },
+    run: next,
+    pending: null,
+  };
+}
+function handleSelectCourtInnovation(
+  command: SeasonSelectCourtInnovationCommand,
+  context: SeasonRunCommandContext,
+): SeasonRunCommandOutput {
+  const base = baseValidation(command, context.run, context.pending, context);
+  if (base !== null) return base;
+  const run = economyRunOf(context);
+  const evo = normalizeEvolutionState((run as unknown as { evolution?: unknown }).evolution);
+  if (!evo.discovery) {
+    return {
+      result: {
+        command: 'select-court-innovation',
+        result: {
+          status: 'rejected',
+          commandId: command.commandId,
+          rejection: { code: 'innovation-not-discovered' },
+        },
+      },
+      run,
+      pending: null,
+    };
+  }
+  const humanFid =
+    context.humanFranchiseId ??
+    run.league.teams.find((t) => t.control === 'human')?.franchiseId ??
+    null;
+  if (
+    humanFid !== null &&
+    (evo.selections as unknown as Record<string, unknown>)[humanFid] !== undefined
+  ) {
+    return {
+      result: {
+        command: 'select-court-innovation',
+        result: {
+          status: 'rejected',
+          commandId: command.commandId,
+          rejection: { code: 'innovation-already-selected' },
+        },
+      },
+      run,
+      pending: null,
+    };
+  }
+  if (
+    !(
+      ['deep-four', 'twenty-second-clock', 'first-to-seven-overtime'] as readonly string[]
+    ).includes(command.innovationId)
+  ) {
+    return {
+      result: {
+        command: 'select-court-innovation',
+        result: {
+          status: 'rejected',
+          commandId: command.commandId,
+          rejection: {
+            code: 'innovation-invalid',
+            innovationId: String((command as { innovationId?: unknown }).innovationId),
+          },
+        },
+      },
+      run,
+      pending: null,
+    };
+  }
+  const targetFid =
+    humanFid ?? Object.keys(evo.selections)[0] ?? run.league.teams[0]?.franchiseId ?? 'unknown';
+  const nextEvo = {
+    ...evo,
+    selections: {
+      ...evo.selections,
+      [targetFid]: {
+        franchiseId: targetFid as never,
+        innovationId: command.innovationId,
+        version: 'season-court-innovation-v1' as const,
+        selectedByCommandId: command.commandId,
+        aiSelected: false,
+        inputDigest: null,
+      },
+    },
+  };
+  const next = advanceRunState({ ...run, evolution: nextEvo });
+  return {
+    result: {
+      command: 'select-court-innovation',
+      result: {
+        status: 'accepted',
+        commandId: command.commandId,
+        innovationId: command.innovationId,
       },
     },
     run: next,
@@ -1752,8 +1967,16 @@ function handleSpendInfluence(
     return rejectedSpend(command, rejection, run);
   }
   const balance = run.influence.balances[command.franchiseId] ?? 0;
-  if (balance + -2 < SEASON_INFLUENCE_FLOOR) {
-    return rejectedSpend(command, insufficientBalanceOf(command.franchiseId, balance, -2), run);
+  const rehabCost = rehabPriceOf(
+    normalizeEvolutionState((run as { evolution?: unknown }).evolution).frontOffice?.executiveId ??
+      null,
+  );
+  if (balance + -rehabCost < SEASON_INFLUENCE_FLOOR) {
+    return rejectedSpend(
+      command,
+      insufficientBalanceOf(command.franchiseId, balance, -rehabCost),
+      run,
+    );
   }
   const outcome = rollSeasonRehabOutcome(run.rootSeed, injuryId);
   const health = applyRiskyRehabOutcome(run.health, injuryId, outcome);
@@ -1761,10 +1984,10 @@ function handleSpendInfluence(
     influence: run.influence,
     franchiseId: command.franchiseId,
     source: 'risky-rehab',
-    requestedDelta: -2,
+    requestedDelta: -rehabCost,
     blockIndex: null,
     commandId: command.commandId,
-    explanation: `Spent 2 Influence on risky rehab for ${injuryId} (${outcome})`,
+    explanation: `Spent ${String(rehabCost)} Influence on risky rehab for ${injuryId} (${outcome})`,
     injuryId,
     rehabOutcome: outcome,
   });
@@ -1776,7 +1999,7 @@ function handleSpendInfluence(
     blockIndex: null,
     appliedAtStateRevision: run.stateRevision + 1,
     payload: { purpose: 'risky-rehab', injuryId, outcome },
-    explanation: `Spent 2 Influence on risky rehab for ${injuryId} (${outcome})`,
+    explanation: `Spent ${String(rehabCost)} Influence on risky rehab for ${injuryId} (${outcome})`,
   });
   const next = advanceRunState({
     ...run,
@@ -2538,12 +2761,16 @@ function handleSubmitPostseasonRotation(
     }
     const humanFidRehab = franchiseIdSchema.parse(humanFranchiseId);
     const balance = run.influence.balances[humanFidRehab] ?? 0;
-    if (balance < SEASON_INFLUENCE_FLOOR + SEASON_POSTSEASON_RISKY_REHAB_COST) {
+    const postseasonRehabCost = rehabPriceOf(
+      normalizeEvolutionState((run as { evolution?: unknown }).evolution).frontOffice
+        ?.executiveId ?? null,
+    );
+    if (balance < SEASON_INFLUENCE_FLOOR + postseasonRehabCost) {
       const rejection: SeasonInsufficientRehabResourcesRejection = {
         code: 'insufficient-rehab-resources',
         franchiseId: humanFidRehab,
         balance,
-        required: SEASON_POSTSEASON_RISKY_REHAB_COST,
+        required: postseasonRehabCost,
       };
       return rejectedSubmit(command, rejection, run);
     }
@@ -2553,10 +2780,10 @@ function handleSubmitPostseasonRotation(
       influence,
       franchiseId: humanFranchiseId,
       source: 'risky-rehab',
-      requestedDelta: -SEASON_POSTSEASON_RISKY_REHAB_COST,
+      requestedDelta: -postseasonRehabCost,
       blockIndex: null,
       commandId: command.commandId,
-      explanation: `Spent ${String(SEASON_POSTSEASON_RISKY_REHAB_COST)} Influence on postseason risky rehab for ${rehabInjuryId} (${outcome})`,
+      explanation: `Spent ${String(postseasonRehabCost)} Influence on postseason risky rehab for ${rehabInjuryId} (${outcome})`,
       injuryId: rehabInjuryId,
       rehabOutcome: outcome,
     });
@@ -2571,7 +2798,7 @@ function handleSubmitPostseasonRotation(
         blockIndex: null,
         appliedAtStateRevision: run.stateRevision + 1,
         payload: { purpose: 'risky-rehab', injuryId: rehabInjuryId, outcome },
-        explanation: `Spent ${String(SEASON_POSTSEASON_RISKY_REHAB_COST)} Influence on postseason risky rehab for ${rehabInjuryId} (${outcome})`,
+        explanation: `Spent ${String(postseasonRehabCost)} Influence on postseason risky rehab for ${rehabInjuryId} (${outcome})`,
       }),
     ];
   }
@@ -3099,6 +3326,10 @@ export function handleSeasonRunCommand(
       return handleWalkAwayFromTrade(command, context);
     case 'purchase-trade-inquiry':
       return handlePurchaseTradeInquiry(command, context);
+    case 'select-front-office':
+      return handleSelectFrontOffice(command, context);
+    case 'select-court-innovation':
+      return handleSelectCourtInnovation(command, context);
     default: {
       const exhaustive: never = command;
       return assertNever(

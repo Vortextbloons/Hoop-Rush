@@ -84,6 +84,7 @@ export * from './season-influence.ts';
 export * from './season-objective.ts';
 export * from './season-campaign.ts';
 export * from './season-trade.ts';
+export * from './season-evolution.ts';
 export * from './season-authority.ts';
 export {
   seasonRoomPaceSchema,

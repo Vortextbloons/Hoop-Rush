@@ -12,7 +12,7 @@ const FRANCHISE_STRIP = '[data-axis="franchise"] .reel-strip';
 const ERA_STRIP = '[data-axis="era"] .reel-strip';
 const LIVE_REGION = '[aria-live="polite"]';
 const ANNOUNCE_TEXT = 'Round 3 of 5 · Los Angeles Lakers · 1990s';
-const SPIN_SETTLE_MS = 2100;
+const SPIN_SETTLE_MS = 2700;
 const FULL_CYCLE_MS = SPIN_SETTLE_MS + 850;
 const MANIFEST = buildManifest();
 interface ReelProps {

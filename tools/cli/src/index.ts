@@ -134,6 +134,14 @@ import {
 } from './commands/season-postseason-calibrate.ts';
 import { seasonRunReproduce, SEASON_RUN_REPRODUCE_OPTIONS } from './commands/season-reproduce.ts';
 import {
+  seasonEvolutionBenchmark,
+  seasonEvolutionCalibrate,
+  seasonEvolutionValidate,
+  SEASON_EVOLUTION_BENCHMARK_OPTIONS,
+  SEASON_EVOLUTION_CALIBRATE_OPTIONS,
+  SEASON_EVOLUTION_VALIDATE_OPTIONS,
+} from './commands/season-evolution.ts';
+import {
   SEASON_ROSTERS_AUDIT_OPTIONS,
   SEASON_ROSTERS_CALIBRATE_OPTIONS,
   SEASON_ROSTERS_GENERATE_OPTIONS,
@@ -610,6 +618,34 @@ const COMMANDS: Record<string, CommandDef> = {
         out: getOptionString(args, 'out') ?? null,
         manifest: getOptionString(args, 'manifest') ?? null,
         validate: getOptionString(args, 'validate') ?? null,
+      }),
+  },
+  'season evolution calibrate': {
+    options: { ...SEASON_EVOLUTION_CALIBRATE_OPTIONS, write: false },
+    run: (args) =>
+      seasonEvolutionCalibrate({
+        fixture: getOptionString(args, 'fixture') ?? null,
+        'seed-from': getOptionString(args, 'seed-from') ?? null,
+        'seed-to': getOptionString(args, 'seed-to') ?? null,
+        out: getOptionString(args, 'out') ?? null,
+        manifest: getOptionString(args, 'manifest') ?? null,
+        validate: getOptionString(args, 'validate') ?? null,
+      }),
+  },
+  'season evolution validate': {
+    options: SEASON_EVOLUTION_VALIDATE_OPTIONS,
+    run: (args) =>
+      seasonEvolutionValidate({
+        out: getOptionString(args, 'out') ?? null,
+        manifest: getOptionString(args, 'manifest') ?? null,
+      }),
+  },
+  'season evolution benchmark': {
+    options: SEASON_EVOLUTION_BENCHMARK_OPTIONS,
+    run: (args) =>
+      seasonEvolutionBenchmark({
+        fixture: getOptionString(args, 'fixture') ?? null,
+        manifest: getOptionString(args, 'manifest') ?? null,
       }),
   },
   'season free-agency audit': {

@@ -119,7 +119,7 @@
             <p class="text-xs text-muted-foreground">
               {affordance.purpose === 'extra-trade-offer'
                 ? 'Talk to one more team this window.'
-                : 'Chance to return sooner — but it can backfire.'}
+                : `Chance to return sooner — but it can backfire.${affordance.priceNote ? ` ${affordance.priceNote}` : ''}`}
             </p>
           </div>
           <button

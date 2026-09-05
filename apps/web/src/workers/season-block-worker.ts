@@ -100,6 +100,7 @@ function postError(
     blockIndex?: number | null;
   } = {},
 ): void {
+  console.error(`[season-block-worker] ${code} for request ${requestId}: ${message}`);
   const payload: SeasonWorkerErrorMessage = {
     schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
     type: 'season-block-error',

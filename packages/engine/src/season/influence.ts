@@ -171,8 +171,14 @@ export class SeasonInfluenceFloorError extends Error {
   readonly floor: number = SEASON_INFLUENCE_FLOOR;
   constructor(input: { franchiseId: string; balance: number; requestedDelta: number }) {
     super(
-      `influence spend for ${input.franchiseId} would cross the -3 floor ` +
-        `(balance ${String(input.balance)}, requested ${String(input.requestedDelta)})`,
+      'influence spend for ' +
+        input.franchiseId +
+        ' would cross the 0 floor ' +
+        '(balance ' +
+        String(input.balance) +
+        ', requested ' +
+        String(input.requestedDelta) +
+        ')',
     );
     this.name = 'SeasonInfluenceFloorError';
     this.franchiseId = input.franchiseId;

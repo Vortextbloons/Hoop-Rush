@@ -11,15 +11,20 @@ import {
   type SeasonRoster,
   type SeasonRotation,
   type SeasonRun,
+  type SeasonTradeBoardTeamProfile,
+  type SeasonTradeNeed,
   type SeasonTradeOffer,
   type SeasonTradeOfferValueBand,
+  type SeasonTradePriority,
   type SeasonTradeRosterChange,
   type SeasonTradeState,
+  type SeasonTradeValueTrend,
   type SeasonTradeWindowState,
   type SeasonTransactionEntry,
   type SimulationRatings,
 } from '@hoop-rush/data-contracts';
 import { slotGroupOf, type SlotGroup } from '../domain/positions.ts';
+import { createRng, shuffle } from '../sim/rng.ts';
 import { canonicalPlayerPairs } from './chemistry.ts';
 import { reconcileSeasonEffects } from './effects.ts';
 import { applyRiskyRehabOutcome, rollSeasonRehabOutcome } from './injuries.ts';
@@ -992,6 +997,179 @@ function applyAiTrades(
   }
   return { run: working, offers, transactions: working.transactions };
 }
+const TRADE_BOARD_PROFILE_COUNT = 8;
+const TRADE_BOARD_NEEDS: readonly SeasonTradeNeed[] = [
+  'ball-handling',
+  'shooting',
+  'perimeter-defense',
+  'interior-defense',
+  'rebounding',
+  'availability',
+  'rotation-talent',
+  'depth',
+];
+const TRADE_BOARD_PRIORITIES: readonly SeasonTradePriority[] = [
+  'talent',
+  'fit',
+  'availability',
+  'depth',
+  'influence',
+];
+const TRADE_BOARD_TRENDS = ['rising', 'stable', 'falling'] as const;
+const TRADE_BOARD_COMPETITOR_INTERESTS = ['low', 'possible', 'strong', 'preferred-fit'] as const;
+export interface TradeBoardProfilesInput {
+  run: SeasonRun;
+  rootSeed: string;
+  windowIndex: number;
+  humanFranchiseId: string;
+  catalogFacts: SeasonTradeCatalogFacts;
+}
+export function generateTradeBoardProfiles(input: TradeBoardProfilesInput): {
+  boardProfiles: SeasonTradeBoardTeamProfile[];
+  canonicalTeamOrder: SeasonTradeWindowState['canonicalTeamOrder'];
+  valueTrends: SeasonTradeValueTrend[];
+} {
+  const { run, rootSeed, windowIndex, humanFranchiseId, catalogFacts } = input;
+  const aiIds = aiFranchiseIdsOf(run, humanFranchiseId);
+  const boardSeed = seasonNamespaceSeed(
+    rootSeed,
+    SEASON_SEED_NAMESPACES.trades,
+    'window',
+    String(windowIndex),
+    'board',
+  );
+  const boardRng = createRng(boardSeed);
+  const selected = shuffle(aiIds, boardRng).slice(0, TRADE_BOARD_PROFILE_COUNT);
+  const rosterByFranchise = new Map<string, SeasonRoster>(
+    run.rosters.map((roster) => [roster.franchiseId, roster]),
+  );
+  const rotationByFranchise = new Map<string, SeasonRotation>(
+    run.rotations.map((rotation) => [rotation.franchiseId, rotation]),
+  );
+  const boardProfiles: SeasonTradeBoardTeamProfile[] = [];
+  for (const franchiseId of selected) {
+    const teamSeed = seasonNamespaceSeed(
+      rootSeed,
+      SEASON_SEED_NAMESPACES.trades,
+      'window',
+      String(windowIndex),
+      'board',
+      franchiseId,
+    );
+    const teamRng = createRng(teamSeed);
+    const rosterIds = rosterPlayerVersionIdsOf(run, franchiseId);
+    const rosterSet = new Set(rosterIds);
+    const rotation = rotationByFranchise.get(franchiseId);
+    let listed: string[] = [];
+    let discussable: string[] = [];
+    let protectedIds: string[] = [];
+    if (rotation !== undefined) {
+      const starters = rotation.starters.filter((id) => rosterSet.has(id));
+      const bench = rotation.benchOrder.filter((id) => rosterSet.has(id));
+      protectedIds = starters.slice(0, 5);
+      listed = bench.slice(0, 1);
+      discussable = bench.slice(1, 3);
+    }
+    if (listed.length === 0 || protectedIds.length === 0) {
+      const roster = rosterByFranchise.get(franchiseId);
+      const ordered = roster?.players.map((player) => player.playerVersionId) ?? rosterIds;
+      if (protectedIds.length === 0) protectedIds = ordered.slice(0, 5);
+      if (listed.length === 0) listed = ordered.slice(5, 6);
+      if (discussable.length === 0) discussable = ordered.slice(6, 8);
+    }
+    listed = listed.filter((id) => !protectedIds.includes(id)).slice(0, 1);
+    discussable = discussable
+      .filter((id) => !protectedIds.includes(id) && !listed.includes(id))
+      .slice(0, 2);
+    const groupDepth: Record<SlotGroup, number> = { G: 0, F: 0, C: 0 };
+    for (const id of rosterIds) {
+      const playable = catalogFacts.playable.get(id);
+      if (playable === undefined) continue;
+      for (const group of ['G', 'F', 'C'] as const) {
+        if (canPlayGroup(playable, group)) groupDepth[group] += 1;
+      }
+    }
+    const thinnest: SlotGroup =
+      groupDepth.G <= groupDepth.F && groupDepth.G <= groupDepth.C
+        ? 'G'
+        : groupDepth.C <= groupDepth.F
+          ? 'C'
+          : 'F';
+    const thinCandidates: SeasonTradeNeed[] =
+      thinnest === 'G'
+        ? ['ball-handling', 'shooting']
+        : thinnest === 'C'
+          ? ['interior-defense', 'rebounding']
+          : ['perimeter-defense', 'shooting'];
+    const needs: SeasonTradeNeed[] = [teamRng.pick(thinCandidates)];
+    const hasInjury = run.health.injuries.some(
+      (injury) =>
+        injury.franchiseId === franchiseId &&
+        injury.sameGameReturned !== true &&
+        injury.missedGamesRemaining > 0,
+    );
+    const firstNeed = needs[0];
+    if (hasInjury && firstNeed !== 'availability' && teamRng.chance(0.5)) {
+      needs.push('availability');
+    } else if (teamRng.chance(0.6)) {
+      const remaining = TRADE_BOARD_NEEDS.filter((need) => !needs.includes(need));
+      if (remaining.length > 0) needs.push(teamRng.pick(remaining));
+    }
+    const priority: SeasonTradePriority = needs.includes('availability')
+      ? teamRng.chance(0.5)
+        ? 'availability'
+        : teamRng.pick(TRADE_BOARD_PRIORITIES)
+      : teamRng.pick(TRADE_BOARD_PRIORITIES);
+    const rationale =
+      `${franchiseId} seeks ${needs.join(' + ')}; ` +
+      `listening on ${listed[0] ?? 'bench depth'} with ${priority} priority.`;
+    const hardConstraints = ['Protected players unavailable'];
+    let competitorInterest: SeasonTradeBoardTeamProfile['competitorInterest'];
+    const listedId = listed[0];
+    if (listedId !== undefined && teamRng.chance(0.35)) {
+      competitorInterest = {
+        [listedId]: teamRng.pick([...TRADE_BOARD_COMPETITOR_INTERESTS]),
+      };
+    }
+    boardProfiles.push({
+      franchiseId: franchiseIdSchema.parse(franchiseId),
+      needs,
+      priority,
+      listedPlayerIds: listed,
+      discussablePlayerIds: discussable,
+      protectedPlayerIds: protectedIds,
+      hardConstraints,
+      rationale,
+      ...(competitorInterest === undefined ? {} : { competitorInterest }),
+    });
+  }
+  const canonicalTeamOrder = selected.map((id) => franchiseIdSchema.parse(id));
+  const humanRosterIds = (() => {
+    try {
+      return rosterPlayerVersionIdsOf(run, humanFranchiseId);
+    } catch {
+      return [];
+    }
+  })();
+  const valueTrends: SeasonTradeValueTrend[] = humanRosterIds.slice(0, 6).map((playerVersionId) => {
+    const trendSeed = seasonNamespaceSeed(
+      rootSeed,
+      SEASON_SEED_NAMESPACES.trades,
+      'window',
+      String(windowIndex),
+      'board',
+      'trend',
+      playerVersionId,
+    );
+    const trend = createRng(trendSeed).pick([...TRADE_BOARD_TRENDS]);
+    return {
+      playerVersionId,
+      trend,
+      basis: `Recorded availability and rotation role hold ${playerVersionId} ${trend} this window.`,
+    };
+  });
+  return { boardProfiles, canonicalTeamOrder, valueTrends };
+}
 export function openSeasonTradeWindow(
   input: SeasonOpenTradeWindowInput,
 ): SeasonWindowOpenResult | null {
@@ -1057,10 +1235,31 @@ export function openSeasonTradeWindow(
   );
   working = aiTrades.run;
   offers.push(...aiTrades.offers);
+  const board = generateTradeBoardProfiles({
+    run: working,
+    rootSeed,
+    windowIndex,
+    humanFranchiseId,
+    catalogFacts: seasonTradeCatalogFactsOf(catalog),
+  });
   const trade: SeasonTradeState = {
     schemaVersion: 1,
     tradeVersion: SEASON_TRADE_VERSION,
-    windows: [...(run.trade?.windows ?? []), { windowIndex, blockIndex, status: 'open', offers }],
+    windows: [
+      ...(run.trade?.windows ?? []),
+      {
+        windowIndex,
+        blockIndex,
+        status: 'open',
+        offers,
+        boardProfiles: board.boardProfiles,
+        canonicalTeamOrder: board.canonicalTeamOrder,
+        inquiryAllowance: 3,
+        activeInquiryId: null,
+        negotiations: [],
+        valueTrends: board.valueTrends,
+      },
+    ],
   };
   const priorTransactionCount = run.transactions.length;
   const next: SeasonEconomyRun = {
@@ -1092,6 +1291,11 @@ export function openSeasonTradeWindow(
         campaign?: unknown;
       }
     ).campaign as never,
+    evolution: (
+      next as unknown as {
+        evolution?: import('@hoop-rush/data-contracts').SeasonEvolutionState | null;
+      }
+    ).evolution,
     rosters: next.rosters,
     ownership: next.ownership,
     rotations: next.rotations,

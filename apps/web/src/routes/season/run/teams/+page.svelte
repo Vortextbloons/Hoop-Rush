@@ -9,6 +9,7 @@
     type SeasonRunShellData,
   } from '$lib/season/season-shell-context';
   import { seasonTeamDetail } from '$lib/season/season-team-detail-view';
+  import { homeRuleOf } from '$lib/season/season-evolution-view';
   import {
     overallRatingOfSlice,
     playablePositionsOfSlice,
@@ -40,6 +41,9 @@
   });
   const isHuman = $derived(franchiseId !== '' && shell.humanFranchiseId === franchiseId);
   const manifest = $derived(shell.manifest);
+  const homeRule = $derived(
+    shell.run === null ? ('standard' as const) : homeRuleOf(shell.run, franchiseId),
+  );
 </script>
 
 <svelte:head>
@@ -93,6 +97,6 @@
       </div>
     </section>
   {:else}
-    <TeamDetailView {detail} {manifest} {shell} {isHuman} />
+    <TeamDetailView {detail} {manifest} {shell} {isHuman} {homeRule} />
   {/if}
 </div>

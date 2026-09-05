@@ -13,6 +13,7 @@ import { seasonCampaignEvaluationSchema } from './season-campaign.ts';
 import { seasonTransactionEntrySchema } from './season-transactions.ts';
 import { seasonFreeAgencyStateSchema } from './season-free-agency.ts';
 import {
+  SEASON_AGGREGATES_LEGACY_VERSION,
   SEASON_AGGREGATES_VERSION,
   SEASON_BLOCK_VERSION,
   SEASON_CAMPAIGN_TARGETS_VERSION,
@@ -24,6 +25,7 @@ import {
   SEASON_FREE_AGENCY_INDEX_VERSION,
   SEASON_FREE_AGENCY_TARGETS_VERSION,
   SEASON_FREE_AGENCY_VERSION,
+  SEASON_GAME_SUMMARY_LEGACY_VERSION,
   SEASON_GAME_SUMMARY_VERSION,
   SEASON_GAME_TARGETS_VERSION,
   SEASON_GAME_VERSION,
@@ -43,8 +45,14 @@ import {
 } from './season-versions.ts';
 export const seasonCheckpointVersionsSchema = z.object({
   blockVersion: z.union([z.literal(SEASON_BLOCK_VERSION), z.literal('season-block-v5')]),
-  summaryVersion: z.literal(SEASON_GAME_SUMMARY_VERSION),
-  aggregatesVersion: z.literal(SEASON_AGGREGATES_VERSION),
+  summaryVersion: z.union([
+    z.literal(SEASON_GAME_SUMMARY_VERSION),
+    z.literal(SEASON_GAME_SUMMARY_LEGACY_VERSION),
+  ]),
+  aggregatesVersion: z.union([
+    z.literal(SEASON_AGGREGATES_VERSION),
+    z.literal(SEASON_AGGREGATES_LEGACY_VERSION),
+  ]),
   recapVersion: z.literal(SEASON_RECAP_VERSION),
   leadersVersion: z.literal(SEASON_LEADERS_VERSION),
   homeCourtVersion: z.literal(SEASON_HOME_COURT_VERSION),
@@ -61,7 +69,11 @@ export const seasonCheckpointVersionsSchema = z.object({
     z.literal(SEASON_EFFECT_TARGETS_LEGACY_VERSION),
   ]),
   healthVersion: z.literal(SEASON_HEALTH_VERSION),
-  tradeVersion: z.union([z.literal(SEASON_TRADE_VERSION), z.literal('season-trade-v3')]),
+  tradeVersion: z.union([
+    z.literal(SEASON_TRADE_VERSION),
+    z.literal('season-trade-v4'),
+    z.literal('season-trade-v3'),
+  ]),
   influenceVersion: z.literal(SEASON_INFLUENCE_VERSION),
   objectiveVersion: z.union([
     z.literal(SEASON_OBJECTIVE_VERSION),

@@ -161,6 +161,14 @@ export class SeasonRunShell implements SeasonRunShellData {
     void input;
     return Promise.resolve();
   };
+  selectFrontOffice = (input: { executiveId: string }): Promise<void> => {
+    void input;
+    return Promise.resolve();
+  };
+  selectCourtInnovation = (input: { innovationId: string }): Promise<void> => {
+    void input;
+    return Promise.resolve();
+  };
   openTradeInquiry = (input: { windowIndex: number; toFranchiseId: string }): Promise<void> => {
     void input;
     return Promise.resolve();

@@ -14,6 +14,7 @@
   } from '@hoop-rush/data-contracts';
   import type { SeasonRunPlayerSliceEntry } from '@hoop-rush/persistence';
   import SeasonDraftBoard from '$lib/components/season/SeasonDraftBoard.svelte';
+  import FrontOfficePicker from '$lib/components/season/FrontOfficePicker.svelte';
   import type { SeasonDraftFlow, SeasonDraftFlowState } from '$lib/season/season-draft-flow';
   import { buildVersionFaceIndex, type SeasonFaceRef } from '$lib/season/season-branding';
   import {
@@ -46,6 +47,7 @@
   let resumeHref: string | null = $state(null);
   let brokenRunError: string | null = $state(null);
   let hasDraft = $state(false);
+  let executiveId = $state<import('@hoop-rush/data-contracts').SeasonFrontOfficeId | null>(null);
   let faces = $state<Map<string, SeasonFaceRef>>(new Map());
   let clearOpen = $state(false);
   let clearing = $state(false);
@@ -161,8 +163,33 @@
   const franchiseName = (franchiseId: string): string =>
     manifest?.modernFranchiseSlots.find((slot) => slot.franchiseId === franchiseId)?.displayName ??
     franchiseId;
+  async function resumeDraft(): Promise<void> {
+    if (board?.draft?.frontOffice == null) {
+      if (executiveId === null || flow === null) return;
+      busy = true;
+      actionError = null;
+      try {
+        const record = await flow.selectFrontOffice(executiveId);
+        if (record.status === 'rejected') {
+          actionError = flow.error ?? 'The draft rejected the front office choice.';
+          return;
+        }
+        board = flow.state();
+      } catch (error) {
+        actionError = error instanceof Error ? error.message : String(error);
+        return;
+      } finally {
+        busy = false;
+      }
+    }
+    started = true;
+  }
   async function startDraft() {
     if (!league) return;
+    if (executiveId === null) {
+      actionError = 'Choose a front office first — the executive sticks for the whole run.';
+      return;
+    }
     busy = true;
     actionError = null;
     try {
@@ -172,7 +199,12 @@
       if (record.status === 'rejected') {
         actionError = record.message;
       } else {
-        started = true;
+        const fo = await instance.selectFrontOffice(executiveId);
+        if (fo.status === 'rejected') {
+          actionError = instance.error ?? 'The draft rejected the front office choice.';
+        } else {
+          started = true;
+        }
       }
     } catch (error) {
       actionError = error instanceof Error ? error.message : String(error);
@@ -376,10 +408,20 @@
       <p class="mt-2 text-sm text-muted-foreground">
         A saved draft is waiting: {board.draft.picks.length} of 10 picks, round {board.draft.round}.
       </p>
+      {#if board.draft.frontOffice == null}
+        <div class="mt-4">
+          <FrontOfficePicker
+            value={executiveId}
+            disabled={busy}
+            onChange={(id) => (executiveId = id)}
+          />
+        </div>
+      {/if}
       <div class="mt-4 flex flex-wrap gap-2">
         <button
           type="button"
-          onclick={() => (started = true)}
+          onclick={resumeDraft}
+          disabled={busy || (board.draft.frontOffice == null && executiveId === null)}
           class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
         >
           Resume draft
@@ -402,10 +444,17 @@
         <p class="mt-2 max-w-xl text-sm text-muted-foreground">
           Pick 10 players, then play 82 games. Your progress saves as you go.
         </p>
+        <div class="mt-4">
+          <FrontOfficePicker
+            value={executiveId}
+            disabled={busy}
+            onChange={(id) => (executiveId = id)}
+          />
+        </div>
         <button
           type="button"
           onclick={startDraft}
-          disabled={busy}
+          disabled={busy || executiveId === null}
           class="mt-4 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {busy ? 'Starting…' : 'Start draft'}

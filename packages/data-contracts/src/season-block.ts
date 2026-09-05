@@ -22,11 +22,6 @@ export const seasonStaleCursorRejectionSchema = z.object({
   currentCompletedRounds: z.number().int().min(0).max(82),
 });
 export type SeasonStaleCursorRejection = z.infer<typeof seasonStaleCursorRejectionSchema>;
-export const seasonDuplicateCommandRejectionSchema = z.object({
-  code: z.literal('duplicate-command'),
-  commandId: z.string().min(1).max(64),
-});
-export type SeasonDuplicateCommandRejection = z.infer<typeof seasonDuplicateCommandRejectionSchema>;
 export const seasonInvalidRotationsRejectionSchema = z.object({
   code: z.literal('invalid-rotations'),
   franchiseFailures: z.array(
@@ -43,11 +38,21 @@ export const seasonNonBoundaryBlockRejectionSchema = z.object({
   submittedBlockIndex: z.number().int().min(0).max(8),
 });
 export type SeasonNonBoundaryBlockRejection = z.infer<typeof seasonNonBoundaryBlockRejectionSchema>;
-export const seasonRunMismatchRejectionSchema = z.object({
-  code: z.literal('run-mismatch'),
-  expectedRunId: z.string().min(1).max(64),
-});
-export type SeasonRunMismatchRejection = z.infer<typeof seasonRunMismatchRejectionSchema>;
+import {
+  seasonDuplicateCommandRejectionSchema,
+  seasonRunMismatchRejectionSchema,
+  seasonStaleStateRejectionSchema,
+} from './season-command-base.ts';
+export {
+  seasonDuplicateCommandRejectionSchema,
+  seasonRunMismatchRejectionSchema,
+  seasonStaleStateRejectionSchema,
+};
+export type {
+  SeasonDuplicateCommandRejection,
+  SeasonRunMismatchRejection,
+  SeasonStaleStateRejection,
+} from './season-command-base.ts';
 export const seasonInvalidObjectiveRejectionSchema = z.object({
   code: z.literal('invalid-objective'),
   expected: z.enum(['required', 'none', 'not-offered']),
@@ -67,6 +72,13 @@ export const seasonFreeAgencyUnresolvedRejectionSchema = z.object({
   windowIndex: z.number().int().min(0).max(2),
   blockIndex: z.number().int().min(0).max(8),
 });
+export const seasonEvolutionSelectionRequiredRejectionSchema = z.object({
+  code: z.literal('evolution-selection-required'),
+  blockIndex: z.number().int().min(0).max(8),
+});
+export type SeasonEvolutionSelectionRequiredRejection = z.infer<
+  typeof seasonEvolutionSelectionRequiredRejectionSchema
+>;
 export type SeasonFreeAgencyUnresolvedRejection = z.infer<
   typeof seasonFreeAgencyUnresolvedRejectionSchema
 >;
@@ -79,6 +91,7 @@ export const seasonSubmitBlockRejectionSchema = z.discriminatedUnion('code', [
   seasonInvalidObjectiveRejectionSchema,
   seasonInvalidCampaignRejectionSchema,
   seasonFreeAgencyUnresolvedRejectionSchema,
+  seasonEvolutionSelectionRequiredRejectionSchema,
 ]);
 export type SeasonSubmitBlockRejection = z.infer<typeof seasonSubmitBlockRejectionSchema>;
 export const seasonSubmitBlockResultSchema = z.discriminatedUnion('status', [

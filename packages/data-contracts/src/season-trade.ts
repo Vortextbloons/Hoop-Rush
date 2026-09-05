@@ -287,7 +287,11 @@ export type SeasonHumanTradeDirectNegotiation = z.infer<
 export const seasonTradeStateSchema = z
   .object({
     schemaVersion: z.literal(1),
-    tradeVersion: z.union([z.literal(SEASON_TRADE_VERSION), z.literal('season-trade-v3')]),
+    tradeVersion: z.union([
+      z.literal(SEASON_TRADE_VERSION),
+      z.literal('season-trade-v4'),
+      z.literal('season-trade-v3'),
+    ]),
     windows: z.array(seasonTradeWindowStateSchema).max(3),
     humanDirectNegotiations: z.array(seasonHumanTradeDirectNegotiationSchema).max(3).optional(),
   })

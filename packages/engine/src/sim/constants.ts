@@ -1,7 +1,9 @@
 import type { ShotZone, SlotGroup } from '@hoop-rush/data-contracts';
 import type { PositionResponsibilityModifiers } from './position-responsibilities.ts';
 import type { ActionType } from './usage.ts';
-export const ENGINE_VERSION = 'm3-engine-v14';
+// m3-engine-v16: trade board profiles (season-trade-v5) in openSeasonTradeWindow;
+// SRS AI court-innovation selection from recorded summaries (srsRuleScorerFor).
+export const ENGINE_VERSION = 'm3-engine-v16';
 export const ENGINE_CONSTANTS = {
   version: ENGINE_VERSION,
   zoneBaseMake: {

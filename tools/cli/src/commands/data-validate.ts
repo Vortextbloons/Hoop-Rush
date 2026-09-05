@@ -11,8 +11,10 @@ import {
   rosterDetailsSchema,
   REQUIRED_RATING_KEYS,
   SEASON_DRAFT_CATALOG_VERSION,
+  SEASON_ROTATION_VERSION,
   SELECTION_SCORE_VERSION,
   seasonFreeAgencyIndexSchema,
+  seasonGameTargetsSchema,
   unavailabilityReasonSchema,
   POSITIONS,
   POSITION_NORMALIZATION_VERSION,
@@ -681,6 +683,51 @@ async function auditSeasonFreeAgencyIndex(
   );
   return { ok: failures.length === 0, details, failures };
 }
+async function auditSeasonGameTargets(manifestDir: string, verbose: boolean): Promise<AuditResult> {
+  const failures: string[] = [];
+  const details: string[] = [];
+  const assetPath = resolve(manifestDir, 'season/game-targets.json');
+  let content: Buffer;
+  try {
+    const info = await stat(assetPath);
+    if (!info.isFile()) {
+      details.push('game-targets: none packaged');
+      return { ok: true, details, failures };
+    }
+    content = await readFile(assetPath);
+  } catch {
+    details.push('game-targets: none packaged');
+    return { ok: true, details, failures };
+  }
+  let raw: unknown;
+  try {
+    raw = JSON.parse(content.toString('utf8')) as unknown;
+  } catch {
+    failures.push('game-targets: artifact is not valid JSON');
+    return { ok: false, details, failures };
+  }
+  const parsed = seasonGameTargetsSchema.safeParse(raw);
+  if (!parsed.success) {
+    failures.push(
+      `game-targets: artifact fails the game targets schema: ${parsed.error.issues[0]?.path.join('.') ?? '(root)'} ${parsed.error.issues[0]?.message ?? 'unknown'}`,
+    );
+    return { ok: failures.length === 0, details, failures };
+  }
+  const targets = parsed.data;
+  if (targets.rotationVersion !== SEASON_ROTATION_VERSION) {
+    failures.push(
+      `game-targets: rotationVersion ${targets.rotationVersion} != ${SEASON_ROTATION_VERSION} (regenerate season/game-targets.json with the season game calibration pipeline; frozen preset minutes require ${SEASON_ROTATION_VERSION})`,
+    );
+  } else if (verbose) {
+    details.push(
+      `game-targets: rotationVersion ${targets.rotationVersion} verified (${assetPath})`,
+    );
+  }
+  details.push(
+    `game-targets: ${String(targets.fixtures.length)} fixtures · rotationVersion ${targets.rotationVersion}`,
+  );
+  return { ok: failures.length === 0, details, failures };
+}
 export async function dataValidate(inputPath: string, verbose: boolean): Promise<CliReport> {
   let raw: string;
   try {
@@ -726,6 +773,7 @@ export async function dataValidate(inputPath: string, verbose: boolean): Promise
     await auditBracket(manifest, manifestDir, verbose),
     await auditGlobalAssets(manifest, manifestDir, verbose),
     await auditSeasonFreeAgencyIndex(manifest, manifestDir, verbose),
+    await auditSeasonGameTargets(manifestDir, verbose),
     auditAssets(manifest),
   ];
   const details = [`dataVersion ${manifest.dataVersion}`, ...audits.flatMap((a) => a.details)];

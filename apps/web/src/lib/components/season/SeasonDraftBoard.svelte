@@ -85,11 +85,18 @@
             class="rounded-full bg-surface-2 px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-[0.12em] sm:px-2.5 sm:text-[10px] sm:tracking-[0.14em]"
           >
             {#if participant}
-              {franchiseAbbreviation(participant.franchiseId)} · your franchise
+              {franchiseAbbreviation(participant.franchiseId)} A� your franchise
             {:else}
               Franchise TBD
             {/if}
           </span>
+          {#if draft.frontOffice}
+            <span
+              class="rounded-full bg-surface-2 px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-[0.12em] sm:px-2.5 sm:text-[10px] sm:tracking-[0.14em]"
+            >
+              {draft.frontOffice.executiveId}
+            </span>
+          {/if}
           <span
             class="rounded-full bg-surface-2 px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-[0.12em] sm:px-2.5 sm:text-[10px] sm:tracking-[0.14em]"
           >

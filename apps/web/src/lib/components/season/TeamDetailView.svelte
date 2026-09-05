@@ -1,4 +1,6 @@
 <script lang="ts">
+  import type { SeasonGameRule } from '@hoop-rush/data-contracts';
+  import RuleBadge from './RuleBadge.svelte';
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
   import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
   import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
@@ -16,11 +18,13 @@
     manifest,
     shell,
     isHuman = false,
+    homeRule = 'standard',
   }: {
     detail: SeasonTeamDetail;
     manifest: HoopRushManifest;
     shell: SeasonRunShellData;
     isHuman?: boolean;
+    homeRule?: SeasonGameRule;
   } = $props();
   const modernIdentity = $derived(franchiseIdentityOf(manifest, detail.franchiseId));
   const teamExternalId = $derived(modernIdentity?.teamExternalId ?? '');
@@ -77,6 +81,7 @@
       <p class="mt-1 font-mono text-[10px] text-muted-foreground">
         {detail.conference === 'east' ? 'East' : 'West'} · {detail.wins}–{detail.losses} ·
         {detail.diff > 0 ? '+' : ''}{detail.diff} diff
+        <RuleBadge rule={homeRule} compact />
       </p>
     </div>
   </div>

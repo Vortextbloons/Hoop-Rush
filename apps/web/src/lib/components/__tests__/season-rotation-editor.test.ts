@@ -378,13 +378,13 @@ describe('RotationEditor component', () => {
       expect((button as HTMLButtonElement).disabled).toBe(true);
     }
   });
-  it('strategy buttons apply their projection plan automatically', async () => {
+  it('strategy buttons commit frozen preset minutes immediately and treat projection as advisory', async () => {
     const result = fixturePlanResult();
-    const released: Array<(value: MinutePlanOptimizationResult) => void> = [];
+    let resolveRun: ((value: MinutePlanOptimizationResult) => void) | null = null;
     const run = vi.fn(
       () =>
         new Promise<MinutePlanOptimizationResult>((resolve) => {
-          released.push(resolve);
+          resolveRun = resolve;
         }),
     );
     const onchange = vi.fn();
@@ -399,14 +399,30 @@ describe('RotationEditor component', () => {
     });
     await fireEvent.click(getByRole('button', { name: 'Balanced' }));
     expect(run).toHaveBeenCalledTimes(1);
+    expect(onchange).toHaveBeenCalledTimes(1);
+    const [rotation, failures] = onchange.mock.calls[0] as [SeasonRotation, string[]];
+    expect(failures).toEqual([]);
+    expect(
+      rotation.targetMinutes.find((t) => t.playerVersionId === rotation.starters[0])?.minutes,
+    ).toBe(33);
+    expect(
+      rotation.targetMinutes.find((t) => t.playerVersionId === rotation.benchOrder[0])?.minutes,
+    ).toBe(21);
     const busyButton = getByRole('button', { name: 'Optimizing…' }) as HTMLButtonElement;
-    expect(busyButton.disabled).toBe(true);
-    released[0]?.(result);
+    expect(busyButton.disabled).toBe(false);
+    expect(busyButton.getAttribute('aria-busy')).toBe('true');
+    for (const name of ['Starter-Heavy', 'Bench-Heavy']) {
+      expect((getByRole('button', { name }) as HTMLButtonElement).disabled).toBe(false);
+    }
+    resolveRun?.(result);
     await waitFor(() => {
-      expect(onchange).toHaveBeenCalledTimes(1);
+      expect(getByRole('button', { name: 'Balanced' })).toBeDefined();
     });
-    const [rotation] = onchange.mock.calls[0] as [SeasonRotation, string[]];
-    expect(rotation.minutePolicy.strategy).toBe('balanced');
+    expect(onchange).toHaveBeenCalledTimes(1);
+    const first = editor.rotation.starters[0];
+    expect(editor.rotation.targetMinutes.find((t) => t.playerVersionId === first)?.minutes).toBe(
+      33,
+    );
     expect(editor.rotation.minutePolicy.strategy).toBe('balanced');
     expect(editor.validate()).toEqual([]);
   });

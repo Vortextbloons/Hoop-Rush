@@ -1,6 +1,22 @@
 export { projectBaseFive, type LedgerSide } from './base.ts';
 export { projectExpectedLedger, expectedStealShare } from './expected-ledger.ts';
 export {
+  EVOLUTION_PROJECTION_ADAPTER_VERSION,
+  adjustLedgerForDeepFour,
+  adjustLedgerForTwentySecondClock,
+  estimateFirstToSevenRace,
+  projectGameWithRule,
+  scoringDistributionOf,
+  twentySecondExpectedMultiplier,
+  twentySecondViolationRate,
+  winProbabilityFromDiff,
+  type DeepFourAdjustment,
+  type FirstToSevenEstimate,
+  type PossessionScoring,
+  type RuleGameProjection,
+  type TwentySecondAdjustment,
+} from './evolution.ts';
+export {
   neutralReference,
   archetypeReference,
   archetypeReferences,

@@ -23,6 +23,7 @@ import {
 import {
   SeasonBlockValidationError,
   auditSeasonBlock,
+  buildEvolutionDataSource,
   createSeasonEffectsState,
   deriveSeasonPostBlockState,
   expandSeasonRunRosters,
@@ -210,6 +211,7 @@ export function runBlockThroughHandler(
     throw new SeasonBlockValidationError(result.rejection);
   }
   const checkpoint = result.checkpoint;
+  const priorSummaries = state.summaries;
   state.summaries = [...state.summaries, ...checkpoint.gameSummaries];
   state.acceptedCommandIds = [...state.acceptedCommandIds, command.commandId];
   state.effects = checkpoint.effects;
@@ -219,12 +221,20 @@ export function runBlockThroughHandler(
     candidate: checkpoint,
     commandId: command.commandId,
     rotationDigest: command.rotationDigest,
+    humanFranchiseId: state.humanFranchiseId,
+    evolutionData: buildEvolutionDataSource({
+      run: state.run,
+      candidate: checkpoint,
+      priorSummaries,
+      schedule: state.schedule,
+    }),
   });
   state.checkpointState = stateFacts.checkpointState;
   state.stateRevision = stateFacts.stateRevision;
   state.stateDigest = stateFacts.stateDigest;
   state.run = {
     ...state.run,
+    evolution: stateFacts.evolution,
     cursor: { schemaVersion: 1, completedRounds: checkpoint.completedRounds },
     standings: checkpoint.standings,
     health: checkpoint.health,

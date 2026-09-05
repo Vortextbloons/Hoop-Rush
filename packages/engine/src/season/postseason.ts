@@ -54,6 +54,7 @@ import { applySeasonGameEffectsTransition } from './effects.ts';
 import { seasonGameSummaryFromResult } from './game-summary.ts';
 import { seasonFranchiseLegalFiveFacts, seasonPregameAvailabilityOf } from './health.ts';
 import { SEASON_HOME_COURT_PROFILE } from './home-court.ts';
+import { resolveHomeGameRule } from './evolution.ts';
 import {
   SEASON_INJURY_MAJOR_BP,
   SEASON_INJURY_MINOR_BP,
@@ -1519,6 +1520,11 @@ export function simulateSeasonPostseasonGame(
       reason: 'injury-return' as const,
     })),
     homeCourt: SEASON_HOME_COURT_PROFILE,
+    gameRule: resolveHomeGameRule(
+      (run as unknown as { evolution?: import('@hoop-rush/data-contracts').SeasonEvolutionState })
+        .evolution ?? null,
+      homeId,
+    ),
   };
   const resolver = options.resolver ?? defaultSeasonPostseasonGameResolver;
   const { result, transition } = resolver({ gameId, gameInput, pregameEffects: pregame });
@@ -1828,6 +1834,17 @@ export function seasonPostseasonSummaryFromGame(input: {
     },
     injuryEvents: [...seasonSummary.injuryEvents],
     resultDigest: '',
+    ...(seasonSummary.gameRule !== undefined ? { gameRule: seasonSummary.gameRule } : {}),
+    ...(seasonSummary.ruleVersion !== undefined ? { ruleVersion: seasonSummary.ruleVersion } : {}),
+    ...(seasonSummary.overtimeRace !== undefined
+      ? {
+          overtimeRace: {
+            target: 7 as const,
+            homePoints: seasonSummary.overtimeRace.homePoints,
+            awayPoints: seasonSummary.overtimeRace.awayPoints,
+          },
+        }
+      : {}),
   };
   return { ...summary, resultDigest: seasonPostseasonSummaryDigest(summary) };
 }

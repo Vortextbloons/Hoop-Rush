@@ -4,6 +4,7 @@ import {
   seasonDuplicateCommandRejectionSchema,
   seasonFreeAgencyUnresolvedRejectionSchema,
   seasonRunMismatchRejectionSchema,
+  seasonStaleStateRejectionSchema,
   seasonSubmitBlockCommandSchema,
 } from './season-block.ts';
 import {
@@ -13,7 +14,7 @@ import {
   seasonRunCommandBaseSchema,
   windowIndexSchema,
 } from './season-command-base.ts';
-import { seasonCheckpointDigestSchema, seasonRotationSetDigestSchema } from './season-digests.ts';
+import { seasonRotationSetDigestSchema } from './season-digests.ts';
 import {
   seasonFreeAgencyRoleExpectationSchema,
   seasonFreeAgencySigningSchema,
@@ -31,16 +32,19 @@ import { playerVersionIdSchema } from './season-identity.ts';
 import { seasonTradeOfferIdSchema, seasonTradeOfferSchema } from './season-trade.ts';
 import { postseasonGameIdSchema } from './season-postseason.ts';
 import { seasonRotationSchema } from './season-rotation.ts';
+import {
+  seasonSelectFrontOfficeCommandSchema,
+  seasonSelectCourtInnovationCommandSchema,
+  seasonFrontOfficeAlreadySelectedRejectionSchema,
+  seasonFrontOfficeInvalidRejectionSchema,
+  seasonFrontOfficeTooLateRejectionSchema,
+  seasonInnovationNotDiscoveredRejectionSchema,
+  seasonInnovationAlreadySelectedRejectionSchema,
+  seasonInnovationInvalidRejectionSchema,
+} from './season-evolution.ts';
 import { seasonRunStageSchema } from './season-run.ts';
 export { seasonRunCommandBaseSchema, type SeasonRunCommandBase } from './season-command-base.ts';
-export const seasonStaleStateRejectionSchema = z.object({
-  code: z.literal('stale-state'),
-  expectedStateRevision: z.number().int().nonnegative(),
-  expectedStateDigest: seasonCheckpointDigestSchema,
-  currentStateRevision: z.number().int().nonnegative(),
-  currentStateDigest: seasonCheckpointDigestSchema,
-});
-export type SeasonStaleStateRejection = z.infer<typeof seasonStaleStateRejectionSchema>;
+export { seasonStaleStateRejectionSchema, type SeasonStaleStateRejection } from './season-block.ts';
 export const seasonNotAtBoundaryRejectionSchema = z.object({
   code: z.literal('not-at-boundary'),
   blockIndex: objectiveBlockIndexSchema,
@@ -896,6 +900,12 @@ export const seasonSubmitTradeProposalRejectionSchema = z.discriminatedUnion('co
   seasonOwnershipConflictRejectionSchema,
   seasonTradeAvailabilityRiskRejectionSchema,
   seasonTradeInsufficientTalentRejectionSchema,
+  seasonFrontOfficeAlreadySelectedRejectionSchema,
+  seasonFrontOfficeTooLateRejectionSchema,
+  seasonFrontOfficeInvalidRejectionSchema,
+  seasonInnovationNotDiscoveredRejectionSchema,
+  seasonInnovationAlreadySelectedRejectionSchema,
+  seasonInnovationInvalidRejectionSchema,
   seasonTradeWrongFitRejectionSchema,
   seasonTradeExchangeLimitRejectionSchema,
   seasonInsufficientBalanceRejectionSchema,
@@ -1252,6 +1262,8 @@ export const seasonRunCommandSchema = z.discriminatedUnion('command', [
   seasonRespondToTradeCounterCommandSchema,
   seasonWalkAwayFromTradeCommandSchema,
   seasonPurchaseTradeInquiryCommandSchema,
+  seasonSelectFrontOfficeCommandSchema,
+  seasonSelectCourtInnovationCommandSchema,
 ]);
 export type SeasonRunCommand = z.infer<typeof seasonRunCommandSchema>;
 export const seasonRunCommandRejectionSchema = z.discriminatedUnion('code', [
@@ -1315,5 +1327,11 @@ export const seasonRunCommandRejectionSchema = z.discriminatedUnion('code', [
   seasonTradeAvailabilityRiskRejectionSchema,
   seasonTradeWrongFitRejectionSchema,
   seasonTradeInsufficientTalentRejectionSchema,
+  seasonFrontOfficeAlreadySelectedRejectionSchema,
+  seasonFrontOfficeTooLateRejectionSchema,
+  seasonFrontOfficeInvalidRejectionSchema,
+  seasonInnovationNotDiscoveredRejectionSchema,
+  seasonInnovationAlreadySelectedRejectionSchema,
+  seasonInnovationInvalidRejectionSchema,
 ]);
 export type SeasonRunCommandRejection = z.infer<typeof seasonRunCommandRejectionSchema>;

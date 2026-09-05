@@ -1,15 +1,17 @@
-﻿<script lang="ts">
+<script lang="ts">
   import { getContext } from 'svelte';
   import { resolve } from '$app/paths';
   import type { RouteId } from '$app/types';
   import type { HoopRushManifest, SeasonGameSummary } from '@hoop-rush/data-contracts';
   import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
+  import RuleBadge from '$lib/components/season/RuleBadge.svelte';
   import {
     SEASON_RUN_SHELL_CONTEXT,
     type SeasonRunShellData,
   } from '$lib/season/season-shell-context';
   import { franchiseIdentityOf } from '$lib/season/season-branding';
   import { boxScoreFromSummary } from '$lib/season/season-presentation';
+  import { homeRuleOf } from '$lib/season/season-evolution-view';
   import { postseasonSummaryRow } from '$lib/season/season-postseason-presentation';
   import { getSeasonRunRepository } from '$lib/season/season-repo';
   import type { SeasonPostseasonSummary } from '@hoop-rush/data-contracts';
@@ -94,7 +96,9 @@
     return map;
   });
   const summaryByGameId = $derived(
-    new Map((shell.snapshot?.summaries ?? []).map((summary) => [summary.gameId, summary])),
+    new Map<string, SeasonGameSummary>(
+      (shell.snapshot?.summaries ?? []).map((summary) => [summary.gameId, summary]),
+    ),
   );
   const humanFranchiseId = $derived(shell.humanFranchiseId);
   const manifest = $derived(shell.manifest);
@@ -106,10 +110,31 @@
     if (!summary) return null;
     return boxScoreFromSummary(summary, humanFranchiseId, playerNames, playable);
   }
+  function ruleFor(row: ScheduleBlockRow) {
+    const summary = summaryByGameId.get(row.gameId);
+    if (summary?.gameRule !== undefined) return summary.gameRule;
+    const run = shell.run;
+    if (run === null) return 'standard' as const;
+    return homeRuleOf(run, row.game.homeFranchiseId);
+  }
   function resultLabel(row: ScheduleBlockRow): string {
     if (row.won === null) return 'scheduled';
-    if (row.forfeit) return row.won ? 'W · forfeit' : 'L · forfeit';
+    if (row.forfeit) return row.won ? 'W � forfeit' : 'L � forfeit';
     return row.won ? 'W' : 'L';
+  }
+  function boxNote(row: ScheduleBlockRow): string | null {
+    const summary = summaryByGameId.get(row.gameId);
+    if (summary === undefined) return null;
+    if (summary.overtimeRace !== undefined) {
+      return (
+        'First-to-7 OT ' +
+        String(summary.overtimeRace.homePoints) +
+        '-' +
+        String(summary.overtimeRace.awayPoints)
+      );
+    }
+    if (summary.overtimePeriods > 0) return 'OT x' + String(summary.overtimePeriods);
+    return null;
   }
   let postseasonSummaries = $state<SeasonPostseasonSummary[] | null>(null);
   let postseasonSummariesError = $state<string | null>(null);
@@ -146,11 +171,11 @@
 </script>
 
 <svelte:head>
-  <title>Season Run — schedule — Hoop Rush</title>
+  <title>Season Run � schedule � Hoop Rush</title>
 </svelte:head>
 
 {#if !shell.ready || !shell.snapshot || !shell.run || !humanFranchiseId || !manifest}
-  <p class="py-10 font-mono text-sm text-muted-foreground">Preparing the schedule…</p>
+  <p class="py-10 font-mono text-sm text-muted-foreground">Preparing the schedule�</p>
 {:else}
   <section aria-labelledby="schedule-heading" class="min-w-0 pt-6">
     <div class="flex flex-col gap-3 px-3 sm:flex-row sm:items-end sm:justify-between sm:px-0">
@@ -163,7 +188,7 @@
           Schedule
         </h1>
         <p class="mt-1 font-mono text-xs text-muted-foreground">
-          {playedCount} of 82 played · 9 blocks
+          {playedCount} of 82 played � 9 blocks
         </p>
       </div>
       <div
@@ -205,7 +230,7 @@
                 Block {group.blockIndex + 1} of 9
               </h2>
               <span class="font-mono text-xs text-muted-foreground">
-                rounds {group.fromRound}–{group.toRound}
+                rounds {group.fromRound}�{group.toRound}
               </span>
               {#if acceptedBlockIndexes.has(group.blockIndex)}
                 <a
@@ -228,6 +253,7 @@
                       <span class="shrink-0 font-mono text-xs text-muted-foreground">
                         R{row.round}
                       </span>
+                      <RuleBadge rule={ruleFor(row)} compact />
                       {#if identityOf(row.opponentFranchiseId)}
                         <SeasonTeamLogo
                           {manifest}
@@ -261,8 +287,8 @@
                             {row.won ? 'W' : 'L'}
                           </span>
                           <span class="mt-0.5 block font-mono text-xs leading-none">
-                            {row.humanScore}–{row.opponentScore}
-                            {#if row.forfeit}· forfeit{/if}
+                            {row.humanScore}�{row.opponentScore}
+                            {#if row.forfeit}� forfeit{/if}
                           </span>
                         {/if}
                       </div>
@@ -281,12 +307,13 @@
                           {#if openedBoxScores.has(row.gameId)}
                             {#await loadBoxScore() then { default: BoxScore }}
                               <p class="py-2 font-mono text-xs text-muted-foreground">
-                                Loading box score…
+                                Loading box score�
                               </p>
                               <BoxScore
                                 {box}
                                 opponentName={shell.franchiseName(row.opponentFranchiseId)}
                                 resultLabel={resultLabel(row)}
+                                note={boxNote(row)}
                                 {manifest}
                                 teamFranchiseId={humanFranchiseId}
                                 opponentFranchiseId={row.opponentFranchiseId}
@@ -305,7 +332,7 @@
               <div class="mt-2 hidden overflow-x-auto rounded-xl bg-surface-1 md:block">
                 <table class="w-full min-w-[56rem] text-sm">
                   <caption class="sr-only">
-                    Block {group.blockIndex + 1} games — rounds {group.fromRound}–{group.toRound}
+                    Block {group.blockIndex + 1} games � rounds {group.fromRound}�{group.toRound}
                   </caption>
                   <thead>
                     <tr
@@ -342,6 +369,7 @@
                             <span class="truncate font-semibold">
                               {shell.franchiseName(row.opponentFranchiseId)}
                             </span>
+                            <RuleBadge rule={ruleFor(row)} compact />
                           </span>
                         </td>
                         <td class="px-4 py-2 text-right">
@@ -354,8 +382,8 @@
                               {row.won ? 'W' : 'L'}
                             </span>
                             <span class="ml-2 font-mono text-[10px]">
-                              {row.humanScore}–{row.opponentScore}
-                              {#if row.forfeit}· forfeit{/if}
+                              {row.humanScore}�{row.opponentScore}
+                              {#if row.forfeit}� forfeit{/if}
                             </span>
                           {/if}
                         </td>
@@ -378,7 +406,7 @@
         Could not load postseason results: {postseasonSummariesError}
       </p>
     {:else if postseasonSummaries === null && (shell.run?.stage ?? 'regular-season') !== 'regular-season'}
-      <p class="mt-6 font-mono text-sm text-muted-foreground">Loading postseason results…</p>
+      <p class="mt-6 font-mono text-sm text-muted-foreground">Loading postseason results�</p>
     {:else if postseasonRows.length > 0}
       <section aria-labelledby="postseason-schedule-heading" class="mt-8">
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 sm:px-0">
@@ -389,12 +417,12 @@
             Postseason
           </h2>
           <span class="font-mono text-xs text-muted-foreground">
-            {postseasonPlayed} game{postseasonPlayed === 1 ? '' : 's'} played · Play-In and playoffs
+            {postseasonPlayed} game{postseasonPlayed === 1 ? '' : 's'} played � Play-In and playoffs
           </span>
         </div>
         <div class="mt-2 hidden overflow-x-auto rounded-xl bg-surface-1 md:block">
           <table class="w-full min-w-[56rem] text-sm">
-            <caption class="sr-only">Postseason games — Play-In and playoffs</caption>
+            <caption class="sr-only">Postseason games � Play-In and playoffs</caption>
             <thead>
               <tr
                 class="border-b border-border/70 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground"
@@ -408,7 +436,7 @@
               {#each postseasonRows as row (row.summary.gameId)}
                 <tr data-season-postseason-schedule-row class="border-b border-border/40">
                   <td class="px-4 py-2 font-mono text-[10px] text-muted-foreground">
-                    {row.phaseLabel} · {row.roundLabel}
+                    {row.phaseLabel} � {row.roundLabel}
                   </td>
                   <td class="px-4 py-2">
                     <span class="flex items-center gap-2">

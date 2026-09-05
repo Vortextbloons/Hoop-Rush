@@ -282,11 +282,12 @@ export class SeasonHubState {
     this.externalReloading = true;
     try {
       const localRunId = this.snapshot?.run.runId ?? this.index?.runId ?? null;
-      const localRevision = this.snapshot?.acceptedBlocks.length ?? this.index?.revision ?? -1;
+      const localAccepted = this.snapshot?.acceptedBlocks.length ?? this.index?.revision ?? -1;
+      const localStateRevision = this.snapshot?.run.stateRevision ?? -1;
       if (
         mutation.kind === 'commit' &&
         mutation.runId === localRunId &&
-        mutation.revision === localRevision
+        (mutation.revision === localAccepted || mutation.revision === localStateRevision)
       ) {
         return;
       }
@@ -322,20 +323,15 @@ export class SeasonHubState {
   async refresh(): Promise<void> {
     try {
       const index = await this.repo.loadActiveRunIndex();
-      if (index !== null && cachedSeasonSnapshotMatches(index.runId, index.revision)) {
-        this.snapshot = getCachedSeasonSnapshot();
-        this.index = index;
-        this.error = null;
-        this.incompatible = null;
-        this.emit();
-        return;
-      }
+      const local = this.snapshot;
       if (
         index !== null &&
-        this.snapshot !== null &&
-        this.snapshot.run.runId === index.runId &&
-        this.snapshot.acceptedBlocks.length === index.revision
+        local !== null &&
+        local.run.runId === index.runId &&
+        local.acceptedBlocks.length === index.revision &&
+        cachedSeasonSnapshotMatches(index.runId, index.revision, local.run.stateRevision)
       ) {
+        this.snapshot = getCachedSeasonSnapshot() ?? local;
         this.index = index;
         this.error = null;
         this.incompatible = null;
@@ -598,6 +594,30 @@ export class SeasonHubState {
       expectedStateRevision: this.requiredStateRevision(),
       expectedStateDigest: this.requiredStateDigest(),
       offerId: input.offerId,
+    };
+    await this.dispatch(command);
+  }
+  async selectFrontOffice(input: { executiveId: string }): Promise<void> {
+    const command: SeasonRunCommand = {
+      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      command: 'select-front-office',
+      commandId: newSeasonId('fo'),
+      runId: this.requiredRunId(),
+      expectedStateRevision: this.requiredStateRevision(),
+      expectedStateDigest: this.requiredStateDigest(),
+      executiveId: input.executiveId as never,
+    };
+    await this.dispatch(command);
+  }
+  async selectCourtInnovation(input: { innovationId: string }): Promise<void> {
+    const command: SeasonRunCommand = {
+      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      command: 'select-court-innovation',
+      commandId: newSeasonId('ci'),
+      runId: this.requiredRunId(),
+      expectedStateRevision: this.requiredStateRevision(),
+      expectedStateDigest: this.requiredStateDigest(),
+      innovationId: input.innovationId as never,
     };
     await this.dispatch(command);
   }
@@ -1670,6 +1690,18 @@ export function describeCommandRejection(
       return `Trade fit issue: ${rejection.reason}`;
     case 'trade-insufficient-talent':
       return `Insufficient talent: ${rejection.reason}`;
+    case 'front-office-already-selected':
+      return 'A front office is already selected and cannot be replaced.';
+    case 'front-office-invalid':
+      return 'That executive is not in the front-office catalog.';
+    case 'front-office-too-late':
+      return 'Front offices are chosen during setup, before the first block.';
+    case 'innovation-not-discovered':
+      return 'Court Innovation discovery has not happened yet (after block 3).';
+    case 'innovation-already-selected':
+      return 'A Court Innovation is already selected and cannot be replaced.';
+    case 'innovation-invalid':
+      return 'That innovation is not in the Court Innovation catalog.';
     default:
       return `The ${command} command was rejected.`;
   }

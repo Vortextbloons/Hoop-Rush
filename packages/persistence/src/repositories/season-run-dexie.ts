@@ -6,6 +6,10 @@ import {
   seasonAcceptedBlockSchema,
   seasonAlmanacSchema,
   seasonCampaignStateSchema,
+  seasonFrontOfficeIdSchema,
+  commandIdSchema,
+  SEASON_FRONT_OFFICE_VERSION,
+  normalizeEvolutionState,
   seasonCheckpointDigestSchema,
   seasonCommandLogDigest,
   seasonCommandLogEntrySchema,
@@ -30,6 +34,7 @@ import {
   type SeasonAcceptedBlock,
   type SeasonActiveRunIndex,
   type SeasonCampaignState,
+  type SeasonEvolutionState,
   type SeasonCommandLog,
   type SeasonGameSummary,
   type SeasonInvalidRosterInterruption,
@@ -339,6 +344,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
           trade: stored.trade,
           objectives: stored.objectives,
           campaign: stored.campaign ?? null,
+          evolution: stored.run.evolution,
           rosters: stored.run.rosters,
           ownership: stored.run.ownership,
           rotations: stored.run.rotations,
@@ -419,6 +425,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
           trade: stored.trade,
           objectives: stored.objectives,
           campaign: stored.campaign ?? null,
+          evolution: stored.run.evolution,
           rosters: stored.run.rosters,
           ownership: stored.run.ownership,
           rotations: stored.run.rotations,
@@ -603,6 +610,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
         ).campaign ??
         buildEmptyCampaignState(),
       checkpointState: stored.checkpointState,
+      evolution: stored.evolution ?? (stored.run as { evolution?: unknown }).evolution,
       stateRevision: stored.stateRevision,
       stateDigest: stored.stateDigest,
     });
@@ -801,6 +809,11 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
             campaign?: unknown;
           }
         ).campaign;
+        const existingEvolution = (
+          checkpoint as {
+            evolution?: unknown;
+          }
+        ).evolution;
         const mutableState = {
           health: window !== null ? window.health : input.health,
           transactions: normalizeSeasonTransactions(
@@ -818,6 +831,10 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
                 ? (existingCampaign as SeasonCampaignState | null)
                 : null,
           checkpointState: input.checkpointState,
+          evolution:
+            input.evolution !== undefined
+              ? input.evolution
+              : (existingEvolution as SeasonEvolutionState | undefined),
           stateRevision: input.stateRevision,
           stateDigest: input.stateDigest,
         };
@@ -844,6 +861,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
             freeAgency: seasonFreeAgencyStateSchema.parse(
               normalizeSeasonFreeAgencyState(input.freeAgency),
             ),
+            evolution: mutableState.evolution,
           },
         });
         await this.db.seasonRuns.put({
@@ -995,6 +1013,20 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
         for (const selection of Object.values(cursor.objectives.selections)) {
           recorded.push(selection.selectedByCommandId);
         }
+        const cursorEvolution = (
+          cursor as unknown as {
+            evolution?: {
+              frontOffice?: { selectedByCommandId?: unknown } | null;
+              selections?: Record<string, { selectedByCommandId?: unknown } | null>;
+            } | null;
+          }
+        ).evolution;
+        if (typeof cursorEvolution?.frontOffice?.selectedByCommandId === 'string')
+          recorded.push(cursorEvolution.frontOffice.selectedByCommandId);
+        for (const selection of Object.values(cursorEvolution?.selections ?? {})) {
+          if (typeof selection?.selectedByCommandId === 'string')
+            recorded.push(selection.selectedByCommandId);
+        }
         const existingLogRows = await this.db.seasonCommandLog
           .where('runId')
           .equals(input.runId)
@@ -1036,6 +1068,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
           trade: run.trade,
           objectives: run.objectives,
           campaign: run.campaign ?? null,
+          evolution: run.evolution,
           checkpointState: run.checkpointState,
           stateRevision: run.stateRevision,
           stateDigest: run.stateDigest,
@@ -1128,6 +1161,36 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
       selections: {},
     });
     const campaign = seasonCampaignStateSchema.parse(buildEmptyCampaignState());
+    const draftFrontOffice =
+      (
+        validatedDraft.draft as {
+          frontOffice?: {
+            executiveId: unknown;
+            version: unknown;
+            selectedByCommandId: unknown;
+          } | null;
+        }
+      ).frontOffice ?? null;
+    const baseEvolution = normalizeEvolutionState(
+      (validatedRun as { evolution?: unknown }).evolution,
+    );
+    let evolution = baseEvolution;
+    if (draftFrontOffice !== null) {
+      const parsedDraftExecutive = seasonFrontOfficeIdSchema.safeParse(
+        draftFrontOffice.executiveId,
+      );
+      if (parsedDraftExecutive.success) {
+        evolution = {
+          ...baseEvolution,
+          frontOffice: {
+            executiveId: parsedDraftExecutive.data,
+            version: SEASON_FRONT_OFFICE_VERSION,
+            selectedByCommandId: commandIdSchema.parse(draftFrontOffice.selectedByCommandId),
+            selectedAtStateRevision: 0,
+          },
+        };
+      }
+    }
     const stateDigest = this.seam.seasonRunStateDigest({
       stateRevision: 0,
       stage: validatedRun.stage,
@@ -1141,6 +1204,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
       trade: null,
       objectives,
       campaign,
+      evolution,
       rosters: validatedRun.rosters,
       ownership: validatedRun.ownership,
       rotations: validatedRun.rotations,
@@ -1151,7 +1215,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
     const checkpointRow = storedSeasonRunRecordSchema.parse({
       recordId: SEASON_RUN_RECORD_ID,
       saveSchemaVersion: SEASON_RUN_SAVE_SCHEMA_VERSION,
-      run: runWithoutGames,
+      run: { ...runWithoutGames, evolution },
       completedRounds: 0,
       revision: 0,
       lastCommandId: null,

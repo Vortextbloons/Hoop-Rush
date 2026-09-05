@@ -1,6 +1,7 @@
 import type {
   SeasonGameSimulationInput,
   SeasonGameSimulationResult,
+  SeasonUnitStint,
 } from '@hoop-rush/data-contracts';
 import { auditSideAccounting } from '../sim/accounting-core.ts';
 import { createEngineContext } from '../sim/context.ts';
@@ -76,9 +77,18 @@ export function checkSeasonGameResult(
       }
     }
     const playerSeconds = players.reduce((sum, p) => sum + p.seconds, 0);
-    if (playerSeconds !== expectedTotalSeconds) {
+    const race = result.overtimeRace;
+    const expectedSeconds =
+      race === undefined
+        ? expectedTotalSeconds
+        : REGULATION_PLAYER_SECONDS +
+          5 *
+            result.unitStints
+              .filter((s) => s.side === sideKey && s.clockKind === 'untimed')
+              .reduce((sum, s) => sum + s.durationSeconds, 0);
+    if (playerSeconds !== expectedSeconds) {
       failures.push(
-        `${sideKey}: player seconds (${String(playerSeconds)}) != ${String(expectedTotalSeconds)}`,
+        `${sideKey}: player seconds (${String(playerSeconds)}) != ${String(expectedSeconds)}`,
       );
     }
     for (const p of players) {
@@ -94,7 +104,7 @@ export function checkSeasonGameResult(
       failures.push(`${sideKey}: player points != team points`);
     }
     if (!accounting.pointsIdentityOk) {
-      failures.push(`${sideKey}: team points != 2*2fg + 3*3fg + ft`);
+      failures.push(`${sideKey}: team points != 2*2fg + 3*3fg + 4*4fg + ft`);
     }
     if (accounting.makesExceed.length > 0) {
       failures.push(`${sideKey}: makes exceed attempts`);
@@ -174,6 +184,90 @@ export function checkSeasonGameResult(
   }
   return failures;
 }
+function auditRaceStints(
+  failures: string[],
+  sideKey: 'home' | 'away',
+  result: Extract<
+    SeasonGameSimulationResult,
+    {
+      outcome: 'completed';
+    }
+  >,
+  input: SeasonGameSimulationInput,
+  stints: readonly SeasonUnitStint[],
+  untimed: readonly SeasonUnitStint[],
+): void {
+  const timed = stints.filter((s) => s.clockKind !== 'untimed');
+  for (const stint of timed) {
+    if (stint.period < 1 || stint.period > 4) {
+      failures.push(`${sideKey}: timed stint outside regulation (period ${String(stint.period)})`);
+    }
+  }
+  const timedSeconds = timed.reduce((sum, stint) => sum + stint.durationSeconds, 0);
+  if (timedSeconds !== REGULATION_TOTAL_SECONDS) {
+    failures.push(
+      `${sideKey}: timed stint seconds (${String(timedSeconds)}) != regulation length (${String(REGULATION_TOTAL_SECONDS)})`,
+    );
+  }
+  const lastTimed = timed[timed.length - 1];
+  if (lastTimed !== undefined) {
+    if (lastTimed.period !== 4 || lastTimed.endSecondsRemaining !== 0) {
+      failures.push(`${sideKey}: last timed stint must end at the end of period 4`);
+    }
+  }
+  for (let i = 1; i < timed.length; i += 1) {
+    const prev = timed[i - 1];
+    const cur = timed[i];
+    if (prev === undefined || cur === undefined) continue;
+    if (cur.period === prev.period) {
+      if (cur.startSecondsRemaining !== prev.endSecondsRemaining) {
+        failures.push(`${sideKey}: timed stint gap in period ${String(prev.period)}`);
+      }
+    } else if (cur.period !== prev.period + 1 || prev.endSecondsRemaining !== 0) {
+      failures.push(
+        `${sideKey}: timed stint period jump ${String(prev.period)} -> ${String(cur.period)}`,
+      );
+    }
+  }
+  const firstUntimed = untimed[0];
+  if (firstUntimed !== undefined && firstUntimed.elapsedStartSeconds !== 0) {
+    failures.push(`${sideKey}: first untimed stint must open at elapsed 0`);
+  }
+  for (const stint of untimed) {
+    if (new Set(stint.players).size !== 5) {
+      failures.push(`${sideKey}: untimed stint unit must be five distinct players`);
+    }
+    if (
+      stint.durationSeconds !==
+      (stint.elapsedEndSeconds ?? -1) - (stint.elapsedStartSeconds ?? 0)
+    ) {
+      failures.push(`${sideKey}: untimed stint duration != elapsed end - start`);
+    }
+  }
+  for (let i = 1; i < untimed.length; i += 1) {
+    const prev = untimed[i - 1];
+    const cur = untimed[i];
+    if (prev === undefined || cur === undefined) continue;
+    if (cur.elapsedStartSeconds !== prev.elapsedEndSeconds) {
+      failures.push(`${sideKey}: untimed stint gap at elapsed ${String(prev.elapsedEndSeconds)}`);
+    }
+  }
+  const race = result.overtimeRace;
+  if (race === undefined) {
+    failures.push(`${sideKey}: untimed stints without an overtime race record`);
+    return;
+  }
+  const sidePoints = sideKey === 'home' ? race.homePoints : race.awayPoints;
+  if (sidePoints < 7) {
+    const otherPoints = sideKey === 'home' ? race.awayPoints : race.homePoints;
+    if (otherPoints < 7) {
+      failures.push(
+        `${sideKey}: overtime race has no winner (${String(race.homePoints)}-${String(race.awayPoints)})`,
+      );
+    }
+  }
+  void input;
+}
 function stintAudit(
   failures: string[],
   sideKey: 'home' | 'away',
@@ -186,6 +280,11 @@ function stintAudit(
   input: SeasonGameSimulationInput,
 ): void {
   const stints = result.unitStints.filter((s) => s.side === sideKey);
+  const untimed = stints.filter((s) => s.clockKind === 'untimed');
+  if (untimed.length > 0) {
+    auditRaceStints(failures, sideKey, result, input, stints, untimed);
+    return;
+  }
   for (let i = 0; i < stints.length; i += 1) {
     const stint = stints[i];
     if (stint === undefined) continue;

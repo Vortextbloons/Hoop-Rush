@@ -2257,11 +2257,11 @@ describe('season checkpoint M2.5 facts', () => {
     ).toThrow();
   });
 });
-describe('season worker wire v7 (M2.5.5)', () => {
+describe('season worker wire v8 (M2.10)', () => {
   function buildStartRequest() {
     const run = buildRun();
     return {
-      schemaVersion: 7,
+      schemaVersion: 8,
       type: 'season-block-start',
       requestId: 'req-1',
       runId: run.runId,
@@ -2325,14 +2325,14 @@ describe('season worker wire v7 (M2.5.5)', () => {
   });
   it('round-trips complete messages with committed and interrupted results', () => {
     const committed = roundTrip(seasonWorkerCompleteMessageSchema, {
-      schemaVersion: 7,
+      schemaVersion: 8,
       type: 'season-block-complete',
       requestId: 'req-1',
       result: { status: 'committed', checkpoint: buildCheckpointFixture() },
     });
     expect(committed.result.status).toBe('committed');
     const interrupted = roundTrip(seasonWorkerCompleteMessageSchema, {
-      schemaVersion: 7,
+      schemaVersion: 8,
       type: 'season-block-complete',
       requestId: 'req-1',
       result: { status: 'interrupted', pending: buildPendingBlockFixture() },
@@ -2340,7 +2340,7 @@ describe('season worker wire v7 (M2.5.5)', () => {
     expect(interrupted.result.status).toBe('interrupted');
     expect(() =>
       seasonWorkerCompleteMessageSchema.parse({
-        schemaVersion: 7,
+        schemaVersion: 8,
         type: 'season-block-complete',
         requestId: 'req-1',
         result: { status: 'committed', pending: buildPendingBlockFixture() },

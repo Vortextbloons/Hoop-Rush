@@ -30,6 +30,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import { assertNever } from '../sim/assert-never.ts';
 import { createRng } from '../sim/rng.ts';
+import { wrapSponsorshipsForBlock, campaignBonusOf } from './evolution.ts';
 import { seasonPlayerAvailable } from './injuries.ts';
 import { deriveSeasonInfluenceEntryId, seasonTransactionEntry } from './transactions.ts';
 export { buildEmptyCampaignState, SEASON_CAMPAIGN_VERSION, SEASON_CAMPAIGN_TARGETS_VERSION };
@@ -1196,6 +1197,31 @@ export function generateSeasonCampaignOffers(
   }
   if (opportunities[0]?.templateId === opportunities[1]?.templateId) {
   }
+  const wrap = wrapSponsorshipsForBlock({
+    rootSeed: input.rootSeed,
+    blockIndex: input.blockIndex,
+    opportunities: opportunities.map((o) => ({
+      opportunityId: o.opportunityId,
+      family: o.family,
+      blockIndex: o.blockIndex,
+    })),
+  });
+  if (wrap.wrapper !== null) {
+    const idx = opportunities.findIndex((o) => o.opportunityId === wrap.wrappedOpportunityId);
+    if (idx >= 0) {
+      const target = opportunities[idx];
+      if (target !== undefined) {
+        opportunities[idx] = {
+          ...target,
+          sponsor: {
+            sponsorId: wrap.wrapper.sponsorId,
+            contentVersion: wrap.wrapper.contentVersion,
+            seedPath: wrap.wrapper.seedPath,
+          },
+        };
+      }
+    }
+  }
   return opportunities;
 }
 export interface SeasonCampaignEvaluationInput {
@@ -1700,6 +1726,7 @@ export interface SeasonCampaignRewardApplicationInput {
   humanFranchiseId: string | null;
   blockIndex: number;
   commandId?: string | null;
+  executiveId?: string | null;
 }
 export interface SeasonCampaignRewardApplicationResult {
   influence: SeasonInfluenceState;
@@ -1844,6 +1871,42 @@ export function applySeasonCampaignReward(
     newBranchState = { ...newBranchState, [opportunity.branchId]: 'open' as const };
   } else {
     newBranchState = { ...newBranchState, [opportunity.branchId]: 'completed' as const };
+  }
+  const bonusId = input.executiveId ?? null;
+  const grantedInfluence = rewardsToApply.some((r) => r.type === 'influence');
+  if (grantedInfluence && humanFranchiseId !== null && campaignBonusOf(bonusId as never) > 0) {
+    const bonusRes = applyInfluenceReward(
+      influence,
+      humanFranchiseId,
+      1,
+      blockIndex,
+      input.commandId ?? null,
+      'Campaign Director bonus (+1 Influence)',
+      'campaign-director-bonus-' + opportunity.opportunityId,
+    );
+    influence = bonusRes.influence;
+    ledgerEntries.push(bonusRes.entry);
+    rewardEntitlements = {
+      ...rewardEntitlements,
+      influenceEarned: rewardEntitlements.influenceEarned + bonusRes.entry.appliedDelta,
+    };
+    transactions.push(
+      seasonTransactionEntry({
+        transactionId: 'txn-campaign-bonus-' + opportunity.opportunityId,
+        commandId: input.commandId ?? null,
+        franchiseId: humanFranchiseId,
+        type: 'campaign-reward',
+        blockIndex,
+        appliedAtStateRevision: 0,
+        payload: {
+          rewardId: 'bonus-campaign-director',
+          type: 'influence',
+          requestedDelta: 1,
+          appliedDelta: bonusRes.entry.appliedDelta,
+        },
+        explanation: bonusRes.entry.explanation,
+      }),
+    );
   }
   campaignState = {
     ...campaignState,

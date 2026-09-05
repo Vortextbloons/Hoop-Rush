@@ -3,8 +3,11 @@ import {
   SEASON_BLOCK_TEAM_GAMES,
   SEASON_FINAL_BLOCK_TEAM_GAMES,
   blockRoundRange,
+  resolveHomeGameRule,
   type SeasonEffectsState,
+  type SeasonEvolutionState,
   type SeasonGame,
+  type SeasonGameRule,
   type SeasonRotation,
   type SeasonUpcomingHumanGame,
 } from '@hoop-rush/data-contracts';
@@ -25,6 +28,7 @@ export interface UpcomingGame {
   awayFranchiseId: string;
   humanIsHome: boolean;
   opponentFranchiseId: string;
+  homeRule: SeasonGameRule;
 }
 export interface FatigueProjection {
   playerVersionId: string;
@@ -58,6 +62,7 @@ export function humanUpcomingGames(
   games: readonly SeasonGame[],
   humanFranchiseId: string,
   blockIndex: number,
+  evolution: SeasonEvolutionState | null = null,
 ): UpcomingGame[] {
   if (gamesToLockForBlock(blockIndex) === 0) return [];
   const { fromRound, toRound } = blockRoundRange(blockIndex);
@@ -77,6 +82,7 @@ export function humanUpcomingGames(
       humanIsHome: game.homeFranchiseId === humanFranchiseId,
       opponentFranchiseId:
         game.homeFranchiseId === humanFranchiseId ? game.awayFranchiseId : game.homeFranchiseId,
+      homeRule: resolveHomeGameRule(evolution, game.homeFranchiseId),
     }));
 }
 export function buildLockPreview(input: {
@@ -96,6 +102,7 @@ export function buildLockPreview(input: {
     objectiveId: string;
     name: string;
   } | null;
+  evolution?: SeasonEvolutionState | null;
 }): LockPreview {
   const {
     pendingHumanRotation,
@@ -108,6 +115,7 @@ export function buildLockPreview(input: {
     humanFranchiseId,
     fatigue,
     objective,
+    evolution,
   } = input;
   const changes: RotationChange[] = [];
   const pendingMinutes = new Map(
@@ -176,7 +184,7 @@ export function buildLockPreview(input: {
     lastLockedDigest,
     unchangedSinceLastLock: lastLockedDigest !== null && lastLockedDigest === pendingSetDigest,
     changes,
-    upcomingGames: humanUpcomingGames(games, humanFranchiseId, blockIndex),
+    upcomingGames: humanUpcomingGames(games, humanFranchiseId, blockIndex, evolution ?? null),
     fatigueProjections,
     objective: objective ?? null,
   };

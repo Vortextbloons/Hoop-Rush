@@ -12,6 +12,7 @@ import {
   type SeasonTradeWindowState,
 } from '@hoop-rush/data-contracts';
 import { seasonObjectiveChoicesForBlock } from '@hoop-rush/engine';
+import { rehabPriceOf } from '@hoop-rush/engine';
 import { SEASON_ROUND_COUNT } from '@hoop-rush/data-contracts';
 export interface InfluenceSpendAffordance {
   purpose: 'extra-trade-offer' | 'risky-rehab';
@@ -22,6 +23,7 @@ export interface InfluenceSpendAffordance {
   spent: boolean;
   affordable: boolean;
   rehabOutcome: SeasonInfluenceRehabOutcome | null;
+  priceNote: string | null;
 }
 export interface InfluenceViewModel {
   balance: number;
@@ -37,6 +39,7 @@ export function influenceViewModel(
   humanFranchiseId: string,
   health: SeasonHealthState | null = null,
   openWindow: SeasonTradeWindowState | null = null,
+  executiveId: import('@hoop-rush/data-contracts').SeasonFrontOfficeId | null = null,
 ): InfluenceViewModel {
   const fid = franchiseIdSchema.parse(humanFranchiseId);
   const balance = state.balances[fid] ?? 0;
@@ -64,6 +67,7 @@ export function influenceViewModel(
       spent: spent ?? false,
       affordable: !spent && balance - 1 >= SEASON_INFLUENCE_FLOOR,
       rehabOutcome: null,
+      priceNote: null,
     });
   }
   const rehabSpent = new Map<string, SeasonInfluenceRehabOutcome>();
@@ -89,16 +93,24 @@ export function influenceViewModel(
   for (const injuryId of injuryIds) {
     const record = activeInjuries.find((active) => active.injuryId === injuryId) ?? null;
     const outcome = rehabSpent.get(injuryId) ?? null;
+    const rehabCost = rehabPriceOf(executiveId);
     affordances.push({
       purpose: 'risky-rehab',
-      cost: 2,
+      cost: rehabCost,
       windowIndex: null,
       injuryId,
       playerVersionId: record?.playerVersionId ?? null,
       spent: outcome !== null && outcome !== 'pending',
       affordable:
-        (outcome === null || outcome === 'pending') && balance - 2 >= SEASON_INFLUENCE_FLOOR,
+        (outcome === null || outcome === 'pending') &&
+        balance - rehabCost >= SEASON_INFLUENCE_FLOOR,
       rehabOutcome: outcome,
+      priceNote:
+        executiveId === 'alex-chen'
+          ? 'Recovery Director discount (minimum 1).'
+          : executiveId === null
+            ? null
+            : 'Executive drawback (+1).',
     });
   }
   return {
@@ -133,8 +145,11 @@ export interface ObjectiveChoicesViewModel {
     success: boolean;
   } | null;
 }
-export function objectiveChoicesViewModel(run: SeasonRun): ObjectiveChoicesViewModel {
-  const blockIndex = currentObjectiveBlock(run);
+export function objectiveChoicesViewModel(
+  run: SeasonRun,
+  acceptedBlockCount: number | null = null,
+): ObjectiveChoicesViewModel {
+  const blockIndex = currentObjectiveBlock(run, acceptedBlockCount);
   const definitions = new Map(SEASON_OBJECTIVE_CATALOG.map((entry) => [entry.objectiveId, entry]));
   if (blockIndex === null) {
     return {
@@ -186,9 +201,22 @@ function acceptedBlockCountOf(completedRounds: number): number {
   if (completedRounds <= 0) return 0;
   return Math.ceil(completedRounds / 10);
 }
-export function currentObjectiveBlock(run: SeasonRun): number | null {
+export function currentObjectiveBlock(
+  run: SeasonRun,
+  acceptedBlockCount: number | null = null,
+): number | null {
   if (run.cursor.completedRounds >= SEASON_ROUND_COUNT) return null;
-  const blockIndex = acceptedBlockCountOf(run.cursor.completedRounds);
+  const fromCursor = acceptedBlockCountOf(run.cursor.completedRounds);
+  // acceptedBlocks.length (shell.nextBlockIndex) is the commit boundary the block
+  // runner and submit gate use. If it disagrees with ceil(completedRounds/10) the
+  // snapshot is stale (e.g. a select bumped stateRevision without moving the cursor,
+  // or a block commit landed without a refresh) — prefer acceptedBlocks and let the
+  // caller force a refresh so the picker and the submit gate agree.
+  const blockIndex = acceptedBlockCount ?? fromCursor;
+  if (acceptedBlockCount !== null && acceptedBlockCount !== fromCursor) {
+    if (acceptedBlockCount >= 8) return null;
+    return acceptedBlockCount;
+  }
   if (blockIndex >= 8) return null;
   return blockIndex;
 }

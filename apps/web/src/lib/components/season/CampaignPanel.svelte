@@ -352,6 +352,18 @@
                   >
                     {card.opportunity.branchId.slice(4, 10)}
                   </span>
+                  {#if card.opportunity.sponsor}
+                    <span
+                      class="shrink-0 rounded-full bg-surface-3 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-primary"
+                      title="Sponsor-backed: the underlying opportunity and reward are unchanged."
+                    >
+                      {card.opportunity.sponsor.sponsorId === 'baseline-supply'
+                        ? 'Baseline Supply'
+                        : card.opportunity.sponsor.sponsorId === 'second-wind'
+                          ? 'Second Wind'
+                          : 'Cityline Sports'}
+                    </span>
+                  {/if}
                 </div>
 
                 <div class="rounded-lg bg-surface-2 p-2.5">

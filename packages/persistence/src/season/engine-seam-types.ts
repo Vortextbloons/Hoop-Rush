@@ -2,6 +2,7 @@ import type {
   SeasonAwards,
   SeasonRunAuthority,
   SeasonCampaignState,
+  SeasonEvolutionState,
   SeasonCheckpointState,
   SeasonEffectsState,
   SeasonFreeAgencyState,
@@ -61,6 +62,7 @@ export interface SeasonRunStateDigestFacts {
   trade: SeasonTradeState | null;
   objectives: SeasonObjectiveState;
   campaign?: SeasonCampaignState | null;
+  evolution?: SeasonEvolutionState | null;
   rosters: readonly SeasonRoster[];
   ownership: readonly SeasonOwnership[];
   rotations: readonly SeasonRotation[];

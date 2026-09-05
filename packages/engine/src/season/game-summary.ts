@@ -12,6 +12,14 @@ import {
   type SeasonScheduleGame,
   type SeasonTeamBox,
 } from '@hoop-rush/data-contracts';
+function fourPointerLineOf(holder: object): {
+  fourPointersMade?: number;
+  fourPointersAttempted?: number;
+} {
+  const deep = (holder as { deepFours?: { made: number; attempted: number } }).deepFours;
+  if (!deep) return {};
+  return { fourPointersMade: deep.made, fourPointersAttempted: deep.attempted };
+}
 function compactLineOf(
   player: {
     playerVersionId: string;
@@ -59,6 +67,7 @@ function compactLineOf(
     blocks: player.blocks,
     turnovers: player.turnovers,
     fouls: player.fouls,
+    ...fourPointerLineOf(player),
   };
 }
 function teamBoxOf(side: {
@@ -106,6 +115,7 @@ function teamBoxOf(side: {
     blocks: box.blocks,
     turnovers: box.turnovers,
     fouls: box.fouls,
+    ...fourPointerLineOf(box),
     possessions: box.possessions,
   };
 }
@@ -178,6 +188,7 @@ export function seasonGameSummaryFromResult(
       awayBox: zeroTeamBox(game.awayFranchiseId),
       homePlayers: [],
       awayPlayers: [],
+      ...(result.gameRule !== undefined ? { gameRule: result.gameRule } : {}),
       injuryEvents: [...injuryEvents],
     };
   }
@@ -190,9 +201,20 @@ export function seasonGameSummaryFromResult(
     awayFranchiseId: game.awayFranchiseId,
     status: 'final',
     overtimePeriods: result.overtimePeriods,
+    ...(result.ruleVersion !== undefined ? { ruleVersion: result.ruleVersion } : {}),
+    ...(result.overtimeRace !== undefined
+      ? {
+          overtimeRace: {
+            target: 7 as const,
+            homePoints: result.overtimeRace.homePoints,
+            awayPoints: result.overtimeRace.awayPoints,
+          },
+        }
+      : {}),
     homeScore: result.home.score,
     awayScore: result.away.score,
     forfeitLoserFranchiseId: null,
+    ...(result.gameRule !== undefined ? { gameRule: result.gameRule } : {}),
     homeBox: teamBoxOf(result.home),
     awayBox: teamBoxOf(result.away),
     homePlayers: sortedLines(
@@ -268,6 +290,8 @@ export function auditSeasonGameSummary(summary: SeasonGameSummary): string[] {
         ['turnovers', box.turnovers],
         ['fouls', box.fouls],
         ['possessions', box.possessions],
+        ['fourPointersMade', box.fourPointersMade ?? 0],
+        ['fourPointersAttempted', box.fourPointersAttempted ?? 0],
       ];
       for (const [label, value] of expectedZero) {
         if (value !== 0)
@@ -311,6 +335,12 @@ export function auditSeasonGameSummary(summary: SeasonGameSummary): string[] {
       ['blocks', sumOf((l) => l.blocks), box.blocks],
       ['turnovers', sumOf((l) => l.turnovers), box.turnovers],
       ['fouls', sumOf((l) => l.fouls), box.fouls],
+      ['fourPointersMade', sumOf((l) => l.fourPointersMade ?? 0), box.fourPointersMade ?? 0],
+      [
+        'fourPointersAttempted',
+        sumOf((l) => l.fourPointersAttempted ?? 0),
+        box.fourPointersAttempted ?? 0,
+      ],
     ];
     for (const [label, playerTotal, boxTotal] of checks) {
       if (playerTotal !== boxTotal) {
@@ -325,10 +355,12 @@ export function auditSeasonGameSummary(summary: SeasonGameSummary): string[] {
     const tpa = box.threePointersAttempted;
     const ftm = box.freeThrowsMade;
     const fta = box.freeThrowsAttempted;
-    if (fgm > fga || tpm > tpa || ftm > fta) {
+    const d4m = box.fourPointersMade ?? 0;
+    const d4a = box.fourPointersAttempted ?? 0;
+    if (fgm > fga || tpm > tpa || ftm > fta || d4m > d4a) {
       failures.push(`${side} makes exceed attempts`);
     }
-    if (box.points !== (fgm - tpm) * 2 + tpm * 3 + ftm) {
+    if (box.points !== (fgm - tpm - d4m) * 2 + tpm * 3 + d4m * 4 + ftm) {
       failures.push(`${side} points do not reconcile with the box scoring`);
     }
     if (box.assists > fgm) {

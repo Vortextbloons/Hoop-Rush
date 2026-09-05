@@ -22,6 +22,7 @@
   import ValueTrendCell from './ValueTrendCell.svelte';
   import SeasonTeamLogo from './SeasonTeamLogo.svelte';
   import { franchiseIdentityOf } from '$lib/season/season-branding';
+  import { inquiryAllowanceView } from '$lib/season/season-evolution-view';
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
   import { franchiseIdSchema } from '@hoop-rush/data-contracts';
   let {
@@ -87,11 +88,16 @@
       ? (negotiations.find((n) => n.inquiryId === windowState.activeInquiryId) ?? null)
       : null,
   );
-  const inquiryAllowance = $derived(windowState?.inquiryAllowance ?? 3);
+  const inquiryFacts = $derived(inquiryAllowanceView(run ?? { evolution: null }));
+  const inquiryAllowance = $derived(windowState?.inquiryAllowance ?? inquiryFacts.base);
   const inquiriesUsed = $derived(negotiations.length);
   const purchasedUsed = $derived(windowState?.purchasedInquiryUsed ?? false);
   const earnedUsed = $derived(windowState?.earnedInquiryUsed ?? false);
-  const canPurchase = $derived(!purchasedUsed && inquiryAllowance < 5 && humanBalance >= 1);
+  const canPurchase = $derived(
+    !purchasedUsed &&
+      inquiryAllowance < inquiryFacts.cap &&
+      humanBalance >= inquiryFacts.purchaseCost,
+  );
   const selectedProfile = $derived(
     boardProfiles.find((p) => p.franchiseId === selectedFranchiseId) ?? null,
   );
@@ -189,9 +195,12 @@
             {purchasedUsed
               ? 'Extra talk used'
               : canPurchase
-                ? '+1 trade talk · 1 Influence'
-                : 'Need 1 Influence for extra talk'}
+                ? `+1 trade talk — ${String(inquiryFacts.purchaseCost)} Influence`
+                : `Need ${String(inquiryFacts.purchaseCost)} Influence for extra talk`}
           </button>
+          <span class="text-xs text-muted-foreground" title={inquiryFacts.explanation}>
+            {inquiryFacts.explanation}
+          </span>
           {#if commandError !== null}
             <span
               role="alert"

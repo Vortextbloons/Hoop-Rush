@@ -9,6 +9,7 @@ import {
   SEASON_TEAM_COUNT,
   blockRoundRange,
   franchiseIdSchema,
+  normalizeEvolutionState,
   seasonGameIdSchema,
   seasonNamespaceSeed,
   type EraSimulationProfile,
@@ -50,6 +51,7 @@ import {
   type SeasonSubmitBlockResult,
   type SeasonTransactionEntry,
   type SeasonRosterTargets,
+  type SeasonEvolutionState,
 } from '@hoop-rush/data-contracts';
 import { createEngineContext } from '../sim/context.ts';
 import {
@@ -67,6 +69,8 @@ import { SEASON_HOME_COURT_PROFILE } from './home-court.ts';
 import { auditSeasonBlockRecap, buildSeasonBlockRecap, seasonBlockGameCount } from './recap.ts';
 import { seasonRotationSetDigest, validateSeasonRotation } from './rotation.ts';
 import { simulateSeasonGameWithEffects } from './season-game.ts';
+import { resolveHomeGameRule } from './evolution.ts';
+import { evolutionWithBlockCommit, type AiSelectionDataSource } from './evolution.ts';
 import { applySeasonGameEffectsTransition } from './effects.ts';
 import { applySeasonRecoveryTick } from './stamina.ts';
 import { auditSeasonStandings, reduceSeasonStandings } from './standings.ts';
@@ -203,6 +207,11 @@ export function seasonRunStateDigestFactsOf(
         campaign?: unknown;
       }
     ).campaign as never,
+    evolution: (
+      next as unknown as {
+        evolution?: import('@hoop-rush/data-contracts').SeasonEvolutionState | null;
+      }
+    ).evolution,
     rosters: next.rosters,
     ownership: next.ownership,
     rotations: next.rotations,
@@ -396,6 +405,14 @@ export function seasonBlockRejection(
       windowIndex: unresolvedWindowIndex,
       blockIndex: command.blockIndex,
     };
+  }
+  if (command.blockIndex >= 3) {
+    const gate = evolutionSelectionGate({
+      blockIndex: command.blockIndex,
+      run,
+      humanFranchiseId: input.humanFranchiseId,
+    });
+    if (gate !== null) return gate;
   }
   const computedDigest = seasonRotationSetDigest(run.rotations);
   const franchiseFailures: Array<{
@@ -726,6 +743,11 @@ export function simulateSeasonBlockGame(
       reason: 'injury-return',
     })),
     homeCourt: SEASON_HOME_COURT_PROFILE,
+    gameRule: resolveHomeGameRule(
+      (run as unknown as { evolution?: import('@hoop-rush/data-contracts').SeasonEvolutionState })
+        .evolution ?? null,
+      game.homeFranchiseId,
+    ),
   };
   const { result, transition } = simulateSeasonGameWithEffects(
     gameInput,
@@ -1327,12 +1349,24 @@ export function deriveSeasonPostBlockState(input: {
   candidate: SeasonCandidateCheckpoint;
   commandId: string;
   rotationDigest: string;
+  humanFranchiseId?: string | null;
+  aiFranchiseIds?: readonly string[];
+  evolutionData?: AiSelectionDataSource | null;
 }): {
   checkpointState: SeasonCheckpointState;
   stateRevision: number;
   stateDigest: string;
+  evolution: SeasonEvolutionState;
 } {
   const objectives = objectivesWithBlockSuccess(input.run.objectives, input.candidate);
+  const evolution = evolutionWithBlockCommit({
+    rootSeed: input.run.rootSeed,
+    blockIndex: input.candidate.blockIndex,
+    evolution: normalizeEvolutionState((input.run as unknown as { evolution?: unknown }).evolution),
+    humanFranchiseId: input.humanFranchiseId ?? null,
+    aiFranchiseIds: input.aiFranchiseIds ?? input.run.league.teams.map((team) => team.franchiseId),
+    data: input.evolutionData ?? null,
+  });
   const campaign = campaignWithBlockEvaluation(
     (
       input.run as {
@@ -1369,9 +1403,51 @@ export function deriveSeasonPostBlockState(input: {
     ownership: input.run.ownership,
     rotations: input.run.rotations,
     effects: input.candidate.effects,
+    evolution,
     authority: input.run.authority,
   });
-  return { checkpointState, stateRevision, stateDigest };
+  return { checkpointState, stateRevision, stateDigest, evolution };
+}
+export function evolutionSelectionGate(input: {
+  blockIndex: number;
+  run: SeasonRun | SeasonBlockRunContext;
+  humanFranchiseId: string | null;
+}): SeasonSubmitBlockRejection | null {
+  if (input.blockIndex < 3) return null;
+  const evolution = normalizeEvolutionState(
+    (input.run as unknown as { evolution?: unknown }).evolution,
+  );
+  if (evolution.discovery === null) return null;
+  const humanFid =
+    input.humanFranchiseId ??
+    input.run.league.teams.find((t) => t.control === 'human')?.franchiseId ??
+    null;
+  if (
+    humanFid !== null &&
+    (evolution.selections as unknown as Record<string, unknown>)[humanFid] === undefined
+  ) {
+    return { code: 'evolution-selection-required', blockIndex: input.blockIndex };
+  }
+  return null;
+}
+export function buildEvolutionDataSource(input: {
+  run: SeasonRun;
+  candidate: SeasonCandidateCheckpoint;
+  priorSummaries?: readonly SeasonGameSummary[];
+  schedule?: SeasonSchedule;
+}): AiSelectionDataSource | null {
+  if (input.schedule === undefined) return null;
+  const run = input.run;
+  const aiOrder = new Map<string, number>(
+    run.aiAssignments.map((assignment, index) => [assignment.franchiseId, index] as const),
+  );
+  return {
+    summaries: [...(input.priorSummaries ?? []), ...(input.candidate.gameSummaries ?? [])],
+    rotations: run.rotations,
+    schedule: input.schedule,
+    completedRounds: input.candidate.completedRounds,
+    aiOrderIndexOf: (franchiseId: string) => aiOrder.get(franchiseId) ?? 0,
+  };
 }
 export function completeSeasonBlockCommit(input: {
   run: SeasonRun;
@@ -1384,6 +1460,9 @@ export function completeSeasonBlockCommit(input: {
   effects?: SeasonEffectsState;
   freeAgencyIndex?: SeasonFreeAgencyIndex;
   freeAgencyTargets?: SeasonRosterTargets;
+  profile?: EraSimulationProfile;
+  schedule?: SeasonSchedule;
+  priorSummaries?: readonly SeasonGameSummary[];
 }): {
   checkpointState: SeasonCheckpointState;
   stateRevision: number;
@@ -1392,6 +1471,7 @@ export function completeSeasonBlockCommit(input: {
   freeAgencyWindow: SeasonFreeAgencyWindowState | null;
   freeAgency: SeasonFreeAgencyState;
   campaign: import('@hoop-rush/data-contracts').SeasonCampaignState | null;
+  evolution: SeasonEvolutionState;
 } {
   const objectives = objectivesWithBlockSuccess(input.run.objectives, input.candidate);
   const campaign = campaignWithBlockEvaluation(
@@ -1407,6 +1487,13 @@ export function completeSeasonBlockCommit(input: {
     candidate: input.candidate,
     commandId: input.commandId,
     rotationDigest: input.rotationDigest,
+    humanFranchiseId: input.humanFranchiseId,
+    evolutionData: buildEvolutionDataSource({
+      run: input.run,
+      candidate: input.candidate,
+      priorSummaries: input.priorSummaries,
+      schedule: input.schedule,
+    }),
   });
   const participantIds =
     input.participantFranchiseIds ?? (input.humanFranchiseId ? [input.humanFranchiseId] : []);
@@ -1421,6 +1508,7 @@ export function completeSeasonBlockCommit(input: {
     freeAgency: input.candidate.freeAgency,
     objectives,
     campaign: campaign,
+    evolution: derived.evolution,
     checkpointState: derived.checkpointState,
     stateRevision: derived.stateRevision,
     stateDigest: derived.stateDigest,
@@ -1553,6 +1641,7 @@ export function completeSeasonBlockCommit(input: {
       freeAgencyWindow: null,
       freeAgency,
       campaign: finalCampaign,
+      evolution: derived.evolution,
     };
   }
   return {
@@ -1563,6 +1652,7 @@ export function completeSeasonBlockCommit(input: {
     freeAgencyWindow,
     freeAgency,
     campaign: finalCampaign,
+    evolution: derived.evolution,
   };
 }
 export function resumeSeasonBlockFromPending(input: {

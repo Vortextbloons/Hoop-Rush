@@ -42,6 +42,7 @@ export function auditReplayDivergences(
         trade: stored.trade,
         objectives: stored.objectives,
         campaign: undefined,
+        evolution: stored.run.evolution ?? stored.evolution ?? null,
         rosters: stored.run.rosters,
         ownership: stored.run.ownership,
         rotations: stored.run.rotations,

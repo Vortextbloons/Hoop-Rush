@@ -41,6 +41,7 @@ export interface AccountingPlayerInput {
   turnovers: number;
   fouls: number;
   diagnostics?: AccountingPlayerDiagnostics | null;
+  deepFours?: { made: number; attempted: number } | null;
 }
 export interface AccountingBoxInput {
   points: number;
@@ -67,13 +68,14 @@ export interface AccountingBoxInput {
   blocks: number;
   turnovers: number;
   fouls: number;
+  deepFours?: { made: number; attempted: number } | null;
   diagnostics?: AccountingTeamDiagnostics | null;
 }
 export interface SideAccountingViolations {
   playerPointsTotal: number;
+  makesExceed: Array<'fieldGoal' | 'three' | 'freeThrow' | 'deepFour'>;
   pointsIdentity: number;
   pointsIdentityOk: boolean;
-  makesExceed: Array<'fieldGoal' | 'three' | 'freeThrow'>;
   assistsExceedMade: boolean;
   reboundBucketsOk: boolean;
   reconciliations: Array<{
@@ -118,11 +120,14 @@ export function auditSideAccounting<P extends AccountingPlayerInput>(
   const tpa = box.threes.attempted;
   const ftm = box.freeThrows.made;
   const fta = box.freeThrows.attempted;
-  const pointsIdentity = (fgm - tpm) * 2 + tpm * 3 + ftm;
+  const d4m = box.deepFours?.made ?? 0;
+  const d4a = box.deepFours?.attempted ?? 0;
+  const pointsIdentity = (fgm - tpm - d4m) * 2 + tpm * 3 + d4m * 4 + ftm;
   const makesExceed: SideAccountingViolations['makesExceed'] = [];
   if (fgm > fga) makesExceed.push('fieldGoal');
   if (tpm > tpa) makesExceed.push('three');
   if (ftm > fta) makesExceed.push('freeThrow');
+  if (d4m > d4a) makesExceed.push('deepFour');
   const reconciliations: SideAccountingViolations['reconciliations'] = [];
   const reconcile = (label: string, select: (p: P) => number, teamValue: number): void => {
     reconciliations.push({ label, playerTotal: sumOf(select), teamValue });
@@ -133,6 +138,8 @@ export function auditSideAccounting<P extends AccountingPlayerInput>(
   reconcile('threeAttempts', (p) => p.threes.attempted, tpa);
   reconcile('freeThrowMakes', (p) => p.freeThrows.made, ftm);
   reconcile('freeThrowAttempts', (p) => p.freeThrows.attempted, fta);
+  reconcile('deepFourMakes', (p) => p.deepFours?.made ?? 0, d4m);
+  reconcile('deepFourAttempts', (p) => p.deepFours?.attempted ?? 0, d4a);
   reconcile('assists', (p) => p.assists, box.assists);
   reconcile('steals', (p) => p.steals, box.steals);
   reconcile('blocks', (p) => p.blocks, box.blocks);

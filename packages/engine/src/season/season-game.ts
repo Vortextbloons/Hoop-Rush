@@ -44,6 +44,10 @@ import {
   type PlannerRotationContext,
 } from './rotation-planner.ts';
 import { seasonHomeCourtMechanisms } from './home-court.ts';
+import { FIRST_TO_SEVEN_SAFETY_POSSESSIONS } from '../sim/evolution-rules.ts';
+import { FirstToSevenOvertimeExhaustedError } from '../sim/evolution-rules.ts';
+import { createRng } from '../sim/rng.ts';
+import { seasonNamespaceSeed, SEASON_COURT_INNOVATION_VERSION } from '@hoop-rush/data-contracts';
 import { createSeasonEffectsBuffer, type SeasonEffectsBuffer } from './effects.ts';
 const CHECKPOINT_MARKS: readonly number[] = [660, 600, 540, 480, 420, 360, 300, 240, 180, 120, 60];
 export interface SeasonGameAvailabilitySeam {
@@ -242,6 +246,16 @@ class SeasonGameController {
   private readonly effectsMode: SeasonGameEffectsMode | null;
   private readonly prepCache = new Map<string, TeamPrep>();
   private offense: SideIndex = 0;
+  private readonly gameRule: import('@hoop-rush/data-contracts').SeasonGameRule;
+  private otElapsed = 0;
+  private otPossessions = 0;
+  private otEventOrder = 0;
+  private otLastPlanElapsed = 0;
+  private otBoundaryElapsed = 0;
+  private otStints: {
+    home: { unit: string[]; elapsedStart: number } | null;
+    away: { unit: string[]; elapsedStart: number } | null;
+  } = { home: null, away: null };
   private secondsRemaining = REGULATION_PERIOD_SECONDS;
   private period = 1;
   private boundaryClock = 0;
@@ -253,7 +267,10 @@ class SeasonGameController {
     effectsMode: SeasonGameEffectsMode | null = null,
   ) {
     this.input = input;
+    this.gameRule = input.gameRule ?? 'standard';
     this.context = context;
+    this.input = input;
+    this.gameRule = input.gameRule ?? 'standard';
     this.profile = input.profile;
     this.rng = context.rngFactory(input.seed);
     this.recorder = new GameRecorder([10, 10]);
@@ -282,6 +299,7 @@ class SeasonGameController {
       seasonHomeCourtMechanisms(input.homeCourt),
       effectsMode?.buffer.hook,
     );
+    this.tripContext.gameRule = this.gameRule;
     this.removalQueue = [...seam.removals].sort(compareQueueEntries);
     this.returnQueue = [...seam.returns].sort(compareQueueEntries);
   }
@@ -310,6 +328,13 @@ class SeasonGameController {
         this.state.periodFouls = [0, 0];
         this.tripContext.possessionStart = 'neutral';
         if (this.period === 3) this.effectsMode?.buffer.hook.halftime();
+        if (
+          this.period === 5 &&
+          this.gameRule === 'first-to-seven-overtime' &&
+          this.recorder.sides[0].points === this.recorder.sides[1].points
+        ) {
+          return this.exitWithEffects(this.runOvertimeRace());
+        }
       }
       this.home.resetCheckpoints();
       this.away.resetCheckpoints();
@@ -400,6 +425,283 @@ class SeasonGameController {
       }
     } while (!step.periodEnded && !step.finished);
     return { step, forfeit: null };
+  }
+  private static readonly OVERTIME_RACE_CLOCK = 1000000;
+  private runOvertimeRace(): SeasonGameSimulationResult {
+    const race = { home: 0, away: 0, target: 7, decided: null as 'home' | 'away' | null };
+    this.tripContext.race = race;
+    this.period = 5;
+    this.state.periodIndex = 4;
+    const tipSeed = seasonNamespaceSeed(this.input.seed, 'overtime-tip');
+    this.offense = createRng(tipSeed).chance(0.5) ? 0 : 1;
+    this.tripContext.possessionStart = 'neutral';
+    this.otElapsed = 0;
+    this.otPossessions = 0;
+    this.otEventOrder = 0;
+    this.otLastPlanElapsed = 0;
+    this.otBoundaryElapsed = 0;
+    this.home.stint = null;
+    this.away.stint = null;
+    this.otStints = {
+      home: { unit: [...this.home.unit], elapsedStart: 0 },
+      away: { unit: [...this.away.unit], elapsedStart: 0 },
+    };
+    for (;;) {
+      if (this.otPossessions > FIRST_TO_SEVEN_SAFETY_POSSESSIONS) {
+        throw new FirstToSevenOvertimeExhaustedError(this.otPossessions, race.home, race.away);
+      }
+      this.state.secondsRemaining = SeasonGameController.OVERTIME_RACE_CLOCK;
+      const trip = this.driveOneOvertimeTrip();
+      if (trip.forfeit !== null) return trip.forfeit;
+      this.otElapsed += SeasonGameController.OVERTIME_RACE_CLOCK - this.state.secondsRemaining;
+      this.processOvertimeBoundary(true);
+      if (trip.step.ended) {
+        this.otPossessions += 1;
+        this.offense = (1 - this.offense) as SideIndex;
+      }
+      if (race.decided) break;
+    }
+    this.closeOvertimeStints();
+    return this.buildResult(race);
+  }
+  private driveOneOvertimeTrip(): {
+    step: PossessionStep;
+    forfeit: SeasonGameSimulationResult | null;
+  } {
+    const machine = new PossessionStepper(this.tripContext, this.offense);
+    let step: PossessionStep = { ended: false, pause: false, periodEnded: false, finished: false };
+    do {
+      step = machine.step();
+      if (step.pause) {
+        const forfeit = this.processOvertimeBoundary(false);
+        if (forfeit !== null) return { step, forfeit };
+      }
+    } while (!step.finished);
+    return { step, forfeit: null };
+  }
+  private overtimeElapsedFloat(): number {
+    return (
+      this.otElapsed + (SeasonGameController.OVERTIME_RACE_CLOCK - this.state.secondsRemaining)
+    );
+  }
+  private distributeOvertimeMinutes(): void {
+    const nowFloor = Math.floor(this.overtimeElapsedFloat());
+    const delta = nowFloor - this.otBoundaryElapsed;
+    if (delta <= 0) return;
+    for (const side of [this.home, this.away]) {
+      for (const playerVersionId of side.unit) {
+        const rosterIndex = side.rosterIndexByVersion.get(playerVersionId);
+        if (rosterIndex === undefined) continue;
+        this.recorder.playSeconds(side.sideIndex, rosterIndex, delta);
+      }
+      this.effectsMode?.buffer.hook.recordStintSeconds(side.sideIndex, delta, side.unit);
+    }
+    this.otBoundaryElapsed = nowFloor;
+  }
+  private processOvertimeBoundary(final: boolean): SeasonGameSimulationResult | null {
+    this.distributeOvertimeMinutes();
+    const elapsedFloor = Math.floor(this.overtimeElapsedFloat());
+    for (const side of [this.home, this.away]) {
+      side.boundaryEvents = { foulOuts: 0, removals: 0, returns: 0 };
+      side.changedThisBoundary = false;
+    }
+    this.applyOvertimeRemovals(elapsedFloor);
+    this.applyOvertimeReturns(elapsedFloor);
+    this.applyOvertimeFoulOuts(this.home, elapsedFloor);
+    this.applyOvertimeFoulOuts(this.away, elapsedFloor);
+    if (final) return null;
+    if (this.tripContext.race?.decided) return null;
+    const minuteCheck = elapsedFloor - this.otLastPlanElapsed >= 60;
+    for (const side of [this.home, this.away]) {
+      const events =
+        side.boundaryEvents.foulOuts + side.boundaryEvents.removals + side.boundaryEvents.returns;
+      if (events === 0 && !minuteCheck) continue;
+      const unit = planUnit(
+        side.planner,
+        {
+          side: side.side,
+          currentUnit: side.unit,
+          unavailable: side.unavailable,
+          actualSeconds: side.regulationSeconds,
+          period: 5,
+          secondsRemaining: 0,
+          closingWindow: false,
+          scoreMargin: this.scoreMargin(),
+        },
+        { candidates: this.cachedCandidates(side) },
+      );
+      if (unit === null) {
+        return this.forfeitResult(side, 'no-legal-five-after-removal');
+      }
+      const reason: SeasonSubstitutionReason =
+        side.boundaryEvents.foulOuts > 0
+          ? 'foul-out'
+          : side.boundaryEvents.removals > 0
+            ? 'injected-injury-removal'
+            : 'rotation-plan';
+      this.applyOvertimeSubstitution(side, unit, elapsedFloor, reason);
+    }
+    if (minuteCheck) this.otLastPlanElapsed = elapsedFloor;
+    return null;
+  }
+  private applyOvertimeRemovals(elapsedFloor: number): void {
+    for (let index = 0; index < this.removalQueue.length;) {
+      const removal = this.removalQueue[index];
+      if (removal === undefined || removal.period < 5) {
+        index += 1;
+        continue;
+      }
+      const dueElapsed = (removal.period - 5) * 300 + (300 - removal.secondsRemaining);
+      if (elapsedFloor < dueElapsed) {
+        index += 1;
+        continue;
+      }
+      this.removalQueue.splice(index, 1);
+      const side = removal.side === 'home' ? this.home : this.away;
+      side.removed.add(removal.playerVersionId);
+      side.unavailable.add(removal.playerVersionId);
+      side.causesFor(removal.playerVersionId).add('injected-injury-removal');
+      side.removalEvents.push({
+        side: removal.side,
+        playerVersionId: removal.playerVersionId,
+        period: 5,
+        secondsRemaining: 0,
+        reason: removal.reason,
+        clockKind: 'untimed' as const,
+        elapsedSeconds: elapsedFloor,
+        eventOrder: this.otEventOrder++,
+      });
+      side.boundaryEvents.removals += 1;
+    }
+  }
+  private applyOvertimeReturns(elapsedFloor: number): void {
+    for (let index = 0; index < this.returnQueue.length;) {
+      const ret = this.returnQueue[index];
+      if (ret === undefined || ret.period < 5) {
+        index += 1;
+        continue;
+      }
+      const dueElapsed = (ret.period - 5) * 300 + (300 - ret.secondsRemaining);
+      if (elapsedFloor < dueElapsed) {
+        index += 1;
+        continue;
+      }
+      this.returnQueue.splice(index, 1);
+      const side = ret.side === 'home' ? this.home : this.away;
+      if (side.fouledOut.has(ret.playerVersionId)) continue;
+      side.removed.delete(ret.playerVersionId);
+      side.unavailable.delete(ret.playerVersionId);
+      side.causesFor(ret.playerVersionId).add('injury-return');
+      side.returnEvents.push({
+        side: ret.side,
+        playerVersionId: ret.playerVersionId,
+        period: 5,
+        secondsRemaining: 0,
+        reason: ret.reason,
+        clockKind: 'untimed' as const,
+        elapsedSeconds: elapsedFloor,
+        eventOrder: this.otEventOrder++,
+      });
+      side.boundaryEvents.returns += 1;
+    }
+  }
+  private applyOvertimeFoulOuts(side: SideState, elapsedFloor: number): void {
+    for (const playerVersionId of side.unit) {
+      if (side.fouledOut.has(playerVersionId)) continue;
+      const rosterIndex = side.rosterIndexByVersion.get(playerVersionId);
+      const record =
+        rosterIndex === undefined ? undefined : this.recorder.players[side.sideIndex][rosterIndex];
+      if (record === undefined) continue;
+      if (record.fouls >= 6) {
+        side.fouledOut.add(playerVersionId);
+        side.unavailable.add(playerVersionId);
+        side.causesFor(playerVersionId).add('foul-out');
+        side.foulOutEvents.push({
+          side: side.side,
+          playerVersionId,
+          period: 5,
+          secondsRemaining: 0,
+          clockKind: 'untimed' as const,
+          elapsedSeconds: elapsedFloor,
+          eventOrder: this.otEventOrder++,
+        });
+        side.boundaryEvents.foulOuts += 1;
+      }
+    }
+  }
+  private applyOvertimeSubstitution(
+    side: SideState,
+    planned: readonly string[],
+    elapsedFloor: number,
+    reason: SeasonSubstitutionReason,
+  ): void {
+    const oldUnit = side.unit;
+    if (sameUnit(planned, oldUnit)) {
+      side.changedThisBoundary = false;
+      return;
+    }
+    const oldSet = new Set(oldUnit);
+    const newSet = new Set(planned);
+    const outs = oldUnit.filter((id) => !newSet.has(id));
+    const ins = planned.filter((id) => !oldSet.has(id));
+    let changes = 0;
+    for (let i = 0; i < outs.length; i += 1) {
+      const out = outs[i];
+      const inn = ins[i];
+      if (out === undefined || inn === undefined) continue;
+      changes += 1;
+      side.causesFor(out).add('dead-ball-timing');
+      side.causesFor(inn).add('dead-ball-timing');
+      side.substitutions.push({
+        side: side.side,
+        period: 5,
+        secondsRemaining: 0,
+        playerIn: inn,
+        playerOut: out,
+        reason,
+        unit: [...planned],
+        clockKind: 'untimed' as const,
+        elapsedSeconds: elapsedFloor,
+        eventOrder: this.otEventOrder++,
+      });
+    }
+    side.changedThisBoundary = changes > 0;
+    if (changes > 0) {
+      this.closeOvertimeStint(side);
+      side.unit = [...planned];
+      this.activateUnit(side);
+      this.openOvertimeStint(side);
+    }
+  }
+  private openOvertimeStint(side: SideState): void {
+    const key = side.side === 'home' ? 'home' : 'away';
+    this.otStints[key] = {
+      unit: [...side.unit],
+      elapsedStart: Math.floor(this.overtimeElapsedFloat()),
+    };
+  }
+  private closeOvertimeStint(side: SideState): void {
+    const key = side.side === 'home' ? 'home' : 'away';
+    const open = this.otStints[key];
+    if (open === null) return;
+    const elapsedEnd = Math.floor(this.overtimeElapsedFloat());
+    side.stints.push({
+      side: side.side,
+      period: 5,
+      startSecondsRemaining: 0,
+      endSecondsRemaining: 0,
+      durationSeconds: Math.max(0, elapsedEnd - open.elapsedStart),
+      players: [...open.unit],
+      clockKind: 'untimed' as const,
+      elapsedStartSeconds: open.elapsedStart,
+      elapsedEndSeconds: elapsedEnd,
+      eventOrder: this.otEventOrder++,
+    });
+    this.otStints[key] = null;
+  }
+  private closeOvertimeStints(): void {
+    this.closeOvertimeStint(this.home);
+    this.closeOvertimeStint(this.away);
   }
   private processBoundary(periodEnded: boolean): SeasonGameSimulationResult | null {
     const period = this.period;
@@ -808,14 +1110,22 @@ class SeasonGameController {
       engineVersion: this.context.engineVersion,
       profileVersion: this.profile.profileVersion,
       winner: homeWins ? 'home' : 'away',
+      ...(this.gameRule !== 'standard' ? { gameRule: this.gameRule } : {}),
+      ...(this.gameRule !== 'standard' ? { ruleVersion: SEASON_COURT_INNOVATION_VERSION } : {}),
       losingFranchiseId: loser.teamInput.franchiseId,
       trigger,
       homeScore: (homeWins ? 2 : 0) as 2,
       awayScore: (homeWins ? 0 : 2) as 0,
     };
   }
-  private buildResult(): SeasonGameSimulationResult {
-    const overtimePeriods = overtimePeriodsOf(this.recorder.sides[0].periodPoints.length);
+  private buildResult(race?: {
+    home: number;
+    away: number;
+    target: number;
+  }): SeasonGameSimulationResult {
+    const overtimePeriods = race
+      ? 1
+      : overtimePeriodsOf(this.recorder.sides[0].periodPoints.length);
     const homeScore = this.recorder.sides[0].points;
     const awayScore = this.recorder.sides[1].points;
     if (homeScore === awayScore) {
@@ -834,6 +1144,18 @@ class SeasonGameController {
       profileVersion: this.profile.profileVersion,
       winner,
       overtimePeriods,
+      ...(this.gameRule !== 'standard' ? { gameRule: this.gameRule } : {}),
+      ...(this.gameRule !== 'standard' ? { ruleVersion: SEASON_COURT_INNOVATION_VERSION } : {}),
+      ...(race
+        ? {
+            overtimeRace: {
+              target: 7 as const,
+              homePoints: race.home,
+              awayPoints: race.away,
+              possessions: this.otPossessions,
+            },
+          }
+        : {}),
       home: this.sideResult(0, this.home),
       away: this.sideResult(1, this.away),
       substitutions: [...this.home.substitutions, ...this.away.substitutions],

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { franchiseIdSchema } from './ids.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import {
+  SEASON_AGGREGATES_LEGACY_VERSION,
   SEASON_AGGREGATES_VERSION,
   SEASON_LEADER_DEPTH,
   SEASON_LEADER_MIN_GAME_SHARE,
@@ -28,6 +29,8 @@ export const seasonTeamAggregateSchema = z.object({
   turnovers: z.number().int().nonnegative(),
   fouls: z.number().int().nonnegative(),
   possessions: z.number().int().nonnegative(),
+  fourPointersMade: z.number().int().nonnegative().optional(),
+  fourPointersAttempted: z.number().int().nonnegative().optional(),
 });
 export type SeasonTeamAggregate = z.infer<typeof seasonTeamAggregateSchema>;
 export function emptySeasonTeamAggregate(franchiseId: string): SeasonTeamAggregate {
@@ -61,6 +64,8 @@ export const seasonPlayerAggregateSchema = z.object({
   started: z.number().int().nonnegative(),
   seconds: z.number().int().nonnegative(),
   points: z.number().int().nonnegative(),
+  fourPointersMade: z.number().int().nonnegative().optional(),
+  fourPointersAttempted: z.number().int().nonnegative().optional(),
   fieldGoalsMade: z.number().int().nonnegative(),
   fieldGoalsAttempted: z.number().int().nonnegative(),
   threePointersMade: z.number().int().nonnegative(),
@@ -137,7 +142,10 @@ export const seasonLeadersSchema = z.object({
 export type SeasonLeaders = z.infer<typeof seasonLeadersSchema>;
 export const seasonAggregatesSchema = z.object({
   schemaVersion: z.literal(1),
-  aggregatesVersion: z.literal(SEASON_AGGREGATES_VERSION),
+  aggregatesVersion: z.union([
+    z.literal(SEASON_AGGREGATES_VERSION),
+    z.literal(SEASON_AGGREGATES_LEGACY_VERSION),
+  ]),
   teams: z.array(seasonTeamAggregateSchema).length(SEASON_TEAM_COUNT),
   players: z
     .array(seasonPlayerAggregateSchema)

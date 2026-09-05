@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "targetsVersion": "franchise-evolution-targets-v1",
+  "frontOfficeVersion": "season-front-office-v1",
+  "courtInnovationVersion": "season-court-innovation-v1",
+  "cohort": {
+    "seedFrom": 0,
+    "seedTo": 63
+  },
+  "heldOut": {
+    "seedFrom": 64,
+    "seedTo": 79
+  },
+  "measured": {
+    "gamesPerRule": {
+      "standard": 192,
+      "deep-four": 192,
+      "twenty-second-clock": 192
+    },
+    "accountingViolations": 0,
+    "auditFailures": 0,
+    "determinismFailures": 0,
+    "meanPointsPerRule": {
+      "standard": 201.97916666666666,
+      "deep-four": 201.46354166666666,
+      "twenty-second-clock": 235.96354166666666
+    },
+    "meanPossessionsPerRule": {
+      "standard": 172.859375,
+      "deep-four": 172.18229166666666,
+      "twenty-second-clock": 201.78125
+    },
+    "deepAttemptShare": 0.021446504733960495,
+    "deepMakes": 189,
+    "racesCompleted": 4,
+    "raceOvershootGames": 1,
+    "sponsorWrapRate": 0.49609375,
+    "sponsorWraps": 254,
+    "aiSelections": 30,
+    "aiDeterminismFailures": 0
+  },
+  "gates": {
+    "zeroAccountingViolations": true,
+    "zeroAuditFailures": true,
+    "deterministicReplay": true,
+    "racesComplete": true,
+    "sponsorRateWithinEnvelope": true
+  }
+}

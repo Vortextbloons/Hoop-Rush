@@ -100,6 +100,7 @@ import {
   type SeasonTeamBox,
   fnv1a32,
   buildEmptyCampaignState,
+  normalizeEvolutionState,
   seasonDigestHex,
   seedFromString,
 } from '@hoop-rush/data-contracts';
@@ -1162,6 +1163,9 @@ export function buildFixtureStateDigest(
     trade: overrides.trade ?? run.trade,
     objectives: overrides.objectives ?? run.objectives,
     campaign: overrides.campaign ?? run.campaign ?? buildEmptyCampaignState(),
+    evolution: normalizeEvolutionState(
+      overrides.evolution ?? (run as { evolution?: unknown }).evolution,
+    ),
     rosters: overrides.rosters ?? run.rosters,
     ownership: overrides.ownership ?? run.ownership,
     rotations: overrides.rotations ?? run.rotations,

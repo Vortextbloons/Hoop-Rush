@@ -72,7 +72,7 @@ type EngineCommitOutput = ReturnType<typeof completeSeasonBlockCommit>;
 type EngineCommitInput = Parameters<typeof completeSeasonBlockCommit>[0];
 type FakeCommitOutput = Pick<
   EngineCommitOutput,
-  'checkpointState' | 'stateRevision' | 'stateDigest' | 'window' | 'freeAgency'
+  'checkpointState' | 'stateRevision' | 'stateDigest' | 'window' | 'freeAgency' | 'evolution'
 >;
 type _FakeSimulateInputParity = EngineSimulateBlockInput extends {
   command: {
@@ -170,6 +170,7 @@ declare global {
 }
 interface FakeM25CommitInput {
   health: SeasonHealthState;
+  evolution?: import('@hoop-rush/data-contracts').SeasonEvolutionState | null;
   transactions: SeasonTransactionEntry[];
   influence: SeasonInfluenceState;
   freeAgency: SeasonFreeAgencyState;
@@ -331,6 +332,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
           stateRevision: committed.stateRevision,
           stateDigest: committed.stateDigest,
           window: committed.window,
+          evolution: committed.evolution,
         });
         const committedView = this.committedSnapshot(
           startInput,
@@ -559,6 +561,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       stateDigest: string;
       window: SeasonWindowOpenResult | null;
       freeAgency: SeasonFreeAgencyState;
+      evolution: import('@hoop-rush/data-contracts').SeasonEvolutionState;
     } | null = null;
     const prior = await loadCurrentSnapshot(this.scheduleOf(input)).catch(() => null);
     try {
@@ -573,6 +576,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
         stateRevision: committed.stateRevision,
         stateDigest: committed.stateDigest,
         window: committed.window,
+        evolution: committed.evolution,
       });
     } catch (error) {
       if (this.isCancelled()) return;
@@ -748,10 +752,10 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       freeAgency: input.run.freeAgency,
       transactions: this.fakeTransactionsFor(input.blockIndex),
       objective: {
-        objectiveId: null,
-        success: null,
+        objectiveId: input.objectiveId ?? null,
+        success: input.objectiveId === null ? null : false,
         evaluation: {
-          objectiveId: 'win-six',
+          objectiveId: input.objectiveId ?? 'win-six',
           blockIndex: input.blockIndex,
           success: false,
           facts: {
@@ -801,14 +805,30 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       transactions: m25.transactions,
       influence: m25.influence,
       trade: null,
-      objectives: input.run.objectives,
+      objectives: this.objectivesWithBlockSuccess(input, checkpoint),
       checkpointState: m25.checkpointState,
       stateRevision: m25.stateRevision,
       stateDigest: m25.stateDigest,
       expectedStateRevision: input.run.stateRevision,
       expectedStateDigest: input.run.stateDigest,
       window: m25.window,
+      evolution: m25.evolution ?? input.run.evolution,
     });
+  }
+  private objectivesWithBlockSuccess(
+    input: SeasonBlockStartInput,
+    checkpoint: SeasonCandidateCheckpoint,
+  ): SeasonBlockStartInput['run']['objectives'] {
+    if (checkpoint.blockIndex === 8) return input.run.objectives;
+    const selection = input.run.objectives.selections[checkpoint.blockIndex];
+    if (selection === undefined) return input.run.objectives;
+    return {
+      ...input.run.objectives,
+      selections: {
+        ...input.run.objectives.selections,
+        [checkpoint.blockIndex]: { ...selection, success: checkpoint.objective.success },
+      },
+    };
   }
   private committedFacts(
     input: SeasonBlockStartInput,

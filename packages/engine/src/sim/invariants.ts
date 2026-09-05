@@ -34,7 +34,7 @@ export function checkGameResult(result: GameResult): string[] {
     }
     if (!accounting.pointsIdentityOk) {
       failures.push(
-        `${side}: points ${String(box.points)} != 2*2fg + 3*3fg + ft (${String(accounting.pointsIdentity)})`,
+        `${side}: points ${String(box.points)} != 2*2fg + 3*3fg + 4*4fg + ft (${String(accounting.pointsIdentity)})`,
       );
     }
     if (accounting.makesExceed.includes('fieldGoal')) {
@@ -45,6 +45,9 @@ export function checkGameResult(result: GameResult): string[] {
     }
     if (accounting.makesExceed.includes('freeThrow')) {
       failures.push(`${side}: free-throw makes exceed attempts`);
+    }
+    if (accounting.makesExceed.includes('deepFour')) {
+      failures.push(`${side}: deep-four makes exceed attempts`);
     }
     if (accounting.assistsExceedMade) failures.push(`${side}: assists exceed made field goals`);
     if (!accounting.reboundBucketsOk) {

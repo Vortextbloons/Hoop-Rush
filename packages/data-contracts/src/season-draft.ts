@@ -4,6 +4,8 @@ import { playerVersionIdSchema } from './season-identity.ts';
 import { SEASON_DRAFT_LEGACY_VERSION, SEASON_DRAFT_VERSION } from './season-versions.ts';
 import { seasonLeagueSchema } from './season-league.ts';
 import { seasonDraftCommandRecordSchema } from './season-draft-command.ts';
+import { seasonFrontOfficeIdSchema } from './season-evolution.ts';
+import { SEASON_FRONT_OFFICE_VERSION } from './season-versions.ts';
 import { seasonDraftOfferSchema } from './season-draft-offer.ts';
 export const seasonDraftParticipantSchema = z.object({
   participantId: z.string().min(1).max(64),
@@ -39,6 +41,14 @@ export const seasonDraftStateSchema = z.object({
   offers: z.array(seasonDraftOfferSchema),
   picks: z.array(seasonDraftPickSchema),
   commandLog: z.array(seasonDraftCommandRecordSchema),
+  frontOffice: z
+    .object({
+      executiveId: seasonFrontOfficeIdSchema,
+      version: z.literal(SEASON_FRONT_OFFICE_VERSION),
+      selectedByCommandId: z.string().min(1).max(64),
+    })
+    .nullable()
+    .optional(),
 });
 export type SeasonDraftState = z.infer<typeof seasonDraftStateSchema>;
 export const seasonDraftRollAttemptSchema = z.object({

@@ -4,6 +4,8 @@
   import type { RouteId } from '$app/types';
   import { blockRoundRange } from '@hoop-rush/data-contracts';
   import BlockProgress from '$lib/components/season/BlockProgress.svelte';
+  import CourtInnovationPicker from '$lib/components/season/CourtInnovationPicker.svelte';
+  import RuleBadge from '$lib/components/season/RuleBadge.svelte';
   import CampaignPanel from '$lib/components/season/CampaignPanel.svelte';
   import ChampionSummary from '$lib/components/season/ChampionSummary.svelte';
   import HealthStrip from '$lib/components/season/HealthStrip.svelte';
@@ -59,6 +61,7 @@
     riskyRehabOptionsOf,
   } from '$lib/season/season-postseason-presentation';
   import { ordinal } from '$lib/season/season-presentation';
+  import { homeRuleOf } from '$lib/season/season-evolution-view';
   import { parsePlayoffGameId } from '@hoop-rush/data-contracts';
   import type { SeasonRunCommandError } from '$lib/season/season-hub-state';
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
@@ -95,7 +98,13 @@
   );
   const influenceVm = $derived(
     shell.influence !== null && humanFranchiseId !== null
-      ? influenceViewModel(shell.influence, humanFranchiseId, shell.health, openWindow)
+      ? influenceViewModel(
+          shell.influence,
+          humanFranchiseId,
+          shell.health,
+          openWindow,
+          evolution?.frontOffice?.executiveId ?? null,
+        )
       : null,
   );
   const tradeOffers = $derived.by(() => {
@@ -126,6 +135,69 @@
       'evolve-gm-campaign',
     ]);
     return campaignCommands.has(e.command) ? e.message : null;
+  });
+  const innovationCommandError = $derived.by(() => {
+    const e = commandError;
+    if (e === null) return null;
+    return e.command === 'select-court-innovation' ? e.message : null;
+  });
+  const evolution = $derived(
+    (
+      run as unknown as {
+        evolution?: import('@hoop-rush/data-contracts').SeasonEvolutionState | null;
+      } | null
+    )?.evolution ?? null,
+  );
+  const needsInnovation = $derived(
+    run !== null &&
+      humanFranchiseId !== null &&
+      evolution?.discovery !== null &&
+      evolution?.discovery !== undefined &&
+      (evolution?.selections as unknown as Record<string, unknown> | undefined)?.[
+        humanFranchiseId
+      ] === undefined,
+  );
+  let innovationPreviews = $state<
+    import('$lib/season/season-innovation-preview').InnovationEnvironmentPreview[] | null
+  >(null);
+  let innovationPreviewNote = $state<string | null>(null);
+  $effect(() => {
+    if (!mounted || !needsInnovation || run === null || humanFranchiseId === null) return;
+    let cancelled = false;
+    innovationPreviews = null;
+    innovationPreviewNote = 'Loading scoring-environment previews…';
+    void (async () => {
+      try {
+        const [{ loadSeasonDraftCatalog, loadSeasonEraProfile }, previewModule] = await Promise.all(
+          [import('$lib/season/season-assets'), import('$lib/season/season-innovation-preview')],
+        );
+        const [catalog, profile] = await Promise.all([
+          loadSeasonDraftCatalog(),
+          loadSeasonEraProfile(),
+        ]);
+        if (cancelled || !mounted) return;
+        const result = previewModule.previewInnovationEnvironments({
+          run,
+          franchiseId: humanFranchiseId,
+          catalog,
+          profile,
+        });
+        if ('error' in result) {
+          innovationPreviewNote = result.error;
+          return;
+        }
+        innovationPreviews = result.previews;
+        innovationPreviewNote = `${result.unitLabel} · adapter ${result.previews[0]?.adapterVersion ?? 'unknown'}`;
+      } catch (error) {
+        if (!cancelled) {
+          innovationPreviewNote =
+            error instanceof Error ? error.message : 'Previews are unavailable.';
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   });
   const rehabAffordances = $derived.by((): InfluenceSpendAffordance[] => {
     const affordances = influenceVm?.affordances ?? [];
@@ -196,6 +268,7 @@
       humanFranchiseId,
       fatigue: effects === null ? null : { effects, staminaByVersion },
       objective: selectedObjective,
+      evolution: evolution ?? null,
     });
   });
   const rotationFailures = $derived(shell.editor?.validate() ?? []);
@@ -582,6 +655,19 @@
             />
           {/if}
 
+          {#if needsInnovation}
+            <CourtInnovationPicker
+              busy={block.phase === 'running'}
+              commandError={innovationCommandError}
+              previews={innovationPreviews}
+              previewNote={innovationPreviewNote}
+              onSelect={(input) => {
+                if (!mounted) return;
+                void shell.selectCourtInnovation?.(input);
+              }}
+            />
+          {/if}
+
           <div class="grid gap-4 lg:grid-cols-3">
             <div class="rounded-lg bg-surface-2 p-3">
               <h3
@@ -611,6 +697,9 @@
                         {game.humanIsHome ? 'vs' : 'at'}
                         {shell.franchiseName(game.opponentFranchiseId)}
                       </span>
+                      {#if run}
+                        <RuleBadge rule={homeRuleOf(run, game.homeFranchiseId)} compact />
+                      {/if}
                       <span
                         class="shrink-0 rounded-full bg-surface-3 px-2 py-0.5 font-mono text-[10px] text-muted-foreground"
                       >
@@ -683,7 +772,7 @@
                     Goal:
                     <strong class="text-foreground">{preview.objective.name}</strong>
                   </p>
-                {:else if nextBlockIndex !== null && nextBlockIndex < 8}
+                {:else if !hasCampaign && nextBlockIndex !== null && nextBlockIndex < 8}
                   <p class="mt-1 text-sm text-amber-600 dark:text-amber-400">
                     Pick a goal above, then play.
                   </p>
