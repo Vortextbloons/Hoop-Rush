@@ -125,6 +125,10 @@ import {
   SEASON_INFLUENCE_CALIBRATE_OPTIONS,
 } from './commands/season-influence.ts';
 import {
+  seasonChallengesCalibrate,
+  SEASON_CHALLENGES_CALIBRATE_OPTIONS,
+} from './commands/season-challenges.ts';
+import {
   seasonPostseasonAudit,
   SEASON_POSTSEASON_AUDIT_OPTIONS,
 } from './commands/season-postseason-audit.ts';
@@ -611,6 +615,19 @@ const COMMANDS: Record<string, CommandDef> = {
     options: { ...SEASON_INFLUENCE_CALIBRATE_OPTIONS, write: false },
     run: (args) =>
       seasonInfluenceCalibrate({
+        input: getOptionString(args, 'input') ?? null,
+        'seed-from': getOptionString(args, 'seed-from') ?? null,
+        'seed-to': getOptionString(args, 'seed-to') ?? null,
+        workers: getOptionString(args, 'workers') ?? null,
+        out: getOptionString(args, 'out') ?? null,
+        manifest: getOptionString(args, 'manifest') ?? null,
+        validate: getOptionString(args, 'validate') ?? null,
+      }),
+  },
+  'season challenges calibrate': {
+    options: { ...SEASON_CHALLENGES_CALIBRATE_OPTIONS, write: false },
+    run: (args) =>
+      seasonChallengesCalibrate({
         input: getOptionString(args, 'input') ?? null,
         'seed-from': getOptionString(args, 'seed-from') ?? null,
         'seed-to': getOptionString(args, 'seed-to') ?? null,

@@ -172,6 +172,70 @@ describe('season influence block grants', () => {
     });
     expect(explicit.entries[0]?.appliedAtStateRevision).toBe(17);
   });
+  it('pays each completed challenge in canonical order with its own challenge-reward entry', () => {
+    const { run, humanFranchiseId } = fixture();
+    const outcome = applySeasonBlockInfluenceGrants({
+      influence: run.influence,
+      blockIndex: 1,
+      humanFranchiseId,
+      challengeSuccesses: [
+        { challengeId: 'winning-block', success: true, reward: 1 },
+        { challengeId: 'beat-leader', success: true, reward: 2 },
+        { challengeId: 'take-care', success: false, reward: 1 },
+      ],
+    });
+    const rewards = outcome.influence.ledger.filter((entry) => entry.source === 'challenge-reward');
+    expect(rewards.map((entry) => entry.requestedDelta)).toEqual([2, 1]);
+    expect(
+      outcome.influence.ledger
+        .filter((entry) => entry.source === 'challenge-reward')
+        .map((entry) => entry.entryId),
+    ).toEqual([...rewards.map((entry) => entry.entryId)].sort());
+    expect(outcome.influence.balances[franchiseIdSchema.parse(humanFranchiseId)]).toBe(2 + 1 + 3);
+    expect(rewards[0]?.explanation).toContain('beat-leader');
+    expect(rewards[1]?.explanation).toContain('winning-block');
+    const txns = outcome.entries.filter((entry) => entry.type === 'challenge-reward');
+    expect(txns).toHaveLength(2);
+    expect(txns.map((entry) => entry.payload['challengeId']).sort()).toEqual([
+      'beat-leader',
+      'winning-block',
+    ]);
+  });
+  it('clamps a +2 hard reward at the +8 cap (banks +1 at balance 7, +0 at cap)', () => {
+    const { run, humanFranchiseId } = fixture();
+    let influence = run.influence;
+    for (let blockIndex = 0; blockIndex < 4; blockIndex += 1) {
+      influence = applySeasonBlockInfluenceGrants({
+        influence,
+        blockIndex,
+        humanFranchiseId,
+        challengeSuccesses: [],
+      }).influence;
+    }
+    expect(influence.balances[franchiseIdSchema.parse(humanFranchiseId)]).toBe(6);
+    const oneHeadroom = applySeasonBlockInfluenceGrants({
+      influence,
+      blockIndex: 4,
+      humanFranchiseId,
+      challengeSuccesses: [{ challengeId: 'beat-leader', success: true, reward: 2 }],
+    });
+    expect(oneHeadroom.influence.balances[franchiseIdSchema.parse(humanFranchiseId)]).toBe(8);
+    const clamped = oneHeadroom.influence.ledger.filter(
+      (entry) => entry.source === 'challenge-reward',
+    );
+    expect(clamped[clamped.length - 1]?.requestedDelta).toBe(2);
+    expect(clamped[clamped.length - 1]?.appliedDelta).toBe(1);
+    const atCap = applySeasonBlockInfluenceGrants({
+      influence: oneHeadroom.influence,
+      blockIndex: 6,
+      humanFranchiseId,
+      challengeSuccesses: [{ challengeId: 'statement-block', success: true, reward: 2 }],
+    });
+    const last = atCap.influence.ledger.filter((entry) => entry.source === 'challenge-reward');
+    expect(last[last.length - 1]?.appliedDelta).toBe(0);
+    expect(last[last.length - 1]?.explanation).toContain('cap');
+    expect(atCap.influence.balances[franchiseIdSchema.parse(humanFranchiseId)]).toBe(8);
+  });
 });
 describe('season influence spends', () => {
   it('applies an extra-trade-offer spend, tracks the window, and reconciles', () => {

@@ -60,7 +60,8 @@ export interface SeasonRunStateDigestFacts {
   influence: SeasonInfluenceState;
   transactions: readonly SeasonTransactionEntry[];
   trade: SeasonTradeState | null;
-  objectives: SeasonObjectiveState;
+  objectives?: SeasonObjectiveState | null;
+  challenges?: import('@hoop-rush/data-contracts').SeasonChallengeState | null;
   campaign?: SeasonCampaignState | null;
   evolution?: SeasonEvolutionState | null;
   rosters: readonly SeasonRoster[];

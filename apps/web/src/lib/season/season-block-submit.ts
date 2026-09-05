@@ -82,8 +82,7 @@ export async function buildSubmitBlockEnvelope(
   ).challenges;
   const challengeDeal: SeasonChallengeDeal | null =
     nextBlockIndex >= 8 ? null : (challenges?.deals[nextBlockIndex] ?? null);
-  const challengeIds =
-    challengeDeal !== null ? [...challengeDeal.challengeIds] : undefined;
+  const challengeIds = challengeDeal !== null ? [...challengeDeal.challengeIds] : undefined;
   const campaignState = (
     run as unknown as {
       campaign?: import('@hoop-rush/data-contracts').SeasonCampaignState;
@@ -156,9 +155,7 @@ export async function buildSubmitBlockEnvelope(
     rotationDigest,
     objectiveId: null,
     campaignOpportunityId: campaignOpportunityId,
-    ...(challengeIds !== undefined
-      ? { challengeIds: challengeIds as SeasonSubmitBlockCommand['challengeIds'] }
-      : {}),
+    ...(challengeIds !== undefined ? { challengeIds } : {}),
     expectedStateRevision: run.stateRevision,
     expectedStateDigest: run.stateDigest,
   };

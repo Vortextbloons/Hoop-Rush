@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   SEASON_CAMPAIGN_TARGETS_VERSION,
+  SEASON_CHALLENGE_TARGETS_VERSION,
   SEASON_EFFECT_TARGETS_LEGACY_VERSION,
   SEASON_EFFECT_TARGETS_VERSION,
   SEASON_FREE_AGENCY_TARGETS_VERSION,
@@ -1075,6 +1076,10 @@ export const seasonInfluenceCalibrateReportSchema = z.object({
   capViolations: z.number().int().nonnegative(),
   objectiveEvaluations: z.number().int().nonnegative(),
   objectiveSuccessRate: z.number().min(0).max(1).nullable(),
+  challengeEvaluations: z.number().int().nonnegative(),
+  challengeSuccessRate: z.number().min(0).max(1).nullable(),
+  expectedEarnedPerBlock: z.number().min(0).max(6).nullable(),
+  capClampedShare: z.number().min(0).max(1).nullable(),
   extraOfferSpendShare: z.number().min(0).max(1),
   extraOfferWindows: z.number().int().nonnegative(),
   rehabSpendShare: z.number().min(0).max(1),
@@ -1085,6 +1090,8 @@ export const seasonInfluenceCalibrateReportSchema = z.object({
     debtFrequency: z.boolean(),
     zeroCapViolations: z.boolean(),
     objectiveSuccessRate: z.boolean(),
+    expectedEarnedPerBlock: z.boolean(),
+    capClampedShare: z.boolean(),
     extraOfferSpendRate: z.boolean(),
     rehabSpendRate: z.boolean(),
     heldOut: z.boolean(),
@@ -1101,6 +1108,37 @@ export const seasonInfluenceCalibrateReportSchema = z.object({
   durationMs: z.number().nonnegative(),
 });
 export type SeasonInfluenceCalibrateReport = z.infer<typeof seasonInfluenceCalibrateReportSchema>;
+export const seasonChallengesCalibrateReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('season challenges calibrate'),
+  targetsVersion: z.literal(SEASON_CHALLENGE_TARGETS_VERSION),
+  calibrationSeeds: z.number().int().nonnegative(),
+  validationSeeds: z.number().int().nonnegative(),
+  seasonsSimulated: z.number().int().nonnegative(),
+  blocksDealt: z.number().int().nonnegative(),
+  dealCompleteness: z.number().min(0).max(1),
+  canonicalOrderShare: z.number().min(0).max(1),
+  replayStabilityShare: z.number().min(0).max(1),
+  hardFeasibleShare: z.number().min(0).max(1),
+  dealFrequency: z.record(z.string(), z.number().min(0).max(1)),
+  completionRate: z.record(z.string(), z.number().min(0).max(1).nullable()),
+  expectedEarnedPerBlock: z.number().min(0).max(6).nullable(),
+  threePointSufficiency: z.number().min(0).max(1).nullable(),
+  threePointEvaluations: z.number().int().nonnegative(),
+  gates: z.object({
+    dealCompleteness: z.boolean(),
+    canonicalOrder: z.boolean(),
+    replayStability: z.boolean(),
+    threePointSufficiency: z.boolean(),
+    heldOut: z.boolean(),
+  }),
+  metrics: z.array(seasonM25GateSchema),
+  skippedGates: z.array(z.string().min(1)),
+  targetsWritten: z.boolean(),
+  targetsPath: z.string().nullable(),
+  durationMs: z.number().nonnegative(),
+});
+export type SeasonChallengesCalibrateReport = z.infer<typeof seasonChallengesCalibrateReportSchema>;
 export const seasonRunReproduceReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season run reproduce'),

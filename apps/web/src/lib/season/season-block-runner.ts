@@ -671,9 +671,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         influence: window !== null ? window.influence : authoritative.influence,
         trade: window !== null ? window.trade : state.input.run.trade,
         objectives,
-        challenges: challenges as unknown as Parameters<
-          typeof repository.commitSeasonBlock
-        >[0]['challenges'],
+        challenges,
         campaign,
         evolution: committed.evolution,
         checkpointState: committed.checkpointState,
@@ -1251,7 +1249,7 @@ export function assembleCommittedSnapshot(input: {
       }
     ).campaign ??
     null;
-  const postCommitRun: SeasonRun = {
+  const postCommitRun = {
     ...run,
     rosters: window !== null ? window.rosters : run.rosters,
     ownership: window !== null ? window.ownership : run.ownership,
@@ -1264,13 +1262,14 @@ export function assembleCommittedSnapshot(input: {
     trade: window !== null ? window.trade : run.trade,
     freeAgency: input.freeAgency,
     objectives,
-    challenges: (challenges ?? (run as unknown as { challenges?: unknown }).challenges) as unknown as SeasonRun['challenges'],
-    campaign: campaign as unknown as SeasonRun['campaign'],
+    challenges:
+      challenges ?? (run as unknown as { challenges?: SeasonRun['challenges'] }).challenges,
+    campaign,
     evolution: input.evolution ?? run.evolution,
     checkpointState: input.checkpointState,
     stateRevision: input.stateRevision,
     stateDigest: input.stateDigest,
-  };
+  } as unknown as SeasonRun;
   const newDetails = dedupeNewByGameId(input.priorRetainedDetails, checkpoint.retainedDetails);
   const summaries = mergeSortedSummaries(input.priorSummaries, checkpoint.gameSummaries);
   const retainedDetails = mergeSortedDetails(input.priorRetainedDetails, newDetails);
@@ -1298,7 +1297,7 @@ function objectivesWithSuccess(
   run: SeasonRun,
   checkpoint: SeasonCandidateCheckpoint,
 ): SeasonObjectiveState | undefined {
-  const objectives = run.objectives;
+  const objectives = run.objectives as SeasonObjectiveState | undefined;
   if (objectives === undefined) return undefined;
   if (checkpoint.blockIndex === 8) return objectives;
   const selection = objectives.selections[checkpoint.blockIndex];
@@ -1316,9 +1315,9 @@ function challengesWithSuccess(
   checkpoint: SeasonCandidateCheckpoint,
 ): SeasonRun['challenges'] {
   const base = (run as unknown as { challenges?: SeasonRun['challenges'] }).challenges;
-  if (base === undefined || base === null) return base;
-  if (checkpoint.challenges === undefined || checkpoint.challenges === null) return base;
+  if (base == null) return base;
   const evaluation = checkpoint.challenges;
+  if (evaluation == null) return base;
   if (base.evaluations.some((entry) => entry.blockIndex === evaluation.blockIndex)) return base;
   return {
     ...base,

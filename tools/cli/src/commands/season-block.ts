@@ -3,6 +3,7 @@ import {
   humanFranchiseIdOf,
   SEASON_BLOCK_COUNT,
   SEASON_BLOCK_VERSION,
+  SEASON_COURT_INNOVATION_VERSION,
   SEASON_RUN_SCHEMA_VERSION,
   commandIdSchema,
   seasonCandidateCheckpointSchema,
@@ -10,6 +11,7 @@ import {
   seasonScheduleSchema,
   type EraSimulationProfile,
   type SeasonCandidateCheckpoint,
+  type SeasonChallengeDeal,
   type SeasonCheckpointState,
   type SeasonDraftCatalog,
   type SeasonGamePlayerInput,
@@ -25,7 +27,9 @@ import {
   auditSeasonBlock,
   buildEvolutionDataSource,
   createSeasonEffectsState,
+  dealSeasonBlockChallenges,
   deriveSeasonPostBlockState,
+  evolutionSelectionGate,
   expandSeasonRunRosters,
   handleSubmitSeasonBlockCommand,
   rosterPlayerIdsOf,
@@ -88,6 +92,7 @@ export interface SeasonBlockRunnerState {
   effects: SeasonEffectsState;
   health: SeasonHealthState;
   objectiveId: SeasonObjectiveId | null;
+  challengeDeal?: SeasonChallengeDeal | null;
   checkpointState: SeasonCheckpointState | null;
   stateRevision: number;
   stateDigest: string;
@@ -132,6 +137,12 @@ export function createSeasonBlockRunner(
     effects: initialEffectsState(expanded),
     health: run.health,
     objectiveId: null,
+    challengeDeal:
+      (
+        run as unknown as {
+          challenges?: { deals?: Record<string, SeasonChallengeDeal | undefined> } | null;
+        }
+      ).challenges?.deals?.['0'] ?? null,
     checkpointState: run.checkpointState,
     stateRevision: run.stateRevision,
     stateDigest: run.stateDigest,
@@ -158,10 +169,55 @@ export function runnerNextBlockIndex(state: SeasonBlockRunnerState): number {
   }
   return next;
 }
+export function ensureChallengeDeal(state: SeasonBlockRunnerState, blockIndex: number): void {
+  if (blockIndex < 0 || blockIndex > 7 || state.humanFranchiseId === null) {
+    state.challengeDeal = null;
+    return;
+  }
+  const existing = (
+    state.run as unknown as {
+      challenges?: { deals?: Record<string, SeasonChallengeDeal | undefined> } | null;
+    }
+  ).challenges?.deals?.[String(blockIndex)];
+  if (existing !== undefined) {
+    state.challengeDeal = existing;
+    return;
+  }
+  const deal = dealSeasonBlockChallenges(state.run.rootSeed, blockIndex, {
+    league: state.run.league,
+    schedule: state.schedule,
+    standings: state.run.standings,
+    humanFranchiseId: state.humanFranchiseId,
+  });
+  state.challengeDeal = deal;
+  if (deal !== null) {
+    const challenges = (
+      state.run as unknown as {
+        challenges?: {
+          schemaVersion: 1;
+          challengeVersion: string;
+          catalog: unknown[];
+          deals: Record<string, unknown>;
+          evaluations: unknown[];
+        } | null;
+      }
+    ).challenges;
+    if (challenges !== undefined && challenges !== null) {
+      state.run = {
+        ...state.run,
+        challenges: {
+          ...challenges,
+          deals: { ...challenges.deals, [blockIndex]: deal },
+        },
+      } as SeasonRun;
+    }
+  }
+}
 export function runnerBlockCommand(
   state: SeasonBlockRunnerState,
   blockIndex: number,
 ): SeasonSubmitBlockCommand {
+  const challengeDeal = state.challengeDeal ?? null;
   return {
     schemaVersion: SEASON_RUN_SCHEMA_VERSION,
     blockVersion: SEASON_BLOCK_VERSION,
@@ -174,6 +230,7 @@ export function runnerBlockCommand(
     blockIndex,
     rotationDigest: seasonRotationSetDigest(state.run.rotations),
     objectiveId: state.objectiveId,
+    ...(challengeDeal !== null ? { challengeIds: [...challengeDeal.challengeIds] } : {}),
     expectedStateRevision: state.stateRevision,
     expectedStateDigest: state.stateDigest,
   };
@@ -195,12 +252,46 @@ export function runnerPipelineInput(
     effects: state.effects,
     health: state.health,
     objectiveId: state.objectiveId,
+    challengeDeal: state.challengeDeal ?? null,
   };
+}
+export function ensureEvolutionSelection(state: SeasonBlockRunnerState, blockIndex: number): void {
+  if (blockIndex < 3 || state.humanFranchiseId === null) return;
+  const gate = evolutionSelectionGate({
+    blockIndex,
+    run: state.run,
+    humanFranchiseId: state.humanFranchiseId,
+  });
+  if (gate === null) return;
+  const humanFid = state.humanFranchiseId;
+  const current = (
+    state.run as unknown as {
+      evolution?: {
+        selections?: Record<string, unknown>;
+      } | null;
+    }
+  ).evolution;
+  const selections = { ...(current?.selections ?? {}) };
+  if (selections[humanFid] !== undefined) return;
+  selections[humanFid] = {
+    franchiseId: humanFid,
+    innovationId: 'deep-four',
+    version: SEASON_COURT_INNOVATION_VERSION,
+    selectedByCommandId: `evo-auto-${String(blockIndex)}`,
+    aiSelected: false,
+    inputDigest: null,
+  };
+  state.run = {
+    ...state.run,
+    evolution: { ...(current ?? {}), selections },
+  } as SeasonRun;
 }
 export function runBlockThroughHandler(
   state: SeasonBlockRunnerState,
   blockIndex: number,
 ): SeasonCandidateCheckpoint {
+  ensureEvolutionSelection(state, blockIndex);
+  ensureChallengeDeal(state, blockIndex);
   const command = runnerBlockCommand(state, blockIndex);
   const input = runnerPipelineInput(state, command);
   const result = handleSubmitSeasonBlockCommand({
@@ -232,6 +323,25 @@ export function runBlockThroughHandler(
   state.checkpointState = stateFacts.checkpointState;
   state.stateRevision = stateFacts.stateRevision;
   state.stateDigest = stateFacts.stateDigest;
+  const runChallenges = (
+    state.run as unknown as {
+      challenges?: import('@hoop-rush/data-contracts').SeasonChallengeState | null;
+    }
+  ).challenges;
+  const nextChallenges =
+    runChallenges !== undefined &&
+    runChallenges !== null &&
+    checkpoint.challenges !== undefined &&
+    !runChallenges.evaluations.some(
+      (entry) => entry.blockIndex === checkpoint.challenges?.blockIndex,
+    )
+      ? {
+          ...runChallenges,
+          evaluations: [...runChallenges.evaluations, checkpoint.challenges].sort(
+            (a, b) => a.blockIndex - b.blockIndex,
+          ),
+        }
+      : runChallenges;
   state.run = {
     ...state.run,
     evolution: stateFacts.evolution,
@@ -243,7 +353,8 @@ export function runBlockThroughHandler(
     checkpointState: stateFacts.checkpointState,
     stateRevision: stateFacts.stateRevision,
     stateDigest: stateFacts.stateDigest,
-  };
+    ...(nextChallenges !== undefined ? { challenges: nextChallenges } : {}),
+  } as unknown as typeof state.run;
   return checkpoint;
 }
 export function rollForwardTo(state: SeasonBlockRunnerState, targetBlockIndex: number): void {
@@ -274,6 +385,7 @@ export function seasonBlockSimulate(args: {
   });
   const blockIndex = validateBlockOption(args.block, state);
   rollForwardTo(state, blockIndex);
+  ensureChallengeDeal(state, blockIndex);
   const command = runnerBlockCommand(state, blockIndex);
   const input = runnerPipelineInput(state, command);
   const started = performance.now();
@@ -290,7 +402,7 @@ export function seasonBlockSimulate(args: {
     completedRounds: checkpoint.completedRounds,
     summaryCount: checkpoint.gameSummaries.length,
     retainedDetailCount: checkpoint.retainedDetails.length,
-    objectiveId: checkpoint.objective.objectiveId,
+    objectiveId: checkpoint.objective?.objectiveId ?? null,
     stateRevision: checkpoint.stateRevision,
     stateDigest: checkpoint.stateDigest,
     digest: checkpoint.digest,
@@ -302,7 +414,7 @@ export function seasonBlockSimulate(args: {
   const details = [
     `run ${state.run.runId} · block ${String(checkpoint.blockIndex)} · revision ${String(checkpoint.revision)} · rounds ${String(checkpoint.completedRounds)}`,
     `summaries ${String(checkpoint.gameSummaries.length)} · retained details ${String(checkpoint.retainedDetails.length)}`,
-    `objective ${checkpoint.objective.objectiveId ?? 'none'} · state revision ${String(checkpoint.stateRevision)} · state digest ${checkpoint.stateDigest}`,
+    `objective ${checkpoint.objective?.objectiveId ?? checkpoint.challengeIds?.join('+') ?? 'none'} · state revision ${String(checkpoint.stateRevision)} · state digest ${checkpoint.stateDigest}`,
     `digest ${checkpoint.digest} in ${durationMs.toFixed(0)}ms`,
     `audit failures: ${String(auditFailures.length)}`,
   ];
@@ -396,6 +508,7 @@ export function seasonFullSimulate(args: {
   } | null = null;
   const tradeWindowsOpened = 0;
   for (let blockIndex = 0; blockIndex < SEASON_BLOCK_COUNT; blockIndex += 1) {
+    ensureChallengeDeal(state, blockIndex);
     const command = runnerBlockCommand(state, blockIndex);
     const input = runnerPipelineInput(state, command);
     const blockStarted = performance.now();

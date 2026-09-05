@@ -117,9 +117,7 @@
       tradeOfferViewModel(offer, currentRun, shell.catalog, shell.franchiseName),
     );
   });
-  const challengesVm = $derived(
-    run !== null ? challengesViewModel(run, nextBlockIndex) : null,
-  );
+  const challengesVm = $derived(run !== null ? challengesViewModel(run, nextBlockIndex) : null);
   const hasCampaign = $derived(
     run !== null &&
       (
@@ -736,9 +734,19 @@
                   <p class="mt-1 text-sm">
                     Challenges:
                     {#if challengesVm.evaluation !== null}
-                      {@const done = challengesVm.evaluation.results.filter((r) => r.success).length}
+                      {@const done = challengesVm.evaluation.results.filter(
+                        (r) => r.success,
+                      ).length}
                       {@const earned = challengesVm.evaluation.results.reduce(
-                        (sum, r) => sum + (r.success ? (r.challengeId === 'beat-leader' || r.challengeId === 'beat-higher' || r.challengeId === 'statement-block' ? 2 : 1) : 0),
+                        (sum, r) =>
+                          sum +
+                          (r.success
+                            ? r.challengeId === 'beat-leader' ||
+                              r.challengeId === 'beat-higher' ||
+                              r.challengeId === 'statement-block'
+                              ? 2
+                              : 1
+                            : 0),
                         0,
                       )}
                       <strong class="text-foreground">{done}/3 (+{earned})</strong>

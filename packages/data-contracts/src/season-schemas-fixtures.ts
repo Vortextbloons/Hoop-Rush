@@ -17,7 +17,7 @@ import type {
 } from './index.ts';
 import { buildInitialPostseasonState } from './season-postseason.ts';
 import { SEASON_OBJECTIVE_CATALOG } from './season-objective.ts';
-import { SEASON_CHALLENGE_CATALOG, buildEmptyChallengeState } from './season-challenge.ts';
+import { buildEmptyChallengeState } from './season-challenge.ts';
 import { SEASON_ALIGNMENT } from './season-alignment.ts';
 import {
   SEASON_BLOCK_VERSION,

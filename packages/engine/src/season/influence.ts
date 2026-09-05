@@ -119,8 +119,7 @@ export function applySeasonBlockInfluenceGrants(
   const participantIds =
     input.participantFranchiseIds ?? (humanFranchiseId ? [humanFranchiseId] : []);
   const hasChallenges =
-    input.challengeSuccesses !== undefined ||
-    input.challengeSuccessesByFranchise !== undefined;
+    input.challengeSuccesses !== undefined || input.challengeSuccessesByFranchise !== undefined;
   if (hasChallenges) {
     const byFranchise =
       input.challengeSuccessesByFranchise ??
@@ -133,13 +132,15 @@ export function applySeasonBlockInfluenceGrants(
         a.challengeId < b.challengeId ? -1 : a.challengeId > b.challengeId ? 1 : 0,
       );
       for (const result of successes) {
-        if (result.success !== true) continue;
+        if (!result.success) continue;
         const requestedDelta = result.reward;
         const headroom = SEASON_INFLUENCE_CAP - (balances[pid] ?? 0);
         const appliedDelta = Math.max(0, Math.min(requestedDelta, headroom));
         balances[pid] = (balances[pid] ?? 0) + appliedDelta;
         ledger.push({
-          entryId: idSchema.parse(`influence-challenge-${String(blockIndex)}-${pid}-${result.challengeId}`),
+          entryId: idSchema.parse(
+            `influence-challenge-${String(blockIndex)}-${pid}-${result.challengeId}`,
+          ),
           franchiseId: fid,
           source: 'challenge-reward',
           blockIndex,
@@ -157,9 +158,7 @@ export function applySeasonBlockInfluenceGrants(
             transactionId: idSchema.parse(
               `txn-challenge-reward-${String(blockIndex)}-${pid}-${result.challengeId}`,
             ),
-            commandId: commandIdSchema.parse(
-              `sys-challenge-reward-${String(blockIndex)}-${pid}`,
-            ),
+            commandId: commandIdSchema.parse(`sys-challenge-reward-${String(blockIndex)}-${pid}`),
             franchiseId: fid,
             type: 'challenge-reward',
             blockIndex,

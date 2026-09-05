@@ -10,6 +10,7 @@
     'initial-grant': 'Starting Influence',
     'block-grant': 'Played block',
     'objective-reward': 'Goal reward',
+    'challenge-reward': 'Challenge reward',
     'campaign-reward': 'Story reward',
     'extra-trade-offer': 'Extra trade offer',
     'trade-inquiry-purchase': 'Trade inquiry',

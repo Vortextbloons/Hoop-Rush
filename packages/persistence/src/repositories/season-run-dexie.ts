@@ -1062,7 +1062,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
         for (const entry of cursor.influence.ledger) {
           if (entry.commandId !== null) recorded.push(entry.commandId);
         }
-        for (const selection of Object.values(cursor.objectives?.selections ?? {})) {
+        for (const selection of Object.values(cursor.objectives.selections)) {
           recorded.push(selection.selectedByCommandId);
         }
         const cursorEvolution = (
@@ -1238,8 +1238,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
       catalog: [...SEASON_OBJECTIVE_CATALOG],
       selections: {},
     });
-    const challenges =
-      validatedRun.challenges ?? buildEmptyChallengeState();
+    const challenges = validatedRun.challenges ?? buildEmptyChallengeState();
     const campaignHumanFranchiseId = humanTeamOf(validatedRun.league)?.franchiseId ?? null;
     const campaign = seasonCampaignStateSchema.parse(
       this.initialCampaignState(validatedRun, health, campaignHumanFranchiseId),

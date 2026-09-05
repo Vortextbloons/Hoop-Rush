@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "targetsVersion": "challenge-targets-v1",
+  "policy": {
+    "catalogVersion": "season-challenge-v3",
+    "standardReward": 1,
+    "hardReward": 2,
+    "threePointPct": 0.35,
+    "threePointMinAttempts": 20,
+    "takeCareMaxPerGame": 13,
+    "winSixWins": 6,
+    "winSixMinGames": 8,
+    "statementMinGames": 4,
+    "threePointSufficiencyMin": 0.5
+  },
+  "cohort": {
+    "seedFrom": 0,
+    "seedTo": 11
+  },
+  "heldOut": {
+    "seedFrom": 12,
+    "seedTo": 15
+  },
+  "measured": {
+    "calibration": {
+      "seasonsSimulated": 12,
+      "blocksDealt": 96,
+      "dealCompleteness": 1,
+      "canonicalOrderShare": 1,
+      "replayStabilityShare": 1,
+      "hardFeasibleShare": 1,
+      "dealFrequency": {
+        "winning-block": 0.4479166666666667,
+        "win-six": 0.34375,
+        "three-point-mark": 0.3958333333333333,
+        "protect-glass": 0.4166666666666667,
+        "take-care": 0.3958333333333333,
+        "beat-leader": 0.16666666666666666,
+        "beat-higher": 0.34375,
+        "statement-block": 0.4895833333333333
+      },
+      "completionRate": {
+        "winning-block": 0.3023255813953488,
+        "win-six": 0.36363636363636365,
+        "three-point-mark": 0.5526315789473685,
+        "protect-glass": 0.45,
+        "take-care": 0.2894736842105263,
+        "beat-leader": 0.25,
+        "beat-higher": 0.9090909090909091,
+        "statement-block": 0
+      },
+      "expectedEarnedPerBlock": 0.3125,
+      "threePointSufficiency": 1,
+      "threePointEvaluations": 38
+    },
+    "heldOut": {
+      "seasonsSimulated": 4,
+      "blocksDealt": 32,
+      "dealCompleteness": 1,
+      "completionRate": {
+        "winning-block": 0.18181818181818182,
+        "win-six": 0.3076923076923077,
+        "three-point-mark": 0.4,
+        "protect-glass": 0.5882352941176471,
+        "take-care": 0.2777777777777778,
+        "beat-leader": 0.7142857142857143,
+        "beat-higher": 1,
+        "statement-block": 0
+      },
+      "expectedEarnedPerBlock": 0.375,
+      "threePointSufficiency": 1
+    }
+  },
+  "gates": {
+    "dealCompleteness": true,
+    "canonicalOrder": true,
+    "replayStability": true,
+    "threePointSufficiency": true,
+    "heldOut": true
+  },
+  "engineVersion": "m3-engine-v16",
+  "gameVersion": "season-game-v4",
+  "gameTargetsVersion": "season-game-targets-v4",
+  "generatedAtIso": "2026-09-05T18:18:53.021Z"
+}

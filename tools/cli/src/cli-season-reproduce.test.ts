@@ -65,7 +65,9 @@ describe('season run reproduce (replay-export-v1)', () => {
   it('rejects an ordinal gap as a chain-fact divergence', () => {
     const { exportInput } = buildReplayedRun();
     const entries = exportInput.commandLog.entries;
-    const gapped = [entries[0], entries[2]].filter(
+    const second = entries[1];
+    if (second === undefined) throw new Error('replay log needs at least two entries');
+    const gapped = [entries[0], { ...second, ordinal: 2 }].filter(
       (entry): entry is SeasonCommandLogEntry => entry !== undefined,
     );
     const gappedLog = chainLog(gapped);

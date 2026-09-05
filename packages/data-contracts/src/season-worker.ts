@@ -18,10 +18,7 @@ import { seasonHealthStateSchema } from './season-health.ts';
 import { seasonHomeCourtProfileSchema } from './season-home-court.ts';
 import { seasonInfluenceStateSchema } from './season-influence.ts';
 import { seasonObjectiveIdSchema } from './season-objective.ts';
-import {
-  seasonChallengeDealSchema,
-  seasonChallengeIdSchema,
-} from './season-challenge.ts';
+import { seasonChallengeDealSchema, seasonChallengeIdSchema } from './season-challenge.ts';
 import { seasonCampaignOpportunityIdSchema } from './season-campaign.ts';
 import { seasonPendingBlockCandidateSchema } from './season-pending-block.ts';
 import { seasonBlockRunContextSchema } from './season-run.ts';

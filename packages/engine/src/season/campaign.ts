@@ -1,8 +1,6 @@
 import {
   SEASON_CAMPAIGN_TARGETS_VERSION,
   SEASON_CAMPAIGN_VERSION,
-  SEASON_CAMPAIGN_VERSION_V1,
-  SEASON_CAMPAIGN_VERSION_V2,
   SEASON_INFLUENCE_CAP,
   SEASON_INFLUENCE_FLOOR,
   blockRoundRange,
@@ -737,14 +735,7 @@ export function normalizeCampaignState(state: unknown): SeasonCampaignState {
   if (state === undefined || state === null) return buildEmptyCampaignState();
   const parsed = seasonCampaignStateSchema.safeParse(state);
   if (!parsed.success) return buildEmptyCampaignState();
-  if (
-    parsed.data.campaignVersion === SEASON_CAMPAIGN_VERSION ||
-    parsed.data.campaignVersion === SEASON_CAMPAIGN_VERSION_V2 ||
-    parsed.data.campaignVersion === SEASON_CAMPAIGN_VERSION_V1
-  ) {
-    return parsed.data;
-  }
-  return buildEmptyCampaignState();
+  return parsed.data;
 }
 export interface SeasonCampaignGenerationInput {
   rootSeed: string;

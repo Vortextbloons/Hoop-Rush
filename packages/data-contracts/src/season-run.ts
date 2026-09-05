@@ -367,7 +367,8 @@ export function isLiveSeasonRunVersions(versions: {
     versions.blockVersion === SEASON_BLOCK_VERSION &&
     versions.checkpointVersion === SEASON_CHECKPOINT_VERSION &&
     versions.recapVersion === SEASON_RECAP_VERSION &&
-    (versions.campaignVersion === undefined || versions.campaignVersion === SEASON_CAMPAIGN_VERSION) &&
+    (versions.campaignVersion === undefined ||
+      versions.campaignVersion === SEASON_CAMPAIGN_VERSION) &&
     versions.influenceVersion === SEASON_INFLUENCE_VERSION &&
     (versions.objectiveVersion === undefined ||
       versions.objectiveVersion === SEASON_OBJECTIVE_VERSION) &&

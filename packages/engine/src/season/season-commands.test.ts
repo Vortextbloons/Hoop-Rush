@@ -250,7 +250,7 @@ function pendingOf(
   };
 }
 describe('select-block-objective command', () => {
-  it('accepts a selection for the current playable block and advances the state chain', () => {
+  it('rejects live selections as retired (M3.11 challenges replace pick-1)', () => {
     const { run, context } = windowedFixture();
     const offered = seasonObjectiveChoicesForBlock(run.rootSeed, 0);
     const command = commandOf(run, {
@@ -264,16 +264,9 @@ describe('select-block-objective command', () => {
     const outputResult = output.result;
     if (outputResult.command !== 'select-block-objective') throw new Error('unexpected command');
     const result = outputResult.result;
-    if (result.status !== 'accepted') throw new Error('expected acceptance');
-    expect(result.objectiveId).toBe(offered[0]);
-    expect(output.run.stateRevision).toBe(run.stateRevision + 1);
-    expect(output.run.stateDigest).toMatch(/^[0-9a-f]{32}$/);
-    expect(output.run.stateDigest).not.toBe(run.stateDigest);
-    expect(output.run.objectives.selections[0]).toEqual({
-      objectiveId: offered[0],
-      selectedByCommandId: commandIdSchema.parse('select-obj-0'),
-      success: null,
-    });
+    expect(result.status).toBe('rejected');
+    if (result.status !== 'rejected') throw new Error('expected rejection');
+    expect(result.rejection.code).toBe('retired');
   });
   it('rejects with run-mismatch, duplicate-command, and stale-state in order', () => {
     const { run, context } = windowedFixture();
@@ -364,7 +357,8 @@ describe('select-block-objective command', () => {
       }),
       context,
     );
-    if (first.result.result.status !== 'accepted') throw new Error('expected acceptance');
+    if (first.result.result.status !== 'rejected') throw new Error('expected rejection');
+    expect(first.result.result.rejection.code).toBe('retired');
     const replay = handleSeasonRunCommand(
       commandOf(first.run, {
         command: 'select-block-objective',
@@ -376,9 +370,9 @@ describe('select-block-objective command', () => {
     );
     expect(replay.result.result.status).toBe('rejected');
     if (replay.result.result.status !== 'rejected') throw new Error('expected rejection');
-    expect(replay.result.result.rejection.code).toBe('duplicate-command');
+    expect(['duplicate-command', 'retired']).toContain(replay.result.result.rejection.code);
   });
-  it('rejects not-at-boundary and objective-not-offered', () => {
+  it('rejects retired instead of not-at-boundary and objective-not-offered', () => {
     const { run, context } = windowedFixture();
     const notAtBoundary = handleSeasonRunCommand(
       commandOf(run, {
@@ -390,7 +384,7 @@ describe('select-block-objective command', () => {
       context,
     );
     if (notAtBoundary.result.result.status !== 'rejected') throw new Error('expected rejection');
-    expect(notAtBoundary.result.result.rejection.code).toBe('not-at-boundary');
+    expect(notAtBoundary.result.result.rejection.code).toBe('retired');
     const offered = seasonObjectiveChoicesForBlock(run.rootSeed, 0);
     const notOfferedId = (
       [
@@ -412,9 +406,9 @@ describe('select-block-objective command', () => {
       context,
     );
     if (notOffered.result.result.status !== 'rejected') throw new Error('expected rejection');
-    expect(notOffered.result.result.rejection.code).toBe('objective-not-offered');
+    expect(notOffered.result.result.rejection.code).toBe('retired');
   });
-  it('rejects objective-already-selected and not-at-boundary for future blocks', () => {
+  it('rejects retired instead of objective-already-selected and not-at-boundary for future blocks', () => {
     const { run, context } = windowedFixture();
     const offered = seasonObjectiveChoicesForBlock(run.rootSeed, 0)[0] ?? 'win-six';
     const first = handleSeasonRunCommand(
@@ -426,7 +420,8 @@ describe('select-block-objective command', () => {
       }),
       context,
     );
-    if (first.result.result.status !== 'accepted') throw new Error('expected acceptance');
+    if (first.result.result.status !== 'rejected') throw new Error('expected rejection');
+    expect(first.result.result.rejection.code).toBe('retired');
     const current = first.run;
     const again = handleSeasonRunCommand(
       commandOf(current, {
@@ -439,7 +434,7 @@ describe('select-block-objective command', () => {
     );
     expect(again.result.result.status).toBe('rejected');
     if (again.result.result.status !== 'rejected') throw new Error('expected rejection');
-    expect(again.result.result.rejection.code).toBe('objective-already-selected');
+    expect(again.result.result.rejection.code).toBe('retired');
     const futureBlock = handleSeasonRunCommand(
       commandOf(current, {
         command: 'select-block-objective',
@@ -451,7 +446,7 @@ describe('select-block-objective command', () => {
     );
     expect(futureBlock.result.result.status).toBe('rejected');
     if (futureBlock.result.result.status !== 'rejected') throw new Error('expected rejection');
-    expect(futureBlock.result.result.rejection.code).toBe('not-at-boundary');
+    expect(futureBlock.result.result.rejection.code).toBe('retired');
   });
 });
 describe('spend-influence command', () => {
@@ -2127,10 +2122,7 @@ describe('campaign commands', () => {
       effects: zeroEffectsOf(run),
     };
   }
-  function runWithBlockOffers(
-    run: SeasonRun,
-    blockIndex: number,
-  ): SeasonRun {
+  function runWithBlockOffers(run: SeasonRun, blockIndex: number): SeasonRun {
     const schedule = generateSeasonSchedule({
       league: run.league,
       seed: run.schedule.generationSeed,
@@ -2149,7 +2141,10 @@ describe('campaign commands', () => {
       campaignState: normalizeCampaignState(run.campaign),
     });
     const campaign = normalizeCampaignState(run.campaign);
-    return { ...run, campaign: { ...campaign, offers: { ...campaign.offers, [blockIndex]: offers } } };
+    return {
+      ...run,
+      campaign: { ...campaign, offers: { ...campaign.offers, [blockIndex]: offers } },
+    };
   }
   it('rejects select-gm-identity as retired without mutating the run', () => {
     const context = campaignFixture();

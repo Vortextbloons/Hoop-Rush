@@ -84,11 +84,8 @@ import { generateSeasonSchedule } from './schedule.ts';
 import { evaluateSeasonBlockObjective, seasonObjectiveChoicesForBlock } from './objectives.ts';
 import {
   SEASON_CHALLENGE_CATALOG,
-  SEASON_CHALLENGE_VERSION,
-  buildEmptyChallengeState,
   type SeasonBlockChallengeEvaluation,
   type SeasonChallengeDeal,
-  type SeasonChallengeId,
   type SeasonChallengeState,
 } from '@hoop-rush/data-contracts';
 import { dealSeasonBlockChallenges, evaluateSeasonBlockChallenges } from './challenges.ts';
@@ -347,14 +344,14 @@ export function seasonBlockRejection(
     const deal = input.challengeDeal ?? null;
     const commandIds = command.challengeIds ?? null;
     if (command.blockIndex >= 8) {
-      if (commandIds !== null && commandIds !== undefined) {
+      if (commandIds !== null) {
         return {
           code: 'invalid-challenge',
           expected: 'none',
           blockIndex: command.blockIndex,
         };
       }
-      if (deal !== null && deal !== undefined) {
+      if (deal !== null) {
         return {
           code: 'invalid-challenge',
           expected: 'none',
@@ -362,7 +359,7 @@ export function seasonBlockRejection(
         };
       }
     } else {
-      if (deal === null || deal === undefined) {
+      if (deal === null) {
         return {
           code: 'invalid-challenge',
           expected: 'required',
@@ -376,7 +373,7 @@ export function seasonBlockRejection(
           blockIndex: command.blockIndex,
         };
       }
-      if (commandIds !== null && commandIds !== undefined) {
+      if (commandIds !== null) {
         const dealIds = [...deal.challengeIds].sort();
         const cmdIds = [...commandIds].sort();
         if (
@@ -1099,8 +1096,9 @@ export function assembleSeasonBlockCandidate(
     });
     for (const pid of participantIds) {
       const dealForPid =
-        input.challengeDealsByFranchise?.get(pid) ?? (pid === primaryFranchiseId ? primaryDeal : null);
-      if (dealForPid === null || dealForPid === undefined) continue;
+        input.challengeDealsByFranchise?.get(pid) ??
+        (pid === primaryFranchiseId ? primaryDeal : null);
+      if (dealForPid === null) continue;
       challengeEvaluationsByFranchise[pid] = evaluateSeasonBlockChallenges({
         deal: dealForPid,
         blockIndex: command.blockIndex,
@@ -1426,9 +1424,11 @@ function challengesWithBlockEvaluation(
   candidate: SeasonCandidateCheckpoint,
 ): SeasonChallengeState | undefined {
   if (challenges === undefined) return undefined;
-  if (candidate.challenges === undefined || candidate.challenges === null) return challenges;
+  if (candidate.challenges == null) return challenges;
   const evaluation = candidate.challenges;
-  const existing = challenges.evaluations.some((entry) => entry.blockIndex === evaluation.blockIndex);
+  const existing = challenges.evaluations.some(
+    (entry) => entry.blockIndex === evaluation.blockIndex,
+  );
   if (existing) return challenges;
   return {
     ...challenges,
@@ -1715,9 +1715,8 @@ export function completeSeasonBlockCommit(input: {
   }
   const nextBlockIndex = input.candidate.blockIndex + 1;
   if (nextBlockIndex >= 0 && nextBlockIndex <= 7 && primaryFranchiseId !== null) {
-    const currentDeals = (
-      postBlockRun as unknown as { challenges?: SeasonChallengeState }
-    ).challenges;
+    const currentDeals = (postBlockRun as unknown as { challenges?: SeasonChallengeState })
+      .challenges;
     if (currentDeals !== undefined && currentDeals.deals[nextBlockIndex] === undefined) {
       let scheduleForDeal: SeasonSchedule | null = input.schedule ?? null;
       if (scheduleForDeal === null) {
@@ -1745,7 +1744,7 @@ export function completeSeasonBlockCommit(input: {
             stateDigest: seasonRunStateDigest(
               seasonRunStateDigestFactsOf(postBlockRun, input.effects ?? input.candidate.effects),
             ),
-          } as SeasonRun;
+          };
         }
       }
     }
@@ -2142,11 +2141,10 @@ export function auditSeasonBlock(
       failures.push(`injury ${record.injuryId} same-game return must carry zero missed games`);
     }
   }
-  const hasCandidateChallenges =
-    candidate.challenges !== undefined && candidate.challenges !== null;
+  const hasCandidateChallenges = candidate.challenges != null;
   if (hasCandidateChallenges) {
     const evaluation = candidate.challenges;
-    if (evaluation === undefined || evaluation === null) {
+    if (evaluation == null) {
       failures.push('candidate challenges missing after presence check');
     } else {
       if (evaluation.blockIndex !== command.blockIndex) {
@@ -2158,6 +2156,71 @@ export function auditSeasonBlock(
         const resultIds = evaluation.results.map((result) => result.challengeId).sort();
         if (JSON.stringify(dealIds) !== JSON.stringify(resultIds)) {
           failures.push('candidate challenges do not match the dealt challengeIds');
+        }
+        if (deal.seedPath !== undefined) {
+          const [seedNamespace, ...seedRest] = deal.seedPath;
+          const reseeded = seasonNamespaceSeed(
+            run.rootSeed,
+            seedNamespace ?? 'challenges',
+            ...seedRest,
+          );
+          if (reseeded !== deal.seedDigest) {
+            failures.push('candidate challenge deal seedDigest does not match its seedPath');
+          }
+        }
+        if (deal.standingsSnapshot !== undefined && input.humanFranchiseId !== null) {
+          const snapshotById = new Map(deal.standingsSnapshot.map((row) => [row.franchiseId, row]));
+          const humanSnapshot = snapshotById.get(franchiseIdSchema.parse(input.humanFranchiseId));
+          if (humanSnapshot === undefined) {
+            failures.push('candidate challenge deal snapshot misses the human franchise');
+          } else {
+            const { fromRound, toRound } = blockRoundRange(command.blockIndex);
+            const scheduledOpponents = new Set(
+              input.schedule.games
+                .filter(
+                  (game) =>
+                    game.round >= fromRound &&
+                    game.round <= toRound &&
+                    (game.homeFranchiseId === input.humanFranchiseId ||
+                      game.awayFranchiseId === input.humanFranchiseId),
+                )
+                .map((game) =>
+                  game.homeFranchiseId === input.humanFranchiseId
+                    ? game.awayFranchiseId
+                    : game.homeFranchiseId,
+                ),
+            );
+            const leader = deal.targets.leaderFranchiseId;
+            if (leader !== null) {
+              const leaderSnapshot = snapshotById.get(leader);
+              if (leaderSnapshot === undefined) {
+                failures.push('candidate challenge deal snapshot misses the dealt leader');
+              } else if (!scheduledOpponents.has(leader)) {
+                failures.push('dealt beat-leader target is not scheduled in the block');
+              }
+            }
+            for (const opponent of deal.targets.qualifyingOpponentIds) {
+              const oppSnapshot = snapshotById.get(opponent);
+              if (oppSnapshot === undefined) {
+                failures.push(`candidate challenge deal snapshot misses qualifier ${opponent}`);
+                continue;
+              }
+              const better =
+                oppSnapshot.wins !== humanSnapshot.wins
+                  ? oppSnapshot.wins > humanSnapshot.wins
+                  : oppSnapshot.losses < humanSnapshot.losses;
+              if (!better) {
+                failures.push(
+                  `dealt beat-higher qualifier ${opponent} is not strictly better in the snapshot`,
+                );
+              }
+              if (!scheduledOpponents.has(opponent)) {
+                failures.push(
+                  `dealt beat-higher qualifier ${opponent} is not scheduled in the block`,
+                );
+              }
+            }
+          }
         }
         const recomputed = evaluateSeasonBlockChallenges({
           deal,
@@ -2171,7 +2234,10 @@ export function auditSeasonBlock(
       }
       if (candidate.challengeIds !== undefined) {
         const ordered = [...evaluation.results.map((r) => r.challengeId)].sort();
-        if (JSON.stringify([...(candidate.challengeIds as readonly string[])].sort()) !== JSON.stringify(ordered)) {
+        if (
+          JSON.stringify([...(candidate.challengeIds as readonly string[])].sort()) !==
+          JSON.stringify(ordered)
+        ) {
           failures.push('candidate challengeIds do not match the evaluated challenges');
         }
       }

@@ -1,6 +1,9 @@
 import {
   SEASON_AGGREGATES_VERSION,
   SEASON_BLOCK_VERSION,
+  SEASON_CHALLENGE_CATALOG,
+  SEASON_CHALLENGE_TARGETS_VERSION,
+  SEASON_CHALLENGE_VERSION,
   SEASON_CHECKPOINT_VERSION,
   SEASON_CHEMISTRY_VERSION,
   SEASON_EFFECT_TARGETS_VERSION,
@@ -55,7 +58,11 @@ import {
   type SeasonRunSnapshot,
   type SeasonWindowOpenResult,
 } from '@hoop-rush/persistence';
-import { completeSeasonBlockCommit, type simulateSeasonBlock } from '@hoop-rush/engine';
+import {
+  completeSeasonBlockCommit,
+  evaluateSeasonBlockChallenges,
+  type simulateSeasonBlock,
+} from '@hoop-rush/engine';
 import type { SeasonFreeAgencyIndex, SeasonRosterTargets } from '@hoop-rush/data-contracts';
 import { assembleCommittedSnapshot } from '$lib/season/season-block-runner';
 import type {
@@ -285,6 +292,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
           commandId: input.commandId,
           humanFranchiseId: input.humanFranchiseId,
           objectiveId: pending.objectiveId ?? null,
+          challengeDeal: pending.challengeDeal ?? null,
           homeCourt: input.homeCourt,
           catalogUrl: input.catalogUrl,
           catalogHash: input.catalogHash,
@@ -325,8 +333,8 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
         const prior = await loadCurrentSnapshot(this.scheduleOf(startInput)).catch(() => null);
         await this.commitCheckpoint(startInput, pending.commandId, checkpoint, {
           health: pending.health,
-          influence: this.fakeInfluenceFor(startInput, input.blockIndex),
-          transactions: this.fakeTransactionsFor(input.blockIndex),
+          influence: checkpoint.influence,
+          transactions: checkpoint.transactions,
           freeAgency: committed.freeAgency,
           checkpointState: committed.checkpointState,
           stateRevision: committed.stateRevision,
@@ -434,6 +442,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       expectedStateRevision: input.run.stateRevision,
       expectedStateDigest: input.run.stateDigest,
       objectiveId: null,
+      challengeDeal: input.challengeDeal ?? null,
       nextGameId: nextHumanGame?.gameId ?? seasonGameIdSchema.parse('s000001'),
       summaries: [],
       retainedDetails: [],
@@ -569,8 +578,8 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       committed = this.committedFacts(input, checkpoint, input.commandId, freeAgencyAssets);
       await this.commitCheckpoint(input, input.commandId, checkpoint, {
         health: this.fakeHealthFor(input),
-        influence: this.fakeInfluenceFor(input, input.blockIndex),
-        transactions: this.fakeTransactionsFor(input.blockIndex),
+        influence: checkpoint.influence,
+        transactions: checkpoint.transactions,
         freeAgency: committed.freeAgency,
         checkpointState: committed.checkpointState,
         stateRevision: committed.stateRevision,
@@ -618,6 +627,12 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       rotationDigest: input.rotationDigest,
       window: committed.window,
       freeAgency: committed.freeAgency,
+      challenges:
+        (
+          committed as unknown as {
+            challenges?: import('@hoop-rush/data-contracts').SeasonChallengeState | null;
+          }
+        ).challenges ?? this.challengesWithSuccess(input, checkpoint),
       checkpointState: committed.checkpointState,
       stateRevision: committed.stateRevision,
       stateDigest: committed.stateDigest,
@@ -667,6 +682,16 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
     );
     const playerAggregates: SeasonPlayerAggregate[] =
       seasonRunEngineSeam.foldSeasonPlayerAggregates(input.run.rosters, allSummaries);
+    const challengeDeal = input.challengeDeal ?? null;
+    const challengeEvaluation =
+      challengeDeal !== null && input.blockIndex <= 7
+        ? evaluateSeasonBlockChallenges({
+            deal: challengeDeal,
+            blockIndex: input.blockIndex,
+            humanFranchiseId: input.humanFranchiseId,
+            summaries,
+          })
+        : null;
     const recap: SeasonBlockRecap = {
       schemaVersion: 1,
       recapVersion: SEASON_RECAP_VERSION,
@@ -690,6 +715,17 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
         humanTeamInjuries: [],
       },
       objectiveEvidence: null,
+      challengeEvidence:
+        challengeEvaluation !== null
+          ? challengeEvaluation.results.map((result) => ({
+              challengeId: result.challengeId,
+              success: result.success,
+              reward:
+                SEASON_CHALLENGE_CATALOG.find((entry) => entry.challengeId === result.challengeId)
+                  ?.reward ?? 1,
+              evaluationFacts: result.facts,
+            }))
+          : undefined,
       tradeEvidence: { tradesAccepted: 0, influenceDelta: 0 },
       freeAgencyEvidence: freeAgencyEvidenceOf({
         blockIndex: input.blockIndex,
@@ -729,6 +765,8 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
         tradeVersion: SEASON_TRADE_VERSION,
         influenceVersion: SEASON_INFLUENCE_VERSION,
         objectiveVersion: SEASON_OBJECTIVE_VERSION,
+        challengeVersion: SEASON_CHALLENGE_VERSION,
+        challengeTargetsVersion: SEASON_CHALLENGE_TARGETS_VERSION,
         injuryTargetsVersion: SEASON_INJURY_TARGETS_VERSION,
         tradeTargetsVersion: SEASON_TRADE_TARGETS_VERSION,
         influenceTargetsVersion: SEASON_INFLUENCE_TARGETS_VERSION,
@@ -748,9 +786,9 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       recap,
       effects,
       health,
-      influence: this.fakeInfluenceFor(input, input.blockIndex),
+      influence: this.fakeInfluenceFor(input, input.blockIndex, challengeEvaluation),
       freeAgency: input.run.freeAgency,
-      transactions: this.fakeTransactionsFor(input.blockIndex),
+      transactions: this.fakeTransactionsFor(input.blockIndex, challengeEvaluation),
       objective: {
         objectiveId: input.objectiveId ?? null,
         success: input.objectiveId === null ? null : false,
@@ -771,6 +809,8 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
           tipCountedGames: 0,
         },
       },
+      challenges: challengeEvaluation ?? undefined,
+      challengeIds: challengeDeal !== null ? [...challengeDeal.challengeIds] : undefined,
       expectedStateRevision: input.run.stateRevision,
       expectedStateDigest: input.run.stateDigest,
       stateRevision,
@@ -806,6 +846,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       influence: m25.influence,
       trade: null,
       objectives: this.objectivesWithBlockSuccess(input, checkpoint),
+      challenges: this.challengesWithSuccess(input, checkpoint),
       checkpointState: m25.checkpointState,
       stateRevision: m25.stateRevision,
       stateDigest: m25.stateDigest,
@@ -819,15 +860,34 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
     input: SeasonBlockStartInput,
     checkpoint: SeasonCandidateCheckpoint,
   ): SeasonBlockStartInput['run']['objectives'] {
-    if (checkpoint.blockIndex === 8) return input.run.objectives;
-    const selection = input.run.objectives.selections[checkpoint.blockIndex];
-    if (selection === undefined) return input.run.objectives;
+    const objectives = input.run.objectives;
+    if (checkpoint.blockIndex === 8) return objectives;
+    const selection = objectives.selections[checkpoint.blockIndex];
+    if (selection === undefined) return objectives;
     return {
-      ...input.run.objectives,
+      ...objectives,
       selections: {
-        ...input.run.objectives.selections,
-        [checkpoint.blockIndex]: { ...selection, success: checkpoint.objective.success },
+        ...objectives.selections,
+        [checkpoint.blockIndex]: { ...selection, success: checkpoint.objective?.success ?? null },
       },
+    };
+  }
+  private challengesWithSuccess(
+    input: SeasonBlockStartInput,
+    checkpoint: SeasonCandidateCheckpoint,
+  ): import('@hoop-rush/data-contracts').SeasonChallengeState | null | undefined {
+    const base = (
+      input.run as unknown as {
+        challenges?: import('@hoop-rush/data-contracts').SeasonChallengeState | null;
+      }
+    ).challenges;
+    if (base === undefined || base === null) return base;
+    if (checkpoint.challenges === undefined) return base;
+    const evaluation = checkpoint.challenges;
+    if (base.evaluations.some((entry) => entry.blockIndex === evaluation.blockIndex)) return base;
+    return {
+      ...base,
+      evaluations: [...base.evaluations, evaluation].sort((a, b) => a.blockIndex - b.blockIndex),
     };
   }
   private committedFacts(
@@ -940,9 +1000,17 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       injuries,
     };
   }
-  private fakeInfluenceFor(input: SeasonBlockStartInput, blockIndex: number): SeasonInfluenceState {
+  private fakeInfluenceFor(
+    input: SeasonBlockStartInput,
+    blockIndex: number,
+    challengeEvaluation?: import('@hoop-rush/data-contracts').SeasonBlockChallengeEvaluation | null,
+  ): SeasonInfluenceState {
     const franchiseIds = input.run.league.teams.map((team) => team.franchiseId);
-    const balance = 2 + blockIndex + 1;
+    const human = input.humanFranchiseId;
+    const baseBalance = 2 + blockIndex + 1;
+    const balances = new Map<string, number>(
+      franchiseIds.map((franchiseId) => [franchiseId, baseBalance]),
+    );
     const ledger: SeasonInfluenceState['ledger'] = [];
     for (const franchiseId of franchiseIds) {
       ledger.push({
@@ -969,17 +1037,54 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
           explanation: `+1 Influence grant for accepted block ${String(block + 1)}`,
         });
       }
+      if (
+        human !== null &&
+        franchiseId === human &&
+        challengeEvaluation !== null &&
+        challengeEvaluation !== undefined
+      ) {
+        const ordered = [...challengeEvaluation.results].sort((a, b) =>
+          a.challengeId < b.challengeId ? -1 : 1,
+        );
+        for (const result of ordered) {
+          if (!result.success) continue;
+          const requestedDelta =
+            SEASON_CHALLENGE_CATALOG.find((entry) => entry.challengeId === result.challengeId)
+              ?.reward ?? 1;
+          const before = balances.get(franchiseId) ?? baseBalance;
+          const appliedDelta = Math.max(0, Math.min(requestedDelta, 8 - before));
+          balances.set(franchiseId, before + appliedDelta);
+          ledger.push({
+            entryId: idSchema.parse(
+              `influence-challenge-${String(blockIndex)}-${franchiseId}-${result.challengeId}`,
+            ),
+            franchiseId,
+            source: 'challenge-reward',
+            blockIndex,
+            commandId: null,
+            requestedDelta,
+            appliedDelta,
+            balanceAfter: before + appliedDelta,
+            explanation: `+${String(requestedDelta)} Influence challenge reward ${result.challengeId} (block ${String(blockIndex)})`,
+          });
+        }
+      }
     }
     return {
       schemaVersion: 1,
       influenceVersion: SEASON_INFLUENCE_VERSION,
-      balances: Object.fromEntries(franchiseIds.map((franchiseId) => [franchiseId, balance])),
+      balances: Object.fromEntries(
+        franchiseIds.map((franchiseId) => [franchiseId, balances.get(franchiseId) ?? baseBalance]),
+      ),
       ledger,
       windows: {},
       rehabs: {},
     };
   }
-  private fakeTransactionsFor(blockIndex: number): SeasonTransactionEntry[] {
+  private fakeTransactionsFor(
+    blockIndex: number,
+    challengeEvaluation?: import('@hoop-rush/data-contracts').SeasonBlockChallengeEvaluation | null,
+  ): SeasonTransactionEntry[] {
     const transactions: SeasonTransactionEntry[] = [];
     for (let block = 0; block <= blockIndex; block += 1) {
       transactions.push({
@@ -992,6 +1097,27 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
         payload: {},
         explanation: `+1 Influence block grant for all franchises (block ${String(block + 1)})`,
       });
+    }
+    if (challengeEvaluation !== null && challengeEvaluation !== undefined) {
+      const ordered = [...challengeEvaluation.results].sort((a, b) =>
+        a.challengeId < b.challengeId ? -1 : 1,
+      );
+      for (const result of ordered) {
+        if (!result.success) continue;
+        const reward =
+          SEASON_CHALLENGE_CATALOG.find((entry) => entry.challengeId === result.challengeId)
+            ?.reward ?? 1;
+        transactions.push({
+          transactionId: idSchema.parse(`tx-challenge-${String(blockIndex)}-${result.challengeId}`),
+          commandId: commandIdSchema.parse(`grant-${String(blockIndex)}`),
+          franchiseId: null,
+          type: 'challenge-reward',
+          blockIndex,
+          appliedAtStateRevision: blockIndex + 1,
+          payload: { blockIndex, challengeId: result.challengeId },
+          explanation: `+${String(reward)} Influence challenge reward ${result.challengeId} (block ${String(blockIndex + 1)})`,
+        });
+      }
     }
     return transactions;
   }

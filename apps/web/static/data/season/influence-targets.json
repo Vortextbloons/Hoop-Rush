@@ -1,16 +1,23 @@
 {
   "schemaVersion": 1,
-  "targetsVersion": "influence-targets-v1",
+  "targetsVersion": "influence-targets-v3",
   "policy": {
     "initialGrant": 2,
     "blockGrant": 1,
     "objectiveReward": 1,
+    "challengeRewardStandard": 1,
+    "challengeRewardHard": 2,
     "cap": 8,
-    "floor": -3,
+    "floor": 0,
     "objectiveSuccessEnvelope": [
       0.65,
       0.95
     ],
+    "expectedEarnedPerBlockEnvelope": [
+      0.1,
+      5
+    ],
+    "capClampedShareMax": 0.9,
     "debtFrequencyMax": 0.1,
     "extraOfferSpendRateMax": 0.5,
     "rehabSpendRateMax": 0.4
@@ -33,11 +40,15 @@
       "debtBoundaries": 0,
       "capViolations": 0,
       "objectiveEvaluations": 96,
-      "objectiveSuccessRate": 0.7916666666666666,
+      "objectiveSuccessRate": 0.6875,
+      "challengeEvaluations": 288,
+      "challengeSuccessRate": 0.3784722222222222,
+      "expectedEarnedPerBlock": 0.2777777777777778,
+      "capClampedShare": 0.7889908256880734,
       "extraOfferSpendShare": 0.25277777777777777,
       "extraOfferWindows": 1080,
-      "rehabSpendShare": 0.03514684641309581,
-      "rehabInjuries": 2077
+      "rehabSpendShare": 0.039114043355325166,
+      "rehabInjuries": 2122
     },
     "heldOut": {
       "seasonsSimulated": 4,
@@ -47,7 +58,11 @@
       "debtFrequency": 0,
       "capViolations": 0,
       "objectiveEvaluations": 32,
-      "objectiveSuccessRate": 0.6875
+      "objectiveSuccessRate": 0.8125,
+      "challengeEvaluations": 96,
+      "challengeSuccessRate": 0.3854166666666667,
+      "expectedEarnedPerBlock": 0.3333333333333333,
+      "capClampedShare": 0.7567567567567568
     }
   },
   "gates": {
@@ -56,12 +71,14 @@
     "debtFrequency": true,
     "zeroCapViolations": true,
     "objectiveSuccessRate": true,
+    "expectedEarnedPerBlock": true,
+    "capClampedShare": true,
     "extraOfferSpendRate": true,
     "rehabSpendRate": true,
     "heldOut": true
   },
-  "engineVersion": "m3-engine-v10",
+  "engineVersion": "m3-engine-v16",
   "gameVersion": "season-game-v4",
   "gameTargetsVersion": "season-game-targets-v4",
-  "generatedAtIso": "2026-08-07T00:18:27.722Z"
+  "generatedAtIso": "2026-09-05T18:25:59.507Z"
 }

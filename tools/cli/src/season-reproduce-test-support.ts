@@ -25,7 +25,6 @@ import {
   handleSeasonRunCommand,
   openSeasonFreeAgencyWindow,
   openSeasonTradeWindow,
-  seasonObjectiveChoicesForBlock,
 } from '@hoop-rush/engine';
 import { REPO_ROOT } from './cli-test-helpers.ts';
 import { loadSeasonRunFixture } from './commands/season-block.ts';
@@ -161,8 +160,6 @@ export function buildReplayedRun(): ReplayedRun {
   );
   if (firstOpen === undefined) throw new Error('no open offers to accept');
   const entries: SeasonCommandLogEntry[] = [];
-  const objectiveId = seasonObjectiveChoicesForBlock(run.rootSeed, 0)[0];
-  if (objectiveId === undefined) throw new Error('no objective offered for block 0');
   const record = (
     command: Parameters<typeof handleSeasonRunCommand>[0],
     runFor: typeof run,
@@ -225,22 +222,7 @@ export function buildReplayedRun(): ReplayedRun {
     effects,
   );
   effects = acceptOutput.effects;
-  const selectOutput = record(
-    {
-      schemaVersion: 11,
-      command: 'select-block-objective',
-      commandId: commandIdSchema.parse('repro-select-1'),
-      runId: run.runId,
-      expectedStateRevision: acceptOutput.run.stateRevision,
-      expectedStateDigest: acceptOutput.run.stateDigest,
-      blockIndex: 0,
-      objectiveId,
-    },
-    acceptOutput.run,
-    effects,
-  );
-  effects = selectOutput.effects;
-  let finalRun = selectOutput.run;
+  let finalRun = acceptOutput.run;
   if (secondOpen !== undefined) {
     finalRun = record(
       {
@@ -248,12 +230,12 @@ export function buildReplayedRun(): ReplayedRun {
         command: 'decline-trade-offer',
         commandId: commandIdSchema.parse('repro-decline-1'),
         runId: run.runId,
-        expectedStateRevision: selectOutput.run.stateRevision,
-        expectedStateDigest: selectOutput.run.stateDigest,
+        expectedStateRevision: acceptOutput.run.stateRevision,
+        expectedStateDigest: acceptOutput.run.stateDigest,
         windowIndex: 0,
         offerId: secondOpen.offerId,
       },
-      selectOutput.run,
+      acceptOutput.run,
       effects,
     ).run;
   }

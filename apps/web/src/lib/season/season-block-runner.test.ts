@@ -900,7 +900,7 @@ describe('season block runner (M2.5 wire)', () => {
     expect(second.humanFranchiseId).toBe('lakers');
     expect(second.schedule).toBeDefined();
   });
-  it('buildWorkerRequest and acceptWorkerResult are pure and worker-independent', async () => {
+  it('buildWorkerRequest and acceptWorkerResult are pure and worker-independent', () => {
     const run = makeRun();
     const input = startInput(run);
     const pending = makePending(run);

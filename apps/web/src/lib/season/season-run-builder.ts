@@ -5,7 +5,6 @@ import {
   SEASON_AUTHORITY_VERSION,
   SEASON_AWARDS_VERSION,
   SEASON_BLOCK_VERSION,
-  SEASON_CHALLENGE_CATALOG,
   SEASON_CHALLENGE_TARGETS_VERSION,
   SEASON_CHALLENGE_VERSION,
   SEASON_CHECKPOINT_VERSION,
@@ -43,7 +42,6 @@ import {
   SEASON_SEED_DERIVATION_VERSION,
   SEASON_STAMINA_VERSION,
   SEASON_STANDINGS_VERSION,
-  SEASON_STANDINGS_VERSION,
   SEASON_TIEBREAK_VERSION,
   SEASON_TRADE_GRADE_VERSION,
   SEASON_TRADE_TARGETS_VERSION,
@@ -71,7 +69,7 @@ function buildInitialChallenges(
 ): SeasonRun['challenges'] {
   const base = buildEmptyChallengeState();
   if (humanFranchiseId === null) return base;
-  const standings = {
+  const standings: import('@hoop-rush/data-contracts').SeasonStandings = {
     schemaVersion: 1 as const,
     standingsVersion: SEASON_STANDINGS_VERSION,
     rows: league.teams.map((team) => ({
@@ -302,7 +300,12 @@ export function buildSeasonRunFromGeneration(input: BuildSeasonRunInput): Season
       catalog: [...SEASON_OBJECTIVE_CATALOG],
       selections: {},
     },
-    challenges: buildInitialChallenges(correctedLeague, schedule, rootSeed, humanFranchiseIds[0] ?? null),
+    challenges: buildInitialChallenges(
+      correctedLeague,
+      schedule,
+      rootSeed,
+      humanFranchiseIds[0] ?? null,
+    ),
     health: {
       schemaVersion: 1,
       healthVersion: SEASON_HEALTH_VERSION,

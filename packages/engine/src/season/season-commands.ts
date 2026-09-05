@@ -322,7 +322,7 @@ function runStateDigestFactsOf(run: SeasonEconomyRun): Parameters<typeof seasonR
     influence: run.influence,
     transactions: run.transactions,
     trade: run.trade,
-    objectives: run.objectives as import('@hoop-rush/data-contracts').SeasonObjectiveState,
+    objectives: run.objectives,
     campaign: run.campaign ?? null,
     evolution:
       (run as { evolution?: import('@hoop-rush/data-contracts').SeasonEvolutionState | null })
@@ -373,7 +373,7 @@ function commandAlreadyRecorded(run: SeasonRun, commandId: string): boolean {
   if (run.checkpointState !== null && run.checkpointState.commandId === commandId) return true;
   if (run.influence.ledger.some((entry) => entry.commandId === commandId)) return true;
   if (run.transactions.some((entry) => entry.commandId === commandId)) return true;
-  for (const selection of Object.values(run.objectives?.selections ?? {})) {
+  for (const selection of Object.values(run.objectives.selections)) {
     if (selection.selectedByCommandId === commandId) return true;
   }
   const evo = (

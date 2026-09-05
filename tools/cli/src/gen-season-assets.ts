@@ -9,6 +9,8 @@ import {
   SEASON_BLOCK_VERSION,
   SEASON_CAMPAIGN_TARGETS_VERSION,
   SEASON_CAMPAIGN_VERSION,
+  SEASON_CHALLENGE_TARGETS_VERSION,
+  SEASON_CHALLENGE_VERSION,
   SEASON_CHECKPOINT_VERSION,
   SEASON_CHEMISTRY_VERSION,
   SEASON_COMMAND_LOG_VERSION,
@@ -55,6 +57,7 @@ import {
   seasonDraftStateSchema,
   seasonLeagueSchema,
   seasonObjectiveStateSchema,
+  buildEmptyChallengeState,
   seasonRosterTargetsSchema,
   seasonRunSchema,
   seasonScheduleSchema,
@@ -72,6 +75,7 @@ import {
   buildLocalSoloAuthority,
   createInitialSeasonInfluenceState,
   createSeasonEffectsState,
+  dealSeasonBlockChallenges,
   expandSeasonRunRosters,
   generateAiLeague,
   seasonDraftStateDigest,
@@ -163,6 +167,46 @@ function playCommittedDraft(
   state = apply(cmd('fixture-generate', state.revision, { kind: 'generate-ai-league' }));
   return { state, commands, generation };
 }
+function buildInitialFixtureChallenges(
+  league: SeasonLeague,
+  schedule: SeasonSchedule,
+  rootSeed: ReturnType<typeof seedSchema.parse>,
+  humanFranchiseId: string | null,
+) {
+  const base = buildEmptyChallengeState();
+  if (humanFranchiseId === null) return base;
+  const standings = {
+    schemaVersion: 1 as const,
+    standingsVersion: 'standings-v1' as const,
+    rows: league.teams.map((team) => ({
+      franchiseId: team.franchiseId,
+      wins: 0,
+      losses: 0,
+      gamesPlayed: 0,
+      homeWins: 0,
+      homeLosses: 0,
+      awayWins: 0,
+      awayLosses: 0,
+      conferenceWins: 0,
+      conferenceLosses: 0,
+      divisionWins: 0,
+      divisionLosses: 0,
+      pointsFor: 0,
+      pointsAgainst: 0,
+      headToHead: league.teams
+        .filter((other) => other.franchiseId !== team.franchiseId)
+        .map((other) => ({ franchiseId: other.franchiseId, wins: 0, losses: 0 })),
+    })),
+  };
+  const deal = dealSeasonBlockChallenges(rootSeed, 0, {
+    league,
+    schedule,
+    standings,
+    humanFranchiseId,
+  });
+  if (deal === null) return base;
+  return { ...base, deals: { 0: deal } };
+}
 function buildRun(
   schedule: SeasonSchedule,
   league: SeasonLeague,
@@ -223,6 +267,8 @@ function buildRun(
       tradeVersion: SEASON_TRADE_VERSION,
       influenceVersion: SEASON_INFLUENCE_VERSION,
       objectiveVersion: SEASON_OBJECTIVE_VERSION,
+      challengeVersion: SEASON_CHALLENGE_VERSION,
+      challengeTargetsVersion: SEASON_CHALLENGE_TARGETS_VERSION,
       campaignVersion: SEASON_CAMPAIGN_VERSION,
       campaignTargetsVersion: SEASON_CAMPAIGN_TARGETS_VERSION,
       injuryTargetsVersion: SEASON_INJURY_TARGETS_VERSION,
@@ -332,6 +378,12 @@ function buildRun(
     evaluations: generation.evaluations,
     trade: null,
     objectives,
+    challenges: buildInitialFixtureChallenges(
+      correctedLeague,
+      schedule,
+      seedSchema.parse(SEASON_COMMITTED_DRAFT_SEED),
+      draft.participants[0]?.franchiseId ?? null,
+    ),
     campaign: buildEmptyCampaignState(),
     health: {
       schemaVersion: 1,
@@ -373,6 +425,7 @@ function buildRun(
     trade: run.trade,
     freeAgency: run.freeAgency,
     objectives: run.objectives,
+    challenges: run.challenges ?? null,
     campaign: run.campaign,
     rosters: run.rosters,
     ownership: run.ownership,

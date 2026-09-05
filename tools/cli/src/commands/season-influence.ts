@@ -44,8 +44,12 @@ export const SEASON_INFLUENCE_OBJECTIVE_SUCCESS_MIN = 0.65;
 export const SEASON_INFLUENCE_OBJECTIVE_SUCCESS_MAX = 0.95;
 export const SEASON_INFLUENCE_EXTRA_OFFER_SPEND_MAX = 0.5;
 export const SEASON_INFLUENCE_REHAB_SPEND_MAX = 0.4;
+export const SEASON_INFLUENCE_EXPECTED_EARNED_MIN = 0.1;
+export const SEASON_INFLUENCE_EXPECTED_EARNED_MAX = 5.0;
+export const SEASON_INFLUENCE_CAP_CLAMPED_MAX = 0.9;
 export const SEASON_INFLUENCE_MIN_BOUNDARY_SAMPLE = 500;
 export const SEASON_INFLUENCE_MIN_OBJECTIVE_SAMPLE = 30;
+export const SEASON_INFLUENCE_MIN_CHALLENGE_SAMPLE = 30;
 export const SEASON_INFLUENCE_MIN_WINDOW_SAMPLE = 10;
 export const SEASON_INFLUENCE_MIN_INJURY_SAMPLE = 20;
 export const seasonInfluenceTargetsSchema = z.object({
@@ -55,9 +59,16 @@ export const seasonInfluenceTargetsSchema = z.object({
     initialGrant: z.literal(2),
     blockGrant: z.literal(1),
     objectiveReward: z.literal(1),
+    challengeRewardStandard: z.literal(1),
+    challengeRewardHard: z.literal(2),
     cap: z.literal(8),
     floor: z.literal(0),
     objectiveSuccessEnvelope: z.tuple([z.literal(0.65), z.literal(0.95)]),
+    expectedEarnedPerBlockEnvelope: z.tuple([
+      z.literal(SEASON_INFLUENCE_EXPECTED_EARNED_MIN),
+      z.literal(SEASON_INFLUENCE_EXPECTED_EARNED_MAX),
+    ]),
+    capClampedShareMax: z.literal(SEASON_INFLUENCE_CAP_CLAMPED_MAX),
     debtFrequencyMax: z.literal(0.1),
     extraOfferSpendRateMax: z.literal(0.5),
     rehabSpendRateMax: z.literal(0.4),
@@ -81,6 +92,10 @@ export const seasonInfluenceTargetsSchema = z.object({
       capViolations: z.number().int().nonnegative(),
       objectiveEvaluations: z.number().int().nonnegative(),
       objectiveSuccessRate: z.number().min(0).max(1).nullable(),
+      challengeEvaluations: z.number().int().nonnegative(),
+      challengeSuccessRate: z.number().min(0).max(1).nullable(),
+      expectedEarnedPerBlock: z.number().min(0).max(6).nullable(),
+      capClampedShare: z.number().min(0).max(1).nullable(),
       extraOfferSpendShare: z.number().min(0).max(1),
       extraOfferWindows: z.number().int().nonnegative(),
       rehabSpendShare: z.number().min(0).max(1),
@@ -95,6 +110,10 @@ export const seasonInfluenceTargetsSchema = z.object({
       capViolations: z.number().int().nonnegative(),
       objectiveEvaluations: z.number().int().nonnegative(),
       objectiveSuccessRate: z.number().min(0).max(1).nullable(),
+      challengeEvaluations: z.number().int().nonnegative(),
+      challengeSuccessRate: z.number().min(0).max(1).nullable(),
+      expectedEarnedPerBlock: z.number().min(0).max(6).nullable(),
+      capClampedShare: z.number().min(0).max(1).nullable(),
     }),
   }),
   gates: z.object({
@@ -103,6 +122,8 @@ export const seasonInfluenceTargetsSchema = z.object({
     debtFrequency: z.boolean(),
     zeroCapViolations: z.boolean(),
     objectiveSuccessRate: z.boolean(),
+    expectedEarnedPerBlock: z.boolean(),
+    capClampedShare: z.boolean(),
     extraOfferSpendRate: z.boolean(),
     rehabSpendRate: z.boolean(),
     heldOut: z.boolean(),
@@ -170,6 +191,13 @@ export interface SeasonInfluenceFacts {
   capViolations: number;
   objectiveEvaluations: number;
   objectiveSuccessRate: number | null;
+  challengeEvaluations: number;
+  challengeSuccesses: number;
+  challengeSuccessRate: number | null;
+  challengeEarnedApplied: number;
+  challengeEarnedRequested: number;
+  challengeClampedCount: number;
+  challengeRewardEntries: number;
   extraOfferSpendShare: number;
   extraOfferWindows: number;
   rehabSpendShare: number;
@@ -193,6 +221,28 @@ export function seasonInfluenceFactsOf(season: SeasonM25SeasonFacts): SeasonInfl
     evaluated.length === 0
       ? null
       : share(evaluated.filter((selection) => selection.success === true).length, evaluated.length);
+  const challengeResults =
+    (
+      run as unknown as {
+        challenges?: { evaluations?: Array<{ results?: Array<{ success?: boolean }> }> } | null;
+      }
+    ).challenges?.evaluations?.flatMap((entry) => entry.results ?? []) ?? [];
+  const challengeEvaluations = challengeResults.length;
+  const challengeSuccesses = challengeResults.filter((result) => result.success === true).length;
+  const challengeSuccessRate =
+    challengeEvaluations === 0 ? null : share(challengeSuccesses, challengeEvaluations);
+  let challengeEarnedApplied = 0;
+  let challengeEarnedRequested = 0;
+  let challengeClampedCount = 0;
+  let challengeRewardEntries = 0;
+  for (const entry of run.influence.ledger) {
+    if (entry.source === 'challenge-reward') {
+      challengeRewardEntries += 1;
+      challengeEarnedApplied += entry.appliedDelta;
+      challengeEarnedRequested += entry.requestedDelta;
+      if (entry.appliedDelta < entry.requestedDelta) challengeClampedCount += 1;
+    }
+  }
   let extraOfferSpent = 0;
   const extraOfferWindows = season.windows.length * run.league.teams.length;
   for (const windowEntries of Object.values(run.influence.windows)) {
@@ -214,6 +264,13 @@ export function seasonInfluenceFactsOf(season: SeasonM25SeasonFacts): SeasonInfl
     capViolations,
     objectiveEvaluations: evaluated.length,
     objectiveSuccessRate,
+    challengeEvaluations,
+    challengeSuccesses,
+    challengeSuccessRate,
+    challengeEarnedApplied,
+    challengeEarnedRequested,
+    challengeClampedCount,
+    challengeRewardEntries,
     extraOfferSpendShare: share(extraOfferSpent, extraOfferWindows),
     extraOfferWindows,
     rehabSpendShare: share(rehabSpends, injuries),
@@ -230,6 +287,15 @@ export function foldInfluenceCohort(seasons: readonly SeasonM25SeasonFacts[]): {
   capViolations: number;
   objectiveEvaluations: number;
   objectiveSuccessRate: number | null;
+  challengeEvaluations: number;
+  challengeSuccesses: number;
+  challengeSuccessRate: number | null;
+  challengeEarnedApplied: number;
+  challengeEarnedRequested: number;
+  challengeClampedCount: number;
+  challengeRewardEntries: number;
+  expectedEarnedPerBlock: number | null;
+  capClampedShare: number | null;
   extraOfferSpendShare: number;
   extraOfferWindows: number;
   rehabSpendShare: number;
@@ -244,6 +310,13 @@ export function foldInfluenceCohort(seasons: readonly SeasonM25SeasonFacts[]): {
     capViolations: 0,
     objectiveEvaluations: 0,
     objectiveSuccesses: 0,
+    challengeEvaluations: 0,
+    challengeSuccesses: 0,
+    challengeEarnedApplied: 0,
+    challengeEarnedRequested: 0,
+    challengeClampedCount: 0,
+    challengeRewardEntries: 0,
+    blocksPlayed: 0,
     extraOfferWindows: 0,
     extraOfferSpent: 0,
     rehabSpends: 0,
@@ -261,6 +334,13 @@ export function foldInfluenceCohort(seasons: readonly SeasonM25SeasonFacts[]): {
         fact.objectiveSuccessRate * fact.objectiveEvaluations,
       );
     }
+    totals.challengeEvaluations += fact.challengeEvaluations;
+    totals.challengeSuccesses += fact.challengeSuccesses;
+    totals.challengeEarnedApplied += fact.challengeEarnedApplied;
+    totals.challengeEarnedRequested += fact.challengeEarnedRequested;
+    totals.challengeClampedCount += fact.challengeClampedCount;
+    totals.challengeRewardEntries += fact.challengeRewardEntries;
+    totals.blocksPlayed += 9;
     totals.extraOfferWindows += fact.extraOfferWindows;
     totals.extraOfferSpent += Math.round(fact.extraOfferSpendShare * fact.extraOfferWindows);
     totals.rehabSpends += Math.round(fact.rehabSpendShare * fact.rehabInjuries);
@@ -279,6 +359,22 @@ export function foldInfluenceCohort(seasons: readonly SeasonM25SeasonFacts[]): {
       totals.objectiveEvaluations === 0
         ? null
         : share(totals.objectiveSuccesses, totals.objectiveEvaluations),
+    challengeEvaluations: totals.challengeEvaluations,
+    challengeSuccesses: totals.challengeSuccesses,
+    challengeSuccessRate:
+      totals.challengeEvaluations === 0
+        ? null
+        : share(totals.challengeSuccesses, totals.challengeEvaluations),
+    challengeEarnedApplied: totals.challengeEarnedApplied,
+    challengeEarnedRequested: totals.challengeEarnedRequested,
+    challengeClampedCount: totals.challengeClampedCount,
+    challengeRewardEntries: totals.challengeRewardEntries,
+    expectedEarnedPerBlock:
+      totals.blocksPlayed === 0 ? null : totals.challengeEarnedApplied / totals.blocksPlayed,
+    capClampedShare:
+      totals.challengeRewardEntries === 0
+        ? null
+        : share(totals.challengeClampedCount, totals.challengeRewardEntries),
     extraOfferSpendShare: share(totals.extraOfferSpent, totals.extraOfferWindows),
     extraOfferWindows: totals.extraOfferWindows,
     rehabSpendShare: share(totals.rehabSpends, totals.rehabInjuries),
@@ -332,6 +428,22 @@ export function evaluateInfluenceGates(args: {
       SEASON_INFLUENCE_OBJECTIVE_SUCCESS_MAX,
       objectiveSample,
       SEASON_INFLUENCE_MIN_OBJECTIVE_SAMPLE,
+    ),
+    m25RangeGate(
+      'expectedEarnedPerBlock',
+      c.expectedEarnedPerBlock ?? 0,
+      SEASON_INFLUENCE_EXPECTED_EARNED_MIN,
+      SEASON_INFLUENCE_EXPECTED_EARNED_MAX,
+      c.challengeEvaluations,
+      SEASON_INFLUENCE_MIN_CHALLENGE_SAMPLE,
+    ),
+    m25RangeGate(
+      'capClampedShare',
+      c.capClampedShare ?? 0,
+      0,
+      SEASON_INFLUENCE_CAP_CLAMPED_MAX,
+      c.challengeRewardEntries,
+      SEASON_INFLUENCE_MIN_CHALLENGE_SAMPLE,
     ),
     m25RangeGate(
       'extraOfferSpendRate',
@@ -461,6 +573,8 @@ export function seasonInfluenceCalibrate(args: SeasonInfluenceArgs): CliReport {
     debtFrequency: gateValue(metrics, 'debtFrequency'),
     zeroCapViolations: gateValue(metrics, 'zeroCapViolations'),
     objectiveSuccessRate: gateValue(metrics, 'objectiveSuccessRate'),
+    expectedEarnedPerBlock: gateValue(metrics, 'expectedEarnedPerBlock'),
+    capClampedShare: gateValue(metrics, 'capClampedShare'),
     extraOfferSpendRate: gateValue(metrics, 'extraOfferSpendRate'),
     rehabSpendRate: gateValue(metrics, 'rehabSpendRate'),
     heldOut:
@@ -480,12 +594,19 @@ export function seasonInfluenceCalibrate(args: SeasonInfluenceArgs): CliReport {
         initialGrant: SEASON_INFLUENCE_INITIAL_GRANT,
         blockGrant: SEASON_INFLUENCE_BLOCK_GRANT,
         objectiveReward: 1,
+        challengeRewardStandard: 1,
+        challengeRewardHard: 2,
         cap: SEASON_INFLUENCE_CAP,
         floor: SEASON_INFLUENCE_FLOOR,
         objectiveSuccessEnvelope: [
           SEASON_INFLUENCE_OBJECTIVE_SUCCESS_MIN,
           SEASON_INFLUENCE_OBJECTIVE_SUCCESS_MAX,
         ],
+        expectedEarnedPerBlockEnvelope: [
+          SEASON_INFLUENCE_EXPECTED_EARNED_MIN,
+          SEASON_INFLUENCE_EXPECTED_EARNED_MAX,
+        ],
+        capClampedShareMax: SEASON_INFLUENCE_CAP_CLAMPED_MAX,
         debtFrequencyMax: SEASON_INFLUENCE_DEBT_FREQUENCY_MAX,
         extraOfferSpendRateMax: SEASON_INFLUENCE_EXTRA_OFFER_SPEND_MAX,
         rehabSpendRateMax: SEASON_INFLUENCE_REHAB_SPEND_MAX,
@@ -503,6 +624,10 @@ export function seasonInfluenceCalibrate(args: SeasonInfluenceArgs): CliReport {
           capViolations: calibrationCohort.capViolations,
           objectiveEvaluations: calibrationCohort.objectiveEvaluations,
           objectiveSuccessRate: calibrationCohort.objectiveSuccessRate,
+          challengeEvaluations: calibrationCohort.challengeEvaluations,
+          challengeSuccessRate: calibrationCohort.challengeSuccessRate,
+          expectedEarnedPerBlock: calibrationCohort.expectedEarnedPerBlock,
+          capClampedShare: calibrationCohort.capClampedShare,
           extraOfferSpendShare: calibrationCohort.extraOfferSpendShare,
           extraOfferWindows: calibrationCohort.extraOfferWindows,
           rehabSpendShare: calibrationCohort.rehabSpendShare,
@@ -517,6 +642,10 @@ export function seasonInfluenceCalibrate(args: SeasonInfluenceArgs): CliReport {
           capViolations: heldOutCohort.capViolations,
           objectiveEvaluations: heldOutCohort.objectiveEvaluations,
           objectiveSuccessRate: heldOutCohort.objectiveSuccessRate,
+          challengeEvaluations: heldOutCohort.challengeEvaluations,
+          challengeSuccessRate: heldOutCohort.challengeSuccessRate,
+          expectedEarnedPerBlock: heldOutCohort.expectedEarnedPerBlock,
+          capClampedShare: heldOutCohort.capClampedShare,
         },
       },
       gates,
@@ -553,6 +682,10 @@ export function seasonInfluenceCalibrate(args: SeasonInfluenceArgs): CliReport {
     capViolations: calibrationCohort.capViolations,
     objectiveEvaluations: calibrationCohort.objectiveEvaluations,
     objectiveSuccessRate: calibrationCohort.objectiveSuccessRate,
+    challengeEvaluations: calibrationCohort.challengeEvaluations,
+    challengeSuccessRate: calibrationCohort.challengeSuccessRate,
+    expectedEarnedPerBlock: calibrationCohort.expectedEarnedPerBlock,
+    capClampedShare: calibrationCohort.capClampedShare,
     extraOfferSpendShare: calibrationCohort.extraOfferSpendShare,
     extraOfferWindows: calibrationCohort.extraOfferWindows,
     rehabSpendShare: calibrationCohort.rehabSpendShare,
@@ -563,6 +696,8 @@ export function seasonInfluenceCalibrate(args: SeasonInfluenceArgs): CliReport {
       debtFrequency: gates.debtFrequency,
       zeroCapViolations: gates.zeroCapViolations,
       objectiveSuccessRate: gates.objectiveSuccessRate,
+      expectedEarnedPerBlock: gates.expectedEarnedPerBlock,
+      capClampedShare: gates.capClampedShare,
       extraOfferSpendRate: gates.extraOfferSpendRate,
       rehabSpendRate: gates.rehabSpendRate,
       heldOut: gates.heldOut,
@@ -578,6 +713,7 @@ export function seasonInfluenceCalibrate(args: SeasonInfluenceArgs): CliReport {
     `balance checks ${String(calibrationCohort.balanceChecks)} · reconciliation failures ${String(calibrationCohort.reconciliationFailures)} · income identity failures ${String(calibrationCohort.incomeIdentityFailures)} · cap violations ${String(calibrationCohort.capViolations)}`,
     `debt frequency ${(calibrationCohort.debtFrequency * 100).toFixed(2)}% (gate ≤ ${String(SEASON_INFLUENCE_DEBT_FREQUENCY_MAX * 100)}%)`,
     `objective success ${calibrationCohort.objectiveSuccessRate === null ? 'n/a' : `${(calibrationCohort.objectiveSuccessRate * 100).toFixed(1)}%`} over ${String(calibrationCohort.objectiveEvaluations)} evaluations (gate [${String(SEASON_INFLUENCE_OBJECTIVE_SUCCESS_MIN * 100)}%, ${String(SEASON_INFLUENCE_OBJECTIVE_SUCCESS_MAX * 100)}%])`,
+    `challenge earned/block ${calibrationCohort.expectedEarnedPerBlock === null ? 'n/a' : calibrationCohort.expectedEarnedPerBlock.toFixed(2)} (gate [${String(SEASON_INFLUENCE_EXPECTED_EARNED_MIN)}, ${String(SEASON_INFLUENCE_EXPECTED_EARNED_MAX)}]) · cap-clamped ${calibrationCohort.capClampedShare === null ? 'n/a' : `${(calibrationCohort.capClampedShare * 100).toFixed(1)}%`} (gate ≤ ${(SEASON_INFLUENCE_CAP_CLAMPED_MAX * 100).toFixed(0)}%) over ${String(calibrationCohort.challengeEvaluations)} challenge evaluations`,
     `extra-offer spend share ${(calibrationCohort.extraOfferSpendShare * 100).toFixed(1)}% · rehab spend share ${(calibrationCohort.rehabSpendShare * 100).toFixed(1)}%`,
     `targets ${targetsWritten ? `written to ${targetsPath ?? '?'}` : 'NOT written'}`,
   ];

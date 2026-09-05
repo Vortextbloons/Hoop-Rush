@@ -501,9 +501,8 @@ export function buildSeasonBlockRecap(input: SeasonBlockRecapInput): SeasonBlock
               challengeId: result.challengeId,
               success: result.success,
               reward:
-                SEASON_CHALLENGE_CATALOG.find(
-                  (entry) => entry.challengeId === result.challengeId,
-                )?.reward ?? 1,
+                SEASON_CHALLENGE_CATALOG.find((entry) => entry.challengeId === result.challengeId)
+                  ?.reward ?? 1,
               evaluationFacts: result.facts,
             }))
         : undefined,
@@ -710,18 +709,23 @@ export function auditSeasonBlockRecap(
       const actualSorted = [...actualChallenges].sort((a, b) =>
         a.challengeId < b.challengeId ? -1 : 1,
       );
-      if (JSON.stringify(actualSorted) !== JSON.stringify(expectedSorted.map((result) => ({
-        challengeId: result.challengeId,
-        success: result.success,
-        reward:
-          SEASON_CHALLENGE_CATALOG.find((entry) => entry.challengeId === result.challengeId)
-            ?.reward ?? 1,
-        evaluationFacts: result.facts,
-      })))) {
+      if (
+        JSON.stringify(actualSorted) !==
+        JSON.stringify(
+          expectedSorted.map((result) => ({
+            challengeId: result.challengeId,
+            success: result.success,
+            reward:
+              SEASON_CHALLENGE_CATALOG.find((entry) => entry.challengeId === result.challengeId)
+                ?.reward ?? 1,
+            evaluationFacts: result.facts,
+          })),
+        )
+      ) {
         failures.push('recap challenge evidence does not match the evaluated challenges');
       }
     }
-  } else if (actualChallenges !== null && actualChallenges !== undefined && actualChallenges.length > 0) {
+  } else if ((actualChallenges?.length ?? 0) > 0) {
     failures.push('recap challenge evidence without evaluated challenges');
   }
   return failures;

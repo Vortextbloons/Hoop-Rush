@@ -237,7 +237,7 @@ export function assembleSeasonPendingBlock(input: {
     input.challengeIds !== undefined &&
     input.challengeIds !== null &&
     input.challengeIds.length === 3
-      ? ( [...input.challengeIds] as unknown as SeasonPendingBlockCandidate['challengeIds'] )
+      ? ([...input.challengeIds] as unknown as SeasonPendingBlockCandidate['challengeIds'])
       : undefined;
   return {
     schemaVersion: 1,

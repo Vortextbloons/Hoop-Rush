@@ -33,10 +33,7 @@ import {
   type SeasonTradeValueTrend,
   type SeasonTradeWindowState,
 } from '@hoop-rush/data-contracts';
-import {
-  handleSeasonRunCommand,
-  type SeasonRunCommandContext,
-} from '@hoop-rush/engine';
+import { handleSeasonRunCommand, type SeasonRunCommandContext } from '@hoop-rush/engine';
 import type {
   SeasonBlockResumeInput,
   SeasonBlockRunner,

@@ -49,7 +49,7 @@ export interface CommitSeasonBlockInput {
   transactions: SeasonTransactionEntry[];
   influence: SeasonInfluenceState;
   trade: SeasonTradeState | null;
-  objectives: SeasonObjectiveState;
+  objectives?: SeasonObjectiveState | null;
   challenges?: SeasonChallengeState | null;
   campaign?: SeasonCampaignState | null;
   evolution?: SeasonEvolutionState | null;

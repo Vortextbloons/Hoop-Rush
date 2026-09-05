@@ -3,13 +3,16 @@ import {
   SEASON_HEALTH_VERSION,
   SEASON_OBJECTIVE_CATALOG,
   SEASON_OBJECTIVE_VERSION,
+  buildEmptyChallengeState,
   buildInitialPostseasonState,
   commandIdSchema,
+  seasonChallengeStateSchema,
   seasonHealthStateSchema,
   seasonObjectiveStateSchema,
   type FranchiseId,
   type Seed,
   type SeasonCandidateCheckpoint,
+  type SeasonChallengeState,
   type SeasonCheckpointState,
   type SeasonDraftCatalog,
   type SeasonEffectsState,
@@ -22,6 +25,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import {
   createInitialSeasonInfluenceState,
+  dealSeasonBlockChallenges,
   expandSeasonRunRosters,
   openSeasonTradeWindow,
   rosterPlayerIdsOf,
@@ -49,6 +53,9 @@ export function m25InitialObjectivesState(): SeasonObjectiveState {
     selections: {},
   });
 }
+export function m25InitialChallengesState(): SeasonChallengeState {
+  return seasonChallengeStateSchema.parse(buildEmptyChallengeState());
+}
 export function m25InitialInfluenceState(
   franchiseIds: readonly FranchiseId[],
 ): SeasonInfluenceState {
@@ -67,6 +74,7 @@ export interface SeasonM25RunStateFacts {
   trade: SeasonTradeState | null;
   freeAgency: SeasonRun['freeAgency'];
   objectives: SeasonObjectiveState;
+  challenges?: SeasonChallengeState | null;
   rosters: SeasonRun['rosters'];
   ownership: SeasonRun['ownership'];
   rotations: SeasonRun['rotations'];
@@ -89,6 +97,7 @@ export function m25RunStateFacts(
     trade: run.trade,
     freeAgency: run.freeAgency,
     objectives: run.objectives,
+    challenges: (run as unknown as { challenges?: SeasonChallengeState | null }).challenges ?? null,
     rosters: run.rosters,
     ownership: run.ownership,
     rotations: run.rotations,
@@ -114,6 +123,7 @@ export function m25FreshRun(args: {
     influence: m25InitialInfluenceState(franchiseIds),
     trade: null,
     objectives: m25InitialObjectivesState(),
+    challenges: m25InitialChallengesState(),
     checkpointState: null,
     stateRevision: 0,
     stateDigest: '0'.repeat(32),
@@ -190,11 +200,43 @@ export function runSeasonM25(options: SeasonM25DriverOptions): SeasonM25SeasonFa
     } else {
       state.objectiveId = null;
     }
+    if (blockIndex <= 7 && state.humanFranchiseId !== null) {
+      const challenges = (state.run as unknown as { challenges?: SeasonChallengeState | null })
+        .challenges;
+      if (
+        challenges !== undefined &&
+        challenges !== null &&
+        challenges.deals[blockIndex] === undefined
+      ) {
+        const deal = dealSeasonBlockChallenges(options.rootSeed, blockIndex, {
+          league: state.run.league,
+          schedule: state.schedule,
+          standings: state.run.standings,
+          humanFranchiseId: state.humanFranchiseId,
+        });
+        if (deal !== null) {
+          const nextChallenges: SeasonChallengeState = {
+            ...challenges,
+            deals: { ...challenges.deals, [blockIndex]: deal },
+          };
+          state.run = { ...state.run, challenges: nextChallenges };
+        }
+      }
+      const currentDeals = (state.run as unknown as { challenges?: SeasonChallengeState | null })
+        .challenges?.deals;
+      state.challengeDeal = currentDeals?.[blockIndex] ?? null;
+    } else {
+      state.challengeDeal = null;
+    }
     const checkpoint = runBlockThroughHandler(state, blockIndex);
     checkpoints.push(checkpoint);
     postBlock.push({ stateRevision: state.stateRevision, stateDigest: state.stateDigest });
     balanceSnapshots.push({ ...checkpoint.influence.balances });
-    if (state.objectiveId !== null && checkpoint.objective.objectiveId !== null) {
+    if (
+      state.objectiveId !== null &&
+      checkpoint.objective != null &&
+      checkpoint.objective.objectiveId != null
+    ) {
       state.run = {
         ...state.run,
         objectives: {

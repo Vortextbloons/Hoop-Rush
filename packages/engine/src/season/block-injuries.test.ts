@@ -1,14 +1,14 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
-  SEASON_OBJECTIVE_CATALOG,
-  commandIdSchema,
+  SEASON_CHALLENGE_CATALOG,
   franchiseIdSchema,
   seasonGameIdSchema,
+  type SeasonChallengeDeal,
   type SeasonGameSummary,
   type SeasonHealthState,
   type SeasonInjuryRecord,
 } from '@hoop-rush/data-contracts';
-import { buildTestRun, pipelineInput } from './block-test-support.ts';
+import { buildTestRun, pipelineInput, scheduleOf } from './block-test-support.ts';
 import {
   assembleSeasonBlockCandidate,
   auditSeasonBlock,
@@ -21,7 +21,21 @@ import {
   type SeasonBlockSimulationInput,
 } from './block.ts';
 import { assembleSeasonPendingBlock } from './health.ts';
-import { seasonObjectiveChoicesForBlock } from './objectives.ts';
+import { dealSeasonBlockChallenges } from './challenges.ts';
+function challengeDealOf(
+  run: ReturnType<typeof buildTestRun>['run'],
+  blockIndex: number,
+): SeasonChallengeDeal {
+  const schedule = scheduleOf(run);
+  const deal = dealSeasonBlockChallenges(run.rootSeed, blockIndex, {
+    league: run.league,
+    schedule,
+    standings: run.standings,
+    humanFranchiseId: 'lakers',
+  });
+  if (deal === null) throw new Error(`no challenge deal for block ${String(blockIndex)}`);
+  return deal;
+}
 function blockedHealthOf(run: SeasonBlockSimulationInput['run']): SeasonHealthState {
   const roster = run.rosters.find((entry) => entry.franchiseId === 'lakers');
   if (roster === undefined) throw new Error('lakers roster');
@@ -92,88 +106,87 @@ describe('M2.5 block pipeline with injuries', () => {
       }
     }
   });
-  it('folds the locked objective, influence grants, and transactions into the candidate', () => {
+  it('folds the dealt challenges, influence grants, and transactions into the candidate', () => {
     const { run, catalog } = buildTestRun();
-    const offered = seasonObjectiveChoicesForBlock(run.rootSeed, 0)[0];
-    if (offered === undefined) throw new Error('block 0 objective choices');
-    const objectives: SeasonBlockSimulationInput['objectives'] = {
-      schemaVersion: 1,
-      objectiveVersion: 'season-objective-v1',
-      catalog: [...SEASON_OBJECTIVE_CATALOG],
-      selections: {
-        0: {
-          objectiveId: offered,
-          selectedByCommandId: commandIdSchema.parse('cmd-select-0'),
-          success: null,
-        },
+    const deal = challengeDealOf(run, 0);
+    const baseInput = pipelineInput(run, catalog, 0);
+    const withChallenges: SeasonBlockSimulationInput = {
+      ...baseInput,
+      challengeDeal: deal,
+      command: {
+        ...baseInput.command,
+        objectiveId: null,
+        challengeIds: [...deal.challengeIds],
       },
     };
-    const withObjective: SeasonBlockSimulationInput = {
-      ...pipelineInput(run, catalog, 0),
-      objectiveId: offered,
-      objectives,
-      command: { ...pipelineInput(run, catalog, 0).command, objectiveId: offered },
-    };
-    const candidate = simulateSeasonBlock(withObjective);
-    expect(candidate.objective.objectiveId).toBe(offered);
-    expect(typeof candidate.objective.success).toBe('boolean');
-    expect(candidate.objective.evaluation.blockIndex).toBe(0);
-    expect(candidate.objective.evaluation.objectiveId).toBe(offered);
+    const candidate = simulateSeasonBlock(withChallenges);
+    expect(candidate.challenges).toBeDefined();
+    expect(candidate.challenges?.blockIndex).toBe(0);
+    expect(candidate.challenges?.results).toHaveLength(3);
+    expect(candidate.challengeIds).toEqual([...deal.challengeIds].sort());
+    const resultIds = (
+      candidate.challenges?.results.map((result) => result.challengeId) ?? []
+    ).sort();
+    expect(resultIds).toEqual([...deal.challengeIds].sort());
+    for (const result of candidate.challenges?.results ?? []) {
+      expect(typeof result.success).toBe('boolean');
+    }
+    const earned = (candidate.challenges?.results ?? []).reduce(
+      (sum, result) =>
+        sum +
+        (result.success
+          ? (SEASON_CHALLENGE_CATALOG.find((entry) => entry.challengeId === result.challengeId)
+              ?.reward ?? 0)
+          : 0),
+      0,
+    );
     const franchiseIds = run.league.teams.map((team) => team.franchiseId);
     for (const franchiseId of franchiseIds) {
       const balance = candidate.influence.balances[franchiseId] ?? 0;
       expect(balance).toBeGreaterThanOrEqual(3);
-      expect(balance).toBeLessThanOrEqual(4);
+      expect(balance).toBeLessThanOrEqual(3 + 4);
     }
     const humanDelta = candidate.influence.ledger
       .filter((entry) => entry.franchiseId === 'lakers' && entry.blockIndex === 0)
       .reduce((sum, entry) => sum + entry.appliedDelta, 0);
-    expect(humanDelta).toBe(candidate.objective.success ? 2 : 1);
+    expect(humanDelta).toBe(1 + earned);
     expect(candidate.recap.tradeEvidence.influenceDelta).toBe(humanDelta);
     expect(candidate.recap.influenceBalance.humanBalance).toBe(
       candidate.influence.balances[franchiseIdSchema.parse('lakers')] ?? 0,
     );
     expect(candidate.transactions.some((entry) => entry.type === 'block-grant')).toBe(true);
-    expect(candidate.transactions.filter((entry) => entry.type === 'objective-reward').length).toBe(
-      candidate.objective.success ? 1 : 0,
+    const successes = (candidate.challenges?.results ?? []).filter(
+      (result) => result.success,
+    ).length;
+    expect(candidate.transactions.filter((entry) => entry.type === 'challenge-reward').length).toBe(
+      successes,
     );
-    if (candidate.objective.objectiveId !== null) {
-      expect(candidate.recap.objectiveEvidence?.objectiveId).toBe(candidate.objective.objectiveId);
-      expect(candidate.recap.objectiveEvidence?.success).toBe(candidate.objective.success);
-    }
-    expect(auditSeasonBlock(candidate, withObjective)).toEqual([]);
+    expect(candidate.recap.challengeEvidence).toHaveLength(3);
+    expect(auditSeasonBlock(candidate, withChallenges)).toEqual([]);
   }, 60000);
-  it('rejects invalid objectives at the command boundary', () => {
+  it('rejects invalid challenges at the command boundary', () => {
     const { run, catalog } = buildTestRun();
-    const offered = seasonObjectiveChoicesForBlock(run.rootSeed, 0)[0];
-    if (offered === undefined) throw new Error('objective choices');
-    const objectives: SeasonBlockSimulationInput['objectives'] = {
-      schemaVersion: 1,
-      objectiveVersion: 'season-objective-v1',
-      catalog: [...SEASON_OBJECTIVE_CATALOG],
-      selections: {
-        0: {
-          objectiveId: offered,
-          selectedByCommandId: commandIdSchema.parse('cmd-select-0'),
-          success: null,
-        },
-      },
-    };
-    const base = { ...pipelineInput(run, catalog, 0), objectives };
-    expect(seasonBlockRejection(base)).toMatchObject({
-      code: 'invalid-objective',
+    const deal = challengeDealOf(run, 0);
+    const base = pipelineInput(run, catalog, 0);
+    expect(seasonBlockRejection({ ...base, challengeDeal: null })).toMatchObject({
+      code: 'invalid-challenge',
       expected: 'required',
       blockIndex: 0,
     });
-    const otherId = offered === 'win-six' ? 'defense-108' : 'win-six';
+    const otherDeal = challengeDealOf(run, 1);
     expect(
       seasonBlockRejection({
         ...base,
-        command: { ...base.command, objectiveId: otherId },
+        challengeDeal: deal,
+        command: { ...base.command, objectiveId: null, challengeIds: [...otherDeal.challengeIds] },
       }),
-    ).toMatchObject({ code: 'invalid-objective', expected: 'not-offered', objectiveId: otherId });
+    ).toMatchObject({ code: 'invalid-challenge', expected: 'not-offered' });
     expect(
-      seasonBlockRejection({ ...base, command: { ...base.command, objectiveId: offered } }),
+      seasonBlockRejection({
+        ...base,
+        challengeDeal: deal,
+        command: { ...base.command, objectiveId: null, challengeIds: [...deal.challengeIds] },
+      }),
     ).toBeNull();
     const block8 = pipelineInput(
       { ...run, cursor: { schemaVersion: 1 as const, completedRounds: 80 } },
@@ -183,16 +196,12 @@ describe('M2.5 block pipeline with injuries', () => {
     expect(
       seasonBlockRejection({
         ...block8,
-        objectives,
-        command: { ...block8.command, objectiveId: offered },
+        challengeDeal: deal,
+        command: { ...block8.command, objectiveId: null, challengeIds: [...deal.challengeIds] },
       }),
-    ).toMatchObject({ code: 'invalid-objective', expected: 'none', objectiveId: offered });
+    ).toMatchObject({ code: 'invalid-challenge', expected: 'none' });
     expect(
-      seasonBlockRejection({
-        ...block8,
-        objectives,
-        command: { ...block8.command, objectiveId: null },
-      }),
+      seasonBlockRejection({ ...block8, command: { ...block8.command, objectiveId: null } }),
     ).toBeNull();
   });
   it('interrupts mid-block and resumes to the identical uninterrupted digest', () => {
