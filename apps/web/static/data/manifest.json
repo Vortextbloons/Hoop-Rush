@@ -9081,13 +9081,9 @@
       "contentHash": "3d06092c5b7fac51b115db2c6c78baba34de133785ff8c0474b91ab042882bb2"
     }
   ],
-  "assets": {
-    "source": "NBA.com",
-    "cacheVersion": "2026-08-03-historical-logos-v1",
-    "headshotUrlTemplate": "https://cdn.nba.com/headshots/nba/latest/1040x760/{playerExternalId}.png",
-    "headshotUrlTemplateSecondary": "https://www.basketball-reference.com/req/20200617/images/headshots/{altIds.bbref}.jpg",
-    "logoUrlTemplate": "https://cdn.nba.com/logos/nba/{teamExternalId}/global/L/logo.svg",
-    "logoUrlTemplateSecondary": "https://a.espncdn.com/i/teamlogos/nba/500/{teamAbbreviation}.png"
+  "bracket": {
+    "url": "opponents/bracket.json",
+    "contentHash": "04c17a7a08ecb581fe1a2a6a9b4feb8d2595bb6b16e3f7722587b6cc3ae6cff6"
   },
   "playersIndex": {
     "url": "players-index.json",
@@ -9096,10 +9092,6 @@
   "rosterDetails": {
     "url": "roster-details.json",
     "contentHash": "5e7b6d4b601f5f47019bc04b97bcd8b2ee17f30b0b55a5be860be4129d73e397"
-  },
-  "bracket": {
-    "url": "opponents/bracket.json",
-    "contentHash": "4849a3382eb759038cd6665c1bd226aaaf02571a21f6dd66b74d0cf6441257e6"
   },
   "season": {
     "league": {
@@ -9112,11 +9104,11 @@
     },
     "draftCatalog": {
       "url": "season/draft-catalog.json",
-      "contentHash": "a3b68a7b804cd79c4a26aa713af0d0feb4f4240a9b048f8486a078f2b0f5cce9"
+      "contentHash": "c079fecd19e0b35f9a607dbfdeb3adf7bcbea2ef25566014f1813ee7a032a649"
     },
     "rosterTargets": {
       "url": "season/roster-targets.json",
-      "contentHash": "efd2e62728fffa13cefcb95e8213ccc5305a67401079d1de95d62c4840ae702f"
+      "contentHash": "b04cab14a77503cac97882c22ef9cebb727fe325d4e5f459fe1daa06866b7c17"
     },
     "freeAgencyIndex": {
       "url": "season/free-agency-index.json",
@@ -9125,10 +9117,14 @@
     "freeAgencyTargets": {
       "url": "season/free-agency-targets.json",
       "contentHash": "6fd388cdf3e15c24b52584975e979dabc105f42304f1fcf1489d34d11b5e17ff"
-    },
-    "evolutionTargets": {
-      "url": "season/franchise-evolution-targets.json",
-      "contentHash": "578dd3ec116da5771e7aa7a85b9091ae3aeee0dfad6c442cbeee8bdd24766243"
     }
+  },
+  "assets": {
+    "headshotUrlTemplate": "https://cdn.nba.com/headshots/nba/latest/1040x760/{playerExternalId}.png",
+    "headshotUrlTemplateSecondary": "https://www.basketball-reference.com/req/20200617/images/headshots/{altIds.bbref}.jpg",
+    "logoUrlTemplate": "https://cdn.nba.com/logos/nba/{teamExternalId}/global/L/logo.svg",
+    "logoUrlTemplateSecondary": "https://a.espncdn.com/i/teamlogos/nba/500/{teamAbbreviation}.png",
+    "source": "NBA.com",
+    "cacheVersion": "2026-08-03-historical-logos-v1"
   }
 }
