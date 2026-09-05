@@ -3,6 +3,7 @@ import { POSTSEASON_ALMANAC_DIGEST_PLACEHOLDER, deriveSeasonTradeGrades, seasonP
 import { SeasonRunCommandDuplicateError, SeasonRunCommandRunMismatchError, SeasonRunCommandStaleStateError, type SeasonPostseasonRepository, type SeasonRunRepository, type SeasonRunSnapshot, } from '@hoop-rush/persistence';
 import type { CommitPostseasonAdvancementInput } from '@hoop-rush/persistence';
 import type { SeasonArtifactUrls } from './season-assets';
+import { randomUUID } from '$lib/random-id';
 import { newSeasonId } from './season-ids';
 import { postseasonPostCommandEffects, seasonPostseasonCommitResultDigest, seasonPostseasonScorelineOf as scorelineOf, seasonPostseasonTransactionIdsOf, seasonPostseasonWireRequestOf, } from './season-postseason-simulation';
 export type SeasonPostseasonMode = 'advance' | 'spectate' | 'fast-forward';
@@ -550,7 +551,7 @@ export function createSeasonPostseasonRunner(deps: SeasonPostseasonRunnerDeps = 
                     if (requestActive())
                         return;
                     const target = createWorker();
-                    const requestId = `warm-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+                    const requestId = `warm-${randomUUID()}`;
                     warmRequestId = requestId;
                     target.postMessage(seasonPostseasonWorkerWarmRequestSchema.parse({
                         schemaVersion: 1,
@@ -578,7 +579,7 @@ export function createSeasonPostseasonRunner(deps: SeasonPostseasonRunnerDeps = 
         if (currentRequestId !== null) {
             throw new Error('a postseason run is already in flight; cancel it first');
         }
-        const requestId = `sp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+        const requestId = `sp-${randomUUID()}`;
         currentRequestId = requestId;
         cancelled = false;
         void orchestrate(requestId, input, mode);

@@ -10,3 +10,7 @@ export const seasonRunCommandBaseSchema = z.object({
     expectedStateDigest: seasonCheckpointDigestSchema,
 });
 export type SeasonRunCommandBase = z.infer<typeof seasonRunCommandBaseSchema>;
+export const windowIndexSchema = z.number().int().min(0).max(2);
+export const blockIndexSchema = z.number().int().min(0).max(8);
+export const objectiveBlockIndexSchema = z.number().int().min(0).max(7);
+export const inquiryIdSchema = z.string().regex(/^inq-[0-9a-f]{32}$/);

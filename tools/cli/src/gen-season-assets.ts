@@ -3,7 +3,6 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SEASON_AGGREGATES_VERSION, SEASON_AI_VERSION, SEASON_ALMANAC_VERSION, SEASON_AWARDS_VERSION, SEASON_BLOCK_VERSION, SEASON_CAMPAIGN_TARGETS_VERSION, SEASON_CAMPAIGN_VERSION, SEASON_CHECKPOINT_VERSION, SEASON_CHEMISTRY_VERSION, SEASON_COMMAND_LOG_VERSION, SEASON_COMMITTED_DRAFT_SEED, SEASON_COMMITTED_SCHEDULE_SEED, contentHashSchema, idSchema, seedSchema, SEASON_DRAFT_VERSION, SEASON_EFFECT_TARGETS_VERSION, SEASON_FREE_AGENCY_INDEX_VERSION, SEASON_FREE_AGENCY_TARGETS_VERSION, SEASON_FREE_AGENCY_VERSION, SEASON_GAME_SUMMARY_VERSION, SEASON_GAME_TARGETS_VERSION, SEASON_GAME_VERSION, SEASON_HEALTH_VERSION, SEASON_HOME_COURT_VERSION, SEASON_INFLUENCE_TARGETS_VERSION, SEASON_INFLUENCE_VERSION, SEASON_INJURY_TARGETS_VERSION, SEASON_LEADERS_VERSION, SEASON_OBJECTIVE_CATALOG, SEASON_OBJECTIVE_VERSION, SEASON_POSTSEASON_SUMMARY_VERSION, SEASON_POSTSEASON_TARGETS_VERSION, SEASON_POSTSEASON_VERSION, SEASON_RECAP_VERSION, SEASON_REPLAY_EXPORT_VERSION, SEASON_ROSTER_GENERATION_VERSION, SEASON_ROSTER_RULES_VERSION, SEASON_ROSTER_TARGETS_VERSION, SEASON_MINUTE_POLICY_VERSION, SEASON_ROTATION_PLANNER_VERSION, SEASON_ROTATION_VERSION, SEASON_RUN_SCHEMA_VERSION, SEASON_STAMINA_VERSION, SEASON_TIEBREAK_VERSION, SEASON_TRADE_GRADE_VERSION, SEASON_TRADE_TARGETS_VERSION, SEASON_TRADE_VERSION, buildInitialPostseasonState, seasonDraftCatalogSchema, seasonDraftStateSchema, seasonLeagueSchema, seasonObjectiveStateSchema, seasonRosterTargetsSchema, seasonRunSchema, seasonScheduleSchema, seasonFreeAgencyStateSchema, type SeasonDraftCommand, type SeasonDraftState, type SeasonLeague, type SeasonLeagueGenerationResult, type SeasonRun, type SeasonSchedule, } from '@hoop-rush/data-contracts';
 import { applySeasonDraftCommand, buildEmptyCampaignState, buildLocalSoloAuthority, createInitialSeasonInfluenceState, createSeasonEffectsState, expandSeasonRunRosters, generateAiLeague, seasonDraftStateDigest, seasonRunStateDigest, } from '@hoop-rush/engine';
-import { buildSeasonRunFixture } from '@hoop-rush/test-fixtures';
 import { pickBestSelectable } from './commands/season-data.ts';
 import { readJson, sha256Hex } from './io.ts';
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../');
@@ -321,8 +320,6 @@ function main(): void {
     const finalizedState = seasonDraftStateSchema.parse(state);
     writeFileSync(resolve(FIXTURES_DIR, 'season-draft-finalized.json'), `${JSON.stringify(finalizedState, null, 2)}\n`);
     console.log(`wrote ${resolve(FIXTURES_DIR, 'season-draft-finalized.json')}`);
-    void buildSeasonRunFixture;
-    void seasonDraftStateSchema;
     const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')) as {
         season?: Record<string, {
             url?: string;

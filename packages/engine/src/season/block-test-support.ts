@@ -1,5 +1,6 @@
-import { SEASON_AGGREGATES_VERSION, SEASON_AI_VERSION, SEASON_ALIGNMENT, SEASON_AUTHORITY_VERSION, SEASON_BLOCK_VERSION, SEASON_CHECKPOINT_VERSION, SEASON_CHEMISTRY_VERSION, SEASON_EFFECT_TARGETS_VERSION, SEASON_FREE_AGENCY_INDEX_VERSION, SEASON_FREE_AGENCY_TARGETS_VERSION, SEASON_FREE_AGENCY_VERSION, SEASON_GAME_SUMMARY_VERSION, SEASON_GAME_TARGETS_VERSION, SEASON_GAME_VERSION, SEASON_HEALTH_VERSION, SEASON_HOME_COURT_VERSION, SEASON_INFLUENCE_TARGETS_VERSION, SEASON_INFLUENCE_VERSION, SEASON_INJURY_TARGETS_VERSION, SEASON_LEAGUE_VERSION, SEASON_LEADERS_VERSION, SEASON_OBJECTIVE_VERSION, SEASON_POSTSEASON_VERSION, SEASON_POSTSEASON_SUMMARY_VERSION, SEASON_POSTSEASON_TARGETS_VERSION, SEASON_RECAP_VERSION, SEASON_ROSTER_GENERATION_VERSION, SEASON_ROSTER_RULES_VERSION, SEASON_ROSTER_TARGETS_VERSION, SEASON_ROTATION_PLANNER_VERSION, SEASON_ROTATION_VERSION, SEASON_MINUTE_POLICY_VERSION, SEASON_RUN_SCHEMA_VERSION, SEASON_SCHEDULE_FORMULA_VERSION, SEASON_SCHEDULE_VERSION, SEASON_SEED_DERIVATION_VERSION, SEASON_STAMINA_VERSION, SEASON_STANDINGS_VERSION, SEASON_TIEBREAK_VERSION, SEASON_TRADE_TARGETS_VERSION, SEASON_TRADE_VERSION, SEASON_ALMANAC_VERSION, SEASON_AWARDS_VERSION, SEASON_COMMAND_LOG_VERSION, SEASON_DRAFT_VERSION, SEASON_REPLAY_EXPORT_VERSION, SEASON_TRADE_GRADE_VERSION, PLAYER_VERSION_ID_VERSION, SEASON_OBJECTIVE_CATALOG, buildInitialPostseasonState, commandIdSchema, contentHashSchema, franchiseIdSchema, idSchema, seasonEffectsStateSchema, seasonRunSchema, seedSchema, type SeasonCheckpointVersions, type SeasonDraftCatalog, type SeasonEffectsState, type SeasonGameSummary, type SeasonHealthState, type SeasonLeagueGenerationResult, type SeasonPairChemistryState, type SeasonRun, type SeasonSubmitBlockCommand, } from '@hoop-rush/data-contracts';
+import { SEASON_AGGREGATES_VERSION, SEASON_AI_VERSION, SEASON_ALIGNMENT, SEASON_AUTHORITY_VERSION, SEASON_BLOCK_VERSION, SEASON_CHECKPOINT_VERSION, SEASON_CHEMISTRY_VERSION, SEASON_EFFECT_TARGETS_VERSION, SEASON_FREE_AGENCY_INDEX_VERSION, SEASON_FREE_AGENCY_TARGETS_VERSION, SEASON_FREE_AGENCY_VERSION, SEASON_GAME_SUMMARY_VERSION, SEASON_GAME_TARGETS_VERSION, SEASON_GAME_VERSION, SEASON_HEALTH_VERSION, SEASON_HOME_COURT_VERSION, SEASON_INFLUENCE_TARGETS_VERSION, SEASON_INFLUENCE_VERSION, SEASON_INJURY_TARGETS_VERSION, SEASON_LEAGUE_VERSION, SEASON_LEADERS_VERSION, SEASON_OBJECTIVE_VERSION, SEASON_POSTSEASON_VERSION, SEASON_POSTSEASON_SUMMARY_VERSION, SEASON_POSTSEASON_TARGETS_VERSION, SEASON_RECAP_VERSION, SEASON_ROSTER_GENERATION_VERSION, SEASON_ROSTER_RULES_VERSION, SEASON_ROSTER_TARGETS_VERSION, SEASON_ROTATION_PLANNER_VERSION, SEASON_ROTATION_VERSION, SEASON_MINUTE_POLICY_VERSION, SEASON_RUN_SCHEMA_VERSION, SEASON_SCHEDULE_FORMULA_VERSION, SEASON_SCHEDULE_VERSION, SEASON_SEED_DERIVATION_VERSION, SEASON_STAMINA_VERSION, SEASON_STANDINGS_VERSION, SEASON_TIEBREAK_VERSION, SEASON_TRADE_TARGETS_VERSION, SEASON_TRADE_VERSION, SEASON_ALMANAC_VERSION, SEASON_AWARDS_VERSION, SEASON_COMMAND_LOG_VERSION, SEASON_DRAFT_VERSION, SEASON_REPLAY_EXPORT_VERSION, SEASON_TRADE_GRADE_VERSION, PLAYER_VERSION_ID_VERSION, SEASON_OBJECTIVE_CATALOG, buildInitialPostseasonState, commandIdSchema, contentHashSchema, franchiseIdSchema, idSchema, seasonRunSchema, seedSchema, type SeasonCheckpointVersions, type SeasonDraftCatalog, type SeasonEffectsState, type SeasonGameSummary, type SeasonHealthState, type SeasonLeagueGenerationResult, type SeasonRun, type SeasonSubmitBlockCommand, } from '@hoop-rush/data-contracts';
 import { buildEraSimulationProfile, buildFixtureGenerationAudit, buildFixtureRosterTargets, buildFixtureSeasonDraftFacts, buildSeasonDraftCatalog, buildSeasonLeague, } from '@hoop-rush/test-fixtures';
+import { zeroEffectsOf } from './season-economy-test-support.ts';
 import { generateSeasonSchedule } from './schedule.ts';
 import { generateAiLeague } from './ai.ts';
 import { expandSeasonRunRosters, deriveSeasonPostBlockState, rosterPlayerIdsOf, simulateSeasonBlock, type SeasonBlockSimulationInput, } from './block.ts';
@@ -290,38 +291,6 @@ export function pipelineInput(run: SeasonRun, catalog: SeasonDraftCatalog, block
         influence: run.influence,
         transactions: run.transactions,
     };
-}
-function zeroEffectsOf(run: SeasonRun): SeasonEffectsState {
-    const playerStates = run.rosters
-        .flatMap((roster) => roster.players.map((player) => ({
-        playerVersionId: player.playerVersionId,
-        fatigueBasisPoints: 0,
-        recentLoadBasisPoints: 0,
-        lastCompletedRound: 0,
-    })))
-        .sort((a, b) => (a.playerVersionId < b.playerVersionId ? -1 : 1));
-    const pairStates: SeasonPairChemistryState[] = [];
-    for (const roster of run.rosters) {
-        const ids = roster.players.map((player) => player.playerVersionId).sort();
-        for (let i = 0; i < ids.length; i += 1) {
-            const a = ids[i];
-            if (a === undefined)
-                continue;
-            for (let j = i + 1; j < ids.length; j += 1) {
-                const b = ids[j];
-                if (b === undefined)
-                    continue;
-                pairStates.push({ a, b, sharedPossessions: 0 });
-            }
-        }
-    }
-    return seasonEffectsStateSchema.parse({
-        schemaVersion: 2,
-        playerStates,
-        inactivePlayerStates: [],
-        pairStates,
-        archivedPairs: [],
-    });
 }
 export interface RunnerState {
     run: SeasonRun;
