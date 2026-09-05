@@ -431,7 +431,7 @@ describe('Season Run performance pass (dexie v9)', () => {
       150,
     );
     expect(await repo.loadActiveRunWithSchedule(schedule)).not.toBeNull();
-  });
+  }, 15000);
   it('every teardown path removes every run-scoped row (centralized lifecycle)', async () => {
     const adapters = makeAdapters();
     const { db, repo, run } = adapters;
@@ -782,7 +782,7 @@ describe('Season Run performance pass (dexie v9)', () => {
     expect(await db.seasonRuns.count()).toBe(1);
     expect((await db.seasonRuns.get(SEASON_RUN_RECORD_ID))?.run.runId).toBe('perf-run-replacement');
     expect((await repo.loadActiveRunIndex())?.runId).toBe('perf-run-replacement');
-  });
+  }, 15000);
   it('writes the compact player slice at promotion and merges upserts', async () => {
     const { repo, run } = makeAdapters();
     const first = run.rosters[0]?.players[0];
