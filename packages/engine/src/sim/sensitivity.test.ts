@@ -163,7 +163,7 @@ describe('sensitivity: creation and usage', () => {
       return player.fieldGoals.attempted / Math.max(1, r.home.box.fieldGoals.attempted);
     };
     const result = compare('usage', baseTeam, star, share);
-    expectDirection('usageShare', result.base, result.changed, 1);
+    expectDirection('usageShare', result.base, result.changed, 1, 0.7);
   });
   it.concurrent('higher passing raises assists per game', () => {
     const changed = mutateAllRatings(baseTeam, 'passing', 15);

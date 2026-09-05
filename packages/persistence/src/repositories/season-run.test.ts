@@ -130,7 +130,7 @@ async function promote(adapters: Adapters): Promise<void> {
   await adapters.repo.promoteSeasonDraftToRun(buildFixtureStoredDraft(adapters.run), adapters.run);
   const snapshot = await adapters.repo.loadActiveRun();
   if (snapshot === null) throw new Error('expected promoted run');
-  adapters.run = snapshot.run;
+  Object.assign(adapters.run, snapshot.run);
 }
 async function loadOrThrow(adapters: Adapters) {
   const snapshot = await adapters.repo.loadActiveRun();
@@ -1036,54 +1036,64 @@ describe('season run M2.5 pending blocks (v5)', () => {
   });
 });
 describe('season run M2.5 command application (v5)', () => {
-  function selectObjectiveCommand(
+  function firstCampaignOffer(adapters: Adapters) {
+    const offer = adapters.run.campaign?.offers[0]?.[0];
+    if (offer === undefined) throw new Error('expected block-0 campaign offers after promote');
+    return offer;
+  }
+  function selectCampaignCommand(
     adapters: Adapters,
     overrides: Partial<SeasonRunCommand> = {},
   ): SeasonRunCommand {
+    const offer = firstCampaignOffer(adapters);
     return seasonRunCommandSchema.parse({
       schemaVersion: 11,
-      command: 'select-block-objective',
+      command: 'select-campaign-opportunity',
       commandId: commandIdSchema.parse('cmd-select-0'),
       runId: adapters.run.runId,
-      expectedStateRevision: 0,
+      expectedStateRevision: adapters.run.stateRevision,
       expectedStateDigest: adapters.run.stateDigest,
       blockIndex: 0,
-      objectiveId: 'win-six',
+      opportunityId: offer.opportunityId,
       ...overrides,
     });
   }
   function postCommandRun(adapters: Adapters): SeasonRun {
     const { run } = adapters;
-    const objectives = {
-      ...run.objectives,
+    const offer = firstCampaignOffer(adapters);
+    const campaign = {
+      ...run.campaign!,
       selections: {
         0: {
-          objectiveId: 'win-six' as const,
+          opportunityId: offer.opportunityId,
           selectedByCommandId: commandIdSchema.parse('cmd-select-0'),
-          success: null,
         },
       },
     };
     return {
       ...run,
-      objectives,
-      stateRevision: 1,
-      stateDigest: buildFixtureStateDigest(run, { stateRevision: 1, objectives }),
+      campaign,
+      stateRevision: run.stateRevision + 1,
+      stateDigest: buildFixtureStateDigest(run, {
+        stateRevision: run.stateRevision + 1,
+        campaign,
+      }),
     };
   }
   it('applies a command atomically and reloads with the audit passing', async () => {
     const adapters = makeAdapters();
     const { repo, run } = adapters;
     await promote(adapters);
+    const offer = firstCampaignOffer(adapters);
     await repo.applySeasonRunCommand({
       runId: run.runId,
-      command: selectObjectiveCommand(adapters),
+      command: selectCampaignCommand(adapters),
       run: postCommandRun(adapters),
       pending: null,
     });
     const snapshot = await repo.loadActiveRun();
     expect(snapshot?.run.stateRevision).toBe(1);
-    expect(snapshot?.run.objectives.selections[0]?.objectiveId).toBe('win-six');
+    expect(snapshot?.run.campaign?.selections[0]?.opportunityId).toBe(offer.opportunityId);
     expect(snapshot?.run.checkpointState).toBeNull();
   });
   it('rejects a stale command (revision and digest) and a run mismatch', async () => {
@@ -1093,7 +1103,7 @@ describe('season run M2.5 command application (v5)', () => {
     await expect(
       repo.applySeasonRunCommand({
         runId: run.runId,
-        command: selectObjectiveCommand(adapters, { expectedStateRevision: 3 }),
+        command: selectCampaignCommand(adapters, { expectedStateRevision: 3 }),
         run: postCommandRun(adapters),
         pending: null,
       }),
@@ -1101,7 +1111,7 @@ describe('season run M2.5 command application (v5)', () => {
     await expect(
       repo.applySeasonRunCommand({
         runId: run.runId,
-        command: selectObjectiveCommand(adapters, { expectedStateDigest: 'f'.repeat(32) }),
+        command: selectCampaignCommand(adapters, { expectedStateDigest: 'f'.repeat(32) }),
         run: postCommandRun(adapters),
         pending: null,
       }),
@@ -1109,7 +1119,7 @@ describe('season run M2.5 command application (v5)', () => {
     await expect(
       repo.applySeasonRunCommand({
         runId: 'other-run',
-        command: selectObjectiveCommand(adapters),
+        command: selectCampaignCommand(adapters),
         run: postCommandRun(adapters),
         pending: null,
       }),
@@ -1119,7 +1129,7 @@ describe('season run M2.5 command application (v5)', () => {
     const adapters = makeAdapters();
     const { repo, run } = adapters;
     await promote(adapters);
-    const command = selectObjectiveCommand(adapters);
+    const command = selectCampaignCommand(adapters);
     await repo.applySeasonRunCommand({
       runId: run.runId,
       command,
@@ -1149,7 +1159,7 @@ describe('season run M2.5 command application (v5)', () => {
     await expect(
       repo.applySeasonRunCommand({
         runId: run.runId,
-        command: selectObjectiveCommand(adapters, {
+        command: selectCampaignCommand(adapters, {
           commandId: commandIdSchema.parse('command-0'),
           expectedStateRevision: 1,
           expectedStateDigest: blocks[0]?.stateDigest ?? '0'.repeat(32),
@@ -1186,7 +1196,7 @@ describe('season run M2.5 command application (v5)', () => {
     const advanced = { ...pending, nextGameId: seasonGameIdSchema.parse('s000017') };
     await repo.applySeasonRunCommand({
       runId: run.runId,
-      command: selectObjectiveCommand(adapters),
+      command: selectCampaignCommand(adapters),
       run: postCommandRun(adapters),
       pending: advanced,
     });
@@ -1249,6 +1259,7 @@ describe('season run M2.5 reload audit (v5)', () => {
       transactions: base.transactions,
       trade,
       objectives: base.objectives,
+      challenges: run.challenges ?? null,
       campaign: run.campaign ?? null,
       rosters: run.rosters,
       ownership: run.ownership,
@@ -1303,6 +1314,7 @@ describe('season run M2.5 reload audit (v5)', () => {
       transactions: base.transactions,
       trade: base.trade,
       objectives: base.objectives,
+      challenges: run.challenges ?? null,
       campaign: run.campaign ?? null,
       rosters: run.rosters,
       ownership: run.ownership,
@@ -1355,6 +1367,7 @@ describe('season run M2.5 reload audit (v5)', () => {
       transactions: stored.transactions,
       trade,
       objectives: stored.objectives,
+      challenges: stored.challenges ?? adapters.run.challenges ?? null,
       campaign: stored.campaign ?? adapters.run.campaign ?? null,
       rosters: stored.run.rosters,
       ownership: stored.run.ownership,

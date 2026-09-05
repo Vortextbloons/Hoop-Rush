@@ -10,6 +10,7 @@ import {
   SIMULATION_TENDENCIES,
   PLAYER_VERSION_ID_VERSION,
   canonicalJson,
+  buildEmptyChallengeState,
   commandIdSchema,
   eraIdSchema,
   franchiseIdSchema,
@@ -45,6 +46,7 @@ import {
   buildFixtureEffectsState,
   buildFixtureLeague,
   buildFixtureRosters,
+  buildFixturePromotedDigestContext,
   buildFixtureRun,
   buildFixtureSchedule,
   buildFixtureStoredDraft,
@@ -327,14 +329,10 @@ async function makeFlow(): Promise<FlowContext> {
     schedule: buildFixtureSchedule(SEED),
     seam,
   });
-  const health = seasonHealthStateSchema.parse({
-    schemaVersion: 1,
-    healthVersion: SEASON_HEALTH_VERSION,
-    injuries: [],
-  });
   const influence = seam.createInitialSeasonInfluenceState(
     run.league.teams.map((team) => team.franchiseId),
   );
+  const promoted = buildFixturePromotedDigestContext(run, seam);
   const stateDigest = seam.seasonRunStateDigest({
     stateRevision: 0,
     stage: run.stage,
@@ -342,12 +340,13 @@ async function makeFlow(): Promise<FlowContext> {
     awards: run.awards,
     completion: run.completion,
     checkpointState: run.checkpointState,
-    health,
-    influence,
+    health: promoted.health,
+    influence: promoted.influence,
     transactions: [],
     trade: run.trade,
-    objectives: run.objectives,
-    campaign: run.campaign ?? null,
+    objectives: promoted.objectives,
+    challenges: promoted.challenges,
+    campaign: promoted.campaign,
     rosters: run.rosters,
     ownership: run.ownership,
     rotations: run.rotations,
@@ -357,8 +356,8 @@ async function makeFlow(): Promise<FlowContext> {
   });
   const aligned: SeasonRun = {
     ...run,
-    health,
-    influence,
+    health: promoted.health,
+    influence: promoted.influence,
     transactions: [],
     stateRevision: 0,
     stateDigest,

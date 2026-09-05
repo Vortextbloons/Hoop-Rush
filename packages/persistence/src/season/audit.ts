@@ -1,5 +1,6 @@
 import {
   blockIndexForRound,
+  buildEmptyChallengeState,
   franchiseIdSchema,
   postseasonGameIdSchema,
   seasonGameIdSchema,
@@ -685,6 +686,10 @@ export function auditSeasonRunState(
       transactions: stored.transactions,
       trade: stored.trade,
       objectives: stored.objectives,
+      challenges:
+        stored.challenges ??
+        (stored.run as { challenges?: unknown }).challenges ??
+        buildEmptyChallengeState(),
       campaign: stored.campaign ?? null,
       evolution: stored.run.evolution ?? stored.evolution ?? null,
       rosters: stored.run.rosters,

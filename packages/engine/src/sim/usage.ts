@@ -41,10 +41,7 @@ export interface ShotSelection {
 }
 export function lineupMeanUsage(team: SimulationTeam): number {
   if (team.players.length === 0) return 10;
-  const total = team.players.reduce(
-    (sum, p) => sum + Math.max(0.5, p.tendencies.usageRate),
-    0,
-  );
+  const total = team.players.reduce((sum, p) => sum + Math.max(0.5, p.tendencies.usageRate), 0);
   return total / team.players.length;
 }
 export function relativeUsage(player: SimulationPlayer, team: SimulationTeam): number {
@@ -55,14 +52,20 @@ export function initiatorRole(player: SimulationPlayer, team: SimulationTeam): n
     Math.max(1e-9, relativeUsage(player, team)),
     ENGINE_CONSTANTS.initiatorRoleExponent,
   );
-  return Math.min(ENGINE_CONSTANTS.initiatorRoleMax, Math.max(ENGINE_CONSTANTS.initiatorRoleMin, curved));
+  return Math.min(
+    ENGINE_CONSTANTS.initiatorRoleMax,
+    Math.max(ENGINE_CONSTANTS.initiatorRoleMin, curved),
+  );
 }
 export function finisherRole(player: SimulationPlayer, team: SimulationTeam): number {
   const curved = Math.pow(
     Math.max(1e-9, relativeUsage(player, team)),
     ENGINE_CONSTANTS.finisherRoleExponent,
   );
-  return Math.min(ENGINE_CONSTANTS.finisherRoleMax, Math.max(ENGINE_CONSTANTS.finisherRoleMin, curved));
+  return Math.min(
+    ENGINE_CONSTANTS.finisherRoleMax,
+    Math.max(ENGINE_CONSTANTS.finisherRoleMin, curved),
+  );
 }
 export function initiatorWeight(
   player: SimulationPlayer,

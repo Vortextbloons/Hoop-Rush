@@ -4,7 +4,7 @@ import {
   handleSeasonRunCommand,
   seasonRunStateDigest,
 } from '@hoop-rush/engine';
-import { commandIdSchema, buildEmptyCampaignState } from '@hoop-rush/data-contracts';
+import { commandIdSchema, buildEmptyCampaignState, buildEmptyChallengeState } from '@hoop-rush/data-contracts';
 import { seasonRunEngineSeam } from './engine-seam.ts';
 import type { SeasonRunStateDigestFacts } from './engine-seam-types.ts';
 import {
@@ -30,6 +30,7 @@ function digestFactsFromRun(
     transactions: run.transactions,
     trade: run.trade,
     objectives: run.objectives,
+    challenges: run.challenges ?? buildEmptyChallengeState(),
     campaign: run.campaign ?? null,
     rosters: run.rosters,
     ownership: run.ownership,
@@ -55,6 +56,7 @@ describe('seasonRunEngineSeam state digest parity', () => {
       transactions: run.transactions,
       trade: run.trade,
       objectives: run.objectives,
+      challenges: run.challenges ?? buildEmptyChallengeState(),
       rosters: run.rosters,
       ownership: run.ownership,
       rotations: run.rotations,
@@ -145,5 +147,16 @@ describe('seasonRunEngineSeam state digest parity', () => {
     const facts = digestFactsFromRun(output.run);
     expect(seasonRunEngineSeam.seasonRunStateDigest(facts)).toBe(output.run.stateDigest);
     expect(seasonRunStateDigest(facts)).toBe(output.run.stateDigest);
+  });
+  it('includes challenges in fixture digests identically through both bindings', () => {
+    const schedule = buildFixtureSchedule(SEED);
+    const run = buildFixtureRun({ seed: SEED, runId: 'digest-parity-challenges-run', schedule });
+    const facts = digestFactsFromRun(run);
+    expect(facts.challenges).toBeDefined();
+    expect(buildFixtureStateDigest(run)).toBe(run.stateDigest);
+    expect(seasonRunEngineSeam.seasonRunStateDigest(facts)).toBe(run.stateDigest);
+    expect(seasonRunStateDigest(facts)).toBe(run.stateDigest);
+    const withoutChallenges = { ...facts, challenges: undefined };
+    expect(seasonRunStateDigest(withoutChallenges)).not.toBe(run.stateDigest);
   });
 });

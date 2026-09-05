@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   SEASON_EMPTY_COMMAND_LOG_DIGEST,
+  buildEmptyChallengeState,
   commandIdSchema,
   franchiseIdSchema,
   idSchema,
@@ -50,6 +51,9 @@ function makeAdapters(): Adapters {
 }
 async function promote(adapters: Adapters): Promise<void> {
   await adapters.repo.promoteSeasonDraftToRun(buildFixtureStoredDraft(adapters.run), adapters.run);
+  const snapshot = await adapters.repo.loadActiveRun();
+  if (snapshot === null) throw new Error('expected promoted run');
+  Object.assign(adapters.run, snapshot.run);
 }
 function advancedRun(adapters: Adapters, stage: SeasonRun['stage']): SeasonRun {
   const next: SeasonRun = {
@@ -89,6 +93,7 @@ function stateDigestOf(adapters: Adapters, run: SeasonRun): string {
     transactions: run.transactions,
     trade: run.trade,
     objectives: run.objectives,
+    challenges: run.challenges ?? buildEmptyChallengeState(),
     campaign: run.campaign ?? null,
     rosters: run.rosters,
     ownership: run.ownership,

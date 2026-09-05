@@ -10,8 +10,10 @@ import {
   buildFixtureCheckpointRow,
   buildFixtureEffectsState,
   buildFixtureHealthState,
+  buildFixturePromotedDigestContext,
   buildFixtureRun,
   buildFixtureSchedule,
+  buildFixtureStateDigest,
   buildFixtureStoredDraft,
   buildFixtureSummaries,
   buildStubSeasonEngineSeam,
@@ -308,6 +310,9 @@ describe('Season Run performance pass (dexie v9)', () => {
   it('block summary reads use the [runId+blockIndex] index and never see other runs', async () => {
     const { db, repo, seam, schedule, run } = makeAdapters();
     await repo.promoteSeasonDraftToRun(buildFixtureStoredDraft(run), run);
+    const promotedSnapshot = await repo.loadActiveRun();
+    if (promotedSnapshot === null) throw new Error('expected promoted run');
+    Object.assign(run, promotedSnapshot.run);
     const summaries = buildFixtureSummaries({
       runId: run.runId,
       schedule,
@@ -338,6 +343,29 @@ describe('Season Run performance pass (dexie v9)', () => {
     const facts = blockFactsFor(seam, run, schedule, summaries);
     const rotationDigest = seam.seasonRotationSetDigest(run.rotations);
     const effects = buildFixtureEffectsState(run.rosters);
+    const promoted = buildFixturePromotedDigestContext(run, seam);
+    const checkpointState = {
+      runId: run.runId,
+      blockIndex: 0,
+      completedRounds: 10,
+      revision: 1,
+      commandId: 'cmd-1',
+      rotationDigest,
+      checkpointDigest: DIGEST_32,
+    };
+    const stateDigest = buildFixtureStateDigest(run, {
+      stateRevision: 1,
+      checkpointState,
+      health: promoted.health,
+      influence: promoted.influence,
+      transactions: [],
+      trade: null,
+      objectives: promoted.objectives,
+      campaign: promoted.campaign,
+      challenges: promoted.challenges,
+      rotations: run.rotations,
+      effects,
+    });
     await repo.commitSeasonBlock({
       runId: run.runId,
       revision: 1,
@@ -384,22 +412,14 @@ describe('Season Run performance pass (dexie v9)', () => {
         influenceBalance: { humanBalance: 2 },
       },
       effects,
-      health: buildFixtureHealthState(),
+      health: promoted.health,
       transactions: [],
-      influence: run.influence,
+      influence: promoted.influence,
       trade: null,
-      objectives: run.objectives,
-      checkpointState: {
-        runId: run.runId,
-        blockIndex: 0,
-        completedRounds: 10,
-        revision: 1,
-        commandId: 'cmd-1',
-        rotationDigest,
-        checkpointDigest: DIGEST_32,
-      },
+      objectives: promoted.objectives,
+      checkpointState,
       stateRevision: 1,
-      stateDigest: DIGEST_32,
+      stateDigest,
       expectedStateRevision: 0,
       expectedStateDigest: run.stateDigest,
       window: null,
@@ -440,13 +460,13 @@ describe('Season Run performance pass (dexie v9)', () => {
       ordinal: 0,
       command: {
         schemaVersion: 11,
-        command: 'select-block-objective',
+        command: 'select-campaign-opportunity',
         commandId: 'cmd-ps',
         runId: run.runId,
         expectedStateRevision: 0,
         expectedStateDigest: DIGEST_32,
         blockIndex: 0,
-        objectiveId: 'win-six',
+        opportunityId: 'copp-12345678',
       },
       preStateRevision: 0,
       preStateDigest: DIGEST_32,

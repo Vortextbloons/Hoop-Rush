@@ -40,7 +40,7 @@ async function promote(adapters: ReturnType<typeof makeAdapters>) {
   await adapters.repo.promoteSeasonDraftToRun(buildFixtureStoredDraft(adapters.run), adapters.run);
   const snapshot = await adapters.repo.loadActiveRun();
   if (!snapshot) throw new Error('expected promoted run');
-  adapters.run = snapshot.run;
+  Object.assign(adapters.run, snapshot.run);
 }
 describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompatibility', () => {
   afterEach(() => {

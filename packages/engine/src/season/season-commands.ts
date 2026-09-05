@@ -323,6 +323,9 @@ function runStateDigestFactsOf(run: SeasonEconomyRun): Parameters<typeof seasonR
     transactions: run.transactions,
     trade: run.trade,
     objectives: run.objectives,
+    challenges:
+      (run as { challenges?: import('@hoop-rush/data-contracts').SeasonChallengeState | null })
+        .challenges ?? null,
     campaign: run.campaign ?? null,
     evolution:
       (run as { evolution?: import('@hoop-rush/data-contracts').SeasonEvolutionState | null })

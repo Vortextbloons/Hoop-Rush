@@ -30,6 +30,7 @@ import {
   buildFixtureHealthState,
   buildFixtureInfluenceState,
   buildFixtureObjectiveState,
+  buildFixturePromotedDigestContext,
   buildFixtureRecap,
   buildFixtureRetainedDetail,
   buildFixtureRun,
@@ -172,9 +173,8 @@ export function buildFullSeasonDataset(input: {
   let teamAggregates: SeasonTeamAggregate[] = [];
   let playerAggregates: SeasonPlayerAggregate[] = [];
   let cumulativeCount = 0;
-  const health = buildFixtureHealthState();
-  const influence = buildFixtureInfluenceState(run.league);
-  const objectives = buildFixtureObjectiveState();
+  const promoted = buildFixturePromotedDigestContext(run, seam);
+  const { health, influence, objectives, campaign, challenges } = promoted;
   let previousCheckpointState: SeasonCheckpointState | null = null;
   let previousEffects: SeasonEffectsState = buildFixtureEffectsState(rosters);
   for (let blockIndex = 0; blockIndex < 9; blockIndex += 1) {
@@ -216,6 +216,8 @@ export function buildFullSeasonDataset(input: {
       transactions: [],
       trade: null,
       objectives,
+      campaign,
+      challenges,
       rotations: run.rotations,
       effects,
     });
@@ -227,6 +229,8 @@ export function buildFullSeasonDataset(input: {
       transactions: [],
       trade: null,
       objectives,
+      campaign,
+      challenges,
       rotations: run.rotations,
       effects: previousEffects,
     });

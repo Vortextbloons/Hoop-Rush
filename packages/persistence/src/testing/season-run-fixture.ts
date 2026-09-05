@@ -77,6 +77,8 @@ import {
   seasonRunSchema,
   type SeasonAiAssignment,
   type SeasonBlockRecap,
+  type SeasonCampaignState,
+  type SeasonChallengeState,
   type SeasonCheckpointState,
   type SeasonCompactPlayerLine,
   type SeasonEffectsState,
@@ -109,6 +111,8 @@ import {
 } from '@hoop-rush/data-contracts';
 import {
   WINDOW_BLOCK_INDEX_TO_INDEX,
+  buildInitialCampaignState,
+  generateSeasonSchedule,
   reduceSeasonStandings,
   seasonRunStateDigest as engineSeasonRunStateDigest,
 } from '@hoop-rush/engine';
@@ -164,6 +168,44 @@ export function buildFixtureObjectiveState(): SeasonObjectiveState {
     catalog: [...SEASON_OBJECTIVE_CATALOG],
     selections: {},
   });
+}
+export function buildFixturePromotedDigestContext(
+  run: SeasonRun,
+  seam: Pick<SeasonRunEngineSeam, 'createInitialSeasonInfluenceState' | 'reduceSeasonStandings'>,
+): {
+  health: SeasonHealthState;
+  influence: SeasonInfluenceState;
+  objectives: SeasonObjectiveState;
+  campaign: SeasonCampaignState;
+  challenges: SeasonChallengeState;
+} {
+  const health = buildFixtureHealthState();
+  const influence = seam.createInitialSeasonInfluenceState(
+    run.league.teams.map((team) => team.franchiseId),
+  );
+  const objectives = buildFixtureObjectiveState();
+  const challenges = run.challenges ?? buildEmptyChallengeState();
+  const humanFranchiseId = run.league.teams.find((team) => team.control === 'human')?.franchiseId ?? null;
+  let campaign = buildEmptyCampaignState();
+  try {
+    const schedule = generateSeasonSchedule({
+      league: run.league,
+      seed: run.schedule.generationSeed,
+    });
+    campaign = buildInitialCampaignState({
+      rootSeed: run.rootSeed,
+      humanFranchiseId,
+      schedule,
+      standings: seam.reduceSeasonStandings(run.league, []),
+      health,
+      rotations: run.rotations,
+      rosters: run.rosters,
+      transactions: [],
+    });
+  } catch {
+    campaign = buildEmptyCampaignState();
+  }
+  return { health, influence, objectives, campaign, challenges };
 }
 export function buildFixtureSchedule(seed: string): SeasonSchedule {
   const parsedSeed = seedSchema.parse(seed);
@@ -557,6 +599,7 @@ export function buildFixtureRun(input: {
       transactions: run.transactions,
       trade: run.trade,
       objectives: run.objectives,
+      challenges: run.challenges,
       campaign: run.campaign,
       rosters: run.rosters,
       ownership: run.ownership,
@@ -1168,6 +1211,7 @@ export function buildFixtureStateDigest(
     transactions: overrides.transactions ?? run.transactions,
     trade: overrides.trade ?? run.trade,
     objectives: overrides.objectives ?? run.objectives,
+    challenges: overrides.challenges ?? run.challenges ?? buildEmptyChallengeState(),
     campaign: overrides.campaign ?? run.campaign ?? buildEmptyCampaignState(),
     evolution: normalizeEvolutionState(
       overrides.evolution ?? (run as { evolution?: unknown }).evolution,

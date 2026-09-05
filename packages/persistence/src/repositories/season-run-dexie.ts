@@ -346,6 +346,10 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
           transactions: stored.transactions,
           trade: stored.trade,
           objectives: stored.objectives,
+          challenges:
+            stored.challenges ??
+            (stored.run as { challenges?: unknown }).challenges ??
+            buildEmptyChallengeState(),
           campaign: stored.campaign ?? null,
           evolution: normalizeEvolutionState(
             (stored as { evolution?: unknown }).evolution ??
@@ -434,6 +438,10 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
           transactions: stored.transactions,
           trade: stored.trade,
           objectives: stored.objectives,
+          challenges:
+            stored.challenges ??
+            (stored.run as { challenges?: unknown }).challenges ??
+            buildEmptyChallengeState(),
           campaign: stored.campaign ?? null,
           evolution: normalizeEvolutionState(
             (stored as { evolution?: unknown }).evolution ??
@@ -1289,6 +1297,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
       transactions: [],
       trade: null,
       objectives,
+      challenges,
       campaign,
       evolution,
       rosters: validatedRun.rosters,

@@ -74,6 +74,9 @@ function makeAdapters(): Adapters {
 }
 async function promote(adapters: Adapters): Promise<void> {
   await adapters.repo.promoteSeasonDraftToRun(buildFixtureStoredDraft(adapters.run), adapters.run);
+  const snapshot = await adapters.repo.loadActiveRun();
+  if (snapshot === null) throw new Error('expected promoted run');
+  Object.assign(adapters.run, snapshot.run);
 }
 function commitInputFor(
   dataset: Pick<Adapters, 'run' | 'blocks'>,

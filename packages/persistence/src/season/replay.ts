@@ -1,3 +1,4 @@
+import { buildEmptyChallengeState } from '@hoop-rush/data-contracts';
 import type { StoredSeasonRunRecord } from '../schemas/season-run-record.ts';
 import type { SeasonRunEngineSeam } from './engine-seam-types.ts';
 export type ReplayDivergenceKind =
@@ -41,6 +42,10 @@ export function auditReplayDivergences(
         transactions: stored.transactions,
         trade: stored.trade,
         objectives: stored.objectives,
+        challenges:
+          stored.challenges ??
+          (stored.run as { challenges?: unknown }).challenges ??
+          buildEmptyChallengeState(),
         campaign: undefined,
         evolution: stored.run.evolution ?? stored.evolution ?? null,
         rosters: stored.run.rosters,
