@@ -1,132 +1,131 @@
-﻿<script lang="ts">import { onMount } from 'svelte';
-import { goto } from '$app/navigation';
-import { resolve } from '$app/paths';
-import { Swords, Zap, Trophy, Plus, LogIn, ArrowLeft } from '@lucide/svelte';
-import type { FixedFiveRoomMode, FixedFiveSourceMode } from '@hoop-rush/data-contracts';
-import { getFixedFiveTransport, isFixedFiveSupabaseConfigured } from '$lib/fixed-five-transport';
-import { friendlyFixedFiveJoinError, loadLastFixedFiveRoomId, saveFixedFiveMembership, } from '$lib/fixed-five-identity';
-type View = 'choose' | 'create' | 'join';
-let view = $state<View>('choose');
-let mode = $state<FixedFiveRoomMode>('classic-shared-82');
-let sourceMode = $state<FixedFiveSourceMode>('classic');
-let variant = $state<'ratings' | 'ball-knowledge'>('ratings');
-let code = $state('');
-let busy = $state(false);
-let error = $state<string | null>(null);
-let preview = $state<string | null>(null);
-let lastRoomId = $state<string | null>(null);
-function transport() {
+﻿<script lang="ts">
+  import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
+  import { resolve } from '$app/paths';
+  import { Swords, Zap, Trophy, Plus, LogIn, ArrowLeft } from '@lucide/svelte';
+  import type { FixedFiveRoomMode, FixedFiveSourceMode } from '@hoop-rush/data-contracts';
+  import { getFixedFiveTransport, isFixedFiveSupabaseConfigured } from '$lib/fixed-five-transport';
+  import {
+    friendlyFixedFiveJoinError,
+    loadLastFixedFiveRoomId,
+    saveFixedFiveMembership,
+  } from '$lib/fixed-five-identity';
+  type View = 'choose' | 'create' | 'join';
+  let view = $state<View>('choose');
+  let mode = $state<FixedFiveRoomMode>('classic-shared-82');
+  let sourceMode = $state<FixedFiveSourceMode>('classic');
+  let variant = $state<'ratings' | 'ball-knowledge'>('ratings');
+  let code = $state('');
+  let busy = $state(false);
+  let error = $state<string | null>(null);
+  let preview = $state<string | null>(null);
+  let lastRoomId = $state<string | null>(null);
+  function transport() {
     return getFixedFiveTransport();
-}
-function versions() {
+  }
+  function versions() {
     return {
-        dataVersion: 'data-v1',
-        ratingVersion: 'ratings-v3.8',
-        positionNormalizationVersion: 'position-v3',
-        engineVersion: 'm3-engine-v14',
-        bracketVersion: 'bracket-m3-v3',
-        scheduleVersion: 'schedule-v1',
-        seedDerivationVersion: 'seed-v1',
-        classicRollVersion: 'classic-roll-v1',
-        profileVersion: '2010s-fixed-v1',
-        multiplayerVersion: 'fixed-five-multiplayer-v1',
-        autopickVersion: 'fixed-five-autopick-v1',
+      dataVersion: 'data-v1',
+      ratingVersion: 'ratings-v3.8',
+      positionNormalizationVersion: 'position-v3',
+      engineVersion: 'm3-engine-v14',
+      bracketVersion: 'bracket-m3-v3',
+      scheduleVersion: 'schedule-v1',
+      seedDerivationVersion: 'seed-v1',
+      classicRollVersion: 'classic-roll-v1',
+      profileVersion: '2010s-fixed-v1',
+      multiplayerVersion: 'fixed-five-multiplayer-v1',
+      autopickVersion: 'fixed-five-autopick-v1',
     };
-}
-onMount(() => {
+  }
+  onMount(() => {
     try {
-        lastRoomId = loadLastFixedFiveRoomId();
-        const params = new URLSearchParams(window.location.search);
-        const codeParam = params.get('code');
-        if (codeParam && /^[0-9]{4}$/.test(codeParam)) {
-            code = codeParam;
-            view = 'join';
-            void doPreview();
-        }
-    }
-    catch { }
-});
-async function startCreate() {
+      lastRoomId = loadLastFixedFiveRoomId();
+      const params = new URLSearchParams(window.location.search);
+      const codeParam = params.get('code');
+      if (codeParam && /^[0-9]{4}$/.test(codeParam)) {
+        code = codeParam;
+        view = 'join';
+        void doPreview();
+      }
+    } catch {}
+  });
+  async function startCreate() {
     busy = true;
     error = null;
     try {
-        const t = transport();
-        const source: FixedFiveSourceMode = mode === 'duel' ? sourceMode : mode === 'classic-shared-82' ? 'classic' : 'sandbox';
-        const created = await t.create({ mode, sourceMode: source, variant, versions: versions() });
-        saveFixedFiveMembership({ ...created.membership, code: created.code });
-        await goto(resolve('/multiplayer/room/[roomId]', { roomId: created.snapshot.roomId }));
+      const t = transport();
+      const source: FixedFiveSourceMode =
+        mode === 'duel' ? sourceMode : mode === 'classic-shared-82' ? 'classic' : 'sandbox';
+      const created = await t.create({ mode, sourceMode: source, variant, versions: versions() });
+      saveFixedFiveMembership({ ...created.membership, code: created.code });
+      await goto(resolve('/multiplayer/room/[roomId]', { roomId: created.snapshot.roomId }));
+    } catch (e) {
+      error = friendlyFixedFiveJoinError(e);
+      if (!isFixedFiveSupabaseConfigured())
+        error = 'Multiplayer is offline right now. You can still play solo Classic/Sandbox.';
+    } finally {
+      busy = false;
     }
-    catch (e) {
-        error = friendlyFixedFiveJoinError(e);
-        if (!isFixedFiveSupabaseConfigured())
-            error = 'Multiplayer is offline right now. You can still play solo Classic/Sandbox.';
-    }
-    finally {
-        busy = false;
-    }
-}
-function cleanCode(): void {
+  }
+  function cleanCode(): void {
     const clean = code.replace(/\D/g, '').slice(0, 4);
-    if (clean !== code)
-        code = clean;
-}
-async function doPreview() {
+    if (clean !== code) code = clean;
+  }
+  async function doPreview() {
     cleanCode();
     if (code.length !== 4) {
-        error = 'Enter a 4-digit code';
-        return;
+      error = 'Enter a 4-digit code';
+      return;
     }
     busy = true;
     error = null;
     try {
-        const snap = await transport().preview(code);
-        const modeName = snap.settings.mode === 'duel'
-            ? 'Duel'
-            : snap.settings.mode === 'sandbox-shared-82'
-                ? 'Sandbox Season'
-                : 'Shared Season';
-        const phaseName = snap.phase === 'lobby'
-            ? 'waiting to start'
-            : snap.phase === 'drafting'
-                ? 'drafting now'
-                : snap.phase === 'completed'
-                    ? 'finished'
-                    : 'playing';
-        preview = `${modeName} · ${phaseName}`;
+      const snap = await transport().preview(code);
+      const modeName =
+        snap.settings.mode === 'duel'
+          ? 'Duel'
+          : snap.settings.mode === 'sandbox-shared-82'
+            ? 'Sandbox Season'
+            : 'Shared Season';
+      const phaseName =
+        snap.phase === 'lobby'
+          ? 'waiting to start'
+          : snap.phase === 'drafting'
+            ? 'drafting now'
+            : snap.phase === 'completed'
+              ? 'finished'
+              : 'playing';
+      preview = `${modeName} · ${phaseName}`;
+    } catch (e) {
+      error = friendlyFixedFiveJoinError(e);
+      preview = null;
+    } finally {
+      busy = false;
     }
-    catch (e) {
-        error = friendlyFixedFiveJoinError(e);
-        preview = null;
-    }
-    finally {
-        busy = false;
-    }
-}
-async function doJoin() {
+  }
+  async function doJoin() {
     cleanCode();
     if (code.length !== 4) {
-        error = 'Enter a 4-digit code';
-        return;
+      error = 'Enter a 4-digit code';
+      return;
     }
     busy = true;
     error = null;
     try {
-        const { snapshot, membership } = await transport().join(code);
-        saveFixedFiveMembership(membership);
-        await goto(resolve('/multiplayer/room/[roomId]', { roomId: snapshot.roomId }));
+      const { snapshot, membership } = await transport().join(code);
+      saveFixedFiveMembership(membership);
+      await goto(resolve('/multiplayer/room/[roomId]', { roomId: snapshot.roomId }));
+    } catch (e) {
+      error = friendlyFixedFiveJoinError(e);
+    } finally {
+      busy = false;
     }
-    catch (e) {
-        error = friendlyFixedFiveJoinError(e);
-    }
-    finally {
-        busy = false;
-    }
-}
-async function resumeLast() {
-    if (!lastRoomId)
-        return;
+  }
+  async function resumeLast() {
+    if (!lastRoomId) return;
     await goto(resolve('/multiplayer/room/[roomId]', { roomId: lastRoomId }));
-}
+  }
 </script>
 
 <svelte:head>

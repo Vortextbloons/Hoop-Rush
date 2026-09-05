@@ -1,30 +1,39 @@
-<script lang="ts">import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-import type { SeriesCardViewModel } from '$lib/season/season-postseason-presentation';
-import SeasonTeamLogo from './SeasonTeamLogo.svelte';
-import { franchiseIdentityOf } from '$lib/season/season-branding';
-let { card, franchiseName, franchiseAbbrev, manifest, humanFranchiseId, }: {
+<script lang="ts">
+  import type { HoopRushManifest } from '@hoop-rush/data-contracts';
+  import type { SeriesCardViewModel } from '$lib/season/season-postseason-presentation';
+  import SeasonTeamLogo from './SeasonTeamLogo.svelte';
+  import { franchiseIdentityOf } from '$lib/season/season-branding';
+  let {
+    card,
+    franchiseName,
+    franchiseAbbrev,
+    manifest,
+    humanFranchiseId,
+  }: {
     card: SeriesCardViewModel;
     franchiseName: (franchiseId: string) => string;
     franchiseAbbrev: (franchiseId: string) => string;
     manifest: HoopRushManifest | null;
     humanFranchiseId: string | null;
-} = $props();
-const home = $derived(card.homeFranchiseId);
-const away = $derived(card.awayFranchiseId);
-const homeWon = $derived(card.winnerFranchiseId !== null && card.winnerFranchiseId === home);
-const awayWon = $derived(card.winnerFranchiseId !== null && card.winnerFranchiseId === away);
-const identityOf = (franchiseId: string | null) => manifest && franchiseId ? franchiseIdentityOf(manifest, franchiseId) : null;
-const seedChip = (seed: number | null, conference: string | null): string => seed === null ? '—' : `${conference === 'west' ? 'W' : 'E'}${String(seed)}`;
-const statusText = $derived.by(() => {
+  } = $props();
+  const home = $derived(card.homeFranchiseId);
+  const away = $derived(card.awayFranchiseId);
+  const homeWon = $derived(card.winnerFranchiseId !== null && card.winnerFranchiseId === home);
+  const awayWon = $derived(card.winnerFranchiseId !== null && card.winnerFranchiseId === away);
+  const identityOf = (franchiseId: string | null) =>
+    manifest && franchiseId ? franchiseIdentityOf(manifest, franchiseId) : null;
+  const seedChip = (seed: number | null, conference: string | null): string =>
+    seed === null ? '—' : `${conference === 'west' ? 'W' : 'E'}${String(seed)}`;
+  const statusText = $derived.by(() => {
     if (card.status === 'complete' && card.winnerFranchiseId !== null) {
-        return `${franchiseName(card.winnerFranchiseId)} wins ${String(card.homeWins)}–${String(card.awayWins)}`;
+      return `${franchiseName(card.winnerFranchiseId)} wins ${String(card.homeWins)}–${String(card.awayWins)}`;
     }
     if (card.nextGame !== null) {
-        return `Next: Game ${String(card.nextGame.gameNumber)} · at ${franchiseName(card.nextGame.homeFranchiseId)}`;
+      return `Next: Game ${String(card.nextGame.gameNumber)} · at ${franchiseName(card.nextGame.homeFranchiseId)}`;
     }
     return 'Series scheduled';
-});
-const pips = (wins: number): Array<boolean> => [0, 1, 2, 3].map((index) => index < wins);
+  });
+  const pips = (wins: number): Array<boolean> => [0, 1, 2, 3].map((index) => index < wins);
 </script>
 
 <article

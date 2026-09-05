@@ -1,11 +1,22 @@
-﻿<script lang="ts">import { resolve } from '$app/paths';
-import type { RouteId } from '$app/types';
-import { Trophy } from '@lucide/svelte';
-import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persistence';
-import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
-import { variantLabel } from '$lib/draft-presentation';
-let { manifest, rows, active, modeLabel, emptyTitle, emptyHref, emptyCta, continueHref, resultHrefFor, }: {
+﻿<script lang="ts">
+  import { resolve } from '$app/paths';
+  import type { RouteId } from '$app/types';
+  import { Trophy } from '@lucide/svelte';
+  import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persistence';
+  import type { HoopRushManifest } from '@hoop-rush/data-contracts';
+  import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
+  import { variantLabel } from '$lib/draft-presentation';
+  let {
+    manifest,
+    rows,
+    active,
+    modeLabel,
+    emptyTitle,
+    emptyHref,
+    emptyCta,
+    continueHref,
+    resultHrefFor,
+  }: {
     manifest: HoopRushManifest | null;
     rows: CompletedRunIndex[];
     active: ActiveRunCheckpoint | null;
@@ -15,23 +26,24 @@ let { manifest, rows, active, modeLabel, emptyTitle, emptyHref, emptyCta, contin
     emptyCta: string;
     continueHref: string | null;
     resultHrefFor: (runId: string) => string;
-} = $props();
-function franchiseName(franchiseId: string | null): string {
-    if (!franchiseId)
-        return 'Mixed lineup';
-    return (manifest?.modernFranchiseSlots.find((e) => e.franchiseId === franchiseId)?.displayName ??
-        franchiseId);
-}
-function franchiseLabel(franchiseId: string | null): string {
+  } = $props();
+  function franchiseName(franchiseId: string | null): string {
+    if (!franchiseId) return 'Mixed lineup';
+    return (
+      manifest?.modernFranchiseSlots.find((e) => e.franchiseId === franchiseId)?.displayName ??
+      franchiseId
+    );
+  }
+  function franchiseLabel(franchiseId: string | null): string {
     return franchiseId ? franchiseAbbreviation(franchiseId) : 'Mixed';
-}
-function eraName(eraId: string): string {
+  }
+  function eraName(eraId: string): string {
     return manifest?.eras.find((e) => e.eraId === eraId)?.label ?? eraId;
-}
-function formatTime(iso: string): string {
+  }
+  function formatTime(iso: string): string {
     const date = new Date(iso);
     return Number.isNaN(date.getTime()) ? iso : date.toLocaleString();
-}
+  }
 </script>
 
 {#if rows.length === 0 && !active}
@@ -73,7 +85,9 @@ function formatTime(iso: string): string {
           href={resolve(resultHrefFor(row.runId) as any)}
           class="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-border bg-card p-4 transition-colors hover:border-line-strong"
         >
-          <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary/15 text-primary">
+          <span
+            class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary/15 text-primary"
+          >
             <Trophy class="h-5 w-5" />
           </span>
           <span class="min-w-0 flex-1">

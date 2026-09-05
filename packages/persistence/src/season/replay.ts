@@ -1,159 +1,187 @@
 import type { StoredSeasonRunRecord } from '../schemas/season-run-record.ts';
 import type { SeasonRunEngineSeam } from './engine-seam-types.ts';
-export type ReplayDivergenceKind = 'campaign-offers' | 'campaign-evaluations' | 'campaign-branch-state' | 'campaign-evolution' | 'board-state' | 'board-inquiry-allowance' | 'board-negotiation-state' | 'board-value-trends' | 'ai-response' | 'ai-counter' | 'ai-transaction' | 'rehab-outcome' | 'rehab-premium' | 'trade-grade' | 'state-digest' | 'command-log-digest';
+export type ReplayDivergenceKind =
+  | 'campaign-offers'
+  | 'campaign-evaluations'
+  | 'campaign-branch-state'
+  | 'campaign-evolution'
+  | 'board-state'
+  | 'board-inquiry-allowance'
+  | 'board-negotiation-state'
+  | 'board-value-trends'
+  | 'ai-response'
+  | 'ai-counter'
+  | 'ai-transaction'
+  | 'rehab-outcome'
+  | 'rehab-premium'
+  | 'trade-grade'
+  | 'state-digest'
+  | 'command-log-digest';
 export interface ReplayDivergence {
-    kind: ReplayDivergenceKind;
-    message: string;
+  kind: ReplayDivergenceKind;
+  message: string;
 }
-export function auditReplayDivergences(stored: StoredSeasonRunRecord, recomputedDigest: string | null, seam: SeasonRunEngineSeam): ReplayDivergence[] {
-    const divergences: ReplayDivergence[] = [];
-    if (recomputedDigest !== null && recomputedDigest !== stored.stateDigest) {
-        try {
-            const withoutCampaign = seam.seasonRunStateDigest({
-                stateRevision: stored.stateRevision,
-                stage: stored.run.stage,
-                postseason: stored.run.postseason,
-                awards: stored.run.awards,
-                completion: stored.run.completion,
-                checkpointState: stored.checkpointState,
-                health: stored.health,
-                influence: stored.influence,
-                transactions: stored.transactions,
-                trade: stored.trade,
-                objectives: stored.objectives,
-                campaign: undefined,
-                rosters: stored.run.rosters,
-                ownership: stored.run.ownership,
-                rotations: stored.run.rotations,
-                effects: stored.effects,
-                freeAgency: stored.run.freeAgency,
-            });
-            if (withoutCampaign === stored.stateDigest) {
-                divergences.push({
-                    kind: 'campaign-offers',
-                    message: 'campaign state divergence: stored digest matches recomputation without campaign',
-                });
-            }
+export function auditReplayDivergences(
+  stored: StoredSeasonRunRecord,
+  recomputedDigest: string | null,
+  seam: SeasonRunEngineSeam,
+): ReplayDivergence[] {
+  const divergences: ReplayDivergence[] = [];
+  if (recomputedDigest !== null && recomputedDigest !== stored.stateDigest) {
+    try {
+      const withoutCampaign = seam.seasonRunStateDigest({
+        stateRevision: stored.stateRevision,
+        stage: stored.run.stage,
+        postseason: stored.run.postseason,
+        awards: stored.run.awards,
+        completion: stored.run.completion,
+        checkpointState: stored.checkpointState,
+        health: stored.health,
+        influence: stored.influence,
+        transactions: stored.transactions,
+        trade: stored.trade,
+        objectives: stored.objectives,
+        campaign: undefined,
+        rosters: stored.run.rosters,
+        ownership: stored.run.ownership,
+        rotations: stored.run.rotations,
+        effects: stored.effects,
+        freeAgency: stored.run.freeAgency,
+      });
+      if (withoutCampaign === stored.stateDigest) {
+        divergences.push({
+          kind: 'campaign-offers',
+          message:
+            'campaign state divergence: stored digest matches recomputation without campaign',
+        });
+      }
+    } catch {}
+    if (divergences.length === 0) {
+      divergences.push({
+        kind: 'state-digest',
+        message: 'stored stateDigest does not recompute over the stored mutable state',
+      });
+    }
+  }
+  if (stored.campaign !== undefined) {
+    const campaign = stored.campaign;
+    for (const [blockKey, offers] of Object.entries(campaign.offers)) {
+      if (!Array.isArray(offers) || offers.length !== 2) {
+        divergences.push({
+          kind: 'campaign-offers',
+          message: `campaign offers for block ${blockKey} must be exactly 2`,
+        });
+      }
+      if (Array.isArray(offers) && offers.length === 2) {
+        if (offers[0]?.opportunityId === offers[1]?.opportunityId) {
+          divergences.push({
+            kind: 'campaign-offers',
+            message: `campaign offers for block ${blockKey} are not distinct`,
+          });
         }
-        catch { }
-        if (divergences.length === 0) {
+      }
+    }
+    for (const evaluation of campaign.evaluations) {
+      const selection = campaign.selections[evaluation.blockIndex];
+      if (!selection || selection.opportunityId !== evaluation.opportunityId) {
+        divergences.push({
+          kind: 'campaign-evaluations',
+          message: `campaign evaluation for block ${String(evaluation.blockIndex)} has no matching selection`,
+        });
+      }
+    }
+    for (const [branchId, state] of Object.entries(campaign.branchState)) {
+      if (!['open', 'completed', 'missed', 'locked'].includes(state)) {
+        divergences.push({
+          kind: 'campaign-branch-state',
+          message: `campaign branch ${branchId} has invalid state ${state}`,
+        });
+      }
+    }
+    if (campaign.evolutionSelection !== null) {
+      if (!campaign.evolutionOffers || campaign.evolutionOffers.length === 0) {
+        divergences.push({
+          kind: 'campaign-evolution',
+          message: 'campaign evolution selection without offers',
+        });
+      }
+    }
+  }
+  if (stored.trade !== null) {
+    for (const window of stored.trade.windows) {
+      if (window.boardProfiles !== undefined) {
+        if (window.boardProfiles.length > 8) {
+          divergences.push({
+            kind: 'board-state',
+            message: `trade window ${String(window.windowIndex)} board exceeds 8 teams`,
+          });
+        }
+        if (
+          window.inquiryAllowance !== undefined &&
+          (window.inquiryAllowance < 3 || window.inquiryAllowance > 5)
+        ) {
+          divergences.push({
+            kind: 'board-inquiry-allowance',
+            message: `trade window ${String(window.windowIndex)} inquiry allowance out of range`,
+          });
+        }
+        if (window.negotiations) {
+          const active = window.negotiations.filter(
+            (n) => n.status === 'active' || n.status === 'countered',
+          );
+          if (active.length > 1) {
             divergences.push({
-                kind: 'state-digest',
-                message: 'stored stateDigest does not recompute over the stored mutable state',
+              kind: 'board-negotiation-state',
+              message: `trade window ${String(window.windowIndex)} has more than one active negotiation`,
             });
+          }
+          for (const negotiation of window.negotiations) {
+            if (negotiation.exchangeCount !== negotiation.exchanges.length) {
+              divergences.push({
+                kind: 'ai-response',
+                message: `negotiation ${negotiation.inquiryId} exchangeCount mismatch`,
+              });
+            }
+            if (negotiation.exchangeCount > 3) {
+              divergences.push({
+                kind: 'ai-counter',
+                message: `negotiation ${negotiation.inquiryId} exceeds 3 exchanges`,
+              });
+            }
+          }
         }
+        if (window.valueTrends !== undefined && window.valueTrends.length > 450) {
+          divergences.push({
+            kind: 'board-value-trends',
+            message: `trade window ${String(window.windowIndex)} valueTrends exceeds 450`,
+          });
+        }
+      }
     }
-    if (stored.campaign !== undefined) {
-        const campaign = stored.campaign;
-        for (const [blockKey, offers] of Object.entries(campaign.offers)) {
-            if (!Array.isArray(offers) || offers.length !== 2) {
-                divergences.push({
-                    kind: 'campaign-offers',
-                    message: `campaign offers for block ${blockKey} must be exactly 2`,
-                });
-            }
-            if (Array.isArray(offers) && offers.length === 2) {
-                if (offers[0]?.opportunityId === offers[1]?.opportunityId) {
-                    divergences.push({
-                        kind: 'campaign-offers',
-                        message: `campaign offers for block ${blockKey} are not distinct`,
-                    });
-                }
-            }
+  }
+  for (const injury of stored.health.injuries) {
+    if (
+      (
+        injury as unknown as {
+          rehabModifier?: unknown;
         }
-        for (const evaluation of campaign.evaluations) {
-            const selection = campaign.selections[evaluation.blockIndex];
-            if (!selection || selection.opportunityId !== evaluation.opportunityId) {
-                divergences.push({
-                    kind: 'campaign-evaluations',
-                    message: `campaign evaluation for block ${String(evaluation.blockIndex)} has no matching selection`,
-                });
-            }
-        }
-        for (const [branchId, state] of Object.entries(campaign.branchState)) {
-            if (!['open', 'completed', 'missed', 'locked'].includes(state)) {
-                divergences.push({
-                    kind: 'campaign-branch-state',
-                    message: `campaign branch ${branchId} has invalid state ${state}`,
-                });
-            }
-        }
-        if (campaign.evolutionSelection !== null) {
-            if (!campaign.evolutionOffers || campaign.evolutionOffers.length === 0) {
-                divergences.push({
-                    kind: 'campaign-evolution',
-                    message: 'campaign evolution selection without offers',
-                });
-            }
-        }
+      ).rehabModifier === undefined
+    ) {
+      divergences.push({
+        kind: 'rehab-outcome',
+        message: `injury ${injury.injuryId} missing rehabModifier (health-v2)`,
+      });
     }
-    if (stored.trade !== null) {
-        for (const window of stored.trade.windows) {
-            if (window.boardProfiles !== undefined) {
-                if (window.boardProfiles.length > 8) {
-                    divergences.push({
-                        kind: 'board-state',
-                        message: `trade window ${String(window.windowIndex)} board exceeds 8 teams`,
-                    });
-                }
-                if (window.inquiryAllowance !== undefined &&
-                    (window.inquiryAllowance < 3 || window.inquiryAllowance > 5)) {
-                    divergences.push({
-                        kind: 'board-inquiry-allowance',
-                        message: `trade window ${String(window.windowIndex)} inquiry allowance out of range`,
-                    });
-                }
-                if (window.negotiations) {
-                    const active = window.negotiations.filter((n) => n.status === 'active' || n.status === 'countered');
-                    if (active.length > 1) {
-                        divergences.push({
-                            kind: 'board-negotiation-state',
-                            message: `trade window ${String(window.windowIndex)} has more than one active negotiation`,
-                        });
-                    }
-                    for (const negotiation of window.negotiations) {
-                        if (negotiation.exchangeCount !== negotiation.exchanges.length) {
-                            divergences.push({
-                                kind: 'ai-response',
-                                message: `negotiation ${negotiation.inquiryId} exchangeCount mismatch`,
-                            });
-                        }
-                        if (negotiation.exchangeCount > 3) {
-                            divergences.push({
-                                kind: 'ai-counter',
-                                message: `negotiation ${negotiation.inquiryId} exceeds 3 exchanges`,
-                            });
-                        }
-                    }
-                }
-                if (window.valueTrends !== undefined && window.valueTrends.length > 450) {
-                    divergences.push({
-                        kind: 'board-value-trends',
-                        message: `trade window ${String(window.windowIndex)} valueTrends exceeds 450`,
-                    });
-                }
-            }
-        }
+  }
+  for (const entry of stored.influence.ledger) {
+    if (entry.source === 'trade-cash-sent' || entry.source === 'trade-cash-received') {
+      if (Math.abs(entry.appliedDelta) > 2) {
+        divergences.push({
+          kind: 'ai-transaction',
+          message: `influence ledger entry ${entry.entryId} trade cash exceeds 2`,
+        });
+      }
     }
-    for (const injury of stored.health.injuries) {
-        if ((injury as unknown as {
-            rehabModifier?: unknown;
-        }).rehabModifier === undefined) {
-            divergences.push({
-                kind: 'rehab-outcome',
-                message: `injury ${injury.injuryId} missing rehabModifier (health-v2)`,
-            });
-        }
-    }
-    for (const entry of stored.influence.ledger) {
-        if (entry.source === 'trade-cash-sent' || entry.source === 'trade-cash-received') {
-            if (Math.abs(entry.appliedDelta) > 2) {
-                divergences.push({
-                    kind: 'ai-transaction',
-                    message: `influence ledger entry ${entry.entryId} trade cash exceeds 2`,
-                });
-            }
-        }
-    }
-    return divergences;
+  }
+  return divergences;
 }

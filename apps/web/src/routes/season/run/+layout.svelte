@@ -1,89 +1,121 @@
-﻿<script lang="ts">import { setContext } from 'svelte';
-import { page } from '$app/state';
-import { goto } from '$app/navigation';
-import { resolve } from '$app/paths';
-import type { RouteId } from '$app/types';
-import { ArrowLeftRight, BarChart3, CalendarDays, ClipboardList, Gavel, LayoutGrid, LogOut, RefreshCw, Trophy, X, } from '@lucide/svelte';
-import { Dialog } from 'bits-ui';
-import { franchiseAbbreviation, humanTeamOf, type PlayersIndexEntry, type Position, } from '@hoop-rush/data-contracts';
-import { ordinal, provisionalRanking, recordLabel } from '$lib/season/season-presentation';
-import { loadSeasonLeague, loadSeasonSchedule } from '$lib/season/season-assets';
-import { getManifest, getPlayersIndex } from '$lib/data';
-import { getSeasonBlockRunner, getSeasonRunRepository } from '$lib/season/season-repo';
-import { SeasonHubState } from '$lib/season/season-hub-state';
-import { SeasonRunShell } from '$lib/season/season-shell-state.svelte';
-import { SEASON_RUN_SHELL_CONTEXT, type SeasonRunShellData, } from '$lib/season/season-shell-context';
-import { catalogCandidateMap } from '$lib/season/season-catalog-index';
-import { buildVersionFaceIndex, freeAgencyVersionTuples, versionTupleOfRosterEntry, } from '$lib/season/season-branding';
-import { createRotationEditor, rotationEditorNeedsPositionRefresh, } from '$lib/season/season-rotation-editor';
-import { hasPostseasonHubMethods, idlePostseasonProgress, POSTSEASON_ORCHESTRATION_UNAVAILABLE, } from '$lib/season/season-postseason-presentation';
-import { isNavItemActive, type NavItem } from '$lib/nav-items';
-import { playablePositionsOfSlice, playerSliceOf, type SeasonRunPlayerSlice, } from '$lib/season/season-player-slice';
-import BottomNav from '$lib/components/BottomNav.svelte';
-import SeasonMasthead from '$lib/components/season/SeasonMasthead.svelte';
-import type { RotationEditor } from '$lib/season/season-rotation-editor';
-import type { SeasonRunPlayerSliceEntry } from '@hoop-rush/persistence';
-let { children } = $props();
-const seasonNavItems: NavItem[] = [
+﻿<script lang="ts">
+  import { setContext } from 'svelte';
+  import { page } from '$app/state';
+  import { goto } from '$app/navigation';
+  import { resolve } from '$app/paths';
+  import type { RouteId } from '$app/types';
+  import {
+    ArrowLeftRight,
+    BarChart3,
+    CalendarDays,
+    ClipboardList,
+    Gavel,
+    LayoutGrid,
+    LogOut,
+    RefreshCw,
+    Trophy,
+    X,
+  } from '@lucide/svelte';
+  import { Dialog } from 'bits-ui';
+  import {
+    franchiseAbbreviation,
+    humanTeamOf,
+    type PlayersIndexEntry,
+    type Position,
+  } from '@hoop-rush/data-contracts';
+  import { ordinal, provisionalRanking, recordLabel } from '$lib/season/season-presentation';
+  import { loadSeasonLeague, loadSeasonSchedule } from '$lib/season/season-assets';
+  import { getManifest, getPlayersIndex } from '$lib/data';
+  import { getSeasonBlockRunner, getSeasonRunRepository } from '$lib/season/season-repo';
+  import { SeasonHubState } from '$lib/season/season-hub-state';
+  import { SeasonRunShell } from '$lib/season/season-shell-state.svelte';
+  import {
+    SEASON_RUN_SHELL_CONTEXT,
+    type SeasonRunShellData,
+  } from '$lib/season/season-shell-context';
+  import { catalogCandidateMap } from '$lib/season/season-catalog-index';
+  import {
+    buildVersionFaceIndex,
+    freeAgencyVersionTuples,
+    versionTupleOfRosterEntry,
+  } from '$lib/season/season-branding';
+  import {
+    createRotationEditor,
+    rotationEditorNeedsPositionRefresh,
+  } from '$lib/season/season-rotation-editor';
+  import {
+    hasPostseasonHubMethods,
+    idlePostseasonProgress,
+    POSTSEASON_ORCHESTRATION_UNAVAILABLE,
+  } from '$lib/season/season-postseason-presentation';
+  import { isNavItemActive, type NavItem } from '$lib/nav-items';
+  import {
+    playablePositionsOfSlice,
+    playerSliceOf,
+    type SeasonRunPlayerSlice,
+  } from '$lib/season/season-player-slice';
+  import BottomNav from '$lib/components/BottomNav.svelte';
+  import SeasonMasthead from '$lib/components/season/SeasonMasthead.svelte';
+  import type { RotationEditor } from '$lib/season/season-rotation-editor';
+  import type { SeasonRunPlayerSliceEntry } from '@hoop-rush/persistence';
+  let { children } = $props();
+  const seasonNavItems: NavItem[] = [
     { id: 'hub', label: 'Hub', href: '/season/run', icon: LayoutGrid },
     { id: 'team', label: 'Rotation', href: '/season/run/team', icon: ClipboardList },
     { id: 'schedule', label: 'Schedule', href: '/season/run/schedule', icon: CalendarDays },
     { id: 'league', label: 'League', href: '/season/run/league', icon: Trophy },
     { id: 'leaders', label: 'Leaders', href: '/season/run/leaders', icon: BarChart3 },
-];
-const freeAgencyNavItem: NavItem = {
+  ];
+  const freeAgencyNavItem: NavItem = {
     id: 'free-agency',
     label: 'Free Agency',
     href: '/season/run/free-agency',
     icon: Gavel,
-};
-const tradeBoardNavItem: NavItem = {
+  };
+  const tradeBoardNavItem: NavItem = {
     id: 'trades',
     label: 'Trades',
     href: '/season/run/trades',
     icon: ArrowLeftRight,
-};
-const navItems = $derived.by(() => {
+  };
+  const navItems = $derived.by(() => {
     const stage = shell.run?.stage ?? null;
     const isRegularSeason = stage === 'regular-season' || stage === null;
     const freeAgencyVisible = (shell.run?.freeAgency.windows.length ?? 0) > 0;
     let base = [...seasonNavItems];
-    if (isRegularSeason)
-        base = [...base, tradeBoardNavItem];
-    if (freeAgencyVisible)
-        base = [...base, freeAgencyNavItem];
+    if (isRegularSeason) base = [...base, tradeBoardNavItem];
+    if (freeAgencyVisible) base = [...base, freeAgencyNavItem];
     return stage === 'play-in' || stage === 'playoffs' || stage === 'completed'
-        ? [
-            ...base,
-            { id: 'postseason', label: 'Postseason', href: '/season/run/postseason', icon: Trophy },
+      ? [
+          ...base,
+          { id: 'postseason', label: 'Postseason', href: '/season/run/postseason', icon: Trophy },
         ]
-        : base;
-});
-const shell = new SeasonRunShell();
-setContext(SEASON_RUN_SHELL_CONTEXT, shell);
-const routeId = $derived(page.route.id);
-let playersIndex: PlayersIndexEntry[] | null = null;
-let faceIndexKey = '';
-let lastHeavyMirrorAt = 0;
-let lastHeavySnapshot: unknown = null;
-let lastHeavyBlockPhase: string | null = null;
-let tradeCacheSource: unknown = null;
-let tradeCacheClone: NonNullable<SeasonRunShellData['trade']> | null = null;
-function cloneTradeState(trade: NonNullable<SeasonRunShellData['trade']>) {
-    if (trade === tradeCacheSource && tradeCacheClone !== null)
-        return tradeCacheClone;
+      : base;
+  });
+  const shell = new SeasonRunShell();
+  setContext(SEASON_RUN_SHELL_CONTEXT, shell);
+  const routeId = $derived(page.route.id);
+  let playersIndex: PlayersIndexEntry[] | null = null;
+  let faceIndexKey = '';
+  let lastHeavyMirrorAt = 0;
+  let lastHeavySnapshot: unknown = null;
+  let lastHeavyBlockPhase: string | null = null;
+  let tradeCacheSource: unknown = null;
+  let tradeCacheClone: NonNullable<SeasonRunShellData['trade']> | null = null;
+  function cloneTradeState(trade: NonNullable<SeasonRunShellData['trade']>) {
+    if (trade === tradeCacheSource && tradeCacheClone !== null) return tradeCacheClone;
     const cloned = {
-        ...trade,
-        windows: trade.windows.map((window) => ({
-            ...window,
-            offers: window.offers.map((offer) => ({ ...offer })),
-        })),
+      ...trade,
+      windows: trade.windows.map((window) => ({
+        ...window,
+        offers: window.offers.map((offer) => ({ ...offer })),
+      })),
     };
     tradeCacheSource = trade;
     tradeCacheClone = cloned;
     return cloned;
-}
-function recomputeRunFacts(): void {
+  }
+  function recomputeRunFacts(): void {
     const snapshot = shell.snapshot;
     const run = snapshot?.run ?? null;
     shell.run = run;
@@ -95,76 +127,90 @@ function recomputeRunFacts(): void {
     shell.health = run?.health ?? null;
     shell.influence = run?.influence ?? null;
     shell.trade =
-        run?.trade !== null && run?.trade !== undefined ? cloneTradeState(run.trade) : null;
+      run?.trade !== null && run?.trade !== undefined ? cloneTradeState(run.trade) : null;
     shell.freeAgency = run?.freeAgency ?? null;
     shell.objectives = run?.objectives ?? null;
     if (run !== null) {
-        rebuildFacesIfNeeded(run);
-        const rebuilt = rebuildRotationEditor(run);
-        shell.editor = rebuilt.editor;
-        shell.editorKey = rebuilt.key;
+      rebuildFacesIfNeeded(run);
+      const rebuilt = rebuildRotationEditor(run);
+      shell.editor = rebuilt.editor;
+      shell.editorKey = rebuilt.key;
+    } else {
+      shell.facesByVersion = new Map();
+      faceIndexKey = '';
+      shell.editor = null;
+      shell.editorKey = null;
     }
-    else {
-        shell.facesByVersion = new Map();
-        faceIndexKey = '';
-        shell.editor = null;
-        shell.editorKey = null;
-    }
-}
-function rebuildFacesIfNeeded(run: NonNullable<SeasonRunShellData['run']>): void {
-    if (playersIndex === null)
-        return;
+  }
+  function rebuildFacesIfNeeded(run: NonNullable<SeasonRunShellData['run']>): void {
+    if (playersIndex === null) return;
     const catalog = shell.catalog;
-    const freeAgencyKey = run.freeAgency === null || run.freeAgency === undefined
+    const freeAgencyKey =
+      run.freeAgency === null || run.freeAgency === undefined
         ? 'no-fa'
         : run.freeAgency.windows
-            .map((window) => window.candidates.map((candidate) => candidate.playerVersionId).join(','))
+            .map((window) =>
+              window.candidates.map((candidate) => candidate.playerVersionId).join(','),
+            )
             .join('|');
     const key = `${run.runId}:${run.rosters
-        .map((roster) => `${roster.franchiseId}:${roster.players.map((p) => p.playerVersionId).join(',')}`)
-        .join('|')}:${freeAgencyKey}:${catalog === null ? 'no-catalog' : 'catalog'}`;
-    if (key === faceIndexKey)
-        return;
+      .map(
+        (roster) =>
+          `${roster.franchiseId}:${roster.players.map((p) => p.playerVersionId).join(',')}`,
+      )
+      .join('|')}:${freeAgencyKey}:${catalog === null ? 'no-catalog' : 'catalog'}`;
+    if (key === faceIndexKey) return;
     const candidates = catalog === null ? null : catalogCandidateMap(catalog);
     const tuples = [
-        ...run.rosters.flatMap((roster) => roster.players.map((entry) => versionTupleOfRosterEntry(entry, candidates?.get(entry.playerVersionId) ?? null))),
-        ...freeAgencyVersionTuples(run.freeAgency, catalog),
+      ...run.rosters.flatMap((roster) =>
+        roster.players.map((entry) =>
+          versionTupleOfRosterEntry(entry, candidates?.get(entry.playerVersionId) ?? null),
+        ),
+      ),
+      ...freeAgencyVersionTuples(run.freeAgency, catalog),
     ];
     shell.facesByVersion = buildVersionFaceIndex(playersIndex, tuples);
     faceIndexKey = key;
-}
-function rebuildRotationEditor(run: NonNullable<SeasonRunShellData['run']>): {
+  }
+  function rebuildRotationEditor(run: NonNullable<SeasonRunShellData['run']>): {
     editor: RotationEditor | null;
     key: string | null;
-} {
+  } {
     const franchiseId = shell.humanFranchiseId;
-    if (franchiseId === null)
-        return { editor: null, key: null };
+    if (franchiseId === null) return { editor: null, key: null };
     const rotation = run.rotations.find((r) => r.franchiseId === franchiseId);
     const roster = run.rosters.find((r) => r.franchiseId === franchiseId);
-    if (rotation === undefined || roster === undefined)
-        return { editor: null, key: null };
+    if (rotation === undefined || roster === undefined) return { editor: null, key: null };
     const key = `${run.runId}:${rotation.starters.join(',')}:${rotation.closingFive.join(',')}`;
     const rosterIds = roster.players.map((entry) => entry.playerVersionId);
-    if (shell.editorKey === key &&
-        shell.editor !== null &&
-        !rotationEditorNeedsPositionRefresh(shell.editor, rosterIds, (playerVersionId) => playablePositionsOfSlice(shell.playerSlice, playerVersionId) as readonly Position[])) {
-        return { editor: shell.editor, key };
+    if (
+      shell.editorKey === key &&
+      shell.editor !== null &&
+      !rotationEditorNeedsPositionRefresh(
+        shell.editor,
+        rosterIds,
+        (playerVersionId) =>
+          playablePositionsOfSlice(shell.playerSlice, playerVersionId) as readonly Position[],
+      )
+    ) {
+      return { editor: shell.editor, key };
     }
     const members = roster.players.map((entry) => ({
-        playerVersionId: entry.playerVersionId,
-        displayName: entry.displayName,
-        playable: playablePositionsOfSlice(shell.playerSlice, entry.playerVersionId) as readonly Position[],
-        franchiseId: entry.franchiseId,
-        eraId: entry.eraId,
-        seasonKey: entry.seasonKey,
+      playerVersionId: entry.playerVersionId,
+      displayName: entry.displayName,
+      playable: playablePositionsOfSlice(
+        shell.playerSlice,
+        entry.playerVersionId,
+      ) as readonly Position[],
+      franchiseId: entry.franchiseId,
+      eraId: entry.eraId,
+      seasonKey: entry.seasonKey,
     }));
     return { editor: createRotationEditor(rotation, members), key };
-}
-function mirrorHub(forceHeavy = false): void {
+  }
+  function mirrorHub(forceHeavy = false): void {
     const hub = shell.hub;
-    if (hub === null)
-        return;
+    if (hub === null) return;
     shell.snapshot = hub.snapshot;
     shell.index = hub.index;
     shell.block = hub.block;
@@ -179,468 +225,470 @@ function mirrorHub(forceHeavy = false): void {
     const phaseChanged = phase !== lastHeavyBlockPhase;
     const now = Date.now();
     const isTerminal = phase !== 'running';
-    if (!forceHeavy && !snapshotChanged && !phaseChanged && !isTerminal && now - lastHeavyMirrorAt < 1000)
-        return;
+    if (
+      !forceHeavy &&
+      !snapshotChanged &&
+      !phaseChanged &&
+      !isTerminal &&
+      now - lastHeavyMirrorAt < 1000
+    )
+      return;
     lastHeavyMirrorAt = now;
     lastHeavySnapshot = shell.snapshot;
     lastHeavyBlockPhase = phase;
     recomputeRunFacts();
-}
-let unsubscribeHub: (() => void) | null = null;
-let quitOpen = $state(false);
-let quitting = $state(false);
-let quitError: string | null = $state(null);
-let clearOpen = $state(false);
-let clearing = $state(false);
-let clearError: string | null = $state(null);
-async function confirmClearSeasonData(): Promise<void> {
-    if (clearing)
-        return;
+  }
+  let unsubscribeHub: (() => void) | null = null;
+  let quitOpen = $state(false);
+  let quitting = $state(false);
+  let quitError: string | null = $state(null);
+  let clearOpen = $state(false);
+  let clearing = $state(false);
+  let clearError: string | null = $state(null);
+  async function confirmClearSeasonData(): Promise<void> {
+    if (clearing) return;
     clearing = true;
     clearError = null;
     try {
-        const result = shell.hub !== null
-            ? await shell.hub.clearSeasonData()
-            : await (async () => {
-                const { clearAllSeasonData } = await import('$lib/season/season-data-recovery');
-                await clearAllSeasonData();
-                return { ok: true, error: null };
+      const result =
+        shell.hub !== null
+          ? await shell.hub.clearSeasonData()
+          : await (async () => {
+              const { clearAllSeasonData } = await import('$lib/season/season-data-recovery');
+              await clearAllSeasonData();
+              return { ok: true, error: null };
             })();
-        if (!result.ok) {
-            clearError = result.error;
-            return;
-        }
-        clearOpen = false;
-        shell.error = null;
-        shell.hubError = null;
-        mirrorHub();
-        await goto(resolve('/season'));
-    }
-    catch (error) {
-        clearError = error instanceof Error ? error.message : String(error);
-    }
-    finally {
-        clearing = false;
-    }
-}
-async function confirmQuit(): Promise<void> {
-    if (quitting)
+      if (!result.ok) {
+        clearError = result.error;
         return;
+      }
+      clearOpen = false;
+      shell.error = null;
+      shell.hubError = null;
+      mirrorHub();
+      await goto(resolve('/season'));
+    } catch (error) {
+      clearError = error instanceof Error ? error.message : String(error);
+    } finally {
+      clearing = false;
+    }
+  }
+  async function confirmQuit(): Promise<void> {
+    if (quitting) return;
     quitting = true;
     quitError = null;
     try {
-        const result = await shell.quitRun();
-        if (!result.ok) {
-            quitError = result.error;
-            return;
-        }
-        quitOpen = false;
-        await goto(resolve('/season'));
+      const result = await shell.quitRun();
+      if (!result.ok) {
+        quitError = result.error;
+        return;
+      }
+      quitOpen = false;
+      await goto(resolve('/season'));
+    } finally {
+      quitting = false;
     }
-    finally {
-        quitting = false;
-    }
-}
-$effect(() => {
+  }
+  $effect(() => {
     if (!import.meta.env.SSR) {
-        void initShell();
+      void initShell();
     }
     return () => {
-        unsubscribeHub?.();
-        unsubscribeHub = null;
-        const hub = shell.hub;
-        if (hub !== null) {
-            hub.destroy();
-            shell.hub = null;
-        }
+      unsubscribeHub?.();
+      unsubscribeHub = null;
+      const hub = shell.hub;
+      if (hub !== null) {
+        hub.destroy();
+        shell.hub = null;
+      }
     };
-});
-async function initShell(): Promise<void> {
+  });
+  async function initShell(): Promise<void> {
     try {
-        const [manifest, league, schedule] = await Promise.all([
-            getManifest(),
-            loadSeasonLeague(),
-            loadSeasonSchedule(),
-        ]);
-        shell.manifest = manifest;
-        shell.league = league;
-        shell.schedule = schedule;
-        const repo = await getSeasonRunRepository(schedule);
-        const runner = await getSeasonBlockRunner();
-        const hub = new SeasonHubState(repo, runner);
-        shell.hub = hub;
-        unsubscribeHub = hub.subscribe(() => mirrorHub());
-        hub.prewarm();
-        await hub.refresh();
-        mirrorHub(true);
-        await loadPlayerSlice();
-        mirrorHub(true);
-        scheduleLazyWork();
+      const [manifest, league, schedule] = await Promise.all([
+        getManifest(),
+        loadSeasonLeague(),
+        loadSeasonSchedule(),
+      ]);
+      shell.manifest = manifest;
+      shell.league = league;
+      shell.schedule = schedule;
+      const repo = await getSeasonRunRepository(schedule);
+      const runner = await getSeasonBlockRunner();
+      const hub = new SeasonHubState(repo, runner);
+      shell.hub = hub;
+      unsubscribeHub = hub.subscribe(() => mirrorHub());
+      hub.prewarm();
+      await hub.refresh();
+      mirrorHub(true);
+      await loadPlayerSlice();
+      mirrorHub(true);
+      scheduleLazyWork();
+    } catch (error) {
+      shell.error = error instanceof Error ? error.message : String(error);
+    } finally {
+      shell.ready = true;
     }
-    catch (error) {
-        shell.error = error instanceof Error ? error.message : String(error);
-    }
-    finally {
-        shell.ready = true;
-    }
-}
-async function loadPlayerSlice(): Promise<void> {
+  }
+  async function loadPlayerSlice(): Promise<void> {
     const runId = shell.snapshot?.run.runId ?? null;
     if (runId === null) {
-        shell.playerSlice = new Map();
-        shell.playerSliceReady = true;
-        return;
+      shell.playerSlice = new Map();
+      shell.playerSliceReady = true;
+      return;
     }
     try {
-        const entries = await shell.hub?.loadPlayerSlice(runId);
-        shell.playerSlice = playerSliceOf(entries ?? []);
+      const entries = await shell.hub?.loadPlayerSlice(runId);
+      shell.playerSlice = playerSliceOf(entries ?? []);
+    } catch {
+      shell.playerSlice = new Map();
+    } finally {
+      shell.playerSliceReady = true;
     }
-    catch {
-        shell.playerSlice = new Map();
-    }
-    finally {
-        shell.playerSliceReady = true;
-    }
-}
-function scheduleLazyWork(): void {
+  }
+  function scheduleLazyWork(): void {
     const run = () => {
-        void lazyLoadAssets();
+      void lazyLoadAssets();
     };
     if (typeof requestIdleCallback !== 'undefined') {
-        requestIdleCallback(run, { timeout: 2500 });
+      requestIdleCallback(run, { timeout: 2500 });
+    } else {
+      setTimeout(run, 0);
     }
-    else {
-        setTimeout(run, 0);
-    }
-}
-async function lazyLoadAssets(): Promise<void> {
-    if (import.meta.env.SSR)
-        return;
+  }
+  async function lazyLoadAssets(): Promise<void> {
+    if (import.meta.env.SSR) return;
     try {
-        const [{ loadSeasonDraftCatalog }, index] = await Promise.all([
-            import('$lib/season/season-assets'),
-            getPlayersIndex(),
-        ]);
-        const catalog = await loadSeasonDraftCatalog();
-        shell.catalog = catalog;
-        if (shell.hub !== null) {
-            shell.hub.catalog = catalog;
-        }
-        playersIndex = index.players;
-        shell.playersIndex = index.players;
-        shell.facesReady = true;
-        if (shell.run !== null) {
-            rebuildFacesIfNeeded(shell.run);
-        }
-        await topUpPlayerSliceFromCatalog(catalog);
-        mirrorHub();
-        shell.hub?.prewarm();
-    }
-    catch { }
-}
-async function topUpPlayerSliceFromCatalog(catalog: NonNullable<SeasonRunShellData['catalog']>): Promise<void> {
+      const [{ loadSeasonDraftCatalog }, index] = await Promise.all([
+        import('$lib/season/season-assets'),
+        getPlayersIndex(),
+      ]);
+      const catalog = await loadSeasonDraftCatalog();
+      shell.catalog = catalog;
+      if (shell.hub !== null) {
+        shell.hub.catalog = catalog;
+      }
+      playersIndex = index.players;
+      shell.playersIndex = index.players;
+      shell.facesReady = true;
+      if (shell.run !== null) {
+        rebuildFacesIfNeeded(shell.run);
+      }
+      await topUpPlayerSliceFromCatalog(catalog);
+      mirrorHub();
+      shell.hub?.prewarm();
+    } catch {}
+  }
+  async function topUpPlayerSliceFromCatalog(
+    catalog: NonNullable<SeasonRunShellData['catalog']>,
+  ): Promise<void> {
     const run = shell.run;
     const hub = shell.hub;
-    if (run === null || hub === null)
-        return;
+    if (run === null || hub === null) return;
     const byVersion = new Map<string, SeasonRunPlayerSliceEntry>();
     for (const entry of shell.playerSlice.values()) {
-        byVersion.set(entry.playerVersionId, entry);
+      byVersion.set(entry.playerVersionId, entry);
     }
-    const candidates = new Map(catalog.candidates.map((candidate) => [candidate.playerVersionId, candidate]));
+    const candidates = new Map(
+      catalog.candidates.map((candidate) => [candidate.playerVersionId, candidate]),
+    );
     const missing: SeasonRunPlayerSliceEntry[] = [];
     for (const roster of run.rosters) {
-        for (const entry of roster.players) {
-            if (byVersion.has(entry.playerVersionId))
-                continue;
-            const candidate = candidates.get(entry.playerVersionId);
-            if (candidate === undefined)
-                continue;
-            missing.push({
-                playerVersionId: entry.playerVersionId,
-                playerId: entry.playerId,
-                franchiseId: candidate.franchiseId,
-                eraId: candidate.eraId,
-                seasonKey: candidate.seasonKey,
-                displayName: entry.displayName,
-                positionsPlayable: [...candidate.positions.playable],
-                summaryRatings: { ...candidate.summaryRatings },
-                staminaRating: candidate.stamina.rating,
-                durabilityRating: candidate.durability.rating,
-            });
-        }
+      for (const entry of roster.players) {
+        if (byVersion.has(entry.playerVersionId)) continue;
+        const candidate = candidates.get(entry.playerVersionId);
+        if (candidate === undefined) continue;
+        missing.push({
+          playerVersionId: entry.playerVersionId,
+          playerId: entry.playerId,
+          franchiseId: candidate.franchiseId,
+          eraId: candidate.eraId,
+          seasonKey: candidate.seasonKey,
+          displayName: entry.displayName,
+          positionsPlayable: [...candidate.positions.playable],
+          summaryRatings: { ...candidate.summaryRatings },
+          staminaRating: candidate.stamina.rating,
+          durabilityRating: candidate.durability.rating,
+        });
+      }
     }
-    if (missing.length === 0)
-        return;
+    if (missing.length === 0) return;
     await hub.upsertPlayerSlice(run.runId, missing);
     const merged = playerSliceOf([...byVersion.values(), ...missing]);
     shell.playerSlice = merged;
-}
-shell.cancelBlock = () => shell.hub?.cancel();
-shell.retryBlock = () => void shell.hub?.retry();
-shell.acknowledgeExternalChange = () => {
+  }
+  shell.cancelBlock = () => shell.hub?.cancel();
+  shell.retryBlock = () => void shell.hub?.retry();
+  shell.acknowledgeExternalChange = () => {
     shell.hub?.acknowledgeExternalChange();
     shell.externalChange = null;
-};
-shell.prewarmWorker = () => shell.hub?.prewarm();
-shell.refresh = async () => {
+  };
+  shell.prewarmWorker = () => shell.hub?.prewarm();
+  shell.refresh = async () => {
     await shell.hub?.refresh();
     mirrorHub();
-};
-shell.quitRun = async () => {
+  };
+  shell.quitRun = async () => {
     if (shell.hub === null) {
-        return { ok: false, error: 'season hub is not ready' };
+      return { ok: false, error: 'season hub is not ready' };
     }
     return shell.hub.quitRun();
-};
-shell.selectBlockObjective = async (input) => {
+  };
+  shell.selectBlockObjective = async (input) => {
     await shell.hub?.selectBlockObjective(input);
     mirrorHub();
-};
-shell.spendInfluence = async (input) => {
+  };
+  shell.spendInfluence = async (input) => {
     await shell.hub?.spendInfluence(input);
     mirrorHub();
-};
-shell.acceptTradeOffer = async (input) => {
+  };
+  shell.acceptTradeOffer = async (input) => {
     await shell.hub?.acceptTradeOffer(input);
     mirrorHub();
     if (shell.catalog !== null) {
-        await topUpPlayerSliceFromCatalog(shell.catalog);
-        mirrorHub();
+      await topUpPlayerSliceFromCatalog(shell.catalog);
+      mirrorHub();
     }
-};
-shell.declineTradeOffer = async (input) => {
+  };
+  shell.declineTradeOffer = async (input) => {
     await shell.hub?.declineTradeOffer(input);
     mirrorHub();
-};
-shell.declareFreeAgentInterest = async (input) => {
+  };
+  shell.declareFreeAgentInterest = async (input) => {
     await shell.hub?.declareFreeAgentInterest(input);
     mirrorHub();
-};
-shell.skipFreeAgentMarket = async (input) => {
+  };
+  shell.skipFreeAgentMarket = async (input) => {
     await shell.hub?.skipFreeAgentMarket(input);
     mirrorHub();
-};
-shell.resolveFreeAgentMarket = async (input) => {
+  };
+  shell.resolveFreeAgentMarket = async (input) => {
     await shell.hub?.resolveFreeAgentMarket(input);
     mirrorHub();
     if (shell.catalog !== null) {
-        await topUpPlayerSliceFromCatalog(shell.catalog);
-        mirrorHub();
+      await topUpPlayerSliceFromCatalog(shell.catalog);
+      mirrorHub();
     }
-};
-shell.forfeitInterruptedGame = async () => {
+  };
+  shell.forfeitInterruptedGame = async () => {
     await shell.hub?.forfeitInterruptedGame();
     mirrorHub();
-};
-shell.resumeBlock = async () => {
+  };
+  shell.resumeBlock = async () => {
     await shell.hub?.resumeBlock();
     mirrorHub();
-};
-shell.selectGmIdentity = async (input) => {
+  };
+  shell.selectGmIdentity = async (input) => {
     await shell.hub?.selectGmIdentity(input);
     mirrorHub();
-};
-shell.selectCampaignOpportunity = async (input) => {
+  };
+  shell.selectCampaignOpportunity = async (input) => {
     await shell.hub?.selectCampaignOpportunity(input);
     mirrorHub();
-};
-shell.evolveGmCampaign = async (input) => {
+  };
+  shell.evolveGmCampaign = async (input) => {
     await shell.hub?.evolveGmCampaign(input);
     mirrorHub();
-};
-shell.openTradeInquiry = async (input) => {
+  };
+  shell.openTradeInquiry = async (input) => {
     await shell.hub?.openTradeInquiry(input);
     mirrorHub();
-};
-shell.submitTradeProposal = async (input) => {
+  };
+  shell.submitTradeProposal = async (input) => {
     await shell.hub?.submitTradeProposal(input);
     mirrorHub();
-};
-shell.respondToTradeCounter = async (input) => {
+  };
+  shell.respondToTradeCounter = async (input) => {
     await shell.hub?.respondToTradeCounter(input);
     mirrorHub();
-};
-shell.walkAwayFromTrade = async (input) => {
+  };
+  shell.walkAwayFromTrade = async (input) => {
     await shell.hub?.walkAwayFromTrade(input);
     mirrorHub();
-};
-shell.purchaseTradeInquiry = async (input) => {
+  };
+  shell.purchaseTradeInquiry = async (input) => {
     await shell.hub?.purchaseTradeInquiry(input);
     mirrorHub();
-};
-function postseasonUnavailable(): void {
+  };
+  function postseasonUnavailable(): void {
     shell.postseason = {
-        ...idlePostseasonProgress(),
-        phase: 'failed',
-        error: { code: 'unavailable', message: POSTSEASON_ORCHESTRATION_UNAVAILABLE },
+      ...idlePostseasonProgress(),
+      phase: 'failed',
+      error: { code: 'unavailable', message: POSTSEASON_ORCHESTRATION_UNAVAILABLE },
     };
-}
-shell.startPostseason = async () => {
+  }
+  shell.startPostseason = async () => {
     const hub = shell.hub;
-    if (hub === null)
-        return;
+    if (hub === null) return;
     if (!hasPostseasonHubMethods(hub)) {
-        postseasonUnavailable();
-        return;
+      postseasonUnavailable();
+      return;
     }
     await hub.startPostseason();
     mirrorHub();
-};
-shell.advancePostseason = async (input) => {
+  };
+  shell.advancePostseason = async (input) => {
     const hub = shell.hub;
-    if (hub === null)
-        return;
+    if (hub === null) return;
     if (!hasPostseasonHubMethods(hub)) {
-        postseasonUnavailable();
-        return;
+      postseasonUnavailable();
+      return;
     }
     await hub.advancePostseason(input);
     mirrorHub();
-};
-shell.submitPostseasonRotation = async (input) => {
+  };
+  shell.submitPostseasonRotation = async (input) => {
     const hub = shell.hub;
-    if (hub === null)
-        return;
+    if (hub === null) return;
     if (!hasPostseasonHubMethods(hub)) {
-        postseasonUnavailable();
-        return;
+      postseasonUnavailable();
+      return;
     }
     await hub.submitPostseasonRotation(input);
     mirrorHub();
-};
-shell.spectatePostseasonGame = async (input) => {
+  };
+  shell.spectatePostseasonGame = async (input) => {
     const hub = shell.hub;
-    if (hub === null)
-        return;
+    if (hub === null) return;
     if (!hasPostseasonHubMethods(hub)) {
-        postseasonUnavailable();
-        return;
+      postseasonUnavailable();
+      return;
     }
     await hub.spectatePostseasonGame(input);
     mirrorHub();
-};
-shell.fastForwardPostseason = async (input) => {
+  };
+  shell.fastForwardPostseason = async (input) => {
     const hub = shell.hub;
-    if (hub === null)
-        return;
+    if (hub === null) return;
     if (!hasPostseasonHubMethods(hub)) {
-        postseasonUnavailable();
-        return;
+      postseasonUnavailable();
+      return;
     }
     await hub.fastForwardPostseason(input);
     mirrorHub();
-};
-shell.cancelPostseason = () => {
+  };
+  shell.cancelPostseason = () => {
     const hub = shell.hub;
     if (hub !== null && hasPostseasonHubMethods(hub)) {
-        hub.cancelPostseason();
+      hub.cancelPostseason();
     }
-};
-shell.playerName = (playerVersionId: string): string => {
+  };
+  shell.playerName = (playerVersionId: string): string => {
     for (const roster of shell.run?.rosters ?? []) {
-        const entry = roster.players.find((p) => p.playerVersionId === playerVersionId);
-        if (entry !== undefined)
-            return entry.displayName;
+      const entry = roster.players.find((p) => p.playerVersionId === playerVersionId);
+      if (entry !== undefined) return entry.displayName;
     }
     return '—';
-};
-shell.playablePositions = (playerVersionId: string): readonly string[] => playablePositionsOfSlice(shell.playerSlice, playerVersionId);
-shell.franchiseName = (franchiseId: string): string => {
-    return (shell.manifest?.modernFranchiseSlots.find((slot) => slot.franchiseId === franchiseId)
-        ?.displayName ?? franchiseId);
-};
-shell.franchiseAbbrev = (franchiseId: string): string => {
+  };
+  shell.playablePositions = (playerVersionId: string): readonly string[] =>
+    playablePositionsOfSlice(shell.playerSlice, playerVersionId);
+  shell.franchiseName = (franchiseId: string): string => {
+    return (
+      shell.manifest?.modernFranchiseSlots.find((slot) => slot.franchiseId === franchiseId)
+        ?.displayName ?? franchiseId
+    );
+  };
+  shell.franchiseAbbrev = (franchiseId: string): string => {
     return franchiseAbbreviation(franchiseId);
-};
-const rankingWeak = new WeakMap<object, ReturnType<typeof provisionalRanking>>();
-const rankingByDigest = new Map<string, ReturnType<typeof provisionalRanking>>();
-function standingsDigest(rows: readonly { franchiseId: string; wins: number; losses: number; pointsFor: number; pointsAgainst: number }[]): string {
+  };
+  const rankingWeak = new WeakMap<object, ReturnType<typeof provisionalRanking>>();
+  const rankingByDigest = new Map<string, ReturnType<typeof provisionalRanking>>();
+  function standingsDigest(
+    rows: readonly {
+      franchiseId: string;
+      wins: number;
+      losses: number;
+      pointsFor: number;
+      pointsAgainst: number;
+    }[],
+  ): string {
     let hash = 2166136261;
     const sorted = [...rows].sort((a, b) => (a.franchiseId < b.franchiseId ? -1 : 1));
     for (const row of sorted) {
-        for (let i = 0; i < row.franchiseId.length; i += 1)
-            hash = Math.imul(hash ^ row.franchiseId.charCodeAt(i), 16777619);
-        hash = Math.imul(hash ^ row.wins, 16777619);
-        hash = Math.imul(hash ^ row.losses, 16777619);
-        hash = Math.imul(hash ^ row.pointsFor, 16777619);
-        hash = Math.imul(hash ^ row.pointsAgainst, 16777619);
+      for (let i = 0; i < row.franchiseId.length; i += 1)
+        hash = Math.imul(hash ^ row.franchiseId.charCodeAt(i), 16777619);
+      hash = Math.imul(hash ^ row.wins, 16777619);
+      hash = Math.imul(hash ^ row.losses, 16777619);
+      hash = Math.imul(hash ^ row.pointsFor, 16777619);
+      hash = Math.imul(hash ^ row.pointsAgainst, 16777619);
     }
     return `${String(rows.length)}:${String(hash >>> 0)}`;
-}
-function memoizedRanking(standings: Parameters<typeof provisionalRanking>[0], league: Parameters<typeof provisionalRanking>[1]): ReturnType<typeof provisionalRanking> {
+  }
+  function memoizedRanking(
+    standings: Parameters<typeof provisionalRanking>[0],
+    league: Parameters<typeof provisionalRanking>[1],
+  ): ReturnType<typeof provisionalRanking> {
     const weakHit = rankingWeak.get(standings);
-    if (weakHit !== undefined)
-        return weakHit;
+    if (weakHit !== undefined) return weakHit;
     const digest = standingsDigest(standings.rows);
     const digestHit = rankingByDigest.get(digest);
     if (digestHit !== undefined) {
-        rankingWeak.set(standings, digestHit);
-        return digestHit;
+      rankingWeak.set(standings, digestHit);
+      return digestHit;
     }
     const ranked = provisionalRanking(standings, league);
     rankingWeak.set(standings, ranked);
     rankingByDigest.set(digest, ranked);
     if (rankingByDigest.size > 4) {
-        const oldest = rankingByDigest.keys().next().value;
-        if (oldest !== undefined)
-            rankingByDigest.delete(oldest);
+      const oldest = rankingByDigest.keys().next().value;
+      if (oldest !== undefined) rankingByDigest.delete(oldest);
     }
     return ranked;
-}
-const mastheadFacts = $derived.by(() => {
+  }
+  const mastheadFacts = $derived.by(() => {
     const run = shell.run;
     const franchiseId = shell.humanFranchiseId;
     const manifest = shell.manifest;
-    if (run === null || franchiseId === null || manifest === null)
-        return null;
+    if (run === null || franchiseId === null || manifest === null) return null;
     const row = run.standings.rows.find((r) => r.franchiseId === franchiseId);
-    if (row === undefined)
-        return null;
-    const ranked = memoizedRanking(run.standings, run.league).find((entry) => entry.row.franchiseId === franchiseId);
+    if (row === undefined) return null;
+    const ranked = memoizedRanking(run.standings, run.league).find(
+      (entry) => entry.row.franchiseId === franchiseId,
+    );
     return {
-        franchiseId,
-        record: recordLabel(row.wins, row.losses),
-        position: ranked === undefined ? '—' : `${ordinal(ranked.rank)} in the ${ranked.conference}`,
+      franchiseId,
+      record: recordLabel(row.wins, row.losses),
+      position: ranked === undefined ? '—' : `${ordinal(ranked.rank)} in the ${ranked.conference}`,
     };
-});
-const seasonLoadError = $derived(shell.error ?? shell.hubError ?? null);
-const incompatible = $derived(shell.hub?.incompatible ?? null);
-const isHistoryRoute = $derived(routeId?.startsWith('/season/run/history') ?? false);
-const showBrokenResume = $derived(shell.ready &&
-    seasonLoadError === null &&
-    incompatible === null &&
-    shell.hub !== null &&
-    shell.snapshot === null &&
-    shell.index !== null);
-const showEmptyState = $derived(shell.ready &&
-    seasonLoadError === null &&
-    incompatible === null &&
-    shell.hub !== null &&
-    shell.snapshot === null &&
-    shell.index === null &&
-    !showBrokenResume &&
-    !isHistoryRoute);
-let discardOpen = $state(false);
-let discarding = $state(false);
-let discardError: string | null = $state(null);
-async function confirmDiscard(): Promise<void> {
-    if (discarding)
-        return;
+  });
+  const seasonLoadError = $derived(shell.error ?? shell.hubError ?? null);
+  const incompatible = $derived(shell.hub?.incompatible ?? null);
+  const isHistoryRoute = $derived(routeId?.startsWith('/season/run/history') ?? false);
+  const showBrokenResume = $derived(
+    shell.ready &&
+      seasonLoadError === null &&
+      incompatible === null &&
+      shell.hub !== null &&
+      shell.snapshot === null &&
+      shell.index !== null,
+  );
+  const showEmptyState = $derived(
+    shell.ready &&
+      seasonLoadError === null &&
+      incompatible === null &&
+      shell.hub !== null &&
+      shell.snapshot === null &&
+      shell.index === null &&
+      !showBrokenResume &&
+      !isHistoryRoute,
+  );
+  let discardOpen = $state(false);
+  let discarding = $state(false);
+  let discardError: string | null = $state(null);
+  async function confirmDiscard(): Promise<void> {
+    if (discarding) return;
     discarding = true;
     discardError = null;
     try {
-        await shell.hub?.discardIncompatibleRun();
-        discardOpen = false;
-        await goto(resolve('/season'));
+      await shell.hub?.discardIncompatibleRun();
+      discardOpen = false;
+      await goto(resolve('/season'));
+    } catch (error) {
+      discardError = error instanceof Error ? error.message : String(error);
+    } finally {
+      discarding = false;
     }
-    catch (error) {
-        discardError = error instanceof Error ? error.message : String(error);
-    }
-    finally {
-        discarding = false;
-    }
-}
+  }
 </script>
 
 <svelte:head>

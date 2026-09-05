@@ -1,6 +1,7 @@
-<script lang="ts">import type { ChallengeRun } from '@hoop-rush/data-contracts';
-import { variantLabel } from '$lib/draft-presentation';
-import ChallengeRunView from '$lib/components/ChallengeRunView.svelte';
+<script lang="ts">
+  import type { ChallengeRun } from '@hoop-rush/data-contracts';
+  import { variantLabel } from '$lib/draft-presentation';
+  import ChallengeRunView from '$lib/components/ChallengeRunView.svelte';
 </script>
 
 <svelte:head>

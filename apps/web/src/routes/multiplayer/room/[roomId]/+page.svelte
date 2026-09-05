@@ -1,967 +1,966 @@
-<script lang="ts">import { onMount } from 'svelte';
-import { page } from '$app/stores';
-import { goto } from '$app/navigation';
-import { resolve } from '$app/paths';
-import { Check, Copy } from '@lucide/svelte';
-import type { CommandId, ContentHash, FixedFiveCommand, FixedFiveCommandPayload, FixedFiveCompetitionResult, FixedFiveRoomSnapshot, FixedFiveWorkerResultEntry, Id, PlayerId, Seed, SlotIndex, } from '@hoop-rush/data-contracts';
-import { commandIdSchema, fixedFiveTimeoutMsForMode, idSchema } from '@hoop-rush/data-contracts';
-import { getFixedFiveTransport } from '$lib/fixed-five-transport';
-import { submitFixedFiveCommand } from '$lib/fixed-five-command-submit';
-import { friendlyFixedFiveJoinError, inviteLinkForFixedFiveCode, loadFixedFiveMembership, saveFixedFiveMembership, } from '$lib/fixed-five-identity';
-import { fixedFiveRepository } from '$lib/fixed-five-repo';
-import { FixedFiveRunner } from '$lib/fixed-five-runner';
-import { FixedFiveSimulationGate, type FixedFiveSimulationReason, } from '$lib/fixed-five-simulation-gate';
-import FixedFiveScoreboard from '$lib/components/FixedFiveScoreboard.svelte';
-import FixedFiveDraftPanel from '$lib/components/FixedFiveDraftPanel.svelte';
-import FixedFiveSimShow from '$lib/components/FixedFiveSimShow.svelte';
-import FixedFiveResults from '$lib/components/FixedFiveResults.svelte';
-import { aggregateFixedFivePlayerStats, type FixedFivePlayerStats, } from '$lib/fixed-five-player-stats';
-import { rollAnimationFor } from '$lib/fixed-five-roll-animation';
-import { assembleCompetitionRun, buildSimulationTeam, computeCompetitionDigest, computeDueAutopick, deriveEffectivePhase, isDraftComplete, isFixedFiveDraftTurn, loadActivityAt, loadFixedFiveAssets, mergeFixedFiveCommands, overlaySnapshotProgress, pickOrdinalOf, refsForParticipant, replayFixedFiveLog, restoreFixedFiveCommandSyncState, roomLogFacts, saveActivityNow, summarizeWorkerEntries, type DraftReplay, type FixedFiveAssets, type PickRef, } from '$lib/fixed-five-room-state';
-import { presentationForVariant } from '$lib/draft-presentation';
-import type { SimulationPlayer } from '@hoop-rush/data-contracts';
-import type { FixedFiveWorkerTeam, PlayersIndexEntry } from '@hoop-rush/data-contracts';
-let roomId = $derived($page.params.roomId as string);
-let snapshot = $state<FixedFiveRoomSnapshot | null>(null);
-let commands = $state<FixedFiveCommand[]>([]);
-let assets = $state<FixedFiveAssets | null>(null);
-let assetsError = $state<string | null>(null);
-let loading = $state(true);
-let error = $state<string | null>(null);
-let notice = $state<string | null>(null);
-let draftError = $state<string | null>(null);
-let reconnecting = $state(false);
-let syncing = $state(false);
-let lastOrdinal = $state(-1);
-let selfId = $state<'p1' | 'p2'>('p1');
-let mounted = true;
-let tick = $state(0);
-const SIM_SHOWDOWN_MIN_MS = 3000;
-const SIM_SHOWDOWN_REDUCED_MS = 400;
-let progress = $state<{
+<script lang="ts">
+  import { onMount } from 'svelte';
+  import { page } from '$app/stores';
+  import { goto } from '$app/navigation';
+  import { resolve } from '$app/paths';
+  import { Check, Copy } from '@lucide/svelte';
+  import type {
+    CommandId,
+    ContentHash,
+    FixedFiveCommand,
+    FixedFiveCommandPayload,
+    FixedFiveCompetitionResult,
+    FixedFiveRoomSnapshot,
+    FixedFiveWorkerResultEntry,
+    Id,
+    PlayerId,
+    Seed,
+    SlotIndex,
+  } from '@hoop-rush/data-contracts';
+  import { commandIdSchema, fixedFiveTimeoutMsForMode, idSchema } from '@hoop-rush/data-contracts';
+  import { getFixedFiveTransport } from '$lib/fixed-five-transport';
+  import { submitFixedFiveCommand } from '$lib/fixed-five-command-submit';
+  import {
+    friendlyFixedFiveJoinError,
+    inviteLinkForFixedFiveCode,
+    loadFixedFiveMembership,
+    saveFixedFiveMembership,
+  } from '$lib/fixed-five-identity';
+  import { fixedFiveRepository } from '$lib/fixed-five-repo';
+  import { FixedFiveRunner } from '$lib/fixed-five-runner';
+  import {
+    FixedFiveSimulationGate,
+    type FixedFiveSimulationReason,
+  } from '$lib/fixed-five-simulation-gate';
+  import FixedFiveScoreboard from '$lib/components/FixedFiveScoreboard.svelte';
+  import FixedFiveDraftPanel from '$lib/components/FixedFiveDraftPanel.svelte';
+  import FixedFiveSimShow from '$lib/components/FixedFiveSimShow.svelte';
+  import FixedFiveResults from '$lib/components/FixedFiveResults.svelte';
+  import {
+    aggregateFixedFivePlayerStats,
+    type FixedFivePlayerStats,
+  } from '$lib/fixed-five-player-stats';
+  import { rollAnimationFor } from '$lib/fixed-five-roll-animation';
+  import {
+    assembleCompetitionRun,
+    buildSimulationTeam,
+    computeCompetitionDigest,
+    computeDueAutopick,
+    deriveEffectivePhase,
+    isDraftComplete,
+    isFixedFiveDraftTurn,
+    loadActivityAt,
+    loadFixedFiveAssets,
+    mergeFixedFiveCommands,
+    overlaySnapshotProgress,
+    pickOrdinalOf,
+    refsForParticipant,
+    replayFixedFiveLog,
+    restoreFixedFiveCommandSyncState,
+    roomLogFacts,
+    saveActivityNow,
+    summarizeWorkerEntries,
+    type DraftReplay,
+    type FixedFiveAssets,
+    type PickRef,
+  } from '$lib/fixed-five-room-state';
+  import { presentationForVariant } from '$lib/draft-presentation';
+  import type { SimulationPlayer } from '@hoop-rush/data-contracts';
+  import type { FixedFiveWorkerTeam, PlayersIndexEntry } from '@hoop-rush/data-contracts';
+  let roomId = $derived($page.params.roomId as string);
+  let snapshot = $state<FixedFiveRoomSnapshot | null>(null);
+  let commands = $state<FixedFiveCommand[]>([]);
+  let assets = $state<FixedFiveAssets | null>(null);
+  let assetsError = $state<string | null>(null);
+  let loading = $state(true);
+  let error = $state<string | null>(null);
+  let notice = $state<string | null>(null);
+  let draftError = $state<string | null>(null);
+  let reconnecting = $state(false);
+  let syncing = $state(false);
+  let lastOrdinal = $state(-1);
+  let selfId = $state<'p1' | 'p2'>('p1');
+  let mounted = true;
+  let tick = $state(0);
+  const SIM_SHOWDOWN_MIN_MS = 3000;
+  const SIM_SHOWDOWN_REDUCED_MS = 400;
+  let progress = $state<{
     completed: number;
     total: number;
-} | null>(null);
-let simStarted = $state(false);
-let simStartAt = $state(0);
-let simDone = $state(false);
-let simError = $state<string | null>(null);
-let simEntries = $state<FixedFiveWorkerResultEntry[]>([]);
-let statsEntries = $state<FixedFiveWorkerResultEntry[]>([]);
-let statsBuilding = $state(false);
-let statsRebuildStarted = $state(false);
-let runner: FixedFiveRunner | null = null;
-let statsRunner: FixedFiveRunner | null = null;
-const simulationGate = new FixedFiveSimulationGate();
-let simulationReason: FixedFiveSimulationReason = 'initial';
-interface LocalResult {
+  } | null>(null);
+  let simStarted = $state(false);
+  let simStartAt = $state(0);
+  let simDone = $state(false);
+  let simError = $state<string | null>(null);
+  let simEntries = $state<FixedFiveWorkerResultEntry[]>([]);
+  let statsEntries = $state<FixedFiveWorkerResultEntry[]>([]);
+  let statsBuilding = $state(false);
+  let statsRebuildStarted = $state(false);
+  let runner: FixedFiveRunner | null = null;
+  let statsRunner: FixedFiveRunner | null = null;
+  const simulationGate = new FixedFiveSimulationGate();
+  let simulationReason: FixedFiveSimulationReason = 'initial';
+  interface LocalResult {
     result: FixedFiveCompetitionResult;
     digest: ContentHash;
     p1: {
-        refs: PickRef[];
-        players: SimulationPlayer[];
+      refs: PickRef[];
+      players: SimulationPlayer[];
     };
     p2: {
-        refs: PickRef[];
-        players: SimulationPlayer[];
+      refs: PickRef[];
+      players: SimulationPlayer[];
     };
     weakestReplacedOpponentId: string | null;
-}
-let localResult = $state<LocalResult | null>(null);
-let submittedPropose = $state<ContentHash | null>(null);
-let confirmedFor = $state<ContentHash | null>(null);
-let reranMismatch = $state(false);
-let mismatchReported = $state(false);
-let completedSent = $state(false);
-let failSent = $state(false);
-let busyAction = $state<string | null>(null);
-let leaveBusy = $state(false);
-let rematchBusy = $state(false);
-let submittedTimeouts = $state<Set<string>>(new Set());
-let copiedInvite = $state(false);
-let copiedCode = $state(false);
-const replay = $derived.by((): DraftReplay | null => {
-    if (!snapshot || !assets || !snapshot.rootSeed)
-        return null;
+  }
+  let localResult = $state<LocalResult | null>(null);
+  let submittedPropose = $state<ContentHash | null>(null);
+  let confirmedFor = $state<ContentHash | null>(null);
+  let reranMismatch = $state(false);
+  let mismatchReported = $state(false);
+  let completedSent = $state(false);
+  let failSent = $state(false);
+  let busyAction = $state<string | null>(null);
+  let leaveBusy = $state(false);
+  let rematchBusy = $state(false);
+  let submittedTimeouts = $state<Set<string>>(new Set());
+  let copiedInvite = $state(false);
+  let copiedCode = $state(false);
+  const replay = $derived.by((): DraftReplay | null => {
+    if (!snapshot || !assets || !snapshot.rootSeed) return null;
     try {
-        return replayFixedFiveLog(snapshot.settings.mode, snapshot.roomId, snapshot.rootSeed, snapshot.settings.versions.dataVersion, snapshot.settings.variant, assets, commands, snapshot.settings.sourceMode);
+      return replayFixedFiveLog(
+        snapshot.settings.mode,
+        snapshot.roomId,
+        snapshot.rootSeed,
+        snapshot.settings.versions.dataVersion,
+        snapshot.settings.variant,
+        assets,
+        commands,
+        snapshot.settings.sourceMode,
+      );
+    } catch {
+      return null;
     }
-    catch {
-        return null;
-    }
-});
-const facts = $derived(roomLogFacts(commands));
-const rollAnimation = $derived(rollAnimationFor(commands, snapshot?.settings.mode ?? 'classic-shared-82', selfId));
-const phase = $derived(snapshot && replay ? deriveEffectivePhase(snapshot.phase, replay, simDone) : 'lobby');
-const display = $derived(snapshot && replay ? overlaySnapshotProgress(snapshot, replay, facts) : snapshot);
-const presentation = $derived(presentationForVariant(snapshot?.settings.variant ?? 'ratings'));
-const indexById = $derived(assets
-    ? new Map<string, PlayersIndexEntry>(assets.index.players.map((p) => [p.playerId as string, p]))
-    : new Map<string, PlayersIndexEntry>());
-const p1ResultRows = $derived.by((): (PlayersIndexEntry | null)[] => {
+  });
+  const facts = $derived(roomLogFacts(commands));
+  const rollAnimation = $derived(
+    rollAnimationFor(commands, snapshot?.settings.mode ?? 'classic-shared-82', selfId),
+  );
+  const phase = $derived(
+    snapshot && replay ? deriveEffectivePhase(snapshot.phase, replay, simDone) : 'lobby',
+  );
+  const display = $derived(
+    snapshot && replay ? overlaySnapshotProgress(snapshot, replay, facts) : snapshot,
+  );
+  const presentation = $derived(presentationForVariant(snapshot?.settings.variant ?? 'ratings'));
+  const indexById = $derived(
+    assets
+      ? new Map<string, PlayersIndexEntry>(
+          assets.index.players.map((p) => [p.playerId as string, p]),
+        )
+      : new Map<string, PlayersIndexEntry>(),
+  );
+  const p1ResultRows = $derived.by((): (PlayersIndexEntry | null)[] => {
     const rows: (PlayersIndexEntry | null)[] = [null, null, null, null, null];
-    if (!localResult)
-        return rows;
+    if (!localResult) return rows;
     for (const ref of localResult.p1.refs) {
-        if (ref.slotIndex >= 0 && ref.slotIndex < 5)
-            rows[ref.slotIndex] = indexById.get(ref.playerId as string) ?? null;
+      if (ref.slotIndex >= 0 && ref.slotIndex < 5)
+        rows[ref.slotIndex] = indexById.get(ref.playerId as string) ?? null;
     }
     return rows;
-});
-const p2ResultRows = $derived.by((): (PlayersIndexEntry | null)[] => {
+  });
+  const p2ResultRows = $derived.by((): (PlayersIndexEntry | null)[] => {
     const rows: (PlayersIndexEntry | null)[] = [null, null, null, null, null];
-    if (!localResult)
-        return rows;
+    if (!localResult) return rows;
     for (const ref of localResult.p2.refs) {
-        if (ref.slotIndex >= 0 && ref.slotIndex < 5)
-            rows[ref.slotIndex] = indexById.get(ref.playerId as string) ?? null;
+      if (ref.slotIndex >= 0 && ref.slotIndex < 5)
+        rows[ref.slotIndex] = indexById.get(ref.playerId as string) ?? null;
     }
     return rows;
-});
-const statsSource = $derived(statsEntries.length > 0 ? statsEntries : simEntries);
-const playerStats = $derived.by((): FixedFivePlayerStats | null => {
-    if (!snapshot || statsSource.length === 0)
-        return null;
+  });
+  const statsSource = $derived(statsEntries.length > 0 ? statsEntries : simEntries);
+  const playerStats = $derived.by((): FixedFivePlayerStats | null => {
+    if (!snapshot || statsSource.length === 0) return null;
     try {
-        return aggregateFixedFivePlayerStats(snapshot.settings.mode, statsSource, 'p1', 'p2');
+      return aggregateFixedFivePlayerStats(snapshot.settings.mode, statsSource, 'p1', 'p2');
+    } catch {
+      return null;
     }
-    catch {
-        return null;
-    }
-});
-const statsState = $derived<'ready' | 'building' | 'empty'>(playerStats ? 'ready' : statsBuilding ? 'building' : 'empty');
-const opponent = $derived(display?.members.find((m) => m.participantId !== selfId) ?? null);
-const timeoutMs = $derived(snapshot ? fixedFiveTimeoutMsForMode(snapshot.settings.mode) : 90 * 1000);
-const anchorMs = $derived.by(() => {
+  });
+  const statsState = $derived<'ready' | 'building' | 'empty'>(
+    playerStats ? 'ready' : statsBuilding ? 'building' : 'empty',
+  );
+  const opponent = $derived(display?.members.find((m) => m.participantId !== selfId) ?? null);
+  const timeoutMs = $derived(
+    snapshot ? fixedFiveTimeoutMsForMode(snapshot.settings.mode) : 90 * 1000,
+  );
+  const anchorMs = $derived.by(() => {
     void tick;
     const stored = loadActivityAt(roomId);
-    if (stored)
-        return stored;
+    if (stored) return stored;
     return snapshot ? Date.parse(snapshot.createdAt) : Date.now();
-});
-const clockText = $derived.by((): string | null => {
-    if (!snapshot || phase !== 'drafting')
-        return null;
+  });
+  const clockText = $derived.by((): string | null => {
+    if (!snapshot || phase !== 'drafting') return null;
     void tick;
     const remaining = anchorMs + timeoutMs - Date.now();
-    if (remaining <= 0)
-        return 'Pick clock expired — resolving the deterministic fallback…';
+    if (remaining <= 0) return 'Pick clock expired — resolving the deterministic fallback…';
     const total = Math.floor(remaining / 1000);
     return `Pick clock: ${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
-});
-const lastAutopick = $derived.by((): {
-    displayName: string;
-    seedPath: string;
-} | null => {
-    if (!assets)
-        return null;
-    const timeouts = commands.filter((c) => c.payload.kind === 'timeout-autopick');
-    const last = timeouts[timeouts.length - 1];
-    if (!last)
-        return null;
-    const payload = last.payload;
-    if (payload.kind !== 'timeout-autopick')
-        return null;
-    const row = assets.index.players.find((p) => p.playerId === payload.playerId);
-    return { displayName: row?.displayName ?? payload.playerId, seedPath: payload.seedPath };
-});
-function transport() {
+  });
+  const lastAutopick = $derived.by(
+    (): {
+      displayName: string;
+      seedPath: string;
+    } | null => {
+      if (!assets) return null;
+      const timeouts = commands.filter((c) => c.payload.kind === 'timeout-autopick');
+      const last = timeouts[timeouts.length - 1];
+      if (!last) return null;
+      const payload = last.payload;
+      if (payload.kind !== 'timeout-autopick') return null;
+      const row = assets.index.players.find((p) => p.playerId === payload.playerId);
+      return { displayName: row?.displayName ?? payload.playerId, seedPath: payload.seedPath };
+    },
+  );
+  function transport() {
     return getFixedFiveTransport();
-}
-async function copyInviteLink() {
-    if (!snapshot?.code)
-        return;
+  }
+  async function copyInviteLink() {
+    if (!snapshot?.code) return;
     try {
-        await navigator.clipboard.writeText(`${window.location.origin}${inviteLinkForFixedFiveCode(snapshot.code)}`);
-        copiedInvite = true;
-        setTimeout(() => (copiedInvite = false), 1500);
-    }
-    catch { }
-}
-async function copyRoomCode() {
-    if (!snapshot?.code)
-        return;
+      await navigator.clipboard.writeText(
+        `${window.location.origin}${inviteLinkForFixedFiveCode(snapshot.code)}`,
+      );
+      copiedInvite = true;
+      setTimeout(() => (copiedInvite = false), 1500);
+    } catch {}
+  }
+  async function copyRoomCode() {
+    if (!snapshot?.code) return;
     try {
-        await navigator.clipboard.writeText(snapshot.code);
-        copiedCode = true;
-        setTimeout(() => (copiedCode = false), 1500);
-    }
-    catch { }
-}
-function brandedRoomId(): Id {
+      await navigator.clipboard.writeText(snapshot.code);
+      copiedCode = true;
+      setTimeout(() => (copiedCode = false), 1500);
+    } catch {}
+  }
+  function brandedRoomId(): Id {
     return idSchema.parse(roomId);
-}
-function newCommandId(provided?: string): CommandId {
+  }
+  function newCommandId(provided?: string): CommandId {
     return provided ? commandIdSchema.parse(provided) : commandIdSchema.parse(crypto.randomUUID());
-}
-async function sync(afterOrdinal: number): Promise<void> {
-    if (!snapshot)
-        return;
+  }
+  async function sync(afterOrdinal: number): Promise<void> {
+    if (!snapshot) return;
     syncing = true;
     try {
-        const fresh = await transport().refetch(roomId, afterOrdinal);
-        if (!mounted)
-            return;
-        if (fresh.length > 0) {
-            const merged = mergeFixedFiveCommands(commands, fresh);
-            const addedCount = merged.length - commands.length;
-            commands = merged;
-            const byOrdinal = new Map(merged.map((c) => [c.ordinal, c] as const));
-            let contiguous = lastOrdinal;
-            while (byOrdinal.has(contiguous + 1))
-                contiguous += 1;
-            lastOrdinal = contiguous;
-            for (const command of fresh) {
-                try {
-                    await fixedFiveRepository.appendCommand(command);
-                }
-                catch {
-                }
-            }
-            saveActivityNow(roomId);
-            if (addedCount > 0) {
-                notice = `Synced ${String(addedCount)} command${addedCount === 1 ? '' : 's'} after the last accepted ordinal.`;
-            }
+      const fresh = await transport().refetch(roomId, afterOrdinal);
+      if (!mounted) return;
+      if (fresh.length > 0) {
+        const merged = mergeFixedFiveCommands(commands, fresh);
+        const addedCount = merged.length - commands.length;
+        commands = merged;
+        const byOrdinal = new Map(merged.map((c) => [c.ordinal, c] as const));
+        let contiguous = lastOrdinal;
+        while (byOrdinal.has(contiguous + 1)) contiguous += 1;
+        lastOrdinal = contiguous;
+        for (const command of fresh) {
+          try {
+            await fixedFiveRepository.appendCommand(command);
+          } catch {}
         }
-        await fixedFiveRepository.saveActiveSnapshot(snapshot, lastOrdinal + 1).catch(() => { });
+        saveActivityNow(roomId);
+        if (addedCount > 0) {
+          notice = `Synced ${String(addedCount)} command${addedCount === 1 ? '' : 's'} after the last accepted ordinal.`;
+        }
+      }
+      await fixedFiveRepository.saveActiveSnapshot(snapshot, lastOrdinal + 1).catch(() => {});
+    } catch (e) {
+      if (mounted) error = friendlyFixedFiveJoinError(e);
+    } finally {
+      if (mounted) syncing = false;
     }
-    catch (e) {
-        if (mounted)
-            error = friendlyFixedFiveJoinError(e);
-    }
-    finally {
-        if (mounted)
-            syncing = false;
-    }
-}
-async function sendCommand(payload: FixedFiveCommandPayload, options?: {
-    actor?: 'p1' | 'p2';
-    commandId?: string;
-    retry?: boolean;
-}): Promise<boolean> {
+  }
+  async function sendCommand(
+    payload: FixedFiveCommandPayload,
+    options?: {
+      actor?: 'p1' | 'p2';
+      commandId?: string;
+      retry?: boolean;
+    },
+  ): Promise<boolean> {
     error = null;
     const commandId = newCommandId(options?.commandId);
     try {
-        const result = await submitFixedFiveCommand({
-            submitCommand: (command) => transport().submitCommand(command),
-            roomId: brandedRoomId(),
-            commandId,
-            actorParticipantId: options?.actor ?? selfId,
-            payload,
-            expectedRevision: snapshot?.revision,
-            resync: () => sync(lastOrdinal),
-            retry: options?.retry,
-            retryAfterResync: () => {
-                if (payload.kind === 'propose-result') {
-                    return localResult?.digest === payload.resultDigest;
-                }
-                const currentResult = localResult;
-                if (payload.kind !== 'confirm-result' || !currentResult)
-                    return false;
-                const freshForeign = roomLogFacts(commands).proposals.filter((proposal) => proposal.actor !== selfId);
-                if (payload.verified) {
-                    return (currentResult.digest === payload.resultDigest &&
-                        freshForeign.some((proposal) => proposal.digest === payload.resultDigest));
-                }
-                return (reranMismatch &&
-                    currentResult.digest !== payload.resultDigest &&
-                    freshForeign.some((proposal) => proposal.digest === payload.resultDigest) &&
-                    !freshForeign.some((proposal) => proposal.digest === currentResult.digest));
-            },
-        });
-        const receipt = result.receipt;
-        if (snapshot && receipt.revision > snapshot.revision) {
-            snapshot = { ...snapshot, revision: receipt.revision };
+      const result = await submitFixedFiveCommand({
+        submitCommand: (command) => transport().submitCommand(command),
+        roomId: brandedRoomId(),
+        commandId,
+        actorParticipantId: options?.actor ?? selfId,
+        payload,
+        expectedRevision: snapshot?.revision,
+        resync: () => sync(lastOrdinal),
+        retry: options?.retry,
+        retryAfterResync: () => {
+          if (payload.kind === 'propose-result') {
+            return localResult?.digest === payload.resultDigest;
+          }
+          const currentResult = localResult;
+          if (payload.kind !== 'confirm-result' || !currentResult) return false;
+          const freshForeign = roomLogFacts(commands).proposals.filter(
+            (proposal) => proposal.actor !== selfId,
+          );
+          if (payload.verified) {
+            return (
+              currentResult.digest === payload.resultDigest &&
+              freshForeign.some((proposal) => proposal.digest === payload.resultDigest)
+            );
+          }
+          return (
+            reranMismatch &&
+            currentResult.digest !== payload.resultDigest &&
+            freshForeign.some((proposal) => proposal.digest === payload.resultDigest) &&
+            !freshForeign.some((proposal) => proposal.digest === currentResult.digest)
+          );
+        },
+      });
+      const receipt = result.receipt;
+      if (snapshot && receipt.revision > snapshot.revision) {
+        snapshot = { ...snapshot, revision: receipt.revision };
+      }
+      if (result.retried && receipt.accepted) {
+        notice = 'Room changed while sending — resynced and recovered.';
+      }
+      if (!receipt.accepted && receipt.rejectionCode === 'stale-revision') {
+        notice = 'Stale command — resyncing once before a single retry.';
+        if (mounted) {
+          error = result.retried
+            ? 'The room changed again during the retry. The command was not applied.'
+            : 'The room changed and invalidated this command. It was not applied.';
+          return false;
         }
-        if (result.retried && receipt.accepted) {
-            notice = 'Room changed while sending — resynced and recovered.';
-        }
-        if (!receipt.accepted && receipt.rejectionCode === 'stale-revision') {
-            notice = 'Stale command — resyncing once before a single retry.';
-            if (mounted) {
-                error = result.retried
-                    ? 'The room changed again during the retry. The command was not applied.'
-                    : 'The room changed and invalidated this command. It was not applied.';
-                return false;
-            }
-        }
-        else if (!receipt.accepted) {
-            error = `Command rejected: ${receipt.rejectionCode ?? 'unknown'}`;
-            return false;
-        }
-        saveActivityNow(roomId);
-        await sync(lastOrdinal);
-        return true;
-    }
-    catch (e) {
-        if (mounted)
-            error = friendlyFixedFiveJoinError(e);
+      } else if (!receipt.accepted) {
+        error = `Command rejected: ${receipt.rejectionCode ?? 'unknown'}`;
         return false;
+      }
+      saveActivityNow(roomId);
+      await sync(lastOrdinal);
+      return true;
+    } catch (e) {
+      if (mounted) error = friendlyFixedFiveJoinError(e);
+      return false;
     }
-}
-async function sendPick(playerId: PlayerId, slot: SlotIndex, moveTarget?: SlotIndex | null): Promise<void> {
+  }
+  async function sendPick(
+    playerId: PlayerId,
+    slot: SlotIndex,
+    moveTarget?: SlotIndex | null,
+  ): Promise<void> {
     draftError = null;
-    if (!snapshot || !replay)
-        return;
+    if (!snapshot || !replay) return;
     const mode = snapshot.settings.mode;
     if (mode === 'sandbox-shared-82') {
-        if (moveTarget == null || replay.mode !== 'sandbox-shared-82') {
-            await sendCommand({ kind: 'sandbox-place', playerId, slotIndex: slot });
-            return;
-        }
-        const builder = selfId === 'p1' ? replay.p1 : replay.p2;
-        const incumbent = builder.placements.find((p) => p.slotIndex === slot) ?? null;
-        const subjectOld = builder.placements.find((p) => p.playerId === playerId)?.slotIndex ?? null;
-        if (!incumbent || incumbent.playerId === playerId) {
-            await sendCommand({ kind: 'sandbox-place', playerId, slotIndex: slot });
-            return;
-        }
-        if (subjectOld !== null) {
-            const freed = await sendCommand({ kind: 'sandbox-remove', slotIndex: subjectOld });
-            if (!freed) {
-                draftError = 'Move was rejected — resync and try again.';
-                return;
-            }
-        }
-        const placed = await sendCommand({ kind: 'sandbox-place', playerId, slotIndex: slot });
-        if (!placed) {
-            draftError = 'Displacement pick was rejected — it may already be spent.';
-            return;
-        }
-        const restored = await sendCommand({
-            kind: 'sandbox-place',
-            playerId: incumbent.playerId,
-            slotIndex: moveTarget,
-        });
-        if (!restored) {
-            draftError = 'Placed your pick but could not move the displaced player back.';
-        }
+      if (moveTarget == null || replay.mode !== 'sandbox-shared-82') {
+        await sendCommand({ kind: 'sandbox-place', playerId, slotIndex: slot });
         return;
+      }
+      const builder = selfId === 'p1' ? replay.p1 : replay.p2;
+      const incumbent = builder.placements.find((p) => p.slotIndex === slot) ?? null;
+      const subjectOld = builder.placements.find((p) => p.playerId === playerId)?.slotIndex ?? null;
+      if (!incumbent || incumbent.playerId === playerId) {
+        await sendCommand({ kind: 'sandbox-place', playerId, slotIndex: slot });
+        return;
+      }
+      if (subjectOld !== null) {
+        const freed = await sendCommand({ kind: 'sandbox-remove', slotIndex: subjectOld });
+        if (!freed) {
+          draftError = 'Move was rejected — resync and try again.';
+          return;
+        }
+      }
+      const placed = await sendCommand({ kind: 'sandbox-place', playerId, slotIndex: slot });
+      if (!placed) {
+        draftError = 'Displacement pick was rejected — it may already be spent.';
+        return;
+      }
+      const restored = await sendCommand({
+        kind: 'sandbox-place',
+        playerId: incumbent.playerId,
+        slotIndex: moveTarget,
+      });
+      if (!restored) {
+        draftError = 'Placed your pick but could not move the displaced player back.';
+      }
+      return;
     }
     if (mode === 'duel') {
-        if (replay.mode === 'sandbox-duel') {
-            if (!isFixedFiveDraftTurn(replay, selfId)) {
-                draftError = 'Wait for your opponent to finish this pick.';
-                return;
-            }
-            await sendCommand({ kind: 'sandbox-place', playerId, slotIndex: slot });
-            return;
-        }
-        if (replay.mode !== 'duel' || !replay.state.currentRoll) {
-            draftError = 'No active duel roll.';
-            return;
-        }
+      if (replay.mode === 'sandbox-duel') {
         if (!isFixedFiveDraftTurn(replay, selfId)) {
-            draftError = 'Wait for your opponent to finish this pick.';
-            return;
+          draftError = 'Wait for your opponent to finish this pick.';
+          return;
         }
-        const roll = replay.state.currentRoll;
-        await sendCommand({
-            kind: 'duel-claim',
-            playerId,
-            slotIndex: slot,
-            franchiseId: roll.franchiseId,
-            eraId: roll.eraId,
-        });
+        await sendCommand({ kind: 'sandbox-place', playerId, slotIndex: slot });
         return;
+      }
+      if (replay.mode !== 'duel' || !replay.state.currentRoll) {
+        draftError = 'No active duel roll.';
+        return;
+      }
+      if (!isFixedFiveDraftTurn(replay, selfId)) {
+        draftError = 'Wait for your opponent to finish this pick.';
+        return;
+      }
+      const roll = replay.state.currentRoll;
+      await sendCommand({
+        kind: 'duel-claim',
+        playerId,
+        slotIndex: slot,
+        franchiseId: roll.franchiseId,
+        eraId: roll.eraId,
+      });
+      return;
     }
     await sendCommand({ kind: 'classic-pick', playerId, slotIndex: slot });
-}
-async function resolveOverdue(): Promise<void> {
-    if (!snapshot || !assets || !snapshot.rootSeed || !replay || phase !== 'drafting')
-        return;
+  }
+  async function resolveOverdue(): Promise<void> {
+    if (!snapshot || !assets || !snapshot.rootSeed || !replay || phase !== 'drafting') return;
     const mode = snapshot.settings.mode;
     const now = Date.now();
-    if (now - anchorMs <= timeoutMs)
-        return;
+    if (now - anchorMs <= timeoutMs) return;
     for (const participant of ['p1', 'p2'] as const) {
-        const ordinal = pickOrdinalOf(replay, participant);
-        const key = `${participant}:${ordinal}`;
-        if (submittedTimeouts.has(key))
-            continue;
-        if (commands.some((c) => c.commandId === `timeout-${mode}-${participant}-${ordinal}`)) {
-            continue;
-        }
-        const pick = computeDueAutopick(mode, snapshot.rootSeed, replay, assets, participant);
-        if (!pick)
-            continue;
-        submittedTimeouts = new Set([...submittedTimeouts, key]);
-        await sendCommand({
-            kind: 'timeout-autopick',
-            playerId: pick.playerId,
-            slotIndex: pick.slotIndex,
-            pickOrdinal: ordinal,
-            seedPath: pick.seedPath,
-        }, { actor: participant, commandId: `timeout-${mode}-${participant}-${ordinal}` });
+      const ordinal = pickOrdinalOf(replay, participant);
+      const key = `${participant}:${ordinal}`;
+      if (submittedTimeouts.has(key)) continue;
+      if (commands.some((c) => c.commandId === `timeout-${mode}-${participant}-${ordinal}`)) {
+        continue;
+      }
+      const pick = computeDueAutopick(mode, snapshot.rootSeed, replay, assets, participant);
+      if (!pick) continue;
+      submittedTimeouts = new Set([...submittedTimeouts, key]);
+      await sendCommand(
+        {
+          kind: 'timeout-autopick',
+          playerId: pick.playerId,
+          slotIndex: pick.slotIndex,
+          pickOrdinal: ordinal,
+          seedPath: pick.seedPath,
+        },
+        { actor: participant, commandId: `timeout-${mode}-${participant}-${ordinal}` },
+      );
     }
-}
-async function startSim(reason: FixedFiveSimulationReason): Promise<void> {
-    if (simStarted || !snapshot || !assets || !snapshot.rootSeed || !replay)
-        return;
-    if (!simulationGate.tryStart(reason))
-        return;
+  }
+  async function startSim(reason: FixedFiveSimulationReason): Promise<void> {
+    if (simStarted || !snapshot || !assets || !snapshot.rootSeed || !replay) return;
+    if (!simulationGate.tryStart(reason)) return;
     simStarted = true;
     simError = null;
     try {
-        const rootSeed: Seed = snapshot.rootSeed;
-        const p1Refs = refsForParticipant(replay, assets, 'p1');
-        const p2Refs = refsForParticipant(replay, assets, 'p2');
-        if (p1Refs.length !== 5 || p2Refs.length !== 5) {
-            throw new Error('both lineups must be complete before simulating');
+      const rootSeed: Seed = snapshot.rootSeed;
+      const p1Refs = refsForParticipant(replay, assets, 'p1');
+      const p2Refs = refsForParticipant(replay, assets, 'p2');
+      if (p1Refs.length !== 5 || p2Refs.length !== 5) {
+        throw new Error('both lineups must be complete before simulating');
+      }
+      const pending = await fixedFiveRepository.loadPendingResult(roomId).catch(() => null);
+      const p1Team: FixedFiveWorkerTeam = await buildSimulationTeam(
+        assets.manifest,
+        'p1',
+        'Player 1',
+        p1Refs,
+      );
+      const p2Team: FixedFiveWorkerTeam = await buildSimulationTeam(
+        assets.manifest,
+        'p2',
+        'Player 2',
+        p2Refs,
+      );
+      if (pending?.run.result) {
+        localResult = {
+          result: pending.run.result,
+          digest: pending.run.resultDigest,
+          p1: { refs: p1Refs, players: [...p1Team.players] },
+          p2: { refs: p2Refs, players: [...p2Team.players] },
+          weakestReplacedOpponentId: pending.run.authorityFacts.weakestReplacedOpponentId,
+        };
+        simulationGate.finish();
+        simDone = true;
+        return;
+      }
+      simEntries = [];
+      progress = { completed: 0, total: snapshot.settings.mode === 'duel' ? 7 : 161 };
+      simStartAt = Date.now();
+      const active = new FixedFiveRunner((event) => {
+        if (!mounted) return;
+        if (event.kind === 'progress') {
+          progress = { completed: event.completedGames, total: event.totalGames };
+        } else if (event.kind === 'results') {
+          simEntries = [...simEntries, ...event.entries];
+          progress = { completed: simEntries.length, total: progress?.total ?? simEntries.length };
+        } else if (event.kind === 'complete') {
+          void finalizeSim();
+        } else {
+          simulationGate.fail();
+          simError = event.message;
         }
-        const pending = await fixedFiveRepository.loadPendingResult(roomId).catch(() => null);
-        const p1Team: FixedFiveWorkerTeam = await buildSimulationTeam(assets.manifest, 'p1', 'Player 1', p1Refs);
-        const p2Team: FixedFiveWorkerTeam = await buildSimulationTeam(assets.manifest, 'p2', 'Player 2', p2Refs);
-        if (pending?.run.result) {
-            localResult = {
-                result: pending.run.result,
-                digest: pending.run.resultDigest,
-                p1: { refs: p1Refs, players: [...p1Team.players] },
-                p2: { refs: p2Refs, players: [...p2Team.players] },
-                weakestReplacedOpponentId: pending.run.authorityFacts.weakestReplacedOpponentId,
-            };
-            simulationGate.finish();
-            simDone = true;
-            return;
-        }
-        simEntries = [];
-        progress = { completed: 0, total: snapshot.settings.mode === 'duel' ? 7 : 161 };
-        simStartAt = Date.now();
-        const active = new FixedFiveRunner((event) => {
-            if (!mounted)
-                return;
-            if (event.kind === 'progress') {
-                progress = { completed: event.completedGames, total: event.totalGames };
-            }
-            else if (event.kind === 'results') {
-                simEntries = [...simEntries, ...event.entries];
-                progress = { completed: simEntries.length, total: progress?.total ?? simEntries.length };
-            }
-            else if (event.kind === 'complete') {
-                void finalizeSim();
-            }
-            else {
-                simulationGate.fail();
-                simError = event.message;
-            }
+      });
+      runner = active;
+      const versions = snapshot.settings.versions;
+      if (snapshot.settings.mode === 'duel') {
+        active.runDuel({
+          rootSeed,
+          p1Team,
+          p2Team,
+          profile: assets.profile,
+          dataVersion: versions.dataVersion,
+          engineVersion: versions.engineVersion,
         });
-        runner = active;
-        const versions = snapshot.settings.versions;
-        if (snapshot.settings.mode === 'duel') {
-            active.runDuel({
-                rootSeed,
-                p1Team,
-                p2Team,
-                profile: assets.profile,
-                dataVersion: versions.dataVersion,
-                engineVersion: versions.engineVersion,
-            });
+      } else {
+        active.runShared82({
+          rootSeed,
+          p1Team,
+          p2Team,
+          bracket: assets.bracket,
+          profile: assets.profile,
+          dataVersion: versions.dataVersion,
+          engineVersion: versions.engineVersion,
+        });
+      }
+      async function finalizeSim(): Promise<void> {
+        if (!mounted || !snapshot || !assets) return;
+        try {
+          const summary = summarizeWorkerEntries({
+            mode: snapshot.settings.mode,
+            bracket: assets.bracket,
+            rootSeed: snapshot.rootSeed as Seed,
+            p1TeamId: 'p1',
+            p2TeamId: 'p2',
+            entries: simEntries,
+          });
+          const digest = computeCompetitionDigest({
+            rootSeed: snapshot.rootSeed as Seed,
+            versions: snapshot.settings.versions,
+            p1: { refs: p1Refs, players: [...p1Team.players] },
+            p2: { refs: p2Refs, players: [...p2Team.players] },
+            commands,
+            result: summary.result,
+          });
+          const run = assembleCompetitionRun({
+            roomId,
+            sourceMode: snapshot.settings.sourceMode,
+            competition: snapshot.settings.mode === 'duel' ? 'duel' : 'shared-82',
+            rootSeed: snapshot.rootSeed as Seed,
+            versions: snapshot.settings.versions,
+            commands,
+            p1: { refs: p1Refs, players: [...p1Team.players] },
+            p2: { refs: p2Refs, players: [...p2Team.players] },
+            result: summary.result,
+            resultDigest: digest,
+            weakestReplacedOpponentId: summary.weakestReplacedOpponentId,
+          });
+          await fixedFiveRepository.savePendingResult(roomId, run, selfId);
+          let reducedMotion = false;
+          try {
+            reducedMotion =
+              typeof window !== 'undefined' &&
+              typeof window.matchMedia === 'function' &&
+              window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          } catch {
+            reducedMotion = false;
+          }
+          const minShow = reducedMotion ? SIM_SHOWDOWN_REDUCED_MS : SIM_SHOWDOWN_MIN_MS;
+          const waitMs = Math.max(0, simStartAt + minShow - Date.now());
+          if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs));
+          if (!mounted) return;
+          localResult = {
+            result: summary.result,
+            digest,
+            p1: { refs: p1Refs, players: [...p1Team.players] },
+            p2: { refs: p2Refs, players: [...p2Team.players] },
+            weakestReplacedOpponentId: summary.weakestReplacedOpponentId,
+          };
+          simulationGate.finish();
+          simDone = true;
+        } catch (e) {
+          simulationGate.fail();
+          if (mounted) simError = e instanceof Error ? e.message : String(e);
         }
-        else {
-            active.runShared82({
-                rootSeed,
-                p1Team,
-                p2Team,
-                bracket: assets.bracket,
-                profile: assets.profile,
-                dataVersion: versions.dataVersion,
-                engineVersion: versions.engineVersion,
-            });
-        }
-        async function finalizeSim(): Promise<void> {
-            if (!mounted || !snapshot || !assets)
-                return;
-            try {
-                const summary = summarizeWorkerEntries({
-                    mode: snapshot.settings.mode,
-                    bracket: assets.bracket,
-                    rootSeed: snapshot.rootSeed as Seed,
-                    p1TeamId: 'p1',
-                    p2TeamId: 'p2',
-                    entries: simEntries,
-                });
-                const digest = computeCompetitionDigest({
-                    rootSeed: snapshot.rootSeed as Seed,
-                    versions: snapshot.settings.versions,
-                    p1: { refs: p1Refs, players: [...p1Team.players] },
-                    p2: { refs: p2Refs, players: [...p2Team.players] },
-                    commands,
-                    result: summary.result,
-                });
-                const run = assembleCompetitionRun({
-                    roomId,
-                    sourceMode: snapshot.settings.sourceMode,
-                    competition: snapshot.settings.mode === 'duel' ? 'duel' : 'shared-82',
-                    rootSeed: snapshot.rootSeed as Seed,
-                    versions: snapshot.settings.versions,
-                    commands,
-                    p1: { refs: p1Refs, players: [...p1Team.players] },
-                    p2: { refs: p2Refs, players: [...p2Team.players] },
-                    result: summary.result,
-                    resultDigest: digest,
-                    weakestReplacedOpponentId: summary.weakestReplacedOpponentId,
-                });
-                await fixedFiveRepository.savePendingResult(roomId, run, selfId);
-                let reducedMotion = false;
-                try {
-                    reducedMotion =
-                        typeof window !== 'undefined' &&
-                            typeof window.matchMedia === 'function' &&
-                            window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-                }
-                catch {
-                    reducedMotion = false;
-                }
-                const minShow = reducedMotion ? SIM_SHOWDOWN_REDUCED_MS : SIM_SHOWDOWN_MIN_MS;
-                const waitMs = Math.max(0, simStartAt + minShow - Date.now());
-                if (waitMs > 0)
-                    await new Promise((resolve) => setTimeout(resolve, waitMs));
-                if (!mounted)
-                    return;
-                localResult = {
-                    result: summary.result,
-                    digest,
-                    p1: { refs: p1Refs, players: [...p1Team.players] },
-                    p2: { refs: p2Refs, players: [...p2Team.players] },
-                    weakestReplacedOpponentId: summary.weakestReplacedOpponentId,
-                };
-                simulationGate.finish();
-                simDone = true;
-            }
-            catch (e) {
-                simulationGate.fail();
-                if (mounted)
-                    simError = e instanceof Error ? e.message : String(e);
-            }
-        }
+      }
+    } catch (e) {
+      simulationGate.fail();
+      simError = e instanceof Error ? e.message : String(e);
+      simStarted = false;
     }
-    catch (e) {
-        simulationGate.fail();
-        simError = e instanceof Error ? e.message : String(e);
-        simStarted = false;
-    }
-}
-async function proposeDigest(digest: ContentHash): Promise<void> {
+  }
+  async function proposeDigest(digest: ContentHash): Promise<void> {
     busyAction = 'propose';
     try {
-        const ok = await sendCommand({ kind: 'propose-result', resultDigest: digest });
-        if (ok)
-            submittedPropose = digest;
+      const ok = await sendCommand({ kind: 'propose-result', resultDigest: digest });
+      if (ok) submittedPropose = digest;
+    } finally {
+      busyAction = null;
     }
-    finally {
-        busyAction = null;
-    }
-}
-async function confirmDigest(digest: ContentHash, verified: boolean): Promise<void> {
+  }
+  async function confirmDigest(digest: ContentHash, verified: boolean): Promise<void> {
     busyAction = 'confirm';
     try {
-        const ok = await sendCommand({ kind: 'confirm-result', resultDigest: digest, verified });
-        if (ok && verified)
-            confirmedFor = digest;
+      const ok = await sendCommand({ kind: 'confirm-result', resultDigest: digest, verified });
+      if (ok && verified) confirmedFor = digest;
+    } finally {
+      busyAction = null;
     }
-    finally {
-        busyAction = null;
-    }
-}
-async function attemptComplete(digest: ContentHash): Promise<void> {
+  }
+  async function attemptComplete(digest: ContentHash): Promise<void> {
     busyAction = 'complete';
     try {
-        const out = await transport().complete(roomId, digest);
-        if (!out.completed && mounted) {
-            notice = 'Completion not ready yet — waiting for the matching confirmation.';
-        }
-        await sync(lastOrdinal);
+      const out = await transport().complete(roomId, digest);
+      if (!out.completed && mounted) {
+        notice = 'Completion not ready yet — waiting for the matching confirmation.';
+      }
+      await sync(lastOrdinal);
+    } catch (e) {
+      if (mounted) error = friendlyFixedFiveJoinError(e);
+    } finally {
+      busyAction = null;
     }
-    catch (e) {
-        if (mounted)
-            error = friendlyFixedFiveJoinError(e);
-    }
-    finally {
-        busyAction = null;
-    }
-}
-async function attemptFail(): Promise<void> {
+  }
+  async function attemptFail(): Promise<void> {
     busyAction = 'fail';
     try {
-        await transport().fail(roomId);
-        await sync(lastOrdinal);
+      await transport().fail(roomId);
+      await sync(lastOrdinal);
+    } catch (e) {
+      if (mounted) error = friendlyFixedFiveJoinError(e);
+    } finally {
+      busyAction = null;
     }
-    catch (e) {
-        if (mounted)
-            error = friendlyFixedFiveJoinError(e);
-    }
-    finally {
-        busyAction = null;
-    }
-}
-async function startDraft(): Promise<void> {
-    if (selfId !== 'p1' || busyAction !== null)
-        return;
+  }
+  async function startDraft(): Promise<void> {
+    if (selfId !== 'p1' || busyAction !== null) return;
     busyAction = 'start';
     try {
-        await sendCommand({ kind: 'start' });
+      await sendCommand({ kind: 'start' });
+    } finally {
+      if (mounted) busyAction = null;
     }
-    finally {
-        if (mounted)
-            busyAction = null;
-    }
-}
-onMount(() => {
+  }
+  onMount(() => {
     mounted = true;
     const membership = loadFixedFiveMembership(roomId);
-    if (membership)
-        selfId = membership.participantId;
+    if (membership) selfId = membership.participantId;
     let unsubscribe: (() => void) | null = null;
     let resyncTimer: ReturnType<typeof setInterval> | null = null;
     let clockTimer: ReturnType<typeof setInterval> | null = null;
     async function boot(): Promise<void> {
-        loading = true;
-        try {
-            const t = transport();
-            const resumed = await t.resume(roomId);
-            if (!mounted)
-                return;
-            const snap = resumed.snapshot;
-            snapshot = snap;
-            selfId = resumed.membership.participantId;
-            saveFixedFiveMembership({
-                ...resumed.membership,
-                code: snap.code ?? resumed.membership.code,
-            });
-            const [storedCommands, loadedAssets] = await Promise.all([
-                fixedFiveRepository.listCommands(roomId).catch(() => []),
-                loadFixedFiveAssets().catch((e: unknown) => {
-                    assetsError = e instanceof Error ? e.message : String(e);
-                    return null;
-                }),
-            ]);
-            if (!mounted)
-                return;
-            assets = loadedAssets;
-            const restored = restoreFixedFiveCommandSyncState(storedCommands);
-            commands = restored.commands;
-            lastOrdinal = restored.lastOrdinal;
-            if (!snap.rootSeed && mounted) {
-                error = 'Room is missing its server seed — it cannot be simulated.';
-            }
-            await fixedFiveRepository.saveActiveSnapshot(snap, lastOrdinal + 1).catch(() => { });
-            unsubscribe = t.subscribe(roomId, (next) => {
-                if (!mounted)
-                    return;
-                snapshot = next;
-                reconnecting = false;
-                void sync(lastOrdinal);
-            }).unsubscribe;
-            await sync(lastOrdinal);
+      loading = true;
+      try {
+        const t = transport();
+        const resumed = await t.resume(roomId);
+        if (!mounted) return;
+        const snap = resumed.snapshot;
+        snapshot = snap;
+        selfId = resumed.membership.participantId;
+        saveFixedFiveMembership({
+          ...resumed.membership,
+          code: snap.code ?? resumed.membership.code,
+        });
+        const [storedCommands, loadedAssets] = await Promise.all([
+          fixedFiveRepository.listCommands(roomId).catch(() => []),
+          loadFixedFiveAssets().catch((e: unknown) => {
+            assetsError = e instanceof Error ? e.message : String(e);
+            return null;
+          }),
+        ]);
+        if (!mounted) return;
+        assets = loadedAssets;
+        const restored = restoreFixedFiveCommandSyncState(storedCommands);
+        commands = restored.commands;
+        lastOrdinal = restored.lastOrdinal;
+        if (!snap.rootSeed && mounted) {
+          error = 'Room is missing its server seed — it cannot be simulated.';
         }
-        catch (e) {
-            if (mounted)
-                error = friendlyFixedFiveJoinError(e);
-        }
-        finally {
-            if (mounted)
-                loading = false;
-        }
+        await fixedFiveRepository.saveActiveSnapshot(snap, lastOrdinal + 1).catch(() => {});
+        unsubscribe = t.subscribe(roomId, (next) => {
+          if (!mounted) return;
+          snapshot = next;
+          reconnecting = false;
+          void sync(lastOrdinal);
+        }).unsubscribe;
+        await sync(lastOrdinal);
+      } catch (e) {
+        if (mounted) error = friendlyFixedFiveJoinError(e);
+      } finally {
+        if (mounted) loading = false;
+      }
     }
     void boot();
     const wake = () => {
-        reconnecting = true;
-        void sync(lastOrdinal).finally(() => {
-            if (mounted)
-                reconnecting = false;
-        });
+      reconnecting = true;
+      void sync(lastOrdinal).finally(() => {
+        if (mounted) reconnecting = false;
+      });
     };
     const onFocus = () => wake();
     const onOnline = () => wake();
     window.addEventListener('focus', onFocus);
     window.addEventListener('online', onOnline);
     resyncTimer = setInterval(() => {
-        void transport()
-            .resolveTimeout(roomId)
-            .then(() => sync(lastOrdinal))
-            .catch(() => { });
+      void transport()
+        .resolveTimeout(roomId)
+        .then(() => sync(lastOrdinal))
+        .catch(() => {});
     }, 15000);
     clockTimer = setInterval(() => {
-        tick += 1;
-        void resolveOverdue();
+      tick += 1;
+      void resolveOverdue();
     }, 1000);
     return () => {
-        mounted = false;
-        unsubscribe?.();
-        runner?.dispose();
-        runner = null;
-        statsRunner?.dispose();
-        statsRunner = null;
-        window.removeEventListener('focus', onFocus);
-        window.removeEventListener('online', onOnline);
-        if (resyncTimer)
-            clearInterval(resyncTimer);
-        if (clockTimer)
-            clearInterval(clockTimer);
+      mounted = false;
+      unsubscribe?.();
+      runner?.dispose();
+      runner = null;
+      statsRunner?.dispose();
+      statsRunner = null;
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('online', onOnline);
+      if (resyncTimer) clearInterval(resyncTimer);
+      if (clockTimer) clearInterval(clockTimer);
     };
-});
-$effect(() => {
-    if (!mounted || !snapshot || !replay)
-        return;
+  });
+  $effect(() => {
+    if (!mounted || !snapshot || !replay) return;
     if (phase === 'simulating' && !simStarted && !simError && snapshot.rootSeed) {
-        void startSim(simulationReason);
+      void startSim(simulationReason);
     }
-});
-$effect(() => {
-    if (!mounted || !snapshot || !replay || !localResult)
-        return;
-    if (phase !== 'awaiting-confirmation' && phase !== 'completed')
-        return;
-    if (statsSource.length > 0 || statsBuilding || statsRebuildStarted)
-        return;
+  });
+  $effect(() => {
+    if (!mounted || !snapshot || !replay || !localResult) return;
+    if (phase !== 'awaiting-confirmation' && phase !== 'completed') return;
+    if (statsSource.length > 0 || statsBuilding || statsRebuildStarted) return;
     statsRebuildStarted = true;
     void rebuildStatsEntries();
-});
-async function rerunSimulation(): Promise<void> {
+  });
+  async function rerunSimulation(): Promise<void> {
     try {
-        simulationReason = 'mismatch-rerun';
-        if (!simulationGate.canStart(simulationReason))
-            return;
-        runner?.dispose();
-        runner = null;
-        statsRunner?.dispose();
-        statsRunner = null;
-        await fixedFiveRepository.clearPendingResult(roomId).catch(() => { });
-        simStarted = false;
-        simDone = false;
-        localResult = null;
-        simEntries = [];
-        statsEntries = [];
-        statsBuilding = false;
-        statsRebuildStarted = false;
-        progress = null;
-        simError = null;
-        await sync(lastOrdinal);
-        if (mounted)
-            void startSim(simulationReason);
+      simulationReason = 'mismatch-rerun';
+      if (!simulationGate.canStart(simulationReason)) return;
+      runner?.dispose();
+      runner = null;
+      statsRunner?.dispose();
+      statsRunner = null;
+      await fixedFiveRepository.clearPendingResult(roomId).catch(() => {});
+      simStarted = false;
+      simDone = false;
+      localResult = null;
+      simEntries = [];
+      statsEntries = [];
+      statsBuilding = false;
+      statsRebuildStarted = false;
+      progress = null;
+      simError = null;
+      await sync(lastOrdinal);
+      if (mounted) void startSim(simulationReason);
+    } catch (e) {
+      if (mounted) simError = e instanceof Error ? e.message : String(e);
     }
-    catch (e) {
-        if (mounted)
-            simError = e instanceof Error ? e.message : String(e);
-    }
-}
-async function rebuildStatsEntries(): Promise<void> {
+  }
+  async function rebuildStatsEntries(): Promise<void> {
     if (statsBuilding || !snapshot || !assets || !snapshot.rootSeed || !replay || !localResult) {
-        return;
+      return;
     }
     statsBuilding = true;
     try {
-        const rootSeed: Seed = snapshot.rootSeed;
-        const p1Team: FixedFiveWorkerTeam = await buildSimulationTeam(assets.manifest, 'p1', 'Player 1', localResult.p1.refs);
-        const p2Team: FixedFiveWorkerTeam = await buildSimulationTeam(assets.manifest, 'p2', 'Player 2', localResult.p2.refs);
-        if (!mounted) {
-            statsBuilding = false;
-            return;
+      const rootSeed: Seed = snapshot.rootSeed;
+      const p1Team: FixedFiveWorkerTeam = await buildSimulationTeam(
+        assets.manifest,
+        'p1',
+        'Player 1',
+        localResult.p1.refs,
+      );
+      const p2Team: FixedFiveWorkerTeam = await buildSimulationTeam(
+        assets.manifest,
+        'p2',
+        'Player 2',
+        localResult.p2.refs,
+      );
+      if (!mounted) {
+        statsBuilding = false;
+        return;
+      }
+      statsRunner?.dispose();
+      const collected: FixedFiveWorkerResultEntry[] = [];
+      const active = new FixedFiveRunner((event) => {
+        if (!mounted) return;
+        if (event.kind === 'results') {
+          for (const entry of event.entries) collected.push(entry);
+        } else if (event.kind === 'complete') {
+          statsEntries = collected;
+          statsBuilding = false;
+          statsRunner?.dispose();
+          statsRunner = null;
+        } else if (event.kind === 'error') {
+          statsBuilding = false;
+          statsRunner?.dispose();
+          statsRunner = null;
         }
-        statsRunner?.dispose();
-        const collected: FixedFiveWorkerResultEntry[] = [];
-        const active = new FixedFiveRunner((event) => {
-            if (!mounted)
-                return;
-            if (event.kind === 'results') {
-                for (const entry of event.entries)
-                    collected.push(entry);
-            }
-            else if (event.kind === 'complete') {
-                statsEntries = collected;
-                statsBuilding = false;
-                statsRunner?.dispose();
-                statsRunner = null;
-            }
-            else if (event.kind === 'error') {
-                statsBuilding = false;
-                statsRunner?.dispose();
-                statsRunner = null;
-            }
+      });
+      statsRunner = active;
+      const versions = snapshot.settings.versions;
+      if (snapshot.settings.mode === 'duel') {
+        active.runDuel({
+          rootSeed,
+          p1Team,
+          p2Team,
+          profile: assets.profile,
+          dataVersion: versions.dataVersion,
+          engineVersion: versions.engineVersion,
         });
-        statsRunner = active;
-        const versions = snapshot.settings.versions;
-        if (snapshot.settings.mode === 'duel') {
-            active.runDuel({
-                rootSeed,
-                p1Team,
-                p2Team,
-                profile: assets.profile,
-                dataVersion: versions.dataVersion,
-                engineVersion: versions.engineVersion,
-            });
-        }
-        else {
-            active.runShared82({
-                rootSeed,
-                p1Team,
-                p2Team,
-                bracket: assets.bracket,
-                profile: assets.profile,
-                dataVersion: versions.dataVersion,
-                engineVersion: versions.engineVersion,
-            });
-        }
+      } else {
+        active.runShared82({
+          rootSeed,
+          p1Team,
+          p2Team,
+          bracket: assets.bracket,
+          profile: assets.profile,
+          dataVersion: versions.dataVersion,
+          engineVersion: versions.engineVersion,
+        });
+      }
+    } catch {
+      if (mounted) statsBuilding = false;
     }
-    catch {
-        if (mounted)
-            statsBuilding = false;
-    }
-}
-function requestStatsRebuild(): void {
+  }
+  function requestStatsRebuild(): void {
     statsRebuildStarted = true;
     void rebuildStatsEntries();
-}
-$effect(() => {
-    if (!mounted || !localResult || !snapshot)
-        return;
-    if (snapshot.phase !== 'lobby')
-        return;
+  }
+  $effect(() => {
+    if (!mounted || !localResult || !snapshot) return;
+    if (snapshot.phase !== 'lobby') return;
     const myDigest = localResult.digest;
     const foreign = facts.proposals.filter((p) => p.actor !== selfId);
     if (foreign.length === 0) {
-        if (submittedPropose !== myDigest)
-            void proposeDigest(myDigest);
-        return;
+      if (submittedPropose !== myDigest) void proposeDigest(myDigest);
+      return;
     }
     const match = foreign.some((p) => p.digest === myDigest);
     if (match && confirmedFor !== myDigest) {
-        void confirmDigest(myDigest, true);
-        return;
+      void confirmDigest(myDigest, true);
+      return;
     }
     if (!match && !reranMismatch) {
-        reranMismatch = true;
-        void rerunSimulation();
+      reranMismatch = true;
+      void rerunSimulation();
     }
-});
-$effect(() => {
-    if (!mounted || !localResult || !snapshot || !reranMismatch || mismatchReported)
-        return;
-    if (snapshot.phase !== 'lobby')
-        return;
+  });
+  $effect(() => {
+    if (!mounted || !localResult || !snapshot || !reranMismatch || mismatchReported) return;
+    if (snapshot.phase !== 'lobby') return;
     const myDigest = localResult.digest;
     const foreign = facts.proposals.filter((p) => p.actor !== selfId);
-    if (foreign.some((p) => p.digest === myDigest))
-        return;
-    if (foreign.length === 0)
-        return;
+    if (foreign.some((p) => p.digest === myDigest)) return;
+    if (foreign.length === 0) return;
     mismatchReported = true;
     const first = foreign[0];
     void (async () => {
-        if (submittedPropose !== myDigest)
-            await proposeDigest(myDigest);
-        if (first)
-            await confirmDigest(first.digest, false);
+      if (submittedPropose !== myDigest) await proposeDigest(myDigest);
+      if (first) await confirmDigest(first.digest, false);
     })();
-});
-$effect(() => {
-    if (!mounted || !snapshot || !localResult)
-        return;
-    if (snapshot.phase !== 'lobby' || completedSent)
-        return;
-    if (!confirmedFor)
-        return;
-    const foreignConfirm = facts.confirms.some((c) => c.actor !== selfId && c.digest === confirmedFor && c.verified);
+  });
+  $effect(() => {
+    if (!mounted || !snapshot || !localResult) return;
+    if (snapshot.phase !== 'lobby' || completedSent) return;
+    if (!confirmedFor) return;
+    const foreignConfirm = facts.confirms.some(
+      (c) => c.actor !== selfId && c.digest === confirmedFor && c.verified,
+    );
     if (foreignConfirm) {
-        completedSent = true;
-        void attemptComplete(confirmedFor).catch(() => {
-            completedSent = false;
-        });
+      completedSent = true;
+      void attemptComplete(confirmedFor).catch(() => {
+        completedSent = false;
+      });
     }
-});
-$effect(() => {
-    if (!mounted || !snapshot || failSent)
-        return;
-    if (snapshot.phase !== 'lobby')
-        return;
+  });
+  $effect(() => {
+    if (!mounted || !snapshot || failSent) return;
+    if (snapshot.phase !== 'lobby') return;
     const digests = new Set(facts.proposals.map((p) => p.digest));
     const denied = facts.confirms.some((c) => !c.verified);
     if (digests.size >= 2 && denied) {
-        failSent = true;
-        void attemptFail().catch(() => {
-            failSent = false;
-        });
+      failSent = true;
+      void attemptFail().catch(() => {
+        failSent = false;
+      });
     }
-});
-async function doLeave(): Promise<void> {
+  });
+  async function doLeave(): Promise<void> {
     leaveBusy = true;
     try {
-        runner?.dispose();
-        runner = null;
-        await transport().leave(roomId, selfId);
-        await goto(resolve('/multiplayer'));
+      runner?.dispose();
+      runner = null;
+      await transport().leave(roomId, selfId);
+      await goto(resolve('/multiplayer'));
+    } catch (e) {
+      error = friendlyFixedFiveJoinError(e);
+    } finally {
+      leaveBusy = false;
     }
-    catch (e) {
-        error = friendlyFixedFiveJoinError(e);
-    }
-    finally {
-        leaveBusy = false;
-    }
-}
-async function doRematch(): Promise<void> {
+  }
+  async function doRematch(): Promise<void> {
     rematchBusy = true;
     error = null;
     try {
-        const { snapshot: next, code } = await transport().rematch(roomId);
-        saveFixedFiveMembership({ roomId: next.roomId, participantId: selfId, code });
-        await goto(resolve('/multiplayer/room/[roomId]', { roomId: next.roomId }));
+      const { snapshot: next, code } = await transport().rematch(roomId);
+      saveFixedFiveMembership({ roomId: next.roomId, participantId: selfId, code });
+      await goto(resolve('/multiplayer/room/[roomId]', { roomId: next.roomId }));
+    } catch (e) {
+      error = friendlyFixedFiveJoinError(e);
+    } finally {
+      rematchBusy = false;
     }
-    catch (e) {
-        error = friendlyFixedFiveJoinError(e);
-    }
-    finally {
-        rematchBusy = false;
-    }
-}
-const canRematch = $derived(facts.rematchRequested.p1 &&
-    facts.rematchRequested.p2 &&
-    facts.rematchConfirmed.p1 &&
-    facts.rematchConfirmed.p2 &&
-    snapshot?.phase === 'completed');
-const modeDetailLabel = $derived.by((): string => {
+  }
+  const canRematch = $derived(
+    facts.rematchRequested.p1 &&
+      facts.rematchRequested.p2 &&
+      facts.rematchConfirmed.p1 &&
+      facts.rematchConfirmed.p2 &&
+      snapshot?.phase === 'completed',
+  );
+  const modeDetailLabel = $derived.by((): string => {
     const current = snapshot;
-    if (!current)
-        return 'Fixed-Five';
-    if (current.settings.mode === 'duel')
-        return 'Fixed-Five · Duel · Best of 7';
-    if (current.settings.mode === 'sandbox-shared-82')
-        return 'Fixed-Five · Sandbox · Shared 82';
+    if (!current) return 'Fixed-Five';
+    if (current.settings.mode === 'duel') return 'Fixed-Five · Duel · Best of 7';
+    if (current.settings.mode === 'sandbox-shared-82') return 'Fixed-Five · Sandbox · Shared 82';
     return 'Fixed-Five · Classic · Shared 82';
-});
-const resultVerified = $derived.by((): boolean => {
-    if (!snapshot || !localResult)
-        return false;
-    if (snapshot.phase === 'completed')
-        return true;
+  });
+  const resultVerified = $derived.by((): boolean => {
+    if (!snapshot || !localResult) return false;
+    if (snapshot.phase === 'completed') return true;
     return snapshot.confirmedDigest === localResult.digest;
-});
-async function doRematchAction(): Promise<void> {
-    if (rematchBusy)
-        return;
+  });
+  async function doRematchAction(): Promise<void> {
+    if (rematchBusy) return;
     rematchBusy = true;
     error = null;
     try {
-        const other = selfId === 'p1' ? 'p2' : 'p1';
-        if (!facts.rematchRequested[selfId]) {
-            await sendCommand({ kind: 'rematch-request' });
-        }
-        if (facts.rematchRequested[other] && !facts.rematchConfirmed[selfId]) {
-            await sendCommand({ kind: 'rematch-confirm' });
-        }
-        if (canRematch) {
-            await doRematch();
-        }
-        else {
-            notice = 'Rematch requested — it starts once your opponent hits rematch too.';
-        }
+      const other = selfId === 'p1' ? 'p2' : 'p1';
+      if (!facts.rematchRequested[selfId]) {
+        await sendCommand({ kind: 'rematch-request' });
+      }
+      if (facts.rematchRequested[other] && !facts.rematchConfirmed[selfId]) {
+        await sendCommand({ kind: 'rematch-confirm' });
+      }
+      if (canRematch) {
+        await doRematch();
+      } else {
+        notice = 'Rematch requested — it starts once your opponent hits rematch too.';
+      }
+    } catch (e) {
+      error = friendlyFixedFiveJoinError(e);
+    } finally {
+      rematchBusy = false;
     }
-    catch (e) {
-        error = friendlyFixedFiveJoinError(e);
-    }
-    finally {
-        rematchBusy = false;
-    }
-}
+  }
 </script>
 
 <svelte:head>

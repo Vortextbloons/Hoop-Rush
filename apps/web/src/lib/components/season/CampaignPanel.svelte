@@ -1,58 +1,70 @@
-<script lang="ts">import type { SeasonCampaignEvaluation, SeasonCampaignState } from '@hoop-rush/data-contracts';
-import { campaignTimelineViewModel, CAMPAIGN_FAMILY_LABELS, CAMPAIGN_IDENTITY_LABELS, CAMPAIGN_OUTCOME_LABELS, CAMPAIGN_REWARD_LABELS, formatCampaignCondition, formatCampaignReward, } from '$lib/season/season-presentation';
-import type { SeasonRun } from '@hoop-rush/data-contracts';
-import GmIdentityPicker from './GmIdentityPicker.svelte';
-import EvolutionPicker from './EvolutionPicker.svelte';
-let { run, nextBlockIndex, busy = false, commandError = null, onSelectIdentity, onSelectOpportunity, onEvolve, playerName = (id: string) => id, }: {
+<script lang="ts">
+  import type { SeasonCampaignEvaluation, SeasonCampaignState } from '@hoop-rush/data-contracts';
+  import {
+    campaignTimelineViewModel,
+    CAMPAIGN_FAMILY_LABELS,
+    CAMPAIGN_IDENTITY_LABELS,
+    CAMPAIGN_OUTCOME_LABELS,
+    CAMPAIGN_REWARD_LABELS,
+    formatCampaignCondition,
+    formatCampaignReward,
+  } from '$lib/season/season-presentation';
+  import type { SeasonRun } from '@hoop-rush/data-contracts';
+  import GmIdentityPicker from './GmIdentityPicker.svelte';
+  import EvolutionPicker from './EvolutionPicker.svelte';
+  let {
+    run,
+    nextBlockIndex,
+    busy = false,
+    commandError = null,
+    onSelectIdentity,
+    onSelectOpportunity,
+    onEvolve,
+    playerName = (id: string) => id,
+  }: {
     run: SeasonRun | null;
     nextBlockIndex: number | null;
     busy?: boolean;
     commandError?: string | null;
-    onSelectIdentity: (input: {
-        identity: string;
-        focus: string | null;
-    }) => void;
-    onSelectOpportunity: (input: {
-        blockIndex: number;
-        opportunityId: string;
-    }) => void;
-    onEvolve: (input: {
-        offerId: string;
-    }) => void;
+    onSelectIdentity: (input: { identity: string; focus: string | null }) => void;
+    onSelectOpportunity: (input: { blockIndex: number; opportunityId: string }) => void;
+    onEvolve: (input: { offerId: string }) => void;
     playerName?: (playerVersionId: string) => string;
-} = $props();
-const vm = $derived(run !== null ? campaignTimelineViewModel(run, nextBlockIndex) : null);
-const campaign = $derived(run?.campaign as SeasonCampaignState | undefined);
-const prior = $derived(vm?.priorEvaluation ?? null);
-const priorRewardIds: string[] = $derived(prior ? prior.appliedRewardIds : []);
-const priorFactsEntries = $derived(prior ? Object.entries(prior.facts ?? {}) : []);
-const branchEntries = $derived(vm?.branchEntries ?? []);
-const currentOffers = $derived(vm?.currentOffers ?? []);
-const isIdentityRequired = $derived(vm?.isIdentityRequired ?? false);
-const isEvolutionRequired = $derived(vm?.isEvolutionRequired ?? false);
-const isBlock8 = $derived(vm?.isBlock8NoOpportunity ?? false);
-const rewardEntitlements = $derived(vm?.rewardEntitlements ?? {
-    influenceEarned: 0,
-    inquiryCredits: 0,
-    informationBenefits: 0,
-    followUpUnlocks: [],
-});
-function outcomeBadge(outcome: SeasonCampaignEvaluation['outcome']): string {
+  } = $props();
+  const vm = $derived(run !== null ? campaignTimelineViewModel(run, nextBlockIndex) : null);
+  const campaign = $derived(run?.campaign as SeasonCampaignState | undefined);
+  const prior = $derived(vm?.priorEvaluation ?? null);
+  const priorRewardIds: string[] = $derived(prior ? prior.appliedRewardIds : []);
+  const priorFactsEntries = $derived(prior ? Object.entries(prior.facts ?? {}) : []);
+  const branchEntries = $derived(vm?.branchEntries ?? []);
+  const currentOffers = $derived(vm?.currentOffers ?? []);
+  const isIdentityRequired = $derived(vm?.isIdentityRequired ?? false);
+  const isEvolutionRequired = $derived(vm?.isEvolutionRequired ?? false);
+  const isBlock8 = $derived(vm?.isBlock8NoOpportunity ?? false);
+  const rewardEntitlements = $derived(
+    vm?.rewardEntitlements ?? {
+      influenceEarned: 0,
+      inquiryCredits: 0,
+      informationBenefits: 0,
+      followUpUnlocks: [],
+    },
+  );
+  function outcomeBadge(outcome: SeasonCampaignEvaluation['outcome']): string {
     switch (outcome) {
-        case 'missed':
-            return 'bg-muted text-muted-foreground border-border';
-        case 'completed':
-            return 'bg-positive/15 text-positive border-positive/30';
-        case 'breakthrough':
-            return 'bg-primary/15 text-primary border-primary/30';
+      case 'missed':
+        return 'bg-muted text-muted-foreground border-border';
+      case 'completed':
+        return 'bg-positive/15 text-positive border-positive/30';
+      case 'breakthrough':
+        return 'bg-primary/15 text-primary border-primary/30';
     }
-}
-function readablePlayerRef(value: unknown): string {
+  }
+  function readablePlayerRef(value: unknown): string {
     if (typeof value === 'string' && value.startsWith('pv-')) {
-        return playerName(value);
+      return playerName(value);
     }
     return String(value);
-}
+  }
 </script>
 
 <section

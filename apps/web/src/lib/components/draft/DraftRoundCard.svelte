@@ -1,6 +1,28 @@
-<script lang="ts">import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-import TeamLogo from '$lib/components/TeamLogo.svelte';
-let { label, round, totalRounds = 5, turnText = null, turnPill = null, ariaLabel, manifest, franchiseId, teamExternalId, logoCandidates = [], franchiseAbbreviation, franchiseDisplayName = null, eraLabel, franchiseRerollAvailable, franchiseRerollSpent, eraRerollAvailable, eraRerollSpent, controlsDisabled = false, onRerollFranchise, onRerollEra, }: {
+<script lang="ts">
+  import type { HoopRushManifest } from '@hoop-rush/data-contracts';
+  import TeamLogo from '$lib/components/TeamLogo.svelte';
+  let {
+    label,
+    round,
+    totalRounds = 5,
+    turnText = null,
+    turnPill = null,
+    ariaLabel,
+    manifest,
+    franchiseId,
+    teamExternalId,
+    logoCandidates = [],
+    franchiseAbbreviation,
+    franchiseDisplayName = null,
+    eraLabel,
+    franchiseRerollAvailable,
+    franchiseRerollSpent,
+    eraRerollAvailable,
+    eraRerollSpent,
+    controlsDisabled = false,
+    onRerollFranchise,
+    onRerollEra,
+  }: {
     label: string;
     round: number;
     totalRounds?: number;
@@ -21,18 +43,22 @@ let { label, round, totalRounds = 5, turnText = null, turnPill = null, ariaLabel
     controlsDisabled?: boolean;
     onRerollFranchise: () => void;
     onRerollEra: () => void;
-} = $props();
-const dots = $derived(Array.from({ length: totalRounds }, (_, i) => i));
-const franchiseTitle = $derived(franchiseRerollSpent
-    ? 'Already used'
-    : !franchiseRerollAvailable
+  } = $props();
+  const dots = $derived(Array.from({ length: totalRounds }, (_, i) => i));
+  const franchiseTitle = $derived(
+    franchiseRerollSpent
+      ? 'Already used'
+      : !franchiseRerollAvailable
         ? 'No alternative'
-        : 'Roll a different franchise');
-const eraTitle = $derived(eraRerollSpent
-    ? 'Already used'
-    : !eraRerollAvailable
+        : 'Roll a different franchise',
+  );
+  const eraTitle = $derived(
+    eraRerollSpent
+      ? 'Already used'
+      : !eraRerollAvailable
         ? 'No alternative'
-        : 'Roll a different era');
+        : 'Roll a different era',
+  );
 </script>
 
 <div class="min-w-0 overflow-hidden rounded-xl bg-surface-1">

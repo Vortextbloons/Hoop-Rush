@@ -1,66 +1,74 @@
-<script lang="ts">import type { SeasonCampaignFocus, SeasonCampaignGmIdentity } from '@hoop-rush/data-contracts';
-let { busy = false, commandError = null, onSelect, }: {
+<script lang="ts">
+  import type { SeasonCampaignFocus, SeasonCampaignGmIdentity } from '@hoop-rush/data-contracts';
+  let {
+    busy = false,
+    commandError = null,
+    onSelect,
+  }: {
     busy?: boolean;
     commandError?: string | null;
     onSelect: (input: {
-        identity: SeasonCampaignGmIdentity;
-        focus: SeasonCampaignFocus | null;
+      identity: SeasonCampaignGmIdentity;
+      focus: SeasonCampaignFocus | null;
     }) => void;
-} = $props();
-let selectedIdentity: SeasonCampaignGmIdentity | null = $state(null);
-let selectedFocus: SeasonCampaignFocus | null = $state(null);
-const identities: Array<{
+  } = $props();
+  let selectedIdentity: SeasonCampaignGmIdentity | null = $state(null);
+  let selectedFocus: SeasonCampaignFocus | null = $state(null);
+  const identities: Array<{
     id: SeasonCampaignGmIdentity;
     label: string;
     blurb: string;
     accent: string;
-}> = [
+  }> = [
     {
-        id: 'win-now',
-        label: 'Win now',
-        blurb: 'Chase wins, marquee matchups, and playoff security. The room hunts block wins and statement victories.',
-        accent: 'border-primary',
+      id: 'win-now',
+      label: 'Win now',
+      blurb:
+        'Chase wins, marquee matchups, and playoff security. The room hunts block wins and statement victories.',
+      accent: 'border-primary',
     },
     {
-        id: 'player-development',
-        label: 'Player development',
-        blurb: 'Give your rotation players real roles and steady minutes. The board tracks workload, availability, and growth.',
-        accent: 'border-sky-500',
+      id: 'player-development',
+      label: 'Player development',
+      blurb:
+        'Give your rotation players real roles and steady minutes. The board tracks workload, availability, and growth.',
+      accent: 'border-sky-500',
     },
     {
-        id: 'team-identity',
-        label: 'Team identity',
-        blurb: 'Declare a style and live it. Pick a focus — the front office will surface opportunities that match.',
-        accent: 'border-amber-500',
+      id: 'team-identity',
+      label: 'Team identity',
+      blurb:
+        'Declare a style and live it. Pick a focus — the front office will surface opportunities that match.',
+      accent: 'border-amber-500',
     },
-];
-const focuses: Array<{
+  ];
+  const focuses: Array<{
     id: SeasonCampaignFocus;
     label: string;
     note: string;
-}> = [
+  }> = [
     { id: 'defense', label: 'Defense', note: 'Defensive efficiency & stops' },
     { id: 'shooting', label: 'Shooting', note: 'Three-point volume & spacing' },
     { id: 'ball-movement', label: 'Ball movement', note: 'Assists & turnover control' },
     { id: 'depth', label: 'Depth', note: 'Bench & coverage' },
-];
-const canSubmit = $derived(selectedIdentity !== null &&
-    (selectedIdentity !== 'team-identity' || selectedFocus !== null) &&
-    !busy);
-function submit(): void {
-    if (!canSubmit || selectedIdentity === null)
-        return;
+  ];
+  const canSubmit = $derived(
+    selectedIdentity !== null &&
+      (selectedIdentity !== 'team-identity' || selectedFocus !== null) &&
+      !busy,
+  );
+  function submit(): void {
+    if (!canSubmit || selectedIdentity === null) return;
     const focus = selectedIdentity === 'team-identity' ? selectedFocus : null;
     onSelect({ identity: selectedIdentity, focus });
-}
-function onIdentityKeydown(event: KeyboardEvent, id: SeasonCampaignGmIdentity): void {
+  }
+  function onIdentityKeydown(event: KeyboardEvent, id: SeasonCampaignGmIdentity): void {
     if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        selectedIdentity = id;
-        if (id !== 'team-identity')
-            selectedFocus = null;
+      event.preventDefault();
+      selectedIdentity = id;
+      if (id !== 'team-identity') selectedFocus = null;
     }
-}
+  }
 </script>
 
 <section

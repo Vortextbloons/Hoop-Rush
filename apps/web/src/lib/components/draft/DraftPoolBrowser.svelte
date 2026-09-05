@@ -1,19 +1,37 @@
-<script lang="ts">import type { HoopRushManifest, PlayersIndexEntry, SlotIndex } from '@hoop-rush/data-contracts';
-import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
-import { untrack } from 'svelte';
-import { Search } from '@lucide/svelte';
-import { lowercaseName } from '$lib/roster-browser';
-import { ratingBadges, type DraftPresentation, type RatingBadgeLabel, } from '$lib/draft-presentation';
-import { SLOT_INDEXES, SLOT_LABELS, canFillSlot, displacementTargetFor } from '$lib/draft-slots';
-import { formatPositions } from '$lib/player-positions';
-import PlayerFace from '$lib/components/PlayerFace.svelte';
-type IndexRow = PlayersIndexEntry;
-const PAGE_SIZE = 48;
-const SEARCH_DEBOUNCE_MS = 80;
-const BADGE_TITLES: Record<RatingBadgeLabel, string> = {
+<script lang="ts">
+  import type { HoopRushManifest, PlayersIndexEntry, SlotIndex } from '@hoop-rush/data-contracts';
+  import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
+  import { untrack } from 'svelte';
+  import { Search } from '@lucide/svelte';
+  import { lowercaseName } from '$lib/roster-browser';
+  import {
+    ratingBadges,
+    type DraftPresentation,
+    type RatingBadgeLabel,
+  } from '$lib/draft-presentation';
+  import { SLOT_INDEXES, SLOT_LABELS, canFillSlot, displacementTargetFor } from '$lib/draft-slots';
+  import { formatPositions } from '$lib/player-positions';
+  import PlayerFace from '$lib/components/PlayerFace.svelte';
+  type IndexRow = PlayersIndexEntry;
+  const PAGE_SIZE = 48;
+  const SEARCH_DEBOUNCE_MS = 80;
+  const BADGE_TITLES: Record<RatingBadgeLabel, string> = {
     O: 'Overall',
-};
-let { heading, rows, slots, countLabel, filtersEditable, manifest, presentation, error, emptyMessage, allowDisplacement = true, selectionDisabled = false, onpick, }: {
+  };
+  let {
+    heading,
+    rows,
+    slots,
+    countLabel,
+    filtersEditable,
+    manifest,
+    presentation,
+    error,
+    emptyMessage,
+    allowDisplacement = true,
+    selectionDisabled = false,
+    onpick,
+  }: {
     heading: string;
     rows: IndexRow[];
     slots: (IndexRow | null)[];
@@ -26,84 +44,79 @@ let { heading, rows, slots, countLabel, filtersEditable, manifest, presentation,
     allowDisplacement?: boolean;
     selectionDisabled?: boolean;
     onpick: (player: IndexRow) => void;
-} = $props();
-let searchInput = $state('');
-let search = $state('');
-let positionFilter = $state<SlotIndex | null>(null);
-let visibleCount = $state(PAGE_SIZE);
-const eraLabel = $derived(new Map(manifest.eras.map((e) => [e.eraId, e.label])));
-function teamLabelFor(player: IndexRow): string {
+  } = $props();
+  let searchInput = $state('');
+  let search = $state('');
+  let positionFilter = $state<SlotIndex | null>(null);
+  let visibleCount = $state(PAGE_SIZE);
+  const eraLabel = $derived(new Map(manifest.eras.map((e) => [e.eraId, e.label])));
+  function teamLabelFor(player: IndexRow): string {
     const identity = resolveEraTeamIdentity(manifest, player.franchiseId, player.eraId);
     return identity.abbreviationLabel ?? franchiseAbbreviation(player.franchiseId);
-}
-$effect(() => {
+  }
+  $effect(() => {
     const raw = searchInput;
     const timeout = setTimeout(() => {
-        search = raw;
+      search = raw;
     }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timeout);
-});
-const filteredRows = $derived.by(() => {
-    if (!filtersEditable)
-        return rows;
+  });
+  const filteredRows = $derived.by(() => {
+    if (!filtersEditable) return rows;
     let list = rows;
     const position = positionFilter;
     if (position !== null) {
-        list = list.filter((p) => canFillSlot(p, position));
+      list = list.filter((p) => canFillSlot(p, position));
     }
     const query = search.trim().toLowerCase();
     if (query) {
-        list = list.filter((p) => lowercaseName(p).includes(query));
+      list = list.filter((p) => lowercaseName(p).includes(query));
     }
     return list;
-});
-const visibleRows = $derived(filteredRows.slice(0, visibleCount));
-const hasMore = $derived(filteredRows.length > visibleCount);
-$effect(() => {
+  });
+  const visibleRows = $derived(filteredRows.slice(0, visibleCount));
+  const hasMore = $derived(filteredRows.length > visibleCount);
+  $effect(() => {
     void [rows, filtersEditable];
     const input = untrack(() => searchInput);
     const query = untrack(() => search);
     const position = untrack(() => positionFilter);
     const visible = untrack(() => visibleCount);
-    if (input !== '')
-        searchInput = '';
-    if (query !== '')
-        search = '';
-    if (position !== null)
-        positionFilter = null;
-    if (visible !== PAGE_SIZE)
-        visibleCount = PAGE_SIZE;
-});
-type PoolCardState = 'lineup' | 'place' | 'displace' | 'blocked';
-type PoolCardInfo = {
+    if (input !== '') searchInput = '';
+    if (query !== '') search = '';
+    if (position !== null) positionFilter = null;
+    if (visible !== PAGE_SIZE) visibleCount = PAGE_SIZE;
+  });
+  type PoolCardState = 'lineup' | 'place' | 'displace' | 'blocked';
+  type PoolCardInfo = {
     state: PoolCardState;
     displace: {
-        incumbent: IndexRow;
-        targetSlot: number;
+      incumbent: IndexRow;
+      targetSlot: number;
     } | null;
-};
-function poolCardInfoFor(player: IndexRow): PoolCardInfo {
+  };
+  function poolCardInfoFor(player: IndexRow): PoolCardInfo {
     if (slots.some((p) => p !== null && p.playerId === player.playerId)) {
-        return { state: 'lineup', displace: null };
+      return { state: 'lineup', displace: null };
     }
     let displace: PoolCardInfo['displace'] = null;
     for (const i of SLOT_INDEXES) {
-        if (!canFillSlot(player, i))
-            continue;
-        const incumbent = slots[i] ?? null;
-        if (!incumbent)
-            return { state: 'place', displace: null };
-        if (displace === null) {
-            const target = displacementTargetFor(slots, incumbent, i, -1);
-            if (target !== null)
-                displace = { incumbent, targetSlot: target };
-        }
+      if (!canFillSlot(player, i)) continue;
+      const incumbent = slots[i] ?? null;
+      if (!incumbent) return { state: 'place', displace: null };
+      if (displace === null) {
+        const target = displacementTargetFor(slots, incumbent, i, -1);
+        if (target !== null) displace = { incumbent, targetSlot: target };
+      }
     }
     return displace !== null && allowDisplacement
-        ? { state: 'displace', displace }
-        : { state: 'blocked', displace: null };
-}
-const poolCardInfo = $derived.by((): ReadonlyMap<string, PoolCardInfo> => new Map(visibleRows.map((player) => [player.playerId, poolCardInfoFor(player)])));
+      ? { state: 'displace', displace }
+      : { state: 'blocked', displace: null };
+  }
+  const poolCardInfo = $derived.by(
+    (): ReadonlyMap<string, PoolCardInfo> =>
+      new Map(visibleRows.map((player) => [player.playerId, poolCardInfoFor(player)])),
+  );
 </script>
 
 <div class="min-w-0 overflow-x-clip rounded-none bg-surface-1 sm:rounded-xl">

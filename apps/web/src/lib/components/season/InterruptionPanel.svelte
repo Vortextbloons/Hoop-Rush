@@ -1,10 +1,26 @@
-<script lang="ts">import { Dialog } from 'bits-ui';
-import { X } from '@lucide/svelte';
-import { resolve } from '$app/paths';
-import type { SeasonInvalidRosterInterruption, SeasonPendingBlockCandidate, } from '@hoop-rush/data-contracts';
-import type { SeasonRunCommandError } from '$lib/season/season-hub-state';
-import type { InfluenceSpendAffordance } from '$lib/season/season-influence-view';
-let { interruption, pending, playerName, injuryPlayerName, rehabAffordances, balance, busy = false, commandError = null, onRehab, onForfeit, onResume, }: {
+<script lang="ts">
+  import { Dialog } from 'bits-ui';
+  import { X } from '@lucide/svelte';
+  import { resolve } from '$app/paths';
+  import type {
+    SeasonInvalidRosterInterruption,
+    SeasonPendingBlockCandidate,
+  } from '@hoop-rush/data-contracts';
+  import type { SeasonRunCommandError } from '$lib/season/season-hub-state';
+  import type { InfluenceSpendAffordance } from '$lib/season/season-influence-view';
+  let {
+    interruption,
+    pending,
+    playerName,
+    injuryPlayerName,
+    rehabAffordances,
+    balance,
+    busy = false,
+    commandError = null,
+    onRehab,
+    onForfeit,
+    onResume,
+  }: {
     interruption: SeasonInvalidRosterInterruption | null;
     pending: SeasonPendingBlockCandidate | null;
     playerName: (playerVersionId: string) => string;
@@ -16,9 +32,9 @@ let { interruption, pending, playerName, injuryPlayerName, rehabAffordances, bal
     onRehab: (affordance: InfluenceSpendAffordance) => void;
     onForfeit: () => void;
     onResume: () => void;
-} = $props();
-let forfeitOpen = $state(false);
-const unavailablePlayers = $derived(interruption?.unavailablePlayerVersionIds ?? []);
+  } = $props();
+  let forfeitOpen = $state(false);
+  const unavailablePlayers = $derived(interruption?.unavailablePlayerVersionIds ?? []);
 </script>
 
 <section

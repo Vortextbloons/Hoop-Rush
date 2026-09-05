@@ -62,7 +62,10 @@ Deno.serve(async (req: Request) => {
     .update({ last_seen_at: new Date().toISOString() } as unknown as Record<string, unknown>)
     .eq('room_id', roomId)
     .eq('uid', uidVal)
-    .then(() => {}, () => {});
+    .then(
+      () => {},
+      () => {},
+    );
 
   // Parallelize independent member queries (finding 3: was 5 sequential DB queries, now 3 parallelizable)
   const countPromise = sc
@@ -98,20 +101,29 @@ Deno.serve(async (req: Request) => {
     .eq('room_id', roomId)
     .eq('cursor', (room as unknown as { cursor?: string }).cursor ?? room.cursor ?? '');
 
-  const [{ count }, { data: allMembers }, commandsResult, { data: locksRows }, { data: attestRows }] =
-    await Promise.all([
-      countPromise,
-      membersPromise,
-      commandsPromise ?? Promise.resolve({ data: null } as unknown as { data: unknown }),
-      locksPromise,
-      attestPromise,
-    ]);
+  const [
+    { count },
+    { data: allMembers },
+    commandsResult,
+    { data: locksRows },
+    { data: attestRows },
+  ] = await Promise.all([
+    countPromise,
+    membersPromise,
+    commandsPromise ?? Promise.resolve({ data: null } as unknown as { data: unknown }),
+    locksPromise,
+    attestPromise,
+  ]);
   // ensure heartbeat settled (already fire-and-forget)
   await heartbeat.catch(() => {});
 
   // Transform fetched commands to envelope shape (same as season-room-refetch)
   let commands: unknown[] | undefined;
-  if (afterOrdinal !== null && commandsResult && Array.isArray((commandsResult as { data?: unknown }).data)) {
+  if (
+    afterOrdinal !== null &&
+    commandsResult &&
+    Array.isArray((commandsResult as { data?: unknown }).data)
+  ) {
     const rows = (commandsResult as { data: unknown[] }).data as Array<{
       command_id: string;
       ordinal: number;
@@ -124,7 +136,8 @@ Deno.serve(async (req: Request) => {
     commands = rows.map((row) => {
       const p = row.payload;
       if (
-        p && typeof p === 'object' &&
+        p &&
+        typeof p === 'object' &&
         typeof (p as { ordinal?: unknown }).ordinal === 'number' &&
         typeof (p as { commandId?: unknown }).commandId === 'string'
       ) {
@@ -163,10 +176,15 @@ Deno.serve(async (req: Request) => {
     ) !== 2;
 
   const locks = (() => {
-    const rows = (locksRows ?? []) as Array<{ participant_id: string; revealed?: boolean; cursor: string }>;
+    const rows = (locksRows ?? []) as Array<{
+      participant_id: string;
+      revealed?: boolean;
+      cursor: string;
+    }>;
     const p1 = rows.some((r) => r.participant_id === 'p1');
     const p2 = rows.some((r) => r.participant_id === 'p2');
-    const revealed = rows.length > 0 ? rows.every((r) => r.revealed === true) || rows.length === 2 : false;
+    const revealed =
+      rows.length > 0 ? rows.every((r) => r.revealed === true) || rows.length === 2 : false;
     const cursor = (room as unknown as { cursor?: string }).cursor ?? room.cursor ?? '';
     if (!p1 && !p2) return undefined;
     return { p1Locked: p1, p2Locked: p2, revealed, cursor };

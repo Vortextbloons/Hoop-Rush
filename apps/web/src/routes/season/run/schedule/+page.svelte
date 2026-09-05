@@ -1,131 +1,148 @@
-﻿<script lang="ts">import { getContext } from 'svelte';
-import { resolve } from '$app/paths';
-import type { RouteId } from '$app/types';
-import type { HoopRushManifest, SeasonGameSummary } from '@hoop-rush/data-contracts';
-import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
-import { SEASON_RUN_SHELL_CONTEXT, type SeasonRunShellData, } from '$lib/season/season-shell-context';
-import { franchiseIdentityOf } from '$lib/season/season-branding';
-import { boxScoreFromSummary } from '$lib/season/season-presentation';
-import { postseasonSummaryRow } from '$lib/season/season-postseason-presentation';
-import { getSeasonRunRepository } from '$lib/season/season-repo';
-import type { SeasonPostseasonSummary } from '@hoop-rush/data-contracts';
-import { playedScheduleCount, scheduleBlockGroups, scheduleBlockRows, type ScheduleBlockRow, } from '$lib/season/season-schedule-view';
-const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
-type ScheduleFilter = 'all' | 'played' | 'upcoming';
-const FILTERS: ReadonlyArray<{
+﻿<script lang="ts">
+  import { getContext } from 'svelte';
+  import { resolve } from '$app/paths';
+  import type { RouteId } from '$app/types';
+  import type { HoopRushManifest, SeasonGameSummary } from '@hoop-rush/data-contracts';
+  import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
+  import {
+    SEASON_RUN_SHELL_CONTEXT,
+    type SeasonRunShellData,
+  } from '$lib/season/season-shell-context';
+  import { franchiseIdentityOf } from '$lib/season/season-branding';
+  import { boxScoreFromSummary } from '$lib/season/season-presentation';
+  import { postseasonSummaryRow } from '$lib/season/season-postseason-presentation';
+  import { getSeasonRunRepository } from '$lib/season/season-repo';
+  import type { SeasonPostseasonSummary } from '@hoop-rush/data-contracts';
+  import {
+    playedScheduleCount,
+    scheduleBlockGroups,
+    scheduleBlockRows,
+    type ScheduleBlockRow,
+  } from '$lib/season/season-schedule-view';
+  const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
+  type ScheduleFilter = 'all' | 'played' | 'upcoming';
+  const FILTERS: ReadonlyArray<{
     value: ScheduleFilter;
     label: string;
-}> = [
+  }> = [
     { value: 'all', label: 'All' },
     { value: 'played', label: 'Played' },
     { value: 'upcoming', label: 'Upcoming' },
-];
-let filter = $state<ScheduleFilter>('all');
-let openedBoxScores = $state.raw(new Set<string>());
-function onBoxScoreToggle(event: Event, gameId: string) {
-    if (!(event.currentTarget instanceof HTMLDetailsElement))
-        return;
-    if (!event.currentTarget.open || openedBoxScores.has(gameId))
-        return;
+  ];
+  let filter = $state<ScheduleFilter>('all');
+  let openedBoxScores = $state.raw(new Set<string>());
+  function onBoxScoreToggle(event: Event, gameId: string) {
+    if (!(event.currentTarget instanceof HTMLDetailsElement)) return;
+    if (!event.currentTarget.open || openedBoxScores.has(gameId)) return;
     openedBoxScores = new Set([...openedBoxScores, gameId]);
-}
-let boxScoreModule: Promise<typeof import('$lib/components/season/BoxScore.svelte')> | null = null;
-function loadBoxScore(): Promise<typeof import('$lib/components/season/BoxScore.svelte')> {
+  }
+  let boxScoreModule: Promise<typeof import('$lib/components/season/BoxScore.svelte')> | null =
+    null;
+  function loadBoxScore(): Promise<typeof import('$lib/components/season/BoxScore.svelte')> {
     boxScoreModule ??= import('$lib/components/season/BoxScore.svelte');
     return boxScoreModule;
-}
-let desktopViewport = $state<boolean>(typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-    ? window.matchMedia('(min-width: 768px)').matches
-    : true);
-$effect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function')
-        return;
+  }
+  let desktopViewport = $state<boolean>(
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia('(min-width: 768px)').matches
+      : true,
+  );
+  $effect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
     const media = window.matchMedia('(min-width: 768px)');
     const update = () => {
-        desktopViewport = media.matches;
+      desktopViewport = media.matches;
     };
     update();
     media.addEventListener('change', update);
     return () => media.removeEventListener('change', update);
-});
-const rows = $derived(shell.run && shell.snapshot && shell.humanFranchiseId
-    ? scheduleBlockRows(shell.run.games, shell.snapshot.summaries, shell.humanFranchiseId)
-    : []);
-const groups = $derived(scheduleBlockGroups(rows));
-const filteredGroups = $derived(groups
-    .map((group) => ({
-    ...group,
-    rows: group.rows.filter((row) => filter === 'all' ? true : filter === 'played' ? row.played : !row.played),
-}))
-    .filter((group) => group.rows.length > 0));
-const playedCount = $derived(playedScheduleCount(rows));
-const acceptedBlockIndexes = $derived(new Set((shell.snapshot?.acceptedBlocks ?? []).map((block) => block.blockIndex)));
-const playerNames = $derived.by(() => {
+  });
+  const rows = $derived(
+    shell.run && shell.snapshot && shell.humanFranchiseId
+      ? scheduleBlockRows(shell.run.games, shell.snapshot.summaries, shell.humanFranchiseId)
+      : [],
+  );
+  const groups = $derived(scheduleBlockGroups(rows));
+  const filteredGroups = $derived(
+    groups
+      .map((group) => ({
+        ...group,
+        rows: group.rows.filter((row) =>
+          filter === 'all' ? true : filter === 'played' ? row.played : !row.played,
+        ),
+      }))
+      .filter((group) => group.rows.length > 0),
+  );
+  const playedCount = $derived(playedScheduleCount(rows));
+  const acceptedBlockIndexes = $derived(
+    new Set((shell.snapshot?.acceptedBlocks ?? []).map((block) => block.blockIndex)),
+  );
+  const playerNames = $derived.by(() => {
     const map = new Map<string, string>();
     for (const roster of shell.run?.rosters ?? []) {
-        for (const entry of roster.players)
-            map.set(entry.playerVersionId, entry.displayName);
+      for (const entry of roster.players) map.set(entry.playerVersionId, entry.displayName);
     }
     return map;
-});
-const playable = $derived.by(() => {
+  });
+  const playable = $derived.by(() => {
     const map = new Map<string, readonly string[]>();
     for (const roster of shell.run?.rosters ?? []) {
-        for (const entry of roster.players) {
-            map.set(entry.playerVersionId, shell.playablePositions(entry.playerVersionId));
-        }
+      for (const entry of roster.players) {
+        map.set(entry.playerVersionId, shell.playablePositions(entry.playerVersionId));
+      }
     }
     return map;
-});
-const summaryByGameId = $derived(new Map((shell.snapshot?.summaries ?? []).map((summary) => [summary.gameId, summary])));
-const humanFranchiseId = $derived(shell.humanFranchiseId);
-const manifest = $derived(shell.manifest);
-const identityOf = (franchiseId: string) => manifest ? franchiseIdentityOf(manifest, franchiseId) : null;
-function boxFor(row: ScheduleBlockRow) {
-    if (!humanFranchiseId || !row.played)
-        return null;
+  });
+  const summaryByGameId = $derived(
+    new Map((shell.snapshot?.summaries ?? []).map((summary) => [summary.gameId, summary])),
+  );
+  const humanFranchiseId = $derived(shell.humanFranchiseId);
+  const manifest = $derived(shell.manifest);
+  const identityOf = (franchiseId: string) =>
+    manifest ? franchiseIdentityOf(manifest, franchiseId) : null;
+  function boxFor(row: ScheduleBlockRow) {
+    if (!humanFranchiseId || !row.played) return null;
     const summary = summaryByGameId.get(row.gameId);
-    if (!summary)
-        return null;
+    if (!summary) return null;
     return boxScoreFromSummary(summary, humanFranchiseId, playerNames, playable);
-}
-function resultLabel(row: ScheduleBlockRow): string {
-    if (row.won === null)
-        return 'scheduled';
-    if (row.forfeit)
-        return row.won ? 'W · forfeit' : 'L · forfeit';
+  }
+  function resultLabel(row: ScheduleBlockRow): string {
+    if (row.won === null) return 'scheduled';
+    if (row.forfeit) return row.won ? 'W · forfeit' : 'L · forfeit';
     return row.won ? 'W' : 'L';
-}
-let postseasonSummaries = $state<SeasonPostseasonSummary[] | null>(null);
-let postseasonSummariesError = $state<string | null>(null);
-$effect(() => {
+  }
+  let postseasonSummaries = $state<SeasonPostseasonSummary[] | null>(null);
+  let postseasonSummariesError = $state<string | null>(null);
+  $effect(() => {
     const runId = shell.run?.runId ?? null;
     const stage = shell.run?.stage ?? null;
     if (runId === null || stage === null || stage === 'regular-season') {
-        postseasonSummaries = null;
-        postseasonSummariesError = null;
-        return;
+      postseasonSummaries = null;
+      postseasonSummariesError = null;
+      return;
     }
     let cancelled = false;
     void (async () => {
-        try {
-            const repo = await getSeasonRunRepository();
-            const summaries = await repo.loadPostseasonSummaries(runId);
-            if (!cancelled)
-                postseasonSummaries = summaries;
+      try {
+        const repo = await getSeasonRunRepository();
+        const summaries = await repo.loadPostseasonSummaries(runId);
+        if (!cancelled) postseasonSummaries = summaries;
+      } catch (error) {
+        if (!cancelled) {
+          postseasonSummariesError = error instanceof Error ? error.message : String(error);
         }
-        catch (error) {
-            if (!cancelled) {
-                postseasonSummariesError = error instanceof Error ? error.message : String(error);
-            }
-        }
+      }
     })();
     return () => {
-        cancelled = true;
+      cancelled = true;
     };
-});
-const postseasonRows = $derived((postseasonSummaries ?? []).map((summary) => postseasonSummaryRow(summary, humanFranchiseId ?? '')));
-const postseasonPlayed = $derived(postseasonRows.length);
+  });
+  const postseasonRows = $derived(
+    (postseasonSummaries ?? []).map((summary) =>
+      postseasonSummaryRow(summary, humanFranchiseId ?? ''),
+    ),
+  );
+  const postseasonPlayed = $derived(postseasonRows.length);
 </script>
 
 <svelte:head>

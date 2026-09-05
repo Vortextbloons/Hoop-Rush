@@ -21,7 +21,10 @@ function devProbeStubPlugin(): Plugin {
       server.middlewares.use((req, res, next) => {
         const path = req.url?.split('?')[0];
         const body = path ? stubs[path] : undefined;
-        if (!body) { next(); return; }
+        if (!body) {
+          next();
+          return;
+        }
         res.statusCode = 200;
         res.setHeader('Content-Type', 'application/json');
         res.end(body);

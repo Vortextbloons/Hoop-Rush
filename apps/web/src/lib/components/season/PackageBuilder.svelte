@@ -1,11 +1,28 @@
-<script lang="ts">import { packageConsequenceFacts, chemistryFootnote } from '$lib/season/season-presentation';
-interface PlayerLite {
+<script lang="ts">
+  import { packageConsequenceFacts, chemistryFootnote } from '$lib/season/season-presentation';
+  interface PlayerLite {
     playerVersionId: string;
     displayName: string;
     playable: readonly string[];
     available: boolean;
-}
-let { yourPlayers, theirPlayers, yourRosterSize, theirRosterSize, yourBalance, theirBalance, humanFranchiseId, targetFranchiseId, targetFranchiseName, inquiryAllowance, inquiriesUsed, allowanceLabel, busy = false, commandError = null, onSubmit, }: {
+  }
+  let {
+    yourPlayers,
+    theirPlayers,
+    yourRosterSize,
+    theirRosterSize,
+    yourBalance,
+    theirBalance,
+    humanFranchiseId,
+    targetFranchiseId,
+    targetFranchiseName,
+    inquiryAllowance,
+    inquiriesUsed,
+    allowanceLabel,
+    busy = false,
+    commandError = null,
+    onSubmit,
+  }: {
     yourPlayers: PlayerLite[];
     theirPlayers: PlayerLite[];
     yourRosterSize: number;
@@ -21,89 +38,94 @@ let { yourPlayers, theirPlayers, yourRosterSize, theirRosterSize, yourBalance, t
     busy?: boolean;
     commandError?: string | null;
     onSubmit: (payload: {
-        outgoing: string[];
-        incoming: string[];
-        influenceAmount: number;
-        influenceFromSender: string | null;
+      outgoing: string[];
+      incoming: string[];
+      influenceAmount: number;
+      influenceFromSender: string | null;
     }) => void;
-} = $props();
-let outgoing: string[] = $state([]);
-let incoming: string[] = $state([]);
-let influenceAmount: number = $state(0);
-let influenceFrom: string | null = $state(null);
-const outgoingSet = $derived(new Set(outgoing));
-const incomingSet = $derived(new Set(incoming));
-const influenceOptions: Array<{
+  } = $props();
+  let outgoing: string[] = $state([]);
+  let incoming: string[] = $state([]);
+  let influenceAmount: number = $state(0);
+  let influenceFrom: string | null = $state(null);
+  const outgoingSet = $derived(new Set(outgoing));
+  const incomingSet = $derived(new Set(incoming));
+  const influenceOptions: Array<{
     amount: number;
     from: string | null;
     label: string;
     disabledReason: string | null;
-}> = $derived.by(() => {
+  }> = $derived.by(() => {
     const opts: typeof influenceOptions = [];
     opts.push({ amount: 0, from: null, label: 'No Influence', disabledReason: null });
     for (const from of [humanFranchiseId, targetFranchiseId]) {
-        for (const amount of [1, 2]) {
-            const balance = from === humanFranchiseId ? yourBalance : theirBalance;
-            const disabled = balance - amount < 0
-                ? `Balance ${String(balance)} cannot cover ${String(amount)} (floor 0)`
-                : null;
-            const who = from === humanFranchiseId ? 'You send' : `${targetFranchiseName} sends`;
-            opts.push({ amount, from, label: `${who} ${String(amount)}`, disabledReason: disabled });
-        }
+      for (const amount of [1, 2]) {
+        const balance = from === humanFranchiseId ? yourBalance : theirBalance;
+        const disabled =
+          balance - amount < 0
+            ? `Balance ${String(balance)} cannot cover ${String(amount)} (floor 0)`
+            : null;
+        const who = from === humanFranchiseId ? 'You send' : `${targetFranchiseName} sends`;
+        opts.push({ amount, from, label: `${who} ${String(amount)}`, disabledReason: disabled });
+      }
     }
     return opts;
-});
-const selectedInfluence = $derived(influenceOptions.find((o) => o.amount === influenceAmount && o.from === influenceFrom) ?? null);
-const canSubmit = $derived(outgoing.length >= 1 &&
-    outgoing.length <= 2 &&
-    incoming.length >= 1 &&
-    incoming.length <= 2 &&
-    (influenceAmount === 0 ||
+  });
+  const selectedInfluence = $derived(
+    influenceOptions.find((o) => o.amount === influenceAmount && o.from === influenceFrom) ?? null,
+  );
+  const canSubmit = $derived(
+    outgoing.length >= 1 &&
+      outgoing.length <= 2 &&
+      incoming.length >= 1 &&
+      incoming.length <= 2 &&
+      (influenceAmount === 0 ||
         (influenceAmount >= 1 && influenceAmount <= 2 && influenceFrom !== null)) &&
-    !(outgoing.length === 0 && incoming.length === 0) &&
-    !busy);
-const consequence = $derived(packageConsequenceFacts({
-    fromRosterSize: yourRosterSize,
-    toRosterSize: theirRosterSize,
-    outgoingIds: outgoing,
-    incomingIds: incoming,
-    outgoingAvailable: outgoing.map((id) => yourPlayers.find((p) => p.playerVersionId === id)?.available ?? true),
-    incomingAvailable: incoming.map((id) => theirPlayers.find((p) => p.playerVersionId === id)?.available ?? true),
-    influenceAmount,
-    influenceFromSender: influenceFrom,
-    humanFranchiseId,
-    toFranchiseId: targetFranchiseId,
-}));
-const inquiriesRemaining = $derived(Math.max(0, inquiryAllowance - inquiriesUsed));
-const willConsumeInquiry = $derived(inquiriesUsed < inquiryAllowance);
-function toggle(set: 'outgoing' | 'incoming', id: string): void {
+      !(outgoing.length === 0 && incoming.length === 0) &&
+      !busy,
+  );
+  const consequence = $derived(
+    packageConsequenceFacts({
+      fromRosterSize: yourRosterSize,
+      toRosterSize: theirRosterSize,
+      outgoingIds: outgoing,
+      incomingIds: incoming,
+      outgoingAvailable: outgoing.map(
+        (id) => yourPlayers.find((p) => p.playerVersionId === id)?.available ?? true,
+      ),
+      incomingAvailable: incoming.map(
+        (id) => theirPlayers.find((p) => p.playerVersionId === id)?.available ?? true,
+      ),
+      influenceAmount,
+      influenceFromSender: influenceFrom,
+      humanFranchiseId,
+      toFranchiseId: targetFranchiseId,
+    }),
+  );
+  const inquiriesRemaining = $derived(Math.max(0, inquiryAllowance - inquiriesUsed));
+  const willConsumeInquiry = $derived(inquiriesUsed < inquiryAllowance);
+  function toggle(set: 'outgoing' | 'incoming', id: string): void {
     if (set === 'outgoing') {
-        if (outgoingSet.has(id))
-            outgoing = outgoing.filter((x) => x !== id);
-        else if (outgoing.length < 2)
-            outgoing = [...outgoing, id];
+      if (outgoingSet.has(id)) outgoing = outgoing.filter((x) => x !== id);
+      else if (outgoing.length < 2) outgoing = [...outgoing, id];
+    } else {
+      if (incomingSet.has(id)) incoming = incoming.filter((x) => x !== id);
+      else if (incoming.length < 2) incoming = [...incoming, id];
     }
-    else {
-        if (incomingSet.has(id))
-            incoming = incoming.filter((x) => x !== id);
-        else if (incoming.length < 2)
-            incoming = [...incoming, id];
-    }
-}
-function handleInfluenceChange(amount: number, from: string | null): void {
+  }
+  function handleInfluenceChange(amount: number, from: string | null): void {
     influenceAmount = amount;
     influenceFrom = from;
-}
-function submit(): void {
-    if (!canSubmit)
-        return;
+  }
+  function submit(): void {
+    if (!canSubmit) return;
     onSubmit({
-        outgoing: [...outgoing],
-        incoming: [...incoming],
-        influenceAmount,
-        influenceFromSender: influenceFrom,
+      outgoing: [...outgoing],
+      incoming: [...incoming],
+      influenceAmount,
+      influenceFromSender: influenceFrom,
     });
-}
+  }
 </script>
 
 <div

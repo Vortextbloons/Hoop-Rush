@@ -1,12 +1,31 @@
-<script lang="ts">import { franchiseAbbreviation, resolveEraTeamIdentity, type HoopRushManifest, } from '@hoop-rush/data-contracts';
-import { untrack } from 'svelte';
-import TeamLogo from '../TeamLogo.svelte';
-const REEL_ROW_HEIGHT_PX = 108;
-const OPTION_REPEATS = 3;
-const SPIN_MS = 2000;
-const RESULT_MS = 800;
-const FADE_MS = 250;
-let { manifest, franchiseId, eraId, franchiseOptions, eraOptions, axis = 'both', spinKey = 0, spotlight = null, announceText, roundLabel = '', reducedMotion, spinDurationMs, onSettled, }: {
+<script lang="ts">
+  import {
+    franchiseAbbreviation,
+    resolveEraTeamIdentity,
+    type HoopRushManifest,
+  } from '@hoop-rush/data-contracts';
+  import { untrack } from 'svelte';
+  import TeamLogo from '../TeamLogo.svelte';
+  const REEL_ROW_HEIGHT_PX = 108;
+  const OPTION_REPEATS = 3;
+  const SPIN_MS = 2000;
+  const RESULT_MS = 800;
+  const FADE_MS = 250;
+  let {
+    manifest,
+    franchiseId,
+    eraId,
+    franchiseOptions,
+    eraOptions,
+    axis = 'both',
+    spinKey = 0,
+    spotlight = null,
+    announceText,
+    roundLabel = '',
+    reducedMotion,
+    spinDurationMs,
+    onSettled,
+  }: {
     manifest: HoopRushManifest;
     franchiseId: string;
     eraId: string;
@@ -20,80 +39,78 @@ let { manifest, franchiseId, eraId, franchiseOptions, eraOptions, axis = 'both',
     reducedMotion?: boolean;
     spinDurationMs?: number;
     onSettled: () => void;
-} = $props();
-let selfDetectedReduced = $state(detectReducedMotion());
-let phase = $state<'idle' | 'spinning' | 'settled'>('idle');
-let franchiseSpinning = $state(false);
-let eraSpinning = $state(false);
-let franchiseFading = $state(false);
-let eraFading = $state(false);
-let franchiseStartPx = $state(0);
-let eraStartPx = $state(0);
-let activeSpinDurationMs = $state(SPIN_MS);
-let announced = $state('');
-let pulseKey = $state(0);
-let spinTimer: ReturnType<typeof setTimeout> | null = null;
-let resultTimer: ReturnType<typeof setTimeout> | null = null;
-let firstRun = true;
-const franchiseCycle = $derived([...franchiseOptions, ...franchiseOptions, ...franchiseOptions]);
-const eraCycle = $derived([...eraOptions, ...eraOptions, ...eraOptions]);
-function detectReducedMotion(): boolean {
+  } = $props();
+  let selfDetectedReduced = $state(detectReducedMotion());
+  let phase = $state<'idle' | 'spinning' | 'settled'>('idle');
+  let franchiseSpinning = $state(false);
+  let eraSpinning = $state(false);
+  let franchiseFading = $state(false);
+  let eraFading = $state(false);
+  let franchiseStartPx = $state(0);
+  let eraStartPx = $state(0);
+  let activeSpinDurationMs = $state(SPIN_MS);
+  let announced = $state('');
+  let pulseKey = $state(0);
+  let spinTimer: ReturnType<typeof setTimeout> | null = null;
+  let resultTimer: ReturnType<typeof setTimeout> | null = null;
+  let firstRun = true;
+  const franchiseCycle = $derived([...franchiseOptions, ...franchiseOptions, ...franchiseOptions]);
+  const eraCycle = $derived([...eraOptions, ...eraOptions, ...eraOptions]);
+  function detectReducedMotion(): boolean {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-        return false;
+      return false;
     }
     return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-}
-function franchiseSlotFor(id: string) {
+  }
+  function franchiseSlotFor(id: string) {
     return manifest.modernFranchiseSlots.find((slot) => slot.franchiseId === id);
-}
-function franchiseIdentityFor(id: string) {
+  }
+  function franchiseIdentityFor(id: string) {
     return resolveEraTeamIdentity(manifest, id, eraId);
-}
-function franchiseNameFor(id: string): string {
+  }
+  function franchiseNameFor(id: string): string {
     return franchiseIdentityFor(id).displayLabel ?? franchiseSlotFor(id)?.displayName ?? id;
-}
-function franchiseAbbreviationFor(id: string): string {
+  }
+  function franchiseAbbreviationFor(id: string): string {
     return franchiseIdentityFor(id).abbreviationLabel ?? franchiseAbbreviation(id);
-}
-function eraLabelFor(id: string): string {
+  }
+  function eraLabelFor(id: string): string {
     return manifest.eras.find((era) => era.eraId === id)?.label ?? id;
-}
-function jitterFor(key: number): number {
+  }
+  function jitterFor(key: number): number {
     const frac = key * 0.6180339887498949;
     return frac - Math.floor(frac);
-}
-function spinStartPx(optionCount: number, key: number, rowHeightPx: number): number {
+  }
+  function spinStartPx(optionCount: number, key: number, rowHeightPx: number): number {
     const travelRows = optionCount * OPTION_REPEATS - 1 + jitterFor(key);
     return -(travelRows * rowHeightPx);
-}
-function clearTimers() {
+  }
+  function clearTimers() {
     if (spinTimer !== null) {
-        clearTimeout(spinTimer);
-        spinTimer = null;
+      clearTimeout(spinTimer);
+      spinTimer = null;
     }
     if (resultTimer !== null) {
-        clearTimeout(resultTimer);
-        resultTimer = null;
+      clearTimeout(resultTimer);
+      resultTimer = null;
     }
-}
-function startSpin(key: number) {
+  }
+  function startSpin(key: number) {
     const params = untrack(() => ({
-        axis,
-        franchiseOptions,
-        eraOptions,
-        reduced: reducedMotion ?? selfDetectedReduced,
-        spinDurationMs,
+      axis,
+      franchiseOptions,
+      eraOptions,
+      reduced: reducedMotion ?? selfDetectedReduced,
+      spinDurationMs,
     }));
     const franchiseActive = params.axis === 'both' || params.axis === 'franchise';
     const eraActive = params.axis === 'both' || params.axis === 'era';
     const franchiseMoves = franchiseActive && params.franchiseOptions.length > 0;
     const eraMoves = eraActive && params.eraOptions.length > 0;
     franchiseStartPx = franchiseMoves
-        ? spinStartPx(params.franchiseOptions.length, key, REEL_ROW_HEIGHT_PX)
-        : 0;
-    eraStartPx = eraMoves
-        ? spinStartPx(params.eraOptions.length, key, REEL_ROW_HEIGHT_PX)
-        : 0;
+      ? spinStartPx(params.franchiseOptions.length, key, REEL_ROW_HEIGHT_PX)
+      : 0;
+    eraStartPx = eraMoves ? spinStartPx(params.eraOptions.length, key, REEL_ROW_HEIGHT_PX) : 0;
     const franchiseStrip = franchiseMoves && !params.reduced;
     const eraStrip = eraMoves && !params.reduced;
     clearTimers();
@@ -106,12 +123,13 @@ function startSpin(key: number) {
     activeSpinDurationMs = params.spinDurationMs ?? SPIN_MS;
     const franchiseDuration = franchiseStrip ? activeSpinDurationMs : 0;
     const eraDuration = eraStrip ? activeSpinDurationMs : 0;
-    const duration = params.reduced || (!franchiseStrip && !eraStrip)
+    const duration =
+      params.reduced || (!franchiseStrip && !eraStrip)
         ? FADE_MS
         : Math.max(franchiseDuration, eraDuration);
     spinTimer = setTimeout(settle, duration);
-}
-function settle() {
+  }
+  function settle() {
     spinTimer = null;
     franchiseSpinning = false;
     eraSpinning = false;
@@ -122,26 +140,26 @@ function settle() {
     phase = 'settled';
     const reduced = reducedMotion ?? selfDetectedReduced;
     resultTimer = setTimeout(finish, reduced ? FADE_MS : RESULT_MS);
-}
-function finish() {
+  }
+  function finish() {
     if (resultTimer !== null) {
-        clearTimeout(resultTimer);
-        resultTimer = null;
+      clearTimeout(resultTimer);
+      resultTimer = null;
     }
     phase = 'idle';
     onSettled();
-}
-$effect(() => {
+  }
+  $effect(() => {
     const key = spinKey;
     const isFirst = firstRun;
     firstRun = false;
     if (!isFirst || key > 0) {
-        startSpin(key);
+      startSpin(key);
     }
     return () => {
-        clearTimers();
+      clearTimers();
     };
-});
+  });
 </script>
 
 {#if phase !== 'idle'}

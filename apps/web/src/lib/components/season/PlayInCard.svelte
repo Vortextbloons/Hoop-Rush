@@ -1,28 +1,38 @@
-<script lang="ts">import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-import type { PlayInGameCardViewModel } from '$lib/season/season-postseason-presentation';
-import SeasonTeamLogo from './SeasonTeamLogo.svelte';
-import { franchiseIdentityOf } from '$lib/season/season-branding';
-let { card, franchiseName, franchiseAbbrev, manifest, humanFranchiseId, }: {
+<script lang="ts">
+  import type { HoopRushManifest } from '@hoop-rush/data-contracts';
+  import type { PlayInGameCardViewModel } from '$lib/season/season-postseason-presentation';
+  import SeasonTeamLogo from './SeasonTeamLogo.svelte';
+  import { franchiseIdentityOf } from '$lib/season/season-branding';
+  let {
+    card,
+    franchiseName,
+    franchiseAbbrev,
+    manifest,
+    humanFranchiseId,
+  }: {
     card: PlayInGameCardViewModel;
     franchiseName: (franchiseId: string) => string;
     franchiseAbbrev: (franchiseId: string) => string;
     manifest: HoopRushManifest | null;
     humanFranchiseId: string | null;
-} = $props();
-const identityOf = (franchiseId: string | null) => manifest && franchiseId ? franchiseIdentityOf(manifest, franchiseId) : null;
-const homeWon = $derived(card.status !== 'scheduled' &&
-    card.winnerFranchiseId !== null &&
-    card.winnerFranchiseId === card.homeFranchiseId);
-const awayWon = $derived(card.status !== 'scheduled' &&
-    card.winnerFranchiseId !== null &&
-    card.winnerFranchiseId === card.awayFranchiseId);
-const scoreText = $derived.by(() => {
-    if (card.status === 'scheduled')
-        return 'scheduled';
-    if (card.status === 'forfeit')
-        return '2–0 · forfeit';
+  } = $props();
+  const identityOf = (franchiseId: string | null) =>
+    manifest && franchiseId ? franchiseIdentityOf(manifest, franchiseId) : null;
+  const homeWon = $derived(
+    card.status !== 'scheduled' &&
+      card.winnerFranchiseId !== null &&
+      card.winnerFranchiseId === card.homeFranchiseId,
+  );
+  const awayWon = $derived(
+    card.status !== 'scheduled' &&
+      card.winnerFranchiseId !== null &&
+      card.winnerFranchiseId === card.awayFranchiseId,
+  );
+  const scoreText = $derived.by(() => {
+    if (card.status === 'scheduled') return 'scheduled';
+    if (card.status === 'forfeit') return '2–0 · forfeit';
     return `${String(card.homeScore ?? 0)}–${String(card.awayScore ?? 0)}`;
-});
+  });
 </script>
 
 <article

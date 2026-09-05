@@ -2,13 +2,13 @@ name: supabase
 on:
   pull_request:
     paths:
-      - "supabase/**"
-      - "packages/data-contracts/src/season-*.ts"
-      - "packages/data-contracts/src/season-versions.ts"
+      - 'supabase/**'
+      - 'packages/data-contracts/src/season-*.ts'
+      - 'packages/data-contracts/src/season-versions.ts'
   push:
     branches: [main]
     paths:
-      - "supabase/**"
+      - 'supabase/**'
   workflow_dispatch:
 
 jobs:
@@ -22,5 +22,6 @@ jobs:
       - run: supabase start
       - run: supabase test db --db-url postgresql://postgres:postgres@localhost:54322/postgres
       - run: supabase db lint
-      - run: supabase gen types typescript --local > /tmp/supabase-types.gen.ts && diff -u packages/data-contracts/src/supabase-types.gen.ts /tmp/supabase-types.gen.ts || (echo "type drift: run supabase gen types typescript --local"; exit 1)
+      - run: |
+          supabase gen types typescript --local > /tmp/supabase-types.gen.ts && diff -u packages/data-contracts/src/supabase-types.gen.ts /tmp/supabase-types.gen.ts || (echo "type drift: run supabase gen types typescript --local"; exit 1)
       - run: supabase stop --no-backup

@@ -1,384 +1,426 @@
-﻿<script lang="ts">import { getContext } from 'svelte';
-import { resolve } from '$app/paths';
-import type { RouteId } from '$app/types';
-import { blockRoundRange } from '@hoop-rush/data-contracts';
-import BlockProgress from '$lib/components/season/BlockProgress.svelte';
-import CampaignPanel from '$lib/components/season/CampaignPanel.svelte';
-import ChampionSummary from '$lib/components/season/ChampionSummary.svelte';
-import HealthStrip from '$lib/components/season/HealthStrip.svelte';
-import InfluencePanel from '$lib/components/season/InfluencePanel.svelte';
-import InterruptionPanel from '$lib/components/season/InterruptionPanel.svelte';
-import ObjectivePicker from '$lib/components/season/ObjectivePicker.svelte';
-import PostseasonMatchupCard from '$lib/components/season/PostseasonMatchupCard.svelte';
-import PostseasonProgress from '$lib/components/season/PostseasonProgress.svelte';
-import PostseasonRotationPanel from '$lib/components/season/PostseasonRotationPanel.svelte';
-import SeasonTape from '$lib/components/season/SeasonTape.svelte';
-import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
-import { franchiseIdentityOf } from '$lib/season/season-branding';
-import { SEASON_RUN_SHELL_CONTEXT, type SeasonRunShellData, } from '$lib/season/season-shell-context';
-import { blockPhaseAllowsSubmit, buildSubmitBlockEnvelope, } from '$lib/season/season-block-submit';
-import { buildLockPreview, gamesToLockForBlock, pendingRotationSetDigest, type LockPreview, } from '$lib/season/season-lock-preview';
-import { didWin, humanUpcomingGamesFromGames, recordLabel, } from '$lib/season/season-presentation';
-import { influenceViewModel, objectiveChoicesViewModel, type InfluenceSpendAffordance, } from '$lib/season/season-influence-view';
-import { availabilityStripRows } from '$lib/season/season-health-view';
-import { openWindowOf, tradeOfferViewModel, humanTradeOffersOf, } from '$lib/season/season-trade-view';
-import { describePostseasonRejection, humanEliminated, humanPlaysNextGame, humanSeriesOf, nextGameTeamsOf, nextPostseasonGameOf, playInGameCardViewModel, postseasonRankingsOf, postseasonStageLabel, riskyRehabOptionsOf, } from '$lib/season/season-postseason-presentation';
-import { ordinal } from '$lib/season/season-presentation';
-import { parsePlayoffGameId } from '@hoop-rush/data-contracts';
-import type { SeasonRunCommandError } from '$lib/season/season-hub-state';
-const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
-let mounted = $state(true);
-$effect(() => {
+﻿<script lang="ts">
+  import { getContext } from 'svelte';
+  import { resolve } from '$app/paths';
+  import type { RouteId } from '$app/types';
+  import { blockRoundRange } from '@hoop-rush/data-contracts';
+  import BlockProgress from '$lib/components/season/BlockProgress.svelte';
+  import CampaignPanel from '$lib/components/season/CampaignPanel.svelte';
+  import ChampionSummary from '$lib/components/season/ChampionSummary.svelte';
+  import HealthStrip from '$lib/components/season/HealthStrip.svelte';
+  import InfluencePanel from '$lib/components/season/InfluencePanel.svelte';
+  import InterruptionPanel from '$lib/components/season/InterruptionPanel.svelte';
+  import ObjectivePicker from '$lib/components/season/ObjectivePicker.svelte';
+  import PostseasonMatchupCard from '$lib/components/season/PostseasonMatchupCard.svelte';
+  import PostseasonProgress from '$lib/components/season/PostseasonProgress.svelte';
+  import PostseasonRotationPanel from '$lib/components/season/PostseasonRotationPanel.svelte';
+  import SeasonTape from '$lib/components/season/SeasonTape.svelte';
+  import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
+  import { franchiseIdentityOf } from '$lib/season/season-branding';
+  import {
+    SEASON_RUN_SHELL_CONTEXT,
+    type SeasonRunShellData,
+  } from '$lib/season/season-shell-context';
+  import {
+    blockPhaseAllowsSubmit,
+    buildSubmitBlockEnvelope,
+  } from '$lib/season/season-block-submit';
+  import {
+    buildLockPreview,
+    gamesToLockForBlock,
+    pendingRotationSetDigest,
+    type LockPreview,
+  } from '$lib/season/season-lock-preview';
+  import {
+    didWin,
+    humanUpcomingGamesFromGames,
+    recordLabel,
+  } from '$lib/season/season-presentation';
+  import {
+    influenceViewModel,
+    objectiveChoicesViewModel,
+    type InfluenceSpendAffordance,
+  } from '$lib/season/season-influence-view';
+  import { availabilityStripRows } from '$lib/season/season-health-view';
+  import {
+    openWindowOf,
+    tradeOfferViewModel,
+    humanTradeOffersOf,
+  } from '$lib/season/season-trade-view';
+  import {
+    describePostseasonRejection,
+    humanEliminated,
+    humanPlaysNextGame,
+    humanSeriesOf,
+    nextGameTeamsOf,
+    nextPostseasonGameOf,
+    playInGameCardViewModel,
+    postseasonRankingsOf,
+    postseasonStageLabel,
+    riskyRehabOptionsOf,
+  } from '$lib/season/season-postseason-presentation';
+  import { ordinal } from '$lib/season/season-presentation';
+  import { parsePlayoffGameId } from '@hoop-rush/data-contracts';
+  import type { SeasonRunCommandError } from '$lib/season/season-hub-state';
+  const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
+  let mounted = $state(true);
+  $effect(() => {
     mounted = true;
     return () => {
-        mounted = false;
+      mounted = false;
     };
-});
-const run = $derived(shell.run);
-const snapshot = $derived(shell.snapshot);
-const humanFranchiseId = $derived(shell.humanFranchiseId);
-const nextBlockIndex = $derived(shell.nextBlockIndex);
-const seasonComplete = $derived(shell.seasonComplete);
-const block = $derived(shell.block);
-const stage = $derived(run?.stage ?? null);
-const stageLabel = $derived(postseasonStageLabel(stage ?? 'regular-season'));
-const inPostseason = $derived(stage === 'play-in' || stage === 'playoffs');
-const blockLabel = $derived.by(() => {
-    if (nextBlockIndex === null || seasonComplete)
-        return '';
+  });
+  const run = $derived(shell.run);
+  const snapshot = $derived(shell.snapshot);
+  const humanFranchiseId = $derived(shell.humanFranchiseId);
+  const nextBlockIndex = $derived(shell.nextBlockIndex);
+  const seasonComplete = $derived(shell.seasonComplete);
+  const block = $derived(shell.block);
+  const stage = $derived(run?.stage ?? null);
+  const stageLabel = $derived(postseasonStageLabel(stage ?? 'regular-season'));
+  const inPostseason = $derived(stage === 'play-in' || stage === 'playoffs');
+  const blockLabel = $derived.by(() => {
+    if (nextBlockIndex === null || seasonComplete) return '';
     const { fromRound, toRound } = blockRoundRange(nextBlockIndex);
     return `Block ${String(nextBlockIndex + 1)} of 9 · rounds ${String(fromRound)}–${String(toRound)}`;
-});
-const pending = $derived(shell.pending);
-const interruption = $derived(shell.interruption);
-const commandError = $derived(shell.commandError);
-const blockPaused = $derived(pending !== null || interruption !== null);
-const openWindow = $derived(run?.trade !== null && run?.trade !== undefined ? openWindowOf(run.trade) : null);
-const openFreeAgencyWindow = $derived(shell.freeAgency?.windows.find((window) => window.status === 'open') ?? null);
-const influenceVm = $derived(shell.influence !== null && humanFranchiseId !== null
-    ? influenceViewModel(shell.influence, humanFranchiseId, shell.health, openWindow)
-    : null);
-const tradeOffers = $derived.by(() => {
+  });
+  const pending = $derived(shell.pending);
+  const interruption = $derived(shell.interruption);
+  const commandError = $derived(shell.commandError);
+  const blockPaused = $derived(pending !== null || interruption !== null);
+  const openWindow = $derived(
+    run?.trade !== null && run?.trade !== undefined ? openWindowOf(run.trade) : null,
+  );
+  const openFreeAgencyWindow = $derived(
+    shell.freeAgency?.windows.find((window) => window.status === 'open') ?? null,
+  );
+  const influenceVm = $derived(
+    shell.influence !== null && humanFranchiseId !== null
+      ? influenceViewModel(shell.influence, humanFranchiseId, shell.health, openWindow)
+      : null,
+  );
+  const tradeOffers = $derived.by(() => {
     const currentRun = shell.run;
     const franchiseId = shell.humanFranchiseId;
-    if (currentRun === null || franchiseId === null)
-        return [];
+    if (currentRun === null || franchiseId === null) return [];
     void currentRun.stateRevision;
     const offers = humanTradeOffersOf(currentRun.trade, franchiseId);
-    return offers.map((offer) => tradeOfferViewModel(offer, currentRun, shell.catalog, shell.franchiseName));
-});
-const objectiveVm = $derived(run !== null ? objectiveChoicesViewModel(run) : null);
-const hasCampaign = $derived(run !== null &&
-    (run as unknown as {
-        campaign?: unknown;
-    }).campaign !== undefined);
-const campaignCommandError = $derived.by(() => {
+    return offers.map((offer) =>
+      tradeOfferViewModel(offer, currentRun, shell.catalog, shell.franchiseName),
+    );
+  });
+  const objectiveVm = $derived(run !== null ? objectiveChoicesViewModel(run) : null);
+  const hasCampaign = $derived(
+    run !== null &&
+      (
+        run as unknown as {
+          campaign?: unknown;
+        }
+      ).campaign !== undefined,
+  );
+  const campaignCommandError = $derived.by(() => {
     const e = commandError;
-    if (e === null)
-        return null;
+    if (e === null) return null;
     const campaignCommands = new Set([
-        'select-gm-identity',
-        'select-campaign-opportunity',
-        'evolve-gm-campaign',
+      'select-gm-identity',
+      'select-campaign-opportunity',
+      'evolve-gm-campaign',
     ]);
     return campaignCommands.has(e.command) ? e.message : null;
-});
-const rehabAffordances = $derived.by((): InfluenceSpendAffordance[] => {
+  });
+  const rehabAffordances = $derived.by((): InfluenceSpendAffordance[] => {
     const affordances = influenceVm?.affordances ?? [];
     const rehab = affordances.filter((affordance) => affordance.purpose === 'risky-rehab');
     const unavailable = new Set(interruption?.unavailablePlayerVersionIds ?? []);
     return unavailable.size > 0
-        ? rehab.filter((affordance) => affordance.playerVersionId !== null && unavailable.has(affordance.playerVersionId))
-        : rehab;
-});
-const nextOpponents = $derived(run !== null && humanFranchiseId !== null && nextBlockIndex !== null && !seasonComplete
-    ? humanUpcomingGamesFromGames(run.games, humanFranchiseId, nextBlockIndex).slice(0, 3)
-    : []);
-const names = $derived.by(() => {
+      ? rehab.filter(
+          (affordance) =>
+            affordance.playerVersionId !== null && unavailable.has(affordance.playerVersionId),
+        )
+      : rehab;
+  });
+  const nextOpponents = $derived(
+    run !== null && humanFranchiseId !== null && nextBlockIndex !== null && !seasonComplete
+      ? humanUpcomingGamesFromGames(run.games, humanFranchiseId, nextBlockIndex).slice(0, 3)
+      : [],
+  );
+  const names = $derived.by(() => {
     const map = new Map<string, string>();
     for (const roster of run?.rosters ?? []) {
-        for (const entry of roster.players)
-            map.set(entry.playerVersionId, entry.displayName);
+      for (const entry of roster.players) map.set(entry.playerVersionId, entry.displayName);
     }
     return map;
-});
-const selectedObjective = $derived.by(() => {
-    if (run === null || nextBlockIndex === null || nextBlockIndex >= 8)
-        return null;
+  });
+  const selectedObjective = $derived.by(() => {
+    if (run === null || nextBlockIndex === null || nextBlockIndex >= 8) return null;
     const selection = run.objectives.selections[nextBlockIndex];
-    if (selection === undefined)
-        return null;
-    const name = shell.objectives?.catalog.find((entry) => entry.objectiveId === selection.objectiveId)
+    if (selection === undefined) return null;
+    const name =
+      shell.objectives?.catalog.find((entry) => entry.objectiveId === selection.objectiveId)
         ?.name ?? selection.objectiveId;
     return { objectiveId: selection.objectiveId, name };
-});
-const staminaByVersion = $derived.by(() => {
+  });
+  const staminaByVersion = $derived.by(() => {
     const slice = shell.playerSlice;
     const map = new Map<string, number>();
     for (const entry of slice.values()) {
-        map.set(entry.playerVersionId, entry.staminaRating);
+      map.set(entry.playerVersionId, entry.staminaRating);
     }
     return map;
-});
-const preview: LockPreview | null = $derived.by(() => {
-    if (run === null ||
-        humanFranchiseId === null ||
-        shell.editor === null ||
-        nextBlockIndex === null ||
-        seasonComplete) {
-        return null;
+  });
+  const preview: LockPreview | null = $derived.by(() => {
+    if (
+      run === null ||
+      humanFranchiseId === null ||
+      shell.editor === null ||
+      nextBlockIndex === null ||
+      seasonComplete
+    ) {
+      return null;
     }
-    const baseline = run.rotations.find((rotation) => rotation.franchiseId === humanFranchiseId) ??
-        shell.editor.rotation;
-    const lastLockedDigest = snapshot !== null && snapshot.acceptedBlocks.length > 0
+    const baseline =
+      run.rotations.find((rotation) => rotation.franchiseId === humanFranchiseId) ??
+      shell.editor.rotation;
+    const lastLockedDigest =
+      snapshot !== null && snapshot.acceptedBlocks.length > 0
         ? (snapshot.acceptedBlocks[snapshot.acceptedBlocks.length - 1]?.rotationDigest ?? null)
         : null;
     const effects = snapshot?.effects ?? null;
     return buildLockPreview({
-        pendingHumanRotation: shell.editor.rotation,
-        baselineHumanRotation: baseline,
-        pendingSetDigest: pendingRotationSetDigest(run.rotations, shell.editor.rotation),
-        lastLockedDigest,
-        blockIndex: nextBlockIndex,
-        names,
-        games: run.games,
-        humanFranchiseId,
-        fatigue: effects === null ? null : { effects, staminaByVersion },
-        objective: selectedObjective,
+      pendingHumanRotation: shell.editor.rotation,
+      baselineHumanRotation: baseline,
+      pendingSetDigest: pendingRotationSetDigest(run.rotations, shell.editor.rotation),
+      lastLockedDigest,
+      blockIndex: nextBlockIndex,
+      names,
+      games: run.games,
+      humanFranchiseId,
+      fatigue: effects === null ? null : { effects, staminaByVersion },
+      objective: selectedObjective,
     });
-});
-const rotationFailures = $derived(shell.editor?.validate() ?? []);
-const canSubmit = $derived(snapshot !== null &&
-    shell.editor !== null &&
-    nextBlockIndex !== null &&
-    !seasonComplete &&
-    rotationFailures.length === 0 &&
-    blockPhaseAllowsSubmit(block.phase) &&
-    block.phase !== 'running');
-let submitting = $state(false);
-let submitError: string | null = $state(null);
-async function submitBlock() {
-    if (!canSubmit || submitting)
-        return;
+  });
+  const rotationFailures = $derived(shell.editor?.validate() ?? []);
+  const canSubmit = $derived(
+    snapshot !== null &&
+      shell.editor !== null &&
+      nextBlockIndex !== null &&
+      !seasonComplete &&
+      rotationFailures.length === 0 &&
+      blockPhaseAllowsSubmit(block.phase) &&
+      block.phase !== 'running',
+  );
+  let submitting = $state(false);
+  let submitError: string | null = $state(null);
+  async function submitBlock() {
+    if (!canSubmit || submitting) return;
     submitting = true;
     submitError = null;
     try {
-        await shell.refresh?.();
-        if (!mounted)
-            return;
-        const result = await buildSubmitBlockEnvelope(shell);
-        if (!mounted)
-            return;
-        if (!result.ok) {
-            submitError = result.error.message;
-            return;
-        }
-        shell.hub?.startBlock(result.envelope);
+      await shell.refresh?.();
+      if (!mounted) return;
+      const result = await buildSubmitBlockEnvelope(shell);
+      if (!mounted) return;
+      if (!result.ok) {
+        submitError = result.error.message;
+        return;
+      }
+      shell.hub?.startBlock(result.envelope);
+    } finally {
+      if (mounted) submitting = false;
     }
-    finally {
-        if (mounted)
-            submitting = false;
-    }
-}
-function blockRecord(blockIndex: number): {
+  }
+  function blockRecord(blockIndex: number): {
     wins: number;
     losses: number;
-} | null {
+  } | null {
     const summaries = snapshot?.summaries ?? [];
-    if (humanFranchiseId === null)
-        return null;
+    if (humanFranchiseId === null) return null;
     const { fromRound, toRound } = blockRoundRange(blockIndex);
     let wins = 0;
     let losses = 0;
     for (const summary of summaries) {
-        if (summary.round < fromRound || summary.round > toRound)
-            continue;
-        if (summary.homeFranchiseId !== humanFranchiseId &&
-            summary.awayFranchiseId !== humanFranchiseId) {
-            continue;
-        }
-        if (didWin(summary, humanFranchiseId))
-            wins += 1;
-        else
-            losses += 1;
+      if (summary.round < fromRound || summary.round > toRound) continue;
+      if (
+        summary.homeFranchiseId !== humanFranchiseId &&
+        summary.awayFranchiseId !== humanFranchiseId
+      ) {
+        continue;
+      }
+      if (didWin(summary, humanFranchiseId)) wins += 1;
+      else losses += 1;
     }
     return { wins, losses };
-}
-const recentBlocks = $derived((snapshot?.acceptedBlocks ?? [])
-    .slice(-3)
-    .reverse()
-    .map((accepted) => ({
-    accepted,
-    record: blockRecord(accepted.blockIndex),
-})));
-const postseason = $derived(run?.postseason ?? null);
-const eliminated = $derived(run !== null && humanFranchiseId !== null && humanEliminated(run, humanFranchiseId));
-const nextGame = $derived(run !== null ? nextPostseasonGameOf(run) : null);
-const humanPlaysNext = $derived(run !== null && humanFranchiseId !== null && humanPlaysNextGame(run, humanFranchiseId));
-const nextTeams = $derived.by(() => {
-    if (run === null || nextGame?.kind !== 'game')
-        return null;
+  }
+  const recentBlocks = $derived(
+    (snapshot?.acceptedBlocks ?? [])
+      .slice(-3)
+      .reverse()
+      .map((accepted) => ({
+        accepted,
+        record: blockRecord(accepted.blockIndex),
+      })),
+  );
+  const postseason = $derived(run?.postseason ?? null);
+  const eliminated = $derived(
+    run !== null && humanFranchiseId !== null && humanEliminated(run, humanFranchiseId),
+  );
+  const nextGame = $derived(run !== null ? nextPostseasonGameOf(run) : null);
+  const humanPlaysNext = $derived(
+    run !== null && humanFranchiseId !== null && humanPlaysNextGame(run, humanFranchiseId),
+  );
+  const nextTeams = $derived.by(() => {
+    if (run === null || nextGame?.kind !== 'game') return null;
     return nextGameTeamsOf(run, nextGame.gameId);
-});
-const seriesContext = $derived(run !== null && humanFranchiseId !== null ? humanSeriesOf(run, humanFranchiseId) : null);
-const playInContext = $derived.by(() => {
-    if (postseason === null || nextGame?.kind !== 'game')
-        return null;
+  });
+  const seriesContext = $derived(
+    run !== null && humanFranchiseId !== null ? humanSeriesOf(run, humanFranchiseId) : null,
+  );
+  const playInContext = $derived.by(() => {
+    if (postseason === null || nextGame?.kind !== 'game') return null;
     const match = /^pi-(east|west)-(seven-eight|nine-ten|final)$/.exec(nextGame.gameId);
-    if (match === null)
-        return null;
-    return playInGameCardViewModel(postseason, match[1] as 'east' | 'west', match[2] as 'seven-eight' | 'nine-ten' | 'final', humanFranchiseId);
-});
-const rankings = $derived(run !== null && inPostseason ? postseasonRankingsOf(run) : null);
-const humanSeed = $derived.by(() => {
-    if (run === null || humanFranchiseId === null || rankings === null)
-        return null;
-    const conference = run.league.teams.find((team) => team.franchiseId === humanFranchiseId)?.conference;
-    if (conference === undefined)
-        return null;
+    if (match === null) return null;
+    return playInGameCardViewModel(
+      postseason,
+      match[1] as 'east' | 'west',
+      match[2] as 'seven-eight' | 'nine-ten' | 'final',
+      humanFranchiseId,
+    );
+  });
+  const rankings = $derived(run !== null && inPostseason ? postseasonRankingsOf(run) : null);
+  const humanSeed = $derived.by(() => {
+    if (run === null || humanFranchiseId === null || rankings === null) return null;
+    const conference = run.league.teams.find(
+      (team) => team.franchiseId === humanFranchiseId,
+    )?.conference;
+    if (conference === undefined) return null;
     const ranked = rankings[conference].ranked;
     const position = ranked.indexOf(humanFranchiseId);
     return position === -1 ? null : position + 1;
-});
-const rehabOptions = $derived(run !== null && humanFranchiseId !== null
-    ? riskyRehabOptionsOf(run, humanFranchiseId, shell.playerName)
-    : []);
-const availabilityRows = $derived.by(() => {
-    if (run === null || humanFranchiseId === null)
-        return [];
+  });
+  const rehabOptions = $derived(
+    run !== null && humanFranchiseId !== null
+      ? riskyRehabOptionsOf(run, humanFranchiseId, shell.playerName)
+      : [],
+  );
+  const availabilityRows = $derived.by(() => {
+    if (run === null || humanFranchiseId === null) return [];
     const roster = run.rosters.find((entry) => entry.franchiseId === humanFranchiseId);
-    if (roster === undefined)
-        return [];
+    if (roster === undefined) return [];
     return availabilityStripRows(run.health, roster, undefined, names);
-});
-const postseasonBusy = $derived(shell.postseason.phase === 'running');
-let lastPostseasonAction = $state<'start' | 'advance' | 'spectate' | 'fast-forward' | 'submit' | null>(null);
-let postseasonSubmitting = $state(false);
-let selectedRehabInjuryId = $state<string | null>(null);
-const postseasonCommandError = $derived.by(() => {
+  });
+  const postseasonBusy = $derived(shell.postseason.phase === 'running');
+  let lastPostseasonAction = $state<
+    'start' | 'advance' | 'spectate' | 'fast-forward' | 'submit' | null
+  >(null);
+  let postseasonSubmitting = $state(false);
+  let selectedRehabInjuryId = $state<string | null>(null);
+  const postseasonCommandError = $derived.by(() => {
     const error = commandError;
-    if (error === null)
-        return null;
+    if (error === null) return null;
     const postseasonCommands = new Set([
-        'start-postseason',
-        'advance-postseason',
-        'submit-postseason-rotation',
-        'spectate-postseason-game',
-        'fast-forward-postseason',
+      'start-postseason',
+      'advance-postseason',
+      'submit-postseason-rotation',
+      'spectate-postseason-game',
+      'fast-forward-postseason',
     ]);
-    if (!postseasonCommands.has(error.command))
-        return null;
+    if (!postseasonCommands.has(error.command)) return null;
     if (error.rejection !== null) {
-        return describePostseasonRejection(error.command, error.rejection);
+      return describePostseasonRejection(error.command, error.rejection);
     }
     return error.message;
-});
-async function startPostseason() {
-    if (postseasonBusy || postseasonSubmitting)
-        return;
+  });
+  async function startPostseason() {
+    if (postseasonBusy || postseasonSubmitting) return;
     postseasonSubmitting = true;
     try {
-        lastPostseasonAction = 'start';
-        await shell.startPostseason();
+      lastPostseasonAction = 'start';
+      await shell.startPostseason();
+    } finally {
+      postseasonSubmitting = false;
     }
-    finally {
-        postseasonSubmitting = false;
-    }
-}
-async function advanceToDecision() {
-    if (postseasonBusy || postseasonSubmitting)
-        return;
+  }
+  async function advanceToDecision() {
+    if (postseasonBusy || postseasonSubmitting) return;
     postseasonSubmitting = true;
     try {
-        lastPostseasonAction = 'advance';
-        await shell.advancePostseason();
+      lastPostseasonAction = 'advance';
+      await shell.advancePostseason();
+    } finally {
+      postseasonSubmitting = false;
     }
-    finally {
-        postseasonSubmitting = false;
-    }
-}
-async function spectateNext() {
-    if (postseasonBusy || postseasonSubmitting || nextGame?.kind !== 'game')
-        return;
+  }
+  async function spectateNext() {
+    if (postseasonBusy || postseasonSubmitting || nextGame?.kind !== 'game') return;
     postseasonSubmitting = true;
     try {
-        lastPostseasonAction = 'spectate';
-        await shell.spectatePostseasonGame({ targetGameId: nextGame.gameId });
+      lastPostseasonAction = 'spectate';
+      await shell.spectatePostseasonGame({ targetGameId: nextGame.gameId });
+    } finally {
+      postseasonSubmitting = false;
     }
-    finally {
-        postseasonSubmitting = false;
-    }
-}
-async function fastForward() {
-    if (postseasonBusy || postseasonSubmitting)
-        return;
+  }
+  async function fastForward() {
+    if (postseasonBusy || postseasonSubmitting) return;
     postseasonSubmitting = true;
     try {
-        lastPostseasonAction = 'fast-forward';
-        await shell.fastForwardPostseason();
+      lastPostseasonAction = 'fast-forward';
+      await shell.fastForwardPostseason();
+    } finally {
+      postseasonSubmitting = false;
     }
-    finally {
-        postseasonSubmitting = false;
-    }
-}
-async function submitPostseasonRotation() {
-    if (postseasonBusy || postseasonSubmitting || nextGame?.kind !== 'game')
-        return;
-    if (shell.editor === null || humanFranchiseId === null)
-        return;
+  }
+  async function submitPostseasonRotation() {
+    if (postseasonBusy || postseasonSubmitting || nextGame?.kind !== 'game') return;
+    if (shell.editor === null || humanFranchiseId === null) return;
     postseasonSubmitting = true;
     try {
-        lastPostseasonAction = 'submit';
-        await shell.submitPostseasonRotation({
-            targetGameId: nextGame.gameId,
-            rotation: {
-                franchiseId: humanFranchiseId,
-                rotation: shell.editor.rotation,
-                ...(selectedRehabInjuryId !== null ? { riskyRehabInjuryId: selectedRehabInjuryId } : {}),
-            },
-        });
-        selectedRehabInjuryId = null;
+      lastPostseasonAction = 'submit';
+      await shell.submitPostseasonRotation({
+        targetGameId: nextGame.gameId,
+        rotation: {
+          franchiseId: humanFranchiseId,
+          rotation: shell.editor.rotation,
+          ...(selectedRehabInjuryId !== null ? { riskyRehabInjuryId: selectedRehabInjuryId } : {}),
+        },
+      });
+      selectedRehabInjuryId = null;
+    } finally {
+      postseasonSubmitting = false;
     }
-    finally {
-        postseasonSubmitting = false;
-    }
-}
-function retryPostseason() {
-    if (lastPostseasonAction === 'start')
-        void startPostseason();
-    else if (lastPostseasonAction === 'advance')
-        void advanceToDecision();
-    else if (lastPostseasonAction === 'spectate')
-        void spectateNext();
-    else if (lastPostseasonAction === 'fast-forward')
-        void fastForward();
-    else if (lastPostseasonAction === 'submit')
-        void submitPostseasonRotation();
-}
-const canSubmitPostseason = $derived(nextGame?.kind === 'game' &&
-    humanPlaysNext &&
-    shell.editor !== null &&
-    shell.editor.validate().length === 0 &&
-    !postseasonBusy &&
-    !postseasonSubmitting);
-const matchupLabel = $derived.by(() => {
-    if (playInContext !== null)
-        return `the Play-In ${playInContext.matchupLabel}`;
+  }
+  function retryPostseason() {
+    if (lastPostseasonAction === 'start') void startPostseason();
+    else if (lastPostseasonAction === 'advance') void advanceToDecision();
+    else if (lastPostseasonAction === 'spectate') void spectateNext();
+    else if (lastPostseasonAction === 'fast-forward') void fastForward();
+    else if (lastPostseasonAction === 'submit') void submitPostseasonRotation();
+  }
+  const canSubmitPostseason = $derived(
+    nextGame?.kind === 'game' &&
+      humanPlaysNext &&
+      shell.editor !== null &&
+      shell.editor.validate().length === 0 &&
+      !postseasonBusy &&
+      !postseasonSubmitting,
+  );
+  const matchupLabel = $derived.by(() => {
+    if (playInContext !== null) return `the Play-In ${playInContext.matchupLabel}`;
     if (seriesContext !== null && nextGame?.kind === 'game') {
-        const gameNumber = parsePlayoffGameId(nextGame.gameId)?.gameNumber ?? null;
-        return gameNumber === null ? 'this game' : `Game ${String(gameNumber)}`;
+      const gameNumber = parsePlayoffGameId(nextGame.gameId)?.gameNumber ?? null;
+      return gameNumber === null ? 'this game' : `Game ${String(gameNumber)}`;
     }
     return 'this game';
-});
-const nextGameLine = $derived.by(() => {
-    if (nextTeams === null || humanFranchiseId === null)
-        return '';
+  });
+  const nextGameLine = $derived.by(() => {
+    if (nextTeams === null || humanFranchiseId === null) return '';
     const humanHome = nextTeams.home === humanFranchiseId;
     const opponent = humanHome ? nextTeams.away : nextTeams.home;
     return `${humanHome ? 'vs' : 'at'} ${shell.franchiseName(opponent)} · ${humanHome ? 'home' : 'away'}`;
-});
-const championFranchiseId = $derived(run?.postseason.championFranchiseId ?? null);
-const humanWonChampionship = $derived(championFranchiseId !== null && championFranchiseId === humanFranchiseId);
+  });
+  const championFranchiseId = $derived(run?.postseason.championFranchiseId ?? null);
+  const humanWonChampionship = $derived(
+    championFranchiseId !== null && championFranchiseId === humanFranchiseId,
+  );
 </script>
 
 <svelte:head>
