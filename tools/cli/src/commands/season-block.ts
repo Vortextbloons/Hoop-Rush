@@ -3,9 +3,9 @@ import {
   humanFranchiseIdOf,
   SEASON_BLOCK_COUNT,
   SEASON_BLOCK_VERSION,
-  SEASON_COURT_INNOVATION_VERSION,
   SEASON_RUN_SCHEMA_VERSION,
   commandIdSchema,
+  normalizeEvolutionState,
   seasonCandidateCheckpointSchema,
   seasonRunSchema,
   seasonScheduleSchema,
@@ -20,6 +20,7 @@ import {
   type SeasonObjectiveId,
   type SeasonRun,
   type SeasonSchedule,
+  type SeasonSelectCourtInnovationCommand,
   type SeasonSubmitBlockCommand,
 } from '@hoop-rush/data-contracts';
 import {
@@ -31,11 +32,14 @@ import {
   deriveSeasonPostBlockState,
   evolutionSelectionGate,
   expandSeasonRunRosters,
+  handleSeasonRunCommand,
   handleSubmitSeasonBlockCommand,
   rosterPlayerIdsOf,
   seasonCheckpointDigest,
   seasonNextBlockIndex,
   seasonRotationSetDigest,
+  selectAiCourtInnovation,
+  srsRuleScorerFor,
   type SeasonBlockSimulationInput,
 } from '@hoop-rush/engine';
 import type { SeasonEffectsState, SeasonStaminaInput } from '@hoop-rush/data-contracts';
@@ -264,27 +268,54 @@ export function ensureEvolutionSelection(state: SeasonBlockRunnerState, blockInd
   });
   if (gate === null) return;
   const humanFid = state.humanFranchiseId;
-  const current = (
-    state.run as unknown as {
-      evolution?: {
-        selections?: Record<string, unknown>;
-      } | null;
-    }
-  ).evolution;
-  const selections = { ...(current?.selections ?? {}) };
-  if (selections[humanFid] !== undefined) return;
-  selections[humanFid] = {
+  const evolution = normalizeEvolutionState(
+    (state.run as unknown as { evolution?: unknown }).evolution,
+  );
+  if ((evolution.selections as unknown as Record<string, unknown>)[humanFid] !== undefined) return;
+  const aiOrder = new Map<string, number>(
+    state.run.aiAssignments.map((assignment, index) => [assignment.franchiseId, index] as const),
+  );
+  const resolved = selectAiCourtInnovation({
+    rootSeed: state.run.rootSeed,
     franchiseId: humanFid,
-    innovationId: 'deep-four',
-    version: SEASON_COURT_INNOVATION_VERSION,
-    selectedByCommandId: `evo-auto-${String(blockIndex)}`,
-    aiSelected: false,
-    inputDigest: null,
+    scorer: srsRuleScorerFor(
+      {
+        summaries: state.summaries,
+        rotations: state.run.rotations,
+        schedule: state.schedule,
+        completedRounds: state.run.cursor.completedRounds,
+        aiOrderIndexOf: (franchiseId: string) => aiOrder.get(franchiseId) ?? 0,
+      },
+      humanFid,
+    ),
+    aiOrderIndex: aiOrder.get(humanFid) ?? 0,
+  });
+  const command: SeasonSelectCourtInnovationCommand = {
+    schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+    command: 'select-court-innovation',
+    commandId: commandIdSchema.parse(
+      `court-innovation-${String(blockIndex)}-${String(state.acceptedCommandIds.length)}`,
+    ),
+    runId: state.run.runId,
+    expectedStateRevision: state.stateRevision,
+    expectedStateDigest: state.stateDigest,
+    innovationId: resolved.innovationId,
   };
-  state.run = {
-    ...state.run,
-    evolution: { ...(current ?? {}), selections },
-  } as SeasonRun;
+  const output = handleSeasonRunCommand(command, {
+    run: state.run,
+    pending: null,
+    humanFranchiseId: state.humanFranchiseId,
+  });
+  const result = output.result;
+  if (result.command !== 'select-court-innovation' || result.result.status !== 'accepted') {
+    throw new Error(
+      `court innovation selection for block ${String(blockIndex)} was rejected: ${JSON.stringify(result)}`,
+    );
+  }
+  state.run = output.run;
+  state.acceptedCommandIds = [...state.acceptedCommandIds, command.commandId];
+  state.stateRevision = output.run.stateRevision;
+  state.stateDigest = output.run.stateDigest;
 }
 export function runBlockThroughHandler(
   state: SeasonBlockRunnerState,

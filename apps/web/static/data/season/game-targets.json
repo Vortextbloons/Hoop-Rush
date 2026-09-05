@@ -3,33 +3,33 @@
   "targetsVersion": "season-game-targets-v4",
   "gameVersion": "season-game-v4",
   "plannerVersion": "rotation-planner-v1",
-  "rotationVersion": "season-rotation-v2",
+  "rotationVersion": "season-rotation-v3",
   "calibration": {
     "calibrationSeedCount": 1024,
     "validationSeedCount": 256,
-    "generatedAtIso": "2026-08-06T23:48:44.853Z"
+    "generatedAtIso": "2026-09-05T19:59:31.895Z"
   },
   "fixtures": [
     {
       "fixtureId": "season-game-balanced",
       "preset": "balanced",
       "sample": 1024,
-      "starterSecondsMedian": 2227,
-      "benchSecondsMedian": 655,
+      "starterSecondsMedian": 2237,
+      "benchSecondsMedian": 646,
       "benchRoleMedianSeconds": [
-        724,
-        690,
-        663,
-        649,
-        616
+        686,
+        669,
+        650,
+        640,
+        617
       ],
       "aggregateEnvelopes": {
         "points": [
-          80,
-          130
+          77,
+          126
         ],
         "possessions": [
-          85,
+          83,
           97
         ]
       }
@@ -37,24 +37,24 @@
     {
       "fixtureId": "season-game-tight",
       "preset": "tight",
-      "sample": 1024,
-      "starterSecondsMedian": 2455,
-      "benchSecondsMedian": 431,
+      "sample": 1023,
+      "starterSecondsMedian": 2463,
+      "benchSecondsMedian": 420,
       "benchRoleMedianSeconds": [
-        528,
-        502,
-        457,
-        411,
-        379
+        493,
+        464,
+        440,
+        406,
+        378
       ],
       "aggregateEnvelopes": {
         "points": [
-          79,
-          130
+          76,
+          126
         ],
         "possessions": [
-          85,
-          98
+          83,
+          97
         ]
       }
     },
@@ -62,23 +62,23 @@
       "fixtureId": "season-game-bench-heavy",
       "preset": "bench-heavy",
       "sample": 1024,
-      "starterSecondsMedian": 1980,
-      "benchSecondsMedian": 900,
+      "starterSecondsMedian": 1999,
+      "benchSecondsMedian": 884,
       "benchRoleMedianSeconds": [
-        934,
-        915,
-        900,
-        891,
-        889
+        897,
+        892,
+        882,
+        873,
+        873
       ],
       "aggregateEnvelopes": {
         "points": [
-          80,
-          130
+          75,
+          125
         ],
         "possessions": [
-          85,
-          98
+          83,
+          96
         ]
       }
     }
@@ -88,7 +88,7 @@
     "starterOrdering": true,
     "benchOrdering": true,
     "benchRoleNonIncreasing": true,
-    "heldOutPassShare": 0.9752604166666666,
+    "heldOutPassShare": 0.9801432291666666,
     "heldOutPass": true
   }
 }

@@ -97,8 +97,7 @@ function humanGamesInBlock(
     }
   }
   gameIds.sort();
-  const sortedOpponents = [...opponents].sort();
-  void sortedOpponents;
+  opponents.sort();
   return { gameIds, opponents, count: gameIds.length };
 }
 

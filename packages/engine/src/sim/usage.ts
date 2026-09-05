@@ -39,23 +39,38 @@ export interface ShotSelection {
   initiator: SimulationPlayer;
   passed: boolean;
 }
+export function lineupMeanUsage(team: SimulationTeam): number {
+  if (team.players.length === 0) return 10;
+  const total = team.players.reduce(
+    (sum, p) => sum + Math.max(0.5, p.tendencies.usageRate),
+    0,
+  );
+  return total / team.players.length;
+}
+export function relativeUsage(player: SimulationPlayer, team: SimulationTeam): number {
+  return Math.max(0.5, player.tendencies.usageRate) / Math.max(1e-9, lineupMeanUsage(team));
+}
+export function initiatorRole(player: SimulationPlayer, team: SimulationTeam): number {
+  const curved = Math.pow(
+    Math.max(1e-9, relativeUsage(player, team)),
+    ENGINE_CONSTANTS.initiatorRoleExponent,
+  );
+  return Math.min(ENGINE_CONSTANTS.initiatorRoleMax, Math.max(ENGINE_CONSTANTS.initiatorRoleMin, curved));
+}
+export function finisherRole(player: SimulationPlayer, team: SimulationTeam): number {
+  const curved = Math.pow(
+    Math.max(1e-9, relativeUsage(player, team)),
+    ENGINE_CONSTANTS.finisherRoleExponent,
+  );
+  return Math.min(ENGINE_CONSTANTS.finisherRoleMax, Math.max(ENGINE_CONSTANTS.finisherRoleMin, curved));
+}
 export function initiatorWeight(
   player: SimulationPlayer,
   team: SimulationTeam,
   modifiers: PositionResponsibilityModifiers,
 ): number {
-  const usage = Math.max(0.5, player.tendencies.usageRate);
-  const usagePower = Math.pow(usage / 10, ENGINE_CONSTANTS.usageExponent);
-  const creationMod = 0.65 + 0.7 * creationScore(player);
-  return usagePower * creationMod * creationBurden(player, team) * modifiers.initiation;
-}
-export function creationBurden(player: SimulationPlayer, team: SimulationTeam): number {
-  if (player.tendencies.usageRate < 25) return 1;
-  const teammates = team.players.filter((p) => p.playerId !== player.playerId);
-  if (teammates.length === 0) return 1;
-  const theirCreation = teammates.reduce((sum, p) => sum + creationScore(p), 0) / teammates.length;
-  const shortfall = Math.min(1, Math.max(0, (0.6 - theirCreation) / 0.3));
-  return 1 + Math.min(0.35, 0.1 + 0.18 * shortfall);
+  const creationMod = 0.7 + 0.6 * creationScore(player);
+  return initiatorRole(player, team) * creationMod * modifiers.initiation;
 }
 export function teamInitiatorWeights(
   team: SimulationTeam,
@@ -75,9 +90,6 @@ export const identityModifiers: PositionResponsibilityModifiers = {
 };
 export function spacingWeight(player: SimulationPlayer): number {
   return 0.55 + 0.9 * spacingScore(player);
-}
-export function usagePull(player: SimulationPlayer): number {
-  return 0.65 + 0.35 * Math.min(1, player.tendencies.usageRate / 36);
 }
 export function actionWeights(
   initiator: SimulationPlayer,
@@ -169,8 +181,9 @@ export function teammateShotWeights(
     action === 'pickAndRollRoll'
       ? Math.max(0.5, p.tendencies.pickAndRollRollManRate) *
         (0.6 + 0.8 * interiorScoringScore(p)) *
-        (positionModifiers.get(p.playerId)?.rollMan ?? 1)
-      : Math.max(0.3, p.tendencies.shotRate * spacingWeight(p) * usagePull(p)),
+        (positionModifiers.get(p.playerId)?.rollMan ?? 1) *
+        finisherRole(p, team)
+      : Math.max(0.3, p.tendencies.shotRate * spacingWeight(p) * finisherRole(p, team)),
   );
   return { teammates, weights };
 }

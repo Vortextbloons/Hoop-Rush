@@ -5,7 +5,7 @@ import type {
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
 import { ENGINE_CONSTANTS } from './constants.ts';
-import { isThreePointZone } from './usage.ts';
+import { finisherRole, isThreePointZone } from './usage.ts';
 export function shootingFoulProbability(
   shooter: SimulationPlayer,
   defender: SimulationPlayer,
@@ -44,7 +44,10 @@ export function foulerWeights(defense: SimulationTeam): number[] {
 }
 export function freeThrowShooterWeights(team: SimulationTeam): number[] {
   return team.players.map(
-    (p) => Math.max(0.5, p.tendencies.freeThrowRate) * (0.6 + 0.8 * (p.ratings.freeThrow / 100)),
+    (p) =>
+      Math.max(0.5, p.tendencies.freeThrowRate) *
+      (0.6 + 0.8 * (p.ratings.freeThrow / 100)) *
+      finisherRole(p, team),
   );
 }
 export function freeThrowsForZone(zone: ShotZone): number {

@@ -3,7 +3,7 @@ import type { PositionResponsibilityModifiers } from './position-responsibilitie
 import type { ActionType } from './usage.ts';
 // m3-engine-v16: trade board profiles (season-trade-v5) in openSeasonTradeWindow;
 // SRS AI court-innovation selection from recorded summaries (srsRuleScorerFor).
-export const ENGINE_VERSION = 'm3-engine-v16';
+export const ENGINE_VERSION = 'm3-engine-v17';
 export const ENGINE_CONSTANTS = {
   version: ENGINE_VERSION,
   zoneBaseMake: {
@@ -78,7 +78,13 @@ export const ENGINE_CONSTANTS = {
   threePointLowVolumeCap: 0.08,
   threePointLowVolumeEraPull: 0.05,
   threePointEraPull: 0.3,
-  usageExponent: 1.45,
+  usageExponent: 1.6,
+  initiatorRoleExponent: 1.6,
+  finisherRoleExponent: 1.25,
+  initiatorRoleMin: 0.65,
+  initiatorRoleMax: 1.55,
+  finisherRoleMin: 0.7,
+  finisherRoleMax: 1.35,
   twoPointAnchorMin: 0.82,
   twoPointAnchorMax: 1.18,
   twoPointAnchorSkillScale: 0.3,
