@@ -12,6 +12,7 @@ import {
   type SeasonScheduleGame,
   type SeasonTeamBox,
 } from '@hoop-rush/data-contracts';
+import { FIRST_TO_SEVEN_TARGET } from '../sim/evolution-rules.ts';
 function fourPointerLineOf(holder: object): {
   fourPointersMade?: number;
   fourPointersAttempted?: number;
@@ -205,7 +206,7 @@ export function seasonGameSummaryFromResult(
     ...(result.overtimeRace !== undefined
       ? {
           overtimeRace: {
-            target: 7 as const,
+            target: FIRST_TO_SEVEN_TARGET,
             homePoints: result.overtimeRace.homePoints,
             awayPoints: result.overtimeRace.awayPoints,
           },

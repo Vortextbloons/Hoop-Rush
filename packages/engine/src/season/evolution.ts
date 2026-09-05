@@ -8,9 +8,7 @@ import {
   type SeasonCourtInnovationId,
   type SeasonEvolutionState,
   type SeasonFrontOfficeId,
-  type SeasonGameRule,
   type SeasonSponsorWrapper,
-  type EraSimulationProfile,
   type SeasonEvolutionSelection,
   type SeasonGameSummary,
   type SeasonRotation,
@@ -153,9 +151,16 @@ export function createEvolutionDiscovery(input: { rootSeed: string; acceptedBloc
   seed: string;
 } | null {
   if (input.acceptedBlockIndex !== 2) return null;
+  const offered = SEASON_COURT_INNOVATION_CATALOG.map((entry) => entry.id);
+  if (offered.length !== 3) return null;
+  const [first, second, third] = offered as [
+    SeasonCourtInnovationId,
+    SeasonCourtInnovationId,
+    SeasonCourtInnovationId,
+  ];
   return {
     blockIndex: 2,
-    offeredInnovationIds: ['deep-four', 'twenty-second-clock', 'first-to-seven-overtime'],
+    offeredInnovationIds: [first, second, third],
     version: SEASON_COURT_INNOVATION_VERSION,
     seed: seasonNamespaceSeed(input.rootSeed, 'evolution', 'discovery', 'block-2'),
   };
@@ -171,21 +176,7 @@ export function evolutionGateAllowsBlock(
   return humanSelected;
 }
 
-export function resolveHomeGameRule(
-  evolution: SeasonEvolutionState | null | undefined,
-  homeFranchiseId: string,
-): SeasonGameRule {
-  if (!evolution) return 'standard';
-  const sel = (
-    evolution.selections as unknown as Record<
-      string,
-      { innovationId: SeasonCourtInnovationId } | undefined
-    >
-  )[homeFranchiseId];
-  if (!sel) return 'standard';
-  const entry = SEASON_COURT_INNOVATION_CATALOG.find((item) => item.id === sel.innovationId);
-  return entry?.rule ?? 'standard';
-}
+export { resolveHomeGameRule } from '@hoop-rush/data-contracts';
 
 export interface AiInnovationScorer {
   (innovationId: SeasonCourtInnovationId): number;
@@ -201,11 +192,9 @@ export function selectAiCourtInnovation(input: {
   candidateScores: { innovationId: SeasonCourtInnovationId; score: number }[];
   inputDigest: string;
 } {
-  const ids: readonly SeasonCourtInnovationId[] = [
-    'deep-four',
-    'twenty-second-clock',
-    'first-to-seven-overtime',
-  ];
+  const ids: readonly SeasonCourtInnovationId[] = SEASON_COURT_INNOVATION_CATALOG.map(
+    (entry) => entry.id,
+  );
   const candidateScores = ids.map((id) => ({ innovationId: id, score: input.scorer(id) }));
   const digestInput = `${input.franchiseId}|${candidateScores.map((c) => `${c.innovationId}:${String(c.score)}`).join(',')}|${String(input.aiOrderIndex)}`;
   const inputDigest = seasonDigestHex(digestInput);
@@ -408,7 +397,10 @@ function srsScorerForContext(ctx: SrsContext, franchiseId: string): AiInnovation
   const z = (value: number, center: number, spread: number): number => (value - center) / spread;
   const overtimeMeanWin = overtimeMeanWinProbability();
   const memo = new Map<string, number>();
-  const scoreAgainst = (innovationId: SeasonCourtInnovationId, opponentId: string | null): number => {
+  const scoreAgainst = (
+    innovationId: SeasonCourtInnovationId,
+    opponentId: string | null,
+  ): number => {
     const key = `${innovationId}|${opponentId ?? ''}`;
     const cached = memo.get(key);
     if (cached !== undefined) return cached;
@@ -460,8 +452,7 @@ export function resolveAiCourtInnovations(input: {
   for (const franchiseId of input.aiFranchiseIds) {
     if (franchiseId === input.humanFranchiseId) continue;
     if (selections[franchiseId] !== undefined) continue;
-    const scorer =
-      shared === null ? () => 0 : srsScorerForContext(shared, franchiseId);
+    const scorer = shared === null ? () => 0 : srsScorerForContext(shared, franchiseId);
     const orderIndex = input.data?.aiOrderIndexOf(franchiseId) ?? 0;
     const resolved = selectAiCourtInnovation({
       rootSeed: input.rootSeed,

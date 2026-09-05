@@ -310,6 +310,12 @@ export {
   baseInquiryAllowanceOf,
 } from './season/evolution.ts';
 export { campaignBonusOf } from './season/evolution.ts';
+export {
+  FIRST_TO_SEVEN_TARGET,
+  FIRST_TO_SEVEN_SAFETY_POSSESSIONS,
+  DEEP_FOUR_SPLIT,
+  DEEP_FOUR_MAKE_SCALE,
+} from './sim/evolution-rules.ts';
 export { wrapSponsorshipsForBlock, createEvolutionDiscovery } from './season/evolution.ts';
 export { selectAiCourtInnovation, resolveHomeGameRule } from './season/evolution.ts';
 export {

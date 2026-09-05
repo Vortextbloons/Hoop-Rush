@@ -34,7 +34,6 @@ import {
   type SeasonAcceptedBlock,
   type SeasonActiveRunIndex,
   type SeasonCampaignState,
-  type SeasonEvolutionState,
   type SeasonCommandLog,
   type SeasonGameSummary,
   type SeasonInvalidRosterInterruption,
@@ -344,7 +343,10 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
           trade: stored.trade,
           objectives: stored.objectives,
           campaign: stored.campaign ?? null,
-          evolution: stored.run.evolution,
+          evolution: normalizeEvolutionState(
+            (stored as { evolution?: unknown }).evolution ??
+              (stored.run as { evolution?: unknown }).evolution,
+          ),
           rosters: stored.run.rosters,
           ownership: stored.run.ownership,
           rotations: stored.run.rotations,
@@ -363,6 +365,10 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
           lastRotationDigest: lockedDigest,
           checkpointState,
           stateDigest,
+          evolution: normalizeEvolutionState(
+            (stored as { evolution?: unknown }).evolution ??
+              (stored.run as { evolution?: unknown }).evolution,
+          ),
           updatedAtIso,
         });
         const repairedBlock = storedSeasonAcceptedBlockRowSchema.parse({
@@ -425,7 +431,10 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
           trade: stored.trade,
           objectives: stored.objectives,
           campaign: stored.campaign ?? null,
-          evolution: stored.run.evolution,
+          evolution: normalizeEvolutionState(
+            (stored as { evolution?: unknown }).evolution ??
+              (stored.run as { evolution?: unknown }).evolution,
+          ),
           rosters: stored.run.rosters,
           ownership: stored.run.ownership,
           rotations: stored.run.rotations,
@@ -610,7 +619,9 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
         ).campaign ??
         buildEmptyCampaignState(),
       checkpointState: stored.checkpointState,
-      evolution: stored.evolution ?? (stored.run as { evolution?: unknown }).evolution,
+      evolution: normalizeEvolutionState(
+        stored.evolution ?? (stored.run as { evolution?: unknown }).evolution,
+      ),
       stateRevision: stored.stateRevision,
       stateDigest: stored.stateDigest,
     });
@@ -833,8 +844,8 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
           checkpointState: input.checkpointState,
           evolution:
             input.evolution !== undefined
-              ? input.evolution
-              : (existingEvolution as SeasonEvolutionState | undefined),
+              ? normalizeEvolutionState(input.evolution)
+              : normalizeEvolutionState(existingEvolution),
           stateRevision: input.stateRevision,
           stateDigest: input.stateDigest,
         };
@@ -1179,17 +1190,21 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
       const parsedDraftExecutive = seasonFrontOfficeIdSchema.safeParse(
         draftFrontOffice.executiveId,
       );
-      if (parsedDraftExecutive.success) {
-        evolution = {
-          ...baseEvolution,
-          frontOffice: {
-            executiveId: parsedDraftExecutive.data,
-            version: SEASON_FRONT_OFFICE_VERSION,
-            selectedByCommandId: commandIdSchema.parse(draftFrontOffice.selectedByCommandId),
-            selectedAtStateRevision: 0,
-          },
-        };
+      const parsedCommandId = commandIdSchema.safeParse(draftFrontOffice.selectedByCommandId);
+      if (!parsedDraftExecutive.success || !parsedCommandId.success) {
+        throw new Error(
+          'promoteSeasonDraftToRun: draft frontOffice is malformed and cannot be promoted',
+        );
       }
+      evolution = {
+        ...baseEvolution,
+        frontOffice: {
+          executiveId: parsedDraftExecutive.data,
+          version: SEASON_FRONT_OFFICE_VERSION,
+          selectedByCommandId: parsedCommandId.data,
+          selectedAtStateRevision: 0,
+        },
+      };
     }
     const stateDigest = this.seam.seasonRunStateDigest({
       stateRevision: 0,

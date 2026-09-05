@@ -167,6 +167,13 @@ import {
 } from './trades.ts';
 import { generateSeasonCampaignOffers, normalizeCampaignState } from './campaign.ts';
 import { normalizeEvolutionState } from '@hoop-rush/data-contracts';
+import {
+  SEASON_COURT_INNOVATION_CATALOG,
+  SEASON_COURT_INNOVATION_VERSION,
+  SEASON_FRONT_OFFICE_CATALOG,
+  SEASON_FRONT_OFFICE_VERSION,
+  type SeasonEvolutionState,
+} from '@hoop-rush/data-contracts';
 import { generateSeasonSchedule } from './schedule.ts';
 import { evaluateTradeProposal, openTradeInquiry } from './trade-board.ts';
 import { rehabPriceOf, purchasedInquiryCostOf, baseInquiryAllowanceOf } from './evolution.ts';
@@ -1674,11 +1681,7 @@ function handleSelectFrontOffice(
       pending: null,
     };
   }
-  if (
-    !(['morgan-vale', 'alex-chen', 'jordan-ellis'] as readonly string[]).includes(
-      command.executiveId,
-    )
-  ) {
+  if (!SEASON_FRONT_OFFICE_CATALOG.some((entry) => entry.id === command.executiveId)) {
     return {
       result: {
         command: 'select-front-office',
@@ -1695,11 +1698,11 @@ function handleSelectFrontOffice(
       pending: null,
     };
   }
-  const nextEvo = {
+  const nextEvo: SeasonEvolutionState = {
     ...evo,
     frontOffice: {
       executiveId: command.executiveId,
-      version: 'season-front-office-v1' as const,
+      version: SEASON_FRONT_OFFICE_VERSION,
       selectedByCommandId: command.commandId,
       selectedAtStateRevision: run.stateRevision + 1,
     },
@@ -1761,11 +1764,7 @@ function handleSelectCourtInnovation(
       pending: null,
     };
   }
-  if (
-    !(
-      ['deep-four', 'twenty-second-clock', 'first-to-seven-overtime'] as readonly string[]
-    ).includes(command.innovationId)
-  ) {
+  if (!SEASON_COURT_INNOVATION_CATALOG.some((entry) => entry.id === command.innovationId)) {
     return {
       result: {
         command: 'select-court-innovation',
@@ -1784,14 +1783,14 @@ function handleSelectCourtInnovation(
   }
   const targetFid =
     humanFid ?? Object.keys(evo.selections)[0] ?? run.league.teams[0]?.franchiseId ?? 'unknown';
-  const nextEvo = {
+  const nextEvo: SeasonEvolutionState = {
     ...evo,
     selections: {
       ...evo.selections,
       [targetFid]: {
         franchiseId: targetFid as never,
         innovationId: command.innovationId,
-        version: 'season-court-innovation-v1' as const,
+        version: SEASON_COURT_INNOVATION_VERSION,
         selectedByCommandId: command.commandId,
         aiSelected: false,
         inputDigest: null,

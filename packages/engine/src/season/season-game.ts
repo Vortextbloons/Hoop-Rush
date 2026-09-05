@@ -44,7 +44,10 @@ import {
   type PlannerRotationContext,
 } from './rotation-planner.ts';
 import { seasonHomeCourtMechanisms } from './home-court.ts';
-import { FIRST_TO_SEVEN_SAFETY_POSSESSIONS } from '../sim/evolution-rules.ts';
+import {
+  FIRST_TO_SEVEN_SAFETY_POSSESSIONS,
+  FIRST_TO_SEVEN_TARGET,
+} from '../sim/evolution-rules.ts';
 import { FirstToSevenOvertimeExhaustedError } from '../sim/evolution-rules.ts';
 import { createRng } from '../sim/rng.ts';
 import { seasonNamespaceSeed, SEASON_COURT_INNOVATION_VERSION } from '@hoop-rush/data-contracts';
@@ -269,8 +272,6 @@ class SeasonGameController {
     this.input = input;
     this.gameRule = input.gameRule ?? 'standard';
     this.context = context;
-    this.input = input;
-    this.gameRule = input.gameRule ?? 'standard';
     this.profile = input.profile;
     this.rng = context.rngFactory(input.seed);
     this.recorder = new GameRecorder([10, 10]);
@@ -428,7 +429,12 @@ class SeasonGameController {
   }
   private static readonly OVERTIME_RACE_CLOCK = 1000000;
   private runOvertimeRace(): SeasonGameSimulationResult {
-    const race = { home: 0, away: 0, target: 7, decided: null as 'home' | 'away' | null };
+    const race = {
+      home: 0,
+      away: 0,
+      target: FIRST_TO_SEVEN_TARGET,
+      decided: null as 'home' | 'away' | null,
+    };
     this.tripContext.race = race;
     this.period = 5;
     this.state.periodIndex = 4;
@@ -448,7 +454,12 @@ class SeasonGameController {
     };
     for (;;) {
       if (this.otPossessions > FIRST_TO_SEVEN_SAFETY_POSSESSIONS) {
-        throw new FirstToSevenOvertimeExhaustedError(this.otPossessions, race.home, race.away);
+        throw new FirstToSevenOvertimeExhaustedError(
+          this.otPossessions,
+          race.home,
+          race.away,
+          `seed ${this.input.seed} game ${String(this.input.gameNumber)}`,
+        );
       }
       this.state.secondsRemaining = SeasonGameController.OVERTIME_RACE_CLOCK;
       const trip = this.driveOneOvertimeTrip();
@@ -1149,7 +1160,7 @@ class SeasonGameController {
       ...(race
         ? {
             overtimeRace: {
-              target: 7 as const,
+              target: FIRST_TO_SEVEN_TARGET,
               homePoints: race.home,
               awayPoints: race.away,
               possessions: this.otPossessions,

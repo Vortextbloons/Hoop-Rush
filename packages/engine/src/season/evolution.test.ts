@@ -745,7 +745,10 @@ describe('block commit evolution', () => {
   });
   it('builds an SRS data source from prior and candidate summaries', () => {
     const { run } = buildEconomyTestRun({ seed: seedFromString('evo-commit-3') });
-    const schedule = generateSeasonSchedule({ league: run.league, seed: run.schedule.generationSeed });
+    const schedule = generateSeasonSchedule({
+      league: run.league,
+      seed: run.schedule.generationSeed,
+    });
     const prior = [{ gameId: 's000001' }] as never;
     const current = [{ gameId: 's000002' }] as never;
     const candidate = { completedRounds: 30, gameSummaries: current, retainedDetails: [] } as never;
@@ -885,7 +888,12 @@ describe('srs AI selection', () => {
     const points = splitTotal(totals.points, versionIds.length);
     const freeThrows = splitTotal(totals.freeThrows, versionIds.length);
     const lines = versionIds.map((playerVersionId, index) => {
-      const made = (threes[index] ?? 0) + Math.ceil(Math.max(0, (points[index] ?? 0) - (threes[index] ?? 0) * 3 - (freeThrows[index] ?? 0)) / 2);
+      const made =
+        (threes[index] ?? 0) +
+        Math.ceil(
+          Math.max(0, (points[index] ?? 0) - (threes[index] ?? 0) * 3 - (freeThrows[index] ?? 0)) /
+            2,
+        );
       return {
         playerVersionId,
         seconds: 600,
@@ -998,8 +1006,13 @@ describe('srs AI selection', () => {
         away: styles[away] ?? { possessions: 98, threes: 8, points: 105, freeThrows: 17 },
       }),
     );
-    const schedule = generateSeasonSchedule({ league: run.league, seed: run.schedule.generationSeed });
-    const order = new Map(run.aiAssignments.map((assignment, index) => [assignment.franchiseId, index] as const));
+    const schedule = generateSeasonSchedule({
+      league: run.league,
+      seed: run.schedule.generationSeed,
+    });
+    const order = new Map(
+      run.aiAssignments.map((assignment, index) => [assignment.franchiseId, index] as const),
+    );
     const data: AiSelectionDataSource = {
       summaries,
       rotations: run.rotations,
@@ -1016,7 +1029,11 @@ describe('srs AI selection', () => {
     const grindersScorer = srsRuleScorerFor(data, grinders);
     const sprintersScorer = srsRuleScorerFor(data, sprinters);
     for (const scorer of [bombersScorer, grindersScorer, sprintersScorer]) {
-      for (const innovation of ['deep-four', 'twenty-second-clock', 'first-to-seven-overtime'] as const) {
+      for (const innovation of [
+        'deep-four',
+        'twenty-second-clock',
+        'first-to-seven-overtime',
+      ] as const) {
         const score = scorer(innovation);
         expect(score).toBeGreaterThanOrEqual(0);
         expect(score).toBeLessThanOrEqual(1);

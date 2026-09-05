@@ -1442,7 +1442,7 @@ export function buildEvolutionDataSource(input: {
     run.aiAssignments.map((assignment, index) => [assignment.franchiseId, index] as const),
   );
   return {
-    summaries: [...(input.priorSummaries ?? []), ...(input.candidate.gameSummaries ?? [])],
+    summaries: [...(input.priorSummaries ?? []), ...input.candidate.gameSummaries],
     rotations: run.rotations,
     schedule: input.schedule,
     completedRounds: input.candidate.completedRounds,

@@ -1165,7 +1165,7 @@ export function generateTradeBoardProfiles(input: TradeBoardProfilesInput): {
     return {
       playerVersionId,
       trend,
-      basis: `Recorded availability and rotation role hold ${playerVersionId} ${trend} this window.`,
+      basis: `Board estimate holds ${playerVersionId} ${trend} this window.`,
     };
   });
   return { boardProfiles, canonicalTeamOrder, valueTrends };

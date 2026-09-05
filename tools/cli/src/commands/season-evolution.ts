@@ -3,13 +3,16 @@ import { z } from 'zod';
 import {
   SEASON_COURT_INNOVATION_VERSION,
   SEASON_EVOLUTION_TARGETS_VERSION,
+  SEASON_FRONT_OFFICE_CATALOG,
   SEASON_FRONT_OFFICE_VERSION,
+  canonicalJson,
   seasonGameSimulationInputSchema,
   seedSchema,
   type SeasonGameRule,
   type SeasonGameSimulationInput,
 } from '@hoop-rush/data-contracts';
 import {
+  FIRST_TO_SEVEN_TARGET,
   baseInquiryAllowanceOf,
   campaignBonusOf,
   checkSeasonGameResult,
@@ -94,7 +97,6 @@ export const seasonEvolutionTargetsSchema = z.object({
 export type SeasonEvolutionTargets = z.infer<typeof seasonEvolutionTargetsSchema>;
 
 const RULES: readonly SeasonGameRule[] = ['standard', 'deep-four', 'twenty-second-clock'];
-const FRONT_OFFICE_IDS = ['morgan-vale', 'alex-chen', 'jordan-ellis'] as const;
 
 interface RuleFacts {
   games: number;
@@ -162,7 +164,7 @@ function simulateCohort(
           accountingViolations += failures.length;
         }
         const replay = simulateSeasonGame(input, context);
-        if (JSON.stringify(replay) !== JSON.stringify(result)) determinismFailures += 1;
+        if (canonicalJson(replay) !== canonicalJson(result)) determinismFailures += 1;
       }
     }
   }
@@ -173,7 +175,13 @@ function simulateCohort(
       seed: seedSchema.parse(raceSeed),
       gameRule: 'first-to-seven-overtime',
     });
-    const result = simulateSeasonGame(input, context);
+    let result: ReturnType<typeof simulateSeasonGame>;
+    try {
+      result = simulateSeasonGame(input, context);
+    } catch {
+      raceAuditFailures += 1;
+      continue;
+    }
     if (result.outcome !== 'completed' || result.overtimeRace === undefined) {
       raceAuditFailures += 1;
       continue;
@@ -181,10 +189,10 @@ function simulateCohort(
     racesCompleted += 1;
     const winnerPoints =
       result.winner === 'home' ? result.overtimeRace.homePoints : result.overtimeRace.awayPoints;
-    if (winnerPoints > 7) raceOvershootGames += 1;
+    if (winnerPoints > FIRST_TO_SEVEN_TARGET) raceOvershootGames += 1;
     if (checkSeasonGameResult(result, input).length > 0) raceAuditFailures += 1;
     const replay = simulateSeasonGame(input, context);
-    if (JSON.stringify(replay) !== JSON.stringify(result)) determinismFailures += 1;
+    if (canonicalJson(replay) !== canonicalJson(result)) determinismFailures += 1;
   }
   return {
     perRule,
@@ -272,22 +280,32 @@ function checkAiSelection(): { selections: number; determinismFailures: number }
   });
   return {
     selections: Object.keys(first.selections).length,
-    determinismFailures: JSON.stringify(first) === JSON.stringify(second) ? 0 : 1,
+    determinismFailures: canonicalJson(first) === canonicalJson(second) ? 0 : 1,
   };
 }
 
 function checkFrontOfficePolicy(): string[] {
   const failures: string[] = [];
   if (rehabPriceOf(null) !== 2) failures.push('base rehab price must be 2');
-  if (rehabPriceOf('morgan-vale') !== 3) failures.push('deal-maker rehab price must be 3');
-  if (rehabPriceOf('alex-chen') !== 1) failures.push('recovery-director rehab price must be 1');
-  if (rehabPriceOf('jordan-ellis') !== 3) failures.push('campaign-director rehab price must be 3');
-  if (baseInquiryAllowanceOf('morgan-vale') !== 4) failures.push('deal-maker allowance must be 4');
-  if (purchasedInquiryCostOf('alex-chen') !== 2)
-    failures.push('recovery-director purchase cost must be 2');
-  if (campaignBonusOf('jordan-ellis') !== 1) failures.push('campaign-director bonus must be 1');
-  for (const id of FRONT_OFFICE_IDS) {
-    if (baseInquiryAllowanceOf(id) > 5) failures.push(`${id} allowance exceeds the cap`);
+  if (baseInquiryAllowanceOf(null) !== 3) failures.push('base inquiry allowance must be 3');
+  if (purchasedInquiryCostOf(null) !== 1) failures.push('base purchased inquiry cost must be 1');
+  if (campaignBonusOf(null) !== 0) failures.push('base campaign bonus must be 0');
+  for (const entry of SEASON_FRONT_OFFICE_CATALOG) {
+    const expectedRehab = Math.max(1, 2 + entry.rehabDelta);
+    if (rehabPriceOf(entry.id) !== expectedRehab) {
+      failures.push(`${entry.id} rehab price must be ${String(expectedRehab)}`);
+    }
+    if (baseInquiryAllowanceOf(entry.id) !== entry.baseInquiryAllowance) {
+      failures.push(`${entry.id} allowance must be ${String(entry.baseInquiryAllowance)}`);
+    }
+    if (purchasedInquiryCostOf(entry.id) !== entry.purchasedInquiryCost) {
+      failures.push(`${entry.id} purchase cost must be ${String(entry.purchasedInquiryCost)}`);
+    }
+    if (campaignBonusOf(entry.id) !== entry.campaignBonus) {
+      failures.push(`${entry.id} bonus must be ${String(entry.campaignBonus)}`);
+    }
+    if (baseInquiryAllowanceOf(entry.id) > 5)
+      failures.push(`${entry.id} allowance exceeds the cap`);
   }
   return failures;
 }

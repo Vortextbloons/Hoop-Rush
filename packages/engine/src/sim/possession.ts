@@ -27,7 +27,11 @@ import {
   shootingFoulProbability,
 } from './fouls.ts';
 import { resolveRebound } from './rebounding.ts';
-import { twentySecondClockPressure } from './evolution-rules.ts';
+import {
+  twentySecondClockPressure,
+  DEEP_FOUR_SPLIT,
+  DEEP_FOUR_MAKE_SCALE,
+} from './evolution-rules.ts';
 import { prepareTeam, enginePlayerKey, type TeamPrep } from './prepare.ts';
 import { ENGINE_CONSTANTS } from './constants.ts';
 import { creationScore } from '../domain/archetypes.ts';
@@ -601,9 +605,11 @@ function resolveShot(
     throw new Error(`possession: no zone preparation for ${shooter.playerId}`);
   }
   const zone = pickZone(action, zonePrep, rng);
-  const deep = ctx.gameRule === 'deep-four' && zone === 'aboveBreakThree' && rng.chance(0.2);
+  const deep =
+    ctx.gameRule === 'deep-four' && zone === 'aboveBreakThree' && rng.chance(DEEP_FOUR_SPLIT);
   const ruleMakeScale =
-    (deep ? 0.75 : 1) * (ctx.shotClock ? twentySecondClockPressure(ctx.shotClock.remaining) : 1);
+    (deep ? DEEP_FOUR_MAKE_SCALE : 1) *
+    (ctx.shotClock ? twentySecondClockPressure(ctx.shotClock.remaining) : 1);
   const shooterSlot = slotOf(teamPrep, shooter);
   const defender = pickDefender(defense, zone, rng, defensePrep.defenderBase, shooterSlot);
   const three = isThreePointZone(zone);

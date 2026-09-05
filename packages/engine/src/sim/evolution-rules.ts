@@ -9,7 +9,7 @@ export const TWENTY_SECOND_RESET_OFFENSIVE_REBOUND = 14;
 export const TWENTY_SECOND_RETAIN_MIN = 14;
 export const TWENTY_SECOND_LATE_WINDOW = 4;
 export const TWENTY_SECOND_LATE_PRESSURE = 0.1;
-export const FIRST_TO_SEVEN_TARGET = 7;
+export const FIRST_TO_SEVEN_TARGET = 7 as const;
 export const FIRST_TO_SEVEN_SAFETY_POSSESSIONS = 1000;
 export const RULE_VERSION = SEASON_COURT_INNOVATION_VERSION;
 
@@ -53,9 +53,9 @@ export class FirstToSevenOvertimeExhaustedError extends Error {
   readonly possessions: number;
   readonly homeOT: number;
   readonly awayOT: number;
-  constructor(possessions: number, homeOT: number, awayOT: number) {
+  constructor(possessions: number, homeOT: number, awayOT: number, context?: string) {
     super(
-      `first-to-seven overtime exceeded ${String(possessions)} possessions (${String(homeOT)}-${String(awayOT)}) without a winner`,
+      `first-to-seven overtime exceeded ${String(possessions)} possessions (${String(homeOT)}-${String(awayOT)}) without a winner${context ? ` (${context})` : ''}`,
     );
     this.name = 'FirstToSevenOvertimeExhaustedError';
     this.possessions = possessions;
