@@ -8,7 +8,11 @@ import {
   seasonObjectiveEvaluationFactsSchema,
   seasonObjectiveIdSchema,
 } from './season-objective.ts';
-import { SEASON_RECAP_VERSION } from './season-versions.ts';
+import {
+  seasonChallengeEvaluationFactsSchema,
+  seasonChallengeIdSchema,
+} from './season-challenge.ts';
+import { SEASON_RECAP_VERSION, SEASON_RECAP_VERSION_V5 } from './season-versions.ts';
 export const seasonBlockEffectsEvidenceSchema = z.object({
   mechanism: seasonMechanismSchema,
   side: seasonEffectsSideSchema,
@@ -32,6 +36,13 @@ export const seasonBlockObjectiveEvidenceSchema = z.object({
   evaluationFacts: seasonObjectiveEvaluationFactsSchema,
 });
 export type SeasonBlockObjectiveEvidence = z.infer<typeof seasonBlockObjectiveEvidenceSchema>;
+export const seasonBlockChallengeEvidenceSchema = z.object({
+  challengeId: seasonChallengeIdSchema,
+  success: z.boolean(),
+  reward: z.union([z.literal(1), z.literal(2)]),
+  evaluationFacts: seasonChallengeEvaluationFactsSchema,
+});
+export type SeasonBlockChallengeEvidence = z.infer<typeof seasonBlockChallengeEvidenceSchema>;
 export const seasonBlockTradeEvidenceSchema = z.object({
   tradesAccepted: z.number().int().nonnegative(),
   influenceDelta: z.number().int(),
@@ -110,7 +121,7 @@ export const seasonUpcomingHumanGameSchema = z.object({
 export type SeasonUpcomingHumanGame = z.infer<typeof seasonUpcomingHumanGameSchema>;
 export const seasonBlockRecapSchema = z.object({
   schemaVersion: z.literal(1),
-  recapVersion: z.literal(SEASON_RECAP_VERSION),
+  recapVersion: z.union([z.literal(SEASON_RECAP_VERSION), z.literal(SEASON_RECAP_VERSION_V5)]),
   runId: z.string().min(1).max(64),
   blockIndex: z.number().int().min(0).max(8),
   completedRounds: z.number().int().min(0).max(82),
@@ -123,6 +134,7 @@ export const seasonBlockRecapSchema = z.object({
   effectsEvidence: z.array(seasonBlockEffectsEvidenceSchema).max(12).optional(),
   injuryEvidence: seasonBlockInjuryEvidenceSchema,
   objectiveEvidence: seasonBlockObjectiveEvidenceSchema.nullable().optional(),
+  challengeEvidence: z.array(seasonBlockChallengeEvidenceSchema).max(3).optional(),
   campaignEvidence: z
     .object({
       outcome: z.enum(['missed', 'completed', 'breakthrough']).nullable(),

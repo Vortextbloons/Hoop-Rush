@@ -1,4 +1,5 @@
 import {
+  SEASON_CHALLENGE_CATALOG,
   SEASON_HEALTH_VERSION,
   SEASON_RECAP_VERSION,
   franchiseIdSchema,
@@ -45,6 +46,7 @@ export interface SeasonBlockRecapInput {
     success: boolean | null;
     evaluation: SeasonObjectiveEvaluation;
   } | null;
+  challenges?: import('@hoop-rush/data-contracts').SeasonBlockChallengeEvaluation | null;
   transactions?: readonly SeasonTransactionEntry[];
   influence?: SeasonInfluenceState;
   freeAgency?: SeasonFreeAgencyState;
@@ -449,6 +451,7 @@ export function buildSeasonBlockRecap(input: SeasonBlockRecapInput): SeasonBlock
   const upcomingHumanGames = upcomingHumanGamesOf(input);
   const blockSummaries = blockSummariesOf(input.summaries, input.blockIndex);
   const objective = input.objective ?? null;
+  const challenges = input.challenges ?? null;
   const tradeEvidence = blockTradeEvidenceOf({
     blockIndex: input.blockIndex,
     humanFranchiseId: input.humanFranchiseId,
@@ -490,6 +493,20 @@ export function buildSeasonBlockRecap(input: SeasonBlockRecapInput): SeasonBlock
             evaluationFacts: objective.evaluation.facts,
           }
         : null,
+    challengeEvidence:
+      challenges !== null
+        ? [...challenges.results]
+            .sort((a, b) => (a.challengeId < b.challengeId ? -1 : 1))
+            .map((result) => ({
+              challengeId: result.challengeId,
+              success: result.success,
+              reward:
+                SEASON_CHALLENGE_CATALOG.find(
+                  (entry) => entry.challengeId === result.challengeId,
+                )?.reward ?? 1,
+              evaluationFacts: result.facts,
+            }))
+        : undefined,
     tradeEvidence,
     freeAgencyEvidence,
     influenceBalance: {
@@ -536,6 +553,14 @@ export function seasonBlockRecapCanonical(recap: SeasonBlockRecap): string {
     upcomingHumanGames: [...recap.upcomingHumanGames].sort((a, b) =>
       a.gameId < b.gameId ? -1 : 1,
     ),
+    challengeEvidence: (recap.challengeEvidence ?? [])
+      .map((entry) => ({
+        challengeId: entry.challengeId,
+        success: entry.success,
+        reward: entry.reward,
+        evaluationFacts: entry.evaluationFacts,
+      }))
+      .sort((a, b) => (a.challengeId < b.challengeId ? -1 : 1)),
     freeAgencyEvidence: {
       ...recap.freeAgencyEvidence,
       signings: [...recap.freeAgencyEvidence.signings].sort(
@@ -672,6 +697,32 @@ export function auditSeasonBlockRecap(
   });
   if (JSON.stringify(recap.freeAgencyEvidence) !== JSON.stringify(expectedFreeAgency)) {
     failures.push('recap free-agency evidence does not match the recorded state');
+  }
+  const expectedChallenges = input.challenges ?? null;
+  const actualChallenges = recap.challengeEvidence ?? null;
+  if (expectedChallenges !== null) {
+    if (actualChallenges === null || actualChallenges.length !== 3) {
+      failures.push('recap challenge evidence must hold exactly 3 results');
+    } else {
+      const expectedSorted = [...expectedChallenges.results].sort((a, b) =>
+        a.challengeId < b.challengeId ? -1 : 1,
+      );
+      const actualSorted = [...actualChallenges].sort((a, b) =>
+        a.challengeId < b.challengeId ? -1 : 1,
+      );
+      if (JSON.stringify(actualSorted) !== JSON.stringify(expectedSorted.map((result) => ({
+        challengeId: result.challengeId,
+        success: result.success,
+        reward:
+          SEASON_CHALLENGE_CATALOG.find((entry) => entry.challengeId === result.challengeId)
+            ?.reward ?? 1,
+        evaluationFacts: result.facts,
+      })))) {
+        failures.push('recap challenge evidence does not match the evaluated challenges');
+      }
+    }
+  } else if (actualChallenges !== null && actualChallenges !== undefined && actualChallenges.length > 0) {
+    failures.push('recap challenge evidence without evaluated challenges');
   }
   return failures;
 }

@@ -46,13 +46,23 @@ export function createInitialSeasonInfluenceState(
     rehabs: {},
   };
 }
+export interface SeasonBlockChallengeSuccess {
+  challengeId: string;
+  success: boolean;
+  reward: number;
+}
+
 export interface SeasonBlockInfluenceGrantInput {
   influence: SeasonInfluenceState;
   blockIndex: number;
   humanFranchiseId: string | null;
   participantFranchiseIds?: readonly string[] | null;
-  objectiveSuccess: boolean | null;
+  objectiveSuccess?: boolean | null;
   objectiveSuccessByFranchise?: Readonly<Record<string, boolean | null>> | null;
+  challengeSuccesses?: readonly SeasonBlockChallengeSuccess[] | null;
+  challengeSuccessesByFranchise?: Readonly<
+    Record<string, readonly SeasonBlockChallengeSuccess[]>
+  > | null;
   appliedAtStateRevision?: number;
 }
 export interface SeasonBlockInfluenceGrantOutput {
@@ -62,7 +72,7 @@ export interface SeasonBlockInfluenceGrantOutput {
 export function applySeasonBlockInfluenceGrants(
   input: SeasonBlockInfluenceGrantInput,
 ): SeasonBlockInfluenceGrantOutput {
-  const { influence, blockIndex, humanFranchiseId, objectiveSuccess } = input;
+  const { influence, blockIndex, humanFranchiseId } = input;
   const appliedAtStateRevision = input.appliedAtStateRevision ?? blockIndex + 1;
   const balances: Record<string, number> = { ...influence.balances };
   const ledger: SeasonInfluenceLedgerEntry[] = [...influence.ledger];
@@ -108,6 +118,70 @@ export function applySeasonBlockInfluenceGrants(
   ];
   const participantIds =
     input.participantFranchiseIds ?? (humanFranchiseId ? [humanFranchiseId] : []);
+  const hasChallenges =
+    input.challengeSuccesses !== undefined ||
+    input.challengeSuccessesByFranchise !== undefined;
+  if (hasChallenges) {
+    const byFranchise =
+      input.challengeSuccessesByFranchise ??
+      (humanFranchiseId && input.challengeSuccesses
+        ? { [humanFranchiseId]: input.challengeSuccesses }
+        : {});
+    for (const pid of participantIds) {
+      const fid = franchiseIdSchema.parse(pid);
+      const successes = [...(byFranchise[pid] ?? [])].sort((a, b) =>
+        a.challengeId < b.challengeId ? -1 : a.challengeId > b.challengeId ? 1 : 0,
+      );
+      for (const result of successes) {
+        if (result.success !== true) continue;
+        const requestedDelta = result.reward;
+        const headroom = SEASON_INFLUENCE_CAP - (balances[pid] ?? 0);
+        const appliedDelta = Math.max(0, Math.min(requestedDelta, headroom));
+        balances[pid] = (balances[pid] ?? 0) + appliedDelta;
+        ledger.push({
+          entryId: idSchema.parse(`influence-challenge-${String(blockIndex)}-${pid}-${result.challengeId}`),
+          franchiseId: fid,
+          source: 'challenge-reward',
+          blockIndex,
+          commandId: null,
+          requestedDelta,
+          appliedDelta,
+          balanceAfter: balances[pid] ?? 0,
+          explanation:
+            appliedDelta === requestedDelta
+              ? `+${String(requestedDelta)} Influence challenge reward ${result.challengeId} (block ${String(blockIndex)})`
+              : `Challenge reward ${result.challengeId} at the +8 cap (block ${String(blockIndex)}, requested +${String(requestedDelta)}, applied +${String(appliedDelta)})`,
+        });
+        entries.push(
+          seasonTransactionEntry({
+            transactionId: idSchema.parse(
+              `txn-challenge-reward-${String(blockIndex)}-${pid}-${result.challengeId}`,
+            ),
+            commandId: commandIdSchema.parse(
+              `sys-challenge-reward-${String(blockIndex)}-${pid}`,
+            ),
+            franchiseId: fid,
+            type: 'challenge-reward',
+            blockIndex,
+            appliedAtStateRevision,
+            payload: {
+              blockIndex,
+              challengeId: result.challengeId,
+              requestedDelta,
+              appliedDelta,
+              success: true,
+            },
+            explanation: `+${String(requestedDelta)} Influence challenge reward ${result.challengeId} for ${pid} (block ${String(blockIndex)})`,
+          }),
+        );
+      }
+    }
+    return {
+      influence: { ...influence, balances, ledger },
+      entries,
+    };
+  }
+  const objectiveSuccess = input.objectiveSuccess ?? null;
   const successMap =
     input.objectiveSuccessByFranchise ??
     (humanFranchiseId && objectiveSuccess !== null ? { [humanFranchiseId]: objectiveSuccess } : {});

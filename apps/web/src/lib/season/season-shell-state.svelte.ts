@@ -9,8 +9,6 @@ import type {
   SeasonInfluenceState,
   SeasonInvalidRosterInterruption,
   SeasonLeague,
-  SeasonObjectiveId,
-  SeasonObjectiveState,
   SeasonPendingBlockCandidate,
   SeasonPostseasonRotationPayload,
   SeasonRun,
@@ -69,7 +67,8 @@ export class SeasonRunShell implements SeasonRunShellData {
   influence = $state.raw<SeasonInfluenceState | null>(null);
   trade = $state.raw<SeasonTradeState | null>(null);
   freeAgency = $state.raw<SeasonFreeAgencyState | null>(null);
-  objectives = $state.raw<SeasonObjectiveState | null>(null);
+  objectives = $state.raw<import('@hoop-rush/data-contracts').SeasonObjectiveState | null>(null);
+  challenges = $state.raw<import('@hoop-rush/data-contracts').SeasonChallengeState | null>(null);
   pending = $state<SeasonPendingBlockCandidate | null>(null);
   interruption = $state<SeasonInvalidRosterInterruption | null>(null);
   commandError = $state<SeasonRunCommandError | null>(null);
@@ -102,13 +101,6 @@ export class SeasonRunShell implements SeasonRunShellData {
     ok: boolean;
     error: string | null;
   }> => Promise.resolve({ ok: false, error: 'season shell not ready' });
-  selectBlockObjective = (input: {
-    blockIndex: number;
-    objectiveId: SeasonObjectiveId;
-  }): Promise<void> => {
-    void input;
-    return Promise.resolve();
-  };
   spendInfluence = (input: {
     purpose: SeasonSpendInfluencePurpose;
     windowIndex?: number;
@@ -146,18 +138,10 @@ export class SeasonRunShell implements SeasonRunShellData {
   };
   forfeitInterruptedGame = (): Promise<void> => Promise.resolve();
   resumeBlock = (): Promise<void> => Promise.resolve();
-  selectGmIdentity = (input: { identity: string; focus: string | null }): Promise<void> => {
-    void input;
-    return Promise.resolve();
-  };
   selectCampaignOpportunity = (input: {
     blockIndex: number;
     opportunityId: string;
   }): Promise<void> => {
-    void input;
-    return Promise.resolve();
-  };
-  evolveGmCampaign = (input: { offerId: string }): Promise<void> => {
     void input;
     return Promise.resolve();
   };

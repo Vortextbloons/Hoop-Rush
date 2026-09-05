@@ -1,45 +1,32 @@
 <script lang="ts">
-  import type { SeasonCampaignEvaluation, SeasonCampaignState } from '@hoop-rush/data-contracts';
+  import type { SeasonCampaignEvaluation } from '@hoop-rush/data-contracts';
   import {
     campaignTimelineViewModel,
     CAMPAIGN_FAMILY_LABELS,
-    CAMPAIGN_IDENTITY_LABELS,
     CAMPAIGN_OUTCOME_LABELS,
-    CAMPAIGN_REWARD_LABELS,
-    formatCampaignCondition,
-    formatCampaignReward,
   } from '$lib/season/season-presentation';
   import type { SeasonRun } from '@hoop-rush/data-contracts';
-  import GmIdentityPicker from './GmIdentityPicker.svelte';
-  import EvolutionPicker from './EvolutionPicker.svelte';
   let {
     run,
     nextBlockIndex,
     busy = false,
     commandError = null,
-    onSelectIdentity,
     onSelectOpportunity,
-    onEvolve,
     playerName = (id: string) => id,
   }: {
     run: SeasonRun | null;
     nextBlockIndex: number | null;
     busy?: boolean;
     commandError?: string | null;
-    onSelectIdentity: (input: { identity: string; focus: string | null }) => void;
     onSelectOpportunity: (input: { blockIndex: number; opportunityId: string }) => void;
-    onEvolve: (input: { offerId: string }) => void;
     playerName?: (playerVersionId: string) => string;
   } = $props();
   const vm = $derived(run !== null ? campaignTimelineViewModel(run, nextBlockIndex) : null);
-  const campaign = $derived(run?.campaign as SeasonCampaignState | undefined);
   const prior = $derived(vm?.priorEvaluation ?? null);
   const priorRewardIds: string[] = $derived(prior ? prior.appliedRewardIds : []);
   const priorFactsEntries = $derived(prior ? Object.entries(prior.facts ?? {}) : []);
   const branchEntries = $derived(vm?.branchEntries ?? []);
   const currentOffers = $derived(vm?.currentOffers ?? []);
-  const isIdentityRequired = $derived(vm?.isIdentityRequired ?? false);
-  const isEvolutionRequired = $derived(vm?.isEvolutionRequired ?? false);
   const isBlock8 = $derived(vm?.isBlock8NoOpportunity ?? false);
   const rewardEntitlements = $derived(
     vm?.rewardEntitlements ?? {
@@ -87,17 +74,7 @@
   {#if vm === null}
     <p class="rounded-xl bg-surface-1 p-4 text-sm text-muted-foreground">Loading campaign…</p>
   {:else}
-    {#if isIdentityRequired}
-      <GmIdentityPicker {busy} {commandError} onSelect={(input) => onSelectIdentity(input)} />
-    {:else if isEvolutionRequired && campaign?.evolutionOffers}
-      <EvolutionPicker
-        offers={campaign.evolutionOffers}
-        {busy}
-        {commandError}
-        onSelect={(offerId) => onEvolve({ offerId })}
-      />
-    {:else}
-      <div class="overflow-hidden rounded-xl border border-border bg-surface-1">
+    <div class="overflow-hidden rounded-xl border border-border bg-surface-1">
         <div
           class="flex flex-wrap items-baseline justify-between gap-2 border-b border-border bg-surface-2 px-4 py-3"
         >
@@ -331,9 +308,7 @@
                     <p
                       class="font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-primary"
                     >
-                      {CAMPAIGN_FAMILY_LABELS[card.opportunity.family] ?? card.opportunity.family} · {CAMPAIGN_IDENTITY_LABELS[
-                        card.opportunity.identity
-                      ] ?? card.opportunity.identity}
+                      {CAMPAIGN_FAMILY_LABELS[card.opportunity.family] ?? card.opportunity.family}
                     </p>
                     <h4
                       id={`card-title-${card.opportunity.opportunityId}`}
@@ -443,7 +418,6 @@
           </p>
         {/if}
       </div>
-    {/if}
   {/if}
 
   <p class="sr-only" role="status" aria-live="polite">

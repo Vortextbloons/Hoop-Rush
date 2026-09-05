@@ -11,7 +11,7 @@
   import HealthStrip from '$lib/components/season/HealthStrip.svelte';
   import InfluencePanel from '$lib/components/season/InfluencePanel.svelte';
   import InterruptionPanel from '$lib/components/season/InterruptionPanel.svelte';
-  import ObjectivePicker from '$lib/components/season/ObjectivePicker.svelte';
+  import ChallengesPanel from '$lib/components/season/ChallengesPanel.svelte';
   import PostseasonMatchupCard from '$lib/components/season/PostseasonMatchupCard.svelte';
   import PostseasonProgress from '$lib/components/season/PostseasonProgress.svelte';
   import PostseasonRotationPanel from '$lib/components/season/PostseasonRotationPanel.svelte';
@@ -39,9 +39,9 @@
   } from '$lib/season/season-presentation';
   import {
     influenceViewModel,
-    objectiveChoicesViewModel,
     type InfluenceSpendAffordance,
   } from '$lib/season/season-influence-view';
+  import { challengesViewModel } from '$lib/season/season-challenges-view';
   import { availabilityStripRows } from '$lib/season/season-health-view';
   import {
     openWindowOf,
@@ -117,7 +117,9 @@
       tradeOfferViewModel(offer, currentRun, shell.catalog, shell.franchiseName),
     );
   });
-  const objectiveVm = $derived(run !== null ? objectiveChoicesViewModel(run) : null);
+  const challengesVm = $derived(
+    run !== null ? challengesViewModel(run, nextBlockIndex) : null,
+  );
   const hasCampaign = $derived(
     run !== null &&
       (
@@ -129,11 +131,7 @@
   const campaignCommandError = $derived.by(() => {
     const e = commandError;
     if (e === null) return null;
-    const campaignCommands = new Set([
-      'select-gm-identity',
-      'select-campaign-opportunity',
-      'evolve-gm-campaign',
-    ]);
+    const campaignCommands = new Set(['select-campaign-opportunity']);
     return campaignCommands.has(e.command) ? e.message : null;
   });
   const innovationCommandError = $derived.by(() => {
@@ -222,15 +220,6 @@
     }
     return map;
   });
-  const selectedObjective = $derived.by(() => {
-    if (run === null || nextBlockIndex === null || nextBlockIndex >= 8) return null;
-    const selection = run.objectives.selections[nextBlockIndex];
-    if (selection === undefined) return null;
-    const name =
-      shell.objectives?.catalog.find((entry) => entry.objectiveId === selection.objectiveId)
-        ?.name ?? selection.objectiveId;
-    return { objectiveId: selection.objectiveId, name };
-  });
   const staminaByVersion = $derived.by(() => {
     const slice = shell.playerSlice;
     const map = new Map<string, number>();
@@ -267,7 +256,6 @@
       games: run.games,
       humanFranchiseId,
       fatigue: effects === null ? null : { effects, staminaByVersion },
-      objective: selectedObjective,
       evolution: evolution ?? null,
     });
   });
@@ -617,41 +605,18 @@
               busy={block.phase === 'running'}
               commandError={campaignCommandError}
               playerName={shell.playerName}
-              onSelectIdentity={(input) => {
-                if (!mounted) return;
-                void shell.selectGmIdentity?.(input);
-              }}
               onSelectOpportunity={(input) => {
                 if (!mounted) return;
                 void shell.selectCampaignOpportunity?.(input);
               }}
-              onEvolve={(input) => {
-                if (!mounted) return;
-                void shell.evolveGmCampaign?.(input);
-              }}
             />
-          {:else if objectiveVm !== null}
-            {#if commandError !== null && commandError.command === 'select-block-objective'}
-              <p
-                role="alert"
-                class="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
-              >
-                {commandError.message}
-              </p>
-            {/if}
-            <ObjectivePicker
-              blockIndex={objectiveVm.blockIndex}
-              choices={objectiveVm.choices}
-              selectedObjectiveId={objectiveVm.selectedObjectiveId}
-              busy={block.phase === 'running'}
-              onSelect={(objectiveId) => {
-                if (objectiveVm.blockIndex !== null) {
-                  void shell.selectBlockObjective({
-                    blockIndex: objectiveVm.blockIndex,
-                    objectiveId,
-                  });
-                }
-              }}
+          {/if}
+          {#if challengesVm !== null}
+            <ChallengesPanel
+              blockIndex={challengesVm.blockIndex}
+              deal={challengesVm.deal}
+              evaluation={challengesVm.evaluation}
+              franchiseName={shell.franchiseName}
             />
           {/if}
 
@@ -767,14 +732,19 @@
                     ? '1 game'
                     : `${String(preview.gamesToLock)} games`} with this lineup.
                 </p>
-                {#if preview.objective !== null}
+                {#if challengesVm !== null && challengesVm.deal !== null}
                   <p class="mt-1 text-sm">
-                    Goal:
-                    <strong class="text-foreground">{preview.objective.name}</strong>
-                  </p>
-                {:else if !hasCampaign && nextBlockIndex !== null && nextBlockIndex < 8}
-                  <p class="mt-1 text-sm text-amber-600 dark:text-amber-400">
-                    Pick a goal above, then play.
+                    Challenges:
+                    {#if challengesVm.evaluation !== null}
+                      {@const done = challengesVm.evaluation.results.filter((r) => r.success).length}
+                      {@const earned = challengesVm.evaluation.results.reduce(
+                        (sum, r) => sum + (r.success ? (r.challengeId === 'beat-leader' || r.challengeId === 'beat-higher' || r.challengeId === 'statement-block' ? 2 : 1) : 0),
+                        0,
+                      )}
+                      <strong class="text-foreground">{done}/3 (+{earned})</strong>
+                    {:else}
+                      <strong class="text-foreground">3 live</strong>
+                    {/if}
                   </p>
                 {/if}
                 {#if preview.upcomingGames.length === 0}

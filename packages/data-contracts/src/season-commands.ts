@@ -1,5 +1,9 @@
 import { z } from 'zod';
 import { commandIdSchema, franchiseIdSchema, seasonGameIdSchema } from './ids.ts';
+export const seasonCampaignRetiredRejectionSchema = z.object({
+  code: z.literal('retired'),
+});
+export type SeasonCampaignRetiredRejection = z.infer<typeof seasonCampaignRetiredRejectionSchema>;
 import {
   seasonDuplicateCommandRejectionSchema,
   seasonFreeAgencyUnresolvedRejectionSchema,
@@ -555,6 +559,7 @@ export const seasonSelectBlockObjectiveRejectionSchema = z.discriminatedUnion('c
   seasonNotAtBoundaryRejectionSchema,
   seasonObjectiveNotOfferedRejectionSchema,
   seasonObjectiveAlreadySelectedRejectionSchema,
+  seasonCampaignRetiredRejectionSchema,
 ]);
 export type SeasonSelectBlockObjectiveRejection = z.infer<
   typeof seasonSelectBlockObjectiveRejectionSchema
@@ -855,6 +860,7 @@ export const seasonSelectGmIdentityRejectionSchema = z.discriminatedUnion('code'
   seasonStaleStateRejectionSchema,
   seasonDuplicateCommandRejectionSchema,
   seasonCampaignIdentityAlreadySelectedRejectionSchema,
+  seasonCampaignRetiredRejectionSchema,
 ]);
 export type SeasonSelectGmIdentityRejection = z.infer<typeof seasonSelectGmIdentityRejectionSchema>;
 export const seasonSelectCampaignOpportunityRejectionSchema = z.discriminatedUnion('code', [
@@ -876,6 +882,7 @@ export const seasonEvolveGmCampaignRejectionSchema = z.discriminatedUnion('code'
   seasonCampaignIdentityRequiredRejectionSchema,
   seasonCampaignEvolutionAlreadySelectedRejectionSchema,
   seasonCampaignEvolutionNotOfferedRejectionSchema,
+  seasonCampaignRetiredRejectionSchema,
 ]);
 export type SeasonEvolveGmCampaignRejection = z.infer<typeof seasonEvolveGmCampaignRejectionSchema>;
 export const seasonOpenTradeInquiryRejectionSchema = z.discriminatedUnion('code', [
@@ -1238,8 +1245,15 @@ export const seasonPurchaseTradeInquiryResultSchema = z.discriminatedUnion('stat
 export type SeasonPurchaseTradeInquiryResult = z.infer<
   typeof seasonPurchaseTradeInquiryResultSchema
 >;
-export const seasonRunCommandSchema = z.discriminatedUnion('command', [
+export const seasonRetiredCommandRejectionSchema = seasonCampaignRetiredRejectionSchema;
+export type SeasonRetiredCommandRejection = SeasonCampaignRetiredRejection;
+export const seasonLegacyRunCommandSchema = z.discriminatedUnion('command', [
   seasonSelectBlockObjectiveCommandSchema,
+  seasonSelectGmIdentityCommandSchema,
+  seasonEvolveGmCampaignCommandSchema,
+]);
+export type SeasonLegacyRunCommand = z.infer<typeof seasonLegacyRunCommandSchema>;
+export const seasonRunCommandSchema = z.discriminatedUnion('command', [
   seasonSpendInfluenceCommandSchema,
   seasonAcceptTradeOfferCommandSchema,
   seasonDeclineTradeOfferCommandSchema,
@@ -1254,9 +1268,7 @@ export const seasonRunCommandSchema = z.discriminatedUnion('command', [
   seasonDeclareFreeAgentInterestCommandSchema,
   seasonSkipFreeAgentMarketCommandSchema,
   seasonResolveFreeAgentMarketCommandSchema,
-  seasonSelectGmIdentityCommandSchema,
   seasonSelectCampaignOpportunityCommandSchema,
-  seasonEvolveGmCampaignCommandSchema,
   seasonOpenTradeInquiryCommandSchema,
   seasonSubmitTradeProposalCommandSchema,
   seasonRespondToTradeCounterCommandSchema,
@@ -1266,6 +1278,34 @@ export const seasonRunCommandSchema = z.discriminatedUnion('command', [
   seasonSelectCourtInnovationCommandSchema,
 ]);
 export type SeasonRunCommand = z.infer<typeof seasonRunCommandSchema>;
+export const seasonRunCommandHistorySchema = z.discriminatedUnion('command', [
+  seasonSpendInfluenceCommandSchema,
+  seasonAcceptTradeOfferCommandSchema,
+  seasonDeclineTradeOfferCommandSchema,
+  seasonResumeSeasonBlockCommandSchema,
+  seasonForfeitInterruptedGameCommandSchema,
+  seasonSubmitBlockCommandSchema,
+  seasonStartPostseasonCommandSchema,
+  seasonAdvancePostseasonCommandSchema,
+  seasonSubmitPostseasonRotationCommandSchema,
+  seasonSpectatePostseasonGameCommandSchema,
+  seasonFastForwardPostseasonCommandSchema,
+  seasonDeclareFreeAgentInterestCommandSchema,
+  seasonSkipFreeAgentMarketCommandSchema,
+  seasonResolveFreeAgentMarketCommandSchema,
+  seasonSelectCampaignOpportunityCommandSchema,
+  seasonOpenTradeInquiryCommandSchema,
+  seasonSubmitTradeProposalCommandSchema,
+  seasonRespondToTradeCounterCommandSchema,
+  seasonWalkAwayFromTradeCommandSchema,
+  seasonPurchaseTradeInquiryCommandSchema,
+  seasonSelectFrontOfficeCommandSchema,
+  seasonSelectCourtInnovationCommandSchema,
+  seasonSelectBlockObjectiveCommandSchema,
+  seasonSelectGmIdentityCommandSchema,
+  seasonEvolveGmCampaignCommandSchema,
+]);
+export type SeasonRunCommandHistory = z.infer<typeof seasonRunCommandHistorySchema>;
 export const seasonRunCommandRejectionSchema = z.discriminatedUnion('code', [
   seasonRunMismatchRejectionSchema,
   seasonStaleStateRejectionSchema,
@@ -1310,6 +1350,7 @@ export const seasonRunCommandRejectionSchema = z.discriminatedUnion('code', [
   seasonFreeAgencyPendingDeclarationRejectionSchema,
   seasonFreeAgencyOwnershipConflictRejectionSchema,
   seasonCampaignIdentityRequiredRejectionSchema,
+  seasonCampaignRetiredRejectionSchema,
   seasonCampaignEvolutionRequiredRejectionSchema,
   seasonCampaignOpportunityRequiredRejectionSchema,
   seasonCampaignOpportunityNotOfferedRejectionSchema,

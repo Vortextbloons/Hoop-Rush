@@ -7,9 +7,14 @@ import { seasonGameSummarySchema, seasonRetainedGameDetailSchema } from './seaso
 import { seasonEffectsStateSchema } from './season-effects.ts';
 import { seasonHealthStateSchema } from './season-health.ts';
 import { seasonObjectiveIdSchema } from './season-objective.ts';
+import { seasonChallengeDealSchema, seasonChallengeIdSchema } from './season-challenge.ts';
 import { seasonCampaignOpportunityIdSchema } from './season-campaign.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
-import { SEASON_BLOCK_VERSION } from './season-versions.ts';
+import {
+  SEASON_BLOCK_VERSION,
+  SEASON_BLOCK_VERSION_V5,
+  SEASON_BLOCK_VERSION_V6,
+} from './season-versions.ts';
 export const seasonInvalidRosterInterruptionSchema = z.object({
   code: z.literal('invalid-roster'),
   runId: idSchema,
@@ -22,7 +27,11 @@ export const seasonInvalidRosterInterruptionSchema = z.object({
 export type SeasonInvalidRosterInterruption = z.infer<typeof seasonInvalidRosterInterruptionSchema>;
 export const seasonPendingBlockCandidateSchema = z.object({
   schemaVersion: z.literal(1),
-  blockVersion: z.union([z.literal(SEASON_BLOCK_VERSION), z.literal('season-block-v5')]),
+  blockVersion: z.union([
+    z.literal(SEASON_BLOCK_VERSION),
+    z.literal(SEASON_BLOCK_VERSION_V6),
+    z.literal(SEASON_BLOCK_VERSION_V5),
+  ]),
   runId: idSchema,
   commandId: commandIdSchema,
   blockIndex: z.number().int().min(0).max(8),
@@ -30,6 +39,8 @@ export const seasonPendingBlockCandidateSchema = z.object({
   expectedStateRevision: z.number().int().nonnegative(),
   expectedStateDigest: seasonCheckpointDigestSchema,
   objectiveId: seasonObjectiveIdSchema.nullable().optional(),
+  challengeDeal: seasonChallengeDealSchema.nullable().optional(),
+  challengeIds: z.array(seasonChallengeIdSchema).length(3).optional(),
   campaignOpportunityId: seasonCampaignOpportunityIdSchema.nullable().optional(),
   nextGameId: seasonGameIdSchema,
   summaries: z.array(seasonGameSummarySchema).max(150),

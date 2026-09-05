@@ -50,10 +50,6 @@ export interface LockPreview {
   changes: RotationChange[];
   upcomingGames: UpcomingGame[];
   fatigueProjections: FatigueProjection[];
-  objective: {
-    objectiveId: string;
-    name: string;
-  } | null;
 }
 export function gamesToLockForBlock(blockIndex: number): number {
   return blockIndex >= 8 ? SEASON_FINAL_BLOCK_TEAM_GAMES : SEASON_BLOCK_TEAM_GAMES;
@@ -98,10 +94,6 @@ export function buildLockPreview(input: {
     effects: SeasonEffectsState;
     staminaByVersion: ReadonlyMap<string, number>;
   } | null;
-  objective?: {
-    objectiveId: string;
-    name: string;
-  } | null;
   evolution?: SeasonEvolutionState | null;
 }): LockPreview {
   const {
@@ -114,7 +106,6 @@ export function buildLockPreview(input: {
     games,
     humanFranchiseId,
     fatigue,
-    objective,
     evolution,
   } = input;
   const changes: RotationChange[] = [];
@@ -186,7 +177,6 @@ export function buildLockPreview(input: {
     changes,
     upcomingGames: humanUpcomingGames(games, humanFranchiseId, blockIndex, evolution ?? null),
     fatigueProjections,
-    objective: objective ?? null,
   };
 }
 function fatigueBandName(fatigueBasisPoints: number): string {

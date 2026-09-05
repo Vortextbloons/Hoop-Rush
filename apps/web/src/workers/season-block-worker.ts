@@ -6,26 +6,21 @@ import {
   SEASON_WORKER_WIRE_SCHEMA_VERSION,
   seasonWorkerMessageSchema,
   seasonWorkerRequestSchema,
-  SEASON_HEALTH_VERSION,
   seasonGameIdSchema,
   seedSchema,
   SEASON_RUN_SCHEMA_VERSION,
   type EraSimulationProfile,
-  type FranchiseId,
   type SeasonBlockRunContext,
   type SeasonDraftCatalog,
   type SeasonEffectsState,
-  type SeasonGameId,
   type SeasonGamePlayerInput,
-  type SeasonGameSummary,
   type SeasonHealthState,
-  type SeasonHomeCourtProfile,
   type SeasonInfluenceState,
   type SeasonInvalidRosterInterruption,
   type SeasonRetainedGameDetail,
-  type SeasonSchedule,
+  type SeasonGameSummary,
+  type SeasonGameId,
   type SeasonWorkerCompleteMessage,
-  type SeasonWorkerContinueRequest,
   type SeasonWorkerErrorMessage,
   type SeasonWorkerProgressMessage,
   type SeasonWorkerStartRequest,
@@ -37,7 +32,6 @@ import {
   assembleSeasonPendingBlock,
   auditSeasonBlock,
   createInitialSeasonInfluenceState,
-  createSeasonEffectsState,
   expandSeasonRunRosters,
   rosterPlayerIdsOf,
   seasonBlockGamesOf,
@@ -50,37 +44,6 @@ import { sleep } from '../lib/sleep';
 const PROGRESS_MIN_INTERVAL_MS = 250;
 let currentRequestId: string | null = null;
 let cancelled = false;
-let accumulatedRunId: string | null = null;
-let accumulatedSummaries: SeasonGameSummary[] = [];
-let accumulatedEffects: SeasonEffectsState | null = null;
-let accumulatedHealth: SeasonHealthState | null = null;
-interface WorkerRunContext {
-  run: SeasonBlockRunContext;
-  schedule: SeasonSchedule;
-  homeCourt: SeasonHomeCourtProfile;
-  humanFranchiseId: FranchiseId | null;
-}
-const contextByRunId = new Map<string, WorkerRunContext>();
-function synthesizeStart(request: SeasonWorkerContinueRequest): SeasonWorkerStartRequest | null {
-  const context = contextByRunId.get(request.runId);
-  if (context === undefined) return null;
-  const { fromRound } = blockRoundRange(request.blockIndex);
-  return {
-    ...request,
-    type: 'season-block-start',
-    run: {
-      ...context.run,
-      rotations: request.rotations,
-      cursor: {
-        ...context.run.cursor,
-        completedRounds: fromRound - 1,
-      },
-    },
-    schedule: context.schedule,
-    homeCourt: context.homeCourt,
-    humanFranchiseId: context.humanFranchiseId,
-  };
-}
 function post(
   message:
     | SeasonWorkerProgressMessage
@@ -168,13 +131,6 @@ function throwIfCancelled(): void {
     throw new SeasonWorkerCancelled();
   }
 }
-function initialHealth(): SeasonHealthState {
-  return {
-    schemaVersion: 1,
-    healthVersion: SEASON_HEALTH_VERSION,
-    injuries: [],
-  };
-}
 function initialInfluence(run: SeasonBlockRunContext): SeasonInfluenceState {
   return createInitialSeasonInfluenceState(run.league.teams.map((team) => team.franchiseId));
 }
@@ -193,42 +149,9 @@ function isInterruption(outcome: unknown): outcome is {
 }
 async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
   const run: SeasonBlockRunContext = request.run;
-  contextByRunId.set(request.runId, {
-    run: request.run,
-    schedule: request.schedule,
-    homeCourt: request.homeCourt,
-    humanFranchiseId: request.humanFranchiseId,
-  });
-  evictIfNeeded(contextByRunId);
-  if (request.priorSummaries !== undefined) {
-    accumulatedRunId = request.runId;
-    accumulatedSummaries = request.priorSummaries;
-  } else if (request.newSummaries !== undefined) {
-    if (accumulatedRunId !== request.runId) {
-      postError(
-        request.requestId,
-        'internal',
-        'summary delta received for a run the worker has no state for',
-      );
-      return;
-    }
-    accumulatedSummaries = [...accumulatedSummaries, ...request.newSummaries];
-  }
-  if (request.priorEffects !== undefined && request.priorEffects !== null) {
-    accumulatedEffects = request.priorEffects;
-  } else if (accumulatedRunId === null) {
-    postError(
-      request.requestId,
-      'internal',
-      'effects state missing for a run the worker has no state for',
-    );
-    return;
-  }
-  if (request.priorHealth !== undefined && request.priorHealth !== null) {
-    accumulatedHealth = request.priorHealth;
-  } else if (accumulatedHealth === null) {
-    accumulatedHealth = initialHealth();
-  }
+  const priorSummaries: SeasonGameSummary[] = request.priorSummaries;
+  const blockEffects: SeasonEffectsState = request.priorEffects;
+  const blockHealth: SeasonHealthState = request.priorHealth;
   let catalog;
   let profile;
   try {
@@ -254,6 +177,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
       blockIndex: request.blockIndex,
       rotationDigest: request.rotationDigest,
       objectiveId: request.objectiveId ?? null,
+      challengeIds: request.challengeIds ?? undefined,
       campaignOpportunityId: request.campaignOpportunityId ?? null,
       expectedStateRevision,
       expectedStateDigest,
@@ -265,12 +189,13 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     profile,
     humanFranchiseId: request.humanFranchiseId,
     rosterPlayerIds: rosterPlayerIdsOf(run),
-    priorSummaries: accumulatedSummaries,
-    effects: accumulatedEffects ?? initialEffects(expanded),
-    health: accumulatedHealth,
+    priorSummaries,
+    effects: blockEffects,
+    health: blockHealth,
     influence: request.priorInfluence ?? initialInfluence(run),
     transactions: request.priorTransactions ?? [],
     objectiveId: request.objectiveId ?? null,
+    challengeDeal: request.challengeDeal ?? null,
     campaignOpportunityId: request.campaignOpportunityId ?? null,
     objectives: (
       run as unknown as {
@@ -296,7 +221,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
   let summaries: SeasonGameSummary[];
   let retainedDetails: SeasonRetainedGameDetail[];
   if (request.startGameId !== null) {
-    summaries = accumulatedSummaries.filter(
+    summaries = priorSummaries.filter(
       (summary) => blockIndexForRound(summary.round) === request.blockIndex,
     );
     retainedDetails = [];
@@ -321,8 +246,8 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
   const precedingRound =
     startIndex > 0 ? (games[startIndex - 1]?.round ?? fromRound) : fromRound - 1;
   let previousRound = precedingRound;
-  let effects = accumulatedEffects ?? initialEffects(expanded);
-  let health = accumulatedHealth;
+  let effects = blockEffects;
+  let health = blockHealth;
   let lastProgressAt = 0;
   let latestSummary: SeasonGameSummary | null = null;
   let interruption: SeasonInvalidRosterInterruption | null = null;
@@ -388,6 +313,8 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
       expectedStateRevision,
       expectedStateDigest,
       objectiveId: request.objectiveId ?? null,
+      challengeDeal: request.challengeDeal ?? null,
+      challengeIds: request.challengeIds ?? null,
       campaignOpportunityId:
         (
           request as unknown as {
@@ -409,8 +336,6 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     });
     return;
   }
-  accumulatedEffects = effects;
-  accumulatedHealth = health;
   const candidate = assembleSeasonBlockCandidate(
     input,
     summaries,
@@ -422,29 +347,12 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
   if (auditFailures.length > 0) {
     throw new EngineInvariantFailure(auditFailures.join('; '));
   }
-  accumulatedSummaries = [
-    ...accumulatedSummaries.filter(
-      (summary) => blockIndexForRound(summary.round) !== request.blockIndex,
-    ),
-    ...summaries,
-  ];
   post({
     schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
     type: 'season-block-complete',
     requestId: request.requestId,
     result: { status: 'committed', checkpoint: candidate },
   });
-}
-function initialEffects(
-  expanded: ReadonlyMap<string, import('@hoop-rush/data-contracts').SeasonGamePlayerInput>,
-): SeasonEffectsState {
-  const staminaInputs = [...expanded.values()].map((player) => {
-    if (player.stamina === undefined) {
-      throw new Error(`expanded player ${player.playerVersionId} has no stamina profile`);
-    }
-    return player.stamina;
-  });
-  return createSeasonEffectsState(staminaInputs);
 }
 class SeasonWorkerCancelled extends Error {
   constructor() {
@@ -490,17 +398,7 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
   }
   currentRequestId = request.requestId;
   cancelled = false;
-  const startRequest =
-    request.type === 'season-block-continue' ? synthesizeStart(request) : request;
-  if (startRequest === null) {
-    postError(
-      request.requestId,
-      'internal',
-      'continuation for a run the worker has no context for',
-    );
-    return;
-  }
-  void runBlock(startRequest).catch((error: unknown) => {
+  void runBlock(request).catch((error: unknown) => {
     if (error instanceof SeasonWorkerCancelled) {
       postError(request.requestId, 'cancelled', 'block cancelled between games');
       return;

@@ -7,13 +7,18 @@ import { seasonCommandLogDigest, seasonCommandLogSchema } from './season-command
 import { seasonEffectsStateSchema } from './season-effects.ts';
 import { seasonRunSchema, seasonRunVersionsSchema } from './season-run.ts';
 import { seasonAlmanacSchema } from './season-almanac.ts';
-import { SEASON_REPLAY_EXPORT_VERSION } from './season-versions.ts';
+import {
+  SEASON_REPLAY_EXPORT_VERSION,
+  SEASON_REPLAY_EXPORT_VERSION_V1,
+  SEASON_REPLAY_EXPORT_VERSION_V2,
+} from './season-versions.ts';
 import { canonicalJson, seasonDigestHex } from './season-hash.ts';
 export const seasonReplayExportSchema = z.object({
   schemaVersion: z.literal(1),
   replayExportVersion: z.union([
     z.literal(SEASON_REPLAY_EXPORT_VERSION),
-    z.literal('replay-export-v1'),
+    z.literal(SEASON_REPLAY_EXPORT_VERSION_V2),
+    z.literal(SEASON_REPLAY_EXPORT_VERSION_V1),
   ]),
   runId: z.string().min(1).max(64),
   gameId: postseasonGameIdSchema,
@@ -42,7 +47,8 @@ export const seasonRunReplayExportSchema = z.object({
   schemaVersion: z.literal(1),
   replayExportVersion: z.union([
     z.literal(SEASON_REPLAY_EXPORT_VERSION),
-    z.literal('replay-export-v1'),
+    z.literal(SEASON_REPLAY_EXPORT_VERSION_V2),
+    z.literal(SEASON_REPLAY_EXPORT_VERSION_V1),
   ]),
   kind: z.literal('full-run'),
   runId: idSchema,

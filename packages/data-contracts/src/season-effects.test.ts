@@ -293,7 +293,7 @@ function buildCheckpoint(effects: SeasonEffectsState): SeasonCandidateCheckpoint
     digest: '0'.repeat(32),
   };
 }
-function buildWorkerRequest(priorEffects: SeasonEffectsState | null): SeasonWorkerStartRequest {
+function buildWorkerRequest(priorEffects: SeasonEffectsState): SeasonWorkerStartRequest {
   const run = buildRun();
   return seasonWorkerStartRequestSchema.parse({
     schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
@@ -315,7 +315,7 @@ function buildWorkerRequest(priorEffects: SeasonEffectsState | null): SeasonWork
     profileHash: '0'.repeat(64),
     priorSummaries: [],
     priorEffects,
-    priorHealth: null,
+    priorHealth: buildEmptyHealth(),
     startGameId: null,
     objectiveId: null,
     priorInfluence: buildInitialInfluence(),
@@ -628,21 +628,29 @@ describe('season checkpoint effects (M2.4)', () => {
   });
 });
 describe('season worker start request priorEffects (M2.4)', () => {
-  it('accepts null and omitted priorEffects for block 0', () => {
-    expect(() => seasonWorkerStartRequestSchema.parse(buildWorkerRequest(null))).not.toThrow();
+  it('requires priorEffects and priorHealth on every stateless request', () => {
+    expect(() =>
+      seasonWorkerStartRequestSchema.parse(buildWorkerRequest(buildEffectsState())),
+    ).not.toThrow();
     expect(() =>
       seasonWorkerStartRequestSchema.parse({
-        ...buildWorkerRequest(null),
+        ...buildWorkerRequest(buildEffectsState()),
         priorEffects: undefined,
       }),
-    ).not.toThrow();
+    ).toThrow();
+    expect(() =>
+      seasonWorkerStartRequestSchema.parse({
+        ...buildWorkerRequest(buildEffectsState()),
+        priorHealth: undefined,
+      }),
+    ).toThrow();
   });
   it('round-trips a carried effects state and rejects corrupt ones', () => {
     const withState = roundTrip(
       seasonWorkerStartRequestSchema,
       buildWorkerRequest(buildEffectsState()),
     );
-    expect(withState.priorEffects?.pairStates).toHaveLength(1350);
+    expect(withState.priorEffects.pairStates).toHaveLength(1350);
     const corrupt = { ...buildEffectsState(), schemaVersion: 1 };
     expect(() =>
       seasonWorkerStartRequestSchema.parse(buildWorkerRequest(corrupt as never)),
@@ -784,13 +792,13 @@ describe('season run schema version 7 (M2.5)', () => {
     const run = buildRun();
     expect(run.versions.healthVersion).toBe('season-health-v2');
     expect(run.versions.tradeVersion).toBe('season-trade-v4');
-    expect(run.versions.influenceVersion).toBe('season-influence-v2');
-    expect(run.versions.objectiveVersion).toBe('season-objective-v2');
-    expect(run.versions.campaignVersion).toBe('season-campaign-v2');
+    expect(run.versions.influenceVersion).toBe('season-influence-v3');
+    expect(run.versions.objectiveVersion).toBe('season-objective-v3');
+    expect(run.versions.campaignVersion).toBe('season-campaign-v3');
     expect(run.versions.campaignTargetsVersion).toBe('campaign-targets-v1');
     expect(run.versions.injuryTargetsVersion).toBe('injury-targets-v2');
     expect(run.versions.tradeTargetsVersion).toBe('trade-targets-v3');
-    expect(run.versions.influenceTargetsVersion).toBe('influence-targets-v2');
+    expect(run.versions.influenceTargetsVersion).toBe('influence-targets-v3');
     expect(run.checkpointState).toBeNull();
     expect(run.stateRevision).toBe(0);
     expect(run.stateDigest).toBe('0'.repeat(32));

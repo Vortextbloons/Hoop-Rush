@@ -1,6 +1,10 @@
 import { z } from 'zod';
 import { commandIdSchema } from './ids.ts';
-import { SEASON_OBJECTIVE_VERSION } from './season-versions.ts';
+import {
+  SEASON_OBJECTIVE_VERSION,
+  SEASON_OBJECTIVE_VERSION_V1,
+  SEASON_OBJECTIVE_VERSION_V2,
+} from './season-versions.ts';
 export const seasonObjectiveIdSchema = z.enum([
   'win-six',
   'defense-108',
@@ -92,7 +96,8 @@ export const seasonObjectiveStateSchema = z
     schemaVersion: z.literal(1),
     objectiveVersion: z.union([
       z.literal(SEASON_OBJECTIVE_VERSION),
-      z.literal('season-objective-v1'),
+      z.literal(SEASON_OBJECTIVE_VERSION_V2),
+      z.literal(SEASON_OBJECTIVE_VERSION_V1),
     ]),
     catalog: z.array(seasonObjectiveDefinitionSchema).length(6),
     selections: z.record(z.coerce.number().int().min(0).max(7), seasonObjectiveSelectionSchema),

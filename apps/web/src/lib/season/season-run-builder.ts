@@ -5,6 +5,9 @@ import {
   SEASON_AUTHORITY_VERSION,
   SEASON_AWARDS_VERSION,
   SEASON_BLOCK_VERSION,
+  SEASON_CHALLENGE_CATALOG,
+  SEASON_CHALLENGE_TARGETS_VERSION,
+  SEASON_CHALLENGE_VERSION,
   SEASON_CHECKPOINT_VERSION,
   SEASON_CHEMISTRY_VERSION,
   SEASON_COMMAND_LOG_VERSION,
@@ -40,6 +43,7 @@ import {
   SEASON_SEED_DERIVATION_VERSION,
   SEASON_STAMINA_VERSION,
   SEASON_STANDINGS_VERSION,
+  SEASON_STANDINGS_VERSION,
   SEASON_TIEBREAK_VERSION,
   SEASON_TRADE_GRADE_VERSION,
   SEASON_TRADE_TARGETS_VERSION,
@@ -56,8 +60,49 @@ import {
   type SeasonRun,
   type SeasonSchedule,
   type Seed,
+  buildEmptyChallengeState,
 } from '@hoop-rush/data-contracts';
-import { createInitialSeasonInfluenceState } from '@hoop-rush/engine';
+import { createInitialSeasonInfluenceState, dealSeasonBlockChallenges } from '@hoop-rush/engine';
+function buildInitialChallenges(
+  league: SeasonLeague,
+  schedule: SeasonSchedule,
+  rootSeed: Seed,
+  humanFranchiseId: string | null,
+): SeasonRun['challenges'] {
+  const base = buildEmptyChallengeState();
+  if (humanFranchiseId === null) return base;
+  const standings = {
+    schemaVersion: 1 as const,
+    standingsVersion: SEASON_STANDINGS_VERSION,
+    rows: league.teams.map((team) => ({
+      franchiseId: team.franchiseId,
+      wins: 0,
+      losses: 0,
+      gamesPlayed: 0,
+      homeWins: 0,
+      homeLosses: 0,
+      awayWins: 0,
+      awayLosses: 0,
+      conferenceWins: 0,
+      conferenceLosses: 0,
+      divisionWins: 0,
+      divisionLosses: 0,
+      pointsFor: 0,
+      pointsAgainst: 0,
+      headToHead: league.teams
+        .filter((other) => other.franchiseId !== team.franchiseId)
+        .map((other) => ({ franchiseId: other.franchiseId, wins: 0, losses: 0 })),
+    })),
+  };
+  const deal = dealSeasonBlockChallenges(rootSeed, 0, {
+    league,
+    schedule,
+    standings,
+    humanFranchiseId,
+  });
+  if (deal === null) return base;
+  return { ...base, deals: { 0: deal } };
+}
 export async function sha256Hex(material: string): Promise<string | null> {
   return sha256Bytes(new TextEncoder().encode(material));
 }
@@ -135,6 +180,8 @@ export function buildSeasonRunFromGeneration(input: BuildSeasonRunInput): Season
       tradeVersion: SEASON_TRADE_VERSION,
       influenceVersion: SEASON_INFLUENCE_VERSION,
       objectiveVersion: SEASON_OBJECTIVE_VERSION,
+      challengeVersion: SEASON_CHALLENGE_VERSION,
+      challengeTargetsVersion: SEASON_CHALLENGE_TARGETS_VERSION,
       injuryTargetsVersion: SEASON_INJURY_TARGETS_VERSION,
       tradeTargetsVersion: SEASON_TRADE_TARGETS_VERSION,
       influenceTargetsVersion: SEASON_INFLUENCE_TARGETS_VERSION,
@@ -255,6 +302,7 @@ export function buildSeasonRunFromGeneration(input: BuildSeasonRunInput): Season
       catalog: [...SEASON_OBJECTIVE_CATALOG],
       selections: {},
     },
+    challenges: buildInitialChallenges(correctedLeague, schedule, rootSeed, humanFranchiseIds[0] ?? null),
     health: {
       schemaVersion: 1,
       healthVersion: SEASON_HEALTH_VERSION,

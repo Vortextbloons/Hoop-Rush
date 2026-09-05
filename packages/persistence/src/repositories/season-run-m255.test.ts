@@ -38,6 +38,9 @@ function makeAdapters() {
 }
 async function promote(adapters: ReturnType<typeof makeAdapters>) {
   await adapters.repo.promoteSeasonDraftToRun(buildFixtureStoredDraft(adapters.run), adapters.run);
+  const snapshot = await adapters.repo.loadActiveRun();
+  if (!snapshot) throw new Error('expected promoted run');
+  adapters.run = snapshot.run;
 }
 describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompatibility', () => {
   afterEach(() => {
@@ -61,6 +64,7 @@ describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompati
     expect(row?.run.campaign).toBeDefined();
     expect(row?.campaign).toBeDefined();
     expect(row?.campaign?.startingIdentity).toBeNull();
+    expect(row?.campaign?.offers[0]).toHaveLength(2);
     expect(row?.trade).toBeNull();
     expect(row?.health.healthVersion).toBe(SEASON_HEALTH_VERSION);
     expect(row?.influence.influenceVersion).toBe(SEASON_INFLUENCE_VERSION);
@@ -138,10 +142,16 @@ describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompati
     await promote(adapters);
     const base = await adapters.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
     if (!base) throw new Error('no base');
+    const firstOffer = adapters.run.campaign?.offers[0]?.[0];
+    if (!firstOffer) throw new Error('expected block-0 campaign offers on a fresh run');
     const nextCampaign = seasonCampaignStateSchema.parse({
-      ...buildEmptyCampaignState(),
-      startingIdentity: 'win-now',
-      startingFocus: 'defense',
+      ...adapters.run.campaign,
+      selections: {
+        0: {
+          opportunityId: firstOffer.opportunityId,
+          selectedByCommandId: commandIdSchema.parse('cmd-campaign-1'),
+        },
+      },
     });
     const nextRun = {
       ...adapters.run,
@@ -154,13 +164,13 @@ describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompati
     };
     const command: SeasonRunCommand = seasonRunCommandSchema.parse({
       schemaVersion: SEASON_RUN_SCHEMA_VERSION,
-      command: 'select-gm-identity',
+      command: 'select-campaign-opportunity',
       commandId: commandIdSchema.parse('cmd-campaign-1'),
       runId: adapters.run.runId,
       expectedStateRevision: 0,
       expectedStateDigest: adapters.run.stateDigest,
-      identity: 'win-now',
-      focus: 'defense',
+      blockIndex: 0,
+      opportunityId: firstOffer.opportunityId,
     });
     await adapters.repo.applySeasonRunCommand({
       runId: adapters.run.runId,
@@ -170,7 +180,7 @@ describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompati
     });
     const stored = await adapters.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
     expect(stored?.stateRevision).toBe(1);
-    expect(stored?.campaign?.startingIdentity).toBe('win-now');
+    expect(stored?.campaign?.selections[0]?.opportunityId).toBe(firstOffer.opportunityId);
     const log = await adapters.db.seasonCommandLog
       .where('runId')
       .equals(adapters.run.runId)
@@ -198,31 +208,34 @@ describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompati
   it('rejected/duplicate/stale/expired writes nothing', async () => {
     const adapters = makeAdapters();
     await promote(adapters);
+    const firstOffer = adapters.run.campaign?.offers[0]?.[0];
+    if (!firstOffer) throw new Error('expected block-0 campaign offers on a fresh run');
+    const selectedCampaign = seasonCampaignStateSchema.parse({
+      ...adapters.run.campaign,
+      selections: {
+        0: {
+          opportunityId: firstOffer.opportunityId,
+          selectedByCommandId: commandIdSchema.parse('cmd-dup'),
+        },
+      },
+    });
     const command: SeasonRunCommand = seasonRunCommandSchema.parse({
       schemaVersion: SEASON_RUN_SCHEMA_VERSION,
-      command: 'select-gm-identity',
+      command: 'select-campaign-opportunity',
       commandId: commandIdSchema.parse('cmd-dup'),
       runId: adapters.run.runId,
       expectedStateRevision: 0,
       expectedStateDigest: adapters.run.stateDigest,
-      identity: 'win-now',
-      focus: null,
+      blockIndex: 0,
+      opportunityId: firstOffer.opportunityId,
     });
     const nextRun = {
       ...adapters.run,
-      campaign: seasonCampaignStateSchema.parse({
-        ...buildEmptyCampaignState(),
-        startingIdentity: 'win-now',
-        startingFocus: null,
-      }),
+      campaign: selectedCampaign,
       stateRevision: 1,
       stateDigest: buildFixtureStateDigest(adapters.run, {
         stateRevision: 1,
-        campaign: seasonCampaignStateSchema.parse({
-          ...buildEmptyCampaignState(),
-          startingIdentity: 'win-now',
-          startingFocus: null,
-        }),
+        campaign: selectedCampaign,
       }),
     };
     await adapters.repo.applySeasonRunCommand({
@@ -528,20 +541,26 @@ describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompati
   it('cross-tab reload cancels stale work, reloads snapshot, never repeats exchange/transaction', async () => {
     const adapters = makeAdapters();
     await promote(adapters);
+    const firstOffer = adapters.run.campaign?.offers[0]?.[0];
+    if (!firstOffer) throw new Error('expected block-0 campaign offers on a fresh run');
     const command: SeasonRunCommand = seasonRunCommandSchema.parse({
       schemaVersion: SEASON_RUN_SCHEMA_VERSION,
-      command: 'select-gm-identity',
+      command: 'select-campaign-opportunity',
       commandId: commandIdSchema.parse('cmd-xtab-1'),
       runId: adapters.run.runId,
       expectedStateRevision: 0,
       expectedStateDigest: adapters.run.stateDigest,
-      identity: 'win-now',
-      focus: 'defense',
+      blockIndex: 0,
+      opportunityId: firstOffer.opportunityId,
     });
     const nextCampaign = seasonCampaignStateSchema.parse({
-      ...buildEmptyCampaignState(),
-      startingIdentity: 'win-now',
-      startingFocus: 'defense',
+      ...adapters.run.campaign,
+      selections: {
+        0: {
+          opportunityId: firstOffer.opportunityId,
+          selectedByCommandId: commandIdSchema.parse('cmd-xtab-1'),
+        },
+      },
     });
     const nextRun = {
       ...adapters.run,
@@ -564,7 +583,7 @@ describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompati
     });
     const reloaded = await tab2.loadActiveRun();
     expect(reloaded?.run.stateRevision).toBe(1);
-    expect(reloaded?.run.campaign?.startingIdentity).toBe('win-now');
+    expect(reloaded?.run.campaign?.selections[0]?.opportunityId).toBe(firstOffer.opportunityId);
     await expect(
       tab2.applySeasonRunCommand({
         runId: adapters.run.runId,

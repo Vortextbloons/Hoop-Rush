@@ -3,7 +3,7 @@ import {
   SEASON_RUN_SCHEMA_VERSION,
   commandIdSchema,
   franchiseIdSchema,
-  type SeasonObjectiveId,
+  type SeasonChallengeDeal,
   type SeasonRotation,
   type SeasonSubmitBlockCommand,
 } from '@hoop-rush/data-contracts';
@@ -23,7 +23,6 @@ export type SubmitBlockFailureCode =
   | 'block-busy'
   | 'rotation-invalid'
   | 'asset-unavailable'
-  | 'objective-not-selected'
   | 'campaign-not-selected'
   | 'evolution-not-selected'
   | 'free-agency-unresolved';
@@ -76,8 +75,15 @@ export async function buildSubmitBlockEnvelope(
       `The rotation cannot be submitted: ${rotationFailures.join('; ')}`,
     );
   }
-  const objectiveId: SeasonObjectiveId | null =
-    nextBlockIndex >= 8 ? null : selectedObjectiveIdOf(run, nextBlockIndex);
+  const challenges = (
+    run as unknown as {
+      challenges?: import('@hoop-rush/data-contracts').SeasonChallengeState;
+    }
+  ).challenges;
+  const challengeDeal: SeasonChallengeDeal | null =
+    nextBlockIndex >= 8 ? null : (challenges?.deals[nextBlockIndex] ?? null);
+  const challengeIds =
+    challengeDeal !== null ? [...challengeDeal.challengeIds] : undefined;
   const campaignState = (
     run as unknown as {
       campaign?: import('@hoop-rush/data-contracts').SeasonCampaignState;
@@ -87,33 +93,12 @@ export async function buildSubmitBlockEnvelope(
     nextBlockIndex >= 8 ? null : (campaignState?.selections[nextBlockIndex]?.opportunityId ?? null);
   const hasCampaign = campaignState !== undefined;
   if (hasCampaign) {
-    if (campaignState.startingIdentity === null) {
-      return fail(
-        'campaign-not-selected',
-        'Select a GM identity first — the campaign identity locks before the first block.',
-      );
-    }
-    if (
-      nextBlockIndex === 5 &&
-      campaignState.evolutionOffers !== null &&
-      campaignState.evolutionSelection === null
-    ) {
-      return fail(
-        'campaign-not-selected',
-        'Complete the midseason evolution choice first — it locks before block 6.',
-      );
-    }
     if (campaignOpportunityId === null && nextBlockIndex < 8) {
       return fail(
         'campaign-not-selected',
         'Pick a campaign opportunity first — the selected opportunity locks into this block.',
       );
     }
-  } else if (objectiveId === null && nextBlockIndex < 8) {
-    return fail(
-      'objective-not-selected',
-      'Pick a block objective first — the selected objective locks into this block.',
-    );
   }
   const unresolvedWindowIndex = freeAgencyUnresolvedWindowIndex(run.freeAgency);
   if (unresolvedWindowIndex !== null) {
@@ -169,8 +154,11 @@ export async function buildSubmitBlockEnvelope(
     expectedRevision: blockIndex,
     blockIndex,
     rotationDigest,
-    objectiveId,
+    objectiveId: null,
     campaignOpportunityId: campaignOpportunityId,
+    ...(challengeIds !== undefined
+      ? { challengeIds: challengeIds as SeasonSubmitBlockCommand['challengeIds'] }
+      : {}),
     expectedStateRevision: run.stateRevision,
     expectedStateDigest: run.stateDigest,
   };
@@ -183,7 +171,8 @@ export async function buildSubmitBlockEnvelope(
     rotationDigest,
     commandId,
     humanFranchiseId: franchiseIdSchema.parse(humanFranchiseId),
-    objectiveId,
+    objectiveId: null,
+    challengeDeal,
     campaignOpportunityId: campaignOpportunityId,
     homeCourt,
     catalogUrl: artifactUrls.catalogUrl,
@@ -192,12 +181,6 @@ export async function buildSubmitBlockEnvelope(
     profileHash: artifactUrls.profileHash,
   };
   return { ok: true, envelope: { command, start } };
-}
-function selectedObjectiveIdOf(
-  run: NonNullable<SeasonRunShellData['run']>,
-  blockIndex: number,
-): SeasonObjectiveId | null {
-  return run.objectives.selections[blockIndex]?.objectiveId ?? null;
 }
 function fail(code: SubmitBlockFailureCode, message: string): BuildSubmitBlockEnvelopeResult {
   return { ok: false, error: { code, message } };

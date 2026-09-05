@@ -1,8 +1,12 @@
 import { z } from 'zod';
 import { idSchema } from './ids.ts';
 import { seasonCheckpointDigestSchema } from './season-digests.ts';
-import { seasonRunCommandSchema } from './season-commands.ts';
-import { SEASON_COMMAND_LOG_VERSION } from './season-versions.ts';
+import { seasonRunCommandHistorySchema } from './season-commands.ts';
+import {
+  SEASON_COMMAND_LOG_VERSION,
+  SEASON_COMMAND_LOG_VERSION_V1,
+  SEASON_COMMAND_LOG_VERSION_V2,
+} from './season-versions.ts';
 import { canonicalJson, seasonDigestHex } from './season-hash.ts';
 export const seasonCommandActorSourceSchema = z.enum(['human', 'timeout-default', 'ai-takeover']);
 export type SeasonCommandActorSource = z.infer<typeof seasonCommandActorSourceSchema>;
@@ -16,7 +20,7 @@ export const seasonCommandLogEntrySchema = z
   .object({
     runId: z.string().min(1).max(64),
     ordinal: z.number().int().nonnegative(),
-    command: seasonRunCommandSchema,
+    command: seasonRunCommandHistorySchema,
     preStateRevision: z.number().int().nonnegative(),
     preStateDigest: seasonCheckpointDigestSchema,
     postStateRevision: z.number().int().nonnegative(),
@@ -44,7 +48,11 @@ export const seasonCommandLogEntrySchema = z
 export type SeasonCommandLogEntry = z.infer<typeof seasonCommandLogEntrySchema>;
 export const seasonCommandLogSchema = z.object({
   schemaVersion: z.literal(1),
-  commandLogVersion: z.union([z.literal(SEASON_COMMAND_LOG_VERSION), z.literal('command-log-v1')]),
+  commandLogVersion: z.union([
+    z.literal(SEASON_COMMAND_LOG_VERSION),
+    z.literal(SEASON_COMMAND_LOG_VERSION_V2),
+    z.literal(SEASON_COMMAND_LOG_VERSION_V1),
+  ]),
   runId: z.string().min(1).max(64),
   entries: z.array(seasonCommandLogEntrySchema),
 });

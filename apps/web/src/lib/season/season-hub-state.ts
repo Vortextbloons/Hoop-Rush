@@ -8,7 +8,6 @@ import {
   type FranchiseId,
   type Id,
   type SeasonActiveRunIndex,
-  type SeasonCampaignOpportunity,
   type SeasonCampaignState,
   type SeasonDraftCatalog,
   type SeasonEffectsState,
@@ -16,7 +15,6 @@ import {
   type SeasonFreeAgencyRoleExpectation,
   type SeasonGameSummary,
   type SeasonInvalidRosterInterruption,
-  type SeasonObjectiveId,
   type SeasonPendingBlockCandidate,
   type SeasonPostseasonRotationPayload,
   type SeasonPostseasonScoreline,
@@ -36,7 +34,6 @@ import {
   type SeasonTradeWindowState,
 } from '@hoop-rush/data-contracts';
 import {
-  generateSeasonCampaignOffers,
   handleSeasonRunCommand,
   type SeasonRunCommandContext,
 } from '@hoop-rush/engine';
@@ -540,35 +537,6 @@ export class SeasonHubState {
     }
     this.emit();
   }
-  async selectBlockObjective(input: {
-    blockIndex: number;
-    objectiveId: SeasonObjectiveId;
-  }): Promise<void> {
-    const command: SeasonRunCommand = {
-      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
-      command: 'select-block-objective',
-      commandId: newSeasonId('obj'),
-      runId: this.requiredRunId(),
-      expectedStateRevision: this.requiredStateRevision(),
-      expectedStateDigest: this.requiredStateDigest(),
-      blockIndex: input.blockIndex,
-      objectiveId: input.objectiveId,
-    };
-    await this.dispatch(command);
-  }
-  async selectGmIdentity(input: { identity: string; focus: string | null }): Promise<void> {
-    const command: SeasonRunCommand = {
-      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
-      command: 'select-gm-identity',
-      commandId: newSeasonId('gm'),
-      runId: this.requiredRunId(),
-      expectedStateRevision: this.requiredStateRevision(),
-      expectedStateDigest: this.requiredStateDigest(),
-      identity: input.identity as never,
-      focus: input.focus as never,
-    };
-    await this.dispatch(command);
-  }
   async selectCampaignOpportunity(input: {
     blockIndex: number;
     opportunityId: string;
@@ -582,18 +550,6 @@ export class SeasonHubState {
       expectedStateDigest: this.requiredStateDigest(),
       blockIndex: input.blockIndex,
       opportunityId: input.opportunityId,
-    };
-    await this.dispatch(command);
-  }
-  async evolveGmCampaign(input: { offerId: string }): Promise<void> {
-    const command: SeasonRunCommand = {
-      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
-      command: 'evolve-gm-campaign',
-      commandId: newSeasonId('evo'),
-      runId: this.requiredRunId(),
-      expectedStateRevision: this.requiredStateRevision(),
-      expectedStateDigest: this.requiredStateDigest(),
-      offerId: input.offerId,
     };
     await this.dispatch(command);
   }
@@ -1391,19 +1347,13 @@ function indexAfterCommit(
   };
 }
 export interface CampaignViewModel {
-  startingIdentity: SeasonCampaignState['startingIdentity'];
-  startingFocus: SeasonCampaignState['startingFocus'];
   offers: SeasonCampaignState['offers'];
   selections: SeasonCampaignState['selections'];
   evaluations: SeasonCampaignState['evaluations'];
   branchState: SeasonCampaignState['branchState'];
-  evolutionOffers: SeasonCampaignState['evolutionOffers'];
-  evolutionSelection: SeasonCampaignState['evolutionSelection'];
   rewardEntitlements: SeasonCampaignState['rewardEntitlements'];
   appliedRewardIds: SeasonCampaignState['appliedRewardIds'];
   currentBlockIndex: number | null;
-  isIdentityRequired: boolean;
-  isEvolutionRequired: boolean;
   isOpportunityRequired: boolean;
   nextBlockOpportunityIds: string[];
 }
@@ -1431,80 +1381,23 @@ export function campaignViewModel(
     },
     appliedRewardIds: [],
   };
-  const isIdentityRequired = campaign.startingIdentity === null;
   const completedBlocks = Math.ceil(run.cursor.completedRounds / 10);
-  const isEvolutionRequired =
-    completedBlocks === 5 &&
-    campaign.evolutionOffers !== null &&
-    campaign.evolutionSelection === null;
   const targetBlock = nextBlockIndex ?? completedBlocks;
   const isOpportunityRequired =
-    !isIdentityRequired &&
-    !isEvolutionRequired &&
-    targetBlock >= 0 &&
-    targetBlock < 8 &&
-    campaign.selections[targetBlock] === undefined;
+    targetBlock >= 0 && targetBlock < 8 && campaign.selections[targetBlock] === undefined;
   const nextOffers =
     targetBlock >= 0 && targetBlock < 8 ? (campaign.offers[targetBlock] ?? null) : null;
   return {
-    startingIdentity: campaign.startingIdentity,
-    startingFocus: campaign.startingFocus,
     offers: campaign.offers,
     selections: campaign.selections,
     evaluations: campaign.evaluations,
     branchState: campaign.branchState,
-    evolutionOffers: campaign.evolutionOffers,
-    evolutionSelection: campaign.evolutionSelection,
     rewardEntitlements: campaign.rewardEntitlements,
     appliedRewardIds: campaign.appliedRewardIds,
     currentBlockIndex: targetBlock,
-    isIdentityRequired,
-    isEvolutionRequired,
     isOpportunityRequired,
     nextBlockOpportunityIds: nextOffers?.map((o) => o.opportunityId) ?? [],
   };
-}
-export function generatePreviewCampaignOffers(
-  run: SeasonRun,
-  blockIndex: number,
-  schedule: import('@hoop-rush/data-contracts').SeasonSchedule,
-  humanFranchiseId: string | null,
-): SeasonCampaignOpportunity[] | null {
-  try {
-    return generateSeasonCampaignOffers({
-      rootSeed: run.rootSeed,
-      blockIndex,
-      humanFranchiseId,
-      schedule,
-      standings: run.standings,
-      health: run.health,
-      rotations: run.rotations,
-      rosters: run.rosters,
-      transactions: run.transactions,
-      summaries: [],
-      campaignState: run.campaign ?? {
-        schemaVersion: 1,
-        campaignVersion: 'season-campaign-v1',
-        startingIdentity: null,
-        startingFocus: null,
-        offers: {},
-        selections: {},
-        evaluations: [],
-        branchState: {},
-        evolutionOffers: null,
-        evolutionSelection: null,
-        rewardEntitlements: {
-          influenceEarned: 0,
-          inquiryCredits: 0,
-          informationBenefits: 0,
-          followUpUnlocks: [],
-        },
-        appliedRewardIds: [],
-      },
-    });
-  } catch {
-    return null;
-  }
 }
 export interface TradeBoardViewModel {
   windows: SeasonTradeWindowState[];
@@ -1656,6 +1549,8 @@ export function describeCommandRejection(
       return `The signing would create an ownership conflict: ${rejection.reason}.`;
     case 'campaign-identity-required':
       return 'Select a GM identity first.';
+    case 'retired':
+      return 'That command was retired — refresh the run to continue with the current options.';
     case 'campaign-identity-already-selected':
       return 'GM identity already selected.';
     case 'campaign-evolution-required':

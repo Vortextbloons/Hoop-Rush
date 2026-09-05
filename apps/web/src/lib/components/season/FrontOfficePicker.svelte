@@ -26,7 +26,7 @@
     Front office
   </legend>
   <p class="mt-1 text-sm text-muted-foreground">
-    One executive for the run, separate from your GM identity. Every pairing is legal. The choice
+    One executive for the run. Every pairing is legal. The choice
     sticks — no replacements, no leveling.
   </p>
   <div class="mt-3 grid gap-3 md:grid-cols-3" role="radiogroup" aria-label="Front office executive">

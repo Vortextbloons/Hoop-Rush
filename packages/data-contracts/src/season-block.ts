@@ -5,15 +5,25 @@ import { seasonCandidateCheckpointSchema } from './season-checkpoint.ts';
 import { seasonRotationSetDigestSchema } from './season-digests.ts';
 import { seasonObjectiveIdSchema } from './season-objective.ts';
 import { seasonCampaignOpportunityIdSchema } from './season-campaign.ts';
-import { SEASON_BLOCK_VERSION } from './season-versions.ts';
+import { seasonChallengeIdSchema } from './season-challenge.ts';
+import {
+  SEASON_BLOCK_VERSION,
+  SEASON_BLOCK_VERSION_V5,
+  SEASON_BLOCK_VERSION_V6,
+} from './season-versions.ts';
 export const seasonSubmitBlockCommandSchema = seasonRunCommandBaseSchema.extend({
-  blockVersion: z.union([z.literal(SEASON_BLOCK_VERSION), z.literal('season-block-v5')]),
+  blockVersion: z.union([
+    z.literal(SEASON_BLOCK_VERSION),
+    z.literal(SEASON_BLOCK_VERSION_V6),
+    z.literal(SEASON_BLOCK_VERSION_V5),
+  ]),
   command: z.literal('submit-season-block'),
   expectedRevision: z.number().int().nonnegative(),
   blockIndex: z.number().int().min(0).max(8),
   rotationDigest: seasonRotationSetDigestSchema,
   objectiveId: seasonObjectiveIdSchema.nullable().optional(),
   campaignOpportunityId: seasonCampaignOpportunityIdSchema.nullable().optional(),
+  challengeIds: z.array(seasonChallengeIdSchema).length(3).optional(),
 });
 export type SeasonSubmitBlockCommand = z.infer<typeof seasonSubmitBlockCommandSchema>;
 export const seasonStaleCursorRejectionSchema = z.object({
@@ -60,6 +70,13 @@ export const seasonInvalidObjectiveRejectionSchema = z.object({
   blockIndex: z.number().int().min(0).max(8),
 });
 export type SeasonInvalidObjectiveRejection = z.infer<typeof seasonInvalidObjectiveRejectionSchema>;
+export const seasonInvalidChallengeRejectionSchema = z.object({
+  code: z.literal('invalid-challenge'),
+  expected: z.enum(['required', 'none', 'not-offered']),
+  challengeId: z.string().min(1).max(64).optional(),
+  blockIndex: z.number().int().min(0).max(8),
+});
+export type SeasonInvalidChallengeRejection = z.infer<typeof seasonInvalidChallengeRejectionSchema>;
 export const seasonInvalidCampaignRejectionSchema = z.object({
   code: z.literal('invalid-campaign'),
   expected: z.enum(['required', 'none', 'not-offered']),
@@ -89,6 +106,7 @@ export const seasonSubmitBlockRejectionSchema = z.discriminatedUnion('code', [
   seasonNonBoundaryBlockRejectionSchema,
   seasonRunMismatchRejectionSchema,
   seasonInvalidObjectiveRejectionSchema,
+  seasonInvalidChallengeRejectionSchema,
   seasonInvalidCampaignRejectionSchema,
   seasonFreeAgencyUnresolvedRejectionSchema,
   seasonEvolutionSelectionRequiredRejectionSchema,

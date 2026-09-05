@@ -8,8 +8,11 @@ import {
 } from '@hoop-rush/data-contracts';
 import { franchiseIdSchema } from '@hoop-rush/data-contracts';
 import {
+  CLOSING_SLOT_LABELS,
   ROTATION_PRESETS,
   createRotationEditor,
+  displayRotationFailure,
+  displayRotationFailures,
   failurePlayerVersionId,
   indexRotationFailures,
   presetLabel,
@@ -495,5 +498,56 @@ describe('rotationEditorNeedsPositionRefresh', () => {
     expect(rotationEditorNeedsPositionRefresh(cached, rosterIds, (id) => playableOf(id))).toBe(
       false,
     );
+  });
+});
+describe('displayRotationFailures', () => {
+  it('maps slot indexes to G1/G2/F1/F2/C labels', () => {
+    expect(CLOSING_SLOT_LABELS).toEqual(['G1', 'G2', 'F1', 'F2', 'C']);
+  });
+  it('replaces playerVersionIds with display names', () => {
+    const e = editor();
+    const names = e.names;
+    const first = e.rotation.starters[0];
+    if (first === undefined) throw new Error('fixture rotation has no starters');
+    const displayName = names.get(first) ?? '';
+    expect(displayName.length).toBeGreaterThan(0);
+    const humanized = displayRotationFailure(`starter ${first} cannot play slot 0`, names);
+    expect(humanized).not.toContain(first);
+    expect(humanized).toContain(displayName);
+  });
+  it('maps slot N to short labels without leaking raw indexes', () => {
+    const names = new Map([['pv-1', 'J. Smith']]);
+    expect(displayRotationFailure('starter pv-1 cannot play slot 0', names)).toBe(
+      'starter J. Smith cannot play G1',
+    );
+    expect(displayRotationFailure('starter pv-1 cannot play slot 4', names)).toBe(
+      'starter J. Smith cannot play C',
+    );
+    expect(displayRotationFailure('closing-five player pv-1 cannot play slot 2', names)).toBe(
+      'closing-five player J. Smith cannot play F1',
+    );
+  });
+  it('humanizes target-minute messages with display names', () => {
+    const names = new Map([['pv-2', 'A. Jones']]);
+    expect(
+      displayRotationFailure('target minutes for pv-2 must be an integer from 0-48 (got 7)', names),
+    ).toContain('A. Jones');
+    expect(displayRotationFailure('no target minutes for rostered player pv-2', names)).toContain(
+      'A. Jones',
+    );
+  });
+  it('leaves unknown ids untouched and maps lists', () => {
+    const names = new Map([['pv-1', 'J. Smith']]);
+    expect(displayRotationFailure('target minutes must total 240 (got 256)', names)).toBe(
+      'target minutes must total 240 (got 256)',
+    );
+    const list = displayRotationFailures(
+      ['starter pv-1 cannot play slot 1', 'target minutes must total 240 (got 200)'],
+      names,
+    );
+    expect(list).toEqual([
+      'starter J. Smith cannot play G2',
+      'target minutes must total 240 (got 200)',
+    ]);
   });
 });

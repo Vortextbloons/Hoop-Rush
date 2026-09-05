@@ -19,6 +19,7 @@ export interface RotationMember {
   seasonKey?: string;
 }
 export const SLOT_GROUPS: readonly SlotGroup[] = ['G', 'G', 'F', 'F', 'C'];
+export const CLOSING_SLOT_LABELS = ['G1', 'G2', 'F1', 'F2', 'C'] as const;
 export interface MinuteAdjustment {
   playerVersionId: string;
   minutes: number;
@@ -340,6 +341,23 @@ export class RotationEditor {
     this.rotation = candidate;
     return this.rotation;
   }
+  applyAutoRotation(candidate: SeasonRotation): SeasonRotation {
+    const nextActive = new Set([...candidate.starters, ...candidate.benchOrder]);
+    const playable = new Map<string, readonly Position[]>();
+    for (const member of this.members) {
+      if (nextActive.has(member.playerVersionId)) {
+        playable.set(member.playerVersionId, member.playable);
+      }
+    }
+    const failures = auditSeasonRotation(candidate, playable);
+    if (failures.length > 0) {
+      throw new Error(`rotation plan rejected: ${failures[0] ?? 'invalid rotation'}`);
+    }
+    this.rotation = candidate;
+    this.memberPlayable = playable;
+    this.activeIds = nextActive;
+    return this.rotation;
+  }
   assignStarter(slotIndex: number, playerVersionId: string): string[] {
     const current = this.rotation.starters[slotIndex];
     if (current === playerVersionId) return [];
@@ -439,4 +457,29 @@ export function indexRotationFailures(failures: readonly string[]): RotationFail
     }
   }
   return { byPlayer, global };
+}
+export function displayRotationFailure(
+  failure: string,
+  names: ReadonlyMap<string, string>,
+): string {
+  let humanized = failure;
+  const entries = [...names.entries()].sort((a, b) => b[0].length - a[0].length);
+  for (const [playerVersionId, displayName] of entries) {
+    if (playerVersionId.length === 0) continue;
+    if (humanized.includes(playerVersionId)) {
+      humanized = humanized.split(playerVersionId).join(displayName);
+    }
+  }
+  humanized = humanized.replace(/\bslot (\d+)\b/g, (_match, rawIndex: string) => {
+    const slotIndex = Number.parseInt(rawIndex, 10);
+    const label = CLOSING_SLOT_LABELS[slotIndex];
+    return label ?? `slot ${rawIndex}`;
+  });
+  return humanized;
+}
+export function displayRotationFailures(
+  failures: readonly string[],
+  names: ReadonlyMap<string, string>,
+): string[] {
+  return failures.map((failure) => displayRotationFailure(failure, names));
 }

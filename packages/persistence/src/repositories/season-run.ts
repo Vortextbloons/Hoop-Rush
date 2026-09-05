@@ -3,6 +3,7 @@ import type {
   SeasonActiveRunIndex,
   SeasonBlockRecap,
   SeasonCampaignState,
+  SeasonChallengeState,
   SeasonEvolutionState,
   SeasonCandidateCheckpoint,
   SeasonCheckpointState,
@@ -49,6 +50,7 @@ export interface CommitSeasonBlockInput {
   influence: SeasonInfluenceState;
   trade: SeasonTradeState | null;
   objectives: SeasonObjectiveState;
+  challenges?: SeasonChallengeState | null;
   campaign?: SeasonCampaignState | null;
   evolution?: SeasonEvolutionState | null;
   checkpointState: SeasonCheckpointState;

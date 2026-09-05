@@ -9,8 +9,6 @@ import type {
   SeasonInfluenceState,
   SeasonInvalidRosterInterruption,
   SeasonLeague,
-  SeasonObjectiveId,
-  SeasonObjectiveState,
   SeasonPendingBlockCandidate,
   SeasonPostseasonRotationPayload,
   SeasonRun,
@@ -58,7 +56,8 @@ export interface SeasonRunShellData {
   influence: SeasonInfluenceState | null;
   trade: SeasonTradeState | null;
   freeAgency: SeasonFreeAgencyState | null;
-  objectives: SeasonObjectiveState | null;
+  objectives: import('@hoop-rush/data-contracts').SeasonObjectiveState | null;
+  challenges: import('@hoop-rush/data-contracts').SeasonChallengeState | null;
   pending: SeasonPendingBlockCandidate | null;
   interruption: SeasonInvalidRosterInterruption | null;
   commandError: SeasonRunCommandError | null;
@@ -79,10 +78,6 @@ export interface SeasonRunShellData {
     ok: boolean;
     error: string | null;
   }>;
-  selectBlockObjective: (input: {
-    blockIndex: number;
-    objectiveId: SeasonObjectiveId;
-  }) => Promise<void>;
   spendInfluence: (input: {
     purpose: SeasonSpendInfluencePurpose;
     windowIndex?: number;
@@ -102,12 +97,10 @@ export interface SeasonRunShellData {
   resolveFreeAgentMarket: (input: { windowIndex: number }) => Promise<void>;
   forfeitInterruptedGame: () => Promise<void>;
   resumeBlock: () => Promise<void>;
-  selectGmIdentity?: (input: { identity: string; focus: string | null }) => Promise<void>;
   selectCampaignOpportunity?: (input: {
     blockIndex: number;
     opportunityId: string;
   }) => Promise<void>;
-  evolveGmCampaign?: (input: { offerId: string }) => Promise<void>;
   selectFrontOffice?: (input: { executiveId: string }) => Promise<void>;
   selectCourtInnovation?: (input: { innovationId: string }) => Promise<void>;
   openTradeInquiry?: (input: { windowIndex: number; toFranchiseId: string }) => Promise<void>;
@@ -178,6 +171,7 @@ export function initialSeasonRunShellData(): SeasonRunShellData {
     trade: null,
     freeAgency: null,
     objectives: null,
+    challenges: null,
     pending: null,
     interruption: null,
     commandError: null,
@@ -192,7 +186,6 @@ export function initialSeasonRunShellData(): SeasonRunShellData {
     retryBlock: () => undefined,
     refresh: () => Promise.resolve(),
     quitRun: () => Promise.resolve({ ok: false, error: 'season shell not ready' }),
-    selectBlockObjective: () => Promise.resolve(),
     spendInfluence: () => Promise.resolve(),
     acceptTradeOffer: () => Promise.resolve(),
     declineTradeOffer: () => Promise.resolve(),
@@ -201,9 +194,7 @@ export function initialSeasonRunShellData(): SeasonRunShellData {
     resolveFreeAgentMarket: () => Promise.resolve(),
     forfeitInterruptedGame: () => Promise.resolve(),
     resumeBlock: () => Promise.resolve(),
-    selectGmIdentity: () => Promise.resolve(),
     selectCampaignOpportunity: () => Promise.resolve(),
-    evolveGmCampaign: () => Promise.resolve(),
     selectFrontOffice: () => Promise.resolve(),
     selectCourtInnovation: () => Promise.resolve(),
     openTradeInquiry: () => Promise.resolve(),

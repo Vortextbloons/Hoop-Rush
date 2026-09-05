@@ -128,6 +128,9 @@ function lockedRotationSet(dataset: Pick<Adapters, 'run'>): SeasonRun['rotations
 }
 async function promote(adapters: Adapters): Promise<void> {
   await adapters.repo.promoteSeasonDraftToRun(buildFixtureStoredDraft(adapters.run), adapters.run);
+  const snapshot = await adapters.repo.loadActiveRun();
+  if (snapshot === null) throw new Error('expected promoted run');
+  adapters.run = snapshot.run;
 }
 async function loadOrThrow(adapters: Adapters) {
   const snapshot = await adapters.repo.loadActiveRun();

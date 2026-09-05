@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   SEASON_CAMPAIGN_VERSION,
+  SEASON_CAMPAIGN_VERSION_V2,
   buildEmptyCampaignState,
   commandIdSchema,
   franchiseIdSchema,
@@ -10,6 +11,7 @@ import {
 import {
   applySeasonCampaignEvolutionSelection,
   applySeasonCampaignReward,
+  buildInitialCampaignState,
   evaluateSeasonCampaignOpportunity,
   generateSeasonCampaignEvolutionOffers,
   generateSeasonCampaignOffers,
@@ -62,8 +64,6 @@ function generationInput(
   });
   const standings = standingsFor(run);
   const campaignState = buildEmptyCampaignState();
-  campaignState.startingIdentity = 'win-now';
-  campaignState.startingFocus = 'defense';
   return {
     rootSeed: ROOT_SEED,
     blockIndex: 0,
@@ -228,19 +228,36 @@ describe('season campaign generation (M2.5.5)', () => {
       expect(opp.feasibilityFacts).toBeDefined();
     }
   });
-  it('applies identity emphasis as ordering weight not hidden modifier', () => {
+  it('ignores legacy GM identity in offer weighting (no identity bonus)', () => {
     const base = generationInput();
-    base.campaignState.startingIdentity = 'win-now';
-    const winNowOffers = generateSeasonCampaignOffers(base);
+    const nullIdentityOffers = generateSeasonCampaignOffers(base);
+    const winNow = generationInput();
+    winNow.campaignState.startingIdentity = 'win-now';
+    const winNowOffers = generateSeasonCampaignOffers(winNow);
     const dev = generationInput();
     dev.campaignState.startingIdentity = 'player-development';
+    dev.campaignState.startingFocus = 'depth';
     const devOffers = generateSeasonCampaignOffers(dev);
-    expect(winNowOffers).toHaveLength(2);
-    expect(devOffers).toHaveLength(2);
+    expect(winNowOffers).toEqual(nullIdentityOffers);
+    expect(devOffers).toEqual(nullIdentityOffers);
     for (const opp of [...winNowOffers, ...devOffers]) {
       expect(opp.completedReward.amount).toBeGreaterThanOrEqual(1);
       expect(opp.target.kind).toBeDefined();
     }
+  });
+  it('loads a legacy non-null identity and ignores it', () => {
+    const legacy = normalizeCampaignState({
+      ...buildEmptyCampaignState(),
+      campaignVersion: SEASON_CAMPAIGN_VERSION_V2,
+      startingIdentity: 'win-now',
+      startingFocus: 'defense',
+    });
+    expect(legacy.campaignVersion).toBe(SEASON_CAMPAIGN_VERSION_V2);
+    expect(legacy.startingIdentity).toBe('win-now');
+    const withLegacy = generationInput({ campaignState: legacy });
+    const legacyOffers = generateSeasonCampaignOffers(withLegacy);
+    const freshOffers = generateSeasonCampaignOffers(generationInput());
+    expect(legacyOffers).toEqual(freshOffers);
   });
 });
 describe('season campaign evaluation', () => {
@@ -665,8 +682,28 @@ describe('campaign old saves', () => {
   });
   it('buildEmptyCampaignState matches frozen version', () => {
     const state = buildEmptyCampaignState();
-    expect(state.campaignVersion).toBe('season-campaign-v2');
+    expect(state.campaignVersion).toBe(SEASON_CAMPAIGN_VERSION);
     expect(state.schemaVersion).toBe(1);
+  });
+  it('buildInitialCampaignState starts without identity and deals block-0 offers', () => {
+    const input = generationInput();
+    const initial = buildInitialCampaignState({
+      rootSeed: input.rootSeed,
+      humanFranchiseId: input.humanFranchiseId,
+      schedule: input.schedule,
+      standings: input.standings,
+      health: input.health,
+      rotations: input.rotations,
+      rosters: input.rosters,
+      transactions: input.transactions,
+    });
+    expect(initial.startingIdentity).toBeNull();
+    expect(initial.startingFocus).toBeNull();
+    expect(initial.evolutionOffers).toBeNull();
+    expect(initial.evolutionSelection).toBeNull();
+    expect(initial.offers[0]).toHaveLength(2);
+    const direct = generateSeasonCampaignOffers({ ...input, blockIndex: 0 });
+    expect(initial.offers[0]).toEqual(direct);
   });
 });
 describe('campaign determinism and seed paths', () => {

@@ -1,7 +1,11 @@
 import { z } from 'zod';
 import { commandIdSchema, franchiseIdSchema } from './ids.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
-import { SEASON_CAMPAIGN_VERSION } from './season-versions.ts';
+import {
+  SEASON_CAMPAIGN_VERSION,
+  SEASON_CAMPAIGN_VERSION_V1,
+  SEASON_CAMPAIGN_VERSION_V2,
+} from './season-versions.ts';
 export const seasonCampaignGmIdentitySchema = z.enum([
   'win-now',
   'player-development',
@@ -240,7 +244,11 @@ export type SeasonCampaignPerFranchiseState = z.infer<typeof seasonCampaignPerFr
 export const seasonCampaignStateSchema = z
   .object({
     schemaVersion: z.literal(1),
-    campaignVersion: z.union([z.literal(SEASON_CAMPAIGN_VERSION), z.literal('season-campaign-v1')]),
+    campaignVersion: z.union([
+      z.literal(SEASON_CAMPAIGN_VERSION),
+      z.literal(SEASON_CAMPAIGN_VERSION_V2),
+      z.literal(SEASON_CAMPAIGN_VERSION_V1),
+    ]),
     startingIdentity: seasonCampaignGmIdentitySchema.nullable(),
     startingFocus: seasonCampaignFocusSchema.nullable(),
     offers: z.record(

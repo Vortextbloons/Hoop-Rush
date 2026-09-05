@@ -12,6 +12,7 @@ import { seasonCheckpointStateSchema } from './season-checkpoint.ts';
 import { seasonHealthStateSchema } from './season-health.ts';
 import { seasonInfluenceStateSchema } from './season-influence.ts';
 import { seasonObjectiveStateSchema } from './season-objective.ts';
+import { seasonChallengeStateSchema } from './season-challenge.ts';
 import { seasonCampaignStateSchema } from './season-campaign.ts';
 import { seasonTradeStateSchema } from './season-trade.ts';
 import { seasonRunAuthoritySchema } from './season-authority.ts';
@@ -26,9 +27,23 @@ import {
   SEASON_AUTHORITY_VERSION,
   SEASON_AWARDS_VERSION,
   SEASON_BLOCK_VERSION,
+  SEASON_BLOCK_VERSION_V5,
+  SEASON_BLOCK_VERSION_V6,
+  SEASON_CAMPAIGN_TARGETS_VERSION,
+  SEASON_CAMPAIGN_VERSION,
+  SEASON_CAMPAIGN_VERSION_V1,
+  SEASON_CAMPAIGN_VERSION_V2,
+  SEASON_CHALLENGE_TARGETS_VERSION,
+  SEASON_CHALLENGE_VERSION,
+  SEASON_CHALLENGE_VERSION_V1,
+  SEASON_CHALLENGE_VERSION_V2,
   SEASON_CHECKPOINT_VERSION,
+  SEASON_CHECKPOINT_VERSION_V5,
+  SEASON_CHECKPOINT_VERSION_V6,
   SEASON_CHEMISTRY_VERSION,
   SEASON_COMMAND_LOG_VERSION,
+  SEASON_COMMAND_LOG_VERSION_V1,
+  SEASON_COMMAND_LOG_VERSION_V2,
   SEASON_DRAFT_LEGACY_VERSION,
   SEASON_DRAFT_VERSION,
   SEASON_EFFECT_TARGETS_LEGACY_VERSION,
@@ -42,21 +57,28 @@ import {
   SEASON_GAME_TARGETS_VERSION,
   SEASON_GAME_VERSION,
   SEASON_HEALTH_VERSION,
-  SEASON_CAMPAIGN_TARGETS_VERSION,
-  SEASON_CAMPAIGN_VERSION,
   SEASON_HOME_COURT_VERSION,
   SEASON_INFLUENCE_TARGETS_VERSION,
+  SEASON_INFLUENCE_TARGETS_VERSION_V1,
+  SEASON_INFLUENCE_TARGETS_VERSION_V2,
   SEASON_INFLUENCE_VERSION,
+  SEASON_INFLUENCE_VERSION_V1,
+  SEASON_INFLUENCE_VERSION_V2,
   SEASON_INJURY_TARGETS_VERSION,
   SEASON_LEAGUE_VERSION,
   SEASON_LEADERS_VERSION,
   SEASON_MINUTE_POLICY_VERSION,
   SEASON_OBJECTIVE_VERSION,
+  SEASON_OBJECTIVE_VERSION_V1,
+  SEASON_OBJECTIVE_VERSION_V2,
   SEASON_POSTSEASON_SUMMARY_VERSION,
   SEASON_POSTSEASON_TARGETS_VERSION,
   SEASON_POSTSEASON_VERSION,
   SEASON_RECAP_VERSION,
+  SEASON_RECAP_VERSION_V5,
   SEASON_REPLAY_EXPORT_VERSION,
+  SEASON_REPLAY_EXPORT_VERSION_V1,
+  SEASON_REPLAY_EXPORT_VERSION_V2,
   SEASON_ROSTER_GENERATION_V2,
   SEASON_ROSTER_GENERATION_VERSION,
   SEASON_ROSTER_RULES_VERSION,
@@ -66,6 +88,9 @@ import {
   SEASON_ROTATION_PLANNER_VERSION,
   SEASON_ROTATION_VERSION,
   SEASON_RUN_SCHEMA_VERSION,
+  SEASON_RUN_SCHEMA_VERSION_V11,
+  SEASON_RUN_SCHEMA_VERSION_V12,
+  SEASON_RUN_SCHEMA_VERSION_V13,
   SEASON_FRONT_OFFICE_VERSION,
   SEASON_COURT_INNOVATION_VERSION,
   SEASON_EVOLUTION_TARGETS_VERSION,
@@ -196,7 +221,12 @@ export const seasonScheduleReferenceSchema = z.object({
 });
 export type SeasonScheduleReference = z.infer<typeof seasonScheduleReferenceSchema>;
 export const seasonRunVersionsSchema = z.object({
-  runSchemaVersion: z.union([z.literal(SEASON_RUN_SCHEMA_VERSION), z.literal(12), z.literal(11)]),
+  runSchemaVersion: z.union([
+    z.literal(SEASON_RUN_SCHEMA_VERSION),
+    z.literal(SEASON_RUN_SCHEMA_VERSION_V13),
+    z.literal(SEASON_RUN_SCHEMA_VERSION_V12),
+    z.literal(SEASON_RUN_SCHEMA_VERSION_V11),
+  ]),
   roomProtocolVersion: z.literal(1).optional(),
   multiplayerVersion: z.string().optional(),
   timerPolicyVersion: z.string().optional(),
@@ -224,7 +254,11 @@ export const seasonRunVersionsSchema = z.object({
     z.literal(SEASON_ROSTER_TARGETS_V2),
     z.literal(SEASON_ROSTER_TARGETS_VERSION),
   ]),
-  blockVersion: z.union([z.literal(SEASON_BLOCK_VERSION), z.literal('season-block-v5')]),
+  blockVersion: z.union([
+    z.literal(SEASON_BLOCK_VERSION),
+    z.literal(SEASON_BLOCK_VERSION_V6),
+    z.literal(SEASON_BLOCK_VERSION_V5),
+  ]),
   summaryVersion: z.union([
     z.literal(SEASON_GAME_SUMMARY_VERSION),
     z.literal(SEASON_GAME_SUMMARY_LEGACY_VERSION),
@@ -233,12 +267,13 @@ export const seasonRunVersionsSchema = z.object({
     z.literal(SEASON_AGGREGATES_VERSION),
     z.literal(SEASON_AGGREGATES_LEGACY_VERSION),
   ]),
-  recapVersion: z.literal(SEASON_RECAP_VERSION),
+  recapVersion: z.union([z.literal(SEASON_RECAP_VERSION), z.literal(SEASON_RECAP_VERSION_V5)]),
   leadersVersion: z.literal(SEASON_LEADERS_VERSION),
   homeCourtVersion: z.literal(SEASON_HOME_COURT_VERSION),
   checkpointVersion: z.union([
     z.literal(SEASON_CHECKPOINT_VERSION),
-    z.literal('season-checkpoint-v5'),
+    z.literal(SEASON_CHECKPOINT_VERSION_V6),
+    z.literal(SEASON_CHECKPOINT_VERSION_V5),
   ]),
   staminaVersion: z.union([
     z.literal(SEASON_STAMINA_VERSION),
@@ -255,27 +290,55 @@ export const seasonRunVersionsSchema = z.object({
     z.literal('season-trade-v4'),
     z.literal('season-trade-v3'),
   ]),
-  influenceVersion: z.literal(SEASON_INFLUENCE_VERSION),
-  objectiveVersion: z.union([
-    z.literal(SEASON_OBJECTIVE_VERSION),
-    z.literal('season-objective-v1'),
+  influenceVersion: z.union([
+    z.literal(SEASON_INFLUENCE_VERSION),
+    z.literal(SEASON_INFLUENCE_VERSION_V2),
+    z.literal(SEASON_INFLUENCE_VERSION_V1),
   ]),
+  objectiveVersion: z
+    .union([
+      z.literal(SEASON_OBJECTIVE_VERSION),
+      z.literal(SEASON_OBJECTIVE_VERSION_V2),
+      z.literal(SEASON_OBJECTIVE_VERSION_V1),
+    ])
+    .optional(),
+  challengeVersion: z
+    .union([
+      z.literal(SEASON_CHALLENGE_VERSION),
+      z.literal(SEASON_CHALLENGE_VERSION_V2),
+      z.literal(SEASON_CHALLENGE_VERSION_V1),
+    ])
+    .optional(),
+  challengeTargetsVersion: z.literal(SEASON_CHALLENGE_TARGETS_VERSION).optional(),
   campaignVersion: z
-    .union([z.literal(SEASON_CAMPAIGN_VERSION), z.literal('season-campaign-v1')])
+    .union([
+      z.literal(SEASON_CAMPAIGN_VERSION),
+      z.literal(SEASON_CAMPAIGN_VERSION_V2),
+      z.literal(SEASON_CAMPAIGN_VERSION_V1),
+    ])
     .optional(),
   campaignTargetsVersion: z.literal(SEASON_CAMPAIGN_TARGETS_VERSION).optional(),
   injuryTargetsVersion: z.literal(SEASON_INJURY_TARGETS_VERSION),
   tradeTargetsVersion: z.literal(SEASON_TRADE_TARGETS_VERSION),
-  influenceTargetsVersion: z.literal(SEASON_INFLUENCE_TARGETS_VERSION),
+  influenceTargetsVersion: z.union([
+    z.literal(SEASON_INFLUENCE_TARGETS_VERSION),
+    z.literal(SEASON_INFLUENCE_TARGETS_VERSION_V2),
+    z.literal(SEASON_INFLUENCE_TARGETS_VERSION_V1),
+  ]),
   tiebreakVersion: z.literal(SEASON_TIEBREAK_VERSION),
   postseasonSummaryVersion: z.literal(SEASON_POSTSEASON_SUMMARY_VERSION),
   awardsVersion: z.literal(SEASON_AWARDS_VERSION),
   tradeGradeVersion: z.literal(SEASON_TRADE_GRADE_VERSION),
-  commandLogVersion: z.union([z.literal(SEASON_COMMAND_LOG_VERSION), z.literal('command-log-v1')]),
+  commandLogVersion: z.union([
+    z.literal(SEASON_COMMAND_LOG_VERSION),
+    z.literal(SEASON_COMMAND_LOG_VERSION_V2),
+    z.literal(SEASON_COMMAND_LOG_VERSION_V1),
+  ]),
   almanacVersion: z.union([z.literal(SEASON_ALMANAC_VERSION), z.literal('almanac-v1')]),
   replayExportVersion: z.union([
     z.literal(SEASON_REPLAY_EXPORT_VERSION),
-    z.literal('replay-export-v1'),
+    z.literal(SEASON_REPLAY_EXPORT_VERSION_V2),
+    z.literal(SEASON_REPLAY_EXPORT_VERSION_V1),
   ]),
   postseasonTargetsVersion: z.literal(SEASON_POSTSEASON_TARGETS_VERSION),
   freeAgencyVersion: z.literal(SEASON_FREE_AGENCY_VERSION),
@@ -286,9 +349,45 @@ export const seasonRunVersionsSchema = z.object({
   evolutionTargetsVersion: z.literal(SEASON_EVOLUTION_TARGETS_VERSION).optional(),
 });
 export type SeasonRunVersions = z.infer<typeof seasonRunVersionsSchema>;
+export function isLiveSeasonRunVersions(versions: {
+  runSchemaVersion: number;
+  blockVersion: string;
+  checkpointVersion: string;
+  recapVersion: string;
+  campaignVersion?: string | undefined;
+  influenceVersion: string;
+  objectiveVersion?: string | undefined;
+  challengeVersion?: string | undefined;
+  commandLogVersion: string;
+  replayExportVersion: string;
+  influenceTargetsVersion: string;
+}): boolean {
+  return (
+    versions.runSchemaVersion === SEASON_RUN_SCHEMA_VERSION &&
+    versions.blockVersion === SEASON_BLOCK_VERSION &&
+    versions.checkpointVersion === SEASON_CHECKPOINT_VERSION &&
+    versions.recapVersion === SEASON_RECAP_VERSION &&
+    (versions.campaignVersion === undefined || versions.campaignVersion === SEASON_CAMPAIGN_VERSION) &&
+    versions.influenceVersion === SEASON_INFLUENCE_VERSION &&
+    (versions.objectiveVersion === undefined ||
+      versions.objectiveVersion === SEASON_OBJECTIVE_VERSION) &&
+    (versions.challengeVersion === undefined ||
+      versions.challengeVersion === SEASON_CHALLENGE_VERSION) &&
+    versions.commandLogVersion === SEASON_COMMAND_LOG_VERSION &&
+    versions.replayExportVersion === SEASON_REPLAY_EXPORT_VERSION &&
+    versions.influenceTargetsVersion === SEASON_INFLUENCE_TARGETS_VERSION
+  );
+}
+export const LIVE_SEASON_RUN_VERSION_MESSAGE =
+  'stored Season Run was made under older rules (expected run 14 / save 12 / command-log-v3 / replay-export-v3 / block-v7 / checkpoint-v7 / recap-v6 / campaign-v3 / influence-v3 / challenge-v3); it cannot continue and must be discarded explicitly';
 export const seasonRunSchema = z
   .object({
-    schemaVersion: z.union([z.literal(SEASON_RUN_SCHEMA_VERSION), z.literal(12), z.literal(11)]),
+    schemaVersion: z.union([
+      z.literal(SEASON_RUN_SCHEMA_VERSION),
+      z.literal(SEASON_RUN_SCHEMA_VERSION_V13),
+      z.literal(SEASON_RUN_SCHEMA_VERSION_V12),
+      z.literal(SEASON_RUN_SCHEMA_VERSION_V11),
+    ]),
     runId: idSchema,
     rootSeed: seedSchema,
     versions: seasonRunVersionsSchema,
@@ -320,6 +419,7 @@ export const seasonRunSchema = z
     trade: seasonTradeStateSchema.nullable(),
     freeAgency: seasonFreeAgencyStateSchema,
     objectives: seasonObjectiveStateSchema,
+    challenges: seasonChallengeStateSchema.optional(),
     campaign: seasonCampaignStateSchema.optional(),
     evolution: seasonEvolutionStateSchema.optional(),
     health: seasonHealthStateSchema,
@@ -357,10 +457,18 @@ export const seasonRunSchema = z
         message: `awards cannot exist before the playoffs (run stage: ${run.stage})`,
       });
     }
+    if (run.schemaVersion === SEASON_RUN_SCHEMA_VERSION && run.challenges === undefined) {
+      ctx.addIssue({ code: 'custom', message: 'a v14 run must carry challenge state' });
+    }
   });
 export type SeasonRun = z.infer<typeof seasonRunSchema>;
 export const seasonBlockRunContextSchema = z.object({
-  schemaVersion: z.union([z.literal(SEASON_RUN_SCHEMA_VERSION), z.literal(12), z.literal(11)]),
+  schemaVersion: z.union([
+    z.literal(SEASON_RUN_SCHEMA_VERSION),
+    z.literal(SEASON_RUN_SCHEMA_VERSION_V13),
+    z.literal(SEASON_RUN_SCHEMA_VERSION_V12),
+    z.literal(SEASON_RUN_SCHEMA_VERSION_V11),
+  ]),
   runId: idSchema,
   rootSeed: seedSchema,
   versions: seasonRunVersionsSchema,

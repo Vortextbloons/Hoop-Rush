@@ -39,6 +39,7 @@ export function seasonTransactionEntry(input: SeasonTransactionEntryInput): Seas
 export const seasonTransactionTypeSchema = z.enum([
   'trade',
   'objective-reward',
+  'challenge-reward',
   'campaign-reward',
   'trade-cash-sent',
   'trade-cash-received',

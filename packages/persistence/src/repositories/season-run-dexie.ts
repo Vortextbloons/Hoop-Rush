@@ -1,8 +1,11 @@
 import {
   blockIndexForRound,
   buildEmptyCampaignState,
+  buildEmptyChallengeState,
   emptySeasonPlayerAggregate,
   humanTeamOf,
+  isLiveSeasonRunVersions,
+  LIVE_SEASON_RUN_VERSION_MESSAGE,
   seasonAcceptedBlockSchema,
   seasonAlmanacSchema,
   seasonCampaignStateSchema,
@@ -79,6 +82,7 @@ import {
   type StoredSeasonDraft,
 } from '../schemas/season-draft-record.ts';
 import type { SeasonRunEngineSeam } from '../season/engine-seam-types.ts';
+import { buildInitialCampaignState, generateSeasonSchedule } from '@hoop-rush/engine';
 import { auditSeasonRunState } from '../season/audit.ts';
 import { seasonRunEngineSeam } from '../season/engine-seam.ts';
 import {
@@ -148,7 +152,7 @@ export class SeasonRunIncompatibleError extends Error {
   constructor(info: SeasonRunIncompatibleInfo) {
     super(
       `stored Season Run was made under older rules (schema ${String(info.storedRunSchemaVersion)}); ` +
-        `it cannot continue and must be discarded explicitly`,
+        `it cannot continue and must be discarded explicitly. ${LIVE_SEASON_RUN_VERSION_MESSAGE}`,
     );
     this.name = 'SeasonRunIncompatibleError';
     this.info = info;
@@ -488,6 +492,18 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
         `corrupt Season Run checkpoint: ${errorMessage(error)}`,
       );
     }
+    if (!isLiveSeasonRunVersions(stored.run.versions)) {
+      const info = incompatibleInfoOf(checkpoint) ?? {
+        storedSaveSchemaVersion:
+          (checkpoint as { saveSchemaVersion?: number }).saveSchemaVersion ??
+          SEASON_RUN_SAVE_SCHEMA_VERSION,
+        storedRunSchemaVersion: stored.run.versions.runSchemaVersion,
+        runId: stored.run.runId,
+      };
+      throw new SeasonRunIncompatibleError({
+        ...info,
+      });
+    }
     const failures: string[] = [];
     const runId = stored.run.runId;
     const [summaryRows, detailRows, blockRows, indexRow, pendingRow] = await Promise.all([
@@ -610,6 +626,10 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
       influence: stored.influence,
       trade: stored.trade,
       objectives: stored.objectives,
+      challenges:
+        stored.challenges ??
+        (stored.run as { challenges?: unknown }).challenges ??
+        buildEmptyChallengeState(),
       campaign:
         stored.campaign ??
         (
@@ -820,6 +840,16 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
             campaign?: unknown;
           }
         ).campaign;
+        const existingChallenges = (
+          checkpoint as {
+            challenges?: unknown;
+          }
+        ).challenges;
+        const existingObjectives = (
+          checkpoint as {
+            objectives?: unknown;
+          }
+        ).objectives;
         const existingEvolution = (
           checkpoint as {
             evolution?: unknown;
@@ -834,7 +864,18 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
             window !== null ? window.influence : input.influence,
           ),
           trade: window !== null ? window.trade : input.trade,
-          objectives: input.objectives,
+          objectives:
+            input.objectives !== undefined
+              ? input.objectives
+              : existingObjectives !== undefined
+                ? (existingObjectives as SeasonRun['objectives'])
+                : undefined,
+          challenges:
+            input.challenges !== undefined
+              ? input.challenges
+              : existingChallenges !== undefined
+                ? (existingChallenges as SeasonRun['challenges'])
+                : undefined,
           campaign:
             input.campaign !== undefined
               ? input.campaign
@@ -1021,7 +1062,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
         for (const entry of cursor.influence.ledger) {
           if (entry.commandId !== null) recorded.push(entry.commandId);
         }
-        for (const selection of Object.values(cursor.objectives.selections)) {
+        for (const selection of Object.values(cursor.objectives?.selections ?? {})) {
           recorded.push(selection.selectedByCommandId);
         }
         const cursorEvolution = (
@@ -1078,6 +1119,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
           influence: run.influence,
           trade: run.trade,
           objectives: run.objectives,
+          challenges: run.challenges,
           campaign: run.campaign ?? null,
           evolution: run.evolution,
           checkpointState: run.checkpointState,
@@ -1149,6 +1191,31 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
       },
     );
   }
+  private initialCampaignState(
+    run: SeasonRun,
+    health: SeasonRun['health'],
+    humanFranchiseId: string | null,
+  ): SeasonCampaignState {
+    const empty = buildEmptyCampaignState();
+    try {
+      const schedule = generateSeasonSchedule({
+        league: run.league,
+        seed: run.schedule.generationSeed,
+      });
+      return buildInitialCampaignState({
+        rootSeed: run.rootSeed,
+        humanFranchiseId,
+        schedule,
+        standings: this.seam.reduceSeasonStandings(run.league, []),
+        health,
+        rotations: run.rotations,
+        rosters: run.rosters,
+        transactions: [],
+      });
+    } catch {
+      return empty;
+    }
+  }
   async promoteSeasonDraftToRun(
     draft: StoredSeasonDraft,
     run: SeasonRun,
@@ -1171,7 +1238,12 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
       catalog: [...SEASON_OBJECTIVE_CATALOG],
       selections: {},
     });
-    const campaign = seasonCampaignStateSchema.parse(buildEmptyCampaignState());
+    const challenges =
+      validatedRun.challenges ?? buildEmptyChallengeState();
+    const campaignHumanFranchiseId = humanTeamOf(validatedRun.league)?.franchiseId ?? null;
+    const campaign = seasonCampaignStateSchema.parse(
+      this.initialCampaignState(validatedRun, health, campaignHumanFranchiseId),
+    );
     const draftFrontOffice =
       (
         validatedDraft.draft as {
@@ -1246,6 +1318,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
       influence,
       trade: null,
       objectives,
+      challenges,
       campaign,
       checkpointState: null,
       stateRevision: 0,

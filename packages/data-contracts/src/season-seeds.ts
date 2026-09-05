@@ -9,6 +9,7 @@ export const SEASON_SEED_NAMESPACES = {
   injuries: 'injuries',
   trades: 'trades',
   objectives: 'objectives',
+  challenges: 'challenges',
   upgrades: 'upgrades',
   postseasonTies: 'postseason-ties',
   playInGames: 'postseason-play-in',

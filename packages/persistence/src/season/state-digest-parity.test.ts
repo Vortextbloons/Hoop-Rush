@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { handleSeasonRunCommand, seasonRunStateDigest } from '@hoop-rush/engine';
-import { commandIdSchema } from '@hoop-rush/data-contracts';
+import {
+  generateSeasonCampaignOffers,
+  handleSeasonRunCommand,
+  seasonRunStateDigest,
+} from '@hoop-rush/engine';
+import { commandIdSchema, buildEmptyCampaignState } from '@hoop-rush/data-contracts';
 import { seasonRunEngineSeam } from './engine-seam.ts';
 import type { SeasonRunStateDigestFacts } from './engine-seam-types.ts';
 import {
@@ -69,7 +73,7 @@ describe('seasonRunEngineSeam state digest parity', () => {
     expect(buildFixtureStateDigest(run)).toBe(run.stateDigest);
     expect(buildFixtureStateDigest(run)).toBe(seasonRunEngineSeam.seasonRunStateDigest(facts));
   });
-  it('matches the engine after select-gm-identity adds campaign offers', () => {
+  it('rejects retired select-gm-identity without mutating the digest', () => {
     const schedule = buildFixtureSchedule(SEED);
     const run = buildFixtureRun({ seed: SEED, runId: 'digest-parity-campaign-run', schedule });
     const output = handleSeasonRunCommand(
@@ -82,6 +86,53 @@ describe('seasonRunEngineSeam state digest parity', () => {
         expectedStateDigest: run.stateDigest,
         identity: 'team-identity',
         focus: 'defense',
+      },
+      {
+        run,
+        pending: null,
+        humanFranchiseId: 'lakers',
+        effects: buildFixtureEffectsState(run.rosters),
+      },
+    );
+    if (output.result.result.status !== 'rejected') throw new Error('expected rejection');
+    expect(output.result.result.rejection.code).toBe('retired');
+    const facts = digestFactsFromRun(output.run);
+    expect(seasonRunEngineSeam.seasonRunStateDigest(facts)).toBe(output.run.stateDigest);
+    expect(seasonRunStateDigest(facts)).toBe(output.run.stateDigest);
+  });
+  it('matches the engine after select-campaign-opportunity with no identity', () => {
+    const schedule = buildFixtureSchedule(SEED);
+    const base = buildFixtureRun({ seed: SEED, runId: 'digest-parity-opportunity-run', schedule });
+    const offers = generateSeasonCampaignOffers({
+      rootSeed: base.rootSeed,
+      blockIndex: 0,
+      humanFranchiseId: 'lakers',
+      schedule,
+      standings: base.standings,
+      health: base.health,
+      rotations: base.rotations,
+      rosters: base.rosters,
+      transactions: base.transactions,
+      summaries: [],
+      campaignState: base.campaign ?? buildEmptyCampaignState(),
+    });
+    const first = offers[0];
+    if (first === undefined) throw new Error('expected block-0 offers');
+    const campaign = base.campaign ?? buildEmptyCampaignState();
+    const run = {
+      ...base,
+      campaign: { ...campaign, offers: { 0: offers } },
+    };
+    const output = handleSeasonRunCommand(
+      {
+        schemaVersion: 11,
+        command: 'select-campaign-opportunity',
+        commandId: commandIdSchema.parse('camp-digest-parity'),
+        runId: run.runId,
+        expectedStateRevision: run.stateRevision,
+        expectedStateDigest: run.stateDigest,
+        blockIndex: 0,
+        opportunityId: first.opportunityId,
       },
       {
         run,

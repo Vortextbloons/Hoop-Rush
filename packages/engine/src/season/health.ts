@@ -4,6 +4,7 @@ import {
   franchiseIdSchema,
   seasonGameIdSchema,
   type Position,
+  type SeasonChallengeDeal,
   type SeasonEffectsState,
   type SeasonGameSummary,
   type SeasonHealthState,
@@ -220,6 +221,8 @@ export function assembleSeasonPendingBlock(input: {
   expectedStateRevision: number;
   expectedStateDigest: string;
   objectiveId: SeasonObjectiveId | null;
+  challengeDeal?: SeasonChallengeDeal | null;
+  challengeIds?: readonly string[] | null;
   campaignOpportunityId?: string | null;
   nextGameId: string;
   summaries: readonly SeasonGameSummary[];
@@ -230,6 +233,12 @@ export function assembleSeasonPendingBlock(input: {
 }): SeasonPendingBlockCandidate {
   const run = input.run;
   const games = partialGamesOf(input.summaries);
+  const challengeIds =
+    input.challengeIds !== undefined &&
+    input.challengeIds !== null &&
+    input.challengeIds.length === 3
+      ? ( [...input.challengeIds] as unknown as SeasonPendingBlockCandidate['challengeIds'] )
+      : undefined;
   return {
     schemaVersion: 1,
     blockVersion: run.versions.blockVersion,
@@ -240,6 +249,8 @@ export function assembleSeasonPendingBlock(input: {
     expectedStateRevision: input.expectedStateRevision,
     expectedStateDigest: input.expectedStateDigest,
     objectiveId: input.objectiveId,
+    challengeDeal: input.challengeDeal ?? null,
+    ...(challengeIds !== undefined ? { challengeIds } : {}),
     campaignOpportunityId:
       (
         input as unknown as {

@@ -984,17 +984,6 @@ export function humanUpcomingGamesFromGames(
     seasonUpcomingHumanGameSchema.parse(game),
   );
 }
-export const CAMPAIGN_IDENTITY_LABELS: Record<string, string> = {
-  'win-now': 'Win now',
-  'player-development': 'Player development',
-  'team-identity': 'Team identity',
-};
-export const CAMPAIGN_FOCUS_LABELS: Record<string, string> = {
-  defense: 'Defense',
-  shooting: 'Shooting',
-  'ball-movement': 'Ball movement',
-  depth: 'Depth',
-};
 export const CAMPAIGN_FAMILY_LABELS: Record<string, string> = {
   results: 'Results',
   marquee: 'Marquee',
@@ -1105,16 +1094,12 @@ export interface CampaignCardViewModel {
   feasibilityFacts: Record<string, unknown>;
 }
 export interface CampaignTimelineViewModel {
-  startingIdentity: SeasonCampaignState['startingIdentity'];
-  startingFocus: SeasonCampaignState['startingFocus'];
   priorEvaluation: SeasonCampaignEvaluation | null;
   branchEntries: Array<{
     branchId: string;
     state: string;
   }>;
   currentOffers: CampaignCardViewModel[];
-  isIdentityRequired: boolean;
-  isEvolutionRequired: boolean;
   isBlock8NoOpportunity: boolean;
   currentBlockIndex: number | null;
   rewardEntitlements: SeasonCampaignState['rewardEntitlements'];
@@ -1152,11 +1137,6 @@ export function campaignTimelineViewModel(
   }));
   const completedBlocks = Math.ceil(run.cursor.completedRounds / 10);
   const targetBlock = nextBlockIndex ?? completedBlocks;
-  const isIdentityRequired = campaign.startingIdentity === null;
-  const isEvolutionRequired =
-    completedBlocks === 5 &&
-    campaign.evolutionOffers !== null &&
-    campaign.evolutionSelection === null;
   const isBlock8NoOpportunity = targetBlock === 8;
   const offersForBlock =
     targetBlock >= 0 && targetBlock < 8 ? (campaign.offers[targetBlock] ?? []) : [];
@@ -1176,13 +1156,9 @@ export function campaignTimelineViewModel(
     };
   });
   return {
-    startingIdentity: campaign.startingIdentity,
-    startingFocus: campaign.startingFocus,
     priorEvaluation,
     branchEntries,
     currentOffers,
-    isIdentityRequired,
-    isEvolutionRequired,
     isBlock8NoOpportunity,
     currentBlockIndex: targetBlock,
     rewardEntitlements: campaign.rewardEntitlements,

@@ -168,6 +168,32 @@ export function seasonCheckpointCanonical(candidate: SeasonCheckpointFacts): str
       a.transactionId < b.transactionId ? -1 : 1,
     ),
     objective: candidate.objective,
+    challenges: (
+      candidate as unknown as {
+        challenges?: import('@hoop-rush/data-contracts').SeasonBlockChallengeEvaluation | null;
+      }
+    ).challenges
+      ? canonicalJson(
+          (
+            candidate as unknown as {
+              challenges: import('@hoop-rush/data-contracts').SeasonBlockChallengeEvaluation;
+            }
+          ).challenges,
+        )
+      : undefined,
+    challengeIds: (
+      candidate as unknown as {
+        challengeIds?: readonly string[] | null;
+      }
+    ).challengeIds
+      ? [
+          ...(
+            candidate as unknown as {
+              challengeIds: readonly string[];
+            }
+          ).challengeIds,
+        ].sort()
+      : undefined,
     campaign: (
       candidate as unknown as {
         campaign?: unknown;

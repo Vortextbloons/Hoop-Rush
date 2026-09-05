@@ -1,6 +1,7 @@
 import type {
   SeasonAcceptedBlock,
   SeasonCandidateCheckpoint,
+  SeasonChallengeDeal,
   SeasonCheckpointState,
   SeasonDraftCatalog,
   SeasonEffectsState,
@@ -23,12 +24,10 @@ import {
   franchiseIdSchema,
   seasonAcceptedBlockSchema,
   seasonWorkerCancelRequestSchema,
-  seasonWorkerContinueRequestSchema,
   seasonWorkerMessageSchema,
   seasonWorkerStartRequestSchema,
   seasonWorkerWarmRequestSchema,
   type SeasonScoreline,
-  type SeasonWorkerContinueRequest,
   type SeasonWorkerStartRequest,
 } from '@hoop-rush/data-contracts';
 import {
@@ -101,6 +100,7 @@ export interface SeasonBlockStartInput {
   commandId: import('@hoop-rush/data-contracts').CommandId;
   humanFranchiseId: import('@hoop-rush/data-contracts').FranchiseId | null;
   objectiveId: SeasonObjectiveId | null;
+  challengeDeal?: SeasonChallengeDeal | null;
   campaignOpportunityId?: string | null;
   homeCourt: SeasonHomeCourtProfile;
   catalogUrl: string;
@@ -136,6 +136,108 @@ export interface SeasonBlockRunnerDeps {
   workerUrl?: string;
   artifacts?: () => Promise<SeasonArtifactUrls>;
 }
+export interface WorkerRequestState {
+  blockIndex: number;
+  expectedRevision: number;
+  rotationDigest: string;
+  commandId: string;
+  rotations: SeasonRotation[];
+  input: SeasonBlockStartInput;
+  resumePending: SeasonPendingBlockCandidate | null;
+}
+export function buildWorkerRequest(
+  requestId: string,
+  state: WorkerRequestState,
+  opts: {
+    knownSummaries: SeasonGameSummary[];
+    schedule: SeasonSchedule;
+    artifacts: SeasonArtifactUrls;
+  },
+): SeasonWorkerStartRequest {
+  const priorSummaries =
+    state.resumePending !== null
+      ? [...opts.knownSummaries, ...state.resumePending.summaries]
+      : [...opts.knownSummaries];
+  const priorEffects =
+    state.resumePending !== null ? state.resumePending.effects : state.input.effects;
+  const priorHealth =
+    state.resumePending !== null ? state.resumePending.health : state.input.run.health;
+  return seasonWorkerStartRequestSchema.parse({
+    schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
+    type: 'season-block-start',
+    requestId,
+    runId: state.input.run.runId,
+    rootSeed: state.input.run.rootSeed,
+    blockIndex: state.blockIndex,
+    expectedRevision: state.expectedRevision,
+    rotationDigest: state.rotationDigest,
+    commandId: state.commandId,
+    run: {
+      schemaVersion: state.input.run.schemaVersion,
+      runId: state.input.run.runId,
+      rootSeed: state.input.run.rootSeed,
+      versions: state.input.run.versions,
+      league: state.input.run.league,
+      rosters: state.input.run.rosters,
+      rotations: state.rotations,
+      cursor: state.input.run.cursor,
+      evolution: state.input.run.evolution,
+    },
+    schedule: opts.schedule,
+    homeCourt: state.input.homeCourt,
+    catalogUrl: opts.artifacts.catalogUrl,
+    catalogHash: opts.artifacts.catalogHash,
+    profileUrl: opts.artifacts.profileUrl,
+    profileHash: opts.artifacts.profileHash,
+    priorSummaries,
+    priorEffects,
+    priorHealth,
+    startGameId: state.resumePending?.nextGameId ?? null,
+    objectiveId: state.input.objectiveId,
+    challengeDeal: state.input.challengeDeal ?? state.resumePending?.challengeDeal ?? null,
+    challengeIds:
+      state.input.challengeDeal?.challengeIds ?? state.resumePending?.challengeIds ?? undefined,
+    campaignOpportunityId: state.input.campaignOpportunityId ?? null,
+    priorInfluence: state.input.run.influence,
+    priorTransactions: state.input.run.transactions,
+    expectedStateRevision: state.input.run.stateRevision,
+    expectedStateDigest: state.input.run.stateDigest,
+    humanFranchiseId: state.input.humanFranchiseId,
+  });
+}
+export function acceptWorkerResult(
+  checkpoint: SeasonCandidateCheckpoint,
+  expected: {
+    runId: string;
+    blockIndex: number;
+    revision: number;
+    rotationDigest: string;
+    expectedStateRevision: number;
+    expectedStateDigest: string;
+  },
+): string[] {
+  const failures: string[] = [];
+  if (seasonCheckpointDigest(checkpoint) !== checkpoint.digest) {
+    failures.push('candidate digest does not verify');
+  }
+  if (checkpoint.runId !== expected.runId) failures.push('candidate runId mismatch');
+  if (checkpoint.blockIndex !== expected.blockIndex) failures.push('candidate blockIndex mismatch');
+  if (checkpoint.revision !== expected.revision) {
+    failures.push('candidate revision does not match expectedRevision');
+  }
+  if (checkpoint.rotationDigest !== expected.rotationDigest) {
+    failures.push('candidate rotationDigest mismatch');
+  }
+  if (checkpoint.expectedStateRevision !== expected.expectedStateRevision) {
+    failures.push(
+      `candidate expectedStateRevision ${String(checkpoint.expectedStateRevision)} does not match the run state ${String(expected.expectedStateRevision)}`,
+    );
+  }
+  if (checkpoint.expectedStateDigest !== expected.expectedStateDigest) {
+    failures.push('candidate expectedStateDigest does not match the run state');
+  }
+  return failures;
+}
 export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): SeasonBlockRunner {
   const listeners = new Set<(event: SeasonRunnerEvent) => void>();
   let worker: Worker | null = null;
@@ -166,22 +268,6 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     stateRevision: number;
     stateDigest: string;
   } | null = null;
-  let workerSummaryRunId: string | null = null;
-  let workerSummaryCount = 0;
-  let workerRosterKey: string | null = null;
-  const rosterKeyCache = new WeakMap<object, string>();
-  function rosterKeyOf(rosters: SeasonRun['rosters']): string {
-    const cached = rosterKeyCache.get(rosters);
-    if (cached !== undefined) return cached;
-    const key = rosters
-      .map(
-        (roster) =>
-          `${roster.franchiseId}:${roster.players.map((player) => player.playerVersionId).join(',')}`,
-      )
-      .join('|');
-    rosterKeyCache.set(rosters, key);
-    return key;
-  }
   const repositoryPromise = deps.repository !== undefined ? Promise.resolve(deps.repository) : null;
   const schedulePromise = deps.schedule !== undefined ? Promise.resolve(deps.schedule) : null;
   function resolveSchedule(): Promise<SeasonSchedule> {
@@ -469,37 +555,18 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     });
     return worker;
   }
-  function assertExpectedState(
-    checkpoint: SeasonCandidateCheckpoint,
-    input: SeasonBlockStartInput,
-    failures: string[],
-  ): void {
-    if (checkpoint.expectedStateRevision !== input.run.stateRevision) {
-      failures.push(
-        `candidate expectedStateRevision ${String(checkpoint.expectedStateRevision)} does not match the run state ${String(input.run.stateRevision)}`,
-      );
-    }
-    if (checkpoint.expectedStateDigest !== input.run.stateDigest) {
-      failures.push('candidate expectedStateDigest does not match the run state');
-    }
-  }
   async function acceptCandidate(checkpoint: SeasonCandidateCheckpoint): Promise<void> {
     const requestId = currentRequestId;
     const state = current;
     if (requestId === null || state === null) return;
-    const failures: string[] = [];
-    if (seasonCheckpointDigest(checkpoint) !== checkpoint.digest) {
-      failures.push('candidate digest does not verify');
-    }
-    if (checkpoint.runId !== state.input.run.runId) failures.push('candidate runId mismatch');
-    if (checkpoint.blockIndex !== state.blockIndex) failures.push('candidate blockIndex mismatch');
-    if (checkpoint.revision !== state.expectedRevision) {
-      failures.push('candidate revision does not match expectedRevision');
-    }
-    if (checkpoint.rotationDigest !== state.rotationDigest) {
-      failures.push('candidate rotationDigest mismatch');
-    }
-    assertExpectedState(checkpoint, state.input, failures);
+    const failures = acceptWorkerResult(checkpoint, {
+      runId: state.input.run.runId,
+      blockIndex: state.blockIndex,
+      revision: state.expectedRevision,
+      rotationDigest: state.rotationDigest,
+      expectedStateRevision: state.input.run.stateRevision,
+      expectedStateDigest: state.input.run.stateDigest,
+    });
     if (failures.length > 0) {
       emit({
         type: 'error',
@@ -540,7 +607,9 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
           : null;
       const evolutionAssets =
         state.blockIndex === 3 ? await resolveEvolutionAssets().catch(() => null) : null;
-      const candidateGameIds = new Set(authoritative.gameSummaries.map((summary) => summary.gameId));
+      const candidateGameIds = new Set(
+        authoritative.gameSummaries.map((summary) => summary.gameId),
+      );
       const knownSummaries =
         runState !== null && runState.runId === state.input.run.runId ? runState.summaries : [];
       const evolutionPriorSummaries = knownSummaries.filter(
@@ -569,6 +638,12 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         ),
       ];
       const objectives = objectivesWithSuccess(state.input.run, authoritative);
+      const challenges =
+        (
+          committed as unknown as {
+            challenges?: import('@hoop-rush/data-contracts').SeasonChallengeState | undefined;
+          }
+        ).challenges ?? challengesWithSuccess(state.input.run, authoritative);
       const campaign =
         (
           committed as unknown as {
@@ -596,6 +671,9 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         influence: window !== null ? window.influence : authoritative.influence,
         trade: window !== null ? window.trade : state.input.run.trade,
         objectives,
+        challenges: challenges as unknown as Parameters<
+          typeof repository.commitSeasonBlock
+        >[0]['challenges'],
         campaign,
         evolution: committed.evolution,
         checkpointState: committed.checkpointState,
@@ -632,9 +710,6 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       runState.health = window !== null ? window.health : checkpoint.health;
       runState.stateRevision = committed.stateRevision;
       runState.stateDigest = committed.stateDigest;
-      workerSummaryRunId = checkpoint.runId;
-      workerSummaryCount = runState.summaries.length;
-      workerRosterKey = rosterKeyOf(state.input.run.rosters);
       const snapshot = assembleCommittedSnapshot({
         run: state.input.run,
         rotations: state.rotations,
@@ -644,6 +719,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         window,
         freeAgency: committed.freeAgency,
         campaign,
+        challenges,
         evolution: committed.evolution,
         checkpointState: committed.checkpointState,
         stateRevision: committed.stateRevision,
@@ -737,90 +813,9 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     state: NonNullable<typeof current>,
     schedule: SeasonSchedule,
     artifacts: SeasonArtifactUrls,
-  ): SeasonWorkerStartRequest | SeasonWorkerContinueRequest {
+  ): SeasonWorkerStartRequest {
     const summaries = runState?.runId === state.input.run.runId ? runState.summaries : [];
-    const rosterKey = rosterKeyOf(state.input.run.rosters);
-    const workerContextMatches =
-      workerSummaryRunId === state.input.run.runId && workerRosterKey === rosterKey;
-    let priorSummaries: SeasonGameSummary[] | undefined;
-    let newSummaries: SeasonGameSummary[] | undefined;
-    if (state.resumePending !== null) {
-      const partial = state.resumePending.summaries;
-      if (workerContextMatches && workerSummaryCount <= summaries.length) {
-        newSummaries = partial;
-      } else {
-        priorSummaries = [...summaries, ...partial];
-      }
-    } else if (workerContextMatches && workerSummaryCount <= summaries.length) {
-      const delta = summaries.slice(workerSummaryCount);
-      if (delta.length <= 600) {
-        newSummaries = delta;
-      } else {
-        priorSummaries = summaries;
-      }
-    } else {
-      priorSummaries = summaries;
-    }
-    const plainRotations = state.rotations;
-    const plainCommon = {
-      requestId,
-      runId: state.input.run.runId,
-      rootSeed: state.input.run.rootSeed,
-      blockIndex: state.blockIndex,
-      expectedRevision: state.expectedRevision,
-      rotationDigest: state.rotationDigest,
-      commandId: state.commandId,
-      catalogUrl: artifacts.catalogUrl,
-      catalogHash: artifacts.catalogHash,
-      profileUrl: artifacts.profileUrl,
-      profileHash: artifacts.profileHash,
-      ...(priorSummaries !== undefined ? { priorSummaries } : {}),
-      ...(newSummaries !== undefined ? { newSummaries } : {}),
-      ...(state.resumePending !== null
-        ? { priorEffects: state.resumePending.effects }
-        : priorSummaries !== undefined
-          ? { priorEffects: state.input.effects }
-          : {}),
-      ...(state.resumePending !== null
-        ? { priorHealth: state.resumePending.health }
-        : priorSummaries !== undefined
-          ? { priorHealth: state.input.run.health }
-          : {}),
-      startGameId: state.resumePending?.nextGameId ?? null,
-      objectiveId: state.input.objectiveId,
-      campaignOpportunityId: state.input.campaignOpportunityId ?? null,
-      priorInfluence: state.input.run.influence,
-      priorTransactions: state.input.run.transactions,
-      expectedStateRevision: state.input.run.stateRevision,
-      expectedStateDigest: state.input.run.stateDigest,
-      humanFranchiseId: state.input.humanFranchiseId,
-    };
-    if (newSummaries !== undefined) {
-      return seasonWorkerContinueRequestSchema.parse({
-        schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
-        type: 'season-block-continue',
-        rotations: plainRotations,
-        ...plainCommon,
-      });
-    }
-    return seasonWorkerStartRequestSchema.parse({
-      schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
-      type: 'season-block-start',
-      run: {
-        schemaVersion: state.input.run.schemaVersion,
-        runId: state.input.run.runId,
-        rootSeed: state.input.run.rootSeed,
-        versions: state.input.run.versions,
-        league: state.input.run.league,
-        rosters: state.input.run.rosters,
-        rotations: state.rotations,
-        cursor: state.input.run.cursor,
-        evolution: state.input.run.evolution,
-      },
-      schedule,
-      homeCourt: state.input.homeCourt,
-      ...plainCommon,
-    });
+    return buildWorkerRequest(requestId, state, { knownSummaries: summaries, schedule, artifacts });
   }
   return {
     startBlock(input: SeasonBlockStartInput): string {
@@ -989,6 +984,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
             commandId: input.commandId,
             humanFranchiseId: input.humanFranchiseId,
             objectiveId: pending.objectiveId ?? null,
+            challengeDeal: pending.challengeDeal ?? null,
             campaignOpportunityId:
               (
                 pending as unknown as {
@@ -1057,9 +1053,6 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       cancelledBeforeWorker.clear();
       warmRequestId = null;
       warmed = false;
-      workerSummaryRunId = null;
-      workerSummaryCount = 0;
-      workerRosterKey = null;
     },
     prewarm(): void {
       if (currentRequestId !== null || warmed || warmRequestId !== null) return;
@@ -1228,6 +1221,7 @@ export function assembleCommittedSnapshot(input: {
   window: SeasonWindowOpenResult | null;
   freeAgency: SeasonFreeAgencyState;
   campaign?: import('@hoop-rush/data-contracts').SeasonCampaignState | null;
+  challenges?: import('@hoop-rush/data-contracts').SeasonChallengeState | null;
   evolution?: import('@hoop-rush/data-contracts').SeasonEvolutionState | null;
   checkpointState: SeasonCheckpointState;
   stateRevision: number;
@@ -1239,6 +1233,12 @@ export function assembleCommittedSnapshot(input: {
 }): SeasonRunSnapshot {
   const { run, rotations, checkpoint, window, schedule } = input;
   const objectives = objectivesWithSuccess(run, checkpoint);
+  const challenges =
+    (
+      input as {
+        challenges?: import('@hoop-rush/data-contracts').SeasonChallengeState | null;
+      }
+    ).challenges ?? challengesWithSuccess(run, checkpoint);
   const campaign =
     (
       input as {
@@ -1264,6 +1264,7 @@ export function assembleCommittedSnapshot(input: {
     trade: window !== null ? window.trade : run.trade,
     freeAgency: input.freeAgency,
     objectives,
+    challenges: (challenges ?? (run as unknown as { challenges?: unknown }).challenges) as unknown as SeasonRun['challenges'],
     campaign: campaign as unknown as SeasonRun['campaign'],
     evolution: input.evolution ?? run.evolution,
     checkpointState: input.checkpointState,
@@ -1296,16 +1297,32 @@ export function assembleCommittedSnapshot(input: {
 function objectivesWithSuccess(
   run: SeasonRun,
   checkpoint: SeasonCandidateCheckpoint,
-): SeasonObjectiveState {
-  if (checkpoint.blockIndex === 8) return run.objectives;
-  const selection = run.objectives.selections[checkpoint.blockIndex];
-  if (selection === undefined) return run.objectives;
+): SeasonObjectiveState | undefined {
+  const objectives = run.objectives;
+  if (objectives === undefined) return undefined;
+  if (checkpoint.blockIndex === 8) return objectives;
+  const selection = objectives.selections[checkpoint.blockIndex];
+  if (selection === undefined) return objectives;
   return {
-    ...run.objectives,
+    ...objectives,
     selections: {
-      ...run.objectives.selections,
-      [checkpoint.blockIndex]: { ...selection, success: checkpoint.objective.success },
+      ...objectives.selections,
+      [checkpoint.blockIndex]: { ...selection, success: checkpoint.objective?.success ?? null },
     },
+  };
+}
+function challengesWithSuccess(
+  run: SeasonRun,
+  checkpoint: SeasonCandidateCheckpoint,
+): SeasonRun['challenges'] {
+  const base = (run as unknown as { challenges?: SeasonRun['challenges'] }).challenges;
+  if (base === undefined || base === null) return base;
+  if (checkpoint.challenges === undefined || checkpoint.challenges === null) return base;
+  const evaluation = checkpoint.challenges;
+  if (base.evaluations.some((entry) => entry.blockIndex === evaluation.blockIndex)) return base;
+  return {
+    ...base,
+    evaluations: [...base.evaluations, evaluation].sort((a, b) => a.blockIndex - b.blockIndex),
   };
 }
 export function getSeasonBlockRunner(): SeasonBlockRunner {

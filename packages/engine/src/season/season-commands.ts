@@ -33,10 +33,7 @@ import type {
   SeasonInvalidRotationRejection,
   SeasonInvalidStageRejection,
   SeasonNoPendingBlockRejection,
-  SeasonNotAtBoundaryRejection,
   SeasonNoWindowRejection,
-  SeasonObjectiveAlreadySelectedRejection,
-  SeasonObjectiveNotOfferedRejection,
   SeasonOfferNotOpenRejection,
   SeasonOfferUnknownRejection,
   SeasonPendingBlockCandidate,
@@ -50,6 +47,7 @@ import type {
   SeasonRun,
   SeasonRunCommand,
   SeasonRunCommandRejection,
+  SeasonLegacyRunCommand,
   SeasonRunMismatchRejection,
   SeasonRunStage,
   SeasonSelectBlockObjectiveCommand,
@@ -124,14 +122,12 @@ import {
   seasonForfeitSummaryForGame,
   seasonFranchiseLegalFiveFacts,
 } from './health.ts';
-import { seasonNextBlockIndex } from './block.ts';
 import {
   applyRiskyRehabOutcome,
   rollSeasonRehabOutcome,
   seasonPlayerAvailable,
 } from './injuries.ts';
 import { applySeasonInfluenceSpend, SEASON_INFLUENCE_FLOOR } from './influence.ts';
-import { seasonObjectiveChoicesForBlock } from './objectives.ts';
 import {
   POSTSEASON_ALMANAC_DIGEST_PLACEHOLDER,
   SeasonPostseasonContextError,
@@ -165,7 +161,7 @@ import {
   generatedExtraOfferForSpend,
   type SeasonEconomyRun,
 } from './trades.ts';
-import { generateSeasonCampaignOffers, normalizeCampaignState } from './campaign.ts';
+import { normalizeCampaignState } from './campaign.ts';
 import { normalizeEvolutionState } from '@hoop-rush/data-contracts';
 import {
   SEASON_COURT_INNOVATION_CATALOG,
@@ -174,7 +170,6 @@ import {
   SEASON_FRONT_OFFICE_VERSION,
   type SeasonEvolutionState,
 } from '@hoop-rush/data-contracts';
-import { generateSeasonSchedule } from './schedule.ts';
 import { evaluateTradeProposal, openTradeInquiry } from './trade-board.ts';
 import { rehabPriceOf, purchasedInquiryCostOf, baseInquiryAllowanceOf } from './evolution.ts';
 import {
@@ -327,7 +322,7 @@ function runStateDigestFactsOf(run: SeasonEconomyRun): Parameters<typeof seasonR
     influence: run.influence,
     transactions: run.transactions,
     trade: run.trade,
-    objectives: run.objectives,
+    objectives: run.objectives as import('@hoop-rush/data-contracts').SeasonObjectiveState,
     campaign: run.campaign ?? null,
     evolution:
       (run as { evolution?: import('@hoop-rush/data-contracts').SeasonEvolutionState | null })
@@ -352,20 +347,6 @@ function authorityOfContext(
   ).authority;
   if (runAuthority) return runAuthority;
   return null;
-}
-function effectiveFranchiseIdOf(context: SeasonRunCommandContext): string | null {
-  return context.actorFranchiseId ?? context.humanFranchiseId ?? null;
-}
-function objectiveSelectionFor(
-  run: SeasonRun,
-  authority: SeasonRunAuthority | null,
-  franchiseId: string | null,
-  blockIndex: number,
-): import('@hoop-rush/data-contracts').SeasonObjectiveSelection | undefined {
-  if (authority?.kind === 'season-multiplayer' && franchiseId) {
-    return run.objectives.franchiseSelections?.[franchiseId]?.[blockIndex];
-  }
-  return run.objectives.selections[blockIndex];
 }
 function advanceRunState(run: SeasonEconomyRun): SeasonRun {
   const next = { ...run, stateRevision: run.stateRevision + 1, stateDigest: '' };
@@ -392,7 +373,7 @@ function commandAlreadyRecorded(run: SeasonRun, commandId: string): boolean {
   if (run.checkpointState !== null && run.checkpointState.commandId === commandId) return true;
   if (run.influence.ledger.some((entry) => entry.commandId === commandId)) return true;
   if (run.transactions.some((entry) => entry.commandId === commandId)) return true;
-  for (const selection of Object.values(run.objectives.selections)) {
+  for (const selection of Object.values(run.objectives?.selections ?? {})) {
     if (selection.selectedByCommandId === commandId) return true;
   }
   const evo = (
@@ -404,7 +385,7 @@ function commandAlreadyRecorded(run: SeasonRun, commandId: string): boolean {
   return false;
 }
 function baseValidation(
-  command: SeasonRunCommand,
+  command: SeasonRunCommand | SeasonLegacyRunCommand,
   run: SeasonRun,
   pending: SeasonPendingBlockCandidate | null,
   context?: SeasonRunCommandContext,
@@ -539,120 +520,7 @@ function handleSelectBlockObjective(
   const base = baseValidation(command, context.run, null, context);
   if (base !== null) return base;
   const run = economyRunOf(context);
-  const authority = authorityOfContext(context, run);
-  const effectiveFid = effectiveFranchiseIdOf(context);
-  const isMulti = authority?.kind === 'season-multiplayer';
-  const currentBlockIndex = seasonNextBlockIndex(run.cursor.completedRounds);
-  if (
-    currentBlockIndex === null ||
-    currentBlockIndex >= 8 ||
-    command.blockIndex !== currentBlockIndex
-  ) {
-    const rejection: SeasonNotAtBoundaryRejection = {
-      code: 'not-at-boundary',
-      blockIndex: command.blockIndex,
-      nextUnselectedBlockIndex: currentBlockIndex ?? 7,
-    };
-    return rejectedSelect(command, rejection, run);
-  }
-  const offered = seasonObjectiveChoicesForBlock(run.rootSeed, command.blockIndex);
-  if (!offered.includes(command.objectiveId)) {
-    const rejection: SeasonObjectiveNotOfferedRejection = {
-      code: 'objective-not-offered',
-      blockIndex: command.blockIndex,
-      objectiveId: command.objectiveId,
-      offeredObjectiveIds: offered,
-    };
-    return rejectedSelect(command, rejection, run);
-  }
-  if (isMulti && effectiveFid) {
-    if (objectiveSelectionFor(run, authority, effectiveFid, command.blockIndex) !== undefined) {
-      const rejection: SeasonObjectiveAlreadySelectedRejection = {
-        code: 'objective-already-selected',
-        blockIndex: command.blockIndex,
-        objectiveId: command.objectiveId,
-      };
-      return rejectedSelect(command, rejection, run);
-    }
-  } else if (run.objectives.selections[command.blockIndex] !== undefined) {
-    const rejection: SeasonObjectiveAlreadySelectedRejection = {
-      code: 'objective-already-selected',
-      blockIndex: command.blockIndex,
-      objectiveId: command.objectiveId,
-    };
-    return rejectedSelect(command, rejection, run);
-  }
-  let nextObjectives: typeof run.objectives;
-  if (isMulti && effectiveFid) {
-    const franchiseSelections = { ...(run.objectives.franchiseSelections ?? {}) };
-    const per = {
-      ...(franchiseSelections[effectiveFid] ?? {}),
-    };
-    per[command.blockIndex] = {
-      objectiveId: command.objectiveId,
-      selectedByCommandId: command.commandId,
-      success: null,
-    };
-    franchiseSelections[effectiveFid] = per;
-    nextObjectives = { ...run.objectives, franchiseSelections };
-  } else {
-    nextObjectives = {
-      ...run.objectives,
-      selections: {
-        ...run.objectives.selections,
-        [command.blockIndex]: {
-          objectiveId: command.objectiveId,
-          selectedByCommandId: command.commandId,
-          success: null,
-        },
-      },
-    };
-  }
-  const next = advanceRunState({ ...run, objectives: nextObjectives });
-  return {
-    result: {
-      command: 'select-block-objective',
-      result: {
-        status: 'accepted',
-        commandId: command.commandId,
-        blockIndex: command.blockIndex,
-        objectiveId: command.objectiveId,
-      },
-    },
-    run: next,
-    pending: null,
-  };
-}
-function campaignOffersForBlockIfMissing(
-  run: SeasonRun,
-  campaign: import('@hoop-rush/data-contracts').SeasonCampaignState,
-  blockIndex: number,
-  context: SeasonRunCommandContext,
-): import('@hoop-rush/data-contracts').SeasonCampaignState {
-  if (blockIndex < 0 || blockIndex > 7 || campaign.offers[blockIndex]) {
-    return campaign;
-  }
-  const schedule = generateSeasonSchedule({
-    league: run.league,
-    seed: run.schedule.generationSeed,
-  });
-  const offers = generateSeasonCampaignOffers({
-    rootSeed: run.rootSeed,
-    blockIndex,
-    humanFranchiseId: context.humanFranchiseId,
-    schedule,
-    standings: run.standings,
-    health: run.health,
-    rotations: run.rotations,
-    rosters: run.rosters,
-    transactions: run.transactions,
-    summaries: context.regularSeasonSummaries ?? [],
-    campaignState: campaign,
-  });
-  return {
-    ...campaign,
-    offers: { ...campaign.offers, [blockIndex]: offers },
-  };
+  return rejectedSelect(command, { code: 'retired' }, run);
 }
 function rejectedSelectGmIdentity(
   command: SeasonSelectGmIdentityCommand,
@@ -774,33 +642,7 @@ function handleSelectGmIdentity(
   if (base !== null) return base;
   const economy = economyRunOf(context);
   const run = economy;
-  const campaign = normalizeCampaignState(run.campaign);
-  if (campaign.startingIdentity !== null) {
-    return rejectedSelectGmIdentity(command, { code: 'campaign-identity-already-selected' }, run);
-  }
-  let nextCampaign: import('@hoop-rush/data-contracts').SeasonCampaignState = {
-    ...campaign,
-    startingIdentity: command.identity,
-    startingFocus: command.focus,
-  };
-  const blockIndex = seasonNextBlockIndex(run.cursor.completedRounds);
-  if (blockIndex !== null) {
-    nextCampaign = campaignOffersForBlockIfMissing(run, nextCampaign, blockIndex, context);
-  }
-  const next = advanceRunState({ ...run, campaign: nextCampaign });
-  return {
-    result: {
-      command: 'select-gm-identity',
-      result: {
-        status: 'accepted',
-        commandId: command.commandId,
-        identity: command.identity,
-        focus: command.focus,
-      },
-    },
-    run: next,
-    pending: null,
-  };
+  return rejectedSelectGmIdentity(command, { code: 'retired' }, run);
 }
 function handleSelectCampaignOpportunity(
   command: SeasonSelectCampaignOpportunityCommand,
@@ -811,24 +653,6 @@ function handleSelectCampaignOpportunity(
   const economy = economyRunOf(context);
   const run = economy;
   const campaign = normalizeCampaignState(run.campaign);
-  if (campaign.startingIdentity === null) {
-    return rejectedSelectCampaignOpportunity(command, { code: 'campaign-identity-required' }, run);
-  }
-  const completedBlocks = Math.ceil(run.cursor.completedRounds / 10);
-  if (
-    completedBlocks === 5 &&
-    campaign.evolutionOffers !== null &&
-    campaign.evolutionSelection === null
-  ) {
-    return rejectedSelectCampaignOpportunity(
-      command,
-      {
-        code: 'campaign-evolution-required',
-        afterBlockIndex: 4,
-      },
-      run,
-    );
-  }
   const offers = campaign.offers[command.blockIndex];
   if (!offers) {
     const rejection: SeasonCampaignOpportunityNotOfferedRejection = {
@@ -889,53 +713,7 @@ function handleEvolveGmCampaign(
   if (base !== null) return base;
   const economy = economyRunOf(context);
   const run = economy;
-  const campaign = normalizeCampaignState(run.campaign);
-  if (campaign.startingIdentity === null) {
-    return rejectedEvolveGmCampaign(command, { code: 'campaign-identity-required' }, run);
-  }
-  if (campaign.evolutionSelection !== null) {
-    return rejectedEvolveGmCampaign(command, { code: 'campaign-evolution-already-selected' }, run);
-  }
-  if (
-    !campaign.evolutionOffers ||
-    !campaign.evolutionOffers.some((o) => o.offerId === command.offerId)
-  ) {
-    return rejectedEvolveGmCampaign(
-      command,
-      {
-        code: 'campaign-evolution-not-offered',
-        offerId: command.offerId,
-      },
-      run,
-    );
-  }
-  const offer = campaign.evolutionOffers.find((o) => o.offerId === command.offerId);
-  if (offer === undefined) {
-    throw new Error(`campaign evolution offer ${command.offerId} missing after validation`);
-  }
-  let nextCampaign: import('@hoop-rush/data-contracts').SeasonCampaignState = {
-    ...campaign,
-    evolutionSelection: {
-      selectedOfferId: offer.offerId,
-      kind: offer.kind,
-      resultingIdentity: offer.resultingIdentity,
-      resultingFocus: offer.resultingFocus,
-      selectedByCommandId: command.commandId,
-    },
-  };
-  const blockIndex = seasonNextBlockIndex(run.cursor.completedRounds);
-  if (blockIndex !== null) {
-    nextCampaign = campaignOffersForBlockIfMissing(run, nextCampaign, blockIndex, context);
-  }
-  const next = advanceRunState({ ...run, campaign: nextCampaign });
-  return {
-    result: {
-      command: 'evolve-gm-campaign',
-      result: { status: 'accepted', commandId: command.commandId, offerId: command.offerId },
-    },
-    run: next,
-    pending: null,
-  };
+  return rejectedEvolveGmCampaign(command, { code: 'retired' }, run);
 }
 function handleOpenTradeInquiry(
   command: SeasonOpenTradeInquiryCommand,
@@ -3273,7 +3051,7 @@ function handleResolveFreeAgentMarket(
   };
 }
 export function handleSeasonRunCommand(
-  command: SeasonRunCommand,
+  command: SeasonRunCommand | SeasonLegacyRunCommand,
   context: SeasonRunCommandContext,
 ): SeasonRunCommandOutput {
   switch (command.command) {

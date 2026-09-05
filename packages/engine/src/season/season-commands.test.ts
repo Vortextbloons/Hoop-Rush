@@ -15,6 +15,7 @@ import {
   type SeasonGameSimulationResult,
   type SeasonGameSideResult,
   type SeasonGameSummary,
+  type SeasonLegacyRunCommand,
   type SeasonPendingBlockCandidate,
   type SeasonRotation,
   type SeasonRun,
@@ -24,6 +25,8 @@ import {
 } from '@hoop-rush/data-contracts';
 import { buildEraSimulationProfile } from '@hoop-rush/test-fixtures';
 import { buildEmptyCampaignState, normalizeCampaignState } from './campaign.ts';
+import { generateSeasonCampaignOffers } from './campaign.ts';
+import { generateSeasonSchedule } from './schedule.ts';
 import { handleSeasonRunCommand, type SeasonRunCommandContext } from './season-commands.ts';
 import { seasonObjectiveChoicesForBlock } from './objectives.ts';
 import { openSeasonTradeWindow } from './trades.ts';
@@ -180,17 +183,20 @@ function windowedFixture(seed = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a'): {
   };
 }
 type SeasonRunCommandFragment = {
-  [K in SeasonRunCommand['command']]: Omit<
+  [K in (SeasonRunCommand | SeasonLegacyRunCommand)['command']]: Omit<
     Extract<
-      SeasonRunCommand,
+      SeasonRunCommand | SeasonLegacyRunCommand,
       {
         command: K;
       }
     >,
     'schemaVersion' | 'runId' | 'expectedStateRevision' | 'expectedStateDigest'
   >;
-}[SeasonRunCommand['command']];
-function commandOf(run: SeasonRun, command: SeasonRunCommandFragment): SeasonRunCommand {
+}[(SeasonRunCommand | SeasonLegacyRunCommand)['command']];
+function commandOf(
+  run: SeasonRun,
+  command: SeasonRunCommandFragment,
+): SeasonRunCommand | SeasonLegacyRunCommand {
   return {
     schemaVersion: SEASON_RUN_SCHEMA_VERSION,
     runId: run.runId,
@@ -2121,7 +2127,31 @@ describe('campaign commands', () => {
       effects: zeroEffectsOf(run),
     };
   }
-  it('select-gm-identity generates two offers for the current block', () => {
+  function runWithBlockOffers(
+    run: SeasonRun,
+    blockIndex: number,
+  ): SeasonRun {
+    const schedule = generateSeasonSchedule({
+      league: run.league,
+      seed: run.schedule.generationSeed,
+    });
+    const offers = generateSeasonCampaignOffers({
+      rootSeed: run.rootSeed,
+      blockIndex,
+      humanFranchiseId: HUMAN,
+      schedule,
+      standings: run.standings,
+      health: run.health,
+      rotations: run.rotations,
+      rosters: run.rosters,
+      transactions: run.transactions,
+      summaries: [],
+      campaignState: normalizeCampaignState(run.campaign),
+    });
+    const campaign = normalizeCampaignState(run.campaign);
+    return { ...run, campaign: { ...campaign, offers: { ...campaign.offers, [blockIndex]: offers } } };
+  }
+  it('rejects select-gm-identity as retired without mutating the run', () => {
     const context = campaignFixture();
     const output = handleSeasonRunCommand(
       commandOf(context.run, {
@@ -2132,10 +2162,76 @@ describe('campaign commands', () => {
       }),
       context,
     );
+    if (output.result.result.status !== 'rejected') throw new Error('expected rejection');
+    expect(output.result.result.rejection.code).toBe('retired');
+    expect(output.run).toEqual({ ...context.run, effects: context.effects });
+  });
+  it('rejects evolve-gm-campaign as retired without mutating the run', () => {
+    const context = campaignFixture();
+    const output = handleSeasonRunCommand(
+      commandOf(context.run, {
+        command: 'evolve-gm-campaign',
+        commandId: commandIdSchema.parse('evo-1'),
+        offerId: 'evo-12345678',
+      }),
+      context,
+    );
+    if (output.result.result.status !== 'rejected') throw new Error('expected rejection');
+    expect(output.result.result.rejection.code).toBe('retired');
+    expect(output.run).toEqual({ ...context.run, effects: context.effects });
+  });
+  it('accepts select-campaign-opportunity with no GM identity selected', () => {
+    const context = campaignFixture();
+    const run = runWithBlockOffers(context.run, 0);
+    const campaign = normalizeCampaignState(run.campaign);
+    const first = campaign.offers[0]?.[0];
+    if (first === undefined) throw new Error('expected block-0 offers');
+    const output = handleSeasonRunCommand(
+      commandOf(run, {
+        command: 'select-campaign-opportunity',
+        commandId: commandIdSchema.parse('camp-1'),
+        blockIndex: 0,
+        opportunityId: first.opportunityId,
+      }),
+      { ...context, run },
+    );
     if (output.result.result.status !== 'accepted') throw new Error('expected acceptance');
-    const campaign = normalizeCampaignState(output.run.campaign);
-    expect(campaign.startingIdentity).toBe('team-identity');
-    expect(campaign.startingFocus).toBe('defense');
-    expect(campaign.offers[0]).toHaveLength(2);
+    const next = normalizeCampaignState(output.run.campaign);
+    expect(next.startingIdentity).toBeNull();
+    expect(next.selections[0]?.opportunityId).toBe(first.opportunityId);
+  });
+  it('has no evolution gate at block 5 (legacy evolution state ignored)', () => {
+    const context = campaignFixture();
+    const withOffers = runWithBlockOffers(context.run, 5);
+    const campaign = normalizeCampaignState(withOffers.campaign);
+    const first = campaign.offers[5]?.[0];
+    if (first === undefined) throw new Error('expected block-5 offers');
+    const run: SeasonRun = {
+      ...withOffers,
+      cursor: { schemaVersion: 1, completedRounds: 50 },
+      campaign: {
+        ...campaign,
+        evolutionOffers: [
+          {
+            offerId: 'evo-12345678',
+            kind: 'double-down',
+            evidence: 'legacy evolution offer',
+            resultingIdentity: 'win-now',
+            resultingFocus: null,
+          },
+        ],
+        evolutionSelection: null,
+      },
+    };
+    const output = handleSeasonRunCommand(
+      commandOf(run, {
+        command: 'select-campaign-opportunity',
+        commandId: commandIdSchema.parse('camp-5'),
+        blockIndex: 5,
+        opportunityId: first.opportunityId,
+      }),
+      { ...context, run },
+    );
+    if (output.result.result.status !== 'accepted') throw new Error('expected acceptance');
   });
 });

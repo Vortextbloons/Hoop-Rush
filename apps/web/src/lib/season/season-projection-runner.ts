@@ -5,8 +5,10 @@ import {
   type SeasonRotation,
 } from '@hoop-rush/data-contracts';
 import type {
+  AutoRotationScope,
   HumanRosterBuildResult,
   MinutePlanOptimizationResult,
+  RecommendSeasonRotationResult,
   SearchLens,
 } from '@hoop-rush/engine';
 import { newSeasonId } from './season-ids';
@@ -14,6 +16,7 @@ import { seasonArtifactUrls } from './season-assets';
 import type {
   ProjectionRotationLoadRow,
   ProjectionRotationOptimizeRequest,
+  ProjectionRotationRecommendRequest,
   ProjectionRosterBuildRequest,
   ProjectionWorkerRequest,
 } from './season-projection-wire';
@@ -33,9 +36,26 @@ export interface ProjectionRotationOptimizeInput {
   horizon: number;
   seed: string;
 }
+export interface ProjectionRotationRecommendInput {
+  roster: readonly string[];
+  unavailable: readonly string[];
+  current: SeasonRotation;
+  load: readonly ProjectionRotationLoadRow[];
+  overall: readonly { playerVersionId: string; overall: number }[];
+  horizon: number;
+  seed: string;
+  scope: AutoRotationScope;
+  keepActive10: boolean;
+}
 export interface ProjectionRunner {
   buildRoster(input: ProjectionRosterBuildInput): Promise<HumanRosterBuildResult>;
   optimizeRotation(input: ProjectionRotationOptimizeInput): Promise<MinutePlanOptimizationResult>;
+  recommendRotation(
+    input: ProjectionRotationRecommendInput,
+    options?: { signal?: AbortSignal },
+  ): Promise<RecommendSeasonRotationResult>;
+  cancel(requestId?: string): void;
+  destroy(): void;
 }
 export function createProjectionRunner(deps: ProjectionRunnerDeps = {}): ProjectionRunner {
   const client = new ProjectionWorkerClient(deps);
@@ -55,8 +75,8 @@ export function createProjectionRunner(deps: ProjectionRunnerDeps = {}): Project
         modelHash: urls.modelHash,
         eraProfileUrl: urls.profileUrl,
         eraProfileHash: urls.profileHash,
-        locked: input.locked,
-        available: input.available,
+        locked: [...input.locked],
+        available: [...input.available],
         seed: input.seed,
         ...(input.lens !== undefined ? { lens: input.lens } : {}),
       };
@@ -93,7 +113,75 @@ export function createProjectionRunner(deps: ProjectionRunnerDeps = {}): Project
       };
       return client.request<MinutePlanOptimizationResult>(request);
     },
+    async recommendRotation(
+      input: ProjectionRotationRecommendInput,
+      options: { signal?: AbortSignal } = {},
+    ): Promise<RecommendSeasonRotationResult> {
+      const urls = await seasonArtifactUrls();
+      const request: ProjectionRotationRecommendRequest = {
+        schemaVersion: PROJECTION_WORKER_WIRE_SCHEMA_VERSION,
+        type: 'recommend-rotation',
+        requestId: newSeasonId('proj'),
+        catalogUrl: urls.catalogUrl,
+        catalogHash: urls.catalogHash,
+        ...(urls.modelUrl !== undefined && urls.modelHash !== undefined
+          ? { modelUrl: urls.modelUrl, modelHash: urls.modelHash }
+          : {}),
+        eraProfileUrl: urls.profileUrl,
+        eraProfileHash: urls.profileHash,
+        franchiseId: input.current.franchiseId,
+        roster: [...input.roster],
+        unavailable: [...input.unavailable],
+        current: seasonRotationSchema.parse(input.current),
+        load: input.load.map((row) => ({
+          playerVersionId: row.playerVersionId,
+          staminaRating: row.staminaRating,
+          durability: row.durability,
+          fatigueBasisPoints: row.fatigueBasisPoints,
+          recentLoadBasisPoints: row.recentLoadBasisPoints,
+        })),
+        overall: input.overall.map((row) => ({
+          playerVersionId: row.playerVersionId,
+          overall: row.overall,
+        })),
+        horizon: input.horizon,
+        seed: input.seed,
+        scope: input.scope,
+        keepActive10: input.keepActive10,
+      };
+      const signal = options.signal;
+      if (signal === undefined) return client.request<RecommendSeasonRotationResult>(request);
+      if (signal.aborted) throw abortError();
+      return await new Promise<RecommendSeasonRotationResult>((resolve, reject) => {
+        const onAbort = () => {
+          client.cancel(request.requestId);
+          reject(abortError());
+        };
+        signal.addEventListener('abort', onAbort, { once: true });
+        client
+          .request<RecommendSeasonRotationResult>(request)
+          .then((result) => {
+            signal.removeEventListener('abort', onAbort);
+            resolve(result);
+          })
+          .catch((error: unknown) => {
+            signal.removeEventListener('abort', onAbort);
+            reject(error instanceof Error ? error : new Error(String(error)));
+          });
+      });
+    },
+    cancel(requestId?: string): void {
+      client.cancel(requestId);
+    },
+    destroy(): void {
+      client.destroy();
+    },
   };
+}
+function abortError(): Error {
+  const error = new Error('auto rotation cancelled');
+  error.name = 'AbortError';
+  return error;
 }
 function missingModelError(): Error {
   return new Error(
@@ -119,6 +207,38 @@ class ProjectionWorkerClient {
       });
       worker.postMessage(request);
     });
+  }
+  cancel(requestId?: string): void {
+    const worker = this.worker;
+    if (worker === null) return;
+    if (requestId === undefined) {
+      const entries = [...this.pending.values()];
+      this.pending.clear();
+      worker.terminate();
+      this.worker = null;
+      for (const entry of entries) entry.reject(abortError());
+      return;
+    }
+    const entry = this.pending.get(requestId);
+    if (entry === undefined) return;
+    this.pending.delete(requestId);
+    worker.terminate();
+    this.worker = null;
+    entry.reject(abortError());
+    if (this.pending.size > 0) {
+      const remaining = [...this.pending.values()];
+      this.pending.clear();
+      for (const leftover of remaining) leftover.reject(abortError());
+    }
+  }
+  destroy(): void {
+    const worker = this.worker;
+    this.worker = null;
+    const entries = [...this.pending.values()];
+    this.pending.clear();
+    worker?.terminate();
+    const error = new Error('projection worker destroyed');
+    for (const entry of entries) entry.reject(error);
   }
   private ensureWorker(): Worker {
     if (this.worker !== null) return this.worker;

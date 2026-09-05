@@ -1,6 +1,8 @@
 import {
   SEASON_CAMPAIGN_TARGETS_VERSION,
   SEASON_CAMPAIGN_VERSION,
+  SEASON_CAMPAIGN_VERSION_V1,
+  SEASON_CAMPAIGN_VERSION_V2,
   SEASON_INFLUENCE_CAP,
   SEASON_INFLUENCE_FLOOR,
   blockRoundRange,
@@ -704,25 +706,42 @@ function effectiveFocus(campaignState: SeasonCampaignState): SeasonCampaignFocus
   }
   return campaignState.startingFocus;
 }
-function focusFamily(focus: SeasonCampaignFocus | null): SeasonCampaignFamily | null {
-  switch (focus) {
-    case 'defense':
-      return 'style';
-    case 'shooting':
-      return 'style';
-    case 'ball-movement':
-      return 'style';
-    case 'depth':
-      return 'roster-response';
-    default:
-      return null;
-  }
+export interface SeasonCampaignInitialInput {
+  rootSeed: string;
+  humanFranchiseId: string | null;
+  schedule: SeasonSchedule;
+  standings: SeasonStandings;
+  health: SeasonHealthState;
+  rotations: readonly SeasonRotation[];
+  rosters: readonly SeasonRoster[];
+  transactions: readonly SeasonTransactionEntry[];
+}
+export function buildInitialCampaignState(input: SeasonCampaignInitialInput): SeasonCampaignState {
+  const empty = buildEmptyCampaignState();
+  const offers = generateSeasonCampaignOffers({
+    rootSeed: input.rootSeed,
+    blockIndex: 0,
+    humanFranchiseId: input.humanFranchiseId,
+    schedule: input.schedule,
+    standings: input.standings,
+    health: input.health,
+    rotations: input.rotations,
+    rosters: input.rosters,
+    transactions: input.transactions,
+    summaries: [],
+    campaignState: empty,
+  });
+  return { ...empty, offers: { 0: offers } };
 }
 export function normalizeCampaignState(state: unknown): SeasonCampaignState {
   if (state === undefined || state === null) return buildEmptyCampaignState();
   const parsed = seasonCampaignStateSchema.safeParse(state);
   if (!parsed.success) return buildEmptyCampaignState();
-  if (parsed.data.campaignVersion === SEASON_CAMPAIGN_VERSION) {
+  if (
+    parsed.data.campaignVersion === SEASON_CAMPAIGN_VERSION ||
+    parsed.data.campaignVersion === SEASON_CAMPAIGN_VERSION_V2 ||
+    parsed.data.campaignVersion === SEASON_CAMPAIGN_VERSION_V1
+  ) {
     return parsed.data;
   }
   return buildEmptyCampaignState();
@@ -996,17 +1015,8 @@ function isBranchOpen(
     audit: `follow-up ${template.templateId} requires previous completed`,
   };
 }
-function weightForCandidate(
-  template: CampaignTemplate,
-  input: SeasonCampaignGenerationInput,
-  isFollowUp: boolean,
-): number {
+function weightForCandidate(isFollowUp: boolean): number {
   let weight = 1;
-  const identity = effectiveIdentity(input.campaignState);
-  const focus = effectiveFocus(input.campaignState);
-  const famFocus = focusFamily(focus);
-  if (identity !== null && template.identity === identity) weight += 1.5;
-  if (famFocus !== null && template.family === famFocus) weight += 1;
   if (isFollowUp) weight += 2;
   return weight;
 }
@@ -1093,7 +1103,7 @@ export function generateSeasonCampaignOffers(
   };
   const weighted = canonical.map((c) => ({
     candidate: c,
-    weight: weightForCandidate(c.template, input, branchHasPrior(c.template.branchId)),
+    weight: weightForCandidate(branchHasPrior(c.template.branchId)),
   }));
   const selected: FeasibilityCandidate[] = [];
   const remaining = [...weighted];

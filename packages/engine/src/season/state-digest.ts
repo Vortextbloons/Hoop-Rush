@@ -32,7 +32,8 @@ export interface SeasonRunStateDigestFacts {
   transactions: readonly SeasonTransactionEntry[];
   trade: SeasonTradeState | null;
   freeAgency: SeasonFreeAgencyState;
-  objectives: SeasonObjectiveState;
+  objectives?: SeasonObjectiveState | null;
+  challenges?: import('@hoop-rush/data-contracts').SeasonChallengeState | null;
   campaign?: SeasonCampaignState | null;
   evolution?: import('@hoop-rush/data-contracts').SeasonEvolutionState | null;
   rosters: readonly SeasonRoster[];
@@ -127,7 +128,23 @@ export function seasonRunStateDigest(facts: SeasonRunStateDigestFacts): string {
       signingCounts: facts.freeAgency.signingCounts,
       seasonSpend: facts.freeAgency.seasonSpend,
     },
-    objectives: facts.objectives,
+    objectives:
+      facts.objectives === undefined || facts.objectives === null ? undefined : facts.objectives,
+    ...(facts.challenges !== undefined && facts.challenges !== null
+      ? {
+          challenges: {
+            schemaVersion: facts.challenges.schemaVersion,
+            challengeVersion: facts.challenges.challengeVersion,
+            catalog: facts.challenges.catalog,
+            deals: Object.fromEntries(
+              Object.entries(facts.challenges.deals).sort(([a], [b]) => Number(a) - Number(b)),
+            ),
+            evaluations: [...facts.challenges.evaluations].sort(
+              (a, b) => a.blockIndex - b.blockIndex,
+            ),
+          },
+        }
+      : {}),
     evolution: normalizeEvolutionState(facts.evolution),
     ...(facts.campaign !== undefined && facts.campaign !== null
       ? {

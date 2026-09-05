@@ -42,6 +42,7 @@ import {
   seasonSubmitPostseasonRotationCommandSchema,
   seasonSpectatePostseasonGameCommandSchema,
   seasonFastForwardPostseasonCommandSchema,
+  seasonRunCommandHistorySchema,
   seasonRunCommandSchema,
   seasonRunCommandRejectionSchema,
   seasonSelectBlockObjectiveResultSchema,
@@ -60,10 +61,12 @@ import {
   seasonCompactInjuryEventSchema,
   seasonBlockRecapSchema,
   SEASON_NEUTRAL_HOME_COURT,
+  SEASON_WORKER_WIRE_SCHEMA_VERSION,
   RATINGS_VERSION,
   seasonMinutePolicySchema,
 } from './index.ts';
 import {
+  buildEffectsStateFixture,
   buildEmptyHealth,
   buildInitialInfluence,
   buildCheckpointFixture,
@@ -1462,10 +1465,10 @@ describe('season AI contracts (M2.1, M2.4 roster-generation-v2)', () => {
     expect(() => seasonRosterTargetsSchema.parse(null)).toThrow();
     expect(seasonRosterTargetsSchema.safeParse(undefined).success).toBe(false);
   });
-  it('round-trips a schema-11 run with its aiPools and M2.5.5 state', () => {
+  it('round-trips a schema-14 run with its aiPools and M2.5.5 state', () => {
     const run = roundTrip(seasonRunSchema, buildRun());
-    expect(run.schemaVersion).toBe(13);
-    expect(run.versions.runSchemaVersion).toBe(13);
+    expect(run.schemaVersion).toBe(14);
+    expect(run.versions.runSchemaVersion).toBe(14);
     expect(run.versions.rosterGenerationVersion).toBe('roster-generation-v2');
     expect(run.versions.aiVersion).toBe('season-ai-v2');
     expect(run.versions.rosterTargetsVersion).toBe('roster-targets-v2');
@@ -1593,6 +1596,9 @@ describe('season influence family (M2.5, season-influence-v2)', () => {
     expect(() => seasonInfluenceStateSchema.parse({ ...state, balances })).toThrow();
     expect(() =>
       seasonInfluenceStateSchema.parse({ ...state, influenceVersion: 'season-influence-v1' }),
+    ).not.toThrow();
+    expect(() =>
+      seasonInfluenceStateSchema.parse({ ...state, influenceVersion: 'season-influence-v99' }),
     ).toThrow();
     expect(() =>
       seasonInfluenceStateSchema.parse({
@@ -1792,7 +1798,7 @@ describe('season pending block family (M2.5)', () => {
     expect(pending.teamAggregates).toHaveLength(0);
     expect(pending.playerAggregates).toHaveLength(0);
     expect(pending.nextGameId).toBe('s000001');
-    expect(pending.blockVersion).toBe('season-block-v6');
+    expect(pending.blockVersion).toBe('season-block-v7');
     expect(pending.objectiveId).toBeNull();
   });
   it('rejects wrong versions and corrupt fields', () => {
@@ -1837,17 +1843,25 @@ describe('season pending block family (M2.5)', () => {
     ).toThrow();
   });
 });
-describe('season commands (M2.5/M2.6, schema 11)', () => {
+describe('season commands (M2.5/M2.6, schema 14)', () => {
   const base = {
-    schemaVersion: 11,
+    schemaVersion: 14,
     commandId: 'cmd-1',
     runId: 'fixture-run-1',
     expectedStateRevision: 3,
     expectedStateDigest: '0'.repeat(32),
   };
   it('validates the base shape on every command', () => {
+    const legacyObjective = {
+      ...base,
+      command: 'select-block-objective',
+      blockIndex: 0,
+      objectiveId: 'win-six',
+    };
+    expect(seasonSelectBlockObjectiveCommandSchema.safeParse(legacyObjective).success).toBe(true);
+    expect(seasonRunCommandHistorySchema.safeParse(legacyObjective).success).toBe(true);
+    expect(seasonRunCommandSchema.safeParse(legacyObjective).success).toBe(false);
     const commands = [
-      { ...base, command: 'select-block-objective', blockIndex: 0, objectiveId: 'win-six' },
       {
         ...base,
         command: 'spend-influence',
@@ -1906,7 +1920,6 @@ describe('season commands (M2.5/M2.6, schema 11)', () => {
       { ...base, command: 'fast-forward-postseason' },
     ];
     const individual = [
-      seasonSelectBlockObjectiveCommandSchema,
       seasonSpendInfluenceCommandSchema,
       seasonAcceptTradeOfferCommandSchema,
       seasonDeclineTradeOfferCommandSchema,
@@ -2199,8 +2212,9 @@ describe('season checkpoint M2.5 facts', () => {
     expect(checkpoint.health.injuries).toEqual([]);
     expect(checkpoint.transactions).toEqual([]);
     expect(Object.keys(checkpoint.influence.balances)).toHaveLength(30);
-    expect(checkpoint.objective.objectiveId).toBeNull();
-    expect(checkpoint.objective.success).toBeNull();
+    expect(checkpoint.challenges?.blockIndex).toBe(0);
+    expect(checkpoint.challenges?.results).toHaveLength(3);
+    expect(checkpoint.challengeIds).toHaveLength(3);
     expect(checkpoint.expectedStateRevision).toBe(0);
     expect(checkpoint.stateDigest).toBe('0'.repeat(32));
     expect(checkpoint.versions.healthVersion).toBe('season-health-v2');
@@ -2224,7 +2238,26 @@ describe('season checkpoint M2.5 facts', () => {
     expect(() =>
       seasonCandidateCheckpointSchema.parse({
         ...checkpoint,
-        objective: { ...checkpoint.objective, objectiveId: 'win-six' },
+        objective: {
+          objectiveId: null,
+          success: null,
+          evaluation: {
+            objectiveId: 'win-six',
+            blockIndex: 0,
+            success: false,
+            facts: {
+              games: 0,
+              wins: 0,
+              pointsAllowed: 0,
+              reboundMargin: 0,
+              tipsWithAtLeastEightAvailable: 0,
+              tipsTotal: 0,
+              benchMinutes: 0,
+              turnovers: 0,
+            },
+            tipCountedGames: 0,
+          },
+        },
       }),
     ).not.toThrow();
   });
@@ -2257,11 +2290,11 @@ describe('season checkpoint M2.5 facts', () => {
     ).toThrow();
   });
 });
-describe('season worker wire v8 (M2.10)', () => {
+describe('season worker wire v9 (stateless)', () => {
   function buildStartRequest() {
     const run = buildRun();
     return {
-      schemaVersion: 8,
+      schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
       type: 'season-block-start',
       requestId: 'req-1',
       runId: run.runId,
@@ -2279,8 +2312,8 @@ describe('season worker wire v8 (M2.10)', () => {
       profileUrl: 'https://example.test/season/era-sim.json',
       profileHash: '0'.repeat(64),
       priorSummaries: [],
-      priorEffects: null,
-      priorHealth: null,
+      priorEffects: buildEffectsStateFixture(),
+      priorHealth: buildEmptyHealth(),
       startGameId: null,
       objectiveId: null,
       priorInfluence: buildInitialInfluence(),
@@ -2299,9 +2332,9 @@ describe('season worker wire v8 (M2.10)', () => {
       }),
     ).toThrow();
   });
-  it('round-trips a start request with the M2.5 fields', () => {
+  it('round-trips a stateless start request with full prior state', () => {
     const request = roundTrip(seasonWorkerStartRequestSchema, buildStartRequest());
-    expect(request.priorHealth).toBeNull();
+    expect(request.priorHealth.injuries).toEqual([]);
     expect(request.startGameId).toBeNull();
     expect(request.objectiveId).toBeNull();
     expect(request.priorInfluence).not.toBeNull();
@@ -2310,12 +2343,17 @@ describe('season worker wire v8 (M2.10)', () => {
       ...buildStartRequest(),
       startGameId: 's000016',
       objectiveId: 'win-six',
-      priorHealth: buildEmptyHealth(),
-      priorSummaries: undefined,
-      newSummaries: [buildSummaryFixture()],
+      priorSummaries: [buildSummaryFixture()],
     });
     expect(withResume.startGameId).toBe('s000016');
     expect(withResume.objectiveId).toBe('win-six');
+    expect(withResume.priorSummaries).toHaveLength(1);
+    expect(() =>
+      seasonWorkerStartRequestSchema.parse({
+        ...buildStartRequest(),
+        priorEffects: undefined,
+      }),
+    ).toThrow();
     expect(() =>
       seasonWorkerStartRequestSchema.parse({
         ...buildStartRequest(),
@@ -2325,14 +2363,14 @@ describe('season worker wire v8 (M2.10)', () => {
   });
   it('round-trips complete messages with committed and interrupted results', () => {
     const committed = roundTrip(seasonWorkerCompleteMessageSchema, {
-      schemaVersion: 8,
+      schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
       type: 'season-block-complete',
       requestId: 'req-1',
       result: { status: 'committed', checkpoint: buildCheckpointFixture() },
     });
     expect(committed.result.status).toBe('committed');
     const interrupted = roundTrip(seasonWorkerCompleteMessageSchema, {
-      schemaVersion: 8,
+      schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
       type: 'season-block-complete',
       requestId: 'req-1',
       result: { status: 'interrupted', pending: buildPendingBlockFixture() },
@@ -2340,7 +2378,7 @@ describe('season worker wire v8 (M2.10)', () => {
     expect(interrupted.result.status).toBe('interrupted');
     expect(() =>
       seasonWorkerCompleteMessageSchema.parse({
-        schemaVersion: 8,
+        schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
         type: 'season-block-complete',
         requestId: 'req-1',
         result: { status: 'committed', pending: buildPendingBlockFixture() },

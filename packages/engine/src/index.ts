@@ -115,6 +115,20 @@ export {
   type PlannerUnitRequest,
 } from './season/rotation-planner.ts';
 export {
+  AUTO_ROTATION_MAX_ALTERNATIVES,
+  AUTO_ROTATION_MAX_COMBOS,
+  AUTO_ROTATION_SEED_NAMESPACE,
+  recommendSeasonRotation,
+  type AutoRotationMemberInput,
+  type AutoRotationProjectionInput,
+  type AutoRotationScope,
+  type RecommendSeasonRotationChange,
+  type RecommendSeasonRotationFacts,
+  type RecommendSeasonRotationInput,
+  type RecommendSeasonRotationMetrics,
+  type RecommendSeasonRotationResult,
+} from './season/auto-rotation.ts';
+export {
   simulateSeasonGame,
   simulateSeasonGameWithEffects,
   type SeasonGameAvailabilitySeam,
@@ -327,6 +341,15 @@ export {
 export { projectGameWithRule, estimateFirstToSevenRace } from './projection/index.ts';
 export { seasonObjectiveChoicesForBlock } from './season/objectives.ts';
 export {
+  challengeCatalog,
+  challengeDifficultyOf,
+  challengeRewardOf,
+  challengeResultById,
+  dealSeasonBlockChallenges,
+  evaluateSeasonBlockChallenges,
+  foldChallengeFacts,
+} from './season/challenges.ts';
+export {
   handleSeasonRunCommand,
   SeasonRunCommandNotImplementedError,
   type SeasonRunCommandContext,
@@ -369,6 +392,7 @@ export {
   applySeasonCampaignEvolutionSelection,
   applySeasonCampaignReward,
   buildEmptyCampaignState,
+  buildInitialCampaignState,
   normalizeCampaignState,
   SEASON_CAMPAIGN_VERSION,
   SEASON_CAMPAIGN_TARGETS_VERSION,

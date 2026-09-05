@@ -74,16 +74,7 @@
   </div>
 
   <div class="mt-3">
-    <RotationEditor
-      {editor}
-      {disabled}
-      {onchange}
-      {faces}
-      {manifest}
-      {effects}
-      {summaries}
-      optimize={null}
-    />
+    <RotationEditor {editor} {disabled} {onchange} {faces} {manifest} {effects} {summaries} />
   </div>
 
   {#if rehabOptions.length > 0}

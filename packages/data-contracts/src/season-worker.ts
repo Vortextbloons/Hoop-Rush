@@ -18,12 +18,17 @@ import { seasonHealthStateSchema } from './season-health.ts';
 import { seasonHomeCourtProfileSchema } from './season-home-court.ts';
 import { seasonInfluenceStateSchema } from './season-influence.ts';
 import { seasonObjectiveIdSchema } from './season-objective.ts';
+import {
+  seasonChallengeDealSchema,
+  seasonChallengeIdSchema,
+} from './season-challenge.ts';
 import { seasonCampaignOpportunityIdSchema } from './season-campaign.ts';
 import { seasonPendingBlockCandidateSchema } from './season-pending-block.ts';
 import { seasonBlockRunContextSchema } from './season-run.ts';
 import { seasonScheduleSchema } from './season-schedule.ts';
 import { seasonTransactionEntrySchema } from './season-transactions.ts';
-export const SEASON_WORKER_WIRE_SCHEMA_VERSION = 8 as const;
+export const SEASON_WORKER_WIRE_SCHEMA_VERSION = 9 as const;
+export const SEASON_WORKER_WIRE_SCHEMA_VERSION_V8 = 8 as const;
 export const seasonScorelineSchema = z.object({
   gameId: seasonGameIdSchema,
   homeFranchiseId: franchiseIdSchema,
@@ -32,74 +37,38 @@ export const seasonScorelineSchema = z.object({
   awayFranchiseId: franchiseIdSchema,
 });
 export type SeasonScoreline = z.infer<typeof seasonScorelineSchema>;
-export const seasonWorkerStartRequestSchema = z
-  .object({
-    schemaVersion: z.literal(SEASON_WORKER_WIRE_SCHEMA_VERSION),
-    type: z.literal('season-block-start'),
-    requestId: z.string().min(1).max(64),
-    runId: idSchema,
-    rootSeed: seedSchema,
-    blockIndex: z.number().int().min(0).max(8),
-    expectedRevision: z.number().int().nonnegative(),
-    rotationDigest: seasonRotationSetDigestSchema,
-    commandId: commandIdSchema,
-    run: seasonBlockRunContextSchema,
-    schedule: seasonScheduleSchema,
-    homeCourt: seasonHomeCourtProfileSchema,
-    humanFranchiseId: franchiseIdSchema.nullable(),
-    catalogUrl: z.string().min(1).max(512),
-    catalogHash: contentHashSchema,
-    profileUrl: z.string().min(1).max(512),
-    profileHash: contentHashSchema,
-    priorSummaries: z.array(seasonGameSummarySchema).max(1200).optional(),
-    newSummaries: z.array(seasonGameSummarySchema).max(150).optional(),
-    priorEffects: seasonEffectsStateSchema.nullable().optional(),
-    priorHealth: seasonHealthStateSchema.nullable().optional(),
-    startGameId: seasonGameIdSchema.nullable(),
-    objectiveId: seasonObjectiveIdSchema.nullable().optional(),
-    campaignOpportunityId: seasonCampaignOpportunityIdSchema.nullable().optional(),
-    priorInfluence: seasonInfluenceStateSchema.nullable(),
-    priorTransactions: z.array(seasonTransactionEntrySchema).max(2000).optional(),
-    expectedStateRevision: z.number().int().nonnegative(),
-    expectedStateDigest: seasonCheckpointDigestSchema,
-  })
-  .refine((value) => (value.priorSummaries === undefined) !== (value.newSummaries === undefined), {
-    message: 'exactly one of priorSummaries or newSummaries is required',
-  });
+export const seasonWorkerStartRequestSchema = z.object({
+  schemaVersion: z.literal(SEASON_WORKER_WIRE_SCHEMA_VERSION),
+  type: z.literal('season-block-start'),
+  requestId: z.string().min(1).max(64),
+  runId: idSchema,
+  rootSeed: seedSchema,
+  blockIndex: z.number().int().min(0).max(8),
+  expectedRevision: z.number().int().nonnegative(),
+  rotationDigest: seasonRotationSetDigestSchema,
+  commandId: commandIdSchema,
+  run: seasonBlockRunContextSchema,
+  schedule: seasonScheduleSchema,
+  homeCourt: seasonHomeCourtProfileSchema,
+  humanFranchiseId: franchiseIdSchema.nullable(),
+  catalogUrl: z.string().min(1).max(512),
+  catalogHash: contentHashSchema,
+  profileUrl: z.string().min(1).max(512),
+  profileHash: contentHashSchema,
+  priorSummaries: z.array(seasonGameSummarySchema).max(1200),
+  priorEffects: seasonEffectsStateSchema,
+  priorHealth: seasonHealthStateSchema,
+  startGameId: seasonGameIdSchema.nullable(),
+  objectiveId: seasonObjectiveIdSchema.nullable().optional(),
+  challengeDeal: seasonChallengeDealSchema.nullable().optional(),
+  challengeIds: z.array(seasonChallengeIdSchema).length(3).optional(),
+  campaignOpportunityId: seasonCampaignOpportunityIdSchema.nullable().optional(),
+  priorInfluence: seasonInfluenceStateSchema.nullable(),
+  priorTransactions: z.array(seasonTransactionEntrySchema).max(2000).optional(),
+  expectedStateRevision: z.number().int().nonnegative(),
+  expectedStateDigest: seasonCheckpointDigestSchema,
+});
 export type SeasonWorkerStartRequest = z.infer<typeof seasonWorkerStartRequestSchema>;
-export const seasonWorkerContinueRequestSchema = z
-  .object({
-    schemaVersion: z.literal(SEASON_WORKER_WIRE_SCHEMA_VERSION),
-    type: z.literal('season-block-continue'),
-    requestId: z.string().min(1).max(64),
-    runId: idSchema,
-    rootSeed: seedSchema,
-    blockIndex: z.number().int().min(0).max(8),
-    expectedRevision: z.number().int().nonnegative(),
-    rotationDigest: seasonRotationSetDigestSchema,
-    commandId: commandIdSchema,
-    humanFranchiseId: franchiseIdSchema.nullable(),
-    rotations: seasonBlockRunContextSchema.shape.rotations,
-    catalogUrl: z.string().min(1).max(512),
-    catalogHash: contentHashSchema,
-    profileUrl: z.string().min(1).max(512),
-    profileHash: contentHashSchema,
-    priorSummaries: z.array(seasonGameSummarySchema).max(1200).optional(),
-    newSummaries: z.array(seasonGameSummarySchema).max(150).optional(),
-    priorEffects: seasonEffectsStateSchema.nullable().optional(),
-    priorHealth: seasonHealthStateSchema.nullable().optional(),
-    startGameId: seasonGameIdSchema.nullable(),
-    objectiveId: seasonObjectiveIdSchema.nullable().optional(),
-    campaignOpportunityId: seasonCampaignOpportunityIdSchema.nullable().optional(),
-    priorInfluence: seasonInfluenceStateSchema.nullable(),
-    priorTransactions: z.array(seasonTransactionEntrySchema).max(2000).optional(),
-    expectedStateRevision: z.number().int().nonnegative(),
-    expectedStateDigest: seasonCheckpointDigestSchema,
-  })
-  .refine((value) => (value.priorSummaries === undefined) !== (value.newSummaries === undefined), {
-    message: 'exactly one of priorSummaries or newSummaries is required',
-  });
-export type SeasonWorkerContinueRequest = z.infer<typeof seasonWorkerContinueRequestSchema>;
 export const seasonWorkerCancelRequestSchema = z.object({
   schemaVersion: z.literal(SEASON_WORKER_WIRE_SCHEMA_VERSION),
   type: z.literal('season-block-cancel'),
@@ -124,7 +93,6 @@ export const seasonWorkerWarmAckMessageSchema = z.object({
 export type SeasonWorkerWarmAckMessage = z.infer<typeof seasonWorkerWarmAckMessageSchema>;
 export const seasonWorkerRequestSchema = z.discriminatedUnion('type', [
   seasonWorkerStartRequestSchema,
-  seasonWorkerContinueRequestSchema,
   seasonWorkerCancelRequestSchema,
   seasonWorkerWarmRequestSchema,
 ]);

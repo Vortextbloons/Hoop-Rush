@@ -82,6 +82,7 @@ export * from './season-health.ts';
 export * from './season-transactions.ts';
 export * from './season-influence.ts';
 export * from './season-objective.ts';
+export * from './season-challenge.ts';
 export * from './season-campaign.ts';
 export * from './season-trade.ts';
 export * from './season-evolution.ts';

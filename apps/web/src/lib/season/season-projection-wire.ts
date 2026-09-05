@@ -1,48 +1,24 @@
-import type { SeasonRotation } from '@hoop-rush/data-contracts';
+import { PROJECTION_WORKER_WIRE_SCHEMA_VERSION } from '@hoop-rush/data-contracts';
+import type {
+  ProjectionRosterBuildRequest as ContractRosterBuildRequest,
+  ProjectionRotationLoadRow as ContractLoadRow,
+  ProjectionRotationOptimizeRequest as ContractOptimizeRequest,
+  ProjectionRotationRecommendRequest as ContractRecommendRequest,
+} from '@hoop-rush/data-contracts';
 import type {
   HumanRosterBuildResult,
   MinutePlanOptimizationResult,
+  RecommendSeasonRotationResult,
   SearchLens,
 } from '@hoop-rush/engine';
-export const PROJECTION_WORKER_WIRE_SCHEMA_VERSION = 1 as const;
-export interface ProjectionRosterBuildRequest {
-  schemaVersion: typeof PROJECTION_WORKER_WIRE_SCHEMA_VERSION;
-  type: 'build-roster';
-  requestId: string;
-  catalogUrl: string;
-  catalogHash: string;
-  modelUrl: string;
-  modelHash: string;
-  eraProfileUrl: string;
-  eraProfileHash: string;
-  locked: readonly string[];
-  available: readonly string[];
-  seed: string;
+
+export { PROJECTION_WORKER_WIRE_SCHEMA_VERSION };
+export type ProjectionRotationLoadRow = ContractLoadRow;
+export type ProjectionRosterBuildRequest = Omit<ContractRosterBuildRequest, 'lens'> & {
   lens?: SearchLens;
-}
-export interface ProjectionRotationLoadRow {
-  playerVersionId: string;
-  staminaRating: number;
-  durability: number;
-  fatigueBasisPoints: number;
-  recentLoadBasisPoints: number;
-}
-export interface ProjectionRotationOptimizeRequest {
-  schemaVersion: typeof PROJECTION_WORKER_WIRE_SCHEMA_VERSION;
-  type: 'optimize-rotation';
-  requestId: string;
-  catalogUrl: string;
-  catalogHash: string;
-  modelUrl: string;
-  modelHash: string;
-  eraProfileUrl: string;
-  eraProfileHash: string;
-  roster: readonly string[];
-  structure: SeasonRotation;
-  load: readonly ProjectionRotationLoadRow[];
-  horizon: number;
-  seed: string;
-}
+};
+export type ProjectionRotationOptimizeRequest = ContractOptimizeRequest;
+export type ProjectionRotationRecommendRequest = ContractRecommendRequest;
 export type ProjectionRosterBuildResponse =
   | {
       type: 'complete';
@@ -65,7 +41,22 @@ export type ProjectionRotationOptimizeResponse =
       requestId: string;
       message: string;
     };
+export type ProjectionRotationRecommendResponse =
+  | {
+      type: 'complete';
+      requestId: string;
+      result: RecommendSeasonRotationResult;
+    }
+  | {
+      type: 'error';
+      requestId: string;
+      message: string;
+    };
 export type ProjectionWorkerRequest =
-  ProjectionRosterBuildRequest | ProjectionRotationOptimizeRequest;
+  | ProjectionRosterBuildRequest
+  | ProjectionRotationOptimizeRequest
+  | ProjectionRotationRecommendRequest;
 export type ProjectionWorkerResponse =
-  ProjectionRosterBuildResponse | ProjectionRotationOptimizeResponse;
+  | ProjectionRosterBuildResponse
+  | ProjectionRotationOptimizeResponse
+  | ProjectionRotationRecommendResponse;

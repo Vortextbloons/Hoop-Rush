@@ -80,7 +80,18 @@ import {
   seasonPregameAvailabilityOf,
 } from './health.ts';
 import { applySeasonGameHealthTransition } from './injuries.ts';
+import { generateSeasonSchedule } from './schedule.ts';
 import { evaluateSeasonBlockObjective, seasonObjectiveChoicesForBlock } from './objectives.ts';
+import {
+  SEASON_CHALLENGE_CATALOG,
+  SEASON_CHALLENGE_VERSION,
+  buildEmptyChallengeState,
+  type SeasonBlockChallengeEvaluation,
+  type SeasonChallengeDeal,
+  type SeasonChallengeId,
+  type SeasonChallengeState,
+} from '@hoop-rush/data-contracts';
+import { dealSeasonBlockChallenges, evaluateSeasonBlockChallenges } from './challenges.ts';
 import {
   SEASON_CAMPAIGN_TARGETS_VERSION,
   SEASON_CAMPAIGN_VERSION,
@@ -158,6 +169,9 @@ export interface SeasonBlockSimulationInput {
   health: SeasonHealthState;
   objectiveId: SeasonObjectiveId | null;
   objectiveIds?: ReadonlyMap<string, SeasonObjectiveId | null> | null;
+  challengeDeal?: SeasonChallengeDeal | null;
+  challengeDealsByFranchise?: ReadonlyMap<string, SeasonChallengeDeal | null> | null;
+  challengeState?: SeasonChallengeState | null;
   campaignOpportunityId?: string | null;
   campaignOpportunityIds?: ReadonlyMap<string, string | null> | null;
   influence?: SeasonInfluenceState;
@@ -202,6 +216,7 @@ export function seasonRunStateDigestFactsOf(
     trade: next.trade,
     freeAgency: next.freeAgency,
     objectives: next.objectives,
+    challenges: (next as unknown as { challenges?: SeasonChallengeState }).challenges ?? null,
     campaign: (
       next as {
         campaign?: unknown;
@@ -323,7 +338,61 @@ export function seasonBlockRejection(
       submittedBlockIndex: command.blockIndex,
     };
   }
-  if (input.objectives !== undefined) {
+  const hasChallengeInput =
+    input.challengeDeal !== undefined ||
+    input.challengeDealsByFranchise !== undefined ||
+    input.challengeState !== undefined ||
+    command.challengeIds !== undefined;
+  if (hasChallengeInput) {
+    const deal = input.challengeDeal ?? null;
+    const commandIds = command.challengeIds ?? null;
+    if (command.blockIndex >= 8) {
+      if (commandIds !== null && commandIds !== undefined) {
+        return {
+          code: 'invalid-challenge',
+          expected: 'none',
+          blockIndex: command.blockIndex,
+        };
+      }
+      if (deal !== null && deal !== undefined) {
+        return {
+          code: 'invalid-challenge',
+          expected: 'none',
+          blockIndex: command.blockIndex,
+        };
+      }
+    } else {
+      if (deal === null || deal === undefined) {
+        return {
+          code: 'invalid-challenge',
+          expected: 'required',
+          blockIndex: command.blockIndex,
+        };
+      }
+      if (deal.blockIndex !== command.blockIndex) {
+        return {
+          code: 'invalid-challenge',
+          expected: 'not-offered',
+          blockIndex: command.blockIndex,
+        };
+      }
+      if (commandIds !== null && commandIds !== undefined) {
+        const dealIds = [...deal.challengeIds].sort();
+        const cmdIds = [...commandIds].sort();
+        if (
+          dealIds.length !== 3 ||
+          cmdIds.length !== 3 ||
+          dealIds.some((id, index) => id !== cmdIds[index])
+        ) {
+          return {
+            code: 'invalid-challenge',
+            expected: 'not-offered',
+            blockIndex: command.blockIndex,
+          };
+        }
+      }
+    }
+  } else if (input.objectives !== undefined) {
     if (command.blockIndex <= 7) {
       if (command.objectiveId === null) {
         return {
@@ -1010,6 +1079,36 @@ export function assembleSeasonBlockCandidate(
     primaryFranchiseId === null
       ? null
       : (run.rotations.find((rotation) => rotation.franchiseId === primaryFranchiseId) ?? null);
+  const hasChallengeDeal =
+    input.challengeDeal !== undefined ||
+    input.challengeDealsByFranchise !== undefined ||
+    input.challengeState !== undefined;
+  const primaryDeal: SeasonChallengeDeal | null =
+    input.challengeDeal ??
+    (primaryFranchiseId !== null
+      ? (input.challengeDealsByFranchise?.get(primaryFranchiseId) ?? null)
+      : null);
+  let challengeEvaluation: SeasonBlockChallengeEvaluation | null = null;
+  const challengeEvaluationsByFranchise: Record<string, SeasonBlockChallengeEvaluation> = {};
+  if (hasChallengeDeal && primaryDeal !== null) {
+    challengeEvaluation = evaluateSeasonBlockChallenges({
+      deal: primaryDeal,
+      blockIndex: command.blockIndex,
+      humanFranchiseId: primaryFranchiseId,
+      summaries: [...summaries],
+    });
+    for (const pid of participantIds) {
+      const dealForPid =
+        input.challengeDealsByFranchise?.get(pid) ?? (pid === primaryFranchiseId ? primaryDeal : null);
+      if (dealForPid === null || dealForPid === undefined) continue;
+      challengeEvaluationsByFranchise[pid] = evaluateSeasonBlockChallenges({
+        deal: dealForPid,
+        blockIndex: command.blockIndex,
+        humanFranchiseId: pid,
+        summaries: [...summaries],
+      });
+    }
+  }
   const objective = evaluateSeasonBlockObjective({
     objectiveId: input.objectiveId,
     blockIndex: command.blockIndex,
@@ -1112,14 +1211,42 @@ export function assembleSeasonBlockCandidate(
     input.influence ??
     (input.run as Partial<SeasonRun>).influence ??
     createInitialSeasonInfluenceState(franchiseIds);
-  const grantResult = applySeasonBlockInfluenceGrants({
-    influence: preBlockInfluence,
-    blockIndex: command.blockIndex,
-    humanFranchiseId: primaryFranchiseId,
-    participantFranchiseIds: participantIds,
-    objectiveSuccess: objective.success,
-    objectiveSuccessByFranchise,
-  });
+  const grantResult = hasChallengeDeal
+    ? applySeasonBlockInfluenceGrants({
+        influence: preBlockInfluence,
+        blockIndex: command.blockIndex,
+        humanFranchiseId: primaryFranchiseId,
+        participantFranchiseIds: participantIds,
+        challengeSuccesses: challengeEvaluation
+          ? challengeEvaluation.results.map((result) => ({
+              challengeId: result.challengeId,
+              success: result.success,
+              reward:
+                SEASON_CHALLENGE_CATALOG.find((entry) => entry.challengeId === result.challengeId)
+                  ?.reward ?? 1,
+            }))
+          : null,
+        challengeSuccessesByFranchise: Object.fromEntries(
+          Object.entries(challengeEvaluationsByFranchise).map(([franchiseId, evaluation]) => [
+            franchiseId,
+            evaluation.results.map((result) => ({
+              challengeId: result.challengeId,
+              success: result.success,
+              reward:
+                SEASON_CHALLENGE_CATALOG.find((entry) => entry.challengeId === result.challengeId)
+                  ?.reward ?? 1,
+            })),
+          ]),
+        ),
+      })
+    : applySeasonBlockInfluenceGrants({
+        influence: preBlockInfluence,
+        blockIndex: command.blockIndex,
+        humanFranchiseId: primaryFranchiseId,
+        participantFranchiseIds: participantIds,
+        objectiveSuccess: objective.success,
+        objectiveSuccessByFranchise,
+      });
   const postTransactions = [...(input.transactions ?? []), ...grantResult.entries];
   const recapInput = {
     runId: run.runId,
@@ -1134,6 +1261,7 @@ export function assembleSeasonBlockCandidate(
     rosterPlayerIds: input.rosterPlayerIds,
     health,
     objective,
+    challenges: challengeEvaluation,
     campaign,
     transactions: postTransactions,
     influence: grantResult.influence,
@@ -1171,6 +1299,16 @@ export function assembleSeasonBlockCandidate(
     tradeVersion: run.versions.tradeVersion,
     influenceVersion: run.versions.influenceVersion,
     objectiveVersion: run.versions.objectiveVersion,
+    challengeVersion: (
+      run.versions as unknown as {
+        challengeVersion?: SeasonCheckpointVersions['challengeVersion'];
+      }
+    ).challengeVersion,
+    challengeTargetsVersion: (
+      run.versions as unknown as {
+        challengeTargetsVersion?: SeasonCheckpointVersions['challengeTargetsVersion'];
+      }
+    ).challengeTargetsVersion,
     campaignVersion:
       (
         run.versions as unknown as {
@@ -1221,6 +1359,10 @@ export function assembleSeasonBlockCandidate(
     },
     objectiveEvaluations:
       Object.keys(objectiveEvaluations).length > 0 ? objectiveEvaluations : undefined,
+    challenges: challengeEvaluation ?? undefined,
+    challengeIds: primaryDeal
+      ? ([...primaryDeal.challengeIds] as SeasonCandidateCheckpoint['challengeIds'])
+      : undefined,
     campaign,
     campaignEvaluations:
       Object.keys(campaignEvaluations).length > 0 ? campaignEvaluations : undefined,
@@ -1263,10 +1405,12 @@ export function handleSubmitSeasonBlockCommand(
   }
 }
 function objectivesWithBlockSuccess(
-  objectives: SeasonObjectiveState,
+  objectives: SeasonObjectiveState | undefined,
   candidate: SeasonCandidateCheckpoint,
-): SeasonObjectiveState {
+): SeasonObjectiveState | undefined {
+  if (objectives === undefined) return undefined;
   if (candidate.blockIndex === 8) return objectives;
+  if (candidate.objective === undefined) return objectives;
   const selection = objectives.selections[candidate.blockIndex];
   if (selection === undefined) return objectives;
   return {
@@ -1275,6 +1419,49 @@ function objectivesWithBlockSuccess(
       ...objectives.selections,
       [candidate.blockIndex]: { ...selection, success: candidate.objective.success },
     },
+  };
+}
+function challengesWithBlockEvaluation(
+  challenges: SeasonChallengeState | undefined,
+  candidate: SeasonCandidateCheckpoint,
+): SeasonChallengeState | undefined {
+  if (challenges === undefined) return undefined;
+  if (candidate.challenges === undefined || candidate.challenges === null) return challenges;
+  const evaluation = candidate.challenges;
+  const existing = challenges.evaluations.some((entry) => entry.blockIndex === evaluation.blockIndex);
+  if (existing) return challenges;
+  return {
+    ...challenges,
+    evaluations: [...challenges.evaluations, evaluation].sort(
+      (a, b) => a.blockIndex - b.blockIndex,
+    ),
+  };
+}
+
+function challengesWithNextDeal(input: {
+  challenges: SeasonChallengeState | undefined;
+  run: SeasonRun;
+  candidate: SeasonCandidateCheckpoint;
+  schedule: SeasonSchedule | null;
+  humanFranchiseId: string | null;
+}): SeasonChallengeState | undefined {
+  const { challenges, run, candidate, schedule, humanFranchiseId } = input;
+  if (challenges === undefined) return undefined;
+  if (humanFranchiseId === null) return challenges;
+  const nextBlockIndex = candidate.blockIndex + 1;
+  if (nextBlockIndex < 0 || nextBlockIndex > 7) return challenges;
+  if (challenges.deals[nextBlockIndex] !== undefined) return challenges;
+  if (schedule === null) return challenges;
+  const deal = dealSeasonBlockChallenges(run.rootSeed, nextBlockIndex, {
+    league: run.league,
+    schedule,
+    standings: candidate.standings,
+    humanFranchiseId,
+  });
+  if (deal === null) return challenges;
+  return {
+    ...challenges,
+    deals: { ...challenges.deals, [nextBlockIndex]: deal },
   };
 }
 function campaignWithBlockEvaluation(
@@ -1359,6 +1546,8 @@ export function deriveSeasonPostBlockState(input: {
   evolution: SeasonEvolutionState;
 } {
   const objectives = objectivesWithBlockSuccess(input.run.objectives, input.candidate);
+  const runChallenges = (input.run as unknown as { challenges?: SeasonChallengeState }).challenges;
+  const challenges = challengesWithBlockEvaluation(runChallenges, input.candidate);
   const evolution = evolutionWithBlockCommit({
     rootSeed: input.run.rootSeed,
     blockIndex: input.candidate.blockIndex,
@@ -1398,6 +1587,7 @@ export function deriveSeasonPostBlockState(input: {
     trade: input.run.trade,
     freeAgency: input.candidate.freeAgency,
     objectives,
+    challenges: challenges ?? null,
     campaign: campaign,
     rosters: input.run.rosters,
     ownership: input.run.ownership,
@@ -1471,9 +1661,12 @@ export function completeSeasonBlockCommit(input: {
   freeAgencyWindow: SeasonFreeAgencyWindowState | null;
   freeAgency: SeasonFreeAgencyState;
   campaign: import('@hoop-rush/data-contracts').SeasonCampaignState | null;
+  challenges: SeasonChallengeState | undefined;
   evolution: SeasonEvolutionState;
 } {
   const objectives = objectivesWithBlockSuccess(input.run.objectives, input.candidate);
+  const baseChallenges = (input.run as unknown as { challenges?: SeasonChallengeState }).challenges;
+  const evaluatedChallenges = challengesWithBlockEvaluation(baseChallenges, input.candidate);
   const campaign = campaignWithBlockEvaluation(
     (
       input.run as {
@@ -1483,7 +1676,7 @@ export function completeSeasonBlockCommit(input: {
     input.candidate,
   );
   const derived = deriveSeasonPostBlockState({
-    run: { ...input.run, objectives, campaign: campaign },
+    run: { ...input.run, objectives, campaign: campaign } as SeasonRun,
     candidate: input.candidate,
     commandId: input.commandId,
     rotationDigest: input.rotationDigest,
@@ -1512,49 +1705,89 @@ export function completeSeasonBlockCommit(input: {
     checkpointState: derived.checkpointState,
     stateRevision: derived.stateRevision,
     stateDigest: derived.stateDigest,
-  };
+  } as SeasonRun;
+  const runChallengesAfterEval =
+    evaluatedChallenges ??
+    (postBlockRun as unknown as { challenges?: SeasonChallengeState }).challenges;
+  if (runChallengesAfterEval !== undefined) {
+    (postBlockRun as unknown as { challenges?: SeasonChallengeState }).challenges =
+      runChallengesAfterEval;
+  }
+  const nextBlockIndex = input.candidate.blockIndex + 1;
+  if (nextBlockIndex >= 0 && nextBlockIndex <= 7 && primaryFranchiseId !== null) {
+    const currentDeals = (
+      postBlockRun as unknown as { challenges?: SeasonChallengeState }
+    ).challenges;
+    if (currentDeals !== undefined && currentDeals.deals[nextBlockIndex] === undefined) {
+      let scheduleForDeal: SeasonSchedule | null = input.schedule ?? null;
+      if (scheduleForDeal === null) {
+        try {
+          scheduleForDeal = generateSeasonSchedule({
+            league: input.run.league,
+            seed: input.run.schedule.generationSeed,
+          });
+        } catch {
+          scheduleForDeal = null;
+        }
+      }
+      if (scheduleForDeal !== null) {
+        const withNext = challengesWithNextDeal({
+          challenges: currentDeals,
+          run: input.run,
+          candidate: input.candidate,
+          schedule: scheduleForDeal,
+          humanFranchiseId: primaryFranchiseId,
+        });
+        if (withNext !== undefined) {
+          (postBlockRun as unknown as { challenges?: SeasonChallengeState }).challenges = withNext;
+          postBlockRun = {
+            ...postBlockRun,
+            stateDigest: seasonRunStateDigest(
+              seasonRunStateDigestFactsOf(postBlockRun, input.effects ?? input.candidate.effects),
+            ),
+          } as SeasonRun;
+        }
+      }
+    }
+  }
   const nextBlockIdxForCampaign = input.candidate.blockIndex + 1;
-  if (nextBlockIdxForCampaign <= 7 && postBlockRun.campaign?.startingIdentity) {
+  if (nextBlockIdxForCampaign <= 7 && postBlockRun.campaign) {
     const nextCampaignState = postBlockRun.campaign;
     if (!nextCampaignState.offers[nextBlockIdxForCampaign]) {
-      const needsEvolution =
-        input.candidate.blockIndex === 4 && !nextCampaignState.evolutionSelection;
-      if (!needsEvolution) {
-        const scheduleForCampaign =
-          (
-            input as unknown as {
-              schedule?: import('@hoop-rush/data-contracts').SeasonSchedule;
-            }
-          ).schedule ??
-          ({ games: [] } as unknown as import('@hoop-rush/data-contracts').SeasonSchedule);
-        const nextOffers = generateSeasonCampaignOffers({
-          rootSeed: input.run.rootSeed,
-          blockIndex: nextBlockIdxForCampaign,
-          humanFranchiseId: primaryFranchiseId,
-          schedule: scheduleForCampaign,
-          standings: input.candidate.standings,
-          health: input.candidate.health,
-          rotations: postBlockRun.rotations,
-          rosters: postBlockRun.rosters,
-          transactions: input.candidate.transactions,
-          summaries: input.candidate.gameSummaries,
-          campaignState: nextCampaignState,
-        });
-        const updatedCampaign = {
-          ...nextCampaignState,
-          offers: { ...nextCampaignState.offers, [nextBlockIdxForCampaign]: nextOffers },
-        };
-        postBlockRun = {
-          ...postBlockRun,
-          campaign: updatedCampaign,
-        };
-        postBlockRun = {
-          ...postBlockRun,
-          stateDigest: seasonRunStateDigest(
-            seasonRunStateDigestFactsOf(postBlockRun, input.effects ?? input.candidate.effects),
-          ),
-        };
-      }
+      const scheduleForCampaign =
+        (
+          input as unknown as {
+            schedule?: import('@hoop-rush/data-contracts').SeasonSchedule;
+          }
+        ).schedule ??
+        ({ games: [] } as unknown as import('@hoop-rush/data-contracts').SeasonSchedule);
+      const nextOffers = generateSeasonCampaignOffers({
+        rootSeed: input.run.rootSeed,
+        blockIndex: nextBlockIdxForCampaign,
+        humanFranchiseId: primaryFranchiseId,
+        schedule: scheduleForCampaign,
+        standings: input.candidate.standings,
+        health: input.candidate.health,
+        rotations: postBlockRun.rotations,
+        rosters: postBlockRun.rosters,
+        transactions: input.candidate.transactions,
+        summaries: input.candidate.gameSummaries,
+        campaignState: nextCampaignState,
+      });
+      const updatedCampaign = {
+        ...nextCampaignState,
+        offers: { ...nextCampaignState.offers, [nextBlockIdxForCampaign]: nextOffers },
+      };
+      postBlockRun = {
+        ...postBlockRun,
+        campaign: updatedCampaign,
+      };
+      postBlockRun = {
+        ...postBlockRun,
+        stateDigest: seasonRunStateDigest(
+          seasonRunStateDigestFactsOf(postBlockRun, input.effects ?? input.candidate.effects),
+        ),
+      };
     }
   }
   const window = openSeasonTradeWindow({
@@ -1632,6 +1865,9 @@ export function completeSeasonBlockCommit(input: {
     };
   }
   const finalCampaign = runAfterTrade.campaign ?? campaign ?? null;
+  const finalChallenges =
+    (runAfterTrade as unknown as { challenges?: SeasonChallengeState }).challenges ??
+    (postBlockRun as unknown as { challenges?: SeasonChallengeState }).challenges;
   if (window === null && freeAgencyWindow === null) {
     return {
       checkpointState: derived.checkpointState,
@@ -1641,6 +1877,7 @@ export function completeSeasonBlockCommit(input: {
       freeAgencyWindow: null,
       freeAgency,
       campaign: finalCampaign,
+      challenges: finalChallenges,
       evolution: derived.evolution,
     };
   }
@@ -1652,6 +1889,7 @@ export function completeSeasonBlockCommit(input: {
     freeAgencyWindow,
     freeAgency,
     campaign: finalCampaign,
+    challenges: finalChallenges,
     evolution: derived.evolution,
   };
 }
@@ -1826,11 +2064,15 @@ export function auditSeasonBlock(
       schedule: input.schedule,
       rosterPlayerIds: input.rosterPlayerIds,
       health: candidate.health,
-      objective: {
-        objectiveId: candidate.objective.objectiveId,
-        success: candidate.objective.success,
-        evaluation: candidate.objective.evaluation,
-      },
+      objective:
+        candidate.objective === undefined
+          ? null
+          : {
+              objectiveId: candidate.objective.objectiveId,
+              success: candidate.objective.success,
+              evaluation: candidate.objective.evaluation,
+            },
+      challenges: candidate.challenges ?? null,
       transactions: candidate.transactions,
       influence: candidate.influence,
     }),
@@ -1900,21 +2142,81 @@ export function auditSeasonBlock(
       failures.push(`injury ${record.injuryId} same-game return must carry zero missed games`);
     }
   }
-  if (candidate.objective.objectiveId !== command.objectiveId) {
-    failures.push(
-      `candidate objective ${String(candidate.objective.objectiveId)} does not match the command ${String(command.objectiveId)}`,
-    );
-  }
-  if (candidate.objective.objectiveId !== null) {
-    if (candidate.objective.evaluation.blockIndex !== command.blockIndex) {
-      failures.push('candidate objective evaluation blockIndex does not match the command');
+  const hasCandidateChallenges =
+    candidate.challenges !== undefined && candidate.challenges !== null;
+  if (hasCandidateChallenges) {
+    const evaluation = candidate.challenges;
+    if (evaluation === undefined || evaluation === null) {
+      failures.push('candidate challenges missing after presence check');
+    } else {
+      if (evaluation.blockIndex !== command.blockIndex) {
+        failures.push('candidate challenges blockIndex does not match the command');
+      }
+      const deal = input.challengeDeal ?? null;
+      if (deal !== null) {
+        const dealIds = [...deal.challengeIds].sort();
+        const resultIds = evaluation.results.map((result) => result.challengeId).sort();
+        if (JSON.stringify(dealIds) !== JSON.stringify(resultIds)) {
+          failures.push('candidate challenges do not match the dealt challengeIds');
+        }
+        const recomputed = evaluateSeasonBlockChallenges({
+          deal,
+          blockIndex: command.blockIndex,
+          humanFranchiseId: input.humanFranchiseId,
+          summaries: candidate.gameSummaries,
+        });
+        if (JSON.stringify(recomputed) !== JSON.stringify(evaluation)) {
+          failures.push('candidate challenges do not replay from the recorded summaries and deal');
+        }
+      }
+      if (candidate.challengeIds !== undefined) {
+        const ordered = [...evaluation.results.map((r) => r.challengeId)].sort();
+        if (JSON.stringify([...(candidate.challengeIds as readonly string[])].sort()) !== JSON.stringify(ordered)) {
+          failures.push('candidate challengeIds do not match the evaluated challenges');
+        }
+      }
+      const recapEvidence = candidate.recap.challengeEvidence ?? [];
+      if (recapEvidence.length !== 3) {
+        failures.push('candidate recap must carry exactly 3 challenge results');
+      }
+      const rewardEntries = candidate.transactions.filter(
+        (entry) => entry.type === 'challenge-reward',
+      );
+      const expectedRewards = evaluation.results.filter((r) => r.success).length;
+      const humanRewards = rewardEntries.filter(
+        (entry) => entry.franchiseId === input.humanFranchiseId,
+      ).length;
+      if (input.humanFranchiseId !== null && humanRewards !== expectedRewards) {
+        failures.push(
+          `candidate must carry ${String(expectedRewards)} challenge-reward transactions for the human (got ${String(humanRewards)})`,
+        );
+      }
     }
-    if (candidate.objective.success !== candidate.objective.evaluation.success) {
-      failures.push('candidate objective success does not match its evaluation');
+    if (command.blockIndex === 8 && candidate.challenges !== undefined) {
+      failures.push('the final two-game block must carry no challenges');
     }
-  }
-  if (command.blockIndex === 8 && candidate.objective.objectiveId !== null) {
-    failures.push('the final two-game block must carry a null objective');
+  } else {
+    const objective = candidate.objective;
+    if (objective === undefined) {
+      failures.push('candidate must carry an objective evaluation for legacy blocks');
+    } else {
+      if (objective.objectiveId !== command.objectiveId) {
+        failures.push(
+          `candidate objective ${String(objective.objectiveId)} does not match the command ${String(command.objectiveId)}`,
+        );
+      }
+      if (objective.objectiveId !== null) {
+        if (objective.evaluation.blockIndex !== command.blockIndex) {
+          failures.push('candidate objective evaluation blockIndex does not match the command');
+        }
+        if (objective.success !== objective.evaluation.success) {
+          failures.push('candidate objective success does not match its evaluation');
+        }
+      }
+      if (command.blockIndex === 8 && objective.objectiveId !== null) {
+        failures.push('the final two-game block must carry a null objective');
+      }
+    }
   }
   if (candidate.expectedStateRevision !== command.expectedStateRevision) {
     failures.push('candidate expectedStateRevision does not match the command');

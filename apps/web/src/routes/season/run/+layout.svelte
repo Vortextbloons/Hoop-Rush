@@ -180,6 +180,8 @@
       run?.trade !== null && run?.trade !== undefined ? cloneTradeState(run.trade) : null;
     shell.freeAgency = run?.freeAgency ?? null;
     shell.objectives = run?.objectives ?? null;
+    shell.challenges =
+      (run as unknown as { challenges?: SeasonRunShellData['challenges'] })?.challenges ?? null;
     if (run !== null) {
       rebuildFacesIfNeeded(run);
       const rebuilt = rebuildRotationEditor(run);
@@ -484,10 +486,6 @@
     }
     return shell.hub.quitRun();
   };
-  shell.selectBlockObjective = async (input) => {
-    await shell.hub?.selectBlockObjective(input);
-    mirrorHub();
-  };
   shell.spendInfluence = async (input) => {
     await shell.hub?.spendInfluence(input);
     mirrorHub();
@@ -528,24 +526,16 @@
     await shell.hub?.resumeBlock();
     mirrorHub();
   };
-  shell.selectGmIdentity = async (input) => {
-    await shell.hub?.selectGmIdentity(input);
-    mirrorHub();
-  };
   shell.selectCampaignOpportunity = async (input) => {
     await shell.hub?.selectCampaignOpportunity(input);
     mirrorHub();
   };
-  shell.evolveGmCampaign = async (input) => {
-    shell.selectFrontOffice = async (input) => {
-      await shell.hub?.selectFrontOffice(input);
-      mirrorHub();
-    };
-    shell.selectCourtInnovation = async (input) => {
-      await shell.hub?.selectCourtInnovation(input);
-      mirrorHub();
-    };
-    await shell.hub?.evolveGmCampaign(input);
+  shell.selectFrontOffice = async (input) => {
+    await shell.hub?.selectFrontOffice(input);
+    mirrorHub();
+  };
+  shell.selectCourtInnovation = async (input) => {
+    await shell.hub?.selectCourtInnovation(input);
     mirrorHub();
   };
   shell.openTradeInquiry = async (input) => {
