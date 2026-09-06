@@ -4,7 +4,6 @@
   import BlockProgress from '$lib/components/season/BlockProgress.svelte';
   import CourtInnovationPicker from '$lib/components/season/CourtInnovationPicker.svelte';
   import RuleBadge from '$lib/components/season/RuleBadge.svelte';
-  import CampaignPanel from '$lib/components/season/CampaignPanel.svelte';
   import ChampionSummary from '$lib/components/season/ChampionSummary.svelte';
   import HealthStrip from '$lib/components/season/HealthStrip.svelte';
   import InfluencePanel from '$lib/components/season/InfluencePanel.svelte';
@@ -24,7 +23,6 @@
     blockPhaseAllowsSubmit,
     buildSubmitBlockEnvelope,
     humanizeBlockSubmitFailure,
-    isCampaignRequired,
     isInnovationRequired,
     seasonBlockReadinessOf,
     type SubmitBlockFailureCode,
@@ -68,7 +66,6 @@
     postseasonStageLabel,
     riskyRehabOptionsOf,
   } from '$lib/season/season-postseason-presentation';
-  import { ordinal } from '$lib/season/season-presentation';
   import { homeRuleOf } from '$lib/season/season-evolution-view';
   import { blockRoundRange, parsePlayoffGameId } from '@hoop-rush/data-contracts';
   import type { SeasonRunCommandError } from '$lib/season/season-hub-state';
@@ -121,20 +118,6 @@
     );
   });
   const challengesVm = $derived(run !== null ? challengesViewModel(run, nextBlockIndex) : null);
-  const hasCampaign = $derived(
-    run !== null &&
-      (
-        run as unknown as {
-          campaign?: unknown;
-        }
-      ).campaign !== undefined,
-  );
-  const campaignCommandError = $derived.by(() => {
-    const e = commandError;
-    if (e === null) return null;
-    const campaignCommands = new Set(['select-campaign-opportunity']);
-    return campaignCommands.has(e.command) ? e.message : null;
-  });
   const innovationCommandError = $derived.by(() => {
     const e = commandError;
     if (e === null) return null;
@@ -221,7 +204,6 @@
     });
   });
   const rotationFailures = $derived(shell.editor?.validate() ?? []);
-  const campaignRequired = $derived(isCampaignRequired(run, nextBlockIndex));
   const innovationRequired = $derived(
     run !== null && humanFranchiseId !== null && nextBlockIndex !== null
       ? isInnovationRequired(run, humanFranchiseId, nextBlockIndex)
@@ -233,7 +215,6 @@
   const readiness = $derived(
     seasonBlockReadinessOf({
       rotationFailures,
-      campaignRequired,
       innovationRequired,
       faUnresolved: faWindowIndex !== null,
       faWindowIndex,
@@ -249,6 +230,7 @@
       block.phase !== 'running',
   );
   let submitting = $state(false);
+  let blockProgressVisible = $state(false);
   let submitFailure: { code: SubmitBlockFailureCode; faWindowIndex: number | null } | null =
     $state(null);
   const submitErrorView = $derived(
@@ -267,11 +249,9 @@
         const code: SubmitBlockFailureCode =
           first.kind === 'rotation'
             ? 'rotation-invalid'
-            : first.kind === 'campaign'
-              ? 'campaign-not-selected'
-              : first.kind === 'innovation'
-                ? 'evolution-not-selected'
-                : 'free-agency-unresolved';
+            : first.kind === 'innovation'
+              ? 'evolution-not-selected'
+              : 'free-agency-unresolved';
         submitFailure = { code, faWindowIndex };
       }
       return;
@@ -603,6 +583,9 @@
         <PostseasonProgress
           progress={shell.postseason}
           label="Start postseason"
+          franchiseAbbrev={shell.franchiseAbbrev}
+          {humanFranchiseId}
+          manifest={shell.manifest}
           onCancel={() => shell.cancelPostseason()}
           onRetry={() => retryPostseason()}
         />
@@ -651,19 +634,6 @@
             <p class="font-mono text-xs text-muted-foreground">{blockLine}</p>
           {/if}
 
-          {#if hasCampaign}
-            <CampaignPanel
-              {run}
-              {nextBlockIndex}
-              busy={block.phase === 'running'}
-              commandError={campaignCommandError}
-              playerName={shell.playerName}
-              onSelectOpportunity={(input) => {
-                if (!mounted) return;
-                void shell.selectCampaignOpportunity?.(input);
-              }}
-            />
-          {/if}
           {#if challengesVm !== null}
             <ChallengesPanel
               blockIndex={challengesVm.blockIndex}
@@ -900,18 +870,22 @@
           </div>
 
           <div aria-live="polite" class="min-h-6">
-            {#if block.phase === 'running' || block.phase === 'failed' || block.phase === 'cancelled' || (block.gamesTotal ?? 0) > 0}
-              <BlockProgress
-                {block}
-                label={blockLine}
-                {humanFranchiseId}
-                schedule={shell.schedule}
-                franchiseName={shell.franchiseName}
-                franchiseAbbrev={shell.franchiseAbbrev}
-                onCancel={() => shell.cancelBlock()}
-                onRetry={() => shell.retryBlock()}
-              />
-            {:else}
+            <BlockProgress
+              {block}
+              label={blockLine}
+              {humanFranchiseId}
+              schedule={shell.schedule}
+              franchiseName={shell.franchiseName}
+              franchiseAbbrev={shell.franchiseAbbrev}
+              recapHref={block.blockIndex !== null
+                ? `/season/run/checkpoint?block=${String(block.blockIndex)}`
+                : '/season/run/checkpoint'}
+              manifest={shell.manifest}
+              bind:visible={blockProgressVisible}
+              onCancel={() => shell.cancelBlock()}
+              onRetry={() => shell.retryBlock()}
+            />
+            {#if !blockProgressVisible}
               <div class="rounded-lg border border-dashed border-border/60 px-3 py-2">
                 <p class="font-mono text-xs text-muted-foreground">
                   Block progress appears here while playing.
@@ -1194,6 +1168,9 @@
         <PostseasonProgress
           progress={shell.postseason}
           label="Postseason"
+          franchiseAbbrev={shell.franchiseAbbrev}
+          {humanFranchiseId}
+          manifest={shell.manifest}
           onCancel={() => shell.cancelPostseason()}
           onRetry={() => retryPostseason()}
         />

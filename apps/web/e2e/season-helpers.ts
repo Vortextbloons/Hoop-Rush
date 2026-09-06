@@ -104,8 +104,8 @@ export async function offerCardCandidates(page: Page): Promise<SeasonDraftCandid
 }
 
 export async function draftOneRound(page: Page, planner: DraftPlanner) {
-  await page.getByRole('button', { name: /^Draw round \d+ offer$/ }).click();
-  await expect(page.getByText(/^Offer · pick \d+$/)).toBeVisible();
+  await page.getByRole('button', { name: /^Draw round \d+/ }).click();
+  await expect(page.getByText(/^Pick \d+ of 10$/)).toBeVisible();
 
   const candidates = await offerCardCandidates(page);
   expect(candidates.length).toBe(8);
@@ -117,6 +117,6 @@ export async function draftOneRound(page: Page, planner: DraftPlanner) {
     .filter({ hasText: `${target.displayName} ${target.seasonKey}` })
     .getByRole('button', { name: 'Pick' })
     .click();
-  await expect(page.getByText(/^Offer · pick \d+$/)).toHaveCount(0, { timeout: 5000 });
+  await expect(page.getByText(/^Pick \d+ of 10$/)).toHaveCount(0, { timeout: 5000 });
   planner.record(target);
 }

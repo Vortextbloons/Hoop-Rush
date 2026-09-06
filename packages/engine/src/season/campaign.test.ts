@@ -685,7 +685,7 @@ describe('campaign old saves', () => {
     expect(state.campaignVersion).toBe(SEASON_CAMPAIGN_VERSION);
     expect(state.schemaVersion).toBe(1);
   });
-  it('buildInitialCampaignState starts without identity and deals block-0 offers', () => {
+  it('buildInitialCampaignState starts empty without offers', () => {
     const input = generationInput();
     const initial = buildInitialCampaignState({
       rootSeed: input.rootSeed,
@@ -701,9 +701,7 @@ describe('campaign old saves', () => {
     expect(initial.startingFocus).toBeNull();
     expect(initial.evolutionOffers).toBeNull();
     expect(initial.evolutionSelection).toBeNull();
-    expect(initial.offers[0]).toHaveLength(2);
-    const direct = generateSeasonCampaignOffers({ ...input, blockIndex: 0 });
-    expect(initial.offers[0]).toEqual(direct);
+    expect(initial.offers).toEqual({});
   });
 });
 describe('campaign determinism and seed paths', () => {

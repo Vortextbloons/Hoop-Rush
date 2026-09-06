@@ -27,6 +27,9 @@
   const lineupChemistry = $derived(
     effects === null ? null : activeLineupChemistryBp(effects, pendingStartersFive),
   );
+  const chemistryLabel = $derived(
+    lineupChemistry === null ? '—' : `${(lineupChemistry / 100).toFixed(0)}`,
+  );
   const pairs = $derived(
     effects === null ? null : strongestAndWeakestPairs(effects, rosterVersions),
   );
@@ -37,21 +40,20 @@
 </script>
 
 {#if effects !== null}
-  <section aria-labelledby="chemistry-heading" class="bg-surface-1 p-4 sm:rounded-xl">
-    <p id="chemistry-heading" class="text-label uppercase text-muted-foreground">Unit chemistry</p>
-    <p class="mt-1 font-mono text-xs text-foreground">
-      Active lineup <span class="font-bold">
-        {lineupChemistry === null ? '—' : `${(lineupChemistry / 100).toFixed(0)}%`}
+  <details class="group rounded-none bg-surface-1 px-3 py-2 sm:rounded-xl" data-unit-chemistry>
+    <summary
+      class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden"
+    >
+      <span class="font-mono text-xs font-bold tracking-[0.12em] uppercase">
+        Chemistry {chemistryLabel}
       </span>
-      {#if pendingStarters.length !== 5}
-        <span class="text-muted-foreground"> · pending starters</span>
-      {/if}
-    </p>
+      <span class="text-xs font-semibold text-primary">View details</span>
+    </summary>
     {#if pairs !== null && (pairs.strongest.length > 0 || pairs.weakest.length > 0)}
-      <div class="mt-3 grid gap-3 sm:grid-cols-2">
+      <div class="grid gap-3 pb-2 sm:grid-cols-2">
         {#if pairs.strongest.length > 0}
           <div>
-            <p class="font-mono text-xs text-muted-foreground">Most shared play</p>
+            <p class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Strong chemistry</p>
             <ul class="mt-1 space-y-1">
               {#each pairs.strongest as pair (pair.a + pair.b)}
                 <li class="flex items-baseline justify-between gap-2 font-mono text-xs">
@@ -59,7 +61,7 @@
                     {nameOf(pair.a)} + {nameOf(pair.b)}
                   </span>
                   <span class="shrink-0 text-positive">
-                    {pair.shared} trips · {(pair.chemistryBp / 100).toFixed(0)}%
+                    {(pair.chemistryBp / 100).toFixed(0)}
                   </span>
                 </li>
               {/each}
@@ -68,7 +70,7 @@
         {/if}
         {#if pairs.weakest.length > 0}
           <div>
-            <p class="font-mono text-xs text-muted-foreground">Least shared play</p>
+            <p class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Still building</p>
             <ul class="mt-1 space-y-1">
               {#each pairs.weakest as pair (pair.a + pair.b)}
                 <li class="flex items-baseline justify-between gap-2 font-mono text-xs">
@@ -76,7 +78,7 @@
                     {nameOf(pair.a)} + {nameOf(pair.b)}
                   </span>
                   <span class="shrink-0 text-muted-foreground">
-                    {pair.shared} trips · {(pair.chemistryBp / 100).toFixed(0)}%
+                    {(pair.chemistryBp / 100).toFixed(0)}
                   </span>
                 </li>
               {/each}
@@ -85,8 +87,5 @@
         {/if}
       </div>
     {/if}
-    <p class="mt-3 font-mono text-[10px] text-muted-foreground/70">
-      Shared possessions are recorded evidence from completed trips, not a prediction.
-    </p>
-  </section>
+  </details>
 {/if}

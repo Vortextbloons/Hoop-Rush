@@ -38,6 +38,7 @@ import {
   buildFixtureStoredDraft,
   buildStubSeasonEngineSeam,
 } from '../testing/season-run-fixture.ts';
+import { buildEmptyCampaignState, generateSeasonCampaignOffers } from '@hoop-rush/engine';
 import { buildFullSeasonDataset } from '../benchmark/season-run.ts';
 import {
   SeasonPendingBlockRejectedError,
@@ -1036,9 +1037,26 @@ describe('season run M2.5 pending blocks (v5)', () => {
   });
 });
 describe('season run M2.5 command application (v5)', () => {
+  function block0Offers(adapters: Adapters) {
+    const humanFranchiseId =
+      adapters.run.league.teams.find((team) => team.control === 'human')?.franchiseId ?? null;
+    return generateSeasonCampaignOffers({
+      rootSeed: adapters.run.rootSeed,
+      blockIndex: 0,
+      humanFranchiseId,
+      schedule: adapters.schedule,
+      standings: adapters.seam.reduceSeasonStandings(adapters.run.league, []),
+      health: adapters.run.health,
+      rotations: adapters.run.rotations,
+      rosters: adapters.run.rosters,
+      transactions: [],
+      summaries: [],
+      campaignState: adapters.run.campaign ?? buildEmptyCampaignState(),
+    });
+  }
   function firstCampaignOffer(adapters: Adapters) {
-    const offer = adapters.run.campaign?.offers[0]?.[0];
-    if (offer === undefined) throw new Error('expected block-0 campaign offers after promote');
+    const offer = block0Offers(adapters)[0];
+    if (offer === undefined) throw new Error('expected block-0 campaign offers');
     return offer;
   }
   function selectCampaignCommand(
@@ -1060,9 +1078,11 @@ describe('season run M2.5 command application (v5)', () => {
   }
   function postCommandRun(adapters: Adapters): SeasonRun {
     const { run } = adapters;
+    const offers = block0Offers(adapters);
     const offer = firstCampaignOffer(adapters);
     const campaign = {
-      ...run.campaign!,
+      ...(run.campaign ?? buildEmptyCampaignState()),
+      offers: { ...(run.campaign?.offers ?? {}), 0: offers },
       selections: {
         0: {
           opportunityId: offer.opportunityId,

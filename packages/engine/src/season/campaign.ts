@@ -714,22 +714,8 @@ export interface SeasonCampaignInitialInput {
   rosters: readonly SeasonRoster[];
   transactions: readonly SeasonTransactionEntry[];
 }
-export function buildInitialCampaignState(input: SeasonCampaignInitialInput): SeasonCampaignState {
-  const empty = buildEmptyCampaignState();
-  const offers = generateSeasonCampaignOffers({
-    rootSeed: input.rootSeed,
-    blockIndex: 0,
-    humanFranchiseId: input.humanFranchiseId,
-    schedule: input.schedule,
-    standings: input.standings,
-    health: input.health,
-    rotations: input.rotations,
-    rosters: input.rosters,
-    transactions: input.transactions,
-    summaries: [],
-    campaignState: empty,
-  });
-  return { ...empty, offers: { 0: offers } };
+export function buildInitialCampaignState(_input: SeasonCampaignInitialInput): SeasonCampaignState {
+  return buildEmptyCampaignState();
 }
 export function normalizeCampaignState(state: unknown): SeasonCampaignState {
   if (state === undefined || state === null) return buildEmptyCampaignState();

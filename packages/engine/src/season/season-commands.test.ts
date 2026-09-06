@@ -2175,7 +2175,7 @@ describe('campaign commands', () => {
     expect(output.result.result.rejection.code).toBe('retired');
     expect(output.run).toEqual({ ...context.run, effects: context.effects });
   });
-  it('accepts select-campaign-opportunity with no GM identity selected', () => {
+  it('rejects select-campaign-opportunity as retired', () => {
     const context = campaignFixture();
     const run = runWithBlockOffers(context.run, 0);
     const campaign = normalizeCampaignState(run.campaign);
@@ -2190,10 +2190,9 @@ describe('campaign commands', () => {
       }),
       { ...context, run },
     );
-    if (output.result.result.status !== 'accepted') throw new Error('expected acceptance');
-    const next = normalizeCampaignState(output.run.campaign);
-    expect(next.startingIdentity).toBeNull();
-    expect(next.selections[0]?.opportunityId).toBe(first.opportunityId);
+    if (output.result.result.status !== 'rejected') throw new Error('expected rejection');
+    expect(output.result.result.rejection.code).toBe('retired');
+    expect(output.run).toEqual({ ...run, effects: context.effects });
   });
   it('has no evolution gate at block 5 (legacy evolution state ignored)', () => {
     const context = campaignFixture();
@@ -2227,6 +2226,7 @@ describe('campaign commands', () => {
       }),
       { ...context, run },
     );
-    if (output.result.result.status !== 'accepted') throw new Error('expected acceptance');
+    if (output.result.result.status !== 'rejected') throw new Error('expected rejection');
+    expect(output.result.result.rejection.code).toBe('retired');
   });
 });

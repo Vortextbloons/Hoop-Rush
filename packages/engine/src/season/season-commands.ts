@@ -655,58 +655,7 @@ function handleSelectCampaignOpportunity(
   if (base !== null) return base;
   const economy = economyRunOf(context);
   const run = economy;
-  const campaign = normalizeCampaignState(run.campaign);
-  const offers = campaign.offers[command.blockIndex];
-  if (!offers) {
-    const rejection: SeasonCampaignOpportunityNotOfferedRejection = {
-      code: 'campaign-opportunity-not-offered',
-      blockIndex: command.blockIndex,
-      opportunityId: command.opportunityId,
-      offeredOpportunityIds: ['copp-00000000', 'copp-00000001'],
-    };
-    return rejectedSelectCampaignOpportunity(command, rejection, run);
-  }
-  const offeredIds = offers.map((o) => o.opportunityId);
-  if (!offeredIds.includes(command.opportunityId)) {
-    const rejection: SeasonCampaignOpportunityNotOfferedRejection = {
-      code: 'campaign-opportunity-not-offered',
-      blockIndex: command.blockIndex,
-      opportunityId: command.opportunityId,
-      offeredOpportunityIds: offeredIds,
-    };
-    return rejectedSelectCampaignOpportunity(command, rejection, run);
-  }
-  if (campaign.selections[command.blockIndex] !== undefined) {
-    const rejection: SeasonCampaignAlreadySelectedRejection = {
-      code: 'campaign-already-selected',
-      blockIndex: command.blockIndex,
-    };
-    return rejectedSelectCampaignOpportunity(command, rejection, run);
-  }
-  const nextCampaign: import('@hoop-rush/data-contracts').SeasonCampaignState = {
-    ...campaign,
-    selections: {
-      ...campaign.selections,
-      [command.blockIndex]: {
-        opportunityId: command.opportunityId,
-        selectedByCommandId: command.commandId,
-      },
-    },
-  };
-  const next = advanceRunState({ ...run, campaign: nextCampaign });
-  return {
-    result: {
-      command: 'select-campaign-opportunity',
-      result: {
-        status: 'accepted',
-        commandId: command.commandId,
-        blockIndex: command.blockIndex,
-        opportunityId: command.opportunityId,
-      },
-    },
-    run: next,
-    pending: null,
-  };
+  return rejectedSelectCampaignOpportunity(command, { code: 'retired' }, run);
 }
 function handleEvolveGmCampaign(
   command: SeasonEvolveGmCampaignCommand,

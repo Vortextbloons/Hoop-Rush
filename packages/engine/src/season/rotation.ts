@@ -96,13 +96,6 @@ export function seasonRotationSetDigest(rotations: readonly SeasonRotation[]): s
   return seasonDigestHex(JSON.stringify(canonical));
 }
 
-export function auditSeasonRotation(
-  rotation: SeasonRotation,
-  memberPlayable: ReadonlyMap<string, readonly Position[]>,
-): string[] {
-  return validateSeasonRotation(rotation, memberPlayable);
-}
-
 export function validateSeasonRotation(
   rotation: SeasonRotation,
   memberPlayable: ReadonlyMap<string, readonly Position[]>,

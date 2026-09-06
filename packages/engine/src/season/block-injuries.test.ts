@@ -8,7 +8,7 @@ import {
   type SeasonHealthState,
   type SeasonInjuryRecord,
 } from '@hoop-rush/data-contracts';
-import { buildTestRun, pipelineInput, scheduleOf } from './block-test-support.ts';
+import { buildTestRun, pipelineInput, scheduleOf, blockCommand } from './block-test-support.ts';
 import {
   assembleSeasonBlockCandidate,
   auditSeasonBlock,
@@ -22,6 +22,7 @@ import {
 } from './block.ts';
 import { assembleSeasonPendingBlock } from './health.ts';
 import { dealSeasonBlockChallenges } from './challenges.ts';
+import { applySeasonBlockInfluenceGrants } from './influence.ts';
 function challengeDealOf(
   run: ReturnType<typeof buildTestRun>['run'],
   blockIndex: number,
@@ -164,6 +165,48 @@ describe('M2.5 block pipeline with injuries', () => {
     expect(candidate.recap.challengeEvidence).toHaveLength(3);
     expect(auditSeasonBlock(candidate, withChallenges)).toEqual([]);
   }, 60000);
+  it('audits challenge-reward transactions for the current block only', () => {
+    const { run, catalog } = buildTestRun();
+    const checkpoint0 = simulateSeasonBlock(pipelineInput(run, catalog, 0));
+    const stateFacts0 = deriveSeasonPostBlockState({
+      run,
+      candidate: checkpoint0,
+      commandId: blockCommand(run, 0, 0).commandId,
+      rotationDigest: blockCommand(run, 0, 0).rotationDigest,
+    });
+    const priorGrant = applySeasonBlockInfluenceGrants({
+      influence: checkpoint0.influence,
+      blockIndex: 0,
+      humanFranchiseId: 'lakers',
+      challengeSuccesses: [{ challengeId: 'winning-block', success: true, reward: 1 }],
+    });
+    const priorReward = priorGrant.entries.find((entry) => entry.type === 'challenge-reward');
+    expect(priorReward).toBeDefined();
+    if (priorReward === undefined) throw new Error('expected a prior challenge reward');
+    const runAfter0 = {
+      ...run,
+      cursor: { schemaVersion: 1 as const, completedRounds: checkpoint0.completedRounds },
+      standings: checkpoint0.standings,
+      health: checkpoint0.health,
+      influence: priorGrant.influence,
+      transactions: [...checkpoint0.transactions, priorReward],
+      checkpointState: stateFacts0.checkpointState,
+      stateRevision: stateFacts0.stateRevision,
+      stateDigest: stateFacts0.stateDigest,
+    };
+    const deal1 = challengeDealOf(runAfter0, 1);
+    const withChallenges1: SeasonBlockSimulationInput = {
+      ...pipelineInput(runAfter0, catalog, 1, checkpoint0.gameSummaries, checkpoint0.effects),
+      challengeDeal: deal1,
+      command: {
+        ...blockCommand(runAfter0, 1, 1),
+        objectiveId: null,
+        challengeIds: [...deal1.challengeIds],
+      },
+    };
+    const checkpoint1 = simulateSeasonBlock(withChallenges1);
+    expect(auditSeasonBlock(checkpoint1, withChallenges1)).toEqual([]);
+  }, 120000);
   it('rejects invalid challenges at the command boundary', () => {
     const { run, catalog } = buildTestRun();
     const deal = challengeDealOf(run, 0);

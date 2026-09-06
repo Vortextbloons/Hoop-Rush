@@ -8,7 +8,6 @@ import {
   type SeasonRunAuthority,
 } from '@hoop-rush/data-contracts';
 import { seasonBlockRecapCanonical } from './recap.ts';
-export { canonicalJson };
 export function reconstructSeasonGames(
   schedule: SeasonSchedule,
   summaries: readonly SeasonGameSummary[],

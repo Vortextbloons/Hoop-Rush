@@ -27,11 +27,11 @@ export function enumerateLegalFives(
   const used = new Set<string>();
   const unit: string[] = [];
   const solve = (slot: number): void => {
-    if (slot >= STARTING_SLOTS.length) {
+    if (slot >= LINEUP_STRUCTURE.length) {
       results.push([...unit]);
       return;
     }
-    const requirement = STARTING_SLOTS[slot];
+    const requirement = LINEUP_STRUCTURE[slot];
     if (requirement === undefined) return;
     for (const member of members) {
       if (used.has(member.playerVersionId)) continue;
@@ -77,11 +77,11 @@ export function chooseInitialUnit(
   const members = plannerState(context).members;
   const playableById = new Map(members.map((member) => [member.playerVersionId, member.playable]));
   const starters = context.rotation.starters;
-  let startersLegal = starters.length === STARTING_SLOTS.length;
+  let startersLegal = starters.length === LINEUP_STRUCTURE.length;
   if (startersLegal) {
-    for (let slot = 0; slot < STARTING_SLOTS.length; slot += 1) {
+    for (let slot = 0; slot < LINEUP_STRUCTURE.length; slot += 1) {
       const starterId = starters[slot];
-      const requirement = STARTING_SLOTS[slot];
+      const requirement = LINEUP_STRUCTURE[slot];
       const playable = starterId === undefined ? undefined : playableById.get(starterId);
       if (
         starterId === undefined ||
@@ -166,7 +166,6 @@ export function plannerCandidates(
   );
   return enumerateLegalFives(members, available);
 }
-export const STARTING_SLOTS = LINEUP_STRUCTURE;
 function orderedPlannerMembers(context: PlannerRotationContext): PlannerMember[] {
   const starters = [...context.rotation.starters].sort();
   const order = [...starters, ...context.rotation.benchOrder];
@@ -262,12 +261,12 @@ function closingFiveIsLegal(
   unavailable: ReadonlySet<string>,
 ): boolean {
   const closing = context.rotation.closingFive;
-  if (closing.length !== STARTING_SLOTS.length || new Set(closing).size !== closing.length) {
+  if (closing.length !== LINEUP_STRUCTURE.length || new Set(closing).size !== closing.length) {
     return false;
   }
-  for (let slot = 0; slot < STARTING_SLOTS.length; slot += 1) {
+  for (let slot = 0; slot < LINEUP_STRUCTURE.length; slot += 1) {
     const playerVersionId = closing[slot];
-    const requirement = STARTING_SLOTS[slot];
+    const requirement = LINEUP_STRUCTURE[slot];
     const playable =
       playerVersionId === undefined ? undefined : context.members.get(playerVersionId);
     if (

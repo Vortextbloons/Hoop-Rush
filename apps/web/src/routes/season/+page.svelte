@@ -168,9 +168,6 @@
     flow = instance;
     return instance;
   }
-  const franchiseName = (franchiseId: string): string =>
-    manifest?.modernFranchiseSlots.find((slot) => slot.franchiseId === franchiseId)?.displayName ??
-    'Unknown team';
   const draftStatus = $derived(
     board?.draft?.status === 'drafting' ||
       board?.draft?.status === 'finalized' ||
@@ -376,15 +373,20 @@
         Draft 10. Coach 82.
       </h1>
       <p class="mt-3 max-w-xl text-xs text-muted-foreground">
-        Pick executive → Draft 10 → Play 82.
+        Choose an executive, then build your roster.
+      </p>
+      <p class="mt-1 font-mono text-[11px] tracking-wide text-muted-foreground">
+        30 teams • 82 games • 10-player roster • 1 champion
       </p>
     </div>
-    <a
-      href={resolve('/')}
-      class="shrink-0 self-start font-mono text-xs text-muted-foreground underline-offset-4 hover:underline sm:self-auto"
-    >
-      Back
-    </a>
+    {#if draftStage !== 'executive'}
+      <a
+        href={resolve('/')}
+        class="shrink-0 self-start font-mono text-xs text-muted-foreground underline-offset-4 hover:underline sm:self-auto"
+      >
+        Back
+      </a>
+    {/if}
   </div>
 
   {#if assetsError}
@@ -428,29 +430,37 @@
       </a>
     </div>
   {:else if draftStage === 'executive'}
-    <div class="mt-10 flex flex-col gap-6">
-      <div class="rounded-none bg-surface-1 sm:rounded-xl p-6">
+    <div class="mx-auto mt-6 flex w-full max-w-3xl flex-col px-3 pb-10 sm:px-0">
+      <div class="rounded-none bg-surface-1 p-6 sm:rounded-xl">
         <h2 class="font-display text-xl font-extrabold uppercase tracking-tight">
           Pick your executive
         </h2>
         <p class="mt-2 max-w-xl text-xs text-muted-foreground">
-          One executive. Stays all season. Then draft 10 players.
+          Choose one for the season. Their ability and drawback affect your run.
         </p>
-        <div class="mt-4">
+        <div class="mt-5">
           <FrontOfficePicker
             value={executiveId}
             disabled={busy}
             onChange={(id) => (executiveId = id)}
           />
         </div>
-        <button
-          type="button"
-          onclick={startDraft}
-          disabled={busy || executiveId === null}
-          class="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-xs font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {busy ? 'Starting…' : 'Start draft'}
-        </button>
+        <div class="mt-6 flex items-center justify-between gap-3 border-t border-border/60 pt-4">
+          <a
+            href={resolve('/')}
+            class="inline-flex min-h-11 items-center justify-center rounded-lg px-4 py-3 text-xs font-semibold text-muted-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground"
+          >
+            ← Back
+          </a>
+          <button
+            type="button"
+            onclick={startDraft}
+            disabled={busy || executiveId === null}
+            class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-xs font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {busy ? 'Starting…' : 'Start draft →'}
+          </button>
+        </div>
         {#if friendlyActionError}
           <p
             role="alert"
@@ -460,30 +470,12 @@
           </p>
         {/if}
       </div>
-
-      {#if league && manifest}
-        <section
-          aria-labelledby="season-league-heading"
-          class="rounded-none bg-surface-1 sm:rounded-xl p-6"
-        >
-          <h2 id="season-league-heading" class="text-base font-extrabold uppercase tracking-tight">
-            The league
-          </h2>
-          <p class="mt-2 text-xs text-muted-foreground">30 teams · 82 games · You coach one.</p>
-        </section>
-      {/if}
     </div>
   {:else if draftStage === 'drafting' || draftStage === 'ready'}
-    <div class="mt-8 flex flex-col gap-6 pb-[max(6rem,env(safe-area-inset-bottom))] sm:mt-10">
+    <div
+      class="mx-auto mt-6 flex w-full max-w-4xl flex-col gap-4 px-3 pb-[max(6rem,env(safe-area-inset-bottom))] sm:mt-8 sm:px-0"
+    >
       {#if flow && manifest && board?.draft}
-        <div class="rounded-none bg-surface-1 sm:rounded-xl px-4 py-3">
-          <p class="text-xs text-muted-foreground">
-            Coaching
-            <span class="font-bold text-foreground">
-              {franchiseName(board.draft.participants[0]?.franchiseId ?? '')}
-            </span>
-          </p>
-        </div>
         <SeasonDraftBoard
           flow={board}
           {manifest}

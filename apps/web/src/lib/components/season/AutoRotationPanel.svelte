@@ -229,10 +229,14 @@
         id="auto-rotation-heading"
         class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
       >
-        Auto rotation
+        Auto build rotation
       </h3>
       <p class="mt-0.5 text-xs text-muted-foreground">
-        Preview only — nothing changes until you apply.
+        {option === 'full-auto'
+          ? 'Picks the 10, starters, minutes, and closing five.'
+          : option === 'minutes-only'
+            ? 'Keeps your 10. Retunes minutes only.'
+            : 'Keeps your 10. Retunes starters, minutes, and closing.'}
       </p>
     </div>
     {#if hasUndo}
@@ -240,77 +244,29 @@
         type="button"
         onclick={undoAuto}
         disabled={disabled || busy}
-        class="inline-flex min-h-11 items-center justify-center rounded-lg border border-border px-3 py-1.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
+        class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg border border-border px-3 py-1.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
       >
         Undo auto
       </button>
     {/if}
   </div>
 
-  <fieldset class="mt-2">
-    <legend class="sr-only">Auto scope</legend>
-    <div class="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Auto scope">
-      <label
-        class="flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-semibold outline-none has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring {option ===
-        'full-auto'
-          ? 'border-primary bg-primary/10 text-foreground'
-          : 'border-border bg-surface-2 text-muted-foreground'}"
-      >
-        <input
-          type="radio"
-          name="auto-scope"
-          value="full-auto"
-          checked={option === 'full-auto'}
-          onchange={() => {
-            option = 'full-auto';
-          }}
-          disabled={busy || disabled}
-          class="sr-only"
-        />
-        Full Auto
-      </label>
-      <label
-        class="flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-semibold outline-none has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring {option ===
-        'minutes-only'
-          ? 'border-primary bg-primary/10 text-foreground'
-          : 'border-border bg-surface-2 text-muted-foreground'}"
-      >
-        <input
-          type="radio"
-          name="auto-scope"
-          value="minutes-only"
-          checked={option === 'minutes-only'}
-          onchange={() => {
-            option = 'minutes-only';
-          }}
-          disabled={busy || disabled}
-          class="sr-only"
-        />
-        Minutes only
-      </label>
-      <label
-        class="flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-semibold outline-none has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring {option ===
-        'keep-10'
-          ? 'border-primary bg-primary/10 text-foreground'
-          : 'border-border bg-surface-2 text-muted-foreground'}"
-      >
-        <input
-          type="radio"
-          name="auto-scope"
-          value="keep-10"
-          checked={option === 'keep-10'}
-          onchange={() => {
-            option = 'keep-10';
-          }}
-          disabled={busy || disabled}
-          class="sr-only"
-        />
-        Keep my 10
-      </label>
-    </div>
-  </fieldset>
-
   <div class="mt-2 flex flex-col gap-2 sm:flex-row">
+    <label class="sr-only" for="auto-scope-select">Auto scope</label>
+    <select
+      id="auto-scope-select"
+      aria-label="Auto scope"
+      value={option}
+      onchange={(event) => {
+        option = (event.currentTarget as HTMLSelectElement).value as AutoScopeOption;
+      }}
+      disabled={busy || disabled}
+      class="min-h-11 min-w-0 flex-1 rounded-lg border border-border bg-surface-2 px-3 py-2 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 sm:max-w-56"
+    >
+      <option value="full-auto">Full auto</option>
+      <option value="minutes-only">Minutes only</option>
+      <option value="keep-10">Keep my 10</option>
+    </select>
     {#if busy}
       <button
         type="button"
@@ -328,7 +284,7 @@
         aria-busy={busy ? 'true' : undefined}
         class="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
       >
-        Run Auto
+        Auto build
       </button>
     {/if}
   </div>
@@ -355,32 +311,6 @@
       class="mt-2 rounded-lg border border-primary/40 bg-primary/5 p-3"
     >
       <p class="text-sm font-semibold">Preview — nothing applied yet</p>
-      {#if preview.degraded}
-        <p class="mt-1 font-mono text-[10px] text-muted-foreground">
-          Projection unavailable — using OVR fallback.
-        </p>
-      {/if}
-      <dl class="mt-2 grid grid-cols-2 gap-2 font-mono text-[11px] sm:grid-cols-4">
-        <div class="rounded bg-surface-2 px-2 py-1.5">
-          <dt class="text-muted-foreground">Quality</dt>
-          <dd class="font-bold">{preview.metrics.quality.toFixed(3)}</dd>
-        </div>
-        <div class="rounded bg-surface-2 px-2 py-1.5">
-          <dt class="text-muted-foreground">Risk</dt>
-          <dd class="font-bold">{preview.metrics.riskScore.toFixed(3)}</dd>
-        </div>
-        <div class="rounded bg-surface-2 px-2 py-1.5">
-          <dt class="text-muted-foreground">Strain</dt>
-          <dd class="font-bold">
-            {preview.metrics.strainBand}
-            {preview.metrics.maxStarterStrainBp}
-          </dd>
-        </div>
-        <div class="rounded bg-surface-2 px-2 py-1.5">
-          <dt class="text-muted-foreground">Relief</dt>
-          <dd class="font-bold">{preview.metrics.relief.toFixed(2)}</dd>
-        </div>
-      </dl>
       {#if preview.metrics.projectedNetRating !== null}
         <p class="mt-1 font-mono text-[11px]">
           Projected net {preview.metrics.projectedNetRating > 0
@@ -465,23 +395,20 @@
       </div>
 
       {#if preview.changes.length > 0}
-        <div class="mt-2">
-          <p
-            class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
+        <details class="mt-2">
+          <summary
+            class="inline-flex min-h-11 cursor-pointer items-center rounded-lg px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden"
           >
             Why ({preview.changes.length})
-          </p>
+          </summary>
           <ul class="mt-1 flex max-h-48 flex-col gap-1 overflow-y-auto text-xs">
             {#each preview.changes as change, index (index)}
               <li class="rounded bg-surface-2 px-2 py-1">
-                <span class="font-mono text-[10px] font-bold uppercase text-muted-foreground">
-                  {change.kind}
-                </span>
-                <span class="ml-1.5 text-muted-foreground">{change.reason}</span>
+                <span class="text-muted-foreground">{change.reason}</span>
               </li>
             {/each}
           </ul>
-        </div>
+        </details>
       {/if}
 
       {#if needsSwapConfirm && confirmingSwaps}

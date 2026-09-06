@@ -92,8 +92,6 @@ import { dealSeasonBlockChallenges, evaluateSeasonBlockChallenges } from './chal
 import {
   SEASON_CAMPAIGN_TARGETS_VERSION,
   SEASON_CAMPAIGN_VERSION,
-  evaluateSeasonCampaignOpportunity,
-  generateSeasonCampaignOffers,
   normalizeCampaignState,
 } from './campaign.ts';
 import { applySeasonBlockInfluenceGrants, createInitialSeasonInfluenceState } from './influence.ts';
@@ -419,47 +417,6 @@ export function seasonBlockRejection(
         objectiveId: command.objectiveId,
         blockIndex: command.blockIndex,
       };
-    }
-  }
-  if (input.campaignState !== undefined) {
-    const campaign = normalizeCampaignState(input.campaignState);
-    if (command.blockIndex <= 7) {
-      const expected = (
-        command as unknown as {
-          campaignOpportunityId?: string | null;
-        }
-      ).campaignOpportunityId;
-      if (expected == null) {
-        return {
-          code: 'invalid-campaign',
-          expected: 'required',
-          blockIndex: command.blockIndex,
-        };
-      }
-      const offers = campaign.offers[command.blockIndex];
-      const offeredIds = offers?.map((o) => o.opportunityId) ?? [];
-      if (!offeredIds.includes(expected)) {
-        return {
-          code: 'invalid-campaign',
-          expected: 'not-offered',
-          opportunityId: expected,
-          blockIndex: command.blockIndex,
-        };
-      }
-    } else {
-      const expected = (
-        command as unknown as {
-          campaignOpportunityId?: string | null;
-        }
-      ).campaignOpportunityId;
-      if (expected != null) {
-        return {
-          code: 'invalid-campaign',
-          expected: 'none',
-          opportunityId: expected,
-          blockIndex: command.blockIndex,
-        };
-      }
     }
   }
   const preBlockFreeAgency =
@@ -1139,7 +1096,7 @@ export function assembleSeasonBlockCandidate(
     objectiveEvaluations['solo'] = objective.evaluation;
     objectiveSuccessByFranchise['solo'] = objective.success;
   }
-  let campaign: {
+  const campaign: {
     opportunityId: string | null;
     outcome: 'missed' | 'completed' | 'breakthrough' | null;
     evaluation: import('@hoop-rush/data-contracts').SeasonCampaignEvaluation | null;
@@ -1148,62 +1105,6 @@ export function assembleSeasonBlockCandidate(
     outcome: null,
     evaluation: null,
   };
-  const campaignEvaluations: Record<
-    string,
-    import('@hoop-rush/data-contracts').SeasonCampaignEvaluation
-  > = {};
-  if (input.campaignState !== undefined) {
-    const campaignState = normalizeCampaignState(input.campaignState);
-    const primaryOppId =
-      input.campaignOpportunityId ??
-      input.campaignOpportunityIds?.get(primaryFranchiseId ?? '') ??
-      null;
-    if (primaryOppId !== null) {
-      const offers = campaignState.offers[command.blockIndex] ?? [];
-      const opportunity = offers.find((o) => o.opportunityId === primaryOppId) ?? null;
-      if (opportunity) {
-        const standingsForEval = standings;
-        const evalResult = evaluateSeasonCampaignOpportunity({
-          opportunity,
-          blockIndex: command.blockIndex,
-          humanFranchiseId: primaryFranchiseId,
-          summaries: [...summaries],
-          standings: standingsForEval,
-          rotations: run.rotations,
-          transactions: [
-            ...(input.transactions ?? []),
-            ...([] as import('@hoop-rush/data-contracts').SeasonTransactionEntry[]),
-          ],
-          health,
-        });
-        campaign = {
-          opportunityId: opportunity.opportunityId,
-          outcome: evalResult.outcome,
-          evaluation: evalResult,
-        };
-        if (primaryFranchiseId) campaignEvaluations[primaryFranchiseId] = evalResult;
-      }
-    }
-    for (const pid of participantIds) {
-      if (pid === primaryFranchiseId) continue;
-      const oppId = input.campaignOpportunityIds?.get(pid) ?? null;
-      if (oppId === null) continue;
-      const offers = campaignState.offers[command.blockIndex] ?? [];
-      const opp = offers.find((o) => o.opportunityId === oppId) ?? null;
-      if (!opp) continue;
-      const evalRes = evaluateSeasonCampaignOpportunity({
-        opportunity: opp,
-        blockIndex: command.blockIndex,
-        humanFranchiseId: pid,
-        summaries: [...summaries],
-        standings,
-        rotations: run.rotations,
-        transactions: [...(input.transactions ?? [])],
-        health,
-      });
-      campaignEvaluations[pid] = evalRes;
-    }
-  }
   const franchiseIds = run.league.teams.map((team) => team.franchiseId);
   const preBlockInfluence =
     input.influence ??
@@ -1362,8 +1263,6 @@ export function assembleSeasonBlockCandidate(
       ? ([...primaryDeal.challengeIds] as SeasonCandidateCheckpoint['challengeIds'])
       : undefined,
     campaign,
-    campaignEvaluations:
-      Object.keys(campaignEvaluations).length > 0 ? campaignEvaluations : undefined,
     expectedStateRevision: command.expectedStateRevision,
     expectedStateDigest: command.expectedStateDigest,
     stateRevision: 0,
@@ -1747,46 +1646,6 @@ export function completeSeasonBlockCommit(input: {
           };
         }
       }
-    }
-  }
-  const nextBlockIdxForCampaign = input.candidate.blockIndex + 1;
-  if (nextBlockIdxForCampaign <= 7 && postBlockRun.campaign) {
-    const nextCampaignState = postBlockRun.campaign;
-    if (!nextCampaignState.offers[nextBlockIdxForCampaign]) {
-      const scheduleForCampaign =
-        (
-          input as unknown as {
-            schedule?: import('@hoop-rush/data-contracts').SeasonSchedule;
-          }
-        ).schedule ??
-        ({ games: [] } as unknown as import('@hoop-rush/data-contracts').SeasonSchedule);
-      const nextOffers = generateSeasonCampaignOffers({
-        rootSeed: input.run.rootSeed,
-        blockIndex: nextBlockIdxForCampaign,
-        humanFranchiseId: primaryFranchiseId,
-        schedule: scheduleForCampaign,
-        standings: input.candidate.standings,
-        health: input.candidate.health,
-        rotations: postBlockRun.rotations,
-        rosters: postBlockRun.rosters,
-        transactions: input.candidate.transactions,
-        summaries: input.candidate.gameSummaries,
-        campaignState: nextCampaignState,
-      });
-      const updatedCampaign = {
-        ...nextCampaignState,
-        offers: { ...nextCampaignState.offers, [nextBlockIdxForCampaign]: nextOffers },
-      };
-      postBlockRun = {
-        ...postBlockRun,
-        campaign: updatedCampaign,
-      };
-      postBlockRun = {
-        ...postBlockRun,
-        stateDigest: seasonRunStateDigest(
-          seasonRunStateDigestFactsOf(postBlockRun, input.effects ?? input.candidate.effects),
-        ),
-      };
     }
   }
   const window = openSeasonTradeWindow({
@@ -2246,7 +2105,8 @@ export function auditSeasonBlock(
         failures.push('candidate recap must carry exactly 3 challenge results');
       }
       const rewardEntries = candidate.transactions.filter(
-        (entry) => entry.type === 'challenge-reward',
+        (entry) =>
+          entry.type === 'challenge-reward' && entry.blockIndex === command.blockIndex,
       );
       const expectedRewards = evaluation.results.filter((r) => r.success).length;
       const humanRewards = rewardEntries.filter(

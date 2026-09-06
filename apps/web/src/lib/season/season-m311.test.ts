@@ -7,7 +7,6 @@ import {
 } from './season-draft-flow';
 import {
   humanizeBlockSubmitFailure,
-  isCampaignRequired,
   isInnovationRequired,
   seasonBlockReadinessOf,
 } from './season-block-submit';
@@ -119,17 +118,15 @@ describe('M3.11.1 DraftStage maps 1:1', () => {
 });
 
 describe('M3.11.1 readiness matches gates', () => {
-  it('orders blockers rotation -> campaign -> innovation -> free-agency', () => {
+  it('orders blockers rotation -> innovation -> free-agency', () => {
     const readiness = seasonBlockReadinessOf({
       rotationFailures: ['a'],
-      campaignRequired: true,
       innovationRequired: true,
       faUnresolved: true,
       faWindowIndex: 1,
     });
     expect(readiness.blockers.map((b) => b.kind)).toEqual([
       'rotation',
-      'campaign',
       'innovation',
       'free-agency',
     ]);
@@ -139,18 +136,10 @@ describe('M3.11.1 readiness matches gates', () => {
     expect(
       seasonBlockReadinessOf({
         rotationFailures: [],
-        campaignRequired: false,
         innovationRequired: false,
         faUnresolved: false,
       }).canPlay,
     ).toBe(true);
-  });
-  it('campaign required only before block 8 with selection missing', () => {
-    const run = { campaign: { selections: {} } };
-    expect(isCampaignRequired(run, 0)).toBe(true);
-    expect(isCampaignRequired(run, 8)).toBe(false);
-    expect(isCampaignRequired({ campaign: { selections: { 0: {} } } }, 0)).toBe(false);
-    expect(isCampaignRequired(null, 0)).toBe(false);
   });
   it('innovation required only from block 3 with discovery and missing selection', () => {
     expect(
@@ -181,7 +170,6 @@ describe('M3.11.1 readiness matches gates', () => {
       'block-busy',
       'rotation-invalid',
       'asset-unavailable',
-      'campaign-not-selected',
       'evolution-not-selected',
       'free-agency-unresolved',
     ] as const;

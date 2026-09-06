@@ -106,6 +106,7 @@
   });
   let highlightIds = $state<ReadonlySet<string>>(new Set());
   let rebalanceNotice: string | null = $state(null);
+  let appliedPreset: string | null = $state(null);
   let editingId: string | null = $state(null);
   let editingMinutes: number | null = $state(null);
   let draft = $state('');
@@ -113,16 +114,6 @@
   let editingInput: HTMLInputElement | null = $state(null);
   let revision = $state(0);
   const minutesProgress = $derived(Math.min(100, Math.round((minutesTotal / 240) * 100)));
-  const lastGameMinutes = $derived.by(() => {
-    const last = summaries[summaries.length - 1];
-    if (last === undefined) return new Map<string, number>();
-    return new Map(
-      [...last.homePlayers, ...last.awayPlayers].map((line) => [
-        line.playerVersionId,
-        line.seconds / 60,
-      ]),
-    );
-  });
   $effect(() => {
     if (editingId !== null && editingInput !== null) {
       editingInput.focus();
@@ -177,6 +168,7 @@
       editor.minutesFor(playerVersionId) + delta,
     );
     if (result.failures.length === 0) {
+      appliedPreset = null;
       flashAdjustments(result.adjustments);
       succeed();
     } else {
@@ -221,6 +213,7 @@
     editError = null;
     const result = editor.rebalanceMinutes(targetId, parsed);
     if (result.failures.length === 0) {
+      appliedPreset = null;
       flashAdjustments(result.adjustments);
       succeed();
     } else {
@@ -232,6 +225,7 @@
     if (disabled) return;
     const failuresAfter = editor.assignStarter(slotIndex, playerVersionId);
     if (failuresAfter.length === 0) {
+      appliedPreset = null;
       succeed();
     } else {
       fail(failuresAfter);
@@ -242,6 +236,7 @@
     if (disabled) return;
     const failuresAfter = editor.toggleClosing(playerVersionId);
     if (failuresAfter.length === 0) {
+      appliedPreset = null;
       succeed();
     } else {
       fail(failuresAfter);
@@ -252,6 +247,7 @@
     if (disabled) return;
     const failuresAfter = editor.moveBench(benchIndex, delta);
     if (failuresAfter.length === 0) {
+      appliedPreset = null;
       if (failuresAfter.length === 0 && editor.validate().length === 0) {
         attemptFailures = [];
       }
@@ -278,6 +274,7 @@
       const inactiveName = editor.names.get(inactiveId) ?? inactiveId;
       const activeName = editor.names.get(activeId) ?? activeId;
       swapNotice = `${inactiveName} joined the rotation replacing ${activeName}. Takes effect at the next block lock.`;
+      appliedPreset = null;
       succeed();
     } else {
       fail(failuresAfter);
@@ -295,6 +292,7 @@
     rebalanceNotice = `Applied ${presetLabel(preset)} preset.`;
     highlightIds = new Set();
     succeed();
+    appliedPreset = preset;
   }
   function scrollToRow(playerVersionId: string) {
     highlightIds = new Set([playerVersionId]);
@@ -339,65 +337,55 @@
 
 <div class="flex min-w-0 flex-col gap-4">
   <div class="flex flex-col gap-3">
-    <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <h2 class="font-display text-base font-extrabold uppercase tracking-tight">Rotation</h2>
-        <p class="mt-0.5 text-xs text-muted-foreground">
-          Only 10 play. Inactives can be swapped in.
-        </p>
-      </div>
-      <div
-        class="grid shrink-0 grid-cols-2 overflow-hidden rounded-lg border border-border bg-surface-1"
-        aria-label="Roster participation status"
-      >
-        <div class="border-r border-border px-3 py-2 text-center">
-          <p class="font-display text-lg leading-none font-extrabold text-positive">10 / 10</p>
-          <p class="mt-1 font-mono text-[9px] font-bold tracking-[0.12em] uppercase">Active</p>
-        </div>
-        <div class="px-3 py-2 text-center">
-          <p class="font-display text-lg leading-none font-extrabold">{inactiveRows.length}</p>
-          <p
-            class="mt-1 font-mono text-[9px] font-bold tracking-[0.12em] uppercase text-muted-foreground"
-          >
-            Inactive
-          </p>
-        </div>
-      </div>
+    <div>
+      <h2 class="font-display text-base font-extrabold uppercase tracking-tight">Rotation</h2>
+      <p class="mt-0.5 text-xs text-muted-foreground">
+        Set your starters, minutes, and closing five.
+      </p>
     </div>
-    <div class="grid grid-cols-3 gap-2" role="group" aria-label="Minute strategies">
-      {#each ROTATION_PRESETS as preset (preset)}
-        <button
-          type="button"
-          onclick={() => applyPreset(preset)}
-          {disabled}
-          class="min-h-11 rounded-lg bg-surface-2 px-2 py-1.5 text-xs font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-40 sm:text-sm motion-reduce:transition-none"
-        >
-          {presetLabel(preset)}
-        </button>
-      {/each}
+    <div>
+      <div class="grid grid-cols-3 gap-2" role="group" aria-label="Minute strategies">
+        {#each ROTATION_PRESETS as preset (preset)}
+          <button
+            type="button"
+            onclick={() => applyPreset(preset)}
+            {disabled}
+            aria-pressed={appliedPreset === preset ? 'true' : 'false'}
+            class="min-h-11 rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 sm:text-sm motion-reduce:transition-none {appliedPreset ===
+            preset
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-surface-2 hover:bg-surface-3'}"
+          >
+            {presetLabel(preset)}
+          </button>
+        {/each}
+      </div>
+      <p class="mt-1.5 text-xs text-muted-foreground">
+        Presets adjust target minutes. Starters and closing five stay the same.
+      </p>
     </div>
   </div>
 
   <div class="flex flex-col gap-2">
-    <p class="text-sm break-words text-muted-foreground">
-      {minutesTotal} / 240 min
+    <p class="text-base font-bold break-words" aria-live="polite">
+      {minutesTotal} / 240 minutes assigned
       {#if minutesRemaining !== 0}
-        <span class="text-destructive">· {Math.abs(minutesRemaining)} left</span>
+        <span class="text-destructive">· {Math.abs(minutesRemaining)} remaining</span>
       {:else}
-        <span class="text-positive">· complete</span>
+        <span class="text-positive">✓</span>
       {/if}
+    </p>
+    <p
+      class="inline-flex items-center gap-1 font-mono text-[10px]"
+      aria-label={closingValid ? 'Closing five valid' : 'Closing five needs work'}
+    >
       <span
-        class="ml-2 inline-flex items-center gap-1 font-mono text-[10px]"
-        aria-label={closingValid ? 'Closing five valid' : 'Closing five needs work'}
-      >
-        <span
-          aria-hidden="true"
-          class="inline-block h-2 w-2 rounded-full {closingValid
-            ? 'bg-positive'
-            : 'bg-destructive'}"
-        ></span>
-        {closingValid ? 'Closing valid' : 'Closing needs work'}
-      </span>
+        aria-hidden="true"
+        class="inline-block h-2 w-2 rounded-full {closingValid
+          ? 'bg-positive'
+          : 'bg-destructive'}"
+      ></span>
+      {closingValid ? '5 closers set' : 'Closers need work'}
     </p>
     <div
       class="h-2 overflow-hidden rounded-full bg-surface-2"
@@ -421,88 +409,24 @@
   </div>
 
   <section aria-labelledby="active10-heading" class="rounded-none bg-surface-1 p-3 sm:rounded-xl">
-    <div class="flex flex-col gap-1">
-      <h3
-        id="active10-heading"
-        class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-      >
-        Active 10 · starters 1–5 then bench 6–10
-      </h3>
-      <dl class="mt-1 flex flex-col gap-1 text-xs text-muted-foreground">
-        <div class="flex items-start gap-1">
-          <dt class="shrink-0 font-semibold text-foreground">Starters:</dt>
-          <dd class="min-w-0">
-            Who opens the game. Slots are G/G/F/F/C and slot-legal only.
-            <button
-              type="button"
-              class="ml-1 inline-grid h-6 w-6 place-items-center rounded-full bg-surface-2 font-mono text-[10px] font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              title="Engine: validateSeasonRotation enforces a legal G/G/F/F/C five; illegal slots reject the edit."
-              aria-label="More info: starters must form a legal G/G/F/F/C five or the edit is rejected"
-            >
-              ?
-            </button>
-          </dd>
-        </div>
-        <div class="flex items-start gap-1">
-          <dt class="shrink-0 font-semibold text-foreground">Bench:</dt>
-          <dd class="min-w-0">
-            Who replaces whom first on foul trouble, fatigue, or injury. Lower bench = earlier call.
-            <button
-              type="button"
-              class="ml-1 inline-grid h-6 w-6 place-items-center rounded-full bg-surface-2 font-mono text-[10px] font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              title="Engine: bench order is the substitution hierarchy for foul trouble, fatigue, and injury."
-              aria-label="More info: bench order sets who replaces whom first"
-            >
-              ?
-            </button>
-          </dd>
-        </div>
-        <div class="flex items-start gap-1">
-          <dt class="shrink-0 font-semibold text-foreground">Closing:</dt>
-          <dd class="min-w-0">
-            Preferred in the versioned late-game window when the score and availability permit — not
-            forced in blowouts or when a member is unavailable, fouled out, or over the safety
-            threshold.
-            <button
-              type="button"
-              class="ml-1 inline-grid h-6 w-6 place-items-center rounded-full bg-surface-2 font-mono text-[10px] font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              title="Engine: closing five is preferred late when score and availability permit; blowouts, foul-outs, and safety limits override it."
-              aria-label="More info: closing five is preferred late, not forced"
-            >
-              ?
-            </button>
-          </dd>
-        </div>
-        <div class="flex items-start gap-1">
-          <dt class="shrink-0 font-semibold text-foreground">Minutes:</dt>
-          <dd class="min-w-0">
-            Intentions, not guarantees. OT, foul trouble, injury, and interruption change actuals;
-            every deviation is recorded with a reason. Total must be exactly 240.
-            <button
-              type="button"
-              class="ml-1 inline-grid h-6 w-6 place-items-center rounded-full bg-surface-2 font-mono text-[10px] font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              title="Engine: target minutes must total 240; actuals may deviate with a recorded reason."
-              aria-label="More info: target minutes must total exactly 240"
-            >
-              ?
-            </button>
-          </dd>
-        </div>
-      </dl>
-      <span class="font-mono text-[10px] leading-snug text-muted-foreground">
-        <span class="sm:hidden">tap a value to type exactly 240</span>
-        <span class="hidden sm:inline">tap a value to type · totals exactly 240</span>
-      </span>
-    </div>
+    <h3
+      id="active10-heading"
+      class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
+    >
+      Active 10
+    </h3>
 
     <ol class="mt-2 flex flex-col gap-2" aria-label="Active 10 in playing order">
-      {#each activeOrdered as row (row.member.playerVersionId)}
+      {#each activeOrdered as row, index (row.member.playerVersionId)}
+        {#if index === 0}
+          <li aria-hidden="true" class="pt-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Starters</li>
+        {/if}
+        {#if index === 5}
+          <li aria-hidden="true" class="pt-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Bench</li>
+        {/if}
         {@const rowFailures = humanizedFor(row.member.playerVersionId)}
         {@const fatigue = fatigueOf(row)}
-        {@const lastMinutes = lastGameMinutes.get(row.member.playerVersionId) ?? null}
-        {@const eraLabel = eraLabelOf(row.member)}
-        {@const closingSlot =
-          row.closingIndex !== -1 ? CLOSING_SLOT_LABELS[row.closingIndex] : null}
+        {@const isCloser = row.closingIndex !== -1}
         <li
           id="rotation-row-{row.member.playerVersionId}"
           data-rotation-active-row
@@ -517,7 +441,7 @@
               class="w-8 shrink-0 pt-0.5 font-mono text-[10px] font-bold uppercase text-muted-foreground md:pt-0"
               aria-hidden="true"
             >
-              {row.activePos}{#if row.isStarter}·{CLOSING_SLOT_LABELS[row.slotIndex]}{/if}
+              {#if row.isStarter}S{row.slotIndex + 1}{:else}B{row.slotIndex + 1}{/if}
             </span>
             {#if manifest !== null && faceOf(row.member.playerVersionId) !== null}
               <SeasonPlayerFace
@@ -530,11 +454,11 @@
             <div class="min-w-0 flex-1">
               <p class="text-sm font-semibold leading-snug">
                 {row.member.displayName}
-                {#if closingSlot !== null}
+                {#if isCloser}
                   <span
                     class="ml-1.5 inline-flex items-center rounded-full bg-primary/15 px-1.5 py-0.5 font-mono text-[10px] font-bold text-primary"
                   >
-                    {closingSlot}
+                    Closer
                   </span>
                 {/if}
               </p>
@@ -569,18 +493,9 @@
                 {/if}
               </div>
               <p class="mt-1 font-mono text-[10px] leading-snug text-muted-foreground">
-                {row.role}
-                {#if row.member.seasonKey !== undefined}· {row.member.seasonKey}{/if}
-                {#if row.member.playable.length > 0}· {formatPositions(row.member.playable)}{/if}
-                {#if lastMinutes !== null}· last game {Math.round(lastMinutes)} min{/if}
+                {#if row.member.playable.length > 0}{formatPositions(row.member.playable)}{/if}
+                {#if row.member.seasonKey !== undefined} · {row.member.seasonKey}{/if}
               </p>
-              {#if eraLabel !== null}
-                <p
-                  class="mt-0.5 line-clamp-2 font-mono text-[9px] leading-snug text-muted-foreground/70"
-                >
-                  {eraLabel}
-                </p>
-              {/if}
             </div>
           </div>
           <div class="flex w-full flex-col gap-2 pl-10 md:w-auto md:shrink-0 md:pl-0">
@@ -636,12 +551,13 @@
                   : `Add ${row.member.displayName} to closing five`}
                 onclick={() => toggleClosingFor(row.member.playerVersionId)}
                 {disabled}
-                class="grid h-11 w-11 shrink-0 place-items-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 transition-colors motion-reduce:transition-none {row.closingIndex !==
+                class="inline-flex h-11 min-h-11 shrink-0 items-center gap-1 rounded-lg px-2.5 outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 transition-colors motion-reduce:transition-none {row.closingIndex !==
                 -1
                   ? 'bg-primary/15 text-primary'
                   : 'bg-surface-2 text-muted-foreground hover:bg-surface-3'}"
               >
-                <Star class="h-5 w-5" fill={row.closingIndex !== -1 ? 'currentColor' : 'none'} />
+                <Star class="h-4 w-4" fill={row.closingIndex !== -1 ? 'currentColor' : 'none'} />
+                <span class="font-mono text-[10px] font-bold">CLOSE</span>
               </button>
               {#if inactiveRows.length > 0}
                 <button
@@ -707,7 +623,7 @@
         id="closing-strip-heading"
         class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
       >
-        Closing five · read-only
+        Closing five
       </h3>
       <span class="font-mono text-[10px] text-muted-foreground">tap a chip to find the row</span>
     </div>
@@ -732,8 +648,7 @@
       {/each}
     </ul>
     <p class="mt-2 text-xs text-muted-foreground">
-      Preferred late when the score and availability permit — not forced in blowouts or when a
-      member is unavailable, fouled out, or over the safety threshold.
+      Finishes close games when available. Change it with the CLOSE toggles above.
     </p>
   </section>
 

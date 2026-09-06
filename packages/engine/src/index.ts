@@ -102,7 +102,6 @@ export {
   matchStartingFive,
   buildMinimalRotation,
   rotationTargetMinutes,
-  auditSeasonRotation,
   validateSeasonRotation,
   applySeasonRotationPreset,
   handleSetSeasonRotationCommand,

@@ -23,10 +23,9 @@ export type SubmitBlockFailureCode =
   | 'block-busy'
   | 'rotation-invalid'
   | 'asset-unavailable'
-  | 'campaign-not-selected'
   | 'evolution-not-selected'
   | 'free-agency-unresolved';
-export type SeasonBlockerKind = 'rotation' | 'campaign' | 'innovation' | 'free-agency';
+export type SeasonBlockerKind = 'rotation' | 'innovation' | 'free-agency';
 export interface SeasonBlockBlocker {
   kind: SeasonBlockerKind;
   label: string;
@@ -38,7 +37,6 @@ export interface SeasonBlockReadiness {
 }
 export function seasonBlockReadinessOf(input: {
   rotationFailures: readonly string[];
-  campaignRequired: boolean;
   innovationRequired: boolean;
   faUnresolved: boolean;
   faWindowIndex?: number | null;
@@ -52,13 +50,6 @@ export function seasonBlockReadinessOf(input: {
           ? 'Fix your lineup to play'
           : `Fix your lineup (${String(input.rotationFailures.length)} issues) to play`,
       destination: '/season/run/team',
-    });
-  }
-  if (input.campaignRequired) {
-    blockers.push({
-      kind: 'campaign',
-      label: 'Pick your opportunity to play',
-      destination: '#campaign-opportunity',
     });
   }
   if (input.innovationRequired) {
@@ -80,17 +71,6 @@ export function seasonBlockReadinessOf(input: {
     });
   }
   return { blockers, canPlay: blockers.length === 0 };
-}
-export function isCampaignRequired(
-  run: {
-    campaign?: { selections: Record<number, unknown> } | undefined;
-  } | null,
-  nextBlockIndex: number | null,
-): boolean {
-  if (run === null || nextBlockIndex === null) return false;
-  if (run.campaign === undefined) return false;
-  if (nextBlockIndex >= 8) return false;
-  return run.campaign.selections[nextBlockIndex] === undefined;
 }
 export function isInnovationRequired(
   run: {
@@ -130,12 +110,6 @@ export function humanizeBlockSubmitFailure(
             ? `Your lineup needs a fix: ${detail.firstFailure}`
             : 'Your lineup needs a fix before you can play.',
         destination: '/season/run/team',
-      };
-    case 'campaign-not-selected':
-      return {
-        code,
-        message: 'Pick one opportunity to unlock Play.',
-        destination: '#campaign-opportunity',
       };
     case 'evolution-not-selected':
       return {
@@ -230,12 +204,10 @@ export async function buildSubmitBlockEnvelope(
     return fail('block-busy', 'A block is already simulating.');
   }
   const rotationFailures = editor.validate();
-  const campaignRequired = isCampaignRequired(run, nextBlockIndex);
   const innovationRequired = isInnovationRequired(run, humanFranchiseId, nextBlockIndex);
   const unresolvedWindowIndex = freeAgencyUnresolvedWindowIndex(run.freeAgency);
   const readiness = seasonBlockReadinessOf({
     rotationFailures,
-    campaignRequired,
     innovationRequired,
     faUnresolved: unresolvedWindowIndex !== null,
     faWindowIndex: unresolvedWindowIndex,
@@ -247,12 +219,6 @@ export async function buildSubmitBlockEnvelope(
         return fail(
           'rotation-invalid',
           `The rotation cannot be submitted: ${rotationFailures.join('; ')}`,
-        );
-      }
-      if (first.kind === 'campaign') {
-        return fail(
-          'campaign-not-selected',
-          'Pick a campaign opportunity first — the selected opportunity locks into this block.',
         );
       }
       if (first.kind === 'innovation') {
@@ -275,13 +241,6 @@ export async function buildSubmitBlockEnvelope(
   const challengeDeal: SeasonChallengeDeal | null =
     nextBlockIndex >= 8 ? null : (challenges?.deals[nextBlockIndex] ?? null);
   const challengeIds = challengeDeal !== null ? [...challengeDeal.challengeIds] : undefined;
-  const campaignState = (
-    run as unknown as {
-      campaign?: import('@hoop-rush/data-contracts').SeasonCampaignState;
-    }
-  ).campaign;
-  const campaignOpportunityId: string | null =
-    nextBlockIndex >= 8 ? null : (campaignState?.selections[nextBlockIndex]?.opportunityId ?? null);
   const pendingHumanRotation = editor.rotation;
   const blockIndex = nextBlockIndex;
   const rotations: SeasonRotation[] = run.rotations.map((rotation) =>
@@ -312,7 +271,6 @@ export async function buildSubmitBlockEnvelope(
     blockIndex,
     rotationDigest,
     objectiveId: null,
-    campaignOpportunityId: campaignOpportunityId,
     ...(challengeIds !== undefined ? { challengeIds } : {}),
     expectedStateRevision: run.stateRevision,
     expectedStateDigest: run.stateDigest,
@@ -328,7 +286,6 @@ export async function buildSubmitBlockEnvelope(
     humanFranchiseId: franchiseIdSchema.parse(humanFranchiseId),
     objectiveId: null,
     challengeDeal,
-    campaignOpportunityId: campaignOpportunityId,
     homeCourt,
     catalogUrl: artifactUrls.catalogUrl,
     catalogHash: artifactUrls.catalogHash,
