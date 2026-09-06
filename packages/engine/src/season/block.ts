@@ -2105,16 +2105,21 @@ export function auditSeasonBlock(
         failures.push('candidate recap must carry exactly 3 challenge results');
       }
       const rewardEntries = candidate.transactions.filter(
-        (entry) =>
-          entry.type === 'challenge-reward' && entry.blockIndex === command.blockIndex,
+        (entry) => entry.type === 'challenge-reward' && entry.blockIndex === command.blockIndex,
       );
       const expectedRewards = evaluation.results.filter((r) => r.success).length;
       const humanRewards = rewardEntries.filter(
         (entry) => entry.franchiseId === input.humanFranchiseId,
       ).length;
-      if (input.humanFranchiseId !== null && humanRewards !== expectedRewards) {
+      const priorHumanRewards = (input.transactions ?? []).filter(
+        (entry) =>
+          entry.type === 'challenge-reward' &&
+          entry.blockIndex === command.blockIndex &&
+          entry.franchiseId === input.humanFranchiseId,
+      ).length;
+      if (input.humanFranchiseId !== null && humanRewards !== priorHumanRewards + expectedRewards) {
         failures.push(
-          `candidate must carry ${String(expectedRewards)} challenge-reward transactions for the human (got ${String(humanRewards)})`,
+          `candidate must append ${String(expectedRewards)} challenge-reward transactions for the human (got ${String(humanRewards - priorHumanRewards)})`,
         );
       }
     }

@@ -165,7 +165,7 @@ describe('M2.5 block pipeline with injuries', () => {
     expect(candidate.recap.challengeEvidence).toHaveLength(3);
     expect(auditSeasonBlock(candidate, withChallenges)).toEqual([]);
   }, 60000);
-  it('audits challenge-reward transactions for the current block only', () => {
+  it('audits newly appended challenge-reward transactions independently of prior history', () => {
     const { run, catalog } = buildTestRun();
     const checkpoint0 = simulateSeasonBlock(pipelineInput(run, catalog, 0));
     const stateFacts0 = deriveSeasonPostBlockState({
@@ -176,7 +176,7 @@ describe('M2.5 block pipeline with injuries', () => {
     });
     const priorGrant = applySeasonBlockInfluenceGrants({
       influence: checkpoint0.influence,
-      blockIndex: 0,
+      blockIndex: 1,
       humanFranchiseId: 'lakers',
       challengeSuccesses: [{ challengeId: 'winning-block', success: true, reward: 1 }],
     });

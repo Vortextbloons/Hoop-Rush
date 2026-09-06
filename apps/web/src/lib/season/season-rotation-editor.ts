@@ -10,7 +10,9 @@ import {
   type SeasonRotationPreset,
   type SlotGroup,
 } from '@hoop-rush/data-contracts';
-import { applySeasonRotationPreset, validateSeasonRotation } from '@hoop-rush/engine';
+import { applySeasonRotationPreset, buildMinutePlanCandidates } from '@hoop-rush/engine';
+import { minuteStrategyOfPreset } from '@hoop-rush/engine';
+import { validateSeasonRotation } from '@hoop-rush/engine';
 export interface RotationMember {
   playerVersionId: string;
   displayName: string;
@@ -59,6 +61,70 @@ export function strategyLabel(strategy: SeasonMinutePolicyStrategy): string {
 export function presetMinutes(preset: SeasonRotationPreset, roleIndex: number): number {
   const table = SEASON_ROTATION_PRESET_TARGETS[preset];
   return roleIndex < 5 ? table.starters : (table.bench[roleIndex - 5] ?? 0);
+}
+export interface PresetPlayerLoad {
+  staminaRating: number;
+  durability: number;
+  fatigueBasisPoints: number;
+  recentLoadBasisPoints: number;
+}
+export interface DynamicPresetContext {
+  overallByVersion?: ReadonlyMap<string, number> | null;
+  loadByVersion?: ReadonlyMap<string, PresetPlayerLoad> | null;
+  horizonGames?: number | null;
+}
+function clamp01(value: number): number {
+  if (Number.isNaN(value)) return 0;
+  return Math.max(0, Math.min(1, value));
+}
+export function dynamicPresetRotationFor(
+  rotation: SeasonRotation,
+  preset: SeasonRotationPreset,
+  context: DynamicPresetContext = {},
+): SeasonRotation | null {
+  const strategy = minuteStrategyOfPreset(preset);
+  const active = [...rotation.starters, ...rotation.benchOrder];
+  if (active.length !== SEASON_ROTATION_SIZE) return null;
+  const horizon =
+    context.horizonGames !== null &&
+    context.horizonGames !== undefined &&
+    Number.isFinite(context.horizonGames) &&
+    context.horizonGames > 0
+      ? Math.floor(context.horizonGames)
+      : 10;
+  const players = new Map(
+    active.map((playerVersionId) => {
+      const overall = context.overallByVersion?.get(playerVersionId);
+      const load = context.loadByVersion?.get(playerVersionId);
+      return [
+        playerVersionId,
+        {
+          playerVersionId,
+          quality: overall === undefined ? 0.5 : clamp01(overall / 100),
+          staminaRating: load?.staminaRating ?? 70,
+          durability: load?.durability ?? 70,
+          fatigueBasisPoints: load?.fatigueBasisPoints ?? 0,
+          recentLoadBasisPoints: load?.recentLoadBasisPoints ?? 0,
+        },
+      ] as const;
+    }),
+  );
+  try {
+    const built = buildMinutePlanCandidates({
+      structure: {
+        starters: [...rotation.starters],
+        benchOrder: [...rotation.benchOrder],
+        closingFive: [...rotation.closingFive],
+      },
+      players,
+      horizon,
+    });
+    const plan = built.plans.find((candidate) => candidate.strategy === strategy);
+    if (plan === undefined) return null;
+    return { ...plan.rotation, franchiseId: rotation.franchiseId };
+  } catch {
+    return null;
+  }
 }
 export function rotationRoleOf(rotation: SeasonRotation, playerVersionId: string): string {
   const starterIndex = rotation.starters.indexOf(playerVersionId);
@@ -330,7 +396,28 @@ export class RotationEditor {
     const index = this.rotation.benchOrder.indexOf(playerVersionId);
     return index === -1 ? this.rotation.benchOrder.length : index;
   }
-  applyPreset(preset: SeasonRotationPreset): string[] {
+  applyPreset(preset: SeasonRotationPreset, context: DynamicPresetContext = {}): string[] {
+    const hasContext =
+      (context.overallByVersion !== null &&
+        context.overallByVersion !== undefined &&
+        context.overallByVersion.size > 0) ||
+      (context.loadByVersion !== null &&
+        context.loadByVersion !== undefined &&
+        context.loadByVersion.size > 0);
+    if (hasContext) {
+      const dynamic = dynamicPresetRotationFor(this.rotation, preset, context);
+      if (dynamic !== null) {
+        const failures = validateSeasonRotation(dynamic, this.memberPlayable);
+        if (failures.length === 0) {
+          this.rotation = dynamic;
+          return [];
+        }
+      }
+    }
+    this.rotation = applySeasonRotationPreset(this.rotation, preset);
+    return this.validate();
+  }
+  applyFlatPreset(preset: SeasonRotationPreset): string[] {
     this.rotation = applySeasonRotationPreset(this.rotation, preset);
     return this.validate();
   }

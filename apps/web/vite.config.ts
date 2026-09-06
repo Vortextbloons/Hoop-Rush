@@ -36,15 +36,8 @@ function devProbeStubPlugin(): Plugin {
 export default defineConfig({
   plugins: [devProbeStubPlugin(), sveltekit(), tailwindcss()],
   optimizeDeps: {
-    // Pre-bundle workspace packages so dev does not serve raw @fs .ts (breaks HMR on paths with spaces).
-    include: [
-      '@hoop-rush/engine',
-      '@hoop-rush/data-contracts',
-      '@hoop-rush/persistence',
-      'bits-ui',
-      '@supabase/supabase-js',
-      'dexie',
-    ],
+    include: ['bits-ui', '@supabase/supabase-js', 'dexie'],
+    exclude: ['@hoop-rush/engine', '@hoop-rush/data-contracts', '@hoop-rush/persistence'],
   },
   build: {
     rollupOptions: {

@@ -13,6 +13,7 @@ import {
   createRotationEditor,
   displayRotationFailure,
   displayRotationFailures,
+  dynamicPresetRotationFor,
   failurePlayerVersionId,
   indexRotationFailures,
   presetLabel,
@@ -127,6 +128,54 @@ describe('RotationEditor', () => {
     expect(presetLabel('balanced')).toBe('Balanced');
     expect(presetLabel('tight')).toBe('Starter-Heavy');
     expect(presetLabel('bench-heavy')).toBe('Bench-Heavy');
+  });
+  it('dynamic presets weight minutes by overall instead of flat role values', () => {
+    const e = editor();
+    const starters = [...e.rotation.starters];
+    const star = starters[0];
+    const scrub = starters[1];
+    if (star === undefined || scrub === undefined)
+      throw new Error('fixture rotation has no starters');
+    const overallByVersion = new Map<string, number>();
+    for (const id of e.activeMemberIds()) overallByVersion.set(id, 70);
+    overallByVersion.set(star, 95);
+    overallByVersion.set(scrub, 55);
+    const failures = e.applyPreset('balanced', { overallByVersion, horizonGames: 10 });
+    expect(failures).toEqual([]);
+    expect(e.validate()).toEqual([]);
+    expect(e.minutesFor(star)).toBeGreaterThan(e.minutesFor(scrub));
+    expect(e.rotation.targetMinutes.reduce((sum, entry) => sum + entry.minutes, 0)).toBe(240);
+    expect(e.rotation.starters).toEqual(starters);
+  });
+  it('dynamic preset starter totals stay ordered tight > balanced > bench-heavy', () => {
+    const totals = new Map<string, number>();
+    for (const preset of ROTATION_PRESETS) {
+      const probe = editor();
+      const overallByVersion = new Map<string, number>();
+      for (const id of probe.activeMemberIds()) overallByVersion.set(id, 75);
+      const failures = probe.applyPreset(preset, { overallByVersion, horizonGames: 10 });
+      expect(failures).toEqual([]);
+      const total = probe.rotation.targetMinutes
+        .filter((row) => probe.rotation.starters.includes(row.playerVersionId))
+        .reduce((sum, row) => sum + row.minutes, 0);
+      totals.set(preset, total);
+    }
+    expect(totals.get('tight') ?? 0).toBeGreaterThan(totals.get('balanced') ?? 0);
+    expect(totals.get('balanced') ?? 0).toBeGreaterThan(totals.get('bench-heavy') ?? 0);
+  });
+  it('dynamicPresetRotationFor preserves structure and falls back to null on bad input', () => {
+    const e = editor();
+    const overallByVersion = new Map<string, number>();
+    for (const id of e.activeMemberIds()) overallByVersion.set(id, 80);
+    const dynamic = dynamicPresetRotationFor(e.rotation, 'balanced', {
+      overallByVersion,
+      horizonGames: 10,
+    });
+    expect(dynamic).not.toBeNull();
+    expect(dynamic?.starters).toEqual(e.rotation.starters);
+    expect(dynamic?.benchOrder).toEqual(e.rotation.benchOrder);
+    expect(dynamic?.closingFive).toEqual(e.rotation.closingFive);
+    expect(dynamic?.franchiseId).toBe(e.rotation.franchiseId);
   });
   it('labels minute-policy strategies for the plan cards', () => {
     expect(strategyLabel('starter-heavy')).toBe('Starter-Heavy');
