@@ -370,6 +370,8 @@ export { seasonRunStateDigest, type SeasonRunStateDigestFacts } from './season/s
 export {
   openSeasonTradeWindow,
   WINDOW_BLOCK_INDEX_TO_INDEX,
+  TRADE_BAND_1V1,
+  TRADE_BAND_DEFAULT,
   seasonTradeValueBandFor,
   ratioMutuallyWithinBand,
   tradeAssetEligibilityOf,

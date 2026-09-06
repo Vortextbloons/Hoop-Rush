@@ -38,7 +38,12 @@
       negotiation?.status === 'walked-away' ||
       negotiation?.status === 'expired',
   );
-  const humanizedError = $derived(humanizeTradeRejection(commandError, { playerNameOf }));
+  const humanizedError = $derived(
+    humanizeTradeRejection(commandError, {
+      playerNameOf,
+      tradeFit: { attemptNumber: exchangeCount },
+    }),
+  );
   let confirmWalkFor: string | null = $state(null);
   const confirmWalk = $derived(negotiation !== null && confirmWalkFor === negotiation.inquiryId);
 

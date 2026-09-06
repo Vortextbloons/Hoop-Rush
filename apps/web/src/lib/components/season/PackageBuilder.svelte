@@ -1,11 +1,27 @@
 <script lang="ts">
-  import { SEASON_ROSTER_MAX_SIZE, SEASON_ROSTER_MIN_SIZE } from '@hoop-rush/data-contracts';
+  import {
+    SEASON_ROSTER_MAX_SIZE,
+    SEASON_ROSTER_MIN_SIZE,
+    type HoopRushManifest,
+    type SeasonDraftCatalog,
+    type SeasonGameSummary,
+  } from '@hoop-rush/data-contracts';
   import { tradeAssetEligibilityOf } from '@hoop-rush/engine';
   import {
     chemistryFootnote,
     humanizeTradeRejection,
     packageConsequenceFacts,
   } from '$lib/season/season-presentation';
+  import { ChevronRight } from '@lucide/svelte';
+  import SeasonPlayerFace from './SeasonPlayerFace.svelte';
+  import TradePlayerDetailDialog from './TradePlayerDetailDialog.svelte';
+  import type { SeasonFaceRef } from '$lib/season/season-branding';
+  import { candidateOf, overallRatingOf } from '$lib/season/season-catalog-index';
+  import {
+    playerSeasonStatsRow,
+    type SeasonPlayerStatsRow,
+  } from '$lib/season/season-player-stats-view';
+  import type { TradePlayerViewModel } from '$lib/season/season-trade-view';
 
   interface PlayerLite {
     playerVersionId: string;
@@ -14,6 +30,10 @@
     available: boolean;
     rotationMinutes?: number | null;
     projectedMinutes?: number | null;
+    overallRating?: number | null;
+    franchiseId?: string;
+    eraId?: string;
+    seasonKey?: string;
   }
   let {
     yourPlayers,
@@ -41,6 +61,10 @@
     prefillKey = null,
     playerNameOf = (id: string) => id,
     franchiseNameOf = (id: string) => id,
+    manifest = null,
+    catalog = null,
+    faceOf = null,
+    summaries = [],
     onSubmit,
     onDraftChange = null,
   }: {
@@ -69,6 +93,10 @@
     prefillKey?: string | null;
     playerNameOf?: (playerVersionId: string) => string;
     franchiseNameOf?: (franchiseId: string) => string;
+    manifest?: HoopRushManifest | null;
+    catalog?: SeasonDraftCatalog | null;
+    faceOf?: ((playerVersionId: string) => SeasonFaceRef | null) | null;
+    summaries?: readonly SeasonGameSummary[];
     onSubmit: (payload: {
       outgoing: string[];
       incoming: string[];
@@ -192,7 +220,16 @@
   });
   const canSubmit = $derived(submitDisabledReason === null);
   const humanizedError = $derived(
-    humanizeTradeRejection(commandError, { playerNameOf, franchiseNameOf }),
+    humanizeTradeRejection(commandError, {
+      playerNameOf,
+      franchiseNameOf,
+      tradeFit: {
+        outgoingCount: outgoing.length,
+        incomingCount: incoming.length,
+        toFranchiseName: targetFranchiseName,
+        attemptNumber: exchangeCount,
+      },
+    }),
   );
   const nextOfferNumber = $derived(Math.min(exchangeMax, exchangeCount + 1));
 
@@ -229,6 +266,58 @@
       .slice(0, 2)
       .toUpperCase();
   }
+
+  let detailId: string | null = $state(null);
+  const allLites = $derived([...yourPlayers, ...theirPlayers]);
+  const liteById = $derived(new Map(allLites.map((p) => [p.playerVersionId, p])));
+  function overallOfLite(player: PlayerLite): number | null {
+    if (player.overallRating !== null && player.overallRating !== undefined)
+      return player.overallRating;
+    return overallRatingOf(catalog, player.playerVersionId);
+  }
+  function faceFor(playerVersionId: string): SeasonFaceRef | null {
+    return faceOf?.(playerVersionId) ?? null;
+  }
+  const detailPlayer: TradePlayerViewModel | null = $derived.by(() => {
+    if (detailId === null) return null;
+    const lite = liteById.get(detailId);
+    if (lite === undefined) return null;
+    const candidate = candidateOf(catalog, lite.playerVersionId);
+    const side: 'you' | 'them' = yourPlayers.some((p) => p.playerVersionId === lite.playerVersionId)
+      ? 'you'
+      : 'them';
+    return {
+      playerVersionId: lite.playerVersionId,
+      displayName: lite.displayName,
+      playable: lite.playable,
+      available: lite.available,
+      activeInjuryIds: [],
+      franchiseId: lite.franchiseId ?? (side === 'you' ? humanFranchiseId : targetFranchiseId),
+      eraId: lite.eraId ?? '',
+      seasonKey: lite.seasonKey ?? '',
+      overallRating: candidate?.summaryRatings.overallRating ?? overallOfLite(lite),
+      offenseRating: candidate?.summaryRatings.offenseRating ?? null,
+      defenseRating: candidate?.summaryRatings.defenseRating ?? null,
+      rotationMinutes: lite.rotationMinutes ?? null,
+      projectedMinutes: lite.projectedMinutes ?? null,
+    };
+  });
+  const detailFace = $derived(
+    detailPlayer === null ? null : (faceFor(detailPlayer.playerVersionId) ?? null),
+  );
+  const detailRunStats: SeasonPlayerStatsRow | null = $derived.by(() => {
+    if (detailPlayer === null) return null;
+    return playerSeasonStatsRow({
+      playerVersionId: detailPlayer.playerVersionId,
+      displayName: detailPlayer.displayName,
+      seasonKey: detailPlayer.seasonKey,
+      eraId: detailPlayer.eraId,
+      franchiseId: detailPlayer.franchiseId,
+      summaries,
+      overallRatingOf: (id) => liteById.get(id)?.overallRating ?? overallRatingOf(catalog, id),
+      playablePositions: (id) => liteById.get(id)?.playable ?? [],
+    });
+  });
 </script>
 
 <div
@@ -264,41 +353,69 @@
           {@const blockedThird = !selected && outgoing.length >= 2}
           {@const blockedProtected = elig.status === 'protected'}
           {@const disabled = busy || blockedThird || blockedProtected}
+          {@const face = faceFor(player.playerVersionId)}
+          {@const ovr = overallOfLite(player)}
           <li>
-            <label
-              class="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 outline-none transition-colors has-[input:focus-visible]:ring-2 has-[input:focus-visible]:ring-ring {selected
+            <div
+              class="flex min-h-11 items-center gap-1 rounded-lg border transition-colors has-[input:focus-visible]:ring-2 has-[input:focus-visible]:ring-ring {selected
                 ? 'border-primary bg-primary/10'
                 : 'border-border bg-surface-1'} {disabled ? 'opacity-60' : ''}"
             >
-              <input
-                type="checkbox"
-                checked={selected}
-                {disabled}
-                onchange={() => toggle('outgoing', player.playerVersionId)}
-                aria-label={`${selected ? 'Remove' : 'Add'} ${player.displayName}`}
-                class="h-5 w-5 shrink-0 accent-primary"
-              />
-              <span
-                class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-surface-2 text-xs font-bold"
-                aria-hidden="true">{initialsOf(player.displayName)}</span
-              >
-              <span class="min-w-0 flex-1">
-                <span class="block truncate text-sm font-semibold">{player.displayName}</span>
-                <span class="block truncate text-xs text-muted-foreground">
-                  {player.playable.join(' · ') || '—'}{player.rotationMinutes !== null &&
-                  player.rotationMinutes !== undefined
-                    ? ` · ${String(player.rotationMinutes)} min`
-                    : ''}
-                </span>
-                {#if blockedProtected}
-                  <span class="block text-xs font-semibold text-destructive">Off limits</span>
-                {:else if elig.status === 'availability-risk'}
-                  <span class="block text-xs text-muted-foreground">{elig.reason}</span>
-                {:else if blockedThird}
-                  <span class="block text-xs text-muted-foreground">Max 2 per side</span>
+              <label class="flex min-w-0 flex-1 cursor-pointer items-center gap-3 px-3 py-2">
+                <input
+                  type="checkbox"
+                  checked={selected}
+                  {disabled}
+                  onchange={() => toggle('outgoing', player.playerVersionId)}
+                  aria-label={`${selected ? 'Remove' : 'Add'} ${player.displayName}`}
+                  class="h-5 w-5 shrink-0 accent-primary"
+                />
+                {#if manifest !== null && face !== null}
+                  <SeasonPlayerFace {face} {manifest} size="sm" />
+                {:else}
+                  <span
+                    class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-surface-2 text-xs font-bold"
+                    aria-hidden="true">{initialsOf(player.displayName)}</span
+                  >
                 {/if}
-              </span>
-            </label>
+                <span class="min-w-0 flex-1">
+                  <span class="flex min-w-0 items-center gap-2">
+                    <span class="truncate text-sm font-semibold">{player.displayName}</span>
+                    {#if ovr !== null}
+                      <span
+                        class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold"
+                      >
+                        OVR {ovr}
+                      </span>
+                    {/if}
+                  </span>
+                  <span class="block truncate text-xs text-muted-foreground">
+                    {player.playable.join(' · ') || '—'}{player.rotationMinutes !== null &&
+                    player.rotationMinutes !== undefined
+                      ? ` · ${String(player.rotationMinutes)} min`
+                      : ''}
+                  </span>
+                  {#if blockedProtected}
+                    <span class="block text-xs font-semibold text-destructive">Off limits</span>
+                  {:else if elig.status === 'availability-risk'}
+                    <span class="block text-xs text-muted-foreground">{elig.reason}</span>
+                  {:else if blockedThird}
+                    <span class="block text-xs text-muted-foreground">Max 2 per side</span>
+                  {/if}
+                </span>
+              </label>
+              {#if manifest !== null}
+                <button
+                  type="button"
+                  onclick={() => (detailId = player.playerVersionId)}
+                  aria-label={`View ${player.displayName} stats`}
+                  data-testid={`player-info-${player.playerVersionId}`}
+                  class="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <ChevronRight class="h-4 w-4" aria-hidden="true" />
+                </button>
+              {/if}
+            </div>
           </li>
         {/each}
       </ul>
@@ -316,41 +433,69 @@
           {@const blockedThird = !selected && incoming.length >= 2}
           {@const blockedProtected = elig.status === 'protected'}
           {@const disabled = busy || blockedThird || blockedProtected}
+          {@const face = faceFor(player.playerVersionId)}
+          {@const ovr = overallOfLite(player)}
           <li>
-            <label
-              class="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 outline-none transition-colors has-[input:focus-visible]:ring-2 has-[input:focus-visible]:ring-ring {selected
+            <div
+              class="flex min-h-11 items-center gap-1 rounded-lg border transition-colors has-[input:focus-visible]:ring-2 has-[input:focus-visible]:ring-ring {selected
                 ? 'border-primary bg-primary/10'
                 : 'border-border bg-surface-1'} {disabled ? 'opacity-60' : ''}"
             >
-              <input
-                type="checkbox"
-                checked={selected}
-                {disabled}
-                onchange={() => toggle('incoming', player.playerVersionId)}
-                aria-label={`${selected ? 'Remove' : 'Add'} ${player.displayName}`}
-                class="h-5 w-5 shrink-0 accent-primary"
-              />
-              <span
-                class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-surface-2 text-xs font-bold"
-                aria-hidden="true">{initialsOf(player.displayName)}</span
-              >
-              <span class="min-w-0 flex-1">
-                <span class="block truncate text-sm font-semibold">{player.displayName}</span>
-                <span class="block truncate text-xs text-muted-foreground">
-                  {player.playable.join(' · ') || '—'}{player.projectedMinutes !== null &&
-                  player.projectedMinutes !== undefined
-                    ? ` · ~${String(player.projectedMinutes)} min`
-                    : ''}
-                </span>
-                {#if blockedProtected}
-                  <span class="block text-xs font-semibold text-destructive">Off limits</span>
-                {:else if elig.status === 'availability-risk'}
-                  <span class="block text-xs text-muted-foreground">{elig.reason}</span>
-                {:else if blockedThird}
-                  <span class="block text-xs text-muted-foreground">Max 2 per side</span>
+              <label class="flex min-w-0 flex-1 cursor-pointer items-center gap-3 px-3 py-2">
+                <input
+                  type="checkbox"
+                  checked={selected}
+                  {disabled}
+                  onchange={() => toggle('incoming', player.playerVersionId)}
+                  aria-label={`${selected ? 'Remove' : 'Add'} ${player.displayName}`}
+                  class="h-5 w-5 shrink-0 accent-primary"
+                />
+                {#if manifest !== null && face !== null}
+                  <SeasonPlayerFace {face} {manifest} size="sm" />
+                {:else}
+                  <span
+                    class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-surface-2 text-xs font-bold"
+                    aria-hidden="true">{initialsOf(player.displayName)}</span
+                  >
                 {/if}
-              </span>
-            </label>
+                <span class="min-w-0 flex-1">
+                  <span class="flex min-w-0 items-center gap-2">
+                    <span class="truncate text-sm font-semibold">{player.displayName}</span>
+                    {#if ovr !== null}
+                      <span
+                        class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold"
+                      >
+                        OVR {ovr}
+                      </span>
+                    {/if}
+                  </span>
+                  <span class="block truncate text-xs text-muted-foreground">
+                    {player.playable.join(' · ') || '—'}{player.projectedMinutes !== null &&
+                    player.projectedMinutes !== undefined
+                      ? ` · ~${String(player.projectedMinutes)} min`
+                      : ''}
+                  </span>
+                  {#if blockedProtected}
+                    <span class="block text-xs font-semibold text-destructive">Off limits</span>
+                  {:else if elig.status === 'availability-risk'}
+                    <span class="block text-xs text-muted-foreground">{elig.reason}</span>
+                  {:else if blockedThird}
+                    <span class="block text-xs text-muted-foreground">Max 2 per side</span>
+                  {/if}
+                </span>
+              </label>
+              {#if manifest !== null}
+                <button
+                  type="button"
+                  onclick={() => (detailId = player.playerVersionId)}
+                  aria-label={`View ${player.displayName} stats`}
+                  data-testid={`player-info-${player.playerVersionId}`}
+                  class="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <ChevronRight class="h-4 w-4" aria-hidden="true" />
+                </button>
+              {/if}
+            </div>
           </li>
         {/each}
       </ul>
@@ -455,9 +600,21 @@
     {/if}
     <p class="text-xs text-muted-foreground">
       Sends Offer {nextOfferNumber} of {exchangeMax} — browsing is free, sending starts a talk.
+      {#if manifest !== null}Tap › on a player for peak-season and run stats.{/if}
     </p>
   </div>
 </div>
+
+{#if manifest !== null}
+  <TradePlayerDetailDialog
+    player={detailPlayer}
+    {manifest}
+    {catalog}
+    face={detailFace}
+    runStats={detailRunStats}
+    onClose={() => (detailId = null)}
+  />
+{/if}
 
 <style>
   @media (prefers-reduced-motion: reduce) {

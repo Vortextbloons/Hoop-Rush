@@ -37,7 +37,7 @@ export const LIMITATION_MAX_STAMINA = 50;
 export const ROLE_FACT_CAP = 3;
 export const LIMITATION_ROLE_FACT_CAP = 2;
 export const EXCLUDED_SIBLING_CITE_CAP = 2;
-export const FREE_AGENCY_INDEX_MAX_BYTES = 4500000;
+export const FREE_AGENCY_INDEX_MAX_BYTES = 7000000;
 export interface ExclusionRecord {
   playerVersionId: string;
   reason: string;
@@ -100,6 +100,7 @@ function bandOf(
 ): SeasonFreeAgencyBand | null {
   const { candidate } = scored;
   if (excluded.has(candidate.playerVersionId)) return null;
+  if (scored.playerTier === 'elite') return 'featured';
   if (scored.playerTier === 'strong') return 'featured';
   if (scored.playerTier === 'useful') return 'role';
   if (candidate.stamina.rating >= DEVELOPMENT_MIN_STAMINA) return 'development';
@@ -110,20 +111,26 @@ function featuredVersionIdOf(
   thresholds: Record<SeasonRosterRole, RoleThresholds>,
 ): string | null {
   let best: ScoredCandidate | null = null;
+  let bestTierRank = -1;
   let bestMulti = -1;
   let bestSum = -Infinity;
   for (const scored of scoredGroup) {
-    if (scored.playerTier !== 'strong') continue;
-    const multi = rolesAtOrAbove(scored, thresholds, 'strong').length;
+    const tierRank = scored.playerTier === 'elite' ? 1 : scored.playerTier === 'strong' ? 0 : -1;
+    if (tierRank < 0) continue;
+    const eliteThreshold: 'elite' | 'strong' = scored.playerTier === 'elite' ? 'elite' : 'strong';
+    const multi = rolesAtOrAbove(scored, thresholds, eliteThreshold).length;
     const sum = ROSTER_ROLES.reduce((total, role) => total + scored.roleScores[role], 0);
     if (
-      multi > bestMulti ||
-      (multi === bestMulti && sum > bestSum) ||
-      (multi === bestMulti &&
+      tierRank > bestTierRank ||
+      (tierRank === bestTierRank && multi > bestMulti) ||
+      (tierRank === bestTierRank && multi === bestMulti && sum > bestSum) ||
+      (tierRank === bestTierRank &&
+        multi === bestMulti &&
         sum === bestSum &&
         (best === null || scored.candidate.playerVersionId < best.candidate.playerVersionId))
     ) {
       best = scored;
+      bestTierRank = tierRank;
       bestMulti = multi;
       bestSum = sum;
     }
@@ -177,6 +184,7 @@ function minimumInfluenceOf(
 ): number {
   if (band === 'emergency' || band === 'development') return 1;
   if (band === 'featured') {
+    if (scored.playerTier === 'elite') return 3;
     return rolesAtOrAbove(scored, thresholds, 'strong').length >= 2 ? 3 : 2;
   }
   return rolesAtOrAbove(scored, thresholds, 'useful').length >= 2 ? 2 : 1;
@@ -199,6 +207,10 @@ function derivationEvidenceOf(
   const capNote = capped ? '; identity featured cap' : '';
   if (scored.playerTier === 'depth') {
     return `tier depth; stamina ${String(candidate.stamina.rating)}/95; dur ${String(candidate.durability.rating)}${capNote}`;
+  }
+  if (scored.playerTier === 'elite') {
+    const bestRole = bestRoleOf(scored);
+    return `tier elite; best ${bestRole} ${String(rounded(scored.roleScores[bestRole]))} (p90 ${String(rounded(thresholds[bestRole].elite))}); dur ${String(candidate.durability.rating)}${capNote}`;
   }
   const bestRole = bestRoleOf(scored);
   const tier = scored.playerTier === 'strong' ? 'p75' : 'p50';
@@ -261,17 +273,6 @@ export function deriveFreeAgencyIndex(
     }
   >();
   for (const candidate of canonical) {
-    const scoredCandidate = scored.get(candidate.playerVersionId);
-    if (scoredCandidate === undefined) continue;
-    if (scoredCandidate.playerTier === 'elite') {
-      const eliteRoles = rolesAtOrAbove(scoredCandidate, thresholds, 'elite');
-      const eliteRole = eliteRoles[0] ?? ROSTER_ROLES[0];
-      excluded.set(candidate.playerVersionId, {
-        version: candidate,
-        reason: `elite in ${String(eliteRole)}`,
-      });
-      continue;
-    }
     const missing = missingFactReason(candidate, catalog.catalogVersion);
     if (missing !== null) {
       excluded.set(candidate.playerVersionId, { version: candidate, reason: missing });
@@ -312,7 +313,9 @@ export function deriveFreeAgencyIndex(
       const { candidate } = scoredCandidate;
       const band = bandOfVersion.get(candidate.playerVersionId);
       if (band === undefined) continue;
-      const capped = scoredCandidate.playerTier === 'strong' && band === 'role';
+      const capped =
+        (scoredCandidate.playerTier === 'strong' || scoredCandidate.playerTier === 'elite') &&
+        band === 'role';
       const excludedSiblings = [...excluded.entries()]
         .filter(([, record]) => record.version.playerId === playerId)
         .map(([, record]) => record);

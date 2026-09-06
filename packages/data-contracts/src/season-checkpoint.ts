@@ -37,8 +37,11 @@ import {
   SEASON_EFFECT_TARGETS_LEGACY_VERSION,
   SEASON_EFFECT_TARGETS_VERSION,
   SEASON_FREE_AGENCY_INDEX_VERSION,
+  SEASON_FREE_AGENCY_INDEX_VERSION_V1,
   SEASON_FREE_AGENCY_TARGETS_VERSION,
+  SEASON_FREE_AGENCY_TARGETS_VERSION_V1,
   SEASON_FREE_AGENCY_VERSION,
+  SEASON_FREE_AGENCY_VERSION_V1,
   SEASON_GAME_SUMMARY_LEGACY_VERSION,
   SEASON_GAME_SUMMARY_VERSION,
   SEASON_GAME_TARGETS_VERSION,
@@ -134,9 +137,18 @@ export const seasonCheckpointVersionsSchema = z.object({
     z.literal(SEASON_INFLUENCE_TARGETS_VERSION_V2),
     z.literal(SEASON_INFLUENCE_TARGETS_VERSION_V1),
   ]),
-  freeAgencyVersion: z.literal(SEASON_FREE_AGENCY_VERSION),
-  freeAgencyIndexVersion: z.literal(SEASON_FREE_AGENCY_INDEX_VERSION),
-  freeAgencyTargetsVersion: z.literal(SEASON_FREE_AGENCY_TARGETS_VERSION),
+  freeAgencyVersion: z.union([
+    z.literal(SEASON_FREE_AGENCY_VERSION),
+    z.literal(SEASON_FREE_AGENCY_VERSION_V1),
+  ]),
+  freeAgencyIndexVersion: z.union([
+    z.literal(SEASON_FREE_AGENCY_INDEX_VERSION),
+    z.literal(SEASON_FREE_AGENCY_INDEX_VERSION_V1),
+  ]),
+  freeAgencyTargetsVersion: z.union([
+    z.literal(SEASON_FREE_AGENCY_TARGETS_VERSION),
+    z.literal(SEASON_FREE_AGENCY_TARGETS_VERSION_V1),
+  ]),
   authorityVersion: z.string().optional(),
   multiplayerVersion: z.string().optional(),
 });

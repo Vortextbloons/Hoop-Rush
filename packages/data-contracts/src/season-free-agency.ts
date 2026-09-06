@@ -6,7 +6,7 @@ import {
   positionUnionSchema,
 } from './positions.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
-import { SEASON_FREE_AGENCY_VERSION } from './season-versions.ts';
+import { SEASON_FREE_AGENCY_VERSION, SEASON_FREE_AGENCY_VERSION_V1 } from './season-versions.ts';
 export const seasonFreeAgencyBandSchema = z.enum(['featured', 'role', 'development', 'emergency']);
 export type SeasonFreeAgencyBand = z.infer<typeof seasonFreeAgencyBandSchema>;
 export const seasonFreeAgencyRoleExpectationSchema = z.enum(['rotation', 'depth', 'emergency']);
@@ -148,10 +148,10 @@ export const seasonFreeAgencyWindowStateSchema = z
       identities.add(candidate.playerId);
       if (candidate.band === 'featured') featured.add(candidate.playerId);
     }
-    if (featured.size > 1) {
+    if (featured.size > 2) {
       ctx.addIssue({
         code: 'custom',
-        message: `window must contain at most one featured candidate (found ${String(featured.size)})`,
+        message: `window must contain at most two featured candidates (found ${String(featured.size)})`,
       });
     }
     for (const signing of window.signings) {
@@ -167,7 +167,10 @@ export type SeasonFreeAgencyWindowState = z.infer<typeof seasonFreeAgencyWindowS
 export const seasonFreeAgencyStateSchema = z
   .object({
     schemaVersion: z.literal(1),
-    freeAgencyVersion: z.literal(SEASON_FREE_AGENCY_VERSION),
+    freeAgencyVersion: z.union([
+      z.literal(SEASON_FREE_AGENCY_VERSION),
+      z.literal(SEASON_FREE_AGENCY_VERSION_V1),
+    ]),
     windows: z.array(seasonFreeAgencyWindowStateSchema).max(3),
     canonicalCandidates: z.record(playerIdSchema, seasonFreeAgencyCanonicalSchema),
     signingCounts: z.record(franchiseIdSchema, z.number().int().min(0).max(3)),

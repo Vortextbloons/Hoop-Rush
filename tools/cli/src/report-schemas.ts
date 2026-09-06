@@ -5,6 +5,7 @@ import {
   SEASON_EFFECT_TARGETS_LEGACY_VERSION,
   SEASON_EFFECT_TARGETS_VERSION,
   SEASON_FREE_AGENCY_TARGETS_VERSION,
+  SEASON_FREE_AGENCY_TARGETS_VERSION_V1,
   SEASON_INFLUENCE_TARGETS_VERSION,
   SEASON_INJURY_TARGETS_VERSION,
   SEASON_POSTSEASON_TARGETS_VERSION,
@@ -1337,7 +1338,10 @@ export type SeasonFreeAgencyAuditReport = z.infer<typeof seasonFreeAgencyAuditRe
 export const seasonFreeAgencyCalibrateReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season free-agency calibrate'),
-  targetsVersion: z.literal(SEASON_FREE_AGENCY_TARGETS_VERSION),
+  targetsVersion: z.union([
+    z.literal(SEASON_FREE_AGENCY_TARGETS_VERSION),
+    z.literal(SEASON_FREE_AGENCY_TARGETS_VERSION_V1),
+  ]),
   calibrationSeeds: z.number().int().nonnegative(),
   validationSeeds: z.number().int().nonnegative(),
   seasonsSimulated: z.number().int().nonnegative(),

@@ -199,7 +199,7 @@ describe('season free-agency targets artifact schema', () => {
         bandSigningCaps: { contender: 1, playoff: 2, average: 3, weaker: 3 },
         maxSigningsPerSeason: 3,
         maxSeasonSpend: 6,
-        windowComposition: { featured: 1, role: 5, development: 3, emergency: 3 },
+        windowComposition: { featured: 2, role: 5, development: 3, emergency: 2 },
         maxCandidates: 12,
         minWindowsPerSeason: 3,
         ownershipRows: [SEASON_FREE_AGENCY_OWNERSHIP_MIN, SEASON_FREE_AGENCY_OWNERSHIP_MAX],

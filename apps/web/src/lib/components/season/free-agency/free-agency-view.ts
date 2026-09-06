@@ -18,7 +18,7 @@ export const FREE_AGENCY_BAND_LABEL: Record<SeasonFreeAgencyBand, string> = {
 export const FREE_AGENCY_BAND_BLURB: Record<SeasonFreeAgencyBand, string> = {
   featured: 'Market headliner · 2-3 Influence',
   role: 'Rotation-ready contributor · 1-2 Influence',
-  development: 'Developmental depth · 1-2 Influence',
+  development: 'Developmental depth · 1 Influence',
   emergency: 'Short-term insurance · 1 Influence',
 };
 export const ROLE_EXPECTATION_LABEL: Record<SeasonFreeAgencyRoleExpectation, string> = {

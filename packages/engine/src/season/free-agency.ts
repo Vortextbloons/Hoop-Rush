@@ -64,10 +64,10 @@ const FALLBACK_BAND_POOL_SCORE_CAPS: Record<string, number> = {
 };
 const FALLBACK_MAX_ROSTER_STRENGTH_OUTLIERS = 2;
 export const SEASON_FREE_AGENCY_WINDOW_COMPOSITION: Record<SeasonFreeAgencyBand, number> = {
-  featured: 1,
+  featured: 2,
   role: 5,
   development: 3,
-  emergency: 3,
+  emergency: 2,
 };
 export const SEASON_FREE_AGENCY_WINDOW_MAX_CANDIDATES = 12;
 export const SEASON_FREE_AGENCY_WINDOW_BLOCK_INDEXES: readonly number[] = [2, 4, 6];

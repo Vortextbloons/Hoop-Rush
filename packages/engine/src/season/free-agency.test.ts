@@ -8,6 +8,7 @@ import type {
   SeasonRun,
 } from '@hoop-rush/data-contracts';
 import { contentHashSchema, franchiseIdSchema, playerIdSchema } from '@hoop-rush/data-contracts';
+import { SEASON_FREE_AGENCY_INDEX_VERSION } from '@hoop-rush/data-contracts';
 import {
   SEASON_FREE_AGENCY_BAND_SIGNING_CAPS,
   SEASON_FREE_AGENCY_WINDOW_MAX_CANDIDATES,
@@ -58,7 +59,7 @@ function fixtureIndex(catalog: SeasonDraftCatalog): SeasonFreeAgencyIndex {
   }
   return {
     schemaVersion: 1,
-    indexVersion: 'free-agency-index-v1',
+    indexVersion: SEASON_FREE_AGENCY_INDEX_VERSION,
     dataVersion: 'fixture',
     catalogRef: {
       catalogVersion: catalog.catalogVersion,
@@ -104,7 +105,7 @@ describe('free-agency universe and canonical selection', () => {
       expect(entries.length).toBeGreaterThan(0);
     }
   });
-  it('opens a window with unique identities, at most one featured, and canonical records', () => {
+  it('opens a window with unique identities, at most two featured, and canonical records', () => {
     const { run, catalog, index } = fixture();
     const opened = openSeasonFreeAgencyWindow(contextOf(run, catalog, index), 0, 2);
     expect(opened.window.candidates.length).toBeLessThanOrEqual(
@@ -114,7 +115,7 @@ describe('free-agency universe and canonical selection', () => {
     const identities = new Set(opened.window.candidates.map((candidate) => candidate.playerId));
     expect(identities.size).toBe(opened.window.candidates.length);
     const featured = opened.window.candidates.filter((candidate) => candidate.band === 'featured');
-    expect(featured.length).toBeLessThanOrEqual(1);
+    expect(featured.length).toBeLessThanOrEqual(2);
     for (const candidate of opened.window.candidates) {
       const canonical = opened.freeAgency.canonicalCandidates[candidate.playerId];
       expect(canonical).toBeDefined();

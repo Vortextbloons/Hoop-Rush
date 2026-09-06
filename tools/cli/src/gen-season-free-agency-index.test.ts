@@ -106,21 +106,37 @@ describe('free-agency index derivation (committed artifacts)', () => {
   });
 });
 describe('free-agency index band sanity', () => {
-  it('admits no elite-tier candidate (recomputed through the engine)', () => {
+  it('admits elite-tier candidates as featured at cost 3 (recomputed through the engine)', () => {
     const { catalog, index, thresholds } = fixture;
     const byId = new Map(
       catalog.candidates.map((candidate) => [candidate.playerVersionId, candidate]),
     );
+    let eliteCount = 0;
+    let eliteFeatured = 0;
     for (const entry of index.candidates) {
       const candidate = byId.get(entry.playerVersionId);
       expect(candidate).toBeDefined();
       if (candidate === undefined) continue;
       const tier = playerPercentileTier(percentileTierOf(roleScoresOf(candidate), thresholds));
-      expect(tier, entry.playerVersionId).not.toBe('elite');
+      if (tier === 'elite') {
+        eliteCount += 1;
+        expect(['featured', 'role'], entry.playerVersionId).toContain(entry.band);
+        if (entry.band === 'featured') {
+          eliteFeatured += 1;
+          expect(entry.minimumInfluence, entry.playerVersionId).toBe(3);
+          expect(entry.derivationEvidence, entry.playerVersionId).toContain('tier elite');
+          expect(entry.derivationEvidence, entry.playerVersionId).toContain('p90');
+        }
+      }
     }
+    expect(eliteCount).toBeGreaterThan(0);
+    expect(eliteFeatured).toBeGreaterThan(0);
   });
-  it('assigns at most one featured version per identity group', () => {
-    const { index } = fixture;
+  it('assigns at most one featured version per identity group, preferring elite over strong', () => {
+    const { catalog, index, thresholds } = fixture;
+    const byId = new Map(
+      catalog.candidates.map((candidate) => [candidate.playerVersionId, candidate]),
+    );
     const featuredByIdentity = new Map<string, number>();
     for (const entry of index.candidates) {
       if (entry.band !== 'featured') continue;
@@ -129,9 +145,29 @@ describe('free-agency index band sanity', () => {
     for (const [playerId, count] of featuredByIdentity) {
       expect(count, `identity ${playerId}`).toBe(1);
     }
+    for (const entry of index.candidates) {
+      if (entry.band !== 'role') continue;
+      const candidate = byId.get(entry.playerVersionId);
+      if (candidate === undefined) continue;
+      const tier = playerPercentileTier(percentileTierOf(roleScoresOf(candidate), thresholds));
+      if (tier !== 'elite' && tier !== 'strong') continue;
+      const featuredSibling = index.candidates.find(
+        (sibling) => sibling.playerId === entry.playerId && sibling.band === 'featured',
+      );
+      expect(featuredSibling, `demoted ${entry.playerVersionId}`).toBeDefined();
+      if (tier === 'strong' && featuredSibling !== undefined) {
+        const featuredCandidate = byId.get(featuredSibling.playerVersionId);
+        if (featuredCandidate !== undefined) {
+          const featuredTier = playerPercentileTier(
+            percentileTierOf(roleScoresOf(featuredCandidate), thresholds),
+          );
+          expect(['elite', 'strong']).toContain(featuredTier);
+        }
+      }
+    }
   });
   it('cites every excluded sibling in the survivors exclusion evidence', () => {
-    const { catalog, index, thresholds } = fixture;
+    const { catalog, index } = fixture;
     const eligible = new Set(index.candidates.map((entry) => entry.playerVersionId));
     const indexedByIdentity = new Map<string, number>();
     for (const entry of index.candidates) {
@@ -140,8 +176,6 @@ describe('free-agency index band sanity', () => {
     const excludedByIdentity = new Map<string, string[]>();
     for (const candidate of catalog.candidates) {
       if (eligible.has(candidate.playerVersionId)) continue;
-      const tier = playerPercentileTier(percentileTierOf(roleScoresOf(candidate), thresholds));
-      expect(tier, `non-indexed ${candidate.playerVersionId}`).toBe('elite');
       const list = excludedByIdentity.get(candidate.playerId) ?? [];
       list.push(candidate.playerVersionId);
       excludedByIdentity.set(candidate.playerId, list);
@@ -240,11 +274,12 @@ describe('free-agency index band sanity', () => {
       content.length,
     );
     expect(content.length).toBeLessThanOrEqual(FREE_AGENCY_INDEX_MAX_BYTES);
-    expect(content.length).toBeLessThan(5000000);
+    expect(content.length).toBeLessThan(7500000);
     expect(stats.bandCounts.featured).toBeGreaterThan(0);
     expect(stats.bandCounts.role).toBeGreaterThan(0);
     expect(stats.bandCounts.development).toBeGreaterThan(0);
     expect(stats.bandCounts.emergency).toBeGreaterThan(0);
     expect(stats.candidateCount + stats.excludedCount).toBeGreaterThan(7000);
+    expect(stats.bandCounts.featured).toBeGreaterThanOrEqual(3 * 2 + 2);
   });
 });

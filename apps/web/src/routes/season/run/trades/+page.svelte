@@ -8,6 +8,8 @@
   import TradeBoardWorkspace from '$lib/components/season/TradeBoardWorkspace.svelte';
   import { tradeBoardViewModel } from '$lib/season/season-hub-state';
   import type { TradePackageDraft } from '$lib/season/season-presentation';
+  import { overallRatingOf } from '$lib/season/season-catalog-index';
+  import { overallRatingOfSlice } from '$lib/season/season-player-slice';
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
   let mounted = $state(true);
   $effect(() => {
@@ -72,6 +74,16 @@
     return tradeCommands.has(e.command) ? e.message : null;
   });
   const busy = $derived(shell.block.phase === 'running');
+  const summaries = $derived(shell.snapshot?.summaries ?? []);
+  function faceOf(playerVersionId: string) {
+    return shell.facesByVersion.get(playerVersionId) ?? null;
+  }
+  function overallOf(playerVersionId: string): number | null {
+    return (
+      overallRatingOf(shell.catalog, playerVersionId) ??
+      overallRatingOfSlice(shell.playerSlice, playerVersionId)
+    );
+  }
   function handlePurchase(): void {
     if (!mounted || windowState === null || busy) return;
     void shell.purchaseTradeInquiry?.({ windowIndex: windowState.windowIndex });
@@ -189,6 +201,9 @@
     playerName={playerNameOf}
     {playableOf}
     {availableOf}
+    {faceOf}
+    {overallOf}
+    {summaries}
   />
 
   <div

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   SEASON_BLOCK_COUNT,
   SEASON_FREE_AGENCY_TARGETS_VERSION,
+  SEASON_FREE_AGENCY_TARGETS_VERSION_V1,
   SEASON_GAME_TARGETS_VERSION,
   SEASON_GAME_VERSION,
   SEASON_RUN_SCHEMA_VERSION,
@@ -153,6 +154,7 @@ export function simulateSeasonFreeAgencyFacts(options: {
   state.run = run;
   state.health = run.health;
   state.objectiveId = null;
+  state.challengeDeal = null;
   state.checkpointState = null;
   state.stateRevision = 0;
   state.stateDigest = run.stateDigest;
@@ -1157,7 +1159,10 @@ export function evaluateFreeAgencyGates(
 }
 export const seasonFreeAgencyTargetsSchema = z.object({
   schemaVersion: z.literal(1),
-  targetsVersion: z.literal(SEASON_FREE_AGENCY_TARGETS_VERSION),
+  targetsVersion: z.union([
+    z.literal(SEASON_FREE_AGENCY_TARGETS_VERSION),
+    z.literal(SEASON_FREE_AGENCY_TARGETS_VERSION_V1),
+  ]),
   policy: z.object({
     bandSigningCaps: z.object({
       contender: z.literal(1),
@@ -1168,10 +1173,10 @@ export const seasonFreeAgencyTargetsSchema = z.object({
     maxSigningsPerSeason: z.literal(3),
     maxSeasonSpend: z.literal(6),
     windowComposition: z.object({
-      featured: z.literal(1),
+      featured: z.union([z.literal(2), z.literal(1)]),
       role: z.literal(5),
       development: z.literal(3),
-      emergency: z.literal(3),
+      emergency: z.union([z.literal(2), z.literal(3)]),
     }),
     maxCandidates: z.literal(12),
     minWindowsPerSeason: z.literal(3),
@@ -1376,7 +1381,7 @@ export function validateSeasonFreeAgencyTargets(
     schema: seasonFreeAgencyTargetsSchema,
     command: 'season free-agency calibrate --validate',
     extraChecks: () => ({
-      details: ['band caps / composition match the frozen 1/2/3/3 and 1/5/3/3 policy'],
+      details: ['band caps / composition match the frozen 1/2/3/3 and 2/5/3/2 policy'],
       failures: [],
     }),
   });
@@ -1519,10 +1524,10 @@ export function seasonFreeAgencyCalibrate(
         maxSigningsPerSeason: SEASON_FREE_AGENCY_MAX_SIGNINGS,
         maxSeasonSpend: SEASON_FREE_AGENCY_MAX_SEASON_SPEND,
         windowComposition: {
-          featured: 1,
+          featured: 2,
           role: 5,
           development: 3,
-          emergency: 3,
+          emergency: 2,
         },
         maxCandidates: 12,
         minWindowsPerSeason: 3,

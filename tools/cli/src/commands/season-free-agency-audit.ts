@@ -163,9 +163,9 @@ function auditWindow(
       );
     }
   }
-  if (featured > 1) {
+  if (featured > 2) {
     counts.featuredFailures += 1;
-    failures.push(`${where} carries ${String(featured)} featured candidates (max 1)`);
+    failures.push(`${where} carries ${String(featured)} featured candidates (max 2)`);
   }
   for (const earlier of run.freeAgency.windows) {
     if (earlier.windowIndex >= windowIndex) continue;

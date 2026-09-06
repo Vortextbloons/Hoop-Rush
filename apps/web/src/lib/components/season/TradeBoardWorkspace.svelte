@@ -1,6 +1,7 @@
 <script lang="ts">
   import type {
     SeasonDraftCatalog,
+    SeasonGameSummary,
     SeasonRun,
     SeasonTradeBoardTeamProfile,
     SeasonTradeNegotiation,
@@ -9,6 +10,7 @@
     HoopRushManifest,
   } from '@hoop-rush/data-contracts';
   import { franchiseIdSchema } from '@hoop-rush/data-contracts';
+  import type { SeasonFaceRef } from '$lib/season/season-branding';
   import {
     formatTradeNeeds,
     formatTradePriority,
@@ -43,6 +45,9 @@
     playerName = (id: string) => id,
     playableOf = (id: string) => [] as readonly string[],
     availableOf = (id: string) => true,
+    faceOf = null,
+    overallOf = null,
+    summaries = [],
     onDraftChange = null,
   }: {
     run: SeasonRun | null;
@@ -70,6 +75,9 @@
     playerName?: (playerVersionId: string) => string;
     playableOf?: (playerVersionId: string) => readonly string[];
     availableOf?: (playerVersionId: string) => boolean;
+    faceOf?: ((playerVersionId: string) => SeasonFaceRef | null) | null;
+    overallOf?: ((playerVersionId: string) => number | null) | null;
+    summaries?: readonly SeasonGameSummary[];
     onDraftChange?:
       | ((draft: {
           partner: string | null;
@@ -122,6 +130,20 @@
       playerNameOf: playerName,
       franchiseNameOf: (fid) =>
         manifest?.modernFranchiseSlots.find((s) => s.franchiseId === fid)?.displayName ?? fid,
+      tradeFit: {
+        outgoingCount: selectedFranchiseId
+          ? (drafts[selectedFranchiseId]?.outgoing.length ?? undefined)
+          : undefined,
+        incomingCount: selectedFranchiseId
+          ? (drafts[selectedFranchiseId]?.incoming.length ?? undefined)
+          : undefined,
+        toFranchiseName:
+          selectedFranchiseId !== null ? franchiseDisplayName(selectedFranchiseId) : null,
+        attemptNumber:
+          activeNegotiation?.toFranchiseId === selectedFranchiseId
+            ? activeNegotiation.exchangeCount
+            : 0,
+      },
     }),
   );
   const canPurchase = $derived(
@@ -272,6 +294,10 @@
       available: availableOf(p.playerVersionId),
       rotationMinutes: humanMinutesById.get(p.playerVersionId) ?? null,
       projectedMinutes: null as number | null,
+      overallRating: overallOf?.(p.playerVersionId) ?? null,
+      franchiseId: p.franchiseId,
+      eraId: p.eraId,
+      seasonKey: p.seasonKey,
     })),
   );
   const theirLites = $derived(
@@ -282,6 +308,10 @@
       available: availableOf(p.playerVersionId),
       rotationMinutes: null as number | null,
       projectedMinutes: targetMinutesById.get(p.playerVersionId) ?? 16,
+      overallRating: overallOf?.(p.playerVersionId) ?? null,
+      franchiseId: p.franchiseId,
+      eraId: p.eraId,
+      seasonKey: p.seasonKey,
     })),
   );
   const draftForBuilder = $derived(
@@ -536,6 +566,10 @@
           {prefillKey}
           playerNameOf={playerName}
           franchiseNameOf={franchiseDisplayName}
+          {manifest}
+          {catalog}
+          {faceOf}
+          {summaries}
           onSubmit={(payload) => handleSubmit(payload)}
           onDraftChange={handleDraftChange}
         />

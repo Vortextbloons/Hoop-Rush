@@ -39,6 +39,7 @@ import {
   type SeasonVersionSpotlight,
 } from '@hoop-rush/data-contracts';
 import { humanUpcomingGames } from './season-lock-preview';
+import { TRADE_BAND_1V1, TRADE_BAND_DEFAULT } from '@hoop-rush/engine';
 export const UNKNOWN_PLAYER_DISPLAY_NAME = 'Unknown player';
 export function displayPlayerName(name: string | null | undefined): string {
   const trimmed = name?.trim();
@@ -1248,11 +1249,65 @@ export function tradeTalksLabel(allowance: number, used: number): string {
   if (remaining === 1) return '1 talk left';
   return `${String(remaining)} talks left`;
 }
+export interface TradeFitContext {
+  outgoingCount?: number;
+  incomingCount?: number;
+  toFranchiseName?: string | null;
+  attemptNumber?: number;
+}
+function tradeBandOf(fit?: TradeFitContext): { lower: number; upper: number } {
+  const is1v1 = fit?.outgoingCount === 1 && fit.incomingCount === 1;
+  return is1v1 ? TRADE_BAND_1V1 : TRADE_BAND_DEFAULT;
+}
+function tradeRatioOf(raw: string): number | null {
+  const match = /\bratio\s+(\d{2,6})\b/i.exec(raw);
+  if (match?.[1] === undefined) return null;
+  const ratio = Number.parseInt(match[1], 10);
+  return Number.isFinite(ratio) ? ratio : null;
+}
+function tradeOverAskMessage(
+  team: string,
+  ratio: number | null,
+  overBy: number | null,
+  repeat: boolean,
+): string {
+  const again = repeat ? 'Still no from' : null;
+  if (ratio === null || overBy === null) {
+    return again !== null
+      ? `${again} ${team} — the mix still isn't right for their roster. Shuffle the pieces and try again.`
+      : `${team} passed — the mix isn't right for their roster. Shuffle the pieces and try again.`;
+  }
+  const pct = Math.round(ratio / 10) - 100;
+  if (overBy <= 50) {
+    return again !== null
+      ? `${again} ${team} — it's close, but the value isn't quite there. Tweak the package or the Influence and go again.`
+      : `${team} nearly said yes — the value just isn't quite there. Tweak the package or the Influence and go again.`;
+  }
+  if (overBy <= 150) {
+    return again !== null
+      ? `${again} ${team} — you're asking for about ${String(pct)}% more than you're sending. Balance the value and try again.`
+      : `${team} turned it down — you're asking for about ${String(pct)}% more than you're sending. Balance the value and try again.`;
+  }
+  return again !== null
+    ? `${again} ${team} — that ask is about ${String(pct)}% richer than your offer. Come back closer to even.`
+    : `${team} waved that one off — the ask is about ${String(pct)}% richer than your offer. Come back closer to even.`;
+}
+function tradeOverpayMessage(ratio: number | null, repeat: boolean): string {
+  const short = ratio === null ? null : 100 - Math.round(ratio / 10);
+  const gap =
+    short === null || short <= 0
+      ? "more than's coming back"
+      : `about ${String(short)}% more than's coming back`;
+  return repeat
+    ? `Your staff is still blocking it — you'd be sending out ${gap}. Ask for more, or trim your side.`
+    : `Your staff pumped the brakes — you'd be sending out ${gap}. Ask for more, or trim your side.`;
+}
 export function humanizeTradeRejection(
   error: string | null | undefined,
   names?: {
     playerNameOf?: (playerVersionId: string) => string;
     franchiseNameOf?: (franchiseId: string) => string;
+    tradeFit?: TradeFitContext;
   },
 ): string | null {
   if (error === null || error === undefined) return null;
@@ -1289,7 +1344,8 @@ export function humanizeTradeRejection(
     return 'They want more value.';
   }
   if (lower.includes('insufficient-talent') || lower.includes('insufficient talent')) {
-    return 'They want more value.';
+    const repeat = (names?.tradeFit?.attemptNumber ?? 0) >= 2;
+    return tradeOverpayMessage(tradeRatioOf(raw), repeat);
   }
   if (
     lower.includes('wrong-roster-fit') ||
@@ -1297,7 +1353,14 @@ export function humanizeTradeRejection(
     lower.includes('wrong-fit') ||
     lower.includes('wrong fit')
   ) {
-    return 'Wrong fit for their roster.';
+    const fit = names?.tradeFit;
+    const team = fit?.toFranchiseName?.trim() ? fit.toFranchiseName.trim() : 'They';
+    const repeat = (fit?.attemptNumber ?? 0) >= 2;
+    const ratio = tradeRatioOf(raw);
+    if (ratio === null) return tradeOverAskMessage(team, null, null, repeat);
+    const band = tradeBandOf(fit);
+    if (ratio < band.lower) return tradeOverpayMessage(ratio, repeat);
+    return tradeOverAskMessage(team, ratio, ratio - band.upper, repeat);
   }
   if (
     lower.includes('unacceptable-injury-risk') ||

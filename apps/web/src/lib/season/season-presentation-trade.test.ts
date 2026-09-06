@@ -48,6 +48,58 @@ describe('humanizeTradeRejection', () => {
   it('returns null for null', () => {
     expect(humanizeTradeRejection(null)).toBeNull();
   });
+  it('names the over-ask with magnitude for a blown 1-for-1', () => {
+    expect(
+      humanizeTradeRejection('trade-wrong-fit: ratio 1284 outside band', {
+        tradeFit: {
+          outgoingCount: 1,
+          incomingCount: 1,
+          toFranchiseName: 'Celtics',
+          attemptNumber: 0,
+        },
+      }),
+    ).toBe(
+      "Celtics turned it down — you're asking for about 28% more than you're sending. Balance the value and try again.",
+    );
+  });
+  it('softens to nearly-yes when close to the band', () => {
+    expect(
+      humanizeTradeRejection('trade-wrong-fit: ratio 1180 outside band', {
+        tradeFit: { outgoingCount: 1, incomingCount: 1, toFranchiseName: 'Celtics' },
+      }),
+    ).toContain('nearly said yes');
+  });
+  it('bluntens repeat rejections without inventing facts', () => {
+    const out = humanizeTradeRejection('trade-wrong-fit: ratio 1284 outside band', {
+      tradeFit: {
+        outgoingCount: 1,
+        incomingCount: 1,
+        toFranchiseName: 'Celtics',
+        attemptNumber: 2,
+      },
+    });
+    expect(out).toContain('Still no from Celtics');
+    expect(out).toContain('28%');
+    expect(out).not.toContain('1284');
+  });
+  it('falls back to a mix message without fit context', () => {
+    expect(humanizeTradeRejection('trade-wrong-fit: something off')).toBe(
+      "They passed — the mix isn't right for their roster. Shuffle the pieces and try again.",
+    );
+  });
+  it('routes under-band fits to your own staff, not the partner', () => {
+    expect(
+      humanizeTradeRejection('trade-wrong-fit: ratio 820 outside band', {
+        tradeFit: { outgoingCount: 1, incomingCount: 1 },
+      }),
+    ).toContain('Your staff pumped the brakes');
+  });
+  it('routes overpay rejections to your own staff with magnitude', () => {
+    const out = humanizeTradeRejection('trade-insufficient-talent: ratio 700 < 800', {});
+    expect(out).toContain('Your staff pumped the brakes');
+    expect(out).toContain('30%');
+    expect(out).not.toContain('700');
+  });
 });
 
 describe('packageConsequenceFacts', () => {

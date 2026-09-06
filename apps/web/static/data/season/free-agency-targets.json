@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "targetsVersion": "free-agency-targets-v1",
+  "targetsVersion": "free-agency-targets-v2",
   "policy": {
     "bandSigningCaps": {
       "contender": 1,
@@ -11,10 +11,10 @@
     "maxSigningsPerSeason": 3,
     "maxSeasonSpend": 6,
     "windowComposition": {
-      "featured": 1,
+      "featured": 2,
       "role": 5,
       "development": 3,
-      "emergency": 3
+      "emergency": 2
     },
     "maxCandidates": 12,
     "minWindowsPerSeason": 3,
@@ -48,41 +48,41 @@
       "windowsComplete": 24,
       "candidateTotal": 288,
       "candidateShortfalls": 0,
-      "uniqueIdentities": 285,
-      "canonicalReuse": 3,
+      "uniqueIdentities": 286,
+      "canonicalReuse": 2,
       "declarations": 720,
-      "declaredTargets": 601,
+      "declaredTargets": 681,
       "interestByBand": {
-        "featured": 143,
-        "role": 227,
-        "development": 186,
-        "emergency": 45
+        "featured": 555,
+        "role": 84,
+        "development": 41,
+        "emergency": 1
       },
       "winsByBand": {
-        "featured": 16,
-        "role": 28,
-        "development": 18,
-        "emergency": 6
+        "featured": 45,
+        "role": 17,
+        "development": 10,
+        "emergency": 1
       },
-      "interestFranchises": 109,
-      "skipFranchises": 147,
-      "skipShare": 0.6125,
-      "signings": 68,
-      "signingFranchises": 60,
-      "signingsPerFranchiseMean": 0.2833333333333333,
+      "interestFranchises": 128,
+      "skipFranchises": 130,
+      "skipShare": 0.5416666666666666,
+      "signings": 73,
+      "signingFranchises": 66,
+      "signingsPerFranchiseMean": 0.3041666666666667,
       "signingsPerFranchiseMin": 0,
-      "signingsPerFranchiseMax": 3,
-      "signingCapReached": 1,
+      "signingsPerFranchiseMax": 2,
+      "signingCapReached": 0,
       "bandCapViolations": 0,
       "signingCapViolations": 0,
       "spendCapViolations": 0,
-      "influenceCostsMean": 1.582986111111111,
+      "influenceCostsMean": 2.280808080808081,
       "influenceCostsMin": 0,
       "influenceCostsMax": 3,
-      "rosterSizesMean": 10.283333333333335,
+      "rosterSizesMean": 10.304166666666667,
       "rosterSizesMin": 0,
-      "rosterSizesMax": 13,
-      "ownershipRows": 2468,
+      "rosterSizesMax": 12,
+      "ownershipRows": 2473,
       "activeLoads": 2400,
       "activePairs": 10800,
       "effectsFailures": 0,
@@ -93,12 +93,12 @@
       "influenceDecideFailures": 0,
       "eliteExclusionFailures": 0,
       "oneOutlierFailures": 0,
-      "signedAboveDraftedMedian": 0,
-      "signedAboveDraftedMedianShare": 0,
+      "signedAboveDraftedMedian": 15,
+      "signedAboveDraftedMedianShare": 0.2054794520547945,
       "signingsByBand": {
-        "contender": 17,
-        "playoff": 36,
-        "average": 15,
+        "contender": 23,
+        "playoff": 30,
+        "average": 20,
         "weaker": 0
       },
       "richGetRicherFailures": 0,
@@ -115,7 +115,7 @@
       "seasonsSimulated": 4,
       "windowsOpened": 12,
       "windowsComplete": 12,
-      "signings": 37,
+      "signings": 40,
       "bandCapViolations": 0,
       "signingCapViolations": 0,
       "spendCapViolations": 0,
@@ -128,7 +128,7 @@
       "eliteExclusionFailures": 0,
       "oneOutlierFailures": 0,
       "richGetRicherFailures": 0,
-      "ownershipRows": 1237,
+      "ownershipRows": 1240,
       "determinismProbe": {
         "probed": true,
         "identical": true
@@ -159,8 +159,8 @@
     "summaryIdentity": true,
     "heldOut": true
   },
-  "engineVersion": "m3-engine-v11",
+  "engineVersion": "m3-engine-v17",
   "gameVersion": "season-game-v4",
   "gameTargetsVersion": "season-game-targets-v4",
-  "generatedAtIso": "2026-08-14T07:03:34.730Z"
+  "generatedAtIso": "2026-09-06T19:06:45.297Z"
 }
