@@ -2,6 +2,7 @@ import {
   SEASON_CHALLENGE_CATALOG,
   SEASON_SEED_NAMESPACES,
   blockRoundRange,
+  canonicalJson,
   franchiseIdSchema,
   seasonDigestHex,
   seasonNamespaceSeed,
@@ -14,7 +15,6 @@ import {
   type SeasonBlockChallengeEvaluation,
   type SeasonChallengeEvaluationFacts,
 } from '@hoop-rush/data-contracts';
-import { canonicalJson } from './checkpoint.ts';
 
 const HARD_IDS: readonly SeasonChallengeId[] = ['beat-leader', 'beat-higher', 'statement-block'];
 

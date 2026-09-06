@@ -12,6 +12,7 @@ import {
 import {
   seasonTradeCatalogFactsOf,
   seasonTradePlayerValue,
+  tradeAssetEligibilityOf,
   TRADE_BAND_1V1,
   TRADE_BAND_DEFAULT,
 } from './trades.ts';
@@ -145,7 +146,13 @@ export function evaluateTradeProposal(input: {
   const boardProfile = win.boardProfiles?.find((p) => p.franchiseId === toFranchiseId);
   if (boardProfile) {
     for (const id of incomingPlayerVersionIds) {
-      if (boardProfile.protectedPlayerIds.includes(id)) {
+      const eligibility = tradeAssetEligibilityOf({
+        playerVersionId: id,
+        fromFranchiseId: toFranchiseId,
+        protectedIds: boardProfile.protectedPlayerIds,
+        available: true,
+      });
+      if (eligibility.status === 'protected') {
         return { ok: false, code: 'trade-protected-player', reason: `${id} protected` };
       }
     }
@@ -160,7 +167,13 @@ export function evaluateTradeProposal(input: {
         const hasMajor = injuries.some(
           (inj) => inj.severity === 'major' || inj.severity === 'season-ending',
         );
-        if (hasMajor)
+        const eligibility = tradeAssetEligibilityOf({
+          playerVersionId: id,
+          protectedIds: [],
+          available: false,
+          hasBlockingInjury: hasMajor,
+        });
+        if (eligibility.status === 'availability-risk')
           return { ok: false, code: 'trade-availability-risk', reason: `${id} injured` };
       }
     }

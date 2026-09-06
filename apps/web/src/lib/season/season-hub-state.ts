@@ -84,6 +84,14 @@ export interface BlockRunState {
   gamesTotal: number;
   latestGameId: string | null;
   latestResult: SeasonScoreline | null;
+  isHumanGame: boolean;
+  humanRecordInBlock: { wins: number; losses: number };
+  humanResults: SeasonScoreline[];
+  leaguePulse: {
+    closest: SeasonScoreline | null;
+    blowout: SeasonScoreline | null;
+    highestScoring: SeasonScoreline | null;
+  };
   error: {
     code: string;
     message: string;
@@ -133,6 +141,10 @@ const IDLE_BLOCK: BlockRunState = {
   gamesTotal: 0,
   latestGameId: null,
   latestResult: null,
+  isHumanGame: false,
+  humanRecordInBlock: { wins: 0, losses: 0 },
+  humanResults: [],
+  leaguePulse: { closest: null, blowout: null, highestScoring: null },
   error: null,
   command: null,
   startInput: null,
@@ -1245,9 +1257,13 @@ export class SeasonHubState {
         this.block.gamesTotal = event.gamesTotal;
         this.block.latestGameId = event.latestGameId;
         this.block.latestResult = event.latestResult;
+        this.block.isHumanGame = event.isHumanGame;
+        this.block.humanRecordInBlock = event.humanRecordInBlock;
+        this.block.humanResults = event.humanResults;
+        this.block.leaguePulse = event.leaguePulse;
         const now = this.now();
         const isFinal = event.gamesTotal > 0 && event.gamesCompleted >= event.gamesTotal;
-        if (!isFinal && now - this.lastProgressEmitAt < 1000) return;
+        if (!isFinal && !event.isHumanGame && now - this.lastProgressEmitAt < 1000) return;
         this.lastProgressEmitAt = now;
         break;
       }
@@ -1276,6 +1292,7 @@ export class SeasonHubState {
         this.block.phase = 'interrupted';
         this.block.latestGameId = null;
         this.block.latestResult = null;
+        this.block.isHumanGame = false;
         this.block.error = null;
         this.pending = event.pending;
         this.interruption = event.interruption;

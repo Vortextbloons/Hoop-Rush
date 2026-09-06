@@ -25,11 +25,13 @@ import {
   seasonAcceptedBlockSchema,
   seasonWorkerCancelRequestSchema,
   seasonWorkerMessageSchema,
+  seasonWorkerProgressMessageSchema,
   seasonWorkerStartRequestSchema,
   seasonWorkerWarmRequestSchema,
-  type SeasonScoreline,
   type SeasonWorkerStartRequest,
 } from '@hoop-rush/data-contracts';
+import type { z } from 'zod';
+export type SeasonWorkerProgress = z.infer<typeof seasonWorkerProgressMessageSchema>;
 import {
   completeSeasonBlockCommit,
   reconstructSeasonGames,
@@ -59,8 +61,12 @@ export type SeasonRunnerEvent =
       blockIndex: number;
       gamesCompleted: number;
       gamesTotal: number;
-      latestGameId: string | null;
-      latestResult: SeasonScoreline | null;
+      latestGameId: SeasonWorkerProgress['latestGameId'];
+      latestResult: SeasonWorkerProgress['latestResult'];
+      isHumanGame: SeasonWorkerProgress['isHumanGame'];
+      humanRecordInBlock: SeasonWorkerProgress['humanRecordInBlock'];
+      humanResults: SeasonWorkerProgress['humanResults'];
+      leaguePulse: SeasonWorkerProgress['leaguePulse'];
     }
   | {
       type: 'complete';
@@ -421,90 +427,21 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       current = null;
     });
     worker.addEventListener('message', (event: MessageEvent<unknown>) => {
-      const raw = event.data as
-        | {
-            type?: unknown;
-            requestId?: unknown;
-          }
-        | null
-        | undefined;
-      if (typeof raw === 'object' && raw !== null && raw.type === 'season-block-progress') {
-        if (raw.requestId !== currentRequestId) {
-          console.warn(
-            `[season-block-runner] dropped message for stale requestId ${String(raw.requestId)} (expected ${String(currentRequestId)})`,
-          );
-          return;
-        }
-        if (current === null) return;
-        const progress = raw as {
-          requestId: string;
-          blockIndex: unknown;
-          gamesCompleted: unknown;
-          gamesTotal: unknown;
-          latestGameId: unknown;
-          latestResult: unknown;
-        };
-        if (
-          typeof progress.blockIndex !== 'number' ||
-          typeof progress.gamesCompleted !== 'number' ||
-          typeof progress.gamesTotal !== 'number' ||
-          progress.blockIndex !== current.blockIndex ||
-          progress.gamesCompleted < 0 ||
-          progress.gamesTotal < 1 ||
-          progress.gamesTotal > 150 ||
-          progress.gamesCompleted > progress.gamesTotal
-        ) {
-          const parsed = seasonWorkerMessageSchema.safeParse(event.data);
-          if (!parsed.success || parsed.data.type !== 'season-block-progress') {
-            console.warn('[season-block-runner] dropped unparsable worker message', event.data);
-            return;
-          }
-          emit({
-            type: 'progress',
-            requestId: parsed.data.requestId,
-            blockIndex: parsed.data.blockIndex,
-            gamesCompleted: parsed.data.gamesCompleted,
-            gamesTotal: parsed.data.gamesTotal,
-            latestGameId: parsed.data.latestGameId,
-            latestResult: parsed.data.latestResult,
-          });
-          return;
-        }
-        emit({
-          type: 'progress',
-          requestId: progress.requestId,
-          blockIndex: progress.blockIndex,
-          gamesCompleted: progress.gamesCompleted,
-          gamesTotal: progress.gamesTotal,
-          latestGameId: (progress.latestGameId as string | null) ?? null,
-          latestResult: (progress.latestResult as SeasonScoreline | null) ?? null,
-        });
-        return;
-      }
-      if (typeof raw === 'object' && raw !== null && raw.type === 'season-block-warm-ack') {
-        if (raw.requestId === warmRequestId) {
-          warmRequestId = null;
-          warmed = true;
-        }
-        return;
-      }
-      if (
-        typeof raw === 'object' &&
-        raw !== null &&
-        raw.type === 'season-block-error' &&
-        raw.requestId === warmRequestId
-      ) {
-        warmRequestId = null;
-        warmed = false;
-        return;
-      }
       const parsed = seasonWorkerMessageSchema.safeParse(event.data);
       if (!parsed.success) {
         console.warn('[season-block-runner] dropped unparsable worker message', event.data);
         return;
       }
       if (parsed.data.type === 'season-block-warm-ack') {
-        if (parsed.data.requestId === warmRequestId) warmRequestId = null;
+        if (parsed.data.requestId === warmRequestId) {
+          warmRequestId = null;
+          warmed = true;
+        }
+        return;
+      }
+      if (parsed.data.type === 'season-block-error' && parsed.data.requestId === warmRequestId) {
+        warmRequestId = null;
+        warmed = false;
         return;
       }
       if (parsed.data.requestId !== currentRequestId) {
@@ -524,6 +461,10 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
           gamesTotal: message.gamesTotal,
           latestGameId: message.latestGameId,
           latestResult: message.latestResult,
+          isHumanGame: message.isHumanGame,
+          humanRecordInBlock: message.humanRecordInBlock,
+          humanResults: message.humanResults,
+          leaguePulse: message.leaguePulse,
         });
         return;
       }

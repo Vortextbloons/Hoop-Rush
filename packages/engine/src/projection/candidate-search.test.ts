@@ -16,7 +16,7 @@ import {
   searchRosterRotationCandidates,
 } from '../projection/index.ts';
 import { buildInput } from './season.test-helpers.ts';
-import { auditSeasonRotation, validateSeasonRotation } from '../season/rotation.ts';
+import { validateSeasonRotation } from '../season/rotation.ts';
 function smallModel(): ProjectionModelArtifact {
   const era1990s = eraIdSchema.parse('1990s');
   return {
@@ -439,7 +439,10 @@ describe('buildHumanSeasonRoster', () => {
       }),
     );
     expect(
-      auditSeasonRotation(result.rotation as NonNullable<typeof result.rotation>, memberPlayable),
+      validateSeasonRotation(
+        result.rotation as NonNullable<typeof result.rotation>,
+        memberPlayable,
+      ),
     ).toEqual([]);
     expect(result.rotation?.minutePolicy.policyVersion).toBe('minute-policy-v1');
   });

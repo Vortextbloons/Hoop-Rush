@@ -6,7 +6,6 @@ export const SEASON_ROSTER_RULES = {
   size: 10,
   gameMinimums: { guards: 3, forwards: 3, centers: 2 },
   completionTargets: { guards: 4, forwards: 4, centers: 3 },
-  fiveStructure: { guards: 2, forwards: 2, centers: 1 },
 } as const;
 export const SEASON_ROSTER_SIZE = SEASON_ROSTER_RULES.size;
 export interface SeasonRosterMemberInput {

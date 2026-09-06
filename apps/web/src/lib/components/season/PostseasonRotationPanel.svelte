@@ -8,7 +8,6 @@
   import type { RotationEditor as RotationEditorType } from '$lib/season/season-rotation-editor';
   import type { RiskyRehabOption } from '$lib/season/season-postseason-presentation';
   import type { SeasonFaceRef } from '$lib/season/season-branding';
-  import { INJURY_SEVERITY_LABEL } from '$lib/season/season-health-view';
   import RotationEditor from './RotationEditor.svelte';
   let {
     editor,
@@ -84,10 +83,14 @@
       >
         Injured players · risky rehab
       </legend>
-      <p class="mt-1 text-sm text-muted-foreground">
-        A lineup with an injured player is rejected. Spend
-        <strong class="text-foreground"> 2 Influence</strong> to roll a risky rehab before this game
-        (once per injury). Balance:
+      <p class="mt-1 text-xs text-muted-foreground">
+        A lineup with an injured player is rejected.
+        {#if rehabOptions.length > 0 && rehabOptions[0] !== undefined}
+          Bring back a player ({rehabOptions[0].cost}◆): chance sooner, can set back.
+        {:else}
+          Chance sooner, can set back.
+        {/if}
+        Balance:
         <span class="font-mono font-bold text-foreground">{balance}</span>.
       </p>
       {#if rehabInjuredPlayerCount === 0}
@@ -114,15 +117,14 @@
                   onchange={() => onRehabSelect(option.injuryId)}
                 />
                 <span class="min-w-0 flex-1">
-                  <span class="block truncate text-sm font-semibold">
-                    {option.displayName}
+                  <span class="block truncate text-xs font-semibold">
+                    Bring back {option.displayName} ({option.cost}◆)
                     {#if option.alreadyRehabbed}
-                      <span class="ml-1 font-mono text-[10px] text-muted-foreground">rolled</span>
+                      <span class="ml-1 font-mono text-xs text-muted-foreground">rolled</span>
                     {/if}
                   </span>
-                  <span class="block font-mono text-[10px] text-muted-foreground">
-                    {INJURY_SEVERITY_LABEL[option.severity]} · {option.missedGamesRemaining} game
-                    {option.missedGamesRemaining === 1 ? 'out' : 's out'}
+                  <span class="block font-mono text-xs text-muted-foreground">
+                    Chance sooner, can set back.
                   </span>
                 </span>
                 {#if option.alreadyRehabbed}
@@ -133,15 +135,15 @@
                   </span>
                 {:else if !option.available}
                   <span
-                    class="shrink-0 rounded-full bg-destructive/15 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-destructive"
+                    class="shrink-0 rounded-full bg-destructive/15 px-2 py-0.5 font-mono text-xs font-bold uppercase tracking-[0.12em] text-destructive"
                   >
-                    Needs 2 Influence
+                    Needs {option.cost}◆
                   </span>
                 {:else}
                   <span
-                    class="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-primary"
+                    class="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 font-mono text-xs font-bold uppercase tracking-[0.12em] text-primary"
                   >
-                    {option.cost} Influence
+                    {option.cost}◆
                   </span>
                 {/if}
               </label>

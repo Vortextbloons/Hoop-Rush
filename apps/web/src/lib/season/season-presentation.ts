@@ -1,6 +1,6 @@
 import {
+  SEASON_CHALLENGE_CATALOG,
   SEASON_INFLUENCE_CAP,
-  SEASON_INFLUENCE_FLOOR,
   SEASON_RECAP_VERSION,
   SEASON_ROSTER_MAX_SIZE,
   SEASON_ROSTER_MIN_SIZE,
@@ -10,6 +10,7 @@ import {
   type FranchiseId,
   type SeasonGameId,
   type HoopRushManifest,
+  type SeasonBlockChallengeEvidence,
   type SeasonBlockInjuryEvidence,
   type SeasonBlockRecap,
   type SeasonCampaignCondition,
@@ -32,11 +33,23 @@ import {
   type SeasonStreak,
   type SeasonTeamAggregate,
   type SeasonTeamBox,
+  type SeasonTradeGrade,
   type SeasonTradeValueTrend,
   type SeasonUpcomingHumanGame,
   type SeasonVersionSpotlight,
 } from '@hoop-rush/data-contracts';
 import { humanUpcomingGames } from './season-lock-preview';
+export const UNKNOWN_PLAYER_DISPLAY_NAME = 'Unknown player';
+export function displayPlayerName(name: string | null | undefined): string {
+  const trimmed = name?.trim();
+  return trimmed !== undefined && trimmed !== '' ? trimmed : UNKNOWN_PLAYER_DISPLAY_NAME;
+}
+export function formatInfluenceBalance(
+  balance: number,
+  cap: number = SEASON_INFLUENCE_CAP,
+): string {
+  return `◆ ${String(balance)} / ${String(cap)}`;
+}
 export function provisionalRanking(
   standings: SeasonStandings,
   league: SeasonLeague,
@@ -262,7 +275,7 @@ export function boxScoreFromSummary(
     team: box,
     players: lines.map((line) => ({
       playerVersionId: line.playerVersionId,
-      displayName: names.get(line.playerVersionId) ?? line.playerVersionId,
+      displayName: displayPlayerName(names.get(line.playerVersionId)),
       position: playable.get(line.playerVersionId)?.[0] ?? '—',
       seconds: line.seconds,
       points: line.points,
@@ -847,6 +860,7 @@ export function deriveBlockRecap(input: {
       humanFranchiseId,
     }),
     objectiveEvidence: null,
+    challengeEvidence: challengeEvidenceOfRun(run, blockIndex),
     tradeEvidence: {
       tradesAccepted: run.transactions.filter(
         (entry) => entry.type === 'trade' && entry.blockIndex === blockIndex,
@@ -1002,7 +1016,10 @@ export const CAMPAIGN_REWARD_LABELS: Record<SeasonCampaignReward['type'], string
   'trade-inquiry-credit': 'Trade inquiry credit',
   'follow-up-unlock': 'Follow-up unlock',
 };
-export function formatCampaignCondition(condition: SeasonCampaignCondition): string {
+export function formatCampaignCondition(
+  condition: SeasonCampaignCondition,
+  playerName: (playerVersionId: string) => string = () => 'Unknown player',
+): string {
   const op =
     condition.comparisonOperator === 'gte'
       ? '≥'
@@ -1041,17 +1058,17 @@ export function formatCampaignCondition(condition: SeasonCampaignCondition): str
     case 'bench-contribution':
       return `Bench scores ${op}${String(condition.threshold)} pts`;
     case 'player-minutes':
-      return `${condition.playerVersionId.slice(0, 8)}… logs ${op}${String(condition.threshold)} minutes`;
+      return `${playerName(condition.playerVersionId)} logs ${op}${String(condition.threshold)} minutes`;
     case 'player-starts':
-      return `${condition.playerVersionId.slice(0, 8)}… starts ${op}${String(condition.threshold)} games`;
+      return `${playerName(condition.playerVersionId)} starts ${op}${String(condition.threshold)} games`;
     case 'player-availability':
-      return `${condition.playerVersionId.slice(0, 8)}… available ${op}${String(condition.threshold)} games`;
+      return `${playerName(condition.playerVersionId)} available ${op}${String(condition.threshold)} games`;
     case 'player-points':
-      return `${condition.playerVersionId.slice(0, 8)}… scores ${op}${String(condition.threshold)} pts`;
+      return `${playerName(condition.playerVersionId)} scores ${op}${String(condition.threshold)} pts`;
     case 'player-assists':
-      return `${condition.playerVersionId.slice(0, 8)}… ${op}${String(condition.threshold)} assists`;
+      return `${playerName(condition.playerVersionId)} · ${op}${String(condition.threshold)} assists`;
     case 'player-rebounds':
-      return `${condition.playerVersionId.slice(0, 8)}… ${op}${String(condition.threshold)} rebounds`;
+      return `${playerName(condition.playerVersionId)} · ${op}${String(condition.threshold)} rebounds`;
     case 'roster-new-player-minutes':
       return `New arrival plays ${op}${String(condition.threshold)} minutes`;
     case 'roster-new-player-starts':
@@ -1071,7 +1088,7 @@ export function formatCampaignCondition(condition: SeasonCampaignCondition): str
 }
 export function formatCampaignReward(reward: SeasonCampaignReward): string {
   const label = CAMPAIGN_REWARD_LABELS[reward.type];
-  return `+${String(reward.amount)} ${label} · ${reward.rewardId}`;
+  return `+${String(reward.amount)} ${label}`;
 }
 export function campaignRewardSummary(
   evaluations: readonly SeasonCampaignEvaluation[],
@@ -1225,6 +1242,127 @@ export function inquiryCounterLabel(
   const earned = earnedUsed ? 1 : 0;
   return `${String(used)}/${String(allowance)} used · 3 base + ${String(extra)} extra (purchased ${String(purchased)}/1 · earned ${String(earned)}/1)`;
 }
+export function tradeTalksLabel(allowance: number, used: number): string {
+  const remaining = Math.max(0, allowance - used);
+  if (remaining <= 0) return 'No talks left — +1 for 1◆ or wait.';
+  if (remaining === 1) return '1 talk left';
+  return `${String(remaining)} talks left`;
+}
+export function humanizeTradeRejection(
+  error: string | null | undefined,
+  names?: {
+    playerNameOf?: (playerVersionId: string) => string;
+    franchiseNameOf?: (franchiseId: string) => string;
+  },
+): string | null {
+  if (error === null || error === undefined) return null;
+  const raw = error.trim();
+  if (raw.length === 0) return null;
+  const lower = raw.toLowerCase();
+  const resolveNames = (text: string): string => {
+    let out = text;
+    out = out.replace(/pv-[a-z0-9_-]{4,64}/gi, (match) => {
+      try {
+        const name = names?.playerNameOf?.(match);
+        if (name !== undefined && name !== match) return name;
+      } catch {}
+      return 'that player';
+    });
+    out = out.replace(/\b(prop|inq|off)-[0-9a-f]{8,64}\b/gi, 'this deal');
+    out = out.replace(/\bfingerprint\s+[a-z0-9|,._-]{1,128}\b/gi, 'this deal');
+    out = out.replace(/\b(at\s+)?revision\s+[0-9a-f-]{1,64}\b/gi, '');
+    out = out.replace(/\bexchange\s*#?\d+\b/gi, '');
+    out = out.replace(/\s{2,}/g, ' ').trim();
+    return out;
+  };
+  if (
+    lower.includes('duplicate') ||
+    lower.includes('fingerprint') ||
+    lower.includes('already sent')
+  ) {
+    return 'Already sent this exact deal.';
+  }
+  if (lower.includes('protected')) {
+    return 'Off limits.';
+  }
+  if (lower.includes('close-needs-more-value') || lower.includes('close needs more value')) {
+    return 'They want more value.';
+  }
+  if (lower.includes('insufficient-talent') || lower.includes('insufficient talent')) {
+    return 'They want more value.';
+  }
+  if (
+    lower.includes('wrong-roster-fit') ||
+    lower.includes('wrong roster fit') ||
+    lower.includes('wrong-fit') ||
+    lower.includes('wrong fit')
+  ) {
+    return 'Wrong fit for their roster.';
+  }
+  if (
+    lower.includes('unacceptable-injury-risk') ||
+    lower.includes('unacceptable injury') ||
+    lower.includes('availability-risk') ||
+    lower.includes('availability risk')
+  ) {
+    return 'Availability risk — they’re wary of injuries.';
+  }
+  if (lower.includes('illegal-roster') || lower.includes('illegal roster')) {
+    return 'That would leave a roster illegal.';
+  }
+  if (lower.includes('roster-illegal') || lower.includes('roster illegal')) {
+    return 'That would leave a roster illegal.';
+  }
+  if (lower.includes('resulting roster 10-15') || lower.includes('must stay 10')) {
+    return 'That would leave a roster illegal.';
+  }
+  if (lower.includes('negotiations-closed') || lower.includes('negotiations closed')) {
+    return 'Talks are closed for this window.';
+  }
+  if (lower.includes('inquiry-cap') || lower.includes('inquiry cap')) {
+    return 'No talks left.';
+  }
+  if (lower.includes('exchange-limit') || lower.includes('exchange limit')) {
+    return 'No more offers in this talk.';
+  }
+  if (lower.includes('cash-cap') || lower.includes('cash cap')) {
+    return 'Influence limit reached for this window.';
+  }
+  if (lower.includes('insufficient-balance') || lower.includes('cannot cover')) {
+    return 'Not enough Influence.';
+  }
+  if (lower.includes('ownership-conflict') || lower.includes('ownership conflict')) {
+    return 'Ownership conflict.';
+  }
+  if (lower.includes('window-not-open') || lower.includes('window not open')) {
+    return 'That window isn’t open.';
+  }
+  if (
+    lower.includes('active-negotiation') ||
+    lower.includes('active negotiation') ||
+    lower.includes('finish the active')
+  ) {
+    return 'Finish the current talk first.';
+  }
+  if (
+    lower.includes('stale-state') ||
+    lower.includes('stale state') ||
+    lower.includes('moved on')
+  ) {
+    return 'The run moved on — refresh and try again.';
+  }
+  const cleaned = resolveNames(raw);
+  if (cleaned !== raw) return cleaned;
+  return raw.replace(/\s{2,}/g, ' ').trim();
+}
+export type TradeWorkspaceStep = 'team' | 'deal' | 'negotiation';
+export interface TradePackageDraft {
+  partner: string | null;
+  outgoing: string[];
+  incoming: string[];
+  influence: { amount: number; from: string | null };
+  validation: { ok: boolean; reason: string | null };
+}
 export interface PackageConsequenceFacts {
   fromRosterSize: number;
   toRosterSize: number;
@@ -1280,7 +1418,7 @@ export function packageConsequenceFacts(input: {
   const influenceNote =
     input.influenceAmount === 0
       ? 'No Influence attached'
-      : `${String(input.influenceAmount)} Influence from ${input.influenceFromSender === input.humanFranchiseId ? 'you' : input.influenceFromSender === input.toFranchiseId ? 'them' : (input.influenceFromSender ?? 'unknown')} · never alone, 1–2 max, capped at 5% per point (10% total)`;
+      : `${String(input.influenceAmount)} Influence from ${input.influenceFromSender === input.humanFranchiseId ? 'you' : 'them'}`;
   return {
     fromRosterSize: input.fromRosterSize,
     toRosterSize: input.toRosterSize,
@@ -1296,7 +1434,9 @@ export function packageConsequenceFacts(input: {
   };
 }
 export function chemistryFootnote(removedPairs: number, newPairs: number): string {
-  return `Chemistry: 45 active pairs per team (1,350 per league) · resets ${String(removedPairs)} existing pairings and starts ${String(newPairs)} new at neutral`;
+  void removedPairs;
+  void newPairs;
+  return 'New teammates start neutral.';
 }
 export function valueTrendToneLabel(trend: SeasonTradeValueTrend['trend']): string {
   switch (trend) {
@@ -1309,22 +1449,155 @@ export function valueTrendToneLabel(trend: SeasonTradeValueTrend['trend']): stri
   }
 }
 export function rehabPresentationFacts(): {
-  floor: number;
-  cap: number;
   cost: number;
   successRate: string;
   successNote: string;
   failureNote: string;
-  recurrenceNote: string;
 } {
   return {
-    floor: SEASON_INFLUENCE_FLOOR,
-    cap: SEASON_INFLUENCE_CAP,
     cost: 2,
     successRate: '60%',
-    successNote: 'Success reduces remaining absence by one team game',
-    failureNote: 'Failure leaves the estimate unchanged',
-    recurrenceNote:
-      'After actual return, +60 bp rehab recurrence premium for 10 games (100 bp total with base 40 bp during window)',
+    successNote: 'Success brings the player back sooner',
+    failureNote: 'It can also set the return back',
+  };
+}
+export interface CampaignOpportunityCard {
+  opportunityId: string;
+  blockIndex: number;
+  targetLabel: string;
+  conditionLabel: string;
+  rewardLabel: string;
+  breakthroughLabel: string | null;
+  selected: boolean;
+}
+export interface CampaignHistoryEntry {
+  blockIndex: number;
+  outcomeLabel: string;
+  explanation: string;
+}
+export function campaignOpportunityCardsOf(
+  run: SeasonRun | null,
+  nextBlockIndex: number | null,
+  playerName: (playerVersionId: string) => string = () => 'Unknown player',
+): {
+  blockIndex: number | null;
+  cards: CampaignOpportunityCard[];
+  isFinalBlock: boolean;
+} | null {
+  if (run === null) return null;
+  const campaign = run.campaign;
+  if (campaign === undefined) return null;
+  const completedBlocks = Math.ceil(run.cursor.completedRounds / 10);
+  const targetBlock = nextBlockIndex ?? completedBlocks;
+  if (targetBlock >= 8) return { blockIndex: targetBlock, cards: [], isFinalBlock: true };
+  if (targetBlock < 0) return { blockIndex: targetBlock, cards: [], isFinalBlock: false };
+  const offers = campaign.offers[targetBlock] ?? [];
+  const selection = campaign.selections[targetBlock]?.opportunityId ?? null;
+  return {
+    blockIndex: targetBlock,
+    isFinalBlock: false,
+    cards: offers.map((opp) => ({
+      opportunityId: opp.opportunityId,
+      blockIndex: opp.blockIndex,
+      targetLabel: formatCampaignCondition(opp.target, playerName),
+      conditionLabel: formatCampaignCondition(opp.target, playerName),
+      rewardLabel: formatCampaignReward(opp.completedReward),
+      breakthroughLabel: opp.breakthroughReward
+        ? formatCampaignReward(opp.breakthroughReward)
+        : null,
+      selected: selection === opp.opportunityId,
+    })),
+  };
+}
+export function campaignHistoryOf(run: SeasonRun | null): CampaignHistoryEntry[] {
+  if (run === null || run.campaign === undefined) return [];
+  return run.campaign.evaluations.map((ev) => ({
+    blockIndex: ev.blockIndex,
+    outcomeLabel: CAMPAIGN_OUTCOME_LABELS[ev.outcome],
+    explanation: ev.explanation,
+  }));
+}
+export function recordRankOutLabel(input: {
+  wins: number;
+  losses: number;
+  rank: number | null;
+  conference: 'east' | 'west' | null;
+  outCount: number;
+}): string {
+  const record = recordLabel(input.wins, input.losses);
+  const rankPart =
+    input.rank !== null && input.conference !== null
+      ? ` · ${ordinal(input.rank)} ${input.conference === 'east' ? 'East' : 'West'}`
+      : '';
+  const outPart = input.outCount > 0 ? ` · ${String(input.outCount)} OUT` : '';
+  return `${record}${rankPart}${outPart}`;
+}
+export function blockOneLiner(input: {
+  blockIndex: number;
+  fromRound: number;
+  toRound: number;
+  wins: number;
+  losses: number;
+}): string {
+  return `Block ${String(input.blockIndex + 1)} of 9 · Rds ${String(input.fromRound)}–${String(input.toRound)} · ${recordLabel(input.wins, input.losses)} so far`;
+}
+export function challengeEvidenceOfRun(
+  run: SeasonRun,
+  blockIndex: number,
+): SeasonBlockChallengeEvidence[] | undefined {
+  const challenges = (
+    run as unknown as {
+      challenges?: {
+        evaluations?: Array<{
+          blockIndex: number;
+          results: Array<{
+            challengeId: SeasonBlockChallengeEvidence['challengeId'];
+            success: boolean;
+            facts: SeasonBlockChallengeEvidence['evaluationFacts'];
+          }>;
+        }>;
+      };
+    }
+  ).challenges;
+  const evaluation = challenges?.evaluations?.find((entry) => entry.blockIndex === blockIndex);
+  if (evaluation === undefined) return undefined;
+  return [...evaluation.results]
+    .sort((a, b) => (a.challengeId < b.challengeId ? -1 : 1))
+    .map((result) => ({
+      challengeId: result.challengeId,
+      success: result.success,
+      reward:
+        SEASON_CHALLENGE_CATALOG.find((entry) => entry.challengeId === result.challengeId)
+          ?.reward ?? 1,
+      evaluationFacts: result.facts,
+    }));
+}
+export type RecapChallengeView =
+  | { kind: 'challenges'; evidence: SeasonBlockChallengeEvidence[] }
+  | { kind: 'legacy-objective'; objectiveId: string; success: boolean };
+export function recapChallengeView(recap: SeasonBlockRecap): RecapChallengeView | null {
+  const evidence = recap.challengeEvidence ?? [];
+  if (evidence.length > 0) return { kind: 'challenges', evidence };
+  const legacy = recap.objectiveEvidence ?? null;
+  if (legacy !== null)
+    return { kind: 'legacy-objective', objectiveId: legacy.objectiveId, success: legacy.success };
+  return null;
+}
+export const TRADE_GRADE_NEUTRAL_FALLBACK = 'Not enough post-trade games to grade.';
+export interface TradeGradeViewModel {
+  label: string;
+  windowLabel: string;
+  detail: string;
+  neutral: boolean;
+}
+export function tradeGradeViewModel(grade: SeasonTradeGrade): TradeGradeViewModel {
+  const firstReason = grade.reasons[0] ?? null;
+  return {
+    label: grade.label,
+    windowLabel: `Window ${String(grade.windowIndex + 1)}`,
+    detail: grade.neutral
+      ? TRADE_GRADE_NEUTRAL_FALLBACK
+      : (firstReason ?? TRADE_GRADE_NEUTRAL_FALLBACK),
+    neutral: grade.neutral,
   };
 }

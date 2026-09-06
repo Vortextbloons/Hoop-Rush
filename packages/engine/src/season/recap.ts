@@ -25,9 +25,8 @@ import {
   type SeasonFreeAgencyBand,
   type SeasonFreeAgencyState,
 } from '@hoop-rush/data-contracts';
-import { blockRoundRange } from '@hoop-rush/data-contracts';
+import { blockRoundRange, canonicalJson } from '@hoop-rush/data-contracts';
 import { provisionalStandingOrder } from './aggregates.ts';
-import { canonicalJson } from './checkpoint.ts';
 export interface SeasonBlockRecapInput {
   runId: string;
   blockIndex: number;

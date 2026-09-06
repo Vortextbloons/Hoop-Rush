@@ -22,6 +22,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import { createEngineContext } from '../../sim/context.ts';
 import { canPlay } from '../../domain/positions.ts';
+import { slotRequirement } from '../../domain/lineup.ts';
 import { createChallenge } from '../../challenge/commands.ts';
 import {
   classicRerollAvailable,
@@ -32,7 +33,6 @@ import {
   repositionClassicPlayer,
   rerollClassicEra,
   rerollClassicFranchise,
-  slotRequirement,
   type ClassicChallengeEnvironment,
 } from './draft.ts';
 const context = createEngineContext();

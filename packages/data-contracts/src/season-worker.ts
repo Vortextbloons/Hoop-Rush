@@ -24,8 +24,9 @@ import { seasonPendingBlockCandidateSchema } from './season-pending-block.ts';
 import { seasonBlockRunContextSchema } from './season-run.ts';
 import { seasonScheduleSchema } from './season-schedule.ts';
 import { seasonTransactionEntrySchema } from './season-transactions.ts';
-export const SEASON_WORKER_WIRE_SCHEMA_VERSION = 9 as const;
+export const SEASON_WORKER_WIRE_SCHEMA_VERSION = 10 as const;
 export const SEASON_WORKER_WIRE_SCHEMA_VERSION_V8 = 8 as const;
+export const SEASON_WORKER_WIRE_SCHEMA_VERSION_V9 = 9 as const;
 export const seasonScorelineSchema = z.object({
   gameId: seasonGameIdSchema,
   homeFranchiseId: franchiseIdSchema,
@@ -94,6 +95,17 @@ export const seasonWorkerRequestSchema = z.discriminatedUnion('type', [
   seasonWorkerWarmRequestSchema,
 ]);
 export type SeasonWorkerRequest = z.infer<typeof seasonWorkerRequestSchema>;
+export const seasonWorkerHumanRecordSchema = z.object({
+  wins: z.number().int().nonnegative(),
+  losses: z.number().int().nonnegative(),
+});
+export type SeasonWorkerHumanRecord = z.infer<typeof seasonWorkerHumanRecordSchema>;
+export const seasonWorkerLeaguePulseSchema = z.object({
+  closest: seasonScorelineSchema.nullable(),
+  blowout: seasonScorelineSchema.nullable(),
+  highestScoring: seasonScorelineSchema.nullable(),
+});
+export type SeasonWorkerLeaguePulse = z.infer<typeof seasonWorkerLeaguePulseSchema>;
 export const seasonWorkerProgressMessageSchema = z.object({
   schemaVersion: z.literal(SEASON_WORKER_WIRE_SCHEMA_VERSION),
   type: z.literal('season-block-progress'),
@@ -103,6 +115,10 @@ export const seasonWorkerProgressMessageSchema = z.object({
   gamesTotal: z.number().int().min(1).max(150),
   latestGameId: seasonGameIdSchema.nullable(),
   latestResult: seasonScorelineSchema.nullable(),
+  isHumanGame: z.boolean(),
+  humanRecordInBlock: seasonWorkerHumanRecordSchema,
+  humanResults: z.array(seasonScorelineSchema).max(10),
+  leaguePulse: seasonWorkerLeaguePulseSchema,
 });
 export type SeasonWorkerProgressMessage = z.infer<typeof seasonWorkerProgressMessageSchema>;
 export const seasonWorkerCompleteMessageSchema = z.object({

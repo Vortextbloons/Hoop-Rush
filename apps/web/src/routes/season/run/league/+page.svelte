@@ -310,7 +310,7 @@
                   : ''}"
               >
                 <a
-                  href={resolve(`/season/run/teams/?franchiseId=${team.franchiseId}` as any)}
+                  href={resolve(`/season/run/teams?franchiseId=${team.franchiseId}` as any)}
                   data-season-team-stats-link={team.franchiseId}
                   aria-label={`${shell.franchiseName(team.franchiseId)} roster`}
                   class="block outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -388,7 +388,7 @@
                   >
                     <th scope="row" class="max-w-48 truncate px-4 py-2 text-left font-semibold">
                       <a
-                        href={resolve(`/season/run/teams/?franchiseId=${team.franchiseId}` as any)}
+                        href={resolve(`/season/run/teams?franchiseId=${team.franchiseId}` as any)}
                         data-season-team-stats-link={team.franchiseId}
                         aria-label={`${shell.franchiseName(team.franchiseId)} roster`}
                         class="flex items-center gap-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:text-primary"

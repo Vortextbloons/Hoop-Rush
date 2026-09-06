@@ -37,12 +37,7 @@ import {
   rosterGroupCounts,
   validateSeasonRoster,
 } from './roster-rules.ts';
-import {
-  auditSeasonRotation,
-  buildMinimalRotation,
-  rotationTargetMinutes,
-  validateSeasonRotation,
-} from './rotation.ts';
+import { buildMinimalRotation, rotationTargetMinutes, validateSeasonRotation } from './rotation.ts';
 import {
   buildTestTargets,
   CATALOG,
@@ -502,7 +497,7 @@ describe('v2 minute-policy rotations (projection milestone)', () => {
           )?.positions.playable ?? [],
         ]),
       );
-      expect(auditSeasonRotation(rotation, playable)).toEqual([]);
+      expect(validateSeasonRotation(rotation, playable)).toEqual([]);
       expect(rotationTargetMinutes(rotation)).toBe(240);
     }
   });
@@ -554,7 +549,7 @@ describe('v2 minute-policy rotations (projection milestone)', () => {
           )?.positions.playable ?? [],
         ]),
       );
-      expect(auditSeasonRotation(rotation, playable)).toEqual([]);
+      expect(validateSeasonRotation(rotation, playable)).toEqual([]);
       expect(rotationTargetMinutes(rotation)).toBe(240);
     }
   });

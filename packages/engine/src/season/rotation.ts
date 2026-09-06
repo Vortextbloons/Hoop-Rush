@@ -1,4 +1,5 @@
 import {
+  LINEUP_STRUCTURE,
   SEASON_MINUTE_POLICY_VERSION,
   SEASON_ROTATION_PRESET_TARGETS,
   SEASON_ROTATION_VERSION,
@@ -14,7 +15,7 @@ import type { Position } from '@hoop-rush/data-contracts';
 import { legalFiveExists, type SeasonRosterMemberInput } from './roster-rules.ts';
 import { canPlay } from '../domain/positions.ts';
 import { minuteStrategyOfPreset } from './minute-plan.ts';
-import { enumerateLegalFives, STARTING_SLOTS } from './rotation-planner.ts';
+import { enumerateLegalFives } from './rotation-planner.ts';
 function canonicalOrder(a: SeasonRosterMemberInput, b: SeasonRosterMemberInput): number {
   return a.playerVersionId < b.playerVersionId ? -1 : a.playerVersionId > b.playerVersionId ? 1 : 0;
 }
@@ -94,12 +95,14 @@ export function seasonRotationSetDigest(rotations: readonly SeasonRotation[]): s
     }));
   return seasonDigestHex(JSON.stringify(canonical));
 }
+
 export function auditSeasonRotation(
   rotation: SeasonRotation,
   memberPlayable: ReadonlyMap<string, readonly Position[]>,
 ): string[] {
   return validateSeasonRotation(rotation, memberPlayable);
 }
+
 export function validateSeasonRotation(
   rotation: SeasonRotation,
   memberPlayable: ReadonlyMap<string, readonly Position[]>,
@@ -159,7 +162,7 @@ export function validateSeasonRotation(
       continue;
     }
     const slotIndex = rotation.starters.indexOf(starterId);
-    const requirement = STARTING_SLOTS[slotIndex];
+    const requirement = LINEUP_STRUCTURE[slotIndex];
     if (requirement === undefined || !canPlay(playable, requirement)) {
       failures.push(`starter ${starterId} cannot play slot ${String(slotIndex)}`);
     }
@@ -183,7 +186,7 @@ export function validateSeasonRotation(
         continue;
       }
       const slotIndex = rotation.closingFive.indexOf(closingId);
-      const requirement = STARTING_SLOTS[slotIndex];
+      const requirement = LINEUP_STRUCTURE[slotIndex];
       if (requirement === undefined || !canPlay(playable, requirement)) {
         failures.push(`closing-five player ${closingId} cannot play slot ${String(slotIndex)}`);
       }

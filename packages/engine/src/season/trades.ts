@@ -42,6 +42,30 @@ export const WINDOW_BLOCK_INDEX_TO_INDEX: Readonly<Record<number, number>> = {
 };
 export const TRADE_BAND_1V1 = { lower: 850, upper: 1150 } as const;
 export const TRADE_BAND_DEFAULT = { lower: 800, upper: 1200 } as const;
+export type TradeAssetEligibilityStatus = 'eligible' | 'protected' | 'availability-risk';
+export interface TradeAssetEligibilityInput {
+  playerVersionId: string;
+  fromFranchiseId?: string;
+  protectedIds: readonly string[];
+  available: boolean;
+  hasBlockingInjury?: boolean;
+}
+export interface TradeAssetEligibilityResult {
+  status: TradeAssetEligibilityStatus;
+  reason: string | null;
+}
+export function tradeAssetEligibilityOf(
+  input: TradeAssetEligibilityInput,
+): TradeAssetEligibilityResult {
+  if (input.protectedIds.includes(input.playerVersionId)) {
+    return { status: 'protected', reason: 'Off limits' };
+  }
+  const blocking = input.hasBlockingInjury ?? !input.available;
+  if (blocking) {
+    return { status: 'availability-risk', reason: 'Out with injury — harder to move' };
+  }
+  return { status: 'eligible', reason: null };
+}
 const RATIO_SCHEMA_BOUNDS = { lower: 800, upper: 1200 } as const;
 export type SeasonTradePackageKind = '1-1' | '2-2' | '1-2' | '2-1';
 function packageKindOf(seed: string): SeasonTradePackageKind {

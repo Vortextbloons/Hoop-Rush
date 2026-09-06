@@ -16,6 +16,11 @@
   import SeasonDraftBoard from '$lib/components/season/SeasonDraftBoard.svelte';
   import FrontOfficePicker from '$lib/components/season/FrontOfficePicker.svelte';
   import type { SeasonDraftFlow, SeasonDraftFlowState } from '$lib/season/season-draft-flow';
+  import {
+    draftStageOf,
+    humanizeDraftError,
+    humanizeDraftGenerationError,
+  } from '$lib/season/season-draft-flow';
   import { buildVersionFaceIndex, type SeasonFaceRef } from '$lib/season/season-branding';
   import {
     loadSeasonDraftCatalog,
@@ -97,6 +102,9 @@
           if (flow !== null) {
             hasDraft = await flow.load();
             board = flow.state();
+            const savedExecutive = board.draft?.frontOffice?.executiveId ?? null;
+            if (savedExecutive !== null) executiveId = savedExecutive;
+            if (board.draft !== null) started = true;
           }
         } else {
           hasDraft = false;
@@ -162,7 +170,28 @@
   }
   const franchiseName = (franchiseId: string): string =>
     manifest?.modernFranchiseSlots.find((slot) => slot.franchiseId === franchiseId)?.displayName ??
-    franchiseId;
+    'Unknown team';
+  const draftStatus = $derived(
+    board?.draft?.status === 'drafting' ||
+      board?.draft?.status === 'finalized' ||
+      board?.draft?.status === 'complete'
+      ? board.draft.status
+      : ('none' as const),
+  );
+  const draftStage = $derived(
+    draftStageOf({
+      draftStatus,
+      phase: board?.phase ?? 'idle',
+      generationError,
+      hasGeneration: board?.generation != null,
+    }),
+  );
+  const friendlyActionError = $derived(
+    actionError === null ? null : humanizeDraftError(actionError),
+  );
+  const friendlyGenerationError = $derived(
+    generationError === null ? null : humanizeDraftGenerationError(generationError),
+  );
   async function resumeDraft(): Promise<void> {
     if (board?.draft?.frontOffice == null) {
       if (executiveId === null || flow === null) return;
@@ -344,13 +373,11 @@
       <h1
         class="font-display mt-2 text-2xl font-extrabold tracking-tight break-words uppercase sm:text-3xl md:text-4xl lg:text-5xl"
       >
-        Ten rounds. One league.
+        Draft 10. Coach 82.
       </h1>
-      {#if !(started && board?.draft)}
-        <p class="mt-3 max-w-xl text-sm text-muted-foreground">
-          1 · Pick your team. 2 · Draft 10 players. 3 · Play 82 games.
-        </p>
-      {/if}
+      <p class="mt-3 max-w-xl text-xs text-muted-foreground">
+        Pick executive → Draft 10 → Play 82.
+      </p>
     </div>
     <a
       href={resolve('/')}
@@ -362,29 +389,29 @@
 
   {#if assetsError}
     <p
-      class="mt-8 mx-3 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm sm:mx-0"
+      class="mt-8 mx-3 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-xs sm:mx-0"
     >
       Failed to load season data: {assetsError}
     </p>
   {:else if !loaded}
-    <p class="mt-8 px-3 font-mono text-sm text-muted-foreground sm:px-0">Loading your season…</p>
+    <p class="mt-8 px-3 font-mono text-xs text-muted-foreground sm:px-0">Loading your season…</p>
   {:else if brokenRunError}
     <div class="mt-10 rounded-none bg-surface-1 sm:rounded-xl p-6">
       <h2 class="font-display text-xl font-extrabold uppercase tracking-tight">
         Saved season could not load
       </h2>
-      <p class="mt-2 text-sm text-muted-foreground">{brokenRunError}</p>
+      <p class="mt-2 text-xs text-muted-foreground">{brokenRunError}</p>
       <div class="mt-4 flex flex-wrap gap-2">
         <button
           type="button"
           onclick={() => (clearOpen = true)}
-          class="inline-flex items-center justify-center gap-2 rounded-lg bg-destructive px-5 py-3 font-semibold text-white transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
+          class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-destructive px-5 py-3 text-xs font-semibold text-white transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
         >
           Clear saved data
         </button>
       </div>
       {#if clearError}
-        <p role="alert" class="mt-3 text-sm text-destructive">{clearError}</p>
+        <p role="alert" class="mt-3 text-xs text-destructive">{clearError}</p>
       {/if}
     </div>
   {:else if resumeHref}
@@ -392,57 +419,22 @@
       <h2 class="font-display text-xl font-extrabold uppercase tracking-tight">
         Back to your season
       </h2>
-      <p class="mt-2 text-sm text-muted-foreground">Pick up right where you left off.</p>
+      <p class="mt-2 text-xs text-muted-foreground">Pick up right where you left off.</p>
       <a
         href={resolve('/season/run')}
-        class="mt-4 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
+        class="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-xs font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
       >
         Continue season
       </a>
     </div>
-  {:else if hasDraft && !started && board?.draft}
-    <div class="mt-10 rounded-none bg-surface-1 sm:rounded-xl p-6">
-      <h2 class="font-display text-xl font-extrabold uppercase tracking-tight">
-        Draft in progress
-      </h2>
-      <p class="mt-2 text-sm text-muted-foreground">
-        A saved draft is waiting: {board.draft.picks.length} of 10 picks, round {board.draft.round}.
-      </p>
-      {#if board.draft.frontOffice == null}
-        <div class="mt-4">
-          <FrontOfficePicker
-            value={executiveId}
-            disabled={busy}
-            onChange={(id) => (executiveId = id)}
-          />
-        </div>
-      {/if}
-      <div class="mt-4 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onclick={resumeDraft}
-          disabled={busy || (board.draft.frontOffice == null && executiveId === null)}
-          class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
-        >
-          Resume draft
-        </button>
-        <button
-          type="button"
-          onclick={discardDraft}
-          class="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-5 py-3 text-sm font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong"
-        >
-          Discard and start over
-        </button>
-      </div>
-    </div>
-  {:else if !started || !board?.draft}
+  {:else if draftStage === 'executive'}
     <div class="mt-10 flex flex-col gap-6">
       <div class="rounded-none bg-surface-1 sm:rounded-xl p-6">
         <h2 class="font-display text-xl font-extrabold uppercase tracking-tight">
-          Start your draft
+          Pick your executive
         </h2>
-        <p class="mt-2 max-w-xl text-sm text-muted-foreground">
-          Pick 10 players, then play 82 games. Your progress saves as you go.
+        <p class="mt-2 max-w-xl text-xs text-muted-foreground">
+          One executive. Stays all season. Then draft 10 players.
         </p>
         <div class="mt-4">
           <FrontOfficePicker
@@ -455,16 +447,16 @@
           type="button"
           onclick={startDraft}
           disabled={busy || executiveId === null}
-          class="mt-4 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+          class="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-xs font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {busy ? 'Starting…' : 'Start draft'}
         </button>
-        {#if actionError}
+        {#if friendlyActionError}
           <p
             role="alert"
-            class="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
+            class="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs"
           >
-            {actionError}
+            {friendlyActionError}
           </p>
         {/if}
       </div>
@@ -474,24 +466,21 @@
           aria-labelledby="season-league-heading"
           class="rounded-none bg-surface-1 sm:rounded-xl p-6"
         >
-          <h2
-            id="season-league-heading"
-            class="font-display text-base font-extrabold uppercase tracking-tight"
-          >
+          <h2 id="season-league-heading" class="text-base font-extrabold uppercase tracking-tight">
             The league
           </h2>
-          <p class="mt-2 text-sm text-muted-foreground">30 teams · 82 games · You control one.</p>
+          <p class="mt-2 text-xs text-muted-foreground">30 teams · 82 games · You coach one.</p>
         </section>
       {/if}
     </div>
-  {:else if board.draft?.status === 'drafting' || board.draft?.status === 'finalized'}
+  {:else if draftStage === 'drafting' || draftStage === 'ready'}
     <div class="mt-8 flex flex-col gap-6 pb-[max(6rem,env(safe-area-inset-bottom))] sm:mt-10">
-      {#if flow && manifest && board.draft}
+      {#if flow && manifest && board?.draft}
         <div class="rounded-none bg-surface-1 sm:rounded-xl px-4 py-3">
-          <p class="text-sm text-muted-foreground">
+          <p class="text-xs text-muted-foreground">
             Coaching
             <span class="font-bold text-foreground">
-              {franchiseName(board.draft.participants[0]?.franchiseId ?? '—')}
+              {franchiseName(board.draft.participants[0]?.franchiseId ?? '')}
             </span>
           </p>
         </div>
@@ -501,61 +490,71 @@
           {faces}
           catalog={flow.catalog}
           {busy}
-          error={actionError}
+          error={friendlyActionError}
           {onDraw}
           {onPick}
           {onFinalize}
         />
       {/if}
-      {#if board.draft?.status === 'finalized'}
+      {#if draftStage === 'ready'}
         <div class="rounded-none bg-surface-1 sm:rounded-xl p-6">
-          <h2 class="font-display text-base font-extrabold uppercase tracking-tight">
-            Build the league
-          </h2>
-          <p class="mt-2 text-sm text-muted-foreground">Fill the other 29 teams, then play.</p>
+          <h2 class="text-base font-extrabold uppercase tracking-tight">Build the league</h2>
+          <p class="mt-2 text-xs text-muted-foreground">Fill the other 29 teams, then play.</p>
           <button
             type="button"
             onclick={generateLeague}
             disabled={busy || promoting}
-            class="mt-4 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+            class="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-xs font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {board.phase === 'generating' ? 'Building…' : 'Build league'}
+            Build league
           </button>
-
-          {#if generationError}
-            <div
-              role="alert"
-              class="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
-            >
-              <p class="font-semibold">League setup hit a snag</p>
-              <p class="mt-1 text-muted-foreground">{generationError}</p>
-              <p class="mt-1 text-sm text-muted-foreground">Your draft is saved — try again.</p>
-            </div>
-          {/if}
         </div>
       {/if}
     </div>
-  {:else if board.draft?.status === 'complete' && board.generation}
+  {:else if draftStage === 'generating'}
+    <div class="mt-10 rounded-none bg-surface-1 sm:rounded-xl p-6">
+      <h2 class="font-display text-xl font-extrabold uppercase tracking-tight">Building league…</h2>
+      <p class="mt-2 text-xs text-muted-foreground">
+        Filling the other 29 teams. Your draft is saved.
+      </p>
+    </div>
+  {:else if draftStage === 'stalled'}
+    <div class="mt-10 rounded-none bg-surface-1 sm:rounded-xl p-6">
+      <h2 class="font-display text-xl font-extrabold uppercase tracking-tight">
+        League setup hit a snag
+      </h2>
+      <p class="mt-2 text-xs text-muted-foreground">{friendlyGenerationError}</p>
+      <p class="mt-1 text-xs text-muted-foreground">Your draft is saved.</p>
+      <button
+        type="button"
+        onclick={generateLeague}
+        disabled={busy}
+        class="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-xs font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        Retry
+      </button>
+    </div>
+  {:else if draftStage === 'complete'}
     <div class="mt-10 flex max-w-2xl flex-col gap-6 pb-32">
       <div class="rounded-none bg-surface-1 sm:rounded-xl p-6">
         <h2 class="font-display text-xl font-extrabold uppercase tracking-tight">League ready</h2>
-        <p class="mt-2 text-sm text-muted-foreground">Your 10 are set. Time to play 82.</p>
+        <p class="mt-2 text-xs text-muted-foreground">Your 10 are set. Time to play 82.</p>
         <button
           type="button"
           onclick={promote}
           disabled={promoting}
-          class="mt-5 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+          class="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-xs font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {promoting ? 'Starting…' : 'Start season'}
         </button>
         {#if promoteError}
           <div
             role="alert"
-            class="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
+            class="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs"
           >
             <p class="font-semibold">Couldn’t start the season</p>
             <p class="mt-1 text-muted-foreground">{promoteError}</p>
-            <p class="mt-1 text-sm text-muted-foreground">Your draft is saved — try again.</p>
+            <p class="mt-1 text-xs text-muted-foreground">Your draft is saved — try again.</p>
           </div>
         {/if}
       </div>

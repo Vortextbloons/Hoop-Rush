@@ -12,9 +12,11 @@
   } from '$lib/season/season-shell-context';
   import {
     deriveBlockRecap,
+    displayPlayerName,
     foldSeasonAggregates,
     LEADER_CATEGORY_LABELS,
     recordLabel,
+    tradeGradeViewModel,
   } from '$lib/season/season-presentation';
   import { engineOrderLeaderTables, LEADER_CATEGORIES } from '$lib/season/season-leaders-view';
   import { humanInjuryTimeline, INJURY_SEVERITY_LABEL } from '$lib/season/season-health-view';
@@ -102,7 +104,7 @@
   });
   const playerName = $derived(
     (playerVersionId: string): string =>
-      rosterByVersion.get(playerVersionId)?.displayName ?? playerVersionId,
+      displayPlayerName(rosterByVersion.get(playerVersionId)?.displayName),
   );
   const humanRoster = $derived(
     run?.rosters.find((roster) => roster.franchiseId === humanFranchiseId) ?? null,
@@ -166,7 +168,17 @@
     const franchiseId = humanFranchiseId;
     if (season === null || franchiseId === null) return [];
     const grades = deriveCompletedSeasonTradeGrades(season);
-    return grades.grades.filter((grade) => grade.franchiseId === franchiseId);
+    return grades.grades
+      .filter((grade) => grade.franchiseId === franchiseId)
+      .map((grade) => ({ grade, view: tradeGradeViewModel(grade) }));
+  });
+  const championRecord = $derived.by(() => {
+    const currentRun = run;
+    const champion = currentRun?.postseason.championFranchiseId ?? null;
+    if (currentRun === null || champion === null) return null;
+    const row = currentRun.standings.rows.find((entry) => entry.franchiseId === champion);
+    if (row === undefined) return null;
+    return recordLabel(row.wins, row.losses);
   });
   function downloadJson(filename: string, payload: unknown): void {
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
@@ -256,13 +268,13 @@
             loadedRunId = null;
             void loadResult();
           }}
-          class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
+          class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 motion-reduce:transition-none"
         >
           Try again
         </button>
         <a
           href={resolve('/season/run/history')}
-          class="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground"
+          class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground motion-reduce:transition-none"
         >
           Back to history
         </a>
@@ -288,21 +300,54 @@
             ? shell.franchiseName(run.postseason.championFranchiseId)
             : 'Season'}
         </h1>
-        <p class="mt-1 font-mono text-[10px] text-muted-foreground">
-          run {run.runId} · seed {run.rootSeed.slice(0, 16)}
-          {#if indexEntry !== null}
-            · completed {new Date(indexEntry.completedAtIso).toLocaleDateString(undefined, {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric',
-            })}
-          {/if}
-        </p>
+        {#if championRecord !== null}
+          <p class="font-display mt-1 text-xl font-extrabold tracking-tight">
+            {championRecord}
+            <span class="ml-2 align-middle font-mono text-xs font-normal text-muted-foreground">
+              Final record · champions
+            </span>
+          </p>
+        {/if}
+        <details class="mt-3 rounded-lg border border-border bg-surface-1 px-4 py-3">
+          <summary
+            class="inline-flex min-h-11 cursor-pointer items-center font-mono text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden"
+          >
+            Export details
+          </summary>
+          <dl class="mt-2 flex flex-col gap-1 font-mono text-xs text-muted-foreground">
+            <div class="flex flex-wrap gap-x-2">
+              <dt class="font-bold uppercase">Run</dt>
+              <dd class="break-all">{run.runId}</dd>
+            </div>
+            <div class="flex flex-wrap gap-x-2">
+              <dt class="font-bold uppercase">Seed</dt>
+              <dd class="break-all">{run.rootSeed}</dd>
+            </div>
+            <div class="flex flex-wrap gap-x-2">
+              <dt class="font-bold uppercase">Versions</dt>
+              <dd>
+                run {run.schemaVersion} · {run.versions.blockVersion} · {run.versions.recapVersion}
+              </dd>
+            </div>
+            {#if indexEntry !== null}
+              <div class="flex flex-wrap gap-x-2">
+                <dt class="font-bold uppercase">Completed</dt>
+                <dd>
+                  {new Date(indexEntry.completedAtIso).toLocaleDateString(undefined, {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                  })}
+                </dd>
+              </div>
+            {/if}
+          </dl>
+        </details>
       </div>
       <div class="flex shrink-0 flex-wrap gap-2">
         <a
           href={resolve('/season/run/history')}
-          class="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground"
+          class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground motion-reduce:transition-none"
         >
           Back to history
         </a>
@@ -310,7 +355,7 @@
           type="button"
           data-season-history-delete
           onclick={() => (deleteOpen = true)}
-          class="inline-flex items-center justify-center gap-2 rounded-lg border border-destructive/50 px-4 py-2 text-sm font-semibold text-destructive transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-destructive/10"
+          class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-destructive/50 px-4 py-2 text-sm font-semibold text-destructive transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-destructive/10 motion-reduce:transition-none"
         >
           Delete season
         </button>
@@ -376,7 +421,7 @@
               data-season-history-postseason-game={row.summary.gameId}
               class="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-surface-1 px-4 py-2.5"
             >
-              <span class="w-24 shrink-0 font-mono text-[10px] text-muted-foreground">
+              <span class="w-24 shrink-0 font-mono text-xs text-muted-foreground">
                 {row.phaseLabel} · {row.roundLabel}
               </span>
               <span class="min-w-0 flex-1 truncate text-sm font-semibold">
@@ -396,7 +441,7 @@
                 data-season-history-export={row.summary.gameId}
                 onclick={() => void exportGame(row.summary.gameId)}
                 disabled={exportingGameId !== null || exportingFullRun}
-                class="shrink-0 rounded-lg border border-border px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                class="inline-flex min-h-11 shrink-0 items-center rounded-lg border border-border px-2.5 py-1 font-mono text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
               >
                 {exportingGameId === row.summary.gameId ? 'Exporting…' : 'Export'}
               </button>
@@ -406,7 +451,7 @@
         {#if exportError !== null}
           <p role="alert" class="mt-2 text-sm text-destructive">{exportError}</p>
         {/if}
-        <p class="mt-2 font-mono text-[10px] text-muted-foreground">
+        <p class="mt-2 font-mono text-xs text-muted-foreground">
           Export downloads a self-contained replay of that game (scores, player lines, and the
           recorded result digest).
         </p>
@@ -430,14 +475,14 @@
         <h2 class="font-display text-base font-extrabold uppercase tracking-tight">
           Regular-season leaders
         </h2>
-        <p class="mt-1 font-mono text-[10px] text-muted-foreground">
+        <p class="mt-1 font-mono text-xs text-muted-foreground">
           Top three per category · engine ordering (per-game desc, then value)
         </p>
         <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {#each LEADER_CATEGORIES as category (category)}
             <div class="rounded-xl border border-border bg-surface-1 p-3">
               <p
-                class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
+                class="font-mono text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground"
               >
                 {LEADER_CATEGORY_LABELS[category]}
               </p>
@@ -445,14 +490,14 @@
                 {#each (leaderTables[category] ?? []).slice(0, 3) as entry, rank (entry.playerVersionId)}
                   <li class="flex items-center gap-2 py-1.5 text-sm">
                     <span
-                      class="w-4 shrink-0 font-mono text-[10px] font-bold text-muted-foreground"
+                      class="w-4 shrink-0 font-mono text-xs font-bold text-muted-foreground"
                     >
                       {rank + 1}
                     </span>
                     <span class="min-w-0 flex-1 truncate font-semibold">
                       {playerName(entry.playerVersionId)}
                     </span>
-                    <span class="shrink-0 font-mono text-[10px] text-muted-foreground">
+                    <span class="shrink-0 font-mono text-xs text-muted-foreground">
                       {Number.isInteger(entry.perGame)
                         ? String(entry.perGame)
                         : entry.perGame.toFixed(1)}
@@ -475,7 +520,7 @@
           {#each blockRecaps as entry (entry.blockIndex)}
             <li class="rounded-lg bg-surface-1 px-4 py-3">
               <div class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-                <span class="font-mono text-[10px] font-bold uppercase text-primary">
+                <span class="font-mono text-xs font-bold uppercase text-primary">
                   Block {entry.blockIndex + 1} of 9
                 </span>
                 {#if entry.recap.humanRecord !== null}
@@ -485,7 +530,7 @@
                       entry.recap.humanRecord.lossesAfter,
                     )}
                   </span>
-                  <span class="font-mono text-[10px] text-muted-foreground">
+                  <span class="font-mono text-xs text-muted-foreground">
                     {entry.recap.humanRecord.positionBefore > 0
                       ? `moved ${String(entry.recap.humanRecord.positionBefore)} → ${String(entry.recap.humanRecord.positionAfter)} in conference`
                       : ''}
@@ -518,7 +563,7 @@
               <p class="text-sm font-semibold">{player.displayName}</p>
               <ul class="mt-1 flex flex-col gap-0.5">
                 {#each player.entries as injury (injury.injuryId)}
-                  <li class="font-mono text-[10px] text-muted-foreground">
+                  <li class="font-mono text-xs text-muted-foreground">
                     {INJURY_SEVERITY_LABEL[injury.severity]} · {injury.missedGamesTotal} game
                     {injury.missedGamesTotal === 1 ? 'out' : 's out'}
                     {#if injury.missedGamesRemaining === 0}
@@ -540,7 +585,7 @@
           {#each humanTransactions.slice(-12).reverse() as entry (entry.transactionId)}
             <li class="rounded-lg bg-surface-1 px-4 py-2.5 text-sm">
               <span
-                class="font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground"
+                class="font-mono text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground"
               >
                 {entry.type}
               </span>
@@ -554,22 +599,19 @@
     {#if humanTradeGrades.length > 0}
       <div class="mt-8">
         <h2 class="font-display text-base font-extrabold uppercase tracking-tight">Trade grades</h2>
-        <p class="mt-1 font-mono text-[10px] text-muted-foreground">
+        <p class="mt-1 font-mono text-xs text-muted-foreground">
           Post-trade production, availability, minutes, and team trend from recorded facts
         </p>
         <ul class="mt-3 flex flex-col gap-1">
-          {#each humanTradeGrades as grade (grade.gradeId)}
+          {#each humanTradeGrades as entry (entry.grade.gradeId)}
             <li class="rounded-lg bg-surface-1 px-4 py-2.5 text-sm">
               <div class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-                <span class="font-mono text-lg font-bold tracking-tight">{grade.label}</span>
-                <span class="font-mono text-[10px] text-muted-foreground">
-                  window {grade.windowIndex + 1} · score {grade.score}
-                  {#if grade.neutral}
-                    · limited sample
-                  {/if}
+                <span class="font-mono text-lg font-bold tracking-tight">{entry.view.label}</span>
+                <span class="font-mono text-xs text-muted-foreground">
+                  {entry.view.windowLabel}
                 </span>
               </div>
-              <p class="mt-1 text-muted-foreground">{grade.reasons[0]}</p>
+              <p class="mt-1 text-muted-foreground">{entry.view.detail}</p>
             </li>
           {/each}
         </ul>
@@ -582,11 +624,11 @@
         data-season-history-export-full-run
         onclick={() => void exportFullRun()}
         disabled={exportingGameId !== null || exportingFullRun}
-        class="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+        class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 font-mono text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
       >
         {exportingFullRun ? 'Exporting full run…' : 'Export full-run replay'}
       </button>
-      <p class="font-mono text-[10px] text-muted-foreground">
+      <p class="font-mono text-xs text-muted-foreground">
         Includes the command log, almanac, and postseason summaries for `season run reproduce`.
       </p>
     </div>
@@ -626,7 +668,7 @@
           type="button"
           onclick={() => (deleteOpen = false)}
           disabled={deleting}
-          class="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-40"
+          class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
         >
           Keep it
         </button>
@@ -634,7 +676,7 @@
           type="button"
           onclick={() => void confirmDelete()}
           disabled={deleting}
-          class="inline-flex items-center justify-center gap-2 rounded-lg border border-destructive/50 px-4 py-2 text-sm font-semibold text-destructive transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-40"
+          class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-destructive/50 px-4 py-2 text-sm font-semibold text-destructive transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
         >
           {deleting ? 'Deleting…' : 'Delete season'}
         </button>

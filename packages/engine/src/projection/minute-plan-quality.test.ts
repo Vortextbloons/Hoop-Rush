@@ -8,7 +8,7 @@ import type {
 } from '@hoop-rush/data-contracts';
 import { DEFAULT_ERA_SIM_PROFILE } from '@hoop-rush/test-fixtures';
 import { ProjectionCache, projectBaseFive, projectSeasonRoster } from '../projection/index.ts';
-import { auditSeasonRotation } from '../season/rotation.ts';
+import { validateSeasonRotation } from '../season/rotation.ts';
 import { buildInput } from './season.test-helpers.ts';
 import { optimizeSeasonRotation, projectedQualityWeights } from './minute-plan-quality.ts';
 function smallModel(): ProjectionModelArtifact {
@@ -269,7 +269,7 @@ describe('optimizeSeasonRotation', () => {
       expect(plan.rotation.minutePolicy.strategy).toBe(plan.strategy);
       expect(plan.rotation.minutePolicy.policyVersion).toBe('minute-policy-v1');
       expect(plan.rotation.rotationVersion).toBe('season-rotation-v3');
-      expect(auditSeasonRotation(plan.rotation, memberPlayable)).toEqual([]);
+      expect(validateSeasonRotation(plan.rotation, memberPlayable)).toEqual([]);
       expect(plan.rotation.targetMinutes.reduce((sum, row) => sum + row.minutes, 0)).toBe(240);
       expect(plan.riskScore).toBeGreaterThanOrEqual(0);
       expect(plan.riskScore).toBeLessThanOrEqual(1);

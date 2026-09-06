@@ -5,6 +5,7 @@ import type {
   SeasonTradeState,
   SeasonTradeWindowState,
 } from '@hoop-rush/data-contracts';
+import { tradeAssetEligibilityOf, type TradeAssetEligibilityResult } from '@hoop-rush/engine';
 import { formatPositions } from '$lib/player-positions';
 import { candidateOf } from '$lib/season/season-catalog-index';
 export interface TradePlayerViewModel {
@@ -49,6 +50,27 @@ export interface TradeOfferViewModel {
 export const TRADE_WINDOW_BLOCK_INDEX: readonly number[] = [2, 4, 5];
 export function windowBlockIndexOf(windowIndex: number): number | null {
   return TRADE_WINDOW_BLOCK_INDEX[windowIndex] ?? null;
+}
+export function tradeAssetStatusOf(input: {
+  playerVersionId: string;
+  fromFranchiseId?: string;
+  protectedIds: readonly string[];
+  available: boolean;
+}): TradeAssetEligibilityResult {
+  return tradeAssetEligibilityOf({
+    playerVersionId: input.playerVersionId,
+    ...(input.fromFranchiseId === undefined ? {} : { fromFranchiseId: input.fromFranchiseId }),
+    protectedIds: input.protectedIds,
+    available: input.available,
+  });
+}
+export function isTradeProtected(
+  playerVersionId: string,
+  protectedIds: readonly string[],
+): boolean {
+  return (
+    tradeAssetStatusOf({ playerVersionId, protectedIds, available: true }).status === 'protected'
+  );
 }
 function slotGroupLabel(group: string): string {
   if (group === 'G') return 'guard';

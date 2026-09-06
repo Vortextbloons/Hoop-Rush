@@ -28,6 +28,50 @@ import {
 export const SOLO_PARTICIPANT_ID = 'human';
 export const COVERAGE_TARGETS = { guards: 4, forwards: 4, centers: 3 } as const;
 export type SeasonDraftFlowPhase = 'idle' | 'drafting' | 'finalized' | 'generating' | 'complete';
+export type DraftStage = 'executive' | 'drafting' | 'ready' | 'generating' | 'stalled' | 'complete';
+export interface DraftStageInput {
+  draftStatus: 'none' | 'drafting' | 'finalized' | 'complete';
+  phase: SeasonDraftFlowPhase;
+  generationError: string | null;
+  hasGeneration: boolean;
+}
+export function draftStageOf(input: DraftStageInput): DraftStage {
+  if (input.draftStatus === 'complete' && input.hasGeneration) return 'complete';
+  if (input.generationError !== null) return 'stalled';
+  if (input.phase === 'generating') return 'generating';
+  if (input.draftStatus === 'finalized') return 'ready';
+  if (input.draftStatus === 'drafting') return 'drafting';
+  return 'executive';
+}
+export function humanizeDraftGenerationError(raw: string | null): string {
+  if (raw === null || raw.trim().length === 0) return 'League setup hit a snag.';
+  const lower = raw.toLowerCase();
+  if (lower.includes('worker') || lower.includes('timeout') || lower.includes('network')) {
+    return 'League setup hit a snag while building the other teams. Your draft is saved.';
+  }
+  if (lower.includes('catalog') || lower.includes('asset') || lower.includes('unavailable')) {
+    return 'Season files were unavailable while building the league. Your draft is saved.';
+  }
+  return 'League setup hit a snag. Your draft is saved.';
+}
+export function humanizeCoverageReason(reason: string | null): string | null {
+  if (reason === null) return null;
+  return 'Would leave a group unfillable with the picks left. One versatile player may cover more than one group.';
+}
+export function humanizeDraftError(raw: string | null): string {
+  if (raw === null || raw.trim().length === 0) return 'That pick did not go through. Try again.';
+  const lower = raw.toLowerCase();
+  if (lower.includes('no_offer_drawn') || lower.includes('no offer')) {
+    return 'Draw this round first, then pick one player.';
+  }
+  if (lower.includes('uncompletable') || lower.includes('completion targets unreachable')) {
+    return 'That player would leave a group unfillable with the picks left.';
+  }
+  if (lower.includes('invalid_catalog') || lower.includes('invalid catalog')) {
+    return 'Season files are unavailable. Check your connection and retry.';
+  }
+  return 'That pick did not go through. Try again.';
+}
 export interface SeasonDraftFlowState {
   draft: SeasonDraftState | null;
   generation: SeasonLeagueGenerationResult | null;

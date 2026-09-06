@@ -1,4 +1,5 @@
 import {
+  LINEUP_STRUCTURE,
   SEASON_ROSTER_MAX_SIZE,
   SEASON_ROTATION_PRESET_TARGETS,
   SEASON_ROTATION_SIZE,
@@ -9,7 +10,7 @@ import {
   type SeasonRotationPreset,
   type SlotGroup,
 } from '@hoop-rush/data-contracts';
-import { applySeasonRotationPreset, auditSeasonRotation } from '@hoop-rush/engine';
+import { applySeasonRotationPreset, validateSeasonRotation } from '@hoop-rush/engine';
 export interface RotationMember {
   playerVersionId: string;
   displayName: string;
@@ -18,7 +19,7 @@ export interface RotationMember {
   eraId?: string;
   seasonKey?: string;
 }
-export const SLOT_GROUPS: readonly SlotGroup[] = ['G', 'G', 'F', 'F', 'C'];
+export const SLOT_GROUPS: readonly SlotGroup[] = LINEUP_STRUCTURE;
 export const CLOSING_SLOT_LABELS = ['G1', 'G2', 'F1', 'F2', 'C'] as const;
 export interface MinuteAdjustment {
   playerVersionId: string;
@@ -147,7 +148,7 @@ export class RotationEditor {
     const playable = new Map(this.memberPlayable);
     playable.delete(replacedPlayerVersionId);
     playable.set(inactivePlayerVersionId, promoted.playable);
-    const failures = auditSeasonRotation(candidate, playable);
+    const failures = validateSeasonRotation(candidate, playable);
     if (failures.length > 0) return failures;
     this.rotation = candidate;
     this.memberPlayable = playable;
@@ -189,7 +190,7 @@ export class RotationEditor {
     );
   }
   validate(): string[] {
-    return auditSeasonRotation(this.rotation, this.memberPlayable);
+    return validateSeasonRotation(this.rotation, this.memberPlayable);
   }
   setMinutes(playerVersionId: string, minutes: number): string[] {
     const clamped = Math.max(0, Math.min(48, Math.round(minutes)));
@@ -262,7 +263,7 @@ export class RotationEditor {
       };
     }
     const candidate = { ...this.rotation, targetMinutes: [...byId.values()] };
-    const failures = auditSeasonRotation(candidate, this.memberPlayable);
+    const failures = validateSeasonRotation(candidate, this.memberPlayable);
     if (failures.length > 0) return { failures, adjustments: [] };
     this.rotation = candidate;
     return { failures: [], adjustments };
@@ -334,7 +335,7 @@ export class RotationEditor {
     return this.validate();
   }
   applyRotation(candidate: SeasonRotation): SeasonRotation {
-    const failures = auditSeasonRotation(candidate, this.memberPlayable);
+    const failures = validateSeasonRotation(candidate, this.memberPlayable);
     if (failures.length > 0) {
       throw new Error(`rotation plan rejected: ${failures[0] ?? 'invalid rotation'}`);
     }
@@ -349,7 +350,7 @@ export class RotationEditor {
         playable.set(member.playerVersionId, member.playable);
       }
     }
-    const failures = auditSeasonRotation(candidate, playable);
+    const failures = validateSeasonRotation(candidate, playable);
     if (failures.length > 0) {
       throw new Error(`rotation plan rejected: ${failures[0] ?? 'invalid rotation'}`);
     }
@@ -395,7 +396,7 @@ export class RotationEditor {
     return this.commit({ ...this.rotation, closingFive });
   }
   private commit(candidate: SeasonRotation): string[] {
-    const failures = auditSeasonRotation(candidate, this.memberPlayable);
+    const failures = validateSeasonRotation(candidate, this.memberPlayable);
     if (failures.length > 0) return failures;
     this.rotation = candidate;
     return [];

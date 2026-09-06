@@ -263,13 +263,13 @@
         >
           Block {displayBlock + 1} recap
         </h1>
-        <p class="mt-1 font-mono text-[10px] text-muted-foreground">
+        <p class="mt-1 font-mono text-xs text-muted-foreground">
           {progressLabel(recap.completedRounds)} · {ordinal(recap.completedRounds)} rounds
         </p>
       </div>
       <a
         href={hubHref}
-        class="shrink-0 font-mono text-xs text-muted-foreground underline-offset-4 hover:underline"
+        class="inline-flex min-h-11 shrink-0 items-center font-mono text-xs text-muted-foreground underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring hover:underline"
       >
         Hub
       </a>
@@ -307,7 +307,7 @@
                 <summary
                   class="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden"
                 >
-                  <span class="font-mono text-[10px] text-muted-foreground">R{summary.round}</span>
+                  <span class="font-mono text-xs text-muted-foreground">R{summary.round}</span>
                   {#if identityOf(opponentId)}
                     <SeasonTeamLogo
                       {manifest}
@@ -321,12 +321,12 @@
                     {summary.homeFranchiseId === humanFranchiseId ? 'vs ' : 'at '}
                     {shell.franchiseName(opponentId)}
                   </span>
-                  <span class="font-mono text-[10px]">
+                  <span class="font-mono text-xs">
                     {summary.homeScore}–{summary.awayScore}
                     {#if summary.status === 'forfeit'}· forfeit{/if}
                   </span>
                   <span
-                    class="rounded-full bg-surface-2 px-2.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] {resultLabel(
+                    class="rounded-full bg-surface-2 px-2.5 py-0.5 font-mono text-xs font-bold uppercase tracking-[0.12em] {resultLabel(
                       summary,
                     ).startsWith('W')
                       ? 'text-primary'

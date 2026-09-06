@@ -1,10 +1,19 @@
 <script lang="ts">
-  import { packageConsequenceFacts, chemistryFootnote } from '$lib/season/season-presentation';
+  import { SEASON_ROSTER_MAX_SIZE, SEASON_ROSTER_MIN_SIZE } from '@hoop-rush/data-contracts';
+  import { tradeAssetEligibilityOf } from '@hoop-rush/engine';
+  import {
+    chemistryFootnote,
+    humanizeTradeRejection,
+    packageConsequenceFacts,
+  } from '$lib/season/season-presentation';
+
   interface PlayerLite {
     playerVersionId: string;
     displayName: string;
     playable: readonly string[];
     available: boolean;
+    rotationMinutes?: number | null;
+    projectedMinutes?: number | null;
   }
   let {
     yourPlayers,
@@ -16,12 +25,24 @@
     humanFranchiseId,
     targetFranchiseId,
     targetFranchiseName,
-    inquiryAllowance,
-    inquiriesUsed,
-    allowanceLabel,
+    yourProtectedIds = [],
+    theirProtectedIds = [],
+    inquiryAllowance = 3,
+    inquiriesUsed = 0,
+    allowanceLabel = '',
+    exchangeCount = 0,
+    exchangeMax = 3,
     busy = false,
     commandError = null,
+    initialOutgoing = [],
+    initialIncoming = [],
+    initialInfluenceAmount = 0,
+    initialInfluenceFrom = null,
+    prefillKey = null,
+    playerNameOf = (id: string) => id,
+    franchiseNameOf = (id: string) => id,
     onSubmit,
+    onDraftChange = null,
   }: {
     yourPlayers: PlayerLite[];
     theirPlayers: PlayerLite[];
@@ -32,58 +53,90 @@
     humanFranchiseId: string;
     targetFranchiseId: string;
     targetFranchiseName: string;
-    inquiryAllowance: number;
-    inquiriesUsed: number;
-    allowanceLabel: string;
+    yourProtectedIds?: readonly string[];
+    theirProtectedIds?: readonly string[];
+    inquiryAllowance?: number;
+    inquiriesUsed?: number;
+    allowanceLabel?: string;
+    exchangeCount?: number;
+    exchangeMax?: number;
     busy?: boolean;
     commandError?: string | null;
+    initialOutgoing?: readonly string[];
+    initialIncoming?: readonly string[];
+    initialInfluenceAmount?: number;
+    initialInfluenceFrom?: string | null;
+    prefillKey?: string | null;
+    playerNameOf?: (playerVersionId: string) => string;
+    franchiseNameOf?: (franchiseId: string) => string;
     onSubmit: (payload: {
       outgoing: string[];
       incoming: string[];
       influenceAmount: number;
       influenceFromSender: string | null;
     }) => void;
+    onDraftChange?:
+      | ((draft: {
+          partner: string;
+          outgoing: string[];
+          incoming: string[];
+          influence: { amount: number; from: string | null };
+        }) => void)
+      | null;
   } = $props();
+
   let outgoing: string[] = $state([]);
   let incoming: string[] = $state([]);
   let influenceAmount: number = $state(0);
   let influenceFrom: string | null = $state(null);
+  let lastPrefill: string | null = $state(null);
+  let initialized = $state(false);
+
+  $effect(() => {
+    if (!initialized) {
+      initialized = true;
+      outgoing = [...initialOutgoing];
+      incoming = [...initialIncoming];
+      influenceAmount = initialInfluenceAmount;
+      influenceFrom = initialInfluenceFrom;
+      lastPrefill = prefillKey;
+    } else if (prefillKey !== null && prefillKey !== lastPrefill) {
+      lastPrefill = prefillKey;
+      outgoing = [...initialOutgoing];
+      incoming = [...initialIncoming];
+      influenceAmount = initialInfluenceAmount;
+      influenceFrom = initialInfluenceFrom;
+    }
+  });
+
+  $effect(() => {
+    onDraftChange?.({
+      partner: targetFranchiseId,
+      outgoing: [...outgoing],
+      incoming: [...incoming],
+      influence: { amount: influenceAmount, from: influenceFrom },
+    });
+  });
+
   const outgoingSet = $derived(new Set(outgoing));
   const incomingSet = $derived(new Set(incoming));
-  const influenceOptions: Array<{
-    amount: number;
-    from: string | null;
-    label: string;
-    disabledReason: string | null;
-  }> = $derived.by(() => {
-    const opts: typeof influenceOptions = [];
-    opts.push({ amount: 0, from: null, label: 'No Influence', disabledReason: null });
-    for (const from of [humanFranchiseId, targetFranchiseId]) {
-      for (const amount of [1, 2]) {
-        const balance = from === humanFranchiseId ? yourBalance : theirBalance;
-        const disabled =
-          balance - amount < 0
-            ? `Balance ${String(balance)} cannot cover ${String(amount)} (floor 0)`
-            : null;
-        const who = from === humanFranchiseId ? 'You send' : `${targetFranchiseName} sends`;
-        opts.push({ amount, from, label: `${who} ${String(amount)}`, disabledReason: disabled });
-      }
-    }
-    return opts;
-  });
-  const selectedInfluence = $derived(
-    influenceOptions.find((o) => o.amount === influenceAmount && o.from === influenceFrom) ?? null,
-  );
-  const canSubmit = $derived(
-    outgoing.length >= 1 &&
-      outgoing.length <= 2 &&
-      incoming.length >= 1 &&
-      incoming.length <= 2 &&
-      (influenceAmount === 0 ||
-        (influenceAmount >= 1 && influenceAmount <= 2 && influenceFrom !== null)) &&
-      !(outgoing.length === 0 && incoming.length === 0) &&
-      !busy,
-  );
+
+  function eligibilityOf(
+    playerVersionId: string,
+    side: 'you' | 'them',
+    available: boolean,
+  ): { status: 'eligible' | 'protected' | 'availability-risk'; reason: string | null } {
+    const protectedIds = side === 'you' ? yourProtectedIds : theirProtectedIds;
+    return tradeAssetEligibilityOf({
+      playerVersionId,
+      fromFranchiseId: side === 'you' ? humanFranchiseId : targetFranchiseId,
+      protectedIds,
+      available,
+    });
+  }
+
+  const hasOnePlusOne = $derived(outgoing.length >= 1 && incoming.length >= 1);
+
   const consequence = $derived(
     packageConsequenceFacts({
       fromRosterSize: yourRosterSize,
@@ -102,8 +155,47 @@
       toFranchiseId: targetFranchiseId,
     }),
   );
-  const inquiriesRemaining = $derived(Math.max(0, inquiryAllowance - inquiriesUsed));
-  const willConsumeInquiry = $derived(inquiriesUsed < inquiryAllowance);
+
+  const rosterLegal = $derived(
+    consequence.fromAfter >= SEASON_ROSTER_MIN_SIZE &&
+      consequence.fromAfter <= SEASON_ROSTER_MAX_SIZE &&
+      consequence.toAfter >= SEASON_ROSTER_MIN_SIZE &&
+      consequence.toAfter <= SEASON_ROSTER_MAX_SIZE,
+  );
+
+  const influenceDisabledReason = $derived.by((): string | null => {
+    if (influenceAmount === 0) return null;
+    if (influenceFrom === null) return 'Pick who sends Influence';
+    const balance = influenceFrom === humanFranchiseId ? yourBalance : theirBalance;
+    if (balance - influenceAmount < 0) return 'Not enough Influence';
+    return null;
+  });
+
+  const submitDisabledReason = $derived.by((): string | null => {
+    if (busy) return 'Sending…';
+    if (outgoing.length < 1 || incoming.length < 1) return 'Pick at least 1 from each side';
+    if (outgoing.length > 2 || incoming.length > 2) return 'Max 2 per side';
+    for (const id of outgoing) {
+      const p = yourPlayers.find((x) => x.playerVersionId === id);
+      if (p && eligibilityOf(id, 'you', p.available).status === 'protected')
+        return 'Remove off-limits players';
+    }
+    for (const id of incoming) {
+      const p = theirPlayers.find((x) => x.playerVersionId === id);
+      if (p && eligibilityOf(id, 'them', p.available).status === 'protected')
+        return 'Remove off-limits players';
+    }
+    if (!rosterLegal)
+      return `Roster would be illegal — must stay ${String(SEASON_ROSTER_MIN_SIZE)}–${String(SEASON_ROSTER_MAX_SIZE)}`;
+    if (influenceDisabledReason !== null) return influenceDisabledReason;
+    return null;
+  });
+  const canSubmit = $derived(submitDisabledReason === null);
+  const humanizedError = $derived(
+    humanizeTradeRejection(commandError, { playerNameOf, franchiseNameOf }),
+  );
+  const nextOfferNumber = $derived(Math.min(exchangeMax, exchangeCount + 1));
+
   function toggle(set: 'outgoing' | 'incoming', id: string): void {
     if (set === 'outgoing') {
       if (outgoingSet.has(id)) outgoing = outgoing.filter((x) => x !== id);
@@ -113,10 +205,12 @@
       else if (incoming.length < 2) incoming = [...incoming, id];
     }
   }
-  function handleInfluenceChange(amount: number, from: string | null): void {
+
+  function setInfluence(amount: number, from: string | null): void {
     influenceAmount = amount;
     influenceFrom = from;
   }
+
   function submit(): void {
     if (!canSubmit) return;
     onSubmit({
@@ -126,228 +220,249 @@
       influenceFromSender: influenceFrom,
     });
   }
+
+  function initialsOf(name: string): string {
+    return name
+      .split(/\s+/)
+      .map((part) => part[0] ?? '')
+      .join('')
+      .slice(0, 2)
+      .toUpperCase();
+  }
 </script>
 
 <div
   class="flex flex-col gap-4 rounded-xl border border-border bg-card"
   data-testid="package-builder"
 >
-  <div class="border-b border-border bg-surface-2 px-4 py-3">
-    <h3 class="font-display text-sm font-extrabold uppercase tracking-tight">Build package</h3>
-    <p class="mt-1 font-mono text-[10px] text-muted-foreground">
-      Pick 1–2 from each side. Optionally add 1–2 Influence from one side — never both, never alone.
-      Rosters must stay 10–15 and keep a legal ten.
-    </p>
-    <p class="mt-2 rounded-lg bg-primary/10 px-2.5 py-1.5 font-mono text-[10px] text-primary">
-      Inquiry: {allowanceLabel} · {inquiriesRemaining} remaining · {willConsumeInquiry
-        ? 'this proposal will consume 1 inquiry'
-        : 'at cap — purchase or earned credit needed'} · browsing is free
+  <div class="border-b border-border px-4 py-3">
+    <h3 class="text-sm font-bold uppercase tracking-tight">Build package</h3>
+    <p class="mt-1 text-xs text-muted-foreground">
+      Pick 1–2 from each side. You {yourRosterSize} → {consequence.fromAfter} · {targetFranchiseName}
+      {theirRosterSize} → {consequence.toAfter} · must stay {SEASON_ROSTER_MIN_SIZE}–{SEASON_ROSTER_MAX_SIZE}.
     </p>
   </div>
 
-  {#if commandError !== null}
+  {#if humanizedError !== null}
     <p
       role="alert"
-      class="mx-4 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
+      class="mx-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm"
     >
-      {commandError}
+      {humanizedError}
     </p>
   {/if}
 
-  <div class="grid gap-4 p-4 lg:grid-cols-2">
-    <fieldset class="rounded-xl border border-line-strong bg-surface-1 p-3">
-      <legend
-        class="px-1 font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-        >You give — {humanFranchiseId} ({yourRosterSize} → {consequence.fromAfter})</legend
-      >
-      <ul
-        class="mt-2 flex flex-col gap-1.5"
-        role="listbox"
-        aria-multiselectable="true"
-        aria-label="Your players to send"
-      >
+  <div class="grid gap-4 px-4 lg:grid-cols-2">
+    <fieldset>
+      <legend class="px-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+        You send
+      </legend>
+      <ul class="mt-2 flex flex-col gap-2">
         {#each yourPlayers as player (player.playerVersionId)}
+          {@const elig = eligibilityOf(player.playerVersionId, 'you', player.available)}
+          {@const selected = outgoingSet.has(player.playerVersionId)}
+          {@const blockedThird = !selected && outgoing.length >= 2}
+          {@const blockedProtected = elig.status === 'protected'}
+          {@const disabled = busy || blockedThird || blockedProtected}
           <li>
-            <button
-              type="button"
-              role="option"
-              aria-selected={outgoingSet.has(player.playerVersionId)}
-              onclick={() => toggle('outgoing', player.playerVersionId)}
-              disabled={busy || (!outgoingSet.has(player.playerVersionId) && outgoing.length >= 2)}
-              class="flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 {outgoingSet.has(
-                player.playerVersionId,
-              )
+            <label
+              class="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 outline-none transition-colors has-[input:focus-visible]:ring-2 has-[input:focus-visible]:ring-ring {selected
                 ? 'border-primary bg-primary/10'
-                : 'border-border bg-card hover:border-primary/30'}"
+                : 'border-border bg-surface-1'} {disabled ? 'opacity-60' : ''}"
             >
+              <input
+                type="checkbox"
+                checked={selected}
+                {disabled}
+                onchange={() => toggle('outgoing', player.playerVersionId)}
+                aria-label={`${selected ? 'Remove' : 'Add'} ${player.displayName}`}
+                class="h-5 w-5 shrink-0 accent-primary"
+              />
               <span
-                class="grid h-4 w-4 place-items-center rounded border {outgoingSet.has(
-                  player.playerVersionId,
-                )
-                  ? 'bg-primary border-primary text-primary-foreground'
-                  : 'border-muted-foreground/30 bg-transparent'}"
+                class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-surface-2 text-xs font-bold"
+                aria-hidden="true">{initialsOf(player.displayName)}</span
               >
-                {#if outgoingSet.has(player.playerVersionId)}✓{/if}
-              </span>
               <span class="min-w-0 flex-1">
                 <span class="block truncate text-sm font-semibold">{player.displayName}</span>
-                <span class="block truncate font-mono text-[10px] text-muted-foreground"
-                  >{player.playable.join('·') || '—'}
-                  {player.available ? '' : '· OUT — availability risk'}</span
-                >
+                <span class="block truncate text-xs text-muted-foreground">
+                  {player.playable.join(' · ') || '—'}{player.rotationMinutes !== null &&
+                  player.rotationMinutes !== undefined
+                    ? ` · ${String(player.rotationMinutes)} min`
+                    : ''}
+                </span>
+                {#if blockedProtected}
+                  <span class="block text-xs font-semibold text-destructive">Off limits</span>
+                {:else if elig.status === 'availability-risk'}
+                  <span class="block text-xs text-muted-foreground">{elig.reason}</span>
+                {:else if blockedThird}
+                  <span class="block text-xs text-muted-foreground">Max 2 per side</span>
+                {/if}
               </span>
-            </button>
+            </label>
           </li>
         {/each}
       </ul>
-      <p class="mt-2 font-mono text-[10px] text-muted-foreground">Selected {outgoing.length}/2</p>
+      <p class="mt-2 text-xs text-muted-foreground">Selected {outgoing.length}/2</p>
     </fieldset>
 
-    <fieldset class="rounded-xl border border-line-strong bg-surface-1 p-3">
-      <legend
-        class="px-1 font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-        >You get — {targetFranchiseName} ({theirRosterSize} → {consequence.toAfter})</legend
-      >
-      <ul
-        class="mt-2 flex flex-col gap-1.5"
-        role="listbox"
-        aria-multiselectable="true"
-        aria-label="Their players to receive"
-      >
+    <fieldset>
+      <legend class="px-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+        You receive
+      </legend>
+      <ul class="mt-2 flex flex-col gap-2">
         {#each theirPlayers as player (player.playerVersionId)}
+          {@const elig = eligibilityOf(player.playerVersionId, 'them', player.available)}
+          {@const selected = incomingSet.has(player.playerVersionId)}
+          {@const blockedThird = !selected && incoming.length >= 2}
+          {@const blockedProtected = elig.status === 'protected'}
+          {@const disabled = busy || blockedThird || blockedProtected}
           <li>
-            <button
-              type="button"
-              role="option"
-              aria-selected={incomingSet.has(player.playerVersionId)}
-              onclick={() => toggle('incoming', player.playerVersionId)}
-              disabled={busy || (!incomingSet.has(player.playerVersionId) && incoming.length >= 2)}
-              class="flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 {incomingSet.has(
-                player.playerVersionId,
-              )
+            <label
+              class="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 outline-none transition-colors has-[input:focus-visible]:ring-2 has-[input:focus-visible]:ring-ring {selected
                 ? 'border-primary bg-primary/10'
-                : 'border-border bg-card hover:border-primary/30'}"
+                : 'border-border bg-surface-1'} {disabled ? 'opacity-60' : ''}"
             >
+              <input
+                type="checkbox"
+                checked={selected}
+                {disabled}
+                onchange={() => toggle('incoming', player.playerVersionId)}
+                aria-label={`${selected ? 'Remove' : 'Add'} ${player.displayName}`}
+                class="h-5 w-5 shrink-0 accent-primary"
+              />
               <span
-                class="grid h-4 w-4 place-items-center rounded border {incomingSet.has(
-                  player.playerVersionId,
-                )
-                  ? 'bg-primary border-primary text-primary-foreground'
-                  : 'border-muted-foreground/30 bg-transparent'}"
+                class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-surface-2 text-xs font-bold"
+                aria-hidden="true">{initialsOf(player.displayName)}</span
               >
-                {#if incomingSet.has(player.playerVersionId)}✓{/if}
-              </span>
               <span class="min-w-0 flex-1">
                 <span class="block truncate text-sm font-semibold">{player.displayName}</span>
-                <span class="block truncate font-mono text-[10px] text-muted-foreground"
-                  >{player.playable.join('·') || '—'} {player.available ? '' : '· OUT'}</span
-                >
+                <span class="block truncate text-xs text-muted-foreground">
+                  {player.playable.join(' · ') || '—'}{player.projectedMinutes !== null &&
+                  player.projectedMinutes !== undefined
+                    ? ` · ~${String(player.projectedMinutes)} min`
+                    : ''}
+                </span>
+                {#if blockedProtected}
+                  <span class="block text-xs font-semibold text-destructive">Off limits</span>
+                {:else if elig.status === 'availability-risk'}
+                  <span class="block text-xs text-muted-foreground">{elig.reason}</span>
+                {:else if blockedThird}
+                  <span class="block text-xs text-muted-foreground">Max 2 per side</span>
+                {/if}
               </span>
-            </button>
+            </label>
           </li>
         {/each}
       </ul>
-      <p class="mt-2 font-mono text-[10px] text-muted-foreground">Selected {incoming.length}/2</p>
+      <p class="mt-2 text-xs text-muted-foreground">Selected {incoming.length}/2</p>
     </fieldset>
   </div>
 
-  <fieldset class="mx-4 rounded-xl border border-border bg-surface-1 p-3">
-    <legend
-      class="px-1 font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-      >Influence as cash consideration — optional</legend
-    >
-    <p class="font-mono text-[10px] text-muted-foreground">
-      Cash may close an already plausible deal (5% per point, 10% max) — never makes an unreasonable
-      package acceptable, never bypasses protected/illegal gates, never alone. Floor 0 — spends
-      reject instead of clamping.
-    </p>
-    <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-      {#each influenceOptions as opt (`${String(opt.amount)}-${opt.from ?? 'none'}`)}
-        <label
-          class="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 outline-none transition-colors has-[input:focus-visible]:ring-2 has-[input:focus-visible]:ring-ring {selectedInfluence?.amount ===
-            opt.amount && selectedInfluence?.from === opt.from
+  {#if hasOnePlusOne}
+    <fieldset class="mx-4 rounded-xl border border-border p-3">
+      <legend class="px-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+        Influence — optional
+      </legend>
+      <div class="mt-1 flex flex-wrap gap-2" role="group" aria-label="Influence">
+        <button
+          type="button"
+          aria-pressed={influenceAmount === 0}
+          onclick={() => setInfluence(0, null)}
+          disabled={busy}
+          class="inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 {influenceAmount ===
+          0
             ? 'border-primary bg-primary/10'
-            : 'border-border bg-card hover:border-primary/30'} {opt.disabledReason
-            ? 'opacity-50'
-            : ''}"
+            : 'border-border'}"
         >
-          <input
-            type="radio"
-            name="influence"
-            checked={selectedInfluence?.amount === opt.amount &&
-              selectedInfluence?.from === opt.from}
-            onchange={() => handleInfluenceChange(opt.amount, opt.from)}
-            disabled={opt.disabledReason !== null || busy}
-            class="h-4 w-4 accent-primary"
-            aria-label={opt.label}
-          />
-          <span class="text-sm font-medium">{opt.label}</span>
-          {#if opt.disabledReason}
-            <span class="ml-auto font-mono text-[10px] text-destructive">{opt.disabledReason}</span>
-          {/if}
-        </label>
-      {/each}
-    </div>
-  </fieldset>
+          None
+        </button>
+        <button
+          type="button"
+          aria-pressed={influenceAmount === 1 && influenceFrom === humanFranchiseId}
+          onclick={() => setInfluence(1, humanFranchiseId)}
+          disabled={busy || yourBalance < 1}
+          title={yourBalance < 1 ? 'Not enough Influence' : ''}
+          class="inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 {influenceAmount ===
+            1 && influenceFrom === humanFranchiseId
+            ? 'border-primary bg-primary/10'
+            : 'border-border'}"
+        >
+          You +1
+        </button>
+        <button
+          type="button"
+          aria-pressed={influenceAmount === 2 && influenceFrom === humanFranchiseId}
+          onclick={() => setInfluence(2, humanFranchiseId)}
+          disabled={busy || yourBalance < 2}
+          title={yourBalance < 2 ? 'Not enough Influence' : ''}
+          class="inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 {influenceAmount ===
+            2 && influenceFrom === humanFranchiseId
+            ? 'border-primary bg-primary/10'
+            : 'border-border'}"
+        >
+          You +2
+        </button>
+        <button
+          type="button"
+          aria-pressed={influenceAmount === 1 && influenceFrom === targetFranchiseId}
+          onclick={() => setInfluence(1, targetFranchiseId)}
+          disabled={busy || theirBalance < 1}
+          title={theirBalance < 1 ? 'Not enough Influence' : ''}
+          class="inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 {influenceAmount ===
+            1 && influenceFrom === targetFranchiseId
+            ? 'border-primary bg-primary/10'
+            : 'border-border'}"
+        >
+          Them +1
+        </button>
+        <button
+          type="button"
+          aria-pressed={influenceAmount === 2 && influenceFrom === targetFranchiseId}
+          onclick={() => setInfluence(2, targetFranchiseId)}
+          disabled={busy || theirBalance < 2}
+          title={theirBalance < 2 ? 'Not enough Influence' : ''}
+          class="inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 {influenceAmount ===
+            2 && influenceFrom === targetFranchiseId
+            ? 'border-primary bg-primary/10'
+            : 'border-border'}"
+        >
+          Them +2
+        </button>
+      </div>
+      <p class="mt-2 text-xs text-muted-foreground">
+        {consequence.influenceNote} · {chemistryFootnote(
+          consequence.chemistryRemoved,
+          consequence.chemistryNew,
+        )}
+      </p>
+    </fieldset>
+  {/if}
 
-  <div class="mx-4 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3" aria-live="polite">
-    <p
-      class="font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-amber-700 dark:text-amber-300"
-    >
-      Before submission — deterministic facts
-    </p>
-    <ul class="mt-2 flex flex-col gap-1 text-sm">
-      <li class="flex gap-2">
-        <span class="shrink-0 font-mono text-[10px] text-muted-foreground">Roster:</span>
-        <span class={consequence.legal ? 'text-foreground' : 'text-destructive font-semibold'}
-          >You {yourRosterSize} → {consequence.fromAfter} · {targetFranchiseName}
-          {theirRosterSize} → {consequence.toAfter}
-          {consequence.legal ? '· legal 10–15' : '· ILLEGAL — must stay 10–15'}</span
-        >
-      </li>
-      <li class="flex gap-2">
-        <span class="shrink-0 font-mono text-[10px] text-muted-foreground">Rotation:</span><span
-          >Will rebuild around incoming minutes · starters/bench/closing five repaired
-          deterministically</span
-        >
-      </li>
-      <li class="flex gap-2">
-        <span class="shrink-0 font-mono text-[10px] text-muted-foreground">Availability:</span><span
-          >{consequence.roleCoverage}</span
-        >
-      </li>
-      <li class="flex gap-2">
-        <span class="shrink-0 font-mono text-[10px] text-muted-foreground">Chemistry:</span><span
-          >{chemistryFootnote(consequence.chemistryRemoved, consequence.chemistryNew)}</span
-        >
-      </li>
-      <li class="flex gap-2">
-        <span class="shrink-0 font-mono text-[10px] text-muted-foreground">Influence:</span><span
-          >{consequence.influenceNote} · balances you {yourBalance} · them {theirBalance}</span
-        >
-      </li>
-    </ul>
-    <p class="mt-2 font-mono text-[10px] text-muted-foreground">
-      Never shows Overall, exact value ratio, threshold, or seeded RNG. Values are board facts only.
-    </p>
-  </div>
-
-  <div
-    class="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between border-t border-border bg-surface-2/40"
-  >
-    <p class="font-mono text-[10px] text-muted-foreground">
-      Browsing the board is free. Submitting consumes one inquiry. Duplicate fingerprints are
-      rejected without consuming another exchange.
-    </p>
+  <div class="flex flex-col gap-2 border-t border-border p-4">
     <button
       type="button"
       onclick={submit}
       disabled={!canSubmit}
       data-testid="package-submit"
-      aria-label="Submit proposal"
-      class="inline-flex h-11 shrink-0 items-center justify-center rounded-lg bg-primary px-6 text-sm font-semibold text-primary-foreground outline-none transition-opacity focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+      title={submitDisabledReason ?? 'Send offer'}
+      aria-disabled={!canSubmit}
+      class="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-6 text-sm font-semibold text-primary-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
     >
-      {busy ? 'Submitting…' : 'Submit proposal'}
+      {busy ? 'Sending…' : 'Send offer'}
     </button>
+    {#if submitDisabledReason !== null && !busy}
+      <p class="text-xs text-muted-foreground" role="status">{submitDisabledReason}</p>
+    {/if}
+    <p class="text-xs text-muted-foreground">
+      Sends Offer {nextOfferNumber} of {exchangeMax} — browsing is free, sending starts a talk.
+    </p>
   </div>
 </div>
+
+<style>
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      transition: none !important;
+    }
+  }
+</style>

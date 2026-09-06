@@ -115,6 +115,89 @@ function deterministicScores(gameId: string): {
     ? { homeScore, awayScore: awayScore + 1 }
     : { homeScore, awayScore };
 }
+function fakeLiveFactsOf(
+  lines: readonly SeasonScoreline[],
+  humanFranchiseId: string | null,
+  orderByGameId: ReadonlyMap<string, number>,
+): {
+  humanResults: SeasonScoreline[];
+  humanRecord: { wins: number; losses: number };
+  leaguePulse: {
+    closest: SeasonScoreline | null;
+    blowout: SeasonScoreline | null;
+    highestScoring: SeasonScoreline | null;
+  };
+} {
+  const humanResults: SeasonScoreline[] = [];
+  let wins = 0;
+  let losses = 0;
+  let closest: SeasonScoreline | null = null;
+  let closestMargin = Number.POSITIVE_INFINITY;
+  let closestOrder = Number.POSITIVE_INFINITY;
+  let closestId = '';
+  let blowout: SeasonScoreline | null = null;
+  let blowoutMargin = -1;
+  let blowoutOrder = Number.POSITIVE_INFINITY;
+  let blowoutId = '';
+  let highest: SeasonScoreline | null = null;
+  let highestCombined = -1;
+  let highestOrder = Number.POSITIVE_INFINITY;
+  let highestId = '';
+  for (const line of lines) {
+    const margin = Math.abs(line.homeScore - line.awayScore);
+    const combined = line.homeScore + line.awayScore;
+    const order = orderByGameId.get(line.gameId) ?? Number.MAX_SAFE_INTEGER;
+    if (
+      closest === null ||
+      margin < closestMargin ||
+      (margin === closestMargin &&
+        (order < closestOrder || (order === closestOrder && line.gameId < closestId)))
+    ) {
+      closest = line;
+      closestMargin = margin;
+      closestOrder = order;
+      closestId = line.gameId;
+    }
+    if (
+      blowout === null ||
+      margin > blowoutMargin ||
+      (margin === blowoutMargin &&
+        (order < blowoutOrder || (order === blowoutOrder && line.gameId < blowoutId)))
+    ) {
+      blowout = line;
+      blowoutMargin = margin;
+      blowoutOrder = order;
+      blowoutId = line.gameId;
+    }
+    if (
+      highest === null ||
+      combined > highestCombined ||
+      (combined === highestCombined &&
+        (order < highestOrder || (order === highestOrder && line.gameId < highestId)))
+    ) {
+      highest = line;
+      highestCombined = combined;
+      highestOrder = order;
+      highestId = line.gameId;
+    }
+    if (
+      humanFranchiseId !== null &&
+      (line.homeFranchiseId === humanFranchiseId || line.awayFranchiseId === humanFranchiseId)
+    ) {
+      humanResults.push(line);
+      const humanScore =
+        line.homeFranchiseId === humanFranchiseId ? line.homeScore : line.awayScore;
+      const oppScore = line.homeFranchiseId === humanFranchiseId ? line.awayScore : line.homeScore;
+      if (humanScore > oppScore) wins += 1;
+      else losses += 1;
+    }
+  }
+  return {
+    humanResults,
+    humanRecord: { wins, losses },
+    leaguePulse: { closest, blowout, highestScoring: highest },
+  };
+}
 function emptyLine(playerVersionId: string): SeasonCompactPlayerLine {
   return {
     playerVersionId,
@@ -210,6 +293,10 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
         gamesTotal: 150,
         latestGameId: null,
         latestResult: null,
+        isHumanGame: false,
+        humanRecordInBlock: { wins: 0, losses: 0 },
+        humanResults: [],
+        leaguePulse: { closest: null, blowout: null, highestScoring: null },
       });
       return requestId;
     }
@@ -219,19 +306,30 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       return requestId;
     }
     const { fromRound, toRound } = blockRoundRange(input.blockIndex);
-    const blockGames = input.run.games.filter(
-      (game) => game.round >= fromRound && game.round <= toRound,
-    );
+    const blockGames = input.run.games
+      .filter((game) => game.round >= fromRound && game.round <= toRound)
+      .sort((a, b) => (a.gameId < b.gameId ? -1 : 1));
     const gamesTotal = blockGames.length;
+    const orderByGameId = new Map(blockGames.map((game, index) => [game.gameId, index]));
     let completed = 0;
     const tick = () => {
       if (this.cancelled) return;
       try {
         const done = Math.min(completed + GAMES_PER_STEP, gamesTotal);
+        const slice = blockGames.slice(0, done);
+        const lines = slice.map((game) =>
+          this.scorelineFor(game.gameId, game.homeFranchiseId, game.awayFranchiseId),
+        );
+        const facts = fakeLiveFactsOf(lines, input.humanFranchiseId, orderByGameId);
         const latest = blockGames[done - 1];
         const latestResult = latest
           ? this.scorelineFor(latest.gameId, latest.homeFranchiseId, latest.awayFranchiseId)
           : null;
+        const isHumanGame =
+          latest !== undefined &&
+          input.humanFranchiseId !== null &&
+          (latest.homeFranchiseId === input.humanFranchiseId ||
+            latest.awayFranchiseId === input.humanFranchiseId);
         completed = done;
         this.emit({
           type: 'progress',
@@ -241,6 +339,10 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
           gamesTotal,
           latestGameId: latest?.gameId ?? null,
           latestResult,
+          isHumanGame,
+          humanRecordInBlock: facts.humanRecord,
+          humanResults: facts.humanResults,
+          leaguePulse: facts.leaguePulse,
         });
         if (completed >= gamesTotal) {
           void this.complete(input, requestId);

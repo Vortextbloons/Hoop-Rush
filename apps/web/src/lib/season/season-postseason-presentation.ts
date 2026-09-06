@@ -57,7 +57,7 @@ export function hasPostseasonHubMethods(hub: {
   return typeof hub.startPostseason === 'function' && hub.postseason !== undefined;
 }
 export const POSTSEASON_ORCHESTRATION_UNAVAILABLE =
-  'Postseason simulation is not available in this build yet. Save your run â€” it is safe â€” and update the app to continue.';
+  'Postseason simulation is not available in this build yet. Save your run — it is safe — and update the app to continue.';
 export function postseasonStageLabel(stage: SeasonRun['stage']): string {
   switch (stage) {
     case 'regular-season':
@@ -553,7 +553,7 @@ export interface AwardViewModel {
 export const AWARD_EXPLANATIONS = {
   mvp: 'Highest MVP composite: game score plus efficiency, defense, and playmaking bonuses and the game-result share, availability-adjusted over the regular season.',
   dpoy: 'Highest defensive composite: steals, blocks, and defensive rebounds plus the team defensive-rating advantage, availability-adjusted.',
-  'sixth-man': 'MVP composite among bench-qualified players â€” more bench games than starts.',
+  'sixth-man': 'MVP composite among bench-qualified players — more bench games than starts.',
   firstTeam: 'The five highest eligible players by the MVP composite, positionless.',
 } as const;
 export function awardsViewModel(
@@ -640,7 +640,7 @@ export function describePostseasonRejection(
       return `The lineup is not legal: ${rejection.reasons.join('; ')}`;
     case 'unavailable-player':
       return rejection.reason === 'injured'
-        ? 'A player in the lineup is injured and cannot play this game â€” move them out or spend Influence on a risky rehab roll.'
+        ? 'A player in the lineup is injured and cannot play this game — move them out or spend Influence on a risky rehab roll.'
         : 'A player in the lineup is no longer on the roster.';
     case 'insufficient-rehab-resources':
       return `Risky rehab needs ${String(rejection.required)} Influence; your balance is ${String(rejection.balance)}.`;

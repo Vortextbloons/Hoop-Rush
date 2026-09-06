@@ -7,6 +7,7 @@
   } from '$lib/season/season-shell-context';
   import TradeBoardWorkspace from '$lib/components/season/TradeBoardWorkspace.svelte';
   import { tradeBoardViewModel } from '$lib/season/season-hub-state';
+  import type { TradePackageDraft } from '$lib/season/season-presentation';
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
   let mounted = $state(true);
   $effect(() => {
@@ -15,6 +16,7 @@
       mounted = false;
     };
   });
+  let draft: TradePackageDraft | null = $state(null);
   const run = $derived(shell.run);
   const humanFranchiseId = $derived(shell.humanFranchiseId ?? '');
   const catalog = $derived(shell.catalog);
@@ -51,6 +53,12 @@
       ? (influence.balances[humanFranchiseKey] ?? 0)
       : 0,
   );
+  const activeNegotiation = $derived(
+    windowState?.activeInquiryId
+      ? (negotiations.find((n) => n.inquiryId === windowState.activeInquiryId) ?? null)
+      : null,
+  );
+  const theyAsked = $derived(activeNegotiation?.latestRequestedChange ?? null);
   const commandError = $derived.by(() => {
     const e = shell.commandError;
     if (e === null) return null;
@@ -101,6 +109,32 @@
     if (!mounted || windowState === null) return;
     void shell.openTradeInquiry?.({ windowIndex: windowState.windowIndex, toFranchiseId });
   }
+  function handleDraftChange(next: {
+    partner: string | null;
+    outgoing: string[];
+    incoming: string[];
+    influence: { amount: number; from: string | null };
+  }): void {
+    draft = {
+      partner: next.partner,
+      outgoing: [...next.outgoing],
+      incoming: [...next.incoming],
+      influence: { ...next.influence },
+      validation: {
+        ok:
+          next.outgoing.length >= 1 &&
+          next.outgoing.length <= 2 &&
+          next.incoming.length >= 1 &&
+          next.incoming.length <= 2,
+        reason:
+          next.outgoing.length < 1 || next.incoming.length < 1
+            ? 'Pick at least 1 from each side'
+            : next.outgoing.length > 2 || next.incoming.length > 2
+              ? 'Max 2 per side'
+              : null,
+      },
+    };
+  }
   function playableOf(playerVersionId: string): readonly string[] {
     return shell.playablePositions(playerVersionId);
   }
@@ -124,6 +158,16 @@
 </svelte:head>
 
 <div class="pt-6">
+  {#if theyAsked !== null}
+    <p
+      class="mb-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm"
+      role="status"
+    >
+      <span class="font-semibold">They asked:</span>
+      {theyAsked}
+    </p>
+  {/if}
+
   <TradeBoardWorkspace
     {run}
     {catalog}
@@ -139,6 +183,7 @@
     onRespond={handleRespond}
     onWalkAway={handleWalkAway}
     onPurchaseInquiry={handlePurchase}
+    onDraftChange={handleDraftChange}
     {commandError}
     {busy}
     playerName={playerNameOf}
@@ -146,7 +191,33 @@
     {availableOf}
   />
 
-  <div class="mt-6 rounded-xl border border-border bg-surface-1 p-4 sm:p-5">
-    <p class="text-sm text-muted-foreground">One deal at a time, up to 3 offers each.</p>
+  <div
+    class="sticky bottom-0 z-10 mt-4 rounded-xl border border-border bg-surface-1 px-4 py-3 lg:static"
+    role="status"
+    aria-live="polite"
+    data-testid="trade-sending-bar"
+  >
+    {#if busy}
+      <p class="text-sm font-semibold">Sending…</p>
+    {:else if draft !== null && draft.partner !== null && (draft.outgoing.length > 0 || draft.incoming.length > 0)}
+      <p class="text-sm">
+        Deal: you send {draft.outgoing.length} · you receive {draft.incoming.length}{draft.influence
+          .amount > 0
+          ? ` · ${draft.influence.amount}◆`
+          : ''}
+      </p>
+    {:else}
+      <p class="text-sm text-muted-foreground">Team → Deal → Track — pick a team to start.</p>
+    {/if}
   </div>
+
+  <p class="mt-4 text-xs text-muted-foreground">One deal at a time, up to 3 offers each.</p>
 </div>
+
+<style>
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      transition: none !important;
+    }
+  }
+</style>

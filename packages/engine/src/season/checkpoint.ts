@@ -1,4 +1,5 @@
 import {
+  canonicalJson,
   seasonDigestHex,
   type SeasonCandidateCheckpoint,
   type SeasonGame,
@@ -7,6 +8,7 @@ import {
   type SeasonRunAuthority,
 } from '@hoop-rush/data-contracts';
 import { seasonBlockRecapCanonical } from './recap.ts';
+export { canonicalJson };
 export function reconstructSeasonGames(
   schedule: SeasonSchedule,
   summaries: readonly SeasonGameSummary[],
@@ -53,24 +55,6 @@ export function reconstructSeasonGames(
 export type SeasonCheckpointFacts = Omit<SeasonCandidateCheckpoint, 'digest'> & {
   authority?: SeasonRunAuthority;
 };
-export function canonicalJson(value: unknown): string {
-  if (value === null) return 'null';
-  if (Array.isArray(value)) {
-    return `[${value.map((entry) => canonicalJson(entry)).join(',')}]`;
-  }
-  if (typeof value === 'object') {
-    const record = value as Record<string, unknown>;
-    const keys = Object.keys(record).sort();
-    const parts: string[] = [];
-    for (const key of keys) {
-      const entry = record[key];
-      if (entry === undefined) continue;
-      parts.push(`${JSON.stringify(key)}:${canonicalJson(entry)}`);
-    }
-    return `{${parts.join(',')}}`;
-  }
-  return JSON.stringify(value);
-}
 function standingsCanonical(candidate: SeasonCheckpointFacts): unknown {
   return {
     schemaVersion: candidate.standings.schemaVersion,

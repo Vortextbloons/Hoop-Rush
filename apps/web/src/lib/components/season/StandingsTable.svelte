@@ -105,10 +105,10 @@
               : ''}"
           >
             <a
-              href={resolve(`/season/run/teams/?franchiseId=${row.franchiseId}` as any)}
+              href={resolve(`/season/run/teams?franchiseId=${row.franchiseId}` as any)}
               data-season-standings-link={row.franchiseId}
               aria-label={`${franchiseName(row.franchiseId)} roster`}
-              class="grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-x-2 px-3 py-3 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-2 sm:gap-x-3 sm:px-4"
+              class="grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-x-2 px-3 py-3 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-2 sm:gap-x-3 sm:px-4 motion-reduce:transition-none"
             >
               <span class="w-7 shrink-0 font-mono text-[10px] font-bold text-muted-foreground">
                 {ordinal(entry.rank)}
@@ -214,10 +214,10 @@
                 </td>
                 <th scope="row" class="max-w-44 truncate px-3 py-2 text-left font-semibold">
                   <a
-                    href={resolve(`/season/run/teams/?franchiseId=${row.franchiseId}` as any)}
+                    href={resolve(`/season/run/teams?franchiseId=${row.franchiseId}` as any)}
                     data-season-standings-link={row.franchiseId}
                     aria-label={`${franchiseName(row.franchiseId)} roster`}
-                    class="flex items-center gap-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:text-primary"
+                    class="flex items-center gap-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:text-primary motion-reduce:transition-none"
                   >
                     {#if manifest && identity}
                       <SeasonTeamLogo

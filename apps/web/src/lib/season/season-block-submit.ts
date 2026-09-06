@@ -26,6 +26,167 @@ export type SubmitBlockFailureCode =
   | 'campaign-not-selected'
   | 'evolution-not-selected'
   | 'free-agency-unresolved';
+export type SeasonBlockerKind = 'rotation' | 'campaign' | 'innovation' | 'free-agency';
+export interface SeasonBlockBlocker {
+  kind: SeasonBlockerKind;
+  label: string;
+  destination: string;
+}
+export interface SeasonBlockReadiness {
+  blockers: SeasonBlockBlocker[];
+  canPlay: boolean;
+}
+export function seasonBlockReadinessOf(input: {
+  rotationFailures: readonly string[];
+  campaignRequired: boolean;
+  innovationRequired: boolean;
+  faUnresolved: boolean;
+  faWindowIndex?: number | null;
+}): SeasonBlockReadiness {
+  const blockers: SeasonBlockBlocker[] = [];
+  if (input.rotationFailures.length > 0) {
+    blockers.push({
+      kind: 'rotation',
+      label:
+        input.rotationFailures.length === 1
+          ? 'Fix your lineup to play'
+          : `Fix your lineup (${String(input.rotationFailures.length)} issues) to play`,
+      destination: '/season/run/team',
+    });
+  }
+  if (input.campaignRequired) {
+    blockers.push({
+      kind: 'campaign',
+      label: 'Pick your opportunity to play',
+      destination: '#campaign-opportunity',
+    });
+  }
+  if (input.innovationRequired) {
+    blockers.push({
+      kind: 'innovation',
+      label: 'Pick your home-court rule to play',
+      destination: '#court-innovation',
+    });
+  }
+  if (input.faUnresolved) {
+    const windowLabel =
+      input.faWindowIndex !== null && input.faWindowIndex !== undefined
+        ? ` (Window ${String(input.faWindowIndex + 1)})`
+        : '';
+    blockers.push({
+      kind: 'free-agency',
+      label: `Finish free agency${windowLabel} to play`,
+      destination: '/season/run/free-agency',
+    });
+  }
+  return { blockers, canPlay: blockers.length === 0 };
+}
+export function isCampaignRequired(
+  run: {
+    campaign?: { selections: Record<number, unknown> } | undefined;
+  } | null,
+  nextBlockIndex: number | null,
+): boolean {
+  if (run === null || nextBlockIndex === null) return false;
+  if (run.campaign === undefined) return false;
+  if (nextBlockIndex >= 8) return false;
+  return run.campaign.selections[nextBlockIndex] === undefined;
+}
+export function isInnovationRequired(
+  run: {
+    evolution?:
+      | {
+          discovery: unknown;
+          selections: Record<string, unknown>;
+        }
+      | null
+      | undefined;
+  } | null,
+  humanFranchiseId: string | null,
+  nextBlockIndex: number | null,
+): boolean {
+  if (run === null || humanFranchiseId === null || nextBlockIndex === null) return false;
+  if (nextBlockIndex < 3) return false;
+  const evolution = run.evolution ?? null;
+  if (evolution === null || evolution.discovery === null || evolution.discovery === undefined)
+    return false;
+  return evolution.selections[humanFranchiseId] === undefined;
+}
+export interface HumanizedBlockSubmitFailure {
+  code: SubmitBlockFailureCode;
+  message: string;
+  destination: string | null;
+}
+export function humanizeBlockSubmitFailure(
+  code: SubmitBlockFailureCode,
+  detail: { faWindowIndex?: number | null; firstFailure?: string | null } = {},
+): HumanizedBlockSubmitFailure {
+  switch (code) {
+    case 'rotation-invalid':
+      return {
+        code,
+        message:
+          detail.firstFailure !== null && detail.firstFailure !== undefined
+            ? `Your lineup needs a fix: ${detail.firstFailure}`
+            : 'Your lineup needs a fix before you can play.',
+        destination: '/season/run/team',
+      };
+    case 'campaign-not-selected':
+      return {
+        code,
+        message: 'Pick one opportunity to unlock Play.',
+        destination: '#campaign-opportunity',
+      };
+    case 'evolution-not-selected':
+      return {
+        code,
+        message: 'Pick one home-court rule to unlock Play.',
+        destination: '#court-innovation',
+      };
+    case 'free-agency-unresolved':
+      return {
+        code,
+        message:
+          detail.faWindowIndex !== null && detail.faWindowIndex !== undefined
+            ? `Finish free agency (Window ${String(detail.faWindowIndex + 1)}) to unlock Play.`
+            : 'Finish free agency to unlock Play.',
+        destination: '/season/run/free-agency',
+      };
+    case 'block-busy':
+      return {
+        code,
+        message: 'A block is already playing. Wait for it to finish.',
+        destination: null,
+      };
+    case 'season-complete':
+      return { code, message: 'The regular season is complete.', destination: null };
+    case 'no-run':
+    case 'no-next-block':
+      return {
+        code,
+        message: 'Your season is still loading. Try again in a moment.',
+        destination: null,
+      };
+    case 'no-human-team':
+      return {
+        code,
+        message: 'This run has no team for you. Start a new season.',
+        destination: '/season',
+      };
+    case 'no-editor':
+      return {
+        code,
+        message: 'Your lineup is still loading. Try again in a moment.',
+        destination: '/season/run/team',
+      };
+    case 'asset-unavailable':
+      return {
+        code,
+        message: 'Season files are unavailable. Check your connection and retry.',
+        destination: null,
+      };
+  }
+}
 export interface SubmitBlockFailure {
   code: SubmitBlockFailureCode;
   message: string;
@@ -69,11 +230,42 @@ export async function buildSubmitBlockEnvelope(
     return fail('block-busy', 'A block is already simulating.');
   }
   const rotationFailures = editor.validate();
-  if (rotationFailures.length > 0) {
-    return fail(
-      'rotation-invalid',
-      `The rotation cannot be submitted: ${rotationFailures.join('; ')}`,
-    );
+  const campaignRequired = isCampaignRequired(run, nextBlockIndex);
+  const innovationRequired = isInnovationRequired(run, humanFranchiseId, nextBlockIndex);
+  const unresolvedWindowIndex = freeAgencyUnresolvedWindowIndex(run.freeAgency);
+  const readiness = seasonBlockReadinessOf({
+    rotationFailures,
+    campaignRequired,
+    innovationRequired,
+    faUnresolved: unresolvedWindowIndex !== null,
+    faWindowIndex: unresolvedWindowIndex,
+  });
+  if (readiness.blockers.length > 0) {
+    const first = readiness.blockers[0];
+    if (first !== undefined) {
+      if (first.kind === 'rotation') {
+        return fail(
+          'rotation-invalid',
+          `The rotation cannot be submitted: ${rotationFailures.join('; ')}`,
+        );
+      }
+      if (first.kind === 'campaign') {
+        return fail(
+          'campaign-not-selected',
+          'Pick a campaign opportunity first — the selected opportunity locks into this block.',
+        );
+      }
+      if (first.kind === 'innovation') {
+        return fail(
+          'evolution-not-selected',
+          'Choose a Court Innovation first — the home rule locks before block 4.',
+        );
+      }
+      return fail(
+        'free-agency-unresolved',
+        `The free-agency market window ${String((unresolvedWindowIndex ?? 0) + 1)} is still open — resolve it on the free-agency screen (/season/run/free-agency) before the next block can submit.`,
+      );
+    }
   }
   const challenges = (
     run as unknown as {
@@ -90,41 +282,7 @@ export async function buildSubmitBlockEnvelope(
   ).campaign;
   const campaignOpportunityId: string | null =
     nextBlockIndex >= 8 ? null : (campaignState?.selections[nextBlockIndex]?.opportunityId ?? null);
-  const hasCampaign = campaignState !== undefined;
-  if (hasCampaign) {
-    if (campaignOpportunityId === null && nextBlockIndex < 8) {
-      return fail(
-        'campaign-not-selected',
-        'Pick a campaign opportunity first — the selected opportunity locks into this block.',
-      );
-    }
-  }
-  const unresolvedWindowIndex = freeAgencyUnresolvedWindowIndex(run.freeAgency);
-  if (unresolvedWindowIndex !== null) {
-    return fail(
-      'free-agency-unresolved',
-      `The free-agency market window ${String(unresolvedWindowIndex + 1)} is still open — resolve it on the free-agency screen (/season/run/free-agency) before the next block can submit.`,
-    );
-  }
   const pendingHumanRotation = editor.rotation;
-  const evolution = (
-    run as unknown as {
-      evolution?: import('@hoop-rush/data-contracts').SeasonEvolutionState | null;
-    }
-  ).evolution;
-  const evolutionState = evolution ?? null;
-  if (
-    nextBlockIndex >= 3 &&
-    evolutionState !== null &&
-    evolutionState.discovery !== null &&
-    (evolutionState.selections as unknown as Record<string, unknown>)[humanFranchiseId] ===
-      undefined
-  ) {
-    return fail(
-      'evolution-not-selected',
-      'Choose a Court Innovation first — the home rule locks before block 4.',
-    );
-  }
   const blockIndex = nextBlockIndex;
   const rotations: SeasonRotation[] = run.rotations.map((rotation) =>
     rotation.franchiseId === humanFranchiseId ? pendingHumanRotation : rotation,

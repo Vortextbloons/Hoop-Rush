@@ -50,9 +50,9 @@ export function rehabPriceView(run: { evolution?: SeasonEvolutionState | null })
     price,
     explanation:
       executiveId === 'alex-chen'
-        ? `Risky rehabilitation costs ${String(price)} Influence (Recovery Director discount, minimum 1).`
+        ? `Risky rehab costs ${String(price)} Influence (Recovery Director discount).`
         : executiveId === null
-          ? 'Risky rehabilitation costs 2 Influence.'
-          : `Risky rehabilitation costs ${String(price)} Influence (executive drawback).`,
+          ? `Risky rehab costs ${String(price)} Influence.`
+          : `Risky rehab costs ${String(price)} Influence.`,
   };
 }

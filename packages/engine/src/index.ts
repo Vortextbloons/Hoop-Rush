@@ -1,5 +1,6 @@
 export { canPlay, type SlotGroup } from './domain/positions.ts';
 export { slotRequirement, validateLineup } from './domain/lineup.ts';
+import { slotRequirement as canonicalSlotRequirement } from './domain/lineup.ts';
 export { classifyArchetype } from './domain/archetypes.ts';
 export { createEngineContext, type EngineContext } from './sim/context.ts';
 export { fnv1a32, hex32, createRng, type Rng, shuffle, swapAt } from './sim/rng.ts';
@@ -372,8 +373,12 @@ export {
   WINDOW_BLOCK_INDEX_TO_INDEX,
   seasonTradeValueBandFor,
   ratioMutuallyWithinBand,
+  tradeAssetEligibilityOf,
   type SeasonTradePackageKind,
   type SeasonWindowOpenResult,
+  type TradeAssetEligibilityInput,
+  type TradeAssetEligibilityResult,
+  type TradeAssetEligibilityStatus,
 } from './season/trades.ts';
 export {
   SEASON_FREE_AGENCY_BAND_SIGNING_CAPS,
@@ -428,7 +433,6 @@ export {
 import {
   classicRollSeed,
   sortClassicCatalog,
-  slotRequirement as classicSlotRequirement,
   classicRollCandidates,
   classicRerollAvailable,
   rollClassicPair,
@@ -449,7 +453,7 @@ export type {
 export const classic = Object.freeze({
   classicRollSeed,
   sortClassicCatalog,
-  slotRequirement: classicSlotRequirement,
+  slotRequirement: canonicalSlotRequirement,
   classicRollCandidates,
   classicRerollAvailable,
   rollClassicPair,

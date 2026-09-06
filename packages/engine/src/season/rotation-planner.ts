@@ -1,4 +1,4 @@
-import type { Position, SeasonRotation } from '@hoop-rush/data-contracts';
+import { LINEUP_STRUCTURE, type Position, type SeasonRotation } from '@hoop-rush/data-contracts';
 import { canPlay } from '../domain/positions.ts';
 export interface PlannerMember {
   playerVersionId: string;
@@ -166,7 +166,7 @@ export function plannerCandidates(
   );
   return enumerateLegalFives(members, available);
 }
-export const STARTING_SLOTS = ['G', 'G', 'F', 'F', 'C'] as const;
+export const STARTING_SLOTS = LINEUP_STRUCTURE;
 function orderedPlannerMembers(context: PlannerRotationContext): PlannerMember[] {
   const starters = [...context.rotation.starters].sort();
   const order = [...starters, ...context.rotation.benchOrder];

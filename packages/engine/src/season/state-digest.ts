@@ -1,4 +1,5 @@
 import {
+  canonicalJson,
   seasonDigestHex,
   type SeasonAwards,
   type SeasonCampaignState,
@@ -19,7 +20,7 @@ import {
   type SeasonRunAuthority,
   normalizeEvolutionState,
 } from '@hoop-rush/data-contracts';
-import { authorityCanonical, canonicalJson } from './checkpoint.ts';
+import { authorityCanonical } from './checkpoint.ts';
 export interface SeasonRunStateDigestFacts {
   stateRevision: number;
   stage: SeasonRunStage;

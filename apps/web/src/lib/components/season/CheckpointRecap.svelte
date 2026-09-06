@@ -5,7 +5,14 @@
     SeasonRecordMovement,
     SeasonRosterEntry,
   } from '@hoop-rush/data-contracts';
-  import { ordinal, recordLabel, streakLabel } from '$lib/season/season-presentation';
+  import { SEASON_CHALLENGE_CATALOG, SEASON_INFLUENCE_CAP } from '@hoop-rush/data-contracts';
+import {
+  formatInfluenceBalance,
+  ordinal,
+  recapChallengeView,
+  recordLabel,
+  streakLabel,
+} from '$lib/season/season-presentation';
   import {
     eraIdentityOf,
     franchiseIdentityOf,
@@ -61,9 +68,13 @@
         `${String(recap.tradeEvidence.tradesAccepted)} trade${recap.tradeEvidence.tradesAccepted === 1 ? '' : 's'}`,
       );
     }
-    parts.push(`Influence ${String(recap.influenceBalance.humanBalance)}`);
+    parts.push(formatInfluenceBalance(recap.influenceBalance.humanBalance, SEASON_INFLUENCE_CAP));
     return parts.join(' · ');
   });
+  const challengeView = $derived(recapChallengeView(recap));
+  const challengeName = (challengeId: string): string =>
+    SEASON_CHALLENGE_CATALOG.find((entry) => entry.challengeId === challengeId)?.name ??
+    challengeId;
   const franchiseIdentity = (franchiseId: string) =>
     manifest ? franchiseIdentityOf(manifest, franchiseId) : null;
   function versionSource(playerVersionId: string): {
@@ -114,7 +125,7 @@
           </span>
         </p>
       </div>
-      <p class="mt-1 font-mono text-[10px] text-muted-foreground">
+      <p class="mt-1 font-mono text-xs text-muted-foreground">
         Block {recap.blockIndex + 1} of 9 · rounds 1–{recap.completedRounds} complete
       </p>
     </section>
@@ -146,7 +157,7 @@
             <span class="min-w-0 flex-1 truncate font-semibold">
               {franchiseName(movement.franchiseId)}
             </span>
-            <span class="font-mono text-[10px] text-muted-foreground">
+            <span class="font-mono text-xs text-muted-foreground">
               {movementLabel(movement)}
             </span>
           </li>
@@ -181,7 +192,7 @@
               <span class="block truncate font-semibold">
                 {playerName(performance.playerVersionId)}
               </span>
-              <span class="flex items-center gap-2 font-mono text-[10px] text-muted-foreground">
+              <span class="flex items-center gap-2 font-mono text-xs text-muted-foreground">
                 {#if source && manifest}
                   <SeasonTeamLogo
                     {manifest}
@@ -201,7 +212,7 @@
             </span>
             {#if performance.humanTeam}
               <span
-                class="rounded-full bg-primary/15 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-primary"
+                class="rounded-full bg-primary/15 px-2 py-0.5 font-mono text-xs font-bold uppercase tracking-[0.12em] text-primary"
               >
                 Your team
               </span>
@@ -238,7 +249,7 @@
             <span class="min-w-0 flex-1 truncate font-semibold">
               {franchiseName(streak.franchiseId)}
             </span>
-            <span class="shrink-0 font-mono text-[10px] font-bold">
+            <span class="shrink-0 font-mono text-xs font-bold">
               {streakLabel(streak.kind, streak.length)}
             </span>
           </li>
@@ -270,7 +281,7 @@
                 <span class="mx-1 text-muted-foreground">vs</span>
                 {playerName(spotlight.versionB)}
               </span>
-              <span class="block font-mono text-[10px] text-muted-foreground">
+              <span class="block font-mono text-xs text-muted-foreground">
                 {spotlight.sameTeam
                   ? 'Same roster · '
                   : ''}{spotlight.gamesPlayedA}/{spotlight.gamesPlayedB}
@@ -312,7 +323,7 @@
       <ol class="mt-2 flex flex-col gap-1.5">
         {#each recap.upcomingHumanGames as game (game.gameId)}
           <li class="flex flex-wrap items-center gap-2 text-sm">
-            <span class="w-14 shrink-0 font-mono text-[10px] text-muted-foreground">
+            <span class="w-14 shrink-0 font-mono text-xs text-muted-foreground">
               R{game.round}
             </span>
             {#if manifest && franchiseIdentity(game.opponentFranchiseId)}
@@ -370,36 +381,73 @@
     </section>
   {/if}
 
-  {#if healthRows.length > 0 || recap.injuryEvidence !== undefined}
+  {#if healthRows.length > 0}
     <HealthStrip rows={healthRows} title="Health" />
-    {#if healthRows.length > 0}
-      <section
-        aria-labelledby="recap-injury-heading"
-        class="rounded-none bg-surface-1 p-4 sm:rounded-xl"
+    <section
+      aria-labelledby="recap-injury-heading"
+      class="rounded-none bg-surface-1 p-4 sm:rounded-xl"
+    >
+      <h2
+        id="recap-injury-heading"
+        class="font-display text-base font-extrabold uppercase tracking-tight"
       >
-        <h2
-          id="recap-injury-heading"
-          class="font-display text-base font-extrabold uppercase tracking-tight"
-        >
-          Health
-        </h2>
-        <p class="mt-1 text-sm text-muted-foreground">{injurySummary}</p>
-        {#if recap.objectiveEvidence! !== null}
-          <p class="mt-1 text-sm">
-            <strong class="text-foreground">Goal:</strong>
-            <span class="ml-1">{recap.objectiveEvidence!.objectiveId}</span>
-            <span
-              class="ml-2 rounded-full px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] {recap
-                .objectiveEvidence!.success
-                ? 'bg-positive/15 text-positive'
-                : 'bg-destructive/15 text-destructive'}"
-            >
-              {recap.objectiveEvidence!.success ? 'Hit · +1 Influence' : 'Missed'}
+        Health
+      </h2>
+      <p class="mt-1 text-sm text-muted-foreground">{injurySummary}</p>
+    </section>
+  {/if}
+
+  {#if challengeView?.kind === 'challenges'}
+    <section
+      aria-labelledby="recap-challenges-heading"
+      class="rounded-none bg-surface-1 p-4 sm:rounded-xl"
+      data-recap-challenge-evidence
+    >
+      <h2
+        id="recap-challenges-heading"
+        class="font-display text-base font-extrabold uppercase tracking-tight"
+      >
+        Challenges
+      </h2>
+      <ul class="mt-2 flex flex-col gap-1.5">
+        {#each challengeView.evidence as result (result.challengeId)}
+          <li class="flex flex-wrap items-center gap-x-3 gap-y-0.5 py-1 text-sm">
+            <span class="min-w-0 flex-1 truncate font-semibold">
+              {challengeName(result.challengeId)}
             </span>
-          </p>
-        {/if}
-      </section>
-    {/if}
+            <span
+              class="shrink-0 rounded-full px-2 py-0.5 font-mono text-xs font-bold uppercase tracking-[0.12em] {result.success
+                ? 'bg-positive/15 text-positive'
+                : 'bg-surface-3 text-muted-foreground'}"
+            >
+              {result.success ? `Hit · +${String(result.reward)} Influence` : 'Missed'}
+            </span>
+          </li>
+        {/each}
+      </ul>
+    </section>
+  {:else if challengeView?.kind === 'legacy-objective'}
+    <section
+      aria-labelledby="recap-goal-heading"
+      class="rounded-none bg-surface-1 p-4 sm:rounded-xl"
+    >
+      <h2
+        id="recap-goal-heading"
+        class="font-display text-base font-extrabold uppercase tracking-tight"
+      >
+        Goal
+      </h2>
+      <p class="mt-1 text-sm">
+        <span>{challengeView.objectiveId}</span>
+        <span
+          class="ml-2 rounded-full px-2 py-0.5 font-mono text-xs font-bold uppercase tracking-[0.12em] {challengeView.success
+            ? 'bg-positive/15 text-positive'
+            : 'bg-destructive/15 text-destructive'}"
+        >
+          {challengeView.success ? 'Hit · +1 Influence' : 'Missed'}
+        </span>
+      </p>
+    </section>
   {/if}
 
   {#if recap.freeAgencyEvidence.windowIndex !== null}

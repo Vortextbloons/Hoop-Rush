@@ -1,8 +1,6 @@
 ﻿<script lang="ts">
   import { getContext } from 'svelte';
   import { resolve } from '$app/paths';
-  import type { RouteId } from '$app/types';
-  import { blockRoundRange } from '@hoop-rush/data-contracts';
   import BlockProgress from '$lib/components/season/BlockProgress.svelte';
   import CourtInnovationPicker from '$lib/components/season/CourtInnovationPicker.svelte';
   import RuleBadge from '$lib/components/season/RuleBadge.svelte';
@@ -25,7 +23,13 @@
   import {
     blockPhaseAllowsSubmit,
     buildSubmitBlockEnvelope,
+    humanizeBlockSubmitFailure,
+    isCampaignRequired,
+    isInnovationRequired,
+    seasonBlockReadinessOf,
+    type SubmitBlockFailureCode,
   } from '$lib/season/season-block-submit';
+  import { freeAgencyUnresolvedWindowIndex } from '@hoop-rush/engine';
   import {
     buildLockPreview,
     gamesToLockForBlock,
@@ -33,9 +37,13 @@
     type LockPreview,
   } from '$lib/season/season-lock-preview';
   import {
+    blockOneLiner,
     didWin,
     humanUpcomingGamesFromGames,
+    ordinal,
+    provisionalRanking,
     recordLabel,
+    recordRankOutLabel,
   } from '$lib/season/season-presentation';
   import {
     influenceViewModel,
@@ -62,7 +70,7 @@
   } from '$lib/season/season-postseason-presentation';
   import { ordinal } from '$lib/season/season-presentation';
   import { homeRuleOf } from '$lib/season/season-evolution-view';
-  import { parsePlayoffGameId } from '@hoop-rush/data-contracts';
+  import { blockRoundRange, parsePlayoffGameId } from '@hoop-rush/data-contracts';
   import type { SeasonRunCommandError } from '$lib/season/season-hub-state';
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
   let mounted = $state(true);
@@ -81,11 +89,6 @@
   const stage = $derived(run?.stage ?? null);
   const stageLabel = $derived(postseasonStageLabel(stage ?? 'regular-season'));
   const inPostseason = $derived(stage === 'play-in' || stage === 'playoffs');
-  const blockLabel = $derived.by(() => {
-    if (nextBlockIndex === null || seasonComplete) return '';
-    const { fromRound, toRound } = blockRoundRange(nextBlockIndex);
-    return `Block ${String(nextBlockIndex + 1)} of 9 · rounds ${String(fromRound)}–${String(toRound)}`;
-  });
   const pending = $derived(shell.pending);
   const interruption = $derived(shell.interruption);
   const commandError = $derived(shell.commandError);
@@ -151,50 +154,10 @@
       evolution?.discovery !== undefined &&
       (evolution?.selections as unknown as Record<string, unknown> | undefined)?.[
         humanFranchiseId
-      ] === undefined,
+      ] === undefined &&
+      nextBlockIndex !== null &&
+      nextBlockIndex >= 3,
   );
-  let innovationPreviews = $state<
-    import('$lib/season/season-innovation-preview').InnovationEnvironmentPreview[] | null
-  >(null);
-  let innovationPreviewNote = $state<string | null>(null);
-  $effect(() => {
-    if (!mounted || !needsInnovation || run === null || humanFranchiseId === null) return;
-    let cancelled = false;
-    innovationPreviews = null;
-    innovationPreviewNote = 'Loading scoring-environment previews…';
-    void (async () => {
-      try {
-        const [{ loadSeasonDraftCatalog, loadSeasonEraProfile }, previewModule] = await Promise.all(
-          [import('$lib/season/season-assets'), import('$lib/season/season-innovation-preview')],
-        );
-        const [catalog, profile] = await Promise.all([
-          loadSeasonDraftCatalog(),
-          loadSeasonEraProfile(),
-        ]);
-        if (cancelled || !mounted) return;
-        const result = previewModule.previewInnovationEnvironments({
-          run,
-          franchiseId: humanFranchiseId,
-          catalog,
-          profile,
-        });
-        if ('error' in result) {
-          innovationPreviewNote = result.error;
-          return;
-        }
-        innovationPreviews = result.previews;
-        innovationPreviewNote = `${result.unitLabel} · adapter ${result.previews[0]?.adapterVersion ?? 'unknown'}`;
-      } catch (error) {
-        if (!cancelled) {
-          innovationPreviewNote =
-            error instanceof Error ? error.message : 'Previews are unavailable.';
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  });
   const rehabAffordances = $derived.by((): InfluenceSpendAffordance[] => {
     const affordances = influenceVm?.affordances ?? [];
     const rehab = affordances.filter((affordance) => affordance.purpose === 'risky-rehab');
@@ -208,7 +171,7 @@
   });
   const nextOpponents = $derived(
     run !== null && humanFranchiseId !== null && nextBlockIndex !== null && !seasonComplete
-      ? humanUpcomingGamesFromGames(run.games, humanFranchiseId, nextBlockIndex).slice(0, 3)
+      ? humanUpcomingGamesFromGames(run.games, humanFranchiseId, nextBlockIndex)
       : [],
   );
   const names = $derived.by(() => {
@@ -258,28 +221,74 @@
     });
   });
   const rotationFailures = $derived(shell.editor?.validate() ?? []);
+  const campaignRequired = $derived(isCampaignRequired(run, nextBlockIndex));
+  const innovationRequired = $derived(
+    run !== null && humanFranchiseId !== null && nextBlockIndex !== null
+      ? isInnovationRequired(run, humanFranchiseId, nextBlockIndex)
+      : needsInnovation,
+  );
+  const faWindowIndex = $derived(
+    run !== null ? freeAgencyUnresolvedWindowIndex(run.freeAgency) : null,
+  );
+  const readiness = $derived(
+    seasonBlockReadinessOf({
+      rotationFailures,
+      campaignRequired,
+      innovationRequired,
+      faUnresolved: faWindowIndex !== null,
+      faWindowIndex,
+    }),
+  );
   const canSubmit = $derived(
     snapshot !== null &&
       shell.editor !== null &&
       nextBlockIndex !== null &&
       !seasonComplete &&
-      rotationFailures.length === 0 &&
+      readiness.canPlay &&
       blockPhaseAllowsSubmit(block.phase) &&
       block.phase !== 'running',
   );
   let submitting = $state(false);
-  let submitError: string | null = $state(null);
+  let submitFailure: { code: SubmitBlockFailureCode; faWindowIndex: number | null } | null =
+    $state(null);
+  const submitErrorView = $derived(
+    submitFailure === null
+      ? null
+      : humanizeBlockSubmitFailure(submitFailure.code, {
+          faWindowIndex: submitFailure.faWindowIndex,
+          firstFailure: rotationFailures[0] ?? null,
+        }),
+  );
   async function submitBlock() {
-    if (!canSubmit || submitting) return;
+    if (submitting) return;
+    if (!canSubmit) {
+      const first = readiness.blockers[0];
+      if (first !== undefined) {
+        const code: SubmitBlockFailureCode =
+          first.kind === 'rotation'
+            ? 'rotation-invalid'
+            : first.kind === 'campaign'
+              ? 'campaign-not-selected'
+              : first.kind === 'innovation'
+                ? 'evolution-not-selected'
+                : 'free-agency-unresolved';
+        submitFailure = { code, faWindowIndex };
+      }
+      return;
+    }
     submitting = true;
-    submitError = null;
+    submitFailure = null;
     try {
       await shell.refresh?.();
       if (!mounted) return;
       const result = await buildSubmitBlockEnvelope(shell);
       if (!mounted) return;
       if (!result.ok) {
-        submitError = result.error.message;
+        submitFailure = {
+          code: result.error.code,
+          faWindowIndex:
+            freeAgencyUnresolvedWindowIndex(shell.run?.freeAgency ?? undefined) ?? null,
+        };
         return;
       }
       shell.hub?.startBlock(result.envelope);
@@ -317,6 +326,49 @@
         accepted,
         record: blockRecord(accepted.blockIndex),
       })),
+  );
+  const hubStrip = $derived.by(() => {
+    if (run === null || humanFranchiseId === null) return null;
+    const row = run.standings.rows.find((r) => r.franchiseId === humanFranchiseId) ?? null;
+    if (row === null) return null;
+    const ranked = provisionalRanking(run.standings, run.league);
+    const found = ranked.find((entry) => entry.row.franchiseId === humanFranchiseId) ?? null;
+    const outCount =
+      run.health.injuries.filter(
+        (record) =>
+          record.franchiseId === humanFranchiseId &&
+          record.missedGamesRemaining > 0 &&
+          record.sameGameReturned !== true,
+      ).length ?? 0;
+    return recordRankOutLabel({
+      wins: row.wins,
+      losses: row.losses,
+      rank: found?.rank ?? null,
+      conference: found?.conference ?? null,
+      outCount,
+    });
+  });
+  const blockLine = $derived.by(() => {
+    if (nextBlockIndex === null || run === null || humanFranchiseId === null) return '';
+    const { fromRound, toRound } = blockRoundRange(nextBlockIndex);
+    const row = run.standings.rows.find((r) => r.franchiseId === humanFranchiseId) ?? null;
+    return blockOneLiner({
+      blockIndex: nextBlockIndex,
+      fromRound,
+      toRound,
+      wins: row?.wins ?? 0,
+      losses: row?.losses ?? 0,
+    });
+  });
+  const lastAcceptedBlockIndex = $derived.by(() => {
+    const accepted = snapshot?.acceptedBlocks ?? [];
+    if (accepted.length === 0) return null;
+    return accepted[accepted.length - 1]?.blockIndex ?? null;
+  });
+  const lastRecapPath = $derived(
+    lastAcceptedBlockIndex === null
+      ? '/season/run/checkpoint'
+      : `/season/run/checkpoint?block=${String(lastAcceptedBlockIndex)}`,
   );
   const postseason = $derived(run?.postseason ?? null);
   const eliminated = $derived(
@@ -534,8 +586,8 @@
             Final standings
           </a>
           <a
-            href={resolve('/season/run/checkpoint/?block=8' as any)}
-            class="inline-flex w-fit items-center justify-center gap-2 rounded-lg border border-border px-5 py-3 text-sm font-semibold text-muted-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground"
+            href={resolve(lastRecapPath as any)}
+            class="inline-flex w-fit items-center justify-center gap-2 rounded-lg border border-border px-5 py-3 text-sm font-semibold text-muted-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground motion-reduce:transition-none"
           >
             Last Block recap
           </a>
@@ -591,10 +643,13 @@
                 ? 'Next block'
                 : `Play Block ${String(nextBlockIndex + 1)} of 9`}
             </h2>
-            <span class="text-xs text-muted-foreground">
-              {nextBlockIndex === null ? '—' : `${String(nextBlockIndex)} of 9 played.`}
-            </span>
+            {#if hubStrip !== null}
+              <span class="font-mono text-xs text-muted-foreground">{hubStrip}</span>
+            {/if}
           </div>
+          {#if blockLine !== ''}
+            <p class="font-mono text-xs text-muted-foreground">{blockLine}</p>
+          {/if}
 
           {#if hasCampaign}
             <CampaignPanel
@@ -622,8 +677,6 @@
             <CourtInnovationPicker
               busy={block.phase === 'running'}
               commandError={innovationCommandError}
-              previews={innovationPreviews}
-              previewNote={innovationPreviewNote}
               onSelect={(input) => {
                 if (!mounted) return;
                 void shell.selectCourtInnovation?.(input);
@@ -634,15 +687,21 @@
           <div class="grid gap-4 lg:grid-cols-3">
             <div class="rounded-lg bg-surface-2 p-3">
               <h3
-                class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
+                class="font-mono text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground"
               >
                 Up next
               </h3>
-              {#if nextOpponents.length === 0}
-                <p class="mt-2 text-sm text-muted-foreground">No games for you in this block.</p>
+              {#if preview === null}
+                <p class="mt-2 animate-pulse text-xs text-muted-foreground">
+                  Loading your matchups…
+                </p>
+              {:else if nextOpponents.length === 0}
+                <p class="mt-2 text-xs text-muted-foreground">
+                  No games for you — Play sims league + earns Influence.
+                </p>
               {:else}
                 <ol class="mt-2 flex flex-col gap-2">
-                  {#each nextOpponents as game (game.gameId)}
+                  {#each nextOpponents.slice(0, 3) as game (game.gameId)}
                     {@const opponentIdentity =
                       shell.manifest !== null
                         ? franchiseIdentityOf(shell.manifest, game.opponentFranchiseId)
@@ -656,7 +715,7 @@
                           size="sm"
                         />
                       {/if}
-                      <span class="min-w-0 flex-1 truncate text-sm font-semibold">
+                      <span class="min-w-0 flex-1 truncate text-xs font-semibold">
                         {game.humanIsHome ? 'vs' : 'at'}
                         {shell.franchiseName(game.opponentFranchiseId)}
                       </span>
@@ -664,156 +723,202 @@
                         <RuleBadge rule={homeRuleOf(run, game.homeFranchiseId)} compact />
                       {/if}
                       <span
-                        class="shrink-0 rounded-full bg-surface-3 px-2 py-0.5 font-mono text-[10px] text-muted-foreground"
+                        class="shrink-0 rounded-full bg-surface-3 px-2 py-0.5 font-mono text-xs text-muted-foreground"
                       >
                         R{game.round}
                       </span>
                     </li>
                   {/each}
                 </ol>
+                {#if nextOpponents.length > 3}
+                  <p class="mt-1 font-mono text-xs text-muted-foreground">
+                    +{nextOpponents.length - 3} more
+                  </p>
+                {/if}
+                <a
+                  href={resolve('/season/run/schedule' as any)}
+                  class="mt-2 inline-flex min-h-11 items-center gap-1 text-xs font-semibold text-primary underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring hover:underline motion-reduce:transition-none"
+                >
+                  Full schedule
+                  <span aria-hidden="true">&rarr;</span>
+                </a>
               {/if}
             </div>
 
             <div class="rounded-lg bg-surface-2 p-3">
               <h3
-                class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
+                class="font-mono text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground"
               >
                 Lineup
               </h3>
               {#if preview === null}
-                <p class="mt-2 text-sm text-muted-foreground">Checking your lineup…</p>
+                <p class="mt-2 animate-pulse text-xs text-muted-foreground">
+                  Loading your matchups…
+                </p>
               {:else if preview.unchangedSinceLastLock || preview.changes.length === 0}
-                <p class="mt-2 text-sm text-muted-foreground">Lineup unchanged — ready to play.</p>
+                <p class="mt-2 text-xs text-muted-foreground">Lineup ready.</p>
               {:else}
-                <p class="mt-2 text-sm">
+                <p class="mt-2 text-xs">
                   <strong class="text-foreground">{preview.changes.length}</strong>
-                  change{preview.changes.length === 1 ? '' : 's'} since the saved baseline:
+                  change{preview.changes.length === 1 ? '' : 's'}:
                 </p>
                 <ul class="mt-1 flex flex-col gap-1">
-                  {#each preview.changes.slice(0, 3) as change (change.playerVersionId)}
-                    <li class="truncate text-sm">
+                  {#each preview.changes.slice(0, 2) as change (change.playerVersionId)}
+                    <li class="truncate text-xs">
                       <span class="font-semibold">{change.displayName}</span>
-                      <span class="ml-2 font-mono text-[10px] text-muted-foreground">
-                        {change.roleBefore}
-                        {change.minutesBefore ?? '—'}→{change.roleAfter}
-                        {change.minutesAfter ?? '—'}
-                      </span>
                     </li>
                   {/each}
                 </ul>
-                {#if preview.changes.length > 3}
-                  <p class="mt-1 font-mono text-[10px] text-muted-foreground">
-                    +{preview.changes.length - 3} more
+                {#if preview.changes.length > 2}
+                  <p class="mt-1 font-mono text-xs text-muted-foreground">
+                    +{preview.changes.length - 2} more
                   </p>
                 {/if}
               {/if}
-              <a
-                href={resolve('/season/run/team/' as any)}
-                class="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-primary underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring hover:underline"
-              >
-                Change lineup
-                <span aria-hidden="true">&rarr;</span>
-              </a>
+              {#if rotationFailures.length > 0}
+                <p role="alert" class="mt-2 text-xs text-destructive">
+                  {rotationFailures[0]}
+                  <a
+                    href={resolve('/season/run/team' as any)}
+                    class="ml-1 font-semibold underline underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    Fix
+                  </a>
+                </p>
+                <a
+                  href={resolve('/season/run/team' as any)}
+                  class="mt-2 inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-border px-4 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong"
+                >
+                  Change lineup
+                </a>
+              {:else}
+                <a
+                  href={resolve('/season/run/team' as any)}
+                  class="mt-2 inline-flex min-h-11 items-center gap-1 text-xs font-semibold text-primary underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring hover:underline motion-reduce:transition-none"
+                >
+                  Change lineup
+                  <span aria-hidden="true">&rarr;</span>
+                </a>
+              {/if}
             </div>
 
             <div class="rounded-lg bg-surface-2 p-3">
               <h3
-                class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
+                class="font-mono text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground"
               >
                 This block
               </h3>
               {#if preview === null}
-                <p class="mt-2 text-sm text-muted-foreground">Checking schedule…</p>
+                <p class="mt-2 animate-pulse text-xs text-muted-foreground">
+                  Loading your matchups…
+                </p>
               {:else}
-                <p class="mt-2 text-sm text-muted-foreground">
+                <p class="mt-2 text-xs text-muted-foreground">
                   Plays {preview.gamesToLock === 1
                     ? '1 game'
                     : `${String(preview.gamesToLock)} games`} with this lineup.
                 </p>
-                {#if challengesVm !== null && challengesVm.deal !== null}
-                  <p class="mt-1 text-sm">
-                    Challenges:
-                    {#if challengesVm.evaluation !== null}
-                      {@const done = challengesVm.evaluation.results.filter(
-                        (r) => r.success,
-                      ).length}
-                      {@const earned = challengesVm.evaluation.results.reduce(
-                        (sum, r) =>
-                          sum +
-                          (r.success
-                            ? r.challengeId === 'beat-leader' ||
-                              r.challengeId === 'beat-higher' ||
-                              r.challengeId === 'statement-block'
-                              ? 2
-                              : 1
-                            : 0),
-                        0,
-                      )}
-                      <strong class="text-foreground">{done}/3 (+{earned})</strong>
-                    {:else}
-                      <strong class="text-foreground">3 live</strong>
-                    {/if}
-                  </p>
-                {/if}
                 {#if preview.upcomingGames.length === 0}
-                  <p class="mt-2 text-sm text-muted-foreground">No games for you in this block.</p>
-                {:else}
-                  <p class="mt-2 text-sm text-muted-foreground">See opponents under Up next.</p>
+                  <p class="mt-2 text-xs text-muted-foreground">
+                    No games for you — Play sims league + earns Influence.
+                  </p>
                 {/if}
               {/if}
             </div>
           </div>
 
           <div class="flex flex-col gap-3">
-            {#if rotationFailures.length > 0}
-              <p
-                role="alert"
-                class="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
-              >
-                Your lineup needs a fix — see the highlighted issues on the Rotation tab.
-              </p>
+            {#if readiness.blockers.length > 0}
+              <ul class="flex flex-col gap-2" aria-label="To play">
+                {#each readiness.blockers as blocker (blocker.kind)}
+                  <li>
+                    <a
+                      href={resolve(
+                        (blocker.destination.startsWith('#')
+                          ? '/season/run' + blocker.destination
+                          : blocker.destination) as any,
+                      )}
+                      class="flex min-h-11 items-center justify-between gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-700 outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-amber-300"
+                    >
+                      <span>{blocker.label}</span>
+                      <span aria-hidden="true">&rarr;</span>
+                    </a>
+                  </li>
+                {/each}
+              </ul>
             {/if}
-            {#if submitError}
+            {#if submitErrorView !== null}
               <p
                 role="alert"
-                class="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
+                class="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs"
               >
-                {submitError}
+                {submitErrorView.message}
+                {#if submitErrorView.destination !== null}
+                  <a
+                    href={resolve(
+                      (submitErrorView.destination.startsWith('#')
+                        ? '/season/run' + submitErrorView.destination
+                        : submitErrorView.destination) as any,
+                    )}
+                    class="ml-1 font-semibold underline underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    Fix
+                  </a>
+                {/if}
               </p>
             {/if}
             {#if commandError !== null}
               <p
                 role="alert"
-                class="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
+                class="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs"
               >
                 {commandError.message}
               </p>
             {/if}
-            <button
-              type="button"
-              onclick={() => void submitBlock()}
-              disabled={!canSubmit || submitting}
-              data-can-submit={canSubmit}
-              data-block-phase={block.phase}
-              data-editor-ready={shell.editor !== null}
-              class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 sm:text-base"
-            >
-              {block.phase === 'running'
-                ? 'Playing block…'
-                : submitting
-                  ? 'Getting ready…'
-                  : nextBlockIndex === null
-                    ? 'Play block'
-                    : `Play Block ${String(nextBlockIndex + 1)}`}
-            </button>
+            <div class="sticky bottom-3 z-20">
+              <button
+                type="button"
+                onclick={() => void submitBlock()}
+                disabled={block.phase === 'running' || submitting}
+                aria-disabled={!canSubmit}
+                data-can-submit={canSubmit}
+                data-block-phase={block.phase}
+                data-editor-ready={shell.editor !== null}
+                class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 sm:text-base motion-reduce:transition-none {canSubmit
+                  ? ''
+                  : 'opacity-60'}"
+              >
+                {block.phase === 'running'
+                  ? 'Playing block…'
+                  : submitting
+                    ? 'Getting ready…'
+                    : nextBlockIndex === null
+                      ? 'Play block'
+                      : `Play Block ${String(nextBlockIndex + 1)}`}
+              </button>
+            </div>
           </div>
 
-          <BlockProgress
-            {block}
-            label={blockLabel}
-            onCancel={() => shell.cancelBlock()}
-            onRetry={() => shell.retryBlock()}
-          />
+          <div aria-live="polite" class="min-h-6">
+            {#if block.phase === 'running' || block.phase === 'failed' || block.phase === 'cancelled' || (block.gamesTotal ?? 0) > 0}
+              <BlockProgress
+                {block}
+                label={blockLine}
+                {humanFranchiseId}
+                schedule={shell.schedule}
+                franchiseName={shell.franchiseName}
+                franchiseAbbrev={shell.franchiseAbbrev}
+                onCancel={() => shell.cancelBlock()}
+                onRetry={() => shell.retryBlock()}
+              />
+            {:else}
+              <div class="rounded-lg border border-dashed border-border/60 px-3 py-2">
+                <p class="font-mono text-xs text-muted-foreground">
+                  Block progress appears here while playing.
+                </p>
+              </div>
+            {/if}
+          </div>
         </section>
       {/if}
 
@@ -900,9 +1005,9 @@
               <li>
                 <a
                   href={resolve(
-                    `/season/run/checkpoint/?block=${String(entry.accepted.blockIndex)}` as any,
+                    `/season/run/checkpoint?block=${String(entry.accepted.blockIndex)}` as any,
                   )}
-                  class="flex items-center justify-between gap-3 bg-surface-1 px-4 py-3 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-2 sm:rounded-xl"
+                  class="flex items-center justify-between gap-3 bg-surface-1 px-4 py-3 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-2 sm:rounded-xl motion-reduce:transition-none"
                 >
                   <span class="font-mono text-[10px] font-bold uppercase text-primary">
                     Block {entry.accepted.blockIndex + 1} of 9
@@ -1120,9 +1225,9 @@
               <li>
                 <a
                   href={resolve(
-                    `/season/run/checkpoint/?block=${String(entry.accepted.blockIndex)}` as any,
+                    `/season/run/checkpoint?block=${String(entry.accepted.blockIndex)}` as any,
                   )}
-                  class="flex items-center justify-between gap-3 bg-surface-1 px-4 py-3 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-2 sm:rounded-xl"
+                  class="flex items-center justify-between gap-3 bg-surface-1 px-4 py-3 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-2 sm:rounded-xl motion-reduce:transition-none"
                 >
                   <span class="font-mono text-[10px] font-bold uppercase text-primary">
                     Block {entry.accepted.blockIndex + 1} of 9

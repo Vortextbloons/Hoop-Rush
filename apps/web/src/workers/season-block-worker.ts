@@ -20,6 +20,7 @@ import {
   type SeasonRetainedGameDetail,
   type SeasonGameSummary,
   type SeasonGameId,
+  type SeasonScoreline,
   type SeasonWorkerCompleteMessage,
   type SeasonWorkerErrorMessage,
   type SeasonWorkerProgressMessage,
@@ -114,8 +115,9 @@ const expandedCache = new Map<string, Map<string, SeasonGamePlayerInput>>();
 function expandRostersCached(
   run: SeasonBlockRunContext,
   catalog: SeasonDraftCatalog,
+  catalogHash: string,
 ): Map<string, SeasonGamePlayerInput> {
-  const key = rosterFingerprint(run);
+  const key = `${catalogHash}|${rosterFingerprint(run)}`;
   const memo = expandedCache.get(key);
   if (memo !== undefined) return memo;
   const expanded = expandSeasonRunRosters(run, catalog);
@@ -133,6 +135,106 @@ function throwIfCancelled(): void {
 }
 function initialInfluence(run: SeasonBlockRunContext): SeasonInfluenceState {
   return createInitialSeasonInfluenceState(run.league.teams.map((team) => team.franchiseId));
+}
+export function scorelineOfSummary(summary: SeasonGameSummary): SeasonScoreline {
+  return {
+    gameId: summary.gameId,
+    homeFranchiseId: summary.homeFranchiseId,
+    homeScore: summary.homeScore,
+    awayScore: summary.awayScore,
+    awayFranchiseId: summary.awayFranchiseId,
+  };
+}
+export function isHumanSummary(
+  summary: SeasonGameSummary,
+  humanFranchiseId: string | null,
+): boolean {
+  return (
+    humanFranchiseId !== null &&
+    (summary.homeFranchiseId === humanFranchiseId || summary.awayFranchiseId === humanFranchiseId)
+  );
+}
+export function blockLiveFactsOf(
+  summaries: readonly SeasonGameSummary[],
+  humanFranchiseId: string | null,
+  orderByGameId: ReadonlyMap<string, number>,
+): {
+  humanResults: SeasonScoreline[];
+  humanRecord: { wins: number; losses: number };
+  leaguePulse: {
+    closest: SeasonScoreline | null;
+    blowout: SeasonScoreline | null;
+    highestScoring: SeasonScoreline | null;
+  };
+} {
+  const humanResults: SeasonScoreline[] = [];
+  let wins = 0;
+  let losses = 0;
+  let closest: SeasonScoreline | null = null;
+  let closestMargin = Number.POSITIVE_INFINITY;
+  let closestOrder = Number.POSITIVE_INFINITY;
+  let closestId = '';
+  let blowout: SeasonScoreline | null = null;
+  let blowoutMargin = -1;
+  let blowoutOrder = Number.POSITIVE_INFINITY;
+  let blowoutId = '';
+  let highest: SeasonScoreline | null = null;
+  let highestCombined = -1;
+  let highestOrder = Number.POSITIVE_INFINITY;
+  let highestId = '';
+  for (const summary of summaries) {
+    const line = scorelineOfSummary(summary);
+    const margin = Math.abs(summary.homeScore - summary.awayScore);
+    const combined = summary.homeScore + summary.awayScore;
+    const order = orderByGameId.get(summary.gameId) ?? Number.MAX_SAFE_INTEGER;
+    if (
+      closest === null ||
+      margin < closestMargin ||
+      (margin === closestMargin &&
+        (order < closestOrder || (order === closestOrder && summary.gameId < closestId)))
+    ) {
+      closest = line;
+      closestMargin = margin;
+      closestOrder = order;
+      closestId = summary.gameId;
+    }
+    if (
+      blowout === null ||
+      margin > blowoutMargin ||
+      (margin === blowoutMargin &&
+        (order < blowoutOrder || (order === blowoutOrder && summary.gameId < blowoutId)))
+    ) {
+      blowout = line;
+      blowoutMargin = margin;
+      blowoutOrder = order;
+      blowoutId = summary.gameId;
+    }
+    if (
+      highest === null ||
+      combined > highestCombined ||
+      (combined === highestCombined &&
+        (order < highestOrder || (order === highestOrder && summary.gameId < highestId)))
+    ) {
+      highest = line;
+      highestCombined = combined;
+      highestOrder = order;
+      highestId = summary.gameId;
+    }
+    if (isHumanSummary(summary, humanFranchiseId)) {
+      humanResults.push(line);
+      const humanScore =
+        summary.homeFranchiseId === humanFranchiseId ? summary.homeScore : summary.awayScore;
+      const oppScore =
+        summary.homeFranchiseId === humanFranchiseId ? summary.awayScore : summary.homeScore;
+      if (humanScore > oppScore) wins += 1;
+      else losses += 1;
+    }
+  }
+  return {
+    humanResults,
+    humanRecord: { wins, losses },
+    leaguePulse: { closest, blowout, highestScoring: highest },
+  };
 }
 function isInterruption(outcome: unknown): outcome is {
   interruption: SeasonInvalidRosterInterruption;
@@ -165,7 +267,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
   }
   const expectedStateRevision = request.expectedStateRevision;
   const expectedStateDigest = request.expectedStateDigest;
-  const expanded = expandRostersCached(run, catalog);
+  const expanded = expandRostersCached(run, catalog, request.catalogHash);
   const input: SeasonBlockSimulationInput = {
     command: {
       schemaVersion: SEASON_RUN_SCHEMA_VERSION,
@@ -251,6 +353,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
   let lastProgressAt = 0;
   let latestSummary: SeasonGameSummary | null = null;
   let interruption: SeasonInvalidRosterInterruption | null = null;
+  const orderByGameId = new Map(games.map((entry, index) => [entry.gameId, index]));
   const gameNumberById = new Map(
     input.schedule.games.map((game, index) => [game.gameId, index + 1]),
   );
@@ -284,8 +387,10 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     if (outcome.retainedDetail !== null) retainedDetails.push(outcome.retainedDetail);
     const now = Date.now();
     const isLast = summaries.length === games.length;
-    if (isLast || now - lastProgressAt >= PROGRESS_MIN_INTERVAL_MS) {
+    const latestIsHuman = isHumanSummary(latestSummary, request.humanFranchiseId);
+    if (isLast || latestIsHuman || now - lastProgressAt >= PROGRESS_MIN_INTERVAL_MS) {
       lastProgressAt = now;
+      const facts = blockLiveFactsOf(summaries, request.humanFranchiseId, orderByGameId);
       post({
         schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
         type: 'season-block-progress',
@@ -294,13 +399,11 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
         gamesCompleted: summaries.length,
         gamesTotal: games.length,
         latestGameId: latestSummary.gameId,
-        latestResult: {
-          gameId: latestSummary.gameId,
-          homeFranchiseId: latestSummary.homeFranchiseId,
-          homeScore: latestSummary.homeScore,
-          awayScore: latestSummary.awayScore,
-          awayFranchiseId: latestSummary.awayFranchiseId,
-        },
+        latestResult: scorelineOfSummary(latestSummary),
+        isHumanGame: latestIsHuman,
+        humanRecordInBlock: facts.humanRecord,
+        humanResults: facts.humanResults,
+        leaguePulse: facts.leaguePulse,
       });
     }
   }
@@ -366,70 +469,72 @@ class EngineInvariantFailure extends Error {
     this.name = 'EngineInvariantFailure';
   }
 }
-self.onmessage = (event: MessageEvent<unknown>): void => {
-  const parsed = seasonWorkerRequestSchema.safeParse(event.data);
-  if (!parsed.success) {
-    return;
-  }
-  const request = parsed.data;
-  if (request.type === 'season-block-warm') {
-    void (async () => {
-      try {
-        await Promise.all([
-          loadCatalogCached(request.catalogUrl, request.catalogHash),
-          loadProfileCached(request.profileUrl, request.profileHash),
-        ]);
-        post({
-          schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
-          type: 'season-block-warm-ack',
-          requestId: request.requestId,
-        });
-      } catch (error) {
-        postError(request.requestId, 'internal', `worker prewarm failed: ${errorMessage(error)}`);
+if (typeof self !== 'undefined') {
+  self.onmessage = (event: MessageEvent<unknown>): void => {
+    const parsed = seasonWorkerRequestSchema.safeParse(event.data);
+    if (!parsed.success) {
+      return;
+    }
+    const request = parsed.data;
+    if (request.type === 'season-block-warm') {
+      void (async () => {
+        try {
+          await Promise.all([
+            loadCatalogCached(request.catalogUrl, request.catalogHash),
+            loadProfileCached(request.profileUrl, request.profileHash),
+          ]);
+          post({
+            schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
+            type: 'season-block-warm-ack',
+            requestId: request.requestId,
+          });
+        } catch (error) {
+          postError(request.requestId, 'internal', `worker prewarm failed: ${errorMessage(error)}`);
+        }
+      })();
+      return;
+    }
+    if (request.type === 'season-block-cancel') {
+      if (request.requestId === currentRequestId) {
+        cancelled = true;
       }
-    })();
-    return;
-  }
-  if (request.type === 'season-block-cancel') {
-    if (request.requestId === currentRequestId) {
-      cancelled = true;
-    }
-    return;
-  }
-  currentRequestId = request.requestId;
-  cancelled = false;
-  void runBlock(request).catch((error: unknown) => {
-    if (error instanceof SeasonWorkerCancelled) {
-      postError(request.requestId, 'cancelled', 'block cancelled between games');
       return;
     }
-    if (error instanceof SeasonBlockInvariantError) {
-      postError(request.requestId, 'invariant-failure', error.message, {
-        seed:
-          error.diagnostics.seed !== undefined
-            ? seedSchema.parse(error.diagnostics.seed)
-            : request.rootSeed,
-        gameId:
-          error.diagnostics.gameId !== undefined
-            ? seasonGameIdSchema.parse(error.diagnostics.gameId)
-            : null,
-        blockIndex: error.diagnostics.blockIndex ?? request.blockIndex,
-      });
-      return;
-    }
-    if (error instanceof EngineInvariantFailure) {
-      postError(request.requestId, 'invariant-failure', error.message, {
+    currentRequestId = request.requestId;
+    cancelled = false;
+    void runBlock(request).catch((error: unknown) => {
+      if (error instanceof SeasonWorkerCancelled) {
+        postError(request.requestId, 'cancelled', 'block cancelled between games');
+        return;
+      }
+      if (error instanceof SeasonBlockInvariantError) {
+        postError(request.requestId, 'invariant-failure', error.message, {
+          seed:
+            error.diagnostics.seed !== undefined
+              ? seedSchema.parse(error.diagnostics.seed)
+              : request.rootSeed,
+          gameId:
+            error.diagnostics.gameId !== undefined
+              ? seasonGameIdSchema.parse(error.diagnostics.gameId)
+              : null,
+          blockIndex: error.diagnostics.blockIndex ?? request.blockIndex,
+        });
+        return;
+      }
+      if (error instanceof EngineInvariantFailure) {
+        postError(request.requestId, 'invariant-failure', error.message, {
+          seed: request.rootSeed,
+          blockIndex: request.blockIndex,
+        });
+        return;
+      }
+      postError(request.requestId, 'internal', errorMessage(error), {
         seed: request.rootSeed,
         blockIndex: request.blockIndex,
       });
-      return;
-    }
-    postError(request.requestId, 'internal', errorMessage(error), {
-      seed: request.rootSeed,
-      blockIndex: request.blockIndex,
     });
-  });
-};
+  };
+}
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }

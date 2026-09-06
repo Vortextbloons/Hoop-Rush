@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { auditSeasonRotation, buildMinimalRotation } from './rotation.ts';
+import { buildMinimalRotation, validateSeasonRotation } from './rotation.ts';
 import {
   buildMinutePlanCandidates,
   fatigueBandOf,
@@ -61,7 +61,7 @@ describe('minute-plan legality and structure', () => {
     });
     expect(candidates.plans).toHaveLength(3);
     for (const plan of candidates.plans) {
-      const errors = auditSeasonRotation(plan.rotation, memberPlayable());
+      const errors = validateSeasonRotation(plan.rotation, memberPlayable());
       expect(errors).toEqual([]);
       const total = plan.rotation.targetMinutes.reduce((sum, row) => sum + row.minutes, 0);
       expect(total).toBe(240);
@@ -250,7 +250,7 @@ describe('minute-plan rotation integration', () => {
     }));
     const base = buildMinimalRotation({ franchiseId: 'lakers', members });
     expect(base.minutePolicy.strategy).toBe('balanced');
-    expect(auditSeasonRotation(base, memberPlayable())).toEqual([]);
+    expect(validateSeasonRotation(base, memberPlayable())).toEqual([]);
     expect(base.targetMinutes.reduce((sum, row) => sum + row.minutes, 0)).toBe(240);
   });
 });

@@ -22,14 +22,9 @@
 </script>
 
 <fieldset>
-  <legend class="font-display text-base font-extrabold uppercase tracking-tight">
-    Front office
-  </legend>
-  <p class="mt-1 text-sm text-muted-foreground">
-    One executive for the run. Every pairing is legal. The choice sticks — no replacements, no
-    leveling.
-  </p>
-  <div class="mt-3 grid gap-3 md:grid-cols-3" role="radiogroup" aria-label="Front office executive">
+  <legend class="text-base font-extrabold uppercase tracking-tight">Executive</legend>
+  <p class="mt-1 text-xs text-muted-foreground">One executive. Stays all season.</p>
+  <div class="mt-3 grid gap-3 md:grid-cols-3" role="radiogroup" aria-label="Executive">
     {#each SEASON_FRONT_OFFICE_CATALOG as executive (executive.id)}
       {@const selected = value === executive.id}
       <div
@@ -38,13 +33,13 @@
         tabindex={disabled ? -1 : 0}
         onkeydown={(event) => onCardKeydown(event, executive.id)}
         onclick={() => choose(executive.id)}
-        class="cursor-pointer rounded-xl border-2 bg-surface-2 p-4 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring {selected
+        class="min-h-11 cursor-pointer rounded-xl border-2 bg-surface-2 p-4 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none {selected
           ? 'border-primary'
           : 'border-border hover:border-line-strong'}"
       >
-        <div class="font-bold">{executive.displayName} — {executive.title}</div>
-        <p class="mt-2 text-sm"><span class="font-semibold">Ability:</span> {executive.ability}</p>
-        <p class="mt-1 text-sm text-muted-foreground">
+        <div class="text-xs font-bold">{executive.displayName} — {executive.title}</div>
+        <p class="mt-2 text-xs"><span class="font-semibold">Ability:</span> {executive.ability}</p>
+        <p class="mt-1 text-xs text-muted-foreground">
           <span class="font-semibold">Drawback:</span>
           {executive.drawback}
         </p>

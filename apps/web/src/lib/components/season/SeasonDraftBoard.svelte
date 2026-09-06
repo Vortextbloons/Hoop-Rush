@@ -7,10 +7,12 @@
   import {
     COVERAGE_TARGETS,
     coverageNeeds,
+    humanizeCoverageReason,
     SOLO_PARTICIPANT_ID,
     type SeasonDraftFlowState,
   } from '$lib/season/season-draft-flow';
   import { formatPositions } from '$lib/player-positions';
+  import { frontOfficeEntryOf } from '@hoop-rush/data-contracts';
   let {
     flow,
     catalog,
@@ -37,10 +39,18 @@
     draft?.participants.find((p) => p.participantId === SOLO_PARTICIPANT_ID) ?? null,
   );
   const eraLabel = (eraId: string): string =>
-    manifest.eras.find((e) => e.eraId === eraId)?.label ?? eraId;
+    manifest.eras.find((e) => e.eraId === eraId)?.label ?? 'Unknown era';
   const franchiseLabel = (franchiseId: string): string =>
     manifest.modernFranchiseSlots.find((s) => s.franchiseId === franchiseId)?.displayName ??
-    franchiseId;
+    'Unknown team';
+  const executiveLabel = (executiveId: string): string => {
+    try {
+      const entry = frontOfficeEntryOf(executiveId as never);
+      return `${entry.displayName} — ${entry.title}`;
+    } catch {
+      return 'Unknown executive';
+    }
+  };
   const picks = $derived(
     draft ? draft.picks.filter((p) => p.participantId === SOLO_PARTICIPANT_ID) : [],
   );
@@ -82,23 +92,23 @@
         </span>
         <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
           <span
-            class="rounded-full bg-surface-2 px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-[0.12em] sm:px-2.5 sm:text-[10px] sm:tracking-[0.14em]"
+            class="rounded-full bg-surface-2 px-2 py-1 font-mono text-xs font-bold uppercase tracking-[0.12em] sm:px-2.5 sm:tracking-[0.14em]"
           >
             {#if participant}
-              {franchiseAbbreviation(participant.franchiseId)} A� your franchise
+              {franchiseAbbreviation(participant.franchiseId)} - your team
             {:else}
-              Franchise TBD
+              Team to be set
             {/if}
           </span>
           {#if draft.frontOffice}
             <span
-              class="rounded-full bg-surface-2 px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-[0.12em] sm:px-2.5 sm:text-[10px] sm:tracking-[0.14em]"
+              class="rounded-full bg-surface-2 px-2 py-1 font-mono text-xs font-bold uppercase tracking-[0.12em] sm:px-2.5 sm:tracking-[0.14em]"
             >
-              {draft.frontOffice.executiveId}
+              {executiveLabel(draft.frontOffice.executiveId)}
             </span>
           {/if}
           <span
-            class="rounded-full bg-surface-2 px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-[0.12em] sm:px-2.5 sm:text-[10px] sm:tracking-[0.14em]"
+            class="rounded-full bg-surface-2 px-2 py-1 font-mono text-xs font-bold uppercase tracking-[0.12em] sm:px-2.5 sm:tracking-[0.14em]"
           >
             {picks.length} of 10 picked
           </span>
@@ -107,34 +117,34 @@
 
       <div class="grid gap-3 p-3 sm:gap-4 sm:p-4 sm:grid-cols-2">
         <section aria-labelledby="season-turn-heading" class="rounded-lg bg-surface-2 p-3">
-          <h3
+          <h2
             id="season-turn-heading"
-            class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
+            class="font-mono text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground"
           >
             Your turn
-          </h3>
-          <p class="mt-2 text-sm text-muted-foreground">
+          </h2>
+          <p class="mt-2 text-xs text-muted-foreground">
             {#if offer}
-              Pick {offer.pickOrdinal} of 10 — draw {offer.cards.length} cards, choose one.
+              Pick {offer.pickOrdinal} of 10 — choose one.
             {:else}
-              Draw the eight-card offer to see this round's candidates.
+              Draw this round to see the candidates.
             {/if}
           </p>
         </section>
 
         <section aria-labelledby="season-coverage-heading" class="rounded-lg bg-surface-2 p-3">
-          <h3
+          <h2
             id="season-coverage-heading"
-            class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
+            class="font-mono text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground"
           >
-            Coverage needs
-          </h3>
+            Coverage
+          </h2>
           <dl class="mt-2 grid grid-cols-3 gap-1.5 text-center sm:gap-2">
             <div class="rounded-lg bg-surface-3 p-1.5 sm:p-2">
               <dt
-                class="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground sm:text-[10px] sm:tracking-[0.12em]"
+                class="font-mono text-xs uppercase tracking-[0.1em] text-muted-foreground sm:tracking-[0.12em]"
               >
-                PG/SG
+                Guards
               </dt>
               <dd
                 class="font-display text-xl font-extrabold"
@@ -145,9 +155,9 @@
             </div>
             <div class="rounded-lg bg-surface-3 p-1.5 sm:p-2">
               <dt
-                class="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground sm:text-[10px] sm:tracking-[0.12em]"
+                class="font-mono text-xs uppercase tracking-[0.1em] text-muted-foreground sm:tracking-[0.12em]"
               >
-                SF/PF
+                Forwards
               </dt>
               <dd
                 class="font-display text-xl font-extrabold"
@@ -160,9 +170,9 @@
             </div>
             <div class="rounded-lg bg-surface-3 p-1.5 sm:p-2">
               <dt
-                class="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground sm:text-[10px] sm:tracking-[0.12em]"
+                class="font-mono text-xs uppercase tracking-[0.1em] text-muted-foreground sm:tracking-[0.12em]"
               >
-                C
+                Centers
               </dt>
               <dd
                 class="font-display text-xl font-extrabold"
@@ -174,8 +184,7 @@
             </div>
           </dl>
           <p class="mt-2 text-xs text-muted-foreground">
-            Ten picks must stay able to complete the 4 PG/SG / 4 SF/PF / 3 C coverage targets; cards
-            that would make completion impossible stay visible but are disabled.
+            One versatile player may satisfy more than one group.
           </p>
         </section>
       </div>
@@ -193,8 +202,8 @@
           >
             Offer · pick {offer.pickOrdinal}
           </h2>
-          <span class="font-mono text-[10px] text-muted-foreground">
-            {offer.cards.filter((card) => card.selectable).length} of {offer.cards.length} safe picks
+          <span class="font-mono text-xs text-muted-foreground">
+            {offer.cards.filter((card) => card.selectable).length} of {offer.cards.length} available
           </span>
         </div>
         <ul class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -230,17 +239,17 @@
                 {/if}
               </div>
               <div class="min-w-0">
-                <p class="truncate text-sm font-bold">
-                  {candidate?.displayName ?? card.playerVersionId}
+                <p class="truncate text-xs font-bold">
+                  {candidate?.displayName ?? 'Unknown player'}
                 </p>
-                <p class="truncate font-mono text-[10px] text-muted-foreground">
+                <p class="truncate font-mono text-xs text-muted-foreground">
                   {candidate?.seasonKey ?? ''} · {formatPositions(
                     candidate?.positions.playable ?? [],
                   )}
                 </p>
-                <p class="truncate font-mono text-[10px] text-muted-foreground">
+                <p class="truncate font-mono text-xs text-muted-foreground">
                   {identity.displayLabel ??
-                    (candidate ? franchiseLabel(candidate.franchiseId) : '')}
+                    (candidate ? franchiseLabel(candidate.franchiseId) : 'Unknown team')}
                   {candidate ? ` · ${eraLabel(candidate.eraId)}` : ''}
                 </p>
               </div>
@@ -249,15 +258,15 @@
                   type="button"
                   onclick={() => onPick(card.playerVersionId)}
                   disabled={busy}
-                  class="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                  class="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
                 >
                   Pick
                 </button>
               {:else}
                 <p
-                  class="rounded-lg bg-surface-3 px-2.5 py-1.5 text-[10px] leading-snug text-muted-foreground"
+                  class="rounded-lg bg-surface-3 px-2.5 py-1.5 text-xs leading-snug text-muted-foreground"
                 >
-                  Disabled · {card.coverageReason}
+                  {humanizeCoverageReason(card.coverageReason) ?? 'Not available this round.'}
                 </p>
               {/if}
             </li>
@@ -287,7 +296,7 @@
           type="button"
           onclick={onFinalize}
           disabled={busy || !canFinalize}
-          class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+          class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-xs font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
         >
           Finalize my roster
         </button>
@@ -316,7 +325,7 @@
             <li class="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:gap-3">
               <div class="flex min-w-0 items-center gap-3">
                 <span
-                  class="w-10 shrink-0 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground sm:w-20"
+                  class="w-10 shrink-0 font-mono text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground sm:w-20"
                 >
                   {pickRoundLabel(pick.pickOrdinal)}
                 </span>
@@ -331,12 +340,12 @@
                     size="sm"
                   />
                 {/if}
-                <span class="min-w-0 flex-1 truncate text-sm font-bold">
-                  {candidate?.displayName ?? pick.playerVersionId}
+                <span class="min-w-0 flex-1 truncate text-xs font-bold">
+                  {candidate?.displayName ?? 'Unknown player'}
                 </span>
               </div>
               <span
-                class="truncate pl-[calc(2.5rem+0.75rem)] font-mono text-[10px] text-muted-foreground sm:shrink-0 sm:pl-0"
+                class="truncate pl-[calc(2.5rem+0.75rem)] font-mono text-xs text-muted-foreground sm:shrink-0 sm:pl-0"
               >
                 {formatPositions(candidate?.positions.playable ?? [])} ·
                 {identity.displayLabel ?? franchiseAbbreviation(pick.franchiseId)} ·
@@ -349,12 +358,12 @@
     {/if}
 
     {#if error}
-      <p role="alert" class="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
+      <p role="alert" class="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-xs">
         {error}
       </p>
     {/if}
   {:else}
-    <p class="font-mono text-sm text-muted-foreground">No draft yet.</p>
+    <p class="font-mono text-xs text-muted-foreground">No draft yet.</p>
   {/if}
 </div>
 

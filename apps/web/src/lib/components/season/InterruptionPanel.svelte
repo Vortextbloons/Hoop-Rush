@@ -91,10 +91,14 @@
         </a>
       </li>
       <li class="rounded-lg bg-surface-2 p-3">
-        <p class="font-semibold">Try rehab (2 Influence)</p>
-        <p class="mt-1 text-muted-foreground">
-          A chance to bring someone back sooner — but it can also set them back.
+        <p class="text-xs font-semibold">
+          {#if rehabAffordances.length > 0 && rehabAffordances[0] !== undefined}
+            Try rehab ({rehabAffordances[0].cost}◆)
+          {:else}
+            Try rehab
+          {/if}
         </p>
+        <p class="mt-1 text-xs text-muted-foreground">Chance sooner, can set back.</p>
         {#if rehabAffordances.length === 0}
           <p class="mt-2 font-mono text-[10px] text-muted-foreground">
             No active injury is rehab-eligible right now.
@@ -107,9 +111,9 @@
                   type="button"
                   onclick={() => onRehab(affordance)}
                   disabled={!affordance.affordable || affordance.spent || busy}
-                  class="rounded-lg bg-primary/15 px-3 py-1.5 text-sm font-semibold text-primary outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
+                  class="min-h-11 rounded-lg bg-primary/15 px-3 py-1.5 text-xs font-semibold text-primary outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  Rehab {injuryPlayerName(affordance.injuryId ?? '')} · balance {balance}
+                  Bring back {injuryPlayerName(affordance.injuryId ?? '')} ({affordance.cost}◆)
                 </button>
               </li>
             {/each}

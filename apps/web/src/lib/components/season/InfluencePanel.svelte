@@ -58,8 +58,15 @@
   }
   function affordanceLabel(affordance: InfluenceSpendAffordance): string {
     return affordance.purpose === 'extra-trade-offer'
-      ? `Open one more trade talk (window ${String((affordance.windowIndex ?? 0) + 1)}) for 1 Influence`
-      : 'Try to bring an injured player back sooner for 2 Influence';
+      ? `Open one more trade talk (window ${String((affordance.windowIndex ?? 0) + 1)}) for ${String(affordance.cost)} Influence`
+      : `Try to bring an injured player back sooner for ${String(affordance.cost)} Influence`;
+  }
+  function rehabTitle(affordance: InfluenceSpendAffordance): string {
+    const name =
+      playerName !== null && affordance.playerVersionId !== null
+        ? playerName(affordance.playerVersionId)
+        : 'Injured player';
+    return `Bring back ${name} (${String(affordance.cost)}◆)`;
   }
   const recordedOutcomes = $derived(
     affordances.filter(
@@ -87,13 +94,13 @@
   </div>
 
   <div class="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-    <p class="text-2xl font-extrabold tabular-nums">{balance}</p>
+    <p class="text-lg font-extrabold tabular-nums">◆ {balance}/{cap}</p>
     <p class="text-xs text-muted-foreground">
       {atCap
-        ? 'Maxed out — win goals to keep earning after you spend'
+        ? 'Full — spend to keep earning'
         : atFloor
-          ? 'Empty — play blocks and hit goals to earn more'
-          : 'Earn it with wins and goals. Spend it on trades and rehab.'}
+          ? 'Empty — play blocks to earn more'
+          : 'Play blocks to earn more.'}
     </p>
   </div>
 
@@ -108,10 +115,8 @@
             <p class="text-sm font-semibold">
               {#if affordance.purpose === 'extra-trade-offer'}
                 Extra trade talk
-              {:else if playerName !== null && affordance.playerVersionId !== null}
-                Bring back {playerName(affordance.playerVersionId)}
               {:else}
-                Injury rehab
+                {rehabTitle(affordance)}
               {/if}
               <span class="ml-1 text-xs font-normal text-muted-foreground">
                 {affordance.cost} Influence
@@ -120,7 +125,7 @@
             <p class="text-xs text-muted-foreground">
               {affordance.purpose === 'extra-trade-offer'
                 ? 'Talk to one more team this window.'
-                : `Chance to return sooner — but it can backfire.${affordance.priceNote ? ` ${affordance.priceNote}` : ''}`}
+                : 'Chance sooner, can set back.'}
             </p>
           </div>
           <button
@@ -164,10 +169,12 @@
   {/if}
 
   {#if entries.length > 0}
-    <div class="mt-4">
-      <p class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-        Recent
-      </p>
+    <details class="mt-4">
+      <summary
+        class="cursor-pointer font-mono text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        Recent activity
+      </summary>
       <ul class="mt-1 flex flex-col divide-y divide-border/50">
         {#each entries as entry (entry.entryId)}
           <li class="flex flex-wrap items-center gap-x-3 gap-y-0.5 py-1.5 text-sm">
@@ -180,7 +187,7 @@
           </li>
         {/each}
       </ul>
-    </div>
+    </details>
   {/if}
   <p class="sr-only" role="status" aria-live="polite">
     Influence balance {balance}; {entries.length} recent entries.

@@ -39,22 +39,17 @@
     {humanWon
       ? 'You are the champion. Every game is recorded, the awards are final, and the run is saved to your history.'
       : `The ${championFranchiseId !== null ? franchiseAbbrev(championFranchiseId) : 'championship'} banner goes up. Your run is saved to your history.`}
-    {#if completion !== null}
-      <span class="ml-1 font-mono text-[10px]">
-        state {String(completion.finalizedAtStateRevision)}
-      </span>
-    {/if}
   </p>
   <div class="mt-4 flex flex-wrap gap-2">
     <a
       href={resolve('/season/run/postseason' as any)}
-      class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
+      class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 motion-reduce:transition-none"
     >
       View final bracket
     </a>
     <a
       href={resolve('/season/run/history' as any)}
-      class="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground"
+      class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground motion-reduce:transition-none"
     >
       Season history
     </a>
