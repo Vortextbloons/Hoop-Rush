@@ -18,13 +18,12 @@ import {
   type SeasonRosterTargets,
 } from '@hoop-rush/data-contracts';
 import {
-  completionTargetsMet,
   evaluateSeasonRoster,
-  legalFiveAfterAnyRemoval,
   percentileTierOf,
   playerPercentileTier,
   rolePercentileThresholds,
   rosterFeasible,
+  validateSeasonRoster,
   type PercentileTier,
   type RoleThresholds,
   type SeasonRosterMemberInput,
@@ -213,7 +212,7 @@ export function fixtureHumanRoster(catalog: SeasonDraftCatalog): string[] {
   if (roster.length !== 10) {
     throw new Error('fixture human roster could not reach ten legal players');
   }
-  if (!completionTargetsMet(roster) || !legalFiveAfterAnyRemoval(roster)) {
+  if (validateSeasonRoster(roster).length > 0) {
     throw new Error('fixture human roster failed the legality checks');
   }
   return roster.map((member) => member.playerVersionId);

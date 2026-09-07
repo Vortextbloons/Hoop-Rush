@@ -10,6 +10,8 @@
   } from '$lib/season/season-shell-context';
   import { seasonTeamDetail } from '$lib/season/season-team-detail-view';
   import { homeRuleOf } from '$lib/season/season-evolution-view';
+  import { candidateOf } from '$lib/season/season-catalog-index';
+  import { boostedOverallForPlayer } from '$lib/season/sponsor-gear-view';
   import {
     overallRatingOfSlice,
     playablePositionsOfSlice,
@@ -34,7 +36,18 @@
       standings: run.standings,
       league: run.league,
       summaries: shell.snapshot?.summaries ?? [],
-      overallRatingOf: (playerVersionId) => overallRatingOfSlice(slice, playerVersionId),
+      overallRatingOf: (playerVersionId) => {
+        const base = overallRatingOfSlice(slice, playerVersionId);
+        const candidate = candidateOf(shell.catalog, playerVersionId);
+        if (candidate === null) return base;
+        return (
+          boostedOverallForPlayer(run, playerVersionId, {
+            overall: candidate.summaryRatings.overallRating,
+            baseRatings: candidate.detailedRatings,
+            tendencies: candidate.tendencies,
+          }) ?? base
+        );
+      },
       summaryRatingsOf: (playerVersionId) => summaryRatingsOfSlice(slice, playerVersionId),
       playablePositions: (playerVersionId) => playablePositionsOfSlice(slice, playerVersionId),
     });

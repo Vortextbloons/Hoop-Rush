@@ -50,6 +50,8 @@
   import { resolveAssetUrl } from '$lib/asset-url';
   import { loadSponsorsIndex } from '$lib/season/season-assets';
   import {
+    boostedOverallDeltaForPlayer,
+    boostedOverallForPlayer,
     playerSponsorCardOf,
     sponsorVaultOf,
     gearPointsOf,
@@ -123,6 +125,35 @@
     const slots = normalizeSponsorGearState(snapshotRun.sponsors).players.slots;
     return new Map(Object.entries(slots).map(([id, entry]) => [id, gearPointsOf(entry)]));
   });
+  const overallDeltaByVersion = $derived.by(() => {
+    const snapshotRun = shell.snapshot?.run ?? null;
+    if (snapshotRun === null || roster === null) return new Map<string, number>();
+    const map = new Map<string, number>();
+    for (const entry of roster.players) {
+      const candidate = candidateOf(shell.catalog, entry.playerVersionId);
+      if (candidate === null || candidate === undefined) continue;
+      const delta = boostedOverallDeltaForPlayer(snapshotRun, entry.playerVersionId, {
+        overall: candidate.summaryRatings.overallRating,
+        baseRatings: candidate.detailedRatings,
+        tendencies: candidate.tendencies,
+      });
+      if (delta !== null) map.set(entry.playerVersionId, delta);
+    }
+    return map;
+  });
+  function boostedOverallOf(playerVersionId: string): number | null {
+    const candidate = candidateOf(shell.catalog, playerVersionId);
+    if (candidate === null || candidate === undefined) {
+      return overallRatingOfSlice(shell.playerSlice, playerVersionId);
+    }
+    return (
+      boostedOverallForPlayer(shell.snapshot?.run ?? null, playerVersionId, {
+        overall: candidate.summaryRatings.overallRating,
+        baseRatings: candidate.detailedRatings,
+        tendencies: candidate.tendencies,
+      }) ?? overallRatingOfSlice(shell.playerSlice, playerVersionId)
+    );
+  }
   const sponsorCard = $derived.by(() => {
     if (selectedPlayerId === null || roster === null || manifest === null) return null;
     const entry = roster.players.find((player) => player.playerVersionId === selectedPlayerId);
@@ -151,6 +182,7 @@
       playable: playablePositionsOfSlice(shell.playerSlice, entry.playerVersionId),
       overall: candidate.summaryRatings.overallRating,
       baseRatings: candidate.detailedRatings,
+      tendencies: candidate.tendencies,
       role: rotation.role,
       minutes: rotation.minutes,
       fatigueLabel: band === null ? null : FATIGUE_BAND_LABEL[band],
@@ -320,7 +352,7 @@
     return humanSeasonPlayerStats({
       roster,
       summaries: shell.snapshot?.summaries ?? [],
-      overallRatingOf: (playerVersionId) => overallRatingOfSlice(slice, playerVersionId),
+      overallRatingOf: (playerVersionId) => boostedOverallOf(playerVersionId),
       playablePositions: (playerVersionId) => playablePositionsOfSlice(slice, playerVersionId),
     });
   });
@@ -461,6 +493,7 @@
         {summaries}
         {overallByVersion}
         {gearPointsByVersion}
+        {overallDeltaByVersion}
         presetLoad={autoLoad}
         presetHorizon={autoHorizon}
         onpending={(pending) => {

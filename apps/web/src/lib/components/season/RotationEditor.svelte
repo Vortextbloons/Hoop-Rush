@@ -33,6 +33,7 @@
     faces = null,
     manifest = null,
     overallByVersion = null,
+    overallDeltaByVersion = null,
     gearPointsByVersion = null,
     effects = null,
     summaries = [],
@@ -47,6 +48,7 @@
     faces?: ReadonlyMap<string, SeasonFaceRef> | null;
     manifest?: HoopRushManifest | null;
     overallByVersion?: ReadonlyMap<string, number> | null;
+    overallDeltaByVersion?: ReadonlyMap<string, number> | null;
     gearPointsByVersion?: ReadonlyMap<string, number> | null;
     effects?: SeasonEffectsState | null;
     summaries?: SeasonGameSummary[];
@@ -860,10 +862,13 @@
     </p>
     <div class="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
       {#if overallByVersion?.has(row.member.playerVersionId)}
+        {@const baseOvr = overallByVersion.get(row.member.playerVersionId)!}
+        {@const ovrDelta = overallDeltaByVersion?.get(row.member.playerVersionId) ?? null}
         <span
           class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold text-foreground"
         >
-          OVR {overallByVersion.get(row.member.playerVersionId)}
+          OVR {baseOvr}{#if ovrDelta !== null}
+            → {baseOvr + ovrDelta}{/if}
         </span>
       {/if}
       {#if (gearPointsByVersion?.get(row.member.playerVersionId) ?? 0) > 0}
@@ -913,10 +918,13 @@
     <p class="text-sm font-semibold leading-snug">{member.displayName}</p>
     <div class="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
       {#if overallByVersion?.has(member.playerVersionId)}
+        {@const baseOvr = overallByVersion.get(member.playerVersionId)!}
+        {@const ovrDelta = overallDeltaByVersion?.get(member.playerVersionId) ?? null}
         <span
           class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold text-foreground"
         >
-          OVR {overallByVersion.get(member.playerVersionId)}
+          OVR {baseOvr}{#if ovrDelta !== null}
+            → {baseOvr + ovrDelta}{/if}
         </span>
       {/if}
       {#if (gearPointsByVersion?.get(member.playerVersionId) ?? 0) > 0}

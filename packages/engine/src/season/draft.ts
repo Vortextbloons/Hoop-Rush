@@ -20,8 +20,7 @@ import { createRng } from '../sim/rng.ts';
 import { validateDraftCatalog } from './catalog-validation.ts';
 import { drawGlobalOffer, multiHumanDraft, ownedPlayerIds } from './draft-offers.ts';
 import {
-  completionTargetsMet,
-  legalFiveAfterAnyRemoval,
+  legalFiveExists,
   rosterFeasible,
   type SeasonRosterMemberInput,
 } from './roster-rules.ts';
@@ -515,26 +514,14 @@ function finalizeRosters(
       picks.map((p) => p.playerVersionId),
       catalog,
     );
-    if (!completionTargetsMet(members)) {
+    if (!legalFiveExists(members)) {
       return {
         state,
         record: rejectedRecord(
           state,
           command,
           'UNCOMPLETABLE_ROSTER',
-          `${participant.participantId}'s roster misses the 4/4/3 completion target`,
-        ),
-        generation: null,
-      };
-    }
-    if (!legalFiveAfterAnyRemoval(members)) {
-      return {
-        state,
-        record: rejectedRecord(
-          state,
-          command,
-          'UNCOMPLETABLE_ROSTER',
-          `${participant.participantId}'s roster has no legal five after every single absence`,
+          `${participant.participantId}'s roster has no legal G,G,F,F,C starting five`,
         ),
         generation: null,
       };

@@ -13,7 +13,7 @@ import {
   canonicalRosterPairs,
   createEngineContext,
   expandSeasonRunRosters,
-  legalFiveAfterAnyRemoval,
+  legalFiveExists,
   ratioMutuallyWithinBand,
   validateSeasonRoster,
   validateSeasonRotation,
@@ -286,7 +286,7 @@ export function rosterAuditFailuresOf(season: SeasonM25SeasonFacts): {
       },
     );
     if (rotationMembers.length !== 10) illegal += 1;
-    if (!legalFiveAfterAnyRemoval(rotationMembers)) illegal += 1;
+    if (!legalFiveExists(rotationMembers)) illegal += 1;
     const memberPlayable = new Map(
       rotationMembers.map((member) => [member.playerVersionId, member.playable]),
     );

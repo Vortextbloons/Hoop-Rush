@@ -31,8 +31,7 @@ import {
   minutePlanHorizonGames,
 } from './minute-plan.ts';
 import {
-  completionTargetsMet,
-  legalFiveAfterAnyRemoval,
+  legalFiveExists,
   rosterFeasibleFromCounts,
   rosterGroupCounts,
   validateSeasonRoster,
@@ -307,8 +306,7 @@ describe('v2 roster legality', () => {
     for (const roster of result.rosters) {
       const members = membersOf(result, roster.franchiseId, CATALOG);
       expect(validateSeasonRoster(members)).toEqual([]);
-      expect(completionTargetsMet(members)).toBe(true);
-      expect(legalFiveAfterAnyRemoval(members)).toBe(true);
+      expect(legalFiveExists(members)).toBe(true);
       const rotation = buildMinimalRotation({ franchiseId: roster.franchiseId, members });
       const playable = new Map(
         members.map((member) => [
@@ -333,7 +331,7 @@ describe('v2 roster legality', () => {
     if (rotation === undefined) throw new Error('no rotations');
     expect(rotation.targetMinutes.length).toBe(10);
   });
-  it('every pool admits a legal ten (4/4/3 completion and a legal five)', () => {
+  it('every pool admits a legal ten (five reachable from an empty ten)', () => {
     const result = generateAiLeague(brandedSolo(seedFromString('legality-pools')));
     for (const pool of result.aiPools) {
       const members = pool.playerVersionIds.map((id) => {

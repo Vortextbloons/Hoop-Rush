@@ -13,7 +13,7 @@ import type { SeasonRosterMemberInput } from './roster-rules.ts';
 const ALL_ROLES = [...ROSTER_ROLES];
 export function buildTestTargets(): SeasonRosterTargets {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     targetsVersion: SEASON_ROSTER_TARGETS_VERSION,
     policy: {
       bandQuotas: {
@@ -37,7 +37,6 @@ export function buildTestTargets(): SeasonRosterTargets {
         'active-trader': ALL_ROLES,
       },
       roleCoverageThreshold: 35,
-      completionTargets: { guards: 4, forwards: 4, centers: 3 },
       poolSize: 20,
       rosterSize: 10,
       percentileTiers: { elite: 0.9, strong: 0.75, useful: 0.5 },

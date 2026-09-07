@@ -18,7 +18,7 @@ import {
 export const OFFER_SAFE_ORDER_KEY = 'safe-order';
 export const OFFER_SAMPLE_ORDER_KEY = 'sample-order';
 export const SEASON_DRAFT_COVERAGE_REASON =
-  'Selecting this version would leave the 4G/4F/3C completion targets unreachable with the remaining picks';
+  'Selecting this version would leave no legal starting five reachable with the remaining picks';
 export function multiHumanDraft(state: SeasonDraftState): boolean {
   return state.participants.length > 1;
 }

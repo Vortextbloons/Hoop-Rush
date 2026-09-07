@@ -16,6 +16,7 @@
     teamExternalId,
     teamDisplayName,
     overall,
+    overallDelta = null,
     playable,
     role,
     minutes,
@@ -39,6 +40,7 @@
     teamExternalId: string;
     teamDisplayName: string;
     overall: number | null;
+    overallDelta?: number | null;
     playable: readonly string[];
     role: string;
     minutes: number | string;
@@ -90,7 +92,8 @@
             <span
               class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold text-foreground"
             >
-              OVR {overall}
+              OVR {overall}{#if overallDelta !== null}
+                → {overall + overallDelta}{/if}
             </span>
           {/if}
           {#if gearPoints > 0}

@@ -1,5 +1,6 @@
 import {
   RATING_MODEL_VERSION,
+  offenseDefenseOf,
   type ArchetypeMemberships,
   type CalibratedImpact,
   type NonlinearComponents,
@@ -568,28 +569,7 @@ export function computeOffenseDefense(
   offenseRating: number;
   defenseRating: number;
 } {
-  const turnoverSecurity =
-    0.5 * ratings.ballHandling + 0.5 * (100 - clamp((tendencies.turnoverRate - 5) * 5, 0, 100));
-  const offense =
-    0.16 * ratings.insideScoring +
-    0.16 * ratings.threePoint +
-    0.1 * ratings.midrange +
-    0.08 * ratings.freeThrow +
-    0.15 * ratings.ballHandling +
-    0.13 * ratings.passing +
-    0.1 * turnoverSecurity +
-    0.08 * ratings.offensiveIq +
-    0.04 * ratings.offensiveRebound;
-  const foulDiscipline = clamp(100 - tendencies.foulRate * 8, 0, 100);
-  const defense =
-    0.24 * ratings.perimeterDefense +
-    0.22 * ratings.interiorDefense +
-    0.18 * ratings.defensiveIq +
-    0.1 * ratings.steal +
-    0.1 * ratings.block +
-    0.1 * ratings.defensiveRebound +
-    0.06 * foulDiscipline;
-  return { offenseRating: clampRating(offense), defenseRating: clampRating(defense) };
+  return offenseDefenseOf(ratings, tendencies);
 }
 export function deriveRatingProfile(input: RatingProfileInput): DerivedRatingProfile {
   const production = productionEvidence(input.stats);

@@ -764,11 +764,11 @@ describe('season run schema version 7 (M2.5)', () => {
     expect(() => seasonRunSchema.parse({ ...run, schemaVersion: 5 })).toThrow();
     expect(() => seasonRunSchema.parse({ ...run, schemaVersion: 6 })).toThrow();
   });
-  it('freezes the roster-generation-v3 material versions on the run', () => {
+  it('freezes the roster-generation-v5 material versions on the run', () => {
     const run = buildRun();
-    expect(run.versions.rosterGenerationVersion).toBe('roster-generation-v3');
-    expect(run.versions.aiVersion).toBe('season-ai-v3');
-    expect(run.versions.rosterTargetsVersion).toBe('roster-targets-v3');
+    expect(run.versions.rosterGenerationVersion).toBe('roster-generation-v5');
+    expect(run.versions.aiVersion).toBe('season-ai-v5');
+    expect(run.versions.rosterTargetsVersion).toBe('roster-targets-v4');
     expect(() =>
       seasonRunSchema.parse({
         ...run,

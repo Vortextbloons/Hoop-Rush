@@ -1,7 +1,8 @@
 import { clamp, clampRating, safeFloat } from '../json.ts';
+import { summaryRatingsOfRatings } from '@hoop-rush/data-contracts';
 import { computeOverall } from './weights.ts';
 import { DEFAULT_RATINGS_MODEL_ARTIFACT } from './artifact.ts';
-import { computeOffenseDefense, deriveRatingProfile, tendenciesForProfile } from './v3.ts';
+import { deriveRatingProfile, tendenciesForProfile } from './v3.ts';
 import type { SimulationRatings, SimulationTendencies } from '@hoop-rush/data-contracts';
 import type { StatsRow } from './stats.ts';
 const RATING_KEYS: readonly (keyof SimulationRatings)[] = [
@@ -43,10 +44,10 @@ export function computeSummaryRatings(
   defenseRating: number;
   overallRating: number;
 } {
-  const { offenseRating, defenseRating } = computeOffenseDefense(completeRatings(ratings), {
+  const { offenseRating, defenseRating } = summaryRatingsOfRatings(completeRatings(ratings), {
     ...TENDENCY_DEFAULTS,
     ...tendencies,
-  } as SimulationTendencies);
+  });
   return {
     offenseRating,
     defenseRating,

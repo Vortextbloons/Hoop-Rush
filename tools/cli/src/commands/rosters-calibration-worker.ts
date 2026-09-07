@@ -2,7 +2,6 @@ import { parentPort, workerData } from 'node:worker_threads';
 import { readJson } from '../io.ts';
 import {
   SeasonAiGenerationError,
-  completionTargetsMet,
   generateAiLeague,
   validateSeasonRoster,
 } from '@hoop-rush/engine';
@@ -92,9 +91,6 @@ function selectionFailuresOf(
     });
     const legality = validateSeasonRoster(members);
     if (legality.length > 0) failures.push(`${team.franchiseId}: ${legality.join('; ')}`);
-    if (!completionTargetsMet(members)) {
-      failures.push(`${team.franchiseId}: completion target (4/4/3) missed`);
-    }
   }
   return failures;
 }

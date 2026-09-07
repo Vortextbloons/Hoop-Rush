@@ -44,7 +44,6 @@ import {
 import { buildMinimalRotation, validateSeasonRotation } from './rotation.ts';
 import { seasonGenerationDigest } from './digest.ts';
 import {
-  completionTargetsMet,
   groupMaskOf,
   rosterGroupCounts,
   validateSeasonRoster,
@@ -125,9 +124,9 @@ export class SeasonAiTargetsError extends Error {
 export function validateSeasonRosterTargets(targets: SeasonRosterTargets | undefined): void {
   if (!targets) throw new SeasonAiTargetsError('roster targets missing');
   const schemaVersion: number = targets.schemaVersion;
-  if (schemaVersion !== 2) {
+  if (schemaVersion !== 3) {
     throw new SeasonAiTargetsError(
-      `roster targets schemaVersion must be 2 (got ${String(schemaVersion)})`,
+      `roster targets schemaVersion must be 3 (got ${String(schemaVersion)})`,
     );
   }
   if (targets.targetsVersion !== SEASON_ROSTER_TARGETS_VERSION) {
@@ -778,7 +777,7 @@ function poolAdmitsTenExact(state: GenerationState, team: PoolTeam): boolean {
   const rest = team.pool.filter((id) => !anchorSet.has(id));
   const picks = 10 - team.anchors.length;
   if (
-    !memberReachCapped(state, { guards: 4, forwards: 4, centers: 3 }, anchorCounts, rest, picks)
+    !memberReachCapped(state, { guards: 2, forwards: 2, centers: 1 }, anchorCounts, rest, picks)
   ) {
     return false;
   }
@@ -822,7 +821,7 @@ function poolTenFeasibleAfterAdd(
   const picksForTen = 10 - team.anchors.length;
   if (
     !reachableAfterFixedAndFills(
-      { guards: 4, forwards: 4, centers: 3 },
+      { guards: 2, forwards: 2, centers: 1 },
       anchorCounts,
       fixedMasks,
       unassignedMasks,
@@ -908,7 +907,7 @@ function poolTenFeasibleAfterAddExact(
   if (versionId !== null) members.push(versionId);
   const picks = 10 - team.anchors.length;
   if (
-    !memberReachCapped(state, { guards: 4, forwards: 4, centers: 3 }, anchorCounts, members, picks)
+    !memberReachCapped(state, { guards: 2, forwards: 2, centers: 1 }, anchorCounts, members, picks)
   ) {
     return false;
   }
@@ -932,7 +931,7 @@ function poolTenFeasibleAfterAddExact(
     !memberReachCappedWithOutlierBudget(
       state,
       team,
-      { guards: 4, forwards: 4, centers: 3 },
+      { guards: 2, forwards: 2, centers: 1 },
       anchorCounts,
       anchorOutliers,
       members,
@@ -1404,14 +1403,11 @@ function poolPickScore(
     const cumulative = tierOverage(state, team, tier, 1);
     if (cumulative > tierRange[1]) score -= (cumulative - tierRange[1]) * TIER_DEFICIT_FACTOR[tier];
   }
-  const completion = state.targets.policy.completionTargets;
   const mask = state.maskByVersion.get(versionId) ?? 0;
   let positionHelp = 0;
-  if (Math.max(0, completion.guards - poolCounts.guards) > 0 && (mask & 1) !== 0) positionHelp += 1;
-  if (Math.max(0, completion.forwards - poolCounts.forwards) > 0 && (mask & 2) !== 0)
-    positionHelp += 1;
-  if (Math.max(0, completion.centers - poolCounts.centers) > 0 && (mask & 4) !== 0)
-    positionHelp += 1;
+  if (Math.max(0, 2 - poolCounts.guards) > 0 && (mask & 1) !== 0) positionHelp += 1;
+  if (Math.max(0, 2 - poolCounts.forwards) > 0 && (mask & 2) !== 0) positionHelp += 1;
+  if (Math.max(0, 1 - poolCounts.centers) > 0 && (mask & 4) !== 0) positionHelp += 1;
   score += positionHelp * 0.4;
   score += rngRank * 2.5;
   return score;
@@ -1516,7 +1512,6 @@ function probeForMask(state: GenerationState, team: PoolTeam, mask: number): str
   return undefined;
 }
 function positionScarcityAfter(state: GenerationState, team: PoolTeam, mask: number): boolean {
-  const completion = state.targets.policy.completionTargets;
   const need = { guards: 0, forwards: 0, centers: 0 };
   for (const teamId of state.teamOrder) {
     const t = state.teams.get(teamId);
@@ -1526,9 +1521,9 @@ function positionScarcityAfter(state: GenerationState, team: PoolTeam, mask: num
     const g = counts.guards + (addToTeam && (mask & 1) !== 0 ? 1 : 0);
     const f = counts.forwards + (addToTeam && (mask & 2) !== 0 ? 1 : 0);
     const c = counts.centers + (addToTeam && (mask & 4) !== 0 ? 1 : 0);
-    need.guards += Math.max(0, completion.guards - g);
-    need.forwards += Math.max(0, completion.forwards - f);
-    need.centers += Math.max(0, completion.centers - c);
+    need.guards += Math.max(0, 2 - g);
+    need.forwards += Math.max(0, 2 - f);
+    need.centers += Math.max(0, 1 - c);
   }
   const counts = state.unassignedMaskCountsArr;
   const supply = {
@@ -1760,7 +1755,7 @@ function poolViolations(state: GenerationState, teamId: string): string[] {
   if (new Set(team.pool).size !== team.pool.length) violations.push('pool contains duplicates');
   if (!uniqueIdentities(state, team.pool)) violations.push('pool contains duplicate identities');
   if (!poolAdmitsTenExact(state, team)) {
-    violations.push('pool admits no 4/4/3 ten');
+    violations.push('pool admits no legal ten');
   }
   if (!poolCoverageFeasible(state, team, null, false)) {
     violations.push('pool cannot cover all eight roles');
@@ -1922,7 +1917,6 @@ function legalTenExists(state: GenerationState, members: readonly string[]): boo
       const roster = membersOf(state, picked);
       return (
         validateSeasonRoster(roster).length === 0 &&
-        completionTargetsMet(roster) &&
         uncoveredRoles(roleScoresOfIds(state, picked)).length === 0
       );
     }
@@ -2071,7 +2065,6 @@ function rosterLegal(state: GenerationState, team: PoolTeam, ids: readonly strin
   if (!uniqueIdentities(state, ids)) return false;
   const members = membersOf(state, ids);
   if (validateSeasonRoster(members).length > 0) return false;
-  if (!completionTargetsMet(members)) return false;
   if (uncoveredRoles(roleScoresOfIds(state, ids)).length > 0) return false;
   let rotation;
   try {
@@ -2171,10 +2164,10 @@ function greedySelection(state: GenerationState, team: PoolTeam): string[] | nul
       if (
         !memberReachCapped(
           state,
-          { guards: 4, forwards: 4, centers: 3 },
+          { guards: 2, forwards: 2, centers: 1 },
           probeCounts,
           remaining,
-          slotsLeft,
+          slotsLeft - 1,
         )
       ) {
         continue;

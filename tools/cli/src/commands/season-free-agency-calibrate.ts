@@ -33,11 +33,9 @@ import {
   deriveSeasonPostBlockState,
   freeAgencyUnresolvedWindowIndex,
   handleSeasonRunCommand,
-  legalFiveAfterAnyRemoval,
   legalFiveExists,
   openSeasonFreeAgencyWindow,
   openSeasonTradeWindow,
-  rosterGroupCounts,
   rosterPlayerIdsOf,
   seasonBlockGamesOf,
   seasonNextBlockIndex,
@@ -419,9 +417,9 @@ function assertBlockPreconditions(
         `block ${String(blockIndex)}: rotation of ${rotation.franchiseId} is not ten players`,
       );
     }
-    if (!legalFiveAfterAnyRemoval(members)) {
+    if (!legalFiveExists(members)) {
       throw new Error(
-        `block ${String(blockIndex)}: rotation of ${rotation.franchiseId} has no legal five after any removal`,
+        `block ${String(blockIndex)}: rotation of ${rotation.franchiseId} has no legal starting five`,
       );
     }
     const memberPlayable = new Map(
@@ -876,10 +874,7 @@ function effectsAccountingOf(season: SeasonFreeAgencySeasonFacts): {
       playable: season.catalog.playableByVersion.get(player.playerVersionId) ?? [],
     }));
     if (members.length < 10 || members.length > 15) rosterIllegal += 1;
-    const counts = rosterGroupCounts(members);
-    if (counts.guards < 3 || counts.forwards < 3 || counts.centers < 2) rosterIllegal += 1;
     if (!legalFiveExists(members)) rosterIllegal += 1;
-    if (!legalFiveAfterAnyRemoval(members)) rosterIllegal += 1;
     for (const player of roster.players) {
       if (versions.has(player.playerVersionId)) rosterIllegal += 1;
       versions.add(player.playerVersionId);
@@ -901,7 +896,6 @@ function effectsAccountingOf(season: SeasonFreeAgencySeasonFacts): {
       },
     );
     if (rotationMembers.length !== 10) rotationIllegal += 1;
-    if (!legalFiveAfterAnyRemoval(rotationMembers)) rotationIllegal += 1;
     activeLoads += rotationMembers.length;
   }
   const activePairs = run.rotations.length * 45;

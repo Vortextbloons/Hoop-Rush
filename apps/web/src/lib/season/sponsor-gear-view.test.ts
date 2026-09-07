@@ -8,11 +8,16 @@ import {
 import { createInitialSponsorGearState } from '@hoop-rush/engine';
 import {
   SPONSOR_RATING_GROUPS,
+  boostedOverallDeltaOf,
+  boostedOverallDeltaForPlayer,
+  boostedOverallForPlayer,
+  boostedOverallOf,
   boostedRatingRows,
   boostedRatingsOf,
   formatBoostLine,
   gearPointsOf,
   playerSponsorCardOf,
+  previewBoostedOverallOf,
   previewGearDeltas,
   sponsorBoardHistoryOf,
   sponsorHistorySummary,
@@ -108,6 +113,72 @@ describe('slots, boosts, and gear points', () => {
     expect(deltas).toHaveLength(1);
     expect(deltas[0]).toMatchObject({ label: 'SPD', from: 70, to: 74, points: 4 });
   });
+
+  it('returns the base overall when nothing is equipped', () => {
+    expect(boostedOverallOf(82, baseRatings(), null, null)).toBe(82);
+    expect(boostedOverallDeltaOf(82, baseRatings(), null, null)).toBeNull();
+    expect(boostedOverallOf(null, baseRatings(), null, null)).toBeNull();
+  });
+
+  it('shifts the catalog overall by the formula delta once gear is on', () => {
+    const slots = {
+      shoe: {
+        instanceId: 'sponsor-0-0',
+        entryId: 'nike-icon',
+        brandFamily: 'nike',
+        slot: 'shoe' as const,
+        tier: 'ICON' as const,
+        boosts: [{ key: 'midrange' as const, points: 8 }],
+        appliedBlock: 0,
+        appliedByCommandId: commandIdSchema.parse('cmd-1'),
+      },
+      apparel: null,
+      fuel: null,
+    };
+    expect(boostedOverallOf(82, baseRatings(), null, slots)).toBe(83);
+    expect(boostedOverallDeltaOf(82, baseRatings(), null, slots)).toBe(1);
+    expect(
+      previewBoostedOverallOf(82, baseRatings(), null, null, {
+        slot: 'shoe',
+        boosts: [{ key: 'midrange', points: 8 }],
+      }),
+    ).toBe(83);
+  });
+
+  it('hides zero-deltas for boosts the overall formula ignores', () => {
+    const slots = {
+      shoe: {
+        instanceId: 'sponsor-0-0',
+        entryId: 'nike-icon',
+        brandFamily: 'nike',
+        slot: 'shoe' as const,
+        tier: 'BUZZ' as const,
+        boosts: [{ key: 'speed' as const, points: 2 }],
+        appliedBlock: 0,
+        appliedByCommandId: commandIdSchema.parse('cmd-1'),
+      },
+      apparel: null,
+      fuel: null,
+    };
+    expect(boostedOverallDeltaOf(82, baseRatings(), null, slots)).toBeNull();
+  });
+
+  it('resolves per-player deltas from a run', () => {
+    expect(
+      boostedOverallDeltaForPlayer(testRun(), 'pv-1', {
+        overall: 82,
+        baseRatings: baseRatings(),
+        tendencies: null,
+      }),
+    ).toBeNull();
+    expect(
+      boostedOverallForPlayer(testRun(), 'pv-1', {
+        overall: null,
+        baseRatings: baseRatings(),
+        tendencies: null,
+      }),
+    ).toBeNull();
+  });
 });
 
 describe('playerSponsorCardOf', () => {
@@ -121,6 +192,7 @@ describe('playerSponsorCardOf', () => {
       playable: ['PG'],
       overall: 82,
       baseRatings: baseRatings(),
+      tendencies: null,
       role: 'Starter',
       minutes: 34,
       fatigueLabel: null,

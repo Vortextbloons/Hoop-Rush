@@ -31,6 +31,7 @@ export { loadJsonAsset, type LoadJsonAssetOptions } from './loaders/load-json.ts
 export { loadAsset } from './loaders/index.ts';
 export * from './ratings-model.ts';
 export * from './overall-bands.ts';
+export * from './summary-ratings.ts';
 export * from './three-point-reconstruction.ts';
 export * from './contextual-value.ts';
 export * from './season-versions.ts';

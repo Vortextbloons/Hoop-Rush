@@ -262,7 +262,7 @@ describe('SeasonDraftFlow', () => {
     const reloaded = makeFlow(repo);
     expect(await reloaded.load()).toBe(false);
   });
-  it('counts coverage needs toward the 4G/4F/3C targets', async () => {
+  it('counts coverage toward a legal five and reports fragility', async () => {
     const flow = makeFlow(new InMemorySeasonDraftRepository());
     await flow.create({ rootSeed: ROOT_SEED, league: LEAGUE });
     const draft = flow.draft;
@@ -270,7 +270,13 @@ describe('SeasonDraftFlow', () => {
       throw new Error('expected the draft to be created');
     }
     const needs = coverageNeeds(draft.picks, CATALOG);
-    expect(needs).toEqual({ guards: 0, forwards: 0, centers: 0 });
+    expect(needs).toEqual({
+      guards: 0,
+      forwards: 0,
+      centers: 0,
+      hasLegalFive: false,
+      fragileGroups: [],
+    });
   });
   it('records duplicate draw commands idempotently through the engine', async () => {
     const flow = makeFlow(new InMemorySeasonDraftRepository());

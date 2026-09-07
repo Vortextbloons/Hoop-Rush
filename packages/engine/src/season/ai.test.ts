@@ -16,7 +16,7 @@ import {
   generateAiLeague,
   runSeasonRosterCalibrationSeeds,
 } from './ai.ts';
-import { completionTargetsMet, validateSeasonRoster } from './roster-rules.ts';
+import { legalFiveExists, validateSeasonRoster } from './roster-rules.ts';
 import { rotationTargetMinutes } from './rotation.ts';
 import {
   buildTestTargets,
@@ -121,7 +121,7 @@ describe('season AI league generation', () => {
     for (const roster of result.rosters) {
       const members = membersOf(result, roster.franchiseId);
       expect(validateSeasonRoster(members)).toEqual([]);
-      expect(completionTargetsMet(members)).toBe(true);
+      expect(legalFiveExists(members)).toBe(true);
     }
     for (const rotation of result.rotations) {
       expect(rotationTargetMinutes(rotation)).toBe(240);
@@ -274,7 +274,7 @@ describe('season AI league generation', () => {
     for (const roster of result.rosters) {
       if (roster.franchiseId === 'lakers') continue;
       const members = modifiedMembers(result, roster.franchiseId);
-      expect(completionTargetsMet(members)).toBe(true);
+      expect(legalFiveExists(members)).toBe(true);
       expect(validateSeasonRoster(members)).toEqual([]);
     }
   });

@@ -18,7 +18,6 @@ import {
 import {
   SeasonAiGenerationError,
   SeasonAiTargetsError,
-  completionTargetsMet,
   generateAiLeague,
   seasonGenerationDigest,
   validateSeasonRoster,
@@ -401,9 +400,6 @@ export function seasonRostersAudit(args: {
     const legality = validateSeasonRoster(members);
     if (legality.length > 0) {
       selectionFailures.push(`${roster.franchiseId}: ${legality.join('; ')}`);
-    }
-    if (!completionTargetsMet(members)) {
-      selectionFailures.push(`${roster.franchiseId}: completion target (4/4/3) missed`);
     }
   }
   for (const rotation of league.rotations) {

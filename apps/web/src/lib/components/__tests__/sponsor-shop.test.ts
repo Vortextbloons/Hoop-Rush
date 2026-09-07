@@ -297,6 +297,7 @@ describe('PlayerSponsorCard', () => {
         strength: 70,
         vertical: 70,
       },
+      tendencies: null,
       role: 'Starter',
       minutes: 34,
       fatigueLabel: null,
@@ -304,6 +305,67 @@ describe('PlayerSponsorCard', () => {
       lastMinutes: null,
     });
   }
+
+  it('shows the buffed overall only when gear moves it', () => {
+    const plain = render(PlayerSponsorCard, {
+      props: {
+        card: card(),
+        face: null,
+        manifest,
+        vault: [],
+        logos: new Map(),
+        onApply: vi.fn(),
+        onClose: vi.fn(),
+      },
+    });
+    expect(plain.queryByTestId('sponsor-ovr-delta')).toBeNull();
+    plain.unmount();
+
+    const sponsors = createInitialSponsorGearState(SEED);
+    const gearedId = `pv-${'2'.repeat(32)}`;
+    sponsors.players.slots[gearedId] = {
+      shoe: {
+        instanceId: 'sponsor-0-0',
+        entryId: 'nike-icon',
+        brandFamily: 'nike',
+        slot: 'shoe',
+        tier: 'ICON',
+        boosts: [{ key: 'midrange', points: 8 }],
+        appliedBlock: 0,
+        appliedByCommandId: commandIdSchema.parse('cmd-1'),
+      },
+      apparel: null,
+      fuel: null,
+    };
+    const geared = playerSponsorCardOf({ sponsors } as SeasonRun, {
+      playerVersionId: gearedId,
+      displayName: 'Test Player',
+      seasonKey: '1995-96',
+      franchiseId: 'lakers',
+      eraId: '1990s',
+      playable: ['PG'],
+      overall: 82,
+      baseRatings: card().baseRatings,
+      tendencies: null,
+      role: 'Starter',
+      minutes: 34,
+      fatigueLabel: null,
+      fatiguePercent: null,
+      lastMinutes: null,
+    });
+    const { getByTestId } = render(PlayerSponsorCard, {
+      props: {
+        card: geared,
+        face: null,
+        manifest,
+        vault: [],
+        logos: new Map(),
+        onApply: vi.fn(),
+        onClose: vi.fn(),
+      },
+    });
+    expect(getByTestId('sponsor-ovr-delta').textContent).toContain('82 → 83');
+  });
 
   it('shows grouped ratings with a Current/Base/Changes toggle and slot sections', () => {
     const { getByTestId, getByText } = render(PlayerSponsorCard, {
@@ -395,6 +457,7 @@ describe('PlayerSponsorCard', () => {
       playable: ['PG'],
       overall: 82,
       baseRatings: card().baseRatings,
+      tendencies: null,
       role: 'Starter',
       minutes: 34,
       fatigueLabel: null,

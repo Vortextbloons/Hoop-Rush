@@ -194,7 +194,7 @@ export const seasonMeasuredBandSchema = seasonScoreRangeSchema.extend({
 });
 export type SeasonMeasuredBand = z.infer<typeof seasonMeasuredBandSchema>;
 export const seasonRosterTargetsSchema = z.object({
-  schemaVersion: z.literal(2),
+  schemaVersion: z.literal(3),
   targetsVersion: z.literal(SEASON_ROSTER_TARGETS_VERSION),
   policy: z.object({
     bandQuotas: z.object({
@@ -254,11 +254,6 @@ export const seasonRosterTargetsSchema = z.object({
       'active-trader': z.array(seasonRosterRoleSchema).min(1),
     }),
     roleCoverageThreshold: z.literal(35),
-    completionTargets: z.object({
-      guards: z.literal(4),
-      forwards: z.literal(4),
-      centers: z.literal(3),
-    }),
     poolSize: z.literal(20),
     rosterSize: z.literal(10),
     percentileTiers: z.object({

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  completionTargetsMet,
   legalFiveAfterAnyRemoval,
   legalFiveExists,
   rosterFeasible,
@@ -11,6 +10,10 @@ import { buildMinimalRotation, matchStartingFive, rotationTargetMinutes } from '
 import { seasonGenerationDigest } from './digest.ts';
 import type { SeasonGenerationDiagnostics } from '@hoop-rush/data-contracts';
 import {
+  SEASON_AI_VERSION,
+  SEASON_ROSTER_GENERATION_VERSION,
+  SEASON_ROSTER_TARGETS_VERSION,
+  SEASON_ROTATION_VERSION,
   eraIdSchema,
   franchiseIdSchema,
   playerIdSchema,
@@ -22,7 +25,7 @@ const g = (id: string, ...positions: string[]): SeasonRosterMemberInput => ({
   playerVersionId: id,
   playable: positions as SeasonRosterMemberInput['playable'],
 });
-describe('season roster legality (season-roster-v1)', () => {
+describe('season roster legality (season-roster-v3)', () => {
   it('accepts a legal ten-player roster', () => {
     const roster = [
       g('pv-01', 'PG'),
@@ -37,29 +40,46 @@ describe('season roster legality (season-roster-v1)', () => {
       g('pv-10', 'C'),
     ];
     expect(validateSeasonRoster(roster)).toEqual([]);
-    expect(completionTargetsMet(roster)).toBe(true);
+    expect(legalFiveExists(roster)).toBe(true);
   });
-  it('rejects duplicate version ids and wrong sizes', () => {
-    const roster = [g('pv-01', 'PG'), g('pv-01', 'PG')];
-    const failures = validateSeasonRoster(roster);
-    expect(failures.some((f) => f.includes('distinct'))).toBe(true);
-    expect(failures.some((f) => f.includes('exactly 10'))).toBe(true);
-  });
-  it('rejects rosters missing the game minimums', () => {
+  it('accepts a fragile roster with exactly one legal five', () => {
     const roster = [
       g('pv-01', 'PG'),
       g('pv-02', 'SG'),
       g('pv-03', 'SF'),
       g('pv-04', 'PF'),
       g('pv-05', 'C'),
-      g('pv-06', 'C'),
-      g('pv-07', 'C'),
+      g('pv-06', 'SF'),
+      g('pv-07', 'PF'),
       g('pv-08', 'SF'),
       g('pv-09', 'PF'),
       g('pv-10', 'SF'),
     ];
+    expect(legalFiveExists(roster)).toBe(true);
+    expect(legalFiveAfterAnyRemoval(roster)).toBe(false);
+    expect(validateSeasonRoster(roster)).toEqual([]);
+  });
+  it('rejects rosters with no legal five', () => {
+    const roster = [
+      g('pv-01', 'PG'),
+      g('pv-02', 'SG'),
+      g('pv-03', 'SF'),
+      g('pv-04', 'PF'),
+      g('pv-05', 'SF'),
+      g('pv-06', 'PF'),
+      g('pv-07', 'SF'),
+      g('pv-08', 'PF'),
+      g('pv-09', 'SF'),
+      g('pv-10', 'PF'),
+    ];
     const failures = validateSeasonRoster(roster);
-    expect(failures.some((f) => f.includes('guard-capable'))).toBe(true);
+    expect(failures.some((f) => f.includes('no legal G,G,F,F,C starting five'))).toBe(true);
+  });
+  it('rejects duplicate version ids and wrong sizes', () => {
+    const roster = [g('pv-01', 'PG'), g('pv-01', 'PG')];
+    const failures = validateSeasonRoster(roster);
+    expect(failures.some((f) => f.includes('distinct'))).toBe(true);
+    expect(failures.some((f) => f.includes('exactly 10'))).toBe(true);
   });
   it('catches the greedy-matching counterexample for the legal five', () => {
     const members = [
@@ -87,7 +107,7 @@ describe('season roster legality (season-roster-v1)', () => {
     ];
     expect(legalFiveExists(noCenter)).toBe(false);
   });
-  it('rejects rosters with no legal five after removing a key player', () => {
+  it('accepts a fragile roster that loses its five after removing a key player', () => {
     const roster = [
       g('pv-01', 'PG'),
       g('pv-02', 'SG'),
@@ -101,7 +121,7 @@ describe('season roster legality (season-roster-v1)', () => {
       g('pv-10', 'PF'),
     ];
     expect(legalFiveAfterAnyRemoval(roster)).toBe(false);
-    expect(validateSeasonRoster(roster).some((f) => f.includes('removing'))).toBe(true);
+    expect(validateSeasonRoster(roster)).toEqual([]);
   });
 });
 describe('season roster feasibility', () => {
@@ -118,7 +138,8 @@ describe('season roster feasibility', () => {
       g('pv-10', 'PF', 'C'),
     ];
     expect(rosterFeasible(owned, available, 8)).toBe(true);
-    expect(rosterFeasible(owned, available, 3)).toBe(false);
+    expect(rosterFeasible(owned, available, 3)).toBe(true);
+    expect(rosterFeasible(owned, available, 1)).toBe(false);
   });
   it('is exact for overlapping multi-position candidates', () => {
     const owned: SeasonRosterMemberInput[] = [];
@@ -235,8 +256,8 @@ describe('season generation digest', () => {
     };
     const diagnostics: SeasonGenerationDiagnostics = {
       seed: seedSchema.parse(seed),
-      aiVersion: 'season-ai-v4',
-      rosterGenerationVersion: 'roster-generation-v4',
+      aiVersion: SEASON_AI_VERSION,
+      rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
       teamsGenerated: 2,
       teamsRepaired: 0,
       backtracks: 0,
@@ -337,10 +358,10 @@ describe('season generation digest', () => {
       );
     const base = {
       seed: seedSchema.parse(seed),
-      aiVersion: 'season-ai-v3',
-      rosterGenerationVersion: 'roster-generation-v3',
-      rotationVersion: 'season-rotation-v2',
-      targetsVersion: 'roster-targets-v3',
+      aiVersion: SEASON_AI_VERSION,
+      rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
+      rotationVersion: SEASON_ROTATION_VERSION,
+      targetsVersion: SEASON_ROSTER_TARGETS_VERSION,
       rosters: [roster('lakers'), roster('celtics')],
       ownership: [
         { playerVersionId: versionId(2), ownerFranchiseId: franchiseIdSchema.parse('lakers') },

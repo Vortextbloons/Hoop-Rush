@@ -1,5 +1,6 @@
 import type {
   PlayerVersionId,
+  Position,
   SeasonDraftCatalog,
   SeasonDraftCommandPayload,
   SeasonDraftCommandRecord,
@@ -13,6 +14,7 @@ import type {
 import { SEASON_DRAFT_VERSION, seasonLeagueGenerationResultSchema } from '@hoop-rush/data-contracts';
 import {
   applySeasonDraftCommand,
+  legalFiveExists,
   type SeasonAiGenerationDeps,
   type SeasonAiGenerationInput,
   type SeasonAiGenerationProgress,
@@ -26,7 +28,7 @@ import {
   type GenerationWorkerResponse,
 } from './season-generation-wire.ts';
 export const SOLO_PARTICIPANT_ID = 'human';
-export const COVERAGE_TARGETS = { guards: 4, forwards: 4, centers: 3 } as const;
+export const FIVE_COVERAGE_TARGETS = { guards: 2, forwards: 2, centers: 1 } as const;
 export type SeasonDraftFlowPhase = 'idle' | 'drafting' | 'finalized' | 'generating' | 'complete';
 export type DraftStage = 'executive' | 'drafting' | 'ready' | 'generating' | 'stalled' | 'complete';
 export interface DraftStageInput {
@@ -56,7 +58,7 @@ export function humanizeDraftGenerationError(raw: string | null): string {
 }
 export function humanizeCoverageReason(reason: string | null): string | null {
   if (reason === null) return null;
-  return 'Would leave a group unfillable with the picks left. One versatile player may cover more than one group.';
+  return 'Would leave no legal starting five reachable with the picks left. One versatile player may cover more than one group.';
 }
 export function humanizeDraftError(raw: string | null): string {
   if (raw === null || raw.trim().length === 0) return 'That pick did not go through. Try again.';
@@ -64,8 +66,8 @@ export function humanizeDraftError(raw: string | null): string {
   if (lower.includes('no_offer_drawn') || lower.includes('no offer')) {
     return 'Draw this round first, then pick one player.';
   }
-  if (lower.includes('uncompletable') || lower.includes('completion targets unreachable')) {
-    return 'That player would leave a group unfillable with the picks left.';
+  if (lower.includes('uncompletable') || lower.includes('no legal starting five')) {
+    return 'That player would leave no legal starting five reachable with the picks left.';
   }
   if (lower.includes('invalid_catalog') || lower.includes('invalid catalog')) {
     return 'Season files are unavailable. Check your connection and retry.';
@@ -78,6 +80,7 @@ export interface SeasonDraftFlowState {
   lastRecord: SeasonDraftCommandRecord | null;
   phase: SeasonDraftFlowPhase;
 }
+export type FragileGroup = 'guards' | 'forwards' | 'centers';
 export function coverageNeeds(
   picks: readonly SeasonDraftPick[],
   catalog: SeasonDraftCatalog,
@@ -85,8 +88,11 @@ export function coverageNeeds(
   guards: number;
   forwards: number;
   centers: number;
+  hasLegalFive: boolean;
+  fragileGroups: FragileGroup[];
 } {
   const byId = new Map(catalog.candidates.map((c) => [c.playerVersionId, c]));
+  const members: Array<{ playerVersionId: string; playable: readonly Position[] }> = [];
   let guards = 0;
   let forwards = 0;
   let centers = 0;
@@ -94,11 +100,28 @@ export function coverageNeeds(
     const candidate = byId.get(pick.playerVersionId);
     if (!candidate) continue;
     const playable = new Set(candidate.positions.playable);
+    members.push({ playerVersionId: pick.playerVersionId, playable: candidate.positions.playable });
     if (playable.has('PG') || playable.has('SG')) guards += 1;
     if (playable.has('SF') || playable.has('PF')) forwards += 1;
     if (playable.has('C')) centers += 1;
   }
-  return { guards, forwards, centers };
+  const hasLegalFive = legalFiveExists(members);
+  const fragileGroups: FragileGroup[] = [];
+  if (hasLegalFive) {
+    const critical: Record<FragileGroup, boolean> = { guards: false, forwards: false, centers: false };
+    for (let remove = 0; remove < members.length; remove += 1) {
+      const remaining = members.filter((_, index) => index !== remove);
+      if (legalFiveExists(remaining)) continue;
+      const playable = new Set(members[remove]?.playable ?? []);
+      if (playable.has('PG') || playable.has('SG')) critical.guards = true;
+      if (playable.has('SF') || playable.has('PF')) critical.forwards = true;
+      if (playable.has('C')) critical.centers = true;
+    }
+    if (critical.guards) fragileGroups.push('guards');
+    if (critical.forwards) fragileGroups.push('forwards');
+    if (critical.centers) fragileGroups.push('centers');
+  }
+  return { guards, forwards, centers, hasLegalFive, fragileGroups };
 }
 function isGenerationDeps(
   value: SeasonAiGenerationDeps | SeasonRosterTargets,

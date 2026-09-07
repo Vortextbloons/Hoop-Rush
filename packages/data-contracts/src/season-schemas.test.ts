@@ -60,6 +60,9 @@ import {
   seasonBlockRecapSchema,
   SEASON_NEUTRAL_HOME_COURT,
   SEASON_WORKER_WIRE_SCHEMA_VERSION,
+  SEASON_AI_VERSION,
+  SEASON_ROSTER_GENERATION_VERSION,
+  SEASON_ROSTER_TARGETS_VERSION,
   RATINGS_VERSION,
   seasonMinutePolicySchema,
 } from './index.ts';
@@ -905,7 +908,7 @@ describe('season draft catalog schema (M2.1)', () => {
     expect(() => seasonDraftCatalogSchema.parse({ ...catalog, candidates })).toThrow();
   });
 });
-describe('season draft state schema (M2.3.5 season-draft-v2)', () => {
+describe('season draft state schema (M2.3.5 season-draft-v3)', () => {
   const seedPath = ['draft', 'offer', 'p1', '1', '1', 'safe-order', 'sample-order'];
   const cards = [
     { playerVersionId: `pv-${'1'.repeat(32)}`, selectable: true, coverageReason: null },
@@ -923,11 +926,11 @@ describe('season draft state schema (M2.3.5 season-draft-v2)', () => {
   ];
   const baseState = {
     schemaVersion: 2,
-    draftVersion: 'season-draft-v2',
+    draftVersion: 'season-draft-v3',
     runId: 'run-1',
     rootSeed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a',
     league: buildLeague(),
-    catalogVersion: 'season-draft-v2',
+    catalogVersion: 'season-draft-v3',
     participants: [
       { participantId: 'p1', franchiseId: 'lakers' },
       { participantId: 'p2', franchiseId: 'celtics' },
@@ -980,7 +983,7 @@ describe('season draft state schema (M2.3.5 season-draft-v2)', () => {
             rootSeed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a',
             league: buildLeague(),
             humanParticipantIds: ['p1', 'p2'],
-            catalogVersion: 'season-draft-v2',
+            catalogVersion: 'season-draft-v3',
           },
         },
       },
@@ -993,7 +996,7 @@ describe('season draft state schema (M2.3.5 season-draft-v2)', () => {
     expect(state.currentOffer).not.toBeNull();
     expect(state.offers).toHaveLength(1);
     expect(state.schemaVersion).toBe(2);
-    expect(state.catalogVersion).toBe('season-draft-v2');
+    expect(state.catalogVersion).toBe('season-draft-v3');
   });
   it('rejects wrong draft versions and malformed offers', () => {
     expect(() =>
@@ -1106,7 +1109,7 @@ describe('season draft command records (M2.1)', () => {
           rootSeed: 'a1b2c3d4e5f60718',
           league: buildLeague(),
           humanParticipantIds: ['p1'],
-          catalogVersion: 'season-draft-v2',
+          catalogVersion: 'season-draft-v3',
         },
       }),
     ).not.toThrow();
@@ -1127,7 +1130,7 @@ describe('season draft command records (M2.1)', () => {
     ).not.toThrow();
   });
 });
-describe('season run draft facts (M2.3.5 season-draft-v2 only)', () => {
+describe('season run draft facts (M2.3.5 season-draft-v3 only)', () => {
   it('rejects legacy season-draft-v1 run facts', () => {
     const run = buildRun();
     const legacyFacts = {
@@ -1162,7 +1165,7 @@ describe('season run draft facts (M2.3.5 season-draft-v2 only)', () => {
     expect(() =>
       seasonRunSchema.parse({
         ...run,
-        draft: { draftVersion: 'season-draft-v3', participants: [] },
+        draft: { draftVersion: 'season-draft-v9', participants: [] },
       }),
     ).toThrow();
   });
@@ -1232,7 +1235,7 @@ describe('season rotation schema (M2.1)', () => {
     ).toThrow();
   });
 });
-describe('season AI contracts (M2.1, M2.4 roster-generation-v3)', () => {
+describe('season AI contracts (M2.1, M2.4 roster-generation-v5)', () => {
   it('round-trips assignments and diagnostics', () => {
     const assignment = {
       franchiseId: 'lakers',
@@ -1243,8 +1246,8 @@ describe('season AI contracts (M2.1, M2.4 roster-generation-v3)', () => {
     expect(() => seasonAiAssignmentSchema.parse({ ...assignment, band: 'super' })).toThrow();
     const diagnostics = {
       seed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a',
-      aiVersion: 'season-ai-v3',
-      rosterGenerationVersion: 'roster-generation-v3',
+      aiVersion: SEASON_AI_VERSION,
+      rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
       teamsGenerated: 29,
       teamsRepaired: 1,
       backtracks: 2,
@@ -1338,8 +1341,8 @@ describe('season AI contracts (M2.1, M2.4 roster-generation-v3)', () => {
     const result = {
       schemaVersion: 2,
       seed: SEED,
-      aiVersion: 'season-ai-v3',
-      rosterGenerationVersion: 'roster-generation-v3',
+      aiVersion: SEASON_AI_VERSION,
+      rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
       rotationVersion: 'season-rotation-v3',
       rosters,
       ownership,
@@ -1349,8 +1352,8 @@ describe('season AI contracts (M2.1, M2.4 roster-generation-v3)', () => {
       evaluations,
       diagnostics: {
         seed: SEED,
-        aiVersion: 'season-ai-v3',
-        rosterGenerationVersion: 'roster-generation-v3',
+        aiVersion: SEASON_AI_VERSION,
+        rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
         teamsGenerated: 29,
         teamsRepaired: 0,
         backtracks: 0,
@@ -1388,7 +1391,7 @@ describe('season AI contracts (M2.1, M2.4 roster-generation-v3)', () => {
       }),
     ).toThrow();
   });
-  it('rejects the v1 targets artifact, wrong target versions, and malformed v2 policy', () => {
+  it('rejects the v1 targets artifact, wrong target versions, and malformed v3 policy', () => {
     const v1Targets = {
       schemaVersion: 1,
       targetsVersion: 'roster-targets-v1',
@@ -1435,9 +1438,9 @@ describe('season AI contracts (M2.1, M2.4 roster-generation-v3)', () => {
     const run = roundTrip(seasonRunSchema, buildRun());
     expect(run.schemaVersion).toBe(14);
     expect(run.versions.runSchemaVersion).toBe(14);
-    expect(run.versions.rosterGenerationVersion).toBe('roster-generation-v3');
-    expect(run.versions.aiVersion).toBe('season-ai-v3');
-    expect(run.versions.rosterTargetsVersion).toBe('roster-targets-v3');
+    expect(run.versions.rosterGenerationVersion).toBe(SEASON_ROSTER_GENERATION_VERSION);
+    expect(run.versions.aiVersion).toBe(SEASON_AI_VERSION);
+    expect(run.versions.rosterTargetsVersion).toBe(SEASON_ROSTER_TARGETS_VERSION);
     expect(run.versions.rotationVersion).toBe('season-rotation-v3');
     expect(run.versions.minutePolicyVersion).toBe('minute-policy-v1');
     expect(run.aiPools).toHaveLength(29);

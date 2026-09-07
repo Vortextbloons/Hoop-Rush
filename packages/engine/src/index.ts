@@ -93,7 +93,6 @@ export {
   rosterGroupCounts,
   legalFiveExists,
   legalFiveAfterAnyRemoval,
-  completionTargetsMet,
   validateSeasonRoster,
   rosterFeasible,
   type SeasonRosterMemberInput,

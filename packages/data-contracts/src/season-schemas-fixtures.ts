@@ -20,12 +20,14 @@ import { SEASON_OBJECTIVE_CATALOG } from './season-objective.ts';
 import { buildEmptyChallengeState } from './season-challenge.ts';
 import { SEASON_ALIGNMENT } from './season-alignment.ts';
 import {
+  SEASON_AI_VERSION,
   SEASON_BLOCK_VERSION,
   SEASON_CAMPAIGN_VERSION,
   SEASON_CHECKPOINT_VERSION,
   SEASON_CHALLENGE_TARGETS_VERSION,
   SEASON_CHALLENGE_VERSION,
   SEASON_COMMAND_LOG_VERSION,
+  SEASON_DRAFT_VERSION,
   SEASON_FREE_AGENCY_INDEX_VERSION,
   SEASON_FREE_AGENCY_TARGETS_VERSION,
   SEASON_FREE_AGENCY_VERSION,
@@ -34,6 +36,9 @@ import {
   SEASON_OBJECTIVE_VERSION,
   SEASON_RECAP_VERSION,
   SEASON_REPLAY_EXPORT_VERSION,
+  SEASON_ROSTER_GENERATION_VERSION,
+  SEASON_ROSTER_RULES_VERSION,
+  SEASON_ROSTER_TARGETS_VERSION,
   SEASON_RUN_SCHEMA_VERSION,
 } from './season-versions.ts';
 import {
@@ -231,16 +236,16 @@ export function buildRun(): SeasonRun {
       postseasonVersion: 'postseason-v2',
       seedDerivationVersion: 'season-seeds-v1',
       playerVersionIdVersion: 'player-version-id-v1',
-      draftVersion: 'season-draft-v2',
-      rosterRulesVersion: 'season-roster-v2',
-      rosterGenerationVersion: 'roster-generation-v3',
-      aiVersion: 'season-ai-v3',
+      draftVersion: SEASON_DRAFT_VERSION,
+      rosterRulesVersion: SEASON_ROSTER_RULES_VERSION,
+      rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
+      aiVersion: SEASON_AI_VERSION,
       rotationVersion: 'season-rotation-v3',
       minutePolicyVersion: 'minute-policy-v1',
       rotationPlannerVersion: 'rotation-planner-v1',
       gameVersion: 'season-game-v4',
       gameTargetsVersion: 'season-game-targets-v4',
-      rosterTargetsVersion: 'roster-targets-v3',
+      rosterTargetsVersion: SEASON_ROSTER_TARGETS_VERSION,
       blockVersion: SEASON_BLOCK_VERSION,
       summaryVersion: 'season-game-summary-v4',
       aggregatesVersion: 'season-aggregates-v3',
@@ -324,7 +329,7 @@ export function buildRun(): SeasonRun {
     awards: null,
     completion: null,
     draft: {
-      draftVersion: 'season-draft-v2',
+      draftVersion: SEASON_DRAFT_VERSION,
       participants: [
         {
           participantId: 'p1',
@@ -344,7 +349,7 @@ export function buildRun(): SeasonRun {
                   playerVersionId: `pv-${'6'.repeat(32)}`,
                   selectable: false,
                   coverageReason:
-                    'Selecting this version would leave the 4G/4F/3C completion targets unreachable with the remaining picks',
+                    'Selecting this version would leave no legal starting five reachable with the remaining picks',
                 },
                 { playerVersionId: `pv-${'7'.repeat(32)}`, selectable: true, coverageReason: null },
                 { playerVersionId: `pv-${'8'.repeat(32)}`, selectable: true, coverageReason: null },
@@ -385,16 +390,16 @@ export function buildRun(): SeasonRun {
     }),
     generationAudit: {
       seed: SEED,
-      aiVersion: 'season-ai-v3',
-      rosterGenerationVersion: 'roster-generation-v3',
+      aiVersion: SEASON_AI_VERSION,
+      rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
       rotationVersion: 'season-rotation-v3',
       minutePolicyVersion: 'minute-policy-v1',
-      rosterTargetsVersion: 'roster-targets-v3',
+      rosterTargetsVersion: SEASON_ROSTER_TARGETS_VERSION,
       digest: '0'.repeat(32),
       diagnostics: {
         seed: SEED,
-        aiVersion: 'season-ai-v3',
-        rosterGenerationVersion: 'roster-generation-v3',
+        aiVersion: SEASON_AI_VERSION,
+        rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
         teamsGenerated: 29,
         teamsRepaired: 0,
         backtracks: 0,

@@ -12,7 +12,11 @@
   } from '$lib/season/season-effects-view';
   import type { SeasonEffectsState, SeasonGameSummary } from '@hoop-rush/data-contracts';
   import { candidateOf } from '$lib/season/season-catalog-index';
-  import { gearPointsOf, sponsorSlotsOf } from '$lib/season/sponsor-gear-view';
+  import {
+    boostedOverallDeltaForPlayer,
+    gearPointsOf,
+    sponsorSlotsOf,
+  } from '$lib/season/sponsor-gear-view';
   import type { SeasonRun } from '@hoop-rush/data-contracts';
   let {
     roster,
@@ -82,6 +86,14 @@
       {@const lastMinutes = lastGameMinutes.get(entry.playerVersionId) ?? null}
       {@const gearPoints =
         sponsorsRun === null ? 0 : gearPointsOf(sponsorSlotsOf(sponsorsRun, entry.playerVersionId))}
+      {@const overallDelta =
+        sponsorsRun === null || candidate === null
+          ? null
+          : boostedOverallDeltaForPlayer(sponsorsRun, entry.playerVersionId, {
+              overall: candidate.summaryRatings.overallRating,
+              baseRatings: candidate.detailedRatings,
+              tendencies: candidate.tendencies,
+            })}
       <li
         data-season-roster-status={active ? 'active' : 'inactive'}
         class="overflow-hidden bg-surface-1 p-0 sm:rounded-xl"
@@ -98,6 +110,7 @@
           teamExternalId={modernIdentity?.teamExternalId ?? ''}
           teamDisplayName={eraIdentity?.displayLabel ?? modernIdentity?.displayName ?? ''}
           overall={candidate?.summaryRatings.overallRating ?? null}
+          {overallDelta}
           {playable}
           role={rotation.role}
           minutes={rotation.minutes}

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import {
+  SEASON_AI_VERSION,
   SEASON_DRAFT_OFFER_SIZE,
   SEASON_DRAFT_SAFE_MINIMUM,
+  SEASON_ROSTER_GENERATION_VERSION,
   SEASON_ROSTER_TARGETS_VERSION,
   SEASON_ROTATION_VERSION,
   eraIdSchema,
@@ -159,8 +161,8 @@ function buildFakeGeneration(input: FakeGenerationInput): SeasonLeagueGeneration
     });
   const diagnostics: SeasonGenerationDiagnostics = {
     seed: input.seed,
-    aiVersion: 'season-ai-v4',
-    rosterGenerationVersion: 'roster-generation-v4',
+    aiVersion: SEASON_AI_VERSION,
+    rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
     teamsGenerated: 29,
     teamsRepaired: 0,
     backtracks: 0,
@@ -171,8 +173,8 @@ function buildFakeGeneration(input: FakeGenerationInput): SeasonLeagueGeneration
   };
   const digest = seasonGenerationDigest({
     seed: input.seed,
-    aiVersion: 'season-ai-v3',
-    rosterGenerationVersion: 'roster-generation-v3',
+    aiVersion: SEASON_AI_VERSION,
+    rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
     rotationVersion: SEASON_ROTATION_VERSION,
     rosters,
     ownership,
@@ -185,8 +187,8 @@ function buildFakeGeneration(input: FakeGenerationInput): SeasonLeagueGeneration
   return seasonLeagueGenerationResultSchema.parse({
     schemaVersion: 2,
     seed: input.seed,
-    aiVersion: 'season-ai-v3',
-    rosterGenerationVersion: 'roster-generation-v3',
+    aiVersion: SEASON_AI_VERSION,
+    rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
     rotationVersion: SEASON_ROTATION_VERSION,
     rosters,
     ownership,
@@ -212,7 +214,7 @@ function createSolo(
       rootSeed: seedSchema.parse(rootSeed),
       league,
       humanParticipantIds: ['p1'],
-      catalogVersion: 'season-draft-v2',
+      catalogVersion: 'season-draft-v3',
     }),
     fakeDeps(),
   );
@@ -231,7 +233,7 @@ function createDuo(
       rootSeed: seedSchema.parse(rootSeed),
       league,
       humanParticipantIds: ['p1', 'p2'],
-      catalogVersion: 'season-draft-v2',
+      catalogVersion: 'season-draft-v3',
     }),
     fakeDeps(),
   );
@@ -319,7 +321,7 @@ function playToFinalized(
       rootSeed: seedSchema.parse(rootSeed),
       league,
       humanParticipantIds: ids,
-      catalogVersion: 'season-draft-v2',
+      catalogVersion: 'season-draft-v3',
     }),
     deps,
   );
@@ -449,8 +451,8 @@ describe('season draft create', () => {
     expect(state.round).toBe(1);
     expect(state.revision).toBe(1);
     expect(state.schemaVersion).toBe(2);
-    expect(state.draftVersion).toBe('season-draft-v2');
-    expect(state.catalogVersion).toBe('season-draft-v2');
+    expect(state.draftVersion).toBe('season-draft-v3');
+    expect(state.catalogVersion).toBe('season-draft-v3');
     expect(state.currentOffer).toBeNull();
     expect(result.record).toMatchObject({
       status: 'accepted',
@@ -489,7 +491,7 @@ describe('season draft create', () => {
         rootSeed: SEED,
         league: LEAGUE,
         humanParticipantIds: ['p1'],
-        catalogVersion: 'season-draft-v2',
+        catalogVersion: 'season-draft-v3',
       }),
       fakeDeps(),
     );
@@ -515,7 +517,7 @@ describe('season draft create', () => {
         rootSeed: SEED,
         league: LEAGUE,
         humanParticipantIds: ['p1'],
-        catalogVersion: 'season-draft-v2',
+        catalogVersion: 'season-draft-v3',
       }),
       fakeDeps(),
     );
@@ -530,7 +532,7 @@ describe('season draft create', () => {
         rootSeed: SEED,
         league: badLeague,
         humanParticipantIds: ['p1'],
-        catalogVersion: 'season-draft-v2',
+        catalogVersion: 'season-draft-v3',
       }),
       fakeDeps(),
     );
@@ -552,7 +554,7 @@ describe('season draft create', () => {
         rootSeed: SEED,
         league: LEAGUE,
         humanParticipantIds: ['p1', 'p2'],
-        catalogVersion: 'season-draft-v2',
+        catalogVersion: 'season-draft-v3',
       }),
       fakeDeps(),
     );
@@ -568,7 +570,7 @@ describe('season draft create', () => {
         rootSeed: SEED,
         league: LEAGUE,
         humanParticipantIds: ['p1', 'p1'],
-        catalogVersion: 'season-draft-v2',
+        catalogVersion: 'season-draft-v3',
       }),
       fakeDeps(),
     );
@@ -1178,8 +1180,8 @@ describe('season draft finalize and generation', () => {
         throw new SeasonAiGenerationError({
           diagnostics: {
             seed: SEED,
-            aiVersion: 'season-ai-v4',
-            rosterGenerationVersion: 'roster-generation-v4',
+            aiVersion: SEASON_AI_VERSION,
+            rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
             teamsGenerated: 20,
             teamsRepaired: 0,
             backtracks: 0,

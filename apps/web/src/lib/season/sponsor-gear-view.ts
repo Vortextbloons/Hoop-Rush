@@ -2,6 +2,8 @@ import {
   SEASON_SPONSOR_SLOTS,
   normalizeSponsorGearState,
   sponsorGearEntryOf,
+  summaryRatingsOfRatings,
+  type OffenseDefenseTendencies,
   type SeasonPlayerSponsorSlots,
   type SeasonRun,
   type SeasonSponsorBoost,
@@ -207,6 +209,7 @@ export interface PlayerSponsorCardModel {
   playable: readonly string[];
   overall: number | null;
   baseRatings: SimulationRatings;
+  tendencies: OffenseDefenseTendencies | null;
   role: string;
   minutes: number | string;
   fatigueLabel: string | null;
@@ -225,6 +228,7 @@ export interface PlayerSponsorCardInput {
   playable: readonly string[];
   overall: number | null;
   baseRatings: SimulationRatings;
+  tendencies: OffenseDefenseTendencies | null;
   role: string;
   minutes: number | string;
   fatigueLabel: string | null;
@@ -308,22 +312,7 @@ export function previewGearDeltas(
   },
 ): GearPreviewDelta[] {
   const current = applySponsorBoosts(base, slots);
-  const merged: SeasonPlayerSponsorSlots = {
-    shoe: slots?.shoe ?? null,
-    apparel: slots?.apparel ?? null,
-    fuel: slots?.fuel ?? null,
-  };
-  merged[candidate.slot] = {
-    instanceId: 'preview',
-    entryId: 'preview',
-    brandFamily: 'preview',
-    slot: candidate.slot,
-    tier: 'BUZZ',
-    boosts: candidate.boosts.map((boost) => ({ key: boost.key, points: boost.points })),
-    appliedBlock: 0,
-    appliedByCommandId: 'cmd-preview' as never,
-  };
-  const next = applySponsorBoosts(base, merged);
+  const next = applySponsorBoosts(base, slotsWithCandidate(slots, candidate));
   return candidate.boosts.map((boost) => ({
     key: boost.key,
     label: SPONSOR_RATING_SHORT_LABELS[boost.key],
@@ -343,4 +332,125 @@ export function sponsorHistorySummary(history: readonly SponsorBoardHistoryEntry
   if (bought > 0) parts.push(`${String(bought)} purchased`);
   if (expired > 0) parts.push(`${String(expired)} expired`);
   return parts.join(' · ');
+}
+
+const SPONSOR_TENDENCY_DEFAULTS: OffenseDefenseTendencies = {
+  turnoverRate: 12,
+  foulRate: 2,
+};
+
+function tendenciesOrDefaults(
+  tendencies: OffenseDefenseTendencies | null | undefined,
+): OffenseDefenseTendencies {
+  return {
+    turnoverRate: tendencies?.turnoverRate ?? SPONSOR_TENDENCY_DEFAULTS.turnoverRate,
+    foulRate: tendencies?.foulRate ?? SPONSOR_TENDENCY_DEFAULTS.foulRate,
+  };
+}
+
+function slotsWithCandidate(
+  slots: SeasonPlayerSponsorSlots | null,
+  candidate: {
+    slot: SeasonSponsorSlot;
+    boosts: readonly { key: SeasonSponsorBoostKey; points: number }[];
+  },
+): SeasonPlayerSponsorSlots {
+  const merged: SeasonPlayerSponsorSlots = {
+    shoe: slots?.shoe ?? null,
+    apparel: slots?.apparel ?? null,
+    fuel: slots?.fuel ?? null,
+  };
+  merged[candidate.slot] = {
+    instanceId: 'preview',
+    entryId: 'preview',
+    brandFamily: 'preview',
+    slot: candidate.slot,
+    tier: 'BUZZ',
+    boosts: candidate.boosts.map((boost) => ({ key: boost.key, points: boost.points })),
+    appliedBlock: 0,
+    appliedByCommandId: 'cmd-preview' as never,
+  };
+  return merged;
+}
+
+export function boostedOverallOf(
+  baseOverall: number | null,
+  baseRatings: SimulationRatings,
+  tendencies: OffenseDefenseTendencies | null | undefined,
+  slots: SeasonPlayerSponsorSlots | null,
+): number | null {
+  if (baseOverall === null) return null;
+  if (gearPointsOf(slots) === 0) return baseOverall;
+  const resolved = tendenciesOrDefaults(tendencies);
+  const before = summaryRatingsOfRatings(baseRatings, resolved).overallRating;
+  const after = summaryRatingsOfRatings(
+    applySponsorBoosts(baseRatings, slots),
+    resolved,
+  ).overallRating;
+  return Math.max(0, Math.min(100, baseOverall + (after - before)));
+}
+
+export function boostedOverallDeltaOf(
+  baseOverall: number | null,
+  baseRatings: SimulationRatings,
+  tendencies: OffenseDefenseTendencies | null | undefined,
+  slots: SeasonPlayerSponsorSlots | null,
+): number | null {
+  if (baseOverall === null) return null;
+  const next = boostedOverallOf(baseOverall, baseRatings, tendencies, slots);
+  if (next === null || next === baseOverall) return null;
+  return next - baseOverall;
+}
+
+export function previewBoostedOverallOf(
+  baseOverall: number | null,
+  baseRatings: SimulationRatings,
+  tendencies: OffenseDefenseTendencies | null | undefined,
+  slots: SeasonPlayerSponsorSlots | null,
+  candidate: {
+    slot: SeasonSponsorSlot;
+    boosts: readonly { key: SeasonSponsorBoostKey; points: number }[];
+  },
+): number | null {
+  if (baseOverall === null) return null;
+  return boostedOverallOf(
+    baseOverall,
+    baseRatings,
+    tendencies,
+    slotsWithCandidate(slots, candidate),
+  );
+}
+
+export interface BoostablePlayerRatings {
+  overall: number | null;
+  baseRatings: SimulationRatings;
+  tendencies: OffenseDefenseTendencies | null;
+}
+
+export function boostedOverallForPlayer(
+  run: SeasonRun | null,
+  playerVersionId: string,
+  player: BoostablePlayerRatings,
+): number | null {
+  if (player.overall === null) return null;
+  return boostedOverallOf(
+    player.overall,
+    player.baseRatings,
+    player.tendencies,
+    sponsorSlotsOf(run, playerVersionId),
+  );
+}
+
+export function boostedOverallDeltaForPlayer(
+  run: SeasonRun | null,
+  playerVersionId: string,
+  player: BoostablePlayerRatings,
+): number | null {
+  if (player.overall === null) return null;
+  return boostedOverallDeltaOf(
+    player.overall,
+    player.baseRatings,
+    player.tendencies,
+    sponsorSlotsOf(run, playerVersionId),
+  );
 }

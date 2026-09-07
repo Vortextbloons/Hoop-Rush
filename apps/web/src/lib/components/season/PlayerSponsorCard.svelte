@@ -11,7 +11,9 @@
     SPONSOR_RATING_LONG_LABELS,
     SPONSOR_SLOT_ICONS,
     SPONSOR_SLOT_LABELS,
+    boostedOverallDeltaOf,
     boostedRatingRows,
+    previewBoostedOverallOf,
     previewGearDeltas,
     type PlayerSponsorCardModel,
     type SponsorVaultEntry,
@@ -67,6 +69,11 @@
   const rows = $derived(card === null ? [] : boostedRatingRows(card.baseRatings, card.slots));
   const byKey = $derived(new Map(rows.map((row) => [row.key, row])));
   const changedCount = $derived(rows.filter((row) => row.boosted !== row.base).length);
+  const ovrDelta = $derived(
+    card === null
+      ? null
+      : boostedOverallDeltaOf(card.overall, card.baseRatings, card.tendencies, card.slots),
+  );
   const eraLabel = $derived(
     card === null ? null : eraIdentityOf(manifest, card.franchiseId, card.eraId).displayLabel,
   );
@@ -125,11 +132,21 @@
               {/if}
               <div class="mt-2 flex flex-wrap items-center gap-1.5">
                 {#if card.overall !== null}
-                  <span
-                    class="rounded-lg bg-primary px-2 py-1 font-mono text-xs font-extrabold text-primary-foreground"
-                  >
-                    OVR {card.overall}
-                  </span>
+                  {#if ovrDelta === null}
+                    <span
+                      class="rounded-lg bg-primary px-2 py-1 font-mono text-xs font-extrabold text-primary-foreground"
+                    >
+                      OVR {card.overall}
+                    </span>
+                  {:else}
+                    <span
+                      class="rounded-lg bg-primary px-2 py-1 font-mono text-xs font-extrabold text-primary-foreground"
+                      data-testid="sponsor-ovr-delta"
+                      title="Overall with gear applied"
+                    >
+                      OVR {card.overall} → {card.overall + ovrDelta}
+                    </span>
+                  {/if}
                 {/if}
                 <span class="rounded-lg bg-surface-3 px-2 py-1 font-mono text-[10px] font-bold">
                   {card.role} · {card.minutes} min
@@ -399,6 +416,16 @@
                         {#each options as option (option.instanceId)}
                           {@const dupe = families.has(option.brandFamily)}
                           {@const deltas = previewFor(slot, option)}
+                          {@const ovrPreview =
+                            card.overall === null
+                              ? null
+                              : previewBoostedOverallOf(
+                                  card.overall,
+                                  card.baseRatings,
+                                  card.tendencies,
+                                  card.slots,
+                                  { slot, boosts: option.boosts },
+                                )}
                           <li class="rounded-lg bg-surface-2 p-2">
                             <div class="flex items-center gap-2">
                               <SponsorMark
@@ -420,6 +447,11 @@
                                       : ''}
                                   {/each}
                                 </p>
+                                {#if ovrPreview !== null && card.overall !== null && ovrPreview !== card.overall}
+                                  <p class="font-mono text-[10px] font-bold text-primary">
+                                    OVR {card.overall} → {ovrPreview}
+                                  </p>
+                                {/if}
                                 {#if dupe}
                                   <p class="font-mono text-[10px] text-muted-foreground">
                                     Already worn by this player ({option.brandFamily})

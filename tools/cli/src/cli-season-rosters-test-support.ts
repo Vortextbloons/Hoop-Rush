@@ -26,7 +26,7 @@ export function handBuiltTargets(): SeasonRosterTargets {
     median: (range[0] + range[1]) / 2,
   });
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     targetsVersion: SEASON_ROSTER_TARGETS_VERSION,
     policy: {
       bandQuotas: {
@@ -50,7 +50,6 @@ export function handBuiltTargets(): SeasonRosterTargets {
         'active-trader': [...ROLES],
       },
       roleCoverageThreshold: 35,
-      completionTargets: { guards: 4, forwards: 4, centers: 3 },
       poolSize: 20,
       rosterSize: 10,
       percentileTiers: { elite: 0.9, strong: 0.75, useful: 0.5 },

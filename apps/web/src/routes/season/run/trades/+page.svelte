@@ -8,8 +8,9 @@
   import TradeBoardWorkspace from '$lib/components/season/TradeBoardWorkspace.svelte';
   import { tradeBoardViewModel } from '$lib/season/season-hub-state';
   import type { TradePackageDraft } from '$lib/season/season-presentation';
-  import { overallRatingOf } from '$lib/season/season-catalog-index';
+  import { overallRatingOf, candidateOf } from '$lib/season/season-catalog-index';
   import { overallRatingOfSlice } from '$lib/season/season-player-slice';
+  import { boostedOverallForPlayer } from '$lib/season/sponsor-gear-view';
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
   let mounted = $state(true);
   $effect(() => {
@@ -95,9 +96,17 @@
     return shell.facesByVersion.get(playerVersionId) ?? null;
   }
   function overallOf(playerVersionId: string): number | null {
-    return (
+    const base =
       overallRatingOf(shell.catalog, playerVersionId) ??
-      overallRatingOfSlice(shell.playerSlice, playerVersionId)
+      overallRatingOfSlice(shell.playerSlice, playerVersionId);
+    const candidate = candidateOf(shell.catalog, playerVersionId);
+    if (candidate === null || run === null) return base;
+    return (
+      boostedOverallForPlayer(run, playerVersionId, {
+        overall: candidate.summaryRatings.overallRating,
+        baseRatings: candidate.detailedRatings,
+        tendencies: candidate.tendencies,
+      }) ?? base
     );
   }
   function handlePurchase(): void {

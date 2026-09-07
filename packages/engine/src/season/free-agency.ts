@@ -39,7 +39,6 @@ import {
   type SeasonScoreMember,
 } from './ai-scoring.ts';
 import {
-  legalFiveAfterAnyRemoval,
   legalFiveExists,
   type SeasonRosterMemberInput,
 } from './roster-rules.ts';
@@ -416,7 +415,7 @@ function rosterLegalWithCandidate(
   const members = rosterMembers(context, roster);
   members.push(membership);
   if (members.length > SEASON_ROSTER_MAX_SIZE) return false;
-  return legalFiveExists(members) && legalFiveAfterAnyRemoval(members);
+  return legalFiveExists(members);
 }
 interface SeasonRosterLike {
   players: SeasonRosterEntry[];

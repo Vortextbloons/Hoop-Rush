@@ -20,8 +20,6 @@ import {
   type MinutePlanPlayerInput,
 } from '../season/minute-plan.ts';
 import {
-  completionTargetsMet,
-  legalFiveAfterAnyRemoval,
   legalFiveExists,
   rosterFeasible,
   validateSeasonRoster,
@@ -458,8 +456,6 @@ export function searchRosterRotationCandidates(
         }
         if (stateMembers.length >= 5 && !legalFiveExists(stateMembers)) continue;
         if (stateMembers.length === 10) {
-          if (!completionTargetsMet(stateMembers)) continue;
-          if (!legalFiveAfterAnyRemoval(stateMembers)) continue;
           complete.set(key, state);
           continue;
         }
@@ -500,7 +496,7 @@ export function searchRosterRotationCandidates(
     if (rotationsEvaluated >= rotationBudget) break;
     const rosterMembers = rosterInputMembers(roster, members);
     const legal = validateSeasonRoster(rosterMembers).length === 0;
-    const coverage = completionTargetsMet(rosterMembers);
+    const coverage = legalFiveExists(rosterMembers);
     const rotations = rotationsFor({
       roster,
       members,

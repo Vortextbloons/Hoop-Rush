@@ -5,7 +5,7 @@
   import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
   import { eraIdentityOf, type SeasonFaceRef } from '$lib/season/season-branding';
   import {
-    COVERAGE_TARGETS,
+    FIVE_COVERAGE_TARGETS,
     coverageNeeds,
     humanizeCoverageReason,
     SOLO_PARTICIPANT_ID,
@@ -65,14 +65,26 @@
     draft ? draft.picks.filter((p) => p.participantId === SOLO_PARTICIPANT_ID) : [],
   );
   const needs = $derived(
-    draft ? coverageNeeds(picks, catalog) : { guards: 0, forwards: 0, centers: 0 },
+    draft
+      ? coverageNeeds(picks, catalog)
+      : { guards: 0, forwards: 0, centers: 0, hasLegalFive: false, fragileGroups: [] },
   );
-  const guardsNeed = $derived(Math.max(0, COVERAGE_TARGETS.guards - needs.guards));
-  const forwardsNeed = $derived(Math.max(0, COVERAGE_TARGETS.forwards - needs.forwards));
-  const centersNeed = $derived(Math.max(0, COVERAGE_TARGETS.centers - needs.centers));
-  const guardTone = $derived(needTone(needs.guards, COVERAGE_TARGETS.guards));
-  const forwardTone = $derived(needTone(needs.forwards, COVERAGE_TARGETS.forwards));
-  const centerTone = $derived(needTone(needs.centers, COVERAGE_TARGETS.centers));
+  const guardsNeed = $derived(Math.max(0, FIVE_COVERAGE_TARGETS.guards - needs.guards));
+  const forwardsNeed = $derived(Math.max(0, FIVE_COVERAGE_TARGETS.forwards - needs.forwards));
+  const centersNeed = $derived(Math.max(0, FIVE_COVERAGE_TARGETS.centers - needs.centers));
+  const guardTone = $derived(needTone(needs.guards, FIVE_COVERAGE_TARGETS.guards));
+  const forwardTone = $derived(needTone(needs.forwards, FIVE_COVERAGE_TARGETS.forwards));
+  const centerTone = $derived(needTone(needs.centers, FIVE_COVERAGE_TARGETS.centers));
+  const fragilitySummary = $derived.by((): string | null => {
+    if (!needs.hasLegalFive || needs.fragileGroups.length === 0) return null;
+    const labels = needs.fragileGroups.map((group) =>
+      group === 'guards' ? 'guard' : group === 'forwards' ? 'forward' : 'center',
+    );
+    if (labels.length === 1)
+      return `No backup ${labels[0] ?? ''} — losing one ends the season.`;
+    const last = labels.pop();
+    return `No backup ${labels.join(', ')} or ${last ?? ''} — losing one ends the season.`;
+  });
   const needsSummary = $derived.by((): string | null => {
     const parts: string[] = [];
     if (guardsNeed > 0) parts.push(`${String(guardsNeed)} guard${guardsNeed === 1 ? '' : 's'}`);
@@ -80,10 +92,11 @@
       parts.push(`${String(forwardsNeed)} forward${forwardsNeed === 1 ? '' : 's'}`);
     if (centersNeed > 0)
       parts.push(`${String(centersNeed)} center-eligible player${centersNeed === 1 ? '' : 's'}`);
-    if (parts.length === 0) return 'Roster minimums covered — best available.';
-    if (parts.length === 1) return `You still need ${parts[0] ?? ''}.`;
+    if (parts.length === 0)
+      return needs.hasLegalFive ? 'Legal five available — best available.' : 'Roster needs review.';
+    if (parts.length === 1) return `You still need ${parts[0] ?? ''} toward a legal five.`;
     const last = parts.pop();
-    return `You still need ${parts.join(', ')} and ${last ?? ''}.`;
+    return `You still need ${parts.join(', ')} and ${last ?? ''} toward a legal five.`;
   });
   function needDisplay(have: number, target: number): string {
     if (have > target) return `${String(target)}+ of ${String(target)}`;
@@ -194,10 +207,10 @@
               Guards
             </dt>
             <dd class="font-display mt-0.5 text-xl font-extrabold {NEED_COUNT_TONE[guardTone]}">
-              {needDisplay(needs.guards, COVERAGE_TARGETS.guards)}
+              {needDisplay(needs.guards, FIVE_COVERAGE_TARGETS.guards)}
             </dd>
             <dd class="mt-0.5 text-[11px] {NEED_STATUS_TONE[guardTone]}">
-              {needStatus(needs.guards, COVERAGE_TARGETS.guards)}
+              {needStatus(needs.guards, FIVE_COVERAGE_TARGETS.guards)}
             </dd>
           </div>
           <div class="rounded-lg border p-2 text-center {NEED_BOX_TONE[forwardTone]}">
@@ -205,10 +218,10 @@
               Forwards
             </dt>
             <dd class="font-display mt-0.5 text-xl font-extrabold {NEED_COUNT_TONE[forwardTone]}">
-              {needDisplay(needs.forwards, COVERAGE_TARGETS.forwards)}
+              {needDisplay(needs.forwards, FIVE_COVERAGE_TARGETS.forwards)}
             </dd>
             <dd class="mt-0.5 text-[11px] {NEED_STATUS_TONE[forwardTone]}">
-              {needStatus(needs.forwards, COVERAGE_TARGETS.forwards)}
+              {needStatus(needs.forwards, FIVE_COVERAGE_TARGETS.forwards)}
             </dd>
           </div>
           <div class="rounded-lg border p-2 text-center {NEED_BOX_TONE[centerTone]}">
@@ -216,15 +229,18 @@
               Centers
             </dt>
             <dd class="font-display mt-0.5 text-xl font-extrabold {NEED_COUNT_TONE[centerTone]}">
-              {needDisplay(needs.centers, COVERAGE_TARGETS.centers)}
+              {needDisplay(needs.centers, FIVE_COVERAGE_TARGETS.centers)}
             </dd>
             <dd class="mt-0.5 text-[11px] {NEED_STATUS_TONE[centerTone]}">
-              {needStatus(needs.centers, COVERAGE_TARGETS.centers)}
+              {needStatus(needs.centers, FIVE_COVERAGE_TARGETS.centers)}
             </dd>
           </div>
         </dl>
         {#if needsSummary}
           <p class="mt-2 text-xs font-semibold">{needsSummary}</p>
+        {/if}
+        {#if fragilitySummary}
+          <p class="mt-1 text-xs font-semibold text-destructive">{fragilitySummary}</p>
         {/if}
         {#if offer}
           <p class="mt-2 text-xs text-muted-foreground">

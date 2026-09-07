@@ -105,13 +105,13 @@ describe('M3.11.1 DraftStage maps 1:1', () => {
   it('humanizes coverage and async errors without internals', () => {
     expect(
       humanizeCoverageReason(
-        'Selecting this version would leave the 4G/4F/3C completion targets unreachable with the remaining picks',
+        'Selecting this version would leave no legal starting five reachable with the remaining picks',
       ),
     ).toContain('versatile');
     expect(humanizeCoverageReason(null)).toBeNull();
     expect(humanizeDraftError('NO_OFFER_DRAWN')).toContain('Draw');
-    expect(humanizeDraftError('UNCOMPLETABLE_ROSTER completion targets unreachable')).toContain(
-      'unfillable',
+    expect(humanizeDraftError('UNCOMPLETABLE_ROSTER no legal starting five')).toContain(
+      'starting five',
     );
     expect(humanizeDraftError(null)).toContain('Try again');
   });
