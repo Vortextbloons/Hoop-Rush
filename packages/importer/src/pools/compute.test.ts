@@ -615,10 +615,10 @@ describe('rawOverallScoreFor', () => {
 describe('overallBandForPercentile', () => {
   it('assigns the exact band endpoints', () => {
     expect(overallBandForPercentile(0)).toBe(99);
-    expect(overallBandForPercentile(0.008)).toBe(96);
-    expect(overallBandForPercentile(0.025)).toBe(93);
-    expect(overallBandForPercentile(0.065)).toBe(89);
-    expect(overallBandForPercentile(0.135)).toBe(85);
+    expect(overallBandForPercentile(0.003)).toBe(96);
+    expect(overallBandForPercentile(0.013)).toBe(93);
+    expect(overallBandForPercentile(0.038)).toBe(89);
+    expect(overallBandForPercentile(0.123)).toBe(85);
     expect(overallBandForPercentile(0.25)).toBe(81);
     expect(overallBandForPercentile(0.42)).toBe(77);
     expect(overallBandForPercentile(0.5)).toBe(75);
