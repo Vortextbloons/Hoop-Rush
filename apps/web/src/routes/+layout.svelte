@@ -20,6 +20,8 @@
   ];
   const routeId = $derived(page.route.id);
   const isMultiplayerLobby = $derived(routeId === '/multiplayer');
+  const isUltimate =
+    $derived(routeId === '/collection' || routeId?.startsWith('/collection/') === true);
   const showBottomNav = $derived(
     routeId === '/' ||
       routeId === '/roster' ||
@@ -53,7 +55,7 @@
       class="flex items-center gap-2.5 text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <img
-        src={asset('/app-icon-96.png')}
+        src={isUltimate ? asset('/ultimate/logo.png') : asset('/app-icon-96.png')}
         alt=""
         class="h-9 w-9 rounded-lg object-contain"
         width="36"
@@ -62,7 +64,7 @@
         decoding="async"
       />
       <span class="font-display text-2xl font-extrabold tracking-tight">
-        Hoop <span class="text-primary">Rush</span>
+        Hoop <span class={isUltimate ? 'text-accent' : 'text-primary'}>Rush</span>
       </span>
     </a>
     {#if showBottomNav}

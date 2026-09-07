@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { resolve } from '$app/paths';
+  import { asset, resolve } from '$app/paths';
+  import '$lib/collection/ultimate-theme.css';
   import { onDestroy } from 'svelte';
   import type {
     CollectionCatalog,
@@ -160,11 +161,15 @@
   <title>Packs · Hoop Rush</title>
 </svelte:head>
 
-<div class="mx-auto w-full max-w-6xl px-3 py-6 sm:px-6">
+<div class="ultimate-root mx-auto w-full max-w-6xl px-3 py-6 sm:px-6">
   <div class="flex flex-wrap items-end justify-between gap-3">
-    <div>
-      <h1 class="font-display text-3xl font-extrabold tracking-tight">Pack store</h1>
-      <p class="text-sm text-muted-foreground">Seeded pulls. Odds shown before every purchase.</p>
+    <div class="flex items-center gap-3">
+      <img src={asset('/ultimate/logo.png')} alt="Ultimate Run" class="h-11 w-11 rounded-lg" width="44" height="44" />
+      <div>
+        <p class="ultimate-eyebrow">Ultimate Run</p>
+        <h1 class="font-display text-3xl font-extrabold tracking-tight">Pack store</h1>
+        <p class="text-sm text-muted-foreground">Seeded pulls. Odds shown before every purchase.</p>
+      </div>
     </div>
     <div class="flex items-center gap-4 text-sm">
       <span><strong class="tabular-nums">{balances.Coins}</strong> Coins</span>

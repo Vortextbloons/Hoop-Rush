@@ -235,13 +235,14 @@ describe('derivePlayerRecord (field-method registry)', () => {
           boxPlusMinus: 3.592,
           usageRate: 31.4,
           tsPct: 0.669,
+          efgPct: 0.631,
         }),
         'SG',
         { heightInches: 75 },
       ),
     );
-    expect(curryLike.summaryRatings.overallRating).toBeGreaterThanOrEqual(95);
-    expect(curryLike.summaryRatings.overallRating).toBeLessThanOrEqual(99);
+    expect(curryLike.summaryRatings.overallRating).toBeGreaterThanOrEqual(90);
+    expect(curryLike.summaryRatings.overallRating).toBeLessThanOrEqual(98);
     expect(computeProductionImpact(starterStats())).toBeLessThan(99);
   });
   it('recognizes complete elite seasons without requiring 28 points per game', () => {
@@ -269,13 +270,14 @@ describe('derivePlayerRecord (field-method registry)', () => {
           boxPlusMinus: 4.456,
           usageRate: 29.4,
           tsPct: 0.64,
+          efgPct: 0.607,
         }),
         'SF',
         { heightInches: 80 },
       ),
     );
-    expect(lebronLike.summaryRatings.overallRating).toBeGreaterThanOrEqual(95);
-    expect(lebronLike.summaryRatings.overallRating).toBeLessThanOrEqual(97);
+    expect(lebronLike.summaryRatings.overallRating).toBeGreaterThanOrEqual(88);
+    expect(lebronLike.summaryRatings.overallRating).toBeLessThanOrEqual(94);
   });
   it('credits exceptional pre-event-stat center defense without a player override', () => {
     const russellLike = derivePlayerRecord(
@@ -406,14 +408,21 @@ describe('derivePlayerRecord (field-method registry)', () => {
   it('records every material athletic-rating input in provenance', () => {
     const derived = derivePlayerRecord(input('2023-24', starterStats(), 'SG'));
     expect(derived.provenance['speed']?.sourceFields).toEqual(
-      expect.arrayContaining(['position', 'heightInches', 'usageRate', 'minutes', 'steals']),
+      expect.arrayContaining(['heightInches']),
     );
+    expect(derived.provenance['speed']?.notesCode).toBe('no-speed-tracking');
     expect(derived.provenance['strength']?.sourceFields).toEqual(
-      expect.arrayContaining(['position', 'heightInches', 'per']),
+      expect.arrayContaining(['position', 'heightInches']),
     );
     expect(derived.provenance['vertical']?.sourceFields).toEqual(
-      expect.arrayContaining(['blocks', 'offensiveRebounds', 'position']),
+      expect.arrayContaining(['blocks', 'offensiveRebounds', 'minutes']),
     );
+  });
+  it('uses speed-tracking evidence for speed when avgSpeed is present', () => {
+    const tracked = derivePlayerRecord(input('2023-24', starterStats({ avgSpeed: 4.7 }), 'SG'));
+    expect(tracked.provenance['speed']?.kind).toBe('derived');
+    expect(tracked.provenance['speed']?.sourceFields).toContain('avgSpeed');
+    expect(tracked.provenance['speed']?.notesCode).toBeUndefined();
   });
   it('smoothly penalizes sustained low-impact bench seasons', () => {
     const derived = derivePlayerRecord(
@@ -483,11 +492,17 @@ describe('derivePlayerRecord (field-method registry)', () => {
     expect(fieldPublished('threesAttempted', '1978-79')).toBe(false);
     expect(fieldPublished('points', '1960-61')).toBe(true);
   });
-  it('rating kind follows evidence: high-sample observed inputs derive; sparse inputs estimate', () => {
-    const full = derivePlayerRecord(input('1996-97', starterStats()));
-    expect(full.provenance['perimeterDefense']?.kind).toBe('derived');
+  it('rating kind follows evidence: contest-tracked containment derives; box-only containment estimates', () => {
+    const boxOnly = derivePlayerRecord(input('1996-97', starterStats()));
+    expect(boxOnly.provenance['perimeterDefense']?.kind).toBe('estimated');
+    expect(boxOnly.provenance['perimeterDefense']?.notesCode).toBe('no-contest-tracking');
+    const tracked = derivePlayerRecord(
+      input('2023-24', starterStats({ contestedShots: 320, deflections: 190 })),
+    );
+    expect(tracked.provenance['perimeterDefense']?.kind).toBe('derived');
     const early = derivePlayerRecord(input('1970-71', pre1974Stats()));
     expect(early.provenance['perimeterDefense']?.kind).toBe('estimated');
+    expect(early.provenance['perimeterDefense']?.notesCode).toBe('positional-prior-pre1974');
   });
   it('shrinks tiny 3P/FT samples far below the large-sample ratings in low-minute seasons', () => {
     const tiny = derivePlayerRecord(
@@ -557,15 +572,21 @@ describe('derivePlayerRecord (field-method registry)', () => {
     expect(derived.anchors.freeThrowPctPrior).toBe(0.8);
     expect(derived.anchors.rateShrinkAttempts).toBe(80);
   });
-  it('keeps perimeter/interior/defensiveIq independent of box plus/minus', () => {
-    const highBpm = derivePlayerRecord(input('1996-97', starterStats({ boxPlusMinus: 8 })));
-    const lowBpm = derivePlayerRecord(input('1996-97', starterStats({ boxPlusMinus: -2 })));
-    for (const field of ['perimeterDefense', 'interiorDefense', 'defensiveIq'] as const) {
-      expect(highBpm.provenance[field]?.sourceFields).not.toContain('boxPlusMinus');
-      expect(highBpm.ratings[field]).toBe(lowBpm.ratings[field]);
+  it('keeps perimeter/interior/defensiveIq/passing/handling/offensiveIq independent of per and box plus/minus', () => {
+    const high = derivePlayerRecord(input('1996-97', starterStats({ per: 28, boxPlusMinus: 8 })));
+    const low = derivePlayerRecord(input('1996-97', starterStats({ per: 8, boxPlusMinus: -2 })));
+    for (const field of [
+      'perimeterDefense',
+      'interiorDefense',
+      'defensiveIq',
+      'passing',
+      'ballHandling',
+      'offensiveIq',
+    ] as const) {
+      expect(high.provenance[field]?.sourceFields).not.toContain('boxPlusMinus');
+      expect(high.provenance[field]?.sourceFields).not.toContain('per');
+      expect(high.ratings[field]).toBe(low.ratings[field]);
     }
-    expect(highBpm.provenance['offensiveIq']?.sourceFields).toContain('boxPlusMinus');
-    expect(highBpm.ratings.offensiveIq).not.toBe(lowBpm.ratings.offensiveIq);
   });
   it('defensiveIq is derived when stocks are observed and estimated otherwise', () => {
     const modern = derivePlayerRecord(input('1996-97', starterStats()));

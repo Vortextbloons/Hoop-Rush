@@ -156,7 +156,7 @@ export function manifestPath(): string {
 }
 export const SCHEMA_VERSION = POOL_SCHEMA_VERSION;
 export const MIN_TEAM_GAMES = 40;
-export const DATA_VERSION = 'm11-ratings-v3.9';
+export const DATA_VERSION = 'm12-ratings-v3.10';
 export const CONFIDENCE_POLICY_VERSION = 'policy-v1';
 export const MAX_LOW_CONFIDENCE_SHARE = 0.4;
 export {

@@ -87,6 +87,13 @@ export const FIELD_AVAILABILITY: Record<string, string> = {
   threesAttempted: '1979-80',
   gamesStarted: '1970-71',
   advanced: '1996-97',
+  shotLocation: '1996-97',
+  reboundChances: '2013-14',
+  contestTracking: '2013-14',
+  hustleStats: '2016-17',
+  passingTracking: '2013-14',
+  speedTracking: '2013-14',
+  combineMeasurements: '2000-01',
 };
 export function fieldAvailableFrom(field: string, season: string): boolean {
   const boundary = FIELD_AVAILABILITY[field];

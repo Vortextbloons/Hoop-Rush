@@ -113,6 +113,14 @@ export function fieldPublished(field: string, season: string): boolean {
   if (boundary === undefined) return true;
   return season >= boundary;
 }
+function confidenceRank(confidence: Confidence): number {
+  return confidence === 'high' ? 2 : confidence === 'medium' ? 1 : 0;
+}
+function minConfidence(values: readonly Confidence[]): Confidence {
+  let rank = 2;
+  for (const value of values) rank = Math.min(rank, confidenceRank(value));
+  return rank === 2 ? 'high' : rank === 1 ? 'medium' : 'low';
+}
 function confidenceFor(kind: ProvenanceKind): Confidence {
   switch (kind) {
     case 'observed':
@@ -124,6 +132,21 @@ function confidenceFor(kind: ProvenanceKind): Confidence {
     default:
       return 'low';
   }
+}
+function confidenceForSample(
+  kind: ProvenanceKind,
+  games: number,
+  minutes: number,
+  evidenceQuality: 'full' | 'partial' | 'prior' = 'full',
+): Confidence {
+  let confidence = confidenceFor(kind);
+  if (evidenceQuality === 'prior') return 'low';
+  if (games < 10 || minutes < 200) return 'low';
+  if (evidenceQuality === 'partial' || games < 30 || minutes < 750) {
+    if (confidence === 'high') confidence = 'medium';
+    else confidence = 'low';
+  }
+  return confidence;
 }
 interface SeasonTotals {
   gamesPlayed: number;
@@ -148,6 +171,30 @@ interface SeasonTotals {
   usageRate: number | null;
   tsPct: number | null;
   efgPct: number | null;
+  offRebChances: number | null;
+  defRebChances: number | null;
+  contestedShots: number | null;
+  contestedShots2pt: number | null;
+  contestedShots3pt: number | null;
+  deflections: number | null;
+  screenAssists: number | null;
+  boxOuts: number | null;
+  defFgPct: number | null;
+  passes: number | null;
+  secondaryAssists: number | null;
+  potentialAssists: number | null;
+  avgSpeed: number | null;
+  distanceMiles: number | null;
+  drives: number | null;
+  closeFgm: number | null;
+  closeFga: number | null;
+  insideFgm: number | null;
+  insideFga: number | null;
+  midFgm: number | null;
+  midFga: number | null;
+  contested3Pct: number | null;
+  wingspanInches: number | null;
+  maxVerticalInches: number | null;
 }
 function seasonTotals(stats: StatsRow): SeasonTotals {
   const maybe = (key: string): number | null => {
@@ -180,6 +227,30 @@ function seasonTotals(stats: StatsRow): SeasonTotals {
     usageRate: maybe('usageRate'),
     tsPct: maybe('tsPct'),
     efgPct: maybe('efgPct'),
+    offRebChances: maybe('offRebChances'),
+    defRebChances: maybe('defRebChances'),
+    contestedShots: maybe('contestedShots'),
+    contestedShots2pt: maybe('contestedShots2pt'),
+    contestedShots3pt: maybe('contestedShots3pt'),
+    deflections: maybe('deflections'),
+    screenAssists: maybe('screenAssists'),
+    boxOuts: maybe('boxOuts'),
+    defFgPct: maybe('defFgPct'),
+    passes: maybe('passes'),
+    secondaryAssists: maybe('secondaryAssists'),
+    potentialAssists: maybe('potentialAssists'),
+    avgSpeed: maybe('avgSpeed'),
+    distanceMiles: maybe('distanceMiles'),
+    drives: maybe('drives'),
+    closeFgm: maybe('closeFgm') ?? maybe('closeM'),
+    closeFga: maybe('closeFga') ?? maybe('closeA'),
+    insideFgm: maybe('insideFgm') ?? maybe('insideM'),
+    insideFga: maybe('insideFga') ?? maybe('insideA'),
+    midFgm: maybe('midFgm') ?? maybe('midM'),
+    midFga: maybe('midFga') ?? maybe('midA'),
+    contested3Pct: maybe('contested3Pct'),
+    wingspanInches: maybe('wingspanInches') ?? maybe('wingspan'),
+    maxVerticalInches: maybe('maxVerticalInches') ?? maybe('maxVertical'),
   };
 }
 interface Resolved {
@@ -216,6 +287,10 @@ function perGame(total: number | null, games: number): number | null {
   if (total === null || games <= 0) return null;
   return total / games;
 }
+function per36(total: number | null, minutes: number): number | null {
+  if (total === null || minutes <= 0) return null;
+  return (total * 36) / minutes;
+}
 export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
   const totals = seasonTotals(input.stats);
   const { gamesPlayed: gp, minutes } = totals;
@@ -241,23 +316,43 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     threePoint: 'threesAttempted',
     freeThrow: 'freeThrowsAttempted',
   };
-  const record = (key: string, value: number, kind: ProvenanceKind, fields: string[]): void => {
+  const record = (
+    key: string,
+    value: number,
+    kind: ProvenanceKind,
+    fields: string[],
+    options: {
+      confidence?: Confidence;
+      notesCode?: string;
+      sourceStatus?: 'available' | 'unavailable' | 'not-applicable';
+    } = {},
+  ): void => {
     unclamped[key] = value;
     methods[key] = kind;
     const sourceField = RATING_SOURCE_FIELD[key] ?? key;
+    const fallbackStatus = fieldPublished(sourceField, input.season) ? undefined : 'not-applicable';
     provenance[key] = {
       kind,
-      confidence: confidenceFor(kind),
+      confidence: options.confidence ?? confidenceForSample(kind, gp, minutes),
       methodVersion: DERIVATION_METHOD_VERSION,
       sourceVersion: SOURCE_VERSION,
       sourceFields: fields,
-      sourceStatus: fieldPublished(sourceField, input.season) ? undefined : 'not-applicable',
+      sampleGames: gp,
+      sampleMinutes: Math.round(minutes),
+      sourceStatus: options.sourceStatus ?? fallbackStatus,
+      ...(options.notesCode !== undefined ? { notesCode: options.notesCode } : {}),
     };
   };
   const ppg = perGame(totals.points, gp);
   const rpg = perGame(totals.rebounds, gp);
   const apg = perGame(totals.assists, gp);
   const mpg = gp > 0 ? minutes / gp : 0;
+  const ptsPer36 = per36(totals.points, minutes);
+  const rebPer36 = per36(totals.rebounds, minutes);
+  const astPer36 = per36(totals.assists, minutes);
+  const stlPer36Observed = per36(totals.steals, minutes);
+  const blkPer36Observed = per36(totals.blocks, minutes);
+  const tovPer36Observed = per36(totals.turnovers, minutes);
   const spg = resolveCounting(
     totals.steals,
     fieldPublished('steals', input.season),
@@ -299,6 +394,16 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     1 - reboundShare,
     'rebounds',
   );
+  const orebPer36Signal = mpg > 0 ? (oreb.value * 36) / mpg : oreb.value;
+  const drebPer36Signal = mpg > 0 ? (dreb.value * 36) / mpg : dreb.value;
+  const offChanceRate =
+    totals.offensiveRebounds !== null && totals.offRebChances !== null && totals.offRebChances > 0
+      ? clampUnitInterval(totals.offensiveRebounds / totals.offRebChances)
+      : null;
+  const defChanceRate =
+    totals.defensiveRebounds !== null && totals.defRebChances !== null && totals.defRebChances > 0
+      ? clampUnitInterval(totals.defensiveRebounds / totals.defRebChances)
+      : null;
   const fga = totals.fieldGoalsAttempted;
   const fgm = totals.fieldGoalsMade;
   const fta = totals.freeThrowsAttempted;
@@ -338,10 +443,7 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
   }
   const tsPct = clampUnitInterval(totals.tsPct);
   const efgPct = clampUnitInterval(totals.efgPct);
-  const per = totals.per;
-  const bpm = totals.boxPlusMinus;
   const usage = totals.usageRate;
-  const ppgNorm = ppg !== null ? ppg * (114.7 / Math.max(1, input.era.leaguePpg)) : null;
   const ratePriors = {
     threePointPctPrior:
       input.ratePriors?.threePointPctPrior ?? LEAGUE_RATE_DEFAULTS[position].threePointPctPrior,
@@ -363,13 +465,25 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
   const blend = (raw: number, mean: number): number => raw * weight + mean * (1 - weight);
   const tsComponent = tsPct !== null ? (tsPct - 0.5) * 60 : 0;
   const ftComponent = ftPctShrunk !== null ? (ftPctShrunk - 0.7) * 15 : 0;
+  const threeEvidenceShare = tpa !== null && tpa > 0 ? tpa / (tpa + 80) : 0;
+  const threeSecondaryWeight = 1 - clamp(threeEvidenceShare, 0, 1);
+  const threeDifficultyAdj =
+    totals.contested3Pct !== null && tpa !== null && tpa >= 100
+      ? clamp((0.5 - totals.contested3Pct) * 6, -3, 3)
+      : 0;
+  const threeDifficultyFields =
+    totals.contested3Pct !== null && tpa !== null && tpa >= 100 ? ['contested3Pct'] : [];
   let threeRaw: number;
   let threeKind: ProvenanceKind;
   let threeFields: string[];
   if (tpa !== null && tpa > 0 && threePctShrunk !== null) {
-    threeRaw = 58 + tsComponent + (threePctShrunk - 0.3) * 140 + ftComponent;
+    threeRaw =
+      62 +
+      (threePctShrunk - 0.36) * 330 +
+      (tsComponent + ftComponent) * threeSecondaryWeight * 0.5 +
+      threeDifficultyAdj;
     threeKind = 'derived';
-    threeFields = ['tpm', 'tpa', 'prior', 'shrink-80-attempts'];
+    threeFields = ['tpm', 'tpa', 'prior', 'shrink-80-attempts', ...threeDifficultyFields];
   } else if (reconstructedThreePoint !== undefined) {
     threeRaw = ratingFromAccuracy(
       reconstructionArtifact as ThreePointReconstructionArtifact,
@@ -401,144 +515,341 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     ftPctShrunk !== null ? 'derived' : 'estimated',
     ftPctShrunk !== null ? ['ftm', 'fta', 'prior', 'shrink-80-attempts'] : ['prior'],
   );
-  const insideRaw =
-    58 +
-    ((ppgNorm ?? 10) - 14) * 1.5 +
-    ((tsPct ?? 0.48) - 0.5) * 25 +
-    (position === 'C' || position === 'F' ? 3 : -2);
-  record('insideScoring', blend(insideRaw, 54), ppg !== null ? 'derived' : 'estimated', [
-    'points',
-    'tsPct',
-  ]);
+  const zoneShrunk = (
+    made: number | null,
+    attempted: number | null,
+    priorRate: number,
+  ): number | null => {
+    if (made === null || attempted === null || attempted <= 0) return null;
+    return (Math.min(made, attempted) + priorRate * 80) / (attempted + 80);
+  };
+  const shotLocationPublished = fieldPublished('shotLocation', input.season);
+  const zoneFallbackNote = shotLocationPublished
+    ? 'no-shot-location'
+    : 'shot-location-not-applicable';
+  const closeShrunk = zoneShrunk(totals.closeFgm, totals.closeFga, 0.6);
+  const insideShrunk = zoneShrunk(totals.insideFgm, totals.insideFga, 0.55);
+  const midShrunk = zoneShrunk(totals.midFgm, totals.midFga, 0.42);
+  const ptsPer36Norm =
+    ptsPer36 !== null ? ptsPer36 * (114.7 / Math.max(1, input.era.leaguePpg)) : null;
+  if (insideShrunk !== null) {
+    record('insideScoring', blend(58 + (insideShrunk - 0.55) * 170, 54), 'derived', [
+      'insideFgm',
+      'insideFga',
+      'prior',
+      'shrink-80-attempts',
+    ]);
+  } else {
+    const insideRaw =
+      62 +
+      ((ptsPer36Norm ?? 14) - 14) * 0.8 +
+      ((tsPct ?? 0.48) - 0.5) * 25 +
+      (position === 'C' || position === 'F' ? 3 : -2);
+    record(
+      'insideScoring',
+      blend(insideRaw, 54),
+      ppg !== null ? 'derived' : 'estimated',
+      ['points', 'minutes', 'tsPct'],
+      { notesCode: zoneFallbackNote },
+    );
+  }
+  if (closeShrunk !== null) {
+    record('closeShot', blend(58 + (closeShrunk - 0.6) * 170, 59), 'derived', [
+      'closeFgm',
+      'closeFga',
+      'prior',
+      'shrink-80-attempts',
+    ]);
+  } else {
+    record(
+      'closeShot',
+      blend(58 + ((fgPct ?? 0.47) - 0.47) * 60 + Math.max(0, (ptsPer36 ?? 15) - 15) * 0.8, 59),
+      ppg !== null ? 'derived' : 'estimated',
+      ['fgm', 'fga', 'points', 'minutes'],
+      { notesCode: zoneFallbackNote },
+    );
+  }
+  const midPct = midShrunk ?? efgPct ?? fgPct;
+  if (midShrunk !== null) {
+    record('midrange', blend(58 + (midShrunk - 0.42) * 200, 54), 'derived', [
+      'midFgm',
+      'midFga',
+      'prior',
+      'shrink-80-attempts',
+    ]);
+  } else {
+    record(
+      'midrange',
+      blend(60 + ((midPct ?? 0.47) - 0.48) * 100, 54),
+      midPct !== null ? 'derived' : 'estimated',
+      ['fgm', 'fga', 'tpm', 'tpa'],
+      { notesCode: zoneFallbackNote },
+    );
+  }
+  const secAstPer36 = per36(totals.secondaryAssists, minutes);
+  const potentialAstPer36 = per36(totals.potentialAssists, minutes);
+  const unconvertedCreation =
+    potentialAstPer36 !== null && astPer36 !== null ? Math.max(0, potentialAstPer36 - astPer36) : 0;
+  const creationRate =
+    astPer36 !== null
+      ? astPer36 + (secAstPer36 !== null ? secAstPer36 * 0.5 : 0) + unconvertedCreation * 0.1
+      : null;
+  const creationFields = [
+    'assists',
+    ...(secAstPer36 !== null ? (['secondaryAssists'] as string[]) : []),
+    ...(unconvertedCreation > 0 ? (['potentialAssists'] as string[]) : []),
+    'minutes',
+  ];
+  const tovPer36 = tovPer36Observed;
+  const expectedTovPer36 =
+    creationRate !== null || usage !== null
+      ? 1.1 + Math.max(0, (usage ?? 18) - 15) * 0.075 + Math.max(0, (creationRate ?? 2) - 2) * 0.22
+      : null;
+  const ballSecurity =
+    tovPer36 !== null && expectedTovPer36 !== null
+      ? clamp((expectedTovPer36 - tovPer36) * 3.5, -8, 8)
+      : 0;
+  const passRaw = 60 + ((creationRate ?? 3) - 3) * 4.2;
   record(
-    'closeShot',
-    blend(60 + ((ppg ?? 10) - 10) * 1.5, 59),
-    ppg !== null ? 'derived' : 'estimated',
-    ['points'],
+    'passing',
+    blend(passRaw, 54),
+    creationRate !== null ? 'derived' : 'estimated',
+    creationRate !== null ? creationFields : ['prior'],
   );
-  const midPct = efgPct ?? fgPct;
-  record(
-    'midrange',
-    blend(60 + ((midPct ?? 0.47) - 0.48) * 100, 54),
-    midPct !== null ? 'derived' : 'estimated',
-    ['fgm', 'fga', 'tpm', 'tpa'],
-  );
-  const passRaw = 60 + ((apg ?? 3) - 3) * 5 + (per ?? 12) * 0.6;
-  record('passing', blend(passRaw, 54), apg !== null ? 'derived' : 'estimated', ['assists', 'per']);
-  const creationRaw = 60 + ((usage ?? 16) - 16) * 0.6 + ((apg ?? 3) - 3) * 3.0 + (per ?? 12) * 0.15;
+  const creationRaw =
+    64 + ((creationRate ?? 3) - 3) * 3.0 + ((usage ?? 18) - 18) * 0.45 + ballSecurity * 0.5;
   record(
     'ballHandling',
     blend(creationRaw, 54),
-    apg !== null || usage !== null ? 'derived' : 'estimated',
-    ['assists', 'usageRate', 'per'],
+    creationRate !== null || usage !== null ? 'derived' : 'estimated',
+    ['assists', 'usageRate', 'turnovers', 'minutes'],
   );
+  const stlPer36 = stlPer36Observed ?? (mpg > 0 ? (spg.value * 36) / mpg : spg.value);
+  const blkPer36 = blkPer36Observed ?? (mpg > 0 ? (bpg.value * 36) / mpg : bpg.value);
+  const rebPer36Signal = rebPer36 ?? (rpg !== null && mpg > 0 ? (rpg * 36) / mpg : null);
+  const stocksPublished =
+    fieldPublished('steals', input.season) && fieldPublished('blocks', input.season);
+  const priorOnlyDefense = !stocksPublished;
+  const defenseNotesCode = priorOnlyDefense ? 'positional-prior-pre1974' : undefined;
+  const contestPublished = fieldPublished('contestTracking', input.season);
+  const contestedPer36 = per36(totals.contestedShots, minutes);
+  const deflectionsPer36 = per36(totals.deflections, minutes);
+  const hasContestEvidence =
+    contestPublished && (contestedPer36 !== null || deflectionsPer36 !== null);
   const reboundEvidence = rpg !== null && (oreb.kind !== 'observed' || dreb.kind !== 'observed');
-  const offensiveReboundRaw = 50 + (oreb.value - 1.5) * 8 + Math.max(0, (rpg ?? 4) - 4) * 0.8;
-  const defensiveReboundRaw = 55 + (dreb.value - 4) * 5 + Math.max(0, (rpg ?? 4) - 4) * 0.4;
+  const chanceNotesCode = 'no-rebound-chances';
+  const offensiveReboundBase = 50 + (orebPer36Signal - 1.5) * 8;
+  const offensiveReboundRaw =
+    offChanceRate !== null
+      ? offensiveReboundBase + clamp((offChanceRate - 0.5) * 20, -6, 6)
+      : offensiveReboundBase;
+  const defensiveReboundBase = 55 + (drebPer36Signal - 4) * 5;
+  const defensiveReboundRaw =
+    defChanceRate !== null
+      ? defensiveReboundBase + clamp((defChanceRate - 0.65) * 20, -6, 6)
+      : defensiveReboundBase;
+  const reboundConfidence = (kind: ProvenanceKind): Confidence =>
+    kind === 'observed'
+      ? confidenceForSample('derived', gp, minutes)
+      : confidenceForSample(kind, gp, minutes, 'prior');
   record(
     'offensiveRebound',
     blend(offensiveReboundRaw, 45),
     oreb.kind === 'observed' ? 'derived' : oreb.kind,
     reboundEvidence && !oreb.fields.includes('rebounds')
-      ? ['rebounds', ...oreb.fields]
-      : oreb.fields,
+      ? ['rebounds', ...oreb.fields, ...(offChanceRate !== null ? ['offRebChances'] : [])]
+      : [...oreb.fields, ...(offChanceRate !== null ? ['offRebChances'] : [])],
+    {
+      confidence: reboundConfidence(oreb.kind),
+      ...(offChanceRate === null ? { notesCode: chanceNotesCode } : {}),
+    },
   );
   record(
     'defensiveRebound',
     blend(defensiveReboundRaw, 59),
     dreb.kind === 'observed' ? 'derived' : dreb.kind,
     reboundEvidence && !dreb.fields.includes('rebounds')
-      ? ['rebounds', ...dreb.fields]
-      : dreb.fields,
+      ? ['rebounds', ...dreb.fields, ...(defChanceRate !== null ? ['defRebChances'] : [])]
+      : [...dreb.fields, ...(defChanceRate !== null ? ['defRebChances'] : [])],
+    {
+      confidence: reboundConfidence(dreb.kind),
+      ...(defChanceRate === null ? { notesCode: chanceNotesCode } : {}),
+    },
   );
-  const stealSignal = spg.value * 9;
-  const blockSignal = bpg.value * 10;
-  const defensiveKind: ProvenanceKind =
-    spg.kind === 'observed' && bpg.kind === 'observed' ? 'derived' : 'estimated';
-  const perimeterRaw =
-    55 +
-    stealSignal +
-    (priors.stealsPer36 - 1.2) * 6 +
-    (position === 'G' ? 3 : position === 'C' ? -7 : 0);
-  record('perimeterDefense', blend(perimeterRaw, 54), defensiveKind, ['steals', 'position']);
+  const stealEventRaw = 60 + stlPer36 * 10;
+  const blockEventRaw = 60 + blkPer36 * 12;
+  const stealKind: ProvenanceKind = spg.kind === 'observed' ? 'derived' : spg.kind;
+  const blockKind: ProvenanceKind = bpg.kind === 'observed' ? 'derived' : bpg.kind;
+  record('steal', blend(stealEventRaw, 54), stealKind, spg.fields, {
+    confidence: stealKind === 'derived' ? confidenceForSample('derived', gp, minutes) : 'low',
+    ...(defenseNotesCode !== undefined && stealKind !== 'derived'
+      ? { notesCode: defenseNotesCode }
+      : {}),
+  });
+  record('block', blend(blockEventRaw, 49), blockKind, bpg.fields, {
+    confidence: blockKind === 'derived' ? confidenceForSample('derived', gp, minutes) : 'low',
+    ...(defenseNotesCode !== undefined && blockKind !== 'derived'
+      ? { notesCode: 'positional-prior-pre1974' }
+      : {}),
+  });
+  const containmentFields = hasContestEvidence
+    ? [
+        ...(contestedPer36 !== null ? ['contestedShots'] : []),
+        ...(deflectionsPer36 !== null ? ['deflections'] : []),
+        'minutes',
+        'position',
+      ]
+    : ['steals', 'minutes', 'position'];
+  const perimeterRaw = hasContestEvidence
+    ? 60 +
+      (deflectionsPer36 ?? 1) * 5 +
+      ((contestedPer36 ?? 3) - 3) * 2 +
+      (position === 'G' ? 2 : position === 'C' ? -5 : 0)
+    : 60 + (stlPer36 - 1.2) * 7 + (position === 'G' ? 2 : position === 'C' ? -6 : 0);
+  const perimeterKind: ProvenanceKind = hasContestEvidence ? 'derived' : 'estimated';
+  record('perimeterDefense', blend(perimeterRaw, 54), perimeterKind, containmentFields, {
+    confidence: hasContestEvidence ? confidenceForSample('derived', gp, minutes, 'partial') : 'low',
+    ...(hasContestEvidence
+      ? {}
+      : defenseNotesCode !== undefined
+        ? { notesCode: defenseNotesCode }
+        : { notesCode: 'no-contest-tracking' }),
+  });
+  const hasRimEvidence = contestPublished && totals.defFgPct !== null && totals.blocks !== null;
   const interior =
-    54 +
-    blockSignal +
-    Math.max(0, (rpg ?? 4) - 4) * 1.2 +
-    (priors.blocksPer36 - 0.9) * 4 +
-    (position === 'C' ? 7 : position === 'F' ? 2 : -6);
+    hasRimEvidence && totals.defFgPct !== null
+      ? 54 +
+        (0.52 - totals.defFgPct) * 100 +
+        blkPer36 * 5 +
+        (position === 'C' ? 5 : position === 'F' ? 1 : -5)
+      : 54 +
+        blkPer36 * 6 +
+        Math.max(0, (rebPer36Signal ?? 8) - 8) * 1.0 +
+        (position === 'C' ? 7 : position === 'F' ? 2 : -6);
+  const interiorKind: ProvenanceKind = hasRimEvidence ? 'derived' : 'estimated';
+  const interiorConfidence = minConfidence([
+    hasRimEvidence ? confidenceForSample('derived', gp, minutes, 'partial') : 'low',
+    blockKind === 'derived' ? confidenceForSample('derived', gp, minutes) : 'low',
+  ]);
   record(
     'interiorDefense',
     blend(interior, position === 'C' || position === 'F' ? 59 : 49),
-    defensiveKind,
-    ['blocks', 'rebounds', 'position'],
+    interiorKind,
+    hasRimEvidence
+      ? ['defFgPct', 'blocks', 'minutes', 'position']
+      : ['blocks', 'rebounds', 'minutes', 'position'],
+    {
+      confidence: interiorConfidence,
+      ...(hasRimEvidence
+        ? {}
+        : defenseNotesCode !== undefined
+          ? { notesCode: defenseNotesCode }
+          : { notesCode: 'no-contest-tracking' }),
+    },
   );
-  record(
-    'steal',
-    blend(60 + spg.value * 10, 54),
-    spg.kind === 'observed' ? 'derived' : spg.kind,
-    spg.fields,
-  );
-  record(
-    'block',
-    blend(60 + bpg.value * 12, 49),
-    bpg.kind === 'observed' ? 'derived' : bpg.kind,
-    bpg.fields,
-  );
-  const reboundDefenseSignal = rpg !== null ? Math.max(0, rpg - 8) * 0.8 : 0;
+  const reboundDefenseSignal = rebPer36Signal !== null ? Math.max(0, rebPer36Signal - 9) * 0.7 : 0;
   const foulDisciplineSignal =
     totals.fouls !== null && minutes > 0
       ? -Math.max(0, (totals.fouls / minutes) * 48 - 4) * 1.5
       : 0;
-  const stockSignal = spg.value * 4 + bpg.value * 3;
+  const screenAstPer36 = per36(totals.screenAssists, minutes);
+  const screenSignal = screenAstPer36 !== null ? Math.min(3, screenAstPer36 * 8) : 0;
+  const stockSignal = stlPer36 * 4 + blkPer36 * 3;
   const stockObserved = spg.kind === 'observed' || bpg.kind === 'observed';
+  const defensiveIqConfidence = minConfidence([
+    stockObserved ? confidenceForSample('derived', gp, minutes) : 'low',
+    blockKind === 'derived' ? confidenceForSample('derived', gp, minutes) : 'low',
+  ]);
   record(
     'defensiveIq',
-    blend(60 + stockSignal + reboundDefenseSignal + foulDisciplineSignal, 59),
+    blend(60 + stockSignal + screenSignal + reboundDefenseSignal + foulDisciplineSignal, 59),
     stockObserved ? 'derived' : 'estimated',
-    stockObserved ? ['steals', 'blocks', 'rebounds', 'fouls'] : ['rebounds', 'prior'],
+    stockObserved
+      ? [
+          'steals',
+          'blocks',
+          'rebounds',
+          'fouls',
+          'minutes',
+          ...(screenAstPer36 !== null ? ['screenAssists'] : []),
+        ]
+      : ['rebounds', 'minutes', 'prior'],
+    {
+      confidence: defensiveIqConfidence,
+      ...(!stockObserved && defenseNotesCode !== undefined ? { notesCode: defenseNotesCode } : {}),
+    },
   );
-  const positionSpeedPrior = position === 'G' ? 75 : position === 'F' ? 67 : 59;
+  const speedTrackingPublished = fieldPublished('speedTracking', input.season);
+  const hasSpeedEvidence = speedTrackingPublished && totals.avgSpeed !== null;
   const heightSpeedPenalty =
     input.heightInches === null ? 0 : Math.max(0, input.heightInches - 78) * 0.7;
-  const activity =
-    positionSpeedPrior +
-    ((usage ?? 18) - 18) * 0.18 +
-    (mpg - 24) * 0.16 +
-    (spg.value - 1) * 1.5 -
-    heightSpeedPenalty;
-  const heightSignal = input.heightInches === null ? 0 : Math.max(0, input.heightInches - 72) * 1.7;
+  const drivesPer36 = per36(totals.drives, minutes);
+  const speedRaw = hasSpeedEvidence
+    ? 58 + ((totals.avgSpeed ?? 4.3) - 4.3) * 35 - heightSpeedPenalty * 0.5
+    : 58 - heightSpeedPenalty + (drivesPer36 !== null ? Math.min(4, drivesPer36 * 0.5) : 0);
   record(
     'speed',
-    blend(activity + (position === 'G' ? 4 : 0), 59),
-    usage !== null ? 'derived' : 'estimated',
-    ['position', 'heightInches', 'usageRate', 'minutes', 'steals'],
+    blend(speedRaw, 59),
+    hasSpeedEvidence ? 'derived' : 'estimated',
+    hasSpeedEvidence
+      ? ['avgSpeed', 'heightInches', 'minutes']
+      : ['heightInches', ...(drivesPer36 !== null ? (['drives', 'minutes'] as string[]) : [])],
+    {
+      confidence: hasSpeedEvidence ? confidenceForSample('derived', gp, minutes, 'partial') : 'low',
+      ...(!hasSpeedEvidence ? { notesCode: 'no-speed-tracking' } : {}),
+    },
   );
+  const heightSignal = input.heightInches === null ? 0 : Math.max(0, input.heightInches - 72) * 1.7;
+  const weightSignal =
+    input.weightLbs !== null && input.weightLbs !== undefined && Number.isFinite(input.weightLbs)
+      ? clamp((input.weightLbs - 220) * 0.08, -6, 6)
+      : 0;
   record(
     'strength',
     blend(
-      53 + heightSignal + (position === 'C' ? 4 : 0) + (per ?? 12) * 0.2,
+      53 + heightSignal + (position === 'C' ? 4 : 0) + weightSignal,
       position === 'C' || position === 'F' ? 64 : 54,
     ),
     input.heightInches !== null ? 'derived' : 'estimated',
-    ['position', 'heightInches', 'per'],
+    ['position', 'heightInches', ...(weightSignal !== 0 ? (['weightLbs'] as string[]) : [])],
   );
+  const verticalMeasurementBonus =
+    totals.maxVerticalInches !== null ? clamp((totals.maxVerticalInches - 28) * 1.2, -6, 8) : 0;
   const verticalRaw =
-    51 +
-    bpg.value * 4 +
-    Math.max(0, (oreb.value - 1.5) * 1.8) +
-    (position === 'G' ? 5 : position === 'F' ? 3 : 0);
+    51 + blkPer36 * 4 + Math.max(0, orebPer36Signal - 1.5) * 1.8 + verticalMeasurementBonus;
+  const verticalConfidence = minConfidence([
+    blockKind === 'derived' ? confidenceForSample('derived', gp, minutes) : 'low',
+    oreb.kind === 'observed' ? confidenceForSample('derived', gp, minutes) : 'low',
+  ]);
   record(
     'vertical',
     blend(verticalRaw, 56),
     bpg.kind === 'observed' || oreb.kind === 'observed' ? 'derived' : 'estimated',
-    ['blocks', 'offensiveRebounds', 'position'],
+    [
+      'blocks',
+      'offensiveRebounds',
+      'minutes',
+      ...(totals.maxVerticalInches !== null ? (['maxVerticalInches'] as string[]) : []),
+    ],
+    {
+      confidence: verticalConfidence,
+      ...(!hasSpeedEvidence && bpg.kind !== 'observed' && defenseNotesCode !== undefined
+        ? { notesCode: defenseNotesCode }
+        : {}),
+    },
   );
+  const astUsageRatio =
+    creationRate !== null && usage !== null && usage > 0
+      ? creationRate / Math.max(10, usage)
+      : null;
+  const shotSelectionSignal = tsPct !== null ? (tsPct - 0.52) * 30 : 0;
+  const decisionQualityRaw =
+    75 + ((astUsageRatio ?? 0.14) - 0.14) * 55 + ballSecurity * 0.8 + shotSelectionSignal * 0.4;
   record(
     'offensiveIq',
-    blend(60 + (per ?? 12) * 1.0 + (bpm ?? 0) * 2.0, 59),
-    per !== null && bpm !== null ? 'derived' : 'estimated',
-    ['per', 'boxPlusMinus'],
+    blend(decisionQualityRaw, 59),
+    creationRate !== null && usage !== null ? 'derived' : 'estimated',
+    ['assists', 'usageRate', 'turnovers', 'tsPct', 'minutes'],
   );
   const ratings = {} as SimulationRatings;
   for (const key of Object.keys(provenance)) {
@@ -546,17 +857,26 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     if (raw !== undefined) ratings[key as keyof SimulationRatings] = clampRating(raw);
   }
   const tendencies = {} as SimulationTendencies;
-  const t = (key: string, raw: number, kind: ProvenanceKind, fields: string[]): void => {
+  const t = (
+    key: string,
+    raw: number,
+    kind: ProvenanceKind,
+    fields: string[],
+    options: { confidence?: Confidence; notesCode?: string } = {},
+  ): void => {
     const value = clamp(raw, 0, 100);
     unclamped[`tendency:${key}`] = raw;
     methods[key] = kind;
     provenance[key] = {
       kind,
-      confidence: confidenceFor(kind),
+      confidence: options.confidence ?? confidenceForSample(kind, gp, minutes),
       methodVersion: DERIVATION_METHOD_VERSION,
       sourceVersion: SOURCE_VERSION,
       sourceFields: fields,
+      sampleGames: gp,
+      sampleMinutes: Math.round(minutes),
       sourceStatus: fieldPublished(key, input.season) ? undefined : 'not-applicable',
+      ...(options.notesCode !== undefined ? { notesCode: options.notesCode } : {}),
     };
     tendencies[key as keyof SimulationTendencies] = Math.round(value * 100) / 100;
   };

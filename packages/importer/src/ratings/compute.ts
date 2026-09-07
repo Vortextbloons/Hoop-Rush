@@ -117,6 +117,22 @@ function seasonContext(season: string): SeasonContext {
   const era = getEra(season);
   return { leaguePpg: era.leaguePpg, league3PARate: era.league3PARate, pace: era.pace };
 }
+function loadEvidenceMap(outDir: string): Map<string, Record<string, unknown>> {
+  const map = new Map<string, Record<string, unknown>>();
+  const path = join(outDir, 'evidence.json');
+  if (!fileExists(path)) return map;
+  try {
+    const raw = readJson(path);
+    if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return map;
+    for (const [pid, patch] of Object.entries(raw)) {
+      if (pid === '' || patch === null || typeof patch !== 'object' || Array.isArray(patch)) {
+        continue;
+      }
+      map.set(pid, patch as Record<string, unknown>);
+    }
+  } catch {}
+  return map;
+}
 function loadPlayerWinPctMap(season: string): Map<string, number> {
   const map = new Map<string, number>();
   const candidates = [
@@ -319,6 +335,7 @@ export function computeForSeason(season: string, force = false): void {
       statsById.set(pid, s);
     }
   }
+  const evidenceById = loadEvidenceMap(out);
   const context = seasonContext(season);
   const artifact = loadRatingsModelArtifact();
   const threePointReconstruction = loadThreePointReconstructionArtifact();
@@ -373,7 +390,9 @@ export function computeForSeason(season: string, force = false): void {
     if (player.secondaryPositions === undefined || player.secondaryPositions === null) {
       player.secondaryPositions = [];
     }
-    const stats: RatingsStatsRow = statsById.get(extId) ?? {};
+    const baseStats: RatingsStatsRow = statsById.get(extId) ?? {};
+    const evidence = extId !== '' ? (evidenceById.get(extId) ?? {}) : {};
+    const stats: RatingsStatsRow = { ...baseStats, ...evidence };
     const rosterTeamId = typeof player.teamExternalId === 'string' ? player.teamExternalId : null;
     const playerWinPct = extId ? (playerWinPctMap.get(extId) ?? null) : null;
     const fallbackTeamWinPct = teamWinPctForPlayer(stats, rosterTeamId, teamWinPctMap);

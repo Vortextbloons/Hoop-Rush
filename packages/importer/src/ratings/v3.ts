@@ -214,7 +214,7 @@ function productionEvidence(stats: StatsRow): ProductionEvidence {
     0,
     100,
   );
-  const capped = score > 86 ? 86 + (score - 86) * 0.55 : score;
+  const capped = score > 88 ? 88 + (score - 88) * 0.75 : score;
   const shrinkage = clamp((minutes / (minutes + 1500)) * (games / (games + 40)), 0, 1);
   return {
     score: capped,
@@ -408,6 +408,12 @@ function deriveMemberships(
   return normalizeMemberships(RATING_ARCHETYPES.map((archetype) => raw[archetype]));
 }
 function canonicalCurve(raw: number): number {
+  // Scale reference (fixed population: qualified 1996-97..2024-25 seasons,
+  // >=50 games and >=1500 minutes): average rotation regulars land near 70 raw
+  // (mid-70s overall), All-NBA production near 80 raw (low-90s overall), and
+  // only historic outlier seasons clear 85 raw. The upper branch is concave so
+  // 90+ stays attainable while 99 stays rare; exceptional gaps are preserved by
+  // the production soft cap above, never by spreading fixed 100s.
   if (raw <= 70) {
     return clampRating(50 + (raw - 50) * 1.635);
   }
@@ -436,6 +442,7 @@ export function eliteEvidenceLiftFor(input: {
   creation: number;
   defenseRating: number;
   teamWinPct: number | null | undefined;
+  hasContestEvidence?: boolean;
 }): number {
   const games = input.production.sampleGames;
   const ppg = safeFloat(input.points) / Math.max(1, games);
@@ -443,16 +450,19 @@ export function eliteEvidenceLiftFor(input: {
   const bpm = safeFloat(input.boxPlusMinus, 0);
   const winOk = input.teamWinPct == null || input.teamWinPct >= 0.7;
   const eliteScoringEvidence =
-    winOk && input.production.score >= 87 && games >= 55 && ppg >= 28 && ts >= 0.6 && bpm >= 3;
+    winOk && input.production.score >= 86 && games >= 55 && ppg >= 27 && ts >= 0.58 && bpm >= 3;
+  // Containment without contest tracking tops out at estimated/low, so the
+  // two-way bar accounts for evidence coverage instead of punishing old seasons.
+  const defenseBar = input.hasContestEvidence === true ? 68 : 65;
   const completeEliteEvidence =
     winOk &&
     input.production.score >= 86 &&
     games >= 65 &&
     ppg >= 25 &&
-    ts >= 0.62 &&
-    bpm >= 4 &&
-    input.creation >= 82 &&
-    input.defenseRating >= 70;
+    ts >= 0.6 &&
+    bpm >= 3.5 &&
+    input.creation >= 78 &&
+    input.defenseRating >= defenseBar;
   if (completeEliteEvidence) return 4;
   if (eliteScoringEvidence) return 3;
   if (input.production.score >= 80 && games >= 50) return 1;
@@ -553,14 +563,9 @@ export function deriveRatingProfile(input: RatingProfileInput): DerivedRatingPro
       sum + memberships[archetype] * archetypeScore(archetype, memberships, input.ratings),
     0,
   );
-  const weakSizePrior = input.position === 'SF' && (input.heightInches ?? 0) >= 82 ? 0.75 : 0;
   const historicalDefenseLift = historicalDefenseEvidenceLift(input);
   const baseScore = clamp(
-    archetypeWeighted +
-      nonlinear.synergyBonus +
-      nonlinear.weaknessPenalty +
-      weakSizePrior +
-      historicalDefenseLift,
+    archetypeWeighted + nonlinear.synergyBonus + nonlinear.weaknessPenalty + historicalDefenseLift,
     0,
     100,
   );
@@ -574,6 +579,10 @@ export function deriveRatingProfile(input: RatingProfileInput): DerivedRatingPro
     artifactVersion: input.artifact.modelVersion,
   };
   const summary = computeOffenseDefense(input.ratings, input.tendencies);
+  const hasContestEvidence =
+    input.stats.contestedShots != null ||
+    input.stats.deflections != null ||
+    input.stats.defFgPct != null;
   const eliteEvidenceLift = eliteEvidenceLiftFor({
     production,
     points: input.stats.points == null ? null : safeFloat(input.stats.points),
@@ -582,6 +591,7 @@ export function deriveRatingProfile(input: RatingProfileInput): DerivedRatingPro
     creation: nonlinear.creation,
     defenseRating: summary.defenseRating,
     teamWinPct: input.teamWinPct,
+    hasContestEvidence,
   });
   const teamDelta = teamContextAdjustment(input.stats, input.teamWinPct, summary.defenseRating);
   const defenseCredit = defenseCreditFor(summary.defenseRating);

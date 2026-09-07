@@ -74,7 +74,10 @@ describe('Ratings v3 profile', () => {
       era: { leaguePpg: 114.7, league3PARate: 0.39, pace: 99 },
       artifact: DEFAULT_RATINGS_MODEL_ARTIFACT,
     });
-    expect(record.summaryRatings.overallRating).toBeGreaterThanOrEqual(86);
+    // derive-v11 evidence-first scale: a sustained efficient star wing grades as a
+    // clear starter-plus season without the old PER-driven inflation.
+    expect(record.summaryRatings.overallRating).toBeGreaterThanOrEqual(74);
+    expect(record.summaryRatings.overallRating).toBeLessThan(88);
   });
   it('persists schemaVersion 2 and the pre-percentile raw overall score', () => {
     const record = recordFor();

@@ -10,6 +10,7 @@ export type NavItem = {
 const ACTIVE_ALIASES: Readonly<Record<string, readonly string[]>> = {
   '/season/run': ['/season/run/checkpoint'],
   '/season/run/league': ['/season/run/teams'],
+  '/collection': ['/collection/packs'],
 };
 function normalizeRouteId(routeId: string): string {
   return routeId.length > 1 && routeId.endsWith('/') ? routeId.slice(0, -1) : routeId;

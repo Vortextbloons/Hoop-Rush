@@ -1,0 +1,72 @@
+.ultimate-root {
+  --ur-bg: #0b0b10;
+  --ur-ember: #c65a2e;
+  --ur-eruption: #ff5a2a;
+  --ur-apex: #ffc53d;
+  --ur-titan: #a9b4d8;
+  --ur-eclipse: #8b5cf6;
+  --ur-immortal: #ffe9b0;
+  --ur-ink: #f2eef4;
+  --ur-accent: #ffc53d;
+}
+
+.ultimate-eyebrow {
+  font-family: var(--font-display);
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: 0.28em;
+  font-size: 12px;
+  color: var(--ur-apex);
+}
+
+.ultimate-title {
+  background: linear-gradient(90deg, var(--ur-ink) 20%, var(--ur-apex) 55%, var(--ur-eclipse) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.ultimate-cta {
+  background: var(--ur-apex);
+  color: #241a02;
+}
+.ultimate-cta:hover {
+  filter: brightness(1.08);
+}
+
+.ur-rarity {
+  border: 1px solid transparent;
+}
+.ur-rarity-ember {
+  background: color-mix(in srgb, #c65a2e 22%, transparent);
+  border-color: color-mix(in srgb, #c65a2e 65%, transparent);
+  color: #f0b48f;
+}
+.ur-rarity-eruption {
+  background: linear-gradient(90deg, #7a1e05, #ff5a2a, #7a1e05);
+  color: #fff;
+}
+.ur-rarity-apex {
+  background: linear-gradient(90deg, #7a5b06, #ffc53d, #7a5b06);
+  color: #241a02;
+}
+.ur-rarity-titan {
+  background: linear-gradient(90deg, #3c4470, #a9b4d8, #3c4470);
+  color: #0d1020;
+}
+.ur-rarity-eclipse {
+  background: #050308;
+  border-color: #8b5cf6;
+  color: #d9c8ff;
+  text-shadow: 0 0 14px #8b5cf6;
+}
+.ur-rarity-immortal {
+  background: linear-gradient(90deg, #8a6a1c, #ffe9b0, #8a6a1c);
+  color: #2a1f04;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ur-rarity-eclipse {
+    text-shadow: none;
+  }
+}

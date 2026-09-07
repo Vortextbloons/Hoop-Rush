@@ -18,10 +18,16 @@
   const entry = $derived(item.entry);
   const rarityClass = $derived(
     entry.rarity === 'Immortal'
-      ? 'bg-accent text-accent-foreground'
+      ? 'ur-rarity ur-rarity-immortal'
       : entry.rarity === 'Eclipse'
-        ? 'bg-primary text-primary-foreground'
-        : 'bg-surface-3 text-muted-foreground',
+        ? 'ur-rarity ur-rarity-eclipse'
+        : entry.rarity === 'Titan'
+          ? 'ur-rarity ur-rarity-titan'
+          : entry.rarity === 'Apex'
+            ? 'ur-rarity ur-rarity-apex'
+            : entry.rarity === 'Eruption'
+              ? 'ur-rarity ur-rarity-eruption'
+              : 'ur-rarity ur-rarity-ember',
   );
   function initialsOf(name: string): string {
     return name
