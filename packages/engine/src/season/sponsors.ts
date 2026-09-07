@@ -1,15 +1,19 @@
 import {
   SEASON_SEED_NAMESPACES,
   SEASON_SPONSOR_SLOTS,
+  buildEmptyPlayerSponsors,
+  buildEmptySponsorBoards,
+  buildEmptySponsorVault,
+  commandIdSchema,
   seasonNamespaceSeed,
   sponsorGearEntriesFor,
-  sponsorGearEntryOf,
   sponsorGearPriceOf,
   sponsorGearTierConfigOf,
   type SeasonPlayerSponsorSlots,
   type SeasonSponsorAppliedSnapshot,
   type SeasonSponsorBoost,
   type SeasonSponsorGearCatalogEntry,
+  type SeasonSponsorGearState,
   type SeasonSponsorOffer,
   type SeasonSponsorSlot,
   type SeasonSponsorTier,
@@ -25,7 +29,10 @@ function tierWeights(): readonly number[] {
   return SPONSOR_TIERS.map((tier) => sponsorGearTierConfigOf(tier).weight);
 }
 
-export function rollSponsorBoosts(rng: Rng, entry: SeasonSponsorGearCatalogEntry): SeasonSponsorBoost[] {
+export function rollSponsorBoosts(
+  rng: Rng,
+  entry: SeasonSponsorGearCatalogEntry,
+): SeasonSponsorBoost[] {
   const tier = sponsorGearTierConfigOf(entry.tier);
   const pool = rng.nextInt(tier.poolMin, tier.poolMax);
   const maxStats = Math.min(tier.statMax, entry.eligible.length);
@@ -111,7 +118,8 @@ export function seasonSponsorOffersForBlock(
   const slotOrder = shuffle([...SEASON_SPONSOR_SLOTS], rng);
   const offers: SeasonSponsorOffer[] = [];
   for (let i = 0; i < OFFER_COUNT; i += 1) {
-    const slot = i < slotOrder.length ? (slotOrder[i] ?? 'shoe') : rng.pick([...SEASON_SPONSOR_SLOTS]);
+    const slot =
+      i < slotOrder.length ? (slotOrder[i] ?? 'shoe') : rng.pick([...SEASON_SPONSOR_SLOTS]);
     offers.push(rollOffer(rng, blockIndex, i, slot));
   }
   return offers;
@@ -164,7 +172,9 @@ export interface AiSponsorKitInput {
   applied: ReadonlyMap<string, SeasonPlayerSponsorSlots>;
 }
 
-export function resolveAiSponsorKit(input: AiSponsorKitInput): SeasonSponsorAppliedSnapshot | null {
+export function resolveAiSponsorKit(
+  input: AiSponsorKitInput,
+): { playerVersionId: string; snapshot: SeasonSponsorAppliedSnapshot } | null {
   const { rotation } = input;
   if (rotation === undefined) return null;
   const minutes = new Map<string, number>();
@@ -222,13 +232,93 @@ export function resolveAiSponsorKit(input: AiSponsorKitInput): SeasonSponsorAppl
   }
   if (fitted === null) return null;
   return {
-    instanceId: `sponsor-ai-${input.franchiseId}-${String(input.blockIndex)}`,
-    entryId: fitted.entryId,
-    brandFamily: fitted.brandFamily,
-    slot: best.slot,
-    tier,
-    boosts: rollSponsorBoosts(rng, fitted),
-    appliedBlock: input.blockIndex,
-    appliedByCommandId: `ai-sponsor-${input.franchiseId}-${String(input.blockIndex)}`,
+    playerVersionId: best.playerVersionId,
+    snapshot: {
+      instanceId: `sponsor-ai-${input.franchiseId}-${String(input.blockIndex)}`,
+      entryId: fitted.entryId,
+      brandFamily: fitted.brandFamily,
+      slot: best.slot,
+      tier,
+      boosts: rollSponsorBoosts(rng, fitted),
+      appliedBlock: input.blockIndex,
+      appliedByCommandId: commandIdSchema.parse(
+        `ai-sponsor-${input.franchiseId}-${String(input.blockIndex)}`,
+      ),
+    },
+  };
+}
+
+export function createInitialSponsorGearState(rootSeed: string): SeasonSponsorGearState {
+  return {
+    vault: buildEmptySponsorVault(),
+    boards: {
+      ...buildEmptySponsorBoards(),
+      boards: [
+        {
+          blockIndex: 0,
+          offers: seasonSponsorOffersForBlock(rootSeed, 0),
+          purchasedInstanceIds: [],
+        },
+      ],
+    },
+    players: buildEmptyPlayerSponsors(),
+  };
+}
+
+export interface SponsorBlockCommitInput {
+  rootSeed: string;
+  acceptedBlockIndex: number;
+  sponsors: SeasonSponsorGearState;
+  rotations: readonly SeasonRotation[];
+  ratings: ReadonlyMap<string, SimulationRatings>;
+  humanFranchiseId: string | null;
+  aiFranchiseIds?: readonly string[];
+}
+
+export function sponsorsWithBlockCommit(input: SponsorBlockCommitInput): SeasonSponsorGearState {
+  const nextBlockIndex = input.acceptedBlockIndex + 1;
+  let boards = input.sponsors.boards;
+  if (
+    nextBlockIndex >= 0 &&
+    nextBlockIndex <= 7 &&
+    !boards.boards.some((board) => board.blockIndex === nextBlockIndex)
+  ) {
+    boards = {
+      ...boards,
+      boards: [
+        ...boards.boards,
+        {
+          blockIndex: nextBlockIndex,
+          offers: seasonSponsorOffersForBlock(input.rootSeed, nextBlockIndex),
+          purchasedInstanceIds: [],
+        },
+      ].sort((a, b) => a.blockIndex - b.blockIndex),
+    };
+  }
+  const applied = new Map<string, SeasonPlayerSponsorSlots>(
+    Object.entries(input.sponsors.players.slots),
+  );
+  for (const franchiseId of input.aiFranchiseIds ?? []) {
+    if (franchiseId === input.humanFranchiseId) continue;
+    const kit = resolveAiSponsorKit({
+      rootSeed: input.rootSeed,
+      blockIndex: input.acceptedBlockIndex,
+      franchiseId,
+      rotation: input.rotations.find((rotation) => rotation.franchiseId === franchiseId),
+      ratings: input.ratings,
+      applied,
+    });
+    if (kit === null) continue;
+    const slots = applied.get(kit.playerVersionId) ?? {
+      shoe: null,
+      apparel: null,
+      fuel: null,
+    };
+    applied.set(kit.playerVersionId, { ...slots, [kit.snapshot.slot]: kit.snapshot });
+  }
+  return {
+    vault: input.sponsors.vault,
+    boards,
+    players: { ...input.sponsors.players, slots: Object.fromEntries(applied) },
   };
 }

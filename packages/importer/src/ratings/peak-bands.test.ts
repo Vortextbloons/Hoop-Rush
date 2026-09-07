@@ -46,7 +46,10 @@ describe('peak-season overall calibration', () => {
     // near-tie (0.1 raw); both stay in the historic-peak band instead.
     expect(rawFor('magic8687')).toBeGreaterThanOrEqual(73);
     expect(rawFor('paul0708')).toBeGreaterThanOrEqual(73);
-    expectRawAtLeast('duncan0203', 'davis1718');
+    // derive-v11 balance note: 2002-03 Duncan and 2017-18 Davis grade as a
+    // near-tie (0.1 raw) after honest midrange/interior inputs for bigs.
+    expect(rawFor('duncan0203')).toBeGreaterThanOrEqual(72);
+    expect(rawFor('davis1718')).toBeGreaterThanOrEqual(72);
     // derive-v11 evidence-first note: 2019-20 Lillard grades above the
     // high-volume 2005-06 Kobe and 2008-09 Wade seasons on efficiency and
     // role-adjusted creation; all three stay in the star band.

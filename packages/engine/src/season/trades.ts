@@ -11,6 +11,7 @@ import {
   type SeasonRoster,
   type SeasonRotation,
   type SeasonRun,
+  type SeasonPlayerSponsorSlots,
   type SeasonTradeBoardTeamProfile,
   type SeasonTradeNeed,
   type SeasonTradeOffer,
@@ -35,7 +36,9 @@ import {
   SEASON_ROSTER_MAX_SIZE,
   SEASON_ROSTER_MIN_SIZE,
   SEASON_TRADE_PACKAGE_MAX,
+  normalizeSponsorGearState,
 } from '@hoop-rush/data-contracts';
+import { applySponsorBoosts } from './sponsors.ts';
 import { drawHexInt } from './season-seeds.ts';
 import { seasonRunStateDigest, seasonRunStateDigestFactsOf } from './state-digest.ts';
 import { seasonTransactionEntry } from './transactions.ts';
@@ -144,16 +147,28 @@ export interface SeasonTradeCatalogFacts {
   ratings: ReadonlyMap<string, SimulationRatings>;
   primary: ReadonlyMap<string, Position>;
 }
-export function seasonTradeCatalogFactsOf(catalog: SeasonDraftCatalog): SeasonTradeCatalogFacts {
+export function seasonTradeCatalogFactsOf(
+  catalog: SeasonDraftCatalog,
+  applied?: Record<string, SeasonPlayerSponsorSlots>,
+): SeasonTradeCatalogFacts {
   const playable = new Map<string, readonly Position[]>();
   const ratings = new Map<string, SimulationRatings>();
   const primary = new Map<string, Position>();
   for (const candidate of catalog.candidates) {
     playable.set(candidate.playerVersionId, candidate.positions.playable);
-    ratings.set(candidate.playerVersionId, candidate.detailedRatings);
+    const slots = applied?.[candidate.playerVersionId];
+    ratings.set(
+      candidate.playerVersionId,
+      slots === undefined
+        ? candidate.detailedRatings
+        : applySponsorBoosts(candidate.detailedRatings, slots),
+    );
     primary.set(candidate.playerVersionId, candidate.positions.primary);
   }
   return { playable, ratings, primary };
+}
+function sponsorSlotsOf(run: SeasonEconomyRun): Record<string, SeasonPlayerSponsorSlots> {
+  return normalizeSponsorGearState(run.sponsors).players.slots;
 }
 export interface SeasonTradePlayerHealthFacts {
   available: boolean;
@@ -455,7 +470,7 @@ export function selectTradeBackfill(input: {
 }): TradeBackfillSelection | null {
   const needed = SEASON_ROSTER_MIN_SIZE - input.rosterAfterIds.length;
   if (needed <= 0) return { picks: [], entries: [] };
-  const facts = seasonTradeCatalogFactsOf(input.catalog);
+  const facts = seasonTradeCatalogFactsOf(input.catalog, sponsorSlotsOf(input.run));
   const owned = new Set(input.run.ownership.map((row) => row.playerVersionId));
   for (const id of input.rosterAfterIds) owned.add(id);
   const ordering = createRng(seasonNamespaceSeed(input.seed, 'backfill-order'));
@@ -833,7 +848,7 @@ export function generatedExtraOfferForSpend(
     windowIndex,
     humanFranchiseId,
     catalog,
-    catalogFacts: seasonTradeCatalogFactsOf(catalog),
+    catalogFacts: seasonTradeCatalogFactsOf(catalog, sponsorSlotsOf(run)),
   };
   const seedPath = ['window', String(windowIndex), 'extra-offer'];
   const priorOffers = (
@@ -1190,7 +1205,7 @@ function applyAiTrades(
     windowIndex,
     humanFranchiseId,
     catalog,
-    catalogFacts: seasonTradeCatalogFactsOf(catalog),
+    catalogFacts: seasonTradeCatalogFactsOf(catalog, sponsorSlotsOf(run)),
   };
   const target =
     3 +
@@ -1421,7 +1436,7 @@ export function openSeasonTradeWindow(
     windowIndex,
     humanFranchiseId,
     catalog,
-    catalogFacts: seasonTradeCatalogFactsOf(catalog),
+    catalogFacts: seasonTradeCatalogFactsOf(catalog, sponsorSlotsOf(economyRun)),
   };
   const offers: SeasonTradeOffer[] = [];
   const usedFranchiseIds: string[] = [];
@@ -1467,7 +1482,7 @@ export function openSeasonTradeWindow(
     rootSeed,
     windowIndex,
     humanFranchiseId,
-    catalogFacts: seasonTradeCatalogFactsOf(catalog),
+    catalogFacts: seasonTradeCatalogFactsOf(catalog, sponsorSlotsOf(working)),
   });
   const trade: SeasonTradeState = {
     schemaVersion: 1,
@@ -1533,7 +1548,7 @@ export function applySeasonTrade(
       'applySeasonTrade requires the packaged catalog (player positions + ratings); the command layer supplies it',
     );
   }
-  const facts = seasonTradeCatalogFactsOf(catalog);
+  const facts = seasonTradeCatalogFactsOf(catalog, sponsorSlotsOf(run));
   const { toFranchiseId, fromFranchiseId } = offer;
   if (toFranchiseId === fromFranchiseId) {
     throw new SeasonTradeInvariantError('a trade must involve two distinct franchises');

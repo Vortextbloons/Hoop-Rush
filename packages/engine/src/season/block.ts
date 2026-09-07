@@ -84,11 +84,14 @@ import { generateSeasonSchedule } from './schedule.ts';
 import { evaluateSeasonBlockObjective, seasonObjectiveChoicesForBlock } from './objectives.ts';
 import {
   SEASON_CHALLENGE_CATALOG,
+  normalizeSponsorGearState,
   type SeasonBlockChallengeEvaluation,
   type SeasonChallengeDeal,
   type SeasonChallengeState,
+  type SeasonSponsorGearState,
 } from '@hoop-rush/data-contracts';
 import { dealSeasonBlockChallenges, evaluateSeasonBlockChallenges } from './challenges.ts';
+import { applySponsorBoosts, sponsorsWithBlockCommit } from './sponsors.ts';
 import {
   SEASON_CAMPAIGN_TARGETS_VERSION,
   SEASON_CAMPAIGN_VERSION,
@@ -214,6 +217,7 @@ export function expandSeasonRunRosters(
   const candidates = new Map(
     catalog.candidates.map((candidate) => [candidate.playerVersionId, candidate]),
   );
+  const applied = normalizeSponsorGearState(run.sponsors).players.slots;
   const expanded = new Map<string, SeasonGamePlayerInput>();
   for (const roster of run.rosters) {
     for (const player of roster.players) {
@@ -234,7 +238,7 @@ export function expandSeasonRunRosters(
         positions: candidate.positions.playable,
         heightInches: candidate.heightInches,
         weightLbs: candidate.weightLbs,
-        ratings: candidate.detailedRatings,
+        ratings: applySponsorBoosts(candidate.detailedRatings, applied[playerVersionId]),
         tendencies: candidate.tendencies,
         stamina: {
           schemaVersion: 1,
@@ -1507,6 +1511,7 @@ export function completeSeasonBlockCommit(input: {
   campaign: import('@hoop-rush/data-contracts').SeasonCampaignState | null;
   challenges: SeasonChallengeState | undefined;
   evolution: SeasonEvolutionState;
+  sponsors: SeasonSponsorGearState;
 } {
   const objectives = objectivesWithBlockSuccess(input.run.objectives, input.candidate);
   const baseChallenges = (input.run as unknown as { challenges?: SeasonChallengeState }).challenges;
@@ -1593,6 +1598,28 @@ export function completeSeasonBlockCommit(input: {
       }
     }
   }
+  const sponsorRatings = new Map(
+    (input.catalog?.candidates ?? []).map((candidate) => [
+      candidate.playerVersionId,
+      candidate.detailedRatings,
+    ]),
+  );
+  const nextSponsors = sponsorsWithBlockCommit({
+    rootSeed: input.run.rootSeed,
+    acceptedBlockIndex: input.candidate.blockIndex,
+    sponsors: normalizeSponsorGearState(postBlockRun.sponsors),
+    rotations: postBlockRun.rotations,
+    ratings: sponsorRatings,
+    humanFranchiseId: primaryFranchiseId,
+    aiFranchiseIds: postBlockRun.league.teams.map((team) => team.franchiseId),
+  });
+  const runWithSponsors: SeasonRun = { ...postBlockRun, sponsors: nextSponsors };
+  postBlockRun = {
+    ...runWithSponsors,
+    stateDigest: seasonRunStateDigest(
+      seasonRunStateDigestFactsOf(runWithSponsors, input.effects ?? input.candidate.effects),
+    ),
+  };
   const window = openSeasonTradeWindow({
     run: postBlockRun,
     blockIndex: input.candidate.blockIndex,
@@ -1682,6 +1709,7 @@ export function completeSeasonBlockCommit(input: {
       campaign: finalCampaign,
       challenges: finalChallenges,
       evolution: derived.evolution,
+      sponsors: nextSponsors,
     };
   }
   return {
@@ -1694,6 +1722,7 @@ export function completeSeasonBlockCommit(input: {
     campaign: finalCampaign,
     challenges: finalChallenges,
     evolution: derived.evolution,
+    sponsors: nextSponsors,
   };
 }
 export function resumeSeasonBlockFromPending(input: {

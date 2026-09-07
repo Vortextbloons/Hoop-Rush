@@ -16,6 +16,7 @@ import {
   type SeasonRun,
   type SeasonRunCompletion,
   type SeasonRunStage,
+  type SeasonSponsorGearState,
   type SeasonTradeState,
   type SeasonTransactionEntry,
   type SeasonRunAuthority,
@@ -38,6 +39,7 @@ export interface SeasonRunStateDigestFacts {
   challenges?: import('@hoop-rush/data-contracts').SeasonChallengeState | null;
   campaign?: SeasonCampaignState | null;
   evolution?: import('@hoop-rush/data-contracts').SeasonEvolutionState | null;
+  sponsors?: SeasonSponsorGearState | null;
   rosters: readonly SeasonRoster[];
   ownership: readonly SeasonOwnership[];
   rotations: readonly SeasonRotation[];
@@ -148,6 +150,35 @@ export function seasonRunStateDigest(facts: SeasonRunStateDigestFacts): string {
         }
       : {}),
     evolution: normalizeEvolutionState(facts.evolution),
+    ...(facts.sponsors !== undefined && facts.sponsors !== null
+      ? {
+          sponsors: {
+            vault: {
+              schemaVersion: facts.sponsors.vault.schemaVersion,
+              gearVersion: facts.sponsors.vault.gearVersion,
+              items: sortedBy(facts.sponsors.vault.items, (item) => item.instanceId),
+            },
+            boards: {
+              schemaVersion: facts.sponsors.boards.schemaVersion,
+              gearVersion: facts.sponsors.boards.gearVersion,
+              boards: [...facts.sponsors.boards.boards]
+                .sort((a, b) => a.blockIndex - b.blockIndex)
+                .map((board) => ({
+                  blockIndex: board.blockIndex,
+                  offers: sortedBy(board.offers, (offer) => offer.instanceId),
+                  purchasedInstanceIds: [...board.purchasedInstanceIds].sort(),
+                })),
+            },
+            players: {
+              schemaVersion: facts.sponsors.players.schemaVersion,
+              gearVersion: facts.sponsors.players.gearVersion,
+              slots: Object.fromEntries(
+                Object.entries(facts.sponsors.players.slots).sort(([a], [b]) => (a < b ? -1 : 1)),
+              ),
+            },
+          },
+        }
+      : {}),
     ...(facts.campaign !== undefined && facts.campaign !== null
       ? {
           campaign: {
@@ -224,6 +255,7 @@ export function seasonRunStateDigestFactsOf(
     campaign: (next as unknown as { campaign?: SeasonRunStateDigestFacts['campaign'] }).campaign,
     evolution: (next as unknown as { evolution?: SeasonRunStateDigestFacts['evolution'] })
       .evolution,
+    sponsors: next.sponsors ?? null,
     rosters: next.rosters,
     ownership: next.ownership,
     rotations: next.rotations,

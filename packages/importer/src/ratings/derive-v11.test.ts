@@ -106,6 +106,41 @@ describe('derive-v11 shooting attribution', () => {
     );
     expect(elite.ratings.threePoint).toBeGreaterThan(average.ratings.threePoint + 10);
   });
+  it('refuses to rate a 7-for-7 fluke as a rotation shooter', () => {
+    const fluke = derivePlayerRecord(
+      input('2023-24', starterStats({ tpm: 7, tpa: 7, tsPct: 0.644, ftm: 160, fta: 241 }), 'C'),
+    );
+    expect(fluke.provenance['threePoint']?.kind).toBe('derived');
+    expect(fluke.ratings.threePoint).toBeLessThanOrEqual(60);
+  });
+  it('reads midrange from free-throw touch for rim-reliant bigs, not dunk efficiency', () => {
+    const rimBig = derivePlayerRecord(
+      input(
+        '2023-24',
+        starterStats({
+          fgm: 435,
+          fga: 703,
+          tpm: 6,
+          tpa: 7,
+          ftm: 160,
+          fta: 241,
+          efgPct: 0.624,
+          tsPct: 0.644,
+        }),
+        'C',
+      ),
+    );
+    expect(rimBig.provenance['midrange']?.kind).toBe('estimated');
+    expect(rimBig.ratings.midrange).toBeLessThan(65);
+    const spacer = derivePlayerRecord(
+      input(
+        '2023-24',
+        starterStats({ fgm: 630, fga: 1350, tpm: 160, tpa: 410, efgPct: 0.526 }),
+        'SG',
+      ),
+    );
+    expect(spacer.provenance['midrange']?.kind).toBe('derived');
+  });
 });
 
 describe('derive-v11 passing and handling', () => {
@@ -180,6 +215,34 @@ describe('derive-v11 evidence-limited defense and athleticism', () => {
     );
     expect(Math.abs(lowMinutes.ratings.speed - highMinutes.ratings.speed)).toBeLessThanOrEqual(4);
     expect(lowMinutes.provenance['speed']?.confidence).toBe('low');
+  });
+  it('penalizes hollow anchors: elite rebound/block piles without creation on losing teams', () => {
+    const anchorStats = starterStats({
+      gamesPlayed: 75,
+      minutes: 2500,
+      points: 900,
+      rebounds: 900,
+      offensiveRebounds: 250,
+      defensiveRebounds: 650,
+      assists: 100,
+      steals: 30,
+      blocks: 200,
+      turnovers: 210,
+      fgm: 380,
+      fga: 700,
+      tpm: 0,
+      tpa: 5,
+      ftm: 140,
+      fta: 220,
+      usageRate: 18,
+      tsPct: 0.6,
+      efgPct: 0.55,
+    });
+    const hollow = derivePlayerRecord(input('2023-24', anchorStats, 'C', { teamWinPct: 0.4 }));
+    const winner = derivePlayerRecord(input('2023-24', anchorStats, 'C', { teamWinPct: 0.75 }));
+    expect(hollow.ratingProfile.nonlinear.weaknesses.hollowAnchor ?? 0).toBeGreaterThan(0);
+    expect(winner.ratingProfile.nonlinear.weaknesses.hollowAnchor ?? 0).toBe(0);
+    expect(hollow.summaryRatings.overallRating).toBeLessThan(winner.summaryRatings.overallRating);
   });
 });
 

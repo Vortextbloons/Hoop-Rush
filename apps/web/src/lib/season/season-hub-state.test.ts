@@ -905,3 +905,55 @@ describe('SeasonHubState postseason commands (M2.6)', () => {
     );
   });
 });
+describe('SeasonHubState trade guards', () => {
+  it('blocks trade commands while a block is pending and keeps the pending row', async () => {
+    const repo = repoWith(snapshot());
+    const runner = new FakeRunner();
+    const hub = new SeasonHubState(repo, runner);
+    await hub.refresh();
+    hub.pending = { runId: RUN_ID, blockIndex: 3 } as unknown as SeasonHubState['pending'];
+    await hub.openTradeInquiry({ windowIndex: 0, toFranchiseId: 'celtics' });
+    expect(hub.commandError?.command).toBe('open-trade-inquiry');
+    expect(hub.commandError?.rejection).toMatchObject({ code: 'pending-block', blockIndex: 3 });
+    expect(hub.commandError?.message).toContain('pending');
+    expect(repo.applySeasonRunCommand).not.toHaveBeenCalled();
+    expect(hub.pending).not.toBeNull();
+    hub.destroy();
+  });
+  it('blocks trade commands while a block is running', async () => {
+    const repo = repoWith(snapshot());
+    const runner = new FakeRunner();
+    const hub = new SeasonHubState(repo, runner);
+    await hub.refresh();
+    hub.block = runningBlock('fake-1', 2);
+    await hub.purchaseTradeInquiry({ windowIndex: 0 });
+    expect(hub.commandError?.command).toBe('purchase-trade-inquiry');
+    expect(hub.commandError?.rejection).toMatchObject({ code: 'pending-block' });
+    expect(repo.applySeasonRunCommand).not.toHaveBeenCalled();
+    hub.destroy();
+  });
+  it('maps the new trade rejection codes in describeCommandRejection', () => {
+    expect(
+      describeCommandRejection('respond-to-trade-counter', {
+        code: 'pending-block',
+        blockIndex: 3,
+      } as never),
+    ).toContain('pending');
+    expect(
+      describeCommandRejection('respond-to-trade-counter', {
+        code: 'trade-negotiation-conflict',
+        windowIndex: 0,
+        inquiryId: 'inq-1',
+        playerVersionIds: ['pv-1'],
+      } as never),
+    ).toContain('proposed');
+    expect(
+      describeCommandRejection('respond-to-trade-counter', {
+        code: 'trade-negotiation-illegal',
+        windowIndex: 0,
+        inquiryId: 'inq-1',
+        reasons: ['lakers: too few centers'],
+      } as never),
+    ).toContain('illegal roster');
+  });
+});

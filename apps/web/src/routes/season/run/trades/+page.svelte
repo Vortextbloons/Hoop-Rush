@@ -70,10 +70,26 @@
       'respond-to-trade-counter',
       'walk-away-from-trade',
       'purchase-trade-inquiry',
+      'accept-trade-offer',
+      'decline-trade-offer',
     ]);
     return tradeCommands.has(e.command) ? e.message : null;
   });
+  const tradeReceipt = $derived(shell.commandReceipt);
   const busy = $derived(shell.block.phase === 'running');
+  const blockedMessage = $derived.by(() => {
+    if (shell.pending !== null) {
+      return `Block ${String(shell.pending.blockIndex + 1)} is still pending — resume or forfeit it before trading.`;
+    }
+    if (shell.interruption !== null) {
+      return 'An interrupted game needs a decision before trading — resume or forfeit it first.';
+    }
+    if (shell.block.phase === 'running') {
+      return 'A block is playing — trading unlocks when it finishes.';
+    }
+    return null;
+  });
+  const tradeBusy = $derived(busy || blockedMessage !== null);
   const summaries = $derived(shell.snapshot?.summaries ?? []);
   function faceOf(playerVersionId: string) {
     return shell.facesByVersion.get(playerVersionId) ?? null;
@@ -85,7 +101,7 @@
     );
   }
   function handlePurchase(): void {
-    if (!mounted || windowState === null || busy) return;
+    if (!mounted || windowState === null || tradeBusy) return;
     void shell.purchaseTradeInquiry?.({ windowIndex: windowState.windowIndex });
   }
   function handleSubmit(payload: {
@@ -95,7 +111,7 @@
     influenceAmount: number;
     influenceFromSender: string | null;
   }): void {
-    if (!mounted || windowState === null || busy) return;
+    if (!mounted || windowState === null || tradeBusy) return;
     void shell.submitTradeProposal?.({
       windowIndex: windowState.windowIndex,
       toFranchiseId: payload.toFranchiseId,
@@ -106,7 +122,7 @@
     });
   }
   function handleRespond(input: { inquiryId: string; accept: boolean }): void {
-    if (!mounted || windowState === null) return;
+    if (!mounted || windowState === null || tradeBusy) return;
     void shell.respondToTradeCounter?.({
       windowIndex: windowState.windowIndex,
       inquiryId: input.inquiryId,
@@ -114,11 +130,11 @@
     });
   }
   function handleWalkAway(inquiryId: string): void {
-    if (!mounted || windowState === null) return;
+    if (!mounted || windowState === null || tradeBusy) return;
     void shell.walkAwayFromTrade?.({ windowIndex: windowState.windowIndex, inquiryId });
   }
   function handleOpenInquiry(toFranchiseId: string): void {
-    if (!mounted || windowState === null) return;
+    if (!mounted || windowState === null || tradeBusy) return;
     void shell.openTradeInquiry?.({ windowIndex: windowState.windowIndex, toFranchiseId });
   }
   function handleDraftChange(next: {
@@ -198,7 +214,9 @@
     onPurchaseInquiry={handlePurchase}
     onDraftChange={handleDraftChange}
     {commandError}
-    {busy}
+    receipt={blockedMessage !== null || busy ? null : tradeReceipt}
+    busy={tradeBusy}
+    {blockedMessage}
     playerName={playerNameOf}
     {playableOf}
     {availableOf}

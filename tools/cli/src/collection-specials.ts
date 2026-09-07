@@ -65,7 +65,7 @@ export const COLLECTION_SPECIALS: readonly AuthoredSpecial[] = [
   {
     family: 'Floor General',
     rarity: 'Titan',
-    sourcePlayerVersionId: 'pv-614500160beaeab2e19d8b5c45afef06',
+    sourcePlayerVersionId: 'pv-0823b9ca50b9fd066cf3235ceb51743a',
     ratingOverlay: { passing: 15, ballHandling: 10, offensiveIq: 15 },
   },
   {
@@ -77,7 +77,7 @@ export const COLLECTION_SPECIALS: readonly AuthoredSpecial[] = [
   {
     family: 'Floor General',
     rarity: 'Immortal',
-    sourcePlayerVersionId: 'pv-23a7fcd70d121adb6efbf9819cfb8307',
+    sourcePlayerVersionId: 'pv-2fdb496bbce89ce726a3054962dba25b',
     ratingOverlay: { passing: 15, ballHandling: 10, offensiveIq: 15 },
   },
 ];
@@ -92,7 +92,7 @@ export const COLLECTION_SPECIAL_SOURCE_SEASONS: Record<string, string> = {
   'pv-0677dab31eb51eef19f4a00946e66403': 'Scottie Pippen 1994-95',
   'pv-a696e35b7419fb37efbb85cd3671f90b': 'Kawhi Leonard 2019-20',
   'pv-a16de3b614e2208264b74d4c5ba4c846': 'Jason Kidd 1998-99',
-  'pv-614500160beaeab2e19d8b5c45afef06': 'John Stockton 1991-92',
+  'pv-0823b9ca50b9fd066cf3235ceb51743a': 'John Stockton 1994-95',
   'pv-cd80b46d697f56b959869843737d4f7d': 'Steve Nash 2006-07',
-  'pv-23a7fcd70d121adb6efbf9819cfb8307': 'Chris Paul 2008-09',
+  'pv-2fdb496bbce89ce726a3054962dba25b': 'Chris Paul 2007-08',
 };

@@ -1034,6 +1034,10 @@ export function buildFixtureStateDigest(
     evolution: normalizeEvolutionState(
       overrides.evolution ?? (run as { evolution?: unknown }).evolution,
     ),
+    sponsors:
+      overrides.sponsors ??
+      (run as { sponsors?: SeasonRunStateDigestFacts['sponsors'] }).sponsors ??
+      null,
     rosters: overrides.rosters ?? run.rosters,
     ownership: overrides.ownership ?? run.ownership,
     rotations: overrides.rotations ?? run.rotations,

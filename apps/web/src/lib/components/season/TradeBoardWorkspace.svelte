@@ -41,6 +41,8 @@
     onWalkAway,
     onPurchaseInquiry,
     commandError = null,
+    receipt = null,
+    blockedMessage = null,
     busy = false,
     playerName = (id: string) => id,
     playableOf = (id: string) => [] as readonly string[],
@@ -71,6 +73,8 @@
     onWalkAway: (inquiryId: string) => void;
     onPurchaseInquiry: () => void;
     commandError?: string | null;
+    receipt?: import('$lib/season/season-hub-state').SeasonTradeReceipt | null;
+    blockedMessage?: string | null;
     busy?: boolean;
     playerName?: (playerVersionId: string) => string;
     playableOf?: (playerVersionId: string) => readonly string[];
@@ -146,6 +150,24 @@
       },
     }),
   );
+  const receiptText = $derived.by(() => {
+    if (receipt === null) return null;
+    const changes =
+      receipt.rosterChanges?.find((row) => row.franchiseId === humanFranchiseId) ??
+      receipt.rosterChanges?.[0] ??
+      null;
+    if (changes !== null && (changes.added.length > 0 || changes.removed.length > 0)) {
+      const sent = changes.removed.map((id) => playerName(id)).join(', ');
+      const received = changes.added.map((id) => playerName(id)).join(', ');
+      return `Trade complete — you sent ${sent} and received ${received}. Your rotation and save are updated.`;
+    }
+    if (receipt.command === 'decline-trade-offer') return 'Offer declined — nothing changed.';
+    if (receipt.command === 'respond-to-trade-counter')
+      return 'Counter declined — nothing changed.';
+    if (receipt.command === 'accept-trade-offer')
+      return 'Trade complete — your rotation and save are updated.';
+    return null;
+  });
   const canPurchase = $derived(
     !purchasedUsed &&
       inquiryAllowance < inquiryFacts.cap &&
@@ -272,7 +294,11 @@
     }
   });
   $effect(() => {
-    if (activeNegotiation?.status === 'accepted') announcement = 'Accepted.';
+    if (receiptText !== null) {
+      announcement = receiptText;
+    }
+  });
+  $effect(() => {
     if (activeNegotiation?.status === 'declined') announcement = 'Declined.';
     if (activeNegotiation?.status === 'walked-away') announcement = 'Walked away — no penalty.';
   });
@@ -383,6 +409,23 @@
         class="mt-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm"
       >
         {humanizedError}
+      </p>
+    {/if}
+    {#if blockedMessage !== null}
+      <p
+        class="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm"
+        role="status"
+      >
+        {blockedMessage}
+      </p>
+    {/if}
+    {#if receiptText !== null}
+      <p
+        class="mt-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm"
+        role="status"
+        data-testid="trade-receipt"
+      >
+        {receiptText}
       </p>
     {/if}
     {#if activeNegotiation?.latestRequestedChange !== null && activeNegotiation?.latestRequestedChange !== undefined}

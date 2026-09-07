@@ -270,6 +270,7 @@
     shell.pending = hub.pending;
     shell.interruption = hub.interruption;
     shell.commandError = hub.commandError;
+    shell.commandReceipt = hub.commandReceipt;
     shell.hubError = hub.error;
     shell.externalChange = hub.externalChange;
     const phase = hub.block.phase;
@@ -549,6 +550,10 @@
   shell.respondToTradeCounter = async (input) => {
     await shell.hub?.respondToTradeCounter(input);
     mirrorHub();
+    if (shell.catalog !== null) {
+      await topUpPlayerSliceFromCatalog(shell.catalog);
+      mirrorHub();
+    }
   };
   shell.walkAwayFromTrade = async (input) => {
     await shell.hub?.walkAwayFromTrade(input);

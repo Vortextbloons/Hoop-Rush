@@ -2,10 +2,7 @@ import { z } from 'zod';
 import { franchiseIdSchema } from './ids.ts';
 import { injuryIdSchema } from './season-health.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
-import {
-  SEASON_TRADE_PACKAGE_MAX,
-  SEASON_TRADE_VERSION,
-} from './season-versions.ts';
+import { SEASON_TRADE_PACKAGE_MAX, SEASON_TRADE_VERSION } from './season-versions.ts';
 export const seasonTradeOfferIdSchema = z.string().regex(/^off-[0-9a-f]{32}$/);
 export type SeasonTradeOfferId = z.infer<typeof seasonTradeOfferIdSchema>;
 export const seasonTradeOfferStatusSchema = z.enum(['open', 'accepted', 'declined', 'expired']);
@@ -222,6 +219,8 @@ export const seasonTradeNegotiationSchema = z
       .string()
       .regex(/^prop-[0-9a-f]{32}$/)
       .nullable(),
+    activeProposalOutgoing: z.array(playerVersionIdSchema).max(SEASON_TRADE_PACKAGE_MAX).optional(),
+    activeProposalIncoming: z.array(playerVersionIdSchema).max(SEASON_TRADE_PACKAGE_MAX).optional(),
   })
   .superRefine((n, ctx) => {
     if (n.exchangeCount !== n.exchanges.length) {

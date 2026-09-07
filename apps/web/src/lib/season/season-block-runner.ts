@@ -196,6 +196,7 @@ export function buildWorkerRequest(
       rotations: state.rotations,
       cursor: state.input.run.cursor,
       evolution: state.input.run.evolution,
+      sponsors: state.input.run.sponsors,
     },
     schedule: opts.schedule,
     homeCourt: state.input.homeCourt,
@@ -623,6 +624,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         challenges,
         campaign,
         evolution: committed.evolution,
+        sponsors: committed.sponsors,
         checkpointState: committed.checkpointState,
         stateRevision: committed.stateRevision,
         stateDigest: committed.stateDigest,
@@ -668,6 +670,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         campaign,
         challenges,
         evolution: committed.evolution,
+        sponsors: committed.sponsors,
         checkpointState: committed.checkpointState,
         stateRevision: committed.stateRevision,
         stateDigest: committed.stateDigest,
@@ -1170,6 +1173,7 @@ export function assembleCommittedSnapshot(input: {
   campaign?: import('@hoop-rush/data-contracts').SeasonCampaignState | null;
   challenges?: import('@hoop-rush/data-contracts').SeasonChallengeState | null;
   evolution?: import('@hoop-rush/data-contracts').SeasonEvolutionState | null;
+  sponsors?: import('@hoop-rush/data-contracts').SeasonSponsorGearState | null;
   checkpointState: SeasonCheckpointState;
   stateRevision: number;
   stateDigest: string;
@@ -1215,6 +1219,7 @@ export function assembleCommittedSnapshot(input: {
       challenges ?? (run as unknown as { challenges?: SeasonRun['challenges'] }).challenges,
     campaign,
     evolution: input.evolution ?? run.evolution,
+    sponsors: input.sponsors ?? run.sponsors,
     checkpointState: input.checkpointState,
     stateRevision: input.stateRevision,
     stateDigest: input.stateDigest,

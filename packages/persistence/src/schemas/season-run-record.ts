@@ -20,6 +20,7 @@ import {
   seasonCampaignStateSchema,
   seasonEvolutionStateSchema,
   type SeasonEvolutionState,
+  type SeasonSponsorGearState,
   seasonHealthStateSchema,
   seasonInfluenceStateSchema,
   seasonInvalidRosterInterruptionSchema,
@@ -35,6 +36,7 @@ import {
   seasonRunCompletionSchema,
   seasonRunSchema,
   seasonRunStageSchema,
+  seasonSponsorGearStateSchema,
   seasonStandingsSchema,
   seasonTeamAggregateSchema,
   seasonTradeStateSchema,
@@ -43,6 +45,7 @@ import {
   seasonAwardsSchema,
   seasonPostseasonStateSchema,
   normalizeEvolutionState,
+  normalizeSponsorGearState,
   SEASON_ROSTER_MAX_SIZE,
   SEASON_ROSTER_MIN_SIZE,
   SEASON_RUN_SAVE_SCHEMA_VERSION,
@@ -74,6 +77,7 @@ export const seasonRunRecordFieldsSchema = z.object({
   challenges: seasonChallengeStateSchema.optional(),
   campaign: seasonCampaignStateSchema.optional(),
   evolution: seasonEvolutionStateSchema.optional(),
+  sponsors: seasonSponsorGearStateSchema.optional(),
   checkpointState: seasonCheckpointStateSchema.nullable(),
   stateRevision: z.number().int().nonnegative(),
   stateDigest: seasonCheckpointDigestSchema,
@@ -86,6 +90,12 @@ export function storedEvolutionOf(stored: {
   run?: { evolution?: unknown } | null;
 }): SeasonEvolutionState {
   return normalizeEvolutionState(stored.run?.evolution ?? stored.evolution);
+}
+export function storedSponsorsOf(stored: {
+  sponsors?: unknown;
+  run?: { sponsors?: unknown } | null;
+}): SeasonSponsorGearState {
+  return normalizeSponsorGearState(stored.run?.sponsors ?? stored.sponsors);
 }
 export const seasonRunCursorSchema = z.object({
   run: z.object({
@@ -113,6 +123,7 @@ export const seasonRunCursorSchema = z.object({
   challenges: seasonChallengeStateSchema.optional(),
   campaign: seasonCampaignStateSchema.optional(),
   evolution: seasonEvolutionStateSchema.optional(),
+  sponsors: seasonSponsorGearStateSchema.optional(),
   checkpointState: seasonCheckpointStateSchema.nullable(),
   stateRevision: z.number().int().nonnegative(),
   stateDigest: seasonCheckpointDigestSchema,
@@ -136,6 +147,7 @@ export const seasonRunCheckpointDeltaSchema = seasonRunRecordFieldsSchema
     objectives: true,
     challenges: true,
     evolution: true,
+    sponsors: true,
     checkpointState: true,
     stateRevision: true,
     stateDigest: true,
@@ -158,6 +170,7 @@ export const seasonRunCheckpointDeltaSchema = seasonRunRecordFieldsSchema
       completion: seasonRunCompletionSchema.nullable().optional(),
       freeAgency: seasonFreeAgencyStateSchema,
       evolution: seasonEvolutionStateSchema.optional(),
+      sponsors: seasonSponsorGearStateSchema.optional(),
     }),
     effects: seasonEffectsStateSchema,
   });

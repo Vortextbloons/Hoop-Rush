@@ -50,6 +50,7 @@ export const nonlinearComponentsSchema = z.object({
     spacingLimitation: z.number().min(0).max(6),
     foulRisk: z.number().min(0).max(6),
     deficientRebounding: z.number().min(0).max(6),
+    hollowAnchor: z.number().min(0).max(6).optional(),
   }),
 });
 export type NonlinearComponents = z.infer<typeof nonlinearComponentsSchema>;

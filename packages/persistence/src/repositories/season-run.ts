@@ -20,6 +20,7 @@ import type {
   SeasonRotation,
   SeasonRun,
   SeasonRunCommand,
+  SeasonSponsorGearState,
   SeasonStandings,
   SeasonTeamAggregate,
   SeasonPlayerAggregate,
@@ -53,6 +54,7 @@ export interface CommitSeasonBlockInput {
   challenges?: SeasonChallengeState | null;
   campaign?: SeasonCampaignState | null;
   evolution?: SeasonEvolutionState | null;
+  sponsors?: SeasonSponsorGearState | null;
   checkpointState: SeasonCheckpointState;
   stateRevision: number;
   stateDigest: string;

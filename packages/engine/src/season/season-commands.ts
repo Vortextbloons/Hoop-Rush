@@ -89,18 +89,27 @@ import type {
   SeasonOpenTradeInquiryCommand,
   SeasonOpenTradeInquiryRejection,
   SeasonOpenTradeInquiryResult,
+  SeasonPendingBlockRejection,
   SeasonSubmitTradeProposalCommand,
   SeasonSubmitTradeProposalRejection,
   SeasonSubmitTradeProposalResult,
   SeasonRespondToTradeCounterCommand,
   SeasonRespondToTradeCounterRejection,
   SeasonRespondToTradeCounterResult,
+  SeasonTradeNegotiationConflictRejection,
+  SeasonTradeNegotiationIllegalRejection,
   SeasonWalkAwayFromTradeCommand,
   SeasonWalkAwayFromTradeRejection,
   SeasonWalkAwayFromTradeResult,
   SeasonPurchaseTradeInquiryCommand,
   SeasonPurchaseTradeInquiryRejection,
   SeasonPurchaseTradeInquiryResult,
+  SeasonBuySponsorCommand,
+  SeasonBuySponsorRejection,
+  SeasonBuySponsorResult,
+  SeasonApplySponsorCommand,
+  SeasonApplySponsorRejection,
+  SeasonApplySponsorResult,
   SeasonCampaignAlreadySelectedRejection,
   SeasonCampaignOpportunityNotOfferedRejection,
   SeasonTradeActiveNegotiationRejection,
@@ -116,7 +125,7 @@ import {
   type SeasonRunAuthority,
 } from '@hoop-rush/data-contracts';
 import { assertNever } from '../sim/assert-never.ts';
-import { expandSeasonRunRosters } from './block.ts';
+import { expandSeasonRunRosters, seasonNextBlockIndex } from './block.ts';
 import {
   advancePendingAfterForfeit,
   seasonForfeitSummaryForGame,
@@ -156,6 +165,7 @@ import {
   fillTradeBackfill,
   seasonEconomyRunOf,
   seasonTradeCatalogFactsOf,
+  seasonTradePlayerHealthFacts,
   generatedExtraOfferForSpend,
   tradeOfferBackfillSeed,
   tradeRosterLegalityReasons,
@@ -179,6 +189,11 @@ import {
   resolveSeasonFreeAgencyWindow,
 } from './free-agency.ts';
 import { seasonTransactionEntry } from './transactions.ts';
+import {
+  SEASON_SPONSOR_SLOTS,
+  normalizeSponsorGearState,
+  sponsorGearEntryOf,
+} from '@hoop-rush/data-contracts';
 export interface SeasonRunCommandContext {
   run: SeasonRun;
   pending: SeasonPendingBlockCandidate | null;
@@ -286,12 +301,20 @@ export type SeasonRunCommandResult =
       result: SeasonPurchaseTradeInquiryResult;
     }
   | {
-      command: 'select-front-office';
-      result: SeasonSelectFrontOfficeResult;
+      command: 'purchase-trade-inquiry';
+      result: SeasonPurchaseTradeInquiryResult;
     }
   | {
-      command: 'select-court-innovation';
-      result: SeasonSelectCourtInnovationResult;
+      command: 'buy-sponsor';
+      result: SeasonBuySponsorResult;
+    }
+  | {
+      command: 'apply-sponsor';
+      result: SeasonApplySponsorResult;
+    }
+  | {
+      command: 'select-front-office';
+      result: SeasonSelectFrontOfficeResult;
     };
 export interface SeasonRunCommandOutput {
   result: SeasonRunCommandResult;
@@ -360,6 +383,18 @@ function commandAlreadyRecorded(run: SeasonRun, commandId: string): boolean {
   if (evo?.frontOffice?.selectedByCommandId === commandId) return true;
   if (evo && Object.values(evo.selections).some((s) => s.selectedByCommandId === commandId))
     return true;
+  const sponsors = run.sponsors;
+  if (sponsors?.vault.items.some((item) => item.acquiredByCommandId === commandId)) return true;
+  if (
+    Object.values(sponsors?.players.slots ?? {}).some(
+      (slots) =>
+        slots.shoe?.appliedByCommandId === commandId ||
+        slots.apparel?.appliedByCommandId === commandId ||
+        slots.fuel?.appliedByCommandId === commandId,
+    )
+  ) {
+    return true;
+  }
   return false;
 }
 function baseValidation(
@@ -482,6 +517,7 @@ function rejectedCommand(
   commandId: string,
   rejection: SeasonRunCommandRejection,
   run: SeasonRun,
+  pending: SeasonPendingBlockCandidate | null = null,
 ): SeasonRunCommandOutput {
   return {
     result: {
@@ -489,7 +525,7 @@ function rejectedCommand(
       result: { status: 'rejected', commandId, rejection },
     } as SeasonRunCommandResult,
     run,
-    pending: null,
+    pending,
   };
 }
 function rejectedSelect(
@@ -564,6 +600,287 @@ function rejectedPurchaseTradeInquiry(
 ): SeasonRunCommandOutput {
   return rejectedCommand('purchase-trade-inquiry', command.commandId, rejection, run);
 }
+function rejectedBuySponsor(
+  command: SeasonBuySponsorCommand,
+  rejection: SeasonBuySponsorRejection,
+  run: SeasonRun,
+): SeasonRunCommandOutput {
+  return rejectedCommand('buy-sponsor', command.commandId, rejection, run);
+}
+function rejectedApplySponsor(
+  command: SeasonApplySponsorCommand,
+  rejection: SeasonApplySponsorRejection,
+  run: SeasonRun,
+): SeasonRunCommandOutput {
+  return rejectedCommand('apply-sponsor', command.commandId, rejection, run);
+}
+function sponsorHumanFranchiseId(run: SeasonEconomyRun, context: SeasonRunCommandContext): string {
+  return (
+    context.humanFranchiseId ??
+    run.league.teams.find((t) => t.control === 'human')?.franchiseId ??
+    ''
+  );
+}
+function handleBuySponsor(
+  command: SeasonBuySponsorCommand,
+  context: SeasonRunCommandContext,
+): SeasonRunCommandOutput {
+  const base = baseValidation(command, context.run, context.pending, context);
+  if (base !== null) return base;
+  const run = economyRunOf(context);
+  const humanFid = franchiseIdSchema.parse(sponsorHumanFranchiseId(run, context));
+  const sponsors = normalizeSponsorGearState(run.sponsors);
+  const currentBlock = seasonNextBlockIndex(run.cursor.completedRounds);
+  const board = sponsors.boards.boards.find((entry) => entry.blockIndex === currentBlock);
+  const offer = board?.offers.find((candidate) => candidate.instanceId === command.instanceId);
+  if (board === undefined || offer === undefined) {
+    const stale = sponsors.boards.boards
+      .flatMap((entry) => entry.offers)
+      .find((candidate) => candidate.instanceId === command.instanceId);
+    if (stale !== undefined) {
+      return rejectedBuySponsor(
+        command,
+        {
+          code: 'sponsor-expired',
+          instanceId: command.instanceId,
+          blockIndex: stale.blockIndex,
+        },
+        run,
+      );
+    }
+    return rejectedBuySponsor(
+      command,
+      { code: 'sponsor-not-offered', instanceId: command.instanceId, blockIndex: currentBlock },
+      run,
+    );
+  }
+  const owned =
+    sponsors.vault.items.some((item) => item.instanceId === command.instanceId) ||
+    Object.values(sponsors.players.slots).some(
+      (slots) =>
+        slots.shoe?.instanceId === command.instanceId ||
+        slots.apparel?.instanceId === command.instanceId ||
+        slots.fuel?.instanceId === command.instanceId,
+    );
+  if (board.purchasedInstanceIds.includes(command.instanceId) || owned) {
+    return rejectedBuySponsor(
+      command,
+      {
+        code: 'sponsor-already-purchased',
+        instanceId: command.instanceId,
+        blockIndex: board.blockIndex,
+      },
+      run,
+    );
+  }
+  const balance = run.influence.balances[humanFid] ?? 0;
+  if (balance - offer.price < SEASON_INFLUENCE_FLOOR) {
+    return rejectedBuySponsor(
+      command,
+      {
+        code: 'insufficient-balance',
+        franchiseId: humanFid,
+        balance,
+        requestedDelta: -offer.price,
+        floor: SEASON_INFLUENCE_FLOOR,
+      },
+      run,
+    );
+  }
+  const spend = applySeasonInfluenceSpend({
+    influence: run.influence,
+    franchiseId: humanFid,
+    source: 'sponsor-purchase',
+    requestedDelta: -offer.price,
+    blockIndex: board.blockIndex,
+    commandId: command.commandId,
+    explanation: `Sponsor ${offer.brandFamily} ${offer.tier} (${offer.slot})`,
+  });
+  const nextSponsors = {
+    ...sponsors,
+    vault: {
+      ...sponsors.vault,
+      items: [
+        ...sponsors.vault.items,
+        {
+          instanceId: offer.instanceId,
+          entryId: offer.entryId,
+          acquiredBlock: board.blockIndex,
+          acquiredByCommandId: command.commandId,
+        },
+      ],
+    },
+    boards: {
+      ...sponsors.boards,
+      boards: sponsors.boards.boards.map((entry) =>
+        entry.blockIndex === board.blockIndex
+          ? { ...entry, purchasedInstanceIds: [...entry.purchasedInstanceIds, offer.instanceId] }
+          : entry,
+      ),
+    },
+  };
+  const nextRunBase = {
+    ...run,
+    sponsors: nextSponsors,
+    influence: spend.influence,
+    transactions: [
+      ...run.transactions,
+      seasonTransactionEntry({
+        transactionId: `txn-sponsor-purchase-${command.commandId}`,
+        commandId: command.commandId,
+        franchiseId: humanFid,
+        type: 'sponsor-purchase',
+        blockIndex: board.blockIndex,
+        appliedAtStateRevision: run.stateRevision + 1,
+        payload: { instanceId: offer.instanceId, entryId: offer.entryId, price: offer.price },
+        explanation: `Sponsor purchase ${offer.brandFamily} ${offer.tier} (${offer.slot})`,
+      }),
+    ],
+  };
+  const next = advanceRunState(nextRunBase);
+  return {
+    result: {
+      command: 'buy-sponsor',
+      result: {
+        status: 'accepted',
+        commandId: command.commandId,
+        instanceId: offer.instanceId,
+        entryId: offer.entryId,
+        price: offer.price,
+      },
+    },
+    run: next,
+    pending: null,
+  };
+}
+function handleApplySponsor(
+  command: SeasonApplySponsorCommand,
+  context: SeasonRunCommandContext,
+): SeasonRunCommandOutput {
+  const base = baseValidation(command, context.run, context.pending, context);
+  if (base !== null) return base;
+  const run = economyRunOf(context);
+  const humanFid = franchiseIdSchema.parse(sponsorHumanFranchiseId(run, context));
+  const sponsors = normalizeSponsorGearState(run.sponsors);
+  const vaultIndex = sponsors.vault.items.findIndex(
+    (item) => item.instanceId === command.instanceId,
+  );
+  if (vaultIndex === -1) {
+    return rejectedApplySponsor(
+      command,
+      { code: 'sponsor-not-owned', instanceId: command.instanceId },
+      run,
+    );
+  }
+  const vaultItem = sponsors.vault.items[vaultIndex];
+  if (vaultItem === undefined) {
+    return rejectedApplySponsor(
+      command,
+      { code: 'sponsor-not-owned', instanceId: command.instanceId },
+      run,
+    );
+  }
+  const entry = sponsorGearEntryOf(vaultItem.entryId);
+  if (entry.slot !== command.slot) {
+    return rejectedApplySponsor(
+      command,
+      {
+        code: 'sponsor-slot-mismatch',
+        instanceId: command.instanceId,
+        expectedSlot: entry.slot,
+        slot: command.slot,
+      },
+      run,
+    );
+  }
+  const owner = run.ownership.find(
+    (row) => row.playerVersionId === command.playerVersionId,
+  )?.ownerFranchiseId;
+  if (owner !== humanFid) {
+    return rejectedApplySponsor(
+      command,
+      { code: 'sponsor-not-on-roster', playerVersionId: command.playerVersionId },
+      run,
+    );
+  }
+  const slots = sponsors.players.slots[command.playerVersionId] ?? {
+    shoe: null,
+    apparel: null,
+    fuel: null,
+  };
+  if (slots[command.slot] !== null) {
+    return rejectedApplySponsor(
+      command,
+      {
+        code: 'sponsor-slot-occupied',
+        playerVersionId: command.playerVersionId,
+        slot: command.slot,
+      },
+      run,
+    );
+  }
+  for (const slot of SEASON_SPONSOR_SLOTS) {
+    if (slots[slot]?.brandFamily === entry.brandFamily) {
+      return rejectedApplySponsor(
+        command,
+        {
+          code: 'sponsor-brand-duplicate',
+          playerVersionId: command.playerVersionId,
+          brandFamily: entry.brandFamily,
+        },
+        run,
+      );
+    }
+  }
+  const offer = sponsors.boards.boards
+    .flatMap((board) => board.offers)
+    .find((candidate) => candidate.instanceId === command.instanceId);
+  if (offer === undefined) {
+    throw new Error(`sponsor vault item ${command.instanceId} has no dealt offer`);
+  }
+  const currentBlock = seasonNextBlockIndex(run.cursor.completedRounds);
+  const nextSponsors = {
+    ...sponsors,
+    vault: {
+      ...sponsors.vault,
+      items: sponsors.vault.items.filter((_, index) => index !== vaultIndex),
+    },
+    players: {
+      ...sponsors.players,
+      slots: {
+        ...sponsors.players.slots,
+        [command.playerVersionId]: {
+          ...slots,
+          [command.slot]: {
+            instanceId: offer.instanceId,
+            entryId: offer.entryId,
+            brandFamily: offer.brandFamily,
+            slot: command.slot,
+            tier: offer.tier,
+            boosts: offer.boosts,
+            appliedBlock: currentBlock ?? 8,
+            appliedByCommandId: command.commandId,
+          },
+        },
+      },
+    },
+  };
+  const next = advanceRunState({ ...run, sponsors: nextSponsors });
+  return {
+    result: {
+      command: 'apply-sponsor',
+      result: {
+        status: 'accepted',
+        commandId: command.commandId,
+        instanceId: offer.instanceId,
+        playerVersionId: command.playerVersionId,
+        slot: command.slot,
+      },
+    },
+    run: next,
+    pending: null,
+  };
+}
 function handleSelectGmIdentity(
   command: SeasonSelectGmIdentityCommand,
   context: SeasonRunCommandContext,
@@ -594,14 +911,63 @@ function handleEvolveGmCampaign(
   const run = economy;
   return rejectedEvolveGmCampaign(command, { code: 'retired' }, run);
 }
+function pendingBlockRejectionOf(
+  context: SeasonRunCommandContext,
+): SeasonPendingBlockRejection | null {
+  if (context.pending === null) return null;
+  return { code: 'pending-block', blockIndex: context.pending.blockIndex };
+}
+function resolveNegotiationPackage(negotiation: {
+  activeProposalOutgoing?: readonly string[];
+  activeProposalIncoming?: readonly string[];
+  exchanges: readonly {
+    proposalFingerprint: string | null;
+  }[];
+}): { outgoing: string[]; incoming: string[] } | null {
+  const outgoing = negotiation.activeProposalOutgoing;
+  const incoming = negotiation.activeProposalIncoming;
+  if (outgoing !== undefined && incoming !== undefined) {
+    return { outgoing: [...outgoing], incoming: [...incoming] };
+  }
+  for (let index = negotiation.exchanges.length - 1; index >= 0; index -= 1) {
+    const fingerprint = negotiation.exchanges[index]?.proposalFingerprint ?? null;
+    if (fingerprint === null) continue;
+    const separator = fingerprint.indexOf('|');
+    if (separator < 0) continue;
+    const left = fingerprint.slice(0, separator).trim();
+    const right = fingerprint.slice(separator + 1).trim();
+    const parse = (part: string): string[] =>
+      part.length === 0
+        ? []
+        : part
+            .split(',')
+            .map((id) => id.trim())
+            .filter((id) => id.length > 0);
+    const parsedOutgoing = parse(left);
+    const parsedIncoming = parse(right);
+    if (parsedOutgoing.length === 0 || parsedIncoming.length === 0) continue;
+    return { outgoing: parsedOutgoing, incoming: parsedIncoming };
+  }
+  return null;
+}
 function handleOpenTradeInquiry(
   command: SeasonOpenTradeInquiryCommand,
   context: SeasonRunCommandContext,
 ): SeasonRunCommandOutput {
   const base = baseValidation(command, context.run, context.pending, context);
   if (base !== null) return base;
+  const pendingRejection = pendingBlockRejectionOf(context);
   const economy = economyRunOf(context);
   const run = economy;
+  if (pendingRejection !== null) {
+    return rejectedCommand(
+      'open-trade-inquiry',
+      command.commandId,
+      pendingRejection,
+      run,
+      context.pending,
+    );
+  }
   if (
     !run.trade ||
     !run.trade.windows.some((w) => w.windowIndex === command.windowIndex && w.status === 'open')
@@ -673,6 +1039,16 @@ function handleSubmitTradeProposal(
   if (base !== null) return base;
   const economy = economyRunOf(context);
   const run = economy;
+  const submitPending = pendingBlockRejectionOf(context);
+  if (submitPending !== null) {
+    return rejectedCommand(
+      'submit-trade-proposal',
+      command.commandId,
+      submitPending,
+      run,
+      context.pending,
+    );
+  }
   if (!context.catalog) {
     return rejectedSubmitTradeProposal(
       command,
@@ -832,6 +1208,8 @@ function handleSubmitTradeProposal(
         },
       ],
       activeProposalId: evalResult.proposal.proposalId,
+      activeProposalOutgoing: [...command.outgoingPlayerVersionIds],
+      activeProposalIncoming: [...command.incomingPlayerVersionIds],
       latestRequestedChange: giftNote ?? existingForUpdate.latestRequestedChange,
       expressedInterests:
         giftNote !== null
@@ -868,6 +1246,8 @@ function handleSubmitTradeProposal(
       latestRequestedChange: giftNote,
       finalReason: null,
       activeProposalId: evalResult.proposal.proposalId,
+      activeProposalOutgoing: [...command.outgoingPlayerVersionIds],
+      activeProposalIncoming: [...command.incomingPlayerVersionIds],
     };
     nextNegotiations = [...(nextWin.negotiations ?? []), newNegotiation];
   }
@@ -1042,6 +1422,16 @@ function handleRespondToTradeCounter(
   if (base !== null) return base;
   const economy = economyRunOf(context);
   const run = economy;
+  const respondPending = pendingBlockRejectionOf(context);
+  if (respondPending !== null) {
+    return rejectedCommand(
+      'respond-to-trade-counter',
+      command.commandId,
+      respondPending,
+      run,
+      context.pending,
+    );
+  }
   const win = run.trade?.windows.find((w) => w.windowIndex === command.windowIndex);
   if (!win) {
     return rejectedRespondToTradeCounter(
@@ -1077,9 +1467,197 @@ function handleRespondToTradeCounter(
       run,
     );
   }
-  const nextNegotiation: import('@hoop-rush/data-contracts').SeasonTradeNegotiation = {
+  if (
+    negotiation.status === 'accepted' ||
+    negotiation.status === 'declined' ||
+    negotiation.status === 'walked-away' ||
+    negotiation.status === 'expired'
+  ) {
+    return rejectedRespondToTradeCounter(
+      command,
+      {
+        code: 'trade-negotiations-closed',
+        windowIndex: command.windowIndex,
+      },
+      run,
+    );
+  }
+  if (!command.accept) {
+    const declinedNegotiation: import('@hoop-rush/data-contracts').SeasonTradeNegotiation = {
+      ...negotiation,
+      status: 'declined',
+      exchangeCount: negotiation.exchangeCount + 1,
+      exchanges: [
+        ...negotiation.exchanges,
+        {
+          exchangeIndex: negotiation.exchangeCount + 1,
+          kind: 'ai-final',
+          proposalId: null,
+          proposalFingerprint: null,
+          responseCause: 'close-needs-more-value',
+          atStateRevision: run.stateRevision,
+        },
+      ],
+      finalReason: 'close-needs-more-value',
+      activeProposalId: null,
+    };
+    const declinedWin: import('@hoop-rush/data-contracts').SeasonTradeWindowState = {
+      ...win,
+      activeInquiryId: null,
+      negotiations: (win.negotiations ?? []).map((n) =>
+        n.inquiryId === command.inquiryId ? declinedNegotiation : n,
+      ),
+    };
+    const declinedTradeState = run.trade;
+    if (!declinedTradeState) {
+      throw new Error('trade command requires an open trade window');
+    }
+    const declinedTrade: import('@hoop-rush/data-contracts').SeasonTradeState = {
+      ...declinedTradeState,
+      windows: declinedTradeState.windows.map((w) =>
+        w.windowIndex === command.windowIndex ? declinedWin : w,
+      ),
+    };
+    const declinedNext = advanceRunState({ ...run, trade: declinedTrade });
+    return {
+      result: {
+        command: 'respond-to-trade-counter',
+        result: {
+          status: 'accepted',
+          commandId: command.commandId,
+          windowIndex: command.windowIndex,
+          inquiryId: command.inquiryId,
+        },
+      },
+      run: declinedNext,
+      pending: null,
+    };
+  }
+  const agreed = resolveNegotiationPackage(negotiation);
+  if (agreed === null) {
+    return rejectedRespondToTradeCounter(
+      command,
+      {
+        code: 'trade-negotiations-closed',
+        windowIndex: command.windowIndex,
+      },
+      run,
+    );
+  }
+  const humanFranchiseId = negotiation.fromFranchiseId;
+  const partnerFranchiseId = negotiation.toFranchiseId;
+  const rosterById = new Map(
+    run.rosters.flatMap((roster) =>
+      roster.players.map((player) => [player.playerVersionId, roster.franchiseId]),
+    ),
+  );
+  const ownershipById = new Map(
+    run.ownership.map((row) => [row.playerVersionId, row.ownerFranchiseId]),
+  );
+  const conflictIds: string[] = [];
+  for (const id of agreed.outgoing) {
+    if (rosterById.get(id) !== humanFranchiseId || ownershipById.get(id) !== humanFranchiseId)
+      conflictIds.push(id);
+  }
+  for (const id of agreed.incoming) {
+    if (rosterById.get(id) !== partnerFranchiseId || ownershipById.get(id) !== partnerFranchiseId)
+      conflictIds.push(id);
+  }
+  if (conflictIds.length > 0) {
+    const rejection: SeasonTradeNegotiationConflictRejection = {
+      code: 'trade-negotiation-conflict',
+      windowIndex: command.windowIndex,
+      inquiryId: command.inquiryId,
+      playerVersionIds: conflictIds,
+    };
+    return rejectedRespondToTradeCounter(command, rejection, run);
+  }
+  if (context.catalog !== undefined) {
+    const facts = seasonTradeCatalogFactsOf(context.catalog);
+    const rosterIdsOf = (franchiseId: string): string[] =>
+      run.rosters
+        .find((roster) => roster.franchiseId === franchiseId)
+        ?.players.map((player) => player.playerVersionId) ?? [];
+    const seedPath = [
+      'trades',
+      'window',
+      String(command.windowIndex),
+      'negotiation',
+      command.inquiryId,
+    ];
+    const filled = fillTradeBackfill({
+      catalog: context.catalog,
+      run,
+      toFranchiseId: humanFranchiseId,
+      fromFranchiseId: partnerFranchiseId,
+      toIds: [
+        ...rosterIdsOf(humanFranchiseId).filter((id) => !agreed.outgoing.includes(id)),
+        ...agreed.incoming,
+      ],
+      fromIds: [
+        ...rosterIdsOf(partnerFranchiseId).filter((id) => !agreed.incoming.includes(id)),
+        ...agreed.outgoing,
+      ],
+      seed: tradeOfferBackfillSeed(run.rootSeed, seedPath),
+    });
+    const reasons: string[] = [];
+    if (filled === null) {
+      reasons.push('trade leaves a roster below ten players with no backfill available');
+    } else {
+      for (const [franchiseId, after] of [
+        [humanFranchiseId, filled.toIdsFilled],
+        [partnerFranchiseId, filled.fromIdsFilled],
+      ] as const) {
+        for (const reason of tradeRosterLegalityReasons(after, facts)) {
+          reasons.push(`${franchiseId}: ${reason}`);
+        }
+      }
+    }
+    if (reasons.length > 0) {
+      const rejection: SeasonTradeNegotiationIllegalRejection = {
+        code: 'trade-negotiation-illegal',
+        windowIndex: command.windowIndex,
+        inquiryId: command.inquiryId,
+        reasons,
+      };
+      return rejectedRespondToTradeCounter(command, rejection, run);
+    }
+  } else {
+    const rejection: SeasonTradeNegotiationIllegalRejection = {
+      code: 'trade-negotiation-illegal',
+      windowIndex: command.windowIndex,
+      inquiryId: command.inquiryId,
+      reasons: ['the draft catalog is unavailable so the final rosters cannot be checked'],
+    };
+    return rejectedRespondToTradeCounter(command, rejection, run);
+  }
+  const syntheticOffer: import('@hoop-rush/data-contracts').SeasonTradeOffer = {
+    offerId: (negotiation.activeProposalId ?? `prop-${'0'.repeat(32)}`).replace(/^prop-/, 'off-'),
+    windowIndex: command.windowIndex,
+    seedPath: ['trades', 'window', String(command.windowIndex), 'negotiation', command.inquiryId],
+    toFranchiseId: franchiseIdSchema.parse(humanFranchiseId),
+    fromFranchiseId: franchiseIdSchema.parse(partnerFranchiseId),
+    outgoingPlayerVersionIds: agreed.outgoing,
+    incomingPlayerVersionIds: agreed.incoming,
+    outgoingHealth: agreed.outgoing.map((id) => seasonTradePlayerHealthFacts(run.health, id)),
+    incomingHealth: agreed.incoming.map((id) => seasonTradePlayerHealthFacts(run.health, id)),
+    valueBand: { ratioBasisPoints: 1000, band: '80-120', qualified: true },
+    roleFit: { outgoingRoles: [], incomingRoles: [], notes: `negotiation ${command.inquiryId}` },
+    rosterNeedFacts: {
+      outgoingDepth: 0,
+      incomingDepth: 0,
+      notes: `negotiation ${command.inquiryId}`,
+    },
+    projectedRotationChanges: `negotiation ${command.inquiryId} accepted`,
+    projectedChemistryDisruption: { removedPairs: 0, newPairs: 0 },
+    status: 'accepted',
+  };
+  const applied = applySeasonTrade(run, syntheticOffer, context.catalog, {
+    commandId: command.commandId,
+  });
+  const acceptedNegotiation: import('@hoop-rush/data-contracts').SeasonTradeNegotiation = {
     ...negotiation,
-    status: command.accept ? 'accepted' : 'declined',
+    status: 'accepted',
     exchangeCount: negotiation.exchangeCount + 1,
     exchanges: [
       ...negotiation.exchanges,
@@ -1088,29 +1666,31 @@ function handleRespondToTradeCounter(
         kind: 'ai-final',
         proposalId: null,
         proposalFingerprint: null,
-        responseCause: command.accept ? 'acceptable' : 'close-needs-more-value',
+        responseCause: 'acceptable',
         atStateRevision: run.stateRevision,
       },
     ],
-    finalReason: command.accept ? 'acceptable' : 'close-needs-more-value',
+    finalReason: 'acceptable',
     activeProposalId: null,
   };
-  const nextWin: import('@hoop-rush/data-contracts').SeasonTradeWindowState = {
+  const appliedWin: import('@hoop-rush/data-contracts').SeasonTradeWindowState = {
     ...win,
     activeInquiryId: null,
     negotiations: (win.negotiations ?? []).map((n) =>
-      n.inquiryId === command.inquiryId ? nextNegotiation : n,
+      n.inquiryId === command.inquiryId ? acceptedNegotiation : n,
     ),
   };
-  const tradeState = run.trade;
-  if (!tradeState) {
+  const appliedTradeState = applied.run.trade;
+  if (!appliedTradeState) {
     throw new Error('trade command requires an open trade window');
   }
-  const nextTrade: import('@hoop-rush/data-contracts').SeasonTradeState = {
-    ...tradeState,
-    windows: tradeState.windows.map((w) => (w.windowIndex === command.windowIndex ? nextWin : w)),
+  const appliedTrade: import('@hoop-rush/data-contracts').SeasonTradeState = {
+    ...appliedTradeState,
+    windows: appliedTradeState.windows.map((w) =>
+      w.windowIndex === command.windowIndex ? appliedWin : w,
+    ),
   };
-  const next = advanceRunState({ ...run, trade: nextTrade });
+  const next = advanceRunState({ ...applied.run, trade: appliedTrade });
   return {
     result: {
       command: 'respond-to-trade-counter',
@@ -1119,6 +1699,7 @@ function handleRespondToTradeCounter(
         commandId: command.commandId,
         windowIndex: command.windowIndex,
         inquiryId: command.inquiryId,
+        rosterChanges: applied.rosterChanges,
       },
     },
     run: next,
@@ -1133,6 +1714,16 @@ function handleWalkAwayFromTrade(
   if (base !== null) return base;
   const economy = economyRunOf(context);
   const run = economy;
+  const walkAwayPending = pendingBlockRejectionOf(context);
+  if (walkAwayPending !== null) {
+    return rejectedCommand(
+      'walk-away-from-trade',
+      command.commandId,
+      walkAwayPending,
+      run,
+      context.pending,
+    );
+  }
   const win = run.trade?.windows.find((w) => w.windowIndex === command.windowIndex);
   if (!win) {
     return rejectedWalkAwayFromTrade(
@@ -1201,6 +1792,16 @@ function handlePurchaseTradeInquiry(
   if (base !== null) return base;
   const economy = economyRunOf(context);
   const run = economy;
+  const purchasePending = pendingBlockRejectionOf(context);
+  if (purchasePending !== null) {
+    return rejectedCommand(
+      'purchase-trade-inquiry',
+      command.commandId,
+      purchasePending,
+      run,
+      context.pending,
+    );
+  }
   const win = run.trade?.windows.find((w) => w.windowIndex === command.windowIndex);
   if (!win || win.status !== 'open') {
     return rejectedPurchaseTradeInquiry(
@@ -1714,9 +2315,19 @@ function handleAcceptTradeOffer(
   command: SeasonAcceptTradeOfferCommand,
   context: SeasonRunCommandContext,
 ): SeasonRunCommandOutput {
-  const base = baseValidation(command, context.run, null, context);
+  const base = baseValidation(command, context.run, context.pending, context);
   if (base !== null) return base;
   const run = economyRunOf(context);
+  const acceptPending = pendingBlockRejectionOf(context);
+  if (acceptPending !== null) {
+    return rejectedCommand(
+      'accept-trade-offer',
+      command.commandId,
+      acceptPending,
+      run,
+      context.pending,
+    );
+  }
   const window = run.trade?.windows.find((entry) => entry.windowIndex === command.windowIndex);
   const offer = window?.offers.find((entry) => entry.offerId === command.offerId);
   if (window === undefined || offer === undefined) {
@@ -1854,9 +2465,19 @@ function handleDeclineTradeOffer(
   command: SeasonDeclineTradeOfferCommand,
   context: SeasonRunCommandContext,
 ): SeasonRunCommandOutput {
-  const base = baseValidation(command, context.run, null, context);
+  const base = baseValidation(command, context.run, context.pending, context);
   if (base !== null) return base;
   const run = economyRunOf(context);
+  const declinePending = pendingBlockRejectionOf(context);
+  if (declinePending !== null) {
+    return rejectedCommand(
+      'decline-trade-offer',
+      command.commandId,
+      declinePending,
+      run,
+      context.pending,
+    );
+  }
   const trade = run.trade;
   const window = trade?.windows.find((entry) => entry.windowIndex === command.windowIndex);
   const offer = window?.offers.find((entry) => entry.offerId === command.offerId);
@@ -3019,6 +3640,10 @@ export function handleSeasonRunCommand(
       return handleWalkAwayFromTrade(command, context);
     case 'purchase-trade-inquiry':
       return handlePurchaseTradeInquiry(command, context);
+    case 'buy-sponsor':
+      return handleBuySponsor(command, context);
+    case 'apply-sponsor':
+      return handleApplySponsor(command, context);
     case 'select-front-office':
       return handleSelectFrontOffice(command, context);
     case 'select-court-innovation':

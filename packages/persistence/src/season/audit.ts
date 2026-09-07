@@ -690,6 +690,7 @@ export function auditSeasonRunState(
       challenges: stored.challenges ?? buildEmptyChallengeState(),
       campaign: stored.campaign ?? null,
       evolution: storedEvolutionOf(stored),
+      sponsors: stored.run.sponsors ?? null,
       rosters: stored.run.rosters,
       ownership: stored.run.ownership,
       rotations: stored.run.rotations,

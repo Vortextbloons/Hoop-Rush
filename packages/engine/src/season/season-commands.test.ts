@@ -980,6 +980,192 @@ describe('decline-trade-offer command', () => {
     expect(second.result.result.rejection.code).toBe('offer-not-open');
   });
 });
+describe('respond-to-trade-counter command', () => {
+  const CELTICS = franchiseIdSchema.parse('celtics');
+  function submitFirstAcceptablePackage(fixture: ReturnType<typeof windowedFixture>): {
+    run: SeasonRun;
+    inquiryId: string;
+    outgoing: string[];
+    incoming: string[];
+  } {
+    const { run, context } = fixture;
+    const humanIds =
+      run.rosters
+        .find((roster) => roster.franchiseId === HUMAN)
+        ?.players.map((p) => p.playerVersionId) ?? [];
+    const celticsIds =
+      run.rosters
+        .find((roster) => roster.franchiseId === 'celtics')
+        ?.players.map((p) => p.playerVersionId) ?? [];
+    let attempt = 0;
+    for (const h of humanIds) {
+      for (const a of celticsIds) {
+        attempt += 1;
+        const output = handleSeasonRunCommand(
+          commandOf(run, {
+            command: 'submit-trade-proposal',
+            commandId: commandIdSchema.parse(`neg-prop-${String(attempt)}`),
+            windowIndex: 0,
+            toFranchiseId: CELTICS,
+            outgoingPlayerVersionIds: [h],
+            incomingPlayerVersionIds: [a],
+            influenceAmount: 0,
+            influenceFromSender: null,
+          }),
+          context,
+        );
+        if (output.result.command !== 'submit-trade-proposal')
+          throw new Error('unexpected command');
+        const result = output.result.result;
+        if (result.status === 'accepted') {
+          return { run: output.run, inquiryId: result.inquiryId, outgoing: [h], incoming: [a] };
+        }
+      }
+    }
+    throw new Error('fixture has no acceptable 1-for-1 package');
+  }
+  it('applies the agreed package to rosters and reports rosterChanges on accept', () => {
+    const fixture = windowedFixture();
+    const submitted = submitFirstAcceptablePackage(fixture);
+    const output = handleSeasonRunCommand(
+      commandOf(submitted.run, {
+        command: 'respond-to-trade-counter',
+        commandId: commandIdSchema.parse('neg-accept-1'),
+        windowIndex: 0,
+        inquiryId: submitted.inquiryId,
+        accept: true,
+      }),
+      { ...fixture.context, run: submitted.run },
+    );
+    if (output.result.command !== 'respond-to-trade-counter') throw new Error('unexpected command');
+    const result = output.result.result;
+    if (result.status !== 'accepted') throw new Error('expected acceptance');
+    expect(result.rosterChanges).toHaveLength(2);
+    expect(result.rosterChanges?.[0]?.franchiseId).toBe(HUMAN);
+    expect(result.rosterChanges?.[1]?.franchiseId).toBe('celtics');
+    const humanAfter = output.run.rosters.find((roster) => roster.franchiseId === HUMAN);
+    const celticsAfter = output.run.rosters.find((roster) => roster.franchiseId === 'celtics');
+    for (const id of submitted.outgoing) {
+      expect(humanAfter?.players.some((p) => p.playerVersionId === id)).toBe(false);
+      expect(celticsAfter?.players.some((p) => p.playerVersionId === id)).toBe(true);
+    }
+    for (const id of submitted.incoming) {
+      expect(celticsAfter?.players.some((p) => p.playerVersionId === id)).toBe(false);
+      expect(humanAfter?.players.some((p) => p.playerVersionId === id)).toBe(true);
+    }
+    const negotiation = output.run.trade?.windows[0]?.negotiations?.find(
+      (n) => n.inquiryId === submitted.inquiryId,
+    );
+    expect(negotiation?.status).toBe('accepted');
+    expect(output.run.trade?.windows[0]?.activeInquiryId).toBeNull();
+    const tradeEntry = output.run.transactions[output.run.transactions.length - 1];
+    expect(tradeEntry?.type).toBe('trade');
+    expect(output.run.stateRevision).toBe(submitted.run.stateRevision + 1);
+  });
+  it('leaves rosters untouched on decline', () => {
+    const fixture = windowedFixture();
+    const submitted = submitFirstAcceptablePackage(fixture);
+    const output = handleSeasonRunCommand(
+      commandOf(submitted.run, {
+        command: 'respond-to-trade-counter',
+        commandId: commandIdSchema.parse('neg-decline-1'),
+        windowIndex: 0,
+        inquiryId: submitted.inquiryId,
+        accept: false,
+      }),
+      { ...fixture.context, run: submitted.run },
+    );
+    if (output.result.command !== 'respond-to-trade-counter') throw new Error('unexpected command');
+    if (output.result.result.status !== 'accepted') throw new Error('expected acceptance');
+    expect(output.result.result.rosterChanges).toBeUndefined();
+    expect(output.run.rosters).toEqual(submitted.run.rosters);
+    expect(output.run.ownership).toEqual(submitted.run.ownership);
+  });
+  it('rejects a second response once the negotiation is terminal', () => {
+    const fixture = windowedFixture();
+    const submitted = submitFirstAcceptablePackage(fixture);
+    const declined = handleSeasonRunCommand(
+      commandOf(submitted.run, {
+        command: 'respond-to-trade-counter',
+        commandId: commandIdSchema.parse('neg-terminal-1'),
+        windowIndex: 0,
+        inquiryId: submitted.inquiryId,
+        accept: false,
+      }),
+      { ...fixture.context, run: submitted.run },
+    );
+    if (declined.result.command !== 'respond-to-trade-counter')
+      throw new Error('unexpected command');
+    if (declined.result.result.status !== 'accepted') throw new Error('expected decline');
+    const resurrected = handleSeasonRunCommand(
+      commandOf(declined.run, {
+        command: 'respond-to-trade-counter',
+        commandId: commandIdSchema.parse('neg-terminal-2'),
+        windowIndex: 0,
+        inquiryId: submitted.inquiryId,
+        accept: true,
+      }),
+      { ...fixture.context, run: declined.run },
+    );
+    if (resurrected.result.result.status !== 'rejected') throw new Error('expected rejection');
+    expect(resurrected.result.result.rejection.code).toBe('trade-negotiations-closed');
+    expect(resurrected.run.rosters).toEqual(declined.run.rosters);
+  });
+  it('rejects every trade command while a block is pending and preserves the pending row', () => {
+    const fixture = windowedFixture();
+    const { context } = fixture;
+    const submitted = submitFirstAcceptablePackage(fixture);
+    const pending = pendingOf(submitted.run);
+    const pendingContext = { ...context, run: submitted.run, pending };
+    const fragments: SeasonRunCommandFragment[] = [
+      {
+        command: 'open-trade-inquiry',
+        commandId: commandIdSchema.parse('pend-open'),
+        windowIndex: 0,
+        toFranchiseId: CELTICS,
+      },
+      {
+        command: 'submit-trade-proposal',
+        commandId: commandIdSchema.parse('pend-submit'),
+        windowIndex: 0,
+        toFranchiseId: CELTICS,
+        outgoingPlayerVersionIds: [...submitted.outgoing],
+        incomingPlayerVersionIds: [...submitted.incoming],
+        influenceAmount: 0,
+        influenceFromSender: null,
+      },
+      {
+        command: 'respond-to-trade-counter',
+        commandId: commandIdSchema.parse('pend-respond'),
+        windowIndex: 0,
+        inquiryId: submitted.inquiryId,
+        accept: true,
+      },
+      {
+        command: 'walk-away-from-trade',
+        commandId: commandIdSchema.parse('pend-walk'),
+        windowIndex: 0,
+        inquiryId: submitted.inquiryId,
+      },
+      {
+        command: 'purchase-trade-inquiry',
+        commandId: commandIdSchema.parse('pend-purchase'),
+        windowIndex: 0,
+      },
+    ];
+    for (const fragment of fragments) {
+      const output = handleSeasonRunCommand(commandOf(submitted.run, fragment), pendingContext);
+      const result = output.result.result;
+      if (result.status !== 'rejected')
+        throw new Error(`expected rejection for ${fragment.command}`);
+      expect(result.rejection.code).toBe('pending-block');
+      expect(output.pending).toBe(pending);
+      expect(output.run.stateRevision).toBe(submitted.run.stateRevision);
+      expect(output.run.stateDigest).toBe(submitted.run.stateDigest);
+      expect(output.run.rosters).toEqual(submitted.run.rosters);
+    }
+  });
+});
 describe('resume-season-block command', () => {
   it('accepts a matching pending block without mutating the run', () => {
     const { run, context } = windowedFixture();

@@ -23,6 +23,7 @@ import type {
   SeasonHubState,
   SeasonRunCommandError,
   SeasonSpendInfluencePurpose,
+  SeasonTradeReceipt,
 } from './season-hub-state';
 import type { HubPostseasonProgress } from './season-postseason-presentation';
 import type { SeasonFaceRef } from './season-branding';
@@ -76,6 +77,7 @@ export class SeasonRunShell implements SeasonRunShellData {
   pending = $state<SeasonPendingBlockCandidate | null>(null);
   interruption = $state<SeasonInvalidRosterInterruption | null>(null);
   commandError = $state<SeasonRunCommandError | null>(null);
+  commandReceipt = $state<SeasonTradeReceipt | null>(null);
   externalChange = $state<{
     kind: 'commit' | 'clear' | 'replace';
     message: string;

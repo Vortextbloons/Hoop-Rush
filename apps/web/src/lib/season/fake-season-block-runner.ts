@@ -79,7 +79,13 @@ type EngineCommitOutput = ReturnType<typeof completeSeasonBlockCommit>;
 type EngineCommitInput = Parameters<typeof completeSeasonBlockCommit>[0];
 type FakeCommitOutput = Pick<
   EngineCommitOutput,
-  'checkpointState' | 'stateRevision' | 'stateDigest' | 'window' | 'freeAgency' | 'evolution'
+  | 'checkpointState'
+  | 'stateRevision'
+  | 'stateDigest'
+  | 'window'
+  | 'freeAgency'
+  | 'evolution'
+  | 'sponsors'
 >;
 type _FakeSimulateInputParity = EngineSimulateBlockInput extends {
   command: {
@@ -261,6 +267,7 @@ declare global {
 interface FakeM25CommitInput {
   health: SeasonHealthState;
   evolution?: import('@hoop-rush/data-contracts').SeasonEvolutionState | null;
+  sponsors?: import('@hoop-rush/data-contracts').SeasonSponsorGearState | null;
   transactions: SeasonTransactionEntry[];
   influence: SeasonInfluenceState;
   freeAgency: SeasonFreeAgencyState;
@@ -443,6 +450,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
           stateDigest: committed.stateDigest,
           window: committed.window,
           evolution: committed.evolution,
+          sponsors: committed.sponsors,
         });
         const committedView = this.committedSnapshot(
           startInput,
@@ -673,6 +681,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       window: SeasonWindowOpenResult | null;
       freeAgency: SeasonFreeAgencyState;
       evolution: import('@hoop-rush/data-contracts').SeasonEvolutionState;
+      sponsors: import('@hoop-rush/data-contracts').SeasonSponsorGearState;
     } | null = null;
     const prior = await loadCurrentSnapshot(this.scheduleOf(input)).catch(() => null);
     try {
@@ -688,6 +697,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
         stateDigest: committed.stateDigest,
         window: committed.window,
         evolution: committed.evolution,
+        sponsors: committed.sponsors,
       });
     } catch (error) {
       if (this.isCancelled()) return;
@@ -716,6 +726,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       stateDigest: string;
       window: SeasonWindowOpenResult | null;
       freeAgency: SeasonFreeAgencyState;
+      sponsors?: import('@hoop-rush/data-contracts').SeasonSponsorGearState | null;
     },
     prior: SeasonRunSnapshot | null,
   ): SeasonRunSnapshot {
@@ -729,6 +740,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       rotationDigest: input.rotationDigest,
       window: committed.window,
       freeAgency: committed.freeAgency,
+      sponsors: committed.sponsors ?? input.run.sponsors,
       challenges:
         (
           committed as unknown as {
@@ -956,6 +968,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       expectedStateDigest: input.run.stateDigest,
       window: m25.window,
       evolution: m25.evolution ?? input.run.evolution,
+      sponsors: m25.sponsors ?? input.run.sponsors,
     });
   }
   private objectivesWithBlockSuccess(

@@ -29,6 +29,7 @@ import {
   type SeasonSubmitBlockCommand,
   type SeasonTradeBoardTeamProfile,
   type SeasonTradeNegotiation,
+  type SeasonTradeRosterChange,
   type SeasonTradeState,
   type SeasonTradeValueTrend,
   type SeasonTradeWindowState,
@@ -110,6 +111,23 @@ export interface SeasonRunCommandError {
   rejection: SeasonRunCommandRejection | null;
   message: string;
 }
+export interface SeasonTradeReceipt {
+  command: SeasonRunCommand['command'];
+  windowIndex: number | null;
+  inquiryId: string | null;
+  offerId: string | null;
+  rosterChanges: SeasonTradeRosterChange[] | null;
+  stateRevision: number;
+}
+const TRADE_COMMANDS: ReadonlySet<SeasonRunCommand['command']> = new Set([
+  'open-trade-inquiry',
+  'submit-trade-proposal',
+  'respond-to-trade-counter',
+  'walk-away-from-trade',
+  'purchase-trade-inquiry',
+  'accept-trade-offer',
+  'decline-trade-offer',
+]);
 export type SeasonSpendInfluencePurpose = SeasonSpendInfluenceCommand['purpose'];
 export type SeasonPostseasonPhase = 'idle' | 'running' | 'cancelled' | 'failed' | 'complete';
 export interface SeasonPostseasonProgress {
@@ -184,6 +202,7 @@ export class SeasonHubState {
   pending: SeasonPendingBlockCandidate | null = null;
   interruption: SeasonInvalidRosterInterruption | null = null;
   commandError: SeasonRunCommandError | null = null;
+  commandReceipt: SeasonTradeReceipt | null = null;
   catalog: SeasonDraftCatalog | null = null;
   freeAgencyIndex: SeasonFreeAgencyIndex | null = null;
   freeAgencyTargets: SeasonRosterTargets | null = null;
@@ -639,6 +658,19 @@ export class SeasonHubState {
     inquiryId: string;
     accept: boolean;
   }): Promise<void> {
+    if (input.accept) {
+      try {
+        await this.ensureCatalog();
+      } catch (error) {
+        this.commandError = {
+          command: 'respond-to-trade-counter',
+          rejection: null,
+          message: `The draft catalog is unavailable: ${error instanceof Error ? error.message : String(error)}`,
+        };
+        this.emit();
+        return;
+      }
+    }
     const command: SeasonRunCommand = {
       schemaVersion: SEASON_RUN_SCHEMA_VERSION,
       command: 'respond-to-trade-counter',
@@ -1155,14 +1187,76 @@ export class SeasonHubState {
       start: this.block.startInput,
     });
   }
+  private get tradeBlockedReason(): 'pending' | 'interrupted' | 'running' | null {
+    if (this.pending !== null || this.interruption !== null) {
+      return this.pending !== null ? 'pending' : 'interrupted';
+    }
+    return this.block.phase === 'running' ? 'running' : null;
+  }
+  private tradeReceiptOf(
+    command: SeasonRunCommand,
+    envelope: ReturnType<typeof handleRunCommand>['result'],
+    stateRevision: number,
+  ): SeasonTradeReceipt | null {
+    if (envelope.result.status !== 'accepted') return null;
+    if (
+      command.command === 'respond-to-trade-counter' &&
+      envelope.command === 'respond-to-trade-counter'
+    ) {
+      const result = envelope.result;
+      return {
+        command: command.command,
+        windowIndex: result.windowIndex,
+        inquiryId: result.inquiryId,
+        offerId: null,
+        rosterChanges: result.rosterChanges ?? null,
+        stateRevision,
+      };
+    }
+    if (command.command === 'accept-trade-offer' && envelope.command === 'accept-trade-offer') {
+      const result = envelope.result;
+      return {
+        command: command.command,
+        windowIndex: result.trade.windowIndex,
+        inquiryId: null,
+        offerId: result.trade.offerId,
+        rosterChanges: result.rosterChanges,
+        stateRevision,
+      };
+    }
+    if (command.command === 'decline-trade-offer' && envelope.command === 'decline-trade-offer') {
+      const result = envelope.result;
+      return {
+        command: command.command,
+        windowIndex: result.windowIndex,
+        inquiryId: null,
+        offerId: result.offerId,
+        rosterChanges: null,
+        stateRevision,
+      };
+    }
+    return null;
+  }
   private async dispatch(command: SeasonRunCommand): Promise<void> {
     const snapshot = this.snapshot;
     this.commandError = null;
+    this.commandReceipt = null;
     if (snapshot === null) {
       this.commandError = {
         command: command.command,
         rejection: null,
         message: 'The active run is not loaded yet.',
+      };
+      this.emit();
+      return;
+    }
+    if (TRADE_COMMANDS.has(command.command) && this.tradeBlockedReason !== null) {
+      const blockIndex = this.pending?.blockIndex ?? this.nextBlockIndex() ?? 0;
+      const rejection = { code: 'pending-block', blockIndex } as const;
+      this.commandError = {
+        command: command.command,
+        rejection,
+        message: describeCommandRejection(command.command, rejection),
       };
       this.emit();
       return;
@@ -1196,6 +1290,7 @@ export class SeasonHubState {
         pending: output.pending,
       });
       this.commandError = null;
+      this.commandReceipt = this.tradeReceiptOf(command, envelope, output.run.stateRevision);
       this.pending = output.pending;
       if (output.pending === null) this.interruption = null;
       if (this.snapshot !== null) {
@@ -1593,6 +1688,12 @@ export function describeCommandRejection(
       return `Trade cash cap reached for this window.`;
     case 'trade-negotiations-closed':
       return 'Negotiations are closed for this window.';
+    case 'trade-negotiation-conflict':
+      return 'Those players changed teams since the deal was proposed — start a fresh proposal.';
+    case 'trade-negotiation-illegal':
+      return `That trade would leave an illegal roster: ${rejection.reasons.join('; ')}`;
+    case 'pending-block':
+      return `Block ${String(rejection.blockIndex + 1)} is still pending — resume or forfeit it before trading.`;
     case 'trade-availability-risk':
       return `Player ${rejection.playerVersionId} has an availability risk.`;
     case 'trade-wrong-fit':

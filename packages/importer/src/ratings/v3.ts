@@ -218,7 +218,7 @@ function productionEvidence(stats: StatsRow): ProductionEvidence {
   const shrinkage = clamp((minutes / (minutes + 1500)) * (games / (games + 40)), 0, 1);
   return {
     score: capped,
-    weight: clamp(0.38 * shrinkage * evidence.factor, 0, 0.38),
+    weight: clamp(0.5 * shrinkage * evidence.factor, 0, 0.5),
     confidence: evidence.label,
     sampleGames: games,
     sampleMinutes: minutes,
@@ -240,6 +240,7 @@ function deriveNonlinear(
   tendencies: SimulationTendencies,
   stats: StatsRow,
   memberships: ArchetypeMemberships,
+  teamWinPct?: number | null,
 ): NonlinearComponents {
   const creation = productMean([
     skill(ratings, 'ballHandling'),
@@ -333,6 +334,7 @@ function deriveNonlinear(
     ),
     foulRisk: clamp(Math.max(0, tendencies.foulRate - 5) * (0.6 + bigRole * 0.6), 0, 6),
     deficientRebounding: clamp((Math.max(0, 55 - rebounding) * (0.5 + bigRole)) / 8, 0, 6),
+    hollowAnchor: hollowAnchorFor(ratings, creation, teamWinPct),
   };
   const weaknessPenalty = -Math.min(
     6,
@@ -350,6 +352,27 @@ function deriveNonlinear(
     weaknessPenalty,
     weaknesses,
   };
+}
+function hollowAnchorFor(
+  ratings: SimulationRatings,
+  creation: number,
+  teamWinPct: number | null | undefined,
+): number {
+  // Rebound/block piles without creation on a losing team are the classic
+  // empty-stats profile: the events are real, but they do not move winning.
+  // The team factor is continuous — a .500 team discounts mildly, a sub-.370
+  // team fully — and unknown context never penalizes (a champion anchor with
+  // missing team data is not hollow by default).
+  const anchorTalent = mean([
+    skill(ratings, 'block'),
+    skill(ratings, 'interiorDefense'),
+    skill(ratings, 'defensiveRebound'),
+  ]);
+  const teamFactor =
+    teamWinPct == null || !Number.isFinite(teamWinPct)
+      ? 0
+      : clamp((0.62 - teamWinPct) / 0.25, 0, 1);
+  return clamp((anchorTalent - 72) * 0.5, 0, 4) * clamp((75 - creation) / 30, 0, 1) * teamFactor;
 }
 function deriveMemberships(
   input: RatingProfileInput,
@@ -465,7 +488,7 @@ export function eliteEvidenceLiftFor(input: {
     input.defenseRating >= defenseBar;
   if (completeEliteEvidence) return 4;
   if (eliteScoringEvidence) return 3;
-  if (input.production.score >= 80 && games >= 50) return 1;
+  if (input.production.score >= 78 && games >= 50) return 1;
   return 0;
 }
 export function teamContextAdjustment(
@@ -557,7 +580,13 @@ export function computeOffenseDefense(
 export function deriveRatingProfile(input: RatingProfileInput): DerivedRatingProfile {
   const production = productionEvidence(input.stats);
   const memberships = deriveMemberships(input, production.confidence);
-  const nonlinear = deriveNonlinear(input.ratings, input.tendencies, input.stats, memberships);
+  const nonlinear = deriveNonlinear(
+    input.ratings,
+    input.tendencies,
+    input.stats,
+    memberships,
+    input.teamWinPct,
+  );
   const archetypeWeighted = RATING_ARCHETYPES.reduce(
     (sum, archetype) =>
       sum + memberships[archetype] * archetypeScore(archetype, memberships, input.ratings),

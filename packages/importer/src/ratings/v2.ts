@@ -444,9 +444,14 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
   const tsPct = clampUnitInterval(totals.tsPct);
   const efgPct = clampUnitInterval(totals.efgPct);
   const usage = totals.usageRate;
+  const eraThreeAnchor = Math.min(
+    0.36,
+    Math.max(0.3, 0.3 + (input.era.league3PARate / 0.15) * 0.06),
+  );
   const ratePriors = {
     threePointPctPrior:
-      input.ratePriors?.threePointPctPrior ?? LEAGUE_RATE_DEFAULTS[position].threePointPctPrior,
+      input.ratePriors?.threePointPctPrior ??
+      Math.min(eraThreeAnchor, LEAGUE_RATE_DEFAULTS[position].threePointPctPrior),
     freeThrowPctPrior:
       input.ratePriors?.freeThrowPctPrior ?? LEAGUE_RATE_DEFAULTS[position].freeThrowPctPrior,
   };
@@ -473,13 +478,20 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
       : 0;
   const threeDifficultyFields =
     totals.contested3Pct !== null && tpa !== null && tpa >= 100 ? ['contested3Pct'] : [];
+  // Era shooting norm: large samples must converge near the observed rate no
+  // matter the prior, so the anchor is fixed per season (from league-wide
+  // three-point volume: modern spacing ~0.36, early-80s ~0.31) while the
+  // pooled group rate keeps its proper role inside the shrink step below.
+  // Judging a 1991 31% shooter against a modern 0.36 anchor would punish
+  // pre-spacing eras for their environment instead of their ability.
+  const threeAnchor = eraThreeAnchor;
   let threeRaw: number;
   let threeKind: ProvenanceKind;
   let threeFields: string[];
   if (tpa !== null && tpa > 0 && threePctShrunk !== null) {
     threeRaw =
       62 +
-      (threePctShrunk - 0.36) * 330 +
+      (threePctShrunk - threeAnchor) * 330 +
       (tsComponent + ftComponent) * threeSecondaryWeight * 0.5 +
       threeDifficultyAdj;
     threeKind = 'derived';
@@ -500,7 +512,18 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     threeKind = 'estimated';
     threeFields = ['prior'];
   }
-  record('threePoint', blend(threeRaw, 54), threeKind, threeFields);
+  // Minutes say how much a player played; attempts say how much of a shooter he
+  // is. A 2000-minute season with 7 three attempts carries almost no shooting
+  // evidence, so the blend leans on volume here too — otherwise flukes like a
+  // 7-for-7 season rate as rotation shooters.
+  const threeAttemptWeight =
+    threeKind === 'derived' && tpa !== null ? Math.min(weight, clamp(tpa / 150, 0.15, 1)) : weight;
+  record(
+    'threePoint',
+    threeRaw * threeAttemptWeight + 54 * (1 - threeAttemptWeight),
+    threeKind,
+    threeFields,
+  );
   if (threeKind === 'reconstructed' && reconstructedThreePoint !== undefined) {
     const entry = provenance['threePoint'];
     if (entry !== undefined) {
@@ -569,6 +592,11 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
       { notesCode: zoneFallbackNote },
     );
   }
+  const threeRateForMix =
+    tpa !== null && fga !== null && fga > 0 ? tpa / fga : priors.threePointRatePrior;
+  const ftaPerFgaForMix = fta !== null && fga !== null && fga > 0 ? fta / fga : 0;
+  const rimReliantBig =
+    (position === 'C' || position === 'F') && threeRateForMix < 0.08 && ftaPerFgaForMix > 0.3;
   const midPct = midShrunk ?? efgPct ?? fgPct;
   if (midShrunk !== null) {
     record('midrange', blend(58 + (midShrunk - 0.42) * 200, 54), 'derived', [
@@ -577,6 +605,15 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
       'prior',
       'shrink-80-attempts',
     ]);
+  } else if (rimReliantBig) {
+    // A rim-only big's efg is dunk efficiency, not jumper skill — reading it
+    // as midrange ability mints fake 75+ ratings (see Gobert/Whiteside). Free
+    // throws are the only observed touch signal, so midrange becomes a
+    // free-throw touch prior, honestly estimated.
+    const touchRate = ftPctShrunk ?? ftPct ?? 0.65;
+    record('midrange', blend(40 + touchRate * 30, 54), 'estimated', ['ftm', 'fta', 'prior'], {
+      notesCode: zoneFallbackNote,
+    });
   } else {
     record(
       'midrange',
@@ -716,6 +753,9 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
         : { notesCode: 'no-contest-tracking' }),
   });
   const hasRimEvidence = contestPublished && totals.defFgPct !== null && totals.blocks !== null;
+  // Event rate is not containment: a gambling shot-blocker piles blocks while
+  // giving up position, so the fallback slope stays flatter than the event
+  // rating and leans on rebounding evidence instead.
   const interior =
     hasRimEvidence && totals.defFgPct !== null
       ? 54 +
@@ -723,9 +763,9 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
         blkPer36 * 5 +
         (position === 'C' ? 5 : position === 'F' ? 1 : -5)
       : 54 +
-        blkPer36 * 6 +
+        blkPer36 * 4.5 +
         Math.max(0, (rebPer36Signal ?? 8) - 8) * 1.0 +
-        (position === 'C' ? 7 : position === 'F' ? 2 : -6);
+        (position === 'C' ? 5 : position === 'F' ? 1 : -6);
   const interiorKind: ProvenanceKind = hasRimEvidence ? 'derived' : 'estimated';
   const interiorConfidence = minConfidence([
     hasRimEvidence ? confidenceForSample('derived', gp, minutes, 'partial') : 'low',

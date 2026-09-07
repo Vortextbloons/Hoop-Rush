@@ -23,6 +23,7 @@ import type {
   SeasonHubState,
   SeasonRunCommandError,
   SeasonSpendInfluencePurpose,
+  SeasonTradeReceipt,
 } from './season-hub-state';
 import type { HubPostseasonProgress } from './season-postseason-presentation';
 import type { SeasonFaceRef } from './season-branding';
@@ -61,6 +62,7 @@ export interface SeasonRunShellData {
   pending: SeasonPendingBlockCandidate | null;
   interruption: SeasonInvalidRosterInterruption | null;
   commandError: SeasonRunCommandError | null;
+  commandReceipt: SeasonTradeReceipt | null;
   externalChange: {
     kind: 'commit' | 'clear' | 'replace';
     message: string;
@@ -179,6 +181,7 @@ export function initialSeasonRunShellData(): SeasonRunShellData {
     pending: null,
     interruption: null,
     commandError: null,
+    commandReceipt: null,
     externalChange: null,
     acknowledgeExternalChange: () => undefined,
     prewarmWorker: () => undefined,

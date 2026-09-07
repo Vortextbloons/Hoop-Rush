@@ -70,6 +70,7 @@ export function normalizeSeasonRunForPersistence(
     challenges: normalized.challenges ?? null,
     campaign: normalized.campaign ?? null,
     evolution: normalized.evolution ?? null,
+    sponsors: normalized.sponsors ?? null,
     rosters: normalized.rosters,
     ownership: normalized.ownership,
     rotations: normalized.rotations,

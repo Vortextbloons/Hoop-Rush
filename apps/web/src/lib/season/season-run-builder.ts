@@ -40,6 +40,7 @@ import {
   SEASON_ROTATION_VERSION,
   SEASON_RUN_SCHEMA_VERSION,
   SEASON_SEED_DERIVATION_VERSION,
+  SEASON_SPONSOR_GEAR_VERSION,
   SEASON_STAMINA_VERSION,
   SEASON_STANDINGS_VERSION,
   SEASON_TIEBREAK_VERSION,
@@ -60,7 +61,11 @@ import {
   type Seed,
   buildEmptyChallengeState,
 } from '@hoop-rush/data-contracts';
-import { createInitialSeasonInfluenceState, dealSeasonBlockChallenges } from '@hoop-rush/engine';
+import {
+  createInitialSeasonInfluenceState,
+  createInitialSponsorGearState,
+  dealSeasonBlockChallenges,
+} from '@hoop-rush/engine';
 function buildInitialChallenges(
   league: SeasonLeague,
   schedule: SeasonSchedule,
@@ -194,6 +199,7 @@ export function buildSeasonRunFromGeneration(input: BuildSeasonRunInput): Season
       freeAgencyVersion: SEASON_FREE_AGENCY_VERSION,
       freeAgencyIndexVersion: SEASON_FREE_AGENCY_INDEX_VERSION,
       freeAgencyTargetsVersion: SEASON_FREE_AGENCY_TARGETS_VERSION,
+      sponsorGearVersion: SEASON_SPONSOR_GEAR_VERSION,
     },
     league: correctedLeague,
     rosters: generation.rosters,
@@ -313,6 +319,7 @@ export function buildSeasonRunFromGeneration(input: BuildSeasonRunInput): Season
     },
     transactions: [],
     influence: createInitialSeasonInfluenceState(league.teams.map((team) => team.franchiseId)),
+    sponsors: createInitialSponsorGearState(rootSeed),
     checkpointState: null,
     stateRevision: 0,
     stateDigest,

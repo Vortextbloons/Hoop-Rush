@@ -347,6 +347,16 @@ export {
   DEEP_FOUR_MAKE_SCALE,
 } from './sim/evolution-rules.ts';
 export { wrapSponsorshipsForBlock, createEvolutionDiscovery } from './season/evolution.ts';
+export {
+  applySponsorBoosts,
+  createInitialSponsorGearState,
+  resolveAiSponsorKit,
+  rollSponsorBoosts,
+  seasonSponsorOffersForBlock,
+  sponsorsWithBlockCommit,
+  type AiSponsorKitInput,
+  type SponsorBlockCommitInput,
+} from './season/sponsors.ts';
 export { selectAiCourtInnovation, resolveHomeGameRule } from './season/evolution.ts';
 export {
   evolutionWithBlockCommit,

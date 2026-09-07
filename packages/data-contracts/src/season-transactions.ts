@@ -48,6 +48,7 @@ export const seasonTransactionTypeSchema = z.enum([
   'influence-spend',
   'initial-grant',
   'free-agent-signing',
+  'sponsor-purchase',
 ]);
 export type SeasonTransactionType = z.infer<typeof seasonTransactionTypeSchema>;
 export const seasonTransactionEntrySchema = z.object({

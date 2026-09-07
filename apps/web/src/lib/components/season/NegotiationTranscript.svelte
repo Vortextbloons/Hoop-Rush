@@ -113,7 +113,7 @@
 
     {#if isFinal}
       <p class="rounded-lg bg-surface-2 p-3 text-sm text-muted-foreground" role="status">
-        {#if negotiation.status === 'accepted'}Accepted — rosters update at commit.{/if}
+        {#if negotiation.status === 'accepted'}Accepted — rosters updated now.{/if}
         {#if negotiation.status === 'declined'}Declined — you can open another talk if talks remain.{/if}
         {#if negotiation.status === 'walked-away'}You walked away — no penalty.{/if}
         {#if negotiation.status === 'expired'}Expired — window closed.{/if}

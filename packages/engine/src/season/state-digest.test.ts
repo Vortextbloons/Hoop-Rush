@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { franchiseIdSchema, seasonGameIdSchema } from '@hoop-rush/data-contracts';
+import {
+  buildEmptySponsorGearState,
+  franchiseIdSchema,
+  seasonGameIdSchema,
+} from '@hoop-rush/data-contracts';
+import { createInitialSponsorGearState } from './sponsors.ts';
 import { seasonRunStateDigest, type SeasonRunStateDigestFacts } from './state-digest.ts';
 import { buildTestRun, pipelineInput } from './block-test-support.ts';
 function baseFacts(): SeasonRunStateDigestFacts {
@@ -133,5 +138,34 @@ describe('seasonRunStateDigest', () => {
     });
     const tampered = { ...run, stateDigest: 'f'.repeat(32) };
     expect(seasonRunStateDigest(factsOfRun(run))).toBe(seasonRunStateDigest(factsOfRun(tampered)));
+  });
+  it('omits absent sponsors so old replays hash identically', () => {
+    const facts = baseFacts();
+    const without = seasonRunStateDigest(facts);
+    expect(seasonRunStateDigest({ ...facts, sponsors: null })).toBe(without);
+    expect(seasonRunStateDigest({ ...facts, sponsors: undefined })).toBe(without);
+  });
+  it('forks the digest once gear state is present and canonicalizes its order', () => {
+    const { run } = buildTestRun();
+    const facts = baseFacts();
+    const sponsors = createInitialSponsorGearState(run.rootSeed);
+    const withGear = seasonRunStateDigest({ ...facts, sponsors });
+    expect(withGear).not.toBe(seasonRunStateDigest(facts));
+    const reordered = {
+      ...sponsors,
+      vault: { ...sponsors.vault, items: [...sponsors.vault.items].reverse() },
+      boards: {
+        ...sponsors.boards,
+        boards: sponsors.boards.boards.map((board) => ({
+          ...board,
+          offers: [...board.offers].reverse(),
+          purchasedInstanceIds: [...board.purchasedInstanceIds].reverse(),
+        })),
+      },
+    };
+    expect(seasonRunStateDigest({ ...facts, sponsors: reordered })).toBe(withGear);
+    expect(seasonRunStateDigest({ ...facts, sponsors: buildEmptySponsorGearState() })).not.toBe(
+      seasonRunStateDigest(facts),
+    );
   });
 });

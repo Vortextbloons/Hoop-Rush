@@ -14,6 +14,7 @@ import {
   commandIdSchema,
   SEASON_FRONT_OFFICE_VERSION,
   normalizeEvolutionState,
+  normalizeSponsorGearState,
   seasonCheckpointDigestSchema,
   seasonCommandLogDigest,
   seasonCommandLogEntrySchema,
@@ -56,6 +57,7 @@ import {
   seasonRunCursorSchema,
   seasonRunPlayerSliceEntrySchema,
   storedEvolutionOf,
+  storedSponsorsOf,
   storedSeasonAcceptedBlockRowSchema,
   storedSeasonActiveRunIndexSchema,
   storedSeasonAlmanacRowSchema,
@@ -483,6 +485,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
       campaign: stored.campaign ?? buildEmptyCampaignState(),
       checkpointState: stored.checkpointState,
       evolution: storedEvolutionOf(stored),
+      sponsors: stored.run.sponsors,
       stateRevision: stored.stateRevision,
       stateDigest: stored.stateDigest,
     });
@@ -740,7 +743,11 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
             evolution?: unknown;
           }
         ).evolution;
-        const mutableState = {
+        const existingSponsors = (
+          checkpoint as {
+            sponsors?: unknown;
+          }
+        ).sponsors;        const mutableState = {
           health: window !== null ? window.health : input.health,
           transactions: normalizeSeasonTransactions(
             window !== null ? window.transactions : input.transactions,
@@ -772,6 +779,12 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
             input.evolution !== undefined
               ? normalizeEvolutionState(input.evolution)
               : normalizeEvolutionState(existingEvolution),
+          sponsors:
+            input.sponsors !== undefined
+              ? normalizeSponsorGearState(input.sponsors)
+              : (existingSponsors as
+                  | import('@hoop-rush/data-contracts').SeasonSponsorGearState
+                  | undefined),
           stateRevision: input.stateRevision,
           stateDigest: input.stateDigest,
         };
@@ -799,6 +812,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
               normalizeSeasonFreeAgencyState(input.freeAgency),
             ),
             evolution: mutableState.evolution,
+            sponsors: mutableState.sponsors,
           },
         });
         await this.db.seasonRuns.put({
@@ -1007,6 +1021,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
           challenges: run.challenges,
           campaign: run.campaign ?? null,
           evolution: normalizeEvolutionState(run.evolution),
+          sponsors: normalizeSponsorGearState(run.sponsors),
           checkpointState: run.checkpointState,
           stateRevision: run.stateRevision,
           stateDigest: run.stateDigest,
@@ -1016,6 +1031,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
             rotations: run.rotations,
             freeAgency: run.freeAgency,
             evolution: normalizeEvolutionState(run.evolution),
+            sponsors: run.sponsors,
           },
         });
         await this.db.seasonRuns.put({
@@ -1104,6 +1120,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
     });
     const challenges = validatedRun.challenges ?? buildEmptyChallengeState();
     const campaign = seasonCampaignStateSchema.parse(this.initialCampaignState());
+    const sponsors = normalizeSponsorGearState(validatedRun.sponsors);
     const draftFrontOffice =
       (
         validatedDraft.draft as {
@@ -1153,6 +1170,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
       challenges,
       campaign,
       evolution,
+      sponsors: validatedRun.sponsors ?? null,
       rosters: validatedRun.rosters,
       ownership: validatedRun.ownership,
       rotations: validatedRun.rotations,
@@ -1182,6 +1200,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
       challenges,
       campaign,
       evolution,
+      sponsors,
       checkpointState: null,
       stateRevision: 0,
       stateDigest,
