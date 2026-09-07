@@ -32,13 +32,12 @@
     franchiseAbbrev: (franchiseId: string) => string;
   } = $props();
   const first = $derived(entries[0] ?? null);
+  const rest = $derived(entries.slice(1));
   const valueText = (value: number): string =>
-    Number.isInteger(value) ? String(value) : oneDecimal(value);
-  function versionSource(entry: SeasonLeaderEntry): {
+    Number.isInteger(value) ? value.toLocaleString('en-US') : oneDecimal(value);
+  function winnerSource(entry: SeasonLeaderEntry): {
     teamExternalId: string;
     logoCandidates: readonly string[];
-    seasonKey: string;
-    seasonLabel: string;
   } | null {
     const rosterEntry = rosterByVersion.get(entry.playerVersionId);
     if (rosterEntry === undefined || manifest === null) return null;
@@ -48,103 +47,85 @@
     return {
       teamExternalId: modern.teamExternalId,
       logoCandidates: era.logoCandidates,
-      seasonKey: rosterEntry.seasonKey,
-      seasonLabel: era.displayLabel === null ? '' : ` · ${era.displayLabel}`,
     };
   }
-  const sourceByVersion = $derived.by(() => {
-    const map = new Map<string, ReturnType<typeof versionSource>>();
-    for (const entry of entries) map.set(entry.playerVersionId, versionSource(entry));
-    return map;
-  });
-  const firstSource = $derived(
-    first !== null ? (sourceByVersion.get(first.playerVersionId) ?? null) : null,
-  );
-  function sourceMeta(entry: SeasonLeaderEntry): string {
-    const source = sourceByVersion.get(entry.playerVersionId) ?? null;
-    if (source === null)
-      return `${franchiseAbbrev(entry.franchiseId)} · ${String(entry.gamesPlayed)} gp`;
-    return `${franchiseAbbrev(entry.franchiseId)} · ${source.seasonKey} · ${String(entry.gamesPlayed)} gp${source.seasonLabel}`;
-  }
+  const firstSource = $derived(first !== null ? winnerSource(first) : null);
 </script>
 
 <section
   data-season-leaders-category={category}
   aria-labelledby={`leaders-${category}-heading`}
-  class="flex flex-col rounded-none bg-surface-1 md:rounded-xl"
+  class="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-surface-1"
 >
   <h3
     id={`leaders-${category}-heading`}
-    class="border-b border-border/70 px-4 py-3 font-display text-sm font-extrabold uppercase tracking-tight"
+    class="border-b border-border/70 px-5 py-3.5 font-display text-base font-extrabold uppercase tracking-tight"
   >
     {LEADER_CATEGORY_LABELS[category]}
   </h3>
 
   {#if entries.length === 0}
-    <p class="px-4 py-3 text-sm text-muted-foreground">No qualified players yet.</p>
+    <p class="px-5 py-4 text-sm text-muted-foreground">No qualified players yet.</p>
   {:else if first}
-    <div class="flex items-center gap-4 border-b border-border/50 px-4 py-4">
-      {#if faces.get(first.playerVersionId)}
-        <SeasonPlayerFace face={faces.get(first.playerVersionId)!} {manifest} size="md" />
-      {/if}
-      <div class="min-w-0 flex-1">
-        <p class="truncate font-display text-xl font-extrabold tracking-tight">
-          {playerName(first.playerVersionId)}
-        </p>
-        <p class="mt-0.5 flex items-center gap-2 font-mono text-[10px] text-muted-foreground">
-          {#if firstSource}
-            <SeasonTeamLogo
-              {manifest}
-              franchiseId={first.franchiseId}
-              teamExternalId={firstSource.teamExternalId}
-              logoCandidates={firstSource.logoCandidates}
-              alt=""
-              size="sm"
-            />
-          {/if}
-          {franchiseAbbrev(first.franchiseId)} · {first.gamesPlayed} gp
-          {#if firstSource}
-            <span class="hidden min-w-0 truncate sm:inline">
-              {firstSource.seasonKey}{firstSource.seasonLabel}
-            </span>
-          {/if}
+    <div class="border-b border-border/50 px-5 py-5">
+      <div class="flex items-center gap-4">
+        {#if faces.get(first.playerVersionId)}
+          <SeasonPlayerFace
+            face={faces.get(first.playerVersionId)!}
+            {manifest}
+            size="xl"
+            eager={false}
+          />
+        {/if}
+        <div class="min-w-0 flex-1">
+          <p class="truncate text-2xl font-extrabold tracking-tight">
+            {playerName(first.playerVersionId)}
+          </p>
+          <p class="mt-1 flex items-center gap-1.5 text-[13px] text-muted-foreground">
+            {#if firstSource}
+              <SeasonTeamLogo
+                {manifest}
+                franchiseId={first.franchiseId}
+                teamExternalId={firstSource.teamExternalId}
+                logoCandidates={firstSource.logoCandidates}
+                alt=""
+                size="sm"
+              />
+            {/if}
+            {franchiseAbbrev(first.franchiseId)}
+          </p>
+        </div>
+        <p class="shrink-0 text-right">
+          <span class="font-display block text-4xl leading-none font-extrabold tabular-nums">
+            {valueText(first.value)}
+          </span>
+          <span class="mt-1 block font-mono text-xs text-muted-foreground">
+            {oneDecimal(first.perGame)}/g
+          </span>
         </p>
       </div>
-      <p class="shrink-0 text-right">
-        <span class="block font-display text-3xl font-extrabold tabular-nums">
-          {valueText(first.value)}
-        </span>
-        <span class="block font-mono text-[10px] text-muted-foreground">
-          {oneDecimal(first.perGame)}/g
-        </span>
-      </p>
     </div>
 
     <ol class="flex flex-col divide-y divide-border/50">
-      {#each entries.slice(1) as entry, index (entry.playerVersionId)}
+      {#each rest as entry, index (entry.playerVersionId)}
         <li
-          class="flex items-center gap-3 px-4 py-2.5 text-sm"
-          aria-label={`Rank ${String(index + 2)}: ${playerName(entry.playerVersionId)}`}
+          class="flex items-center gap-3 px-5 py-3"
+          aria-label={`Rank ${String(index + 2)}: ${playerName(entry.playerVersionId)}, ${oneDecimal(entry.perGame)} per game`}
         >
-          <span class="w-5 shrink-0 font-mono text-[10px] font-bold text-muted-foreground">
+          <span class="w-6 shrink-0 font-mono text-sm font-bold text-muted-foreground">
             {index + 2}
           </span>
           {#if faces.get(entry.playerVersionId)}
             <SeasonPlayerFace face={faces.get(entry.playerVersionId)!} {manifest} size="sm" />
           {/if}
-          <span class="min-w-0 flex-1">
-            <span class="block truncate font-semibold">
-              {playerName(entry.playerVersionId)}
-            </span>
-            <span class="block truncate font-mono text-[10px] text-muted-foreground">
-              {sourceMeta(entry)}
-            </span>
+          <span class="min-w-0 flex-1 truncate text-[15px] font-semibold">
+            {playerName(entry.playerVersionId)}
           </span>
           <span class="shrink-0 text-right">
-            <span class="block font-display text-base font-extrabold tabular-nums">
+            <span class="font-display block text-lg leading-none font-extrabold tabular-nums">
               {valueText(entry.value)}
             </span>
-            <span class="block font-mono text-[10px] text-muted-foreground">
+            <span class="mt-0.5 block font-mono text-xs text-muted-foreground">
               {oneDecimal(entry.perGame)}/g
             </span>
           </span>

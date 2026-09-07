@@ -1614,30 +1614,50 @@ describe('season run M2.5 reload audit (v5)', () => {
     await promote(adapters);
     const row = await currentRow(adapters);
     let influence = row.influence;
-    for (let blockIndex = 0; blockIndex < 4; blockIndex += 1) {
+    for (let blockIndex = 0; blockIndex < 2; blockIndex += 1) {
       influence = applySeasonBlockInfluenceGrants({
         influence,
         blockIndex,
-        humanFranchiseId: 'lakers',
-        challengeSuccesses: [],
+        humanFranchiseId: 'pelicans',
+        challengeSuccesses:
+          blockIndex === 1 ? [{ challengeId: 'beat-leader', success: true, reward: 2 }] : [],
       }).influence;
     }
     influence = applySeasonBlockInfluenceGrants({
       influence,
-      blockIndex: 4,
-      humanFranchiseId: 'lakers',
+      blockIndex: 2,
+      humanFranchiseId: 'pelicans',
       challengeSuccesses: [{ challengeId: 'beat-higher', success: true, reward: 2 }],
     }).influence;
     const entry = influence.ledger.find(
-      (candidate) =>
-        candidate.source === 'challenge-reward' &&
-        candidate.entryId.includes('beat-higher'),
+      (candidate) => candidate.entryId === 'influence-challenge-2-pelicans-beat-higher',
     );
-    await db.seasonRuns.put({ ...row, influence });
+    const stateDigest = adapters.seam.seasonRunStateDigest({
+      stateRevision: row.stateRevision,
+      stage: row.run.stage,
+      postseason: row.run.postseason,
+      awards: row.run.awards,
+      completion: row.run.completion,
+      checkpointState: row.checkpointState,
+      health: row.health,
+      influence,
+      transactions: row.transactions,
+      trade: row.trade,
+      objectives: row.objectives,
+      challenges: row.challenges ?? adapters.run.challenges ?? null,
+      campaign: row.campaign ?? adapters.run.campaign ?? null,
+      rosters: row.run.rosters,
+      ownership: row.run.ownership,
+      rotations: row.run.rotations,
+      effects: row.effects,
+      freeAgency: row.run.freeAgency,
+      authority: row.run.authority,
+    });
+    await db.seasonRuns.put({ ...row, influence, stateDigest });
     const snapshot = await repo.loadActiveRun();
     expect(entry?.requestedDelta).toBe(2);
     expect(entry?.appliedDelta).toBe(1);
-    expect(snapshot?.run.influence.balances.lakers).toBe(8);
+    expect(snapshot?.run.influence.balances[franchiseIdSchema.parse('pelicans')]).toBe(8);
   });
   it('rejects health injuries referencing unknown players or games', async () => {
     const adapters = makeAdapters();

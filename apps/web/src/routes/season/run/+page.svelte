@@ -12,7 +12,10 @@
   import SponsorShopModal from '$lib/components/season/SponsorShopModal.svelte';
   import LeaguePulse from '$lib/components/season/LeaguePulse.svelte';
   import PostseasonMatchupCard from '$lib/components/season/PostseasonMatchupCard.svelte';
+  import PlayoffSnapshot from '$lib/components/season/PlayoffSnapshot.svelte';
+  import PlayoffGamePrep from '$lib/components/season/PlayoffGamePrep.svelte';
   import PostseasonProgress from '$lib/components/season/PostseasonProgress.svelte';
+  import PostseasonGamecast from '$lib/components/season/PostseasonGamecast.svelte';
   import PostseasonRotationPanel from '$lib/components/season/PostseasonRotationPanel.svelte';
   import SeasonTape from '$lib/components/season/SeasonTape.svelte';
   import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
@@ -77,7 +80,15 @@
     riskyRehabOptionsOf,
   } from '$lib/season/season-postseason-presentation';
   import { homeRuleOf } from '$lib/season/season-evolution-view';
-  import { blockRoundRange, parsePlayoffGameId } from '@hoop-rush/data-contracts';
+  import {
+    playoffPrepSummaryOf,
+    playoffSnapshotOf,
+  } from '$lib/season/season-playoff-hub-view';
+  import {
+    blockRoundRange,
+    parsePlayoffGameId,
+    type SeasonPostseasonSummary,
+  } from '@hoop-rush/data-contracts';
   import type { SeasonRunCommandError } from '$lib/season/season-hub-state';
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
   let mounted = $state(true);
@@ -448,6 +459,13 @@
   >(null);
   let postseasonSubmitting = $state(false);
   let selectedRehabInjuryId = $state<string | null>(null);
+  let gamecast = $state<{
+    open: boolean;
+    gameLabel: string;
+    homeFranchiseId: string;
+    awayFranchiseId: string;
+    result: SeasonPostseasonSummary | null;
+  } | null>(null);
   const postseasonCommandError = $derived.by(() => {
     const error = commandError;
     if (error === null) return null;
@@ -470,6 +488,15 @@
     try {
       lastPostseasonAction = 'start';
       await shell.startPostseason();
+      if (
+        shell.commandError === null &&
+        shell.run !== null &&
+        shell.humanFranchiseId !== null &&
+        !humanPlaysNextGame(shell.run, shell.humanFranchiseId)
+      ) {
+        lastPostseasonAction = 'advance';
+        await shell.advancePostseason();
+      }
     } finally {
       postseasonSubmitting = false;
     }
@@ -510,15 +537,47 @@
     postseasonSubmitting = true;
     try {
       lastPostseasonAction = 'submit';
+      const targetGameId = nextGame.gameId;
+      if (nextTeams !== null) {
+        gamecast = {
+          open: true,
+          gameLabel: matchupLabel,
+          homeFranchiseId: nextTeams.home,
+          awayFranchiseId: nextTeams.away,
+          result: null,
+        };
+      }
       await shell.submitPostseasonRotation({
-        targetGameId: nextGame.gameId,
+        targetGameId,
         rotation: {
           franchiseId: humanFranchiseId,
           rotation: shell.editor.rotation,
           ...(selectedRehabInjuryId !== null ? { riskyRehabInjuryId: selectedRehabInjuryId } : {}),
         },
       });
+      if (
+        shell.commandError === null &&
+        shell.hub !== null &&
+        run !== null &&
+        gamecast !== null
+      ) {
+        gamecast.result = await shell.hub.loadPostseasonSummary(run.runId, targetGameId);
+      } else if (shell.commandError !== null) {
+        gamecast = null;
+      }
       selectedRehabInjuryId = null;
+    } finally {
+      postseasonSubmitting = false;
+    }
+  }
+  async function continuePostseason() {
+    if (gamecast === null || postseasonBusy || postseasonSubmitting) return;
+    gamecast.open = false;
+    gamecast = null;
+    postseasonSubmitting = true;
+    try {
+      lastPostseasonAction = 'advance';
+      await shell.advancePostseason();
     } finally {
       postseasonSubmitting = false;
     }
@@ -556,11 +615,64 @@
   const humanWonChampionship = $derived(
     championFranchiseId !== null && championFranchiseId === humanFranchiseId,
   );
+  const playoffSnapshot = $derived(
+    seriesContext !== null && snapshot !== null
+      ? playoffSnapshotOf({ series: seriesContext, summaries: snapshot.summaries })
+      : null,
+  );
+  const playoffPrep = $derived(
+    shell.editor !== null
+      ? playoffPrepSummaryOf({
+          rotation: shell.editor.rotation,
+          failures: shell.editor.validate(),
+          nameOf: (id) => shell.playerName(id),
+        })
+      : null,
+  );
+  const playoffEyebrow = $derived.by(() => {
+    if (humanSeed === null) return stageLabel;
+    if (seriesContext !== null && nextTeams !== null && humanFranchiseId !== null) {
+      const humanHome = nextTeams.home === humanFranchiseId;
+      const opponent = humanHome ? nextTeams.away : nextTeams.home;
+      return `#${String(humanSeed)} seed · ${seriesContext.label} vs ${shell.franchiseName(opponent)}`;
+    }
+    return `#${String(humanSeed)} seed · ${stageLabel}`;
+  });
+  const playoffPrimaryLabel = $derived.by(() => {
+    if (playInContext !== null) return `Play ${matchupLabel}`;
+    if (seriesContext !== null && nextGame?.kind === 'game') {
+      const gameNumber = parsePlayoffGameId(nextGame.gameId)?.gameNumber ?? null;
+      return gameNumber === null ? 'Play next game' : `Play Game ${String(gameNumber)}`;
+    }
+    return 'Play next game';
+  });
+  const playoffPrimaryHint = $derived.by(() => {
+    if (shell.editor === null) return 'Loading lineup…';
+    const failures = shell.editor.validate();
+    if (failures.length > 0) return 'Lineup needs a fix below';
+    if (playoffPrep !== null && (!playoffPrep.minutesOk || !playoffPrep.closersOk))
+      return playoffPrep.rotationLabel;
+    return 'Locks your lineup and sims now';
+  });
 </script>
 
 <svelte:head>
   <title>Season Run — Hub — Hoop Rush</title>
 </svelte:head>
+
+{#if gamecast !== null}
+  <PostseasonGamecast
+    open={gamecast.open}
+    homeFranchiseId={gamecast.homeFranchiseId}
+    awayFranchiseId={gamecast.awayFranchiseId}
+    gameLabel={gamecast.gameLabel}
+    result={gamecast.result}
+    manifest={shell.manifest}
+    franchiseName={shell.franchiseName}
+    franchiseAbbrev={shell.franchiseAbbrev}
+    onContinue={() => void continuePostseason()}
+  />
+{/if}
 
 <div class="flex min-w-0 flex-col gap-6 pt-6">
   {#if stage === 'regular-season'}
@@ -1118,14 +1230,19 @@
       {/if}
     {/if}
   {:else if inPostseason}
-    <section aria-labelledby="postseason-hub-heading" class="px-3 sm:px-0">
-      <div class="flex flex-wrap items-baseline justify-between gap-2">
-        <h2
-          id="postseason-hub-heading"
-          class="font-display text-xl font-extrabold uppercase tracking-tight"
-        >
-          {stageLabel}
-        </h2>
+    <section aria-labelledby="postseason-hub-heading" class="flex min-w-0 flex-col gap-4 px-3 sm:px-0">
+      <div class="flex flex-wrap items-end justify-between gap-2">
+        <div class="min-w-0">
+          <p class="font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-accent">
+            {playoffEyebrow}
+          </p>
+          <h2
+            id="postseason-hub-heading"
+            class="font-display mt-1 text-2xl font-black uppercase tracking-tight sm:text-3xl"
+          >
+            {stageLabel}
+          </h2>
+        </div>
         <div class="flex items-center gap-2">
           {#if humanSeed !== null}
             <span
@@ -1147,7 +1264,7 @@
         <div
           role="status"
           data-season-eliminated
-          class="mt-3 rounded-none border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm sm:rounded-xl"
+          class="rounded-none border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm sm:rounded-xl"
         >
           <span class="font-bold text-amber-700 dark:text-amber-300">Eliminated.</span>
           <span class="text-amber-700/80 dark:text-amber-300/80">
@@ -1159,52 +1276,69 @@
       {#if nextGame?.kind === 'integrity-failure'}
         <div
           role="alert"
-          class="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
+          class="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
         >
           Something went wrong scheduling the next game. Refresh to try again.
         </div>
       {:else}
-        <div class="mt-4">
-          <PostseasonMatchupCard
-            series={seriesContext}
-            playInCard={playInContext}
-            franchiseName={shell.franchiseName}
-            franchiseAbbrev={shell.franchiseAbbrev}
-            manifest={shell.manifest}
-            {humanFranchiseId}
-          />
-        </div>
+        <PostseasonMatchupCard
+          series={seriesContext}
+          playInCard={playInContext}
+          franchiseName={shell.franchiseName}
+          franchiseAbbrev={shell.franchiseAbbrev}
+          manifest={shell.manifest}
+          {humanFranchiseId}
+          gameLabel={nextGame?.kind === 'game' && humanPlaysNext ? `Your next game · ${matchupLabel} ${nextGameLine}` : nextGame?.kind === 'game' ? `Next game · ${nextGameLine}` : null}
+          seasonSeriesLabel={playoffSnapshot?.seasonSeries.label ?? null}
+          primaryLabel={nextGame?.kind === 'game' && humanPlaysNext && shell.editor !== null ? playoffPrimaryLabel : null}
+          primaryDisabled={!canSubmitPostseason}
+          primaryBusy={postseasonSubmitting || postseasonBusy}
+          primaryHint={nextGame?.kind === 'game' && humanPlaysNext ? playoffPrimaryHint : null}
+          onPrimary={nextGame?.kind === 'game' && humanPlaysNext ? () => void submitPostseasonRotation() : null}
+        />
+      {/if}
+
+      {#if seriesContext !== null && playoffSnapshot !== null}
+        <PlayoffSnapshot
+          snapshot={playoffSnapshot}
+          {humanFranchiseId}
+          franchiseAbbrev={shell.franchiseAbbrev}
+        />
       {/if}
 
       {#if nextGame?.kind === 'game' && nextTeams !== null && humanPlaysNext && shell.editor !== null}
-        <div class="mt-4">
-          <PostseasonRotationPanel
-            editor={shell.editor}
-            disabled={postseasonBusy}
-            onchange={() => undefined}
-            faces={shell.facesByVersion}
-            manifest={shell.manifest}
-            effects={snapshot?.effects ?? null}
-            summaries={snapshot?.summaries ?? []}
-            targetGameId={nextGame.gameId}
-            {matchupLabel}
-            matchupDetail={nextGameLine}
-            {rehabOptions}
-            {selectedRehabInjuryId}
-            onRehabSelect={(injuryId) => (selectedRehabInjuryId = injuryId)}
-            failures={shell.editor?.validate() ?? []}
-            rejectionMessage={postseasonCommandError}
-            balance={run?.influence.balances[humanFranchiseId ?? ''] ?? 0}
-            submitting={postseasonSubmitting}
-            canSubmit={canSubmitPostseason}
-            onSubmit={() => void submitPostseasonRotation()}
-          />
-        </div>
+        <PlayoffGamePrep
+          prep={playoffPrep}
+          healthRows={availabilityRows}
+          gameLabel={`${matchupLabel} ${nextGameLine}`}
+          rehabCount={rehabOptions.length}
+        />
+        <PostseasonRotationPanel
+          editor={shell.editor}
+          disabled={postseasonBusy}
+          onchange={() => undefined}
+          faces={shell.facesByVersion}
+          manifest={shell.manifest}
+          effects={snapshot?.effects ?? null}
+          summaries={snapshot?.summaries ?? []}
+          targetGameId={nextGame.gameId}
+          {matchupLabel}
+          matchupDetail={nextGameLine}
+          {rehabOptions}
+          {selectedRehabInjuryId}
+          onRehabSelect={(injuryId) => (selectedRehabInjuryId = injuryId)}
+          failures={shell.editor?.validate() ?? []}
+          rejectionMessage={postseasonCommandError}
+          balance={run?.influence.balances[humanFranchiseId ?? ''] ?? 0}
+          submitting={postseasonSubmitting}
+          canSubmit={canSubmitPostseason}
+          onSubmit={() => void submitPostseasonRotation()}
+        />
       {:else if nextGame?.kind === 'game' && nextTeams !== null && eliminated}
         <section
           aria-labelledby="spectate-heading"
           data-season-spectate
-          class="mt-4 rounded-xl border border-border bg-surface-1 p-4 sm:p-5"
+          class="rounded-xl border border-border bg-surface-1 p-4 sm:p-5"
         >
           <h2
             id="spectate-heading"
@@ -1249,7 +1383,7 @@
         <section
           aria-labelledby="advance-heading"
           data-season-advance
-          class="mt-4 rounded-xl border border-border bg-surface-1 p-4 sm:p-5"
+          class="rounded-xl border border-border bg-surface-1 p-4 sm:p-5"
         >
           <h2
             id="advance-heading"
@@ -1258,8 +1392,8 @@
             Your next decision is later
           </h2>
           <p class="mt-1 text-sm text-muted-foreground">
-            The next game ({nextGameLine}) runs on AI rotations. Simulate ahead to your next lineup
-            decision.
+            The rest of the bracket runs on AI rotations. Continue straight to your next playoff
+            game.
           </p>
           {#if postseasonCommandError !== null}
             <p
@@ -1276,29 +1410,25 @@
             disabled={postseasonBusy || postseasonSubmitting}
             class="mt-3 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {postseasonBusy ? 'Playing…' : 'Play to my next game'}
+            {postseasonBusy ? 'Simulating bracket…' : 'Continue to my next game'}
           </button>
         </section>
       {:else if nextGame?.kind === 'complete'}
-        <p class="mt-4 text-sm text-muted-foreground">Season complete — see the champion above.</p>
+        <p class="text-sm text-muted-foreground">Season complete — see the champion above.</p>
       {/if}
 
-      <div class="mt-4">
-        <PostseasonProgress
-          progress={shell.postseason}
-          label="Postseason"
-          franchiseAbbrev={shell.franchiseAbbrev}
-          {humanFranchiseId}
-          manifest={shell.manifest}
-          onCancel={() => shell.cancelPostseason()}
-          onRetry={() => retryPostseason()}
-        />
-      </div>
+      <PostseasonProgress
+        progress={shell.postseason}
+        label="Postseason"
+        franchiseAbbrev={shell.franchiseAbbrev}
+        {humanFranchiseId}
+        manifest={shell.manifest}
+        onCancel={() => shell.cancelPostseason()}
+        onRetry={() => retryPostseason()}
+      />
 
       {#if availabilityRows.length > 0}
-        <div class="mt-4">
-          <HealthStrip rows={availabilityRows} title="Playoff health" />
-        </div>
+        <HealthStrip rows={availabilityRows} title="Playoff health" />
       {/if}
     </section>
   {:else if stage === 'completed'}

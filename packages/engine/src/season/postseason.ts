@@ -1402,12 +1402,19 @@ export function simulateSeasonPostseasonGame(
       reason: `game ${gameId} references a roster or rotation outside the run`,
     };
   }
-  const homePlayers = homeRoster.players.map((player) =>
-    expandedPlayer(input, player.playerVersionId),
-  );
-  const awayPlayers = awayRoster.players.map((player) =>
-    expandedPlayer(input, player.playerVersionId),
-  );
+  const expandedPlayers = (roster: typeof homeRoster): SeasonGamePlayerInput[] =>
+    roster.players.map((player) => expandedPlayer(input, player.playerVersionId));
+  const activePlayers = (
+    players: readonly SeasonGamePlayerInput[],
+    rotation: typeof homeRotation,
+  ): SeasonGamePlayerInput[] => {
+    const activeIds = new Set([...rotation.starters, ...rotation.benchOrder]);
+    return players.filter((player) => activeIds.has(player.playerVersionId));
+  };
+  const allHomePlayers = expandedPlayers(homeRoster);
+  const allAwayPlayers = expandedPlayers(awayRoster);
+  const homePlayers = activePlayers(allHomePlayers, homeRotation);
+  const awayPlayers = activePlayers(allAwayPlayers, awayRotation);
   const seed = seasonNamespaceSeed(
     run.rootSeed,
     phase === 'play-in' ? SEASON_SEED_NAMESPACES.playInGames : SEASON_SEED_NAMESPACES.playoffGames,
@@ -1415,7 +1422,7 @@ export function simulateSeasonPostseasonGame(
   );
   const positions = new Map<string, readonly Position[]>();
   const targetMinutes = new Map<string, number>();
-  for (const player of [...homePlayers, ...awayPlayers]) {
+  for (const player of [...allHomePlayers, ...allAwayPlayers]) {
     positions.set(player.playerVersionId, player.positions);
   }
   for (const rotation of [homeRotation, awayRotation]) {

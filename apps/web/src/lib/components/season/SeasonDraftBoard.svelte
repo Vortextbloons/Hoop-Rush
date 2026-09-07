@@ -215,8 +215,7 @@
           <span
             class="draft-hopper-slot"
             data-done={ordinal <= picks.length ? 'true' : 'false'}
-            data-current={ordinal === picks.length + 1 ? 'true' : 'false'}
-            >{ordinal}</span
+            data-current={ordinal === picks.length + 1 ? 'true' : 'false'}>{ordinal}</span
           >
         {/each}
       </div>

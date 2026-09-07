@@ -3,18 +3,21 @@
   import type { SeriesCardViewModel } from '$lib/season/season-postseason-presentation';
   import SeasonTeamLogo from './SeasonTeamLogo.svelte';
   import { franchiseIdentityOf } from '$lib/season/season-branding';
+  import { franchiseColor } from '$lib/season/franchise-colors';
   let {
     card,
     franchiseName,
     franchiseAbbrev,
     manifest,
     humanFranchiseId,
+    compact = false,
   }: {
     card: SeriesCardViewModel;
     franchiseName: (franchiseId: string) => string;
     franchiseAbbrev: (franchiseId: string) => string;
     manifest: HoopRushManifest | null;
     humanFranchiseId: string | null;
+    compact?: boolean;
   } = $props();
   const home = $derived(card.homeFranchiseId);
   const away = $derived(card.awayFranchiseId);
@@ -39,7 +42,8 @@
 <article
   data-season-series-card={card.seriesId}
   data-series-status={card.status}
-  class="rounded-xl border border-border bg-surface-1 p-3 {card.humanSeries
+  style:--series-color={franchiseColor(card.winnerFranchiseId ?? home)}
+  class="series-card rounded-xl border border-border bg-surface-1 {compact ? 'compact' : 'p-3'} {card.humanSeries
     ? 'ring-1 ring-primary/40'
     : ''}"
 >
@@ -77,7 +81,7 @@
           />
         {/if}
         <span class="min-w-0 flex-1 truncate text-sm font-semibold">
-          {franchiseName(home)}
+          {compact ? franchiseAbbrev(home) : franchiseName(home)}
           {#if home === humanFranchiseId}<span class="text-primary" aria-label="your team">*</span
             >{/if}
         </span>
@@ -121,7 +125,7 @@
           />
         {/if}
         <span class="min-w-0 flex-1 truncate text-sm font-semibold">
-          {franchiseName(away)}
+          {compact ? franchiseAbbrev(away) : franchiseName(away)}
           {#if away === humanFranchiseId}<span class="text-primary" aria-label="your team">*</span
             >{/if}
         </span>
@@ -140,10 +144,18 @@
     {/if}
   </div>
 
-  <footer class="mt-2 px-1 font-mono text-[10px] text-muted-foreground">
+  {#if !compact}<footer class="mt-2 px-1 font-mono text-[10px] text-muted-foreground">
     {statusText}
     {#if home !== null && away !== null}
       <span class="ml-1">· home court {franchiseAbbrev(home)}</span>
     {/if}
-  </footer>
+  </footer>{/if}
 </article>
+
+<style>
+  .series-card { min-width:0; overflow:hidden; border-left:3px solid var(--series-color); box-shadow:0 10px 30px rgb(0 0 0 / .08); }
+  .series-card.compact { padding:.55rem; border-radius:.65rem; }
+  .series-card.compact header span:first-child { max-width:7rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .series-card.compact :global(img) { width:1.25rem; height:1.25rem; }
+  .series-card[data-series-status='in-progress'] { box-shadow:0 0 0 1px color-mix(in srgb,var(--series-color) 28%,transparent),0 12px 30px rgb(0 0 0 / .1); }
+</style>

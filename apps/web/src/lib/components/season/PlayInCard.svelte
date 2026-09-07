@@ -3,6 +3,7 @@
   import type { PlayInGameCardViewModel } from '$lib/season/season-postseason-presentation';
   import SeasonTeamLogo from './SeasonTeamLogo.svelte';
   import { franchiseIdentityOf } from '$lib/season/season-branding';
+  import { franchiseColor } from '$lib/season/franchise-colors';
   let {
     card,
     franchiseName,
@@ -37,7 +38,8 @@
 
 <article
   data-season-playin-card={card.gameId}
-  class="rounded-xl border border-dashed border-border bg-surface-1 p-3 {card.humanGame
+  style:--game-color={franchiseColor(card.winnerFranchiseId ?? card.homeFranchiseId)}
+  class="play-in-card rounded-xl border border-dashed border-border bg-surface-1 p-3 {card.humanGame
     ? 'ring-1 ring-primary/40'
     : ''}"
 >
@@ -129,3 +131,7 @@
     {/if}
   </footer>
 </article>
+
+<style>
+  .play-in-card { border-left:3px solid var(--game-color); box-shadow:0 10px 28px rgb(0 0 0 / .07); }
+</style>

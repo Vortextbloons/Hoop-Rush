@@ -102,9 +102,8 @@
     }
     return map;
   });
-  const playerName = $derived(
-    (playerVersionId: string): string =>
-      displayPlayerName(rosterByVersion.get(playerVersionId)?.displayName),
+  const playerName = $derived((playerVersionId: string): string =>
+    displayPlayerName(rosterByVersion.get(playerVersionId)?.displayName),
   );
   const humanRoster = $derived(
     run?.rosters.find((roster) => roster.franchiseId === humanFranchiseId) ?? null,
@@ -464,6 +463,7 @@
           awards={run.awards}
           {playerName}
           franchiseName={shell.franchiseName}
+          aggregates={aggregates?.players ?? null}
           manifest={shell.manifest}
           faces={new Map()}
         />
@@ -476,7 +476,7 @@
           Regular-season leaders
         </h2>
         <p class="mt-1 font-mono text-xs text-muted-foreground">
-          Top three per category · engine ordering (per-game desc, then value)
+          Top three per category · per game, then total
         </p>
         <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {#each LEADER_CATEGORIES as category (category)}
@@ -489,9 +489,7 @@
               <ol class="mt-1 flex flex-col divide-y divide-border/40">
                 {#each (leaderTables[category] ?? []).slice(0, 3) as entry, rank (entry.playerVersionId)}
                   <li class="flex items-center gap-2 py-1.5 text-sm">
-                    <span
-                      class="w-4 shrink-0 font-mono text-xs font-bold text-muted-foreground"
-                    >
+                    <span class="w-4 shrink-0 font-mono text-xs font-bold text-muted-foreground">
                       {rank + 1}
                     </span>
                     <span class="min-w-0 flex-1 truncate font-semibold">

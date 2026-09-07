@@ -1,0 +1,14 @@
+const FRANCHISE_COLORS: Readonly<Record<string, string>> = {
+  hawks: '#e03a3e', celtics: '#007a33', nets: '#111111', hornets: '#1d1160',
+  bulls: '#ce1141', cavaliers: '#6f263d', pistons: '#c8102e', pacers: '#fdbb30',
+  heat: '#98002e', bucks: '#00471b', knicks: '#f58426', magic: '#0077c0',
+  sixers: '#006bb6', raptors: '#ce1141', wizards: '#002b5c', mavericks: '#00538c',
+  nuggets: '#fec524', warriors: '#1d428a', rockets: '#ce1141', clippers: '#c8102e',
+  lakers: '#fdb927', grizzlies: '#5d76a9', timberwolves: '#78be20', pelicans: '#b4975a',
+  thunder: '#007ac1', suns: '#e56020', blazers: '#e03a3e', kings: '#5a2d81',
+  spurs: '#c4ced4', jazz: '#f9a01b',
+};
+
+export function franchiseColor(franchiseId: string | null): string {
+  return franchiseId === null ? '#64748b' : (FRANCHISE_COLORS[franchiseId] ?? '#64748b');
+}

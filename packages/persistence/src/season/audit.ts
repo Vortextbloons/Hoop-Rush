@@ -603,16 +603,14 @@ export function auditSeasonRunState(
           `(balanceBefore ${String(before)} + appliedDelta ${String(entry.appliedDelta)} != balanceAfter ${String(entry.balanceAfter)})`,
       );
     }
-    if (entry.appliedDelta !== entry.requestedDelta) {
-      if (
-        entry.appliedDelta !== 0 ||
-        entry.requestedDelta <= 0 ||
-        before + entry.requestedDelta <= SEASON_INFLUENCE_CAP
-      ) {
-        failures.push(
-          `influence ledger entry ${entry.entryId} appliedDelta ${String(entry.appliedDelta)} does not match requestedDelta ${String(entry.requestedDelta)}`,
-        );
-      }
+    const expectedAppliedDelta =
+      entry.requestedDelta > 0
+        ? Math.max(0, Math.min(entry.requestedDelta, SEASON_INFLUENCE_CAP - before))
+        : entry.requestedDelta;
+    if (entry.appliedDelta !== expectedAppliedDelta) {
+      failures.push(
+        `influence ledger entry ${entry.entryId} appliedDelta ${String(entry.appliedDelta)} does not match requestedDelta ${String(entry.requestedDelta)}`,
+      );
     }
     balancesFromLedger.set(entry.franchiseId, entry.balanceAfter);
   }

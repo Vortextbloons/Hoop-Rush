@@ -11,11 +11,19 @@ export const seasonSponsorTierSchema = z.enum(['BUZZ', 'PRIME', 'ICON']);
 export type SeasonSponsorTier = z.infer<typeof seasonSponsorTierSchema>;
 
 export const SEASON_SPONSOR_GEAR_TIERS = {
-  BUZZ: { price: 1, poolMin: 5, poolMax: 8, statMin: 1, statMax: 2, singleKeyCap: 6, weight: 55 },
+  BUZZ: {
+    price: 1,
+    poolMin: 10,
+    poolMax: 16,
+    statMin: 1,
+    statMax: 2,
+    singleKeyCap: 7,
+    weight: 55,
+  },
   PRIME: {
     price: 2,
-    poolMin: 9,
-    poolMax: 13,
+    poolMin: 12,
+    poolMax: 22,
     statMin: 1,
     statMax: 3,
     singleKeyCap: 9,
@@ -23,8 +31,8 @@ export const SEASON_SPONSOR_GEAR_TIERS = {
   },
   ICON: {
     price: 3,
-    poolMin: 14,
-    poolMax: 18,
+    poolMin: 15,
+    poolMax: 35,
     statMin: 1,
     statMax: 3,
     singleKeyCap: 12,

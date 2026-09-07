@@ -248,7 +248,7 @@
                   {@const box = boxFor(row)}
                   <li data-season-schedule-row class="overflow-hidden bg-surface-1 md:rounded-xl">
                     <div
-                      class="grid grid-cols-[2rem_auto_minmax(0,1fr)_auto] items-center gap-x-2 px-3 py-3.5 sm:gap-x-3 sm:px-4"
+                      class="grid grid-cols-[2rem_auto_auto_minmax(0,1fr)_auto] items-center gap-x-2 px-3 py-3.5 sm:gap-x-3 sm:px-4"
                     >
                       <span class="shrink-0 font-mono text-xs text-muted-foreground">
                         R{row.round}

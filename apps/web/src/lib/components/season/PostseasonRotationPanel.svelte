@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { resolve } from '$app/paths';
   import type {
     HoopRushManifest,
     SeasonEffectsState,
@@ -53,28 +54,76 @@
   const rehabInjuredPlayerCount = $derived(
     rehabOptions.filter((option) => !option.alreadyRehabbed).length,
   );
+  let fineTuneOpen = $state(false);
+  const minutesTotal = $derived(editor.rotation.targetMinutes.reduce((s, t) => s + t.minutes, 0));
+  const closersCount = $derived(new Set(editor.rotation.closingFive).size);
+  const minuteById = $derived(new Map(editor.rotation.targetMinutes.map((t) => [t.playerVersionId, t.minutes] as const)));
+  const startersLine = $derived(
+    editor.rotation.starters
+      .map((id) => {
+        const name = editor.names.get(id) ?? id;
+        const short = name.split(' ').slice(-1)[0] ?? name;
+        return `${short} ${String(minuteById.get(id) ?? 0)}`;
+      })
+      .join(' · '),
+  );
 </script>
 
 <section
   aria-labelledby="postseason-lineup-heading"
   data-season-postseason-lineup
-  class="rounded-xl border border-border bg-surface-1 p-4 sm:p-5"
+  class="rounded-2xl border border-border bg-surface-1 p-4 sm:p-5"
 >
   <div class="flex flex-wrap items-baseline justify-between gap-2">
     <h2
       id="postseason-lineup-heading"
-      class="font-display text-lg font-extrabold uppercase tracking-tight"
+      class="font-display text-base font-extrabold uppercase tracking-tight"
     >
-      Your lineup
+      Game 1 rotation
     </h2>
     <span class="font-mono text-[10px] text-muted-foreground">
       {matchupLabel}{matchupDetail !== null ? ` · ${matchupDetail}` : ''}
     </span>
   </div>
 
-  <div class="mt-3">
-    <RotationEditor {editor} {disabled} {onchange} {faces} {manifest} {effects} {summaries} />
+  <div class="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface-2 px-3 py-2.5">
+    <div class="min-w-0">
+      <p class="font-mono text-[11px] font-bold tabular-nums text-foreground">{String(minutesTotal)}/240 min · {String(closersCount)}/5 closers</p>
+      <p class="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{startersLine}</p>
+    </div>
+    <div class="flex shrink-0 items-center gap-2">
+      <a
+        href={resolve('/season/run/team' as any)}
+        class="inline-flex min-h-10 items-center justify-center gap-1 rounded-lg border border-border px-3.5 text-xs font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong"
+      >
+        Edit rotation
+      </a>
+      <button
+        type="button"
+        aria-expanded={fineTuneOpen}
+        aria-controls="playoff-fine-tune"
+        onclick={() => (fineTuneOpen = !fineTuneOpen)}
+        class="inline-flex min-h-10 items-center justify-center gap-1 rounded-lg border border-border px-3.5 text-xs font-bold text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground"
+      >
+        {fineTuneOpen ? 'Hide fine-tune' : 'Fine-tune here'}
+      </button>
+    </div>
   </div>
+
+  {#if fineTuneOpen}
+    <div id="playoff-fine-tune" class="mt-3">
+      <RotationEditor {editor} {disabled} {onchange} {faces} {manifest} {effects} {summaries} />
+      <button
+        type="button"
+        data-season-postseason-submit-secondary
+        onclick={onSubmit}
+        disabled={!canSubmit || submitting || disabled}
+        class="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border px-5 py-3 text-sm font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        {submitting ? 'Locking lineup…' : `Lock lineup and play ${matchupLabel}`}
+      </button>
+    </div>
+  {/if}
 
   {#if rehabOptions.length > 0}
     <fieldset class="mt-4 rounded-lg bg-surface-2 p-3">
@@ -165,21 +214,13 @@
         {rejectionMessage}
       </p>
     {/if}
-    <button
-      type="button"
-      data-season-postseason-submit
-      onclick={onSubmit}
-      disabled={!canSubmit || submitting || disabled}
-      class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 sm:text-base"
-    >
-      {submitting ? 'Locking lineup…' : `Lock lineup and simulate ${matchupLabel}`}
-    </button>
-    <p class="hidden font-mono text-[10px] text-muted-foreground sm:block">
-      Nothing is saved until the game completes.
+    <p class="font-mono text-[10px] text-muted-foreground">
+      The hero card above plays the game — this panel stays a summary unless you open fine-tune.
     </p>
   </div>
 
   <p class="sr-only" role="status" aria-live="polite">
     {submitting ? 'Locking your postseason lineup.' : ''}
   </p>
+  <span class="hidden">{targetGameId}</span>
 </section>

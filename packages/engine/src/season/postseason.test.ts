@@ -1069,6 +1069,33 @@ describe('postseason game simulation', () => {
     expect(seasonPostseasonGameOrdinal('pi-east-seven-eight')).toBe(1);
     expect(seasonPostseasonGameOrdinal(playoffGameIdOf('finals', 7))).toBe(111);
   });
+  it('simulates an expanded roster using the carried ten-player rotation', () => {
+    const { run, catalog, effects, profile, expanded } = fixture();
+    const postseason = rankedState(run.league);
+    const teams = seasonPostseasonGameTeamsOf(postseason, 'pi-east-seven-eight');
+    if (teams === null) throw new Error('expected play-in teams');
+    const extra = run.rosters.find((roster) => roster.franchiseId !== teams.home)?.players[0];
+    if (extra === undefined) throw new Error('expected an extra roster player');
+    const runWithExtra = {
+      ...run,
+      postseason,
+      rosters: run.rosters.map((roster) =>
+        roster.franchiseId === teams.home
+          ? { ...roster, players: [...roster.players, extra] }
+          : roster,
+      ),
+    };
+    const outcome = simulateSeasonPostseasonGame({
+      run: runWithExtra,
+      effects,
+      expanded,
+      catalog,
+      profile,
+      gameId: 'pi-east-seven-eight',
+      humanFranchiseId: null,
+    });
+    expect(outcome.kind).toBe('simulated');
+  });
   it('rolls postseason injuries and folds them into health and the summary', () => {
     const { run, catalog, effects, profile, expanded } = fixture();
     let state = rankedState(run.league);

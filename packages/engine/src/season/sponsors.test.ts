@@ -171,8 +171,8 @@ describe('sponsor offer generation', () => {
       for (const offer of seasonSponsorOffersForBlock(seed, i % 8)) {
         const tier = sponsorGearTierConfigOf(offer.tier);
         const pool = offer.boosts.reduce((sum, boost) => sum + boost.points, 0);
-        expect(pool).toBeGreaterThanOrEqual(tier.poolMin - (offer.boosts.length - 1));
-        expect(pool).toBeLessThanOrEqual(tier.poolMax - (offer.boosts.length - 1));
+        expect(pool).toBeGreaterThanOrEqual(tier.poolMin - 2 * (offer.boosts.length - 1));
+        expect(pool).toBeLessThanOrEqual(tier.poolMax - 2 * (offer.boosts.length - 1));
         expect(offer.boosts.length).toBeGreaterThanOrEqual(tier.statMin);
         expect(offer.boosts.length).toBeLessThanOrEqual(tier.statMax);
         for (const boost of offer.boosts) {

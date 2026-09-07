@@ -64,7 +64,7 @@
     { id: 'team', label: 'Rotation', href: '/season/run/team', icon: ClipboardList },
     { id: 'schedule', label: 'Schedule', href: '/season/run/schedule', icon: CalendarDays },
     { id: 'league', label: 'League', href: '/season/run/league', icon: Trophy },
-    { id: 'leaders', label: 'Leaders', href: '/season/run/leaders', icon: BarChart3 },
+    { id: 'leaders', label: 'League Honors', href: '/season/run/leaders', icon: BarChart3 },
   ];
   const freeAgencyNavItem: NavItem = {
     id: 'free-agency',
@@ -81,17 +81,42 @@
   const navItems = $derived.by(() => {
     const stage = shell.run?.stage ?? null;
     const isRegularSeason = stage === 'regular-season' || stage === null;
+    const isPostseason = stage === 'play-in' || stage === 'playoffs' || stage === 'completed';
     const freeAgencyVisible = (shell.run?.freeAgency.windows.length ?? 0) > 0;
+    if (isPostseason) {
+      const bracketItem: NavItem = {
+        id: 'postseason',
+        label: 'Bracket',
+        href: '/season/run/postseason',
+        icon: Trophy,
+      };
+      const ordered = [
+        seasonNavItems[0]!,
+        seasonNavItems[1]!,
+        bracketItem,
+        seasonNavItems[2]!,
+        seasonNavItems[4]!,
+        seasonNavItems[3]!,
+      ];
+      if (freeAgencyVisible) ordered.push(freeAgencyNavItem);
+      return ordered;
+    }
     let base = [...seasonNavItems];
     if (isRegularSeason) base = [...base, tradeBoardNavItem];
     if (freeAgencyVisible) base = [...base, freeAgencyNavItem];
-    return stage === 'play-in' || stage === 'playoffs' || stage === 'completed'
-      ? [
-          ...base,
-          { id: 'postseason', label: 'Postseason', href: '/season/run/postseason', icon: Trophy },
-        ]
-      : base;
+    return base;
   });
+  const mobileNavItems = $derived.by(() => {
+    const stage = shell.run?.stage ?? null;
+    const isPostseason = stage === 'play-in' || stage === 'playoffs' || stage === 'completed';
+    if (isPostseason) {
+      return navItems.filter((item) => ['hub', 'team', 'postseason', 'schedule'].includes(item.id));
+    }
+    return navItems.filter((item) => ['hub', 'team', 'schedule', 'league'].includes(item.id));
+  });
+  const mobileOverflowItems = $derived(
+    navItems.filter((item) => !['hub', 'team', 'schedule', 'league'].includes(item.id)),
+  );
   const shell = new SeasonRunShell();
   setContext(SEASON_RUN_SHELL_CONTEXT, shell);
   const routeId = $derived(page.route.id);
@@ -698,6 +723,15 @@
     const ranked = memoizedRanking(run.standings, run.league).find(
       (entry) => entry.row.franchiseId === franchiseId,
     );
+    if (run.stage === 'play-in' || run.stage === 'playoffs' || run.stage === 'completed') {
+      const stageWord =
+        run.stage === 'play-in' ? 'Play-In' : run.stage === 'playoffs' ? 'Playoffs' : 'Finals';
+      return {
+        franchiseId,
+        record: recordLabel(row.wins, row.losses),
+        position: ranked === undefined ? stageWord : `${ordinal(ranked.rank)} seed · ${stageWord}`,
+      };
+    }
     return {
       franchiseId,
       record: recordLabel(row.wins, row.losses),
@@ -990,7 +1024,7 @@
     </main>
   </div>
 
-  <BottomNav items={navItems} label="Season navigation" />
+  <BottomNav items={mobileNavItems} overflowItems={mobileOverflowItems} label="Season navigation" />
 
   <Dialog.Root
     open={quitOpen}
