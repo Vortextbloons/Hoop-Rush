@@ -133,9 +133,8 @@ export function projectExpectedLedger(input: {
     eraPoss,
     passingAnchorFactor,
   });
-  const offenseSteals = defense.ledger.turnovers * expectedStealShare(prep.stealAbility, profile);
-  const defenseSteals =
-    offense.ledger.turnovers * expectedStealShare(opponentPrep.stealAbility, profile);
+  const offenseSteals = defense.turnoverCauses.expectedSteals;
+  const defenseSteals = offense.turnoverCauses.expectedSteals;
   return {
     offense: { ...offense, ledger: { ...offense.ledger, steals: offenseSteals } },
     defense: { ...defense, ledger: { ...defense.ledger, steals: defenseSteals } },
@@ -162,10 +161,20 @@ function computeSide(input: {
   const turnoverRate = Math.min(1, Math.max(0, turnoverMass));
   const noTurnover = 1 - turnoverRate;
   const nsfPerTrip = nonShootingFoulProbability(profile);
-  const expectedNsfPerTrip =
-    nsfPerTrip * (1 + nsfPerTrip + nsfPerTrip * nsfPerTrip + nsfPerTrip * nsfPerTrip * nsfPerTrip);
+  const defensiveShare = 1 - ENGINE_CONSTANTS.offensiveFoulShare;
+  const continuationPerCheck = nsfPerTrip * defensiveShare;
+  const continuationGeometric =
+    1 +
+    continuationPerCheck +
+    continuationPerCheck * continuationPerCheck +
+    continuationPerCheck * continuationPerCheck * continuationPerCheck;
+  const expectedNsfPerTrip = nsfPerTrip * continuationGeometric;
+  const offensiveFoulProbGivenNoTurnover =
+    nsfPerTrip * ENGINE_CONSTANTS.offensiveFoulShare * continuationGeometric;
+  const offensiveFoulTurnoverRate = noTurnover * offensiveFoulProbGivenNoTurnover;
   const nonShootingFoulRate = noTurnover * expectedNsfPerTrip;
-  const shotMass = noTurnover * 100;
+  const shotMass = (noTurnover - offensiveFoulTurnoverRate) * 100;
+  const foulerShares = normalizedWeights(prep.foulerWeights);
   const playerCount = players.length;
   const actionCount = ACTION_TYPES.length;
   const zoneCount = ZONES.length;
@@ -294,7 +303,7 @@ function computeSide(input: {
     points: 0,
     offensiveRebounds: 0,
     defensiveRebounds: 0,
-    turnovers: turnoverRate * 100,
+    turnovers: turnoverRate * 100 + offensiveFoulTurnoverRate * 100,
     assists: 0,
     steals: 0,
     blocks: 0,
@@ -429,18 +438,19 @@ function computeSide(input: {
       orebPFlat[zoneIndex] = orebP;
       orebPSeen[zoneIndex] = 1;
     }
-    const missMass = mass * missProb;
-    internal.offensiveReboundChances += missMass;
-    internal.defensiveReboundChances += missMass;
-    const liveOreb = missMass * orebP;
+    const deadMissMass = mass * missedWithFoulProb;
+    const liveMissMass = mass * missProb - deadMissMass;
+    internal.offensiveReboundChances += mass * missProb;
+    internal.defensiveReboundChances += mass * missProb;
+    const liveOreb = liveMissMass * orebP;
     internal.offensiveRebounds += liveOreb;
-    internal.defensiveRebounds += missMass * (1 - orebP);
+    internal.defensiveRebounds += liveMissMass * (1 - orebP) + deadMissMass;
     const liveFtMiss = mass * (missedWithFoulProb + madeWithFoulProb) * (1 - ftP);
-    internal.offensiveReboundChances += liveFtMiss;
-    internal.defensiveReboundChances += liveFtMiss;
+    const deadFtMiss = mass * missedWithFoulProb * (ftCount - 1) * (1 - ftP);
+    internal.offensiveReboundChances += liveFtMiss + deadFtMiss;
+    internal.defensiveReboundChances += liveFtMiss + deadFtMiss;
     internal.offensiveRebounds += liveFtMiss * rimOrebP;
-    internal.defensiveRebounds += liveFtMiss * (1 - rimOrebP);
-    internal.defensiveRebounds += mass * missedWithFoulProb * (ftCount - 1) * (1 - ftP);
+    internal.defensiveRebounds += liveFtMiss * (1 - rimOrebP) + deadFtMiss;
     const passedMass = passedMassByKey[keyIndex] ?? 0;
     if (passedMass > 0) {
       const totalPassed = passedMass;
@@ -486,9 +496,15 @@ function computeSide(input: {
       internal.assists += assists;
       for (let passerIndex = 0; passerIndex < playerCount; passerIndex += 1) {
         if (passerIndex === shooterIndex) continue;
+        const passer = players[passerIndex];
+        if (passer === undefined) continue;
+        const probKey =
+          ((passerIndex * actionCount + actionIndex) * zoneCount + zoneIndex) * playerCount +
+          shooterIndex;
+        const cachedAssistP = assistPSeen[probKey] === 1 ? (assistPFlat[probKey] ?? 0) : 0;
         playerAssists[passerIndex] =
           (playerAssists[passerIndex] ?? 0) +
-          passedMass * makeProb * (assisterFlat[assisterSlot + passerIndex] ?? 0);
+          passedMass * makeProb * (assisterFlat[assisterSlot + passerIndex] ?? 0) * cachedAssistP;
       }
     }
     const agg = playerAgg[shooterIndex];
@@ -498,7 +514,7 @@ function computeSide(input: {
     agg.points += mass * (three ? 3 : 2) * makeProb + ftmMass;
     agg.fouls += mass * foulP;
     agg.rebounds += liveOreb * (offensiveRebounderShare[shooterIndex] ?? 0);
-    agg.rebounds += missMass * (1 - orebP) * (defensiveRebounderShare[shooterIndex] ?? 0);
+    agg.rebounds += liveMissMass * (1 - orebP) * (defensiveRebounderShare[shooterIndex] ?? 0);
     agg.rebounds += liveFtMiss * rimOrebP * (offensiveRebounderShare[shooterIndex] ?? 0);
     agg.rebounds += liveFtMiss * (1 - rimOrebP) * (defensiveRebounderShare[shooterIndex] ?? 0);
     qualityLiftTotal +=
@@ -511,7 +527,8 @@ function computeSide(input: {
   }
   for (let index = 0; index < players.length; index += 1) {
     playerAggAt(index).turnovers =
-      (initiatorShares[index] ?? 0) * (turnoverRates[index] ?? 0) * 100;
+      (initiatorShares[index] ?? 0) * (turnoverRates[index] ?? 0) * 100 +
+      (foulerShares[index] ?? 0) * offensiveFoulTurnoverRate * 100;
   }
   const makeAvg =
     internal.fieldGoalAttempts > 0 ? internal.fieldGoalMakes / internal.fieldGoalAttempts : 0.45;
@@ -520,7 +537,7 @@ function computeSide(input: {
   const scale = Math.min(1 / Math.max(1e-9, 1 - averageOrebRate * (1 - makeAvg)), 4);
   const ledger: ProjectionLedger = {
     possessions: 100,
-    turnoverRate,
+    turnoverRate: turnoverRate + offensiveFoulTurnoverRate,
     nonShootingFoulRate,
     shotRate: (shotMass * scale) / 100,
     fieldGoalAttempts: internal.fieldGoalAttempts * scale,
@@ -556,11 +573,12 @@ function computeSide(input: {
     secondChancePoints: internal.points * (scale - 1),
   };
   const stealShare = expectedStealShare(opponentPrep.stealAbility, profile);
+  const securityTurnovers = turnoverRate * 100;
   const turnoverCauses: ProjectionTurnoverCauses = {
     stealShare,
     nonStealShare: 1 - stealShare,
-    expectedSteals: ledger.turnovers * stealShare,
-    expectedOther: ledger.turnovers * (1 - stealShare),
+    expectedSteals: securityTurnovers * stealShare,
+    expectedOther: ledger.turnovers - securityTurnovers * stealShare,
   };
   return {
     ledger,

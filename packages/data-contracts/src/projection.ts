@@ -142,6 +142,7 @@ export const projectionModelArtifactSchema = z.object({
   modelVersion: z.literal(PROJECTION_MODEL_VERSION),
   dataVersion: z.string().min(1).max(64),
   ratingsVersion: z.string().min(1).max(64),
+  engineVersion: z.string().min(1).max(64),
   eraProfileVersions: z.record(eraIdSchema, z.string().min(1).max(64)),
   references: z
     .record(

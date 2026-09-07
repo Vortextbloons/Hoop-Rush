@@ -197,8 +197,7 @@ def to_player_season_stats(payload: list[dict[str, Any]], season: str, roster: l
         a = adv_by_id.get(ext_id, {})
         rp = roster_by_id.get(ext_id, {})
         gp = _safe_int(b.get("GP"))
-        out.append(
-            {
+        row = {
                 "playerExternalId": ext_id,
                 "season": season,
                 "teamExternalId": str(b.get("TEAM_ID") or (rp.get("teamExternalId") or "")) or None,
@@ -248,8 +247,9 @@ def to_player_season_stats(payload: list[dict[str, Any]], season: str, roster: l
                     gp,
                 ),
                 "vorp": _safe_float(a.get("VORP")),
-            }
-        )
+        }
+        sanitize_shooting_totals(row)
+        out.append(row)
     return out
 
 
@@ -259,6 +259,55 @@ def estimate_usage(fga: float, fta: float, tov: float, gp: int, pace: float = 95
         return 0
     per_game = (fga + 0.44 * fta + tov) / gp
     return clamp(per_game / pace * 100, 0, 100)
+
+
+def _coverage_ok(coverage: dict[str, Any], out_key: str, games: int) -> bool:
+    """A family counts as a season total only when the source logged it in at
+    least three-quarters of the player's games. Partial sums (e.g. FGA in 58
+    of 81 games) look complete but produce fictional rates, while nulling errs
+    toward conservative estimates downstream."""
+    if games <= 0:
+        return False
+    try:
+        present = float(coverage.get(out_key, games))
+    except (ValueError, TypeError):
+        return False
+    return (present / games) >= 0.75
+
+
+def _drop_inconsistent_shooting(t: dict[str, Any]) -> None:
+    """Makes without matching attempts (or splits that contradict totals) mean
+    the family is unobserved, not zero and not capped into fiction: capping
+    fgm 973 to a partial fga 883 would invent a 1.000 efg."""
+    for made, attempted in (("fgm", "fga"), ("ftm", "fta"), ("tpm", "tpa")):
+        m = t.get(made)
+        a = t.get(attempted)
+        if m is None:
+            continue
+        try:
+            mf, af = float(m), float(a) if a is not None else None
+        except (ValueError, TypeError):
+            t[made] = None
+            continue
+        if af is None or not math.isfinite(af) or af <= 0 or not math.isfinite(mf) or mf < 0:
+            t[made] = None
+            continue
+        if mf > af:
+            t[made] = None
+            t[attempted] = None
+    oreb = t.get("offensiveRebounds")
+    dreb = t.get("defensiveRebounds")
+    reb = t.get("rebounds")
+    try:
+        if (
+            oreb is not None and dreb is not None and reb is not None
+            and float(oreb) + float(dreb) < 0.5 * float(reb)
+        ):
+            t["offensiveRebounds"] = None
+            t["defensiveRebounds"] = None
+    except (ValueError, TypeError):
+        t["offensiveRebounds"] = None
+        t["defensiveRebounds"] = None
 
 
 def stats_from_stints(season: str) -> list[dict[str, Any]]:
@@ -281,7 +330,10 @@ def stats_from_stints(season: str) -> list[dict[str, Any]]:
     for stint in json.loads(stints_path.read_text(encoding="utf-8")):
         pid = stint["playerExternalId"]
         row = totals.setdefault(pid, {})
-        row["gamesPlayed"] = row.get("gamesPlayed", 0) + int(stint.get("gamesPlayed") or 0)
+        stint_games = int(stint.get("gamesPlayed") or 0)
+        row["gamesPlayed"] = row.get("gamesPlayed", 0) + stint_games
+        stint_coverage = stint.get("coverage") if isinstance(stint.get("coverage"), dict) else {}
+        row_coverage = row.setdefault("_coverage", {})
         for key in ("minutes", "points", "rebounds", "offensiveRebounds",
                     "defensiveRebounds", "assists", "steals", "blocks",
                     "turnovers", "fouls", "fgm", "fga", "tpm", "tpa", "ftm", "fta"):
@@ -295,24 +347,76 @@ def stats_from_stints(season: str) -> list[dict[str, Any]]:
             if math.isnan(f) or math.isinf(f):
                 continue
             row[key] = row.get(key, 0.0) + f
+            try:
+                covered = float(stint_coverage.get(key, stint_games))
+            except (ValueError, TypeError):
+                covered = float(stint_games)
+            row_coverage[key] = row_coverage.get(key, 0.0) + covered
+
+    def _num(t: dict[str, Any], key: str, default: float = 0.0) -> float:
+        try:
+            f = float(t.get(key, default))
+        except (ValueError, TypeError):
+            return default
+        return f if math.isfinite(f) else default
+
+    def _present(t: dict[str, Any], key: str) -> float | None:
+        # A popped (R1/R2-nulled) key and a never-observed key look identical
+        # here, and should: both mean the family is unobserved and must stay
+        # null downstream so derivation estimates instead of trusting a zero.
+        if key not in t:
+            return None
+        try:
+            f = float(t[key])
+        except (ValueError, TypeError):
+            return None
+        return f if math.isfinite(f) else None
 
     out: list[dict[str, Any]] = []
     for pid, t in totals.items():
         gp = int(t.get("gamesPlayed") or 0)
         if gp == 0:
             continue
-        sanitize_shooting_totals(t)
-        minutes = t.get("minutes", 0.0)
-        fga = t.get("fga", 0.0)
-        fta = t.get("fta", 0.0)
+        coverage = t.get("_coverage", {})
+        if isinstance(coverage, dict):
+            for key in ("minutes", "points", "rebounds", "offensiveRebounds",
+                        "defensiveRebounds", "assists", "steals", "blocks",
+                        "turnovers", "fouls", "fgm", "fga", "tpm", "tpa", "ftm", "fta"):
+                if not _coverage_ok(coverage, key, gp):
+                    t.pop(key, None)
+        _drop_inconsistent_shooting(t)
+        # Magnitude sanity: no real season exceeds ~1.1 points per minute
+        # (Wilt's peak is ~1.04). Past 1.5 the minutes column is corrupt, not
+        # the scoring line, so minutes go while points stay for per-game use.
+        try:
+            _min = float(t.get("minutes", 0.0) or 0.0)
+            _pts = float(t.get("points", 0.0) or 0.0)
+        except (ValueError, TypeError):
+            _min, _pts = 0.0, 0.0
+        if _min > 0 and (_pts / _min) > 1.5:
+            t.pop("minutes", None)
+        minutes = _present(t, "minutes")
+        fga = _num(t, "fga")
+        fta = _num(t, "fta")
         tpa = t.get("tpa")
         tpm = t.get("tpm")
-        pts = t.get("points", 0.0)
+        pts = _num(t, "points")
+        rebounds = _present(t, "rebounds")
+        assists = _present(t, "assists")
+        fouls = _present(t, "fouls")
+        fgm = _present(t, "fgm")
+        ftm = _present(t, "ftm")
         stl = t.get("steals")
         blk = t.get("blocks")
         tov = t.get("turnovers")
-        efg = clamp_unit(((t.get("fgm", 0.0) + 0.5 * (tpm or 0.0)) / fga) if fga > 0 else None)
-        ts = clamp_unit((pts / (2 * (fga + 0.44 * fta))) if (fga + fta) > 0 else None)
+        efg = (
+            clamp_unit(((float(fgm) + 0.5 * (tpm or 0.0)) / fga))
+            if fgm is not None and fga > 0 else None
+        )
+        ts = (
+            clamp_unit((pts / (2 * (fga + 0.44 * fta))))
+            if t.get("points") is not None and fga > 0 else None
+        )
         out.append(
             {
                 "playerExternalId": pid,
@@ -321,31 +425,31 @@ def stats_from_stints(season: str) -> list[dict[str, Any]]:
                 "gamesPlayed": gp,
                 "minutes": minutes,
                 "starts": 0,
-                "points": pts,
-                "rebounds": t.get("rebounds", 0.0),
+                "points": _present(t, "points"),
+                "rebounds": rebounds,
                 "offensiveRebounds": t.get("offensiveRebounds"),
                 "defensiveRebounds": t.get("defensiveRebounds"),
-                "assists": t.get("assists", 0.0),
+                "assists": assists,
                 "steals": stl,
                 "blocks": blk,
                 "turnovers": tov,
-                "fouls": t.get("fouls", 0.0),
-                "fgm": t.get("fgm", 0.0),
-                "fga": fga,
+                "fouls": fouls,
+                "fgm": fgm,
+                "fga": _present(t, "fga"),
                 "tpm": tpm,
                 "tpa": tpa,
-                "ftm": t.get("ftm", 0.0),
-                "fta": fta,
+                "ftm": ftm,
+                "fta": _present(t, "fta"),
                 "tsPct": ts,
                 "efgPct": efg,
                 "per": estimate_per(
-                    pts, t.get("rebounds", 0.0), t.get("assists", 0.0), stl or 0.0,
+                    pts, rebounds or 0.0, assists or 0.0, stl or 0.0,
                     blk or 0.0, tov or 0.0, fga, fta, 0, gp,
                 ),
-                "usageRate": estimate_usage(fga, fta, tov or 0.0, gp),
+                "usageRate": estimate_usage(fga, fta, tov or 0.0, gp) if fga > 0 else None,
                 "winShares": 0,
                 "boxPlusMinus": estimate_bpm(
-                    pts, t.get("rebounds", 0.0), t.get("assists", 0.0), stl or 0.0,
+                    pts, rebounds or 0.0, assists or 0.0, stl or 0.0,
                     blk or 0.0, tov or 0.0, fga, fta, gp,
                 ),
                 "vorp": 0,

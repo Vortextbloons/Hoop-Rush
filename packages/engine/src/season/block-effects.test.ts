@@ -64,6 +64,7 @@ import {
   SEASON_OBJECTIVE_VERSION,
   SEASON_TRADE_TARGETS_VERSION,
   SEASON_TRADE_VERSION,
+  buildEmptyChallengeState,
 } from '@hoop-rush/data-contracts';
 function synthesizeRoster(
   catalog: SeasonDraftCatalog,
@@ -358,6 +359,7 @@ function buildSynthesizedRun(): {
       catalog: [...SEASON_OBJECTIVE_CATALOG],
       selections: {},
     },
+    challenges: buildEmptyChallengeState(),
     health: {
       schemaVersion: 1,
       healthVersion: SEASON_HEALTH_VERSION,

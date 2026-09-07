@@ -53,6 +53,7 @@ function buildModel(): ProjectionModelArtifact {
     modelVersion: 'projection-model-v1',
     dataVersion: `m10-${RATINGS_VERSION}`,
     ratingsVersion: RATINGS_VERSION,
+    engineVersion: 'm3-engine-v21',
     eraProfileVersions: { '1990s': DEFAULT_ERA_SIM_PROFILE.profileVersion },
     references: {
       '1990s': {
@@ -548,9 +549,13 @@ describe('projectExpectedLedger', () => {
       profile: DEFAULT_ERA_SIM_PROFILE,
     });
     expect(result.offense.ledger.steals).toBeCloseTo(
-      result.defense.ledger.turnovers *
-        Math.min(0.9, Math.max(0.3, DEFAULT_ERA_SIM_PROFILE.parameters.stealShareOfTurnovers)),
+      result.defense.turnoverCauses.expectedSteals,
       9,
+    );
+    expect(result.offense.ledger.steals).toBeLessThanOrEqual(
+      result.defense.ledger.turnovers *
+        Math.min(0.9, Math.max(0.3, DEFAULT_ERA_SIM_PROFILE.parameters.stealShareOfTurnovers)) +
+        1e-9,
     );
     expect(result.offense.ledger.possessions).toBe(100);
     for (const side of [result.offense, result.defense]) {

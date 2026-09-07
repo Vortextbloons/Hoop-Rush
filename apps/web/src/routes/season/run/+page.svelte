@@ -9,7 +9,7 @@
   import InfluencePanel from '$lib/components/season/InfluencePanel.svelte';
   import InterruptionPanel from '$lib/components/season/InterruptionPanel.svelte';
   import ChallengesPanel from '$lib/components/season/ChallengesPanel.svelte';
-  import SponsorShopPanel from '$lib/components/season/SponsorShopPanel.svelte';
+  import SponsorShopModal from '$lib/components/season/SponsorShopModal.svelte';
   import LeaguePulse from '$lib/components/season/LeaguePulse.svelte';
   import PostseasonMatchupCard from '$lib/components/season/PostseasonMatchupCard.svelte';
   import PostseasonProgress from '$lib/components/season/PostseasonProgress.svelte';
@@ -51,7 +51,11 @@
     type InfluenceSpendAffordance,
   } from '$lib/season/season-influence-view';
   import { challengesViewModel } from '$lib/season/season-challenges-view';
-  import { sponsorBoardHistoryOf, sponsorShopOf } from '$lib/season/sponsor-gear-view';
+  import {
+    sponsorBoardHistoryOf,
+    sponsorShopOf,
+    sponsorVaultOf,
+  } from '$lib/season/sponsor-gear-view';
   import { loadSponsorsIndex } from '$lib/season/season-assets';
   import { resolveAssetUrl } from '$lib/asset-url';
   import { availabilityStripRows } from '$lib/season/season-health-view';
@@ -134,6 +138,11 @@
   const sponsorOwnedCount = $derived(
     sponsorOffers?.filter((offer) => offer.state === 'owned').length ?? 0,
   );
+  const sponsorVault = $derived(run !== null ? sponsorVaultOf(run) : []);
+  const sponsorBlockLabel = $derived(
+    nextBlockIndex === null ? null : `Block ${String(nextBlockIndex + 1)} of 9`,
+  );
+  let sponsorShopOpen = $state(false);
   const sponsorCommandError = $derived.by(() => {
     const e = commandError;
     if (e === null) return null;
@@ -678,7 +687,53 @@
             />
           {/if}
 
-          <SponsorShopPanel
+          <section
+            aria-labelledby="sponsor-shop-trigger-heading"
+            class="flex flex-col gap-3 rounded-xl border border-border bg-card p-4"
+            data-testid="sponsor-shop-trigger"
+          >
+            <div class="flex flex-wrap items-baseline justify-between gap-2">
+              <h2
+                id="sponsor-shop-trigger-heading"
+                class="text-base font-extrabold uppercase tracking-tight"
+              >
+                Sponsors
+              </h2>
+              {#if sponsorOffers !== null}
+                <p
+                  class="font-mono text-[11px] text-muted-foreground"
+                  data-testid="sponsor-shop-count"
+                >
+                  {sponsorOwnedCount}/{sponsorOffers.length} owned · {sponsorVault.length} in vault ·
+                  {sponsorBalance}/{sponsorCap}◆
+                </p>
+              {/if}
+            </div>
+            <p class="text-xs text-muted-foreground">
+              {#if nextBlockIndex !== null && nextBlockIndex >= 8}
+                Final block — no new offers. Open the shop to review the vault before it locks.
+              {:else if sponsorOffers === null}
+                Loading this block's endorsement board…
+              {:else}
+                {sponsorOffers.length - sponsorOwnedCount} offers left this block. Buying stashes gear
+                in the vault for the roster.
+              {/if}
+            </p>
+            <button
+              type="button"
+              data-testid="open-sponsor-shop"
+              onclick={() => {
+                sponsorShopOpen = true;
+              }}
+              class="inline-flex min-h-11 w-fit items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground outline-none transition-opacity focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
+            >
+              Open sponsor shop
+              <span aria-hidden="true">&rarr;</span>
+            </button>
+          </section>
+
+          <SponsorShopModal
+            open={sponsorShopOpen}
             offers={sponsorOffers}
             balance={sponsorBalance}
             cap={sponsorCap}
@@ -687,10 +742,16 @@
             isFinalBlock={nextBlockIndex !== null && nextBlockIndex >= 8}
             ownedCount={sponsorOwnedCount}
             history={run !== null ? sponsorBoardHistoryOf(run) : []}
+            vault={sponsorVault}
             logos={sponsorLogos}
+            blockLabel={sponsorBlockLabel}
             onBuy={(input) => {
               if (!mounted) return;
               void shell.hub?.buySponsor(input);
+            }}
+            onOpenChange={(next) => {
+              if (!mounted) return;
+              sponsorShopOpen = next;
             }}
           />
 

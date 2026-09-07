@@ -39,6 +39,7 @@
     onpending = null,
     presetLoad = null,
     presetHorizon = null,
+    onSelectPlayer = null,
   }: {
     editor: RotationEditor;
     disabled: boolean;
@@ -58,6 +59,7 @@
       recentLoadBasisPoints: number;
     }> | null;
     presetHorizon?: number | null;
+    onSelectPlayer?: ((playerVersionId: string) => void) | null;
   } = $props();
   const rows = $derived.by(() => {
     void revision;
@@ -429,6 +431,9 @@
   function highlightOf(playerVersionId: string): string {
     return highlightIds.has(playerVersionId) ? ' ring-2 ring-primary' : '';
   }
+  function selectPlayer(playerVersionId: string): void {
+    onSelectPlayer?.(playerVersionId);
+  }
 </script>
 
 <div class="flex min-w-0 flex-col gap-4">
@@ -548,8 +553,6 @@
           </li>
         {/if}
         {@const rowFailures = humanizedFor(row.member.playerVersionId)}
-        {@const fatigue = fatigueOf(row)}
-        {@const isCloser = row.closingIndex !== -1}
         <li
           id="rotation-row-{row.member.playerVersionId}"
           data-rotation-active-row
@@ -566,69 +569,21 @@
             >
               {#if row.isStarter}S{row.slotIndex + 1}{:else}B{row.slotIndex + 1}{/if}
             </span>
-            {#if manifest !== null && faceOf(row.member.playerVersionId) !== null}
-              <SeasonPlayerFace
-                face={faceOf(row.member.playerVersionId)!}
-                {manifest}
-                size="sm"
-                eager={row.activePos <= 2}
-              />
-            {/if}
-            <div class="min-w-0 flex-1">
-              <p class="text-sm font-semibold leading-snug">
-                {row.member.displayName}
-                {#if isCloser}
-                  <span
-                    class="ml-1.5 inline-flex items-center rounded-full bg-primary/15 px-1.5 py-0.5 font-mono text-[10px] font-bold text-primary"
-                  >
-                    Closer
-                  </span>
-                {/if}
-              </p>
-              <div class="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
-                {#if overallByVersion?.has(row.member.playerVersionId)}
-                  <span
-                    class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold text-foreground"
-                  >
-                    OVR {overallByVersion.get(row.member.playerVersionId)}
-                  </span>
-                {/if}
-                {#if (gearPointsByVersion?.get(row.member.playerVersionId) ?? 0) > 0}
-                  <span
-                    class="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 font-mono text-[10px] font-bold text-amber-300 ring-1 ring-amber-400/40"
-                    title="Attribute points from applied sponsors"
-                  >
-                    +{gearPointsByVersion?.get(row.member.playerVersionId)} gear
-                  </span>
-                {/if}
-                {#if fatigue !== null}
-                  <span
-                    class={`shrink-0 rounded-full px-2 py-0.5 font-mono text-[10px] font-bold ${fatigue.badge}`}
-                  >
-                    {fatigue.label}
-                    {fatigue.percent}%
-                  </span>
-                {/if}
-                {#if row.isStarter}
-                  <span
-                    class="shrink-0 rounded-full bg-surface-3 px-2 py-0.5 font-mono text-[10px] font-bold text-muted-foreground"
-                  >
-                    Starter
-                  </span>
-                {:else}
-                  <span
-                    class="shrink-0 rounded-full bg-surface-3 px-2 py-0.5 font-mono text-[10px] font-bold text-muted-foreground"
-                  >
-                    Bench {row.slotIndex + 1}
-                  </span>
-                {/if}
+            {#if onSelectPlayer !== null}
+              <button
+                type="button"
+                onclick={() => selectPlayer(row.member.playerVersionId)}
+                aria-label={`View ${row.member.displayName}`}
+                data-rotation-player-select={row.member.playerVersionId}
+                class="flex min-w-0 flex-1 items-start gap-2 rounded-lg text-left outline-none transition-colors hover:bg-surface-3/60 focus-visible:ring-2 focus-visible:ring-ring md:items-center md:gap-3"
+              >
+                {@render activePlayerIdentity(row)}
+              </button>
+            {:else}
+              <div class="flex min-w-0 flex-1 items-start gap-2 md:items-center md:gap-3">
+                {@render activePlayerIdentity(row)}
               </div>
-              <p class="mt-1 font-mono text-[10px] leading-snug text-muted-foreground">
-                {#if row.member.playable.length > 0}{formatPositions(row.member.playable)}{/if}
-                {#if row.member.seasonKey !== undefined}
-                  · {row.member.seasonKey}{/if}
-              </p>
-            </div>
+            {/if}
           </div>
           <div class="flex w-full min-w-0 flex-col gap-2 md:w-auto md:shrink-0">
             <div class="flex min-w-0 flex-col gap-2 md:flex-row md:items-center md:gap-2">
@@ -762,7 +717,9 @@
       >
         Closing five
       </h3>
-      <span class="font-mono text-[10px] text-muted-foreground">tap a chip to find the row</span>
+      <span class="font-mono text-[10px] text-muted-foreground">
+        {onSelectPlayer !== null ? 'tap a chip to view the player' : 'tap a chip to find the row'}
+      </span>
     </div>
     <ul class="mt-2 flex flex-wrap gap-1.5" aria-label="Current closing five">
       {#each closingIds as playerVersionId, slotIndex (slotIndex)}
@@ -771,8 +728,13 @@
           <button
             type="button"
             data-closing-chip={playerVersionId}
-            onclick={() => scrollToRow(playerVersionId)}
-            aria-label={`Show ${row?.member.displayName ?? playerVersionId} in Active 10`}
+            onclick={() =>
+              onSelectPlayer !== null
+                ? selectPlayer(playerVersionId)
+                : scrollToRow(playerVersionId)}
+            aria-label={onSelectPlayer !== null
+              ? `View ${row?.member.displayName ?? playerVersionId}`
+              : `Show ${row?.member.displayName ?? playerVersionId} in Active 10`}
             class="flex min-h-11 items-center gap-1.5 rounded-full bg-surface-2 py-1 pr-3 pl-1 font-mono text-xs font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 motion-reduce:transition-none"
           >
             {#if manifest !== null && faceOf(playerVersionId) !== null}
@@ -816,7 +778,6 @@
       </p>
       <ul class="mt-2 flex flex-col divide-y divide-border/60">
         {#each inactiveRows as member (member.playerVersionId)}
-          {@const eraLabel = eraLabelOf(member)}
           {@const open =
             swap?.kind === 'promote' && swap.playerVersionId === member.playerVersionId}
           <li data-rotation-inactive-row class="flex flex-col gap-2 py-2.5 sm:py-2">
@@ -824,45 +785,21 @@
               class="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-3"
             >
               <div class="flex min-w-0 items-start gap-2 sm:items-center sm:gap-3">
-                {#if manifest !== null && faceOf(member.playerVersionId) !== null}
-                  <SeasonPlayerFace face={faceOf(member.playerVersionId)!} {manifest} size="sm" />
-                {/if}
-                <div class="min-w-0 flex-1">
-                  <p class="text-sm font-semibold leading-snug">{member.displayName}</p>
-                  <div class="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
-                    {#if overallByVersion?.has(member.playerVersionId)}
-                      <span
-                        class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold text-foreground"
-                      >
-                        OVR {overallByVersion.get(member.playerVersionId)}
-                      </span>
-                    {/if}
-                    {#if (gearPointsByVersion?.get(member.playerVersionId) ?? 0) > 0}
-                      <span
-                        class="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 font-mono text-[10px] font-bold text-amber-300 ring-1 ring-amber-400/40"
-                        title="Attribute points from applied sponsors"
-                      >
-                        +{gearPointsByVersion?.get(member.playerVersionId)} gear
-                      </span>
-                    {/if}
-                    <span
-                      class="shrink-0 rounded-full bg-surface-3 px-2 py-0.5 font-mono text-[10px] font-bold text-muted-foreground"
-                    >
-                      Inactive
-                    </span>
+                {#if onSelectPlayer !== null}
+                  <button
+                    type="button"
+                    onclick={() => selectPlayer(member.playerVersionId)}
+                    aria-label={`View ${member.displayName}`}
+                    data-rotation-player-select={member.playerVersionId}
+                    class="flex min-w-0 flex-1 items-start gap-2 rounded-lg text-left outline-none transition-colors hover:bg-surface-3/60 focus-visible:ring-2 focus-visible:ring-ring sm:items-center sm:gap-3"
+                  >
+                    {@render inactivePlayerIdentity(member)}
+                  </button>
+                {:else}
+                  <div class="flex min-w-0 flex-1 items-start gap-2 sm:items-center sm:gap-3">
+                    {@render inactivePlayerIdentity(member)}
                   </div>
-                  <p class="mt-1 font-mono text-[10px] leading-snug text-muted-foreground">
-                    {member.seasonKey ?? ''}
-                    {#if member.playable.length > 0}· {formatPositions(member.playable)}{/if}
-                  </p>
-                  {#if eraLabel !== null}
-                    <p
-                      class="mt-0.5 line-clamp-2 font-mono text-[9px] leading-snug text-muted-foreground/70"
-                    >
-                      {eraLabel}
-                    </p>
-                  {/if}
-                </div>
+                {/if}
               </div>
               <div class="flex justify-end sm:justify-start">
                 <button
@@ -898,6 +835,115 @@
     <p role="status" class="text-xs font-semibold text-primary">{swapNotice}</p>
   {/if}
 </div>
+
+{#snippet activePlayerIdentity(row: (typeof activeOrdered)[number])}
+  {@const isCloser = row.closingIndex !== -1}
+  {@const fatigue = fatigueOf(row)}
+  {#if manifest !== null && faceOf(row.member.playerVersionId) !== null}
+    <SeasonPlayerFace
+      face={faceOf(row.member.playerVersionId)!}
+      {manifest}
+      size="sm"
+      eager={row.activePos <= 2}
+    />
+  {/if}
+  <div class="min-w-0 flex-1">
+    <p class="text-sm font-semibold leading-snug">
+      {row.member.displayName}
+      {#if isCloser}
+        <span
+          class="ml-1.5 inline-flex items-center rounded-full bg-primary/15 px-1.5 py-0.5 font-mono text-[10px] font-bold text-primary"
+        >
+          Closer
+        </span>
+      {/if}
+    </p>
+    <div class="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
+      {#if overallByVersion?.has(row.member.playerVersionId)}
+        <span
+          class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold text-foreground"
+        >
+          OVR {overallByVersion.get(row.member.playerVersionId)}
+        </span>
+      {/if}
+      {#if (gearPointsByVersion?.get(row.member.playerVersionId) ?? 0) > 0}
+        <span
+          class="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 font-mono text-[10px] font-bold text-amber-300 ring-1 ring-amber-400/40"
+          title="Attribute points from applied sponsors"
+        >
+          +{gearPointsByVersion?.get(row.member.playerVersionId)} gear
+        </span>
+      {/if}
+      {#if fatigue !== null}
+        <span
+          class={`shrink-0 rounded-full px-2 py-0.5 font-mono text-[10px] font-bold ${fatigue.badge}`}
+        >
+          {fatigue.label}
+          {fatigue.percent}%
+        </span>
+      {/if}
+      {#if row.isStarter}
+        <span
+          class="shrink-0 rounded-full bg-surface-3 px-2 py-0.5 font-mono text-[10px] font-bold text-muted-foreground"
+        >
+          Starter
+        </span>
+      {:else}
+        <span
+          class="shrink-0 rounded-full bg-surface-3 px-2 py-0.5 font-mono text-[10px] font-bold text-muted-foreground"
+        >
+          Bench {row.slotIndex + 1}
+        </span>
+      {/if}
+    </div>
+    <p class="mt-1 font-mono text-[10px] leading-snug text-muted-foreground">
+      {#if row.member.playable.length > 0}{formatPositions(row.member.playable)}{/if}
+      {#if row.member.seasonKey !== undefined}
+        · {row.member.seasonKey}{/if}
+    </p>
+  </div>
+{/snippet}
+
+{#snippet inactivePlayerIdentity(member: RotationMember)}
+  {@const eraLabel = eraLabelOf(member)}
+  {#if manifest !== null && faceOf(member.playerVersionId) !== null}
+    <SeasonPlayerFace face={faceOf(member.playerVersionId)!} {manifest} size="sm" />
+  {/if}
+  <div class="min-w-0 flex-1">
+    <p class="text-sm font-semibold leading-snug">{member.displayName}</p>
+    <div class="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
+      {#if overallByVersion?.has(member.playerVersionId)}
+        <span
+          class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold text-foreground"
+        >
+          OVR {overallByVersion.get(member.playerVersionId)}
+        </span>
+      {/if}
+      {#if (gearPointsByVersion?.get(member.playerVersionId) ?? 0) > 0}
+        <span
+          class="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 font-mono text-[10px] font-bold text-amber-300 ring-1 ring-amber-400/40"
+          title="Attribute points from applied sponsors"
+        >
+          +{gearPointsByVersion?.get(member.playerVersionId)} gear
+        </span>
+      {/if}
+      <span
+        class="shrink-0 rounded-full bg-surface-3 px-2 py-0.5 font-mono text-[10px] font-bold text-muted-foreground"
+      >
+        Inactive
+      </span>
+    </div>
+    <p class="mt-1 font-mono text-[10px] leading-snug text-muted-foreground">
+      {member.seasonKey ?? ''}
+      {#if member.playable.length > 0}· {formatPositions(member.playable)}{/if}
+    </p>
+    {#if eraLabel !== null}
+      <p class="mt-0.5 line-clamp-2 font-mono text-[9px] leading-snug text-muted-foreground/70">
+        {eraLabel}
+      </p>
+    {/if}
+  </div>
+{/snippet}
 
 {#snippet swapPicker(options: RotationMember[], onPick: (optionPlayerVersionId: string) => void)}
   <div

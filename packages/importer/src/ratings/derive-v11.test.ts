@@ -362,6 +362,91 @@ describe('derive-v11 evidence-limited defense and athleticism', () => {
     expect(Math.abs(lowMinutes.ratings.speed - highMinutes.ratings.speed)).toBeLessThanOrEqual(4);
     expect(lowMinutes.provenance['speed']?.confidence).toBe('low');
   });
+  it('caps the oIQ assist-ratio term for extreme distributors', () => {
+    const extreme = derivePlayerRecord(
+      input('2023-24', starterStats({ assists: 900, usageRate: 22, turnovers: 250 }), 'PG'),
+    );
+    expect(extreme.ratings.offensiveIq).toBeLessThan(92);
+    const moderate = derivePlayerRecord(
+      input('2023-24', starterStats({ assists: 500, usageRate: 30, turnovers: 250 }), 'PG'),
+    );
+    expect(moderate.ratings.offensiveIq).toBeGreaterThan(60);
+  });
+  it('shrinks garbage-time rates toward priors despite many games', () => {
+    const fringeTotals = {
+      gamesPlayed: 79,
+      minutes: 322,
+      points: 190,
+      rebounds: 47,
+      offensiveRebounds: 9,
+      defensiveRebounds: 38,
+      assists: 35,
+      steals: 11,
+      blocks: 3,
+      turnovers: 24,
+      fouls: 20,
+      fgm: 71,
+      fga: 153,
+      tpm: 18,
+      tpa: 46,
+      ftm: 29,
+      fta: 35,
+    };
+    const fringe = derivePlayerRecord(
+      input('2023-24', starterStats(fringeTotals), 'C', {
+        heightInches: 84,
+      }),
+    );
+    expect(fringe.ratings.insideScoring).toBeLessThan(70);
+    expect(fringe.ratings.block).toBeLessThan(70);
+    const regular = derivePlayerRecord(
+      input('2023-24', starterStats({ gamesPlayed: 79, minutes: 2400 }), 'C', {
+        heightInches: 84,
+      }),
+    );
+    expect(regular.ratings.insideScoring).toBeGreaterThan(fringe.ratings.insideScoring);
+  });
+  it('grades unobserved minutes as priors with low confidence, never 100s', () => {
+    const noMinutes = derivePlayerRecord(
+      input(
+        '1961-62',
+        {
+          gamesPlayed: 79,
+          minutes: null,
+          points: 2495,
+          rebounds: 1461,
+          offensiveRebounds: null,
+          defensiveRebounds: null,
+          assists: null,
+          steals: null,
+          blocks: null,
+          turnovers: null,
+          fouls: 281,
+          fgm: null,
+          fga: null,
+          tpm: null,
+          tpa: null,
+          ftm: 549,
+          fta: 853,
+        },
+        'C',
+        { heightInches: 85 },
+      ),
+    );
+    for (const field of Object.keys(noMinutes.ratings)) {
+      expect(noMinutes.ratings[field as keyof typeof noMinutes.ratings]).toBeLessThan(100);
+    }
+    expect(noMinutes.provenance['block']?.confidence).toBe('low');
+    expect(noMinutes.provenance['interiorDefense']?.confidence).toBe('low');
+    expect(noMinutes.anchors.pointsPerGame).toBeCloseTo(2495 / 79, 5);
+  });
+  it('caps height-driven strength for very tall frames', () => {
+    const giant = derivePlayerRecord(input('2023-24', starterStats({}), 'C', { heightInches: 88 }));
+    const center = derivePlayerRecord(
+      input('2023-24', starterStats({}), 'C', { heightInches: 82 }),
+    );
+    expect(giant.ratings.strength - center.ratings.strength).toBeLessThanOrEqual(2);
+  });
   it('penalizes hollow anchors: elite rebound/block piles without creation on losing teams', () => {
     const anchorStats = starterStats({
       gamesPlayed: 75,

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   SEASON_CAMPAIGN_VERSION,
-  SEASON_CAMPAIGN_VERSION,
   buildEmptyCampaignState,
   commandIdSchema,
   franchiseIdSchema,

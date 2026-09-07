@@ -468,7 +468,15 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
   };
   const threePctShrunk = shrunkRate(tpm, tpa, ratePriors.threePointPctPrior);
   const ftPctShrunk = shrunkRate(ftm, fta, ratePriors.freeThrowPctPrior);
-  const weight = clamp(0.6 * Math.min(1, minutes / 1500) + 0.4 * Math.min(1, gp / 45), 0, 1);
+  // Games without minutes are not evidence: a 79-game season at 4 mpg is
+  // garbage time, so the games term is capped by minutes-implied rotation
+  // share. Regulars (20+ mpg) are unaffected.
+  const mpgForBlend = gp > 0 ? minutes / gp : 0;
+  const weight = clamp(
+    0.6 * Math.min(1, minutes / 1500) + 0.4 * Math.min(1, gp / 45, mpgForBlend / 20),
+    0,
+    1,
+  );
   const blend = (raw: number, mean: number): number => raw * weight + mean * (1 - weight);
   const tsComponent = tsPct !== null ? (tsPct - 0.5) * 60 : 0;
   const ftComponent = ftPctShrunk !== null ? (ftPctShrunk - 0.7) * 15 : 0;
@@ -860,7 +868,10 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
       ...(!hasSpeedEvidence ? { notesCode: 'no-speed-tracking' } : {}),
     },
   );
-  const heightSignal = input.heightInches === null ? 0 : Math.max(0, input.heightInches - 72) * 1.7;
+  // Height helps strength to a point; past ~82 inches frame matters more than
+  // altitude, so the height term caps and real mass (weightSignal) does the rest.
+  const heightSignal =
+    input.heightInches === null ? 0 : Math.min(10, Math.max(0, input.heightInches - 72)) * 1.7;
   const weightSignal =
     input.weightLbs !== null && input.weightLbs !== undefined && Number.isFinite(input.weightLbs)
       ? clamp((input.weightLbs - 220) * 0.08, -6, 6)
@@ -904,8 +915,14 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
       ? creationRate / Math.max(10, usage)
       : null;
   const shotSelectionSignal = tsPct !== null ? (tsPct - 0.52) * 30 : 0;
+  // Diminishing returns on playmaking volume: beyond ~0.36 assists per usage
+  // point the extra creation stops telling us about decision quality, so the
+  // ratio term caps instead of pinning oIQ at 100 for extreme distributors.
   const decisionQualityRaw =
-    75 + ((astUsageRatio ?? 0.14) - 0.14) * 55 + ballSecurity * 0.8 + shotSelectionSignal * 0.4;
+    75 +
+    clamp(((astUsageRatio ?? 0.14) - 0.14) * 55, -8, 12) +
+    ballSecurity * 0.8 +
+    shotSelectionSignal * 0.4;
   record(
     'offensiveIq',
     blend(decisionQualityRaw, 59),

@@ -969,6 +969,7 @@ export const seasonSelectCampaignOpportunityRejectionSchema = z.discriminatedUni
   seasonCampaignEvolutionRequiredRejectionSchema,
   seasonCampaignOpportunityNotOfferedRejectionSchema,
   seasonCampaignAlreadySelectedRejectionSchema,
+  seasonCampaignRetiredRejectionSchema,
 ]);
 export type SeasonSelectCampaignOpportunityRejection = z.infer<
   typeof seasonSelectCampaignOpportunityRejectionSchema

@@ -159,8 +159,8 @@ function buildFakeGeneration(input: FakeGenerationInput): SeasonLeagueGeneration
     });
   const diagnostics: SeasonGenerationDiagnostics = {
     seed: input.seed,
-    aiVersion: 'season-ai-v3',
-    rosterGenerationVersion: 'roster-generation-v3',
+    aiVersion: 'season-ai-v4',
+    rosterGenerationVersion: 'roster-generation-v4',
     teamsGenerated: 29,
     teamsRepaired: 0,
     backtracks: 0,
@@ -1178,8 +1178,8 @@ describe('season draft finalize and generation', () => {
         throw new SeasonAiGenerationError({
           diagnostics: {
             seed: SEED,
-            aiVersion: 'season-ai-v3',
-            rosterGenerationVersion: 'roster-generation-v3',
+            aiVersion: 'season-ai-v4',
+            rosterGenerationVersion: 'roster-generation-v4',
             teamsGenerated: 20,
             teamsRepaired: 0,
             backtracks: 0,

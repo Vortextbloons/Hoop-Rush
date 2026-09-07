@@ -471,6 +471,9 @@
           rotationRevision += 1;
           autoPanel?.notifyManualEdit();
         }}
+        onSelectPlayer={(playerVersionId) => {
+          selectedPlayerId = playerVersionId;
+        }}
       />
 
       {#if statsView !== null}

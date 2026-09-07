@@ -235,8 +235,8 @@ describe('season generation digest', () => {
     };
     const diagnostics: SeasonGenerationDiagnostics = {
       seed: seedSchema.parse(seed),
-      aiVersion: 'season-ai-v3',
-      rosterGenerationVersion: 'roster-generation-v3',
+      aiVersion: 'season-ai-v4',
+      rosterGenerationVersion: 'roster-generation-v4',
       teamsGenerated: 2,
       teamsRepaired: 0,
       backtracks: 0,

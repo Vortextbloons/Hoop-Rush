@@ -133,6 +133,10 @@ def aggregate_stints(logs: list[dict[str, Any]], season: str) -> list[dict[str, 
             else:
                 # Absent family: keep null, never a converted zero.
                 row[out_key] = None
+        # Per-family game coverage: downstream totals must be able to tell a
+        # season total (present in most games) from a partial sum over the few
+        # games where the source bothered to log the column.
+        row["coverage"] = {OUTPUT_KEY[k]: counts.get(k, 0) for k in AGGREGATE_KEYS}
         out.append(row)
     return out
 

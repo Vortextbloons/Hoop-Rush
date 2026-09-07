@@ -29,6 +29,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import {
   createEngineContext,
+  ENGINE_VERSION,
   generateAiLeague,
   projectBaseFive,
   projectSeasonRoster,
@@ -463,6 +464,7 @@ export function deriveProjectionModel(data: PackagedData): {
     modelVersion: PROJECTION_MODEL_VERSION,
     dataVersion: data.manifest.dataVersion,
     ratingsVersion: data.manifest.dataVersion,
+    engineVersion: ENGINE_VERSION,
     eraProfileVersions,
     references,
     scales: {
@@ -1201,20 +1203,20 @@ export function projectionCalibrateBase(input: {
     `pairwise ordering accuracy: ${(stats.pairwiseOrderingAccuracy * 100).toFixed(1)}%`,
   ];
   const targets = buildProjectionTargets();
+  const gateChecks: Array<[string, boolean]> = [
+    ['offensive rating MAE', stats.offensiveRatingMae <= targets.gates.offensiveRatingMaeMax],
+    ['defensive rating MAE', stats.defensiveRatingMae <= targets.gates.defensiveRatingMaeMax],
+    ['net rating MAE', stats.netRatingMae <= targets.gates.netRatingMaeMax],
+    ['net rating bias', Math.abs(stats.netRatingBias) <= targets.gates.netRatingBiasMax],
+    ['rank correlation', stats.rankCorrelation >= targets.gates.rankCorrelationMin],
+    [
+      'pairwise ordering accuracy',
+      stats.pairwiseOrderingAccuracy >= targets.gates.pairwiseOrderingAccuracyMin,
+    ],
+  ];
   if (!validate) {
     const enforceGates = gamesPerLineup > 25;
     const failures: string[] = [];
-    const gateChecks: Array<[string, boolean]> = [
-      ['offensive rating MAE', stats.offensiveRatingMae <= targets.gates.offensiveRatingMaeMax],
-      ['defensive rating MAE', stats.defensiveRatingMae <= targets.gates.defensiveRatingMaeMax],
-      ['net rating MAE', stats.netRatingMae <= targets.gates.netRatingMaeMax],
-      ['net rating bias', Math.abs(stats.netRatingBias) <= targets.gates.netRatingBiasMax],
-      ['rank correlation', stats.rankCorrelation >= targets.gates.rankCorrelationMin],
-      [
-        'pairwise ordering accuracy',
-        stats.pairwiseOrderingAccuracy >= targets.gates.pairwiseOrderingAccuracyMin,
-      ],
-    ];
     for (const [label, passed] of gateChecks) {
       if (!passed && enforceGates) failures.push(`${label} gate failed`);
     }
@@ -1232,12 +1234,18 @@ export function projectionCalibrateBase(input: {
       { details, failures, payload: stats },
     );
   }
-  const passRate = stats.netRatingMae <= targets.gates.netRatingMaeMax ? 1 : 0;
-  details.push(`held-out pass: ${passRate === 1 ? 'PASS' : 'FAIL'}`);
+  const failures: string[] = [];
+  for (const [label, passed] of gateChecks) {
+    if (!passed) failures.push(`${label} gate failed`);
+  }
+  details.push(`held-out pass: ${failures.length === 0 ? 'PASS' : 'FAIL'}`);
+  if (verbose && failures.length > 0) {
+    details.push(...failures);
+  }
   return makeReport(
     'projection validate',
     { era: eraId, samples: gamesPerLineup },
-    { details, payload: stats },
+    { details, failures, payload: stats },
   );
 }
 function summarize(

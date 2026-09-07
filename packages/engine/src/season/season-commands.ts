@@ -301,10 +301,6 @@ export type SeasonRunCommandResult =
       result: SeasonPurchaseTradeInquiryResult;
     }
   | {
-      command: 'purchase-trade-inquiry';
-      result: SeasonPurchaseTradeInquiryResult;
-    }
-  | {
       command: 'buy-sponsor';
       result: SeasonBuySponsorResult;
     }
@@ -315,6 +311,10 @@ export type SeasonRunCommandResult =
   | {
       command: 'select-front-office';
       result: SeasonSelectFrontOfficeResult;
+    }
+  | {
+      command: 'select-court-innovation';
+      result: SeasonSelectCourtInnovationResult;
     };
 export interface SeasonRunCommandOutput {
   result: SeasonRunCommandResult;
@@ -513,7 +513,7 @@ function baseValidation(
   return null;
 }
 function rejectedCommand(
-  commandKind: SeasonRunCommand['command'],
+  commandKind: SeasonRunCommand['command'] | SeasonLegacyRunCommand['command'],
   commandId: string,
   rejection: SeasonRunCommandRejection,
   run: SeasonRun,

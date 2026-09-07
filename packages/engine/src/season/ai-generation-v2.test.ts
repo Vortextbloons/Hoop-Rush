@@ -55,6 +55,118 @@ function brandedSolo(
   const base = soloInput(seed, catalog, league, humanFranchiseId);
   return { ...base, seed: seedSchema.parse(base.seed) };
 }
+describe('v2 projection-driven selection', () => {
+  it('picks legal rosters deterministically and changes picks when projection is present', async () => {
+    const { DEFAULT_ERA_SIM_PROFILE, buildSimulationPlayer } = await import(
+      '@hoop-rush/test-fixtures'
+    );
+    const { RATINGS_VERSION, projectionModelArtifactSchema, playerIdSchema } = await import(
+      '@hoop-rush/data-contracts'
+    );
+    const refPlayer = (index: number) =>
+      buildSimulationPlayer({
+        playerId: playerIdSchema.parse(`p-proj-ref-${String(index)}`),
+        displayName: `Proj Ref ${String(index)}`,
+        positions: index === 4 ? ['C'] : index >= 2 ? ['SF'] : ['PG'],
+      });
+    type RefPlayer = ReturnType<typeof refPlayer>;
+    const five = (archetype: 'neutral' | 'perimeter' | 'interior' | 'pressure' | 'size-switch') => ({
+      referenceId: `ref-1990s-${archetype}`,
+      archetype,
+      eraId: '1990s',
+      referenceHash: 'b'.repeat(64),
+      players: [refPlayer(1), refPlayer(2), refPlayer(3), refPlayer(4), refPlayer(5)] as [
+        RefPlayer,
+        RefPlayer,
+        RefPlayer,
+        RefPlayer,
+        RefPlayer,
+      ],
+    });
+    const model = projectionModelArtifactSchema.parse({
+      schemaVersion: 1,
+      modelVersion: 'projection-model-v1',
+      dataVersion: `m10-${RATINGS_VERSION}`,
+      ratingsVersion: RATINGS_VERSION,
+      engineVersion: 'm3-engine-v21',
+      eraProfileVersions: { '1990s': DEFAULT_ERA_SIM_PROFILE.profileVersion },
+      references: {
+        '1990s': {
+          neutral: five('neutral'),
+          archetypes: [five('perimeter'), five('interior'), five('pressure'), five('size-switch')],
+        },
+      },
+      scales: {
+        creation: { baseline: 0.5, perPoint: 0.01, min: 0, max: 100, higherIsBetter: true },
+        spacing: { baseline: 0.5, perPoint: 0.01, min: 0, max: 100, higherIsBetter: true },
+        defense: { baseline: 55, perPoint: 1, min: 0, max: 100, higherIsBetter: true },
+      },
+      componentWeights: { creation: 1, spacing: 1, defense: 1 },
+      weights: { basketballMean: 0.4, rotationMean: 0.35, robustnessMean: 0.25 },
+      weaknesses: [],
+      search: {
+        seedNamespace: 'season-projection-search',
+        partialBeamsPerLens: 2,
+        completeCandidates: 4,
+        startingFives: 2,
+        closingFives: 2,
+        benchHierarchies: 1,
+        minuteTemplates: 1,
+        singleRemovals: 'all',
+        pairRemovals: 1,
+        nodeBudgets: { partial: 2000, complete: 2000, rotation: 6 },
+        closeScenarioWeight: 0.2,
+      },
+      cohorts: {
+        calibrationGames: 2048,
+        validationGames: 1024,
+        heldOutGames: 2048,
+        calibrationSeedFrom: '00000000000000000000000000000000',
+        calibrationSeedTo: '000000000000000000000000000007ff',
+        validationSeedFrom: '00000000000000000000000000000800',
+        validationSeedTo: '00000000000000000000000000000bff',
+        heldOutSeedFrom: '00000000000000000000000000000c00',
+        heldOutSeedTo: '000000000000000000000000000013ff',
+      },
+      monotonicGates: [
+        {
+          code: 'shooting-monotonic',
+          driver: 'threePoint',
+          output: 'effectiveFieldGoalPct',
+          description: 'better shooting must not lower projected eFG%',
+        },
+      ],
+    });
+    const projection = { eraProfile: DEFAULT_ERA_SIM_PROFILE, model };
+    const ratings = generateAiLeague(brandedSolo(seedFromString('proj-select-1')));
+    const first = generateAiLeague({ ...brandedSolo(seedFromString('proj-select-1')), projection });
+    const second = generateAiLeague({ ...brandedSolo(seedFromString('proj-select-1')), projection });
+    expect(first.digest).toBe(second.digest);
+    for (const roster of first.rosters) {
+      expect(roster.players).toHaveLength(10);
+      expect(validateSeasonRoster(membersOf(first, roster.franchiseId))).toEqual([]);
+    }
+    const summaries = first.evaluations.filter(
+      (evaluation) => evaluation.projectionSummary !== undefined,
+    );
+    expect(summaries.length).toBeGreaterThan(0);
+    expect(
+      summaries.filter((evaluation) => evaluation.projectionSummary?.selectedIsBest === true).length,
+    ).toBeGreaterThan(0);
+    const ratingsIds = new Map(
+      ratings.rosters.map((roster) => [
+        roster.franchiseId,
+        roster.players.map((player) => player.playerVersionId).sort().join(','),
+      ]),
+    );
+    let changed = 0;
+    for (const roster of first.rosters) {
+      const ids = roster.players.map((player) => player.playerVersionId).sort().join(',');
+      if (ratingsIds.get(roster.franchiseId) !== ids) changed += 1;
+    }
+    expect(changed).toBeGreaterThan(0);
+  });
+});
 function canonicalFacts(result: SeasonLeagueGenerationResult): string {
   const rosters = [...result.rosters]
     .sort((a, b) => (a.franchiseId < b.franchiseId ? -1 : 1))

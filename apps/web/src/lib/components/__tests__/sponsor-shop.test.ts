@@ -11,6 +11,9 @@ import {
 import { createInitialSponsorGearState } from '@hoop-rush/engine';
 import { buildManifest } from '@hoop-rush/test-fixtures';
 import SponsorShopPanel from '$lib/components/season/SponsorShopPanel.svelte';
+import SponsorShopModal from '$lib/components/season/SponsorShopModal.svelte';
+import SponsorOfferCard from '$lib/components/season/SponsorOfferCard.svelte';
+import SponsorMark from '$lib/components/season/SponsorMark.svelte';
 import PlayerSponsorCard from '$lib/components/season/PlayerSponsorCard.svelte';
 import SeasonRosterList from '$lib/components/season/SeasonRosterList.svelte';
 import {
@@ -98,6 +101,122 @@ describe('SponsorShopPanel', () => {
     const button = getByTestId(`buy-sponsor-${first.instanceId}`);
     expect((button as HTMLButtonElement).disabled).toBe(true);
     expect(button.textContent).toContain('Owned');
+  });
+});
+
+describe('SponsorMark tile contrast', () => {
+  it('uses a light tile for dark artwork and a dark tile for light artwork', () => {
+    const darkArt = render(SponsorMark, {
+      props: { family: 'nike', displayName: 'Nike', logoUrl: '/nike.svg' },
+    });
+    const darkArtImg = darkArt.container.querySelector('img');
+    expect(darkArtImg?.className).toContain('bg-[#e9edf3]');
+    darkArt.unmount();
+
+    const lightArt = render(SponsorMark, {
+      props: { family: 'skratch', displayName: 'Skratch', logoUrl: '/skratch.svg' },
+    });
+    const lightArtImg = lightArt.container.querySelector('img');
+    expect(lightArtImg?.className).toContain('bg-[#141a24]');
+    lightArt.unmount();
+  });
+});
+
+describe('SponsorOfferCard brand links', () => {
+  it('links out to the official brand site without replacing local art', () => {
+    const offers = sponsorShopOf(testRun(), 0, 8);
+    if (offers === null || offers[0] === undefined) throw new Error('expected offers');
+    const { getByTestId } = render(SponsorOfferCard, {
+      props: {
+        offer: offers[0],
+        balance: 8,
+        cap: 8,
+        logos: new Map(),
+        onBuy: vi.fn(),
+      },
+    });
+    const link = getByTestId(`sponsor-brand-link-${offers[0].instanceId}`);
+    expect(link.getAttribute('href')).toMatch(/^https:\/\//);
+    expect(link.getAttribute('target')).toBe('_blank');
+    expect(link.getAttribute('rel')).toContain('noopener');
+  });
+});
+
+describe('SponsorShopModal', () => {
+  it('renders the board, balance, and empty vault summary when open', () => {
+    const offers = sponsorShopOf(testRun(), 0, 8);
+    if (offers === null) throw new Error('expected offers');
+    const { getByTestId, getAllByTestId } = render(SponsorShopModal, {
+      props: {
+        open: true,
+        offers,
+        balance: 8,
+        cap: 8,
+        ownedCount: 0,
+        history: [{ blockIndex: 0, bought: 0, expired: 5 }],
+        vault: [],
+        logos: new Map(),
+        blockLabel: 'Block 1 of 9',
+        onBuy: vi.fn(),
+        onOpenChange: vi.fn(),
+      },
+    });
+    expect(getByTestId('sponsor-shop-modal')).toBeTruthy();
+    expect(getByTestId('sponsor-shop-modal-title').textContent).toContain('Sponsor shop');
+    expect(getByTestId('sponsor-shop-balance').textContent).toContain('8/8');
+    expect(getAllByTestId(/^sponsor-offer-/)).toHaveLength(5);
+    expect(getByTestId('sponsor-vault-counts').textContent).toContain('0');
+  });
+
+  it('filters offers by slot and fires buy with the instance id', async () => {
+    const offers = sponsorShopOf(testRun(), 0, 8);
+    if (offers === null || offers[0] === undefined) throw new Error('expected offers');
+    const onBuy = vi.fn();
+    const { getByTestId, getAllByTestId } = render(SponsorShopModal, {
+      props: {
+        open: true,
+        offers,
+        balance: 8,
+        cap: 8,
+        ownedCount: 0,
+        history: [],
+        vault: [],
+        logos: new Map(),
+        onBuy,
+        onOpenChange: vi.fn(),
+      },
+    });
+    await fireEvent.click(getByTestId('filter-sponsor-shoe'));
+    const visible = getAllByTestId(/^sponsor-offer-/);
+    expect(visible.length).toBeGreaterThan(0);
+    expect(visible.length).toBeLessThanOrEqual(5);
+    await fireEvent.click(getByTestId('filter-sponsor-all'));
+    expect(getAllByTestId(/^sponsor-offer-/)).toHaveLength(5);
+    await fireEvent.click(getByTestId(`buy-sponsor-${offers[0].instanceId}`));
+    expect(onBuy).toHaveBeenCalledWith({ instanceId: offers[0].instanceId });
+  });
+
+  it('summarizes stashed vault gear by slot', () => {
+    const offers = sponsorShopOf(testRun(), 0, 8);
+    if (offers === null) throw new Error('expected offers');
+    const { getByTestId } = render(SponsorShopModal, {
+      props: {
+        open: true,
+        offers,
+        balance: 8,
+        cap: 8,
+        ownedCount: 0,
+        history: [],
+        vault: [vaultEntry('shoe'), vaultEntry('fuel', 'gatorade')],
+        logos: new Map(),
+        onBuy: vi.fn(),
+        onOpenChange: vi.fn(),
+      },
+    });
+    expect(getByTestId('sponsor-vault-counts').textContent).toContain('SHOE 1');
+    expect(getByTestId('sponsor-vault-counts').textContent).toContain('FUEL 1');
+    expect(getByTestId('sponsor-vault-vault-shoe')).toBeTruthy();
+    expect(getByTestId('sponsor-vault-vault-fuel')).toBeTruthy();
   });
 });
 

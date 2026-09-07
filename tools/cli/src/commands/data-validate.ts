@@ -300,6 +300,32 @@ function auditPoolContent(
         );
       }
     }
+    const counted = player.stats;
+    const finite = (value: unknown): value is number =>
+      typeof value === 'number' && Number.isFinite(value);
+    if (
+      (finite(counted.fieldGoalsMade) &&
+        finite(counted.fieldGoalsAttempted) &&
+        counted.fieldGoalsMade > counted.fieldGoalsAttempted) ||
+      (finite(counted.freeThrowsMade) &&
+        finite(counted.freeThrowsAttempted) &&
+        counted.freeThrowsMade > counted.freeThrowsAttempted) ||
+      (finite(counted.threesMade) &&
+        finite(counted.threesAttempted) &&
+        counted.threesMade > counted.threesAttempted)
+    ) {
+      failures.push(`pools: ${key} ${player.displayName} makes exceed attempts`);
+    }
+    if (
+      finite(counted.gamesPlayed) &&
+      finite(counted.minutes) &&
+      counted.gamesPlayed >= 40 &&
+      counted.minutes / counted.gamesPlayed < 5
+    ) {
+      failures.push(
+        `pools: ${key} ${player.displayName} implausible workload (${String(counted.minutes)} min / ${String(counted.gamesPlayed)} g)`,
+      );
+    }
     const psKey = `${player.franchiseId}/${player.playerExternalId}/${player.seasonKey}`;
     const owner = playerSeasons.get(psKey);
     if (owner !== undefined && owner !== key) {

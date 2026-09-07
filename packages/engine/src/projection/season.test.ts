@@ -89,6 +89,7 @@ function buildModel(): ProjectionModelArtifact {
     modelVersion: 'projection-model-v1',
     dataVersion: `m10-${RATINGS_VERSION}`,
     ratingsVersion: RATINGS_VERSION,
+    engineVersion: 'm3-engine-v21',
     eraProfileVersions: { '1990s': DEFAULT_ERA_SIM_PROFILE.profileVersion },
     references: {
       '1990s': {

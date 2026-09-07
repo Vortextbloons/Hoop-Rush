@@ -477,6 +477,10 @@ interface GenerationState {
   backtracks: number;
   bans: Set<string>;
   onProgress?: (progress: SeasonAiGenerationProgress) => void;
+  projection?: {
+    eraProfile: EraSimulationProfile;
+    model: ProjectionModelArtifact;
+  };
 }
 function reportProgress(state: GenerationState, progress: SeasonAiGenerationProgress): void {
   try {
@@ -2387,6 +2391,37 @@ function bestRosterFromPool(state: GenerationState, team: PoolTeam): string[] | 
       : null,
   );
 }
+function bestRosterFromPoolProjection(
+  state: GenerationState,
+  team: PoolTeam,
+  eraProfile: EraSimulationProfile,
+  model: ProjectionModelArtifact,
+): string[] | null {
+  const anchors = team.anchors.map((anchor) => anchor.playerVersionId);
+  let search: ReturnType<typeof searchRosterRotationCandidates>;
+  try {
+    search = searchRosterRotationCandidates({
+      catalog: state.catalog,
+      locked: anchors,
+      available: team.pool,
+      seed: seasonDigestHex(`${state.seed} ai-projection ${team.franchiseId}`),
+      eraProfile,
+      model,
+      caps: { completeCandidates: 8, rotationsPerRoster: 8 },
+    });
+  } catch {
+    return null;
+  }
+  for (const candidate of search.ranked) {
+    const ids = candidate.projection.minutes.map((row) => row.playerVersionId);
+    if (ids.length !== 10) continue;
+    if (!anchors.every((anchor) => ids.includes(anchor))) continue;
+    if (!rosterLegal(state, team, ids)) continue;
+    if (!rosterOutlierBudgetOk(state, team, ids)) continue;
+    return [...ids];
+  }
+  return null;
+}
 function selectRosters(state: GenerationState): void {
   const teamCount = Math.max(1, state.teamOrder.length);
   const perTeam = Math.max(150, Math.floor(budgetForPhase(state, 'selection') / teamCount));
@@ -2395,7 +2430,12 @@ function selectRosters(state: GenerationState): void {
     const team = state.teams.get(teamId);
     if (team === undefined) continue;
     state.selectionFloor = state.nodesByPhase.selection + perTeam;
-    const ten = bestRosterFromPool(state, team);
+    const projection = state.projection;
+    const projected =
+      projection === undefined
+        ? null
+        : bestRosterFromPoolProjection(state, team, projection.eraProfile, projection.model);
+    const ten = projected ?? bestRosterFromPool(state, team);
     if (ten === null) {
       throw exhausted(
         state,
@@ -2808,6 +2848,7 @@ export function generateAiLeague(input: SeasonAiGenerationInput): SeasonLeagueGe
     bans: new Set(),
     assignments,
     onProgress: input.onProgress,
+    ...(input.projection !== undefined ? { projection: input.projection } : {}),
   };
   reportProgress(state, { phase: 'scouting', completed: 1, total: 1 });
   matchGuaranteedAnchors(state);
