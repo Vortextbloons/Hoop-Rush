@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   SEASON_WORKER_WIRE_SCHEMA_VERSION,
-  SEASON_WORKER_WIRE_SCHEMA_VERSION_V8,
-  SEASON_WORKER_WIRE_SCHEMA_VERSION_V9,
   seasonWorkerMessageSchema,
   seasonWorkerProgressMessageSchema,
 } from './season-worker.ts';
@@ -44,10 +42,8 @@ function validProgress(overrides: Record<string, unknown> = {}) {
 }
 
 describe('season worker wire v10', () => {
-  it('bumps the wire version to 10 and keeps v8/v9 legacy constants', () => {
+  it('pins the wire version to 10', () => {
     expect(SEASON_WORKER_WIRE_SCHEMA_VERSION).toBe(10);
-    expect(SEASON_WORKER_WIRE_SCHEMA_VERSION_V8).toBe(8);
-    expect(SEASON_WORKER_WIRE_SCHEMA_VERSION_V9).toBe(9);
   });
 
   it('parses a valid v10 progress message with human results and league pulse', () => {

@@ -5,7 +5,6 @@ import { seasonCompactInjuryEventSchema } from './season-health.ts';
 import { seasonGameSimulationResultSchema } from './season-game-simulation.ts';
 import { seasonEffectsRollupSchema, seasonMechanismEvidenceSchema } from './season-effects.ts';
 import {
-  SEASON_GAME_SUMMARY_LEGACY_VERSION,
   SEASON_GAME_SUMMARY_VERSION,
 } from './season-versions.ts';
 export const seasonCompactPlayerLineSchema = z.object({
@@ -54,10 +53,7 @@ export type SeasonTeamBox = z.infer<typeof seasonTeamBoxSchema>;
 export const seasonGameSummarySchema = z
   .object({
     schemaVersion: z.literal(1),
-    summaryVersion: z.union([
-      z.literal(SEASON_GAME_SUMMARY_VERSION),
-      z.literal(SEASON_GAME_SUMMARY_LEGACY_VERSION),
-    ]),
+    summaryVersion: z.literal(SEASON_GAME_SUMMARY_VERSION),
     gameId: seasonGameIdSchema,
     round: z.number().int().min(1).max(82),
     homeFranchiseId: franchiseIdSchema,

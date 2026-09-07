@@ -25,8 +25,6 @@ import { seasonBlockRunContextSchema } from './season-run.ts';
 import { seasonScheduleSchema } from './season-schedule.ts';
 import { seasonTransactionEntrySchema } from './season-transactions.ts';
 export const SEASON_WORKER_WIRE_SCHEMA_VERSION = 10 as const;
-export const SEASON_WORKER_WIRE_SCHEMA_VERSION_V8 = 8 as const;
-export const SEASON_WORKER_WIRE_SCHEMA_VERSION_V9 = 9 as const;
 export const seasonScorelineSchema = z.object({
   gameId: seasonGameIdSchema,
   homeFranchiseId: franchiseIdSchema,

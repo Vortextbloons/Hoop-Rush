@@ -2,10 +2,6 @@ import { z } from 'zod';
 import { franchiseIdSchema } from './ids.ts';
 import {
   SEASON_CHALLENGE_VERSION,
-  SEASON_CHALLENGE_VERSION_V1,
-  SEASON_CHALLENGE_VERSION_V2,
-  SEASON_OBJECTIVE_VERSION_V1,
-  SEASON_OBJECTIVE_VERSION_V2,
 } from './season-versions.ts';
 
 export const seasonChallengeIdSchema = z.enum([
@@ -236,13 +232,7 @@ export type SeasonBlockChallengeEvaluation = z.infer<typeof seasonBlockChallenge
 export const seasonChallengeStateSchema = z
   .object({
     schemaVersion: z.literal(1),
-    challengeVersion: z.union([
-      z.literal(SEASON_CHALLENGE_VERSION),
-      z.literal(SEASON_CHALLENGE_VERSION_V2),
-      z.literal(SEASON_CHALLENGE_VERSION_V1),
-      z.literal(SEASON_OBJECTIVE_VERSION_V2),
-      z.literal(SEASON_OBJECTIVE_VERSION_V1),
-    ]),
+    challengeVersion: z.literal(SEASON_CHALLENGE_VERSION),
     catalog: z.array(seasonChallengeDefinitionSchema).length(8),
     deals: z.record(z.coerce.number().int().min(0).max(7), seasonChallengeDealSchema),
     evaluations: z.array(seasonBlockChallengeEvaluationSchema),

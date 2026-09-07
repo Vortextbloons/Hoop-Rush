@@ -35,9 +35,7 @@ export function envelopeToDraftCommand(
     case 'draw-season-offer':
     case 'select-draft-player':
     case 'finalize-human-rosters':
-    case 'generate-ai-league':
-    case 'reveal-draft-roll':
-    case 'claim-draft-pool': {
+    case 'generate-ai-league': {
       const parsed = seasonDraftCommandPayloadSchema.safeParse(raw);
       if (!parsed.success) return null;
       return {

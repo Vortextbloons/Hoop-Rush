@@ -8,8 +8,6 @@ import {
 import { playerVersionIdSchema } from './season-identity.ts';
 import {
   SEASON_FREE_AGENCY_VERSION,
-  SEASON_FREE_AGENCY_VERSION_V1,
-  SEASON_FREE_AGENCY_VERSION_V2,
 } from './season-versions.ts';
 export const seasonFreeAgencyBandSchema = z.enum(['featured', 'role', 'development', 'emergency']);
 export type SeasonFreeAgencyBand = z.infer<typeof seasonFreeAgencyBandSchema>;

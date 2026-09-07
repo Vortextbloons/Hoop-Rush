@@ -672,16 +672,12 @@ export function applySeasonDraftCommand(
   }
   if (state === null) {
     if (command.payload.kind !== 'create-season-draft') {
-      const errorCode: SeasonDraftErrorCode =
-        command.payload.kind === 'reveal-draft-roll' || command.payload.kind === 'claim-draft-pool'
-          ? 'UNSUPPORTED_COMMAND'
-          : 'INVALID_CATALOG';
       return {
         state: null,
         record: rejectedRecord(
           null,
           command,
-          errorCode,
+          'INVALID_CATALOG',
           'no draft exists; only create-season-draft is accepted',
         ),
         generation: null,
@@ -719,18 +715,6 @@ export function applySeasonDraftCommand(
       );
       return { state: withLog(validatedState, record), record, generation: null };
     }
-    case 'reveal-draft-roll':
-    case 'claim-draft-pool':
-      return {
-        state: validatedState,
-        record: rejectedRecord(
-          validatedState,
-          command,
-          'UNSUPPORTED_COMMAND',
-          'season-draft-v1 reveal/claim commands are not supported by season-draft-v2',
-        ),
-        generation: null,
-      };
     case 'draw-season-offer':
       return drawOffer(validatedState, validatedCatalog, command);
     case 'select-draft-player':

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { franchiseIdSchema } from './ids.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
-import { SEASON_STAMINA_LEGACY_VERSION, SEASON_STAMINA_VERSION } from './season-versions.ts';
+import { SEASON_STAMINA_VERSION } from './season-versions.ts';
 export const seasonMechanismSchema = z.enum([
   'shooter-fatigue',
   'handler-fatigue',
@@ -18,10 +18,7 @@ export const seasonStaminaInputSchema = z.object({
   playerVersionId: playerVersionIdSchema,
   rating: z.number().int().min(45).max(95),
   historicalMpg: z.number().min(0).max(60),
-  derivationVersion: z.union([
-    z.literal(SEASON_STAMINA_VERSION),
-    z.literal(SEASON_STAMINA_LEGACY_VERSION),
-  ]),
+  derivationVersion: z.literal(SEASON_STAMINA_VERSION),
 });
 export type SeasonStaminaInput = z.infer<typeof seasonStaminaInputSchema>;
 export const seasonPlayerLoadStateSchema = z.object({

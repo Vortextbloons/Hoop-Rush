@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { eraIdSchema, franchiseIdSchema, seedSchema } from './ids.ts';
+import { franchiseIdSchema, seedSchema } from './ids.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
-import { SEASON_DRAFT_LEGACY_VERSION, SEASON_DRAFT_VERSION } from './season-versions.ts';
+import { SEASON_DRAFT_VERSION } from './season-versions.ts';
 import { seasonLeagueSchema } from './season-league.ts';
 import { seasonDraftCommandRecordSchema } from './season-draft-command.ts';
 import { seasonFrontOfficeIdSchema } from './season-evolution.ts';
@@ -51,58 +51,5 @@ export const seasonDraftStateSchema = z.object({
     .optional(),
 });
 export type SeasonDraftState = z.infer<typeof seasonDraftStateSchema>;
-export const seasonDraftRollAttemptSchema = z.object({
-  franchiseId: franchiseIdSchema,
-  eraId: eraIdSchema,
-  attemptIndex: z.number().int().nonnegative(),
-  usable: z.boolean(),
-});
-export type SeasonDraftRollAttempt = z.infer<typeof seasonDraftRollAttemptSchema>;
-export const seasonDraftRevealSchema = z.object({
-  participantId: z.string().min(1).max(64),
-  round: z.number().int().min(1).max(10),
-  pickOrdinal: z.number().int().min(1).max(10),
-  attempts: z.array(seasonDraftRollAttemptSchema).min(1),
-});
-export type SeasonDraftReveal = z.infer<typeof seasonDraftRevealSchema>;
-export const seasonDraftClaimSchema = z.object({
-  participantId: z.string().min(1).max(64),
-  franchiseId: franchiseIdSchema,
-  eraId: eraIdSchema,
-});
-export type SeasonDraftClaim = z.infer<typeof seasonDraftClaimSchema>;
-export const seasonDraftLegacyPickSchema = z.object({
-  participantId: z.string().min(1).max(64),
-  round: z.number().int().min(1).max(10),
-  pickOrdinal: z.number().int().min(1).max(10),
-  playerVersionId: playerVersionIdSchema,
-  franchiseId: franchiseIdSchema,
-  eraId: eraIdSchema,
-  rollAttempts: z.number().int().positive(),
-});
-export type SeasonDraftLegacyPick = z.infer<typeof seasonDraftLegacyPickSchema>;
-export const seasonDraftLegacyStateSchema = z.object({
-  schemaVersion: z.literal(1),
-  draftVersion: z.literal(SEASON_DRAFT_LEGACY_VERSION),
-  runId: z.string().min(1).max(64),
-  rootSeed: seedSchema,
-  league: seasonLeagueSchema,
-  catalogVersion: z.literal(SEASON_DRAFT_LEGACY_VERSION),
-  participants: z.array(seasonDraftParticipantSchema).min(1).max(2),
-  firstPickParticipantId: z.string().min(1).max(64),
-  round: z.number().int().min(1).max(10),
-  currentTurnParticipantId: z.string().min(1).max(64).nullable(),
-  status: seasonDraftStatusSchema,
-  revision: z.number().int().nonnegative(),
-  currentReveal: seasonDraftRevealSchema.nullable(),
-  rolls: z.array(seasonDraftRollAttemptSchema),
-  claims: z.array(seasonDraftClaimSchema),
-  picks: z.array(seasonDraftLegacyPickSchema),
-  commandLog: z.array(seasonDraftCommandRecordSchema),
-});
-export type SeasonDraftLegacyState = z.infer<typeof seasonDraftLegacyStateSchema>;
-export const storedSeasonDraftStateSchema = z.discriminatedUnion('schemaVersion', [
-  seasonDraftStateSchema,
-  seasonDraftLegacyStateSchema,
-]);
+export const storedSeasonDraftStateSchema = seasonDraftStateSchema;
 export type StoredSeasonDraftState = z.infer<typeof storedSeasonDraftStateSchema>;

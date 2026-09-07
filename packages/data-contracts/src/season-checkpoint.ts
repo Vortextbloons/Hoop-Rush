@@ -83,7 +83,7 @@ export const seasonCheckpointVersionsSchema = z.object({
     z.literal(SEASON_AGGREGATES_VERSION),
     z.literal(SEASON_AGGREGATES_LEGACY_VERSION),
   ]),
-  recapVersion: z.union([z.literal(SEASON_RECAP_VERSION), z.literal(SEASON_RECAP_VERSION_V5)]),
+  recapVersion: z.literal(SEASON_RECAP_VERSION),
   leadersVersion: z.literal(SEASON_LEADERS_VERSION),
   homeCourtVersion: z.literal(SEASON_HOME_COURT_VERSION),
   gameVersion: z.literal(SEASON_GAME_VERSION),

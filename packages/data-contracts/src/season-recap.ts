@@ -121,7 +121,7 @@ export const seasonUpcomingHumanGameSchema = z.object({
 export type SeasonUpcomingHumanGame = z.infer<typeof seasonUpcomingHumanGameSchema>;
 export const seasonBlockRecapSchema = z.object({
   schemaVersion: z.literal(1),
-  recapVersion: z.union([z.literal(SEASON_RECAP_VERSION), z.literal(SEASON_RECAP_VERSION_V5)]),
+  recapVersion: z.literal(SEASON_RECAP_VERSION),
   runId: z.string().min(1).max(64),
   blockIndex: z.number().int().min(0).max(8),
   completedRounds: z.number().int().min(0).max(82),

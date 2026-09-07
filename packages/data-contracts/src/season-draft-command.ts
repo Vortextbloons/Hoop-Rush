@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { eraIdSchema, franchiseIdSchema, seedSchema } from './ids.ts';
+import { seedSchema } from './ids.ts';
 import { seasonCheckpointDigestSchema } from './season-digests.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import { seasonFrontOfficeIdSchema } from './season-evolution.ts';
@@ -11,8 +11,6 @@ export const seasonDraftCommandKindSchema = z.enum([
   'select-draft-player',
   'finalize-human-rosters',
   'generate-ai-league',
-  'reveal-draft-roll',
-  'claim-draft-pool',
   'select-draft-front-office',
 ]);
 export type SeasonDraftCommandKind = z.infer<typeof seasonDraftCommandKindSchema>;
@@ -39,16 +37,6 @@ export const finalizeHumanRostersPayloadSchema = z.object({
 export const generateAiLeaguePayloadSchema = z.object({
   kind: z.literal('generate-ai-league'),
 });
-export const revealDraftRollPayloadSchema = z.object({
-  kind: z.literal('reveal-draft-roll'),
-  participantId: z.string().min(1).max(64),
-});
-export const claimDraftPoolPayloadSchema = z.object({
-  kind: z.literal('claim-draft-pool'),
-  participantId: z.string().min(1).max(64),
-  franchiseId: franchiseIdSchema,
-  eraId: eraIdSchema,
-});
 export const selectDraftFrontOfficePayloadSchema = z.object({
   kind: z.literal('select-draft-front-office'),
   participantId: z.string().min(1).max(64),
@@ -60,8 +48,6 @@ export const seasonDraftCommandPayloadSchema = z.discriminatedUnion('kind', [
   selectDraftPlayerPayloadSchema,
   finalizeHumanRostersPayloadSchema,
   generateAiLeaguePayloadSchema,
-  revealDraftRollPayloadSchema,
-  claimDraftPoolPayloadSchema,
   selectDraftFrontOfficePayloadSchema,
 ]);
 export type SeasonDraftCommandPayload = z.infer<typeof seasonDraftCommandPayloadSchema>;
@@ -81,7 +67,6 @@ export const seasonDraftErrorCodeSchema = z.enum([
   'UNCOMPLETABLE_ROSTER',
   'INVALID_CATALOG',
   'GENERATION_EXHAUSTED',
-  'UNSUPPORTED_COMMAND',
   'UNAVAILABLE_POOL',
   'INVALID_FRONT_OFFICE',
 ]);

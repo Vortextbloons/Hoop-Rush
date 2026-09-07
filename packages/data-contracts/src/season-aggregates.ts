@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { franchiseIdSchema } from './ids.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import {
-  SEASON_AGGREGATES_LEGACY_VERSION,
   SEASON_AGGREGATES_VERSION,
   SEASON_LEADER_DEPTH,
   SEASON_LEADER_MIN_GAME_SHARE,
@@ -142,10 +141,7 @@ export const seasonLeadersSchema = z.object({
 export type SeasonLeaders = z.infer<typeof seasonLeadersSchema>;
 export const seasonAggregatesSchema = z.object({
   schemaVersion: z.literal(1),
-  aggregatesVersion: z.union([
-    z.literal(SEASON_AGGREGATES_VERSION),
-    z.literal(SEASON_AGGREGATES_LEGACY_VERSION),
-  ]),
+  aggregatesVersion: z.literal(SEASON_AGGREGATES_VERSION),
   teams: z.array(seasonTeamAggregateSchema).length(SEASON_TEAM_COUNT),
   players: z
     .array(seasonPlayerAggregateSchema)

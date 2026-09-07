@@ -5,12 +5,9 @@ import { playerVersionIdSchema } from './season-identity.ts';
 import { seasonRosterSchema, seasonOwnershipSchema } from './season-roster.ts';
 import { seasonMinutePolicyStrategySchema, seasonRotationSchema } from './season-rotation.ts';
 import {
-  SEASON_AI_V2,
   SEASON_AI_VERSION,
   SEASON_MINUTE_POLICY_VERSION,
-  SEASON_ROSTER_GENERATION_V2,
   SEASON_ROSTER_GENERATION_VERSION,
-  SEASON_ROSTER_TARGETS_V2,
   SEASON_ROSTER_TARGETS_VERSION,
   SEASON_ROTATION_VERSION,
 } from './season-versions.ts';
@@ -81,11 +78,8 @@ export const seasonRosterEvaluationSchema = z.object({
 export type SeasonRosterEvaluation = z.infer<typeof seasonRosterEvaluationSchema>;
 export const seasonGenerationDiagnosticsSchema = z.object({
   seed: seedSchema,
-  aiVersion: z.union([z.literal(SEASON_AI_V2), z.literal(SEASON_AI_VERSION)]),
-  rosterGenerationVersion: z.union([
-    z.literal(SEASON_ROSTER_GENERATION_V2),
-    z.literal(SEASON_ROSTER_GENERATION_VERSION),
-  ]),
+  aiVersion: z.literal(SEASON_AI_VERSION),
+  rosterGenerationVersion: z.literal(SEASON_ROSTER_GENERATION_VERSION),
   teamsGenerated: z.number().int().nonnegative(),
   teamsRepaired: z.number().int().nonnegative(),
   backtracks: z.number().int().nonnegative(),
@@ -155,11 +149,8 @@ export type SeasonAiPool = z.infer<typeof seasonAiPoolSchema>;
 export const seasonLeagueGenerationResultSchema = z.object({
   schemaVersion: z.literal(2),
   seed: seedSchema,
-  aiVersion: z.union([z.literal(SEASON_AI_V2), z.literal(SEASON_AI_VERSION)]),
-  rosterGenerationVersion: z.union([
-    z.literal(SEASON_ROSTER_GENERATION_V2),
-    z.literal(SEASON_ROSTER_GENERATION_VERSION),
-  ]),
+  aiVersion: z.literal(SEASON_AI_VERSION),
+  rosterGenerationVersion: z.literal(SEASON_ROSTER_GENERATION_VERSION),
   rotationVersion: z.literal(SEASON_ROTATION_VERSION),
   rosters: z.array(seasonRosterSchema).length(30),
   ownership: z.array(seasonOwnershipSchema).length(300),
@@ -204,10 +195,7 @@ export const seasonMeasuredBandSchema = seasonScoreRangeSchema.extend({
 export type SeasonMeasuredBand = z.infer<typeof seasonMeasuredBandSchema>;
 export const seasonRosterTargetsSchema = z.object({
   schemaVersion: z.literal(2),
-  targetsVersion: z.union([
-    z.literal(SEASON_ROSTER_TARGETS_V2),
-    z.literal(SEASON_ROSTER_TARGETS_VERSION),
-  ]),
+  targetsVersion: z.literal(SEASON_ROSTER_TARGETS_VERSION),
   policy: z.object({
     bandQuotas: z.object({
       solo: z.object({
@@ -296,11 +284,8 @@ export const seasonRosterTargetsSchema = z.object({
     calibrationSeedCount: z.number().int().positive(),
     validationSeedCount: z.number().int().positive(),
     generatedAtIso: z.iso.datetime(),
-    aiVersion: z.union([z.literal(SEASON_AI_V2), z.literal(SEASON_AI_VERSION)]),
-    rosterGenerationVersion: z.union([
-      z.literal(SEASON_ROSTER_GENERATION_V2),
-      z.literal(SEASON_ROSTER_GENERATION_VERSION),
-    ]),
+    aiVersion: z.literal(SEASON_AI_VERSION),
+    rosterGenerationVersion: z.literal(SEASON_ROSTER_GENERATION_VERSION),
     gates: z.object({
       failureRateMax: z.literal(0),
       minBandSeparation: z.literal(3),

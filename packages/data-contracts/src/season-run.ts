@@ -202,7 +202,7 @@ export const seasonDraftFactsSchema = z.discriminatedUnion('draftVersion', [
 export type SeasonDraftFacts = z.infer<typeof seasonDraftFactsSchema>;
 export const seasonGenerationAuditSchema = z.object({
   seed: seedSchema,
-  aiVersion: z.union([z.literal(SEASON_AI_V2), z.literal(SEASON_AI_VERSION)]),
+  aiVersion: z.literal(SEASON_AI_V2),
   rosterGenerationVersion: z.union([
     z.literal(SEASON_ROSTER_GENERATION_V2),
     z.literal(SEASON_ROSTER_GENERATION_VERSION),
@@ -243,13 +243,13 @@ export const seasonRunVersionsSchema = z.object({
   postseasonVersion: z.literal(SEASON_POSTSEASON_VERSION),
   seedDerivationVersion: z.literal(SEASON_SEED_DERIVATION_VERSION),
   playerVersionIdVersion: z.literal(PLAYER_VERSION_ID_VERSION),
-  draftVersion: z.union([z.literal(SEASON_DRAFT_VERSION), z.literal(SEASON_DRAFT_LEGACY_VERSION)]),
+  draftVersion: z.literal(SEASON_DRAFT_VERSION),
   rosterRulesVersion: z.literal(SEASON_ROSTER_RULES_VERSION),
   rosterGenerationVersion: z.union([
     z.literal(SEASON_ROSTER_GENERATION_V2),
     z.literal(SEASON_ROSTER_GENERATION_VERSION),
   ]),
-  aiVersion: z.union([z.literal(SEASON_AI_V2), z.literal(SEASON_AI_VERSION)]),
+  aiVersion: z.literal(SEASON_AI_V2),
   rotationVersion: z.literal(SEASON_ROTATION_VERSION),
   minutePolicyVersion: z.literal(SEASON_MINUTE_POLICY_VERSION),
   rotationPlannerVersion: z.literal(SEASON_ROTATION_PLANNER_VERSION),
@@ -272,7 +272,7 @@ export const seasonRunVersionsSchema = z.object({
     z.literal(SEASON_AGGREGATES_VERSION),
     z.literal(SEASON_AGGREGATES_LEGACY_VERSION),
   ]),
-  recapVersion: z.union([z.literal(SEASON_RECAP_VERSION), z.literal(SEASON_RECAP_VERSION_V5)]),
+  recapVersion: z.literal(SEASON_RECAP_VERSION),
   leadersVersion: z.literal(SEASON_LEADERS_VERSION),
   homeCourtVersion: z.literal(SEASON_HOME_COURT_VERSION),
   checkpointVersion: z.union([
@@ -341,7 +341,7 @@ export const seasonRunVersionsSchema = z.object({
     z.literal(SEASON_COMMAND_LOG_VERSION_V2),
     z.literal(SEASON_COMMAND_LOG_VERSION_V1),
   ]),
-  almanacVersion: z.union([z.literal(SEASON_ALMANAC_VERSION), z.literal('almanac-v1')]),
+  almanacVersion: z.literal(SEASON_ALMANAC_VERSION),
   replayExportVersion: z.union([
     z.literal(SEASON_REPLAY_EXPORT_VERSION),
     z.literal(SEASON_REPLAY_EXPORT_VERSION_V2),

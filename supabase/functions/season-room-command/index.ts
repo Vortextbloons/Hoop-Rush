@@ -23,8 +23,6 @@ const ALLOWED_KINDS = new Set([
   'select-draft-player',
   'finalize-human-rosters',
   'generate-ai-league',
-  'reveal-draft-roll',
-  'claim-draft-pool',
   'room-draft-pick',
 ]);
 

@@ -3,8 +3,6 @@ import { commandIdSchema, franchiseIdSchema, idSchema } from './ids.ts';
 import { injuryIdSchema } from './season-health.ts';
 import {
   SEASON_INFLUENCE_VERSION,
-  SEASON_INFLUENCE_VERSION_V1,
-  SEASON_INFLUENCE_VERSION_V2,
 } from './season-versions.ts';
 export const seasonInfluenceSourceSchema = z.enum([
   'initial-grant',
@@ -54,11 +52,7 @@ export const SEASON_INFLUENCE_FLOOR = 0;
 export const seasonInfluenceStateSchema = z
   .object({
     schemaVersion: z.literal(1),
-    influenceVersion: z.union([
-      z.literal(SEASON_INFLUENCE_VERSION),
-      z.literal(SEASON_INFLUENCE_VERSION_V2),
-      z.literal(SEASON_INFLUENCE_VERSION_V1),
-    ]),
+    influenceVersion: z.literal(SEASON_INFLUENCE_VERSION),
     balances: z.record(
       franchiseIdSchema,
       z.number().int().min(SEASON_INFLUENCE_FLOOR).max(SEASON_INFLUENCE_CAP),

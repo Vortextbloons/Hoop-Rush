@@ -4,8 +4,6 @@ import { seasonCheckpointDigestSchema } from './season-digests.ts';
 import { seasonRunCommandHistorySchema } from './season-commands.ts';
 import {
   SEASON_COMMAND_LOG_VERSION,
-  SEASON_COMMAND_LOG_VERSION_V1,
-  SEASON_COMMAND_LOG_VERSION_V2,
 } from './season-versions.ts';
 import { canonicalJson, seasonDigestHex } from './season-hash.ts';
 export const seasonCommandActorSourceSchema = z.enum(['human', 'timeout-default', 'ai-takeover']);
@@ -48,11 +46,7 @@ export const seasonCommandLogEntrySchema = z
 export type SeasonCommandLogEntry = z.infer<typeof seasonCommandLogEntrySchema>;
 export const seasonCommandLogSchema = z.object({
   schemaVersion: z.literal(1),
-  commandLogVersion: z.union([
-    z.literal(SEASON_COMMAND_LOG_VERSION),
-    z.literal(SEASON_COMMAND_LOG_VERSION_V2),
-    z.literal(SEASON_COMMAND_LOG_VERSION_V1),
-  ]),
+  commandLogVersion: z.literal(SEASON_COMMAND_LOG_VERSION),
   runId: z.string().min(1).max(64),
   entries: z.array(seasonCommandLogEntrySchema),
 });

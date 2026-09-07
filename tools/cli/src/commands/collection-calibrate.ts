@@ -259,29 +259,43 @@ function genesisRecords(
   commands: CollectionCommand[];
 } {
   const sorted = [...ownedIds].sort();
-  const slots = sorted.map((cardId, slotIndex) => {
-    const card = catalog.cards.find((entry) => entry.cardId === cardId);
-    if (card === undefined) throw new Error(`genesis references unknown ${cardId}`);
-    return {
-      slotIndex,
-      cardId: card.cardId,
-      rarity: card.rarity,
-      kept: true,
-      conversionAmount: 0,
-    };
-  });
-  const pull = collectionPullRecordSchema.parse({
-    pullSequence: 0,
-    kind: 'pack',
-    packId: 'tip-off',
-    packRulesVersion: COLLECTION_PACK_RULES_VERSION,
-    economyVersion: 'collection-economy-v1',
-    catalogVersion: 'collection-catalog-v1',
-    catalogHash,
-    commandId: 'calibration-genesis',
-    seedPath: ['collection', 'calibration', 'genesis'],
-    slots,
-  });
+  const pulls: CollectionPullRecord[] = [];
+  const owned: CollectionState['owned'] = [];
+  const CHUNK = 10;
+  for (let chunk = 0; chunk * CHUNK < sorted.length; chunk += 1) {
+    const members = sorted.slice(chunk * CHUNK, chunk * CHUNK + CHUNK);
+    const slots = members.map((cardId, slotIndex) => {
+      const card = catalog.cards.find((entry) => entry.cardId === cardId);
+      if (card === undefined) throw new Error(`genesis references unknown ${cardId}`);
+      owned.push({
+        cardId: card.cardId,
+        acquiredPullSequence: chunk,
+        acquiredSlotIndex: slotIndex,
+        acquiredAtIso: AT_ISO,
+      });
+      return {
+        slotIndex,
+        cardId: card.cardId,
+        rarity: card.rarity,
+        kept: true,
+        conversionAmount: 0,
+      };
+    });
+    pulls.push(
+      collectionPullRecordSchema.parse({
+        pullSequence: chunk,
+        kind: 'pack',
+        packId: 'tip-off',
+        packRulesVersion: COLLECTION_PACK_RULES_VERSION,
+        economyVersion: 'collection-economy-v1',
+        catalogVersion: 'collection-catalog-v1',
+        catalogHash,
+        commandId: 'calibration-genesis',
+        seedPath: ['collection', 'calibration', 'genesis', String(chunk)],
+        slots,
+      }),
+    );
+  }
   const grant = collectionLedgerEntrySchema.parse({
     transactionId: `txn-${'0'.repeat(32)}`,
     commandId: 'calibration-genesis',
@@ -290,6 +304,7 @@ function genesisRecords(
     amount: 3000,
     reason: 'welcome-grant',
   });
+  const chunks = pulls.length;
   const state = collectionStateSchema.parse({
     schemaVersion: 1,
     collectionVersion: 'collection-v1',
@@ -297,17 +312,12 @@ function genesisRecords(
     economyVersion: 'collection-economy-v1',
     collectionId: 'calibration',
     rootSeed,
-    revision: 1,
+    revision: chunks,
     digest: '0'.repeat(32),
     claimedWelcome: true,
-    owned: sorted.map((cardId, index) => ({
-      cardId,
-      acquiredPullSequence: 0,
-      acquiredSlotIndex: index,
-      acquiredAtIso: AT_ISO,
-    })),
+    owned,
     balances: { Coins: 3000, Exchange: 0 },
-    nextPullSequence: 1,
+    nextPullSequence: chunks,
   });
   const digest = collectionStateDigest({
     collectionId: state.collectionId,
@@ -319,7 +329,7 @@ function genesisRecords(
     catalogVersion: state.catalogVersion,
     economyVersion: state.economyVersion,
   });
-  return { state: { ...state, digest }, pulls: [pull], ledger: [grant], commands: [] };
+  return { state: { ...state, digest }, pulls, ledger: [grant], commands: [] };
 }
 
 function runOwnershipCohort(

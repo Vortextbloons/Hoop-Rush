@@ -17,7 +17,6 @@ import {
   SEASON_GAME_TARGETS_VERSION,
   SEASON_GAME_VERSION,
   SEASON_ROTATION_PLANNER_VERSION,
-  SEASON_ROTATION_V2,
   SEASON_ROTATION_VERSION,
 } from './season-versions.ts';
 export const seasonRotationPresetSchema = z.enum(['balanced', 'tight', 'bench-heavy']);
@@ -449,7 +448,7 @@ export const seasonGameTargetsSchema = z.object({
   targetsVersion: z.literal(SEASON_GAME_TARGETS_VERSION),
   gameVersion: z.literal(SEASON_GAME_VERSION),
   plannerVersion: z.literal(SEASON_ROTATION_PLANNER_VERSION),
-  rotationVersion: z.union([z.literal(SEASON_ROTATION_VERSION), z.literal(SEASON_ROTATION_V2)]),
+  rotationVersion: z.literal(SEASON_ROTATION_VERSION),
   calibration: z.object({
     calibrationSeedCount: z.number().int().positive(),
     validationSeedCount: z.number().int().positive(),
