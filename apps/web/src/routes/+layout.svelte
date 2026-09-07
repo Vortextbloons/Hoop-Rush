@@ -3,7 +3,7 @@
   import { asset, resolve } from '$app/paths';
   import { page } from '$app/state';
   import type { RouteId } from '$app/types';
-  import { Home, Layers, Users, Swords } from '@lucide/svelte';
+  import { ArrowLeft, Home, Users, Swords } from '@lucide/svelte';
   import '../app.css';
   import { ModeWatcher } from 'mode-watcher';
   import { Toaster } from 'svelte-sonner';
@@ -15,7 +15,6 @@
   const navItems: NavItem[] = [
     { id: 'home', label: 'Home', href: '/', icon: Home },
     { id: 'roster', label: 'Roster', href: '/roster', icon: Users },
-    { id: 'collection', label: 'Ultimate Run', href: '/collection', icon: Layers },
     { id: 'multiplayer', label: 'Multiplayer', href: '/multiplayer', icon: Swords },
   ];
   const routeId = $derived(page.route.id);
@@ -23,11 +22,7 @@
   const isUltimate =
     $derived(routeId === '/collection' || routeId?.startsWith('/collection/') === true);
   const showBottomNav = $derived(
-    routeId === '/' ||
-      routeId === '/roster' ||
-      routeId === '/collection' ||
-      routeId?.startsWith('/collection/') === true ||
-      routeId === '/multiplayer',
+    routeId === '/' || routeId === '/roster' || routeId === '/multiplayer',
   );
   $effect(() => {
     if (!browser || isMultiplayerLobby) return;
@@ -67,7 +62,16 @@
         Hoop <span class={isUltimate ? 'text-accent' : 'text-primary'}>Rush</span>
       </span>
     </a>
-    {#if showBottomNav}
+    {#if isUltimate}
+      <a
+        href={homeHref}
+        aria-label="Back to home"
+        class="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-muted-foreground outline-none transition-colors hover:bg-surface-2 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <ArrowLeft class="h-4 w-4 shrink-0" />
+        Back
+      </a>
+    {:else if showBottomNav}
       <nav aria-label="Main navigation" class="hidden items-center gap-1 md:flex">
         {#each navItems as item (item.id)}
           {@const active = isActive(item)}
