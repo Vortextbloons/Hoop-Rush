@@ -157,8 +157,9 @@ export function manifestPath(): string {
 export const SCHEMA_VERSION = POOL_SCHEMA_VERSION;
 export const MIN_TEAM_GAMES = 40;
 export const DATA_VERSION = 'm12-ratings-v3.10';
-export const CONFIDENCE_POLICY_VERSION = 'policy-v1';
+export const CONFIDENCE_POLICY_VERSION = 'policy-v2';
 export const MAX_LOW_CONFIDENCE_SHARE = 0.4;
+export const MAX_LOW_CONFIDENCE_PLAYER_SHARE = 0.25;
 export {
   POSITION_NORMALIZATION_VERSION,
   RATINGS_VERSION,
@@ -1282,10 +1283,15 @@ export function computePool(
   const policyFailures = playersOut.filter(
     (p) => playerLowConfidenceShare(p) > MAX_LOW_CONFIDENCE_SHARE,
   );
-  if (policyFailures.length > 0) {
+  // policy-v2: per-player honesty (derive-v11 labels sub-200-minute and
+  // prior-only evidence as low) must not let a thin tail veto an otherwise
+  // evidence-backed pool. The pool fails only when trippers are more than a
+  // quarter of membership; a majority-thin pool still fails as before.
+  const policyFailureShare = playersOut.length > 0 ? policyFailures.length / playersOut.length : 0;
+  if (policyFailureShare > MAX_LOW_CONFIDENCE_PLAYER_SHARE) {
     return failure(
       'confidence-failed',
-      `${String(policyFailures.length)} players exceed the low-confidence share under ${CONFIDENCE_POLICY_VERSION}`,
+      `${String(policyFailures.length)} of ${String(playersOut.length)} players exceed the low-confidence share under ${CONFIDENCE_POLICY_VERSION}`,
     );
   }
   if (withAssets) {

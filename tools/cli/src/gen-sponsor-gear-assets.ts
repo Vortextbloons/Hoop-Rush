@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -35,11 +35,25 @@ function monogramSvg(displayName: string, tier: SeasonSponsorTier): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="${displayName} placeholder mark"><rect x="2" y="2" width="92" height="92" rx="20" fill="#141a24" stroke="${ring}" stroke-width="5"/><text x="48" y="60" text-anchor="middle" font-family="system-ui, sans-serif" font-weight="700" font-size="${String(fontSize)}" fill="${ring}">${initials}</text></svg>\n`;
 }
 
+const LOGO_EXTENSIONS = ['svg', 'png', 'webp', 'jpg'] as const;
+
+function existingLogoFile(family: string): string | null {
+  for (const ext of LOGO_EXTENSIONS) {
+    if (existsSync(resolve(SPONSORS_DIR, `${family}.${ext}`))) return `sponsors/${family}.${ext}`;
+  }
+  return null;
+}
+
 function main(): void {
   mkdirSync(SPONSORS_DIR, { recursive: true });
   const logos = [...SEASON_SPONSOR_GEAR_CATALOG]
     .sort((a, b) => (a.brandFamily < b.brandFamily ? -1 : 1))
     .map((entry) => {
+      const kept = existingLogoFile(entry.brandFamily);
+      if (kept !== null) {
+        const bytes = readFileSync(resolve(STATIC_DATA, kept));
+        return { family: entry.brandFamily, file: kept, contentHash: sha256Hex(bytes) };
+      }
       const file = `sponsors/${entry.brandFamily}.svg`;
       const bytes = monogramSvg(entry.displayName, entry.tier);
       writeFileSync(resolve(STATIC_DATA, file), bytes);

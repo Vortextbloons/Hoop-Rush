@@ -139,13 +139,13 @@ function confidenceForSample(
   minutes: number,
   evidenceQuality: 'full' | 'partial' | 'prior' = 'full',
 ): Confidence {
-  let confidence = confidenceFor(kind);
   if (evidenceQuality === 'prior') return 'low';
   if (games < 10 || minutes < 200) return 'low';
-  if (evidenceQuality === 'partial' || games < 30 || minutes < 750) {
-    if (confidence === 'high') confidence = 'medium';
-    else confidence = 'low';
+  const confidence = confidenceFor(kind);
+  if (evidenceQuality === 'partial') {
+    return confidence === 'high' ? 'medium' : confidence;
   }
+  if (confidence === 'high' && (games < 30 || minutes < 750)) return 'medium';
   return confidence;
 }
 interface SeasonTotals {

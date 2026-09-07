@@ -912,6 +912,54 @@ describe('computePool error and skip paths', () => {
       ),
     ).toBe(true);
   });
+  it('policy-v2 keeps a pool available when only a thin tail trips the low-confidence bar', () => {
+    const root = buildStandardFixture('policy-tail');
+    const rosterPath = join(root.nba, '1991-92', 'roster.json');
+    const roster = readJson(rosterPath) as Array<Record<string, unknown>>;
+    const tail = roster.find((player) => player.externalId === '8');
+    if (tail === undefined) throw new Error('fixture player 8 missing');
+    const lowProvenance: Record<string, unknown> = {};
+    for (const field of [...Object.keys(FULL_RATINGS_60), ...Object.keys(FULL_TENDENCIES)]) {
+      lowProvenance[field] = {
+        kind: 'estimated',
+        confidence: 'low',
+        methodVersion: 'derive-v11',
+        sourceVersion: 'source-v1',
+        sourceFields: ['prior'],
+      };
+    }
+    tail.provenance = lowProvenance;
+    writeJson(rosterPath, roster);
+    const pool = computePool('lakers', '1990s', fixtureManifest(), BBREF_IDS, false);
+    if ('reason' in pool) throw new Error(`expected pool, got ${pool.reason}: ${pool.detail}`);
+    expect(pool.coverageSummary.policyVersion).toBe(CONFIDENCE_POLICY_VERSION);
+    expect(pool.players.map((player) => player.playerExternalId)).toContain('8');
+  });
+  it('policy-v2 fails a pool when low-confidence players are more than a quarter of membership', () => {
+    const root = buildStandardFixture('policy-majority');
+    for (const season of ['1991-92', '1992-93']) {
+      const rosterPath = join(root.nba, season, 'roster.json');
+      const roster = readJson(rosterPath) as Array<Record<string, unknown>>;
+      for (const player of roster) {
+        const lowProvenance: Record<string, unknown> = {};
+        for (const field of [...Object.keys(FULL_RATINGS_60), ...Object.keys(FULL_TENDENCIES)]) {
+          lowProvenance[field] = {
+            kind: 'estimated',
+            confidence: 'low',
+            methodVersion: 'derive-v11',
+            sourceVersion: 'source-v1',
+            sourceFields: ['prior'],
+          };
+        }
+        player.provenance = lowProvenance;
+      }
+      writeJson(rosterPath, roster);
+    }
+    const pool = computePool('lakers', '1990s', fixtureManifest(), BBREF_IDS, false);
+    if (!('reason' in pool)) throw new Error('expected a confidence-failed pool build failure');
+    expect(pool.reason).toBe('confidence-failed');
+    expect(pool.detail).toContain('policy-v2');
+  });
 });
 describe('loadBbrefIds', () => {
   it('warns and returns {} when the cache file is missing', () => {

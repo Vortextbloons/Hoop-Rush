@@ -7,7 +7,6 @@ import type { PeakPlayerSeason } from '@hoop-rush/data-contracts';
 import {
   POSITION_NORMALIZATION_VERSION,
   SEASON_ROTATION_VERSION,
-  SEASON_ROTATION_VERSION,
   SEASON_SPONSOR_GEAR_CATALOG,
   SEASON_SPONSOR_GEAR_VERSION,
   contentHashSchema,
