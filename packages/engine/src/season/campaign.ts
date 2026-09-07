@@ -87,7 +87,7 @@ function opportunityId(
     ),
   );
 }
-const CAMPAIGN_TEMPLATES: readonly CampaignTemplate[] = [
+const createCampaignTemplates = (): readonly CampaignTemplate[] => [
   {
     templateId: hexId(
       'ctpl',
@@ -97,7 +97,12 @@ const CAMPAIGN_TEMPLATES: readonly CampaignTemplate[] = [
     family: 'results',
     identity: 'win-now',
     target: { kind: 'block-wins', comparisonOperator: 'gte', threshold: 6, window: 'block' },
-    breakthrough: { kind: 'block-wins', comparisonOperator: 'gte', threshold: 8, window: 'block' },
+    breakthrough: {
+      kind: 'block-wins',
+      comparisonOperator: 'gte',
+      threshold: 8,
+      window: 'block',
+    },
     completedReward: {
       rewardId: rewardId('campaign-catalog-v1', 'results-block-wins-6', 'completed'),
       type: 'influence',
@@ -119,7 +124,12 @@ const CAMPAIGN_TEMPLATES: readonly CampaignTemplate[] = [
     family: 'results',
     identity: 'win-now',
     target: { kind: 'winning-block', comparisonOperator: 'gte', threshold: 1, window: 'block' },
-    breakthrough: { kind: 'block-wins', comparisonOperator: 'gte', threshold: 7, window: 'block' },
+    breakthrough: {
+      kind: 'block-wins',
+      comparisonOperator: 'gte',
+      threshold: 7,
+      window: 'block',
+    },
     completedReward: {
       rewardId: rewardId('campaign-catalog-v1', 'results-winning-block', 'completed'),
       type: 'influence',
@@ -675,13 +685,17 @@ const CAMPAIGN_TEMPLATES: readonly CampaignTemplate[] = [
     breakthroughReward: null,
     requires: 'transaction',
   },
-] as const;
+];
+let campaignTemplates: readonly CampaignTemplate[] | undefined;
+function campaignTemplatesOf(): readonly CampaignTemplate[] {
+  return (campaignTemplates ??= createCampaignTemplates());
+}
 export function campaignCatalog(): readonly CampaignTemplate[] {
-  return CAMPAIGN_TEMPLATES;
+  return campaignTemplatesOf();
 }
 function branches(): Map<string, CampaignTemplate[]> {
   const map = new Map<string, CampaignTemplate[]>();
-  for (const tpl of CAMPAIGN_TEMPLATES) {
+  for (const tpl of campaignTemplatesOf()) {
     const arr = map.get(tpl.branchId) ?? [];
     arr.push(tpl);
     map.set(tpl.branchId, arr);
@@ -1024,7 +1038,7 @@ export function generateSeasonCampaignOffers(
   }
   const auditDropped: string[] = [];
   const feasible: FeasibilityCandidate[] = [];
-  for (const tpl of CAMPAIGN_TEMPLATES) {
+  for (const tpl of campaignTemplatesOf()) {
     const playerRes = resolvePlayerForTemplate(tpl, input);
     const scheduleRes = scheduleFactsForTemplate(tpl, input);
     const txnRes = transactionFactsForTemplate(tpl, input);
