@@ -47,7 +47,7 @@ export const COLLECTION_SPECIALS: readonly AuthoredSpecial[] = [
   {
     family: 'Lockdown',
     rarity: 'Eclipse',
-    sourcePlayerVersionId: 'pv-0677dab31eb51eef19f4a00946e66403',
+    sourcePlayerVersionId: 'pv-78bc6c5372c2f10fc60ddd59f2d891e3',
     ratingOverlay: { perimeterDefense: 15, interiorDefense: 10, defensiveIq: 15, steal: 10 },
   },
   {
@@ -89,7 +89,7 @@ export const COLLECTION_SPECIAL_SOURCE_SEASONS: Record<string, string> = {
   'pv-b1ea0fc379982caf201e5ecde1170853': 'Stephen Curry 2015-16',
   'pv-fdf9480106edeb1da95790b7443ce991': 'Dennis Rodman 1991-92',
   'pv-05566ef67aa3d2c2e95cfaa4e030e826': 'Gary Payton 1999-00',
-  'pv-0677dab31eb51eef19f4a00946e66403': 'Scottie Pippen 1994-95',
+  'pv-78bc6c5372c2f10fc60ddd59f2d891e3': 'Scottie Pippen 1990-91',
   'pv-a696e35b7419fb37efbb85cd3671f90b': 'Kawhi Leonard 2019-20',
   'pv-a16de3b614e2208264b74d4c5ba4c846': 'Jason Kidd 1998-99',
   'pv-0823b9ca50b9fd066cf3235ceb51743a': 'John Stockton 1994-95',

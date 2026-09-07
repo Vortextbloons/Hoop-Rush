@@ -343,13 +343,13 @@ describe('searchRosterRotationCandidates', () => {
     const catalog = buildInput().catalog;
     const model = smallModel();
     const versions = catalog.candidates.map((candidate) => candidate.playerVersionId);
-    const guards = versions.filter((id) => {
+    const nonCenters = versions.filter((id) => {
       const member = catalog.candidates.find((candidate) => candidate.playerVersionId === id);
-      return member?.positions.playable.includes('PG') || member?.positions.playable.includes('SG');
+      return !(member?.positions.playable.includes('C') ?? true);
     });
     const result = searchRosterRotationCandidates({
       catalog,
-      locked: guards.slice(0, 9),
+      locked: nonCenters.slice(0, 10),
       available: versions,
       seed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a',
       eraProfile: DEFAULT_ERA_SIM_PROFILE,
@@ -448,17 +448,16 @@ describe('buildHumanSeasonRoster', () => {
     expect(result.rotation?.minutePolicy.policyVersion).toBe('minute-policy-v1');
   });
   it('fails with the typed feasibility error on impossible locks', () => {
-    const { players } = buildInput();
     const catalog = buildInput().catalog;
     const model = smallModel();
-    const versions = players.map((player) => player.playerVersionId ?? '');
-    const guards = versions.filter((id) => {
+    const versions = catalog.candidates.map((candidate) => candidate.playerVersionId);
+    const nonCenters = versions.filter((id) => {
       const member = catalog.candidates.find((candidate) => candidate.playerVersionId === id);
-      return member?.positions.playable.includes('PG') || member?.positions.playable.includes('SG');
+      return !(member?.positions.playable.includes('C') ?? true);
     });
     const result = buildHumanSeasonRoster({
       catalog,
-      locked: guards.slice(0, 9),
+      locked: nonCenters.slice(0, 10),
       available: versions,
       seed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a',
       eraProfile: DEFAULT_ERA_SIM_PROFILE,

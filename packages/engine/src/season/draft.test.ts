@@ -410,14 +410,20 @@ function customCatalog(
 function stateWithNinePicks(
   catalog: SeasonDraftCatalog,
   rootSeed: Seed | string,
+  pickCandidates?: SeasonDraftCandidate[],
 ): SeasonDraftState {
   const created = createSolo(catalog, LEAGUE, seedSchema.parse(rootSeed));
   expectAccepted(created.record);
   const state = requireState(created.state, 'create');
-  const guards = catalog.candidates.filter((c) => c.positions.playable.includes('PG'));
-  const forwards = catalog.candidates.filter((c) => c.positions.playable.includes('SF'));
-  const centers = catalog.candidates.filter((c) => c.positions.playable.includes('C'));
-  const picks = [...guards.slice(0, 4), ...forwards.slice(0, 3), ...centers.slice(0, 2)];
+  const chosen =
+    pickCandidates ??
+    (() => {
+      const guards = catalog.candidates.filter((c) => c.positions.playable.includes('PG'));
+      const forwards = catalog.candidates.filter((c) => c.positions.playable.includes('SF'));
+      const centers = catalog.candidates.filter((c) => c.positions.playable.includes('C'));
+      return [...guards.slice(0, 4), ...forwards.slice(0, 3), ...centers.slice(0, 2)];
+    })();
+  const picks = [...chosen];
   if (picks.length !== 9) throw new Error('expected nine hand picks');
   const handPicks = picks.map((c, i) => ({
     participantId: 'p1',
@@ -736,7 +742,10 @@ describe('season draft offers', () => {
         positions: Array.from({ length: 12 }, () => ['SF']),
       },
     ]);
-    const state = stateWithNinePicks(catalog, seedFromString('no-safe-offer'));
+    const nineCenters = catalog.candidates
+      .filter((c) => c.positions.playable.includes('C'))
+      .slice(0, 9);
+    const state = stateWithNinePicks(catalog, seedFromString('no-safe-offer'), nineCenters);
     const result = applySeasonDraftCommand(
       state,
       catalog,
@@ -894,7 +903,7 @@ describe('season draft picks', () => {
                 ...card,
                 selectable: false,
                 coverageReason:
-                  'Selecting this version would leave the 4G/4F/3C completion targets unreachable with the remaining picks',
+                  'Selecting this version would leave no legal starting five reachable with the remaining picks',
               }
             : card,
         ),
@@ -911,7 +920,7 @@ describe('season draft picks', () => {
       fakeDeps(),
     );
     expect(expectRejected(disabled.record).errorCode).toBe('UNCOMPLETABLE_ROSTER');
-    expect(expectRejected(disabled.record).message).toContain('completion targets unreachable');
+    expect(expectRejected(disabled.record).message).toContain('no legal starting five reachable');
   });
   it('rejects a pick when the roster is already full', () => {
     const state = requireState(createSolo(FULL_CATALOG, LEAGUE, SEED).state, 'create');

@@ -6,6 +6,7 @@ import {
   SEASON_RUN_SCHEMA_VERSION,
   commandIdSchema,
   normalizeEvolutionState,
+  normalizeSponsorGearState,
   seasonCandidateCheckpointSchema,
   seasonRunSchema,
   seasonScheduleSchema,
@@ -38,7 +39,10 @@ import {
   seasonCheckpointDigest,
   seasonNextBlockIndex,
   seasonRotationSetDigest,
+  seasonRunStateDigest,
+  seasonRunStateDigestFactsOf,
   selectAiCourtInnovation,
+  sponsorsWithBlockCommit,
   srsRuleScorerFor,
   type SeasonBlockSimulationInput,
 } from '@hoop-rush/engine';
@@ -386,6 +390,33 @@ export function runBlockThroughHandler(
     stateDigest: stateFacts.stateDigest,
     ...(nextChallenges !== undefined ? { challenges: nextChallenges } : {}),
   } as unknown as typeof state.run;
+  const sponsorRatings = new Map(
+    state.catalog.candidates.map((candidate) => [
+      candidate.playerVersionId,
+      candidate.detailedRatings,
+    ]),
+  );
+  const nextSponsors = sponsorsWithBlockCommit({
+    rootSeed: state.run.rootSeed,
+    acceptedBlockIndex: checkpoint.blockIndex,
+    sponsors: normalizeSponsorGearState(
+      (state.run as unknown as { sponsors?: unknown }).sponsors,
+    ),
+    rotations: state.run.rotations,
+    ratings: sponsorRatings,
+    humanFranchiseId: state.humanFranchiseId,
+    aiFranchiseIds: state.run.league.teams.map((team) => team.franchiseId),
+  });
+  const runWithSponsors = { ...state.run, sponsors: nextSponsors };
+  const sponsoredDigest = seasonRunStateDigest(
+    seasonRunStateDigestFactsOf(runWithSponsors as never, state.effects),
+  );
+  state.run = {
+    ...(runWithSponsors as typeof state.run),
+    stateDigest: sponsoredDigest,
+  };
+  state.stateDigest = sponsoredDigest;
+  state.expanded = expandSeasonRunRosters(state.run, state.catalog);
   return checkpoint;
 }
 export function rollForwardTo(state: SeasonBlockRunnerState, targetBlockIndex: number): void {

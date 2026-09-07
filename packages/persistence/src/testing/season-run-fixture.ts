@@ -1171,7 +1171,7 @@ export function buildFixtureSeasonDraftFacts(seed: string): SeasonRun['draft'] {
     selectable,
     coverageReason: selectable
       ? null
-      : 'Selecting this version would leave the 4G/4F/3C completion targets unreachable with the remaining picks',
+      : 'Selecting this version would leave no legal starting five reachable with the remaining picks',
   });
   void seed;
   return {
@@ -1226,7 +1226,7 @@ export function buildSeasonDraftState(
     selectable,
     coverageReason: selectable
       ? null
-      : 'Selecting this version would leave the 4G/4F/3C completion targets unreachable with the remaining picks',
+      : 'Selecting this version would leave no legal starting five reachable with the remaining picks',
   });
   const cards = [card(1), card(2), card(3), card(4), card(5, false), card(6), card(7), card(8)];
   const league = buildFixtureLeague('lakers');

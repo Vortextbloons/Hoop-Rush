@@ -422,7 +422,7 @@ export function searchRosterRotationCandidates(
   if (!rosterFeasible(ownedInput, availableInput, remaining)) {
     return failure(
       'NO_FEASIBLE_COMPLETION',
-      'no legal completion exists with the locked picks and the available catalog under the 4/4/3 targets',
+      'no legal completion exists with the locked picks and the available catalog',
     );
   }
   const budget = input.model.search.nodeBudgets.partial;

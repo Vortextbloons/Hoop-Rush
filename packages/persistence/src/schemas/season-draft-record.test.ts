@@ -7,7 +7,7 @@ describe('storedSeasonDraftSchema', () => {
     expect(storedSeasonDraftSchema.safeParse(record).success).toBe(true);
     expect(record.saveSchemaVersion).toBe(3);
     expect(record.draft.schemaVersion).toBe(2);
-    expect(record.draft.draftVersion).toBe('season-draft-v2');
+    expect(record.draft.draftVersion).toBe('season-draft-v3');
   });
   it('accepts an adapter-stamped updatedAtIso', () => {
     const record = {

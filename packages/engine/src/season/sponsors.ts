@@ -278,20 +278,23 @@ export interface SponsorBlockCommitInput {
 export function sponsorsWithBlockCommit(input: SponsorBlockCommitInput): SeasonSponsorGearState {
   const nextBlockIndex = input.acceptedBlockIndex + 1;
   let boards = input.sponsors.boards;
-  if (
-    nextBlockIndex >= 0 &&
-    nextBlockIndex <= 7 &&
-    !boards.boards.some((board) => board.blockIndex === nextBlockIndex)
-  ) {
+  const missing: number[] = [];
+  const top = Math.min(Math.max(nextBlockIndex, -1), 7);
+  for (let blockIndex = 0; blockIndex <= top; blockIndex += 1) {
+    if (!boards.boards.some((board) => board.blockIndex === blockIndex)) {
+      missing.push(blockIndex);
+    }
+  }
+  if (missing.length > 0) {
     boards = {
       ...boards,
       boards: [
         ...boards.boards,
-        {
-          blockIndex: nextBlockIndex,
-          offers: seasonSponsorOffersForBlock(input.rootSeed, nextBlockIndex),
-          purchasedInstanceIds: [],
-        },
+        ...missing.map((blockIndex) => ({
+          blockIndex,
+          offers: seasonSponsorOffersForBlock(input.rootSeed, blockIndex),
+          purchasedInstanceIds: [] as string[],
+        })),
       ].sort((a, b) => a.blockIndex - b.blockIndex),
     };
   }

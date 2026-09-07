@@ -100,7 +100,12 @@
         schedule = seasonSchedule;
         playersIndex = ix;
         const draftRepo = new DexieSeasonDraftRepository();
-        const storedDraft = await draftRepo.loadSeasonDraft();
+        let storedDraft: Awaited<ReturnType<DexieSeasonDraftRepository['loadSeasonDraft']>> = null;
+        try {
+          storedDraft = await draftRepo.loadSeasonDraft();
+        } catch {
+          await draftRepo.clearSeasonDraft();
+        }
         if (cancelled) return;
         if (storedDraft !== null) {
           await ensureFlow(rosterTargets);

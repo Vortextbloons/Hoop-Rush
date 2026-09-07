@@ -367,7 +367,7 @@ export function buildFixtureSeasonDraftFacts(): SeasonRun['draft'] {
                 playerVersionId: `pv-${'5'.repeat(32)}`,
                 selectable: false,
                 coverageReason:
-                  'Selecting this version would leave the 4G/4F/3C completion targets unreachable with the remaining picks',
+                  'Selecting this version would leave no legal starting five reachable with the remaining picks',
               },
               {
                 playerVersionId: `pv-${'6'.repeat(32)}`,

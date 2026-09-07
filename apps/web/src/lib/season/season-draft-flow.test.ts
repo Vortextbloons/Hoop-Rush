@@ -198,7 +198,7 @@ describe('SeasonDraftFlow', () => {
     expect(pick.status).toBe('rejected');
     if (pick.status === 'rejected') {
       expect(pick.errorCode).toBe('UNCOMPLETABLE_ROSTER');
-      expect(pick.message).toContain('completion targets unreachable');
+      expect(pick.message).toContain('no legal starting five reachable');
     }
   });
   it('plays all ten rounds, finalizes, and generates the league deterministically', async () => {

@@ -199,7 +199,13 @@ async function loadBracketFor(entry: OpponentIndexEntry): Promise<OpponentBracke
     return retryWithFreshManifest(
       error,
       entry.contentHash,
-      (manifest) => manifest.bracket ?? null,
+      (manifest) =>
+        [manifest.bracketCasual ?? null, manifest.bracket ?? null].find(
+          (candidate) => candidate?.url === entry.url,
+        ) ??
+        manifest.bracketCasual ??
+        manifest.bracket ??
+        null,
       (url, contentHash) => load(url, contentHash, true),
     );
   }

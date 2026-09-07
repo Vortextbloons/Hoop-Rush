@@ -1935,7 +1935,7 @@ function legalTenExists(state: GenerationState, members: readonly string[]): boo
       if (
         !memberReachCapped(
           state,
-          { guards: 4, forwards: 4, centers: 3 },
+          { guards: 2, forwards: 2, centers: 1 },
           probeCounts,
           remaining,
           slotsLeft - 1,
@@ -2329,7 +2329,7 @@ function bestTenDfs(
       if (
         !memberReachCapped(
           state,
-          { guards: 4, forwards: 4, centers: 3 },
+          { guards: 2, forwards: 2, centers: 1 },
           probeCounts,
           remaining,
           slotsLeft - 1,

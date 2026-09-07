@@ -197,6 +197,18 @@ const DEFAULT_DIFFICULTY: DifficultyProfile = {
   leagueMedianPercentileBand: [0.4, 0.55],
   teamPercentileBand: [0.25, 0.65],
 };
+export const MEDIUM_DIFFICULTY_V4: DifficultyProfile = {
+  profileVersion: 'm3-medium-v4',
+  name: 'medium',
+  leagueMedianPercentileBand: [0.4, 0.52],
+  teamPercentileBand: [0.23, 0.6],
+};
+export const CASUAL_DIFFICULTY: DifficultyProfile = {
+  profileVersion: 'm3-casual-v1',
+  name: 'casual',
+  leagueMedianPercentileBand: [0.38, 0.5],
+  teamPercentileBand: [0.2, 0.55],
+};
 const ALL_FRANCHISE_SLOTS: ReadonlyArray<{
   franchiseId: string;
   displayName: string;

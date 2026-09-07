@@ -67,6 +67,7 @@
   let pickerFallbackId = $state<string | null>(null);
   let franchiseFilter = $state('');
   let eraFilter = $state('');
+  let difficulty = $state<'medium' | 'casual'>('medium');
   function loadSandboxData() {
     manifestError = null;
     indexError = null;
@@ -132,6 +133,7 @@
     if (typeof window === 'undefined') return;
     const result = parseSandboxUrl(new URL(window.location.href), m, ix);
     if (!result.ok || !result.state) return;
+    difficulty = result.state.difficulty;
     const rows = result.state.slots.map((sel) =>
       ix.players.find(
         (p) =>
@@ -269,7 +271,7 @@
       }));
       const resolved = await resolveRefsToPlayers(refs);
       if (!mounted) return;
-      await startSandboxRun(resolved, generateSeed());
+      await startSandboxRun(resolved, generateSeed(), difficulty);
       if (!mounted) return;
     } catch (e) {
       if (!mounted) return;
@@ -551,7 +553,34 @@
         />
         <DraftValuePanel players={resolvedDraftPlayers} presentation="sandbox" />
         {#if ready}
-          <div>
+          <div class="flex flex-col gap-3">
+            <div class="flex items-center gap-2" role="group" aria-label="Difficulty">
+              <button
+                type="button"
+                onclick={() => (difficulty = 'medium')}
+                aria-pressed={difficulty === 'medium'}
+                class="rounded-lg border px-4 py-2 font-mono text-xs tracking-[0.12em] uppercase transition-colors {difficulty ===
+                'medium'
+                  ? 'border-primary bg-primary/10 text-foreground'
+                  : 'border-input text-muted-foreground hover:border-line-strong'}"
+              >
+                Medium
+              </button>
+              <button
+                type="button"
+                onclick={() => (difficulty = 'casual')}
+                aria-pressed={difficulty === 'casual'}
+                class="rounded-lg border px-4 py-2 font-mono text-xs tracking-[0.12em] uppercase transition-colors {difficulty ===
+                'casual'
+                  ? 'border-primary bg-primary/10 text-foreground'
+                  : 'border-input text-muted-foreground hover:border-line-strong'}"
+              >
+                Casual
+              </button>
+              <span class="font-mono text-[11px] text-muted-foreground">
+                {difficulty === 'casual' ? 'Softer opponents' : 'Standard bracket'}
+              </span>
+            </div>
             <button
               type="button"
               onclick={play82}

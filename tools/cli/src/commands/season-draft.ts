@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  SEASON_DRAFT_VERSION,
   seasonDraftCommandSchema,
   seasonDraftStateSchema,
   seedSchema,
@@ -28,7 +29,7 @@ export const seasonDraftReproduceInputSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season draft reproduce'),
   seed: seedSchema,
-  catalogVersion: z.literal('season-draft-v2'),
+  catalogVersion: z.literal(SEASON_DRAFT_VERSION),
   initialState: seasonDraftStateSchema.nullable(),
   commands: z.array(seasonDraftCommandSchema),
   expected: z

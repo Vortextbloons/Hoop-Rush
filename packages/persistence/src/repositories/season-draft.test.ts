@@ -183,6 +183,55 @@ describe('season draft repository (dexie)', () => {
     expect(loaded?.generation?.ownership).toHaveLength(300);
     expect(withoutTimestamp(loaded as StoredSeasonDraft)).toEqual(saved);
   });
+  it('auto-clears a v3 envelope that still stores season-draft-v2 state', async () => {
+    const { season, db } = makeAdapter();
+    const legacyDraft = {
+      schemaVersion: 2,
+      draftVersion: 'season-draft-v2',
+      runId: 'legacy-run-1',
+      rootSeed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a',
+      league: buildSeasonLeague(),
+      catalogVersion: 'season-draft-v2',
+      participants: [{ participantId: 'p1', franchiseId: 'lakers' }],
+      firstPickParticipantId: 'p1',
+      round: 2,
+      currentTurnParticipantId: 'p1',
+      status: 'drafting',
+      revision: 4,
+      currentOffer: null,
+      offers: [],
+      picks: [],
+      commandLog: [
+        {
+          status: 'accepted',
+          commandId: 'cmd-1',
+          revisionBefore: 0,
+          revisionAfter: 1,
+          stateDigest: '0'.repeat(32),
+          command: {
+            commandId: 'cmd-1',
+            expectedRevision: 0,
+            payload: {
+              kind: 'create-season-draft',
+              runId: 'legacy-run-1',
+              rootSeed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a',
+              league: buildSeasonLeague(),
+              humanParticipantIds: ['p1'],
+              catalogVersion: 'season-draft-v2',
+            },
+          },
+        },
+      ],
+    };
+    await db.seasonDrafts.put({
+      recordId: SEASON_DRAFT_RECORD_ID,
+      saveSchemaVersion: 3,
+      draft: legacyDraft,
+      generation: null,
+    } as never);
+    expect(await season.loadSeasonDraft()).toBeNull();
+    expect(await db.seasonDrafts.count()).toBe(0);
+  });
   it('auto-clears a stored v1/v2 development row and returns null', async () => {
     const { season, db } = makeAdapter();
     const legacyDraft = {

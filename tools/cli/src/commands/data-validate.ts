@@ -29,6 +29,7 @@ import {
   POSITION_NORMALIZATION_VERSION,
   playableSlotGroups,
   type HoopRushManifest,
+  type OpponentIndexEntry,
 } from '@hoop-rush/data-contracts';
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
 import { sha256Hex } from '../io.ts';
@@ -500,45 +501,52 @@ async function auditBracket(
 ): Promise<AuditResult> {
   const failures: string[] = [];
   const details: string[] = [];
-  const entry = manifest.bracket;
-  if (!entry) {
+  const entries: Array<{ label: string; entry: OpponentIndexEntry }> = [];
+  if (manifest.bracket) entries.push({ label: 'bracket', entry: manifest.bracket });
+  if (manifest.bracketCasual)
+    entries.push({ label: 'bracketCasual', entry: manifest.bracketCasual });
+  if (entries.length === 0) {
     details.push('bracket: none packaged');
     return { ok: true, details, failures };
   }
-  const assetPath = isAbsolute(entry.url) ? entry.url : resolve(manifestDir, entry.url);
-  try {
-    const info = await stat(assetPath);
-    if (!info.isFile()) {
-      failures.push(`bracket: asset is not a file (${assetPath})`);
-      return { ok: false, details, failures };
-    }
-    const content = await readFile(assetPath);
-    const actualHash = sha256Hex(content);
-    if (actualHash !== entry.contentHash) {
-      failures.push(`bracket: content hash mismatch (${assetPath})`);
-    } else if (verbose) {
-      details.push(`bracket: hash verified (${assetPath})`);
-    }
-    const parsed = opponentBracketSchema.safeParse(JSON.parse(content.toString('utf8')) as unknown);
-    if (!parsed.success) {
-      failures.push(
-        `bracket: artifact fails the bracket schema: ${parsed.error.issues[0]?.message ?? 'unknown'}`,
+  for (const { label, entry } of entries) {
+    const assetPath = isAbsolute(entry.url) ? entry.url : resolve(manifestDir, entry.url);
+    try {
+      const info = await stat(assetPath);
+      if (!info.isFile()) {
+        failures.push(`${label}: asset is not a file (${assetPath})`);
+        return { ok: false, details, failures };
+      }
+      const content = await readFile(assetPath);
+      const actualHash = sha256Hex(content);
+      if (actualHash !== entry.contentHash) {
+        failures.push(`${label}: content hash mismatch (${assetPath})`);
+      } else if (verbose) {
+        details.push(`${label}: hash verified (${assetPath})`);
+      }
+      const parsed = opponentBracketSchema.safeParse(
+        JSON.parse(content.toString('utf8')) as unknown,
       );
-      return { ok: failures.length === 0, details, failures };
+      if (!parsed.success) {
+        failures.push(
+          `${label}: artifact fails the bracket schema: ${parsed.error.issues[0]?.message ?? 'unknown'}`,
+        );
+        return { ok: failures.length === 0, details, failures };
+      }
+      const bracket = parsed.data;
+      failures.push(
+        ...validateBracketContent(bracket).map((f) => `${label}: ${f}`),
+        ...scheduleInvariants(bracket.schedule).map((f) => `${label}: ${f}`),
+      );
+      const percentiles = bracket.opponents.map((o) => o.strength.percentile);
+      const sorted = [...percentiles].sort((a, b) => a - b);
+      const median = sorted[Math.floor(sorted.length / 2)] ?? 0;
+      details.push(
+        `${label}: ${String(bracket.opponents.length)} opponents · ${String(bracket.schedule.length)} games · median pct ${median.toFixed(3)} · version ${bracket.bracketVersion}`,
+      );
+    } catch {
+      failures.push(`${label}: asset missing (${assetPath})`);
     }
-    const bracket = parsed.data;
-    failures.push(
-      ...validateBracketContent(bracket).map((f) => `bracket: ${f}`),
-      ...scheduleInvariants(bracket.schedule).map((f) => `bracket: ${f}`),
-    );
-    const percentiles = bracket.opponents.map((o) => o.strength.percentile);
-    const sorted = [...percentiles].sort((a, b) => a - b);
-    const median = sorted[Math.floor(sorted.length / 2)] ?? 0;
-    details.push(
-      `bracket: ${String(bracket.opponents.length)} opponents · ${String(bracket.schedule.length)} games · median pct ${median.toFixed(3)} · version ${bracket.bracketVersion}`,
-    );
-  } catch {
-    failures.push(`bracket: asset missing (${assetPath})`);
   }
   return { ok: failures.length === 0, details, failures };
 }

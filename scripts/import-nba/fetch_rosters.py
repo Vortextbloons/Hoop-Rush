@@ -25,6 +25,22 @@ def _safe_int(value: Any, default: int = 0) -> int:
     except (ValueError, TypeError):
         return default
 
+
+def _cell(value: Any) -> Any:
+    """Pass a cell through unless it is missing/NaN. Pandas NaN must never
+    reach the JSON writer: Python's json emits it as a bare NaN token, which
+    strict parsers (Node) reject, corrupting the whole file."""
+    import math
+    if value is None:
+        return ""
+    try:
+        f = float(value)
+    except (ValueError, TypeError):
+        return value
+    if math.isnan(f) or math.isinf(f):
+        return ""
+    return value
+
 try:
     from nba_api.stats.endpoints import commonteamroster, leaguestandings
     from nba_api.stats.static import teams as nba_static_teams
@@ -242,8 +258,8 @@ def fetch_roster(season: str, team_external_id: str) -> list[dict[str, Any]]:
             player_id = _safe_int(row.get("PLAYER_ID"))
             if player_id == 0:
                 continue  # historical seasons sometimes return NaN rows
-            full_name = str(row.get("PLAYER", "")).strip()
-            nickname = str(row.get("NICKNAME", "")).strip()
+            full_name = str(_cell(row.get("PLAYER", ""))).strip()
+            nickname = str(_cell(row.get("NICKNAME", ""))).strip()
             parts = full_name.split(None, 1) if full_name else ["", ""]
             first = nickname if nickname else (parts[0] if len(parts) > 0 else "")
             last = parts[1] if len(parts) > 1 else (parts[0] if len(parts) == 1 else "")
@@ -253,13 +269,13 @@ def fetch_roster(season: str, team_external_id: str) -> list[dict[str, Any]]:
                     "firstName": first,
                     "lastName": last,
                     "teamExternalId": team_external_id,
-                    "position": row.get("POSITION", ""),
-                    "jersey": row.get("NUM", ""),
-                    "height": row.get("HEIGHT", ""),
-                    "weight": row.get("WEIGHT", ""),
-                    "birthDate": row.get("BIRTH_DATE", ""),
+                    "position": _cell(row.get("POSITION", "")),
+                    "jersey": _cell(row.get("NUM", "")),
+                    "height": _cell(row.get("HEIGHT", "")),
+                    "weight": _cell(row.get("WEIGHT", "")),
+                    "birthDate": _cell(row.get("BIRTH_DATE", "")),
                     "age": _safe_int(row.get("AGE"), 25),
-                    "college": row.get("SCHOOL", ""),
+                    "college": _cell(row.get("SCHOOL", "")),
                 }
             )
         return out
@@ -341,8 +357,8 @@ def run(season: str) -> None:
             internal_id = team_internal_ids[team_id]
             abbr = abbr_by_team_id.get(team_id, "UNK")
             for p in players:
-                fn = p.get("firstName", "?") or "?"
-                ln = p.get("lastName", "?") or "?"
+                fn = str(_cell(p.get("firstName", "?")) or "?")
+                ln = str(_cell(p.get("lastName", "?")) or "?")
                 initials_key = f"{abbr.lower()}-{fn[0]}{ln[0]}"
                 n = initials_counter.get(initials_key, 0) + 1
                 initials_counter[initials_key] = n
@@ -393,22 +409,27 @@ def run(season: str) -> None:
                     "firstName": fn,
                     "lastName": ln,
                     "age": age_val,
-                    "position": p.get("position", "F"),
+                    "position": _cell(p.get("position", "F")) or "F",
                     "secondaryPositions": [],
                     "heightInches": height_inches,
                     "weightLbs": weight_lbs,
                     "teamId": internal_id,
                     "teamExternalId": team_id,
-                    "college": bio.get("college", p.get("college", "")),
-                    "country": bio.get("country", ""),
-                    "draftYear": bio.get("draftYear", 0),
-                    "draftRound": bio.get("draftRound", 0),
-                    "draftPick": bio.get("draftPick", 0),
-                    "birthDate": bio.get("birthDate", p.get("birthDate", "")),
+                    "college": _cell(bio.get("college", p.get("college", ""))),
+                    "country": _cell(bio.get("country", "")),
+                    "draftYear": _safe_int(bio.get("draftYear", 0)),
+                    "draftRound": _safe_int(bio.get("draftRound", 0)),
+                    "draftPick": _safe_int(bio.get("draftPick", 0)),
+                    "birthDate": _cell(bio.get("birthDate", p.get("birthDate", ""))),
                 })
             if done % 10 == 0 or done == len(team_ids):
                 print(f"  ... {done}/{len(team_ids)} teams fetched")
 
+    import json
+
+    # Fail loudly on non-finite floats: Python's json would emit them as bare
+    # NaN/Infinity tokens, producing files strict parsers reject outright.
+    json.dumps(roster_out, allow_nan=False)
     write_json(out / "roster.json", roster_out)
     print(f"  [OK] wrote roster.json ({len(roster_out)} players)")
     if failed_teams:

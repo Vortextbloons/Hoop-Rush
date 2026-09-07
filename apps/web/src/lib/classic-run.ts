@@ -11,15 +11,19 @@ import { challengeRepository } from '$lib/challenge-repo';
 import { randomUUID } from '$lib/random-id';
 import { setClassicGuardBypass } from '$lib/classic-nav-guard';
 import { resolvePlayerRefs } from '$lib/player-refs';
-import { FIXED_SANDBOX_ERA, loadRunPreamble } from '$lib/run-preamble';
-export async function startClassicRun(draft: ClassicDraftState, runSeed: Seed): Promise<void> {
+import { FIXED_SANDBOX_ERA, loadRunPreamble, type ChallengeDifficulty } from '$lib/run-preamble';
+export async function startClassicRun(
+  draft: ClassicDraftState,
+  runSeed: Seed,
+  difficulty: ChallengeDifficulty = 'medium',
+): Promise<void> {
   if (draft.status !== 'complete') {
     throw new Error('The classic draft is not complete.');
   }
   if (draft.picks.length !== 5) {
     throw new Error('A classic draft needs exactly five picks.');
   }
-  const { manifest, profile, bracket } = await loadRunPreamble();
+  const { manifest, profile, bracket } = await loadRunPreamble(difficulty);
   const pickBySlot = new Map(draft.picks.map((pick) => [pick.slotIndex, pick]));
   const refs = [0, 1, 2, 3, 4].map((slotIndex) => {
     const pick = pickBySlot.get(slotIndex);

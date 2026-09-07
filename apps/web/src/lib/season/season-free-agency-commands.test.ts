@@ -171,8 +171,8 @@ function fixtureIndex(catalog: SeasonDraftCatalog): SeasonFreeAgencyIndex {
 }
 function fixtureTargets(): SeasonRosterTargets {
   return {
-    schemaVersion: 2,
-    targetsVersion: 'roster-targets-v3',
+    schemaVersion: 3,
+    targetsVersion: 'roster-targets-v4',
     policy: {
       bandQuotas: {
         solo: { contender: 4, playoff: 8, average: 10, weaker: 7 },
@@ -200,7 +200,6 @@ function fixtureTargets(): SeasonRosterTargets {
         'active-trader': ['primary-creation'],
       },
       roleCoverageThreshold: 35,
-      completionTargets: { guards: 4, forwards: 4, centers: 3 },
       poolSize: 20,
       rosterSize: 10,
       percentileTiers: { elite: 0.9, strong: 0.75, useful: 0.5 },
@@ -213,8 +212,8 @@ function fixtureTargets(): SeasonRosterTargets {
       calibrationSeedCount: 4,
       validationSeedCount: 2,
       generatedAtIso: '2026-08-14T00:00:00.000Z',
-      aiVersion: 'season-ai-v3',
-      rosterGenerationVersion: 'roster-generation-v3',
+      aiVersion: 'season-ai-v5',
+      rosterGenerationVersion: 'roster-generation-v5',
       gates: {
         failureRateMax: 0,
         minBandSeparation: 3,

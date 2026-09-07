@@ -14,12 +14,16 @@ import {
 } from '@hoop-rush/engine';
 import { challengeRepository } from '$lib/challenge-repo';
 import { randomUUID } from '$lib/random-id';
-import { FIXED_SANDBOX_ERA, loadRunPreamble } from '$lib/run-preamble';
-export async function startSandboxRun(players: PeakPlayerSeason[], seed: Seed): Promise<void> {
+import { FIXED_SANDBOX_ERA, loadRunPreamble, type ChallengeDifficulty } from '$lib/run-preamble';
+export async function startSandboxRun(
+  players: PeakPlayerSeason[],
+  seed: Seed,
+  difficulty: ChallengeDifficulty = 'medium',
+): Promise<void> {
   if (players.length !== 5) {
     throw new Error('A lineup needs exactly five players.');
   }
-  const { profile, bracket } = await loadRunPreamble();
+  const { profile, bracket } = await loadRunPreamble(difficulty);
   const selections: RunPlayerSelection[] = players.map((p) => ({
     playerId: p.playerId,
     franchiseId: p.franchiseId,

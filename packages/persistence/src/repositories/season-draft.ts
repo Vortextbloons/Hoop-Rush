@@ -1,4 +1,7 @@
-import { SEASON_DRAFT_SAVE_SCHEMA_VERSION } from '@hoop-rush/data-contracts';
+import {
+  SEASON_DRAFT_SAVE_SCHEMA_VERSION,
+  SEASON_DRAFT_VERSION,
+} from '@hoop-rush/data-contracts';
 import {
   SEASON_DRAFT_RECORD_ID,
   storedSeasonDraftSchema,
@@ -6,6 +9,14 @@ import {
   type StoredSeasonDraft,
 } from '../schemas/season-draft-record.ts';
 import { HoopRushDatabase } from './dexie.ts';
+
+function isIncompatibleDraftVersion(draft: unknown): boolean {
+  if (draft === null || typeof draft !== 'object') return false;
+  const row = draft as { draftVersion?: unknown; catalogVersion?: unknown };
+  if (row.draftVersion === undefined && row.catalogVersion === undefined) return false;
+  return row.draftVersion !== SEASON_DRAFT_VERSION || row.catalogVersion !== SEASON_DRAFT_VERSION;
+}
+
 export class DexieSeasonDraftRepository implements SeasonDraftRepository {
   private readonly db: HoopRushDatabase;
   constructor(db: HoopRushDatabase = new HoopRushDatabase()) {
@@ -30,6 +41,12 @@ export class DexieSeasonDraftRepository implements SeasonDraftRepository {
         }
       ).saveSchemaVersion !== SEASON_DRAFT_SAVE_SCHEMA_VERSION
     ) {
+      await this.db.seasonDrafts.delete(SEASON_DRAFT_RECORD_ID);
+      return null;
+    }
+    const parsed = storedSeasonDraftSchema.safeParse(record);
+    if (parsed.success) return parsed.data;
+    if (isIncompatibleDraftVersion(record.draft)) {
       await this.db.seasonDrafts.delete(SEASON_DRAFT_RECORD_ID);
       return null;
     }

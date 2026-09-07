@@ -316,7 +316,7 @@ const offerTargetsSchema = z.object({
     calibrationSeedCount: z.number().int().positive(),
     validationSeedCount: z.number().int().positive(),
     generatedAtIso: z.string().min(1),
-    draftVersion: z.literal('season-draft-v2'),
+      draftVersion: z.literal(SEASON_DRAFT_VERSION),
     safeMinimum: z.literal(SEASON_DRAFT_SAFE_MINIMUM),
   }),
   variety: z.object({
@@ -507,7 +507,7 @@ export async function seasonDraftCalibrate(args: {
       calibrationSeedCount: calibrationCount,
       validationSeedCount: validationCount,
       generatedAtIso: new Date().toISOString(),
-      draftVersion: 'season-draft-v2',
+      draftVersion: SEASON_DRAFT_VERSION,
       safeMinimum: SEASON_DRAFT_SAFE_MINIMUM,
     },
     variety: {

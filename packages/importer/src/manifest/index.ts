@@ -67,6 +67,13 @@ const importerManifestSchema = z.looseObject({
   playersIndex: manifestAssetRefSchema.optional(),
   rosterDetails: manifestAssetRefSchema.optional(),
   season: seasonArtifactsSchema.optional(),
+  collection: z
+    .object({
+      catalog: manifestAssetRefSchema,
+      index: manifestAssetRefSchema,
+      packTargets: manifestAssetRefSchema.optional(),
+    })
+    .optional(),
   assets: z
     .looseObject({
       source: z.string().optional(),
@@ -200,6 +207,7 @@ export function run(dataDir = PUBLIC_DATA): void {
     previousRaw === null ? null : importerManifestSchema.safeParse(previousRaw);
   const previous = previousParsed?.success === true ? previousParsed.data : null;
   const previousAssets = previous?.assets;
+  const previousCollection = previous?.collection;
   const manifest: Manifest = {
     schemaVersion: MANIFEST_SCHEMA_VERSION,
     dataVersion: DATA_VERSION,
@@ -346,6 +354,9 @@ export function run(dataDir = PUBLIC_DATA): void {
   }
   if (Object.keys(seasonRefs).length > 0) {
     manifest.season = seasonRefs;
+  }
+  if (previousCollection !== undefined) {
+    manifest.collection = previousCollection;
   }
   writeJsonRetry(manifestPath, manifest, true);
   console.log(`updated ${manifestPath}`);

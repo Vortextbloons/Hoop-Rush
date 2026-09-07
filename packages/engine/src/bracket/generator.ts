@@ -411,7 +411,7 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
       schemaVersion: 2,
       opponentId,
       bracketVersion: options.generationVersion,
-      difficultyBand: 'medium',
+      difficultyBand: options.difficulty.name,
       teamId: franchiseIdSchema.parse(franchiseId),
       displayName: candidates.displayName,
       seasonKey,

@@ -19,10 +19,10 @@ import {
 } from '@hoop-rush/data-contracts';
 import {
   evaluateSeasonRoster,
+  fiveCompletable,
   percentileTierOf,
   playerPercentileTier,
   rolePercentileThresholds,
-  rosterFeasible,
   validateSeasonRoster,
   type PercentileTier,
   type RoleThresholds,
@@ -203,7 +203,7 @@ export function fixtureHumanRoster(catalog: SeasonDraftCatalog): string[] {
         member.playerVersionId !== candidate.playerVersionId &&
         !probe.some((p) => p.playerVersionId === member.playerVersionId),
     );
-    if (!rosterFeasible(probe, remaining, 10 - probe.length)) continue;
+    if (!fiveCompletable(probe, remaining, 10 - probe.length, 0)) continue;
     roster.push({
       playerVersionId: candidate.playerVersionId,
       playable: candidate.positions.playable,

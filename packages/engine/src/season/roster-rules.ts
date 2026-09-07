@@ -148,3 +148,76 @@ export function rosterFeasible(
   }
   return rosterFeasibleFromCounts(ownedCounts, maskCounts, remainingPicks);
 }
+export function fiveCompletable(
+  owned: readonly SeasonRosterMemberInput[],
+  available: readonly SeasonRosterMemberInput[],
+  remainingPicks: number,
+  scarcityMargin = 0,
+): boolean {
+  if (!Number.isInteger(remainingPicks) || remainingPicks < 0) return false;
+  if (!Number.isInteger(scarcityMargin) || scarcityMargin < 0) return false;
+  if (owned.length + remainingPicks !== SEASON_ROSTER_RULES.size) return false;
+  if (available.length - scarcityMargin < remainingPicks) return false;
+  const targetG = 2;
+  const targetF = 2;
+  const targetC = 1;
+  const capU = Math.min(remainingPicks, 5);
+  const index = (g: number, f: number, c: number, u: number): number =>
+    ((u * (targetC + 1) + c) * (targetF + 1) + f) * (targetG + 1) + g;
+  let reachable = new Uint8Array((targetG + 1) * (targetF + 1) * (targetC + 1) * (capU + 1));
+  reachable[index(0, 0, 0, 0)] = 1;
+  for (const member of owned) {
+    const mask = groupMaskOf(member.playable);
+    if (mask === 0) continue;
+    for (let u = 0; u <= capU; u += 1) {
+      for (let g = targetG; g >= 0; g -= 1) {
+        for (let f = targetF; f >= 0; f -= 1) {
+          for (let c = targetC; c >= 0; c -= 1) {
+            if (reachable[index(g, f, c, u)] === 0) continue;
+            if ((mask & 1) !== 0) {
+              reachable[index(Math.min(targetG, g + 1), f, c, u)] = 1;
+            }
+            if ((mask & 2) !== 0) {
+              reachable[index(g, Math.min(targetF, f + 1), c, u)] = 1;
+            }
+            if ((mask & 4) !== 0) {
+              reachable[index(g, f, Math.min(targetC, c + 1), u)] = 1;
+            }
+          }
+        }
+      }
+    }
+  }
+  const maskCounts = new Array<number>(8).fill(0);
+  for (const member of available) {
+    const mask = groupMaskOf(member.playable);
+    if (mask !== 0) maskCounts[mask] = (maskCounts[mask] ?? 0) + 1;
+  }
+  for (let mask = 1; mask <= 7; mask += 1) {
+    const takes = Math.min(Math.max(0, (maskCounts[mask] ?? 0) - scarcityMargin), 5, capU);
+    for (let t = 0; t < takes; t += 1) {
+      for (let u = capU - 1; u >= 0; u -= 1) {
+        for (let g = targetG; g >= 0; g -= 1) {
+          for (let f = targetF; f >= 0; f -= 1) {
+            for (let c = targetC; c >= 0; c -= 1) {
+              if (reachable[index(g, f, c, u)] === 0) continue;
+              if ((mask & 1) !== 0) {
+                reachable[index(Math.min(targetG, g + 1), f, c, u + 1)] = 1;
+              }
+              if ((mask & 2) !== 0) {
+                reachable[index(g, Math.min(targetF, f + 1), c, u + 1)] = 1;
+              }
+              if ((mask & 4) !== 0) {
+                reachable[index(g, f, Math.min(targetC, c + 1), u + 1)] = 1;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  for (let u = 0; u <= capU; u += 1) {
+    if (reachable[index(targetG, targetF, targetC, u)] === 1) return true;
+  }
+  return false;
+}

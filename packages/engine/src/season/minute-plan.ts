@@ -193,7 +193,8 @@ function allocateGroup(
     for (const entry of active) {
       const raw = (pool * Math.max(0, entry.weight)) / weightSum;
       const floor = Math.floor(raw);
-      const base = Math.min(48, floor);
+      const headroom = Math.max(0, 48 - (result.get(entry.playerVersionId) ?? 0));
+      const base = Math.min(headroom, floor);
       result.set(entry.playerVersionId, (result.get(entry.playerVersionId) ?? 0) + base);
       assigned += base;
       withRemainder.push({ id: entry.playerVersionId, frac: raw - floor });

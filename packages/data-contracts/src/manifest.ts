@@ -51,6 +51,7 @@ export const hoopRushManifestSchema = z.object({
   availability: z.array(poolAvailabilitySchema),
   eraSimulationProfiles: z.array(simProfileIndexEntrySchema),
   bracket: opponentIndexEntrySchema.optional(),
+  bracketCasual: opponentIndexEntrySchema.optional(),
   playersIndex: playersIndexAssetSchema.optional(),
   rosterDetails: playersIndexAssetSchema.optional(),
   season: z

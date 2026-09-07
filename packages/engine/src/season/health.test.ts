@@ -16,6 +16,8 @@ import {
   seasonGameHealthSeam,
 } from './health.ts';
 import { seasonPlayerAvailable } from './injuries.ts';
+import { validateSeasonRoster } from './roster-rules.ts';
+import { buildMinimalRotation } from './rotation.ts';
 import {
   assembleSeasonBlockCandidate,
   auditSeasonBlock,
@@ -174,6 +176,88 @@ describe('season franchise legal-five facts (M2.5 §9)', () => {
     expect(withPositions.unavailablePlayerVersionIds).toHaveLength(5);
     const withoutPositions = seasonFranchiseLegalFiveFacts(run, 'lakers', healthWith(starterOut));
     expect(withoutPositions.legal).toBe(true);
+  });
+  it('flags a fragile roster illegal once its lone center is injured', () => {
+    const { run, catalog } = buildTestRun();
+    const guards = catalog.candidates.filter((candidate) =>
+      candidate.positions.playable.includes('PG'),
+    );
+    const forwards = catalog.candidates.filter(
+      (candidate) =>
+        !candidate.positions.playable.includes('C') &&
+        (candidate.positions.playable.includes('SF') ||
+          candidate.positions.playable.includes('PF')),
+    );
+    const centers = catalog.candidates.filter((candidate) =>
+      candidate.positions.playable.includes('C'),
+    );
+    const loneCenter = centers[0];
+    if (loneCenter === undefined) throw new Error('fixture catalog has no center');
+    const picked = new Set<string>([loneCenter.playerVersionId]);
+    const take = (list: typeof guards, count: number) => {
+      const chosen: typeof guards = [];
+      for (const candidate of list) {
+        if (chosen.length >= count) break;
+        if (picked.has(candidate.playerVersionId)) continue;
+        picked.add(candidate.playerVersionId);
+        chosen.push(candidate);
+      }
+      return chosen;
+    };
+    const ten = [...take(guards, 4), ...take(forwards, 5), loneCenter];
+    expect(ten).toHaveLength(10);
+    const members = ten.map((candidate) => ({
+      playerVersionId: candidate.playerVersionId,
+      playable: candidate.positions.playable,
+    }));
+    expect(validateSeasonRoster(members)).toEqual([]);
+    const fragileRotation = buildMinimalRotation({ franchiseId: 'lakers', members });
+    const fragileRoster = {
+      franchiseId: franchiseIdSchema.parse('lakers'),
+      players: ten.map((candidate) => ({
+        playerVersionId: candidate.playerVersionId,
+        playerId: candidate.playerId,
+        franchiseId: franchiseIdSchema.parse(candidate.franchiseId),
+        eraId: candidate.eraId,
+        seasonKey: candidate.seasonKey,
+        displayName: candidate.displayName,
+      })),
+    };
+    const fragileRun = {
+      ...run,
+      rosters: [
+        ...run.rosters.filter((entry) => entry.franchiseId !== 'lakers'),
+        fragileRoster,
+      ],
+      rotations: [
+        ...run.rotations.filter((entry) => entry.franchiseId !== 'lakers'),
+        fragileRotation,
+      ],
+    };
+    const positions = new Map(
+      catalog.candidates.map((candidate) => [
+        candidate.playerVersionId,
+        candidate.positions.playable,
+      ]),
+    );
+    const healthy = seasonFranchiseLegalFiveFacts(
+      fragileRun,
+      'lakers',
+      emptyHealthState(),
+      positions,
+    );
+    expect(healthy.legal).toBe(true);
+    const centerOut = healthWith([
+      injuryRecord({
+        injuryId: 'inj-' + '1'.repeat(32),
+        playerVersionId: loneCenter.playerVersionId,
+        gameId: seasonGameIdSchema.parse('s000001'),
+        seedPath: ['injuries', 's000001', loneCenter.playerVersionId, 'occurrence'],
+      }),
+    ]);
+    const facts = seasonFranchiseLegalFiveFacts(fragileRun, 'lakers', centerOut, positions);
+    expect(facts.legal).toBe(false);
+    expect(facts.unavailablePlayerVersionIds).toEqual([loneCenter.playerVersionId]);
   });
 });
 describe('season game health seam (M2.5 §9)', () => {

@@ -111,13 +111,51 @@ function rosterFingerprint(run: SeasonBlockRunContext): string {
     )
     .join('|');
 }
+function sponsorSlotsFingerprint(run: SeasonBlockRunContext): string {
+  const slots = run.sponsors?.players?.slots;
+  if (slots === undefined || slots === null) return 'no-sponsors';
+  const ids = Object.keys(slots).sort();
+  if (ids.length === 0) return 'empty-slots';
+  return ids
+    .map((id) => {
+      const entry = (slots as Record<string, unknown>)[id] as {
+        shoe: {
+          instanceId: string;
+          entryId: string;
+          boosts: readonly { key: string; points: number }[];
+        } | null;
+        apparel: {
+          instanceId: string;
+          entryId: string;
+          boosts: readonly { key: string; points: number }[];
+        } | null;
+        fuel: {
+          instanceId: string;
+          entryId: string;
+          boosts: readonly { key: string; points: number }[];
+        } | null;
+      };
+      const part = (
+        snapshot: {
+          instanceId: string;
+          entryId: string;
+          boosts: readonly { key: string; points: number }[];
+        } | null,
+      ) =>
+        snapshot === null
+          ? 'null'
+          : `${snapshot.instanceId}:${snapshot.entryId}:${snapshot.boosts.map((boost) => `${boost.key}+${String(boost.points)}`).join(',')}`;
+      return `${id}|${part(entry.shoe)}|${part(entry.apparel)}|${part(entry.fuel)}`;
+    })
+    .join(';');
+}
 const expandedCache = new Map<string, Map<string, SeasonGamePlayerInput>>();
 function expandRostersCached(
   run: SeasonBlockRunContext,
   catalog: SeasonDraftCatalog,
   catalogHash: string,
 ): Map<string, SeasonGamePlayerInput> {
-  const key = `${catalogHash}|${rosterFingerprint(run)}`;
+  const key = `${catalogHash}|${rosterFingerprint(run)}|${sponsorSlotsFingerprint(run)}`;
   const memo = expandedCache.get(key);
   if (memo !== undefined) return memo;
   const expanded = expandSeasonRunRosters(run, catalog);

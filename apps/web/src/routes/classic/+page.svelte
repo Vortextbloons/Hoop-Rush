@@ -72,6 +72,7 @@
   let guardTarget = $state<ClassicGuardTarget | null>(null);
   let starting = $state(false);
   let launchError: string | null = $state(null);
+  let difficulty = $state<'medium' | 'casual'>('medium');
   let resolvedDraftPlayers = $state.raw<PeakPlayerSeason[]>([]);
   let mounted = true;
   $effect(() => {
@@ -345,7 +346,7 @@
     starting = true;
     launchError = null;
     try {
-      await startClassicRun(draftToRun, classicDraftSeed());
+      await startClassicRun(draftToRun, classicDraftSeed(), difficulty);
     } catch (error) {
       if (!mounted) return;
       launchError = error instanceof Error ? error.message : String(error);
@@ -601,7 +602,34 @@
               {/each}
             </ul>
           </div>
-          <div>
+          <div class="flex flex-col gap-3">
+            <div class="flex items-center gap-2" role="group" aria-label="Difficulty">
+              <button
+                type="button"
+                onclick={() => (difficulty = 'medium')}
+                aria-pressed={difficulty === 'medium'}
+                class="rounded-lg border px-4 py-2 font-mono text-xs tracking-[0.12em] uppercase transition-colors {difficulty ===
+                'medium'
+                  ? 'border-primary bg-primary/10 text-foreground'
+                  : 'border-input text-muted-foreground hover:border-line-strong'}"
+              >
+                Medium
+              </button>
+              <button
+                type="button"
+                onclick={() => (difficulty = 'casual')}
+                aria-pressed={difficulty === 'casual'}
+                class="rounded-lg border px-4 py-2 font-mono text-xs tracking-[0.12em] uppercase transition-colors {difficulty ===
+                'casual'
+                  ? 'border-primary bg-primary/10 text-foreground'
+                  : 'border-input text-muted-foreground hover:border-line-strong'}"
+              >
+                Casual
+              </button>
+              <span class="font-mono text-[11px] text-muted-foreground">
+                {difficulty === 'casual' ? 'Softer opponents' : 'Standard bracket'}
+              </span>
+            </div>
             <button
               type="button"
               onclick={() => launchRun(completeDraft)}

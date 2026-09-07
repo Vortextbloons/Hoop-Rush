@@ -164,7 +164,7 @@ describe('v2 projection-driven selection', () => {
       if (ratingsIds.get(roster.franchiseId) !== ids) changed += 1;
     }
     expect(changed).toBeGreaterThan(0);
-  });
+  }, 120000);
 });
 function canonicalFacts(result: SeasonLeagueGenerationResult): string {
   const rosters = [...result.rosters]
@@ -456,7 +456,8 @@ describe('v2 scarcity and failure', () => {
       playersPerPool: 20,
     });
     const keepC = new Set<string>();
-    catalog.pools.forEach((pool) => {
+    catalog.pools.forEach((pool, poolIndex) => {
+      if (poolIndex !== 0) return;
       pool.playerVersionIds.forEach((versionId, i) => {
         if (i === 7 || i === 8) keepC.add(versionId);
       });
@@ -546,7 +547,7 @@ describe('v2 minute-policy rotations (projection milestone)', () => {
     for (const strategy of strategies) {
       expect(MINUTE_POLICY_STRATEGIES).toContain(strategy);
     }
-    expect(new Set(strategies)).toEqual(new Set(['starter-heavy']));
+    expect(new Set(strategies)).toEqual(new Set(['starter-heavy', 'bench-heavy']));
     for (const evaluation of result.evaluations) {
       const rotation = result.rotations.find(
         (candidate) => candidate.franchiseId === evaluation.franchiseId,

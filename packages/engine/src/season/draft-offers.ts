@@ -11,8 +11,8 @@ import {
 import { createRng } from '../sim/rng.ts';
 import {
   SEASON_ROSTER_SIZE,
+  fiveCompletable,
   groupMaskOf,
-  rosterFeasible,
   type SeasonRosterMemberInput,
 } from './roster-rules.ts';
 export const OFFER_SAFE_ORDER_KEY = 'safe-order';
@@ -86,6 +86,16 @@ function ownedMembers(
   }
   return members;
 }
+export function pendingOpponentTakes(state: SeasonDraftState, participantId: string): number {
+  if (!multiHumanDraft(state)) return 0;
+  let opponents = 0;
+  for (const participant of state.participants) {
+    if (participant.participantId === participantId) continue;
+    const picks = state.picks.filter((p) => p.participantId === participant.participantId).length;
+    if (picks < SEASON_ROSTER_SIZE) opponents += 1;
+  }
+  return 2 * opponents;
+}
 export function selectionKeepsFeasibility(
   state: SeasonDraftState,
   catalog: SeasonDraftCatalog,
@@ -100,7 +110,7 @@ export function selectionKeepsFeasibility(
     { playerVersionId: candidate.playerVersionId, playable: candidate.positions.playable },
   ];
   const available = availableMembers(state, catalog, candidate.playerVersionId);
-  return rosterFeasible(probe, available, remaining);
+  return fiveCompletable(probe, available, remaining, pendingOpponentTakes(state, participantId));
 }
 export function offerSeedPath(participantId: string, round: number, pickOrdinal: number): string[] {
   return [

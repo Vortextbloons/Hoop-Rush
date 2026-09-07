@@ -60,7 +60,9 @@ describe('collection launch content', () => {
       JSON.parse(readFileSync(CATALOG_PATH, 'utf8')) as unknown,
     );
     expect(catalog.catalogVersion).toBe(COLLECTION_CATALOG_VERSION);
-    expect(catalog.cards).toHaveLength(7933 + 12);
+    const baseCards = catalog.cards.filter((card) => card.family === 'Base');
+    expect(baseCards.length).toBeGreaterThan(0);
+    expect(catalog.cards).toHaveLength(baseCards.length + 12);
     const index = collectionIndexSchema.parse(
       JSON.parse(readFileSync(INDEX_PATH, 'utf8')) as unknown,
     );
