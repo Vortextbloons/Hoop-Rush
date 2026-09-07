@@ -84,7 +84,7 @@ vi.mock('./health.ts', async (importOriginal) => {
       const humanIsHome = homeFranchiseId === humanFranchiseId;
       return {
         schemaVersion: 1,
-        summaryVersion: 'season-game-summary-v3',
+        summaryVersion: 'season-game-summary-v4',
         gameId: seasonGameIdSchema.parse(gameId),
         round: game?.round ?? 1,
         homeFranchiseId,
@@ -229,7 +229,7 @@ function pendingOf(
 ): SeasonPendingBlockCandidate {
   return {
     schemaVersion: 1,
-    blockVersion: 'season-block-v6',
+    blockVersion: 'season-block-v7',
     runId: run.runId,
     commandId: commandIdSchema.parse('block-3-command'),
     blockIndex: 3,
@@ -1362,7 +1362,7 @@ function regularSeasonSummariesOf(run: SeasonRun): SeasonGameSummary[] {
       });
       return {
         schemaVersion: 1,
-        summaryVersion: 'season-game-summary-v3',
+        summaryVersion: 'season-game-summary-v4',
         gameId: game.gameId,
         round: game.round,
         homeFranchiseId: game.homeFranchiseId,

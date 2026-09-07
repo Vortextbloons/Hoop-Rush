@@ -155,33 +155,4 @@ describe('buildFacts usage fact', () => {
     const result = buildFacts(game(home, away, 'home'));
     expect(result.some((fact) => fact.kind === 'usage')).toBe(false);
   });
-  it('falls back to the usage formula for legacy records without diagnostics', () => {
-    const workhorse = player({
-      playerId: playerIdSchema.parse('p-legacy'),
-      points: 8,
-      fieldGoals: { made: 3, attempted: 16 },
-      freeThrows: { made: 2, attempted: 5 },
-      turnovers: 4,
-      diagnostics: undefined,
-    });
-    const rest = Array.from({ length: 4 }, (_, i) =>
-      player({
-        playerId: playerIdSchema.parse(`p-rest-${String(i)}`),
-        points: 6,
-        diagnostics: undefined,
-      }),
-    );
-    const home = team('user', [workhorse, ...rest], 32);
-    const away = team(
-      'away',
-      Array.from({ length: 5 }, (_, i) =>
-        player({ playerId: playerIdSchema.parse(`p-away-${String(i)}`), diagnostics: undefined }),
-      ),
-      30,
-    );
-    const result = buildFacts(game(home, away, 'home'));
-    const usageFact = result.find((fact) => fact.kind === 'usage');
-    expect(usageFact?.playerIds).toEqual(['p-legacy']);
-    expect(usageFact?.evidence.usageShare).toBeCloseTo(1, 6);
-  });
 });

@@ -496,7 +496,7 @@ describe('season applySeasonTrade', () => {
       ...base,
       trade: {
         schemaVersion: 1,
-        tradeVersion: 'season-trade-v3' as const,
+        tradeVersion: 'season-trade-v7' as const,
         windows: [{ windowIndex: 0, blockIndex: 2, status: 'open' as const, offers: [offer] }],
       },
       effects,
@@ -720,7 +720,7 @@ describe('season uneven trades with backfill', () => {
       ...base,
       trade: {
         schemaVersion: 1,
-        tradeVersion: 'season-trade-v3' as const,
+        tradeVersion: 'season-trade-v7' as const,
         windows: [{ windowIndex: 0, blockIndex: 2, status: 'open' as const, offers: [offer] }],
       },
       effects: zeroEffectsOf(base),

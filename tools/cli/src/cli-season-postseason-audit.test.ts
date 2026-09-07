@@ -465,7 +465,7 @@ describe('season postseason audit (postseason-v2)', () => {
     const run = runWithChampion('lakers');
     const log = seasonCommandLogSchema.parse({
       schemaVersion: 1,
-      commandLogVersion: 'command-log-v1',
+      commandLogVersion: 'command-log-v3',
       runId: run.runId,
       entries: [
         seasonCommandLogEntrySchema.parse({
@@ -505,7 +505,7 @@ describe('season postseason audit (postseason-v2)', () => {
       postseasonSummaries: summaries,
       almanac: {
         schemaVersion: 1,
-        almanacVersion: 'almanac-v1',
+        almanacVersion: 'almanac-v2',
         runId: run.runId,
         rootSeed: run.rootSeed,
         championFranchiseId: franchiseIdSchema.parse('lakers'),

@@ -169,11 +169,7 @@ export type SeasonFreeAgencyWindowState = z.infer<typeof seasonFreeAgencyWindowS
 export const seasonFreeAgencyStateSchema = z
   .object({
     schemaVersion: z.literal(1),
-    freeAgencyVersion: z.union([
-      z.literal(SEASON_FREE_AGENCY_VERSION),
-      z.literal(SEASON_FREE_AGENCY_VERSION_V2),
-      z.literal(SEASON_FREE_AGENCY_VERSION_V1),
-    ]),
+    freeAgencyVersion: z.literal(SEASON_FREE_AGENCY_VERSION),
     windows: z.array(seasonFreeAgencyWindowStateSchema).max(3),
     canonicalCandidates: z.record(playerIdSchema, seasonFreeAgencyCanonicalSchema),
     signingCounts: z.record(franchiseIdSchema, z.number().int().min(0).max(3)),

@@ -147,7 +147,7 @@ describe('season draft repository (dexie)', () => {
       command: {
         commandId: 'c-reveal-stale',
         expectedRevision: 99,
-        payload: { kind: 'reveal-draft-roll', participantId: 'human-2' },
+        payload: { kind: 'draw-season-offer', participantId: 'human-2' },
       },
     };
     const state = seasonDraftStateSchema.parse({
@@ -187,11 +187,11 @@ describe('season draft repository (dexie)', () => {
     const { season, db } = makeAdapter();
     const legacyDraft = {
       schemaVersion: 1,
-      draftVersion: 'season-draft-v1',
+      draftVersion: 'season-draft-v2',
       runId: 'legacy-run-1',
       rootSeed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a',
       league: buildSeasonLeague(),
-      catalogVersion: 'season-draft-v1',
+      catalogVersion: 'season-draft-v2',
       participants: [{ participantId: 'p1', franchiseId: 'lakers' }],
       firstPickParticipantId: 'p1',
       round: 2,

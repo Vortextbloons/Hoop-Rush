@@ -1164,28 +1164,10 @@ export function assembleSeasonBlockCandidate(
     tradeVersion: run.versions.tradeVersion,
     influenceVersion: run.versions.influenceVersion,
     objectiveVersion: run.versions.objectiveVersion,
-    challengeVersion: (
-      run.versions as unknown as {
-        challengeVersion?: SeasonCheckpointVersions['challengeVersion'];
-      }
-    ).challengeVersion,
-    challengeTargetsVersion: (
-      run.versions as unknown as {
-        challengeTargetsVersion?: SeasonCheckpointVersions['challengeTargetsVersion'];
-      }
-    ).challengeTargetsVersion,
-    campaignVersion:
-      (
-        run.versions as unknown as {
-          campaignVersion?: typeof SEASON_CAMPAIGN_VERSION;
-        }
-      ).campaignVersion ?? SEASON_CAMPAIGN_VERSION,
-    campaignTargetsVersion:
-      (
-        run.versions as unknown as {
-          campaignTargetsVersion?: typeof SEASON_CAMPAIGN_TARGETS_VERSION;
-        }
-      ).campaignTargetsVersion ?? SEASON_CAMPAIGN_TARGETS_VERSION,
+    challengeVersion: run.versions.challengeVersion,
+    challengeTargetsVersion: run.versions.challengeTargetsVersion,
+    campaignVersion: run.versions.campaignVersion ?? SEASON_CAMPAIGN_VERSION,
+    campaignTargetsVersion: run.versions.campaignTargetsVersion ?? SEASON_CAMPAIGN_TARGETS_VERSION,
     injuryTargetsVersion: run.versions.injuryTargetsVersion,
     tradeTargetsVersion: run.versions.tradeTargetsVersion,
     influenceTargetsVersion: run.versions.influenceTargetsVersion,
@@ -1212,10 +1194,7 @@ export function assembleSeasonBlockCandidate(
     effects,
     health,
     influence: grantResult.influence,
-    freeAgency:
-      input.freeAgency ??
-      (input.run as Partial<SeasonRun>).freeAgency ??
-      emptyFreeAgencyStateOf(run),
+    freeAgency: input.freeAgency ?? emptyFreeAgencyStateOf(run),
     transactions: postTransactions,
     objective: {
       objectiveId: objective.objectiveId,

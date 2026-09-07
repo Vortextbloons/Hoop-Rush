@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
-  SEASON_DRAFT_CATALOG_V3,
+  SEASON_DRAFT_CATALOG_VERSION,
   SEASON_DURABILITY_VERSION,
   SEASON_HEALTH_VERSION,
   SEASON_ROUND_COUNT,
@@ -173,7 +173,7 @@ function catalogOf(rosters: ReturnType<typeof buildFixtureRosters>): SeasonDraft
   }));
   return {
     schemaVersion: 1,
-    catalogVersion: SEASON_DRAFT_CATALOG_V3,
+    catalogVersion: SEASON_DRAFT_CATALOG_VERSION,
     dataVersion: 'data-v1',
     ratingsVersion: 'ratings-v1',
     positionNormalizationVersion: 'position-v3',
@@ -490,7 +490,7 @@ describe('cross-track postseason integration (M2.6)', () => {
     const championId = champion;
     const almanacFacts = {
       schemaVersion: 1 as const,
-      almanacVersion: 'almanac-v1' as const,
+      almanacVersion: 'almanac-v2' as const,
       runId: RUN_ID,
       rootSeed: run.rootSeed,
       championFranchiseId: championId,

@@ -159,8 +159,8 @@ function buildFakeGeneration(input: FakeGenerationInput): SeasonLeagueGeneration
     });
   const diagnostics: SeasonGenerationDiagnostics = {
     seed: input.seed,
-    aiVersion: 'season-ai-v2',
-    rosterGenerationVersion: 'roster-generation-v2',
+    aiVersion: 'season-ai-v3',
+    rosterGenerationVersion: 'roster-generation-v3',
     teamsGenerated: 29,
     teamsRepaired: 0,
     backtracks: 0,
@@ -171,8 +171,8 @@ function buildFakeGeneration(input: FakeGenerationInput): SeasonLeagueGeneration
   };
   const digest = seasonGenerationDigest({
     seed: input.seed,
-    aiVersion: 'season-ai-v2',
-    rosterGenerationVersion: 'roster-generation-v2',
+    aiVersion: 'season-ai-v3',
+    rosterGenerationVersion: 'roster-generation-v3',
     rotationVersion: SEASON_ROTATION_VERSION,
     rosters,
     ownership,
@@ -185,8 +185,8 @@ function buildFakeGeneration(input: FakeGenerationInput): SeasonLeagueGeneration
   return seasonLeagueGenerationResultSchema.parse({
     schemaVersion: 2,
     seed: input.seed,
-    aiVersion: 'season-ai-v2',
-    rosterGenerationVersion: 'roster-generation-v2',
+    aiVersion: 'season-ai-v3',
+    rosterGenerationVersion: 'roster-generation-v3',
     rotationVersion: SEASON_ROTATION_VERSION,
     rosters,
     ownership,
@@ -1149,28 +1149,6 @@ describe('season draft finalize and generation', () => {
     );
     expect(expectRejected(result.record).errorCode).toBe('UNCOMPLETABLE_ROSTER');
   });
-  it('rejects legacy v1 commands with UNSUPPORTED_COMMAND', () => {
-    const state = requireState(createSolo().state, 'create');
-    const reveal = applySeasonDraftCommand(
-      state,
-      CATALOG,
-      cmd('c-reveal', 1, { kind: 'reveal-draft-roll', participantId: 'p1' }),
-      fakeDeps(),
-    );
-    expect(expectRejected(reveal.record).errorCode).toBe('UNSUPPORTED_COMMAND');
-    const claim = applySeasonDraftCommand(
-      state,
-      CATALOG,
-      cmd('c-claim', 1, {
-        kind: 'claim-draft-pool',
-        participantId: 'p1',
-        franchiseId: franchiseIdSchema.parse('lakers'),
-        eraId: eraIdSchema.parse('1990s'),
-      }),
-      fakeDeps(),
-    );
-    expect(expectRejected(claim.record).errorCode).toBe('UNSUPPORTED_COMMAND');
-  });
   it('finalizes and generates the AI league with the injected generator', () => {
     const { state, generation } = playFullDraft(
       FULL_CATALOG,
@@ -1200,8 +1178,8 @@ describe('season draft finalize and generation', () => {
         throw new SeasonAiGenerationError({
           diagnostics: {
             seed: SEED,
-            aiVersion: 'season-ai-v2',
-            rosterGenerationVersion: 'roster-generation-v2',
+            aiVersion: 'season-ai-v3',
+            rosterGenerationVersion: 'roster-generation-v3',
             teamsGenerated: 20,
             teamsRepaired: 0,
             backtracks: 0,

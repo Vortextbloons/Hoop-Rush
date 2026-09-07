@@ -43,10 +43,7 @@ export function auditReplayDivergences(
         transactions: stored.transactions,
         trade: stored.trade,
         objectives: stored.objectives,
-        challenges:
-          stored.challenges ??
-          (stored.run as { challenges?: unknown }).challenges ??
-          buildEmptyChallengeState(),
+        challenges: stored.challenges ?? buildEmptyChallengeState(),
         campaign: undefined,
         evolution: storedEvolutionOf(stored),
         rosters: stored.run.rosters,

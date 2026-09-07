@@ -161,7 +161,7 @@ export function withFixtureStamina(input: SeasonGameSimulationInput): SeasonGame
         playerVersionId: player.playerVersionId,
         rating: fixtureStaminaFor(index),
         historicalMpg: index < 5 ? 28 : 16,
-        derivationVersion: 'season-stamina-v1' as const,
+        derivationVersion: 'season-stamina-v2' as const,
       },
     }));
   return {
@@ -181,7 +181,7 @@ function fillerStamina(roster: number, slot: number): SeasonStaminaInput {
     ),
     rating: 60 + ((roster + slot) % 20),
     historicalMpg: 12 + ((roster + slot) % 20),
-    derivationVersion: 'season-stamina-v1',
+    derivationVersion: 'season-stamina-v2',
   };
 }
 function staminaInputOf(
@@ -193,7 +193,7 @@ function staminaInputOf(
     playerVersionId: player.playerVersionId,
     rating: player.stamina?.rating ?? fixtureStaminaFor(index),
     historicalMpg: player.stamina?.historicalMpg ?? 28,
-    derivationVersion: 'season-stamina-v1',
+    derivationVersion: 'season-stamina-v2',
   };
 }
 export function representativeEffectsState(input: SeasonGameSimulationInput): {

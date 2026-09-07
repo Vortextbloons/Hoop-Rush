@@ -130,7 +130,7 @@ describe('Season Run performance pass (dexie v9)', () => {
         round: 1,
         summary: {
           schemaVersion: 1,
-          summaryVersion: 'season-game-summary-v3',
+          summaryVersion: 'season-game-summary-v4',
           gameId: 's000001',
           round: 1,
           homeFranchiseId: 'lakers',
@@ -381,7 +381,7 @@ describe('Season Run performance pass (dexie v9)', () => {
       rotations: run.rotations,
       recap: {
         schemaVersion: 1,
-        recapVersion: 'season-recap-v5',
+        recapVersion: 'season-recap-v6',
         runId: run.runId,
         blockIndex: 0,
         completedRounds: 10,
@@ -639,7 +639,7 @@ describe('Season Run performance pass (dexie v9)', () => {
       round: 1,
       summary: {
         schemaVersion: 1,
-        summaryVersion: 'season-game-summary-v3',
+        summaryVersion: 'season-game-summary-v4',
         gameId: seasonGameIdSchema.parse('s000002'),
         round: 1,
         homeFranchiseId: lakersFid,
@@ -701,7 +701,7 @@ describe('Season Run performance pass (dexie v9)', () => {
       round: 1,
       summary: {
         schemaVersion: 1,
-        summaryVersion: 'season-game-summary-v3',
+        summaryVersion: 'season-game-summary-v4',
         gameId: seasonGameIdSchema.parse('s000003'),
         round: 1,
         homeFranchiseId: lakersFid,

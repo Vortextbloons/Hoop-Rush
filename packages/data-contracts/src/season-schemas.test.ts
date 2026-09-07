@@ -11,8 +11,6 @@ import {
   seasonStandingsSchema,
   seasonDraftCatalogSchema,
   seasonDraftStateSchema,
-  seasonDraftLegacyStateSchema,
-  storedSeasonDraftStateSchema,
   seasonDraftCommandSchema,
   seasonDraftCommandRecordSchema,
   seasonRotationSchema,
@@ -808,22 +806,39 @@ describe('season draft catalog schema (M2.1)', () => {
       stamina: {
         rating: 45 + n,
         historicalMpg: (30 + n) / 2,
-        derivationVersion: 'season-stamina-v1',
+        derivationVersion: 'season-stamina-v2',
       },
       durability: {
         rating: 45 + n,
         derivationVersion: 'durability-v1',
       },
+      anchors: {
+        gamesPlayed: 70,
+        minutesPerGame: 30,
+        pointsPerGame: 12,
+        reboundsPerGame: 5,
+        offensiveReboundsPerGame: 1,
+        defensiveReboundsPerGame: 4,
+        assistsPerGame: 3,
+        stealsPerGame: 1,
+        blocksPerGame: 0.5,
+        turnoversPerGame: 1.5,
+        fieldGoalPct: 0.45,
+        threePointPct: 0.35,
+        freeThrowPct: 0.78,
+        threePointAttemptRate: 0.2,
+        freeThrowAttemptRate: 0.2,
+      },
     });
     const candidates = [candidate(1, ['PG']), candidate(2, ['SG']), candidate(3, ['SF'])];
     return {
       schemaVersion: 1,
-      catalogVersion: 'season-draft-catalog-v3',
+      catalogVersion: 'season-draft-catalog-v4',
       dataVersion: `m10-${RATINGS_VERSION}`,
       ratingsVersion: RATINGS_VERSION,
       positionNormalizationVersion: 'position-v3',
       playerVersionIdVersion: 'player-version-id-v1',
-      staminaVersion: 'season-stamina-v1',
+      staminaVersion: 'season-stamina-v2',
       durabilityVersion: 'durability-v1',
       pools: [
         {
@@ -839,13 +854,13 @@ describe('season draft catalog schema (M2.1)', () => {
     const catalog = roundTrip(seasonDraftCatalogSchema, buildCatalog());
     expect(catalog.pools).toHaveLength(1);
     expect(catalog.candidates).toHaveLength(3);
-    expect(catalog.catalogVersion).toBe('season-draft-catalog-v3');
-    expect(catalog.staminaVersion).toBe('season-stamina-v1');
+    expect(catalog.catalogVersion).toBe('season-draft-catalog-v4');
+    expect(catalog.staminaVersion).toBe('season-stamina-v2');
     expect(catalog.durabilityVersion).toBe('durability-v1');
     for (const candidate of catalog.candidates) {
       expect(candidate.stamina.rating).toBeGreaterThanOrEqual(45);
       expect(candidate.stamina.rating).toBeLessThanOrEqual(95);
-      expect(candidate.stamina.derivationVersion).toBe('season-stamina-v1');
+      expect(candidate.stamina.derivationVersion).toBe('season-stamina-v2');
       expect(candidate.durability.rating).toBeGreaterThanOrEqual(45);
       expect(candidate.durability.rating).toBeLessThanOrEqual(95);
       expect(candidate.durability.derivationVersion).toBe('durability-v1');
@@ -1025,65 +1040,15 @@ describe('season draft state schema (M2.3.5 season-draft-v2)', () => {
       }),
     ).toThrow();
   });
-  it('reads legacy season-draft-v1 states through the legacy schema and the stored union', () => {
-    const legacy = {
-      schemaVersion: 1,
-      draftVersion: 'season-draft-v1',
-      runId: 'run-1',
-      rootSeed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a',
-      league: buildLeague(),
-      catalogVersion: 'season-draft-v1',
-      participants: [
-        { participantId: 'p1', franchiseId: 'lakers' },
-        { participantId: 'p2', franchiseId: 'celtics' },
-      ],
-      firstPickParticipantId: 'p1',
-      round: 2,
-      currentTurnParticipantId: 'p2',
-      status: 'drafting',
-      revision: 4,
-      currentReveal: {
-        participantId: 'p2',
-        round: 2,
-        pickOrdinal: 2,
-        attempts: [
-          { franchiseId: 'lakers', eraId: '1990s', attemptIndex: 0, usable: false },
-          { franchiseId: 'celtics', eraId: '1980s', attemptIndex: 1, usable: true },
-        ],
-      },
-      rolls: [
-        { franchiseId: 'lakers', eraId: '1990s', attemptIndex: 0, usable: false },
-        { franchiseId: 'celtics', eraId: '1980s', attemptIndex: 1, usable: true },
-      ],
-      claims: [{ participantId: 'p1', franchiseId: 'lakers', eraId: '1990s' }],
-      picks: [
-        {
-          participantId: 'p1',
-          round: 1,
-          pickOrdinal: 1,
-          playerVersionId: `pv-${'0'.repeat(32)}`,
-          franchiseId: 'lakers',
-          eraId: '1990s',
-          rollAttempts: 1,
-        },
-      ],
-      commandLog: [],
-    };
-    expect(roundTrip(seasonDraftLegacyStateSchema, legacy).draftVersion).toBe('season-draft-v1');
-    expect(() => seasonDraftStateSchema.parse(legacy)).toThrow();
-    expect(roundTrip(storedSeasonDraftStateSchema, legacy).schemaVersion).toBe(1);
-    expect(roundTrip(storedSeasonDraftStateSchema, baseState).schemaVersion).toBe(2);
-  });
 });
 describe('season draft command records (M2.1)', () => {
   const command = {
     commandId: 'c-claim-1',
     expectedRevision: 2,
     payload: {
-      kind: 'claim-draft-pool',
+      kind: 'select-draft-player',
       participantId: 'p1',
-      franchiseId: 'lakers',
-      eraId: '1990s',
+      playerVersionId: `pv-${'0'.repeat(32)}`,
     },
   };
   it('round-trips an accepted record and rejects mismatched kinds', () => {
@@ -1131,7 +1096,7 @@ describe('season draft command records (M2.1)', () => {
         ...command,
         payload: { kind: 'reveal-draft-roll', participantId: 'p1' },
       }),
-    ).not.toThrow();
+    ).toThrow();
     expect(() =>
       seasonDraftCommandSchema.parse({
         ...command,
@@ -1148,9 +1113,9 @@ describe('season draft command records (M2.1)', () => {
     expect(() =>
       seasonDraftCommandSchema.parse({
         ...command,
-        payload: { kind: 'reveal-draft-roll', participantId: 'p1' },
+        payload: { kind: 'claim-draft-pool', participantId: 'p1' },
       }),
-    ).not.toThrow();
+    ).toThrow();
     expect(() =>
       seasonDraftCommandSchema.parse({
         ...command,
@@ -1162,8 +1127,8 @@ describe('season draft command records (M2.1)', () => {
     ).not.toThrow();
   });
 });
-describe('season run draft facts union (M2.3.5)', () => {
-  it('accepts legacy season-draft-v1 run facts alongside v2 versions', () => {
+describe('season run draft facts (M2.3.5 season-draft-v2 only)', () => {
+  it('rejects legacy season-draft-v1 run facts', () => {
     const run = buildRun();
     const legacyFacts = {
       draftVersion: 'season-draft-v1',
@@ -1184,12 +1149,13 @@ describe('season run draft facts union (M2.3.5)', () => {
         },
       ],
     };
-    const parsed = roundTrip(seasonRunSchema, {
-      ...run,
-      versions: { ...run.versions, draftVersion: 'season-draft-v1' },
-      draft: legacyFacts,
-    });
-    expect(parsed.draft.draftVersion).toBe('season-draft-v1');
+    expect(() =>
+      seasonRunSchema.parse({
+        ...run,
+        versions: { ...run.versions, draftVersion: 'season-draft-v1' },
+        draft: legacyFacts,
+      }),
+    ).toThrow();
   });
   it('rejects draft facts that do not match either variant', () => {
     const run = buildRun();
@@ -1266,7 +1232,7 @@ describe('season rotation schema (M2.1)', () => {
     ).toThrow();
   });
 });
-describe('season AI contracts (M2.1, M2.4 roster-generation-v2)', () => {
+describe('season AI contracts (M2.1, M2.4 roster-generation-v3)', () => {
   it('round-trips assignments and diagnostics', () => {
     const assignment = {
       franchiseId: 'lakers',
@@ -1277,8 +1243,8 @@ describe('season AI contracts (M2.1, M2.4 roster-generation-v2)', () => {
     expect(() => seasonAiAssignmentSchema.parse({ ...assignment, band: 'super' })).toThrow();
     const diagnostics = {
       seed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a',
-      aiVersion: 'season-ai-v2',
-      rosterGenerationVersion: 'roster-generation-v2',
+      aiVersion: 'season-ai-v3',
+      rosterGenerationVersion: 'roster-generation-v3',
       teamsGenerated: 29,
       teamsRepaired: 1,
       backtracks: 2,
@@ -1372,8 +1338,8 @@ describe('season AI contracts (M2.1, M2.4 roster-generation-v2)', () => {
     const result = {
       schemaVersion: 2,
       seed: SEED,
-      aiVersion: 'season-ai-v2',
-      rosterGenerationVersion: 'roster-generation-v2',
+      aiVersion: 'season-ai-v3',
+      rosterGenerationVersion: 'roster-generation-v3',
       rotationVersion: 'season-rotation-v3',
       rosters,
       ownership,
@@ -1383,8 +1349,8 @@ describe('season AI contracts (M2.1, M2.4 roster-generation-v2)', () => {
       evaluations,
       diagnostics: {
         seed: SEED,
-        aiVersion: 'season-ai-v2',
-        rosterGenerationVersion: 'roster-generation-v2',
+        aiVersion: 'season-ai-v3',
+        rosterGenerationVersion: 'roster-generation-v3',
         teamsGenerated: 29,
         teamsRepaired: 0,
         backtracks: 0,
@@ -1469,9 +1435,9 @@ describe('season AI contracts (M2.1, M2.4 roster-generation-v2)', () => {
     const run = roundTrip(seasonRunSchema, buildRun());
     expect(run.schemaVersion).toBe(14);
     expect(run.versions.runSchemaVersion).toBe(14);
-    expect(run.versions.rosterGenerationVersion).toBe('roster-generation-v2');
-    expect(run.versions.aiVersion).toBe('season-ai-v2');
-    expect(run.versions.rosterTargetsVersion).toBe('roster-targets-v2');
+    expect(run.versions.rosterGenerationVersion).toBe('roster-generation-v3');
+    expect(run.versions.aiVersion).toBe('season-ai-v3');
+    expect(run.versions.rosterTargetsVersion).toBe('roster-targets-v3');
     expect(run.versions.rotationVersion).toBe('season-rotation-v3');
     expect(run.versions.minutePolicyVersion).toBe('minute-policy-v1');
     expect(run.aiPools).toHaveLength(29);
@@ -1490,7 +1456,7 @@ describe('season AI contracts (M2.1, M2.4 roster-generation-v2)', () => {
     expect(() =>
       seasonRunSchema.parse({
         ...run,
-        versions: { ...run.versions, rotationVersion: 'season-rotation-v2' },
+        versions: { ...run.versions, rotationVersion: 'season-rotation-v1' },
       }),
     ).toThrow();
     expect(() =>
@@ -1595,7 +1561,7 @@ describe('season influence family (M2.5, season-influence-v2)', () => {
     Reflect.deleteProperty(balances, franchiseIdSchema.parse('lakers'));
     expect(() => seasonInfluenceStateSchema.parse({ ...state, balances })).toThrow();
     expect(() =>
-      seasonInfluenceStateSchema.parse({ ...state, influenceVersion: 'season-influence-v1' }),
+      seasonInfluenceStateSchema.parse({ ...state, influenceVersion: 'season-influence-v3' }),
     ).not.toThrow();
     expect(() =>
       seasonInfluenceStateSchema.parse({ ...state, influenceVersion: 'season-influence-v99' }),
@@ -1661,7 +1627,7 @@ describe('season objective family (M2.5, season-objective-v1)', () => {
   function buildObjectiveState() {
     return {
       schemaVersion: 1,
-      objectiveVersion: 'season-objective-v1',
+      objectiveVersion: 'season-objective-v3',
       catalog: [
         {
           objectiveId: 'win-six',
@@ -2153,7 +2119,7 @@ describe('season commands (M2.5/M2.6, schema 14)', () => {
   it('parses submit-season-block with the M2.5 objective and state fields', () => {
     const command = {
       schemaVersion: 11,
-      blockVersion: 'season-block-v5',
+      blockVersion: 'season-block-v7',
       command: 'submit-season-block',
       commandId: 'cmd-submit-1',
       runId: 'fixture-run-1',
@@ -2445,7 +2411,7 @@ describe('season block recap M2.5.5 evidence', () => {
     const run = buildRun();
     const recap = {
       schemaVersion: 1,
-      recapVersion: 'season-recap-v5',
+      recapVersion: 'season-recap-v6',
       runId: run.runId,
       blockIndex: 1,
       completedRounds: 10,

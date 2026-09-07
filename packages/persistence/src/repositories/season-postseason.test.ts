@@ -222,7 +222,7 @@ function buildAlmanac(
   const parsedChampion = franchiseIdSchema.parse(champion);
   const base = {
     schemaVersion: 1 as const,
-    almanacVersion: 'almanac-v1' as const,
+    almanacVersion: 'almanac-v2' as const,
     runId: run.runId,
     rootSeed: run.rootSeed,
     championFranchiseId: parsedChampion,
@@ -497,7 +497,7 @@ describe('season postseason repository (M2.6)', () => {
         almanac,
         commandLog: {
           schemaVersion: 1,
-          commandLogVersion: 'command-log-v1',
+          commandLogVersion: 'command-log-v3',
           runId: adapters.run.runId,
           entries: [],
         },
@@ -523,7 +523,7 @@ describe('season postseason repository (M2.6)', () => {
         almanac,
         commandLog: {
           schemaVersion: 1,
-          commandLogVersion: 'command-log-v1',
+          commandLogVersion: 'command-log-v3',
           runId: adapters.run.runId,
           entries: [],
         },

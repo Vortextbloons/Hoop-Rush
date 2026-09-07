@@ -9,17 +9,11 @@ import { seasonRunSchema, seasonRunVersionsSchema } from './season-run.ts';
 import { seasonAlmanacSchema } from './season-almanac.ts';
 import {
   SEASON_REPLAY_EXPORT_VERSION,
-  SEASON_REPLAY_EXPORT_VERSION_V1,
-  SEASON_REPLAY_EXPORT_VERSION_V2,
 } from './season-versions.ts';
 import { canonicalJson, seasonDigestHex } from './season-hash.ts';
 export const seasonReplayExportSchema = z.object({
   schemaVersion: z.literal(1),
-  replayExportVersion: z.union([
-    z.literal(SEASON_REPLAY_EXPORT_VERSION),
-    z.literal(SEASON_REPLAY_EXPORT_VERSION_V2),
-    z.literal(SEASON_REPLAY_EXPORT_VERSION_V1),
-  ]),
+  replayExportVersion: z.literal(SEASON_REPLAY_EXPORT_VERSION),
   runId: z.string().min(1).max(64),
   gameId: postseasonGameIdSchema,
   summary: seasonPostseasonSummarySchema,
@@ -45,11 +39,7 @@ export const seasonReplayAssetHashesSchema = z.object({
 export type SeasonReplayAssetHashes = z.infer<typeof seasonReplayAssetHashesSchema>;
 export const seasonRunReplayExportSchema = z.object({
   schemaVersion: z.literal(1),
-  replayExportVersion: z.union([
-    z.literal(SEASON_REPLAY_EXPORT_VERSION),
-    z.literal(SEASON_REPLAY_EXPORT_VERSION_V2),
-    z.literal(SEASON_REPLAY_EXPORT_VERSION_V1),
-  ]),
+  replayExportVersion: z.literal(SEASON_REPLAY_EXPORT_VERSION),
   kind: z.literal('full-run'),
   runId: idSchema,
   rootSeed: seedSchema,

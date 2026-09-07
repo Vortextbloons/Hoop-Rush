@@ -1378,7 +1378,7 @@ export function campaignViewModel(
   if (run === null) return null;
   const campaign = run.campaign ?? {
     schemaVersion: 1,
-    campaignVersion: 'season-campaign-v1',
+    campaignVersion: 'season-campaign-v3',
     startingIdentity: null,
     startingFocus: null,
     offers: {},

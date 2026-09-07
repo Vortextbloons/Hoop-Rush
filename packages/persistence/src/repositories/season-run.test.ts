@@ -1353,7 +1353,7 @@ describe('season run M2.5 reload audit (v5)', () => {
     const base = commitInputFor(adapters, 2);
     const trade = {
       schemaVersion: 1 as const,
-      tradeVersion: 'season-trade-v3' as const,
+      tradeVersion: 'season-trade-v7' as const,
       windows: [
         {
           windowIndex: 0,

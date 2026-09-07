@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { franchiseIdSchema, seedSchema } from './ids.ts';
+import { eraIdSchema, franchiseIdSchema, seedSchema } from './ids.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import { SEASON_DRAFT_VERSION } from './season-versions.ts';
 import { seasonLeagueSchema } from './season-league.ts';

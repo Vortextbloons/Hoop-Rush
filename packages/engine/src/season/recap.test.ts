@@ -104,7 +104,7 @@ describe('season block recap (M2.3)', () => {
   it('keeps streak facts consistent with the ordered game results', () => {
     const win = (gameId: string): SeasonGameSummary => ({
       schemaVersion: 1,
-      summaryVersion: 'season-game-summary-v3',
+      summaryVersion: 'season-game-summary-v4',
       gameId: seasonGameIdSchema.parse(gameId),
       round: 1,
       homeFranchiseId: franchiseIdSchema.parse('lakers'),

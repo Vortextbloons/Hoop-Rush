@@ -5,7 +5,6 @@ import { playerVersionIdSchema } from './season-identity.ts';
 import {
   SEASON_TRADE_PACKAGE_MAX,
   SEASON_TRADE_VERSION,
-  SEASON_TRADE_VERSION_V6,
 } from './season-versions.ts';
 export const seasonTradeOfferIdSchema = z.string().regex(/^off-[0-9a-f]{32}$/);
 export type SeasonTradeOfferId = z.infer<typeof seasonTradeOfferIdSchema>;
@@ -291,13 +290,7 @@ export type SeasonHumanTradeDirectNegotiation = z.infer<
 export const seasonTradeStateSchema = z
   .object({
     schemaVersion: z.literal(1),
-    tradeVersion: z.union([
-      z.literal(SEASON_TRADE_VERSION),
-      z.literal(SEASON_TRADE_VERSION_V6),
-      z.literal('season-trade-v5'),
-      z.literal('season-trade-v4'),
-      z.literal('season-trade-v3'),
-    ]),
+    tradeVersion: z.literal(SEASON_TRADE_VERSION),
     windows: z.array(seasonTradeWindowStateSchema).max(3),
     humanDirectNegotiations: z.array(seasonHumanTradeDirectNegotiationSchema).max(3).optional(),
   })

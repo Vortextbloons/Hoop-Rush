@@ -479,18 +479,8 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
       influence: stored.influence,
       trade: stored.trade,
       objectives: stored.objectives,
-      challenges:
-        stored.challenges ??
-        (stored.run as { challenges?: unknown }).challenges ??
-        buildEmptyChallengeState(),
-      campaign:
-        stored.campaign ??
-        (
-          stored.run as {
-            campaign?: unknown;
-          }
-        ).campaign ??
-        buildEmptyCampaignState(),
+      challenges: stored.challenges ?? buildEmptyChallengeState(),
+      campaign: stored.campaign ?? buildEmptyCampaignState(),
       checkpointState: stored.checkpointState,
       evolution: storedEvolutionOf(stored),
       stateRevision: stored.stateRevision,
@@ -1883,7 +1873,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
     if (summary === null) return null;
     const facts = {
       schemaVersion: 1,
-      replayExportVersion: 'replay-export-v1',
+      replayExportVersion: 'replay-export-v3',
       runId,
       gameId,
       summary,

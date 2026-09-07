@@ -4,7 +4,6 @@ import {
   PROJECTION_SCHEMA_VERSION,
   RATINGS_VERSION,
   SEASON_DRAFT_CATALOG_VERSION,
-  SEASON_DRAFT_CATALOG_V3,
   SEASON_PROJECTION_TARGETS_VERSION,
   SEASON_PROJECTION_VERSION,
   SIMULATION_RATINGS,
@@ -497,7 +496,7 @@ describe('season draft catalog v4', () => {
       summaryRatings: { overallRating: 80, offenseRating: 82, defenseRating: 74 },
       detailedRatings: { ...SIMULATION_RATINGS },
       tendencies: { ...SIMULATION_TENDENCIES },
-      stamina: { rating: 60, historicalMpg: 30, derivationVersion: 'season-stamina-v1' },
+      stamina: { rating: 60, historicalMpg: 30, derivationVersion: 'season-stamina-v2' },
       durability: { rating: 60, derivationVersion: 'durability-v1' },
       anchors: {
         gamesPlayed: 70,
@@ -525,7 +524,7 @@ describe('season draft catalog v4', () => {
       ratingsVersion: RATINGS_VERSION,
       positionNormalizationVersion: 'position-v3',
       playerVersionIdVersion: 'player-version-id-v1',
-      staminaVersion: 'season-stamina-v1',
+      staminaVersion: 'season-stamina-v2',
       durabilityVersion: 'durability-v1',
       pools: [
         {
@@ -546,19 +545,6 @@ describe('season draft catalog v4', () => {
     const catalog = buildCatalog();
     for (const candidate of catalog.candidates) delete candidate.anchors;
     expect(() => seasonDraftCatalogSchema.parse(catalog)).toThrow(/missing the validated anchors/);
-  });
-  it('accepts a v3 catalog without anchors', () => {
-    const catalog = buildCatalog();
-    catalog.catalogVersion = SEASON_DRAFT_CATALOG_V3;
-    for (const candidate of catalog.candidates) delete candidate.anchors;
-    const parsed = seasonDraftCatalogSchema.parse(catalog);
-    expect(parsed.catalogVersion).toBe(SEASON_DRAFT_CATALOG_V3);
-  });
-  it('accepts a v3 catalog with anchors', () => {
-    const catalog = buildCatalog();
-    catalog.catalogVersion = SEASON_DRAFT_CATALOG_V3;
-    const parsed = seasonDraftCatalogSchema.parse(catalog);
-    expect(parsed.candidates[0]?.anchors?.pointsPerGame).toBe(12);
   });
   it('rejects unknown catalog versions', () => {
     const catalog = buildCatalog() as unknown as {

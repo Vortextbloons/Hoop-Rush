@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   SEASON_COMMAND_LOG_VERSION,
-  SEASON_DRAFT_CATALOG_V3,
+  SEASON_DRAFT_CATALOG_VERSION,
   SEASON_DURABILITY_VERSION,
   SEASON_ROUND_COUNT,
   SEASON_RUN_SCHEMA_VERSION,
@@ -192,7 +192,7 @@ function catalogOf(run: SeasonRun): SeasonDraftCatalog {
   }));
   return {
     schemaVersion: 1,
-    catalogVersion: SEASON_DRAFT_CATALOG_V3,
+    catalogVersion: SEASON_DRAFT_CATALOG_VERSION,
     dataVersion: 'data-v1',
     ratingsVersion: 'ratings-v1',
     positionNormalizationVersion: 'position-v3',
@@ -1109,7 +1109,7 @@ describe('season postseason runner (M2.6 orchestration)', () => {
     );
     const facts = {
       schemaVersion: 1 as const,
-      almanacVersion: 'almanac-v1' as const,
+      almanacVersion: 'almanac-v2' as const,
       runId: completed.almanac.runId,
       rootSeed: completed.almanac.rootSeed,
       championFranchiseId: completed.almanac.championFranchiseId,

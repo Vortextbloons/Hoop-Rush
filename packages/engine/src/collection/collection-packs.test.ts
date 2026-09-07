@@ -4,7 +4,9 @@ import {
   COLLECTION_ECONOMY_VERSION,
   COLLECTION_PACK_RULES_VERSION,
   COLLECTION_RARITY_ORDER,
+  collectionCommandSchema,
   collectionStateSchema,
+  gameSimulationInputSchema,
   type CollectionBalances,
   type CollectionCatalog,
   type CollectionCommand,
@@ -71,7 +73,7 @@ function freshState(
 }
 
 function welcomeCommand(state: CollectionState, commandId = 'cmd-welcome'): CollectionCommand {
-  return {
+  return collectionCommandSchema.parse({
     schemaVersion: 1,
     commandVersion: 'collection-command-v1',
     commandId,
@@ -80,7 +82,7 @@ function welcomeCommand(state: CollectionState, commandId = 'cmd-welcome'): Coll
     expectedDigest: state.digest,
     command: 'claim-welcome',
     acquiredAtIso: ACQUIRED_AT,
-  };
+  });
 }
 
 function packCommand(
@@ -88,7 +90,7 @@ function packCommand(
   packId: 'tip-off',
   commandId: string,
 ): CollectionCommand {
-  return {
+  return collectionCommandSchema.parse({
     schemaVersion: 1,
     commandVersion: 'collection-command-v1',
     commandId,
@@ -98,7 +100,7 @@ function packCommand(
     command: 'open-pack',
     packId,
     acquiredAtIso: ACQUIRED_AT,
-  };
+  });
 }
 
 function rarityCatalog(): CollectionCatalog {
@@ -213,7 +215,7 @@ describe('collection starter', () => {
       throw new Error('starter did not yield five players');
     }
     const result = simulateGame(
-      {
+      gameSimulationInputSchema.parse({
         schemaVersion: 2,
         seed: seedFromString('starter-game'),
         gameNumber: 1,
@@ -221,7 +223,7 @@ describe('collection starter', () => {
         profile: DEFAULT_ERA_SIM_PROFILE,
         home: { teamId: 'starter', displayName: 'Starter Five', players: [p0, p1, p2, p3, p4] },
         away: buildLegalSimulationTeam({ teamId: 'fixture-away', displayName: 'Fixture Away' }),
-      },
+      }),
       createEngineContext(),
     );
     expect(checkGameResult(result)).toEqual([]);
@@ -326,11 +328,13 @@ describe('collection commands', () => {
 
   it('converts exact duplicates and keeps versions separate', () => {
     const twinA = buildCollectionFixtureCard('twin-player', { displayName: 'Twin A' });
-    const twinB = buildCollectionFixtureCard('twin-player-b', {
-      playerId: 'twin-player',
-      displayName: 'Twin B',
-      summarySource: { overallRating: 61, offenseRating: 61, defenseRating: 60 },
-    });
+    const twinB = {
+      ...buildCollectionFixtureCard('twin-player-b', {
+        displayName: 'Twin B',
+        summarySource: { overallRating: 61, offenseRating: 61, defenseRating: 60 },
+      }),
+      playerId: twinA.playerId,
+    };
     expect(twinA.cardId).not.toBe(twinB.cardId);
     const base = buildCollectionFixtureCatalog();
     const pack = emberOnlyPack(0);

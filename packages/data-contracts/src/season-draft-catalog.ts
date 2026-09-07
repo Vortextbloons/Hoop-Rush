@@ -17,7 +17,6 @@ import {
   PLAYER_VERSION_ID_VERSION,
   SEASON_DRAFT_CATALOG_VERSION,
   SEASON_DURABILITY_VERSION,
-  SEASON_STAMINA_LEGACY_VERSION,
   SEASON_STAMINA_VERSION,
 } from './season-versions.ts';
 import {
@@ -36,10 +35,7 @@ export type SeasonDraftCatalogPool = z.infer<typeof seasonDraftCatalogPoolSchema
 export const seasonDraftCandidateStaminaSchema = z.object({
   rating: z.number().int().min(45).max(95),
   historicalMpg: z.number().min(0).max(60),
-  derivationVersion: z.union([
-    z.literal(SEASON_STAMINA_VERSION),
-    z.literal(SEASON_STAMINA_LEGACY_VERSION),
-  ]),
+  derivationVersion: z.literal(SEASON_STAMINA_VERSION),
 });
 export type SeasonDraftCandidateStamina = z.infer<typeof seasonDraftCandidateStaminaSchema>;
 export const seasonDraftCandidateDurabilitySchema = z.object({
@@ -75,18 +71,12 @@ export type SeasonDraftCandidate = z.infer<typeof seasonDraftCandidateSchema>;
 export const seasonDraftCatalogSchema = z
   .object({
     schemaVersion: z.literal(1),
-    catalogVersion: z.union([
-      z.literal(SEASON_DRAFT_CATALOG_VERSION),
-      z.literal(SEASON_DRAFT_CATALOG_V3),
-    ]),
+    catalogVersion: z.literal(SEASON_DRAFT_CATALOG_VERSION),
     dataVersion: z.string().min(1).max(64),
     ratingsVersion: z.string().min(1).max(64),
     positionNormalizationVersion: positionNormalizationVersionSchema,
     playerVersionIdVersion: z.literal(PLAYER_VERSION_ID_VERSION),
-    staminaVersion: z.union([
-      z.literal(SEASON_STAMINA_VERSION),
-      z.literal(SEASON_STAMINA_LEGACY_VERSION),
-    ]),
+    staminaVersion: z.literal(SEASON_STAMINA_VERSION),
     durabilityVersion: z.literal(SEASON_DURABILITY_VERSION),
     pools: z.array(seasonDraftCatalogPoolSchema).min(1),
     candidates: z.array(seasonDraftCandidateSchema).min(1),

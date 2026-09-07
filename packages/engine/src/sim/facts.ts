@@ -1,5 +1,4 @@
 import type { ExplanationFact, GameResult, TeamResult } from '@hoop-rush/data-contracts';
-import { usageOf } from './recorder.ts';
 export const FACT_THRESHOLDS = {
   turnoverMargin: 2,
   shotEfficiencyEfgDiff: 0.02,
@@ -79,8 +78,8 @@ export function buildFacts(result: GameResult): ExplanationFact[] {
     });
   }
   function playerUsage(player: TeamResult['players'][number]): number {
-    if (player.diagnostics) return player.diagnostics.usage;
-    return usageOf(player.fieldGoals.attempted, player.freeThrows.attempted, player.turnovers);
+    if (player.diagnostics === undefined) throw new Error('missing player diagnostics');
+    return player.diagnostics.usage;
   }
   const topUsage = [...winner.players].sort((a, b) => playerUsage(b) - playerUsage(a))[0];
   const teamUsage = winner.players.reduce((sum, player) => sum + playerUsage(player), 0);

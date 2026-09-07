@@ -235,8 +235,8 @@ describe('season generation digest', () => {
     };
     const diagnostics: SeasonGenerationDiagnostics = {
       seed: seedSchema.parse(seed),
-      aiVersion: 'season-ai-v2',
-      rosterGenerationVersion: 'roster-generation-v2',
+      aiVersion: 'season-ai-v3',
+      rosterGenerationVersion: 'roster-generation-v3',
       teamsGenerated: 2,
       teamsRepaired: 0,
       backtracks: 0,
@@ -337,10 +337,10 @@ describe('season generation digest', () => {
       );
     const base = {
       seed: seedSchema.parse(seed),
-      aiVersion: 'season-ai-v2',
-      rosterGenerationVersion: 'roster-generation-v2',
+      aiVersion: 'season-ai-v3',
+      rosterGenerationVersion: 'roster-generation-v3',
       rotationVersion: 'season-rotation-v2',
-      targetsVersion: 'roster-targets-v2',
+      targetsVersion: 'roster-targets-v3',
       rosters: [roster('lakers'), roster('celtics')],
       ownership: [
         { playerVersionId: versionId(2), ownerFranchiseId: franchiseIdSchema.parse('lakers') },

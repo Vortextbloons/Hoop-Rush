@@ -123,7 +123,7 @@ function buildSummary(): SeasonGameSummary {
   });
   return seasonGameSummarySchema.parse({
     schemaVersion: 1,
-    summaryVersion: 'season-game-summary-v3',
+    summaryVersion: 'season-game-summary-v4',
     gameId: 's000001',
     round: 1,
     homeFranchiseId: 'lakers',
@@ -144,34 +144,34 @@ function buildCheckpoint(effects: SeasonEffectsState): SeasonCandidateCheckpoint
   const run = buildRun();
   return {
     schemaVersion: 1,
-    checkpointVersion: 'season-checkpoint-v5',
+    checkpointVersion: 'season-checkpoint-v7',
     runId: run.runId,
     rootSeed: run.rootSeed,
     versions: {
-      blockVersion: 'season-block-v5',
-      summaryVersion: 'season-game-summary-v3',
-      aggregatesVersion: 'season-aggregates-v2',
-      recapVersion: 'season-recap-v5',
+      blockVersion: 'season-block-v7',
+      summaryVersion: 'season-game-summary-v4',
+      aggregatesVersion: 'season-aggregates-v3',
+      recapVersion: 'season-recap-v6',
       leadersVersion: 'season-leaders-v1',
       homeCourtVersion: 'season-home-court-v1',
       gameVersion: 'season-game-v4',
       gameTargetsVersion: 'season-game-targets-v4',
       seedDerivationVersion: 'season-seeds-v1',
-      staminaVersion: 'season-stamina-v1',
+      staminaVersion: 'season-stamina-v2',
       chemistryVersion: 'season-chemistry-v2',
-      effectsTargetsVersion: 'season-effect-targets-v1',
+      effectsTargetsVersion: 'season-effect-targets-v2',
       healthVersion: 'season-health-v2',
-      tradeVersion: 'season-trade-v3',
-      influenceVersion: 'season-influence-v2',
-      objectiveVersion: 'season-objective-v1',
-      campaignVersion: 'season-campaign-v1',
+      tradeVersion: 'season-trade-v7',
+      influenceVersion: 'season-influence-v3',
+      objectiveVersion: 'season-objective-v3',
+      campaignVersion: 'season-campaign-v3',
       campaignTargetsVersion: 'campaign-targets-v1',
       injuryTargetsVersion: 'injury-targets-v2',
       tradeTargetsVersion: 'trade-targets-v3',
-      influenceTargetsVersion: 'influence-targets-v2',
+      influenceTargetsVersion: 'influence-targets-v3',
       freeAgencyVersion: SEASON_FREE_AGENCY_VERSION,
-      freeAgencyIndexVersion: 'free-agency-index-v1',
-      freeAgencyTargetsVersion: 'free-agency-targets-v1',
+      freeAgencyIndexVersion: 'free-agency-index-v2',
+      freeAgencyTargetsVersion: 'free-agency-targets-v2',
     },
     blockIndex: 0,
     completedRounds: 0,
@@ -225,7 +225,7 @@ function buildCheckpoint(effects: SeasonEffectsState): SeasonCandidateCheckpoint
     retainedDetails: [],
     recap: {
       schemaVersion: 1,
-      recapVersion: 'season-recap-v5',
+      recapVersion: 'season-recap-v6',
       runId: run.runId,
       blockIndex: 0,
       completedRounds: 0,
@@ -329,12 +329,12 @@ describe('season stamina input schema (M2.4)', () => {
     playerVersionId: playerId(0),
     rating: 78,
     historicalMpg: 26.4,
-    derivationVersion: 'season-stamina-v1',
+    derivationVersion: 'season-stamina-v2',
   };
   it('round-trips a valid profile', () => {
     const parsed = roundTrip(seasonStaminaInputSchema, stamina);
     expect(parsed.rating).toBe(78);
-    expect(parsed.derivationVersion).toBe('season-stamina-v1');
+    expect(parsed.derivationVersion).toBe('season-stamina-v2');
   });
   it('rejects out-of-range ratings, mpg, and derivation versions', () => {
     expect(() => seasonStaminaInputSchema.parse({ ...stamina, rating: 44 })).toThrow();
@@ -611,7 +611,7 @@ describe('season checkpoint effects (M2.4)', () => {
   it('freezes the M2.4/M2.6.5 material versions in the checkpoint versions', () => {
     const checkpoint = buildCheckpoint(buildEffectsState());
     expect(roundTrip(seasonCheckpointVersionsSchema, checkpoint.versions).staminaVersion).toBe(
-      'season-stamina-v1',
+      'season-stamina-v2',
     );
     expect(() =>
       seasonCheckpointVersionsSchema.parse({
@@ -662,7 +662,7 @@ describe('season block recap effects evidence (M2.4)', () => {
     const run = buildRun();
     return {
       schemaVersion: 1,
-      recapVersion: 'season-recap-v5',
+      recapVersion: 'season-recap-v6',
       runId: run.runId,
       blockIndex: 0,
       completedRounds: 0,
@@ -743,7 +743,7 @@ describe('season game player input stamina (M2.4)', () => {
         playerVersionId: playerId(0),
         rating: 78,
         historicalMpg: 26.4,
-        derivationVersion: 'season-stamina-v1',
+        derivationVersion: 'season-stamina-v2',
       },
     });
     expect(withStamina.stamina?.rating).toBe(78);
@@ -764,11 +764,11 @@ describe('season run schema version 7 (M2.5)', () => {
     expect(() => seasonRunSchema.parse({ ...run, schemaVersion: 5 })).toThrow();
     expect(() => seasonRunSchema.parse({ ...run, schemaVersion: 6 })).toThrow();
   });
-  it('freezes the roster-generation-v2 material versions on the run', () => {
+  it('freezes the roster-generation-v3 material versions on the run', () => {
     const run = buildRun();
-    expect(run.versions.rosterGenerationVersion).toBe('roster-generation-v2');
-    expect(run.versions.aiVersion).toBe('season-ai-v2');
-    expect(run.versions.rosterTargetsVersion).toBe('roster-targets-v2');
+    expect(run.versions.rosterGenerationVersion).toBe('roster-generation-v3');
+    expect(run.versions.aiVersion).toBe('season-ai-v3');
+    expect(run.versions.rosterTargetsVersion).toBe('roster-targets-v3');
     expect(() =>
       seasonRunSchema.parse({
         ...run,
@@ -791,7 +791,7 @@ describe('season run schema version 7 (M2.5)', () => {
   it('freezes the seven M2.5 material versions and the state chain on the run', () => {
     const run = buildRun();
     expect(run.versions.healthVersion).toBe('season-health-v2');
-    expect(run.versions.tradeVersion).toBe('season-trade-v4');
+    expect(run.versions.tradeVersion).toBe('season-trade-v7');
     expect(run.versions.influenceVersion).toBe('season-influence-v3');
     expect(run.versions.objectiveVersion).toBe('season-objective-v3');
     expect(run.versions.campaignVersion).toBe('season-campaign-v3');

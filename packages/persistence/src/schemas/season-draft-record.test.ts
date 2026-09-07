@@ -29,7 +29,7 @@ describe('storedSeasonDraftSchema', () => {
       storedSeasonDraftSchema.safeParse({
         recordId: 'season-draft',
         saveSchemaVersion: 3,
-        draft: { schemaVersion: 1, draftVersion: 'season-draft-v1' },
+        draft: { schemaVersion: 1, draftVersion: 'season-draft-v2' },
         generation: null,
       }).success,
     ).toBe(false);

@@ -12,7 +12,6 @@ import {
 } from './season-free-agency.ts';
 import {
   SEASON_FREE_AGENCY_INDEX_VERSION,
-  SEASON_FREE_AGENCY_INDEX_VERSION_V1,
 } from './season-versions.ts';
 export const seasonFreeAgencyIndexEntrySchema = z.object({
   playerVersionId: playerVersionIdSchema,
@@ -47,10 +46,7 @@ export type SeasonFreeAgencyIndexEntry = z.infer<typeof seasonFreeAgencyIndexEnt
 export const seasonFreeAgencyIndexSchema = z
   .object({
     schemaVersion: z.literal(1),
-    indexVersion: z.union([
-      z.literal(SEASON_FREE_AGENCY_INDEX_VERSION),
-      z.literal(SEASON_FREE_AGENCY_INDEX_VERSION_V1),
-    ]),
+    indexVersion: z.literal(SEASON_FREE_AGENCY_INDEX_VERSION),
     dataVersion: z.string().min(1).max(64),
     catalogRef: z.object({
       catalogVersion: z.string().min(1).max(64),

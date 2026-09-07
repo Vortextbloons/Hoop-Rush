@@ -108,7 +108,7 @@ export function chainLog(entries: readonly SeasonCommandLogEntry[]): SeasonComma
   }
   return seasonCommandLogSchema.parse({
     schemaVersion: 1,
-    commandLogVersion: 'command-log-v1',
+    commandLogVersion: 'command-log-v3',
     runId: entries[0]?.runId ?? '',
     entries: chained,
   });
@@ -243,7 +243,7 @@ export function buildReplayedRun(): ReplayedRun {
   const finalStateDigest = finalRun.stateDigest;
   const almanac: SeasonAlmanac = {
     schemaVersion: 1,
-    almanacVersion: 'almanac-v1',
+    almanacVersion: 'almanac-v2',
     runId: run.runId,
     rootSeed: run.rootSeed,
     championFranchiseId: franchiseIdSchema.parse('lakers'),
@@ -382,7 +382,7 @@ export function buildFreeAgencyReplayedRun(
   const finalStateDigest = resolveOutput.run.stateDigest;
   const almanac: SeasonAlmanac = {
     schemaVersion: 1,
-    almanacVersion: 'almanac-v1',
+    almanacVersion: 'almanac-v2',
     runId: run.runId,
     rootSeed: run.rootSeed,
     championFranchiseId: franchiseIdSchema.parse('lakers'),

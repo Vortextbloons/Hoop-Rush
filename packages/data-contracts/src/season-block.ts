@@ -8,15 +8,9 @@ import { seasonCampaignOpportunityIdSchema } from './season-campaign.ts';
 import { seasonChallengeIdSchema } from './season-challenge.ts';
 import {
   SEASON_BLOCK_VERSION,
-  SEASON_BLOCK_VERSION_V5,
-  SEASON_BLOCK_VERSION_V6,
 } from './season-versions.ts';
 export const seasonSubmitBlockCommandSchema = seasonRunCommandBaseSchema.extend({
-  blockVersion: z.union([
-    z.literal(SEASON_BLOCK_VERSION),
-    z.literal(SEASON_BLOCK_VERSION_V6),
-    z.literal(SEASON_BLOCK_VERSION_V5),
-  ]),
+  blockVersion: z.literal(SEASON_BLOCK_VERSION),
   command: z.literal('submit-season-block'),
   expectedRevision: z.number().int().nonnegative(),
   blockIndex: z.number().int().min(0).max(8),

@@ -97,6 +97,7 @@ export const SEASON_PROJECTION_TARGETS_VERSION = 'season-projection-targets-v1';
 export const SEASON_ROSTER_AUTOFILL_VERSION = 'season-roster-autofill-v1';
 export const SEASON_HEALTH_VERSION = 'season-health-v2';
 export const SEASON_FRONT_OFFICE_VERSION = 'season-front-office-v1';
+export const SEASON_SPONSOR_GEAR_VERSION = 'season-sponsor-gear-v1';
 export const SEASON_COURT_INNOVATION_VERSION = 'season-court-innovation-v1';
 export const SEASON_EVOLUTION_TARGETS_VERSION = 'franchise-evolution-targets-v1';
 export const SEASON_TRADE_VERSION = 'season-trade-v7';

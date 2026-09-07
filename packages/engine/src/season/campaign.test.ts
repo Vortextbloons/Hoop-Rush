@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   SEASON_CAMPAIGN_VERSION,
-  SEASON_CAMPAIGN_VERSION_V2,
+  SEASON_CAMPAIGN_VERSION,
   buildEmptyCampaignState,
   commandIdSchema,
   franchiseIdSchema,
@@ -248,11 +248,11 @@ describe('season campaign generation (M2.5.5)', () => {
   it('loads a legacy non-null identity and ignores it', () => {
     const legacy = normalizeCampaignState({
       ...buildEmptyCampaignState(),
-      campaignVersion: SEASON_CAMPAIGN_VERSION_V2,
+      campaignVersion: SEASON_CAMPAIGN_VERSION,
       startingIdentity: 'win-now',
       startingFocus: 'defense',
     });
-    expect(legacy.campaignVersion).toBe(SEASON_CAMPAIGN_VERSION_V2);
+    expect(legacy.campaignVersion).toBe(SEASON_CAMPAIGN_VERSION);
     expect(legacy.startingIdentity).toBe('win-now');
     const withLegacy = generationInput({ campaignState: legacy });
     const legacyOffers = generateSeasonCampaignOffers(withLegacy);

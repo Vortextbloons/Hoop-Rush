@@ -109,7 +109,7 @@ function summary(round: number, spec: GameSpec = {}): SeasonGameSummary {
   const awayScore = spec.awayScore ?? awayBox.points;
   return {
     schemaVersion: 1,
-    summaryVersion: 'season-game-summary-v3',
+    summaryVersion: 'season-game-summary-v4',
     gameId: seasonGameIdSchema.parse(`s${String(round).padStart(6, '0')}`),
     round,
     homeFranchiseId: franchiseIdSchema.parse(LAKERS),
@@ -229,7 +229,7 @@ function offer(
   };
 }
 function tradeState(windows: SeasonTradeState['windows']): SeasonTradeState {
-  return { schemaVersion: 1, tradeVersion: 'season-trade-v3', windows };
+  return { schemaVersion: 1, tradeVersion: 'season-trade-v7', windows };
 }
 function runWithTrade(): {
   run: ReturnType<typeof buildEconomyTestRun>['run'];

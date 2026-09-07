@@ -2,8 +2,6 @@ import { z } from 'zod';
 import { commandIdSchema } from './ids.ts';
 import {
   SEASON_OBJECTIVE_VERSION,
-  SEASON_OBJECTIVE_VERSION_V1,
-  SEASON_OBJECTIVE_VERSION_V2,
 } from './season-versions.ts';
 export const seasonObjectiveIdSchema = z.enum([
   'win-six',
@@ -94,11 +92,7 @@ export type SeasonObjectivePerFranchiseSelection = z.infer<
 export const seasonObjectiveStateSchema = z
   .object({
     schemaVersion: z.literal(1),
-    objectiveVersion: z.union([
-      z.literal(SEASON_OBJECTIVE_VERSION),
-      z.literal(SEASON_OBJECTIVE_VERSION_V2),
-      z.literal(SEASON_OBJECTIVE_VERSION_V1),
-    ]),
+    objectiveVersion: z.literal(SEASON_OBJECTIVE_VERSION),
     catalog: z.array(seasonObjectiveDefinitionSchema).length(6),
     selections: z.record(z.coerce.number().int().min(0).max(7), seasonObjectiveSelectionSchema),
     franchiseSelections: seasonObjectivePerFranchiseSelectionSchema.optional(),

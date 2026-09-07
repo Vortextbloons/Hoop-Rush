@@ -454,12 +454,11 @@ export function collectionPackCalibrate(args: {
   starterSeeds?: string;
   out?: string;
   manifest?: string;
-  validate?: boolean;
+  validate?: string | null;
 }): CliReport {
-  if (args.validate === true) {
-    const outPath = args.out ?? DEFAULT_COLLECTION_TARGETS;
+  if (typeof args.validate === 'string') {
     return validateTargetsArtifact({
-      outPath,
+      outPath: args.validate,
       schema: collectionPackTargetsSchema,
       command: 'collection pack-calibrate',
       extraChecks: (parsed) => {

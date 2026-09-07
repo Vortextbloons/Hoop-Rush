@@ -429,7 +429,7 @@ const COMMANDS: Record<string, CommandDef> = {
         starterSeeds: getOptionString(args, 'starter-seeds') ?? undefined,
         out: getOptionString(args, 'out') ?? undefined,
         manifest: getOptionString(args, 'manifest') ?? undefined,
-        validate: hasOption(args, 'validate'),
+        validate: getOptionString(args, 'validate') ?? null,
       }),
   },
   'season rosters generate': {

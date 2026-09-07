@@ -192,7 +192,7 @@ describe('M3.11.1 readiness matches gates', () => {
 function influenceStateWith(balance: number, fid: string): SeasonInfluenceState {
   return {
     schemaVersion: 1,
-    influenceVersion: 'season-influence-v2',
+    influenceVersion: 'season-influence-v3',
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
     balances: { [fid]: balance } as SeasonInfluenceState['balances'],
     ledger: [],
@@ -262,7 +262,7 @@ describe('M3.11.1 Campaign/Innovation expose no internals', () => {
   function campaignRun(): SeasonRun {
     const campaign = {
       schemaVersion: 1,
-      campaignVersion: 'season-campaign-v1',
+      campaignVersion: 'season-campaign-v3',
       startingIdentity: null,
       startingFocus: null,
       offers: {

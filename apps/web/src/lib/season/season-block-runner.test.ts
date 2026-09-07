@@ -228,7 +228,7 @@ function makeCandidate(
   if (home === undefined || away === undefined) throw new Error('fixture rosters missing');
   const gameSummary: SeasonGameSummary = {
     schemaVersion: 1,
-    summaryVersion: 'season-game-summary-v3',
+    summaryVersion: 'season-game-summary-v4',
     gameId: seasonGameIdSchema.parse('s000001'),
     round: 1,
     homeFranchiseId: home.franchiseId,
@@ -314,7 +314,7 @@ function makeCandidate(
   );
   const recap: SeasonBlockRecap = {
     schemaVersion: 1,
-    recapVersion: 'season-recap-v5',
+    recapVersion: 'season-recap-v6',
     runId: run.runId,
     blockIndex: 0,
     completedRounds: 10,
@@ -346,7 +346,7 @@ function makeCandidate(
   };
   const base: SeasonCandidateCheckpoint = {
     schemaVersion: 1,
-    checkpointVersion: 'season-checkpoint-v5',
+    checkpointVersion: 'season-checkpoint-v7',
     runId: run.runId,
     rootSeed: run.rootSeed,
     versions: run.versions,
@@ -401,7 +401,7 @@ function makePending(
 ): SeasonPendingBlockCandidate {
   return {
     schemaVersion: 1,
-    blockVersion: 'season-block-v5',
+    blockVersion: 'season-block-v7',
     runId: run.runId,
     commandId: commandIdSchema.parse('cmd-1'),
     blockIndex: 0,
@@ -734,7 +734,7 @@ describe('season block runner (M2.5 wire)', () => {
       ...makeRun(),
       freeAgency: {
         schemaVersion: 1 as const,
-        freeAgencyVersion: 'season-free-agency-v1' as const,
+        freeAgencyVersion: 'season-free-agency-v3' as const,
         windows: [],
         canonicalCandidates: {
           'p-magic': {
@@ -771,7 +771,7 @@ describe('season block runner (M2.5 wire)', () => {
     const candidate = makeCandidate(run, {
       freeAgency: {
         schemaVersion: 1,
-        freeAgencyVersion: 'season-free-agency-v1' as const,
+        freeAgencyVersion: 'season-free-agency-v3' as const,
         windows: [],
         canonicalCandidates: {},
         signingCounts: Object.fromEntries(LEAGUE.teams.map((team) => [team.franchiseId, 0])),

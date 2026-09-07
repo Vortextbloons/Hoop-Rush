@@ -16,6 +16,7 @@ export const seasonInfluenceSourceSchema = z.enum([
   'trade-cash-received',
   'risky-rehab',
   'free-agent-signing',
+  'sponsor-purchase',
 ]);
 export type SeasonInfluenceSource = z.infer<typeof seasonInfluenceSourceSchema>;
 export const seasonInfluenceLedgerEntrySchema = z.object({

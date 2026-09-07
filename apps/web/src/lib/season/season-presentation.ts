@@ -965,7 +965,7 @@ export function campaignTimelineViewModel(
   if (run === null) return null;
   const campaign = run.campaign ?? {
     schemaVersion: 1,
-    campaignVersion: 'season-campaign-v1',
+    campaignVersion: 'season-campaign-v3',
     startingIdentity: null,
     startingFocus: null,
     offers: {},
@@ -1485,15 +1485,10 @@ export function challengeEvidenceOfRun(
       evaluationFacts: result.facts,
     }));
 }
-export type RecapChallengeView =
-  | { kind: 'challenges'; evidence: SeasonBlockChallengeEvidence[] }
-  | { kind: 'legacy-objective'; objectiveId: string; success: boolean };
+export type RecapChallengeView = { kind: 'challenges'; evidence: SeasonBlockChallengeEvidence[] };
 export function recapChallengeView(recap: SeasonBlockRecap): RecapChallengeView | null {
   const evidence = recap.challengeEvidence ?? [];
   if (evidence.length > 0) return { kind: 'challenges', evidence };
-  const legacy = recap.objectiveEvidence ?? null;
-  if (legacy !== null)
-    return { kind: 'legacy-objective', objectiveId: legacy.objectiveId, success: legacy.success };
   return null;
 }
 export const TRADE_GRADE_NEUTRAL_FALLBACK = 'Not enough post-trade games to grade.';

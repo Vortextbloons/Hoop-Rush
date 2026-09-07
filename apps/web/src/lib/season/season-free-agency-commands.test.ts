@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  SEASON_DRAFT_CATALOG_V3,
+  SEASON_DRAFT_CATALOG_VERSION,
   SEASON_DURABILITY_VERSION,
   SEASON_RUN_SCHEMA_VERSION,
   SEASON_STAMINA_VERSION,
@@ -76,7 +76,7 @@ function fixtureCatalog(run: SeasonRun): SeasonDraftCatalog {
   }
   return {
     schemaVersion: 1,
-    catalogVersion: SEASON_DRAFT_CATALOG_V3,
+    catalogVersion: SEASON_DRAFT_CATALOG_VERSION,
     dataVersion: 'data-v1',
     ratingsVersion: 'ratings-v1',
     positionNormalizationVersion: 'position-v3',
@@ -158,7 +158,7 @@ function fixtureIndex(catalog: SeasonDraftCatalog): SeasonFreeAgencyIndex {
   }
   return {
     schemaVersion: 1,
-    indexVersion: 'free-agency-index-v1',
+    indexVersion: 'free-agency-index-v2',
     dataVersion: 'fixture',
     catalogRef: {
       catalogVersion: catalog.catalogVersion,

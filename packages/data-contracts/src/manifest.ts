@@ -42,7 +42,7 @@ export const seasonArtifactIndexEntrySchema = z.object({
 });
 export type SeasonArtifactIndexEntry = z.infer<typeof seasonArtifactIndexEntrySchema>;
 export const hoopRushManifestSchema = z.object({
-  schemaVersion: z.literal(3),
+  schemaVersion: z.union([z.literal(3), z.literal(MANIFEST_SCHEMA_VERSION)]),
   dataVersion: z.string().min(1).max(64),
   modernFranchiseSlots: z.array(modernFranchiseSlotSchema).length(30),
   franchiseLineage: franchiseLineageSchema,
@@ -61,6 +61,7 @@ export const hoopRushManifestSchema = z.object({
       rosterTargets: seasonArtifactIndexEntrySchema,
       freeAgencyIndex: seasonArtifactIndexEntrySchema.optional(),
       freeAgencyTargets: seasonArtifactIndexEntrySchema.optional(),
+      sponsorsIndex: seasonArtifactIndexEntrySchema.optional(),
     })
     .optional(),
   projection: z

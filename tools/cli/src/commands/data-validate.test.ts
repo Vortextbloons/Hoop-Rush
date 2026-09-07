@@ -6,8 +6,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { PeakPlayerSeason } from '@hoop-rush/data-contracts';
 import {
   POSITION_NORMALIZATION_VERSION,
-  SEASON_ROTATION_V2,
   SEASON_ROTATION_VERSION,
+  SEASON_ROTATION_VERSION,
+  SEASON_SPONSOR_GEAR_CATALOG,
+  SEASON_SPONSOR_GEAR_VERSION,
   contentHashSchema,
   eraIdSchema,
   franchiseIdSchema,
@@ -217,7 +219,7 @@ describe('dataValidate season free-agency index audit', () => {
   function minimalIndex(catalogHash: string): unknown {
     return {
       schemaVersion: 1,
-      indexVersion: 'free-agency-index-v1',
+      indexVersion: 'free-agency-index-v2',
       dataVersion: 'data-v1',
       catalogRef: {
         catalogVersion: 'season-draft-catalog-v4',
@@ -398,13 +400,13 @@ describe('dataValidate season game targets audit', () => {
     return writeManifest(buildManifest());
   }
   it('fails packaged game targets pinned to the stale rotation version', async () => {
-    const path = await writeTargetsManifest(SEASON_ROTATION_V2);
+    const path = await writeTargetsManifest(SEASON_ROTATION_VERSION);
     const report = await dataValidate(path, false);
     expect(report.ok).toBe(false);
     expect(
       report.failures.some((f) =>
         f.includes(
-          `game-targets: rotationVersion ${SEASON_ROTATION_V2} != ${SEASON_ROTATION_VERSION}`,
+          `game-targets: rotationVersion ${SEASON_ROTATION_VERSION} != ${SEASON_ROTATION_VERSION}`,
         ),
       ),
     ).toBe(true);
@@ -416,6 +418,73 @@ describe('dataValidate season game targets audit', () => {
     expect(report.ok).toBe(true);
   });
   it('passes when no game targets are packaged', async () => {
+    const path = await writeManifest(buildManifest());
+    const report = await dataValidate(path, false);
+    expect(report.ok).toBe(true);
+  });
+});
+describe('dataValidate sponsor gear audit', () => {
+  function sha256Hex(content: string | Buffer): string {
+    return createHash('sha256').update(content).digest('hex');
+  }
+  async function writeSponsorPack(): Promise<string> {
+    const sponsorsDir = join(dir, 'sponsors');
+    await mkdir(sponsorsDir, { recursive: true });
+    const logos = [...SEASON_SPONSOR_GEAR_CATALOG]
+      .sort((a, b) => (a.brandFamily < b.brandFamily ? -1 : 1))
+      .map((entry) => {
+        const bytes = `<svg xmlns="http://www.w3.org/2000/svg">${entry.brandFamily}</svg>\n`;
+        return { entry, bytes };
+      });
+    for (const { entry, bytes } of logos) {
+      await writeFile(join(sponsorsDir, `${entry.brandFamily}.svg`), bytes);
+    }
+    const index = {
+      schemaVersion: 1,
+      gearVersion: SEASON_SPONSOR_GEAR_VERSION,
+      logos: logos.map(({ entry, bytes }) => ({
+        family: entry.brandFamily,
+        file: `sponsors/${entry.brandFamily}.svg`,
+        contentHash: contentHashSchema.parse(sha256Hex(bytes)),
+      })),
+    };
+    const indexJson = JSON.stringify(index);
+    const seasonDir = join(dir, 'season');
+    await mkdir(seasonDir, { recursive: true });
+    await writeFile(join(seasonDir, 'sponsors-index.json'), indexJson);
+    const placeholder = {
+      url: 'season/league.json',
+      contentHash: contentHashSchema.parse(sha256Hex('placeholder')),
+    };
+    return writeManifest(
+      buildManifest({
+        season: {
+          league: placeholder,
+          schedule: placeholder,
+          draftCatalog: placeholder,
+          rosterTargets: placeholder,
+          sponsorsIndex: {
+            url: 'season/sponsors-index.json',
+            contentHash: contentHashSchema.parse(sha256Hex(indexJson)),
+          },
+        },
+      }),
+    );
+  }
+  it('accepts a packaged sponsors index with catalog parity', async () => {
+    const path = await writeSponsorPack();
+    const report = await dataValidate(path, false);
+    expect(report.failures).toEqual([]);
+    expect(report.ok).toBe(true);
+  });
+  it('fails a tampered sponsor logo', async () => {
+    const path = await writeSponsorPack();
+    await writeFile(join(dir, 'sponsors', 'nike.svg'), '<svg>tampered</svg>\n');
+    const report = await dataValidate(path, false);
+    expect(report.ok).toBe(false);
+    expect(report.failures.some((f) => f.includes('sponsor-gear: logo hash mismatch'))).toBe(true);
+  });
+  it('passes when no sponsors index is packaged', async () => {
     const path = await writeManifest(buildManifest());
     const report = await dataValidate(path, false);
     expect(report.ok).toBe(true);

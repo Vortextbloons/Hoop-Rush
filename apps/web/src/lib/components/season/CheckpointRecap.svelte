@@ -426,28 +426,6 @@ import {
         {/each}
       </ul>
     </section>
-  {:else if challengeView?.kind === 'legacy-objective'}
-    <section
-      aria-labelledby="recap-goal-heading"
-      class="rounded-none bg-surface-1 p-4 sm:rounded-xl"
-    >
-      <h2
-        id="recap-goal-heading"
-        class="font-display text-base font-extrabold uppercase tracking-tight"
-      >
-        Goal
-      </h2>
-      <p class="mt-1 text-sm">
-        <span>{challengeView.objectiveId}</span>
-        <span
-          class="ml-2 rounded-full px-2 py-0.5 font-mono text-xs font-bold uppercase tracking-[0.12em] {challengeView.success
-            ? 'bg-positive/15 text-positive'
-            : 'bg-destructive/15 text-destructive'}"
-        >
-          {challengeView.success ? 'Hit · +1 Influence' : 'Missed'}
-        </span>
-      </p>
-    </section>
   {/if}
 
   {#if recap.freeAgencyEvidence.windowIndex !== null}

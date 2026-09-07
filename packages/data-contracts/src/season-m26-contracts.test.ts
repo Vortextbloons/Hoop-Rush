@@ -465,7 +465,7 @@ describe('awards, almanac, and replay exports (M2.6)', () => {
   it('round-trips an almanac whose digest reconciles with the run completion', () => {
     const almanac: SeasonAlmanac = seasonAlmanacSchema.parse({
       schemaVersion: 1,
-      almanacVersion: 'almanac-v1',
+      almanacVersion: 'almanac-v2',
       runId: 'fixture-run-1',
       rootSeed: SEED,
       championFranchiseId: 'lakers',
@@ -486,7 +486,7 @@ describe('awards, almanac, and replay exports (M2.6)', () => {
     const summary = basePostseasonSummary();
     const exportArtifact = {
       schemaVersion: 1,
-      replayExportVersion: 'replay-export-v1',
+      replayExportVersion: 'replay-export-v3',
       runId: 'fixture-run-1',
       gameId: summary.gameId,
       summary,
@@ -588,7 +588,7 @@ describe('command log (M2.6, command-log-v1)', () => {
     expect(
       seasonCommandLogSchema.safeParse({
         schemaVersion: 1,
-        commandLogVersion: 'command-log-v2',
+        commandLogVersion: 'command-log-v3',
         runId: 'fixture-run-1',
         entries: [],
       }).success,
@@ -596,7 +596,7 @@ describe('command log (M2.6, command-log-v1)', () => {
     expect(
       seasonCommandLogSchema.safeParse({
         schemaVersion: 1,
-        commandLogVersion: 'command-log-v99' as unknown as 'command-log-v2',
+        commandLogVersion: 'command-log-v99' as unknown as 'command-log-v3',
         runId: 'fixture-run-1',
         entries: [],
       }).success,

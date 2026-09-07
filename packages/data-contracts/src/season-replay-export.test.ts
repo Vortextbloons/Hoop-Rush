@@ -170,7 +170,7 @@ function postseasonSummary(): SeasonPostseasonSummary {
 function almanac(commandLogDigest: string): SeasonAlmanac {
   return seasonAlmanacSchema.parse({
     schemaVersion: 1,
-    almanacVersion: 'almanac-v1',
+    almanacVersion: 'almanac-v2',
     runId: 'fixture-run-1',
     rootSeed: buildRun().rootSeed,
     championFranchiseId: 'lakers',
@@ -203,7 +203,7 @@ function exportInput(): SeasonRunReplayExportInput {
     finalStateDigest: '6'.repeat(32),
   };
 }
-describe('full-run replay export (replay-export-v1)', () => {
+describe('full-run replay export (replay-export-v3)', () => {
   it('builds a byte-stable export: identical inputs, identical bytes and digest', () => {
     const first = buildSeasonRunReplayExport(exportInput());
     const second = buildSeasonRunReplayExport(exportInput());
@@ -293,14 +293,14 @@ describe('full-run replay export (replay-export-v1)', () => {
     const summary = postseasonSummary();
     const perGame = seasonReplayExportSchema.parse({
       schemaVersion: 1,
-      replayExportVersion: 'replay-export-v1',
+      replayExportVersion: 'replay-export-v3',
       runId: 'fixture-run-1',
       gameId: summary.gameId,
       summary,
       digest: DIGEST_32,
     });
     expect(perGame.digest).toMatch(/^[0-9a-f]{32}$/);
-    expect(perGame.replayExportVersion).toBe('replay-export-v1');
+    expect(perGame.replayExportVersion).toBe('replay-export-v3');
   });
 });
 describe('seasonCommandResultDigest (command-log-v1 shared convention)', () => {

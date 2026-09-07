@@ -12,8 +12,6 @@ import { seasonCampaignOpportunityIdSchema } from './season-campaign.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import {
   SEASON_BLOCK_VERSION,
-  SEASON_BLOCK_VERSION_V5,
-  SEASON_BLOCK_VERSION_V6,
 } from './season-versions.ts';
 export const seasonInvalidRosterInterruptionSchema = z.object({
   code: z.literal('invalid-roster'),
@@ -27,11 +25,7 @@ export const seasonInvalidRosterInterruptionSchema = z.object({
 export type SeasonInvalidRosterInterruption = z.infer<typeof seasonInvalidRosterInterruptionSchema>;
 export const seasonPendingBlockCandidateSchema = z.object({
   schemaVersion: z.literal(1),
-  blockVersion: z.union([
-    z.literal(SEASON_BLOCK_VERSION),
-    z.literal(SEASON_BLOCK_VERSION_V6),
-    z.literal(SEASON_BLOCK_VERSION_V5),
-  ]),
+  blockVersion: z.literal(SEASON_BLOCK_VERSION),
   runId: idSchema,
   commandId: commandIdSchema,
   blockIndex: z.number().int().min(0).max(8),

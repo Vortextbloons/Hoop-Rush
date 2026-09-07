@@ -351,7 +351,7 @@ function buildAlmanac(
   const parsedChampion = franchiseIdSchema.parse(champion);
   const base = {
     schemaVersion: 1 as const,
-    almanacVersion: 'almanac-v1' as const,
+    almanacVersion: 'almanac-v2' as const,
     runId: run.runId,
     rootSeed: run.rootSeed,
     championFranchiseId: parsedChampion,

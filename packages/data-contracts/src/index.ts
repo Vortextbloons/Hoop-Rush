@@ -86,6 +86,7 @@ export * from './season-challenge.ts';
 export * from './season-campaign.ts';
 export * from './season-trade.ts';
 export * from './season-evolution.ts';
+export * from './season-sponsor-gear.ts';
 export * from './season-authority.ts';
 export {
   seasonRoomPaceSchema,

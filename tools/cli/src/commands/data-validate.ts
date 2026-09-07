@@ -21,6 +21,9 @@ import {
   collectionIndexSchema,
   seasonFreeAgencyIndexSchema,
   seasonGameTargetsSchema,
+  seasonSponsorsIndexSchema,
+  SEASON_SPONSOR_GEAR_CATALOG,
+  SEASON_SPONSOR_GEAR_VERSION,
   unavailabilityReasonSchema,
   POSITIONS,
   POSITION_NORMALIZATION_VERSION,
@@ -858,6 +861,91 @@ async function auditSeasonGameTargets(manifestDir: string, verbose: boolean): Pr
   );
   return { ok: failures.length === 0, details, failures };
 }
+async function auditSponsorGear(
+  manifest: HoopRushManifest,
+  manifestDir: string,
+  verbose: boolean,
+): Promise<AuditResult> {
+  const failures: string[] = [];
+  const details: string[] = [];
+  const entry = manifest.season?.sponsorsIndex;
+  if (entry === undefined) {
+    details.push('sponsor-gear: no packaged sponsors index');
+    return { ok: true, details, failures };
+  }
+  const assetPath = isAbsolute(entry.url) ? entry.url : resolve(manifestDir, entry.url);
+  let content: Buffer;
+  try {
+    const info = await stat(assetPath);
+    if (!info.isFile()) {
+      failures.push(`sponsor-gear: asset is not a file (${assetPath})`);
+      return { ok: false, details, failures };
+    }
+    content = await readFile(assetPath);
+  } catch {
+    failures.push(`sponsor-gear: asset missing (${assetPath})`);
+    return { ok: false, details, failures };
+  }
+  if (sha256Hex(content) !== entry.contentHash) {
+    failures.push(`sponsor-gear: content hash mismatch (${assetPath})`);
+  } else if (verbose) {
+    details.push(`sponsor-gear: hash verified (${assetPath})`);
+  }
+  let raw: unknown;
+  try {
+    raw = JSON.parse(content.toString('utf8')) as unknown;
+  } catch {
+    failures.push('sponsor-gear: artifact is not valid JSON');
+    return { ok: false, details, failures };
+  }
+  const parsed = seasonSponsorsIndexSchema.safeParse(raw);
+  if (!parsed.success) {
+    failures.push(
+      `sponsor-gear: artifact fails the sponsors index schema: ${parsed.error.issues[0]?.path.join('.') ?? '(root)'} ${parsed.error.issues[0]?.message ?? 'unknown'}`,
+    );
+    return { ok: failures.length === 0, details, failures };
+  }
+  const index = parsed.data;
+  if (index.gearVersion !== SEASON_SPONSOR_GEAR_VERSION) {
+    failures.push(
+      `sponsor-gear: unexpected gearVersion ${index.gearVersion} (want ${SEASON_SPONSOR_GEAR_VERSION})`,
+    );
+  }
+  const catalogFamilies = new Set(SEASON_SPONSOR_GEAR_CATALOG.map((item) => item.brandFamily));
+  const indexFamilies = new Set(index.logos.map((logo) => logo.family));
+  for (const family of catalogFamilies) {
+    if (!indexFamilies.has(family)) {
+      failures.push(`sponsor-gear: catalog family ${family} has no packaged logo`);
+    }
+  }
+  for (const family of indexFamilies) {
+    if (!catalogFamilies.has(family)) {
+      failures.push(`sponsor-gear: packaged logo ${family} matches no catalog family`);
+    }
+  }
+  for (const logo of index.logos) {
+    const logoPath = isAbsolute(logo.file) ? logo.file : resolve(manifestDir, logo.file);
+    let logoBytes: Buffer;
+    try {
+      const info = await stat(logoPath);
+      if (!info.isFile()) {
+        failures.push(`sponsor-gear: logo is not a file (${logoPath})`);
+        continue;
+      }
+      logoBytes = await readFile(logoPath);
+    } catch {
+      failures.push(`sponsor-gear: logo missing (${logoPath})`);
+      continue;
+    }
+    if (sha256Hex(logoBytes) !== logo.contentHash) {
+      failures.push(`sponsor-gear: logo hash mismatch (${logoPath})`);
+    }
+  }
+  details.push(
+    `sponsor-gear: ${String(index.logos.length)} logos · gearVersion ${index.gearVersion}`,
+  );
+  return { ok: failures.length === 0, details, failures };
+}
 export async function dataValidate(inputPath: string, verbose: boolean): Promise<CliReport> {
   let raw: string;
   try {
@@ -903,6 +991,7 @@ export async function dataValidate(inputPath: string, verbose: boolean): Promise
     await auditBracket(manifest, manifestDir, verbose),
     await auditGlobalAssets(manifest, manifestDir, verbose),
     await auditSeasonFreeAgencyIndex(manifest, manifestDir, verbose),
+    await auditSponsorGear(manifest, manifestDir, verbose),
     await auditSeasonGameTargets(manifestDir, verbose),
     await auditCollectionCatalog(manifest, manifestDir, verbose),
     auditAssets(manifest),

@@ -137,7 +137,7 @@ function summary(round: number, spec: GameSpec = {}): SeasonGameSummary {
   if (spec.forfeit === true) {
     return {
       schemaVersion: 1,
-      summaryVersion: 'season-game-summary-v3',
+      summaryVersion: 'season-game-summary-v4',
       gameId,
       round,
       homeFranchiseId: franchiseIdSchema.parse(LAKERS),
@@ -156,7 +156,7 @@ function summary(round: number, spec: GameSpec = {}): SeasonGameSummary {
   }
   return {
     schemaVersion: 1,
-    summaryVersion: 'season-game-summary-v3',
+    summaryVersion: 'season-game-summary-v4',
     gameId,
     round,
     homeFranchiseId: franchiseIdSchema.parse(LAKERS),

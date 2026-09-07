@@ -18,6 +18,7 @@ export const SEASON_SEED_NAMESPACES = {
   postseasonInjuries: 'postseason-injuries',
   postseasonDraws: 'postseason-draws',
   freeAgency: 'free-agency',
+  sponsors: 'sponsors',
 } as const;
 export type SeasonSeedNamespace = keyof typeof SEASON_SEED_NAMESPACES;
 export function seasonNamespaceSeed(
