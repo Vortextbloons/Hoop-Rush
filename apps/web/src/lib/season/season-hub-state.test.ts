@@ -932,6 +932,34 @@ describe('SeasonHubState trade guards', () => {
     expect(repo.applySeasonRunCommand).not.toHaveBeenCalled();
     hub.destroy();
   });
+  it('maps every M3.12 sponsor rejection code in describeCommandRejection', () => {
+    const rejectionOf = (code: string, facts: Record<string, unknown> = {}) =>
+      describeCommandRejection('buy-sponsor', { code, ...facts } as never);
+    expect(
+      rejectionOf('sponsor-not-offered', { instanceId: 'sponsor-0-0', blockIndex: 0 }),
+    ).toContain('not offered');
+    expect(
+      rejectionOf('sponsor-already-purchased', { instanceId: 'sponsor-0-0', blockIndex: 0 }),
+    ).toContain('already bought');
+    expect(rejectionOf('sponsor-expired', { instanceId: 'sponsor-0-0', blockIndex: 0 })).toContain(
+      'expired',
+    );
+    expect(rejectionOf('sponsor-not-owned', { instanceId: 'sponsor-0-0' })).toContain('vault');
+    expect(
+      rejectionOf('sponsor-slot-mismatch', {
+        instanceId: 'sponsor-0-0',
+        expectedSlot: 'shoe',
+        slot: 'fuel',
+      }),
+    ).toContain('shoe');
+    expect(
+      rejectionOf('sponsor-slot-occupied', { playerVersionId: 'pv-1', slot: 'shoe' }),
+    ).toContain('permanent');
+    expect(rejectionOf('sponsor-not-on-roster', { playerVersionId: 'pv-1' })).toContain('roster');
+    expect(
+      rejectionOf('sponsor-brand-duplicate', { playerVersionId: 'pv-1', brandFamily: 'nike' }),
+    ).toContain('nike');
+  });
   it('maps the new trade rejection codes in describeCommandRejection', () => {
     expect(
       describeCommandRejection('respond-to-trade-counter', {

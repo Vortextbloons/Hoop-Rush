@@ -1332,11 +1332,23 @@ export function writePool(pool: Pool): string {
 export function parsePoolTargets(raw: readonly string[]): Array<[string, string]> {
   const targets: Array<[string, string]> = [];
   for (const item of raw) {
-    const parts = item.split('/');
-    if (parts.length !== 2 || !parts[0] || !parts[1]) {
-      throw new Error(`invalid pool target '${item}' (expected franchiseId/eraId)`);
+    const slash = item.split('/');
+    if (slash.length === 2 && slash[0] && slash[1]) {
+      targets.push([slash[0], slash[1]]);
+      continue;
     }
-    targets.push([parts[0], parts[1]]);
+    // Accept the filename-style dash form (franchise-era) too: no published
+    // franchise or era id contains a dash, so the last dash is unambiguous.
+    const dash = item.lastIndexOf('-');
+    if (dash > 0) {
+      const franchiseId = item.slice(0, dash);
+      const eraId = item.slice(dash + 1);
+      if (franchiseId && /^\d{4}s$/.test(eraId)) {
+        targets.push([franchiseId, eraId]);
+        continue;
+      }
+    }
+    throw new Error(`invalid pool target '${item}' (expected franchiseId/eraId)`);
   }
   return targets;
 }

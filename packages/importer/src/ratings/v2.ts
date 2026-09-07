@@ -180,6 +180,7 @@ interface SeasonTotals {
   screenAssists: number | null;
   boxOuts: number | null;
   defFgPct: number | null;
+  defRimFga: number | null;
   passes: number | null;
   secondaryAssists: number | null;
   potentialAssists: number | null;
@@ -236,6 +237,7 @@ function seasonTotals(stats: StatsRow): SeasonTotals {
     screenAssists: maybe('screenAssists'),
     boxOuts: maybe('boxOuts'),
     defFgPct: maybe('defFgPct'),
+    defRimFga: maybe('defRimFga'),
     passes: maybe('passes'),
     secondaryAssists: maybe('secondaryAssists'),
     potentialAssists: maybe('potentialAssists'),
@@ -669,10 +671,10 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
   const priorOnlyDefense = !stocksPublished;
   const defenseNotesCode = priorOnlyDefense ? 'positional-prior-pre1974' : undefined;
   const contestPublished = fieldPublished('contestTracking', input.season);
-  const contestedPer36 = per36(totals.contestedShots, minutes);
+  const contested3ptPer36 = per36(totals.contestedShots3pt, minutes);
   const deflectionsPer36 = per36(totals.deflections, minutes);
   const hasContestEvidence =
-    contestPublished && (contestedPer36 !== null || deflectionsPer36 !== null);
+    contestPublished && (contested3ptPer36 !== null || deflectionsPer36 !== null);
   const reboundEvidence = rpg !== null && (oreb.kind !== 'observed' || dreb.kind !== 'observed');
   const chanceNotesCode = 'no-rebound-chances';
   const offensiveReboundBase = 50 + (orebPer36Signal - 1.5) * 8;
@@ -729,9 +731,14 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
       ? { notesCode: 'positional-prior-pre1974' }
       : {}),
   });
+  // Perimeter containment reads perimeter activity, not rim volume: total
+  // contested shots are dominated by rim contests for bigs (Whiteside
+  // contested 800+ two-pointers he never stepped out on), so only three-point
+  // contests plus deflections count out here. League medians calibrate the
+  // center: ~2 deflections and ~2.5 three-point contests per 36 is average.
   const containmentFields = hasContestEvidence
     ? [
-        ...(contestedPer36 !== null ? ['contestedShots'] : []),
+        ...(contested3ptPer36 !== null ? ['contestedShots3pt'] : []),
         ...(deflectionsPer36 !== null ? ['deflections'] : []),
         'minutes',
         'position',
@@ -739,8 +746,8 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     : ['steals', 'minutes', 'position'];
   const perimeterRaw = hasContestEvidence
     ? 60 +
-      (deflectionsPer36 ?? 1) * 5 +
-      ((contestedPer36 ?? 3) - 3) * 2 +
+      clamp(((deflectionsPer36 ?? 2) - 2) * 5, -8, 10) +
+      clamp(((contested3ptPer36 ?? 2.5) - 2.5) * 2, -4, 6) +
       (position === 'G' ? 2 : position === 'C' ? -5 : 0)
     : 60 + (stlPer36 - 1.2) * 7 + (position === 'G' ? 2 : position === 'C' ? -6 : 0);
   const perimeterKind: ProvenanceKind = hasContestEvidence ? 'derived' : 'estimated';
@@ -752,7 +759,11 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
         ? { notesCode: defenseNotesCode }
         : { notesCode: 'no-contest-tracking' }),
   });
-  const hasRimEvidence = contestPublished && totals.defFgPct !== null && totals.blocks !== null;
+  const hasRimEvidence =
+    contestPublished &&
+    totals.defFgPct !== null &&
+    totals.blocks !== null &&
+    (totals.defRimFga ?? 0) >= 20;
   // Event rate is not containment: a gambling shot-blocker piles blocks while
   // giving up position, so the fallback slope stays flatter than the event
   // rating and leans on rebounding evidence instead.
@@ -824,15 +835,25 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
   const heightSpeedPenalty =
     input.heightInches === null ? 0 : Math.max(0, input.heightInches - 78) * 0.7;
   const drivesPer36 = per36(totals.drives, minutes);
+  // Cruise speed conflates role with burst: an iso-heavy guard standing
+  // around posts a below-median average while blowing by everyone. Drives per
+  // 36 carry the burst signal; cruise speed contributes gently around the
+  // league median (4.25 mph); height still costs bigs.
+  const burstBonus = drivesPer36 !== null ? Math.min(10, drivesPer36 * 0.45) : 0;
   const speedRaw = hasSpeedEvidence
-    ? 58 + ((totals.avgSpeed ?? 4.3) - 4.3) * 35 - heightSpeedPenalty * 0.5
+    ? 56 + ((totals.avgSpeed ?? 4.25) - 4.25) * 15 + burstBonus - heightSpeedPenalty * 0.5
     : 58 - heightSpeedPenalty + (drivesPer36 !== null ? Math.min(4, drivesPer36 * 0.5) : 0);
   record(
     'speed',
     blend(speedRaw, 59),
     hasSpeedEvidence ? 'derived' : 'estimated',
     hasSpeedEvidence
-      ? ['avgSpeed', 'heightInches', 'minutes']
+      ? [
+          'avgSpeed',
+          'heightInches',
+          'minutes',
+          ...(drivesPer36 !== null ? (['drives'] as string[]) : []),
+        ]
       : ['heightInches', ...(drivesPer36 !== null ? (['drives', 'minutes'] as string[]) : [])],
     {
       confidence: hasSpeedEvidence ? confidenceForSample('derived', gp, minutes, 'partial') : 'low',
@@ -941,32 +962,82 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
   const assistRole = clamp((apg ?? 2) / 8, 0, 1);
   const interiorRole = clamp((oreb.value / 4 + Math.max(0, (rpg ?? 4) - 4) / 12) / 2, 0, 1);
   const guardRole = position === 'G' ? 1 : position === 'F' ? 0.45 : 0.1;
-  const driveRate = clamp(
+  const driveRateFormula = clamp(
     6 + guardRole * 10 + freeThrowPressure * 22 + (usageVal - 18) * 0.25,
     3,
     35,
   );
+  // Observed drives beat the formula: tracking counts real rim attacks while
+  // the formula guesses from foul pressure and role.
+  const driveRate = drivesPer36 !== null ? clamp(drivesPer36, 3, 35) : driveRateFormula;
   const postUpRate = clamp(
     3 + interiorRole * 18 + (1 - threeRate) * (position === 'C' ? 7 : 2),
     2,
     32,
   );
-  const rimFrequency = clamp(
-    12 + freeThrowPressure * 25 + interiorRole * 16 + guardRole * 2,
+  const insideFga = totals.insideFga;
+  const closeFga = totals.closeFga;
+  const midFga = totals.midFga;
+  const zoneVolumeTotal =
+    insideFga !== null && closeFga !== null && midFga !== null
+      ? insideFga + closeFga + midFga
+      : null;
+  const hasZoneVolume =
+    zoneVolumeTotal !== null &&
+    zoneVolumeTotal >= 50 &&
+    insideFga !== null &&
+    insideFga >= 0 &&
+    closeFga !== null &&
+    closeFga >= 0 &&
+    midFga !== null &&
+    midFga >= 0 &&
+    fga !== null &&
+    fga > 0;
+  const fgPctForMix = fgPct ?? 0.47;
+  const threeRateMixForBig =
+    tpa !== null && fga !== null && fga > 0 ? tpa / fga : priors.threePointRatePrior;
+  const ftaPerFgaMix = fta !== null && fga !== null && fga > 0 ? fta / fga : 0;
+  const rimReliantBigMix =
+    (position === 'C' || position === 'F') && threeRateMixForBig < 0.08 && ftaPerFgaMix > 0.3;
+  const dunkSignal = threeRateMixForBig < 0.1 ? clamp((fgPctForMix - 0.55) / 0.15, 0, 1) : 0;
+  const rimHeuristic = clamp(
+    12 +
+      freeThrowPressure * 25 +
+      interiorRole * 16 +
+      guardRole * 2 +
+      dunkSignal * 26 +
+      (rimReliantBigMix ? 8 : 0),
     8,
-    48,
+    72,
   );
+  let rimFrequency: number;
+  let rimKind: ProvenanceKind;
+  let rimFields: string[];
+  let rimNotesCode: string | undefined;
+  if (hasZoneVolume && zoneVolumeTotal > 0) {
+    const twoRate = clamp(1 - threeRate, 0, 1);
+    rimFrequency = clamp((insideFga / zoneVolumeTotal) * twoRate * 100, 8, 72);
+    rimKind = 'derived';
+    rimFields = ['insideFga', 'closeFga', 'midFga', 'tpa', 'fga'];
+    rimNotesCode = undefined;
+  } else {
+    rimFrequency = rimHeuristic;
+    rimKind = 'estimated';
+    rimFields = ['fta', 'fga', 'offensiveRebounds', 'position', 'fgm'];
+    rimNotesCode = zoneFallbackNote;
+  }
   const nonThreeShare = clamp(100 - threeRate * 100 - rimFrequency, 5, 80);
-  const longMidShare = clamp(nonThreeShare * (0.34 + guardRole * 0.12), 4, 30);
+  const longMidFactor = rimReliantBigMix ? 0.22 : 0.34 + guardRole * 0.12;
+  const longMidShare = clamp(nonThreeShare * longMidFactor, 4, 30);
   const shortMidShare = clamp(nonThreeShare - longMidShare, 5, 35);
   const cornerShare = clamp(threeRate * 100 * (0.28 + (1 - assistRole) * 0.18), 0, 35);
   const aboveBreakShare = clamp(threeRate * 100 - cornerShare, 0, 55);
-  t('driveRate', driveRate, fta !== null ? 'derived' : 'estimated', [
-    'fta',
-    'fga',
-    'usageRate',
-    'position',
-  ]);
+  t(
+    'driveRate',
+    driveRate,
+    drivesPer36 !== null ? 'derived' : fta !== null ? 'derived' : 'estimated',
+    drivesPer36 !== null ? ['drives', 'minutes'] : ['fta', 'fga', 'usageRate', 'position'],
+  );
   t('postUpRate', postUpRate, oreb.kind === 'observed' ? 'derived' : 'estimated', [
     'offensiveRebounds',
     'rebounds',
@@ -974,24 +1045,27 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     'fga',
     'position',
   ]);
-  t('rimFrequency', rimFrequency, fta !== null ? 'derived' : 'estimated', [
-    'fta',
-    'fga',
-    'offensiveRebounds',
-    'position',
-  ]);
-  t('shortMidFrequency', shortMidShare, fga !== null ? 'derived' : 'estimated', [
-    'fga',
-    'tpa',
-    'fta',
-    'position',
-  ]);
-  t('longMidFrequency', longMidShare, fga !== null ? 'derived' : 'estimated', [
-    'fga',
-    'tpa',
-    'fta',
-    'position',
-  ]);
+  t('rimFrequency', rimFrequency, rimKind, rimFields, {
+    ...(rimNotesCode !== undefined ? { notesCode: rimNotesCode } : {}),
+  });
+  t(
+    'shortMidFrequency',
+    shortMidShare,
+    hasZoneVolume ? 'derived' : 'estimated',
+    hasZoneVolume
+      ? ['insideFga', 'closeFga', 'midFga', 'tpa', 'fga']
+      : ['fga', 'tpa', 'fta', 'position'],
+    { ...(rimNotesCode !== undefined && !hasZoneVolume ? { notesCode: rimNotesCode } : {}) },
+  );
+  t(
+    'longMidFrequency',
+    longMidShare,
+    hasZoneVolume ? 'derived' : 'estimated',
+    hasZoneVolume
+      ? ['insideFga', 'closeFga', 'midFga', 'tpa', 'fga']
+      : ['fga', 'tpa', 'fta', 'position'],
+    { ...(rimNotesCode !== undefined && !hasZoneVolume ? { notesCode: rimNotesCode } : {}) },
+  );
   t('cornerThreeFrequency', cornerShare, tpa !== null ? 'derived' : 'estimated', [
     'tpa',
     'fga',

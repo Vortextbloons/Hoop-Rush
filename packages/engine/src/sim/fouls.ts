@@ -19,7 +19,7 @@ export function shootingFoulProbability(
   const anchorFactor =
     observedRate === undefined
       ? 1
-      : Math.min(1.8, Math.max(0.4, observedRate / Math.max(1e-9, p.leagueFtaPerFga)));
+      : Math.min(2, Math.max(0.4, observedRate / Math.max(1e-9, p.leagueFtaPerFga)));
   const drawsFouls =
     tendencyFactor * (1 - ENGINE_CONSTANTS.observedFoulDrawBlend) +
     anchorFactor * ENGINE_CONSTANTS.observedFoulDrawBlend;

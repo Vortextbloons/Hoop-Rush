@@ -63,7 +63,7 @@ export function observedTwoPointPct(shooter: SimulationPlayer): number | null {
   const threePct =
     anchors.threePointPct ?? reconstructed?.accuracyConservative ?? anchors.fieldGoalPct;
   const twoPct = (anchors.fieldGoalPct - threeRate * threePct) / twoShare;
-  return Math.min(0.62, Math.max(0.32, twoPct));
+  return Math.min(0.7, Math.max(0.32, twoPct));
 }
 export function twoPointAnchorFactor(
   shooter: SimulationPlayer,

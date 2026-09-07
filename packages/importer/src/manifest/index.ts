@@ -51,6 +51,7 @@ const seasonArtifactsSchema = z.object({
   rosterTargets: manifestAssetRefSchema.optional(),
   freeAgencyIndex: manifestAssetRefSchema.optional(),
   freeAgencyTargets: manifestAssetRefSchema.optional(),
+  sponsorsIndex: manifestAssetRefSchema.optional(),
 });
 type SeasonArtifacts = z.infer<typeof seasonArtifactsSchema>;
 const importerManifestSchema = z.looseObject({
@@ -336,6 +337,7 @@ export function run(dataDir = PUBLIC_DATA): void {
     ['rosterTargets', 'roster-targets.json'],
     ['freeAgencyIndex', 'free-agency-index.json'],
     ['freeAgencyTargets', 'free-agency-targets.json'],
+    ['sponsorsIndex', 'sponsors-index.json'],
   ] as const) {
     const path = join(seasonDir, name);
     if (fileExists(path)) {

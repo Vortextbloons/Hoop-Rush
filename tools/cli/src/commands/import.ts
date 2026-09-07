@@ -12,7 +12,7 @@ import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.
 function splitList(value: string | null): string[] | null {
   if (value === null || value === '') return null;
   return value
-    .split(',')
+    .split(/[,\s]+/)
     .map((part) => part.trim())
     .filter((part) => part !== '');
 }

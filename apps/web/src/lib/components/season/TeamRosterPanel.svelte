@@ -4,6 +4,7 @@
     SeasonEffectsState,
     SeasonGameSummary,
     SeasonRoster,
+    SeasonRun,
   } from '@hoop-rush/data-contracts';
   import SeasonPlayerStats from '$lib/components/season/SeasonPlayerStats.svelte';
   import SeasonRosterList from '$lib/components/season/SeasonRosterList.svelte';
@@ -18,6 +19,8 @@
     effects,
     summaries,
     statsView,
+    sponsorsRun = null,
+    onSelectPlayer = null,
   }: {
     roster: SeasonRoster;
     manifest: HoopRushManifest;
@@ -29,6 +32,8 @@
     effects: SeasonEffectsState | null;
     summaries: SeasonGameSummary[];
     statsView: SeasonPlayerStatsView;
+    sponsorsRun?: SeasonRun | null;
+    onSelectPlayer?: ((playerVersionId: string) => void) | null;
   } = $props();
   let view = $state<RosterPanelView>('roster');
   const inactiveCount = $derived(shell.editor?.inactiveMembers().length ?? 0);
@@ -87,7 +92,17 @@
 
   <div class="mt-4">
     {#if view === 'roster'}
-      <SeasonRosterList {roster} {manifest} {shell} {roleOf} {effects} {summaries} embedded />
+      <SeasonRosterList
+        {roster}
+        {manifest}
+        {shell}
+        {roleOf}
+        {effects}
+        {summaries}
+        {sponsorsRun}
+        {onSelectPlayer}
+        embedded
+      />
     {:else}
       <SeasonPlayerStats view={statsView} {manifest} {shell} embedded />
     {/if}

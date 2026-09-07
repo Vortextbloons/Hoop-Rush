@@ -388,7 +388,11 @@ function computeSide(input: {
     }
     const ftCount = freeThrowsForZone(zone);
     const makeGivenFoul = makeP * ENGINE_CONSTANTS.fouledShotMakeScale;
-    const makeProb = foulP * makeGivenFoul + (1 - foulP) * (1 - blockP) * makeP;
+    const threeEarly = zone === 'cornerThree' || zone === 'aboveBreakThree';
+    const anchoredTwo =
+      !threeEarly && (prep.twoPointAnchor.get(engineKey(shooter)) ?? null) !== null;
+    const nonFoulMake = anchoredTwo ? makeP : (1 - blockP) * makeP;
+    const makeProb = foulP * makeGivenFoul + (1 - foulP) * nonFoulMake;
     const missProb = 1 - makeProb;
     const blockProb = (1 - foulP) * blockP;
     const madeWithFoulProb = foulP * makeGivenFoul;

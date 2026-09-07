@@ -16,10 +16,25 @@ from __future__ import annotations
 
 import math
 import sys
+import types
+from pathlib import Path
 from typing import Any
 
-from .config import ensure_output_dir
-from .util import read_cache, with_retry, write_cache, write_json
+PACKAGE_DIR = Path(__file__).resolve().parent
+PACKAGE_NAME = "_hoop_rush_import"
+if PACKAGE_NAME not in sys.modules:
+    package = types.ModuleType(PACKAGE_NAME)
+    package.__path__ = [str(PACKAGE_DIR)]  # type: ignore[attr-defined]
+    package.__package__ = PACKAGE_NAME
+    sys.modules[PACKAGE_NAME] = package
+
+if __package__ in (None, ''):
+    sys.path.insert(0, str(PACKAGE_DIR.parents[2]))
+    from _hoop_rush_import.config import ensure_output_dir
+    from _hoop_rush_import.util import read_cache, with_retry, write_cache, write_json
+else:
+    from .config import ensure_output_dir
+    from .util import read_cache, with_retry, write_cache, write_json
 
 
 PT_MEASURES = ("Rebounding", "Defense", "Passing", "SpeedDistance", "Drives")
@@ -63,6 +78,43 @@ def fetch_pt_measure(season: str, measure: str) -> list[dict[str, Any]]:
         return []
     write_cache("league_dash_pt_stats", result, season=season, measure=measure)
     return result.get("rows", [])
+
+
+def fetch_standings(season: str) -> dict[str, float]:
+    try:
+        from nba_api.stats.endpoints import leaguestandings
+    except Exception as exc:  # pragma: no cover
+        print(f"  ! evidence standings: nba_api unavailable: {exc}")
+        return {}
+    cached = read_cache("league_standings", season=season)
+    rows = cached.get("rows", []) if cached is not None else None
+    if rows is None:
+        def _do_fetch() -> dict[str, Any]:
+            resp = leaguestandings.LeagueStandings(season=season)
+            frames = resp.get_data_frames()
+            data = frames[0].to_dict(orient="records") if frames else []
+            return {"rows": data}
+
+        try:
+            result = with_retry(_do_fetch)
+        except Exception as exc:
+            print(f"  ! evidence standings {season}: unavailable ({exc})")
+            return {}
+        write_cache("league_standings", result, season=season)
+        rows = result.get("rows", [])
+    out: dict[str, float] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        try:
+            raw_id = row.get("TeamID", row.get("TEAM_ID", ""))
+            pid = str(raw_id if raw_id is not None else "")
+            pct = float(row.get("WinPCT", row.get("W_PCT", "nan")))
+        except (ValueError, TypeError):
+            continue
+        if pid and pid != "None" and pct == pct and 0.0 <= pct <= 1.0:
+            out[pid] = pct
+    return out
 
 
 def fetch_hustle(season: str) -> list[dict[str, Any]]:
@@ -122,9 +174,8 @@ def merge_evidence(season: str) -> dict[str, dict[str, Any]]:
                 put(
                     pid,
                     {
-                        "defFgPct": row.get("D_FG_PCT"),
-                        "defFgFreq": row.get("D_FG_FREQ"),
-                        "stlPct": row.get("STL_PCT"),
+                        "defFgPct": row.get("DEF_RIM_FG_PCT"),
+                        "defRimFga": row.get("DEF_RIM_FGA"),
                     },
                 )
             elif measure == "Passing":
@@ -164,15 +215,24 @@ def merge_evidence(season: str) -> dict[str, dict[str, Any]]:
 
 
 def main() -> None:
-    seasons = sys.argv[1:] or []
+    args = [a for a in sys.argv[1:] if not a.startswith('--')]
+    standings_only = '--standings-only' in sys.argv[1:]
+    seasons = args or []
     if not seasons:
-        print("usage: fetch_evidence.py <season> [season ...]")
+        print("usage: fetch_evidence.py [--standings-only] <season> [season ...]")
         raise SystemExit(2)
     for season in seasons:
-        merged = merge_evidence(season)
-        out_dir = ensure_output_dir(season)
-        write_json(out_dir / "evidence.json", merged)
-        print(f"  [OK] evidence {season}: {len(merged)} players")
+        if not standings_only:
+            merged = merge_evidence(season)
+            out_dir = ensure_output_dir(season)
+            write_json(out_dir / "evidence.json", merged)
+            print(f"  [OK] evidence {season}: {len(merged)} players")
+        else:
+            out_dir = ensure_output_dir(season)
+        standings = fetch_standings(season)
+        if standings:
+            write_json(out_dir / "standings.json", standings)
+            print(f"  [OK] standings {season}: {len(standings)} teams")
 
 
 if __name__ == "__main__":

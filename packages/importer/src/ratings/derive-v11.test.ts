@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { derivePlayerRecord, type DerivationInput } from './v2.ts';
+import { defenseCreditFor, twoWayBonusFor } from './v3.ts';
 import { MODERN_ERA, starterStats } from './ratings-test-support.ts';
 
 function input(
@@ -141,6 +142,151 @@ describe('derive-v11 shooting attribution', () => {
     );
     expect(spacer.provenance['midrange']?.kind).toBe('derived');
   });
+  it('gives rim-reliant finishers a rim-heavy diet with honest estimated provenance', () => {
+    const claxtonLike = derivePlayerRecord(
+      input(
+        '2023-24',
+        starterStats({
+          points: 958,
+          rebounds: 699,
+          offensiveRebounds: 182,
+          defensiveRebounds: 517,
+          assists: 144,
+          fgm: 400,
+          fga: 571,
+          tpm: 0,
+          tpa: 1,
+          ftm: 158,
+          fta: 281,
+          usageRate: 15.5,
+        }),
+        'C',
+      ),
+    );
+    expect(claxtonLike.tendencies.rimFrequency).toBeGreaterThan(55);
+    expect(claxtonLike.tendencies.longMidFrequency).toBeLessThan(15);
+    expect(claxtonLike.provenance['rimFrequency']?.kind).toBe('estimated');
+    expect(claxtonLike.provenance['rimFrequency']?.notesCode).toBeDefined();
+    const twoShare =
+      claxtonLike.tendencies.rimFrequency +
+      claxtonLike.tendencies.shortMidFrequency +
+      claxtonLike.tendencies.longMidFrequency;
+    expect(twoShare).toBeGreaterThan(85);
+  });
+  it('uses observed zone volume for rim frequency when present', () => {
+    const zoned = derivePlayerRecord(
+      input(
+        '2023-24',
+        starterStats({
+          fgm: 400,
+          fga: 800,
+          tpm: 40,
+          tpa: 200,
+          insideFga: 420,
+          closeFga: 120,
+          midFga: 60,
+        }),
+        'C',
+      ),
+    );
+    expect(zoned.provenance['rimFrequency']?.kind).toBe('derived');
+    expect(zoned.provenance['rimFrequency']?.sourceFields).toContain('insideFga');
+    expect(zoned.tendencies.rimFrequency).toBeGreaterThan(zoned.tendencies.longMidFrequency);
+  });
+});
+
+describe('derive-v11 production load-conditioning', () => {
+  it('credits efficiency to the creator carrying load, not the finisher dunking it', () => {
+    const finisher = derivePlayerRecord(
+      input(
+        '2023-24',
+        starterStats({
+          assists: 100,
+          usageRate: 16,
+          tsPct: 0.62,
+          efgPct: 0.58,
+          per: 18,
+          boxPlusMinus: 2,
+        }),
+        'C',
+      ),
+    );
+    const creator = derivePlayerRecord(
+      input(
+        '2023-24',
+        starterStats({
+          assists: 500,
+          usageRate: 30,
+          tsPct: 0.62,
+          efgPct: 0.58,
+          per: 18,
+          boxPlusMinus: 2,
+        }),
+        'PG',
+      ),
+    );
+    expect(creator.ratingProfile.production.score).toBeGreaterThan(
+      finisher.ratingProfile.production.score + 5,
+    );
+  });
+  it('grades playmaking by rate, not minutes: same assists per 36, same credit', () => {
+    const full = derivePlayerRecord(
+      input('2023-24', starterStats({ gamesPlayed: 78, minutes: 2808, assists: 560 })),
+    );
+    const half = derivePlayerRecord(
+      input('2023-24', starterStats({ gamesPlayed: 78, minutes: 1404, assists: 280 })),
+    );
+    expect(
+      Math.abs(full.ratingProfile.production.score - half.ratingProfile.production.score),
+    ).toBeLessThan(6);
+  });
+  it('rewards two-way balance and nothing for one-way stars', () => {
+    expect(twoWayBonusFor(80, 72)).toBeGreaterThan(1);
+    expect(twoWayBonusFor(81, 58)).toBe(0);
+    expect(twoWayBonusFor(60, 74)).toBe(0);
+    const twoWay = derivePlayerRecord(
+      input(
+        '2023-24',
+        starterStats({
+          points: 2000,
+          assists: 500,
+          steals: 150,
+          blocks: 80,
+          usageRate: 28,
+          tsPct: 0.6,
+          efgPct: 0.55,
+          per: 22,
+          boxPlusMinus: 4,
+        }),
+        'SF',
+      ),
+    );
+    const oneWay = derivePlayerRecord(
+      input(
+        '2023-24',
+        starterStats({
+          points: 2000,
+          assists: 150,
+          steals: 40,
+          blocks: 20,
+          usageRate: 28,
+          tsPct: 0.6,
+          efgPct: 0.55,
+          per: 22,
+          boxPlusMinus: 4,
+        }),
+        'SF',
+      ),
+    );
+    expect(twoWay.summaryRatings.overallRating).toBeGreaterThan(
+      oneWay.summaryRatings.overallRating,
+    );
+  });
+  it('caps defense credit without contest evidence', () => {
+    expect(defenseCreditFor(74, true)).toBe(3);
+    expect(defenseCreditFor(74, false)).toBe(1.5);
+    expect(defenseCreditFor(60, false)).toBe(-2.5);
+  });
 });
 
 describe('derive-v11 passing and handling', () => {
@@ -243,6 +389,44 @@ describe('derive-v11 evidence-limited defense and athleticism', () => {
     expect(hollow.ratingProfile.nonlinear.weaknesses.hollowAnchor ?? 0).toBeGreaterThan(0);
     expect(winner.ratingProfile.nonlinear.weaknesses.hollowAnchor ?? 0).toBe(0);
     expect(hollow.summaryRatings.overallRating).toBeLessThan(winner.summaryRatings.overallRating);
+  });
+  it('reads perimeter containment from three-point contests, not rim volume', () => {
+    const rimAnchor = derivePlayerRecord(
+      input(
+        '2023-24',
+        starterStats({ contestedShots: 900, contestedShots3pt: 60, deflections: 50 }),
+        'C',
+      ),
+    );
+    expect(rimAnchor.provenance['perimeterDefense']?.kind).toBe('derived');
+    expect(rimAnchor.provenance['perimeterDefense']?.sourceFields).toContain('contestedShots3pt');
+    expect(rimAnchor.provenance['perimeterDefense']?.sourceFields).not.toContain('contestedShots');
+    const disruptor = derivePlayerRecord(
+      input(
+        '2023-24',
+        starterStats({ contestedShots: 300, contestedShots3pt: 200, deflections: 220 }),
+        'SG',
+      ),
+    );
+    expect(disruptor.ratings.perimeterDefense).toBeGreaterThan(
+      rimAnchor.ratings.perimeterDefense + 5,
+    );
+  });
+  it('grades burst from drives and cruise speed gently', () => {
+    const burner = derivePlayerRecord(
+      input('2023-24', starterStats({ avgSpeed: 4.1, drives: 1700 }), 'SG'),
+    );
+    const cruiser = derivePlayerRecord(
+      input('2023-24', starterStats({ avgSpeed: 4.1, drives: 100 }), 'SG'),
+    );
+    expect(burner.ratings.speed).toBeGreaterThan(cruiser.ratings.speed + 3);
+    expect(burner.provenance['speed']?.sourceFields).toContain('drives');
+  });
+  it('uses observed drives for the drive-rate tendency', () => {
+    const derived = derivePlayerRecord(input('2023-24', starterStats({ drives: 1700 }), 'SG'));
+    expect(derived.provenance['driveRate']?.kind).toBe('derived');
+    expect(derived.provenance['driveRate']?.sourceFields).toContain('drives');
+    expect(derived.tendencies.driveRate).toBeGreaterThan(20);
   });
 });
 

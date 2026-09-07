@@ -1,11 +1,14 @@
 import type { ShotZone, SlotGroup } from '@hoop-rush/data-contracts';
 import type { PositionResponsibilityModifiers } from './position-responsibilities.ts';
 import type { ActionType } from './usage.ts';
+// m3-engine-v21: interior-finisher fidelity (2P anchor 0.70/1.32 + block-aware
+// conversion, rim-heavy importer diet, foul-draw 0.70 blend, assist 1.01,
+// saturated usage caps 1.48/1.28) — seeded formulas unchanged.
 // m3-engine-v20: player sponsorship gear (season-sponsor-gear-v1) —
 // seeded 5-offer shop per block, vault + 3-slot equipment, sponsor boosts
 // applied to ratings inputs (sim, trade valuation, AI kits); formulas unchanged.
 // m3-engine-v19: season parity tune (season-trade-v7, season-free-agency-v3).
-export const ENGINE_VERSION = 'm3-engine-v20';
+export const ENGINE_VERSION = 'm3-engine-v21';
 export const ENGINE_CONSTANTS = {
   version: ENGINE_VERSION,
   zoneBaseMake: {
@@ -46,9 +49,9 @@ export const ENGINE_CONSTANTS = {
   blockAnchorFloorPer48: 0.8,
   blockAnchorScale: 0.025,
   blockAnchorMax: 0.06,
-  shootingFoulScale: 1.36,
+  shootingFoulScale: 1.33,
   fouledShotMakeScale: 0.95,
-  observedFoulDrawBlend: 0.5,
+  observedFoulDrawBlend: 0.7,
   offensiveFoulShare: 0.32,
   offensiveFoulTurnoverOffset: 0.029,
   freeThrowAnchorRating: 75,
@@ -84,11 +87,11 @@ export const ENGINE_CONSTANTS = {
   initiatorRoleExponent: 1.6,
   finisherRoleExponent: 1.25,
   initiatorRoleMin: 0.65,
-  initiatorRoleMax: 1.55,
+  initiatorRoleMax: 1.48,
   finisherRoleMin: 0.7,
-  finisherRoleMax: 1.35,
+  finisherRoleMax: 1.28,
   twoPointAnchorMin: 0.82,
-  twoPointAnchorMax: 1.18,
+  twoPointAnchorMax: 1.32,
   twoPointAnchorSkillScale: 0.3,
   shotQuality: {
     isolation: { rim: 0, shortMid: -0.005, longMid: -0.01, cornerThree: 0, aboveBreakThree: 0 },

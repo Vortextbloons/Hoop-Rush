@@ -747,7 +747,8 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
           checkpoint as {
             sponsors?: unknown;
           }
-        ).sponsors;        const mutableState = {
+        ).sponsors;
+        const mutableState = {
           health: window !== null ? window.health : input.health,
           transactions: normalizeSeasonTransactions(
             window !== null ? window.transactions : input.transactions,
@@ -783,8 +784,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
             input.sponsors !== undefined
               ? normalizeSponsorGearState(input.sponsors)
               : (existingSponsors as
-                  | import('@hoop-rush/data-contracts').SeasonSponsorGearState
-                  | undefined),
+                  import('@hoop-rush/data-contracts').SeasonSponsorGearState | undefined),
           stateRevision: input.stateRevision,
           stateDigest: input.stateDigest,
         };
@@ -1120,7 +1120,6 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
     });
     const challenges = validatedRun.challenges ?? buildEmptyChallengeState();
     const campaign = seasonCampaignStateSchema.parse(this.initialCampaignState());
-    const sponsors = normalizeSponsorGearState(validatedRun.sponsors);
     const draftFrontOffice =
       (
         validatedDraft.draft as {
@@ -1200,7 +1199,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
       challenges,
       campaign,
       evolution,
-      sponsors,
+      sponsors: validatedRun.sponsors,
       checkpointState: null,
       stateRevision: 0,
       stateDigest,

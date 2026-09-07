@@ -1,16 +1,30 @@
 import { describe, expect, it } from 'vitest';
 import {
   SEASON_RUN_SCHEMA_VERSION,
+  commandIdSchema,
+  franchiseIdSchema,
   normalizeSponsorGearState,
+  playerIdSchema,
+  seedSchema,
   sponsorGearPriceOf,
   sponsorGearTierConfigOf,
   type SeasonDraftCatalog,
+  type SeasonApplySponsorResult,
+  type SeasonBuySponsorResult,
   type SeasonRun,
-  type SeasonRunCommandContext,
 } from '@hoop-rush/data-contracts';
+import {
+  buildGameSimulationInput,
+  buildLegalSimulationTeam,
+  buildSimulationPlayer,
+} from '@hoop-rush/test-fixtures';
+import {
+  handleSeasonRunCommand,
+  type SeasonRunCommandContext,
+  type SeasonRunCommandResult,
+} from './season-commands.ts';
 import { expandSeasonRunRosters } from './block.ts';
 import { buildEconomyTestRun, zeroEffectsOf } from './season-economy-test-support.ts';
-import { handleSeasonRunCommand } from './season-commands.ts';
 import {
   applySponsorBoosts,
   createInitialSponsorGearState,
@@ -18,8 +32,12 @@ import {
   seasonSponsorOffersForBlock,
   sponsorsWithBlockCommit,
 } from './sponsors.ts';
+import { simulateGame } from '../sim/game.ts';
+import { checkGameResult } from '../sim/invariants.ts';
+import { createEngineContext } from '../sim/context.ts';
 
 const HUMAN = 'lakers';
+const humanFid = franchiseIdSchema.parse(HUMAN);
 
 function hexSeed(tag: number): string {
   return `face${tag.toString(16).padStart(12, '0')}abcdef`;
@@ -76,7 +94,18 @@ function humanPlayer(run: SeasonRun): string {
   return player.playerVersionId;
 }
 
-function resultOf(output: ReturnType<typeof handleSeasonRunCommand>, command: string) {
+function resultOf(
+  output: ReturnType<typeof handleSeasonRunCommand>,
+  command: 'buy-sponsor',
+): SeasonBuySponsorResult;
+function resultOf(
+  output: ReturnType<typeof handleSeasonRunCommand>,
+  command: 'apply-sponsor',
+): SeasonApplySponsorResult;
+function resultOf(
+  output: ReturnType<typeof handleSeasonRunCommand>,
+  command: string,
+): SeasonRunCommandResult['result'] {
   if (output.result.command !== command) throw new Error(`wrong command ${output.result.command}`);
   return output.result.result;
 }
@@ -174,7 +203,7 @@ describe('applySponsorBoosts', () => {
         tier: 'ICON',
         boosts: [{ key: 'speed', points: 6 }],
         appliedBlock: 0,
-        appliedByCommandId: 'cmd-00000000000000000000000000000001',
+        appliedByCommandId: commandIdSchema.parse('cmd-00000000000000000000000000000001'),
       },
       apparel: null,
       fuel: {
@@ -185,7 +214,7 @@ describe('applySponsorBoosts', () => {
         tier: 'ICON',
         boosts: [{ key: 'strength', points: 4 }],
         appliedBlock: 0,
-        appliedByCommandId: 'cmd-00000000000000000000000000000002',
+        appliedByCommandId: commandIdSchema.parse('cmd-00000000000000000000000000000002'),
       },
     });
     expect(boosted.speed).toBe(100);
@@ -220,7 +249,7 @@ describe('buy-sponsor command', () => {
     const sponsors = normalizeSponsorGearState(output.run.sponsors);
     expect(sponsors.vault.items).toHaveLength(1);
     expect(sponsors.boards.boards[0]?.purchasedInstanceIds).toEqual([offer.instanceId]);
-    expect(output.run.influence.balances[HUMAN]).toBe(1);
+    expect(output.run.influence.balances[humanFid]).toBe(1);
     const ledger = output.run.influence.ledger[output.run.influence.ledger.length - 1];
     expect(ledger?.source).toBe('sponsor-purchase');
     expect(ledger?.commandId).toBe('cmd-buy-1');
@@ -266,9 +295,11 @@ describe('buy-sponsor command', () => {
     if (expired.status !== 'rejected') throw new Error('expected rejection');
     expect(expired.rejection.code).toBe('sponsor-expired');
 
+    const brokeBalances = { ...run.influence.balances };
+    brokeBalances[humanFid] = 0;
     const broke = {
       ...run,
-      influence: { ...run.influence, balances: { ...run.influence.balances, [HUMAN]: 0 } },
+      influence: { ...run.influence, balances: brokeBalances },
     };
     const poor = resultOf(
       handleSeasonRunCommand(buyCommand(broke, offer.instanceId, 'cmd-buy-x5'), runContext(broke)),
@@ -402,7 +433,7 @@ describe('apply-sponsor command', () => {
                 instanceId: sameFamily.instanceId,
                 entryId: sameFamily.entryId,
                 acquiredBlock: 0,
-                acquiredByCommandId: 'cmd-dupe-seed',
+                acquiredByCommandId: commandIdSchema.parse('cmd-dupe-seed'),
               },
             ],
           },
@@ -506,25 +537,15 @@ describe('sponsor sim hookup', () => {
     const board = normalizeSponsorGearState(run.sponsors).boards.boards[0];
     const offer = board?.offers[0];
     if (board === undefined || offer === undefined) throw new Error('no offer dealt');
+    const richBalances = { ...run.influence.balances };
+    richBalances[humanFid] = 8;
+    const rich = {
+      ...run,
+      influence: { ...run.influence, balances: richBalances },
+    };
     const bought = handleSeasonRunCommand(
-      buyCommand(
-        {
-          ...run,
-          influence: {
-            ...run.influence,
-            balances: { ...run.influence.balances, [HUMAN]: 8 },
-          },
-        },
-        offer.instanceId,
-        'cmd-sim-buy',
-      ),
-      runContext({
-        ...run,
-        influence: {
-          ...run.influence,
-          balances: { ...run.influence.balances, [HUMAN]: 8 },
-        },
-      }),
+      buyCommand(rich, offer.instanceId, 'cmd-sim-buy'),
+      runContext(rich),
     );
     if (resultOf(bought, 'buy-sponsor').status !== 'accepted') throw new Error('buy failed');
     const applied = handleSeasonRunCommand(
@@ -540,6 +561,91 @@ describe('sponsor sim hookup', () => {
     if (base === undefined || boosted === undefined) throw new Error('expansion failed');
     for (const boost of offer.boosts) {
       expect(boosted[boost.key]).toBe(Math.min(100, base[boost.key] + boost.points));
+    }
+  });
+});
+
+describe('sponsor max-kit edge audit', () => {
+  function fullIconKit(commandNoun: string) {
+    const snapshot = (
+      slot: 'shoe' | 'apparel' | 'fuel',
+      brandFamily: string,
+      entryId: string,
+      boosts: {
+        key:
+          | 'speed'
+          | 'vertical'
+          | 'ballHandling'
+          | 'threePoint'
+          | 'midrange'
+          | 'perimeterDefense'
+          | 'strength'
+          | 'offensiveRebound'
+          | 'defensiveRebound';
+        points: number;
+      }[],
+    ) => ({
+      instanceId: `sponsor-0-${slot}`,
+      entryId,
+      brandFamily,
+      slot,
+      tier: 'ICON' as const,
+      boosts,
+      appliedBlock: 0,
+      appliedByCommandId: commandIdSchema.parse(commandNoun),
+    });
+    return {
+      shoe: snapshot('shoe', 'nike', 'nike-icon', [
+        { key: 'speed', points: 12 },
+        { key: 'vertical', points: 2 },
+        { key: 'ballHandling', points: 2 },
+      ]),
+      apparel: snapshot('apparel', 'beats', 'beats-icon', [
+        { key: 'threePoint', points: 12 },
+        { key: 'midrange', points: 2 },
+        { key: 'perimeterDefense', points: 2 },
+      ]),
+      fuel: snapshot('fuel', 'gatorade', 'gatorade-icon', [
+        { key: 'strength', points: 12 },
+        { key: 'offensiveRebound', points: 2 },
+        { key: 'defensiveRebound', points: 2 },
+      ]),
+    };
+  }
+  it('clamps a fully kitted card at 100 without breaking game accounting', () => {
+    const { catalog } = buildEconomyTestRun({ seed: hexSeed(201) });
+    const candidate = catalog.candidates[0];
+    if (candidate === undefined) throw new Error('catalog is empty');
+    const base = { ...candidate.detailedRatings, speed: 95, threePoint: 95, strength: 95 };
+    const boosted = applySponsorBoosts(base, fullIconKit('cmd-max-kit-audit-000000000001'));
+    expect(boosted.speed).toBe(100);
+    expect(boosted.threePoint).toBe(100);
+    expect(boosted.strength).toBe(100);
+    expect(boosted.vertical).toBe(Math.min(100, base.vertical + 2));
+    const ctx = createEngineContext();
+    const template = buildSimulationPlayer();
+    for (let game = 0; game < 20; game += 1) {
+      const kitted = {
+        ...template,
+        ratings: boosted,
+        tendencies: { ...template.tendencies },
+      };
+      const home = buildLegalSimulationTeam({
+        teamId: `fixture-max-home-${String(game)}`,
+        players: Array.from({ length: 5 }, (_, index) => ({
+          ...kitted,
+          playerId: playerIdSchema.parse(`p-max-${String(game)}-${String(index)}`),
+          displayName: `Max Kit ${String(index)}`,
+        })),
+      });
+      const away = buildLegalSimulationTeam({ teamId: `fixture-max-away-${String(game)}` });
+      const input = buildGameSimulationInput({
+        seed: seedSchema.parse(hexSeed(300 + game)),
+        home,
+        away,
+      });
+      const result = simulateGame(input, ctx);
+      expect(checkGameResult(result), `game ${String(game)}`).toEqual([]);
     }
   });
 });

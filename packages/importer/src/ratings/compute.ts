@@ -226,6 +226,29 @@ function teamWinPctForPlayer(
   if (!key) return null;
   return winMap.get(key) ?? null;
 }
+export function resolveTeamWinPct(
+  playerWinPct: number | null,
+  standingsWinPct: number | null,
+  fallbackWinPct: number | null,
+): number | null {
+  // Real per-player win% first, then real standings, then the BPM estimate.
+  // Standings are the only team context available before 1996-97.
+  return playerWinPct ?? standingsWinPct ?? fallbackWinPct;
+}
+export function loadStandingsMap(outDir: string): Map<string, number> {
+  const map = new Map<string, number>();
+  const path = join(outDir, 'standings.json');
+  if (!fileExists(path)) return map;
+  try {
+    const raw: unknown = readJson(path);
+    if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return map;
+    for (const [teamId, value] of Object.entries(raw)) {
+      const pct = typeof value === 'number' && Number.isFinite(value) ? value : null;
+      if (teamId !== '' && pct !== null) map.set(teamId, clamp(pct, 0, 1));
+    }
+  } catch {}
+  return map;
+}
 export function pooledRatePriors(
   roster: readonly RosterPlayer[],
   statsList: readonly RatingsStatsRow[],
@@ -342,6 +365,7 @@ export function computeForSeason(season: string, force = false): void {
   const ratePriorsByGroup = pooledRatePriors(roster, statsList);
   const teamWinPctMap = estimateTeamWinPctMap(statsList);
   const playerWinPctMap = loadPlayerWinPctMap(season);
+  const standingsWinPctMap = loadStandingsMap(out);
   let computed = 0;
   for (const player of roster) {
     const extId = player.externalId ?? '';
@@ -395,8 +419,9 @@ export function computeForSeason(season: string, force = false): void {
     const stats: RatingsStatsRow = { ...baseStats, ...evidence };
     const rosterTeamId = typeof player.teamExternalId === 'string' ? player.teamExternalId : null;
     const playerWinPct = extId ? (playerWinPctMap.get(extId) ?? null) : null;
+    const standingsWinPct = teamWinPctForPlayer(stats, rosterTeamId, standingsWinPctMap);
     const fallbackTeamWinPct = teamWinPctForPlayer(stats, rosterTeamId, teamWinPctMap);
-    const teamWinPct = playerWinPct ?? fallbackTeamWinPct;
+    const teamWinPct = resolveTeamWinPct(playerWinPct, standingsWinPct, fallbackTeamWinPct);
     const derived = derivePlayerRecord({
       season,
       playerId: extId !== '' ? `p-${extId}` : (player.id ?? undefined),

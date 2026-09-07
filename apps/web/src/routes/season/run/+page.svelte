@@ -9,6 +9,7 @@
   import InfluencePanel from '$lib/components/season/InfluencePanel.svelte';
   import InterruptionPanel from '$lib/components/season/InterruptionPanel.svelte';
   import ChallengesPanel from '$lib/components/season/ChallengesPanel.svelte';
+  import SponsorShopPanel from '$lib/components/season/SponsorShopPanel.svelte';
   import LeaguePulse from '$lib/components/season/LeaguePulse.svelte';
   import PostseasonMatchupCard from '$lib/components/season/PostseasonMatchupCard.svelte';
   import PostseasonProgress from '$lib/components/season/PostseasonProgress.svelte';
@@ -50,6 +51,9 @@
     type InfluenceSpendAffordance,
   } from '$lib/season/season-influence-view';
   import { challengesViewModel } from '$lib/season/season-challenges-view';
+  import { sponsorBoardHistoryOf, sponsorShopOf } from '$lib/season/sponsor-gear-view';
+  import { loadSponsorsIndex } from '$lib/season/season-assets';
+  import { resolveAssetUrl } from '$lib/asset-url';
   import { availabilityStripRows } from '$lib/season/season-health-view';
   import {
     openWindowOf,
@@ -120,6 +124,32 @@
     );
   });
   const challengesVm = $derived(run !== null ? challengesViewModel(run, nextBlockIndex) : null);
+  const sponsorBalance = $derived(influenceVm?.balance ?? 0);
+  const sponsorCap = $derived(influenceVm?.cap ?? 8);
+  const sponsorOffers = $derived(
+    run !== null && nextBlockIndex !== null
+      ? sponsorShopOf(run, nextBlockIndex, sponsorBalance)
+      : null,
+  );
+  const sponsorOwnedCount = $derived(
+    sponsorOffers?.filter((offer) => offer.state === 'owned').length ?? 0,
+  );
+  const sponsorCommandError = $derived.by(() => {
+    const e = commandError;
+    if (e === null) return null;
+    return e.command === 'buy-sponsor' ? e.message : null;
+  });
+  let sponsorLogos: ReadonlyMap<string, string> = $state(new Map());
+  $effect(() => {
+    let cancelled = false;
+    void loadSponsorsIndex().then((index) => {
+      if (cancelled || !mounted || index === null) return;
+      sponsorLogos = new Map(index.logos.map((logo) => [logo.family, resolveAssetUrl(logo.file)]));
+    });
+    return () => {
+      cancelled = true;
+    };
+  });
   const innovationCommandError = $derived.by(() => {
     const e = commandError;
     if (e === null) return null;
@@ -648,6 +678,22 @@
             />
           {/if}
 
+          <SponsorShopPanel
+            offers={sponsorOffers}
+            balance={sponsorBalance}
+            cap={sponsorCap}
+            busy={block.phase === 'running'}
+            commandError={sponsorCommandError}
+            isFinalBlock={nextBlockIndex !== null && nextBlockIndex >= 8}
+            ownedCount={sponsorOwnedCount}
+            history={run !== null ? sponsorBoardHistoryOf(run) : []}
+            logos={sponsorLogos}
+            onBuy={(input) => {
+              if (!mounted) return;
+              void shell.hub?.buySponsor(input);
+            }}
+          />
+
           {#if needsInnovation}
             <CourtInnovationPicker
               busy={block.phase === 'running'}
@@ -793,6 +839,11 @@
                     ? '1 game'
                     : `${String(preview.gamesToLock)} games`} with this lineup.
                 </p>
+                {#if sponsorOffers !== null}
+                  <p class="mt-1 font-mono text-[11px] text-muted-foreground">
+                    Sponsors: {sponsorOwnedCount}/{sponsorOffers.length} owned
+                  </p>
+                {/if}
                 {#if preview.upcomingGames.length === 0}
                   <p class="mt-2 text-xs text-muted-foreground">
                     No games for you — Play sims league + earns Influence.

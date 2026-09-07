@@ -18,6 +18,7 @@
     'trade-cash-received': 'Trade Influence received',
     'risky-rehab': 'Injury rehab',
     'free-agent-signing': 'Signed free agent',
+    'sponsor-purchase': 'Sponsor gear',
   };
   let {
     balance,

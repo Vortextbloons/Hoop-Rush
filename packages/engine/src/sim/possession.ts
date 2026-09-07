@@ -445,7 +445,7 @@ export function assistProbabilityPure(
     Math.max(
       0.05,
       profile.parameters.assistRate *
-        0.95 *
+        1.01 *
         roleFactor *
         creation *
         actionFactor *
@@ -697,7 +697,7 @@ function resolveShot(
   }
   const homeDefenseAdjustment =
     defenseSide === 0 ? (ctx.homeCourt?.homeDefenseShotAdjustment ?? 0) : 0;
-  const shotP = makeProbability(
+  const baseShotP = makeProbability(
     shooter,
     defender,
     profile,
@@ -708,6 +708,10 @@ function resolveShot(
     homeDefenseAdjustment,
     effectsAdjustmentFraction,
   );
+  const shotP =
+    shotPrep.twoPointAnchor !== null && !three
+      ? Math.min(0.97, baseShotP / Math.max(0.5, 1 - blockP))
+      : baseShotP;
   const made = rng.chance(shotP * ruleMakeScale);
   recorder.fieldGoalAttempt(offenseSide, shooterSlot, zone, made, three, shot.passed, deep);
   if (made) raceRecordPoints(ctx, offenseSide, deep ? 4 : three ? 3 : 2);

@@ -33,6 +33,7 @@
     faces = null,
     manifest = null,
     overallByVersion = null,
+    gearPointsByVersion = null,
     effects = null,
     summaries = [],
     onpending = null,
@@ -45,6 +46,7 @@
     faces?: ReadonlyMap<string, SeasonFaceRef> | null;
     manifest?: HoopRushManifest | null;
     overallByVersion?: ReadonlyMap<string, number> | null;
+    gearPointsByVersion?: ReadonlyMap<string, number> | null;
     effects?: SeasonEffectsState | null;
     summaries?: SeasonGameSummary[];
     onpending?: ((pending: boolean) => void) | null;
@@ -591,6 +593,14 @@
                     OVR {overallByVersion.get(row.member.playerVersionId)}
                   </span>
                 {/if}
+                {#if (gearPointsByVersion?.get(row.member.playerVersionId) ?? 0) > 0}
+                  <span
+                    class="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 font-mono text-[10px] font-bold text-amber-300 ring-1 ring-amber-400/40"
+                    title="Attribute points from applied sponsors"
+                  >
+                    +{gearPointsByVersion?.get(row.member.playerVersionId)} gear
+                  </span>
+                {/if}
                 {#if fatigue !== null}
                   <span
                     class={`shrink-0 rounded-full px-2 py-0.5 font-mono text-[10px] font-bold ${fatigue.badge}`}
@@ -825,6 +835,14 @@
                         class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold text-foreground"
                       >
                         OVR {overallByVersion.get(member.playerVersionId)}
+                      </span>
+                    {/if}
+                    {#if (gearPointsByVersion?.get(member.playerVersionId) ?? 0) > 0}
+                      <span
+                        class="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 font-mono text-[10px] font-bold text-amber-300 ring-1 ring-amber-400/40"
+                        title="Attribute points from applied sponsors"
+                      >
+                        +{gearPointsByVersion?.get(member.playerVersionId)} gear
                       </span>
                     {/if}
                     <span

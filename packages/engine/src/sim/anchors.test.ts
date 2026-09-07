@@ -262,7 +262,51 @@ describe('observed player anchors pin efficiency (m3-engine-v5)', () => {
       300,
     );
     expect(fieldGoalPct).toBeGreaterThan(0.545);
-    expect(fieldGoalPct).toBeLessThan(0.59);
+    expect(fieldGoalPct).toBeLessThan(0.6);
+  });
+  it('keeps an elite rim finisher near observed efficiency instead of collapsing to 54%', () => {
+    const base = anchoredCenterTeam();
+    const template = base.players[4];
+    if (template === undefined) throw new Error('anchored fixture team requires five players');
+    const claxtonAnchors: SimulationAnchors = {
+      ...shaquilleAnchors,
+      pointsPerGame: 12.6,
+      reboundsPerGame: 9.2,
+      offensiveReboundsPerGame: 2.4,
+      defensiveReboundsPerGame: 6.8,
+      assistsPerGame: 1.9,
+      blocksPerGame: 2.5,
+      turnoversPerGame: 1.3,
+      fieldGoalPct: 0.701,
+      threePointPct: null,
+      freeThrowPct: 0.562,
+      threePointAttemptRate: 0,
+      freeThrowAttemptRate: 0.416,
+    };
+    const finisher = {
+      ...template,
+      playerId: playerIdSchema.parse('claxton-anchor'),
+      displayName: 'Elite Finisher',
+      tendencies: {
+        ...template.tendencies,
+        usageRate: 15.5,
+        rimFrequency: 64,
+        shortMidFrequency: 27,
+        longMidFrequency: 8,
+        cornerThreeFrequency: 0,
+        aboveBreakThreeFrequency: 0,
+        threePointRate: 0,
+        freeThrowRate: 41.6,
+      },
+      anchors: claxtonAnchors,
+    };
+    const team: SimulationTeam = {
+      ...base,
+      players: base.players.map((p, i) => (i === 4 ? finisher : p)),
+    };
+    const { fieldGoalPct } = sampleFieldGoalPct('claxton-anchor', team, averageDefenseTeam(), 200);
+    expect(fieldGoalPct).toBeGreaterThan(0.6);
+    expect(fieldGoalPct).toBeLessThan(0.72);
   });
   it('pins a perimeter star to observed field-goal, three-point, and free-throw rates', () => {
     const mjAnchors: SimulationAnchors = {

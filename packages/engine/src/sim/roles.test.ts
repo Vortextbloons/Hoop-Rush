@@ -4,7 +4,9 @@ import { playerIdSchema, seedSchema } from '@hoop-rush/data-contracts';
 import {
   DEFAULT_ERA_SIM_PROFILE,
   buildGameSimulationInput,
+  buildLegalSimulationTeam,
   buildRolesTeam,
+  buildSimulationPlayer,
   seedFromString,
 } from '@hoop-rush/test-fixtures';
 import { simulateGame } from './game.ts';
@@ -162,5 +164,56 @@ describe('player-role behavior (roles lineup)', () => {
       ).toBeGreaterThanOrEqual(value - tolerance);
       expect(observed).toBeLessThanOrEqual(value + tolerance);
     }
+  });
+});
+
+describe('extreme-roster usage distribution (m3-engine-v21)', () => {
+  it('keeps a lone star below 40% usage against four reluctant scorers', () => {
+    const base = buildLegalSimulationTeam();
+    const starBase = base.players[0];
+    if (starBase === undefined) throw new Error('fixture team requires five players');
+    const star = buildSimulationPlayer({
+      ...starBase,
+      playerId: playerIdSchema.parse('p-extreme-star'),
+      displayName: 'Extreme Star',
+      positions: ['SF'],
+      tendencies: { ...starBase.tendencies, usageRate: 32, shotRate: 34 },
+    });
+    const rolePlayers = base.players.slice(1).map((p, i) =>
+      buildSimulationPlayer({
+        ...p,
+        playerId: playerIdSchema.parse(`p-extreme-role-${String(i)}`),
+        displayName: `Extreme Role ${String(i)}`,
+        tendencies: { ...p.tendencies, usageRate: 13 + i, shotRate: 14 },
+      }),
+    );
+    const team: SimulationTeam = {
+      ...base,
+      teamId: 'extreme-home',
+      players: [star, ...rolePlayers],
+    };
+    const away: SimulationTeam = { ...team, teamId: 'extreme-away' };
+    let starUsage = 0;
+    let teamUsage = 0;
+    const games = 200;
+    for (let i = 0; i < games; i += 1) {
+      const input = buildGameSimulationInput({
+        seed: seedSchema.parse(seedFromString(`extreme-usage-${String(i)}`)),
+        profile: DEFAULT_ERA_SIM_PROFILE,
+        home: team,
+        away,
+      });
+      const result = simulateGame(input, ctx);
+      for (const side of [result.home, result.away] as const) {
+        const usageBySlot = side.players.map((p) => p.diagnostics?.usage ?? 0);
+        const total = usageBySlot.reduce((a, b) => a + b, 0);
+        teamUsage += total;
+        const starBox = side.players.find((p) => p.playerId === 'p-extreme-star');
+        if (starBox?.diagnostics) starUsage += starBox.diagnostics.usage;
+      }
+    }
+    const share = starUsage / Math.max(1e-9, teamUsage);
+    expect(share).toBeGreaterThan(0.25);
+    expect(share).toBeLessThan(0.4);
   });
 });

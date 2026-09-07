@@ -188,12 +188,19 @@ function productionEvidence(stats: StatsRow): ProductionEvidence {
   const minutes = Math.max(0, safeFloat(stats.minutes));
   const ppg = safeFloat(stats.points) / Math.max(1, games);
   const rpg = safeFloat(stats.rebounds) / Math.max(1, games);
-  const apg = safeFloat(stats.assists) / Math.max(1, games);
   const per = safeFloat(stats.per, 15);
   const bpm = safeFloat(stats.boxPlusMinus, 0);
   const usage = safeFloat(stats.usageRate, 18);
   const ts = safeFloat(stats.tsPct, 0.52);
   const efg = safeFloat(stats.efgPct, 0.5);
+  // Efficiency without load is not production: a 16% usage finisher dunking
+  // at .680 TS did not produce what a 30% usage creator did at .600. Creation
+  // counts as load (playmakers carry offense without shooting), and missing
+  // usage data never reads as low load.
+  const mpg = minutes / Math.max(1, games);
+  const astPer36 = mpg > 0 ? ((safeFloat(stats.assists) / Math.max(1, games)) * 36) / mpg : 0;
+  const loadFactor =
+    stats.usageRate == null ? 1 : clamp((usage + astPer36 * 1.5 - 16) / 14, 0.3, 1);
   const evidence = confidenceFor(stats);
   const stocks =
     stats.steals == null || stats.blocks == null || games <= 0
@@ -203,13 +210,13 @@ function productionEvidence(stats: StatsRow): ProductionEvidence {
     50 +
       (ppg - 15) * 0.6 +
       (rpg - 5) * 0.25 +
-      (apg - 3) * 0.4 +
+      (astPer36 - 3.5) * 0.9 +
       (per - 15) * 1.0 +
       bpm * 1.3 +
       (usage - 20) * 0.1 -
       Math.max(0, usage - 30) * 0.22 +
-      (ts - 0.54) * 85 +
-      (efg - 0.5) * 45 +
+      (ts - 0.54) * 85 * loadFactor +
+      (efg - 0.5) * 45 * loadFactor +
       stocks,
     0,
     100,
@@ -454,8 +461,15 @@ function historicalDefenseEvidenceLift(input: RatingProfileInput): number {
   const anchorLift = clamp((skill(input.ratings, 'interiorDefense') - 80) / 10, 0, 2);
   return reboundLift + anchorLift;
 }
-export function defenseCreditFor(defenseRating: number): number {
-  return clamp((defenseRating - 66) * 0.5, -2.5, 3);
+export function defenseCreditFor(defenseRating: number, hasContestEvidence = false): number {
+  // Containment without tracking evidence is estimated, so its credit caps at
+  // +1.5: a 74 defense built on box-score stocks alone is not proven lockdown
+  // the way a contested-shot profile is.
+  const full = clamp((defenseRating - 66) * 0.5, -2.5, 3);
+  return hasContestEvidence ? full : Math.min(full, 1.5);
+}
+export function twoWayBonusFor(offenseRating: number, defenseRating: number): number {
+  return clamp((offenseRating - 60) / 25, 0, 1) * clamp((defenseRating - 60) / 20, 0, 1) * 3;
 }
 export function eliteEvidenceLiftFor(input: {
   production: ProductionEvidence;
@@ -623,13 +637,18 @@ export function deriveRatingProfile(input: RatingProfileInput): DerivedRatingPro
     hasContestEvidence,
   });
   const teamDelta = teamContextAdjustment(input.stats, input.teamWinPct, summary.defenseRating);
-  const defenseCredit = defenseCreditFor(summary.defenseRating);
+  const defenseCredit = defenseCreditFor(summary.defenseRating, hasContestEvidence);
+  // Two-way synergy is scarce and playoff-proof: only players above average on
+  // BOTH ends collect it, scaled continuously so there is no tier cliff.
+  // One-way stars (elite offense with average defense or vice versa) get nothing.
+  const twoWayBonus = twoWayBonusFor(summary.offenseRating, summary.defenseRating);
   const raw =
     baseScore * (1 - production.weight) +
     production.score * production.weight +
     eliteEvidenceLift +
     teamDelta +
-    defenseCredit;
+    defenseCredit +
+    twoWayBonus;
   const canonicalOverall = canonicalCurve(raw);
   const profile: RatingProfile = {
     schemaVersion: 2,

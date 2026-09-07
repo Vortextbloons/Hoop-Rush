@@ -9,6 +9,8 @@ import {
   seasonLeagueSchema,
   seasonRosterTargetsSchema,
   seasonScheduleSchema,
+  seasonSponsorsIndexSchema,
+  type SeasonSponsorsIndex,
   type EraSimulationProfile,
   type ProjectionModelArtifact,
   type SeasonDraftCatalog,
@@ -131,6 +133,19 @@ export function loadSeasonFreeAgencyTargets(): Promise<SeasonRosterTargets> {
 }
 export function loadSeasonHomeCourtProfile(): Promise<SeasonHomeCourtProfile> {
   return Promise.resolve({ ...SEASON_HOME_COURT_PROFILE });
+}
+export function loadSponsorsIndex(): Promise<SeasonSponsorsIndex | null> {
+  return memoized('season/sponsors-index', async () => {
+    const manifest = await getManifest();
+    const entry = manifest.season?.sponsorsIndex;
+    if (!entry) return null;
+    const parse = (value: unknown) => seasonSponsorsIndexSchema.parse(value);
+    const cached = await readCachedAsset(entry.contentHash, parse);
+    if (cached !== null) return cached;
+    const index = await fetchVerified(resolveAssetUrl(entry.url), entry.contentHash, parse);
+    void writeCachedAsset(entry.contentHash, index);
+    return index;
+  });
 }
 export function seasonArtifactUrls(): Promise<SeasonArtifactUrls> {
   return memoized('season/artifact-urls', async () => {

@@ -709,6 +709,36 @@ export class SeasonHubState {
     };
     await this.dispatch(command);
   }
+  async buySponsor(input: { instanceId: string }): Promise<void> {
+    const command: SeasonRunCommand = {
+      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      command: 'buy-sponsor',
+      commandId: newSeasonId('spon'),
+      runId: this.requiredRunId(),
+      expectedStateRevision: this.requiredStateRevision(),
+      expectedStateDigest: this.requiredStateDigest(),
+      instanceId: input.instanceId,
+    };
+    await this.dispatch(command);
+  }
+  async applySponsor(input: {
+    instanceId: string;
+    playerVersionId: string;
+    slot: 'shoe' | 'apparel' | 'fuel';
+  }): Promise<void> {
+    const command: SeasonRunCommand = {
+      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      command: 'apply-sponsor',
+      commandId: newSeasonId('spon'),
+      runId: this.requiredRunId(),
+      expectedStateRevision: this.requiredStateRevision(),
+      expectedStateDigest: this.requiredStateDigest(),
+      instanceId: input.instanceId,
+      playerVersionId: input.playerVersionId,
+      slot: input.slot,
+    };
+    await this.dispatch(command);
+  }
   async spendInfluence(input: {
     purpose: SeasonSpendInfluencePurpose;
     windowIndex?: number;
@@ -1712,6 +1742,22 @@ export function describeCommandRejection(
       return 'A Court Innovation is already selected and cannot be replaced.';
     case 'innovation-invalid':
       return 'That innovation is not in the Court Innovation catalog.';
+    case 'sponsor-not-offered':
+      return 'That sponsor was not offered for this block.';
+    case 'sponsor-already-purchased':
+      return 'That sponsor was already bought this block.';
+    case 'sponsor-expired':
+      return 'That sponsor offer expired when its block locked.';
+    case 'sponsor-not-owned':
+      return 'That sponsor is not in the team vault.';
+    case 'sponsor-slot-mismatch':
+      return `That sponsor fits the ${rejection.expectedSlot} slot, not ${rejection.slot}.`;
+    case 'sponsor-slot-occupied':
+      return 'That gear slot is already filled — sponsorships are permanent.';
+    case 'sponsor-not-on-roster':
+      return 'That player is no longer on the roster.';
+    case 'sponsor-brand-duplicate':
+      return `That player already wears ${rejection.brandFamily} — one brand per player.`;
     default:
       return `The ${command} command was rejected.`;
   }

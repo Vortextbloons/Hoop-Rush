@@ -713,9 +713,15 @@ describe('parsePoolTargets', () => {
     ]);
   });
   it('rejects malformed targets', () => {
-    for (const bad of ['lakers', 'lakers/', '/1990s', 'a/b/c', '']) {
+    for (const bad of ['lakers', 'lakers/', '/1990s', 'a/b/c', '', 'lakers-1990', 'a-b-c']) {
       expect(() => parsePoolTargets([bad])).toThrow(/invalid pool target/);
     }
+  });
+  it('accepts the filename-style dash form', () => {
+    expect(parsePoolTargets(['lakers-1990s', 'celtics/2000s'])).toEqual([
+      ['lakers', '1990s'],
+      ['celtics', '2000s'],
+    ]);
   });
 });
 describe('computePool (fixture)', () => {

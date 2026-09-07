@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_RATINGS_MODEL_ARTIFACT } from './artifact.ts';
 import { derivePlayerRecord } from './v2.ts';
 import { computeSummaryRatings } from './summary.ts';
-import { defenseCreditFor, eliteEvidenceLiftFor, teamContextAdjustment } from './v3.ts';
+import {
+  defenseCreditFor,
+  eliteEvidenceLiftFor,
+  teamContextAdjustment,
+  twoWayBonusFor,
+} from './v3.ts';
 import { starterStats } from './ratings-test-support.ts';
 const stats = starterStats();
 function recordFor(statsOver: Record<string, unknown> = {}) {
@@ -98,7 +103,8 @@ describe('Ratings v3 profile', () => {
         teamWinPct: undefined,
       }) +
       teamContextAdjustment(line, undefined, profile.defenseRating) +
-      defenseCreditFor(profile.defenseRating);
+      defenseCreditFor(profile.defenseRating, false) +
+      twoWayBonusFor(profile.offenseRating, profile.defenseRating);
     expect(profile.rawOverallScore).toBe(Math.round(recomputed * 100) / 100);
     expect(profile.rawOverallScore).not.toBe(profile.canonicalOverall);
   });

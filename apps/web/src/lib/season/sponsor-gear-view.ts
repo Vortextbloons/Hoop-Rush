@@ -1,0 +1,257 @@
+import {
+  SEASON_SPONSOR_SLOTS,
+  normalizeSponsorGearState,
+  sponsorGearEntryOf,
+  type SeasonPlayerSponsorSlots,
+  type SeasonRun,
+  type SeasonSponsorBoost,
+  type SeasonSponsorBoostKey,
+  type SeasonSponsorSlot,
+  type SimulationRatings,
+} from '@hoop-rush/data-contracts';
+import { applySponsorBoosts } from '@hoop-rush/engine';
+
+export const SPONSOR_RATING_SHORT_LABELS: Record<SeasonSponsorBoostKey, string> = {
+  speed: 'SPD',
+  ballHandling: 'BH',
+  vertical: 'VERT',
+  steal: 'STL',
+  midrange: 'MID',
+  strength: 'STR',
+  threePoint: '3PT',
+  perimeterDefense: 'PD',
+  interiorDefense: 'ID',
+  block: 'BLK',
+  offensiveRebound: 'OREB',
+  defensiveRebound: 'DREB',
+  freeThrow: 'FT',
+};
+
+export const SPONSOR_SLOT_LABELS: Record<SeasonSponsorSlot, string> = {
+  shoe: 'SHOE',
+  apparel: 'APPAREL',
+  fuel: 'FUEL',
+};
+
+export type SponsorOfferState = 'available' | 'owned' | 'expired';
+
+export interface SponsorOfferCard {
+  instanceId: string;
+  brandFamily: string;
+  displayName: string;
+  slot: SeasonSponsorSlot;
+  tier: 'BUZZ' | 'PRIME' | 'ICON';
+  boosts: { key: SeasonSponsorBoostKey; label: string; points: number }[];
+  boostLine: string;
+  price: number;
+  state: SponsorOfferState;
+  affordable: boolean;
+}
+
+export interface SponsorVaultEntry {
+  instanceId: string;
+  brandFamily: string;
+  displayName: string;
+  slot: SeasonSponsorSlot;
+  tier: 'BUZZ' | 'PRIME' | 'ICON';
+  boosts: { key: SeasonSponsorBoostKey; label: string; points: number }[];
+  boostLine: string;
+}
+
+export interface SponsorBoardHistoryEntry {
+  blockIndex: number;
+  bought: number;
+  expired: number;
+}
+
+function toBoostLines(boosts: readonly SeasonSponsorBoost[]) {
+  return [...boosts]
+    .sort((a, b) => (a.key < b.key ? -1 : 1))
+    .map((boost) => ({
+      key: boost.key,
+      label: SPONSOR_RATING_SHORT_LABELS[boost.key],
+      points: boost.points,
+    }));
+}
+
+export function formatBoostLine(boosts: readonly { label: string; points: number }[]): string {
+  return boosts.map((boost) => `+${String(boost.points)} ${boost.label}`).join(', ');
+}
+
+export function sponsorShopOf(
+  run: SeasonRun | null,
+  blockIndex: number | null,
+  balance: number,
+): SponsorOfferCard[] | null {
+  if (run === null || blockIndex === null || blockIndex < 0 || blockIndex > 7) return null;
+  const sponsors = normalizeSponsorGearState(run.sponsors);
+  const board = sponsors.boards.boards.find((entry) => entry.blockIndex === blockIndex);
+  if (board === undefined) return null;
+  return board.offers.map((offer) => {
+    const owned = board.purchasedInstanceIds.includes(offer.instanceId);
+    const boosts = toBoostLines(offer.boosts);
+    return {
+      instanceId: offer.instanceId,
+      brandFamily: offer.brandFamily,
+      displayName: sponsorGearEntryOf(offer.entryId).displayName,
+      slot: offer.slot,
+      tier: offer.tier,
+      boosts,
+      boostLine: formatBoostLine(boosts),
+      price: offer.price,
+      state: owned ? 'owned' : 'available',
+      affordable: balance >= offer.price,
+    };
+  });
+}
+
+export function sponsorVaultOf(run: SeasonRun | null): SponsorVaultEntry[] {
+  if (run === null) return [];
+  const sponsors = normalizeSponsorGearState(run.sponsors);
+  const offersById = new Map(
+    sponsors.boards.boards
+      .flatMap((board) => board.offers)
+      .map((offer) => [offer.instanceId, offer]),
+  );
+  return sponsors.vault.items.map((item) => {
+    const entry = sponsorGearEntryOf(item.entryId);
+    const offer = offersById.get(item.instanceId);
+    const boosts = toBoostLines(offer?.boosts ?? []);
+    return {
+      instanceId: item.instanceId,
+      brandFamily: entry.brandFamily,
+      displayName: entry.displayName,
+      slot: entry.slot,
+      tier: entry.tier,
+      boosts,
+      boostLine: formatBoostLine(boosts),
+    };
+  });
+}
+
+export function sponsorSlotsOf(run: SeasonRun | null, playerVersionId: string) {
+  if (run === null) return null;
+  return normalizeSponsorGearState(run.sponsors).players.slots[playerVersionId] ?? null;
+}
+
+export function boostedRatingsOf(
+  base: SimulationRatings,
+  run: SeasonRun | null,
+  playerVersionId: string,
+): SimulationRatings {
+  if (run === null) return { ...base };
+  return applySponsorBoosts(base, sponsorSlotsOf(run, playerVersionId));
+}
+
+export function gearPointsOf(slots: ReturnType<typeof sponsorSlotsOf>): number {
+  if (slots === null) return 0;
+  let total = 0;
+  for (const slot of SEASON_SPONSOR_SLOTS) {
+    for (const boost of slots[slot]?.boosts ?? []) total += boost.points;
+  }
+  return total;
+}
+
+export function sponsorBoardHistoryOf(run: SeasonRun | null): SponsorBoardHistoryEntry[] {
+  if (run === null) return [];
+  const sponsors = normalizeSponsorGearState(run.sponsors);
+  return [...sponsors.boards.boards]
+    .sort((a, b) => a.blockIndex - b.blockIndex)
+    .map((board) => ({
+      blockIndex: board.blockIndex,
+      bought: board.purchasedInstanceIds.length,
+      expired: board.offers.length - board.purchasedInstanceIds.length,
+    }));
+}
+
+export interface PlayerSponsorCardModel {
+  playerVersionId: string;
+  displayName: string;
+  seasonKey: string;
+  franchiseId: string;
+  eraId: string;
+  playable: readonly string[];
+  overall: number | null;
+  baseRatings: SimulationRatings;
+  role: string;
+  minutes: number | string;
+  fatigueLabel: string | null;
+  fatiguePercent: number | null;
+  lastMinutes: number | null;
+  slots: SeasonPlayerSponsorSlots | null;
+  gearPoints: number;
+}
+
+export interface PlayerSponsorCardInput {
+  playerVersionId: string;
+  displayName: string;
+  seasonKey: string;
+  franchiseId: string;
+  eraId: string;
+  playable: readonly string[];
+  overall: number | null;
+  baseRatings: SimulationRatings;
+  role: string;
+  minutes: number | string;
+  fatigueLabel: string | null;
+  fatiguePercent: number | null;
+  lastMinutes: number | null;
+}
+
+export function playerSponsorCardOf(
+  run: SeasonRun | null,
+  input: PlayerSponsorCardInput,
+): PlayerSponsorCardModel {
+  const slots = sponsorSlotsOf(run, input.playerVersionId);
+  return { ...input, slots, gearPoints: gearPointsOf(slots) };
+}
+
+export interface BoostedRatingRow {
+  key: SeasonSponsorBoostKey;
+  label: string;
+  base: number;
+  boosted: number;
+  source: string | null;
+}
+
+const BOOSTED_RATING_KEYS: readonly SeasonSponsorBoostKey[] = [
+  'speed',
+  'ballHandling',
+  'vertical',
+  'steal',
+  'midrange',
+  'threePoint',
+  'perimeterDefense',
+  'interiorDefense',
+  'block',
+  'strength',
+  'offensiveRebound',
+  'defensiveRebound',
+  'freeThrow',
+];
+
+export function boostedRatingRows(
+  base: SimulationRatings,
+  slots: SeasonPlayerSponsorSlots | null,
+): BoostedRatingRow[] {
+  const boosted = applySponsorBoosts(base, slots);
+  const byKey = new Map<string, string>();
+  if (slots) {
+    for (const slot of SEASON_SPONSOR_SLOTS) {
+      const snapshot = slots[slot];
+      if (snapshot === null) continue;
+      for (const boost of snapshot.boosts) {
+        const prior = byKey.get(boost.key);
+        const line = `+${String(boost.points)} ${snapshot.brandFamily} ${snapshot.tier}`;
+        byKey.set(boost.key, prior === undefined ? line : `${prior}, ${line}`);
+      }
+    }
+  }
+  return BOOSTED_RATING_KEYS.map((key) => ({
+    key,
+    label: SPONSOR_RATING_SHORT_LABELS[key],
+    base: base[key],
+    boosted: boosted[key],
+    source: byKey.get(key) ?? null,
+  }));
+}
