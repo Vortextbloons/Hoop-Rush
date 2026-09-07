@@ -220,9 +220,44 @@
   {
     "franchiseId": "bucks",
     "eraId": "1960s",
-    "status": "unavailable",
-    "reason": "confidence-failed",
-    "detail": "4 of 14 players exceed the low-confidence share under policy-v2"
+    "status": "available",
+    "playerCount": 14,
+    "coverageSummary": {
+      "coverageBand": "reconstructed",
+      "observedFamilies": [
+        "usage"
+      ],
+      "derivedFamilies": [
+        "athleticism",
+        "creation",
+        "defensive-events",
+        "fouls",
+        "shooting",
+        "usage"
+      ],
+      "estimatedFamilies": [
+        "athleticism",
+        "creation",
+        "defense",
+        "rebounding",
+        "shooting",
+        "shot-mix",
+        "turnovers",
+        "usage"
+      ],
+      "reconstructedFamilies": [
+        "shooting",
+        "shot-mix"
+      ],
+      "missingCategories": [
+        "defense",
+        "rebounding",
+        "shooting",
+        "three-point"
+      ],
+      "lowConfidenceShare": 0.344,
+      "policyVersion": "policy-v2"
+    }
   },
   {
     "franchiseId": "bucks",
@@ -440,7 +475,7 @@
     "eraId": "1960s",
     "status": "unavailable",
     "reason": "confidence-failed",
-    "detail": "13 of 21 players exceed the low-confidence share under policy-v2"
+    "detail": "15 of 21 players exceed the low-confidence share under policy-v2"
   },
   {
     "franchiseId": "bulls",
@@ -887,7 +922,7 @@
     "eraId": "1960s",
     "status": "unavailable",
     "reason": "confidence-failed",
-    "detail": "13 of 33 players exceed the low-confidence share under policy-v2"
+    "detail": "19 of 33 players exceed the low-confidence share under policy-v2"
   },
   {
     "franchiseId": "celtics",
@@ -1511,6 +1546,7 @@
       ],
       "estimatedFamilies": [
         "athleticism",
+        "creation",
         "defense",
         "rebounding",
         "shooting",
@@ -2096,6 +2132,7 @@
       ],
       "estimatedFamilies": [
         "athleticism",
+        "creation",
         "defense",
         "rebounding",
         "shooting",
@@ -2293,51 +2330,14 @@
     "eraId": "1960s",
     "status": "unavailable",
     "reason": "confidence-failed",
-    "detail": "29 of 43 players exceed the low-confidence share under policy-v2"
+    "detail": "42 of 43 players exceed the low-confidence share under policy-v2"
   },
   {
     "franchiseId": "kings",
     "eraId": "1970s",
-    "status": "available",
-    "playerCount": 53,
-    "coverageSummary": {
-      "coverageBand": "reconstructed",
-      "observedFamilies": [
-        "usage"
-      ],
-      "derivedFamilies": [
-        "athleticism",
-        "creation",
-        "defense",
-        "defensive-events",
-        "fouls",
-        "shooting",
-        "shot-mix",
-        "usage"
-      ],
-      "estimatedFamilies": [
-        "athleticism",
-        "creation",
-        "defense",
-        "rebounding",
-        "shooting",
-        "shot-mix",
-        "turnovers",
-        "usage"
-      ],
-      "reconstructedFamilies": [
-        "shooting",
-        "shot-mix"
-      ],
-      "missingCategories": [
-        "defense",
-        "rebounding",
-        "shooting",
-        "three-point"
-      ],
-      "lowConfidenceShare": 0.23,
-      "policyVersion": "policy-v2"
-    }
+    "status": "unavailable",
+    "reason": "confidence-failed",
+    "detail": "17 of 53 players exceed the low-confidence share under policy-v2"
   },
   {
     "franchiseId": "kings",
@@ -2516,7 +2516,7 @@
     "eraId": "1960s",
     "status": "unavailable",
     "reason": "confidence-failed",
-    "detail": "29 of 48 players exceed the low-confidence share under policy-v2"
+    "detail": "28 of 48 players exceed the low-confidence share under policy-v2"
   },
   {
     "franchiseId": "knicks",
@@ -2737,7 +2737,7 @@
     "eraId": "1960s",
     "status": "unavailable",
     "reason": "confidence-failed",
-    "detail": "12 of 35 players exceed the low-confidence share under policy-v2"
+    "detail": "25 of 35 players exceed the low-confidence share under policy-v2"
   },
   {
     "franchiseId": "lakers",
@@ -4117,7 +4117,7 @@
     "eraId": "1960s",
     "status": "unavailable",
     "reason": "confidence-failed",
-    "detail": "32 of 42 players exceed the low-confidence share under policy-v2"
+    "detail": "41 of 42 players exceed the low-confidence share under policy-v2"
   },
   {
     "franchiseId": "pistons",
@@ -4496,7 +4496,7 @@
     "eraId": "1960s",
     "status": "unavailable",
     "reason": "confidence-failed",
-    "detail": "5 of 18 players exceed the low-confidence share under policy-v2"
+    "detail": "18 of 18 players exceed the low-confidence share under policy-v2"
   },
   {
     "franchiseId": "rockets",
@@ -4683,7 +4683,7 @@
     "eraId": "1960s",
     "status": "unavailable",
     "reason": "confidence-failed",
-    "detail": "8 of 31 players exceed the low-confidence share under policy-v2"
+    "detail": "15 of 31 players exceed the low-confidence share under policy-v2"
   },
   {
     "franchiseId": "sixers",
@@ -5392,6 +5392,7 @@
       ],
       "estimatedFamilies": [
         "athleticism",
+        "creation",
         "defense",
         "rebounding",
         "shooting",
