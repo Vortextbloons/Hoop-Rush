@@ -640,12 +640,32 @@ export type PoolOverallRow = {
     modelVersion?: string;
   } | null;
   eraId?: string;
+  minutes?: number | null;
 };
+export const MINUTES_FLOOR_SAMPLE = 1500;
+export const MINUTES_FLOOR_OVERALL = 60;
 export interface PoolOverallDiagnostics {
   totalRowCount: number;
   rowsWithoutRawOverall: number;
 }
 export { overallBandForPercentile } from '@hoop-rush/data-contracts';
+function minutesOf(row: PoolOverallRow): number | null {
+  if (typeof row.minutes === 'number' && Number.isFinite(row.minutes)) return row.minutes;
+  const stats = (row as { stats?: { minutes?: unknown } }).stats;
+  const minutes = stats?.minutes;
+  return typeof minutes === 'number' && Number.isFinite(minutes) ? minutes : null;
+}
+export function minutesFloorOverall(overall: number, minutes: number | null): number {
+  // A proven rotation workload cannot grade as a scrub: seasons with real
+  // minutes compress into 60-64 instead of scattering through the 40s-50s.
+  // Rank order is preserved (monotonic), the percentile stays honest, and
+  // unobserved minutes (null) never qualify.
+  if (minutes === null || minutes < MINUTES_FLOOR_SAMPLE || overall >= MINUTES_FLOOR_OVERALL) {
+    return overall;
+  }
+  const clamped = Math.max(40, Math.min(59, Math.round(overall)));
+  return 60 + Math.round(((clamped - 40) / 20) * 4);
+}
 function hasRawOverallScore(row: PoolOverallRow): boolean {
   const raw = row.ratingProfile?.rawOverallScore;
   return typeof raw === 'number' && Number.isFinite(raw);
@@ -701,7 +721,10 @@ export function normalizePoolOveralls(rows: PoolOverallRow[]): PoolOverallDiagno
     const eraIdx = eraIndexMap.get(row) ?? globalIndex;
     const pEra = eraTotal > 0 ? eraIdx / eraTotal : pGlobal;
     const pBlended = 0.65 * pGlobal + 0.35 * pEra;
-    row.summaryRatings.overallRating = overallBandForPercentile(pBlended);
+    row.summaryRatings.overallRating = minutesFloorOverall(
+      overallBandForPercentile(pBlended),
+      minutesOf(row),
+    );
     if (hasRawOverallScore(row) && row.ratingProfile != null) {
       row.ratingProfile.overallPercentile =
         Math.round(((globalIndex + 1) / totalRowCount) * 10000) / 10000;

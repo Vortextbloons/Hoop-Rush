@@ -42,6 +42,7 @@ import {
   buildStubSeasonEngineSeam,
 } from '../testing/season-run-fixture.ts';
 import { buildEmptyCampaignState, generateSeasonCampaignOffers } from '@hoop-rush/engine';
+import { applySeasonBlockInfluenceGrants } from '@hoop-rush/engine/src/season/influence.ts';
 import { buildFullSeasonDataset } from '../benchmark/season-run.ts';
 import {
   SeasonPendingBlockRejectedError,
@@ -1606,6 +1607,37 @@ describe('season run M2.5 reload audit (v5)', () => {
     );
     await db.seasonRuns.put({ ...row, influence: { ...row.influence, ledger } });
     await expect(repo.loadActiveRun()).rejects.toThrow(/does not reconcile/);
+  });
+  it('accepts a valid partially capped challenge reward', async () => {
+    const adapters = makeAdapters();
+    const { db, repo } = adapters;
+    await promote(adapters);
+    const row = await currentRow(adapters);
+    let influence = row.influence;
+    for (let blockIndex = 0; blockIndex < 4; blockIndex += 1) {
+      influence = applySeasonBlockInfluenceGrants({
+        influence,
+        blockIndex,
+        humanFranchiseId: 'lakers',
+        challengeSuccesses: [],
+      }).influence;
+    }
+    influence = applySeasonBlockInfluenceGrants({
+      influence,
+      blockIndex: 4,
+      humanFranchiseId: 'lakers',
+      challengeSuccesses: [{ challengeId: 'beat-higher', success: true, reward: 2 }],
+    }).influence;
+    const entry = influence.ledger.find(
+      (candidate) =>
+        candidate.source === 'challenge-reward' &&
+        candidate.entryId.includes('beat-higher'),
+    );
+    await db.seasonRuns.put({ ...row, influence });
+    const snapshot = await repo.loadActiveRun();
+    expect(entry?.requestedDelta).toBe(2);
+    expect(entry?.appliedDelta).toBe(1);
+    expect(snapshot?.run.influence.balances.lakers).toBe(8);
   });
   it('rejects health injuries referencing unknown players or games', async () => {
     const adapters = makeAdapters();

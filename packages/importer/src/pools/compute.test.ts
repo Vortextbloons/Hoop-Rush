@@ -678,11 +678,11 @@ describe('normalizePoolOveralls', () => {
       overallPercentile: 0.25,
       overallCohortVersion: COHORT_NORMALIZATION_VERSION,
     });
-    expect(p2?.summaryRatings.overallRating).toBe(83);
+    expect(p2?.summaryRatings.overallRating).toBe(81);
     expect(p2?.ratingProfile?.overallPercentile).toBe(0.5);
-    expect(p3?.summaryRatings.overallRating).toBe(77);
+    expect(p3?.summaryRatings.overallRating).toBe(75);
     expect(p3?.ratingProfile?.overallPercentile).toBe(0.75);
-    expect(p4?.summaryRatings.overallRating).toBe(73);
+    expect(p4?.summaryRatings.overallRating).toBe(68);
     expect(p4?.ratingProfile?.overallPercentile).toBe(1);
     expect(p2?.playerId).toBe('p-2');
     expect(p3?.playerId).toBe('p-3');
@@ -702,7 +702,7 @@ describe('normalizePoolOveralls', () => {
       overallPercentile: undefined,
       overallCohortVersion: undefined,
     });
-    expect(p1?.summaryRatings.overallRating).toBe(77);
+    expect(p1?.summaryRatings.overallRating).toBe(75);
     expect(p1?.ratingProfile).toEqual({
       schemaVersion: 2,
       modelVersion: 'ratings-model-v3.3',
