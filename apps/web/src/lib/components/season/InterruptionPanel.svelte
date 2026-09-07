@@ -158,12 +158,7 @@
   </p>
 </section>
 
-<Dialog.Root
-  open={forfeitOpen}
-  onOpenChange={(open) => {
-    if (!open) forfeitOpen = false;
-  }}
->
+<Dialog.Root bind:open={forfeitOpen}>
   <Dialog.Portal>
     <Dialog.Overlay class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
     <Dialog.Content

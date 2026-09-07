@@ -122,18 +122,28 @@ describe('cli: data overalls-distribution', () => {
         sample: 12,
       });
       expect(payload.bands.map((band) => band.label)).toEqual([
-        '95-99',
-        '90-94',
-        '85-89',
-        '72-84',
-        '40-71',
+        '97-99',
+        '94-96',
+        '90-93',
+        '86-89',
+        '82-85',
+        '78-81',
+        '74-77',
+        '70-73',
+        '65-69',
+        '40-64',
       ]);
       const overall = {
-        '95-99': { count: 2, percentage: 16.7, median: 97 },
-        '90-94': { count: 2, percentage: 16.7, median: 92 },
-        '85-89': { count: 2, percentage: 16.7, median: 88 },
-        '72-84': { count: 3, percentage: 25, median: 80 },
-        '40-71': { count: 3, percentage: 25, median: 60 },
+        '97-99': { count: 1, percentage: 8.3, median: 97 },
+        '94-96': { count: 1, percentage: 8.3, median: 95 },
+        '90-93': { count: 2, percentage: 16.7, median: 92 },
+        '86-89': { count: 1, percentage: 8.3, median: 88 },
+        '82-85': { count: 2, percentage: 16.7, median: 85 },
+        '78-81': { count: 1, percentage: 8.3, median: 80 },
+        '74-77': { count: 0, percentage: 0, median: null },
+        '70-73': { count: 2, percentage: 16.7, median: 72 },
+        '65-69': { count: 0, percentage: 0, median: null },
+        '40-64': { count: 2, percentage: 16.7, median: 60 },
       };
       for (const [label, expected] of Object.entries(overall)) {
         expect(bandOf(payload.bands, label)).toMatchObject(expected);
@@ -141,32 +151,37 @@ describe('cli: data overalls-distribution', () => {
       expect(Object.keys(payload.perEra)).toEqual(['1990s', '2000s']);
       const nineties = payload.perEra['1990s'];
       expect(nineties?.count).toBe(6);
-      expect(bandOf(nineties?.bands ?? [], '95-99')).toMatchObject({
-        count: 2,
-        percentage: 33.3,
+      expect(bandOf(nineties?.bands ?? [], '97-99')).toMatchObject({
+        count: 1,
+        percentage: 16.7,
         median: 97,
       });
-      expect(bandOf(nineties?.bands ?? [], '40-71')).toMatchObject({
+      expect(bandOf(nineties?.bands ?? [], '40-64')).toMatchObject({
         count: 1,
         percentage: 16.7,
         median: 60,
       });
       const twoThousands = payload.perEra['2000s'];
       expect(twoThousands?.count).toBe(6);
-      expect(bandOf(twoThousands?.bands ?? [], '95-99')).toMatchObject({
+      expect(bandOf(twoThousands?.bands ?? [], '97-99')).toMatchObject({
         count: 0,
         percentage: 0,
         median: null,
       });
-      expect(bandOf(twoThousands?.bands ?? [], '72-84')).toMatchObject({
-        count: 2,
-        percentage: 33.3,
+      expect(bandOf(twoThousands?.bands ?? [], '82-85')).toMatchObject({
+        count: 1,
+        percentage: 16.7,
         median: 84,
       });
-      expect(bandOf(twoThousands?.bands ?? [], '40-71')).toMatchObject({
+      expect(bandOf(twoThousands?.bands ?? [], '70-73')).toMatchObject({
         count: 2,
         percentage: 33.3,
-        median: 71,
+        median: 72,
+      });
+      expect(bandOf(twoThousands?.bands ?? [], '40-64')).toMatchObject({
+        count: 1,
+        percentage: 16.7,
+        median: 40,
       });
     });
   });

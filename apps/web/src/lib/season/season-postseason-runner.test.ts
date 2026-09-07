@@ -608,6 +608,9 @@ class FakePostseasonRepository implements SeasonRunRepository {
   loadPendingBlock(): Promise<null> {
     return Promise.resolve(null);
   }
+  loadPendingInterruption(): Promise<null> {
+    return Promise.resolve(null);
+  }
   discardPendingBlock(): Promise<void> {
     return Promise.resolve();
   }

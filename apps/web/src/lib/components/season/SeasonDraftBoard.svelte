@@ -80,8 +80,7 @@
     const labels = needs.fragileGroups.map((group) =>
       group === 'guards' ? 'guard' : group === 'forwards' ? 'forward' : 'center',
     );
-    if (labels.length === 1)
-      return `No backup ${labels[0] ?? ''} — losing one ends the season.`;
+    if (labels.length === 1) return `No backup ${labels[0] ?? ''} — losing one ends the season.`;
     const last = labels.pop();
     return `No backup ${labels.join(', ')} or ${last ?? ''} — losing one ends the season.`;
   });
@@ -297,8 +296,7 @@
                 (candidate ? franchiseLabel(candidate.franchiseId) : 'Unknown team'))
               : 'Unknown team'}
             {@const playerName = candidate?.displayName ?? 'Unknown player'}
-            {@const teamLine =
-              `${shortTeam ?? (candidate ? franchiseLabel(candidate.franchiseId) : 'Unknown team')}${candidate ? ` · ${eraLabel(candidate.eraId)}` : ''}`}
+            {@const teamLine = `${shortTeam ?? (candidate ? franchiseLabel(candidate.franchiseId) : 'Unknown team')}${candidate ? ` · ${eraLabel(candidate.eraId)}` : ''}`}
             <li
               class="flex h-full min-w-0 flex-col gap-2 rounded-lg border bg-surface-2 p-3 {fillsNeed
                 ? 'border-primary/60'

@@ -794,13 +794,13 @@ describe('accept-trade-offer command', () => {
     const centerCapable = humanRoster.players.filter((player) =>
       playableOf(player.playerVersionId).includes('C'),
     );
-    if (centerCapable.length < 2) throw new Error('fixture human roster needs two centers');
-    const outgoing = centerCapable.slice(0, 2).map((player) => player.playerVersionId);
+    if (centerCapable.length < 1) throw new Error('fixture human roster needs a center');
+    const outgoing = centerCapable.map((player) => player.playerVersionId);
     const nonCenters = celticsRoster.players.filter(
       (player) => !playableOf(player.playerVersionId).includes('C'),
     );
-    const incoming = nonCenters.slice(0, 2).map((player) => player.playerVersionId);
-    if (outgoing.length < 2 || incoming.length < 2) throw new Error('fixture lacks swap players');
+    const incoming = nonCenters.slice(0, outgoing.length).map((player) => player.playerVersionId);
+    if (incoming.length < outgoing.length) throw new Error('fixture lacks swap players');
     const illegalOffer: SeasonTradeOffer = {
       offerId: 'off-' + 'e'.repeat(32),
       windowIndex: 0,

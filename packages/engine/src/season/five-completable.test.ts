@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  fiveCompletable,
-  legalFiveExists,
-  type SeasonRosterMemberInput,
-} from './roster-rules.ts';
+import { fiveCompletable, legalFiveExists, type SeasonRosterMemberInput } from './roster-rules.ts';
 
 const POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
 
@@ -59,10 +55,8 @@ describe('fiveCompletable', () => {
       const ownedSize = rand(10);
       const availSize = rand(13);
       const remaining = 10 - ownedSize;
-      const owned = Array.from({ length: ownedSize }, (_, i) => randomMember(`o${trial}-${i}`));
-      const available = Array.from({ length: availSize }, (_, i) =>
-        randomMember(`a${trial}-${i}`),
-      );
+      const owned = Array.from({ length: ownedSize }, (_, i) => randomMember(`o${String(trial)}-${String(i)}`));
+      const available = Array.from({ length: availSize }, (_, i) => randomMember(`a${String(trial)}-${String(i)}`));
       const got = fiveCompletable(owned, available, remaining, 0);
       const want = bruteFiveCompletable(owned, available, remaining);
       if (got !== want) {
@@ -88,10 +82,8 @@ describe('fiveCompletable', () => {
       const availSize = rand(9);
       const remaining = 10 - ownedSize;
       const margin = rand(3);
-      const owned = Array.from({ length: ownedSize }, (_, i) => randomMember(`m${trial}-${i}`));
-      const available = Array.from({ length: availSize }, (_, i) =>
-        randomMember(`n${trial}-${i}`),
-      );
+      const owned = Array.from({ length: ownedSize }, (_, i) => randomMember(`m${String(trial)}-${String(i)}`));
+      const available = Array.from({ length: availSize }, (_, i) => randomMember(`n${String(trial)}-${String(i)}`));
       if (!fiveCompletable(owned, available, remaining, margin)) continue;
       checked += 1;
       const indices = available.map((_, i) => i);

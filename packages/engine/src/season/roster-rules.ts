@@ -164,7 +164,7 @@ export function fiveCompletable(
   const capU = Math.min(remainingPicks, 5);
   const index = (g: number, f: number, c: number, u: number): number =>
     ((u * (targetC + 1) + c) * (targetF + 1) + f) * (targetG + 1) + g;
-  let reachable = new Uint8Array((targetG + 1) * (targetF + 1) * (targetC + 1) * (capU + 1));
+  const reachable = new Uint8Array((targetG + 1) * (targetF + 1) * (targetC + 1) * (capU + 1));
   reachable[index(0, 0, 0, 0)] = 1;
   for (const member of owned) {
     const mask = groupMaskOf(member.playable);

@@ -45,6 +45,7 @@ import { buildMinimalRotation, validateSeasonRotation } from './rotation.ts';
 import { seasonGenerationDigest } from './digest.ts';
 import {
   groupMaskOf,
+  legalFiveAfterAnyRemoval,
   rosterGroupCounts,
   validateSeasonRoster,
   type SeasonRosterMemberInput,
@@ -101,6 +102,7 @@ export const DEFAULT_IDENTITY_PRIORITY_ROLES: Record<
   continuity: ROSTER_ROLES,
   'active-trader': ROSTER_ROLES,
 };
+export const POOL_COMPOSITION_TARGETS = { guards: 4, forwards: 4, centers: 3 } as const;
 export function identityPriorityRolesOf(
   targets: SeasonRosterTargets,
   identity: SeasonAiIdentity,
@@ -435,10 +437,7 @@ interface PoolTeam {
   selections: string[] | null;
 }
 export type SeasonAiGenerationProgressPhase =
-  | SeasonAiGenerationPhase
-  | 'scouting'
-  | 'rotations'
-  | 'done';
+  SeasonAiGenerationPhase | 'scouting' | 'rotations' | 'done';
 export interface SeasonAiGenerationProgress {
   phase: SeasonAiGenerationProgressPhase;
   completed: number;
@@ -776,9 +775,7 @@ function poolAdmitsTenExact(state: GenerationState, team: PoolTeam): boolean {
   const anchorSet = new Set(anchorIds);
   const rest = team.pool.filter((id) => !anchorSet.has(id));
   const picks = 10 - team.anchors.length;
-  if (
-    !memberReachCapped(state, { guards: 2, forwards: 2, centers: 1 }, anchorCounts, rest, picks)
-  ) {
+  if (!memberReachCapped(state, { ...POOL_COMPOSITION_TARGETS }, anchorCounts, rest, picks)) {
     return false;
   }
   if (
@@ -821,7 +818,7 @@ function poolTenFeasibleAfterAdd(
   const picksForTen = 10 - team.anchors.length;
   if (
     !reachableAfterFixedAndFills(
-      { guards: 2, forwards: 2, centers: 1 },
+      { ...POOL_COMPOSITION_TARGETS },
       anchorCounts,
       fixedMasks,
       unassignedMasks,
@@ -906,9 +903,7 @@ function poolTenFeasibleAfterAddExact(
   }
   if (versionId !== null) members.push(versionId);
   const picks = 10 - team.anchors.length;
-  if (
-    !memberReachCapped(state, { guards: 2, forwards: 2, centers: 1 }, anchorCounts, members, picks)
-  ) {
+  if (!memberReachCapped(state, { ...POOL_COMPOSITION_TARGETS }, anchorCounts, members, picks)) {
     return false;
   }
   if (
@@ -931,7 +926,7 @@ function poolTenFeasibleAfterAddExact(
     !memberReachCappedWithOutlierBudget(
       state,
       team,
-      { guards: 2, forwards: 2, centers: 1 },
+      { ...POOL_COMPOSITION_TARGETS },
       anchorCounts,
       anchorOutliers,
       members,
@@ -1405,9 +1400,12 @@ function poolPickScore(
   }
   const mask = state.maskByVersion.get(versionId) ?? 0;
   let positionHelp = 0;
-  if (Math.max(0, 2 - poolCounts.guards) > 0 && (mask & 1) !== 0) positionHelp += 1;
-  if (Math.max(0, 2 - poolCounts.forwards) > 0 && (mask & 2) !== 0) positionHelp += 1;
-  if (Math.max(0, 1 - poolCounts.centers) > 0 && (mask & 4) !== 0) positionHelp += 1;
+  if (Math.max(0, POOL_COMPOSITION_TARGETS.guards - poolCounts.guards) > 0 && (mask & 1) !== 0)
+    positionHelp += 1;
+  if (Math.max(0, POOL_COMPOSITION_TARGETS.forwards - poolCounts.forwards) > 0 && (mask & 2) !== 0)
+    positionHelp += 1;
+  if (Math.max(0, POOL_COMPOSITION_TARGETS.centers - poolCounts.centers) > 0 && (mask & 4) !== 0)
+    positionHelp += 1;
   score += positionHelp * 0.4;
   score += rngRank * 2.5;
   return score;
@@ -1491,7 +1489,15 @@ function pickForPool(state: GenerationState, team: PoolTeam, round: number): str
     if (state.bans.has(teamPrefix + id)) continue;
     if (!poolCoverageFeasible(state, team, id, true)) continue;
     if (!coverageScarcityAfterWithLacking(state, lacking, id)) continue;
-    const score = poolPickScore(state, team, id, rngRanks[i] ?? 0, priorityRoles, weakest, poolCounts);
+    const score = poolPickScore(
+      state,
+      team,
+      id,
+      rngRanks[i] ?? 0,
+      priorityRoles,
+      weakest,
+      poolCounts,
+    );
     if (best === undefined || score > best.score || (score === best.score && id < best.id)) {
       best = { id, score };
     }
@@ -1521,9 +1527,9 @@ function positionScarcityAfter(state: GenerationState, team: PoolTeam, mask: num
     const g = counts.guards + (addToTeam && (mask & 1) !== 0 ? 1 : 0);
     const f = counts.forwards + (addToTeam && (mask & 2) !== 0 ? 1 : 0);
     const c = counts.centers + (addToTeam && (mask & 4) !== 0 ? 1 : 0);
-    need.guards += Math.max(0, 2 - g);
-    need.forwards += Math.max(0, 2 - f);
-    need.centers += Math.max(0, 1 - c);
+    need.guards += Math.max(0, POOL_COMPOSITION_TARGETS.guards - g);
+    need.forwards += Math.max(0, POOL_COMPOSITION_TARGETS.forwards - f);
+    need.centers += Math.max(0, POOL_COMPOSITION_TARGETS.centers - c);
   }
   const counts = state.unassignedMaskCountsArr;
   const supply = {
@@ -1755,7 +1761,7 @@ function poolViolations(state: GenerationState, teamId: string): string[] {
   if (new Set(team.pool).size !== team.pool.length) violations.push('pool contains duplicates');
   if (!uniqueIdentities(state, team.pool)) violations.push('pool contains duplicate identities');
   if (!poolAdmitsTenExact(state, team)) {
-    violations.push('pool admits no legal ten');
+    violations.push('pool admits no removal-robust ten');
   }
   if (!poolCoverageFeasible(state, team, null, false)) {
     violations.push('pool cannot cover all eight roles');
@@ -1917,6 +1923,7 @@ function legalTenExists(state: GenerationState, members: readonly string[]): boo
       const roster = membersOf(state, picked);
       return (
         validateSeasonRoster(roster).length === 0 &&
+        legalFiveAfterAnyRemoval(roster) &&
         uncoveredRoles(roleScoresOfIds(state, picked)).length === 0
       );
     }
@@ -2065,6 +2072,7 @@ function rosterLegal(state: GenerationState, team: PoolTeam, ids: readonly strin
   if (!uniqueIdentities(state, ids)) return false;
   const members = membersOf(state, ids);
   if (validateSeasonRoster(members).length > 0) return false;
+  if (!legalFiveAfterAnyRemoval(members)) return false;
   if (uncoveredRoles(roleScoresOfIds(state, ids)).length > 0) return false;
   let rotation;
   try {
@@ -2538,7 +2546,9 @@ function finalizeResult(
     const rotation = buildMinimalRotation({
       franchiseId: roster.franchiseId,
       members,
-      order: (a, b) => (talentByVersion.get(b.playerVersionId) ?? 0) - (talentByVersion.get(a.playerVersionId) ?? 0),
+      order: (a, b) =>
+        (talentByVersion.get(b.playerVersionId) ?? 0) -
+        (talentByVersion.get(a.playerVersionId) ?? 0),
     });
     reportProgress(state, { phase: 'rotations', completed: index + 1, total: rosters.length });
     return rotation;

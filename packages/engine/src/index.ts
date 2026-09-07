@@ -614,7 +614,8 @@ export {
   collectionNamespaceSeed,
   collectionStarterSeed,
   collectionPullSeed,
-} from './collection/seeds.ts';export {
+} from './collection/seeds.ts';
+export {
   collectionCardId,
   resolveCollectionCard,
   toCollectionSimulationPlayer,

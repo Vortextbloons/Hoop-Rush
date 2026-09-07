@@ -225,10 +225,7 @@ describe('season franchise legal-five facts (M2.5 §9)', () => {
     };
     const fragileRun = {
       ...run,
-      rosters: [
-        ...run.rosters.filter((entry) => entry.franchiseId !== 'lakers'),
-        fragileRoster,
-      ],
+      rosters: [...run.rosters.filter((entry) => entry.franchiseId !== 'lakers'), fragileRoster],
       rotations: [
         ...run.rotations.filter((entry) => entry.franchiseId !== 'lakers'),
         fragileRotation,

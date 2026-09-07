@@ -11,7 +11,10 @@ import type {
   SeasonLeagueGenerationResult,
   SeasonRosterTargets,
 } from '@hoop-rush/data-contracts';
-import { SEASON_DRAFT_VERSION, seasonLeagueGenerationResultSchema } from '@hoop-rush/data-contracts';
+import {
+  SEASON_DRAFT_VERSION,
+  seasonLeagueGenerationResultSchema,
+} from '@hoop-rush/data-contracts';
 import {
   applySeasonDraftCommand,
   legalFiveExists,
@@ -108,7 +111,11 @@ export function coverageNeeds(
   const hasLegalFive = legalFiveExists(members);
   const fragileGroups: FragileGroup[] = [];
   if (hasLegalFive) {
-    const critical: Record<FragileGroup, boolean> = { guards: false, forwards: false, centers: false };
+    const critical: Record<FragileGroup, boolean> = {
+      guards: false,
+      forwards: false,
+      centers: false,
+    };
     for (let remove = 0; remove < members.length; remove += 1) {
       const remaining = members.filter((_, index) => index !== remove);
       if (legalFiveExists(remaining)) continue;

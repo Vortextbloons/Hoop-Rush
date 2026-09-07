@@ -18,12 +18,13 @@ import {
 import { assertNever } from '../sim/assert-never.ts';
 import { createRng } from '../sim/rng.ts';
 import { validateDraftCatalog } from './catalog-validation.ts';
-import { drawGlobalOffer, multiHumanDraft, ownedPlayerIds, pendingOpponentTakes } from './draft-offers.ts';
 import {
-  fiveCompletable,
-  legalFiveExists,
-  type SeasonRosterMemberInput,
-} from './roster-rules.ts';
+  drawGlobalOffer,
+  multiHumanDraft,
+  ownedPlayerIds,
+  pendingOpponentTakes,
+} from './draft-offers.ts';
+import { fiveCompletable, legalFiveExists, type SeasonRosterMemberInput } from './roster-rules.ts';
 import {
   SeasonAiGenerationError,
   type SeasonAiGenerationInput,
@@ -451,9 +452,7 @@ function selectPlayer(
     .filter((c) => !multiHumanDraft(state) || !ownedPlayerIds(state, catalog).has(c.playerId))
     .map((c) => ({ playerVersionId: c.playerVersionId, playable: c.positions.playable }));
   const remaining = MAX_PICKS_PER_PARTICIPANT - ownedMembers.length - 1;
-  if (
-    !fiveCompletable(probe, available, remaining, pendingOpponentTakes(state, pid))
-  ) {
+  if (!fiveCompletable(probe, available, remaining, pendingOpponentTakes(state, pid))) {
     return {
       state,
       record: rejectedRecord(

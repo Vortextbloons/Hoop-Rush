@@ -906,6 +906,18 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
     }
     return parsed.block;
   }
+  async loadPendingInterruption(runId: string): Promise<SeasonInvalidRosterInterruption | null> {
+    const row = await this.db.seasonPendingBlocks.get(runId);
+    if (row === undefined) return null;
+    const parsed = storedSeasonPendingBlockRowSchema.parse(row);
+    if (parsed.block.runId !== runId || parsed.interruption.runId !== runId) {
+      throw new SeasonRunLoadError(
+        ['pending block row runId does not match its key'],
+        'corrupt stored Season Run pending block row',
+      );
+    }
+    return parsed.interruption;
+  }
   async discardPendingBlock(runId: string): Promise<void> {
     await this.db.seasonPendingBlocks.delete(runId);
   }
@@ -1080,13 +1092,15 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
               'Season Run pending block state is inconsistent',
             );
           }
+          const interruption =
+            input.pendingInterruption ?? {
+              ...storedSeasonPendingBlockRowSchema.parse(existingPending).interruption,
+              nextGameId: input.pending.nextGameId,
+            };
           await this.db.seasonPendingBlocks.put({
             runId: input.runId,
             block: input.pending,
-            interruption: {
-              ...existingPending.interruption,
-              nextGameId: input.pending.nextGameId,
-            },
+            interruption,
             updatedAtIso: new Date().toISOString(),
           });
         }

@@ -129,6 +129,7 @@ function makeRepository(run: SeasonRun) {
     forceClearActiveSeasonRun: vi.fn(() => Promise.resolve(undefined)),
     savePendingBlock: vi.fn(() => Promise.resolve(undefined)),
     loadPendingBlock: vi.fn(() => Promise.resolve(null)),
+    loadPendingInterruption: vi.fn(() => Promise.resolve(null)),
     discardPendingBlock: vi.fn(() => Promise.resolve(undefined)),
     applySeasonRunCommand: vi.fn(() => Promise.resolve(undefined)),
     loadSeasonRunPlayerSlice: vi.fn(() => Promise.resolve(null)),

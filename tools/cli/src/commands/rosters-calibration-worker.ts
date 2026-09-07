@@ -1,10 +1,6 @@
 import { parentPort, workerData } from 'node:worker_threads';
 import { readJson } from '../io.ts';
-import {
-  SeasonAiGenerationError,
-  generateAiLeague,
-  validateSeasonRoster,
-} from '@hoop-rush/engine';
+import { SeasonAiGenerationError, generateAiLeague, validateSeasonRoster } from '@hoop-rush/engine';
 import {
   seasonDraftCatalogSchema,
   seasonLeagueSchema,

@@ -1279,6 +1279,71 @@ describe('season run M2.5 command application (v5)', () => {
     expect(row?.interruption.nextGameId).toBe('s000017');
     expect(row?.interruption.unavailablePlayerVersionIds).toEqual(['pv-' + '1'.repeat(32)]);
   });
+  it('applies an explicit pending interruption when provided', async () => {
+    const adapters = makeAdapters();
+    const { db, repo, run } = adapters;
+    await promote(adapters);
+    const pending = buildFixturePendingBlock({
+      run,
+      commandId: 'command-0',
+      blockIndex: 0,
+      expectedRevision: 0,
+      expectedStateRevision: 0,
+      expectedStateDigest: run.stateDigest,
+      nextGameId: 's000016',
+    });
+    await repo.savePendingBlock(
+      pending,
+      buildFixtureInterruption({
+        runId: run.runId,
+        blockIndex: 0,
+        commandId: 'command-0',
+        nextGameId: 's000016',
+        unavailablePlayerVersionIds: ['pv-' + '1'.repeat(32)],
+      }),
+    );
+    const advanced = { ...pending, nextGameId: seasonGameIdSchema.parse('s000017') };
+    const updatedInterruption = buildFixtureInterruption({
+      runId: run.runId,
+      blockIndex: 0,
+      commandId: 'command-0',
+      nextGameId: 's000017',
+      unavailablePlayerVersionIds: ['pv-' + '2'.repeat(32)],
+    });
+    await repo.applySeasonRunCommand({
+      runId: run.runId,
+      command: selectCampaignCommand(adapters),
+      run: postCommandRun(adapters),
+      pending: advanced,
+      pendingInterruption: updatedInterruption,
+    });
+    const row = await db.seasonPendingBlocks.get(run.runId);
+    expect(row?.interruption.nextGameId).toBe('s000017');
+    expect(row?.interruption.unavailablePlayerVersionIds).toEqual(['pv-' + '2'.repeat(32)]);
+  });
+  it('loads a stored pending interruption', async () => {
+    const adapters = makeAdapters();
+    const { repo, run } = adapters;
+    await promote(adapters);
+    const pending = buildFixturePendingBlock({
+      run,
+      commandId: 'command-0',
+      blockIndex: 0,
+      expectedRevision: 0,
+      expectedStateRevision: 0,
+      expectedStateDigest: run.stateDigest,
+      nextGameId: 's000016',
+    });
+    const interruption = buildFixtureInterruption({
+      runId: run.runId,
+      blockIndex: 0,
+      commandId: 'command-0',
+      nextGameId: 's000016',
+      unavailablePlayerVersionIds: ['pv-' + '3'.repeat(32)],
+    });
+    await repo.savePendingBlock(pending, interruption);
+    expect(await repo.loadPendingInterruption(run.runId)).toEqual(interruption);
+  });
 });
 describe('season run M2.5 reload audit (v5)', () => {
   async function currentRow(

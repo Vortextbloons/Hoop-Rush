@@ -34,7 +34,7 @@ import {
   type SeasonTradeValueTrend,
   type SeasonTradeWindowState,
 } from '@hoop-rush/data-contracts';
-import { handleSeasonRunCommand, type SeasonRunCommandContext } from '@hoop-rush/engine';
+import { handleSeasonRunCommand, seasonFranchiseLegalFiveFacts, type SeasonRunCommandContext } from '@hoop-rush/engine';
 import type {
   SeasonBlockResumeInput,
   SeasonBlockRunner,
@@ -384,9 +384,14 @@ export class SeasonHubState {
       if (snapshot !== null) {
         try {
           this.pending = await this.repo.loadPendingBlock(snapshot.run.runId);
-          if (this.pending === null) this.interruption = null;
+          if (this.pending === null) {
+            this.interruption = null;
+          } else {
+            this.interruption = await this.repo.loadPendingInterruption(snapshot.run.runId);
+          }
         } catch {
           this.pending = null;
+          this.interruption = null;
         }
       } else {
         this.pending = null;
@@ -808,7 +813,6 @@ export class SeasonHubState {
   }
   async forfeitInterruptedGame(): Promise<void> {
     const pending = this.pending;
-    const interruption = this.interruption;
     if (pending === null) return;
     const command: SeasonRunCommand = {
       schemaVersion: SEASON_RUN_SCHEMA_VERSION,
@@ -818,7 +822,7 @@ export class SeasonHubState {
       expectedStateRevision: this.requiredStateRevision(),
       expectedStateDigest: this.requiredStateDigest(),
       blockIndex: pending.blockIndex,
-      nextGameId: interruption?.nextGameId ?? pending.nextGameId,
+      nextGameId: pending.nextGameId,
     };
     await this.dispatch(command);
   }
@@ -1312,17 +1316,28 @@ export class SeasonHubState {
         return;
       }
       const beforeRosterKey = rosterKeyOfRun(snapshot.run.rosters);
+      const pendingInterruption =
+        command.command === 'forfeit-interrupted-game' && output.pending !== null
+          ? this.interruptionStateForPending(output.pending)
+          : undefined;
+      if (command.command === 'forfeit-interrupted-game') {
+        this.interruption = pendingInterruption ?? null;
+      } else if (output.pending === null) {
+        this.interruption = null;
+      }
       await this.repo.applySeasonRunCommand({
         runId: snapshot.run.runId,
         command,
         run: output.run,
         effects: postCommandEffects(output.run, snapshot.effects),
         pending: output.pending,
+        ...(pendingInterruption !== undefined && pendingInterruption !== null
+          ? { pendingInterruption }
+          : {}),
       });
       this.commandError = null;
       this.commandReceipt = this.tradeReceiptOf(command, envelope, output.run.stateRevision);
       this.pending = output.pending;
-      if (output.pending === null) this.interruption = null;
       if (this.snapshot !== null) {
         const effects = postCommandEffects(output.run, this.snapshot.effects);
         this.snapshot = { ...this.snapshot, run: output.run, effects };
@@ -1441,6 +1456,29 @@ export class SeasonHubState {
         break;
     }
     this.emit();
+  }
+  private interruptionStateForPending(
+    pending: SeasonPendingBlockCandidate,
+  ): SeasonInvalidRosterInterruption | null {
+    const snapshot = this.snapshot;
+    const humanFranchiseId = this.humanFranchiseId();
+    if (snapshot === null || humanFranchiseId === null) return null;
+    const facts = seasonFranchiseLegalFiveFacts(snapshot.run, humanFranchiseId, pending.health);
+    if (facts.legal) return null;
+    const unavailablePlayerVersionIds =
+      facts.unavailablePlayerVersionIds.length > 0
+        ? facts.unavailablePlayerVersionIds
+        : (this.interruption?.unavailablePlayerVersionIds ?? []);
+    if (unavailablePlayerVersionIds.length === 0) return this.interruption;
+    return {
+      code: 'invalid-roster',
+      runId: pending.runId,
+      blockIndex: pending.blockIndex,
+      commandId: pending.commandId,
+      nextGameId: pending.nextGameId,
+      humanFranchiseId: franchiseIdSchema.parse(humanFranchiseId),
+      unavailablePlayerVersionIds,
+    };
   }
   private emit(): void {
     for (const listener of this.listeners) listener();

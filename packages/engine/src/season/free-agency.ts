@@ -38,10 +38,7 @@ import {
   roleScoresOf,
   type SeasonScoreMember,
 } from './ai-scoring.ts';
-import {
-  legalFiveExists,
-  type SeasonRosterMemberInput,
-} from './roster-rules.ts';
+import { legalFiveExists, type SeasonRosterMemberInput } from './roster-rules.ts';
 import { seasonPlayerAvailable } from './injuries.ts';
 import {
   seasonTransactionEntry,

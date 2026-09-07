@@ -9,7 +9,6 @@
   import { Toaster } from 'svelte-sonner';
   import BottomNav from '$lib/components/BottomNav.svelte';
   import { isNavItemActive, type NavItem } from '$lib/nav-items';
-  import { warmManifest, warmPlayersIndex } from '$lib/data';
   let { children } = $props();
   const homeHref = resolve('/');
   const navItems: NavItem[] = [
@@ -26,13 +25,15 @@
   );
   $effect(() => {
     if (!browser || isMultiplayerLobby) return;
-    warmManifest();
+    void import('$lib/data').then(({ warmManifest }) => warmManifest());
   });
   function isActive(item: NavItem): boolean {
     return isNavItemActive(item, routeId);
   }
   function warmForRoster(itemId: string): void {
-    if (itemId === 'roster') warmPlayersIndex();
+    if (itemId === 'roster') {
+      void import('$lib/data').then(({ warmPlayersIndex }) => warmPlayersIndex());
+    }
   }
 </script>
 

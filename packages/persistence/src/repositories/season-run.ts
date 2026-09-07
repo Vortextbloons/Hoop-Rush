@@ -80,6 +80,7 @@ export interface SeasonRunCommandApplication {
   run: SeasonRun;
   effects?: SeasonEffectsState;
   pending: SeasonPendingBlockCandidate | null;
+  pendingInterruption?: SeasonInvalidRosterInterruption;
   resultDigest?: string;
   relatedGameIds?: string[];
   transactionIds?: string[];
@@ -143,6 +144,7 @@ export interface SeasonRunRepository {
     interruption: SeasonInvalidRosterInterruption,
   ): Promise<void>;
   loadPendingBlock(runId: string): Promise<SeasonPendingBlockCandidate | null>;
+  loadPendingInterruption(runId: string): Promise<SeasonInvalidRosterInterruption | null>;
   discardPendingBlock(runId: string): Promise<void>;
   applySeasonRunCommand(input: SeasonRunCommandApplication): Promise<void>;
   loadSeasonRunPlayerSlice(runId: string): Promise<SeasonRunPlayerSliceEntry[] | null>;

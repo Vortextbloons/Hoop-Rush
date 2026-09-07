@@ -615,10 +615,16 @@ describe('rawOverallScoreFor', () => {
 describe('overallBandForPercentile', () => {
   it('assigns the exact band endpoints', () => {
     expect(overallBandForPercentile(0)).toBe(99);
-    expect(overallBandForPercentile(0.003)).toBe(94);
-    expect(overallBandForPercentile(0.028)).toBe(89);
-    expect(overallBandForPercentile(0.153)).toBe(84);
-    expect(overallBandForPercentile(0.7)).toBe(71);
+    expect(overallBandForPercentile(0.008)).toBe(96);
+    expect(overallBandForPercentile(0.024)).toBe(93);
+    expect(overallBandForPercentile(0.066)).toBe(89);
+    expect(overallBandForPercentile(0.15)).toBe(85);
+    expect(overallBandForPercentile(0.295)).toBe(81);
+    expect(overallBandForPercentile(0.5)).toBe(77);
+    expect(overallBandForPercentile(0.73)).toBe(73);
+    expect(overallBandForPercentile(0.885)).toBe(69);
+    expect(overallBandForPercentile(0.965)).toBe(64);
+    expect(overallBandForPercentile(0.7)).toBe(74);
     expect(overallBandForPercentile(1)).toBe(40);
   });
   it('clamps to the 40..99 contract', () => {
@@ -671,11 +677,11 @@ describe('normalizePoolOveralls', () => {
       overallPercentile: 0.25,
       overallCohortVersion: COHORT_NORMALIZATION_VERSION,
     });
-    expect(p2?.summaryRatings.overallRating).toBe(82);
+    expect(p2?.summaryRatings.overallRating).toBe(83);
     expect(p2?.ratingProfile?.overallPercentile).toBe(0.5);
-    expect(p3?.summaryRatings.overallRating).toBe(76);
+    expect(p3?.summaryRatings.overallRating).toBe(77);
     expect(p3?.ratingProfile?.overallPercentile).toBe(0.75);
-    expect(p4?.summaryRatings.overallRating).toBe(66);
+    expect(p4?.summaryRatings.overallRating).toBe(73);
     expect(p4?.ratingProfile?.overallPercentile).toBe(1);
     expect(p2?.playerId).toBe('p-2');
     expect(p3?.playerId).toBe('p-3');
@@ -695,7 +701,7 @@ describe('normalizePoolOveralls', () => {
       overallPercentile: undefined,
       overallCohortVersion: undefined,
     });
-    expect(p1?.summaryRatings.overallRating).toBe(76);
+    expect(p1?.summaryRatings.overallRating).toBe(77);
     expect(p1?.ratingProfile).toEqual({
       schemaVersion: 2,
       modelVersion: 'ratings-model-v3.3',

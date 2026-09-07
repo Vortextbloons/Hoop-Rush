@@ -38,6 +38,7 @@ function repo() {
     forceClearActiveSeasonRun: vi.fn(() => Promise.resolve()),
     savePendingBlock: vi.fn(() => Promise.resolve()),
     loadPendingBlock: vi.fn(() => Promise.resolve(null)),
+    loadPendingInterruption: vi.fn(() => Promise.resolve(null)),
     discardPendingBlock: vi.fn(() => Promise.resolve()),
     applySeasonRunCommand: vi.fn(() => Promise.resolve()),
     loadSeasonRunPlayerSlice: vi.fn(() => Promise.resolve(null)),

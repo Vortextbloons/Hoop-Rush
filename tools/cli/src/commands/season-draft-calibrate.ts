@@ -316,7 +316,7 @@ const offerTargetsSchema = z.object({
     calibrationSeedCount: z.number().int().positive(),
     validationSeedCount: z.number().int().positive(),
     generatedAtIso: z.string().min(1),
-      draftVersion: z.literal(SEASON_DRAFT_VERSION),
+    draftVersion: z.literal(SEASON_DRAFT_VERSION),
     safeMinimum: z.literal(SEASON_DRAFT_SAFE_MINIMUM),
   }),
   variety: z.object({
