@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { franchiseIdSchema } from './ids.ts';
 import { injuryIdSchema } from './season-health.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
-import { SEASON_TRADE_VERSION } from './season-versions.ts';
+import { SEASON_TRADE_PACKAGE_MAX, SEASON_TRADE_VERSION } from './season-versions.ts';
 export const seasonTradeOfferIdSchema = z.string().regex(/^off-[0-9a-f]{32}$/);
 export type SeasonTradeOfferId = z.infer<typeof seasonTradeOfferIdSchema>;
 export const seasonTradeOfferStatusSchema = z.enum(['open', 'accepted', 'declined', 'expired']);
@@ -44,8 +44,8 @@ export const seasonTradeOfferSchema = z
     seedPath: z.array(z.string()).min(1),
     toFranchiseId: franchiseIdSchema,
     fromFranchiseId: franchiseIdSchema,
-    outgoingPlayerVersionIds: z.array(playerVersionIdSchema).min(1).max(2),
-    incomingPlayerVersionIds: z.array(playerVersionIdSchema).min(1).max(2),
+    outgoingPlayerVersionIds: z.array(playerVersionIdSchema).min(1).max(SEASON_TRADE_PACKAGE_MAX),
+    incomingPlayerVersionIds: z.array(playerVersionIdSchema).min(1).max(SEASON_TRADE_PACKAGE_MAX),
     outgoingHealth: z.array(seasonTradePlayerHealthSchema),
     incomingHealth: z.array(seasonTradePlayerHealthSchema),
     valueBand: seasonTradeOfferValueBandSchema,
@@ -132,8 +132,8 @@ export const seasonTradeProposalSchema = z
     windowIndex: z.number().int().min(0).max(2),
     fromFranchiseId: franchiseIdSchema,
     toFranchiseId: franchiseIdSchema,
-    outgoingPlayerVersionIds: z.array(playerVersionIdSchema).min(1).max(2),
-    incomingPlayerVersionIds: z.array(playerVersionIdSchema).min(1).max(2),
+    outgoingPlayerVersionIds: z.array(playerVersionIdSchema).min(1).max(SEASON_TRADE_PACKAGE_MAX),
+    incomingPlayerVersionIds: z.array(playerVersionIdSchema).min(1).max(SEASON_TRADE_PACKAGE_MAX),
     influenceFromSender: franchiseIdSchema.nullable(),
     influenceAmount: z.number().int().min(0).max(2),
     fingerprint: z.string().min(1).max(128),

@@ -17,6 +17,8 @@ export {
   validateSeasonRosterTargets,
   type SeasonAiGenerationInput,
   type SeasonAiGenerationPhase,
+  type SeasonAiGenerationProgress,
+  type SeasonAiGenerationProgressPhase,
   type SeasonRosterCalibrationRunV2,
 } from './ai-generation.ts';
 export type { SeasonLeagueGenerationResult } from '@hoop-rush/data-contracts';

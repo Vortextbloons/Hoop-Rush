@@ -2,6 +2,7 @@
   import {
     SEASON_ROSTER_MAX_SIZE,
     SEASON_ROSTER_MIN_SIZE,
+    SEASON_TRADE_PACKAGE_MAX,
     type HoopRushManifest,
     type SeasonDraftCatalog,
     type SeasonGameSummary,
@@ -184,12 +185,7 @@
     }),
   );
 
-  const rosterLegal = $derived(
-    consequence.fromAfter >= SEASON_ROSTER_MIN_SIZE &&
-      consequence.fromAfter <= SEASON_ROSTER_MAX_SIZE &&
-      consequence.toAfter >= SEASON_ROSTER_MIN_SIZE &&
-      consequence.toAfter <= SEASON_ROSTER_MAX_SIZE,
-  );
+  const rosterLegal = $derived(consequence.legal);
 
   const influenceDisabledReason = $derived.by((): string | null => {
     if (influenceAmount === 0) return null;
@@ -202,7 +198,8 @@
   const submitDisabledReason = $derived.by((): string | null => {
     if (busy) return 'Sending…';
     if (outgoing.length < 1 || incoming.length < 1) return 'Pick at least 1 from each side';
-    if (outgoing.length > 2 || incoming.length > 2) return 'Max 2 per side';
+    if (outgoing.length > SEASON_TRADE_PACKAGE_MAX || incoming.length > SEASON_TRADE_PACKAGE_MAX)
+      return `Max ${String(SEASON_TRADE_PACKAGE_MAX)} per side`;
     for (const id of outgoing) {
       const p = yourPlayers.find((x) => x.playerVersionId === id);
       if (p && eligibilityOf(id, 'you', p.available).status === 'protected')
@@ -236,10 +233,10 @@
   function toggle(set: 'outgoing' | 'incoming', id: string): void {
     if (set === 'outgoing') {
       if (outgoingSet.has(id)) outgoing = outgoing.filter((x) => x !== id);
-      else if (outgoing.length < 2) outgoing = [...outgoing, id];
+      else if (outgoing.length < SEASON_TRADE_PACKAGE_MAX) outgoing = [...outgoing, id];
     } else {
       if (incomingSet.has(id)) incoming = incoming.filter((x) => x !== id);
-      else if (incoming.length < 2) incoming = [...incoming, id];
+      else if (incoming.length < SEASON_TRADE_PACKAGE_MAX) incoming = [...incoming, id];
     }
   }
 
@@ -327,8 +324,13 @@
   <div class="border-b border-border px-4 py-3">
     <h3 class="text-sm font-bold uppercase tracking-tight">Build package</h3>
     <p class="mt-1 text-xs text-muted-foreground">
-      Pick 1–2 from each side. You {yourRosterSize} → {consequence.fromAfter} · {targetFranchiseName}
-      {theirRosterSize} → {consequence.toAfter} · must stay {SEASON_ROSTER_MIN_SIZE}–{SEASON_ROSTER_MAX_SIZE}.
+      Pick 1–{SEASON_TRADE_PACKAGE_MAX} from each side. You {yourRosterSize} → {consequence.fromAfterFilled}
+      · {targetFranchiseName}
+      {theirRosterSize} → {consequence.toAfterFilled} · must stay {SEASON_ROSTER_MIN_SIZE}–{SEASON_ROSTER_MAX_SIZE}.
+      {#if consequence.backfillFrom > 0 || consequence.backfillTo > 0}
+        A side dealt below {SEASON_ROSTER_MIN_SIZE} auto-signs replacement-level depth to reach
+        {SEASON_ROSTER_MIN_SIZE}.
+      {/if}
     </p>
   </div>
 
@@ -350,7 +352,7 @@
         {#each yourPlayers as player (player.playerVersionId)}
           {@const elig = eligibilityOf(player.playerVersionId, 'you', player.available)}
           {@const selected = outgoingSet.has(player.playerVersionId)}
-          {@const blockedThird = !selected && outgoing.length >= 2}
+          {@const blockedThird = !selected && outgoing.length >= SEASON_TRADE_PACKAGE_MAX}
           {@const blockedProtected = elig.status === 'protected'}
           {@const disabled = busy || blockedThird || blockedProtected}
           {@const face = faceFor(player.playerVersionId)}
@@ -400,7 +402,9 @@
                   {:else if elig.status === 'availability-risk'}
                     <span class="block text-xs text-muted-foreground">{elig.reason}</span>
                   {:else if blockedThird}
-                    <span class="block text-xs text-muted-foreground">Max 2 per side</span>
+                    <span class="block text-xs text-muted-foreground"
+                      >Max {SEASON_TRADE_PACKAGE_MAX} per side</span
+                    >
                   {/if}
                 </span>
               </label>
@@ -419,7 +423,9 @@
           </li>
         {/each}
       </ul>
-      <p class="mt-2 text-xs text-muted-foreground">Selected {outgoing.length}/2</p>
+      <p class="mt-2 text-xs text-muted-foreground">
+        Selected {outgoing.length}/{SEASON_TRADE_PACKAGE_MAX}
+      </p>
     </fieldset>
 
     <fieldset>
@@ -430,7 +436,7 @@
         {#each theirPlayers as player (player.playerVersionId)}
           {@const elig = eligibilityOf(player.playerVersionId, 'them', player.available)}
           {@const selected = incomingSet.has(player.playerVersionId)}
-          {@const blockedThird = !selected && incoming.length >= 2}
+          {@const blockedThird = !selected && incoming.length >= SEASON_TRADE_PACKAGE_MAX}
           {@const blockedProtected = elig.status === 'protected'}
           {@const disabled = busy || blockedThird || blockedProtected}
           {@const face = faceFor(player.playerVersionId)}
@@ -480,7 +486,9 @@
                   {:else if elig.status === 'availability-risk'}
                     <span class="block text-xs text-muted-foreground">{elig.reason}</span>
                   {:else if blockedThird}
-                    <span class="block text-xs text-muted-foreground">Max 2 per side</span>
+                    <span class="block text-xs text-muted-foreground"
+                      >Max {SEASON_TRADE_PACKAGE_MAX} per side</span
+                    >
                   {/if}
                 </span>
               </label>
@@ -499,7 +507,9 @@
           </li>
         {/each}
       </ul>
-      <p class="mt-2 text-xs text-muted-foreground">Selected {incoming.length}/2</p>
+      <p class="mt-2 text-xs text-muted-foreground">
+        Selected {incoming.length}/{SEASON_TRADE_PACKAGE_MAX}
+      </p>
     </fieldset>
   </div>
 

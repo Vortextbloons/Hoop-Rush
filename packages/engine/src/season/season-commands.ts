@@ -146,19 +146,18 @@ import {
   type SeasonPostseasonRankingsInput,
 } from './postseason.ts';
 import { rankSeasonPostseason } from './tiebreakers.ts';
-import {
-  legalFiveExists,
-  validateSeasonRoster,
-  type SeasonRosterMemberInput,
-} from './roster-rules.ts';
+import { legalFiveExists, type SeasonRosterMemberInput } from './roster-rules.ts';
 import { validateSeasonRotation, seasonRotationSetDigest } from './rotation.ts';
 import { deriveSeasonAwards } from './awards.ts';
 import { seasonRunStateDigest } from './state-digest.ts';
 import {
   applySeasonTrade,
+  fillTradeBackfill,
   seasonEconomyRunOf,
   seasonTradeCatalogFactsOf,
   generatedExtraOfferForSpend,
+  tradeOfferBackfillSeed,
+  tradeRosterLegalityReasons,
   type SeasonEconomyRun,
 } from './trades.ts';
 import { normalizeCampaignState } from './campaign.ts';
@@ -1834,17 +1833,37 @@ function handleAcceptTradeOffer(
       run.rosters
         .find((roster) => roster.franchiseId === franchiseId)
         ?.players.map((player) => player.playerVersionId) ?? [];
+    const filled = fillTradeBackfill({
+      catalog: context.catalog,
+      run,
+      toFranchiseId: offer.toFranchiseId,
+      fromFranchiseId: offer.fromFranchiseId,
+      toIds: [
+        ...rosterIdsOf(offer.toFranchiseId).filter(
+          (id) => !offer.outgoingPlayerVersionIds.includes(id),
+        ),
+        ...offer.incomingPlayerVersionIds,
+      ],
+      fromIds: [
+        ...rosterIdsOf(offer.fromFranchiseId).filter(
+          (id) => !offer.incomingPlayerVersionIds.includes(id),
+        ),
+        ...offer.outgoingPlayerVersionIds,
+      ],
+      seed: tradeOfferBackfillSeed(run.rootSeed, offer.seedPath),
+    });
     const reasons: string[] = [];
-    for (const [franchiseId, removed, added] of [
-      [offer.toFranchiseId, offer.outgoingPlayerVersionIds, offer.incomingPlayerVersionIds],
-      [offer.fromFranchiseId, offer.incomingPlayerVersionIds, offer.outgoingPlayerVersionIds],
-    ] as const) {
-      const after = [...rosterIdsOf(franchiseId).filter((id) => !removed.includes(id)), ...added];
-      const members: SeasonRosterMemberInput[] = after.map((playerVersionId) => ({
-        playerVersionId,
-        playable: facts.playable.get(playerVersionId) ?? [],
-      }));
-      for (const reason of validateSeasonRoster(members)) reasons.push(`${franchiseId}: ${reason}`);
+    if (filled === null) {
+      reasons.push('trade leaves a roster below ten players with no backfill available');
+    } else {
+      for (const [franchiseId, after] of [
+        [offer.toFranchiseId, filled.toIdsFilled],
+        [offer.fromFranchiseId, filled.fromIdsFilled],
+      ] as const) {
+        for (const reason of tradeRosterLegalityReasons(after, facts)) {
+          reasons.push(`${franchiseId}: ${reason}`);
+        }
+      }
     }
     if (reasons.length > 0) {
       const rejection: SeasonAcceptTradeOfferRejection = {

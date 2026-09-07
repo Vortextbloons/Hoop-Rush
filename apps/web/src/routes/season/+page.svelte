@@ -15,7 +15,12 @@
   import type { SeasonRunPlayerSliceEntry } from '@hoop-rush/persistence';
   import SeasonDraftBoard from '$lib/components/season/SeasonDraftBoard.svelte';
   import FrontOfficePicker from '$lib/components/season/FrontOfficePicker.svelte';
-  import type { SeasonDraftFlow, SeasonDraftFlowState } from '$lib/season/season-draft-flow';
+  import LeagueGenerationArena from '$lib/components/season/LeagueGenerationArena.svelte';
+  import type {
+    SeasonDraftFlow,
+    SeasonDraftFlowState,
+    SeasonDraftGenerationProgress,
+  } from '$lib/season/season-draft-flow';
   import {
     draftStageOf,
     humanizeDraftError,
@@ -47,6 +52,7 @@
   let started = $state(false);
   let actionError = $state<string | null>(null);
   let generationError: string | null = $state(null);
+  let generationProgress = $state<SeasonDraftGenerationProgress | null>(null);
   let promoting = $state(false);
   let promoteError: string | null = $state(null);
   let resumeHref: string | null = $state(null);
@@ -150,6 +156,10 @@
     const { SeasonDraftFlow } = await import('$lib/season/season-draft-flow');
     const instance = new SeasonDraftFlow(new DexieSeasonDraftRepository(), catalog, targets);
     instance.onPhaseChange = () => {
+      if (flow !== null) board = flow.state();
+    };
+    instance.onGenerationProgress = () => {
+      generationProgress = instance.generationProgress;
       if (flow !== null) board = flow.state();
     };
     if (playersIndex !== null) {
@@ -274,6 +284,7 @@
     busy = true;
     actionError = null;
     generationError = null;
+    generationProgress = flow.generationProgress;
     try {
       const generation = await flow.generate();
       if (generation === null && flow.error !== null) {
@@ -504,12 +515,7 @@
       {/if}
     </div>
   {:else if draftStage === 'generating'}
-    <div class="mt-10 rounded-none bg-surface-1 sm:rounded-xl p-6">
-      <h2 class="font-display text-xl font-extrabold uppercase tracking-tight">Building league…</h2>
-      <p class="mt-2 text-xs text-muted-foreground">
-        Filling the other 29 teams. Your draft is saved.
-      </p>
-    </div>
+    <LeagueGenerationArena progress={generationProgress} league={league} />
   {:else if draftStage === 'stalled'}
     <div class="mt-10 rounded-none bg-surface-1 sm:rounded-xl p-6">
       <h2 class="font-display text-xl font-extrabold uppercase tracking-tight">

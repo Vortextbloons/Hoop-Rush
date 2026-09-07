@@ -77,14 +77,18 @@ describe('PackageBuilder M3.11.1', () => {
     return { onSubmit, container: result.container };
   }
 
-  it('enforces 2-asset limits (blocks 3rd pick)', async () => {
-    const { container } = renderBuilder();
+  it('enforces 5-asset limits (blocks 6th pick)', async () => {
+    const yours = ['a', 'b', 'c', 'g', 'h', 'i'].map((ch, index) =>
+      lite(pv(ch), `You ${String(index + 1)}`),
+    );
+    const { container } = renderBuilder({ yourPlayers: yours });
     const boxes = container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
-    expect(boxes.length).toBe(6);
-    await fireEvent.click(checkboxAt(container, 0));
-    await fireEvent.click(checkboxAt(container, 1));
-    expect(checkboxAt(container, 2).disabled).toBe(true);
-    expect(textOf(container)).toContain('Max 2 per side');
+    expect(boxes.length).toBe(9);
+    for (let index = 0; index < 5; index += 1) {
+      await fireEvent.click(checkboxAt(container, index));
+    }
+    expect(checkboxAt(container, 5).disabled).toBe(true);
+    expect(textOf(container)).toContain('Max 5 per side');
   });
 
   it('shows Off limits for protected and disables', () => {

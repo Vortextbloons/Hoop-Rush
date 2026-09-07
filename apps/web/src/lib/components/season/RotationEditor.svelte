@@ -221,15 +221,32 @@
     editingMinutes = null;
     draft = '';
     editError = null;
-    const result = editor.rebalanceMinutes(targetId, parsed);
-    if (result.failures.length === 0) {
-      appliedPreset = null;
-      flashAdjustments(result.adjustments);
-      succeed();
+    applyDirectMinutes(targetId, parsed);
+  }
+  function applyDirectMinutes(playerVersionId: string, minutes: number) {
+    if (disabled) return;
+    const failuresAfter = editor.setMinutes(playerVersionId, minutes);
+    appliedPreset = null;
+    const actual = editor.minutesFor(playerVersionId);
+    const displayName = editor.names.get(playerVersionId) ?? playerVersionId;
+    const total = editor.rotation.targetMinutes.reduce((sum, row) => sum + row.minutes, 0);
+    const remaining = 240 - total;
+    highlightIds = new Set([playerVersionId]);
+    if (remaining === 0) {
+      rebalanceNotice = `Set ${displayName} to ${actual} min.`;
+    } else if (remaining > 0) {
+      rebalanceNotice = `Set ${displayName} to ${actual} min · ${remaining} left — raise teammates to reach 240.`;
     } else {
-      fail(result.failures);
-      revision += 1;
+      rebalanceNotice = `Set ${displayName} to ${actual} min · ${Math.abs(remaining)} over — lower teammates to reach 240.`;
     }
+    attemptFailures = failuresAfter;
+    editError = null;
+    revision += 1;
+    emit();
+  }
+  function setZero(playerVersionId: string) {
+    if (disabled || editor.minutesFor(playerVersionId) === 0) return;
+    applyDirectMinutes(playerVersionId, 0);
   }
   function changeStarter(slotIndex: number, playerVersionId: string) {
     if (disabled) return;
@@ -577,9 +594,7 @@
             </div>
           </div>
           <div class="flex w-full min-w-0 flex-col gap-2 md:w-auto md:shrink-0">
-            <div
-              class="flex min-w-0 flex-col gap-2 md:flex-row md:items-center md:gap-2"
-            >
+            <div class="flex min-w-0 flex-col gap-2 md:flex-row md:items-center md:gap-2">
               <div class="flex min-w-0 flex-wrap items-center gap-1.5 md:gap-2">
                 {#if row.isStarter}
                   <select
@@ -591,7 +606,10 @@
                       ? `rotation-failure-${row.member.playerVersionId}`
                       : undefined}
                     onchange={(event) =>
-                      changeStarter(row.slotIndex, (event.currentTarget as HTMLSelectElement).value)}
+                      changeStarter(
+                        row.slotIndex,
+                        (event.currentTarget as HTMLSelectElement).value,
+                      )}
                     class="min-h-11 min-w-0 w-full rounded-lg bg-surface-2 px-3 py-2 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 md:min-h-11 md:w-48 md:flex-none"
                   >
                     {#each editor.eligibleForSlot(row.slotIndex) as member (member.playerVersionId)}
@@ -928,6 +946,16 @@
       class="grid h-10 w-10 place-items-center rounded-lg bg-surface-2 text-base font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:opacity-40 motion-reduce:transition-none sm:h-11 sm:w-11"
     >
       +
+    </button>
+    <button
+      type="button"
+      aria-label={`Set ${row.member.displayName} to zero minutes`}
+      title="Set to 0 without touching teammates"
+      onclick={() => setZero(row.member.playerVersionId)}
+      disabled={disabled || row.minutes === 0}
+      class="h-10 shrink-0 rounded-lg bg-surface-2 px-2 font-mono text-[10px] font-bold text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none sm:h-11"
+    >
+      DNP
     </button>
   </div>
 {/snippet}

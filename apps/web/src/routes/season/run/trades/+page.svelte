@@ -1,6 +1,6 @@
 <script lang="ts">
   import { getContext } from 'svelte';
-  import { franchiseIdSchema } from '@hoop-rush/data-contracts';
+  import { franchiseIdSchema, SEASON_TRADE_PACKAGE_MAX } from '@hoop-rush/data-contracts';
   import {
     SEASON_RUN_SHELL_CONTEXT,
     type SeasonRunShellData,
@@ -135,14 +135,15 @@
       validation: {
         ok:
           next.outgoing.length >= 1 &&
-          next.outgoing.length <= 2 &&
+          next.outgoing.length <= SEASON_TRADE_PACKAGE_MAX &&
           next.incoming.length >= 1 &&
-          next.incoming.length <= 2,
+          next.incoming.length <= SEASON_TRADE_PACKAGE_MAX,
         reason:
           next.outgoing.length < 1 || next.incoming.length < 1
             ? 'Pick at least 1 from each side'
-            : next.outgoing.length > 2 || next.incoming.length > 2
-              ? 'Max 2 per side'
+            : next.outgoing.length > SEASON_TRADE_PACKAGE_MAX ||
+                next.incoming.length > SEASON_TRADE_PACKAGE_MAX
+              ? `Max ${String(SEASON_TRADE_PACKAGE_MAX)} per side`
               : null,
       },
     };

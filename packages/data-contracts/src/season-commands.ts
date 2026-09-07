@@ -34,6 +34,7 @@ import {
 } from './season-campaign.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import { seasonTradeOfferIdSchema, seasonTradeOfferSchema } from './season-trade.ts';
+import { SEASON_TRADE_PACKAGE_MAX } from './season-versions.ts';
 import { postseasonGameIdSchema } from './season-postseason.ts';
 import { seasonRotationSchema } from './season-rotation.ts';
 import {
@@ -825,8 +826,8 @@ export const seasonSubmitTradeProposalCommandSchema = seasonRunCommandBaseSchema
   command: z.literal('submit-trade-proposal'),
   windowIndex: windowIndexSchema,
   toFranchiseId: franchiseIdSchema,
-  outgoingPlayerVersionIds: z.array(playerVersionIdSchema).min(1).max(2),
-  incomingPlayerVersionIds: z.array(playerVersionIdSchema).min(1).max(2),
+  outgoingPlayerVersionIds: z.array(playerVersionIdSchema).min(1).max(SEASON_TRADE_PACKAGE_MAX),
+  incomingPlayerVersionIds: z.array(playerVersionIdSchema).min(1).max(SEASON_TRADE_PACKAGE_MAX),
   influenceAmount: z.number().int().min(0).max(2),
   influenceFromSender: franchiseIdSchema.nullable(),
 });
@@ -956,8 +957,8 @@ export type SeasonPurchaseTradeInquiryRejection = z.infer<
 >;
 export const seasonTradeRosterChangeSchema = z.object({
   franchiseId: franchiseIdSchema,
-  added: z.array(playerVersionIdSchema).min(1).max(2),
-  removed: z.array(playerVersionIdSchema).min(1).max(2),
+  added: z.array(playerVersionIdSchema).min(1).max(SEASON_TRADE_PACKAGE_MAX),
+  removed: z.array(playerVersionIdSchema).min(1).max(SEASON_TRADE_PACKAGE_MAX),
 });
 export type SeasonTradeRosterChange = z.infer<typeof seasonTradeRosterChangeSchema>;
 export const seasonSelectBlockObjectiveResultSchema = z.discriminatedUnion('status', [

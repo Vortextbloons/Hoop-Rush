@@ -99,6 +99,23 @@ describe('RotationEditor', () => {
     const failures = e.validate();
     expect(failures.some((failure) => failure.includes('240'))).toBe(true);
   });
+  it('sets a player to zero without touching teammates', () => {
+    const e = editor();
+    const first = e.rows()[0];
+    if (first === undefined) {
+      throw new Error('fixture editor has no rows');
+    }
+    const before = new Map(
+      e.rotation.targetMinutes.map((entry) => [entry.playerVersionId, entry.minutes]),
+    );
+    e.setMinutes(first.member.playerVersionId, 0);
+    expect(e.minutesFor(first.member.playerVersionId)).toBe(0);
+    for (const entry of e.rotation.targetMinutes) {
+      if (entry.playerVersionId === first.member.playerVersionId) continue;
+      expect(entry.minutes).toBe(before.get(entry.playerVersionId));
+    }
+    expect(e.validate().some((failure) => failure.includes('240'))).toBe(true);
+  });
   it('applies presets through the engine tables and stays valid', () => {
     const e = editor();
     const expectedStarters: Record<(typeof ROTATION_PRESETS)[number], number> = {

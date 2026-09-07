@@ -347,6 +347,7 @@ export interface SeasonAiGenerationInput {
     eraProfile: EraSimulationProfile;
     model: ProjectionModelArtifact;
   };
+  onProgress?: (progress: SeasonAiGenerationProgress) => void;
 }
 export function assignAiBandsAndIdentities(input: {
   seed: Seed;
@@ -434,6 +435,17 @@ interface PoolTeam {
   repairCount: number;
   selections: string[] | null;
 }
+export type SeasonAiGenerationProgressPhase =
+  | SeasonAiGenerationPhase
+  | 'scouting'
+  | 'rotations'
+  | 'done';
+export interface SeasonAiGenerationProgress {
+  phase: SeasonAiGenerationProgressPhase;
+  completed: number;
+  total: number;
+  teamsCompleted?: string[];
+}
 interface GenerationState {
   seed: Seed;
   catalog: SeasonDraftCatalog;
@@ -464,6 +476,14 @@ interface GenerationState {
   selectionFloor: number;
   backtracks: number;
   bans: Set<string>;
+  onProgress?: (progress: SeasonAiGenerationProgress) => void;
+}
+function reportProgress(state: GenerationState, progress: SeasonAiGenerationProgress): void {
+  try {
+    state.onProgress?.(progress);
+  } catch {
+    return;
+  }
 }
 function memberOf(state: GenerationState, versionId: string): SeasonRosterMemberInput {
   const candidate = state.byId.get(versionId);
@@ -660,6 +680,13 @@ function reachableAfterFixedAndFills(
   const capC = (c: number): number => Math.min(targetC, c);
   const stateIndex = (g: number, f: number, c: number): number =>
     g * (targetF + 1) * (targetC + 1) + f * (targetC + 1) + c;
+  if (
+    capG(startCounts.guards) >= targetG &&
+    capF(startCounts.forwards) >= targetF &&
+    capC(startCounts.centers) >= targetC
+  ) {
+    return true;
+  }
   let reachable = new Uint8Array(usedBase);
   reachable[
     stateIndex(capG(startCounts.guards), capF(startCounts.forwards), capC(startCounts.centers))
@@ -821,10 +848,9 @@ function poolCoverageFeasible(
   versionId: string | null,
   includeUnassigned: boolean,
 ): boolean {
-  let poolMask = 0;
-  const ids = versionId !== null ? [...team.pool, versionId] : team.pool;
-  for (const id of ids) {
-    poolMask |= state.coverageMaskByVersion.get(id) ?? 0;
+  let poolMask = team.coverageMask;
+  if (versionId !== null) {
+    poolMask |= state.coverageMaskByVersion.get(versionId) ?? 0;
   }
   if (poolMask === 0xff) return true;
   if (!includeUnassigned) return false;
@@ -834,13 +860,20 @@ function poolCoverageFeasible(
   }
   return (poolMask | unassignedMask) === 0xff;
 }
-function coverageScarcityAfter(state: GenerationState, team: PoolTeam, versionId: string): boolean {
+function lackingCoverageMask(state: GenerationState): number {
   let lacking = 0xff;
   for (const teamId of state.teamOrder) {
     const t = state.teams.get(teamId);
     if (t === undefined) continue;
     lacking &= ~t.coverageMask;
   }
+  return lacking;
+}
+function coverageScarcityAfterWithLacking(
+  state: GenerationState,
+  lacking: number,
+  versionId: string,
+): boolean {
   const probeMask = state.coverageMaskByVersion.get(versionId) ?? 0;
   const stillLacking = lacking & ~probeMask;
   if (stillLacking === 0) return true;
@@ -850,6 +883,10 @@ function coverageScarcityAfter(state: GenerationState, team: PoolTeam, versionId
     if ((probeMask & (1 << role)) !== 0) return false;
   }
   return true;
+}
+function coverageScarcityAfter(state: GenerationState, team: PoolTeam, versionId: string): boolean {
+  void team;
+  return coverageScarcityAfterWithLacking(state, lackingCoverageMask(state), versionId);
 }
 function poolTenFeasibleAfterAddExact(
   state: GenerationState,
@@ -1330,7 +1367,7 @@ function poolPickScore(
   state: GenerationState,
   team: PoolTeam,
   versionId: string,
-  rngRanks: ReadonlyMap<string, number>,
+  rngRank: number,
   priorityRoles: readonly SeasonRosterRole[],
   weakest: readonly SeasonRosterRole[],
   poolCounts: {
@@ -1372,7 +1409,7 @@ function poolPickScore(
   if (Math.max(0, completion.centers - poolCounts.centers) > 0 && (mask & 4) !== 0)
     positionHelp += 1;
   score += positionHelp * 0.4;
-  score += (rngRanks.get(versionId) ?? 0) * 2.5;
+  score += rngRank * 2.5;
   return score;
 }
 function tierOverage(
@@ -1416,7 +1453,8 @@ function pickForPool(state: GenerationState, team: PoolTeam, round: number): str
     if (feasible) feasibleMasks.add(mask);
   }
   if (feasibleMasks.size === 0) return null;
-  const rngRanks = new Map<string, number>();
+  const candidates = state.canonicalCandidates;
+  const rngRanks = new Array<number>(candidates.length);
   const rng = createRng(
     seasonNamespaceSeed(
       state.seed,
@@ -1427,29 +1465,33 @@ function pickForPool(state: GenerationState, team: PoolTeam, round: number): str
       'candidate-order',
     ),
   );
-  for (const candidate of state.canonicalCandidates) {
-    rngRanks.set(candidate.playerVersionId, rng.next());
+  for (let i = 0; i < candidates.length; i += 1) {
+    rngRanks[i] = rng.next();
   }
   const poolRoleScores = roleScoresOfIds(state, team.pool);
   const priorityRoles = identityPriorityRolesOf(state.targets, team.identity);
   const weakest = weakestRoles(poolRoleScores, 2);
   const poolCounts = team.groupCounts;
+  const lacking = lackingCoverageMask(state);
+  const teamPrefix = `${team.franchiseId}:`;
   let best:
     | {
         id: string;
         score: number;
       }
     | undefined;
-  for (const candidate of state.canonicalCandidates) {
+  for (let i = 0; i < candidates.length; i += 1) {
+    const candidate = candidates[i];
+    if (candidate === undefined) continue;
     const id = candidate.playerVersionId;
     const mask = state.maskByVersion.get(id) ?? 0;
     if (mask === 0 || !feasibleMasks.has(mask)) continue;
     if (!state.unassigned.has(id)) continue;
     if (state.claimedIdentities.has(candidate.playerId)) continue;
-    if (state.bans.has(`${team.franchiseId}:${id}`)) continue;
+    if (state.bans.has(teamPrefix + id)) continue;
     if (!poolCoverageFeasible(state, team, id, true)) continue;
-    if (!coverageScarcityAfter(state, team, id)) continue;
-    const score = poolPickScore(state, team, id, rngRanks, priorityRoles, weakest, poolCounts);
+    if (!coverageScarcityAfterWithLacking(state, lacking, id)) continue;
+    const score = poolPickScore(state, team, id, rngRanks[i] ?? 0, priorityRoles, weakest, poolCounts);
     if (best === undefined || score > best.score || (score === best.score && id < best.id)) {
       best = { id, score };
     }
@@ -1522,6 +1564,7 @@ function fillPools(state: GenerationState): void {
       if (pick === null) throw new PoolFillDeadlock(teamId, round);
       addPoolMember(state, team, pick, ['ai-rosters', 'pool-fill', String(round), teamId]);
     }
+    reportProgress(state, { phase: 'pool-fill', completed: round + 1, total: poolSize });
   }
 }
 interface PoolSnapshot {
@@ -1744,6 +1787,13 @@ function memberReachCapped(
   const index = (g: number, f: number, c: number): number => g * strideG + f * strideF + c;
   const cap = (value: number, max: number): number => Math.min(max, value);
   if (maxPicks < 0) return false;
+  if (
+    cap(startCounts.guards, targetG) >= targetG &&
+    cap(startCounts.forwards, targetF) >= targetF &&
+    cap(startCounts.centers, targetC) >= targetC
+  ) {
+    return true;
+  }
   const reachable = new Uint8Array(usedBase * (maxPicks + 1));
   reachable[
     index(
@@ -1808,6 +1858,13 @@ function memberReachCappedWithOutlierBudget(
     g * strideG + f * strideF + c + o * strideO;
   const cap = (value: number, max: number): number => Math.min(max, value);
   if (maxPicks < 0 || startOutliers > maxOutliers) return false;
+  if (
+    cap(startCounts.guards, targetG) >= targetG &&
+    cap(startCounts.forwards, targetF) >= targetF &&
+    cap(startCounts.centers, targetC) >= targetC
+  ) {
+    return true;
+  }
   const capValue = state.targets.policy.bandPoolScoreCaps[team.band];
   const reachable = new Uint8Array(usedBase * (maxPicks + 1));
   reachable[
@@ -2333,6 +2390,7 @@ function bestRosterFromPool(state: GenerationState, team: PoolTeam): string[] | 
 function selectRosters(state: GenerationState): void {
   const teamCount = Math.max(1, state.teamOrder.length);
   const perTeam = Math.max(150, Math.floor(budgetForPhase(state, 'selection') / teamCount));
+  const done: string[] = [];
   for (const teamId of state.teamOrder) {
     const team = state.teams.get(teamId);
     if (team === undefined) continue;
@@ -2347,6 +2405,13 @@ function selectRosters(state: GenerationState): void {
       );
     }
     team.selections = ten;
+    done.push(teamId);
+    reportProgress(state, {
+      phase: 'selection',
+      completed: done.length,
+      total: state.teamOrder.length,
+      teamsCompleted: [...done],
+    });
   }
 }
 function toSeasonAiPool(state: GenerationState, team: PoolTeam): SeasonAiPool {
@@ -2423,25 +2488,27 @@ function finalizeResult(
       ownerFranchiseId: roster.franchiseId,
     })),
   );
-  const rotations = rosters.map((roster) => {
+  const talentByVersion = new Map<string, number>();
+  for (const candidate of state.canonicalCandidates) {
+    const ratings = Object.values(candidate.detailedRatings);
+    talentByVersion.set(
+      candidate.playerVersionId,
+      ratings.reduce((sum, value) => sum + value, 0) / Math.max(1, ratings.length),
+    );
+  }
+  const rotations = rosters.map((roster, index) => {
     const members = roster.players.map((player) => {
       const candidate = state.byId.get(player.playerVersionId);
       if (!candidate) throw new Error(`missing candidate ${player.playerVersionId}`);
       return { playerVersionId: player.playerVersionId, playable: candidate.positions.playable };
     });
-    return buildMinimalRotation({
+    const rotation = buildMinimalRotation({
       franchiseId: roster.franchiseId,
       members,
-      order: (a, b) => {
-        const talentOf = (member: { playerVersionId: string }): number => {
-          const candidate = state.byId.get(member.playerVersionId);
-          if (!candidate) return 0;
-          const ratings = Object.values(candidate.detailedRatings);
-          return ratings.reduce((sum, value) => sum + value, 0) / Math.max(1, ratings.length);
-        };
-        return talentOf(b) - talentOf(a);
-      },
+      order: (a, b) => (talentByVersion.get(b.playerVersionId) ?? 0) - (talentByVersion.get(a.playerVersionId) ?? 0),
     });
+    reportProgress(state, { phase: 'rotations', completed: index + 1, total: rosters.length });
+    return rotation;
   });
   const rotationByFranchise = new Map(
     rotations.map((rotation) => [rotation.franchiseId, rotation]),
@@ -2740,14 +2807,23 @@ export function generateAiLeague(input: SeasonAiGenerationInput): SeasonLeagueGe
     backtracks: 0,
     bans: new Set(),
     assignments,
+    onProgress: input.onProgress,
   };
+  reportProgress(state, { phase: 'scouting', completed: 1, total: 1 });
   matchGuaranteedAnchors(state);
   rollExtraEliteAnchors(state);
+  reportProgress(state, { phase: 'anchors', completed: 1, total: 1 });
   state.phase = 'pool-fill';
   fillPoolsWithRepair(state);
   state.phase = 'selection';
   selectRosters(state);
   const generation = finalizeResult(state, league, input.humanFranchiseIds, input.humanRosters);
+  reportProgress(state, {
+    phase: 'done',
+    completed: 1,
+    total: 1,
+    teamsCompleted: [...state.teamOrder],
+  });
   if (input.projection !== undefined) {
     return attachAiProjectionSummaries({
       generation,

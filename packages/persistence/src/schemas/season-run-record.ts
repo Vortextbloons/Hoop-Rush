@@ -19,6 +19,7 @@ import {
   seasonGameSummarySchema,
   seasonCampaignStateSchema,
   seasonEvolutionStateSchema,
+  type SeasonEvolutionState,
   seasonHealthStateSchema,
   seasonInfluenceStateSchema,
   seasonInvalidRosterInterruptionSchema,
@@ -41,6 +42,7 @@ import {
   seasonOwnershipSchema,
   seasonAwardsSchema,
   seasonPostseasonStateSchema,
+  normalizeEvolutionState,
   SEASON_ROSTER_MAX_SIZE,
   SEASON_ROSTER_MIN_SIZE,
   SEASON_RUN_SAVE_SCHEMA_VERSION,
@@ -79,6 +81,12 @@ export const seasonRunRecordFieldsSchema = z.object({
 });
 export const storedSeasonRunRecordSchema = seasonRunRecordFieldsSchema;
 export type StoredSeasonRunRecord = z.infer<typeof storedSeasonRunRecordSchema>;
+export function storedEvolutionOf(stored: {
+  evolution?: unknown;
+  run?: { evolution?: unknown } | null;
+}): SeasonEvolutionState {
+  return normalizeEvolutionState(stored.run?.evolution ?? stored.evolution);
+}
 export const seasonRunCursorSchema = z.object({
   run: z.object({
     runId: z.string().min(1).max(64),

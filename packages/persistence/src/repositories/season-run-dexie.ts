@@ -1,5 +1,6 @@
 import {
   blockIndexForRound,
+  blockRoundRange,
   buildEmptyCampaignState,
   buildEmptyChallengeState,
   emptySeasonPlayerAggregate,
@@ -54,6 +55,7 @@ import {
   seasonRunCheckpointDeltaSchema,
   seasonRunCursorSchema,
   seasonRunPlayerSliceEntrySchema,
+  storedEvolutionOf,
   storedSeasonAcceptedBlockRowSchema,
   storedSeasonActiveRunIndexSchema,
   storedSeasonAlmanacRowSchema,
@@ -82,7 +84,11 @@ import {
   type StoredSeasonDraft,
 } from '../schemas/season-draft-record.ts';
 import type { SeasonRunEngineSeam } from '../season/engine-seam-types.ts';
-import { buildInitialCampaignState, generateSeasonSchedule } from '@hoop-rush/engine';
+import {
+  buildInitialCampaignState,
+  generateSeasonSchedule,
+  seasonBlockGameCount,
+} from '@hoop-rush/engine';
 import { auditSeasonRunState } from '../season/audit.ts';
 import { seasonRunEngineSeam } from '../season/engine-seam.ts';
 import {
@@ -266,209 +272,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
         'stored Season Run checkpoint is unidentifiable',
       );
     }
-    try {
-      return await this.loadValidated(checkpoint, schedule);
-    } catch (error) {
-      if (
-        error instanceof SeasonRunLoadError &&
-        ((await this.repairLegacyRotationLockDivergence(error.failures)) ||
-          (await this.repairLegacyCommittedStateDigest(error.failures)))
-      ) {
-        const repaired = await this.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
-        if (repaired === undefined) {
-          throw new SeasonRunLoadError(['the repaired Season Run checkpoint disappeared']);
-        }
-        return this.loadValidated(repaired, schedule);
-      }
-      throw error;
-    }
-  }
-  private async repairLegacyRotationLockDivergence(failures: readonly string[]): Promise<boolean> {
-    const rotationFailure = failures.some((failure) =>
-      /^stored rotations digest [0-9a-f]{32} does not match the last accepted lock [0-9a-f]{32}$/.test(
-        failure,
-      ),
-    );
-    const stateDigestFailure = failures.includes(
-      'stored stateDigest does not recompute over the stored mutable state',
-    );
-    const allowed = failures.every(
-      (failure) =>
-        /^stored rotations digest [0-9a-f]{32} does not match the last accepted lock [0-9a-f]{32}$/.test(
-          failure,
-        ) ||
-        failure === 'stored stateDigest does not recompute over the stored mutable state' ||
-        failure ===
-          'run.effects diverged from the last checkpoint effects without a trade window ' +
-            '(last block stateDigest does not recompute over the stored facts)',
-    );
-    if (!rotationFailure || !stateDigestFailure || !allowed) return false;
-    return this.db.transaction(
-      'rw',
-      [this.db.seasonRuns, this.db.seasonRunBlocks, this.db.seasonPendingBlocks],
-      async () => {
-        const rawCheckpoint = await this.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
-        if (rawCheckpoint === undefined) return false;
-        const parsedCheckpoint = storedSeasonRunRecordSchema.safeParse(rawCheckpoint);
-        if (!parsedCheckpoint.success) return false;
-        const stored = parsedCheckpoint.data;
-        if (stored.revision === 0 || stored.checkpointState === null) return false;
-        if ((await this.db.seasonPendingBlocks.get(stored.run.runId)) !== undefined) return false;
-        const rawBlock = await this.db.seasonRunBlocks.get([stored.run.runId, stored.revision - 1]);
-        if (rawBlock === undefined) return false;
-        const parsedBlock = storedSeasonAcceptedBlockRowSchema.safeParse(rawBlock);
-        if (!parsedBlock.success) return false;
-        const last = parsedBlock.data.block;
-        const oldDigest = last.rotationDigest;
-        const lockedDigest = this.seam.seasonRotationSetDigest(stored.run.rotations);
-        if (lockedDigest === oldDigest) return false;
-        if (
-          stored.lastRotationDigest !== oldDigest ||
-          stored.checkpointState.rotationDigest !== oldDigest ||
-          stored.checkpointState.commandId !== last.commandId ||
-          stored.checkpointState.checkpointDigest !== last.checkpointDigest
-        ) {
-          return false;
-        }
-        const checkpointState = {
-          ...stored.checkpointState,
-          rotationDigest: lockedDigest,
-        };
-        const stateDigest = this.seam.seasonRunStateDigest({
-          stateRevision: stored.stateRevision,
-          stage: stored.run.stage,
-          postseason: stored.run.postseason,
-          awards: stored.run.awards,
-          completion: stored.run.completion,
-          checkpointState,
-          health: stored.health,
-          influence: stored.influence,
-          transactions: stored.transactions,
-          trade: stored.trade,
-          objectives: stored.objectives,
-          challenges:
-            stored.challenges ??
-            (stored.run as { challenges?: unknown }).challenges ??
-            buildEmptyChallengeState(),
-          campaign: stored.campaign ?? null,
-          evolution: normalizeEvolutionState(
-            (stored as { evolution?: unknown }).evolution ??
-              (stored.run as { evolution?: unknown }).evolution,
-          ),
-          rosters: stored.run.rosters,
-          ownership: stored.run.ownership,
-          rotations: stored.run.rotations,
-          effects: stored.effects,
-          freeAgency: stored.run.freeAgency,
-          authority: stored.run.authority,
-        });
-        const block = seasonAcceptedBlockSchema.parse({
-          ...last,
-          rotationDigest: lockedDigest,
-          ...(stored.stateRevision === last.stateRevision ? { stateDigest } : {}),
-        });
-        const updatedAtIso = new Date().toISOString();
-        const repairedCheckpoint = storedSeasonRunRecordSchema.parse({
-          ...stored,
-          lastRotationDigest: lockedDigest,
-          checkpointState,
-          stateDigest,
-          evolution: normalizeEvolutionState(
-            (stored as { evolution?: unknown }).evolution ??
-              (stored.run as { evolution?: unknown }).evolution,
-          ),
-          updatedAtIso,
-        });
-        const repairedBlock = storedSeasonAcceptedBlockRowSchema.parse({
-          ...parsedBlock.data,
-          block,
-          updatedAtIso,
-        });
-        await this.db.seasonRuns.put(repairedCheckpoint);
-        await this.db.seasonRunBlocks.put(repairedBlock);
-        return true;
-      },
-    );
-  }
-  private async repairLegacyCommittedStateDigest(failures: readonly string[]): Promise<boolean> {
-    const digestFailure = 'stored stateDigest does not recompute over the stored mutable state';
-    const effectsFailure =
-      'run.effects diverged from the last checkpoint effects without a trade window ' +
-      '(last block stateDigest does not recompute over the stored facts)';
-    if (
-      !failures.includes(digestFailure) ||
-      !failures.every((failure) => failure === digestFailure || failure === effectsFailure)
-    ) {
-      return false;
-    }
-    return this.db.transaction(
-      'rw',
-      [this.db.seasonRuns, this.db.seasonRunBlocks, this.db.seasonPendingBlocks],
-      async () => {
-        const rawCheckpoint = await this.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
-        if (rawCheckpoint === undefined) return false;
-        const parsedCheckpoint = storedSeasonRunRecordSchema.safeParse(rawCheckpoint);
-        if (!parsedCheckpoint.success) return false;
-        const stored = parsedCheckpoint.data;
-        if (stored.revision === 0 || stored.checkpointState === null) return false;
-        if ((await this.db.seasonPendingBlocks.get(stored.run.runId)) !== undefined) return false;
-        const rawBlock = await this.db.seasonRunBlocks.get([stored.run.runId, stored.revision - 1]);
-        if (rawBlock === undefined) return false;
-        const parsedBlock = storedSeasonAcceptedBlockRowSchema.safeParse(rawBlock);
-        if (!parsedBlock.success) return false;
-        const last = parsedBlock.data.block;
-        if (
-          last.stateRevision !== stored.stateRevision ||
-          last.stateDigest !== stored.stateDigest ||
-          last.commandId !== stored.checkpointState.commandId ||
-          last.rotationDigest !== stored.checkpointState.rotationDigest ||
-          last.checkpointDigest !== stored.checkpointState.checkpointDigest
-        ) {
-          return false;
-        }
-        const stateDigest = this.seam.seasonRunStateDigest({
-          stateRevision: stored.stateRevision,
-          stage: stored.run.stage,
-          postseason: stored.run.postseason,
-          awards: stored.run.awards,
-          completion: stored.run.completion,
-          checkpointState: stored.checkpointState,
-          health: stored.health,
-          influence: stored.influence,
-          transactions: stored.transactions,
-          trade: stored.trade,
-          objectives: stored.objectives,
-          challenges:
-            stored.challenges ??
-            (stored.run as { challenges?: unknown }).challenges ??
-            buildEmptyChallengeState(),
-          campaign: stored.campaign ?? null,
-          evolution: normalizeEvolutionState(
-            (stored as { evolution?: unknown }).evolution ??
-              (stored.run as { evolution?: unknown }).evolution,
-          ),
-          rosters: stored.run.rosters,
-          ownership: stored.run.ownership,
-          rotations: stored.run.rotations,
-          effects: stored.effects,
-          freeAgency: stored.run.freeAgency,
-          authority: stored.run.authority,
-        });
-        if (stateDigest === stored.stateDigest) return false;
-        const updatedAtIso = new Date().toISOString();
-        await this.db.seasonRuns.put(
-          storedSeasonRunRecordSchema.parse({ ...stored, stateDigest, updatedAtIso }),
-        );
-        await this.db.seasonRunBlocks.put(
-          storedSeasonAcceptedBlockRowSchema.parse({
-            ...parsedBlock.data,
-            block: { ...last, stateDigest },
-            updatedAtIso,
-          }),
-        );
-        return true;
-      },
-    );
+    return this.loadValidated(checkpoint, schedule);
   }
   private async deleteRunRows(runId: string): Promise<void> {
     await this.db.seasonRunSummaries.where('runId').equals(runId).delete();
@@ -487,9 +291,9 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
     checkpoint: unknown,
     schedule: SeasonSchedule,
   ): Promise<SeasonRunSnapshot> {
-    let stored: StoredSeasonRunRecord;
+    let probe: StoredSeasonRunRecord;
     try {
-      stored = storedSeasonRunRecordSchema.parse(checkpoint);
+      probe = storedSeasonRunRecordSchema.parse(checkpoint);
     } catch (error) {
       const info = incompatibleInfoOf(checkpoint);
       if (info !== null) {
@@ -500,10 +304,61 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
         `corrupt Season Run checkpoint: ${errorMessage(error)}`,
       );
     }
-    if (!isLiveSeasonRunVersions(stored.run.versions)) {
+    if (!isLiveSeasonRunVersions(probe.run.versions)) {
       const info = incompatibleInfoOf(checkpoint) ?? {
         storedSaveSchemaVersion:
           (checkpoint as { saveSchemaVersion?: number }).saveSchemaVersion ??
+          SEASON_RUN_SAVE_SCHEMA_VERSION,
+        storedRunSchemaVersion: probe.run.versions.runSchemaVersion,
+        runId: probe.run.runId,
+      };
+      throw new SeasonRunIncompatibleError({
+        ...info,
+      });
+    }
+    const snapshot = await this.db.transaction(
+      'r',
+      [
+        this.db.seasonRuns,
+        this.db.seasonRunSummaries,
+        this.db.seasonRunDetails,
+        this.db.seasonRunBlocks,
+        this.db.seasonRunIndex,
+        this.db.seasonPendingBlocks,
+      ],
+      async () => {
+        const freshCheckpoint = await this.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
+        const active: unknown = freshCheckpoint ?? checkpoint;
+        const activeRun = (active as { run?: { runId?: unknown } }).run;
+        const activeRunId =
+          typeof activeRun?.runId === 'string' ? activeRun.runId : probe.run.runId;
+        const [summaryRows, detailRows, blockRows, indexRow, pendingRow] = await Promise.all([
+          this.db.seasonRunSummaries.where('runId').equals(activeRunId).toArray(),
+          this.db.seasonRunDetails.where('runId').equals(activeRunId).toArray(),
+          this.db.seasonRunBlocks.where('runId').equals(activeRunId).toArray(),
+          this.db.seasonRunIndex.get(SEASON_RUN_RECORD_ID),
+          this.db.seasonPendingBlocks.get(activeRunId),
+        ]);
+        return { active, summaryRows, detailRows, blockRows, indexRow, pendingRow };
+      },
+    );
+    let stored: StoredSeasonRunRecord;
+    try {
+      stored = storedSeasonRunRecordSchema.parse(snapshot.active);
+    } catch (error) {
+      const info = incompatibleInfoOf(snapshot.active);
+      if (info !== null) {
+        throw new SeasonRunIncompatibleError(info);
+      }
+      throw new SeasonRunLoadError(
+        ['stored Season Run checkpoint failed schema validation'],
+        `corrupt Season Run checkpoint: ${errorMessage(error)}`,
+      );
+    }
+    if (!isLiveSeasonRunVersions(stored.run.versions)) {
+      const info = incompatibleInfoOf(snapshot.active) ?? {
+        storedSaveSchemaVersion:
+          (snapshot.active as { saveSchemaVersion?: number }).saveSchemaVersion ??
           SEASON_RUN_SAVE_SCHEMA_VERSION,
         storedRunSchemaVersion: stored.run.versions.runSchemaVersion,
         runId: stored.run.runId,
@@ -514,13 +369,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
     }
     const failures: string[] = [];
     const runId = stored.run.runId;
-    const [summaryRows, detailRows, blockRows, indexRow, pendingRow] = await Promise.all([
-      this.db.seasonRunSummaries.where('runId').equals(runId).toArray(),
-      this.db.seasonRunDetails.where('runId').equals(runId).toArray(),
-      this.db.seasonRunBlocks.where('runId').equals(runId).toArray(),
-      this.db.seasonRunIndex.get(SEASON_RUN_RECORD_ID),
-      this.db.seasonPendingBlocks.get(runId),
-    ]);
+    const { summaryRows, detailRows, blockRows, indexRow, pendingRow } = snapshot;
     const summaries: SeasonGameSummary[] = [];
     for (const row of summaryRows) {
       try {
@@ -647,9 +496,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
         ).campaign ??
         buildEmptyCampaignState(),
       checkpointState: stored.checkpointState,
-      evolution: normalizeEvolutionState(
-        stored.evolution ?? (stored.run as { evolution?: unknown }).evolution,
-      ),
+      evolution: storedEvolutionOf(stored),
       stateRevision: stored.stateRevision,
       stateDigest: stored.stateDigest,
     });
@@ -780,6 +627,50 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
           throw new Error(
             `commitSeasonBlock: stateRevision does not advance (stored ${String(cursor.stateRevision)}, ` +
               `commit ${String(input.stateRevision)})`,
+          );
+        }
+        const { fromRound, toRound } = blockRoundRange(blockIndex);
+        if (input.completedRounds !== toRound) {
+          throw new Error(
+            `commitSeasonBlock: completedRounds ${String(input.completedRounds)} is not the block end ` +
+              `${String(toRound)} for block ${String(blockIndex)}`,
+          );
+        }
+        const expectedSummaries = seasonBlockGameCount(blockIndex);
+        if (input.summaries.length !== expectedSummaries) {
+          throw new Error(
+            `commitSeasonBlock: block ${String(blockIndex)} must carry exactly ${String(expectedSummaries)} ` +
+              `summaries (got ${String(input.summaries.length)})`,
+          );
+        }
+        const committedGameIds = new Set<string>();
+        for (const summary of input.summaries) {
+          if (committedGameIds.has(summary.gameId)) {
+            throw new Error(
+              `commitSeasonBlock: block ${String(blockIndex)} carries duplicate game ${summary.gameId}`,
+            );
+          }
+          committedGameIds.add(summary.gameId);
+          if (summary.round < fromRound || summary.round > toRound) {
+            throw new Error(
+              `commitSeasonBlock: game ${summary.gameId} round ${String(summary.round)} is outside block ${String(blockIndex)}`,
+            );
+          }
+        }
+        for (const detail of input.retainedDetails) {
+          if (!committedGameIds.has(detail.gameId)) {
+            throw new Error(
+              `commitSeasonBlock: retained detail ${detail.gameId} has no committed summary in block ${String(blockIndex)}`,
+            );
+          }
+        }
+        if (
+          input.recap.runId !== input.runId ||
+          input.recap.blockIndex !== blockIndex ||
+          input.recap.completedRounds !== input.completedRounds
+        ) {
+          throw new Error(
+            `commitSeasonBlock: recap does not describe block ${String(blockIndex)} at round ${String(input.completedRounds)}`,
           );
         }
         await this.db.seasonRunSummaries
@@ -1129,7 +1020,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
           objectives: run.objectives,
           challenges: run.challenges,
           campaign: run.campaign ?? null,
-          evolution: run.evolution,
+          evolution: normalizeEvolutionState(run.evolution),
           checkpointState: run.checkpointState,
           stateRevision: run.stateRevision,
           stateDigest: run.stateDigest,
@@ -1138,6 +1029,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
             ownership: run.ownership,
             rotations: run.rotations,
             freeAgency: run.freeAgency,
+            evolution: normalizeEvolutionState(run.evolution),
           },
         });
         await this.db.seasonRuns.put({
@@ -1328,6 +1220,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
       objectives,
       challenges,
       campaign,
+      evolution,
       checkpointState: null,
       stateRevision: 0,
       stateDigest,
@@ -1668,6 +1561,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
           trade: validatedRun.trade,
           objectives: validatedRun.objectives,
           campaign: validatedRun.campaign ?? null,
+          evolution: normalizeEvolutionState(validatedRun.evolution),
           checkpointState: validatedRun.checkpointState,
           stateRevision: validatedRun.stateRevision,
           stateDigest: validatedRun.stateDigest,
@@ -1680,6 +1574,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
             awards: validatedRun.awards,
             completion: validatedRun.completion,
             freeAgency: validatedRun.freeAgency,
+            evolution: normalizeEvolutionState(validatedRun.evolution),
           },
         });
         await this.db.seasonRuns.put({

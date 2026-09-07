@@ -1,12 +1,15 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import Dexie from 'dexie';
 import {
+  SEASON_FRONT_OFFICE_VERSION,
   SEASON_RUN_SAVE_SCHEMA_VERSION,
   commandIdSchema,
   franchiseIdSchema,
   idSchema,
+  normalizeEvolutionState,
   seasonGameIdSchema,
   seasonRunCommandSchema,
+  seasonFrontOfficeSelectionSchema,
   type SeasonEffectsState,
   type SeasonPendingBlockCandidate,
   type SeasonRun,
@@ -1116,6 +1119,58 @@ describe('season run M2.5 command application (v5)', () => {
     expect(snapshot?.run.campaign?.selections[0]?.opportunityId).toBe(offer.opportunityId);
     expect(snapshot?.run.checkpointState).toBeNull();
   });
+  it('stores an executive selection in both evolution copies and reloads', async () => {
+    const adapters = makeAdapters();
+    const { db, repo, run } = adapters;
+    await promote(adapters);
+    const nextEvolution = {
+      ...normalizeEvolutionState((run as { evolution?: unknown }).evolution),
+      frontOffice: seasonFrontOfficeSelectionSchema.parse({
+        executiveId: 'morgan-vale',
+        version: SEASON_FRONT_OFFICE_VERSION,
+        selectedByCommandId: commandIdSchema.parse('cmd-front-office-1'),
+        selectedAtStateRevision: 1,
+      }),
+    };
+    const nextRun = {
+      ...run,
+      evolution: nextEvolution,
+      stateRevision: run.stateRevision + 1,
+      stateDigest: buildFixtureStateDigest(run, {
+        stateRevision: run.stateRevision + 1,
+        evolution: nextEvolution,
+      }),
+    };
+    const command = seasonRunCommandSchema.parse({
+      schemaVersion: 11,
+      command: 'select-front-office',
+      commandId: commandIdSchema.parse('cmd-front-office-1'),
+      runId: run.runId,
+      expectedStateRevision: run.stateRevision,
+      expectedStateDigest: run.stateDigest,
+      executiveId: 'morgan-vale',
+    });
+    await repo.applySeasonRunCommand({
+      runId: run.runId,
+      command,
+      run: nextRun,
+      pending: null,
+    });
+    const stored = await db.seasonRuns.get(SEASON_RUN_RECORD_ID);
+    expect(stored?.evolution).toEqual(nextEvolution);
+    expect(stored?.run.evolution).toEqual(nextEvolution);
+    const snapshot = await repo.loadActiveRun();
+    expect(snapshot?.run.stateRevision).toBe(1);
+    expect(snapshot?.run.evolution).toEqual(nextEvolution);
+    await expect(
+      repo.applySeasonRunCommand({
+        runId: run.runId,
+        command: { ...command, expectedStateRevision: 1, expectedStateDigest: nextRun.stateDigest },
+        run: nextRun,
+        pending: null,
+      }),
+    ).rejects.toThrow(SeasonRunCommandDuplicateError);
+  });
   it('rejects a stale command (revision and digest) and a run mismatch', async () => {
     const adapters = makeAdapters();
     const { repo, run } = adapters;
@@ -1250,6 +1305,44 @@ describe('season run M2.5 reload audit (v5)', () => {
     const row = await currentRow(adapters);
     await db.seasonRuns.put({ ...row, stateDigest: 'f'.repeat(32) });
     await expect(repo.loadActiveRun()).rejects.toThrow(/stateDigest/);
+  });
+  it('rejects an in-range fatigue edit without rewriting the stored record', async () => {
+    const adapters = makeAdapters();
+    const { db, repo, run } = adapters;
+    await promote(adapters);
+    await repo.commitSeasonBlock(commitInputFor(adapters, 0));
+    const before = await currentRow(adapters);
+    const [first, ...rest] = before.effects.playerStates;
+    if (first === undefined) throw new Error('expected fixture player states');
+    const tamperedFatigue = first.fatigueBasisPoints + 1;
+    await db.seasonRuns.put({
+      ...before,
+      effects: {
+        ...before.effects,
+        playerStates: [{ ...first, fatigueBasisPoints: tamperedFatigue }, ...rest],
+      },
+    });
+    await expect(repo.loadActiveRun()).rejects.toThrow(/stateDigest/);
+    const after = await currentRow(adapters);
+    expect(after.stateDigest).toBe(before.stateDigest);
+    expect(after.effects.playerStates[0]?.fatigueBasisPoints).toBe(tamperedFatigue);
+    const blockRows = await db.seasonRunBlocks.where('runId').equals(run.runId).toArray();
+    expect(blockRows).toHaveLength(1);
+    expect(blockRows[0]?.block.stateDigest).toBe(before.stateDigest);
+  });
+  it('rejects a block missing a game summary without touching the good checkpoint', async () => {
+    const adapters = makeAdapters();
+    const { db, repo } = adapters;
+    await promote(adapters);
+    const base = commitInputFor(adapters, 0);
+    await expect(
+      repo.commitSeasonBlock({ ...base, summaries: base.summaries.slice(1) }),
+    ).rejects.toThrow(/exactly 150 summaries/);
+    expect(await db.seasonRunSummaries.count()).toBe(0);
+    expect(await db.seasonRunBlocks.count()).toBe(0);
+    const snapshot = await repo.loadActiveRun();
+    expect(snapshot?.acceptedBlocks).toHaveLength(0);
+    expect(snapshot?.run.cursor.completedRounds).toBe(0);
   });
   it('stores the post-commit revision when a trade window is behind the free-agency bump', async () => {
     const adapters = makeAdapters();

@@ -19,10 +19,22 @@ self.addEventListener('message', (event: MessageEvent<unknown>) => {
   const respond = (response: GenerationWorkerResponse): void => {
     self.postMessage(response);
   };
+  let lastPost = 0;
   try {
     const generation = generateAiLeague({
       ...request.input,
       targets: request.targets,
+      onProgress: (progress) => {
+        const now = Date.now();
+        const isDone = progress.phase === 'done';
+        if (!isDone && now - lastPost < 120) return;
+        lastPost = now;
+        self.postMessage({
+          type: 'progress',
+          requestId: request.requestId,
+          ...progress,
+        } satisfies GenerationWorkerResponse);
+      },
     });
     respond({ type: 'complete', requestId: request.requestId, generation });
   } catch (error) {

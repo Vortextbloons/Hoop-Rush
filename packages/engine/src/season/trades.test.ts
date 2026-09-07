@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import fc from 'fast-check';
 import { seedFromString } from '@hoop-rush/test-fixtures';
-import { franchiseIdSchema } from '@hoop-rush/data-contracts';
+import { franchiseIdSchema, SEASON_TRADE_PACKAGE_MAX } from '@hoop-rush/data-contracts';
 import type {
   Position,
   SeasonDraftCatalog,
@@ -22,6 +22,7 @@ import {
   seasonTradeCatalogFactsOf,
   SeasonTradeFactsError,
   SeasonTradeInvariantError,
+  type SeasonEconomyRun,
   type SeasonWindowOpenResult,
 } from './trades.ts';
 import {
@@ -180,7 +181,7 @@ describe('season trade window opening', () => {
     expect(first.results[1]?.trade).toEqual(second.results[1]?.trade);
     expect(first.results[2]?.trade).toEqual(second.results[2]?.trade);
   });
-  it('creates three open base offers for the human franchise with 1-for-1 or 2-for-2 shapes', () => {
+  it('creates three open base offers for the human franchise with 1-to-5-wide shapes', () => {
     const { results } = sharedSeason();
     const window = results[0]?.trade.windows[0];
     expect(window).toBeDefined();
@@ -192,8 +193,10 @@ describe('season trade window opening', () => {
       expect(offer.offerId).toMatch(/^off-[0-9a-f]{32}$/);
       expect(offer.seedPath.length).toBeGreaterThan(0);
       expect(offer.fromFranchiseId).not.toBe(HUMAN);
-      expect(offer.outgoingPlayerVersionIds.length).toBe(offer.incomingPlayerVersionIds.length);
-      expect([1, 2]).toContain(offer.outgoingPlayerVersionIds.length);
+      for (const ids of [offer.outgoingPlayerVersionIds, offer.incomingPlayerVersionIds]) {
+        expect(ids.length).toBeGreaterThanOrEqual(1);
+        expect(ids.length).toBeLessThanOrEqual(SEASON_TRADE_PACKAGE_MAX);
+      }
       expect(offer.outgoingHealth).toHaveLength(offer.outgoingPlayerVersionIds.length);
       expect(offer.incomingHealth).toHaveLength(offer.incomingPlayerVersionIds.length);
       expect(offer.projectedRotationChanges.length).toBeLessThanOrEqual(512);
@@ -206,11 +209,13 @@ describe('season trade window opening', () => {
     for (const result of results) {
       for (const window of result.trade.windows) {
         for (const offer of window.offers) {
-          const size = offer.outgoingPlayerVersionIds.length;
-          expect(offer.valueBand.band).toBe(size === 1 ? '85-115' : '80-120');
+          const oneForOne =
+            offer.outgoingPlayerVersionIds.length === 1 &&
+            offer.incomingPlayerVersionIds.length === 1;
+          expect(offer.valueBand.band).toBe(oneForOne ? '85-115' : '80-120');
           expect(offer.valueBand.ratioBasisPoints).toBeGreaterThanOrEqual(800);
           expect(offer.valueBand.ratioBasisPoints).toBeLessThanOrEqual(1200);
-          const bounds = size === 1 ? [850, 1150] : [800, 1200];
+          const bounds = oneForOne ? [850, 1150] : [800, 1200];
           const inBand =
             offer.valueBand.ratioBasisPoints >= (bounds[0] ?? 0) &&
             offer.valueBand.ratioBasisPoints <= (bounds[1] ?? 0);
@@ -671,6 +676,182 @@ describe('season applySeasonTrade', () => {
     const run3 = applyWindowResult(run, second);
     expect(run2.rotations).toEqual(run3.rotations);
     expect(run2.effects).toEqual(run3.effects);
+  });
+});
+describe('season uneven trades with backfill', () => {
+  function unevenOffer(input: {
+    tag: string;
+    outgoing: string[];
+    incoming: string[];
+  }): SeasonTradeOffer {
+    return {
+      offerId: 'off-' + input.tag.repeat(32).slice(0, 32),
+      windowIndex: 0,
+      seedPath: ['window', '0', 'offer', '0'],
+      toFranchiseId: franchiseIdSchema.parse(HUMAN),
+      fromFranchiseId: franchiseIdSchema.parse('celtics'),
+      outgoingPlayerVersionIds: [...input.outgoing],
+      incomingPlayerVersionIds: [...input.incoming],
+      outgoingHealth: input.outgoing.map(() => ({ available: true, activeInjuryIds: [] })),
+      incomingHealth: input.incoming.map(() => ({ available: true, activeInjuryIds: [] })),
+      valueBand: { ratioBasisPoints: 1000, band: '80-120', qualified: true },
+      roleFit: { outgoingRoles: ['G'], incomingRoles: ['G'], notes: 'test' },
+      rosterNeedFacts: { outgoingDepth: 4, incomingDepth: 4, notes: 'test' },
+      projectedRotationChanges: 'test',
+      projectedChemistryDisruption: { removedPairs: 9, newPairs: 9 },
+      status: 'open',
+    };
+  }
+  function applyUneven(tag: string, outCount: number, inCount: number) {
+    const { run: base, catalog } = fixture('a1b2c3d4e5f60718293a4b5c6d7e8f9a');
+    const humanRoster = base.rosters.find((roster) => roster.franchiseId === HUMAN);
+    const aiRoster = base.rosters.find((roster) => roster.franchiseId === 'celtics');
+    if (humanRoster === undefined || aiRoster === undefined) throw new Error('missing rosters');
+    const outgoing = humanRoster.players.slice(0, outCount).map((p) => p.playerVersionId);
+    const incoming = aiRoster.players.slice(0, inCount).map((p) => p.playerVersionId);
+    if (outgoing.length !== outCount || incoming.length !== inCount) {
+      throw new Error('fixture lacks trade players');
+    }
+    const offer = unevenOffer({ tag, outgoing, incoming });
+    const withTrade: SeasonRun & {
+      effects: SeasonEffectsState;
+      trade: SeasonTradeState;
+    } = {
+      ...base,
+      trade: {
+        schemaVersion: 1,
+        tradeVersion: 'season-trade-v3' as const,
+        windows: [{ windowIndex: 0, blockIndex: 2, status: 'open' as const, offers: [offer] }],
+      },
+      effects: zeroEffectsOf(base),
+    };
+    const { run: next, rosterChanges } = applySeasonTrade(withTrade, offer, catalog, {
+      commandId: `cmd-uneven-${tag}`,
+    });
+    return { base, catalog, offer, outgoing, incoming, next, rosterChanges };
+  }
+  function expectHealthyLeague(next: SeasonEconomyRun, catalog: SeasonDraftCatalog) {
+    const facts = seasonTradeCatalogFactsOf(catalog);
+    const ownedCount = new Map<string, number>();
+    for (const row of next.ownership) {
+      ownedCount.set(row.playerVersionId, (ownedCount.get(row.playerVersionId) ?? 0) + 1);
+    }
+    for (const count of ownedCount.values()) expect(count).toBe(1);
+    for (const roster of next.rosters) {
+      expect(roster.players.length).toBeGreaterThanOrEqual(10);
+      expect(roster.players.length).toBeLessThanOrEqual(15);
+      expect(new Set(roster.players.map((player) => player.playerVersionId)).size).toBe(
+        roster.players.length,
+      );
+    }
+    for (const rotation of next.rotations) {
+      const roster = next.rosters.find((entry) => entry.franchiseId === rotation.franchiseId);
+      const rosterIds = new Set((roster?.players ?? []).map((player) => player.playerVersionId));
+      const rotationIds = [...rotation.starters, ...rotation.benchOrder];
+      for (const id of rotationIds) expect(rosterIds.has(id)).toBe(true);
+      const playable = new Map<string, readonly Position[]>(
+        rotationIds.map((id) => [id, facts.playable.get(id) ?? []]),
+      );
+      expect(validateSeasonRotation(rotation, playable)).toEqual([]);
+      expect(rotation.targetMinutes.reduce((sum, entry) => sum + entry.minutes, 0)).toBe(240);
+    }
+    expect(next.effects.playerStates).toHaveLength(300);
+  }
+  it('applies a 2-for-1 with backfill and keeps every rotation at 240', () => {
+    const { base, catalog, incoming, outgoing, next, rosterChanges } = applyUneven('d', 2, 1);
+    const incomingId = incoming[0];
+    if (incomingId === undefined) throw new Error('missing incoming');
+    const baseOwned = new Set(base.ownership.map((row) => row.playerVersionId));
+    const humanAfter = next.rosters.find((roster) => roster.franchiseId === HUMAN);
+    const celticsAfter = next.rosters.find((roster) => roster.franchiseId === 'celtics');
+    expect(humanAfter?.players).toHaveLength(10);
+    expect(celticsAfter?.players).toHaveLength(11);
+    expect(humanAfter?.players.map((p) => p.playerVersionId)).toContain(incomingId);
+    const backfillId = humanAfter?.players
+      .map((p) => p.playerVersionId)
+      .find((id) => !baseOwned.has(id));
+    expect(backfillId).toBeDefined();
+    expectHealthyLeague(next, catalog);
+    expect(next.ownership.find((row) => row.playerVersionId === backfillId)?.ownerFranchiseId).toBe(
+      HUMAN,
+    );
+    expect(rosterChanges).toEqual([
+      { franchiseId: HUMAN, added: [incomingId, backfillId], removed: outgoing },
+      { franchiseId: 'celtics', added: [...outgoing], removed: [incomingId] },
+    ]);
+    const payload = next.transactions[next.transactions.length - 1]?.payload as {
+      backfillToPlayerVersionIds: string[];
+      backfillFromPlayerVersionIds: string[];
+    };
+    expect(payload.backfillToPlayerVersionIds).toEqual([backfillId]);
+    expect(payload.backfillFromPlayerVersionIds).toEqual([]);
+  });
+  it('splits vacated minutes exactly across five incoming', () => {
+    const { base, catalog, incoming, outgoing, next } = applyUneven('e', 1, 5);
+    const humanAfter = next.rosters.find((roster) => roster.franchiseId === HUMAN);
+    const celticsAfter = next.rosters.find((roster) => roster.franchiseId === 'celtics');
+    expect(humanAfter?.players).toHaveLength(14);
+    expect(celticsAfter?.players).toHaveLength(10);
+    expectHealthyLeague(next, catalog);
+    const baseOwned = new Set(base.ownership.map((row) => row.playerVersionId));
+    const celticsBackfill = (celticsAfter?.players ?? [])
+      .map((p) => p.playerVersionId)
+      .filter((id) => !baseOwned.has(id));
+    expect(celticsBackfill).toHaveLength(4);
+    const baseCelticsRotation = base.rotations.find((r) => r.franchiseId === 'celtics');
+    const vacated = incoming.reduce(
+      (sum, id) =>
+        sum +
+        (baseCelticsRotation?.targetMinutes.find((entry) => entry.playerVersionId === id)
+          ?.minutes ?? 0),
+      0,
+    );
+    const celticsRotation = next.rotations.find((r) => r.franchiseId === 'celtics');
+    const recipients = new Set([...outgoing, ...celticsBackfill]);
+    const shared = (celticsRotation?.targetMinutes ?? [])
+      .filter((entry) => recipients.has(entry.playerVersionId))
+      .reduce((sum, entry) => sum + entry.minutes, 0);
+    expect(shared).toBe(vacated);
+  });
+  it('is deterministic for the same named seed', () => {
+    const first = applyUneven('d', 2, 1);
+    const second = applyUneven('d', 2, 1);
+    expect(second.next.rotations).toEqual(first.next.rotations);
+    expect(second.next.ownership).toEqual(first.next.ownership);
+    expect(second.rosterChanges).toEqual(first.rosterChanges);
+  });
+  it('throws for packages wider than five per side', () => {
+    const { run: base, catalog } = fixture('a1b2c3d4e5f60718293a4b5c6d7e8f9a');
+    const humanRoster = base.rosters.find((roster) => roster.franchiseId === HUMAN);
+    const aiRoster = base.rosters.find((roster) => roster.franchiseId === 'celtics');
+    if (humanRoster === undefined || aiRoster === undefined) throw new Error('missing rosters');
+    const offer = unevenOffer({
+      tag: 'f',
+      outgoing: humanRoster.players.slice(0, 6).map((p) => p.playerVersionId),
+      incoming: aiRoster.players.slice(0, 1).map((p) => p.playerVersionId),
+    });
+    expect(() =>
+      applySeasonTrade({ ...base, effects: zeroEffectsOf(base) }, offer, catalog),
+    ).toThrow(SeasonTradeInvariantError);
+  });
+  it('generation can emit uneven offers once backfill makes them legal', () => {
+    const { results } = sharedSeason();
+    const open = results
+      .flatMap((result) => result.trade.windows.flatMap((window) => window.offers))
+      .filter((offer) => offer.status === 'open');
+    expect(open.length).toBeGreaterThan(0);
+    const uneven = open.filter(
+      (offer) => offer.outgoingPlayerVersionIds.length !== offer.incomingPlayerVersionIds.length,
+    );
+    expect(uneven.length).toBeGreaterThan(0);
+    for (const offer of uneven) {
+      for (const ids of [offer.outgoingPlayerVersionIds, offer.incomingPlayerVersionIds]) {
+        expect(ids.length).toBeGreaterThanOrEqual(1);
+        expect(ids.length).toBeLessThanOrEqual(SEASON_TRADE_PACKAGE_MAX);
+      }
+      expect(offer.outgoingHealth).toHaveLength(offer.outgoingPlayerVersionIds.length);
+      expect(offer.incomingHealth).toHaveLength(offer.incomingPlayerVersionIds.length);
+    }
   });
 });
 describe('season trade deadlines', () => {

@@ -841,6 +841,69 @@ describe('accept-trade-offer command', () => {
     if (output.result.result.status !== 'rejected') throw new Error('expected rejection');
     expect(output.result.result.rejection.code).toBe('roster-illegal');
   });
+  it('accepts an uneven offer with backfill to ten', () => {
+    const { run, context } = windowedFixture();
+    const humanRoster = run.rosters.find((roster) => roster.franchiseId === HUMAN);
+    const celticsRoster = run.rosters.find((roster) => roster.franchiseId === 'celtics');
+    if (humanRoster === undefined || celticsRoster === undefined)
+      throw new Error('missing rosters');
+    const outgoing = humanRoster.players.slice(0, 2).map((player) => player.playerVersionId);
+    const incoming = celticsRoster.players.slice(0, 1).map((player) => player.playerVersionId);
+    if (outgoing.length !== 2 || incoming.length !== 1) throw new Error('fixture lacks players');
+    const unevenOffer: SeasonTradeOffer = {
+      offerId: 'off-' + 'd'.repeat(32),
+      windowIndex: 0,
+      seedPath: ['window', '0', 'offer', '9'],
+      toFranchiseId: HUMAN,
+      fromFranchiseId: franchiseIdSchema.parse('celtics'),
+      outgoingPlayerVersionIds: outgoing,
+      incomingPlayerVersionIds: incoming,
+      outgoingHealth: outgoing.map(() => ({ available: true, activeInjuryIds: [] })),
+      incomingHealth: incoming.map(() => ({ available: true, activeInjuryIds: [] })),
+      valueBand: { ratioBasisPoints: 1000, band: '80-120', qualified: true },
+      roleFit: { outgoingRoles: ['G', 'G'], incomingRoles: ['G'], notes: 'test' },
+      rosterNeedFacts: { outgoingDepth: 3, incomingDepth: 2, notes: 'test' },
+      projectedRotationChanges: 'test',
+      projectedChemistryDisruption: { removedPairs: 17, newPairs: 17 },
+      status: 'open',
+    };
+    const baseTrade = run.trade;
+    if (baseTrade === null) throw new Error('no trade state');
+    const windowZero = baseTrade.windows[0];
+    if (windowZero === undefined) throw new Error('no window 0');
+    const withOffer: SeasonRun = {
+      ...run,
+      trade: {
+        ...baseTrade,
+        windows: [{ ...windowZero, offers: [...windowZero.offers, unevenOffer] }],
+      },
+    };
+    const output = handleSeasonRunCommand(
+      commandOf(withOffer, {
+        command: 'accept-trade-offer',
+        commandId: commandIdSchema.parse('accept-uneven'),
+        windowIndex: 0,
+        offerId: unevenOffer.offerId,
+      }),
+      { ...context, run: withOffer },
+    );
+    if (output.result.command !== 'accept-trade-offer') throw new Error('unexpected command');
+    const accepted = output.result.result;
+    if (accepted.status !== 'accepted') throw new Error('expected acceptance');
+    const humanAfter = output.run.rosters.find((roster) => roster.franchiseId === HUMAN);
+    const celticsAfter = output.run.rosters.find((roster) => roster.franchiseId === 'celtics');
+    expect(humanAfter?.players).toHaveLength(10);
+    expect(celticsAfter?.players).toHaveLength(11);
+    const baseOwned = new Set(run.ownership.map((row) => row.playerVersionId));
+    const backfillId = humanAfter?.players
+      .map((player) => player.playerVersionId)
+      .find((id) => !baseOwned.has(id));
+    expect(backfillId).toBeDefined();
+    expect(accepted.rosterChanges).toEqual([
+      { franchiseId: HUMAN, added: [...incoming, backfillId], removed: outgoing },
+      { franchiseId: 'celtics', added: [...outgoing], removed: [...incoming] },
+    ]);
+  });
 });
 describe('decline-trade-offer command', () => {
   it('marks an open offer declined and advances the state chain', () => {

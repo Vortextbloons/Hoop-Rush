@@ -1,5 +1,6 @@
 import {
   SEASON_INFLUENCE_FLOOR,
+  SEASON_TRADE_PACKAGE_MAX,
   franchiseIdSchema,
   seasonNamespaceSeed,
   type SeasonDraftCatalog,
@@ -10,6 +11,7 @@ import {
   type SeasonTradeWindowState,
 } from '@hoop-rush/data-contracts';
 import {
+  fillTradeBackfill,
   seasonTradeCatalogFactsOf,
   seasonTradePlayerValue,
   tradeAssetEligibilityOf,
@@ -70,11 +72,15 @@ export function evaluateTradeProposal(input: {
   }
   if (
     outgoingPlayerVersionIds.length < 1 ||
-    outgoingPlayerVersionIds.length > 2 ||
+    outgoingPlayerVersionIds.length > SEASON_TRADE_PACKAGE_MAX ||
     incomingPlayerVersionIds.length < 1 ||
-    incomingPlayerVersionIds.length > 2
+    incomingPlayerVersionIds.length > SEASON_TRADE_PACKAGE_MAX
   ) {
-    return { ok: false, code: 'roster-illegal', reason: 'package must be 1-2 per side' };
+    return {
+      ok: false,
+      code: 'roster-illegal',
+      reason: `package must be 1-${String(SEASON_TRADE_PACKAGE_MAX)} per side`,
+    };
   }
   const all = [...outgoingPlayerVersionIds, ...incomingPlayerVersionIds];
   if (new Set(all).size !== all.length) {
@@ -123,18 +129,37 @@ export function evaluateTradeProposal(input: {
   for (const id of incomingPlayerVersionIds)
     if (!toIds.has(id))
       return { ok: false, code: 'ownership-conflict', reason: `${id} not on ${toFranchiseId}` };
-  const fromAfter = [
+  const fromAfterRaw = [
     ...fromRoster.players
       .filter((p) => !outgoingPlayerVersionIds.includes(p.playerVersionId))
       .map((p) => p.playerVersionId),
     ...incomingPlayerVersionIds,
   ];
-  const toAfter = [
+  const toAfterRaw = [
     ...toRoster.players
       .filter((p) => !incomingPlayerVersionIds.includes(p.playerVersionId))
       .map((p) => p.playerVersionId),
     ...outgoingPlayerVersionIds,
   ];
+  const filled = fillTradeBackfill({
+    catalog,
+    run: run as unknown as import('./trades.ts').SeasonEconomyRun,
+    toFranchiseId,
+    fromFranchiseId,
+    toIds: toAfterRaw,
+    fromIds: fromAfterRaw,
+    seed: boardSeed(
+      rootSeed,
+      windowIndex,
+      'proposal-backfill',
+      fingerprintOf(outgoingPlayerVersionIds, incomingPlayerVersionIds),
+    ),
+  });
+  if (filled === null) {
+    return { ok: false, code: 'roster-illegal', reason: 'resulting roster 10-15' };
+  }
+  const fromAfter = filled.fromIdsFilled;
+  const toAfter = filled.toIdsFilled;
   const checkRoster = (ids: readonly string[]) => {
     if (ids.length < 10 || ids.length > 15) return false;
     if (new Set(ids).size !== ids.length) return false;
@@ -278,6 +303,8 @@ export function evaluateTradeProposal(input: {
     consequenceFacts: {
       fromAfterSize: fromAfter.length,
       toAfterSize: toAfter.length,
+      backfillFrom: filled.fromIdsFilled.filter((id) => !fromAfterRaw.includes(id)),
+      backfillTo: filled.toIdsFilled.filter((id) => !toAfterRaw.includes(id)),
       rawRatio,
       adjustedRatio: finalRatio,
       fromTotal,

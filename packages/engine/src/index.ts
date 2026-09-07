@@ -179,6 +179,8 @@ export {
   attachAiProjectionSummaries,
   type SeasonAiGenerationInput,
   type SeasonAiGenerationPhase,
+  type SeasonAiGenerationProgress,
+  type SeasonAiGenerationProgressPhase,
   type SeasonRosterCalibrationRunV2,
 } from './season/ai.ts';
 export {
@@ -375,11 +377,16 @@ export {
   seasonTradeValueBandFor,
   ratioMutuallyWithinBand,
   tradeAssetEligibilityOf,
+  selectTradeBackfill,
+  fillTradeBackfill,
+  tradeOfferBackfillSeed,
   type SeasonTradePackageKind,
   type SeasonWindowOpenResult,
   type TradeAssetEligibilityInput,
   type TradeAssetEligibilityResult,
   type TradeAssetEligibilityStatus,
+  type TradeBackfillSelection,
+  type TradeBackfillFill,
 } from './season/trades.ts';
 export {
   SEASON_FREE_AGENCY_BAND_SIGNING_CAPS,

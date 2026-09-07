@@ -20,6 +20,7 @@ import {
   type SeasonSchedule,
 } from '@hoop-rush/data-contracts';
 import type { StoredSeasonRunRecord } from '../schemas/season-run-record.ts';
+import { storedEvolutionOf } from '../schemas/season-run-record.ts';
 import type { SeasonRunEngineSeam } from './engine-seam-types.ts';
 import { auditReplayDivergences } from './replay.ts';
 export interface SeasonRunAuditFacts {
@@ -691,7 +692,7 @@ export function auditSeasonRunState(
         (stored.run as { challenges?: unknown }).challenges ??
         buildEmptyChallengeState(),
       campaign: stored.campaign ?? null,
-      evolution: stored.run.evolution ?? stored.evolution ?? null,
+      evolution: storedEvolutionOf(stored),
       rosters: stored.run.rosters,
       ownership: stored.run.ownership,
       rotations: stored.run.rotations,

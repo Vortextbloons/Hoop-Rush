@@ -134,7 +134,30 @@ describe('packageConsequenceFacts', () => {
       toFranchiseId: 'celtics',
     });
     expect(facts.fromAfter).toBe(9);
+    expect(facts.backfillFrom).toBe(1);
+    expect(facts.fromAfterFilled).toBe(10);
+    expect(facts.toAfter).toBe(16);
     expect(facts.legal).toBe(false);
+  });
+  it('backfills a short side to ten instead of flagging it', () => {
+    const facts = packageConsequenceFacts({
+      fromRosterSize: 10,
+      toRosterSize: 10,
+      outgoingIds: ['a', 'b'],
+      incomingIds: ['c'],
+      outgoingAvailable: [true, true],
+      incomingAvailable: [true],
+      influenceAmount: 0,
+      influenceFromSender: null,
+      humanFranchiseId: 'lakers',
+      toFranchiseId: 'celtics',
+    });
+    expect(facts.fromAfter).toBe(9);
+    expect(facts.backfillFrom).toBe(1);
+    expect(facts.fromAfterFilled).toBe(10);
+    expect(facts.backfillTo).toBe(0);
+    expect(facts.toAfterFilled).toBe(11);
+    expect(facts.legal).toBe(true);
   });
   it('simplifies influence note without math', () => {
     const facts = packageConsequenceFacts({

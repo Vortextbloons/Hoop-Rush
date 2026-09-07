@@ -99,6 +99,7 @@ export const SEASON_FRONT_OFFICE_VERSION = 'season-front-office-v1';
 export const SEASON_COURT_INNOVATION_VERSION = 'season-court-innovation-v1';
 export const SEASON_EVOLUTION_TARGETS_VERSION = 'franchise-evolution-targets-v1';
 export const SEASON_TRADE_VERSION = 'season-trade-v5';
+export const SEASON_TRADE_PACKAGE_MAX = 5;
 export const SEASON_INFLUENCE_VERSION = 'season-influence-v3';
 export const SEASON_INFLUENCE_VERSION_V2 = 'season-influence-v2';
 export const SEASON_INFLUENCE_VERSION_V1 = 'season-influence-v1';

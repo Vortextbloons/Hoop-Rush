@@ -10,15 +10,15 @@ import type {
   SeasonLeagueGenerationResult,
   SeasonRosterTargets,
 } from '@hoop-rush/data-contracts';
-import { SEASON_DRAFT_VERSION } from '@hoop-rush/data-contracts';
+import { SEASON_DRAFT_VERSION, seasonLeagueGenerationResultSchema } from '@hoop-rush/data-contracts';
 import {
   applySeasonDraftCommand,
   type SeasonAiGenerationDeps,
   type SeasonAiGenerationInput,
+  type SeasonAiGenerationProgress,
 } from '@hoop-rush/engine';
 import { recordFromState, type SeasonDraftRepository } from '@hoop-rush/persistence';
 import { newSeasonId } from './season-ids';
-import { runOneShotWorker } from '$lib/one-shot-worker';
 import { sleep } from '$lib/sleep';
 import {
   GENERATION_WORKER_WIRE_SCHEMA_VERSION,
@@ -105,6 +105,7 @@ function isGenerationDeps(
 ): value is SeasonAiGenerationDeps {
   return typeof (value as SeasonAiGenerationDeps).generate === 'function';
 }
+export type SeasonDraftGenerationProgress = SeasonAiGenerationProgress;
 export class SeasonDraftFlow {
   private readonly repo: SeasonDraftRepository;
   private readonly catalogRef: SeasonDraftCatalog;
@@ -120,6 +121,8 @@ export class SeasonDraftFlow {
   phase: SeasonDraftFlowPhase = 'idle';
   error: string | null = null;
   onPhaseChange: (() => void) | null = null;
+  onGenerationProgress: (() => void) | null = null;
+  generationProgress: SeasonDraftGenerationProgress | null = null;
   constructor(
     repo: SeasonDraftRepository,
     catalog: SeasonDraftCatalog,
@@ -172,6 +175,11 @@ export class SeasonDraftFlow {
       phase: this.phase,
     };
   }
+  private setProgress(progress: SeasonDraftGenerationProgress | null): void {
+    this.generationProgress = progress;
+    this.onGenerationProgress?.();
+    this.onPhaseChange?.();
+  }
   async create(input: { rootSeed: Seed; league: SeasonLeague }): Promise<SeasonDraftCommandRecord> {
     this.error = null;
     const record = await this.apply(
@@ -221,6 +229,7 @@ export class SeasonDraftFlow {
     }
     this.error = null;
     this.setPhase('generating');
+    this.setProgress(null);
     await sleep(0);
     try {
       if (this.useWorker && this.targets !== null) {
@@ -242,13 +251,16 @@ export class SeasonDraftFlow {
       throw error;
     } finally {
       this.generationBridge.precomputed = null;
+      this.setProgress(null);
     }
   }
   private setPhase(phase: SeasonDraftFlowPhase): void {
     this.phase = phase;
     this.onPhaseChange?.();
   }
-  private buildGenerationInput(state: SeasonDraftState): Omit<SeasonAiGenerationInput, 'targets'> {
+  private buildGenerationInput(
+    state: SeasonDraftState,
+  ): Omit<SeasonAiGenerationInput, 'targets' | 'onProgress'> {
     return {
       seed: state.rootSeed,
       catalog: this.catalogRef,
@@ -263,7 +275,7 @@ export class SeasonDraftFlow {
     };
   }
   private runGenerationInWorker(
-    input: Omit<SeasonAiGenerationInput, 'targets'>,
+    input: Omit<SeasonAiGenerationInput, 'targets' | 'onProgress'>,
   ): Promise<SeasonLeagueGenerationResult> {
     const targets = this.targets;
     if (targets === null) {
@@ -276,19 +288,68 @@ export class SeasonDraftFlow {
       input,
       targets,
     };
-    return runOneShotWorker<
-      GenerationWorkerRequest,
-      GenerationWorkerResponse,
-      SeasonLeagueGenerationResult
-    >({
-      createWorker: () =>
-        new Worker(new URL('../../workers/season-draft-generation-worker.ts', import.meta.url), {
-          type: 'module',
-        }),
-      request,
-      resultOf: (message) => (message.type === 'complete' ? message.generation : null),
-      errorOf: (message) => (message.type === 'error' ? message.message : null),
-      errorFallback: 'AI league generation worker failed',
+    const worker = new Worker(
+      new URL('../../workers/season-draft-generation-worker.ts', import.meta.url),
+      { type: 'module' },
+    );
+    return new Promise<SeasonLeagueGenerationResult>((resolve, reject) => {
+      let settled = false;
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      const cleanup = (): void => {
+        worker.removeEventListener('message', onMessage);
+        worker.removeEventListener('error', onError);
+        if (timeoutId !== undefined) clearTimeout(timeoutId);
+        worker.terminate();
+      };
+      const armTimeout = (): void => {
+        if (timeoutId !== undefined) clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          reject(new Error('AI league generation worker failed (timed out after 30s)'));
+        }, 30000);
+      };
+      const onMessage = (event: MessageEvent<GenerationWorkerResponse>): void => {
+        const message = event.data;
+        if (message.requestId !== request.requestId) return;
+        if (settled) return;
+        if (message.type === 'progress') {
+          armTimeout();
+          this.setProgress({
+            phase: message.phase,
+            completed: message.completed,
+            total: message.total,
+            ...(message.teamsCompleted !== undefined
+              ? { teamsCompleted: message.teamsCompleted }
+              : {}),
+          });
+          return;
+        }
+        if (message.type === 'complete') {
+          settled = true;
+          cleanup();
+          try {
+            resolve(seasonLeagueGenerationResultSchema.parse(message.generation));
+          } catch (error) {
+            reject(error instanceof Error ? error : new Error(String(error)));
+          }
+          return;
+        }
+        settled = true;
+        cleanup();
+        reject(new Error(message.message));
+      };
+      const onError = (event: ErrorEvent): void => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(new Error(event.message || 'AI league generation worker failed'));
+      };
+      worker.addEventListener('message', onMessage);
+      worker.addEventListener('error', onError);
+      armTimeout();
+      worker.postMessage(request);
     });
   }
   private revision(): number {

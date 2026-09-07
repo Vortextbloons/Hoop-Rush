@@ -1431,6 +1431,10 @@ export interface PackageConsequenceFacts {
   toRosterSize: number;
   fromAfter: number;
   toAfter: number;
+  backfillFrom: number;
+  backfillTo: number;
+  fromAfterFilled: number;
+  toAfterFilled: number;
   legal: boolean;
   outgoingAvailable: Array<{
     playerVersionId: string;
@@ -1459,11 +1463,15 @@ export function packageConsequenceFacts(input: {
 }): PackageConsequenceFacts {
   const fromAfter = input.fromRosterSize - input.outgoingIds.length + input.incomingIds.length;
   const toAfter = input.toRosterSize - input.incomingIds.length + input.outgoingIds.length;
+  const backfillFrom = Math.max(0, SEASON_ROSTER_MIN_SIZE - fromAfter);
+  const backfillTo = Math.max(0, SEASON_ROSTER_MIN_SIZE - toAfter);
+  const fromAfterFilled = fromAfter + backfillFrom;
+  const toAfterFilled = toAfter + backfillTo;
   const legal =
-    fromAfter >= SEASON_ROSTER_MIN_SIZE &&
-    fromAfter <= SEASON_ROSTER_MAX_SIZE &&
-    toAfter >= SEASON_ROSTER_MIN_SIZE &&
-    toAfter <= SEASON_ROSTER_MAX_SIZE;
+    fromAfterFilled >= SEASON_ROSTER_MIN_SIZE &&
+    fromAfterFilled <= SEASON_ROSTER_MAX_SIZE &&
+    toAfterFilled >= SEASON_ROSTER_MIN_SIZE &&
+    toAfterFilled <= SEASON_ROSTER_MAX_SIZE;
   const outgoingAvailable = input.outgoingIds.map((id, idx) => ({
     playerVersionId: id,
     available: input.outgoingAvailable[idx] ?? true,
@@ -1487,6 +1495,10 @@ export function packageConsequenceFacts(input: {
     toRosterSize: input.toRosterSize,
     fromAfter,
     toAfter,
+    backfillFrom,
+    backfillTo,
+    fromAfterFilled,
+    toAfterFilled,
     legal,
     outgoingAvailable,
     incomingAvailable,

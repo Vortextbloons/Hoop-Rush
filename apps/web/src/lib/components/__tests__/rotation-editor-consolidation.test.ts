@@ -183,6 +183,34 @@ describe('rotation editor consolidation (M3.11a)', () => {
     );
   });
 
+  it('typing zero sets that player to zero without touching teammates', async () => {
+    const base = createRotationEditor(legalRotation(), rotationMembers());
+    const { container, onchange } = renderEditor(base);
+    const [first, second] = base.rotation.starters;
+    if (first === undefined || second === undefined)
+      throw new Error('fixture rotation has no starters');
+    const firstLabel = base.names.get(first) ?? '';
+    const secondMinutes = base.minutesFor(second);
+    const opener = within(
+      container.querySelector(
+        `[data-rotation-active-row][data-player-version-id="${first}"]`,
+      ) as HTMLElement,
+    ).getByRole('button', {
+      name: new RegExp(
+        `Edit target minutes for ${firstLabel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`,
+      ),
+    });
+    await fireEvent.click(opener);
+    const input = container.querySelector(`input[aria-label="Target minutes for ${firstLabel}"]`);
+    if (input === null) throw new Error('minutes input missing');
+    await fireEvent.input(input, { target: { value: '0' } });
+    await fireEvent.keyDown(input, { key: 'Enter' });
+    expect(base.minutesFor(first)).toBe(0);
+    expect(base.minutesFor(second)).toBe(secondMinutes);
+    expect(onchange).toHaveBeenCalled();
+    expect(container.querySelector('[role="status"]')?.textContent ?? '').toMatch(/left/);
+  });
+
   it('preserves minute-rebalance feedback instead of timing it out', async () => {
     vi.useFakeTimers();
     try {
