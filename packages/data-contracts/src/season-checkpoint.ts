@@ -42,6 +42,7 @@ import {
   SEASON_FREE_AGENCY_TARGETS_VERSION_V1,
   SEASON_FREE_AGENCY_VERSION,
   SEASON_FREE_AGENCY_VERSION_V1,
+  SEASON_FREE_AGENCY_VERSION_V2,
   SEASON_GAME_SUMMARY_LEGACY_VERSION,
   SEASON_GAME_SUMMARY_VERSION,
   SEASON_GAME_TARGETS_VERSION,
@@ -66,6 +67,7 @@ import {
   SEASON_STAMINA_VERSION,
   SEASON_TRADE_TARGETS_VERSION,
   SEASON_TRADE_VERSION,
+  SEASON_TRADE_VERSION_V6,
 } from './season-versions.ts';
 export const seasonCheckpointVersionsSchema = z.object({
   blockVersion: z.union([
@@ -99,6 +101,8 @@ export const seasonCheckpointVersionsSchema = z.object({
   healthVersion: z.literal(SEASON_HEALTH_VERSION),
   tradeVersion: z.union([
     z.literal(SEASON_TRADE_VERSION),
+    z.literal(SEASON_TRADE_VERSION_V6),
+    z.literal('season-trade-v5'),
     z.literal('season-trade-v4'),
     z.literal('season-trade-v3'),
   ]),
@@ -139,6 +143,7 @@ export const seasonCheckpointVersionsSchema = z.object({
   ]),
   freeAgencyVersion: z.union([
     z.literal(SEASON_FREE_AGENCY_VERSION),
+    z.literal(SEASON_FREE_AGENCY_VERSION_V2),
     z.literal(SEASON_FREE_AGENCY_VERSION_V1),
   ]),
   freeAgencyIndexVersion: z.union([

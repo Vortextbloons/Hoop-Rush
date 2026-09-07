@@ -767,7 +767,7 @@ export const seasonTradeCashCapRejectionSchema = z.object({
   code: z.literal('trade-cash-cap'),
   franchiseId: franchiseIdSchema,
   windowIndex: windowIndexSchema,
-  sent: z.number().int().min(0).max(2),
+  sent: z.number().int().min(0).max(3),
   requested: z.number().int().min(1).max(2),
 });
 export type SeasonTradeCashCapRejection = z.infer<typeof seasonTradeCashCapRejectionSchema>;
@@ -1198,6 +1198,9 @@ export const seasonSubmitTradeProposalResultSchema = z.discriminatedUnion('statu
     windowIndex: windowIndexSchema,
     inquiryId: inquiryIdSchema,
     proposalId: z.string().regex(/^prop-[0-9a-f]{32}$/),
+    isOverpay: z.boolean().optional(),
+    rawRatio: z.number().int().optional(),
+    adjustedRatio: z.number().int().optional(),
   }),
 ]);
 export type SeasonSubmitTradeProposalResult = z.infer<typeof seasonSubmitTradeProposalResultSchema>;

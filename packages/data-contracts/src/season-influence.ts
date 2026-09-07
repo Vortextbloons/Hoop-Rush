@@ -37,8 +37,8 @@ export const seasonInfluenceWindowStateSchema = z.object({
   extraOfferSpent: z.boolean().optional(),
   purchasedInquiryUsed: z.boolean().optional(),
   earnedInquiryUsed: z.boolean().optional(),
-  tradeCashSent: z.number().int().min(0).max(2).optional(),
-  tradeCashReceived: z.number().int().min(0).max(2).optional(),
+  tradeCashSent: z.number().int().min(0).max(3).optional(),
+  tradeCashReceived: z.number().int().min(0).max(3).optional(),
 });
 export type SeasonInfluenceWindowState = z.infer<typeof seasonInfluenceWindowStateSchema>;
 export const seasonInfluenceRehabOutcomeSchema = z.enum(['success', 'failure', 'pending']);

@@ -166,6 +166,46 @@
 
   const hasOnePlusOne = $derived(outgoing.length >= 1 && incoming.length >= 1);
 
+  const PACKAGE_WEIGHTS = [1, 0.4, 0.3, 0.2, 0.15];
+  function packageEstimate(ids: readonly string[]): number {
+    const overalls = ids
+      .map((id) => {
+        const lite = allLites.find((p) => p.playerVersionId === id);
+        const ovr = lite === undefined ? null : overallOfLite(lite);
+        return ovr ?? 70;
+      })
+      .sort((a, b) => b - a);
+    return overalls.reduce((sum, v, i) => sum + v * (PACKAGE_WEIGHTS[i] ?? 0.15), 0);
+  }
+  const rawEstimate = $derived.by((): number | null => {
+    if (outgoing.length < 1 || incoming.length < 1) return null;
+    const outPkg = packageEstimate(outgoing);
+    const inPkg = packageEstimate(incoming);
+    if (outPkg <= 0) return null;
+    return Math.round((1000 * inPkg) / outPkg);
+  });
+  const influencePct = $derived(influenceAmount === 0 ? 0 : Math.min(influenceAmount * 8, 16));
+  const adjustedEstimate = $derived.by((): number | null => {
+    if (rawEstimate === null) return null;
+    if (influenceAmount === 0) return rawEstimate;
+    if (influenceFrom === humanFranchiseId)
+      return Math.round(rawEstimate * (1 + influencePct / 100));
+    if (influenceFrom === targetFranchiseId)
+      return Math.round(rawEstimate * (1 - influencePct / 100));
+    return rawEstimate;
+  });
+  const isLikelyGift = $derived(
+    adjustedEstimate !== null && adjustedEstimate < 850 && hasOnePlusOne,
+  );
+  const isLikelySteal = $derived(
+    adjustedEstimate !== null && adjustedEstimate > 1150 && hasOnePlusOne,
+  );
+  const isConsolidatingTrash = $derived(outgoing.length > incoming.length && hasOnePlusOne);
+  let confirmGift = $state(false);
+  $effect(() => {
+    if (!isLikelyGift) confirmGift = false;
+  });
+
   const consequence = $derived(
     packageConsequenceFacts({
       fromRosterSize: yourRosterSize,
@@ -213,6 +253,7 @@
     if (!rosterLegal)
       return `Roster would be illegal — must stay ${String(SEASON_ROSTER_MIN_SIZE)}–${String(SEASON_ROSTER_MAX_SIZE)}`;
     if (influenceDisabledReason !== null) return influenceDisabledReason;
+    if (isLikelyGift && !confirmGift) return 'Confirm the overpay gift below to send';
     return null;
   });
   const canSubmit = $derived(submitDisabledReason === null);
@@ -247,6 +288,7 @@
 
   function submit(): void {
     if (!canSubmit) return;
+    if (isLikelyGift && !confirmGift) return;
     onSubmit({
       outgoing: [...outgoing],
       incoming: [...incoming],
@@ -594,6 +636,32 @@
   {/if}
 
   <div class="flex flex-col gap-2 border-t border-border p-4">
+    {#if hasOnePlusOne && adjustedEstimate !== null}
+      <p class="text-xs text-muted-foreground" role="status">
+        Est. value {rawEstimate}→{adjustedEstimate} (quantity-discounted, best counts most).
+        {#if isLikelyGift}
+          Looks like an overpay gift — allowed, logged as a gift.
+        {:else if isLikelySteal}
+          Looks rich for you — still blocked above 1150. Add value or attach Them Influence.
+        {:else if isConsolidatingTrash}
+          2-for-1 now discounts the 2nd player (×0.4) and needs your best close to theirs.
+        {/if}
+      </p>
+      {#if isLikelyGift}
+        <label
+          class="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm"
+        >
+          <input
+            type="checkbox"
+            checked={confirmGift}
+            onchange={(e) => (confirmGift = e.currentTarget.checked)}
+            disabled={busy}
+            class="h-5 w-5 shrink-0 accent-primary"
+          />
+          <span>Confirm overpay gift — send anyway</span>
+        </label>
+      {/if}
+    {/if}
     <button
       type="button"
       onclick={submit}
@@ -603,7 +671,7 @@
       aria-disabled={!canSubmit}
       class="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-6 text-sm font-semibold text-primary-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
     >
-      {busy ? 'Sending…' : 'Send offer'}
+      {busy ? 'Sending…' : isLikelyGift ? 'Send gift offer' : 'Send offer'}
     </button>
     {#if submitDisabledReason !== null && !busy}
       <p class="text-xs text-muted-foreground" role="status">{submitDisabledReason}</p>

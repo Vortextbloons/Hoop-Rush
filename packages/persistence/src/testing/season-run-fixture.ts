@@ -2,6 +2,8 @@ import {
   playerVersionId,
   commandIdSchema,
   contentHashSchema,
+  emptySeasonPlayerAggregate,
+  emptySeasonTeamAggregate,
   eraIdSchema,
   franchiseIdSchema,
   idSchema,
@@ -112,8 +114,13 @@ import {
 import {
   WINDOW_BLOCK_INDEX_TO_INDEX,
   buildInitialCampaignState,
+  createInitialSeasonInfluenceState as engineCreateInitialSeasonInfluenceStateImpl,
+  foldSeasonPlayerAggregates as engineFoldSeasonPlayerAggregatesImpl,
+  foldSeasonTeamAggregates as engineFoldSeasonTeamAggregatesImpl,
   generateSeasonSchedule,
+  reconstructSeasonGames as engineReconstructSeasonGamesImpl,
   reduceSeasonStandings,
+  seasonRotationSetDigest as engineSeasonRotationSetDigestImpl,
   seasonRunStateDigest as engineSeasonRunStateDigest,
 } from '@hoop-rush/engine';
 import type {
@@ -764,182 +771,33 @@ export function reconstructSeasonGamesFixture(
   schedule: SeasonSchedule,
   summaries: readonly SeasonGameSummary[],
 ): SeasonGame[] {
-  const byId = new Map(summaries.map((summary) => [summary.gameId, summary]));
-  return schedule.games.map((game) => {
-    const summary = byId.get(game.gameId);
-    if (summary === undefined) {
-      return {
-        gameId: game.gameId,
-        round: game.round,
-        homeFranchiseId: game.homeFranchiseId,
-        awayFranchiseId: game.awayFranchiseId,
-        status: 'scheduled' as const,
-        homeScore: null,
-        awayScore: null,
-        forfeitLoserFranchiseId: null,
-      };
-    }
-    if (summary.status === 'forfeit') {
-      return {
-        gameId: summary.gameId,
-        round: summary.round,
-        homeFranchiseId: summary.homeFranchiseId,
-        awayFranchiseId: summary.awayFranchiseId,
-        status: 'forfeit' as const,
-        homeScore: null,
-        awayScore: null,
-        forfeitLoserFranchiseId: summary.forfeitLoserFranchiseId,
-      };
-    }
-    return {
-      gameId: summary.gameId,
-      round: summary.round,
-      homeFranchiseId: summary.homeFranchiseId,
-      awayFranchiseId: summary.awayFranchiseId,
-      status: 'final' as const,
-      homeScore: summary.homeScore,
-      awayScore: summary.awayScore,
-      forfeitLoserFranchiseId: null,
-    };
-  });
-}
-function winnerOf(summary: SeasonGameSummary): string {
-  if (summary.status === 'forfeit') {
-    const loser = summary.forfeitLoserFranchiseId;
-    if (loser === null) {
-      throw new Error(`forfeit summary ${summary.gameId} does not name the losing team`);
-    }
-    return loser === summary.homeFranchiseId ? summary.awayFranchiseId : summary.homeFranchiseId;
-  }
-  return summary.homeScore > summary.awayScore ? summary.homeFranchiseId : summary.awayFranchiseId;
+  return engineReconstructSeasonGamesImpl(schedule, summaries);
 }
 export function foldTeamAggregatesFixture(
   league: SeasonLeague,
   summaries: readonly SeasonGameSummary[],
 ): SeasonTeamAggregate[] {
-  const zeroRow = (franchiseId: string): SeasonTeamAggregate => ({
-    franchiseId: franchiseIdSchema.parse(franchiseId),
-    gamesPlayed: 0,
-    wins: 0,
-    losses: 0,
-    points: 0,
-    fieldGoalsMade: 0,
-    fieldGoalsAttempted: 0,
-    threePointersMade: 0,
-    threePointersAttempted: 0,
-    freeThrowsMade: 0,
-    freeThrowsAttempted: 0,
-    offensiveRebounds: 0,
-    defensiveRebounds: 0,
-    assists: 0,
-    steals: 0,
-    blocks: 0,
-    turnovers: 0,
-    fouls: 0,
-    possessions: 0,
-  });
-  const totals = new Map(
-    league.teams.map((team) => [team.franchiseId, zeroRow(team.franchiseId)] as const),
-  );
-  for (const summary of summaries) {
-    for (const side of ['home', 'away'] as const) {
-      const franchiseId = side === 'home' ? summary.homeFranchiseId : summary.awayFranchiseId;
-      const row = totals.get(franchiseId);
-      if (row === undefined) continue;
-      const box = side === 'home' ? summary.homeBox : summary.awayBox;
-      row.gamesPlayed += 1;
-      row.points += box.points;
-      row.fieldGoalsMade += box.fieldGoalsMade;
-      row.fieldGoalsAttempted += box.fieldGoalsAttempted;
-      row.threePointersMade += box.threePointersMade;
-      row.threePointersAttempted += box.threePointersAttempted;
-      row.freeThrowsMade += box.freeThrowsMade;
-      row.freeThrowsAttempted += box.freeThrowsAttempted;
-      row.offensiveRebounds += box.offensiveRebounds;
-      row.defensiveRebounds += box.defensiveRebounds;
-      row.assists += box.assists;
-      row.steals += box.steals;
-      row.blocks += box.blocks;
-      row.turnovers += box.turnovers;
-      row.fouls += box.fouls;
-      row.possessions += box.possessions;
-      if (winnerOf(summary) === franchiseId) row.wins += 1;
-      else row.losses += 1;
-    }
-  }
-  return [...totals.values()].sort((a, b) => (a.franchiseId < b.franchiseId ? -1 : 1));
+  const folded = engineFoldSeasonTeamAggregatesImpl(summaries);
+  const byId = new Map(folded.map((row) => [row.franchiseId, row]));
+  return league.teams
+    .map((team) => byId.get(team.franchiseId) ?? emptySeasonTeamAggregate(team.franchiseId))
+    .sort((a, b) => (a.franchiseId < b.franchiseId ? -1 : 1));
 }
 export function foldPlayerAggregatesFixture(
   rosters: readonly SeasonRoster[],
   summaries: readonly SeasonGameSummary[],
 ): SeasonPlayerAggregate[] {
-  const ownerOf = new Map(
-    rosters.flatMap((roster) =>
-      roster.players.map((player) => [player.playerVersionId, roster.franchiseId] as const),
-    ),
-  );
-  const zeroRow = (playerVersionIdValue: string): SeasonPlayerAggregate => {
-    const ownerRaw = ownerOf.get(playerVersionIdValue);
-    const parsedOwner = ownerRaw === undefined ? franchiseIdSchema.parse('lakers') : ownerRaw;
-    return {
-      playerVersionId: playerVersionIdValue,
-      franchiseId: parsedOwner,
-      gamesPlayed: 0,
-      appearances: 0,
-      started: 0,
-      seconds: 0,
-      points: 0,
-      fieldGoalsMade: 0,
-      fieldGoalsAttempted: 0,
-      threePointersMade: 0,
-      threePointersAttempted: 0,
-      freeThrowsMade: 0,
-      freeThrowsAttempted: 0,
-      offensiveRebounds: 0,
-      defensiveRebounds: 0,
-      assists: 0,
-      steals: 0,
-      blocks: 0,
-      turnovers: 0,
-      fouls: 0,
-    };
-  };
-  const totals = new Map(
-    rosters.flatMap((roster) =>
-      roster.players.map(
-        (player) => [player.playerVersionId, zeroRow(player.playerVersionId)] as const,
-      ),
-    ),
-  );
-  for (const summary of summaries) {
-    if (summary.status === 'forfeit') continue;
-    for (const side of ['home', 'away'] as const) {
-      const lines = side === 'home' ? summary.homePlayers : summary.awayPlayers;
-      for (const line of lines) {
-        const row = totals.get(line.playerVersionId);
-        if (row === undefined) continue;
-        row.gamesPlayed += 1;
-        row.appearances += line.seconds > 0 ? 1 : 0;
-        row.started += line.started === true ? 1 : 0;
-        row.seconds += line.seconds;
-        row.points += line.points;
-        row.fieldGoalsMade += line.fieldGoalsMade;
-        row.fieldGoalsAttempted += line.fieldGoalsAttempted;
-        row.threePointersMade += line.threePointersMade;
-        row.threePointersAttempted += line.threePointersAttempted;
-        row.freeThrowsMade += line.freeThrowsMade;
-        row.freeThrowsAttempted += line.freeThrowsAttempted;
-        row.offensiveRebounds += line.offensiveRebounds;
-        row.defensiveRebounds += line.defensiveRebounds;
-        row.assists += line.assists;
-        row.steals += line.steals;
-        row.blocks += line.blocks;
-        row.turnovers += line.turnovers;
-        row.fouls += line.fouls;
-      }
-    }
-  }
-  return [...totals.values()].sort((a, b) => (a.playerVersionId < b.playerVersionId ? -1 : 1));
+  const folded = engineFoldSeasonPlayerAggregatesImpl(summaries);
+  const byId = new Map(folded.map((row) => [row.playerVersionId, row]));
+  return rosters
+    .flatMap((roster) =>
+      roster.players.map((player) => {
+        const row = byId.get(player.playerVersionId);
+        if (row !== undefined) return row;
+        return emptySeasonPlayerAggregate(player.playerVersionId, roster.franchiseId);
+      }),
+    )
+    .sort((a, b) => (a.playerVersionId < b.playerVersionId ? -1 : 1));
 }
 export function buildFixtureRetainedDetail(input: {
   runId: string;
@@ -1092,33 +950,7 @@ export function buildFixtureRecap(input: {
 export function buildFixtureInfluenceStateFromIds(
   franchiseIds: readonly string[],
 ): SeasonInfluenceState {
-  const balances: Record<string, number> = {};
-  const ledger: SeasonInfluenceState['ledger'] = [];
-  const windows: SeasonInfluenceState['windows'] = {};
-  for (const franchiseId of franchiseIds) {
-    const fid = franchiseIdSchema.parse(franchiseId);
-    balances[fid] = 2;
-    ledger.push({
-      entryId: idSchema.parse(`influence-initial-${franchiseId}`),
-      franchiseId: fid,
-      source: 'initial-grant',
-      blockIndex: null,
-      commandId: null,
-      requestedDelta: 2,
-      appliedDelta: 2,
-      balanceAfter: 2,
-      explanation: 'Initial +2 Influence grant at run creation',
-    });
-    windows[fid] = [];
-  }
-  return {
-    schemaVersion: 1,
-    influenceVersion: SEASON_INFLUENCE_VERSION,
-    balances,
-    ledger,
-    windows,
-    rehabs: {},
-  };
+  return engineCreateInitialSeasonInfluenceStateImpl(franchiseIds);
 }
 export function buildStubSeasonEngineSeam(): SeasonRunEngineSeam {
   return {
@@ -1138,21 +970,7 @@ export function buildStubSeasonEngineSeam(): SeasonRunEngineSeam {
   };
 }
 export function seasonRotationSetDigestFixture(rotations: readonly SeasonRotation[]): string {
-  const canonical = JSON.stringify(
-    [...rotations]
-      .sort((a, b) => (a.franchiseId < b.franchiseId ? -1 : 1))
-      .map((rotation) => ({
-        franchiseId: rotation.franchiseId,
-        starters: rotation.starters,
-        benchOrder: rotation.benchOrder,
-        targetMinutes: [...rotation.targetMinutes].sort((a, b) =>
-          a.playerVersionId < b.playerVersionId ? -1 : 1,
-        ),
-        closingFive: rotation.closingFive,
-        rotationVersion: rotation.rotationVersion,
-      })),
-  );
-  return seasonDigestHex(canonical);
+  return engineSeasonRotationSetDigestImpl(rotations);
 }
 type EngineDigestFactsParity = Parameters<typeof engineSeasonRunStateDigestFn>[0];
 type EngineDigestReturnParity = ReturnType<typeof engineSeasonRunStateDigestFn>;

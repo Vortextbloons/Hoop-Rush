@@ -1,30 +1,21 @@
 import type {
-  SeasonAwards,
-  SeasonRunAuthority,
-  SeasonCampaignState,
-  SeasonEvolutionState,
-  SeasonCheckpointState,
   SeasonEffectsState,
-  SeasonFreeAgencyState,
   SeasonGame,
   SeasonGameSummary,
   SeasonHealthState,
   SeasonInfluenceState,
   SeasonLeague,
-  SeasonObjectiveState,
   SeasonOwnership,
   SeasonPlayerAggregate,
-  SeasonPostseasonState,
   SeasonRoster,
   SeasonRotation,
-  SeasonRunCompletion,
-  SeasonRunStage,
   SeasonSchedule,
   SeasonStandings,
   SeasonTeamAggregate,
   SeasonTradeState,
   SeasonTransactionEntry,
 } from '@hoop-rush/data-contracts';
+import type { SeasonRunStateDigestFacts } from '@hoop-rush/engine';
 export interface SeasonRunEngineSeam {
   reconstructSeasonGames(
     schedule: SeasonSchedule,
@@ -49,28 +40,7 @@ export interface SeasonRunEngineSeam {
   seasonRunStateDigest: (facts: SeasonRunStateDigestFacts) => string;
   createInitialSeasonInfluenceState(franchiseIds: readonly string[]): SeasonInfluenceState;
 }
-export interface SeasonRunStateDigestFacts {
-  stateRevision: number;
-  stage: SeasonRunStage;
-  postseason: SeasonPostseasonState;
-  awards: SeasonAwards | null;
-  completion: SeasonRunCompletion | null;
-  checkpointState: SeasonCheckpointState | null;
-  health: SeasonHealthState;
-  influence: SeasonInfluenceState;
-  transactions: readonly SeasonTransactionEntry[];
-  trade: SeasonTradeState | null;
-  objectives?: SeasonObjectiveState | null;
-  challenges?: import('@hoop-rush/data-contracts').SeasonChallengeState | null;
-  campaign?: SeasonCampaignState | null;
-  evolution?: SeasonEvolutionState | null;
-  rosters: readonly SeasonRoster[];
-  ownership: readonly SeasonOwnership[];
-  rotations: readonly SeasonRotation[];
-  effects: SeasonEffectsState;
-  freeAgency: SeasonFreeAgencyState;
-  authority?: SeasonRunAuthority;
-}
+export type { SeasonRunStateDigestFacts } from '@hoop-rush/engine';
 export interface SeasonWindowOpenResult {
   trade: SeasonTradeState;
   influence: SeasonInfluenceState;

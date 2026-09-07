@@ -54,6 +54,7 @@ import {
   SEASON_FREE_AGENCY_TARGETS_VERSION_V1,
   SEASON_FREE_AGENCY_VERSION,
   SEASON_FREE_AGENCY_VERSION_V1,
+  SEASON_FREE_AGENCY_VERSION_V2,
   SEASON_GAME_COUNT,
   SEASON_GAME_SUMMARY_VERSION,
   SEASON_GAME_SUMMARY_LEGACY_VERSION,
@@ -108,6 +109,7 @@ import {
   SEASON_TRADE_GRADE_VERSION,
   SEASON_TRADE_TARGETS_VERSION,
   SEASON_TRADE_VERSION,
+  SEASON_TRADE_VERSION_V6,
 } from './season-versions.ts';
 import { seasonRosterSchema, seasonOwnershipSchema } from './season-roster.ts';
 import { seasonEvolutionStateSchema } from './season-evolution.ts';
@@ -290,6 +292,8 @@ export const seasonRunVersionsSchema = z.object({
   healthVersion: z.literal(SEASON_HEALTH_VERSION),
   tradeVersion: z.union([
     z.literal(SEASON_TRADE_VERSION),
+    z.literal(SEASON_TRADE_VERSION_V6),
+    z.literal('season-trade-v5'),
     z.literal('season-trade-v4'),
     z.literal('season-trade-v3'),
   ]),
@@ -346,6 +350,7 @@ export const seasonRunVersionsSchema = z.object({
   postseasonTargetsVersion: z.literal(SEASON_POSTSEASON_TARGETS_VERSION),
   freeAgencyVersion: z.union([
     z.literal(SEASON_FREE_AGENCY_VERSION),
+    z.literal(SEASON_FREE_AGENCY_VERSION_V2),
     z.literal(SEASON_FREE_AGENCY_VERSION_V1),
   ]),
   freeAgencyIndexVersion: z.union([

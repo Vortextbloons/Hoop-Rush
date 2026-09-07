@@ -9,6 +9,7 @@
   import InfluencePanel from '$lib/components/season/InfluencePanel.svelte';
   import InterruptionPanel from '$lib/components/season/InterruptionPanel.svelte';
   import ChallengesPanel from '$lib/components/season/ChallengesPanel.svelte';
+  import LeaguePulse from '$lib/components/season/LeaguePulse.svelte';
   import PostseasonMatchupCard from '$lib/components/season/PostseasonMatchupCard.svelte';
   import PostseasonProgress from '$lib/components/season/PostseasonProgress.svelte';
   import PostseasonRotationPanel from '$lib/components/season/PostseasonRotationPanel.svelte';
@@ -38,6 +39,7 @@
     blockOneLiner,
     didWin,
     humanUpcomingGamesFromGames,
+    leaguePulseOf,
     ordinal,
     provisionalRanking,
     recordLabel,
@@ -306,6 +308,9 @@
         accepted,
         record: blockRecord(accepted.blockIndex),
       })),
+  );
+  const leaguePulse = $derived(
+    run === null ? [] : leaguePulseOf(run, snapshot?.summaries ?? [], shell.franchiseName),
   );
   const hubStrip = $derived.by(() => {
     if (run === null || humanFranchiseId === null) return null;
@@ -967,6 +972,7 @@
       {/if}
 
       {#if recentBlocks.length > 0}
+        <LeaguePulse entries={leaguePulse} />
         <section aria-labelledby="recent-recaps-heading" class="px-3 sm:px-0">
           <h2
             id="recent-recaps-heading"

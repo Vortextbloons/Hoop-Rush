@@ -13,6 +13,7 @@ import {
   type SeasonPostseasonState,
   type SeasonRoster,
   type SeasonRotation,
+  type SeasonRun,
   type SeasonRunCompletion,
   type SeasonRunStage,
   type SeasonTradeState,
@@ -200,4 +201,33 @@ export function seasonRunStateDigest(facts: SeasonRunStateDigestFacts): string {
     ),
   });
   return seasonDigestHex(canonical);
+}
+export function seasonRunStateDigestFactsOf(
+  next: SeasonRun,
+  effects: SeasonEffectsState,
+): SeasonRunStateDigestFacts {
+  return {
+    stateRevision: next.stateRevision,
+    stage: next.stage,
+    postseason: next.postseason,
+    awards: next.awards,
+    completion: next.completion,
+    checkpointState: next.checkpointState,
+    health: next.health,
+    influence: next.influence,
+    transactions: next.transactions,
+    trade: next.trade,
+    freeAgency: next.freeAgency,
+    objectives: next.objectives,
+    challenges: (next as unknown as { challenges?: SeasonRunStateDigestFacts['challenges'] })
+      .challenges,
+    campaign: (next as unknown as { campaign?: SeasonRunStateDigestFacts['campaign'] }).campaign,
+    evolution: (next as unknown as { evolution?: SeasonRunStateDigestFacts['evolution'] })
+      .evolution,
+    rosters: next.rosters,
+    ownership: next.ownership,
+    rotations: next.rotations,
+    effects,
+    authority: next.authority,
+  };
 }

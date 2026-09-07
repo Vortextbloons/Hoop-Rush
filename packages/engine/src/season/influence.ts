@@ -1,6 +1,7 @@
 import {
   SEASON_INFLUENCE_CAP,
   SEASON_INFLUENCE_FLOOR,
+  SEASON_INFLUENCE_VERSION,
   commandIdSchema,
   franchiseIdSchema,
   idSchema,
@@ -39,7 +40,7 @@ export function createInitialSeasonInfluenceState(
   }
   return {
     schemaVersion: 1,
-    influenceVersion: 'season-influence-v2',
+    influenceVersion: SEASON_INFLUENCE_VERSION,
     balances,
     ledger,
     windows,

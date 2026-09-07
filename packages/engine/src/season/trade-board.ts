@@ -12,19 +12,23 @@ import {
 } from '@hoop-rush/data-contracts';
 import {
   fillTradeBackfill,
+  seasonTradeBestValue,
   seasonTradeCatalogFactsOf,
+  seasonTradePackageRatio,
+  seasonTradePackageValue,
   seasonTradePlayerValue,
   tradeAssetEligibilityOf,
   TRADE_BAND_1V1,
   TRADE_BAND_DEFAULT,
+  TRADE_CONSOLIDATION_BEST_MIN_RATIO,
 } from './trades.ts';
 export const TRADE_INQUIRY_BASE = 3;
 export const TRADE_INQUIRY_MAX = 5;
 export const TRADE_EXCHANGE_MAX = 3;
 export const TRADE_CASH_MAX_PER_PROPOSAL = 2;
-export const TRADE_CASH_MAX_PER_WINDOW = 2;
-export const TRADE_CASH_PCT_PER_POINT = 5;
-export const TRADE_CASH_PCT_MAX = 10;
+export const TRADE_CASH_MAX_PER_WINDOW = 3;
+export const TRADE_CASH_PCT_PER_POINT = 8;
+export const TRADE_CASH_PCT_MAX = 16;
 export const TRADE_MIN_TALENT_RATIO = 800;
 function boardSeed(rootSeed: string, windowIndex: number, ...keys: string[]): string {
   return seasonNamespaceSeed(rootSeed, 'trades', 'window', String(windowIndex), ...keys);
@@ -233,19 +237,13 @@ export function evaluateTradeProposal(input: {
       receivingFranchiseId: toFranchiseId,
     }),
   );
-  const outSum = outgoingValues.reduce((a, b) => a + b, 0);
-  const inSum = incomingValues.reduce((a, b) => a + b, 0);
-  const rawRatio = outSum > 0 ? Math.round((1000 * inSum) / outSum) : 0;
-  if (rawRatio < TRADE_MIN_TALENT_RATIO) {
-    return {
-      ok: false,
-      code: 'trade-insufficient-talent',
-      reason: `ratio ${String(rawRatio)} < ${String(TRADE_MIN_TALENT_RATIO)}`,
-    };
-  }
+  const outPackage = seasonTradePackageValue(outgoingValues);
+  const inPackage = seasonTradePackageValue(incomingValues);
+  const rawRatio = outPackage > 0 ? Math.round((1000 * inPackage) / outPackage) : 0;
+  const outBest = seasonTradeBestValue(outgoingValues);
+  const inBest = seasonTradeBestValue(incomingValues);
   const is1v1 = outgoingPlayerVersionIds.length === 1 && incomingPlayerVersionIds.length === 1;
   const band = is1v1 ? TRADE_BAND_1V1 : TRADE_BAND_DEFAULT;
-  const withinBand = rawRatio >= band.lower && rawRatio <= band.upper;
   let adjusted = rawRatio;
   if (influenceAmount > 0) {
     const pct = Math.min(influenceAmount * TRADE_CASH_PCT_PER_POINT, TRADE_CASH_PCT_MAX);
@@ -279,14 +277,31 @@ export function evaluateTradeProposal(input: {
     }
   }
   const finalRatio = adjusted;
-  const withinWithCash = finalRatio >= band.lower && finalRatio <= band.upper;
-  if (withinBand || withinWithCash) {
-  } else {
-    return {
-      ok: false,
-      code: 'trade-wrong-fit',
-      reason: `ratio ${String(finalRatio)} outside band`,
-    };
+  const isOverpay = finalRatio < band.lower;
+  if (!isOverpay) {
+    if (finalRatio > band.upper) {
+      return {
+        ok: false,
+        code: 'trade-wrong-fit',
+        reason: `ratio ${String(finalRatio)} outside band`,
+      };
+    }
+    if (
+      finalRatio > 1000 &&
+      outgoingPlayerVersionIds.length > incomingPlayerVersionIds.length &&
+      outBest > 0 &&
+      inBest > 0
+    ) {
+      const bestRatio = Math.round((1000 * outBest) / inBest);
+      const minBest = Math.round((inBest * TRADE_CONSOLIDATION_BEST_MIN_RATIO) / 1000);
+      if (outBest < minBest) {
+        return {
+          ok: false,
+          code: 'trade-wrong-fit',
+          reason: `best-player gap ${String(bestRatio)} consolidating quantity for quality`,
+        };
+      }
+    }
   }
   const fingerprint = fingerprintOf(outgoingPlayerVersionIds, incomingPlayerVersionIds);
   const proposal: SeasonTradeProposal = {
@@ -309,6 +324,13 @@ export function evaluateTradeProposal(input: {
       adjustedRatio: finalRatio,
       fromTotal,
       toTotal,
+      outPackage,
+      inPackage,
+      outBest,
+      inBest,
+      isOverpay,
+      overpayPct: isOverpay ? Math.round(1000 / Math.max(1, finalRatio)) - 100 : 0,
+      giftValue: isOverpay ? Math.round((outPackage - inPackage) * 100) / 100 : 0,
     },
     seedPath: ['trades', 'window', String(windowIndex), 'proposal', fingerprint],
     expectedStateRevision: run.stateRevision,

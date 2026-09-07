@@ -167,6 +167,9 @@ export * from './season-worker.ts';
 export * from './season-postseason-worker.ts';
 export * from './projection-worker.ts';
 export * from './generation-worker.ts';
+export * from './collection-versions.ts';
+export * from './collection.ts';
+export * from './loaders/collection-catalog.ts';
 export {
   buildEmptyHealth,
   buildInitialInfluence,

@@ -92,6 +92,16 @@ import {
 } from './commands/season-draft-calibrate.ts';
 import { seasonDraftReproduce, SEASON_DRAFT_REPRODUCE_OPTIONS } from './commands/season-draft.ts';
 import {
+  collectionPackAudit,
+  collectionPullReproduce,
+  COLLECTION_PACK_AUDIT_OPTIONS,
+  COLLECTION_PULL_REPRODUCE_OPTIONS,
+} from './commands/collection.ts';
+import {
+  collectionPackCalibrate,
+  COLLECTION_PACK_CALIBRATE_OPTIONS,
+} from './commands/collection-calibrate.ts';
+import {
   SEASON_EFFECTS_OPTIONS,
   seasonEffectsCalibrate,
   seasonEffectsDistribution,
@@ -394,6 +404,32 @@ const COMMANDS: Record<string, CommandDef> = {
       seasonDraftReproduce({
         input: getOptionString(args, 'input') ?? null,
         manifest: getOptionString(args, 'manifest'),
+      }),
+  },
+  'collection pack-audit': {
+    options: COLLECTION_PACK_AUDIT_OPTIONS,
+    run: (args) =>
+      collectionPackAudit({
+        manifest: getOptionString(args, 'manifest'),
+      }),
+  },
+  'collection pull-reproduce': {
+    options: COLLECTION_PULL_REPRODUCE_OPTIONS,
+    run: (args) =>
+      collectionPullReproduce({
+        input: getOptionString(args, 'input') ?? null,
+        manifest: getOptionString(args, 'manifest'),
+      }),
+  },
+  'collection pack-calibrate': {
+    options: COLLECTION_PACK_CALIBRATE_OPTIONS,
+    run: (args) =>
+      collectionPackCalibrate({
+        samples: getOptionString(args, 'samples') ?? undefined,
+        starterSeeds: getOptionString(args, 'starter-seeds') ?? undefined,
+        out: getOptionString(args, 'out') ?? undefined,
+        manifest: getOptionString(args, 'manifest') ?? undefined,
+        validate: hasOption(args, 'validate'),
       }),
   },
   'season rosters generate': {

@@ -215,7 +215,7 @@ describe('season trade window opening', () => {
           expect(offer.valueBand.band).toBe(oneForOne ? '85-115' : '80-120');
           expect(offer.valueBand.ratioBasisPoints).toBeGreaterThanOrEqual(800);
           expect(offer.valueBand.ratioBasisPoints).toBeLessThanOrEqual(1200);
-          const bounds = oneForOne ? [850, 1150] : [800, 1200];
+          const bounds = [850, 1150];
           const inBand =
             offer.valueBand.ratioBasisPoints >= (bounds[0] ?? 0) &&
             offer.valueBand.ratioBasisPoints <= (bounds[1] ?? 0);
@@ -347,7 +347,7 @@ describe('season trade window opening', () => {
   });
 });
 describe('season AI trade season totals', () => {
-  it('stays within the frozen 8-15 gate across seeds', () => {
+  it('stays within the frozen 8-12 gate across seeds', () => {
     const seeds = [
       'a1b2c3d4e5f60718293a4b5c6d7e8f9a',
       'c0ffee2026a1b2c3d4e5f60718293a4b',
@@ -361,10 +361,10 @@ describe('season AI trade season totals', () => {
     });
     for (const count of counts) {
       expect(count).toBeGreaterThanOrEqual(8);
-      expect(count).toBeLessThanOrEqual(15);
+      expect(count).toBeLessThanOrEqual(12);
     }
   });
-  it('never exceeds 15 even when prior windows record their maximum', () => {
+  it('never exceeds 12 even when prior windows record their maximum', () => {
     const { run: base, catalog } = fixture('b1d2e3f405162738495a6b7c8d9e0f11');
     let run: SeasonRun & {
       effects: SeasonEffectsState;
@@ -377,7 +377,7 @@ describe('season AI trade season totals', () => {
       const result = openWindow(run, catalog, blockIndex);
       run = applyWindowResult(run, result);
       total = aiTradeCountOf(run, HUMAN);
-      expect(total).toBeLessThanOrEqual(15);
+      expect(total).toBeLessThanOrEqual(12);
     }
   });
 });
@@ -1005,13 +1005,13 @@ describe('season contextual player value', () => {
     expect(ratioMutuallyWithinBand(870, '1-1')).toBe(true);
     expect(ratioMutuallyWithinBand(1150, '1-1')).toBe(true);
     expect(ratioMutuallyWithinBand(1151, '1-1')).toBe(false);
-    expect(ratioMutuallyWithinBand(833, '2-2')).toBe(false);
-    expect(ratioMutuallyWithinBand(834, '2-2')).toBe(true);
-    expect(ratioMutuallyWithinBand(1200, '2-2')).toBe(true);
-    expect(ratioMutuallyWithinBand(1201, '2-2')).toBe(false);
-    expect(ratioMutuallyWithinBand(834, '1-2')).toBe(true);
-    expect(ratioMutuallyWithinBand(1200, '2-1')).toBe(true);
-    expect(ratioMutuallyWithinBand(833, '1-2')).toBe(false);
+    expect(ratioMutuallyWithinBand(869, '2-2')).toBe(false);
+    expect(ratioMutuallyWithinBand(870, '2-2')).toBe(true);
+    expect(ratioMutuallyWithinBand(1150, '2-2')).toBe(true);
+    expect(ratioMutuallyWithinBand(1151, '2-2')).toBe(false);
+    expect(ratioMutuallyWithinBand(870, '1-2')).toBe(true);
+    expect(ratioMutuallyWithinBand(1150, '2-1')).toBe(true);
+    expect(ratioMutuallyWithinBand(869, '1-2')).toBe(false);
   });
 });
 describe('season AI risky-rehab spends (health seam stubbed)', () => {
@@ -1074,9 +1074,11 @@ describe('season AI risky-rehab spends (health seam stubbed)', () => {
     }
     for (const [injuryId, state] of Object.entries(result.influence.rehabs)) {
       expect(state.franchiseId).not.toBe(HUMAN);
-      expect(
-        result.health.injuries.find((injury) => injury.injuryId === injuryId)?.franchiseId,
-      ).toBe(state.franchiseId);
+      const record = result.health.injuries.find((injury) => injury.injuryId === injuryId);
+      const owner = result.ownership.find(
+        (row) => row.playerVersionId === record?.playerVersionId,
+      )?.ownerFranchiseId;
+      expect(record?.franchiseId).toBe(owner);
     }
     expect(result.effects.playerStates).toHaveLength(300);
   });

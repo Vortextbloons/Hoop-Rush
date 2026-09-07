@@ -44,6 +44,13 @@ import type {
   StoredFixedFiveHistoryIndex,
   StoredFixedFivePendingResult,
 } from '../schemas/fixed-five-record.ts';
+import type {
+  StoredCollectionCommandRow,
+  StoredCollectionLedgerRow,
+  StoredCollectionOwnershipRow,
+  StoredCollectionPullRow,
+  StoredCollectionStateRow,
+} from '../schemas/collection-record.ts';
 const ACTIVE_RECORD_ID = 'active';
 const CLASSIC_DRAFT_RECORD_ID = 'classic-draft';
 const V2_MIGRATED_CHECKPOINT_SAVE_SCHEMA_VERSION = 3;
@@ -83,6 +90,11 @@ export class HoopRushDatabase extends Dexie {
   fixedFivePendingResults!: EntityTable<StoredFixedFivePendingResult, 'roomId'>;
   fixedFiveCompleted!: EntityTable<StoredFixedFiveCompleted, 'roomId'>;
   fixedFiveHistory!: EntityTable<StoredFixedFiveHistoryIndex, 'recordId'>;
+  collectionState!: EntityTable<StoredCollectionStateRow, 'collectionId'>;
+  collectionOwnership!: Table<StoredCollectionOwnershipRow, [string, string]>;
+  collectionPulls!: Table<StoredCollectionPullRow, [string, number]>;
+  collectionLedger!: Table<StoredCollectionLedgerRow, [string, string]>;
+  collectionCommands!: Table<StoredCollectionCommandRow, [string, string]>;
   constructor(name = 'hoop-rush-saves') {
     super(name);
     this.version(1).stores({
@@ -290,6 +302,32 @@ export class HoopRushDatabase extends Dexie {
       fixedFivePendingResults: 'roomId',
       fixedFiveCompleted: 'roomId',
       fixedFiveHistory: 'recordId, completedAtIso',
+    });
+    this.version(16).stores({
+      seasonRuns: 'recordId',
+      seasonRunSummaries: '[runId+gameId], [runId+blockIndex], runId, blockIndex',
+      seasonRunDetails: '[runId+gameId], runId',
+      seasonRunBlocks: '[runId+blockIndex], runId',
+      seasonRunIndex: 'recordId',
+      seasonPendingBlocks: 'runId',
+      seasonPostseasonSummaries: '[runId+gameId], runId',
+      seasonPostseasonDetails: '[runId+gameId], runId',
+      seasonCommandLog: '[runId+ordinal], runId',
+      seasonAlmanacs: 'runId',
+      seasonCompletedRuns: 'runId',
+      seasonCompletedIndex: 'recordId, completedAtIso',
+      seasonRunPlayerSlices: 'runId',
+      seasonRoomStates: null,
+      fixedFiveActive: 'roomId',
+      fixedFiveCommands: '[roomId+ordinal], roomId',
+      fixedFivePendingResults: 'roomId',
+      fixedFiveCompleted: 'roomId',
+      fixedFiveHistory: 'recordId, completedAtIso',
+      collectionState: 'collectionId',
+      collectionOwnership: '[collectionId+cardId], collectionId',
+      collectionPulls: '[collectionId+pullSequence], collectionId',
+      collectionLedger: '[collectionId+transactionId], collectionId',
+      collectionCommands: '[collectionId+commandId], collectionId',
     });
   }
 }

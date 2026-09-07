@@ -37,7 +37,7 @@ import {
   SEASON_TRADE_PACKAGE_MAX,
 } from '@hoop-rush/data-contracts';
 import { drawHexInt } from './season-seeds.ts';
-import { seasonRunStateDigest } from './state-digest.ts';
+import { seasonRunStateDigest, seasonRunStateDigestFactsOf } from './state-digest.ts';
 import { seasonTransactionEntry } from './transactions.ts';
 export const WINDOW_BLOCK_INDEX_TO_INDEX: Readonly<Record<number, number>> = {
   2: 0,
@@ -45,7 +45,9 @@ export const WINDOW_BLOCK_INDEX_TO_INDEX: Readonly<Record<number, number>> = {
   5: 2,
 };
 export const TRADE_BAND_1V1 = { lower: 850, upper: 1150 } as const;
-export const TRADE_BAND_DEFAULT = { lower: 800, upper: 1200 } as const;
+export const TRADE_BAND_DEFAULT = { lower: 850, upper: 1150 } as const;
+export const TRADE_PACKAGE_WEIGHTS = [1, 0.4, 0.3, 0.2, 0.15] as const;
+export const TRADE_CONSOLIDATION_BEST_MIN_RATIO = 700;
 export type TradeAssetEligibilityStatus = 'eligible' | 'protected' | 'availability-risk';
 export interface TradeAssetEligibilityInput {
   playerVersionId: string;
@@ -97,9 +99,9 @@ const VALUE_ROLE_FIT_BONUS_PER_SHORTAGE = 0.02;
 const VALUE_ROLE_FIT_NEUTRAL_DEPTH = 3;
 const AI_EXTRA_OFFER_WILLINGNESS_PERCENT = 25;
 const AI_REHAB_WILLINGNESS_PERCENT = 30;
-const AI_TRADE_TARGET_RANGE = 4;
+const AI_TRADE_TARGET_RANGE = 2;
 const AI_TRADE_ATTEMPT_BUDGET = 40;
-const AI_TRADE_SEASON_CAP = 15;
+const AI_TRADE_SEASON_CAP = 12;
 const OFFER_PROBE_BUDGET = 7;
 export class SeasonTradeFactsError extends Error {
   constructor(message: string) {
@@ -255,8 +257,8 @@ export function seasonTradeValueBandFor(input: {
   outgoingValues: readonly number[];
   incomingValues: readonly number[];
 }): SeasonTradeOfferValueBand {
-  const outgoing = input.outgoingValues.reduce((sum, value) => sum + value, 0);
-  const incoming = input.incomingValues.reduce((sum, value) => sum + value, 0);
+  const outgoing = seasonTradePackageValue(input.outgoingValues);
+  const incoming = seasonTradePackageValue(input.incomingValues);
   if (outgoing <= 0) throw new SeasonTradeInvariantError('outgoing trade value must be positive');
   const raw = Math.round((1000 * incoming) / outgoing);
   const ratioBasisPoints = Math.min(
@@ -279,6 +281,29 @@ export function ratioMutuallyWithinBand(
   if (ratioBasisPoints < bounds.lower || ratioBasisPoints > bounds.upper) return false;
   const reciprocal = Math.ceil(1000000 / ratioBasisPoints);
   return reciprocal >= bounds.lower && reciprocal <= bounds.upper;
+}
+export function seasonTradePackageValue(values: readonly number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => b - a);
+  let total = 0;
+  for (let i = 0; i < sorted.length; i += 1) {
+    const weight = TRADE_PACKAGE_WEIGHTS[i] ?? 0.15;
+    total += (sorted[i] ?? 0) * weight;
+  }
+  return Math.round(total * 100) / 100;
+}
+export function seasonTradeBestValue(values: readonly number[]): number {
+  if (values.length === 0) return 0;
+  return Math.max(...values);
+}
+export function seasonTradePackageRatio(input: {
+  outgoingValues: readonly number[];
+  incomingValues: readonly number[];
+}): number {
+  const outgoing = seasonTradePackageValue(input.outgoingValues);
+  const incoming = seasonTradePackageValue(input.incomingValues);
+  if (outgoing <= 0) return 0;
+  return Math.round((1000 * incoming) / outgoing);
 }
 export function rosterPlayerVersionIdsOf(run: SeasonRun, franchiseId: string): string[] {
   const roster = run.rosters.find((entry) => entry.franchiseId === franchiseId);
@@ -625,10 +650,7 @@ function humanOfferCandidate(
       candidateRosterIds: filled.toIdsFilled,
     }),
   );
-  const rawRatio = Math.round(
-    (1000 * incomingValues.reduce((sum, value) => sum + value, 0)) /
-      outgoingValues.reduce((sum, value) => sum + value, 0),
-  );
+  const rawRatio = seasonTradePackageRatio({ outgoingValues, incomingValues });
   return { aiFranchiseId, kind, outgoing, incoming, rawRatio };
 }
 function rankedAiFranchises(
@@ -660,12 +682,11 @@ export function generateHumanTradeOffer(
   for (const aiFranchiseId of franchises) {
     let best: OfferCandidate | null = null;
     for (const kind of kinds) {
+      const bounds = kind === '1-1' ? TRADE_BAND_1V1 : TRADE_BAND_DEFAULT;
       for (let probe = 0; probe < OFFER_PROBE_BUDGET; probe += 1) {
         const candidate = humanOfferCandidate(context, seedPath, aiFranchiseId, kind, probe);
         if (candidate === null) continue;
-        const inRange =
-          candidate.rawRatio >= RATIO_SCHEMA_BOUNDS.lower &&
-          candidate.rawRatio <= RATIO_SCHEMA_BOUNDS.upper;
+        const inRange = candidate.rawRatio >= bounds.lower && candidate.rawRatio <= bounds.upper;
         if (inRange) {
           best = candidate;
           break;
@@ -860,7 +881,11 @@ function aiTradeCandidate(
   const kind = packageKindOf(tradeSeed(rootSeed, ...basePath, 'size'));
   const rosterA = rosterPlayerVersionIdsOf(run, a);
   const rosterB = rosterPlayerVersionIdsOf(run, b);
-  for (const probeKind of kindOrderStartingAt(kind)) {
+  const evenKinds = kindOrderStartingAt(kind).filter((probeKind) => {
+    const sizes = packageSizesOf(probeKind);
+    return sizes.outgoing === sizes.incoming;
+  });
+  for (const probeKind of evenKinds) {
     const probeSizes = packageSizesOf(probeKind);
     const outgoing = pickDistinct(
       rosterA,
@@ -914,10 +939,7 @@ function aiTradeCandidate(
         candidateRosterIds: filled.toIdsFilled,
       }),
     );
-    const rawRatio = Math.round(
-      (1000 * incomingValues.reduce((sum, value) => sum + value, 0)) /
-        outgoingValues.reduce((sum, value) => sum + value, 0),
-    );
+    const rawRatio = seasonTradePackageRatio({ outgoingValues, incomingValues });
     if (!ratioMutuallyWithinBand(rawRatio, probeKind)) continue;
     return { a, b, kind: probeKind, outgoing, incoming, rawRatio };
   }
@@ -1478,34 +1500,7 @@ export function openSeasonTradeWindow(
     stateRevision: run.stateRevision + 1,
     stateDigest: '',
   };
-  const stateDigest = seasonRunStateDigest({
-    stateRevision: next.stateRevision,
-    stage: next.stage,
-    postseason: next.postseason,
-    awards: next.awards,
-    completion: next.completion,
-    checkpointState: next.checkpointState,
-    health: next.health,
-    influence: next.influence,
-    transactions: next.transactions,
-    trade: next.trade,
-    freeAgency: next.freeAgency,
-    objectives: next.objectives,
-    campaign: (
-      next as {
-        campaign?: unknown;
-      }
-    ).campaign as never,
-    evolution: (
-      next as unknown as {
-        evolution?: import('@hoop-rush/data-contracts').SeasonEvolutionState | null;
-      }
-    ).evolution,
-    rosters: next.rosters,
-    ownership: next.ownership,
-    rotations: next.rotations,
-    effects: next.effects,
-  });
+  const stateDigest = seasonRunStateDigest(seasonRunStateDigestFactsOf(next, next.effects));
   return {
     trade,
     influence: next.influence,
@@ -1825,7 +1820,9 @@ function repairRotationAfterTrade(
   );
   const vacated = movedOut.reduce((sum, id) => sum + (minutesById.get(id) ?? 0), 0);
   const rotationMemberIds = rotationMembers.map((member) => member.playerVersionId);
-  const recipientIds = rotationMemberIds.filter((id) => movedIn.includes(id));
+  const retainedIds = new Set(retained.map((member) => member.playerVersionId));
+  const newFaceIds = rotationMemberIds.filter((id) => !retainedIds.has(id));
+  const recipientIds = newFaceIds.length > 0 ? newFaceIds : [];
   const shares = splitMinutesEvenly(vacated, recipientIds.length);
   const shareById = new Map(recipientIds.map((id, index) => [id, shares[index] ?? 0]));
   const targetMinutes = rotationMemberIds.map((playerVersionId) => {

@@ -1,9 +1,11 @@
 import type { ShotZone, SlotGroup } from '@hoop-rush/data-contracts';
 import type { PositionResponsibilityModifiers } from './position-responsibilities.ts';
 import type { ActionType } from './usage.ts';
-// m3-engine-v16: trade board profiles (season-trade-v5) in openSeasonTradeWindow;
+// m3-engine-v19: season parity tune (season-trade-v7, season-free-agency-v3) —
+// fewer AI-AI trades per window/season, top bands blocked from outlier FA adds;
+// trade board profiles, consolidation tax, overpay gifts, Influence sweeteners;
 // SRS AI court-innovation selection from recorded summaries (srsRuleScorerFor).
-export const ENGINE_VERSION = 'm3-engine-v17';
+export const ENGINE_VERSION = 'm3-engine-v19';
 export const ENGINE_CONSTANTS = {
   version: ENGINE_VERSION,
   zoneBaseMake: {

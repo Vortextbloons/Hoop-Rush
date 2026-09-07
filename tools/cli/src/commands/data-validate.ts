@@ -13,6 +13,12 @@ import {
   SEASON_DRAFT_CATALOG_VERSION,
   SEASON_ROTATION_VERSION,
   SELECTION_SCORE_VERSION,
+  COLLECTION_CATALOG_VERSION,
+  COLLECTION_ECONOMY_VERSION,
+  COLLECTION_OVERLAY_VERSION,
+  COLLECTION_PACK_RULES_VERSION,
+  collectionCatalogSchema,
+  collectionIndexSchema,
   seasonFreeAgencyIndexSchema,
   seasonGameTargetsSchema,
   unavailabilityReasonSchema,
@@ -683,6 +689,130 @@ async function auditSeasonFreeAgencyIndex(
   );
   return { ok: failures.length === 0, details, failures };
 }
+async function auditCollectionCatalog(
+  manifest: HoopRushManifest,
+  manifestDir: string,
+  verbose: boolean,
+): Promise<AuditResult> {
+  const failures: string[] = [];
+  const details: string[] = [];
+  const entry = manifest.collection;
+  if (entry === undefined) {
+    details.push('collection: none packaged');
+    return { ok: true, details, failures };
+  }
+  async function readPinned(
+    label: string,
+    ref: { url: string; contentHash: string },
+  ): Promise<Buffer | null> {
+    const assetPath = isAbsolute(ref.url) ? ref.url : resolve(manifestDir, ref.url);
+    let content: Buffer;
+    try {
+      const info = await stat(assetPath);
+      if (!info.isFile()) {
+        failures.push(`${label}: asset is not a file (${assetPath})`);
+        return null;
+      }
+      content = await readFile(assetPath);
+    } catch {
+      failures.push(`${label}: asset missing (${assetPath})`);
+      return null;
+    }
+    if (sha256Hex(content) !== ref.contentHash) {
+      failures.push(`${label}: content hash mismatch (${assetPath})`);
+    } else if (verbose) {
+      details.push(`${label}: hash verified (${assetPath})`);
+    }
+    return content;
+  }
+  const catalogContent = await readPinned('collection-catalog', entry.catalog);
+  const indexContent = await readPinned('collection-index', entry.index);
+  if (catalogContent === null || indexContent === null) {
+    return { ok: false, details, failures };
+  }
+  let catalogRaw: unknown;
+  let indexRaw: unknown;
+  try {
+    catalogRaw = JSON.parse(catalogContent.toString('utf8')) as unknown;
+    indexRaw = JSON.parse(indexContent.toString('utf8')) as unknown;
+  } catch {
+    failures.push('collection: artifact is not valid JSON');
+    return { ok: false, details, failures };
+  }
+  const catalogParsed = collectionCatalogSchema.safeParse(catalogRaw);
+  if (!catalogParsed.success) {
+    failures.push(
+      `collection-catalog: schema failure: ${catalogParsed.error.issues[0]?.path.join('.') ?? '(root)'} ${catalogParsed.error.issues[0]?.message ?? 'unknown'}`,
+    );
+    return { ok: false, details, failures };
+  }
+  const indexParsed = collectionIndexSchema.safeParse(indexRaw);
+  if (!indexParsed.success) {
+    failures.push(
+      `collection-index: schema failure: ${indexParsed.error.issues[0]?.path.join('.') ?? '(root)'} ${indexParsed.error.issues[0]?.message ?? 'unknown'}`,
+    );
+    return { ok: false, details, failures };
+  }
+  const catalog = catalogParsed.data;
+  const index = indexParsed.data;
+  const catalogVersion: string = catalog.catalogVersion;
+  if (catalogVersion !== COLLECTION_CATALOG_VERSION) {
+    failures.push(`collection-catalog: catalogVersion ${catalogVersion} unexpected`);
+  }
+  const overlayVersion: string = catalog.overlayVersion;
+  if (overlayVersion !== COLLECTION_OVERLAY_VERSION) {
+    failures.push(`collection-catalog: overlayVersion ${overlayVersion} unexpected`);
+  }
+  for (const pack of catalog.packs) {
+    const packRulesVersion: string = pack.packRulesVersion;
+    if (packRulesVersion !== COLLECTION_PACK_RULES_VERSION) {
+      failures.push(`collection-catalog: pack ${pack.packId} rules version unexpected`);
+    }
+  }
+  const indexCatalogVersion: string = index.catalogVersion;
+  if (indexCatalogVersion !== COLLECTION_CATALOG_VERSION) {
+    failures.push('collection-index: catalogVersion unexpected');
+  }
+  if (index.catalogHash !== entry.catalog.contentHash) {
+    failures.push('collection-index: catalogHash does not match the packaged catalog');
+  }
+  const draftEntry = manifest.season?.draftCatalog;
+  if (draftEntry === undefined) {
+    failures.push('collection-catalog: manifest has no season.draftCatalog entry to pin against');
+  } else if (catalog.sourceCatalogHash !== draftEntry.contentHash) {
+    failures.push(
+      'collection-catalog: sourceCatalogHash does not match the packaged draft catalog',
+    );
+  }
+  const baseCount = catalog.cards.filter((card) => card.family === 'Base').length;
+  const specialCount = catalog.cards.length - baseCount;
+  if (specialCount !== 12) {
+    failures.push(`collection-catalog: want 12 specials, have ${String(specialCount)}`);
+  }
+  if (catalog.sets.length !== 3) {
+    failures.push(`collection-catalog: want 3 sets, have ${String(catalog.sets.length)}`);
+  }
+  for (const set of catalog.sets) {
+    if (set.memberCardIds.length !== 4) {
+      failures.push(
+        `collection-catalog: set ${set.setId} has ${String(set.memberCardIds.length)} members, want 4`,
+      );
+    }
+  }
+  if (catalog.packs.length !== 5) {
+    failures.push(`collection-catalog: want 5 packs, have ${String(catalog.packs.length)}`);
+  }
+  if (index.cards.length !== catalog.cards.length) {
+    failures.push(
+      `collection-index: ${String(index.cards.length)} entries != ${String(catalog.cards.length)} cards`,
+    );
+  }
+  void COLLECTION_ECONOMY_VERSION;
+  details.push(
+    `collection: ${String(catalog.cards.length)} cards (${String(baseCount)} base + ${String(specialCount)} specials) · ${String(catalog.sets.length)} sets · ${String(catalog.packs.length)} packs · ${String(catalogContent.length)} bytes`,
+  );
+  return { ok: failures.length === 0, details, failures };
+}
 async function auditSeasonGameTargets(manifestDir: string, verbose: boolean): Promise<AuditResult> {
   const failures: string[] = [];
   const details: string[] = [];
@@ -774,6 +904,7 @@ export async function dataValidate(inputPath: string, verbose: boolean): Promise
     await auditGlobalAssets(manifest, manifestDir, verbose),
     await auditSeasonFreeAgencyIndex(manifest, manifestDir, verbose),
     await auditSeasonGameTargets(manifestDir, verbose),
+    await auditCollectionCatalog(manifest, manifestDir, verbose),
     auditAssets(manifest),
   ];
   const details = [`dataVersion ${manifest.dataVersion}`, ...audits.flatMap((a) => a.details)];

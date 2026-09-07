@@ -1,4 +1,6 @@
 export * from './schemas/classic-draft-record.ts';
+export * from './schemas/collection-record.ts';
+export * from './repositories/collection.ts';
 export * from './schemas/run-record.ts';
 export * from './schemas/season-draft-record.ts';
 export * from './schemas/season-run-record.ts';

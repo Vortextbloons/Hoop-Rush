@@ -1,7 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { franchiseIdSchema } from '@hoop-rush/data-contracts';
-import { tradeAssetEligibilityOf, openSeasonTradeWindow } from './trades.ts';
-import { evaluateTradeProposal } from './trade-board.ts';
+import {
+  tradeAssetEligibilityOf,
+  openSeasonTradeWindow,
+  seasonTradePackageValue,
+  seasonTradeBestValue,
+  seasonTradePackageRatio,
+} from './trades.ts';
+import {
+  evaluateTradeProposal,
+  TRADE_CASH_MAX_PER_WINDOW,
+  TRADE_CASH_PCT_PER_POINT,
+  TRADE_CASH_PCT_MAX,
+} from './trade-board.ts';
 import { buildEconomyTestRun, zeroEffectsOf, injuryIdOf } from './season-economy-test-support.ts';
 
 const HUMAN = 'lakers';
@@ -210,5 +221,84 @@ describe('eligibility matches evaluation', () => {
     } else {
       expect(result).toBeDefined();
     }
+  });
+});
+
+describe('trade fairness v6 (consolidation tax, overpay gifts, influence 8%)', () => {
+  it('discounts quantity: two 60s lose to one 100', () => {
+    expect(seasonTradePackageValue([60, 60])).toBe(84);
+    expect(seasonTradePackageValue([100])).toBe(100);
+    expect(seasonTradePackageRatio({ outgoingValues: [100], incomingValues: [60, 60] })).toBe(840);
+    expect(seasonTradePackageRatio({ outgoingValues: [60, 60], incomingValues: [100] })).toBe(1190);
+  });
+
+  it('ranks best first and exposes best value', () => {
+    expect(seasonTradePackageValue([50, 90])).toBe(110);
+    expect(seasonTradeBestValue([50, 90])).toBe(90);
+    expect(seasonTradeBestValue([])).toBe(0);
+  });
+
+  it('buffs influence to 8%/pt max 16% with a 3/window sweetener cap', () => {
+    expect(TRADE_CASH_PCT_PER_POINT).toBe(8);
+    expect(TRADE_CASH_PCT_MAX).toBe(16);
+    expect(TRADE_CASH_MAX_PER_WINDOW).toBe(3);
+  });
+
+  it('never rejects 1-1 gifts with insufficient-talent (overpay allowed, logged)', () => {
+    const { run: base, catalog } = buildEconomyTestRun({
+      seed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a',
+    });
+    const baseEffects = { ...base, effects: zeroEffectsOf(base) };
+    const opened = openSeasonTradeWindow({
+      run: baseEffects,
+      blockIndex: 2,
+      rootSeed: baseEffects.rootSeed,
+      humanFranchiseId: HUMAN,
+      catalog,
+      effects: baseEffects.effects,
+    });
+    if (opened === null) throw new Error('no window');
+    const run = {
+      ...baseEffects,
+      trade: opened.trade,
+      influence: opened.influence,
+      transactions: opened.transactions,
+      rosters: opened.rosters,
+      ownership: opened.ownership,
+      rotations: opened.rotations,
+      effects: opened.effects,
+      health: opened.health,
+      stateRevision: opened.stateRevision,
+      stateDigest: opened.stateDigest,
+    };
+    const win = run.trade.windows.find((w) => w.windowIndex === 0);
+    const profiles = win?.boardProfiles ?? [];
+    expect(profiles.length).toBeGreaterThan(0);
+    let evaluated = 0;
+    for (const toProfile of profiles) {
+      const incoming = toProfile.listedPlayerIds[0] ?? toProfile.discussablePlayerIds[0];
+      if (incoming === undefined) continue;
+      const humanRoster = run.rosters.find((r) => r.franchiseId === HUMAN);
+      for (const outgoing of humanRoster?.players.map((p) => p.playerVersionId).slice(0, 3) ?? []) {
+        const result = evaluateTradeProposal({
+          run,
+          windowIndex: 0,
+          toFranchiseId: toProfile.franchiseId,
+          outgoingPlayerVersionIds: [outgoing],
+          incomingPlayerVersionIds: [incoming],
+          influenceAmount: 0,
+          influenceFromSender: null,
+          catalog,
+          rootSeed: run.rootSeed,
+        });
+        evaluated += 1;
+        if (!result.ok) {
+          expect(result.code).not.toBe('trade-insufficient-talent');
+        } else {
+          expect(typeof result.proposal.consequenceFacts).toBe('object');
+        }
+      }
+    }
+    expect(evaluated).toBeGreaterThan(0);
   });
 });

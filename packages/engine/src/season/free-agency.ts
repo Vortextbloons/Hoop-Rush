@@ -494,6 +494,7 @@ function aiWithinStrengthCeiling(
   const candidateOutlier =
     identityScore(roleScoresOf(membershipToMember(membership, context)), identity) > cap;
   if (currentStrength <= cap && !candidateOutlier) return true;
+  if (band === 'contender' || band === 'playoff') return false;
   const signingCount = context.run.freeAgency.signingCounts[fid] ?? 0;
   if (signingCount > 0) return false;
   return rosterOutliers + (candidateOutlier ? 1 : 0) <= maxOutliers;

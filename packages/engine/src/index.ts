@@ -245,6 +245,7 @@ export {
 export {
   foldSeasonTeamAggregates,
   foldSeasonPlayerAggregates,
+  foldSeasonAggregates,
   auditSeasonAggregates,
   deriveSeasonLeaders,
   provisionalStandingOrder,
@@ -259,6 +260,9 @@ export {
   auditSeasonBlockRecap,
   seasonBlockGameCount,
   seasonBlockRecapCanonical,
+  blockFreeAgencyEvidenceOf,
+  blockTradeEvidenceOf,
+  humanInfluenceBalanceAtBlockEnd,
   type SeasonBlockRecapInput,
 } from './season/recap.ts';
 export {
@@ -368,13 +372,22 @@ export {
   type SeasonRunCommandResult,
   type SeasonRunCommandOutput,
 } from './season/season-commands.ts';
-export { seasonRunStateDigest, type SeasonRunStateDigestFacts } from './season/state-digest.ts';
+export {
+  seasonRunStateDigest,
+  seasonRunStateDigestFactsOf,
+  type SeasonRunStateDigestFacts,
+} from './season/state-digest.ts';
 export {
   openSeasonTradeWindow,
   WINDOW_BLOCK_INDEX_TO_INDEX,
   TRADE_BAND_1V1,
   TRADE_BAND_DEFAULT,
+  TRADE_PACKAGE_WEIGHTS,
+  TRADE_CONSOLIDATION_BEST_MIN_RATIO,
   seasonTradeValueBandFor,
+  seasonTradePackageValue,
+  seasonTradePackageRatio,
+  seasonTradeBestValue,
   ratioMutuallyWithinBand,
   tradeAssetEligibilityOf,
   selectTradeBackfill,
@@ -586,3 +599,32 @@ export {
   isFixedFiveGameInputCommand,
   gameInputCommands,
 } from './modes/fixed-five/digest.ts';
+export { ENGINE_VERSION } from './sim/constants.ts';
+export {
+  collectionNamespaceSeed,
+  collectionStarterSeed,
+  collectionPullSeed,
+} from './collection/seeds.ts';export {
+  collectionCardId,
+  resolveCollectionCard,
+  toCollectionSimulationPlayer,
+  collectionStateDigest,
+  collectionStateFactsOf,
+} from './collection/cards.ts';
+export {
+  validateCollectionTeamFoundation,
+  validateCollectionPlayableFive,
+} from './collection/team.ts';
+export { auditCollectionState } from './collection/audit.ts';
+export {
+  WELCOME_COIN_GRANT,
+  CollectionCommandError,
+  eligiblePackCards,
+  validateCollectionPackDef,
+  slotRarityDistribution,
+  generateCollectionStarter,
+  drawCollectionPackSlots,
+  describeCollectionPackOdds,
+  applyCollectionCommand,
+  reproduceCollectionPull,
+} from './collection/packs.ts';

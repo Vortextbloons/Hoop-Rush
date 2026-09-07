@@ -269,8 +269,74 @@ export class RotationEditor {
     return this.validate();
   }
   adjustMinutes(playerVersionId: string, delta: number): string[] {
-    return this.rebalanceMinutes(playerVersionId, this.minutesFor(playerVersionId) + delta)
-      .failures;
+    return this.setMinutes(playerVersionId, this.minutesFor(playerVersionId) + delta);
+  }
+  balanceMinutesTotal(): RebalanceResult {
+    const total = this.rotation.targetMinutes.reduce((sum, entry) => sum + entry.minutes, 0);
+    const gap = 240 - total;
+    if (gap === 0) return { failures: [], adjustments: [] };
+    const byId = new Map(
+      this.rotation.targetMinutes.map((entry) => [entry.playerVersionId, { ...entry }]),
+    );
+    const adjustments: MinuteAdjustment[] = [];
+    const ordered = this.rotation.targetMinutes.map((entry) => ({
+      playerVersionId: entry.playerVersionId,
+      minutes: entry.minutes,
+      benchIndex: this.benchIndex(entry.playerVersionId),
+    }));
+    if (gap > 0) {
+      const recipients = [...ordered]
+        .filter((player) => player.minutes > 0)
+        .sort((a, b) => a.minutes - b.minutes || a.benchIndex - b.benchIndex);
+      let remaining = gap;
+      for (const player of recipients) {
+        if (remaining <= 0) break;
+        const capacity = 48 - player.minutes;
+        const give = Math.min(remaining, capacity);
+        if (give <= 0) continue;
+        const next = player.minutes + give;
+        byId.set(player.playerVersionId, { playerVersionId: player.playerVersionId, minutes: next });
+        adjustments.push({ playerVersionId: player.playerVersionId, minutes: next, delta: give });
+        remaining -= give;
+      }
+      if (remaining > 0) {
+        return {
+          failures: [
+            `cannot balance to 240: ${String(remaining)} minutes could not be assigned within 48-minute caps`,
+          ],
+          adjustments: [],
+        };
+      }
+    } else {
+      const surplus = -gap;
+      const donors = [...ordered].sort(
+        (a, b) => b.minutes - a.minutes || a.benchIndex - b.benchIndex,
+      );
+      let remaining = surplus;
+      for (const player of donors) {
+        if (remaining <= 0) break;
+        const capacity = player.minutes;
+        const take = Math.min(remaining, capacity);
+        if (take <= 0) continue;
+        const next = player.minutes - take;
+        byId.set(player.playerVersionId, { playerVersionId: player.playerVersionId, minutes: next });
+        adjustments.push({ playerVersionId: player.playerVersionId, minutes: next, delta: -take });
+        remaining -= take;
+      }
+      if (remaining > 0) {
+        return {
+          failures: [
+            `cannot balance to 240: ${String(remaining)} minutes could not be removed`,
+          ],
+          adjustments: [],
+        };
+      }
+    }
+    const candidate = { ...this.rotation, targetMinutes: [...byId.values()] };
+    const failures = validateSeasonRotation(candidate, this.memberPlayable);
+    if (failures.length > 0) return { failures, adjustments: [] };
+    this.rotation = candidate;
+    return { failures: [], adjustments };
   }
   rebalanceMinutes(playerVersionId: string, minutes: number): RebalanceResult {
     if (!this.activeIds.has(playerVersionId)) {

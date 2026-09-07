@@ -84,11 +84,7 @@ import {
   type StoredSeasonDraft,
 } from '../schemas/season-draft-record.ts';
 import type { SeasonRunEngineSeam } from '../season/engine-seam-types.ts';
-import {
-  buildInitialCampaignState,
-  generateSeasonSchedule,
-  seasonBlockGameCount,
-} from '@hoop-rush/engine';
+import { seasonBlockGameCount } from '@hoop-rush/engine';
 import { auditSeasonRunState } from '../season/audit.ts';
 import { seasonRunEngineSeam } from '../season/engine-seam.ts';
 import {
@@ -1091,30 +1087,8 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
       },
     );
   }
-  private initialCampaignState(
-    run: SeasonRun,
-    health: SeasonRun['health'],
-    humanFranchiseId: string | null,
-  ): SeasonCampaignState {
-    const empty = buildEmptyCampaignState();
-    try {
-      const schedule = generateSeasonSchedule({
-        league: run.league,
-        seed: run.schedule.generationSeed,
-      });
-      return buildInitialCampaignState({
-        rootSeed: run.rootSeed,
-        humanFranchiseId,
-        schedule,
-        standings: this.seam.reduceSeasonStandings(run.league, []),
-        health,
-        rotations: run.rotations,
-        rosters: run.rosters,
-        transactions: [],
-      });
-    } catch {
-      return empty;
-    }
+  private initialCampaignState(): SeasonCampaignState {
+    return buildEmptyCampaignState();
   }
   async promoteSeasonDraftToRun(
     draft: StoredSeasonDraft,
@@ -1139,10 +1113,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
       selections: {},
     });
     const challenges = validatedRun.challenges ?? buildEmptyChallengeState();
-    const campaignHumanFranchiseId = humanTeamOf(validatedRun.league)?.franchiseId ?? null;
-    const campaign = seasonCampaignStateSchema.parse(
-      this.initialCampaignState(validatedRun, health, campaignHumanFranchiseId),
-    );
+    const campaign = seasonCampaignStateSchema.parse(this.initialCampaignState());
     const draftFrontOffice =
       (
         validatedDraft.draft as {

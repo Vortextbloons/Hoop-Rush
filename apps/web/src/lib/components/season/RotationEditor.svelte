@@ -173,18 +173,17 @@
   }
   function changeMinutes(playerVersionId: string, delta: number) {
     if (disabled) return;
-    const result = editor.rebalanceMinutes(
+    const failuresAfter = editor.setMinutes(
       playerVersionId,
       editor.minutesFor(playerVersionId) + delta,
     );
-    if (result.failures.length === 0) {
-      appliedPreset = null;
-      flashAdjustments(result.adjustments);
-      succeed();
-    } else {
-      fail(result.failures);
-      revision += 1;
-    }
+    appliedPreset = null;
+    const actual = editor.minutesFor(playerVersionId);
+    const displayName = editor.names.get(playerVersionId) ?? playerVersionId;
+    highlightIds = new Set([playerVersionId]);
+    rebalanceNotice = `Set ${displayName} to ${actual} min.`;
+    attemptFailures = failuresAfter;
+    succeed();
   }
   function startEdit(playerVersionId: string, current: number) {
     if (disabled) return;
@@ -235,9 +234,9 @@
     if (remaining === 0) {
       rebalanceNotice = `Set ${displayName} to ${actual} min.`;
     } else if (remaining > 0) {
-      rebalanceNotice = `Set ${displayName} to ${actual} min · ${remaining} left — raise teammates to reach 240.`;
+      rebalanceNotice = `Set ${displayName} to ${actual} min · ${remaining} left — use Balance to 240 when ready.`;
     } else {
-      rebalanceNotice = `Set ${displayName} to ${actual} min · ${Math.abs(remaining)} over — lower teammates to reach 240.`;
+      rebalanceNotice = `Set ${displayName} to ${actual} min · ${Math.abs(remaining)} over — use Balance to 240 when ready.`;
     }
     attemptFailures = failuresAfter;
     editError = null;
@@ -247,6 +246,19 @@
   function setZero(playerVersionId: string) {
     if (disabled || editor.minutesFor(playerVersionId) === 0) return;
     applyDirectMinutes(playerVersionId, 0);
+  }
+  function balanceMinutes() {
+    if (disabled || minutesRemaining === 0) return;
+    const result = editor.balanceMinutesTotal();
+    if (result.failures.length > 0) {
+      fail(result.failures);
+      revision += 1;
+      return;
+    }
+    appliedPreset = null;
+    flashAdjustments(result.adjustments);
+    rebalanceNotice = 'Balanced rotation to 240 minutes.';
+    succeed();
   }
   function changeStarter(slotIndex: number, playerVersionId: string) {
     if (disabled) return;
@@ -486,6 +498,21 @@
     </div>
     {#if rebalanceNotice !== null}
       <p role="status" class="text-xs font-semibold text-primary">{rebalanceNotice}</p>
+    {/if}
+    {#if minutesRemaining !== 0}
+      <button
+        type="button"
+        onclick={balanceMinutes}
+        {disabled}
+        class="min-h-11 self-start rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
+      >
+        Balance to 240
+        {#if minutesRemaining > 0}
+          (+{minutesRemaining})
+        {:else}
+          ({minutesRemaining})
+        {/if}
+      </button>
     {/if}
   </div>
 

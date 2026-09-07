@@ -3,7 +3,7 @@
   import { asset, resolve } from '$app/paths';
   import { page } from '$app/state';
   import type { RouteId } from '$app/types';
-  import { Home, Users, Swords } from '@lucide/svelte';
+  import { Home, Layers, Users, Swords } from '@lucide/svelte';
   import '../app.css';
   import { ModeWatcher } from 'mode-watcher';
   import { Toaster } from 'svelte-sonner';
@@ -15,12 +15,17 @@
   const navItems: NavItem[] = [
     { id: 'home', label: 'Home', href: '/', icon: Home },
     { id: 'roster', label: 'Roster', href: '/roster', icon: Users },
+    { id: 'collection', label: 'Ultimate Run', href: '/collection', icon: Layers },
     { id: 'multiplayer', label: 'Multiplayer', href: '/multiplayer', icon: Swords },
   ];
   const routeId = $derived(page.route.id);
   const isMultiplayerLobby = $derived(routeId === '/multiplayer');
   const showBottomNav = $derived(
-    routeId === '/' || routeId === '/roster' || routeId === '/multiplayer',
+    routeId === '/' ||
+      routeId === '/roster' ||
+      routeId === '/collection' ||
+      routeId?.startsWith('/collection/') === true ||
+      routeId === '/multiplayer',
   );
   $effect(() => {
     if (!browser || isMultiplayerLobby) return;

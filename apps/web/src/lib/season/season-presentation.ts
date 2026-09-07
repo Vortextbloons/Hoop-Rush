@@ -39,7 +39,14 @@ import {
   type SeasonVersionSpotlight,
 } from '@hoop-rush/data-contracts';
 import { humanUpcomingGames } from './season-lock-preview';
-import { TRADE_BAND_1V1, TRADE_BAND_DEFAULT } from '@hoop-rush/engine';
+import {
+  TRADE_BAND_1V1,
+  TRADE_BAND_DEFAULT,
+  blockFreeAgencyEvidenceOf as engineFreeAgencyEvidenceOf,
+  blockTradeEvidenceOf as engineTradeEvidenceOf,
+  foldSeasonAggregates as foldEngineSeasonAggregates,
+  humanInfluenceBalanceAtBlockEnd as engineHumanBalanceAtBlockEnd,
+} from '@hoop-rush/engine';
 export const UNKNOWN_PLAYER_DISPLAY_NAME = 'Unknown player';
 export function displayPlayerName(name: string | null | undefined): string {
   const trimmed = name?.trim();
@@ -355,138 +362,7 @@ export function foldSeasonAggregates(summaries: readonly SeasonGameSummary[]): {
 } {
   const cached = aggregateFoldCache.get(summaries);
   if (cached !== undefined) return cached;
-  const teams = new Map<string, SeasonTeamAggregate>();
-  const players = new Map<string, SeasonPlayerAggregate>();
-  const touchTeam = (franchiseId: FranchiseId): SeasonTeamAggregate => {
-    const existing = teams.get(franchiseId);
-    if (existing) return existing;
-    const zero: SeasonTeamAggregate = {
-      franchiseId,
-      gamesPlayed: 0,
-      wins: 0,
-      losses: 0,
-      points: 0,
-      fieldGoalsMade: 0,
-      fieldGoalsAttempted: 0,
-      threePointersMade: 0,
-      threePointersAttempted: 0,
-      freeThrowsMade: 0,
-      freeThrowsAttempted: 0,
-      offensiveRebounds: 0,
-      defensiveRebounds: 0,
-      assists: 0,
-      steals: 0,
-      blocks: 0,
-      turnovers: 0,
-      fouls: 0,
-      possessions: 0,
-    };
-    teams.set(franchiseId, zero);
-    return zero;
-  };
-  const touchPlayer = (
-    playerVersionId: string,
-    franchiseId: FranchiseId,
-  ): SeasonPlayerAggregate => {
-    const existing = players.get(playerVersionId);
-    if (existing) return existing;
-    const zero: SeasonPlayerAggregate = {
-      playerVersionId,
-      franchiseId,
-      gamesPlayed: 0,
-      appearances: 0,
-      started: 0,
-      seconds: 0,
-      points: 0,
-      fieldGoalsMade: 0,
-      fieldGoalsAttempted: 0,
-      threePointersMade: 0,
-      threePointersAttempted: 0,
-      freeThrowsMade: 0,
-      freeThrowsAttempted: 0,
-      offensiveRebounds: 0,
-      defensiveRebounds: 0,
-      assists: 0,
-      steals: 0,
-      blocks: 0,
-      turnovers: 0,
-      fouls: 0,
-    };
-    players.set(playerVersionId, zero);
-    return zero;
-  };
-  for (const summary of summaries) {
-    const home = touchTeam(summary.homeFranchiseId);
-    const away = touchTeam(summary.awayFranchiseId);
-    home.gamesPlayed += 1;
-    away.gamesPlayed += 1;
-    if (summary.status === 'forfeit') {
-      const loser = summary.forfeitLoserFranchiseId;
-      if (loser === summary.homeFranchiseId) {
-        away.wins += 1;
-        home.losses += 1;
-      } else {
-        home.wins += 1;
-        away.losses += 1;
-      }
-      continue;
-    }
-    const homeWon = summary.homeScore > summary.awayScore;
-    if (homeWon) {
-      home.wins += 1;
-      away.losses += 1;
-    } else {
-      away.wins += 1;
-      home.losses += 1;
-    }
-    for (const [team, box, lines] of [
-      [home, summary.homeBox, summary.homePlayers],
-      [away, summary.awayBox, summary.awayPlayers],
-    ] as const) {
-      team.points += box.points;
-      team.fieldGoalsMade += box.fieldGoalsMade;
-      team.fieldGoalsAttempted += box.fieldGoalsAttempted;
-      team.threePointersMade += box.threePointersMade;
-      team.threePointersAttempted += box.threePointersAttempted;
-      team.freeThrowsMade += box.freeThrowsMade;
-      team.freeThrowsAttempted += box.freeThrowsAttempted;
-      team.offensiveRebounds += box.offensiveRebounds;
-      team.defensiveRebounds += box.defensiveRebounds;
-      team.assists += box.assists;
-      team.steals += box.steals;
-      team.blocks += box.blocks;
-      team.turnovers += box.turnovers;
-      team.fouls += box.fouls;
-      team.possessions += box.possessions;
-      for (const line of lines) {
-        const player = touchPlayer(line.playerVersionId, team.franchiseId);
-        player.gamesPlayed += 1;
-        if (line.seconds > 0) player.appearances += 1;
-        if (line.started === true) player.started += 1;
-        player.seconds += line.seconds;
-        player.points += line.points;
-        player.fieldGoalsMade += line.fieldGoalsMade;
-        player.fieldGoalsAttempted += line.fieldGoalsAttempted;
-        player.threePointersMade += line.threePointersMade;
-        player.threePointersAttempted += line.threePointersAttempted;
-        player.freeThrowsMade += line.freeThrowsMade;
-        player.freeThrowsAttempted += line.freeThrowsAttempted;
-        player.offensiveRebounds += line.offensiveRebounds;
-        player.defensiveRebounds += line.defensiveRebounds;
-        player.assists += line.assists;
-        player.steals += line.steals;
-        player.blocks += line.blocks;
-        player.turnovers += line.turnovers;
-        player.fouls += line.fouls;
-      }
-    }
-  }
-  const result = {
-    teams: [...teams.values()].sort((a, b) => a.franchiseId.localeCompare(b.franchiseId)),
-    players: [...players.values()].sort((a, b) =>
-      a.playerVersionId.localeCompare(b.playerVersionId),
-    ),
-  };
+  const result = foldEngineSeasonAggregates(summaries);
   aggregateFoldCache.set(summaries, result);
   return result;
 }
@@ -862,16 +738,12 @@ export function deriveBlockRecap(input: {
     }),
     objectiveEvidence: null,
     challengeEvidence: challengeEvidenceOfRun(run, blockIndex),
-    tradeEvidence: {
-      tradesAccepted: run.transactions.filter(
-        (entry) => entry.type === 'trade' && entry.blockIndex === blockIndex,
-      ).length,
-      influenceDelta: run.influence.ledger
-        .filter(
-          (entry) => entry.franchiseId === humanFranchiseId && entry.blockIndex === blockIndex,
-        )
-        .reduce((sum, entry) => sum + entry.appliedDelta, 0),
-    },
+    tradeEvidence: engineTradeEvidenceOf({
+      blockIndex,
+      humanFranchiseId,
+      transactions: run.transactions,
+      influence: run.influence,
+    }),
     freeAgencyEvidence: blockFreeAgencyEvidenceOf({
       blockIndex,
       humanFranchiseId,
@@ -885,51 +757,14 @@ export function blockFreeAgencyEvidenceOf(input: {
   humanFranchiseId: string | null;
   freeAgency: SeasonFreeAgencyState | undefined;
 }): SeasonBlockRecap['freeAgencyEvidence'] {
-  const freeAgency = input.freeAgency;
-  if (freeAgency === undefined) {
-    return {
-      windowIndex: null,
-      signings: [],
-      influenceDelta: 0,
-      seasonSignings: 0,
-      seasonSpend: 0,
-    };
-  }
-  const resolvedWindow = freeAgency.windows.find(
-    (window) => window.blockIndex === input.blockIndex && window.status === 'resolved',
-  );
-  const parsedHuman =
-    input.humanFranchiseId === null ? null : (input.humanFranchiseId as FranchiseId);
-  const humanDelta = parsedHuman === null ? 0 : (freeAgency.seasonSpend[parsedHuman] ?? 0);
-  return {
-    windowIndex: resolvedWindow?.windowIndex ?? null,
-    signings: (resolvedWindow?.signings ?? []).map((signing) => ({
-      franchiseId: signing.franchiseId,
-      playerVersionId: signing.playerVersionId,
-      band: signing.band,
-      influenceCost: signing.influenceCost,
-    })),
-    influenceDelta: -humanDelta,
-    seasonSignings: parsedHuman === null ? 0 : (freeAgency.signingCounts[parsedHuman] ?? 0),
-    seasonSpend: humanDelta,
-  };
+  return engineFreeAgencyEvidenceOf(input);
 }
 export function humanBalanceAtBlockEnd(
   run: SeasonRun,
   humanFranchiseId: string,
   blockIndex: number,
 ): number {
-  const fid = humanFranchiseId as FranchiseId;
-  const current = run.influence.balances[fid] ?? 0;
-  const laterDelta = run.influence.ledger
-    .filter(
-      (entry) =>
-        entry.franchiseId === humanFranchiseId &&
-        entry.blockIndex !== null &&
-        entry.blockIndex > blockIndex,
-    )
-    .reduce((sum, entry) => sum + entry.appliedDelta, 0);
-  return current - laterDelta;
+  return engineHumanBalanceAtBlockEnd(run.influence, humanFranchiseId, blockIndex);
 }
 export function deriveBlockInjuryEvidence(input: {
   blockSummaries: readonly SeasonGameSummary[];
@@ -1486,10 +1321,13 @@ export function packageConsequenceFacts(input: {
     : 'Role coverage: rotation will repair by slotting incoming to outgoing minutes; both teams retain a legal ten';
   const chemistryRemoved = input.outgoingIds.length * 9;
   const chemistryNew = input.incomingIds.length * 9;
+  const influencePct = input.influenceAmount === 0 ? 0 : Math.min(input.influenceAmount * 8, 16);
   const influenceNote =
     input.influenceAmount === 0
       ? 'No Influence attached'
-      : `${String(input.influenceAmount)} Influence from ${input.influenceFromSender === input.humanFranchiseId ? 'you' : 'them'}`;
+      : input.influenceFromSender === input.humanFranchiseId
+        ? `+${String(input.influenceAmount)} Influence from you (+${String(influencePct)}% value, 3/window cap)`
+        : `${String(input.influenceAmount)} Influence from them (−${String(influencePct)}% value, helps when asking more)`;
   return {
     fromRosterSize: input.fromRosterSize,
     toRosterSize: input.toRosterSize,
@@ -1659,6 +1497,167 @@ export function recapChallengeView(recap: SeasonBlockRecap): RecapChallengeView 
   return null;
 }
 export const TRADE_GRADE_NEUTRAL_FALLBACK = 'Not enough post-trade games to grade.';
+export type LeaguePulseEntryKind =
+  'threat' | 'streak' | 'trade' | 'signing' | 'rehab' | 'innovation';
+export interface LeaguePulseEntry {
+  kind: LeaguePulseEntryKind;
+  headline: string;
+  detail: string;
+  franchiseId: string | null;
+  blockIndex: number | null;
+}
+function currentWinStreaks(
+  summaries: readonly SeasonGameSummary[],
+): Map<string, { kind: 'wins' | 'losses'; length: number }> {
+  const byFranchise = new Map<string, { won: boolean }[]>();
+  for (const summary of summaries) {
+    if (summary.status !== 'final' && summary.status !== 'forfeit') continue;
+    let winner: string;
+    if (summary.status === 'forfeit') {
+      const loser = summary.forfeitLoserFranchiseId;
+      if (loser === null) continue;
+      winner =
+        loser === summary.homeFranchiseId ? summary.awayFranchiseId : summary.homeFranchiseId;
+    } else {
+      winner =
+        summary.homeScore > summary.awayScore ? summary.homeFranchiseId : summary.awayFranchiseId;
+    }
+    for (const [fid, won] of [
+      [summary.homeFranchiseId, winner === summary.homeFranchiseId],
+      [summary.awayFranchiseId, winner === summary.awayFranchiseId],
+    ] as const) {
+      const list = byFranchise.get(fid) ?? [];
+      list.push({ won });
+      byFranchise.set(fid, list);
+    }
+  }
+  const streaks = new Map<string, { kind: 'wins' | 'losses'; length: number }>();
+  for (const [fid, games] of byFranchise) {
+    if (games.length === 0) continue;
+    const last = games[games.length - 1];
+    if (last === undefined) continue;
+    let length = 0;
+    for (let i = games.length - 1; i >= 0; i -= 1) {
+      if (games[i]?.won === last.won) length += 1;
+      else break;
+    }
+    streaks.set(fid, { kind: last.won ? 'wins' : 'losses', length });
+  }
+  return streaks;
+}
+export function leaguePulseOf(
+  run: SeasonRun | null,
+  summaries: readonly SeasonGameSummary[] = [],
+  franchiseName: (franchiseId: string) => string = (id) => id,
+  limit = 6,
+): LeaguePulseEntry[] {
+  if (run === null) return [];
+  const entries: LeaguePulseEntry[] = [];
+  const humanId = run.league.teams.find((team) => team.control === 'human')?.franchiseId ?? null;
+  const assignmentById = new Map(
+    run.aiAssignments.map((assignment) => [assignment.franchiseId, assignment]),
+  );
+  const ranked = [...run.standings.rows].sort(
+    (a, b) =>
+      b.wins - a.wins ||
+      b.pointsFor - b.pointsAgainst - (a.pointsFor - a.pointsAgainst) ||
+      a.franchiseId.localeCompare(b.franchiseId),
+  );
+  for (const row of ranked) {
+    if (row.franchiseId === humanId) continue;
+    if (row.wins + row.losses === 0) continue;
+    const assignment = assignmentById.get(row.franchiseId);
+    entries.push({
+      kind: 'threat',
+      headline: `${franchiseName(row.franchiseId)} looms at ${recordLabel(row.wins, row.losses)}`,
+      detail:
+        assignment === undefined
+          ? 'Above you in the standings.'
+          : `${assignment.band} · ${assignment.identity}`,
+      franchiseId: row.franchiseId,
+      blockIndex: null,
+    });
+    if (entries.filter((entry) => entry.kind === 'threat').length >= 2) break;
+  }
+  const streaks = currentWinStreaks(summaries);
+  const hot = [...streaks.entries()]
+    .filter(([, streak]) => streak.kind === 'wins' && streak.length >= 3)
+    .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))
+    .slice(0, 2);
+  for (const [fid, streak] of hot) {
+    entries.push({
+      kind: 'streak',
+      headline: `${franchiseName(fid)} has won ${String(streak.length)} straight`,
+      detail: fid === humanId ? 'Your run — protect it.' : 'The league is noticing.',
+      franchiseId: fid,
+      blockIndex: null,
+    });
+  }
+  const ledger = [...run.transactions]
+    .filter((entry) => entry.type !== 'block-grant' && entry.type !== 'initial-grant')
+    .sort(
+      (a, b) =>
+        b.appliedAtStateRevision - a.appliedAtStateRevision ||
+        a.transactionId.localeCompare(b.transactionId),
+    );
+  for (const entry of ledger) {
+    if (entries.length >= limit + 4) break;
+    if (entry.type === 'trade') {
+      entries.push({
+        kind: 'trade',
+        headline: entry.explanation,
+        detail:
+          entry.blockIndex === null ? 'Trade window' : `Block ${String(entry.blockIndex + 1)}`,
+        franchiseId: entry.franchiseId,
+        blockIndex: entry.blockIndex,
+      });
+    } else if (entry.type === 'free-agent-signing') {
+      entries.push({
+        kind: 'signing',
+        headline: entry.explanation,
+        detail: entry.blockIndex === null ? 'Free agency' : `Block ${String(entry.blockIndex + 1)}`,
+        franchiseId: entry.franchiseId,
+        blockIndex: entry.blockIndex,
+      });
+    } else if (entry.type === 'influence-spend' && entry.explanation.startsWith('AI ')) {
+      entries.push({
+        kind: 'rehab',
+        headline: entry.explanation,
+        detail: 'Rival gamble from the ledger.',
+        franchiseId: entry.franchiseId,
+        blockIndex: entry.blockIndex,
+      });
+    }
+    if (
+      entries.filter(
+        (item) => item.kind === 'trade' || item.kind === 'signing' || item.kind === 'rehab',
+      ).length >= 3
+    ) {
+      break;
+    }
+  }
+  const evolution = (
+    run as unknown as {
+      evolution?: {
+        selections?: Record<string, { innovationId: string; aiSelected: boolean } | undefined>;
+      } | null;
+    }
+  ).evolution;
+  if (evolution?.selections !== undefined && evolution.selections !== null) {
+    for (const [fid, selection] of Object.entries(evolution.selections)) {
+      if (selection?.aiSelected !== true || fid === humanId) continue;
+      entries.push({
+        kind: 'innovation',
+        headline: `${franchiseName(fid)} backs ${selection.innovationId}`,
+        detail: 'Scouted from their remaining home slate.',
+        franchiseId: fid,
+        blockIndex: null,
+      });
+      break;
+    }
+  }
+  return entries.slice(0, limit);
+}
 export interface TradeGradeViewModel {
   label: string;
   windowLabel: string;

@@ -150,6 +150,7 @@ import { legalFiveExists, type SeasonRosterMemberInput } from './roster-rules.ts
 import { validateSeasonRotation, seasonRotationSetDigest } from './rotation.ts';
 import { deriveSeasonAwards } from './awards.ts';
 import { seasonRunStateDigest } from './state-digest.ts';
+import { seasonRunStateDigestFactsOf } from './state-digest.ts';
 import {
   applySeasonTrade,
   fillTradeBackfill,
@@ -310,32 +311,7 @@ function economyRunOf(context: SeasonRunCommandContext): SeasonEconomyRun {
   return seasonEconomyRunOf(context.run, context.effects);
 }
 function runStateDigestFactsOf(run: SeasonEconomyRun): Parameters<typeof seasonRunStateDigest>[0] {
-  return {
-    stateRevision: run.stateRevision,
-    stage: run.stage,
-    postseason: run.postseason,
-    awards: run.awards,
-    completion: run.completion,
-    checkpointState: run.checkpointState,
-    health: run.health,
-    influence: run.influence,
-    transactions: run.transactions,
-    trade: run.trade,
-    objectives: run.objectives,
-    challenges:
-      (run as { challenges?: import('@hoop-rush/data-contracts').SeasonChallengeState | null })
-        .challenges ?? null,
-    campaign: run.campaign ?? null,
-    evolution:
-      (run as { evolution?: import('@hoop-rush/data-contracts').SeasonEvolutionState | null })
-        .evolution ?? null,
-    rosters: run.rosters,
-    ownership: run.ownership,
-    rotations: run.rotations,
-    effects: run.effects,
-    freeAgency: run.freeAgency,
-    authority: run.authority,
-  };
+  return seasonRunStateDigestFactsOf(run, run.effects);
 }
 function authorityOfContext(
   context: SeasonRunCommandContext | undefined,
@@ -501,19 +477,27 @@ function baseValidation(
   }
   return null;
 }
+function rejectedCommand(
+  commandKind: SeasonRunCommand['command'],
+  commandId: string,
+  rejection: SeasonRunCommandRejection,
+  run: SeasonRun,
+): SeasonRunCommandOutput {
+  return {
+    result: {
+      command: commandKind,
+      result: { status: 'rejected', commandId, rejection },
+    } as SeasonRunCommandResult,
+    run,
+    pending: null,
+  };
+}
 function rejectedSelect(
   command: SeasonSelectBlockObjectiveCommand,
   rejection: SeasonSelectBlockObjectiveRejection,
   run: SeasonRun,
 ): SeasonRunCommandOutput {
-  return {
-    result: {
-      command: 'select-block-objective',
-      result: { status: 'rejected', commandId: command.commandId, rejection },
-    },
-    run,
-    pending: null,
-  };
+  return rejectedCommand('select-block-objective', command.commandId, rejection, run);
 }
 function handleSelectBlockObjective(
   command: SeasonSelectBlockObjectiveCommand,
@@ -529,112 +513,56 @@ function rejectedSelectGmIdentity(
   rejection: SeasonSelectGmIdentityRejection,
   run: SeasonRun,
 ): SeasonRunCommandOutput {
-  return {
-    result: {
-      command: 'select-gm-identity',
-      result: { status: 'rejected', commandId: command.commandId, rejection },
-    },
-    run,
-    pending: null,
-  };
+  return rejectedCommand('select-gm-identity', command.commandId, rejection, run);
 }
 function rejectedSelectCampaignOpportunity(
   command: SeasonSelectCampaignOpportunityCommand,
   rejection: SeasonSelectCampaignOpportunityRejection,
   run: SeasonRun,
 ): SeasonRunCommandOutput {
-  return {
-    result: {
-      command: 'select-campaign-opportunity',
-      result: { status: 'rejected', commandId: command.commandId, rejection },
-    },
-    run,
-    pending: null,
-  };
+  return rejectedCommand('select-campaign-opportunity', command.commandId, rejection, run);
 }
 function rejectedEvolveGmCampaign(
   command: SeasonEvolveGmCampaignCommand,
   rejection: SeasonEvolveGmCampaignRejection,
   run: SeasonRun,
 ): SeasonRunCommandOutput {
-  return {
-    result: {
-      command: 'evolve-gm-campaign',
-      result: { status: 'rejected', commandId: command.commandId, rejection },
-    },
-    run,
-    pending: null,
-  };
+  return rejectedCommand('evolve-gm-campaign', command.commandId, rejection, run);
 }
 function rejectedOpenTradeInquiry(
   command: SeasonOpenTradeInquiryCommand,
   rejection: SeasonOpenTradeInquiryRejection,
   run: SeasonRun,
 ): SeasonRunCommandOutput {
-  return {
-    result: {
-      command: 'open-trade-inquiry',
-      result: { status: 'rejected', commandId: command.commandId, rejection },
-    },
-    run,
-    pending: null,
-  };
+  return rejectedCommand('open-trade-inquiry', command.commandId, rejection, run);
 }
 function rejectedSubmitTradeProposal(
   command: SeasonSubmitTradeProposalCommand,
   rejection: SeasonSubmitTradeProposalRejection,
   run: SeasonRun,
 ): SeasonRunCommandOutput {
-  return {
-    result: {
-      command: 'submit-trade-proposal',
-      result: { status: 'rejected', commandId: command.commandId, rejection },
-    },
-    run,
-    pending: null,
-  };
+  return rejectedCommand('submit-trade-proposal', command.commandId, rejection, run);
 }
 function rejectedRespondToTradeCounter(
   command: SeasonRespondToTradeCounterCommand,
   rejection: SeasonRespondToTradeCounterRejection,
   run: SeasonRun,
 ): SeasonRunCommandOutput {
-  return {
-    result: {
-      command: 'respond-to-trade-counter',
-      result: { status: 'rejected', commandId: command.commandId, rejection },
-    },
-    run,
-    pending: null,
-  };
+  return rejectedCommand('respond-to-trade-counter', command.commandId, rejection, run);
 }
 function rejectedWalkAwayFromTrade(
   command: SeasonWalkAwayFromTradeCommand,
   rejection: SeasonWalkAwayFromTradeRejection,
   run: SeasonRun,
 ): SeasonRunCommandOutput {
-  return {
-    result: {
-      command: 'walk-away-from-trade',
-      result: { status: 'rejected', commandId: command.commandId, rejection },
-    },
-    run,
-    pending: null,
-  };
+  return rejectedCommand('walk-away-from-trade', command.commandId, rejection, run);
 }
 function rejectedPurchaseTradeInquiry(
   command: SeasonPurchaseTradeInquiryCommand,
   rejection: SeasonPurchaseTradeInquiryRejection,
   run: SeasonRun,
 ): SeasonRunCommandOutput {
-  return {
-    result: {
-      command: 'purchase-trade-inquiry',
-      result: { status: 'rejected', commandId: command.commandId, rejection },
-    },
-    run,
-    pending: null,
-  };
+  return rejectedCommand('purchase-trade-inquiry', command.commandId, rejection, run);
 }
 function handleSelectGmIdentity(
   command: SeasonSelectGmIdentityCommand,
@@ -865,6 +793,15 @@ function handleSubmitTradeProposal(
   }
   const existingForUpdate = nextWin.negotiations?.find((n) => n.inquiryId === inquiryId) ?? null;
   let nextNegotiations: import('@hoop-rush/data-contracts').SeasonTradeNegotiation[];
+  const consequenceFacts = evalResult.proposal.consequenceFacts as {
+    isOverpay?: boolean;
+    rawRatio?: number;
+    adjustedRatio?: number;
+  };
+  const isOverpayGift = consequenceFacts.isOverpay === true;
+  const giftNote = isOverpayGift
+    ? `Overpay gift ${String(consequenceFacts.rawRatio ?? '')}→${String(consequenceFacts.adjustedRatio ?? '')}`
+    : null;
   if (existingForUpdate) {
     if (existingForUpdate.exchangeCount >= 3) {
       return rejectedSubmitTradeProposal(
@@ -895,6 +832,11 @@ function handleSubmitTradeProposal(
         },
       ],
       activeProposalId: evalResult.proposal.proposalId,
+      latestRequestedChange: giftNote ?? existingForUpdate.latestRequestedChange,
+      expressedInterests:
+        giftNote !== null
+          ? [...existingForUpdate.expressedInterests, giftNote]
+          : existingForUpdate.expressedInterests,
     };
     nextNegotiations = (nextWin.negotiations ?? []).map((n) =>
       n.inquiryId === inquiryId ? updated : n,
@@ -922,8 +864,8 @@ function handleSubmitTradeProposal(
         },
       ],
       rejectedPlayerVersionIds: [],
-      expressedInterests: [],
-      latestRequestedChange: null,
+      expressedInterests: giftNote !== null ? [giftNote] : [],
+      latestRequestedChange: giftNote,
       finalReason: null,
       activeProposalId: evalResult.proposal.proposalId,
     };
@@ -956,7 +898,7 @@ function handleSubmitTradeProposal(
     const sent =
       (run.influence.windows[sender] ?? []).find((w) => w.windowIndex === command.windowIndex)
         ?.tradeCashSent ?? 0;
-    if (sent + amount > 2) {
+    if (sent + amount > 3) {
       return rejectedSubmitTradeProposal(
         command,
         {
@@ -1083,6 +1025,9 @@ function handleSubmitTradeProposal(
         windowIndex: command.windowIndex,
         inquiryId: inquiryId,
         proposalId: evalResult.proposal.proposalId,
+        isOverpay: isOverpayGift,
+        rawRatio: consequenceFacts.rawRatio,
+        adjustedRatio: consequenceFacts.adjustedRatio,
       },
     },
     run: next,

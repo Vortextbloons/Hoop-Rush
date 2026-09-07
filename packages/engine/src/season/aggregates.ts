@@ -143,6 +143,15 @@ export function foldSeasonPlayerAggregates(
     a.playerVersionId < b.playerVersionId ? -1 : a.playerVersionId > b.playerVersionId ? 1 : 0,
   );
 }
+export function foldSeasonAggregates(summaries: readonly SeasonGameSummary[]): {
+  teams: SeasonTeamAggregate[];
+  players: SeasonPlayerAggregate[];
+} {
+  return {
+    teams: foldSeasonTeamAggregates(summaries),
+    players: foldSeasonPlayerAggregates(summaries),
+  };
+}
 export function auditSeasonAggregates(input: {
   teams: readonly SeasonTeamAggregate[];
   players: readonly SeasonPlayerAggregate[];

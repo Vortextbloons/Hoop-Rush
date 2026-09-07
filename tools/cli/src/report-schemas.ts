@@ -1411,3 +1411,46 @@ export const seasonFreeAgencyCalibrateReportSchema = z.object({
   durationMs: z.number().nonnegative(),
 });
 export type SeasonFreeAgencyCalibrateReport = z.infer<typeof seasonFreeAgencyCalibrateReportSchema>;
+
+export const collectionPackAuditReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('collection pack-audit'),
+  catalogVersion: z.string().min(1).max(64),
+  catalogHash: z.string().regex(/^[0-9a-f]{64}$/),
+  economyVersion: z.string().min(1).max(64),
+  packRulesVersion: z.string().min(1).max(64),
+  packs: z.array(
+    z.object({
+      packId: z.string().min(1).max(64),
+      priceCurrency: z.string().min(1).max(32),
+      priceAmount: z.number().int().nonnegative(),
+      cardCount: z.number().int().min(1).max(10),
+      atLeastOne: z.record(z.string(), z.number().min(0).max(1)),
+      expectedExchangeFullDuplicate: z.number().nonnegative(),
+      maxDuplicatePayout: z.number().int().nonnegative(),
+    }),
+  ),
+});
+export type CollectionPackAuditReport = z.infer<typeof collectionPackAuditReportSchema>;
+export const collectionPullReproduceReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('collection pull-reproduce'),
+  pullSequence: z.number().int().nonnegative(),
+  kind: z.enum(['welcome', 'pack']),
+  ok: z.boolean(),
+  failures: z.array(z.string().min(1)),
+});
+export type CollectionPullReproduceReport = z.infer<typeof collectionPullReproduceReportSchema>;
+
+export const collectionPackCalibrateReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('collection pack-calibrate'),
+  ordinarySamples: z.number().int().nonnegative(),
+  starterSeeds: z.number().int().nonnegative(),
+  heldOutSamples: z.number().int().nonnegative(),
+  gates: z.record(z.string(), z.boolean()),
+  targetsWritten: z.boolean(),
+  targetsPath: z.string().nullable(),
+  durationMs: z.number().nonnegative(),
+});
+export type CollectionPackCalibrateReport = z.infer<typeof collectionPackCalibrateReportSchema>;

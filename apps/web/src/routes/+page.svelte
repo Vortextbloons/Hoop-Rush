@@ -37,6 +37,14 @@
       cta: 'Start season run',
       href: '/season' as any,
     },
+    {
+      code: '04',
+      name: 'Ultimate Run',
+      line: 'Claim a starter, open seeded packs, grow one permanent collection.',
+      status: 'available',
+      cta: 'Open collection',
+      href: '/collection' as any,
+    },
   ] as const;
   let manifest = $state<HoopRushManifest | null>(null);
   let active = $state.raw<ActiveRunCheckpoint | null>(null);

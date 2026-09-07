@@ -6,7 +6,11 @@ import {
   positionUnionSchema,
 } from './positions.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
-import { SEASON_FREE_AGENCY_VERSION, SEASON_FREE_AGENCY_VERSION_V1 } from './season-versions.ts';
+import {
+  SEASON_FREE_AGENCY_VERSION,
+  SEASON_FREE_AGENCY_VERSION_V1,
+  SEASON_FREE_AGENCY_VERSION_V2,
+} from './season-versions.ts';
 export const seasonFreeAgencyBandSchema = z.enum(['featured', 'role', 'development', 'emergency']);
 export type SeasonFreeAgencyBand = z.infer<typeof seasonFreeAgencyBandSchema>;
 export const seasonFreeAgencyRoleExpectationSchema = z.enum(['rotation', 'depth', 'emergency']);
@@ -169,6 +173,7 @@ export const seasonFreeAgencyStateSchema = z
     schemaVersion: z.literal(1),
     freeAgencyVersion: z.union([
       z.literal(SEASON_FREE_AGENCY_VERSION),
+      z.literal(SEASON_FREE_AGENCY_VERSION_V2),
       z.literal(SEASON_FREE_AGENCY_VERSION_V1),
     ]),
     windows: z.array(seasonFreeAgencyWindowStateSchema).max(3),

@@ -208,7 +208,7 @@ describe('rotation editor consolidation (M3.11a)', () => {
     expect(base.minutesFor(first)).toBe(0);
     expect(base.minutesFor(second)).toBe(secondMinutes);
     expect(onchange).toHaveBeenCalled();
-    expect(container.querySelector('[role="status"]')?.textContent ?? '').toMatch(/left/);
+    expect(container.querySelector('[role="status"]')?.textContent ?? '').toMatch(/Balance to 240/);
   });
 
   it('preserves minute-rebalance feedback instead of timing it out', async () => {

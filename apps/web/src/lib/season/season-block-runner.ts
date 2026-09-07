@@ -141,6 +141,14 @@ export interface SeasonBlockRunnerDeps {
   schedule?: SeasonSchedule;
   workerUrl?: string;
   artifacts?: () => Promise<SeasonArtifactUrls>;
+  simulate?: (
+    request: SeasonWorkerStartRequest,
+    onProgress: (progress: SeasonWorkerProgress) => void,
+  ) => Promise<
+    | { status: 'complete'; candidate: unknown; pending: unknown }
+    | { status: 'interrupted'; pending: unknown }
+    | { status: 'error'; code: string; message: string }
+  >;
 }
 export interface WorkerRequestState {
   blockIndex: number;
@@ -1264,19 +1272,4 @@ function challengesWithSuccess(
     ...base,
     evaluations: [...base.evaluations, evaluation].sort((a, b) => a.blockIndex - b.blockIndex),
   };
-}
-export function getSeasonBlockRunner(): SeasonBlockRunner {
-  if (typeof window !== 'undefined' && window.__HOOP_RUSH_SEASON_BLOCK_RUNNER__) {
-    return window.__HOOP_RUSH_SEASON_BLOCK_RUNNER__;
-  }
-  if (runnerSingleton === null) {
-    runnerSingleton = createSeasonBlockRunner();
-  }
-  return runnerSingleton;
-}
-let runnerSingleton: SeasonBlockRunner | null = null;
-declare global {
-  interface Window {
-    __HOOP_RUSH_SEASON_BLOCK_RUNNER__?: SeasonBlockRunner;
-  }
 }

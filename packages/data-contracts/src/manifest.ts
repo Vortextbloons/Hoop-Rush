@@ -68,6 +68,13 @@ export const hoopRushManifestSchema = z.object({
       model: seasonArtifactIndexEntrySchema,
     })
     .optional(),
+  collection: z
+    .object({
+      catalog: seasonArtifactIndexEntrySchema,
+      index: seasonArtifactIndexEntrySchema,
+      packTargets: seasonArtifactIndexEntrySchema.optional(),
+    })
+    .optional(),
   assets: assetConfigSchema,
 });
 export type HoopRushManifest = z.infer<typeof hoopRushManifestSchema>;

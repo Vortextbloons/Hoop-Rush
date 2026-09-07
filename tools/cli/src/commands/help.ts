@@ -158,12 +158,13 @@ Commands:
                           per-block digests, the final digest, the M2.5 state
                           chain, and final health/transaction facts.
                           --input <run.json> --manifest <path> --profile <eraId>
-  season campaign audit  Audit campaign hard gates: exactly 2 offers per
+  season campaign audit  Audit campaign hard gates (historical; gameplay retired):
+                           exactly 2 offers per
                            eligible checkpoint (blocks 0-7), zero
                            unsupported-fact/duplicate-reward/branch/evolution
                            violations, determinism and order-invariance.
                            --input <run.json> --manifest <path>
-  season campaign calibrate Freeze campaign-targets-v1 from a season cohort:
+  season campaign calibrate Freeze campaign-targets-v1 from a season cohort (historical; gameplay retired):
                            offer feasibility, branch/evolution, determinism,
                            completion/breakthrough rates with held-out cohort.
                            --input <run.json> --seed-from N --seed-to N

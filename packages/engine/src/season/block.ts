@@ -95,7 +95,8 @@ import {
   normalizeCampaignState,
 } from './campaign.ts';
 import { applySeasonBlockInfluenceGrants, createInitialSeasonInfluenceState } from './influence.ts';
-import { seasonRunStateDigest } from './state-digest.ts';
+import { seasonRunStateDigest, seasonRunStateDigestFactsOf } from './state-digest.ts';
+export { seasonRunStateDigestFactsOf } from './state-digest.ts';
 import { openSeasonTradeWindow, type SeasonWindowOpenResult } from './trades.ts';
 import { freeAgencyUnresolvedWindowIndex, openSeasonFreeAgencyWindow } from './free-agency.ts';
 export function seasonAcceptedBlockCount(completedRounds: number): number {
@@ -192,41 +193,6 @@ function emptyFreeAgencyStateOf(run: SeasonRun | SeasonBlockRunContext): SeasonF
     canonicalCandidates: {},
     signingCounts: Object.fromEntries(franchiseIds.map((franchiseId) => [franchiseId, 0])),
     seasonSpend: Object.fromEntries(franchiseIds.map((franchiseId) => [franchiseId, 0])),
-  };
-}
-export function seasonRunStateDigestFactsOf(
-  next: SeasonRun,
-  effects: SeasonEffectsState,
-): Parameters<typeof seasonRunStateDigest>[0] {
-  return {
-    stateRevision: next.stateRevision,
-    stage: next.stage,
-    postseason: next.postseason,
-    awards: next.awards,
-    completion: next.completion,
-    checkpointState: next.checkpointState,
-    health: next.health,
-    influence: next.influence,
-    transactions: next.transactions,
-    trade: next.trade,
-    freeAgency: next.freeAgency,
-    objectives: next.objectives,
-    challenges: (next as unknown as { challenges?: SeasonChallengeState }).challenges ?? null,
-    campaign: (
-      next as {
-        campaign?: unknown;
-      }
-    ).campaign as never,
-    evolution: (
-      next as unknown as {
-        evolution?: import('@hoop-rush/data-contracts').SeasonEvolutionState | null;
-      }
-    ).evolution,
-    rosters: next.rosters,
-    ownership: next.ownership,
-    rotations: next.rotations,
-    effects,
-    authority: next.authority,
   };
 }
 export interface SeasonBlockSimulationOptions {

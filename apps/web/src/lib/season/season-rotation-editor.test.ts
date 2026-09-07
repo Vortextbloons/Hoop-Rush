@@ -348,6 +348,44 @@ describe('RotationEditor.rebalanceMinutes', () => {
     expect(noop.adjustments).toEqual([]);
   });
 });
+describe('RotationEditor.balanceMinutesTotal', () => {
+  it('redistributes freed minutes after a DNP without touching the zeroed player', () => {
+    const e = editor();
+    const first = e.rows()[0];
+    if (first === undefined) {
+      throw new Error('fixture editor has no rows');
+    }
+    const freed = e.minutesFor(first.member.playerVersionId);
+    e.setMinutes(first.member.playerVersionId, 0);
+    const result = e.balanceMinutesTotal();
+    expect(result.failures).toEqual([]);
+    expect(e.minutesFor(first.member.playerVersionId)).toBe(0);
+    expect(e.validate()).toEqual([]);
+    expect(e.rotation.targetMinutes.reduce((sum, entry) => sum + entry.minutes, 0)).toBe(240);
+    expect(result.adjustments.reduce((sum, adjustment) => sum + adjustment.delta, 0)).toBe(freed);
+  });
+  it('removes excess minutes when total is above 240', () => {
+    const e = editor();
+    const first = e.rotation.starters[0];
+    if (first === undefined) {
+      throw new Error('fixture rotation has no starters');
+    }
+    e.setMinutes(first, 48);
+    const result = e.balanceMinutesTotal();
+    expect(result.failures).toEqual([]);
+    expect(e.minutesFor(first)).toBe(32);
+    expect(e.validate()).toEqual([]);
+    expect(e.rotation.targetMinutes.reduce((sum, entry) => sum + entry.minutes, 0)).toBe(240);
+  });
+  it('is a no-op when total is already 240', () => {
+    const e = editor();
+    const before = e.rotation;
+    const result = e.balanceMinutesTotal();
+    expect(result.failures).toEqual([]);
+    expect(result.adjustments).toEqual([]);
+    expect(e.rotation).toEqual(before);
+  });
+});
 describe('RotationEditor.toggleClosing', () => {
   it('adds a non-closing player to the first legal closing slot, displacing the incumbent', () => {
     const e = editor();
