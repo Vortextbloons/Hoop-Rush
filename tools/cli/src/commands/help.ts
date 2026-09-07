@@ -24,6 +24,16 @@ Commands:
                          packaged franchise-era row: band counts/percentages
                          vs targets, medians, min/max, and per-era breakdowns.
                           --input <path>   Manifest path (default apps/web/static/data/manifest.json)
+  data overalls-audit    Raw vs canonical vs final Overall audit: raw
+                         distribution, minutes-floor violations (>=1500 min
+                         below 60 Overall), low-confidence 97+ flags, canonical
+                         stretch, and year-over-year cliffs (>=15).
+                          --input <path>   Manifest path (default apps/web/static/data/manifest.json)
+  data positions-coverage
+                         Primary/playable/source-label coverage by era.
+                         Fails when PG primaries are zero or PF primaries
+                         are below 1% (source labels collapse PG/PF).
+                          --input <path>   Manifest path (default apps/web/static/data/manifest.json)
   data defense-bpm-correlation
                          Pearson correlation between packaged defenseRating
                          and the raw source season box plus/minus (matched by

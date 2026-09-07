@@ -594,6 +594,11 @@ export const seasonDraftCalibrateReportSchema = z.object({
   duplicateDrafts: z.number().int().nonnegative(),
   draftFailures: z.number().int().nonnegative(),
   generationFailures: z.number().int().nonnegative(),
+  scriptMisses: z.number().int().nonnegative(),
+  minStarOffers: z.number().int().nonnegative(),
+  minFloorOffers: z.number().int().nonnegative(),
+  starOfferShare: z.number().min(0).max(1),
+  floorOfferShare: z.number().min(0).max(1),
   bands: z.object({
     contender: distributionEntrySchema,
     playoff: distributionEntrySchema,
@@ -605,6 +610,7 @@ export const seasonDraftCalibrateReportSchema = z.object({
     zeroDuplicates: z.boolean(),
     zeroDraftFailures: z.boolean(),
     zeroGenerationFailures: z.boolean(),
+    scriptGuarantee: z.boolean(),
     selectableGroupCoverage: z.boolean(),
     heldOutVarietyPassShare: z.number().min(0).max(1),
     heldOutVarietyPass: z.boolean(),
@@ -1454,3 +1460,66 @@ export const collectionPackCalibrateReportSchema = z.object({
   durationMs: z.number().nonnegative(),
 });
 export type CollectionPackCalibrateReport = z.infer<typeof collectionPackCalibrateReportSchema>;
+
+export const overallsAuditFlagSchema = z.object({
+  displayName: z.string().min(1).max(96),
+  playerExternalId: z.string().min(1).max(64),
+  seasonKey: z.string().min(1).max(16),
+  franchiseId: z.string().min(1).max(64),
+  eraId: z.string().min(1).max(24),
+  overall: z.number().int().min(0).max(100),
+  rawOverallScore: z.number().nullable(),
+  canonicalOverall: z.number().int().min(0).max(100).nullable(),
+  minutes: z.number().int().nonnegative(),
+  games: z.number().int().nonnegative(),
+  productionScore: z.number().nullable(),
+  productionWeight: z.number().nullable(),
+  productionConfidence: z.string().min(1).max(16).nullable(),
+});
+export const overallsAuditYoyFlagSchema = overallsAuditFlagSchema.extend({
+  previousSeasonKey: z.string().min(1).max(16),
+  previousOverall: z.number().int().min(0).max(100),
+  delta: z.number().int(),
+});
+export const overallsAuditReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('data overalls-audit'),
+  dataVersion: z.string().min(1).max(64),
+  total: z.number().int().nonnegative(),
+  rowsWithoutRawOverall: z.number().int().nonnegative(),
+  raw: z.object({
+    min: z.number().nullable(),
+    max: z.number().nullable(),
+    mean: z.number().nullable(),
+    median: z.number().nullable(),
+    p10: z.number().nullable(),
+    p25: z.number().nullable(),
+    p75: z.number().nullable(),
+    p90: z.number().nullable(),
+    p95: z.number().nullable(),
+    p99: z.number().nullable(),
+  }),
+  floorViolations: z.array(overallsAuditFlagSchema),
+  lowConfidenceTop: z.array(overallsAuditFlagSchema),
+  canonStretch: z.array(overallsAuditFlagSchema.extend({ stretch: z.number().int() })),
+  yoyCliffs: z.array(overallsAuditYoyFlagSchema),
+});
+export type OverallsAuditReport = z.infer<typeof overallsAuditReportSchema>;
+
+export const positionsCoverageReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('data positions-coverage'),
+  dataVersion: z.string().min(1).max(64),
+  total: z.number().int().nonnegative(),
+  primary: z.record(z.string().min(1), z.number().int().nonnegative()),
+  playable: z.record(z.string().min(1), z.number().int().nonnegative()),
+  sourceLabels: z.record(z.string().min(1), z.number().int().nonnegative()),
+  perEra: z.record(
+    z.string().min(1),
+    z.object({
+      count: z.number().int().nonnegative(),
+      primary: z.record(z.string().min(1), z.number().int().nonnegative()),
+    }),
+  ),
+});
+export type PositionsCoverageReport = z.infer<typeof positionsCoverageReportSchema>;

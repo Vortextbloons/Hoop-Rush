@@ -214,7 +214,7 @@ function createSolo(
       rootSeed: seedSchema.parse(rootSeed),
       league,
       humanParticipantIds: ['p1'],
-      catalogVersion: 'season-draft-v3',
+      catalogVersion: 'season-draft-v4',
     }),
     fakeDeps(),
   );
@@ -233,7 +233,7 @@ function createDuo(
       rootSeed: seedSchema.parse(rootSeed),
       league,
       humanParticipantIds: ['p1', 'p2'],
-      catalogVersion: 'season-draft-v3',
+      catalogVersion: 'season-draft-v4',
     }),
     fakeDeps(),
   );
@@ -321,7 +321,7 @@ function playToFinalized(
       rootSeed: seedSchema.parse(rootSeed),
       league,
       humanParticipantIds: ids,
-      catalogVersion: 'season-draft-v3',
+      catalogVersion: 'season-draft-v4',
     }),
     deps,
   );
@@ -456,9 +456,9 @@ describe('season draft create', () => {
     expect(state.currentTurnParticipantId).toBe('p1');
     expect(state.round).toBe(1);
     expect(state.revision).toBe(1);
-    expect(state.schemaVersion).toBe(2);
-    expect(state.draftVersion).toBe('season-draft-v3');
-    expect(state.catalogVersion).toBe('season-draft-v3');
+    expect(state.schemaVersion).toBe(3);
+    expect(state.draftVersion).toBe('season-draft-v4');
+    expect(state.catalogVersion).toBe('season-draft-v4');
     expect(state.currentOffer).toBeNull();
     expect(result.record).toMatchObject({
       status: 'accepted',
@@ -497,7 +497,7 @@ describe('season draft create', () => {
         rootSeed: SEED,
         league: LEAGUE,
         humanParticipantIds: ['p1'],
-        catalogVersion: 'season-draft-v3',
+        catalogVersion: 'season-draft-v4',
       }),
       fakeDeps(),
     );
@@ -523,7 +523,7 @@ describe('season draft create', () => {
         rootSeed: SEED,
         league: LEAGUE,
         humanParticipantIds: ['p1'],
-        catalogVersion: 'season-draft-v3',
+        catalogVersion: 'season-draft-v4',
       }),
       fakeDeps(),
     );
@@ -538,7 +538,7 @@ describe('season draft create', () => {
         rootSeed: SEED,
         league: badLeague,
         humanParticipantIds: ['p1'],
-        catalogVersion: 'season-draft-v3',
+        catalogVersion: 'season-draft-v4',
       }),
       fakeDeps(),
     );
@@ -560,7 +560,7 @@ describe('season draft create', () => {
         rootSeed: SEED,
         league: LEAGUE,
         humanParticipantIds: ['p1', 'p2'],
-        catalogVersion: 'season-draft-v3',
+        catalogVersion: 'season-draft-v4',
       }),
       fakeDeps(),
     );
@@ -576,7 +576,7 @@ describe('season draft create', () => {
         rootSeed: SEED,
         league: LEAGUE,
         humanParticipantIds: ['p1', 'p1'],
-        catalogVersion: 'season-draft-v3',
+        catalogVersion: 'season-draft-v4',
       }),
       fakeDeps(),
     );

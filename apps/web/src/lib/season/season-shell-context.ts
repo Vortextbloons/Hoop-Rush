@@ -21,6 +21,7 @@ import type { SeasonRunPlayerSlice } from './season-player-slice';
 import type {
   BlockRunState,
   SeasonHubState,
+  SeasonRunLoadDiagnostic,
   SeasonRunCommandError,
   SeasonSpendInfluencePurpose,
   SeasonTradeReceipt,
@@ -31,8 +32,8 @@ import type { RotationEditor } from './season-rotation-editor';
 export const SEASON_RUN_SHELL_CONTEXT = 'hoop-rush:season-run-shell';
 export interface SeasonRunShellData {
   ready: boolean;
-  error: string | null;
-  hubError: string | null;
+  error: SeasonRunLoadDiagnostic | null;
+  hubError: SeasonRunLoadDiagnostic | null;
   hub: SeasonHubState | null;
   snapshot: SeasonRunSnapshot | null;
   index: SeasonActiveRunIndex | null;

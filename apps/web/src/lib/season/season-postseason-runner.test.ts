@@ -40,20 +40,20 @@ import {
   seedSchema,
   seasonGameIdSchema,
 } from '@hoop-rush/data-contracts';
+import { handleSeasonRunCommand } from '@hoop-rush/engine/src/season/season-commands.ts';
+import { seasonRunStateDigest } from '@hoop-rush/engine/src/season/state-digest.ts';
 import {
-  handleSeasonRunCommand,
-  seasonRunStateDigest,
   seasonPostseasonNextGame,
   seasonPostseasonHumanEliminated,
   zeroSeasonGameTransition,
   type SeasonPostseasonGameResolver,
-} from '@hoop-rush/engine';
+} from '@hoop-rush/engine/src/season/postseason.ts';
 import {
   buildEraSimulationProfile,
   buildSeasonLeague,
   buildSeasonRunFixture,
 } from '@hoop-rush/test-fixtures';
-import { generateSeasonSchedule } from '@hoop-rush/engine';
+import { generateSeasonSchedule } from '@hoop-rush/engine/src/season/schedule.ts';
 import {
   SeasonRunCommandDuplicateError,
   SeasonRunCommandRunMismatchError,

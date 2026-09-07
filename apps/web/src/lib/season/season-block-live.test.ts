@@ -5,7 +5,8 @@ import {
   seedSchema,
   type SeasonScoreline,
 } from '@hoop-rush/data-contracts';
-import { generateSeasonSchedule, seasonBlockGamesOf } from '@hoop-rush/engine';
+import { generateSeasonSchedule } from '@hoop-rush/engine/src/season/schedule.ts';
+import { seasonBlockGamesOf } from '@hoop-rush/engine/src/season/block.ts';
 import { buildSeasonLeague } from '@hoop-rush/test-fixtures';
 import { buildBlockLiveViewModel } from './season-block-live';
 

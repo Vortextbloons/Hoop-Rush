@@ -3,6 +3,10 @@ import { z } from 'zod';
 import {
   SEASON_AI_VERSION,
   SEASON_DRAFT_SAFE_MINIMUM,
+  SEASON_DRAFT_SCRIPT_FLOOR_COUNT,
+  SEASON_DRAFT_SCRIPT_FLOOR_MAX_OVERALL,
+  SEASON_DRAFT_SCRIPT_STAR_COUNT,
+  SEASON_DRAFT_SCRIPT_STAR_MIN_OVERALL,
   SEASON_DRAFT_VERSION,
   SEASON_OFFER_TARGETS_VERSION,
   SEASON_ROSTER_GENERATION_VERSION,
@@ -45,6 +49,8 @@ export interface SeasonDraftCalibrationRun {
   duplicateVersion: boolean;
   draftFailed: boolean;
   generationFailed: boolean;
+  starOffers: number;
+  floorOffers: number;
   bands: Record<'contender' | 'playoff' | 'average' | 'weaker', number[]>;
 }
 function cmd(
@@ -78,7 +84,12 @@ function measureDraft(
   catalog: SeasonDraftCatalog,
 ): Pick<
   SeasonDraftCalibrationRun,
-  'variety' | 'minSafePerOffer' | 'selectableGroupCoverageShare' | 'duplicateVersion'
+  | 'variety'
+  | 'minSafePerOffer'
+  | 'selectableGroupCoverageShare'
+  | 'duplicateVersion'
+  | 'starOffers'
+  | 'floorOffers'
 > {
   const allCards = state.offers.flatMap((offer) => offer.cards.map((card) => card.playerVersionId));
   const groupMask = (playable: readonly string[]): number =>
@@ -117,6 +128,26 @@ function measureDraft(
     const ownPick = state.picks[index];
     if (ownPick !== undefined) pickedBefore.add(ownPick.playerVersionId);
   });
+  let starOffers = 0;
+  let floorOffers = 0;
+  for (const offer of state.offers) {
+    let hasStar = false;
+    let hasFloor = false;
+    for (const card of offer.cards) {
+      if (!card.selectable) continue;
+      const candidate = byId.get(card.playerVersionId);
+      if (candidate === undefined) continue;
+      if (candidate.summaryRatings.overallRating >= SEASON_DRAFT_SCRIPT_STAR_MIN_OVERALL) {
+        hasStar = true;
+      }
+      if (candidate.summaryRatings.overallRating <= SEASON_DRAFT_SCRIPT_FLOOR_MAX_OVERALL) {
+        hasFloor = true;
+      }
+      if (hasStar && hasFloor) break;
+    }
+    if (hasStar) starOffers += 1;
+    if (hasFloor) floorOffers += 1;
+  }
   return {
     variety: new Set(allCards).size,
     minSafePerOffer:
@@ -128,6 +159,8 @@ function measureDraft(
     selectableGroupCoverageShare:
       state.offers.length === 0 ? 0 : coveredOffers / state.offers.length,
     duplicateVersion,
+    starOffers,
+    floorOffers,
   };
 }
 export function playSeasonDraftCalibrationSeed(args: {
@@ -142,6 +175,8 @@ export function playSeasonDraftCalibrationSeed(args: {
     minSafePerOffer: 0,
     selectableGroupCoverageShare: 0,
     duplicateVersion: false,
+    starOffers: 0,
+    floorOffers: 0,
     draftFailed: false,
     generationFailed: false,
     bands: {
@@ -318,6 +353,11 @@ const offerTargetsSchema = z.object({
     generatedAtIso: z.string().min(1),
     draftVersion: z.literal(SEASON_DRAFT_VERSION),
     safeMinimum: z.literal(SEASON_DRAFT_SAFE_MINIMUM),
+    scriptVersion: z.literal('draft-script-v1'),
+    starCount: z.literal(SEASON_DRAFT_SCRIPT_STAR_COUNT),
+    floorCount: z.literal(SEASON_DRAFT_SCRIPT_FLOOR_COUNT),
+    starMinOverall: z.literal(SEASON_DRAFT_SCRIPT_STAR_MIN_OVERALL),
+    floorMaxOverall: z.literal(SEASON_DRAFT_SCRIPT_FLOOR_MAX_OVERALL),
   }),
   variety: z.object({
     median: z.number(),
@@ -330,6 +370,12 @@ const offerTargetsSchema = z.object({
     share: z.number().min(0).max(1),
     range: z.tuple([z.number(), z.number()]),
     sampleOffers: z.number().int().nonnegative(),
+  }),
+  script: z.object({
+    starOffersMin: z.number().int().nonnegative(),
+    floorOffersMin: z.number().int().nonnegative(),
+    starOfferShare: z.number().min(0).max(1),
+    floorOfferShare: z.number().min(0).max(1),
   }),
   bands: z.object({
     contender: z.object({
@@ -424,10 +470,18 @@ export async function seasonDraftCalibrate(args: {
   let generationFailures = 0;
   let draftFailures = 0;
   let duplicateDrafts = 0;
+  let scriptMisses = 0;
   for (const run of calibrationRuns) {
     if (run.generationFailed) generationFailures += 1;
     if (run.draftFailed) draftFailures += 1;
     if (run.duplicateVersion) duplicateDrafts += 1;
+    if (
+      !run.draftFailed &&
+      (run.starOffers < SEASON_DRAFT_SCRIPT_STAR_COUNT ||
+        run.floorOffers < SEASON_DRAFT_SCRIPT_FLOOR_COUNT)
+    ) {
+      scriptMisses += 1;
+    }
     for (const band of ['contender', 'playoff', 'average', 'weaker'] as const) {
       byBand[band].push(...run.bands[band]);
     }
@@ -455,6 +509,19 @@ export async function seasonDraftCalibrate(args: {
   const minSafeGate = safeAvailabilityShare === 1 && minSafe >= SEASON_DRAFT_SAFE_MINIMUM;
   const zeroDuplicates = duplicateDrafts === 0;
   const zeroGenerationFailures = generationFailures === 0;
+  const scriptGate = scriptMisses === 0;
+  const starOfferShare =
+    calibrationRuns.length === 0
+      ? 0
+      : calibrationRuns.filter((run) => run.starOffers >= SEASON_DRAFT_SCRIPT_STAR_COUNT).length /
+        calibrationRuns.length;
+  const floorOfferShare =
+    calibrationRuns.length === 0
+      ? 0
+      : calibrationRuns.filter((run) => run.floorOffers >= SEASON_DRAFT_SCRIPT_FLOOR_COUNT).length /
+        calibrationRuns.length;
+  const minStarOffers = Math.min(...calibrationRuns.map((run) => run.starOffers));
+  const minFloorOffers = Math.min(...calibrationRuns.map((run) => run.floorOffers));
   const withinVariety = (run: SeasonDraftCalibrationRun): boolean =>
     !run.draftFailed && run.variety >= variety.range[0] && run.variety <= variety.range[1];
   const withinCoverage = (run: SeasonDraftCalibrationRun): boolean =>
@@ -496,7 +563,7 @@ export async function seasonDraftCalibrate(args: {
     heldOutStrengthPassShare,
   );
   const heldOutPass = heldOutPassShare >= 0.95;
-  const pass = minSafeGate && zeroDuplicates && zeroGenerationFailures && heldOutPass;
+  const pass = minSafeGate && zeroDuplicates && zeroGenerationFailures && scriptGate && heldOutPass;
   let targetsWritten = false;
   let targetsPath: string | null = null;
   const gateFailures: string[] = [];
@@ -509,6 +576,11 @@ export async function seasonDraftCalibrate(args: {
       generatedAtIso: new Date().toISOString(),
       draftVersion: SEASON_DRAFT_VERSION,
       safeMinimum: SEASON_DRAFT_SAFE_MINIMUM,
+      scriptVersion: 'draft-script-v1',
+      starCount: SEASON_DRAFT_SCRIPT_STAR_COUNT,
+      floorCount: SEASON_DRAFT_SCRIPT_FLOOR_COUNT,
+      starMinOverall: SEASON_DRAFT_SCRIPT_STAR_MIN_OVERALL,
+      floorMaxOverall: SEASON_DRAFT_SCRIPT_FLOOR_MAX_OVERALL,
     },
     variety: {
       median: variety.median,
@@ -521,6 +593,12 @@ export async function seasonDraftCalibrate(args: {
       share: selectableGroupCoverageShare,
       range: coverage.range,
       sampleOffers: allOffers,
+    },
+    script: {
+      starOffersMin: minStarOffers,
+      floorOffersMin: minFloorOffers,
+      starOfferShare,
+      floorOfferShare,
     },
     bands: {
       contender: { median: bands.contender.median, range: bands.contender.range },
@@ -556,12 +634,18 @@ export async function seasonDraftCalibrate(args: {
     duplicateDrafts,
     draftFailures,
     generationFailures,
+    scriptMisses,
+    minStarOffers,
+    minFloorOffers,
+    starOfferShare,
+    floorOfferShare,
     bands,
     gates: {
       minSafe: minSafeGate,
       zeroDuplicates,
       zeroDraftFailures: draftFailures === 0,
       zeroGenerationFailures,
+      scriptGuarantee: scriptGate,
       selectableGroupCoverage: selectableGroupCoverageShare >= 0.95,
       heldOutVarietyPassShare,
       heldOutVarietyPass: heldOutVarietyPassShare >= 0.95,
@@ -580,8 +664,9 @@ export async function seasonDraftCalibrate(args: {
     `${String(calibrationCount)} calibration + ${String(validationCount)} validation seeds in ${String(durationMs)}ms (${String(workers)} workers)`,
     `variety median ${variety.median.toFixed(1)} (range ${variety.range[0].toFixed(1)}-${variety.range[1].toFixed(1)}) · min safe per offer ${String(minSafe)} · safe availability ${(safeAvailabilityShare * 100).toFixed(1)}%`,
     `selectable group coverage ${(selectableGroupCoverageShare * 100).toFixed(1)}% · duplicate drafts ${String(duplicateDrafts)} · draft failures ${String(draftFailures)} · generation failures ${String(generationFailures)}`,
+    `script guarantee min star offers ${String(minStarOffers)} (need 2) · min floor offers ${String(minFloorOffers)} (need 3) · misses ${String(scriptMisses)}`,
     `held-out pass share ${(heldOutPassShare * 100).toFixed(1)}% (≥ 95% required)`,
-    `gates: minSafe ${String(minSafeGate)} · duplicates ${String(zeroDuplicates)} · generation ${String(zeroGenerationFailures)}`,
+    `gates: minSafe ${String(minSafeGate)} · duplicates ${String(zeroDuplicates)} · generation ${String(zeroGenerationFailures)} · script ${String(scriptGate)}`,
     `targets ${targetsWritten ? `written to ${targetsPath ?? '?'}` : 'NOT written'}`,
   ];
   if (draftFailures > 0) {
@@ -591,6 +676,11 @@ export async function seasonDraftCalibrate(args: {
   }
   if (!minSafeGate) gateFailures.push('some offer had fewer than 3 selectable cards');
   if (!zeroDuplicates) gateFailures.push('an exact version was duplicated across offers+picks');
+  if (!scriptGate) {
+    gateFailures.push(
+      `${String(scriptMisses)} drafts missed the 2x85+ / 3x sub-80 scripted opportunity guarantee`,
+    );
+  }
   if (!zeroGenerationFailures) {
     gateFailures.push(`${String(generationFailures)} AI generation failures`);
   }

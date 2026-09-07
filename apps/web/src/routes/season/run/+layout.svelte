@@ -27,7 +27,7 @@
   import { loadSeasonLeague, loadSeasonSchedule } from '$lib/season/season-assets';
   import { getManifest, getPlayersIndex } from '$lib/data';
   import { getSeasonBlockRunner, getSeasonRunRepository } from '$lib/season/season-repo';
-  import { SeasonHubState } from '$lib/season/season-hub-state';
+  import { seasonRunLoadDiagnosticOf, SeasonHubState } from '$lib/season/season-hub-state';
   import { SeasonRunShell } from '$lib/season/season-shell-state.svelte';
   import {
     SEASON_RUN_SHELL_CONTEXT,
@@ -378,7 +378,7 @@
       mirrorHub(true);
       scheduleLazyWork();
     } catch (error) {
-      shell.error = error instanceof Error ? error.message : String(error);
+      shell.error = seasonRunLoadDiagnosticOf(error, 'SEASON_RUN_INIT_FAILED');
     } finally {
       shell.ready = true;
     }
@@ -756,12 +756,34 @@
       </h1>
       <p class="mt-2 text-sm text-muted-foreground">
         {#if seasonLoadError !== null}
-          {seasonLoadError}
+          {seasonLoadError.message}
         {:else}
           A resume marker exists in this browser, but the saved season checkpoint is missing or
           incomplete. You can clear the broken save and start fresh.
         {/if}
       </p>
+      {#if seasonLoadError !== null}
+        <div class="mt-4 rounded-lg border border-border bg-surface-2 p-3">
+          <p
+            class="font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
+          >
+            Diagnostic code
+          </p>
+          <code class="mt-1 block break-all text-xs text-foreground">{seasonLoadError.code}</code>
+          {#if seasonLoadError.failures.length > 0}
+            <details class="mt-3">
+              <summary class="cursor-pointer text-xs font-semibold text-muted-foreground">
+                Validation details ({seasonLoadError.failures.length})
+              </summary>
+              <ul class="mt-2 list-disc space-y-1 pl-4 text-xs text-muted-foreground">
+                {#each seasonLoadError.failures as failure (failure)}
+                  <li class="break-words">{failure}</li>
+                {/each}
+              </ul>
+            </details>
+          {/if}
+        </div>
+      {/if}
       <div class="mt-5 flex flex-wrap items-center gap-3">
         <button
           type="button"

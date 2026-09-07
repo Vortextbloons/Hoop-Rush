@@ -1,5 +1,8 @@
 import type { SeasonRotation } from '@hoop-rush/data-contracts';
-import type { AutoRotationScope, RecommendSeasonRotationResult } from '@hoop-rush/engine';
+import type {
+  AutoRotationScope,
+  RecommendSeasonRotationResult,
+} from '@hoop-rush/engine/src/season/auto-rotation.ts';
 import type { ProjectionRotationRecommendInput } from './season-projection-runner';
 
 export type AutoScopeOption = 'full-auto' | 'minutes-only' | 'keep-10';

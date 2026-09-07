@@ -29,11 +29,9 @@ import {
 import type { SeasonRunRepository } from '@hoop-rush/persistence';
 import type { SeasonRunCommandApplication, SeasonRunSnapshot } from '@hoop-rush/persistence';
 import { buildSeasonLeague, buildSeasonRunFixture } from '@hoop-rush/test-fixtures';
-import {
-  generateSeasonSchedule,
-  openSeasonFreeAgencyWindow,
-  seasonRunStateDigest,
-} from '@hoop-rush/engine';
+import { generateSeasonSchedule } from '@hoop-rush/engine/src/season/schedule.ts';
+import { openSeasonFreeAgencyWindow } from '@hoop-rush/engine/src/season/free-agency.ts';
+import { seasonRunStateDigest } from '@hoop-rush/engine/src/season/state-digest.ts';
 import { SeasonHubState, describeCommandRejection } from './season-hub-state';
 import { clearCachedSeasonSnapshot } from './season-state-cache';
 import type { SeasonBlockRunner, SeasonRunnerEvent } from './season-block-runner';
@@ -579,7 +577,8 @@ describe('SeasonHubState free-agency commands (M2.6.5)', () => {
       run: SeasonRun;
     };
     expect(applied.run.stateRevision).toBe(2);
-    const { handleSeasonRunCommand } = await import('@hoop-rush/engine');
+    const { handleSeasonRunCommand } =
+      await import('@hoop-rush/engine/src/season/season-commands.ts');
     const authoritative = applied.run;
     const staleOutput = handleSeasonRunCommand(
       {

@@ -177,7 +177,7 @@ function createDraft(command: SeasonDraftCommand, catalog: SeasonDraftCatalog): 
     seasonNamespaceSeed(payload.rootSeed, 'draft', DRAFT_SEED_KEYS.firstPick),
   ).pick([...humanIds].sort());
   const bareState: SeasonDraftState = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     draftVersion: SEASON_DRAFT_VERSION,
     runId: payload.runId,
     rootSeed: payload.rootSeed,

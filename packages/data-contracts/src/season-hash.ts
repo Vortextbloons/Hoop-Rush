@@ -16,11 +16,27 @@ export function seedFromString(value: string): string {
 }
 const HASH_OFFSETS = [FNV_OFFSET_32, 0x9e3779b9, 0x85ebca6b, 0xc2b2ae35];
 export function seasonDigestHex(material: string): string {
-  let out = '';
-  for (const offset of HASH_OFFSETS) {
-    out += hex32(fnv1a32(material, offset));
+  let h0 = HASH_OFFSETS[0] | 0;
+  let h1 = HASH_OFFSETS[1] | 0;
+  let h2 = HASH_OFFSETS[2] | 0;
+  let h3 = HASH_OFFSETS[3] | 0;
+  for (let i = 0; i < material.length; i += 1) {
+    const code = material.charCodeAt(i);
+    h0 ^= code;
+    h0 = Math.imul(h0, FNV_PRIME_32);
+    h1 ^= code;
+    h1 = Math.imul(h1, FNV_PRIME_32);
+    h2 ^= code;
+    h2 = Math.imul(h2, FNV_PRIME_32);
+    h3 ^= code;
+    h3 = Math.imul(h3, FNV_PRIME_32);
   }
-  return out;
+  return (
+    hex32(h0 >>> 0) +
+    hex32(h1 >>> 0) +
+    hex32(h2 >>> 0) +
+    hex32(h3 >>> 0)
+  );
 }
 export function canonicalJson(value: unknown): string {
   if (value === null) return 'null';

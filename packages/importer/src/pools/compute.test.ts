@@ -616,15 +616,16 @@ describe('overallBandForPercentile', () => {
   it('assigns the exact band endpoints', () => {
     expect(overallBandForPercentile(0)).toBe(99);
     expect(overallBandForPercentile(0.008)).toBe(96);
-    expect(overallBandForPercentile(0.024)).toBe(93);
-    expect(overallBandForPercentile(0.066)).toBe(89);
-    expect(overallBandForPercentile(0.15)).toBe(85);
-    expect(overallBandForPercentile(0.295)).toBe(81);
-    expect(overallBandForPercentile(0.5)).toBe(77);
-    expect(overallBandForPercentile(0.73)).toBe(73);
-    expect(overallBandForPercentile(0.885)).toBe(69);
-    expect(overallBandForPercentile(0.965)).toBe(64);
-    expect(overallBandForPercentile(0.7)).toBe(74);
+    expect(overallBandForPercentile(0.025)).toBe(93);
+    expect(overallBandForPercentile(0.065)).toBe(89);
+    expect(overallBandForPercentile(0.135)).toBe(85);
+    expect(overallBandForPercentile(0.25)).toBe(81);
+    expect(overallBandForPercentile(0.42)).toBe(77);
+    expect(overallBandForPercentile(0.5)).toBe(75);
+    expect(overallBandForPercentile(0.57)).toBe(73);
+    expect(overallBandForPercentile(0.7)).toBe(70);
+    expect(overallBandForPercentile(0.72)).toBe(69);
+    expect(overallBandForPercentile(0.86)).toBe(64);
     expect(overallBandForPercentile(1)).toBe(40);
   });
   it('clamps to the 40..99 contract', () => {

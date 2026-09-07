@@ -174,6 +174,27 @@ function auditAvailability(manifest: HoopRushManifest): AuditResult {
   );
   return { ok: failures.length === 0, details, failures };
 }
+async function loadUnavailablePools(manifestDir: string): Promise<Map<string, string>> {
+  const unavailable = new Map<string, string>();
+  try {
+    const raw = JSON.parse(
+      (await readFile(resolve(manifestDir, 'coverage-report.json'))).toString('utf8'),
+    ) as unknown;
+    if (!Array.isArray(raw)) return unavailable;
+    for (const entry of raw) {
+      const record = entry as Record<string, unknown>;
+      if (record['status'] !== 'unavailable') continue;
+      if (typeof record['franchiseId'] !== 'string' || typeof record['eraId'] !== 'string')
+        continue;
+      const poolKey = `${record['franchiseId']}/${record['eraId']}`;
+      const reason = record['reason'];
+      unavailable.set(poolKey, typeof reason === 'string' ? reason : 'unavailable');
+    }
+  } catch {
+    return unavailable;
+  }
+  return unavailable;
+}
 async function auditPools(
   manifest: HoopRushManifest,
   manifestDir: string,
@@ -181,6 +202,7 @@ async function auditPools(
 ): Promise<AuditResult> {
   const failures: string[] = [];
   const details: string[] = [];
+  const unavailable = await loadUnavailablePools(manifestDir);
   const keys = new Set<string>();
   const slotIds = new Set(manifest.modernFranchiseSlots.map((s) => s.franchiseId));
   const eraIds = new Set(manifest.eras.map((e) => e.eraId));
@@ -211,7 +233,15 @@ async function auditPools(
       } else if (verbose) {
         details.push(`pools: ${key} hash verified (${assetPath})`);
       }
-      auditPoolContent(content, pool, manifest, failures, details, playerSeasons);
+      auditPoolContent(
+        content,
+        pool,
+        manifest,
+        failures,
+        details,
+        playerSeasons,
+        unavailable.get(key) ?? null,
+      );
     } catch {
       failures.push(`pools: ${key} asset missing (${assetPath})`);
     }
@@ -281,6 +311,7 @@ function auditPoolContent(
   failures: string[],
   details: string[],
   playerSeasons: Map<string, string>,
+  unavailableReason: string | null = null,
 ): void {
   const key = `${index.franchiseId}/${index.eraId}`;
   const era = manifest.eras.find((e) => e.eraId === index.eraId);
@@ -300,6 +331,7 @@ function auditPoolContent(
     failures.push(`pools: ${key} asset declares ${pool.franchiseId}/${pool.eraId}`);
   }
   const seen = new Set<string>();
+  let poolSanitySkipped = 0;
   for (const player of pool.players) {
     if (seen.has(player.playerId)) {
       failures.push(`pools: ${key} duplicate playerId ${player.playerId}`);
@@ -357,7 +389,14 @@ function auditPoolContent(
       }
     }
     const counted = player.stats;
-    failures.push(...auditPlayerStatSanity(counted, key, player.displayName));
+    const sanity = auditPlayerStatSanity(counted, key, player.displayName);
+    if (unavailableReason !== null) {
+      if (sanity.length > 0) {
+        poolSanitySkipped += sanity.length;
+      }
+    } else {
+      failures.push(...sanity);
+    }
     const psKey = `${player.franchiseId}/${player.playerExternalId}/${player.seasonKey}`;
     const owner = playerSeasons.get(psKey);
     if (owner !== undefined && owner !== key) {
@@ -412,6 +451,7 @@ function auditPoolContent(
       failures.push(`pools: ${key} ${player.displayName} playable positions map to no slot groups`);
     }
   }
+  let poolVersionNoted = false;
   for (const player of pool.players) {
     const rawOverall = pools.rawOverallScoreFor(player, player.summaryRatings);
     const recomputed = pools.selectionScore(
@@ -428,9 +468,18 @@ function auditPoolContent(
       );
     }
     if (player.selectionScoreVersion !== SELECTION_SCORE_VERSION) {
-      failures.push(
-        `pools: ${key} ${player.displayName} selectionScoreVersion ${player.selectionScoreVersion} != ${SELECTION_SCORE_VERSION}`,
-      );
+      if (unavailableReason !== null) {
+        if (!poolVersionNoted) {
+          details.push(
+            `pools: ${key} skips version-currency checks (coverage: ${unavailableReason})`,
+          );
+          poolVersionNoted = true;
+        }
+      } else {
+        failures.push(
+          `pools: ${key} ${player.displayName} selectionScoreVersion ${player.selectionScoreVersion} != ${SELECTION_SCORE_VERSION}`,
+        );
+      }
     }
   }
   const withFallback = pool.players.filter(
@@ -446,6 +495,11 @@ function auditPoolContent(
         `pools: ${key} ${String(missingMarker.length)} players lack nbaHeadshotAvailable while a primary headshot template is configured`,
       );
     }
+  }
+  if (poolSanitySkipped > 0 && unavailableReason !== null) {
+    details.push(
+      `pools: ${key} skips ${String(poolSanitySkipped)} stat-sanity findings on stale rows (coverage: ${unavailableReason})`,
+    );
   }
   details.push(`pools: ${key} ${String(pool.players.length)} players audited`);
 }

@@ -191,7 +191,7 @@ export class PossessionStepper {
       const offense = this.offenseSide;
       const team = teams[offense];
       const teamPrep = preps[offense];
-      const handler = rng.weightedPick(team.players, teamPrep.initiatorWeights);
+      const handler = rng.weightedPick(team.players, teamPrep.initiatorPickTable);
       const handlerSlot = slotOf(teamPrep, handler);
       this.handlerVersion = handler.playerVersionId;
       consumeTime(state, Math.min(clock.remaining, state.secondsRemaining));
@@ -217,7 +217,7 @@ export class PossessionStepper {
     const team = teams[offense];
     const teamPrep = preps[offense];
     const defensePrep = preps[defense];
-    const handler = rng.weightedPick(team.players, teamPrep.initiatorWeights);
+    const handler = rng.weightedPick(team.players, teamPrep.initiatorPickTable);
     const handlerSlot = slotOf(teamPrep, handler);
     this.handlerVersion = handler.playerVersionId;
     const awayTurnoverPressure =
@@ -241,7 +241,7 @@ export class PossessionStepper {
     ) {
       recorder.turnover(offense, handlerSlot >= 0 ? handlerSlot : 0);
       if (isSteal(rng, defensePrep.stealAbility, this.ctx.profile)) {
-        const stealer = rng.weightedPick(teams[defense].players, defensePrep.stealerWeights);
+        const stealer = rng.weightedPick(teams[defense].players, defensePrep.stealerPickTable);
         const stealerSlot = slotOf(defensePrep, stealer);
         recorder.steal(defense, stealerSlot >= 0 ? stealerSlot : 0);
       }
@@ -268,7 +268,7 @@ export class PossessionStepper {
     if (rng.chance(ENGINE_CONSTANTS.offensiveFoulShare)) {
       const offenseTeam = teams[offense];
       const offensePrep = preps[offense];
-      const fouler = rng.weightedPick(offenseTeam.players, offensePrep.foulerWeights);
+      const fouler = rng.weightedPick(offenseTeam.players, offensePrep.foulerPickTable);
       const foulerSlot = slotOf(offensePrep, fouler);
       recorder.foul(offense, foulerSlot >= 0 ? foulerSlot : 0);
       recorder.turnover(offense, foulerSlot >= 0 ? foulerSlot : 0);
@@ -279,14 +279,14 @@ export class PossessionStepper {
     }
     const defenseTeam = teams[defense];
     const defensePrep = preps[defense];
-    const fouler = rng.weightedPick(defenseTeam.players, defensePrep.foulerWeights);
+    const fouler = rng.weightedPick(defenseTeam.players, defensePrep.foulerPickTable);
     const foulerSlot = slotOf(defensePrep, fouler);
     recorder.foul(defense, foulerSlot >= 0 ? foulerSlot : 0);
     state.periodFouls[defense] += 1;
     if (teamInBonus(state.periodFouls[defense], state.periodIndex >= 4)) {
       const team = teams[offense];
       const teamPrep = preps[offense];
-      const shooter = rng.weightedPick(team.players, teamPrep.freeThrowShooterWeights);
+      const shooter = rng.weightedPick(team.players, teamPrep.freeThrowShooterPickTable);
       const shooterSlot = slotOf(teamPrep, shooter);
       resolveFreeThrows(
         this.ctx,
@@ -467,7 +467,10 @@ function creditAssist(
   passed: boolean,
 ): void {
   if (!passed) return;
-  const passer = pickAssister(team, shooter, initiator, ctx.rng);
+  const teamPrep = ctx.preps[offenseSide];
+  const assisterPrep = teamPrep.assisterByPair.get(`${shooter.playerId}\u0000${initiator.playerId}`);
+  if (assisterPrep === undefined) return;
+  const passer = pickAssister(assisterPrep, ctx.rng);
   if (!passer) return;
   const slot = slotOf(ctx.preps[offenseSide], passer);
   if (slot < 0) return;
@@ -525,7 +528,10 @@ function reboundFromMissedFreeThrow(
   const side = offensive ? offenseSide : defenseSide;
   const team = ctx.teams[side];
   const prep = ctx.preps[side];
-  const rebounder = ctx.rng.weightedPick(team.players, prep.rebounderWeights[offensive ? 0 : 1]);
+  const rebounder = ctx.rng.weightedPick(
+    team.players,
+    prep.rebounderPickTables[offensive ? 0 : 1],
+  );
   const slot = slotOrZero(prep, rebounder);
   if (offensive) {
     ctx.recorder.offensiveRebound(offenseSide, slot);
@@ -582,7 +588,7 @@ function resolveShot(
   const teamPrep = ctx.preps[offenseSide];
   const defense = ctx.teams[defenseSide];
   const defensePrep = ctx.preps[defenseSide];
-  const initiator = rng.weightedPick(team.players, teamPrep.initiatorWeights);
+  const initiator = rng.weightedPick(team.players, teamPrep.initiatorPickTable);
   const actionWeights = teamPrep.actionWeights.get(enginePlayerKey(initiator));
   if (actionWeights === undefined) {
     throw new Error(`possession: no action weights for ${initiator.playerId}`);
@@ -768,7 +774,7 @@ function reboundAfterMiss(
   }
   if (result.offensive) {
     const prep = ctx.preps[offenseSide];
-    const rebounder = rng.weightedPick(ctx.teams[offenseSide].players, prep.rebounderWeights[0]);
+    const rebounder = rng.weightedPick(ctx.teams[offenseSide].players, prep.rebounderPickTables[0]);
     recorder.offensiveRebound(offenseSide, slotOrZero(prep, rebounder));
     ctx.possessionStart = 'offensiveRebound';
     if (ctx.shotClock) ctx.shotClock.remaining = 14;
@@ -780,7 +786,7 @@ function reboundAfterMiss(
     };
   }
   const prep = ctx.preps[defenseSide];
-  const rebounder = rng.weightedPick(ctx.teams[defenseSide].players, prep.rebounderWeights[1]);
+  const rebounder = rng.weightedPick(ctx.teams[defenseSide].players, prep.rebounderPickTables[1]);
   recorder.defensiveRebound(defenseSide, slotOrZero(prep, rebounder));
   ctx.possessionStart = 'defensiveRebound';
   return {

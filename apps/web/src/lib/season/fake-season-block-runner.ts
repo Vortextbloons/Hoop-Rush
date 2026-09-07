@@ -60,9 +60,9 @@ import {
 } from '@hoop-rush/persistence';
 import {
   completeSeasonBlockCommit,
-  evaluateSeasonBlockChallenges,
   type simulateSeasonBlock,
-} from '@hoop-rush/engine';
+} from '@hoop-rush/engine/src/season/block.ts';
+import { evaluateSeasonBlockChallenges } from '@hoop-rush/engine/src/season/challenges.ts';
 import type { SeasonFreeAgencyIndex, SeasonRosterTargets } from '@hoop-rush/data-contracts';
 import { assembleCommittedSnapshot } from '$lib/season/season-block-runner';
 import type {

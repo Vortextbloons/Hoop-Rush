@@ -908,7 +908,7 @@ describe('season draft catalog schema (M2.1)', () => {
     expect(() => seasonDraftCatalogSchema.parse({ ...catalog, candidates })).toThrow();
   });
 });
-describe('season draft state schema (M2.3.5 season-draft-v3)', () => {
+describe('season draft state schema (M2.3.5 season-draft-v4)', () => {
   const seedPath = ['draft', 'offer', 'p1', '1', '1', 'safe-order', 'sample-order'];
   const cards = [
     { playerVersionId: `pv-${'1'.repeat(32)}`, selectable: true, coverageReason: null },
@@ -925,12 +925,12 @@ describe('season draft state schema (M2.3.5 season-draft-v3)', () => {
     { playerVersionId: `pv-${'8'.repeat(32)}`, selectable: true, coverageReason: null },
   ];
   const baseState = {
-    schemaVersion: 2,
-    draftVersion: 'season-draft-v3',
+    schemaVersion: 3,
+    draftVersion: 'season-draft-v4',
     runId: 'run-1',
     rootSeed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a',
     league: buildLeague(),
-    catalogVersion: 'season-draft-v3',
+    catalogVersion: 'season-draft-v4',
     participants: [
       { participantId: 'p1', franchiseId: 'lakers' },
       { participantId: 'p2', franchiseId: 'celtics' },
@@ -983,7 +983,7 @@ describe('season draft state schema (M2.3.5 season-draft-v3)', () => {
             rootSeed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a',
             league: buildLeague(),
             humanParticipantIds: ['p1', 'p2'],
-            catalogVersion: 'season-draft-v3',
+            catalogVersion: 'season-draft-v4',
           },
         },
       },
@@ -995,8 +995,8 @@ describe('season draft state schema (M2.3.5 season-draft-v3)', () => {
     expect(state.picks).toHaveLength(1);
     expect(state.currentOffer).not.toBeNull();
     expect(state.offers).toHaveLength(1);
-    expect(state.schemaVersion).toBe(2);
-    expect(state.catalogVersion).toBe('season-draft-v3');
+    expect(state.schemaVersion).toBe(3);
+    expect(state.catalogVersion).toBe('season-draft-v4');
   });
   it('rejects wrong draft versions and malformed offers', () => {
     expect(() =>
@@ -1109,7 +1109,7 @@ describe('season draft command records (M2.1)', () => {
           rootSeed: 'a1b2c3d4e5f60718',
           league: buildLeague(),
           humanParticipantIds: ['p1'],
-          catalogVersion: 'season-draft-v3',
+          catalogVersion: 'season-draft-v4',
         },
       }),
     ).not.toThrow();
@@ -1130,7 +1130,7 @@ describe('season draft command records (M2.1)', () => {
     ).not.toThrow();
   });
 });
-describe('season run draft facts (M2.3.5 season-draft-v3 only)', () => {
+describe('season run draft facts (M2.3.5 season-draft-v4 only)', () => {
   it('rejects legacy season-draft-v1 run facts', () => {
     const run = buildRun();
     const legacyFacts = {

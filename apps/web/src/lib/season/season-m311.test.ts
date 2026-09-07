@@ -22,7 +22,7 @@ import {
   riskyRehabOptionsOf,
   SEASON_POSTSEASON_REHAB_COST,
 } from './season-postseason-presentation';
-import { rehabPriceOf } from '@hoop-rush/engine';
+import { rehabPriceOf } from '@hoop-rush/engine/src/season/evolution.ts';
 import {
   SEASON_INFLUENCE_CAP,
   franchiseIdSchema,

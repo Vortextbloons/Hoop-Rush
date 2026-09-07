@@ -192,7 +192,8 @@ export function buildFixturePromotedDigestContext(
   );
   const objectives = buildFixtureObjectiveState();
   const challenges = run.challenges ?? buildEmptyChallengeState();
-  const humanFranchiseId = run.league.teams.find((team) => team.control === 'human')?.franchiseId ?? null;
+  const humanFranchiseId =
+    run.league.teams.find((team) => team.control === 'human')?.franchiseId ?? null;
   let campaign = buildEmptyCampaignState();
   try {
     const schedule = generateSeasonSchedule({
@@ -1232,7 +1233,7 @@ export function buildSeasonDraftState(
   const league = buildFixtureLeague('lakers');
   const rootSeed = fixtureSeedFromString('fixture-season-draft');
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     draftVersion: SEASON_DRAFT_VERSION,
     runId: idSchema.parse('fixture-draft-1'),
     rootSeed,

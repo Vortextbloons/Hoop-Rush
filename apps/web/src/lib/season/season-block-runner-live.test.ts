@@ -10,7 +10,8 @@ import {
   type SeasonSchedule,
 } from '@hoop-rush/data-contracts';
 import { buildSeasonLeague, buildSeasonRunFixture } from '@hoop-rush/test-fixtures';
-import { generateSeasonSchedule, seasonRotationSetDigest } from '@hoop-rush/engine';
+import { generateSeasonSchedule } from '@hoop-rush/engine/src/season/schedule.ts';
+import { seasonRotationSetDigest } from '@hoop-rush/engine/src/season/rotation.ts';
 import { createSeasonBlockRunner, type SeasonRunnerEvent } from './season-block-runner';
 
 const LEAGUE = buildSeasonLeague({}, { humanFranchiseId: franchiseIdSchema.parse('lakers') });

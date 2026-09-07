@@ -36,12 +36,10 @@ import {
   type SeasonBlockStartInput,
 } from './season-block-runner';
 const LEAGUE = buildSeasonLeague({}, { humanFranchiseId: franchiseIdSchema.parse('lakers') });
-import {
-  generateSeasonSchedule,
-  seasonCheckpointDigest,
-  seasonFranchiseLegalFiveFacts,
-  seasonRotationSetDigest,
-} from '@hoop-rush/engine';
+import { generateSeasonSchedule } from '@hoop-rush/engine/src/season/schedule.ts';
+import { seasonCheckpointDigest } from '@hoop-rush/engine/src/season/checkpoint.ts';
+import { seasonFranchiseLegalFiveFacts } from '@hoop-rush/engine/src/season/health.ts';
+import { seasonRotationSetDigest } from '@hoop-rush/engine/src/season/rotation.ts';
 class FakeWorker {
   static instances: FakeWorker[] = [];
   static clonePostedMessages = false;
@@ -130,10 +128,10 @@ type MockRepository = SeasonRunRepository & MockRepositoryFns;
 function repositoryMocks(repository: MockRepository): MockRepositoryFns {
   return repository;
 }
-function makeRepository(run: SeasonRun): MockRepository {
+function makeRepository(run: SeasonRun, summaries: SeasonGameSummary[] = []): MockRepository {
   const snapshot = {
     run,
-    summaries: [],
+    summaries,
     retainedDetails: [],
     acceptedBlocks: [],
     effects: buildZeroEffects(run),
@@ -900,6 +898,24 @@ describe('season block runner (M2.5 wire)', () => {
     expect(second.run.rotations).toHaveLength(run.rotations.length);
     expect(second.humanFranchiseId).toBe('lakers');
     expect(second.schedule).toBeDefined();
+  });
+  it('starts when prior summaries exist without reading aggregates from checkpoint metadata', async () => {
+    const run = makeRun();
+    const repository = makeRepository(run, makeCandidate(run).gameSummaries);
+    const runner = createSeasonBlockRunner({
+      repository,
+      schedule,
+      workerUrl: 'fake-worker.ts',
+      artifacts,
+    });
+    const events: Array<{ type: string }> = [];
+    runner.subscribe((event) => events.push(event));
+
+    runner.startBlock(startInput(run));
+    await flush();
+
+    expect(events.some((event) => event.type === 'started')).toBe(true);
+    expect(FakeWorker.instances[0]?.posted[0]).toBeDefined();
   });
   it('buildWorkerRequest and acceptWorkerResult are pure and worker-independent', () => {
     const run = makeRun();

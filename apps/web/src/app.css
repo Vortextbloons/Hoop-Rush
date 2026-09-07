@@ -331,6 +331,186 @@
     border: 1px dashed var(--color-border);
     color: var(--color-muted-foreground);
   }
+  .draft-arena {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    box-shadow: inset 0 3px 0 0 var(--color-court-rim);
+    background:
+      radial-gradient(
+        58% 38% at 50% 118%,
+        color-mix(in srgb, var(--color-court-wood) 16%, transparent),
+        transparent 72%
+      ),
+      var(--color-surface-1);
+  }
+  .draft-arena::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.45;
+    background:
+      linear-gradient(
+        90deg,
+        transparent 11.5%,
+        color-mix(in srgb, var(--color-court-wood) 38%, transparent) 11.5%,
+        color-mix(in srgb, var(--color-court-wood) 38%, transparent) 12%,
+        transparent 12%
+      ),
+      linear-gradient(
+        90deg,
+        transparent 88%,
+        color-mix(in srgb, var(--color-court-wood) 38%, transparent) 88%,
+        color-mix(in srgb, var(--color-court-wood) 38%, transparent) 88.5%,
+        transparent 88.5%
+      ),
+      repeating-linear-gradient(
+        90deg,
+        transparent 0,
+        transparent 27px,
+        color-mix(in srgb, var(--color-court-wood) 14%, transparent) 27px,
+        color-mix(in srgb, var(--color-court-wood) 14%, transparent) 28px
+      );
+    mask-image: linear-gradient(180deg, transparent, #000 22%, #000 78%, transparent);
+  }
+  .draft-arena::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: -52%;
+    width: 78%;
+    height: 92%;
+    z-index: 0;
+    pointer-events: none;
+    transform: translateX(-50%);
+    border: 1px solid color-mix(in srgb, var(--color-court-wood) 32%, transparent);
+    border-radius: 50%;
+  }
+  .draft-arena > * {
+    position: relative;
+    z-index: 1;
+  }
+  .draft-jumbo {
+    font-family: var(--font-display);
+    font-weight: 900;
+    letter-spacing: -0.045em;
+    line-height: 0.84;
+    text-transform: uppercase;
+    color: var(--color-foreground);
+    animation: draft-jumbo-in 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .draft-ticker {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-muted-foreground);
+  }
+  .draft-ticker strong {
+    color: var(--color-court-wood);
+  }
+  .draft-draw-btn {
+    position: relative;
+    letter-spacing: 0.08em;
+  }
+  .draft-ball {
+    display: inline-grid;
+    place-items: center;
+    width: 1.85rem;
+    height: 1.85rem;
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 800;
+    color: var(--color-foreground);
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, white 14%, transparent),
+        transparent 42%
+      ),
+      linear-gradient(
+        90deg,
+        var(--color-surface-3) 49%,
+        color-mix(in srgb, var(--color-court-rim) 70%, var(--color-surface-3)) 50%,
+        var(--color-surface-3) 51%
+      );
+    border: 1px solid color-mix(in srgb, var(--color-court-wood) 55%, transparent);
+  }
+  .draft-card-enter {
+    animation: draft-card-drop 0.46s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: calc(var(--draft-index, 0) * 60ms);
+  }
+  .draft-card-inner {
+    position: relative;
+    min-height: 0;
+  }
+  .draft-card-enter:hover {
+    transform: translateY(-2px);
+  }
+  .draft-card-off {
+    filter: grayscale(0.35) brightness(0.88);
+  }
+  .draft-tape {
+    background: var(--color-surface-3);
+    border-left: 3px solid color-mix(in srgb, var(--color-muted-foreground) 45%, transparent);
+  }
+  .draft-roster-enter {
+    animation: draft-roster-in 0.36s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .draft-just-picked {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.1rem 0.5rem;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-court-rim);
+    border: 1px solid color-mix(in srgb, var(--color-court-rim) 55%, transparent);
+    background: color-mix(in srgb, var(--color-court-rim) 12%, transparent);
+    animation: draft-tag-in 0.35s ease both;
+  }
+  .draft-finale {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-1);
+    box-shadow: inset 3px 0 0 0 var(--color-court-wood);
+  }
+  .draft-hopper {
+    display: flex;
+    align-items: center;
+    gap: 0.28rem;
+  }
+  .draft-hopper-slot {
+    display: inline-grid;
+    place-items: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 800;
+    color: var(--color-muted-foreground);
+    background: var(--color-surface-3);
+    border: 1px solid var(--color-border);
+  }
+  .draft-hopper-slot[data-done='true'] {
+    color: var(--color-primary-foreground);
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+  }
+  .draft-hopper-slot[data-current='true'] {
+    color: var(--color-court-wood);
+    border-color: var(--color-court-wood);
+    background: color-mix(in srgb, var(--color-court-wood) 14%, var(--color-surface-2));
+  }
 }
 
 @keyframes sim-live-pulse {
@@ -370,6 +550,50 @@
     transform: scale(1);
   }
 }
+@keyframes draft-card-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes draft-jumbo-in {
+  from {
+    opacity: 0;
+    clip-path: inset(0 72% 0 0);
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+    transform: translateX(0);
+  }
+}
+@keyframes draft-roster-in {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+    box-shadow: inset 3px 0 0 0 var(--color-court-wood);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+    box-shadow: inset 0 0 0 0 transparent;
+  }
+}
+@keyframes draft-tag-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 .sim-modal-overlay {
   animation: sim-fade-in 180ms ease both;
 }
@@ -399,7 +623,11 @@
   .sim-ticker-card,
   .sim-spot-badge,
   .sim-modal-overlay,
-  .sim-modal-content {
+  .sim-modal-content,
+  .draft-card-enter,
+  .draft-jumbo,
+  .draft-roster-enter,
+  .draft-just-picked {
     animation: none;
   }
   .sim-bar-fill {

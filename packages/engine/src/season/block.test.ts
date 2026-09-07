@@ -38,6 +38,14 @@ describe('season block pipeline (M2.3)', () => {
     expect(seasonCheckpointDigest(checkpoint)).toBe(checkpoint.digest);
     expect(auditSeasonBlock(checkpoint, input)).toEqual([]);
   });
+  it('timestamps block rewards at the next state revision', () => {
+    const shifted = simulateSeasonBlock({
+      ...input,
+      command: { ...input.command, expectedStateRevision: 7 },
+    });
+    const grant = shifted.transactions.find((entry) => entry.type === 'block-grant');
+    expect(grant?.appliedAtStateRevision).toBe(8);
+  });
   it('keeps game-id order stable and unique across the block', () => {
     const ids = checkpoint.gameSummaries.map((summary) => summary.gameId);
     expect(new Set(ids).size).toBe(150);

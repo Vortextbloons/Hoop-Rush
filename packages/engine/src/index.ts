@@ -161,6 +161,18 @@ export {
   type SeasonOfferDrawResult,
 } from './season/draft-offers.ts';
 export {
+  DRAFT_SCRIPT_ROUND_COUNT,
+  DRAFT_SCRIPT_STAR_TIER_WEIGHTS,
+  isStarCandidate,
+  isFloorCandidate,
+  starTierWeight,
+  scriptedSlotsFor,
+  scriptKindFor,
+  chooseStarCandidate,
+  chooseFloorCandidate,
+  type DraftScriptKind,
+} from './season/draft-script.ts';
+export {
   SOLO_BAND_QUOTAS,
   DUO_BAND_QUOTAS,
   AI_GENERATION_NODE_BUDGET,

@@ -96,7 +96,7 @@ export class HoopRushDatabase extends Dexie {
   collectionCommands!: Table<StoredCollectionCommandRow, [string, string]>;
   constructor(name = 'hoop-rush-saves') {
     super(name);
-    this.version(16).stores({
+    this.version(17).stores({
       active: 'recordId',
       activeGames: '[runId+gameNumber], runId',
       completed: 'recordId',

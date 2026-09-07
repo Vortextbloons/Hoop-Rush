@@ -21,6 +21,7 @@ import type { SeasonRunPlayerSlice } from './season-player-slice';
 import type {
   BlockRunState,
   SeasonHubState,
+  SeasonRunLoadDiagnostic,
   SeasonRunCommandError,
   SeasonSpendInfluencePurpose,
   SeasonTradeReceipt,
@@ -31,8 +32,8 @@ import type { RotationEditor } from './season-rotation-editor';
 import type { SeasonRunShellData } from './season-shell-context';
 export class SeasonRunShell implements SeasonRunShellData {
   ready = $state(false);
-  error = $state<string | null>(null);
-  hubError = $state<string | null>(null);
+  error = $state<SeasonRunLoadDiagnostic | null>(null);
+  hubError = $state<SeasonRunLoadDiagnostic | null>(null);
   hub = $state<SeasonHubState | null>(null);
   snapshot = $state.raw<SeasonRunSnapshot | null>(null);
   index = $state<SeasonActiveRunIndex | null>(null);

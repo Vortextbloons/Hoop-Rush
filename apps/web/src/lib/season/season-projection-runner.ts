@@ -6,11 +6,13 @@ import {
 } from '@hoop-rush/data-contracts';
 import type {
   AutoRotationScope,
-  HumanRosterBuildResult,
-  MinutePlanOptimizationResult,
   RecommendSeasonRotationResult,
+} from '@hoop-rush/engine/src/season/auto-rotation.ts';
+import type {
+  HumanRosterBuildResult,
   SearchLens,
-} from '@hoop-rush/engine';
+} from '@hoop-rush/engine/src/projection/candidate-search.ts';
+import type { MinutePlanOptimizationResult } from '@hoop-rush/engine/src/projection/minute-plan-quality.ts';
 import { newSeasonId } from './season-ids';
 import { seasonArtifactUrls } from './season-assets';
 import type {

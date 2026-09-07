@@ -26,17 +26,16 @@ import {
   commandIdSchema,
 } from '@hoop-rush/data-contracts';
 import type { SeasonRunSnapshot } from '@hoop-rush/persistence';
-import {
-  generateSeasonSchedule,
-  handleSeasonRunCommand,
-  seasonPostseasonNextGame,
-  seasonRunStateDigest,
-} from '@hoop-rush/engine';
+import { generateSeasonSchedule } from '@hoop-rush/engine/src/season/schedule.ts';
+import { handleSeasonRunCommand } from '@hoop-rush/engine/src/season/season-commands.ts';
+import { seasonPostseasonNextGame } from '@hoop-rush/engine/src/season/postseason.ts';
+import { seasonRunStateDigest } from '@hoop-rush/engine/src/season/state-digest.ts';
 import {
   buildEraSimulationProfile,
   buildSeasonLeague,
   buildSeasonRunFixture,
 } from '@hoop-rush/test-fixtures';
+import { SeasonRunLoadError } from '@hoop-rush/persistence';
 import { SeasonHubState, type BlockRunState, describeCommandRejection } from './season-hub-state';
 import { clearCachedSeasonSnapshot } from './season-state-cache';
 import type {
@@ -163,6 +162,52 @@ function runningBlock(requestId: string, blockIndex: number): BlockRunState {
     startInput: null,
   };
 }
+describe('SeasonHubState season-load diagnostics', () => {
+  it('preserves a typed load diagnostic for the recovery screen', async () => {
+    const repo = repoWith(null);
+    repo.loadActiveRun.mockRejectedValueOnce(
+      new SeasonRunLoadError(
+        ['corrupt accepted-block row 3: revision does not match block index'],
+        'Season Run reload validation failed',
+        'SEASON_RUN_STATE_VALIDATION_FAILED',
+      ),
+    );
+    const hub = new SeasonHubState(repo, new FakeRunner());
+
+    await hub.refresh();
+
+    expect(hub.error).toEqual({
+      code: 'SEASON_RUN_STATE_VALIDATION_FAILED',
+      message: 'Season Run reload validation failed',
+      failures: ['corrupt accepted-block row 3: revision does not match block index'],
+    });
+    hub.destroy();
+  });
+
+  it('reports a missing checkpoint when the active-run index survives alone', async () => {
+    const repo = repoWith(null);
+    repo.loadActiveRunIndex.mockResolvedValueOnce({
+      runId: RUN_ID,
+      rootSeed: 'a'.repeat(32),
+      humanFranchiseId: 'lakers',
+      revision: 4,
+      stateRevision: 4,
+      lastCheckpointDigest: 'b'.repeat(32),
+      updatedAtIso: '2026-01-01T00:00:00.000Z',
+      humanWins: 0,
+      humanLosses: 0,
+    } as never);
+    const hub = new SeasonHubState(repo, new FakeRunner());
+
+    await hub.refresh();
+
+    expect(hub.error).toMatchObject({
+      code: 'SEASON_RUN_CHECKPOINT_MISSING',
+      failures: [`run ${RUN_ID} is indexed at revision 4 but has no checkpoint record`],
+    });
+    hub.destroy();
+  });
+});
 describe('SeasonHubState.quitRun', () => {
   beforeEach(() => {
     vi.useFakeTimers();

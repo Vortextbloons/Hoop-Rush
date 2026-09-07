@@ -6,5 +6,8 @@ export default defineConfig({
     name: '@hoop-rush/persistence',
     root: path.dirname(fileURLToPath(import.meta.url)),
     setupFiles: ['./src/test-setup.ts'],
+    experimental: {
+      fsModuleCache: true,
+    },
   },
 });

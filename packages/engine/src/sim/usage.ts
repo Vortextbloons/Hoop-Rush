@@ -4,7 +4,8 @@ import type {
   SimulationPlayer,
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
-import type { Rng } from './rng.ts';
+import type { Rng, WeightedPickTable } from './rng.ts';
+import { buildWeightedPickTable } from './rng.ts';
 import { ENGINE_CONSTANTS } from './constants.ts';
 import { creationScore, interiorScoringScore, spacingScore } from '../domain/archetypes.ts';
 import {
@@ -168,6 +169,7 @@ export function passProbability(initiator: SimulationPlayer, action: ActionType)
 export interface TeammateShotWeights {
   teammates: SimulationPlayer[];
   weights: number[];
+  pickTable: WeightedPickTable;
 }
 export interface TeammateShots {
   roll: TeammateShotWeights;
@@ -188,7 +190,7 @@ export function teammateShotWeights(
         finisherRole(p, team)
       : Math.max(0.3, p.tendencies.shotRate * spacingWeight(p) * finisherRole(p, team)),
   );
-  return { teammates, weights };
+  return { teammates, weights, pickTable: buildWeightedPickTable(weights) };
 }
 export function pickShot(
   shots: TeammateShots,
@@ -207,7 +209,7 @@ export function pickShot(
   const selected = action === 'pickAndRollRoll' ? shots.roll : shots.pass;
   if (selected.teammates.length === 0) return { shooter: initiator, initiator, passed: false };
   return {
-    shooter: rng.weightedPick(selected.teammates, selected.weights),
+    shooter: rng.weightedPick(selected.teammates, selected.pickTable),
     initiator,
     passed: true,
   };
@@ -241,16 +243,22 @@ function assisterWeightOf(p: SimulationPlayer, initiator: SimulationPlayer): num
   const initiatorBonus = p.playerId === initiator.playerId ? 1.35 : 1;
   return roleWeight * passingWeight * creationMod * initiatorBonus;
 }
-export function pickAssister(
+export interface AssisterPickPrep {
+  candidates: SimulationPlayer[];
+  pickTable: WeightedPickTable;
+}
+export function assisterPickPrep(
   team: SimulationTeam,
   shooter: SimulationPlayer,
   initiator: SimulationPlayer,
-  rng: Rng,
-): SimulationPlayer | null {
+): AssisterPickPrep {
   const candidates = team.players.filter((p) => p.playerId !== shooter.playerId);
-  if (candidates.length === 0) return null;
   const weights = candidates.map((p) => assisterWeightOf(p, initiator));
-  return rng.weightedPick(candidates, weights);
+  return { candidates, pickTable: buildWeightedPickTable(weights) };
+}
+export function pickAssister(prep: AssisterPickPrep, rng: Rng): SimulationPlayer | null {
+  if (prep.candidates.length === 0) return null;
+  return rng.weightedPick(prep.candidates, prep.pickTable);
 }
 function defenderWeight(defender: SimulationPlayer, zone: ShotZone): number {
   const zoneRating =
@@ -265,21 +273,42 @@ export interface DefenderBase {
   weights: number[][];
   rimProtection: number[];
   matchMatrix: number[][];
+  pickTables: WeightedPickTable[][];
 }
 export function defenderBase(
   team: SimulationTeam,
   positionModifiers: ReadonlyMap<string, PositionResponsibilityModifiers>,
 ): DefenderBase {
+  const count = team.players.length;
+  const weights = SHOT_ZONES.map((zone) =>
+    team.players.map((defender) => defenderWeight(defender, zone)),
+  );
+  const rimProtection = team.players.map(
+    (defender) => positionModifiers.get(defender.playerId)?.rimProtection ?? 1,
+  );
+  const matchMatrix = team.players.map((_, defenderSlot) =>
+    team.players.map((_, shooterSlot) => sameGroupMatchWeight(defenderSlot, shooterSlot)),
+  );
+  const pickTables: WeightedPickTable[][] = [];
+  for (let zoneIndex = 0; zoneIndex < SHOT_ZONES.length; zoneIndex += 1) {
+    const interior = zoneIndex === 0 || zoneIndex === 1;
+    const zoneWeights = weights[zoneIndex] ?? [];
+    const zoneTables: WeightedPickTable[] = [];
+    for (let shooterSlot = 0; shooterSlot < count; shooterSlot += 1) {
+      const slotWeights = team.players.map((_, defenderSlot) => {
+        const match = matchMatrix[defenderSlot]?.[shooterSlot] ?? 1;
+        const rim = interior ? (rimProtection[defenderSlot] ?? 1) : 1;
+        return (zoneWeights[defenderSlot] ?? 0) * match * rim;
+      });
+      zoneTables.push(buildWeightedPickTable(slotWeights));
+    }
+    pickTables.push(zoneTables);
+  }
   return {
-    weights: SHOT_ZONES.map((zone) =>
-      team.players.map((defender) => defenderWeight(defender, zone)),
-    ),
-    rimProtection: team.players.map(
-      (defender) => positionModifiers.get(defender.playerId)?.rimProtection ?? 1,
-    ),
-    matchMatrix: team.players.map((_, defenderSlot) =>
-      team.players.map((_, shooterSlot) => sameGroupMatchWeight(defenderSlot, shooterSlot)),
-    ),
+    weights,
+    rimProtection,
+    matchMatrix,
+    pickTables,
   };
 }
 export function pickDefender(
@@ -289,31 +318,10 @@ export function pickDefender(
   base: DefenderBase,
   shooterSlot: number,
 ): SimulationPlayer {
-  const interior = zone === 'rim' || zone === 'shortMid';
   const zoneIndex = ZONE_INDEX[zone];
-  const zoneWeights = base.weights[zoneIndex] ?? [];
-  const count = team.players.length;
-  const weightOf = (slot: number): number => {
-    const match = base.matchMatrix[slot]?.[shooterSlot] ?? 1;
-    const rim = interior ? (base.rimProtection[slot] ?? 1) : 1;
-    return (zoneWeights[slot] ?? 0) * match * rim;
-  };
-  let total = 0;
-  for (let slot = 0; slot < count; slot += 1) total += Math.max(0, weightOf(slot));
-  if (total <= 0) return rng.pick(team.players);
-  let roll = rng.next() * total;
-  for (let slot = 0; slot < count; slot += 1) {
-    const w = Math.max(0, weightOf(slot));
-    if (roll < w) {
-      const player = team.players[slot];
-      if (player === undefined) throw new Error(`pickDefender: no player at slot ${String(slot)}`);
-      return player;
-    }
-    roll -= w;
-  }
-  const last = team.players[count - 1];
-  if (last === undefined) throw new Error('pickDefender: index out of range');
-  return last;
+  const table = base.pickTables[zoneIndex]?.[shooterSlot];
+  if (table === undefined) return rng.pick(team.players);
+  return rng.weightedPick(team.players, table);
 }
 const ZONE_INDEX = Object.fromEntries(SHOT_ZONES.map((zone, index) => [zone, index])) as Record<
   ShotZone,
@@ -404,15 +412,25 @@ export interface ZonePrep {
   threePointTarget: number;
   driveRate: number;
   base: number[];
+  actionPickTables: Record<ActionType, WeightedPickTable>;
 }
 export function zonePrep(shooter: SimulationPlayer, profile: EraSimulationProfile): ZonePrep {
   const blend = blendedZoneWeights(shooter, profile);
   const targetThreeRate = threePointTarget(shooter, profile);
+  const driveRate = shooter.tendencies.driveRate;
+  const base = rescaleZoneWeights(blend, targetThreeRate);
+  const actionPickTables = Object.fromEntries(
+    ACTION_TYPES.map((action) => [
+      action,
+      buildWeightedPickTable(applyZonePulls(action, base, driveRate)),
+    ]),
+  ) as Record<ActionType, WeightedPickTable>;
   return {
     blend,
     threePointTarget: targetThreeRate,
-    driveRate: shooter.tendencies.driveRate,
-    base: rescaleZoneWeights(blend, targetThreeRate),
+    driveRate,
+    base,
+    actionPickTables,
   };
 }
 export function twoPointZoneSharesFromBlend(weights: readonly number[]): [number, number, number] {
@@ -436,31 +454,13 @@ export function applyZonePulls(
   weights[1] = (weights[1] ?? 0) * (action === 'postUp' ? 1.05 : 1);
   return weights;
 }
-function scaledZoneWeight(
-  index: number,
-  base: readonly number[],
-  action: ActionType,
-  driveRate: number,
-): number {
-  if (index === 0) {
-    let w = (base[0] ?? 0) * (action === 'transition' ? 1.1 : action === 'postUp' ? 1.02 : 1);
-    if (action === 'isolation' || action === 'pickAndRoll') {
-      w = w * (0.9 + Math.min(40, driveRate) / 100);
-    }
-    return w;
-  }
-  if (index === 1) return (base[1] ?? 0) * (action === 'postUp' ? 1.05 : 1);
-  return base[index] ?? 0;
-}
 export function pickZone(action: ActionType, prep: ZonePrep, rng: Rng): ShotZone {
-  let total = 0;
+  const table = prep.actionPickTables[action];
+  const pickUniform = () => rng.pick(SHOT_ZONES);
+  let roll = rng.next() * table.total;
+  if (table.total <= 0) return pickUniform();
   for (let i = 0; i < SHOT_ZONES.length; i += 1) {
-    total += Math.max(0, scaledZoneWeight(i, prep.base, action, prep.driveRate));
-  }
-  if (total <= 0) return rng.pick(SHOT_ZONES);
-  let roll = rng.next() * total;
-  for (let i = 0; i < SHOT_ZONES.length; i += 1) {
-    const w = Math.max(0, scaledZoneWeight(i, prep.base, action, prep.driveRate));
+    const w = table.weights[i] ?? 0;
     if (roll < w) {
       const zone = SHOT_ZONES[i];
       if (zone === undefined) throw new Error('pickZone: index out of range');

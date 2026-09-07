@@ -26,30 +26,5 @@ export default defineConfig({
     experimental: {
       fsModuleCache: true,
     },
-    projects: [
-      {
-        plugins: [sveltekit()],
-        resolve: {
-          alias: [{ find: /^svelte$/, replacement: svelteClientEntry }],
-        },
-        test: {
-          name: 'node',
-          environment: 'node',
-          include: ['src/**/*.test.ts'],
-          exclude: ['src/lib/components/__tests__/**'],
-        },
-      },
-      {
-        plugins: [sveltekit()],
-        resolve: {
-          alias: [{ find: /^svelte$/, replacement: svelteClientEntry }],
-        },
-        test: {
-          name: 'jsdom',
-          environment: 'jsdom',
-          include: ['src/lib/components/__tests__/**/*.test.ts'],
-        },
-      },
-    ],
   },
 });

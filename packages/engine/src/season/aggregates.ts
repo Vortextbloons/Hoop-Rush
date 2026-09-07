@@ -96,6 +96,99 @@ export function foldSeasonTeamAggregates(
   }
   return [...rows.values()].sort((a, b) => (a.franchiseId < b.franchiseId ? -1 : 1));
 }
+function cloneTeamAggregate(row: SeasonTeamAggregate): SeasonTeamAggregate {
+  return { ...row };
+}
+export function extendSeasonTeamAggregates(
+  prior: readonly SeasonTeamAggregate[],
+  summaries: readonly SeasonGameSummary[],
+): SeasonTeamAggregate[] {
+  const rows = new Map(prior.map((row) => [row.franchiseId, cloneTeamAggregate(row)]));
+  for (const summary of summaries) {
+    for (const side of ['home', 'away'] as const) {
+      const franchiseId = summary[`${side}FranchiseId`];
+      let row = rows.get(franchiseId);
+      if (row === undefined) {
+        row = { franchiseId, gamesPlayed: 0, wins: 0, losses: 0, ...ZERO_TEAM };
+        rows.set(franchiseId, row);
+      }
+      const box = side === 'home' ? summary.homeBox : summary.awayBox;
+      row.gamesPlayed += 1;
+      row.points += box.points;
+      row.fieldGoalsMade += box.fieldGoalsMade;
+      row.fieldGoalsAttempted += box.fieldGoalsAttempted;
+      row.threePointersMade += box.threePointersMade;
+      row.threePointersAttempted += box.threePointersAttempted;
+      row.fourPointersMade = (row.fourPointersMade ?? 0) + (box.fourPointersMade ?? 0);
+      row.fourPointersAttempted =
+        (row.fourPointersAttempted ?? 0) + (box.fourPointersAttempted ?? 0);
+      row.freeThrowsMade += box.freeThrowsMade;
+      row.freeThrowsAttempted += box.freeThrowsAttempted;
+      row.offensiveRebounds += box.offensiveRebounds;
+      row.defensiveRebounds += box.defensiveRebounds;
+      row.assists += box.assists;
+      row.steals += box.steals;
+      row.blocks += box.blocks;
+      row.turnovers += box.turnovers;
+      row.fouls += box.fouls;
+      row.possessions += box.possessions;
+      if (winnerOf(summary) === franchiseId) row.wins += 1;
+      else row.losses += 1;
+    }
+  }
+  return [...rows.values()].sort((a, b) => (a.franchiseId < b.franchiseId ? -1 : 1));
+}
+function clonePlayerAggregate(row: SeasonPlayerAggregate): SeasonPlayerAggregate {
+  return { ...row };
+}
+export function extendSeasonPlayerAggregates(
+  prior: readonly SeasonPlayerAggregate[],
+  summaries: readonly SeasonGameSummary[],
+): SeasonPlayerAggregate[] {
+  const rows = new Map(prior.map((row) => [row.playerVersionId, clonePlayerAggregate(row)]));
+  for (const summary of summaries) {
+    if (summary.status === 'forfeit') continue;
+    for (const side of ['home', 'away'] as const) {
+      const box = side === 'home' ? summary.homeBox : summary.awayBox;
+      const lines = side === 'home' ? summary.homePlayers : summary.awayPlayers;
+      for (const line of lines) {
+        let row = rows.get(line.playerVersionId);
+        if (row === undefined) {
+          row = {
+            playerVersionId: line.playerVersionId,
+            franchiseId: box.franchiseId,
+            ...ZERO_PLAYER,
+          };
+          rows.set(line.playerVersionId, row);
+        }
+        row.gamesPlayed += 1;
+        row.appearances += line.seconds > 0 ? 1 : 0;
+        row.started += line.started === true ? 1 : 0;
+        row.seconds += line.seconds;
+        row.points += line.points;
+        row.fieldGoalsMade += line.fieldGoalsMade;
+        row.fieldGoalsAttempted += line.fieldGoalsAttempted;
+        row.threePointersMade += line.threePointersMade;
+        row.threePointersAttempted += line.threePointersAttempted;
+        row.fourPointersMade = (row.fourPointersMade ?? 0) + (line.fourPointersMade ?? 0);
+        row.fourPointersAttempted =
+          (row.fourPointersAttempted ?? 0) + (line.fourPointersAttempted ?? 0);
+        row.freeThrowsMade += line.freeThrowsMade;
+        row.freeThrowsAttempted += line.freeThrowsAttempted;
+        row.offensiveRebounds += line.offensiveRebounds;
+        row.defensiveRebounds += line.defensiveRebounds;
+        row.assists += line.assists;
+        row.steals += line.steals;
+        row.blocks += line.blocks;
+        row.turnovers += line.turnovers;
+        row.fouls += line.fouls;
+      }
+    }
+  }
+  return [...rows.values()].sort((a, b) =>
+    a.playerVersionId < b.playerVersionId ? -1 : a.playerVersionId > b.playerVersionId ? 1 : 0,
+  );
+}
 export function foldSeasonPlayerAggregates(
   summaries: readonly SeasonGameSummary[],
 ): SeasonPlayerAggregate[] {

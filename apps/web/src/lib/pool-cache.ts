@@ -28,6 +28,10 @@ function getDb(): HoopRushCacheDb {
       pools: 'key',
       assets: 'key',
     });
+    db.version(3).stores({
+      pools: 'key, savedAt',
+      assets: 'key, savedAt',
+    });
     dbInstance = db;
   }
   return dbInstance;
@@ -61,8 +65,8 @@ export async function writeCachedPool(
     await db.pools.put({ key, contentHash, pool, savedAt: Date.now() });
     const count = await db.pools.count();
     if (count > POOL_CACHE_MAX_POOLS) {
-      const sorted = await db.pools.toCollection().sortBy('savedAt');
-      const victims = sorted.slice(0, count - POOL_CACHE_MAX_POOLS).map((record) => record.key);
+      const excess = count - POOL_CACHE_MAX_POOLS;
+      const victims = await db.pools.orderBy('savedAt').limit(excess).primaryKeys();
       if (victims.length > 0) await db.pools.bulkDelete(victims);
     }
   } catch (error) {
@@ -88,8 +92,8 @@ export async function writeCachedAsset(contentHash: string, value: unknown): Pro
     await db.assets.put({ key: contentHash, value, savedAt: Date.now() });
     const count = await db.assets.count();
     if (count > POOL_CACHE_MAX_ASSETS) {
-      const sorted = await db.assets.toCollection().sortBy('savedAt');
-      const victims = sorted.slice(0, count - POOL_CACHE_MAX_ASSETS).map((record) => record.key);
+      const excess = count - POOL_CACHE_MAX_ASSETS;
+      const victims = await db.assets.orderBy('savedAt').limit(excess).primaryKeys();
       if (victims.length > 0) await db.assets.bulkDelete(victims);
     }
   } catch (error) {

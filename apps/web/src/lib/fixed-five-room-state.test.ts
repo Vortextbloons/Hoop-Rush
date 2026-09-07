@@ -8,7 +8,8 @@ import {
   seedSchema,
 } from '@hoop-rush/data-contracts';
 import type { FixedFiveCommand } from '@hoop-rush/data-contracts';
-import { createEngineContext, type DuelDraftState } from '@hoop-rush/engine';
+import { createEngineContext } from '@hoop-rush/engine/src/sim/context.ts';
+import type { DuelDraftState } from '@hoop-rush/engine/src/modes/fixed-five/duel.ts';
 import {
   computeDueAutopick,
   deriveEffectivePhase,

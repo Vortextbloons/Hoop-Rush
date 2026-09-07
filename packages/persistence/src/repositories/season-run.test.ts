@@ -174,7 +174,10 @@ describe('season run repository (dexie)', () => {
   it('loadActiveRun without a configured schedule throws a typed error', async () => {
     const { db, seam } = makeAdapters();
     const bare = new DexieSeasonRunRepository(db, { seam });
-    await expect(bare.loadActiveRun()).rejects.toThrow(SeasonRunLoadError);
+    await expect(bare.loadActiveRun()).rejects.toMatchObject({
+      name: 'SeasonRunLoadError',
+      code: 'SEASON_RUN_SCHEDULE_UNAVAILABLE',
+    });
   });
   it('promotes a draft into an all-zero checkpoint and removes the draft', async () => {
     const adapters = makeAdapters();
@@ -338,7 +341,10 @@ describe('season run repository (dexie)', () => {
     const row = (await db.seasonRunSummaries.toArray())[0];
     if (row === undefined) throw new Error('expected a stored summary row');
     await db.seasonRunSummaries.put({ ...row, summary: { corrupted: true } } as never);
-    await expect(repo.loadActiveRun()).rejects.toThrow(SeasonRunLoadError);
+    await expect(repo.loadActiveRun()).rejects.toMatchObject({
+      name: 'SeasonRunLoadError',
+      code: 'SEASON_RUN_STATE_VALIDATION_FAILED',
+    });
     await expect(repo.loadBlockSummaries(run.runId, 0)).rejects.toThrow(SeasonRunLoadError);
   });
   it('surfaces a stale revision on load', async () => {

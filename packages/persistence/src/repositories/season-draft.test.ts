@@ -118,7 +118,7 @@ describe('season draft repository (dexie)', () => {
     await challenge.saveActiveRun(runRecord());
     const loaded = await season.loadSeasonDraft();
     expect(loaded?.draft.runId).toBe('fixture-draft-1');
-    expect(loaded?.saveSchemaVersion).toBe(3);
+    expect(loaded?.saveSchemaVersion).toBe(4);
     expect(await db.seasonDrafts.count()).toBe(1);
     expect((await challenge.loadActiveRun())?.run.runId).toBe('challenge-run-1');
   });
@@ -183,15 +183,15 @@ describe('season draft repository (dexie)', () => {
     expect(loaded?.generation?.ownership).toHaveLength(300);
     expect(withoutTimestamp(loaded as StoredSeasonDraft)).toEqual(saved);
   });
-  it('auto-clears a v3 envelope that still stores season-draft-v2 state', async () => {
+  it('auto-clears a v4 envelope that still stores season-draft-v3 state', async () => {
     const { season, db } = makeAdapter();
     const legacyDraft = {
-      schemaVersion: 2,
-      draftVersion: 'season-draft-v2',
+      schemaVersion: 3,
+      draftVersion: 'season-draft-v3',
       runId: 'legacy-run-1',
       rootSeed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a',
       league: buildSeasonLeague(),
-      catalogVersion: 'season-draft-v2',
+      catalogVersion: 'season-draft-v3',
       participants: [{ participantId: 'p1', franchiseId: 'lakers' }],
       firstPickParticipantId: 'p1',
       round: 2,
@@ -217,7 +217,7 @@ describe('season draft repository (dexie)', () => {
               rootSeed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a',
               league: buildSeasonLeague(),
               humanParticipantIds: ['p1'],
-              catalogVersion: 'season-draft-v2',
+              catalogVersion: 'season-draft-v3',
             },
           },
         },
@@ -225,18 +225,18 @@ describe('season draft repository (dexie)', () => {
     };
     await db.seasonDrafts.put({
       recordId: SEASON_DRAFT_RECORD_ID,
-      saveSchemaVersion: 3,
+      saveSchemaVersion: 4,
       draft: legacyDraft,
       generation: null,
     } as never);
     expect(await season.loadSeasonDraft()).toBeNull();
     expect(await db.seasonDrafts.count()).toBe(0);
   });
-  it('auto-clears a stored v1/v2 development row and returns null', async () => {
+  it('auto-clears a stored v1/v2/v3 development row and returns null', async () => {
     const { season, db } = makeAdapter();
     const legacyDraft = {
       schemaVersion: 1,
-      draftVersion: 'season-draft-v2',
+      draftVersion: 'season-draft-v3',
       runId: 'legacy-run-1',
       rootSeed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a',
       league: buildSeasonLeague(),
@@ -286,12 +286,12 @@ describe('season draft repository (dexie)', () => {
     expect(await season.loadSeasonDraft()).toBeNull();
     expect(await db.seasonDrafts.count()).toBe(0);
   });
-  it('surfaces corrupt v3 rows while auto-clearing malformed save schemas', async () => {
+  it('surfaces corrupt v4 rows while auto-clearing malformed save schemas', async () => {
     const { season, db } = makeAdapter();
     await season.saveSeasonDraft(recordFromState(buildSeasonDraftState()));
     await db.seasonDrafts.put({
       recordId: SEASON_DRAFT_RECORD_ID,
-      saveSchemaVersion: 3,
+      saveSchemaVersion: 4,
       draft: { corrupted: true },
       generation: null,
     } as never);

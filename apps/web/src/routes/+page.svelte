@@ -6,7 +6,6 @@
   import type { SeasonActiveRunIndex } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
   import { getManifest, warmPlayersIndex } from '$lib/data';
-  import { challengeRepository } from '$lib/challenge-repo';
   import { variantLabel } from '$lib/draft-presentation';
   import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persistence';
   const sandboxHref = resolve('/sandbox');
@@ -51,13 +50,10 @@
   let classicDraft = $state.raw<ClassicDraftState | null>(null);
   let recent = $state.raw<CompletedRunIndex[]>([]);
   let seasonRun = $state.raw<SeasonActiveRunIndex | null>(null);
-  function warmPlayersIndexDuringIdle(): void {
-    const idle = window.requestIdleCallback;
-    if (typeof idle === 'function') {
-      idle(() => warmPlayersIndex());
-    } else {
-      setTimeout(() => warmPlayersIndex(), 0);
-    }
+  const playersIndexModes = new Set(['01', '02', '03']);
+  function warmPlayersIndexForMode(modeCode: string): void {
+    if (!playersIndexModes.has(modeCode)) return;
+    warmPlayersIndex();
   }
   $effect(() => {
     if (!browser) return;
@@ -68,19 +64,23 @@
       },
       () => {},
     );
-    Promise.all([
-      challengeRepository.loadActiveRunCheckpoint(),
-      challengeRepository.listCompletedRuns(),
-      challengeRepository.loadClassicDraft(),
-    ]).then(
-      ([activeCheckpoint, rows, savedDraft]) => {
-        if (cancelled) return;
-        active = activeCheckpoint;
-        recent = rows.slice(0, 3);
-        classicDraft = savedDraft?.draft ?? null;
-      },
-      () => {},
-    );
+    import('$lib/challenge-repo')
+      .then(({ challengeRepository }) =>
+        Promise.all([
+          challengeRepository.loadActiveRunCheckpoint(),
+          challengeRepository.listCompletedRuns(),
+          challengeRepository.loadClassicDraft(),
+        ]),
+      )
+      .then(
+        ([activeCheckpoint, rows, savedDraft]) => {
+          if (cancelled) return;
+          active = activeCheckpoint;
+          recent = rows.slice(0, 3);
+          classicDraft = savedDraft?.draft ?? null;
+        },
+        () => {},
+      );
     import('$lib/season/season-repo')
       .then(({ getSeasonRunRepository }) => getSeasonRunRepository())
       .then((repo) => repo.loadActiveRunIndex())
@@ -88,7 +88,6 @@
         if (!cancelled) seasonRun = index;
       })
       .catch(() => {});
-    warmPlayersIndexDuringIdle();
     return () => {
       cancelled = true;
     };
@@ -163,9 +162,9 @@
       {#if mode.status === 'available'}
         <a
           href={resolve(mode.href)}
-          onpointerenter={() => warmPlayersIndex()}
-          onfocus={() => warmPlayersIndex()}
-          ontouchstart={() => warmPlayersIndex()}
+          onpointerenter={() => warmPlayersIndexForMode(mode.code)}
+          onfocus={() => warmPlayersIndexForMode(mode.code)}
+          ontouchstart={() => warmPlayersIndexForMode(mode.code)}
           class="group flex h-full flex-col rounded-xl bg-card p-6 outline-none transition-colors hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring sm:p-7 {mode.code === '04'
             ? 'border border-accent/60'
             : ''}"

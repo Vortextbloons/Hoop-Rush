@@ -114,14 +114,16 @@ import {
   type SeasonPostseasonRepository,
 } from './season-postseason.ts';
 export class SeasonRunLoadError extends Error {
+  readonly code: string;
   readonly failures: readonly string[];
-  constructor(failures: readonly string[], message?: string) {
+  constructor(failures: readonly string[], message?: string, code = 'SEASON_RUN_LOAD_FAILED') {
     super(
       message ??
         `Season Run reload validation failed (${String(failures.length)} failure(s)): ` +
           failures.join('; '),
     );
     this.name = 'SeasonRunLoadError';
+    this.code = code;
     this.failures = failures;
   }
 }
@@ -252,6 +254,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
             'loadActiveRunWithSchedule(schedule)',
         ],
         'Season Run schedule not supplied',
+        'SEASON_RUN_SCHEDULE_UNAVAILABLE',
       );
     }
     return this.loadActiveRunWithSchedule(this.schedule);
@@ -268,6 +271,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
       throw new SeasonRunLoadError(
         ['stored Season Run checkpoint failed schema validation'],
         'stored Season Run checkpoint is unidentifiable',
+        'SEASON_RUN_CHECKPOINT_UNIDENTIFIABLE',
       );
     }
     return this.loadValidated(checkpoint, schedule);
@@ -300,6 +304,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
       throw new SeasonRunLoadError(
         ['stored Season Run checkpoint failed schema validation'],
         `corrupt Season Run checkpoint: ${errorMessage(error)}`,
+        'SEASON_RUN_CHECKPOINT_SCHEMA_INVALID',
       );
     }
     if (!isLiveSeasonRunVersions(probe.run.versions)) {
@@ -351,6 +356,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
       throw new SeasonRunLoadError(
         ['stored Season Run checkpoint failed schema validation'],
         `corrupt Season Run checkpoint: ${errorMessage(error)}`,
+        'SEASON_RUN_CHECKPOINT_SCHEMA_INVALID',
       );
     }
     if (!isLiveSeasonRunVersions(stored.run.versions)) {
@@ -468,7 +474,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
       }
     }
     if (failures.length > 0) {
-      throw new SeasonRunLoadError(failures);
+      throw new SeasonRunLoadError(failures, undefined, 'SEASON_RUN_STATE_VALIDATION_FAILED');
     }
     const games = this.seam.reconstructSeasonGames(schedule, summaries);
     const run = seasonRunSchema.parse({
@@ -1092,11 +1098,10 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
               'Season Run pending block state is inconsistent',
             );
           }
-          const interruption =
-            input.pendingInterruption ?? {
-              ...storedSeasonPendingBlockRowSchema.parse(existingPending).interruption,
-              nextGameId: input.pending.nextGameId,
-            };
+          const interruption = input.pendingInterruption ?? {
+            ...storedSeasonPendingBlockRowSchema.parse(existingPending).interruption,
+            nextGameId: input.pending.nextGameId,
+          };
           await this.db.seasonPendingBlocks.put({
             runId: input.runId,
             block: input.pending,

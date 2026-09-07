@@ -10,6 +10,13 @@ import {
 } from '@hoop-rush/data-contracts';
 import { createRng } from '../sim/rng.ts';
 import {
+  chooseFloorCandidate,
+  chooseStarCandidate,
+  isFloorCandidate,
+  isStarCandidate,
+  scriptKindFor,
+} from './draft-script.ts';
+import {
   SEASON_ROSTER_SIZE,
   fiveCompletable,
   groupMaskOf,
@@ -190,6 +197,33 @@ export function drawGlobalOffer(
     const picked = sampleRng.pick(samplePool);
     samplePool.splice(samplePool.indexOf(picked), 1);
     sampled.push(picked);
+  }
+  const scriptKind = scriptKindFor(state.rootSeed, participantId, pickOrdinal);
+  if (scriptKind !== null) {
+    const tierPresent = [...safeSelected, ...sampled].some((candidate) =>
+      scriptKind === 'star' ? isStarCandidate(candidate) : isFloorCandidate(candidate),
+    );
+    if (!tierPresent) {
+      const offeredIds = new Set(
+        [...safeSelected, ...sampled].map((candidate) => candidate.playerVersionId),
+      );
+      const eligible = candidates.filter((candidate) => {
+        if (offeredIds.has(candidate.playerVersionId)) return false;
+        if (scriptKind === 'star' ? !isStarCandidate(candidate) : !isFloorCandidate(candidate)) {
+          return false;
+        }
+        return selectionKeepsFeasibility(state, catalog, participantId, candidate);
+      });
+      if (eligible.length > 0) {
+        const scriptSeed = seasonNamespaceSeed(offerSeed, 'script-pick');
+        const injected =
+          scriptKind === 'star'
+            ? chooseStarCandidate(eligible, scriptSeed)
+            : chooseFloorCandidate(eligible, scriptSeed);
+        const replaceIndex = sampled.length - 1;
+        if (replaceIndex >= 0) sampled[replaceIndex] = injected;
+      }
+    }
   }
   const cardOf = (candidate: SeasonDraftCandidate): SeasonDraftOfferCard => {
     const selectable = selectionKeepsFeasibility(state, catalog, participantId, candidate);

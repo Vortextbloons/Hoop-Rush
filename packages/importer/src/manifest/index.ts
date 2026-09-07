@@ -83,7 +83,7 @@ const importerManifestSchema = z.looseObject({
 });
 export type Manifest = z.infer<typeof importerManifestSchema>;
 export const MANIFEST_PATH = join(PUBLIC_DATA, 'manifest.json');
-export const DATA_VERSION = 'm12-ratings-v3.10';
+export const DATA_VERSION = 'm14-ratings-v3.11';
 function peakPlayerToDraftEntry(player: ReturnType<typeof parsePool>['players'][number]) {
   return {
     playerId: player.playerId,

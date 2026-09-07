@@ -622,7 +622,7 @@ export function buildSeasonDraftState(
   const rootSeed = overrides.rootSeed ?? 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
   const league = buildSeasonLeague();
   return seasonDraftStateSchema.parse({
-    schemaVersion: 2,
+    schemaVersion: 3,
     draftVersion: SEASON_DRAFT_VERSION,
     runId: 'fixture-draft-1',
     rootSeed: seedSchema.parse(rootSeed),

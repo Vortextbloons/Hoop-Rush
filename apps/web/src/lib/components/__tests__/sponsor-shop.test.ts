@@ -8,7 +8,7 @@ import {
   playerIdSchema,
   seasonKeySchema,
 } from '@hoop-rush/data-contracts';
-import { createInitialSponsorGearState } from '@hoop-rush/engine';
+import { createInitialSponsorGearState } from '@hoop-rush/engine/src/season/sponsors.ts';
 import { buildManifest } from '@hoop-rush/test-fixtures';
 import SponsorShopPanel from '$lib/components/season/SponsorShopPanel.svelte';
 import SponsorShopModal from '$lib/components/season/SponsorShopModal.svelte';

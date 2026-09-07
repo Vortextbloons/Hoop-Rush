@@ -12,6 +12,8 @@ import { seasonCampaignOpportunityIdSchema } from './season-campaign.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import {
   SEASON_BLOCK_VERSION,
+  SEASON_ROSTER_MAX_SIZE,
+  SEASON_TEAM_COUNT,
 } from './season-versions.ts';
 export const seasonInvalidRosterInterruptionSchema = z.object({
   code: z.literal('invalid-roster'),
@@ -43,7 +45,9 @@ export const seasonPendingBlockCandidateSchema = z.object({
   health: seasonHealthStateSchema,
   standings: seasonStandingsSchema,
   teamAggregates: z.array(seasonTeamAggregateSchema).max(30),
-  playerAggregates: z.array(seasonPlayerAggregateSchema).max(300),
+  playerAggregates: z
+    .array(seasonPlayerAggregateSchema)
+    .max(SEASON_TEAM_COUNT * SEASON_ROSTER_MAX_SIZE),
   rotationDigest: seasonRotationSetDigestSchema,
 });
 export type SeasonPendingBlockCandidate = z.infer<typeof seasonPendingBlockCandidateSchema>;

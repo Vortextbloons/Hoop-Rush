@@ -28,11 +28,11 @@ import {
 } from '@hoop-rush/data-contracts';
 import {
   POSTSEASON_ALMANAC_DIGEST_PLACEHOLDER,
-  deriveSeasonTradeGrades,
   seasonPostseasonHumanEliminated,
   seasonPostseasonNextGame,
   seasonPostseasonUpcomingGames,
-} from '@hoop-rush/engine';
+} from '@hoop-rush/engine/src/season/postseason.ts';
+import { deriveSeasonTradeGrades } from '@hoop-rush/engine/src/season/trade-grades.ts';
 import {
   SeasonRunCommandDuplicateError,
   SeasonRunCommandRunMismatchError,
@@ -148,6 +148,15 @@ export function createSeasonPostseasonRunner(
   let cancelled = false;
   let warmRequestId: string | null = null;
   let warmed = false;
+  let wireSnapshotCache:
+    | {
+        stateRevision: number;
+        stateDigest: string;
+        run: SeasonRun;
+        effects: SeasonEffectsState;
+        regularSeasonSummaries: readonly SeasonGameSummary[];
+      }
+    | null = null;
   const pending = new Map<
     string,
     (message: SeasonPostseasonWorkerCompleteMessage | SeasonPostseasonWorkerErrorMessage) => void
@@ -361,6 +370,20 @@ export function createSeasonPostseasonRunner(
         firstCommandId = null;
         const wireRequestId = `${requestId}-${String(commitCount)}`;
         commitCount += 1;
+        const wireSnapshot =
+          wireSnapshotCache !== null &&
+          wireSnapshotCache.stateRevision === run.stateRevision &&
+          wireSnapshotCache.stateDigest === run.stateDigest &&
+          wireSnapshotCache.regularSeasonSummaries === snapshot.summaries
+            ? wireSnapshotCache
+            : {
+                stateRevision: run.stateRevision,
+                stateDigest: run.stateDigest,
+                run,
+                effects: snapshot.effects,
+                regularSeasonSummaries: snapshot.summaries,
+              };
+        wireSnapshotCache = wireSnapshot;
         const request = seasonPostseasonWireRequestOf({
           requestId: wireRequestId,
           runId: run.runId,
@@ -374,9 +397,9 @@ export function createSeasonPostseasonRunner(
           catalogHash: artifacts.catalogHash,
           profileUrl: artifacts.profileUrl,
           profileHash: artifacts.profileHash,
-          run: deepClonePlain(run),
-          effects: deepClonePlain(snapshot.effects),
-          regularSeasonSummaries: snapshot.summaries,
+          run: wireSnapshot.run,
+          effects: wireSnapshot.effects,
+          regularSeasonSummaries: wireSnapshot.regularSeasonSummaries,
         });
         currentWireRequestId = wireRequestId;
         const outcome = await simulate(request);
@@ -640,6 +663,7 @@ export function createSeasonPostseasonRunner(
       currentWireRequestId = null;
       warmRequestId = null;
       warmed = false;
+      wireSnapshotCache = null;
       const failure: SeasonPostseasonWorkerErrorMessage = {
         schemaVersion: 1,
         type: 'season-postseason-error',
@@ -764,20 +788,6 @@ function describeAdvanceRejection(rejection: SeasonAdvancePostseasonRejection): 
     default:
       return 'The postseason advance was rejected.';
   }
-}
-function deepClonePlain<T>(value: T): T {
-  if (Array.isArray(value)) {
-    const items = value as unknown[];
-    return items.map((item) => deepClonePlain(item)) as T;
-  }
-  if (value !== null && typeof value === 'object') {
-    const out: Record<string, unknown> = {};
-    for (const key of Object.keys(value)) {
-      out[key] = deepClonePlain((value as Record<string, unknown>)[key]);
-    }
-    return out as T;
-  }
-  return value;
 }
 export function getSeasonPostseasonRunner(): SeasonPostseasonRunner {
   if (typeof window !== 'undefined' && window.__HOOP_RUSH_SEASON_POSTSEASON_RUNNER__) {

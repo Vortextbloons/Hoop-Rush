@@ -14,6 +14,11 @@ import {
 import { seasonRotationSetDigestSchema } from './season-digests.ts';
 import { seasonEffectsStateSchema } from './season-effects.ts';
 import { seasonGameSummarySchema } from './season-game-summary.ts';
+import {
+  seasonPlayerAggregateSchema,
+  seasonTeamAggregateSchema,
+} from './season-aggregates.ts';
+import { seasonStandingsSchema } from './season-standings.ts';
 import { seasonHealthStateSchema } from './season-health.ts';
 import { seasonHomeCourtProfileSchema } from './season-home-court.ts';
 import { seasonInfluenceStateSchema } from './season-influence.ts';
@@ -52,6 +57,9 @@ export const seasonWorkerStartRequestSchema = z.object({
   profileUrl: z.string().min(1).max(512),
   profileHash: contentHashSchema,
   priorSummaries: z.array(seasonGameSummarySchema).max(1200),
+  priorStandings: seasonStandingsSchema.optional(),
+  priorTeamAggregates: z.array(seasonTeamAggregateSchema).max(30).optional(),
+  priorPlayerAggregates: z.array(seasonPlayerAggregateSchema).max(450).optional(),
   priorEffects: seasonEffectsStateSchema,
   priorHealth: seasonHealthStateSchema,
   startGameId: seasonGameIdSchema.nullable(),

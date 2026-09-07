@@ -34,12 +34,14 @@ import type { z } from 'zod';
 export type SeasonWorkerProgress = z.infer<typeof seasonWorkerProgressMessageSchema>;
 import {
   completeSeasonBlockCommit,
+  seasonNextBlockIndex,
+} from '@hoop-rush/engine/src/season/block.ts';
+import {
   reconstructSeasonGames,
   seasonCheckpointDigest,
-  seasonFranchiseLegalFiveFacts,
-  seasonNextBlockIndex,
-  seasonRotationSetDigest,
-} from '@hoop-rush/engine';
+} from '@hoop-rush/engine/src/season/checkpoint.ts';
+import { seasonFranchiseLegalFiveFacts } from '@hoop-rush/engine/src/season/health.ts';
+import { seasonRotationSetDigest } from '@hoop-rush/engine/src/season/rotation.ts';
 import type {
   SeasonRunRepository,
   SeasonRunSnapshot,
@@ -166,6 +168,9 @@ export function buildWorkerRequest(
     knownSummaries: SeasonGameSummary[];
     schedule: SeasonSchedule;
     artifacts: SeasonArtifactUrls;
+    priorStandings?: SeasonRun['standings'];
+    priorTeamAggregates?: import('@hoop-rush/data-contracts').SeasonTeamAggregate[];
+    priorPlayerAggregates?: import('@hoop-rush/data-contracts').SeasonPlayerAggregate[];
   },
 ): SeasonWorkerStartRequest {
   const priorSummaries =
@@ -205,6 +210,9 @@ export function buildWorkerRequest(
     profileUrl: opts.artifacts.profileUrl,
     profileHash: opts.artifacts.profileHash,
     priorSummaries,
+    priorStandings: opts.priorStandings,
+    priorTeamAggregates: opts.priorTeamAggregates,
+    priorPlayerAggregates: opts.priorPlayerAggregates,
     priorEffects,
     priorHealth,
     startGameId: state.resumePending?.nextGameId ?? null,
@@ -765,7 +773,11 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     artifacts: SeasonArtifactUrls,
   ): SeasonWorkerStartRequest {
     const summaries = runState?.runId === state.input.run.runId ? runState.summaries : [];
-    return buildWorkerRequest(requestId, state, { knownSummaries: summaries, schedule, artifacts });
+    return buildWorkerRequest(requestId, state, {
+      knownSummaries: summaries,
+      schedule,
+      artifacts,
+    });
   }
   return {
     startBlock(input: SeasonBlockStartInput): string {

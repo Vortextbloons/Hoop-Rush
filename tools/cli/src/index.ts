@@ -27,6 +27,11 @@ import {
 import { dataDerive, DATA_DERIVE_OPTIONS } from './commands/data-derive.ts';
 import { dataLineageAudit, DATA_LINEAGE_AUDIT_OPTIONS } from './commands/data-lineage-audit.ts';
 import { dataOveralls, DATA_OVERALLS_OPTIONS } from './commands/data-overalls.ts';
+import { dataOverallsAudit, DATA_OVERALLS_AUDIT_OPTIONS } from './commands/data-overalls-audit.ts';
+import {
+  dataPositionsCoverage,
+  DATA_POSITIONS_COVERAGE_OPTIONS,
+} from './commands/data-positions-coverage.ts';
 import {
   dataOverallsDistribution,
   DATA_OVERALLS_DISTRIBUTION_OPTIONS,
@@ -205,6 +210,14 @@ const COMMANDS: Record<string, CommandDef> = {
     options: DATA_OVERALLS_DISTRIBUTION_OPTIONS,
     run: (args) =>
       dataOverallsDistribution({ input: parseOption(args, 'input', DEFAULT_MANIFEST) }),
+  },
+  'data overalls-audit': {
+    options: DATA_OVERALLS_AUDIT_OPTIONS,
+    run: (args) => dataOverallsAudit({ input: parseOption(args, 'input', DEFAULT_MANIFEST) }),
+  },
+  'data positions-coverage': {
+    options: DATA_POSITIONS_COVERAGE_OPTIONS,
+    run: (args) => dataPositionsCoverage({ input: parseOption(args, 'input', DEFAULT_MANIFEST) }),
   },
   'data defense-bpm-correlation': {
     options: DATA_DEFENSE_BPM_CORRELATION_OPTIONS,

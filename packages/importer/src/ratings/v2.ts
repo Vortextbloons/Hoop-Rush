@@ -1220,6 +1220,8 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
       (typeof input.stats.playerExternalId === 'string' ? input.stats.playerExternalId : undefined),
     artifact: input.artifact ?? DEFAULT_RATINGS_MODEL_ARTIFACT,
     teamWinPct: input.teamWinPct,
+    age: input.age,
+    eraPace: input.era.pace,
   });
   const summaryRatings: SummaryRatings = v3.summaryRatings;
   return {

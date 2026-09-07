@@ -137,6 +137,8 @@ export interface RatingProfileInput {
   artifact: RatingsModelArtifact;
   playerId?: string;
   teamWinPct?: number | null;
+  age?: number | null;
+  eraPace?: number | null;
 }
 export interface DerivedRatingProfile {
   profile: RatingProfile;
@@ -184,25 +186,51 @@ function confidenceFor(stats: StatsRow): {
   if (games >= 30 && minutes >= 750) return { label: 'medium', factor: 0.75 };
   return { label: 'low', factor: 0.45 };
 }
-function productionEvidence(stats: StatsRow): ProductionEvidence {
+export function effectiveUsageFor(stats: StatsRow, eraPace?: number | null): number | null {
+  const games = Math.max(0, Math.trunc(safeFloat(stats.gamesPlayed)));
+  const minutes = Math.max(0, safeFloat(stats.minutes));
+  const fga = safeFloat(stats.fga, 0);
+  const fta = safeFloat(stats.fta, 0);
+  const turnovers = safeFloat(stats.turnovers, 0);
+  if (games <= 0 || minutes <= 0 || fga <= 0) return null;
+  const pace = eraPace != null && Number.isFinite(eraPace) && eraPace > 0 ? eraPace : 100;
+  const possessionsPerGame = (fga + 0.44 * fta + turnovers) / games;
+  const mpg = minutes / games;
+  if (mpg <= 0) return null;
+  return clamp((100 * possessionsPerGame) / (pace * (mpg / 48)), 0, 45);
+}
+function productionEvidence(stats: StatsRow, eraPace?: number | null): ProductionEvidence {
   const games = Math.max(0, Math.trunc(safeFloat(stats.gamesPlayed)));
   const minutes = Math.max(0, safeFloat(stats.minutes));
   const ppg = safeFloat(stats.points) / Math.max(1, games);
   const rpg = safeFloat(stats.rebounds) / Math.max(1, games);
   const per = safeFloat(stats.per, 15);
   const bpm = safeFloat(stats.boxPlusMinus, 0);
-  const usage = safeFloat(stats.usageRate, 18);
+  const reportedUsage = stats.usageRate == null ? null : safeFloat(stats.usageRate);
+  const impliedUsage = effectiveUsageFor(stats, eraPace);
+  // Stints-derived estimates divide possessions by pace without a minutes
+  // share, so low-minute scorers (e.g. 1973-74 Murphy at a reported 14.2%)
+  // read as role players. Repair only clear under-reports so modern tracking
+  // numbers pass through untouched.
+  const usage =
+    impliedUsage !== null && (reportedUsage === null || impliedUsage - reportedUsage > 8)
+      ? impliedUsage
+      : (reportedUsage ?? 18);
   const ts = safeFloat(stats.tsPct, 0.52);
   const efg = safeFloat(stats.efgPct, 0.5);
-  // Efficiency without load is not production: a 16% usage finisher dunking
-  // at .680 TS did not produce what a 30% usage creator did at .600. Creation
-  // counts as load (playmakers carry offense without shooting), and missing
-  // usage data never reads as low load.
+  // Efficiency without scoring load is not production: a 16% usage finisher
+  // dunking at .680 TS did not produce what a 30% usage creator did at .600.
+  // Creation already earns its own assist-rate term below; counting it again
+  // here let low-usage passers bank star efficiency (Porter 1990-91).
+  // Missing usage data never reads as low load.
+  const loadFactor =
+    stats.usageRate == null && impliedUsage === null ? 1 : clamp((usage - 16) / 14, 0.3, 1);
+  // Below 18% usage the efficiency terms taper: standstill shooting is real
+  // but must not carry a production score on its own.
+  const efficiencyScale = usage < 18 ? clamp(usage / 18, 0.5, 1) : 1;
+  const evidence = confidenceFor(stats);
   const mpg = minutes / Math.max(1, games);
   const astPer36 = mpg > 0 ? ((safeFloat(stats.assists) / Math.max(1, games)) * 36) / mpg : 0;
-  const loadFactor =
-    stats.usageRate == null ? 1 : clamp((usage + astPer36 * 1.5 - 16) / 14, 0.3, 1);
-  const evidence = confidenceFor(stats);
   const stocks =
     stats.steals == null || stats.blocks == null || games <= 0
       ? 0
@@ -216,8 +244,8 @@ function productionEvidence(stats: StatsRow): ProductionEvidence {
       bpm * 1.3 +
       (usage - 20) * 0.1 -
       Math.max(0, usage - 30) * 0.22 +
-      (ts - 0.54) * 85 * loadFactor +
-      (efg - 0.5) * 45 * loadFactor +
+      (ts - 0.54) * 85 * loadFactor * efficiencyScale +
+      (efg - 0.5) * 45 * loadFactor * efficiencyScale +
       stocks,
     0,
     100,
@@ -226,7 +254,7 @@ function productionEvidence(stats: StatsRow): ProductionEvidence {
   const shrinkage = clamp((minutes / (minutes + 1500)) * (games / (games + 40)), 0, 1);
   return {
     score: capped,
-    weight: clamp(0.5 * shrinkage * evidence.factor, 0, 0.5),
+    weight: clamp(0.6 * shrinkage * evidence.factor, 0, 0.6),
     confidence: evidence.label,
     sampleGames: games,
     sampleMinutes: minutes,
@@ -483,10 +511,14 @@ export function eliteEvidenceLiftFor(input: {
   hasContestEvidence?: boolean;
 }): number {
   const games = input.production.sampleGames;
+  const minutes = input.production.sampleMinutes;
   const ppg = safeFloat(input.points) / Math.max(1, games);
   const ts = safeFloat(input.tsPct, 0);
   const bpm = safeFloat(input.boxPlusMinus, 0);
   const winOk = input.teamWinPct == null || input.teamWinPct >= 0.7;
+  // All elite tiers need a real workload: fringe-minute stat lines (Bellamy
+  // 1961-62 at 322 minutes, Baylor 1960-61 at 719) must not bank star lifts.
+  if (minutes < 1500) return 0;
   const eliteScoringEvidence =
     winOk && input.production.score >= 86 && games >= 55 && ppg >= 27 && ts >= 0.58 && bpm >= 3;
   // Containment without contest tracking tops out at estimated/low, so the
@@ -510,6 +542,7 @@ export function teamContextAdjustment(
   stats: StatsRow,
   teamWinPct: number | null | undefined,
   defenseRating: number,
+  age?: number | null,
 ): number {
   if (teamWinPct == null || !Number.isFinite(teamWinPct)) return 0;
   const pct = clamp(teamWinPct, 0, 1);
@@ -556,6 +589,11 @@ export function teamContextAdjustment(
           clamp((per - 12) / 10, 0, 1) * 0.3;
         bonus = eliteFactor * roleFactor * (0.5 + 0.5 * effScale) * 3;
         bonus = clamp(bonus, 0, 3);
+        // Veterans on good teams keep their credit but stop compounding it:
+        // a 36-year-old role player on a 55-win team is not ascending.
+        if (age != null && Number.isFinite(age) && age >= 34) {
+          bonus = Math.min(bonus, 1);
+        }
         if (mpg < 20 && per < 14 && apg < 3) bonus = Math.min(bonus, 1.2);
       }
     }
@@ -572,7 +610,7 @@ export function computeOffenseDefense(
   return offenseDefenseOf(ratings, tendencies);
 }
 export function deriveRatingProfile(input: RatingProfileInput): DerivedRatingProfile {
-  const production = productionEvidence(input.stats);
+  const production = productionEvidence(input.stats, input.eraPace);
   const memberships = deriveMemberships(input, production.confidence);
   const nonlinear = deriveNonlinear(
     input.ratings,
@@ -616,7 +654,12 @@ export function deriveRatingProfile(input: RatingProfileInput): DerivedRatingPro
     teamWinPct: input.teamWinPct,
     hasContestEvidence,
   });
-  const teamDelta = teamContextAdjustment(input.stats, input.teamWinPct, summary.defenseRating);
+  const teamDelta = teamContextAdjustment(
+    input.stats,
+    input.teamWinPct,
+    summary.defenseRating,
+    input.age,
+  );
   const defenseCredit = defenseCreditFor(summary.defenseRating, hasContestEvidence);
   // Two-way synergy is scarce and playoff-proof: only players above average on
   // BOTH ends collect it, scaled continuously so there is no tier cliff.

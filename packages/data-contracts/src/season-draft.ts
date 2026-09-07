@@ -25,7 +25,7 @@ export type SeasonDraftPick = z.infer<typeof seasonDraftPickSchema>;
 export const seasonDraftStatusSchema = z.enum(['drafting', 'finalized', 'complete']);
 export type SeasonDraftStatus = z.infer<typeof seasonDraftStatusSchema>;
 export const seasonDraftStateSchema = z.object({
-  schemaVersion: z.literal(2),
+  schemaVersion: z.literal(3),
   draftVersion: z.literal(SEASON_DRAFT_VERSION),
   runId: z.string().min(1).max(64),
   rootSeed: seedSchema,

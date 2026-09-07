@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildMinimalRotation } from '@hoop-rush/engine';
+import { buildMinimalRotation } from '@hoop-rush/engine/src/season/rotation.ts';
 import type { SeasonRotation } from '@hoop-rush/data-contracts';
 import {
   AutoUndoState,

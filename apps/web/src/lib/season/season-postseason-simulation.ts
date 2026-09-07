@@ -20,11 +20,11 @@ import {
   type SeasonPostseasonScoreline,
   type SeasonPostseasonWorkerStartRequest,
 } from '@hoop-rush/data-contracts';
+import { handleSeasonRunCommand } from '@hoop-rush/engine/src/season/season-commands.ts';
 import {
-  handleSeasonRunCommand,
   SeasonPostseasonInvariantError,
   type SeasonPostseasonGameResolver,
-} from '@hoop-rush/engine';
+} from '@hoop-rush/engine/src/season/postseason.ts';
 export interface SeasonPostseasonSimulationRequest {
   commandId: CommandId;
   runId: Id;

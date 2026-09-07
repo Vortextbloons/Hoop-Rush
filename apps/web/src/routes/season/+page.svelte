@@ -33,7 +33,7 @@
     loadSeasonRosterTargets,
     loadSeasonSchedule,
   } from '$lib/season/season-assets';
-  import { getManifest, getPlayersIndex } from '$lib/data';
+  import { getManifest } from '$lib/data';
   import { DexieSeasonDraftRepository } from '@hoop-rush/persistence';
   import { isSeasonRunIncompatibleError } from '@hoop-rush/persistence';
   import { getSeasonRunRepository } from '$lib/season/season-repo';
@@ -86,19 +86,12 @@
   $effect(() => {
     if (!browser) return;
     let cancelled = false;
-    Promise.all([
-      getManifest(),
-      loadSeasonLeague(),
-      loadSeasonSchedule(),
-      loadSeasonRosterTargets(),
-      getPlayersIndex(),
-    ])
-      .then(async ([m, seasonLeague, seasonSchedule, rosterTargets, ix]) => {
+    Promise.all([getManifest(), loadSeasonLeague(), loadSeasonSchedule()])
+      .then(async ([m, seasonLeague, seasonSchedule]) => {
         if (cancelled) return;
         manifest = m;
         league = seasonLeague;
         schedule = seasonSchedule;
-        playersIndex = ix;
         const draftRepo = new DexieSeasonDraftRepository();
         let storedDraft: Awaited<ReturnType<DexieSeasonDraftRepository['loadSeasonDraft']>> = null;
         try {
@@ -108,6 +101,8 @@
         }
         if (cancelled) return;
         if (storedDraft !== null) {
+          const rosterTargets = await loadSeasonRosterTargets();
+          if (cancelled) return;
           await ensureFlow(rosterTargets);
           if (cancelled) return;
           if (flow !== null) {
@@ -167,19 +162,21 @@
       generationProgress = instance.generationProgress;
       if (flow !== null) board = flow.state();
     };
-    if (playersIndex !== null) {
-      faces = buildVersionFaceIndex(
-        playersIndex.players,
-        catalog.candidates.map((candidate) => ({
-          playerVersionId: candidate.playerVersionId,
-          playerId: candidate.playerId,
-          franchiseId: candidate.franchiseId,
-          eraId: candidate.eraId,
-          seasonKey: candidate.seasonKey,
-          displayName: candidate.displayName,
-        })),
-      );
+    if (playersIndex === null) {
+      const { getPlayersIndex } = await import('$lib/data');
+      playersIndex = await getPlayersIndex();
     }
+    faces = buildVersionFaceIndex(
+      playersIndex.players,
+      catalog.candidates.map((candidate) => ({
+        playerVersionId: candidate.playerVersionId,
+        playerId: candidate.playerId,
+        franchiseId: candidate.franchiseId,
+        eraId: candidate.eraId,
+        seasonKey: candidate.seasonKey,
+        displayName: candidate.displayName,
+      })),
+    );
     flow = instance;
     return instance;
   }

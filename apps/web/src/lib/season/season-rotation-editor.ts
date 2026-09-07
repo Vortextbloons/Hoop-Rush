@@ -10,9 +10,14 @@ import {
   type SeasonRotationPreset,
   type SlotGroup,
 } from '@hoop-rush/data-contracts';
-import { applySeasonRotationPreset, buildMinutePlanCandidates } from '@hoop-rush/engine';
-import { minuteStrategyOfPreset } from '@hoop-rush/engine';
-import { validateSeasonRotation } from '@hoop-rush/engine';
+import {
+  applySeasonRotationPreset,
+  validateSeasonRotation,
+} from '@hoop-rush/engine/src/season/rotation.ts';
+import {
+  buildMinutePlanCandidates,
+  minuteStrategyOfPreset,
+} from '@hoop-rush/engine/src/season/minute-plan.ts';
 export interface RotationMember {
   playerVersionId: string;
   displayName: string;
@@ -295,7 +300,10 @@ export class RotationEditor {
         const give = Math.min(remaining, capacity);
         if (give <= 0) continue;
         const next = player.minutes + give;
-        byId.set(player.playerVersionId, { playerVersionId: player.playerVersionId, minutes: next });
+        byId.set(player.playerVersionId, {
+          playerVersionId: player.playerVersionId,
+          minutes: next,
+        });
         adjustments.push({ playerVersionId: player.playerVersionId, minutes: next, delta: give });
         remaining -= give;
       }
@@ -319,15 +327,16 @@ export class RotationEditor {
         const take = Math.min(remaining, capacity);
         if (take <= 0) continue;
         const next = player.minutes - take;
-        byId.set(player.playerVersionId, { playerVersionId: player.playerVersionId, minutes: next });
+        byId.set(player.playerVersionId, {
+          playerVersionId: player.playerVersionId,
+          minutes: next,
+        });
         adjustments.push({ playerVersionId: player.playerVersionId, minutes: next, delta: -take });
         remaining -= take;
       }
       if (remaining > 0) {
         return {
-          failures: [
-            `cannot balance to 240: ${String(remaining)} minutes could not be removed`,
-          ],
+          failures: [`cannot balance to 240: ${String(remaining)} minutes could not be removed`],
           adjustments: [],
         };
       }

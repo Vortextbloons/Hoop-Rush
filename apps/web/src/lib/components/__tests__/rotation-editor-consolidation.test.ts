@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, within } from '@testing-library/svelte';
 import { franchiseIdSchema } from '@hoop-rush/data-contracts';
-import { buildMinimalRotation } from '@hoop-rush/engine';
+import { buildMinimalRotation } from '@hoop-rush/engine/src/season/rotation.ts';
 import RotationEditor from '$lib/components/season/RotationEditor.svelte';
 import { createRotationEditor } from '$lib/season/season-rotation-editor';
 import type { RotationMember } from '$lib/season/season-rotation-editor';

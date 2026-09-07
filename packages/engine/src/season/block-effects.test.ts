@@ -246,7 +246,7 @@ function buildSynthesizedRun(): {
       postseasonVersion: SEASON_POSTSEASON_VERSION,
       seedDerivationVersion: SEASON_SEED_DERIVATION_VERSION,
       playerVersionIdVersion: 'player-version-id-v1',
-      draftVersion: 'season-draft-v3',
+      draftVersion: 'season-draft-v4',
       rosterRulesVersion: SEASON_ROSTER_RULES_VERSION,
       rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
       aiVersion: SEASON_AI_VERSION,

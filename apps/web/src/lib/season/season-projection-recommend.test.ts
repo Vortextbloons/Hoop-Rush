@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createProjectionRunner } from './season-projection-runner';
 import { seasonArtifactUrls } from './season-assets';
-import { buildMinimalRotation } from '@hoop-rush/engine';
-import type { RecommendSeasonRotationResult } from '@hoop-rush/engine';
+import { buildMinimalRotation } from '@hoop-rush/engine/src/season/rotation.ts';
+import type { RecommendSeasonRotationResult } from '@hoop-rush/engine/src/season/auto-rotation.ts';
 import type { SeasonRotation } from '@hoop-rush/data-contracts';
 
 vi.mock('./season-assets', () => ({

@@ -1,4 +1,4 @@
-import { seasonBlockGamesOf } from '@hoop-rush/engine';
+import { seasonBlockGamesOf } from '@hoop-rush/engine/src/season/block.ts';
 import type { SeasonSchedule, SeasonScoreline } from '@hoop-rush/data-contracts';
 
 export interface BlockLiveProgressInput {

@@ -153,6 +153,102 @@ export function reduceSeasonStandings(
     rows: reduced,
   };
 }
+function cloneStandingsRow(row: SeasonStandingsRow): SeasonStandingsRow {
+  return {
+    ...row,
+    headToHead: row.headToHead.map((entry) => ({ ...entry })),
+  };
+}
+export function extendSeasonStandings(
+  league: SeasonLeague,
+  prior: SeasonStandings,
+  summaries: readonly import('@hoop-rush/data-contracts').SeasonGameSummary[],
+): SeasonStandings {
+  const teams = new Map(league.teams.map((team) => [team.franchiseId, team]));
+  const rows = new Map(prior.rows.map((row) => [row.franchiseId, cloneStandingsRow(row)]));
+  for (const summary of summaries) {
+    const homeTeam = teams.get(summary.homeFranchiseId);
+    const awayTeam = teams.get(summary.awayFranchiseId);
+    if (homeTeam === undefined || awayTeam === undefined) {
+      throw new Error(`summary ${summary.gameId} references a franchise outside the league`);
+    }
+    const homeScore = summary.homeScore;
+    const awayScore = summary.awayScore;
+    let winner: string;
+    let loser: string;
+    let winnerPointsFor: number;
+    let winnerPointsAgainst: number;
+    let loserPointsFor: number;
+    let loserPointsAgainst: number;
+    if (summary.status === 'forfeit') {
+      const forfeitLoser = summary.forfeitLoserFranchiseId;
+      if (forfeitLoser === null) {
+        throw new Error(`forfeit summary ${summary.gameId} does not name the losing team`);
+      }
+      loser = forfeitLoser;
+      winner = loser === summary.homeFranchiseId ? summary.awayFranchiseId : summary.homeFranchiseId;
+      winnerPointsFor = 2;
+      winnerPointsAgainst = 0;
+      loserPointsFor = 0;
+      loserPointsAgainst = 2;
+    } else {
+      if (homeScore === awayScore) {
+        throw new Error(`final summary ${summary.gameId} is tied`);
+      }
+      winner = homeScore > awayScore ? summary.homeFranchiseId : summary.awayFranchiseId;
+      loser = winner === summary.homeFranchiseId ? summary.awayFranchiseId : summary.homeFranchiseId;
+      winnerPointsFor = winner === summary.homeFranchiseId ? homeScore : awayScore;
+      winnerPointsAgainst = winner === summary.homeFranchiseId ? awayScore : homeScore;
+      loserPointsFor = loser === summary.homeFranchiseId ? homeScore : awayScore;
+      loserPointsAgainst = loser === summary.homeFranchiseId ? awayScore : homeScore;
+    }
+    const winnerRow = rows.get(winner);
+    const loserRow = rows.get(loser);
+    if (winnerRow === undefined || loserRow === undefined) {
+      throw new Error(`summary ${summary.gameId} references a franchise outside the league`);
+    }
+    winnerRow.wins += 1;
+    loserRow.losses += 1;
+    winnerRow.gamesPlayed += 1;
+    loserRow.gamesPlayed += 1;
+    const homeRow = summary.homeFranchiseId === winner ? winnerRow : loserRow;
+    const awayRow = summary.awayFranchiseId === winner ? winnerRow : loserRow;
+    if (summary.homeFranchiseId === winner) homeRow.homeWins += 1;
+    else homeRow.homeLosses += 1;
+    if (summary.awayFranchiseId === winner) awayRow.awayWins += 1;
+    else awayRow.awayLosses += 1;
+    if (homeTeam.conference === awayTeam.conference) {
+      const confWinner = summary.homeFranchiseId === winner ? homeRow : awayRow;
+      const confLoser = summary.homeFranchiseId === winner ? awayRow : homeRow;
+      confWinner.conferenceWins += 1;
+      confLoser.conferenceLosses += 1;
+      if (homeTeam.division === awayTeam.division) {
+        confWinner.divisionWins += 1;
+        confLoser.divisionLosses += 1;
+      }
+    }
+    winnerRow.pointsFor += winnerPointsFor;
+    winnerRow.pointsAgainst += winnerPointsAgainst;
+    loserRow.pointsFor += loserPointsFor;
+    loserRow.pointsAgainst += loserPointsAgainst;
+    const winnerHeadToHead = winnerRow.headToHead.find((entry) => entry.franchiseId === loser);
+    const loserHeadToHead = loserRow.headToHead.find((entry) => entry.franchiseId === winner);
+    if (winnerHeadToHead === undefined || loserHeadToHead === undefined) {
+      throw new Error(`summary ${summary.gameId} has no head-to-head slot for its participants`);
+    }
+    winnerHeadToHead.wins += 1;
+    loserHeadToHead.losses += 1;
+  }
+  return {
+    schemaVersion: 1,
+    standingsVersion: SEASON_STANDINGS_VERSION,
+    rows: league.teams.map((team) => {
+      const row = rows.get(team.franchiseId);
+      if (row === undefined) throw new Error(`missing standings row for ${team.franchiseId}`);
+      return row;
+    }),
+  };
+}
 export function auditSeasonStandings(
   league: SeasonLeague,
   games: readonly SeasonGame[],

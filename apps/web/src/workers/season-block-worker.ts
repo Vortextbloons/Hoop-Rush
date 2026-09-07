@@ -43,6 +43,8 @@ import {
 } from '@hoop-rush/engine';
 import { sleep } from '../lib/sleep';
 const PROGRESS_MIN_INTERVAL_MS = 250;
+const YIELD_GAME_BATCH = 4;
+const YIELD_TIME_BUDGET_MS = 12;
 let currentRequestId: string | null = null;
 let cancelled = false;
 function post(
@@ -330,6 +332,9 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     humanFranchiseId: request.humanFranchiseId,
     rosterPlayerIds: rosterPlayerIdsOf(run),
     priorSummaries,
+    priorStandings: request.priorStandings,
+    priorTeamAggregates: request.priorTeamAggregates,
+    priorPlayerAggregates: request.priorPlayerAggregates,
     effects: blockEffects,
     health: blockHealth,
     influence: request.priorInfluence ?? initialInfluence(run),
@@ -401,11 +406,12 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
   const rosterByFranchise = new Map(
     input.run.rosters.map((roster) => [roster.franchiseId, roster]),
   );
+  let gamesSinceYield = 0;
+  let yieldStartedAt = performance.now();
   for (const game of remainingGames) {
     if (cancelled) {
       throw new SeasonWorkerCancelled();
     }
-    await yieldToEventLoop();
     throwIfCancelled();
     const outcome = simulateSeasonBlockGame(input, game, effects, health, {
       skipRecoveryTick: !(previousRound !== 0 && game.round > previousRound),
@@ -422,6 +428,14 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     previousRound = game.round;
     summaries.push(outcome.summary);
     latestSummary = outcome.summary;
+    gamesSinceYield += 1;
+    const elapsed = performance.now() - yieldStartedAt;
+    if (gamesSinceYield >= YIELD_GAME_BATCH || elapsed >= YIELD_TIME_BUDGET_MS) {
+      await yieldToEventLoop();
+      throwIfCancelled();
+      gamesSinceYield = 0;
+      yieldStartedAt = performance.now();
+    }
     if (outcome.retainedDetail !== null) retainedDetails.push(outcome.retainedDetail);
     const now = Date.now();
     const isLast = summaries.length === games.length;

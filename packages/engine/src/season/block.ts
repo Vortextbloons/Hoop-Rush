@@ -52,10 +52,15 @@ import {
   type SeasonTransactionEntry,
   type SeasonRosterTargets,
   type SeasonEvolutionState,
+  type SeasonPlayerAggregate,
+  type SeasonStandings,
+  type SeasonTeamAggregate,
 } from '@hoop-rush/data-contracts';
 import { createEngineContext } from '../sim/context.ts';
 import {
   auditSeasonAggregates,
+  extendSeasonPlayerAggregates,
+  extendSeasonTeamAggregates,
   foldSeasonPlayerAggregates,
   foldSeasonTeamAggregates,
 } from './aggregates.ts';
@@ -73,7 +78,7 @@ import { resolveHomeGameRule } from './evolution.ts';
 import { evolutionWithBlockCommit, type AiSelectionDataSource } from './evolution.ts';
 import { applySeasonGameEffectsTransition } from './effects.ts';
 import { applySeasonRecoveryTick } from './stamina.ts';
-import { auditSeasonStandings, reduceSeasonStandings } from './standings.ts';
+import { auditSeasonStandings, extendSeasonStandings, reduceSeasonStandings } from './standings.ts';
 import {
   seasonFranchiseLegalFiveFacts,
   seasonGameHealthSeam,
@@ -164,6 +169,9 @@ export interface SeasonBlockSimulationInput {
   participantFranchiseIds?: readonly string[] | null;
   rosterPlayerIds: ReadonlyMap<string, string>;
   priorSummaries: readonly SeasonGameSummary[];
+  priorStandings?: SeasonStandings;
+  priorTeamAggregates?: readonly SeasonTeamAggregate[];
+  priorPlayerAggregates?: readonly SeasonPlayerAggregate[];
   effects: SeasonEffectsState;
   health: SeasonHealthState;
   objectiveId: SeasonObjectiveId | null;
@@ -983,16 +991,31 @@ export function assembleSeasonBlockCandidate(
   const command = input.command;
   const run = input.run;
   const allSummaries = [...input.priorSummaries, ...summaries];
-  const standingsBefore = reduceSeasonStandings(
+  const freshStandingsBefore = reduceSeasonStandings(
     run.league,
     reconstructSeasonGames(input.schedule, input.priorSummaries),
   );
-  const standings = reduceSeasonStandings(
+  const freshStandings = reduceSeasonStandings(
     run.league,
     reconstructSeasonGames(input.schedule, allSummaries),
   );
-  const teams = foldSeasonTeamAggregates(allSummaries);
-  const players = foldSeasonPlayerAggregates(allSummaries);
+  const freshTeams = foldSeasonTeamAggregates(allSummaries);
+  const freshPlayers = foldSeasonPlayerAggregates(allSummaries);
+  const canExtendAggregates =
+    input.priorStandings !== undefined &&
+    input.priorTeamAggregates !== undefined &&
+    input.priorPlayerAggregates !== undefined &&
+    input.priorSummaries.length > 0;
+  const standingsBefore = canExtendAggregates ? input.priorStandings : freshStandingsBefore;
+  const standings = canExtendAggregates
+    ? extendSeasonStandings(run.league, input.priorStandings, summaries)
+    : freshStandings;
+  const teams = canExtendAggregates
+    ? extendSeasonTeamAggregates(input.priorTeamAggregates, summaries)
+    : freshTeams;
+  const players = canExtendAggregates
+    ? extendSeasonPlayerAggregates(input.priorPlayerAggregates, summaries)
+    : freshPlayers;
   const { toRound } = blockRoundRange(command.blockIndex);
   const completedRounds = toRound;
   const participantIds = [
@@ -1086,6 +1109,7 @@ export function assembleSeasonBlockCandidate(
         blockIndex: command.blockIndex,
         humanFranchiseId: primaryFranchiseId,
         participantFranchiseIds: participantIds,
+        appliedAtStateRevision: input.command.expectedStateRevision + 1,
         challengeSuccesses: challengeEvaluation
           ? challengeEvaluation.results.map((result) => ({
               challengeId: result.challengeId,
@@ -1113,6 +1137,7 @@ export function assembleSeasonBlockCandidate(
         blockIndex: command.blockIndex,
         humanFranchiseId: primaryFranchiseId,
         participantFranchiseIds: participantIds,
+      appliedAtStateRevision: input.command.expectedStateRevision + 1,
         objectiveSuccess: objective.success,
         objectiveSuccessByFranchise,
       });
@@ -1141,8 +1166,8 @@ export function assembleSeasonBlockCandidate(
     players,
     summaries: allSummaries,
     standings,
-    freshTeams: teams,
-    freshPlayers: players,
+    freshTeams,
+    freshPlayers,
   });
   const recapFailures = auditSeasonBlockRecap(recap, recapInput);
   if (aggregateFailures.length > 0 || recapFailures.length > 0) {
@@ -1829,9 +1854,10 @@ export function auditSeasonBlock(
       ...auditSeasonGameSummary(summary).map((failure) => `summary ${summary.gameId}: ${failure}`),
     );
   }
-  if (candidate.playerAggregates.length > SEASON_TEAM_COUNT * 10) {
+  const maxPlayerAggregates = SEASON_TEAM_COUNT * SEASON_ROSTER_MAX_SIZE;
+  if (candidate.playerAggregates.length > maxPlayerAggregates) {
     failures.push(
-      `candidate must carry at most 300 player aggregates (got ${String(candidate.playerAggregates.length)})`,
+      `candidate must carry at most ${String(maxPlayerAggregates)} player aggregates (got ${String(candidate.playerAggregates.length)})`,
     );
   }
   const aggregateIds = candidate.playerAggregates.map((player) => player.playerVersionId);

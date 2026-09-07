@@ -5,7 +5,7 @@ import {
   type SeasonRun,
   type SimulationRatings,
 } from '@hoop-rush/data-contracts';
-import { createInitialSponsorGearState } from '@hoop-rush/engine';
+import { createInitialSponsorGearState } from '@hoop-rush/engine/src/season/sponsors.ts';
 import {
   SPONSOR_RATING_GROUPS,
   boostedOverallDeltaOf,

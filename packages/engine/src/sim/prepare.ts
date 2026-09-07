@@ -6,15 +6,18 @@ import type {
 import {
   ACTION_TYPES,
   actionWeights,
+  assisterPickPrep,
   defenderBase,
   passProbability,
   teamInitiatorWeights,
   teammateShotWeights,
   zonePrep,
+  type AssisterPickPrep,
   type DefenderBase,
   type TeammateShots,
   type ZonePrep,
 } from './usage.ts';
+import { buildWeightedPickTable, type WeightedPickTable } from './rng.ts';
 import { teamSpacing, twoPointAnchorFactor } from './shooting.ts';
 import { defenderPressure, stealerWeights } from './security.ts';
 import { rebounderWeights, teamMean } from './rebounding.ts';
@@ -29,12 +32,18 @@ export function enginePlayerKey(player: SimulationPlayer): string {
 export interface TeamPrep {
   slotByPlayerId: Map<string, number>;
   initiatorWeights: number[];
+  initiatorPickTable: WeightedPickTable;
   actionWeights: Map<string, number[]>;
   teammateShots: Map<string, TeammateShots>;
+  assisterByPair: Map<string, AssisterPickPrep>;
   rebounderWeights: [number[], number[]];
+  rebounderPickTables: [WeightedPickTable, WeightedPickTable];
   foulerWeights: number[];
+  foulerPickTable: WeightedPickTable;
   freeThrowShooterWeights: number[];
+  freeThrowShooterPickTable: WeightedPickTable;
   stealerWeights: number[];
+  stealerPickTable: WeightedPickTable;
   offensiveReboundMean: number;
   defensiveReboundMean: number;
   pressure: number;
@@ -56,6 +65,7 @@ export function prepareTeam(team: SimulationTeam, profile: EraSimulationProfile)
   const twoPointAnchorByPlayer = new Map<string, number | null>();
   const passPByPlayer = new Map<string, number[]>();
   const positionModifiersByPlayer = new Map<string, PositionResponsibilityModifiers>();
+  const assisterByPair = new Map<string, AssisterPickPrep>();
   const freeThrowP: number[] = [];
   let pressureTotal = 0;
   let stealTotal = 0;
@@ -81,18 +91,39 @@ export function prepareTeam(team: SimulationTeam, profile: EraSimulationProfile)
     pressureTotal += defenderPressure(player);
     stealTotal += player.ratings.steal;
   });
+  for (const shooter of players) {
+    for (const initiator of players) {
+      if (shooter.playerId === initiator.playerId) continue;
+      assisterByPair.set(
+        `${shooter.playerId}\u0000${initiator.playerId}`,
+        assisterPickPrep(team, shooter, initiator),
+      );
+    }
+  }
+  const initiatorWeights = teamInitiatorWeights(team, positionModifiersByPlayer);
+  const offensiveRebounderWeights = rebounderWeights(team, true, positionModifiersByPlayer);
+  const defensiveRebounderWeights = rebounderWeights(team, false, positionModifiersByPlayer);
+  const teamFoulerWeights = foulerWeights(team);
+  const teamFreeThrowShooterWeights = freeThrowShooterWeights(team);
+  const teamStealerWeights = stealerWeights(team);
   return {
     slotByPlayerId,
-    initiatorWeights: teamInitiatorWeights(team, positionModifiersByPlayer),
+    initiatorWeights,
+    initiatorPickTable: buildWeightedPickTable(initiatorWeights),
     actionWeights: actionWeightsByPlayer,
     teammateShots: teammateShotsByPlayer,
-    rebounderWeights: [
-      rebounderWeights(team, true, positionModifiersByPlayer),
-      rebounderWeights(team, false, positionModifiersByPlayer),
+    assisterByPair,
+    rebounderWeights: [offensiveRebounderWeights, defensiveRebounderWeights],
+    rebounderPickTables: [
+      buildWeightedPickTable(offensiveRebounderWeights),
+      buildWeightedPickTable(defensiveRebounderWeights),
     ],
-    foulerWeights: foulerWeights(team),
-    freeThrowShooterWeights: freeThrowShooterWeights(team),
-    stealerWeights: stealerWeights(team),
+    foulerWeights: teamFoulerWeights,
+    foulerPickTable: buildWeightedPickTable(teamFoulerWeights),
+    freeThrowShooterWeights: teamFreeThrowShooterWeights,
+    freeThrowShooterPickTable: buildWeightedPickTable(teamFreeThrowShooterWeights),
+    stealerWeights: teamStealerWeights,
+    stealerPickTable: buildWeightedPickTable(teamStealerWeights),
     offensiveReboundMean: teamMean(team, 'offensiveRebound'),
     defensiveReboundMean: teamMean(team, 'defensiveRebound'),
     pressure: pressureTotal / players.length,

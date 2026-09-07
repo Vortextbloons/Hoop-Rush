@@ -34,7 +34,11 @@ import {
   type SeasonTradeValueTrend,
   type SeasonTradeWindowState,
 } from '@hoop-rush/data-contracts';
-import { handleSeasonRunCommand, seasonFranchiseLegalFiveFacts, type SeasonRunCommandContext } from '@hoop-rush/engine';
+import {
+  handleSeasonRunCommand,
+  type SeasonRunCommandContext,
+} from '@hoop-rush/engine/src/season/season-commands.ts';
+import { seasonFranchiseLegalFiveFacts } from '@hoop-rush/engine/src/season/health.ts';
 import type {
   SeasonBlockResumeInput,
   SeasonBlockRunner,
@@ -57,6 +61,7 @@ import type {
 } from '@hoop-rush/persistence';
 import {
   isSeasonRunIncompatibleError,
+  SeasonRunLoadError,
   type SeasonRunIncompatibleInfo,
 } from '@hoop-rush/persistence';
 import { newSeasonId } from './season-ids';
@@ -144,6 +149,34 @@ export interface SeasonPostseasonProgress {
 export interface SeasonHubStateOptions {
   now?: () => number;
 }
+export interface SeasonRunLoadDiagnostic {
+  code: string;
+  message: string;
+  failures: readonly string[];
+}
+export function seasonRunLoadDiagnosticOf(
+  error: unknown,
+  fallbackCode = 'SEASON_RUN_LOAD_FAILED',
+): SeasonRunLoadDiagnostic {
+  if (error instanceof SeasonRunLoadError) {
+    return {
+      code: error.code,
+      message: error.message,
+      failures: error.failures,
+    };
+  }
+  const candidate = error as { code?: unknown; failures?: unknown } | null;
+  const failures =
+    Array.isArray(candidate?.failures) &&
+    candidate.failures.every((item) => typeof item === 'string')
+      ? candidate.failures
+      : [];
+  return {
+    code: typeof candidate?.code === 'string' ? candidate.code : fallbackCode,
+    message: error instanceof Error ? error.message : String(error),
+    failures,
+  };
+}
 function postCommandEffects(run: SeasonRun, prior: SeasonEffectsState): SeasonEffectsState {
   const withEffects = run as SeasonRun & {
     effects?: SeasonEffectsState;
@@ -197,7 +230,7 @@ export class SeasonHubState {
   index: SeasonActiveRunIndex | null = null;
   block: BlockRunState = { ...IDLE_BLOCK };
   postseason: SeasonPostseasonProgress = { ...IDLE_POSTSEASON };
-  error: string | null = null;
+  error: SeasonRunLoadDiagnostic | null = null;
   incompatible: SeasonRunIncompatibleInfo | null = null;
   pending: SeasonPendingBlockCandidate | null = null;
   interruption: SeasonInvalidRosterInterruption | null = null;
@@ -405,9 +438,19 @@ export class SeasonHubState {
       ) {
         setCachedSeasonSnapshot(snapshot);
       }
-      this.error = null;
+      this.error =
+        snapshot === null && index !== null
+          ? {
+              code: 'SEASON_RUN_CHECKPOINT_MISSING',
+              message:
+                'The active-run index exists, but the saved Season Run checkpoint is missing.',
+              failures: [
+                `run ${index.runId} is indexed at revision ${String(index.revision)} but has no checkpoint record`,
+              ],
+            }
+          : null;
     } catch (error) {
-      this.error = error instanceof Error ? error.message : String(error);
+      this.error = seasonRunLoadDiagnosticOf(error);
     }
     this.emit();
   }
