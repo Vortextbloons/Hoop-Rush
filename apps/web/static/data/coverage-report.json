@@ -33,6 +33,7 @@
         "athleticism",
         "defense",
         "rebounding",
+        "shooting",
         "shot-mix",
         "turnovers",
         "usage"
@@ -203,7 +204,8 @@
       ],
       "estimatedFamilies": [
         "athleticism",
-        "defense"
+        "defense",
+        "shooting"
       ],
       "missingCategories": [],
       "lowConfidenceShare": 0.049,
@@ -233,6 +235,7 @@
         "athleticism",
         "defense",
         "rebounding",
+        "shooting",
         "shot-mix",
         "turnovers",
         "usage"
@@ -324,7 +327,7 @@
         "shooting"
       ],
       "missingCategories": [],
-      "lowConfidenceShare": 0.049,
+      "lowConfidenceShare": 0.066,
       "policyVersion": "policy-v2"
     }
   },
@@ -459,16 +462,89 @@
   {
     "franchiseId": "bulls",
     "eraId": "1960s",
-    "status": "unavailable",
-    "reason": "confidence-failed",
-    "detail": "8 of 21 players exceed the low-confidence share under policy-v2"
+    "status": "available",
+    "playerCount": 21,
+    "coverageSummary": {
+      "coverageBand": "reconstructed",
+      "observedFamilies": [
+        "usage"
+      ],
+      "derivedFamilies": [
+        "athleticism",
+        "creation",
+        "defensive-events",
+        "fouls",
+        "shooting",
+        "shot-mix",
+        "usage"
+      ],
+      "estimatedFamilies": [
+        "athleticism",
+        "defense",
+        "rebounding",
+        "shooting",
+        "shot-mix",
+        "turnovers",
+        "usage"
+      ],
+      "reconstructedFamilies": [
+        "shooting",
+        "shot-mix"
+      ],
+      "missingCategories": [
+        "defense",
+        "rebounding",
+        "shooting",
+        "three-point"
+      ],
+      "lowConfidenceShare": 0.311,
+      "policyVersion": "policy-v2"
+    }
   },
   {
     "franchiseId": "bulls",
     "eraId": "1970s",
-    "status": "unavailable",
-    "reason": "confidence-failed",
-    "detail": "14 of 46 players exceed the low-confidence share under policy-v2"
+    "status": "available",
+    "playerCount": 46,
+    "coverageSummary": {
+      "coverageBand": "reconstructed",
+      "observedFamilies": [
+        "usage"
+      ],
+      "derivedFamilies": [
+        "athleticism",
+        "creation",
+        "defense",
+        "defensive-events",
+        "fouls",
+        "rebounding",
+        "shooting",
+        "shot-mix",
+        "turnovers",
+        "usage"
+      ],
+      "estimatedFamilies": [
+        "athleticism",
+        "defense",
+        "rebounding",
+        "shooting",
+        "shot-mix",
+        "turnovers",
+        "usage"
+      ],
+      "reconstructedFamilies": [
+        "shooting",
+        "shot-mix"
+      ],
+      "missingCategories": [
+        "defense",
+        "rebounding",
+        "shooting",
+        "three-point"
+      ],
+      "lowConfidenceShare": 0.164,
+      "policyVersion": "policy-v2"
+    }
   },
   {
     "franchiseId": "bulls",
@@ -562,7 +638,7 @@
         "shooting"
       ],
       "missingCategories": [],
-      "lowConfidenceShare": 0.049,
+      "lowConfidenceShare": 0.066,
       "policyVersion": "policy-v2"
     }
   },
@@ -664,6 +740,7 @@
         "athleticism",
         "defense",
         "rebounding",
+        "shooting",
         "shot-mix",
         "turnovers",
         "usage"
@@ -678,7 +755,7 @@
         "shooting",
         "three-point"
       ],
-      "lowConfidenceShare": 0.148,
+      "lowConfidenceShare": 0.164,
       "policyVersion": "policy-v2"
     }
   },
@@ -774,7 +851,7 @@
         "shooting"
       ],
       "missingCategories": [],
-      "lowConfidenceShare": 0.656,
+      "lowConfidenceShare": 0.082,
       "policyVersion": "policy-v2"
     }
   },
@@ -845,9 +922,44 @@
   {
     "franchiseId": "celtics",
     "eraId": "1960s",
-    "status": "unavailable",
-    "reason": "confidence-failed",
-    "detail": "17 of 33 players exceed the low-confidence share under policy-v2"
+    "status": "available",
+    "playerCount": 33,
+    "coverageSummary": {
+      "coverageBand": "reconstructed",
+      "observedFamilies": [
+        "usage"
+      ],
+      "derivedFamilies": [
+        "athleticism",
+        "creation",
+        "defensive-events",
+        "fouls",
+        "shooting",
+        "shot-mix",
+        "usage"
+      ],
+      "estimatedFamilies": [
+        "athleticism",
+        "defense",
+        "rebounding",
+        "shooting",
+        "shot-mix",
+        "turnovers",
+        "usage"
+      ],
+      "reconstructedFamilies": [
+        "shooting",
+        "shot-mix"
+      ],
+      "missingCategories": [
+        "defense",
+        "rebounding",
+        "shooting",
+        "three-point"
+      ],
+      "lowConfidenceShare": 0.295,
+      "policyVersion": "policy-v2"
+    }
   },
   {
     "franchiseId": "celtics",
@@ -897,9 +1009,34 @@
   {
     "franchiseId": "celtics",
     "eraId": "1980s",
-    "status": "unavailable",
-    "reason": "confidence-failed",
-    "detail": "10 of 38 players exceed the low-confidence share under policy-v2"
+    "status": "available",
+    "playerCount": 38,
+    "coverageSummary": {
+      "coverageBand": "complete-box-derived",
+      "observedFamilies": [
+        "usage"
+      ],
+      "derivedFamilies": [
+        "athleticism",
+        "creation",
+        "defense",
+        "defensive-events",
+        "fouls",
+        "rebounding",
+        "shooting",
+        "shot-mix",
+        "turnovers",
+        "usage"
+      ],
+      "estimatedFamilies": [
+        "athleticism",
+        "defense",
+        "shooting"
+      ],
+      "missingCategories": [],
+      "lowConfidenceShare": 0.066,
+      "policyVersion": "policy-v2"
+    }
   },
   {
     "franchiseId": "celtics",
@@ -993,7 +1130,7 @@
         "shooting"
       ],
       "missingCategories": [],
-      "lowConfidenceShare": 0.656,
+      "lowConfidenceShare": 0.049,
       "policyVersion": "policy-v2"
     }
   },
@@ -1063,6 +1200,7 @@
         "athleticism",
         "defense",
         "rebounding",
+        "shooting",
         "shot-mix",
         "turnovers",
         "usage"
@@ -1109,7 +1247,7 @@
         "shooting"
       ],
       "missingCategories": [],
-      "lowConfidenceShare": 0.049,
+      "lowConfidenceShare": 0.066,
       "policyVersion": "policy-v2"
     }
   },
@@ -1141,7 +1279,7 @@
         "shooting"
       ],
       "missingCategories": [],
-      "lowConfidenceShare": 0.656,
+      "lowConfidenceShare": 0.049,
       "policyVersion": "policy-v2"
     }
   },
@@ -1173,7 +1311,7 @@
         "shooting"
       ],
       "missingCategories": [],
-      "lowConfidenceShare": 0.656,
+      "lowConfidenceShare": 0.049,
       "policyVersion": "policy-v2"
     }
   },
@@ -1325,7 +1463,7 @@
         "shooting"
       ],
       "missingCategories": [],
-      "lowConfidenceShare": 0.049,
+      "lowConfidenceShare": 0.066,
       "policyVersion": "policy-v2"
     }
   },
@@ -1416,6 +1554,7 @@
         "athleticism",
         "defense",
         "rebounding",
+        "shooting",
         "shot-mix",
         "turnovers",
         "usage"
@@ -1683,7 +1822,7 @@
         "shooting"
       ],
       "missingCategories": [],
-      "lowConfidenceShare": 0.049,
+      "lowConfidenceShare": 0.066,
       "policyVersion": "policy-v2"
     }
   },
@@ -1855,10 +1994,11 @@
       ],
       "estimatedFamilies": [
         "athleticism",
-        "defense"
+        "defense",
+        "shooting"
       ],
       "missingCategories": [],
-      "lowConfidenceShare": 0.049,
+      "lowConfidenceShare": 0.066,
       "policyVersion": "policy-v2"
     }
   },
@@ -1890,7 +2030,7 @@
         "shooting"
       ],
       "missingCategories": [],
-      "lowConfidenceShare": 0.049,
+      "lowConfidenceShare": 0.066,
       "policyVersion": "policy-v2"
     }
   },
@@ -2023,6 +2163,7 @@
       "estimatedFamilies": [
         "athleticism",
         "defense",
+        "shooting",
         "shot-mix",
         "turnovers",
         "usage"
@@ -2035,16 +2176,41 @@
         "shooting",
         "three-point"
       ],
-      "lowConfidenceShare": 0.656,
+      "lowConfidenceShare": 0.131,
       "policyVersion": "policy-v2"
     }
   },
   {
     "franchiseId": "jazz",
     "eraId": "1980s",
-    "status": "unavailable",
-    "reason": "confidence-failed",
-    "detail": "12 of 44 players exceed the low-confidence share under policy-v2"
+    "status": "available",
+    "playerCount": 44,
+    "coverageSummary": {
+      "coverageBand": "complete-box-derived",
+      "observedFamilies": [
+        "usage"
+      ],
+      "derivedFamilies": [
+        "athleticism",
+        "creation",
+        "defense",
+        "defensive-events",
+        "fouls",
+        "rebounding",
+        "shooting",
+        "shot-mix",
+        "turnovers",
+        "usage"
+      ],
+      "estimatedFamilies": [
+        "athleticism",
+        "defense",
+        "shooting"
+      ],
+      "missingCategories": [],
+      "lowConfidenceShare": 0.066,
+      "policyVersion": "policy-v2"
+    }
   },
   {
     "franchiseId": "jazz",
@@ -2074,7 +2240,7 @@
         "shooting"
       ],
       "missingCategories": [],
-      "lowConfidenceShare": 0.049,
+      "lowConfidenceShare": 0.066,
       "policyVersion": "policy-v2"
     }
   },
@@ -2179,7 +2345,7 @@
     "eraId": "1960s",
     "status": "unavailable",
     "reason": "confidence-failed",
-    "detail": "31 of 43 players exceed the low-confidence share under policy-v2"
+    "detail": "11 of 43 players exceed the low-confidence share under policy-v2"
   },
   {
     "franchiseId": "kings",
@@ -2222,7 +2388,7 @@
         "shooting",
         "three-point"
       ],
-      "lowConfidenceShare": 0.066,
+      "lowConfidenceShare": 0.082,
       "policyVersion": "policy-v2"
     }
   },
@@ -2381,7 +2547,8 @@
       ],
       "estimatedFamilies": [
         "athleticism",
-        "defense"
+        "defense",
+        "shooting"
       ],
       "missingCategories": [],
       "lowConfidenceShare": 0.049,
@@ -2391,16 +2558,89 @@
   {
     "franchiseId": "knicks",
     "eraId": "1960s",
-    "status": "unavailable",
-    "reason": "confidence-failed",
-    "detail": "33 of 48 players exceed the low-confidence share under policy-v2"
+    "status": "available",
+    "playerCount": 48,
+    "coverageSummary": {
+      "coverageBand": "reconstructed",
+      "observedFamilies": [
+        "usage"
+      ],
+      "derivedFamilies": [
+        "athleticism",
+        "creation",
+        "defensive-events",
+        "fouls",
+        "shooting",
+        "shot-mix",
+        "usage"
+      ],
+      "estimatedFamilies": [
+        "athleticism",
+        "defense",
+        "rebounding",
+        "shooting",
+        "shot-mix",
+        "turnovers",
+        "usage"
+      ],
+      "reconstructedFamilies": [
+        "shooting",
+        "shot-mix"
+      ],
+      "missingCategories": [
+        "defense",
+        "rebounding",
+        "shooting",
+        "three-point"
+      ],
+      "lowConfidenceShare": 0.672,
+      "policyVersion": "policy-v2"
+    }
   },
   {
     "franchiseId": "knicks",
     "eraId": "1970s",
-    "status": "unavailable",
-    "reason": "confidence-failed",
-    "detail": "12 of 47 players exceed the low-confidence share under policy-v2"
+    "status": "available",
+    "playerCount": 47,
+    "coverageSummary": {
+      "coverageBand": "reconstructed",
+      "observedFamilies": [
+        "usage"
+      ],
+      "derivedFamilies": [
+        "athleticism",
+        "creation",
+        "defense",
+        "defensive-events",
+        "fouls",
+        "rebounding",
+        "shooting",
+        "shot-mix",
+        "turnovers",
+        "usage"
+      ],
+      "estimatedFamilies": [
+        "athleticism",
+        "defense",
+        "rebounding",
+        "shooting",
+        "shot-mix",
+        "turnovers",
+        "usage"
+      ],
+      "reconstructedFamilies": [
+        "shooting",
+        "shot-mix"
+      ],
+      "missingCategories": [
+        "defense",
+        "rebounding",
+        "shooting",
+        "three-point"
+      ],
+      "lowConfidenceShare": 0.098,
+      "policyVersion": "policy-v2"
+    }
   },
   {
     "franchiseId": "knicks",
@@ -2430,7 +2670,7 @@
         "shooting"
       ],
       "missingCategories": [],
-      "lowConfidenceShare": 0.049,
+      "lowConfidenceShare": 0.066,
       "policyVersion": "policy-v2"
     }
   },
@@ -2462,7 +2702,7 @@
         "shooting"
       ],
       "missingCategories": [],
-      "lowConfidenceShare": 0.656,
+      "lowConfidenceShare": 0.066,
       "policyVersion": "policy-v2"
     }
   },
@@ -2565,9 +2805,44 @@
   {
     "franchiseId": "lakers",
     "eraId": "1960s",
-    "status": "unavailable",
-    "reason": "confidence-failed",
-    "detail": "19 of 35 players exceed the low-confidence share under policy-v2"
+    "status": "available",
+    "playerCount": 35,
+    "coverageSummary": {
+      "coverageBand": "reconstructed",
+      "observedFamilies": [
+        "usage"
+      ],
+      "derivedFamilies": [
+        "athleticism",
+        "creation",
+        "defensive-events",
+        "fouls",
+        "shooting",
+        "shot-mix",
+        "usage"
+      ],
+      "estimatedFamilies": [
+        "athleticism",
+        "defense",
+        "rebounding",
+        "shooting",
+        "shot-mix",
+        "turnovers",
+        "usage"
+      ],
+      "reconstructedFamilies": [
+        "shooting",
+        "shot-mix"
+      ],
+      "missingCategories": [
+        "defense",
+        "rebounding",
+        "shooting",
+        "three-point"
+      ],
+      "lowConfidenceShare": 0.311,
+      "policyVersion": "policy-v2"
+    }
   },
   {
     "franchiseId": "lakers",
@@ -2595,6 +2870,7 @@
         "athleticism",
         "defense",
         "rebounding",
+        "shooting",
         "shot-mix",
         "turnovers",
         "usage"
@@ -2609,23 +2885,73 @@
         "shooting",
         "three-point"
       ],
-      "lowConfidenceShare": 0.148,
+      "lowConfidenceShare": 0.164,
       "policyVersion": "policy-v2"
     }
   },
   {
     "franchiseId": "lakers",
     "eraId": "1980s",
-    "status": "unavailable",
-    "reason": "confidence-failed",
-    "detail": "10 of 33 players exceed the low-confidence share under policy-v2"
+    "status": "available",
+    "playerCount": 33,
+    "coverageSummary": {
+      "coverageBand": "complete-box-derived",
+      "observedFamilies": [
+        "usage"
+      ],
+      "derivedFamilies": [
+        "athleticism",
+        "creation",
+        "defense",
+        "defensive-events",
+        "fouls",
+        "rebounding",
+        "shooting",
+        "shot-mix",
+        "turnovers",
+        "usage"
+      ],
+      "estimatedFamilies": [
+        "athleticism",
+        "defense",
+        "shooting"
+      ],
+      "missingCategories": [],
+      "lowConfidenceShare": 0.082,
+      "policyVersion": "policy-v2"
+    }
   },
   {
     "franchiseId": "lakers",
     "eraId": "1990s",
-    "status": "unavailable",
-    "reason": "confidence-failed",
-    "detail": "14 of 44 players exceed the low-confidence share under policy-v2"
+    "status": "available",
+    "playerCount": 44,
+    "coverageSummary": {
+      "coverageBand": "complete-box-derived",
+      "observedFamilies": [
+        "usage"
+      ],
+      "derivedFamilies": [
+        "athleticism",
+        "creation",
+        "defense",
+        "defensive-events",
+        "fouls",
+        "rebounding",
+        "shooting",
+        "shot-mix",
+        "turnovers",
+        "usage"
+      ],
+      "estimatedFamilies": [
+        "athleticism",
+        "defense",
+        "shooting"
+      ],
+      "missingCategories": [],
+      "lowConfidenceShare": 0.049,
+      "policyVersion": "policy-v2"
+    }
   },
   {
     "franchiseId": "lakers",
@@ -2655,7 +2981,7 @@
         "shooting"
       ],
       "missingCategories": [],
-      "lowConfidenceShare": 0.066,
+      "lowConfidenceShare": 0.082,
       "policyVersion": "policy-v2"
     }
   },
@@ -2720,7 +3046,7 @@
         "shooting"
       ],
       "missingCategories": [],
-      "lowConfidenceShare": 0.049,
+      "lowConfidenceShare": 0.066,
       "policyVersion": "policy-v2"
     }
   },
@@ -2832,7 +3158,7 @@
         "shooting"
       ],
       "missingCategories": [],
-      "lowConfidenceShare": 0.656,
+      "lowConfidenceShare": 0.066,
       "policyVersion": "policy-v2"
     }
   },
@@ -3072,7 +3398,7 @@
         "shooting"
       ],
       "missingCategories": [],
-      "lowConfidenceShare": 0.049,
+      "lowConfidenceShare": 0.066,
       "policyVersion": "policy-v2"
     }
   },
@@ -3189,7 +3515,7 @@
         "shooting"
       ],
       "missingCategories": [],
-      "lowConfidenceShare": 0.066,
+      "lowConfidenceShare": 0.082,
       "policyVersion": "policy-v2"
     }
   },
@@ -3335,7 +3661,7 @@
         "shooting",
         "three-point"
       ],
-      "lowConfidenceShare": 0.656,
+      "lowConfidenceShare": 0.148,
       "policyVersion": "policy-v2"
     }
   },
@@ -3367,7 +3693,7 @@
         "shooting"
       ],
       "missingCategories": [],
-      "lowConfidenceShare": 0.049,
+      "lowConfidenceShare": 0.066,
       "policyVersion": "policy-v2"
     }
   },
@@ -3399,7 +3725,7 @@
         "shooting"
       ],
       "missingCategories": [],
-      "lowConfidenceShare": 0.066,
+      "lowConfidenceShare": 0.082,
       "policyVersion": "policy-v2"
     }
   },
@@ -3431,7 +3757,7 @@
         "shooting"
       ],
       "missingCategories": [],
-      "lowConfidenceShare": 0.049,
+      "lowConfidenceShare": 0.066,
       "policyVersion": "policy-v2"
     }
   },
@@ -3546,7 +3872,7 @@
         "shooting",
         "three-point"
       ],
-      "lowConfidenceShare": 0.131,
+      "lowConfidenceShare": 0.066,
       "policyVersion": "policy-v2"
     }
   },
@@ -3578,7 +3904,7 @@
         "shooting"
       ],
       "missingCategories": [],
-      "lowConfidenceShare": 0.049,
+      "lowConfidenceShare": 0.066,
       "policyVersion": "policy-v2"
     }
   },
@@ -3610,7 +3936,7 @@
         "shooting"
       ],
       "missingCategories": [],
-      "lowConfidenceShare": 0.049,
+      "lowConfidenceShare": 0.066,
       "policyVersion": "policy-v2"
     }
   },
@@ -3642,7 +3968,7 @@
         "shooting"
       ],
       "missingCategories": [],
-      "lowConfidenceShare": 0.066,
+      "lowConfidenceShare": 0.082,
       "policyVersion": "policy-v2"
     }
   },
@@ -3702,7 +4028,8 @@
       ],
       "estimatedFamilies": [
         "athleticism",
-        "defense"
+        "defense",
+        "shooting"
       ],
       "missingCategories": [],
       "lowConfidenceShare": 0.049,
@@ -3833,16 +4160,51 @@
         "shooting"
       ],
       "missingCategories": [],
-      "lowConfidenceShare": 0.049,
+      "lowConfidenceShare": 0.066,
       "policyVersion": "policy-v2"
     }
   },
   {
     "franchiseId": "pistons",
     "eraId": "1960s",
-    "status": "unavailable",
-    "reason": "confidence-failed",
-    "detail": "30 of 42 players exceed the low-confidence share under policy-v2"
+    "status": "available",
+    "playerCount": 42,
+    "coverageSummary": {
+      "coverageBand": "reconstructed",
+      "observedFamilies": [
+        "usage"
+      ],
+      "derivedFamilies": [
+        "athleticism",
+        "creation",
+        "defensive-events",
+        "fouls",
+        "shooting",
+        "shot-mix",
+        "usage"
+      ],
+      "estimatedFamilies": [
+        "athleticism",
+        "defense",
+        "rebounding",
+        "shooting",
+        "shot-mix",
+        "turnovers",
+        "usage"
+      ],
+      "reconstructedFamilies": [
+        "shooting",
+        "shot-mix"
+      ],
+      "missingCategories": [
+        "defense",
+        "rebounding",
+        "shooting",
+        "three-point"
+      ],
+      "lowConfidenceShare": 0.295,
+      "policyVersion": "policy-v2"
+    }
   },
   {
     "franchiseId": "pistons",
@@ -3870,6 +4232,7 @@
         "athleticism",
         "defense",
         "rebounding",
+        "shooting",
         "shot-mix",
         "turnovers",
         "usage"
@@ -3891,9 +4254,34 @@
   {
     "franchiseId": "pistons",
     "eraId": "1980s",
-    "status": "unavailable",
-    "reason": "confidence-failed",
-    "detail": "11 of 39 players exceed the low-confidence share under policy-v2"
+    "status": "available",
+    "playerCount": 39,
+    "coverageSummary": {
+      "coverageBand": "complete-box-derived",
+      "observedFamilies": [
+        "usage"
+      ],
+      "derivedFamilies": [
+        "athleticism",
+        "creation",
+        "defense",
+        "defensive-events",
+        "fouls",
+        "rebounding",
+        "shooting",
+        "shot-mix",
+        "turnovers",
+        "usage"
+      ],
+      "estimatedFamilies": [
+        "athleticism",
+        "defense",
+        "shooting"
+      ],
+      "missingCategories": [],
+      "lowConfidenceShare": 0.066,
+      "policyVersion": "policy-v2"
+    }
   },
   {
     "franchiseId": "pistons",
@@ -4167,7 +4555,8 @@
       ],
       "estimatedFamilies": [
         "athleticism",
-        "defense"
+        "defense",
+        "shooting"
       ],
       "missingCategories": [],
       "lowConfidenceShare": 0.049,
@@ -4177,9 +4566,44 @@
   {
     "franchiseId": "rockets",
     "eraId": "1960s",
-    "status": "unavailable",
-    "reason": "confidence-failed",
-    "detail": "7 of 18 players exceed the low-confidence share under policy-v2"
+    "status": "available",
+    "playerCount": 18,
+    "coverageSummary": {
+      "coverageBand": "reconstructed",
+      "observedFamilies": [
+        "usage"
+      ],
+      "derivedFamilies": [
+        "athleticism",
+        "creation",
+        "defensive-events",
+        "fouls",
+        "shooting",
+        "shot-mix",
+        "usage"
+      ],
+      "estimatedFamilies": [
+        "athleticism",
+        "defense",
+        "rebounding",
+        "shooting",
+        "shot-mix",
+        "turnovers",
+        "usage"
+      ],
+      "reconstructedFamilies": [
+        "shooting",
+        "shot-mix"
+      ],
+      "missingCategories": [
+        "defense",
+        "rebounding",
+        "shooting",
+        "three-point"
+      ],
+      "lowConfidenceShare": 0.295,
+      "policyVersion": "policy-v2"
+    }
   },
   {
     "franchiseId": "rockets",
@@ -4222,7 +4646,7 @@
         "shooting",
         "three-point"
       ],
-      "lowConfidenceShare": 0.131,
+      "lowConfidenceShare": 0.049,
       "policyVersion": "policy-v2"
     }
   },
@@ -4254,7 +4678,7 @@
         "shooting"
       ],
       "missingCategories": [],
-      "lowConfidenceShare": 0.656,
+      "lowConfidenceShare": 0.082,
       "policyVersion": "policy-v2"
     }
   },
@@ -4390,9 +4814,44 @@
   {
     "franchiseId": "sixers",
     "eraId": "1960s",
-    "status": "unavailable",
-    "reason": "confidence-failed",
-    "detail": "21 of 31 players exceed the low-confidence share under policy-v2"
+    "status": "available",
+    "playerCount": 31,
+    "coverageSummary": {
+      "coverageBand": "reconstructed",
+      "observedFamilies": [
+        "usage"
+      ],
+      "derivedFamilies": [
+        "athleticism",
+        "creation",
+        "defensive-events",
+        "fouls",
+        "shooting",
+        "shot-mix",
+        "usage"
+      ],
+      "estimatedFamilies": [
+        "athleticism",
+        "defense",
+        "rebounding",
+        "shooting",
+        "shot-mix",
+        "turnovers",
+        "usage"
+      ],
+      "reconstructedFamilies": [
+        "shooting",
+        "shot-mix"
+      ],
+      "missingCategories": [
+        "defense",
+        "rebounding",
+        "shooting",
+        "three-point"
+      ],
+      "lowConfidenceShare": 0.295,
+      "policyVersion": "policy-v2"
+    }
   },
   {
     "franchiseId": "sixers",
@@ -4420,6 +4879,7 @@
         "athleticism",
         "defense",
         "rebounding",
+        "shooting",
         "shot-mix",
         "turnovers",
         "usage"
@@ -4434,7 +4894,7 @@
         "shooting",
         "three-point"
       ],
-      "lowConfidenceShare": 0.295,
+      "lowConfidenceShare": 0.311,
       "policyVersion": "policy-v2"
     }
   },
@@ -4594,7 +5054,7 @@
         "shooting"
       ],
       "missingCategories": [],
-      "lowConfidenceShare": 0.656,
+      "lowConfidenceShare": 0.066,
       "policyVersion": "policy-v2"
     }
   },
@@ -4707,7 +5167,7 @@
         "shooting"
       ],
       "missingCategories": [],
-      "lowConfidenceShare": 0.656,
+      "lowConfidenceShare": 0.049,
       "policyVersion": "policy-v2"
     }
   },
@@ -4830,6 +5290,7 @@
         "athleticism",
         "defense",
         "rebounding",
+        "shooting",
         "shot-mix",
         "turnovers",
         "usage"
@@ -4844,7 +5305,7 @@
         "shooting",
         "three-point"
       ],
-      "lowConfidenceShare": 0.656,
+      "lowConfidenceShare": 0.295,
       "policyVersion": "policy-v2"
     }
   },
@@ -5079,6 +5540,7 @@
         "athleticism",
         "defense",
         "rebounding",
+        "shooting",
         "shot-mix",
         "turnovers",
         "usage"
@@ -5202,7 +5664,7 @@
         "shooting"
       ],
       "missingCategories": [],
-      "lowConfidenceShare": 0.656,
+      "lowConfidenceShare": 0.049,
       "policyVersion": "policy-v2"
     }
   },
@@ -5342,10 +5804,11 @@
       ],
       "estimatedFamilies": [
         "athleticism",
-        "defense"
+        "defense",
+        "shooting"
       ],
       "missingCategories": [],
-      "lowConfidenceShare": 0.656,
+      "lowConfidenceShare": 0.066,
       "policyVersion": "policy-v2"
     }
   },
@@ -5480,9 +5943,44 @@
   {
     "franchiseId": "warriors",
     "eraId": "1960s",
-    "status": "unavailable",
-    "reason": "confidence-failed",
-    "detail": "17 of 42 players exceed the low-confidence share under policy-v2"
+    "status": "available",
+    "playerCount": 42,
+    "coverageSummary": {
+      "coverageBand": "reconstructed",
+      "observedFamilies": [
+        "usage"
+      ],
+      "derivedFamilies": [
+        "athleticism",
+        "creation",
+        "defensive-events",
+        "fouls",
+        "shooting",
+        "shot-mix",
+        "usage"
+      ],
+      "estimatedFamilies": [
+        "athleticism",
+        "defense",
+        "rebounding",
+        "shooting",
+        "shot-mix",
+        "turnovers",
+        "usage"
+      ],
+      "reconstructedFamilies": [
+        "shooting",
+        "shot-mix"
+      ],
+      "missingCategories": [
+        "defense",
+        "rebounding",
+        "shooting",
+        "three-point"
+      ],
+      "lowConfidenceShare": 0.311,
+      "policyVersion": "policy-v2"
+    }
   },
   {
     "franchiseId": "warriors",
@@ -5589,7 +6087,7 @@
         "shooting"
       ],
       "missingCategories": [],
-      "lowConfidenceShare": 0.656,
+      "lowConfidenceShare": 0.049,
       "policyVersion": "policy-v2"
     }
   },
@@ -5621,7 +6119,7 @@
         "shooting"
       ],
       "missingCategories": [],
-      "lowConfidenceShare": 0.066,
+      "lowConfidenceShare": 0.082,
       "policyVersion": "policy-v2"
     }
   },
@@ -5692,9 +6190,44 @@
   {
     "franchiseId": "wizards",
     "eraId": "1960s",
-    "status": "unavailable",
-    "reason": "confidence-failed",
-    "detail": "28 of 43 players exceed the low-confidence share under policy-v2"
+    "status": "available",
+    "playerCount": 43,
+    "coverageSummary": {
+      "coverageBand": "reconstructed",
+      "observedFamilies": [
+        "usage"
+      ],
+      "derivedFamilies": [
+        "athleticism",
+        "creation",
+        "defensive-events",
+        "fouls",
+        "shooting",
+        "shot-mix",
+        "usage"
+      ],
+      "estimatedFamilies": [
+        "athleticism",
+        "defense",
+        "rebounding",
+        "shooting",
+        "shot-mix",
+        "turnovers",
+        "usage"
+      ],
+      "reconstructedFamilies": [
+        "shooting",
+        "shot-mix"
+      ],
+      "missingCategories": [
+        "defense",
+        "rebounding",
+        "shooting",
+        "three-point"
+      ],
+      "lowConfidenceShare": 0.295,
+      "policyVersion": "policy-v2"
+    }
   },
   {
     "franchiseId": "wizards",
@@ -5722,6 +6255,7 @@
         "athleticism",
         "defense",
         "rebounding",
+        "shooting",
         "shot-mix",
         "turnovers",
         "usage"
