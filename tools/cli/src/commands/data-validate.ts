@@ -218,6 +218,61 @@ async function auditPools(
   details.push(`pools: ${String(manifest.pools.length)} franchise-era pools`);
   return { ok: failures.length === 0, details, failures };
 }
+export interface CountedSeasonStats {
+  gamesPlayed?: unknown;
+  minutes?: unknown;
+  points?: unknown;
+  rebounds?: unknown;
+  assists?: unknown;
+  fouls?: unknown;
+  fieldGoalsMade?: unknown;
+  fieldGoalsAttempted?: unknown;
+  freeThrowsMade?: unknown;
+  freeThrowsAttempted?: unknown;
+  threesMade?: unknown;
+  threesAttempted?: unknown;
+}
+export function auditPlayerStatSanity(
+  counted: CountedSeasonStats,
+  key: string,
+  displayName: string,
+): string[] {
+  // Impossible box-score shapes mean a partial family leaked through as a
+  // total. Low minutes alone are NOT corruption — end-of-bench players really
+  // do play 40+ games at 4 mpg — and a zero-minutes row means unobserved (the
+  // pool schema has no null for minutes), so this fires only on
+  // contradictions: makes above attempts, and scoring volume no logged
+  // minutes could physically produce.
+  const failures: string[] = [];
+  const finite = (value: unknown): value is number =>
+    typeof value === 'number' && Number.isFinite(value);
+  if (
+    (finite(counted.fieldGoalsMade) &&
+      finite(counted.fieldGoalsAttempted) &&
+      counted.fieldGoalsMade > counted.fieldGoalsAttempted) ||
+    (finite(counted.freeThrowsMade) &&
+      finite(counted.freeThrowsAttempted) &&
+      counted.freeThrowsMade > counted.freeThrowsAttempted) ||
+    (finite(counted.threesMade) &&
+      finite(counted.threesAttempted) &&
+      counted.threesMade > counted.threesAttempted)
+  ) {
+    failures.push(`pools: ${key} ${displayName} makes exceed attempts`);
+  }
+  if (
+    finite(counted.gamesPlayed) &&
+    finite(counted.minutes) &&
+    counted.gamesPlayed >= 20 &&
+    counted.minutes > 0 &&
+    finite(counted.points) &&
+    counted.points / counted.minutes > 1.5
+  ) {
+    failures.push(
+      `pools: ${key} ${displayName} impossible scoring rate (${String(counted.points)} pts / ${String(counted.minutes)} min)`,
+    );
+  }
+  return failures;
+}
 function auditPoolContent(
   content: Buffer,
   index: HoopRushManifest['pools'][number],
@@ -301,31 +356,7 @@ function auditPoolContent(
       }
     }
     const counted = player.stats;
-    const finite = (value: unknown): value is number =>
-      typeof value === 'number' && Number.isFinite(value);
-    if (
-      (finite(counted.fieldGoalsMade) &&
-        finite(counted.fieldGoalsAttempted) &&
-        counted.fieldGoalsMade > counted.fieldGoalsAttempted) ||
-      (finite(counted.freeThrowsMade) &&
-        finite(counted.freeThrowsAttempted) &&
-        counted.freeThrowsMade > counted.freeThrowsAttempted) ||
-      (finite(counted.threesMade) &&
-        finite(counted.threesAttempted) &&
-        counted.threesMade > counted.threesAttempted)
-    ) {
-      failures.push(`pools: ${key} ${player.displayName} makes exceed attempts`);
-    }
-    if (
-      finite(counted.gamesPlayed) &&
-      finite(counted.minutes) &&
-      counted.gamesPlayed >= 40 &&
-      counted.minutes / counted.gamesPlayed < 5
-    ) {
-      failures.push(
-        `pools: ${key} ${player.displayName} implausible workload (${String(counted.minutes)} min / ${String(counted.gamesPlayed)} g)`,
-      );
-    }
+    failures.push(...auditPlayerStatSanity(counted, key, player.displayName));
     const psKey = `${player.franchiseId}/${player.playerExternalId}/${player.seasonKey}`;
     const owner = playerSeasons.get(psKey);
     if (owner !== undefined && owner !== key) {

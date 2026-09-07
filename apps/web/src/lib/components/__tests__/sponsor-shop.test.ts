@@ -164,8 +164,54 @@ describe('SponsorShopModal', () => {
     expect(getByTestId('sponsor-shop-modal')).toBeTruthy();
     expect(getByTestId('sponsor-shop-modal-title').textContent).toContain('Sponsor shop');
     expect(getByTestId('sponsor-shop-balance').textContent).toContain('8/8');
+    expect(getByTestId('sponsor-shop-balance').textContent).toContain('Influence');
+    expect(getByTestId('sponsor-shop-count').textContent).toContain('Owned Gear');
     expect(getAllByTestId(/^sponsor-offer-/)).toHaveLength(5);
     expect(getByTestId('sponsor-vault-counts').textContent).toContain('0');
+  });
+
+  it('shows slot counts on filters and a compact history summary', () => {
+    const offers = sponsorShopOf(testRun(), 0, 8);
+    if (offers === null) throw new Error('expected offers');
+    const shoeCount = offers.filter((offer) => offer.slot === 'shoe').length;
+    const { getByTestId } = render(SponsorShopModal, {
+      props: {
+        open: true,
+        offers,
+        balance: 8,
+        cap: 8,
+        ownedCount: 0,
+        history: [{ blockIndex: 0, bought: 0, expired: 5 }],
+        vault: [],
+        logos: new Map(),
+        blockLabel: 'Block 1 of 9',
+        onBuy: vi.fn(),
+        onOpenChange: vi.fn(),
+      },
+    });
+    expect(getByTestId('filter-sponsor-shoe').textContent).toContain(`(${String(shoeCount)})`);
+    expect(getByTestId('sponsor-shop-modal').textContent).toContain('5 expired');
+  });
+
+  it('toggles an offer preview without buying', async () => {
+    const offers = sponsorShopOf(testRun(), 0, 8);
+    if (offers === null || offers[0] === undefined) throw new Error('expected offers');
+    const { getByTestId } = render(SponsorShopModal, {
+      props: {
+        open: true,
+        offers,
+        balance: 8,
+        cap: 8,
+        ownedCount: 0,
+        history: [],
+        vault: [],
+        logos: new Map(),
+        onBuy: vi.fn(),
+        onOpenChange: vi.fn(),
+      },
+    });
+    await fireEvent.click(getByTestId(`preview-sponsor-${offers[0].instanceId}`));
+    expect(getByTestId(`preview-sponsor-${offers[0].instanceId}`).textContent).toContain('Hide');
   });
 
   it('filters offers by slot and fires buy with the instance id', async () => {
@@ -259,7 +305,7 @@ describe('PlayerSponsorCard', () => {
     });
   }
 
-  it('shows boosted ratings with source lines and slot sections', () => {
+  it('shows grouped ratings with a Current/Base/Changes toggle and slot sections', () => {
     const { getByTestId, getByText } = render(PlayerSponsorCard, {
       props: {
         card: card(),
@@ -271,11 +317,31 @@ describe('PlayerSponsorCard', () => {
         onClose: vi.fn(),
       },
     });
-    expect(getByTestId('sponsor-ratings-grid').children.length).toBe(13);
+    expect(getByTestId('sponsor-ratings-grid').querySelectorAll('[data-rating-key]').length).toBe(
+      13,
+    );
+    expect(getByTestId('sponsor-ratings-grid').textContent).toContain('Offense');
     expect(getByTestId('sponsor-slot-shoe')).toBeTruthy();
     expect(getByTestId('sponsor-slot-apparel')).toBeTruthy();
     expect(getByTestId('sponsor-slot-fuel')).toBeTruthy();
-    expect(getByText('Showing boosted')).toBeTruthy();
+    expect(getByText('Current')).toBeTruthy();
+    expect(getByTestId('rating-mode-boosted')).toBeTruthy();
+  });
+
+  it('previews before/after stat changes before confirming', async () => {
+    const { getByTestId, getByText } = render(PlayerSponsorCard, {
+      props: {
+        card: card(),
+        face: null,
+        manifest,
+        vault: [vaultEntry('shoe')],
+        logos: new Map(),
+        onApply: vi.fn(),
+        onClose: vi.fn(),
+      },
+    });
+    await fireEvent.click(getByTestId('apply-sponsor-vault-shoe'));
+    expect(getByText(/70 → 73/)).toBeTruthy();
   });
 
   it('requires an explicit irreversible confirm before applying', async () => {
@@ -302,7 +368,7 @@ describe('PlayerSponsorCard', () => {
     });
   });
 
-  it('disables brand duplicates with a reason', () => {
+  it('disables brand duplicates with a reason', async () => {
     const playerVersionId = `pv-${'1'.repeat(32)}`;
     const sponsors = createInitialSponsorGearState(SEED);
     sponsors.players.slots[playerVersionId] = {
@@ -346,6 +412,7 @@ describe('PlayerSponsorCard', () => {
         onClose: vi.fn(),
       },
     });
+    await fireEvent.click(getByTestId('select-slot-apparel'));
     const dupe = getByTestId('apply-sponsor-vault-apparel');
     expect((dupe as HTMLButtonElement).disabled).toBe(true);
     expect(getByText('Already worn by this player (nike)')).toBeTruthy();

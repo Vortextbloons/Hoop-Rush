@@ -1,8 +1,9 @@
 <script lang="ts">
   import SponsorOfferCard from '$lib/components/season/SponsorOfferCard.svelte';
-  import type {
-    SponsorBoardHistoryEntry,
-    SponsorOfferCard as SponsorOffer,
+  import {
+    sponsorHistorySummary,
+    type SponsorBoardHistoryEntry,
+    type SponsorOfferCard as SponsorOffer,
   } from '$lib/season/sponsor-gear-view';
   let {
     offers,
@@ -27,6 +28,7 @@
     logos?: ReadonlyMap<string, string>;
     onBuy: (input: { instanceId: string }) => void;
   } = $props();
+  const historySummary = $derived(sponsorHistorySummary(history));
 </script>
 
 <section
@@ -35,13 +37,13 @@
   class="flex flex-col gap-3"
   data-testid="sponsor-shop-panel"
 >
-  <div class="flex items-baseline justify-between gap-2">
+  <div class="flex flex-wrap items-baseline justify-between gap-2">
     <h2 id="sponsor-shop-heading" class="text-base font-extrabold uppercase tracking-tight">
       Sponsors
     </h2>
     {#if offers !== null}
       <p class="font-mono text-[11px] text-muted-foreground" data-testid="sponsor-shop-count">
-        {ownedCount}/{offers.length} owned
+        Owned Gear: {ownedCount}/{offers.length} owned
       </p>
     {/if}
   </div>
@@ -65,17 +67,17 @@
         <SponsorOfferCard {offer} {balance} {cap} {busy} {logos} {onBuy} />
       {/each}
     </ul>
-    {#if history.length > 0}
+    {#if historySummary !== null}
       <details class="rounded-xl border border-border bg-surface-1">
         <summary
-          class="cursor-pointer p-4 text-xs font-bold uppercase tracking-wide text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          class="cursor-pointer p-3 font-mono text-[11px] font-bold uppercase tracking-wide text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          Past blocks ({history.length})
+          History · {historySummary}
         </summary>
-        <ul class="flex flex-col gap-2 border-t border-border p-4">
+        <ul class="flex flex-col gap-1.5 border-t border-border p-3">
           {#each history as entry (entry.blockIndex)}
-            <li class="font-mono text-xs text-muted-foreground">
-              Block {entry.blockIndex + 1} · bought {entry.bought} · expired {entry.expired}
+            <li class="font-mono text-[11px] text-muted-foreground">
+              Block {entry.blockIndex + 1} · {entry.bought} purchased · {entry.expired} expired
             </li>
           {/each}
         </ul>

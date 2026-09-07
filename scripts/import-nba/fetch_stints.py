@@ -113,6 +113,10 @@ def aggregate_stints(logs: list[dict[str, Any]], season: str) -> list[dict[str, 
             value = _real(game.get(k))
             if value is None:
                 continue
+            if k == "MIN" and value <= 0:
+                # A log row with no logged minutes is not a zero-minute
+                # appearance; counting it would fake full coverage of nothing.
+                continue
             counts = stint.setdefault("_counts", {})
             counts[k] = counts.get(k, 0) + 1
             stint[k] = round(float(stint.get(k, 0.0)) + value, 1)

@@ -27,6 +27,40 @@ export const SPONSOR_RATING_SHORT_LABELS: Record<SeasonSponsorBoostKey, string> 
   freeThrow: 'FT',
 };
 
+export const SPONSOR_RATING_LONG_LABELS: Record<SeasonSponsorBoostKey, string> = {
+  speed: 'Speed',
+  ballHandling: 'Ball Handling',
+  vertical: 'Vertical',
+  steal: 'Steal',
+  midrange: 'Mid-Range',
+  strength: 'Strength',
+  threePoint: 'Three-Point',
+  perimeterDefense: 'Perimeter D',
+  interiorDefense: 'Interior D',
+  block: 'Block',
+  offensiveRebound: 'Off. Rebound',
+  defensiveRebound: 'Def. Rebound',
+  freeThrow: 'Free Throw',
+};
+
+export const SPONSOR_SLOT_ICONS: Record<SeasonSponsorSlot, string> = {
+  shoe: '◈',
+  apparel: '⬣',
+  fuel: '⚡',
+};
+
+export interface SponsorRatingGroup {
+  title: string;
+  keys: readonly SeasonSponsorBoostKey[];
+}
+
+export const SPONSOR_RATING_GROUPS: readonly SponsorRatingGroup[] = [
+  { title: 'Offense', keys: ['midrange', 'threePoint', 'freeThrow', 'ballHandling'] },
+  { title: 'Defense', keys: ['steal', 'perimeterDefense', 'interiorDefense', 'block'] },
+  { title: 'Physical', keys: ['speed', 'vertical', 'strength'] },
+  { title: 'Rebounding', keys: ['offensiveRebound', 'defensiveRebound'] },
+];
+
 export const SPONSOR_SLOT_LABELS: Record<SeasonSponsorSlot, string> = {
   shoe: 'SHOE',
   apparel: 'APPAREL',
@@ -254,4 +288,59 @@ export function boostedRatingRows(
     boosted: boosted[key],
     source: byKey.get(key) ?? null,
   }));
+}
+
+export interface GearPreviewDelta {
+  key: SeasonSponsorBoostKey;
+  label: string;
+  longLabel: string;
+  from: number;
+  to: number;
+  points: number;
+}
+
+export function previewGearDeltas(
+  base: SimulationRatings,
+  slots: SeasonPlayerSponsorSlots | null,
+  candidate: {
+    slot: SeasonSponsorSlot;
+    boosts: readonly { key: SeasonSponsorBoostKey; points: number }[];
+  },
+): GearPreviewDelta[] {
+  const current = applySponsorBoosts(base, slots);
+  const merged: SeasonPlayerSponsorSlots = {
+    shoe: slots?.shoe ?? null,
+    apparel: slots?.apparel ?? null,
+    fuel: slots?.fuel ?? null,
+  };
+  merged[candidate.slot] = {
+    instanceId: 'preview',
+    entryId: 'preview',
+    brandFamily: 'preview',
+    slot: candidate.slot,
+    tier: 'BUZZ',
+    boosts: candidate.boosts.map((boost) => ({ key: boost.key, points: boost.points })),
+    appliedBlock: 0,
+    appliedByCommandId: 'cmd-preview' as never,
+  };
+  const next = applySponsorBoosts(base, merged);
+  return candidate.boosts.map((boost) => ({
+    key: boost.key,
+    label: SPONSOR_RATING_SHORT_LABELS[boost.key],
+    longLabel: SPONSOR_RATING_LONG_LABELS[boost.key],
+    from: current[boost.key],
+    to: next[boost.key],
+    points: boost.points,
+  }));
+}
+
+export function sponsorHistorySummary(history: readonly SponsorBoardHistoryEntry[]): string | null {
+  if (history.length === 0) return null;
+  const bought = history.reduce((sum, entry) => sum + entry.bought, 0);
+  const expired = history.reduce((sum, entry) => sum + entry.expired, 0);
+  if (bought === 0 && expired === 0) return null;
+  const parts: string[] = [];
+  if (bought > 0) parts.push(`${String(bought)} purchased`);
+  if (expired > 0) parts.push(`${String(expired)} expired`);
+  return parts.join(' · ');
 }

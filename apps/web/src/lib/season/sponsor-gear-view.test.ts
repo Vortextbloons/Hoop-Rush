@@ -7,12 +7,15 @@ import {
 } from '@hoop-rush/data-contracts';
 import { createInitialSponsorGearState } from '@hoop-rush/engine';
 import {
+  SPONSOR_RATING_GROUPS,
   boostedRatingRows,
   boostedRatingsOf,
   formatBoostLine,
   gearPointsOf,
   playerSponsorCardOf,
+  previewGearDeltas,
   sponsorBoardHistoryOf,
+  sponsorHistorySummary,
   sponsorShopOf,
   sponsorSlotsOf,
   sponsorVaultOf,
@@ -90,6 +93,21 @@ describe('slots, boosts, and gear points', () => {
   it('labels all thirteen boostable keys', () => {
     expect(Object.keys(SPONSOR_RATING_SHORT_LABELS)).toHaveLength(13);
   });
+
+  it('groups all thirteen keys without overlap', () => {
+    const grouped = SPONSOR_RATING_GROUPS.flatMap((group) => group.keys);
+    expect(grouped).toHaveLength(13);
+    expect(new Set(grouped).size).toBe(13);
+  });
+
+  it('previews before/after deltas for a vault candidate', () => {
+    const deltas = previewGearDeltas(baseRatings(), null, {
+      slot: 'shoe',
+      boosts: [{ key: 'speed', points: 4 }],
+    });
+    expect(deltas).toHaveLength(1);
+    expect(deltas[0]).toMatchObject({ label: 'SPD', from: 70, to: 74, points: 4 });
+  });
 });
 
 describe('playerSponsorCardOf', () => {
@@ -119,5 +137,16 @@ describe('sponsorBoardHistoryOf', () => {
   it('summarizes bought and expired counts per block', () => {
     expect(sponsorBoardHistoryOf(testRun())).toEqual([{ blockIndex: 0, bought: 0, expired: 5 }]);
     expect(sponsorBoardHistoryOf(null)).toEqual([]);
+  });
+
+  it('compacts history into a one-line summary', () => {
+    expect(sponsorHistorySummary([])).toBeNull();
+    expect(sponsorHistorySummary([{ blockIndex: 0, bought: 0, expired: 5 }])).toBe('5 expired');
+    expect(
+      sponsorHistorySummary([
+        { blockIndex: 0, bought: 2, expired: 3 },
+        { blockIndex: 1, bought: 1, expired: 0 },
+      ]),
+    ).toBe('3 purchased · 3 expired');
   });
 });

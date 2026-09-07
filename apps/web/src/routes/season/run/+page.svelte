@@ -697,26 +697,27 @@
                 id="sponsor-shop-trigger-heading"
                 class="text-base font-extrabold uppercase tracking-tight"
               >
-                Sponsors
+                Sponsor deal board
               </h2>
               {#if sponsorOffers !== null}
                 <p
                   class="font-mono text-[11px] text-muted-foreground"
                   data-testid="sponsor-shop-count"
                 >
-                  {sponsorOwnedCount}/{sponsorOffers.length} owned · {sponsorVault.length} in vault ·
-                  {sponsorBalance}/{sponsorCap}◆
+                  Owned Gear: {sponsorOwnedCount}/{sponsorOffers.length} · Vault: {sponsorVault.length}
+                  items · Influence: {sponsorBalance}/{sponsorCap}
                 </p>
               {/if}
             </div>
             <p class="text-xs text-muted-foreground">
               {#if nextBlockIndex !== null && nextBlockIndex >= 8}
-                Final block — no new offers. Open the shop to review the vault before it locks.
+                Final block — no new offers. Open the shop to review the vault, then equip from the
+                roster.
               {:else if sponsorOffers === null}
                 Loading this block's endorsement board…
               {:else}
-                {sponsorOffers.length - sponsorOwnedCount} offers left this block. Buying stashes gear
-                in the vault for the roster.
+                {sponsorOffers.length - sponsorOwnedCount} offers left this block. Bought gear goes to
+                your vault — equip it to players from the roster.
               {/if}
             </p>
             <button
