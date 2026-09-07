@@ -34,11 +34,16 @@ export interface MinutePlanStructure {
 export function minutePlanHorizonGames(remainingGamesInSeason: number): number {
   return Math.min(10, Math.max(1, remainingGamesInSeason));
 }
-const ENVELOPE_STARTER_TOTAL: Record<SeasonMinutePolicyStrategy, number> = {
-  'starter-heavy': 5 * SEASON_ROTATION_PRESET_TARGETS.tight.starters,
-  balanced: 5 * SEASON_ROTATION_PRESET_TARGETS.balanced.starters,
-  'bench-heavy': 5 * SEASON_ROTATION_PRESET_TARGETS['bench-heavy'].starters,
-};
+function envelopeStarterTotal(strategy: SeasonMinutePolicyStrategy): number {
+  switch (strategy) {
+    case 'starter-heavy':
+      return 5 * SEASON_ROTATION_PRESET_TARGETS.tight.starters;
+    case 'balanced':
+      return 5 * SEASON_ROTATION_PRESET_TARGETS.balanced.starters;
+    case 'bench-heavy':
+      return 5 * SEASON_ROTATION_PRESET_TARGETS['bench-heavy'].starters;
+  }
+}
 export const STRATEGY_TO_PRESET: Record<
   SeasonMinutePolicyStrategy,
   keyof typeof SEASON_ROTATION_PRESET_TARGETS
@@ -307,7 +312,7 @@ function buildPlan(input: {
   horizon: number;
 }): MinutePlanCandidate {
   const { structure, players, strategy, horizon } = input;
-  const starterTotal = ENVELOPE_STARTER_TOTAL[strategy];
+  const starterTotal = envelopeStarterTotal(strategy);
   const starterIds = structure.starters;
   const benchIds = structure.benchOrder;
   const weightOf = (id: string) => {

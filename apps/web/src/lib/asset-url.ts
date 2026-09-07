@@ -3,7 +3,8 @@ export function siteRoot(): string {
   return resolve('/');
 }
 export function resolveAssetUrl(url: string): string {
-  if (/^https?:\/\//.test(url) || url.startsWith('/')) return url;
+  if (/^https?:\/\//.test(url)) return url;
+  if (url.startsWith('/')) return resolve(url);
   return `${siteRoot()}data/${url}`;
 }
 const memoCache = new Map<string, Promise<unknown>>();
