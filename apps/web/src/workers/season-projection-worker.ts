@@ -229,6 +229,9 @@ async function handleRecommendRotation(
       durability: load?.durability ?? candidate.durability.rating,
       fatigueBasisPoints: load?.fatigueBasisPoints ?? 0,
       recentLoadBasisPoints: load?.recentLoadBasisPoints ?? 0,
+      foulRate: candidate.tendencies.foulRate,
+      usageRate: candidate.tendencies.usageRate,
+      freeThrowRating: candidate.detailedRatings.freeThrow,
     };
   });
   const players =
@@ -245,11 +248,13 @@ async function handleRecommendRotation(
     franchiseId: request.franchiseId,
     roster,
     unavailable: [...request.unavailable],
+    ...(request.excluded !== undefined ? { excluded: [...request.excluded] } : {}),
     current: request.current,
     horizon: request.horizon,
     seed: request.seed,
     scope: request.scope,
     keepActive10: request.keepActive10,
+    ...(request.allowDnp !== undefined ? { allowDnp: request.allowDnp } : {}),
     ...(players !== null && model !== null
       ? { projection: { players, eraProfile, model } }
       : { projection: null }),

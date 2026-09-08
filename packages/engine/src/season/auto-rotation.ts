@@ -11,11 +11,15 @@ import {
 } from '@hoop-rush/data-contracts';
 import { createRng } from '../sim/rng.ts';
 import {
+  benchReliefOf,
   buildMinutePlanCandidates,
   fatigueBandOf,
   MINUTE_PLAN_HEAVY_THRESHOLD_BP,
   minuteCapacityOf,
   minutePlanHorizonGames,
+  planQualityOf,
+  projectFatigueAfterBlock,
+  riskScoreOf,
   type FatigueBand,
 } from './minute-plan.ts';
 import { legalFiveExists } from './roster-rules.ts';
@@ -41,6 +45,9 @@ export interface AutoRotationMemberInput {
   durability: number;
   fatigueBasisPoints: number;
   recentLoadBasisPoints: number;
+  foulRate?: number;
+  usageRate?: number;
+  freeThrowRating?: number;
 }
 
 export interface AutoRotationProjectionInput {
@@ -76,10 +83,12 @@ export interface SeasonRotationRecommendationInput {
   current: SeasonRotation;
   loadByPlayerId: Readonly<Record<PlayerId, SeasonPlayerLoad>>;
   unavailablePlayerIds: readonly PlayerId[];
+  excludedPlayerIds?: readonly PlayerId[];
   horizon: RotationProjectionHorizon;
   seed: string;
   scope: 'minutes-only' | 'full';
   keepActive10: boolean;
+  allowDnp?: boolean;
   projection?: RotationProjectionContext | null;
   franchiseId?: string;
   sharedPossessions?: ReadonlyMap<string, number> | null;
@@ -106,11 +115,13 @@ export interface RecommendSeasonRotationInput {
   franchiseId: string;
   roster: readonly AutoRotationMemberInput[];
   unavailable: readonly string[];
+  excluded?: readonly string[];
   current: SeasonRotation;
   horizon: number;
   seed: string;
   scope?: AutoRotationScope;
   keepActive10?: boolean;
+  allowDnp?: boolean;
   projection?: AutoRotationProjectionInput | null;
   sharedPossessions?: ReadonlyMap<string, number> | null;
 }
@@ -156,6 +167,8 @@ export interface RecommendSeasonRotationFacts {
   seed: string;
   eligibleCount: number;
   consideredCombos: number;
+  allowDnp: boolean;
+  excludedCount: number;
 }
 
 export type RecommendSeasonRotationResult =
@@ -251,7 +264,9 @@ function fmt2(value: number): string {
 function isSpecRecommendationInput(
   value: RecommendSeasonRotationInput | SeasonRotationRecommendationInput,
 ): value is SeasonRotationRecommendationInput {
-  return 'loadByPlayerId' in value || 'unavailablePlayerIds' in value || !('unavailable' in value);
+  return (
+    'loadByPlayerId' in value || 'unavailablePlayerIds' in value || !('unavailable' in value)
+  );
 }
 
 function normalizeRecommendationInput(
@@ -276,11 +291,13 @@ function normalizeRecommendationInput(
     franchiseId: spec.franchiseId ?? spec.current.franchiseId,
     roster: merged,
     unavailable: [...spec.unavailablePlayerIds],
+    excluded: spec.excludedPlayerIds !== undefined ? [...spec.excludedPlayerIds] : undefined,
     current: spec.current,
     horizon: spec.horizon,
     seed: spec.seed,
     scope: spec.scope,
     keepActive10: spec.keepActive10,
+    allowDnp: spec.allowDnp,
     projection: spec.projection ?? null,
     sharedPossessions: spec.sharedPossessions ?? null,
   };
@@ -317,16 +334,22 @@ export function recommendSeasonRotation(
     }
     seen.add(member.playerVersionId);
   }
-  const unavailable = new Set(input.unavailable);
   const byId = new Map(input.roster.map((member) => [member.playerVersionId, member]));
+  const excluded = new Set(input.excluded ?? []);
+  const unavailable = new Set([...input.unavailable, ...excluded]);
+  const excludedCount = [...excluded].filter((id) => byId.has(id)).length;
+  const allowDnp = input.allowDnp ?? false;
   const eligible = input.roster.filter((member) => !unavailable.has(member.playerVersionId));
   const eligibleIds = new Set(eligible.map((member) => member.playerVersionId));
+  const excludedKey = [...excluded].sort().join(',');
   const derivedSeed = seasonNamespaceSeed(
     seed,
     AUTO_ROTATION_SEED_NAMESPACE,
     scope,
     keepActive10 ? 'keep10' : 'full10',
     String(horizon),
+    allowDnp ? 'dnp' : 'nodnp',
+    excludedKey === '' ? 'noexcl' : excludedKey.slice(0, 48),
   );
   const rng = createRng(derivedSeed);
   const baseFacts: RecommendSeasonRotationFacts = {
@@ -336,6 +359,8 @@ export function recommendSeasonRotation(
     seed: derivedSeed,
     eligibleCount: eligible.length,
     consideredCombos: 0,
+    allowDnp,
+    excludedCount,
   };
   if (eligible.length < 10) {
     return {
@@ -418,11 +443,73 @@ export function recommendSeasonRotation(
     degraded = true;
   }
   const factsBase: RecommendSeasonRotationFacts = { ...baseFacts, qualitySource };
+  const foulByVersion = new Map<string, number>();
+  const usageByVersion = new Map<string, number>();
+  const freeThrowByVersion = new Map<string, number>();
+  if (projectionPlayers !== null) {
+    for (const player of projectionPlayers) {
+      const version = player.playerVersionId;
+      if (version === undefined) continue;
+      foulByVersion.set(version, player.tendencies.foulRate);
+      usageByVersion.set(version, player.tendencies.usageRate);
+      freeThrowByVersion.set(version, player.ratings.freeThrow);
+    }
+  }
+  for (const member of eligible) {
+    if (member.foulRate !== undefined) foulByVersion.set(member.playerVersionId, member.foulRate);
+    if (member.usageRate !== undefined)
+      usageByVersion.set(member.playerVersionId, member.usageRate);
+    if (member.freeThrowRating !== undefined)
+      freeThrowByVersion.set(member.playerVersionId, member.freeThrowRating);
+  }
+  const foulDiscountOf = (id: string): number => {
+    const foul = foulByVersion.get(id);
+    if (foul === undefined) return 1;
+    if (foul <= 55) return 1;
+    return Math.max(0.7, 1 - 0.15 * Math.min(1, (foul - 55) / 45));
+  };
+  const injuryDiscountOf = (id: string): number => {
+    const member = byId.get(id);
+    if (member === undefined) return 1;
+    const loadRisk = Math.max(0, Math.min(1, member.recentLoadBasisPoints / 10000)) * 0.12;
+    const durabilityRisk =
+      Math.max(0, Math.min(1, (70 - member.durability) / 70)) * 0.1;
+    return Math.max(0.75, 1 - loadRisk - durabilityRisk);
+  };
   const effectiveOf = (id: string): number => {
     const member = byId.get(id);
     const quality = qualityByVersion.get(id) ?? 0.5;
     if (member === undefined) return 0;
-    return clamp01(quality) * capacityOf(member);
+    const base = clamp01(quality) * capacityOf(member);
+    if (!allowDnp) return base;
+    return base * foulDiscountOf(id) * injuryDiscountOf(id);
+  };
+  const chemistryCostOf = (combo: readonly string[]): number => {
+    const shared = input.sharedPossessions ?? null;
+    if (shared === null || shared.size === 0) return 0;
+    const comboSet = new Set(combo);
+    let broken = 0;
+    for (const id of currentActive) {
+      if (comboSet.has(id)) continue;
+      const disruption = describeChemistryDisruption(id, comboSet, shared);
+      if (disruption !== null) broken += 1;
+    }
+    return broken * 0.02;
+  };
+  const synergyPenaltyOf = (five: readonly string[]): number => {
+    if (!allowDnp) return 0;
+    let penalty = 0;
+    let highUsage = 0;
+    let highFoul = 0;
+    for (const id of five) {
+      const usage = usageByVersion.get(id) ?? 20;
+      const foul = foulByVersion.get(id) ?? 30;
+      if (usage >= 30) highUsage += 1;
+      if (foul >= 70) highFoul += 1;
+    }
+    if (highUsage >= 3) penalty += 0.03 + 0.02 * (highUsage - 3);
+    if (highFoul >= 2) penalty += 0.03 + 0.02 * (highFoul - 2);
+    return penalty;
   };
   const currentActive = [...input.current.starters, ...input.current.benchOrder];
   const currentActiveSet = new Set(currentActive);
@@ -469,7 +556,41 @@ export function recommendSeasonRotation(
       horizon,
       franchiseId,
     );
-    const recommended = recommendedPlanOf(built);
+    let recommended = recommendedPlanOf(built);
+    if (allowDnp) {
+      const structure = {
+        starters: [...input.current.starters],
+        benchOrder: [...input.current.benchOrder],
+        closingFive: [...input.current.closingFive],
+      };
+      const players = new Map(
+        [...structure.starters, ...structure.benchOrder].map((id) => {
+          const member = eligible.find((entry) => entry.playerVersionId === id);
+          return [
+            id,
+            {
+              playerVersionId: id,
+              quality: qualityByVersion.get(id) ?? 0.5,
+              staminaRating: member?.staminaRating ?? 70,
+              durability: member?.durability ?? 70,
+              fatigueBasisPoints: member?.fatigueBasisPoints ?? 0,
+              recentLoadBasisPoints: member?.recentLoadBasisPoints ?? 0,
+            },
+          ] as const;
+        }),
+      );
+      const dnp = tryDnpVariant({
+        structure,
+        players,
+        basePlan: recommended,
+        allPlans: built.plans,
+        qualityByVersion,
+        effectiveOf,
+        horizon,
+        franchiseId,
+      });
+      if (dnp !== null) recommended = dnp.plan;
+    }
     const candidate = withFranchise(recommended.rotation, franchiseId);
     const candidateFailures = validateSeasonRotation(candidate, memberPlayable);
     if (candidateFailures.length > 0) {
@@ -563,7 +684,8 @@ export function recommendSeasonRotation(
         playable: byId.get(id)?.playable ?? [],
       }));
       const legal = legalFiveExists(members);
-      const score = legal ? combo.reduce((sum, id) => sum + effectiveOf(id), 0) : -1;
+      const base = legal ? combo.reduce((sum, id) => sum + effectiveOf(id), 0) : -1;
+      const score = legal && allowDnp ? base - chemistryCostOf(combo) : base;
       return { combo: [...combo].sort(), legal, score, tie: rng.next() };
     });
     const legal = scored.filter((entry) => entry.legal);
@@ -595,8 +717,8 @@ export function recommendSeasonRotation(
     plan: ReturnType<typeof buildMinutePlanCandidates>['plans'][number];
   }> = [];
   const seenRotations = new Set<string>();
-  const maxActiveToExpand = keepActive10 || eligible.length === 10 ? 1 : 3;
-  const activesToExpand = activeCombos.slice(0, Math.max(3, maxActiveToExpand));
+  const maxActiveToExpand = keepActive10 || eligible.length === 10 ? 1 : allowDnp ? 6 : 3;
+  const activesToExpand = activeCombos.slice(0, Math.max(allowDnp ? 6 : 3, maxActiveToExpand));
   for (const active of activesToExpand) {
     const built = buildFullRotationForActive({
       active: [...active].sort(),
@@ -608,6 +730,9 @@ export function recommendSeasonRotation(
       qualityByVersion,
       rng,
       sharedPossessions: input.sharedPossessions ?? null,
+      synergyPenaltyOf: allowDnp ? synergyPenaltyOf : undefined,
+      freeThrowByVersion: allowDnp ? freeThrowByVersion : undefined,
+      allowDnp,
     });
     if (built === null) continue;
     const key = rotationKeyOf(built.rotation);
@@ -639,7 +764,8 @@ export function recommendSeasonRotation(
       effectiveOf,
       incumbentStarters: input.current.starters,
       rng,
-    }).slice(0, 3);
+      synergyPenaltyOf: allowDnp ? synergyPenaltyOf : undefined,
+    }).slice(0, allowDnp ? 4 : 3);
     rankedRotations.length = 0;
     seenRotations.clear();
     for (const starters of starterVariants) {
@@ -654,6 +780,9 @@ export function recommendSeasonRotation(
         rng,
         sharedPossessions: input.sharedPossessions ?? null,
         forcedStarters: starters,
+        synergyPenaltyOf: allowDnp ? synergyPenaltyOf : undefined,
+        freeThrowByVersion: allowDnp ? freeThrowByVersion : undefined,
+        allowDnp,
       });
       if (built === null) continue;
       const key = rotationKeyOf(built.rotation);
@@ -825,6 +954,7 @@ function rankStarterVariants(input: {
   effectiveOf: (id: string) => number;
   incumbentStarters: readonly string[];
   rng: ReturnType<typeof createRng>;
+  synergyPenaltyOf?: (five: readonly string[]) => number;
 }): string[][] {
   const members: PlannerMember[] = [...input.active]
     .sort()
@@ -833,7 +963,9 @@ function rankStarterVariants(input: {
   const fives = enumerateLegalFives(members, available);
   const scored = fives.map((five) => ({
     five: [...five],
-    score: five.reduce((sum, id) => sum + input.effectiveOf(id), 0),
+    score:
+      five.reduce((sum, id) => sum + input.effectiveOf(id), 0) -
+      (input.synergyPenaltyOf?.(five) ?? 0),
     continuity: five.filter((id) => input.incumbentStarters.includes(id)).length,
     tie: input.rng.next(),
   }));
@@ -852,6 +984,9 @@ function pickBestFive(input: {
   effectiveOf: (id: string) => number;
   incumbent: readonly string[];
   rng: ReturnType<typeof createRng>;
+  synergyPenaltyOf?: (five: readonly string[]) => number;
+  freeThrowByVersion?: ReadonlyMap<string, number>;
+  preferClosing?: boolean;
 }): string[] | null {
   const ranked = rankStarterVariants({
     active: input.active,
@@ -859,9 +994,32 @@ function pickBestFive(input: {
     effectiveOf: input.effectiveOf,
     incumbentStarters: [...input.incumbent],
     rng: input.rng,
+    synergyPenaltyOf: input.synergyPenaltyOf,
   });
-  const first = ranked[0];
-  return first === undefined ? null : [...first];
+  if (ranked.length === 0) return null;
+  if (input.preferClosing !== true || input.freeThrowByVersion === undefined) {
+    const first = ranked[0];
+    return first === undefined ? null : [...first];
+  }
+  const topScore =
+    ranked[0] === undefined
+      ? 0
+      : ranked[0].reduce((sum, id) => sum + input.effectiveOf(id), 0) -
+        (input.synergyPenaltyOf?.(ranked[0]) ?? 0);
+  const contenders = ranked.slice(0, 3).filter((five) => {
+    const score =
+      five.reduce((sum, id) => sum + input.effectiveOf(id), 0) -
+      (input.synergyPenaltyOf?.(five) ?? 0);
+    return topScore - score <= 0.04;
+  });
+  contenders.sort((a, b) => {
+    const ftA = a.reduce((sum, id) => sum + (input.freeThrowByVersion?.get(id) ?? 70), 0) / 5;
+    const ftB = b.reduce((sum, id) => sum + (input.freeThrowByVersion?.get(id) ?? 70), 0) / 5;
+    if (ftB !== ftA) return ftB - ftA;
+    return fiveKeyOf(a) < fiveKeyOf(b) ? -1 : 1;
+  });
+  const winner = contenders[0] ?? ranked[0];
+  return winner === undefined ? null : [...winner];
 }
 
 function orderBench(input: {
@@ -905,6 +1063,144 @@ function orderBench(input: {
   return scored.map((entry) => entry.id);
 }
 
+function tryDnpVariant(input: {
+  structure: { starters: string[]; benchOrder: string[]; closingFive: string[] };
+  players: ReadonlyMap<
+    string,
+    {
+      playerVersionId: string;
+      quality: number;
+      staminaRating: number;
+      durability: number;
+      fatigueBasisPoints: number;
+      recentLoadBasisPoints: number;
+    }
+  >;
+  basePlan: ReturnType<typeof buildMinutePlanCandidates>['plans'][number];
+  allPlans: ReadonlyArray<ReturnType<typeof buildMinutePlanCandidates>['plans'][number]>;
+  qualityByVersion: ReadonlyMap<string, number>;
+  effectiveOf: (id: string) => number;
+  horizon: number;
+  franchiseId: string;
+}): {
+  rotation: SeasonRotation;
+  plan: ReturnType<typeof buildMinutePlanCandidates>['plans'][number];
+} | null {
+  const closingSet = new Set(input.structure.closingFive);
+  const starterSet = new Set(input.structure.starters);
+  const dnpCandidates = input.structure.benchOrder.filter(
+    (id) => !closingSet.has(id) && !starterSet.has(id),
+  );
+  if (dnpCandidates.length === 0) return null;
+  const ranked = [...dnpCandidates].sort((a, b) => input.effectiveOf(a) - input.effectiveOf(b));
+  const dnpId = ranked[0];
+  if (dnpId === undefined) return null;
+  const baseMinutes = new Map(
+    input.basePlan.rotation.targetMinutes.map((row) => [row.playerVersionId, row.minutes]),
+  );
+  const dnpMinutes = baseMinutes.get(dnpId) ?? 0;
+  if (dnpMinutes <= 4) return null;
+  const worstEffective = input.effectiveOf(dnpId);
+  const remainingBench = input.structure.benchOrder.filter((id) => id !== dnpId);
+  const bestRemaining = Math.max(...remainingBench.map((id) => input.effectiveOf(id)));
+  if (!(bestRemaining > worstEffective + 0.05)) return null;
+  const weights = new Map(
+    remainingBench.map((id) => {
+      const player = input.players.get(id);
+      const quality = input.qualityByVersion.get(id) ?? 0.5;
+      const capacity =
+        player === undefined
+          ? 0.55
+          : minuteCapacityOf({
+              staminaRating: player.staminaRating,
+              durability: player.durability,
+              fatigueBasisPoints: player.fatigueBasisPoints,
+            });
+      return [id, Math.max(0, quality * capacity)] as const;
+    }),
+  );
+  const weightSum = [...weights.values()].reduce((sum, w) => sum + w, 0);
+  if (weightSum <= 0) return null;
+  const extras = new Map<string, number>();
+  let assigned = 0;
+  const remainders: Array<{ id: string; frac: number }> = [];
+  for (const id of remainingBench) {
+    const raw = (dnpMinutes * (weights.get(id) ?? 0)) / weightSum;
+    const floor = Math.floor(raw);
+    extras.set(id, floor);
+    assigned += floor;
+    remainders.push({ id, frac: raw - floor });
+  }
+  remainders.sort((a, b) => (b.frac !== a.frac ? b.frac - a.frac : a.id < b.id ? -1 : 1));
+  let leftover = dnpMinutes - assigned;
+  for (const entry of remainders) {
+    if (leftover <= 0) break;
+    extras.set(entry.id, (extras.get(entry.id) ?? 0) + 1);
+    leftover -= 1;
+  }
+  const nextMinutes = input.basePlan.rotation.targetMinutes.map((row) => {
+    if (row.playerVersionId === dnpId) return { ...row, minutes: 0 };
+    const extra = extras.get(row.playerVersionId) ?? 0;
+    return { ...row, minutes: row.minutes + extra };
+  });
+  if (nextMinutes.some((row) => row.minutes < 0 || row.minutes > 48)) return null;
+  if (nextMinutes.reduce((sum, row) => sum + row.minutes, 0) !== 240) return null;
+  const quality = planQualityOf(nextMinutes, input.qualityByVersion);
+  const relief = benchReliefOf(nextMinutes, input.structure.benchOrder, input.qualityByVersion);
+  const playerList = [...input.players.values()];
+  const fatigue = projectFatigueAfterBlock(
+    playerList,
+    new Map(nextMinutes.map((row) => [row.playerVersionId, row.minutes])),
+    input.horizon,
+  );
+  const maxStarterStrain = Math.max(
+    0,
+    ...input.structure.starters.map((id) => fatigue.get(id)?.fatigueBasisPoints ?? 0),
+  );
+  const bands: Record<FatigueBand, number> = { fresh: 0, ready: 0, tired: 0, heavy: 0 };
+  for (const row of nextMinutes) bands[fatigue.get(row.playerVersionId)?.band ?? 'fresh'] += 1;
+  const heavyStrain =
+    bands.heavy > 0 ||
+    [...fatigue.values()].some(
+      (facts) => facts.peakBasisPoints >= MINUTE_PLAN_HEAVY_THRESHOLD_BP,
+    );
+  if (heavyStrain && !input.basePlan.heavyStrain) return null;
+  const qualities = [
+    ...input.allPlans.map((plan) => plan.quality),
+    quality,
+  ];
+  const maxQ = Math.max(...qualities);
+  const minQ = Math.min(...qualities);
+  const relative = maxQ <= minQ ? 0.5 : Math.max(0, Math.min(1, (quality - minQ) / (maxQ - minQ)));
+  const riskScore = riskScoreOf({
+    quality: relative,
+    maxStarterStrainBasisPoints: maxStarterStrain,
+    relief,
+  });
+  if (!(quality >= input.basePlan.quality + 0.003 && riskScore >= input.basePlan.riskScore - 0.002)) {
+    return null;
+  }
+  const rotation: SeasonRotation = {
+    ...input.basePlan.rotation,
+    franchiseId: franchiseIdSchema.parse(input.franchiseId),
+    targetMinutes: nextMinutes,
+  };
+  return {
+    rotation,
+    plan: {
+      ...input.basePlan,
+      rotation,
+      quality,
+      relief,
+      maxStarterStrainBasisPoints: maxStarterStrain,
+      strainBand: fatigueBandOf(maxStarterStrain),
+      fatigueBands: bands,
+      riskScore,
+      heavyStrain,
+    },
+  };
+}
+
 function buildFullRotationForActive(input: {
   active: readonly string[];
   byId: ReadonlyMap<string, AutoRotationMemberInput>;
@@ -916,11 +1212,15 @@ function buildFullRotationForActive(input: {
   rng: ReturnType<typeof createRng>;
   sharedPossessions?: ReadonlyMap<string, number> | null;
   forcedStarters?: readonly string[];
+  synergyPenaltyOf?: (five: readonly string[]) => number;
+  freeThrowByVersion?: ReadonlyMap<string, number>;
+  allowDnp?: boolean;
 }): {
   rotation: SeasonRotation;
   plan: ReturnType<typeof buildMinutePlanCandidates>['plans'][number];
 } | null {
   const activeSorted = [...input.active].sort();
+  const synergy = input.synergyPenaltyOf;
   const starters =
     input.forcedStarters !== undefined
       ? [...input.forcedStarters]
@@ -930,6 +1230,7 @@ function buildFullRotationForActive(input: {
           effectiveOf: input.effectiveOf,
           incumbent: input.current.starters,
           rng: input.rng,
+          synergyPenaltyOf: synergy,
         });
   if (starters === null) return null;
   const starterSet = new Set(starters);
@@ -942,13 +1243,17 @@ function buildFullRotationForActive(input: {
     starterIds: starters,
     rng: input.rng,
   });
-  const closing = pickBestFive({
-    active: activeSorted,
-    byId: input.byId,
-    effectiveOf: input.effectiveOf,
-    incumbent: input.current.closingFive,
-    rng: input.rng,
-  }) ?? [...starters];
+  const closing =
+    pickBestFive({
+      active: activeSorted,
+      byId: input.byId,
+      effectiveOf: input.effectiveOf,
+      incumbent: input.current.closingFive,
+      rng: input.rng,
+      synergyPenaltyOf: synergy,
+      freeThrowByVersion: input.allowDnp === true ? input.freeThrowByVersion : undefined,
+      preferClosing: input.allowDnp === true,
+    }) ?? [...starters];
   const eligibleList = activeSorted
     .map((id) => input.byId.get(id))
     .filter((member): member is AutoRotationMemberInput => member !== undefined);
@@ -977,6 +1282,26 @@ function buildFullRotationForActive(input: {
   const recommended =
     built.plans.find((plan) => plan.strategy === built.recommended) ?? built.plans[0];
   if (recommended === undefined) return null;
+  if (input.allowDnp === true) {
+    const dnp = tryDnpVariant({
+      structure: { starters, benchOrder, closingFive: closing },
+      players,
+      basePlan: recommended,
+      allPlans: built.plans,
+      qualityByVersion: input.qualityByVersion,
+      effectiveOf: input.effectiveOf,
+      horizon: input.horizon,
+      franchiseId: input.franchiseId,
+    });
+    if (dnp !== null) {
+      const memberPlayable = new Map(
+        activeSorted.map((id) => [id, input.byId.get(id)?.playable ?? []] as const),
+      );
+      if (validateSeasonRotation(dnp.rotation, memberPlayable).length === 0) {
+        return { rotation: dnp.rotation, plan: { ...dnp.plan, rotation: dnp.rotation } };
+      }
+    }
+  }
   const rotation = withFranchise(recommended.rotation, input.franchiseId);
   const memberPlayable = new Map(
     activeSorted.map((id) => [id, input.byId.get(id)?.playable ?? []] as const),
@@ -1002,12 +1327,13 @@ function diffMinutes(
     const member = byId.get(row.playerVersionId);
     const quality = qualityByVersion.get(row.playerVersionId) ?? 0.5;
     const capacity = member === undefined ? 0 : capacityOf(member);
+    const dnpTag = row.minutes === 0 ? ' · DNP-CD (dressed, 0 min)' : '';
     changes.push({
       kind: 'minutes',
       playerVersionId: row.playerVersionId,
       from,
       to: row.minutes,
-      reason: `minutes ${String(from)}→${String(row.minutes)} on quality ${fmt2(quality)} × capacity ${fmt2(capacity)} = ${fmt2(effectiveOf(row.playerVersionId))}`,
+      reason: `minutes ${String(from)}→${String(row.minutes)} on quality ${fmt2(quality)} × capacity ${fmt2(capacity)} = ${fmt2(effectiveOf(row.playerVersionId))}${dnpTag}`,
     });
   }
   changes.sort((a, b) => {
@@ -1098,12 +1424,13 @@ function diffRotations(
     const from = currentMinutes.get(row.playerVersionId);
     if (from === undefined) continue;
     if (from === row.minutes) continue;
+    const dnpTag = row.minutes === 0 ? ' · DNP-CD (dressed, 0 min)' : '';
     changes.push({
       kind: 'minutes',
       playerVersionId: row.playerVersionId,
       from,
       to: row.minutes,
-      reason: `minutes ${String(from)}→${String(row.minutes)} on effective ${fmt2(deps.effectiveOf(row.playerVersionId))}`,
+      reason: `minutes ${String(from)}→${String(row.minutes)} on effective ${fmt2(deps.effectiveOf(row.playerVersionId))}${dnpTag}`,
     });
   }
   const orderOf = (change: RecommendSeasonRotationChange): number => {

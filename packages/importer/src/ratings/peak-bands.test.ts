@@ -24,6 +24,12 @@ describe('peak-season overall calibration', () => {
   it('ranks canonical peaks ahead of higher-volume adjacent seasons', () => {
     expectRawAtLeast('jordan9091', 'jordan8889');
     expectRawAtLeast('lebron1213', 'lebron0910');
+    // 1986-87 Magic (MVP, title) clears the 1988-89 spacing-outlier season:
+    // era-neutral three weights keep a 39-attempt year from outvoting it.
+    expectRawAtLeast('magic8687', 'magic8889');
+    // 2002-03 Duncan (title, 81 games) clears 2017-18 Davis: era-relative
+    // efficiency plus full-season weight beat the higher-BPM partial peak.
+    expectRawAtLeast('duncan0203', 'davis1718');
   });
   it('keeps two-way title peaks ahead of high-usage non-contender peaks', () => {
     expectRawAtLeast('shaq9900', 'embiid2122');
@@ -61,9 +67,11 @@ describe('peak-season overall calibration', () => {
   });
   it('keeps the money ordering: 2012-13 LeBron clears 2024-25 SGA on evidence; 1990-91 Jordan grades in the same historic band', () => {
     expectRawAtLeast('lebron1213', 'sga2425');
-    // derive-v11 evidence-first note: 2024-25 SGA grades slightly above
-    // 1990-91 Jordan on efficiency and role-adjusted creation while Jordan
-    // keeps the defensive edge; both stay in the historic-peak band.
+    // Historic two-way peaks clear modern scoring peaks: 1990-91 Jordan and
+    // 1999-00 Shaq both grade above 2024-25 SGA on era-relative efficiency
+    // plus title-team context; all three stay in the historic-peak band.
+    expectRawAtLeast('jordan9091', 'sga2425');
+    expectRawAtLeast('shaq9900', 'sga2425');
     expect(rawFor('jordan9091')).toBeGreaterThanOrEqual(74);
     expect(rawFor('sga2425')).toBeGreaterThanOrEqual(74);
   });

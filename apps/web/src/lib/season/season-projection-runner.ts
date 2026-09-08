@@ -41,6 +41,7 @@ export interface ProjectionRotationOptimizeInput {
 export interface ProjectionRotationRecommendInput {
   roster: readonly string[];
   unavailable: readonly string[];
+  excluded?: readonly string[];
   current: SeasonRotation;
   load: readonly ProjectionRotationLoadRow[];
   overall: readonly { playerVersionId: string; overall: number }[];
@@ -48,6 +49,7 @@ export interface ProjectionRotationRecommendInput {
   seed: string;
   scope: AutoRotationScope;
   keepActive10: boolean;
+  allowDnp?: boolean;
 }
 export interface ProjectionRunner {
   buildRoster(input: ProjectionRosterBuildInput): Promise<HumanRosterBuildResult>;
@@ -134,6 +136,7 @@ export function createProjectionRunner(deps: ProjectionRunnerDeps = {}): Project
         franchiseId: input.current.franchiseId,
         roster: [...input.roster],
         unavailable: [...input.unavailable],
+        ...(input.excluded !== undefined ? { excluded: [...input.excluded] } : {}),
         current: seasonRotationSchema.parse(input.current),
         load: input.load.map((row) => ({
           playerVersionId: row.playerVersionId,
@@ -150,6 +153,7 @@ export function createProjectionRunner(deps: ProjectionRunnerDeps = {}): Project
         seed: input.seed,
         scope: input.scope,
         keepActive10: input.keepActive10,
+        ...(input.allowDnp !== undefined ? { allowDnp: input.allowDnp } : {}),
       };
       const signal = options.signal;
       if (signal === undefined) return client.request<RecommendSeasonRotationResult>(request);

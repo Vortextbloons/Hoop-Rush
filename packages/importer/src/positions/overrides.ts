@@ -4,7 +4,10 @@ export interface PositionOverride {
   secondary: Position[];
 }
 export const POSITION_OVERRIDES: Readonly<Record<string, PositionOverride>> = {
-  '1641705': { primary: 'C', secondary: ['SF'] },
+  '77142': { primary: 'PG', secondary: ['SG'] },
+  '600015': { primary: 'PG', secondary: ['SG'] },
+  '787': { primary: 'PF', secondary: ['C'] },
+  '708': { primary: 'PF', secondary: ['C'] },
   '1631096': { primary: 'C', secondary: ['PF'] },
   '204001': { primary: 'C', secondary: ['PF'] },
   '1628392': { primary: 'C', secondary: ['PF'] },

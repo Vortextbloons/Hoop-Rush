@@ -567,6 +567,86 @@ describe('season run free-agency persistence (M2.6.5)', () => {
     expect(snapshot?.run.freeAgency.windows[0]?.status).toBe('resolved');
     expect(snapshot?.acceptedBlocks.at(-1)?.stateDigest).toBe(context.block2Digest);
   });
+  it('allows a signed player to have a different current owner after a trade', async () => {
+    const adapters = makeAdapters();
+    const { db, repo, run } = adapters;
+    const context = await setupResolution(adapters);
+    await repo.applySeasonRunCommand({
+      runId: run.runId,
+      command: context.command,
+      run: context.run,
+      effects: context.effects,
+      pending: null,
+    });
+    const row = await db.seasonRuns.get(SEASON_RUN_RECORD_ID);
+    if (row === undefined) throw new Error('expected the stored checkpoint row');
+    const lakersRoster = row.run.rosters.find((roster) => roster.franchiseId === 'lakers');
+    const celticsRoster = row.run.rosters.find((roster) => roster.franchiseId === 'celtics');
+    if (lakersRoster === undefined || celticsRoster === undefined) {
+      throw new Error('expected the trade rosters');
+    }
+    const celtics = franchiseIdSchema.parse('celtics');
+    const tradedPlayer = lakersRoster.players.find(
+      (player) => player.playerVersionId === FA_LAKERS.playerVersionId,
+    );
+    if (tradedPlayer === undefined) throw new Error('expected the signed player');
+    const tradedEntry = { ...tradedPlayer, franchiseId: celtics };
+    const rosters = row.run.rosters.map((roster) => {
+      if (roster.franchiseId === 'lakers') {
+        return {
+          ...roster,
+          players: roster.players.filter(
+            (player) => player.playerVersionId !== FA_LAKERS.playerVersionId,
+          ),
+        };
+      }
+      if (roster.franchiseId === 'celtics') {
+        return { ...roster, players: [...roster.players, tradedEntry] };
+      }
+      return roster;
+    });
+    const ownership = row.run.ownership.map((entry) =>
+      entry.playerVersionId === FA_LAKERS.playerVersionId
+        ? { ...entry, ownerFranchiseId: celtics }
+        : entry,
+    );
+    const runForDigest = { ...run, ...row.run, rosters, ownership };
+    const stateDigest = buildFixtureStateDigest(runForDigest, {
+      rosters,
+      ownership,
+      stateRevision: row.stateRevision,
+      checkpointState: row.checkpointState,
+      health: row.health,
+      influence: row.influence,
+      transactions: row.transactions,
+      trade: row.trade,
+      objectives: row.objectives,
+      challenges: row.run.challenges,
+      campaign: row.run.campaign,
+      evolution: row.run.evolution,
+      sponsors: row.run.sponsors,
+      freeAgency: row.run.freeAgency,
+      effects: row.effects,
+      authority: row.run.authority,
+    });
+    const playerAggregates = row.playerAggregates.map((aggregate) =>
+      aggregate.playerVersionId === FA_LAKERS.playerVersionId
+        ? { ...aggregate, franchiseId: celtics }
+        : aggregate,
+    );
+    await db.seasonRuns.put({
+      ...row,
+      run: { ...row.run, rosters, ownership },
+      playerAggregates,
+      stateDigest,
+    });
+    const snapshot = await repo.loadActiveRun();
+    expect(
+      snapshot?.run.rosters
+        .find((roster) => roster.franchiseId === 'celtics')
+        ?.players.some((player) => player.playerVersionId === FA_LAKERS.playerVersionId),
+    ).toBe(true);
+  });
   it('rejects stale and duplicate free-agency commands without writing anything', async () => {
     const adapters = makeAdapters();
     const { db, repo, run } = adapters;

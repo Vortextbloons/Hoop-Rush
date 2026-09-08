@@ -35,17 +35,20 @@ export function autoScopeLabel(option: AutoScopeOption): string {
 export function buildAutoRecommendInput(input: {
   roster: readonly string[];
   unavailable: readonly string[];
+  excluded?: readonly string[];
   current: SeasonRotation;
   load: ProjectionRotationRecommendInput['load'];
   overall: ProjectionRotationRecommendInput['overall'];
   horizon: number;
   seed: string;
   option: AutoScopeOption;
+  allowDnp?: boolean;
 }): ProjectionRotationRecommendInput {
   const { scope, keepActive10 } = autoEngineArgsOf(input.option);
   return {
     roster: [...input.roster],
     unavailable: [...input.unavailable],
+    ...(input.excluded !== undefined ? { excluded: [...input.excluded] } : {}),
     current: input.current,
     load: input.load.map((row) => ({ ...row })),
     overall: input.overall.map((row) => ({ ...row })),
@@ -53,6 +56,7 @@ export function buildAutoRecommendInput(input: {
     seed: input.seed,
     scope,
     keepActive10,
+    ...(input.allowDnp !== undefined ? { allowDnp: input.allowDnp } : {}),
   };
 }
 
@@ -76,6 +80,23 @@ export function swapPairsOf(
     });
   }
   return pairs;
+}
+
+export function dnpOf(
+  result: RecommendSeasonRotationResult & { status: 'recommended' },
+): Array<{ playerVersionId: string; from: number; reason: string }> {
+  const out: Array<{ playerVersionId: string; from: number; reason: string }> = [];
+  for (const change of result.changes) {
+    if (change.kind !== 'minutes' || change.to !== 0) continue;
+    out.push({ playerVersionId: change.playerVersionId, from: change.from, reason: change.reason });
+  }
+  return out;
+}
+
+export function hasDnp(
+  result: RecommendSeasonRotationResult & { status: 'recommended' },
+): boolean {
+  return result.changes.some((change) => change.kind === 'minutes' && change.to === 0);
 }
 
 export function cloneRotation(rotation: SeasonRotation): SeasonRotation {

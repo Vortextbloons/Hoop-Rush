@@ -7,7 +7,9 @@ import {
   autoUndoKeyOf,
   buildAutoRecommendInput,
   cloneRotation,
+  dnpOf,
   hasActiveSwaps,
+  hasDnp,
   swapPairsOf,
 } from './season-auto-rotation';
 
@@ -76,6 +78,40 @@ describe('buildAutoRecommendInput', () => {
     expect(input.load).toEqual(load);
     expect(input.load[0]).not.toBe(load[0]);
   });
+
+  it('passes allowDnp and excluded through when provided', () => {
+    const current = fixtureRotation();
+    const input = buildAutoRecommendInput({
+      roster: ['pv-1', 'pv-2'],
+      unavailable: [],
+      excluded: ['pv-9'],
+      current,
+      load: [],
+      overall: [],
+      horizon: 6,
+      seed: 'seed-1',
+      option: 'full-auto',
+      allowDnp: true,
+    });
+    expect(input.allowDnp).toBe(true);
+    expect(input.excluded).toEqual(['pv-9']);
+  });
+
+  it('omits allowDnp and excluded when not provided for wire compat', () => {
+    const current = fixtureRotation();
+    const input = buildAutoRecommendInput({
+      roster: ['pv-1'],
+      unavailable: [],
+      current,
+      load: [],
+      overall: [],
+      horizon: 6,
+      seed: 'seed-1',
+      option: 'keep-10',
+    });
+    expect('allowDnp' in input).toBe(false);
+    expect('excluded' in input).toBe(false);
+  });
 });
 
 describe('swap helpers', () => {
@@ -97,6 +133,24 @@ describe('swap helpers', () => {
     } as unknown as Parameters<typeof hasActiveSwaps>[0];
     expect(hasActiveSwaps(withoutSwaps)).toBe(false);
     expect(swapPairsOf(withoutSwaps)).toEqual([]);
+  });
+
+  it('detects DNP-CD zero-minute changes', () => {
+    const withDnp = {
+      status: 'recommended',
+      changes: [
+        { kind: 'minutes', playerVersionId: 'p1', from: 12, to: 0, reason: 'DNP-CD' },
+        { kind: 'minutes', playerVersionId: 'p2', from: 10, to: 12, reason: 'r2' },
+      ],
+    } as unknown as Parameters<typeof hasDnp>[0];
+    expect(hasDnp(withDnp)).toBe(true);
+    expect(dnpOf(withDnp)).toEqual([{ playerVersionId: 'p1', from: 12, reason: 'DNP-CD' }]);
+    const withoutDnp = {
+      status: 'recommended',
+      changes: [{ kind: 'minutes', playerVersionId: 'p2', from: 10, to: 12, reason: 'r2' }],
+    } as unknown as Parameters<typeof hasDnp>[0];
+    expect(hasDnp(withoutDnp)).toBe(false);
+    expect(dnpOf(withoutDnp)).toEqual([]);
   });
 });
 

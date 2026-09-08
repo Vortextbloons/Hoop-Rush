@@ -139,6 +139,15 @@ export interface RatingProfileInput {
   teamWinPct?: number | null;
   age?: number | null;
   eraPace?: number | null;
+  eraThreeRate?: number | null;
+}
+export function spacingWeightForEra(leagueThreePARate?: number | null): number {
+  // Before spacing, three-point skill barely moved winning: judging a 1986
+  // 31% shooter by modern spacing weight punishes the era, not the player.
+  // Modern volume (rate >= 0.15) keeps full weight; the pre-line era floors
+  // at 0.35 so range still matters a little (free-throw touch signal).
+  if (leagueThreePARate == null || !Number.isFinite(leagueThreePARate)) return 1;
+  return clamp(leagueThreePARate / 0.15, 0.35, 1);
 }
 export interface DerivedRatingProfile {
   profile: RatingProfile;
@@ -199,7 +208,11 @@ export function effectiveUsageFor(stats: StatsRow, eraPace?: number | null): num
   if (mpg <= 0) return null;
   return clamp((100 * possessionsPerGame) / (pace * (mpg / 48)), 0, 45);
 }
-function productionEvidence(stats: StatsRow, eraPace?: number | null): ProductionEvidence {
+function productionEvidence(
+  stats: StatsRow,
+  eraPace?: number | null,
+  eraThreeRate?: number | null,
+): ProductionEvidence {
   const games = Math.max(0, Math.trunc(safeFloat(stats.gamesPlayed)));
   const minutes = Math.max(0, safeFloat(stats.minutes));
   const ppg = safeFloat(stats.points) / Math.max(1, games);
@@ -218,6 +231,13 @@ function productionEvidence(stats: StatsRow, eraPace?: number | null): Productio
       : (reportedUsage ?? 18);
   const ts = safeFloat(stats.tsPct, 0.52);
   const efg = safeFloat(stats.efgPct, 0.5);
+  // Cross-era fairness: modern spacing inflates raw efficiency (league TS
+  // ~0.58 today vs ~0.53 in 1990), so the efficiency terms measure margin
+  // over the era baseline instead of absolute rate. A 0.578 TS leading a
+  // title team grades like what it was, not like a modern role season.
+  const eraRate = clamp(safeFloat(eraThreeRate, 0.39), 0, 0.45);
+  const tsRef = 0.52 + eraRate * 0.15;
+  const efgRef = 0.485 + eraRate * 0.12;
   // Efficiency without scoring load is not production: a 16% usage finisher
   // dunking at .680 TS did not produce what a 30% usage creator did at .600.
   // Creation already earns its own assist-rate term below; counting it again
@@ -244,8 +264,8 @@ function productionEvidence(stats: StatsRow, eraPace?: number | null): Productio
       bpm * 1.3 +
       (usage - 20) * 0.1 -
       Math.max(0, usage - 30) * 0.22 +
-      (ts - 0.54) * 85 * loadFactor * efficiencyScale +
-      (efg - 0.5) * 45 * loadFactor * efficiencyScale +
+      (ts - tsRef) * 85 * loadFactor * efficiencyScale +
+      (efg - efgRef) * 45 * loadFactor * efficiencyScale +
       stocks,
     0,
     100,
@@ -265,8 +285,12 @@ function archetypeScore(
   archetype: RatingArchetype,
   memberships: ArchetypeMemberships,
   ratings: SimulationRatings,
+  spacingWeight = 1,
 ): number {
-  const entries = Object.entries(ARCHETYPE_WEIGHTS[archetype]) as Array<[SkillKey, number]>;
+  const entries = (Object.entries(ARCHETYPE_WEIGHTS[archetype]) as Array<[SkillKey, number]>).map(
+    ([key, weight]) =>
+      [key, key === 'threePoint' ? weight * spacingWeight : weight] as [SkillKey, number],
+  );
   const totalWeight = entries.reduce((sum, [, weight]) => sum + weight, 0);
   const weighted = entries.reduce((sum, [key, weight]) => sum + skill(ratings, key) * weight, 0);
   return (weighted / Math.max(1e-9, totalWeight)) * (0.95 + 0.05 * memberships[archetype]);
@@ -277,6 +301,7 @@ function deriveNonlinear(
   stats: StatsRow,
   memberships: ArchetypeMemberships,
   teamWinPct?: number | null,
+  spacingWeight = 1,
 ): NonlinearComponents {
   const creation = productMean([
     skill(ratings, 'ballHandling'),
@@ -363,11 +388,13 @@ function deriveNonlinear(
       0,
       6,
     ),
-    spacingLimitation: clamp(
-      ((Math.max(0, 58 - shootingGravity) * (0.8 + primaryRole * 0.8)) / 8) * (1 - bigRole * 0.65),
-      0,
-      6,
-    ),
+    spacingLimitation:
+      clamp(
+        ((Math.max(0, 58 - shootingGravity) * (0.8 + primaryRole * 0.8)) / 8) *
+          (1 - bigRole * 0.65),
+        0,
+        6,
+      ) * spacingWeight,
     foulRisk: clamp(Math.max(0, tendencies.foulRate - 5) * (0.6 + bigRole * 0.6), 0, 6),
     deficientRebounding: clamp((Math.max(0, 55 - rebounding) * (0.5 + bigRole)) / 8, 0, 6),
     hollowAnchor: hollowAnchorFor(ratings, creation, teamWinPct),
@@ -396,7 +423,7 @@ function hollowAnchorFor(
 ): number {
   // Rebound/block piles without creation on a losing team are the classic
   // empty-stats profile: the events are real, but they do not move winning.
-  // The team factor is continuous — a .500 team discounts mildly, a sub-.370
+  // The team factor is continuous — a .500 team discounts mildly, a sub-.400
   // team fully — and unknown context never penalizes (a champion anchor with
   // missing team data is not hollow by default).
   const anchorTalent = mean([
@@ -407,8 +434,8 @@ function hollowAnchorFor(
   const teamFactor =
     teamWinPct == null || !Number.isFinite(teamWinPct)
       ? 0
-      : clamp((0.62 - teamWinPct) / 0.25, 0, 1);
-  return clamp((anchorTalent - 72) * 0.5, 0, 4) * clamp((75 - creation) / 30, 0, 1) * teamFactor;
+      : clamp((0.65 - teamWinPct) / 0.25, 0, 1);
+  return clamp((anchorTalent - 72) * 0.55, 0, 4) * clamp((75 - creation) / 30, 0, 1) * teamFactor;
 }
 function deriveMemberships(
   input: RatingProfileInput,
@@ -490,12 +517,19 @@ function historicalDefenseEvidenceLift(input: RatingProfileInput): number {
   const anchorLift = clamp((skill(input.ratings, 'interiorDefense') - 80) / 10, 0, 2);
   return reboundLift + anchorLift;
 }
-export function defenseCreditFor(defenseRating: number, hasContestEvidence = false): number {
+export function defenseCreditFor(
+  defenseRating: number,
+  hasContestEvidence = false,
+  observedStocks = false,
+): number {
   // Containment without tracking evidence is estimated, so its credit caps at
   // +1.5: a 74 defense built on box-score stocks alone is not proven lockdown
-  // the way a contested-shot profile is.
+  // the way a contested-shot profile is. Bigs with observed block/rebound
+  // volume get a touch more room (+2.0) since rim protection leaves a box
+  // trail tracking never had to see.
   const full = clamp((defenseRating - 66) * 0.5, -2.5, 3);
-  return hasContestEvidence ? full : Math.min(full, 1.5);
+  if (hasContestEvidence) return full;
+  return Math.min(full, observedStocks ? 2.0 : 1.5);
 }
 export function twoWayBonusFor(offenseRating: number, defenseRating: number): number {
   return clamp((offenseRating - 60) / 25, 0, 1) * clamp((defenseRating - 60) / 20, 0, 1) * 3;
@@ -509,34 +543,43 @@ export function eliteEvidenceLiftFor(input: {
   defenseRating: number;
   teamWinPct: number | null | undefined;
   hasContestEvidence?: boolean;
+  eraThreeRate?: number | null;
 }): number {
   const games = input.production.sampleGames;
   const minutes = input.production.sampleMinutes;
   const ppg = safeFloat(input.points) / Math.max(1, games);
   const ts = safeFloat(input.tsPct, 0);
   const bpm = safeFloat(input.boxPlusMinus, 0);
-  const winOk = input.teamWinPct == null || input.teamWinPct >= 0.7;
   // All elite tiers need a real workload: fringe-minute stat lines (Bellamy
   // 1961-62 at 322 minutes, Baylor 1960-61 at 719) must not bank star lifts.
   if (minutes < 1500) return 0;
-  const eliteScoringEvidence =
-    winOk && input.production.score >= 86 && games >= 55 && ppg >= 27 && ts >= 0.58 && bpm >= 3;
+  // Continuous evidence factors replace the old hard gates: a 0.578 TS on a
+  // title team missed the old 0.58 line by 0.002 and lost two full points to
+  // a 0.637 modern guard. Efficiency is judged against the era baseline
+  // (modern spacing inflates TS), winning ramps instead of cliffing.
+  const winF =
+    input.teamWinPct == null || !Number.isFinite(input.teamWinPct)
+      ? 1
+      : clamp((input.teamWinPct - 0.5) / 0.2, 0, 1);
+  const tsRef = 0.54 + safeFloat(input.eraThreeRate, 0.39) * 0.1;
+  const tsF = clamp((ts - tsRef + 0.02) / 0.04, 0, 1);
+  const gamesF = games >= 55 ? 1 : clamp((games - 40) / 15, 0, 1);
+  const volF = clamp((ppg - 24) / 4, 0, 1) * gamesF;
+  const prodF = clamp((input.production.score - 82) / 6, 0, 1);
+  const bpmF = clamp((bpm - 2) / 2, 0, 1);
+  const scoringLift = 3 * Math.min(winF, tsF, volF, prodF, bpmF);
   // Containment without contest tracking tops out at estimated/low, so the
   // two-way bar accounts for evidence coverage instead of punishing old seasons.
   const defenseBar = input.hasContestEvidence === true ? 68 : 65;
-  const completeEliteEvidence =
-    winOk &&
-    input.production.score >= 86 &&
-    games >= 65 &&
-    ppg >= 25 &&
-    ts >= 0.6 &&
-    bpm >= 3.5 &&
-    input.creation >= 78 &&
-    input.defenseRating >= defenseBar;
-  if (completeEliteEvidence) return 4;
-  if (eliteScoringEvidence) return 3;
-  if (input.production.score >= 78 && games >= 50) return 1;
-  return 0;
+  const completeF =
+    clamp((input.production.score - 86) / 4, 0, 1) *
+    clamp((ppg - 25) / 2, 0, 1) *
+    clamp((ts - tsRef) / 0.03, 0, 1) *
+    clamp((input.creation - 72) / 8, 0, 1) *
+    clamp((input.defenseRating - defenseBar + 3) / 6, 0, 1) *
+    winF;
+  const floorLift = input.production.score >= 78 && games >= 50 ? 1 : 0;
+  return Math.min(4, Math.max(floorLift, scoringLift + completeF));
 }
 export function teamContextAdjustment(
   stats: StatsRow,
@@ -556,8 +599,8 @@ export function teamContextAdjustment(
   const per = safeFloat(stats.per, 15);
   const apg = safeFloat(stats.assists) / Math.max(1, games);
   let penalty = 0;
-  if (pct < 0.58) {
-    const badTeamFactor = clamp((0.58 - pct) / 0.3, 0, 1);
+  if (pct < 0.6) {
+    const badTeamFactor = clamp((0.6 - pct) / 0.3, 0, 1);
     const usageExcess = clamp((usage - 22) / 14, 0, 1);
     if (usageExcess > 0.05 && badTeamFactor > 0) {
       const tsProtect = clamp((ts - 0.58) / 0.07, 0, 1);
@@ -569,8 +612,13 @@ export function teamContextAdjustment(
       const inefficiency = clamp((0.6 - ts) / 0.12, 0, 1) * 0.6 + clamp((2 - bpm) / 5, 0, 1) * 0.4;
       const emptyVolume = clamp(usageExcess * 0.65 + inefficiency * 0.55, 0, 1);
       const base = badTeamFactor * emptyVolume * 6.5;
-      penalty = base * (1 - protection * 0.88);
+      penalty = base * (1 - protection * 0.7);
       penalty = clamp(penalty, 0, 5);
+      // Short-season losing usage counts double: a 56-game shutdown year
+      // (2018-19 Davis) should not outrank full-season title peaks.
+      if (games < 65) {
+        penalty += badTeamFactor * clamp((usage - 24) / 10, 0, 1) * 1.5;
+      }
       if (games < 40 || mpg < 18) {
         penalty *= 0.6;
       }
@@ -603,25 +651,31 @@ export function teamContextAdjustment(
 export function computeOffenseDefense(
   ratings: SimulationRatings,
   tendencies: SimulationTendencies,
+  eraThreeRate?: number | null,
+  position?: string | null,
 ): {
   offenseRating: number;
   defenseRating: number;
 } {
-  return offenseDefenseOf(ratings, tendencies);
+  const group = position === 'PG' || position === 'SG' ? 'G' : position === 'C' ? 'C' : 'F';
+  return offenseDefenseOf(ratings, tendencies, eraThreeRate, position == null ? null : group);
 }
 export function deriveRatingProfile(input: RatingProfileInput): DerivedRatingProfile {
-  const production = productionEvidence(input.stats, input.eraPace);
+  const production = productionEvidence(input.stats, input.eraPace, input.eraThreeRate);
   const memberships = deriveMemberships(input, production.confidence);
+  const spacingWeight = spacingWeightForEra(input.eraThreeRate);
   const nonlinear = deriveNonlinear(
     input.ratings,
     input.tendencies,
     input.stats,
     memberships,
     input.teamWinPct,
+    spacingWeight,
   );
   const archetypeWeighted = RATING_ARCHETYPES.reduce(
     (sum, archetype) =>
-      sum + memberships[archetype] * archetypeScore(archetype, memberships, input.ratings),
+      sum +
+      memberships[archetype] * archetypeScore(archetype, memberships, input.ratings, spacingWeight),
     0,
   );
   const historicalDefenseLift = historicalDefenseEvidenceLift(input);
@@ -639,11 +693,17 @@ export function deriveRatingProfile(input: RatingProfileInput): DerivedRatingPro
     sampleCount: calibrated?.sampleCount ?? 0,
     artifactVersion: input.artifact.modelVersion,
   };
-  const summary = computeOffenseDefense(input.ratings, input.tendencies);
+  const summary = computeOffenseDefense(
+    input.ratings,
+    input.tendencies,
+    input.eraThreeRate,
+    input.position,
+  );
   const hasContestEvidence =
     input.stats.contestedShots != null ||
     input.stats.deflections != null ||
     input.stats.defFgPct != null;
+  const observedStocks = input.stats.steals != null && input.stats.blocks != null;
   const eliteEvidenceLift = eliteEvidenceLiftFor({
     production,
     points: input.stats.points == null ? null : safeFloat(input.stats.points),
@@ -653,6 +713,7 @@ export function deriveRatingProfile(input: RatingProfileInput): DerivedRatingPro
     defenseRating: summary.defenseRating,
     teamWinPct: input.teamWinPct,
     hasContestEvidence,
+    eraThreeRate: input.eraThreeRate,
   });
   const teamDelta = teamContextAdjustment(
     input.stats,
@@ -660,7 +721,7 @@ export function deriveRatingProfile(input: RatingProfileInput): DerivedRatingPro
     summary.defenseRating,
     input.age,
   );
-  const defenseCredit = defenseCreditFor(summary.defenseRating, hasContestEvidence);
+  const defenseCredit = defenseCreditFor(summary.defenseRating, hasContestEvidence, observedStocks);
   // Two-way synergy is scarce and playoff-proof: only players above average on
   // BOTH ends collect it, scaled continuously so there is no tier cliff.
   // One-way stars (elite offense with average defense or vice versa) get nothing.

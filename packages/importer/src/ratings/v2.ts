@@ -656,15 +656,20 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     tovPer36 !== null && expectedTovPer36 !== null
       ? clamp((expectedTovPer36 - tovPer36) * 3.5, -8, 8)
       : 0;
-  const passRaw = 60 + ((creationRate ?? 3) - 3) * 4.2;
+  // Diminishing returns on raw creation volume: beyond ~9 assists per 36
+  // the extra dimes stop telling us about handle quality, so the volume
+  // term bends instead of pinning passing at 100 for extreme distributors
+  // (1991-92 Stockton at 13.5 ast/36). Decision quality lives in oIQ.
+  const creationOver = (creationRate ?? 3) - 3;
+  const creationCapped = Math.min(creationOver, 6) + Math.max(0, creationOver - 6) * 0.5;
+  const passRaw = 60 + creationCapped * 4.2;
   record(
     'passing',
     blend(passRaw, 54),
     creationRate !== null ? 'derived' : 'estimated',
     creationRate !== null ? creationFields : ['prior'],
   );
-  const creationRaw =
-    64 + ((creationRate ?? 3) - 3) * 3.0 + ((usage ?? 18) - 18) * 0.45 + ballSecurity * 0.5;
+  const creationRaw = 64 + creationCapped * 3.0 + ((usage ?? 18) - 18) * 0.45 + ballSecurity * 0.5;
   record(
     'ballHandling',
     blend(creationRaw, 54),
@@ -1222,6 +1227,7 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     teamWinPct: input.teamWinPct,
     age: input.age,
     eraPace: input.era.pace,
+    eraThreeRate: input.era.league3PARate,
   });
   const summaryRatings: SummaryRatings = v3.summaryRatings;
   return {

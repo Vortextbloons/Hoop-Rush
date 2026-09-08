@@ -103,7 +103,7 @@ describe('Ratings v3 profile', () => {
         teamWinPct: undefined,
       }) +
       teamContextAdjustment(line, undefined, profile.defenseRating) +
-      defenseCreditFor(profile.defenseRating, false) +
+      defenseCreditFor(profile.defenseRating, false, true) +
       twoWayBonusFor(profile.offenseRating, profile.defenseRating);
     expect(profile.rawOverallScore).toBe(Math.round(recomputed * 100) / 100);
     expect(profile.rawOverallScore).not.toBe(profile.canonicalOverall);

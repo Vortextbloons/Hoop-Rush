@@ -550,7 +550,7 @@ describe('buildStats', () => {
     expect(bad.per).toBeNull();
     expect(bad.boxPlusMinus).toBeNull();
   });
-  it('caps inconsistent shooting totals and clamps advanced percentages to 0..1', () => {
+  it('nulls inconsistent shooting families instead of capping them into fiction', () => {
     const stats = buildStats({
       gamesPlayed: 78,
       minutes: 403,
@@ -566,10 +566,54 @@ describe('buildStats', () => {
       tsPct: 1.026,
       efgPct: 1.081,
     });
-    expect(stats.fieldGoalsMade).toBe(272);
-    expect(stats.threesMade).toBe(2);
-    expect(stats.tsPct).toBe(1);
-    expect(stats.efgPct).toBe(1);
+    // Capping fgm 294 to a partial fga 272 would invent elite efficiency;
+    // the family is unobserved instead (derivation estimates from priors).
+    expect(stats.fieldGoalsMade).toBe(0);
+    expect(stats.fieldGoalsAttempted).toBe(0);
+    expect(stats.threesMade).toBeNull();
+    expect(stats.threesAttempted).toBeNull();
+    expect(stats.tsPct).toBeNull();
+    expect(stats.efgPct).toBeNull();
+    // Valid families pass through untouched.
+    expect(stats.freeThrowsMade).toBe(151);
+    expect(stats.freeThrowsAttempted).toBe(200);
+  });
+  it('nulls corrupt minutes while keeping the scoring line for per-game use', () => {
+    // 1961-62 Bellamy class: 2495 points in 322 minutes is 7.7 pts/min
+    // (Wilt's peak is ~1.04); the minutes column is corrupt, not the points.
+    const stats = buildStats({
+      gamesPlayed: 79,
+      minutes: 322,
+      points: 2495,
+      rebounds: 1461,
+      fgm: 973,
+      fga: 883,
+      ftm: 549,
+      fta: 853,
+      tsPct: 0.9914012333905525,
+      efgPct: 1,
+    });
+    expect(stats.minutes).toBe(0);
+    expect(stats.points).toBe(2495);
+    expect(stats.fieldGoalsMade).toBe(0);
+    expect(stats.fieldGoalsAttempted).toBe(0);
+    expect(stats.tsPct).toBeNull();
+    expect(stats.efgPct).toBeNull();
+  });
+  it('nulls rebound splits that contradict the total', () => {
+    const stats = buildStats({
+      gamesPlayed: 82,
+      minutes: 2500,
+      points: 1200,
+      rebounds: 800,
+      offensiveRebounds: 100,
+      defensiveRebounds: 100,
+      fgm: 400,
+      fga: 800,
+    });
+    expect(stats.offensiveRebounds).toBeNull();
+    expect(stats.defensiveRebounds).toBeNull();
+    expect(stats.rebounds).toBe(800);
   });
 });
 describe('sanitizeAnchors', () => {
@@ -585,8 +629,8 @@ describe('sanitizeAnchors', () => {
   });
 });
 describe('selectionScore', () => {
-  it('computes the rating blend with a modest availability adjustment', () => {
-    expect(selectionScore(90, 85, 80, 25, 2400, 80)).toBe(87.764);
+  it('ranks peaks raw-first with a modest availability adjustment', () => {
+    expect(selectionScore(90, 85, 80, 25, 2400, 80)).toBe(89.113);
   });
   it('clamps usage to 40 and mpg to 48', () => {
     expect(selectionScore(60, 60, 60, 50, 4000, 50)).toBe(60.008);

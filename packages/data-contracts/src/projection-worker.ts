@@ -69,6 +69,7 @@ export const projectionRotationRecommendRequestSchema = z
     franchiseId: z.string().min(1).max(64),
     roster: z.array(z.string().min(1).max(128)).min(10).max(15),
     unavailable: z.array(z.string().min(1).max(128)).max(15),
+    excluded: z.array(z.string().min(1).max(128)).max(15).optional(),
     current: seasonRotationSchema,
     load: z.array(projectionRotationLoadRowSchema).min(10).max(15),
     overall: z
@@ -85,6 +86,7 @@ export const projectionRotationRecommendRequestSchema = z
     seed: seedStringSchema,
     scope: z.enum(['full', 'minutes-only']),
     keepActive10: z.boolean(),
+    allowDnp: z.boolean().optional(),
   })
   .strict();
 export type ProjectionRotationRecommendRequest = z.infer<

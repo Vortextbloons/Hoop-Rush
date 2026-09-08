@@ -367,6 +367,23 @@ describe('season run repository (dexie)', () => {
     await db.seasonRuns.put({ ...row, revision: 5 });
     await expect(repo.loadActiveRun()).rejects.toThrow(/revision/);
   });
+  it('accepts legacy player aggregates without optional four-pointer totals', async () => {
+    const adapters = makeAdapters();
+    const { db, repo } = adapters;
+    await promote(adapters);
+    await repo.commitSeasonBlock(commitInputFor(adapters, 0));
+    const row = await db.seasonRuns.get(SEASON_RUN_RECORD_ID);
+    if (row === undefined) throw new Error('expected a stored checkpoint row');
+    const playerAggregates = row.playerAggregates.map(
+      ({
+        fourPointersMade: _fourPointersMade,
+        fourPointersAttempted: _fourPointersAttempted,
+        ...aggregate
+      }) => aggregate,
+    );
+    await db.seasonRuns.put({ ...row, playerAggregates });
+    await expect(repo.loadActiveRun()).resolves.not.toBeNull();
+  });
   it('surfaces a mismatched checkpoint digest on load', async () => {
     const adapters = makeAdapters();
     const { db, repo } = adapters;

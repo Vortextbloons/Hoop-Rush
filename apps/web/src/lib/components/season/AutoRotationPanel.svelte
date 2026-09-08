@@ -9,7 +9,9 @@
     AutoUndoState,
     autoUndoKeyOf,
     buildAutoRecommendInput,
+    dnpOf,
     hasActiveSwaps,
+    hasDnp,
     swapPairsOf,
     type AutoScopeOption,
   } from '$lib/season/season-auto-rotation';
@@ -58,6 +60,7 @@
   });
 
   let option = $state<AutoScopeOption>('full-auto');
+  let allowDnp = $state(true);
   let busy = $state(false);
   let error = $state<string | null>(null);
   let result = $state<RecommendSeasonRotationResult | null>(null);
@@ -75,6 +78,8 @@
     result !== null && result.status === 'unavailable' ? result : null,
   );
   const swaps = $derived(preview !== null ? swapPairsOf(preview) : []);
+  const dnps = $derived(preview !== null ? dnpOf(preview) : []);
+  const hasDnpPreview = $derived(preview !== null && hasDnp(preview));
   const needsSwapConfirm = $derived(preview !== null && hasActiveSwaps(preview));
   const canRun = $derived(
     editor !== null &&
@@ -84,6 +89,21 @@
       rosterIds.length >= 10 &&
       !busy &&
       !disabled,
+  );
+  const disabledReason = $derived(
+    disabled
+      ? 'Disabled while the block is running.'
+      : editor === null
+        ? 'Rotation editor is not ready yet.'
+        : runner === null
+          ? 'Projection worker is starting…'
+          : seed === null
+            ? 'Waiting for block seed.'
+            : horizon <= 0
+              ? 'No games left in the horizon.'
+              : rosterIds.length < 10
+                ? `Needs 10+ rostered players (has ${rosterIds.length}).`
+                : null,
   );
   const nameOf = (id: string): string => names?.get(id) ?? id;
   const minutesOf = (rotation: SeasonRotation, id: string): number =>
@@ -138,6 +158,7 @@
         horizon,
         seed,
         option,
+        allowDnp,
       });
       const next = await activeRunner.recommendRotation(input, { signal: aborter.signal });
       if (!mounted || runner === null) return;
@@ -237,6 +258,7 @@
           : option === 'minutes-only'
             ? 'Keeps your 10. Retunes minutes only.'
             : 'Keeps your 10. Retunes starters, minutes, and closing.'}
+        {allowDnp ? ' May DNP (0 min) a weak bench spot when better.' : ''}
       </p>
     </div>
     {#if hasUndo}
@@ -267,6 +289,12 @@
       <option value="minutes-only">Minutes only</option>
       <option value="keep-10">Keep my 10</option>
     </select>
+    <label
+      class="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-surface-2 px-3 py-2 text-xs font-semibold"
+    >
+      <input type="checkbox" bind:checked={allowDnp} disabled={busy || disabled} class="h-4 w-4" />
+      Allow DNP when better
+    </label>
     {#if busy}
       <button
         type="button"
@@ -288,6 +316,9 @@
       </button>
     {/if}
   </div>
+  {#if !canRun && disabledReason !== null && !busy}
+    <p class="mt-2 font-mono text-[11px] text-muted-foreground">{disabledReason}</p>
+  {/if}
 
   {#if error !== null}
     <p
@@ -316,7 +347,34 @@
           Projected net {preview.metrics.projectedNetRating > 0
             ? '+'
             : ''}{preview.metrics.projectedNetRating.toFixed(1)}
+          · quality {preview.metrics.quality.toFixed(3)} · risk {preview.metrics.riskScore.toFixed(
+            3,
+          )} · relief {preview.metrics.relief.toFixed(2)}
         </p>
+      {:else}
+        <p class="mt-1 font-mono text-[11px]">
+          Quality {preview.metrics.quality.toFixed(3)} · risk {preview.metrics.riskScore.toFixed(
+            3,
+          )} · relief {preview.metrics.relief.toFixed(2)} · {preview.metrics.strainBand}
+        </p>
+      {/if}
+
+      {#if dnps.length > 0}
+        <div class="mt-2">
+          <p
+            class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
+          >
+            DNP-CD — dressed, 0 min{hasDnpPreview ? '' : ''}
+          </p>
+          <ul class="mt-1 flex flex-col gap-1 text-xs">
+            {#each dnps as dnp (dnp.playerVersionId)}
+              <li class="rounded bg-surface-2 px-2 py-1.5">
+                <span class="font-semibold text-destructive">DNP {nameOf(dnp.playerVersionId)}</span>
+                <span class="text-muted-foreground"> · was {dnp.from}m → 0m</span>
+              </li>
+            {/each}
+          </ul>
+        </div>
       {/if}
 
       {#if swaps.length > 0}

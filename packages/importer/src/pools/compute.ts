@@ -156,7 +156,7 @@ export function manifestPath(): string {
 }
 export const SCHEMA_VERSION = POOL_SCHEMA_VERSION;
 export const MIN_TEAM_GAMES = 40;
-export const DATA_VERSION = 'm14-ratings-v3.11';
+export const DATA_VERSION = 'm15-ratings-v3.12';
 export const CONFIDENCE_POLICY_VERSION = 'policy-v2';
 export const MAX_LOW_CONFIDENCE_SHARE = 0.4;
 export const MAX_LOW_CONFIDENCE_PLAYER_SHARE = 0.25;
@@ -470,6 +470,21 @@ function nullableFrom(value: unknown): number | null {
   return n;
 }
 export type PoolStats = PlayerSeasonStats;
+function sanitizeShootingFamily(
+  made: number | null,
+  attempted: number | null,
+): { made: number | null; attempted: number | null } {
+  // Made > attempted means partial coverage, not hot shooting: capping fgm
+  // 973 to a partial fga 883 would invent a 1.000 efg (1961-62 Bellamy).
+  // Null the family so derivation estimates instead of trusting fiction.
+  if (made !== null && (attempted === null || attempted <= 0 || made < 0 || made > attempted)) {
+    return { made: null, attempted: null };
+  }
+  if (attempted !== null && attempted <= 0) {
+    return { made: null, attempted: null };
+  }
+  return { made, attempted };
+}
 export function buildStats(seasonStats: unknown): PoolStats {
   const parsed = seasonStatsInputSchema.safeParse(seasonStats);
   const input: SeasonStatsInput = parsed.success ? parsed.data : {};
@@ -477,38 +492,58 @@ export function buildStats(seasonStats: unknown): PoolStats {
     const n = nullableFrom(value);
     return n === null ? null : Math.trunc(n);
   };
-  const fieldGoalsAttempted = Math.trunc(numFrom(input.fga));
-  const fieldGoalsMade = Math.min(Math.trunc(numFrom(input.fgm)), fieldGoalsAttempted);
-  const freeThrowsAttempted = Math.trunc(numFrom(input.fta));
-  const freeThrowsMade = Math.min(Math.trunc(numFrom(input.ftm)), freeThrowsAttempted);
-  const threesAttempted = truncNullable(input.tpa);
-  const threesMadeRaw = truncNullable(input.tpm);
-  const threesMade =
-    threesAttempted !== null && threesMadeRaw !== null
-      ? Math.min(threesMadeRaw, threesAttempted)
-      : threesMadeRaw;
+  const fieldGoals = sanitizeShootingFamily(truncNullable(input.fgm), truncNullable(input.fga));
+  const freeThrows = sanitizeShootingFamily(truncNullable(input.ftm), truncNullable(input.fta));
+  const threes = sanitizeShootingFamily(truncNullable(input.tpm), truncNullable(input.tpa));
+  const gamesPlayed = Math.trunc(numFrom(input.gamesPlayed));
+  let minutes: number | null = truncNullable(input.minutes);
+  const points = Math.trunc(numFrom(input.points));
+  // Magnitude sanity: no real season exceeds ~1.1 points per minute (Wilt's
+  // peak is ~1.04). Past 1.5 the minutes column is corrupt, not the scoring
+  // line, so minutes go while points stay for per-game use.
+  if (minutes !== null && minutes > 0 && points / minutes > 1.5) {
+    minutes = null;
+  }
+  let offensiveRebounds = truncNullable(input.offensiveRebounds);
+  let defensiveRebounds = truncNullable(input.defensiveRebounds);
+  const rebounds = Math.trunc(numFrom(input.rebounds));
+  if (
+    offensiveRebounds !== null &&
+    defensiveRebounds !== null &&
+    offensiveRebounds + defensiveRebounds < 0.5 * rebounds
+  ) {
+    offensiveRebounds = null;
+    defensiveRebounds = null;
+  }
+  // Shooting rates without attempts are fiction (stale ts 0.991 on nulled
+  // fga): the family being unobserved nulls the rate too. Nulled counting
+  // families fall back to 0/0 downstream, which derivation reads as
+  // unobserved (priors + low confidence) rather than as a real zero game.
+  const tsPct = fieldGoals.attempted === null ? null : clampUnitInterval(nullableFrom(input.tsPct));
+  const efgPct =
+    fieldGoals.attempted === null ? null : clampUnitInterval(nullableFrom(input.efgPct));
   const output = {
-    gamesPlayed: Math.trunc(numFrom(input.gamesPlayed)),
-    minutes: Math.trunc(numFrom(input.minutes)),
-    points: Math.trunc(numFrom(input.points)),
-    rebounds: Math.trunc(numFrom(input.rebounds)),
-    offensiveRebounds: truncNullable(input.offensiveRebounds),
-    defensiveRebounds: truncNullable(input.defensiveRebounds),
+    gamesPlayed,
+    minutes: minutes ?? 0,
+    points,
+    rebounds,
+    offensiveRebounds,
+    defensiveRebounds,
     assists: Math.trunc(numFrom(input.assists)),
     steals: truncNullable(input.steals),
     blocks: truncNullable(input.blocks),
     turnovers: truncNullable(input.turnovers),
-    fieldGoalsMade,
-    fieldGoalsAttempted,
-    threesMade,
-    threesAttempted,
-    freeThrowsMade,
-    freeThrowsAttempted,
+    fieldGoalsMade: fieldGoals.made ?? 0,
+    fieldGoalsAttempted: fieldGoals.attempted ?? 0,
+    threesMade: threes.made,
+    threesAttempted: threes.attempted,
+    freeThrowsMade: freeThrows.made ?? 0,
+    freeThrowsAttempted: freeThrows.attempted ?? 0,
     per: nullableFrom(input.per),
     boxPlusMinus: nullableFrom(input.boxPlusMinus),
     usageRate: nullableFrom(input.usageRate),
-    tsPct: clampUnitInterval(nullableFrom(input.tsPct)),
-    efgPct: clampUnitInterval(nullableFrom(input.efgPct)),
+    tsPct,
+    efgPct,
   };
   return playerSeasonStatsSchema.parse(output);
 }
@@ -566,7 +601,10 @@ export function selectionScore(
 ): number {
   const mpg = Math.min(teamMinutes / Math.max(1, teamGames), 48.0);
   const availability = 0.96 + 0.04 * Math.min(Math.max(teamGames, 0) / 82, 1);
-  const raw = 0.6 * rawOverallScore + 0.25 * offenseRating + 0.15 * defenseRating + 0.02 * mpg;
+  // Rank peaks by holistic evidence first: three-point-era offense ratings
+  // used to outvote MVP production (1989-90 Magic over 1986-87). Raw carries
+  // the season; offense/defense break ties.
+  const raw = 0.8 * rawOverallScore + 0.12 * offenseRating + 0.08 * defenseRating + 0.02 * mpg;
   return Math.round(raw * availability * 1000) / 1000;
 }
 export type Candidate = {

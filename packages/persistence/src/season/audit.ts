@@ -56,6 +56,17 @@ function deepEqual(a: unknown, b: unknown): boolean {
 function sortById<T>(rows: readonly T[], idOf: (row: T) => string): T[] {
   return [...rows].sort((a, b) => (idOf(a) < idOf(b) ? -1 : 1));
 }
+type AggregateWithOptionalFourPointers = {
+  fourPointersMade?: number;
+  fourPointersAttempted?: number;
+};
+function normalizeAggregateForAudit<T extends AggregateWithOptionalFourPointers>(row: T): T {
+  return {
+    ...row,
+    fourPointersMade: row.fourPointersMade ?? 0,
+    fourPointersAttempted: row.fourPointersAttempted ?? 0,
+  };
+}
 function expectedCompletedRoundsAt(blockIndex: number): number {
   return blockIndex === 8 ? 82 : (blockIndex + 1) * 10;
 }
@@ -132,11 +143,11 @@ export function auditSeasonRunState(
     const expectedTeams = sortById(
       seam.foldSeasonTeamAggregates(facts.league, summaries),
       (row) => row.franchiseId,
-    );
+    ).map(normalizeAggregateForAudit);
     if (
       !deepEqual(
         expectedTeams,
-        sortById(stored.teamAggregates, (row) => row.franchiseId),
+        sortById(stored.teamAggregates, (row) => row.franchiseId).map(normalizeAggregateForAudit),
       )
     ) {
       failures.push('stored team aggregates do not reconcile with the stored summaries');
@@ -148,11 +159,13 @@ export function auditSeasonRunState(
     const expectedPlayers = sortById(
       seam.foldSeasonPlayerAggregates(facts.rosters, summaries),
       (row) => row.playerVersionId,
-    );
+    ).map(normalizeAggregateForAudit);
     if (
       !deepEqual(
         expectedPlayers,
-        sortById(stored.playerAggregates, (row) => row.playerVersionId),
+        sortById(stored.playerAggregates, (row) => row.playerVersionId).map(
+          normalizeAggregateForAudit,
+        ),
       )
     ) {
       failures.push('stored player aggregates do not reconcile with the stored summaries');
@@ -447,6 +460,7 @@ export function auditSeasonRunState(
   }
   const { freeAgency } = stored.run;
   const signingById = new Map<string, SeasonFreeAgencySigning>();
+  const transactionById = new Map(stored.transactions.map((entry) => [entry.transactionId, entry]));
   const signingCountsFromSignings = new Map<string, number>();
   const seasonSpendFromSignings = new Map<string, number>();
   freeAgency.windows.forEach((window, index) => {
@@ -496,7 +510,7 @@ export function auditSeasonRunState(
         failures.push(`free-agency signing ${signing.signingId} is not a window candidate`);
       }
       const owner = rosterOwnerOf.get(signing.playerVersionId);
-      if (owner === undefined || owner !== signing.franchiseId) {
+      if (owner === undefined) {
         failures.push(
           `free-agency signing ${signing.signingId} does not reconcile with ownership (${signing.playerVersionId} -> ${String(owner)})`,
         );
@@ -506,10 +520,19 @@ export function auditSeasonRunState(
           `free-agency signing ${signing.signingId} applied at revision ${String(signing.appliedAtStateRevision)} beyond the stored stateRevision ${String(stored.stateRevision)}`,
         );
       }
-      const transactionIds = new Set(stored.transactions.map((entry) => entry.transactionId));
-      if (!transactionIds.has(signing.transactionId)) {
+      const transaction = transactionById.get(signing.transactionId);
+      if (transaction === undefined) {
         failures.push(
           `free-agency signing ${signing.signingId} links unknown transaction ${signing.transactionId}`,
+        );
+      } else if (
+        transaction.type !== 'free-agent-signing' ||
+        transaction.franchiseId !== signing.franchiseId ||
+        transaction.payload.playerVersionId !== signing.playerVersionId ||
+        transaction.payload.windowIndex !== signing.windowIndex
+      ) {
+        failures.push(
+          `free-agency signing ${signing.signingId} does not match transaction ${signing.transactionId}`,
         );
       }
       const ledgerEntryIds = new Set(stored.influence.ledger.map((entry) => entry.entryId));
