@@ -56,6 +56,7 @@ import { buildPlayerPositions } from './positions.ts';
 import { positionOverrideFor } from '../positions/overrides.ts';
 import { canonicalPlayerName } from '../identity.ts';
 import { derivePlayerRecord } from '../ratings/v2.ts';
+import { defenseCreditFor, twoWayBonusFor } from '../ratings/v3.ts';
 import { getEra } from '../ratings/era.ts';
 import { loadRatingsModelArtifact } from '../ratings/artifact.ts';
 export { POSITION_LABEL_MAP, buildPlayerPositions, normalizePositionLabels } from './positions.ts';
@@ -156,10 +157,19 @@ export function manifestPath(): string {
 }
 export const SCHEMA_VERSION = POOL_SCHEMA_VERSION;
 export const MIN_TEAM_GAMES = 40;
-export const DATA_VERSION = 'm15-ratings-v3.12';
+export const DATA_VERSION = 'm17-ratings-v3.12';
 export const CONFIDENCE_POLICY_VERSION = 'policy-v2';
 export const MAX_LOW_CONFIDENCE_SHARE = 0.4;
 export const MAX_LOW_CONFIDENCE_PLAYER_SHARE = 0.25;
+export function maxLowConfidenceShareFor(coverageBand: CoverageSummary['coverageBand']): number {
+  // Pre-1974 seasons never observed steals, blocks, rebound splits,
+  // turnovers, or threes, so ~half of all fields are low-confidence by
+  // construction even with complete box scores. The tripwire follows the
+  // evidence era instead of vetoing whole decades for honesty.
+  if (coverageBand === 'reconstructed') return 0.65;
+  if (coverageBand === 'late-historical') return 0.5;
+  return MAX_LOW_CONFIDENCE_SHARE;
+}
 export {
   POSITION_NORMALIZATION_VERSION,
   RATINGS_VERSION,
@@ -572,6 +582,57 @@ const overallScoreProfileSchema = z.looseObject({
   rawOverallScore: z.unknown().optional(),
   canonicalOverall: z.unknown().optional(),
 });
+const neutralScoreProfileSchema = z.looseObject({
+  rawOverallScore: z.unknown().optional(),
+  canonicalOverall: z.unknown().optional(),
+  baseScore: z.unknown().optional(),
+  offenseRating: z.unknown().optional(),
+  defenseRating: z.unknown().optional(),
+  production: z
+    .looseObject({
+      score: z.unknown().optional(),
+      weight: z.unknown().optional(),
+    })
+    .optional(),
+});
+export function neutralSelectionScoreFor(
+  player: OverallScoreInput,
+  summary: SummaryRatingsRaw | undefined,
+  stats: SeasonStatsInput,
+): number {
+  // Peak selection answers "best individual season", so team context stays
+  // out: rawOverallScore bundles teamDelta (±5 for title vs lottery teams),
+  // which let a 61-win season outvote an All-NBA First Team year with
+  // clearly better individual production (1997-98 Payton over 1999-00).
+  // Neutral form keeps base, production, and individual two-way credit.
+  const profileParsed = neutralScoreProfileSchema.safeParse(player.ratingProfile);
+  const profile = profileParsed.success ? profileParsed.data : undefined;
+  const base = typeof profile?.baseScore === 'number' ? profile.baseScore : null;
+  const production = profile?.production;
+  const prodScore = typeof production?.score === 'number' ? production.score : null;
+  const prodWeight =
+    typeof production?.weight === 'number' && Number.isFinite(production.weight)
+      ? clamp(production.weight, 0, 1)
+      : null;
+  const offense =
+    typeof profile?.offenseRating === 'number'
+      ? profile.offenseRating
+      : safeFloat(summary?.offenseRating);
+  const defense =
+    typeof profile?.defenseRating === 'number'
+      ? profile.defenseRating
+      : safeFloat(summary?.defenseRating);
+  if (base === null || prodScore === null || prodWeight === null) {
+    return rawOverallScoreFor(player, summary);
+  }
+  const observedStocks = stats.steals != null && stats.blocks != null;
+  return (
+    base * (1 - prodWeight) +
+    prodScore * prodWeight +
+    defenseCreditFor(defense, false, observedStocks) +
+    twoWayBonusFor(offense, defense)
+  );
+}
 type OverallScoreInput = {
   ratingProfile?: unknown;
 };
@@ -592,7 +653,7 @@ export function rawOverallScoreFor(
   return safeFloat(summary?.overallRating);
 }
 export function selectionScore(
-  rawOverallScore: number,
+  peakScore: number,
   offenseRating: number,
   defenseRating: number,
   _usageRate: number | null,
@@ -602,10 +663,17 @@ export function selectionScore(
   const mpg = Math.min(teamMinutes / Math.max(1, teamGames), 48.0);
   const availability = 0.96 + 0.04 * Math.min(Math.max(teamGames, 0) / 82, 1);
   // Rank peaks by holistic evidence first: three-point-era offense ratings
-  // used to outvote MVP production (1989-90 Magic over 1986-87). Raw carries
-  // the season; offense/defense break ties.
-  const raw = 0.8 * rawOverallScore + 0.12 * offenseRating + 0.08 * defenseRating + 0.02 * mpg;
+  // used to outvote MVP production (1989-90 Magic over 1986-87). The peak
+  // score below carries the season; offense/defense break ties.
+  const raw = 0.8 * peakScore + 0.12 * offenseRating + 0.08 * defenseRating + 0.02 * mpg;
   return Math.round(raw * availability * 1000) / 1000;
+}
+export function peakSelectionBlend(neutralScore: number, rawOverallScore: number): number {
+  // Individual merit first (60%), holistic context second (20%): team wins
+  // and elite lifts nudge near-ties but cannot outvote clearly better
+  // individual production (1999-00 Payton keeps his All-NBA First Team year
+  // over 61-win 1997-98).
+  return 0.75 * neutralScore + 0.25 * rawOverallScore;
 }
 export type Candidate = {
   season: string;
@@ -624,7 +692,10 @@ export function candidateKey(candidate: Candidate): readonly number[] {
   const games = Math.trunc(numFrom(stint.gamesPlayed));
   return [
     selectionScore(
-      rawOverallScoreFor(candidate.player, summary),
+      peakSelectionBlend(
+        neutralSelectionScoreFor(candidate.player, summary, candidate.stats),
+        rawOverallScoreFor(candidate.player, summary),
+      ),
       safeFloat(summary?.offenseRating),
       safeFloat(summary?.defenseRating),
       nullableFrom(candidate.stats.usageRate),
@@ -1011,6 +1082,12 @@ function asNumberOrNull(value: unknown): number | null {
   }
   return null;
 }
+function minutesUnobservedForPolicy(player: PoolPlayer): boolean {
+  // buildStats nulls corrupt minutes to 0 while keeping games: a real
+  // rotation player always logs minutes, so 0 with games played means the
+  // minutes column was quarantined (1961-62 Bellamy class).
+  return player.stats.minutes <= 0 && player.stats.gamesPlayed > 0;
+}
 function playerLowConfidenceShare(player: PoolPlayer): number {
   const fields = [
     ...Object.keys(player.detailedRatings),
@@ -1341,14 +1418,34 @@ export function computePool(
     );
   }
   const coverageSummary = buildCoverageSummary(playersOut, seasons);
+  const tripThreshold = maxLowConfidenceShareFor(coverageSummary.coverageBand);
   const policyFailures = playersOut.filter(
-    (p) => playerLowConfidenceShare(p) > MAX_LOW_CONFIDENCE_SHARE,
+    (p) => !minutesUnobservedForPolicy(p) && playerLowConfidenceShare(p) > tripThreshold,
   );
   // policy-v2: per-player honesty (derive-v11 labels sub-200-minute and
   // prior-only evidence as low) must not let a thin tail veto an otherwise
-  // evidence-backed pool. The pool fails only when trippers are more than a
-  // quarter of membership; a majority-thin pool still fails as before.
-  const policyFailureShare = playersOut.length > 0 ? policyFailures.length / playersOut.length : 0;
+  // evidence-backed pool. Players with unobserved minutes are excluded from
+  // the tripwire: every one of their fields is low-confidence by
+  // construction, and their ratings already collapse to shrunk priors with
+  // ~0 production weight — self-quarantined, with nothing left to veto.
+  // The pool fails only when trippers are more than a quarter of the
+  // minutes-observed membership; a pool with no observed minutes at all
+  // still fails outside the reconstructed era (modern minutes always exist).
+  // Inside it, the pool builds honestly shrunk — an expansion-era roster of
+  // priors with a loud warning beats a stale file of fabricated stars.
+  const policyDenominator = playersOut.filter((p) => !minutesUnobservedForPolicy(p)).length;
+  if (policyDenominator === 0 && coverageSummary.coverageBand !== 'reconstructed') {
+    return failure(
+      'confidence-failed',
+      `no observed minutes for any player under ${CONFIDENCE_POLICY_VERSION}`,
+    );
+  }
+  if (policyDenominator === 0) {
+    console.log(
+      `  [WARN] ${franchiseId} ${eraId}: no observed minutes; ratings are shrunk priors, pool kept for era completeness`,
+    );
+  }
+  const policyFailureShare = policyDenominator > 0 ? policyFailures.length / policyDenominator : 0;
   if (policyFailureShare > MAX_LOW_CONFIDENCE_PLAYER_SHARE) {
     return failure(
       'confidence-failed',

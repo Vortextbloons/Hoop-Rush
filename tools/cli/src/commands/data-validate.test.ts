@@ -399,14 +399,16 @@ describe('dataValidate season game targets audit', () => {
     return writeManifest(buildManifest());
   }
   it('fails packaged game targets pinned to the stale rotation version', async () => {
-    const path = await writeTargetsManifest(SEASON_ROTATION_VERSION);
+    // The targets schema pins rotationVersion as a literal, so stale input
+    // fails schema validation (which is the operative gate) before the
+    // version-mismatch branch below it is reached.
+    const staleRotationVersion = 'season-rotation-v0';
+    const path = await writeTargetsManifest(staleRotationVersion);
     const report = await dataValidate(path, false);
     expect(report.ok).toBe(false);
     expect(
-      report.failures.some((f) =>
-        f.includes(
-          `game-targets: rotationVersion ${SEASON_ROTATION_VERSION} != ${SEASON_ROTATION_VERSION}`,
-        ),
+      report.failures.some(
+        (f) => f.includes('game-targets: artifact fails the game targets schema') && f.includes('rotationVersion'),
       ),
     ).toBe(true);
   });

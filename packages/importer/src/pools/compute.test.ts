@@ -30,6 +30,9 @@ import {
   computePool,
   loadBbrefIds,
   loadCareerPositionLabels,
+  maxLowConfidenceShareFor,
+  neutralSelectionScoreFor,
+  peakSelectionBlend,
   normalizePoolOveralls,
   overallBandForPercentile,
   parsePoolTargets,
@@ -992,6 +995,45 @@ describe('computePool error and skip paths', () => {
     expect(pool.coverageSummary.policyVersion).toBe(CONFIDENCE_POLICY_VERSION);
     expect(pool.players.map((player) => player.playerExternalId)).toContain('8');
   });
+  it('policy-v2 excludes minutes-unobserved players from the low-confidence tripwire', () => {
+    // 1961-62 Bellamy class: quarantined minutes read as 0 with games
+    // played, which forces every provenance field low by construction. Those
+    // players rate as shrunk priors already, so counting them would veto
+    // whole pre-1974 eras for honesty instead of catching bad data.
+    const root = buildStandardFixture('policy-minutes');
+    for (const season of ['1991-92', '1992-93']) {
+      const rosterPath = join(root.nba, season, 'roster.json');
+      const roster = readJson(rosterPath) as Array<Record<string, unknown>>;
+      for (const player of roster) {
+        if (player.externalId !== '5' && player.externalId !== '6') continue;
+        const lowProvenance: Record<string, unknown> = {};
+        for (const field of [...Object.keys(FULL_RATINGS_60), ...Object.keys(FULL_TENDENCIES)]) {
+          lowProvenance[field] = {
+            kind: 'estimated',
+            confidence: 'low',
+            methodVersion: 'derive-v11',
+            sourceVersion: 'source-v1',
+            sourceFields: ['prior'],
+          };
+        }
+        player.provenance = lowProvenance;
+      }
+      writeJson(rosterPath, roster);
+      const statsPath = join(root.nba, season, 'season-stats.json');
+      const statsRows = readJson(statsPath) as Array<Record<string, unknown>>;
+      for (const row of statsRows) {
+        if (row.playerExternalId !== '5' && row.playerExternalId !== '6') continue;
+        row.minutes = null;
+      }
+      writeJson(statsPath, statsRows);
+    }
+    const pool = computePool('lakers', '1990s', fixtureManifest(), BBREF_IDS, false);
+    if ('reason' in pool) throw new Error(`expected pool, got ${pool.reason}: ${pool.detail}`);
+    const byId = new Map(pool.players.map((player) => [player.playerExternalId, player]));
+    // Without the exclusion, 2 trippers of 6 members would fail the pool.
+    expect(byId.get('5')?.stats.minutes).toBe(0);
+    expect(byId.get('6')?.stats.minutes).toBe(0);
+  });
   it('policy-v2 fails a pool when low-confidence players are more than a quarter of membership', () => {
     const root = buildStandardFixture('policy-majority');
     for (const season of ['1991-92', '1992-93']) {
@@ -1016,6 +1058,61 @@ describe('computePool error and skip paths', () => {
     if (!('reason' in pool)) throw new Error('expected a confidence-failed pool build failure');
     expect(pool.reason).toBe('confidence-failed');
     expect(pool.detail).toContain('policy-v2');
+  });
+});
+describe('neutralSelectionScoreFor', () => {
+  function profile(over: Record<string, unknown> = {}): { ratingProfile: Record<string, unknown> } {
+    return {
+      ratingProfile: {
+        rawOverallScore: 64.35,
+        canonicalOverall: 73,
+        baseScore: 65.07,
+        offenseRating: 70,
+        defenseRating: 62,
+        production: { score: 71.7, weight: 0.25 },
+        ...over,
+      },
+    };
+  }
+  it('excludes team context so individual production picks the peak', () => {
+    // 1999-00 Payton (All-NBA First Team) carries a lottery-team penalty in
+    // raw that 1997-98 does not; neutral form restores the production winner.
+    const neutral = neutralSelectionScoreFor(profile(), { overallRating: 73 }, {
+      steals: 100,
+      blocks: 10,
+    } as never);
+    // base 65.07 * 0.75 + prod 71.7 * 0.25 + defense credit + two-way bonus
+    expect(neutral).toBeCloseTo(64.85, 1);
+    expect(neutral).toBeGreaterThan(
+      neutralSelectionScoreFor(
+        profile({ baseScore: 64.14, production: { score: 65.2, weight: 0.25 } }),
+        { overallRating: 74 },
+        { steals: 100, blocks: 10 } as never,
+      ),
+    );
+  });
+  it('falls back to the raw overall when no profile is present', () => {
+    expect(neutralSelectionScoreFor({}, { overallRating: 91 }, {})).toBe(91);
+  });
+});
+describe('peakSelectionBlend', () => {
+  it('weighs individual merit first with context breaking near-ties', () => {
+    // 1993-94 Pippen (neutral 65.95, raw 67.25) edges 1994-95 (66.09/66.05):
+    // the 55-win first-option year keeps its peak over the respectively
+    // noisier 47-win follow-up.
+    expect(peakSelectionBlend(65.95, 67.25)).toBeCloseTo(66.275, 2);
+    expect(peakSelectionBlend(65.95, 67.25)).toBeGreaterThan(peakSelectionBlend(66.09, 66.05));
+    // But context cannot outvote clearly better production: 1999-00 Payton
+    // (neutral 64.51, raw 64.35) keeps his peak over 61-win 1997-98 (62.55).
+    expect(peakSelectionBlend(64.51, 64.35)).toBeGreaterThan(peakSelectionBlend(62.55, 65));
+  });
+});
+describe('maxLowConfidenceShareFor', () => {
+  it('relaxes the tripwire where whole field families were never observed', () => {
+    expect(maxLowConfidenceShareFor('reconstructed')).toBe(0.65);
+    expect(maxLowConfidenceShareFor('late-historical')).toBe(0.5);
+    expect(maxLowConfidenceShareFor('complete-box-derived')).toBe(0.4);
+    expect(maxLowConfidenceShareFor('advanced-supported')).toBe(0.4);
   });
 });
 describe('loadBbrefIds', () => {
