@@ -338,10 +338,13 @@ describe('collection persistence', () => {
       'collectionPulls',
       'collectionLedger',
       'collectionCommands',
+      'collectionPlayState',
+      'collectionGames',
+      'collectionGameCommands',
     ]) {
       expect(names).toContain(name);
     }
-    expect(db.verno).toBe(16);
+    expect(db.verno).toBe(18);
     db.close();
   });
 });

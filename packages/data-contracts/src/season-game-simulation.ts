@@ -361,6 +361,7 @@ export const seasonGameSideResultSchema = z.object({
     turnovers: z.number().int().nonnegative(),
     fouls: z.number().int().nonnegative(),
     possessions: z.number().int().nonnegative(),
+    shotClockViolations: z.number().int().nonnegative().optional(),
     deepFours: z
       .object({ made: z.number().int().nonnegative(), attempted: z.number().int().nonnegative() })
       .optional(),

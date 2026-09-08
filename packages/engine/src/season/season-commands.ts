@@ -2804,6 +2804,7 @@ function handleAdvancePostseason(
   const summaries: SeasonPostseasonSummary[] = [];
   let humanWait: string | null = null;
   let integrityReason: string | null = null;
+  let forfeitedHumanGame = false;
   for (;;) {
     const decision = seasonPostseasonNextGame(current.postseason);
     if (decision.kind === 'integrity-failure') {
@@ -2816,6 +2817,40 @@ function handleAdvancePostseason(
       humanFranchiseId !== null &&
       seasonPostseasonHumanPlaysGame(current.postseason, gameId, humanFranchiseId)
     ) {
+      if (command.forfeit === true) {
+        const outcome = simulateSeasonPostseasonGame(
+          {
+            run: current,
+            effects: current.effects,
+            expanded,
+            catalog: context.catalog,
+            profile: context.profile,
+            gameId,
+            humanFranchiseId,
+            forfeitHumanGame: true,
+          },
+          { resolver: context.postseasonGameResolver },
+        );
+        if (outcome.kind === 'integrity-failure') {
+          integrityReason = outcome.reason;
+          break;
+        }
+        current = {
+          ...current,
+          postseason: seasonPostseasonApplyGameResult(
+            current.postseason,
+            outcome.facts,
+            current.league,
+            current.standings,
+          ),
+          health: outcome.nextHealth,
+          effects: outcome.nextEffects,
+        };
+        advanced.push(gameId);
+        summaries.push(outcome.summary);
+        forfeitedHumanGame = true;
+        break;
+      }
       const humanRotation = current.rotations.find(
         (rotation) => rotation.franchiseId === humanFranchiseId,
       );
@@ -2864,6 +2899,9 @@ function handleAdvancePostseason(
     advanced.push(gameId);
     summaries.push(outcome.summary);
     if (target !== undefined && gameId === target) break;
+  }
+  if (command.forfeit === true && !forfeitedHumanGame && integrityReason === null) {
+    integrityReason = 'forfeit requested, but the human franchise has no upcoming game';
   }
   if (integrityReason !== null) {
     return rejectedAdvance(command, { code: 'integrity-failure', reason: integrityReason }, run);

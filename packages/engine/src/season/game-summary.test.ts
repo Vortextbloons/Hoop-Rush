@@ -133,6 +133,8 @@ describe('season game summaries (M2.3)', () => {
     expect(seasonGameSummarySchema.safeParse(summary).success).toBe(true);
     expect(summary.homeBox.franchiseId).toBe(game.homeFranchiseId);
     expect(summary.awayBox.franchiseId).toBe(game.awayFranchiseId);
+    expect(summary.homeBox.shotClockViolations).toBe(result.home.box.shotClockViolations);
+    expect(summary.awayBox.shotClockViolations).toBe(result.away.box.shotClockViolations);
   });
   it('retains the full result detail for human games', () => {
     const input = buildInput('summary-2');

@@ -165,14 +165,14 @@ describe('sponsor offer generation', () => {
     expect(counts.ICON / total).toBeLessThan(0.17);
   });
 
-  it('rolls pools inside tier rails with spread tax and caps held', () => {
+  it('rolls bonuses inside tier rails with caps held', () => {
     for (let i = 0; i < 500; i += 1) {
       const seed = `sponsor-roll-${String(i).padStart(4, '0')}abcdef0123456`;
       for (const offer of seasonSponsorOffersForBlock(seed, i % 8)) {
         const tier = sponsorGearTierConfigOf(offer.tier);
         const pool = offer.boosts.reduce((sum, boost) => sum + boost.points, 0);
-        expect(pool).toBeGreaterThanOrEqual(tier.poolMin - 2 * (offer.boosts.length - 1));
-        expect(pool).toBeLessThanOrEqual(tier.poolMax - 2 * (offer.boosts.length - 1));
+        expect(pool).toBeGreaterThanOrEqual(tier.poolMin);
+        expect(pool).toBeLessThanOrEqual(tier.poolMax);
         expect(offer.boosts.length).toBeGreaterThanOrEqual(tier.statMin);
         expect(offer.boosts.length).toBeLessThanOrEqual(tier.statMax);
         for (const boost of offer.boosts) {

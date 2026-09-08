@@ -93,7 +93,7 @@
         </a>
       </div>
     {:else}
-      <ul class="mt-6 flex flex-col gap-2">
+      <ul class="mt-6 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
         {#each entries as entry (entry.runId)}
           <li>
             <a

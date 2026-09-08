@@ -468,6 +468,7 @@ export type SeasonStartPostseasonRejection = z.infer<typeof seasonStartPostseaso
 export const seasonAdvancePostseasonCommandSchema = seasonRunCommandBaseSchema.extend({
   command: z.literal('advance-postseason'),
   targetGameId: postseasonGameIdSchema.optional(),
+  forfeit: z.boolean().optional(),
 });
 export type SeasonAdvancePostseasonCommand = z.infer<typeof seasonAdvancePostseasonCommandSchema>;
 export const seasonAdvancePostseasonRejectionSchema = z.discriminatedUnion('code', [

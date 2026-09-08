@@ -6,13 +6,13 @@
     SeasonRosterEntry,
   } from '@hoop-rush/data-contracts';
   import { SEASON_CHALLENGE_CATALOG, SEASON_INFLUENCE_CAP } from '@hoop-rush/data-contracts';
-import {
-  formatInfluenceBalance,
-  ordinal,
-  recapChallengeView,
-  recordLabel,
-  streakLabel,
-} from '$lib/season/season-presentation';
+  import {
+    formatInfluenceBalance,
+    ordinal,
+    recapChallengeView,
+    recordLabel,
+    streakLabel,
+  } from '$lib/season/season-presentation';
   import {
     eraIdentityOf,
     franchiseIdentityOf,
@@ -23,7 +23,9 @@ import {
     MECHANISM_LABEL,
     type BlockMechanismEvidenceRow,
   } from '$lib/season/season-effects-view';
+  import type { SeasonInnovationImpact } from '$lib/season/season-innovation-impact-view';
   import type { AvailabilityStripRow } from '$lib/season/season-health-view';
+  import CourtInnovationImpact from './CourtInnovationImpact.svelte';
   import HealthStrip from './HealthStrip.svelte';
   import SeasonPlayerFace from './SeasonPlayerFace.svelte';
   import SeasonTeamLogo from './SeasonTeamLogo.svelte';
@@ -37,6 +39,8 @@ import {
     rosterByVersion = new Map(),
     effectsEvidence = [],
     healthRows = [],
+    innovationImpact = null,
+    blockInnovationImpact = null,
   }: {
     recap: SeasonBlockRecap;
     humanRecord: SeasonRecordMovement | null;
@@ -47,6 +51,8 @@ import {
     rosterByVersion?: ReadonlyMap<string, SeasonRosterEntry>;
     effectsEvidence?: BlockMechanismEvidenceRow[];
     healthRows?: AvailabilityStripRow[];
+    innovationImpact?: SeasonInnovationImpact | null;
+    blockInnovationImpact?: SeasonInnovationImpact | null;
   } = $props();
   const movementLabel = (movement: SeasonRecordMovement): string =>
     `${movement.winsBefore}–${movement.lossesBefore} → ${movement.winsAfter}–${movement.lossesAfter} (${
@@ -129,6 +135,14 @@ import {
         Block {recap.blockIndex + 1} of 9 · rounds 1–{recap.completedRounds} complete
       </p>
     </section>
+  {/if}
+
+  {#if innovationImpact !== null}
+    <CourtInnovationImpact
+      impact={innovationImpact}
+      blockImpact={blockInnovationImpact}
+      {franchiseName}
+    />
   {/if}
 
   {#if recap.standingsMovement.length > 0}

@@ -615,6 +615,16 @@
     await hub.advancePostseason(input);
     mirrorHub();
   };
+  shell.forfeitPostseasonGame = async (input) => {
+    const hub = shell.hub;
+    if (hub === null) return;
+    if (!hasPostseasonHubMethods(hub)) {
+      postseasonUnavailable();
+      return;
+    }
+    await hub.forfeitPostseasonGame(input);
+    mirrorHub();
+  };
   shell.submitPostseasonRotation = async (input) => {
     const hub = shell.hub;
     if (hub === null) return;
@@ -945,7 +955,9 @@
     </div>
   </div>
 {:else}
-  <div class="mx-auto w-full min-w-0 max-w-6xl overflow-x-clip sm:px-6">
+  <div
+    class="mx-auto w-full min-w-0 max-w-6xl overflow-x-clip sm:px-6 xl:max-w-7xl 2xl:max-w-[88rem]"
+  >
     {#if shell.externalChange !== null}
       <div
         role="status"
@@ -1002,7 +1014,9 @@
       aria-label="Season navigation"
       class="sticky top-0 z-30 mt-4 hidden border-y border-border/70 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85 md:block"
     >
-      <div class="mx-auto flex w-full max-w-6xl items-center gap-1 px-4 sm:px-6">
+      <div
+        class="mx-auto flex w-full max-w-6xl items-center gap-1 px-4 sm:px-6 xl:max-w-7xl 2xl:max-w-[88rem]"
+      >
         {#each navItems as item (item.id)}
           {@const active = isNavItemActive(item, routeId)}
           <a

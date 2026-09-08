@@ -168,6 +168,8 @@ export const collectionLedgerReasonSchema = z.enum([
   'welcome-grant',
   'pack-purchase',
   'duplicate-conversion',
+  'game-win-reward',
+  'game-loss-reward',
 ]);
 export type CollectionLedgerReason = z.infer<typeof collectionLedgerReasonSchema>;
 

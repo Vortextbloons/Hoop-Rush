@@ -103,7 +103,7 @@
 {:else}
   <section aria-labelledby="leaders-heading" class="min-w-0 pt-6">
     <div class="flex flex-col gap-3 px-3 sm:px-0">
-      <div class="min-w-0 max-w-3xl">
+      <div class="min-w-0 max-w-3xl lg:max-w-none">
         <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">
           Season Run · League Honors
         </p>
@@ -113,7 +113,7 @@
         >
           League Honors
         </h1>
-        <p class="mt-2 max-w-2xl text-[15px] leading-relaxed text-muted-foreground">
+        <p class="mt-2 max-w-2xl text-[15px] leading-relaxed text-muted-foreground lg:max-w-3xl">
           Every award and category champion from the regular season.
         </p>
       </div>
@@ -182,7 +182,7 @@
         />
       </div>
 
-      <div class="mt-4 hidden grid-cols-2 gap-4 px-3 sm:px-0 lg:grid-cols-3 md:grid">
+      <div class="mt-4 hidden gap-4 px-3 sm:px-0 md:grid md:grid-cols-2 xl:grid-cols-3">
         {#each LEADER_CATEGORIES as category (category)}
           <LeadersTable
             {category}

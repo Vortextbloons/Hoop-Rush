@@ -36,16 +36,3 @@ export function runWorker<Result>(workerUrl: URL, workerData: unknown): Promise<
     });
   });
 }
-export async function runParallel<T, R>(
-  items: readonly T[],
-  workerUrl: URL,
-  toWorkerData: (chunk: T[]) => unknown,
-  chunkFn: (items: readonly T[], workers: number) => T[][] = chunkList,
-  workers?: number,
-  cap = 8,
-): Promise<R[]> {
-  const count = workers === undefined ? defaultWorkerCount(cap) : Math.max(1, Math.trunc(workers));
-  if (count <= 1 || items.length <= 1) return [];
-  const chunks = chunkFn(items, count);
-  return Promise.all(chunks.map((chunk) => runWorker<R>(workerUrl, toWorkerData(chunk))));
-}

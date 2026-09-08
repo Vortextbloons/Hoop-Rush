@@ -977,6 +977,20 @@ export class SeasonHubState {
       humanFranchiseId: rawHuman === null ? null : franchiseIdSchema.parse(rawHuman),
     });
   }
+  async forfeitPostseasonGame(input: { targetGameId: string }): Promise<void> {
+    const command: SeasonRunCommand = {
+      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      command: 'advance-postseason',
+      commandId: newSeasonId('for'),
+      runId: this.requiredRunId(),
+      expectedStateRevision: this.requiredStateRevision(),
+      expectedStateDigest: this.requiredStateDigest(),
+      targetGameId: postseasonGameIdSchema.parse(input.targetGameId),
+      forfeit: true,
+    };
+    if (!this.requirePostseasonStage(command.command)) return;
+    await this.dispatchPostseason(command);
+  }
   async submitPostseasonRotation(input: {
     targetGameId: string;
     rotation: SeasonPostseasonRotationPayload;
@@ -1104,7 +1118,7 @@ export class SeasonHubState {
         preStateRevision: command.expectedStateRevision,
         preStateDigest: command.expectedStateDigest,
         resultDigest: seasonPostseasonCommitResultDigest(command.commandId, [], summaries),
-        relatedGameIds: [],
+        relatedGameIds: summaries.map((summary) => summary.gameId),
         transactionIds: seasonPostseasonTransactionIdsOf(output.run, command.commandId),
       };
       await this.repo.commitPostseasonAdvancement(commitInput);

@@ -37,7 +37,7 @@ export function rollSponsorBoosts(
   const pool = rng.nextInt(tier.poolMin, tier.poolMax);
   const maxStats = Math.min(tier.statMax, entry.eligible.length);
   let statCount = Math.min(rng.nextInt(tier.statMin, tier.statMax), maxStats);
-  while (statCount < maxStats && pool - 2 * (statCount - 1) > statCount * tier.singleKeyCap) {
+  while (statCount < maxStats && pool > statCount * tier.singleKeyCap) {
     statCount += 1;
   }
   const remaining = [...entry.eligible];
@@ -50,7 +50,7 @@ export function rollSponsorBoosts(
     chosen.push({ key: pick.key, weight: pick.weight });
     remaining.splice(remaining.indexOf(pick), 1);
   }
-  const effective = pool - 2 * (chosen.length - 1);
+  const effective = pool;
   const amounts = chosen.map(() => 1);
   let leftover = effective - chosen.length;
   for (let i = 0; i < amounts.length - 1; i += 1) {

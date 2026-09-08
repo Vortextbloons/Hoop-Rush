@@ -1461,6 +1461,40 @@ export const collectionPackCalibrateReportSchema = z.object({
 });
 export type CollectionPackCalibrateReport = z.infer<typeof collectionPackCalibrateReportSchema>;
 
+export const collectionGameAuditReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('collection game-audit'),
+  catalogVersion: z.string().min(1).max(64),
+  catalogHash: z.string().regex(/^[0-9a-f]{64}$/),
+  rulesVersion: z.string().min(1).max(64),
+  rulesHash: z.string().regex(/^[0-9a-f]{64}$/),
+  profileVersion: z.string().min(1).max(64),
+  fixedGames: z.number().int().nonnegative(),
+  heldOutGames: z.number().int().nonnegative(),
+  wins: z.number().int().nonnegative(),
+  losses: z.number().int().nonnegative(),
+  rarityCounts: z.record(z.string(), z.number().int().nonnegative()),
+  shortHandedGames: z.number().int().nonnegative(),
+  overtimeGames: z.number().int().nonnegative(),
+  foulLimitExceptions: z.number().int().nonnegative(),
+});
+export type CollectionGameAuditReport = z.infer<typeof collectionGameAuditReportSchema>;
+
+export const collectionGameReproduceReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('collection game-reproduce'),
+  gameId: z.string().min(1).max(64),
+  gameSequence: z.number().int().nonnegative(),
+  ok: z.boolean(),
+  eventDigest: z.string().regex(/^[0-9a-f]{32}$/),
+  resultDigest: z.string().regex(/^[0-9a-f]{32}$/),
+  rewardReason: z.string().min(1).max(64),
+  rewardAmount: z.number().int().nonnegative(),
+  rewardTransactionId: z.string().min(1).max(128),
+  failures: z.array(z.string().min(1)),
+});
+export type CollectionGameReproduceReport = z.infer<typeof collectionGameReproduceReportSchema>;
+
 export const overallsAuditFlagSchema = z.object({
   displayName: z.string().min(1).max(96),
   playerExternalId: z.string().min(1).max(64),

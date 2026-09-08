@@ -13,29 +13,29 @@ export type SeasonSponsorTier = z.infer<typeof seasonSponsorTierSchema>;
 export const SEASON_SPONSOR_GEAR_TIERS = {
   BUZZ: {
     price: 1,
-    poolMin: 10,
-    poolMax: 16,
+    poolMin: 12,
+    poolMax: 20,
     statMin: 1,
     statMax: 2,
-    singleKeyCap: 7,
+    singleKeyCap: 10,
     weight: 55,
   },
   PRIME: {
     price: 2,
-    poolMin: 12,
-    poolMax: 22,
+    poolMin: 16,
+    poolMax: 28,
     statMin: 1,
     statMax: 3,
-    singleKeyCap: 9,
+    singleKeyCap: 14,
     weight: 32,
   },
   ICON: {
     price: 3,
-    poolMin: 15,
-    poolMax: 35,
+    poolMin: 25,
+    poolMax: 40,
     statMin: 1,
     statMax: 3,
-    singleKeyCap: 12,
+    singleKeyCap: 15,
     weight: 13,
   },
 } as const;
@@ -69,7 +69,7 @@ export type SeasonSponsorBoostKey = z.infer<typeof seasonSponsorBoostKeySchema>;
 
 export const seasonSponsorBoostSchema = z.object({
   key: seasonSponsorBoostKeySchema,
-  points: z.number().int().min(1).max(12),
+  points: z.number().int().min(1).max(15),
 });
 export type SeasonSponsorBoost = z.infer<typeof seasonSponsorBoostSchema>;
 

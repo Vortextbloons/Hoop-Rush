@@ -365,11 +365,13 @@ export class GameRecorder {
     teamId: string,
   ): Omit<TeamBoxScore, 'diagnostics'> & {
     deepFours?: { made: number; attempted: number };
+    shotClockViolations: number;
     diagnostics: TeamDiagnostics;
   } {
     const t = this.sides[side];
     return {
       ...buildTeamBoxBase(t, teamId),
+      shotClockViolations: t.shotClockViolations,
       ...(t.deepAttempts > 0 || t.deepMakes > 0
         ? { deepFours: { made: t.deepMakes, attempted: t.deepAttempts } }
         : {}),

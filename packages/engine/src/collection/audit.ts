@@ -1,4 +1,5 @@
 import {
+  type CollectionGameRecord,
   type CollectionLedgerEntry,
   type CollectionPullRecord,
   type CollectionState,
@@ -14,6 +15,7 @@ export function auditCollectionState(
   state: CollectionState,
   pulls: readonly CollectionPullRecord[],
   ledger: readonly CollectionLedgerEntry[],
+  gameRecords: readonly CollectionGameRecord[] = [],
 ): CollectionAuditFailure[] {
   const failures: CollectionAuditFailure[] = [];
   const facts = collectionStateFactsOf(state);
@@ -40,11 +42,34 @@ export function auditCollectionState(
       message: `nextPullSequence ${String(state.nextPullSequence)} != pulls ${String(orderedPulls.length)}`,
     });
   }
-  if (state.revision !== orderedPulls.length) {
+  if (state.revision !== orderedPulls.length + gameRecords.length) {
     failures.push({
       code: 'revision-mismatch',
-      message: `revision ${String(state.revision)} != pulls ${String(orderedPulls.length)}`,
+      message: `revision ${String(state.revision)} != pulls ${String(orderedPulls.length)} + games ${String(gameRecords.length)}`,
     });
+  }
+  const ledgerByTransaction = new Map(ledger.map((entry) => [entry.transactionId, entry]));
+  for (const record of gameRecords) {
+    const entry = ledgerByTransaction.get(record.reward.transactionId);
+    if (entry === undefined) {
+      failures.push({
+        code: 'missing-game-reward',
+        message: `game ${record.gameId} reward ${record.reward.transactionId} missing from the ledger`,
+      });
+      continue;
+    }
+    if (entry.pullSequence !== null) {
+      failures.push({
+        code: 'game-reward-pull-sequence',
+        message: `game ${record.gameId} reward must not consume a pull sequence`,
+      });
+    }
+    if (entry.amount !== record.reward.amount || entry.reason !== record.reward.reason) {
+      failures.push({
+        code: 'game-reward-mismatch',
+        message: `game ${record.gameId} ledger entry does not match the record reward`,
+      });
+    }
   }
   const folded: Record<'Coins' | 'Exchange', number> = { Coins: 0, Exchange: 0 };
   for (const entry of ledger) {

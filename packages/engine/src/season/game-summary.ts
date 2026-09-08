@@ -97,6 +97,7 @@ function teamBoxOf(side: {
     turnovers: number;
     fouls: number;
     possessions: number;
+    shotClockViolations?: number;
   };
 }): SeasonTeamBox {
   const box = side.box;
@@ -116,6 +117,9 @@ function teamBoxOf(side: {
     blocks: box.blocks,
     turnovers: box.turnovers,
     fouls: box.fouls,
+    ...(box.shotClockViolations === undefined
+      ? {}
+      : { shotClockViolations: box.shotClockViolations }),
     ...fourPointerLineOf(box),
     possessions: box.possessions,
   };
@@ -143,6 +147,7 @@ function zeroTeamBox(franchiseId: string): SeasonTeamBox {
     turnovers: 0,
     fouls: 0,
     possessions: 0,
+    shotClockViolations: 0,
   };
 }
 function openingStartersOf(result: SeasonGameSimulationResult, side: 'home' | 'away'): Set<string> {
@@ -291,6 +296,7 @@ export function auditSeasonGameSummary(summary: SeasonGameSummary): string[] {
         ['turnovers', box.turnovers],
         ['fouls', box.fouls],
         ['possessions', box.possessions],
+        ['shotClockViolations', box.shotClockViolations ?? 0],
         ['fourPointersMade', box.fourPointersMade ?? 0],
         ['fourPointersAttempted', box.fourPointersAttempted ?? 0],
       ];
@@ -366,6 +372,9 @@ export function auditSeasonGameSummary(summary: SeasonGameSummary): string[] {
     }
     if (box.assists > fgm) {
       failures.push(`${side} assists exceed made field goals`);
+    }
+    if ((box.shotClockViolations ?? 0) > box.turnovers) {
+      failures.push(`${side} shot-clock violations exceed turnovers`);
     }
   }
   if (summary.status === 'forfeit') {

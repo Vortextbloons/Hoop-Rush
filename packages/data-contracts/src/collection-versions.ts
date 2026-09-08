@@ -25,3 +25,16 @@ export const COLLECTION_RARITY_ORDER = [
   'Eclipse',
   'Immortal',
 ] as const;
+export const COLLECTION_TEAM_VERSION = 'collection-team-v1';
+export const COLLECTION_GAME_VERSION = 'collection-game-v1';
+export const COLLECTION_GAME_RULES_VERSION = 'collection-game-rules-v1';
+export const COLLECTION_REWARD_VERSION = 'collection-reward-v1';
+export const COLLECTION_GAME_REPLAY_VERSION = 'collection-game-replay-v1';
+export const COLLECTION_PLAY_SAVE_VERSION = 1;
+export const COLLECTION_GAME_SEED_DERIVATION_VERSION = 'collection-game-seeds-v1';
+export const COLLECTION_GAME_WORKER_WIRE_VERSION = 1;
+export const COLLECTION_GAME_CPU_ROSTER_SIZE = 12;
+export const COLLECTION_GAME_REWARD_WIN_COINS = 100;
+export const COLLECTION_GAME_REWARD_LOSS_COINS = 10;
+export const COLLECTION_GAME_ENVIRONMENT_ERA_ID = '2020s';
+export const COLLECTION_GAME_HOME_COURT_POLICY = 'neutral-home-court';

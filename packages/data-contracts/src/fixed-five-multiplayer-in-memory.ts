@@ -1,8 +1,6 @@
 import {
   FIXED_FIVE_CODE_TTL_MS,
   FIXED_FIVE_ENVELOPE_MAX_BYTES,
-  FIXED_FIVE_MULTIPLAYER_VERSION,
-  FIXED_FIVE_ROOM_PROTOCOL_VERSION,
   FIXED_FIVE_ROOM_SCHEMA_VERSION,
   fixedFiveCommandSchema,
   fixedFiveTimeoutMsForMode,
@@ -519,7 +517,4 @@ export function createInMemoryFixedFiveTransport(options?: {
       return { failed: true, phase: record.snapshot.phase };
     },
   };
-}
-export function fixedFiveInMemoryProtocolTag(): string {
-  return `${FIXED_FIVE_MULTIPLAYER_VERSION}/room-${String(FIXED_FIVE_ROOM_PROTOCOL_VERSION)}`;
 }

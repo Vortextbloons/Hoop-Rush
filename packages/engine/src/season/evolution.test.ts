@@ -395,6 +395,9 @@ describe('twenty-second clock games', () => {
     const result = simulateSeasonGame(input, ctx);
     expect(result.outcome).toBe('completed');
     expect(checkSeasonGameResult(result, input)).toEqual([]);
+    if (result.outcome !== 'completed') throw new Error('expected a completed game');
+    expect(result.home.box.shotClockViolations).toBeGreaterThan(0);
+    expect(result.away.box.shotClockViolations).toBeGreaterThan(0);
   });
 });
 

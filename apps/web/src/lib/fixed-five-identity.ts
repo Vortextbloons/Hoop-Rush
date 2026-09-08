@@ -63,8 +63,3 @@ export function loadLastFixedFiveRoomId(): Id | null {
     return null;
   }
 }
-export function clearFixedFiveMembership(roomId: string): void {
-  try {
-    localStorage.removeItem(`${MEMBERSHIP_PREFIX}${roomId}`);
-  } catch {}
-}

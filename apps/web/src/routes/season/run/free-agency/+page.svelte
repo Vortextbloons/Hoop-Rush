@@ -350,7 +350,7 @@
           </p>
         {/if}
 
-        <div class="mt-4">
+        <div class="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
           <FreeAgencyMarketOverview
             {cards}
             {manifest}
@@ -362,61 +362,60 @@
             onRoleChange={setRole}
             onInfluenceChange={setInfluence}
           />
-        </div>
 
-        <div class="mt-4">
-          {#if declaration === null}
-            <FreeAgencyDeclarationPanel
-              candidates={openWindow.candidates}
-              targets={orderedTargets}
-              {balance}
-              {seasonSpend}
-              {signingCount}
-              failures={localFailures}
-              busy={submitting}
-              onSubmit={() => void submitDeclaration()}
-              onSkip={() => void skipMarket()}
-            />
-          {:else}
-            <FreeAgencyReviewPanel
-              windowIndex={openWindow.windowIndex}
-              {declaration}
-              candidates={openWindow.candidates}
-              {manifest}
-              {faceOf}
-              overallOf={(playerVersionId) => overallRatingOf(shell.catalog, playerVersionId)}
-              busy={submitting}
-              onSubmit={() => void resolveMarket()}
-            />
-          {/if}
+          <div class="min-w-0 lg:sticky lg:top-16">
+            {#if declaration === null}
+              <FreeAgencyDeclarationPanel
+                candidates={openWindow.candidates}
+                targets={orderedTargets}
+                {balance}
+                {seasonSpend}
+                {signingCount}
+                failures={localFailures}
+                busy={submitting}
+                onSubmit={() => void submitDeclaration()}
+                onSkip={() => void skipMarket()}
+              />
+            {:else}
+              <FreeAgencyReviewPanel
+                windowIndex={openWindow.windowIndex}
+                {declaration}
+                candidates={openWindow.candidates}
+                {manifest}
+                {faceOf}
+                overallOf={(playerVersionId) => overallRatingOf(shell.catalog, playerVersionId)}
+                busy={submitting}
+                onSubmit={() => void resolveMarket()}
+              />
+            {/if}
+          </div>
         </div>
       </section>
     {/if}
 
     {#if resolvedWindows.length > 0}
-      <section
-        aria-labelledby="free-agency-history-heading"
-        class="flex flex-col gap-3 px-3 sm:px-0"
-      >
+      <section aria-labelledby="free-agency-history-heading" class="px-3 sm:px-0">
         <h2
           id="free-agency-history-heading"
           class="font-display text-base font-extrabold uppercase tracking-tight"
         >
           Resolved markets
         </h2>
-        {#each resolvedWindows as window (window.windowIndex)}
-          <FreeAgencyResolvedPanel
-            {window}
-            {humanFranchiseId}
-            {manifest}
-            franchiseName={shell.franchiseName}
-            playerName={shell.playerName}
-            {faceOf}
-            {signingCount}
-            {seasonSpend}
-            resolvedInThisSession={resolvedThisSession === window.windowIndex}
-          />
-        {/each}
+        <div class="mt-3 grid gap-3 lg:grid-cols-2 lg:items-start">
+          {#each resolvedWindows as window (window.windowIndex)}
+            <FreeAgencyResolvedPanel
+              {window}
+              {humanFranchiseId}
+              {manifest}
+              franchiseName={shell.franchiseName}
+              playerName={shell.playerName}
+              {faceOf}
+              {signingCount}
+              {seasonSpend}
+              resolvedInThisSession={resolvedThisSession === window.windowIndex}
+            />
+          {/each}
+        </div>
       </section>
     {/if}
   {/if}

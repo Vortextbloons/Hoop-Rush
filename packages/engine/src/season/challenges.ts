@@ -1,5 +1,4 @@
 import {
-  SEASON_CHALLENGE_CATALOG,
   SEASON_SEED_NAMESPACES,
   blockRoundRange,
   canonicalJson,
@@ -15,31 +14,6 @@ import {
   type SeasonBlockChallengeEvaluation,
   type SeasonChallengeEvaluationFacts,
 } from '@hoop-rush/data-contracts';
-
-const HARD_IDS: readonly SeasonChallengeId[] = ['beat-leader', 'beat-higher', 'statement-block'];
-
-const REWARD_OF: Record<SeasonChallengeId, 1 | 2> = {
-  'winning-block': 1,
-  'win-six': 1,
-  'three-point-mark': 1,
-  'protect-glass': 1,
-  'take-care': 1,
-  'beat-leader': 2,
-  'beat-higher': 2,
-  'statement-block': 2,
-};
-
-export function challengeRewardOf(challengeId: SeasonChallengeId): 1 | 2 {
-  return REWARD_OF[challengeId];
-}
-
-export function challengeDifficultyOf(challengeId: SeasonChallengeId): 'standard' | 'hard' {
-  return (HARD_IDS as readonly string[]).includes(challengeId) ? 'hard' : 'standard';
-}
-
-export function challengeCatalog(): readonly (typeof SEASON_CHALLENGE_CATALOG)[number][] {
-  return SEASON_CHALLENGE_CATALOG;
-}
 
 interface StandingsRow {
   franchiseId: string;
@@ -390,11 +364,4 @@ export function evaluateSeasonBlockChallenges(input: {
     blockIndex: deal.blockIndex,
     results,
   };
-}
-
-export function challengeResultById(
-  evaluation: SeasonBlockChallengeEvaluation,
-  challengeId: SeasonChallengeId,
-): boolean | null {
-  return evaluation.results.find((result) => result.challengeId === challengeId)?.success ?? null;
 }

@@ -202,9 +202,6 @@ export function applySandboxBuilderCommand(
 function nextIsFull(state: SandboxBuilderState): boolean {
   return state.placements.length === 5;
 }
-export function isSandboxBuilderComplete(state: SandboxBuilderState): boolean {
-  return state.locked && state.placements.length === 5;
-}
 export function listSandboxOpenSlots(state: SandboxBuilderState): SlotIndex[] {
   return openSlots(state);
 }

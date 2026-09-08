@@ -80,10 +80,8 @@
     riskyRehabOptionsOf,
   } from '$lib/season/season-postseason-presentation';
   import { homeRuleOf } from '$lib/season/season-evolution-view';
-  import {
-    playoffPrepSummaryOf,
-    playoffSnapshotOf,
-  } from '$lib/season/season-playoff-hub-view';
+  import { seasonInnovationImpactOf } from '$lib/season/season-innovation-impact-view';
+  import { playoffPrepSummaryOf, playoffSnapshotOf } from '$lib/season/season-playoff-hub-view';
   import {
     blockRoundRange,
     parsePlayoffGameId,
@@ -405,6 +403,19 @@
       ? '/season/run/checkpoint'
       : `/season/run/checkpoint?block=${String(lastAcceptedBlockIndex)}`,
   );
+  const innovationImpactAvailable = $derived.by(() => {
+    if (run === null || humanFranchiseId === null || snapshot === null) return false;
+    const rule = homeRuleOf(run, humanFranchiseId);
+    return (
+      rule !== 'standard' &&
+      seasonInnovationImpactOf({
+        summaries: snapshot.summaries,
+        details: snapshot.retainedDetails,
+        humanFranchiseId,
+        rule,
+      }) !== null
+    );
+  });
   const postseason = $derived(run?.postseason ?? null);
   const eliminated = $derived(
     run !== null && humanFranchiseId !== null && humanEliminated(run, humanFranchiseId),
@@ -455,7 +466,7 @@
   });
   const postseasonBusy = $derived(shell.postseason.phase === 'running');
   let lastPostseasonAction = $state<
-    'start' | 'advance' | 'spectate' | 'fast-forward' | 'submit' | null
+    'start' | 'advance' | 'spectate' | 'fast-forward' | 'submit' | 'forfeit' | null
   >(null);
   let postseasonSubmitting = $state(false);
   let selectedRehabInjuryId = $state<string | null>(null);
@@ -555,17 +566,23 @@
           ...(selectedRehabInjuryId !== null ? { riskyRehabInjuryId: selectedRehabInjuryId } : {}),
         },
       });
-      if (
-        shell.commandError === null &&
-        shell.hub !== null &&
-        run !== null &&
-        gamecast !== null
-      ) {
+      if (shell.commandError === null && shell.hub !== null && run !== null && gamecast !== null) {
         gamecast.result = await shell.hub.loadPostseasonSummary(run.runId, targetGameId);
       } else if (shell.commandError !== null) {
         gamecast = null;
       }
       selectedRehabInjuryId = null;
+    } finally {
+      postseasonSubmitting = false;
+    }
+  }
+  async function forfeitPostseasonGame() {
+    if (postseasonBusy || postseasonSubmitting || nextGame?.kind !== 'game' || !humanPlaysNext)
+      return;
+    postseasonSubmitting = true;
+    try {
+      lastPostseasonAction = 'forfeit';
+      await shell.forfeitPostseasonGame({ targetGameId: nextGame.gameId });
     } finally {
       postseasonSubmitting = false;
     }
@@ -588,12 +605,27 @@
     else if (lastPostseasonAction === 'spectate') void spectateNext();
     else if (lastPostseasonAction === 'fast-forward') void fastForward();
     else if (lastPostseasonAction === 'submit') void submitPostseasonRotation();
+    else if (lastPostseasonAction === 'forfeit') void forfeitPostseasonGame();
   }
   const canSubmitPostseason = $derived(
     nextGame?.kind === 'game' &&
       humanPlaysNext &&
       shell.editor !== null &&
       shell.editor.validate().length === 0 &&
+      !postseasonBusy &&
+      !postseasonSubmitting,
+  );
+  const canForfeitPostseason = $derived(
+    nextGame?.kind === 'game' &&
+      humanPlaysNext &&
+      run !== null &&
+      humanFranchiseId !== null &&
+      run.health.injuries.some(
+        (record) =>
+          record.franchiseId === humanFranchiseId &&
+          record.missedGamesRemaining > 0 &&
+          record.sameGameReturned !== true,
+      ) &&
       !postseasonBusy &&
       !postseasonSubmitting,
   );
@@ -788,6 +820,15 @@
           </div>
           {#if blockLine !== ''}
             <p class="font-mono text-xs text-muted-foreground">{blockLine}</p>
+          {/if}
+          {#if innovationImpactAvailable}
+            <a
+              href={resolve(lastRecapPath as any)}
+              class="inline-flex min-h-11 w-fit items-center gap-2 rounded-lg border border-primary/35 bg-primary/10 px-4 py-2 text-xs font-semibold text-primary outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:bg-primary/15"
+            >
+              Review court impact
+              <span aria-hidden="true">→</span>
+            </a>
           {/if}
 
           {#if challengesVm !== null}
@@ -1126,111 +1167,130 @@
         </section>
       {/if}
 
-      {#if openFreeAgencyWindow !== null}
-        <section
-          aria-labelledby="free-agency-cta-heading"
-          data-fa-hub-cta
-          class="flex flex-col gap-3 rounded-none border border-primary/30 bg-primary/5 p-4 sm:rounded-xl sm:p-5"
-        >
-          <div class="flex flex-wrap items-baseline justify-between gap-2">
-            <h2
-              id="free-agency-cta-heading"
-              class="font-display text-lg font-extrabold uppercase tracking-tight"
+      {#if openFreeAgencyWindow !== null || openWindow !== null}
+        <div class="grid gap-6 lg:grid-cols-2 lg:items-stretch">
+          {#if openFreeAgencyWindow !== null}
+            <section
+              aria-labelledby="free-agency-cta-heading"
+              data-fa-hub-cta
+              class="flex h-full flex-col gap-3 rounded-none border border-primary/30 bg-primary/5 p-4 sm:rounded-xl sm:p-5"
             >
-              Free Agency Window {openFreeAgencyWindow.windowIndex + 1}
-            </h2>
-            <span class="font-mono text-[10px] text-muted-foreground">
-              {openFreeAgencyWindow.candidates.length} candidate
-              {openFreeAgencyWindow.candidates.length === 1 ? '' : 's'} on the market
-            </span>
-          </div>
-          <p class="text-sm text-muted-foreground">
-            Declare interest in up to two targets — or skip — before the next block can submit.
-            Resolve the market whenever you are ready.
-          </p>
-          <a
-            href={resolve('/season/run/free-agency' as any)}
-            data-fa-hub-cta-link
-            class="inline-flex w-fit items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
-          >
-            Open Free Agency
-            <span aria-hidden="true">&rarr;</span>
-          </a>
-        </section>
-      {/if}
-
-      {#if openWindow !== null}
-        <section class="rounded-none border border-border bg-surface-1 p-4 sm:rounded-xl">
-          <h2 class="font-display text-base font-extrabold uppercase tracking-tight">
-            Trade window open
-          </h2>
-          <p class="mt-1 text-sm text-muted-foreground">
-            {tradeOffers.length} offer{tradeOffers.length === 1 ? '' : 's'} waiting.
-          </p>
-          <a
-            href={resolve('/season/run/trades' as any)}
-            class="mt-3 inline-flex w-fit items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
-          >
-            Open trades
-          </a>
-        </section>
-      {/if}
-
-      {#if influenceVm !== null}
-        <InfluencePanel
-          balance={influenceVm.balance}
-          cap={influenceVm.cap}
-          floor={influenceVm.floor}
-          atCap={influenceVm.atCap}
-          atFloor={influenceVm.atFloor}
-          entries={influenceVm.recentEntries}
-          affordances={influenceVm.affordances}
-          busy={block.phase === 'running'}
-          playerName={shell.playerName}
-          onSpend={(affordance) =>
-            shell.spendInfluence({
-              purpose: affordance.purpose,
-              windowIndex: affordance.windowIndex ?? undefined,
-              injuryId: affordance.injuryId ?? undefined,
-            })}
-        />
-      {/if}
-
-      {#if recentBlocks.length > 0}
-        <LeaguePulse entries={leaguePulse} />
-        <section aria-labelledby="recent-recaps-heading" class="px-3 sm:px-0">
-          <h2
-            id="recent-recaps-heading"
-            class="font-display text-base font-extrabold uppercase tracking-tight"
-          >
-            Recent blocks
-          </h2>
-          <ul class="mt-2 flex flex-col gap-0 sm:gap-2">
-            {#each recentBlocks as entry (entry.accepted.blockIndex)}
-              <li>
-                <a
-                  href={resolve(
-                    `/season/run/checkpoint?block=${String(entry.accepted.blockIndex)}` as any,
-                  )}
-                  class="flex items-center justify-between gap-3 bg-surface-1 px-4 py-3 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-2 sm:rounded-xl motion-reduce:transition-none"
+              <div class="flex flex-wrap items-baseline justify-between gap-2">
+                <h2
+                  id="free-agency-cta-heading"
+                  class="font-display text-lg font-extrabold uppercase tracking-tight"
                 >
-                  <span class="font-mono text-[10px] font-bold uppercase text-primary">
-                    Block {entry.accepted.blockIndex + 1} of 9
-                  </span>
-                  {#if entry.record !== null}
-                    <span class="font-mono text-xs font-bold">
-                      {recordLabel(entry.record.wins, entry.record.losses)}
-                    </span>
-                  {/if}
-                </a>
-              </li>
-            {/each}
-          </ul>
-        </section>
+                  Free Agency Window {openFreeAgencyWindow.windowIndex + 1}
+                </h2>
+                <span class="font-mono text-[10px] text-muted-foreground">
+                  {openFreeAgencyWindow.candidates.length} candidate
+                  {openFreeAgencyWindow.candidates.length === 1 ? '' : 's'} on the market
+                </span>
+              </div>
+              <p class="text-sm text-muted-foreground">
+                Declare interest in up to two targets — or skip — before the next block can submit.
+                Resolve the market whenever you are ready.
+              </p>
+              <a
+                href={resolve('/season/run/free-agency' as any)}
+                data-fa-hub-cta-link
+                class="inline-flex w-fit items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
+              >
+                Open Free Agency
+                <span aria-hidden="true">&rarr;</span>
+              </a>
+            </section>
+          {/if}
+
+          {#if openWindow !== null}
+            <section
+              class="flex h-full flex-col justify-center rounded-none border border-border bg-surface-1 p-4 sm:rounded-xl sm:p-5"
+            >
+              <h2 class="font-display text-base font-extrabold uppercase tracking-tight">
+                Trade window open
+              </h2>
+              <p class="mt-1 text-sm text-muted-foreground">
+                {tradeOffers.length} offer{tradeOffers.length === 1 ? '' : 's'} waiting.
+              </p>
+              <a
+                href={resolve('/season/run/trades' as any)}
+                class="mt-3 inline-flex w-fit items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+              >
+                Open trades
+              </a>
+            </section>
+          {/if}
+        </div>
+      {/if}
+
+      {#if influenceVm !== null || recentBlocks.length > 0}
+        <div class="grid gap-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-start">
+          <div class="min-w-0">
+            {#if influenceVm !== null}
+              <InfluencePanel
+                balance={influenceVm.balance}
+                cap={influenceVm.cap}
+                floor={influenceVm.floor}
+                atCap={influenceVm.atCap}
+                atFloor={influenceVm.atFloor}
+                entries={influenceVm.recentEntries}
+                affordances={influenceVm.affordances}
+                busy={block.phase === 'running'}
+                playerName={shell.playerName}
+                onSpend={(affordance) =>
+                  shell.spendInfluence({
+                    purpose: affordance.purpose,
+                    windowIndex: affordance.windowIndex ?? undefined,
+                    injuryId: affordance.injuryId ?? undefined,
+                  })}
+              />
+            {/if}
+          </div>
+          <div class="min-w-0">
+            {#if recentBlocks.length > 0}
+              <LeaguePulse entries={leaguePulse} />
+              <section
+                aria-labelledby="recent-recaps-heading"
+                class="mt-6 px-3 sm:px-0 lg:mt-0 lg:px-0"
+              >
+                <h2
+                  id="recent-recaps-heading"
+                  class="font-display text-base font-extrabold uppercase tracking-tight"
+                >
+                  Recent blocks
+                </h2>
+                <ul class="mt-2 flex flex-col gap-0 sm:gap-2">
+                  {#each recentBlocks as entry (entry.accepted.blockIndex)}
+                    <li>
+                      <a
+                        href={resolve(
+                          `/season/run/checkpoint?block=${String(entry.accepted.blockIndex)}` as any,
+                        )}
+                        class="flex items-center justify-between gap-3 bg-surface-1 px-4 py-3 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-2 sm:rounded-xl motion-reduce:transition-none"
+                      >
+                        <span class="font-mono text-[10px] font-bold uppercase text-primary">
+                          Block {entry.accepted.blockIndex + 1} of 9
+                        </span>
+                        {#if entry.record !== null}
+                          <span class="font-mono text-xs font-bold">
+                            {recordLabel(entry.record.wins, entry.record.losses)}
+                          </span>
+                        {/if}
+                      </a>
+                    </li>
+                  {/each}
+                </ul>
+              </section>
+            {/if}
+          </div>
+        </div>
       {/if}
     {/if}
   {:else if inPostseason}
-    <section aria-labelledby="postseason-hub-heading" class="flex min-w-0 flex-col gap-4 px-3 sm:px-0">
+    <section
+      aria-labelledby="postseason-hub-heading"
+      class="flex min-w-0 flex-col gap-4 px-3 sm:px-0"
+    >
       <div class="flex flex-wrap items-end justify-between gap-2">
         <div class="min-w-0">
           <p class="font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-accent">
@@ -1281,29 +1341,38 @@
           Something went wrong scheduling the next game. Refresh to try again.
         </div>
       {:else}
-        <PostseasonMatchupCard
-          series={seriesContext}
-          playInCard={playInContext}
-          franchiseName={shell.franchiseName}
-          franchiseAbbrev={shell.franchiseAbbrev}
-          manifest={shell.manifest}
-          {humanFranchiseId}
-          gameLabel={nextGame?.kind === 'game' && humanPlaysNext ? `Your next game · ${matchupLabel} ${nextGameLine}` : nextGame?.kind === 'game' ? `Next game · ${nextGameLine}` : null}
-          seasonSeriesLabel={playoffSnapshot?.seasonSeries.label ?? null}
-          primaryLabel={nextGame?.kind === 'game' && humanPlaysNext && shell.editor !== null ? playoffPrimaryLabel : null}
-          primaryDisabled={!canSubmitPostseason}
-          primaryBusy={postseasonSubmitting || postseasonBusy}
-          primaryHint={nextGame?.kind === 'game' && humanPlaysNext ? playoffPrimaryHint : null}
-          onPrimary={nextGame?.kind === 'game' && humanPlaysNext ? () => void submitPostseasonRotation() : null}
-        />
-      {/if}
-
-      {#if seriesContext !== null && playoffSnapshot !== null}
-        <PlayoffSnapshot
-          snapshot={playoffSnapshot}
-          {humanFranchiseId}
-          franchiseAbbrev={shell.franchiseAbbrev}
-        />
+        <div class="grid gap-4 lg:grid-cols-[minmax(0,8fr)_minmax(0,5fr)] lg:items-start">
+          <PostseasonMatchupCard
+            series={seriesContext}
+            playInCard={playInContext}
+            franchiseName={shell.franchiseName}
+            franchiseAbbrev={shell.franchiseAbbrev}
+            manifest={shell.manifest}
+            {humanFranchiseId}
+            gameLabel={nextGame?.kind === 'game' && humanPlaysNext
+              ? `Your next game · ${matchupLabel} ${nextGameLine}`
+              : nextGame?.kind === 'game'
+                ? `Next game · ${nextGameLine}`
+                : null}
+            seasonSeriesLabel={playoffSnapshot?.seasonSeries.label ?? null}
+            primaryLabel={nextGame?.kind === 'game' && humanPlaysNext && shell.editor !== null
+              ? playoffPrimaryLabel
+              : null}
+            primaryDisabled={!canSubmitPostseason}
+            primaryBusy={postseasonSubmitting || postseasonBusy}
+            primaryHint={nextGame?.kind === 'game' && humanPlaysNext ? playoffPrimaryHint : null}
+            onPrimary={nextGame?.kind === 'game' && humanPlaysNext
+              ? () => void submitPostseasonRotation()
+              : null}
+          />
+          {#if seriesContext !== null && playoffSnapshot !== null}
+            <PlayoffSnapshot
+              snapshot={playoffSnapshot}
+              {humanFranchiseId}
+              franchiseAbbrev={shell.franchiseAbbrev}
+            />
+          {/if}
+        </div>
       {/if}
 
       {#if nextGame?.kind === 'game' && nextTeams !== null && humanPlaysNext && shell.editor !== null}
@@ -1332,7 +1401,9 @@
           balance={run?.influence.balances[humanFranchiseId ?? ''] ?? 0}
           submitting={postseasonSubmitting}
           canSubmit={canSubmitPostseason}
+          canForfeit={canForfeitPostseason}
           onSubmit={() => void submitPostseasonRotation()}
+          onForfeit={() => void forfeitPostseasonGame()}
         />
       {:else if nextGame?.kind === 'game' && nextTeams !== null && eliminated}
         <section
@@ -1417,19 +1488,21 @@
         <p class="text-sm text-muted-foreground">Season complete — see the champion above.</p>
       {/if}
 
-      <PostseasonProgress
-        progress={shell.postseason}
-        label="Postseason"
-        franchiseAbbrev={shell.franchiseAbbrev}
-        {humanFranchiseId}
-        manifest={shell.manifest}
-        onCancel={() => shell.cancelPostseason()}
-        onRetry={() => retryPostseason()}
-      />
+      <div class="grid gap-4 lg:grid-cols-2 lg:items-start">
+        <PostseasonProgress
+          progress={shell.postseason}
+          label="Postseason"
+          franchiseAbbrev={shell.franchiseAbbrev}
+          {humanFranchiseId}
+          manifest={shell.manifest}
+          onCancel={() => shell.cancelPostseason()}
+          onRetry={() => retryPostseason()}
+        />
 
-      {#if availabilityRows.length > 0}
-        <HealthStrip rows={availabilityRows} title="Playoff health" />
-      {/if}
+        {#if availabilityRows.length > 0}
+          <HealthStrip rows={availabilityRows} title="Playoff health" />
+        {/if}
+      </div>
     </section>
   {:else if stage === 'completed'}
     <section aria-labelledby="completed-hub-heading" class="px-3 sm:px-0">

@@ -1369,6 +1369,7 @@ export interface SeasonPostseasonGameSimulationInput {
   profile: EraSimulationProfile;
   gameId: string;
   humanFranchiseId: string | null;
+  forfeitHumanGame?: boolean;
 }
 export function simulateSeasonPostseasonGame(
   input: SeasonPostseasonGameSimulationInput,
@@ -1420,6 +1421,56 @@ export function simulateSeasonPostseasonGame(
     phase === 'play-in' ? SEASON_SEED_NAMESPACES.playInGames : SEASON_SEED_NAMESPACES.playoffGames,
     gameId,
   );
+  if (
+    input.forfeitHumanGame === true &&
+    humanFranchiseId !== null &&
+    (homeId === humanFranchiseId || awayId === humanFranchiseId)
+  ) {
+    const humanIsHome = homeId === humanFranchiseId;
+    const winnerFranchiseId = humanIsHome ? awayId : homeId;
+    const result: SeasonGameSimulationResult = {
+      schemaVersion: 1,
+      outcome: 'forfeit',
+      seed,
+      gameNumber: seasonPostseasonGameOrdinal(gameId),
+      dataVersion: catalog.dataVersion,
+      engineVersion: createEngineContext().engineVersion,
+      profileVersion: profile.profileVersion,
+      winner: humanIsHome ? 'away' : 'home',
+      losingFranchiseId: franchiseIdSchema.parse(humanFranchiseId),
+      trigger: 'human-interruption-forfeit',
+      homeScore: (humanIsHome ? 0 : 2) as 0 | 2,
+      awayScore: (humanIsHome ? 2 : 0) as 0 | 2,
+    };
+    const factsOf = roundFactsOf(run.postseason, run.league, gameId);
+    const summary = seasonPostseasonSummaryFromGame({
+      runId: run.runId,
+      gameId,
+      phase,
+      round: factsOf.round,
+      seriesId: factsOf.seriesId,
+      gameNumber: factsOf.gameNumber,
+      conference: factsOf.conference,
+      homeFranchiseId: homeId,
+      awayFranchiseId: awayId,
+      result,
+      injuryEvents: [],
+    });
+    return {
+      kind: 'simulated',
+      facts: {
+        gameId,
+        status: 'forfeit',
+        winnerFranchiseId,
+        loserFranchiseId: franchiseIdSchema.parse(humanFranchiseId),
+        homeScore: null,
+        awayScore: null,
+      },
+      summary,
+      nextHealth: run.health,
+      nextEffects: effects,
+    };
+  }
   const positions = new Map<string, readonly Position[]>();
   const targetMinutes = new Map<string, number>();
   for (const player of [...allHomePlayers, ...allAwayPlayers]) {

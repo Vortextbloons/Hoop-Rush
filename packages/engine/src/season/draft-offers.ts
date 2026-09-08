@@ -8,13 +8,14 @@ import {
   type SeasonDraftOfferCard,
   type SeasonDraftState,
 } from '@hoop-rush/data-contracts';
-import { createRng } from '../sim/rng.ts';
+import { createRng, type Rng } from '../sim/rng.ts';
 import {
-  chooseFloorCandidate,
-  chooseStarCandidate,
+  floorTierWeight,
   isFloorCandidate,
   isStarCandidate,
+  starTierWeight,
   scriptKindFor,
+  type DraftScriptKind,
 } from './draft-script.ts';
 import {
   SEASON_ROSTER_SIZE,
@@ -143,12 +144,36 @@ export type SeasonOfferDrawResult =
       status: 'too-few-safe';
       safeCount: number;
     };
+
+function drawOfferCandidate(
+  pool: readonly SeasonDraftCandidate[],
+  rng: Rng,
+  scriptKind: DraftScriptKind | null,
+): SeasonDraftCandidate {
+  if (scriptKind === null) return rng.pick(pool);
+  const weights = pool.map((candidate) =>
+    scriptKind === 'star'
+      ? starTierWeight(candidate.summaryRatings.overallRating)
+      : floorTierWeight(candidate.summaryRatings.overallRating),
+  );
+  return rng.weightedPick(pool, weights);
+}
+
 export function drawGlobalOffer(
   state: SeasonDraftState,
   catalog: SeasonDraftCatalog,
   participantId: string,
 ): SeasonOfferDrawResult {
-  const candidates = remainingCandidates(state, catalog);
+  const allCandidates = remainingCandidates(state, catalog);
+  const round = state.round;
+  const pickOrdinal = state.picks.filter((pick) => pick.participantId === participantId).length + 1;
+  const scriptKind = scriptKindFor(state.rootSeed, round);
+  const candidates =
+    scriptKind === 'star'
+      ? allCandidates.filter(isStarCandidate)
+      : scriptKind === 'floor'
+        ? allCandidates.filter(isFloorCandidate)
+        : allCandidates;
   if (candidates.length < SEASON_DRAFT_OFFER_SIZE) {
     return { status: 'too-few-candidates', remainingCount: candidates.length };
   }
@@ -170,8 +195,6 @@ export function drawGlobalOffer(
   if (safeCandidates.length < SEASON_DRAFT_SAFE_MINIMUM) {
     return { status: 'too-few-safe', safeCount: safeCandidates.length };
   }
-  const round = state.round;
-  const pickOrdinal = state.picks.filter((pick) => pick.participantId === participantId).length + 1;
   const seedPath = offerSeedPath(participantId, round, pickOrdinal);
   const offerSeed = seasonNamespaceSeed(
     state.rootSeed,
@@ -185,7 +208,7 @@ export function drawGlobalOffer(
   const safeRng = createRng(seasonNamespaceSeed(offerSeed, OFFER_SAFE_ORDER_KEY));
   const safeSelected: SeasonDraftCandidate[] = [];
   for (let i = 0; i < SEASON_DRAFT_SAFE_MINIMUM; i += 1) {
-    const picked = safeRng.pick(safePool);
+    const picked = drawOfferCandidate(safePool, safeRng, scriptKind);
     safePool.splice(safePool.indexOf(picked), 1);
     safeSelected.push(picked);
   }
@@ -194,36 +217,9 @@ export function drawGlobalOffer(
   const sampleRng = createRng(seasonNamespaceSeed(offerSeed, OFFER_SAMPLE_ORDER_KEY));
   const sampled: SeasonDraftCandidate[] = [];
   for (let i = 0; i < SEASON_DRAFT_OFFER_SIZE - SEASON_DRAFT_SAFE_MINIMUM; i += 1) {
-    const picked = sampleRng.pick(samplePool);
+    const picked = drawOfferCandidate(samplePool, sampleRng, scriptKind);
     samplePool.splice(samplePool.indexOf(picked), 1);
     sampled.push(picked);
-  }
-  const scriptKind = scriptKindFor(state.rootSeed, participantId, pickOrdinal);
-  if (scriptKind !== null) {
-    const tierPresent = [...safeSelected, ...sampled].some((candidate) =>
-      scriptKind === 'star' ? isStarCandidate(candidate) : isFloorCandidate(candidate),
-    );
-    if (!tierPresent) {
-      const offeredIds = new Set(
-        [...safeSelected, ...sampled].map((candidate) => candidate.playerVersionId),
-      );
-      const eligible = candidates.filter((candidate) => {
-        if (offeredIds.has(candidate.playerVersionId)) return false;
-        if (scriptKind === 'star' ? !isStarCandidate(candidate) : !isFloorCandidate(candidate)) {
-          return false;
-        }
-        return selectionKeepsFeasibility(state, catalog, participantId, candidate);
-      });
-      if (eligible.length > 0) {
-        const scriptSeed = seasonNamespaceSeed(offerSeed, 'script-pick');
-        const injected =
-          scriptKind === 'star'
-            ? chooseStarCandidate(eligible, scriptSeed)
-            : chooseFloorCandidate(eligible, scriptSeed);
-        const replaceIndex = sampled.length - 1;
-        if (replaceIndex >= 0) sampled[replaceIndex] = injected;
-      }
-    }
   }
   const cardOf = (candidate: SeasonDraftCandidate): SeasonDraftOfferCard => {
     const selectable = selectionKeepsFeasibility(state, catalog, participantId, candidate);

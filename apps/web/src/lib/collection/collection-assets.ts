@@ -1,9 +1,11 @@
 import {
+  collectionGameRulesSchema,
   loadCollectionCatalog as loadPackagedCatalog,
   loadCollectionIndex as loadPackagedIndex,
   parseCollectionCatalog,
   parseCollectionIndex,
   type CollectionCatalog,
+  type CollectionGameRules,
   type CollectionIndex,
 } from '@hoop-rush/data-contracts';
 import { getManifest } from '$lib/data';
@@ -33,5 +35,22 @@ export function loadCollectionCatalog(): Promise<CollectionCatalog> {
     const catalog = await loadPackagedCatalog(resolveAssetUrl(entry.url), entry.contentHash);
     void writeCachedAsset(entry.contentHash, catalog);
     return catalog;
+  });
+}
+
+export function loadCollectionGameRules(): Promise<CollectionGameRules> {
+  return memoized('collection/game-rules', async () => {
+    const manifest = await getManifest();
+    const entry = manifest.collection?.gameRules;
+    if (!entry) throw new Error('The collection game rules are unavailable.');
+    const parseGameRules = (value: unknown): CollectionGameRules =>
+      collectionGameRulesSchema.parse(value);
+    const cached = await readCachedAsset(entry.contentHash, parseGameRules);
+    if (cached !== null) return cached;
+    const response = await fetch(resolveAssetUrl(entry.url));
+    if (!response.ok) throw new Error('The collection game rules are unavailable.');
+    const rules = collectionGameRulesSchema.parse(await response.json());
+    void writeCachedAsset(entry.contentHash, rules);
+    return rules;
   });
 }

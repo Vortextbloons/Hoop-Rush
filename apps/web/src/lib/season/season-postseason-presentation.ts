@@ -41,6 +41,7 @@ export function idlePostseasonProgress(): HubPostseasonProgress {
 export interface SeasonPostseasonHubMethods {
   startPostseason(): Promise<void>;
   advancePostseason(input?: { targetGameId?: string }): Promise<void>;
+  forfeitPostseasonGame(input: { targetGameId: string }): Promise<void>;
   submitPostseasonRotation(input: {
     targetGameId: string;
     rotation: SeasonPostseasonRotationPayload;

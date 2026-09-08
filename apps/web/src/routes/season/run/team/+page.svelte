@@ -465,88 +465,94 @@
 
       <UnitChemistry {roster} {effects} {shell} />
 
-      <AutoRotationPanel
-        bind:this={autoPanel}
-        editor={shell.editor}
-        disabled={shell.block.phase === 'running'}
-        rosterIds={autoRosterIds}
-        unavailable={autoUnavailable}
-        load={autoLoad}
-        overall={autoOverall}
-        horizon={autoHorizon}
-        seed={autoSeed}
-        runId={shell.snapshot?.run.runId ?? null}
-        blockIndex={shell.nextBlockIndex}
-        names={autoNames}
-        onAutoApplied={() => {
-          if (!mounted) return;
-          rotationRevision += 1;
-        }}
-      />
+      <div class="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,8fr)_minmax(0,5fr)] lg:items-start">
+        <div class="min-w-0">
+          <RotationEditor
+            editor={shell.editor}
+            disabled={shell.block.phase === 'running'}
+            faces={shell.facesByVersion}
+            {manifest}
+            {effects}
+            {summaries}
+            {overallByVersion}
+            {gearPointsByVersion}
+            {overallDeltaByVersion}
+            presetLoad={autoLoad}
+            presetHorizon={autoHorizon}
+            onpending={(pending) => {
+              swapPending = pending;
+            }}
+            onchange={() => {
+              if (!mounted) return;
+              rotationRevision += 1;
+              autoPanel?.notifyManualEdit();
+            }}
+            onSelectPlayer={(playerVersionId: string) => {
+              selectedPlayerId = playerVersionId;
+            }}
+          />
 
-      <RotationEditor
-        editor={shell.editor}
-        disabled={shell.block.phase === 'running'}
-        faces={shell.facesByVersion}
-        {manifest}
-        {effects}
-        {summaries}
-        {overallByVersion}
-        {gearPointsByVersion}
-        {overallDeltaByVersion}
-        presetLoad={autoLoad}
-        presetHorizon={autoHorizon}
-        onpending={(pending) => {
-          swapPending = pending;
-        }}
-        onchange={() => {
-          if (!mounted) return;
-          rotationRevision += 1;
-          autoPanel?.notifyManualEdit();
-        }}
-        onSelectPlayer={(playerVersionId) => {
-          selectedPlayerId = playerVersionId;
-        }}
-      />
+          {#if statsView !== null}
+            <div class="mt-6">
+              <TeamRosterPanel
+                {roster}
+                {manifest}
+                {shell}
+                {roleOf}
+                {effects}
+                {summaries}
+                {statsView}
+                sponsorsRun={run}
+                onSelectPlayer={(playerVersionId: string) => {
+                  selectedPlayerId = playerVersionId;
+                }}
+              />
+            </div>
+          {/if}
 
-      {#if statsView !== null}
-        <TeamRosterPanel
-          {roster}
-          {manifest}
-          {shell}
-          {roleOf}
-          {effects}
-          {summaries}
-          {statsView}
-          sponsorsRun={run}
-          onSelectPlayer={(playerVersionId) => {
-            selectedPlayerId = playerVersionId;
-          }}
-        />
-      {/if}
-
-      {#if statsView !== null}
-        <details class="rounded-none bg-surface-1 px-3 py-2 sm:rounded-xl">
-          <summary
-            class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden"
-          >
-            <span
-              id="team-season-stats-heading"
-              class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-            >
-              Season stats
-            </span>
-            <span class="text-xs font-semibold text-primary">View stats</span>
-          </summary>
-          <div class="pb-2">
-            <SeasonPlayerStats view={statsView} {manifest} {shell} embedded />
-          </div>
-        </details>
-      {/if}
-
-      {#if injuryTimeline.length > 0}
-        <InjuryTimeline players={injuryTimeline} />
-      {/if}
+          {#if statsView !== null}
+            <details class="mt-6 rounded-none bg-surface-1 px-3 py-2 sm:rounded-xl">
+              <summary
+                class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden"
+              >
+                <span
+                  id="team-season-stats-heading"
+                  class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
+                >
+                  Season stats
+                </span>
+                <span class="text-xs font-semibold text-primary">View stats</span>
+              </summary>
+              <div class="pb-2">
+                <SeasonPlayerStats view={statsView} {manifest} {shell} embedded />
+              </div>
+            </details>
+          {/if}
+        </div>
+        <aside class="flex min-w-0 flex-col gap-6 lg:sticky lg:top-16">
+          <AutoRotationPanel
+            bind:this={autoPanel}
+            editor={shell.editor}
+            disabled={shell.block.phase === 'running'}
+            rosterIds={autoRosterIds}
+            unavailable={autoUnavailable}
+            load={autoLoad}
+            overall={autoOverall}
+            horizon={autoHorizon}
+            seed={autoSeed}
+            runId={shell.snapshot?.run.runId ?? null}
+            blockIndex={shell.nextBlockIndex}
+            names={autoNames}
+            onAutoApplied={() => {
+              if (!mounted) return;
+              rotationRevision += 1;
+            }}
+          />
+          {#if injuryTimeline.length > 0}
+            <InjuryTimeline players={injuryTimeline} />
+          {/if}
+        </aside>
+      </div>
       {#if manifest !== null}
         <PlayerSponsorCard
           card={sponsorCard}

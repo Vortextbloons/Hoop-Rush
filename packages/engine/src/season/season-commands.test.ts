@@ -1839,6 +1839,56 @@ describe('advance-postseason command', () => {
     ]);
     expect(result.aiNextGameId).toBeNull();
   });
+  it('allows an injured human team to forfeit the next postseason game without Influence', () => {
+    const context = postseasonFixture({ resolver: forcedPostseasonResolver(humanWinsEveryGame) });
+    const start = handleSeasonRunCommand(
+      commandOf(context.run, {
+        command: 'start-postseason',
+        commandId: commandIdSchema.parse('start-forfeit'),
+      }),
+      context,
+    );
+    if (start.result.result.status !== 'accepted') throw new Error('expected acceptance');
+    const humanRoster = start.run.rosters.find((roster) => roster.franchiseId === HUMAN);
+    if (humanRoster === undefined) throw new Error('no human roster');
+    const injuries = humanRoster.players.slice(0, 2).map((player, index) => ({
+      injuryId: `inj-${'8'.repeat(31)}${String(index)}`,
+      playerVersionId: player.playerVersionId,
+      franchiseId: HUMAN,
+      gameId: seasonGameIdSchema.parse('s000001'),
+      type: 'lower-body' as const,
+      severity: 'season-ending' as const,
+      occurredBeforeHalftime: true,
+      sameGameReturn: false,
+      sameGameReturned: null,
+      missedGamesTotal: 999,
+      missedGamesRemaining: 999,
+      actualReturnRound: null,
+      seasonEnding: true,
+      rehabModifier: 0 as const,
+      recurrenceWindowRoundsRemaining: 0,
+      seedPath: ['injuries', 'forfeit', player.playerVersionId, 'occurrence'],
+    }));
+    const injured = { ...start.run, health: { ...start.run.health, injuries } };
+    const output = handleSeasonRunCommand(
+      commandOf(injured, {
+        command: 'advance-postseason',
+        commandId: commandIdSchema.parse('forfeit-1'),
+        forfeit: true,
+      }),
+      { ...context, run: injured },
+    );
+    const outputResult = output.result;
+    if (outputResult.command !== 'advance-postseason') throw new Error('unexpected command');
+    const result = outputResult.result;
+    if (result.status !== 'accepted') throw new Error('expected acceptance');
+    const summary = output.postseasonSummaries?.at(-1);
+    expect(summary?.status).toBe('forfeit');
+    expect(summary?.forfeitLoserFranchiseId).toBe(HUMAN);
+    expect([summary?.homeScore, summary?.awayScore].sort()).toEqual([0, 2]);
+    expect(output.run.influence).toEqual(injured.influence);
+    expectSchemaValidRun(output.run);
+  });
   it('rejects wrong-game targets, invalid stages, and stale states', () => {
     const context = postseasonFixture();
     const start = handleSeasonRunCommand(

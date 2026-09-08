@@ -15,6 +15,7 @@
   import AsyncState from '$lib/components/AsyncState.svelte';
   import CollectionCard from '$lib/collection/CollectionCard.svelte';
   import CardDialog from '$lib/collection/CardDialog.svelte';
+  import CollectionNav from '$lib/collection/CollectionNav.svelte';
   import { loadCollectionCatalog, loadCollectionIndex } from '$lib/collection/collection-assets.ts';
   import {
     buildBookItems,
@@ -202,7 +203,13 @@
 <div class="ultimate-root mx-auto w-full max-w-6xl px-3 py-6 sm:px-6">
   <div class="flex flex-wrap items-end justify-between gap-3">
     <div class="flex items-center gap-3">
-      <img src={asset('/ultimate/logo.png')} alt="Ultimate Run" class="h-11 w-11 rounded-lg" width="44" height="44" />
+      <img
+        src={asset('/ultimate/logo.png')}
+        alt="Ultimate Run"
+        class="h-11 w-11 rounded-lg"
+        width="44"
+        height="44"
+      />
       <div>
         <p class="ultimate-eyebrow">Ultimate Run</p>
         <h1 class="font-display text-3xl font-extrabold tracking-tight">Collection</h1>
@@ -211,18 +218,13 @@
         </p>
       </div>
     </div>
-    <div class="flex items-center gap-4 text-sm" aria-live="off">
+    <div class="flex flex-wrap items-center gap-2 text-sm" aria-live="off">
       <span><strong class="tabular-nums">{collectionState?.balances.Coins ?? 0}</strong> Coins</span
       >
       <span
         ><strong class="tabular-nums">{collectionState?.balances.Exchange ?? 0}</strong> Exchange</span
       >
-      <a
-        href={resolve('/collection/packs')}
-        class="rounded-xl bg-accent px-4 py-2 font-bold text-accent-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        Packs
-      </a>
+      <CollectionNav current="collection" />
     </div>
   </div>
 

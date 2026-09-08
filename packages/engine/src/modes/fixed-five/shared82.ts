@@ -54,9 +54,6 @@ function opponentById(bracket: OpponentBracket, opponentId: string): BracketOppo
   if (!opponent) throw new Error(`unknown opponent ${opponentId}`);
   return opponent;
 }
-export function displayHomeForH2hIndex(index: number): 'p1' | 'p2' {
-  return index % 2 === 0 ? 'p1' : 'p2';
-}
 export function simulateShared82(
   input: Shared82SimulationInput,
   context: EngineContext,

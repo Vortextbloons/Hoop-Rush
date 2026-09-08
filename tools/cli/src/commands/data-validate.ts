@@ -17,7 +17,13 @@ import {
   COLLECTION_ECONOMY_VERSION,
   COLLECTION_OVERLAY_VERSION,
   COLLECTION_PACK_RULES_VERSION,
+  COLLECTION_GAME_RULES_VERSION,
+  COLLECTION_GAME_VERSION,
+  COLLECTION_TEAM_VERSION,
+  COLLECTION_REWARD_VERSION,
+  COLLECTION_GAME_REPLAY_VERSION,
   collectionCatalogSchema,
+  collectionGameRulesSchema,
   collectionIndexSchema,
   seasonFreeAgencyIndexSchema,
   seasonGameTargetsSchema,
@@ -935,6 +941,116 @@ async function auditCollectionCatalog(
   );
   return { ok: failures.length === 0, details, failures };
 }
+async function auditCollectionGameRules(
+  manifest: HoopRushManifest,
+  manifestDir: string,
+  verbose: boolean,
+): Promise<AuditResult> {
+  const failures: string[] = [];
+  const details: string[] = [];
+  const entry = manifest.collection;
+  if (entry === undefined) {
+    details.push('collection-game-rules: none packaged');
+    return { ok: true, details, failures };
+  }
+  const ref = entry.gameRules;
+  if (ref === undefined) {
+    failures.push('collection-game-rules: manifest collection is missing the gameRules entry');
+    return { ok: false, details, failures };
+  }
+  const assetPath = isAbsolute(ref.url) ? ref.url : resolve(manifestDir, ref.url);
+  let content: Buffer;
+  try {
+    const info = await stat(assetPath);
+    if (!info.isFile()) {
+      failures.push(`collection-game-rules: asset is not a file (${assetPath})`);
+      return { ok: false, details, failures };
+    }
+    content = await readFile(assetPath);
+  } catch {
+    failures.push(`collection-game-rules: asset missing (${assetPath})`);
+    return { ok: false, details, failures };
+  }
+  const actualHash = sha256Hex(content);
+  if (actualHash !== ref.contentHash) {
+    failures.push(`collection-game-rules: content hash mismatch (${assetPath})`);
+  } else if (verbose) {
+    details.push(`collection-game-rules: hash verified (${assetPath})`);
+  }
+  let raw: unknown;
+  try {
+    raw = JSON.parse(content.toString('utf8')) as unknown;
+  } catch {
+    failures.push('collection-game-rules: artifact is not valid JSON');
+    return { ok: false, details, failures };
+  }
+  const parsed = collectionGameRulesSchema.safeParse(raw);
+  if (!parsed.success) {
+    failures.push(
+      `collection-game-rules: schema failure: ${parsed.error.issues[0]?.path.join('.') ?? '(root)'} ${parsed.error.issues[0]?.message ?? 'unknown'}`,
+    );
+    return { ok: false, details, failures };
+  }
+  const rules = parsed.data;
+  const rulesVersion: string = rules.rulesVersion;
+  if (rulesVersion !== COLLECTION_GAME_RULES_VERSION) {
+    failures.push(`collection-game-rules: rulesVersion ${rulesVersion} unexpected`);
+  }
+  const gameVersion: string = rules.gameVersion;
+  if (gameVersion !== COLLECTION_GAME_VERSION) {
+    failures.push(`collection-game-rules: gameVersion ${gameVersion} unexpected`);
+  }
+  const teamVersion: string = rules.teamVersion;
+  if (teamVersion !== COLLECTION_TEAM_VERSION) {
+    failures.push(`collection-game-rules: teamVersion ${teamVersion} unexpected`);
+  }
+  const rewardVersion: string = rules.rewardVersion;
+  if (rewardVersion !== COLLECTION_REWARD_VERSION) {
+    failures.push(`collection-game-rules: rewardVersion ${rewardVersion} unexpected`);
+  }
+  const replayVersion: string = rules.replayVersion;
+  if (replayVersion !== COLLECTION_GAME_REPLAY_VERSION) {
+    failures.push(`collection-game-rules: replayVersion ${replayVersion} unexpected`);
+  }
+  const cpuRosterSize: number = rules.cpuRosterSize;
+  if (cpuRosterSize !== 12) {
+    failures.push(`collection-game-rules: cpuRosterSize ${String(cpuRosterSize)} != 12`);
+  }
+  const eligibleScope: string = rules.eligibleScope;
+  if (eligibleScope !== 'full-catalog') {
+    failures.push('collection-game-rules: eligibleScope must be full-catalog');
+  }
+  const expectedWeights: Record<string, number> = {
+    Ember: 70,
+    Eruption: 23,
+    Apex: 5,
+    Titan: 1.7,
+    Eclipse: 0.29,
+    Immortal: 0.01,
+  };
+  for (const [rarity, weight] of Object.entries(expectedWeights)) {
+    if (rules.cpuRarityWeights[rarity as keyof typeof rules.cpuRarityWeights] !== weight) {
+      failures.push(`collection-game-rules: cpu weight ${rarity} != ${String(weight)}`);
+    }
+  }
+  const environmentEraId: string = rules.environmentEraId;
+  if (environmentEraId !== '2020s') {
+    failures.push(`collection-game-rules: environmentEraId ${environmentEraId} != 2020s`);
+  }
+  const homeCourtPolicy: string = rules.homeCourtPolicy;
+  if (homeCourtPolicy !== 'neutral-home-court') {
+    failures.push('collection-game-rules: homeCourtPolicy must be neutral-home-court');
+  }
+  const winRewardCoins: number = rules.winRewardCoins;
+  const lossRewardCoins: number = rules.lossRewardCoins;
+  if (winRewardCoins !== 100 || lossRewardCoins !== 10) {
+    failures.push('collection-game-rules: rewards must be win 100 / loss 10 Coins');
+  }
+  details.push(
+    `collection-game-rules: ${rules.rulesVersion} · CPU 12 full-catalog · 2020s neutral-home · win ${String(rules.winRewardCoins)} / loss ${String(rules.lossRewardCoins)} · ${String(content.length)} bytes`,
+  );
+  return { ok: failures.length === 0, details, failures };
+}
 async function auditSeasonGameTargets(manifestDir: string, verbose: boolean): Promise<AuditResult> {
   const failures: string[] = [];
   const details: string[] = [];
@@ -1113,6 +1229,7 @@ export async function dataValidate(inputPath: string, verbose: boolean): Promise
     await auditSponsorGear(manifest, manifestDir, verbose),
     await auditSeasonGameTargets(manifestDir, verbose),
     await auditCollectionCatalog(manifest, manifestDir, verbose),
+    await auditCollectionGameRules(manifest, manifestDir, verbose),
     auditAssets(manifest),
   ];
   const details = [`dataVersion ${manifest.dataVersion}`, ...audits.flatMap((a) => a.details)];

@@ -81,183 +81,187 @@
   });
 </script>
 
-{#each conferences as section (section.title)}
-  <section aria-labelledby={`standings-${section.title.toLowerCase()}-heading`}>
-    <h3
-      id={`standings-${section.title.toLowerCase()}-heading`}
-      class="font-display px-3 text-sm font-extrabold uppercase tracking-tight sm:px-0"
-    >
-      {section.title} · {authoritative ? 'official' : 'provisional'}
-    </h3>
+<div class="grid gap-8 lg:grid-cols-2 lg:items-start">
+  {#each conferences as section (section.title)}
+    <section aria-labelledby={`standings-${section.title.toLowerCase()}-heading`} class="min-w-0">
+      <h3
+        id={`standings-${section.title.toLowerCase()}-heading`}
+        class="font-display px-3 text-sm font-extrabold uppercase tracking-tight sm:px-0"
+      >
+        {section.title} · {authoritative ? 'official' : 'provisional'}
+      </h3>
 
-    {#if desktopViewport !== true}
-      <ul class="mt-2 flex flex-col gap-0 md:hidden md:gap-2">
-        {#each section.entries as entry (entry.row.franchiseId)}
-          {@const row = entry.row}
-          {@const isHuman = row.franchiseId === humanFranchiseId}
-          {@const streak = streakOf(row.franchiseId)}
-          {@const identity = identityOf(row.franchiseId)}
-          <li
-            data-season-standings-row
-            aria-label={isHuman ? `${franchiseName(row.franchiseId)} (your team)` : undefined}
-            class="overflow-hidden bg-surface-1 sm:rounded-xl {isHuman
-              ? 'ring-1 ring-primary/40'
-              : ''}"
-          >
-            <a
-              href={resolve(`/season/run/teams?franchiseId=${row.franchiseId}` as any)}
-              data-season-standings-link={row.franchiseId}
-              aria-label={`${franchiseName(row.franchiseId)} roster`}
-              class="grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-x-2 px-3 py-3 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-2 sm:gap-x-3 sm:px-4 motion-reduce:transition-none"
+      {#if desktopViewport !== true}
+        <ul class="mt-2 flex flex-col gap-0 md:hidden md:gap-2">
+          {#each section.entries as entry (entry.row.franchiseId)}
+            {@const row = entry.row}
+            {@const isHuman = row.franchiseId === humanFranchiseId}
+            {@const streak = streakOf(row.franchiseId)}
+            {@const identity = identityOf(row.franchiseId)}
+            <li
+              data-season-standings-row
+              aria-label={isHuman ? `${franchiseName(row.franchiseId)} (your team)` : undefined}
+              class="overflow-hidden bg-surface-1 sm:rounded-xl {isHuman
+                ? 'ring-1 ring-primary/40'
+                : ''}"
             >
-              <span class="w-7 shrink-0 font-mono text-[10px] font-bold text-muted-foreground">
-                {ordinal(entry.rank)}
-              </span>
-              {#if manifest && identity}
-                <SeasonTeamLogo
-                  {manifest}
-                  franchiseId={identity.franchiseId}
-                  teamExternalId={identity.teamExternalId}
-                  alt=""
-                  size="sm"
-                />
-              {:else}
-                <span class="h-7 w-7 shrink-0" aria-hidden="true"></span>
-              {/if}
-              <span class="min-w-0 truncate font-semibold">
-                {franchiseName(row.franchiseId)}
-                {#if isHuman}<span class="text-primary" aria-label="your team">*</span>{/if}
-              </span>
-              <span class="shrink-0 text-right tabular-nums">
-                <span class="block font-mono text-xs font-bold">
-                  {recordLabel(row.wins, row.losses)}
-                </span>
-                <span class="block font-mono text-[10px] text-muted-foreground">
-                  {diffText(row.pointsFor, row.pointsAgainst)}
-                </span>
-              </span>
-            </a>
-            <details class="group border-t border-border/50">
-              <summary
-                class="cursor-pointer px-4 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden"
+              <a
+                href={resolve(`/season/run/teams?franchiseId=${row.franchiseId}` as any)}
+                data-season-standings-link={row.franchiseId}
+                aria-label={`${franchiseName(row.franchiseId)} roster`}
+                class="grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-x-2 px-3 py-3 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-2 sm:gap-x-3 sm:px-4 motion-reduce:transition-none"
               >
-                Splits
-              </summary>
-              <dl class="grid grid-cols-2 gap-x-4 gap-y-1 px-4 pb-3 text-sm">
-                <div class="flex items-center justify-between gap-2">
-                  <dt class="font-mono text-[10px] text-muted-foreground">Home</dt>
-                  <dd class="font-mono text-[10px]">{row.homeWins}–{row.homeLosses}</dd>
-                </div>
-                <div class="flex items-center justify-between gap-2">
-                  <dt class="font-mono text-[10px] text-muted-foreground">Away</dt>
-                  <dd class="font-mono text-[10px]">{row.awayWins}–{row.awayLosses}</dd>
-                </div>
-                <div class="flex items-center justify-between gap-2">
-                  <dt class="font-mono text-[10px] text-muted-foreground">Conference</dt>
-                  <dd class="font-mono text-[10px]">{row.conferenceWins}–{row.conferenceLosses}</dd>
-                </div>
-                <div class="flex items-center justify-between gap-2">
-                  <dt class="font-mono text-[10px] text-muted-foreground">Division</dt>
-                  <dd class="font-mono text-[10px]">{row.divisionWins}–{row.divisionLosses}</dd>
-                </div>
-                <div class="flex items-center justify-between gap-2">
-                  <dt class="font-mono text-[10px] text-muted-foreground">Streak</dt>
-                  <dd class="font-mono text-[10px] font-bold">
-                    {streak ? streakLabel(streak.kind, streak.length) : '—'}
-                  </dd>
-                </div>
-              </dl>
-            </details>
-          </li>
-        {/each}
-      </ul>
-    {/if}
-
-    {#if desktopViewport !== false}
-      <div class="mt-2 hidden overflow-x-auto rounded-xl bg-surface-1 md:block">
-        <table class="w-full min-w-[42rem] text-sm">
-          <caption class="sr-only">
-            {section.title} conference standings — {authoritative
-              ? 'official NBA tiebreak'
-              : 'provisional'} ordering
-          </caption>
-          <thead>
-            <tr
-              class="border-b border-border/70 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground"
-            >
-              <th scope="col" class="px-3 py-2 text-left font-medium">#</th>
-              <th scope="col" class="px-3 py-2 text-left font-medium">Team</th>
-              <th scope="col" class="px-3 py-2 text-right font-medium">W</th>
-              <th scope="col" class="px-3 py-2 text-right font-medium">L</th>
-              <th scope="col" class="px-3 py-2 text-right font-medium">Pct</th>
-              <th scope="col" class="px-3 py-2 text-right font-medium">Diff</th>
-              <th scope="col" class="px-3 py-2 text-right font-medium">Conf</th>
-              <th scope="col" class="px-3 py-2 text-right font-medium">Div</th>
-              <th scope="col" class="px-3 py-2 text-right font-medium">Streak</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each section.entries as entry (entry.row.franchiseId)}
-              {@const row = entry.row}
-              {@const isHuman = row.franchiseId === humanFranchiseId}
-              {@const streak = streakOf(row.franchiseId)}
-              {@const identity = identityOf(row.franchiseId)}
-              <tr
-                data-season-standings-row
-                class="border-b border-border/50 transition-colors hover:bg-surface-2/60 {isHuman
-                  ? 'bg-primary/10'
-                  : ''}"
-                aria-label={isHuman ? `${franchiseName(row.franchiseId)} (your team)` : undefined}
-              >
-                <td class="px-3 py-2 font-mono text-[10px] text-muted-foreground">
+                <span class="w-7 shrink-0 font-mono text-[10px] font-bold text-muted-foreground">
                   {ordinal(entry.rank)}
-                </td>
-                <th scope="row" class="max-w-44 truncate px-3 py-2 text-left font-semibold">
-                  <a
-                    href={resolve(`/season/run/teams?franchiseId=${row.franchiseId}` as any)}
-                    data-season-standings-link={row.franchiseId}
-                    aria-label={`${franchiseName(row.franchiseId)} roster`}
-                    class="flex items-center gap-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:text-primary motion-reduce:transition-none"
-                  >
-                    {#if manifest && identity}
-                      <SeasonTeamLogo
-                        {manifest}
-                        franchiseId={identity.franchiseId}
-                        teamExternalId={identity.teamExternalId}
-                        alt=""
-                        size="sm"
-                      />
-                    {/if}
-                    <span class="min-w-0 truncate">
-                      {franchiseName(row.franchiseId)}
-                      {#if isHuman}<span class="text-primary" aria-label="your team">*</span>{/if}
-                    </span>
-                  </a>
-                </th>
-                <td class="px-3 py-2 text-right font-bold">{row.wins}</td>
-                <td class="px-3 py-2 text-right">{row.losses}</td>
-                <td class="px-3 py-2 text-right font-mono text-[10px]">
-                  {pctText(row.wins, row.losses)}
-                </td>
-                <td class="px-3 py-2 text-right font-mono text-[10px]">
-                  {diffText(row.pointsFor, row.pointsAgainst)}
-                </td>
-                <td class="px-3 py-2 text-right font-mono text-[10px]">
-                  {row.conferenceWins}–{row.conferenceLosses}
-                </td>
-                <td class="px-3 py-2 text-right font-mono text-[10px]">
-                  {row.divisionWins}–{row.divisionLosses}
-                </td>
-                <td class="px-3 py-2 text-right font-mono text-[10px]">
-                  {streak ? streakLabel(streak.kind, streak.length) : '—'}
-                </td>
+                </span>
+                {#if manifest && identity}
+                  <SeasonTeamLogo
+                    {manifest}
+                    franchiseId={identity.franchiseId}
+                    teamExternalId={identity.teamExternalId}
+                    alt=""
+                    size="sm"
+                  />
+                {:else}
+                  <span class="h-7 w-7 shrink-0" aria-hidden="true"></span>
+                {/if}
+                <span class="min-w-0 truncate font-semibold">
+                  {franchiseName(row.franchiseId)}
+                  {#if isHuman}<span class="text-primary" aria-label="your team">*</span>{/if}
+                </span>
+                <span class="shrink-0 text-right tabular-nums">
+                  <span class="block font-mono text-xs font-bold">
+                    {recordLabel(row.wins, row.losses)}
+                  </span>
+                  <span class="block font-mono text-[10px] text-muted-foreground">
+                    {diffText(row.pointsFor, row.pointsAgainst)}
+                  </span>
+                </span>
+              </a>
+              <details class="group border-t border-border/50">
+                <summary
+                  class="cursor-pointer px-4 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden"
+                >
+                  Splits
+                </summary>
+                <dl class="grid grid-cols-2 gap-x-4 gap-y-1 px-4 pb-3 text-sm">
+                  <div class="flex items-center justify-between gap-2">
+                    <dt class="font-mono text-[10px] text-muted-foreground">Home</dt>
+                    <dd class="font-mono text-[10px]">{row.homeWins}–{row.homeLosses}</dd>
+                  </div>
+                  <div class="flex items-center justify-between gap-2">
+                    <dt class="font-mono text-[10px] text-muted-foreground">Away</dt>
+                    <dd class="font-mono text-[10px]">{row.awayWins}–{row.awayLosses}</dd>
+                  </div>
+                  <div class="flex items-center justify-between gap-2">
+                    <dt class="font-mono text-[10px] text-muted-foreground">Conference</dt>
+                    <dd class="font-mono text-[10px]">
+                      {row.conferenceWins}–{row.conferenceLosses}
+                    </dd>
+                  </div>
+                  <div class="flex items-center justify-between gap-2">
+                    <dt class="font-mono text-[10px] text-muted-foreground">Division</dt>
+                    <dd class="font-mono text-[10px]">{row.divisionWins}–{row.divisionLosses}</dd>
+                  </div>
+                  <div class="flex items-center justify-between gap-2">
+                    <dt class="font-mono text-[10px] text-muted-foreground">Streak</dt>
+                    <dd class="font-mono text-[10px] font-bold">
+                      {streak ? streakLabel(streak.kind, streak.length) : '—'}
+                    </dd>
+                  </div>
+                </dl>
+              </details>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+
+      {#if desktopViewport !== false}
+        <div class="mt-2 hidden overflow-x-auto rounded-xl bg-surface-1 md:block">
+          <table class="w-full min-w-[42rem] text-sm">
+            <caption class="sr-only">
+              {section.title} conference standings — {authoritative
+                ? 'official NBA tiebreak'
+                : 'provisional'} ordering
+            </caption>
+            <thead>
+              <tr
+                class="border-b border-border/70 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground"
+              >
+                <th scope="col" class="px-3 py-2 text-left font-medium">#</th>
+                <th scope="col" class="px-3 py-2 text-left font-medium">Team</th>
+                <th scope="col" class="px-3 py-2 text-right font-medium">W</th>
+                <th scope="col" class="px-3 py-2 text-right font-medium">L</th>
+                <th scope="col" class="px-3 py-2 text-right font-medium">Pct</th>
+                <th scope="col" class="px-3 py-2 text-right font-medium">Diff</th>
+                <th scope="col" class="px-3 py-2 text-right font-medium">Conf</th>
+                <th scope="col" class="px-3 py-2 text-right font-medium">Div</th>
+                <th scope="col" class="px-3 py-2 text-right font-medium">Streak</th>
               </tr>
-            {/each}
-          </tbody>
-        </table>
-      </div>
-    {/if}
-  </section>
-{/each}
+            </thead>
+            <tbody>
+              {#each section.entries as entry (entry.row.franchiseId)}
+                {@const row = entry.row}
+                {@const isHuman = row.franchiseId === humanFranchiseId}
+                {@const streak = streakOf(row.franchiseId)}
+                {@const identity = identityOf(row.franchiseId)}
+                <tr
+                  data-season-standings-row
+                  class="border-b border-border/50 transition-colors hover:bg-surface-2/60 {isHuman
+                    ? 'bg-primary/10'
+                    : ''}"
+                  aria-label={isHuman ? `${franchiseName(row.franchiseId)} (your team)` : undefined}
+                >
+                  <td class="px-3 py-2 font-mono text-[10px] text-muted-foreground">
+                    {ordinal(entry.rank)}
+                  </td>
+                  <th scope="row" class="max-w-44 truncate px-3 py-2 text-left font-semibold">
+                    <a
+                      href={resolve(`/season/run/teams?franchiseId=${row.franchiseId}` as any)}
+                      data-season-standings-link={row.franchiseId}
+                      aria-label={`${franchiseName(row.franchiseId)} roster`}
+                      class="flex items-center gap-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:text-primary motion-reduce:transition-none"
+                    >
+                      {#if manifest && identity}
+                        <SeasonTeamLogo
+                          {manifest}
+                          franchiseId={identity.franchiseId}
+                          teamExternalId={identity.teamExternalId}
+                          alt=""
+                          size="sm"
+                        />
+                      {/if}
+                      <span class="min-w-0 truncate">
+                        {franchiseName(row.franchiseId)}
+                        {#if isHuman}<span class="text-primary" aria-label="your team">*</span>{/if}
+                      </span>
+                    </a>
+                  </th>
+                  <td class="px-3 py-2 text-right font-bold">{row.wins}</td>
+                  <td class="px-3 py-2 text-right">{row.losses}</td>
+                  <td class="px-3 py-2 text-right font-mono text-[10px]">
+                    {pctText(row.wins, row.losses)}
+                  </td>
+                  <td class="px-3 py-2 text-right font-mono text-[10px]">
+                    {diffText(row.pointsFor, row.pointsAgainst)}
+                  </td>
+                  <td class="px-3 py-2 text-right font-mono text-[10px]">
+                    {row.conferenceWins}–{row.conferenceLosses}
+                  </td>
+                  <td class="px-3 py-2 text-right font-mono text-[10px]">
+                    {row.divisionWins}–{row.divisionLosses}
+                  </td>
+                  <td class="px-3 py-2 text-right font-mono text-[10px]">
+                    {streak ? streakLabel(streak.kind, streak.length) : '—'}
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      {/if}
+    </section>
+  {/each}
+</div>
 
 <p class="mt-2 font-mono text-[10px] text-muted-foreground">Tiebreaks finalized at playoffs.</p>

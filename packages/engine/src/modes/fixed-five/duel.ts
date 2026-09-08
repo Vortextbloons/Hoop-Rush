@@ -252,11 +252,6 @@ export function claimDuelPlayer(
   const nextRoll = rollPair(state.rootSeed, nextOrdinal, 'initial', candidates, context);
   return { ...interim, currentRoll: nextRoll };
 }
-export function duelPicksFor(state: DuelDraftState, participantId: 'p1' | 'p2'): DuelDraftPick[] {
-  return state.picks
-    .filter((p) => p.participantId === participantId)
-    .sort((a, b) => a.slotIndex - b.slotIndex);
-}
 export function isDuelComplete(state: DuelDraftState): boolean {
   return state.status === 'complete' && state.picks.length === 10;
 }

@@ -29,7 +29,9 @@
     balance,
     submitting,
     canSubmit,
+    canForfeit = false,
     onSubmit,
+    onForfeit,
   }: {
     editor: RotationEditorType;
     disabled: boolean;
@@ -49,7 +51,9 @@
     balance: number;
     submitting: boolean;
     canSubmit: boolean;
+    canForfeit?: boolean;
     onSubmit: () => void;
+    onForfeit: () => void;
   } = $props();
   const rehabInjuredPlayerCount = $derived(
     rehabOptions.filter((option) => !option.alreadyRehabbed).length,
@@ -109,6 +113,24 @@
       </button>
     </div>
   </div>
+
+  {#if canForfeit}
+    <div class="mt-3 rounded-xl border border-destructive/30 bg-destructive/5 p-3">
+      <p class="text-xs text-muted-foreground">
+        Your roster is carrying an active injury. You can take a 0–2 playoff loss without spending
+        Influence.
+      </p>
+      <button
+        type="button"
+        data-season-postseason-forfeit
+        onclick={onForfeit}
+        disabled={submitting || disabled}
+        class="mt-2 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-destructive/40 px-4 py-2.5 text-sm font-bold text-destructive outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        Forfeit game and continue
+      </button>
+    </div>
+  {/if}
 
   {#if fineTuneOpen}
     <div id="playoff-fine-tune" class="mt-3">

@@ -196,6 +196,10 @@ export class SeasonRunShell implements SeasonRunShellData {
     void input;
     return Promise.resolve();
   };
+  forfeitPostseasonGame = (input: { targetGameId: string }): Promise<void> => {
+    void input;
+    return Promise.resolve();
+  };
   submitPostseasonRotation = (input: {
     targetGameId: string;
     rotation: SeasonPostseasonRotationPayload;

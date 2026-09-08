@@ -4,9 +4,7 @@ import { playerVersionIdSchema } from './season-identity.ts';
 import { seasonCompactInjuryEventSchema } from './season-health.ts';
 import { seasonGameSimulationResultSchema } from './season-game-simulation.ts';
 import { seasonEffectsRollupSchema, seasonMechanismEvidenceSchema } from './season-effects.ts';
-import {
-  SEASON_GAME_SUMMARY_VERSION,
-} from './season-versions.ts';
+import { SEASON_GAME_SUMMARY_VERSION } from './season-versions.ts';
 export const seasonCompactPlayerLineSchema = z.object({
   playerVersionId: playerVersionIdSchema,
   seconds: z.number().int().min(0),
@@ -46,6 +44,7 @@ export const seasonTeamBoxSchema = z.object({
   turnovers: z.number().int().nonnegative(),
   fouls: z.number().int().nonnegative(),
   possessions: z.number().int().nonnegative(),
+  shotClockViolations: z.number().int().nonnegative().optional(),
   fourPointersMade: z.number().int().nonnegative().optional(),
   fourPointersAttempted: z.number().int().nonnegative().optional(),
 });

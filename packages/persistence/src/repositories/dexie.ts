@@ -51,6 +51,11 @@ import type {
   StoredCollectionPullRow,
   StoredCollectionStateRow,
 } from '../schemas/collection-record.ts';
+import type {
+  StoredCollectionGameCommandRow,
+  StoredCollectionGameRow,
+  StoredCollectionPlayStateRow,
+} from '../schemas/collection-record.ts';
 const ACTIVE_RECORD_ID = 'active';
 const CLASSIC_DRAFT_RECORD_ID = 'classic-draft';
 function hasStaleSaveSchemaVersion(record: unknown, expected: number): boolean {
@@ -94,9 +99,12 @@ export class HoopRushDatabase extends Dexie {
   collectionPulls!: Table<StoredCollectionPullRow, [string, number]>;
   collectionLedger!: Table<StoredCollectionLedgerRow, [string, string]>;
   collectionCommands!: Table<StoredCollectionCommandRow, [string, string]>;
+  collectionPlayState!: EntityTable<StoredCollectionPlayStateRow, 'collectionId'>;
+  collectionGames!: Table<StoredCollectionGameRow, [string, string]>;
+  collectionGameCommands!: Table<StoredCollectionGameCommandRow, [string, string]>;
   constructor(name = 'hoop-rush-saves') {
     super(name);
-    this.version(17).stores({
+    this.version(18).stores({
       active: 'recordId',
       activeGames: '[runId+gameNumber], runId',
       completed: 'recordId',
@@ -126,6 +134,9 @@ export class HoopRushDatabase extends Dexie {
       collectionPulls: '[collectionId+pullSequence], collectionId',
       collectionLedger: '[collectionId+transactionId], collectionId',
       collectionCommands: '[collectionId+commandId], collectionId',
+      collectionPlayState: 'collectionId',
+      collectionGames: '[collectionId+gameId], collectionId',
+      collectionGameCommands: '[collectionId+commandId], collectionId',
     });
   }
 }

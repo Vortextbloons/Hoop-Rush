@@ -219,7 +219,7 @@
         No games in this view yet.
       </p>
     {:else}
-      <div class="mt-6 flex flex-col gap-8">
+      <div class="mt-6 flex flex-col gap-8 lg:grid lg:grid-cols-2 lg:gap-6">
         {#each filteredGroups as group (group.blockIndex)}
           <section aria-labelledby={`schedule-block-${group.blockIndex}-heading`}>
             <div class="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 sm:px-0">

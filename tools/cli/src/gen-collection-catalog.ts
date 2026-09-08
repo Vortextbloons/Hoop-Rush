@@ -325,6 +325,7 @@ function main(): void {
     collection?: { catalog?: unknown; index?: unknown };
   };
   fullManifest.collection = {
+    ...fullManifest.collection,
     catalog: { url: 'collection/catalog.json', contentHash: catalogHash },
     index: { url: 'collection/index.json', contentHash: sha256Hex(indexContent) },
   };

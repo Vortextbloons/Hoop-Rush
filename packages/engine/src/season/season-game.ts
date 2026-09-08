@@ -39,6 +39,7 @@ import {
 import { prepareTeam, type TeamPrep } from '../sim/prepare.ts';
 import {
   chooseInitialUnit,
+  enumerateLegalFives,
   planUnit,
   plannerCandidates,
   type PlannerRotationContext,
@@ -58,6 +59,48 @@ export interface SeasonGameAvailabilitySeam {
   removals: readonly SeasonRemoval[];
   returns: readonly SeasonReturn[];
 }
+export interface RotationBoxSnapshot {
+  points: number;
+  fieldGoalMakes: number;
+  fieldGoalAttempts: number;
+  threeMakes: number;
+  threeAttempts: number;
+  freeThrowMakes: number;
+  freeThrowAttempts: number;
+  offensiveRebounds: number;
+  defensiveRebounds: number;
+  assists: number;
+  steals: number;
+  blocks: number;
+  turnovers: number;
+  fouls: number;
+}
+export interface RotationTripSnapshot {
+  kind: 'trip';
+  tripIndex: number;
+  period: number;
+  clockBefore: number;
+  clockAfter: number;
+  offenseSide: 'home' | 'away';
+  homeScore: number;
+  awayScore: number;
+  homeUnit: string[];
+  awayUnit: string[];
+  homeBoxes: RotationBoxSnapshot[];
+  awayBoxes: RotationBoxSnapshot[];
+}
+export interface RotationFoulLimitExceptionNotice {
+  kind: 'foul-limit-exception';
+  side: 'home' | 'away';
+  participantId: string;
+  period: number;
+  secondsRemaining: number;
+}
+export type RotationGameFact = RotationTripSnapshot | RotationFoulLimitExceptionNotice;
+export interface RotationGameHooks {
+  minimumFiveFoulException?: boolean;
+  onGameFact?: (fact: RotationGameFact) => void;
+}
 export function defaultSeasonGameSeam(
   input: SeasonGameSimulationInput,
 ): SeasonGameAvailabilitySeam {
@@ -72,10 +115,11 @@ export function simulateSeasonGame(
   context: EngineContext,
   options: {
     seam?: SeasonGameAvailabilitySeam;
+    hooks?: RotationGameHooks;
   } = {},
 ): SeasonGameSimulationResult {
   const seam = options.seam ?? defaultSeasonGameSeam(input);
-  const controller = new SeasonGameController(input, context, seam);
+  const controller = new RotationGameController(input, context, seam, null, options.hooks);
   return controller.run();
 }
 export function simulateSeasonGameWithEffects(
@@ -109,7 +153,7 @@ export function simulateSeasonGameWithEffects(
     awayStamina.set(player.playerVersionId, player.stamina);
   }
   const buffer = createSeasonEffectsBuffer(state, homeStamina, awayStamina);
-  const controller = new SeasonGameController(input, context, seam, {
+  const controller = new RotationGameController(input, context, seam, {
     buffer,
     pregamePlayerStates: state.playerStates,
   });
@@ -234,7 +278,13 @@ class SideState {
     this.checkpointIndex = 0;
   }
 }
-class SeasonGameController {
+// Participant-ID-neutral rotation controller shared by Season Run and
+// Collection games. Roster IDs are opaque strings throughout: Season Run
+// passes player-version IDs, Collection games pass exact card IDs. Season
+// behavior is pinned by the season-game fixtures; collection-only extensions
+// (foul-limit exception, trip snapshots) stay behind hooks that default to
+// off/absent.
+class RotationGameController {
   private readonly input: SeasonGameSimulationInput;
   private readonly context: EngineContext;
   private readonly rng: ReturnType<EngineContext['rngFactory']>;
@@ -247,12 +297,15 @@ class SeasonGameController {
   private readonly removalQueue: SeasonRemoval[];
   private readonly returnQueue: SeasonReturn[];
   private readonly effectsMode: SeasonGameEffectsMode | null;
+  private readonly hooks: RotationGameHooks | null;
   private readonly prepCache = new Map<string, TeamPrep>();
   private offense: SideIndex = 0;
   private readonly gameRule: import('@hoop-rush/data-contracts').SeasonGameRule;
   private otElapsed = 0;
   private otPossessions = 0;
   private otEventOrder = 0;
+  private tripIndex = 0;
+  private notifiedFoulExceptions = new Set<string>();
   private otLastPlanElapsed = 0;
   private otBoundaryElapsed = 0;
   private otStints: {
@@ -268,13 +321,15 @@ class SeasonGameController {
     context: EngineContext,
     seam: SeasonGameAvailabilitySeam,
     effectsMode: SeasonGameEffectsMode | null = null,
+    hooks?: RotationGameHooks,
   ) {
     this.input = input;
     this.gameRule = input.gameRule ?? 'standard';
     this.context = context;
     this.profile = input.profile;
     this.rng = context.rngFactory(input.seed);
-    this.recorder = new GameRecorder([10, 10]);
+    this.hooks = hooks ?? null;
+    this.recorder = new GameRecorder([input.home.players.length, input.away.players.length]);
     this.state = createGameState();
     this.home = new SideState('home', 0, input.home, input.homeRotation, seam.pregame);
     this.away = new SideState('away', 1, input.away, input.awayRotation, seam.pregame);
@@ -416,6 +471,7 @@ class SeasonGameController {
     step: PossessionStep;
     forfeit: SeasonGameSimulationResult | null;
   } {
+    const clockBefore = this.state.secondsRemaining;
     const machine = new PossessionStepper(this.tripContext, this.offense);
     let step: PossessionStep = { ended: false, pause: false, periodEnded: false, finished: false };
     do {
@@ -425,6 +481,7 @@ class SeasonGameController {
         if (forfeit !== null) return { step, forfeit };
       }
     } while (!step.periodEnded && !step.finished);
+    this.emitTripSnapshot(this.period, clockBefore);
     return { step, forfeit: null };
   }
   private static readonly OVERTIME_RACE_CLOCK = 1000000;
@@ -461,10 +518,10 @@ class SeasonGameController {
           `seed ${this.input.seed} game ${String(this.input.gameNumber)}`,
         );
       }
-      this.state.secondsRemaining = SeasonGameController.OVERTIME_RACE_CLOCK;
+      this.state.secondsRemaining = RotationGameController.OVERTIME_RACE_CLOCK;
       const trip = this.driveOneOvertimeTrip();
       if (trip.forfeit !== null) return trip.forfeit;
-      this.otElapsed += SeasonGameController.OVERTIME_RACE_CLOCK - this.state.secondsRemaining;
+      this.otElapsed += RotationGameController.OVERTIME_RACE_CLOCK - this.state.secondsRemaining;
       this.processOvertimeBoundary(true);
       if (trip.step.ended) {
         this.otPossessions += 1;
@@ -479,6 +536,7 @@ class SeasonGameController {
     step: PossessionStep;
     forfeit: SeasonGameSimulationResult | null;
   } {
+    const clockBefore = this.state.secondsRemaining;
     const machine = new PossessionStepper(this.tripContext, this.offense);
     let step: PossessionStep = { ended: false, pause: false, periodEnded: false, finished: false };
     do {
@@ -488,11 +546,47 @@ class SeasonGameController {
         if (forfeit !== null) return { step, forfeit };
       }
     } while (!step.finished);
+    this.emitTripSnapshot(5, clockBefore);
     return { step, forfeit: null };
+  }
+  private emitTripSnapshot(period: number, clockBefore: number): void {
+    const hooks = this.hooks;
+    if (hooks?.onGameFact === undefined) return;
+    const snapshotBoxes = (side: SideState): RotationBoxSnapshot[] =>
+      this.recorder.players[side.sideIndex].map((record) => ({
+        points: record.points,
+        fieldGoalMakes: record.fieldGoalMakes,
+        fieldGoalAttempts: record.fieldGoalAttempts,
+        threeMakes: record.threeMakes,
+        threeAttempts: record.threeAttempts,
+        freeThrowMakes: record.freeThrowMakes,
+        freeThrowAttempts: record.freeThrowAttempts,
+        offensiveRebounds: record.offensiveRebounds,
+        defensiveRebounds: record.defensiveRebounds,
+        assists: record.assists,
+        steals: record.steals,
+        blocks: record.blocks,
+        turnovers: record.turnovers,
+        fouls: record.fouls,
+      }));
+    hooks.onGameFact({
+      kind: 'trip',
+      tripIndex: this.tripIndex++,
+      period,
+      clockBefore,
+      clockAfter: this.state.secondsRemaining,
+      offenseSide: this.offense === 0 ? 'home' : 'away',
+      homeScore: this.recorder.sides[0].points,
+      awayScore: this.recorder.sides[1].points,
+      homeUnit: [...this.home.unit],
+      awayUnit: [...this.away.unit],
+      homeBoxes: snapshotBoxes(this.home),
+      awayBoxes: snapshotBoxes(this.away),
+    });
   }
   private overtimeElapsedFloat(): number {
     return (
-      this.otElapsed + (SeasonGameController.OVERTIME_RACE_CLOCK - this.state.secondsRemaining)
+      this.otElapsed + (RotationGameController.OVERTIME_RACE_CLOCK - this.state.secondsRemaining)
     );
   }
   private distributeOvertimeMinutes(): void {
@@ -624,6 +718,23 @@ class SeasonGameController {
         rosterIndex === undefined ? undefined : this.recorder.players[side.sideIndex][rosterIndex];
       if (record === undefined) continue;
       if (record.fouls >= 6) {
+        if (
+          this.hooks?.minimumFiveFoulException === true &&
+          this.wouldLoseLegalFive(side, playerVersionId)
+        ) {
+          const noticeKey = `${side.side}:${playerVersionId}`;
+          if (!this.notifiedFoulExceptions.has(noticeKey)) {
+            this.notifiedFoulExceptions.add(noticeKey);
+            this.hooks.onGameFact?.({
+              kind: 'foul-limit-exception',
+              side: side.side,
+              participantId: playerVersionId,
+              period: 5,
+              secondsRemaining: 0,
+            });
+          }
+          continue;
+        }
         side.fouledOut.add(playerVersionId);
         side.unavailable.add(playerVersionId);
         side.causesFor(playerVersionId).add('foul-out');
@@ -844,6 +955,21 @@ class SeasonGameController {
     if (entry.period > period) return false;
     return periodEnded || entry.period < period || floatClock <= entry.secondsRemaining;
   }
+  private wouldLoseLegalFive(side: SideState, playerVersionId: string): boolean {
+    const available = new Set<string>();
+    for (const player of side.roster) {
+      const id = player.playerVersionId;
+      if (id === playerVersionId) continue;
+      if (side.unavailable.has(id)) continue;
+      if (side.fouledOut.has(id)) continue;
+      available.add(id);
+    }
+    const members = side.roster.map((player) => ({
+      playerVersionId: player.playerVersionId,
+      playable: player.positions,
+    }));
+    return enumerateLegalFives(members, available).length === 0;
+  }
   private applyFoulOuts(side: SideState, period: number, clock: number): void {
     for (const playerVersionId of side.unit) {
       if (side.fouledOut.has(playerVersionId)) continue;
@@ -852,6 +978,23 @@ class SeasonGameController {
         rosterIndex === undefined ? undefined : this.recorder.players[side.sideIndex][rosterIndex];
       if (rosterRecord === undefined) continue;
       if (rosterRecord.fouls >= 6) {
+        if (
+          this.hooks?.minimumFiveFoulException === true &&
+          this.wouldLoseLegalFive(side, playerVersionId)
+        ) {
+          const noticeKey = `${side.side}:${playerVersionId}`;
+          if (!this.notifiedFoulExceptions.has(noticeKey)) {
+            this.notifiedFoulExceptions.add(noticeKey);
+            this.hooks.onGameFact?.({
+              kind: 'foul-limit-exception',
+              side: side.side,
+              participantId: playerVersionId,
+              period,
+              secondsRemaining: clock,
+            });
+          }
+          continue;
+        }
         side.fouledOut.add(playerVersionId);
         side.unavailable.add(playerVersionId);
         side.causesFor(playerVersionId).add('foul-out');

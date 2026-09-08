@@ -124,6 +124,7 @@ export interface SeasonRunShellData {
   purchaseTradeInquiry?: (input: { windowIndex: number }) => Promise<void>;
   startPostseason: () => Promise<void>;
   advancePostseason: (input?: { targetGameId?: string }) => Promise<void>;
+  forfeitPostseasonGame: (input: { targetGameId: string }) => Promise<void>;
   submitPostseasonRotation: (input: {
     targetGameId: string;
     rotation: SeasonPostseasonRotationPayload;
@@ -212,6 +213,7 @@ export function initialSeasonRunShellData(): SeasonRunShellData {
     purchaseTradeInquiry: () => Promise.resolve(),
     startPostseason: () => Promise.resolve(),
     advancePostseason: () => Promise.resolve(),
+    forfeitPostseasonGame: () => Promise.resolve(),
     submitPostseasonRotation: () => Promise.resolve(),
     spectatePostseasonGame: () => Promise.resolve(),
     fastForwardPostseason: () => Promise.resolve(),

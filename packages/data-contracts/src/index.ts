@@ -171,6 +171,9 @@ export * from './projection-worker.ts';
 export * from './generation-worker.ts';
 export * from './collection-versions.ts';
 export * from './collection.ts';
+export * from './collection-team.ts';
+export * from './collection-game.ts';
+export * from './collection-game-worker.ts';
 export * from './loaders/collection-catalog.ts';
 export {
   buildEmptyHealth,

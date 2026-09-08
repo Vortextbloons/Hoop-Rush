@@ -14,11 +14,23 @@ export const DRAFT_SCRIPT_STAR_TIER_WEIGHTS: ReadonlyArray<{
   max: number;
   weight: number;
 }> = [
-  { min: 85, max: 87, weight: 55 },
-  { min: 88, max: 90, weight: 25 },
-  { min: 91, max: 93, weight: 12 },
-  { min: 94, max: 96, weight: 6 },
-  { min: 97, max: 99, weight: 2 },
+  { min: 85, max: 87, weight: 40 },
+  { min: 88, max: 90, weight: 30 },
+  { min: 91, max: 93, weight: 15 },
+  { min: 94, max: 96, weight: 10 },
+  { min: 97, max: 99, weight: 5 },
+];
+
+export const DRAFT_SCRIPT_FLOOR_TIER_WEIGHTS: ReadonlyArray<{
+  min: number;
+  max: number;
+  weight: number;
+}> = [
+  { min: 77, max: 80, weight: 40 },
+  { min: 74, max: 76, weight: 30 },
+  { min: 71, max: 73, weight: 15 },
+  { min: 68, max: 70, weight: 10 },
+  { min: 0, max: 67, weight: 5 },
 ];
 
 export type DraftScriptKind = 'star' | 'floor';
@@ -42,11 +54,17 @@ export function starTierWeight(overall: number): number {
   return 0;
 }
 
-export function scriptedSlotsFor(
+export function floorTierWeight(overall: number): number {
+  for (const tier of DRAFT_SCRIPT_FLOOR_TIER_WEIGHTS) {
+    if (overall >= tier.min && overall <= tier.max) return tier.weight;
+  }
+  return 0;
+}
+
+export function scriptedRoundsFor(
   rootSeed: string,
-  participantId: string,
 ): { stars: Set<number>; floors: Set<number> } {
-  const rng = createRng(seasonNamespaceSeed(rootSeed, 'draft', 'script', participantId));
+  const rng = createRng(seasonNamespaceSeed(rootSeed, 'draft', 'script'));
   const ordinals = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], rng);
   const stars = new Set(ordinals.slice(0, SEASON_DRAFT_SCRIPT_STAR_COUNT).sort((a, b) => a - b));
   const floors = new Set(
@@ -62,12 +80,11 @@ export function scriptedSlotsFor(
 
 export function scriptKindFor(
   rootSeed: string,
-  participantId: string,
-  pickOrdinal: number,
+  draftRound: number,
 ): DraftScriptKind | null {
-  const slots = scriptedSlotsFor(rootSeed, participantId);
-  if (slots.stars.has(pickOrdinal)) return 'star';
-  if (slots.floors.has(pickOrdinal)) return 'floor';
+  const rounds = scriptedRoundsFor(rootSeed);
+  if (rounds.stars.has(draftRound)) return 'star';
+  if (rounds.floors.has(draftRound)) return 'floor';
   return null;
 }
 
@@ -84,5 +101,9 @@ export function chooseFloorCandidate(
   eligible: readonly SeasonDraftCandidate[],
   seed: string,
 ): SeasonDraftCandidate {
-  return createRng(seed).pick(eligible);
+  const rng = createRng(seed);
+  return rng.weightedPick(
+    eligible,
+    eligible.map((candidate) => floorTierWeight(overallOf(candidate))),
+  );
 }

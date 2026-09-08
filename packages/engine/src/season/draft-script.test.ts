@@ -13,7 +13,8 @@ import { applySeasonDraftCommand, type SeasonAiGenerationDeps } from './draft.ts
 import {
   isFloorCandidate,
   isStarCandidate,
-  scriptedSlotsFor,
+  floorTierWeight,
+  scriptedRoundsFor,
   scriptKindFor,
   starTierWeight,
 } from './draft-script.ts';
@@ -102,37 +103,43 @@ function pickFirstSelectable(
 }
 
 describe('draft script tiers', () => {
-  it('weights stars steeply so 99 stays mythic', () => {
-    expect(starTierWeight(86)).toBe(55);
-    expect(starTierWeight(89)).toBe(25);
-    expect(starTierWeight(92)).toBe(12);
-    expect(starTierWeight(95)).toBe(6);
-    expect(starTierWeight(98)).toBe(2);
+  it('weights stars non-linearly', () => {
+    expect(starTierWeight(86)).toBe(40);
+    expect(starTierWeight(89)).toBe(30);
+    expect(starTierWeight(92)).toBe(15);
+    expect(starTierWeight(95)).toBe(10);
+    expect(starTierWeight(98)).toBe(5);
     expect(starTierWeight(84)).toBe(0);
     expect(starTierWeight(100)).toBe(0);
+    expect(floorTierWeight(79)).toBe(40);
+    expect(floorTierWeight(75)).toBe(30);
+    expect(floorTierWeight(72)).toBe(15);
+    expect(floorTierWeight(69)).toBe(10);
+    expect(floorTierWeight(60)).toBe(5);
+    expect(floorTierWeight(81)).toBe(0);
   });
 
-  it('assigns exactly 2 star and 3 floor ordinals deterministically', () => {
-    const a = scriptedSlotsFor('seed-a', 'human');
-    const b = scriptedSlotsFor('seed-a', 'human');
+  it('assigns exactly 1 star and 2 floor rounds deterministically', () => {
+    const a = scriptedRoundsFor('seed-a');
+    const b = scriptedRoundsFor('seed-a');
     expect([...a.stars].sort()).toEqual([...b.stars].sort());
     expect([...a.floors].sort()).toEqual([...b.floors].sort());
-    expect(a.stars.size).toBe(2);
-    expect(a.floors.size).toBe(3);
+    expect(a.stars.size).toBe(1);
+    expect(a.floors.size).toBe(2);
     for (const ordinal of a.stars) {
       expect(a.floors.has(ordinal)).toBe(false);
-      expect(scriptKindFor('seed-a', 'human', ordinal)).toBe('star');
+      expect(scriptKindFor('seed-a', ordinal)).toBe('star');
     }
     for (const ordinal of a.floors) {
-      expect(scriptKindFor('seed-a', 'human', ordinal)).toBe('floor');
+      expect(scriptKindFor('seed-a', ordinal)).toBe('floor');
     }
-    const c = scriptedSlotsFor('seed-b', 'human');
+    const c = scriptedRoundsFor('seed-b');
     expect([...a.stars].sort()).not.toEqual([...c.stars].sort());
   });
 });
 
 describe('draft script offers', () => {
-  it('seeds at least 2 star and 3 floor selectable opportunities across ten offers', () => {
+  it('seeds at least 1 star and 2 floor rounds across ten offers', () => {
     let state = createSolo('script-opportunity-seed');
     const byId = new Map(FULL_CATALOG.candidates.map((c) => [c.playerVersionId, c]));
     let starOffers = 0;
@@ -143,6 +150,20 @@ describe('draft script offers', () => {
       if (offer === null) throw new Error('missing offer');
       const selectable = offer.cards.filter((card) => card.selectable);
       expect(selectable.length).toBeGreaterThanOrEqual(3);
+      const scriptedKind = scriptKindFor(state.rootSeed, offer.round);
+      if (scriptedKind !== null) {
+        expect(
+          offer.cards.every((card) => {
+            const candidate = byId.get(card.playerVersionId);
+            return (
+              candidate !== undefined &&
+              (scriptedKind === 'star'
+                ? isStarCandidate(candidate)
+                : isFloorCandidate(candidate))
+            );
+          }),
+        ).toBe(true);
+      }
       const hasStar = selectable.some((card) => {
         const candidate = byId.get(card.playerVersionId);
         return candidate !== undefined && isStarCandidate(candidate);
@@ -155,8 +176,8 @@ describe('draft script offers', () => {
       if (hasFloor) floorOffers += 1;
       state = pickFirstSelectable(state, FULL_CATALOG, sequence);
     }
-    expect(starOffers).toBeGreaterThanOrEqual(2);
-    expect(floorOffers).toBeGreaterThanOrEqual(3);
+    expect(starOffers).toBeGreaterThanOrEqual(1);
+    expect(floorOffers).toBeGreaterThanOrEqual(2);
   });
 
   it('reproduces scripted offers byte-for-byte for the same seed', () => {

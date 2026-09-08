@@ -17,6 +17,8 @@
   } from '$lib/season/season-shell-context';
   import { franchiseIdentityOf } from '$lib/season/season-branding';
   import { aggregateMechanismEvidence } from '$lib/season/season-effects-view';
+  import { homeRuleOf } from '$lib/season/season-evolution-view';
+  import { seasonInnovationImpactOf } from '$lib/season/season-innovation-impact-view';
   import {
     boxScoreFromSummary,
     deriveBlockRecap,
@@ -28,6 +30,7 @@
   let blockSummaries = $state<SeasonGameSummary[]>([]);
   let retainedGameIds = $state<string[]>([]);
   let blockDetails = $state<SeasonRetainedGameDetail[]>([]);
+  let retainedDetails = $state<SeasonRetainedGameDetail[]>([]);
   let loadError = $state<string | null>(null);
   let openedBoxScores = $state.raw(new Set<string>());
   function onBoxScoreToggle(event: Event, gameId: string) {
@@ -107,11 +110,13 @@
     blockSummaries = [];
     retainedGameIds = [];
     blockDetails = [];
+    retainedDetails = [];
     loadError = null;
     Promise.all([hub.loadBlockSummaries(runId, blockIndex), hub.loadRetainedDetails(runId)])
       .then(([summaries, details]) => {
         if (cancelled) return;
         blockSummaries = summaries;
+        retainedDetails = details;
         const { fromRound, toRound } = blockRoundRange(blockIndex);
         blockDetails = details.filter(
           (detail) => detail.round >= fromRound && detail.round <= toRound,
@@ -175,6 +180,27 @@
     });
   });
   const effectsEvidence = $derived(aggregateMechanismEvidence(blockDetails));
+  const innovationRule = $derived(
+    run !== null && humanFranchiseId !== null ? homeRuleOf(run, humanFranchiseId) : 'standard',
+  );
+  const innovationImpact = $derived.by(() => {
+    if (humanFranchiseId === null || innovationRule === 'standard') return null;
+    return seasonInnovationImpactOf({
+      summaries: shell.snapshot?.summaries ?? [],
+      details: retainedDetails,
+      humanFranchiseId,
+      rule: innovationRule,
+    });
+  });
+  const blockInnovationImpact = $derived.by(() => {
+    if (humanFranchiseId === null || innovationRule === 'standard') return null;
+    return seasonInnovationImpactOf({
+      summaries: blockSummaries,
+      details: blockDetails,
+      humanFranchiseId,
+      rule: innovationRule,
+    });
+  });
   const healthRows = $derived.by(() => {
     if (!run || !humanFranchiseId) return [];
     const roster = run.rosters.find((r) => r.franchiseId === humanFranchiseId);
@@ -286,6 +312,8 @@
         {rosterByVersion}
         {effectsEvidence}
         {healthRows}
+        {innovationImpact}
+        {blockInnovationImpact}
       />
 
       {#if humanGames.length > 0}
@@ -296,11 +324,12 @@
           >
             Box scores · your games
           </h2>
-          <div class="mt-3 flex flex-col gap-0 sm:gap-3">
+          <div class="mt-3 grid gap-0 sm:gap-3 lg:grid-cols-2 lg:items-start">
             {#each humanGames as summary (summary.gameId)}
               {@const box = boxFor(summary)}
               {@const opponentId = opponentOf(summary)}
               <details
+                id={`box-score-${summary.gameId}`}
                 class="group bg-surface-1 open:ring-1 open:ring-ring/30 sm:rounded-xl"
                 ontoggle={(event) => onBoxScoreToggle(event, summary.gameId)}
               >

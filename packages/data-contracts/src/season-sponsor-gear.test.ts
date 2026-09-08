@@ -35,9 +35,9 @@ describe('sponsor gear tiers', () => {
     const buzz = sponsorGearTierConfigOf('BUZZ');
     const prime = sponsorGearTierConfigOf('PRIME');
     const icon = sponsorGearTierConfigOf('ICON');
-    expect([buzz.poolMin, buzz.poolMax]).toEqual([10, 16]);
-    expect([prime.poolMin, prime.poolMax]).toEqual([12, 22]);
-    expect([icon.poolMin, icon.poolMax]).toEqual([15, 35]);
+    expect([buzz.poolMin, buzz.poolMax]).toEqual([12, 20]);
+    expect([prime.poolMin, prime.poolMax]).toEqual([16, 28]);
+    expect([icon.poolMin, icon.poolMax]).toEqual([25, 40]);
     expect(buzz.singleKeyCap).toBeLessThan(prime.singleKeyCap);
     expect(prime.singleKeyCap).toBeLessThan(icon.singleKeyCap);
     for (const tier of [buzz, prime, icon]) {

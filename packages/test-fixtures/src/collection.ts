@@ -9,7 +9,6 @@ import {
 } from '@hoop-rush/data-contracts';
 import {
   COLLECTION_CATALOG_VERSION,
-  COLLECTION_ECONOMY_VERSION,
   COLLECTION_OVERLAY_VERSION,
   COLLECTION_PACK_RULES_VERSION,
   COLLECTION_REPLAY_VERSION,
@@ -144,22 +143,4 @@ export function buildCollectionFixtureCatalog(
     replayVersion: COLLECTION_REPLAY_VERSION,
     ...overrides,
   });
-}
-
-export function buildCollectionFixtureState(overrides = {}) {
-  return {
-    schemaVersion: COLLECTION_SCHEMA_VERSION,
-    collectionVersion: COLLECTION_VERSION,
-    catalogVersion: COLLECTION_CATALOG_VERSION,
-    economyVersion: COLLECTION_ECONOMY_VERSION,
-    collectionId: 'collection-1',
-    rootSeed: '0'.repeat(32),
-    revision: 0,
-    digest: '0'.repeat(32),
-    claimedWelcome: false,
-    owned: [],
-    balances: { Coins: 0, Exchange: 0 },
-    nextPullSequence: 0,
-    ...overrides,
-  };
 }

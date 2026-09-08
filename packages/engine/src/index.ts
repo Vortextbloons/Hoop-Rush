@@ -143,6 +143,11 @@ export {
   simulateSeasonGameWithEffects,
   type SeasonGameAvailabilitySeam,
   type SeasonGameEffectsMode,
+  type RotationBoxSnapshot,
+  type RotationTripSnapshot,
+  type RotationFoulLimitExceptionNotice,
+  type RotationGameFact,
+  type RotationGameHooks,
 } from './season/season-game.ts';
 export { checkSeasonGameResult } from './season/season-game-audit.ts';
 export { seasonGenerationDigest, type SeasonGenerationDigestInput } from './season/digest.ts';
@@ -163,10 +168,12 @@ export {
 export {
   DRAFT_SCRIPT_ROUND_COUNT,
   DRAFT_SCRIPT_STAR_TIER_WEIGHTS,
+  DRAFT_SCRIPT_FLOOR_TIER_WEIGHTS,
   isStarCandidate,
   isFloorCandidate,
   starTierWeight,
-  scriptedSlotsFor,
+  floorTierWeight,
+  scriptedRoundsFor,
   scriptKindFor,
   chooseStarCandidate,
   chooseFloorCandidate,
@@ -379,10 +386,6 @@ export {
 export { projectGameWithRule, estimateFirstToSevenRace } from './projection/index.ts';
 export { seasonObjectiveChoicesForBlock } from './season/objectives.ts';
 export {
-  challengeCatalog,
-  challengeDifficultyOf,
-  challengeRewardOf,
-  challengeResultById,
   dealSeasonBlockChallenges,
   evaluateSeasonBlockChallenges,
   foldChallengeFacts,
@@ -553,7 +556,6 @@ export {
 export {
   createSandboxBuilder,
   applySandboxBuilderCommand,
-  isSandboxBuilderComplete,
   enumerateSandboxSafeMoves,
   type FixedFiveCandidate,
   type SandboxBuilderState,
@@ -569,7 +571,6 @@ export {
   createDuelDraft,
   rerollDuel,
   claimDuelPlayer,
-  duelPicksFor,
   isDuelComplete,
   duelAlternationHolds,
   duelCurrentPicker,
@@ -597,7 +598,6 @@ export {
 export {
   findWeakestOpponent,
   h2hGameNumbersFor,
-  displayHomeForH2hIndex,
   simulateShared82,
   type Shared82SimulationInput,
   type Shared82SimulationOutput,
@@ -626,6 +626,11 @@ export {
   collectionNamespaceSeed,
   collectionStarterSeed,
   collectionPullSeed,
+  collectionGameNamespaceSeed,
+  collectionCpuTeamSeed,
+  collectionGameSeed,
+  collectionGameSeedPaths,
+  collectionGameId,
 } from './collection/seeds.ts';
 export {
   collectionCardId,
@@ -637,7 +642,34 @@ export {
 export {
   validateCollectionTeamFoundation,
   validateCollectionPlayableFive,
+  type CollectionTeamCheck,
 } from './collection/team.ts';
+export {
+  validateCollectionActiveTeam,
+  allocateDefaultMinutes,
+  initializeCollectionActiveTeam,
+} from './collection/active-team.ts';
+export { generateCollectionCpuTeam, cpuPerCardWeights } from './collection/cpu.ts';
+export {
+  CollectionGameError,
+  collectionPreparedInputDigest,
+  collectionGameResultDigest,
+  collectionGameEventDigest,
+  collectionGameRewardFor,
+  prepareCollectionBasicGame,
+  simulateCollectionGame,
+  reproduceCollectionGame,
+} from './collection/game.ts';
+export { checkCollectionGameResult } from './collection/game-audit.ts';
+export {
+  initializeCollectionPlayState,
+  collectionPlayStateFactsOf,
+  collectionPlayStateDigest,
+} from './collection/play-state.ts';
+export {
+  applyCollectionGameCommand,
+  type CollectionGameCommandResult,
+} from './collection/game-commands.ts';
 export { auditCollectionState } from './collection/audit.ts';
 export {
   WELCOME_COIN_GRANT,
