@@ -14,7 +14,7 @@ export function hex32(value: number): string {
 export function seedFromString(value: string): string {
   return fnv1a32(value).toString(16).padStart(8, '0').repeat(4);
 }
-const HASH_OFFSETS = [FNV_OFFSET_32, 0x9e3779b9, 0x85ebca6b, 0xc2b2ae35];
+const HASH_OFFSETS = [FNV_OFFSET_32, 0x9e3779b9, 0x85ebca6b, 0xc2b2ae35] as const;
 export function seasonDigestHex(material: string): string {
   let h0 = HASH_OFFSETS[0] | 0;
   let h1 = HASH_OFFSETS[1] | 0;
@@ -31,12 +31,7 @@ export function seasonDigestHex(material: string): string {
     h3 ^= code;
     h3 = Math.imul(h3, FNV_PRIME_32);
   }
-  return (
-    hex32(h0 >>> 0) +
-    hex32(h1 >>> 0) +
-    hex32(h2 >>> 0) +
-    hex32(h3 >>> 0)
-  );
+  return hex32(h0 >>> 0) + hex32(h1 >>> 0) + hex32(h2 >>> 0) + hex32(h3 >>> 0);
 }
 export function canonicalJson(value: unknown): string {
   if (value === null) return 'null';

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { CollectionGameEvent, CollectionGameRecord } from '@hoop-rush/data-contracts';
+import type { CollectionGameEvent, CollectionGameRecordUnion } from '@hoop-rush/data-contracts';
 import {
   cadenceFor,
   clockLabel,
@@ -151,12 +151,91 @@ describe('collection gamecast', () => {
         transactionId: `txn-${'4'.repeat(32)}`,
       },
       completedAtIso: '2026-01-01T00:00:00.000Z',
-    } as unknown as CollectionGameRecord;
+    } as unknown as CollectionGameRecordUnion;
     const facts = explanationFacts(record, EVENTS);
     expect(facts.winner).toBe('home');
     expect(facts.rewardCoins).toBe(100);
     expect(facts.topHome?.points).toBe(2);
     expect(facts.leadChanges).toBe(0);
     expect(facts.biggestLead).toEqual({ side: 'home', points: 2 });
+  });
+
+  it('reads the v2 receipt total and outcome reason from a componentized record', () => {
+    const v2Record = {
+      gameVersion: 'collection-game-v2',
+      collectionId: 'collection-1',
+      gameId: `game-${'5'.repeat(32)}`,
+      gameSequence: 3,
+      prepared: {},
+      result: {
+        gameVersion: 'collection-game-v2',
+        gameId: `game-${'5'.repeat(32)}`,
+        gameSequence: 3,
+        catalogVersion: 'collection-catalog-v1',
+        rulesVersion: 'collection-game-rules-v2',
+        engineVersion: 'm3-engine-v21',
+        profileVersion: 'm3-2020s-v1',
+        winner: 'away',
+        outcome: 'completed',
+        overtimePeriods: 1,
+        home: {
+          teamId: 'collection-player',
+          displayName: 'Your Team',
+          score: 120,
+          periodScores: [25, 25, 25, 25, 20],
+          box: {},
+          players: [{ cardId: `card-${'1'.repeat(32)}`, points: 30 }],
+          shotZones: [],
+          foulLimitExceptions: [],
+        },
+        away: {
+          teamId: 'collection-cpu',
+          displayName: 'CPU Team',
+          score: 124,
+          periodScores: [25, 25, 25, 25, 24],
+          box: {},
+          players: [{ cardId: `card-${'2'.repeat(32)}`, points: 32 }],
+          shotZones: [],
+          foulLimitExceptions: [],
+        },
+        substitutions: [],
+        unitStints: [],
+        deviations: [],
+        foulOuts: [],
+      },
+      events: [],
+      eventDigest: '0'.repeat(32),
+      resultDigest: '1'.repeat(32),
+      objectiveEvaluation: { kind: 'not-selected' },
+      reward: {
+        rewardVersion: 'collection-reward-v2',
+        difficultyId: 'pro',
+        gameOutcome: 'completed',
+        playerWin: false,
+        scoreMargin: 4,
+        objectiveId: null,
+        objectiveSucceeded: false,
+        firstClearEligible: true,
+        firstClearGranted: false,
+        components: [
+          {
+            kind: 'outcome',
+            reason: 'game-loss-reward',
+            currency: 'Coins',
+            baseAmount: 10,
+            multiplierBp: 13_500,
+            amount: 14,
+            transactionId: `txn-${'6'.repeat(32)}`,
+          },
+        ],
+        total: 14,
+      },
+      completedAtIso: '2026-01-01T00:00:00.000Z',
+    } as unknown as CollectionGameRecordUnion;
+    const facts = explanationFacts(v2Record, EVENTS);
+    expect(facts.rewardCoins).toBe(14);
+    expect(facts.rewardReason).toBe('game-loss-reward');
+    expect(facts.overtimePeriods).toBe(1);
+    expect(facts.topAway?.points).toBe(32);
   });
 });

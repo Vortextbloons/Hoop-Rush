@@ -113,6 +113,10 @@ import {
   COLLECTION_GAME_REPRODUCE_OPTIONS,
 } from './commands/collection-game.ts';
 import {
+  collectionGameCalibrate,
+  COLLECTION_GAME_CALIBRATE_OPTIONS,
+} from './commands/collection-game-calibrate.ts';
+import {
   SEASON_EFFECTS_OPTIONS,
   seasonEffectsCalibrate,
   seasonEffectsDistribution,
@@ -467,6 +471,18 @@ const COMMANDS: Record<string, CommandDef> = {
       collectionGameReproduce({
         input: getOptionString(args, 'input') ?? null,
         manifest: getOptionString(args, 'manifest'),
+      }),
+  },
+  'collection game-calibrate': {
+    options: COLLECTION_GAME_CALIBRATE_OPTIONS,
+    run: (args) =>
+      collectionGameCalibrate({
+        workers: getOptionString(args, 'workers') ?? undefined,
+        calibrationSeeds: getOptionString(args, 'calibration-seeds') ?? undefined,
+        validationSeeds: getOptionString(args, 'validation-seeds') ?? undefined,
+        out: getOptionString(args, 'out') ?? undefined,
+        manifest: getOptionString(args, 'manifest') ?? undefined,
+        validate: getOptionString(args, 'validate') ?? null,
       }),
   },
   'season rosters generate': {

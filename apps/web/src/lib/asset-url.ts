@@ -1,10 +1,10 @@
-import { resolve } from '$app/paths';
+import { asset, resolve } from '$app/paths';
 export function siteRoot(): string {
   return resolve('/');
 }
 export function resolveAssetUrl(url: string): string {
   if (/^https?:\/\//.test(url)) return url;
-  if (url.startsWith('/')) return resolve(url);
+  if (url.startsWith('/')) return asset(url);
   return `${siteRoot()}data/${url}`;
 }
 const memoCache = new Map<string, Promise<unknown>>();

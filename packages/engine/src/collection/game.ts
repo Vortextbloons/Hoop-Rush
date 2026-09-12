@@ -1,16 +1,36 @@
 import {
+  COLLECTION_CATALOG_VERSION,
+  COLLECTION_GAME_ENVIRONMENT_ERA_ID,
+  COLLECTION_GAME_HOME_COURT_POLICY,
+  COLLECTION_GAME_REPLAY_VERSION,
+  COLLECTION_GAME_RULES_VERSION,
+  COLLECTION_GAME_V1_REPLAY_VERSION,
+  COLLECTION_GAME_V1_RULES_VERSION,
+  COLLECTION_GAME_V1_VERSION,
+  COLLECTION_GAME_VERSION,
+  COLLECTION_REWARD_V1_VERSION,
+  COLLECTION_REWARD_VERSION,
   COLLECTION_GAME_REWARD_LOSS_COINS,
   COLLECTION_GAME_REWARD_WIN_COINS,
-  COLLECTION_REWARD_VERSION,
+  COLLECTION_OBJECTIVE_VERSION,
+  COLLECTION_DIFFICULTY_VERSION,
+  collectionPreparedGameV2Schema,
   canonicalJson,
   seasonDigestHex,
   type CollectionActiveTeam,
   type CollectionCatalog,
   type CollectionCpuRarityWeights,
+  type CollectionDifficultyId,
+  type CollectionDifficultyProfile,
   type CollectionGameEvent,
   type CollectionGameResult,
+  type CollectionGameResultUnion,
   type CollectionGameReward,
+  type CollectionObjectiveDefinition,
+  type CollectionObjectiveId,
   type CollectionPreparedGame,
+  type CollectionPreparedGameUnion,
+  type CollectionPreparedGameV1,
   type EraSimulationProfile,
 } from '@hoop-rush/data-contracts';
 import { createEngineContext } from '../sim/context.ts';
@@ -21,8 +41,17 @@ import {
   COLLECTION_PLAYER_TEAM_ID,
   toControllerInput,
 } from './adapters.ts';
-import { generateCollectionCpuTeam } from './cpu.ts';
-import { collectionGameId, collectionGameSeed, collectionGameSeedPaths } from './seeds.ts';
+import { generateCollectionCpuTeam, generateCollectionCpuTeamV2 } from './cpu.ts';
+import { resolveDifficultyRatingAdjustments } from './difficulty.ts';
+import { buildCollectionObjectiveFacts } from './objectives.ts';
+import {
+  collectionGameId,
+  collectionGameIdV2,
+  collectionGameSeed,
+  collectionGameSeedPaths,
+  collectionGameSeedPathsV2,
+  collectionGameSeedV2,
+} from './seeds.ts';
 
 export class CollectionGameError extends Error {
   readonly code: string;
@@ -32,15 +61,15 @@ export class CollectionGameError extends Error {
   }
 }
 
-export function collectionPreparedInputDigest(
-  prepared: Omit<CollectionPreparedGame, 'inputDigest'> & { inputDigest?: string },
-): string {
-  const { inputDigest: _ignored, ...rest } = prepared;
+export function collectionPreparedInputDigest(prepared: { inputDigest?: string }): string {
+  const { inputDigest: _ignored, ...rest } = prepared as Record<string, unknown> & {
+    inputDigest?: string;
+  };
   void _ignored;
   return seasonDigestHex(canonicalJson(rest));
 }
 
-export function collectionGameResultDigest(result: CollectionGameResult): string {
+export function collectionGameResultDigest(result: CollectionGameResultUnion): string {
   return seasonDigestHex(canonicalJson(result));
 }
 
@@ -49,17 +78,17 @@ export function collectionGameEventDigest(events: readonly CollectionGameEvent[]
 }
 
 export function collectionGameRewardFor(
-  result: Pick<CollectionGameResult, 'winner'>,
+  result: Pick<CollectionGameResultUnion, 'winner'>,
   gameId: string,
 ): CollectionGameReward {
   const win = result.winner === 'home';
   return {
-    rewardVersion: COLLECTION_REWARD_VERSION,
+    rewardVersion: COLLECTION_REWARD_V1_VERSION,
     reason: win ? 'game-win-reward' : 'game-loss-reward',
     currency: 'Coins',
     amount: win ? COLLECTION_GAME_REWARD_WIN_COINS : COLLECTION_GAME_REWARD_LOSS_COINS,
     transactionId: `txn-${seasonDigestHex(
-      ['collection-game-reward', gameId, COLLECTION_REWARD_VERSION].join('\u0000'),
+      ['collection-game-reward', gameId, COLLECTION_REWARD_V1_VERSION].join('\u0000'),
     )}`,
   };
 }
@@ -76,7 +105,7 @@ export function prepareCollectionBasicGame(input: {
   profileHash: string;
   catalogHash: string;
   rulesHash: string;
-}): CollectionPreparedGame {
+}): CollectionPreparedGameV1 {
   const resolve = (cardId: string) => input.catalog.cards.find((card) => card.cardId === cardId);
   const check = validateCollectionActiveTeam(input.team, resolve, input.ownedCardIds);
   if (!check.ok) {
@@ -95,12 +124,87 @@ export function prepareCollectionBasicGame(input: {
   const seedPaths = collectionGameSeedPaths(input.gameSequence);
   const seed = collectionGameSeed(input.rootSeed, input.gameSequence);
   const gameId = collectionGameId(input.rootSeed, input.gameSequence);
+  const prepared: CollectionPreparedGameV1 = {
+    gameVersion: COLLECTION_GAME_V1_VERSION,
+    teamVersion: 'collection-team-v1' as const,
+    rewardVersion: COLLECTION_REWARD_V1_VERSION,
+    replayVersion: COLLECTION_GAME_V1_REPLAY_VERSION,
+    rulesVersion: COLLECTION_GAME_V1_RULES_VERSION,
+    collectionId: input.collectionId as CollectionPreparedGameV1['collectionId'],
+    gameId,
+    gameSequence: input.gameSequence,
+    rootSeed: input.rootSeed as CollectionPreparedGameV1['rootSeed'],
+    seedPaths,
+    seed: seed as CollectionPreparedGameV1['seed'],
+    playerTeam: input.team,
+    cpuTeam: cpu.team,
+    environmentEraId: COLLECTION_GAME_ENVIRONMENT_ERA_ID,
+    profileVersion: input.profileVersion,
+    profileHash: input.profileHash as CollectionPreparedGameV1['profileHash'],
+    catalogVersion: COLLECTION_CATALOG_VERSION,
+    catalogHash: input.catalogHash as CollectionPreparedGameV1['catalogHash'],
+    rulesHash: input.rulesHash as CollectionPreparedGameV1['rulesHash'],
+    homeCourtPolicy: COLLECTION_GAME_HOME_COURT_POLICY,
+    inputDigest: '0'.repeat(32),
+  };
+  return { ...prepared, inputDigest: collectionPreparedInputDigest(prepared) };
+}
+
+export function prepareCollectionBasicGameV2(input: {
+  collectionId: string;
+  rootSeed: string;
+  gameSequence: number;
+  ownedCardIds: ReadonlySet<string>;
+  team: CollectionActiveTeam;
+  catalog: CollectionCatalog;
+  difficulty: CollectionDifficultyProfile;
+  objectiveDefinitions: readonly CollectionObjectiveDefinition[];
+  selectedObjectiveId: CollectionObjectiveId | null;
+  clearedDifficultyIds: readonly CollectionDifficultyId[];
+  profileVersion: string;
+  profileHash: string;
+  catalogHash: string;
+  rulesHash: string;
+}): CollectionPreparedGame {
+  const resolve = (cardId: string) => input.catalog.cards.find((card) => card.cardId === cardId);
+  const check = validateCollectionActiveTeam(input.team, resolve, input.ownedCardIds);
+  if (!check.ok) {
+    const first = check.issues[0];
+    throw new CollectionGameError(
+      first?.code ?? 'illegal-starters',
+      first?.message ?? 'invalid active team',
+    );
+  }
+  const cpu = generateCollectionCpuTeamV2(
+    input.catalog,
+    input.rootSeed,
+    input.gameSequence,
+    input.difficulty,
+  );
+  const adjustments = resolveDifficultyRatingAdjustments(input.catalog, cpu.team, input.difficulty);
+  const objectives = buildCollectionObjectiveFacts({
+    definitions: input.objectiveDefinitions,
+    rootSeed: input.rootSeed,
+    difficultyId: input.difficulty.difficultyId,
+    gameSequence: input.gameSequence,
+    team: input.team,
+    selectedObjectiveId: input.selectedObjectiveId,
+  });
+  const seedPaths = collectionGameSeedPathsV2(input.difficulty.difficultyId, input.gameSequence);
+  const seed = collectionGameSeedV2(input.rootSeed, input.gameSequence);
+  const gameId = collectionGameIdV2(
+    input.rootSeed,
+    input.difficulty.difficultyId,
+    input.gameSequence,
+  );
   const prepared: CollectionPreparedGame = {
-    gameVersion: 'collection-game-v1' as const,
+    gameVersion: COLLECTION_GAME_VERSION,
     teamVersion: 'collection-team-v1' as const,
     rewardVersion: COLLECTION_REWARD_VERSION,
-    replayVersion: 'collection-game-replay-v1' as const,
-    rulesVersion: 'collection-game-rules-v1' as const,
+    replayVersion: COLLECTION_GAME_REPLAY_VERSION,
+    rulesVersion: COLLECTION_GAME_RULES_VERSION,
+    difficultyVersion: COLLECTION_DIFFICULTY_VERSION,
+    objectiveVersion: COLLECTION_OBJECTIVE_VERSION,
     collectionId: input.collectionId as CollectionPreparedGame['collectionId'],
     gameId,
     gameSequence: input.gameSequence,
@@ -109,16 +213,22 @@ export function prepareCollectionBasicGame(input: {
     seed: seed as CollectionPreparedGame['seed'],
     playerTeam: input.team,
     cpuTeam: cpu.team,
-    environmentEraId: '2020s' as const,
+    difficulty: input.difficulty,
+    construction: cpu.construction,
+    adjustments,
+    objectives,
+    firstClearEligible: !input.clearedDifficultyIds.includes(input.difficulty.difficultyId),
+    environmentEraId: COLLECTION_GAME_ENVIRONMENT_ERA_ID,
     profileVersion: input.profileVersion,
     profileHash: input.profileHash as CollectionPreparedGame['profileHash'],
-    catalogVersion: 'collection-catalog-v1' as const,
+    catalogVersion: COLLECTION_CATALOG_VERSION,
     catalogHash: input.catalogHash as CollectionPreparedGame['catalogHash'],
     rulesHash: input.rulesHash as CollectionPreparedGame['rulesHash'],
-    homeCourtPolicy: 'neutral-home-court' as const,
+    homeCourtPolicy: COLLECTION_GAME_HOME_COURT_POLICY,
     inputDigest: '0'.repeat(32),
   };
-  return { ...prepared, inputDigest: collectionPreparedInputDigest(prepared) };
+  const parsed = collectionPreparedGameV2Schema.parse(prepared);
+  return { ...parsed, inputDigest: collectionPreparedInputDigest(parsed) };
 }
 
 interface CollectedFacts {
@@ -324,11 +434,27 @@ function buildEvents(
   return events;
 }
 
+interface ResultVersionInfo {
+  gameVersion: typeof COLLECTION_GAME_V1_VERSION | typeof COLLECTION_GAME_VERSION;
+  rulesVersion: typeof COLLECTION_GAME_V1_RULES_VERSION | typeof COLLECTION_GAME_RULES_VERSION;
+}
+
+function resultVersionInfoOf(prepared: CollectionPreparedGameUnion): ResultVersionInfo {
+  if (prepared.gameVersion === COLLECTION_GAME_V1_VERSION) {
+    return {
+      gameVersion: COLLECTION_GAME_V1_VERSION,
+      rulesVersion: COLLECTION_GAME_V1_RULES_VERSION,
+    };
+  }
+  return { gameVersion: COLLECTION_GAME_VERSION, rulesVersion: COLLECTION_GAME_RULES_VERSION };
+}
+
 function mapCompletedResult(
   raw: unknown,
-  prepared: CollectionPreparedGame,
+  prepared: CollectionPreparedGameUnion,
   exceptions: CollectedFacts['exceptions'],
 ): Extract<CollectionGameResult, { outcome: 'completed' }> {
+  const versions = resultVersionInfoOf(prepared);
   const source = raw as {
     seed: string;
     engineVersion: string;
@@ -388,11 +514,11 @@ function mapCompletedResult(
       })),
   });
   return {
-    gameVersion: 'collection-game-v1' as const,
+    gameVersion: versions.gameVersion,
     gameId: prepared.gameId,
     gameSequence: prepared.gameSequence,
-    catalogVersion: 'collection-catalog-v1' as const,
-    rulesVersion: 'collection-game-rules-v1' as const,
+    catalogVersion: COLLECTION_CATALOG_VERSION,
+    rulesVersion: versions.rulesVersion,
     engineVersion: source.engineVersion,
     profileVersion: source.profileVersion,
     winner: source.winner,
@@ -430,12 +556,12 @@ function mapCompletedResult(
 }
 
 export interface SimulatedCollectionGame {
-  result: CollectionGameResult;
+  result: CollectionGameResultUnion;
   events: CollectionGameEvent[];
 }
 
 export function simulateCollectionGame(
-  prepared: CollectionPreparedGame,
+  prepared: CollectionPreparedGameUnion,
   catalog: CollectionCatalog,
   profile: EraSimulationProfile,
 ): SimulatedCollectionGame {
@@ -453,17 +579,18 @@ export function simulateCollectionGame(
       },
     },
   });
+  const versions = resultVersionInfoOf(prepared);
   if (raw.outcome === 'no-legal-five-both') {
     throw new CollectionGameError('no-legal-five', 'prepared game has no legal five at tipoff');
   }
   if (raw.outcome === 'forfeit') {
     const winner = raw.winner;
-    const result: CollectionGameResult = {
-      gameVersion: 'collection-game-v1' as const,
+    const result = {
+      gameVersion: versions.gameVersion,
       gameId: prepared.gameId,
       gameSequence: prepared.gameSequence,
-      catalogVersion: 'collection-catalog-v1' as const,
-      rulesVersion: 'collection-game-rules-v1' as const,
+      catalogVersion: COLLECTION_CATALOG_VERSION,
+      rulesVersion: versions.rulesVersion,
       engineVersion: raw.engineVersion,
       profileVersion: raw.profileVersion,
       winner,
@@ -473,7 +600,7 @@ export function simulateCollectionGame(
         raw.trigger === 'human-interruption-forfeit' ? 'no-legal-five-after-removal' : raw.trigger,
       homeScore: raw.homeScore,
       awayScore: raw.awayScore,
-    };
+    } as CollectionGameResultUnion;
     const events: CollectionGameEvent[] = [
       {
         eventOrder: 0,
@@ -509,7 +636,7 @@ export function simulateCollectionGame(
 }
 
 export function reproduceCollectionGame(
-  prepared: CollectionPreparedGame,
+  prepared: CollectionPreparedGameUnion,
   catalog: CollectionCatalog,
   profile: EraSimulationProfile,
 ): SimulatedCollectionGame & { eventDigest: string; resultDigest: string } {

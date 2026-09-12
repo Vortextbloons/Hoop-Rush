@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
-  COLLECTION_COMMAND_VERSION,
+  COLLECTION_COMMAND_V1_VERSION,
+  COLLECTION_GAME_COMMAND_VERSION,
+  COLLECTION_GAME_V1_VERSION,
   COLLECTION_SCHEMA_VERSION,
+  collectionPlayStateSchema,
+  collectionPreparedGameV2Schema,
   type CollectionCatalog,
   type CollectionCatalogCard,
   type CollectionGameCommand,
@@ -12,10 +16,16 @@ import {
   DEFAULT_ERA_SIM_PROFILE,
   buildCollectionFixtureCard,
   buildCollectionFixtureCatalog,
+  buildCollectionGameRulesFixture,
+  buildCollectionDifficultyProfiles,
 } from '@hoop-rush/test-fixtures';
 import { initializeCollectionActiveTeam } from './active-team.ts';
 import { applyCollectionGameCommand } from './game-commands.ts';
-import { simulateCollectionGame } from './game.ts';
+import { collectionPreparedInputDigest, simulateCollectionGame } from './game.ts';
+import {
+  buildCollectionObjectiveFacts,
+  collectionObjectiveDefinitionsFromRules,
+} from './objectives.ts';
 import {
   collectionPlayStateDigest,
   collectionPlayStateFactsOf,
@@ -39,6 +49,7 @@ const POSITIONS: Array<CollectionCatalogCard['positions']> = [
   ['C'],
 ];
 const HASH = 'a'.repeat(64);
+const FIXED_TIME = '2026-01-01T00:00:00.000Z';
 
 function gameCatalog(size: number): CollectionCatalog {
   const cards: CollectionCatalogCard[] = [];
@@ -64,21 +75,24 @@ function gameCatalog(size: number): CollectionCatalog {
   });
 }
 
-function setup() {
-  const catalog = gameCatalog(18);
+function setup(size = 24) {
+  const catalog = gameCatalog(size);
   const byId = new Map(catalog.cards.map((card) => [card.cardId, card]));
-  const ownedIds = catalog.cards.slice(0, 6).map((card) => card.cardId);
+  const ownedIds = catalog.cards.slice(0, 12).map((card) => card.cardId);
   const playState = initializeCollectionPlayState({
     collectionId: 'collection-1' as CollectionPlayState['collectionId'],
     ownedCardIds: ownedIds,
     resolve: (cardId) => byId.get(cardId),
   });
   const owned = new Set(ownedIds);
+  const rules = buildCollectionGameRulesFixture();
   const baseInput = {
     catalog,
     ownedCardIds: owned,
     rootSeed: '0'.repeat(32),
     cpuWeights: WEIGHTS,
+    difficultyProfiles: buildCollectionDifficultyProfiles(),
+    objectiveDefinitions: collectionObjectiveDefinitionsFromRules(rules),
     profile: DEFAULT_ERA_SIM_PROFILE,
     profileHash: HASH,
     catalogHash: HASH,
@@ -86,17 +100,18 @@ function setup() {
     balances: { Coins: 3000, Exchange: 0 },
     priorCommands: [] as CollectionGameCommand[],
   };
-  return { catalog, byId, owned, playState, baseInput };
+  return { catalog, byId, owned, playState, baseInput, rules };
 }
 
 function baseCommand(
   playState: CollectionPlayState,
   commandId: string,
   extra: Record<string, unknown>,
+  version: string = COLLECTION_GAME_COMMAND_VERSION,
 ): CollectionGameCommand {
   return {
     schemaVersion: COLLECTION_SCHEMA_VERSION,
-    commandVersion: COLLECTION_COMMAND_VERSION,
+    commandVersion: version,
     commandId,
     collectionId: playState.collectionId,
     expectedRevision: playState.revision,
@@ -105,19 +120,58 @@ function baseCommand(
   } as unknown as CollectionGameCommand;
 }
 
+function prepareV2(
+  state: CollectionPlayState,
+  input: ReturnType<typeof setup>['baseInput'],
+  commandId: string,
+  difficultyId: 'street' | 'pro' | 'legend',
+  objectiveId: string | null,
+) {
+  return applyCollectionGameCommand(
+    state,
+    baseCommand(state, commandId, {
+      command: 'prepare-basic-game',
+      difficultyId,
+      objectiveId,
+    }),
+    input,
+  );
+}
+
+function acceptPending(
+  state: CollectionPlayState,
+  input: ReturnType<typeof setup>['baseInput'],
+  commandId: string,
+) {
+  const pending = state.pendingGame;
+  if (pending === null) throw new Error('no pending game');
+  const { result, events } = simulateCollectionGame(pending, input.catalog, input.profile);
+  return applyCollectionGameCommand(
+    state,
+    baseCommand(state, commandId, {
+      command: 'accept-basic-game-result',
+      gameId: pending.gameId,
+      result,
+      events,
+      completedAtIso: FIXED_TIME,
+    }),
+    input,
+  );
+}
+
 describe('collection game commands', () => {
   it('initializes play state lazily with a valid default team', () => {
     const { playState } = setup();
     expect(playState.revision).toBe(0);
     expect(playState.nextGameSequence).toBe(0);
     expect(playState.pendingGame).toBeNull();
+    expect(playState.clearedDifficultyIds).toEqual([]);
     expect(playState.activeTeam.starters).toHaveLength(5);
   });
 
-  it('sets, prepares, abandons, and re-prepares without reusing seeds', () => {
-    const { catalog, byId, owned, playState: initial, baseInput } = setup();
-    const ownedIds = [...owned];
-    const team = initializeCollectionActiveTeam(ownedIds, (cardId) => byId.get(cardId));
+  it('prepares a v2 street game with snapshot facts and locks the setup', () => {
+    const { byId, owned, playState: initial, baseInput } = setup();
+    const team = initializeCollectionActiveTeam([...owned], (cardId) => byId.get(cardId));
     const setResult = applyCollectionGameCommand(
       initial,
       baseCommand(initial, 'cmd-set-1', { command: 'set-active-team', team }),
@@ -125,30 +179,32 @@ describe('collection game commands', () => {
     );
     expect(setResult.status).toBe('accepted');
     if (setResult.status !== 'accepted') throw new Error('set rejected');
-    expect(setResult.playState.revision).toBe(1);
 
-    const stale = applyCollectionGameCommand(
-      setResult.playState,
-      baseCommand(initial, 'cmd-set-2', { command: 'set-active-team', team }),
-      baseInput,
-    );
-    expect(stale.status).toBe('rejected');
-    if (stale.status !== 'rejected') throw new Error('expected stale');
-    expect(stale.rejection.code).toBe('stale-state');
-
-    const prepared = applyCollectionGameCommand(
-      setResult.playState,
-      baseCommand(setResult.playState, 'cmd-prep-1', { command: 'prepare-basic-game' }),
-      baseInput,
-    );
+    const prepared = prepareV2(setResult.playState, baseInput, 'cmd-prep-1', 'street', null);
     expect(prepared.status).toBe('accepted');
-    if (prepared.status !== 'accepted') throw new Error('prepare rejected');
-    expect(prepared.playState.pendingGame?.gameSequence).toBe(0);
+    if (prepared.status !== 'accepted' || prepared.playState.pendingGame === null) {
+      throw new Error(JSON.stringify(prepared));
+    }
+    const pending = prepared.playState.pendingGame;
+    if (pending.gameVersion === COLLECTION_GAME_V1_VERSION) throw new Error('expected v2');
+    expect(pending.gameVersion).toBe('collection-game-v2');
+    expect(pending.difficulty.difficultyId).toBe('street');
+    expect(pending.construction.candidateCount).toBe(1);
+    expect(pending.construction.chosenCandidateIndex).toBe(0);
+    expect(pending.construction.targetMinutes.reduce((sum, entry) => sum + entry.minutes, 0)).toBe(
+      240,
+    );
+    expect(pending.adjustments.requestedDelta).toBe(-2);
+    expect(pending.adjustments.facts).toHaveLength(12);
+    expect(pending.objectives.offers).toHaveLength(3);
+    expect(pending.objectives.selectedObjectiveId).toBeNull();
+    expect(pending.firstClearEligible).toBe(true);
     expect(prepared.playState.nextGameSequence).toBe(1);
+    expect(prepared.playState.clearedDifficultyIds).toEqual([]);
 
     const locked = applyCollectionGameCommand(
       prepared.playState,
-      baseCommand(prepared.playState, 'cmd-set-3', { command: 'set-active-team', team }),
+      baseCommand(prepared.playState, 'cmd-set-2', { command: 'set-active-team', team }),
       baseInput,
     );
     expect(locked.status).toBe('rejected');
@@ -159,7 +215,7 @@ describe('collection game commands', () => {
       prepared.playState,
       baseCommand(prepared.playState, 'cmd-abandon-1', {
         command: 'abandon-basic-game',
-        gameId: prepared.playState.pendingGame?.gameId,
+        gameId: pending.gameId,
       }),
       baseInput,
     );
@@ -167,30 +223,12 @@ describe('collection game commands', () => {
     if (abandoned.status !== 'accepted') throw new Error('abandon rejected');
     expect(abandoned.playState.pendingGame).toBeNull();
     expect(abandoned.playState.nextGameSequence).toBe(1);
-
-    const reprepared = applyCollectionGameCommand(
-      abandoned.playState,
-      baseCommand(abandoned.playState, 'cmd-prep-2', { command: 'prepare-basic-game' }),
-      baseInput,
-    );
-    expect(reprepared.status).toBe('accepted');
-    if (reprepared.status !== 'accepted') throw new Error('reprepare rejected');
-    expect(reprepared.playState.pendingGame?.gameSequence).toBe(1);
-    expect(reprepared.playState.pendingGame?.gameId).not.toBe(
-      prepared.playState.pendingGame?.gameId,
-    );
-    void catalog;
+    expect(abandoned.playState.clearedDifficultyIds).toEqual([]);
   });
 
-  it('accepts a reproduced result exactly once with the correct reward', () => {
-    const { owned, playState: initial, baseInput } = setup();
-    void owned;
-    const prepared = applyCollectionGameCommand(
-      initial,
-      baseCommand(initial, 'cmd-prep-1', { command: 'prepare-basic-game' }),
-      baseInput,
-    );
-    expect(prepared.status).toBe('accepted');
+  it('accepts a v2 result and pays componentized coins once', () => {
+    const { playState: initial, baseInput } = setup();
+    const prepared = prepareV2(initial, baseInput, 'cmd-prep-1', 'street', null);
     if (prepared.status !== 'accepted' || prepared.playState.pendingGame === null) {
       throw new Error('prepare rejected');
     }
@@ -198,28 +236,38 @@ describe('collection game commands', () => {
     const { result, events } = simulateCollectionGame(
       pending,
       baseInput.catalog,
-      DEFAULT_ERA_SIM_PROFILE,
+      baseInput.profile,
     );
     const acceptCommand = baseCommand(prepared.playState, 'cmd-accept-1', {
       command: 'accept-basic-game-result',
       gameId: pending.gameId,
       result,
       events,
-      completedAtIso: '2026-01-01T00:00:00.000Z',
+      completedAtIso: FIXED_TIME,
     });
-    const accepted = applyCollectionGameCommand(prepared.playState, acceptCommand, {
-      ...baseInput,
-      priorCommands: [baseCommand(initial, 'cmd-prep-1', { command: 'prepare-basic-game' })],
-    });
+    const accepted = applyCollectionGameCommand(prepared.playState, acceptCommand, baseInput);
     expect(accepted.status).toBe('accepted');
     if (accepted.status !== 'accepted') throw new Error(JSON.stringify(accepted));
     expect(accepted.playState.pendingGame).toBeNull();
-    expect(accepted.ledgerEntry?.pullSequence).toBeNull();
-    expect(accepted.ledgerEntry?.currency).toBe('Coins');
-    const expectedAmount = result.winner === 'home' ? 100 : 10;
-    expect(accepted.ledgerEntry?.amount).toBe(expectedAmount);
-    expect(accepted.balances?.Coins).toBe(3000 + expectedAmount);
-    expect(accepted.record?.reward.amount).toBe(expectedAmount);
+    const record = accepted.record;
+    if (record === undefined || record.gameVersion === COLLECTION_GAME_V1_VERSION) {
+      throw new Error('expected v2 record');
+    }
+    expect(accepted.ledgerEntries).toHaveLength(record.reward.components.length);
+    expect(accepted.ledgerEntries?.reduce((sum, entry) => sum + entry.amount, 0)).toBe(
+      record.reward.total,
+    );
+    expect(record.reward.difficultyId).toBe('street');
+    expect(accepted.balances?.Coins).toBe(3000 + record.reward.total);
+    if (record.reward.firstClearGranted) {
+      expect(accepted.playState.clearedDifficultyIds).toEqual(['street']);
+    } else {
+      expect(accepted.playState.clearedDifficultyIds).toEqual([]);
+    }
+    for (const entry of accepted.ledgerEntries ?? []) {
+      expect(entry.pullSequence).toBeNull();
+      expect(entry.currency).toBe('Coins');
+    }
 
     const duplicate = applyCollectionGameCommand(prepared.playState, acceptCommand, {
       ...baseInput,
@@ -240,13 +288,245 @@ describe('collection game commands', () => {
     expect(conflict.rejection.code).toBe('conflicting-command-reuse');
   });
 
-  it('rejects tampered results and illegal teams with typed codes', () => {
-    const { byId, owned, playState: initial, baseInput } = setup();
-    const prepared = applyCollectionGameCommand(
-      initial,
-      baseCommand(initial, 'cmd-prep-1', { command: 'prepare-basic-game' }),
+  it('grants the first clear exactly once per difficulty', () => {
+    const { playState: initial, baseInput } = setup();
+    let state = initial;
+    let firstClear: 'street' | null = null;
+    let repeatClear = false;
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const prepared = prepareV2(state, baseInput, `cmd-prep-${String(attempt)}`, 'street', null);
+      if (prepared.status !== 'accepted') throw new Error('prepare rejected');
+      const accepted = acceptPending(
+        prepared.playState,
+        baseInput,
+        `cmd-accept-${String(attempt)}`,
+      );
+      if (accepted.status !== 'accepted') throw new Error(JSON.stringify(accepted));
+      const record = accepted.record;
+      if (record === undefined || record.gameVersion === COLLECTION_GAME_V1_VERSION) {
+        throw new Error('expected v2 record');
+      }
+      state = accepted.playState;
+      if (firstClear === null) {
+        if (record.reward.firstClearGranted) {
+          firstClear = 'street';
+          expect(state.clearedDifficultyIds).toEqual(['street']);
+        } else {
+          continue;
+        }
+      } else if (record.reward.playerWin) {
+        repeatClear = record.reward.firstClearGranted;
+        expect(record.reward.components.some((component) => component.kind === 'first-clear')).toBe(
+          false,
+        );
+        expect(state.clearedDifficultyIds).toEqual(['street']);
+        break;
+      }
+    }
+    expect(firstClear).toBe('street');
+    expect(repeatClear).toBe(false);
+  });
+
+  it('rejects unknown difficulties, infeasible objectives, and unoffered objectives', () => {
+    const { playState, baseInput } = setup();
+    const unknown = applyCollectionGameCommand(
+      playState,
+      baseCommand(playState, 'cmd-prep-unknown', {
+        command: 'prepare-basic-game',
+        difficultyId: 'impossible',
+        objectiveId: null,
+      }),
       baseInput,
     );
+    expect(unknown.status).toBe('rejected');
+    if (unknown.status !== 'rejected') throw new Error('expected rejection');
+    expect(unknown.rejection.code).toBe('unknown-difficulty');
+
+    const smallOwned = baseInput.catalog.cards.slice(0, 5).map((card) => card.cardId);
+    const smallPlayState = initializeCollectionPlayState({
+      collectionId: 'collection-1' as CollectionPlayState['collectionId'],
+      ownedCardIds: smallOwned,
+      resolve: (cardId) => baseInput.catalog.cards.find((card) => card.cardId === cardId),
+    });
+    const infeasible = applyCollectionGameCommand(
+      smallPlayState,
+      baseCommand(smallPlayState, 'cmd-prep-infeasible', {
+        command: 'prepare-basic-game',
+        difficultyId: 'street',
+        objectiveId: 'obj-bench-spark-v1',
+      }),
+      { ...baseInput, ownedCardIds: new Set(smallOwned) },
+    );
+    expect(infeasible.status).toBe('rejected');
+    if (infeasible.status !== 'rejected') throw new Error('expected rejection');
+    expect(infeasible.rejection.code).toBe('infeasible-objective');
+
+    const offers = buildCollectionObjectiveFacts({
+      definitions: baseInput.objectiveDefinitions,
+      rootSeed: baseInput.rootSeed,
+      difficultyId: 'street',
+      gameSequence: playState.nextGameSequence,
+      team: playState.activeTeam,
+      selectedObjectiveId: null,
+    }).offers;
+    const offeredIds = new Set(offers.map((offer) => offer.objectiveId));
+    const unoffered = baseInput.objectiveDefinitions.find(
+      (definition) => !offeredIds.has(definition.objectiveId),
+    );
+    if (unoffered === undefined) throw new Error('expected an unoffered objective');
+    const notOffered = applyCollectionGameCommand(
+      playState,
+      baseCommand(playState, 'cmd-prep-unoffered', {
+        command: 'prepare-basic-game',
+        difficultyId: 'street',
+        objectiveId: unoffered.objectiveId,
+      }),
+      baseInput,
+    );
+    expect(notOffered.status).toBe('rejected');
+    if (notOffered.status !== 'rejected') throw new Error('expected rejection');
+    expect(notOffered.rejection.code).toBe('objective-not-offered');
+  });
+
+  it('selects an offered objective and records its evaluation', () => {
+    const { playState, baseInput } = setup();
+    const offers = buildCollectionObjectiveFacts({
+      definitions: baseInput.objectiveDefinitions,
+      rootSeed: baseInput.rootSeed,
+      difficultyId: 'pro',
+      gameSequence: playState.nextGameSequence,
+      team: playState.activeTeam,
+      selectedObjectiveId: null,
+    }).offers;
+    const selected = offers[0];
+    if (selected === undefined) throw new Error('no offer');
+    const prepared = prepareV2(playState, baseInput, 'cmd-prep-obj', 'pro', selected.objectiveId);
+    expect(prepared.status).toBe('accepted');
+    if (prepared.status !== 'accepted' || prepared.playState.pendingGame === null) {
+      throw new Error('prepare rejected');
+    }
+    const pending = prepared.playState.pendingGame;
+    if (pending.gameVersion === COLLECTION_GAME_V1_VERSION) throw new Error('expected v2');
+    expect(pending.objectives.selectedObjectiveId).toBe(selected.objectiveId);
+    const accepted = acceptPending(prepared.playState, baseInput, 'cmd-accept-obj');
+    if (accepted.status !== 'accepted') throw new Error(JSON.stringify(accepted));
+    const record = accepted.record;
+    if (record === undefined || record.gameVersion === COLLECTION_GAME_V1_VERSION) {
+      throw new Error('expected v2 record');
+    }
+    expect(record.objectiveEvaluation.kind).not.toBe('not-selected');
+    if (record.objectiveEvaluation.kind === 'evaluated') {
+      expect(record.objectiveEvaluation.objectiveId).toBe(selected.objectiveId);
+      const hasObjectiveComponent = record.reward.components.some(
+        (component) => component.kind === 'objective',
+      );
+      expect(hasObjectiveComponent).toBe(record.objectiveEvaluation.success);
+    }
+  });
+
+  it('still completes a legacy v1 pending game with the 100/10 reward', () => {
+    const { playState: initial, baseInput } = setup();
+    const prepared = applyCollectionGameCommand(
+      initial,
+      baseCommand(
+        initial,
+        'cmd-prep-v1',
+        { command: 'prepare-basic-game' },
+        COLLECTION_COMMAND_V1_VERSION,
+      ),
+      baseInput,
+    );
+    expect(prepared.status).toBe('accepted');
+    if (prepared.status !== 'accepted' || prepared.playState.pendingGame === null) {
+      throw new Error('prepare rejected');
+    }
+    const pending = prepared.playState.pendingGame;
+    expect(pending.gameVersion).toBe(COLLECTION_GAME_V1_VERSION);
+    const { result, events } = simulateCollectionGame(
+      pending,
+      baseInput.catalog,
+      baseInput.profile,
+    );
+    const accepted = applyCollectionGameCommand(
+      prepared.playState,
+      baseCommand(prepared.playState, 'cmd-accept-v1', {
+        command: 'accept-basic-game-result',
+        gameId: pending.gameId,
+        result,
+        events,
+        completedAtIso: FIXED_TIME,
+      }),
+      baseInput,
+    );
+    expect(accepted.status).toBe('accepted');
+    if (accepted.status !== 'accepted') throw new Error(JSON.stringify(accepted));
+    const record = accepted.record;
+    if (record === undefined || record.gameVersion !== COLLECTION_GAME_V1_VERSION) {
+      throw new Error('expected v1 record');
+    }
+    const expectedAmount = record.result.winner === 'home' ? 100 : 10;
+    expect(record.reward.amount).toBe(expectedAmount);
+    expect(accepted.ledgerEntries).toHaveLength(1);
+    expect(accepted.ledgerEntries?.[0]?.amount).toBe(expectedAmount);
+    expect(accepted.playState.clearedDifficultyIds).toEqual([]);
+  });
+
+  it('rejects tampered adjustment facts as a typed rejection', () => {
+    const { playState: initial, baseInput } = setup();
+    const prepared = prepareV2(initial, baseInput, 'cmd-prep-tamper', 'street', null);
+    if (prepared.status !== 'accepted' || prepared.playState.pendingGame === null) {
+      throw new Error('prepare rejected');
+    }
+    const pending = prepared.playState.pendingGame;
+    if (pending.gameVersion === COLLECTION_GAME_V1_VERSION) throw new Error('expected v2');
+    const tamperedBase = collectionPreparedGameV2Schema.parse({
+      ...pending,
+      adjustments: {
+        ...pending.adjustments,
+        facts: pending.adjustments.facts.map((fact, index) =>
+          index === 0
+            ? {
+                ...fact,
+                ratings: fact.ratings.map((entry) => {
+                  const before = entry.before + 1;
+                  return {
+                    ...entry,
+                    before,
+                    after: Math.min(100, Math.max(0, before + fact.requestedDelta)),
+                  };
+                }),
+              }
+            : fact,
+        ),
+      },
+    });
+    const tampered = {
+      ...prepared.playState,
+      pendingGame: {
+        ...tamperedBase,
+        inputDigest: collectionPreparedInputDigest(tamperedBase),
+      },
+    };
+    const { result, events } = simulateCollectionGame(pending, baseInput.catalog, baseInput.profile);
+    const rejected = applyCollectionGameCommand(
+      tampered,
+      baseCommand(tampered, 'cmd-accept-tamper', {
+        command: 'accept-basic-game-result',
+        gameId: pending.gameId,
+        result,
+        events,
+        completedAtIso: FIXED_TIME,
+      }),
+      baseInput,
+    );
+    expect(rejected.status).toBe('rejected');
+    if (rejected.status !== 'rejected') throw new Error('expected rejection');
+    expect(rejected.rejection.code).toBe('invalid-adjustment-facts');
+  });
+
+  it('rejects tampered results and illegal teams with typed codes', () => {
+    const { byId, owned, playState: initial, baseInput } = setup();
+    const prepared = prepareV2(initial, baseInput, 'cmd-prep-1', 'pro', null);
     if (prepared.status !== 'accepted' || prepared.playState.pendingGame === null) {
       throw new Error('prepare rejected');
     }
@@ -254,7 +534,7 @@ describe('collection game commands', () => {
     const { result, events } = simulateCollectionGame(
       pending,
       baseInput.catalog,
-      DEFAULT_ERA_SIM_PROFILE,
+      baseInput.profile,
     );
     if (result.outcome !== 'completed') throw new Error('expected completed');
     const tampered = {
@@ -268,7 +548,7 @@ describe('collection game commands', () => {
         gameId: pending.gameId,
         result: tampered,
         events,
-        completedAtIso: '2026-01-01T00:00:00.000Z',
+        completedAtIso: FIXED_TIME,
       }),
       baseInput,
     );
@@ -276,10 +556,7 @@ describe('collection game commands', () => {
     if (rejected.status !== 'rejected') throw new Error('expected invalid-result');
     expect(rejected.rejection.code).toBe('invalid-result');
 
-    const ownedIds = [...owned];
-    const good = initializeCollectionActiveTeam(ownedIds, (cardId) => byId.get(cardId));
-    const guards = good.starters.map((cardId) => byId.get(cardId));
-    void guards;
+    const good = initializeCollectionActiveTeam([...owned], (cardId) => byId.get(cardId));
     const illegal = applyCollectionGameCommand(
       initial,
       baseCommand(initial, 'cmd-set-9', {
@@ -303,15 +580,14 @@ describe('collection game commands', () => {
     expect(mismatch.status).toBe('rejected');
     if (mismatch.status !== 'rejected') throw new Error('expected mismatch');
     expect(mismatch.rejection.code).toBe('collection-mismatch');
+
+    const parsed = collectionPlayStateSchema.parse(prepared.playState);
+    expect(parsed.digest).toBe(prepared.playState.digest);
   });
 
   it('rejects rewards that overflow safe integers', () => {
     const { playState: initial, baseInput } = setup();
-    const prepared = applyCollectionGameCommand(
-      initial,
-      baseCommand(initial, 'cmd-prep-1', { command: 'prepare-basic-game' }),
-      baseInput,
-    );
+    const prepared = prepareV2(initial, baseInput, 'cmd-prep-1', 'legend', null);
     if (prepared.status !== 'accepted' || prepared.playState.pendingGame === null) {
       throw new Error('prepare rejected');
     }
@@ -319,7 +595,7 @@ describe('collection game commands', () => {
     const { result, events } = simulateCollectionGame(
       pending,
       baseInput.catalog,
-      DEFAULT_ERA_SIM_PROFILE,
+      baseInput.profile,
     );
     const outcome = applyCollectionGameCommand(
       prepared.playState,
@@ -328,7 +604,7 @@ describe('collection game commands', () => {
         gameId: pending.gameId,
         result,
         events,
-        completedAtIso: '2026-01-01T00:00:00.000Z',
+        completedAtIso: FIXED_TIME,
       }),
       {
         ...baseInput,

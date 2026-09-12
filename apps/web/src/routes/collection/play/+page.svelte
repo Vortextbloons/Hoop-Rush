@@ -5,19 +5,30 @@
   import type {
     CollectionCatalog,
     CollectionCatalogCard,
-    CollectionGameRecord,
+    CollectionDifficultyId,
+    CollectionGameRecordUnion,
+    CollectionGameRules,
+    CollectionObjectiveId,
     CollectionPlayState,
     CollectionState,
   } from '@hoop-rush/data-contracts';
   import AsyncState from '$lib/components/AsyncState.svelte';
   import CollectionNav from '$lib/collection/CollectionNav.svelte';
-  import { loadCollectionCatalog } from '$lib/collection/collection-assets.ts';
+  import DifficultyPicker from '$lib/collection/DifficultyPicker.svelte';
+  import MatchupReport from '$lib/collection/MatchupReport.svelte';
+  import ObjectivePicker from '$lib/collection/ObjectivePicker.svelte';
+  import RewardReceipt from '$lib/collection/RewardReceipt.svelte';
+  import {
+    loadCollectionCatalog,
+    loadCollectionGameRules,
+  } from '$lib/collection/collection-assets.ts';
   import {
     abandonBasicGame,
     acceptBasicGameResult,
     collectionGameWorkerAssets,
+    collectionObjectiveOffers,
     ensureCollection,
-    ensurePlayState,
+    ensurePlayStateSnapshot,
     loadCommittedGame,
     prepareBasicGame,
   } from '$lib/collection/collection-hub.ts';
@@ -29,6 +40,11 @@
     visibleEvents,
     type WatchMode,
   } from '$lib/collection/collection-gamecast.ts';
+  import {
+    difficultyOptionViews,
+    objectiveOptionViews,
+    rewardPreview,
+  } from '$lib/collection/collection-setup.ts';
 
   let mounted = true;
   onDestroy(() => {
@@ -39,12 +55,17 @@
   let phase = $state<'loading' | 'error' | 'ready'>('loading');
   let error = $state<string | null>(null);
   let catalog = $state<CollectionCatalog | null>(null);
+  let rules = $state<CollectionGameRules | null>(null);
   let collectionState = $state<CollectionState | null>(null);
   let playState = $state<CollectionPlayState | null>(null);
+  let rootSeed = $state<string | null>(null);
   let busy = $state<'idle' | 'preparing' | 'playing' | 'committing'>('idle');
   let flowError = $state<string | null>(null);
-  let record = $state<CollectionGameRecord | null>(null);
+  let record = $state<CollectionGameRecordUnion | null>(null);
   let announcement = $state('');
+
+  let difficultyId = $state<CollectionDifficultyId>('street');
+  let selectedObjectiveId = $state<CollectionObjectiveId | null>(null);
 
   let watchMode = $state<WatchMode>('standard');
   let cursor = $state(0);
@@ -59,11 +80,58 @@
     card?.summarySource?.overallRating ?? 60;
 
   const pending = $derived(playState?.pendingGame ?? null);
+  const pendingV2 = $derived(pending?.gameVersion === 'collection-game-v2' ? pending : null);
+  const pendingV1 = $derived(pending?.gameVersion === 'collection-game-v1' ? pending : null);
+  const recordV2 = $derived(record?.gameVersion === 'collection-game-v2' ? record : null);
   const shownEvents = $derived(record ? visibleEvents(record.events, watchMode) : []);
   const facts = $derived(record ? explanationFacts(record, record.events) : null);
   const claimed = $derived(collectionState?.claimedWelcome ?? false);
   const hasTeam = $derived(playState !== null);
   const balances = $derived(collectionState?.balances ?? { Coins: 0, Exchange: 0 });
+  const clearedDifficultyIds = $derived(playState?.clearedDifficultyIds ?? []);
+  const difficultyOptions = $derived(
+    rules ? difficultyOptionViews(rules, clearedDifficultyIds) : [],
+  );
+  const offers = $derived.by(() => {
+    if (rules === null || playState === null || rootSeed === null || pending !== null) return [];
+    try {
+      return collectionObjectiveOffers({
+        rules,
+        rootSeed,
+        difficultyId,
+        gameSequence: playState.nextGameSequence,
+        team: playState.activeTeam,
+      });
+    } catch {
+      return [];
+    }
+  });
+  const effectiveObjectiveId = $derived(
+    selectedObjectiveId !== null &&
+      offers.some((offer) => offer.objectiveId === selectedObjectiveId)
+      ? selectedObjectiveId
+      : null,
+  );
+  const objectiveOptions = $derived(
+    rules ? objectiveOptionViews({ offers, rules, difficultyId }) : [],
+  );
+  const preview = $derived(
+    rules
+      ? rewardPreview({
+          rules,
+          difficultyId,
+          selectedObjectiveId: effectiveObjectiveId,
+          clearedDifficultyIds,
+        })
+      : null,
+  );
+  const setupLocked = $derived(busy !== 'idle');
+  const pendingPlayerStarters = $derived(
+    pendingV1?.playerTeam.starters.map((cardId) => byId.get(cardId) ?? null) ?? [],
+  );
+  const pendingCpuStarters = $derived(
+    pendingV1?.cpuTeam.starters.map((cardId) => byId.get(cardId) ?? null) ?? [],
+  );
 
   function stopPlayback(): void {
     playing = false;
@@ -118,19 +186,35 @@
     cursor = Math.max(0, shownEvents.length - 1);
   }
 
+  function difficultyNameOf(id: CollectionDifficultyId): string {
+    return difficultyOptions.find((option) => option.difficultyId === id)?.displayName ?? id;
+  }
+
+  function objectiveTitleOf(objectiveId: string): string | null {
+    if (recordV2 === null) return null;
+    const offer = recordV2.prepared.objectives.offers.find(
+      (candidate) => candidate.objectiveId === objectiveId,
+    );
+    return offer?.title ?? null;
+  }
+
   async function load(): Promise<void> {
     try {
-      const [loadedCatalog, loadedState] = await Promise.all([
+      const nowIso = new Date().toISOString();
+      const [loadedCatalog, loadedState, loadedRules] = await Promise.all([
         loadCollectionCatalog(),
-        ensureCollection(new Date().toISOString()),
+        ensureCollection(nowIso),
+        loadCollectionGameRules(),
       ]);
       if (!mounted) return;
       catalog = loadedCatalog;
       collectionState = loadedState;
+      rules = loadedRules;
       if (loadedState.claimedWelcome) {
-        const play = await ensurePlayState(new Date().toISOString());
+        const snapshot = await ensurePlayStateSnapshot(new Date().toISOString());
         if (!mounted) return;
-        playState = play;
+        playState = snapshot.playState;
+        rootSeed = snapshot.rootSeed;
         await restoreLastGame();
       }
       phase = 'ready';
@@ -159,13 +243,14 @@
   });
 
   async function refreshState(): Promise<void> {
-    const [loadedState, play] = await Promise.all([
+    const [loadedState, snapshot] = await Promise.all([
       ensureCollection(new Date().toISOString()),
-      ensurePlayState(new Date().toISOString()),
+      ensurePlayStateSnapshot(new Date().toISOString()),
     ]);
     if (!mounted) return;
     collectionState = loadedState;
-    playState = play;
+    playState = snapshot.playState;
+    rootSeed = snapshot.rootSeed;
   }
 
   async function prepare(): Promise<void> {
@@ -173,10 +258,19 @@
     busy = 'preparing';
     flowError = null;
     try {
-      const outcome = await prepareBasicGame(new Date().toISOString());
+      const outcome = await prepareBasicGame(new Date().toISOString(), {
+        difficultyId,
+        objectiveId: effectiveObjectiveId,
+      });
       if (!mounted) return;
       playState = outcome.playState;
-      announcement = 'Matchup ready. Your team faces the CPU team.';
+      record = null;
+      try {
+        sessionStorage.removeItem('collection-last-game');
+      } catch {
+        // Session storage is best-effort.
+      }
+      announcement = `Matchup prepared at ${difficultyNameOf(difficultyId)}.`;
     } catch (prepareError) {
       if (!mounted) return;
       flowError = prepareError instanceof Error ? prepareError.message : 'Preparing failed.';
@@ -251,8 +345,22 @@
       }
       cursor = 0;
       playing = false;
-      const won = record?.result.winner === 'home';
-      announcement = won ? 'You won. 100 Coins.' : 'You lost. 10 Coins.';
+      const committed = record;
+      const won = committed?.result.winner === 'home';
+      const coins =
+        committed === null
+          ? 0
+          : committed.gameVersion === 'collection-game-v2'
+            ? committed.reward.total
+            : committed.reward.amount;
+      let objectiveNote = '';
+      if (committed?.gameVersion === 'collection-game-v2') {
+        const evaluation = committed.objectiveEvaluation;
+        if (evaluation.kind === 'evaluated') {
+          objectiveNote = evaluation.success ? ' Objective passed.' : ' Objective failed.';
+        }
+      }
+      announcement = `${won ? 'You won' : 'CPU won'}. +${coins} Coins.${objectiveNote}`;
       busy = 'idle';
     } catch (playError) {
       if (!mounted) return;
@@ -261,13 +369,6 @@
       if (mounted) busy = 'idle';
     }
   }
-
-  const pendingPlayerStarters = $derived(
-    pending?.playerTeam.starters.map((cardId) => byId.get(cardId) ?? null) ?? [],
-  );
-  const pendingCpuStarters = $derived(
-    pending?.cpuTeam.starters.map((cardId) => byId.get(cardId) ?? null) ?? [],
-  );
 </script>
 
 <svelte:head>
@@ -280,7 +381,7 @@
       <p class="ultimate-eyebrow">Ultimate Run</p>
       <h1 class="font-display text-3xl font-extrabold tracking-tight">Play</h1>
       <p class="text-sm text-muted-foreground">
-        One game at a time. Win 100 Coins · Loss 10 Coins.
+        One game at a time. Street, Pro, and Legend scale the CPU and the rewards.
       </p>
     </div>
     <div class="flex flex-wrap items-center gap-2 text-sm">
@@ -317,7 +418,7 @@
     </div>
     <a
       href={resolve('/collection')}
-      class="mt-3 inline-block min-h-[44px] rounded-xl bg-accent px-5 py-2.5 font-bold text-accent-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      class="mt-3 inline-block min-h-11 rounded-xl bg-accent px-5 py-2.5 font-bold text-accent-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       Go to collection
     </a>
@@ -331,23 +432,11 @@
     </div>
     <a
       href={resolve('/collection/team')}
-      class="mt-3 inline-block min-h-[44px] rounded-xl bg-accent px-5 py-2.5 font-bold text-accent-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      class="mt-3 inline-block min-h-11 rounded-xl bg-accent px-5 py-2.5 font-bold text-accent-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       Build team
     </a>
   {:else}
-    <section
-      aria-label="Game rules"
-      class="mt-4 rounded-2xl border border-border bg-card p-5 text-sm"
-    >
-      <h2 class="font-display text-lg font-extrabold">Basic game</h2>
-      <ul class="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
-        <li>Your saved team against a generated 12-card CPU team.</li>
-        <li>2020s simulation profile, neutral home court.</li>
-        <li>Reward: <strong>Win 100 Coins · Loss 10 Coins</strong>.</li>
-      </ul>
-    </section>
-
     {#if flowError}
       <p
         role="alert"
@@ -357,66 +446,147 @@
       </p>
     {/if}
 
-    {#if pending && !record}
-      <section aria-label="Matchup" class="mt-4 rounded-2xl border border-accent/50 bg-card p-5">
-        <h2 class="font-display text-xl font-extrabold">Matchup ready</h2>
-        <div class="mt-3 grid gap-4 md:grid-cols-2">
-          <div>
-            <h3 class="font-bold">Your starters</h3>
-            <ul class="mt-2 space-y-1 text-sm">
-              {#each pendingPlayerStarters as card, index (index)}
-                <li class="tabular-nums">
-                  {card ? `${card.displayName} · Overall ${overallOf(card)}` : 'Unknown card'}
-                </li>
-              {/each}
-            </ul>
-          </div>
-          <div>
-            <h3 class="font-bold">CPU starters</h3>
-            <ul class="mt-2 space-y-1 text-sm">
-              {#each pendingCpuStarters as card, index (index)}
-                <li class="tabular-nums">
-                  {card ? `${card.displayName} · Overall ${overallOf(card)}` : 'Unknown card'}
-                </li>
-              {/each}
-            </ul>
-          </div>
-        </div>
-        <div class="mt-4 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onclick={play}
-            disabled={busy !== 'idle'}
-            class="min-h-[44px] rounded-xl bg-accent px-5 py-2.5 text-sm font-bold text-accent-foreground outline-none disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            {busy === 'playing' ? 'Playing…' : busy === 'committing' ? 'Committing…' : 'Start game'}
-          </button>
-          <button
-            type="button"
-            onclick={abandon}
-            disabled={busy !== 'idle'}
-            class="min-h-[44px] rounded-xl bg-surface-2 px-5 py-2.5 text-sm font-bold outline-none disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            Abandon matchup
-          </button>
-        </div>
-        {#if busy === 'playing'}
-          <p class="mt-3 text-sm text-muted-foreground" aria-live="polite">
-            Simulating in the background. The result commits before it is shown.
+    {#if pending}
+      {#if pendingV2 && catalog}
+        <MatchupReport prepared={pendingV2} {catalog} />
+      {:else if pendingV1}
+        <section aria-label="Matchup" class="mt-4 rounded-2xl border border-accent/50 bg-card p-5">
+          <h2 class="font-display text-xl font-extrabold">Matchup ready</h2>
+          <p class="mt-1 text-sm text-muted-foreground">
+            Legacy matchup. Rewards use the recorded M4.2 100/10 table.
           </p>
-        {/if}
-      </section>
-    {:else if !record}
-      <div class="mt-4">
+          <div class="mt-3 grid gap-4 md:grid-cols-2">
+            <div>
+              <h3 class="font-bold">Your starters</h3>
+              <ul class="mt-2 space-y-1 text-sm">
+                {#each pendingPlayerStarters as card, index (index)}
+                  <li class="tabular-nums">
+                    {card ? `${card.displayName} · Overall ${overallOf(card)}` : 'Unknown card'}
+                  </li>
+                {/each}
+              </ul>
+            </div>
+            <div>
+              <h3 class="font-bold">CPU starters</h3>
+              <ul class="mt-2 space-y-1 text-sm">
+                {#each pendingCpuStarters as card, index (index)}
+                  <li class="tabular-nums">
+                    {card ? `${card.displayName} · Overall ${overallOf(card)}` : 'Unknown card'}
+                  </li>
+                {/each}
+              </ul>
+            </div>
+          </div>
+        </section>
+      {/if}
+      <div class="mt-5 flex flex-wrap gap-2">
         <button
           type="button"
-          onclick={prepare}
+          onclick={play}
           disabled={busy !== 'idle'}
-          class="min-h-[44px] rounded-xl bg-accent px-5 py-2.5 text-sm font-bold text-accent-foreground outline-none disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-ring"
+          class="min-h-11 rounded-xl bg-accent px-5 py-2.5 text-sm font-bold text-accent-foreground outline-none disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-ring"
         >
-          {busy === 'preparing' ? 'Preparing…' : 'Prepare game'}
+          {busy === 'playing' ? 'Playing…' : busy === 'committing' ? 'Committing…' : 'Start game'}
+        </button>
+        <button
+          type="button"
+          onclick={abandon}
+          disabled={busy !== 'idle'}
+          class="min-h-11 rounded-xl bg-surface-2 px-5 py-2.5 text-sm font-bold outline-none disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          Abandon matchup
         </button>
       </div>
+      {#if busy === 'playing'}
+        <p class="mt-3 text-sm text-muted-foreground" aria-live="polite">
+          Simulating in the background. The result commits before it is shown.
+        </p>
+      {/if}
+    {:else if !record}
+      <section aria-label="Game setup" class="mt-4 rounded-2xl border border-border bg-card p-5">
+        <div class="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <p class="ultimate-eyebrow">Pre-game setup</p>
+            <h2 class="font-display text-xl font-extrabold">Scout the matchup</h2>
+          </div>
+          <p class="text-xs text-muted-foreground">
+            Setup locks when you prepare. Abandon to change it.
+          </p>
+        </div>
+        <div class="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,21rem)]">
+          <div class="space-y-6">
+            <DifficultyPicker
+              options={difficultyOptions}
+              value={difficultyId}
+              disabled={setupLocked}
+              onChange={(id) => {
+                if (id !== difficultyId) selectedObjectiveId = null;
+                difficultyId = id;
+              }}
+            />
+            <ObjectivePicker
+              options={objectiveOptions}
+              value={effectiveObjectiveId}
+              disabled={setupLocked}
+              onChange={(id) => {
+                selectedObjectiveId = id;
+              }}
+            />
+          </div>
+          {#if preview}
+            <section
+              aria-label="Reward preview"
+              class="rounded-2xl border border-border bg-surface-2 p-4 lg:sticky lg:top-4 lg:self-start"
+            >
+              <h3 class="font-display text-base font-extrabold">Exact reward preview</h3>
+              <p class="mt-1 text-xs text-muted-foreground">
+                {difficultyNameOf(difficultyId)} · {preview.multiplierLabel} on outcome, objective, and
+                margin. First clear is fixed.
+              </p>
+              <ul class="mt-3 space-y-2">
+                {#each preview.rows as row (row.kind)}
+                  <li
+                    class="flex items-start justify-between gap-3 rounded-lg bg-card px-3 py-2 text-sm"
+                  >
+                    <span>
+                      <span class="block font-semibold">{row.label}</span>
+                      <span class="block text-xs text-muted-foreground">{row.detail}</span>
+                    </span>
+                    <span
+                      class="font-bold tabular-nums {row.coins === 0
+                        ? 'text-muted-foreground'
+                        : 'text-accent'}"
+                    >
+                      {row.coins === 0 ? '—' : `+${row.coins}`}
+                    </span>
+                  </li>
+                {/each}
+              </ul>
+              <dl class="mt-3 space-y-1 text-xs text-muted-foreground">
+                <div class="flex items-center justify-between gap-3">
+                  <dt>Max repeat (win + objective + margin)</dt>
+                  <dd class="font-bold text-foreground tabular-nums">+{preview.maxRepeatCoins}</dd>
+                </div>
+                <div class="flex items-center justify-between gap-3">
+                  <dt>Max total with first clear</dt>
+                  <dd class="font-bold text-foreground tabular-nums">+{preview.maxTotalCoins}</dd>
+                </div>
+              </dl>
+              <button
+                type="button"
+                onclick={prepare}
+                disabled={setupLocked}
+                class="mt-4 min-h-11 w-full rounded-xl bg-accent px-5 py-2.5 text-sm font-bold text-accent-foreground outline-none disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {busy === 'preparing' ? 'Preparing…' : 'Prepare matchup'}
+              </button>
+              <p class="mt-2 text-xs text-muted-foreground" aria-live="polite">
+                Preparing consumes the game sequence. Abandoning never reuses it.
+              </p>
+            </section>
+          {/if}
+        </div>
+      </section>
     {/if}
 
     {#if record && facts}
@@ -438,7 +608,7 @@
                 type="button"
                 onclick={() => setMode(mode.id as WatchMode)}
                 aria-pressed={watchMode === mode.id}
-                class="min-h-[44px] rounded-xl px-4 py-2 text-sm font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring {watchMode ===
+                class="min-h-11 rounded-xl px-4 py-2 text-sm font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring {watchMode ===
                 mode.id
                   ? 'bg-accent text-accent-foreground'
                   : 'bg-surface-2'}"
@@ -454,7 +624,7 @@
             <button
               type="button"
               onclick={togglePlayback}
-              class="min-h-[44px] rounded-xl bg-surface-2 px-4 py-2 text-sm font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              class="min-h-11 rounded-xl bg-surface-2 px-4 py-2 text-sm font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               {playing ? 'Pause' : 'Play'}
             </button>
@@ -462,14 +632,14 @@
               type="button"
               onclick={stepOnce}
               disabled={playing}
-              class="min-h-[44px] rounded-xl bg-surface-2 px-4 py-2 text-sm font-bold outline-none disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-ring"
+              class="min-h-11 rounded-xl bg-surface-2 px-4 py-2 text-sm font-bold outline-none disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-ring"
             >
               Step
             </button>
             <button
               type="button"
               onclick={skipToFinal}
-              class="min-h-[44px] rounded-xl bg-surface-2 px-4 py-2 text-sm font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              class="min-h-11 rounded-xl bg-surface-2 px-4 py-2 text-sm font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               Skip to final
             </button>
@@ -510,15 +680,21 @@
               {/if}
             </ul>
           </div>
-          <div class="rounded-xl bg-surface-2 p-4 text-sm">
-            <h3 class="font-bold">Reward receipt</h3>
-            <p class="mt-2 tabular-nums text-muted-foreground">
-              +{facts.rewardCoins} Coins ({facts.rewardReason === 'game-win-reward'
-                ? 'win'
-                : 'loss'}) · balances now {balances.Coins} Coins.
-            </p>
-          </div>
+          {#if !recordV2}
+            <div class="rounded-xl bg-surface-2 p-4 text-sm">
+              <h3 class="font-bold">Reward receipt</h3>
+              <p class="mt-2 tabular-nums text-muted-foreground">
+                +{facts.rewardCoins} Coins ({facts.rewardReason === 'game-win-reward'
+                  ? 'win'
+                  : 'loss'}) · balances now {balances.Coins} Coins.
+              </p>
+            </div>
+          {/if}
         </div>
+
+        {#if recordV2}
+          <RewardReceipt record={recordV2} {balances} {objectiveTitleOf} />
+        {/if}
 
         {#if record.result.outcome === 'completed'}
           {@const completed = record.result}
@@ -561,7 +737,7 @@
               type="button"
               onclick={prepare}
               disabled={busy !== 'idle'}
-              class="min-h-[44px] rounded-xl bg-accent px-5 py-2.5 text-sm font-bold text-accent-foreground outline-none disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-ring"
+              class="min-h-11 rounded-xl bg-accent px-5 py-2.5 text-sm font-bold text-accent-foreground outline-none disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-ring"
             >
               {busy === 'preparing' ? 'Preparing…' : 'Play again'}
             </button>

@@ -35,14 +35,20 @@
     rosterByVersion?: ReadonlyMap<string, SeasonRosterEntry> | null;
     franchiseAbbrev?: ((franchiseId: string) => string) | null;
   } = $props();
+  function isAggregateMap(
+    value: readonly SeasonPlayerAggregate[] | ReadonlyMap<string, SeasonPlayerAggregate>,
+  ): value is ReadonlyMap<string, SeasonPlayerAggregate> {
+    return value instanceof Map;
+  }
   const view = $derived(awardsViewModel(awards, playerName, franchiseName));
   const mvp = $derived(view.awards[0] ?? null);
   const dpoy = $derived(view.awards[1] ?? null);
   const sixth = $derived(view.awards[2] ?? null);
   const aggregateMap = $derived.by(() => {
-    if (aggregates instanceof Map) return aggregates;
+    if (aggregates === null) return new Map<string, SeasonPlayerAggregate>();
+    if (isAggregateMap(aggregates)) return aggregates;
     const map = new Map<string, SeasonPlayerAggregate>();
-    for (const row of aggregates ?? []) map.set(row.playerVersionId, row);
+    for (const row of aggregates) map.set(row.playerVersionId, row);
     return map;
   });
   const faceOf = (playerVersionId: string): SeasonFaceRef | null => {

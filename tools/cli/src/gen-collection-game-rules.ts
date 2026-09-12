@@ -7,16 +7,20 @@ import {
   COLLECTION_GAME_ENVIRONMENT_ERA_ID,
   COLLECTION_GAME_HOME_COURT_POLICY,
   COLLECTION_GAME_REPLAY_VERSION,
-  COLLECTION_GAME_REWARD_LOSS_COINS,
-  COLLECTION_GAME_REWARD_WIN_COINS,
   COLLECTION_GAME_RULES_VERSION,
   COLLECTION_GAME_VERSION,
+  COLLECTION_DIFFICULTY_VERSION,
+  COLLECTION_OBJECTIVE_VERSION,
   COLLECTION_REWARD_VERSION,
   COLLECTION_TEAM_VERSION,
-  collectionGameRulesSchema,
-  type CollectionRarity,
+  collectionGameRulesV2Schema,
 } from '@hoop-rush/data-contracts';
 import { ENGINE_VERSION } from '@hoop-rush/engine';
+import {
+  COLLECTION_GAME_REWARD_TABLE,
+  buildCollectionLaunchDifficultyProfiles,
+  buildCollectionLaunchObjectives,
+} from './collection-game-constants.ts';
 import { readJson } from './io.ts';
 
 function atomicWriteFileSync(target: string, content: string): void {
@@ -37,15 +41,6 @@ const PROFILE_PATH = resolve(STATIC_DATA, `era-sim/${COLLECTION_GAME_ENVIRONMENT
 const IS_ENTRY =
   process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
-export const COLLECTION_GAME_CPU_RARITY_WEIGHTS: Record<CollectionRarity, number> = {
-  Ember: 70,
-  Eruption: 23,
-  Apex: 5,
-  Titan: 1.7,
-  Eclipse: 0.29,
-  Immortal: 0.01,
-};
-
 export function buildCollectionGameRules(): unknown {
   const profile = readJson(PROFILE_PATH) as { profileVersion?: unknown };
   if (typeof profile.profileVersion !== 'string' || profile.profileVersion.length === 0) {
@@ -57,20 +52,22 @@ export function buildCollectionGameRules(): unknown {
     teamVersion: COLLECTION_TEAM_VERSION,
     rewardVersion: COLLECTION_REWARD_VERSION,
     replayVersion: COLLECTION_GAME_REPLAY_VERSION,
+    difficultyVersion: COLLECTION_DIFFICULTY_VERSION,
+    objectiveVersion: COLLECTION_OBJECTIVE_VERSION,
     cpuRosterSize: COLLECTION_GAME_CPU_ROSTER_SIZE,
     eligibleScope: 'full-catalog',
-    cpuRarityWeights: { ...COLLECTION_GAME_CPU_RARITY_WEIGHTS },
+    difficulties: buildCollectionLaunchDifficultyProfiles(),
+    objectives: buildCollectionLaunchObjectives(),
+    rewardTable: COLLECTION_GAME_REWARD_TABLE,
     environmentEraId: COLLECTION_GAME_ENVIRONMENT_ERA_ID,
     homeCourtPolicy: COLLECTION_GAME_HOME_COURT_POLICY,
-    winRewardCoins: COLLECTION_GAME_REWARD_WIN_COINS,
-    lossRewardCoins: COLLECTION_GAME_REWARD_LOSS_COINS,
     engineVersion: ENGINE_VERSION,
     profileVersion: profile.profileVersion,
   };
 }
 
 export function main(): void {
-  const parsed = collectionGameRulesSchema.safeParse(buildCollectionGameRules());
+  const parsed = collectionGameRulesV2Schema.safeParse(buildCollectionGameRules());
   if (!parsed.success) {
     throw new Error(
       `derived collection game rules fail the schema: ${parsed.error.issues[0]?.message ?? 'unknown'}`,

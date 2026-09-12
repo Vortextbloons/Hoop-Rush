@@ -15,6 +15,8 @@ import {
   type PostseasonGameId,
   type SeasonAdvancePostseasonRejection,
   type SeasonAlmanac,
+  type SeasonEffectsState,
+  type SeasonGameSummary,
   type SeasonRun,
   type SeasonRunCommand,
   type SeasonRunStage,
@@ -148,15 +150,13 @@ export function createSeasonPostseasonRunner(
   let cancelled = false;
   let warmRequestId: string | null = null;
   let warmed = false;
-  let wireSnapshotCache:
-    | {
-        stateRevision: number;
-        stateDigest: string;
-        run: SeasonRun;
-        effects: SeasonEffectsState;
-        regularSeasonSummaries: readonly SeasonGameSummary[];
-      }
-    | null = null;
+  let wireSnapshotCache: {
+    stateRevision: number;
+    stateDigest: string;
+    run: SeasonRun;
+    effects: SeasonEffectsState;
+    regularSeasonSummaries: readonly SeasonGameSummary[];
+  } | null = null;
   const pending = new Map<
     string,
     (message: SeasonPostseasonWorkerCompleteMessage | SeasonPostseasonWorkerErrorMessage) => void

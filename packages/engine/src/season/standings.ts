@@ -1,6 +1,7 @@
 import {
   SEASON_STANDINGS_VERSION,
   franchiseIdSchema,
+  type FranchiseId,
   type SeasonGame,
   type SeasonLeague,
   type SeasonStandings,
@@ -174,8 +175,8 @@ export function extendSeasonStandings(
     }
     const homeScore = summary.homeScore;
     const awayScore = summary.awayScore;
-    let winner: string;
-    let loser: string;
+    let winner: FranchiseId;
+    let loser: FranchiseId;
     let winnerPointsFor: number;
     let winnerPointsAgainst: number;
     let loserPointsFor: number;
@@ -186,7 +187,8 @@ export function extendSeasonStandings(
         throw new Error(`forfeit summary ${summary.gameId} does not name the losing team`);
       }
       loser = forfeitLoser;
-      winner = loser === summary.homeFranchiseId ? summary.awayFranchiseId : summary.homeFranchiseId;
+      winner =
+        loser === summary.homeFranchiseId ? summary.awayFranchiseId : summary.homeFranchiseId;
       winnerPointsFor = 2;
       winnerPointsAgainst = 0;
       loserPointsFor = 0;
@@ -196,7 +198,8 @@ export function extendSeasonStandings(
         throw new Error(`final summary ${summary.gameId} is tied`);
       }
       winner = homeScore > awayScore ? summary.homeFranchiseId : summary.awayFranchiseId;
-      loser = winner === summary.homeFranchiseId ? summary.awayFranchiseId : summary.homeFranchiseId;
+      loser =
+        winner === summary.homeFranchiseId ? summary.awayFranchiseId : summary.homeFranchiseId;
       winnerPointsFor = winner === summary.homeFranchiseId ? homeScore : awayScore;
       winnerPointsAgainst = winner === summary.homeFranchiseId ? awayScore : homeScore;
       loserPointsFor = loser === summary.homeFranchiseId ? homeScore : awayScore;

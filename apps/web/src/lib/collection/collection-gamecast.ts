@@ -1,7 +1,8 @@
 import type {
   CollectionGameEvent,
-  CollectionGameRecord,
-  CollectionGameResult,
+  CollectionGameRecordUnion,
+  CollectionGameResultUnion,
+  CollectionRewardReason,
 } from '@hoop-rush/data-contracts';
 
 export type WatchMode = 'fast' | 'standard' | 'slow';
@@ -49,7 +50,7 @@ export interface GameExplanationFacts {
   awayScore: number;
   overtimePeriods: number;
   rewardCoins: number;
-  rewardReason: 'game-win-reward' | 'game-loss-reward';
+  rewardReason: CollectionRewardReason;
   topHome: { cardId: string; points: number } | null;
   topAway: { cardId: string; points: number } | null;
   leadChanges: number;
@@ -62,18 +63,33 @@ function leaderOf(homeScore: number, awayScore: number): 'home' | 'away' | 'tied
   return homeScore > awayScore ? 'home' : 'away';
 }
 
+function rewardFactsOf(record: CollectionGameRecordUnion): {
+  coins: number;
+  reason: CollectionRewardReason;
+} {
+  if (record.gameVersion === 'collection-game-v1') {
+    return { coins: record.reward.amount, reason: record.reward.reason };
+  }
+  const outcome = record.reward.components.find((component) => component.kind === 'outcome');
+  return {
+    coins: record.reward.total,
+    reason: outcome?.reason ?? (record.reward.playerWin ? 'game-win-reward' : 'game-loss-reward'),
+  };
+}
+
 export function explanationFacts(
-  record: CollectionGameRecord,
+  record: CollectionGameRecordUnion,
   events: readonly CollectionGameEvent[],
 ): GameExplanationFacts {
-  const { result, reward } = record;
+  const { result } = record;
+  const reward = rewardFactsOf(record);
   if (result.outcome !== 'completed') {
     return {
       winner: result.winner,
       homeScore: result.winner === 'home' ? 2 : 0,
       awayScore: result.winner === 'home' ? 0 : 2,
       overtimePeriods: 0,
-      rewardCoins: reward.amount,
+      rewardCoins: reward.coins,
       rewardReason: reward.reason,
       topHome: null,
       topAway: null,
@@ -82,7 +98,7 @@ export function explanationFacts(
       exceptions: 0,
     };
   }
-  const completed: Extract<CollectionGameResult, { outcome: 'completed' }> = result;
+  const completed: Extract<CollectionGameResultUnion, { outcome: 'completed' }> = result;
   const topOf = (players: ReadonlyArray<{ cardId: string; points: number }>) => {
     let top: { cardId: string; points: number } | null = null;
     for (const player of players) {
@@ -114,7 +130,7 @@ export function explanationFacts(
     homeScore: completed.home.score,
     awayScore: completed.away.score,
     overtimePeriods: completed.overtimePeriods,
-    rewardCoins: reward.amount,
+    rewardCoins: reward.coins,
     rewardReason: reward.reason,
     topHome: topOf(completed.home.players),
     topAway: topOf(completed.away.players),

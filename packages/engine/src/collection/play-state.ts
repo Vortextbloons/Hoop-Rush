@@ -1,5 +1,6 @@
 import {
   COLLECTION_GAME_VERSION,
+  COLLECTION_PLAY_SAVE_VERSION,
   COLLECTION_SCHEMA_VERSION,
   COLLECTION_TEAM_VERSION,
   canonicalJson,
@@ -7,6 +8,7 @@ import {
   type CollectionActiveTeam,
   type CollectionCatalogCard,
   type CollectionPlayState,
+  type CollectionPlayStateV1,
 } from '@hoop-rush/data-contracts';
 import { CollectionCommandError } from './packs.ts';
 import { initializeCollectionActiveTeam } from './active-team.ts';
@@ -19,6 +21,7 @@ export function collectionPlayStateFactsOf(state: CollectionPlayState): {
   pendingGameDigest: string | null;
   teamVersion: string;
   gameVersion: string;
+  clearedDifficultyIds: string[];
 } {
   return {
     collectionId: state.collectionId,
@@ -29,6 +32,7 @@ export function collectionPlayStateFactsOf(state: CollectionPlayState): {
       state.pendingGame === null ? null : seasonDigestHex(canonicalJson(state.pendingGame)),
     teamVersion: state.teamVersion,
     gameVersion: state.gameVersion,
+    clearedDifficultyIds: [...state.clearedDifficultyIds].sort(),
   };
 }
 
@@ -53,6 +57,7 @@ export function initializeCollectionPlayState(input: {
     );
   }
   const state: CollectionPlayState = {
+    saveVersion: COLLECTION_PLAY_SAVE_VERSION,
     schemaVersion: COLLECTION_SCHEMA_VERSION,
     teamVersion: COLLECTION_TEAM_VERSION,
     gameVersion: COLLECTION_GAME_VERSION,
@@ -62,6 +67,24 @@ export function initializeCollectionPlayState(input: {
     digest: '0'.repeat(32),
     nextGameSequence: 0,
     pendingGame: null,
+    clearedDifficultyIds: [],
   };
   return { ...state, digest: collectionPlayStateDigest(collectionPlayStateFactsOf(state)) };
+}
+
+export function migrateCollectionPlayStateV1(state: CollectionPlayStateV1): CollectionPlayState {
+  const migrated: CollectionPlayState = {
+    saveVersion: COLLECTION_PLAY_SAVE_VERSION,
+    schemaVersion: COLLECTION_SCHEMA_VERSION,
+    teamVersion: state.teamVersion,
+    gameVersion: COLLECTION_GAME_VERSION,
+    collectionId: state.collectionId,
+    activeTeam: state.activeTeam,
+    revision: state.revision,
+    digest: '0'.repeat(32),
+    nextGameSequence: state.nextGameSequence,
+    pendingGame: state.pendingGame,
+    clearedDifficultyIds: [],
+  };
+  return { ...migrated, digest: collectionPlayStateDigest(collectionPlayStateFactsOf(migrated)) };
 }

@@ -1461,6 +1461,36 @@ export const collectionPackCalibrateReportSchema = z.object({
 });
 export type CollectionPackCalibrateReport = z.infer<typeof collectionPackCalibrateReportSchema>;
 
+export const collectionGameAuditDifficultySchema = z.object({
+  difficultyId: z.string().min(1).max(32),
+  games: z.number().int().nonnegative(),
+  wins: z.number().int().nonnegative(),
+  losses: z.number().int().nonnegative(),
+  cpuSequences: z.number().int().nonnegative(),
+  meanRosterScoreMillionths: z.number().int().nonnegative(),
+  meanSpecialCount: z.number().nonnegative(),
+  adjustmentFacts: z.number().int().nonnegative(),
+  boundedRatingCount: z.number().int().nonnegative(),
+  firstClearEligibleGames: z.number().int().nonnegative(),
+  firstClearGranted: z.number().int().nonnegative(),
+  objectiveEvaluations: z.number().int().nonnegative(),
+  objectiveSuccesses: z.number().int().nonnegative(),
+  maxReward: z.number().int().nonnegative(),
+});
+export type CollectionGameAuditDifficulty = z.infer<typeof collectionGameAuditDifficultySchema>;
+
+export const collectionGameAuditObjectiveSchema = z.object({
+  objectiveId: z.string().min(1).max(64),
+  threshold: z.number().int(),
+  offered: z.number().int().nonnegative(),
+  selected: z.number().int().nonnegative(),
+  evaluated: z.number().int().nonnegative(),
+  successes: z.number().int().nonnegative(),
+  minActualValue: z.number().int().nullable(),
+  maxActualValue: z.number().int().nullable(),
+});
+export type CollectionGameAuditObjective = z.infer<typeof collectionGameAuditObjectiveSchema>;
+
 export const collectionGameAuditReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('collection game-audit'),
@@ -1477,6 +1507,14 @@ export const collectionGameAuditReportSchema = z.object({
   shortHandedGames: z.number().int().nonnegative(),
   overtimeGames: z.number().int().nonnegative(),
   foulLimitExceptions: z.number().int().nonnegative(),
+  difficulties: z.array(collectionGameAuditDifficultySchema).length(3),
+  objectives: z.array(collectionGameAuditObjectiveSchema),
+  v1Reproductions: z.number().int().nonnegative(),
+  v2Reproductions: z.number().int().nonnegative(),
+  selectionInvariantGames: z.number().int().nonnegative(),
+  deterministicIds: z.number().int().nonnegative(),
+  adjustmentChecks: z.number().int().nonnegative(),
+  rewardChecks: z.number().int().nonnegative(),
 });
 export type CollectionGameAuditReport = z.infer<typeof collectionGameAuditReportSchema>;
 
@@ -1485,15 +1523,52 @@ export const collectionGameReproduceReportSchema = z.object({
   command: z.literal('collection game-reproduce'),
   gameId: z.string().min(1).max(64),
   gameSequence: z.number().int().nonnegative(),
+  gameVersion: z.string().min(1).max(64),
+  difficultyId: z.string().min(1).max(32).nullable(),
+  objectiveSuccess: z.boolean().nullable(),
   ok: z.boolean(),
   eventDigest: z.string().regex(/^[0-9a-f]{32}$/),
   resultDigest: z.string().regex(/^[0-9a-f]{32}$/),
+  rewardVersion: z.string().min(1).max(64),
   rewardReason: z.string().min(1).max(64),
   rewardAmount: z.number().int().nonnegative(),
+  rewardTotal: z.number().int().nonnegative(),
   rewardTransactionId: z.string().min(1).max(128),
   failures: z.array(z.string().min(1)),
 });
 export type CollectionGameReproduceReport = z.infer<typeof collectionGameReproduceReportSchema>;
+
+export const collectionGameCalibrateReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('collection game-calibrate'),
+  status: z.enum(['scaffold', 'frozen']),
+  rulesVersion: z.string().min(1).max(64),
+  rulesHash: z.string().regex(/^[0-9a-f]{64}$/),
+  catalogHash: z.string().regex(/^[0-9a-f]{64}$/),
+  workers: z.number().int().positive(),
+  calibrationSeeds: z.number().int().nonnegative(),
+  validationSeeds: z.number().int().nonnegative(),
+  projection: z.object({
+    calibrationGames: z.number().int().nonnegative(),
+    validationGames: z.number().int().nonnegative(),
+    chunkInvariant: z.boolean(),
+    difficulties: z.array(
+      z.object({
+        difficultyId: z.string().min(1).max(32),
+        games: z.number().int().nonnegative(),
+        meanRosterScoreMillionths: z.number().int().nonnegative(),
+        meanSpecialCount: z.number().nonnegative(),
+        legalityFailures: z.number().int().nonnegative(),
+      }),
+    ),
+  }),
+  gates: z.record(z.string(), z.boolean()),
+  blockers: z.array(z.string().min(1)),
+  targetsWritten: z.literal(false),
+  targetsPath: z.string().nullable(),
+  durationMs: z.number().nonnegative(),
+});
+export type CollectionGameCalibrateReport = z.infer<typeof collectionGameCalibrateReportSchema>;
 
 export const overallsAuditFlagSchema = z.object({
   displayName: z.string().min(1).max(96),

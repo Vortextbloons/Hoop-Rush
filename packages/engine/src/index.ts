@@ -631,6 +631,14 @@ export {
   collectionGameSeed,
   collectionGameSeedPaths,
   collectionGameId,
+  collectionGameNamespaceSeedV2,
+  collectionCpuDifficultySeed,
+  collectionCpuIdentitySeed,
+  collectionCpuCandidateSeed,
+  collectionObjectiveOfferSeed,
+  collectionGameSeedV2,
+  collectionGameSeedPathsV2,
+  collectionGameIdV2,
 } from './collection/seeds.ts';
 export {
   collectionCardId,
@@ -649,7 +657,11 @@ export {
   allocateDefaultMinutes,
   initializeCollectionActiveTeam,
 } from './collection/active-team.ts';
-export { generateCollectionCpuTeam, cpuPerCardWeights } from './collection/cpu.ts';
+export {
+  generateCollectionCpuTeam,
+  generateCollectionCpuTeamV2,
+  cpuPerCardWeights,
+} from './collection/cpu.ts';
 export {
   CollectionGameError,
   collectionPreparedInputDigest,
@@ -657,20 +669,41 @@ export {
   collectionGameEventDigest,
   collectionGameRewardFor,
   prepareCollectionBasicGame,
+  prepareCollectionBasicGameV2,
   simulateCollectionGame,
   reproduceCollectionGame,
 } from './collection/game.ts';
-export { checkCollectionGameResult } from './collection/game-audit.ts';
+export { checkCollectionGameResult, checkCollectionGameRecord } from './collection/game-audit.ts';
+export {
+  DIFFICULTY_RATING_SHIFT_MECHANISM,
+  resolveDifficultyRatingAdjustmentForCard,
+  resolveDifficultyRatingAdjustments,
+  materializeAdjustedCpuRatings,
+  verifyDifficultyRatingAdjustments,
+  verifyMaterializedAdjustments,
+} from './collection/difficulty.ts';
+export {
+  COLLECTION_OBJECTIVE_TEMPLATES,
+  collectionObjectiveDefinitionsFromRules,
+  collectionObjectiveFeasibilityFactsOf,
+  buildCollectionObjectiveFacts,
+  evaluateCollectionObjective,
+} from './collection/objectives.ts';
+export {
+  collectionRewardTransactionId,
+  collectionGameRewardReceiptFor,
+} from './collection/rewards.ts';
 export {
   initializeCollectionPlayState,
   collectionPlayStateFactsOf,
   collectionPlayStateDigest,
+  migrateCollectionPlayStateV1,
 } from './collection/play-state.ts';
 export {
   applyCollectionGameCommand,
   type CollectionGameCommandResult,
 } from './collection/game-commands.ts';
-export { auditCollectionState } from './collection/audit.ts';
+export { auditCollectionState, auditCollectionFirstClearState } from './collection/audit.ts';
 export {
   WELCOME_COIN_GRANT,
   CollectionCommandError,

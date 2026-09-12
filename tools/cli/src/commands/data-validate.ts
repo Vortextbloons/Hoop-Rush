@@ -14,17 +14,28 @@ import {
   SEASON_ROTATION_VERSION,
   SELECTION_SCORE_VERSION,
   COLLECTION_CATALOG_VERSION,
+  COLLECTION_DIFFICULTY_ORDER,
+  COLLECTION_DIFFICULTY_VERSION,
   COLLECTION_ECONOMY_VERSION,
-  COLLECTION_OVERLAY_VERSION,
-  COLLECTION_PACK_RULES_VERSION,
+  COLLECTION_GAME_FIRST_CLEAR_COINS,
+  COLLECTION_GAME_REPLAY_VERSION,
+  COLLECTION_GAME_REWARD_LOSS_COINS,
+  COLLECTION_GAME_REWARD_MARGIN_CAP_POINTS,
+  COLLECTION_GAME_REWARD_MARGIN_COIN_PER_POINT,
+  COLLECTION_GAME_REWARD_OBJECTIVE_COINS,
+  COLLECTION_GAME_REWARD_WIN_COINS,
   COLLECTION_GAME_RULES_VERSION,
   COLLECTION_GAME_VERSION,
-  COLLECTION_TEAM_VERSION,
+  COLLECTION_OBJECTIVE_VERSION,
+  COLLECTION_OVERLAY_VERSION,
+  COLLECTION_PACK_RULES_VERSION,
+  COLLECTION_RARITY_ORDER,
   COLLECTION_REWARD_VERSION,
-  COLLECTION_GAME_REPLAY_VERSION,
+  COLLECTION_TEAM_VERSION,
   collectionCatalogSchema,
   collectionGameRulesSchema,
   collectionIndexSchema,
+  collectionScaleRewardCoins,
   seasonFreeAgencyIndexSchema,
   seasonGameTargetsSchema,
   seasonSponsorsIndexSchema,
@@ -40,6 +51,7 @@ import {
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
 import { sha256Hex } from '../io.ts';
 import { DEFAULT_MANIFEST } from './data-loader.ts';
+import { collectionGameTargetsSchema } from './collection-game-calibrate.ts';
 export const DATA_VALIDATE_OPTIONS: Record<string, boolean> = {
   input: true,
   format: true,
@@ -941,10 +953,36 @@ async function auditCollectionCatalog(
   );
   return { ok: failures.length === 0, details, failures };
 }
-async function auditCollectionGameRules(
+const COLLECTION_EXPECTED_OBJECTIVE_THRESHOLDS: Record<string, number> = {
+  'obj-three-barrage-v1': 12,
+  'obj-lock-score-v1': 105,
+  'obj-bench-spark-v1': 25,
+  'obj-ball-pressure-v1': 14,
+  'obj-own-glass-v1': 10,
+  'obj-box-score-star-v1': 10,
+};
+const COLLECTION_EXPECTED_REPEAT_MAX: Record<string, number> = {
+  street: 150,
+  pro: 203,
+  legend: 263,
+};
+function collectionMaxRepeatReward(multiplierBp: number): number {
+  const outcome = collectionScaleRewardCoins(COLLECTION_GAME_REWARD_WIN_COINS, multiplierBp);
+  const objective = collectionScaleRewardCoins(
+    COLLECTION_GAME_REWARD_OBJECTIVE_COINS,
+    multiplierBp,
+  );
+  const margin = collectionScaleRewardCoins(
+    COLLECTION_GAME_REWARD_MARGIN_COIN_PER_POINT * COLLECTION_GAME_REWARD_MARGIN_CAP_POINTS,
+    multiplierBp,
+  );
+  return outcome + objective + margin;
+}
+export async function auditCollectionGameRules(
   manifest: HoopRushManifest,
   manifestDir: string,
   verbose: boolean,
+  rawManifest: unknown,
 ): Promise<AuditResult> {
   const failures: string[] = [];
   const details: string[] = [];
@@ -992,25 +1030,19 @@ async function auditCollectionGameRules(
     return { ok: false, details, failures };
   }
   const rules = parsed.data;
-  const rulesVersion: string = rules.rulesVersion;
-  if (rulesVersion !== COLLECTION_GAME_RULES_VERSION) {
-    failures.push(`collection-game-rules: rulesVersion ${rulesVersion} unexpected`);
-  }
-  const gameVersion: string = rules.gameVersion;
-  if (gameVersion !== COLLECTION_GAME_VERSION) {
-    failures.push(`collection-game-rules: gameVersion ${gameVersion} unexpected`);
-  }
-  const teamVersion: string = rules.teamVersion;
-  if (teamVersion !== COLLECTION_TEAM_VERSION) {
-    failures.push(`collection-game-rules: teamVersion ${teamVersion} unexpected`);
-  }
-  const rewardVersion: string = rules.rewardVersion;
-  if (rewardVersion !== COLLECTION_REWARD_VERSION) {
-    failures.push(`collection-game-rules: rewardVersion ${rewardVersion} unexpected`);
-  }
-  const replayVersion: string = rules.replayVersion;
-  if (replayVersion !== COLLECTION_GAME_REPLAY_VERSION) {
-    failures.push(`collection-game-rules: replayVersion ${replayVersion} unexpected`);
+  const versions: Array<[string, string, string]> = [
+    ['rulesVersion', rules.rulesVersion, COLLECTION_GAME_RULES_VERSION],
+    ['gameVersion', rules.gameVersion, COLLECTION_GAME_VERSION],
+    ['teamVersion', rules.teamVersion, COLLECTION_TEAM_VERSION],
+    ['rewardVersion', rules.rewardVersion, COLLECTION_REWARD_VERSION],
+    ['replayVersion', rules.replayVersion, COLLECTION_GAME_REPLAY_VERSION],
+    ['difficultyVersion', rules.difficultyVersion, COLLECTION_DIFFICULTY_VERSION],
+    ['objectiveVersion', rules.objectiveVersion, COLLECTION_OBJECTIVE_VERSION],
+  ];
+  for (const [label, value, expected] of versions) {
+    if (value !== expected) {
+      failures.push(`collection-game-rules: ${label} ${value} unexpected (want ${expected})`);
+    }
   }
   const cpuRosterSize: number = rules.cpuRosterSize;
   if (cpuRosterSize !== 12) {
@@ -1020,19 +1052,6 @@ async function auditCollectionGameRules(
   if (eligibleScope !== 'full-catalog') {
     failures.push('collection-game-rules: eligibleScope must be full-catalog');
   }
-  const expectedWeights: Record<string, number> = {
-    Ember: 70,
-    Eruption: 23,
-    Apex: 5,
-    Titan: 1.7,
-    Eclipse: 0.29,
-    Immortal: 0.01,
-  };
-  for (const [rarity, weight] of Object.entries(expectedWeights)) {
-    if (rules.cpuRarityWeights[rarity as keyof typeof rules.cpuRarityWeights] !== weight) {
-      failures.push(`collection-game-rules: cpu weight ${rarity} != ${String(weight)}`);
-    }
-  }
   const environmentEraId: string = rules.environmentEraId;
   if (environmentEraId !== '2020s') {
     failures.push(`collection-game-rules: environmentEraId ${environmentEraId} != 2020s`);
@@ -1041,14 +1060,204 @@ async function auditCollectionGameRules(
   if (homeCourtPolicy !== 'neutral-home-court') {
     failures.push('collection-game-rules: homeCourtPolicy must be neutral-home-court');
   }
-  const winRewardCoins: number = rules.winRewardCoins;
-  const lossRewardCoins: number = rules.lossRewardCoins;
-  if (winRewardCoins !== 100 || lossRewardCoins !== 10) {
-    failures.push('collection-game-rules: rewards must be win 100 / loss 10 Coins');
+  for (let index = 0; index < COLLECTION_DIFFICULTY_ORDER.length; index += 1) {
+    const expectedId = COLLECTION_DIFFICULTY_ORDER[index];
+    if (rules.difficulties[index]?.difficultyId !== expectedId) {
+      failures.push('collection-game-rules: difficulties must be ordered street, pro, legend');
+      break;
+    }
+  }
+  const rarityIndex = new Map<string, number>(
+    COLLECTION_RARITY_ORDER.map((rarity, index) => [rarity, index]),
+  );
+  for (const profile of rules.difficulties) {
+    const profileVersion: string = profile.difficultyVersion;
+    const rulesDifficultyVersion: string = rules.difficultyVersion;
+    if (profileVersion !== rulesDifficultyVersion) {
+      failures.push(
+        `collection-game-rules: ${profile.difficultyId} difficultyVersion does not match the rules`,
+      );
+    }
+    let total = 0;
+    const seen = new Set<string>();
+    for (const entry of profile.rarityWeightsBp) {
+      total += entry.weightBp;
+      seen.add(entry.rarity);
+      const low = rarityIndex.get(profile.rarityBand.floor) ?? 0;
+      const high = rarityIndex.get(profile.rarityBand.ceiling) ?? 0;
+      const index = rarityIndex.get(entry.rarity) ?? -1;
+      if (index < low || index > high) {
+        failures.push(
+          `collection-game-rules: ${profile.difficultyId} weight ${entry.rarity} is outside the band`,
+        );
+      }
+    }
+    if (total !== 10_000) {
+      failures.push(
+        `collection-game-rules: ${profile.difficultyId} rarity weights sum to ${String(total)} bp`,
+      );
+    }
+    for (const rarity of COLLECTION_RARITY_ORDER) {
+      const low = rarityIndex.get(profile.rarityBand.floor) ?? 0;
+      const high = rarityIndex.get(profile.rarityBand.ceiling) ?? 0;
+      const index = rarityIndex.get(rarity) ?? -1;
+      if (index >= low && index <= high && !seen.has(rarity)) {
+        failures.push(
+          `collection-game-rules: ${profile.difficultyId} is missing band weight ${rarity}`,
+        );
+      }
+    }
+  }
+  for (let index = 1; index < rules.difficulties.length; index += 1) {
+    const previous = rules.difficulties[index - 1];
+    const current = rules.difficulties[index];
+    if (previous === undefined || current === undefined) continue;
+    if (current.ratingShift <= previous.ratingShift) {
+      failures.push('collection-game-rules: rating shifts must strictly increase with difficulty');
+    }
+    if (current.rewardMultiplierBp <= previous.rewardMultiplierBp) {
+      failures.push(
+        'collection-game-rules: reward multipliers must strictly increase with difficulty',
+      );
+    }
+  }
+  const objectiveIds = new Set<string>();
+  for (const objective of rules.objectives) {
+    if (objectiveIds.has(objective.objectiveId)) {
+      failures.push(`collection-game-rules: duplicate objective ${objective.objectiveId}`);
+    }
+    objectiveIds.add(objective.objectiveId);
+    const objectiveVersion: string = objective.objectiveVersion;
+    const rulesObjectiveVersion: string = rules.objectiveVersion;
+    if (objectiveVersion !== rulesObjectiveVersion) {
+      failures.push(
+        `collection-game-rules: objective ${objective.objectiveId} version does not match the rules`,
+      );
+    }
+    const expected = COLLECTION_EXPECTED_OBJECTIVE_THRESHOLDS[objective.objectiveId];
+    if (expected === undefined) {
+      failures.push(`collection-game-rules: unexpected objective ${objective.objectiveId}`);
+    } else if (objective.threshold !== expected) {
+      failures.push(
+        `collection-game-rules: threshold for ${objective.objectiveId} is ${String(objective.threshold)}, want ${String(expected)}`,
+      );
+    }
+  }
+  for (const objectiveId of Object.keys(COLLECTION_EXPECTED_OBJECTIVE_THRESHOLDS)) {
+    if (!objectiveIds.has(objectiveId)) {
+      failures.push(`collection-game-rules: missing objective definition ${objectiveId}`);
+    }
+  }
+  if (rules.objectives.length !== Object.keys(COLLECTION_EXPECTED_OBJECTIVE_THRESHOLDS).length) {
+    failures.push(
+      `collection-game-rules: ${String(rules.objectives.length)} objectives, want ${String(Object.keys(COLLECTION_EXPECTED_OBJECTIVE_THRESHOLDS).length)}`,
+    );
+  }
+  const reward = rules.rewardTable;
+  const winCoins: number = reward.winCoins;
+  const lossCoins: number = reward.lossCoins;
+  const objectiveCoins: number = reward.objectiveCoins;
+  const marginCoinPerPoint: number = reward.marginCoinPerPoint;
+  const marginCapPoints: number = reward.marginCapPoints;
+  if (
+    winCoins !== COLLECTION_GAME_REWARD_WIN_COINS ||
+    lossCoins !== COLLECTION_GAME_REWARD_LOSS_COINS
+  ) {
+    failures.push(
+      `collection-game-rules: reward table outcome must be win ${String(COLLECTION_GAME_REWARD_WIN_COINS)} / loss ${String(COLLECTION_GAME_REWARD_LOSS_COINS)}`,
+    );
+  }
+  if (
+    objectiveCoins !== COLLECTION_GAME_REWARD_OBJECTIVE_COINS ||
+    marginCoinPerPoint !== COLLECTION_GAME_REWARD_MARGIN_COIN_PER_POINT ||
+    marginCapPoints !== COLLECTION_GAME_REWARD_MARGIN_CAP_POINTS
+  ) {
+    failures.push('collection-game-rules: reward table objective/margin values unexpected');
+  }
+  for (const difficultyId of COLLECTION_DIFFICULTY_ORDER) {
+    if (reward.firstClearCoins[difficultyId] !== COLLECTION_GAME_FIRST_CLEAR_COINS[difficultyId]) {
+      failures.push(
+        `collection-game-rules: first clear for ${difficultyId} must be ${String(COLLECTION_GAME_FIRST_CLEAR_COINS[difficultyId])}`,
+      );
+    }
+  }
+  for (const profile of rules.difficulties) {
+    const maximum = collectionMaxRepeatReward(profile.rewardMultiplierBp);
+    const expected = COLLECTION_EXPECTED_REPEAT_MAX[profile.difficultyId];
+    if (expected === undefined || maximum !== expected) {
+      failures.push(
+        `collection-game-rules: ${profile.difficultyId} repeat maximum ${String(maximum)} != ${String(expected ?? -1)}`,
+      );
+    }
   }
   details.push(
-    `collection-game-rules: ${rules.rulesVersion} · CPU 12 full-catalog · 2020s neutral-home · win ${String(rules.winRewardCoins)} / loss ${String(rules.lossRewardCoins)} · ${String(content.length)} bytes`,
+    `collection-game-rules: ${rules.rulesVersion} · ${String(rules.difficulties.length)} difficulties · ${String(rules.objectives.length)} objectives · repeat maxima ${rules.difficulties.map((profile) => `${profile.difficultyId} ${String(collectionMaxRepeatReward(profile.rewardMultiplierBp))}`).join(' / ')} · ${String(content.length)} bytes`,
   );
+
+  const targetsRef = (
+    rawManifest as {
+      collection?: { gameTargets?: { url?: string; contentHash?: string } };
+    }
+  ).collection?.gameTargets;
+  if (targetsRef?.url === undefined || targetsRef.contentHash === undefined) {
+    details.push('collection-game-targets: none packaged (calibration not frozen)');
+  } else {
+    const targetsPath = isAbsolute(targetsRef.url)
+      ? targetsRef.url
+      : resolve(manifestDir, targetsRef.url);
+    let targetsContent: Buffer;
+    try {
+      const info = await stat(targetsPath);
+      if (!info.isFile()) {
+        failures.push(`collection-game-targets: asset is not a file (${targetsPath})`);
+        return { ok: false, details, failures };
+      }
+      targetsContent = await readFile(targetsPath);
+    } catch {
+      failures.push(`collection-game-targets: asset missing (${targetsPath})`);
+      return { ok: false, details, failures };
+    }
+    if (sha256Hex(targetsContent) !== targetsRef.contentHash) {
+      failures.push(`collection-game-targets: content hash mismatch (${targetsPath})`);
+    } else if (verbose) {
+      details.push(`collection-game-targets: hash verified (${targetsPath})`);
+    }
+    let targetsRaw: unknown;
+    try {
+      targetsRaw = JSON.parse(targetsContent.toString('utf8')) as unknown;
+    } catch {
+      failures.push('collection-game-targets: artifact is not valid JSON');
+      return { ok: false, details, failures };
+    }
+    const targetsParsed = collectionGameTargetsSchema.safeParse(targetsRaw);
+    if (!targetsParsed.success) {
+      failures.push(
+        `collection-game-targets: schema failure: ${targetsParsed.error.issues[0]?.path.join('.') ?? '(root)'} ${targetsParsed.error.issues[0]?.message ?? 'unknown'}`,
+      );
+      return { ok: false, details, failures };
+    }
+    const targets = targetsParsed.data;
+    if (targets.rulesHash !== actualHash) {
+      failures.push('collection-game-targets: rulesHash does not match the packaged game rules');
+    }
+    if (targets.catalogHash !== entry.catalog.contentHash) {
+      failures.push('collection-game-targets: catalogHash does not match the packaged catalog');
+    }
+    if (targets.fixtures.length < 4) {
+      failures.push('collection-game-targets: fewer than four collection-strength fixtures');
+    }
+    const failedGates = Object.entries(targets.gates)
+      .filter(([, pass]) => !pass)
+      .map(([name]) => name);
+    if (failedGates.length > 0) {
+      failures.push(`collection-game-targets: failed gates ${failedGates.join(', ')}`);
+    } else if (verbose) {
+      details.push('collection-game-targets: all recorded gates pass');
+    }
+    details.push(
+      `collection-game-targets: ${targets.targetsVersion} · ${String(targets.fixtures.length)} fixtures · ${String(Object.keys(targets.gates).length)} gates`,
+    );
+  }
   return { ok: failures.length === 0, details, failures };
 }
 async function auditSeasonGameTargets(manifestDir: string, verbose: boolean): Promise<AuditResult> {
@@ -1229,7 +1438,7 @@ export async function dataValidate(inputPath: string, verbose: boolean): Promise
     await auditSponsorGear(manifest, manifestDir, verbose),
     await auditSeasonGameTargets(manifestDir, verbose),
     await auditCollectionCatalog(manifest, manifestDir, verbose),
-    await auditCollectionGameRules(manifest, manifestDir, verbose),
+    await auditCollectionGameRules(manifest, manifestDir, verbose, parsed),
     auditAssets(manifest),
   ];
   const details = [`dataVersion ${manifest.dataVersion}`, ...audits.flatMap((a) => a.details)];

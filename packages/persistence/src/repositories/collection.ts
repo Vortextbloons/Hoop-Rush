@@ -1,7 +1,9 @@
 import {
   COLLECTION_CATALOG_VERSION,
   COLLECTION_ECONOMY_VERSION,
+  COLLECTION_GAME_V1_VERSION,
   COLLECTION_PLAY_SAVE_VERSION,
+  COLLECTION_PLAY_SAVE_V1_VERSION,
   COLLECTION_SAVE_VERSION,
   COLLECTION_VERSION,
   canonicalJson,
@@ -11,9 +13,11 @@ import {
   type CollectionCatalog,
   type CollectionCommand,
   type CollectionCpuRarityWeights,
+  type CollectionDifficultyProfile,
   type CollectionGameCommand,
-  type CollectionGameRecord,
+  type CollectionGameRecordUnion,
   type CollectionLedgerEntry,
+  type CollectionObjectiveDefinition,
   type CollectionPlayState,
   type CollectionPullRecord,
   type CollectionState,
@@ -22,19 +26,24 @@ import {
 import {
   applyCollectionCommand as applyEngineCommand,
   applyCollectionGameCommand as applyEngineGameCommand,
+  auditCollectionFirstClearState,
   auditCollectionState,
   collectionStateDigest,
   collectionStateFactsOf,
   initializeCollectionPlayState,
+  migrateCollectionPlayStateV1,
 } from '@hoop-rush/engine';
 import { HoopRushDatabase } from './dexie.ts';
 import {
   storedCollectionCommandSchema,
   storedCollectionGameCommandSchema,
   storedCollectionGameSchema,
+  storedCollectionGameV1Schema,
+  storedCollectionGameV2Schema,
   storedCollectionLedgerSchema,
   storedCollectionOwnershipSchema,
   storedCollectionPlayStateSchema,
+  storedCollectionPlayStateUnionSchema,
   storedCollectionPullSchema,
   storedCollectionStateSchema,
   type StoredCollectionCommandRow,
@@ -92,7 +101,7 @@ export interface LoadedCollection {
   pulls: CollectionPullRecord[];
   ledger: CollectionLedgerEntry[];
   commands: CollectionCommand[];
-  gameRecords: CollectionGameRecord[];
+  gameRecords: CollectionGameRecordUnion[];
   catalogHash: string;
 }
 
@@ -112,7 +121,7 @@ export interface LoadedPlayState {
 export interface CollectionGameCommandOutcome {
   playState: CollectionPlayState;
   prepared: { gameId: string; gameSequence: number } | null;
-  record: CollectionGameRecord | null;
+  record: CollectionGameRecordUnion | null;
   ledgerEntries: CollectionLedgerEntry[];
   balances: CollectionBalances | null;
   duplicate: boolean;
@@ -402,7 +411,7 @@ export class DexieCollectionRepository {
     pulls: CollectionPullRecord[];
     ledger: CollectionLedgerEntry[];
     commands: CollectionCommand[];
-    gameRecords: CollectionGameRecord[];
+    gameRecords: CollectionGameRecordUnion[];
     gameCommands: CollectionGameCommand[];
     playState: LoadedPlayState | null;
     catalogHash: string;
@@ -482,20 +491,53 @@ export class DexieCollectionRepository {
     const row = await this.db.collectionPlayState.get(collectionId);
     if (row === undefined) return null;
     const savedVersion: number = row.saveSchemaVersion;
-    if (savedVersion !== COLLECTION_PLAY_SAVE_VERSION) {
+    if (
+      savedVersion !== COLLECTION_PLAY_SAVE_VERSION &&
+      savedVersion !== COLLECTION_PLAY_SAVE_V1_VERSION
+    ) {
       throw new CollectionLoadError('unsupported', [
-        `play saveSchemaVersion ${String(savedVersion)} != ${String(COLLECTION_PLAY_SAVE_VERSION)}`,
+        `play saveSchemaVersion ${String(savedVersion)} is not supported`,
       ]);
     }
-    const parsed = checked(() => storedCollectionPlayStateSchema.parse(row), 'play state row');
+    const parsed = checked(() => storedCollectionPlayStateUnionSchema.parse(row), 'play state row');
+    const playState =
+      parsed.saveSchemaVersion === COLLECTION_PLAY_SAVE_VERSION
+        ? parsed.playState
+        : migrateCollectionPlayStateV1(parsed.playState);
+    const gameRows = await this.db.collectionGames
+      .where('[collectionId+gameId]')
+      .between([collectionId, ''], [collectionId, '￿'])
+      .toArray();
+    const ledgerRows = await this.db.collectionLedger
+      .where('[collectionId+transactionId]')
+      .between([collectionId, ''], [collectionId, '￿'])
+      .toArray();
+    const gameRecords = checked(
+      () => gameRows.map((entry) => storedCollectionGameSchema.parse(entry).record),
+      'game rows',
+    );
+    const ledgerEntries = checked(
+      () => ledgerRows.map((entry) => storedCollectionLedgerSchema.parse(entry).entry),
+      'ledger rows',
+    );
+    const failures = auditCollectionFirstClearState(playState, gameRecords, ledgerEntries);
+    if (failures.length > 0) {
+      throw new CollectionLoadError(
+        'divergent',
+        failures.map((failure) => `${failure.code}: ${failure.message}`),
+      );
+    }
     return {
-      playState: parsed.playState,
+      playState,
       rootSeed: parsed.rootSeed,
       catalogHash: parsed.catalogHash,
     };
   }
 
-  async getGameRecord(collectionId: string, gameId: string): Promise<CollectionGameRecord | null> {
+  async getGameRecord(
+    collectionId: string,
+    gameId: string,
+  ): Promise<CollectionGameRecordUnion | null> {
     const row = await this.db.collectionGames.get([collectionId, gameId]);
     if (row === undefined) return null;
     return checked(() => storedCollectionGameSchema.parse(row).record, 'game row');
@@ -546,6 +588,8 @@ export class DexieCollectionRepository {
     profileHash: string;
     rulesHash: string;
     cpuWeights: CollectionCpuRarityWeights;
+    difficultyProfiles: readonly CollectionDifficultyProfile[];
+    objectiveDefinitions: readonly CollectionObjectiveDefinition[];
     recordedAtIso: string;
   }): Promise<CollectionGameCommandOutcome> {
     const { command, catalog, catalogHash, profile, recordedAtIso } = input;
@@ -585,6 +629,8 @@ export class DexieCollectionRepository {
       resolve: (cardId) => catalogById.get(cardId),
       rootSeed: play.rootSeed,
       cpuWeights: input.cpuWeights,
+      difficultyProfiles: input.difficultyProfiles,
+      objectiveDefinitions: input.objectiveDefinitions,
       profile,
       profileHash: input.profileHash,
       catalogHash,
@@ -610,11 +656,43 @@ export class DexieCollectionRepository {
       if (code === 'stale-state') {
         throw new CollectionCommandStaleError(`stale play state for ${command.commandId}`);
       }
-      const error = new Error(`collection game command rejected: ${code}`);
+      const detail = typeof outcome.rejection.detail === 'string' ? outcome.rejection.detail : null;
+      const error = new Error(
+        detail === null
+          ? `collection game command rejected: ${code}`
+          : `collection game command rejected: ${code}: ${detail}`,
+      );
       (error as { code?: string }).code = code;
       throw error;
     }
-    const { playState: next, prepared, record, ledgerEntry } = outcome;
+    const {
+      playState: next,
+      prepared,
+      record,
+      ledgerEntries: rewardEntries,
+      balances: outcomeBalances,
+    } = outcome;
+    const ledgerEntries = rewardEntries ?? [];
+    let ledgerTotal = 0;
+    for (const entry of ledgerEntries) {
+      if (entry.commandId !== command.commandId) {
+        const error = new Error('reward ledger entry does not belong to the accepted command');
+        (error as { code?: string }).code = 'divergent';
+        throw error;
+      }
+      ledgerTotal = addLedgerChecked(ledgerTotal, entry.amount);
+    }
+    if (outcomeBalances !== undefined) {
+      const expectedCoins = addLedgerChecked(snapshot.state.balances.Coins, ledgerTotal);
+      if (
+        outcomeBalances.Coins !== expectedCoins ||
+        outcomeBalances.Exchange !== snapshot.state.balances.Exchange
+      ) {
+        const error = new Error('reward balances do not match the reward ledger components');
+        (error as { code?: string }).code = 'divergent';
+        throw error;
+      }
+    }
     let balances = snapshot.state.balances;
     await this.db.transaction(
       'rw',
@@ -628,12 +706,23 @@ export class DexieCollectionRepository {
         if (currentPlay === undefined) {
           throw new CollectionCommandStaleError('play state deleted during commit');
         }
-        const parsedPlay = storedCollectionPlayStateSchema.parse(currentPlay);
+        const parsedPlay = storedCollectionPlayStateUnionSchema.parse(currentPlay);
         if (
           parsedPlay.playState.revision !== play.playState.revision ||
           parsedPlay.playState.digest !== play.playState.digest
         ) {
           throw new CollectionCommandStaleError('play state revision advanced during commit');
+        }
+        const current = await this.db.collectionState.get(command.collectionId);
+        if (current === undefined) {
+          throw new CollectionCommandStaleError('collection deleted during commit');
+        }
+        const parsed = storedCollectionStateSchema.parse(current);
+        if (
+          parsed.state.revision !== snapshot.state.revision ||
+          parsed.state.digest !== snapshot.state.digest
+        ) {
+          throw new CollectionCommandStaleError('collection revision advanced during commit');
         }
         const rerun = await this.db.collectionGameCommands.get([
           command.collectionId,
@@ -675,14 +764,9 @@ export class DexieCollectionRepository {
             updatedAtIso: recordedAtIso,
           }),
         );
-        if (record !== undefined && ledgerEntry !== undefined) {
-          const current = await this.db.collectionState.get(command.collectionId);
-          if (current === undefined) {
-            throw new CollectionCommandStaleError('collection deleted during commit');
-          }
-          const parsed = storedCollectionStateSchema.parse(current);
+        if (record !== undefined) {
           const nextBalances = {
-            Coins: addLedgerChecked(parsed.state.balances.Coins, ledgerEntry.amount),
+            Coins: addLedgerChecked(parsed.state.balances.Coins, ledgerTotal),
             Exchange: parsed.state.balances.Exchange,
           };
           const nextCollection = {
@@ -695,21 +779,29 @@ export class DexieCollectionRepository {
             ...nextCollection,
             digest: collectionStateDigest(collectionStateFactsOf(nextCollection)),
           };
+          const gameRowSchema =
+            record.gameVersion === COLLECTION_GAME_V1_VERSION
+              ? storedCollectionGameV1Schema
+              : storedCollectionGameV2Schema;
           await this.db.collectionGames.put(
-            storedCollectionGameSchema.parse({
+            gameRowSchema.parse({
               collectionId: command.collectionId,
               gameId: record.gameId,
               gameSequence: record.gameSequence,
               record,
             }),
           );
-          await this.db.collectionLedger.put(
-            storedCollectionLedgerSchema.parse({
-              collectionId: command.collectionId,
-              transactionId: ledgerEntry.transactionId,
-              entry: ledgerEntry,
-            }),
-          );
+          if (ledgerEntries.length > 0) {
+            await this.db.collectionLedger.bulkPut(
+              ledgerEntries.map((entry) =>
+                storedCollectionLedgerSchema.parse({
+                  collectionId: command.collectionId,
+                  transactionId: entry.transactionId,
+                  entry,
+                }),
+              ),
+            );
+          }
           await this.db.collectionState.put(
             storedCollectionStateSchema.parse({
               collectionId: command.collectionId,
@@ -727,7 +819,7 @@ export class DexieCollectionRepository {
       playState: next,
       prepared: prepared ?? null,
       record: record ?? null,
-      ledgerEntries: ledgerEntry === undefined ? [] : [ledgerEntry],
+      ledgerEntries,
       balances,
       duplicate: false,
     };

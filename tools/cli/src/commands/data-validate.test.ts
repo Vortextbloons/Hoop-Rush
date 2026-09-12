@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdtemp, writeFile, rm, mkdir } from 'node:fs/promises';
+import { mkdtemp, writeFile, rm, mkdir, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -16,7 +16,8 @@ import {
   seasonKeySchema,
 } from '@hoop-rush/data-contracts';
 import { buildManifest, buildPlayerSeason, buildPool } from '@hoop-rush/test-fixtures';
-import { dataValidate } from './data-validate.ts';
+import { auditCollectionGameRules, dataValidate } from './data-validate.ts';
+import { buildCollectionGameRules } from '../gen-collection-game-rules.ts';
 import { EXIT_CHECKS_FAILED, EXIT_OK, EXIT_USAGE_OR_DATA_ERROR } from '../report.ts';
 let dir: string;
 beforeEach(async () => {
@@ -408,7 +409,9 @@ describe('dataValidate season game targets audit', () => {
     expect(report.ok).toBe(false);
     expect(
       report.failures.some(
-        (f) => f.includes('game-targets: artifact fails the game targets schema') && f.includes('rotationVersion'),
+        (f) =>
+          f.includes('game-targets: artifact fails the game targets schema') &&
+          f.includes('rotationVersion'),
       ),
     ).toBe(true);
   });
@@ -489,5 +492,137 @@ describe('dataValidate sponsor gear audit', () => {
     const path = await writeManifest(buildManifest());
     const report = await dataValidate(path, false);
     expect(report.ok).toBe(true);
+  });
+});
+describe('dataValidate collection game rules audit', () => {
+  function sha256(content: string): string {
+    return createHash('sha256').update(content).digest('hex');
+  }
+  async function writeRulesPack(rulesContent?: string): Promise<{
+    manifest: ReturnType<typeof buildManifest>;
+    manifestPath: string;
+    rulesContent: string;
+  }> {
+    const collectionDir = join(dir, 'collection');
+    await mkdir(collectionDir, { recursive: true });
+    const content = rulesContent ?? `${JSON.stringify(buildCollectionGameRules())}\n`;
+    await writeFile(join(collectionDir, 'game-rules.json'), content);
+    const manifest = buildManifest({
+      collection: {
+        catalog: {
+          url: 'collection/catalog.json',
+          contentHash: contentHashSchema.parse('a'.repeat(64)),
+        },
+        index: {
+          url: 'collection/index.json',
+          contentHash: contentHashSchema.parse('b'.repeat(64)),
+        },
+        gameRules: {
+          url: 'collection/game-rules.json',
+          contentHash: contentHashSchema.parse(sha256(content)),
+        },
+      },
+    });
+    const manifestPath = await writeManifest(manifest);
+    return { manifest, manifestPath, rulesContent: content };
+  }
+  function targetsFixture(rulesHash: string, gates: Record<string, boolean>): unknown {
+    return {
+      schemaVersion: 1,
+      targetsVersion: 'collection-game-targets-v1',
+      rulesVersion: 'collection-game-rules-v2',
+      gameVersion: 'collection-game-v2',
+      difficultyVersion: 'collection-difficulty-v1',
+      objectiveVersion: 'collection-objectives-v1',
+      rewardVersion: 'collection-reward-v2',
+      replayVersion: 'collection-game-replay-v2',
+      catalogHash: 'a'.repeat(64),
+      rulesHash,
+      engineVersion: 'engine-fixture',
+      cohorts: {
+        calibrationSeeds: 16,
+        validationSeeds: 8,
+        generatedAtIso: '2026-01-01T00:00:00.000Z',
+      },
+      fixtures: [0, 1, 2, 3].map((index) => ({
+        fixtureId: `fixture-${String(index)}`,
+        collectionHash: 'c'.repeat(64),
+      })),
+      gates,
+      measured: {},
+    };
+  }
+  it('accepts a valid v2 rules artifact and reports unfrozen targets', async () => {
+    const { manifest, manifestPath } = await writeRulesPack();
+    const raw = JSON.parse(await readFile(manifestPath, 'utf8')) as unknown;
+    const result = await auditCollectionGameRules(manifest, dir, true, raw);
+    expect(result.failures).toEqual([]);
+    expect(result.ok).toBe(true);
+    expect(result.details.some((detail) => detail.includes('difficulties'))).toBe(true);
+    expect(
+      result.details.some((detail) => detail.includes('collection-game-targets: none packaged')),
+    ).toBe(true);
+  });
+  it('flags a rules artifact whose content hash does not match the manifest', async () => {
+    const { manifest } = await writeRulesPack();
+    await writeFile(join(dir, 'collection', 'game-rules.json'), '{}\n');
+    const result = await auditCollectionGameRules(manifest, dir, false, {});
+    expect(result.ok).toBe(false);
+    expect(result.failures.some((failure) => failure.includes('content hash mismatch'))).toBe(true);
+  });
+  it('flags a tampered objective threshold even when the hash is refreshed', async () => {
+    const tampered = buildCollectionGameRules() as {
+      objectives: Array<{ objectiveId: string; threshold: number }>;
+    };
+    const target = tampered.objectives.find(
+      (objective) => objective.objectiveId === 'obj-three-barrage-v1',
+    );
+    if (target !== undefined) target.threshold = 11;
+    const content = `${JSON.stringify(tampered)}\n`;
+    const { manifest } = await writeRulesPack(content);
+    const result = await auditCollectionGameRules(manifest, dir, false, {});
+    expect(result.ok).toBe(false);
+    expect(result.failures.some((failure) => failure.includes('threshold'))).toBe(true);
+  });
+  it('flags a rules artifact with a bad version literal', async () => {
+    const tampered = buildCollectionGameRules() as Record<string, unknown>;
+    tampered.gameVersion = 'collection-game-v1';
+    const content = `${JSON.stringify(tampered)}\n`;
+    const { manifest } = await writeRulesPack(content);
+    const result = await auditCollectionGameRules(manifest, dir, false, {});
+    expect(result.ok).toBe(false);
+    expect(result.failures.some((failure) => failure.includes('schema failure'))).toBe(true);
+  });
+  it('verifies a pinned frozen targets artifact and rejects failed gates', async () => {
+    const { manifest, rulesContent } = await writeRulesPack();
+    const rulesHash = sha256(rulesContent);
+    const targetsDir = join(dir, 'collection');
+    const passing = `${JSON.stringify(targetsFixture(rulesHash, { zeroFailures: true }))}\n`;
+    await writeFile(join(targetsDir, 'game-targets.json'), passing);
+    const passingRaw = {
+      collection: {
+        catalog: { url: 'collection/catalog.json', contentHash: 'a'.repeat(64) },
+        index: { url: 'collection/index.json', contentHash: 'b'.repeat(64) },
+        gameRules: { url: 'collection/game-rules.json', contentHash: rulesHash },
+        gameTargets: { url: 'collection/game-targets.json', contentHash: sha256(passing) },
+      },
+    };
+    const accepted = await auditCollectionGameRules(manifest, dir, true, passingRaw);
+    expect(accepted.failures).toEqual([]);
+    expect(accepted.ok).toBe(true);
+
+    const failing = `${JSON.stringify(targetsFixture(rulesHash, { zeroFailures: false }))}\n`;
+    await writeFile(join(targetsDir, 'game-targets.json'), failing);
+    const failingRaw = {
+      collection: {
+        catalog: { url: 'collection/catalog.json', contentHash: 'a'.repeat(64) },
+        index: { url: 'collection/index.json', contentHash: 'b'.repeat(64) },
+        gameRules: { url: 'collection/game-rules.json', contentHash: rulesHash },
+        gameTargets: { url: 'collection/game-targets.json', contentHash: sha256(failing) },
+      },
+    };
+    const rejected = await auditCollectionGameRules(manifest, dir, false, failingRaw);
+    expect(rejected.ok).toBe(false);
+    expect(rejected.failures.some((failure) => failure.includes('zeroFailures'))).toBe(true);
   });
 });

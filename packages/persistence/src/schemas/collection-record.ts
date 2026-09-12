@@ -1,24 +1,27 @@
 import { z } from 'zod';
 import {
   COLLECTION_PLAY_SAVE_VERSION,
+  COLLECTION_PLAY_SAVE_V1_VERSION,
   COLLECTION_SAVE_VERSION,
   collectionCommandSchema,
   collectionGameCommandSchema,
   collectionGameIdSchema,
-  collectionGameRecordSchema,
+  collectionGameRecordV1Schema,
+  collectionGameRecordV2Schema,
   collectionLedgerEntrySchema,
   collectionOwnedCardSchema,
-  collectionPlayStateSchema,
+  collectionPlayStateV1Schema,
+  collectionPlayStateV2Schema,
   collectionPullRecordSchema,
   collectionStateSchema,
   contentHashSchema,
   seedSchema,
   type CollectionCommand,
   type CollectionGameCommand,
-  type CollectionGameRecord,
+  type CollectionGameRecordUnion,
   type CollectionLedgerEntry,
   type CollectionOwnedCard,
-  type CollectionPlayState,
+  type CollectionPlayStateUnion,
   type CollectionPullRecord,
   type CollectionState,
 } from '@hoop-rush/data-contracts';
@@ -75,23 +78,57 @@ export type StoredCollectionPull = CollectionPullRecord;
 export type StoredCollectionLedger = CollectionLedgerEntry;
 export type StoredCollectionCommand = CollectionCommand;
 
-export const storedCollectionPlayStateSchema = z.object({
+const storedCollectionPlayStateRowBaseSchema = z.object({
   collectionId: z.string().min(1).max(64),
-  saveSchemaVersion: z.literal(COLLECTION_PLAY_SAVE_VERSION),
-  playState: collectionPlayStateSchema,
   rootSeed: seedSchema,
   catalogHash: contentHashSchema,
   updatedAtIso: z.string().min(1).max(64),
 });
-export type StoredCollectionPlayStateRow = z.infer<typeof storedCollectionPlayStateSchema>;
 
-export const storedCollectionGameSchema = z.object({
+export const storedCollectionPlayStateV1Schema = storedCollectionPlayStateRowBaseSchema.extend({
+  saveSchemaVersion: z.literal(COLLECTION_PLAY_SAVE_V1_VERSION),
+  playState: collectionPlayStateV1Schema,
+});
+
+export const storedCollectionPlayStateV2Schema = storedCollectionPlayStateRowBaseSchema.extend({
+  saveSchemaVersion: z.literal(COLLECTION_PLAY_SAVE_VERSION),
+  playState: collectionPlayStateV2Schema,
+});
+
+export const storedCollectionPlayStateUnionSchema = z.union([
+  storedCollectionPlayStateV1Schema,
+  storedCollectionPlayStateV2Schema,
+]);
+
+export const storedCollectionPlayStateSchema = storedCollectionPlayStateV2Schema;
+
+export type StoredCollectionPlayStateV1Row = z.infer<typeof storedCollectionPlayStateV1Schema>;
+export type StoredCollectionPlayStateV2Row = z.infer<typeof storedCollectionPlayStateV2Schema>;
+export type StoredCollectionPlayStateRow = z.infer<typeof storedCollectionPlayStateUnionSchema>;
+
+const storedCollectionGameRowBaseSchema = z.object({
   collectionId: z.string().min(1).max(64),
   gameId: collectionGameIdSchema,
   gameSequence: z.number().int().nonnegative(),
-  record: collectionGameRecordSchema,
 });
-export type StoredCollectionGameRow = z.infer<typeof storedCollectionGameSchema>;
+
+export const storedCollectionGameV1Schema = storedCollectionGameRowBaseSchema.extend({
+  record: collectionGameRecordV1Schema,
+});
+
+export const storedCollectionGameV2Schema = storedCollectionGameRowBaseSchema.extend({
+  record: collectionGameRecordV2Schema,
+});
+
+export const storedCollectionGameUnionSchema = z.union([
+  storedCollectionGameV1Schema,
+  storedCollectionGameV2Schema,
+]);
+
+export const storedCollectionGameSchema = storedCollectionGameUnionSchema;
+
+export type StoredCollectionGameRow = z.infer<typeof storedCollectionGameUnionSchema>;
+export type StoredCollectionGameV2Row = z.infer<typeof storedCollectionGameV2Schema>;
 
 export const storedCollectionGameCommandSchema = z.object({
   collectionId: z.string().min(1).max(64),
@@ -110,6 +147,6 @@ export const storedCollectionGameCommandSchema = z.object({
 });
 export type StoredCollectionGameCommandRow = z.infer<typeof storedCollectionGameCommandSchema>;
 
-export type StoredCollectionPlayState = CollectionPlayState;
-export type StoredCollectionGame = CollectionGameRecord;
+export type StoredCollectionPlayState = CollectionPlayStateUnion;
+export type StoredCollectionGame = CollectionGameRecordUnion;
 export type StoredCollectionGameCommand = CollectionGameCommand;

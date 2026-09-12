@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { reproduceCollectionPull, auditCollectionState } from '@hoop-rush/engine';
+import {
+  collectionPlayStateDigest,
+  collectionPlayStateFactsOf,
+  reproduceCollectionPull,
+  auditCollectionState,
+} from '@hoop-rush/engine';
 import {
   buildCollectionFixtureCatalog,
   buildCollectionFixtureCard,
@@ -9,7 +14,15 @@ import type {
   CollectionCommand,
   CollectionRarity,
 } from '@hoop-rush/data-contracts';
-import { COLLECTION_PACK_RULES_VERSION, collectionCommandSchema } from '@hoop-rush/data-contracts';
+import {
+  COLLECTION_GAME_V1_VERSION,
+  COLLECTION_PACK_RULES_VERSION,
+  COLLECTION_PLAY_SAVE_VERSION,
+  COLLECTION_PLAY_SAVE_V1_VERSION,
+  COLLECTION_SCHEMA_VERSION,
+  collectionCommandSchema,
+  collectionPlayStateV1Schema,
+} from '@hoop-rush/data-contracts';
 import { HoopRushDatabase } from './dexie.ts';
 import {
   CollectionCommandConflictError,
@@ -17,6 +30,10 @@ import {
   CollectionLoadError,
   DexieCollectionRepository,
 } from './collection.ts';
+import {
+  storedCollectionPlayStateV1Schema,
+  storedCollectionPlayStateV2Schema,
+} from '../schemas/collection-record.ts';
 import {
   resetIndexedDb,
   restoreIndexedDb,
@@ -322,6 +339,98 @@ describe('collection persistence', () => {
     db.close();
   });
 
+  it('recovers an unmigrated save v1 play state row in memory', async () => {
+    resetIndexedDb();
+    const db = new HoopRushDatabase(testDatabaseName('collection'));
+    const repo = new DexieCollectionRepository(db);
+    const catalog = buildCollectionFixtureCatalog();
+    const initial = await repo.initializeCollection({
+      collectionId: COLLECTION_ID,
+      rootSeed: ROOT_SEED,
+      catalogHash: CATALOG_HASH,
+      createdAtIso: AT_ISO,
+    });
+    await repo.applyCollectionCommand({
+      command: commandFor(initial, 'cmd-welcome'),
+      catalog,
+      catalogHash: CATALOG_HASH,
+      recordedAtIso: AT_ISO,
+    });
+    await repo.ensurePlayState({
+      collectionId: COLLECTION_ID,
+      catalog,
+      catalogHash: CATALOG_HASH,
+      recordedAtIso: AT_ISO,
+    });
+    const row = await db.collectionPlayState.get(COLLECTION_ID);
+    if (row === undefined) throw new Error('missing play state row');
+    const v2 = storedCollectionPlayStateV2Schema.parse(row);
+    const legacyRow = storedCollectionPlayStateV1Schema.parse({
+      collectionId: COLLECTION_ID,
+      saveSchemaVersion: COLLECTION_PLAY_SAVE_V1_VERSION,
+      playState: collectionPlayStateV1Schema.parse({
+        schemaVersion: COLLECTION_SCHEMA_VERSION,
+        teamVersion: v2.playState.teamVersion,
+        gameVersion: COLLECTION_GAME_V1_VERSION,
+        collectionId: v2.playState.collectionId,
+        activeTeam: v2.playState.activeTeam,
+        revision: v2.playState.revision,
+        digest: '0'.repeat(32),
+        nextGameSequence: v2.playState.nextGameSequence,
+        pendingGame: null,
+      }),
+      rootSeed: v2.rootSeed,
+      catalogHash: v2.catalogHash,
+      updatedAtIso: v2.updatedAtIso,
+    });
+    await db.collectionPlayState.put(legacyRow);
+    const loaded = await repo.loadPlayState(COLLECTION_ID);
+    if (loaded === null) throw new Error('missing play state');
+    expect(loaded.playState.saveVersion).toBe(COLLECTION_PLAY_SAVE_VERSION);
+    expect(loaded.playState.clearedDifficultyIds).toEqual([]);
+    expect(loaded.playState.digest).toBe(
+      collectionPlayStateDigest(collectionPlayStateFactsOf(loaded.playState)),
+    );
+    const ghost = await db.collectionPlayState.get(COLLECTION_ID);
+    expect(ghost?.saveSchemaVersion).toBe(COLLECTION_PLAY_SAVE_V1_VERSION);
+    db.close();
+  });
+
+  it('reports corrupt v2 play state rows without overwriting them', async () => {
+    resetIndexedDb();
+    const db = new HoopRushDatabase(testDatabaseName('collection'));
+    const repo = new DexieCollectionRepository(db);
+    const catalog = buildCollectionFixtureCatalog();
+    const initial = await repo.initializeCollection({
+      collectionId: COLLECTION_ID,
+      rootSeed: ROOT_SEED,
+      catalogHash: CATALOG_HASH,
+      createdAtIso: AT_ISO,
+    });
+    await repo.applyCollectionCommand({
+      command: commandFor(initial, 'cmd-welcome'),
+      catalog,
+      catalogHash: CATALOG_HASH,
+      recordedAtIso: AT_ISO,
+    });
+    await repo.ensurePlayState({
+      collectionId: COLLECTION_ID,
+      catalog,
+      catalogHash: CATALOG_HASH,
+      recordedAtIso: AT_ISO,
+    });
+    const row = await db.collectionPlayState.get(COLLECTION_ID);
+    if (row === undefined) throw new Error('missing play state row');
+    await db.collectionPlayState.put({
+      ...row,
+      playState: { ...row.playState, digest: 'not-a-digest' },
+    });
+    await expect(repo.loadPlayState(COLLECTION_ID)).rejects.toBeInstanceOf(CollectionLoadError);
+    const ghost = await db.collectionPlayState.get(COLLECTION_ID);
+    expect(ghost?.playState.digest).toBe('not-a-digest');
+    db.close();
+  });
+
   it('exposes collection tables alongside existing stores', async () => {
     resetIndexedDb();
     const db = new HoopRushDatabase(testDatabaseName('collection'));
@@ -344,7 +453,7 @@ describe('collection persistence', () => {
     ]) {
       expect(names).toContain(name);
     }
-    expect(db.verno).toBe(18);
+    expect(db.verno).toBe(19);
     db.close();
   });
 });

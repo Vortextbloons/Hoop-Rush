@@ -3,11 +3,11 @@ import {
   collectionGameWorkerMessageSchema,
   collectionGameWorkerRequestSchema,
   type CollectionGameWorkerCompleteMessage,
-  type CollectionPreparedGame,
+  type CollectionPreparedGameUnion,
 } from '@hoop-rush/data-contracts';
 
 export interface CollectionGameRunInput {
-  prepared: CollectionPreparedGame;
+  prepared: CollectionPreparedGameUnion;
   catalogUrl: string;
   catalogHash: string;
   profileUrl: string;
@@ -57,6 +57,10 @@ export function runCollectionGame(
       if (message.type === 'collection-game-complete') {
         if (message.gameId !== input.prepared.gameId) {
           reject(new Error('The worker returned a different game.'));
+          return;
+        }
+        if (message.result.gameVersion !== input.prepared.gameVersion) {
+          reject(new Error('The worker returned a result for a different game version.'));
           return;
         }
         resolve(message);

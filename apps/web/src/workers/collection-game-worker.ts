@@ -97,6 +97,16 @@ async function handleSimulate(request: CollectionGameWorkerSimulateRequest): Pro
     }
     const { result, events } = simulateCollectionGame(prepared, catalog, profile);
     if (isStale(requestId)) return;
+    if (result.gameVersion !== prepared.gameVersion) {
+      postError(
+        requestId,
+        'invariant-failure',
+        'the simulated result version does not match the prepared game version',
+        prepared.gameId,
+        prepared.seed,
+      );
+      return;
+    }
     const failures = checkCollectionGameResult(result, events, prepared, catalog, profile);
     if (failures.length > 0) {
       postError(

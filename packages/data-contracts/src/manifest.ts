@@ -76,6 +76,7 @@ export const hoopRushManifestSchema = z.object({
       index: seasonArtifactIndexEntrySchema,
       packTargets: seasonArtifactIndexEntrySchema.optional(),
       gameRules: seasonArtifactIndexEntrySchema.optional(),
+      gameTargets: seasonArtifactIndexEntrySchema.optional(),
     })
     .optional(),
   assets: assetConfigSchema,

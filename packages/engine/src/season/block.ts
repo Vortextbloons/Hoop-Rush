@@ -1001,20 +1001,23 @@ export function assembleSeasonBlockCandidate(
   );
   const freshTeams = foldSeasonTeamAggregates(allSummaries);
   const freshPlayers = foldSeasonPlayerAggregates(allSummaries);
+  const priorStandings = input.priorStandings;
+  const priorTeamAggregates = input.priorTeamAggregates;
+  const priorPlayerAggregates = input.priorPlayerAggregates;
   const canExtendAggregates =
-    input.priorStandings !== undefined &&
-    input.priorTeamAggregates !== undefined &&
-    input.priorPlayerAggregates !== undefined &&
+    priorStandings !== undefined &&
+    priorTeamAggregates !== undefined &&
+    priorPlayerAggregates !== undefined &&
     input.priorSummaries.length > 0;
-  const standingsBefore = canExtendAggregates ? input.priorStandings : freshStandingsBefore;
+  const standingsBefore = canExtendAggregates ? priorStandings : freshStandingsBefore;
   const standings = canExtendAggregates
-    ? extendSeasonStandings(run.league, input.priorStandings, summaries)
+    ? extendSeasonStandings(run.league, priorStandings, summaries)
     : freshStandings;
   const teams = canExtendAggregates
-    ? extendSeasonTeamAggregates(input.priorTeamAggregates, summaries)
+    ? extendSeasonTeamAggregates(priorTeamAggregates, summaries)
     : freshTeams;
   const players = canExtendAggregates
-    ? extendSeasonPlayerAggregates(input.priorPlayerAggregates, summaries)
+    ? extendSeasonPlayerAggregates(priorPlayerAggregates, summaries)
     : freshPlayers;
   const { toRound } = blockRoundRange(command.blockIndex);
   const completedRounds = toRound;
@@ -1137,7 +1140,7 @@ export function assembleSeasonBlockCandidate(
         blockIndex: command.blockIndex,
         humanFranchiseId: primaryFranchiseId,
         participantFranchiseIds: participantIds,
-      appliedAtStateRevision: input.command.expectedStateRevision + 1,
+        appliedAtStateRevision: input.command.expectedStateRevision + 1,
         objectiveSuccess: objective.success,
         objectiveSuccessByFranchise,
       });

@@ -20,6 +20,7 @@ import {
   reproduceCollectionGame,
   simulateCollectionGame,
 } from './game.ts';
+import { prepareV2Fixture } from './v2-fixtures.ts';
 
 const RARITIES: CollectionRarity[] = ['Ember', 'Eruption', 'Apex', 'Titan', 'Eclipse', 'Immortal'];
 const WEIGHTS: Record<CollectionRarity, number> = {
@@ -232,5 +233,88 @@ describe('collection basic games', () => {
       break;
     }
     expect(found).toBe(1);
+  });
+
+  it('exempts a foul-out at the final buzzer from removal substitution backing', () => {
+    const cards: CollectionCatalogCard[] = [];
+    const rarities: CollectionRarity[] = [
+      'Ember',
+      'Ember',
+      'Ember',
+      'Ember',
+      'Ember',
+      'Ember',
+      'Ember',
+      'Ember',
+      'Eruption',
+      'Eruption',
+      'Eruption',
+      'Eruption',
+      'Apex',
+      'Apex',
+      'Apex',
+      'Apex',
+      'Titan',
+      'Titan',
+      'Titan',
+      'Titan',
+      'Eclipse',
+      'Eclipse',
+      'Immortal',
+      'Immortal',
+    ];
+    const positions: Array<CollectionCatalogCard['positions']> = [
+      ['PG'],
+      ['SG'],
+      ['SF'],
+      ['PF'],
+      ['C'],
+    ];
+    for (let i = 0; i < 24; i += 1) {
+      cards.push(
+        buildCollectionFixtureCard(`eos-${String(i).padStart(2, '0')}`, {
+          playerId: `eos-${String(i).padStart(2, '0')}` as CollectionCatalogCard['playerId'],
+          displayName: `Eos ${String(i).padStart(2, '0')}`,
+          positions: positions[i % positions.length] ?? ['PG'],
+          rarity: rarities[i] ?? 'Ember',
+          summarySource: { overallRating: 60, offenseRating: 60, defenseRating: 60 },
+        }),
+      );
+    }
+    const catalog = buildCollectionFixtureCatalog({
+      cards,
+      sets: [
+        {
+          setId: 'sharpshooter-set',
+          title: 'Eos',
+          memberCardIds: [cards[0]?.cardId as string, cards[1]?.cardId as string],
+        },
+      ],
+    });
+    const byId = new Map(catalog.cards.map((card) => [card.cardId, card]));
+    const owned = catalog.cards.slice(0, 12).map((card) => card.cardId);
+    const team = initializeCollectionActiveTeam(owned, (cardId) => byId.get(cardId));
+    let found = 0;
+    for (const gameSequence of [1, 53, 66]) {
+      const { prepared } = prepareV2Fixture({
+        catalog,
+        team,
+        difficultyId: 'street',
+        gameSequence,
+        rootSeed: 'e'.repeat(32),
+      });
+      const { result, events } = simulateCollectionGame(prepared, catalog, DEFAULT_ERA_SIM_PROFILE);
+      if (result.outcome !== 'completed') continue;
+      const finalPeriod = 4 + result.overtimePeriods;
+      const finalFoulOut = result.foulOuts.find(
+        (foulOut) => foulOut.period === finalPeriod && foulOut.secondsRemaining === 0,
+      );
+      if (finalFoulOut === undefined) continue;
+      found += 1;
+      expect(
+        checkCollectionGameResult(result, events, prepared, catalog, DEFAULT_ERA_SIM_PROFILE),
+      ).toEqual([]);
+    }
+    expect(found).toBeGreaterThan(0);
   });
 });

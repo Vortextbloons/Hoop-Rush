@@ -6,13 +6,15 @@ import {
   type CollectionRarity,
 } from '@hoop-rush/data-contracts';
 import {
+  buildCollectionDifficultyProfiles,
   buildCollectionFixtureCard,
   buildCollectionFixtureCatalog,
 } from '@hoop-rush/test-fixtures';
-import { generateCollectionCpuTeam } from './cpu.ts';
+import { generateCollectionCpuTeam, generateCollectionCpuTeamV2 } from './cpu.ts';
 import { collectionCpuTeamSeed, collectionGameId, collectionGameSeed } from './seeds.ts';
 import { validateCollectionActiveTeam } from './active-team.ts';
 import { assignLineup } from '../domain/lineup.ts';
+import { v2Catalog } from './v2-fixtures.ts';
 
 const RARITIES: CollectionRarity[] = ['Ember', 'Eruption', 'Apex', 'Titan', 'Eclipse', 'Immortal'];
 const WEIGHTS: Record<CollectionRarity, number> = {
@@ -134,5 +136,71 @@ describe('collection cpu teams', () => {
     expect(counts.Titan).toBeLessThan(90);
     expect(counts.Eclipse).toBeLessThan(30);
     expect(counts.Immortal).toBeLessThan(5);
+  });
+
+  it('generates legal v2 rosters for every difficulty across seeds', () => {
+    const catalog = v2Catalog(60, { specials: true });
+    const byId = new Map(catalog.cards.map((card) => [card.cardId, card]));
+    const owned = new Set(catalog.cards.map((card) => card.cardId));
+    const profiles = buildCollectionDifficultyProfiles();
+    for (const profile of profiles) {
+      for (let sequence = 0; sequence < 20; sequence += 1) {
+        const { team, construction, assignment } = generateCollectionCpuTeamV2(
+          catalog,
+          '5'.repeat(32),
+          sequence,
+          profile,
+        );
+        const roster = [...team.starters, ...team.bench];
+        expect(roster).toHaveLength(COLLECTION_GAME_CPU_ROSTER_SIZE);
+        expect(new Set(roster).size).toBe(roster.length);
+        const players = roster.map((cardId) => byId.get(cardId)?.playerId);
+        expect(new Set(players).size).toBe(players.length);
+        expect(assignment).not.toBeNull();
+        expect(validateCollectionActiveTeam(team, (id) => byId.get(id), owned).ok).toBe(true);
+        expect(team.targetMinutes.reduce((sum, entry) => sum + entry.minutes, 0)).toBe(240);
+        for (const starterId of team.starters) {
+          const entry = team.targetMinutes.find((minutes) => minutes.cardId === starterId);
+          expect(entry?.minutes ?? 0).toBeGreaterThanOrEqual(1);
+        }
+        expect(construction.candidateCount).toBe(profile.candidateTeams);
+        expect(construction.starters).toEqual(team.starters);
+        expect(construction.bench).toEqual(team.bench);
+        expect(construction.closingFive).toHaveLength(5);
+        for (const cardId of construction.closingFive) {
+          expect(roster).toContain(cardId);
+        }
+        const rarityTotal = Object.values(construction.rarityCounts).reduce(
+          (sum, count) => sum + count,
+          0,
+        );
+        expect(rarityTotal).toBe(roster.length);
+      }
+    }
+  });
+
+  it('grows the special share with difficulty inside the frozen bands', () => {
+    const catalog = v2Catalog(60, { specials: true });
+    const profiles = buildCollectionDifficultyProfiles();
+    const share = new Map<string, number>();
+    for (const profile of profiles) {
+      share.set(profile.difficultyId, 0);
+    }
+    for (let sequence = 0; sequence < 24; sequence += 1) {
+      for (const profile of profiles) {
+        const { construction } = generateCollectionCpuTeamV2(
+          catalog,
+          '6'.repeat(32),
+          sequence,
+          profile,
+        );
+        share.set(
+          profile.difficultyId,
+          (share.get(profile.difficultyId) ?? 0) + construction.specialCount,
+        );
+      }
+    }
+    expect(share.get('legend') ?? 0).toBeGreaterThan(share.get('pro') ?? 0);
+    expect(share.get('pro') ?? 0).toBeGreaterThan(share.get('street') ?? 0);
   });
 });

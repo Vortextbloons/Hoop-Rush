@@ -2,8 +2,9 @@ import {
   canonicalJson,
   type CollectionCatalog,
   type CollectionGameEvent,
-  type CollectionGameResult,
-  type CollectionPreparedGame,
+  type CollectionGameRecordUnion,
+  type CollectionGameResultUnion,
+  type CollectionPreparedGameUnion,
   type EraSimulationProfile,
 } from '@hoop-rush/data-contracts';
 import { auditSideAccounting } from '../sim/accounting-core.ts';
@@ -13,19 +14,29 @@ import {
   REGULATION_TOTAL_SECONDS,
 } from '../sim/periods.ts';
 import { sameUnit } from '../season/season-game.ts';
-import { collectionGameResultDigest, simulateCollectionGame } from './game.ts';
+import { verifyDifficultyRatingAdjustments } from './difficulty.ts';
+import {
+  collectionGameEventDigest,
+  collectionGameResultDigest,
+  simulateCollectionGame,
+} from './game.ts';
+import { evaluateCollectionObjective } from './objectives.ts';
+import { collectionGameRewardReceiptFor } from './rewards.ts';
 
 const PLAYER_SECONDS_PER_SIDE = (side: { players: Array<{ seconds: number }> }): number =>
   side.players.reduce((sum, player) => sum + player.seconds, 0);
 
 export function checkCollectionGameResult(
-  result: CollectionGameResult,
+  result: CollectionGameResultUnion,
   events: readonly CollectionGameEvent[],
-  prepared: CollectionPreparedGame,
+  prepared: CollectionPreparedGameUnion,
   catalog: CollectionCatalog,
   profile: EraSimulationProfile,
 ): string[] {
   const failures: string[] = [];
+  if (prepared.gameVersion !== 'collection-game-v1') {
+    failures.push(...verifyDifficultyRatingAdjustments(prepared, catalog));
+  }
   let reproduced: ReturnType<typeof simulateCollectionGame>;
   try {
     reproduced = simulateCollectionGame(prepared, catalog, profile);
@@ -144,7 +155,7 @@ export function checkCollectionGameResult(
 function stintAudit(
   failures: string[],
   sideKey: 'home' | 'away',
-  result: Extract<CollectionGameResult, { outcome: 'completed' }>,
+  result: Extract<CollectionGameResultUnion, { outcome: 'completed' }>,
   roster: readonly string[],
 ): void {
   const side = result[sideKey];
@@ -218,7 +229,7 @@ function stintAudit(
 function substitutionAudit(
   failures: string[],
   sideKey: 'home' | 'away',
-  result: Extract<CollectionGameResult, { outcome: 'completed' }>,
+  result: Extract<CollectionGameResultUnion, { outcome: 'completed' }>,
   roster: readonly string[],
 ): void {
   const subs = result.substitutions.filter((s) => s.side === sideKey);
@@ -262,8 +273,10 @@ function substitutionAudit(
       failures.push(`${sideKey}: unit change without a substitution record`);
     }
   }
+  const finalPeriod = 4 + result.overtimePeriods;
   for (const foulOut of result.foulOuts) {
     if (foulOut.side !== sideKey) continue;
+    if (foulOut.period === finalPeriod && foulOut.secondsRemaining === 0) continue;
     const player = result[sideKey].players.find((p) => p.cardId === foulOut.cardId);
     if (player === undefined || player.fouls < 6) {
       failures.push(`${sideKey}: foul-out for a player with fewer than six fouls`);
@@ -284,7 +297,7 @@ function substitutionAudit(
 function deviationAudit(
   failures: string[],
   sideKey: 'home' | 'away',
-  result: Extract<CollectionGameResult, { outcome: 'completed' }>,
+  result: Extract<CollectionGameResultUnion, { outcome: 'completed' }>,
   team: { targetMinutes: ReadonlyArray<{ cardId: string; minutes: number }> },
 ): void {
   const regSeconds = new Map<string, number>();
@@ -366,7 +379,7 @@ function boxValue(player: Record<string, unknown>, path: string): number {
 function eventAudit(
   failures: string[],
   events: CollectionGameEvent[],
-  result: Extract<CollectionGameResult, { outcome: 'completed' }>,
+  result: Extract<CollectionGameResultUnion, { outcome: 'completed' }>,
 ): void {
   for (let i = 0; i < events.length; i += 1) {
     if (events[i]?.eventOrder !== i) {
@@ -467,4 +480,44 @@ function eventAudit(
   if (subEvents.length !== result.substitutions.length) {
     failures.push('substitution events do not match the result substitutions');
   }
+}
+
+export function checkCollectionGameRecord(
+  record: CollectionGameRecordUnion,
+  catalog: CollectionCatalog,
+  profile: EraSimulationProfile,
+): string[] {
+  const failures = checkCollectionGameResult(
+    record.result,
+    record.events,
+    record.prepared,
+    catalog,
+    profile,
+  );
+  if (collectionGameEventDigest(record.events) !== record.eventDigest) {
+    failures.push('event digest does not match the record');
+  }
+  if (collectionGameResultDigest(record.result) !== record.resultDigest) {
+    failures.push('result digest does not match the record');
+  }
+  if (record.gameVersion === 'collection-game-v1') {
+    return failures;
+  }
+  const evaluation = evaluateCollectionObjective({
+    prepared: record.prepared,
+    result: record.result,
+  });
+  if (canonicalJson(evaluation) !== canonicalJson(record.objectiveEvaluation)) {
+    failures.push('objective evaluation does not reproduce from the prepared input');
+  }
+  const receipt = collectionGameRewardReceiptFor({
+    gameId: record.gameId,
+    prepared: record.prepared,
+    result: record.result,
+    evaluation,
+  });
+  if (canonicalJson(receipt) !== canonicalJson(record.reward)) {
+    failures.push('reward receipt does not reproduce from the prepared input');
+  }
+  return failures;
 }

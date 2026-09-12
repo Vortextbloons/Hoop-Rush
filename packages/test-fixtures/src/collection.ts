@@ -2,9 +2,20 @@ import {
   SIMULATION_RATINGS,
   SIMULATION_TENDENCIES,
   collectionCatalogSchema,
+  collectionDifficultyProfileSchema,
+  collectionGameRulesV2Schema,
   seasonDigestHex,
+  COLLECTION_DIFFICULTY_VERSION,
+  COLLECTION_GAME_REPLAY_VERSION,
+  COLLECTION_GAME_RULES_VERSION,
+  COLLECTION_GAME_VERSION,
+  COLLECTION_OBJECTIVE_VERSION,
+  COLLECTION_REWARD_VERSION,
   type CollectionCatalog,
   type CollectionCatalogCard,
+  type CollectionDifficultyId,
+  type CollectionDifficultyProfile,
+  type CollectionGameRules,
   type CollectionRarity,
 } from '@hoop-rush/data-contracts';
 import {
@@ -141,6 +152,147 @@ export function buildCollectionFixtureCatalog(
       },
     ],
     replayVersion: COLLECTION_REPLAY_VERSION,
+    ...overrides,
+  });
+}
+
+const DIFFICULTY_FIXTURES: Record<CollectionDifficultyId, unknown> = {
+  street: {
+    rarityBand: { floor: 'Ember', ceiling: 'Apex' },
+    rarityWeightsBp: [
+      { rarity: 'Ember', weightBp: 7600 },
+      { rarity: 'Eruption', weightBp: 2200 },
+      { rarity: 'Apex', weightBp: 200 },
+    ],
+    specialWeightMultiplierBp: 5000,
+    candidateTeams: 1,
+    identityFitWeightBp: 0,
+    useGeneratedStarters: true,
+    ratingShift: -2,
+    rewardMultiplierBp: 10_000,
+    displayName: 'Street',
+    rotation: {
+      starterWeightBp: 20_000,
+      benchWeightBp: 10_000,
+      overallBonusFloor: 0,
+      overallBonusPerPointBp: 0,
+      maxMinutes: 48,
+      closingFivePolicy: 'generated-starters',
+    },
+  },
+  pro: {
+    rarityBand: { floor: 'Eruption', ceiling: 'Titan' },
+    rarityWeightsBp: [
+      { rarity: 'Eruption', weightBp: 5200 },
+      { rarity: 'Apex', weightBp: 3500 },
+      { rarity: 'Titan', weightBp: 1300 },
+    ],
+    specialWeightMultiplierBp: 12_500,
+    candidateTeams: 4,
+    identityFitWeightBp: 1500,
+    useGeneratedStarters: false,
+    ratingShift: 0,
+    rewardMultiplierBp: 13_500,
+    displayName: 'Pro',
+    rotation: {
+      starterWeightBp: 20_000,
+      benchWeightBp: 8000,
+      overallBonusFloor: 75,
+      overallBonusPerPointBp: 400,
+      maxMinutes: 42,
+      closingFivePolicy: 'best-legal-five',
+    },
+  },
+  legend: {
+    rarityBand: { floor: 'Apex', ceiling: 'Immortal' },
+    rarityWeightsBp: [
+      { rarity: 'Apex', weightBp: 4200 },
+      { rarity: 'Titan', weightBp: 4000 },
+      { rarity: 'Eclipse', weightBp: 1600 },
+      { rarity: 'Immortal', weightBp: 200 },
+    ],
+    specialWeightMultiplierBp: 20_000,
+    candidateTeams: 8,
+    identityFitWeightBp: 3000,
+    useGeneratedStarters: false,
+    ratingShift: 2,
+    rewardMultiplierBp: 17_500,
+    displayName: 'Legend',
+    rotation: {
+      starterWeightBp: 30_000,
+      benchWeightBp: 5000,
+      overallBonusFloor: 80,
+      overallBonusPerPointBp: 500,
+      maxMinutes: 44,
+      closingFivePolicy: 'best-legal-five',
+    },
+  },
+};
+
+export function buildCollectionDifficultyProfile(
+  difficultyId: CollectionDifficultyId,
+  overrides: Partial<CollectionDifficultyProfile> = {},
+): CollectionDifficultyProfile {
+  return collectionDifficultyProfileSchema.parse({
+    difficultyVersion: COLLECTION_DIFFICULTY_VERSION,
+    difficultyId,
+    ...(DIFFICULTY_FIXTURES[difficultyId] as Record<string, unknown>),
+    ...overrides,
+  });
+}
+
+export function buildCollectionDifficultyProfiles(): CollectionDifficultyProfile[] {
+  return [
+    buildCollectionDifficultyProfile('street'),
+    buildCollectionDifficultyProfile('pro'),
+    buildCollectionDifficultyProfile('legend'),
+  ];
+}
+
+export const COLLECTION_OBJECTIVE_LAUNCH_THRESHOLDS: Record<string, number> = {
+  'obj-three-barrage-v1': 12,
+  'obj-lock-score-v1': 105,
+  'obj-bench-spark-v1': 25,
+  'obj-ball-pressure-v1': 14,
+  'obj-own-glass-v1': 10,
+  'obj-box-score-star-v1': 10,
+};
+
+export function buildCollectionGameRulesFixture(
+  overrides: Partial<CollectionGameRules> = {},
+): CollectionGameRules {
+  const difficulties = buildCollectionDifficultyProfiles();
+  return collectionGameRulesV2Schema.parse({
+    rulesVersion: COLLECTION_GAME_RULES_VERSION,
+    gameVersion: COLLECTION_GAME_VERSION,
+    teamVersion: 'collection-team-v1',
+    rewardVersion: COLLECTION_REWARD_VERSION,
+    replayVersion: COLLECTION_GAME_REPLAY_VERSION,
+    difficultyVersion: COLLECTION_DIFFICULTY_VERSION,
+    objectiveVersion: COLLECTION_OBJECTIVE_VERSION,
+    cpuRosterSize: 12,
+    eligibleScope: 'full-catalog',
+    difficulties,
+    objectives: Object.entries(COLLECTION_OBJECTIVE_LAUNCH_THRESHOLDS).map(
+      ([objectiveId, threshold]) => ({
+        objectiveVersion: COLLECTION_OBJECTIVE_VERSION,
+        objectiveId,
+        title: objectiveId,
+        threshold,
+      }),
+    ),
+    rewardTable: {
+      winCoins: 100,
+      lossCoins: 10,
+      objectiveCoins: 30,
+      marginCoinPerPoint: 1,
+      marginCapPoints: 20,
+      firstClearCoins: { street: 200, pro: 350, legend: 500 },
+    },
+    environmentEraId: '2020s',
+    homeCourtPolicy: 'neutral-home-court',
+    engineVersion: 'engine-fixture',
+    profileVersion: 'profile-fixture',
     ...overrides,
   });
 }

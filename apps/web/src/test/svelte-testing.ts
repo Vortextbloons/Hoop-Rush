@@ -12,6 +12,7 @@ const svelteKitMocks = vi.hoisted(() => {
     assets: '',
     appDir: '',
     resolve: (path: string) => path,
+    asset: (path: string) => path,
   };
   const navigation = {
     goto: vi.fn(() => Promise.resolve()),

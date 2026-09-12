@@ -2,8 +2,11 @@ import Dexie, { type EntityTable, type Table } from 'dexie';
 import {
   CHECKPOINT_SAVE_SCHEMA_VERSION,
   CLASSIC_DRAFT_SCHEMA_VERSION,
+  COLLECTION_PLAY_SAVE_VERSION,
+  COLLECTION_PLAY_SAVE_V1_VERSION,
   SAVE_SCHEMA_VERSION,
 } from '@hoop-rush/data-contracts';
+import { migrateCollectionPlayStateV1 } from '@hoop-rush/engine';
 import {
   classicDraftRecordSchema,
   type StoredClassicDraft,
@@ -56,8 +59,47 @@ import type {
   StoredCollectionGameRow,
   StoredCollectionPlayStateRow,
 } from '../schemas/collection-record.ts';
+import {
+  storedCollectionPlayStateV1Schema,
+  storedCollectionPlayStateV2Schema,
+} from '../schemas/collection-record.ts';
 const ACTIVE_RECORD_ID = 'active';
 const CLASSIC_DRAFT_RECORD_ID = 'classic-draft';
+
+export const HOOP_RUSH_DATABASE_STORES: Record<string, string> = {
+  active: 'recordId',
+  activeGames: '[runId+gameNumber], runId',
+  completed: 'recordId',
+  history: 'recordId, completedAtIso',
+  classicDrafts: 'recordId',
+  seasonDrafts: 'recordId',
+  seasonRuns: 'recordId',
+  seasonRunSummaries: '[runId+gameId], [runId+blockIndex], runId, blockIndex',
+  seasonRunDetails: '[runId+gameId], runId',
+  seasonRunBlocks: '[runId+blockIndex], runId',
+  seasonRunIndex: 'recordId',
+  seasonPendingBlocks: 'runId',
+  seasonPostseasonSummaries: '[runId+gameId], runId',
+  seasonPostseasonDetails: '[runId+gameId], runId',
+  seasonCommandLog: '[runId+ordinal], runId',
+  seasonAlmanacs: 'runId',
+  seasonCompletedRuns: 'runId',
+  seasonCompletedIndex: 'recordId, completedAtIso',
+  seasonRunPlayerSlices: 'runId',
+  fixedFiveActive: 'roomId',
+  fixedFiveCommands: '[roomId+ordinal], roomId',
+  fixedFivePendingResults: 'roomId',
+  fixedFiveCompleted: 'roomId',
+  fixedFiveHistory: 'recordId, completedAtIso',
+  collectionState: 'collectionId',
+  collectionOwnership: '[collectionId+cardId], collectionId',
+  collectionPulls: '[collectionId+pullSequence], collectionId',
+  collectionLedger: '[collectionId+transactionId], collectionId',
+  collectionCommands: '[collectionId+commandId], collectionId',
+  collectionPlayState: 'collectionId',
+  collectionGames: '[collectionId+gameId], collectionId',
+  collectionGameCommands: '[collectionId+commandId], collectionId',
+};
 function hasStaleSaveSchemaVersion(record: unknown, expected: number): boolean {
   if (typeof record !== 'object' || record === null) return false;
   if (!Object.hasOwn(record, 'saveSchemaVersion')) return false;
@@ -104,40 +146,26 @@ export class HoopRushDatabase extends Dexie {
   collectionGameCommands!: Table<StoredCollectionGameCommandRow, [string, string]>;
   constructor(name = 'hoop-rush-saves') {
     super(name);
-    this.version(18).stores({
-      active: 'recordId',
-      activeGames: '[runId+gameNumber], runId',
-      completed: 'recordId',
-      history: 'recordId, completedAtIso',
-      classicDrafts: 'recordId',
-      seasonDrafts: 'recordId',
-      seasonRuns: 'recordId',
-      seasonRunSummaries: '[runId+gameId], [runId+blockIndex], runId, blockIndex',
-      seasonRunDetails: '[runId+gameId], runId',
-      seasonRunBlocks: '[runId+blockIndex], runId',
-      seasonRunIndex: 'recordId',
-      seasonPendingBlocks: 'runId',
-      seasonPostseasonSummaries: '[runId+gameId], runId',
-      seasonPostseasonDetails: '[runId+gameId], runId',
-      seasonCommandLog: '[runId+ordinal], runId',
-      seasonAlmanacs: 'runId',
-      seasonCompletedRuns: 'runId',
-      seasonCompletedIndex: 'recordId, completedAtIso',
-      seasonRunPlayerSlices: 'runId',
-      fixedFiveActive: 'roomId',
-      fixedFiveCommands: '[roomId+ordinal], roomId',
-      fixedFivePendingResults: 'roomId',
-      fixedFiveCompleted: 'roomId',
-      fixedFiveHistory: 'recordId, completedAtIso',
-      collectionState: 'collectionId',
-      collectionOwnership: '[collectionId+cardId], collectionId',
-      collectionPulls: '[collectionId+pullSequence], collectionId',
-      collectionLedger: '[collectionId+transactionId], collectionId',
-      collectionCommands: '[collectionId+commandId], collectionId',
-      collectionPlayState: 'collectionId',
-      collectionGames: '[collectionId+gameId], collectionId',
-      collectionGameCommands: '[collectionId+commandId], collectionId',
-    });
+    this.version(18).stores(HOOP_RUSH_DATABASE_STORES);
+    this.version(19)
+      .stores(HOOP_RUSH_DATABASE_STORES)
+      .upgrade(async (transaction) => {
+        const table = transaction.table('collectionPlayState');
+        const rows: unknown[] = await table.toArray();
+        for (const row of rows) {
+          if (typeof row !== 'object' || row === null) continue;
+          const saveSchemaVersion = (row as { saveSchemaVersion?: unknown }).saveSchemaVersion;
+          if (saveSchemaVersion !== COLLECTION_PLAY_SAVE_V1_VERSION) continue;
+          const parsed = storedCollectionPlayStateV1Schema.parse(row);
+          await table.put(
+            storedCollectionPlayStateV2Schema.parse({
+              ...parsed,
+              saveSchemaVersion: COLLECTION_PLAY_SAVE_VERSION,
+              playState: migrateCollectionPlayStateV1(parsed.playState),
+            }),
+          );
+        }
+      });
   }
 }
 export class DexieChallengeRepository {

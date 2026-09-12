@@ -1,4 +1,5 @@
 import {
+  COLLECTION_GAME_COMMAND_VERSION,
   collectionCommandSchema,
   collectionGameCommandSchema,
   collectionPackIdSchema,
@@ -6,16 +7,24 @@ import {
   type CollectionActiveTeam,
   type CollectionCatalog,
   type CollectionCpuRarityWeights,
+  type CollectionDifficultyId,
   type CollectionGameCommand,
-  type CollectionGameRecord,
-  type CollectionGameResult,
   type CollectionGameEvent,
+  type CollectionGameRecordUnion,
+  type CollectionGameResultUnion,
+  type CollectionGameRules,
   type CollectionLedgerEntry,
+  type CollectionObjectiveId,
+  type CollectionObjectiveOffer,
   type CollectionPlayState,
   type CollectionPullRecord,
   type CollectionState,
   type EraSimulationProfile,
 } from '@hoop-rush/data-contracts';
+import {
+  buildCollectionObjectiveFacts,
+  collectionObjectiveDefinitionsFromRules,
+} from '@hoop-rush/engine';
 import { DexieCollectionRepository, HoopRushDatabase } from '@hoop-rush/persistence';
 import { getManifest } from '$lib/data';
 import { resolveAssetUrl } from '$lib/asset-url';
@@ -135,7 +144,12 @@ export async function openPack(packId: string, nowIso: string): Promise<PackOutc
   };
 }
 
-export async function ensurePlayState(nowIso: string): Promise<CollectionPlayState> {
+export interface CollectionPlaySnapshot {
+  playState: CollectionPlayState;
+  rootSeed: string;
+}
+
+export async function ensurePlayStateSnapshot(nowIso: string): Promise<CollectionPlaySnapshot> {
   const repo = getCollectionRepo();
   const catalog = await loadCollectionCatalog();
   const loaded = await repo.ensurePlayState({
@@ -144,7 +158,28 @@ export async function ensurePlayState(nowIso: string): Promise<CollectionPlaySta
     catalogHash: await collectionCatalogHash(),
     recordedAtIso: nowIso,
   });
-  return loaded.playState;
+  return { playState: loaded.playState, rootSeed: loaded.rootSeed };
+}
+
+export async function ensurePlayState(nowIso: string): Promise<CollectionPlayState> {
+  return (await ensurePlayStateSnapshot(nowIso)).playState;
+}
+
+export function collectionObjectiveOffers(input: {
+  rules: CollectionGameRules;
+  rootSeed: string;
+  difficultyId: CollectionDifficultyId;
+  gameSequence: number;
+  team: CollectionActiveTeam;
+}): CollectionObjectiveOffer[] {
+  return buildCollectionObjectiveFacts({
+    definitions: collectionObjectiveDefinitionsFromRules(input.rules),
+    rootSeed: input.rootSeed,
+    difficultyId: input.difficultyId,
+    gameSequence: input.gameSequence,
+    team: input.team,
+    selectedObjectiveId: null,
+  }).offers;
 }
 
 function gameCommandBase(
@@ -152,7 +187,7 @@ function gameCommandBase(
   commandId: string,
 ): {
   schemaVersion: 1;
-  commandVersion: 'collection-command-v1';
+  commandVersion: typeof COLLECTION_GAME_COMMAND_VERSION;
   commandId: string;
   collectionId: string;
   expectedRevision: number;
@@ -160,11 +195,44 @@ function gameCommandBase(
 } {
   return {
     schemaVersion: 1,
-    commandVersion: 'collection-command-v1',
+    commandVersion: COLLECTION_GAME_COMMAND_VERSION,
     commandId,
     collectionId: COLLECTION_ID,
     expectedRevision: playState.revision,
     expectedDigest: playState.digest,
+  };
+}
+
+// Frozen M4.1/M4.2 CPU rarity weights. The v2 rules artifact has no v1 weights,
+// but the shared command input still requires them for legacy v1 replay paths.
+export const LEGACY_COLLECTION_CPU_WEIGHTS: CollectionCpuRarityWeights = {
+  Ember: 70,
+  Eruption: 23,
+  Apex: 5,
+  Titan: 1.7,
+  Eclipse: 0.29,
+  Immortal: 0.01,
+};
+
+async function gameCommandArgs(recordedAtIso: string) {
+  const [catalog, rules, catalogHash, profile, profileHash, rulesHash] = await Promise.all([
+    loadCollectionCatalog(),
+    loadCollectionGameRules(),
+    collectionCatalogHash(),
+    loadCollectionProfile(),
+    collectionProfileHash(),
+    collectionGameRulesHash(),
+  ]);
+  return {
+    catalog,
+    catalogHash,
+    profile,
+    profileHash,
+    rulesHash,
+    cpuWeights: LEGACY_COLLECTION_CPU_WEIGHTS,
+    difficultyProfiles: rules.difficulties,
+    objectiveDefinitions: collectionObjectiveDefinitionsFromRules(rules),
+    recordedAtIso,
   };
 }
 
@@ -173,7 +241,6 @@ export async function setActiveTeam(
   nowIso: string,
 ): Promise<CollectionPlayState> {
   const repo = getCollectionRepo();
-  const catalog = await loadCollectionCatalog();
   const playState = await ensurePlayState(nowIso);
   const command = collectionGameCommandSchema.parse({
     ...gameCommandBase(playState, crypto.randomUUID()),
@@ -181,14 +248,8 @@ export async function setActiveTeam(
     team,
   });
   const outcome = await repo.applyCollectionGameCommand({
+    ...(await gameCommandArgs(nowIso)),
     command,
-    catalog,
-    catalogHash: await collectionCatalogHash(),
-    profile: await loadCollectionProfile(),
-    profileHash: await collectionProfileHash(),
-    rulesHash: await collectionGameRulesHash(),
-    cpuWeights: await collectionCpuWeights(),
-    recordedAtIso: nowIso,
   });
   return outcome.playState;
 }
@@ -199,9 +260,16 @@ export interface PreparedGameOutcome {
   gameSequence: number;
 }
 
-export async function prepareBasicGame(nowIso: string): Promise<PreparedGameOutcome> {
+export interface PrepareGameSetup {
+  difficultyId: CollectionDifficultyId;
+  objectiveId: CollectionObjectiveId | null;
+}
+
+export async function prepareBasicGame(
+  nowIso: string,
+  setup: PrepareGameSetup,
+): Promise<PreparedGameOutcome> {
   const repo = getCollectionRepo();
-  const catalog = await loadCollectionCatalog();
   const playState = await ensurePlayState(nowIso);
   if (playState.pendingGame !== null) {
     return {
@@ -210,19 +278,15 @@ export async function prepareBasicGame(nowIso: string): Promise<PreparedGameOutc
       gameSequence: playState.pendingGame.gameSequence,
     };
   }
-  const command = collectionGameCommandSchema.parse({
+  const command: CollectionGameCommand = collectionGameCommandSchema.parse({
     ...gameCommandBase(playState, crypto.randomUUID()),
     command: 'prepare-basic-game',
+    difficultyId: setup.difficultyId,
+    objectiveId: setup.objectiveId,
   });
   const outcome = await repo.applyCollectionGameCommand({
+    ...(await gameCommandArgs(nowIso)),
     command,
-    catalog,
-    catalogHash: await collectionCatalogHash(),
-    profile: await loadCollectionProfile(),
-    profileHash: await collectionProfileHash(),
-    rulesHash: await collectionGameRulesHash(),
-    cpuWeights: await collectionCpuWeights(),
-    recordedAtIso: nowIso,
   });
   if (!outcome.prepared) throw new Error('Preparing the game did not produce a matchup.');
   return {
@@ -234,7 +298,6 @@ export async function prepareBasicGame(nowIso: string): Promise<PreparedGameOutc
 
 export async function abandonBasicGame(nowIso: string): Promise<CollectionPlayState> {
   const repo = getCollectionRepo();
-  const catalog = await loadCollectionCatalog();
   const playState = await ensurePlayState(nowIso);
   const pending = playState.pendingGame;
   if (pending === null) return playState;
@@ -244,32 +307,25 @@ export async function abandonBasicGame(nowIso: string): Promise<CollectionPlaySt
     gameId: pending.gameId,
   });
   const outcome = await repo.applyCollectionGameCommand({
+    ...(await gameCommandArgs(nowIso)),
     command,
-    catalog,
-    catalogHash: await collectionCatalogHash(),
-    profile: await loadCollectionProfile(),
-    profileHash: await collectionProfileHash(),
-    rulesHash: await collectionGameRulesHash(),
-    cpuWeights: await collectionCpuWeights(),
-    recordedAtIso: nowIso,
   });
   return outcome.playState;
 }
 
 export interface AcceptedGameOutcome {
   playState: CollectionPlayState;
-  record: CollectionGameRecord;
+  record: CollectionGameRecordUnion;
   balances: { Coins: number; Exchange: number };
 }
 
 export async function acceptBasicGameResult(input: {
-  result: CollectionGameResult;
+  result: CollectionGameResultUnion;
   events: CollectionGameEvent[];
   completedAtIso: string;
   recordedAtIso: string;
 }): Promise<AcceptedGameOutcome> {
   const repo = getCollectionRepo();
-  const catalog = await loadCollectionCatalog();
   const playState = await ensurePlayState(input.recordedAtIso);
   const pending = playState.pendingGame;
   if (pending === null) throw new Error('No pending game to complete.');
@@ -282,14 +338,8 @@ export async function acceptBasicGameResult(input: {
     completedAtIso: input.completedAtIso,
   });
   const outcome = await repo.applyCollectionGameCommand({
+    ...(await gameCommandArgs(input.recordedAtIso)),
     command,
-    catalog,
-    catalogHash: await collectionCatalogHash(),
-    profile: await loadCollectionProfile(),
-    profileHash: await collectionProfileHash(),
-    rulesHash: await collectionGameRulesHash(),
-    cpuWeights: await collectionCpuWeights(),
-    recordedAtIso: input.recordedAtIso,
   });
   if (!outcome.record || !outcome.balances) {
     throw new Error('Completing the game did not produce a record.');
@@ -297,14 +347,9 @@ export async function acceptBasicGameResult(input: {
   return { playState: outcome.playState, record: outcome.record, balances: outcome.balances };
 }
 
-export async function loadCommittedGame(gameId: string): Promise<CollectionGameRecord | null> {
+export async function loadCommittedGame(gameId: string): Promise<CollectionGameRecordUnion | null> {
   const repo = getCollectionRepo();
   return repo.getGameRecord(COLLECTION_ID, gameId);
-}
-
-export async function collectionCpuWeights(): Promise<CollectionCpuRarityWeights> {
-  const rules = await loadCollectionGameRules();
-  return { ...rules.cpuRarityWeights };
 }
 
 export async function collectionGameRulesHash(): Promise<string> {
