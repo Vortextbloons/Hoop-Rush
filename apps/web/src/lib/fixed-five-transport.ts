@@ -125,16 +125,36 @@ function commandPayload(value: unknown): RpcCommandPayload {
     typeof record['rejection_code'] === 'string' ? record['rejection_code'] : undefined;
   return { accepted, ordinal, revision, rejection_code: rejection };
 }
+function isUsableSupabaseUrl(url: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+  const host = parsed.hostname.toLowerCase();
+  if (host === 'localhost' || host === '127.0.0.1') return parsed.protocol === 'http:';
+  return parsed.protocol === 'https:' && host.endsWith('.supabase.co');
+}
+function isUsablePublishableKey(key: string): boolean {
+  if (key.length < 20 || /\s/.test(key)) return false;
+  const lower = key.toLowerCase();
+  if (lower.includes('your-') || lower.includes('example') || lower.includes('placeholder'))
+    return false;
+  return key.startsWith('sb_publishable_') || key.startsWith('sb_secret_') || key.startsWith('eyJ');
+}
 function supabaseEnv(): {
   url?: string;
   publishableKey?: string;
 } {
   const env = import.meta.env as Record<string, unknown>;
-  const url = env['VITE_SUPABASE_URL'];
-  const publishableKey = env['VITE_SUPABASE_PUBLISHABLE_KEY'];
+  const rawUrl = env['VITE_SUPABASE_URL'];
+  const rawKey = env['VITE_SUPABASE_PUBLISHABLE_KEY'];
+  const url = typeof rawUrl === 'string' ? rawUrl.trim().replace(/\/+$/, '') : undefined;
+  const publishableKey = typeof rawKey === 'string' ? rawKey.trim() : undefined;
   return {
-    url: typeof url === 'string' ? url : undefined,
-    publishableKey: typeof publishableKey === 'string' ? publishableKey : undefined,
+    url: url && isUsableSupabaseUrl(url) ? url : undefined,
+    publishableKey: publishableKey && isUsablePublishableKey(publishableKey) ? publishableKey : undefined,
   };
 }
 export function isFixedFiveSupabaseConfigured(): boolean {
@@ -163,23 +183,34 @@ export function getFixedFiveTransport(options?: {
   return created;
 }
 async function ensureAnonymous(client: FixedFiveClient): Promise<void> {
-  const session = await client.auth.getSession();
-  if (session.data.session) return;
-  const signed = await client.auth.signInAnonymously();
-  if (signed.error) throw new Error(`anonymous sign-in failed: ${signed.error.message}`);
+  try {
+    const session = await client.auth.getSession();
+    if (session.data.session) return;
+  } catch {
+    throw new Error('anonymous sign-in unreachable: failed to fetch');
+  }
+  try {
+    const signed = await client.auth.signInAnonymously();
+    if (signed.error) throw new Error(`anonymous sign-in failed: ${signed.error.message}`);
+  } catch (e) {
+    if (e instanceof Error && e.message.startsWith('anonymous sign-in failed:')) throw e;
+    throw new Error('anonymous sign-in unreachable: failed to fetch');
+  }
 }
 export function createFixedFiveTransport(options?: {
   url?: string;
   publishableKey?: string;
   storageKey?: string;
 }): FixedFiveMultiplayerTransport {
-  if (!options?.url || !options.publishableKey) {
+  const candidateUrl = typeof options?.url === 'string' ? options.url.trim().replace(/\/+$/, '') : undefined;
+  const candidateKey = typeof options?.publishableKey === 'string' ? options.publishableKey.trim() : undefined;
+  if (!candidateUrl || !candidateKey || !isUsableSupabaseUrl(candidateUrl) || !isUsablePublishableKey(candidateKey)) {
     return createInMemoryFixedFiveTransport();
   }
   let clientPromise: Promise<FixedFiveClient> | null = null;
-  const transportUrl = options.url;
-  const transportPublishableKey = options.publishableKey;
-  const transportStorageKey = options.storageKey;
+  const transportUrl = candidateUrl;
+  const transportPublishableKey = candidateKey;
+  const transportStorageKey = options?.storageKey;
   function getClient(): Promise<FixedFiveClient> {
     if (!clientPromise)
       clientPromise = supabaseClient(transportUrl, transportPublishableKey, transportStorageKey);

@@ -11,6 +11,18 @@ export function inviteLinkForFixedFiveCode(code: string): string {
 }
 export function friendlyFixedFiveJoinError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
+  const lower = message.toLowerCase();
+  if (
+    lower.includes('unreachable') ||
+    lower.includes('failed to fetch') ||
+    lower.includes('load failed') ||
+    lower.includes('networkerror') ||
+    lower.includes('err_name_not_resolved') ||
+    lower.includes('name not resolved')
+  )
+    return 'Can’t reach the online lobby. Check your connection and try again.';
+  if (lower.includes('anonymous sign-ins are disabled') || lower.includes('anonymous sign ins are disabled'))
+    return 'Online play is disabled on the server right now. Solo Classic and Sandbox still work.';
   if (message.includes('invalid-code'))
     return 'That code was not found. Check the 4 digits and try again.';
   if (message.includes('code-expired')) return 'That code expired. Ask the host for a fresh code.';
