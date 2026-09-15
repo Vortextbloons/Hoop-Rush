@@ -133,6 +133,23 @@
   let receiptSubmitInFlight = false;
   let receiptRetry = $state(0);
   let receiptRebuilds = 0;
+  let receiptsUnsupported = $state(false);
+  function isMissingFunctionError(e: unknown): boolean {
+    const message = e instanceof Error ? e.message : String(e);
+    if (/schema cache|PGRST202|404/.test(message)) return true;
+    const code = typeof e === 'object' && e !== null ? (e as { code?: unknown }).code : null;
+    return code === 'PGRST202';
+  }
+  function markReceiptsUnsupported(): void {
+    if (receiptsUnsupported) return;
+    receiptsUnsupported = true;
+    verificationError = null;
+    saveVerifyGuards();
+    if (mounted) {
+      notice =
+        'Server verification receipts are unavailable — completing with result confirmation instead.';
+    }
+  }
   function verifyGuardStorageKey(id: string): string {
     return `hoop-rush:fixed-five:verify:${id}`;
   }
@@ -140,7 +157,13 @@
     try {
       localStorage.setItem(
         verifyGuardStorageKey(roomId),
-        JSON.stringify({ submittedPropose, confirmedFor, reranMismatch, mismatchReported }),
+        JSON.stringify({
+          submittedPropose,
+          confirmedFor,
+          reranMismatch,
+          mismatchReported,
+          receiptsUnsupported,
+        }),
       );
     } catch {}
   }
@@ -153,6 +176,7 @@
         confirmedFor?: unknown;
         reranMismatch?: unknown;
         mismatchReported?: unknown;
+        receiptsUnsupported?: unknown;
       };
       if (typeof parsed.submittedPropose === 'string')
         submittedPropose = parsed.submittedPropose as ContentHash;
@@ -160,6 +184,7 @@
         confirmedFor = parsed.confirmedFor as ContentHash;
       if (parsed.reranMismatch === true) reranMismatch = true;
       if (parsed.mismatchReported === true) mismatchReported = true;
+      if (parsed.receiptsUnsupported === true) receiptsUnsupported = true;
     } catch {}
   }
   let busyAction = $state<string | null>(null);
@@ -519,7 +544,11 @@
       verificationReceipt = outcome.receipt;
       void storeReceipt(outcome.receipt);
     } catch (e) {
-      if (mounted) verificationError = e instanceof Error ? e.message : String(e);
+      if (isMissingFunctionError(e)) {
+        markReceiptsUnsupported();
+      } else if (mounted) {
+        verificationError = e instanceof Error ? e.message : String(e);
+      }
     } finally {
       verificationInFlight = false;
     }
@@ -558,6 +587,8 @@
           verificationError =
             'The server rejected the verification receipt for this accepted command log.';
         }
+      } else if (isMissingFunctionError(e)) {
+        markReceiptsUnsupported();
       } else if (mounted) {
         notice = 'Verification receipt is ready but not stored yet — retrying after the next sync.';
       }
@@ -612,6 +643,21 @@
       await sync(lastOrdinal);
     } catch (e) {
       submittedTimeouts = new Set([...submittedTimeouts].filter((entry) => entry !== key));
+      if (isMissingFunctionError(e)) {
+        markReceiptsUnsupported();
+        submittedTimeouts = new Set([...submittedTimeouts, key]);
+        void sendCommand(
+          {
+            kind: 'timeout-autopick',
+            playerId: pick.playerId,
+            slotIndex: pick.slotIndex,
+            pickOrdinal: ordinal,
+            seedPath: pick.seedPath,
+          },
+          { actor: participant, commandId: `timeout-${mode}-${participant}-${ordinal}` },
+        );
+        return;
+      }
       if (mounted) error = friendlyFixedFiveJoinError(e);
     }
   }
@@ -1096,6 +1142,7 @@
   $effect(() => {
     if (!mounted || !snapshot || !localResult || !assets) return;
     if (phase !== 'awaiting-confirmation') return;
+    if (receiptsUnsupported) return;
     if (!snapshot.rootSeed) return;
     if (verificationReceipt || verificationError || verificationInFlight) return;
     const myDigest = localResult.digest;
@@ -1117,17 +1164,28 @@
   $effect(() => {
     if (!mounted || !snapshot || !localResult) return;
     if (phase !== 'awaiting-confirmation') return;
-    const receipt = verificationReceipt;
-    if (!receipt || receipt.resultDigest !== localResult.digest) return;
-    if (submittedReceipt !== receipt.receiptDigest) return;
-    if (confirmedFor !== receipt.resultDigest) return;
+    if (!receiptsUnsupported) {
+      const receipt = verificationReceipt;
+      if (!receipt || receipt.resultDigest !== localResult.digest) return;
+      if (submittedReceipt !== receipt.receiptDigest) return;
+      if (confirmedFor !== receipt.resultDigest) return;
+      const foreignVerified = facts.confirms.filter(
+        (c) => c.actor !== selfId && c.digest === receipt.resultDigest && c.verified,
+      );
+      if (foreignVerified.length === 0) return;
+      const pairKey = `receipt:${receipt.resultDigest}:${String(foreignVerified.length)}`;
+      if (completedPairKey === pairKey) return;
+      void runCompleteOnce(receipt.resultDigest, pairKey);
+      return;
+    }
+    if (!confirmedFor) return;
     const foreignVerified = facts.confirms.filter(
-      (c) => c.actor !== selfId && c.digest === receipt.resultDigest && c.verified,
+      (c) => c.actor !== selfId && c.digest === confirmedFor && c.verified,
     );
     if (foreignVerified.length === 0) return;
-    const pairKey = `${receipt.resultDigest}:${String(foreignVerified.length)}`;
+    const pairKey = `${confirmedFor}:${String(foreignVerified.length)}`;
     if (completedPairKey === pairKey) return;
-    void runCompleteOnce(receipt.receiptDigest, pairKey);
+    void runCompleteOnce(confirmedFor, pairKey);
   });
   $effect(() => {
     if (!mounted || !snapshot || failSent) return;
@@ -1188,6 +1246,7 @@
   const resultVerified = $derived.by((): boolean => {
     if (!snapshot || !localResult) return false;
     if (snapshot.phase === 'completed') return true;
+    if (receiptsUnsupported) return snapshot.confirmedDigest === localResult.digest;
     return (
       verificationReceipt !== null &&
       verificationReceipt.resultDigest === localResult.digest &&
@@ -1498,6 +1557,13 @@
             <p class="mt-1 text-xs text-muted-foreground">
               {#if !localResult}
                 Recomputing the shared result from the accepted command log…
+              {:else if receiptsUnsupported && rivalProposal == null}
+                You proposed {youShort} — waiting for your rival's result…
+              {:else if receiptsUnsupported && !digestsMatch}
+                Results differ — you {youShort} vs rival {rivalShort}. Re-running from the shared
+                log…
+              {:else if receiptsUnsupported}
+                Both sides agree ({youShort}). Locking the room…
               {:else if verificationError}
                 Local verification failed: {verificationError}. This result cannot receive a
                 receipt, so the room cannot complete from this device.
