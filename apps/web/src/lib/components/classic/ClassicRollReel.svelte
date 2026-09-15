@@ -4,13 +4,21 @@
     resolveEraTeamIdentity,
     type HoopRushManifest,
   } from '@hoop-rush/data-contracts';
-  import { untrack } from 'svelte';
+  import { onDestroy, untrack } from 'svelte';
   import TeamLogo from '../TeamLogo.svelte';
+  import {
+    arenaReelLock,
+    arenaReelSettle,
+    arenaReelSpin,
+    arenaReelTick,
+    type ArenaSpotlight,
+  } from '$lib/arena-sound';
   const REEL_ROW_HEIGHT_PX = 108;
-  const OPTION_REPEATS = 3;
-  const SPIN_MS = 2600;
+  const TRAVEL_ROWS = 30;
+  const SPIN_MS = 1750;
+  const SINGLE_AXIS_SPIN_MS = 1000;
   const RESULT_MS = 800;
-  const FADE_MS = 250;
+  const CROSSFADE_MS = 300;
   let {
     manifest,
     franchiseId,
@@ -19,11 +27,13 @@
     eraOptions,
     axis = 'both',
     spinKey = 0,
+    spinId = null,
     spotlight = null,
     announceText,
     roundLabel = '',
     reducedMotion,
     spinDurationMs,
+    sound = true,
     onSettled,
   }: {
     manifest: HoopRushManifest;
@@ -33,11 +43,13 @@
     eraOptions: string[];
     axis?: 'both' | 'franchise' | 'era';
     spinKey?: number;
+    spinId?: string | null;
     spotlight?: 'you' | 'rival' | null;
     announceText: string;
     roundLabel?: string;
     reducedMotion?: boolean;
     spinDurationMs?: number;
+    sound?: boolean;
     onSettled: () => void;
   } = $props();
   let selfDetectedReduced = $state(detectReducedMotion());
@@ -53,9 +65,20 @@
   let pulseKey = $state(0);
   let spinTimer: ReturnType<typeof setTimeout> | null = null;
   let resultTimer: ReturnType<typeof setTimeout> | null = null;
+  let tickTimer: ReturnType<typeof setInterval> | null = null;
   let firstRun = true;
-  const franchiseCycle = $derived([...franchiseOptions, ...franchiseOptions, ...franchiseOptions]);
-  const eraCycle = $derived([...eraOptions, ...eraOptions, ...eraOptions]);
+  let activeKey: string | null = $state(null);
+  let pendingKey: string | null = $state(null);
+  function repeatsFor(optionCount: number): number {
+    if (optionCount <= 0) return 1;
+    return Math.max(1, Math.ceil(TRAVEL_ROWS / optionCount));
+  }
+  const franchiseRepeats = $derived(repeatsFor(franchiseOptions.length));
+  const eraRepeats = $derived(repeatsFor(eraOptions.length));
+  const franchiseCycle = $derived(
+    Array.from({ length: franchiseRepeats }, () => franchiseOptions).flat(),
+  );
+  const eraCycle = $derived(Array.from({ length: eraRepeats }, () => eraOptions).flat());
   function detectReducedMotion(): boolean {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
       return false;
@@ -77,12 +100,21 @@
   function eraLabelFor(id: string): string {
     return manifest.eras.find((era) => era.eraId === id)?.label ?? id;
   }
-  function jitterFor(key: number): number {
-    const frac = key * 0.6180339887498949;
+  function jitterFor(key: number | string): number {
+    const numeric =
+      typeof key === 'number'
+        ? key
+        : Array.from(key).reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
+    const frac = numeric * 0.6180339887498949;
     return frac - Math.floor(frac);
   }
-  function spinStartPx(optionCount: number, key: number, rowHeightPx: number): number {
-    const travelRows = optionCount * OPTION_REPEATS - 1 + jitterFor(key);
+  function spinStartPx(
+    optionCount: number,
+    repeats: number,
+    key: number | string,
+    rowHeightPx: number,
+  ): number {
+    const travelRows = optionCount * repeats - 1 + jitterFor(key);
     return -(travelRows * rowHeightPx);
   }
   function spinVars(startPx: number): string {
@@ -97,12 +129,34 @@
       clearTimeout(resultTimer);
       resultTimer = null;
     }
+    stopTicks();
   }
-  function startSpin(key: number) {
+  function stopTicks() {
+    if (tickTimer !== null) {
+      clearInterval(tickTimer);
+      tickTimer = null;
+    }
+  }
+  function startTicks() {
+    stopTicks();
+    const useSound = untrack(() => sound);
+    if (!useSound) return;
+    try {
+      arenaReelTick();
+    } catch {}
+    tickTimer = setInterval(() => {
+      try {
+        arenaReelTick();
+      } catch {}
+    }, 130);
+  }
+  function startSpin(key: string) {
     const params = untrack(() => ({
       axis,
       franchiseOptions,
       eraOptions,
+      franchiseRepeats,
+      eraRepeats,
       reduced: reducedMotion ?? selfDetectedReduced,
       spinDurationMs,
     }));
@@ -111,29 +165,46 @@
     const franchiseMoves = franchiseActive && params.franchiseOptions.length > 0;
     const eraMoves = eraActive && params.eraOptions.length > 0;
     franchiseStartPx = franchiseMoves
-      ? spinStartPx(params.franchiseOptions.length, key, REEL_ROW_HEIGHT_PX)
+      ? spinStartPx(
+          params.franchiseOptions.length,
+          params.franchiseRepeats,
+          key,
+          REEL_ROW_HEIGHT_PX,
+        )
       : 0;
-    eraStartPx = eraMoves ? spinStartPx(params.eraOptions.length, key, REEL_ROW_HEIGHT_PX) : 0;
+    eraStartPx = eraMoves
+      ? spinStartPx(params.eraOptions.length, params.eraRepeats, key, REEL_ROW_HEIGHT_PX)
+      : 0;
     const franchiseStrip = franchiseMoves && !params.reduced;
     const eraStrip = eraMoves && !params.reduced;
     clearTimers();
+    activeKey = key;
+    if (pendingKey === key) pendingKey = null;
     phase = 'spinning';
     franchiseSpinning = franchiseStrip;
     eraSpinning = eraStrip;
     franchiseFading = franchiseActive && !franchiseStrip;
     eraFading = eraActive && !eraStrip;
     announced = '';
-    activeSpinDurationMs = params.spinDurationMs ?? SPIN_MS;
+    activeSpinDurationMs =
+      params.spinDurationMs ?? (params.axis === 'both' ? SPIN_MS : SINGLE_AXIS_SPIN_MS);
     const franchiseDuration = franchiseStrip ? activeSpinDurationMs : 0;
     const eraDuration = eraStrip ? activeSpinDurationMs : 0;
     const duration =
       params.reduced || (!franchiseStrip && !eraStrip)
-        ? FADE_MS
+        ? CROSSFADE_MS
         : Math.max(franchiseDuration, eraDuration);
+    if (sound) {
+      try {
+        arenaReelSpin(spotlight as ArenaSpotlight);
+      } catch {}
+      if (!params.reduced && (franchiseStrip || eraStrip)) startTicks();
+    }
     spinTimer = setTimeout(settle, duration);
   }
   function settle() {
     spinTimer = null;
+    stopTicks();
     franchiseSpinning = false;
     eraSpinning = false;
     franchiseFading = false;
@@ -141,28 +212,47 @@
     pulseKey += 1;
     announced = announceText;
     phase = 'settled';
+    if (sound) {
+      try {
+        arenaReelLock(spotlight as ArenaSpotlight);
+      } catch {}
+    }
     const reduced = reducedMotion ?? selfDetectedReduced;
-    resultTimer = setTimeout(finish, reduced ? FADE_MS : RESULT_MS);
+    resultTimer = setTimeout(finish, reduced ? CROSSFADE_MS : RESULT_MS);
   }
   function finish() {
     if (resultTimer !== null) {
       clearTimeout(resultTimer);
       resultTimer = null;
     }
+    const next = pendingKey;
+    pendingKey = null;
+    if (next !== null && next !== activeKey) {
+      startSpin(next);
+      return;
+    }
     phase = 'idle';
+    if (sound) {
+      try {
+        arenaReelSettle();
+      } catch {}
+    }
     onSettled();
   }
   $effect(() => {
-    const key = spinKey;
+    const key = spinId ?? String(spinKey);
     const isFirst = firstRun;
     firstRun = false;
-    if (!isFirst || key > 0) {
-      startSpin(key);
+    if (isFirst && key === '0') return;
+    const snapshot = untrack(() => ({ active: activeKey, currentPhase: phase }));
+    if (key === snapshot.active) return;
+    if (snapshot.currentPhase === 'spinning') {
+      pendingKey = key;
+      return;
     }
-    return () => {
-      clearTimers();
-    };
+    startSpin(key);
   });
+  onDestroy(clearTimers);
 </script>
 
 {#if phase !== 'idle'}
@@ -436,7 +526,7 @@
   }
 
   .reel-strip.reel-fade {
-    animation: reel-fade 250ms ease-out both;
+    animation: reel-crossfade 300ms ease-out both;
   }
 
   .reel-row {
@@ -888,6 +978,15 @@
     }
   }
 
+  @keyframes reel-crossfade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
   @keyframes reel-lock {
     0% {
       transform: scale(1.07);
@@ -896,6 +995,17 @@
     100% {
       transform: scale(1);
       filter: brightness(1);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .roll-stage,
+    .roll-result,
+    .reel-lock--active {
+      animation: reel-crossfade 300ms ease-out both;
+    }
+    .reel-strip.reel-spinning {
+      animation: reel-crossfade 300ms ease-out both;
     }
   }
 </style>

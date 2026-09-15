@@ -1,7 +1,7 @@
 import { readdirSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { z } from 'zod';
-import { parsePool } from '@hoop-rush/data-contracts';
+import { hoopRushManifestSchema, parsePool } from '@hoop-rush/data-contracts';
 import {
   COHORT_NORMALIZATION_VERSION,
   DERIVATION_METHOD_VERSION,
@@ -38,6 +38,8 @@ import {
 } from '@hoop-rush/data-contracts';
 import { playableSlotGroups } from '@hoop-rush/data-contracts';
 import { NBA_ROOT, PUBLIC_DATA, RAW_CACHE } from '../config.ts';
+import { DATA_VERSION } from '../data-version.ts';
+export { DATA_VERSION };
 import { refreshPlayersIndexInManifest } from '../manifest/index.ts';
 import {
   clamp,
@@ -157,7 +159,6 @@ export function manifestPath(): string {
 }
 export const SCHEMA_VERSION = POOL_SCHEMA_VERSION;
 export const MIN_TEAM_GAMES = 40;
-export const DATA_VERSION = 'm17-ratings-v3.12';
 export const CONFIDENCE_POLICY_VERSION = 'policy-v2';
 export const MAX_LOW_CONFIDENCE_SHARE = 0.4;
 export const MAX_LOW_CONFIDENCE_PLAYER_SHARE = 0.25;
@@ -1467,15 +1468,12 @@ export function computePool(
     players: playersOut,
   };
 }
-export function logPoolValidation(pool: Pool): void {
+export function assertPoolValid(pool: Pool): void {
   try {
     parsePool(pool);
   } catch (error) {
     const message = error instanceof Error ? error.message : JSON.stringify(error);
-    console.error(
-      `  [VALIDATION] parsePool rejected ${pool.franchiseId}-${pool.eraId} ` +
-        `(pool still written; report to the integration wave): ${message}`,
-    );
+    throw new Error(`invalid pool ${pool.franchiseId}-${pool.eraId}: ${message}`);
   }
 }
 export function writePool(pool: Pool): string {
@@ -1577,7 +1575,7 @@ export function buildPoolForTarget(
       },
     };
   }
-  logPoolValidation(pool);
+  assertPoolValid(pool);
   const digest = writePool(pool);
   return {
     entry: {
@@ -1651,6 +1649,7 @@ export async function run(
   if (targets === null) {
     targets = [['lakers', '1990s']];
   }
+  seasonDataCache.clear();
   const manifest = loadManifest();
   const bbrefIds = loadBbrefIds();
   const careerLabels = loadCareerPositionLabels();
@@ -1779,6 +1778,13 @@ export function updateManifest(
   manifest.pools = [...existing.entries()]
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
     .map(([, entry]) => entry);
+  const validated = hoopRushManifestSchema.safeParse(manifest);
+  if (!validated.success) {
+    const issue = validated.error.issues[0];
+    throw new Error(
+      `manifest fails validation: ${issue?.path.join('.') || '(root)'} ${issue?.message ?? 'unknown'}`,
+    );
+  }
   writeJsonRetry(manifestPath(), manifest);
   console.log(
     `  [OK] manifest updated: ${String(manifest.pools.length)} pools, dataVersion ${DATA_VERSION}`,

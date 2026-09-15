@@ -188,6 +188,71 @@ describe('season game controller (M2.2)', () => {
     }
     expect(checkSeasonGameResult(result, withRemoval)).toEqual([]);
   });
+  it('applies a period-start exact removal before the period begins', () => {
+    const away = buildSeasonTeam('away');
+    const target = away.players[0];
+    if (target === undefined) throw new Error('fixture missing starter');
+    const { input, result } = run('period-start-removal', {
+      away,
+      awayRotation: buildSeasonRotation(away),
+      removals: [
+        {
+          side: 'away',
+          playerVersionId: target.playerVersionId,
+          period: 2,
+          secondsRemaining: 720,
+          reason: 'injury',
+        },
+      ],
+    });
+    if (result.outcome !== 'completed') throw new Error('expected a completed game');
+    const event = result.removals.find((entry) => entry.playerVersionId === target.playerVersionId);
+    expect(event).toBeDefined();
+    expect(event?.period).toBe(2);
+    expect(event?.secondsRemaining).toBe(720);
+    const periodTwoStints = result.unitStints.filter(
+      (stint) => stint.side === 'away' && stint.period >= 2,
+    );
+    expect(periodTwoStints.every((stint) => !stint.players.includes(target.playerVersionId))).toBe(
+      true,
+    );
+    expect(checkSeasonGameResult(result, input)).toEqual([]);
+  });
+  it('applies a period-start exact return before the period begins', () => {
+    const away = buildSeasonTeam('away');
+    const target = away.players[0];
+    if (target === undefined) throw new Error('fixture missing starter');
+    const { input, result } = run('period-start-return', {
+      away,
+      awayRotation: buildSeasonRotation(away),
+      removals: [
+        {
+          side: 'away',
+          playerVersionId: target.playerVersionId,
+          period: 1,
+          secondsRemaining: 360,
+          reason: 'injury',
+        },
+      ],
+      returns: [
+        {
+          side: 'away',
+          playerVersionId: target.playerVersionId,
+          period: 2,
+          secondsRemaining: 720,
+          reason: 'injury-return',
+        },
+      ],
+    });
+    if (result.outcome !== 'completed') throw new Error('expected a completed game');
+    const returnEvent = result.away.returns.find(
+      (event) => event.playerVersionId === target.playerVersionId,
+    );
+    expect(returnEvent).toBeDefined();
+    expect(returnEvent?.period).toBe(2);
+    expect(returnEvent?.secondsRemaining).toBe(720);
+    expect(checkSeasonGameResult(result, input)).toEqual([]);
+  });
   it('runs real rotation substitutions with dead-ball timestamps', () => {
     const { result } = run('subs-1');
     if (result.outcome !== 'completed') throw new Error('expected a completed game');

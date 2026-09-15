@@ -5,6 +5,7 @@
   import SeasonTeamLogo from './SeasonTeamLogo.svelte';
   import { franchiseIdentityOf } from '$lib/season/season-branding';
   import { franchiseColor } from '$lib/season/franchise-colors';
+  import { arenaBuzzer, arenaConfirm } from '$lib/arena-sound';
 
   let {
     open,
@@ -30,6 +31,24 @@
 
   const identityOf = (franchiseId: string) =>
     manifest === null ? null : franchiseIdentityOf(manifest, franchiseId);
+
+  let gamecastSoundFor: string | null = $state(null);
+  $effect(() => {
+    if (result === null) return;
+    const key = `${homeFranchiseId}:${awayFranchiseId}:${result.homeScore}:${result.awayScore}`;
+    if (gamecastSoundFor === key) return;
+    gamecastSoundFor = key;
+    try {
+      arenaBuzzer();
+    } catch {}
+  });
+
+  function handleContinue() {
+    try {
+      arenaConfirm();
+    } catch {}
+    onContinue();
+  }
 </script>
 
 <LiveSimModal {open} onOpenChange={() => undefined}>
@@ -84,7 +103,9 @@
       <p class="gamecast-note" role="status">
         {franchiseName(result.winnerFranchiseId)} wins {result.awayScore}–{result.homeScore}.
       </p>
-      <button type="button" class="continue-button" onclick={onContinue}>Continue bracket</button>
+      <button type="button" class="continue-button" onclick={handleContinue}
+        >Continue bracket</button
+      >
     {/if}
   </div>
 </LiveSimModal>

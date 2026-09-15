@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import {
   POSITION_SLOTS,
+  PROJECTION_COMPONENT_HIGHER_IS_BETTER,
   PROJECTION_MODEL_VERSION,
   PROJECTION_TARGETS_VERSION,
   contentHashSchema,
@@ -435,6 +436,9 @@ function deriveReferenceFive(
 function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
+function scaleDirection(key: string): boolean {
+  return PROJECTION_COMPONENT_HIGHER_IS_BETTER[key] ?? true;
+}
 export function deriveProjectionModel(data: PackagedData): {
   model: ProjectionModelArtifact;
   populationSizes: Record<string, number>;
@@ -468,9 +472,27 @@ export function deriveProjectionModel(data: PackagedData): {
     eraProfileVersions,
     references,
     scales: {
-      creation: { baseline: 0.5, perPoint: 0.01, min: 0, max: 100, higherIsBetter: true },
-      spacing: { baseline: 0.5, perPoint: 0.01, min: 0, max: 100, higherIsBetter: true },
-      defense: { baseline: 55, perPoint: 1, min: 0, max: 100, higherIsBetter: true },
+      creation: {
+        baseline: 0.5,
+        perPoint: 0.01,
+        min: 0,
+        max: 100,
+        higherIsBetter: scaleDirection('creation'),
+      },
+      spacing: {
+        baseline: 0.5,
+        perPoint: 0.01,
+        min: 0,
+        max: 100,
+        higherIsBetter: scaleDirection('spacing'),
+      },
+      defense: {
+        baseline: 55,
+        perPoint: 1,
+        min: 0,
+        max: 100,
+        higherIsBetter: scaleDirection('defense'),
+      },
     },
     componentWeights: { creation: 1, spacing: 1, defense: 1 },
     weights: { basketballMean: 0.4, rotationMean: 0.35, robustnessMean: 0.25 },

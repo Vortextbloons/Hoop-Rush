@@ -16,6 +16,7 @@
   import { loadCollectionCatalog } from '$lib/collection/collection-assets.ts';
   import { ensureCollection, openPack } from '$lib/collection/collection-hub.ts';
   import { getCollectionRepo } from '$lib/collection/collection-hub.ts';
+  import { arenaDuplicate, arenaError, arenaPackOpen, arenaPackReveal } from '$lib/arena-sound';
 
   let mounted = true;
   onDestroy(() => {
@@ -119,6 +120,9 @@
     purchaseError = null;
     showAll = false;
     try {
+      arenaPackOpen();
+    } catch {}
+    try {
       const outcome = await openPack(packId, new Date().toISOString());
       if (!mounted) return;
       collectionState = outcome.state;
@@ -140,8 +144,21 @@
         // Receipt restore is best-effort.
       }
       announcement = `Pack opened. ${receipt.cardsAdded} new cards, plus ${receipt.exchangeGained} Exchange.`;
+      try {
+        const order = ['Ember', 'Eruption', 'Apex', 'Titan', 'Eclipse', 'Immortal'];
+        let best = 0;
+        for (const slot of outcome.pull.slots) {
+          const rank = order.indexOf(slot.rarity);
+          if (rank > best) best = rank;
+        }
+        arenaPackReveal(order[best]);
+        if (receipt.cardsAdded === 0) arenaDuplicate();
+      } catch {}
     } catch (buyError) {
       if (!mounted) return;
+      try {
+        arenaError();
+      } catch {}
       purchaseError = buyError instanceof Error ? buyError.message : 'Purchase failed. Try again.';
       const refreshed = await ensureCollection(new Date().toISOString()).catch(() => null);
       if (mounted && refreshed) collectionState = refreshed;

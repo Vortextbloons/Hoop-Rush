@@ -1,6 +1,5 @@
 import { readFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   seasonDraftCatalogSchema,
   seasonDraftStateSchema,
@@ -8,6 +7,7 @@ import {
   seasonLeagueSchema,
   seasonRosterRoleSchema,
   seasonRosterTargetsSchema,
+  seasonScheduleSchema,
   type SeasonAiPool,
   type SeasonDraftCandidate,
   type SeasonDraftCatalog,
@@ -16,6 +16,7 @@ import {
   type SeasonLeague,
   type SeasonRosterRole,
   type SeasonRosterTargets,
+  type SeasonSchedule,
 } from '@hoop-rush/data-contracts';
 import {
   evaluateSeasonRoster,
@@ -29,37 +30,109 @@ import {
   type SeasonRosterMemberInput,
 } from '@hoop-rush/engine';
 import { readJson as readJsonFile, sha256Hex } from '../io.ts';
+import { DEFAULT_MANIFEST, REPO_ROOT } from './data-loader.ts';
 export { sha256Hex };
 export { readJsonFile };
-export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../');
-export const DEFAULT_MANIFEST = resolve(REPO_ROOT, 'apps/web/static/data/manifest.json');
-export const DEFAULT_SEASON_DIR = resolve(REPO_ROOT, 'apps/web/static/data/season');
+export { DEFAULT_MANIFEST, REPO_ROOT };
+export const DEFAULT_SEASON_DIR = resolve(dirname(DEFAULT_MANIFEST), 'season');
 export const DEFAULT_DRAFT_CATALOG = resolve(DEFAULT_SEASON_DIR, 'draft-catalog.json');
 export const DEFAULT_LEAGUE = resolve(DEFAULT_SEASON_DIR, 'league.json');
+export const DEFAULT_SCHEDULE = resolve(DEFAULT_SEASON_DIR, 'schedule.json');
 export const DEFAULT_ROSTER_TARGETS = resolve(DEFAULT_SEASON_DIR, 'roster-targets.json');
 export const DEFAULT_FREE_AGENCY_INDEX = resolve(DEFAULT_SEASON_DIR, 'free-agency-index.json');
+export type SeasonArtifactKey =
+  'league' | 'schedule' | 'draftCatalog' | 'rosterTargets' | 'freeAgencyIndex';
+interface SeasonArtifactEntry {
+  url?: string;
+  contentHash?: string;
+}
+interface SeasonManifestShape {
+  season?: Partial<Record<SeasonArtifactKey, SeasonArtifactEntry>>;
+}
+export interface SeasonArtifactRef {
+  key: SeasonArtifactKey;
+  url: string;
+  contentHash: string;
+  path: string;
+}
+export function resolveArtifact(manifestDir: string, url: string): string {
+  return isAbsolute(url) ? url : resolve(manifestDir, url);
+}
+export function manifestSeasonEntry(
+  manifestPath: string,
+  key: SeasonArtifactKey,
+): SeasonArtifactEntry | undefined {
+  return (readJsonFile(manifestPath) as SeasonManifestShape).season?.[key];
+}
+export function resolveSeasonArtifact(
+  manifestPath: string = DEFAULT_MANIFEST,
+  key: SeasonArtifactKey,
+): SeasonArtifactRef {
+  const entry = manifestSeasonEntry(manifestPath, key);
+  if (entry === undefined) {
+    throw new Error(`manifest ${manifestPath} has no season.${key} entry`);
+  }
+  if (entry.url === undefined || entry.url === '') {
+    throw new Error(`manifest ${manifestPath} season.${key} entry has no url`);
+  }
+  if (entry.contentHash === undefined || entry.contentHash === '') {
+    throw new Error(`manifest ${manifestPath} season.${key} entry has no contentHash`);
+  }
+  return {
+    key,
+    url: entry.url,
+    contentHash: entry.contentHash,
+    path: resolveArtifact(dirname(manifestPath), entry.url),
+  };
+}
+export interface SeasonArtifactBytes {
+  path: string;
+  bytes: Buffer;
+  actualHash: string;
+  matches: boolean;
+}
+export function readSeasonArtifact(
+  ref: SeasonArtifactRef,
+  overridePath?: string,
+): SeasonArtifactBytes {
+  const path = overridePath ?? ref.path;
+  let bytes: Buffer;
+  try {
+    bytes = readFileSync(path);
+  } catch (error) {
+    throw new Error(`cannot read season.${ref.key} artifact ${path}: ${(error as Error).message}`);
+  }
+  const actualHash = sha256Hex(bytes);
+  return { path, bytes, actualHash, matches: actualHash === ref.contentHash };
+}
+function parseSeasonArtifactJson(label: string, bytes: Buffer): unknown {
+  try {
+    return JSON.parse(bytes.toString('utf8')) as unknown;
+  } catch (error) {
+    throw new Error(`${label} is not valid JSON: ${(error as Error).message}`);
+  }
+}
+function readVerifiedSeasonArtifact(
+  ref: SeasonArtifactRef,
+  overridePath?: string,
+): SeasonArtifactBytes {
+  const read = readSeasonArtifact(ref, overridePath);
+  if (!read.matches) {
+    throw new Error(
+      `${ref.key} content hash mismatch: expected ${ref.contentHash}, got ${read.actualHash} (${read.path})`,
+    );
+  }
+  return read;
+}
 export function loadSeasonDraftCatalog(
   manifestPath: string = DEFAULT_MANIFEST,
-  catalogPath: string = DEFAULT_DRAFT_CATALOG,
+  catalogPath?: string,
 ): SeasonDraftCatalog {
-  const manifest = readJsonFile(manifestPath) as {
-    season?: {
-      draftCatalog?: {
-        url?: string;
-        contentHash?: string;
-      };
-    };
-  };
-  const expectedHash = manifest.season?.draftCatalog?.contentHash;
-  if (expectedHash !== undefined) {
-    const actual = sha256Hex(readFileSync(catalogPath));
-    if (actual !== expectedHash) {
-      throw new Error(
-        `draft catalog content hash mismatch: expected ${expectedHash}, got ${actual}`,
-      );
-    }
-  }
-  const parsed = seasonDraftCatalogSchema.safeParse(readJsonFile(catalogPath));
+  const ref = resolveSeasonArtifact(manifestPath, 'draftCatalog');
+  const read = readVerifiedSeasonArtifact(ref, catalogPath);
+  const parsed = seasonDraftCatalogSchema.safeParse(
+    parseSeasonArtifactJson('draft catalog', read.bytes),
+  );
   if (!parsed.success) {
     throw new Error(
       `draft catalog fails the schema: ${parsed.error.issues[0]?.message ?? 'unknown'}`,
@@ -67,11 +140,30 @@ export function loadSeasonDraftCatalog(
   }
   return parsed.data;
 }
-export function loadSeasonLeague(leaguePath: string = DEFAULT_LEAGUE): SeasonLeague {
-  const parsed = seasonLeagueSchema.safeParse(readJsonFile(leaguePath));
+export function loadSeasonLeague(
+  manifestPath: string = DEFAULT_MANIFEST,
+  leaguePath?: string,
+): SeasonLeague {
+  const ref = resolveSeasonArtifact(manifestPath, 'league');
+  const read = readVerifiedSeasonArtifact(ref, leaguePath);
+  const parsed = seasonLeagueSchema.safeParse(parseSeasonArtifactJson('league', read.bytes));
   if (!parsed.success) {
     throw new Error(
       `league artifact fails the schema: ${parsed.error.issues[0]?.message ?? 'unknown'}`,
+    );
+  }
+  return parsed.data;
+}
+export function loadSeasonSchedule(
+  manifestPath: string = DEFAULT_MANIFEST,
+  schedulePath?: string,
+): SeasonSchedule {
+  const ref = resolveSeasonArtifact(manifestPath, 'schedule');
+  const read = readVerifiedSeasonArtifact(ref, schedulePath);
+  const parsed = seasonScheduleSchema.safeParse(parseSeasonArtifactJson('schedule', read.bytes));
+  if (!parsed.success) {
+    throw new Error(
+      `schedule artifact fails the schema: ${parsed.error.issues[0]?.message ?? 'unknown'}`,
     );
   }
   return parsed.data;
@@ -80,35 +172,11 @@ export function loadSeasonRosterTargets(
   manifestPath: string = DEFAULT_MANIFEST,
   targetsPath?: string,
 ): SeasonRosterTargets {
-  const manifest = readJsonFile(manifestPath) as {
-    season?: {
-      rosterTargets?: {
-        url?: string;
-        contentHash?: string;
-      };
-    };
-  };
-  const entry = manifest.season?.rosterTargets;
-  if (entry === undefined) {
-    throw new Error(
-      'manifest has no season.rosterTargets entry (verified roster targets required)',
-    );
-  }
-  if (entry.contentHash === undefined) {
-    throw new Error('manifest season.rosterTargets entry has no contentHash');
-  }
-  const resolved =
-    targetsPath ??
-    (entry.url !== undefined
-      ? resolveArtifact(dirname(manifestPath), entry.url)
-      : DEFAULT_ROSTER_TARGETS);
-  const actual = sha256Hex(readFileSync(resolved));
-  if (actual !== entry.contentHash) {
-    throw new Error(
-      `roster targets content hash mismatch: expected ${entry.contentHash}, got ${actual} (${resolved})`,
-    );
-  }
-  const parsed = seasonRosterTargetsSchema.safeParse(readJsonFile(resolved));
+  const ref = resolveSeasonArtifact(manifestPath, 'rosterTargets');
+  const read = readVerifiedSeasonArtifact(ref, targetsPath);
+  const parsed = seasonRosterTargetsSchema.safeParse(
+    parseSeasonArtifactJson('roster targets', read.bytes),
+  );
   if (!parsed.success) {
     throw new Error(
       `roster targets fails the schema: ${parsed.error.issues[0]?.message ?? 'unknown'}`,
@@ -120,49 +188,23 @@ export function loadSeasonFreeAgencyIndex(
   manifestPath: string = DEFAULT_MANIFEST,
   indexPath?: string,
 ): SeasonFreeAgencyIndex {
-  const manifest = readJsonFile(manifestPath) as {
-    season?: {
-      freeAgencyIndex?: {
-        url?: string;
-        contentHash?: string;
-      };
-      draftCatalog?: {
-        url?: string;
-        contentHash?: string;
-      };
-    };
-  };
-  const entry = manifest.season?.freeAgencyIndex;
-  if (entry === undefined) {
-    throw new Error(
-      'manifest has no season.freeAgencyIndex entry (verified free-agency index required)',
-    );
-  }
-  if (entry.contentHash === undefined) {
-    throw new Error('manifest season.freeAgencyIndex entry has no contentHash');
-  }
-  const resolved =
-    indexPath ??
-    (entry.url !== undefined
-      ? resolveArtifact(dirname(manifestPath), entry.url)
-      : DEFAULT_FREE_AGENCY_INDEX);
-  const actual = sha256Hex(readFileSync(resolved));
-  if (actual !== entry.contentHash) {
-    throw new Error(
-      `free-agency index content hash mismatch: expected ${entry.contentHash}, got ${actual} (${resolved})`,
-    );
-  }
-  const parsed = seasonFreeAgencyIndexSchema.safeParse(readJsonFile(resolved));
+  const ref = resolveSeasonArtifact(manifestPath, 'freeAgencyIndex');
+  const read = readVerifiedSeasonArtifact(ref, indexPath);
+  const parsed = seasonFreeAgencyIndexSchema.safeParse(
+    parseSeasonArtifactJson('free-agency index', read.bytes),
+  );
   if (!parsed.success) {
     throw new Error(
       `free-agency index fails the schema: ${parsed.error.issues[0]?.message ?? 'unknown'}`,
     );
   }
-  const draftEntry = manifest.season?.draftCatalog;
-  if (
-    draftEntry?.contentHash !== undefined &&
-    parsed.data.catalogRef.contentHash !== draftEntry.contentHash
-  ) {
+  const draftEntry = manifestSeasonEntry(manifestPath, 'draftCatalog');
+  if (draftEntry?.contentHash === undefined) {
+    throw new Error(
+      'manifest has no season.draftCatalog contentHash to pin the free-agency index against',
+    );
+  }
+  if (parsed.data.catalogRef.contentHash !== draftEntry.contentHash) {
     throw new Error(
       `free-agency index catalogRef hash ${parsed.data.catalogRef.contentHash} does not match the packaged draft catalog ${draftEntry.contentHash}`,
     );
@@ -177,9 +219,6 @@ export function loadDraftStateInput(path: string): SeasonDraftState {
     );
   }
   return parsed.data;
-}
-export function resolveArtifact(manifestDir: string, url: string): string {
-  return isAbsolute(url) ? url : resolve(manifestDir, url);
 }
 export function fixtureHumanRoster(catalog: SeasonDraftCatalog): string[] {
   const sorted = [...catalog.candidates].sort(

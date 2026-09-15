@@ -225,6 +225,28 @@ describe('challenge commands', () => {
     };
     expect(() => acceptGameResult(run, swapped)).toThrow(/does not match scheduled/);
   });
+  it('rejects a result whose home player identities do not match the run lineup', () => {
+    const run = createChallenge(fixtureCreation());
+    const input = createGameInput(run, buildGameSimulationInput().profile, 1);
+    const result = simulateGame(input, context);
+    const swapped: GameResult = {
+      ...result,
+      home: { ...result.home, players: [...result.home.players].reverse() },
+    };
+    expect(() => acceptGameResult(run, swapped)).toThrow(/home player identities/);
+  });
+  it('rejects a result whose away player identities do not match the scheduled opponent', () => {
+    const run = createChallenge(fixtureCreation());
+    const input = createGameInput(run, buildGameSimulationInput().profile, 1);
+    const result = simulateGame(input, context);
+    const [first, second, ...rest] = result.away.players;
+    if (first === undefined || second === undefined) throw new Error('fixture players missing');
+    const swapped: GameResult = {
+      ...result,
+      away: { ...result.away, players: [second, first, ...rest] },
+    };
+    expect(() => acceptGameResult(run, swapped)).toThrow(/away player identities/);
+  });
   it('rejects a result with a mismatched engine version', () => {
     const run = createChallenge(fixtureCreation());
     const input = createGameInput(run, buildGameSimulationInput().profile, 1);

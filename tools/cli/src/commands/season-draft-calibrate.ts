@@ -28,6 +28,7 @@ import {
   DEFAULT_SEASON_DIR,
   loadSeasonRosterTargets,
   pickBestSelectable,
+  resolveSeasonArtifact,
 } from './season-data.ts';
 import { rosterCalibrationSeed } from './season-rosters.ts';
 import { percentile } from '../stats.ts';
@@ -424,8 +425,8 @@ export async function seasonDraftCalibrate(args: {
   const validationCount = parseCount(args['validation-seeds'], '--validation-seeds', 64);
   const workers = Math.max(1, parseCount(args.workers, '--workers', 4));
   const manifestPath = args.manifest ?? DEFAULT_MANIFEST;
-  const catalogPath = resolve(manifestPath, '..', 'season', 'draft-catalog.json');
-  const leaguePath = resolve(manifestPath, '..', 'season', 'league.json');
+  const catalogPath = resolveSeasonArtifact(manifestPath, 'draftCatalog').path;
+  const leaguePath = resolveSeasonArtifact(manifestPath, 'league').path;
   const start = Date.now();
   let rosterTargets: SeasonRosterTargets;
   try {

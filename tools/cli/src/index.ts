@@ -411,6 +411,7 @@ const COMMANDS: Record<string, CommandDef> = {
         out: getOptionString(args, 'out'),
         league: getOptionString(args, 'league'),
         seed: getOptionString(args, 'seed'),
+        manifest: getOptionString(args, 'manifest'),
       }),
   },
   'season schedule audit': {

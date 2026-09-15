@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { FixedFiveRoomMode, FixedFiveWorkerResultEntry } from '@hoop-rush/data-contracts';
+  import { arenaGameResult, arenaLeaderChange, arenaStreak } from '$lib/arena-sound';
   const SHOW_TICK_MS = 120;
   const DUEL_REVEAL_EVERY = 4;
   const SHARED_REVEAL_DIVISOR = 25;
@@ -51,6 +52,88 @@
   const visible = $derived(entries.slice(0, shownCount));
   const completed = $derived(shownCount);
   const pct = $derived(Math.min(100, (completed / Math.max(1, total)) * 100));
+  let lastSoundFor = $state(0);
+  $effect(() => {
+    if (visible.length <= lastSoundFor) {
+      lastSoundFor = visible.length;
+      return;
+    }
+    const latest = visible[visible.length - 1];
+    if (latest) {
+      const g = latest.game;
+      let won: boolean | null = null;
+      if (latest.tag === 'h2h') won = selfId === 'p1' ? g.winner === 'home' : g.winner === 'away';
+      else if (latest.tag === selfId) won = g.winner === 'home';
+      else if (latest.tag === 'duel') {
+        const homeIsSelf = g.home.teamId === selfId;
+        won = homeIsSelf ? g.winner === 'home' : g.winner === 'away';
+      }
+      if (won !== null) arenaGameResult(won);
+    }
+    lastSoundFor = visible.length;
+  });
+  const streak = $derived.by((): { side: 'you' | 'opp' | null; count: number } => {
+    let side: 'you' | 'opp' | null = null;
+    let count = 0;
+    for (let i = visible.length - 1; i >= 0; i--) {
+      const entry = visible[i];
+      if (!entry) continue;
+      const g = entry.game;
+      let won: boolean | null = null;
+      if (entry.tag === 'h2h') won = selfId === 'p1' ? g.winner === 'home' : g.winner === 'away';
+      else if (entry.tag === selfId) won = g.winner === 'home';
+      else if (entry.tag === 'duel') {
+        const homeIsSelf = g.home.teamId === selfId;
+        won = homeIsSelf ? g.winner === 'home' : g.winner === 'away';
+      } else continue;
+      const s = won ? 'you' : 'opp';
+      if (side === null) {
+        side = s;
+        count = 1;
+      } else if (side === s) count += 1;
+      else break;
+    }
+    return { side, count };
+  });
+  const bottomLine = $derived.by(() =>
+    visible.map((entry) => {
+      const g = entry.game;
+      return `${entry.tag === 'h2h' ? 'H2H' : entry.tag.toUpperCase()} G${g.gameNumber} ${g.home.box.points}-${g.away.box.points}${g.winner === 'home' ? ' H' : ' A'}`;
+    }),
+  );
+  const momentum = $derived.by(() => {
+    if (isDuel) return duelScore.p1 - duelScore.p2;
+    return sharedLive.p1Diff - sharedLive.p2Diff;
+  });
+  let lastStreakSoundKey = $state<string | null>(null);
+  $effect(() => {
+    const current = streak;
+    if (current.side === null || current.count < 3) return;
+    const key = `${current.side}:${current.count}`;
+    if (lastStreakSoundKey === key) return;
+    if (current.count === 3 || current.count % 5 === 0) {
+      lastStreakSoundKey = key;
+      try {
+        arenaStreak(current.count);
+      } catch {}
+    }
+  });
+  let lastMomentumSign = $state(0);
+  $effect(() => {
+    const sign = momentum > 0 ? 1 : momentum < 0 ? -1 : 0;
+    if (lastMomentumSign === 0) {
+      lastMomentumSign = sign;
+      return;
+    }
+    if (sign !== 0 && sign !== lastMomentumSign) {
+      lastMomentumSign = sign;
+      try {
+        arenaLeaderChange();
+      } catch {}
+    } else if (sign !== 0) {
+      lastMomentumSign = sign;
+    }
+  });
   interface DuelDot {
     winner: 'p1' | 'p2' | null;
   }
@@ -141,16 +224,60 @@
 </script>
 
 <div
-  class="overflow-hidden rounded-2xl border border-line-strong bg-card shadow-[0_0_32px_hsl(13_100%_62%/0.14)]"
+  class="broadcast overflow-hidden rounded-2xl border border-line-strong bg-card shadow-[0_0_32px_hsl(13_100%_62%/0.14)]"
 >
-  <div class="flex items-center justify-between gap-3 border-b border-border/60 px-4 py-3 sm:px-5">
+  <div class="scorebug">
+    <span class="scorebug-team scorebug-team--you">
+      <span class="scorebug-abbr">YOU</span>
+      <span class="scorebug-num"
+        >{isDuel
+          ? selfId === 'p1'
+            ? duelScore.p1
+            : duelScore.p2
+          : selfId === 'p1'
+            ? sharedLive.p1Wins
+            : sharedLive.p2Wins}</span
+      >
+    </span>
+    <span class="scorebug-mid">
+      <span class="live-pill" role="status">
+        <span class="live-dot" aria-hidden="true"></span>
+        {completed}/{total}
+      </span>
+      {#if streak.side && streak.count >= 2}
+        <span class="streak" role="status"
+          >{streak.side === 'you' ? 'W' : 'L'}{streak.count} streak</span
+        >
+      {/if}
+    </span>
+    <span class="scorebug-team scorebug-team--opp">
+      <span class="scorebug-num"
+        >{isDuel
+          ? selfId === 'p1'
+            ? duelScore.p2
+            : duelScore.p1
+          : selfId === 'p1'
+            ? sharedLive.p2Wins
+            : sharedLive.p1Wins}</span
+      >
+      <span class="scorebug-abbr">OPP</span>
+    </span>
+  </div>
+  <div class="flex items-center justify-between gap-3 border-b border-border/60 px-4 py-2 sm:px-5">
     <p class="font-display text-sm font-extrabold tracking-widest uppercase">
       {#if mode === 'duel'}Duel · Best of 7{:else if mode === 'sandbox-shared-82'}Sandbox · Shared
         82{:else}Classic · Shared 82{/if}
     </p>
-    <span class="live-pill" role="status">
-      <span class="live-dot" aria-hidden="true"></span> SIMMING
+    <span class="font-mono text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
+      {momentum > 0 ? '▲ You' : momentum < 0 ? '▼ Opp' : 'Even'} · {pct.toFixed(0)}%
     </span>
+  </div>
+
+  <div class="momentum" aria-hidden="true">
+    <div
+      class="momentum-needle"
+      style={`left: ${Math.max(4, Math.min(96, 50 + Math.max(-30, Math.min(30, momentum)) * 1.4))}%`}
+    ></div>
   </div>
 
   <div class="px-4 py-4 sm:px-5">
@@ -275,9 +402,144 @@
       Every game validated. H2H simulates once and mirrors into both records.
     </p>
   </div>
+  {#if bottomLine.length > 0}
+    <div class="bottomline" aria-label="Game bottom line">
+      <span class="bottomline-tag">Bottom line</span>
+      <div class="bottomline-track">
+        <span class="bottomline-scroll"
+          >{bottomLine.join('   •   ')} • {bottomLine.join('   •   ')}</span
+        >
+      </div>
+    </div>
+  {/if}
 </div>
 
 <style>
+  .broadcast {
+    position: relative;
+  }
+  .scorebug {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    background: hsl(222 28% 5%);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .scorebug-team {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    padding: 0.6rem 0.5rem;
+    font-family: var(--font-display);
+  }
+  .scorebug-team--you {
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--color-primary) 22%, transparent),
+      transparent
+    );
+    border-right: 1px solid var(--color-border);
+  }
+  .scorebug-team--opp {
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--color-destructive) 14%, transparent),
+      transparent
+    );
+    border-left: 1px solid var(--color-border);
+  }
+  .scorebug-abbr {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.2em;
+    color: var(--color-muted-foreground);
+  }
+  .scorebug-num {
+    font-size: 2rem;
+    font-weight: 900;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .scorebug-team--you .scorebug-num {
+    color: var(--color-primary);
+    text-shadow: 0 0 18px color-mix(in srgb, var(--color-primary) 50%, transparent);
+  }
+  .scorebug-mid {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    padding: 0.4rem 0.8rem;
+    min-width: 7rem;
+  }
+  .streak {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-accent);
+    animation: streak-pop 0.35s ease both;
+  }
+  .momentum {
+    position: relative;
+    height: 0.45rem;
+    background: linear-gradient(
+      90deg,
+      var(--color-destructive) 0%,
+      var(--color-surface-3) 30%,
+      var(--color-surface-3) 70%,
+      var(--color-primary) 100%
+    );
+    opacity: 0.9;
+  }
+  .momentum-needle {
+    position: absolute;
+    top: -3px;
+    width: 3px;
+    height: 12px;
+    background: white;
+    border-radius: 2px;
+    box-shadow: 0 0 10px white;
+    transform: translateX(-50%);
+    transition: left 0.4s ease;
+  }
+  .bottomline {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    border-top: 1px solid var(--color-border);
+    background: hsl(222 28% 5%);
+    overflow: hidden;
+  }
+  .bottomline-tag {
+    flex-shrink: 0;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-primary-foreground);
+    background: var(--color-primary);
+    padding: 0.55rem 0.65rem;
+  }
+  .bottomline-track {
+    overflow: hidden;
+    flex: 1;
+    white-space: nowrap;
+  }
+  .bottomline-scroll {
+    display: inline-block;
+    padding: 0.55rem 0;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-muted-foreground);
+    animation: bottom-scroll 28s linear infinite;
+  }
   .live-pill {
     display: inline-flex;
     align-items: center;
@@ -460,6 +722,24 @@
     to {
       opacity: 1;
       transform: translateY(0);
+    }
+  }
+  @keyframes streak-pop {
+    from {
+      opacity: 0;
+      transform: scale(0.8);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  @keyframes bottom-scroll {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
     }
   }
   @keyframes vs-slide {

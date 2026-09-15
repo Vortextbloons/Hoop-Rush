@@ -11,6 +11,7 @@
     FixedFiveCommandPayload,
     FixedFiveCompetitionResult,
     FixedFiveRoomSnapshot,
+    FixedFiveVerificationReceipt,
     FixedFiveWorkerResultEntry,
     Id,
     PlayerId,
@@ -43,6 +44,7 @@
   import { rollAnimationFor } from '$lib/fixed-five-roll-animation';
   import {
     assembleCompetitionRun,
+    buildFixedFiveVerificationInput,
     buildSimulationTeam,
     computeCompetitionDigest,
     computeDueAutopick,
@@ -53,7 +55,6 @@
     loadFixedFiveAssets,
     mergeFixedFiveCommands,
     overlaySnapshotProgress,
-    pickOrdinalOf,
     refsForParticipant,
     replayFixedFiveLog,
     restoreFixedFiveCommandSyncState,
@@ -65,6 +66,8 @@
     type PickRef,
   } from '$lib/fixed-five-room-state';
   import { presentationForVariant } from '$lib/draft-presentation';
+  import ArenaSoundToggle from '$lib/components/ArenaSoundToggle.svelte';
+  import { arenaWin } from '$lib/arena-sound';
   import type { SimulationPlayer } from '@hoop-rush/data-contracts';
   import type { FixedFiveWorkerTeam, PlayersIndexEntry } from '@hoop-rush/data-contracts';
   let roomId = $derived($page.params.roomId as string);
@@ -118,14 +121,54 @@
   let confirmedFor = $state<ContentHash | null>(null);
   let reranMismatch = $state(false);
   let mismatchReported = $state(false);
-  let completedSent = $state(false);
+  let completedPairKey = $state<string | null>(null);
+  let completeNotReady = $state(false);
+  let completeInFlight = false;
   let failSent = $state(false);
+  let verificationReceipt = $state<FixedFiveVerificationReceipt | null>(null);
+  let verificationError = $state<string | null>(null);
+  let verificationInFlight = $state(false);
+  let verificationRunner: FixedFiveRunner | null = null;
+  let submittedReceipt = $state<string | null>(null);
+  let receiptSubmitInFlight = false;
+  let receiptRetry = $state(0);
+  let receiptRebuilds = 0;
+  function verifyGuardStorageKey(id: string): string {
+    return `hoop-rush:fixed-five:verify:${id}`;
+  }
+  function saveVerifyGuards(): void {
+    try {
+      localStorage.setItem(
+        verifyGuardStorageKey(roomId),
+        JSON.stringify({ submittedPropose, confirmedFor, reranMismatch, mismatchReported }),
+      );
+    } catch {}
+  }
+  function restoreVerifyGuards(): void {
+    try {
+      const raw = localStorage.getItem(verifyGuardStorageKey(roomId));
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as {
+        submittedPropose?: unknown;
+        confirmedFor?: unknown;
+        reranMismatch?: unknown;
+        mismatchReported?: unknown;
+      };
+      if (typeof parsed.submittedPropose === 'string')
+        submittedPropose = parsed.submittedPropose as ContentHash;
+      if (typeof parsed.confirmedFor === 'string')
+        confirmedFor = parsed.confirmedFor as ContentHash;
+      if (parsed.reranMismatch === true) reranMismatch = true;
+      if (parsed.mismatchReported === true) mismatchReported = true;
+    } catch {}
+  }
   let busyAction = $state<string | null>(null);
   let leaveBusy = $state(false);
   let rematchBusy = $state(false);
   let submittedTimeouts = $state<Set<string>>(new Set());
   let copiedInvite = $state(false);
   let copiedCode = $state(false);
+  let winPlayed = $state(false);
   const replay = $derived.by((): DraftReplay | null => {
     if (!snapshot || !assets || !snapshot.rootSeed) return null;
     try {
@@ -276,6 +319,7 @@
         }
       }
       await fixedFiveRepository.saveActiveSnapshot(snapshot, lastOrdinal + 1).catch(() => {});
+      if (verificationReceipt && submittedReceipt === null) receiptRetry += 1;
     } catch (e) {
       if (mounted) error = friendlyFixedFiveJoinError(e);
     } finally {
@@ -423,22 +467,138 @@
     }
     await sendCommand({ kind: 'classic-pick', playerId, slotIndex: slot });
   }
+  type VerificationOutcome =
+    | {
+        ok: true;
+        receipt: FixedFiveVerificationReceipt;
+      }
+    | {
+        ok: false;
+        failures: string[];
+      };
+  function runVerification(
+    input: Parameters<FixedFiveRunner['verify']>[0],
+  ): Promise<VerificationOutcome> {
+    return new Promise((resolve) => {
+      const active = new FixedFiveRunner((event) => {
+        if (event.kind === 'progress' || event.kind === 'results' || event.kind === 'complete') {
+          return;
+        }
+        active.dispose();
+        if (verificationRunner === active) verificationRunner = null;
+        if (event.kind === 'verified') resolve({ ok: true, receipt: event.receipt });
+        else if (event.kind === 'verification-failed')
+          resolve({ ok: false, failures: event.failures });
+        else resolve({ ok: false, failures: [event.message] });
+      });
+      verificationRunner = active;
+      active.verify(input);
+    });
+  }
+  async function prepareReceipt(): Promise<void> {
+    if (verificationInFlight || !snapshot || !assets || !localResult || !snapshot.rootSeed) return;
+    verificationInFlight = true;
+    verificationError = null;
+    try {
+      const challenge = await transport().verificationChallenge(roomId);
+      const current = localResult;
+      if (!mounted || !snapshot || !assets || !current) return;
+      const input = buildFixedFiveVerificationInput({
+        roomId,
+        competition: snapshot.settings.mode === 'duel' ? 'duel' : 'shared-82',
+        rootSeed: snapshot.rootSeed,
+        versions: snapshot.settings.versions,
+        challenge,
+        commands,
+        bracket: assets.bracket,
+        profile: assets.profile,
+        result: current.result,
+        resultDigest: current.digest,
+        p1: current.p1,
+        p2: current.p2,
+      });
+      const outcome = await runVerification(input);
+      if (!mounted) return;
+      if (!outcome.ok) {
+        verificationError = outcome.failures.join('; ');
+        return;
+      }
+      verificationReceipt = outcome.receipt;
+      void storeReceipt(outcome.receipt);
+    } catch (e) {
+      if (mounted) verificationError = e instanceof Error ? e.message : String(e);
+    } finally {
+      verificationInFlight = false;
+    }
+  }
+  async function storeReceipt(receipt: FixedFiveVerificationReceipt): Promise<void> {
+    if (receiptSubmitInFlight || submittedReceipt === receipt.receiptDigest) return;
+    receiptSubmitInFlight = true;
+    try {
+      const out = await transport().submitVerification(roomId, receipt, snapshot?.revision);
+      if (!mounted) return;
+      submittedReceipt = out.receiptId;
+      if (snapshot && out.revision > snapshot.revision) {
+        snapshot = { ...snapshot, revision: out.revision };
+      }
+    } catch (e) {
+      const rejection = e as {
+        rejectionCode?: unknown;
+        revision?: unknown;
+      };
+      if (
+        typeof rejection.revision === 'number' &&
+        snapshot &&
+        rejection.revision > snapshot.revision
+      ) {
+        snapshot = { ...snapshot, revision: rejection.revision };
+      }
+      if (rejection.rejectionCode === 'invalid-receipt' && receiptRebuilds < 2) {
+        receiptRebuilds += 1;
+        verificationReceipt = null;
+        verificationError = null;
+        if (mounted) {
+          notice = 'Verification receipt was rejected — rebuilding it from the accepted log.';
+        }
+      } else if (rejection.rejectionCode === 'invalid-receipt') {
+        if (mounted) {
+          verificationError =
+            'The server rejected the verification receipt for this accepted command log.';
+        }
+      } else if (mounted) {
+        notice = 'Verification receipt is ready but not stored yet — retrying after the next sync.';
+      }
+      if (mounted) void sync(lastOrdinal);
+    } finally {
+      receiptSubmitInFlight = false;
+    }
+  }
   async function resolveOverdue(): Promise<void> {
     if (!snapshot || !assets || !snapshot.rootSeed || !replay || phase !== 'drafting') return;
     const mode = snapshot.settings.mode;
     const now = Date.now();
     if (now - anchorMs <= timeoutMs) return;
-    for (const participant of ['p1', 'p2'] as const) {
-      const ordinal = pickOrdinalOf(replay, participant);
-      const key = `${participant}:${ordinal}`;
-      if (submittedTimeouts.has(key)) continue;
-      if (commands.some((c) => c.commandId === `timeout-${mode}-${participant}-${ordinal}`)) {
-        continue;
-      }
-      const pick = computeDueAutopick(mode, snapshot.rootSeed, replay, assets, participant);
-      if (!pick) continue;
-      submittedTimeouts = new Set([...submittedTimeouts, key]);
-      await sendCommand(
+    const deadline = snapshot.deadline;
+    if (!deadline) return;
+    const participant = deadline.participantId;
+    if (participant !== selfId) return;
+    const ordinal = deadline.pickOrdinal;
+    const key = `${participant}:${ordinal}`;
+    if (submittedTimeouts.has(key)) return;
+    const applied = commands.some(
+      (c) =>
+        c.actorParticipantId === participant &&
+        c.payload.kind === 'timeout-autopick' &&
+        c.payload.pickOrdinal === ordinal,
+    );
+    if (applied) return;
+    const pick = computeDueAutopick(mode, snapshot.rootSeed, replay, assets, participant);
+    if (!pick) return;
+    submittedTimeouts = new Set([...submittedTimeouts, key]);
+    try {
+      const stored = await transport().commitFallback(
+        roomId,
+        deadline.cursor,
         {
           kind: 'timeout-autopick',
           playerId: pick.playerId,
@@ -446,8 +606,20 @@
           pickOrdinal: ordinal,
           seedPath: pick.seedPath,
         },
-        { actor: participant, commandId: `timeout-${mode}-${participant}-${ordinal}` },
+        snapshot?.revision,
       );
+      if (snapshot && stored.revision > snapshot.revision) {
+        snapshot = { ...snapshot, revision: stored.revision };
+      }
+      if (!stored.stored) {
+        submittedTimeouts = new Set([...submittedTimeouts].filter((entry) => entry !== key));
+        return;
+      }
+      await transport().resolveTimeout(roomId);
+      await sync(lastOrdinal);
+    } catch (e) {
+      submittedTimeouts = new Set([...submittedTimeouts].filter((entry) => entry !== key));
+      if (mounted) error = friendlyFixedFiveJoinError(e);
     }
   }
   async function startSim(reason: FixedFiveSimulationReason): Promise<void> {
@@ -499,7 +671,7 @@
           progress = { completed: simEntries.length, total: progress?.total ?? simEntries.length };
         } else if (event.kind === 'complete') {
           void finalizeSim();
-        } else {
+        } else if (event.kind === 'error') {
           simulationGate.fail();
           simError = event.message;
         }
@@ -535,6 +707,8 @@
             rootSeed: snapshot.rootSeed as Seed,
             p1TeamId: 'p1',
             p2TeamId: 'p2',
+            p1PlayerIds: p1Team.players.map((player) => player.playerId),
+            p2PlayerIds: p2Team.players.map((player) => player.playerId),
             entries: simEntries,
           });
           const digest = computeCompetitionDigest({
@@ -596,7 +770,10 @@
     busyAction = 'propose';
     try {
       const ok = await sendCommand({ kind: 'propose-result', resultDigest: digest });
-      if (ok) submittedPropose = digest;
+      if (ok) {
+        submittedPropose = digest;
+        saveVerifyGuards();
+      }
     } finally {
       busyAction = null;
     }
@@ -605,32 +782,51 @@
     busyAction = 'confirm';
     try {
       const ok = await sendCommand({ kind: 'confirm-result', resultDigest: digest, verified });
-      if (ok && verified) confirmedFor = digest;
+      if (ok && verified) {
+        confirmedFor = digest;
+        saveVerifyGuards();
+      }
     } finally {
       busyAction = null;
     }
   }
-  async function attemptComplete(digest: ContentHash): Promise<void> {
+  async function attemptComplete(receiptId: string): Promise<boolean> {
     busyAction = 'complete';
     try {
-      const out = await transport().complete(roomId, digest);
+      const out = await transport().complete(roomId, receiptId);
       if (!out.completed && mounted) {
         notice = 'Completion not ready yet — waiting for the matching confirmation.';
       }
       await sync(lastOrdinal);
+      return out.completed;
     } catch (e) {
       if (mounted) error = friendlyFixedFiveJoinError(e);
+      return false;
     } finally {
       busyAction = null;
     }
   }
-  async function attemptFail(): Promise<void> {
+  async function runCompleteOnce(receiptId: string, pairKey: string | null): Promise<void> {
+    if (completeInFlight || !mounted) return;
+    completeInFlight = true;
+    if (pairKey) completedPairKey = pairKey;
+    completeNotReady = false;
+    try {
+      const done = await attemptComplete(receiptId);
+      if (mounted) completeNotReady = !done;
+    } finally {
+      completeInFlight = false;
+    }
+  }
+  async function attemptFail(): Promise<boolean> {
     busyAction = 'fail';
     try {
-      await transport().fail(roomId);
+      const out = await transport().fail(roomId);
       await sync(lastOrdinal);
+      return out.failed;
     } catch (e) {
       if (mounted) error = friendlyFixedFiveJoinError(e);
+      return false;
     } finally {
       busyAction = null;
     }
@@ -646,6 +842,7 @@
   }
   onMount(() => {
     mounted = true;
+    restoreVerifyGuards();
     const membership = loadFixedFiveMembership(roomId);
     if (membership) selfId = membership.participantId;
     let unsubscribe: (() => void) | null = null;
@@ -721,6 +918,8 @@
       runner = null;
       statsRunner?.dispose();
       statsRunner = null;
+      verificationRunner?.dispose();
+      verificationRunner = null;
       window.removeEventListener('focus', onFocus);
       window.removeEventListener('online', onOnline);
       if (resyncTimer) clearInterval(resyncTimer);
@@ -732,6 +931,12 @@
     if (phase === 'simulating' && !simStarted && !simError && snapshot.rootSeed) {
       void startSim(simulationReason);
     }
+  });
+  $effect(() => {
+    if (!mounted || phase !== 'completed' || winPlayed) return;
+    if (!localResult) return;
+    winPlayed = true;
+    arenaWin();
   });
   $effect(() => {
     if (!mounted || !snapshot || !replay || !localResult) return;
@@ -749,6 +954,10 @@
       statsRunner?.dispose();
       statsRunner = null;
       await fixedFiveRepository.clearPendingResult(roomId).catch(() => {});
+      verificationReceipt = null;
+      verificationError = null;
+      submittedReceipt = null;
+      receiptRebuilds = 0;
       simStarted = false;
       simDone = false;
       localResult = null;
@@ -836,60 +1045,110 @@
   }
   $effect(() => {
     if (!mounted || !localResult || !snapshot) return;
-    if (snapshot.phase !== 'lobby') return;
+    if (phase !== 'awaiting-confirmation') return;
     const myDigest = localResult.digest;
-    const foreign = facts.proposals.filter((p) => p.actor !== selfId);
+    const proposals = facts.proposals;
+    const foreign = proposals.filter((p) => p.actor !== selfId);
+    const iProposed = proposals.some((p) => p.actor === selfId && p.digest === myDigest);
+    const matchingProposal = proposals.some((p) => p.digest === myDigest);
+    const iConfirmed = facts.confirms.some(
+      (c) => c.actor === selfId && c.digest === myDigest && c.verified,
+    );
+    if (iProposed && submittedPropose !== myDigest) {
+      submittedPropose = myDigest;
+      saveVerifyGuards();
+    }
+    if (iConfirmed && confirmedFor !== myDigest) {
+      confirmedFor = myDigest;
+      saveVerifyGuards();
+    }
+    if (iConfirmed) return;
     if (foreign.length === 0) {
-      if (submittedPropose !== myDigest) void proposeDigest(myDigest);
+      if (!matchingProposal && submittedPropose !== myDigest) {
+        void proposeDigest(myDigest);
+      } else if (matchingProposal && confirmedFor !== myDigest) {
+        void confirmDigest(myDigest, true);
+      }
       return;
     }
     const match = foreign.some((p) => p.digest === myDigest);
-    if (match && confirmedFor !== myDigest) {
-      void confirmDigest(myDigest, true);
+    if (match) {
+      if (confirmedFor !== myDigest) void confirmDigest(myDigest, true);
       return;
     }
-    if (!match && !reranMismatch) {
+    if (!reranMismatch) {
       reranMismatch = true;
+      saveVerifyGuards();
       void rerunSimulation();
     }
   });
   $effect(() => {
     if (!mounted || !localResult || !snapshot || !reranMismatch || mismatchReported) return;
-    if (snapshot.phase !== 'lobby') return;
+    if (phase !== 'awaiting-confirmation') return;
     const myDigest = localResult.digest;
     const foreign = facts.proposals.filter((p) => p.actor !== selfId);
     if (foreign.some((p) => p.digest === myDigest)) return;
     if (foreign.length === 0) return;
     mismatchReported = true;
+    saveVerifyGuards();
     const first = foreign[0];
+    const iDenied = first
+      ? facts.confirms.some((c) => c.actor === selfId && c.digest === first.digest && !c.verified)
+      : true;
     void (async () => {
       if (submittedPropose !== myDigest) await proposeDigest(myDigest);
-      if (first) await confirmDigest(first.digest, false);
+      if (first && !iDenied) await confirmDigest(first.digest, false);
     })();
   });
   $effect(() => {
-    if (!mounted || !snapshot || !localResult) return;
-    if (snapshot.phase !== 'lobby' || completedSent) return;
-    if (!confirmedFor) return;
-    const foreignConfirm = facts.confirms.some(
-      (c) => c.actor !== selfId && c.digest === confirmedFor && c.verified,
+    if (!mounted || !snapshot || !localResult || !assets) return;
+    if (phase !== 'awaiting-confirmation') return;
+    if (!snapshot.rootSeed) return;
+    if (verificationReceipt || verificationError || verificationInFlight) return;
+    const myDigest = localResult.digest;
+    const ownConfirmed = facts.confirms.some(
+      (c) => c.actor === selfId && c.digest === myDigest && c.verified,
     );
-    if (foreignConfirm) {
-      completedSent = true;
-      void attemptComplete(confirmedFor).catch(() => {
-        completedSent = false;
-      });
-    }
+    const foreignConfirmed = facts.confirms.some(
+      (c) => c.actor !== selfId && c.digest === myDigest && c.verified,
+    );
+    if (!ownConfirmed || !foreignConfirmed) return;
+    void prepareReceipt();
+  });
+  $effect(() => {
+    void receiptRetry;
+    if (!mounted || !verificationReceipt) return;
+    if (submittedReceipt === verificationReceipt.receiptDigest) return;
+    void storeReceipt(verificationReceipt);
+  });
+  $effect(() => {
+    if (!mounted || !snapshot || !localResult) return;
+    if (phase !== 'awaiting-confirmation') return;
+    const receipt = verificationReceipt;
+    if (!receipt || receipt.resultDigest !== localResult.digest) return;
+    if (submittedReceipt !== receipt.receiptDigest) return;
+    if (confirmedFor !== receipt.resultDigest) return;
+    const foreignVerified = facts.confirms.filter(
+      (c) => c.actor !== selfId && c.digest === receipt.resultDigest && c.verified,
+    );
+    if (foreignVerified.length === 0) return;
+    const pairKey = `${receipt.resultDigest}:${String(foreignVerified.length)}`;
+    if (completedPairKey === pairKey) return;
+    void runCompleteOnce(receipt.receiptDigest, pairKey);
   });
   $effect(() => {
     if (!mounted || !snapshot || failSent) return;
-    if (snapshot.phase !== 'lobby') return;
+    if (phase === 'completed' || phase === 'integrity-failed' || phase === 'expired') return;
     const digests = new Set(facts.proposals.map((p) => p.digest));
     const denied = facts.confirms.some((c) => !c.verified);
     if (digests.size >= 2 && denied) {
       failSent = true;
-      void attemptFail().catch(() => {
-        failSent = false;
+      void attemptFail().then((failed) => {
+        if (!mounted) return;
+        if (!failed) {
+          failSent = false;
+          notice = 'Mismatch recorded — will retry marking the room once synced.';
+        }
       });
     }
   });
@@ -936,7 +1195,11 @@
   const resultVerified = $derived.by((): boolean => {
     if (!snapshot || !localResult) return false;
     if (snapshot.phase === 'completed') return true;
-    return snapshot.confirmedDigest === localResult.digest;
+    return (
+      verificationReceipt !== null &&
+      verificationReceipt.resultDigest === localResult.digest &&
+      verificationReceipt.receiptDigest === submittedReceipt
+    );
   });
   async function doRematchAction(): Promise<void> {
     if (rematchBusy) return;
@@ -994,14 +1257,18 @@
           Room {snapshot.code ?? '····'}
         </h1>
       </div>
-      {#if resultVerified}
-        <p
-          class="inline-flex items-center gap-1.5 rounded-full border border-positive/40 bg-positive/10 px-3 py-1 font-mono text-[11px] font-bold text-positive"
-        >
-          <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full bg-current"></span>
-          Result verified
-        </p>
-      {/if}
+      <div class="flex items-center gap-2">
+        <ArenaSoundToggle />
+        {#if resultVerified}
+          <p
+            class="inline-flex items-center gap-1.5 rounded-full border border-positive/40 bg-positive/10 px-3 py-1 font-mono text-[11px] font-bold text-positive"
+          >
+            <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full bg-current"
+            ></span>
+            Verified locally
+          </p>
+        {/if}
+      </div>
     </div>
 
     <div class="mt-4">
@@ -1207,16 +1474,86 @@
         {/if}
       </div>
     {:else if phase === 'awaiting-confirmation'}
+      {@const youShort =
+        localResult != null
+          ? `${localResult.digest.slice(0, 6)}…${localResult.digest.slice(-4)}`
+          : null}
+      {@const rivalProposal = facts.proposals.find((p) => p.actor !== selfId) ?? null}
+      {@const rivalShort =
+        rivalProposal != null
+          ? `${rivalProposal.digest.slice(0, 6)}…${rivalProposal.digest.slice(-4)}`
+          : null}
+      {@const digestsMatch =
+        localResult != null && rivalProposal != null
+          ? rivalProposal.digest === localResult.digest
+          : null}
+      {@const youDigest = localResult?.digest ?? null}
+      {@const foreignConfirmed =
+        youDigest != null &&
+        facts.confirms.some((c) => c.actor !== selfId && c.digest === youDigest && c.verified)}
+      {@const receiptShort =
+        verificationReceipt != null
+          ? `${verificationReceipt.receiptDigest.slice(0, 6)}…${verificationReceipt.receiptDigest.slice(-4)}`
+          : null}
       <div class="mt-6 flex flex-col gap-4">
-        <div class="rounded-2xl bg-surface-1 p-4 sm:p-5">
-          <h2 class="font-display text-sm font-extrabold uppercase">
-            Waiting for result confirmation
-          </h2>
-          {#if !localResult}
-            <p class="mt-2 text-sm text-muted-foreground" role="status">
-              Recomputing the shared result from the accepted command log…
+        <div class="verify-banner" role="status">
+          <span class="verify-orb" aria-hidden="true"></span>
+          <div class="min-w-0 flex-1">
+            <h2 class="font-display text-sm font-extrabold uppercase">
+              Deterministic verification — no tap needed
+            </h2>
+            <p class="mt-1 text-xs text-muted-foreground">
+              {#if !localResult}
+                Recomputing the shared result from the accepted command log…
+              {:else if verificationError}
+                Local verification failed: {verificationError}. This result cannot receive a
+                receipt, so the room cannot complete from this device.
+              {:else if rivalProposal == null}
+                Result {youShort} ready — proposing to the room…
+              {:else if !digestsMatch}
+                Results differ — you {youShort} vs rival {rivalShort}. Re-running from the shared
+                log…
+              {:else if !foreignConfirmed}
+                Waiting for your rival's verified confirmation of {youShort}…
+              {:else if !verificationReceipt}
+                Both seats confirmed {youShort} — replaying every game from the accepted command log to
+                produce a verification receipt…
+              {:else if submittedReceipt !== verificationReceipt.receiptDigest}
+                Replay verified against the accepted command log — storing receipt {receiptShort}…
+              {:else}
+                Receipt {receiptShort} stored — locking the room…
+              {/if}
             </p>
-          {/if}
+            {#if verificationError}
+              <button
+                type="button"
+                onclick={() => (verificationError = null)}
+                disabled={verificationInFlight}
+                class="mt-2 rounded-lg border border-primary/50 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary disabled:opacity-40"
+              >
+                {verificationInFlight ? 'Verifying…' : 'Retry verification'}
+              </button>
+            {/if}
+            {#if completeNotReady && localResult}
+              <button
+                type="button"
+                onclick={() => {
+                  completedPairKey = null;
+                  completeNotReady = false;
+                  void sync(lastOrdinal);
+                }}
+                disabled={busyAction !== null}
+                class="mt-2 rounded-lg border border-primary/50 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary disabled:opacity-40"
+              >
+                {busyAction === 'complete' ? 'Locking…' : 'Try locking again'}
+              </button>
+            {/if}
+          </div>
+          <span
+            class="verify-count"
+            title={`Receipt ${submittedReceipt ?? 'pending'} · proposals ${facts.proposals.length} · confirmations ${facts.confirms.length}`}
+            >{facts.proposals.length}/{facts.confirms.length}</span
+          >
         </div>
         {#if localResult && snapshot && assets}
           <FixedFiveResults
@@ -1236,26 +1573,15 @@
             createdAt={snapshot.createdAt}
             verified={resultVerified}
             modeDetail={modeDetailLabel}
+            receiptDigest={verificationReceipt?.receiptDigest ?? null}
           />
         {/if}
         <p class="mt-2 text-xs text-muted-foreground">
-          Proposals {facts.proposals.length} · confirmations {facts.confirms.length}{reranMismatch
-            ? ' · mismatch rerun done'
-            : ''}. First finished client proposes; the peer recomputes and confirms.
+          Receipt {receiptShort ?? 'pending'} · proposals {facts.proposals.length} · confirmations
+          {facts.confirms.length}{reranMismatch ? ' · mismatch rerun done' : ''}. Both clients
+          replay every game from the accepted command log and store a verification receipt; the room
+          locks only after the matching confirmations.
         </p>
-        <div class="mt-4 flex flex-wrap gap-2">
-          {#if localResult}
-            {@const confirmed = localResult}
-            <button
-              type="button"
-              onclick={() => attemptComplete(confirmed.digest)}
-              disabled={busyAction !== null}
-              class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-40"
-            >
-              Complete room
-            </button>
-          {/if}
-        </div>
       </div>
     {:else if phase === 'completed' && localResult}
       <div class="mt-6 flex flex-col gap-4">
@@ -1277,6 +1603,7 @@
             createdAt={snapshot.createdAt}
             verified={resultVerified}
             modeDetail={modeDetailLabel}
+            receiptDigest={verificationReceipt?.receiptDigest ?? null}
             onRematch={doRematchAction}
             onNewRoom={doRematch}
             {rematchBusy}
@@ -1328,3 +1655,63 @@
     </div>
   {/if}
 </section>
+
+<style>
+  .verify-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    border-radius: 1rem;
+    border: 1px solid color-mix(in srgb, var(--color-primary) 45%, transparent);
+    background:
+      radial-gradient(
+        60% 120% at 0% 0%,
+        color-mix(in srgb, var(--color-primary) 16%, transparent),
+        transparent 70%
+      ),
+      var(--color-surface-1);
+    padding: 0.9rem 1rem;
+    animation: verify-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .verify-orb {
+    width: 1rem;
+    height: 1rem;
+    border-radius: 999px;
+    flex-shrink: 0;
+    background: conic-gradient(var(--color-primary), var(--color-accent), var(--color-primary));
+    animation: orb-spin 1s linear infinite;
+    box-shadow: 0 0 16px color-mix(in srgb, var(--color-primary) 60%, transparent);
+  }
+  .verify-count {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--color-primary);
+    border: 1px solid color-mix(in srgb, var(--color-primary) 50%, transparent);
+    border-radius: 999px;
+    padding: 0.25rem 0.6rem;
+    flex-shrink: 0;
+  }
+  @keyframes verify-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+  @keyframes orb-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .verify-banner,
+    .verify-orb {
+      animation: none;
+    }
+  }
+</style>

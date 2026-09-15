@@ -12,6 +12,13 @@
   import { clearDataLoaderCaches, getEraSimulationProfile, getManifest } from '$lib/data';
   import { challengeRepository } from '$lib/challenge-repo';
   import { ChallengeRunner, type RunnerPhase } from '$lib/challenge-runner';
+  import {
+    arenaBlockComplete,
+    arenaError,
+    arenaGameResult,
+    arenaSimTick,
+    arenaStreak,
+  } from '$lib/arena-sound';
   import { loadRunPlayersById } from '$lib/sandbox-lineup';
   import ChallengeOverlay from './ChallengeOverlay.svelte';
   import AsyncState from './AsyncState.svelte';
@@ -32,6 +39,8 @@
   let retryCount = $state(0);
   let announcedCount = 0;
   const ANNOUNCEMENT_EVERY = 10;
+  let winStreak = 0;
+  let finalePlayedFor: string | null = null;
   $effect(() => {
     if (!browser) return;
     void retryCount;
@@ -118,14 +127,33 @@
       typeof window.matchMedia === 'function' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const instance = new ChallengeRunner(challengeRepository, {
-      onReveal(_result, nextRun) {
+      onReveal(result, nextRun) {
         run = nextRun;
         announcedCount += 1;
+        try {
+          arenaSimTick();
+        } catch {}
+        try {
+          const won = result.winner === 'home';
+          winStreak = won ? winStreak + 1 : 0;
+          if (won && (winStreak === 3 || (winStreak > 3 && winStreak % 5 === 0))) {
+            arenaStreak(winStreak);
+          } else if (nextRun.games.length % ANNOUNCEMENT_EVERY === 0) {
+            arenaGameResult(won);
+          }
+        } catch {}
         if (announcedCount % ANNOUNCEMENT_EVERY === 0) {
           announceProgress(nextRun);
         }
       },
-      onFinished() {
+      onFinished(finishedRun) {
+        try {
+          if (finalePlayedFor !== finishedRun.runId) {
+            finalePlayedFor = finishedRun.runId;
+            const record = finishedRun.aggregates.team;
+            arenaBlockComplete({ wins: record.wins, losses: record.losses });
+          }
+        } catch {}
         void goto(resolve(resultHrefFor(active.run) as any));
       },
       onPaused() {
@@ -134,6 +162,9 @@
       onError(message) {
         phase = 'error';
         runnerError = message;
+        try {
+          arenaError();
+        } catch {}
       },
     });
     runner = instance;

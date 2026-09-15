@@ -1,5 +1,6 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { resolveUid } from '../_shared/http.ts';
 
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -16,30 +17,6 @@ function json(status: number, body: unknown) {
 
 const CHECKPOINT_MAX = 16 * 1024;
 
-async function resolveUid(
-  req: Request,
-  supabaseUrl: string,
-  serviceRoleKey: string,
-): Promise<string | null> {
-  const authHeader = req.headers.get('Authorization');
-  if (authHeader) {
-    const anonClient = createClient(
-      supabaseUrl,
-      Deno.env.get('SUPABASE_ANON_KEY') ?? serviceRoleKey,
-      {
-        global: { headers: { Authorization: authHeader } },
-      },
-    );
-    const {
-      data: { user },
-    } = await anonClient.auth.getUser();
-    if (user) return user.id;
-  }
-  const devUid = req.headers.get('x-dev-uid');
-  if (devUid && /^[0-9a-f-]{36}$/i.test(devUid)) return devUid;
-  return null;
-}
-
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return json(405, { code: 'phase', message: 'method not allowed' });
@@ -49,7 +26,7 @@ Deno.serve(async (req: Request) => {
   if (!supabaseUrl || !serviceRoleKey)
     return json(500, { code: 'authorization', message: 'server not configured' });
 
-  const uid = await resolveUid(req, supabaseUrl, serviceRoleKey);
+  const uid = await resolveUid(req, supabaseUrl);
   if (!uid) return json(401, { code: 'authorization', message: 'missing auth' });
 
   const body = await req.json().catch(() => null);
@@ -86,18 +63,24 @@ Deno.serve(async (req: Request) => {
   if (!member) return json(403, { code: 'membership', message: 'not a member' });
   if (member.participant_id !== sub.participantId)
     return json(403, { code: 'authorization', message: 'participant mismatch' });
+  if (member.franchise_id !== sub.franchiseId)
+    return json(403, { code: 'authorization', message: 'franchise mismatch' });
   const { data: room } = await serviceClient
     .from('season_rooms')
     .select('*')
     .eq('id', sub.roomId)
     .single();
   if (!room) return json(404, { code: 'membership', message: 'room not found' });
+  if (room.phase !== 'private-lock')
+    return json(409, { code: 'phase', message: 'private decisions require private-lock phase' });
+  if (room.cursor !== sub.cursor)
+    return json(409, { code: 'stale-revision', message: 'cursor mismatch' });
   const { error: upsertError } = await serviceClient.from('season_private_decisions').upsert(
     {
       room_id: sub.roomId,
       cursor: sub.cursor,
       participant_id: sub.participantId,
-      franchise_id: sub.franchiseId,
+      franchise_id: member.franchise_id,
       payload: sub.payload ?? null,
       payload_digest: sub.payloadDigest,
       revealed: false,

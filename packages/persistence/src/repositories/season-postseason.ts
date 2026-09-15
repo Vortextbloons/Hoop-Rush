@@ -32,6 +32,9 @@ export interface PromoteChampionInput {
   almanac: SeasonAlmanac;
   commandLog: SeasonCommandLog;
   postseasonSummaries: SeasonPostseasonSummary[];
+  expectedStateRevision: number;
+  expectedStateDigest: string;
+  expectedRevision: number;
 }
 export type { SeasonCommandLogEntry };
 export class SeasonPostseasonIntegrityError extends Error {

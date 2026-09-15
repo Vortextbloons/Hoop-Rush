@@ -45,6 +45,7 @@
     objectiveOptionViews,
     rewardPreview,
   } from '$lib/collection/collection-setup.ts';
+  import { arenaError, arenaGameResult } from '$lib/arena-sound';
 
   let mounted = true;
   onDestroy(() => {
@@ -361,9 +362,15 @@
         }
       }
       announcement = `${won ? 'You won' : 'CPU won'}. +${coins} Coins.${objectiveNote}`;
+      try {
+        arenaGameResult(won);
+      } catch {}
       busy = 'idle';
     } catch (playError) {
       if (!mounted) return;
+      try {
+        arenaError();
+      } catch {}
       flowError = playError instanceof Error ? playError.message : 'The game failed. Try again.';
       await refreshState().catch(() => undefined);
       if (mounted) busy = 'idle';

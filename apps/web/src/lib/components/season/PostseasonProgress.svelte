@@ -8,6 +8,7 @@
   import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
   import LiveSimModal from '$lib/components/season/LiveSimModal.svelte';
   import { SIM_BAR_FILL_MS } from '$lib/components/season/live-sim-animation';
+  import { arenaBlockComplete, arenaError, arenaGameResult, arenaSimTick } from '$lib/arena-sound';
   const RECENT_SIZE = 3;
   let {
     progress,
@@ -69,6 +70,57 @@
     recent = [...prior.slice(-(RECENT_SIZE - 1)), line];
   });
   const feed = $derived([...recent].reverse());
+  let lastPostSoundId = $state<string | null>(null);
+  let lastPostPhaseKey = $state<string | null>(null);
+  $effect(() => {
+    const id = progress.latestGameId;
+    const line = progress.latestResult;
+    const prev = untrack(() => lastPostSoundId);
+    if (id === null || line === null) return;
+    if (prev === null) {
+      untrack(() => {
+        lastPostSoundId = id;
+      });
+      return;
+    }
+    if (id === prev) return;
+    untrack(() => {
+      lastPostSoundId = id;
+    });
+    try {
+      if (involvesHuman(line)) {
+        const humanWon =
+          humanFranchiseId !== null &&
+          ((line.homeFranchiseId === humanFranchiseId && line.homeScore > line.awayScore) ||
+            (line.awayFranchiseId === humanFranchiseId && line.awayScore > line.homeScore));
+        arenaGameResult(humanWon);
+      } else {
+        arenaSimTick();
+      }
+    } catch {}
+  });
+  $effect(() => {
+    const phase = progress.phase;
+    const key = `${progress.gamesCompleted}:${progress.gamesTotal}:${phase}`;
+    const prev = untrack(() => lastPostPhaseKey);
+    if (prev === null) {
+      untrack(() => {
+        lastPostPhaseKey = key;
+      });
+      return;
+    }
+    if (key === prev) return;
+    untrack(() => {
+      lastPostPhaseKey = key;
+    });
+    try {
+      if (phase === 'complete') {
+        arenaBlockComplete(null);
+      } else if (phase === 'failed') {
+        arenaError();
+      }
+    } catch {}
+  });
   const countsText = $derived(
     progress.gamesTotal > 0
       ? `${String(progress.gamesCompleted)} / ${String(progress.gamesTotal)} games`

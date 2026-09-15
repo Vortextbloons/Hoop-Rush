@@ -24,6 +24,7 @@ import {
   eraIdSchema,
   seedSchema,
   commandIdSchema,
+  idSchema,
 } from '@hoop-rush/data-contracts';
 import type { SeasonRunSnapshot } from '@hoop-rush/persistence';
 import { generateSeasonSchedule } from '@hoop-rush/engine/src/season/schedule.ts';
@@ -55,6 +56,17 @@ vi.mock('$lib/season/season-assets', async (importOriginal) => {
   return {
     ...original,
     loadSeasonEraProfile: () => Promise.resolve(buildEraSimulationProfile()),
+  };
+});
+vi.mock('@hoop-rush/persistence', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@hoop-rush/persistence')>();
+  return {
+    ...original,
+    DexieSeasonDraftRepository: class {
+      clearSeasonDraft(): Promise<void> {
+        return Promise.resolve();
+      }
+    },
   };
 });
 class FakeRunner implements SeasonBlockRunner {
@@ -93,7 +105,7 @@ class FakeRunner implements SeasonBlockRunner {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   }
-  private emit(event: SeasonRunnerEvent): void {
+  emit(event: SeasonRunnerEvent): void {
     for (const listener of [...this.listeners]) listener(event);
   }
 }
@@ -1030,5 +1042,83 @@ describe('SeasonHubState trade guards', () => {
         reasons: ['lakers: too few centers'],
       } as never),
     ).toContain('illegal roster');
+  });
+});
+describe('SeasonHubState runner teardown', () => {
+  function setPostseasonRequestId(hub: SeasonHubState, requestId: string | null): void {
+    (hub as unknown as { postseasonRequestId: string | null }).postseasonRequestId = requestId;
+  }
+  it('destroy cancels and terminates both runners', async () => {
+    const repo = repoWith(snapshot());
+    const runner = new FakeRunner();
+    const postseasonRunner = new FakePostseasonRunner();
+    const hub = new SeasonHubState(repo, runner, postseasonRunner);
+    await hub.refresh();
+    hub.block = runningBlock('fake-1', 0);
+    hub.postseason = { ...hub.postseason, phase: 'running' };
+    setPostseasonRequestId(hub, 'sp-1');
+    hub.destroy();
+    expect(runner.cancelCalls).toEqual(['fake-1']);
+    expect(postseasonRunner.cancelCalls).toEqual(['sp-1']);
+    expect(runner.terminateCalls).toBe(1);
+    expect(postseasonRunner.terminateCalls).toBe(1);
+  });
+  it('clearSeasonData cancels and terminates both runners before clearing storage', async () => {
+    const repo = repoWith(snapshot());
+    const runner = new FakeRunner();
+    const postseasonRunner = new FakePostseasonRunner();
+    const hub = new SeasonHubState(repo, runner, postseasonRunner);
+    await hub.refresh();
+    hub.block = runningBlock('fake-1', 0);
+    hub.postseason = { ...hub.postseason, phase: 'running' };
+    setPostseasonRequestId(hub, 'sp-1');
+    const result = await hub.clearSeasonData();
+    expect(result.ok).toBe(true);
+    expect(runner.cancelCalls).toEqual(['fake-1']);
+    expect(postseasonRunner.cancelCalls).toEqual(['sp-1']);
+    expect(runner.terminateCalls).toBe(1);
+    expect(postseasonRunner.terminateCalls).toBe(1);
+    expect(repo.forceClearActiveSeasonRun).toHaveBeenCalledTimes(1);
+    hub.destroy();
+  });
+  it('quitRun cancels both runners and a late postseason event cannot resurrect state', async () => {
+    const repo = repoWith(snapshot());
+    const runner = new FakeRunner();
+    const postseasonRunner = new FakePostseasonRunner();
+    const hub = new SeasonHubState(repo, runner, postseasonRunner);
+    await hub.refresh();
+    hub.postseason = { ...hub.postseason, phase: 'running' };
+    setPostseasonRequestId(hub, 'sp-1');
+    const result = await hub.quitRun();
+    expect(result.ok).toBe(true);
+    expect(postseasonRunner.cancelCalls).toEqual(['sp-1']);
+    expect(postseasonRunner.terminateCalls).toBe(1);
+    expect(hub.snapshot).toBeNull();
+    postseasonRunner.emit({
+      type: 'committed',
+      requestId: 'sp-1',
+      runId: idSchema.parse(RUN_ID),
+      gameIds: [],
+      snapshot: snapshot(),
+    });
+    expect(hub.snapshot).toBeNull();
+    expect(hub.index).toBeNull();
+    hub.destroy();
+  });
+  it('drops late block events that no longer match the active request or run', async () => {
+    const repo = repoWith(snapshot());
+    const runner = new FakeRunner();
+    const hub = new SeasonHubState(repo, runner);
+    await hub.refresh();
+    hub.block = runningBlock('fake-1', 0);
+    runner.emit({
+      type: 'complete',
+      requestId: 'stale-request',
+      checkpoint: { blockIndex: 0 } as never,
+      snapshot: snapshot(),
+    });
+    expect(hub.snapshot?.run.runId).toBe(RUN_ID);
+    expect(hub.block.requestId).toBe('fake-1');
+    hub.destroy();
   });
 });

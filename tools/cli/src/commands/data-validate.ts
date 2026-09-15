@@ -343,6 +343,11 @@ function auditPoolContent(
     return;
   }
   const pool = parsed.data;
+  if (pool.dataVersion !== manifest.dataVersion) {
+    failures.push(
+      `pools: ${key} dataVersion ${pool.dataVersion} does not match the manifest ${manifest.dataVersion}`,
+    );
+  }
   if (pool.franchiseId !== index.franchiseId || pool.eraId !== index.eraId) {
     failures.push(`pools: ${key} asset declares ${pool.franchiseId}/${pool.eraId}`);
   }
@@ -722,6 +727,11 @@ async function auditGlobalAssets(
         }
         indexAsset.keys.add(key);
       }
+      if (parsed.data.dataVersion !== manifest.dataVersion) {
+        failures.push(
+          `playersIndex: dataVersion ${parsed.data.dataVersion} does not match the manifest ${manifest.dataVersion}`,
+        );
+      }
       details.push(`playersIndex: ${String(parsed.data.players.length)} draft rows`);
     }
   }
@@ -739,6 +749,11 @@ async function auditGlobalAssets(
           failures.push(`rosterDetails: duplicate entry ${key}`);
         }
         detailsAsset.keys.add(key);
+      }
+      if (parsed.data.dataVersion !== manifest.dataVersion) {
+        failures.push(
+          `rosterDetails: dataVersion ${parsed.data.dataVersion} does not match the manifest ${manifest.dataVersion}`,
+        );
       }
       details.push(`rosterDetails: ${String(parsed.data.players.length)} detail entries`);
     }

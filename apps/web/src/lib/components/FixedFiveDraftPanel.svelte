@@ -14,10 +14,12 @@
   import PlayerFace from '$lib/components/PlayerFace.svelte';
   import DraftValuePanel from '$lib/components/DraftValuePanel.svelte';
   import LineupSummaryNav from '$lib/components/LineupSummaryNav.svelte';
-  import TeamLogo from '$lib/components/TeamLogo.svelte';
   import { classicPoolRows } from '$lib/classic-draft';
+  import FixedFiveTurnTakeover from '$lib/components/FixedFiveTurnTakeover.svelte';
+  import { arenaPickSlam } from '$lib/arena-sound';
   import { poolSortLabel, sortDraftRows, type DraftPresentation } from '$lib/draft-presentation';
   import type { RollAnimationAxis } from '$lib/fixed-five-roll-animation';
+  import { stableRollSpinId } from '$lib/fixed-five-roll-animation';
   import { displacementTargetFor } from '$lib/draft-slots';
   import { formatPositions } from '$lib/player-positions';
   import { resolvePlayerRefs } from '$lib/player-refs';
@@ -378,11 +380,93 @@
       return;
     }
   }
+  const takeover = $derived.by(
+    (): {
+      turn: 'you' | 'rival' | null;
+      label: string;
+      ordinal: number;
+      total: number;
+    } => {
+      if (rollView && !rollView.complete && mode === 'duel') {
+        return {
+          turn: rollView.turn ? 'you' : 'rival',
+          label: rollView.turnText,
+          ordinal: rollView.spinKey,
+          total: 10,
+        };
+      }
+      if (sandboxDuelView && !sandboxDuelView.complete) {
+        return {
+          turn: sandboxDuelView.turn ? 'you' : 'rival',
+          label: sandboxDuelView.turnText,
+          ordinal: sandboxDuelView.pickOrdinal,
+          total: 10,
+        };
+      }
+      if (mode === 'sandbox-shared-82') {
+        const lockedCount = sandboxLocked ? 5 : pickedCount;
+        return {
+          turn: sandboxLocked ? null : 'you',
+          label: `${pickedCount}/5 locked`,
+          ordinal: lockedCount,
+          total: 5,
+        };
+      }
+      if (rollView && !rollView.complete) {
+        return { turn: 'you', label: rollView.turnText, ordinal: rollView.round - 1, total: 5 };
+      }
+      return { turn: null, label: '', ordinal: 0, total: 10 };
+    },
+  );
+  let lastSlamCount = $state(0);
+  let slamName = $state<string | null>(null);
+  $effect(() => {
+    const count = myPicks.length;
+    if (count > lastSlamCount) {
+      const latest = myPicks[myPicks.length - 1];
+      if (latest) {
+        slamName = displayNameOf(latest.playerId);
+        arenaPickSlam();
+      }
+    }
+    lastSlamCount = count;
+  });
+  const clockUrgent = $derived(deadlineText ? /0:0\d|0:09|expired/i.test(deadlineText) : false);
+  const reelSpinId = $derived.by((): string | null => {
+    if (!rollView || rollView.complete) return null;
+    if (!rollFranchise || !rollEra) return null;
+    return stableRollSpinId({
+      mode,
+      ordinal: rollView.spinKey,
+      franchiseId: rollView.franchiseId,
+      eraId: rollView.eraId,
+      axis: rollAxis,
+    });
+  });
+  const reelSpotlight = $derived<null | 'you' | 'rival'>(
+    mode === 'duel' ? (rollView?.turn ? 'you' : 'rival') : null,
+  );
 </script>
 
 <div class="mt-2 flex min-w-0 flex-col gap-6 pb-24">
+  <FixedFiveTurnTakeover
+    turn={takeover.turn}
+    label={takeover.label}
+    ordinal={takeover.ordinal}
+    total={takeover.total}
+    {mode}
+  />
+  {#if slamName}
+    <p class="pick-slam" role="status" aria-live="polite">
+      <span class="pick-slam-ball" aria-hidden="true"></span>
+      Slammed {slamName} into your five
+    </p>
+  {/if}
   {#if deadlineText}
-    <p class="text-xs text-muted-foreground" role="status">{deadlineText}</p>
+    <p class="clock-line {clockUrgent ? 'clock-line--hot' : ''}" role="status">
+      <span class="clock-ring" aria-hidden="true"><span class="clock-hand"></span></span
+      >{deadlineText}
+    </p>
   {/if}
   {#if lastAutopick}
     <p class="mt-1 rounded-lg border border-line-soft bg-card p-2 text-xs" role="status">
@@ -424,47 +508,30 @@
         onRerollFranchise={() => onReroll('franchise')}
         onRerollEra={() => onReroll('era')}
       />
-      {#if mode === 'duel' && !rollView.turn}
-        <div
-          class="rival-roll"
-          role="status"
-          aria-label={`Rival's roll: ${rollView.label}, ${rollFranchiseDisplayName ?? rollView.franchiseId}, ${rollEraLabel}`}
-        >
-          <span class="rival-roll-pill">Rival's roll</span>
-          <span class="rival-roll-main">
-            {#if rollFranchise}
-              <TeamLogo
-                manifest={rollManifest}
-                franchiseId={rollView.franchiseId}
-                teamExternalId={rollFranchise.teamExternalId}
-                logoCandidates={rollIdentity?.logoCandidates ?? []}
-              />
-            {/if}
-            <span class="rival-roll-text">
-              <span class="rival-roll-label">{rollView.label}</span>
-              <span class="rival-roll-pair">
-                {rollFranchiseAbbreviation} · {rollEraLabel}
-              </span>
-            </span>
-          </span>
-          <span class="rival-roll-hint">Your rival is picking — your pool opens on your turn.</span>
-        </div>
-      {:else}
-        <ClassicRollReel
-          manifest={assets.manifest}
-          franchiseId={rollView.franchiseId}
-          eraId={rollView.eraId}
-          {franchiseOptions}
-          {eraOptions}
-          axis={rollAxis}
-          spinKey={rollNonce}
-          spotlight={mode === 'duel' ? 'you' : null}
-          announceText={mode === 'duel'
+      <ClassicRollReel
+        manifest={assets.manifest}
+        franchiseId={rollView.franchiseId}
+        eraId={rollView.eraId}
+        {franchiseOptions}
+        {eraOptions}
+        axis={rollAxis}
+        spinKey={rollNonce}
+        spinId={reelSpinId}
+        spotlight={reelSpotlight}
+        announceText={mode === 'duel'
+          ? rollView.turn
             ? `Your roll: ${rollView.label}, ${rollFranchiseDisplayName ?? rollView.franchiseId}, ${rollEraLabel}`
-            : `${rollView.label}: ${rollView.franchiseId} ${rollView.eraId}`}
-          roundLabel={mode === 'duel' ? `Your roll · ${rollView.label}` : rollView.label}
-          onSettled={() => {}}
-        />
+            : `Rival's roll: ${rollView.label}, ${rollFranchiseDisplayName ?? rollView.franchiseId}, ${rollEraLabel}`
+          : `${rollView.label}: ${rollView.franchiseId} ${rollView.eraId}`}
+        roundLabel={mode === 'duel'
+          ? rollView.turn
+            ? `Your roll · ${rollView.label}`
+            : `Rival's roll · ${rollView.label}`
+          : rollView.label}
+        onSettled={() => {}}
+      />
+      {#if mode === 'duel' && !rollView.turn}
+        <p class="rival-watch" role="status">Watching live — your pool opens on your turn.</p>
       {/if}
     {/if}
     {#if !rollView.complete}
@@ -638,51 +705,123 @@
 {/if}
 
 <style>
-  .rival-roll {
-    display: flex;
-    flex-direction: column;
-    gap: 0.625rem;
+  .rival-watch {
     border-radius: 0.875rem;
     border: 1px dashed color-mix(in srgb, var(--color-destructive) 45%, transparent);
     background: color-mix(in srgb, var(--color-destructive) 6%, transparent);
-    padding: 0.875rem 1rem;
+    padding: 0.625rem 0.875rem;
+    font-size: 11px;
+    color: var(--color-muted-foreground);
   }
-  .rival-roll-pill {
-    align-self: flex-start;
-    border-radius: 999px;
-    background: var(--color-destructive);
-    color: white;
-    font-family: var(--font-mono);
-    font-size: 10px;
-    font-weight: 800;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    padding: 0.25rem 0.65rem;
-  }
-  .rival-roll-main {
+  .pick-slam {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    min-width: 0;
+    gap: 0.55rem;
+    border-radius: 0.75rem;
+    border: 1px solid color-mix(in srgb, var(--color-primary) 55%, transparent);
+    background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+    padding: 0.55rem 0.75rem;
+    font-family: var(--font-display);
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    animation: slam-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
-  .rival-roll-text {
+  .pick-slam-ball {
+    width: 1.1rem;
+    height: 1.1rem;
+    border-radius: 999px;
+    flex-shrink: 0;
+    background:
+      linear-gradient(
+        90deg,
+        transparent 46%,
+        var(--color-court-rim) 46%,
+        var(--color-court-rim) 54%,
+        transparent 54%
+      ),
+      radial-gradient(
+        circle at 30% 25%,
+        color-mix(in srgb, white 30%, transparent),
+        transparent 45%
+      ),
+      var(--color-court-wood);
+    border: 1px solid color-mix(in srgb, black 30%, var(--color-court-wood));
+    animation: ball-spin 0.6s ease both;
+  }
+  .clock-line {
     display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-  }
-  .rival-roll-label {
+    align-items: center;
+    gap: 0.55rem;
     font-family: var(--font-mono);
     font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
     color: var(--color-muted-foreground);
   }
-  .rival-roll-pair {
-    font-family: var(--font-display);
-    font-size: 1.125rem;
-    font-weight: 800;
+  .clock-line--hot {
+    color: var(--color-destructive);
+    animation: clock-blink 0.8s ease-in-out infinite;
   }
-  .rival-roll-hint {
-    font-size: 11px;
-    color: var(--color-muted-foreground);
+  .clock-ring {
+    display: grid;
+    place-items: center;
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 999px;
+    border: 2px solid var(--color-border);
+    border-top-color: var(--color-primary);
+    animation: ring-spin 1.2s linear infinite;
+    flex-shrink: 0;
+  }
+  .clock-line--hot .clock-ring {
+    border-top-color: var(--color-destructive);
+    box-shadow: 0 0 14px color-mix(in srgb, var(--color-destructive) 50%, transparent);
+  }
+  .clock-hand {
+    width: 2px;
+    height: 0.55rem;
+    background: currentColor;
+    border-radius: 2px;
+  }
+  @keyframes slam-in {
+    from {
+      opacity: 0;
+      transform: scale(0.94) translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+  @keyframes ball-spin {
+    from {
+      transform: rotate(-180deg) scale(0.6);
+    }
+    to {
+      transform: rotate(0) scale(1);
+    }
+  }
+  @keyframes ring-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @keyframes clock-blink {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.55;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pick-slam,
+    .pick-slam-ball,
+    .clock-ring,
+    .clock-line--hot {
+      animation: none;
+    }
   }
 </style>

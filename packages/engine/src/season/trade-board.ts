@@ -98,18 +98,6 @@ export function evaluateTradeProposal(input: {
   if (influenceAmount === 0 && influenceFromSender !== null) {
     return { ok: false, code: 'trade-cash-cap', reason: 'Sender without amount' };
   }
-  if (
-    influenceFromSender !== null &&
-    influenceFromSender !==
-      run.league.teams.find((t) => t.franchiseId === toFranchiseId)?.franchiseId &&
-    influenceFromSender !==
-      run.league.teams.find(
-        (t) =>
-          t.franchiseId ===
-          run.league.teams.find((x) => x.franchiseId === toFranchiseId)?.franchiseId,
-      )?.franchiseId
-  ) {
-  }
   if (outgoingPlayerVersionIds.length === 0 && incomingPlayerVersionIds.length === 0) {
     return { ok: false, code: 'roster-illegal', reason: 'Influence cannot be only asset' };
   }
@@ -119,6 +107,17 @@ export function evaluateTradeProposal(input: {
     run.league.teams[0]?.franchiseId ??
     '';
   const fromFranchiseId = humanFranchiseId;
+  if (
+    influenceFromSender !== null &&
+    influenceFromSender !== fromFranchiseId &&
+    influenceFromSender !== toFranchiseId
+  ) {
+    return {
+      ok: false,
+      code: 'trade-cash-cap',
+      reason: 'Influence sender must be one of the two trade franchises',
+    };
+  }
   const fromRoster = run.rosters.find((r) => r.franchiseId === fromFranchiseId);
   const toRoster = run.rosters.find((r) => r.franchiseId === toFranchiseId);
   if (!fromRoster || !toRoster) {

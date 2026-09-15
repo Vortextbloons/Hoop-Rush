@@ -42,6 +42,7 @@
   import DraftRoundCard from '$lib/components/draft/DraftRoundCard.svelte';
   import ClassicRollReel from '$lib/components/classic/ClassicRollReel.svelte';
   import AsyncState from '$lib/components/AsyncState.svelte';
+  import { arenaDraftPick, arenaError } from '$lib/arena-sound';
   let slotPickerModule: Promise<
     typeof import('$lib/components/draft/SlotPickerDialog.svelte')
   > | null = null;
@@ -330,15 +331,25 @@
         closePicker();
         draft = await persist(next);
         if (!mounted) return;
+        try {
+          arenaDraftPick(false);
+        } catch {}
         void launchRun(next);
       } else {
         spinning = true;
         closePicker();
         await applyRoll(next, 'both');
+        if (!mounted) return;
+        try {
+          arenaDraftPick(false);
+        } catch {}
       }
     } catch (error) {
       spinning = false;
       starting = false;
+      try {
+        arenaError();
+      } catch {}
       actionError = error instanceof Error ? error.message : String(error);
     }
   }

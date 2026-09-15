@@ -1,5 +1,6 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { resolveUid } from '../_shared/http.ts';
 
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -29,30 +30,6 @@ async function hashIp(ip: string): Promise<string> {
     .slice(0, 32);
 }
 
-async function resolveUid(
-  req: Request,
-  supabaseUrl: string,
-  serviceRoleKey: string,
-): Promise<string | null> {
-  const authHeader = req.headers.get('Authorization');
-  if (authHeader) {
-    const anonClient = createClient(
-      supabaseUrl,
-      Deno.env.get('SUPABASE_ANON_KEY') ?? serviceRoleKey,
-      {
-        global: { headers: { Authorization: authHeader } },
-      },
-    );
-    const {
-      data: { user },
-    } = await anonClient.auth.getUser();
-    if (user) return user.id;
-  }
-  const devUid = req.headers.get('x-dev-uid');
-  if (devUid && /^[0-9a-f-]{36}$/i.test(devUid)) return devUid;
-  return null;
-}
-
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST')
@@ -63,7 +40,7 @@ Deno.serve(async (req: Request) => {
   if (!supabaseUrl || !serviceRoleKey)
     return json(500, { code: 'authorization', message: 'server not configured' });
 
-  const uid = await resolveUid(req, supabaseUrl, serviceRoleKey);
+  const uid = await resolveUid(req, supabaseUrl);
   if (!uid) return json(401, { code: 'authorization', message: 'missing auth' });
 
   const body = await req.json().catch(() => null);

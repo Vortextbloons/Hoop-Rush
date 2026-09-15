@@ -288,7 +288,8 @@ export class PossessionStepper {
       const teamPrep = preps[offense];
       const shooter = rng.weightedPick(team.players, teamPrep.freeThrowShooterPickTable);
       const shooterSlot = slotOf(teamPrep, shooter);
-      resolveFreeThrows(
+      this.ctx.possessionStart = 'deadBall';
+      const freeThrows = resolveFreeThrows(
         this.ctx,
         offense,
         defense,
@@ -297,9 +298,12 @@ export class PossessionStepper {
         this.deadBall,
         this.tripRebounds,
       );
-      this.ctx.possessionStart = 'deadBall';
+      if (freeThrows.continues) {
+        this.phase = 'continuation';
+        return { ended: false, pause: false, periodEnded: false, finished: false };
+      }
       recorder.possession(offense);
-      return this.endedStep(true);
+      return this.endedStep(!freeThrows.liveReboundEnd);
     }
     this.phase = 'inbound';
     if (this.ctx.shotClock) {
@@ -503,16 +507,20 @@ function reboundChances(
 ): void {
   ctx.recorder.offensiveReboundChance(offenseSide);
   ctx.recorder.defensiveReboundChance(defenseSide);
+  ctx.recorder.reboundOpportunity(offenseSide);
   reboundCounter[offenseSide] += 1;
   reboundCounter[defenseSide] += 1;
 }
-function reboundFromMissedFreeThrow(
+interface FreeThrowOutcome {
+  continues: boolean;
+  liveReboundEnd: boolean;
+}
+function reboundFromLiveMissedFreeThrow(
   ctx: TripContext,
   offenseSide: SideIndex,
   defenseSide: SideIndex,
-  deadBall: boolean,
   reboundCounter: [number, number],
-): void {
+): FreeThrowOutcome {
   reboundChances(ctx, offenseSide, defenseSide, reboundCounter);
   const result = resolveRebound(
     ctx.rng,
@@ -520,23 +528,31 @@ function reboundFromMissedFreeThrow(
     ctx.preps[defenseSide].defensiveReboundMean,
     'rim',
     ctx.profile,
-    deadBall,
+    false,
   );
   if (result.team) {
     ctx.recorder.teamRebound(defenseSide);
-    return;
+    return { continues: false, liveReboundEnd: false };
   }
-  const offensive = result.offensive;
-  const side = offensive ? offenseSide : defenseSide;
-  const team = ctx.teams[side];
-  const prep = ctx.preps[side];
-  const rebounder = ctx.rng.weightedPick(team.players, prep.rebounderPickTables[offensive ? 0 : 1]);
-  const slot = slotOrZero(prep, rebounder);
-  if (offensive) {
-    ctx.recorder.offensiveRebound(offenseSide, slot);
-  } else {
-    ctx.recorder.defensiveRebound(defenseSide, slot);
+  if (result.offensive) {
+    const prep = ctx.preps[offenseSide];
+    const rebounder = ctx.rng.weightedPick(
+      ctx.teams[offenseSide].players,
+      prep.rebounderPickTables[0],
+    );
+    ctx.recorder.offensiveRebound(offenseSide, slotOrZero(prep, rebounder));
+    ctx.possessionStart = 'offensiveRebound';
+    if (ctx.shotClock) ctx.shotClock.remaining = 14;
+    return { continues: true, liveReboundEnd: false };
   }
+  const prep = ctx.preps[defenseSide];
+  const rebounder = ctx.rng.weightedPick(
+    ctx.teams[defenseSide].players,
+    prep.rebounderPickTables[1],
+  );
+  ctx.recorder.defensiveRebound(defenseSide, slotOrZero(prep, rebounder));
+  ctx.possessionStart = 'defensiveRebound';
+  return { continues: false, liveReboundEnd: true };
 }
 function resolveFreeThrows(
   ctx: TripContext,
@@ -546,12 +562,13 @@ function resolveFreeThrows(
   attempts: number,
   deadBall: boolean,
   reboundCounter: [number, number],
-): void {
+): FreeThrowOutcome {
   const { rng, recorder } = ctx;
   const shooter = ctx.teams[offenseSide].players[shooterSlot];
   if (shooter === undefined) {
     throw new Error(`possession: no player at slot ${String(shooterSlot)}`);
   }
+  let outcome: FreeThrowOutcome = { continues: false, liveReboundEnd: false };
   for (let i = 0; i < attempts; i += 1) {
     if (ctx.race?.decided) break;
     const last = i === attempts - 1;
@@ -559,15 +576,22 @@ function resolveFreeThrows(
       ctx.preps[offenseSide].freeThrowP[shooterSlot] ?? freeThrowProbability(shooter, ctx.profile);
     const made = rng.chance(p);
     recorder.freeThrow(offenseSide, shooterSlot, made);
-    if (made) raceRecordPoints(ctx, offenseSide, 1);
-    if (last && !made) {
-      reboundFromMissedFreeThrow(ctx, offenseSide, defenseSide, deadBall, reboundCounter);
-    } else if (!made) {
-      reboundChances(ctx, offenseSide, defenseSide, reboundCounter);
-      recorder.teamRebound(defenseSide);
+    if (made) {
+      raceRecordPoints(ctx, offenseSide, 1);
+      continue;
     }
+    if (last) {
+      if (deadBall) {
+        recorder.teamRebound(defenseSide);
+      } else {
+        outcome = reboundFromLiveMissedFreeThrow(ctx, offenseSide, defenseSide, reboundCounter);
+      }
+      break;
+    }
+    recorder.teamRebound(defenseSide);
   }
   recorder.freeThrowTrip(offenseSide);
+  return outcome;
 }
 interface ShotOutcome {
   continues: boolean;
@@ -661,13 +685,21 @@ function resolveShot(
         defenderVersion: defender.playerVersionId,
       };
     }
+    let freeThrows: FreeThrowOutcome;
     if (made) {
       creditAssist(ctx, offenseSide, team, shooter, initiator, action, zone, shot.passed);
-      resolveFreeThrows(ctx, offenseSide, defenseSide, shooterSlot, 1, false, reboundCounter);
+      freeThrows = resolveFreeThrows(
+        ctx,
+        offenseSide,
+        defenseSide,
+        shooterSlot,
+        1,
+        false,
+        reboundCounter,
+      );
     } else {
-      reboundChances(ctx, offenseSide, defenseSide, reboundCounter);
       recorder.teamRebound(defenseSide);
-      resolveFreeThrows(
+      freeThrows = resolveFreeThrows(
         ctx,
         offenseSide,
         defenseSide,
@@ -677,10 +709,18 @@ function resolveShot(
         reboundCounter,
       );
     }
-    ctx.possessionStart = 'deadBall';
+    if (freeThrows.continues) {
+      return {
+        continues: true,
+        liveReboundEnd: false,
+        shooterVersion: shooter.playerVersionId,
+        defenderVersion: defender.playerVersionId,
+      };
+    }
+    if (!freeThrows.liveReboundEnd) ctx.possessionStart = 'deadBall';
     return {
       continues: false,
-      liveReboundEnd: false,
+      liveReboundEnd: freeThrows.liveReboundEnd,
       shooterVersion: shooter.playerVersionId,
       defenderVersion: defender.playerVersionId,
     };
@@ -752,7 +792,7 @@ function reboundAfterMiss(
   defenderVersion?: string,
 ): ShotOutcome {
   const { rng, recorder } = ctx;
-  reboundChances(ctx, offenseSide, defenseSide, reboundCounter);
+  if (!deadBall) reboundChances(ctx, offenseSide, defenseSide, reboundCounter);
   const result = resolveRebound(
     rng,
     ctx.preps[offenseSide].offensiveReboundMean,

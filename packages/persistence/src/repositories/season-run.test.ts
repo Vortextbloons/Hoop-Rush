@@ -18,7 +18,7 @@ import {
 import { SEASON_RUN_RECORD_ID } from '../schemas/season-run-record.ts';
 import { storedSeasonActiveRunIndexSchema } from '../schemas/season-run-record.ts';
 import { storedSeasonSummaryRowSchema } from '../schemas/season-run-record.ts';
-import { DexieChallengeRepository, HoopRushDatabase } from './dexie.ts';
+import { DexieChallengeRepository, HoopRushDatabase, challengeRunProgressDigest } from './dexie.ts';
 import { DexieSeasonDraftRepository } from './season-draft.ts';
 import {
   DexieSeasonRunRepository,
@@ -51,6 +51,7 @@ import {
   SeasonRunCommandStaleStateError,
   type CommitSeasonBlockInput,
 } from './season-run.ts';
+import { buildChallengeRun } from '@hoop-rush/test-fixtures';
 interface Adapters {
   db: TestDatabase;
   repo: DexieSeasonRunRepository;
@@ -850,6 +851,73 @@ describe('season run migration', () => {
     const snapshot = await seasonRun.loadActiveRun();
     expect(snapshot?.run.games).toHaveLength(1230);
     expect(await seasonDraft.loadSeasonDraft()).toBeNull();
+  });
+  it('preserves pre-v10 season rows through migration and requires an explicit reset', async () => {
+    resetIndexedDb();
+    const runId = 'legacy-migration-run';
+    const legacyDb = new Dexie('hoop-rush-saves');
+    legacyDb.version(1).stores({ active: 'recordId', completed: 'recordId', history: 'recordId' });
+    legacyDb.version(2).stores({
+      active: 'recordId',
+      activeGames: '[runId+gameNumber], runId',
+      completed: 'recordId',
+      history: 'recordId',
+    });
+    legacyDb.version(3).stores({ history: 'recordId, completedAtIso' });
+    legacyDb.version(4).stores({ classicDrafts: 'recordId' });
+    legacyDb.version(5).stores({ seasonDrafts: 'recordId' });
+    legacyDb.version(6).stores({
+      seasonRuns: 'recordId',
+      seasonRunSummaries: '[runId+gameId], runId, blockIndex',
+      seasonRunDetails: '[runId+gameId], runId',
+      seasonRunBlocks: '[runId+blockIndex], runId',
+      seasonRunIndex: 'recordId',
+    });
+    legacyDb.version(7).stores({ seasonPendingBlocks: 'runId' });
+    legacyDb.version(8).stores({
+      seasonPostseasonSummaries: '[runId+gameId], runId',
+      seasonCommandLog: '[runId+ordinal], runId',
+      seasonAlmanacs: 'runId',
+      seasonCompletedRuns: 'runId',
+      seasonCompletedIndex: 'recordId, completedAtIso',
+    });
+    await legacyDb.open();
+    await legacyDb.table('seasonRuns').put({
+      recordId: SEASON_RUN_RECORD_ID,
+      saveSchemaVersion: 1,
+      run: {
+        runId,
+        schemaVersion: 4,
+        versions: { runSchemaVersion: 4 },
+      },
+    });
+    await legacyDb.table('seasonRunIndex').put({
+      recordId: SEASON_RUN_RECORD_ID,
+      index: {
+        runId,
+        rootSeed: 'a'.repeat(32),
+        humanFranchiseId: 'lakers',
+        completedRounds: 0,
+        revision: 0,
+        humanWins: 0,
+        humanLosses: 0,
+        updatedAtIso: '2026-01-01T00:00:00.000Z',
+      },
+    });
+    legacyDb.close();
+    const db = new HoopRushDatabase();
+    const seasonRun = new DexieSeasonRunRepository(db, {
+      schedule: buildFixtureSchedule('a'.repeat(32)),
+      seam: buildStubSeasonEngineSeam(),
+    });
+    await expect(seasonRun.loadActiveRun()).rejects.toMatchObject({
+      name: 'SeasonRunIncompatibleError',
+    });
+    expect(await db.seasonRuns.count()).toBe(1);
+    expect(await db.seasonRunIndex.count()).toBe(1);
+    await seasonRun.clearSeasonRun(runId);
+    expect(await db.seasonRuns.count()).toBe(0);
+    expect(await db.seasonRunIndex.count()).toBe(0);
   });
 });
 describe('season run M2.5 pending blocks (v5)', () => {
@@ -1820,5 +1888,63 @@ describe('season run M2.5 reload audit (v5)', () => {
       },
     });
     expect(await db.seasonRuns.count()).toBe(1);
+  });
+});
+describe('classic run promotion compare-and-swap', () => {
+  function classicRecord(runId: string) {
+    const run = buildChallengeRun({
+      runId,
+      status: 'finished',
+      firstLossGameNumber: 1,
+    });
+    return {
+      run,
+      record: { recordId: 'active', saveSchemaVersion: 2 as const, run },
+      index: {
+        recordId: runId,
+        runId,
+        mode: run.mode,
+        variant: run.variant,
+        franchiseId: run.franchiseId,
+        eraId: run.eraId,
+        playerIds: run.playerIds,
+        runSeed: run.runSeed,
+        wins: 0,
+        losses: 0,
+        gamesPlayed: 1,
+        outcome: 'eliminated' as const,
+        completedAtIso: '2026-01-01T00:00:00.000Z',
+      },
+    };
+  }
+  it('promotes a finished classic run under matching games/digest facts', async () => {
+    const { db, challenge } = makeAdapters();
+    const { run, record, index } = classicRecord('classic-cas-run');
+    await challenge.saveActiveRun(record);
+    await challenge.promoteActiveToCompleted(record, index, {
+      expectedGamesPlayed: 0,
+      expectedRunDigest: challengeRunProgressDigest(run),
+    });
+    expect(await challenge.loadActiveRun()).toBeNull();
+    const completed = await challenge.loadCompletedRun(run.runId);
+    expect(completed?.run.runId).toBe(run.runId);
+    expect(await db.history.count()).toBe(1);
+  });
+  it('rejects a stale classic promotion atomically and keeps the active run', async () => {
+    const { db, challenge } = makeAdapters();
+    const { run, record, index } = classicRecord('classic-stale-run');
+    await challenge.saveActiveRun(record);
+    const checkpoint = await db.active.get('active');
+    if (checkpoint === undefined) throw new Error('expected an active checkpoint');
+    await db.active.put({ ...checkpoint, status: 'active' });
+    await expect(
+      challenge.promoteActiveToCompleted(record, index, {
+        expectedGamesPlayed: 0,
+        expectedRunDigest: challengeRunProgressDigest(run),
+      }),
+    ).rejects.toThrow(/moved before the promotion/);
+    expect(await db.completed.count()).toBe(0);
+    expect(await db.history.count()).toBe(0);
+    expect(await challenge.loadActiveRun()).not.toBeNull();
   });
 });

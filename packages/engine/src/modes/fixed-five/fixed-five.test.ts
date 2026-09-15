@@ -8,9 +8,11 @@ import type {
   ClassicDraftCatalog,
   EraId,
   EraSimulationProfile,
+  FixedFiveLineupEntry,
   FranchiseId,
   PlayerId,
   Position,
+  SimulationPlayer,
 } from '@hoop-rush/data-contracts';
 import {
   commandIdSchema,
@@ -62,6 +64,7 @@ import {
 import { findWeakestOpponent, h2hGameNumbersFor, simulateShared82 } from './shared82.ts';
 import { simulateDuelSeries } from './duel-sim.ts';
 import { fixedFiveResultDigest } from './digest.ts';
+import { verifyFixedFiveCompetition } from './verification.ts';
 const context = createEngineContext();
 const ROOT = seedSchema.parse(seedFromString('fixed-five-golden'));
 function candidatePool(): FixedFiveCandidate[] {
@@ -781,6 +784,194 @@ describe('result digest', () => {
         : command,
     );
     expect(digestOf(draft)).not.toBe(digestOf(tampered));
+  });
+});
+describe('competition verification receipts', () => {
+  const VERSIONS = {
+    dataVersion: 'data-v1',
+    ratingVersion: 'ratings-v1',
+    positionNormalizationVersion: 'position-v3',
+    engineVersion: 'engine-v1',
+    bracketVersion: 'bracket-v1',
+    scheduleVersion: 'schedule-v1',
+    seedDerivationVersion: 'seed-v1',
+    classicRollVersion: 'classic-roll-v1',
+    profileVersion: 'profile-v1',
+    multiplayerVersion: 'fixed-five-multiplayer-v1',
+    autopickVersion: 'fixed-five-autopick-v1',
+  };
+  function lineupEntryOf(players: readonly SimulationPlayer[]): FixedFiveLineupEntry {
+    return {
+      lineup: {
+        structure: ['G', 'G', 'F', 'F', 'C'] as ['G', 'G', 'F', 'F', 'C'],
+        assignments: players.map((player, slotIndex) => ({
+          slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4,
+          playerId: player.playerId,
+          positions: player.positions,
+        })),
+      },
+      players: [...players],
+    };
+  }
+  const shared82Fixture = (() => {
+    const bracket = buildFixtureBracket();
+    const p1Team = buildLegalSimulationTeam({ teamId: 'p1', displayName: 'P1' });
+    const p2Team = buildLegalSimulationTeam({ teamId: 'p2', displayName: 'P2' });
+    const out = simulateShared82(
+      {
+        p1Team,
+        p2Team,
+        bracket,
+        profile: DEFAULT_ERA_SIM_PROFILE,
+        rootSeed: ROOT,
+        dataVersion: 'data-v1',
+      },
+      context,
+    );
+    const lineups = { p1: lineupEntryOf(p1Team.players), p2: lineupEntryOf(p2Team.players) };
+    const resultDigest = fixedFiveResultDigest({
+      rootSeed: ROOT,
+      versions: VERSIONS,
+      lineups,
+      acceptedCommands: [],
+      result: out.result,
+    });
+    return { bracket, lineups, out, resultDigest };
+  })();
+  it('issues a receipt for a recomputation that matches the submitted result', () => {
+    const verified = verifyFixedFiveCompetition(
+      {
+        roomId: 'room-verify',
+        competition: 'shared-82',
+        rootSeed: ROOT,
+        versions: VERSIONS,
+        challenge: 'server-challenge-1',
+        acceptedCommands: [],
+        lineups: shared82Fixture.lineups,
+        result: shared82Fixture.out.result,
+        resultDigest: shared82Fixture.resultDigest,
+        bracket: shared82Fixture.bracket,
+        profile: DEFAULT_ERA_SIM_PROFILE,
+        dataVersion: 'data-v1',
+      },
+      context,
+    );
+    expect(verified.ok).toBe(true);
+    if (!verified.ok) throw new Error('expected a valid receipt');
+    expect(verified.receipt.roomId).toBe('room-verify');
+    expect(verified.receipt.challenge).toBe('server-challenge-1');
+    expect(verified.receipt.participantIds).toEqual(['p1', 'p2']);
+    expect(verified.receipt.gameSeeds).toHaveLength(82 + 82 - 3);
+    expect(verified.receipt.resultDigest).toBe(shared82Fixture.resultDigest);
+    expect(verified.receipt.receiptDigest).toMatch(/^[0-9a-f]{64}$/);
+  });
+  it('rejects a tampered result, digest, lineup, or command log', () => {
+    const base = {
+      roomId: 'room-verify',
+      competition: 'shared-82' as const,
+      rootSeed: ROOT,
+      versions: VERSIONS,
+      challenge: 'server-challenge-1',
+      acceptedCommands: [] as FixedFiveCommand[],
+      lineups: shared82Fixture.lineups,
+      result: shared82Fixture.out.result,
+      resultDigest: shared82Fixture.resultDigest,
+      bracket: shared82Fixture.bracket,
+      profile: DEFAULT_ERA_SIM_PROFILE,
+      dataVersion: 'data-v1',
+    };
+    const tamperedResult = {
+      ...base,
+      result: {
+        ...base.result,
+        participants: base.result.participants.map((participant, index) =>
+          index === 0
+            ? { ...participant, wins: participant.wins - 1, losses: participant.losses + 1 }
+            : participant,
+        ),
+      } as typeof base.result,
+    };
+    const resultCheck = verifyFixedFiveCompetition(tamperedResult, context);
+    expect(resultCheck.ok).toBe(false);
+    if (resultCheck.ok) throw new Error('expected rejection');
+    expect(resultCheck.failures.join('; ')).toMatch(/recomputed shared-82 result/);
+
+    const digestCheck = verifyFixedFiveCompetition(
+      { ...base, resultDigest: contentHashSchema.parse('0'.repeat(64)) },
+      context,
+    );
+    expect(digestCheck.ok).toBe(false);
+    if (digestCheck.ok) throw new Error('expected rejection');
+    expect(digestCheck.failures.join('; ')).toMatch(/digest/);
+
+    const swappedPlayers = [...base.lineups.p1.players].reverse();
+    const lineupCheck = verifyFixedFiveCompetition(
+      { ...base, lineups: { ...base.lineups, p1: lineupEntryOf(swappedPlayers) } },
+      context,
+    );
+    expect(lineupCheck.ok).toBe(false);
+
+    const commandCheck = verifyFixedFiveCompetition(
+      {
+        ...base,
+        acceptedCommands: [
+          {
+            schemaVersion: 1,
+            roomId: idSchema.parse('room-verify'),
+            commandId: commandIdSchema.parse('cmd-1'),
+            ordinal: 1,
+            actorParticipantId: 'p1',
+            payload: { kind: 'reroll', axis: 'franchise' },
+          },
+        ],
+      },
+      context,
+    );
+    expect(commandCheck.ok).toBe(false);
+    if (commandCheck.ok) throw new Error('expected rejection');
+    expect(commandCheck.failures.join('; ')).toMatch(/not dense/);
+  });
+  it('issues a receipt for a duel recomputation', () => {
+    const p1Team = buildLegalSimulationTeam({ teamId: 'p1', displayName: 'P1' });
+    const p2Team = buildLegalSimulationTeam({ teamId: 'p2', displayName: 'P2' });
+    const out = simulateDuelSeries(
+      {
+        p1Team,
+        p2Team,
+        profile: DEFAULT_ERA_SIM_PROFILE,
+        rootSeed: ROOT,
+        dataVersion: 'data-v1',
+      },
+      context,
+    );
+    const lineups = { p1: lineupEntryOf(p1Team.players), p2: lineupEntryOf(p2Team.players) };
+    const resultDigest = fixedFiveResultDigest({
+      rootSeed: ROOT,
+      versions: VERSIONS,
+      lineups,
+      acceptedCommands: [],
+      result: out.result,
+    });
+    const verified = verifyFixedFiveCompetition(
+      {
+        roomId: 'room-duel',
+        competition: 'duel',
+        rootSeed: ROOT,
+        versions: VERSIONS,
+        challenge: 'server-challenge-2',
+        acceptedCommands: [],
+        lineups,
+        result: out.result,
+        resultDigest,
+        bracket: buildFixtureBracket(),
+        profile: DEFAULT_ERA_SIM_PROFILE,
+        dataVersion: 'data-v1',
+      },
+      context,
+    );
+    expect(verified.ok).toBe(true);
+    if (!verified.ok) throw new Error('expected a valid duel receipt');
+    expect(verified.receipt.gameSeeds).toHaveLength(out.result.games.length);
   });
 });
 describe('classic safe moves', () => {

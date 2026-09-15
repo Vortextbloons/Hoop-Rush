@@ -54,11 +54,14 @@ import {
   summarizeDuelGames,
   summarizeShared82Games,
   toSimulationPlayer,
+  verifyFixedFiveCompetition,
   type AutopickSelection,
   type ClassicBuilderCommand,
   type DuelDraftState,
   type EngineContext,
   type FixedFiveCandidate,
+  type FixedFiveVerificationInput,
+  type FixedFiveVerificationResult,
   type SandboxBuilderState,
   type SandboxDuelState,
 } from '@hoop-rush/engine';
@@ -474,7 +477,13 @@ export function deriveEffectivePhase(
   replay: DraftReplay,
   localSimDone: boolean,
 ): FixedFiveRoomPhase {
-  if (serverPhase !== 'lobby') return serverPhase;
+  if (
+    serverPhase === 'completed' ||
+    serverPhase === 'integrity-failed' ||
+    serverPhase === 'expired'
+  ) {
+    return serverPhase;
+  }
   if (!replay.hasStart) return 'lobby';
   if (!isDraftComplete(replay)) return 'drafting';
   if (!localSimDone) return 'simulating';
@@ -693,6 +702,8 @@ export interface WorkerSummaryInput {
   rootSeed: Seed;
   p1TeamId: string;
   p2TeamId: string;
+  p1PlayerIds: readonly string[];
+  p2PlayerIds: readonly string[];
   entries: FixedFiveWorkerResultEntry[];
 }
 export function summarizeWorkerEntries(input: WorkerSummaryInput): {
@@ -704,6 +715,8 @@ export function summarizeWorkerEntries(input: WorkerSummaryInput): {
       games: input.entries.map((entry) => entry.game),
       p1TeamId: input.p1TeamId,
       p2TeamId: input.p2TeamId,
+      p1PlayerIds: input.p1PlayerIds,
+      p2PlayerIds: input.p2PlayerIds,
       rootSeed: input.rootSeed,
     });
     return { result, weakestReplacedOpponentId: null };
@@ -714,6 +727,10 @@ export function summarizeWorkerEntries(input: WorkerSummaryInput): {
   const { result } = summarizeShared82Games({
     bracket: input.bracket,
     rootSeed: input.rootSeed,
+    p1TeamId: input.p1TeamId,
+    p2TeamId: input.p2TeamId,
+    p1PlayerIds: input.p1PlayerIds,
+    p2PlayerIds: input.p2PlayerIds,
     h2h,
     p1NonH2h,
     p2NonH2h,
@@ -745,4 +762,51 @@ export function computeCompetitionDigest(input: DigestInput): ContentHash {
     acceptedCommands: [...input.commands].sort((a, b) => a.ordinal - b.ordinal),
     result: input.result,
   });
+}
+export interface VerificationInputBuild {
+  roomId: string;
+  competition: FixedFiveCompetitionRun['competition'];
+  rootSeed: Seed;
+  versions: FixedFiveRoomSettings['versions'];
+  challenge: string;
+  commands: FixedFiveCommand[];
+  bracket: OpponentBracket;
+  profile: EraSimulationProfile;
+  result: FixedFiveCompetitionResult;
+  resultDigest: ContentHash;
+  p1: {
+    refs: PickRef[];
+    players: SimulationPlayer[];
+  };
+  p2: {
+    refs: PickRef[];
+    players: SimulationPlayer[];
+  };
+}
+export function buildFixedFiveVerificationInput(
+  input: VerificationInputBuild,
+): FixedFiveVerificationInput {
+  return {
+    roomId: input.roomId,
+    competition: input.competition,
+    rootSeed: input.rootSeed,
+    versions: input.versions,
+    challenge: input.challenge,
+    acceptedCommands: [...input.commands].sort((a, b) => a.ordinal - b.ordinal),
+    lineups: {
+      p1: lineupEntryFor(input.p1.refs, input.p1.players),
+      p2: lineupEntryFor(input.p2.refs, input.p2.players),
+    },
+    result: input.result,
+    resultDigest: input.resultDigest,
+    bracket: input.bracket,
+    profile: input.profile,
+    dataVersion: input.versions.dataVersion,
+  };
+}
+export function verifyFixedFiveResult(
+  input: FixedFiveVerificationInput,
+  assets: FixedFiveAssets,
+): FixedFiveVerificationResult {
+  return verifyFixedFiveCompetition(input, assets.context);
 }

@@ -36,3 +36,31 @@ revoke all on function public.season_cron_tick() from public;
 revoke all on function public.season_cron_tick() from authenticated;
 revoke all on function public.season_cron_tick() from anon;
 grant execute on function public.season_cron_tick() to service_role;
+
+-- Bind private decisions to the franchise of the room member that owns the
+-- participant seat. The Edge Function checks membership/participant/cursor
+-- already; this makes the franchise binding a database guarantee too.
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'season_room_members_franchise_uk'
+      and conrelid = 'public.season_room_members'::regclass
+  ) then
+    alter table public.season_room_members
+      add constraint season_room_members_franchise_uk
+      unique (room_id, participant_id, franchise_id);
+  end if;
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'season_private_decisions_franchise_fk'
+      and conrelid = 'public.season_private_decisions'::regclass
+  ) then
+    alter table public.season_private_decisions
+      add constraint season_private_decisions_franchise_fk
+      foreign key (room_id, participant_id, franchise_id)
+      references public.season_room_members (room_id, participant_id, franchise_id)
+      on update cascade
+      on delete cascade;
+  end if;
+end $$;

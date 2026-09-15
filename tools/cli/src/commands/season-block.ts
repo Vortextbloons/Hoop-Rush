@@ -9,7 +9,6 @@ import {
   normalizeSponsorGearState,
   seasonCandidateCheckpointSchema,
   seasonRunSchema,
-  seasonScheduleSchema,
   type EraSimulationProfile,
   type SeasonCandidateCheckpoint,
   type SeasonChallengeDeal,
@@ -56,8 +55,8 @@ import {
 import { loadPackagedData, PackagedData } from './data-loader.ts';
 import {
   DEFAULT_MANIFEST,
-  DEFAULT_SEASON_DIR,
   loadSeasonDraftCatalog,
+  loadSeasonSchedule,
   readJsonFile,
 } from './season-data.ts';
 export const SEASON_BLOCK_SIMULATE_OPTIONS: Record<string, boolean> = {
@@ -86,7 +85,6 @@ export const DEFAULT_RUN_FIXTURE = resolve(
     .replace(/%20/g, ' '),
   'season-run.json',
 );
-export const DEFAULT_SCHEDULE = resolve(DEFAULT_SEASON_DIR, 'schedule.json');
 export interface SeasonBlockRunnerState {
   run: SeasonRun;
   catalog: SeasonDraftCatalog;
@@ -125,7 +123,7 @@ export function createSeasonBlockRunner(
   const run = loadSeasonRunFixture(resolve(runPath));
   const manifestPath = options.manifestPath ?? DEFAULT_MANIFEST;
   const catalog = loadSeasonDraftCatalog(manifestPath);
-  const schedule = seasonScheduleSchema.parse(readJsonFile(DEFAULT_SCHEDULE));
+  const schedule = loadSeasonSchedule(manifestPath);
   const packaged = loadPackagedData(manifestPath);
   const profile = new PackagedData(packaged.manifest, packaged.dir).eraProfile(
     options.profileEra ?? '1990s',

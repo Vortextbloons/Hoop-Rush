@@ -59,6 +59,8 @@ export function simulateDuelSeries(
     games,
     p1TeamId: input.p1Team.teamId,
     p2TeamId: input.p2Team.teamId,
+    p1PlayerIds: input.p1Team.players.map((player) => player.playerId),
+    p2PlayerIds: input.p2Team.players.map((player) => player.playerId),
     rootSeed: input.rootSeed,
   });
 }

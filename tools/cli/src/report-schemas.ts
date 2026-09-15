@@ -410,6 +410,8 @@ export const seasonScheduleGenerateReportSchema = z.object({
   sha256: z.string().regex(/^[0-9a-f]{64}$/),
   wrote: z.boolean(),
   outPath: z.string().nullable(),
+  manifestPath: z.string().nullable(),
+  published: z.boolean(),
   pass: z.boolean(),
 });
 export type SeasonScheduleGenerateReport = z.infer<typeof seasonScheduleGenerateReportSchema>;

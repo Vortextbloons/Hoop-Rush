@@ -394,6 +394,10 @@ class RotationGameController {
       }
       this.home.resetCheckpoints();
       this.away.resetCheckpoints();
+      if (this.period > 1) {
+        const startForfeit = this.processPeriodStart();
+        if (startForfeit !== null) return this.exitWithEffects(startForfeit);
+      }
       while (this.secondsRemaining > 0) {
         this.state.secondsRemaining = this.secondsRemaining;
         const trip = this.driveOneTrip();
@@ -825,6 +829,33 @@ class RotationGameController {
     this.closeOvertimeStint(this.home);
     this.closeOvertimeStint(this.away);
   }
+  private processPeriodStart(): SeasonGameSimulationResult | null {
+    this.state.secondsRemaining = this.secondsRemaining;
+    const period = this.period;
+    const floatClock = this.state.secondsRemaining;
+    const clock = Math.floor(floatClock);
+    this.boundaryClock = clock;
+    for (const side of [this.home, this.away]) {
+      side.boundaryEvents = { foulOuts: 0, removals: 0, returns: 0 };
+      side.changedThisBoundary = false;
+    }
+    this.applyDueRemovals(period, floatClock, clock, false);
+    this.applyDueReturns(period, floatClock, clock, false);
+    this.applyFoulOuts(this.home, period, clock);
+    this.applyFoulOuts(this.away, period, clock);
+    for (const side of [this.home, this.away]) {
+      const plan = this.planFor(side, period, false, clock);
+      if (plan === null) continue;
+      if (plan.unit === null) {
+        return this.forfeitResult(side, 'no-legal-five-after-removal');
+      }
+      this.applySubstitutionIfChanged(side, plan.unit, period, clock, plan.reason);
+    }
+    for (const side of [this.home, this.away]) {
+      this.reopenStint(side, period, false);
+    }
+    return null;
+  }
   private processBoundary(periodEnded: boolean): SeasonGameSimulationResult | null {
     const period = this.period;
     const floatClock = this.state.secondsRemaining;
@@ -855,7 +886,7 @@ class RotationGameController {
       this.finalizeStint(side, period, clock, periodEnded);
     }
     for (const side of [this.home, this.away]) {
-      if (gameContinues) this.reopenStint(side, period, periodEnded);
+      if (gameContinues && !periodEnded) this.reopenStint(side, period, false);
     }
     return null;
   }

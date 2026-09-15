@@ -8,6 +8,7 @@ import {
   fixedFiveRoomPhaseSchema,
   fixedFiveRoomSettingsSchema,
   fixedFiveRoomSnapshotSchema,
+  fixedFiveVerificationReceiptSchema,
   idSchema,
   type FixedFiveCommandReceipt,
   type FixedFiveMemberSnapshot,
@@ -136,12 +137,31 @@ function isUsableSupabaseUrl(url: string): boolean {
   if (host === 'localhost' || host === '127.0.0.1') return parsed.protocol === 'http:';
   return parsed.protocol === 'https:' && host.endsWith('.supabase.co');
 }
-function isUsablePublishableKey(key: string): boolean {
+function legacyJwtRole(key: string): string | null {
+  const parts = key.split('.');
+  if (parts.length !== 3) return null;
+  const segment = parts[1];
+  if (!segment) return null;
+  try {
+    const normalized = segment.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+    const payload: unknown = JSON.parse(atob(padded));
+    if (typeof payload !== 'object' || payload === null) return null;
+    const role = (payload as Record<string, unknown>)['role'];
+    return typeof role === 'string' ? role : null;
+  } catch {
+    return null;
+  }
+}
+export function isUsablePublishableKey(key: string): boolean {
   if (key.length < 20 || /\s/.test(key)) return false;
   const lower = key.toLowerCase();
   if (lower.includes('your-') || lower.includes('example') || lower.includes('placeholder'))
     return false;
-  return key.startsWith('sb_publishable_') || key.startsWith('sb_secret_') || key.startsWith('eyJ');
+  if (key.startsWith('sb_secret_')) return false;
+  if (key.startsWith('sb_publishable_')) return true;
+  if (!key.startsWith('eyJ')) return false;
+  return legacyJwtRole(key) === 'anon';
 }
 function supabaseEnv(): {
   url?: string;
@@ -270,16 +290,14 @@ export function createFixedFiveTransport(options?: {
     let deadline: FixedFiveRoomSnapshot['deadline'] = null;
     if (row.deadline_at) {
       const fallback = fixedFiveCommandPayloadSchema.safeParse(row.deadline_fallback);
-      if (fallback.success) {
-        deadline = {
-          roomId: row.id,
-          cursor: row.deadline_cursor ?? 'lobby',
-          participantId: row.deadline_participant === 'p2' ? 'p2' : 'p1',
-          deadlineAt: row.deadline_at,
-          fallback: fallback.data,
-          pickOrdinal: row.deadline_pick_ordinal ?? 0,
-        };
-      }
+      deadline = {
+        roomId: row.id,
+        cursor: row.deadline_cursor ?? 'lobby',
+        participantId: row.deadline_participant === 'p2' ? 'p2' : 'p1',
+        deadlineAt: row.deadline_at,
+        fallback: fallback.success ? fallback.data : null,
+        pickOrdinal: row.deadline_pick_ordinal ?? 0,
+      };
     }
     const settings = fixedFiveRoomSettingsSchema.parse({
       schemaVersion: 1,
@@ -576,6 +594,73 @@ export function createFixedFiveTransport(options?: {
       };
       return receipt;
     },
+    async verificationChallenge(roomId) {
+      const client = await getClient();
+      await ensureAnonymous(client);
+      const response = await client.rpc('fixed_five_verification_challenge', {
+        p_room_id: roomId,
+      });
+      if (response.error)
+        throw new Error(`verification challenge failed: ${response.error.message}`);
+      const data: unknown = response.data;
+      if (typeof data === 'string' && data.length > 0) return data;
+      const record =
+        typeof data === 'object' && data !== null ? (data as Record<string, unknown>) : {};
+      for (const key of ['challenge', 'challenge_string', 'value', 'token']) {
+        const candidate = record[key];
+        if (typeof candidate === 'string' && candidate.length > 0) return candidate;
+      }
+      throw new Error('verification challenge failed: server returned no challenge');
+    },
+    async submitVerification(roomId, receipt, expectedRevision) {
+      const client = await getClient();
+      await ensureAnonymous(client);
+      const parsed = fixedFiveVerificationReceiptSchema.parse(receipt);
+      const response = await client.rpc('fixed_five_verification_submit', {
+        p_room_id: roomId,
+        p_receipt_id: parsed.receiptDigest,
+        p_receipt: parsed,
+        p_expected_revision: expectedRevision ?? null,
+      });
+      if (response.error) throw new Error(`verification submit failed: ${response.error.message}`);
+      const record =
+        typeof response.data === 'object' && response.data !== null
+          ? (response.data as Record<string, unknown>)
+          : {};
+      if (record['accepted'] !== true) {
+        const rejectionCode =
+          typeof record['rejectionCode'] === 'string' ? record['rejectionCode'] : 'invalid-receipt';
+        const rejectionRevision =
+          typeof record['revision'] === 'number' ? record['revision'] : null;
+        throw Object.assign(new Error(`verification submit rejected: ${rejectionCode}`), {
+          rejectionCode,
+          revision: rejectionRevision,
+        });
+      }
+      const receiptId =
+        typeof record['receiptId'] === 'string' && record['receiptId'].length > 0
+          ? record['receiptId']
+          : parsed.receiptDigest;
+      const revision = typeof record['revision'] === 'number' ? record['revision'] : 0;
+      return { receiptId, revision };
+    },
+    async commitFallback(roomId, cursor, payload, expectedRevision) {
+      const client = await getClient();
+      await ensureAnonymous(client);
+      const response = await client.rpc('fixed_five_commit_fallback', {
+        p_room_id: roomId,
+        p_cursor: cursor,
+        p_payload: payload,
+        p_expected_revision: expectedRevision ?? null,
+      });
+      if (response.error) throw new Error(`commit fallback failed: ${response.error.message}`);
+      const record =
+        typeof response.data === 'object' && response.data !== null
+          ? (response.data as Record<string, unknown>)
+          : {};
+      const revision = typeof record['revision'] === 'number' ? record['revision'] : 0;
+      return { stored: record['stored'] === true, revision };
+    },
     async resolveTimeout(roomId) {
       const client = await getClient();
       await ensureAnonymous(client);
@@ -623,12 +708,12 @@ export function createFixedFiveTransport(options?: {
       if (!payload.code) throw new Error('rematch failed: room code missing');
       return { snapshot, code: payload.code };
     },
-    async complete(roomId, resultDigest) {
+    async complete(roomId, receiptId) {
       const client = await getClient();
       await ensureAnonymous(client);
       const response = await client.rpc('fixed_five_complete', {
         p_room_id: roomId,
-        p_result_digest: resultDigest,
+        p_receipt_id: receiptId,
       });
       if (response.error || !response.data)
         throw new Error(`complete failed: ${response.error?.message ?? 'unknown'}`);

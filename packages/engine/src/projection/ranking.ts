@@ -65,22 +65,24 @@ const DEFAULT_SCALES: Record<
   {
     baseline: number;
     perPoint: number;
+    higherIsBetter: boolean;
   }
 > = {
-  offensiveRating: { baseline: 105, perPoint: 1 },
-  defensiveRatingAllowed: { baseline: 105, perPoint: 1 },
-  netRating: { baseline: 0, perPoint: 1 },
-  effectiveFieldGoalPct: { baseline: 0.5, perPoint: 0.01 },
-  turnoverRate: { baseline: 0.14, perPoint: 0.01 },
-  rebounding: { baseline: 50, perPoint: 1 },
-  freeThrowRate: { baseline: 0.24, perPoint: 0.02 },
-  spacing: { baseline: 0.45, perPoint: 0.02 },
-  creation: { baseline: 0.55, perPoint: 0.02 },
-  defense: { baseline: 55, perPoint: 1 },
-  minuteDistribution: { baseline: 40, perPoint: 1 },
-  matchup: { baseline: 0, perPoint: 1 },
-  redundancy: { baseline: 60, perPoint: 1 },
+  offensiveRating: { baseline: 105, perPoint: 1, higherIsBetter: true },
+  defensiveRatingAllowed: { baseline: 105, perPoint: 1, higherIsBetter: false },
+  netRating: { baseline: 0, perPoint: 1, higherIsBetter: true },
+  effectiveFieldGoalPct: { baseline: 0.5, perPoint: 0.01, higherIsBetter: true },
+  turnoverRate: { baseline: 0.14, perPoint: 0.01, higherIsBetter: false },
+  rebounding: { baseline: 50, perPoint: 1, higherIsBetter: true },
+  freeThrowRate: { baseline: 0.24, perPoint: 0.02, higherIsBetter: true },
+  spacing: { baseline: 0.45, perPoint: 0.02, higherIsBetter: true },
+  creation: { baseline: 0.55, perPoint: 0.02, higherIsBetter: true },
+  defense: { baseline: 55, perPoint: 1, higherIsBetter: true },
+  minuteDistribution: { baseline: 40, perPoint: 1, higherIsBetter: true },
+  matchup: { baseline: 0, perPoint: 1, higherIsBetter: true },
+  redundancy: { baseline: 60, perPoint: 1, higherIsBetter: true },
 };
+const FALLBACK_SCALE = { baseline: 55, perPoint: 1, higherIsBetter: true };
 function scaleOf(
   model: ProjectionModelArtifact,
   key: string,
@@ -92,13 +94,15 @@ export function normalizeComponent(
   key: string,
   raw: number,
 ): number {
-  const fallback = DEFAULT_SCALES[key] ?? DEFAULT_SCALES.defense ?? { baseline: 55, perPoint: 1 };
+  const fallback = DEFAULT_SCALES[key] ?? DEFAULT_SCALES.defense ?? FALLBACK_SCALE;
   const scale = scaleOf(model, key);
   const baseline = scale?.baseline ?? fallback.baseline;
   const perPoint = scale?.perPoint ?? fallback.perPoint;
   const min = scale?.min ?? 0;
   const max = scale?.max ?? 100;
-  return normalizeValue(raw, baseline, perPoint, min, max);
+  const higherIsBetter = scale?.higherIsBetter ?? fallback.higherIsBetter;
+  const oriented = higherIsBetter ? raw : 2 * baseline - raw;
+  return normalizeValue(oriented, baseline, perPoint, min, max);
 }
 function mean(values: readonly number[]): number {
   return values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length);
@@ -122,10 +126,10 @@ export function rankingVectorOf(
     projection.units.find((unit) => unit.weight > 0)?.base.offense.defense.score ?? 55;
   return {
     offense: normalizeComponent(model, 'offensiveRating', m.offensiveRating),
-    inverseDefense: normalizeComponent(model, 'defensiveRatingAllowed', -m.defensiveRatingAllowed),
+    inverseDefense: normalizeComponent(model, 'defensiveRatingAllowed', m.defensiveRatingAllowed),
     net: normalizeComponent(model, 'netRating', m.netRating),
     shooting: normalizeComponent(model, 'effectiveFieldGoalPct', efg),
-    turnoverSecurity: normalizeComponent(model, 'turnoverRate', 1 - tovRate),
+    turnoverSecurity: normalizeComponent(model, 'turnoverRate', tovRate),
     rebounding: normalizeComponent(
       model,
       'rebounding',

@@ -5,6 +5,9 @@ import {
   COLLECTION_PLAY_SAVE_VERSION,
   COLLECTION_PLAY_SAVE_V1_VERSION,
   SAVE_SCHEMA_VERSION,
+  canonicalJson,
+  seasonDigestHex,
+  type ChallengeRun,
 } from '@hoop-rush/data-contracts';
 import { migrateCollectionPlayStateV1 } from '@hoop-rush/engine';
 import {
@@ -205,65 +208,35 @@ export class HoopRushDatabase extends Dexie {
       seasonCompletedRuns: 'runId',
       seasonCompletedIndex: 'recordId, completedAtIso',
     });
-    this.version(9)
-      .stores({
-        seasonRuns: 'recordId',
-        seasonRunSummaries: '[runId+gameId], [runId+blockIndex], runId, blockIndex',
-        seasonRunDetails: '[runId+gameId], runId',
-        seasonRunBlocks: '[runId+blockIndex], runId',
-        seasonRunIndex: 'recordId',
-        seasonPendingBlocks: 'runId',
-        seasonPostseasonSummaries: '[runId+gameId], runId',
-        seasonCommandLog: '[runId+ordinal], runId',
-        seasonAlmanacs: 'runId',
-        seasonCompletedRuns: 'runId',
-        seasonCompletedIndex: 'recordId, completedAtIso',
-        seasonRunPlayerSlices: 'runId',
-      })
-      .upgrade(async (tx) => {
-        await tx.table('seasonRuns').clear();
-        await tx.table('seasonRunSummaries').clear();
-        await tx.table('seasonRunDetails').clear();
-        await tx.table('seasonRunBlocks').clear();
-        await tx.table('seasonRunIndex').clear();
-        await tx.table('seasonPendingBlocks').clear();
-        await tx.table('seasonPostseasonSummaries').clear();
-        await tx.table('seasonCommandLog').clear();
-        await tx.table('seasonAlmanacs').clear();
-        await tx.table('seasonCompletedRuns').clear();
-        await tx.table('seasonCompletedIndex').clear();
-      });
-    this.version(10)
-      .stores({
-        seasonRuns: 'recordId',
-        seasonRunSummaries: '[runId+gameId], [runId+blockIndex], runId, blockIndex',
-        seasonRunDetails: '[runId+gameId], runId',
-        seasonRunBlocks: '[runId+blockIndex], runId',
-        seasonRunIndex: 'recordId',
-        seasonPendingBlocks: 'runId',
-        seasonPostseasonSummaries: '[runId+gameId], runId',
-        seasonPostseasonDetails: '[runId+gameId], runId',
-        seasonCommandLog: '[runId+ordinal], runId',
-        seasonAlmanacs: 'runId',
-        seasonCompletedRuns: 'runId',
-        seasonCompletedIndex: 'recordId, completedAtIso',
-        seasonRunPlayerSlices: 'runId',
-      })
-      .upgrade(async (tx) => {
-        await tx.table('seasonRuns').clear();
-        await tx.table('seasonRunSummaries').clear();
-        await tx.table('seasonRunDetails').clear();
-        await tx.table('seasonRunBlocks').clear();
-        await tx.table('seasonRunIndex').clear();
-        await tx.table('seasonPendingBlocks').clear();
-        await tx.table('seasonPostseasonSummaries').clear();
-        await tx.table('seasonPostseasonDetails').clear();
-        await tx.table('seasonCommandLog').clear();
-        await tx.table('seasonAlmanacs').clear();
-        await tx.table('seasonCompletedRuns').clear();
-        await tx.table('seasonCompletedIndex').clear();
-        await tx.table('seasonRunPlayerSlices').clear();
-      });
+    this.version(9).stores({
+      seasonRuns: 'recordId',
+      seasonRunSummaries: '[runId+gameId], [runId+blockIndex], runId, blockIndex',
+      seasonRunDetails: '[runId+gameId], runId',
+      seasonRunBlocks: '[runId+blockIndex], runId',
+      seasonRunIndex: 'recordId',
+      seasonPendingBlocks: 'runId',
+      seasonPostseasonSummaries: '[runId+gameId], runId',
+      seasonCommandLog: '[runId+ordinal], runId',
+      seasonAlmanacs: 'runId',
+      seasonCompletedRuns: 'runId',
+      seasonCompletedIndex: 'recordId, completedAtIso',
+      seasonRunPlayerSlices: 'runId',
+    });
+    this.version(10).stores({
+      seasonRuns: 'recordId',
+      seasonRunSummaries: '[runId+gameId], [runId+blockIndex], runId, blockIndex',
+      seasonRunDetails: '[runId+gameId], runId',
+      seasonRunBlocks: '[runId+blockIndex], runId',
+      seasonRunIndex: 'recordId',
+      seasonPendingBlocks: 'runId',
+      seasonPostseasonSummaries: '[runId+gameId], runId',
+      seasonPostseasonDetails: '[runId+gameId], runId',
+      seasonCommandLog: '[runId+ordinal], runId',
+      seasonAlmanacs: 'runId',
+      seasonCompletedRuns: 'runId',
+      seasonCompletedIndex: 'recordId, completedAtIso',
+      seasonRunPlayerSlices: 'runId',
+    });
     this.version(11).stores({
       seasonRuns: 'recordId',
       seasonRunSummaries: '[runId+gameId], [runId+blockIndex], runId, blockIndex',
@@ -462,6 +435,7 @@ export class DexieChallengeRepository {
   async promoteActiveToCompleted(
     completed: StoredRunRecord,
     index: CompletedRunIndex,
+    expected: PromoteActiveToCompletedExpectation,
   ): Promise<void> {
     const validatedRun = storedRunRecordSchema.parse(completed);
     const validatedIndex = completedRunIndexSchema.parse(index);
@@ -471,6 +445,12 @@ export class DexieChallengeRepository {
     if (validatedRun.run.status !== 'finished') {
       throw new Error(`cannot promote a run in status ${validatedRun.run.status}`);
     }
+    if (validatedRun.run.games.length !== expected.expectedGamesPlayed) {
+      throw new Error('promotion gamesPlayed does not match the completed run');
+    }
+    if (challengeRunProgressDigest(validatedRun.run) !== expected.expectedRunDigest) {
+      throw new Error('promotion digest does not match the completed run');
+    }
     await this.db.transaction(
       'rw',
       this.db.active,
@@ -478,6 +458,32 @@ export class DexieChallengeRepository {
       this.db.completed,
       this.db.history,
       async () => {
+        const checkpoint = await this.db.active.get(ACTIVE_RECORD_ID);
+        if (checkpoint === undefined) {
+          throw new Error('promoteActiveToCompleted: no active run checkpoint to promote');
+        }
+        const validatedCheckpoint = activeRunCheckpointSchema.parse(checkpoint);
+        if (validatedCheckpoint.runId !== validatedRun.run.runId) {
+          throw new Error('promoteActiveToCompleted: runId does not match the active checkpoint');
+        }
+        const rows = await this.db.activeGames
+          .where('runId')
+          .equals(validatedCheckpoint.runId)
+          .sortBy('gameNumber');
+        const storedGamesPlayed = validatedCheckpoint.gamesPlayed ?? rows.length;
+        const storedRun = runFromCheckpoint(
+          validatedCheckpoint,
+          rows.map((row) => activeGameRowSchema.parse(row).result),
+        );
+        if (
+          storedGamesPlayed !== expected.expectedGamesPlayed ||
+          storedRun.games.length !== expected.expectedGamesPlayed ||
+          challengeRunProgressDigest(storedRun) !== expected.expectedRunDigest
+        ) {
+          throw new Error(
+            'promoteActiveToCompleted: the active run moved before the promotion could apply',
+          );
+        }
         await this.db.active.delete(ACTIVE_RECORD_ID);
         await this.db.activeGames.clear();
         await this.db.completed.put({ ...validatedRun, recordId: validatedIndex.runId });
@@ -554,3 +560,18 @@ export class DexieChallengeRepository {
   }
 }
 export type ChallengeRepository = DexieChallengeRepository;
+export function challengeRunProgressDigest(run: ChallengeRun): string {
+  return seasonDigestHex(
+    canonicalJson({
+      runId: run.runId,
+      status: run.status,
+      firstLossGameNumber: run.firstLossGameNumber,
+      aggregates: run.aggregates,
+      games: run.games,
+    }),
+  );
+}
+export interface PromoteActiveToCompletedExpectation {
+  expectedGamesPlayed: number;
+  expectedRunDigest: string;
+}

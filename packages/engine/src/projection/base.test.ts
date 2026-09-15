@@ -572,40 +572,31 @@ describe('projectExpectedLedger', () => {
   });
 });
 describe('ProjectionCache', () => {
-  it('hits identical keys and evicts over the budget', () => {
-    const cache = new ProjectionCache(2, 1024 * 1024);
-    const key = ProjectionCache.key({
+  const keyOf = (
+    referenceId: string,
+    overrides: Partial<Parameters<typeof ProjectionCache.key>[0]> = {},
+  ) =>
+    ProjectionCache.key({
       eraId: '1990s',
       modelVersion: 'projection-model-v1',
-      referenceId: 'ref-1990s-neutral',
+      referenceId,
       slots: ['G1', 'G2', 'F1', 'F2', 'C'],
       playerIds: ['p-1', 'p-2', 'p-3', 'p-4', 'p-5'],
       playerVersionIds: [null, null, null, null, null],
+      playerFingerprints: ['f-1', 'f-2', 'f-3', 'f-4', 'f-5'],
+      modelFingerprint: 'model-fingerprint',
+      eraProfileFingerprint: 'era-profile-fingerprint',
+      ...overrides,
     });
+  it('hits identical keys and evicts over the budget', () => {
+    const cache = new ProjectionCache(2, 1024 * 1024);
+    const key = keyOf('ref-1990s-neutral');
     const projection = buildProjectionLineup();
     cache.set(key, projection);
     expect(cache.get(key)?.digest).toBe(projection.digest);
     expect(cache.stats().hits).toBe(1);
-    const other = ProjectionCache.key({
-      eraId: '1990s',
-      modelVersion: 'projection-model-v1',
-      referenceId: 'ref-1990s-perimeter',
-      slots: ['G1', 'G2', 'F1', 'F2', 'C'],
-      playerIds: ['p-1', 'p-2', 'p-3', 'p-4', 'p-5'],
-      playerVersionIds: [null, null, null, null, null],
-    });
-    cache.set(other, projection);
-    cache.set(
-      ProjectionCache.key({
-        eraId: '1990s',
-        modelVersion: 'projection-model-v1',
-        referenceId: 'ref-1990s-interior',
-        slots: ['G1', 'G2', 'F1', 'F2', 'C'],
-        playerIds: ['p-1', 'p-2', 'p-3', 'p-4', 'p-5'],
-        playerVersionIds: [null, null, null, null, null],
-      }),
-      projection,
-    );
+    cache.set(keyOf('ref-1990s-perimeter'), projection);
+    cache.set(keyOf('ref-1990s-interior'), projection);
     expect(cache.stats().entries).toBeLessThanOrEqual(2);
     expect(cache.get(key)).toBeUndefined();
   });

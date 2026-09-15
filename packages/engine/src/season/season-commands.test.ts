@@ -29,7 +29,8 @@ import { generateSeasonCampaignOffers } from './campaign.ts';
 import { generateSeasonSchedule } from './schedule.ts';
 import { handleSeasonRunCommand, type SeasonRunCommandContext } from './season-commands.ts';
 import { seasonObjectiveChoicesForBlock } from './objectives.ts';
-import { openSeasonTradeWindow } from './trades.ts';
+import { openSeasonTradeWindow, seasonEconomyRunOf } from './trades.ts';
+import { evaluateTradeProposal } from './trade-board.ts';
 import {
   buildEconomyTestRun,
   injuryIdOf,
@@ -1164,6 +1165,110 @@ describe('respond-to-trade-counter command', () => {
       expect(output.run.stateDigest).toBe(submitted.run.stateDigest);
       expect(output.run.rosters).toEqual(submitted.run.rosters);
     }
+  });
+});
+describe('Influence sender authorization', () => {
+  const CELTICS = franchiseIdSchema.parse('celtics');
+  const WARRIORS = franchiseIdSchema.parse('warriors');
+  function rosterIds(run: SeasonRun, franchiseId: string): string[] {
+    return (
+      run.rosters
+        .find((roster) => roster.franchiseId === franchiseId)
+        ?.players.map((player) => player.playerVersionId) ?? []
+    );
+  }
+  it('rejects an Influence sender outside the two trade franchises', () => {
+    const fixture = windowedFixture();
+    const humanIds = rosterIds(fixture.run, HUMAN);
+    const celticsIds = rosterIds(fixture.run, 'celtics');
+    const outgoing = humanIds[0];
+    const incoming = celticsIds[0];
+    if (outgoing === undefined || incoming === undefined) {
+      throw new Error('fixture rosters missing');
+    }
+    const evaluation = evaluateTradeProposal({
+      run: fixture.run,
+      windowIndex: 0,
+      toFranchiseId: CELTICS,
+      outgoingPlayerVersionIds: [outgoing],
+      incomingPlayerVersionIds: [incoming],
+      influenceAmount: 1,
+      influenceFromSender: WARRIORS,
+      catalog: fixture.catalog,
+      rootSeed: fixture.run.rootSeed,
+    });
+    expect(evaluation.ok).toBe(false);
+    if (evaluation.ok) throw new Error('expected rejection');
+    expect(evaluation.code).toBe('trade-cash-cap');
+    expect(evaluation.reason).toMatch(/two trade franchises/);
+  });
+  it('rejects invalid Influence sender combinations at command application', () => {
+    const fixture = windowedFixture();
+    const { run, context } = fixture;
+    const humanIds = rosterIds(run, HUMAN);
+    const celticsIds = rosterIds(run, 'celtics');
+    const outgoing = humanIds[0];
+    const incoming = celticsIds[0];
+    if (outgoing === undefined || incoming === undefined) {
+      throw new Error('fixture rosters missing');
+    }
+    const cases = [
+      { influenceAmount: 1, influenceFromSender: null },
+      { influenceAmount: 0, influenceFromSender: HUMAN },
+      { influenceAmount: 1, influenceFromSender: WARRIORS },
+    ];
+    cases.forEach((entry, index) => {
+      const output = handleSeasonRunCommand(
+        commandOf(run, {
+          command: 'submit-trade-proposal',
+          commandId: commandIdSchema.parse(`sender-bad-${String(index)}`),
+          windowIndex: 0,
+          toFranchiseId: CELTICS,
+          outgoingPlayerVersionIds: [outgoing],
+          incomingPlayerVersionIds: [incoming],
+          ...entry,
+        }),
+        context,
+      );
+      const result = output.result.result;
+      if (result.status !== 'rejected') {
+        throw new Error(`expected rejection for sender case ${String(index)}`);
+      }
+      expect(result.rejection.code).toBe('trade-wrong-fit');
+      expect(output.run.stateRevision).toBe(run.stateRevision);
+      expect(output.run.rosters).toEqual(run.rosters);
+    });
+  });
+  it('accepts an Influence sender that is one of the two franchises', () => {
+    const fixture = windowedFixture();
+    const humanIds = rosterIds(fixture.run, HUMAN);
+    const celticsIds = rosterIds(fixture.run, 'celtics');
+    let accepted = false;
+    for (const sender of [HUMAN, CELTICS]) {
+      for (const amount of [1, 2]) {
+        for (const outgoing of humanIds) {
+          for (const incoming of celticsIds) {
+            const evaluation = evaluateTradeProposal({
+              run: seasonEconomyRunOf(fixture.run, fixture.effects),
+              windowIndex: 0,
+              toFranchiseId: CELTICS,
+              outgoingPlayerVersionIds: [outgoing],
+              incomingPlayerVersionIds: [incoming],
+              influenceAmount: amount,
+              influenceFromSender: sender,
+              catalog: fixture.catalog,
+              rootSeed: fixture.run.rootSeed,
+            });
+            if (evaluation.ok) accepted = true;
+            if (accepted) break;
+          }
+          if (accepted) break;
+        }
+        if (accepted) break;
+      }
+      if (accepted) break;
+    }
+    expect(accepted).toBe(true);
   });
 });
 describe('resume-season-block command', () => {

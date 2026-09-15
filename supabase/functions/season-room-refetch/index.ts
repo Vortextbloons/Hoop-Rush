@@ -1,5 +1,6 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { resolveUid } from '../_shared/http.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -13,22 +14,6 @@ function json(s: number, b: unknown) {
     status: s,
     headers: { 'Content-Type': 'application/json', ...cors },
   });
-}
-
-async function uid(req: Request, url: string, srk: string) {
-  const ah = req.headers.get('Authorization');
-  if (ah) {
-    const ac = createClient(url, Deno.env.get('SUPABASE_ANON_KEY') ?? srk, {
-      global: { headers: { Authorization: ah } },
-    });
-    const {
-      data: { user },
-    } = await ac.auth.getUser();
-    if (user) return user.id;
-  }
-  const du = req.headers.get('x-dev-uid');
-  if (du && /^[0-9a-f-]{36}$/i.test(du)) return du;
-  return null;
 }
 
 type CommandRow = {
@@ -70,7 +55,7 @@ Deno.serve(async (req: Request) => {
   const url = Deno.env.get('SUPABASE_URL') ?? '';
   const srk = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
   if (!url || !srk) return json(500, { code: 'authorization', message: 'server not configured' });
-  const uidVal = await uid(req, url, srk);
+  const uidVal = await resolveUid(req, url);
   if (!uidVal) return json(401, { code: 'authorization', message: 'missing auth' });
   const body = await req.json().catch(() => null);
   const roomId = typeof body?.roomId === 'string' ? body.roomId.trim() : '';

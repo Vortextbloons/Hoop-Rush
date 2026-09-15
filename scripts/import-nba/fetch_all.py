@@ -4,6 +4,10 @@ Fetches raw nba_api data for the requested seasons: rosters, stints, season
 stats, and optionally schedules, plus the Basketball-Reference id mapping.
 All compute (era config, ratings, pools, careers) lives in TypeScript.
 
+Every stage failure is collected and the required per-season outputs are
+checked for existence and non-empty content; ``main`` returns nonzero when
+anything failed or is missing.
+
 Usage:
     python scripts/import-nba/fetch_all.py                 # fetch all default seasons
     python scripts/import-nba/fetch_all.py --seasons 2024-25 2023-24
@@ -38,6 +42,10 @@ if PACKAGE_NAME not in sys.modules:
     package.__package__ = PACKAGE_NAME
     sys.modules[PACKAGE_NAME] = package
 
+REQUIRED_SEASON_OUTPUTS = ("roster.json", "stints.json", "season-stats.json")
+SCHEDULE_OUTPUT = "schedule.json"
+BBREF_IDS_FILENAME = "bbref_ids.json"
+
 
 def _import(module_name: str):
     """Import a submodule dynamically to avoid circular imports."""
@@ -45,43 +53,87 @@ def _import(module_name: str):
     return importlib.import_module(full)
 
 
-def _fetch_season(season: str, include_schedule: bool, force_stints: bool) -> None:
-    """Fetch all raw data for a single season."""
-    fetch_rosters = _import("fetch_rosters").run
-    fetch_season_stats = _import("fetch_season_stats").run
-
-    print(f"\n=== {season} ===")
+def _require_output(path: Path, label: str, failures: list[str]) -> None:
+    """Record a failure when a required output is missing or empty."""
     try:
-        fetch_rosters(season)
-    except Exception as exc:
-        print(f"  ! roster fetch failed: {exc}")
+        size = path.stat().st_size
+    except OSError:
+        failures.append(f"{label} missing: {path}")
         return
+    if size <= 0:
+        failures.append(f"{label} is empty: {path}")
 
-    config = _import("config")
+
+def _verify_season_outputs(
+    season: str,
+    include_schedule: bool,
+    config,
+    failures: list[str],
+) -> None:
+    season_dir = Path(config.NBA_ROOT) / season
+    for name in REQUIRED_SEASON_OUTPUTS:
+        _require_output(season_dir / name, f"{season} {name}", failures)
+    if include_schedule:
+        _require_output(season_dir / SCHEDULE_OUTPUT, f"{season} {SCHEDULE_OUTPUT}", failures)
+
+
+def _fetch_season(season: str, include_schedule: bool, force_stints: bool) -> list[str]:
+    """Fetch all raw data for a single season, returning collected failures."""
+    failures: list[str] = []
+    print(f"\n=== {season} ===")
+
+    try:
+        config = _import("config")
+    except Exception as exc:
+        message = f"{season} config load failed: {exc}"
+        print(f"  ! {message}")
+        failures.append(message)
+        return failures
+
+    roster_failed = False
+    try:
+        _import("fetch_rosters").run(season)
+    except Exception as exc:
+        message = f"{season} roster fetch failed: {exc}"
+        print(f"  ! {message}")
+        failures.append(message)
+        roster_failed = True
+
     roster_path = config.NBA_ROOT / season / "roster.json"
     roster = []
     if roster_path.exists():
-        roster = json.loads(roster_path.read_text(encoding="utf-8"))
-
-    # Stints run before season stats: early-90s seasons fall back to
-    # stint-derived league totals when the league dashboard returns nothing.
-    try:
-        fetch_stints = _import("fetch_stints")
-        fetch_stints.compute_for_season(season, force=force_stints)
-    except Exception as exc:
-        print(f"  ! stints fetch failed: {exc}")
-
-    try:
-        fetch_season_stats(season, roster)
-    except Exception as exc:
-        print(f"  ! season stats fetch failed: {exc}")
-
-    if include_schedule:
         try:
-            fetch_schedule = _import("fetch_schedule").run
-            fetch_schedule(season)
+            roster = json.loads(roster_path.read_text(encoding="utf-8"))
         except Exception as exc:
-            print(f"  ! schedule fetch failed: {exc}")
+            failures.append(f"{season} roster.json unreadable: {exc}")
+
+    if not roster_failed:
+        # Stints run before season stats: early-90s seasons fall back to
+        # stint-derived league totals when the league dashboard returns nothing.
+        try:
+            _import("fetch_stints").compute_for_season(season, force=force_stints)
+        except Exception as exc:
+            message = f"{season} stints fetch failed: {exc}"
+            print(f"  ! {message}")
+            failures.append(message)
+
+        try:
+            _import("fetch_season_stats").run(season, roster)
+        except Exception as exc:
+            message = f"{season} season stats fetch failed: {exc}"
+            print(f"  ! {message}")
+            failures.append(message)
+
+        if include_schedule:
+            try:
+                _import("fetch_schedule").run(season)
+            except Exception as exc:
+                message = f"{season} schedule fetch failed: {exc}"
+                print(f"  ! {message}")
+                failures.append(message)
+
+    _verify_season_outputs(season, include_schedule, config, failures)
+    return failures
 
 
 def main() -> int:
@@ -103,6 +155,7 @@ def main() -> int:
     started_at = time.perf_counter()
     print(f"Running pipeline for {len(seasons)} seasons ({workers} workers)")
 
+    failures: list[str] = []
     if workers > 1:
         print(f"\n--- Phase 1: Fetching seasons concurrently ({workers} workers) ---")
         with ThreadPoolExecutor(max_workers=workers) as pool:
@@ -113,12 +166,19 @@ def main() -> int:
             for future in as_completed(futures):
                 season = futures[future]
                 try:
-                    future.result()
+                    failures.extend(future.result())
                 except Exception as exc:
-                    print(f"  ! {season} failed: {exc}")
+                    message = f"{season} failed: {exc}"
+                    print(f"  ! {message}")
+                    failures.append(message)
     else:
         for season in seasons:
-            _fetch_season(season, args.include_schedule, args.force_stints)
+            try:
+                failures.extend(_fetch_season(season, args.include_schedule, args.force_stints))
+            except Exception as exc:
+                message = f"{season} failed: {exc}"
+                print(f"  ! {message}")
+                failures.append(message)
 
     print("\n--- Phase 2: Basketball-Reference IDs ---")
     if args.skip_bbref:
@@ -128,10 +188,22 @@ def main() -> int:
             fetch_bbref_ids = _import("fetch_bbref_ids").run
             fetch_bbref_ids()
         except Exception as exc:
-            print(f"  ! bbref ids fetch failed: {exc}")
+            message = f"bbref ids fetch failed: {exc}"
+            print(f"  ! {message}")
+            failures.append(message)
+        _require_output(config.RAW_CACHE / BBREF_IDS_FILENAME, BBREF_IDS_FILENAME, failures)
 
-    metrics = _import("util").import_metrics()
+    try:
+        metrics = _import("util").import_metrics()
+    except Exception as exc:
+        failures.append(f"metrics unavailable: {exc}")
+        metrics = {"networkRequests": 0, "cacheHits": 0}
     elapsed = time.perf_counter() - started_at
+    if failures:
+        print(f"\nFAILED after {elapsed:.1f}s with {len(failures)} failure(s):")
+        for message in failures:
+            print(f"  - {message}")
+        return 1
     print(
         f"\nAll done in {elapsed:.1f}s "
         f"({metrics['networkRequests']} network requests, "

@@ -1,5 +1,5 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, isAbsolute, resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import {
   SEASON_COMMITTED_SCHEDULE_SEED,
   seasonLeagueSchema,
@@ -19,12 +19,19 @@ import {
   seasonScheduleAuditReportSchema,
   seasonScheduleGenerateReportSchema,
 } from '../report-schemas.ts';
-import { DEFAULT_MANIFEST, REPO_ROOT } from './data-loader.ts';
-import { readJson, sha256Hex } from '../io.ts';
+import { sha256Hex } from '../io.ts';
+import {
+  DEFAULT_MANIFEST,
+  manifestSeasonEntry,
+  readSeasonArtifact,
+  resolveArtifact,
+  resolveSeasonArtifact,
+} from './season-data.ts';
 export const SEASON_SCHEDULE_GENERATE_OPTIONS: Record<string, boolean> = {
   out: true,
   league: true,
   seed: true,
+  manifest: true,
   format: true,
 };
 export const SEASON_SCHEDULE_AUDIT_OPTIONS: Record<string, boolean> = {
@@ -34,16 +41,20 @@ export const SEASON_SCHEDULE_AUDIT_OPTIONS: Record<string, boolean> = {
   verbose: false,
   format: true,
 };
-export const DEFAULT_SEASON_LEAGUE = resolve(REPO_ROOT, 'apps/web/static/data/season/league.json');
-export const DEFAULT_SEASON_SCHEDULE = resolve(
-  REPO_ROOT,
-  'apps/web/static/data/season/schedule.json',
-);
 function serializeSchedule(schedule: SeasonSchedule): string {
   return `${JSON.stringify(schedule)}\n`;
 }
+function parseJson(label: string, text: string): unknown {
+  try {
+    return JSON.parse(text) as unknown;
+  } catch (error) {
+    throw new Error(`${label} is not valid JSON: ${(error as Error).message}`);
+  }
+}
 function loadLeague(leaguePath: string): SeasonLeague {
-  const parsed = seasonLeagueSchema.safeParse(readJson(leaguePath));
+  const parsed = seasonLeagueSchema.safeParse(
+    parseJson('league artifact', readFileSync(leaguePath, 'utf8')),
+  );
   if (!parsed.success) {
     throw new Error(
       `league artifact fails the schema: ${parsed.error.issues[0]?.message ?? 'invalid'}`,
@@ -51,18 +62,36 @@ function loadLeague(leaguePath: string): SeasonLeague {
   }
   return parsed.data;
 }
+function loadSchedule(text: string): SeasonSchedule {
+  const parsed = seasonScheduleSchema.safeParse(parseJson('schedule artifact', text));
+  if (!parsed.success) {
+    throw new Error(
+      `schedule artifact fails the schema: ${parsed.error.issues[0]?.message ?? 'invalid'}`,
+    );
+  }
+  return parsed.data;
+}
+function publishScheduleDeclaration(manifestPath: string, url: string, contentHash: string): void {
+  const manifest = parseJson('manifest', readFileSync(manifestPath, 'utf8')) as {
+    season?: Record<string, unknown>;
+  };
+  manifest.season = manifest.season ?? {};
+  manifest.season.schedule = { url, contentHash };
+  writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+}
 export function seasonScheduleGenerate(args: {
   out: string | null;
   league: string | null;
   seed: string | null;
+  manifest: string | null;
 }): CliReport {
-  const leaguePath = args.league ?? DEFAULT_SEASON_LEAGUE;
+  const manifestPath = args.manifest ?? DEFAULT_MANIFEST;
   const rawSeed = args.seed ?? SEASON_COMMITTED_SCHEDULE_SEED;
   const parsedSeed = seedSchema.safeParse(rawSeed);
   if (!parsedSeed.success) {
     return makeReport(
       'season schedule generate',
-      { out: args.out, league: leaguePath, seed: rawSeed },
+      { out: args.out, league: args.league, seed: rawSeed },
       {
         failures: [`--seed must be a hex seed (got "${rawSeed}")`],
         exitCode: EXIT_USAGE_OR_DATA_ERROR,
@@ -70,6 +99,20 @@ export function seasonScheduleGenerate(args: {
     );
   }
   const seed = parsedSeed.data;
+  let leaguePath: string;
+  if (args.league !== null) {
+    leaguePath = args.league;
+  } else {
+    try {
+      leaguePath = resolveSeasonArtifact(manifestPath, 'league').path;
+    } catch (error) {
+      return makeReport(
+        'season schedule generate',
+        { out: args.out, league: null, seed },
+        { failures: [(error as Error).message], exitCode: EXIT_USAGE_OR_DATA_ERROR },
+      );
+    }
+  }
   let league: SeasonLeague;
   try {
     league = loadLeague(leaguePath);
@@ -107,6 +150,7 @@ export function seasonScheduleGenerate(args: {
   const details: string[] = [];
   let wrote = false;
   let outPath: string | null = null;
+  let published = false;
   if (args.out !== null) {
     const target = resolve(args.out);
     try {
@@ -115,6 +159,23 @@ export function seasonScheduleGenerate(args: {
       wrote = true;
       outPath = target;
       details.push(`wrote ${target} (${String(content.length)} bytes)`);
+      const declaredEntry = manifestSeasonEntry(manifestPath, 'schedule');
+      if (declaredEntry?.url === undefined || declaredEntry.url === '') {
+        details.push(
+          `manifest ${manifestPath} declares no season.schedule url; declaration not published`,
+        );
+      } else {
+        const declaredPath = resolveArtifact(dirname(manifestPath), declaredEntry.url);
+        if (resolve(declaredPath) === target) {
+          publishScheduleDeclaration(manifestPath, declaredEntry.url, contentHash);
+          published = true;
+          details.push(`published season.schedule contentHash to ${manifestPath}`);
+        } else {
+          details.push(
+            `manifest declaration unchanged (declared ${declaredPath}); write to the declared path to publish`,
+          );
+        }
+      }
     } catch (error) {
       failures.push(`cannot write ${target}: ${(error as Error).message}`);
     }
@@ -133,12 +194,14 @@ export function seasonScheduleGenerate(args: {
     sha256: contentHash,
     wrote,
     outPath,
+    manifestPath,
+    published,
     pass: failures.length === 0,
   });
   details.push(
     `schedule ${schedule.scheduleVersion} · formula ${schedule.formulaVersion} · league ${schedule.leagueVersion}`,
     `rounds ${String(schedule.rounds)} · games ${String(schedule.games.length)} · seed ${seed}`,
-    `sha256 ${contentHash}`,
+    `sha256 ${contentHash}${published ? ' · published to manifest' : ''}`,
   );
   return makeReport(
     'season schedule generate',
@@ -152,29 +215,55 @@ export function seasonScheduleAudit(args: {
   manifest: string | null;
   verbose: boolean;
 }): CliReport {
-  const leaguePath = args.league ?? DEFAULT_SEASON_LEAGUE;
-  const schedulePath = args.schedule ?? DEFAULT_SEASON_SCHEDULE;
   const manifestPath = args.manifest ?? DEFAULT_MANIFEST;
-  const input = { schedule: schedulePath, league: leaguePath, manifest: manifestPath };
-  let league: SeasonLeague;
-  let schedule: SeasonSchedule;
+  let scheduleRef: ReturnType<typeof resolveSeasonArtifact>;
+  let leagueRef: ReturnType<typeof resolveSeasonArtifact>;
   try {
-    league = loadLeague(leaguePath);
-    const parsedSchedule = seasonScheduleSchema.safeParse(readJson(schedulePath));
-    if (!parsedSchedule.success) {
-      throw new Error(
-        `schedule artifact fails the schema: ${parsedSchedule.error.issues[0]?.message ?? 'invalid'}`,
-      );
-    }
-    schedule = parsedSchedule.data;
+    scheduleRef = resolveSeasonArtifact(manifestPath, 'schedule');
+    leagueRef = resolveSeasonArtifact(manifestPath, 'league');
   } catch (error) {
-    return makeReport('season schedule audit', input, {
-      failures: [(error as Error).message],
-      exitCode: EXIT_USAGE_OR_DATA_ERROR,
-    });
+    return makeReport(
+      'season schedule audit',
+      { schedule: args.schedule, league: args.league, manifest: manifestPath },
+      { failures: [(error as Error).message], exitCode: EXIT_USAGE_OR_DATA_ERROR },
+    );
   }
   const failures: string[] = [];
   const details: string[] = [];
+  const scheduleRead = readSeasonArtifact(scheduleRef, args.schedule ?? undefined);
+  const leagueRead = readSeasonArtifact(leagueRef, args.league ?? undefined);
+  if (!scheduleRead.matches) {
+    failures.push(
+      `schedule content hash mismatch: expected ${scheduleRef.contentHash}, got ${scheduleRead.actualHash} (${scheduleRead.path})`,
+    );
+  } else if (args.verbose) {
+    details.push(`manifest schedule hash verified (${scheduleRead.path})`);
+  }
+  if (!leagueRead.matches) {
+    failures.push(
+      `league content hash mismatch: expected ${leagueRef.contentHash}, got ${leagueRead.actualHash} (${leagueRead.path})`,
+    );
+  } else if (args.verbose) {
+    details.push(`manifest league hash verified (${leagueRead.path})`);
+  }
+  const manifestVerified = scheduleRead.matches && leagueRead.matches;
+  const input = {
+    schedule: scheduleRead.path,
+    league: leagueRead.path,
+    manifest: manifestPath,
+  };
+  let league: SeasonLeague;
+  let schedule: SeasonSchedule;
+  try {
+    league = loadLeague(leagueRead.path);
+    schedule = loadSchedule(scheduleRead.bytes.toString('utf8'));
+  } catch (error) {
+    failures.push((error as Error).message);
+    return makeReport('season schedule audit', input, {
+      failures,
+      exitCode: EXIT_USAGE_OR_DATA_ERROR,
+    });
+  }
   const scheduleAuditFailures = auditSeasonSchedule(schedule, league);
   failures.push(...scheduleAuditFailures.map((f) => `audit: ${f}`));
   let regenerationIdentical = false;
@@ -188,60 +277,6 @@ export function seasonScheduleAudit(args: {
     }
   } catch (error) {
     failures.push(`regeneration failed: ${(error as Error).message}`);
-  }
-  let manifestVerified: boolean | null = null;
-  try {
-    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
-      season?: {
-        league?: {
-          url?: string;
-          contentHash?: string;
-        };
-        schedule?: {
-          url?: string;
-          contentHash?: string;
-        };
-      };
-    };
-    const seasonRefs = manifest.season;
-    if (seasonRefs?.league === undefined || seasonRefs.schedule === undefined) {
-      details.push(`manifest has no season artifact references (${manifestPath})`);
-    } else {
-      manifestVerified = true;
-      const refs: Array<
-        [
-          string,
-          {
-            url?: string;
-            contentHash?: string;
-          },
-        ]
-      > = [
-        ['league', seasonRefs.league],
-        ['schedule', seasonRefs.schedule],
-      ];
-      for (const [name, ref] of refs) {
-        const url = ref.url ?? '';
-        const expectedHash = ref.contentHash ?? '';
-        const artifactPath = isAbsolute(url) ? url : resolve(dirname(manifestPath), url);
-        let actualHash: string;
-        try {
-          actualHash = sha256Hex(readFileSync(artifactPath));
-        } catch (error) {
-          manifestVerified = false;
-          failures.push(`manifest ${name} artifact missing: ${(error as Error).message}`);
-          continue;
-        }
-        if (actualHash !== expectedHash) {
-          manifestVerified = false;
-          failures.push(`manifest ${name} content hash mismatch (${artifactPath})`);
-        } else if (args.verbose) {
-          details.push(`manifest ${name} hash verified (${artifactPath})`);
-        }
-      }
-    }
-  } catch (error) {
-    failures.push(`manifest check failed: ${(error as Error).message}`);
   }
   const payload = seasonScheduleAuditReportSchema.parse({
     schemaVersion: 1,
@@ -260,7 +295,7 @@ export function seasonScheduleAudit(args: {
   details.push(
     `schedule ${schedule.scheduleVersion} · formula ${schedule.formulaVersion} · league ${schedule.leagueVersion}`,
     `rounds ${String(schedule.rounds)} · games ${String(schedule.games.length)} · seed ${schedule.generationSeed}`,
-    `regeneration ${regenerationIdentical ? 'identical' : 'DIFFERS'} · manifest ${manifestVerified === null ? 'n/a' : manifestVerified ? 'verified' : 'mismatch'}`,
+    `regeneration ${regenerationIdentical ? 'identical' : 'DIFFERS'} · manifest ${manifestVerified ? 'verified' : 'mismatch'}`,
   );
   return makeReport('season schedule audit', input, { details, failures, payload });
 }

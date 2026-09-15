@@ -174,6 +174,68 @@ describe('PossessionStepper decomposition', () => {
       }
     }
   });
+  it('reconciles dead-ball misses with team rebounds and live misses with contests', () => {
+    for (const seed of GAME_SEEDS) {
+      const input = buildGameSimulationInput({ seed: seedSchema.parse(seedFromString(seed)) });
+      const { sides } = driveGame(input, 'step');
+      for (const side of [0, 1] as const) {
+        const own = sides[side];
+        const other = sides[(1 - side) as SideIndex];
+        const misses =
+          own.fieldGoalAttempts - own.fieldGoalMakes + (own.freeThrowAttempts - own.freeThrowMakes);
+        expect(own.reboundOpportunities, seed).toBe(misses - other.teamRebounds);
+        expect(own.offensiveRebounds + other.defensiveRebounds + other.teamRebounds, seed).toBe(
+          misses,
+        );
+      }
+    }
+  });
+  it('continues the trip when a live final free-throw miss is rebounded by the offense', () => {
+    const observeContinuation = (seed: string): boolean => {
+      const input = buildGameSimulationInput({ seed: seedSchema.parse(seedFromString(seed)) });
+      const rng = createEngineContext().rngFactory(input.seed);
+      const recorder = new GameRecorder();
+      const state = createGameState();
+      const ctx = createTripContext(rng, recorder, state, input.profile, [input.home, input.away]);
+      let offense: SideIndex = rng.chance(0.5) ? 0 : 1;
+      state.periodIndex = 0;
+      for (let period = 0; period < MAX_PERIODS_HARD_CAP; period += 1) {
+        if (period > 0) {
+          if (period >= 4 && recorder.sides[0].points !== recorder.sides[1].points) break;
+          recorder.nextPeriod();
+          state.periodIndex = period;
+          state.periodFouls = [0, 0];
+        }
+        state.secondsRemaining = period < 4 ? REGULATION_PERIOD_SECONDS : OVERTIME_PERIOD_SECONDS;
+        while (state.secondsRemaining > 0) {
+          const machine = new PossessionStepper(ctx, offense);
+          const possessionsBefore = recorder.sides[offense].possessions;
+          let freeThrowTaken = false;
+          let previousFta = recorder.sides[offense].freeThrowAttempts;
+          let previousOreb = recorder.sides[offense].offensiveRebounds;
+          for (;;) {
+            const step = machine.step();
+            const fta = recorder.sides[offense].freeThrowAttempts;
+            const oreb = recorder.sides[offense].offensiveRebounds;
+            if (fta > previousFta) freeThrowTaken = true;
+            if (freeThrowTaken && oreb > previousOreb && !step.finished) {
+              expect(recorder.sides[offense].possessions, seed).toBe(possessionsBefore);
+              return true;
+            }
+            previousFta = fta;
+            previousOreb = oreb;
+            if (step.finished || step.periodEnded) {
+              if (step.ended) offense = (1 - offense) as SideIndex;
+              break;
+            }
+          }
+        }
+      }
+      return false;
+    };
+    const observed = GAME_SEEDS.some((seed) => observeContinuation(seed));
+    expect(observed).toBe(true);
+  });
   it('keeps the clock stopped during free throws and counts the foul toward the bonus', () => {
     const input = buildGameSimulationInput({
       seed: seedSchema.parse(seedFromString('stopped-clock-foul-accounting')),

@@ -16,7 +16,13 @@ import {
 } from '../season/minute-plan.ts';
 import { applySeasonRotationPreset, validateSeasonRotation } from '../season/rotation.ts';
 import { traceContext, traceRotationNormal } from './rotation-trace.ts';
-import { ProjectionCache } from './cache.ts';
+import {
+  ProjectionCache,
+  eraProfileFingerprint,
+  playerProjectionKeyParts,
+  projectionModelFingerprint,
+  type ProjectionFingerprints,
+} from './cache.ts';
 import { projectBaseFive } from './base.ts';
 import { projectSeasonRoster } from './season.ts';
 const SLOT_ORDER = ['G1', 'G2', 'F1', 'F2', 'C'] as const;
@@ -32,15 +38,17 @@ function projectStructureUnit(input: {
   profile: EraSimulationProfile;
   model: ProjectionModelArtifact;
   cache: ProjectionCache;
+  fingerprints: ProjectionFingerprints;
 }): ReturnType<typeof projectBaseFive> {
-  const { players, byVersion, profile, model, cache } = input;
+  const { players, byVersion, profile, model, cache, fingerprints } = input;
   const key = ProjectionCache.key({
     eraId: profile.eraId,
     modelVersion: model.modelVersion,
     referenceId: model.references[profile.eraId]?.neutral.referenceId ?? 'neutral',
     slots: SLOT_ORDER,
-    playerIds: players.map((id) => byVersion.get(id)?.playerId ?? id),
-    playerVersionIds: players,
+    ...playerProjectionKeyParts(players, byVersion),
+    modelFingerprint: fingerprints.model,
+    eraProfileFingerprint: fingerprints.eraProfile,
   });
   const cached = cache.get(key);
   if (cached !== undefined) return cached;
@@ -62,8 +70,13 @@ export function projectedQualityWeights(input: {
   eraProfile: EraSimulationProfile;
   model: ProjectionModelArtifact;
   cache: ProjectionCache;
+  fingerprints?: ProjectionFingerprints;
 }): Map<string, number> {
   const { players, byVersion, rotation, eraProfile, model, cache } = input;
+  const fingerprints: ProjectionFingerprints = input.fingerprints ?? {
+    model: projectionModelFingerprint(model),
+    eraProfile: eraProfileFingerprint(eraProfile),
+  };
   const members = new Map<string, readonly Position[]>(
     players.map((player) => [player.playerVersionId ?? player.playerId, player.positions]),
   );
@@ -80,6 +93,7 @@ export function projectedQualityWeights(input: {
         profile: eraProfile,
         model,
         cache,
+        fingerprints,
       }),
     });
   };
@@ -149,6 +163,10 @@ export function optimizeSeasonRotation(input: {
 }): MinutePlanOptimizationResult {
   const { roster, structure, eraProfile, model, load, horizon } = input;
   const cache = input.cache ?? new ProjectionCache();
+  const fingerprints: ProjectionFingerprints = {
+    model: projectionModelFingerprint(model),
+    eraProfile: eraProfileFingerprint(eraProfile),
+  };
   const players = roster.map((entry) => entry.player);
   const byVersion = new Map<string, SimulationPlayer>();
   for (const player of players) {
@@ -172,6 +190,7 @@ export function optimizeSeasonRotation(input: {
     eraProfile,
     model,
     cache,
+    fingerprints,
   });
   const minutePlanPlayers = new Map<string, MinutePlanPlayerInput>(
     players.map((player) => {
@@ -202,7 +221,7 @@ export function optimizeSeasonRotation(input: {
   const projected = built.plans.map((plan) => {
     const projection = projectSeasonRoster(
       { roster, rotation: plan.rotation, eraProfile, model },
-      { cache },
+      { cache, fingerprints },
     );
     return {
       ...plan,

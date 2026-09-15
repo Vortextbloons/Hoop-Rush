@@ -63,6 +63,7 @@ export interface RecorderSide {
   shotClockViolations: number;
   possessions: number;
   freeThrowTrips: number;
+  reboundOpportunities: number;
   periodPoints: number[];
   zoneAttempts: Record<ShotZone, number>;
   zoneMakes: Record<ShotZone, number>;
@@ -91,6 +92,7 @@ export function createRecorderSide(): RecorderSide {
     deepAttempts: 0,
     shotClockViolations: 0,
     freeThrowTrips: 0,
+    reboundOpportunities: 0,
     periodPoints: [0],
     zoneAttempts: createZoneCounters(),
     zoneMakes: createZoneCounters(),
@@ -300,6 +302,9 @@ export class GameRecorder {
   freeThrowTrip(side: SideIndex): void {
     this.sides[side].freeThrowTrips += 1;
   }
+  reboundOpportunity(side: SideIndex): void {
+    this.sides[side].reboundOpportunities += 1;
+  }
   nextPeriod(): void {
     this.sides[0].periodPoints.push(0);
     this.sides[1].periodPoints.push(0);
@@ -411,8 +416,7 @@ function teamDiagnostics(t: RecorderSide, players: readonly RecorderPlayer[]): T
   return {
     assistedFieldGoals: t.assistedFieldGoals,
     unassistedFieldGoals: t.unassistedFieldGoals,
-    reboundOpportunities:
-      t.fieldGoalAttempts - t.fieldGoalMakes + (t.freeThrowAttempts - t.freeThrowMakes),
+    reboundOpportunities: t.reboundOpportunities,
     contestedShots: players.reduce((sum, player) => sum + player.contestedShots, 0),
   };
 }

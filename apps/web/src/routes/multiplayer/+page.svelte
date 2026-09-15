@@ -3,13 +3,25 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { Swords, Zap, Trophy, Plus, LogIn, ArrowLeft } from '@lucide/svelte';
-  import type { FixedFiveRoomMode, FixedFiveSourceMode } from '@hoop-rush/data-contracts';
+  import {
+    CLASSIC_ROLL_VERSION,
+    FIXED_FIVE_AUTOPICK_VERSION,
+    FIXED_FIVE_MULTIPLAYER_VERSION,
+    POSITION_NORMALIZATION_VERSION,
+    RATINGS_VERSION,
+    defaultFixedFiveVersionLocks,
+    type FixedFiveRoomMode,
+    type FixedFiveSourceMode,
+    type FixedFiveVersionLocks,
+  } from '@hoop-rush/data-contracts';
+  import { ENGINE_VERSION } from '@hoop-rush/engine';
   import { getFixedFiveTransport, isFixedFiveSupabaseConfigured } from '$lib/fixed-five-transport';
   import {
     friendlyFixedFiveJoinError,
     loadLastFixedFiveRoomId,
     saveFixedFiveMembership,
   } from '$lib/fixed-five-identity';
+  import { loadRunPreamble } from '$lib/run-preamble';
   type View = 'choose' | 'create' | 'join';
   let view = $state<View>('choose');
   let mode = $state<FixedFiveRoomMode>('classic-shared-82');
@@ -23,20 +35,20 @@
   function transport() {
     return getFixedFiveTransport();
   }
-  function versions() {
-    return {
-      dataVersion: 'data-v1',
-      ratingVersion: 'ratings-v3.8',
-      positionNormalizationVersion: 'position-v3',
-      engineVersion: 'm3-engine-v14',
-      bracketVersion: 'bracket-m3-v3',
-      scheduleVersion: 'schedule-v1',
-      seedDerivationVersion: 'seed-v1',
-      classicRollVersion: 'classic-roll-v1',
-      profileVersion: '2010s-fixed-v1',
-      multiplayerVersion: 'fixed-five-multiplayer-v1',
-      autopickVersion: 'fixed-five-autopick-v1',
-    };
+  async function versions(): Promise<FixedFiveVersionLocks> {
+    const { manifest, profile, bracket } = await loadRunPreamble();
+    return defaultFixedFiveVersionLocks({
+      dataVersion: manifest.dataVersion,
+      ratingVersion: RATINGS_VERSION,
+      positionNormalizationVersion: POSITION_NORMALIZATION_VERSION,
+      engineVersion: ENGINE_VERSION,
+      bracketVersion: bracket.bracketVersion,
+      scheduleVersion: bracket.scheduleVersion,
+      classicRollVersion: CLASSIC_ROLL_VERSION,
+      profileVersion: profile.profileVersion,
+      multiplayerVersion: FIXED_FIVE_MULTIPLAYER_VERSION,
+      autopickVersion: FIXED_FIVE_AUTOPICK_VERSION,
+    });
   }
   onMount(() => {
     try {
@@ -57,7 +69,12 @@
       const t = transport();
       const source: FixedFiveSourceMode =
         mode === 'duel' ? sourceMode : mode === 'classic-shared-82' ? 'classic' : 'sandbox';
-      const created = await t.create({ mode, sourceMode: source, variant, versions: versions() });
+      const created = await t.create({
+        mode,
+        sourceMode: source,
+        variant,
+        versions: await versions(),
+      });
       saveFixedFiveMembership({ ...created.membership, code: created.code });
       await goto(resolve('/multiplayer/room/[roomId]', { roomId: created.snapshot.roomId }));
     } catch (e) {

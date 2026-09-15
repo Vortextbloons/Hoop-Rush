@@ -265,7 +265,9 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
   const listeners = new Set<(event: SeasonRunnerEvent) => void>();
   let worker: Worker | null = null;
   let currentRequestId: string | null = null;
-  const cancelledBeforeWorker = new Set<string>();
+  let postedRequestId: string | null = null;
+  let cancellationEpoch = 0;
+  const cancelledRequestIds = new Map<string, number>();
   const requestActive = () => currentRequestId !== null;
   let warmRequestId: string | null = null;
   let warmed = false;
@@ -306,13 +308,32 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
   function emit(event: SeasonRunnerEvent): void {
     for (const listener of [...listeners]) listener(event);
   }
-  function consumePreWorkerCancellation(requestId: string, blockIndex: number): boolean {
-    if (!cancelledBeforeWorker.delete(requestId)) return false;
+  function signalCancellation(requestId: string): void {
+    const cancelledBlockIndex = cancelledRequestIds.get(requestId);
+    if (cancelledBlockIndex === undefined) return;
+    cancelledRequestIds.delete(requestId);
+    emit({ type: 'cancelled', requestId, blockIndex: cancelledBlockIndex });
+  }
+  function consumePreWorkerCancellation(requestId: string): boolean {
+    if (!cancelledRequestIds.has(requestId)) return false;
+    signalCancellation(requestId);
     if (currentRequestId === requestId) {
       currentRequestId = null;
       current = null;
+      postedRequestId = null;
     }
-    emit({ type: 'cancelled', requestId, blockIndex });
+    return true;
+  }
+  function requestLive(requestId: string, epoch: number): boolean {
+    return (
+      cancellationEpoch === epoch &&
+      currentRequestId === requestId &&
+      !cancelledRequestIds.has(requestId)
+    );
+  }
+  function abandonIfNotLive(requestId: string, epoch: number): boolean {
+    if (requestLive(requestId, epoch)) return false;
+    signalCancellation(requestId);
     return true;
   }
   let catalogCache: {
@@ -442,6 +463,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       });
       currentRequestId = null;
       current = null;
+      postedRequestId = null;
     });
     worker.addEventListener('message', (event: MessageEvent<unknown>) => {
       const parsed = seasonWorkerMessageSchema.safeParse(event.data);
@@ -489,7 +511,13 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         const requestId = message.requestId;
         const blockIndex = current.blockIndex;
         if (message.code === 'cancelled') {
-          emit({ type: 'cancelled', requestId, blockIndex });
+          if (cancelledRequestIds.has(requestId)) {
+            signalCancellation(requestId);
+          } else {
+            emit({ type: 'cancelled', requestId, blockIndex });
+          }
+        } else if (cancelledRequestIds.has(requestId)) {
+          signalCancellation(requestId);
         } else {
           emit({
             type: 'error',
@@ -503,6 +531,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         }
         currentRequestId = null;
         current = null;
+        postedRequestId = null;
         return;
       }
       if (message.result.status === 'interrupted') {
@@ -517,6 +546,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     const requestId = currentRequestId;
     const state = current;
     if (requestId === null || state === null) return;
+    const epoch = cancellationEpoch;
     const failures = acceptWorkerResult(checkpoint, {
       runId: state.input.run.runId,
       blockIndex: state.blockIndex,
@@ -541,8 +571,10 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     }
     try {
       const repository = await resolveRepository();
+      if (abandonIfNotLive(requestId, epoch)) return;
       const authoritative = { ...checkpoint, freeAgency: state.input.run.freeAgency };
       const scheduleForSnapshot = await resolveSchedule();
+      if (abandonIfNotLive(requestId, epoch)) return;
       const needsCatalog =
         state.blockIndex === 2 ||
         state.blockIndex === 4 ||
@@ -559,12 +591,15 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         }
         catalog = undefined;
       }
+      if (abandonIfNotLive(requestId, epoch)) return;
       const freeAgencyAssets =
         state.blockIndex === 2 || state.blockIndex === 4 || state.blockIndex === 6
           ? await resolveFreeAgencyAssets()
           : null;
+      if (abandonIfNotLive(requestId, epoch)) return;
       const evolutionAssets =
         state.blockIndex === 3 ? await resolveEvolutionAssets().catch(() => null) : null;
+      if (abandonIfNotLive(requestId, epoch)) return;
       const candidateGameIds = new Set(
         authoritative.gameSummaries.map((summary) => summary.gameId),
       );
@@ -608,6 +643,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
             campaign?: import('@hoop-rush/data-contracts').SeasonCampaignState | null;
           }
         ).campaign ?? null;
+      if (abandonIfNotLive(requestId, epoch)) return;
       await repository.commitSeasonBlock({
         runId: authoritative.runId,
         revision: authoritative.revision + 1,
@@ -640,6 +676,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         expectedStateDigest: state.input.run.stateDigest,
         window,
       });
+      if (abandonIfNotLive(requestId, epoch)) return;
       const priorSummaries = runState?.runId === checkpoint.runId ? runState.summaries : [];
       const priorAcceptedBlocks = runState?.runId === checkpoint.runId ? runState.blocks : [];
       const priorRetainedDetails =
@@ -687,8 +724,10 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         priorAcceptedBlocks,
         priorRetainedDetails,
       });
+      if (abandonIfNotLive(requestId, epoch)) return;
       emit({ type: 'complete', requestId, checkpoint: authoritative, snapshot });
     } catch (error) {
+      if (abandonIfNotLive(requestId, epoch)) return;
       console.error('[season-block-runner] checkpoint commit failed', error);
       emit({
         type: 'error',
@@ -700,14 +739,18 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         gameId: null,
       });
     } finally {
-      currentRequestId = null;
-      current = null;
+      if (currentRequestId === requestId) {
+        currentRequestId = null;
+        current = null;
+        postedRequestId = null;
+      }
     }
   }
   async function acceptInterruption(pending: SeasonPendingBlockCandidate): Promise<void> {
     const requestId = currentRequestId;
     const state = current;
     if (requestId === null || state === null) return;
+    const epoch = cancellationEpoch;
     try {
       if (pending.runId !== state.input.run.runId) {
         throw new Error('pending candidate runId mismatch');
@@ -742,7 +785,9 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         unavailablePlayerVersionIds: availability.unavailablePlayerVersionIds,
       };
       const repository = await resolveRepository();
+      if (abandonIfNotLive(requestId, epoch)) return;
       await repository.savePendingBlock(pending, interruption);
+      if (abandonIfNotLive(requestId, epoch)) return;
       emit({
         type: 'interrupted',
         requestId,
@@ -752,6 +797,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         interruption,
       });
     } catch (error) {
+      if (abandonIfNotLive(requestId, epoch)) return;
       emit({
         type: 'error',
         requestId,
@@ -762,8 +808,11 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         gameId: null,
       });
     } finally {
-      currentRequestId = null;
-      current = null;
+      if (currentRequestId === requestId) {
+        currentRequestId = null;
+        current = null;
+        postedRequestId = null;
+      }
     }
   }
   function buildRequest(
@@ -785,6 +834,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         throw new Error('a season block is already running; cancel it first');
       }
       const requestId = `sb-${randomUUID()}`;
+      const requestEpoch = cancellationEpoch;
       currentRequestId = requestId;
       current = {
         blockIndex: input.blockIndex,
@@ -805,14 +855,16 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
               ? deps.artifacts()
               : import('./season-assets').then((module) => module.seasonArtifactUrls()),
           ]);
-          if (consumePreWorkerCancellation(requestId, input.blockIndex)) return;
-          if (currentRequestId !== requestId) return;
+          if (consumePreWorkerCancellation(requestId)) return;
+          if (!requestLive(requestId, requestEpoch)) return;
           if (
             runState === null ||
             runState.runId !== input.run.runId ||
             input.expectedRevision !== runState.revision
           ) {
             const snapshot = await repository.loadActiveRun();
+            if (consumePreWorkerCancellation(requestId)) return;
+            if (!requestLive(requestId, requestEpoch)) return;
             if (snapshot === null) throw new Error('no active season run to advance');
             if (snapshot.run.runId !== input.run.runId) {
               throw new Error('the active run does not match the submitted run');
@@ -859,16 +911,17 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
           if (seasonRotationSetDigest(input.rotations) !== input.rotationDigest) {
             throw new Error('rotation digest does not match the submitted rotations');
           }
-          if (consumePreWorkerCancellation(requestId, input.blockIndex)) return;
-          if (currentRequestId !== requestId) return;
+          if (consumePreWorkerCancellation(requestId)) return;
+          if (!requestLive(requestId, requestEpoch)) return;
           const plainStart = buildRequest(requestId, current, schedule, artifacts);
           const target = createWorker();
           target.postMessage(plainStart);
+          postedRequestId = requestId;
           warmed = true;
           emit({ type: 'started', requestId, blockIndex: input.blockIndex });
         } catch (error) {
-          if (consumePreWorkerCancellation(requestId, input.blockIndex)) return;
-          if (currentRequestId !== requestId) return;
+          if (consumePreWorkerCancellation(requestId)) return;
+          if (!requestLive(requestId, requestEpoch)) return;
           emit({
             type: 'error',
             requestId,
@@ -880,6 +933,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
           });
           currentRequestId = null;
           current = null;
+          postedRequestId = null;
         }
       })();
       return requestId;
@@ -889,6 +943,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         throw new Error('a season block is already running; cancel it first');
       }
       const requestId = `sb-${randomUUID()}`;
+      const requestEpoch = cancellationEpoch;
       currentRequestId = requestId;
       void (async () => {
         try {
@@ -899,14 +954,18 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
               ? deps.artifacts()
               : import('./season-assets').then((module) => module.seasonArtifactUrls()),
           ]);
-          if (consumePreWorkerCancellation(requestId, input.blockIndex)) return;
-          if (currentRequestId !== requestId) return;
+          if (consumePreWorkerCancellation(requestId)) return;
+          if (!requestLive(requestId, requestEpoch)) return;
           const snapshot = await repository.loadActiveRun();
+          if (consumePreWorkerCancellation(requestId)) return;
+          if (!requestLive(requestId, requestEpoch)) return;
           if (snapshot === null) throw new Error('no active season run to resume');
           if (snapshot.run.runId !== input.runId) {
             throw new Error('the active run does not match the resume request');
           }
           const pending = await repository.loadPendingBlock(input.runId);
+          if (consumePreWorkerCancellation(requestId)) return;
+          if (!requestLive(requestId, requestEpoch)) return;
           if (pending === null) {
             throw new Error(`no pending block for run ${input.runId}`);
           }
@@ -959,8 +1018,8 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
             profileUrl: input.profileUrl,
             profileHash: input.profileHash,
           };
-          if (consumePreWorkerCancellation(requestId, input.blockIndex)) return;
-          if (currentRequestId !== requestId) return;
+          if (consumePreWorkerCancellation(requestId)) return;
+          if (!requestLive(requestId, requestEpoch)) return;
           current = {
             blockIndex: input.blockIndex,
             expectedRevision: input.expectedRevision,
@@ -973,11 +1032,12 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
           const plainStart = buildRequest(requestId, current, schedule, artifacts);
           const target = createWorker();
           target.postMessage(plainStart);
+          postedRequestId = requestId;
           warmed = true;
           emit({ type: 'started', requestId, blockIndex: input.blockIndex });
         } catch (error) {
-          if (consumePreWorkerCancellation(requestId, input.blockIndex)) return;
-          if (currentRequestId !== requestId) return;
+          if (consumePreWorkerCancellation(requestId)) return;
+          if (!requestLive(requestId, requestEpoch)) return;
           emit({
             type: 'error',
             requestId,
@@ -989,16 +1049,17 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
           });
           currentRequestId = null;
           current = null;
+          postedRequestId = null;
         }
       })();
       return requestId;
     },
     cancel(requestId: string): void {
       if (requestId !== currentRequestId) return;
-      if (worker === null) {
-        cancelledBeforeWorker.add(requestId);
-        return;
+      if (!cancelledRequestIds.has(requestId)) {
+        cancelledRequestIds.set(requestId, current?.blockIndex ?? 0);
       }
+      if (worker === null || postedRequestId !== requestId) return;
       worker.postMessage(
         seasonWorkerCancelRequestSchema.parse({
           schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
@@ -1012,7 +1073,9 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       worker = null;
       currentRequestId = null;
       current = null;
-      cancelledBeforeWorker.clear();
+      postedRequestId = null;
+      cancellationEpoch += 1;
+      cancelledRequestIds.clear();
       warmRequestId = null;
       warmed = false;
     },

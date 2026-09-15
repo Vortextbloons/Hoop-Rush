@@ -65,7 +65,13 @@ export function checkGameResult(result: GameResult): string[] {
       const misses = missesOf(box);
       if (!accounting.reboundOpportunitiesOk) {
         failures.push(
-          `${side}: rebound opportunities (${String(d.reboundOpportunities)}) != misses (${String(misses)})`,
+          `${side}: rebound opportunities (${String(d.reboundOpportunities)}) exceed misses (${String(misses)})`,
+        );
+      }
+      const liveMisses = misses - otherBox.rebounds.team;
+      if (d.reboundOpportunities !== liveMisses) {
+        failures.push(
+          `${side}: live rebound opportunities (${String(d.reboundOpportunities)}) != misses minus opponent team rebounds (${String(liveMisses)})`,
         );
       }
       if (!accounting.assistedUnassistedOk) {

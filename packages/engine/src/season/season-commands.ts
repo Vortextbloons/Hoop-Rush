@@ -1046,6 +1046,38 @@ function handleSubmitTradeProposal(
       context.pending,
     );
   }
+  const humanFranchiseId =
+    context.humanFranchiseId ??
+    run.league.teams.find((team) => team.control === 'human')?.franchiseId ??
+    null;
+  if (command.influenceAmount > 0 && command.influenceFromSender === null) {
+    return rejectedSubmitTradeProposal(
+      command,
+      { code: 'trade-wrong-fit', reason: 'Influence amount requires a sender' },
+      run,
+    );
+  }
+  if (command.influenceAmount === 0 && command.influenceFromSender !== null) {
+    return rejectedSubmitTradeProposal(
+      command,
+      { code: 'trade-wrong-fit', reason: 'Influence sender requires an amount' },
+      run,
+    );
+  }
+  if (
+    command.influenceFromSender !== null &&
+    command.influenceFromSender !== command.toFranchiseId &&
+    (humanFranchiseId === null || command.influenceFromSender !== humanFranchiseId)
+  ) {
+    return rejectedSubmitTradeProposal(
+      command,
+      {
+        code: 'trade-wrong-fit',
+        reason: 'Influence sender must be one of the two trade franchises',
+      },
+      run,
+    );
+  }
   if (!context.catalog) {
     return rejectedSubmitTradeProposal(
       command,

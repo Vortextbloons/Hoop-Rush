@@ -44,6 +44,21 @@ export const projectionComponentScaleSchema = z.object({
   higherIsBetter: z.boolean(),
 });
 export type ProjectionComponentScale = z.infer<typeof projectionComponentScaleSchema>;
+export const PROJECTION_COMPONENT_HIGHER_IS_BETTER: Readonly<Record<string, boolean>> = {
+  offensiveRating: true,
+  defensiveRatingAllowed: false,
+  netRating: true,
+  effectiveFieldGoalPct: true,
+  turnoverRate: false,
+  rebounding: true,
+  freeThrowRate: true,
+  spacing: true,
+  creation: true,
+  defense: true,
+  minuteDistribution: true,
+  matchup: true,
+  redundancy: true,
+};
 export const projectionWeaknessSeveritySchema = z.enum(['critical', 'major', 'minor']);
 export type ProjectionWeaknessSeverity = z.infer<typeof projectionWeaknessSeveritySchema>;
 export const projectionWeaknessSchema = z.object({
@@ -137,39 +152,51 @@ export const projectionCohortPolicySchema = z.object({
   heldOutSeedTo: seedSchema,
 });
 export type ProjectionCohortPolicy = z.infer<typeof projectionCohortPolicySchema>;
-export const projectionModelArtifactSchema = z.object({
-  schemaVersion: z.literal(1),
-  modelVersion: z.literal(PROJECTION_MODEL_VERSION),
-  dataVersion: z.string().min(1).max(64),
-  ratingsVersion: z.string().min(1).max(64),
-  engineVersion: z.string().min(1).max(64),
-  eraProfileVersions: z.record(eraIdSchema, z.string().min(1).max(64)),
-  references: z
-    .record(
-      eraIdSchema,
-      z.object({
-        neutral: projectionReferenceFiveSchema,
-        archetypes: z
-          .array(projectionReferenceFiveSchema)
-          .min(PROJECTION_MATCHUP_ARCHETYPES.length - 1)
-          .max(PROJECTION_MATCHUP_ARCHETYPES.length - 1),
+export const projectionModelArtifactSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    modelVersion: z.literal(PROJECTION_MODEL_VERSION),
+    dataVersion: z.string().min(1).max(64),
+    ratingsVersion: z.string().min(1).max(64),
+    engineVersion: z.string().min(1).max(64),
+    eraProfileVersions: z.record(eraIdSchema, z.string().min(1).max(64)),
+    references: z
+      .record(
+        eraIdSchema,
+        z.object({
+          neutral: projectionReferenceFiveSchema,
+          archetypes: z
+            .array(projectionReferenceFiveSchema)
+            .min(PROJECTION_MATCHUP_ARCHETYPES.length - 1)
+            .max(PROJECTION_MATCHUP_ARCHETYPES.length - 1),
+        }),
+      )
+      .refine((references) => Object.keys(references).length >= 1, {
+        message: 'the model must carry at least one era reference set',
       }),
-    )
-    .refine((references) => Object.keys(references).length >= 1, {
-      message: 'the model must carry at least one era reference set',
+    scales: z.record(z.string().min(1).max(64), projectionComponentScaleSchema),
+    componentWeights: z.record(z.string().min(1).max(64), z.number().min(0)),
+    weights: z.object({
+      basketballMean: z.literal(0.4),
+      rotationMean: z.literal(0.35),
+      robustnessMean: z.literal(0.25),
     }),
-  scales: z.record(z.string().min(1).max(64), projectionComponentScaleSchema),
-  componentWeights: z.record(z.string().min(1).max(64), z.number().min(0)),
-  weights: z.object({
-    basketballMean: z.literal(0.4),
-    rotationMean: z.literal(0.35),
-    robustnessMean: z.literal(0.25),
-  }),
-  weaknesses: z.array(projectionWeaknessPolicySchema),
-  search: projectionSearchPolicySchema,
-  cohorts: projectionCohortPolicySchema,
-  monotonicGates: z.array(projectionMonotonicGateSchema).min(1),
-});
+    weaknesses: z.array(projectionWeaknessPolicySchema),
+    search: projectionSearchPolicySchema,
+    cohorts: projectionCohortPolicySchema,
+    monotonicGates: z.array(projectionMonotonicGateSchema).min(1),
+  })
+  .superRefine((model, ctx) => {
+    for (const [key, scale] of Object.entries(model.scales)) {
+      const declared = PROJECTION_COMPONENT_HIGHER_IS_BETTER[key];
+      if (declared === undefined || declared === scale.higherIsBetter) continue;
+      ctx.addIssue({
+        code: 'custom',
+        path: ['scales', key, 'higherIsBetter'],
+        message: `scale ${key} must declare higherIsBetter=${String(declared)}`,
+      });
+    }
+  });
 export type ProjectionModelArtifact = z.infer<typeof projectionModelArtifactSchema>;
 export const projectionLedgerSchema = z.object({
   possessions: z.literal(100),

@@ -121,7 +121,7 @@ export function checkSeasonGameResult(
       }
     }
     if (!accounting.reboundOpportunitiesOk) {
-      failures.push(`${sideKey}: rebound opportunities != misses`);
+      failures.push(`${sideKey}: rebound opportunities exceed misses`);
     }
     if (!accounting.assistedUnassistedOk) {
       failures.push(`${sideKey}: assisted + unassisted != made field goals`);
@@ -133,15 +133,23 @@ export function checkSeasonGameResult(
       failures.push(`${sideKey}: player offensive-rebound chances != 5 * rebound opportunities`);
     }
     const other = result[sideKey === 'home' ? 'away' : 'home'];
-    const otherMisses =
-      other.box.fieldGoals.attempted -
-      other.box.fieldGoals.made +
-      (other.box.freeThrows.attempted - other.box.freeThrows.made);
+    const misses =
+      box.fieldGoals.attempted -
+      box.fieldGoals.made +
+      (box.freeThrows.attempted - box.freeThrows.made);
+    const liveMisses = misses - other.box.rebounds.team;
+    if (box.diagnostics.reboundOpportunities !== liveMisses) {
+      failures.push(
+        `${sideKey}: live rebound opportunities != misses minus opponent team rebounds`,
+      );
+    }
     if (
       players.reduce((acc, p) => acc + p.diagnostics.defensiveReboundChances, 0) !==
-      otherMisses * 5
+      other.box.diagnostics.reboundOpportunities * 5
     ) {
-      failures.push(`${sideKey}: player defensive-rebound chances != 5 * opponent misses`);
+      failures.push(
+        `${sideKey}: player defensive-rebound chances != 5 * opponent live rebound opportunities`,
+      );
     }
     for (const zone of accounting.zoneSplits) {
       if (zone.playerAttempts !== zone.teamAttempts || zone.playerMakes !== zone.teamMakes) {

@@ -10,6 +10,7 @@ import {
   type WorkerMessage,
 } from '@hoop-rush/data-contracts';
 import {
+  challengeRunProgressDigest,
   type ChallengeRepository,
   type CompletedRunIndex,
   type StoredRunRecord,
@@ -308,7 +309,10 @@ export class ChallengeRunner {
       outcome: run.outcome ?? 'eliminated',
       completedAtIso,
     };
-    await this.repo.promoteActiveToCompleted(completed, index);
+    await this.repo.promoteActiveToCompleted(completed, index, {
+      expectedGamesPlayed: run.games.length,
+      expectedRunDigest: challengeRunProgressDigest(run),
+    });
   }
   private fail(message: string): void {
     if (this.phase === 'error' || this.phase === 'finished') return;

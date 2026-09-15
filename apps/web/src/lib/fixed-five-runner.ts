@@ -7,9 +7,11 @@ import {
   type FixedFiveWorkerRequest,
   type FixedFiveWorkerResultEntry,
   type FixedFiveWorkerTeam,
+  type FixedFiveVerificationReceipt,
   type OpponentBracketCore,
   type Seed,
 } from '@hoop-rush/data-contracts';
+import type { FixedFiveVerificationInput } from '@hoop-rush/engine';
 import { randomUUID } from '$lib/random-id';
 export type FixedFiveRunnerEvent =
   | {
@@ -24,6 +26,14 @@ export type FixedFiveRunnerEvent =
   | {
       kind: 'complete';
       gamesDelivered: number;
+    }
+  | {
+      kind: 'verified';
+      receipt: FixedFiveVerificationReceipt;
+    }
+  | {
+      kind: 'verification-failed';
+      failures: string[];
     }
   | {
       kind: 'error';
@@ -78,6 +88,27 @@ export class FixedFiveRunner {
       engineVersion: input.engineVersion,
     });
   }
+  verify(input: FixedFiveVerificationInput): void {
+    this.start(
+      fixedFiveWorkerRequestSchema.parse({
+        schemaVersion: FIXED_FIVE_WORKER_WIRE_VERSION,
+        type: 'fixed-five-verify',
+        requestId: randomUUID(),
+        roomId: input.roomId,
+        competition: input.competition,
+        rootSeed: input.rootSeed,
+        versions: input.versions,
+        challenge: input.challenge,
+        acceptedCommands: [...input.acceptedCommands],
+        lineups: input.lineups,
+        result: input.result,
+        resultDigest: input.resultDigest,
+        bracket: input.bracket,
+        profile: input.profile,
+        dataVersion: input.dataVersion,
+      }),
+    );
+  }
   cancel(): void {
     if (this.worker && this.requestId) {
       try {
@@ -122,6 +153,10 @@ export class FixedFiveRunner {
         this.onEvent({ kind: 'results', entries: message.entries });
       } else if (message.type === 'fixed-five-complete') {
         this.onEvent({ kind: 'complete', gamesDelivered: message.gamesDelivered });
+      } else if (message.type === 'fixed-five-verified') {
+        this.onEvent({ kind: 'verified', receipt: message.receipt });
+      } else if (message.type === 'fixed-five-verification-failed') {
+        this.onEvent({ kind: 'verification-failed', failures: message.failures });
       } else {
         this.onEvent({ kind: 'error', message: message.message });
       }

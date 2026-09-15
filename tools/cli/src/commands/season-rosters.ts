@@ -39,6 +39,7 @@ import {
   loadSeasonRosterTargets,
   poolLegalFailuresOf,
   readJsonFile,
+  resolveSeasonArtifact,
   roleTierThresholdsOf,
 } from './season-data.ts';
 import type { RosterCalibrationWorkerRun } from './rosters-calibration-worker.ts';
@@ -710,8 +711,8 @@ export async function seasonRostersCalibrate(
   const catalog = loadSeasonDraftCatalog(manifestPath);
   const humanRoster = fixtureHumanRoster(catalog);
   const humanRosters = [{ franchiseId: 'lakers', playerVersionIds: humanRoster }];
-  const catalogPath = resolve(manifestPath, '..', 'season', 'draft-catalog.json');
-  const leaguePath = resolve(manifestPath, '..', 'season', 'league.json');
+  const catalogPath = resolveSeasonArtifact(manifestPath, 'draftCatalog').path;
+  const leaguePath = resolveSeasonArtifact(manifestPath, 'league').path;
   const start = Date.now();
   const calibrationSeeds = Array.from({ length: calibrationCount }, (_, i) =>
     rosterCalibrationSeed(i),

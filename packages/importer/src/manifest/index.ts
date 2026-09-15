@@ -7,13 +7,17 @@ import { fileExists, readJson, sha256File, sha256Hex, writeJsonRetry } from '../
 import {
   LINEAGE_RULE_VERSION,
   MANIFEST_SCHEMA_VERSION,
+  hoopRushManifestSchema,
   parsePool,
   parsePlayersIndex,
   parseRosterDetails,
   PLAYERS_INDEX_SCHEMA_VERSION,
   RATING_MODEL_VERSION,
+  type FranchiseEraPool,
 } from '@hoop-rush/data-contracts';
 import { LINEAGE_SEGMENTS, MODERN_SLOTS } from '../lineage.ts';
+import { DATA_VERSION } from '../data-version.ts';
+export { DATA_VERSION };
 import { classifyUnattempted, loadCoverageReport, loadManifest } from '../pools/compute.ts';
 const manifestEraSchema = z.looseObject({
   eraId: z.string(),
@@ -31,11 +35,6 @@ const manifestAssetRefSchema = z.looseObject({
   url: z.string(),
   contentHash: z.string(),
 });
-const manifestPoolFileSchema = z.looseObject({
-  players: z.array(z.unknown()).optional(),
-  coverageSummary: z.unknown().optional(),
-});
-type ManifestPoolFile = z.infer<typeof manifestPoolFileSchema>;
 const manifestSimProfileSchema = z.looseObject({
   eraId: z.string(),
 });
@@ -44,7 +43,7 @@ type ManifestSimIndexEntry = {
   url: string;
   contentHash: string;
 };
-const seasonArtifactsSchema = z.object({
+const seasonArtifactsSchema = z.looseObject({
   league: manifestAssetRefSchema.optional(),
   schedule: manifestAssetRefSchema.optional(),
   draftCatalog: manifestAssetRefSchema.optional(),
@@ -68,7 +67,7 @@ const importerManifestSchema = z.looseObject({
   rosterDetails: manifestAssetRefSchema.optional(),
   season: seasonArtifactsSchema.optional(),
   collection: z
-    .object({
+    .looseObject({
       catalog: manifestAssetRefSchema,
       index: manifestAssetRefSchema,
       packTargets: manifestAssetRefSchema.optional(),
@@ -83,7 +82,16 @@ const importerManifestSchema = z.looseObject({
 });
 export type Manifest = z.infer<typeof importerManifestSchema>;
 export const MANIFEST_PATH = join(PUBLIC_DATA, 'manifest.json');
-export const DATA_VERSION = 'm14-ratings-v3.11';
+function writeManifestValidated(path: string, manifest: Manifest): void {
+  const validated = hoopRushManifestSchema.safeParse(manifest);
+  if (!validated.success) {
+    const issue = validated.error.issues[0];
+    throw new Error(
+      `manifest fails validation: ${issue?.path.join('.') || '(root)'} ${issue?.message ?? 'unknown'}`,
+    );
+  }
+  writeJsonRetry(path, manifest, true);
+}
 function peakPlayerToDraftEntry(player: ReturnType<typeof parsePool>['players'][number]) {
   return {
     playerId: player.playerId,
@@ -132,7 +140,9 @@ export function rebuildPlayersIndex(
         indexPlayers.push(peakPlayerToDraftEntry(player));
       }
     } catch (error) {
-      console.warn(`skipped pool ${name} for players index: ${(error as Error).message}`);
+      throw new Error(
+        `pool ${name} fails validation for the players index: ${(error as Error).message}`,
+      );
     }
   }
   if (indexPlayers.length === 0) return null;
@@ -166,7 +176,9 @@ export function rebuildRosterDetails(
         detailPlayers.push(peakPlayerToRosterDetails(player));
       }
     } catch (error) {
-      console.warn(`skipped pool ${name} for roster details: ${(error as Error).message}`);
+      throw new Error(
+        `pool ${name} fails validation for roster details: ${(error as Error).message}`,
+      );
     }
   }
   if (detailPlayers.length === 0) return null;
@@ -194,7 +206,7 @@ export function refreshPlayersIndexInManifest(dataDir = PUBLIC_DATA): void {
   const manifest = manifestParsed.data;
   if (entry !== null) manifest.playersIndex = entry;
   if (detailsEntry !== null) manifest.rosterDetails = detailsEntry;
-  writeJsonRetry(manifestPath, manifest, true);
+  writeManifestValidated(manifestPath, manifest);
   console.log(
     `updated players index (${entry?.contentHash.slice(0, 8) ?? 'n/a'}…) and roster details (${detailsEntry?.contentHash.slice(0, 8) ?? 'n/a'}…)`,
   );
@@ -237,7 +249,7 @@ export function run(dataDir = PUBLIC_DATA): void {
   };
   const poolsDir = join(dataDir, 'pools');
   const poolFiles = sortedJsonFiles(poolsDir);
-  const poolByKey = new Map<string, ManifestPoolFile>();
+  const poolByKey = new Map<string, FranchiseEraPool>();
   const poolTextByKey = new Map<string, string>();
   const poolEntries: z.infer<typeof manifestPoolEntrySchema>[] = [];
   for (const name of poolFiles) {
@@ -245,18 +257,22 @@ export function run(dataDir = PUBLIC_DATA): void {
     if (franchiseId === undefined || eraId === undefined) {
       throw new Error(`cannot derive pool ids from filename: ${name}`);
     }
-    let pool: ManifestPoolFile;
+    let pool: FranchiseEraPool;
     let poolText: string;
     try {
       poolText = readFileSync(join(poolsDir, name), 'utf8');
-      const poolRaw = JSON.parse(poolText) as unknown;
-      const poolParsed = manifestPoolFileSchema.safeParse(poolRaw);
-      if (!poolParsed.success) {
-        throw new Error(poolParsed.error.issues[0]?.message ?? 'invalid pool');
-      }
-      pool = poolParsed.data;
+      pool = parsePool(JSON.parse(poolText) as unknown);
     } catch (error) {
-      throw new Error(`unreadable pool ${name}: ${(error as Error).message}`);
+      const detail =
+        error instanceof z.ZodError
+          ? `${error.issues[0]?.path.join('.') || '(root)'} ${error.issues[0]?.message ?? 'invalid pool'}`
+          : (error as Error).message;
+      throw new Error(`pool ${name} fails validation: ${detail}`);
+    }
+    if (pool.dataVersion !== DATA_VERSION) {
+      throw new Error(
+        `pool ${name} dataVersion ${pool.dataVersion} does not match the importer ${DATA_VERSION}; rebuild the pool before publishing`,
+      );
     }
     poolByKey.set(`${franchiseId}/${eraId}`, pool);
     poolTextByKey.set(`${franchiseId}/${eraId}`, poolText);
@@ -292,7 +308,7 @@ export function run(dataDir = PUBLIC_DATA): void {
           status: 'available',
           url: `pools/${slot.franchiseId}-${era.eraId}.json`,
           contentHash: sha256Hex(poolTextByKey.get(key) ?? ''),
-          playerCount: pool.players?.length ?? 0,
+          playerCount: pool.players.length,
           coverageSummary: pool.coverageSummary,
         });
         continue;
@@ -358,7 +374,7 @@ export function run(dataDir = PUBLIC_DATA): void {
   if (previousCollection !== undefined) {
     manifest.collection = previousCollection;
   }
-  writeJsonRetry(manifestPath, manifest, true);
+  writeManifestValidated(manifestPath, manifest);
   console.log(`updated ${manifestPath}`);
   console.log(
     `slots=${String(MODERN_SLOTS.length)} lineageSegments=${String(LINEAGE_SEGMENTS.length)} pools=${String(poolEntries.length)} availability=${String(availability.length)}`,

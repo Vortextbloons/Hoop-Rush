@@ -373,7 +373,6 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
   }
   resumeBlock(input: SeasonBlockResumeInput): string {
     const requestId = `fake-resume-${input.commandId}`;
-    if (this.cancelled) return requestId;
     this.cancelled = false;
     this.currentBlockIndex = input.blockIndex;
     void (async () => {
@@ -440,6 +439,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
           freeAgencyAssets,
         );
         const prior = await loadCurrentSnapshot(this.scheduleOf(startInput)).catch(() => null);
+        if (this.isCancelled()) return;
         await this.commitCheckpoint(startInput, pending.commandId, checkpoint, {
           health: pending.health,
           influence: checkpoint.influence,
@@ -452,6 +452,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
           evolution: committed.evolution,
           sponsors: committed.sponsors,
         });
+        if (this.isCancelled()) return;
         const committedView = this.committedSnapshot(
           startInput,
           checkpoint,
@@ -686,6 +687,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
     const prior = await loadCurrentSnapshot(this.scheduleOf(input)).catch(() => null);
     try {
       const freeAgencyAssets = await this.freeAgencyAssetsOf(input);
+      if (this.isCancelled()) return;
       committed = this.committedFacts(input, checkpoint, input.commandId, freeAgencyAssets);
       await this.commitCheckpoint(input, input.commandId, checkpoint, {
         health: this.fakeHealthFor(input),

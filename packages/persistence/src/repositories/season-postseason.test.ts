@@ -472,6 +472,9 @@ describe('season postseason repository (M2.6)', () => {
       almanac,
       commandLog: log,
       postseasonSummaries: await adapters.repo.loadPostseasonSummaries(adapters.run.runId),
+      expectedStateRevision: adapters.run.stateRevision,
+      expectedStateDigest: adapters.run.stateDigest,
+      expectedRevision: 0,
     });
     expect(await adapters.repo.loadActiveRun()).toBeNull();
     expect(await adapters.repo.loadActiveRunIndex()).toBeNull();
@@ -483,6 +486,48 @@ describe('season postseason repository (M2.6)', () => {
     expect(completedSeason?.commandLog.entries).toHaveLength(1);
     expect(completedSeason?.postseasonSummaries).toHaveLength(1);
     expect(await adapters.db.seasonCompletedIndex.get(adapters.run.runId)).not.toBeUndefined();
+  });
+  it('rejects a stale champion promotion atomically and preserves the active run', async () => {
+    const adapters = makeAdapters();
+    await promote(adapters);
+    const command = commandOf(adapters.run, 'start-postseason', 'cmd-start-1');
+    const next = advancedRun(adapters, 'play-in');
+    await adapters.repo.commitPostseasonAdvancement(
+      advancementInput(adapters, command, basePostseasonSummary(adapters), next),
+    );
+    adapters.run = next;
+    const champion = adapters.run.rosters[0]?.franchiseId ?? 'lakers';
+    const finalRun = completedRunOf(adapters, adapters.run.stateRevision + 1);
+    const log = await adapters.repo.loadCommandLog(adapters.run.runId);
+    if (log === null) throw new Error('expected a command log');
+    const almanac = buildAlmanac(adapters.run, champion, seasonCommandLogDigest(log.entries));
+    const expectedStateRevision = adapters.run.stateRevision;
+    const expectedStateDigest = adapters.run.stateDigest;
+    const advanceCommand = commandOf(adapters.run, 'advance-postseason', 'cmd-advance-2');
+    const advanced = advancedRun(adapters, 'playoffs');
+    await adapters.repo.commitPostseasonAdvancement(
+      advancementInput(adapters, advanceCommand, basePostseasonSummary(adapters), advanced),
+    );
+    adapters.run = advanced;
+    await expect(
+      adapters.repo.promoteChampionToCompleted({
+        runId: finalRun.runId,
+        run: withAlmanacDigest(finalRun, almanac.digest),
+        almanac,
+        commandLog: log,
+        postseasonSummaries: await adapters.repo.loadPostseasonSummaries(finalRun.runId),
+        expectedStateRevision,
+        expectedStateDigest,
+        expectedRevision: 0,
+      }),
+    ).rejects.toBeInstanceOf(SeasonRunCommandStaleStateError);
+    expect(await adapters.db.seasonCompletedRuns.count()).toBe(0);
+    expect(await adapters.db.seasonAlmanacs.count()).toBe(0);
+    expect(await adapters.db.seasonCompletedIndex.count()).toBe(0);
+    const snapshot = await adapters.repo.loadActiveRun();
+    expect(snapshot).not.toBeNull();
+    expect(snapshot?.run.stateRevision).toBe(advanced.stateRevision);
+    expect(snapshot?.run.stage).toBe('playoffs');
   });
   it('rejects promotions with an empty command log', async () => {
     const adapters = makeAdapters();
@@ -502,6 +547,9 @@ describe('season postseason repository (M2.6)', () => {
           entries: [],
         },
         postseasonSummaries: [],
+        expectedStateRevision: adapters.run.stateRevision,
+        expectedStateDigest: adapters.run.stateDigest,
+        expectedRevision: 0,
       }),
     ).rejects.toBeInstanceOf(SeasonPostseasonIntegrityError);
     expect(await adapters.db.seasonCompletedRuns.count()).toBe(0);
@@ -528,6 +576,9 @@ describe('season postseason repository (M2.6)', () => {
           entries: [],
         },
         postseasonSummaries: [],
+        expectedStateRevision: adapters.run.stateRevision,
+        expectedStateDigest: adapters.run.stateDigest,
+        expectedRevision: 0,
       }),
     ).rejects.toBeInstanceOf(SeasonPostseasonIntegrityError);
     expect(await adapters.db.seasonCompletedRuns.count()).toBe(0);
@@ -553,6 +604,9 @@ describe('season postseason repository (M2.6)', () => {
       almanac,
       commandLog: log,
       postseasonSummaries: await adapters.repo.loadPostseasonSummaries(adapters.run.runId),
+      expectedStateRevision: adapters.run.stateRevision,
+      expectedStateDigest: adapters.run.stateDigest,
+      expectedRevision: 0,
     });
     expect(await adapters.repo.loadCompletedSeason(adapters.run.runId)).not.toBeNull();
     await adapters.repo.deleteCompletedSeason(adapters.run.runId);

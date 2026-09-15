@@ -12,6 +12,7 @@
   import { clearDataLoaderCaches, getManifest, getPlayersIndex } from '$lib/data';
   import { challengeRepository } from '$lib/challenge-repo';
   import { loadRunPlayersById } from '$lib/sandbox-lineup';
+  import { arenaBlockComplete } from '$lib/arena-sound';
   import SeasonReport from './SeasonReport.svelte';
   import AsyncState from './AsyncState.svelte';
   let {
@@ -40,6 +41,7 @@
   let retryCount = $state(0);
   let manifestLoaded = false;
   let runLoaded = false;
+  let finalePlayedFor: string | null = null;
   function markLoaded() {
     if (manifestLoaded && runLoaded) loading = false;
   }
@@ -113,6 +115,16 @@
     return () => {
       cancelled = true;
     };
+  });
+  $effect(() => {
+    const finished = run;
+    if (!browser || !finished) return;
+    if (finalePlayedFor === finished.runId) return;
+    finalePlayedFor = finished.runId;
+    try {
+      const record = finished.aggregates.team;
+      arenaBlockComplete({ wins: record.wins, losses: record.losses });
+    } catch {}
   });
   function retryResult() {
     clearDataLoaderCaches();

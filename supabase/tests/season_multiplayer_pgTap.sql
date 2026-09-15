@@ -2,7 +2,7 @@
 -- Run with: supabase test db
 
 begin;
-select plan(18);
+select plan(22);
 
 -- schema existence
 select has_table('public', 'season_rooms', 'season_rooms exists');
@@ -41,6 +41,50 @@ select has_index('public', 'season_join_attempts', 'season_join_attempts_created
 -- functions
 select has_function('public', 'season_room_create', array['text','text'], 'season_room_create exists');
 select has_function('public', 'season_cron_tick', array[]::text[], 'season_cron_tick exists');
+
+-- private decision franchise binding
+select fk_ok(
+  'public',
+  'season_private_decisions',
+  array['room_id','participant_id','franchise_id'],
+  'public',
+  'season_room_members',
+  array['room_id','participant_id','franchise_id'],
+  'private decisions franchise fk binds to the member seat'
+);
+
+insert into public.season_rooms (id, pace, root_seed, phase, cursor)
+values ('00000000-0000-4000-8000-000000000001', 'async', 'seed-pgtap', 'private-lock', 'cursor-1');
+
+insert into public.season_room_members (room_id, uid, participant_id, seat, franchise_id)
+values (
+  '00000000-0000-4000-8000-000000000001',
+  '00000000-0000-4000-8000-000000000002',
+  'p1',
+  'p1',
+  'franchise-p1'
+);
+
+select throws_ok(
+  $$
+    insert into public.season_private_decisions
+      (room_id, cursor, participant_id, franchise_id, payload, payload_digest)
+    values
+      ('00000000-0000-4000-8000-000000000001', 'cursor-1', 'p1', 'franchise-forged', '{}'::jsonb, 'digest-1')
+  $$,
+  '23503',
+  'forged franchise id is rejected'
+);
+
+select lives_ok(
+  $$
+    insert into public.season_private_decisions
+      (room_id, cursor, participant_id, franchise_id, payload, payload_digest)
+    values
+      ('00000000-0000-4000-8000-000000000001', 'cursor-1', 'p1', 'franchise-p1', '{}'::jsonb, 'digest-1')
+  $$,
+  'member franchise id is accepted'
+);
 
 select * from finish();
 rollback;

@@ -13,6 +13,7 @@
   } from '$lib/season/season-draft-flow';
   import { formatPositions } from '$lib/player-positions';
   import { frontOfficeEntryOf } from '@hoop-rush/data-contracts';
+  import { arenaDraftDraw, arenaDraftFinalize, arenaDraftPick, arenaError } from '$lib/arena-sound';
   let {
     flow,
     catalog,
@@ -167,6 +168,17 @@
   function pickRoundLabel(pickOrdinal: number): string {
     return `R${String(pickOrdinal)}`;
   }
+  let lastErrorSeen: string | null = null;
+  $effect(() => {
+    if (error && error !== lastErrorSeen) {
+      lastErrorSeen = error;
+      try {
+        arenaError();
+      } catch {}
+    } else if (!error) {
+      lastErrorSeen = null;
+    }
+  });
 </script>
 
 <div class="flex min-w-0 flex-col gap-4">
@@ -278,7 +290,12 @@
         {:else if canDraw}
           <button
             type="button"
-            onclick={onDraw}
+            onclick={() => {
+              try {
+                arenaDraftDraw();
+              } catch {}
+              onDraw();
+            }}
             disabled={busy}
             class="draft-draw-btn mt-3 inline-flex min-h-13 w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-4 text-sm font-extrabold tracking-wide text-primary-foreground uppercase outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
           >
@@ -429,7 +446,12 @@
                   {#if card.selectable}
                     <button
                       type="button"
-                      onclick={() => onPick(card.playerVersionId)}
+                      onclick={() => {
+                        try {
+                          arenaDraftPick(fillsNeed);
+                        } catch {}
+                        onPick(card.playerVersionId);
+                      }}
                       disabled={busy}
                       class="mt-auto inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-extrabold tracking-wide text-primary-foreground uppercase outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
                     >
@@ -456,7 +478,12 @@
         <p class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase">Lock it in</p>
         <button
           type="button"
-          onclick={onFinalize}
+          onclick={() => {
+            try {
+              arenaDraftFinalize();
+            } catch {}
+            onFinalize();
+          }}
           disabled={busy || !canFinalize}
           class="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-xs font-extrabold tracking-wide text-primary-foreground uppercase outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
         >

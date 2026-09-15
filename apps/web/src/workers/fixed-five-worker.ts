@@ -2,6 +2,7 @@ import {
   createEngineContext,
   simulateGame,
   checkGameResult,
+  verifyFixedFiveCompetition,
   type EngineContext,
 } from '@hoop-rush/engine';
 import {
@@ -13,6 +14,8 @@ import {
   type FixedFiveWorkerProgress,
   type FixedFiveWorkerResultEntry,
   type FixedFiveWorkerResults,
+  type FixedFiveWorkerVerificationFailed,
+  type FixedFiveWorkerVerified,
 } from '@hoop-rush/data-contracts';
 import {
   fixedFiveDuelGameSeed,
@@ -29,7 +32,9 @@ function post(
     | FixedFiveWorkerProgress
     | FixedFiveWorkerResults
     | FixedFiveWorkerComplete
-    | FixedFiveWorkerError,
+    | FixedFiveWorkerError
+    | FixedFiveWorkerVerified
+    | FixedFiveWorkerVerificationFailed,
 ): void {
   fixedFiveWorkerMessageSchema.parse(message);
   self.postMessage(message);
@@ -74,7 +79,9 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
   requestToken += 1;
   const token = requestToken;
   lastProgressAt = 0;
-  const context: EngineContext = createEngineContext({ engineVersion: request.engineVersion });
+  const engineVersion =
+    request.type === 'fixed-five-verify' ? request.versions.engineVersion : request.engineVersion;
+  const context: EngineContext = createEngineContext({ engineVersion });
   void (async () => {
     const pending: FixedFiveWorkerResultEntry[] = [];
     function flush(requestId: string): void {
@@ -87,6 +94,42 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
       });
     }
     try {
+      if (request.type === 'fixed-five-verify') {
+        const outcome = verifyFixedFiveCompetition(
+          {
+            roomId: request.roomId,
+            competition: request.competition,
+            rootSeed: request.rootSeed,
+            versions: request.versions,
+            challenge: request.challenge,
+            acceptedCommands: request.acceptedCommands,
+            lineups: request.lineups,
+            result: request.result,
+            resultDigest: request.resultDigest,
+            bracket: request.bracket,
+            profile: request.profile,
+            dataVersion: request.dataVersion,
+          },
+          context,
+        );
+        if (token !== requestToken) return;
+        if (outcome.ok) {
+          post({
+            schemaVersion: FIXED_FIVE_WORKER_WIRE_VERSION,
+            type: 'fixed-five-verified',
+            requestId: request.requestId,
+            receipt: outcome.receipt,
+          });
+        } else {
+          post({
+            schemaVersion: FIXED_FIVE_WORKER_WIRE_VERSION,
+            type: 'fixed-five-verification-failed',
+            requestId: request.requestId,
+            failures: outcome.failures,
+          });
+        }
+        return;
+      }
       if (request.type === 'fixed-five-duel') {
         let p1Wins = 0;
         let p2Wins = 0;

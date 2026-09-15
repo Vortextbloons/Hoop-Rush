@@ -280,6 +280,7 @@ export function createSeasonPostseasonRunner(
       for (;;) {
         if (requestAborted(requestId)) return;
         const snapshot = await repository.loadActiveRun();
+        if (requestAborted(requestId)) return;
         if (snapshot === null) {
           fail(requestId, 'internal', 'no active season run to advance', null);
           return;
@@ -459,6 +460,7 @@ export function createSeasonPostseasonRunner(
         try {
           await repository.commitPostseasonAdvancement(commitInput);
         } catch (error) {
+          if (requestAborted(requestId)) return;
           if (error instanceof SeasonRunCommandDuplicateError) {
             continue;
           }
@@ -482,7 +484,9 @@ export function createSeasonPostseasonRunner(
           );
           return;
         }
+        if (requestAborted(requestId)) return;
         const after = await repository.loadActiveRun();
+        if (requestAborted(requestId)) return;
         if (after === null) {
           fail(requestId, 'internal', 'the active run disappeared after the commit', run.rootSeed);
           return;
@@ -516,7 +520,7 @@ export function createSeasonPostseasonRunner(
           return;
         }
         if (after.run.stage === 'completed') {
-          await promoteAndComplete(requestId, repository, after.run, snapshot);
+          await promoteAndComplete(requestId, repository, after.run, after);
           return;
         }
         if (accepted.nextDecision === 'rotation') {
@@ -552,8 +556,10 @@ export function createSeasonPostseasonRunner(
       if (requestAborted(requestId)) return;
       fail(requestId, 'internal', error instanceof Error ? error.message : String(error), null);
     } finally {
-      currentRequestId = null;
-      currentWireRequestId = null;
+      if (currentRequestId === requestId) {
+        currentRequestId = null;
+        currentWireRequestId = null;
+      }
     }
   }
   function requestAborted(requestId: string): boolean {
@@ -565,7 +571,7 @@ export function createSeasonPostseasonRunner(
     message: string,
     seed: Seed | null,
   ): void {
-    if (cancelled) return;
+    if (requestAborted(requestId)) return;
     emit({
       type: 'error',
       requestId,
@@ -586,6 +592,7 @@ export function createSeasonPostseasonRunner(
       aiNextGameId: PostseasonGameId | null;
     },
   ): void {
+    if (requestAborted(requestId)) return;
     const run = snapshot.run;
     emit({
       type: 'complete',
@@ -605,8 +612,10 @@ export function createSeasonPostseasonRunner(
     run: SeasonRun,
     snapshot: SeasonRunSnapshot,
   ): Promise<void> {
+    if (requestAborted(requestId)) return;
     try {
       await promoteSeasonChampion(repository, run, snapshot);
+      if (requestAborted(requestId)) return;
       emit({
         type: 'complete',
         requestId,
@@ -766,6 +775,9 @@ export async function promoteSeasonChampion(
     almanac,
     commandLog,
     postseasonSummaries,
+    expectedStateRevision: snapshot.run.stateRevision,
+    expectedStateDigest: snapshot.run.stateDigest,
+    expectedRevision: snapshot.acceptedBlocks.length,
   });
   return almanac;
 }

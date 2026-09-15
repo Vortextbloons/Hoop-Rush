@@ -608,6 +608,155 @@ describe('season block runner (M2.5 wire)', () => {
     expect(FakeWorker.instances).toHaveLength(0);
     expect(events).toEqual(['cancelled']);
   });
+  it('cancels a block during asset loading even when a warm worker already exists', async () => {
+    const run = makeRun();
+    let artifactsCalls = 0;
+    let resolveArtifacts!: (value: Awaited<ReturnType<typeof artifacts>>) => void;
+    const deferredArtifacts = new Promise<Awaited<ReturnType<typeof artifacts>>>((resolve) => {
+      resolveArtifacts = resolve;
+    });
+    const artifactsFn = (): Promise<Awaited<ReturnType<typeof artifacts>>> => {
+      artifactsCalls += 1;
+      return artifactsCalls === 1 ? artifacts() : deferredArtifacts;
+    };
+    const runner = createSeasonBlockRunner({
+      repository: makeRepository(run),
+      schedule,
+      workerUrl: 'fake-worker.ts',
+      artifacts: artifactsFn,
+    });
+    const events: string[] = [];
+    runner.subscribe((event) => events.push(event.type));
+    runner.prewarm();
+    await flush();
+    expect(FakeWorker.instances).toHaveLength(1);
+    const requestId = runner.startBlock(startInput(run));
+    await flush();
+    expect(FakeWorker.instances[0]?.posted).toHaveLength(1);
+    runner.cancel(requestId);
+    resolveArtifacts(await artifacts());
+    await flush();
+    expect(FakeWorker.instances).toHaveLength(1);
+    expect(FakeWorker.instances[0]?.posted).toHaveLength(1);
+    expect(events).toEqual(['cancelled']);
+  });
+  it('drops a deferred commit that resolves after cancel and emits no complete', async () => {
+    const run = makeRun();
+    const repository = makeRepository(run);
+    let resolveCommit!: () => void;
+    const deferredCommit = new Promise<void>((resolve) => {
+      resolveCommit = resolve;
+    });
+    repository.commitSeasonBlock.mockImplementationOnce(() => deferredCommit);
+    const runner = createSeasonBlockRunner({
+      repository,
+      schedule,
+      workerUrl: 'fake-worker.ts',
+      artifacts,
+    });
+    const events: Array<{
+      type: string;
+      requestId?: string;
+    }> = [];
+    runner.subscribe((event) => events.push(event));
+    runner.startBlock(startInput(run));
+    await flush();
+    const worker = FakeWorker.instances[0];
+    expect(worker).toBeDefined();
+    const requestId = events.find((event) => event.type === 'started')?.requestId ?? 'sb-1';
+    worker?.emit({
+      schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
+      type: 'season-block-complete',
+      requestId,
+      result: { status: 'committed', checkpoint: makeCandidate(run) },
+    });
+    await flush();
+    expect(repositoryMocks(repository).commitSeasonBlock).toHaveBeenCalledTimes(1);
+    runner.cancel(requestId);
+    resolveCommit();
+    await flush();
+    expect(events.some((event) => event.type === 'complete')).toBe(false);
+    expect(events.some((event) => event.type === 'error')).toBe(false);
+    expect(events.filter((event) => event.type === 'cancelled')).toHaveLength(1);
+  });
+  it('drops a deferred commit that resolves after terminate without emitting', async () => {
+    const run = makeRun();
+    const repository = makeRepository(run);
+    let resolveCommit!: () => void;
+    const deferredCommit = new Promise<void>((resolve) => {
+      resolveCommit = resolve;
+    });
+    repository.commitSeasonBlock.mockImplementationOnce(() => deferredCommit);
+    const runner = createSeasonBlockRunner({
+      repository,
+      schedule,
+      workerUrl: 'fake-worker.ts',
+      artifacts,
+    });
+    const events: Array<{
+      type: string;
+      requestId?: string;
+    }> = [];
+    runner.subscribe((event) => events.push(event));
+    runner.startBlock(startInput(run));
+    await flush();
+    const worker = FakeWorker.instances[0];
+    expect(worker).toBeDefined();
+    const requestId = events.find((event) => event.type === 'started')?.requestId ?? 'sb-1';
+    worker?.emit({
+      schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
+      type: 'season-block-complete',
+      requestId,
+      result: { status: 'committed', checkpoint: makeCandidate(run) },
+    });
+    await flush();
+    expect(repositoryMocks(repository).commitSeasonBlock).toHaveBeenCalledTimes(1);
+    runner.terminate();
+    resolveCommit();
+    await flush();
+    expect(events.some((event) => event.type === 'complete')).toBe(false);
+    expect(events.some((event) => event.type === 'error')).toBe(false);
+    expect(events.some((event) => event.type === 'cancelled')).toBe(false);
+  });
+  it('drops a deferred interruption save that resolves after cancel', async () => {
+    const run = makeRun();
+    const repository = makeRepository(run);
+    let resolveSave!: () => void;
+    const deferredSave = new Promise<void>((resolve) => {
+      resolveSave = resolve;
+    });
+    repository.savePendingBlock.mockImplementationOnce(() => deferredSave);
+    const runner = createSeasonBlockRunner({
+      repository,
+      schedule,
+      workerUrl: 'fake-worker.ts',
+      artifacts,
+    });
+    const events: Array<{
+      type: string;
+      requestId?: string;
+    }> = [];
+    runner.subscribe((event) => events.push(event));
+    runner.startBlock(startInput(run));
+    await flush();
+    const worker = FakeWorker.instances[0];
+    expect(worker).toBeDefined();
+    const requestId = events.find((event) => event.type === 'started')?.requestId ?? 'sb-1';
+    worker?.emit({
+      schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
+      type: 'season-block-complete',
+      requestId,
+      result: { status: 'interrupted', pending: makePending(run) },
+    });
+    await flush();
+    expect(repositoryMocks(repository).savePendingBlock).toHaveBeenCalledTimes(1);
+    runner.cancel(requestId);
+    resolveSave();
+    await flush();
+    expect(events.some((event) => event.type === 'interrupted')).toBe(false);
+    expect(events.some((event) => event.type === 'error')).toBe(false);
+    expect(events.filter((event) => event.type === 'cancelled')).toHaveLength(1);
+  });
   it('drops messages that fail the frozen wire schema', async () => {
     const run = makeRun();
     const runner = createSeasonBlockRunner({

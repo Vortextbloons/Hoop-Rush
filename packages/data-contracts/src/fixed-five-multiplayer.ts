@@ -197,7 +197,7 @@ export const fixedFiveDeadlineSchema = z.object({
   cursor: z.string().min(1).max(128),
   participantId: fixedFiveParticipantIdSchema,
   deadlineAt: z.string().min(1).max(64),
-  fallback: fixedFiveCommandPayloadSchema,
+  fallback: fixedFiveCommandPayloadSchema.nullable(),
   pickOrdinal: z.number().int().nonnegative(),
 });
 export type FixedFiveDeadline = z.infer<typeof fixedFiveDeadlineSchema>;
@@ -294,6 +294,26 @@ export const fixedFiveCompetitionRunSchema = z.object({
   result: fixedFiveCompetitionResultSchema,
 });
 export type FixedFiveCompetitionRun = z.infer<typeof fixedFiveCompetitionRunSchema>;
+const receiptHexSchema = z.string().regex(/^[0-9a-f]{64}$/);
+export const fixedFiveReceiptGameSeedSchema = z.object({
+  gameNumber: z.number().int().min(1).max(82),
+  seed: seedSchema,
+  tag: z.enum(['h2h', 'p1', 'p2', 'duel']),
+});
+export type FixedFiveReceiptGameSeed = z.infer<typeof fixedFiveReceiptGameSeedSchema>;
+export const fixedFiveVerificationReceiptSchema = z.object({
+  schemaVersion: z.literal(1),
+  roomId: z.string().min(1).max(64),
+  rootSeed: seedSchema,
+  versions: fixedFiveVersionLocksSchema,
+  challenge: z.string().min(1).max(256),
+  participantIds: z.tuple([fixedFiveParticipantIdSchema, fixedFiveParticipantIdSchema]),
+  commandIds: z.array(z.string().min(1).max(64)),
+  gameSeeds: z.array(fixedFiveReceiptGameSeedSchema),
+  resultDigest: receiptHexSchema,
+  receiptDigest: receiptHexSchema,
+});
+export type FixedFiveVerificationReceipt = z.infer<typeof fixedFiveVerificationReceiptSchema>;
 export const fixedFiveMultiplayerErrorCodeSchema = z.enum([
   'authorization',
   'membership',
@@ -352,6 +372,24 @@ export interface FixedFiveMultiplayerTransport {
       expectedRevision?: number;
     },
   ): Promise<FixedFiveCommandReceipt>;
+  verificationChallenge(roomId: string): Promise<string>;
+  submitVerification(
+    roomId: string,
+    receipt: FixedFiveVerificationReceipt,
+    expectedRevision?: number,
+  ): Promise<{
+    receiptId: string;
+    revision: number;
+  }>;
+  commitFallback(
+    roomId: string,
+    cursor: string,
+    payload: FixedFiveCommandPayload,
+    expectedRevision?: number,
+  ): Promise<{
+    stored: boolean;
+    revision: number;
+  }>;
   resolveTimeout(roomId: string): Promise<FixedFiveCommandReceipt | null>;
   removeGuest(
     roomId: string,
@@ -364,7 +402,7 @@ export interface FixedFiveMultiplayerTransport {
   }>;
   complete(
     roomId: string,
-    resultDigest: string,
+    receiptId: string,
   ): Promise<{
     completed: boolean;
     phase: FixedFiveRoomPhase;

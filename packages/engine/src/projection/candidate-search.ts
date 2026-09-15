@@ -25,7 +25,12 @@ import {
   validateSeasonRoster,
   type SeasonRosterMemberInput,
 } from '../season/roster-rules.ts';
-import { ProjectionCache } from './cache.ts';
+import {
+  ProjectionCache,
+  eraProfileFingerprint,
+  projectionModelFingerprint,
+  type ProjectionFingerprints,
+} from './cache.ts';
 import { projectedQualityWeights } from './minute-plan-quality.ts';
 import { projectSeasonRoster } from './season.ts';
 import {
@@ -118,6 +123,18 @@ interface SearchableCandidate {
   projection: RankedCandidate['projection'];
   rotation: SeasonRotation;
   gates: RankingGates;
+}
+function candidateIdOf(roster: readonly string[], rotation: SeasonRotation): string {
+  return JSON.stringify([
+    roster,
+    rotation.starters,
+    rotation.closingFive,
+    rotation.benchOrder,
+    rotation.targetMinutes.map((row) => [row.playerVersionId, row.minutes]),
+    rotation.minutePolicy,
+    rotation.franchiseId,
+    rotation.rotationVersion,
+  ]);
 }
 interface CatalogMember {
   playerVersionId: string;
@@ -308,6 +325,7 @@ function rotationsFor(input: {
   eraProfile: EraSimulationProfile;
   model: ProjectionModelArtifact;
   cache: ProjectionCache;
+  fingerprints: ProjectionFingerprints;
   load?: ReadonlyMap<
     string,
     {
@@ -364,6 +382,7 @@ function rotationsFor(input: {
           eraProfile: input.eraProfile,
           model: input.model,
           cache: input.cache,
+          fingerprints: input.fingerprints,
         });
         const minutePlanPlayers = new Map<string, MinutePlanPlayerInput>();
         for (const id of orderedRoster) {
@@ -406,6 +425,10 @@ export function searchRosterRotationCandidates(
   const lens = input.lens ?? 'balance';
   const members = catalogMembers(input.catalog);
   const cache = new ProjectionCache();
+  const fingerprints: ProjectionFingerprints = {
+    model: projectionModelFingerprint(input.model),
+    eraProfile: eraProfileFingerprint(input.eraProfile),
+  };
   const locked = [...input.locked];
   const available = input.available.filter((id) => !locked.includes(id));
   const ownedInput = rosterInputMembers(locked, members);
@@ -509,6 +532,7 @@ export function searchRosterRotationCandidates(
       eraProfile: input.eraProfile,
       model: input.model,
       cache,
+      fingerprints,
       load: input.load,
     });
     const minutePlanLoad = roster.map((id) => {
@@ -540,12 +564,12 @@ export function searchRosterRotationCandidates(
               horizonGames: minutePlanHorizonGames(82),
             },
           },
-          { cache },
+          { cache, fingerprints },
         );
       } catch {
         continue;
       }
-      const candidateId = `${roster.join('-')}#${rotation.starters.join('-')}`;
+      const candidateId = candidateIdOf(roster, rotation);
       const gatesForCandidate: RankingGates = {
         ...gates,
         legal,

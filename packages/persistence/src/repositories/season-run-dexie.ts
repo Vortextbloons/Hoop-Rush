@@ -1762,6 +1762,25 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
         if (typeof storedRunId !== 'string' || storedRunId !== input.runId) {
           throw new SeasonRunCommandRunMismatchError(input.runId);
         }
+        let cursor;
+        try {
+          cursor = seasonRunCursorSchema.parse(checkpoint);
+        } catch {
+          throw new SeasonPostseasonIntegrityError(
+            'the stored run checkpoint cannot be read for champion promotion',
+          );
+        }
+        if (
+          cursor.stateRevision !== input.expectedStateRevision ||
+          cursor.stateDigest !== input.expectedStateDigest ||
+          cursor.revision !== input.expectedRevision
+        ) {
+          throw new SeasonRunCommandStaleStateError(
+            input.runId,
+            input.expectedStateRevision,
+            cursor.stateRevision,
+          );
+        }
         const storedPostseasonRows = await this.db.seasonPostseasonSummaries
           .where('runId')
           .equals(input.runId)

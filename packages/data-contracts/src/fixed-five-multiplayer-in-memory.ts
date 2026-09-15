@@ -2,9 +2,12 @@ import {
   FIXED_FIVE_CODE_TTL_MS,
   FIXED_FIVE_ENVELOPE_MAX_BYTES,
   FIXED_FIVE_ROOM_SCHEMA_VERSION,
+  fixedFiveCommandPayloadSchema,
   fixedFiveCommandSchema,
   fixedFiveTimeoutMsForMode,
+  fixedFiveVerificationReceiptSchema,
   type FixedFiveCommand,
+  type FixedFiveCommandPayload,
   type FixedFiveCommandReceipt,
   type FixedFiveMultiplayerTransport,
   type FixedFiveParticipantId,
@@ -12,6 +15,7 @@ import {
   type FixedFiveRoomMembership,
   type FixedFiveRoomSettings,
   type FixedFiveRoomSnapshot,
+  type FixedFiveVerificationReceipt,
 } from './fixed-five-multiplayer.ts';
 import { canonicalJson } from './season-hash.ts';
 import { commandIdSchema, contentHashSchema, idSchema, seedSchema } from './ids.ts';
@@ -85,6 +89,23 @@ function randomRoomIdWith(rng: () => number, useCrypto: boolean): string {
     .toLowerCase()
     .replace(/[^a-z0-9._:-]/g, 'a');
 }
+function randomChallengeWith(rng: () => number, useCrypto: boolean): string {
+  const bytes = new Uint8Array(24);
+  if (useCrypto) {
+    crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < bytes.length; i += 1) {
+      bytes[i] = Math.floor(rng() * 256);
+    }
+  }
+  return `ff-challenge-${[...bytes].map((b) => b.toString(16).padStart(2, '0')).join('')}`;
+}
+interface FallbackCommitment {
+  cursor: string;
+  participantId: FixedFiveParticipantId;
+  pickOrdinal: number;
+  payload: FixedFiveCommandPayload;
+}
 interface RoomRecord {
   snapshot: FixedFiveRoomSnapshot;
   commands: FixedFiveCommand[];
@@ -92,6 +113,9 @@ interface RoomRecord {
   code: FixedFiveRoomCode;
   codeExpiresAt: number;
   subscribers: Set<(snapshot: FixedFiveRoomSnapshot) => void>;
+  verificationChallenge: string | null;
+  receipts: Map<string, FixedFiveVerificationReceipt>;
+  fallback: FallbackCommitment | null;
 }
 export function createInMemoryFixedFiveTransport(options?: {
   clock?: () => number;
@@ -210,6 +234,9 @@ export function createInMemoryFixedFiveTransport(options?: {
         code,
         codeExpiresAt: now + FIXED_FIVE_CODE_TTL_MS,
         subscribers: new Set(),
+        verificationChallenge: null,
+        receipts: new Map(),
+        fallback: null,
       };
       rooms.set(roomId, record);
       codeIndex.set(code, roomId);
@@ -374,20 +401,112 @@ export function createInMemoryFixedFiveTransport(options?: {
         revision: record.snapshot.revision,
       };
     },
+    async verificationChallenge(roomId) {
+      await Promise.resolve();
+      const record = rooms.get(roomId);
+      if (!record)
+        throw Object.assign(new Error('authorization'), {
+          code: 'authorization',
+          retryable: false,
+        });
+      record.verificationChallenge ??= randomChallengeWith(rng, useCrypto);
+      return record.verificationChallenge;
+    },
+    async submitVerification(roomId, receipt, expectedRevision) {
+      await Promise.resolve();
+      const record = rooms.get(roomId);
+      if (!record)
+        throw Object.assign(new Error('authorization'), {
+          code: 'authorization',
+          retryable: false,
+        });
+      const parsed = fixedFiveVerificationReceiptSchema.safeParse(receipt);
+      if (!parsed.success) {
+        throw Object.assign(new Error('verification: invalid receipt'), {
+          rejectionCode: 'invalid-receipt',
+          revision: record.snapshot.revision,
+        });
+      }
+      if (parsed.data.roomId !== record.snapshot.roomId) {
+        throw Object.assign(new Error('verification: receipt does not belong to the room'), {
+          rejectionCode: 'invalid-receipt',
+          revision: record.snapshot.revision,
+        });
+      }
+      if (
+        record.verificationChallenge === null ||
+        parsed.data.challenge !== record.verificationChallenge
+      ) {
+        throw Object.assign(new Error('verification: challenge mismatch'), {
+          rejectionCode: 'invalid-receipt',
+          revision: record.snapshot.revision,
+        });
+      }
+      if (expectedRevision !== undefined && expectedRevision !== record.snapshot.revision) {
+        throw Object.assign(new Error('stale-revision'), {
+          rejectionCode: 'stale-revision',
+          revision: record.snapshot.revision,
+        });
+      }
+      record.receipts.set(parsed.data.receiptDigest, parsed.data);
+      return { receiptId: parsed.data.receiptDigest, revision: record.snapshot.revision };
+    },
+    async commitFallback(roomId, cursor, payload, expectedRevision) {
+      await Promise.resolve();
+      const record = rooms.get(roomId);
+      if (!record)
+        throw Object.assign(new Error('authorization'), {
+          code: 'authorization',
+          retryable: false,
+        });
+      const deadline = record.snapshot.deadline;
+      if (!deadline || deadline.cursor !== cursor) {
+        return { stored: false, revision: record.snapshot.revision };
+      }
+      if (expectedRevision !== undefined && expectedRevision !== record.snapshot.revision) {
+        throw Object.assign(new Error('stale-revision'), {
+          code: 'stale-revision',
+          retryable: true,
+        });
+      }
+      const parsed = fixedFiveCommandPayloadSchema.safeParse(payload);
+      if (
+        !parsed.success ||
+        parsed.data.kind !== 'timeout-autopick' ||
+        parsed.data.pickOrdinal !== deadline.pickOrdinal
+      ) {
+        throw Object.assign(
+          new Error('commit-fallback: payload must match the deadline autopick'),
+          {
+            code: 'illegal-move',
+            retryable: false,
+          },
+        );
+      }
+      record.fallback = {
+        cursor,
+        participantId: deadline.participantId,
+        pickOrdinal: deadline.pickOrdinal,
+        payload: parsed.data,
+      };
+      return { stored: true, revision: record.snapshot.revision };
+    },
     async resolveTimeout(roomId) {
       const record = rooms.get(roomId);
       if (!record) return null;
-      if (!record.snapshot.deadline) return null;
       const deadline = record.snapshot.deadline;
+      if (!deadline) return null;
       if (clock() < Date.parse(deadline.deadlineAt)) return null;
-      const commandId = `timeout-${deadline.cursor}-${String(deadline.pickOrdinal)}`;
+      const commitment = record.fallback;
+      if (!commitment || commitment.cursor !== deadline.cursor) return null;
+      const commandId = `timeout-${deadline.cursor}-${String(commitment.pickOrdinal)}`;
       if (record.commandIds.has(commandId)) return null;
       const receipt = await this.submitCommand({
         schemaVersion: 1,
         roomId: record.snapshot.roomId,
         commandId: commandIdSchema.parse(commandId),
-        actorParticipantId: deadline.participantId,
-        payload: deadline.fallback,
+        actorParticipantId: commitment.participantId,
+        payload: commitment.payload,
       });
       return receipt;
     },
@@ -450,7 +569,7 @@ export function createInMemoryFixedFiveTransport(options?: {
       emit(record);
       return { snapshot: created.snapshot, code: created.code };
     },
-    async complete(roomId, resultDigest) {
+    async complete(roomId, receiptId) {
       await Promise.resolve();
       const record = rooms.get(roomId);
       if (!record)
@@ -462,17 +581,20 @@ export function createInMemoryFixedFiveTransport(options?: {
         return { completed: true, phase: record.snapshot.phase };
       if (record.snapshot.phase === 'integrity-failed' || record.snapshot.phase === 'expired')
         return { completed: false, phase: record.snapshot.phase };
-      const proposed = record.commands.some(
-        (c) => c.payload.kind === 'propose-result' && c.payload.resultDigest === resultDigest,
+      const receipt = record.receipts.get(receiptId);
+      if (!receipt) return { completed: false, phase: record.snapshot.phase };
+      const confirmedSeats = new Set(
+        record.commands
+          .filter(
+            (c) =>
+              c.payload.kind === 'confirm-result' &&
+              c.payload.verified &&
+              c.payload.resultDigest === receipt.resultDigest,
+          )
+          .map((c) => c.actorParticipantId),
       );
-      const confirmed = record.commands.some(
-        (c) =>
-          c.payload.kind === 'confirm-result' &&
-          c.payload.verified &&
-          c.payload.resultDigest === resultDigest,
-      );
-      if (!proposed || !confirmed) return { completed: false, phase: record.snapshot.phase };
-      const digest = contentHashSchema.parse(resultDigest);
+      if (confirmedSeats.size < 2) return { completed: false, phase: record.snapshot.phase };
+      const digest = contentHashSchema.parse(receipt.resultDigest);
       record.snapshot = {
         ...record.snapshot,
         phase: 'completed',

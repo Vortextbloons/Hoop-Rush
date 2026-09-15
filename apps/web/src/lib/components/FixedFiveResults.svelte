@@ -36,6 +36,7 @@
     createdAt = null,
     verified = false,
     modeDetail = null,
+    receiptDigest = null,
     onRematch = null,
     onNewRoom = null,
     rematchBusy = false,
@@ -57,6 +58,7 @@
     createdAt?: string | null;
     verified?: boolean;
     modeDetail?: string | null;
+    receiptDigest?: string | null;
     onRematch?: (() => void) | null;
     onNewRoom?: (() => void) | null;
     rematchBusy?: boolean;
@@ -240,7 +242,7 @@
           class="inline-flex items-center gap-1.5 rounded-full border border-positive/40 bg-positive/10 px-2.5 py-0.5 text-[10px] font-bold text-positive"
         >
           <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full bg-current"></span>
-          Result verified
+          Verified locally
         </span>
       {/if}
     </div>
@@ -339,15 +341,11 @@
   {/if}
 
   {#if onRematch || onNewRoom}
-    <div class="flex flex-col gap-2 px-4 pb-4 sm:flex-row sm:items-center sm:px-6">
+    <div class="rematch-strip">
       {#if onRematch}
-        <button
-          type="button"
-          onclick={onRematch}
-          disabled={rematchBusy}
-          class="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-bold tracking-widest uppercase text-primary-foreground disabled:opacity-40"
-        >
-          {rematchBusy ? 'Working…' : '⟳ Rematch'}
+        <button type="button" onclick={onRematch} disabled={rematchBusy} class="rematch-main">
+          <span class="rematch-ball" aria-hidden="true"></span>
+          {rematchBusy ? 'Locking run-back…' : 'Run it back'}
         </button>
       {/if}
       {#if onNewRoom}
@@ -358,7 +356,7 @@
           title={canNewRoom ? 'Create the successor room' : 'Needs both confirmations first'}
           class="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-line-soft bg-surface-1 px-6 py-3 text-sm font-bold tracking-widest uppercase disabled:opacity-40"
         >
-          ⊕ New room
+          New room
         </button>
       {/if}
       <button
@@ -1123,13 +1121,18 @@
         <ul class="mt-3 flex flex-col gap-2 font-mono text-[11px] text-muted-foreground">
           <li class="flex items-center gap-2">
             <ShieldCheck class="h-4 w-4" />
-            {verified ? 'Result verified by both clients' : 'Awaiting peer confirmation'}
+            {verified
+              ? 'Verified locally against the accepted command log'
+              : 'Verification receipt pending'}
           </li>
           <li>Mode · {modeDetailLabel}</li>
           {#if digest}
             <li class="break-all" title={digest}>Digest · {digest}</li>
           {:else}
             <li>No digest recorded yet.</li>
+          {/if}
+          {#if receiptDigest}
+            <li class="break-all" title={receiptDigest}>Receipt · {receiptDigest}</li>
           {/if}
           {#if shared}
             <li>Tie-break · {shared.tiebreakPath}</li>
@@ -1143,3 +1146,93 @@
     </div>
   {/if}
 </div>
+
+<style>
+  .rematch-strip {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0 1rem 1rem;
+  }
+  @media (min-width: 640px) {
+    .rematch-strip {
+      flex-direction: row;
+      align-items: center;
+      padding: 0 1.5rem 1rem;
+    }
+  }
+  .rematch-main {
+    position: relative;
+    overflow: hidden;
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    border-radius: 0.9rem;
+    background: var(--color-primary);
+    color: var(--color-primary-foreground);
+    padding: 0.85rem 1.5rem;
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 900;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    isolation: isolate;
+  }
+  .rematch-main::after {
+    content: '';
+    position: absolute;
+    inset: -40% -20%;
+    z-index: 0;
+    background: linear-gradient(
+      100deg,
+      transparent 42%,
+      color-mix(in srgb, white 35%, transparent) 50%,
+      transparent 58%
+    );
+    animation: rematch-sheen 2.6s ease infinite;
+  }
+  .rematch-ball {
+    position: relative;
+    z-index: 1;
+    width: 1.2rem;
+    height: 1.2rem;
+    border-radius: 999px;
+    flex-shrink: 0;
+    background:
+      linear-gradient(90deg, transparent 46%, black 46%, black 54%, transparent 54%),
+      radial-gradient(circle at 30% 25%, white 0 12%, transparent 13%), var(--color-court-wood);
+    border: 1px solid black;
+    animation: ball-bounce 1.1s ease-in-out infinite;
+  }
+  @keyframes rematch-sheen {
+    0%,
+    55% {
+      transform: translateX(-70%);
+      opacity: 0;
+    }
+    75% {
+      opacity: 1;
+    }
+    100% {
+      transform: translateX(70%);
+      opacity: 0;
+    }
+  }
+  @keyframes ball-bounce {
+    0%,
+    100% {
+      transform: translateY(0) rotate(0);
+    }
+    50% {
+      transform: translateY(-4px) rotate(40deg);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .rematch-main::after,
+    .rematch-ball {
+      animation: none;
+    }
+  }
+</style>

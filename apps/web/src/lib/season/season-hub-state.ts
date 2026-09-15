@@ -81,6 +81,11 @@ import {
   type SeasonRunChannel,
   type SeasonRunMutation,
 } from './season-cross-tab';
+function monotonicNow(): number {
+  return typeof performance !== 'undefined' && typeof performance.now === 'function'
+    ? performance.now()
+    : Date.now();
+}
 export type BlockPhase = 'idle' | 'running' | 'interrupted' | 'cancelled' | 'failed' | 'complete';
 export interface BlockRunState {
   requestId: string | null;
@@ -260,7 +265,42 @@ export class SeasonHubState {
     });
   }
   private lastProgressEmitAt = 0;
+  private cancelInFlightRunners(): void {
+    const blockRequestId = this.block.requestId;
+    if (this.block.phase === 'running' && blockRequestId !== null) {
+      try {
+        this.runner.cancel(blockRequestId);
+      } catch {}
+    }
+    const postseasonRunner = this.postseasonRunner;
+    const postseasonRequestId = this.postseasonRequestId;
+    if (
+      postseasonRunner !== null &&
+      this.postseason.phase === 'running' &&
+      postseasonRequestId !== null
+    ) {
+      try {
+        postseasonRunner.cancel(postseasonRequestId);
+      } catch {}
+    }
+  }
+  private resetRunnerProgress(): void {
+    this.block = { ...IDLE_BLOCK };
+    this.postseason = { ...IDLE_POSTSEASON };
+    this.postseasonRequestId = null;
+  }
+  private teardownRunners(): void {
+    this.cancelInFlightRunners();
+    try {
+      this.runner.terminate();
+    } catch {}
+    try {
+      this.postseasonRunner?.terminate();
+    } catch {}
+    this.resetRunnerProgress();
+  }
   destroy(): void {
+    this.teardownRunners();
     this.unsubscribeRunner?.();
     this.unsubscribeRunner = null;
     this.unsubscribePostseasonRunner?.();
@@ -268,13 +308,7 @@ export class SeasonHubState {
     this.unsubscribeChannel?.();
     this.unsubscribeChannel = null;
     this.channel.close();
-    if (this.block.phase === 'running' && this.block.requestId !== null) {
-      try {
-        this.runner.cancel(this.block.requestId);
-      } catch {}
-    }
     this.postseasonRunner = null;
-    this.postseasonRequestId = null;
     this.listeners.clear();
   }
   prewarm(): void {
@@ -349,9 +383,7 @@ export class SeasonHubState {
       ) {
         return;
       }
-      if (this.block.phase === 'running' && this.block.requestId !== null) {
-        this.cancel();
-      }
+      this.teardownRunners();
       clearCachedSeasonSnapshot();
       this.externalChange = {
         kind: mutation.kind,
@@ -457,6 +489,7 @@ export class SeasonHubState {
   async discardIncompatibleRun(): Promise<void> {
     const incompatible = this.incompatible;
     if (incompatible === null) return;
+    this.teardownRunners();
     await this.repo.clearSeasonRun(incompatible.runId);
     clearCachedSeasonSnapshot();
     this.channel.announce({ kind: 'clear', runId: incompatible.runId, committedAt: this.now() });
@@ -470,6 +503,7 @@ export class SeasonHubState {
     error: string | null;
   }> {
     try {
+      this.teardownRunners();
       await this.repo.forceClearActiveSeasonRun();
       const { DexieSeasonDraftRepository } = await import('@hoop-rush/persistence');
       await new DexieSeasonDraftRepository().clearSeasonDraft();
@@ -1140,6 +1174,11 @@ export class SeasonHubState {
     }
   }
   private onPostseasonRunnerEvent(event: SeasonPostseasonEvent): void {
+    if (event.type === 'started') {
+      this.postseasonRequestId = event.requestId;
+    } else if (event.requestId !== this.postseasonRequestId) {
+      return;
+    }
     switch (event.type) {
       case 'started':
         this.postseason = {
@@ -1158,6 +1197,7 @@ export class SeasonHubState {
         };
         break;
       case 'committed': {
+        if (this.activeRunId() !== event.runId) break;
         this.snapshot = event.snapshot;
         this.index = indexAfterCommit(this.index, event.snapshot, this.now);
         setCachedSeasonSnapshot(event.snapshot);
@@ -1174,6 +1214,7 @@ export class SeasonHubState {
         break;
       }
       case 'complete': {
+        if (this.activeRunId() !== event.runId) break;
         const promoted = event.promoted;
         this.postseason = {
           ...this.postseason,
@@ -1238,19 +1279,24 @@ export class SeasonHubState {
       return { ok: false, error: 'no active season run to quit' };
     }
     const runId = this.snapshot.run.runId;
+    this.cancelInFlightRunners();
     if (this.block.phase === 'running') {
-      this.cancel();
-      const deadline = this.now() + 5000;
+      const deadline = monotonicNow() + 5000;
+      let waited = 0;
       const phaseOf = (): BlockPhase => this.block.phase;
-      while (phaseOf() === 'running' && this.now() < deadline) {
+      while (phaseOf() === 'running' && waited < 5000 && monotonicNow() < deadline) {
         await sleep(100);
+        waited += 100;
       }
       if (phaseOf() === 'running') {
         this.runner.terminate();
-        this.block = { ...IDLE_BLOCK };
-        this.emit();
       }
     }
+    try {
+      this.postseasonRunner?.terminate();
+    } catch {}
+    this.resetRunnerProgress();
+    this.emit();
     try {
       await this.repo.clearSeasonRun(runId);
       clearCachedSeasonSnapshot();
@@ -1440,14 +1486,20 @@ export class SeasonHubState {
   private humanFranchiseId(): string | null {
     return this.snapshot === null ? null : humanFranchiseIdOf(this.snapshot.run.league);
   }
+  private activeRunId(): string | null {
+    return this.snapshot?.run.runId ?? this.index?.runId ?? null;
+  }
   private onRunnerEvent(event: SeasonRunnerEvent): void {
+    if (event.type === 'started') {
+      if (this.block.blockIndex !== event.blockIndex) return;
+      this.block.requestId = event.requestId;
+      this.block.phase = 'running';
+      this.lastProgressEmitAt = 0;
+      this.emit();
+      return;
+    }
+    if (event.requestId !== this.block.requestId) return;
     switch (event.type) {
-      case 'started':
-        if (this.block.blockIndex !== event.blockIndex) break;
-        this.block.requestId = event.requestId;
-        this.block.phase = 'running';
-        this.lastProgressEmitAt = 0;
-        break;
       case 'progress': {
         if (this.block.blockIndex !== event.blockIndex) break;
         this.block.gamesCompleted = event.gamesCompleted;
@@ -1466,6 +1518,7 @@ export class SeasonHubState {
       }
       case 'complete': {
         if (this.block.blockIndex !== event.checkpoint.blockIndex) break;
+        if (this.activeRunId() !== event.snapshot.run.runId) break;
         this.block.latestGameId = null;
         this.block.latestResult = null;
         this.block.error = null;
@@ -1486,6 +1539,7 @@ export class SeasonHubState {
       }
       case 'interrupted':
         if (this.block.blockIndex !== event.blockIndex) break;
+        if (this.activeRunId() !== event.runId) break;
         this.block.phase = 'interrupted';
         this.block.latestGameId = null;
         this.block.latestResult = null;

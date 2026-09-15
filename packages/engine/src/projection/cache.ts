@@ -1,10 +1,48 @@
-import { seasonDigestHex } from '@hoop-rush/data-contracts';
-import type { BaseFiveProjection } from '@hoop-rush/data-contracts';
+import { canonicalJson, seasonDigestHex } from '@hoop-rush/data-contracts';
+import type {
+  BaseFiveProjection,
+  EraSimulationProfile,
+  ProjectionModelArtifact,
+  SimulationPlayer,
+} from '@hoop-rush/data-contracts';
 export interface ProjectionCacheStats {
   hits: number;
   misses: number;
   entries: number;
   bytes: number;
+}
+export interface ProjectionFingerprints {
+  model: string;
+  eraProfile: string;
+}
+function fingerprintOf(value: unknown): string {
+  return seasonDigestHex(canonicalJson(value));
+}
+export function simulationPlayerFingerprint(player: SimulationPlayer): string {
+  return fingerprintOf(player);
+}
+export function projectionModelFingerprint(model: ProjectionModelArtifact): string {
+  return fingerprintOf(model);
+}
+export function eraProfileFingerprint(profile: EraSimulationProfile): string {
+  return fingerprintOf(profile);
+}
+export function playerProjectionKeyParts(
+  players: readonly string[],
+  byVersion: ReadonlyMap<string, SimulationPlayer>,
+): {
+  playerIds: string[];
+  playerVersionIds: string[];
+  playerFingerprints: string[];
+} {
+  return {
+    playerIds: players.map((id) => byVersion.get(id)?.playerId ?? id),
+    playerVersionIds: [...players],
+    playerFingerprints: players.map((id) => {
+      const player = byVersion.get(id);
+      return player === undefined ? `missing:${id}` : simulationPlayerFingerprint(player);
+    }),
+  };
 }
 export class ProjectionCache {
   private readonly entries = new Map<
@@ -30,6 +68,9 @@ export class ProjectionCache {
     slots: readonly string[];
     playerIds: readonly string[];
     playerVersionIds: readonly (string | null)[];
+    playerFingerprints: readonly string[];
+    modelFingerprint: string;
+    eraProfileFingerprint: string;
   }): string {
     return seasonDigestHex(
       JSON.stringify([
@@ -39,6 +80,9 @@ export class ProjectionCache {
         input.slots,
         input.playerIds,
         input.playerVersionIds,
+        input.playerFingerprints,
+        input.modelFingerprint,
+        input.eraProfileFingerprint,
       ]),
     );
   }

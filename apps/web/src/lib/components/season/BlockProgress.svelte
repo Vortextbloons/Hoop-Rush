@@ -14,6 +14,7 @@
   import { buildBlockLiveViewModel } from '$lib/season/season-block-live';
   import LiveSimModal from '$lib/components/season/LiveSimModal.svelte';
   import { SIM_BAR_FILL_MS } from '$lib/components/season/live-sim-animation';
+  import { arenaBlockComplete, arenaError, arenaGameResult, arenaSimTick } from '$lib/arena-sound';
   const LEAGUE_FEED_SIZE = 3;
   let {
     block: blockInput,
@@ -113,6 +114,55 @@
       block.phase === 'failed',
   );
   const runKey = $derived(`${block.requestId ?? 'idle'}:${block.blockIndex ?? 'none'}`);
+  let lastHumanSoundId = $state<string | null>(null);
+  let lastPhaseSoundKey = $state<string | null>(null);
+  $effect(() => {
+    const id = block.latestGameId;
+    const line = block.latestResult;
+    const human = effectiveHuman;
+    const isHuman = block.isHumanGame;
+    const prev = untrack(() => lastHumanSoundId);
+    if (id === null || line === null) return;
+    if (prev === null) {
+      untrack(() => {
+        lastHumanSoundId = id;
+      });
+      return;
+    }
+    if (id === prev) return;
+    untrack(() => {
+      lastHumanSoundId = id;
+    });
+    try {
+      if (isHuman && human !== null && involvesHuman(line, human)) {
+        arenaGameResult(humanSplit(line, human).won);
+      } else {
+        arenaSimTick();
+      }
+    } catch {}
+  });
+  $effect(() => {
+    const phase = block.phase;
+    const key = `${runKey}:${phase}`;
+    const prev = untrack(() => lastPhaseSoundKey);
+    if (prev === null) {
+      untrack(() => {
+        lastPhaseSoundKey = key;
+      });
+      return;
+    }
+    if (key === prev) return;
+    untrack(() => {
+      lastPhaseSoundKey = key;
+    });
+    try {
+      if (phase === 'complete') {
+        arenaBlockComplete({ wins, losses });
+      } else if (phase === 'failed') {
+        arenaError();
+      }
+    } catch {}
+  });
   let dismissedFor = $state<string | null>(null);
   const dialogOpen = $derived(isActive && dismissedFor !== runKey);
   function showLive() {

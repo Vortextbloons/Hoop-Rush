@@ -24,9 +24,38 @@ function assertClean(result: GameResult, label: string): void {
 export interface Shared82GameGroups {
   bracket: OpponentBracket;
   rootSeed: Seed;
+  p1TeamId: string;
+  p2TeamId: string;
+  p1PlayerIds: readonly string[];
+  p2PlayerIds: readonly string[];
   h2h: GameResult[];
   p1NonH2h: GameResult[];
   p2NonH2h: GameResult[];
+}
+function assertPlayerIdentity(
+  players: readonly { playerId: string }[],
+  expected: readonly string[],
+  label: string,
+): void {
+  if (
+    players.length !== expected.length ||
+    players.some((player, index) => player.playerId !== expected[index])
+  ) {
+    throw new Error(`${label} player identities do not match the expected roster`);
+  }
+}
+function opponentByIdFor(
+  bracket: OpponentBracket,
+  gameNumber: number,
+): OpponentBracket['opponents'][number] {
+  const entry = bracket.schedule[gameNumber - 1];
+  const opponent = bracket.opponents.find(
+    (candidate) => candidate.opponentId === entry?.opponentId,
+  );
+  if (!opponent) {
+    throw new Error(`shared82 game ${String(gameNumber)} references an unknown opponent`);
+  }
+  return opponent;
 }
 export interface Shared82Summary {
   result: FixedFiveShared82Result;
@@ -68,6 +97,11 @@ export function summarizeShared82Games(groups: Shared82GameGroups): Shared82Summ
       if (result.seed !== fixedFiveH2HSeed(groups.rootSeed, gameNumber)) {
         throw new Error(`H2H game ${String(gameNumber)} seed does not derive from the root seed`);
       }
+      if (result.home.teamId !== groups.p1TeamId || result.away.teamId !== groups.p2TeamId) {
+        throw new Error(`H2H game ${String(gameNumber)} participants do not match the room seats`);
+      }
+      assertPlayerIdentity(result.home.players, groups.p1PlayerIds, `H2H game p1`);
+      assertPlayerIdentity(result.away.players, groups.p2PlayerIds, `H2H game p2`);
       assertClean(result, `H2H game ${String(gameNumber)}`);
       h2hResults.push(result);
       p1Games.push(result);
@@ -105,6 +139,23 @@ export function summarizeShared82Games(groups: Shared82GameGroups): Shared82Summ
         `shared82 p2 game ${String(gameNumber)} seed does not derive from the root seed`,
       );
     }
+    const opponent = opponentByIdFor(groups.bracket, gameNumber);
+    if (p1Result.home.teamId !== groups.p1TeamId) {
+      throw new Error(`shared82 p1 game ${String(gameNumber)} home team is not the p1 participant`);
+    }
+    if (p2Result.home.teamId !== groups.p2TeamId) {
+      throw new Error(`shared82 p2 game ${String(gameNumber)} home team is not the p2 participant`);
+    }
+    if (p1Result.away.teamId !== opponent.teamId || p2Result.away.teamId !== opponent.teamId) {
+      throw new Error(
+        `shared82 game ${String(gameNumber)} opponent does not match the scheduled bracket entry`,
+      );
+    }
+    assertPlayerIdentity(p1Result.home.players, groups.p1PlayerIds, `shared82 p1 game home`);
+    assertPlayerIdentity(p2Result.home.players, groups.p2PlayerIds, `shared82 p2 game home`);
+    const opponentIds = opponent.players.map((player) => player.playerId);
+    assertPlayerIdentity(p1Result.away.players, opponentIds, `shared82 p1 game away`);
+    assertPlayerIdentity(p2Result.away.players, opponentIds, `shared82 p2 game away`);
     assertClean(p1Result, `shared82 p1 game ${String(gameNumber)}`);
     assertClean(p2Result, `shared82 p2 game ${String(gameNumber)}`);
     p1Games.push(p1Result);
@@ -154,6 +205,8 @@ export interface DuelGameGroup {
   games: GameResult[];
   p1TeamId: string;
   p2TeamId: string;
+  p1PlayerIds: readonly string[];
+  p2PlayerIds: readonly string[];
   rootSeed: Seed;
 }
 export function summarizeDuelGames(group: DuelGameGroup): {
@@ -183,6 +236,21 @@ export function summarizeDuelGames(group: DuelGameGroup): {
     if (!homeIsP1 && game.home.teamId !== group.p2TeamId) {
       throw new Error(`duel game ${String(game.gameNumber)} home team is not a participant`);
     }
+    if (game.away.teamId !== (homeIsP1 ? group.p2TeamId : group.p1TeamId)) {
+      throw new Error(
+        `duel game ${String(game.gameNumber)} away team is not the other participant`,
+      );
+    }
+    assertPlayerIdentity(
+      game.home.players,
+      homeIsP1 ? group.p1PlayerIds : group.p2PlayerIds,
+      `duel game ${String(game.gameNumber)} home`,
+    );
+    assertPlayerIdentity(
+      game.away.players,
+      homeIsP1 ? group.p2PlayerIds : group.p1PlayerIds,
+      `duel game ${String(game.gameNumber)} away`,
+    );
     const p1Won = (game.winner === 'home') === homeIsP1;
     if (p1Won) p1Wins += 1;
     else p2Wins += 1;

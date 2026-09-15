@@ -156,7 +156,7 @@ export function auditSideAccounting<P extends AccountingPlayerInput>(
   let contestedShotsOk = true;
   let offensiveReboundChancesOk = true;
   if (d) {
-    reboundOpportunitiesOk = d.reboundOpportunities === misses;
+    reboundOpportunitiesOk = d.reboundOpportunities <= misses;
     assistedUnassistedOk = d.assistedFieldGoals + d.unassistedFieldGoals === fgm;
     contestedShotsOk = playerDiag((p) => p.contestedShots) === d.contestedShots;
     offensiveReboundChancesOk =

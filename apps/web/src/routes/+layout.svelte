@@ -8,6 +8,7 @@
   import { ModeWatcher } from 'mode-watcher';
   import { Toaster } from 'svelte-sonner';
   import BottomNav from '$lib/components/BottomNav.svelte';
+  import ArenaSoundToggle from '$lib/components/ArenaSoundToggle.svelte';
   import { isNavItemActive, type NavItem } from '$lib/nav-items';
   let { children } = $props();
   const homeHref = resolve('/');
@@ -64,34 +65,37 @@
         Hoop <span class={isUltimate ? 'text-accent' : 'text-primary'}>Rush</span>
       </span>
     </a>
-    {#if isUltimate}
-      <a
-        href={homeHref}
-        aria-label="Back to home"
-        class="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-muted-foreground outline-none transition-colors hover:bg-surface-2 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        <ArrowLeft class="h-4 w-4 shrink-0" />
-        Back
-      </a>
-    {:else if showBottomNav}
-      <nav aria-label="Main navigation" class="hidden items-center gap-1 md:flex">
-        {#each navItems as item (item.id)}
-          {@const active = isActive(item)}
-          <a
-            href={resolve(item.href as any)}
-            aria-current={active ? 'page' : undefined}
-            onpointerenter={() => warmForRoster(item.id)}
-            onfocus={() => warmForRoster(item.id)}
-            class="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring {active
-              ? 'bg-primary text-primary-foreground'
-              : 'text-muted-foreground hover:bg-surface-2 hover:text-foreground'}"
-          >
-            <item.icon class="h-4 w-4 shrink-0" />
-            {item.label}
-          </a>
-        {/each}
-      </nav>
-    {/if}
+    <div class="flex shrink-0 items-center gap-2">
+      <ArenaSoundToggle />
+      {#if isUltimate}
+        <a
+          href={homeHref}
+          aria-label="Back to home"
+          class="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-muted-foreground outline-none transition-colors hover:bg-surface-2 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <ArrowLeft class="h-4 w-4 shrink-0" />
+          Back
+        </a>
+      {:else if showBottomNav}
+        <nav aria-label="Main navigation" class="hidden items-center gap-1 md:flex">
+          {#each navItems as item (item.id)}
+            {@const active = isActive(item)}
+            <a
+              href={resolve(item.href as any)}
+              aria-current={active ? 'page' : undefined}
+              onpointerenter={() => warmForRoster(item.id)}
+              onfocus={() => warmForRoster(item.id)}
+              class="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring {active
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:bg-surface-2 hover:text-foreground'}"
+            >
+              <item.icon class="h-4 w-4 shrink-0" />
+              {item.label}
+            </a>
+          {/each}
+        </nav>
+      {/if}
+    </div>
   </div>
 </header>
 

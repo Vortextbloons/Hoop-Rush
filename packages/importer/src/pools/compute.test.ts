@@ -12,7 +12,7 @@ import {
   type MockInstance,
 } from 'vitest';
 import { parsePool } from '@hoop-rush/data-contracts';
-import { COHORT_NORMALIZATION_VERSION } from '@hoop-rush/data-contracts';
+import { COHORT_NORMALIZATION_VERSION, MANIFEST_SCHEMA_VERSION } from '@hoop-rush/data-contracts';
 import { readJson, sha256File, writeJson } from '../json.ts';
 import { normalizePositionLabels } from './positions.ts';
 import {
@@ -407,23 +407,23 @@ const CAREER_LABELS: Record<string, string[]> = {
 const BBREF_IDS: Record<string, string> = { '1': 'alpha01', '2': 'bravo01' };
 function fixtureManifest(): Manifest {
   return {
-    schemaVersion: 1,
+    schemaVersion: MANIFEST_SCHEMA_VERSION,
     dataVersion: 'm1.6',
+    modernFranchiseSlots: Array.from({ length: 30 }, (_, index) => ({
+      franchiseId: `fixture-${String(index).padStart(2, '0')}`,
+      displayName: `Fixture Franchise ${String(index)}`,
+      teamExternalId: String(1610612700 + index),
+    })),
     franchiseLineage: [
-      { franchiseId: 'lakers', displayName: 'Los Angeles Lakers', teamExternalId: TEAM, names: [] },
       {
-        franchiseId: 'nets',
-        displayName: 'Brooklyn Nets',
-        teamExternalId: '1610612751',
-        firstNbaSeasonKey: '2000-01',
-        names: [],
-      },
-      {
-        franchiseId: 'celtics',
+        modernFranchiseId: 'celtics',
+        historicalTeamId: '1610612738',
+        validFromSeasonKey: '1946-47',
         displayName: 'Boston Celtics',
-        teamExternalId: '1610612738',
-        firstNbaSeasonKey: '1946-47',
-        names: [],
+        city: 'Boston',
+        abbreviation: 'BOS',
+        sourceIdentityIds: ['1610612738'],
+        lineageRuleVersion: 'lineage-v1',
       },
     ],
     eras: [
@@ -438,7 +438,16 @@ function fixtureManifest(): Manifest {
         contentHash: 'a'.repeat(64),
       },
     ],
-    assets: {},
+    availability: [],
+    eraSimulationProfiles: [],
+    assets: {
+      headshotUrlTemplate: null,
+      headshotUrlTemplateSecondary: null,
+      logoUrlTemplate: null,
+      logoUrlTemplateSecondary: null,
+      source: 'fixture',
+      cacheVersion: 'fixture-v1',
+    },
   };
 }
 interface FixtureRoot {
@@ -1363,6 +1372,29 @@ describe('run / writePool / updateManifest', () => {
     const manifest = readJson(join(root.data, 'manifest.json')) as Manifest;
     expect(manifest.pools).toEqual(fixtureManifest().pools);
     expect(manifest.dataVersion).toBe(DATA_VERSION);
+  });
+  it('fails the build before writing a pool that parsePool rejects', async () => {
+    const root = buildStandardFixture('invalid-pool');
+    const rosterPath = join(root.nba, '1991-92', 'roster.json');
+    const roster = readJson(rosterPath) as Array<Record<string, unknown>>;
+    const echo = roster.find((player) => player.externalId === '5');
+    if (echo === undefined) throw new Error('fixture player 5 is missing');
+    echo.position = '';
+    writeJson(rosterPath, roster);
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    await expect(run([['lakers', '1990s']], false, 1)).rejects.toThrow(/invalid pool lakers-1990s/);
+    expect(() => readFileSync(join(root.data, 'pools', 'lakers-1990s.json'))).toThrow();
+  });
+  it('refuses to write a manifest that fails the authoritative schema', async () => {
+    const root = buildStandardFixture('manifest-invalid');
+    const manifestPath = join(root.data, 'manifest.json');
+    const invalid = { ...fixtureManifest(), modernFranchiseSlots: [] };
+    writeJson(manifestPath, invalid);
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    await expect(run([['lakers', '1990s']], false, 1)).rejects.toThrow(
+      /manifest fails validation: modernFranchiseSlots/,
+    );
+    expect(readJson(manifestPath)).toEqual(invalid);
   });
 });
 describe('schema fit (documented discrepancy)', () => {

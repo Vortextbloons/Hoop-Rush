@@ -1,6 +1,9 @@
 import type { ShotZone, SlotGroup } from '@hoop-rush/data-contracts';
 import type { PositionResponsibilityModifiers } from './position-responsibilities.ts';
 import type { ActionType } from './usage.ts';
+// m3-engine-v22: free-throw integrity — non-final misses are dead-ball team
+// rebounds, a live final miss continues only through an explicit offensive
+// rebound, and rebound opportunities count live contests only.
 // m3-engine-v21: interior-finisher fidelity (2P anchor 0.70/1.32 + block-aware
 // conversion, rim-heavy importer diet, foul-draw 0.70 blend, assist 1.01,
 // saturated usage caps 1.48/1.28) — seeded formulas unchanged.
@@ -8,7 +11,7 @@ import type { ActionType } from './usage.ts';
 // seeded 5-offer shop per block, vault + 3-slot equipment, sponsor boosts
 // applied to ratings inputs (sim, trade valuation, AI kits); formulas unchanged.
 // m3-engine-v19: season parity tune (season-trade-v7, season-free-agency-v3).
-export const ENGINE_VERSION = 'm3-engine-v21';
+export const ENGINE_VERSION = 'm3-engine-v22';
 export const ENGINE_CONSTANTS = {
   version: ENGINE_VERSION,
   zoneBaseMake: {

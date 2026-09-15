@@ -358,6 +358,31 @@ export function acceptGameResult(run: ChallengeRun, result: GameResult): Challen
       `game ${String(result.gameNumber)} opponent ${result.away.displayName} does not match scheduled ${opponent.displayName}`,
     );
   }
+  const identityMismatch = (
+    side: 'home' | 'away',
+    actual: readonly string[],
+    scheduled: readonly string[],
+  ): string | null => {
+    if (
+      actual.length !== scheduled.length ||
+      actual.some((playerId, index) => playerId !== scheduled[index])
+    ) {
+      return `game ${String(result.gameNumber)} ${side} player identities ${actual.join(',')} do not match scheduled ${scheduled.join(',')}`;
+    }
+    return null;
+  };
+  const homeIdentity = identityMismatch(
+    'home',
+    result.home.players.map((player) => player.playerId),
+    run.players.map((player) => player.playerId),
+  );
+  if (homeIdentity !== null) failures.push(homeIdentity);
+  const awayIdentity = identityMismatch(
+    'away',
+    result.away.players.map((player) => player.playerId),
+    opponent.players.map((player) => player.playerId),
+  );
+  if (awayIdentity !== null) failures.push(awayIdentity);
   if (result.engineVersion !== run.versions.engineVersion) {
     failures.push(
       `engine version mismatch: run ${run.versions.engineVersion}, result ${result.engineVersion}`,

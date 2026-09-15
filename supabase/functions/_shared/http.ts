@@ -1,5 +1,6 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { resolveDevUid } from './dev-identity.ts';
 
 export const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -30,26 +31,23 @@ export async function hashIp(ip: string): Promise<string> {
     .slice(0, 32);
 }
 
-export async function resolveUid(
-  req: Request,
-  supabaseUrl: string,
-  serviceRoleKey: string,
-): Promise<string | null> {
+export async function resolveUid(req: Request, supabaseUrl: string): Promise<string | null> {
   const authHeader = req.headers.get('Authorization');
   if (authHeader) {
-    const anonClient = createClient(
-      supabaseUrl,
-      Deno.env.get('SUPABASE_ANON_KEY') ?? serviceRoleKey,
-      {
+    const verifyKey = Deno.env.get('SUPABASE_ANON_KEY') ?? Deno.env.get('SUPABASE_PUBLISHABLE_KEY');
+    if (verifyKey) {
+      const anonClient = createClient(supabaseUrl, verifyKey, {
         global: { headers: { Authorization: authHeader } },
-      },
-    );
-    const {
-      data: { user },
-    } = await anonClient.auth.getUser();
-    if (user) return user.id;
+      });
+      const {
+        data: { user },
+      } = await anonClient.auth.getUser();
+      if (user) return user.id;
+    }
   }
-  const devUid = req.headers.get('x-dev-uid');
-  if (devUid && /^[0-9a-f-]{36}$/i.test(devUid)) return devUid;
-  return null;
+  return resolveDevUid(req.headers, {
+    supabaseUrl,
+    // x-dev-uid is honored only for local deployments that opt in explicitly.
+    allowDevUid: Deno.env.get('SEASON_ALLOW_DEV_UID') === 'true',
+  });
 }

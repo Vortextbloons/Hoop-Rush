@@ -23,6 +23,7 @@ export {
   validateBracketContent,
   type ChallengeCreation,
 } from './challenge/commands.ts';
+export { SEED_DERIVATION_VERSION } from './challenge/seeds.ts';
 export { generateSchedule, scheduleInvariants } from './bracket/schedule.ts';
 export {
   generateBracket,
@@ -621,6 +622,13 @@ export {
   isFixedFiveGameInputCommand,
   gameInputCommands,
 } from './modes/fixed-five/digest.ts';
+export {
+  verifyFixedFiveCompetition,
+  type FixedFiveVerificationInput,
+  type FixedFiveVerificationResult,
+  type FixedFiveVerificationReceipt,
+  type FixedFiveReceiptGameSeed,
+} from './modes/fixed-five/verification.ts';
 export { ENGINE_VERSION } from './sim/constants.ts';
 export {
   collectionNamespaceSeed,

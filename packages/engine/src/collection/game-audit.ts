@@ -113,7 +113,7 @@ export function checkCollectionGameResult(
       }
     }
     if (!accounting.reboundOpportunitiesOk)
-      failures.push(`${key}: rebound opportunities != misses`);
+      failures.push(`${key}: rebound opportunities exceed misses`);
     if (!accounting.assistedUnassistedOk) failures.push(`${key}: assisted + unassisted != made FG`);
     if (!accounting.contestedShotsOk) failures.push(`${key}: contested shots mismatch`);
     if (!accounting.offensiveReboundChancesOk) {

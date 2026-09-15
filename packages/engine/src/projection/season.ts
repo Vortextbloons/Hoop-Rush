@@ -21,7 +21,13 @@ import {
   type FatigueBand,
   type MinutePlanPlayerInput,
 } from '../season/minute-plan.ts';
-import { ProjectionCache } from './cache.ts';
+import {
+  ProjectionCache,
+  eraProfileFingerprint,
+  playerProjectionKeyParts,
+  projectionModelFingerprint,
+  type ProjectionFingerprints,
+} from './cache.ts';
 import { projectBaseFive } from './base.ts';
 import { projectedQualityWeights } from './minute-plan-quality.ts';
 import { archetypeReferences } from './reference-lineups.ts';
@@ -35,6 +41,7 @@ import { identifyWeaknesses } from './weaknesses.ts';
 const SLOT_ORDER = ['G1', 'G2', 'F1', 'F2', 'C'] as const;
 export interface SeasonProjectionOptions {
   cache?: ProjectionCache;
+  fingerprints?: ProjectionFingerprints;
 }
 interface UnitDraft {
   unitId: string;
@@ -53,15 +60,17 @@ export function projectUnit(input: {
   model: ProjectionModelArtifact;
   referenceId?: string;
   cache: ProjectionCache;
+  fingerprints: ProjectionFingerprints;
 }): ReturnType<typeof projectBaseFive> {
-  const { players, byVersion, profile, model, referenceId, cache } = input;
+  const { players, byVersion, profile, model, referenceId, cache, fingerprints } = input;
   const key = ProjectionCache.key({
     eraId: profile.eraId,
     modelVersion: model.modelVersion,
     referenceId: referenceId ?? model.references[profile.eraId]?.neutral.referenceId ?? 'neutral',
     slots: SLOT_ORDER,
-    playerIds: players.map((id) => byVersion.get(id)?.playerId ?? id),
-    playerVersionIds: players,
+    ...playerProjectionKeyParts(players, byVersion),
+    modelFingerprint: fingerprints.model,
+    eraProfileFingerprint: fingerprints.eraProfile,
   });
   const cached = cache.get(key);
   if (cached !== undefined) return cached;
@@ -127,10 +136,21 @@ function planFactsOf(input: {
   profile: SeasonProjectionInput['eraProfile'];
   model: ProjectionModelArtifact;
   cache: ProjectionCache;
+  fingerprints: ProjectionFingerprints;
   metrics: SeasonProjectionMetrics;
 }): SeasonProjectionPlanFacts {
-  const { rotation, allVersions, players, byVersion, minutePlan, profile, model, cache, metrics } =
-    input;
+  const {
+    rotation,
+    allVersions,
+    players,
+    byVersion,
+    minutePlan,
+    profile,
+    model,
+    cache,
+    fingerprints,
+    metrics,
+  } = input;
   const loadByVersion = new Map(minutePlan.players.map((row) => [row.playerVersionId, row]));
   const qualityByVersion = projectedQualityWeights({
     players,
@@ -139,6 +159,7 @@ function planFactsOf(input: {
     eraProfile: profile,
     model,
     cache,
+    fingerprints,
   });
   const minutePlanPlayers: MinutePlanPlayerInput[] = allVersions.map((versionId) => {
     const load = loadByVersion.get(versionId);
@@ -198,6 +219,10 @@ export function projectSeasonRoster(
   options: SeasonProjectionOptions = {},
 ): SeasonProjection {
   const cache = options.cache ?? new ProjectionCache();
+  const fingerprints: ProjectionFingerprints = options.fingerprints ?? {
+    model: projectionModelFingerprint(input.model),
+    eraProfile: eraProfileFingerprint(input.eraProfile),
+  };
   const roster = input.roster;
   if (roster.length !== 10) {
     throw new Error(
@@ -258,6 +283,7 @@ export function projectSeasonRoster(
         profile: input.eraProfile,
         model: input.model,
         cache,
+        fingerprints,
       }),
     });
   }
@@ -283,6 +309,7 @@ export function projectSeasonRoster(
         profile: input.eraProfile,
         model: input.model,
         cache,
+        fingerprints,
       }),
     });
   } else if (benchHeavyTrace.units[0] !== undefined) {
@@ -297,6 +324,7 @@ export function projectSeasonRoster(
         profile: input.eraProfile,
         model: input.model,
         cache,
+        fingerprints,
       }),
     });
   }
@@ -318,6 +346,7 @@ export function projectSeasonRoster(
           profile: input.eraProfile,
           model: input.model,
           cache,
+          fingerprints,
         }),
       });
     }
@@ -340,6 +369,7 @@ export function projectSeasonRoster(
           profile: input.eraProfile,
           model: input.model,
           cache,
+          fingerprints,
         }),
       });
     }
@@ -359,6 +389,7 @@ export function projectSeasonRoster(
         model: input.model,
         referenceId: reference.referenceId,
         cache,
+        fingerprints,
       }),
     });
   }
@@ -491,6 +522,7 @@ export function projectSeasonRoster(
           profile: input.eraProfile,
           model: input.model,
           cache,
+          fingerprints,
           metrics,
         });
   const rosterMaterial = players
