@@ -34,13 +34,7 @@
     slotPickerModule ??= import('$lib/components/draft/SlotPickerDialog.svelte');
     return slotPickerModule;
   }
-  import {
-    SLOT_INDEXES,
-    SLOT_LABELS,
-    SLOT_NAMES,
-    canFillSlot,
-    displacementTargetFor,
-  } from '$lib/draft-slots';
+  import { planPlayerMove } from '$lib/draft-slots';
   type IndexRow = PlayersIndexEntry;
   type SlotRef = {
     playerId: string;
@@ -198,15 +192,21 @@
     eraFilter = id;
   }
   function placePlayer(subject: IndexRow, slotIndex: number) {
-    const subjectSlot = slots.findIndex((p) => p !== null && p.playerId === subject.playerId);
-    const incumbent = slots[slotIndex];
-    if (incumbent && incumbent.playerId !== subject.playerId) {
-      const target = displacementTargetFor(slots, incumbent, slotIndex, subjectSlot);
-      if (target === null) return;
-      slots[target] = incumbent;
+    const plan = planPlayerMove(slots, subject, slotIndex);
+    if (plan === null) return;
+    const rowsById = new Map(
+      slots
+        .filter((player): player is IndexRow => player !== null)
+        .concat(subject)
+        .map((player) => [player.playerId, player]),
+    );
+    const next: (IndexRow | null)[] = [null, null, null, null, null];
+    for (const placement of plan.placements) {
+      const player = rowsById.get(placement.playerId);
+      if (!player) return;
+      next[placement.slotIndex] = player;
     }
-    slots[slotIndex] = subject;
-    if (subjectSlot !== -1 && subjectSlot !== slotIndex) slots[subjectSlot] = null;
+    slots = next;
     if (manifest) {
       const entry = manifest.pools.find(
         (p) => p.franchiseId === subject.franchiseId && p.eraId === subject.eraId,

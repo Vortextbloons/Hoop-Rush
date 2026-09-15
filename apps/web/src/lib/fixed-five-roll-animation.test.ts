@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   rollAnimationFor,
+  stableRollAnimationId,
   stableRollSpinId,
   type RollAnimationAxis,
 } from './fixed-five-roll-animation';
@@ -55,6 +56,24 @@ describe('stableRollSpinId', () => {
   });
 });
 
+describe('stableRollAnimationId', () => {
+  it('stays stable when an ignored rival command changes the shared roll', () => {
+    const start = rollAnimationFor([command(0, 'start', 'p1')], 'duel', 'p2');
+    const afterRivalReroll = rollAnimationFor(
+      [command(0, 'start', 'p1'), command(1, 'reroll', 'p1')],
+      'duel',
+      'p2',
+    );
+    expect(
+      stableRollAnimationId({
+        mode: 'duel',
+        nonce: afterRivalReroll.nonce,
+        axis: afterRivalReroll.axis,
+      }),
+    ).toBe(stableRollAnimationId({ mode: 'duel', nonce: start.nonce, axis: start.axis }));
+  });
+});
+
 describe('rollAnimationFor axis', () => {
   it('reports the reroll axis from the latest command', () => {
     const commands = [command(0, 'start'), command(1, 'reroll')];
@@ -68,5 +87,16 @@ describe('rollAnimationFor axis', () => {
     const commands = [command(0, 'start'), command(1, 'reroll', 'p2')];
     expect(rollAnimationFor(commands, 'classic-shared-82', 'p1').axis).toBe('both');
     expect(rollAnimationFor(commands, 'classic-shared-82', 'p2').axis).toBe('franchise');
+  });
+  it('does not animate a duel reroll for the rival viewer', () => {
+    const commands = [command(0, 'start', 'p1'), command(1, 'reroll', 'p1')];
+    expect(rollAnimationFor(commands, 'duel', 'p1')).toEqual({
+      nonce: 2,
+      axis: 'franchise',
+    });
+    expect(rollAnimationFor(commands, 'duel', 'p2')).toEqual({
+      nonce: 1,
+      axis: 'both',
+    });
   });
 });

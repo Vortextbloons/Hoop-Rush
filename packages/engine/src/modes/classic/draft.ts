@@ -23,6 +23,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import { canPlay, slotGroupOf } from '../../domain/positions.ts';
 import { slotRequirement, validateLineup } from '../../domain/lineup.ts';
+import { planLineupReposition } from '../../domain/lineup-reposition.ts';
 import type { EngineContext } from '../../sim/context.ts';
 import type { ClassicChallengeCreation } from '../../challenge/commands.ts';
 export type ClassicRollKind = 'initial' | 'franchise-reroll' | 'era-reroll';
@@ -47,7 +48,6 @@ export function sortClassicCatalog(catalog: ClassicDraftCatalog): ClassicDraftCa
             : 0,
   );
 }
-const SLOT_INDEXES: SlotIndex[] = [0, 1, 2, 3, 4];
 function catalogPlayer(
   catalog: ClassicDraftCatalog,
   franchiseId: string,
@@ -59,31 +59,6 @@ function catalogPlayer(
 } | null {
   const entry = catalog.find((e) => e.franchiseId === franchiseId && e.eraId === eraId);
   return entry?.players.find((p) => p.playerId === playerId) ?? null;
-}
-function displacementTargetFor(
-  catalog: ClassicDraftCatalog,
-  incumbent: ClassicPick,
-  targetSlot: SlotIndex,
-  vacatingSlot: SlotIndex | null,
-  picks: ClassicPick[],
-): SlotIndex | null {
-  const incumbentPlayer = catalogPlayer(
-    catalog,
-    incumbent.franchiseId,
-    incumbent.eraId,
-    incumbent.playerId,
-  );
-  if (!incumbentPlayer) return null;
-  for (const slotIndex of SLOT_INDEXES) {
-    if (slotIndex === targetSlot) continue;
-    const occupied = picks.some((pick) => pick.slotIndex === slotIndex);
-    const willBeOpen = slotIndex === vacatingSlot || !occupied;
-    if (!willBeOpen) continue;
-    if (canPlay(incumbentPlayer.positions, slotRequirement(slotIndex))) {
-      return slotIndex;
-    }
-  }
-  return null;
 }
 export function classicRollCandidates(
   catalog: ClassicDraftCatalog,
@@ -275,40 +250,38 @@ export function draftClassicPlayer(
   if (!canPlay(player.positions, slotRequirement(input.slotIndex))) {
     throw new Error(`${input.playerId} cannot play slot ${String(input.slotIndex)}`);
   }
-  const incumbentAtSlot = state.picks.find((p) => p.slotIndex === input.slotIndex);
-  if (incumbentAtSlot) {
-    const target = displacementTargetFor(
+  const lineupPlayers = state.picks.map((currentPick) => {
+    const currentPlayer = catalogPlayer(
       catalog,
-      incumbentAtSlot,
-      input.slotIndex,
-      null,
-      state.picks,
+      currentPick.franchiseId,
+      currentPick.eraId,
+      currentPick.playerId,
     );
-    if (target === null) {
-      throw new Error(`slot ${String(input.slotIndex)} is already filled`);
+    if (!currentPlayer) {
+      throw new Error(`${currentPick.playerId} has no catalog record`);
     }
-    const picksWithDisplacement = state.picks.map((pick) =>
-      pick.playerId === incumbentAtSlot.playerId ? { ...pick, slotIndex: target } : pick,
-    );
-    const pick: ClassicPick = {
-      round: state.round,
-      playerId: input.playerId,
-      franchiseId: roll.franchiseId,
-      eraId: roll.eraId,
-      slotIndex: input.slotIndex,
+    return {
+      playerId: currentPick.playerId,
+      positions: currentPlayer.positions,
+      slotIndex: currentPick.slotIndex,
     };
-    const picks = [...picksWithDisplacement, pick];
-    if (picks.length === 5) {
-      return { ...state, picks, status: 'complete', roll: null };
-    }
-    const nextState: ClassicDraftState = { ...state, picks, round: state.round + 1 };
-    const candidates = classicRollCandidates(catalog, nextState, 'initial');
-    if (candidates.length === 0) {
-      throw new Error(`no eligible pool for round ${String(nextState.round)}`);
-    }
-    const nextRoll = rollClassicPair(state.seed, nextState.round, 'initial', candidates, context);
-    return { ...nextState, roll: nextRoll };
+  });
+  const plan = planLineupReposition(
+    lineupPlayers,
+    { playerId: player.playerId, positions: player.positions },
+    input.slotIndex,
+  );
+  if (plan === null) {
+    throw new Error(`no legal placement for ${input.playerId} at slot ${String(input.slotIndex)}`);
   }
+  const slotByPlayerId = new Map(
+    plan.placements.map((placement) => [placement.playerId, placement.slotIndex]),
+  );
+  const picksWithDisplacement = state.picks.map((currentPick) => {
+    const slotIndex = slotByPlayerId.get(currentPick.playerId);
+    if (slotIndex === undefined) throw new Error(`no planned slot for ${currentPick.playerId}`);
+    return { ...currentPick, slotIndex };
+  });
   const pick: ClassicPick = {
     round: state.round,
     playerId: input.playerId,
@@ -316,7 +289,7 @@ export function draftClassicPlayer(
     eraId: roll.eraId,
     slotIndex: input.slotIndex,
   };
-  const picks = [...state.picks, pick];
+  const picks = [...picksWithDisplacement, pick];
   if (picks.length === 5) {
     return { ...state, picks, status: 'complete', roll: null };
   }
@@ -352,50 +325,39 @@ export function repositionClassicPlayer(
   if (!canPlay(player.positions, slotRequirement(input.slotIndex))) {
     throw new Error(`${input.playerId} cannot play slot ${String(input.slotIndex)}`);
   }
-  const incumbent = state.picks.find((p) => p.slotIndex === input.slotIndex);
-  if (!incumbent) {
+  const lineupPlayers = state.picks.map((currentPick) => {
+    const currentPlayer = catalogPlayer(
+      catalog,
+      currentPick.franchiseId,
+      currentPick.eraId,
+      currentPick.playerId,
+    );
+    if (!currentPlayer) {
+      throw new Error(`${currentPick.playerId} has no catalog record`);
+    }
     return {
-      ...state,
-      picks: state.picks.map((p) =>
-        p.playerId === input.playerId ? { ...p, slotIndex: input.slotIndex } : p,
-      ),
+      playerId: currentPick.playerId,
+      positions: currentPlayer.positions,
+      slotIndex: currentPick.slotIndex,
     };
-  }
-  const incumbentPlayer = catalogPlayer(
-    catalog,
-    incumbent.franchiseId,
-    incumbent.eraId,
-    incumbent.playerId,
-  );
-  if (!incumbentPlayer) {
-    throw new Error(`${incumbent.playerId} has no catalog record`);
-  }
-  if (canPlay(incumbentPlayer.positions, slotRequirement(pick.slotIndex))) {
-    return {
-      ...state,
-      picks: state.picks.map((p) => {
-        if (p.playerId === input.playerId) return { ...p, slotIndex: input.slotIndex };
-        if (p.playerId === incumbent.playerId) return { ...p, slotIndex: pick.slotIndex };
-        return p;
-      }),
-    };
-  }
-  const target = displacementTargetFor(
-    catalog,
-    incumbent,
+  });
+  const plan = planLineupReposition(
+    lineupPlayers,
+    { playerId: player.playerId, positions: player.positions },
     input.slotIndex,
-    pick.slotIndex,
-    state.picks,
   );
-  if (target === null) {
-    throw new Error(`${incumbent.playerId} cannot be moved out of slot ${String(input.slotIndex)}`);
+  if (plan === null) {
+    throw new Error(`no legal reposition for ${input.playerId} to slot ${String(input.slotIndex)}`);
   }
+  const slotByPlayerId = new Map(
+    plan.placements.map((placement) => [placement.playerId, placement.slotIndex]),
+  );
   return {
     ...state,
     picks: state.picks.map((p) => {
-      if (p.playerId === input.playerId) return { ...p, slotIndex: input.slotIndex };
-      if (p.playerId === incumbent.playerId) return { ...p, slotIndex: target };
-      return p;
+      const slotIndex = slotByPlayerId.get(p.playerId);
+      if (slotIndex === undefined) throw new Error(`no planned slot for ${p.playerId}`);
+      return { ...p, slotIndex };
     }),
   };
 }

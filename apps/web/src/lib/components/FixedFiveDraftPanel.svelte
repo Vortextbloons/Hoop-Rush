@@ -19,8 +19,7 @@
   import { arenaPickSlam } from '$lib/arena-sound';
   import { poolSortLabel, sortDraftRows, type DraftPresentation } from '$lib/draft-presentation';
   import type { RollAnimationAxis } from '$lib/fixed-five-roll-animation';
-  import { stableRollSpinId } from '$lib/fixed-five-roll-animation';
-  import { displacementTargetFor } from '$lib/draft-slots';
+  import { stableRollAnimationId } from '$lib/fixed-five-roll-animation';
   import { formatPositions } from '$lib/player-positions';
   import { resolvePlayerRefs } from '$lib/player-refs';
   import type { PeakPlayerSeason } from '@hoop-rush/data-contracts';
@@ -60,7 +59,7 @@
       seedPath: string;
     } | null;
     error?: string | null;
-    onPick: (playerId: PlayerId, slotIndex: SlotIndex, moveTarget?: SlotIndex | null) => void;
+    onPick: (playerId: PlayerId, slotIndex: SlotIndex) => void;
     onReroll: (axis: 'franchise' | 'era') => void;
     onRemove: (slotIndex: SlotIndex) => void;
     onLock: () => void;
@@ -359,23 +358,11 @@
     });
   }
   function placeWithDisplacement(player: PlayersIndexEntry, slotIndex: number) {
-    const slots = activeCourtRows;
-    const subjectSlot = slots.findIndex((p) => p !== null && p.playerId === player.playerId);
-    const incumbent = slots[slotIndex] ?? null;
-    let moveTarget: SlotIndex | null = null;
-    if (incumbent && incumbent.playerId !== player.playerId && allowDisplacement) {
-      moveTarget = displacementTargetFor(
-        slots,
-        incumbent,
-        slotIndex,
-        subjectSlot,
-      ) as SlotIndex | null;
-    }
     closePicker();
-    onPick(player.playerId, slotIndex as SlotIndex, moveTarget);
+    onPick(player.playerId, slotIndex as SlotIndex);
   }
   function openPickerForCourt(player: PlayersIndexEntry) {
-    if (mode === 'sandbox-shared-82') {
+    if (mode === 'sandbox-shared-82' || mode === 'classic-shared-82') {
       openPicker(player);
       return;
     }
@@ -434,12 +421,9 @@
   const clockUrgent = $derived(deadlineText ? /0:0\d|0:09|expired/i.test(deadlineText) : false);
   const reelSpinId = $derived.by((): string | null => {
     if (!rollView || rollView.complete) return null;
-    if (!rollFranchise || !rollEra) return null;
-    return stableRollSpinId({
+    return stableRollAnimationId({
       mode,
-      ordinal: rollView.spinKey,
-      franchiseId: rollView.franchiseId,
-      eraId: rollView.eraId,
+      nonce: rollNonce,
       axis: rollAxis,
     });
   });

@@ -11,6 +11,7 @@ import { classicVariantSchema } from './classic.ts';
 import { lineupSchema } from './lineup.ts';
 import { simulationPlayerSchema } from './simulation.ts';
 import { CLASSIC_ROLL_VERSION } from './versions.ts';
+import { FIXED_FIVE_MULTIPLAYER_VERSION } from './fixed-five-versions.ts';
 export {
   FIXED_FIVE_ROOM_SCHEMA_VERSION,
   FIXED_FIVE_ROOM_PROTOCOL_VERSION,
@@ -69,7 +70,7 @@ export function defaultFixedFiveVersionLocks(
     seedDerivationVersion: overrides.seedDerivationVersion ?? 'seed-v1',
     classicRollVersion: overrides.classicRollVersion ?? CLASSIC_ROLL_VERSION,
     profileVersion: overrides.profileVersion ?? 'unknown',
-    multiplayerVersion: overrides.multiplayerVersion ?? 'fixed-five-multiplayer-v1',
+    multiplayerVersion: overrides.multiplayerVersion ?? FIXED_FIVE_MULTIPLAYER_VERSION,
     autopickVersion: overrides.autopickVersion ?? 'fixed-five-autopick-v1',
   };
 }
@@ -98,6 +99,11 @@ export const fixedFiveClassicPickPayloadSchema = z.object({
   playerId: playerIdSchema,
   slotIndex: z.number().int().min(0).max(4),
 });
+export const fixedFiveClassicRepositionPayloadSchema = z.object({
+  kind: z.literal('classic-reposition'),
+  playerId: playerIdSchema,
+  slotIndex: z.number().int().min(0).max(4),
+});
 export const fixedFiveDuelClaimPayloadSchema = z.object({
   kind: z.literal('duel-claim'),
   playerId: playerIdSchema,
@@ -107,6 +113,11 @@ export const fixedFiveDuelClaimPayloadSchema = z.object({
 });
 export const fixedFiveSandboxPlacePayloadSchema = z.object({
   kind: z.literal('sandbox-place'),
+  playerId: playerIdSchema,
+  slotIndex: z.number().int().min(0).max(4),
+});
+export const fixedFiveSandboxRepositionPayloadSchema = z.object({
+  kind: z.literal('sandbox-reposition'),
   playerId: playerIdSchema,
   slotIndex: z.number().int().min(0).max(4),
 });
@@ -151,8 +162,10 @@ export const fixedFiveCommandPayloadSchema = z.discriminatedUnion('kind', [
   fixedFiveStartPayloadSchema,
   fixedFiveRerollPayloadSchema,
   fixedFiveClassicPickPayloadSchema,
+  fixedFiveClassicRepositionPayloadSchema,
   fixedFiveDuelClaimPayloadSchema,
   fixedFiveSandboxPlacePayloadSchema,
+  fixedFiveSandboxRepositionPayloadSchema,
   fixedFiveSandboxRemovePayloadSchema,
   fixedFiveSandboxLockPayloadSchema,
   fixedFiveTimeoutAutopickPayloadSchema,

@@ -32,7 +32,7 @@ export function rollAnimationFor(
   for (const command of commands) {
     if (!isRollAffecting(mode, command.payload.kind)) continue;
     if (
-      mode === 'classic-shared-82' &&
+      (mode === 'classic-shared-82' || mode === 'duel') &&
       viewer !== null &&
       command.payload.kind !== 'start' &&
       command.actorParticipantId !== viewer
@@ -45,6 +45,13 @@ export function rollAnimationFor(
     axis = command.payload.kind === 'reroll' ? command.payload.axis : 'both';
   }
   return { nonce, axis };
+}
+export function stableRollAnimationId(input: {
+  mode: string;
+  nonce: number;
+  axis: RollAnimationAxis;
+}): string {
+  return `${input.mode}|${String(input.nonce)}|${input.axis}`;
 }
 export function stableRollSpinId(input: {
   mode: string;

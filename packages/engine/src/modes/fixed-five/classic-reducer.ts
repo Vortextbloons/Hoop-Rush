@@ -9,6 +9,7 @@ import {
   classicRollCandidates,
   createClassicDraft,
   draftClassicPlayer,
+  repositionClassicPlayer,
   rerollClassicEra,
   rerollClassicFranchise,
 } from '../classic/draft.ts';
@@ -20,6 +21,11 @@ export type ClassicBuilderCommand =
     }
   | {
       kind: 'classic-pick';
+      playerId: PlayerId;
+      slotIndex: SlotIndex;
+    }
+  | {
+      kind: 'classic-reposition';
       playerId: PlayerId;
       slotIndex: SlotIndex;
     };
@@ -36,6 +42,9 @@ export function applyClassicBuilderCommand(
     return command.axis === 'franchise'
       ? rerollClassicFranchise(state, effectiveCatalog, context)
       : rerollClassicEra(state, effectiveCatalog, context);
+  }
+  if (command.kind === 'classic-reposition') {
+    return repositionClassicPlayer(state, effectiveCatalog, command);
   }
   return draftClassicPlayer(
     state,

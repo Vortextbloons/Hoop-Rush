@@ -10,8 +10,10 @@ const STALE_RETRY_SAFE_KINDS: ReadonlySet<FixedFiveCommandPayload['kind']> = new
   'ready',
   'reroll',
   'classic-pick',
+  'classic-reposition',
   'duel-claim',
   'sandbox-place',
+  'sandbox-reposition',
   'sandbox-remove',
 ]);
 export interface SubmitFixedFiveCommandInput {

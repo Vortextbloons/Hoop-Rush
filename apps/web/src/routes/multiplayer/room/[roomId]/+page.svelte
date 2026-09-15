@@ -396,45 +396,29 @@
       return false;
     }
   }
-  async function sendPick(
-    playerId: PlayerId,
-    slot: SlotIndex,
-    moveTarget?: SlotIndex | null,
-  ): Promise<void> {
+  async function sendPick(playerId: PlayerId, slot: SlotIndex): Promise<void> {
     draftError = null;
     if (!snapshot || !replay) return;
     const mode = snapshot.settings.mode;
     if (mode === 'sandbox-shared-82') {
-      if (moveTarget == null || replay.mode !== 'sandbox-shared-82') {
+      if (replay.mode !== 'sandbox-shared-82') {
         await sendCommand({ kind: 'sandbox-place', playerId, slotIndex: slot });
         return;
       }
       const builder = selfId === 'p1' ? replay.p1 : replay.p2;
       const incumbent = builder.placements.find((p) => p.slotIndex === slot) ?? null;
-      const subjectOld = builder.placements.find((p) => p.playerId === playerId)?.slotIndex ?? null;
-      if (!incumbent || incumbent.playerId === playerId) {
+      const subjectPlaced = builder.placements.some((p) => p.playerId === playerId);
+      if (!incumbent && !subjectPlaced) {
         await sendCommand({ kind: 'sandbox-place', playerId, slotIndex: slot });
         return;
       }
-      if (subjectOld !== null) {
-        const freed = await sendCommand({ kind: 'sandbox-remove', slotIndex: subjectOld });
-        if (!freed) {
-          draftError = 'Move was rejected — resync and try again.';
-          return;
-        }
-      }
-      const placed = await sendCommand({ kind: 'sandbox-place', playerId, slotIndex: slot });
-      if (!placed) {
-        draftError = 'Displacement pick was rejected — it may already be spent.';
-        return;
-      }
-      const restored = await sendCommand({
-        kind: 'sandbox-place',
-        playerId: incumbent.playerId,
-        slotIndex: moveTarget,
+      const repositioned = await sendCommand({
+        kind: 'sandbox-reposition',
+        playerId,
+        slotIndex: slot,
       });
-      if (!restored) {
-        draftError = 'Placed your pick but could not move the displaced player back.';
+      if (!repositioned) {
+        draftError = 'That rearrangement is no longer legal — resync and try again.';
       }
       return;
     }
@@ -463,6 +447,15 @@
         franchiseId: roll.franchiseId,
         eraId: roll.eraId,
       });
+      return;
+    }
+    if (replay.mode !== 'classic-shared-82') {
+      await sendCommand({ kind: 'classic-pick', playerId, slotIndex: slot });
+      return;
+    }
+    const draft = selfId === 'p1' ? replay.p1 : replay.p2;
+    if (draft.picks.some((pick) => pick.playerId === playerId)) {
+      await sendCommand({ kind: 'classic-reposition', playerId, slotIndex: slot });
       return;
     }
     await sendCommand({ kind: 'classic-pick', playerId, slotIndex: slot });
@@ -1426,9 +1419,9 @@
             deadlineText={clockText}
             {lastAutopick}
             error={draftError}
-            onPick={(playerId, slot, moveTarget) => {
+            onPick={(playerId, slot) => {
               draftError = null;
-              void sendPick(playerId, slot, moveTarget).catch((e: unknown) => {
+              void sendPick(playerId, slot).catch((e: unknown) => {
                 draftError = e instanceof Error ? e.message : String(e);
               });
             }}

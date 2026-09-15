@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { HoopRushManifest, PlayersIndexEntry, SlotIndex } from '@hoop-rush/data-contracts';
+  import type { LineupRepositionPlan } from '@hoop-rush/engine';
   import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
   import { untrack } from 'svelte';
   import { Search } from '@lucide/svelte';
@@ -9,7 +10,7 @@
     type DraftPresentation,
     type RatingBadgeLabel,
   } from '$lib/draft-presentation';
-  import { SLOT_INDEXES, SLOT_LABELS, canFillSlot, displacementTargetFor } from '$lib/draft-slots';
+  import { SLOT_INDEXES, SLOT_LABELS, canFillSlot, planPlayerMove } from '$lib/draft-slots';
   import { formatPositions } from '$lib/player-positions';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
   type IndexRow = PlayersIndexEntry;
@@ -92,7 +93,7 @@
     state: PoolCardState;
     displace: {
       incumbent: IndexRow;
-      targetSlot: number;
+      plan: LineupRepositionPlan;
     } | null;
   };
   function poolCardInfoFor(player: IndexRow): PoolCardInfo {
@@ -101,12 +102,12 @@
     }
     let displace: PoolCardInfo['displace'] = null;
     for (const i of SLOT_INDEXES) {
-      if (!canFillSlot(player, i)) continue;
       const incumbent = slots[i] ?? null;
+      const plan = planPlayerMove(slots, player, i);
+      if (plan === null) continue;
       if (!incumbent) return { state: 'place', displace: null };
       if (displace === null) {
-        const target = displacementTargetFor(slots, incumbent, i, -1);
-        if (target !== null) displace = { incumbent, targetSlot: target };
+        displace = { incumbent, plan };
       }
     }
     return displace !== null && allowDisplacement
@@ -239,6 +240,12 @@
                   player.positionsPlayable,
                 )}
               </span>
+              {#if cardState === 'displace' && card.displace}
+                {@const movedCount = Math.max(1, card.displace.plan.moves.length - 1)}
+                <span class="block truncate font-mono text-[10px] leading-tight text-accent">
+                  Rearranges {movedCount} player{movedCount === 1 ? '' : 's'}
+                </span>
+              {/if}
             </span>
             <span class="ml-1 flex shrink-0 gap-1 font-mono text-[10px]">
               {#each ratingBadges(player, presentation) as badge (badge.label)}

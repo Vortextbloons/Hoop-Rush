@@ -160,9 +160,13 @@ function applyClassicPayload(
     const command: ClassicBuilderCommand = { kind: 'reroll', axis: payload.axis };
     return applyClassicBuilderCommand(state, assets.catalog, command, assets.context);
   }
-  if (payload.kind === 'classic-pick' || payload.kind === 'timeout-autopick') {
+  if (
+    payload.kind === 'classic-pick' ||
+    payload.kind === 'classic-reposition' ||
+    payload.kind === 'timeout-autopick'
+  ) {
     const command: ClassicBuilderCommand = {
-      kind: 'classic-pick',
+      kind: payload.kind === 'classic-reposition' ? 'classic-reposition' : 'classic-pick',
       playerId: payload.playerId,
       slotIndex: payload.slotIndex,
     };
@@ -175,9 +179,13 @@ function applySandboxPayload(
   assets: FixedFiveAssets,
   payload: FixedFiveCommandPayload,
 ): SandboxBuilderState {
-  if (payload.kind === 'sandbox-place' || payload.kind === 'timeout-autopick') {
+  if (
+    payload.kind === 'sandbox-place' ||
+    payload.kind === 'sandbox-reposition' ||
+    payload.kind === 'timeout-autopick'
+  ) {
     return applySandboxBuilderCommand(state, assets.pool, {
-      kind: 'sandbox-place',
+      kind: payload.kind === 'sandbox-reposition' ? 'sandbox-reposition' : 'sandbox-place',
       playerId: payload.playerId,
       slotIndex: payload.slotIndex,
     });
@@ -251,12 +259,18 @@ function isDraftPayload(
   if (mode === 'sandbox-shared-82') {
     return (
       kind === 'sandbox-place' ||
+      kind === 'sandbox-reposition' ||
       kind === 'sandbox-remove' ||
       kind === 'sandbox-lock' ||
       kind === 'timeout-autopick'
     );
   }
-  return kind === 'reroll' || kind === 'classic-pick' || kind === 'timeout-autopick';
+  return (
+    kind === 'reroll' ||
+    kind === 'classic-pick' ||
+    kind === 'classic-reposition' ||
+    kind === 'timeout-autopick'
+  );
 }
 export function replayFixedFiveLog(
   mode: FixedFiveRoomMode,

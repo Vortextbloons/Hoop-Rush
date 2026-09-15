@@ -6,12 +6,14 @@ import {
   FIXED_FIVE_AUTOPICK_VERSION,
   FIXED_FIVE_MULTIPLAYER_VERSION,
   POSITION_NORMALIZATION_VERSION,
+  fixedFiveCommandPayloadSchema,
+  playerIdSchema,
 } from '@hoop-rush/data-contracts';
 import { ENGINE_VERSION, SEED_DERIVATION_VERSION } from '@hoop-rush/engine';
 
 const MIGRATION_PATH = fileURLToPath(
   new URL(
-    '../../../../supabase/migrations/20260904000002_fixed_five_rpc_hardening.sql',
+    '../../../../supabase/migrations/20260914000001_fixed_five_deep_reposition.sql',
     import.meta.url,
   ),
 );
@@ -42,5 +44,31 @@ describe('fixed-five server version locks', () => {
       classicRollVersion: CLASSIC_ROLL_VERSION,
       positionNormalizationVersion: POSITION_NORMALIZATION_VERSION,
     });
+  });
+});
+
+describe('fixed-five reposition protocol', () => {
+  it('accepts atomic Classic and Sandbox reposition payloads', () => {
+    const playerId = playerIdSchema.parse('deep-player');
+    expect(
+      fixedFiveCommandPayloadSchema.parse({
+        kind: 'classic-reposition',
+        playerId,
+        slotIndex: 2,
+      }),
+    ).toEqual({ kind: 'classic-reposition', playerId, slotIndex: 2 });
+    expect(
+      fixedFiveCommandPayloadSchema.parse({
+        kind: 'sandbox-reposition',
+        playerId,
+        slotIndex: 3,
+      }),
+    ).toEqual({ kind: 'sandbox-reposition', playerId, slotIndex: 3 });
+  });
+
+  it('keeps atomic reposition kinds in the server command allowlist', () => {
+    const sql = readFileSync(MIGRATION_PATH, 'utf8');
+    expect(sql).toContain("'classic-reposition'");
+    expect(sql).toContain("'sandbox-reposition'");
   });
 });

@@ -21,8 +21,10 @@ export interface FixedFiveDigestInput {
 const DIGESTED_COMMAND_KINDS: ReadonlySet<FixedFiveCommand['payload']['kind']> = new Set([
   'reroll',
   'classic-pick',
+  'classic-reposition',
   'duel-claim',
   'sandbox-place',
+  'sandbox-reposition',
   'sandbox-remove',
   'sandbox-lock',
   'timeout-autopick',

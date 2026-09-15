@@ -6,6 +6,7 @@ import {
 } from '@hoop-rush/test-fixtures';
 import type {
   ClassicDraftCatalog,
+  ClassicDraftState,
   EraId,
   EraSimulationProfile,
   FixedFiveLineupEntry,
@@ -294,6 +295,75 @@ describe('sandbox builder', () => {
       expect(move.selectionScore).toBeGreaterThan(0);
     }
   });
+
+  it('applies a deep reposition chain atomically', () => {
+    const pool: FixedFiveCandidate[] = [
+      {
+        playerId: pid('a'),
+        playerVersionId: 'pv-a',
+        positions: ['PG', 'SF'],
+        selectionScore: 90,
+        franchiseId: fid('lakers'),
+        eraId: eid('1990s'),
+      },
+      {
+        playerId: pid('e'),
+        playerVersionId: 'pv-e',
+        positions: ['SG'],
+        selectionScore: 89,
+        franchiseId: fid('lakers'),
+        eraId: eid('1990s'),
+      },
+      {
+        playerId: pid('b'),
+        playerVersionId: 'pv-b',
+        positions: ['SF', 'PF'],
+        selectionScore: 88,
+        franchiseId: fid('bulls'),
+        eraId: eid('1990s'),
+      },
+      {
+        playerId: pid('c'),
+        playerVersionId: 'pv-c',
+        positions: ['PF', 'C'],
+        selectionScore: 87,
+        franchiseId: fid('celtics'),
+        eraId: eid('1990s'),
+      },
+      {
+        playerId: pid('d'),
+        playerVersionId: 'pv-d',
+        positions: ['C', 'PG'],
+        selectionScore: 86,
+        franchiseId: fid('heat'),
+        eraId: eid('2000s'),
+      },
+    ];
+    const state = {
+      placements: [
+        { playerId: pid('a'), slotIndex: 0 as const },
+        { playerId: pid('e'), slotIndex: 1 as const },
+        { playerId: pid('b'), slotIndex: 2 as const },
+        { playerId: pid('c'), slotIndex: 3 as const },
+        { playerId: pid('d'), slotIndex: 4 as const },
+      ],
+      locked: false,
+    };
+
+    const moved = applySandboxBuilderCommand(state, pool, {
+      kind: 'sandbox-reposition',
+      playerId: pid('a'),
+      slotIndex: 2,
+    });
+
+    expect(moved.placements).toEqual([
+      { playerId: pid('d'), slotIndex: 0 },
+      { playerId: pid('e'), slotIndex: 1 },
+      { playerId: pid('a'), slotIndex: 2 },
+      { playerId: pid('b'), slotIndex: 3 },
+      { playerId: pid('c'), slotIndex: 4 },
+    ]);
+  });
 });
 describe('classic reducer', () => {
   it('wraps solo draft functions without changing default behavior', () => {
@@ -349,6 +419,101 @@ describe('classic reducer', () => {
       context,
     );
     expect(p1.seed).not.toBe(p2.seed);
+  });
+  it('repositions Classic picks through a deep legal chain', () => {
+    const deepCatalog: ClassicDraftCatalog = [
+      {
+        franchiseId: fid('lakers'),
+        eraId: eid('1990s'),
+        players: [{ playerId: pid('a'), positions: ['PG', 'SF'] }],
+      },
+      {
+        franchiseId: fid('lakers'),
+        eraId: eid('2010s'),
+        players: [{ playerId: pid('e'), positions: ['SG'] }],
+      },
+      {
+        franchiseId: fid('bulls'),
+        eraId: eid('1990s'),
+        players: [{ playerId: pid('b'), positions: ['SF', 'PF'] }],
+      },
+      {
+        franchiseId: fid('celtics'),
+        eraId: eid('1990s'),
+        players: [{ playerId: pid('c'), positions: ['PF', 'C'] }],
+      },
+      {
+        franchiseId: fid('heat'),
+        eraId: eid('2000s'),
+        players: [{ playerId: pid('d'), positions: ['C', 'PG'] }],
+      },
+    ];
+    const base = createParticipantClassicDraft(
+      'deep-reposition',
+      'ratings',
+      fixedFiveDraftSeed(ROOT, 'p1'),
+      'data-v1',
+      classicCatalog(),
+      context,
+    );
+    const state: ClassicDraftState = {
+      ...base,
+      status: 'complete',
+      round: 5,
+      roll: null,
+      picks: [
+        {
+          round: 1,
+          playerId: pid('a'),
+          franchiseId: fid('lakers'),
+          eraId: eid('1990s'),
+          slotIndex: 0,
+        },
+        {
+          round: 2,
+          playerId: pid('e'),
+          franchiseId: fid('lakers'),
+          eraId: eid('2010s'),
+          slotIndex: 1,
+        },
+        {
+          round: 3,
+          playerId: pid('b'),
+          franchiseId: fid('bulls'),
+          eraId: eid('1990s'),
+          slotIndex: 2,
+        },
+        {
+          round: 4,
+          playerId: pid('c'),
+          franchiseId: fid('celtics'),
+          eraId: eid('1990s'),
+          slotIndex: 3,
+        },
+        {
+          round: 5,
+          playerId: pid('d'),
+          franchiseId: fid('heat'),
+          eraId: eid('2000s'),
+          slotIndex: 4,
+        },
+      ],
+    };
+
+    const moved = applyClassicBuilderCommand(
+      state,
+      deepCatalog,
+      { kind: 'classic-reposition', playerId: pid('a'), slotIndex: 2 },
+      context,
+    );
+
+    expect(moved.picks.map((pick) => [pick.playerId, pick.slotIndex])).toEqual([
+      [pid('a'), 2],
+      [pid('e'), 1],
+      [pid('b'), 3],
+      [pid('c'), 4],
+      [pid('d'), 0],
+    ]);
   });
 });
 describe('duel draft', () => {

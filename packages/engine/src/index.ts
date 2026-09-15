@@ -1,5 +1,12 @@
 export { canPlay, type SlotGroup } from './domain/positions.ts';
 export { slotRequirement, validateLineup } from './domain/lineup.ts';
+export {
+  planLineupReposition,
+  type LineupRepositionMove,
+  type LineupRepositionPlan,
+  type LineupRepositionPlayer,
+  type LineupRepositionSubject,
+} from './domain/lineup-reposition.ts';
 import { slotRequirement as canonicalSlotRequirement } from './domain/lineup.ts';
 export { classifyArchetype } from './domain/archetypes.ts';
 export { createEngineContext, type EngineContext } from './sim/context.ts';

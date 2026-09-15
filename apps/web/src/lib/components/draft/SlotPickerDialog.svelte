@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { HoopRushManifest, PlayersIndexEntry } from '@hoop-rush/data-contracts';
+  import type { LineupRepositionMove, LineupRepositionPlan } from '@hoop-rush/engine';
   import { ArrowRight, Check, Lock, Plus, X } from '@lucide/svelte';
   import { Dialog } from 'bits-ui';
   import {
@@ -12,7 +13,7 @@
     SLOT_LABELS,
     SLOT_NAMES,
     canFillSlot,
-    displacementTargetFor,
+    planPlayerMove,
   } from '$lib/draft-slots';
   import { formatPositions } from '$lib/player-positions';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
@@ -41,9 +42,19 @@
     index: number;
     incumbent: IndexRow | null;
     state: 'open' | 'self' | 'displace' | 'swap' | 'blocked' | 'cant-play';
-    moveTarget: number | null;
+    plan: LineupRepositionPlan | null;
     ariaLabel: string;
   };
+  function secondaryMovesFor(
+    plan: LineupRepositionPlan | null,
+    subjectPlayerId: string,
+  ): LineupRepositionMove[] {
+    return plan?.moves.filter((move) => move.playerId !== subjectPlayerId) ?? [];
+  }
+  function moveLabel(move: LineupRepositionMove): string {
+    const movedPlayer = slots.find((candidate) => candidate?.playerId === move.playerId);
+    return `${movedPlayer?.displayName ?? move.playerId} → ${SLOT_LABELS[move.toSlot]}`;
+  }
   const pickerOptions = $derived.by((): PickerOption[] => {
     const subject = player;
     if (!subject) return [];
@@ -56,16 +67,18 @@
           index: i,
           incumbent,
           state: 'cant-play',
-          moveTarget: null,
+          plan: null,
           ariaLabel: `${subject.displayName} cannot play ${slotName}`,
         };
       }
+      const plan = planPlayerMove(slots, subject, i);
+      const secondaryMoves = secondaryMovesFor(plan, subject.playerId);
       if (!incumbent) {
         return {
           index: i,
           incumbent: null,
           state: 'open',
-          moveTarget: null,
+          plan,
           ariaLabel: `Place ${subject.displayName} at ${slotName}`,
         };
       }
@@ -74,26 +87,25 @@
           index: i,
           incumbent,
           state: 'self',
-          moveTarget: null,
+          plan,
           ariaLabel: `${subject.displayName} already at ${slotName}`,
         };
       }
-      const target = displacementTargetFor(slots, incumbent, i, subjectSlot);
-      if (allowDisplacement && target !== null) {
+      if (allowDisplacement && plan !== null) {
         return {
           index: i,
           incumbent,
           state: 'displace',
-          moveTarget: target,
-          ariaLabel: `Place ${subject.displayName} at ${slotName}, moving ${incumbent.displayName} to ${SLOT_NAMES[target]} slot ${target + 1}`,
+          plan,
+          ariaLabel: `Place ${subject.displayName} at ${slotName}, moving ${secondaryMoves.map(moveLabel).join(', ')}`,
         };
       }
-      if (!allowDisplacement && subjectSlot !== -1 && canFillSlot(incumbent, subjectSlot)) {
+      if (!allowDisplacement && subjectSlot !== -1 && plan !== null && plan.moves.length <= 2) {
         return {
           index: i,
           incumbent,
           state: 'swap',
-          moveTarget: null,
+          plan,
           ariaLabel: `Swap ${subject.displayName} with ${incumbent.displayName} at ${slotName}`,
         };
       }
@@ -101,7 +113,7 @@
         index: i,
         incumbent,
         state: 'blocked',
-        moveTarget: null,
+        plan: null,
         ariaLabel: `${slotName} occupied by ${incumbent.displayName}`,
       };
     });
@@ -202,11 +214,12 @@
                 {#if opt.state === 'self'}
                   <Check class="h-4 w-4 text-primary" />
                   <span class="font-mono text-[10px] tracking-wide uppercase">Current</span>
-                {:else if opt.state === 'displace' && opt.moveTarget !== null}
+                {:else if opt.state === 'displace' && opt.plan !== null}
+                  {@const secondaryMoves = secondaryMovesFor(opt.plan, subject.playerId)}
                   <ArrowRight class="h-4 w-4 shrink-0 text-accent" />
                   <span class="font-mono text-[10px] tracking-wide uppercase text-accent">
-                    Moves {opt.incumbent!.displayName.split(' ').pop()} to
-                    {SLOT_LABELS[opt.moveTarget]}
+                    Moves {secondaryMoves.length} player{secondaryMoves.length === 1 ? '' : 's'}:
+                    {secondaryMoves.map(moveLabel).join(', ')}
                   </span>
                 {:else if opt.state === 'swap'}
                   <ArrowRight class="h-4 w-4 shrink-0 text-accent" />

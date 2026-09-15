@@ -1,6 +1,7 @@
 import type { PlayerId, Position, SlotIndex } from '@hoop-rush/data-contracts';
 import { canPlay } from '../../domain/positions.ts';
 import { slotRequirement, validateLineup } from '../../domain/lineup.ts';
+import { planLineupReposition } from '../../domain/lineup-reposition.ts';
 export interface FixedFiveCandidate {
   playerId: PlayerId;
   playerVersionId: string;
@@ -19,6 +20,11 @@ export interface SandboxBuilderState {
 export type SandboxBuilderCommand =
   | {
       kind: 'sandbox-place';
+      playerId: PlayerId;
+      slotIndex: SlotIndex;
+    }
+  | {
+      kind: 'sandbox-reposition';
       playerId: PlayerId;
       slotIndex: SlotIndex;
     }
@@ -187,6 +193,34 @@ export function applySandboxBuilderCommand(
       );
     }
     return { placements: [...next].sort((a, b) => a.slotIndex - b.slotIndex), locked: false };
+  }
+  if (command.kind === 'sandbox-reposition') {
+    const candidate = candidateById(pool, command.playerId);
+    if (!candidate) {
+      throw new Error(`unknown player ${command.playerId}`);
+    }
+    const plan = planLineupReposition(
+      state.placements.map((placement) => {
+        const placed = candidateById(pool, placement.playerId);
+        if (!placed) throw new Error(`unknown player ${placement.playerId}`);
+        return {
+          playerId: placement.playerId,
+          positions: placed.positions,
+          slotIndex: placement.slotIndex,
+        };
+      }),
+      { playerId: candidate.playerId, positions: candidate.positions },
+      command.slotIndex,
+    );
+    if (plan === null) {
+      throw new Error(
+        `no legal reposition for ${command.playerId} to slot ${String(command.slotIndex)}`,
+      );
+    }
+    return {
+      placements: plan.placements.sort((a, b) => a.slotIndex - b.slotIndex),
+      locked: false,
+    };
   }
   if (command.kind === 'sandbox-remove') {
     return {
