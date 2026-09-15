@@ -269,7 +269,9 @@
   const autoSeed = $derived(
     shell.snapshot === null || shell.nextBlockIndex === null
       ? null
-      : seasonDigestHex(`${shell.snapshot.run.runId} auto-rotation ${String(shell.nextBlockIndex)}`),
+      : seasonDigestHex(
+          `${shell.snapshot.run.runId}\u0000auto-rotation\u0000${String(shell.nextBlockIndex)}`,
+        ),
   );
   const autoNames = $derived(shell.editor?.names ?? null);
   const ratingsOf = (playerVersionId: string) =>

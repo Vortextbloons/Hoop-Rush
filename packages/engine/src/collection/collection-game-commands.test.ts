@@ -507,7 +507,11 @@ describe('collection game commands', () => {
         inputDigest: collectionPreparedInputDigest(tamperedBase),
       },
     };
-    const { result, events } = simulateCollectionGame(pending, baseInput.catalog, baseInput.profile);
+    const { result, events } = simulateCollectionGame(
+      pending,
+      baseInput.catalog,
+      baseInput.profile,
+    );
     const rejected = applyCollectionGameCommand(
       tampered,
       baseCommand(tampered, 'cmd-accept-tamper', {

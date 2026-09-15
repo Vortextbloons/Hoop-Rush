@@ -14,13 +14,11 @@ export function buildWeightedPickTable(weights: readonly number[]): WeightedPick
   }
   return { weights: clamped, total };
 }
-function isWeightedPickTable(value: readonly number[] | WeightedPickTable): value is WeightedPickTable {
+function isWeightedPickTable(
+  value: readonly number[] | WeightedPickTable,
+): value is WeightedPickTable {
   return (
-    typeof value === 'object' &&
-    value !== null &&
-    !Array.isArray(value) &&
-    'total' in value &&
-    'weights' in value
+    typeof value === 'object' && !Array.isArray(value) && 'total' in value && 'weights' in value
   );
 }
 function weightedPickFromTable<T>(
@@ -117,11 +115,8 @@ export function createRng(seed: string, position = 0): Rng {
           `weightedPick: items (${String(items.length)}) and weights (${String(weights.length)}) length mismatch`,
         );
       }
-      return weightedPickFromTable(
-        items,
-        buildWeightedPickTable(weights),
-        draw,
-        () => this.pick(items),
+      return weightedPickFromTable(items, buildWeightedPickTable(weights), draw, () =>
+        this.pick(items),
       );
     },
   };

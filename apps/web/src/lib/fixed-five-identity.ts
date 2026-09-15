@@ -21,7 +21,10 @@ export function friendlyFixedFiveJoinError(error: unknown): string {
     lower.includes('name not resolved')
   )
     return 'Can’t reach the online lobby. Check your connection and try again.';
-  if (lower.includes('anonymous sign-ins are disabled') || lower.includes('anonymous sign ins are disabled'))
+  if (
+    lower.includes('anonymous sign-ins are disabled') ||
+    lower.includes('anonymous sign ins are disabled')
+  )
     return 'Online play is disabled on the server right now. Solo Classic and Sandbox still work.';
   if (message.includes('invalid-code'))
     return 'That code was not found. Check the 4 digits and try again.';

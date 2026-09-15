@@ -1077,17 +1077,21 @@ describe('neutralSelectionScoreFor', () => {
   it('excludes team context so individual production picks the peak', () => {
     // 1999-00 Payton (All-NBA First Team) carries a lottery-team penalty in
     // raw that 1997-98 does not; neutral form restores the production winner.
-    const neutral = neutralSelectionScoreFor(profile(), { overallRating: 73 }, {
-      steals: 100,
-      blocks: 10,
-    } as never);
+    const neutral = neutralSelectionScoreFor(
+      profile(),
+      { overallRating: 73 },
+      {
+        steals: 100,
+        blocks: 10,
+      },
+    );
     // base 65.07 * 0.75 + prod 71.7 * 0.25 + defense credit + two-way bonus
     expect(neutral).toBeCloseTo(64.85, 1);
     expect(neutral).toBeGreaterThan(
       neutralSelectionScoreFor(
         profile({ baseScore: 64.14, production: { score: 65.2, weight: 0.25 } }),
         { overallRating: 74 },
-        { steals: 100, blocks: 10 } as never,
+        { steals: 100, blocks: 10 },
       ),
     );
   });

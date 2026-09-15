@@ -1,9 +1,7 @@
 import { z } from 'zod';
 import { commandIdSchema, franchiseIdSchema, idSchema } from './ids.ts';
 import { injuryIdSchema } from './season-health.ts';
-import {
-  SEASON_INFLUENCE_VERSION,
-} from './season-versions.ts';
+import { SEASON_INFLUENCE_VERSION } from './season-versions.ts';
 export const seasonInfluenceSourceSchema = z.enum([
   'initial-grant',
   'block-grant',

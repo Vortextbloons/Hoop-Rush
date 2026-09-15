@@ -192,16 +192,10 @@ export const seasonRunVersionsSchema = z.object({
   healthVersion: z.literal(SEASON_HEALTH_VERSION),
   tradeVersion: z.literal(SEASON_TRADE_VERSION),
   influenceVersion: z.literal(SEASON_INFLUENCE_VERSION),
-  objectiveVersion: z
-    .literal(SEASON_OBJECTIVE_VERSION)
-    .optional(),
-  challengeVersion: z
-    .literal(SEASON_CHALLENGE_VERSION)
-    .optional(),
+  objectiveVersion: z.literal(SEASON_OBJECTIVE_VERSION).optional(),
+  challengeVersion: z.literal(SEASON_CHALLENGE_VERSION).optional(),
   challengeTargetsVersion: z.literal(SEASON_CHALLENGE_TARGETS_VERSION).optional(),
-  campaignVersion: z
-    .literal(SEASON_CAMPAIGN_VERSION)
-    .optional(),
+  campaignVersion: z.literal(SEASON_CAMPAIGN_VERSION).optional(),
   campaignTargetsVersion: z.literal(SEASON_CAMPAIGN_TARGETS_VERSION).optional(),
   injuryTargetsVersion: z.literal(SEASON_INJURY_TARGETS_VERSION),
   tradeTargetsVersion: z.literal(SEASON_TRADE_TARGETS_VERSION),
@@ -328,7 +322,7 @@ export const seasonRunSchema = z
         message: `awards cannot exist before the playoffs (run stage: ${run.stage})`,
       });
     }
-    if (run.schemaVersion === SEASON_RUN_SCHEMA_VERSION && run.challenges === undefined) {
+    if (run.challenges === undefined) {
       ctx.addIssue({ code: 'custom', message: 'a v14 run must carry challenge state' });
     }
   });

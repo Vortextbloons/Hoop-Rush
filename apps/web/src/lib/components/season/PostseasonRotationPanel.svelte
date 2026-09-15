@@ -61,7 +61,9 @@
   let fineTuneOpen = $state(false);
   const minutesTotal = $derived(editor.rotation.targetMinutes.reduce((s, t) => s + t.minutes, 0));
   const closersCount = $derived(new Set(editor.rotation.closingFive).size);
-  const minuteById = $derived(new Map(editor.rotation.targetMinutes.map((t) => [t.playerVersionId, t.minutes] as const)));
+  const minuteById = $derived(
+    new Map(editor.rotation.targetMinutes.map((t) => [t.playerVersionId, t.minutes] as const)),
+  );
   const startersLine = $derived(
     editor.rotation.starters
       .map((id) => {
@@ -90,9 +92,13 @@
     </span>
   </div>
 
-  <div class="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface-2 px-3 py-2.5">
+  <div
+    class="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface-2 px-3 py-2.5"
+  >
     <div class="min-w-0">
-      <p class="font-mono text-[11px] font-bold tabular-nums text-foreground">{String(minutesTotal)}/240 min · {String(closersCount)}/5 closers</p>
+      <p class="font-mono text-[11px] font-bold tabular-nums text-foreground">
+        {String(minutesTotal)}/240 min · {String(closersCount)}/5 closers
+      </p>
       <p class="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{startersLine}</p>
     </div>
     <div class="flex shrink-0 items-center gap-2">

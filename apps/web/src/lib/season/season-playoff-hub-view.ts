@@ -65,9 +65,7 @@ function lastN(
 
 function formLabel(games: SeasonGameSummary[], franchiseId: string): string {
   if (games.length === 0) return 'No games yet';
-  return games
-    .map((g) => (didWin(g, franchiseId) ? 'W' : 'L'))
-    .join(' ');
+  return games.map((g) => (didWin(g, franchiseId) ? 'W' : 'L')).join(' ');
 }
 
 function headToHead(
@@ -97,8 +95,20 @@ function rowOf(
   higherWins = true,
 ): PlayoffTeamStatRow {
   const leader =
-    Math.abs(homeValue - awayValue) < 1e-9 ? 'tie' : homeValue > awayValue === higherWins ? 'home' : 'away';
-  return { key, label, homeValue, awayValue, homeDisplay: format(homeDisplay(homeValue)), awayDisplay: format(awayDisplay(awayValue)), leader };
+    Math.abs(homeValue - awayValue) < 1e-9
+      ? 'tie'
+      : homeValue > awayValue === higherWins
+        ? 'home'
+        : 'away';
+  return {
+    key,
+    label,
+    homeValue,
+    awayValue,
+    homeDisplay: format(homeDisplay(homeValue)),
+    awayDisplay: format(awayDisplay(awayValue)),
+    leader,
+  };
   function homeDisplay(v: number): number {
     return v;
   }
@@ -126,7 +136,13 @@ export function playoffSnapshotOf(input: {
   if (home === undefined || away === undefined) return null;
 
   const rows: PlayoffTeamStatRow[] = [
-    rowOf('ppg', 'PPG', perGame(home.points, home.gamesPlayed), perGame(away.points, away.gamesPlayed), oneDecimal),
+    rowOf(
+      'ppg',
+      'PPG',
+      perGame(home.points, home.gamesPlayed),
+      perGame(away.points, away.gamesPlayed),
+      oneDecimal,
+    ),
     rowOf('ts', 'TS%', trueShootingOf(home), trueShootingOf(away), pct1),
     rowOf(
       '3p',
@@ -183,20 +199,36 @@ export function playoffSnapshotOf(input: {
       detail: 'True shooting from completed regular-season games.',
     });
   }
-  if (oreb !== undefined && oreb.leader !== 'tie' && Math.abs(oreb.homeValue - oreb.awayValue) >= 0.8) {
+  if (
+    oreb !== undefined &&
+    oreb.leader !== 'tie' &&
+    Math.abs(oreb.homeValue - oreb.awayValue) >= 0.8
+  ) {
     edges.push({
       tone: 'watch',
       label: `Glass gap ${oreb.homeDisplay}–${oreb.awayDisplay} OREB`,
       detail: 'Offensive boards per game create extra possessions.',
     });
-  } else if (reb !== undefined && reb.leader !== 'tie' && Math.abs(reb.homeValue - reb.awayValue) >= 1.5) {
+  } else if (
+    reb !== undefined &&
+    reb.leader !== 'tie' &&
+    Math.abs(reb.homeValue - reb.awayValue) >= 1.5
+  ) {
     edges.push({
       tone: 'watch',
       label: `Rebound gap ${reb.homeDisplay}–${reb.awayDisplay}`,
       detail: 'Total boards per game from completed games.',
     });
   }
-  return { homeFranchiseId: homeId, awayFranchiseId: awayId, rows, edges: edges.slice(0, 3), seasonSeries, homeForm, awayForm };
+  return {
+    homeFranchiseId: homeId,
+    awayFranchiseId: awayId,
+    rows,
+    edges: edges.slice(0, 3),
+    seasonSeries,
+    homeForm,
+    awayForm,
+  };
 }
 
 export function playoffPrepSummaryOf(input: {
@@ -206,7 +238,9 @@ export function playoffPrepSummaryOf(input: {
 }): PlayoffPrepSummary {
   const minutesTotal = input.rotation.targetMinutes.reduce((sum, t) => sum + t.minutes, 0);
   const closersSet = new Set(input.rotation.closingFive).size;
-  const minuteById = new Map(input.rotation.targetMinutes.map((t) => [t.playerVersionId, t.minutes]));
+  const minuteById = new Map(
+    input.rotation.targetMinutes.map((t) => [t.playerVersionId, t.minutes]),
+  );
   const starters = input.rotation.starters.map((id) => {
     const name = input.nameOf(id);
     const minutes = minuteById.get(id) ?? 0;

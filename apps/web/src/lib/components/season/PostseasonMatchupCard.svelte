@@ -93,7 +93,9 @@
         {roundEyebrow}{nextGameNumber !== null ? ` · Game ${String(nextGameNumber)}` : ''}
       </p>
       {#if locationLabel !== null && locationLabel !== ''}
-        <p class="rounded-full border border-border bg-surface-2 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+        <p
+          class="rounded-full border border-border bg-surface-2 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground"
+        >
           {locationLabel}
         </p>
       {/if}
@@ -111,25 +113,52 @@
           />
         {/if}
         <div class="min-w-0">
-          <p class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-            {#if homeSeed !== null}#{String(homeSeed)} seed · {/if}{homeFranchiseId !== null ? franchiseAbbrev(homeFranchiseId) : ''}{#if homeFranchiseId === humanFranchiseId} · you{/if}
+          <p
+            class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
+          >
+            {#if homeSeed !== null}#{String(homeSeed)} seed ·
+            {/if}{homeFranchiseId !== null
+              ? franchiseAbbrev(homeFranchiseId)
+              : ''}{#if homeFranchiseId === humanFranchiseId}
+              · you{/if}
           </p>
-          <h2 class="font-display text-2xl font-black uppercase leading-[0.95] tracking-tight sm:text-4xl">
+          <h2
+            class="font-display text-2xl font-black uppercase leading-[0.95] tracking-tight sm:text-4xl"
+          >
             {homeFranchiseId !== null ? franchiseName(homeFranchiseId) : 'TBD'}
           </h2>
-          <div class="mt-2 flex justify-end gap-1.5" aria-label={`${homeFranchiseId !== null ? franchiseName(homeFranchiseId) : 'Home'} ${String(homeWins)} wins, ${String(4 - homeWins)} to go`}>
+          <div
+            class="mt-2 flex justify-end gap-1.5"
+            aria-label={`${homeFranchiseId !== null ? franchiseName(homeFranchiseId) : 'Home'} ${String(homeWins)} wins, ${String(4 - homeWins)} to go`}
+          >
             {#each homeTape as slot, i (i)}
-              <span class="playoff-pip" data-filled={slot === 'win'} data-side="home"><span class="sr-only">{slot === 'win' ? 'Win' : `Win ${String(i + 1)} open`}</span></span>
+              <span class="playoff-pip" data-filled={slot === 'win'} data-side="home"
+                ><span class="sr-only">{slot === 'win' ? 'Win' : `Win ${String(i + 1)} open`}</span
+                ></span
+              >
             {/each}
           </div>
-          <p class="mt-1 font-display text-5xl font-black tabular-nums leading-none sm:text-6xl">{homeWins}</p>
+          <p class="mt-1 font-display text-5xl font-black tabular-nums leading-none sm:text-6xl">
+            {homeWins}
+          </p>
         </div>
       </div>
 
       <div class="flex flex-col items-center gap-1 pt-1">
-        <p id="current-matchup-heading" class="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Series</p>
-        <p class="font-display text-center text-sm font-black uppercase leading-tight text-accent">First<br />to 4</p>
-        <p class="sr-only">{homeFranchiseId !== null && awayFranchiseId !== null ? `${franchiseName(homeFranchiseId)} ${String(homeWins)}, ${franchiseName(awayFranchiseId)} ${String(awayWins)}` : 'Series score'}</p>
+        <p
+          id="current-matchup-heading"
+          class="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground"
+        >
+          Series
+        </p>
+        <p class="font-display text-center text-sm font-black uppercase leading-tight text-accent">
+          First<br />to 4
+        </p>
+        <p class="sr-only">
+          {homeFranchiseId !== null && awayFranchiseId !== null
+            ? `${franchiseName(homeFranchiseId)} ${String(homeWins)}, ${franchiseName(awayFranchiseId)} ${String(awayWins)}`
+            : 'Series score'}
+        </p>
       </div>
 
       <div class="flex min-w-0 flex-col items-start gap-2">
@@ -143,27 +172,49 @@
           />
         {/if}
         <div class="min-w-0">
-          <p class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-            {#if awaySeed !== null}#{String(awaySeed)} seed · {/if}{awayFranchiseId !== null ? franchiseAbbrev(awayFranchiseId) : ''}{#if awayFranchiseId === humanFranchiseId} · you{/if}
+          <p
+            class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
+          >
+            {#if awaySeed !== null}#{String(awaySeed)} seed ·
+            {/if}{awayFranchiseId !== null
+              ? franchiseAbbrev(awayFranchiseId)
+              : ''}{#if awayFranchiseId === humanFranchiseId}
+              · you{/if}
           </p>
-          <h2 class="font-display text-2xl font-black uppercase leading-[0.95] tracking-tight sm:text-4xl">
+          <h2
+            class="font-display text-2xl font-black uppercase leading-[0.95] tracking-tight sm:text-4xl"
+          >
             {awayFranchiseId !== null ? franchiseName(awayFranchiseId) : 'TBD'}
           </h2>
-          <div class="mt-2 flex gap-1.5" aria-label={`${awayFranchiseId !== null ? franchiseName(awayFranchiseId) : 'Away'} ${String(awayWins)} wins, ${String(4 - awayWins)} to go`}>
+          <div
+            class="mt-2 flex gap-1.5"
+            aria-label={`${awayFranchiseId !== null ? franchiseName(awayFranchiseId) : 'Away'} ${String(awayWins)} wins, ${String(4 - awayWins)} to go`}
+          >
             {#each awayTape as slot, i (i)}
-              <span class="playoff-pip" data-filled={slot === 'win'} data-side="away"><span class="sr-only">{slot === 'win' ? 'Win' : `Win ${String(i + 1)} open`}</span></span>
+              <span class="playoff-pip" data-filled={slot === 'win'} data-side="away"
+                ><span class="sr-only">{slot === 'win' ? 'Win' : `Win ${String(i + 1)} open`}</span
+                ></span
+              >
             {/each}
           </div>
-          <p class="mt-1 font-display text-5xl font-black tabular-nums leading-none sm:text-6xl">{awayWins}</p>
+          <p class="mt-1 font-display text-5xl font-black tabular-nums leading-none sm:text-6xl">
+            {awayWins}
+          </p>
         </div>
       </div>
     </div>
 
-    <div class="flex flex-col gap-3 border-t border-border/60 pt-4 sm:flex-row sm:items-center sm:justify-between">
+    <div
+      class="flex flex-col gap-3 border-t border-border/60 pt-4 sm:flex-row sm:items-center sm:justify-between"
+    >
       <div class="min-w-0">
         {#if gameLabel !== null}<p class="text-sm font-bold">{gameLabel}</p>{/if}
         <p class="mt-0.5 font-mono text-[11px] text-muted-foreground">{statusLine}</p>
-        {#if seasonSeriesLabel !== null && series?.status !== 'complete'}<p class="mt-0.5 font-mono text-[11px] text-muted-foreground">{seasonSeriesLabel}</p>{/if}
+        {#if seasonSeriesLabel !== null && series?.status !== 'complete'}<p
+            class="mt-0.5 font-mono text-[11px] text-muted-foreground"
+          >
+            {seasonSeriesLabel}
+          </p>{/if}
       </div>
       {#if primaryLabel !== null && onPrimary !== null}
         <div class="flex shrink-0 flex-col items-stretch gap-1.5">
@@ -177,7 +228,11 @@
             {primaryBusy ? 'Locking in…' : primaryLabel}
             <span aria-hidden="true">→</span>
           </button>
-          {#if primaryHint !== null}<p class="text-center font-mono text-[10px] text-muted-foreground sm:text-right">{primaryHint}</p>{/if}
+          {#if primaryHint !== null}<p
+              class="text-center font-mono text-[10px] text-muted-foreground sm:text-right"
+            >
+              {primaryHint}
+            </p>{/if}
         </div>
       {/if}
     </div>
@@ -190,8 +245,18 @@
     inset: 0;
     pointer-events: none;
     background:
-      radial-gradient(60% 90% at 50% 115%, color-mix(in srgb, var(--color-court-wood) 18%, transparent), transparent 70%),
-      linear-gradient(90deg, transparent 49.6%, color-mix(in srgb, var(--color-court-wood) 26%, transparent) 49.6%, color-mix(in srgb, var(--color-court-wood) 26%, transparent) 50.4%, transparent 50.4%);
+      radial-gradient(
+        60% 90% at 50% 115%,
+        color-mix(in srgb, var(--color-court-wood) 18%, transparent),
+        transparent 70%
+      ),
+      linear-gradient(
+        90deg,
+        transparent 49.6%,
+        color-mix(in srgb, var(--color-court-wood) 26%, transparent) 49.6%,
+        color-mix(in srgb, var(--color-court-wood) 26%, transparent) 50.4%,
+        transparent 50.4%
+      );
     opacity: 0.8;
   }
   .playoff-hero-court::after {
@@ -213,26 +278,52 @@
     background: color-mix(in srgb, var(--color-surface-3) 70%, transparent);
     animation: playoff-pip-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
-  .playoff-pip:nth-child(2) { animation-delay: 60ms; }
-  .playoff-pip:nth-child(3) { animation-delay: 120ms; }
-  .playoff-pip:nth-child(4) { animation-delay: 180ms; }
+  .playoff-pip:nth-child(2) {
+    animation-delay: 60ms;
+  }
+  .playoff-pip:nth-child(3) {
+    animation-delay: 120ms;
+  }
+  .playoff-pip:nth-child(4) {
+    animation-delay: 180ms;
+  }
   .playoff-pip[data-filled='true'][data-side='home'] {
     border-style: solid;
     border-color: color-mix(in srgb, var(--color-primary) 70%, transparent);
-    background: radial-gradient(circle at 32% 30%, color-mix(in srgb, white 22%, transparent), transparent 46%), var(--color-primary);
+    background:
+      radial-gradient(
+        circle at 32% 30%,
+        color-mix(in srgb, white 22%, transparent),
+        transparent 46%
+      ),
+      var(--color-primary);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 22%, transparent);
   }
   .playoff-pip[data-filled='true'][data-side='away'] {
     border-style: solid;
     border-color: color-mix(in srgb, var(--color-accent) 70%, transparent);
-    background: radial-gradient(circle at 32% 30%, color-mix(in srgb, white 22%, transparent), transparent 46%), var(--color-accent);
+    background:
+      radial-gradient(
+        circle at 32% 30%,
+        color-mix(in srgb, white 22%, transparent),
+        transparent 46%
+      ),
+      var(--color-accent);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 20%, transparent);
   }
   @keyframes playoff-pip-in {
-    from { opacity: 0; transform: scale(0.7); }
-    to { opacity: 1; transform: scale(1); }
+    from {
+      opacity: 0;
+      transform: scale(0.7);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
   }
   @media (prefers-reduced-motion: reduce) {
-    .playoff-pip { animation: none; }
+    .playoff-pip {
+      animation: none;
+    }
   }
 </style>

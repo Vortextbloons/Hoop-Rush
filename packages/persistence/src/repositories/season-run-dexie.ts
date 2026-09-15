@@ -57,7 +57,6 @@ import {
   seasonRunCursorSchema,
   seasonRunPlayerSliceEntrySchema,
   storedEvolutionOf,
-  storedSponsorsOf,
   storedSeasonAcceptedBlockRowSchema,
   storedSeasonActiveRunIndexSchema,
   storedSeasonAlmanacRowSchema,

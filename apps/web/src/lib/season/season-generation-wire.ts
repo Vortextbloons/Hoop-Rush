@@ -1,12 +1,6 @@
-import type {
-  SeasonLeagueGenerationResult,
-  SeasonRosterTargets,
-} from '@hoop-rush/data-contracts';
+import type { SeasonLeagueGenerationResult, SeasonRosterTargets } from '@hoop-rush/data-contracts';
 import { GENERATION_WORKER_WIRE_SCHEMA_VERSION } from '@hoop-rush/data-contracts';
-import type {
-  SeasonAiGenerationInput,
-  SeasonAiGenerationProgress,
-} from '@hoop-rush/engine';
+import type { SeasonAiGenerationInput, SeasonAiGenerationProgress } from '@hoop-rush/engine';
 export { GENERATION_WORKER_WIRE_SCHEMA_VERSION };
 export interface GenerationWorkerRequest {
   schemaVersion: typeof GENERATION_WORKER_WIRE_SCHEMA_VERSION;

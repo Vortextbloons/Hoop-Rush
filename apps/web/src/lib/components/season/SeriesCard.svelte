@@ -43,9 +43,9 @@
   data-season-series-card={card.seriesId}
   data-series-status={card.status}
   style:--series-color={franchiseColor(card.winnerFranchiseId ?? home)}
-  class="series-card rounded-xl border border-border bg-surface-1 {compact ? 'compact' : 'p-3'} {card.humanSeries
-    ? 'ring-1 ring-primary/40'
-    : ''}"
+  class="series-card rounded-xl border border-border bg-surface-1 {compact
+    ? 'compact'
+    : 'p-3'} {card.humanSeries ? 'ring-1 ring-primary/40' : ''}"
 >
   <header class="flex items-baseline justify-between gap-2">
     <span class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
@@ -145,17 +145,37 @@
   </div>
 
   {#if !compact}<footer class="mt-2 px-1 font-mono text-[10px] text-muted-foreground">
-    {statusText}
-    {#if home !== null && away !== null}
-      <span class="ml-1">· home court {franchiseAbbrev(home)}</span>
-    {/if}
-  </footer>{/if}
+      {statusText}
+      {#if home !== null && away !== null}
+        <span class="ml-1">· home court {franchiseAbbrev(home)}</span>
+      {/if}
+    </footer>{/if}
 </article>
 
 <style>
-  .series-card { min-width:0; overflow:hidden; border-left:3px solid var(--series-color); box-shadow:0 10px 30px rgb(0 0 0 / .08); }
-  .series-card.compact { padding:.55rem; border-radius:.65rem; }
-  .series-card.compact header span:first-child { max-width:7rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .series-card.compact :global(img) { width:1.25rem; height:1.25rem; }
-  .series-card[data-series-status='in-progress'] { box-shadow:0 0 0 1px color-mix(in srgb,var(--series-color) 28%,transparent),0 12px 30px rgb(0 0 0 / .1); }
+  .series-card {
+    min-width: 0;
+    overflow: hidden;
+    border-left: 3px solid var(--series-color);
+    box-shadow: 0 10px 30px rgb(0 0 0 / 0.08);
+  }
+  .series-card.compact {
+    padding: 0.55rem;
+    border-radius: 0.65rem;
+  }
+  .series-card.compact header span:first-child {
+    max-width: 7rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .series-card.compact :global(img) {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+  .series-card[data-series-status='in-progress'] {
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--series-color) 28%, transparent),
+      0 12px 30px rgb(0 0 0 / 0.1);
+  }
 </style>

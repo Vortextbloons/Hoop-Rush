@@ -130,9 +130,9 @@ describe('auto-rotation old vs new comparison', () => {
           dnpApplied += 1;
           stats.dnp += 1;
         }
-        expect(
-          newResult.candidate.targetMinutes.reduce((sum, row) => sum + row.minutes, 0),
-        ).toBe(240);
+        expect(newResult.candidate.targetMinutes.reduce((sum, row) => sum + row.minutes, 0)).toBe(
+          240,
+        );
       }
     }
     const avgQ = qualityDeltaSum / Math.max(1, total);

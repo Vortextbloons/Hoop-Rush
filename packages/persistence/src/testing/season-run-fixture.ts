@@ -108,16 +108,13 @@ import {
   fnv1a32,
   buildEmptyCampaignState,
   normalizeEvolutionState,
-  seasonDigestHex,
   seedFromString,
 } from '@hoop-rush/data-contracts';
 import {
   WINDOW_BLOCK_INDEX_TO_INDEX,
-  buildInitialCampaignState,
   createInitialSeasonInfluenceState as engineCreateInitialSeasonInfluenceStateImpl,
   foldSeasonPlayerAggregates as engineFoldSeasonPlayerAggregatesImpl,
   foldSeasonTeamAggregates as engineFoldSeasonTeamAggregatesImpl,
-  generateSeasonSchedule,
   reconstructSeasonGames as engineReconstructSeasonGamesImpl,
   reduceSeasonStandings,
   seasonRotationSetDigest as engineSeasonRotationSetDigestImpl,
@@ -178,7 +175,7 @@ export function buildFixtureObjectiveState(): SeasonObjectiveState {
 }
 export function buildFixturePromotedDigestContext(
   run: SeasonRun,
-  seam: Pick<SeasonRunEngineSeam, 'createInitialSeasonInfluenceState' | 'reduceSeasonStandings'>,
+  seam: Pick<SeasonRunEngineSeam, 'createInitialSeasonInfluenceState'>,
 ): {
   health: SeasonHealthState;
   influence: SeasonInfluenceState;
@@ -192,27 +189,7 @@ export function buildFixturePromotedDigestContext(
   );
   const objectives = buildFixtureObjectiveState();
   const challenges = run.challenges ?? buildEmptyChallengeState();
-  const humanFranchiseId =
-    run.league.teams.find((team) => team.control === 'human')?.franchiseId ?? null;
-  let campaign = buildEmptyCampaignState();
-  try {
-    const schedule = generateSeasonSchedule({
-      league: run.league,
-      seed: run.schedule.generationSeed,
-    });
-    campaign = buildInitialCampaignState({
-      rootSeed: run.rootSeed,
-      humanFranchiseId,
-      schedule,
-      standings: seam.reduceSeasonStandings(run.league, []),
-      health,
-      rotations: run.rotations,
-      rosters: run.rosters,
-      transactions: [],
-    });
-  } catch {
-    campaign = buildEmptyCampaignState();
-  }
+  const campaign = buildEmptyCampaignState();
   return { health, influence, objectives, campaign, challenges };
 }
 export function buildFixtureSchedule(seed: string): SeasonSchedule {

@@ -28,8 +28,7 @@
     if (p === 'scouting') return 'Scouting the pool…';
     if (p === 'anchors') return 'Placing franchise anchors…';
     if (p === 'pool-fill') return `Filling pools — round ${String(completed)}/${String(total)}`;
-    if (p === 'selection')
-      return `Selecting rosters — ${String(completed)}/${String(total)} teams`;
+    if (p === 'selection') return `Selecting rosters — ${String(completed)}/${String(total)} teams`;
     if (p === 'rotations') return `Planning rotations — ${String(completed)}/${String(total)}`;
     return 'Final buzzer…';
   });
@@ -50,7 +49,8 @@
   <div class="p-6">
     <div class="flex flex-wrap items-center gap-2">
       <span class="sim-live-pill"><span class="sim-live-dot" aria-hidden="true"></span>Live</span>
-      <span class="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground"
+      <span
+        class="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground"
         >Arena reveal</span
       >
     </div>
@@ -58,7 +58,9 @@
       Building league…
     </h2>
     <p class="mt-1 text-xs text-muted-foreground" role="status">{stageLine}</p>
-    <p class="mt-1 text-xs text-muted-foreground">Filling the other 29 teams. Your draft is saved.</p>
+    <p class="mt-1 text-xs text-muted-foreground">
+      Filling the other 29 teams. Your draft is saved.
+    </p>
     <div
       role="progressbar"
       aria-valuemin={0}
@@ -88,7 +90,10 @@
             >
               {conf.label}
             </p>
-            <div class="mt-2 flex flex-wrap items-center gap-1.5" aria-label="{conf.label} teams lit">
+            <div
+              class="mt-2 flex flex-wrap items-center gap-1.5"
+              aria-label="{conf.label} teams lit"
+            >
               {#each conf.teams as team (team.franchiseId)}
                 {@const isLit = lit(team.franchiseId, team.control)}
                 <span

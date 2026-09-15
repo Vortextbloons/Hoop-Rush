@@ -154,7 +154,8 @@ function supabaseEnv(): {
   const publishableKey = typeof rawKey === 'string' ? rawKey.trim() : undefined;
   return {
     url: url && isUsableSupabaseUrl(url) ? url : undefined,
-    publishableKey: publishableKey && isUsablePublishableKey(publishableKey) ? publishableKey : undefined,
+    publishableKey:
+      publishableKey && isUsablePublishableKey(publishableKey) ? publishableKey : undefined,
   };
 }
 export function isFixedFiveSupabaseConfigured(): boolean {
@@ -202,9 +203,16 @@ export function createFixedFiveTransport(options?: {
   publishableKey?: string;
   storageKey?: string;
 }): FixedFiveMultiplayerTransport {
-  const candidateUrl = typeof options?.url === 'string' ? options.url.trim().replace(/\/+$/, '') : undefined;
-  const candidateKey = typeof options?.publishableKey === 'string' ? options.publishableKey.trim() : undefined;
-  if (!candidateUrl || !candidateKey || !isUsableSupabaseUrl(candidateUrl) || !isUsablePublishableKey(candidateKey)) {
+  const candidateUrl =
+    typeof options?.url === 'string' ? options.url.trim().replace(/\/+$/, '') : undefined;
+  const candidateKey =
+    typeof options?.publishableKey === 'string' ? options.publishableKey.trim() : undefined;
+  if (
+    !candidateUrl ||
+    !candidateKey ||
+    !isUsableSupabaseUrl(candidateUrl) ||
+    !isUsablePublishableKey(candidateKey)
+  ) {
     return createInMemoryFixedFiveTransport();
   }
   let clientPromise: Promise<FixedFiveClient> | null = null;

@@ -12,7 +12,7 @@ import {
   seasonChallengeEvaluationFactsSchema,
   seasonChallengeIdSchema,
 } from './season-challenge.ts';
-import { SEASON_RECAP_VERSION, SEASON_RECAP_VERSION_V5 } from './season-versions.ts';
+import { SEASON_RECAP_VERSION } from './season-versions.ts';
 export const seasonBlockEffectsEvidenceSchema = z.object({
   mechanism: seasonMechanismSchema,
   side: seasonEffectsSideSchema,

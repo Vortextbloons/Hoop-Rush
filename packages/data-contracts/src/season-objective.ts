@@ -1,8 +1,6 @@
 import { z } from 'zod';
 import { commandIdSchema } from './ids.ts';
-import {
-  SEASON_OBJECTIVE_VERSION,
-} from './season-versions.ts';
+import { SEASON_OBJECTIVE_VERSION } from './season-versions.ts';
 export const seasonObjectiveIdSchema = z.enum([
   'win-six',
   'defense-108',

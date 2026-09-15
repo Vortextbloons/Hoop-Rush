@@ -718,17 +718,7 @@ function effectiveFocus(campaignState: SeasonCampaignState): SeasonCampaignFocus
   }
   return campaignState.startingFocus;
 }
-export interface SeasonCampaignInitialInput {
-  rootSeed: string;
-  humanFranchiseId: string | null;
-  schedule: SeasonSchedule;
-  standings: SeasonStandings;
-  health: SeasonHealthState;
-  rotations: readonly SeasonRotation[];
-  rosters: readonly SeasonRoster[];
-  transactions: readonly SeasonTransactionEntry[];
-}
-export function buildInitialCampaignState(_input: SeasonCampaignInitialInput): SeasonCampaignState {
+export function buildInitialCampaignState(): SeasonCampaignState {
   return buildEmptyCampaignState();
 }
 export function normalizeCampaignState(state: unknown): SeasonCampaignState {

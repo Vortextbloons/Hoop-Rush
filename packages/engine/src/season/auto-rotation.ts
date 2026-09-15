@@ -264,9 +264,7 @@ function fmt2(value: number): string {
 function isSpecRecommendationInput(
   value: RecommendSeasonRotationInput | SeasonRotationRecommendationInput,
 ): value is SeasonRotationRecommendationInput {
-  return (
-    'loadByPlayerId' in value || 'unavailablePlayerIds' in value || !('unavailable' in value)
-  );
+  return 'loadByPlayerId' in value || 'unavailablePlayerIds' in value || !('unavailable' in value);
 }
 
 function normalizeRecommendationInput(
@@ -472,8 +470,7 @@ export function recommendSeasonRotation(
     const member = byId.get(id);
     if (member === undefined) return 1;
     const loadRisk = Math.max(0, Math.min(1, member.recentLoadBasisPoints / 10000)) * 0.12;
-    const durabilityRisk =
-      Math.max(0, Math.min(1, (70 - member.durability) / 70)) * 0.1;
+    const durabilityRisk = Math.max(0, Math.min(1, (70 - member.durability) / 70)) * 0.1;
     return Math.max(0.75, 1 - loadRisk - durabilityRisk);
   };
   const effectiveOf = (id: string): number => {
@@ -1161,14 +1158,9 @@ function tryDnpVariant(input: {
   for (const row of nextMinutes) bands[fatigue.get(row.playerVersionId)?.band ?? 'fresh'] += 1;
   const heavyStrain =
     bands.heavy > 0 ||
-    [...fatigue.values()].some(
-      (facts) => facts.peakBasisPoints >= MINUTE_PLAN_HEAVY_THRESHOLD_BP,
-    );
+    [...fatigue.values()].some((facts) => facts.peakBasisPoints >= MINUTE_PLAN_HEAVY_THRESHOLD_BP);
   if (heavyStrain && !input.basePlan.heavyStrain) return null;
-  const qualities = [
-    ...input.allPlans.map((plan) => plan.quality),
-    quality,
-  ];
+  const qualities = [...input.allPlans.map((plan) => plan.quality), quality];
   const maxQ = Math.max(...qualities);
   const minQ = Math.min(...qualities);
   const relative = maxQ <= minQ ? 0.5 : Math.max(0, Math.min(1, (quality - minQ) / (maxQ - minQ)));
@@ -1177,7 +1169,9 @@ function tryDnpVariant(input: {
     maxStarterStrainBasisPoints: maxStarterStrain,
     relief,
   });
-  if (!(quality >= input.basePlan.quality + 0.003 && riskScore >= input.basePlan.riskScore - 0.002)) {
+  if (!(
+    quality >= input.basePlan.quality + 0.003 && riskScore >= input.basePlan.riskScore - 0.002
+  )) {
     return null;
   }
   const rotation: SeasonRotation = {
@@ -1243,17 +1237,16 @@ function buildFullRotationForActive(input: {
     starterIds: starters,
     rng: input.rng,
   });
-  const closing =
-    pickBestFive({
-      active: activeSorted,
-      byId: input.byId,
-      effectiveOf: input.effectiveOf,
-      incumbent: input.current.closingFive,
-      rng: input.rng,
-      synergyPenaltyOf: synergy,
-      freeThrowByVersion: input.allowDnp === true ? input.freeThrowByVersion : undefined,
-      preferClosing: input.allowDnp === true,
-    }) ?? [...starters];
+  const closing = pickBestFive({
+    active: activeSorted,
+    byId: input.byId,
+    effectiveOf: input.effectiveOf,
+    incumbent: input.current.closingFive,
+    rng: input.rng,
+    synergyPenaltyOf: synergy,
+    freeThrowByVersion: input.allowDnp === true ? input.freeThrowByVersion : undefined,
+    preferClosing: input.allowDnp === true,
+  }) ?? [...starters];
   const eligibleList = activeSorted
     .map((id) => input.byId.get(id))
     .filter((member): member is AutoRotationMemberInput => member !== undefined);

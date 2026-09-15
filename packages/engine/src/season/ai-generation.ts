@@ -125,27 +125,6 @@ export class SeasonAiTargetsError extends Error {
 }
 export function validateSeasonRosterTargets(targets: SeasonRosterTargets | undefined): void {
   if (!targets) throw new SeasonAiTargetsError('roster targets missing');
-  const schemaVersion: number = targets.schemaVersion;
-  if (schemaVersion !== 3) {
-    throw new SeasonAiTargetsError(
-      `roster targets schemaVersion must be 3 (got ${String(schemaVersion)})`,
-    );
-  }
-  if (targets.targetsVersion !== SEASON_ROSTER_TARGETS_VERSION) {
-    throw new SeasonAiTargetsError(
-      `roster targets version mismatch: expected ${SEASON_ROSTER_TARGETS_VERSION}, got ${targets.targetsVersion}`,
-    );
-  }
-  if (targets.calibration.aiVersion !== SEASON_AI_VERSION) {
-    throw new SeasonAiTargetsError(
-      `targets aiVersion mismatch: expected ${SEASON_AI_VERSION}, got ${targets.calibration.aiVersion}`,
-    );
-  }
-  if (targets.calibration.rosterGenerationVersion !== SEASON_ROSTER_GENERATION_VERSION) {
-    throw new SeasonAiTargetsError(
-      `targets rosterGenerationVersion mismatch: expected ${SEASON_ROSTER_GENERATION_VERSION}, got ${targets.calibration.rosterGenerationVersion}`,
-    );
-  }
   for (const identity of IDENTITIES) {
     const roles = (
       targets.policy.identityPriorityRoles as Partial<
@@ -2405,7 +2384,7 @@ function bestRosterFromPoolProjection(
       catalog: state.catalog,
       locked: anchors,
       available: team.pool,
-      seed: seasonDigestHex(`${state.seed} ai-projection ${team.franchiseId}`),
+      seed: seasonDigestHex(`${state.seed}\u0000ai-projection\u0000${team.franchiseId}`),
       eraProfile,
       model,
       caps: { completeCandidates: 8, rotationsPerRoster: 8 },

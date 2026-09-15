@@ -114,8 +114,8 @@ function rosterFingerprint(run: SeasonBlockRunContext): string {
     .join('|');
 }
 function sponsorSlotsFingerprint(run: SeasonBlockRunContext): string {
-  const slots = run.sponsors?.players?.slots;
-  if (slots === undefined || slots === null) return 'no-sponsors';
+  const slots = run.sponsors?.players.slots;
+  if (slots === undefined) return 'no-sponsors';
   const ids = Object.keys(slots).sort();
   if (ids.length === 0) return 'empty-slots';
   return ids

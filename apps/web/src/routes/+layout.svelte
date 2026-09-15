@@ -18,8 +18,9 @@
   ];
   const routeId = $derived(page.route.id);
   const isMultiplayerLobby = $derived(routeId === '/multiplayer');
-  const isUltimate =
-    $derived(routeId === '/collection' || routeId?.startsWith('/collection/') === true);
+  const isUltimate = $derived(
+    routeId === '/collection' || routeId?.startsWith('/collection/') === true,
+  );
   const showBottomNav = $derived(
     routeId === '/' || routeId === '/roster' || routeId === '/multiplayer',
   );

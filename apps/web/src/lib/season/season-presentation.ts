@@ -1506,7 +1506,6 @@ function currentWinStreaks(
 ): Map<string, { kind: 'wins' | 'losses'; length: number }> {
   const byFranchise = new Map<string, { won: boolean }[]>();
   for (const summary of summaries) {
-    if (summary.status !== 'final' && summary.status !== 'forfeit') continue;
     let winner: string;
     if (summary.status === 'forfeit') {
       const loser = summary.forfeitLoserFranchiseId;
@@ -1638,7 +1637,7 @@ export function leaguePulseOf(
       } | null;
     }
   ).evolution;
-  if (evolution?.selections !== undefined && evolution.selections !== null) {
+  if (evolution?.selections !== undefined) {
     for (const [fid, selection] of Object.entries(evolution.selections)) {
       if (selection?.aiSelected !== true || fid === humanId) continue;
       entries.push({

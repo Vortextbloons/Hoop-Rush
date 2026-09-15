@@ -1656,16 +1656,10 @@ export function applySeasonTrade(
   ];
   const rotations = run.rotations.map((rotation) => {
     if (rotation.franchiseId === toFranchiseId) {
-      return repairRotationAfterTrade(rotation, facts, toIdsAfter, outgoing, [
-        ...incoming,
-        ...toBackfillIds,
-      ]);
+      return repairRotationAfterTrade(rotation, facts, toIdsAfter, outgoing);
     }
     if (rotation.franchiseId === fromFranchiseId) {
-      return repairRotationAfterTrade(rotation, facts, fromIdsAfter, incoming, [
-        ...outgoing,
-        ...fromBackfillIds,
-      ]);
+      return repairRotationAfterTrade(rotation, facts, fromIdsAfter, incoming);
     }
     return rotation;
   });
@@ -1795,7 +1789,6 @@ function repairRotationAfterTrade(
   facts: SeasonTradeCatalogFacts,
   newRosterIds: readonly string[],
   movedOut: readonly string[],
-  movedIn: readonly string[],
 ): SeasonRotation {
   const members: SeasonRosterMemberInput[] = newRosterIds.map((playerVersionId) => ({
     playerVersionId,

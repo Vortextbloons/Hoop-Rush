@@ -7,9 +7,7 @@ import { seasonCommandLogDigest, seasonCommandLogSchema } from './season-command
 import { seasonEffectsStateSchema } from './season-effects.ts';
 import { seasonRunSchema, seasonRunVersionsSchema } from './season-run.ts';
 import { seasonAlmanacSchema } from './season-almanac.ts';
-import {
-  SEASON_REPLAY_EXPORT_VERSION,
-} from './season-versions.ts';
+import { SEASON_REPLAY_EXPORT_VERSION } from './season-versions.ts';
 import { canonicalJson, seasonDigestHex } from './season-hash.ts';
 export const seasonReplayExportSchema = z.object({
   schemaVersion: z.literal(1),

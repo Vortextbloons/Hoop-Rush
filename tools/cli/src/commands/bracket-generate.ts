@@ -412,6 +412,8 @@ export function bracketGenerate(args: {
   difficulty?: string;
   out?: string;
   verbose?: boolean;
+  opponentsDir?: string;
+  manifestPath?: string;
 }): CliReport {
   const rawSeed = args.seed ?? COMMITTED_GENERATION_SEED;
   const parsedSeed = seedSchema.safeParse(rawSeed);
@@ -441,7 +443,8 @@ export function bracketGenerate(args: {
   const manifest = packaged.manifest;
   const profile = new PackagedData(packaged.manifest, packaged.dir).eraProfile();
   const { candidates, details } = buildCandidateCatalog(manifest, args.verbose === true);
-  const openingRaw = readJson(resolve(OPPONENTS_DIR, 'lakers-1990s-opening.json'));
+  const opponentsDir = args.opponentsDir ?? OPPONENTS_DIR;
+  const openingRaw = readJson(resolve(opponentsDir, 'lakers-1990s-opening.json'));
   const openingParsed = opponentTeamSchema.safeParse(openingRaw);
   if (!openingParsed.success) {
     return makeReport(
@@ -482,10 +485,10 @@ export function bracketGenerate(args: {
     );
   }
   const outFile = args.out ?? (isCasual ? 'bracket-casual.json' : 'bracket.json');
-  const outPath = resolve(OPPONENTS_DIR, outFile);
+  const outPath = resolve(opponentsDir, outFile);
   writeFileSync(outPath, `${JSON.stringify(bracket, null, 2)}\n`, 'utf8');
   const contentHash = contentHashSchema.parse(sha256Hex(readFileSync(outPath)));
-  const manifestPath = MANIFEST_PATH;
+  const manifestPath = args.manifestPath ?? MANIFEST_PATH;
   const nextManifest = { ...manifest } as HoopRushManifest & {
     opponents?: unknown;
   };

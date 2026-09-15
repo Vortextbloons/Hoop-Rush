@@ -131,7 +131,7 @@ describe('challenge evidence derivation (M3.11.1)', () => {
     ]);
   });
 
-  it('prefers challenges over legacy objectives and falls back only for old histories', () => {
+  it('prefers challenges and ignores retired legacy objectives', () => {
     const withBoth = recapChallengeView({
       challengeEvidence: [
         {
@@ -162,11 +162,7 @@ describe('challenge evidence derivation (M3.11.1)', () => {
       challengeEvidence: undefined,
       objectiveEvidence: { objectiveId: 'win-six', success: false, evaluationFacts: null },
     } as never);
-    expect(legacyOnly).toEqual({
-      kind: 'legacy-objective',
-      objectiveId: 'win-six',
-      success: false,
-    });
+    expect(legacyOnly).toBeNull();
 
     const neither = recapChallengeView({
       challengeEvidence: undefined,

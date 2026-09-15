@@ -1,9 +1,7 @@
 import { z } from 'zod';
 import { commandIdSchema, franchiseIdSchema } from './ids.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
-import {
-  SEASON_CAMPAIGN_VERSION,
-} from './season-versions.ts';
+import { SEASON_CAMPAIGN_VERSION } from './season-versions.ts';
 export const seasonCampaignGmIdentitySchema = z.enum([
   'win-now',
   'player-development',

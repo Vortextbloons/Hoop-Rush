@@ -517,7 +517,7 @@
       {/if}
     </div>
   {:else if draftStage === 'generating'}
-    <LeagueGenerationArena progress={generationProgress} league={league} />
+    <LeagueGenerationArena progress={generationProgress} {league} />
   {:else if draftStage === 'stalled'}
     <div class="mt-10 rounded-none bg-surface-1 sm:rounded-xl p-6">
       <h2 class="font-display text-xl font-extrabold uppercase tracking-tight">

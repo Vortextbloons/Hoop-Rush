@@ -468,7 +468,9 @@ function creditAssist(
 ): void {
   if (!passed) return;
   const teamPrep = ctx.preps[offenseSide];
-  const assisterPrep = teamPrep.assisterByPair.get(`${shooter.playerId}\u0000${initiator.playerId}`);
+  const assisterPrep = teamPrep.assisterByPair.get(
+    `${shooter.playerId}\u0000${initiator.playerId}`,
+  );
   if (assisterPrep === undefined) return;
   const passer = pickAssister(assisterPrep, ctx.rng);
   if (!passer) return;
@@ -528,10 +530,7 @@ function reboundFromMissedFreeThrow(
   const side = offensive ? offenseSide : defenseSide;
   const team = ctx.teams[side];
   const prep = ctx.preps[side];
-  const rebounder = ctx.rng.weightedPick(
-    team.players,
-    prep.rebounderPickTables[offensive ? 0 : 1],
-  );
+  const rebounder = ctx.rng.weightedPick(team.players, prep.rebounderPickTables[offensive ? 0 : 1]);
   const slot = slotOrZero(prep, rebounder);
   if (offensive) {
     ctx.recorder.offensiveRebound(offenseSide, slot);

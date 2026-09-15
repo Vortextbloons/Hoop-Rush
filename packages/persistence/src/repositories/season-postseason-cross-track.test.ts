@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   SEASON_DRAFT_CATALOG_VERSION,
   SEASON_DURABILITY_VERSION,
-  SEASON_HEALTH_VERSION,
   SEASON_ROUND_COUNT,
   SEASON_RUN_SCHEMA_VERSION,
   SEASON_STAMINA_VERSION,
@@ -10,14 +9,12 @@ import {
   SIMULATION_TENDENCIES,
   PLAYER_VERSION_ID_VERSION,
   canonicalJson,
-  buildEmptyChallengeState,
   commandIdSchema,
   eraIdSchema,
   franchiseIdSchema,
   seasonAlmanacDigest,
   seasonCommandLogDigest,
   seasonDigestHex,
-  seasonHealthStateSchema,
   seasonPostseasonSummarySchema,
   seasonRunCommandSchema,
   type Position,
@@ -329,9 +326,6 @@ async function makeFlow(): Promise<FlowContext> {
     schedule: buildFixtureSchedule(SEED),
     seam,
   });
-  const influence = seam.createInitialSeasonInfluenceState(
-    run.league.teams.map((team) => team.franchiseId),
-  );
   const promoted = buildFixturePromotedDigestContext(run, seam);
   const stateDigest = seam.seasonRunStateDigest({
     stateRevision: 0,

@@ -127,8 +127,11 @@ export function bracketAudit(
     try {
       openingFailures = openingOpponentUnchanged(bracket, previewPath);
     } catch (error) {
-      failures.push(`${tag}${(error as Error).message}`);
-      continue;
+      return makeReport(
+        'bracket audit',
+        { input: inputPath, dataVersion: manifest.dataVersion },
+        { failures: [`${tag}${(error as Error).message}`], exitCode: EXIT_USAGE_OR_DATA_ERROR },
+      );
     }
     failures.push(...openingFailures.map((f) => `${tag}${f}`));
     if (bracket.schedule[0]?.opponentId !== 'lakers-1990s-opening') {

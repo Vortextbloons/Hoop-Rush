@@ -14,10 +14,7 @@ import {
 import { seasonRotationSetDigestSchema } from './season-digests.ts';
 import { seasonEffectsStateSchema } from './season-effects.ts';
 import { seasonGameSummarySchema } from './season-game-summary.ts';
-import {
-  seasonPlayerAggregateSchema,
-  seasonTeamAggregateSchema,
-} from './season-aggregates.ts';
+import { seasonPlayerAggregateSchema, seasonTeamAggregateSchema } from './season-aggregates.ts';
 import { seasonStandingsSchema } from './season-standings.ts';
 import { seasonHealthStateSchema } from './season-health.ts';
 import { seasonHomeCourtProfileSchema } from './season-home-court.ts';

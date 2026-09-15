@@ -157,9 +157,7 @@ describe('draft script offers', () => {
             const candidate = byId.get(card.playerVersionId);
             return (
               candidate !== undefined &&
-              (scriptedKind === 'star'
-                ? isStarCandidate(candidate)
-                : isFloorCandidate(candidate))
+              (scriptedKind === 'star' ? isStarCandidate(candidate) : isFloorCandidate(candidate))
             );
           }),
         ).toBe(true);

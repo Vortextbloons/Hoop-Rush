@@ -107,8 +107,8 @@ function acceptedResult(output: ReturnType<typeof handleSeasonRunCommand>, comma
 }
 
 describe('sponsor gear persistence', () => {
-  afterEach(async () => {
-    await resetIndexedDb();
+  afterEach(() => {
+    resetIndexedDb();
     restoreIndexedDb();
   });
 

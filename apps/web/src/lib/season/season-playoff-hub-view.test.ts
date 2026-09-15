@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  playoffPrepSummaryOf,
-  playoffSnapshotOf,
-} from './season-playoff-hub-view';
+import { playoffPrepSummaryOf, playoffSnapshotOf } from './season-playoff-hub-view';
 
 function agg(franchiseId: string, overrides: Record<string, number> = {}) {
   return {
@@ -55,7 +52,10 @@ describe('playoffSnapshotOf', () => {
 
   it('returns null without both teams', () => {
     expect(
-      playoffSnapshotOf({ series: { homeFranchiseId: null, awayFranchiseId: 'nop' } as never, summaries: [] }),
+      playoffSnapshotOf({
+        series: { homeFranchiseId: null, awayFranchiseId: 'nop' } as never,
+        summaries: [],
+      }),
     ).toBeNull();
   });
 });

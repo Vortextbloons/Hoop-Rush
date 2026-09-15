@@ -192,10 +192,10 @@ export function buildPool(
   });
 }
 const DEFAULT_DIFFICULTY: DifficultyProfile = {
-  profileVersion: 'm3-medium-v3',
+  profileVersion: 'm3-medium-v4',
   name: 'medium',
-  leagueMedianPercentileBand: [0.4, 0.55],
-  teamPercentileBand: [0.25, 0.65],
+  leagueMedianPercentileBand: [0.4, 0.52],
+  teamPercentileBand: [0.23, 0.6],
 };
 const ALL_FRANCHISE_SLOTS: ReadonlyArray<{
   franchiseId: string;
@@ -544,8 +544,8 @@ export function buildFixtureBracket(overrides: Partial<OpponentBracket> = {}): O
       generationVersion: 'fixture-v1',
       dataVersion: 'data-v1',
       targetBands: {
-        teamPercentileBand: [0.25, 0.65],
-        leagueMedianPercentileBand: [0.4, 0.55],
+        teamPercentileBand: [0.23, 0.6],
+        leagueMedianPercentileBand: [0.4, 0.52],
       },
     },
     opponents,

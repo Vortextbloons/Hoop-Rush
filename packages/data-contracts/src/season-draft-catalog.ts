@@ -91,7 +91,7 @@ export const seasonDraftCatalogSchema = z
         });
       }
       seen.add(candidate.playerVersionId);
-      if (catalog.catalogVersion === SEASON_DRAFT_CATALOG_VERSION && !candidate.anchors) {
+      if (!candidate.anchors) {
         ctx.addIssue({
           code: 'custom',
           message: `v4 candidate ${candidate.playerVersionId} is missing the validated anchors`,

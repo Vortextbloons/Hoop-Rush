@@ -65,6 +65,7 @@ import {
 } from '../schemas/collection-record.ts';
 const ACTIVE_RECORD_ID = 'active';
 const CLASSIC_DRAFT_RECORD_ID = 'classic-draft';
+const V2_MIGRATED_CHECKPOINT_SAVE_SCHEMA_VERSION = 3;
 
 export const HOOP_RUSH_DATABASE_STORES: Record<string, string> = {
   active: 'recordId',
@@ -146,6 +147,214 @@ export class HoopRushDatabase extends Dexie {
   collectionGameCommands!: Table<StoredCollectionGameCommandRow, [string, string]>;
   constructor(name = 'hoop-rush-saves') {
     super(name);
+    this.version(1).stores({
+      active: 'recordId',
+      completed: 'recordId',
+      history: 'recordId',
+    });
+    this.version(2)
+      .stores({
+        active: 'recordId',
+        activeGames: '[runId+gameNumber], runId',
+        completed: 'recordId',
+        history: 'recordId',
+      })
+      .upgrade(async (tx) => {
+        const legacy = await tx.table<StoredRunRecord, string>('active').get(ACTIVE_RECORD_ID);
+        if (legacy === undefined) return;
+        const validated = storedRunRecordSchema.parse(legacy);
+        await tx.table('activeGames').bulkPut(
+          validated.run.games.map((result) => ({
+            runId: validated.run.runId,
+            gameNumber: result.gameNumber,
+            result,
+            updatedAtIso: validated.updatedAtIso,
+          })),
+        );
+        const { games: _games, schemaVersion: _schemaVersion, ...run } = validated.run;
+        await tx.table('active').put({
+          recordId: ACTIVE_RECORD_ID,
+          saveSchemaVersion: V2_MIGRATED_CHECKPOINT_SAVE_SCHEMA_VERSION,
+          ...run,
+          updatedAtIso: validated.updatedAtIso,
+        });
+      });
+    this.version(3).stores({
+      history: 'recordId, completedAtIso',
+    });
+    this.version(4).stores({
+      classicDrafts: 'recordId',
+    });
+    this.version(5).stores({
+      seasonDrafts: 'recordId',
+    });
+    this.version(6).stores({
+      seasonRuns: 'recordId',
+      seasonRunSummaries: '[runId+gameId], runId, blockIndex',
+      seasonRunDetails: '[runId+gameId], runId',
+      seasonRunBlocks: '[runId+blockIndex], runId',
+      seasonRunIndex: 'recordId',
+    });
+    this.version(7).stores({
+      seasonPendingBlocks: 'runId',
+    });
+    this.version(8).stores({
+      seasonPostseasonSummaries: '[runId+gameId], runId',
+      seasonCommandLog: '[runId+ordinal], runId',
+      seasonAlmanacs: 'runId',
+      seasonCompletedRuns: 'runId',
+      seasonCompletedIndex: 'recordId, completedAtIso',
+    });
+    this.version(9)
+      .stores({
+        seasonRuns: 'recordId',
+        seasonRunSummaries: '[runId+gameId], [runId+blockIndex], runId, blockIndex',
+        seasonRunDetails: '[runId+gameId], runId',
+        seasonRunBlocks: '[runId+blockIndex], runId',
+        seasonRunIndex: 'recordId',
+        seasonPendingBlocks: 'runId',
+        seasonPostseasonSummaries: '[runId+gameId], runId',
+        seasonCommandLog: '[runId+ordinal], runId',
+        seasonAlmanacs: 'runId',
+        seasonCompletedRuns: 'runId',
+        seasonCompletedIndex: 'recordId, completedAtIso',
+        seasonRunPlayerSlices: 'runId',
+      })
+      .upgrade(async (tx) => {
+        await tx.table('seasonRuns').clear();
+        await tx.table('seasonRunSummaries').clear();
+        await tx.table('seasonRunDetails').clear();
+        await tx.table('seasonRunBlocks').clear();
+        await tx.table('seasonRunIndex').clear();
+        await tx.table('seasonPendingBlocks').clear();
+        await tx.table('seasonPostseasonSummaries').clear();
+        await tx.table('seasonCommandLog').clear();
+        await tx.table('seasonAlmanacs').clear();
+        await tx.table('seasonCompletedRuns').clear();
+        await tx.table('seasonCompletedIndex').clear();
+      });
+    this.version(10)
+      .stores({
+        seasonRuns: 'recordId',
+        seasonRunSummaries: '[runId+gameId], [runId+blockIndex], runId, blockIndex',
+        seasonRunDetails: '[runId+gameId], runId',
+        seasonRunBlocks: '[runId+blockIndex], runId',
+        seasonRunIndex: 'recordId',
+        seasonPendingBlocks: 'runId',
+        seasonPostseasonSummaries: '[runId+gameId], runId',
+        seasonPostseasonDetails: '[runId+gameId], runId',
+        seasonCommandLog: '[runId+ordinal], runId',
+        seasonAlmanacs: 'runId',
+        seasonCompletedRuns: 'runId',
+        seasonCompletedIndex: 'recordId, completedAtIso',
+        seasonRunPlayerSlices: 'runId',
+      })
+      .upgrade(async (tx) => {
+        await tx.table('seasonRuns').clear();
+        await tx.table('seasonRunSummaries').clear();
+        await tx.table('seasonRunDetails').clear();
+        await tx.table('seasonRunBlocks').clear();
+        await tx.table('seasonRunIndex').clear();
+        await tx.table('seasonPendingBlocks').clear();
+        await tx.table('seasonPostseasonSummaries').clear();
+        await tx.table('seasonPostseasonDetails').clear();
+        await tx.table('seasonCommandLog').clear();
+        await tx.table('seasonAlmanacs').clear();
+        await tx.table('seasonCompletedRuns').clear();
+        await tx.table('seasonCompletedIndex').clear();
+        await tx.table('seasonRunPlayerSlices').clear();
+      });
+    this.version(11).stores({
+      seasonRuns: 'recordId',
+      seasonRunSummaries: '[runId+gameId], [runId+blockIndex], runId, blockIndex',
+      seasonRunDetails: '[runId+gameId], runId',
+      seasonRunBlocks: '[runId+blockIndex], runId',
+      seasonRunIndex: 'recordId',
+      seasonPendingBlocks: 'runId',
+      seasonPostseasonSummaries: '[runId+gameId], runId',
+      seasonPostseasonDetails: '[runId+gameId], runId',
+      seasonCommandLog: '[runId+ordinal], runId',
+      seasonAlmanacs: 'runId',
+      seasonCompletedRuns: 'runId',
+      seasonCompletedIndex: 'recordId, completedAtIso',
+      seasonRunPlayerSlices: 'runId',
+    });
+    this.version(12).stores({
+      seasonRuns: 'recordId',
+      seasonRunSummaries: '[runId+gameId], [runId+blockIndex], runId, blockIndex',
+      seasonRunDetails: '[runId+gameId], runId',
+      seasonRunBlocks: '[runId+blockIndex], runId',
+      seasonRunIndex: 'recordId',
+      seasonPendingBlocks: 'runId',
+      seasonPostseasonSummaries: '[runId+gameId], runId',
+      seasonPostseasonDetails: '[runId+gameId], runId',
+      seasonCommandLog: '[runId+ordinal], runId',
+      seasonAlmanacs: 'runId',
+      seasonCompletedRuns: 'runId',
+      seasonCompletedIndex: 'recordId, completedAtIso',
+      seasonRunPlayerSlices: 'runId',
+      seasonRoomStates: 'roomId',
+    });
+    this.version(13).stores({
+      seasonRuns: 'recordId',
+      seasonRunSummaries: '[runId+gameId], [runId+blockIndex], runId, blockIndex',
+      seasonRunDetails: '[runId+gameId], runId',
+      seasonRunBlocks: '[runId+blockIndex], runId',
+      seasonRunIndex: 'recordId',
+      seasonPendingBlocks: 'runId',
+      seasonPostseasonSummaries: '[runId+gameId], runId',
+      seasonPostseasonDetails: '[runId+gameId], runId',
+      seasonCommandLog: '[runId+ordinal], runId',
+      seasonAlmanacs: 'runId',
+      seasonCompletedRuns: 'runId',
+      seasonCompletedIndex: 'recordId, completedAtIso',
+      seasonRunPlayerSlices: 'runId',
+      seasonRoomStates: 'roomId',
+    });
+    this.version(14).stores({
+      seasonRuns: 'recordId',
+      seasonRunSummaries: '[runId+gameId], [runId+blockIndex], runId, blockIndex',
+      seasonRunDetails: '[runId+gameId], runId',
+      seasonRunBlocks: '[runId+blockIndex], runId',
+      seasonRunIndex: 'recordId',
+      seasonPendingBlocks: 'runId',
+      seasonPostseasonSummaries: '[runId+gameId], runId',
+      seasonPostseasonDetails: '[runId+gameId], runId',
+      seasonCommandLog: '[runId+ordinal], runId',
+      seasonAlmanacs: 'runId',
+      seasonCompletedRuns: 'runId',
+      seasonCompletedIndex: 'recordId, completedAtIso',
+      seasonRunPlayerSlices: 'runId',
+      seasonRoomStates: 'roomId',
+      fixedFiveActive: 'roomId',
+      fixedFiveCommands: '[roomId+ordinal], roomId',
+      fixedFivePendingResults: 'roomId',
+      fixedFiveCompleted: 'roomId',
+      fixedFiveHistory: 'recordId, completedAtIso',
+    });
+    this.version(15).stores({
+      seasonRuns: 'recordId',
+      seasonRunSummaries: '[runId+gameId], [runId+blockIndex], runId, blockIndex',
+      seasonRunDetails: '[runId+gameId], runId',
+      seasonRunBlocks: '[runId+blockIndex], runId',
+      seasonRunIndex: 'recordId',
+      seasonPendingBlocks: 'runId',
+      seasonPostseasonSummaries: '[runId+gameId], runId',
+      seasonPostseasonDetails: '[runId+gameId], runId',
+      seasonCommandLog: '[runId+ordinal], runId',
+      seasonAlmanacs: 'runId',
+      seasonCompletedRuns: 'runId',
+      seasonCompletedIndex: 'recordId, completedAtIso',
+      seasonRunPlayerSlices: 'runId',
+      seasonRoomStates: null,
+      fixedFiveActive: 'roomId',
+      fixedFiveCommands: '[roomId+ordinal], roomId',
+      fixedFivePendingResults: 'roomId',
+      fixedFiveCompleted: 'roomId',
+      fixedFiveHistory: 'recordId, completedAtIso',
+    });
+    this.version(16).stores(HOOP_RUSH_DATABASE_STORES);
+    this.version(17).stores(HOOP_RUSH_DATABASE_STORES);
     this.version(18).stores(HOOP_RUSH_DATABASE_STORES);
     this.version(19)
       .stores(HOOP_RUSH_DATABASE_STORES)

@@ -110,8 +110,6 @@ import type {
   SeasonApplySponsorCommand,
   SeasonApplySponsorRejection,
   SeasonApplySponsorResult,
-  SeasonCampaignAlreadySelectedRejection,
-  SeasonCampaignOpportunityNotOfferedRejection,
   SeasonTradeActiveNegotiationRejection,
   SeasonTradeInquiryCapRejection,
 } from '@hoop-rush/data-contracts';
@@ -171,7 +169,6 @@ import {
   tradeRosterLegalityReasons,
   type SeasonEconomyRun,
 } from './trades.ts';
-import { normalizeCampaignState } from './campaign.ts';
 import { normalizeEvolutionState } from '@hoop-rush/data-contracts';
 import {
   SEASON_COURT_INNOVATION_CATALOG,

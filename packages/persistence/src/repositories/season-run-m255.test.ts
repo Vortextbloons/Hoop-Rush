@@ -42,6 +42,41 @@ async function promote(adapters: ReturnType<typeof makeAdapters>) {
   if (!snapshot) throw new Error('expected promoted run');
   Object.assign(adapters.run, snapshot.run);
 }
+function campaignWithBlockZeroOffers() {
+  const opportunity = {
+    opportunityId: 'copp-aaaaaaaa',
+    branchId: 'cbr-bbbbbbbb',
+    templateId: 'ctpl-cccccccc',
+    blockIndex: 0,
+    identity: 'win-now',
+    family: 'results',
+    prerequisiteId: null,
+    target: {
+      kind: 'block-wins',
+      comparisonOperator: 'gte',
+      threshold: 6,
+      window: 'block',
+    },
+    breakthrough: null,
+    completedReward: { rewardId: 'rew-dddddddd', type: 'influence', amount: 1 },
+    breakthroughReward: null,
+    feasibilityFacts: {},
+    seedPath: ['campaign', '0', 'offers', '0'],
+  };
+  return seasonCampaignStateSchema.parse({
+    ...buildEmptyCampaignState(),
+    offers: {
+      0: [
+        opportunity,
+        {
+          ...opportunity,
+          opportunityId: 'copp-eeeeeeee',
+          seedPath: ['campaign', '0', 'offers', '1'],
+        },
+      ],
+    },
+  });
+}
 describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompatibility', () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -64,7 +99,7 @@ describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompati
     expect(row?.run.campaign).toBeDefined();
     expect(row?.campaign).toBeDefined();
     expect(row?.campaign?.startingIdentity).toBeNull();
-    expect(row?.campaign?.offers[0]).toHaveLength(2);
+    expect(row?.campaign?.offers).toEqual({});
     expect(row?.trade).toBeNull();
     expect(row?.health.healthVersion).toBe(SEASON_HEALTH_VERSION);
     expect(row?.influence.influenceVersion).toBe(SEASON_INFLUENCE_VERSION);
@@ -142,13 +177,12 @@ describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompati
     await promote(adapters);
     const base = await adapters.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
     if (!base) throw new Error('no base');
-    const firstOffer = adapters.run.campaign?.offers[0]?.[0];
-    if (!firstOffer) throw new Error('expected block-0 campaign offers on a fresh run');
+    const opportunityId = 'copp-aaaaaaaa';
     const nextCampaign = seasonCampaignStateSchema.parse({
-      ...adapters.run.campaign,
+      ...campaignWithBlockZeroOffers(),
       selections: {
         0: {
-          opportunityId: firstOffer.opportunityId,
+          opportunityId,
           selectedByCommandId: commandIdSchema.parse('cmd-campaign-1'),
         },
       },
@@ -170,7 +204,7 @@ describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompati
       expectedStateRevision: 0,
       expectedStateDigest: adapters.run.stateDigest,
       blockIndex: 0,
-      opportunityId: firstOffer.opportunityId,
+      opportunityId,
     });
     await adapters.repo.applySeasonRunCommand({
       runId: adapters.run.runId,
@@ -180,7 +214,7 @@ describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompati
     });
     const stored = await adapters.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
     expect(stored?.stateRevision).toBe(1);
-    expect(stored?.campaign?.selections[0]?.opportunityId).toBe(firstOffer.opportunityId);
+    expect(stored?.campaign?.selections[0]?.opportunityId).toBe(opportunityId);
     const log = await adapters.db.seasonCommandLog
       .where('runId')
       .equals(adapters.run.runId)
@@ -208,13 +242,11 @@ describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompati
   it('rejected/duplicate/stale/expired writes nothing', async () => {
     const adapters = makeAdapters();
     await promote(adapters);
-    const firstOffer = adapters.run.campaign?.offers[0]?.[0];
-    if (!firstOffer) throw new Error('expected block-0 campaign offers on a fresh run');
     const selectedCampaign = seasonCampaignStateSchema.parse({
-      ...adapters.run.campaign,
+      ...campaignWithBlockZeroOffers(),
       selections: {
         0: {
-          opportunityId: firstOffer.opportunityId,
+          opportunityId: 'copp-aaaaaaaa',
           selectedByCommandId: commandIdSchema.parse('cmd-dup'),
         },
       },
@@ -227,7 +259,7 @@ describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompati
       expectedStateRevision: 0,
       expectedStateDigest: adapters.run.stateDigest,
       blockIndex: 0,
-      opportunityId: firstOffer.opportunityId,
+      opportunityId: 'copp-aaaaaaaa',
     });
     const nextRun = {
       ...adapters.run,
@@ -541,8 +573,16 @@ describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompati
   it('cross-tab reload cancels stale work, reloads snapshot, never repeats exchange/transaction', async () => {
     const adapters = makeAdapters();
     await promote(adapters);
-    const firstOffer = adapters.run.campaign?.offers[0]?.[0];
-    if (!firstOffer) throw new Error('expected block-0 campaign offers on a fresh run');
+    const opportunityId = 'copp-aaaaaaaa';
+    const nextCampaign = seasonCampaignStateSchema.parse({
+      ...campaignWithBlockZeroOffers(),
+      selections: {
+        0: {
+          opportunityId,
+          selectedByCommandId: commandIdSchema.parse('cmd-xtab-1'),
+        },
+      },
+    });
     const command: SeasonRunCommand = seasonRunCommandSchema.parse({
       schemaVersion: SEASON_RUN_SCHEMA_VERSION,
       command: 'select-campaign-opportunity',
@@ -551,16 +591,7 @@ describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompati
       expectedStateRevision: 0,
       expectedStateDigest: adapters.run.stateDigest,
       blockIndex: 0,
-      opportunityId: firstOffer.opportunityId,
-    });
-    const nextCampaign = seasonCampaignStateSchema.parse({
-      ...adapters.run.campaign,
-      selections: {
-        0: {
-          opportunityId: firstOffer.opportunityId,
-          selectedByCommandId: commandIdSchema.parse('cmd-xtab-1'),
-        },
-      },
+      opportunityId,
     });
     const nextRun = {
       ...adapters.run,
@@ -583,7 +614,7 @@ describe('M2.5.5 persistence — saveSchema 9, atomic commits, replay, incompati
     });
     const reloaded = await tab2.loadActiveRun();
     expect(reloaded?.run.stateRevision).toBe(1);
-    expect(reloaded?.run.campaign?.selections[0]?.opportunityId).toBe(firstOffer.opportunityId);
+    expect(reloaded?.run.campaign?.selections[0]?.opportunityId).toBe(opportunityId);
     await expect(
       tab2.applySeasonRunCommand({
         runId: adapters.run.runId,

@@ -93,9 +93,7 @@ export function dnpOf(
   return out;
 }
 
-export function hasDnp(
-  result: RecommendSeasonRotationResult & { status: 'recommended' },
-): boolean {
+export function hasDnp(result: RecommendSeasonRotationResult & { status: 'recommended' }): boolean {
   return result.changes.some((change) => change.kind === 'minutes' && change.to === 0);
 }
 

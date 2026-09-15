@@ -165,12 +165,20 @@
           onpointerenter={() => warmPlayersIndexForMode(mode.code)}
           onfocus={() => warmPlayersIndexForMode(mode.code)}
           ontouchstart={() => warmPlayersIndexForMode(mode.code)}
-          class="group flex h-full flex-col rounded-xl bg-card p-6 outline-none transition-colors hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring sm:p-7 {mode.code === '04'
+          class="group flex h-full flex-col rounded-xl bg-card p-6 outline-none transition-colors hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring sm:p-7 {mode.code ===
+          '04'
             ? 'border border-accent/60'
             : ''}"
         >
           {#if mode.code === '04'}
-            <img src={asset('/ultimate/logo.png')} alt="" aria-hidden="true" class="h-10 w-10 rounded-lg" width="40" height="40" />
+            <img
+              src={asset('/ultimate/logo.png')}
+              alt=""
+              aria-hidden="true"
+              class="h-10 w-10 rounded-lg"
+              width="40"
+              height="40"
+            />
           {/if}
           <h2 class="font-display mt-5 text-4xl font-extrabold tracking-tight uppercase">
             {mode.name}

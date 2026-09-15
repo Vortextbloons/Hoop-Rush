@@ -133,5 +133,8 @@
 </article>
 
 <style>
-  .play-in-card { border-left:3px solid var(--game-color); box-shadow:0 10px 28px rgb(0 0 0 / .07); }
+  .play-in-card {
+    border-left: 3px solid var(--game-color);
+    box-shadow: 0 10px 28px rgb(0 0 0 / 0.07);
+  }
 </style>

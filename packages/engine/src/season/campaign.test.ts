@@ -685,17 +685,7 @@ describe('campaign old saves', () => {
     expect(state.schemaVersion).toBe(1);
   });
   it('buildInitialCampaignState starts empty without offers', () => {
-    const input = generationInput();
-    const initial = buildInitialCampaignState({
-      rootSeed: input.rootSeed,
-      humanFranchiseId: input.humanFranchiseId,
-      schedule: input.schedule,
-      standings: input.standings,
-      health: input.health,
-      rotations: input.rotations,
-      rosters: input.rosters,
-      transactions: input.transactions,
-    });
+    const initial = buildInitialCampaignState();
     expect(initial.startingIdentity).toBeNull();
     expect(initial.startingFocus).toBeNull();
     expect(initial.evolutionOffers).toBeNull();

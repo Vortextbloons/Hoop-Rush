@@ -61,9 +61,7 @@ export function floorTierWeight(overall: number): number {
   return 0;
 }
 
-export function scriptedRoundsFor(
-  rootSeed: string,
-): { stars: Set<number>; floors: Set<number> } {
+export function scriptedRoundsFor(rootSeed: string): { stars: Set<number>; floors: Set<number> } {
   const rng = createRng(seasonNamespaceSeed(rootSeed, 'draft', 'script'));
   const ordinals = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], rng);
   const stars = new Set(ordinals.slice(0, SEASON_DRAFT_SCRIPT_STAR_COUNT).sort((a, b) => a - b));
@@ -78,10 +76,7 @@ export function scriptedRoundsFor(
   return { stars, floors };
 }
 
-export function scriptKindFor(
-  rootSeed: string,
-  draftRound: number,
-): DraftScriptKind | null {
+export function scriptKindFor(rootSeed: string, draftRound: number): DraftScriptKind | null {
   const rounds = scriptedRoundsFor(rootSeed);
   if (rounds.stars.has(draftRound)) return 'star';
   if (rounds.floors.has(draftRound)) return 'floor';

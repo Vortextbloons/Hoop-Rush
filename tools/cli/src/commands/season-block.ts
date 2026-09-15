@@ -234,7 +234,7 @@ export function runnerBlockCommand(
       `season-block-${String(blockIndex)}-${String(state.acceptedCommandIds.length)}`,
     ),
     runId: state.run.runId,
-    expectedRevision: state.acceptedCommandIds.length,
+    expectedRevision: blockIndex,
     blockIndex,
     rotationDigest: seasonRotationSetDigest(state.run.rotations),
     objectiveId: state.objectiveId,
@@ -309,6 +309,7 @@ export function ensureEvolutionSelection(state: SeasonBlockRunnerState, blockInd
     run: state.run,
     pending: null,
     humanFranchiseId: state.humanFranchiseId,
+    effects: state.effects,
   });
   const result = output.result;
   if (result.command !== 'select-court-innovation' || result.result.status !== 'accepted') {
@@ -399,9 +400,7 @@ export function runBlockThroughHandler(
   const nextSponsors = sponsorsWithBlockCommit({
     rootSeed: state.run.rootSeed,
     acceptedBlockIndex: checkpoint.blockIndex,
-    sponsors: normalizeSponsorGearState(
-      (state.run as unknown as { sponsors?: unknown }).sponsors,
-    ),
+    sponsors: normalizeSponsorGearState((state.run as unknown as { sponsors?: unknown }).sponsors),
     rotations: state.run.rotations,
     ratings: sponsorRatings,
     humanFranchiseId: state.humanFranchiseId,
@@ -409,7 +408,7 @@ export function runBlockThroughHandler(
   });
   const runWithSponsors = { ...state.run, sponsors: nextSponsors };
   const sponsoredDigest = seasonRunStateDigest(
-    seasonRunStateDigestFactsOf(runWithSponsors as never, state.effects),
+    seasonRunStateDigestFactsOf(runWithSponsors, state.effects),
   );
   state.run = {
     ...(runWithSponsors as typeof state.run),

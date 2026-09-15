@@ -6,9 +6,7 @@ import { seasonRotationSetDigestSchema } from './season-digests.ts';
 import { seasonObjectiveIdSchema } from './season-objective.ts';
 import { seasonCampaignOpportunityIdSchema } from './season-campaign.ts';
 import { seasonChallengeIdSchema } from './season-challenge.ts';
-import {
-  SEASON_BLOCK_VERSION,
-} from './season-versions.ts';
+import { SEASON_BLOCK_VERSION } from './season-versions.ts';
 export const seasonSubmitBlockCommandSchema = seasonRunCommandBaseSchema.extend({
   blockVersion: z.literal(SEASON_BLOCK_VERSION),
   command: z.literal('submit-season-block'),

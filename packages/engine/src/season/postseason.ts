@@ -909,7 +909,7 @@ export function decideSeasonFinalsHomeCourt(input: {
   const challenger = homeCourtFranchiseId === east ? west : east;
   const resolution: SeasonTiebreakResolution = {
     resolutionId: idSchema.parse(
-      `tb-finals-home-court-${seasonDigestHex([east, west, input.drawSeed, rule].join(' '))}`,
+      `tb-finals-home-court-${seasonDigestHex([east, west, input.drawSeed, rule].join('\u0000'))}`,
     ),
     conference: conferenceOf(league, homeCourtFranchiseId),
     kind: 'finals-home-court',
@@ -1439,8 +1439,8 @@ export function simulateSeasonPostseasonGame(
       winner: humanIsHome ? 'away' : 'home',
       losingFranchiseId: franchiseIdSchema.parse(humanFranchiseId),
       trigger: 'human-interruption-forfeit',
-      homeScore: (humanIsHome ? 0 : 2) as 0 | 2,
-      awayScore: (humanIsHome ? 2 : 0) as 0 | 2,
+      homeScore: humanIsHome ? 0 : 2,
+      awayScore: humanIsHome ? 2 : 0,
     };
     const factsOf = roundFactsOf(run.postseason, run.league, gameId);
     const summary = seasonPostseasonSummaryFromGame({

@@ -10,9 +10,7 @@ import {
   seasonFreeAgencyBandSchema,
   seasonFreeAgencyRoleExpectationSchema,
 } from './season-free-agency.ts';
-import {
-  SEASON_FREE_AGENCY_INDEX_VERSION,
-} from './season-versions.ts';
+import { SEASON_FREE_AGENCY_INDEX_VERSION } from './season-versions.ts';
 export const seasonFreeAgencyIndexEntrySchema = z.object({
   playerVersionId: playerVersionIdSchema,
   playerId: playerIdSchema,

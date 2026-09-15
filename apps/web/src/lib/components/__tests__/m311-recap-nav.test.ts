@@ -107,17 +107,14 @@ describe('checkpoint recap evidence (M3.11.1)', () => {
     expect(container.querySelector('[aria-labelledby="recap-goal-heading"]')).toBeNull();
   });
 
-  it('falls back to the legacy goal only when challenge evidence is absent', () => {
+  it('ignores the retired legacy goal when challenge evidence is absent', () => {
     const legacy = {
       ...baseRecap(),
       objectiveEvidence: legacyObjective(),
     };
     const { container } = renderRecap(legacy);
     expect(container.querySelector('[data-recap-challenge-evidence]')).toBeNull();
-    const goal = container.querySelector('[aria-labelledby="recap-goal-heading"]');
-    expect(goal).not.toBeNull();
-    expect(goal?.textContent).toContain('win-six');
-    expect(goal?.textContent).toContain('Missed');
+    expect(container.querySelector('[aria-labelledby="recap-goal-heading"]')).toBeNull();
   });
 
   it('prefers challenges over the legacy goal when both exist', () => {

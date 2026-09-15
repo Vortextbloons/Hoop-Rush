@@ -1,8 +1,6 @@
 import { z } from 'zod';
 import { franchiseIdSchema } from './ids.ts';
-import {
-  SEASON_CHALLENGE_VERSION,
-} from './season-versions.ts';
+import { SEASON_CHALLENGE_VERSION } from './season-versions.ts';
 
 export const seasonChallengeIdSchema = z.enum([
   'winning-block',

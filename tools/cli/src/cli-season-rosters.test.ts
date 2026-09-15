@@ -416,7 +416,13 @@ describe('cli: season rosters calibrate (roster-generation-v2)', () => {
     writeFileSync(targetsPath, `${JSON.stringify(targets, null, 2)}\n`);
     const run = async (workers: string) => {
       const report = await seasonRostersCalibrate(
-        { targets: targetsPath, 'calibration-seeds': '4', 'validation-seeds': '2', workers },
+        {
+          targets: targetsPath,
+          out: join(TMP, `workers-out-${workers}.json`),
+          'calibration-seeds': '4',
+          'validation-seeds': '2',
+          workers,
+        },
         { runCohort: fakeCohort(), runOrderInvariance: fakeOrderInvariance },
       );
       return seasonRostersCalibrateReportSchema.parse(report.payload);
@@ -446,7 +452,7 @@ describe('cli: season draft reproduce', () => {
     const payload = seasonDraftReproduceReportSchema.parse(jsonPayload(stdout));
     expect(payload.pass).toBe(true);
     expect(payload.identical).toBe(true);
-    expect(payload.finalDigest).toBe('8f230d0a2d69f11e8429ff042997933a');
+    expect(payload.finalDigest).toBe('26224f8558bdf439e740a013788e71f5');
     expect(payload.acceptedCount).toBe(payload.commandCount);
     expect(payload.rejectedCount).toBe(0);
     expect(payload.offers).toHaveLength(10);

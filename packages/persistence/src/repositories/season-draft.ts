@@ -1,7 +1,4 @@
-import {
-  SEASON_DRAFT_SAVE_SCHEMA_VERSION,
-  SEASON_DRAFT_VERSION,
-} from '@hoop-rush/data-contracts';
+import { SEASON_DRAFT_SAVE_SCHEMA_VERSION, SEASON_DRAFT_VERSION } from '@hoop-rush/data-contracts';
 import {
   SEASON_DRAFT_RECORD_ID,
   storedSeasonDraftSchema,

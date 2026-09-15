@@ -61,16 +61,10 @@ export const seasonCheckpointVersionsSchema = z.object({
   healthVersion: z.literal(SEASON_HEALTH_VERSION),
   tradeVersion: z.literal(SEASON_TRADE_VERSION),
   influenceVersion: z.literal(SEASON_INFLUENCE_VERSION),
-  objectiveVersion: z
-    .literal(SEASON_OBJECTIVE_VERSION)
-    .optional(),
-  challengeVersion: z
-    .literal(SEASON_CHALLENGE_VERSION)
-    .optional(),
+  objectiveVersion: z.literal(SEASON_OBJECTIVE_VERSION).optional(),
+  challengeVersion: z.literal(SEASON_CHALLENGE_VERSION).optional(),
   challengeTargetsVersion: z.literal(SEASON_CHALLENGE_TARGETS_VERSION).optional(),
-  campaignVersion: z
-    .literal(SEASON_CAMPAIGN_VERSION)
-    .optional(),
+  campaignVersion: z.literal(SEASON_CAMPAIGN_VERSION).optional(),
   campaignTargetsVersion: z.literal(SEASON_CAMPAIGN_TARGETS_VERSION).optional(),
   injuryTargetsVersion: z.literal(SEASON_INJURY_TARGETS_VERSION),
   tradeTargetsVersion: z.literal(SEASON_TRADE_TARGETS_VERSION),

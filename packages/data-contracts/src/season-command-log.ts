@@ -2,9 +2,7 @@ import { z } from 'zod';
 import { idSchema } from './ids.ts';
 import { seasonCheckpointDigestSchema } from './season-digests.ts';
 import { seasonRunCommandHistorySchema } from './season-commands.ts';
-import {
-  SEASON_COMMAND_LOG_VERSION,
-} from './season-versions.ts';
+import { SEASON_COMMAND_LOG_VERSION } from './season-versions.ts';
 import { canonicalJson, seasonDigestHex } from './season-hash.ts';
 export const seasonCommandActorSourceSchema = z.enum(['human', 'timeout-default', 'ai-takeover']);
 export type SeasonCommandActorSource = z.infer<typeof seasonCommandActorSourceSchema>;
