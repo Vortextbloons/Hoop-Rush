@@ -583,12 +583,14 @@
       Slammed {slamName} into your five
     </p>
   {/if}
-  {#if deadlineText}
-    <p class="clock-line {clockUrgent ? 'clock-line--hot' : ''}" role="status">
-      <span class="clock-ring" aria-hidden="true"><span class="clock-hand"></span></span
-      >{deadlineText}
-    </p>
-  {/if}
+  <div class="clock-slot">
+    {#if deadlineText}
+      <p class="clock-line {clockUrgent ? 'clock-line--hot' : ''}" role="status">
+        <span class="clock-ring" aria-hidden="true"><span class="clock-hand"></span></span
+        >{deadlineText}
+      </p>
+    {/if}
+  </div>
   {#if lastAutopick}
     <p class="mt-1 rounded-lg border border-line-soft bg-card p-2 text-xs" role="status">
       Timeout auto-pick: <strong>{lastAutopick.displayName}</strong>
@@ -906,6 +908,9 @@
     border-top-color: var(--color-primary);
     animation: ring-spin 1.2s linear infinite;
     flex-shrink: 0;
+  }
+  .clock-slot {
+    min-height: 1.6rem;
   }
   .clock-line--hot .clock-ring {
     border-top-color: var(--color-destructive);

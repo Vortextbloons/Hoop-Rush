@@ -333,41 +333,41 @@
     </p>
   </LiveSimModal>
 
-  {#if !dialogOpen}
-    <div
-      class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface-1 px-4 py-3"
-      role="status"
-    >
-      <div class="flex min-w-0 flex-wrap items-center gap-2">
-        {#if progress.phase === 'running'}
-          <span class="sim-live-pill" role="status">
-            <span class="sim-live-dot" aria-hidden="true"></span> Simming
-          </span>
-        {:else if progress.phase === 'complete'}
-          <span class="sim-live-pill" data-tone="final">Final</span>
-        {:else}
-          <span class="sim-live-pill" data-tone="muted">{progress.phase}</span>
-        {/if}
-        {#if manifest !== null && humanFranchiseId !== null && humanExternalId !== ''}
-          <SeasonTeamLogo
-            {manifest}
-            franchiseId={humanFranchiseId}
-            teamExternalId={humanExternalId}
-            size="md"
-            eager
-          />
-        {/if}
-        <p class="truncate text-sm font-semibold">
-          {label}{countsText !== null ? ` · ${countsText}` : ''}
-        </p>
-      </div>
-      <button
-        type="button"
-        onclick={showLive}
-        class="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
-      >
-        {progress.phase === 'running' ? 'Watch live' : 'Show results'}
-      </button>
+  <div
+    class:invisible={dialogOpen}
+    aria-hidden={dialogOpen}
+    class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface-1 px-4 py-3"
+    role="status"
+  >
+    <div class="flex min-w-0 flex-wrap items-center gap-2">
+      {#if progress.phase === 'running'}
+        <span class="sim-live-pill" role="status">
+          <span class="sim-live-dot" aria-hidden="true"></span> Simming
+        </span>
+      {:else if progress.phase === 'complete'}
+        <span class="sim-live-pill" data-tone="final">Final</span>
+      {:else}
+        <span class="sim-live-pill" data-tone="muted">{progress.phase}</span>
+      {/if}
+      {#if manifest !== null && humanFranchiseId !== null && humanExternalId !== ''}
+        <SeasonTeamLogo
+          {manifest}
+          franchiseId={humanFranchiseId}
+          teamExternalId={humanExternalId}
+          size="md"
+          eager
+        />
+      {/if}
+      <p class="truncate text-sm font-semibold">
+        {label}{countsText !== null ? ` · ${countsText}` : ''}
+      </p>
     </div>
-  {/if}
+    <button
+      type="button"
+      onclick={showLive}
+      class="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
+    >
+      {progress.phase === 'running' ? 'Watch live' : 'Show results'}
+    </button>
+  </div>
 {/if}

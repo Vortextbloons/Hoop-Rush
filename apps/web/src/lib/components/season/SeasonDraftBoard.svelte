@@ -335,140 +335,138 @@
         {#if needsSummary}
           <p class="mt-1 text-xs font-semibold">{needsSummary}</p>
         {/if}
-        {#key offer.pickOrdinal}
-          <ul class="mt-3 grid auto-rows-fr gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {#each offer.cards as card, index (card.playerVersionId)}
-              {@const candidate = candidateOf(card.playerVersionId)}
-              {@const identity = candidate
-                ? eraIdentityOf(manifest, candidate.franchiseId, candidate.eraId)
-                : { displayLabel: null, logoCandidates: [] }}
-              {@const playable = candidate?.positions.playable ?? []}
-              {@const covers = coverageOf(playable)}
-              {@const fillsNeed = card.selectable && fillsAnOpenNeed(playable)}
-              {@const shortTeam = candidate
-                ? teamShortLabel(candidate.franchiseId, candidate.eraId)
-                : null}
-              {@const fullTeam = candidate
-                ? (identity.displayLabel ??
-                  (candidate ? franchiseLabel(candidate.franchiseId) : 'Unknown team'))
-                : 'Unknown team'}
-              {@const playerName = candidate?.displayName ?? 'Unknown player'}
-              {@const teamLine = `${shortTeam ?? (candidate ? franchiseLabel(candidate.franchiseId) : 'Unknown team')}${candidate ? ` · ${eraLabel(candidate.eraId)}` : ''}`}
-              <li
-                class="draft-card-enter flex h-full min-w-0 flex-col gap-2 rounded-xl border bg-surface-2 p-3 transition-transform duration-150 {fillsNeed
-                  ? 'border-primary/60'
-                  : 'border-transparent'} {card.selectable
-                  ? 'hover:-translate-y-1'
-                  : 'draft-card-off'}"
+        <ul class="mt-3 grid auto-rows-fr gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {#each offer.cards as card, index (card.playerVersionId)}
+            {@const candidate = candidateOf(card.playerVersionId)}
+            {@const identity = candidate
+              ? eraIdentityOf(manifest, candidate.franchiseId, candidate.eraId)
+              : { displayLabel: null, logoCandidates: [] }}
+            {@const playable = candidate?.positions.playable ?? []}
+            {@const covers = coverageOf(playable)}
+            {@const fillsNeed = card.selectable && fillsAnOpenNeed(playable)}
+            {@const shortTeam = candidate
+              ? teamShortLabel(candidate.franchiseId, candidate.eraId)
+              : null}
+            {@const fullTeam = candidate
+              ? (identity.displayLabel ??
+                (candidate ? franchiseLabel(candidate.franchiseId) : 'Unknown team'))
+              : 'Unknown team'}
+            {@const playerName = candidate?.displayName ?? 'Unknown player'}
+            {@const teamLine = `${shortTeam ?? (candidate ? franchiseLabel(candidate.franchiseId) : 'Unknown team')}${candidate ? ` · ${eraLabel(candidate.eraId)}` : ''}`}
+            <li
+              class="draft-card-enter flex h-full min-w-0 flex-col gap-2 rounded-xl border bg-surface-2 p-3 transition-transform duration-150 {fillsNeed
+                ? 'border-primary/60'
+                : 'border-transparent'} {card.selectable
+                ? 'hover:-translate-y-1'
+                : 'draft-card-off'}"
+              style="--draft-index: {index}"
+              class:opacity-70={!card.selectable}
+            >
+              <div
+                class="draft-card-inner flex min-w-0 flex-1 flex-col gap-2 rounded-lg p-0.5"
                 style="--draft-index: {index}"
-                class:opacity-70={!card.selectable}
               >
-                <div
-                  class="draft-card-inner flex min-w-0 flex-1 flex-col gap-2 rounded-lg p-0.5"
-                  style="--draft-index: {index}"
-                >
-                  <div class="flex min-w-0 items-start justify-between gap-2">
-                    <span class="flex min-w-0 items-center gap-2">
-                      <span class="draft-ball" aria-hidden="true"
-                        >{String(index + 1).padStart(2, '0')}</span
-                      >
-                      {#if faceOf(card.playerVersionId)}
-                        <SeasonPlayerFace
-                          face={faceOf(card.playerVersionId)!}
-                          {manifest}
-                          size="md"
-                          eager={card.selectable}
-                        />
-                      {/if}
-                    </span>
-                    {#if candidate}
-                      <SeasonTeamLogo
+                <div class="flex min-w-0 items-start justify-between gap-2">
+                  <span class="flex min-w-0 items-center gap-2">
+                    <span class="draft-ball" aria-hidden="true"
+                      >{String(index + 1).padStart(2, '0')}</span
+                    >
+                    {#if faceOf(card.playerVersionId)}
+                      <SeasonPlayerFace
+                        face={faceOf(card.playerVersionId)!}
                         {manifest}
-                        franchiseId={candidate.franchiseId}
-                        teamExternalId={manifest.modernFranchiseSlots.find(
-                          (s) => s.franchiseId === candidate.franchiseId,
-                        )?.teamExternalId ?? ''}
-                        logoCandidates={identity.logoCandidates}
-                        alt={fullTeam}
-                        size="sm"
+                        size="md"
+                        eager={card.selectable}
                       />
                     {/if}
-                  </div>
-                  <div class="flex min-h-0 flex-1 flex-col">
-                    <p
-                      class="line-clamp-2 min-h-10 text-sm font-semibold leading-snug"
-                      title={playerName}
-                    >
-                      {playerName}
-                    </p>
-                    <div class="mt-1 min-h-5">
-                      {#if fillsNeed}
-                        <span
-                          class="inline-flex rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-bold tracking-wide text-primary uppercase"
-                        >
-                          Fills a need
-                        </span>
-                      {/if}
-                    </div>
-                    <p class="mt-0.5 text-xs leading-snug text-muted-foreground">
-                      {candidate?.seasonKey ?? ''} · {formatPositions(playable)}
-                    </p>
-                    <p
-                      class="line-clamp-2 min-h-10 text-xs leading-snug text-muted-foreground"
-                      title={teamLine}
-                    >
-                      {teamLine}
-                    </p>
-                    <p
-                      class="mt-1.5 flex gap-1"
-                      aria-label={`Covers${covers.g ? ' guards' : ''}${covers.f ? ' forwards' : ''}${covers.c ? ' centers' : ''}`}
-                    >
-                      <span
-                        class="rounded px-1.5 py-0.5 text-[10px] font-bold {covers.g
-                          ? 'bg-primary/15 text-primary'
-                          : 'bg-surface-3 text-muted-foreground/60'}"
-                        aria-hidden="true">G</span
-                      >
-                      <span
-                        class="rounded px-1.5 py-0.5 text-[10px] font-bold {covers.f
-                          ? 'bg-primary/15 text-primary'
-                          : 'bg-surface-3 text-muted-foreground/60'}"
-                        aria-hidden="true">F</span
-                      >
-                      <span
-                        class="rounded px-1.5 py-0.5 text-[10px] font-bold {covers.c
-                          ? 'bg-primary/15 text-primary'
-                          : 'bg-surface-3 text-muted-foreground/60'}"
-                        aria-hidden="true">C</span
-                      >
-                    </p>
-                  </div>
-                  {#if card.selectable}
-                    <button
-                      type="button"
-                      onclick={() => {
-                        try {
-                          arenaDraftPick(fillsNeed);
-                        } catch {}
-                        onPick(card.playerVersionId);
-                      }}
-                      disabled={busy}
-                      class="mt-auto inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-extrabold tracking-wide text-primary-foreground uppercase outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
-                    >
-                      Draft No. {String(index + 1).padStart(2, '0')}
-                    </button>
-                  {:else}
-                    <p
-                      class="draft-tape mt-auto flex min-h-11 items-center rounded-lg px-2.5 py-1.5 text-xs leading-snug text-muted-foreground"
-                    >
-                      {humanizeCoverageReason(card.coverageReason) ?? 'Not available this round.'}
-                    </p>
+                  </span>
+                  {#if candidate}
+                    <SeasonTeamLogo
+                      {manifest}
+                      franchiseId={candidate.franchiseId}
+                      teamExternalId={manifest.modernFranchiseSlots.find(
+                        (s) => s.franchiseId === candidate.franchiseId,
+                      )?.teamExternalId ?? ''}
+                      logoCandidates={identity.logoCandidates}
+                      alt={fullTeam}
+                      size="sm"
+                    />
                   {/if}
                 </div>
-              </li>
-            {/each}
-          </ul>
-        {/key}
+                <div class="flex min-h-0 flex-1 flex-col">
+                  <p
+                    class="line-clamp-2 min-h-10 text-sm font-semibold leading-snug"
+                    title={playerName}
+                  >
+                    {playerName}
+                  </p>
+                  <div class="mt-1 min-h-5">
+                    {#if fillsNeed}
+                      <span
+                        class="inline-flex rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-bold tracking-wide text-primary uppercase"
+                      >
+                        Fills a need
+                      </span>
+                    {/if}
+                  </div>
+                  <p class="mt-0.5 text-xs leading-snug text-muted-foreground">
+                    {candidate?.seasonKey ?? ''} · {formatPositions(playable)}
+                  </p>
+                  <p
+                    class="line-clamp-2 min-h-10 text-xs leading-snug text-muted-foreground"
+                    title={teamLine}
+                  >
+                    {teamLine}
+                  </p>
+                  <p
+                    class="mt-1.5 flex gap-1"
+                    aria-label={`Covers${covers.g ? ' guards' : ''}${covers.f ? ' forwards' : ''}${covers.c ? ' centers' : ''}`}
+                  >
+                    <span
+                      class="rounded px-1.5 py-0.5 text-[10px] font-bold {covers.g
+                        ? 'bg-primary/15 text-primary'
+                        : 'bg-surface-3 text-muted-foreground/60'}"
+                      aria-hidden="true">G</span
+                    >
+                    <span
+                      class="rounded px-1.5 py-0.5 text-[10px] font-bold {covers.f
+                        ? 'bg-primary/15 text-primary'
+                        : 'bg-surface-3 text-muted-foreground/60'}"
+                      aria-hidden="true">F</span
+                    >
+                    <span
+                      class="rounded px-1.5 py-0.5 text-[10px] font-bold {covers.c
+                        ? 'bg-primary/15 text-primary'
+                        : 'bg-surface-3 text-muted-foreground/60'}"
+                      aria-hidden="true">C</span
+                    >
+                  </p>
+                </div>
+                {#if card.selectable}
+                  <button
+                    type="button"
+                    onclick={() => {
+                      try {
+                        arenaDraftPick(fillsNeed);
+                      } catch {}
+                      onPick(card.playerVersionId);
+                    }}
+                    disabled={busy}
+                    class="mt-auto inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-extrabold tracking-wide text-primary-foreground uppercase outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
+                  >
+                    Draft No. {String(index + 1).padStart(2, '0')}
+                  </button>
+                {:else}
+                  <p
+                    class="draft-tape mt-auto flex min-h-11 items-center rounded-lg px-2.5 py-1.5 text-xs leading-snug text-muted-foreground"
+                  >
+                    {humanizeCoverageReason(card.coverageReason) ?? 'Not available this round.'}
+                  </p>
+                {/if}
+              </div>
+            </li>
+          {/each}
+        </ul>
       </section>
     {/if}
 

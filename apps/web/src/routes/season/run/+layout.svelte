@@ -1012,17 +1012,17 @@
 
     <nav
       aria-label="Season navigation"
-      class="sticky top-0 z-30 mt-4 hidden border-y border-border/70 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85 md:block"
+      class="sticky top-0 z-30 mt-4 hidden overflow-x-auto border-y border-border/70 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85 md:block"
     >
       <div
-        class="mx-auto flex w-full max-w-6xl items-center gap-1 px-4 sm:px-6 xl:max-w-7xl 2xl:max-w-[88rem]"
+        class="mx-auto flex min-w-max w-full max-w-6xl items-center gap-1 px-4 sm:px-6 xl:max-w-7xl 2xl:max-w-[88rem]"
       >
         {#each navItems as item (item.id)}
           {@const active = isNavItemActive(item, routeId)}
           <a
             href={resolve(item.href as any)}
             aria-current={active ? 'page' : undefined}
-            class="inline-flex items-center gap-2 px-4 py-3 text-sm font-semibold outline-none transition-colors focus-visible:bg-surface-2 focus-visible:text-foreground {active
+            class="inline-flex shrink-0 items-center gap-2 whitespace-nowrap px-4 py-3 text-sm font-semibold outline-none transition-colors focus-visible:bg-surface-2 focus-visible:text-foreground {active
               ? 'border-b-2 border-primary text-foreground'
               : 'text-muted-foreground hover:bg-surface-2 hover:text-foreground'}"
           >

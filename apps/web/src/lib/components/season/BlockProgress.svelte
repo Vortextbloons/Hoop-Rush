@@ -662,51 +662,51 @@
     </p>
   </LiveSimModal>
 
-  {#if !dialogOpen}
-    <div
-      class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface-1 px-4 py-3"
-      role="status"
-    >
-      <div class="flex min-w-0 flex-wrap items-center gap-2">
-        {#if block.phase === 'running'}
-          <span class="sim-live-pill">
-            <span class="sim-live-dot" aria-hidden="true"></span> Simming
-          </span>
-        {:else if block.phase === 'complete'}
-          <span class="sim-live-pill" data-tone="final">Final</span>
+  <div
+    class:invisible={dialogOpen}
+    aria-hidden={dialogOpen}
+    class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface-1 px-4 py-3"
+    role="status"
+  >
+    <div class="flex min-w-0 flex-wrap items-center gap-2">
+      {#if block.phase === 'running'}
+        <span class="sim-live-pill">
+          <span class="sim-live-dot" aria-hidden="true"></span> Simming
+        </span>
+      {:else if block.phase === 'complete'}
+        <span class="sim-live-pill" data-tone="final">Final</span>
+      {:else}
+        <span class="sim-live-pill" data-tone="muted">{block.phase}</span>
+      {/if}
+      {#if manifest !== null && effectiveHuman !== null && humanExternalId !== ''}
+        <SeasonTeamLogo
+          {manifest}
+          franchiseId={effectiveHuman}
+          teamExternalId={humanExternalId}
+          size="sm"
+        />
+      {/if}
+      <p class="truncate text-sm font-semibold">
+        {#if block.phase === 'complete' && completeLine !== null}
+          {completeLine}
+        {:else if block.gamesTotal > 0}
+          {blockNum !== null ? `Block ${String(blockNum)}` : 'Block'} · {wins}–{losses} · {String(
+            block.gamesCompleted,
+          )}/{String(block.gamesTotal)} games
         {:else}
-          <span class="sim-live-pill" data-tone="muted">{block.phase}</span>
+          {label}
         {/if}
-        {#if manifest !== null && effectiveHuman !== null && humanExternalId !== ''}
-          <SeasonTeamLogo
-            {manifest}
-            franchiseId={effectiveHuman}
-            teamExternalId={humanExternalId}
-            size="sm"
-          />
-        {/if}
-        <p class="truncate text-sm font-semibold">
-          {#if block.phase === 'complete' && completeLine !== null}
-            {completeLine}
-          {:else if block.gamesTotal > 0}
-            {blockNum !== null ? `Block ${String(blockNum)}` : 'Block'} · {wins}–{losses} · {String(
-              block.gamesCompleted,
-            )}/{String(block.gamesTotal)} games
-          {:else}
-            {label}
-          {/if}
-        </p>
-      </div>
-      <button
-        type="button"
-        onclick={showLive}
-        class="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
-      >
-        {block.phase === 'running' ? 'Watch live' : 'Show results'}
-      </button>
+      </p>
     </div>
-    <p class="sr-only" role="status" aria-live="polite">
-      {politeMessage}
-    </p>
-  {/if}
+    <button
+      type="button"
+      onclick={showLive}
+      class="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
+    >
+      {block.phase === 'running' ? 'Watch live' : 'Show results'}
+    </button>
+  </div>
+  <p class="sr-only" role="status" aria-live="polite">
+    {politeMessage}
+  </p>
 {/if}

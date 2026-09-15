@@ -401,6 +401,7 @@
   .roll-stage {
     width: min(560px, 100%);
     max-width: 100%;
+    min-height: 17rem;
     overflow: hidden;
     border-radius: 1.25rem;
     border: 1px solid var(--color-border-strong);
@@ -409,7 +410,7 @@
     box-shadow:
       0 0 60px color-mix(in srgb, var(--color-court-rim) 18%, transparent),
       0 24px 60px rgba(0, 0, 0, 0.5);
-    animation: roll-stage-in 220ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    animation: roll-stage-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
   .roll-round {
@@ -653,7 +654,7 @@
   }
 
   .reel-lock--active {
-    animation: reel-lock 260ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    animation: reel-lock 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
   .reel-row--final {
@@ -719,7 +720,7 @@
     );
     box-shadow: 0 0 34px color-mix(in srgb, var(--color-court-rim) 25%, transparent);
     padding: 12px 16px;
-    animation: roll-result-in 260ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    animation: roll-result-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
   .roll-result .reel-lock {
@@ -771,7 +772,7 @@
   }
 
   .roll-result--franchise .reel-lock--active {
-    animation: wall-slam 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    animation: wall-slam 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
   .roll-result--era {
@@ -859,6 +860,7 @@
 
   @media (max-width: 639px) {
     .roll-stage {
+      min-height: 19rem;
       padding: 1rem;
       border-radius: 1rem;
     }
@@ -930,7 +932,7 @@
   @keyframes roll-stage-in {
     from {
       opacity: 0;
-      transform: translateY(14px) scale(0.97);
+      transform: translateY(8px) scale(0.99);
     }
     to {
       opacity: 1;
@@ -941,7 +943,7 @@
   @keyframes roll-result-in {
     from {
       opacity: 0;
-      transform: scale(0.94);
+      transform: scale(0.99);
     }
     to {
       opacity: 1;
@@ -960,8 +962,8 @@
 
   @keyframes wall-slam {
     0% {
-      transform: scale(1.12) rotate(-1deg);
-      filter: brightness(1.6);
+      transform: scale(1.01);
+      filter: brightness(1.2);
     }
     100% {
       transform: scale(1) rotate(0deg);
@@ -989,8 +991,8 @@
 
   @keyframes reel-lock {
     0% {
-      transform: scale(1.07);
-      filter: brightness(1.45);
+      transform: scale(1.01);
+      filter: brightness(1.2);
     }
     100% {
       transform: scale(1);

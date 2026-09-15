@@ -49,4 +49,50 @@ describe('fixed-five command submission', () => {
     expect(result.retried).toBe(true);
     expect(revisions).toEqual([7, 8]);
   });
+
+  it('recovers when the room revision changes again during the stale-command resync', async () => {
+    const roomId = idSchema.parse('room-1');
+    const commandId = commandIdSchema.parse('confirm-1');
+    const digest = contentHashSchema.parse('a'.repeat(64));
+    let authoritativeRevision = 8;
+    const revisions: Array<number | undefined> = [];
+    const submitCommand = (command: {
+      expectedRevision?: number;
+    }): Promise<FixedFiveCommandReceipt> => {
+      revisions.push(command.expectedRevision);
+      if (command.expectedRevision !== authoritativeRevision) {
+        return Promise.resolve({
+          roomId,
+          commandId,
+          ordinal: -1,
+          accepted: false,
+          rejectionCode: 'stale-revision',
+          revision: authoritativeRevision,
+        });
+      }
+      return Promise.resolve({
+        roomId,
+        commandId,
+        ordinal: 12,
+        accepted: true,
+        rejectionCode: null,
+        revision: authoritativeRevision + 1,
+      });
+    };
+    const result = await submitFixedFiveCommand({
+      submitCommand,
+      roomId,
+      commandId,
+      actorParticipantId: 'p1',
+      payload: { kind: 'confirm-result', resultDigest: digest, verified: true },
+      expectedRevision: 7,
+      resync: async () => {
+        authoritativeRevision = 9;
+      },
+      retryAfterResync: () => true,
+    });
+    expect(result.receipt.accepted).toBe(true);
+    expect(result.retried).toBe(true);
+    expect(revisions).toEqual([7, 8, 9]);
+  });
 });

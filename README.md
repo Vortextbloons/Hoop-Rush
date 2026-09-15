@@ -44,7 +44,12 @@ apps/web            → SvelteKit client
 packages/engine     → basketball simulation & game logic
 packages/persistence→ local save storage
 packages/data-contracts → schemas & packaged data
+packages/importer   → NBA data derivation
+packages/test-fixtures → deterministic fixtures
 tools/cli           → simulation, calibration, audit CLI
+scripts/            → NBA data acquisition
+spec/               → requirements
+Docs/               → current implementation docs
 ```
 
 ## Getting Started
@@ -63,12 +68,17 @@ pnpm dev
 
 | Command | Purpose |
 | --- | --- |
-| `pnpm dev` | Run the web app in watch mode |
+| `pnpm dev` | Run the web app dev server (`vite dev --host`) |
 | `pnpm check` | Typecheck every package |
 | `pnpm lint` | ESLint + Prettier checks |
+| `pnpm format:check` | Prettier check |
 | `pnpm test:run` | Run the full test suite once |
+| `pnpm test:quick` | Fast PR test gate (excludes slow suites) |
+| `pnpm e2e` / `pnpm e2e:smoke` | Full / smoke Playwright journeys (build first) |
+| `pnpm test:import-nba` | Python NBA fetch-layer tests |
+| `pnpm build` / `pnpm preview` | Build / serve the static bundle |
 | `pnpm verify` | Full gate: check + lint + tests + build |
-| `pnpm hoop-rush` | Developer CLI (`sim`, `calibrate`, `benchmark`, …) |
+| `pnpm hoop-rush` | Developer CLI — see `Docs/developer/cli.md`, `pnpm hoop-rush help` |
 
 ---
 

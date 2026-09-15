@@ -607,7 +607,7 @@
           />
         {/if}
 
-        {#if draft.status === 'drafting' && roll && !spinning && !starting}
+        {#if draft.status === 'drafting' && roll && !starting}
           <DraftPoolBrowser
             heading={poolHeading}
             rows={rollRows}

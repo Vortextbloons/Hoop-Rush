@@ -42,18 +42,20 @@ export async function submitFixedFiveCommand(
     payload: input.payload,
     expectedRevision: input.expectedRevision,
   };
-  const receipt = await input.submitCommand(command);
+  let receipt = await input.submitCommand(command);
   if (receipt.accepted || receipt.rejectionCode !== 'stale-revision') {
     return { receipt, retried: false };
   }
-  await input.resync();
-  const retrySafe =
-    STALE_RETRY_SAFE_KINDS.has(input.payload.kind) || input.retryAfterResync?.() === true;
-  if (input.retry === false || !retrySafe) {
-    return { receipt, retried: false };
+  if (input.retry === false) return { receipt, retried: false };
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await input.resync();
+    const retrySafe =
+      STALE_RETRY_SAFE_KINDS.has(input.payload.kind) || input.retryAfterResync?.() === true;
+    if (!retrySafe) return { receipt, retried: attempt > 0 };
+    receipt = await input.submitCommand({ ...command, expectedRevision: receipt.revision });
+    if (receipt.accepted || receipt.rejectionCode !== 'stale-revision') {
+      return { receipt, retried: true };
+    }
   }
-  return {
-    receipt: await input.submitCommand({ ...command, expectedRevision: receipt.revision }),
-    retried: true,
-  };
+  return { receipt, retried: true };
 }

@@ -80,4 +80,23 @@ test.describe('classic: reel draft and auto-launch smoke', () => {
       await expect(page.getByText(/Classic · Ratings/)).toBeVisible();
     },
   );
+
+  test(
+    'ratings draft shows fit suggestions after the first pick',
+    {
+      tag: '@smoke',
+    },
+    async ({ page }) => {
+      await page.goto('/classic');
+      await expect(page.getByRole('heading', { name: 'Five draft rounds' })).toBeVisible();
+      await page.getByRole('button', { name: 'Start Ratings draft' }).click();
+      await expect(roundHeading(page, 1)).toBeVisible();
+      await expect(page.locator('.roll-overlay')).not.toBeVisible({ timeout: 6000 });
+
+      await pickOne(page);
+
+      await expect(page.locator('[data-fit-top]')).toBeVisible({ timeout: 10000 });
+      await expect(page.getByText('Suggested picks', { exact: true })).toBeVisible();
+    },
+  );
 });
