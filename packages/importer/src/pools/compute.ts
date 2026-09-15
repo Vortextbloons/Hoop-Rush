@@ -56,6 +56,7 @@ import { defaultWorkerCount, runWorker } from '../shared/worker-pool.ts';
 import { sortedJsonFiles } from '../shared/manifest.ts';
 import { buildPlayerPositions } from './positions.ts';
 import { positionOverrideFor } from '../positions/overrides.ts';
+import { primaryPositionForSource } from '../positions/normalize.ts';
 import { canonicalPlayerName } from '../identity.ts';
 import { derivePlayerRecord } from '../ratings/v2.ts';
 import { defenseCreditFor, twoWayBonusFor } from '../ratings/v3.ts';
@@ -177,7 +178,7 @@ export {
   SELECTION_SCORE_VERSION,
 } from '@hoop-rush/data-contracts';
 export function loadCareerPositionLabels(): Map<string, Set<string>> {
-  const cachePath = join(RAW_CACHE, 'career-position-labels-v5.json');
+  const cachePath = join(RAW_CACHE, 'career-position-labels-v6.json');
   if (fileExists(cachePath)) {
     const raw = readJsonLoose(cachePath);
     const parsed = careerLabelsSchema.safeParse(raw);
@@ -274,7 +275,7 @@ function refreshedFallbackPlayer(
   stats: SeasonStatsInput,
   playerExternalId: string,
 ): RosterInput {
-  const position = str(player.position) || 'SF';
+  const position = primaryPositionForSource(str(player.position) || 'SF');
   const height = player.heightInches;
   const heightInches =
     typeof height === 'number' && Number.isFinite(height) ? Math.trunc(height) : 78;

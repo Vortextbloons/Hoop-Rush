@@ -9,7 +9,12 @@ import {
   SELECTION_SCORE_VERSION,
   SOURCE_VERSION,
 } from '@hoop-rush/data-contracts';
-import { NBA_ROOT, ratings, resolveHistoricalIdentity } from '@hoop-rush/importer';
+import {
+  NBA_ROOT,
+  primaryPositionForSource,
+  ratings,
+  resolveHistoricalIdentity,
+} from '@hoop-rush/importer';
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
 export const DATA_DERIVE_OPTIONS: Record<string, boolean> = {
   player: true,
@@ -162,7 +167,8 @@ export function dataDerive(args: {
     league3PARate: era.league3PARate,
     pace: era.pace,
   };
-  const position = typeof roster.position === 'string' ? roster.position : 'SF';
+  const position =
+    typeof roster.position === 'string' ? primaryPositionForSource(roster.position) : 'SF';
   const derived = ratings.derivePlayerRecord({
     season,
     position,

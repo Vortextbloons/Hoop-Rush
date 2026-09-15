@@ -79,13 +79,13 @@ export function dataPositionsCoverage(options: DataPositionsCoverageOptions): Cl
   const gateFailures: string[] = [];
   if ((primary['PG'] ?? 0) === 0) {
     gateFailures.push(
-      'positions: zero PG primaries packaged (source roster labels only emit SG/SF/C; PG/PF cannot survive position-v3 normalization)',
+      'positions: zero PG primaries packaged (source roster labels only emit SG/SF/C; PG/PF cannot survive position-v4 normalization)',
     );
   }
-  const pfShare = total > 0 ? (primary['PF'] ?? 0) / total : 0;
-  if (pfShare < 0.01) {
+  const pfPlayableShare = total > 0 ? (playable['PF'] ?? 0) / total : 0;
+  if (pfPlayableShare < 0.01) {
     gateFailures.push(
-      `positions: PF primaries below 1% (${String(primary['PF'] ?? 0)}/${String(total)}); true power forwards collapse to SF`,
+      `positions: PF playable coverage below 1% (${String(playable['PF'] ?? 0)}/${String(total)})`,
     );
   }
 

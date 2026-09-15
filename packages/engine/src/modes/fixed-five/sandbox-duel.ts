@@ -1,17 +1,23 @@
 import type { PlayerId, Seed, SlotIndex } from '@hoop-rush/data-contracts';
 import { canPlay } from '../../domain/positions.ts';
 import { slotRequirement } from '../../domain/lineup.ts';
-import { fixedFiveFirstPicker } from './seeds.ts';
+import {
+  fixedFiveFirstPicker,
+  fixedFiveSandboxDraftPicker,
+  fixedFiveSandboxFirstPicker,
+} from './seeds.ts';
 import { selectionKeepsFeasibility, type FixedFiveCandidate } from './sandbox-builder.ts';
 export interface SandboxDuelPick {
   pickOrdinal: number;
   participantId: 'p1' | 'p2';
   playerId: PlayerId;
+  playerVersionId: string;
   slotIndex: SlotIndex;
 }
 export interface SandboxDuelState {
   rootSeed: Seed;
   firstPicker: 'p1' | 'p2';
+  order: 'alternating' | 'snake';
   pickOrdinal: number;
   picks: SandboxDuelPick[];
   status: 'drafting' | 'complete';
@@ -21,15 +27,22 @@ function otherParticipant(p: 'p1' | 'p2'): 'p1' | 'p2' {
 }
 export function sandboxDuelPicker(state: SandboxDuelState): 'p1' | 'p2' {
   if (state.status === 'complete') throw new Error('sandbox duel draft is complete');
-  return state.pickOrdinal % 2 === 0 ? state.firstPicker : otherParticipant(state.firstPicker);
+  if (state.order === 'alternating') {
+    return state.pickOrdinal % 2 === 0 ? state.firstPicker : otherParticipant(state.firstPicker);
+  }
+  return fixedFiveSandboxDraftPicker(state.rootSeed, state.pickOrdinal, state.firstPicker);
 }
 export function createSandboxDuelDraft(
   rootSeed: Seed,
   firstPickerOverride?: 'p1' | 'p2',
+  order: 'alternating' | 'snake' = 'snake',
 ): SandboxDuelState {
   return {
     rootSeed,
-    firstPicker: firstPickerOverride ?? fixedFiveFirstPicker(rootSeed),
+    firstPicker:
+      firstPickerOverride ??
+      (order === 'snake' ? fixedFiveSandboxFirstPicker(rootSeed) : fixedFiveFirstPicker(rootSeed)),
+    order,
     pickOrdinal: 0,
     picks: [],
     status: 'drafting',
@@ -37,8 +50,19 @@ export function createSandboxDuelDraft(
 }
 export interface SandboxDuelClaimInput {
   playerId: PlayerId;
+  playerVersionId?: string;
   slotIndex: SlotIndex;
   actor: 'p1' | 'p2';
+}
+function candidateForClaim(
+  pool: readonly FixedFiveCandidate[],
+  input: SandboxDuelClaimInput,
+): FixedFiveCandidate | null {
+  if (input.playerVersionId) {
+    const candidate = pool.find((c) => c.playerVersionId === input.playerVersionId) ?? null;
+    return candidate?.playerId === input.playerId ? candidate : null;
+  }
+  return pool.find((c) => c.playerId === input.playerId) ?? null;
 }
 export function claimSandboxDuelPlayer(
   state: SandboxDuelState,
@@ -48,9 +72,12 @@ export function claimSandboxDuelPlayer(
   if (state.status !== 'drafting') throw new Error('sandbox duel draft is not active');
   const picker = sandboxDuelPicker(state);
   if (input.actor !== picker) throw new Error(`it is ${picker}'s pick, not ${input.actor}'s`);
-  const candidate = pool.find((c) => c.playerId === input.playerId) ?? null;
+  const candidate = candidateForClaim(pool, input);
   if (!candidate) throw new Error(`unknown player ${input.playerId}`);
   const own = state.picks.filter((p) => p.participantId === input.actor);
+  if (state.picks.some((p) => p.playerId === input.playerId)) {
+    throw new Error(`${input.playerId} is already claimed`);
+  }
   if (own.some((p) => p.playerId === input.playerId)) {
     throw new Error(`${input.playerId} is already on ${input.actor}'s five`);
   }
@@ -61,10 +88,15 @@ export function claimSandboxDuelPlayer(
     throw new Error(`${input.playerId} cannot play slot ${String(input.slotIndex)}`);
   }
   const trial = [
-    ...own.map((p) => ({ playerId: p.playerId, slotIndex: p.slotIndex })),
+    ...own.map((p) => ({
+      playerId: p.playerId,
+      slotIndex: p.slotIndex,
+      playerVersionId: p.playerVersionId,
+    })),
     {
       playerId: input.playerId,
       slotIndex: input.slotIndex,
+      playerVersionId: candidate.playerVersionId,
     },
   ];
   if (!selectionKeepsFeasibility(pool, trial)) {
@@ -76,6 +108,7 @@ export function claimSandboxDuelPlayer(
     pickOrdinal: state.pickOrdinal,
     participantId: picker,
     playerId: input.playerId,
+    playerVersionId: candidate.playerVersionId,
     slotIndex: input.slotIndex,
   };
   const picks = [...state.picks, pick];
@@ -98,8 +131,20 @@ export function isSandboxDuelComplete(state: SandboxDuelState): boolean {
 }
 export function sandboxDuelAlternationHolds(state: SandboxDuelState): boolean {
   for (let i = 0; i < state.picks.length; i += 1) {
-    const expected = i % 2 === 0 ? state.firstPicker : otherParticipant(state.firstPicker);
+    const expected =
+      state.order === 'snake'
+        ? (() => {
+            const roundFirst =
+              Math.floor(i / 2) % 2 === 0 ? state.firstPicker : otherParticipant(state.firstPicker);
+            return i % 2 === 0 ? roundFirst : otherParticipant(roundFirst);
+          })()
+        : i % 2 === 0
+          ? state.firstPicker
+          : otherParticipant(state.firstPicker);
     if (state.picks[i]?.participantId !== expected) return false;
   }
   return true;
+}
+export function sandboxDuelSnakeOrderHolds(state: SandboxDuelState): boolean {
+  return state.order === 'snake' && sandboxDuelAlternationHolds(state);
 }

@@ -47,6 +47,25 @@ function cryptoRng(): number {
 function nowIsoWith(clock: () => number): string {
   return new Date(clock()).toISOString();
 }
+function isSandboxSnakeRoom(settings: FixedFiveRoomSettings): boolean {
+  return (
+    settings.mode === 'sandbox-shared-82' ||
+    (settings.mode === 'duel' && settings.sourceMode === 'sandbox')
+  );
+}
+function sandboxPicker(rootSeed: string, pickOrdinal: number): FixedFiveParticipantId {
+  const first = Number.parseInt(rootSeed.slice(0, 2), 16) % 2 === 0 ? 'p1' : 'p2';
+  const other = first === 'p1' ? 'p2' : 'p1';
+  const roundFirst = Math.floor(pickOrdinal / 2) % 2 === 0 ? first : other;
+  return pickOrdinal % 2 === 0 ? roundFirst : roundFirst === 'p1' ? 'p2' : 'p1';
+}
+function sandboxPickerForSnapshot(
+  snapshot: FixedFiveRoomSnapshot,
+  pickOrdinal: number,
+): FixedFiveParticipantId {
+  if (!snapshot.rootSeed) throw new Error('sandbox snake room is missing a root seed');
+  return sandboxPicker(snapshot.rootSeed, pickOrdinal);
+}
 function randomSeedWith(rng: () => number, useCrypto: boolean): string {
   if (useCrypto) {
     const bytes = new Uint8Array(16);
@@ -150,11 +169,53 @@ export function createInMemoryFixedFiveTransport(options?: {
       }
     }
   }
-  function touchDeadline(record: RoomRecord): void {
-    if (record.snapshot.phase !== 'drafting') {
-      if (record.snapshot.deadline !== null) {
-        record.snapshot = { ...record.snapshot, deadline: null };
-      }
+  function touchDeadline(record: RoomRecord, payload: FixedFiveCommandPayload): void {
+    const { snapshot } = record;
+    const sandboxSnake = isSandboxSnakeRoom(snapshot.settings);
+    const current = snapshot.deadline;
+    if (payload.kind === 'start') {
+      const participant = sandboxSnake ? sandboxPickerForSnapshot(snapshot, 0) : 'p1';
+      record.snapshot = {
+        ...snapshot,
+        phase: 'drafting',
+        deadline: {
+          roomId: snapshot.roomId,
+          cursor: 't0',
+          participantId: participant,
+          deadlineAt: new Date(
+            clock() + fixedFiveTimeoutMsForMode(snapshot.settings.mode),
+          ).toISOString(),
+          fallback: null,
+          pickOrdinal: 0,
+        },
+      };
+      return;
+    }
+    if (
+      current &&
+      (payload.kind === 'timeout-autopick' || (sandboxSnake && payload.kind === 'sandbox-place'))
+    ) {
+      const nextOrdinal = current.pickOrdinal + 1;
+      record.snapshot = {
+        ...snapshot,
+        deadline:
+          nextOrdinal >= 10
+            ? null
+            : {
+                roomId: snapshot.roomId,
+                cursor: `t${String(nextOrdinal)}`,
+                participantId: sandboxSnake
+                  ? sandboxPickerForSnapshot(snapshot, nextOrdinal)
+                  : current.participantId === 'p1'
+                    ? 'p2'
+                    : 'p1',
+                deadlineAt: new Date(
+                  clock() + fixedFiveTimeoutMsForMode(snapshot.settings.mode),
+                ).toISOString(),
+                fallback: null,
+                pickOrdinal: nextOrdinal,
+              },
+      };
       return;
     }
   }
@@ -382,6 +443,57 @@ export function createInMemoryFixedFiveTransport(options?: {
           revision: record.snapshot.revision,
         };
       }
+      const sandboxSnake = isSandboxSnakeRoom(record.snapshot.settings);
+      const pickedPayload =
+        parsed.data.payload.kind === 'sandbox-place' ||
+        parsed.data.payload.kind === 'timeout-autopick'
+          ? parsed.data.payload
+          : null;
+      if (sandboxSnake && pickedPayload) {
+        const priorPicks = record.commands.filter(
+          (entry) =>
+            entry.payload.kind === 'sandbox-place' || entry.payload.kind === 'timeout-autopick',
+        );
+        if (
+          priorPicks.some((entry) => {
+            if (
+              entry.payload.kind !== 'sandbox-place' &&
+              entry.payload.kind !== 'timeout-autopick'
+            ) {
+              return false;
+            }
+            return (
+              entry.payload.playerId === pickedPayload.playerId ||
+              (entry.actorParticipantId === parsed.data.actorParticipantId &&
+                entry.payload.slotIndex === pickedPayload.slotIndex)
+            );
+          })
+        ) {
+          return {
+            roomId: command.roomId,
+            commandId: command.commandId,
+            ordinal: -1,
+            accepted: false,
+            rejectionCode: 'illegal-move',
+            revision: record.snapshot.revision,
+          };
+        }
+      }
+      if (
+        sandboxSnake &&
+        pickedPayload?.kind === 'sandbox-place' &&
+        record.snapshot.deadline &&
+        record.snapshot.deadline.participantId !== parsed.data.actorParticipantId
+      ) {
+        return {
+          roomId: command.roomId,
+          commandId: command.commandId,
+          ordinal: -1,
+          accepted: false,
+          rejectionCode: 'turn',
+          revision: record.snapshot.revision,
+        };
+      }
       record.commands.push(parsed.data);
       record.commandIds.add(command.commandId);
       record.snapshot = {
@@ -390,7 +502,7 @@ export function createInMemoryFixedFiveTransport(options?: {
         revision: record.snapshot.revision + 1,
         digest: null,
       };
-      touchDeadline(record);
+      touchDeadline(record, parsed.data.payload);
       emit(record);
       return {
         roomId: command.roomId,

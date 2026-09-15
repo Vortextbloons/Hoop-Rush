@@ -2,6 +2,7 @@ export * from './config.ts';
 export * from './json.ts';
 export * from './fetch.ts';
 export * from './lineage.ts';
+export * from './positions/normalize.ts';
 export * as ratings from './ratings/index.ts';
 export * from './ratings/artifact.ts';
 export * as pools from './pools/compute.ts';

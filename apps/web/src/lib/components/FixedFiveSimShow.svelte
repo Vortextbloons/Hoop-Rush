@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { FixedFiveRoomMode, FixedFiveWorkerResultEntry } from '@hoop-rush/data-contracts';
   import { arenaGameResult, arenaLeaderChange, arenaStreak } from '$lib/arena-sound';
-  const SHOW_TICK_MS = 120;
+  const SHOW_TICK_MS = 240;
   const DUEL_REVEAL_EVERY = 4;
   const SHARED_REVEAL_DIVISOR = 25;
   let {

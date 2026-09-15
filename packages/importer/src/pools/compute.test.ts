@@ -487,7 +487,7 @@ function buildStandardFixture(label: string): FixtureRoot {
   const root = makeRoot(label);
   writeSeason(root, '1991-92', ROSTER_S1, STINTS_S1, STATS_S1);
   writeSeason(root, '1992-93', ROSTER_S2, STINTS_S2, STATS_S2);
-  writeJson(join(root.cache, 'career-position-labels-v5.json'), CAREER_LABELS);
+  writeJson(join(root.cache, 'career-position-labels-v6.json'), CAREER_LABELS);
   writeJson(join(root.cache, 'bbref_ids.json'), BBREF_IDS);
   writeJson(join(root.data, 'manifest.json'), fixtureManifest());
   return root;
@@ -1146,7 +1146,7 @@ describe('loadBbrefIds', () => {
 describe('loadCareerPositionLabels', () => {
   it('reads the versioned cache when present', () => {
     const root = makeRoot('labels-cached');
-    writeJson(join(root.cache, 'career-position-labels-v5.json'), { '1': ['SG', 'G-F'] });
+    writeJson(join(root.cache, 'career-position-labels-v6.json'), { '1': ['SG', 'G-F'] });
     const labels = loadCareerPositionLabels();
     expect(labels.get('1')).toEqual(new Set(['G-F', 'SG']));
   });
@@ -1158,7 +1158,7 @@ describe('loadCareerPositionLabels', () => {
     expect(labels.get('1')).toEqual(new Set(['SG']));
     expect(labels.get('999')).toBeUndefined();
     expect(
-      JSON.parse(readFileSync(join(root.cache, 'career-position-labels-v5.json'), 'utf8')),
+      JSON.parse(readFileSync(join(root.cache, 'career-position-labels-v6.json'), 'utf8')),
     ).toEqual(expect.objectContaining({ '1': ['SG'], '5': ['C'] }));
     expect(messages(log).some((m) => m.includes('[OK] career position labels for'))).toBe(true);
   });
@@ -1187,7 +1187,7 @@ describe('loadCareerPositionLabels', () => {
     expect(labels.get('1')).toEqual(new Set(['PG', 'SG']));
     expect(labels.get('2')).toEqual(new Set(['PG']));
     expect(
-      JSON.parse(readFileSync(join(root.cache, 'career-position-labels-v5.json'), 'utf8')),
+      JSON.parse(readFileSync(join(root.cache, 'career-position-labels-v6.json'), 'utf8')),
     ).toEqual(expect.objectContaining({ '1': ['PG', 'SG'], '2': ['PG'] }));
     expect(messages(log).some((m) => m.includes('[OK] career position labels for'))).toBe(true);
   });

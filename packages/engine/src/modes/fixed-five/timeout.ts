@@ -100,15 +100,27 @@ export function enumerateSandboxDuelSafeMoves(
   const own = state.picks.filter((p) => p.participantId === picker);
   const usedIds = new Set(own.map((p) => p.playerId));
   const usedSlots = new Set(own.map((p) => p.slotIndex));
+  const claimedIds = new Set(state.picks.map((p) => p.playerId));
+  const seenVariants = new Set<string>();
   const moves: ClassicSafeMove[] = [];
   for (const candidate of pool) {
-    if (usedIds.has(candidate.playerId)) continue;
+    if (usedIds.has(candidate.playerId) || claimedIds.has(candidate.playerId)) continue;
+    if (seenVariants.has(candidate.playerVersionId)) continue;
+    seenVariants.add(candidate.playerVersionId);
     for (const slot of [0, 1, 2, 3, 4] as SlotIndex[]) {
       if (usedSlots.has(slot)) continue;
       if (!canPlay(candidate.positions, slotRequirement(slot))) continue;
       const trial = [
-        ...own.map((p) => ({ playerId: p.playerId, slotIndex: p.slotIndex })),
-        { playerId: candidate.playerId, slotIndex: slot },
+        ...own.map((p) => ({
+          playerId: p.playerId,
+          slotIndex: p.slotIndex,
+          playerVersionId: p.playerVersionId,
+        })),
+        {
+          playerId: candidate.playerId,
+          slotIndex: slot,
+          playerVersionId: candidate.playerVersionId,
+        },
       ];
       if (!selectionKeepsFeasibility(pool, trial)) continue;
       moves.push({

@@ -41,6 +41,17 @@ def _cell(value: Any) -> Any:
         return ""
     return value
 
+
+def _split_player_name(full_name: Any, nickname: Any) -> tuple[str, str]:
+    name = str(_cell(full_name)).strip() or str(_cell(nickname)).strip()
+    parts = name.split()
+    if not parts:
+        return "", ""
+    if len(parts) == 1:
+        return parts[0], parts[0]
+    return parts[0], " ".join(parts[1:])
+
+
 try:
     from nba_api.stats.endpoints import commonteamroster, leaguestandings
     from nba_api.stats.static import teams as nba_static_teams
@@ -246,7 +257,7 @@ def fetch_standings(season: str) -> list[dict[str, Any]]:
 
 
 def fetch_roster(season: str, team_external_id: str) -> list[dict[str, Any]]:
-    cached = read_cache("roster", season=season, team=team_external_id)
+    cached = read_cache("roster_v2", season=season, team=team_external_id)
     if cached is not None:
         return cached
 
@@ -260,9 +271,7 @@ def fetch_roster(season: str, team_external_id: str) -> list[dict[str, Any]]:
                 continue  # historical seasons sometimes return NaN rows
             full_name = str(_cell(row.get("PLAYER", ""))).strip()
             nickname = str(_cell(row.get("NICKNAME", ""))).strip()
-            parts = full_name.split(None, 1) if full_name else ["", ""]
-            first = nickname if nickname else (parts[0] if len(parts) > 0 else "")
-            last = parts[1] if len(parts) > 1 else (parts[0] if len(parts) == 1 else "")
+            first, last = _split_player_name(full_name, nickname)
             out.append(
                 {
                     "externalId": str(player_id),
@@ -281,7 +290,7 @@ def fetch_roster(season: str, team_external_id: str) -> list[dict[str, Any]]:
         return out
 
     roster = with_retry(_do_fetch)
-    write_cache("roster", roster, season=season, team=team_external_id)
+    write_cache("roster_v2", roster, season=season, team=team_external_id)
     return roster
 
 

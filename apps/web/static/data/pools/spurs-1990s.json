@@ -50,15 +50,16 @@
         "photoUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Reggie_Geary.jpg/330px-Reggie_Geary.jpg"
       },
       "positions": {
-        "primary": "SG",
+        "primary": "PG",
         "secondary": [],
         "playable": [
+          "PG",
           "SG"
         ],
         "sourceLabels": [
-          "SG"
+          "G"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 74,
       "weightLbs": 187,
@@ -67,7 +68,7 @@
         "teamGames": 62,
         "teamMinutes": 685
       },
-      "selectionScore": 49.002,
+      "selectionScore": 48.97,
       "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
       "stats": {
         "gamesPlayed": 62,
@@ -109,35 +110,35 @@
         "schemaVersion": 2,
         "modelVersion": "ratings-model-v3.6",
         "memberships": {
-          "primaryCreator": 0.042739,
-          "secondaryCreator": 0.069616,
-          "scoringGuard": 0.070398,
-          "movementSpacer": 0.200716,
-          "twoWayWing": 0.12677,
-          "connector": 0.147265,
-          "interiorFinisher": 0.057992,
-          "stretchBig": 0.119853,
-          "rebounder": 0.07348,
-          "defensiveAnchor": 0.091171
+          "primaryCreator": 0.066661,
+          "secondaryCreator": 0.087294,
+          "scoringGuard": 0.049619,
+          "movementSpacer": 0.164602,
+          "twoWayWing": 0.111221,
+          "connector": 0.172607,
+          "interiorFinisher": 0.058923,
+          "stretchBig": 0.121778,
+          "rebounder": 0.07466,
+          "defensiveAnchor": 0.092635
         },
-        "baseScore": 51.75,
+        "baseScore": 51.71,
         "nonlinear": {
           "creation": 61.507721506100346,
           "penetration": 56.60463030289624,
-          "shootingGravity": 62.055,
+          "shootingGravity": 61.805,
           "scalableScoring": 58.333333333333336,
           "switchability": 56.92264051659207,
           "rimProtection": 53.403955550027504,
           "possessionControl": 61.108,
-          "synergyBonus": 0.002319907236842093,
-          "weaknessPenalty": -3.2014326861054547,
+          "synergyBonus": 0,
+          "weaknessPenalty": -3.2445085246327277,
           "weaknesses": {
-            "turnoverLiability": 4.954130414545455,
+            "turnoverLiability": 5.051648407272728,
             "inefficientUsage": 0,
-            "defensiveTargeting": 1.01878945,
+            "defensiveTargeting": 1.0323231,
             "spacingLimitation": 0,
-            "foulRisk": 2.8111866240000003,
-            "deficientRebounding": 0.631872,
+            "foulRisk": 2.822703624,
+            "deficientRebounding": 0.6359969999999999,
             "hollowAnchor": 0
           }
         },
@@ -156,10 +157,10 @@
           "artifactVersion": "ratings-model-v3.6"
         },
         "canonicalOverall": 46,
-        "rawOverallScore": 47.68,
+        "rawOverallScore": 47.64,
         "offenseRating": 56,
         "defenseRating": 55,
-        "overallPercentile": 0.9816,
+        "overallPercentile": 0.9814,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -167,7 +168,7 @@
         "closeShot": 54,
         "midrange": 51,
         "threePoint": 54,
-        "freeThrow": 71,
+        "freeThrow": 70,
         "ballHandling": 59,
         "passing": 58,
         "offensiveIq": 68,
@@ -223,10 +224,10 @@
         "freeThrowPct": 0.5555555555555555,
         "threePointAttemptRate": 0.22222222222222218,
         "freeThrowAttemptRate": 0.33333333333333337,
-        "threePointPctShrunk": 0.34355321912624975,
-        "freeThrowPctShrunk": 0.6969368725252111,
-        "threePointPctPrior": 0.34830546601995577,
-        "freeThrowPctPrior": 0.7955503411115458,
+        "threePointPctShrunk": 0.34542210077254276,
+        "freeThrowPctShrunk": 0.6906788433411584,
+        "threePointPctPrior": 0.3510433776317751,
+        "freeThrowPctPrior": 0.7849273365716164,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -789,17 +790,20 @@
         "photoUrl": null
       },
       "positions": {
-        "primary": "SG",
+        "primary": "PG",
         "secondary": [],
         "playable": [
+          "PF",
+          "PG",
           "SF",
           "SG"
         ],
         "sourceLabels": [
-          "SF",
-          "SG"
+          "F-G",
+          "G",
+          "G-F"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 79,
       "weightLbs": 205,
@@ -900,7 +904,7 @@
         "rawOverallScore": 54.89,
         "offenseRating": 66,
         "defenseRating": 58,
-        "overallPercentile": 0.3867,
+        "overallPercentile": 0.3843,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -964,10 +968,10 @@
         "freeThrowPct": 0.7969543147208121,
         "threePointAttemptRate": 0.27197802197802196,
         "freeThrowAttemptRate": 0.1804029304029304,
-        "threePointPctShrunk": 0.38937263663765787,
-        "freeThrowPctShrunk": 0.7967853183332936,
-        "threePointPctPrior": 0.3474185501549626,
-        "freeThrowPctPrior": 0.7963691647290287,
+        "threePointPctShrunk": 0.3892745021437905,
+        "freeThrowPctShrunk": 0.7957920959112532,
+        "threePointPctPrior": 0.3469560913526126,
+        "freeThrowPctPrior": 0.7929301320927141,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -1519,7 +1523,7 @@
       "playerId": "p-1114",
       "franchiseId": "spurs",
       "eraId": "1990s",
-      "seasonKey": "1998-99",
+      "seasonKey": "1997-98",
       "firstName": "Jaren",
       "lastName": "Jackson",
       "displayName": "Jaren Jackson",
@@ -1530,104 +1534,105 @@
         "photoUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Jaren_Jackson_March_2%2C_2000_%28cropped%29.jpg/330px-Jaren_Jackson_March_2%2C_2000_%28cropped%29.jpg"
       },
       "positions": {
-        "primary": "SG",
+        "primary": "PG",
         "secondary": [],
         "playable": [
+          "PG",
           "SG"
         ],
         "sourceLabels": [
-          "SG"
+          "G"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 78,
       "weightLbs": 215,
       "eligibility": {
         "minimumTeamGames": 40,
-        "teamGames": 47,
-        "teamMinutes": 862
+        "teamGames": 82,
+        "teamMinutes": 2226
       },
-      "selectionScore": 53.226,
+      "selectionScore": 53.335,
       "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
       "stats": {
-        "gamesPlayed": 47,
-        "minutes": 860,
-        "points": 300,
-        "rebounds": 98,
-        "offensiveRebounds": 18,
-        "defensiveRebounds": 79,
-        "assists": 47,
-        "steals": 42,
-        "blocks": 9,
-        "turnovers": 37,
-        "fieldGoalsMade": 108,
-        "fieldGoalsAttempted": 282,
-        "threesMade": 51,
-        "threesAttempted": 145,
-        "freeThrowsMade": 32,
-        "freeThrowsAttempted": 37,
-        "per": 5.710000000000001,
-        "boxPlusMinus": -1.2969999999999997,
-        "usageRate": 17.599999999999998,
-        "tsPct": 0.5,
-        "efgPct": 0.474
+        "gamesPlayed": 82,
+        "minutes": 2222,
+        "points": 721,
+        "rebounds": 213,
+        "offensiveRebounds": 57,
+        "defensiveRebounds": 155,
+        "assists": 155,
+        "steals": 57,
+        "blocks": 8,
+        "turnovers": 106,
+        "fieldGoalsMade": 254,
+        "fieldGoalsAttempted": 656,
+        "threesMade": 114,
+        "threesAttempted": 295,
+        "freeThrowsMade": 90,
+        "freeThrowsAttempted": 114,
+        "per": 7.210000000000001,
+        "boxPlusMinus": -1.6439999999999992,
+        "usageRate": 16.6,
+        "tsPct": 0.511,
+        "efgPct": 0.48
       },
       "historicalTeamIdentity": {
         "teamId": "1610612759",
         "displayName": "San Antonio Spurs",
         "city": "San Antonio",
         "abbreviation": "SAS",
-        "seasonKey": "1998-99",
+        "seasonKey": "1997-98",
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 74,
-        "offenseRating": 60,
-        "defenseRating": 59
+        "overallRating": 70,
+        "offenseRating": 63,
+        "defenseRating": 56
       },
       "ratingProfile": {
         "schemaVersion": 2,
         "modelVersion": "ratings-model-v3.6",
         "memberships": {
-          "primaryCreator": 0.028606,
-          "secondaryCreator": 0.045207,
-          "scoringGuard": 0.048487,
-          "movementSpacer": 0.243537,
-          "twoWayWing": 0.112057,
-          "connector": 0.138631,
-          "interiorFinisher": 0.051133,
-          "stretchBig": 0.187285,
-          "rebounder": 0.06328,
-          "defensiveAnchor": 0.081777
+          "primaryCreator": 0.030559,
+          "secondaryCreator": 0.054953,
+          "scoringGuard": 0.045417,
+          "movementSpacer": 0.252511,
+          "twoWayWing": 0.101171,
+          "connector": 0.151656,
+          "interiorFinisher": 0.048821,
+          "stretchBig": 0.191663,
+          "rebounder": 0.052234,
+          "defensiveAnchor": 0.071015
         },
-        "baseScore": 57.26,
+        "baseScore": 59.81,
         "nonlinear": {
-          "creation": 60.08506452862499,
-          "penetration": 57.99999999999999,
-          "shootingGravity": 74.4175,
-          "scalableScoring": 61,
+          "creation": 63.97297035679023,
+          "penetration": 59.65355905005373,
+          "shootingGravity": 77,
+          "scalableScoring": 67.66666666666667,
           "switchability": 59.97776954224081,
-          "rimProtection": 55.29598677569483,
-          "possessionControl": 64.0955,
-          "synergyBonus": 0.7039121296052635,
-          "weaknessPenalty": -0.6135096653690478,
+          "rimProtection": 55.1611401848454,
+          "possessionControl": 66.0395,
+          "synergyBonus": 0.8845923685701517,
+          "weaknessPenalty": -1.4386569645835356,
           "weaknesses": {
-            "turnoverLiability": 0,
+            "turnoverLiability": 0.7711639873381292,
             "inefficientUsage": 0,
-            "defensiveTargeting": 0.7462819047619051,
+            "defensiveTargeting": 1.0320135571428575,
             "spacingLimitation": 0,
-            "foulRisk": 0.3403348500000001,
-            "deficientRebounding": 0.7178234375,
+            "foulRisk": 1.4564668440000001,
+            "deficientRebounding": 0.9716996250000001,
             "hollowAnchor": 0
           }
         },
         "production": {
-          "score": 29.91720513661203,
-          "weight": 0.08859509167495826,
-          "confidence": "medium",
-          "sampleGames": 47,
-          "sampleMinutes": 860.1,
-          "shrinkage": 0.19687798149990723
+          "score": 33.356616715867155,
+          "weight": 0.24076242588773958,
+          "confidence": "high",
+          "sampleGames": 82,
+          "sampleMinutes": 2222.2000000000003,
+          "shrinkage": 0.4012707098128993
         },
         "calibratedImpact": {
           "adjustment": 0.656,
@@ -1635,78 +1640,78 @@
           "sampleCount": 1280,
           "artifactVersion": "ratings-model-v3.6"
         },
-        "canonicalOverall": 53,
-        "rawOverallScore": 52.33,
-        "offenseRating": 60,
-        "defenseRating": 59,
-        "overallPercentile": 0.5982,
+        "canonicalOverall": 51,
+        "rawOverallScore": 50.94,
+        "offenseRating": 63,
+        "defenseRating": 56,
+        "overallPercentile": 0.7355,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
-        "insideScoring": 58,
-        "closeShot": 54,
-        "midrange": 57,
-        "threePoint": 57,
-        "freeThrow": 82,
-        "ballHandling": 58,
-        "passing": 55,
-        "offensiveIq": 68,
-        "offensiveRebound": 44,
-        "defensiveRebound": 53,
-        "perimeterDefense": 62,
-        "interiorDefense": 49,
-        "steal": 70,
-        "block": 60,
-        "defensiveIq": 65,
+        "insideScoring": 60,
+        "closeShot": 53,
+        "midrange": 60,
+        "threePoint": 69,
+        "freeThrow": 84,
+        "ballHandling": 61,
+        "passing": 58,
+        "offensiveIq": 74,
+        "offensiveRebound": 45,
+        "defensiveRebound": 47,
+        "perimeterDefense": 60,
+        "interiorDefense": 48,
+        "steal": 69,
+        "block": 61,
+        "defensiveIq": 62,
         "speed": 58,
-        "strength": 60,
-        "vertical": 53
+        "strength": 62,
+        "vertical": 51
       },
       "tendencies": {
-        "usageRate": 17.6,
-        "passRate": 7.69,
-        "shotRate": 12.5,
-        "driveRate": 18.83,
-        "postUpRate": 4.87,
-        "rimFrequency": 18.13,
-        "shortMidFrequency": 16.31,
-        "longMidFrequency": 13.89,
-        "cornerThreeFrequency": 22.6,
-        "aboveBreakThreeFrequency": 29.06,
-        "threePointRate": 51.67,
-        "freeThrowRate": 13.33,
-        "turnoverRate": 11.19,
-        "isolationRate": 2.58,
-        "pickAndRollBallHandlerRate": 23.13,
-        "pickAndRollRollManRate": 6.1,
-        "spotUpRate": 31.07,
-        "transitionRate": 10.48,
-        "cutRate": 8.9,
-        "foulRate": 5.41,
-        "stealAttemptRate": 10.6,
-        "blockAttemptRate": 9.8,
-        "crashOffensiveGlassRate": 15.28
+        "usageRate": 16.6,
+        "passRate": 10.41,
+        "shotRate": 16.67,
+        "driveRate": 19.5,
+        "postUpRate": 5.68,
+        "rimFrequency": 19.77,
+        "shortMidFrequency": 19.02,
+        "longMidFrequency": 16.2,
+        "cornerThreeFrequency": 18.78,
+        "aboveBreakThreeFrequency": 26.22,
+        "threePointRate": 45,
+        "freeThrowRate": 17.5,
+        "turnoverRate": 13.11,
+        "isolationRate": 2.24,
+        "pickAndRollBallHandlerRate": 25.04,
+        "pickAndRollRollManRate": 6.93,
+        "spotUpRate": 29.11,
+        "transitionRate": 10.24,
+        "cutRate": 9.38,
+        "foulRate": 6.78,
+        "stealAttemptRate": 10.52,
+        "blockAttemptRate": 9.88,
+        "crashOffensiveGlassRate": 15.4
       },
       "anchors": {
-        "gamesPlayed": 47,
-        "minutesPerGame": 18.3,
-        "pointsPerGame": 6.4,
-        "reboundsPerGame": 2.1,
-        "offensiveReboundsPerGame": 0.4,
-        "defensiveReboundsPerGame": 1.6999999999999997,
-        "assistsPerGame": 1,
-        "stealsPerGame": 0.9000000000000001,
-        "blocksPerGame": 0.2,
-        "turnoversPerGame": 0.8,
-        "fieldGoalPct": 0.3833333333333333,
-        "threePointPct": 0.3548387096774193,
-        "freeThrowPct": 0.8749999999999999,
-        "threePointAttemptRate": 0.5166666666666667,
-        "freeThrowAttemptRate": 0.13333333333333333,
-        "threePointPctShrunk": 0.34982278666281474,
-        "freeThrowPctShrunk": 0.81441375321505,
-        "threePointPctPrior": 0.34068753687246606,
-        "freeThrowPctPrior": 0.7859382172261236,
+        "gamesPlayed": 82,
+        "minutesPerGame": 27.100000000000005,
+        "pointsPerGame": 8.8,
+        "reboundsPerGame": 2.6,
+        "offensiveReboundsPerGame": 0.7,
+        "defensiveReboundsPerGame": 1.8999999999999997,
+        "assistsPerGame": 1.8999999999999997,
+        "stealsPerGame": 0.7,
+        "blocksPerGame": 0.10000000000000002,
+        "turnoversPerGame": 1.3,
+        "fieldGoalPct": 0.3875,
+        "threePointPct": 0.3888888888888889,
+        "freeThrowPct": 0.7857142857142858,
+        "threePointAttemptRate": 0.44999999999999996,
+        "freeThrowAttemptRate": 0.175,
+        "threePointPctShrunk": 0.3808194835035768,
+        "freeThrowPctShrunk": 0.7853911033148321,
+        "threePointPctPrior": 0.3510433776317751,
+        "freeThrowPctPrior": 0.7849273365716164,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -1721,8 +1726,8 @@
             "prior",
             "shrink-80-attempts"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860
+          "sampleGames": 82,
+          "sampleMinutes": 2222
         },
         "freeThrow": {
           "kind": "derived",
@@ -1735,8 +1740,8 @@
             "prior",
             "shrink-80-attempts"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860
+          "sampleGames": 82,
+          "sampleMinutes": 2222
         },
         "insideScoring": {
           "kind": "derived",
@@ -1748,8 +1753,8 @@
             "minutes",
             "tsPct"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860,
+          "sampleGames": 82,
+          "sampleMinutes": 2222,
           "notesCode": "no-shot-location"
         },
         "closeShot": {
@@ -1763,8 +1768,8 @@
             "points",
             "minutes"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860,
+          "sampleGames": 82,
+          "sampleMinutes": 2222,
           "notesCode": "no-shot-location"
         },
         "midrange": {
@@ -1778,8 +1783,8 @@
             "tpm",
             "tpa"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860,
+          "sampleGames": 82,
+          "sampleMinutes": 2222,
           "notesCode": "no-shot-location"
         },
         "passing": {
@@ -1791,8 +1796,8 @@
             "assists",
             "minutes"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860
+          "sampleGames": 82,
+          "sampleMinutes": 2222
         },
         "ballHandling": {
           "kind": "derived",
@@ -1805,8 +1810,8 @@
             "turnovers",
             "minutes"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860
+          "sampleGames": 82,
+          "sampleMinutes": 2222
         },
         "offensiveRebound": {
           "kind": "derived",
@@ -1816,8 +1821,8 @@
           "sourceFields": [
             "offensiveRebounds"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860,
+          "sampleGames": 82,
+          "sampleMinutes": 2222,
           "notesCode": "no-rebound-chances"
         },
         "defensiveRebound": {
@@ -1828,8 +1833,8 @@
           "sourceFields": [
             "defensiveRebounds"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860,
+          "sampleGames": 82,
+          "sampleMinutes": 2222,
           "notesCode": "no-rebound-chances"
         },
         "steal": {
@@ -1840,8 +1845,8 @@
           "sourceFields": [
             "steals"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860
+          "sampleGames": 82,
+          "sampleMinutes": 2222
         },
         "block": {
           "kind": "derived",
@@ -1851,8 +1856,8 @@
           "sourceFields": [
             "blocks"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860
+          "sampleGames": 82,
+          "sampleMinutes": 2222
         },
         "perimeterDefense": {
           "kind": "estimated",
@@ -1864,8 +1869,8 @@
             "minutes",
             "position"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860,
+          "sampleGames": 82,
+          "sampleMinutes": 2222,
           "notesCode": "no-contest-tracking"
         },
         "interiorDefense": {
@@ -1879,8 +1884,8 @@
             "minutes",
             "position"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860,
+          "sampleGames": 82,
+          "sampleMinutes": 2222,
           "notesCode": "no-contest-tracking"
         },
         "defensiveIq": {
@@ -1895,8 +1900,8 @@
             "fouls",
             "minutes"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860
+          "sampleGames": 82,
+          "sampleMinutes": 2222
         },
         "speed": {
           "kind": "estimated",
@@ -1906,8 +1911,8 @@
           "sourceFields": [
             "heightInches"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860,
+          "sampleGames": 82,
+          "sampleMinutes": 2222,
           "notesCode": "no-speed-tracking"
         },
         "strength": {
@@ -1920,8 +1925,8 @@
             "heightInches",
             "weightLbs"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860
+          "sampleGames": 82,
+          "sampleMinutes": 2222
         },
         "vertical": {
           "kind": "derived",
@@ -1933,8 +1938,8 @@
             "offensiveRebounds",
             "minutes"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860
+          "sampleGames": 82,
+          "sampleMinutes": 2222
         },
         "offensiveIq": {
           "kind": "derived",
@@ -1948,8 +1953,8 @@
             "tsPct",
             "minutes"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860
+          "sampleGames": 82,
+          "sampleMinutes": 2222
         },
         "usageRate": {
           "kind": "observed",
@@ -1959,8 +1964,8 @@
           "sourceFields": [
             "usageRate"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860
+          "sampleGames": 82,
+          "sampleMinutes": 2222
         },
         "passRate": {
           "kind": "derived",
@@ -1971,8 +1976,8 @@
             "assists",
             "points"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860
+          "sampleGames": 82,
+          "sampleMinutes": 2222
         },
         "shotRate": {
           "kind": "derived",
@@ -1982,8 +1987,8 @@
           "sourceFields": [
             "fga"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860
+          "sampleGames": 82,
+          "sampleMinutes": 2222
         },
         "driveRate": {
           "kind": "derived",
@@ -1996,8 +2001,8 @@
             "usageRate",
             "position"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860
+          "sampleGames": 82,
+          "sampleMinutes": 2222
         },
         "postUpRate": {
           "kind": "derived",
@@ -2011,8 +2016,8 @@
             "fga",
             "position"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860
+          "sampleGames": 82,
+          "sampleMinutes": 2222
         },
         "rimFrequency": {
           "kind": "estimated",
@@ -2026,8 +2031,8 @@
             "position",
             "fgm"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860,
+          "sampleGames": 82,
+          "sampleMinutes": 2222,
           "notesCode": "no-shot-location"
         },
         "shortMidFrequency": {
@@ -2041,8 +2046,8 @@
             "fta",
             "position"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860,
+          "sampleGames": 82,
+          "sampleMinutes": 2222,
           "notesCode": "no-shot-location"
         },
         "longMidFrequency": {
@@ -2056,8 +2061,8 @@
             "fta",
             "position"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860,
+          "sampleGames": 82,
+          "sampleMinutes": 2222,
           "notesCode": "no-shot-location"
         },
         "cornerThreeFrequency": {
@@ -2070,8 +2075,8 @@
             "fga",
             "assists"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860
+          "sampleGames": 82,
+          "sampleMinutes": 2222
         },
         "aboveBreakThreeFrequency": {
           "kind": "derived",
@@ -2083,8 +2088,8 @@
             "fga",
             "assists"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860
+          "sampleGames": 82,
+          "sampleMinutes": 2222
         },
         "threePointRate": {
           "kind": "derived",
@@ -2095,8 +2100,8 @@
             "tpa",
             "fga"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860
+          "sampleGames": 82,
+          "sampleMinutes": 2222
         },
         "freeThrowRate": {
           "kind": "derived",
@@ -2107,8 +2112,8 @@
             "fta",
             "fga"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860
+          "sampleGames": 82,
+          "sampleMinutes": 2222
         },
         "turnoverRate": {
           "kind": "derived",
@@ -2120,8 +2125,8 @@
             "fga",
             "fta"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860
+          "sampleGames": 82,
+          "sampleMinutes": 2222
         },
         "isolationRate": {
           "kind": "derived",
@@ -2132,8 +2137,8 @@
             "usageRate",
             "position"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860
+          "sampleGames": 82,
+          "sampleMinutes": 2222
         },
         "pickAndRollBallHandlerRate": {
           "kind": "derived",
@@ -2145,8 +2150,8 @@
             "usageRate",
             "position"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860
+          "sampleGames": 82,
+          "sampleMinutes": 2222
         },
         "pickAndRollRollManRate": {
           "kind": "derived",
@@ -2158,8 +2163,8 @@
             "rebounds",
             "position"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860
+          "sampleGames": 82,
+          "sampleMinutes": 2222
         },
         "spotUpRate": {
           "kind": "derived",
@@ -2171,8 +2176,8 @@
             "fga",
             "usageRate"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860
+          "sampleGames": 82,
+          "sampleMinutes": 2222
         },
         "transitionRate": {
           "kind": "derived",
@@ -2183,8 +2188,8 @@
             "speed",
             "steals"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860
+          "sampleGames": 82,
+          "sampleMinutes": 2222
         },
         "cutRate": {
           "kind": "derived",
@@ -2196,8 +2201,8 @@
             "offensiveRebounds",
             "rebounds"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860
+          "sampleGames": 82,
+          "sampleMinutes": 2222
         },
         "foulRate": {
           "kind": "derived",
@@ -2207,8 +2212,8 @@
           "sourceFields": [
             "fouls"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860
+          "sampleGames": 82,
+          "sampleMinutes": 2222
         },
         "stealAttemptRate": {
           "kind": "derived",
@@ -2218,8 +2223,8 @@
           "sourceFields": [
             "steal"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860
+          "sampleGames": 82,
+          "sampleMinutes": 2222
         },
         "blockAttemptRate": {
           "kind": "derived",
@@ -2229,8 +2234,8 @@
           "sourceFields": [
             "block"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860
+          "sampleGames": 82,
+          "sampleMinutes": 2222
         },
         "crashOffensiveGlassRate": {
           "kind": "derived",
@@ -2240,8 +2245,8 @@
           "sourceFields": [
             "offensiveRebound"
           ],
-          "sampleGames": 47,
-          "sampleMinutes": 860
+          "sampleGames": 82,
+          "sampleMinutes": 2222
         }
       },
       "source": {
@@ -2272,12 +2277,13 @@
         "primary": "SF",
         "secondary": [],
         "playable": [
+          "PF",
           "SF"
         ],
         "sourceLabels": [
-          "SF"
+          "F"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 80,
       "weightLbs": 230,
@@ -2286,7 +2292,7 @@
         "teamGames": 63,
         "teamMinutes": 1946
       },
-      "selectionScore": 51.06,
+      "selectionScore": 50.91,
       "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
       "stats": {
         "gamesPlayed": 63,
@@ -2328,32 +2334,32 @@
         "schemaVersion": 2,
         "modelVersion": "ratings-model-v3.6",
         "memberships": {
-          "primaryCreator": 0.047487,
-          "secondaryCreator": 0.054149,
-          "scoringGuard": 0.055089,
-          "movementSpacer": 0.097036,
-          "twoWayWing": 0.126636,
-          "connector": 0.099134,
-          "interiorFinisher": 0.103414,
-          "stretchBig": 0.152406,
-          "rebounder": 0.133128,
-          "defensiveAnchor": 0.131521
+          "primaryCreator": 0.048136,
+          "secondaryCreator": 0.054459,
+          "scoringGuard": 0.054893,
+          "movementSpacer": 0.0941,
+          "twoWayWing": 0.127361,
+          "connector": 0.098357,
+          "interiorFinisher": 0.104827,
+          "stretchBig": 0.149601,
+          "rebounder": 0.134947,
+          "defensiveAnchor": 0.133319
         },
-        "baseScore": 58.09,
+        "baseScore": 57.86,
         "nonlinear": {
           "creation": 63.72013210625463,
           "penetration": 64.6177166435507,
-          "shootingGravity": 65.0425,
-          "scalableScoring": 62.333333333333336,
+          "shootingGravity": 64.5425,
+          "scalableScoring": 61.666666666666664,
           "switchability": 59.44978462197532,
           "rimProtection": 61.29434454234601,
           "possessionControl": 67.126,
-          "synergyBonus": 0.14622628254024553,
-          "weaknessPenalty": -0.38532618928571416,
+          "synergyBonus": 0.12852861238949506,
+          "weaknessPenalty": -0.38544663428571413,
           "weaknesses": {
             "turnoverLiability": 0,
             "inefficientUsage": 0.41768999999999945,
-            "defensiveTargeting": 0.7156223214285714,
+            "defensiveTargeting": 0.7159765714285715,
             "spacingLimitation": 0,
             "foulRisk": 0,
             "deficientRebounding": 0,
@@ -2374,18 +2380,18 @@
           "sampleCount": 1280,
           "artifactVersion": "ratings-model-v3.6"
         },
-        "canonicalOverall": 47,
-        "rawOverallScore": 48.2,
+        "canonicalOverall": 46,
+        "rawOverallScore": 48.01,
         "offenseRating": 63,
         "defenseRating": 60,
-        "overallPercentile": 0.9656,
+        "overallPercentile": 0.9709,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
         "insideScoring": 73,
         "closeShot": 59,
         "midrange": 57,
-        "threePoint": 44,
+        "threePoint": 42,
         "freeThrow": 84,
         "ballHandling": 66,
         "passing": 56,
@@ -2442,10 +2448,10 @@
         "freeThrowPct": 0.8035714285714287,
         "threePointAttemptRate": 0.25165562913907286,
         "freeThrowAttemptRate": 0.37086092715231783,
-        "threePointPctShrunk": 0.3054081878357659,
-        "freeThrowPctShrunk": 0.7889106373906346,
-        "threePointPctPrior": 0.3530921899342951,
-        "freeThrowPctPrior": 0.7242565482833327,
+        "threePointPctShrunk": 0.30099451615300593,
+        "freeThrowPctShrunk": 0.7855923392420349,
+        "threePointPctPrior": 0.33547060574087606,
+        "freeThrowPctPrior": 0.7063045552994086,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -3011,12 +3017,13 @@
         "primary": "SF",
         "secondary": [],
         "playable": [
+          "PF",
           "SF"
         ],
         "sourceLabels": [
-          "SF"
+          "F"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 81,
       "weightLbs": 227,
@@ -3025,7 +3032,7 @@
         "teamGames": 64,
         "teamMinutes": 598
       },
-      "selectionScore": 49.865,
+      "selectionScore": 49.651,
       "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
       "stats": {
         "gamesPlayed": 64,
@@ -3060,42 +3067,42 @@
       },
       "summaryRatings": {
         "overallRating": 52,
-        "offenseRating": 56,
+        "offenseRating": 55,
         "defenseRating": 55
       },
       "ratingProfile": {
         "schemaVersion": 2,
         "modelVersion": "ratings-model-v3.6",
         "memberships": {
-          "primaryCreator": 0.019682,
-          "secondaryCreator": 0.044369,
-          "scoringGuard": 0.032425,
-          "movementSpacer": 0.125689,
-          "twoWayWing": 0.17254,
-          "connector": 0.123427,
-          "interiorFinisher": 0.086653,
-          "stretchBig": 0.16242,
-          "rebounder": 0.111122,
-          "defensiveAnchor": 0.121673
+          "primaryCreator": 0.019837,
+          "secondaryCreator": 0.044541,
+          "scoringGuard": 0.0324,
+          "movementSpacer": 0.123901,
+          "twoWayWing": 0.173212,
+          "connector": 0.12307,
+          "interiorFinisher": 0.087333,
+          "stretchBig": 0.161084,
+          "rebounder": 0.111994,
+          "defensiveAnchor": 0.122628
         },
-        "baseScore": 52.64,
+        "baseScore": 52.52,
         "nonlinear": {
           "creation": 57.37700236507835,
           "penetration": 55.63420165075203,
-          "shootingGravity": 62.7375,
-          "scalableScoring": 58.666666666666664,
+          "shootingGravity": 62.4875,
+          "scalableScoring": 58.333333333333336,
           "switchability": 59.14624259233611,
           "rimProtection": 58.8575755244032,
           "possessionControl": 58.878,
-          "synergyBonus": 0.027957945723684104,
-          "weaknessPenalty": -3.0396383725157152,
+          "synergyBonus": 0.01828028782894726,
+          "weaknessPenalty": -3.041288232108856,
           "weaknesses": {
-            "turnoverLiability": 3.7509342471022444,
+            "turnoverLiability": 3.752100289436408,
             "inefficientUsage": 0,
-            "defensiveTargeting": 0.916866095238095,
+            "defensiveTargeting": 0.9170530476190473,
             "spacingLimitation": 0,
-            "foulRisk": 3.9654787680000005,
-            "deficientRebounding": 0.30683375,
+            "foulRisk": 3.968612364000001,
+            "deficientRebounding": 0.3071996875,
             "hollowAnchor": 0
           }
         },
@@ -3114,17 +3121,17 @@
           "artifactVersion": "ratings-model-v3.6"
         },
         "canonicalOverall": 47,
-        "rawOverallScore": 48.75,
-        "offenseRating": 56,
+        "rawOverallScore": 48.63,
+        "offenseRating": 55,
         "defenseRating": 55,
-        "overallPercentile": 0.936,
+        "overallPercentile": 0.9384,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
         "insideScoring": 57,
         "closeShot": 57,
         "midrange": 55,
-        "threePoint": 53,
+        "threePoint": 52,
         "freeThrow": 75,
         "ballHandling": 53,
         "passing": 54,
@@ -3181,10 +3188,10 @@
         "freeThrowPct": 0.8363636363636363,
         "threePointAttemptRate": 0.1794871794871795,
         "freeThrowAttemptRate": 0.4700854700854701,
-        "threePointPctShrunk": 0.3011420355732466,
-        "freeThrowPctShrunk": 0.7814808392578464,
-        "threePointPctPrior": 0.31769181991122386,
-        "freeThrowPctPrior": 0.7437489162476157,
+        "threePointPctShrunk": 0.29811268112350725,
+        "freeThrowPctShrunk": 0.7813237753882915,
+        "threePointPctPrior": 0.3138672599184279,
+        "freeThrowPctPrior": 0.7434838709677419,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -3747,15 +3754,16 @@
         "photoUrl": null
       },
       "positions": {
-        "primary": "SG",
+        "primary": "PG",
         "secondary": [],
         "playable": [
+          "PG",
           "SG"
         ],
         "sourceLabels": [
-          "SG"
+          "G"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 76,
       "weightLbs": 190,
@@ -3920,10 +3928,10 @@
         "freeThrowPct": 0.7599999999999999,
         "threePointAttemptRate": 0.4126984126984128,
         "freeThrowAttemptRate": 0.19841269841269843,
-        "threePointPctShrunk": 0.3181150888174419,
-        "freeThrowPctShrunk": 0.7709439350487705,
-        "threePointPctPrior": 0.3668937044830701,
-        "freeThrowPctPrior": 0.795567788908504,
+        "threePointPctShrunk": 0.31828346748508995,
+        "freeThrowPctShrunk": 0.7695101643189981,
+        "threePointPctPrior": 0.36785009531531104,
+        "freeThrowPctPrior": 0.7909080340367443,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -4486,15 +4494,16 @@
         "photoUrl": null
       },
       "positions": {
-        "primary": "SG",
+        "primary": "PG",
         "secondary": [],
         "playable": [
+          "PG",
           "SG"
         ],
         "sourceLabels": [
-          "SG"
+          "G"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 79,
       "weightLbs": 205,
@@ -4595,7 +4604,7 @@
         "rawOverallScore": 51.5,
         "offenseRating": 63,
         "defenseRating": 58,
-        "overallPercentile": 0.6801,
+        "overallPercentile": 0.6748,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -4659,10 +4668,10 @@
         "freeThrowPct": 0.7272727272727273,
         "threePointAttemptRate": 0.2748447204968944,
         "freeThrowAttemptRate": 0.15372670807453417,
-        "threePointPctShrunk": 0.3377178366241129,
-        "freeThrowPctShrunk": 0.7581538166386722,
-        "threePointPctPrior": 0.3474185501549626,
-        "freeThrowPctPrior": 0.7963691647290287,
+        "threePointPctShrunk": 0.33757388057668875,
+        "freeThrowPctShrunk": 0.7566168188123862,
+        "threePointPctPrior": 0.3469560913526126,
+        "freeThrowPctPrior": 0.7929301320927141,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -5228,12 +5237,13 @@
         "primary": "SF",
         "secondary": [],
         "playable": [
+          "PF",
           "SF"
         ],
         "sourceLabels": [
-          "SF"
+          "F"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 80,
       "weightLbs": 210,
@@ -5334,7 +5344,7 @@
         "rawOverallScore": 50.62,
         "offenseRating": 57,
         "defenseRating": 57,
-        "overallPercentile": 0.7761,
+        "overallPercentile": 0.7706,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -5399,9 +5409,9 @@
         "threePointAttemptRate": 0,
         "freeThrowAttemptRate": 0.7471910112359551,
         "threePointPctShrunk": null,
-        "freeThrowPctShrunk": 0.7128718897642533,
-        "threePointPctPrior": 0.3108376339817388,
-        "freeThrowPctPrior": 0.7480214064973242,
+        "freeThrowPctShrunk": 0.712745160078198,
+        "threePointPctPrior": 0.3052052281586792,
+        "freeThrowPctPrior": 0.7476839887082024,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -5973,10 +5983,11 @@
         ],
         "sourceLabels": [
           "C",
-          "PF",
-          "SF"
+          "C-F",
+          "F",
+          "F-C"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 84,
       "weightLbs": 260,
@@ -6141,10 +6152,10 @@
         "freeThrowPct": 0.7654320987654322,
         "threePointAttemptRate": 0.005780346820809248,
         "freeThrowAttemptRate": 0.4682080924855491,
-        "threePointPctShrunk": 0.32417802626057224,
-        "freeThrowPctShrunk": 0.7626982141144673,
-        "threePointPctPrior": 0.3541644936896752,
-        "freeThrowPctPrior": 0.7422145833671133,
+        "threePointPctShrunk": 0.32161141211080535,
+        "freeThrowPctShrunk": 0.761517865904089,
+        "threePointPctPrior": 0.35136046773105484,
+        "freeThrowPctPrior": 0.732190476190476,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -6706,15 +6717,16 @@
         "photoUrl": null
       },
       "positions": {
-        "primary": "SG",
+        "primary": "PG",
         "secondary": [],
         "playable": [
+          "PG",
           "SG"
         ],
         "sourceLabels": [
-          "SG"
+          "G"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 76,
       "weightLbs": 205,
@@ -6723,7 +6735,7 @@
         "teamGames": 68,
         "teamMinutes": 1189
       },
-      "selectionScore": 54.471,
+      "selectionScore": 54.527,
       "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
       "stats": {
         "gamesPlayed": 68,
@@ -6765,18 +6777,18 @@
         "schemaVersion": 2,
         "modelVersion": "ratings-model-v3.6",
         "memberships": {
-          "primaryCreator": 0.057057,
-          "secondaryCreator": 0.099472,
-          "scoringGuard": 0.059281,
-          "movementSpacer": 0.160144,
-          "twoWayWing": 0.12693,
-          "connector": 0.175994,
-          "interiorFinisher": 0.063688,
-          "stretchBig": 0.114297,
-          "rebounder": 0.056365,
-          "defensiveAnchor": 0.086772
+          "primaryCreator": 0.066206,
+          "secondaryCreator": 0.107083,
+          "scoringGuard": 0.052248,
+          "movementSpacer": 0.148383,
+          "twoWayWing": 0.120586,
+          "connector": 0.184782,
+          "interiorFinisher": 0.063607,
+          "stretchBig": 0.114151,
+          "rebounder": 0.056293,
+          "defensiveAnchor": 0.086661
         },
-        "baseScore": 58.34,
+        "baseScore": 58.43,
         "nonlinear": {
           "creation": 71.07985460829421,
           "penetration": 61.54857686285338,
@@ -6785,15 +6797,15 @@
           "switchability": 59.27630621643206,
           "rimProtection": 54.05273477224233,
           "possessionControl": 71.0695,
-          "synergyBonus": 0.2000611864322952,
-          "weaknessPenalty": -1.026979411071807,
+          "synergyBonus": 0.20526924857851678,
+          "weaknessPenalty": -1.0317075268010958,
           "weaknesses": {
-            "turnoverLiability": 1.0830398465753421,
+            "turnoverLiability": 1.092697558356164,
             "inefficientUsage": 0,
-            "defensiveTargeting": 0.7925916190476194,
+            "defensiveTargeting": 0.7974088000000004,
             "spacingLimitation": 0,
-            "foulRisk": 0.01585346399999966,
-            "deficientRebounding": 1.12904275,
+            "foulRisk": 0.015848543999999663,
+            "deficientRebounding": 1.128479,
             "hollowAnchor": 0
           }
         },
@@ -6812,10 +6824,10 @@
           "artifactVersion": "ratings-model-v3.6"
         },
         "canonicalOverall": 54,
-        "rawOverallScore": 52.87,
+        "rawOverallScore": 52.94,
         "offenseRating": 63,
         "defenseRating": 58,
-        "overallPercentile": 0.5463,
+        "overallPercentile": 0.5358,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -6879,10 +6891,10 @@
         "freeThrowPct": 0.7333333333333334,
         "threePointAttemptRate": 0.19607843137254904,
         "freeThrowAttemptRate": 0.2941176470588236,
-        "threePointPctShrunk": 0.33179280171306846,
-        "freeThrowPctShrunk": 0.7621006908555429,
-        "threePointPctPrior": 0.3588166831691767,
-        "freeThrowPctPrior": 0.7987790716963599,
+        "threePointPctShrunk": 0.332008918485756,
+        "freeThrowPctShrunk": 0.7618365797177669,
+        "threePointPctPrior": 0.3592164991986486,
+        "freeThrowPctPrior": 0.7981782188579195,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -7448,12 +7460,15 @@
         "primary": "SF",
         "secondary": [],
         "playable": [
+          "C",
+          "PF",
           "SF"
         ],
         "sourceLabels": [
-          "SF"
+          "C-F",
+          "F"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 81,
       "weightLbs": 225,
@@ -7554,7 +7569,7 @@
         "rawOverallScore": 53.84,
         "offenseRating": 62,
         "defenseRating": 61,
-        "overallPercentile": 0.4613,
+        "overallPercentile": 0.459,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -7618,10 +7633,10 @@
         "freeThrowPct": 0.7767857142857143,
         "threePointAttemptRate": 0.0070921985815602835,
         "freeThrowAttemptRate": 0.3177304964539007,
-        "threePointPctShrunk": 0.2990040657987989,
-        "freeThrowPctShrunk": 0.7680918200651621,
-        "threePointPctPrior": 0.31769181991122386,
-        "freeThrowPctPrior": 0.7437489162476157,
+        "threePointPctShrunk": 0.2954044799232262,
+        "freeThrowPctShrunk": 0.7680220713073005,
+        "threePointPctPrior": 0.3138672599184279,
+        "freeThrowPctPrior": 0.7434838709677419,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -8183,15 +8198,16 @@
         "photoUrl": null
       },
       "positions": {
-        "primary": "SG",
+        "primary": "PG",
         "secondary": [],
         "playable": [
+          "PG",
           "SG"
         ],
         "sourceLabels": [
-          "SG"
+          "G"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 73,
       "weightLbs": 175,
@@ -8200,7 +8216,7 @@
         "teamGames": 64,
         "teamMinutes": 1430
       },
-      "selectionScore": 54.476,
+      "selectionScore": 54.54,
       "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
       "stats": {
         "gamesPlayed": 65,
@@ -8242,18 +8258,18 @@
         "schemaVersion": 2,
         "modelVersion": "ratings-model-v3.6",
         "memberships": {
-          "primaryCreator": 0.059452,
-          "secondaryCreator": 0.123764,
-          "scoringGuard": 0.066938,
-          "movementSpacer": 0.144764,
-          "twoWayWing": 0.127935,
-          "connector": 0.187936,
-          "interiorFinisher": 0.066616,
-          "stretchBig": 0.081747,
-          "rebounder": 0.053484,
-          "defensiveAnchor": 0.087364
+          "primaryCreator": 0.068775,
+          "secondaryCreator": 0.132828,
+          "scoringGuard": 0.058818,
+          "movementSpacer": 0.133725,
+          "twoWayWing": 0.12117,
+          "connector": 0.196719,
+          "interiorFinisher": 0.066329,
+          "stretchBig": 0.081394,
+          "rebounder": 0.053253,
+          "defensiveAnchor": 0.086989
         },
-        "baseScore": 57.97,
+        "baseScore": 58.06,
         "nonlinear": {
           "creation": 71.51917265031939,
           "penetration": 61.9289856358571,
@@ -8262,15 +8278,15 @@
           "switchability": 55.88347368345959,
           "rimProtection": 53.27706874201487,
           "possessionControl": 70.99199999999999,
-          "synergyBonus": 0.0999474680798407,
-          "weaknessPenalty": -1.628816643109888,
+          "synergyBonus": 0.11034313737180487,
+          "weaknessPenalty": -1.6358118543806184,
           "weaknesses": {
-            "turnoverLiability": 1.8396786138792225,
+            "turnoverLiability": 1.856465631770727,
             "inefficientUsage": 0,
-            "defensiveTargeting": 1.012000095238095,
+            "defensiveTargeting": 1.0183558571428566,
             "spacingLimitation": 0,
-            "foulRisk": 0.804467664,
-            "deficientRebounding": 1.1344908125,
+            "foulRisk": 0.80369016,
+            "deficientRebounding": 1.1326996875,
             "hollowAnchor": 0
           }
         },
@@ -8289,10 +8305,10 @@
           "artifactVersion": "ratings-model-v3.6"
         },
         "canonicalOverall": 54,
-        "rawOverallScore": 52.94,
+        "rawOverallScore": 53.02,
         "offenseRating": 64,
         "defenseRating": 56,
-        "overallPercentile": 0.5395,
+        "overallPercentile": 0.5285,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -8356,10 +8372,10 @@
         "freeThrowPct": 0.8103448275862069,
         "threePointAttemptRate": 0.04421052631578947,
         "freeThrowAttemptRate": 0.3663157894736842,
-        "threePointPctShrunk": 0.3119112511379737,
-        "freeThrowPctShrunk": 0.802429442826102,
-        "threePointPctPrior": 0.3437879545616918,
-        "freeThrowPctPrior": 0.7852134809728737,
+        "threePointPctShrunk": 0.3095690224049804,
+        "freeThrowPctShrunk": 0.8010110592454684,
+        "threePointPctPrior": 0.34083089078628775,
+        "freeThrowPctPrior": 0.7807101131043626,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -8925,12 +8941,13 @@
         "primary": "SF",
         "secondary": [],
         "playable": [
+          "PF",
           "SF"
         ],
         "sourceLabels": [
-          "SF"
+          "F"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 81,
       "weightLbs": 220,
@@ -8939,7 +8956,7 @@
         "teamGames": 70,
         "teamMinutes": 2149
       },
-      "selectionScore": 57.372,
+      "selectionScore": 57.332,
       "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
       "stats": {
         "gamesPlayed": 70,
@@ -8981,34 +8998,34 @@
         "schemaVersion": 2,
         "modelVersion": "ratings-model-v3.6",
         "memberships": {
-          "primaryCreator": 0.029597,
-          "secondaryCreator": 0.044534,
-          "scoringGuard": 0.043085,
-          "movementSpacer": 0.065408,
-          "twoWayWing": 0.131609,
-          "connector": 0.07949,
-          "interiorFinisher": 0.107999,
-          "stretchBig": 0.137536,
-          "rebounder": 0.205081,
-          "defensiveAnchor": 0.155661
+          "primaryCreator": 0.029762,
+          "secondaryCreator": 0.044606,
+          "scoringGuard": 0.042955,
+          "movementSpacer": 0.064331,
+          "twoWayWing": 0.131822,
+          "connector": 0.07908,
+          "interiorFinisher": 0.108599,
+          "stretchBig": 0.136096,
+          "rebounder": 0.206221,
+          "defensiveAnchor": 0.156528
         },
-        "baseScore": 60.28,
+        "baseScore": 60.21,
         "nonlinear": {
           "creation": 60.64308278384818,
           "penetration": 61.30431112216955,
-          "shootingGravity": 60.5575,
-          "scalableScoring": 65,
+          "shootingGravity": 60.3075,
+          "scalableScoring": 64.66666666666667,
           "switchability": 60.08506452862499,
           "rimProtection": 62.86487018061608,
           "possessionControl": 65.8,
           "synergyBonus": 0,
-          "weaknessPenalty": -0.6960249453771431,
+          "weaknessPenalty": -0.6964374147257144,
           "weaknesses": {
             "turnoverLiability": 0,
             "inefficientUsage": 0,
-            "defensiveTargeting": 0.4183673142857143,
+            "defensiveTargeting": 0.4183971214285714,
             "spacingLimitation": 0,
-            "foulRisk": 1.6287648780000004,
+            "foulRisk": 1.6299482160000003,
             "deficientRebounding": 0,
             "hollowAnchor": 0
           }
@@ -9028,17 +9045,17 @@
           "artifactVersion": "ratings-model-v3.6"
         },
         "canonicalOverall": 59,
-        "rawOverallScore": 55.82,
+        "rawOverallScore": 55.77,
         "offenseRating": 63,
         "defenseRating": 61,
-        "overallPercentile": 0.317,
+        "overallPercentile": 0.3192,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
         "insideScoring": 71,
         "closeShot": 63,
         "midrange": 61,
-        "threePoint": 54,
+        "threePoint": 53,
         "freeThrow": 76,
         "ballHandling": 59,
         "passing": 54,
@@ -9095,10 +9112,10 @@
         "freeThrowPct": 0.7108433734939759,
         "threePointAttemptRate": 0.012345679012345678,
         "freeThrowAttemptRate": 0.23646723646723647,
-        "threePointPctShrunk": 0.32115065288751726,
-        "freeThrowPctShrunk": 0.7198836246802004,
-        "threePointPctPrior": 0.3108376339817388,
-        "freeThrowPctPrior": 0.7480214064973242,
+        "threePointPctShrunk": 0.3163055726096165,
+        "freeThrowPctShrunk": 0.7198015778013865,
+        "threePointPctPrior": 0.3052052281586792,
+        "freeThrowPctPrior": 0.7476839887082024,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -9660,15 +9677,16 @@
         "photoUrl": null
       },
       "positions": {
-        "primary": "SG",
+        "primary": "PG",
         "secondary": [],
         "playable": [
+          "PG",
           "SG"
         ],
         "sourceLabels": [
-          "SG"
+          "G"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 76,
       "weightLbs": 200,
@@ -9769,7 +9787,7 @@
         "rawOverallScore": 57.37,
         "offenseRating": 68,
         "defenseRating": 58,
-        "overallPercentile": 0.2264,
+        "overallPercentile": 0.2241,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -9833,10 +9851,10 @@
         "freeThrowPct": 0.8317757009345794,
         "threePointAttemptRate": 0.15592515592515593,
         "freeThrowAttemptRate": 0.22245322245322247,
-        "threePointPctShrunk": 0.3776065765239657,
-        "freeThrowPctShrunk": 0.8207457982036638,
-        "threePointPctPrior": 0.3731189075064013,
-        "freeThrowPctPrior": 0.7912408083984646,
+        "threePointPctShrunk": 0.3775530048782074,
+        "freeThrowPctShrunk": 0.8193502320599786,
+        "threePointPctPrior": 0.3729648890248462,
+        "freeThrowPctPrior": 0.7861121028204213,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -10402,12 +10420,13 @@
         "primary": "SF",
         "secondary": [],
         "playable": [
+          "PF",
           "SF"
         ],
         "sourceLabels": [
-          "SF"
+          "F"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 79,
       "weightLbs": 210,
@@ -10416,7 +10435,7 @@
         "teamGames": 49,
         "teamMinutes": 1568
       },
-      "selectionScore": 63.623,
+      "selectionScore": 63.615,
       "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
       "stats": {
         "gamesPlayed": 49,
@@ -10458,34 +10477,34 @@
         "schemaVersion": 2,
         "modelVersion": "ratings-model-v3.6",
         "memberships": {
-          "primaryCreator": 0.016089,
-          "secondaryCreator": 0.034078,
-          "scoringGuard": 0.02216,
-          "movementSpacer": 0.052084,
-          "twoWayWing": 0.097672,
-          "connector": 0.071518,
-          "interiorFinisher": 0.083195,
-          "stretchBig": 0.110888,
-          "rebounder": 0.363025,
-          "defensiveAnchor": 0.149291
+          "primaryCreator": 0.0161,
+          "secondaryCreator": 0.033969,
+          "scoringGuard": 0.021987,
+          "movementSpacer": 0.05212,
+          "twoWayWing": 0.097358,
+          "connector": 0.071569,
+          "interiorFinisher": 0.083254,
+          "stretchBig": 0.110967,
+          "rebounder": 0.363281,
+          "defensiveAnchor": 0.149395
         },
-        "baseScore": 65.42,
+        "baseScore": 65.4,
         "nonlinear": {
           "creation": 61.89855070583461,
           "penetration": 58.236155661645064,
-          "shootingGravity": 59.457499999999996,
+          "shootingGravity": 59.207499999999996,
           "scalableScoring": 64.66666666666667,
           "switchability": 58.89534256763373,
           "rimProtection": 64.69797150415314,
           "possessionControl": 58.0685,
           "synergyBonus": 0,
-          "weaknessPenalty": -2.69095709052,
+          "weaknessPenalty": -2.69114706756,
           "weaknesses": {
             "turnoverLiability": 6,
             "inefficientUsage": 0,
             "defensiveTargeting": 0,
             "spacingLimitation": 0,
-            "foulRisk": 1.914579678,
+            "foulRisk": 1.915138434,
             "deficientRebounding": 0,
             "hollowAnchor": 0
           }
@@ -10505,10 +10524,10 @@
           "artifactVersion": "ratings-model-v3.6"
         },
         "canonicalOverall": 73,
-        "rawOverallScore": 64.63,
+        "rawOverallScore": 64.62,
         "offenseRating": 58,
         "defenseRating": 67,
-        "overallPercentile": 0.0379,
+        "overallPercentile": 0.0373,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -10516,7 +10535,7 @@
         "closeShot": 64,
         "midrange": 60,
         "threePoint": 54,
-        "freeThrow": 73,
+        "freeThrow": 72,
         "ballHandling": 55,
         "passing": 56,
         "offensiveIq": 77,
@@ -10572,10 +10591,10 @@
         "freeThrowPct": 0.6756756756756757,
         "threePointAttemptRate": 0.008333333333333333,
         "freeThrowAttemptRate": 0.4625,
-        "threePointPctShrunk": 0.3449250278165345,
-        "freeThrowPctShrunk": 0.6927464765696321,
-        "threePointPctPrior": 0.35354815351194785,
-        "freeThrowPctPrior": 0.7164322128099966,
+        "threePointPctShrunk": 0.3434468786957928,
+        "freeThrowPctShrunk": 0.6908997651853135,
+        "threePointPctPrior": 0.35203305066318763,
+        "freeThrowPctPrior": 0.7120231893799361,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -11140,12 +11159,16 @@
         "primary": "SF",
         "secondary": [],
         "playable": [
+          "C",
+          "PF",
           "SF"
         ],
         "sourceLabels": [
-          "SF"
+          "C-F",
+          "F",
+          "F-C"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 82,
       "weightLbs": 250,
@@ -11154,7 +11177,7 @@
         "teamGames": 82,
         "teamMinutes": 1661
       },
-      "selectionScore": 52.597,
+      "selectionScore": 52.581,
       "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
       "stats": {
         "gamesPlayed": 82,
@@ -11196,34 +11219,34 @@
         "schemaVersion": 2,
         "modelVersion": "ratings-model-v3.6",
         "memberships": {
-          "primaryCreator": 0.019826,
-          "secondaryCreator": 0.036316,
-          "scoringGuard": 0.033314,
-          "movementSpacer": 0.061058,
-          "twoWayWing": 0.145014,
-          "connector": 0.0746,
-          "interiorFinisher": 0.105211,
-          "stretchBig": 0.133102,
-          "rebounder": 0.192284,
-          "defensiveAnchor": 0.199275
+          "primaryCreator": 0.019845,
+          "secondaryCreator": 0.03621,
+          "scoringGuard": 0.033062,
+          "movementSpacer": 0.061119,
+          "twoWayWing": 0.144589,
+          "connector": 0.074675,
+          "interiorFinisher": 0.105316,
+          "stretchBig": 0.133234,
+          "rebounder": 0.192475,
+          "defensiveAnchor": 0.199475
         },
-        "baseScore": 57.04,
+        "baseScore": 57.01,
         "nonlinear": {
           "creation": 56.39935616185703,
           "penetration": 55.569833367316335,
-          "shootingGravity": 60,
+          "shootingGravity": 59.75,
           "scalableScoring": 60.333333333333336,
           "switchability": 62.279006175336974,
           "rimProtection": 67.65949553015753,
           "possessionControl": 56.9535,
-          "synergyBonus": 0.005323658093462627,
-          "weaknessPenalty": -3.091880909385929,
+          "synergyBonus": 0.005308055774447072,
+          "weaknessPenalty": -3.0916259408288784,
           "weaknesses": {
-            "turnoverLiability": 5.697134926451611,
+            "turnoverLiability": 5.69513242064516,
             "inefficientUsage": 0,
-            "defensiveTargeting": 0.09125203809523777,
+            "defensiveTargeting": 0.09123105238095205,
             "spacingLimitation": 0,
-            "foulRisk": 3.3053804160000007,
+            "foulRisk": 3.3066540000000004,
             "deficientRebounding": 0,
             "hollowAnchor": 0
           }
@@ -11243,10 +11266,10 @@
           "artifactVersion": "ratings-model-v3.6"
         },
         "canonicalOverall": 50,
-        "rawOverallScore": 50.44,
+        "rawOverallScore": 50.42,
         "offenseRating": 56,
         "defenseRating": 64,
-        "overallPercentile": 0.7948,
+        "overallPercentile": 0.7915,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -11254,7 +11277,7 @@
         "closeShot": 59,
         "midrange": 61,
         "threePoint": 52,
-        "freeThrow": 77,
+        "freeThrow": 76,
         "ballHandling": 52,
         "passing": 50,
         "offensiveIq": 69,
@@ -11311,9 +11334,9 @@
         "threePointAttemptRate": 0,
         "freeThrowAttemptRate": 0.34374999999999994,
         "threePointPctShrunk": null,
-        "freeThrowPctShrunk": 0.725855016819428,
-        "threePointPctPrior": 0.3530921899342951,
-        "freeThrowPctPrior": 0.7242565482833327,
+        "freeThrowPctShrunk": 0.7174169472617667,
+        "threePointPctPrior": 0.33547060574087606,
+        "freeThrowPctPrior": 0.7063045552994086,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -11878,12 +11901,13 @@
         "primary": "SF",
         "secondary": [],
         "playable": [
+          "PF",
           "SF"
         ],
         "sourceLabels": [
-          "SF"
+          "F"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 80,
       "weightLbs": 220,
@@ -11892,7 +11916,7 @@
         "teamGames": 77,
         "teamMinutes": 2901
       },
-      "selectionScore": 61.26,
+      "selectionScore": 61.14,
       "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
       "stats": {
         "gamesPlayed": 77,
@@ -11934,35 +11958,35 @@
         "schemaVersion": 2,
         "modelVersion": "ratings-model-v3.6",
         "memberships": {
-          "primaryCreator": 0.029761,
-          "secondaryCreator": 0.050533,
-          "scoringGuard": 0.05066,
-          "movementSpacer": 0.197152,
-          "twoWayWing": 0.11418,
-          "connector": 0.130422,
-          "interiorFinisher": 0.073394,
-          "stretchBig": 0.202485,
-          "rebounder": 0.06309,
-          "defensiveAnchor": 0.088323
+          "primaryCreator": 0.030062,
+          "secondaryCreator": 0.050844,
+          "scoringGuard": 0.050736,
+          "movementSpacer": 0.194785,
+          "twoWayWing": 0.114883,
+          "connector": 0.130337,
+          "interiorFinisher": 0.074137,
+          "stretchBig": 0.201273,
+          "rebounder": 0.063728,
+          "defensiveAnchor": 0.089215
         },
-        "baseScore": 62.79,
+        "baseScore": 62.58,
         "nonlinear": {
           "creation": 63.735890764522004,
           "penetration": 63.28501084695283,
-          "shootingGravity": 76.695,
-          "scalableScoring": 73.66666666666667,
+          "shootingGravity": 76.445,
+          "scalableScoring": 73.33333333333333,
           "switchability": 59.50255385314378,
           "rimProtection": 59.221420468087274,
           "possessionControl": 65.795,
-          "synergyBonus": 0.791926269229499,
-          "weaknessPenalty": -0.7010260174194336,
+          "synergyBonus": 0.7721722378057367,
+          "weaknessPenalty": -0.7015502134083007,
           "weaknesses": {
-            "turnoverLiability": 0.720670763418502,
+            "turnoverLiability": 0.7211636502555063,
             "inefficientUsage": 0,
-            "defensiveTargeting": 0.7036572142857143,
+            "defensiveTargeting": 0.7039766428571428,
             "spacingLimitation": 0,
             "foulRisk": 0,
-            "deficientRebounding": 0.63751325,
+            "deficientRebounding": 0.6382426875,
             "hollowAnchor": 0
           }
         },
@@ -11980,18 +12004,18 @@
           "sampleCount": 1280,
           "artifactVersion": "ratings-model-v3.6"
         },
-        "canonicalOverall": 66,
-        "rawOverallScore": 59.87,
+        "canonicalOverall": 65,
+        "rawOverallScore": 59.72,
         "offenseRating": 67,
         "defenseRating": 59,
-        "overallPercentile": 0.1234,
+        "overallPercentile": 0.1257,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
         "insideScoring": 73,
         "closeShot": 61,
         "midrange": 65,
-        "threePoint": 76,
+        "threePoint": 75,
         "freeThrow": 81,
         "ballHandling": 62,
         "passing": 58,
@@ -12048,10 +12072,10 @@
         "freeThrowPct": 0.7706855791962175,
         "threePointAttemptRate": 0.34782608695652173,
         "freeThrowAttemptRate": 0.37533274179236914,
-        "threePointPctShrunk": 0.4023085229416447,
-        "freeThrowPctShrunk": 0.7628122837448914,
-        "threePointPctPrior": 0.3611202853557038,
-        "freeThrowPctPrior": 0.7211822340460046,
+        "threePointPctShrunk": 0.4005798589942667,
+        "freeThrowPctShrunk": 0.7608348924296747,
+        "threePointPctPrior": 0.3509211680661737,
+        "freeThrowPctPrior": 0.7087493861515797,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -12613,17 +12637,20 @@
         "photoUrl": null
       },
       "positions": {
-        "primary": "SG",
+        "primary": "PG",
         "secondary": [],
         "playable": [
+          "PF",
+          "PG",
           "SF",
           "SG"
         ],
         "sourceLabels": [
-          "SF",
-          "SG"
+          "F-G",
+          "G",
+          "G-F"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 80,
       "weightLbs": 190,
@@ -12632,7 +12659,7 @@
         "teamGames": 57,
         "teamMinutes": 1889
       },
-      "selectionScore": 56.628,
+      "selectionScore": 56.604,
       "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
       "stats": {
         "gamesPlayed": 57,
@@ -12674,35 +12701,35 @@
         "schemaVersion": 2,
         "modelVersion": "ratings-model-v3.6",
         "memberships": {
-          "primaryCreator": 0.057218,
-          "secondaryCreator": 0.101351,
-          "scoringGuard": 0.043184,
-          "movementSpacer": 0.09741,
-          "twoWayWing": 0.128512,
-          "connector": 0.152771,
-          "interiorFinisher": 0.073433,
-          "stretchBig": 0.1287,
-          "rebounder": 0.093285,
-          "defensiveAnchor": 0.124136
+          "primaryCreator": 0.05729,
+          "secondaryCreator": 0.101082,
+          "scoringGuard": 0.04287,
+          "movementSpacer": 0.097534,
+          "twoWayWing": 0.128171,
+          "connector": 0.152965,
+          "interiorFinisher": 0.073527,
+          "stretchBig": 0.128864,
+          "rebounder": 0.093404,
+          "defensiveAnchor": 0.124293
         },
-        "baseScore": 59.81,
+        "baseScore": 59.77,
         "nonlinear": {
           "creation": 74.73864586701717,
           "penetration": 61.7275593631717,
-          "shootingGravity": 62.795,
+          "shootingGravity": 62.545,
           "scalableScoring": 65,
           "switchability": 59.91097909774806,
           "rimProtection": 59.76664212908987,
           "possessionControl": 72.55449999999999,
-          "synergyBonus": 0.1195575380551301,
-          "weaknessPenalty": -1.3516141118967493,
+          "synergyBonus": 0.11226104364755449,
+          "weaknessPenalty": -1.3513364316935308,
           "weaknesses": {
-            "turnoverLiability": 2.2767232357971605,
+            "turnoverLiability": 2.2756427599837736,
             "inefficientUsage": 0,
-            "defensiveTargeting": 0.6383244214285718,
+            "defensiveTargeting": 0.6381188047619052,
             "spacingLimitation": 0,
-            "foulRisk": 0.7154552159999998,
-            "deficientRebounding": 0.34483275,
+            "foulRisk": 0.7157243519999998,
+            "deficientRebounding": 0.34503300000000003,
             "hollowAnchor": 0
           }
         },
@@ -12721,10 +12748,10 @@
           "artifactVersion": "ratings-model-v3.6"
         },
         "canonicalOverall": 58,
-        "rawOverallScore": 55.23,
+        "rawOverallScore": 55.2,
         "offenseRating": 64,
         "defenseRating": 60,
-        "overallPercentile": 0.3636,
+        "overallPercentile": 0.3626,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -12732,7 +12759,7 @@
         "closeShot": 57,
         "midrange": 58,
         "threePoint": 51,
-        "freeThrow": 84,
+        "freeThrow": 83,
         "ballHandling": 70,
         "passing": 71,
         "offensiveIq": 84,
@@ -12788,10 +12815,10 @@
         "freeThrowPct": 0.7753623188405797,
         "threePointAttemptRate": 0.08175182481751825,
         "freeThrowAttemptRate": 0.20145985401459854,
-        "threePointPctShrunk": 0.29622424838308264,
-        "freeThrowPctShrunk": 0.7834243414158996,
-        "threePointPctPrior": 0.34108122225124055,
-        "freeThrowPctPrior": 0.7973313303583264,
+        "threePointPctShrunk": 0.29642193937752676,
+        "freeThrowPctShrunk": 0.7825119645007305,
+        "threePointPctPrior": 0.34141729694179546,
+        "freeThrowPctPrior": 0.7948451032644903,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -13354,15 +13381,16 @@
         "photoUrl": null
       },
       "positions": {
-        "primary": "SG",
+        "primary": "PG",
         "secondary": [],
         "playable": [
+          "PG",
           "SG"
         ],
         "sourceLabels": [
-          "SG"
+          "G"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 75,
       "weightLbs": 205,
@@ -13463,7 +13491,7 @@
         "rawOverallScore": 58.55,
         "offenseRating": 69,
         "defenseRating": 58,
-        "overallPercentile": 0.1694,
+        "overallPercentile": 0.1681,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -13527,10 +13555,10 @@
         "freeThrowPct": 0.8,
         "threePointAttemptRate": 0.44117647058823534,
         "freeThrowAttemptRate": 0.36764705882352944,
-        "threePointPctShrunk": 0.4123427276532892,
-        "freeThrowPctShrunk": 0.7996093029428352,
-        "threePointPctPrior": 0.3588166831691767,
-        "freeThrowPctPrior": 0.7987790716963599,
+        "threePointPctShrunk": 0.41245535188694327,
+        "freeThrowPctShrunk": 0.7994170300345342,
+        "threePointPctPrior": 0.3592164991986486,
+        "freeThrowPctPrior": 0.7981782188579195,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -14093,15 +14121,16 @@
         "photoUrl": null
       },
       "positions": {
-        "primary": "SG",
+        "primary": "PG",
         "secondary": [],
         "playable": [
+          "PG",
           "SG"
         ],
         "sourceLabels": [
-          "SG"
+          "G"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 74,
       "weightLbs": 170,
@@ -14110,7 +14139,7 @@
         "teamGames": 67,
         "teamMinutes": 601
       },
-      "selectionScore": 48.82,
+      "selectionScore": 48.748,
       "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
       "stats": {
         "gamesPlayed": 67,
@@ -14144,7 +14173,7 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 42,
+        "overallRating": 43,
         "offenseRating": 56,
         "defenseRating": 53
       },
@@ -14152,18 +14181,18 @@
         "schemaVersion": 2,
         "modelVersion": "ratings-model-v3.6",
         "memberships": {
-          "primaryCreator": 0.02874,
-          "secondaryCreator": 0.064228,
-          "scoringGuard": 0.0565,
-          "movementSpacer": 0.246546,
-          "twoWayWing": 0.113952,
-          "connector": 0.154661,
-          "interiorFinisher": 0.053804,
-          "stretchBig": 0.138072,
-          "rebounder": 0.065792,
-          "defensiveAnchor": 0.077705
+          "primaryCreator": 0.045259,
+          "secondaryCreator": 0.081636,
+          "scoringGuard": 0.040554,
+          "movementSpacer": 0.204139,
+          "twoWayWing": 0.101338,
+          "connector": 0.183027,
+          "interiorFinisher": 0.055196,
+          "stretchBig": 0.141644,
+          "rebounder": 0.067493,
+          "defensiveAnchor": 0.079714
         },
-        "baseScore": 51.46,
+        "baseScore": 51.37,
         "nonlinear": {
           "creation": 61.19279679415255,
           "penetration": 56.99415144670633,
@@ -14172,15 +14201,15 @@
           "switchability": 56.28300614340629,
           "rimProtection": 52.93750078497155,
           "possessionControl": 59.329,
-          "synergyBonus": 0.26670221842105246,
-          "weaknessPenalty": -4.289608685956667,
+          "synergyBonus": 0.23977321184210504,
+          "weaknessPenalty": -4.307311764071905,
           "weaknesses": {
             "turnoverLiability": 6,
             "inefficientUsage": 0,
-            "defensiveTargeting": 1.2345718666666663,
+            "defensiveTargeting": 1.2490422904761902,
             "spacingLimitation": 0,
-            "foulRisk": 4.703183706,
-            "deficientRebounding": 0.6787405625,
+            "foulRisk": 4.733733533999999,
+            "deficientRebounding": 0.6857881875,
             "hollowAnchor": 0
           }
         },
@@ -14199,10 +14228,10 @@
           "artifactVersion": "ratings-model-v3.6"
         },
         "canonicalOverall": 45,
-        "rawOverallScore": 47.55,
+        "rawOverallScore": 47.46,
         "offenseRating": 56,
         "defenseRating": 53,
-        "overallPercentile": 0.989,
+        "overallPercentile": 0.9861,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -14266,10 +14295,10 @@
         "freeThrowPct": 0.7555555555555555,
         "threePointAttemptRate": 0.37083333333333335,
         "freeThrowAttemptRate": 0.1875,
-        "threePointPctShrunk": 0.3153047205923032,
-        "freeThrowPctShrunk": 0.7822920514293289,
-        "threePointPctPrior": 0.34108122225124055,
-        "freeThrowPctPrior": 0.7973313303583264,
+        "threePointPctShrunk": 0.31546380920321676,
+        "freeThrowPctShrunk": 0.7807008660892738,
+        "threePointPctPrior": 0.34141729694179546,
+        "freeThrowPctPrior": 0.7948451032644903,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -14840,7 +14869,7 @@
         "sourceLabels": [
           "C"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 85,
       "weightLbs": 260,
@@ -14941,7 +14970,7 @@
         "rawOverallScore": 50.14,
         "offenseRating": 54,
         "defenseRating": 58,
-        "overallPercentile": 0.8228,
+        "overallPercentile": 0.8178,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -15571,15 +15600,16 @@
         "photoUrl": null
       },
       "positions": {
-        "primary": "SG",
+        "primary": "PG",
         "secondary": [],
         "playable": [
+          "PG",
           "SG"
         ],
         "sourceLabels": [
-          "SG"
+          "G"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 75,
       "weightLbs": 185,
@@ -15680,7 +15710,7 @@
         "rawOverallScore": 60.15,
         "offenseRating": 67,
         "defenseRating": 62,
-        "overallPercentile": 0.1156,
+        "overallPercentile": 0.1146,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -15744,10 +15774,10 @@
         "freeThrowPct": 0.6867924528301886,
         "threePointAttemptRate": 0.02276176024279211,
         "freeThrowAttemptRate": 0.40212443095599393,
-        "threePointPctShrunk": 0.33985787136946566,
-        "freeThrowPctShrunk": 0.7124246563149742,
-        "threePointPctPrior": 0.34108122225124055,
-        "freeThrowPctPrior": 0.7973313303583264,
+        "threePointPctShrunk": 0.3401408816351962,
+        "freeThrowPctShrunk": 0.711848139887418,
+        "threePointPctPrior": 0.34141729694179546,
+        "freeThrowPctPrior": 0.7948451032644903,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -16313,12 +16343,17 @@
         "primary": "SF",
         "secondary": [],
         "playable": [
-          "SF"
+          "PF",
+          "PG",
+          "SF",
+          "SG"
         ],
         "sourceLabels": [
-          "SF"
+          "F",
+          "F-G",
+          "G-F"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 80,
       "weightLbs": 225,
@@ -16327,7 +16362,7 @@
         "teamGames": 65,
         "teamMinutes": 1346
       },
-      "selectionScore": 52.59,
+      "selectionScore": 52.567,
       "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
       "stats": {
         "gamesPlayed": 65,
@@ -16369,35 +16404,35 @@
         "schemaVersion": 2,
         "modelVersion": "ratings-model-v3.6",
         "memberships": {
-          "primaryCreator": 0.040395,
-          "secondaryCreator": 0.054623,
-          "scoringGuard": 0.048056,
-          "movementSpacer": 0.074382,
-          "twoWayWing": 0.162379,
-          "connector": 0.102686,
-          "interiorFinisher": 0.117424,
-          "stretchBig": 0.114959,
-          "rebounder": 0.116572,
-          "defensiveAnchor": 0.168524
+          "primaryCreator": 0.040446,
+          "secondaryCreator": 0.054478,
+          "scoringGuard": 0.047706,
+          "movementSpacer": 0.074476,
+          "twoWayWing": 0.161947,
+          "connector": 0.102816,
+          "interiorFinisher": 0.117572,
+          "stretchBig": 0.115104,
+          "rebounder": 0.116719,
+          "defensiveAnchor": 0.168736
         },
-        "baseScore": 55.78,
+        "baseScore": 55.74,
         "nonlinear": {
           "creation": 62.13714006631663,
           "penetration": 61.47175207011591,
-          "shootingGravity": 57,
+          "shootingGravity": 56.75,
           "scalableScoring": 62.666666666666664,
           "switchability": 60.52866160111975,
           "rimProtection": 64.47381532919192,
           "possessionControl": 62.0205,
-          "synergyBonus": 0.0007289174972184706,
-          "weaknessPenalty": -2.4272367475461403,
+          "synergyBonus": 0.0007298377792424376,
+          "weaknessPenalty": -2.433413036432451,
           "weaknesses": {
-            "turnoverLiability": 4.150095087761195,
+            "turnoverLiability": 4.148285158208956,
             "inefficientUsage": 0,
-            "defensiveTargeting": 0.2364281190476187,
-            "spacingLimitation": 0.07585880862101001,
-            "foulRisk": 2.54936472,
-            "deficientRebounding": 0.127184875,
+            "defensiveTargeting": 0.23635940476190442,
+            "spacingLimitation": 0.09472614800693749,
+            "foulRisk": 2.5504600799999997,
+            "deficientRebounding": 0.127266375,
             "hollowAnchor": 0
           }
         },
@@ -16416,10 +16451,10 @@
           "artifactVersion": "ratings-model-v3.6"
         },
         "canonicalOverall": 51,
-        "rawOverallScore": 50.82,
+        "rawOverallScore": 50.79,
         "offenseRating": 59,
         "defenseRating": 61,
-        "overallPercentile": 0.7566,
+        "overallPercentile": 0.7526,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -16427,7 +16462,7 @@
         "closeShot": 60,
         "midrange": 59,
         "threePoint": 51,
-        "freeThrow": 68,
+        "freeThrow": 67,
         "ballHandling": 61,
         "passing": 57,
         "offensiveIq": 69,
@@ -16484,9 +16519,9 @@
         "threePointAttemptRate": 0,
         "freeThrowAttemptRate": 0.4084507042253521,
         "threePointPctShrunk": null,
-        "freeThrowPctShrunk": 0.6515475749075107,
-        "threePointPctPrior": 0.3530921899342951,
-        "freeThrowPctPrior": 0.7242565482833327,
+        "freeThrowPctShrunk": 0.6461987501823192,
+        "threePointPctPrior": 0.33547060574087606,
+        "freeThrowPctPrior": 0.7063045552994086,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -17048,15 +17083,16 @@
         "photoUrl": null
       },
       "positions": {
-        "primary": "SG",
+        "primary": "PG",
         "secondary": [],
         "playable": [
+          "PG",
           "SG"
         ],
         "sourceLabels": [
-          "SG"
+          "G"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 71,
       "weightLbs": 180,
@@ -17157,7 +17193,7 @@
         "rawOverallScore": 60.21,
         "offenseRating": 68,
         "defenseRating": 59,
-        "overallPercentile": 0.1142,
+        "overallPercentile": 0.1132,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -17221,10 +17257,10 @@
         "freeThrowPct": 0.7213740458015268,
         "threePointAttemptRate": 0.03494926719278467,
         "freeThrowAttemptRate": 0.29537767756482525,
-        "threePointPctShrunk": 0.32296858198659556,
-        "freeThrowPctShrunk": 0.7377171481633835,
-        "threePointPctPrior": 0.3731189075064013,
-        "freeThrowPctPrior": 0.7912408083984646,
+        "threePointPctShrunk": 0.3228575776755649,
+        "freeThrowPctShrunk": 0.7365174509521454,
+        "threePointPctPrior": 0.3729648890248462,
+        "freeThrowPctPrior": 0.7861121028204213,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -17787,15 +17823,16 @@
         "photoUrl": null
       },
       "positions": {
-        "primary": "SG",
+        "primary": "PG",
         "secondary": [],
         "playable": [
+          "PG",
           "SG"
         ],
         "sourceLabels": [
-          "SG"
+          "G"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 72,
       "weightLbs": 175,
@@ -17804,7 +17841,7 @@
         "teamGames": 40,
         "teamMinutes": 339
       },
-      "selectionScore": 47.817,
+      "selectionScore": 47.739,
       "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
       "stats": {
         "gamesPlayed": 40,
@@ -17846,18 +17883,18 @@
         "schemaVersion": 2,
         "modelVersion": "ratings-model-v3.6",
         "memberships": {
-          "primaryCreator": 0.027777,
-          "secondaryCreator": 0.067293,
-          "scoringGuard": 0.055839,
-          "movementSpacer": 0.26213,
-          "twoWayWing": 0.107854,
-          "connector": 0.156922,
-          "interiorFinisher": 0.049561,
-          "stretchBig": 0.133464,
-          "rebounder": 0.067121,
-          "defensiveAnchor": 0.072039
+          "primaryCreator": 0.043806,
+          "secondaryCreator": 0.085658,
+          "scoringGuard": 0.040138,
+          "movementSpacer": 0.217362,
+          "twoWayWing": 0.096056,
+          "connector": 0.185976,
+          "interiorFinisher": 0.050918,
+          "stretchBig": 0.137118,
+          "rebounder": 0.068958,
+          "defensiveAnchor": 0.07401
         },
-        "baseScore": 50.93,
+        "baseScore": 50.83,
         "nonlinear": {
           "creation": 59.88496477441765,
           "penetration": 55.62849323683441,
@@ -17866,15 +17903,15 @@
           "switchability": 55.2764047330775,
           "rimProtection": 51.45296676346695,
           "possessionControl": 53.797,
-          "synergyBonus": 0.22889797565789516,
-          "weaknessPenalty": -3.9145789918928573,
+          "synergyBonus": 0.20510865789473723,
+          "weaknessPenalty": -3.930441200714286,
           "weaknesses": {
             "turnoverLiability": 6,
             "inefficientUsage": 0,
-            "defensiveTargeting": 1.3783159357142856,
+            "defensiveTargeting": 1.3950951285714284,
             "spacingLimitation": 0,
-            "foulRisk": 3.5698995,
-            "deficientRebounding": 0.5652521875,
+            "foulRisk": 3.5937108,
+            "deficientRebounding": 0.57131525,
             "hollowAnchor": 0
           }
         },
@@ -17893,10 +17930,10 @@
           "artifactVersion": "ratings-model-v3.6"
         },
         "canonicalOverall": 46,
-        "rawOverallScore": 47.66,
+        "rawOverallScore": 47.56,
         "offenseRating": 53,
         "defenseRating": 52,
-        "overallPercentile": 0.9826,
+        "overallPercentile": 0.9829,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -17960,10 +17997,10 @@
         "freeThrowPct": 0.8,
         "threePointAttemptRate": 0.36585365853658536,
         "freeThrowAttemptRate": 0.18292682926829268,
-        "threePointPctShrunk": 0.34093669422668493,
-        "freeThrowPctShrunk": 0.7875481945034726,
-        "threePointPctPrior": 0.3437879545616918,
-        "freeThrowPctPrior": 0.7852134809728737,
+        "threePointPctShrunk": 0.3387861023900275,
+        "freeThrowPctShrunk": 0.7837558847194631,
+        "threePointPctPrior": 0.34083089078628775,
+        "freeThrowPctPrior": 0.7807101131043626,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -18529,12 +18566,13 @@
         "primary": "SF",
         "secondary": [],
         "playable": [
+          "PF",
           "SF"
         ],
         "sourceLabels": [
-          "SF"
+          "F"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 80,
       "weightLbs": 235,
@@ -18543,7 +18581,7 @@
         "teamGames": 80,
         "teamMinutes": 2131
       },
-      "selectionScore": 58.939,
+      "selectionScore": 58.891,
       "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
       "stats": {
         "gamesPlayed": 80,
@@ -18585,34 +18623,34 @@
         "schemaVersion": 2,
         "modelVersion": "ratings-model-v3.6",
         "memberships": {
-          "primaryCreator": 0.01484,
-          "secondaryCreator": 0.030962,
-          "scoringGuard": 0.027721,
-          "movementSpacer": 0.291214,
-          "twoWayWing": 0.078729,
-          "connector": 0.127362,
-          "interiorFinisher": 0.043353,
-          "stretchBig": 0.257143,
-          "rebounder": 0.059864,
-          "defensiveAnchor": 0.068812
+          "primaryCreator": 0.01485,
+          "secondaryCreator": 0.030861,
+          "scoringGuard": 0.027503,
+          "movementSpacer": 0.291408,
+          "twoWayWing": 0.078472,
+          "connector": 0.127447,
+          "interiorFinisher": 0.043381,
+          "stretchBig": 0.257315,
+          "rebounder": 0.059904,
+          "defensiveAnchor": 0.068859
         },
-        "baseScore": 63.94,
+        "baseScore": 63.86,
         "nonlinear": {
           "creation": 60.98378140889121,
           "penetration": 60.035534506381914,
-          "shootingGravity": 82.9175,
+          "shootingGravity": 82.6675,
           "scalableScoring": 73.33333333333333,
           "switchability": 59.8015666826676,
           "rimProtection": 59.67533730946896,
           "possessionControl": 65.30449999999999,
-          "synergyBonus": 1.509244414144737,
-          "weaknessPenalty": -0.6653562966247621,
+          "synergyBonus": 1.4922016582236846,
+          "weaknessPenalty": -0.6653885760304765,
           "weaknesses": {
             "turnoverLiability": 0,
             "inefficientUsage": 0,
-            "defensiveTargeting": 0.7221256761904765,
+            "defensiveTargeting": 0.721972647619048,
             "spacingLimitation": 0,
-            "foulRisk": 1.2348046080000004,
+            "foulRisk": 1.2350525760000004,
             "deficientRebounding": 0,
             "hollowAnchor": 0
           }
@@ -18632,10 +18670,10 @@
           "artifactVersion": "ratings-model-v3.6"
         },
         "canonicalOverall": 62,
-        "rawOverallScore": 57.43,
+        "rawOverallScore": 57.37,
         "offenseRating": 65,
         "defenseRating": 59,
-        "overallPercentile": 0.223,
+        "overallPercentile": 0.2244,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -18643,7 +18681,7 @@
         "closeShot": 56,
         "midrange": 69,
         "threePoint": 76,
-        "freeThrow": 71,
+        "freeThrow": 70,
         "ballHandling": 56,
         "passing": 54,
         "offensiveIq": 75,
@@ -18699,10 +18737,10 @@
         "freeThrowPct": 0.6442307692307693,
         "threePointAttemptRate": 0.6567375886524822,
         "freeThrowAttemptRate": 0.1475177304964539,
-        "threePointPctShrunk": 0.40311164425130075,
-        "freeThrowPctShrunk": 0.6776879278460889,
-        "threePointPctPrior": 0.3611202853557038,
-        "freeThrowPctPrior": 0.7211822340460046,
+        "threePointPctShrunk": 0.40160901186978615,
+        "freeThrowPctShrunk": 0.6722823418050347,
+        "threePointPctPrior": 0.3509211680661737,
+        "freeThrowPctPrior": 0.7087493861515797,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -19268,12 +19306,15 @@
         "primary": "SF",
         "secondary": [],
         "playable": [
+          "C",
+          "PF",
           "SF"
         ],
         "sourceLabels": [
-          "SF"
+          "F",
+          "F-C"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 81,
       "weightLbs": 247,
@@ -19282,7 +19323,7 @@
         "teamGames": 70,
         "teamMinutes": 1344
       },
-      "selectionScore": 53.103,
+      "selectionScore": 53.079,
       "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
       "stats": {
         "gamesPlayed": 70,
@@ -19324,35 +19365,35 @@
         "schemaVersion": 2,
         "modelVersion": "ratings-model-v3.6",
         "memberships": {
-          "primaryCreator": 0.028006,
-          "secondaryCreator": 0.053151,
-          "scoringGuard": 0.041937,
-          "movementSpacer": 0.084326,
-          "twoWayWing": 0.169306,
-          "connector": 0.106782,
-          "interiorFinisher": 0.10596,
-          "stretchBig": 0.133736,
-          "rebounder": 0.12431,
-          "defensiveAnchor": 0.152486
+          "primaryCreator": 0.028041,
+          "secondaryCreator": 0.053008,
+          "scoringGuard": 0.04163,
+          "movementSpacer": 0.08443,
+          "twoWayWing": 0.16885,
+          "connector": 0.106914,
+          "interiorFinisher": 0.106091,
+          "stretchBig": 0.133901,
+          "rebounder": 0.124463,
+          "defensiveAnchor": 0.152672
         },
-        "baseScore": 56.95,
+        "baseScore": 56.91,
         "nonlinear": {
           "creation": 60.4434733730399,
           "penetration": 59.386337631806654,
-          "shootingGravity": 59.3925,
+          "shootingGravity": 59.1425,
           "scalableScoring": 64.66666666666667,
           "switchability": 61.08900381864634,
           "rimProtection": 61.737057635969016,
           "possessionControl": 63.9685,
           "synergyBonus": 0,
-          "weaknessPenalty": -1.2100918191709467,
+          "weaknessPenalty": -1.210406496699518,
           "weaknesses": {
-            "turnoverLiability": 0.24242861493975906,
+            "turnoverLiability": 0.24232781493975908,
             "inefficientUsage": 0,
-            "defensiveTargeting": 0.5600063428571429,
+            "defensiveTargeting": 0.5598522,
             "spacingLimitation": 0,
-            "foulRisk": 2.629597128,
-            "deficientRebounding": 0.1270615,
+            "foulRisk": 2.6306982179999996,
+            "deficientRebounding": 0.127140875,
             "hollowAnchor": 0
           }
         },
@@ -19371,10 +19412,10 @@
           "artifactVersion": "ratings-model-v3.6"
         },
         "canonicalOverall": 52,
-        "rawOverallScore": 51.39,
+        "rawOverallScore": 51.36,
         "offenseRating": 60,
         "defenseRating": 59,
-        "overallPercentile": 0.6928,
+        "overallPercentile": 0.6895,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -19382,7 +19423,7 @@
         "closeShot": 60,
         "midrange": 60,
         "threePoint": 53,
-        "freeThrow": 74,
+        "freeThrow": 73,
         "ballHandling": 55,
         "passing": 55,
         "offensiveIq": 73,
@@ -19438,10 +19479,10 @@
         "freeThrowPct": 0.6993464052287581,
         "threePointAttemptRate": 0.005660377358490566,
         "freeThrowAttemptRate": 0.28867924528301886,
-        "threePointPctShrunk": 0.3057687662914088,
-        "freeThrowPctShrunk": 0.7046496920352818,
-        "threePointPctPrior": 0.31723509502733666,
-        "freeThrowPctPrior": 0.7147922280527584,
+        "threePointPctShrunk": 0.30598584815452284,
+        "freeThrowPctShrunk": 0.702781201897097,
+        "threePointPctPrior": 0.31746031746031744,
+        "freeThrowPctPrior": 0.709350250525295,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -20004,15 +20045,16 @@
         "photoUrl": null
       },
       "positions": {
-        "primary": "SG",
+        "primary": "PG",
         "secondary": [],
         "playable": [
+          "PG",
           "SG"
         ],
         "sourceLabels": [
-          "SG"
+          "G"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 76,
       "weightLbs": 185,
@@ -20021,7 +20063,7 @@
         "teamGames": 60,
         "teamMinutes": 942
       },
-      "selectionScore": 53.692,
+      "selectionScore": 53.699,
       "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
       "stats": {
         "gamesPlayed": 63,
@@ -20063,18 +20105,18 @@
         "schemaVersion": 2,
         "modelVersion": "ratings-model-v3.6",
         "memberships": {
-          "primaryCreator": 0.031544,
-          "secondaryCreator": 0.072548,
-          "scoringGuard": 0.037386,
-          "movementSpacer": 0.23658,
-          "twoWayWing": 0.102277,
-          "connector": 0.186423,
-          "interiorFinisher": 0.046209,
-          "stretchBig": 0.151615,
-          "rebounder": 0.056191,
-          "defensiveAnchor": 0.079227
+          "primaryCreator": 0.036877,
+          "secondaryCreator": 0.078683,
+          "scoringGuard": 0.033197,
+          "movementSpacer": 0.220847,
+          "twoWayWing": 0.097892,
+          "connector": 0.197196,
+          "interiorFinisher": 0.046496,
+          "stretchBig": 0.152555,
+          "rebounder": 0.056539,
+          "defensiveAnchor": 0.079718
         },
-        "baseScore": 57.74,
+        "baseScore": 57.75,
         "nonlinear": {
           "creation": 68.70574121085954,
           "penetration": 59.27630621643206,
@@ -20083,15 +20125,15 @@
           "switchability": 59.54470194859239,
           "rimProtection": 55.554991458075165,
           "possessionControl": 68.4615,
-          "synergyBonus": 0.4626362945072835,
-          "weaknessPenalty": -2.302059057818095,
+          "synergyBonus": 0.450772650478009,
+          "weaknessPenalty": -2.310435115481905,
           "weaknesses": {
-            "turnoverLiability": 2.0559164442352937,
+            "turnoverLiability": 2.070638864,
             "inefficientUsage": 0,
-            "defensiveTargeting": 0.6140709095238099,
+            "defensiveTargeting": 0.6169998404761908,
             "spacingLimitation": 0,
-            "foulRisk": 3.4237654559999995,
-            "deficientRebounding": 0.677009125,
+            "foulRisk": 3.4290709439999993,
+            "deficientRebounding": 0.6786877499999999,
             "hollowAnchor": 0
           }
         },
@@ -20110,10 +20152,10 @@
           "artifactVersion": "ratings-model-v3.6"
         },
         "canonicalOverall": 54,
-        "rawOverallScore": 52.5,
+        "rawOverallScore": 52.51,
         "offenseRating": 61,
         "defenseRating": 58,
-        "overallPercentile": 0.5823,
+        "overallPercentile": 0.5778,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -20177,10 +20219,10 @@
         "freeThrowPct": 0.7317073170731707,
         "threePointAttemptRate": 0.4205298013245033,
         "freeThrowAttemptRate": 0.271523178807947,
-        "threePointPctShrunk": 0.3586473160482,
-        "freeThrowPctShrunk": 0.7586123415679732,
-        "threePointPctPrior": 0.3654999302747176,
-        "freeThrowPctPrior": 0.7861899916751457,
+        "threePointPctShrunk": 0.35851208639284915,
+        "freeThrowPctShrunk": 0.7574877341054611,
+        "threePointPctPrior": 0.3651500235414972,
+        "freeThrowPctPrior": 0.7839126615635588,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -20743,17 +20785,21 @@
         "photoUrl": null
       },
       "positions": {
-        "primary": "SF",
+        "primary": "PG",
         "secondary": [],
         "playable": [
+          "PF",
+          "PG",
           "SF",
           "SG"
         ],
         "sourceLabels": [
-          "SF",
-          "SG"
+          "F",
+          "F-G",
+          "G",
+          "G-F"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 77,
       "weightLbs": 210,
@@ -20762,7 +20808,7 @@
         "teamGames": 47,
         "teamMinutes": 1292
       },
-      "selectionScore": 56.496,
+      "selectionScore": 56.127,
       "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
       "stats": {
         "gamesPlayed": 47,
@@ -20797,42 +20843,42 @@
       },
       "summaryRatings": {
         "overallRating": 80,
-        "offenseRating": 64,
+        "offenseRating": 63,
         "defenseRating": 59
       },
       "ratingProfile": {
         "schemaVersion": 2,
         "modelVersion": "ratings-model-v3.6",
         "memberships": {
-          "primaryCreator": 0.032208,
-          "secondaryCreator": 0.060601,
-          "scoringGuard": 0.052723,
-          "movementSpacer": 0.197611,
-          "twoWayWing": 0.136335,
-          "connector": 0.156526,
-          "interiorFinisher": 0.064152,
-          "stretchBig": 0.14778,
-          "rebounder": 0.058564,
-          "defensiveAnchor": 0.0935
+          "primaryCreator": 0.039133,
+          "secondaryCreator": 0.067776,
+          "scoringGuard": 0.054199,
+          "movementSpacer": 0.196578,
+          "twoWayWing": 0.121321,
+          "connector": 0.155275,
+          "interiorFinisher": 0.063453,
+          "stretchBig": 0.154544,
+          "rebounder": 0.061244,
+          "defensiveAnchor": 0.086477
         },
-        "baseScore": 59.49,
+        "baseScore": 59.13,
         "nonlinear": {
           "creation": 63.25370108584705,
-          "penetration": 61.54857686285338,
-          "shootingGravity": 73.965,
-          "scalableScoring": 68,
-          "switchability": 59.325785626899005,
-          "rimProtection": 57.59977575100525,
+          "penetration": 59.97776954224081,
+          "shootingGravity": 74.715,
+          "scalableScoring": 66.33333333333333,
+          "switchability": 59.97776954224081,
+          "rimProtection": 55.70867201720999,
           "possessionControl": 65.1435,
-          "synergyBonus": 0.549076647312232,
-          "weaknessPenalty": -0.9801170517643439,
+          "synergyBonus": 0.5938917519200597,
+          "weaknessPenalty": -1.0706092834007748,
           "weaknesses": {
-            "turnoverLiability": 1.2898349766906476,
+            "turnoverLiability": 1.3095212477697844,
             "inefficientUsage": 0,
-            "defensiveTargeting": 0.520978752380952,
+            "defensiveTargeting": 0.7655011047619051,
             "spacingLimitation": 0,
-            "foulRisk": 0.2618872320000002,
-            "deficientRebounding": 0.80999625,
+            "foulRisk": 0.2622178560000002,
+            "deficientRebounding": 0.811610625,
             "hollowAnchor": 0
           }
         },
@@ -20850,26 +20896,26 @@
           "sampleCount": 1280,
           "artifactVersion": "ratings-model-v3.6"
         },
-        "canonicalOverall": 59,
-        "rawOverallScore": 55.66,
-        "offenseRating": 64,
+        "canonicalOverall": 58,
+        "rawOverallScore": 55.34,
+        "offenseRating": 63,
         "defenseRating": 59,
-        "overallPercentile": 0.3301,
+        "overallPercentile": 0.3518,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
-        "insideScoring": 67,
+        "insideScoring": 62,
         "closeShot": 58,
         "midrange": 64,
         "threePoint": 63,
-        "freeThrow": 86,
+        "freeThrow": 89,
         "ballHandling": 60,
         "passing": 57,
         "offensiveIq": 74,
         "offensiveRebound": 46,
         "defensiveRebound": 49,
-        "perimeterDefense": 60,
-        "interiorDefense": 56,
+        "perimeterDefense": 62,
+        "interiorDefense": 49,
         "steal": 71,
         "block": 63,
         "defensiveIq": 65,
@@ -20881,18 +20927,18 @@
         "usageRate": 15.7,
         "passRate": 9.81,
         "shotRate": 14.58,
-        "driveRate": 17.78,
+        "driveRate": 23.28,
         "postUpRate": 6.14,
-        "rimFrequency": 23.43,
-        "shortMidFrequency": 26.49,
-        "longMidFrequency": 17.22,
+        "rimFrequency": 24.53,
+        "shortMidFrequency": 23.01,
+        "longMidFrequency": 19.6,
         "cornerThreeFrequency": 13.71,
         "aboveBreakThreeFrequency": 19.15,
         "threePointRate": 32.86,
         "freeThrowRate": 35.71,
         "turnoverRate": 13.83,
-        "isolationRate": 1.56,
-        "pickAndRollBallHandlerRate": 17.89,
+        "isolationRate": 1.94,
+        "pickAndRollBallHandlerRate": 25.04,
         "pickAndRollRollManRate": 7.2,
         "spotUpRate": 25.27,
         "transitionRate": 10.6,
@@ -20918,10 +20964,10 @@
         "freeThrowPct": 0.88,
         "threePointAttemptRate": 0.32857142857142857,
         "freeThrowAttemptRate": 0.35714285714285715,
-        "threePointPctShrunk": 0.3702134711689028,
-        "freeThrowPctShrunk": 0.8156265788385755,
-        "threePointPctPrior": 0.3417144240858826,
-        "freeThrowPctPrior": 0.7210781165077331,
+        "threePointPctShrunk": 0.3701264809638681,
+        "freeThrowPctShrunk": 0.8406164581390435,
+        "threePointPctPrior": 0.3415098883662946,
+        "freeThrowPctPrior": 0.7827718810307637,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -21487,14 +21533,16 @@
         "primary": "SF",
         "secondary": [],
         "playable": [
+          "PF",
+          "PG",
           "SF",
           "SG"
         ],
         "sourceLabels": [
-          "SF",
-          "SG"
+          "F",
+          "G"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 81,
       "weightLbs": 225,
@@ -21503,7 +21551,7 @@
         "teamGames": 75,
         "teamMinutes": 1831
       },
-      "selectionScore": 51.057,
+      "selectionScore": 50.97,
       "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
       "stats": {
         "gamesPlayed": 75,
@@ -21545,34 +21593,34 @@
         "schemaVersion": 2,
         "modelVersion": "ratings-model-v3.6",
         "memberships": {
-          "primaryCreator": 0.032815,
-          "secondaryCreator": 0.046915,
-          "scoringGuard": 0.045971,
-          "movementSpacer": 0.077794,
-          "twoWayWing": 0.15346,
-          "connector": 0.090234,
-          "interiorFinisher": 0.093245,
-          "stretchBig": 0.138221,
-          "rebounder": 0.143239,
-          "defensiveAnchor": 0.178106
+          "primaryCreator": 0.033054,
+          "secondaryCreator": 0.046887,
+          "scoringGuard": 0.045518,
+          "movementSpacer": 0.076644,
+          "twoWayWing": 0.153367,
+          "connector": 0.089922,
+          "interiorFinisher": 0.093923,
+          "stretchBig": 0.137006,
+          "rebounder": 0.14428,
+          "defensiveAnchor": 0.179399
         },
-        "baseScore": 56.26,
+        "baseScore": 56.12,
         "nonlinear": {
           "creation": 58.25295778481095,
           "penetration": 58.236155661645064,
-          "shootingGravity": 58.3175,
-          "scalableScoring": 61.333333333333336,
+          "shootingGravity": 57.8175,
+          "scalableScoring": 61,
           "switchability": 60.4284152076502,
           "rimProtection": 63.419141971133065,
           "possessionControl": 61.7785,
           "synergyBonus": 0,
-          "weaknessPenalty": -1.2889593176564682,
+          "weaknessPenalty": -1.2943218675910204,
           "weaknesses": {
-            "turnoverLiability": 0.854772003779528,
+            "turnoverLiability": 0.8545652938582682,
             "inefficientUsage": 0,
-            "defensiveTargeting": 0.4207309928571429,
-            "spacingLimitation": 0,
-            "foulRisk": 2.51555382,
+            "defensiveTargeting": 0.4206635785714286,
+            "spacingLimitation": 0.013135189896833216,
+            "foulRisk": 2.51846496,
             "deficientRebounding": 0,
             "hollowAnchor": 0
           }
@@ -21592,18 +21640,18 @@
           "artifactVersion": "ratings-model-v3.6"
         },
         "canonicalOverall": 47,
-        "rawOverallScore": 48.63,
+        "rawOverallScore": 48.52,
         "offenseRating": 58,
         "defenseRating": 61,
-        "overallPercentile": 0.9417,
+        "overallPercentile": 0.9447,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
         "insideScoring": 63,
         "closeShot": 55,
         "midrange": 55,
-        "threePoint": 53,
-        "freeThrow": 74,
+        "threePoint": 52,
+        "freeThrow": 73,
         "ballHandling": 57,
         "passing": 51,
         "offensiveIq": 68,
@@ -21659,10 +21707,10 @@
         "freeThrowPct": 0.6875,
         "threePointAttemptRate": 0.012658227848101266,
         "freeThrowAttemptRate": 0.20253164556962025,
-        "threePointPctShrunk": 0.3228271450827841,
-        "freeThrowPctShrunk": 0.7022026193133332,
-        "threePointPctPrior": 0.3530921899342951,
-        "freeThrowPctPrior": 0.7242565482833327,
+        "threePointPctShrunk": 0.3067159823916581,
+        "freeThrowPctShrunk": 0.6950218221197635,
+        "threePointPctPrior": 0.33547060574087606,
+        "freeThrowPctPrior": 0.7063045552994086,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -22225,17 +22273,20 @@
         "photoUrl": null
       },
       "positions": {
-        "primary": "SG",
+        "primary": "PG",
         "secondary": [],
         "playable": [
+          "PF",
+          "PG",
           "SF",
           "SG"
         ],
         "sourceLabels": [
-          "SF",
-          "SG"
+          "F",
+          "G",
+          "G-F"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 79,
       "weightLbs": 220,
@@ -22244,7 +22295,7 @@
         "teamGames": 40,
         "teamMinutes": 267
       },
-      "selectionScore": 48.699,
+      "selectionScore": 48.636,
       "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
       "stats": {
         "gamesPlayed": 40,
@@ -22286,18 +22337,18 @@
         "schemaVersion": 2,
         "modelVersion": "ratings-model-v3.6",
         "memberships": {
-          "primaryCreator": 0.024109,
-          "secondaryCreator": 0.048747,
-          "scoringGuard": 0.057029,
-          "movementSpacer": 0.160901,
-          "twoWayWing": 0.145035,
-          "connector": 0.111899,
-          "interiorFinisher": 0.087548,
-          "stretchBig": 0.151267,
-          "rebounder": 0.110125,
-          "defensiveAnchor": 0.10334
+          "primaryCreator": 0.037986,
+          "secondaryCreator": 0.061992,
+          "scoringGuard": 0.040956,
+          "movementSpacer": 0.133296,
+          "twoWayWing": 0.129049,
+          "connector": 0.132493,
+          "interiorFinisher": 0.089861,
+          "stretchBig": 0.155262,
+          "rebounder": 0.113034,
+          "defensiveAnchor": 0.106071
         },
-        "baseScore": 51.61,
+        "baseScore": 51.53,
         "nonlinear": {
           "creation": 56.193632422355655,
           "penetration": 55.62849323683441,
@@ -22307,14 +22358,14 @@
           "rimProtection": 53.18089800999268,
           "possessionControl": 59.9405,
           "synergyBonus": 0,
-          "weaknessPenalty": -2.312147022711688,
+          "weaknessPenalty": -2.3321667014051948,
           "weaknesses": {
-            "turnoverLiability": 1.0056158254545446,
+            "turnoverLiability": 1.0166728610909084,
             "inefficientUsage": 0,
-            "defensiveTargeting": 1.218812214285714,
+            "defensiveTargeting": 1.2277040285714285,
             "spacingLimitation": 0,
-            "foulRisk": 4.27841688,
-            "deficientRebounding": 0.2975875,
+            "foulRisk": 4.3136156880000005,
+            "deficientRebounding": 0.30132125,
             "hollowAnchor": 0
           }
         },
@@ -22333,10 +22384,10 @@
           "artifactVersion": "ratings-model-v3.6"
         },
         "canonicalOverall": 47,
-        "rawOverallScore": 48.43,
+        "rawOverallScore": 48.35,
         "offenseRating": 55,
         "defenseRating": 53,
-        "overallPercentile": 0.9504,
+        "overallPercentile": 0.9515,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -22400,10 +22451,10 @@
         "freeThrowPct": 0.7758620689655172,
         "threePointAttemptRate": 0.1864406779661017,
         "freeThrowAttemptRate": 0.4915254237288136,
-        "threePointPctShrunk": 0.3018969020823236,
-        "freeThrowPctShrunk": 0.7877502404226254,
-        "threePointPctPrior": 0.3474185501549626,
-        "freeThrowPctPrior": 0.7963691647290287,
+        "threePointPctShrunk": 0.3015341892961667,
+        "freeThrowPctShrunk": 0.7857565983146169,
+        "threePointPctPrior": 0.3469560913526126,
+        "freeThrowPctPrior": 0.7929301320927141,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -22965,15 +23016,16 @@
         "photoUrl": null
       },
       "positions": {
-        "primary": "SG",
+        "primary": "PG",
         "secondary": [],
         "playable": [
+          "PG",
           "SG"
         ],
         "sourceLabels": [
-          "SG"
+          "G"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 75,
       "weightLbs": 181,
@@ -22982,7 +23034,7 @@
         "teamGames": 44,
         "teamMinutes": 731
       },
-      "selectionScore": 52.304,
+      "selectionScore": 52.179,
       "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
       "stats": {
         "gamesPlayed": 44,
@@ -23024,18 +23076,18 @@
         "schemaVersion": 2,
         "modelVersion": "ratings-model-v3.6",
         "memberships": {
-          "primaryCreator": 0.030769,
-          "secondaryCreator": 0.055706,
-          "scoringGuard": 0.061975,
-          "movementSpacer": 0.276586,
-          "twoWayWing": 0.111094,
-          "connector": 0.149926,
-          "interiorFinisher": 0.048581,
-          "stretchBig": 0.141178,
-          "rebounder": 0.053346,
-          "defensiveAnchor": 0.070839
+          "primaryCreator": 0.048893,
+          "secondaryCreator": 0.071444,
+          "scoringGuard": 0.044886,
+          "movementSpacer": 0.231083,
+          "twoWayWing": 0.09969,
+          "connector": 0.179027,
+          "interiorFinisher": 0.050289,
+          "stretchBig": 0.14614,
+          "rebounder": 0.055221,
+          "defensiveAnchor": 0.073327
         },
-        "baseScore": 55.65,
+        "baseScore": 55.48,
         "nonlinear": {
           "creation": 60.68112738779451,
           "penetration": 56.99415144670633,
@@ -23044,15 +23096,15 @@
           "switchability": 56.63478406435417,
           "rimProtection": 52.89887434496564,
           "possessionControl": 65.0795,
-          "synergyBonus": 0.5084627631578948,
-          "weaknessPenalty": -0.7158384042857143,
+          "synergyBonus": 0.45912009868421055,
+          "weaknessPenalty": -0.7245293586071428,
           "weaknesses": {
             "turnoverLiability": 0,
             "inefficientUsage": 0,
-            "defensiveTargeting": 1.1388485714285714,
+            "defensiveTargeting": 1.1513085142857145,
             "spacingLimitation": 0,
             "foulRisk": 0,
-            "deficientRebounding": 0.9665585,
+            "deficientRebounding": 0.9796601875,
             "hollowAnchor": 0
           }
         },
@@ -23071,10 +23123,10 @@
           "artifactVersion": "ratings-model-v3.6"
         },
         "canonicalOverall": 52,
-        "rawOverallScore": 51.75,
+        "rawOverallScore": 51.59,
         "offenseRating": 59,
         "defenseRating": 56,
-        "overallPercentile": 0.6547,
+        "overallPercentile": 0.6666,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -23138,10 +23190,10 @@
         "freeThrowPct": 0.8749999999999999,
         "threePointAttemptRate": 0.45,
         "freeThrowAttemptRate": 0.2,
-        "threePointPctShrunk": 0.3370289130012392,
-        "freeThrowPctShrunk": 0.8131515397403636,
-        "threePointPctPrior": 0.34068753687246606,
-        "freeThrowPctPrior": 0.7859382172261236,
+        "threePointPctShrunk": 0.337442154957937,
+        "freeThrowPctShrunk": 0.8109526951602525,
+        "threePointPctPrior": 0.3415098883662946,
+        "freeThrowPctPrior": 0.7827718810307637,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -23704,15 +23756,16 @@
         "photoUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/24/Cory_Alexander.jpg/330px-Cory_Alexander.jpg"
       },
       "positions": {
-        "primary": "SG",
+        "primary": "PG",
         "secondary": [],
         "playable": [
+          "PG",
           "SG"
         ],
         "sourceLabels": [
-          "SG"
+          "G"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 73,
       "weightLbs": 190,
@@ -23721,7 +23774,7 @@
         "teamGames": 80,
         "teamMinutes": 1450
       },
-      "selectionScore": 56.803,
+      "selectionScore": 56.787,
       "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
       "stats": {
         "gamesPlayed": 80,
@@ -23763,18 +23816,18 @@
         "schemaVersion": 2,
         "modelVersion": "ratings-model-v3.6",
         "memberships": {
-          "primaryCreator": 0.048803,
-          "secondaryCreator": 0.080202,
-          "scoringGuard": 0.048734,
-          "movementSpacer": 0.282893,
-          "twoWayWing": 0.081908,
-          "connector": 0.208457,
-          "interiorFinisher": 0.032928,
-          "stretchBig": 0.128444,
-          "rebounder": 0.032689,
-          "defensiveAnchor": 0.054942
+          "primaryCreator": 0.057005,
+          "secondaryCreator": 0.086912,
+          "scoringGuard": 0.043238,
+          "movementSpacer": 0.263858,
+          "twoWayWing": 0.078331,
+          "connector": 0.220319,
+          "interiorFinisher": 0.033104,
+          "stretchBig": 0.129132,
+          "rebounder": 0.032864,
+          "defensiveAnchor": 0.055237
         },
-        "baseScore": 61.01,
+        "baseScore": 60.99,
         "nonlinear": {
           "creation": 74.26155314563445,
           "penetration": 63.735890764522004,
@@ -23783,15 +23836,15 @@
           "switchability": 58.38820053099689,
           "rimProtection": 53.75091098467571,
           "possessionControl": 69.244,
-          "synergyBonus": 0.9043314137184978,
-          "weaknessPenalty": -3.0030859371695993,
+          "synergyBonus": 0.8811156072283726,
+          "weaknessPenalty": -3.0232065209933094,
           "weaknesses": {
-            "turnoverLiability": 5.930799082105264,
+            "turnoverLiability": 5.98384585263158,
             "inefficientUsage": 0,
-            "defensiveTargeting": 0.48358588095238125,
+            "defensiveTargeting": 0.4865003571428575,
             "spacingLimitation": 0,
-            "foulRisk": 1.528779672,
-            "deficientRebounding": 0.8894410625,
+            "foulRisk": 1.5304124879999998,
+            "deficientRebounding": 0.8910251875,
             "hollowAnchor": 0
           }
         },
@@ -23810,10 +23863,10 @@
           "artifactVersion": "ratings-model-v3.6"
         },
         "canonicalOverall": 57,
-        "rawOverallScore": 54.87,
+        "rawOverallScore": 54.85,
         "offenseRating": 65,
         "defenseRating": 60,
-        "overallPercentile": 0.3874,
+        "overallPercentile": 0.3872,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -23877,10 +23930,10 @@
         "freeThrowPct": 0.75,
         "threePointAttemptRate": 0.5245901639344263,
         "freeThrowAttemptRate": 0.26229508196721313,
-        "threePointPctShrunk": 0.37306992963882624,
-        "freeThrowPctShrunk": 0.7675260726571168,
-        "threePointPctPrior": 0.3668937044830701,
-        "freeThrowPctPrior": 0.795567788908504,
+        "threePointPctShrunk": 0.37329764174174074,
+        "freeThrowPctShrunk": 0.7657338592449017,
+        "threePointPctPrior": 0.36785009531531104,
+        "freeThrowPctPrior": 0.7909080340367443,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -24446,12 +24499,13 @@
         "primary": "SF",
         "secondary": [],
         "playable": [
+          "PF",
           "SF"
         ],
         "sourceLabels": [
-          "SF"
+          "F"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 79,
       "weightLbs": 245,
@@ -24460,7 +24514,7 @@
         "teamGames": 72,
         "teamMinutes": 1310
       },
-      "selectionScore": 52.849,
+      "selectionScore": 52.825,
       "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
       "stats": {
         "gamesPlayed": 72,
@@ -24502,35 +24556,35 @@
         "schemaVersion": 2,
         "modelVersion": "ratings-model-v3.6",
         "memberships": {
-          "primaryCreator": 0.033844,
-          "secondaryCreator": 0.056274,
-          "scoringGuard": 0.043234,
-          "movementSpacer": 0.091379,
-          "twoWayWing": 0.171545,
-          "connector": 0.117028,
-          "interiorFinisher": 0.075188,
-          "stretchBig": 0.122835,
-          "rebounder": 0.114908,
-          "defensiveAnchor": 0.173765
+          "primaryCreator": 0.033886,
+          "secondaryCreator": 0.056124,
+          "scoringGuard": 0.042919,
+          "movementSpacer": 0.091495,
+          "twoWayWing": 0.171088,
+          "connector": 0.117176,
+          "interiorFinisher": 0.075283,
+          "stretchBig": 0.122991,
+          "rebounder": 0.115053,
+          "defensiveAnchor": 0.173985
         },
-        "baseScore": 56.89,
+        "baseScore": 56.86,
         "nonlinear": {
           "creation": 60.95598365439402,
           "penetration": 57.994252303995665,
-          "shootingGravity": 58.26,
+          "shootingGravity": 58.01,
           "scalableScoring": 61,
           "switchability": 61.55596729533157,
           "rimProtection": 63.43099417074178,
           "possessionControl": 64.43299999999999,
           "synergyBonus": 0,
-          "weaknessPenalty": -0.9600270240571428,
+          "weaknessPenalty": -0.9604047985428572,
           "weaknesses": {
             "turnoverLiability": 0,
             "inefficientUsage": 0,
-            "defensiveTargeting": 0.14095411428571428,
+            "defensiveTargeting": 0.14091483571428573,
             "spacingLimitation": 0,
-            "foulRisk": 2.4976492799999996,
-            "deficientRebounding": 0.1850055,
+            "foulRisk": 2.49868416,
+            "deficientRebounding": 0.18512099999999998,
             "hollowAnchor": 0
           }
         },
@@ -24549,10 +24603,10 @@
           "artifactVersion": "ratings-model-v3.6"
         },
         "canonicalOverall": 51,
-        "rawOverallScore": 51.03,
+        "rawOverallScore": 51,
         "offenseRating": 58,
         "defenseRating": 62,
-        "overallPercentile": 0.7282,
+        "overallPercentile": 0.7263,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -24560,7 +24614,7 @@
         "closeShot": 54,
         "midrange": 53,
         "threePoint": 53,
-        "freeThrow": 75,
+        "freeThrow": 74,
         "ballHandling": 58,
         "passing": 55,
         "offensiveIq": 71,
@@ -24616,10 +24670,10 @@
         "freeThrowPct": 0.6666666666666667,
         "threePointAttemptRate": 0.02040816326530612,
         "freeThrowAttemptRate": 0.12244897959183672,
-        "threePointPctShrunk": 0.3249215538437387,
-        "freeThrowPctShrunk": 0.7157237554331906,
-        "threePointPctPrior": 0.3541644936896752,
-        "freeThrowPctPrior": 0.7422145833671133,
+        "threePointPctShrunk": 0.32234905296427047,
+        "freeThrowPctShrunk": 0.7092145949288805,
+        "threePointPctPrior": 0.35136046773105484,
+        "freeThrowPctPrior": 0.732190476190476,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -25190,7 +25244,7 @@
         "sourceLabels": [
           "C"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 85,
       "weightLbs": 235,
@@ -25291,7 +25345,7 @@
         "rawOverallScore": 79.18,
         "offenseRating": 65,
         "defenseRating": 75,
-        "overallPercentile": 0.0016,
+        "overallPercentile": 0.0015,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -25920,15 +25974,16 @@
         "photoUrl": null
       },
       "positions": {
-        "primary": "SG",
+        "primary": "PG",
         "secondary": [],
         "playable": [
+          "PG",
           "SG"
         ],
         "sourceLabels": [
-          "SG"
+          "G"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 75,
       "weightLbs": 170,
@@ -25937,7 +25992,7 @@
         "teamGames": 53,
         "teamMinutes": 737
       },
-      "selectionScore": 49.141,
+      "selectionScore": 49.196,
       "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
       "stats": {
         "gamesPlayed": 53,
@@ -25971,7 +26026,7 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 46,
+        "overallRating": 47,
         "offenseRating": 56,
         "defenseRating": 55
       },
@@ -25979,18 +26034,18 @@
         "schemaVersion": 2,
         "modelVersion": "ratings-model-v3.6",
         "memberships": {
-          "primaryCreator": 0.037469,
-          "secondaryCreator": 0.081427,
-          "scoringGuard": 0.059674,
-          "movementSpacer": 0.183383,
-          "twoWayWing": 0.129429,
-          "connector": 0.155629,
-          "interiorFinisher": 0.064328,
-          "stretchBig": 0.118963,
-          "rebounder": 0.077113,
-          "defensiveAnchor": 0.092585
+          "primaryCreator": 0.057929,
+          "secondaryCreator": 0.101609,
+          "scoringGuard": 0.042052,
+          "movementSpacer": 0.149072,
+          "twoWayWing": 0.113003,
+          "connector": 0.180815,
+          "interiorFinisher": 0.064789,
+          "stretchBig": 0.119816,
+          "rebounder": 0.077666,
+          "defensiveAnchor": 0.093249
         },
-        "baseScore": 52.07,
+        "baseScore": 52.15,
         "nonlinear": {
           "creation": 63.735890764522004,
           "penetration": 56.63478406435417,
@@ -25999,15 +26054,15 @@
           "switchability": 55.976180345914116,
           "rimProtection": 53.421319868872054,
           "possessionControl": 61.978,
-          "synergyBonus": 0.008558169875773024,
-          "weaknessPenalty": -3.1168993077559306,
+          "synergyBonus": 0.013231370539209895,
+          "weaknessPenalty": -3.1682304447757583,
           "weaknesses": {
-            "turnoverLiability": 5.847888174545454,
+            "turnoverLiability": 5.975661730909091,
             "inefficientUsage": 0,
-            "defensiveTargeting": 1.2579920476190474,
+            "defensiveTargeting": 1.2765176666666662,
             "spacingLimitation": 0,
-            "foulRisk": 1.3151053080000001,
-            "deficientRebounding": 0.746365375,
+            "foulRisk": 1.31756544,
+            "deficientRebounding": 0.74858,
             "hollowAnchor": 0
           }
         },
@@ -26026,10 +26081,10 @@
           "artifactVersion": "ratings-model-v3.6"
         },
         "canonicalOverall": 46,
-        "rawOverallScore": 48.06,
+        "rawOverallScore": 48.13,
         "offenseRating": 56,
         "defenseRating": 55,
-        "overallPercentile": 0.9709,
+        "overallPercentile": 0.9661,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -26093,10 +26148,10 @@
         "freeThrowPct": 0.6666666666666666,
         "threePointAttemptRate": 0.1722488038277512,
         "freeThrowAttemptRate": 0.37320574162679426,
-        "threePointPctShrunk": 0.3060606583184081,
-        "freeThrowPctShrunk": 0.7266903701128474,
-        "threePointPctPrior": 0.3437879545616918,
-        "freeThrowPctPrior": 0.7852134809728737,
+        "threePointPctShrunk": 0.30402130399054333,
+        "freeThrowPctShrunk": 0.7244101838503101,
+        "threePointPctPrior": 0.34083089078628775,
+        "freeThrowPctPrior": 0.7807101131043626,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -26662,12 +26717,13 @@
         "primary": "SF",
         "secondary": [],
         "playable": [
+          "PF",
           "SF"
         ],
         "sourceLabels": [
-          "SF"
+          "F"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 81,
       "weightLbs": 220,
@@ -26768,7 +26824,7 @@
         "rawOverallScore": 49.75,
         "offenseRating": 57,
         "defenseRating": 59,
-        "overallPercentile": 0.8553,
+        "overallPercentile": 0.8519,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -26833,9 +26889,9 @@
         "threePointAttemptRate": 0,
         "freeThrowAttemptRate": 0.25872093023255816,
         "threePointPctShrunk": null,
-        "freeThrowPctShrunk": 0.7860456362117512,
-        "threePointPctPrior": 0.3108376339817388,
-        "freeThrowPctPrior": 0.7480214064973242,
+        "freeThrowPctShrunk": 0.7858859118145336,
+        "threePointPctPrior": 0.3052052281586792,
+        "freeThrowPctPrior": 0.7476839887082024,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -27400,12 +27456,13 @@
         "primary": "SF",
         "secondary": [],
         "playable": [
+          "PF",
           "SF"
         ],
         "sourceLabels": [
-          "SF"
+          "F"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 81,
       "weightLbs": 222,
@@ -27506,7 +27563,7 @@
         "rawOverallScore": 48.12,
         "offenseRating": 55,
         "defenseRating": 57,
-        "overallPercentile": 0.9689,
+        "overallPercentile": 0.9668,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -27570,10 +27627,10 @@
         "freeThrowPct": 0.7340425531914894,
         "threePointAttemptRate": 0.011834319526627219,
         "freeThrowAttemptRate": 0.5562130177514792,
-        "threePointPctShrunk": 0.2952726655203889,
-        "freeThrowPctShrunk": 0.7420023162617334,
-        "threePointPctPrior": 0.30265448215839863,
-        "freeThrowPctPrior": 0.7513550378692703,
+        "threePointPctShrunk": 0.291739657728069,
+        "freeThrowPctShrunk": 0.7420274666767679,
+        "threePointPctPrior": 0.2990331491712707,
+        "freeThrowPctPrior": 0.75140974002197,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -28135,15 +28192,16 @@
         "photoUrl": null
       },
       "positions": {
-        "primary": "SG",
+        "primary": "PG",
         "secondary": [],
         "playable": [
+          "PG",
           "SG"
         ],
         "sourceLabels": [
-          "SG"
+          "G"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 74,
       "weightLbs": 200,
@@ -28152,7 +28210,7 @@
         "teamGames": 60,
         "teamMinutes": 1350
       },
-      "selectionScore": 53.486,
+      "selectionScore": 53.533,
       "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
       "stats": {
         "gamesPlayed": 60,
@@ -28194,18 +28252,18 @@
         "schemaVersion": 2,
         "modelVersion": "ratings-model-v3.6",
         "memberships": {
-          "primaryCreator": 0.048939,
-          "secondaryCreator": 0.093692,
-          "scoringGuard": 0.053823,
-          "movementSpacer": 0.165013,
-          "twoWayWing": 0.121234,
-          "connector": 0.180899,
-          "interiorFinisher": 0.057464,
-          "stretchBig": 0.106451,
-          "rebounder": 0.075125,
-          "defensiveAnchor": 0.09736
+          "primaryCreator": 0.05684,
+          "secondaryCreator": 0.100955,
+          "scoringGuard": 0.047483,
+          "movementSpacer": 0.153039,
+          "twoWayWing": 0.115283,
+          "connector": 0.19011,
+          "interiorFinisher": 0.057445,
+          "stretchBig": 0.106416,
+          "rebounder": 0.0751,
+          "defensiveAnchor": 0.097329
         },
-        "baseScore": 57.96,
+        "baseScore": 58.03,
         "nonlinear": {
           "creation": 68.32550111831897,
           "penetration": 58.983237601417486,
@@ -28214,15 +28272,15 @@
           "switchability": 57.27841625616025,
           "rimProtection": 54.51946239872082,
           "possessionControl": 70.084,
-          "synergyBonus": 0.04073206568808052,
-          "weaknessPenalty": -0.573085007693212,
+          "synergyBonus": 0.04730808994279607,
+          "weaknessPenalty": -0.5749682668360526,
           "weaknesses": {
-            "turnoverLiability": 0.08561722598843875,
+            "turnoverLiability": 0.08632232989595319,
             "inefficientUsage": 0,
-            "defensiveTargeting": 0.8808815142857144,
+            "defensiveTargeting": 0.8857977428571429,
             "spacingLimitation": 0,
-            "foulRisk": 0.2485703999999997,
-            "deficientRebounding": 0.47047500000000003,
+            "foulRisk": 0.2485499399999997,
+            "deficientRebounding": 0.470413125,
             "hollowAnchor": 0
           }
         },
@@ -28241,10 +28299,10 @@
           "artifactVersion": "ratings-model-v3.6"
         },
         "canonicalOverall": 53,
-        "rawOverallScore": 52.07,
+        "rawOverallScore": 52.13,
         "offenseRating": 61,
         "defenseRating": 58,
-        "overallPercentile": 0.6233,
+        "overallPercentile": 0.6113,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -28308,10 +28366,10 @@
         "freeThrowPct": 0.6470588235294118,
         "threePointAttemptRate": 0.12024048096192384,
         "freeThrowAttemptRate": 0.17034068136272545,
-        "threePointPctShrunk": 0.33061784128642313,
-        "freeThrowPctShrunk": 0.7199182207797946,
-        "threePointPctPrior": 0.34108122225124055,
-        "freeThrowPctPrior": 0.7973313303583264,
+        "threePointPctShrunk": 0.33080988396674027,
+        "freeThrowPctShrunk": 0.718712777340359,
+        "threePointPctPrior": 0.34141729694179546,
+        "freeThrowPctPrior": 0.7948451032644903,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -28874,15 +28932,16 @@
         "photoUrl": null
       },
       "positions": {
-        "primary": "SG",
+        "primary": "PG",
         "secondary": [],
         "playable": [
+          "PG",
           "SG"
         ],
         "sourceLabels": [
-          "SG"
+          "G"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 77,
       "weightLbs": 185,
@@ -28983,7 +29042,7 @@
         "rawOverallScore": 52.31,
         "offenseRating": 63,
         "defenseRating": 59,
-        "overallPercentile": 0.6012,
+        "overallPercentile": 0.5964,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -29047,10 +29106,10 @@
         "freeThrowPct": 0.8270676691729323,
         "threePointAttemptRate": 0.13380281690140844,
         "freeThrowAttemptRate": 0.31220657276995306,
-        "threePointPctShrunk": 0.3099441130452456,
-        "freeThrowPctShrunk": 0.8186278757071938,
-        "threePointPctPrior": 0.3307792935899832,
-        "freeThrowPctPrior": 0.8045967190704033,
+        "threePointPctShrunk": 0.3104048915904466,
+        "freeThrowPctShrunk": 0.8181462052217578,
+        "threePointPctPrior": 0.33156837684863977,
+        "freeThrowPctPrior": 0.8033142714029302,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -29617,13 +29676,14 @@
         "secondary": [],
         "playable": [
           "C",
+          "PF",
           "SF"
         ],
         "sourceLabels": [
           "C",
-          "SF"
+          "F-C"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 84,
       "weightLbs": 240,
@@ -29724,7 +29784,7 @@
         "rawOverallScore": 57.53,
         "offenseRating": 56,
         "defenseRating": 66,
-        "overallPercentile": 0.2188,
+        "overallPercentile": 0.2173,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -30356,12 +30416,13 @@
         "primary": "SF",
         "secondary": [],
         "playable": [
+          "PF",
           "SF"
         ],
         "sourceLabels": [
-          "SF"
+          "F"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 80,
       "weightLbs": 215,
@@ -30404,7 +30465,7 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 41,
+        "overallRating": 42,
         "offenseRating": 52,
         "defenseRating": 57
       },
@@ -30462,7 +30523,7 @@
         "rawOverallScore": 47.13,
         "offenseRating": 52,
         "defenseRating": 57,
-        "overallPercentile": 0.9942,
+        "overallPercentile": 0.9932,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -30527,9 +30588,9 @@
         "threePointAttemptRate": 0,
         "freeThrowAttemptRate": 0.25287356321839083,
         "threePointPctShrunk": null,
-        "freeThrowPctShrunk": 0.6715677774491104,
-        "threePointPctPrior": 0.31769181991122386,
-        "freeThrowPctPrior": 0.7437489162476157,
+        "freeThrowPctShrunk": 0.6713598987982289,
+        "threePointPctPrior": 0.3138672599184279,
+        "freeThrowPctPrior": 0.7434838709677419,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -31095,12 +31156,16 @@
         "primary": "SF",
         "secondary": [],
         "playable": [
-          "SF"
+          "PF",
+          "PG",
+          "SF",
+          "SG"
         ],
         "sourceLabels": [
-          "SF"
+          "F",
+          "G-F"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 81,
       "weightLbs": 205,
@@ -31109,7 +31174,7 @@
         "teamGames": 50,
         "teamMinutes": 464
       },
-      "selectionScore": 49.725,
+      "selectionScore": 49.536,
       "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
       "stats": {
         "gamesPlayed": 50,
@@ -31144,42 +31209,42 @@
       },
       "summaryRatings": {
         "overallRating": 55,
-        "offenseRating": 56,
+        "offenseRating": 55,
         "defenseRating": 55
       },
       "ratingProfile": {
         "schemaVersion": 2,
         "modelVersion": "ratings-model-v3.6",
         "memberships": {
-          "primaryCreator": 0.023726,
-          "secondaryCreator": 0.048838,
-          "scoringGuard": 0.038175,
-          "movementSpacer": 0.110514,
-          "twoWayWing": 0.185654,
-          "connector": 0.121864,
-          "interiorFinisher": 0.08796,
-          "stretchBig": 0.148842,
-          "rebounder": 0.112444,
-          "defensiveAnchor": 0.121983
+          "primaryCreator": 0.023901,
+          "secondaryCreator": 0.049006,
+          "scoringGuard": 0.038129,
+          "movementSpacer": 0.108893,
+          "twoWayWing": 0.186293,
+          "connector": 0.121456,
+          "interiorFinisher": 0.08861,
+          "stretchBig": 0.147552,
+          "rebounder": 0.113275,
+          "defensiveAnchor": 0.122885
         },
-        "baseScore": 52.6,
+        "baseScore": 52.51,
         "nonlinear": {
           "creation": 57.43597157653576,
           "penetration": 56.277428598414524,
-          "shootingGravity": 59.99,
-          "scalableScoring": 58.666666666666664,
+          "shootingGravity": 59.74,
+          "scalableScoring": 58.333333333333336,
           "switchability": 58.487176676485284,
           "rimProtection": 57.06429556294933,
           "possessionControl": 58.471,
           "synergyBonus": 0,
-          "weaknessPenalty": -2.7199639671013727,
+          "weaknessPenalty": -2.721212705369809,
           "weaknesses": {
-            "turnoverLiability": 4.306825640314961,
+            "turnoverLiability": 4.308123273070867,
             "inefficientUsage": 0,
-            "defensiveTargeting": 1.018265128571429,
+            "defensiveTargeting": 1.0184673714285717,
             "spacingLimitation": 0,
-            "foulRisk": 2.189188752,
-            "deficientRebounding": 0.4856145,
+            "foulRisk": 2.1908151360000003,
+            "deficientRebounding": 0.486161,
             "hollowAnchor": 0
           }
         },
@@ -31198,17 +31263,17 @@
           "artifactVersion": "ratings-model-v3.6"
         },
         "canonicalOverall": 48,
-        "rawOverallScore": 49.01,
-        "offenseRating": 56,
+        "rawOverallScore": 48.92,
+        "offenseRating": 55,
         "defenseRating": 55,
-        "overallPercentile": 0.9185,
+        "overallPercentile": 0.9237,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
         "insideScoring": 59,
         "closeShot": 59,
         "midrange": 55,
-        "threePoint": 52,
+        "threePoint": 51,
         "freeThrow": 74,
         "ballHandling": 53,
         "passing": 55,
@@ -31265,10 +31330,10 @@
         "freeThrowPct": 0.8484848484848485,
         "threePointAttemptRate": 0.08962264150943396,
         "freeThrowAttemptRate": 0.15566037735849056,
-        "threePointPctShrunk": 0.27487230881486757,
-        "freeThrowPctShrunk": 0.7797203807924037,
-        "threePointPctPrior": 0.30265448215839863,
-        "freeThrowPctPrior": 0.7513550378692703,
+        "threePointPctShrunk": 0.2719459791282996,
+        "freeThrowPctShrunk": 0.7797591079801558,
+        "threePointPctPrior": 0.2990331491712707,
+        "freeThrowPctPrior": 0.75140974002197,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -31834,12 +31899,13 @@
         "primary": "SF",
         "secondary": [],
         "playable": [
+          "PF",
           "SF"
         ],
         "sourceLabels": [
-          "SF"
+          "F"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 81,
       "weightLbs": 260,
@@ -31882,7 +31948,7 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 66,
+        "overallRating": 67,
         "offenseRating": 57,
         "defenseRating": 59
       },
@@ -31940,7 +32006,7 @@
         "rawOverallScore": 50.06,
         "offenseRating": 57,
         "defenseRating": 59,
-        "overallPercentile": 0.8295,
+        "overallPercentile": 0.8255,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -32005,9 +32071,9 @@
         "threePointAttemptRate": 0,
         "freeThrowAttemptRate": 0.41860465116279066,
         "threePointPctShrunk": null,
-        "freeThrowPctShrunk": 0.6957515239141918,
-        "threePointPctPrior": 0.3541644936896752,
-        "freeThrowPctPrior": 0.7422145833671133,
+        "freeThrowPctShrunk": 0.6918923873688069,
+        "threePointPctPrior": 0.35136046773105484,
+        "freeThrowPctPrior": 0.732190476190476,
         "rateShrinkAttempts": 80
       },
       "provenance": {
@@ -32572,12 +32638,13 @@
         "primary": "SF",
         "secondary": [],
         "playable": [
+          "PF",
           "SF"
         ],
         "sourceLabels": [
-          "SF"
+          "F"
         ],
-        "normalizationVersion": "position-v3"
+        "normalizationVersion": "position-v4"
       },
       "heightInches": 79,
       "weightLbs": 255,
@@ -32586,7 +32653,7 @@
         "teamGames": 74,
         "teamMinutes": 1336
       },
-      "selectionScore": 51.416,
+      "selectionScore": 51.392,
       "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
       "stats": {
         "gamesPlayed": 74,
@@ -32628,34 +32695,34 @@
         "schemaVersion": 2,
         "modelVersion": "ratings-model-v3.6",
         "memberships": {
-          "primaryCreator": 0.030213,
-          "secondaryCreator": 0.044206,
-          "scoringGuard": 0.047898,
-          "movementSpacer": 0.073563,
-          "twoWayWing": 0.151563,
-          "connector": 0.086595,
-          "interiorFinisher": 0.111021,
-          "stretchBig": 0.121719,
-          "rebounder": 0.165718,
-          "defensiveAnchor": 0.167504
+          "primaryCreator": 0.030249,
+          "secondaryCreator": 0.044084,
+          "scoringGuard": 0.047545,
+          "movementSpacer": 0.07365,
+          "twoWayWing": 0.151147,
+          "connector": 0.086697,
+          "interiorFinisher": 0.111151,
+          "stretchBig": 0.121863,
+          "rebounder": 0.165913,
+          "defensiveAnchor": 0.167701
         },
-        "baseScore": 55.21,
+        "baseScore": 55.18,
         "nonlinear": {
           "creation": 57.709206400127755,
           "penetration": 59.20050523065289,
-          "shootingGravity": 59.25,
+          "shootingGravity": 59,
           "scalableScoring": 61,
           "switchability": 60.50517907533811,
           "rimProtection": 64.77312904690427,
           "possessionControl": 59.1995,
           "synergyBonus": 0,
-          "weaknessPenalty": -3.1263768850742855,
+          "weaknessPenalty": -3.1264722811733336,
           "weaknesses": {
-            "turnoverLiability": 3.7309154057142853,
+            "turnoverLiability": 3.7292731276190474,
             "inefficientUsage": 0,
-            "defensiveTargeting": 0.5597177428571428,
+            "defensiveTargeting": 0.5595546857142858,
             "spacingLimitation": 0,
-            "foulRisk": 4.904592984000001,
+            "foulRisk": 4.906678896000001,
             "deficientRebounding": 0,
             "hollowAnchor": 0
           }
@@ -32675,10 +32742,10 @@
           "artifactVersion": "ratings-model-v3.6"
         },
         "canonicalOverall": 49,
-        "rawOverallScore": 49.47,
+        "rawOverallScore": 49.44,
         "offenseRating": 58,
         "defenseRating": 59,
-        "overallPercentile": 0.8911,
+        "overallPercentile": 0.8894,
         "overallCohortVersion": "overall-cohort-v7"
       },
       "detailedRatings": {
@@ -32686,7 +32753,7 @@
         "closeShot": 57,
         "midrange": 60,
         "threePoint": 52,
-        "freeThrow": 75,
+        "freeThrow": 74,
         "ballHandling": 56,
         "passing": 52,
         "offensiveIq": 66,
@@ -32743,9 +32810,9 @@
         "threePointAttemptRate": 0,
         "freeThrowAttemptRate": 0.5192307692307693,
         "threePointPctShrunk": null,
-        "freeThrowPctShrunk": 0.7147146771600038,
-        "threePointPctPrior": 0.3541644936896752,
-        "freeThrowPctPrior": 0.7422145833671133,
+        "freeThrowPctShrunk": 0.7118485993396643,
+        "threePointPctPrior": 0.35136046773105484,
+        "freeThrowPctPrior": 0.732190476190476,
         "rateShrinkAttempts": 80
       },
       "provenance": {

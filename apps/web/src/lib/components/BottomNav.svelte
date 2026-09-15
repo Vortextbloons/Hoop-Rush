@@ -33,7 +33,7 @@
   class="fixed inset-x-0 bottom-0 z-40 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:hidden"
 >
   <div
-    class="relative flex w-full items-stretch gap-0.5 border-t border-border bg-background/90 p-1 shadow-2xl shadow-black/30 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:rounded-none"
+    class="relative flex w-full items-stretch gap-0.5 border-t border-border bg-background p-1 shadow-2xl shadow-black/30 sm:rounded-none"
   >
     {#each items as item (item.id)}
       {@const active = isNavItemActive(item, routeId)}

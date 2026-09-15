@@ -14,11 +14,16 @@
     FixedFiveVerificationReceipt,
     FixedFiveWorkerResultEntry,
     Id,
-    PlayerId,
+    PlayersIndexEntry,
     Seed,
     SlotIndex,
   } from '@hoop-rush/data-contracts';
-  import { commandIdSchema, fixedFiveTimeoutMsForMode, idSchema } from '@hoop-rush/data-contracts';
+  import {
+    commandIdSchema,
+    fixedFiveTimeoutMsForMode,
+    idSchema,
+    playerVersionId,
+  } from '@hoop-rush/data-contracts';
   import { getFixedFiveTransport } from '$lib/fixed-five-transport';
   import { submitFixedFiveCommand } from '$lib/fixed-five-command-submit';
   import {
@@ -69,7 +74,7 @@
   import ArenaSoundToggle from '$lib/components/ArenaSoundToggle.svelte';
   import { arenaWin } from '$lib/arena-sound';
   import type { SimulationPlayer } from '@hoop-rush/data-contracts';
-  import type { FixedFiveWorkerTeam, PlayersIndexEntry } from '@hoop-rush/data-contracts';
+  import type { FixedFiveWorkerTeam } from '@hoop-rush/data-contracts';
   let roomId = $derived($page.params.roomId as string);
   let snapshot = $state<FixedFiveRoomSnapshot | null>(null);
   let commands = $state<FixedFiveCommand[]>([]);
@@ -85,7 +90,7 @@
   let selfId = $state<'p1' | 'p2'>('p1');
   let mounted = true;
   let tick = $state(0);
-  const SIM_SHOWDOWN_MIN_MS = 3000;
+  const SIM_SHOWDOWN_MIN_MS = 7000;
   const SIM_SHOWDOWN_REDUCED_MS = 400;
   let progress = $state<{
     completed: number;
@@ -206,6 +211,7 @@
         assets,
         commands,
         snapshot.settings.sourceMode,
+        snapshot.settings.versions.multiplayerVersion,
       );
     } catch {
       return null;
@@ -229,12 +235,25 @@
         )
       : new Map<string, PlayersIndexEntry>(),
   );
+  const indexByVersionId = $derived(
+    assets
+      ? new Map<string, PlayersIndexEntry>(
+          assets.index.players.map((p) => [
+            playerVersionId(p.playerId, p.franchiseId, p.eraId, p.seasonKey),
+            p,
+          ]),
+        )
+      : new Map<string, PlayersIndexEntry>(),
+  );
   const p1ResultRows = $derived.by((): (PlayersIndexEntry | null)[] => {
     const rows: (PlayersIndexEntry | null)[] = [null, null, null, null, null];
     if (!localResult) return rows;
     for (const ref of localResult.p1.refs) {
       if (ref.slotIndex >= 0 && ref.slotIndex < 5)
-        rows[ref.slotIndex] = indexById.get(ref.playerId as string) ?? null;
+        rows[ref.slotIndex] =
+          (ref.playerVersionId ? indexByVersionId.get(ref.playerVersionId) : null) ??
+          indexById.get(ref.playerId as string) ??
+          null;
     }
     return rows;
   });
@@ -243,7 +262,10 @@
     if (!localResult) return rows;
     for (const ref of localResult.p2.refs) {
       if (ref.slotIndex >= 0 && ref.slotIndex < 5)
-        rows[ref.slotIndex] = indexById.get(ref.playerId as string) ?? null;
+        rows[ref.slotIndex] =
+          (ref.playerVersionId ? indexByVersionId.get(ref.playerVersionId) : null) ??
+          indexById.get(ref.playerId as string) ??
+          null;
     }
     return rows;
   });
@@ -272,7 +294,10 @@
   const clockText = $derived.by((): string | null => {
     if (!snapshot || phase !== 'drafting') return null;
     void tick;
-    const remaining = anchorMs + timeoutMs - Date.now();
+    const deadlineMs = snapshot.deadline
+      ? Date.parse(snapshot.deadline.deadlineAt)
+      : anchorMs + timeoutMs;
+    const remaining = deadlineMs - Date.now();
     if (remaining <= 0) return 'Pick clock expired — resolving the deterministic fallback…';
     const total = Math.floor(remaining / 1000);
     return `Pick clock: ${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
@@ -288,7 +313,13 @@
       if (!last) return null;
       const payload = last.payload;
       if (payload.kind !== 'timeout-autopick') return null;
-      const row = assets.index.players.find((p) => p.playerId === payload.playerId);
+      const row = payload.playerVersionId
+        ? assets.index.players.find(
+            (p) =>
+              playerVersionId(p.playerId, p.franchiseId, p.eraId, p.seasonKey) ===
+              payload.playerVersionId,
+          )
+        : assets.index.players.find((p) => p.playerId === payload.playerId);
       return { displayName: row?.displayName ?? payload.playerId, seedPath: payload.seedPath };
     },
   );
@@ -421,20 +452,45 @@
       return false;
     }
   }
-  async function sendPick(playerId: PlayerId, slot: SlotIndex): Promise<void> {
+  async function sendPick(player: PlayersIndexEntry, slot: SlotIndex): Promise<void> {
     draftError = null;
     if (!snapshot || !replay) return;
+    const playerId = player.playerId;
+    const playerVersion = playerVersionId(
+      player.playerId,
+      player.franchiseId,
+      player.eraId,
+      player.seasonKey,
+    );
     const mode = snapshot.settings.mode;
     if (mode === 'sandbox-shared-82') {
       if (replay.mode !== 'sandbox-shared-82') {
-        await sendCommand({ kind: 'sandbox-place', playerId, slotIndex: slot });
+        draftError = 'The draft is still syncing — try again in a moment.';
+        return;
+      }
+      if (replay.draftStyle === 'snake') {
+        if (!isFixedFiveDraftTurn(replay, selfId)) {
+          draftError = 'Wait for your opponent to finish this pick.';
+          return;
+        }
+        await sendCommand({
+          kind: 'sandbox-place',
+          playerId,
+          playerVersionId: playerVersion,
+          slotIndex: slot,
+        });
         return;
       }
       const builder = selfId === 'p1' ? replay.p1 : replay.p2;
       const incumbent = builder.placements.find((p) => p.slotIndex === slot) ?? null;
       const subjectPlaced = builder.placements.some((p) => p.playerId === playerId);
       if (!incumbent && !subjectPlaced) {
-        await sendCommand({ kind: 'sandbox-place', playerId, slotIndex: slot });
+        await sendCommand({
+          kind: 'sandbox-place',
+          playerId,
+          playerVersionId: playerVersion,
+          slotIndex: slot,
+        });
         return;
       }
       const repositioned = await sendCommand({
@@ -453,7 +509,12 @@
           draftError = 'Wait for your opponent to finish this pick.';
           return;
         }
-        await sendCommand({ kind: 'sandbox-place', playerId, slotIndex: slot });
+        await sendCommand({
+          kind: 'sandbox-place',
+          playerId,
+          playerVersionId: playerVersion,
+          slotIndex: slot,
+        });
         return;
       }
       if (replay.mode !== 'duel' || !replay.state.currentRoll) {
@@ -601,9 +662,9 @@
     if (!snapshot || !assets || !snapshot.rootSeed || !replay || phase !== 'drafting') return;
     const mode = snapshot.settings.mode;
     const now = Date.now();
-    if (now - anchorMs <= timeoutMs) return;
     const deadline = snapshot.deadline;
     if (!deadline) return;
+    if (now < Date.parse(deadline.deadlineAt)) return;
     const participant = deadline.participantId;
     if (participant !== selfId) return;
     const ordinal = deadline.pickOrdinal;
@@ -626,6 +687,7 @@
         {
           kind: 'timeout-autopick',
           playerId: pick.playerId,
+          playerVersionId: pick.playerVersionId,
           slotIndex: pick.slotIndex,
           pickOrdinal: ordinal,
           seedPath: pick.seedPath,
@@ -650,11 +712,12 @@
           {
             kind: 'timeout-autopick',
             playerId: pick.playerId,
+            playerVersionId: pick.playerVersionId,
             slotIndex: pick.slotIndex,
             pickOrdinal: ordinal,
             seedPath: pick.seedPath,
           },
-          { actor: participant, commandId: `timeout-${mode}-${participant}-${ordinal}` },
+          { actor: participant, commandId: `timeout-${deadline.cursor}-${ordinal}` },
         );
         return;
       }
@@ -923,6 +986,20 @@
           void sync(lastOrdinal);
         }).unsubscribe;
         await sync(lastOrdinal);
+        if (receiptsUnsupported) {
+          try {
+            await t.verificationChallenge(roomId);
+            if (!mounted) return;
+            receiptsUnsupported = false;
+            completedPairKey = null;
+            completeNotReady = false;
+            saveVerifyGuards();
+            notice = 'Server verification is available — continuing with receipt flow.';
+            await sync(lastOrdinal);
+          } catch (e) {
+            if (!isMissingFunctionError(e) && mounted) error = friendlyFixedFiveJoinError(e);
+          }
+        }
       } catch (e) {
         if (mounted) error = friendlyFixedFiveJoinError(e);
       } finally {
@@ -1175,7 +1252,7 @@
       if (foreignVerified.length === 0) return;
       const pairKey = `receipt:${receipt.resultDigest}:${String(foreignVerified.length)}`;
       if (completedPairKey === pairKey) return;
-      void runCompleteOnce(receipt.resultDigest, pairKey);
+      void runCompleteOnce(receipt.receiptDigest, pairKey);
       return;
     }
     if (!confirmedFor) return;
@@ -1458,9 +1535,11 @@
       <div class="mt-4 min-w-0 overflow-x-clip rounded-2xl bg-surface-1 p-3 sm:mt-6 sm:p-6">
         <h2 class="font-display text-sm font-extrabold break-words uppercase">
           Drafting — {snapshot.settings.mode === 'duel'
-            ? 'alternating duel draft'
+            ? snapshot.settings.sourceMode === 'sandbox'
+              ? 'snake duel draft'
+              : 'alternating duel draft'
             : snapshot.settings.mode === 'sandbox-shared-82'
-              ? 'simultaneous free-pick draft'
+              ? 'snake sandbox draft'
               : 'simultaneous roll draft'}
         </h2>
         {#if assetsError}
@@ -1478,9 +1557,9 @@
             deadlineText={clockText}
             {lastAutopick}
             error={draftError}
-            onPick={(playerId, slot) => {
+            onPick={(player, slot) => {
               draftError = null;
-              void sendPick(playerId, slot).catch((e: unknown) => {
+              void sendPick(player, slot).catch((e: unknown) => {
                 draftError = e instanceof Error ? e.message : String(e);
               });
             }}
@@ -1597,9 +1676,23 @@
               <button
                 type="button"
                 onclick={() => {
-                  completedPairKey = null;
-                  completeNotReady = false;
-                  void sync(lastOrdinal);
+                  void (async () => {
+                    try {
+                      await transport().verificationChallenge(roomId);
+                      if (!mounted) return;
+                      receiptsUnsupported = false;
+                      completedPairKey = null;
+                      completeNotReady = false;
+                      saveVerifyGuards();
+                      notice = 'Server verification is available — continuing with receipt flow.';
+                    } catch (e) {
+                      if (!isMissingFunctionError(e) && mounted)
+                        error = friendlyFixedFiveJoinError(e);
+                      completedPairKey = null;
+                      completeNotReady = false;
+                    }
+                    await sync(lastOrdinal);
+                  })();
                 }}
                 disabled={busyAction !== null}
                 class="mt-2 rounded-lg border border-primary/50 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary disabled:opacity-40"

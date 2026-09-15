@@ -19,6 +19,16 @@
   import { generateSeed, parseSandboxUrl } from '$lib/sandbox-url';
   import { startSandboxRun } from '$lib/sandbox-run';
   import { sortDraftRows } from '$lib/draft-presentation';
+  import {
+    heuristicDraftPoolReport,
+    loadDraftFitContext,
+    nextPageWindow,
+    poolRowKey,
+    scoreDraftPoolMemo,
+    type DraftFitContext,
+    type DraftFitNeed,
+    type DraftFitTier,
+  } from '$lib/draft-fit';
   import TeamLogo from '$lib/components/TeamLogo.svelte';
   import LineupCourt from '$lib/components/LineupCourt.svelte';
   import LineupSummaryNav from '$lib/components/LineupSummaryNav.svelte';
@@ -56,6 +66,16 @@
   });
   let slots = $state<(IndexRow | null)[]>([null, null, null, null, null]);
   let resolvedDraftPlayers = $state.raw<PeakPlayerSeason[]>([]);
+  let sandboxFitContext = $state.raw<DraftFitContext | null>(null);
+  let pageDots = $state.raw<ReadonlyMap<
+    string,
+    { tier: DraftFitTier; need: DraftFitNeed; netDelta: number | null }
+  > | null>(null);
+  let pageNeeds = $state.raw<DraftFitNeed[]>([]);
+  const detailCache = new Map<string, PeakPlayerSeason>();
+  let lastVisible: IndexRow[] = [];
+  let lastVisibleKey = '';
+  let pageScoreGen = 0;
   let pickerPlayer = $state<IndexRow | null>(null);
   let pickerTrigger = $state<HTMLElement | null>(null);
   let pickerFallbackId = $state<string | null>(null);
@@ -68,23 +88,30 @@
     manifest = null;
     index = null;
     let cancelled = false;
+    let restored = false;
+    function maybeRestore(): void {
+      if (restored || cancelled || manifest === null || index === null) return;
+      restored = true;
+      restoreUrlState(manifest, index);
+    }
     getManifest().then(
       (m) => {
         if (cancelled) return;
         manifest = m;
-        getPlayersIndex().then(
-          (ix) => {
-            if (cancelled) return;
-            index = ix;
-            restoreUrlState(m, ix);
-          },
-          (error: unknown) => {
-            if (!cancelled) indexError = error instanceof Error ? error.message : String(error);
-          },
-        );
+        maybeRestore();
       },
       (error: unknown) => {
         if (!cancelled) manifestError = error instanceof Error ? error.message : String(error);
+      },
+    );
+    getPlayersIndex().then(
+      (ix) => {
+        if (cancelled) return;
+        index = ix;
+        maybeRestore();
+      },
+      (error: unknown) => {
+        if (!cancelled) indexError = error instanceof Error ? error.message : String(error);
       },
     );
     return () => {
@@ -117,6 +144,104 @@
     return () => {
       cancelled = true;
     };
+  });
+  $effect(() => {
+    const m = manifest;
+    if (!m) {
+      sandboxFitContext = null;
+      return;
+    }
+    let cancelled = false;
+    loadDraftFitContext(m, '2010s').then(
+      (context) => {
+        if (!cancelled) sandboxFitContext = context;
+      },
+      () => {
+        if (!cancelled) sandboxFitContext = null;
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  });
+  async function ensureDetails(rows: readonly IndexRow[]): Promise<void> {
+    const m = manifest;
+    if (!m) return;
+    const missing = rows.filter((row) => !detailCache.has(poolRowKey(row)));
+    if (missing.length === 0) return;
+    try {
+      const resolved = await resolvePlayerRefs(
+        missing.map((row) => ({
+          playerId: row.playerId,
+          franchiseId: row.franchiseId,
+          eraId: row.eraId,
+        })),
+        m,
+      );
+      resolved.forEach((player, offset) => {
+        const row = missing[offset];
+        if (row) detailCache.set(poolRowKey(row), player);
+      });
+    } catch {
+      return;
+    }
+  }
+  function detailsFor(rows: readonly IndexRow[]): PeakPlayerSeason[] {
+    const seen = new Set<string>();
+    const details: PeakPlayerSeason[] = [];
+    for (const row of rows) {
+      if (seen.has(row.playerId)) continue;
+      seen.add(row.playerId);
+      const detail = detailCache.get(poolRowKey(row));
+      if (detail) details.push(detail);
+    }
+    return details;
+  }
+  async function refreshPageFit(): Promise<void> {
+    const gen = ++pageScoreGen;
+    if (lastVisible.length === 0) return;
+    await ensureDetails(lastVisible);
+    if (gen !== pageScoreGen || !mounted) return;
+    const details = detailsFor(lastVisible);
+    if (details.length === 0) return;
+    try {
+      const context = sandboxFitContext;
+      const report =
+        context === null
+          ? heuristicDraftPoolReport({ pool: details, locked: resolvedDraftPlayers })
+          : scoreDraftPoolMemo({ pool: details, locked: resolvedDraftPlayers, context });
+      if (gen !== pageScoreGen || !mounted) return;
+      const keyById = new Map<string, string>(
+        details.map((player) => [player.playerId, poolRowKey(player)]),
+      );
+      pageDots = new Map(
+        report.scores.map((entry) => [
+          keyById.get(entry.playerId) ?? entry.playerId,
+          { tier: entry.tier, need: entry.primaryNeed, netDelta: entry.netDelta },
+        ]),
+      );
+      pageNeeds = report.missingNeeds;
+    } catch {
+      return;
+    }
+  }
+  function handleVisiblePage(rows: IndexRow[]) {
+    const key = rows.map((row) => poolRowKey(row)).join(',');
+    if (key === lastVisibleKey) return;
+    lastVisibleKey = key;
+    lastVisible = rows;
+    pageDots = null;
+    pageNeeds = [];
+    void refreshPageFit();
+    const upcoming = nextPageWindow(sortedRows, rows);
+    if (upcoming.length > 0) void ensureDetails(upcoming).catch(() => {});
+  }
+  $effect(() => {
+    void resolvedDraftPlayers;
+    void sandboxFitContext;
+    void manifest;
+    if (lastVisible.length === 0) return;
+    void refreshPageFit();
   });
   function retrySandboxData() {
     clearDataLoaderCaches();
@@ -529,9 +654,11 @@
           {manifest}
           presentation="sandbox"
           filtersEditable
+          fitByRow={pageDots}
           error={null}
           emptyMessage="No players match."
           onpick={openPicker}
+          onvisible={handleVisiblePage}
         />
 
         {#if runError}
@@ -551,7 +678,11 @@
           onmove={openPicker}
           onremove={removePlayer}
         />
-        <DraftValuePanel players={resolvedDraftPlayers} presentation="sandbox" />
+        <DraftValuePanel
+          players={resolvedDraftPlayers}
+          presentation="sandbox"
+          missingNeeds={pageNeeds}
+        />
         {#if ready}
           <div class="flex flex-col gap-3">
             <div class="flex items-center gap-2" role="group" aria-label="Difficulty">

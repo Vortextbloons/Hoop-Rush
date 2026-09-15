@@ -18,6 +18,7 @@ import { derivePlayerRecord, fieldPublished, positionGroup, type SeasonContext }
 import { getEra } from './era.ts';
 import { canonicalPlayerName } from '../identity.ts';
 import { positionOverrideFor } from '../positions/overrides.ts';
+import { primaryPositionForSource } from '../positions/normalize.ts';
 import { loadRatingsModelArtifact } from './artifact.ts';
 import { loadThreePointReconstructionArtifact } from '../reconstruction/artifact.ts';
 const rosterPlayerSchema = z.looseObject({
@@ -96,18 +97,6 @@ const winPctFileSchema = z.looseObject({
 export { parseJsonLoose };
 export function readJsonLoose(path: string): unknown {
   return parseJsonLoose(readFileSync(path, 'utf8'));
-}
-const POS_MAP: Record<string, string> = {
-  G: 'SG',
-  F: 'SF',
-  C: 'C',
-  PG: 'PG',
-  SG: 'SG',
-  SF: 'SF',
-  PF: 'PF',
-};
-function mapPosition(raw: string): string {
-  return POS_MAP[raw] ?? 'SF';
 }
 function safeHeight(value: unknown): number | null {
   if (typeof value !== 'number' || !Number.isFinite(value)) return null;
@@ -264,7 +253,8 @@ export function pooledRatePriors(
     const extId = player.externalId ?? '';
     if (extId === '') continue;
     const override = positionOverrideFor(extId);
-    const pos = override !== null ? override.primary : mapPosition(player.position ?? 'SF');
+    const pos =
+      override !== null ? override.primary : primaryPositionForSource(player.position ?? 'SF');
     groupByExtId.set(extId, positionGroup(pos));
   }
   const sums = new Map<
@@ -377,8 +367,8 @@ export function computeForSeason(season: string, force = false): void {
     player.firstName = canonicalFirstName;
     player.lastName = canonicalLastName;
     const override = positionOverrideFor(extId);
-    const pos = override !== null ? override.primary : mapPosition(player.position ?? 'SF');
-    player.position = pos;
+    const pos =
+      override !== null ? override.primary : primaryPositionForSource(player.position ?? 'SF');
     if (override !== null) {
       player.secondaryPositions = [...override.secondary];
     } else if (player.secondaryPositions === undefined || player.secondaryPositions === null) {

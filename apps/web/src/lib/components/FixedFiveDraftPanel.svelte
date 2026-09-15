@@ -6,7 +6,11 @@
     PlayerId,
     SlotIndex,
   } from '@hoop-rush/data-contracts';
-  import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
+  import {
+    franchiseAbbreviation,
+    playerVersionId,
+    resolveEraTeamIdentity,
+  } from '@hoop-rush/data-contracts';
   import ClassicRollReel from '$lib/components/classic/ClassicRollReel.svelte';
   import DraftPoolBrowser from '$lib/components/draft/DraftPoolBrowser.svelte';
   import DraftRoundCard from '$lib/components/draft/DraftRoundCard.svelte';
@@ -18,6 +22,13 @@
   import FixedFiveTurnTakeover from '$lib/components/FixedFiveTurnTakeover.svelte';
   import { arenaPickSlam } from '$lib/arena-sound';
   import { poolSortLabel, sortDraftRows, type DraftPresentation } from '$lib/draft-presentation';
+  import {
+    loadDraftFitContext,
+    poolRowKey,
+    resolveDraftPoolDetails,
+    scoreDraftPoolMemo,
+    type DraftFitContext,
+  } from '$lib/draft-fit';
   import type { RollAnimationAxis } from '$lib/fixed-five-roll-animation';
   import { stableRollAnimationId } from '$lib/fixed-five-roll-animation';
   import { formatPositions } from '$lib/player-positions';
@@ -59,7 +70,7 @@
       seedPath: string;
     } | null;
     error?: string | null;
-    onPick: (playerId: PlayerId, slotIndex: SlotIndex) => void;
+    onPick: (player: PlayersIndexEntry, slotIndex: SlotIndex) => void;
     onReroll: (axis: 'franchise' | 'era') => void;
     onRemove: (slotIndex: SlotIndex) => void;
     onLock: () => void;
@@ -77,7 +88,17 @@
   let pickerTrigger = $state<HTMLElement | null>(null);
   let pickerFallbackId = $state<string | null>(null);
   let resolvedLineupPlayers = $state.raw<PeakPlayerSeason[]>([]);
+  let rollPoolDetails = $state.raw<PeakPlayerSeason[]>([]);
+  let rollFitContext = $state.raw<DraftFitContext | null>(null);
   const indexById = $derived(new Map(assets.index.players.map((p) => [p.playerId, p])));
+  const indexByVersionId = $derived(
+    new Map(
+      assets.index.players.map((p) => [
+        playerVersionId(p.playerId, p.franchiseId, p.eraId, p.seasonKey),
+        p,
+      ]),
+    ),
+  );
   const catalogPairs = $derived(
     assets.catalog.map((e) => ({ franchiseId: e.franchiseId, eraId: e.eraId })),
   );
@@ -171,31 +192,37 @@
     complete: boolean;
     turn: boolean;
     turnText: string;
-    myClaimed: Set<PlayerId>;
+    claimedPlayerIds: Set<PlayerId>;
   }
   const sandboxDuelView = $derived.by((): SandboxDuelView | null => {
-    if (mode !== 'duel' || replay.mode !== 'sandbox-duel') return null;
-    const turn = isFixedFiveDraftTurn(replay, selfId);
-    const complete = replay.state.status === 'complete';
+    const sandboxReplay =
+      mode === 'duel' && replay.mode === 'sandbox-duel'
+        ? replay
+        : mode === 'sandbox-shared-82' &&
+            replay.mode === 'sandbox-shared-82' &&
+            replay.draftStyle === 'snake'
+          ? replay
+          : null;
+    if (!sandboxReplay) return null;
+    const turn = isFixedFiveDraftTurn(sandboxReplay, selfId);
+    const complete = sandboxReplay.state.status === 'complete';
     return {
-      label: `Pick ${Math.min(10, replay.state.pickOrdinal + 1)} of 10`,
-      pickOrdinal: replay.state.pickOrdinal,
+      label: `Pick ${Math.min(10, sandboxReplay.state.pickOrdinal + 1)} of 10`,
+      pickOrdinal: sandboxReplay.state.pickOrdinal,
       complete,
       turn,
       turnText: complete
         ? 'Both fives are set.'
         : turn
-          ? 'Your pick — claim any player.'
+          ? 'Your pick — snake draft.'
           : 'Opponent is picking…',
-      myClaimed: new Set(
-        replay.state.picks.filter((p) => p.participantId === selfId).map((p) => p.playerId),
-      ),
+      claimedPlayerIds: new Set(sandboxReplay.state.picks.map((p) => p.playerId)),
     };
   });
   const sandboxDuelRows = $derived.by((): PlayersIndexEntry[] => {
     if (!sandboxDuelView || sandboxDuelView.complete) return [];
     return sortDraftRows(
-      assets.index.players.filter((p) => !sandboxDuelView.myClaimed.has(p.playerId)),
+      assets.index.players.filter((p) => !sandboxDuelView.claimedPlayerIds.has(p.playerId)),
       presentation,
     );
   });
@@ -228,6 +255,7 @@
     (): Array<{
       playerId: PlayerId;
       slotIndex: SlotIndex;
+      playerVersionId?: string;
     }> => {
       if (replay.mode === 'duel') {
         return replay.state.picks
@@ -237,9 +265,22 @@
       if (replay.mode === 'sandbox-duel') {
         return replay.state.picks
           .filter((p) => p.participantId === selfId)
-          .map((p) => ({ playerId: p.playerId, slotIndex: p.slotIndex }));
+          .map((p) => ({
+            playerId: p.playerId,
+            slotIndex: p.slotIndex,
+            playerVersionId: p.playerVersionId,
+          }));
       }
       if (replay.mode === 'sandbox-shared-82') {
+        if (replay.draftStyle === 'snake') {
+          return replay.state.picks
+            .filter((p) => p.participantId === selfId)
+            .map((p) => ({
+              playerId: p.playerId,
+              slotIndex: p.slotIndex,
+              playerVersionId: p.playerVersionId,
+            }));
+        }
         const builder = selfId === 'p1' ? replay.p1 : replay.p2;
         return builder.placements.map((p) => ({ playerId: p.playerId, slotIndex: p.slotIndex }));
       }
@@ -248,19 +289,28 @@
     },
   );
   const myCourtRows = $derived.by((): (PlayersIndexEntry | null)[] => {
-    if (replay.mode === 'sandbox-shared-82') return courtRows;
+    if (replay.mode === 'sandbox-shared-82' && replay.draftStyle === 'legacy') return courtRows;
     const rows: (PlayersIndexEntry | null)[] = [null, null, null, null, null];
     for (const pick of myPicks) {
-      rows[pick.slotIndex] = indexById.get(pick.playerId) ?? null;
+      rows[pick.slotIndex] =
+        (pick.playerVersionId ? indexByVersionId.get(pick.playerVersionId) : null) ??
+        indexById.get(pick.playerId) ??
+        null;
     }
     return rows;
   });
   function displayNameOf(playerId: PlayerId): string {
     return indexById.get(playerId)?.displayName ?? playerId;
   }
-  const sandboxRows = $derived(sortDraftRows(assets.index.players, presentation));
+  const sandboxRows = $derived(
+    sortDraftRows(
+      assets.index.players.filter((row) => !sandboxDuelView?.claimedPlayerIds.has(row.playerId)),
+      presentation,
+    ),
+  );
   const courtRows = $derived.by((): (PlayersIndexEntry | null)[] => {
-    if (replay.mode !== 'sandbox-shared-82') return [null, null, null, null, null];
+    if (replay.mode !== 'sandbox-shared-82' || replay.draftStyle !== 'legacy')
+      return [null, null, null, null, null];
     const builder = selfId === 'p1' ? replay.p1 : replay.p2;
     const rows: (PlayersIndexEntry | null)[] = [null, null, null, null, null];
     for (const placement of builder.placements) {
@@ -269,11 +319,26 @@
     return rows;
   });
   const sandboxLocked = $derived(
-    replay.mode === 'sandbox-shared-82' ? (selfId === 'p1' ? replay.p1 : replay.p2).locked : false,
+    replay.mode === 'sandbox-shared-82' && replay.draftStyle === 'legacy'
+      ? (selfId === 'p1' ? replay.p1 : replay.p2).locked
+      : false,
   );
-  const activeCourtRows = $derived(mode === 'sandbox-shared-82' ? courtRows : myCourtRows);
+  const activeCourtRows = $derived(
+    mode === 'sandbox-shared-82' &&
+      replay.mode === 'sandbox-shared-82' &&
+      replay.draftStyle === 'legacy'
+      ? courtRows
+      : myCourtRows,
+  );
   const pickedCount = $derived(activeCourtRows.filter((p) => p !== null).length);
-  const allowDisplacement = $derived(mode !== 'duel');
+  const allowDisplacement = $derived(
+    mode !== 'duel' &&
+      !(
+        mode === 'sandbox-shared-82' &&
+        replay.mode === 'sandbox-shared-82' &&
+        replay.draftStyle === 'snake'
+      ),
+  );
   const rollManifest = $derived(assets.manifest);
   const rollFranchise = $derived(
     rollView && !rollView.complete
@@ -311,6 +376,69 @@
       : (rollView?.label ?? 'Draft pool'),
   );
   const poolCountLabel = $derived(`${rollRows.length} players · ${poolSortLabel(presentation)}`);
+  const boundedRoll = $derived(
+    rollView !== null &&
+      !rollView.complete &&
+      (replay.mode === 'classic-shared-82' || replay.mode === 'duel') &&
+      presentation === 'ratings',
+  );
+  $effect(() => {
+    if (!boundedRoll || !rollView || rollView.complete) {
+      rollPoolDetails = [];
+      rollFitContext = null;
+      return;
+    }
+    const manifest = assets.manifest;
+    let cancelled = false;
+    resolveDraftPoolDetails(manifest, rollView.franchiseId, rollView.eraId).then(
+      (players) => {
+        if (cancelled) return;
+        rollPoolDetails = players;
+      },
+      () => {
+        if (!cancelled) rollPoolDetails = [];
+      },
+    );
+    loadDraftFitContext(manifest, rollView.eraId).then(
+      (context) => {
+        if (cancelled) return;
+        rollFitContext = context;
+      },
+      () => {
+        if (!cancelled) rollFitContext = null;
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  });
+  const rollFitReport = $derived.by(() => {
+    if (!boundedRoll || rollFitContext === null || resolvedLineupPlayers.length === 0) return null;
+    const available = new Set(rollRows.map((row) => row.playerId));
+    const pool = rollPoolDetails.filter((player) => available.has(player.playerId));
+    if (pool.length === 0) return null;
+    try {
+      return scoreDraftPoolMemo({
+        pool,
+        locked: resolvedLineupPlayers,
+        context: rollFitContext,
+      });
+    } catch {
+      return null;
+    }
+  });
+  const rollFitByRow = $derived.by(() => {
+    if (rollFitReport === null) return null;
+    const keyById = new Map<string, string>(
+      rollPoolDetails.map((player) => [player.playerId, poolRowKey(player)]),
+    );
+    return new Map(
+      rollFitReport.scores.map((entry) => [
+        keyById.get(entry.playerId) ?? entry.playerId,
+        { tier: entry.tier, need: entry.primaryNeed, netDelta: entry.netDelta },
+      ]),
+    );
+  });
   $effect(() => {
     const rows = activeCourtRows;
     const manifest = assets.manifest;
@@ -359,10 +487,15 @@
   }
   function placeWithDisplacement(player: PlayersIndexEntry, slotIndex: number) {
     closePicker();
-    onPick(player.playerId, slotIndex as SlotIndex);
+    onPick(player, slotIndex as SlotIndex);
   }
   function openPickerForCourt(player: PlayersIndexEntry) {
-    if (mode === 'sandbox-shared-82' || mode === 'classic-shared-82') {
+    if (
+      mode === 'classic-shared-82' ||
+      (mode === 'sandbox-shared-82' &&
+        replay.mode === 'sandbox-shared-82' &&
+        replay.draftStyle === 'legacy')
+    ) {
       openPicker(player);
       return;
     }
@@ -390,7 +523,11 @@
           total: 10,
         };
       }
-      if (mode === 'sandbox-shared-82') {
+      if (
+        mode === 'sandbox-shared-82' &&
+        replay.mode === 'sandbox-shared-82' &&
+        replay.draftStyle === 'legacy'
+      ) {
         const lockedCount = sandboxLocked ? 5 : pickedCount;
         return {
           turn: sandboxLocked ? null : 'you',
@@ -528,6 +665,7 @@
         {presentation}
         filtersEditable={true}
         {allowDisplacement}
+        fitByRow={rollFitByRow}
         selectionDisabled={disabled || !rollView.turn}
         error={null}
         emptyMessage="No players in this pool."
@@ -540,7 +678,10 @@
         </div>
         <ul class="flex flex-col divide-y divide-border/60">
           {#each myPicks as pick (pick.playerId)}
-            {@const row = indexById.get(pick.playerId) ?? null}
+            {@const row =
+              (pick.playerVersionId ? indexByVersionId.get(pick.playerVersionId) : null) ??
+              indexById.get(pick.playerId) ??
+              null}
             <li class="flex min-w-0 items-center gap-3 px-3 py-3 sm:px-4">
               {#if row}
                 <PlayerFace
@@ -581,14 +722,22 @@
       onmove={openPickerForCourt}
       onremove={() => undefined}
     />
-    <DraftValuePanel players={resolvedLineupPlayers} {presentation} />
+    <DraftValuePanel
+      players={resolvedLineupPlayers}
+      {presentation}
+      poolScores={rollFitReport?.scores ?? null}
+      missingNeeds={rollFitReport?.missingNeeds ?? []}
+      refinedCount={rollFitReport?.refinedCount ?? 0}
+    />
     <LineupSummaryNav slots={myCourtRows} {pickedCount} />
   {/if}
 
-  {#if mode === 'duel' && sandboxDuelView && !sandboxDuelView.complete}
+  {#if sandboxDuelView && !sandboxDuelView.complete}
     <div class="min-w-0 rounded-xl bg-surface-1 p-3 sm:p-4">
       <div class="flex items-center justify-between gap-2">
-        <h3 class="font-display text-sm font-extrabold uppercase">Duel · alternating free picks</h3>
+        <h3 class="font-display text-sm font-extrabold uppercase">
+          {mode === 'duel' ? 'Duel' : 'Sandbox Season'} · snake draft
+        </h3>
         <span
           class="shrink-0 rounded-full px-2.5 py-1 font-mono text-[10px] font-extrabold tracking-[0.14em] uppercase {sandboxDuelView.turn
             ? 'bg-primary text-primary-foreground'
@@ -598,7 +747,7 @@
         </span>
       </div>
       <p class="mt-1 text-xs text-muted-foreground" role="status">
-        {sandboxDuelView.label} · {sandboxDuelView.turnText} Same player may appear on both teams.
+        {sandboxDuelView.label} · {sandboxDuelView.turnText} Picking a player blocks every variant.
       </p>
     </div>
     <DraftPoolBrowser
@@ -627,7 +776,7 @@
     <LineupSummaryNav slots={myCourtRows} {pickedCount} />
   {/if}
 
-  {#if mode === 'sandbox-shared-82'}
+  {#if mode === 'sandbox-shared-82' && replay.mode === 'sandbox-shared-82' && replay.draftStyle === 'legacy'}
     <div class="min-w-0 rounded-xl bg-surface-1 p-3 sm:p-4">
       <h3 class="font-display text-sm font-extrabold uppercase">Build your five</h3>
       <p class="mt-1 text-xs text-muted-foreground">

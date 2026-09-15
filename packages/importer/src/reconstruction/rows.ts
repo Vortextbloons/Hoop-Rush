@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { NBA_ROOT } from '../config.ts';
 import { readJson } from '../json.ts';
+import { positionGroupForSource } from '../positions/normalize.ts';
 export const RECONSTRUCTION_SEASONS = [
   '1979-80',
   '1980-81',
@@ -96,10 +97,7 @@ function intOrNull(value: unknown): number | null {
   return n === null ? null : Math.trunc(n);
 }
 export function positionGroupOf(position: string | null | undefined): PositionGroup {
-  const pos = (position ?? '').toUpperCase();
-  if (pos === 'PG' || pos === 'SG' || pos === 'G') return 'G';
-  if (pos === 'PF' || pos === 'SF' || pos === 'F') return 'F';
-  return 'C';
+  return positionGroupForSource(position ?? '');
 }
 export function median(values: readonly (number | null)[]): number {
   const present = values

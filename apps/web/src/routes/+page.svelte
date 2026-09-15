@@ -6,6 +6,7 @@
   import type { SeasonActiveRunIndex } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
   import { getManifest, warmPlayersIndex } from '$lib/data';
+  import SeasonTierBadge from '$lib/components/SeasonTierBadge.svelte';
   import { variantLabel } from '$lib/draft-presentation';
   import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persistence';
   const sandboxHref = resolve('/sandbox');
@@ -53,7 +54,20 @@
   const playersIndexModes = new Set(['01', '02', '03']);
   function warmPlayersIndexForMode(modeCode: string): void {
     if (!playersIndexModes.has(modeCode)) return;
+    if (
+      typeof navigator !== 'undefined' &&
+      (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData ===
+        true
+    )
+      return;
     warmPlayersIndex();
+  }
+  function deferIdle(work: () => void): void {
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      window.requestIdleCallback(() => work(), { timeout: 2000 });
+    } else {
+      setTimeout(work, 0);
+    }
   }
   $effect(() => {
     if (!browser) return;
@@ -64,30 +78,33 @@
       },
       () => {},
     );
-    import('$lib/challenge-repo')
-      .then(({ challengeRepository }) =>
-        Promise.all([
-          challengeRepository.loadActiveRunCheckpoint(),
-          challengeRepository.listCompletedRuns(),
-          challengeRepository.loadClassicDraft(),
-        ]),
-      )
-      .then(
-        ([activeCheckpoint, rows, savedDraft]) => {
-          if (cancelled) return;
-          active = activeCheckpoint;
-          recent = rows.slice(0, 3);
-          classicDraft = savedDraft?.draft ?? null;
-        },
-        () => {},
-      );
-    import('$lib/season/season-repo')
-      .then(({ getSeasonRunRepository }) => getSeasonRunRepository())
-      .then((repo) => repo.loadActiveRunIndex())
-      .then((index) => {
-        if (!cancelled) seasonRun = index;
-      })
-      .catch(() => {});
+    deferIdle(() => {
+      if (cancelled) return;
+      import('$lib/challenge-repo')
+        .then(({ challengeRepository }) =>
+          Promise.all([
+            challengeRepository.loadActiveRunCheckpoint(),
+            challengeRepository.listCompletedRuns(),
+            challengeRepository.loadClassicDraft(),
+          ]),
+        )
+        .then(
+          ([activeCheckpoint, rows, savedDraft]) => {
+            if (cancelled) return;
+            active = activeCheckpoint;
+            recent = rows.slice(0, 3);
+            classicDraft = savedDraft?.draft ?? null;
+          },
+          () => {},
+        );
+      import('$lib/season/season-repo')
+        .then(({ getSeasonRunRepository }) => getSeasonRunRepository())
+        .then((repo) => repo.loadActiveRunIndex())
+        .then((index) => {
+          if (!cancelled) seasonRun = index;
+        })
+        .catch(() => {});
+    });
     return () => {
       cancelled = true;
     };
@@ -162,9 +179,9 @@
       {#if mode.status === 'available'}
         <a
           href={resolve(mode.href)}
+          data-sveltekit-preload-code="hover"
           onpointerenter={() => warmPlayersIndexForMode(mode.code)}
           onfocus={() => warmPlayersIndexForMode(mode.code)}
-          ontouchstart={() => warmPlayersIndexForMode(mode.code)}
           class="group flex h-full flex-col rounded-xl bg-card p-6 outline-none transition-colors hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring sm:p-7 {mode.code ===
           '04'
             ? 'border border-accent/60'
@@ -178,6 +195,9 @@
               class="h-10 w-10 rounded-lg"
               width="40"
               height="40"
+              loading="lazy"
+              decoding="async"
+              fetchpriority="low"
             />
           {/if}
           <h2 class="font-display mt-5 text-4xl font-extrabold tracking-tight uppercase">
@@ -257,9 +277,7 @@
                 <span class="text-stat text-3xl font-extrabold tracking-tight">
                   {row.wins}<span class="text-muted-foreground">–</span>{row.losses}
                 </span>
-                {#await import('$lib/components/SeasonTierBadge.svelte') then { default: SeasonTierBadge }}
-                  <SeasonTierBadge wins={row.wins} />
-                {/await}
+                <SeasonTierBadge wins={row.wins} />
               </span></a
             >
           </li>

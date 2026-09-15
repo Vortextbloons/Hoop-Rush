@@ -1,46 +1,15 @@
 import { POSITION_NORMALIZATION_VERSION, type Position } from '@hoop-rush/data-contracts';
 import type { PositionOverride } from '../positions/overrides.ts';
-export const POSITION_LABEL_MAP: Readonly<Record<string, readonly Position[]>> = {
-  PG: ['PG'],
-  SG: ['SG'],
-  SF: ['SF'],
-  PF: ['PF'],
-  C: ['C'],
-  G: ['PG', 'SG'],
-  F: ['SF', 'PF'],
-  'G-F': ['PG', 'SG', 'SF', 'PF'],
-  'F-G': ['PG', 'SG', 'SF', 'PF'],
-  'F-C': ['SF', 'PF', 'C'],
-  'C-F': ['SF', 'PF', 'C'],
-  'G-C': ['PG', 'SG', 'C'],
-  'C-G': ['PG', 'SG', 'C'],
-  'G-F-C': ['PG', 'SG', 'SF', 'PF', 'C'],
-  'F-G-C': ['PG', 'SG', 'SF', 'PF', 'C'],
-  '': [],
-};
-export interface NormalizedPositionLabels {
-  detailed: Position[];
-  sourceLabels: string[];
-  unknownLabels: string[];
-}
-export function normalizePositionLabels(
-  labels: ReadonlySet<string> | readonly string[],
-): NormalizedPositionLabels {
-  const detailed = new Set<Position>();
-  const unknownLabels: string[] = [];
-  const sourceLabels = [...new Set([...labels].map(String))].sort();
-  for (const label of sourceLabels) {
-    const mapped = POSITION_LABEL_MAP[label];
-    if (mapped === undefined) {
-      unknownLabels.push(label);
-      continue;
-    }
-    for (const position of mapped) {
-      detailed.add(position);
-    }
-  }
-  return { detailed: [...detailed].sort(), sourceLabels, unknownLabels };
-}
+import {
+  normalizePositionLabels,
+  positionsForSourceLabel,
+} from '../positions/normalize.ts';
+export {
+  normalizePositionLabels,
+  POSITION_LABEL_MAP,
+  primaryPositionForSource,
+} from '../positions/normalize.ts';
+export type { NormalizedPositionLabels } from '../positions/normalize.ts';
 export interface PlayerPositionRecord {
   primary: Position;
   secondary: Position[];
@@ -71,7 +40,7 @@ export function buildPlayerPositions(input: {
   const sourceLabels = [...allLabels].sort();
   const unknownLabels: string[] = [];
   for (const label of sourceLabels) {
-    if (POSITION_LABEL_MAP[label] === undefined) {
+    if (positionsForSourceLabel(label) === undefined) {
       unknownLabels.push(label);
     }
   }
@@ -99,7 +68,7 @@ export function buildPlayerPositions(input: {
       unknownLabels: [...unknownLabels].sort(),
     };
   }
-  const peakMapped = POSITION_LABEL_MAP[peakPrimary];
+  const peakMapped = positionsForSourceLabel(peakPrimary);
   let primary: Position;
   if (peakPrimary === '' || peakMapped === undefined) {
     if (!unknownLabels.includes(peakPrimary)) {
@@ -114,7 +83,7 @@ export function buildPlayerPositions(input: {
     if (label === '') {
       continue;
     }
-    const mapped = POSITION_LABEL_MAP[label];
+    const mapped = positionsForSourceLabel(label);
     if (mapped === undefined) {
       if (!unknownLabels.includes(label)) {
         unknownLabels.push(label);

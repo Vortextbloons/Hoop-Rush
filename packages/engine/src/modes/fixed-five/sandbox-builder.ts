@@ -14,6 +14,7 @@ export interface SandboxBuilderState {
   placements: Array<{
     playerId: PlayerId;
     slotIndex: SlotIndex;
+    playerVersionId?: string;
   }>;
   locked: boolean;
 }
@@ -45,6 +46,16 @@ function candidateById(
 ): FixedFiveCandidate | null {
   return pool.find((c) => c.playerId === playerId) ?? null;
 }
+function candidateForPlacement(
+  pool: readonly FixedFiveCandidate[],
+  placement: { playerId: PlayerId; playerVersionId?: string },
+): FixedFiveCandidate | null {
+  if (placement.playerVersionId) {
+    const candidate = pool.find((c) => c.playerVersionId === placement.playerVersionId) ?? null;
+    return candidate?.playerId === placement.playerId ? candidate : null;
+  }
+  return candidateById(pool, placement.playerId);
+}
 function openSlots(state: SandboxBuilderState): SlotIndex[] {
   const occupied = new Set(state.placements.map((p) => p.slotIndex));
   const open: SlotIndex[] = [];
@@ -58,14 +69,14 @@ export function selectionKeepsFeasibility(
   placed: ReadonlyArray<{
     playerId: PlayerId;
     slotIndex: SlotIndex;
+    playerVersionId?: string;
   }>,
 ): boolean {
-  const byId = new Map(pool.map((c) => [c.playerId, c]));
   const usedIds = new Set<string>();
   for (const p of placed) {
     if (usedIds.has(p.playerId)) return false;
     usedIds.add(p.playerId);
-    const candidate = byId.get(p.playerId);
+    const candidate = candidateForPlacement(pool, p);
     if (!candidate) return false;
     if (!canPlay(candidate.positions, slotRequirement(p.slotIndex))) return false;
   }
@@ -75,7 +86,7 @@ export function selectionKeepsFeasibility(
       assignments: placed.map((p) => ({
         slotIndex: p.slotIndex,
         playerId: p.playerId,
-        positions: byId.get(p.playerId)?.positions ?? FALLBACK_POSITIONS,
+        positions: candidateForPlacement(pool, p)?.positions ?? FALLBACK_POSITIONS,
       })),
     };
     return validateLineup(lineup).ok;
@@ -88,22 +99,20 @@ export function selectionKeepsFeasibility(
       const full: Array<{
         playerId: PlayerId;
         slotIndex: SlotIndex;
+        playerVersionId?: string;
       }> = [];
       for (const p of placed) full.push(p);
       for (const c of chosen) {
         const slotAt = open[chosen.indexOf(c)];
         if (slotAt === undefined) return false;
-        full.push({ playerId: c.playerId, slotIndex: slotAt });
+        full.push({ playerId: c.playerId, slotIndex: slotAt, playerVersionId: c.playerVersionId });
       }
       const lineup = {
         structure: ['G', 'G', 'F', 'F', 'C'] as ['G', 'G', 'F', 'F', 'C'],
         assignments: full.map((p) => ({
           slotIndex: p.slotIndex,
           playerId: p.playerId,
-          positions:
-            byId.get(p.playerId)?.positions ??
-            chosen.find((c) => c.playerId === p.playerId)?.positions ??
-            FALLBACK_POSITIONS,
+          positions: candidateForPlacement(pool, p)?.positions ?? FALLBACK_POSITIONS,
         })),
       };
       return validateLineup(lineup).ok;
@@ -128,9 +137,9 @@ function assignLineupFeasible(
   placed: ReadonlyArray<{
     playerId: PlayerId;
     slotIndex: SlotIndex;
+    playerVersionId?: string;
   }>,
 ): boolean {
-  const byId = new Map(pool.map((c) => [c.playerId, c]));
   const occupied = new Set(placed.map((p) => p.slotIndex));
   const open = ([0, 1, 2, 3, 4] as SlotIndex[]).filter((s) => !occupied.has(s));
   const remaining = pool.filter((c) => ![...placed].some((p) => p.playerId === c.playerId));
@@ -147,13 +156,14 @@ function assignLineupFeasible(
       const trial = [
         ...placed,
         ...usedList.map((id) => {
-          const c = byId.get(id) ?? remaining.find((r) => r.playerId === id);
+          const c = remaining.find((r) => r.playerId === id);
           const slotIndex = usedList.indexOf(id);
           const slotFor = open[slotIndex];
           if (slotFor === undefined) throw new Error('sandbox feasibility ran out of slots');
           return {
             playerId: id,
             slotIndex: slotFor,
+            playerVersionId: c?.playerVersionId,
             positions: c?.positions ?? FALLBACK_POSITIONS,
           };
         }),

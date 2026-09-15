@@ -40,6 +40,7 @@
       src={logoUrl}
       alt=""
       loading="lazy"
+      decoding="async"
       onerror={() => {
         failed = true;
       }}

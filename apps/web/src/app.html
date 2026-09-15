@@ -18,12 +18,25 @@
         link.rel = 'preload';
         link.href = '%sveltekit.assets%/data/manifest.json';
         link.as = 'fetch';
-        link.crossOrigin = '';
+        link.fetchPriority = 'low';
         document.head.appendChild(link);
       })();
     </script>
-    <link rel="preload" href="%sveltekit.assets%/fonts/fonts.css" as="style" />
     <link rel="stylesheet" href="%sveltekit.assets%/fonts/fonts.css" />
+    <link
+      rel="preload"
+      href="%sveltekit.assets%/fonts/barlow-condensed-800-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="%sveltekit.assets%/fonts/inter-400-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
     %sveltekit.head%
   </head>
   <body>

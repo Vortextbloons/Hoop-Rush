@@ -56,7 +56,7 @@
   ];
   const POSITION_OPTIONS = DETAILED_POSITIONS;
   const PAGE_SIZE = 120;
-  const SEARCH_DEBOUNCE_MS = 80;
+  const SEARCH_DEBOUNCE_MS = 150;
   let manifest = $state.raw<HoopRushManifest | null>(null);
   let manifestError: string | null = $state(null);
   let index = $state.raw<PlayersIndex | null>(null);
@@ -92,27 +92,27 @@
       (m) => {
         if (cancelled) return;
         manifest = m;
-        getPlayersIndex().then(
-          (ix) => {
-            if (cancelled) return;
-            index = ix;
-          },
-          (error: unknown) => {
-            if (!cancelled) indexError = error instanceof Error ? error.message : String(error);
-          },
-        );
-        getRosterDetails().then(
-          (det) => {
-            if (cancelled) return;
-            details = det;
-          },
-          (error: unknown) => {
-            if (!cancelled) detailsError = error instanceof Error ? error.message : String(error);
-          },
-        );
       },
       (error: unknown) => {
         if (!cancelled) manifestError = error instanceof Error ? error.message : String(error);
+      },
+    );
+    getPlayersIndex().then(
+      (ix) => {
+        if (cancelled) return;
+        index = ix;
+      },
+      (error: unknown) => {
+        if (!cancelled) indexError = error instanceof Error ? error.message : String(error);
+      },
+    );
+    getRosterDetails().then(
+      (det) => {
+        if (cancelled) return;
+        details = det;
+      },
+      (error: unknown) => {
+        if (!cancelled) detailsError = error instanceof Error ? error.message : String(error);
       },
     );
     return () => {

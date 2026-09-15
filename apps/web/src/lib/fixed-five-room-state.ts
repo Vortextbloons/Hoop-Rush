@@ -1,6 +1,7 @@
 import {
   canonicalJson,
   contentHashSchema,
+  FIXED_FIVE_MULTIPLAYER_VERSION,
   fixedFiveTimeoutMsForMode,
   idSchema,
   playerIdSchema,
@@ -121,8 +122,15 @@ export interface ClassicDraftReplay {
 }
 export interface SandboxDraftReplay {
   hasStart: boolean;
+  draftStyle: 'legacy';
   p1: SandboxBuilderState;
   p2: SandboxBuilderState;
+  skipped: number;
+}
+export interface SandboxSnakeDraftReplay {
+  hasStart: boolean;
+  draftStyle: 'snake';
+  state: SandboxDuelState;
   skipped: number;
 }
 export interface DuelDraftReplay {
@@ -141,7 +149,7 @@ export type DraftReplay =
     } & ClassicDraftReplay)
   | ({
       mode: 'sandbox-shared-82';
-    } & SandboxDraftReplay)
+    } & (SandboxDraftReplay | SandboxSnakeDraftReplay))
   | ({
       mode: 'duel';
     } & DuelDraftReplay)
@@ -234,6 +242,7 @@ function applySandboxDuelPayload(
   if (payload.kind === 'sandbox-place' || payload.kind === 'timeout-autopick') {
     return claimSandboxDuelPlayer(state, assets.pool, {
       playerId: payload.playerId,
+      playerVersionId: payload.playerVersionId,
       slotIndex: payload.slotIndex,
       actor: command.actorParticipantId,
     });
@@ -244,6 +253,7 @@ function isDraftPayload(
   mode: FixedFiveRoomMode,
   kind: FixedFiveCommandPayload['kind'],
   sandboxDuel = false,
+  sandboxSnake = false,
 ): boolean {
   if (mode === 'duel') {
     if (sandboxDuel) {
@@ -257,6 +267,7 @@ function isDraftPayload(
     );
   }
   if (mode === 'sandbox-shared-82') {
+    if (sandboxSnake) return kind === 'sandbox-place' || kind === 'timeout-autopick';
     return (
       kind === 'sandbox-place' ||
       kind === 'sandbox-reposition' ||
@@ -281,11 +292,13 @@ export function replayFixedFiveLog(
   assets: FixedFiveAssets,
   commands: FixedFiveCommand[],
   sourceMode: FixedFiveRoomSettings['sourceMode'] = 'classic',
+  multiplayerVersion = FIXED_FIVE_MULTIPLAYER_VERSION,
 ): DraftReplay {
   const ordered = [...commands].sort((a, b) => a.ordinal - b.ordinal);
   const hasStart = ordered.some((c) => c.payload.kind === 'start');
   if (mode === 'duel' && sourceMode === 'sandbox') {
-    let state = createSandboxDuelDraft(rootSeed);
+    const snake = multiplayerVersion === FIXED_FIVE_MULTIPLAYER_VERSION;
+    let state = createSandboxDuelDraft(rootSeed, undefined, snake ? 'snake' : 'alternating');
     let skipped = 0;
     for (const command of ordered) {
       if (!isDraftPayload(mode, command.payload.kind, true)) continue;
@@ -311,6 +324,19 @@ export function replayFixedFiveLog(
     return { mode, hasStart, state, skipped };
   }
   if (mode === 'sandbox-shared-82') {
+    if (multiplayerVersion === FIXED_FIVE_MULTIPLAYER_VERSION) {
+      let state = createSandboxDuelDraft(rootSeed);
+      let skipped = 0;
+      for (const command of ordered) {
+        if (!isDraftPayload(mode, command.payload.kind, false, true)) continue;
+        try {
+          state = applySandboxDuelPayload(state, assets, command);
+        } catch {
+          skipped += 1;
+        }
+      }
+      return { mode, hasStart, draftStyle: 'snake', state, skipped };
+    }
     let p1 = createSandboxBuilder();
     let p2 = createSandboxBuilder();
     let skipped = 0;
@@ -326,7 +352,7 @@ export function replayFixedFiveLog(
         skipped += 1;
       }
     }
-    return { mode, hasStart, p1, p2, skipped };
+    return { mode, hasStart, draftStyle: 'legacy', p1, p2, skipped };
   }
   let p1 = createParticipantClassicDraft(
     draftIdFor(roomId, 'p1'),
@@ -362,7 +388,11 @@ export function replayFixedFiveLog(
 export function isDraftComplete(replay: DraftReplay): boolean {
   if (replay.mode === 'duel') return replay.state.status === 'complete';
   if (replay.mode === 'sandbox-duel') return replay.state.status === 'complete';
-  if (replay.mode === 'sandbox-shared-82') return replay.p1.locked && replay.p2.locked;
+  if (replay.mode === 'sandbox-shared-82') {
+    return replay.draftStyle === 'snake'
+      ? replay.state.status === 'complete'
+      : replay.p1.locked && replay.p2.locked;
+  }
   return replay.p1.status === 'complete' && replay.p2.status === 'complete';
 }
 export function isFixedFiveDraftTurn(
@@ -380,6 +410,9 @@ export function isFixedFiveDraftTurn(
     return replay.state.status === 'drafting' && sandboxDuelPicker(replay.state) === participant;
   }
   if (replay.mode === 'sandbox-shared-82') {
+    if (replay.draftStyle === 'snake') {
+      return replay.state.status === 'drafting' && sandboxDuelPicker(replay.state) === participant;
+    }
     return !(participant === 'p1' ? replay.p1 : replay.p2).locked;
   }
   return (participant === 'p1' ? replay.p1 : replay.p2).status === 'drafting';
@@ -392,6 +425,9 @@ export function picksCommittedOf(replay: DraftReplay, participant: FixedFivePart
     return replay.state.picks.filter((p) => p.participantId === participant).length;
   }
   if (replay.mode === 'sandbox-shared-82') {
+    if (replay.draftStyle === 'snake') {
+      return replay.state.picks.filter((p) => p.participantId === participant).length;
+    }
     const builder = participant === 'p1' ? replay.p1 : replay.p2;
     return builder.placements.length;
   }
@@ -402,6 +438,7 @@ export function lockedOf(replay: DraftReplay, participant: FixedFiveParticipantI
   if (replay.mode === 'duel') return replay.state.status === 'complete';
   if (replay.mode === 'sandbox-duel') return replay.state.status === 'complete';
   if (replay.mode === 'sandbox-shared-82') {
+    if (replay.draftStyle === 'snake') return replay.state.status === 'complete';
     return (participant === 'p1' ? replay.p1 : replay.p2).locked;
   }
   return (participant === 'p1' ? replay.p1 : replay.p2).status === 'complete';
@@ -520,6 +557,19 @@ export function overlaySnapshotProgress(
 }
 export interface PickRef extends PlayerRef {
   slotIndex: SlotIndex;
+  playerVersionId?: string;
+}
+function sandboxCandidateForPick(
+  assets: FixedFiveAssets,
+  playerId: string,
+  versionId?: string,
+): FixedFiveCandidate {
+  const candidate =
+    (versionId ? assets.pool.find((entry) => entry.playerVersionId === versionId) : null) ??
+    assets.poolById.get(playerId);
+  if (!candidate || candidate.playerId !== playerId)
+    throw new Error(`sandbox pick ${playerId} has no matching pool record`);
+  return candidate;
 }
 export function refsForParticipant(
   replay: DraftReplay,
@@ -540,17 +590,31 @@ export function refsForParticipant(
     return replay.state.picks
       .filter((p) => p.participantId === participant)
       .map((pick) => {
-        const candidate = assets.poolById.get(pick.playerId);
-        if (!candidate) throw new Error(`sandbox duel pick ${pick.playerId} has no pool record`);
+        const candidate = sandboxCandidateForPick(assets, pick.playerId, pick.playerVersionId);
         return {
           playerId: pick.playerId,
           franchiseId: candidate.franchiseId,
           eraId: candidate.eraId,
           slotIndex: pick.slotIndex,
+          playerVersionId: candidate.playerVersionId,
         };
       });
   }
   if (replay.mode === 'sandbox-shared-82') {
+    if (replay.draftStyle === 'snake') {
+      return replay.state.picks
+        .filter((p) => p.participantId === participant)
+        .map((pick) => {
+          const candidate = sandboxCandidateForPick(assets, pick.playerId, pick.playerVersionId);
+          return {
+            playerId: pick.playerId,
+            franchiseId: candidate.franchiseId,
+            eraId: candidate.eraId,
+            slotIndex: pick.slotIndex,
+            playerVersionId: candidate.playerVersionId,
+          };
+        });
+    }
     const builder = participant === 'p1' ? replay.p1 : replay.p2;
     return builder.placements.map((placement) => {
       const candidate = assets.poolById.get(placement.playerId);
@@ -664,6 +728,7 @@ export function pickOrdinalOf(replay: DraftReplay, participant: FixedFivePartici
   if (replay.mode === 'duel') return replay.state.pickOrdinal;
   if (replay.mode === 'sandbox-duel') return replay.state.pickOrdinal;
   if (replay.mode === 'sandbox-shared-82') {
+    if (replay.draftStyle === 'snake') return replay.state.pickOrdinal;
     return (participant === 'p1' ? replay.p1 : replay.p2).placements.length;
   }
   return (participant === 'p1' ? replay.p1 : replay.p2).picks.length;
@@ -682,6 +747,12 @@ export function computeDueAutopick(
   const ordinal = pickOrdinalOf(replay, participant);
   if (mode === 'sandbox-shared-82') {
     if (replay.mode !== 'sandbox-shared-82') return null;
+    if (replay.draftStyle === 'snake') {
+      if (!isFixedFiveDraftTurn(replay, participant)) return null;
+      const safe = enumerateSandboxDuelSafeMoves(assets.pool, replay.state);
+      if (safe.length === 0) return null;
+      return chooseAutopick(rootSeed, mode, participant, ordinal, safe);
+    }
     const builder = participant === 'p1' ? replay.p1 : replay.p2;
     if (builder.locked) return null;
     const safe = enumerateSandboxSafeMoves(assets.pool, builder);

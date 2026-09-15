@@ -271,7 +271,7 @@
           <Zap class="h-5 w-5 text-muted-foreground" />
           <p class="font-display mt-3 text-sm font-extrabold uppercase">Sandbox Season</p>
           <p class="mt-1 text-xs text-muted-foreground">
-            Pick any five · both teams can share players
+            Snake draft · each pick blocks every player variant
           </p>
         </button>
         <button
@@ -307,7 +307,7 @@
           >
             <p class="text-sm font-bold">From Sandbox</p>
             <p class="text-xs text-muted-foreground">
-              Free-pick duel — any player, stars can repeat
+              Snake draft — any player, each pick blocks every variant
             </p>
           </button>
         </div>

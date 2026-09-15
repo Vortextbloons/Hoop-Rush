@@ -10,6 +10,7 @@ import {
 import { classicVariantSchema } from './classic.ts';
 import { lineupSchema } from './lineup.ts';
 import { simulationPlayerSchema } from './simulation.ts';
+import { playerVersionIdSchema } from './season-identity.ts';
 import { CLASSIC_ROLL_VERSION } from './versions.ts';
 import { FIXED_FIVE_MULTIPLAYER_VERSION } from './fixed-five-versions.ts';
 export {
@@ -114,6 +115,7 @@ export const fixedFiveDuelClaimPayloadSchema = z.object({
 export const fixedFiveSandboxPlacePayloadSchema = z.object({
   kind: z.literal('sandbox-place'),
   playerId: playerIdSchema,
+  playerVersionId: playerVersionIdSchema.optional(),
   slotIndex: z.number().int().min(0).max(4),
 });
 export const fixedFiveSandboxRepositionPayloadSchema = z.object({
@@ -131,6 +133,7 @@ export const fixedFiveSandboxLockPayloadSchema = z.object({
 export const fixedFiveTimeoutAutopickPayloadSchema = z.object({
   kind: z.literal('timeout-autopick'),
   playerId: playerIdSchema,
+  playerVersionId: playerVersionIdSchema.optional(),
   slotIndex: z.number().int().min(0).max(4),
   pickOrdinal: z.number().int().nonnegative(),
   seedPath: z.string().min(1).max(256),

@@ -3,6 +3,7 @@ import { seedSchema } from '@hoop-rush/data-contracts';
 import { FNV_OFFSET_32, fnv1a32, hex32 } from '../../sim/rng.ts';
 import { createRng } from '../../sim/rng.ts';
 export const FIXED_FIVE_SEED_VERSION = 'fixed-five-v1';
+export const FIXED_FIVE_SANDBOX_DRAFT_ORDER_VERSION = 'fixed-five-sandbox-snake-v1';
 function hexSeed(material: string): Seed {
   const high = fnv1a32(material);
   const low = fnv1a32(`${material}:tail`, FNV_OFFSET_32 ^ high);
@@ -20,6 +21,23 @@ export function fixedFiveDraftSeed(rootSeed: Seed, participantId: FixedFiveParti
 export function fixedFiveFirstPicker(rootSeed: Seed): FixedFiveParticipantId {
   const rng = createRng(`hoop-rush:${FIXED_FIVE_SEED_VERSION}:${rootSeed}:duel-first-picker`);
   return rng.chance(0.5) ? 'p1' : 'p2';
+}
+export function fixedFiveSandboxFirstPicker(rootSeed: Seed): FixedFiveParticipantId {
+  const firstByte = Number.parseInt(rootSeed.slice(0, 2), 16);
+  return firstByte % 2 === 0 ? 'p1' : 'p2';
+}
+export function fixedFiveSandboxDraftPicker(
+  rootSeed: Seed,
+  pickOrdinal: number,
+  firstPickerOverride?: FixedFiveParticipantId,
+): FixedFiveParticipantId {
+  if (!Number.isInteger(pickOrdinal) || pickOrdinal < 0 || pickOrdinal >= 10) {
+    throw new Error(`sandbox pickOrdinal must be an integer in 0..9 (got ${String(pickOrdinal)})`);
+  }
+  const firstPicker = firstPickerOverride ?? fixedFiveSandboxFirstPicker(rootSeed);
+  const other = firstPicker === 'p1' ? 'p2' : 'p1';
+  const roundFirst = Math.floor(pickOrdinal / 2) % 2 === 0 ? firstPicker : other;
+  return pickOrdinal % 2 === 0 ? roundFirst : roundFirst === 'p1' ? 'p2' : 'p1';
 }
 export function fixedFiveDuelGameSeed(rootSeed: Seed, gameNumber: number): Seed {
   if (!Number.isInteger(gameNumber) || gameNumber < 1 || gameNumber > 7) {

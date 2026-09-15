@@ -8,6 +8,7 @@
     logoCandidates = [],
     alt = '',
     className = '',
+    eager = false,
   }: {
     manifest: HoopRushManifest;
     franchiseId: string;
@@ -15,6 +16,7 @@
     logoCandidates?: string[];
     alt?: string;
     className?: string;
+    eager?: boolean;
   } = $props();
   const urls = $derived(
     resolveLogoUrlsWithHistorical(manifest, franchiseId, teamExternalId, logoCandidates),
@@ -33,6 +35,8 @@
       width="20"
       height="20"
       class="h-full w-full object-contain"
+      loading={eager ? 'eager' : 'lazy'}
+      fetchpriority={eager ? 'high' : 'low'}
       decoding="async"
       referrerpolicy="no-referrer"
       onerror={fallback.onError}

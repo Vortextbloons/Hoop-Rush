@@ -58,8 +58,15 @@ import {
   rerollDuel,
 } from './duel.ts';
 import {
+  claimSandboxDuelPlayer,
+  createSandboxDuelDraft,
+  sandboxDuelPicker,
+  sandboxDuelSnakeOrderHolds,
+} from './sandbox-duel.ts';
+import {
   chooseAutopick,
   chooseSandboxAutopicksUntilFull,
+  enumerateSandboxDuelSafeMoves,
   enumerateClassicSafeMoves,
 } from './timeout.ts';
 import { findWeakestOpponent, h2hGameNumbersFor, simulateShared82 } from './shared82.ts';
@@ -575,6 +582,71 @@ describe('duel draft', () => {
     expect(() =>
       rerollDuel(state, catalog, byId, 'franchise', duelCurrentPicker(state), context),
     ).toThrow();
+  });
+});
+describe('sandbox snake draft', () => {
+  it('uses seeded snake order and blocks every canonical player variant', () => {
+    const { pool } = duelPool();
+    let state = createSandboxDuelDraft(ROOT);
+    const first = state.firstPicker;
+    const other = first === 'p1' ? 'p2' : 'p1';
+    const expectedOrder = [first, other, other, first, first, other, other, first, first, other];
+
+    for (let i = 0; i < expectedOrder.length; i += 1) {
+      const actor = expectedOrder[i];
+      if (!actor) throw new Error('sandbox snake test is missing a participant');
+      expect(sandboxDuelPicker(state)).toBe(actor);
+      const move = enumerateSandboxDuelSafeMoves(pool, state)[0];
+      expect(move).toBeDefined();
+      if (!move) throw new Error('sandbox snake test found no safe move');
+      state = claimSandboxDuelPlayer(state, pool, {
+        playerId: move.playerId,
+        playerVersionId: move.playerVersionId,
+        slotIndex: move.slotIndex,
+        actor,
+      });
+    }
+
+    expect(state.status).toBe('complete');
+    expect(sandboxDuelSnakeOrderHolds(state)).toBe(true);
+    expect(new Set(state.picks.map((pick) => pick.playerId)).size).toBe(10);
+
+    const firstPick = state.picks[0];
+    if (!firstPick) throw new Error('sandbox snake test is missing its first pick');
+    const openState = createSandboxDuelDraft(ROOT);
+    const firstCandidate = pool.find((candidate) => candidate.playerId === firstPick.playerId);
+    if (!firstCandidate) throw new Error('sandbox snake test is missing its first candidate');
+    const mismatchedCandidate = pool.find(
+      (candidate) => candidate.playerId !== firstCandidate.playerId,
+    );
+    if (!mismatchedCandidate) throw new Error('sandbox snake test is missing a second candidate');
+    expect(() =>
+      claimSandboxDuelPlayer(openState, pool, {
+        playerId: firstCandidate.playerId,
+        playerVersionId: mismatchedCandidate.playerVersionId,
+        slotIndex: 0,
+        actor: first,
+      }),
+    ).toThrow(/unknown player/);
+    const variant = {
+      ...firstCandidate,
+      playerVersionId: `${firstCandidate.playerVersionId}-variant`,
+    };
+    const variantPool = [variant, ...pool];
+    const claimed = claimSandboxDuelPlayer(openState, variantPool, {
+      playerId: firstCandidate.playerId,
+      playerVersionId: firstCandidate.playerVersionId,
+      slotIndex: 0,
+      actor: first,
+    });
+    expect(() =>
+      claimSandboxDuelPlayer(claimed, variantPool, {
+        playerId: firstCandidate.playerId,
+        playerVersionId: variant.playerVersionId,
+        slotIndex: 0,
+        actor: sandboxDuelPicker(claimed),
+      }),
+    ).toThrow(/already claimed/);
   });
 });
 describe('timeout autopick', () => {

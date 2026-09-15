@@ -33,6 +33,13 @@
   import { randomUUID } from '$lib/random-id';
   import { resolvePlayerRefs } from '$lib/player-refs';
   import { poolSortLabel, presentationForVariant, variantLabel } from '$lib/draft-presentation';
+  import {
+    loadDraftFitContext,
+    poolRowKey,
+    resolveDraftPoolDetails,
+    scoreDraftPoolMemo,
+    type DraftFitContext,
+  } from '$lib/draft-fit';
   import { formatPositions } from '$lib/player-positions';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
   import LineupCourt from '$lib/components/LineupCourt.svelte';
@@ -75,6 +82,8 @@
   let launchError: string | null = $state(null);
   let difficulty = $state<'medium' | 'casual'>('medium');
   let resolvedDraftPlayers = $state.raw<PeakPlayerSeason[]>([]);
+  let poolDetails = $state.raw<PeakPlayerSeason[]>([]);
+  let fitContext = $state.raw<DraftFitContext | null>(null);
   let mounted = true;
   $effect(() => {
     mounted = true;
@@ -109,30 +118,30 @@
       (m) => {
         if (cancelled) return;
         manifest = m;
-        getPlayersIndex().then(
-          (ix) => {
-            if (cancelled) return;
-            index = ix;
-            loadClassicDraftState().then(
-              (saved) => {
-                if (cancelled) return;
-                draft = saved;
-                draftLoaded = true;
-              },
-              (error: unknown) => {
-                if (cancelled) return;
-                draftError = error instanceof Error ? error.message : String(error);
-                draftLoaded = true;
-              },
-            );
-          },
-          (error: unknown) => {
-            if (!cancelled) indexError = error instanceof Error ? error.message : String(error);
-          },
-        );
       },
       (error: unknown) => {
         if (!cancelled) manifestError = error instanceof Error ? error.message : String(error);
+      },
+    );
+    getPlayersIndex().then(
+      (ix) => {
+        if (cancelled) return;
+        index = ix;
+      },
+      (error: unknown) => {
+        if (!cancelled) indexError = error instanceof Error ? error.message : String(error);
+      },
+    );
+    loadClassicDraftState().then(
+      (saved) => {
+        if (cancelled) return;
+        draft = saved;
+        draftLoaded = true;
+      },
+      (error: unknown) => {
+        if (cancelled) return;
+        draftError = error instanceof Error ? error.message : String(error);
+        draftLoaded = true;
       },
     );
     return () => {
@@ -213,6 +222,60 @@
     return () => {
       cancelled = true;
     };
+  });
+  $effect(() => {
+    const m = manifest;
+    const currentRoll = roll;
+    if (!m || !currentRoll || presentation !== 'ratings') {
+      poolDetails = [];
+      fitContext = null;
+      return;
+    }
+    const poolKey = `${currentRoll.franchiseId}/${currentRoll.eraId}`;
+    let cancelled = false;
+    resolveDraftPoolDetails(m, currentRoll.franchiseId, currentRoll.eraId).then(
+      (players) => {
+        if (cancelled || `${roll?.franchiseId}/${roll?.eraId}` !== poolKey) return;
+        poolDetails = players;
+      },
+      () => {
+        if (!cancelled) poolDetails = [];
+      },
+    );
+    loadDraftFitContext(m, currentRoll.eraId).then(
+      (context) => {
+        if (cancelled || `${roll?.franchiseId}/${roll?.eraId}` !== poolKey) return;
+        fitContext = context;
+      },
+      () => {
+        if (!cancelled) fitContext = null;
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  });
+  const fitReport = $derived.by(() => {
+    if (presentation !== 'ratings' || draft?.status !== 'drafting') return null;
+    const context = fitContext;
+    if (!context || poolDetails.length === 0 || resolvedDraftPlayers.length === 0) return null;
+    try {
+      return scoreDraftPoolMemo({ pool: poolDetails, locked: resolvedDraftPlayers, context });
+    } catch {
+      return null;
+    }
+  });
+  const fitByRow = $derived.by(() => {
+    if (fitReport === null) return null;
+    const keyById = new Map<string, string>(
+      poolDetails.map((player) => [player.playerId, poolRowKey(player)]),
+    );
+    return new Map(
+      fitReport.scores.map((entry) => [
+        keyById.get(entry.playerId) ?? entry.playerId,
+        { tier: entry.tier, need: entry.primaryNeed, netDelta: entry.netDelta },
+      ]),
+    );
   });
   const pickedCount = $derived(slots.filter((player) => player !== null).length);
   const franchiseRerollAvailable = $derived(
@@ -554,6 +617,7 @@
             {presentation}
             filtersEditable={true}
             allowDisplacement
+            {fitByRow}
             error={actionError}
             emptyMessage="No players in this pool."
             onpick={openPicker}
@@ -660,7 +724,13 @@
           onmove={openPicker}
           onremove={() => undefined}
         />
-        <DraftValuePanel players={resolvedDraftPlayers} {presentation} />
+        <DraftValuePanel
+          players={resolvedDraftPlayers}
+          {presentation}
+          poolScores={fitReport?.scores ?? null}
+          missingNeeds={fitReport?.missingNeeds ?? []}
+          refinedCount={fitReport?.refinedCount ?? 0}
+        />
 
         <LineupSummaryNav {slots} {pickedCount} />
       </div>

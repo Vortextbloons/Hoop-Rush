@@ -226,6 +226,11 @@ export function warmManifest(): void {
 }
 export function warmPlayersIndex(): void {
   if (typeof window === 'undefined') return;
+  if (
+    typeof navigator !== 'undefined' &&
+    (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData === true
+  )
+    return;
   void getPlayersIndex().catch(() => {});
 }
 async function loadPlayersIndexFor(): Promise<PlayersIndex> {

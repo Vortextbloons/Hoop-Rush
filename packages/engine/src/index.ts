@@ -18,6 +18,17 @@ export {
   evaluateContextualPlayerValue,
   evaluateLineupMatchup,
 } from './challenge/contextual-value.ts';
+export {
+  scoreDraftPool,
+  DRAFT_FIT_REFINE_DEFAULT,
+  DRAFT_FIT_REFINE_MAX,
+  DRAFT_FIT_TOP_COUNT,
+  type DraftFitNeed,
+  type DraftFitProjectionOptions,
+  type DraftFitReport,
+  type DraftFitScore,
+  type DraftFitTier,
+} from './challenge/draft-fit-projection.ts';
 export { explainSeason } from './challenge/explain.ts';
 export { selectMemorableGames } from './challenge/memorable.ts';
 export { leagueMvp } from './challenge/mvp.ts';
@@ -550,9 +561,12 @@ export {
 } from './projection/index.ts';
 export {
   FIXED_FIVE_SEED_VERSION,
+  FIXED_FIVE_SANDBOX_DRAFT_ORDER_VERSION,
   fixedFiveParticipantSeed,
   fixedFiveDraftSeed,
   fixedFiveFirstPicker,
+  fixedFiveSandboxFirstPicker,
+  fixedFiveSandboxDraftPicker,
   fixedFiveDuelGameSeed,
   fixedFiveSharedGameSeed,
   fixedFiveH2HSeed,
@@ -591,6 +605,7 @@ export {
   sandboxDuelPicksFor,
   isSandboxDuelComplete,
   sandboxDuelAlternationHolds,
+  sandboxDuelSnakeOrderHolds,
   sandboxDuelPicker,
   type SandboxDuelState,
   type SandboxDuelPick,

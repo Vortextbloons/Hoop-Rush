@@ -8,18 +8,34 @@
     evaluateContextualPlayerValue,
     evaluateLineupMatchup,
     toSimulationPlayer,
+    type DraftFitNeed,
+    type DraftFitScore,
   } from '@hoop-rush/engine';
   import type { DraftPresentation } from '$lib/draft-presentation';
+  import { FIT_NEED_META, FIT_TIER_META, formatNetDelta } from '$lib/draft-fit';
   let {
     players,
     opponent = null,
     presentation = 'ratings',
+    poolScores = null,
+    missingNeeds = [],
+    refinedCount = 0,
   }: {
     players: PeakPlayerSeason[];
     opponent?: BracketOpponent | null;
     presentation?: DraftPresentation;
+    poolScores?: DraftFitScore[] | null;
+    missingNeeds?: DraftFitNeed[];
+    refinedCount?: number;
   } = $props();
   const hideRatings = $derived(presentation === 'ball-knowledge');
+  const showSuggestions = $derived(!hideRatings && (poolScores?.length ?? 0) > 0);
+  const topSuggestions = $derived((poolScores ?? []).slice(0, 5));
+  const needsText = $derived(
+    missingNeeds.length === 0
+      ? null
+      : `Needs: ${missingNeeds.map((need) => FIT_NEED_META[need].label).join(' · ')}`,
+  );
   const values = $derived.by((): ContextualPlayerValue[] => {
     const simulationPlayers = players.map(toSimulationPlayer);
     return simulationPlayers.map((player, index) =>
@@ -68,6 +84,74 @@
       </span>
     {/if}
   </div>
+  {#if showSuggestions}
+    <div class="border-b border-border/60 px-3 py-3 sm:px-4" data-fit-top>
+      <div class="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 class="font-mono text-[10px] font-bold tracking-[0.14em] text-primary uppercase">
+          Suggested picks
+        </h3>
+        {#if needsText}
+          <span class="font-mono text-[10px] text-muted-foreground">{needsText}</span>
+        {/if}
+      </div>
+      <ol class="mt-2 flex flex-col gap-1.5">
+        {#each topSuggestions as suggestion, rank (suggestion.playerId)}
+          {@const tier = FIT_TIER_META[suggestion.tier]}
+          {@const need = FIT_NEED_META[suggestion.primaryNeed]}
+          <li
+            class="flex items-center gap-2 rounded-lg border px-2.5 py-1.5 {rank === 0
+              ? 'border-primary/45 bg-primary/10'
+              : 'border-border/60 bg-surface-2'}"
+            data-fit-tier={suggestion.tier}
+          >
+            <span
+              class="grid h-5 w-5 shrink-0 place-items-center rounded-full font-mono text-[10px] font-extrabold {rank ===
+              0
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-surface-3 text-muted-foreground'}"
+              aria-hidden="true">{rank + 1}</span
+            >
+            <span class="min-w-0 flex-1">
+              <span class="block truncate text-sm font-bold">
+                {suggestion.displayName}
+                {#if rank === 0}
+                  <span class="sr-only">(best fit)</span>
+                {/if}
+              </span>
+              <span class="block truncate text-xs text-muted-foreground"
+                >{suggestion.reasonLabel}</span
+              >
+            </span>
+            <span
+              class="shrink-0 rounded-full border px-2 py-0.5 font-mono text-[10px] font-bold {tier.badge}"
+              title="Fit quality: {tier.label}"
+            >
+              {rank === 0 ? 'BEST FIT' : tier.label}
+            </span>
+            <span
+              class="flex shrink-0 items-center gap-1 font-mono text-[10px] text-muted-foreground"
+            >
+              <span class="h-2 w-2 rounded-full {need.dot}" aria-hidden="true"></span>
+              <span class="sr-only">{need.label}: </span>{formatNetDelta(suggestion.netDelta)}
+            </span>
+          </li>
+        {/each}
+      </ol>
+      <p class="mt-2 font-mono text-[10px] text-muted-foreground">
+        {#if refinedCount > 0}
+          Deltas from marginal projection over a reference replacement ({refinedCount} refined).
+        {:else}
+          Heuristic screen — projection unavailable for this pool.
+        {/if}
+      </p>
+    </div>
+  {/if}
+  {#if !showSuggestions && needsText && !hideRatings}
+    <p class="border-b border-border/60 px-3 py-2 font-mono text-[10px] sm:px-4" data-fit-needs>
+      <span class="font-bold tracking-[0.14em] text-primary uppercase">Fit guide · </span>
+      <span class="text-muted-foreground">{needsText}</span>
+    </p>
+  {/if}
   {#if players.length < 2}
     <p class="px-3 py-3 text-sm text-muted-foreground sm:p-4">
       Choose at least two players to see marginal fit.

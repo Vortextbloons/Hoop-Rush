@@ -1,6 +1,6 @@
 export const FIXED_FIVE_ROOM_SCHEMA_VERSION = 1;
 export const FIXED_FIVE_ROOM_PROTOCOL_VERSION = 1;
-export const FIXED_FIVE_MULTIPLAYER_VERSION = 'fixed-five-multiplayer-v2';
+export const FIXED_FIVE_MULTIPLAYER_VERSION = 'fixed-five-multiplayer-v3';
 export const FIXED_FIVE_AUTOPICK_VERSION = 'fixed-five-autopick-v1';
 export const FIXED_FIVE_WORKER_WIRE_VERSION = 1;
 export const FIXED_FIVE_ENVELOPE_MAX_BYTES = 32 * 1024;

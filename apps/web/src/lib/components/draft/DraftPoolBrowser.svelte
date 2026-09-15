@@ -1,10 +1,11 @@
 <script lang="ts">
   import type { HoopRushManifest, PlayersIndexEntry, SlotIndex } from '@hoop-rush/data-contracts';
-  import type { LineupRepositionPlan } from '@hoop-rush/engine';
+  import type { DraftFitNeed, DraftFitTier, LineupRepositionPlan } from '@hoop-rush/engine';
   import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
   import { untrack } from 'svelte';
   import { Search } from '@lucide/svelte';
   import { lowercaseName } from '$lib/roster-browser';
+  import { FIT_NEED_META, FIT_TIER_META, DRAFT_POOL_PAGE_SIZE, poolRowKey } from '$lib/draft-fit';
   import {
     ratingBadges,
     type DraftPresentation,
@@ -14,7 +15,7 @@
   import { formatPositions } from '$lib/player-positions';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
   type IndexRow = PlayersIndexEntry;
-  const PAGE_SIZE = 48;
+  const PAGE_SIZE = DRAFT_POOL_PAGE_SIZE;
   const SEARCH_DEBOUNCE_MS = 80;
   const BADGE_TITLES: Record<RatingBadgeLabel, string> = {
     O: 'Overall',
@@ -31,7 +32,9 @@
     emptyMessage,
     allowDisplacement = true,
     selectionDisabled = false,
+    fitByRow = null,
     onpick,
+    onvisible,
   }: {
     heading: string;
     rows: IndexRow[];
@@ -44,7 +47,12 @@
     emptyMessage: string;
     allowDisplacement?: boolean;
     selectionDisabled?: boolean;
+    fitByRow?: ReadonlyMap<
+      string,
+      { tier: DraftFitTier; need: DraftFitNeed; netDelta: number | null }
+    > | null;
     onpick: (player: IndexRow) => void;
+    onvisible?: (rows: IndexRow[]) => void;
   } = $props();
   let searchInput = $state('');
   let search = $state('');
@@ -96,6 +104,9 @@
       plan: LineupRepositionPlan;
     } | null;
   };
+  function rowKey(player: IndexRow): string {
+    return `${player.franchiseId}/${player.eraId}/${player.seasonKey}/${player.playerId}`;
+  }
   function poolCardInfoFor(player: IndexRow): PoolCardInfo {
     if (slots.some((p) => p !== null && p.playerId === player.playerId)) {
       return { state: 'lineup', displace: null };
@@ -116,8 +127,20 @@
   }
   const poolCardInfo = $derived.by(
     (): ReadonlyMap<string, PoolCardInfo> =>
-      new Map(visibleRows.map((player) => [player.playerId, poolCardInfoFor(player)])),
+      new Map(visibleRows.map((player) => [rowKey(player), poolCardInfoFor(player)])),
   );
+  // Fit map is keyed by franchise/era/player so global pools with repeat
+  // playerIds still resolve to the right row.
+  const showFit = $derived(presentation !== 'ball-knowledge' && fitByRow !== null);
+  let lastVisibleKey = '';
+  $effect(() => {
+    if (!onvisible) return;
+    const current = visibleRows;
+    const key = current.map((player) => rowKey(player)).join(',');
+    if (key === lastVisibleKey) return;
+    lastVisibleKey = key;
+    onvisible(current);
+  });
 </script>
 
 <div class="min-w-0 overflow-x-clip rounded-none bg-surface-1 sm:rounded-xl">
@@ -195,8 +218,8 @@
     <ul
       class="grid max-h-[55vh] min-w-0 gap-1 overflow-x-hidden overflow-y-auto p-1.5 sm:max-h-[560px] sm:grid-cols-2 sm:p-2 xl:grid-cols-3"
     >
-      {#each visibleRows as player (player.franchiseId + '/' + player.eraId + '/' + player.playerId)}
-        {@const card = poolCardInfo.get(player.playerId) ?? {
+      {#each visibleRows as player (rowKey(player))}
+        {@const card = poolCardInfo.get(rowKey(player)) ?? {
           state: 'blocked',
           displace: null,
         }}
@@ -245,6 +268,22 @@
                 <span class="block truncate font-mono text-[10px] leading-tight text-accent">
                   Rearranges {movedCount} player{movedCount === 1 ? '' : 's'}
                 </span>
+              {/if}
+              {#if showFit}
+                {@const fit = fitByRow?.get(poolRowKey(player)) ?? null}
+                {#if fit}
+                  {@const tier = FIT_TIER_META[fit.tier]}
+                  {@const need = FIT_NEED_META[fit.need]}
+                  <span
+                    class="flex items-center gap-1 truncate font-mono text-[10px] leading-tight"
+                    title={`${tier.label} · fills ${need.label}${fit.netDelta === null ? '' : ` · ${fit.netDelta > 0 ? '+' : ''}${fit.netDelta} NET vs reference`}`}
+                    data-fit-row={fit.tier}
+                  >
+                    <span class="h-2 w-2 shrink-0 rounded-full {tier.dot}" aria-hidden="true"
+                    ></span>
+                    <span class="truncate text-muted-foreground">{tier.label} · {need.label}</span>
+                  </span>
+                {/if}
               {/if}
             </span>
             <span class="ml-1 flex shrink-0 gap-1 font-mono text-[10px]">

@@ -45,7 +45,7 @@
           {mode === 'duel'
             ? 'Duel draft'
             : mode === 'sandbox-shared-82'
-              ? 'Sandbox build'
+              ? 'Sandbox snake draft'
               : 'Shared draft'}
           · {ordinal + 1}/{total}
         </p>
