@@ -9,6 +9,7 @@
     HoopRushManifest,
   } from '@hoop-rush/data-contracts';
   import { COLLECTION_RARITY_ORDER } from '@hoop-rush/data-contracts';
+  import { z } from 'zod';
   import { describeCollectionPackOdds } from '@hoop-rush/engine';
   import { getManifest } from '$lib/data';
   import AsyncState from '$lib/components/AsyncState.svelte';
@@ -81,11 +82,16 @@
     }
   }
 
+  const lastReceiptSchema = z.object({
+    pullSequence: z.number().int().nonnegative(),
+  });
   async function restoreReceipt(): Promise<void> {
     try {
       const raw = sessionStorage.getItem('collection-last-receipt');
       if (!raw || !collectionState) return;
-      const saved = JSON.parse(raw) as { pullSequence: number };
+      const result = lastReceiptSchema.safeParse(JSON.parse(raw));
+      if (!result.success) return;
+      const saved = result.data;
       const repo = getCollectionRepo();
       const snapshot = await repo.loadCollection(collectionState.collectionId);
       if (!mounted || !snapshot) return;

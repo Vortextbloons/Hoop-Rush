@@ -32,16 +32,10 @@ import {
 } from '@hoop-rush/data-contracts';
 import type { z } from 'zod';
 export type SeasonWorkerProgress = z.infer<typeof seasonWorkerProgressMessageSchema>;
-import {
-  completeSeasonBlockCommit,
-  seasonNextBlockIndex,
-} from '@hoop-rush/engine/src/season/block.ts';
-import {
-  reconstructSeasonGames,
-  seasonCheckpointDigest,
-} from '@hoop-rush/engine/src/season/checkpoint.ts';
-import { seasonFranchiseLegalFiveFacts } from '@hoop-rush/engine/src/season/health.ts';
-import { seasonRotationSetDigest } from '@hoop-rush/engine/src/season/rotation.ts';
+import { completeSeasonBlockCommit, seasonNextBlockIndex } from '@hoop-rush/engine';
+import { reconstructSeasonGames, seasonCheckpointDigest } from '@hoop-rush/engine';
+import { seasonFranchiseLegalFiveFacts } from '@hoop-rush/engine';
+import { seasonRotationSetDigest } from '@hoop-rush/engine';
 import type {
   SeasonRunRepository,
   SeasonRunSnapshot,
@@ -314,6 +308,23 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     cancelledRequestIds.delete(requestId);
     emit({ type: 'cancelled', requestId, blockIndex: cancelledBlockIndex });
   }
+  function failOnUnparsableEnvelope(): void {
+    if (currentRequestId === null || current === null) return;
+    const requestId = currentRequestId;
+    const blockIndex = current.blockIndex;
+    currentRequestId = null;
+    current = null;
+    postedRequestId = null;
+    emit({
+      type: 'error',
+      requestId,
+      blockIndex,
+      code: 'invariant-failure',
+      message: 'the season block worker sent a message outside the frozen wire schema',
+      seed: null,
+      gameId: null,
+    });
+  }
   function consumePreWorkerCancellation(requestId: string): boolean {
     if (!cancelledRequestIds.has(requestId)) return false;
     signalCancellation(requestId);
@@ -469,6 +480,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       const parsed = seasonWorkerMessageSchema.safeParse(event.data);
       if (!parsed.success) {
         console.warn('[season-block-runner] dropped unparsable worker message', event.data);
+        failOnUnparsableEnvelope();
         return;
       }
       if (parsed.data.type === 'season-block-warm-ack') {
@@ -484,6 +496,8 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         return;
       }
       if (parsed.data.requestId !== currentRequestId) {
+        // Stale but well-formed envelopes are expected during cancel/resume races and must
+        // not fail the live request, so they stay a warn-and-drop.
         console.warn(
           `[season-block-runner] dropped message for stale requestId ${parsed.data.requestId} (expected ${String(currentRequestId)})`,
         );

@@ -12,6 +12,7 @@
     CollectionPlayState,
     CollectionState,
   } from '@hoop-rush/data-contracts';
+  import { collectionGameIdSchema } from '@hoop-rush/data-contracts';
   import AsyncState from '$lib/components/AsyncState.svelte';
   import CollectionNav from '$lib/collection/CollectionNav.svelte';
   import DifficultyPicker from '$lib/collection/DifficultyPicker.svelte';
@@ -228,9 +229,11 @@
 
   async function restoreLastGame(): Promise<void> {
     try {
-      const gameId = sessionStorage.getItem('collection-last-game');
-      if (!gameId || playState?.pendingGame) return;
-      const committed = await loadCommittedGame(gameId);
+      const rawGameId = sessionStorage.getItem('collection-last-game');
+      if (!rawGameId || playState?.pendingGame) return;
+      const parsedGameId = collectionGameIdSchema.safeParse(rawGameId);
+      if (!parsedGameId.success) return;
+      const committed = await loadCommittedGame(parsedGameId.data);
       if (!mounted || !committed) return;
       record = committed;
       cursor = 0;
@@ -340,7 +343,9 @@
       }
       if (!mounted) return;
       try {
-        sessionStorage.setItem('collection-last-game', matchup.gameId);
+        if (collectionGameIdSchema.safeParse(matchup.gameId).success) {
+          sessionStorage.setItem('collection-last-game', matchup.gameId);
+        }
       } catch {
         // Receipt restore is best-effort.
       }

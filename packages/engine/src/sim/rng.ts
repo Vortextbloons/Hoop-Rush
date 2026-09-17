@@ -8,6 +8,9 @@ export function buildWeightedPickTable(weights: readonly number[]): WeightedPick
   const clamped: number[] = [];
   let total = 0;
   for (const weight of weights) {
+    if (typeof weight !== 'number' || !Number.isFinite(weight)) {
+      throw new Error('weightedPick: weights must be finite numbers');
+    }
     const value = Math.max(0, weight);
     clamped.push(value);
     total += value;

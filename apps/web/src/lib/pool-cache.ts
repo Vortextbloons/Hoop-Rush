@@ -75,12 +75,12 @@ export async function writeCachedPool(
 }
 export async function readCachedAsset<T>(
   contentHash: string,
-  parse?: (value: unknown) => T,
+  parse: (value: unknown) => T,
 ): Promise<T | null> {
   try {
     const record = await getDb().assets.get(contentHash);
     if (!record) return null;
-    return parse === undefined ? (record.value as T) : parse(record.value);
+    return parse(record.value);
   } catch (error) {
     console.warn('[pool-cache] readCachedAsset failed', error);
     return null;

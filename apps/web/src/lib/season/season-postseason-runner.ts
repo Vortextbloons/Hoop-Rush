@@ -33,8 +33,8 @@ import {
   seasonPostseasonHumanEliminated,
   seasonPostseasonNextGame,
   seasonPostseasonUpcomingGames,
-} from '@hoop-rush/engine/src/season/postseason.ts';
-import { deriveSeasonTradeGrades } from '@hoop-rush/engine/src/season/trade-grades.ts';
+} from '@hoop-rush/engine';
+import { deriveSeasonTradeGrades } from '@hoop-rush/engine';
 import {
   SeasonRunCommandDuplicateError,
   SeasonRunCommandRunMismatchError,
@@ -176,6 +176,21 @@ export function createSeasonPostseasonRunner(
   function emit(event: SeasonPostseasonEvent): void {
     for (const listener of [...listeners]) listener(event);
   }
+  function failPendingOnUnparsableEnvelope(data: unknown): void {
+    console.warn('[season-postseason-runner] dropped unparsable worker message', data);
+    if (pending.size === 0) return;
+    const failure: SeasonPostseasonWorkerErrorMessage = {
+      schemaVersion: 1,
+      type: 'season-postseason-error',
+      requestId: currentWireRequestId ?? '',
+      code: 'invariant-failure',
+      message: 'the postseason worker sent a message outside the wire schema',
+      seed: null,
+      gameId: null,
+    };
+    for (const resolve of [...pending.values()]) resolve(failure);
+    pending.clear();
+  }
   function createWorker(): Worker {
     if (worker !== null) return worker;
     worker =
@@ -199,7 +214,10 @@ export function createSeasonPostseasonRunner(
     });
     worker.addEventListener('message', (event: MessageEvent<unknown>) => {
       const parsed = seasonPostseasonWorkerMessageSchema.safeParse(event.data);
-      if (!parsed.success) return;
+      if (!parsed.success) {
+        failPendingOnUnparsableEnvelope(event.data);
+        return;
+      }
       const message = parsed.data;
       if (message.type === 'season-postseason-warm-ack') {
         if (message.requestId === warmRequestId) warmRequestId = null;

@@ -1,5 +1,5 @@
 import type { Position, SeasonRotation } from '@hoop-rush/data-contracts';
-import { buildMinimalRotation } from '@hoop-rush/engine/src/season/rotation.ts';
+import { buildMinimalRotation } from '@hoop-rush/engine';
 import { buildSeasonDraftCatalog } from '@hoop-rush/test-fixtures';
 import type { RotationMember } from './season-rotation-editor';
 const CATALOG = buildSeasonDraftCatalog({

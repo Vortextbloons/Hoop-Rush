@@ -371,7 +371,13 @@ export {
   type SeasonInjuryRollInput,
   type SeasonInjuryRollResult,
 } from './season/injuries.ts';
-export { createInitialSeasonInfluenceState } from './season/influence.ts';
+export {
+  applySeasonBlockInfluenceGrants,
+  createInitialSeasonInfluenceState,
+  type SeasonBlockChallengeSuccess,
+  type SeasonBlockInfluenceGrantInput,
+  type SeasonBlockInfluenceGrantOutput,
+} from './season/influence.ts';
 export {
   rehabPriceOf,
   purchasedInquiryCostOf,
@@ -445,6 +451,7 @@ export {
   type TradeBackfillSelection,
   type TradeBackfillFill,
 } from './season/trades.ts';
+export { TRADE_CASH_PCT_MAX, TRADE_CASH_PCT_PER_POINT } from './season/trade-board.ts';
 export {
   SEASON_FREE_AGENCY_BAND_SIGNING_CAPS,
   SEASON_FREE_AGENCY_WINDOW_COMPOSITION,
@@ -559,6 +566,7 @@ export {
   type MinutePlanOptimizationResult,
   type OptimizedMinutePlan,
 } from './projection/index.ts';
+export { buildProjectionModel } from './projection/projection.test-helpers.ts';
 export {
   FIXED_FIVE_SEED_VERSION,
   FIXED_FIVE_SANDBOX_DRAFT_ORDER_VERSION,

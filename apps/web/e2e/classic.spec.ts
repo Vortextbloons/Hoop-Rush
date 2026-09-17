@@ -97,6 +97,8 @@ test.describe('classic: reel draft and auto-launch smoke', () => {
 
       await expect(page.locator('[data-fit-top]')).toBeVisible({ timeout: 10000 });
       await expect(page.getByText('Suggested picks', { exact: true })).toBeVisible();
+      await page.locator('[data-fit-top] button').first().click();
+      await expect(page.getByRole('dialog')).toBeVisible();
     },
   );
 });

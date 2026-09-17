@@ -36,10 +36,10 @@ import {
   type SeasonBlockStartInput,
 } from './season-block-runner';
 const LEAGUE = buildSeasonLeague({}, { humanFranchiseId: franchiseIdSchema.parse('lakers') });
-import { generateSeasonSchedule } from '@hoop-rush/engine/src/season/schedule.ts';
-import { seasonCheckpointDigest } from '@hoop-rush/engine/src/season/checkpoint.ts';
-import { seasonFranchiseLegalFiveFacts } from '@hoop-rush/engine/src/season/health.ts';
-import { seasonRotationSetDigest } from '@hoop-rush/engine/src/season/rotation.ts';
+import { generateSeasonSchedule } from '@hoop-rush/engine';
+import { seasonCheckpointDigest } from '@hoop-rush/engine';
+import { seasonFranchiseLegalFiveFacts } from '@hoop-rush/engine';
+import { seasonRotationSetDigest } from '@hoop-rush/engine';
 class FakeWorker {
   static instances: FakeWorker[] = [];
   static clonePostedMessages = false;
@@ -757,7 +757,7 @@ describe('season block runner (M2.5 wire)', () => {
     expect(events.some((event) => event.type === 'error')).toBe(false);
     expect(events.filter((event) => event.type === 'cancelled')).toHaveLength(1);
   });
-  it('drops messages that fail the frozen wire schema', async () => {
+  it('emits invariant-failure for messages that fail the frozen wire schema', async () => {
     const run = makeRun();
     const runner = createSeasonBlockRunner({
       repository: makeRepository(run),
@@ -765,12 +765,14 @@ describe('season block runner (M2.5 wire)', () => {
       workerUrl: 'fake-worker.ts',
       artifacts,
     });
-    const events: string[] = [];
-    runner.subscribe((event) => events.push(event.type));
+    const events: Array<{ type: string; code?: string; requestId?: string }> = [];
+    runner.subscribe((event) => events.push(event));
     runner.startBlock(startInput(run));
     await flush();
     const worker = FakeWorker.instances[0];
     expect(worker).toBeDefined();
+    const started = events.find((event) => event.type === 'started');
+    const requestId = started?.requestId ?? 'sb-1';
     worker?.emit({
       schemaVersion: 3,
       type: 'season-block-complete',
@@ -778,8 +780,75 @@ describe('season block runner (M2.5 wire)', () => {
       checkpoint: {},
     });
     await flush();
-    expect(events).toEqual(['started']);
+    const error = events.find((event) => event.type === 'error');
+    expect(error).toMatchObject({ code: 'invariant-failure', requestId });
+    // The corrupt envelope fails the request fast: a late valid message is ignored.
+    worker?.emit({
+      schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
+      type: 'season-block-complete',
+      requestId,
+      result: { status: 'committed', checkpoint: makeCandidate(run) },
+    });
+    await flush();
+    expect(events.some((event) => event.type === 'complete')).toBe(false);
+    runner.terminate();
   });
+  it.each([
+    ['undefined', undefined],
+    ['null', null],
+    ['number', 42],
+    ['string', 'wire-noise'],
+    ['array', []],
+    ['empty-object', {}],
+    ['bare-type', { type: 'season-block-progress' }],
+    ['unknown-schema', { schemaVersion: 999, type: 'nope', requestId: 'sb-fuzz' }],
+    ['truncated-progress', { schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION }],
+    [
+      'truncated-complete',
+      {
+        schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
+        type: 'season-block-complete',
+        requestId: 'sb-fuzz',
+      },
+    ],
+    [
+      'wrong-request-id-type',
+      {
+        schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
+        type: 'season-block-error',
+        requestId: 42,
+        code: 'internal',
+        message: 'boom',
+        seed: null,
+        gameId: null,
+      },
+    ],
+  ])(
+    'fuzz: unparsable envelope %s emits invariant-failure, never hangs',
+    async (_label, payload) => {
+      const run = makeRun();
+      const repository = makeRepository(run);
+      const runner = createSeasonBlockRunner({
+        repository,
+        schedule,
+        workerUrl: 'fake-worker.ts',
+        artifacts,
+      });
+      const events: Array<{ type: string; code?: string }> = [];
+      runner.subscribe((event) => events.push(event));
+      runner.startBlock(startInput(run));
+      await flush();
+      const worker = FakeWorker.instances[0];
+      expect(worker).toBeDefined();
+      worker?.emit(payload);
+      await flush();
+      const error = events.find((event) => event.type === 'error');
+      expect(error).toMatchObject({ code: 'invariant-failure' });
+      expect(events.some((event) => event.type === 'complete')).toBe(false);
+      expect(repositoryMocks(repository).commitSeasonBlock).not.toHaveBeenCalled();
+      runner.terminate();
+    },
+  );
   it('rejects a stale cursor before any worker start', async () => {
     const run = makeRun();
     const runner = createSeasonBlockRunner({

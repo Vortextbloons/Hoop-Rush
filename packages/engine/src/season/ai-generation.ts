@@ -283,20 +283,20 @@ export function attachAiProjectionSummaries(input: {
       }
     }
     const best = search.ranked[0];
-    const bestRoster =
+    const bestIds =
       best === undefined ? null : best.projection.minutes.map((row) => row.playerVersionId);
-    const selectedSorted = [...selected].sort().join(',');
-    const bestSorted = bestRoster === null ? null : [...bestRoster].sort().join(',');
+    const selectedKey = [...selected].sort().join(',');
+    const bestKey = bestIds === null ? null : [...bestIds].sort().join(',');
     const selectedIsBest =
-      selectedSorted !== '' && bestSorted !== null && selectedSorted === bestSorted;
+      selectedKey !== '' && bestKey !== null && selectedKey === bestKey;
     const searchDigest = seasonDigestHex(
       JSON.stringify({
         seed: search.audit.seed,
         lens: search.audit.lens,
         rotationsEvaluated: search.audit.rotationsEvaluated,
         nodeCount: search.audit.nodeCount,
-        selected: selectedSorted,
-        best: bestSorted,
+        selected: selectedKey,
+        best: bestKey,
       }),
     );
     return {

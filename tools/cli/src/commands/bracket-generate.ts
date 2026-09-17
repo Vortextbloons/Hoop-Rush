@@ -33,25 +33,17 @@ export const BRACKET_GENERATE_OPTIONS: Record<string, boolean> = {
   samples: true,
   'min-score': true,
   'data-version': true,
-  difficulty: true,
   out: true,
   format: true,
   verbose: false,
 };
 const COMMITTED_GENERATION_SEED: Seed = seedSchema.parse('8f2c1d4e6a9b7c3d8f2c1d4e6a9b7c3d');
-const GENERATION_VERSION = 'bracket-m3-v3';
-const CASUAL_GENERATION_VERSION = 'bracket-m3-casual-v1';
-const MEDIUM_DIFFICULTY: DifficultyProfile = {
-  profileVersion: 'm3-medium-v4',
+const GENERATION_VERSION = 'bracket-m3-v4';
+const SINGLE_DIFFICULTY: DifficultyProfile = {
+  profileVersion: 'm3-single-v1',
   name: 'medium',
-  leagueMedianPercentileBand: [0.4, 0.52],
-  teamPercentileBand: [0.23, 0.6],
-};
-const CASUAL_DIFFICULTY: DifficultyProfile = {
-  profileVersion: 'm3-casual-v1',
-  name: 'casual',
-  leagueMedianPercentileBand: [0.38, 0.5],
-  teamPercentileBand: [0.2, 0.55],
+  leagueMedianPercentileBand: [0.3, 0.42],
+  teamPercentileBand: [0.2, 0.5],
 };
 const MIN_BRACKET_SAMPLES = 32;
 const NBA_ROOT = resolve(REPO_ROOT, 'raw-data/nba');
@@ -409,7 +401,6 @@ export function bracketGenerate(args: {
   samples?: string;
   'min-score'?: string;
   'data-version'?: string;
-  difficulty?: string;
   out?: string;
   verbose?: boolean;
   opponentsDir?: string;
@@ -430,15 +421,8 @@ export function bracketGenerate(args: {
   }
   const minScore = parseCount(args['min-score'], '--min-score', 45);
   const dataVersion = args['data-version'];
-  const difficultyArg = args.difficulty ?? 'medium';
-  if (difficultyArg !== 'medium' && difficultyArg !== 'casual') {
-    throw new UsageError(`--difficulty must be medium or casual (got "${difficultyArg}")`);
-  }
-  const isCasual = difficultyArg === 'casual';
-  const difficulty: DifficultyProfile = isCasual
-    ? { ...CASUAL_DIFFICULTY }
-    : { ...MEDIUM_DIFFICULTY };
-  const generationVersion = isCasual ? CASUAL_GENERATION_VERSION : GENERATION_VERSION;
+  const difficulty: DifficultyProfile = { ...SINGLE_DIFFICULTY };
+  const generationVersion = GENERATION_VERSION;
   const packaged = loadPackagedData();
   const manifest = packaged.manifest;
   const profile = new PackagedData(packaged.manifest, packaged.dir).eraProfile();
@@ -484,26 +468,21 @@ export function bracketGenerate(args: {
       },
     );
   }
-  const outFile = args.out ?? (isCasual ? 'bracket-casual.json' : 'bracket.json');
+  const outFile = args.out ?? 'bracket.json';
   const outPath = resolve(opponentsDir, outFile);
   writeFileSync(outPath, `${JSON.stringify(bracket, null, 2)}\n`, 'utf8');
   const contentHash = contentHashSchema.parse(sha256Hex(readFileSync(outPath)));
   const manifestPath = args.manifestPath ?? MANIFEST_PATH;
   const nextManifest = { ...manifest } as HoopRushManifest & {
     opponents?: unknown;
+    bracketCasual?: unknown;
   };
   delete nextManifest.opponents;
-  if (isCasual) {
-    nextManifest.bracketCasual = {
-      url: `opponents/${outFile}`,
-      contentHash,
-    };
-  } else {
-    nextManifest.bracket = {
-      url: 'opponents/bracket.json',
-      contentHash,
-    };
-  }
+  delete nextManifest.bracketCasual;
+  nextManifest.bracket = {
+    url: 'opponents/bracket.json',
+    contentHash,
+  };
   writeFileSync(manifestPath, `${JSON.stringify(nextManifest, null, 2)}\n`, 'utf8');
   const payload = bracketGenerateReportSchema.parse({
     schemaVersion: 1,

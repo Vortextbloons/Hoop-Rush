@@ -20,6 +20,7 @@
     poolScores = null,
     missingNeeds = [],
     refinedCount = 0,
+    onSuggestionPick,
   }: {
     players: PeakPlayerSeason[];
     opponent?: BracketOpponent | null;
@@ -27,6 +28,7 @@
     poolScores?: DraftFitScore[] | null;
     missingNeeds?: DraftFitNeed[];
     refinedCount?: number;
+    onSuggestionPick?: (playerId: string) => void;
   } = $props();
   const hideRatings = $derived(presentation === 'ball-knowledge');
   const showSuggestions = $derived(!hideRatings && (poolScores?.length ?? 0) > 0);
@@ -98,48 +100,70 @@
         {#each topSuggestions as suggestion, rank (suggestion.playerId)}
           {@const tier = FIT_TIER_META[suggestion.tier]}
           {@const need = FIT_NEED_META[suggestion.primaryNeed]}
-          <li
-            class="flex items-center gap-2 rounded-lg border px-2.5 py-1.5 {rank === 0
-              ? 'border-primary/45 bg-primary/10'
-              : 'border-border/60 bg-surface-2'}"
-            data-fit-tier={suggestion.tier}
-          >
-            <span
-              class="grid h-5 w-5 shrink-0 place-items-center rounded-full font-mono text-[10px] font-extrabold {rank ===
+          <li data-fit-tier={suggestion.tier}>
+            <button
+              type="button"
+              disabled={onSuggestionPick === undefined}
+              onclick={() => onSuggestionPick?.(suggestion.playerId)}
+              class="flex w-full items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left transition-colors disabled:cursor-default {rank ===
               0
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-surface-3 text-muted-foreground'}"
-              aria-hidden="true">{rank + 1}</span
+                ? 'border-primary/45 bg-primary/10 hover:bg-primary/15'
+                : 'border-border/60 bg-surface-2 hover:bg-surface-3'}"
             >
-            <span class="min-w-0 flex-1">
-              <span class="block truncate text-sm font-bold">
-                {suggestion.displayName}
-                {#if rank === 0}
-                  <span class="sr-only">(best fit)</span>
+              <span
+                class="grid h-5 w-5 shrink-0 place-items-center rounded-full font-mono text-[10px] font-extrabold {rank ===
+                0
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-surface-3 text-muted-foreground'}"
+                aria-hidden="true">{rank + 1}</span
+              >
+              <span class="min-w-0 flex-1">
+                <span class="block truncate text-sm font-bold">
+                  {suggestion.displayName}
+                  <span class="ml-1 font-mono text-[10px] font-normal text-muted-foreground">
+                    OVR {suggestion.baseOverall}
+                  </span>
+                  {#if rank === 0}
+                    <span class="sr-only">(best fit)</span>
+                  {/if}
+                </span>
+                <span class="block truncate text-xs text-muted-foreground">
+                  {suggestion.reasonLabel}
+                  {#if suggestion.recommendedSlot}
+                    · {suggestion.recommendedSlot}
+                  {/if}
+                  {#if suggestion.rearrangementCount > 0}
+                    · moves {suggestion.rearrangementCount}
+                  {/if}
+                </span>
+                {#if suggestion.warningLabel}
+                  <span class="block truncate text-[10px] text-amber-300">
+                    Watch: {suggestion.warningLabel}
+                  </span>
                 {/if}
               </span>
-              <span class="block truncate text-xs text-muted-foreground"
-                >{suggestion.reasonLabel}</span
+              <span
+                class="shrink-0 rounded-full border px-2 py-0.5 font-mono text-[10px] font-bold {tier.badge}"
+                title="Fit quality: {tier.label}"
               >
-            </span>
-            <span
-              class="shrink-0 rounded-full border px-2 py-0.5 font-mono text-[10px] font-bold {tier.badge}"
-              title="Fit quality: {tier.label}"
-            >
-              {rank === 0 ? 'BEST FIT' : tier.label}
-            </span>
-            <span
-              class="flex shrink-0 items-center gap-1 font-mono text-[10px] text-muted-foreground"
-            >
-              <span class="h-2 w-2 rounded-full {need.dot}" aria-hidden="true"></span>
-              <span class="sr-only">{need.label}: </span>{formatNetDelta(suggestion.netDelta)}
-            </span>
+                {rank === 0 ? 'BEST FIT' : tier.label}
+              </span>
+              <span
+                class="flex shrink-0 items-center gap-1 font-mono text-[10px] text-muted-foreground"
+                title={suggestion.worstNetDelta === null
+                  ? 'Heuristic fit'
+                  : `Average NET lift across era references; worst case ${formatNetDelta(suggestion.worstNetDelta)}`}
+              >
+                <span class="h-2 w-2 rounded-full {need.dot}" aria-hidden="true"></span>
+                <span class="sr-only">{need.label}: </span>{formatNetDelta(suggestion.netDelta)}
+              </span>
+            </button>
           </li>
         {/each}
       </ol>
       <p class="mt-2 font-mono text-[10px] text-muted-foreground">
         {#if refinedCount > 0}
-          Deltas from marginal projection over a reference replacement ({refinedCount} refined).
+          Projected NET lift across neutral and matchup references ({refinedCount} checked).
         {:else}
           Heuristic screen — projection unavailable for this pool.
         {/if}

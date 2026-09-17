@@ -6,7 +6,7 @@ import {
   type PeakPlayerSeason,
 } from '@hoop-rush/data-contracts';
 import { DEFAULT_ERA_SIM_PROFILE, buildPlayerSeason } from '@hoop-rush/test-fixtures';
-import { buildProjectionModel } from '@hoop-rush/engine/src/projection/projection.test-helpers.ts';
+import { buildProjectionModel } from '@hoop-rush/engine';
 import {
   FIT_NEED_META,
   FIT_TIER_META,
@@ -129,5 +129,25 @@ describe('scoreDraftPoolMemo', () => {
     const second = scoreDraftPoolMemo({ pool, locked, context: context() });
     expect(second).toBe(first);
     expect(first.scores[0]?.playerId).toBe('p-memo-cand-2');
+    const firstSlots = scoreDraftPoolMemo({
+      pool,
+      locked,
+      lockedSlots: ['G1', 'C'],
+      context: context(),
+    });
+    const secondSlots = scoreDraftPoolMemo({
+      pool,
+      locked,
+      lockedSlots: ['G2', 'C'],
+      context: context(),
+    });
+    expect(secondSlots).not.toBe(firstSlots);
+    const reordered = scoreDraftPoolMemo({
+      pool,
+      locked: [locked[1]!, locked[0]!],
+      lockedSlots: ['G1', 'C'],
+      context: context(),
+    });
+    expect(reordered).not.toBe(firstSlots);
   });
 });

@@ -7,7 +7,7 @@ import {
   type SeasonPostseasonWorkerErrorMessage,
   type SeasonPostseasonWorkerStartRequest,
 } from '@hoop-rush/data-contracts';
-import type { SeasonPostseasonGameResolver } from '@hoop-rush/engine/src/season/postseason.ts';
+import type { SeasonPostseasonGameResolver } from '@hoop-rush/engine';
 import {
   seasonPostseasonScorelineOf,
   simulateSeasonPostseasonCommand,

@@ -42,7 +42,7 @@ import {
   buildStubSeasonEngineSeam,
 } from '../testing/season-run-fixture.ts';
 import { buildEmptyCampaignState, generateSeasonCampaignOffers } from '@hoop-rush/engine';
-import { applySeasonBlockInfluenceGrants } from '@hoop-rush/engine/src/season/influence.ts';
+import { applySeasonBlockInfluenceGrants } from '@hoop-rush/engine';
 import { buildFullSeasonDataset } from '../benchmark/season-run.ts';
 import {
   SeasonPendingBlockRejectedError,

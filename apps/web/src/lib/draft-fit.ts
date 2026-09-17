@@ -1,7 +1,9 @@
+import { PROJECTION_SLOTS } from '@hoop-rush/data-contracts';
 import type {
   EraSimulationProfile,
   HoopRushManifest,
   PeakPlayerSeason,
+  ProjectionSlot,
   ProjectionModelArtifact,
 } from '@hoop-rush/data-contracts';
 import {
@@ -11,12 +13,7 @@ import {
   type DraftFitReport,
   type DraftFitTier,
 } from '@hoop-rush/engine';
-export type {
-  DraftFitNeed,
-  DraftFitReport,
-  DraftFitScore,
-  DraftFitTier,
-} from '@hoop-rush/engine';
+export type { DraftFitNeed, DraftFitReport, DraftFitScore, DraftFitTier } from '@hoop-rush/engine';
 import { getEraSimulationProfile, getPool } from '$lib/data';
 import { loadSeasonProjectionModel } from '$lib/season/season-assets';
 
@@ -24,6 +21,8 @@ export interface DraftFitContext {
   eraProfile: EraSimulationProfile;
   model: ProjectionModelArtifact;
 }
+
+export const DRAFT_FIT_SLOT_ORDER = PROJECTION_SLOTS;
 
 export async function loadDraftFitContext(
   manifest: HoopRushManifest,
@@ -61,28 +60,43 @@ export async function resolveDraftPoolDetails(
 const REPORT_CACHE = new Map<string, DraftFitReport>();
 const REPORT_CACHE_MAX = 8;
 
+function detailKey(player: PeakPlayerSeason): string {
+  return `${player.franchiseId}/${player.eraId}/${player.seasonKey}/${player.playerId}`;
+}
+
 function reportKey(input: {
   poolIds: readonly string[];
   lockedIds: readonly string[];
+  lockedSlots?: readonly ProjectionSlot[];
+  allowDisplacement?: boolean;
+  refineTopN?: number;
   context: DraftFitContext;
 }): string {
   return [
     input.context.model.modelVersion,
     input.context.eraProfile.profileVersion,
-    [...input.lockedIds].sort().join(','),
+    input.lockedIds.join(','),
+    input.lockedSlots?.join(',') ?? '',
+    String(input.allowDisplacement ?? true),
     [...input.poolIds].sort().join(','),
+    input.refineTopN === undefined ? '' : String(input.refineTopN),
   ].join('|');
 }
 
 export function scoreDraftPoolMemo(input: {
   pool: readonly PeakPlayerSeason[];
   locked: readonly PeakPlayerSeason[];
+  lockedSlots?: readonly ProjectionSlot[];
+  allowDisplacement?: boolean;
   context: DraftFitContext;
   refineTopN?: number;
 }): DraftFitReport {
   const key = reportKey({
-    poolIds: input.pool.map((player) => player.playerId),
-    lockedIds: input.locked.map((player) => player.playerId),
+    poolIds: input.pool.map(detailKey).sort(),
+    lockedIds: input.locked.map(detailKey),
+    lockedSlots: input.lockedSlots,
+    allowDisplacement: input.allowDisplacement,
+    refineTopN: input.refineTopN,
     context: input.context,
   });
   const cached = REPORT_CACHE.get(key);
@@ -90,6 +104,8 @@ export function scoreDraftPoolMemo(input: {
   const report = scoreDraftPool({
     candidates: input.pool.map(toSimulationPlayer),
     locked: input.locked.map(toSimulationPlayer),
+    lockedSlots: input.lockedSlots,
+    allowDisplacement: input.allowDisplacement,
     projection: {
       eraProfile: input.context.eraProfile,
       model: input.context.model,
@@ -108,10 +124,14 @@ export function scoreDraftPoolMemo(input: {
 export function heuristicDraftPoolReport(input: {
   pool: readonly PeakPlayerSeason[];
   locked: readonly PeakPlayerSeason[];
+  lockedSlots?: readonly ProjectionSlot[];
+  allowDisplacement?: boolean;
 }): DraftFitReport {
   return scoreDraftPool({
     candidates: input.pool.map(toSimulationPlayer),
     locked: input.locked.map(toSimulationPlayer),
+    lockedSlots: input.lockedSlots,
+    allowDisplacement: input.allowDisplacement,
   });
 }
 

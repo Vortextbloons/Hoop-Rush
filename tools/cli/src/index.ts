@@ -325,7 +325,6 @@ const COMMANDS: Record<string, CommandDef> = {
         samples: getOptionString(args, 'samples') ?? undefined,
         'min-score': getOptionString(args, 'min-score') ?? undefined,
         'data-version': getOptionString(args, 'data-version') ?? undefined,
-        difficulty: getOptionString(args, 'difficulty') ?? undefined,
         out: getOptionString(args, 'out') ?? undefined,
         verbose: hasOption(args, 'verbose'),
       }),

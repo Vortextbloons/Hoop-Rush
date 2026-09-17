@@ -21,11 +21,13 @@
   import { sortDraftRows } from '$lib/draft-presentation';
   import {
     heuristicDraftPoolReport,
+    DRAFT_FIT_SLOT_ORDER,
     loadDraftFitContext,
     nextPageWindow,
     poolRowKey,
     scoreDraftPoolMemo,
     type DraftFitContext,
+    type DraftFitScore,
     type DraftFitNeed,
     type DraftFitTier,
   } from '$lib/draft-fit';
@@ -69,8 +71,17 @@
   let sandboxFitContext = $state.raw<DraftFitContext | null>(null);
   let pageDots = $state.raw<ReadonlyMap<
     string,
-    { tier: DraftFitTier; need: DraftFitNeed; netDelta: number | null }
+    {
+      tier: DraftFitTier;
+      need: DraftFitNeed;
+      netDelta: number | null;
+      worstNetDelta: number | null;
+      warningLabel: string | null;
+      recommendedSlot: DraftFitScore['recommendedSlot'];
+    }
   > | null>(null);
+  let pageScores = $state.raw<DraftFitScore[] | null>(null);
+  let pageRefinedCount = $state(0);
   let pageNeeds = $state.raw<DraftFitNeed[]>([]);
   const detailCache = new Map<string, PeakPlayerSeason>();
   let lastVisible: IndexRow[] = [];
@@ -81,7 +92,6 @@
   let pickerFallbackId = $state<string | null>(null);
   let franchiseFilter = $state('');
   let eraFilter = $state('');
-  let difficulty = $state<'medium' | 'casual'>('medium');
   function loadSandboxData() {
     manifestError = null;
     indexError = null;
@@ -147,12 +157,13 @@
   });
   $effect(() => {
     const m = manifest;
-    if (!m) {
+    const eraId = eraFilter;
+    if (!m || eraId === '') {
       sandboxFitContext = null;
       return;
     }
     let cancelled = false;
-    loadDraftFitContext(m, '2010s').then(
+    loadDraftFitContext(m, eraId).then(
       (context) => {
         if (!cancelled) sandboxFitContext = context;
       },
@@ -199,17 +210,38 @@
   }
   async function refreshPageFit(): Promise<void> {
     const gen = ++pageScoreGen;
-    if (lastVisible.length === 0) return;
+    if (lastVisible.length === 0) {
+      pageScores = null;
+      pageRefinedCount = 0;
+      return;
+    }
     await ensureDetails(lastVisible);
     if (gen !== pageScoreGen || !mounted) return;
     const details = detailsFor(lastVisible);
     if (details.length === 0) return;
     try {
-      const context = sandboxFitContext;
+      const context =
+        sandboxFitContext !== null &&
+        details.every((player) => player.eraId === sandboxFitContext?.eraProfile.eraId)
+          ? sandboxFitContext
+          : null;
       const report =
         context === null
-          ? heuristicDraftPoolReport({ pool: details, locked: resolvedDraftPlayers })
-          : scoreDraftPoolMemo({ pool: details, locked: resolvedDraftPlayers, context });
+          ? heuristicDraftPoolReport({
+              pool: details,
+              locked: resolvedDraftPlayers,
+              lockedSlots: slots.flatMap((player, index) =>
+                player ? [DRAFT_FIT_SLOT_ORDER[index]!] : [],
+              ),
+            })
+          : scoreDraftPoolMemo({
+              pool: details,
+              locked: resolvedDraftPlayers,
+              lockedSlots: slots.flatMap((player, index) =>
+                player ? [DRAFT_FIT_SLOT_ORDER[index]!] : [],
+              ),
+              context,
+            });
       if (gen !== pageScoreGen || !mounted) return;
       const keyById = new Map<string, string>(
         details.map((player) => [player.playerId, poolRowKey(player)]),
@@ -217,12 +249,26 @@
       pageDots = new Map(
         report.scores.map((entry) => [
           keyById.get(entry.playerId) ?? entry.playerId,
-          { tier: entry.tier, need: entry.primaryNeed, netDelta: entry.netDelta },
+          {
+            tier: entry.tier,
+            need: entry.primaryNeed,
+            netDelta: entry.netDelta,
+            worstNetDelta: entry.worstNetDelta,
+            warningLabel: entry.warningLabel,
+            recommendedSlot: entry.recommendedSlot,
+          },
         ]),
       );
+      pageScores = report.top;
+      pageRefinedCount = report.refinedCount;
       pageNeeds = report.missingNeeds;
     } catch {
-      return;
+      if (gen === pageScoreGen && mounted) {
+        pageDots = null;
+        pageScores = null;
+        pageRefinedCount = 0;
+        pageNeeds = [];
+      }
     }
   }
   function handleVisiblePage(rows: IndexRow[]) {
@@ -231,6 +277,8 @@
     lastVisibleKey = key;
     lastVisible = rows;
     pageDots = null;
+    pageScores = null;
+    pageRefinedCount = 0;
     pageNeeds = [];
     void refreshPageFit();
     const upcoming = nextPageWindow(sortedRows, rows);
@@ -240,6 +288,7 @@
     void resolvedDraftPlayers;
     void sandboxFitContext;
     void manifest;
+    void eraFilter;
     if (lastVisible.length === 0) return;
     void refreshPageFit();
   });
@@ -252,7 +301,6 @@
     if (typeof window === 'undefined') return;
     const result = parseSandboxUrl(new URL(window.location.href), m, ix);
     if (!result.ok || !result.state) return;
-    difficulty = result.state.difficulty;
     const rows = result.state.slots.map((sel) =>
       ix.players.find(
         (p) =>
@@ -345,6 +393,11 @@
     pickerFallbackId = pickerTrigger?.closest<HTMLElement>('[id^="court-slot-"]')?.id ?? null;
     pickerPlayer = player;
   }
+  function pickSuggested(playerId: string) {
+    if (starting) return;
+    const row = lastVisible.find((candidate) => candidate.playerId === playerId);
+    if (row) openPicker(row);
+  }
   function closePicker() {
     if (!mounted) return;
     pickerPlayer = null;
@@ -396,7 +449,7 @@
       }));
       const resolved = await resolveRefsToPlayers(refs);
       if (!mounted) return;
-      await startSandboxRun(resolved, generateSeed(), difficulty);
+      await startSandboxRun(resolved, generateSeed());
       if (!mounted) return;
     } catch (e) {
       if (!mounted) return;
@@ -681,37 +734,13 @@
         <DraftValuePanel
           players={resolvedDraftPlayers}
           presentation="sandbox"
+          poolScores={pageScores}
           missingNeeds={pageNeeds}
+          refinedCount={pageRefinedCount}
+          onSuggestionPick={pickSuggested}
         />
         {#if ready}
           <div class="flex flex-col gap-3">
-            <div class="flex items-center gap-2" role="group" aria-label="Difficulty">
-              <button
-                type="button"
-                onclick={() => (difficulty = 'medium')}
-                aria-pressed={difficulty === 'medium'}
-                class="rounded-lg border px-4 py-2 font-mono text-xs tracking-[0.12em] uppercase transition-colors {difficulty ===
-                'medium'
-                  ? 'border-primary bg-primary/10 text-foreground'
-                  : 'border-input text-muted-foreground hover:border-line-strong'}"
-              >
-                Medium
-              </button>
-              <button
-                type="button"
-                onclick={() => (difficulty = 'casual')}
-                aria-pressed={difficulty === 'casual'}
-                class="rounded-lg border px-4 py-2 font-mono text-xs tracking-[0.12em] uppercase transition-colors {difficulty ===
-                'casual'
-                  ? 'border-primary bg-primary/10 text-foreground'
-                  : 'border-input text-muted-foreground hover:border-line-strong'}"
-              >
-                Casual
-              </button>
-              <span class="font-mono text-[11px] text-muted-foreground">
-                {difficulty === 'casual' ? 'Softer opponents' : 'Standard bracket'}
-              </span>
-            </div>
             <button
               type="button"
               onclick={play82}

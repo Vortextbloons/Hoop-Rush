@@ -20,10 +20,12 @@
   } from '@hoop-rush/data-contracts';
   import {
     commandIdSchema,
+    contentHashSchema,
     fixedFiveTimeoutMsForMode,
     idSchema,
     playerVersionId,
   } from '@hoop-rush/data-contracts';
+  import { z } from 'zod';
   import { getFixedFiveTransport } from '$lib/fixed-five-transport';
   import { submitFixedFiveCommand } from '$lib/fixed-five-command-submit';
   import {
@@ -172,24 +174,23 @@
       );
     } catch {}
   }
+  const verifyGuardSchema = z.object({
+    submittedPropose: contentHashSchema.nullable().optional(),
+    confirmedFor: contentHashSchema.nullable().optional(),
+    reranMismatch: z.boolean().optional(),
+    mismatchReported: z.boolean().optional(),
+    receiptsUnsupported: z.boolean().optional(),
+  });
   function restoreVerifyGuards(): void {
     try {
       const raw = localStorage.getItem(verifyGuardStorageKey(roomId));
       if (!raw) return;
-      const parsed = JSON.parse(raw) as {
-        submittedPropose?: unknown;
-        confirmedFor?: unknown;
-        reranMismatch?: unknown;
-        mismatchReported?: unknown;
-        receiptsUnsupported?: unknown;
-      };
-      if (typeof parsed.submittedPropose === 'string')
-        submittedPropose = parsed.submittedPropose as ContentHash;
-      if (typeof parsed.confirmedFor === 'string')
-        confirmedFor = parsed.confirmedFor as ContentHash;
-      if (parsed.reranMismatch === true) reranMismatch = true;
-      if (parsed.mismatchReported === true) mismatchReported = true;
-      if (parsed.receiptsUnsupported === true) receiptsUnsupported = true;
+      const result = verifyGuardSchema.safeParse(JSON.parse(raw));
+      if (!result.success) return;
+      if (result.data.submittedPropose) submittedPropose = result.data.submittedPropose;
+      if (result.data.confirmedFor) confirmedFor = result.data.confirmedFor;
+      if (result.data.reranMismatch === true) reranMismatch = true;
+      if (result.data.mismatchReported === true) mismatchReported = true;
     } catch {}
   }
   let busyAction = $state<string | null>(null);

@@ -12,12 +12,10 @@ import {
 } from '@hoop-rush/data-contracts';
 import {
   applySeasonRotationPreset,
-  validateSeasonRotation,
-} from '@hoop-rush/engine/src/season/rotation.ts';
-import {
   buildMinutePlanCandidates,
   minuteStrategyOfPreset,
-} from '@hoop-rush/engine/src/season/minute-plan.ts';
+  validateSeasonRotation,
+} from '@hoop-rush/engine';
 export interface RotationMember {
   playerVersionId: string;
   displayName: string;

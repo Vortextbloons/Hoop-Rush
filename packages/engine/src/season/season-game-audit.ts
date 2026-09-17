@@ -1,4 +1,5 @@
 import type {
+  SeasonEffectsState,
   SeasonGameSimulationInput,
   SeasonGameSimulationResult,
   SeasonUnitStint,
@@ -12,17 +13,28 @@ import {
 } from '../sim/periods.ts';
 import { SEASON_ROSTER_SIZE } from './roster-rules.ts';
 import { chooseInitialUnit, type PlannerRotationContext } from './rotation-planner.ts';
-import { sameUnit, simulateSeasonGame } from './season-game.ts';
+import { sameUnit, simulateSeasonGame, simulateSeasonGameWithEffects } from './season-game.ts';
 const REGULATION_PLAYER_SECONDS = 5 * REGULATION_TOTAL_SECONDS;
 const OVERTIME_PLAYER_SECONDS = 5 * OVERTIME_PERIOD_SECONDS;
+export interface CheckSeasonGameResultOptions {
+  effectsState?: SeasonEffectsState;
+  skipDeterminism?: boolean;
+}
 export function checkSeasonGameResult(
   result: SeasonGameSimulationResult,
   input: SeasonGameSimulationInput,
+  options?: CheckSeasonGameResultOptions | SeasonEffectsState,
 ): string[] {
   const failures: string[] = [];
-  const replay = simulateSeasonGame(input, createEngineContext());
-  if (JSON.stringify(replay) !== JSON.stringify(result)) {
-    failures.push('determinism: re-running the same input produced a different result');
+  const resolved = normalizeAuditOptions(options);
+  if (resolved.skipDeterminism !== true) {
+    const replay =
+      resolved.effectsState === undefined
+        ? simulateSeasonGame(input, createEngineContext())
+        : simulateSeasonGameWithEffects(input, createEngineContext(), resolved.effectsState).result;
+    if (JSON.stringify(replay) !== JSON.stringify(result)) {
+      failures.push('determinism: re-running the same input produced a different result');
+    }
   }
   const homeIds = new Set(input.home.players.map((p) => p.playerVersionId));
   const awayIds = new Set(input.away.players.map((p) => p.playerVersionId));
@@ -676,6 +688,18 @@ function isDeviationReason(reason: string): boolean {
     reason === 'contingency-legality' ||
     reason === 'injury-return'
   );
+}
+function isEffectsState(
+  value: CheckSeasonGameResultOptions | SeasonEffectsState,
+): value is SeasonEffectsState {
+  return 'playerStates' in value && 'pairStates' in value;
+}
+function normalizeAuditOptions(
+  options?: CheckSeasonGameResultOptions | SeasonEffectsState,
+): CheckSeasonGameResultOptions {
+  if (options === undefined) return {};
+  if (isEffectsState(options)) return { effectsState: options };
+  return options;
 }
 function sideHasLegalFiveAtTipoff(
   input: SeasonGameSimulationInput,

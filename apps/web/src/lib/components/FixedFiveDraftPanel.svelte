@@ -23,7 +23,9 @@
   import { arenaPickSlam } from '$lib/arena-sound';
   import { poolSortLabel, sortDraftRows, type DraftPresentation } from '$lib/draft-presentation';
   import {
+    heuristicDraftPoolReport,
     loadDraftFitContext,
+    DRAFT_FIT_SLOT_ORDER,
     poolRowKey,
     resolveDraftPoolDetails,
     scoreDraftPoolMemo,
@@ -89,7 +91,10 @@
   let pickerFallbackId = $state<string | null>(null);
   let resolvedLineupPlayers = $state.raw<PeakPlayerSeason[]>([]);
   let rollPoolDetails = $state.raw<PeakPlayerSeason[]>([]);
+  let sandboxPoolDetails = $state.raw<PeakPlayerSeason[]>([]);
   let rollFitContext = $state.raw<DraftFitContext | null>(null);
+  let sandboxVisibleKey = '';
+  let sandboxVisibleGeneration = 0;
   const indexById = $derived(new Map(assets.index.players.map((p) => [p.playerId, p])));
   const indexByVersionId = $derived(
     new Map(
@@ -228,6 +233,9 @@
   });
   const sandboxDuelCountLabel = $derived(
     `${sandboxDuelRows.length} players · ${poolSortLabel(presentation)}`,
+  );
+  const sandboxDuelFit = $derived(
+    sandboxDuelView !== null && !sandboxDuelView.complete && presentation === 'ratings',
   );
   const rollRows = $derived.by((): PlayersIndexEntry[] => {
     if (!rollView || rollView.complete) return [];
@@ -382,24 +390,45 @@
       (replay.mode === 'classic-shared-82' || replay.mode === 'duel') &&
       presentation === 'ratings',
   );
+  const legacySandbox = $derived(
+    mode === 'sandbox-shared-82' &&
+      replay.mode === 'sandbox-shared-82' &&
+      replay.draftStyle === 'legacy' &&
+      presentation === 'ratings',
+  );
+  const sandboxFitActive = $derived(legacySandbox || sandboxDuelFit);
   $effect(() => {
-    if (!boundedRoll || !rollView || rollView.complete) {
+    if ((!boundedRoll || !rollView || rollView.complete) && !sandboxFitActive) {
       rollPoolDetails = [];
       rollFitContext = null;
+      sandboxPoolDetails = [];
+      sandboxVisibleKey = '';
+      sandboxVisibleGeneration += 1;
       return;
     }
     const manifest = assets.manifest;
     let cancelled = false;
-    resolveDraftPoolDetails(manifest, rollView.franchiseId, rollView.eraId).then(
-      (players) => {
-        if (cancelled) return;
-        rollPoolDetails = players;
-      },
-      () => {
-        if (!cancelled) rollPoolDetails = [];
-      },
-    );
-    loadDraftFitContext(manifest, rollView.eraId).then(
+    if (boundedRoll && rollView && !rollView.complete) {
+      resolveDraftPoolDetails(manifest, rollView.franchiseId, rollView.eraId).then(
+        (players) => {
+          if (cancelled) return;
+          rollPoolDetails = players;
+        },
+        () => {
+          if (!cancelled) rollPoolDetails = [];
+        },
+      );
+    } else {
+      rollPoolDetails = [];
+    }
+    const fitEraId = sandboxFitActive ? assets.profile.eraId : rollView?.eraId;
+    if (!fitEraId) {
+      rollFitContext = null;
+      return () => {
+        cancelled = true;
+      };
+    }
+    loadDraftFitContext(manifest, fitEraId).then(
       (context) => {
         if (cancelled) return;
         rollFitContext = context;
@@ -412,17 +441,85 @@
       cancelled = true;
     };
   });
+  async function handleSandboxVisible(rows: PlayersIndexEntry[]) {
+    if (!sandboxFitActive) return;
+    const key = rows.map((row) => poolRowKey(row)).join(',');
+    if (key === sandboxVisibleKey) return;
+    sandboxVisibleKey = key;
+    const generation = ++sandboxVisibleGeneration;
+    if (rows.length === 0) {
+      sandboxPoolDetails = [];
+      return;
+    }
+    try {
+      const players = await resolvePlayerRefs(
+        rows.map((row) => ({
+          playerId: row.playerId,
+          franchiseId: row.franchiseId,
+          eraId: row.eraId,
+        })),
+        assets.manifest,
+      );
+      if (generation === sandboxVisibleGeneration && sandboxFitActive) {
+        sandboxPoolDetails = players;
+      }
+    } catch {
+      if (generation === sandboxVisibleGeneration) sandboxPoolDetails = [];
+    }
+  }
   const rollFitReport = $derived.by(() => {
-    if (!boundedRoll || rollFitContext === null || resolvedLineupPlayers.length === 0) return null;
+    if (!boundedRoll || resolvedLineupPlayers.length === 0) return null;
     const available = new Set(rollRows.map((row) => row.playerId));
     const pool = rollPoolDetails.filter((player) => available.has(player.playerId));
     if (pool.length === 0) return null;
     try {
-      return scoreDraftPoolMemo({
-        pool,
-        locked: resolvedLineupPlayers,
-        context: rollFitContext,
-      });
+      const lockedSlots = activeCourtRows.flatMap((player, index) =>
+        player ? [DRAFT_FIT_SLOT_ORDER[index]!] : [],
+      );
+      return rollFitContext === null
+        ? heuristicDraftPoolReport({
+            pool,
+            locked: resolvedLineupPlayers,
+            lockedSlots,
+            allowDisplacement,
+          })
+        : scoreDraftPoolMemo({
+            pool,
+            locked: resolvedLineupPlayers,
+            lockedSlots,
+            allowDisplacement,
+            context: rollFitContext,
+          });
+    } catch {
+      return null;
+    }
+  });
+  const sandboxFitReport = $derived.by(() => {
+    if (
+      !sandboxFitActive ||
+      resolvedLineupPlayers.length === 0 ||
+      sandboxPoolDetails.length === 0
+    ) {
+      return null;
+    }
+    const lockedSlots = activeCourtRows.flatMap((player, index) =>
+      player ? [DRAFT_FIT_SLOT_ORDER[index]!] : [],
+    );
+    try {
+      return rollFitContext === null
+        ? heuristicDraftPoolReport({
+            pool: sandboxPoolDetails,
+            locked: resolvedLineupPlayers,
+            lockedSlots,
+            allowDisplacement,
+          })
+        : scoreDraftPoolMemo({
+            pool: sandboxPoolDetails,
+            locked: resolvedLineupPlayers,
+            lockedSlots,
+            allowDisplacement,
+            context: rollFitContext,
+          });
     } catch {
       return null;
     }
@@ -435,7 +532,33 @@
     return new Map(
       rollFitReport.scores.map((entry) => [
         keyById.get(entry.playerId) ?? entry.playerId,
-        { tier: entry.tier, need: entry.primaryNeed, netDelta: entry.netDelta },
+        {
+          tier: entry.tier,
+          need: entry.primaryNeed,
+          netDelta: entry.netDelta,
+          worstNetDelta: entry.worstNetDelta,
+          warningLabel: entry.warningLabel,
+          recommendedSlot: entry.recommendedSlot,
+        },
+      ]),
+    );
+  });
+  const sandboxFitByRow = $derived.by(() => {
+    if (sandboxFitReport === null) return null;
+    const keyById = new Map<string, string>(
+      sandboxPoolDetails.map((player) => [player.playerId, poolRowKey(player)]),
+    );
+    return new Map(
+      sandboxFitReport.scores.map((entry) => [
+        keyById.get(entry.playerId) ?? entry.playerId,
+        {
+          tier: entry.tier,
+          need: entry.primaryNeed,
+          netDelta: entry.netDelta,
+          worstNetDelta: entry.worstNetDelta,
+          warningLabel: entry.warningLabel,
+          recommendedSlot: entry.recommendedSlot,
+        },
       ]),
     );
   });
@@ -470,6 +593,24 @@
     pickerTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     pickerFallbackId = pickerTrigger?.closest<HTMLElement>('[id^="court-slot-"]')?.id ?? null;
     pickerPlayer = player;
+  }
+  function pickSuggested(playerId: string) {
+    if (disabled) return;
+    if (rollView !== null && !rollView.complete) {
+      if (!rollView.turn) return;
+      const row = rollRows.find((candidate) => candidate.playerId === playerId);
+      if (row) openPicker(row);
+      return;
+    }
+    if (legacySandbox) {
+      if (sandboxLocked) return;
+      const row = sandboxRows.find((candidate) => candidate.playerId === playerId);
+      if (row) openPicker(row);
+      return;
+    }
+    if (!sandboxDuelFit || sandboxDuelView === null || !sandboxDuelView.turn) return;
+    const row = sandboxDuelRows.find((candidate) => candidate.playerId === playerId);
+    if (row) openPicker(row);
   }
   function closePicker() {
     pickerPlayer = null;
@@ -727,9 +868,10 @@
     <DraftValuePanel
       players={resolvedLineupPlayers}
       {presentation}
-      poolScores={rollFitReport?.scores ?? null}
+      poolScores={rollFitReport?.top ?? null}
       missingNeeds={rollFitReport?.missingNeeds ?? []}
       refinedCount={rollFitReport?.refinedCount ?? 0}
+      onSuggestionPick={disabled || !rollView.turn ? undefined : pickSuggested}
     />
     <LineupSummaryNav slots={myCourtRows} {pickedCount} />
   {/if}
@@ -763,8 +905,10 @@
       error={null}
       emptyMessage="No players match."
       allowDisplacement={false}
+      fitByRow={sandboxFitByRow}
       selectionDisabled={disabled || !sandboxDuelView.turn}
       onpick={openPicker}
+      onvisible={handleSandboxVisible}
     />
     <LineupCourt
       slots={myCourtRows}
@@ -774,7 +918,14 @@
       onmove={openPickerForCourt}
       onremove={() => undefined}
     />
-    <DraftValuePanel players={resolvedLineupPlayers} {presentation} />
+    <DraftValuePanel
+      players={resolvedLineupPlayers}
+      {presentation}
+      poolScores={sandboxFitReport?.top ?? null}
+      missingNeeds={sandboxFitReport?.missingNeeds ?? []}
+      refinedCount={sandboxFitReport?.refinedCount ?? 0}
+      onSuggestionPick={disabled || !sandboxDuelView.turn ? undefined : pickSuggested}
+    />
     <LineupSummaryNav slots={myCourtRows} {pickedCount} />
   {/if}
 
@@ -794,11 +945,13 @@
       filtersEditable={true}
       manifest={assets.manifest}
       {presentation}
+      fitByRow={sandboxFitByRow}
       error={null}
       emptyMessage="No players match."
       allowDisplacement={true}
       selectionDisabled={disabled || sandboxLocked}
       onpick={openPicker}
+      onvisible={handleSandboxVisible}
     />
     <LineupCourt
       slots={courtRows}
@@ -808,7 +961,14 @@
       onmove={openPicker}
       onremove={(index) => onRemove(index as SlotIndex)}
     />
-    <DraftValuePanel players={resolvedLineupPlayers} {presentation} />
+    <DraftValuePanel
+      players={resolvedLineupPlayers}
+      {presentation}
+      poolScores={sandboxFitReport?.top ?? null}
+      missingNeeds={sandboxFitReport?.missingNeeds ?? []}
+      refinedCount={sandboxFitReport?.refinedCount ?? 0}
+      onSuggestionPick={disabled || sandboxLocked ? undefined : pickSuggested}
+    />
     {#if !sandboxLocked}
       <div>
         <button

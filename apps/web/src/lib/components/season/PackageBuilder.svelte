@@ -7,7 +7,15 @@
     type SeasonDraftCatalog,
     type SeasonGameSummary,
   } from '@hoop-rush/data-contracts';
-  import { tradeAssetEligibilityOf } from '@hoop-rush/engine';
+  import {
+    seasonTradePackageRatio,
+    TRADE_BAND_1V1,
+    TRADE_BAND_DEFAULT,
+    TRADE_CASH_PCT_MAX,
+    TRADE_CASH_PCT_PER_POINT,
+    TRADE_PACKAGE_WEIGHTS,
+    tradeAssetEligibilityOf,
+  } from '@hoop-rush/engine';
   import {
     chemistryFootnote,
     humanizeTradeRejection,
@@ -166,25 +174,26 @@
 
   const hasOnePlusOne = $derived(outgoing.length >= 1 && incoming.length >= 1);
 
-  const PACKAGE_WEIGHTS = [1, 0.4, 0.3, 0.2, 0.15];
-  function packageEstimate(ids: readonly string[]): number {
-    const overalls = ids
-      .map((id) => {
-        const lite = allLites.find((p) => p.playerVersionId === id);
-        const ovr = lite === undefined ? null : overallOfLite(lite);
-        return ovr ?? 70;
-      })
-      .sort((a, b) => b - a);
-    return overalls.reduce((sum, v, i) => sum + v * (PACKAGE_WEIGHTS[i] ?? 0.15), 0);
+  function overallsOf(ids: readonly string[]): number[] {
+    return ids.map((id) => {
+      const lite = allLites.find((p) => p.playerVersionId === id);
+      const ovr = lite === undefined ? null : overallOfLite(lite);
+      return ovr ?? 70;
+    });
   }
   const rawEstimate = $derived.by((): number | null => {
     if (outgoing.length < 1 || incoming.length < 1) return null;
-    const outPkg = packageEstimate(outgoing);
-    const inPkg = packageEstimate(incoming);
-    if (outPkg <= 0) return null;
-    return Math.round((1000 * inPkg) / outPkg);
+    const ratio = seasonTradePackageRatio({
+      outgoingValues: overallsOf(outgoing),
+      incomingValues: overallsOf(incoming),
+    });
+    return ratio > 0 ? ratio : null;
   });
-  const influencePct = $derived(influenceAmount === 0 ? 0 : Math.min(influenceAmount * 8, 16));
+  const influencePct = $derived(
+    influenceAmount === 0
+      ? 0
+      : Math.min(influenceAmount * TRADE_CASH_PCT_PER_POINT, TRADE_CASH_PCT_MAX),
+  );
   const adjustedEstimate = $derived.by((): number | null => {
     if (rawEstimate === null) return null;
     if (influenceAmount === 0) return rawEstimate;
@@ -194,11 +203,14 @@
       return Math.round(rawEstimate * (1 - influencePct / 100));
     return rawEstimate;
   });
+  const valueBand = $derived(
+    outgoing.length === 1 && incoming.length === 1 ? TRADE_BAND_1V1 : TRADE_BAND_DEFAULT,
+  );
   const isLikelyGift = $derived(
-    adjustedEstimate !== null && adjustedEstimate < 850 && hasOnePlusOne,
+    adjustedEstimate !== null && adjustedEstimate < valueBand.lower && hasOnePlusOne,
   );
   const isLikelySteal = $derived(
-    adjustedEstimate !== null && adjustedEstimate > 1150 && hasOnePlusOne,
+    adjustedEstimate !== null && adjustedEstimate > valueBand.upper && hasOnePlusOne,
   );
   const isConsolidatingTrash = $derived(outgoing.length > incoming.length && hasOnePlusOne);
   let confirmGift = $state(false);
@@ -642,9 +654,11 @@
         {#if isLikelyGift}
           Looks like an overpay gift — allowed, logged as a gift.
         {:else if isLikelySteal}
-          Looks rich for you — still blocked above 1150. Add value or attach Them Influence.
+          Looks rich for you — still blocked above {valueBand.upper}. Add value or attach Them
+          Influence.
         {:else if isConsolidatingTrash}
-          2-for-1 now discounts the 2nd player (×0.4) and needs your best close to theirs.
+          2-for-1 now discounts the 2nd player (×{TRADE_PACKAGE_WEIGHTS[1]}) and needs your best
+          close to theirs.
         {/if}
       </p>
       {#if isLikelyGift}

@@ -35,6 +35,7 @@
   import { poolSortLabel, presentationForVariant, variantLabel } from '$lib/draft-presentation';
   import {
     loadDraftFitContext,
+    DRAFT_FIT_SLOT_ORDER,
     poolRowKey,
     resolveDraftPoolDetails,
     scoreDraftPoolMemo,
@@ -80,7 +81,6 @@
   let guardTarget = $state<ClassicGuardTarget | null>(null);
   let starting = $state(false);
   let launchError: string | null = $state(null);
-  let difficulty = $state<'medium' | 'casual'>('medium');
   let resolvedDraftPlayers = $state.raw<PeakPlayerSeason[]>([]);
   let poolDetails = $state.raw<PeakPlayerSeason[]>([]);
   let fitContext = $state.raw<DraftFitContext | null>(null);
@@ -260,7 +260,14 @@
     const context = fitContext;
     if (!context || poolDetails.length === 0 || resolvedDraftPlayers.length === 0) return null;
     try {
-      return scoreDraftPoolMemo({ pool: poolDetails, locked: resolvedDraftPlayers, context });
+      return scoreDraftPoolMemo({
+        pool: poolDetails,
+        locked: resolvedDraftPlayers,
+        lockedSlots: slots.flatMap((player, index) =>
+          player ? [DRAFT_FIT_SLOT_ORDER[index]!] : [],
+        ),
+        context,
+      });
     } catch {
       return null;
     }
@@ -273,7 +280,14 @@
     return new Map(
       fitReport.scores.map((entry) => [
         keyById.get(entry.playerId) ?? entry.playerId,
-        { tier: entry.tier, need: entry.primaryNeed, netDelta: entry.netDelta },
+        {
+          tier: entry.tier,
+          need: entry.primaryNeed,
+          netDelta: entry.netDelta,
+          worstNetDelta: entry.worstNetDelta,
+          warningLabel: entry.warningLabel,
+          recommendedSlot: entry.recommendedSlot,
+        },
       ]),
     );
   });
@@ -357,6 +371,11 @@
     pickerFallbackId = pickerTrigger?.closest<HTMLElement>('[id^="court-slot-"]')?.id ?? null;
     pickerPlayer = player;
   }
+  function pickSuggested(playerId: string) {
+    if (spinning || starting) return;
+    const row = rollRows.find((candidate) => candidate.playerId === playerId);
+    if (row) openPicker(row);
+  }
   function closePicker() {
     if (!mounted) return;
     pickerPlayer = null;
@@ -420,7 +439,7 @@
     starting = true;
     launchError = null;
     try {
-      await startClassicRun(draftToRun, classicDraftSeed(), difficulty);
+      await startClassicRun(draftToRun, classicDraftSeed());
     } catch (error) {
       if (!mounted) return;
       launchError = error instanceof Error ? error.message : String(error);
@@ -678,33 +697,6 @@
             </ul>
           </div>
           <div class="flex flex-col gap-3">
-            <div class="flex items-center gap-2" role="group" aria-label="Difficulty">
-              <button
-                type="button"
-                onclick={() => (difficulty = 'medium')}
-                aria-pressed={difficulty === 'medium'}
-                class="rounded-lg border px-4 py-2 font-mono text-xs tracking-[0.12em] uppercase transition-colors {difficulty ===
-                'medium'
-                  ? 'border-primary bg-primary/10 text-foreground'
-                  : 'border-input text-muted-foreground hover:border-line-strong'}"
-              >
-                Medium
-              </button>
-              <button
-                type="button"
-                onclick={() => (difficulty = 'casual')}
-                aria-pressed={difficulty === 'casual'}
-                class="rounded-lg border px-4 py-2 font-mono text-xs tracking-[0.12em] uppercase transition-colors {difficulty ===
-                'casual'
-                  ? 'border-primary bg-primary/10 text-foreground'
-                  : 'border-input text-muted-foreground hover:border-line-strong'}"
-              >
-                Casual
-              </button>
-              <span class="font-mono text-[11px] text-muted-foreground">
-                {difficulty === 'casual' ? 'Softer opponents' : 'Standard bracket'}
-              </span>
-            </div>
             <button
               type="button"
               onclick={() => launchRun(completeDraft)}
@@ -727,9 +719,10 @@
         <DraftValuePanel
           players={resolvedDraftPlayers}
           {presentation}
-          poolScores={fitReport?.scores ?? null}
+          poolScores={fitReport?.top ?? null}
           missingNeeds={fitReport?.missingNeeds ?? []}
           refinedCount={fitReport?.refinedCount ?? 0}
+          onSuggestionPick={pickSuggested}
         />
 
         <LineupSummaryNav {slots} {pickedCount} />

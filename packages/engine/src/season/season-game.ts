@@ -50,7 +50,6 @@ import {
   FIRST_TO_SEVEN_TARGET,
 } from '../sim/evolution-rules.ts';
 import { FirstToSevenOvertimeExhaustedError } from '../sim/evolution-rules.ts';
-import { createRng } from '../sim/rng.ts';
 import { seasonNamespaceSeed, SEASON_COURT_INNOVATION_VERSION } from '@hoop-rush/data-contracts';
 import { createSeasonEffectsBuffer, type SeasonEffectsBuffer } from './effects.ts';
 const CHECKPOINT_MARKS: readonly number[] = [660, 600, 540, 480, 420, 360, 300, 240, 180, 120, 60];
@@ -118,6 +117,7 @@ export function simulateSeasonGame(
     hooks?: RotationGameHooks;
   } = {},
 ): SeasonGameSimulationResult {
+  assertFiniteSeasonGameInput(input);
   const seam = options.seam ?? defaultSeasonGameSeam(input);
   const controller = new RotationGameController(input, context, seam, null, options.hooks);
   return controller.run();
@@ -133,6 +133,7 @@ export function simulateSeasonGameWithEffects(
   result: SeasonGameSimulationResult;
   transition: SeasonGameEffectsTransition;
 } {
+  assertFiniteSeasonGameInput(input);
   const seam = options.seam ?? defaultSeasonGameSeam(input);
   const homeStamina = new Map<string, SeasonStaminaInput>();
   for (const player of input.home.players) {
@@ -500,7 +501,7 @@ class RotationGameController {
     this.period = 5;
     this.state.periodIndex = 4;
     const tipSeed = seasonNamespaceSeed(this.input.seed, 'overtime-tip');
-    this.offense = createRng(tipSeed).chance(0.5) ? 0 : 1;
+    this.offense = this.context.rngFactory(tipSeed).chance(0.5) ? 0 : 1;
     this.tripContext.possessionStart = 'neutral';
     this.otElapsed = 0;
     this.otPossessions = 0;
@@ -1390,6 +1391,38 @@ class RotationGameController {
       });
     }
     return deviations;
+  }
+}
+function assertFiniteNumber(value: unknown, label: string): void {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`season: non-finite numeric input at ${label}`);
+  }
+}
+function assertFiniteSeasonGameInput(input: SeasonGameSimulationInput): void {
+  for (const side of [input.home, input.away] as const) {
+    for (const player of side.players) {
+      const prefix = player.playerVersionId;
+      for (const [key, value] of Object.entries(player.ratings)) {
+        assertFiniteNumber(value, `${prefix}.ratings.${key}`);
+      }
+      for (const [key, value] of Object.entries(player.tendencies)) {
+        assertFiniteNumber(value, `${prefix}.tendencies.${key}`);
+      }
+      if (player.heightInches !== null)
+        assertFiniteNumber(player.heightInches, `${prefix}.heightInches`);
+      if (player.weightLbs !== null) assertFiniteNumber(player.weightLbs, `${prefix}.weightLbs`);
+      if (player.overall !== undefined) assertFiniteNumber(player.overall, `${prefix}.overall`);
+      if (player.stamina !== undefined) {
+        assertFiniteNumber(player.stamina.rating, `${prefix}.stamina.rating`);
+        assertFiniteNumber(player.stamina.historicalMpg, `${prefix}.stamina.historicalMpg`);
+      }
+      if (player.anchors !== undefined) {
+        for (const [key, value] of Object.entries(player.anchors)) {
+          if (value === null || value === undefined) continue;
+          assertFiniteNumber(value, `${prefix}.anchors.${key}`);
+        }
+      }
+    }
   }
 }
 function toSimulationPlayer(player: SeasonGamePlayerInput): SimulationPlayer {

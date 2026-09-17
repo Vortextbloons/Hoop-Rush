@@ -686,8 +686,8 @@ function emergencyRepairsRotation(
   const rotation = context.run.rotations.find((entry) => entry.franchiseId === franchiseId);
   if (rotation === undefined) return false;
   const rotationIds = [...rotation.starters, ...rotation.benchOrder];
-  const anyUnavailable = rotationIds.some((id) => !seasonPlayerAvailable(context.run.health, id));
-  if (!anyUnavailable) return false;
+  const allAvailable = rotationIds.every((id) => seasonPlayerAvailable(context.run.health, id));
+  if (allAvailable) return false;
   return candidate.availability.healthy;
 }
 export function applyFreeAgencyDeclaration(

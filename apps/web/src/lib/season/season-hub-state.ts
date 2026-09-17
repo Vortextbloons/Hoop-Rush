@@ -34,11 +34,8 @@ import {
   type SeasonTradeValueTrend,
   type SeasonTradeWindowState,
 } from '@hoop-rush/data-contracts';
-import {
-  handleSeasonRunCommand,
-  type SeasonRunCommandContext,
-} from '@hoop-rush/engine/src/season/season-commands.ts';
-import { seasonFranchiseLegalFiveFacts } from '@hoop-rush/engine/src/season/health.ts';
+import { handleSeasonRunCommand, type SeasonRunCommandContext } from '@hoop-rush/engine';
+import { seasonFranchiseLegalFiveFacts } from '@hoop-rush/engine';
 import type {
   SeasonBlockResumeInput,
   SeasonBlockRunner,

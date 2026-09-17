@@ -14,7 +14,7 @@ import type {
   SeasonRunSnapshot,
 } from '@hoop-rush/persistence';
 import { buildSeasonLeague, buildSeasonRunFixture } from '@hoop-rush/test-fixtures';
-import { generateSeasonSchedule } from '@hoop-rush/engine/src/season/schedule.ts';
+import { generateSeasonSchedule } from '@hoop-rush/engine';
 import {
   createSeasonPostseasonRunner,
   type SeasonPostseasonSimulatorFn,
@@ -24,9 +24,8 @@ const postseasonFns = vi.hoisted(() => ({
   upcomingGames: vi.fn(() => [] as string[]),
   humanEliminated: vi.fn(() => false),
 }));
-vi.mock('@hoop-rush/engine/src/season/postseason.ts', async (importOriginal) => {
-  const original =
-    await importOriginal<typeof import('@hoop-rush/engine/src/season/postseason.ts')>();
+vi.mock('@hoop-rush/engine', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@hoop-rush/engine')>();
   return {
     ...original,
     seasonPostseasonNextGame: postseasonFns.nextGame,
@@ -316,4 +315,101 @@ describe('season postseason runner cancellation', () => {
     expect(events.some((event) => event.type === 'error')).toBe(false);
     runner.terminate();
   });
+});
+
+describe('season postseason runner worker envelope', () => {
+  let schedule: SeasonSchedule;
+  class EnvelopeFakeWorker {
+    static instances: EnvelopeFakeWorker[] = [];
+    posted: unknown[] = [];
+    private listeners: Array<(event: MessageEvent<unknown>) => void> = [];
+    constructor(
+      public url: string,
+      public options?: { type?: string },
+    ) {
+      EnvelopeFakeWorker.instances.push(this);
+    }
+    postMessage(data: unknown): void {
+      this.posted.push(data);
+    }
+    addEventListener(type: string, listener: (event: MessageEvent<unknown>) => void): void {
+      if (type === 'message') this.listeners.push(listener);
+    }
+    removeEventListener(): void {}
+    emit(data: unknown): void {
+      for (const listener of [...this.listeners]) listener({ data } as MessageEvent<unknown>);
+    }
+    terminate(): void {}
+  }
+  beforeEach(() => {
+    EnvelopeFakeWorker.instances = [];
+    schedule = generateSeasonSchedule({
+      league: LEAGUE,
+      seed: seedSchema.parse('a'.repeat(32)),
+    });
+    postseasonFns.nextGame.mockReset();
+    postseasonFns.upcomingGames.mockReset().mockReturnValue([]);
+    postseasonFns.humanEliminated.mockReset().mockReturnValue(false);
+    vi.stubGlobal('Worker', EnvelopeFakeWorker);
+  });
+  it.each([
+    ['undefined', undefined],
+    ['null', null],
+    ['number', 42],
+    ['string', 'wire-noise'],
+    ['array', []],
+    ['empty-object', {}],
+    ['bare-type', { type: 'season-postseason-progress' }],
+    ['unknown-schema', { schemaVersion: 999, type: 'nope', requestId: 'sp-fuzz' }],
+    ['truncated-progress', { schemaVersion: 1 }],
+    [
+      'truncated-complete',
+      { schemaVersion: 1, type: 'season-postseason-complete', requestId: 'sp-fuzz' },
+    ],
+    [
+      'wrong-request-id-type',
+      {
+        schemaVersion: 1,
+        type: 'season-postseason-error',
+        requestId: 42,
+        code: 'internal',
+        message: 'boom',
+        seed: null,
+        gameId: null,
+      },
+    ],
+  ])(
+    'fuzz: unparsable envelope %s surfaces invariant-failure instead of hanging',
+    async (_label, payload) => {
+      const run = buildSeasonRunFixture({ schedule, stateDigest: 'a'.repeat(32) });
+      const { repository } = makeRepository(run);
+      postseasonFns.nextGame.mockReturnValue({ kind: 'game', gameId: 'pi-east-seven-eight' });
+      const runner = createSeasonPostseasonRunner({
+        repository,
+        schedule,
+        artifacts,
+        workerUrl: 'fake-postseason-worker.ts',
+      });
+      try {
+        const events: Array<{ type: string; code?: string }> = [];
+        runner.subscribe((event) => events.push(event));
+        runner.advancePostseason({
+          runId: run.runId,
+          commandId: commandIdSchema.parse('cmd-fuzz-1'),
+          humanFranchiseId: null,
+        });
+        await flush();
+        expect(events.some((event) => event.type === 'started')).toBe(true);
+        EnvelopeFakeWorker.instances[0]?.emit(payload);
+        await flush();
+        const error = events.find((event) => event.type === 'error');
+        expect(error).toMatchObject({ code: 'invariant-failure' });
+        expect(events.some((event) => event.type === 'committed')).toBe(false);
+        expect(events.some((event) => event.type === 'complete')).toBe(false);
+      } finally {
+        runner.terminate();
+        vi.unstubAllGlobals();
+      }
+    },
+  );
 });

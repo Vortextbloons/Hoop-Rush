@@ -66,6 +66,7 @@ import {
   type SandboxBuilderState,
   type SandboxDuelState,
 } from '@hoop-rush/engine';
+import { z } from 'zod';
 import { buildClassicCatalog } from '$lib/classic-draft';
 import { getPlayersIndex } from '$lib/data';
 import { resolvePlayerRefs, type PlayerRef } from '$lib/player-refs';
@@ -709,12 +710,16 @@ export function assembleCompetitionRun(input: CompetitionAssembleInput): FixedFi
   };
 }
 const ACTIVITY_PREFIX = 'hoop-rush:fixed-five:activity:';
-export function loadActivityAt(roomId: string): number | null {
+const activityTimestampSchema = z.number().int().nonnegative();
+export function loadActivityAt(roomId: string, now = Date.now()): number | null {
   try {
+    if (!idSchema.safeParse(roomId).success) return null;
     const raw = localStorage.getItem(`${ACTIVITY_PREFIX}${roomId}`);
     if (!raw) return null;
-    const value = Number(raw);
-    return Number.isFinite(value) ? value : null;
+    const parsed = activityTimestampSchema.safeParse(Number(raw));
+    if (!parsed.success) return null;
+    if (parsed.data > now + 5 * 60 * 1000) return null;
+    return parsed.data;
   } catch {
     return null;
   }

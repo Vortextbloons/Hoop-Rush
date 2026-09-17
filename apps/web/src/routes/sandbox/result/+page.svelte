@@ -18,18 +18,11 @@
     if (!players) {
       throw new Error('Could not restore the lineup for another run.');
     }
-    await startSandboxRun(
-      players,
-      generateSeed(),
-      currentRun.difficulty.name === 'casual' ? 'casual' : 'medium',
-    );
+    await startSandboxRun(players, generateSeed());
   }
   function editTeamHrefFor(current: ChallengeRun): SandboxHref | null {
     return current.mode === 'sandbox' && current.selections
-      ? buildSandboxHref(
-          current.selections,
-          current.difficulty.name === 'casual' ? 'casual' : 'medium',
-        )
+      ? buildSandboxHref(current.selections)
       : null;
   }
 </script>

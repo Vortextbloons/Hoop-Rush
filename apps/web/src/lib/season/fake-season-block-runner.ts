@@ -58,11 +58,8 @@ import {
   type SeasonRunSnapshot,
   type SeasonWindowOpenResult,
 } from '@hoop-rush/persistence';
-import {
-  completeSeasonBlockCommit,
-  type simulateSeasonBlock,
-} from '@hoop-rush/engine/src/season/block.ts';
-import { evaluateSeasonBlockChallenges } from '@hoop-rush/engine/src/season/challenges.ts';
+import { completeSeasonBlockCommit, type simulateSeasonBlock } from '@hoop-rush/engine';
+import { evaluateSeasonBlockChallenges } from '@hoop-rush/engine';
 import type { SeasonFreeAgencyIndex, SeasonRosterTargets } from '@hoop-rush/data-contracts';
 import { assembleCommittedSnapshot } from '$lib/season/season-block-runner';
 import type {
@@ -104,6 +101,10 @@ export const _fakeSimulateInputParity: _FakeSimulateInputParity = true;
 export const _fakeCommitInputParity: _FakeCommitInputParity = true;
 const PROGRESS_STEP_MS = 40;
 const GAMES_PER_STEP = 15;
+export const FAKE_SEASON_BLOCK_RUNNER_SOURCE = 'fake-season-block-runner' as const;
+export const FAKE_SEASON_BLOCK_CHECKPOINT_COMMITTABLE = false as const;
+export const FAKE_SEASON_BLOCK_NON_COMMITTABLE_REASON =
+  'fake-season-block-runner synthesizes scores, boxes, and ledgers without engine simulation; its checkpoints bypass digest/commit and must never be submitted to the real commit path.' as const;
 function deterministicPoints(gameId: string, base: number): number {
   let hash = 0;
   for (let i = 0; i < gameId.length; i += 1) {

@@ -356,10 +356,29 @@ export class DexieChallengeRepository {
     this.db = db;
   }
   async saveActiveRun(record: StoredRunRecord): Promise<void> {
-    const checkpoint = checkpointFromRun(record);
+    const validated = storedRunRecordSchema.parse(record);
+    const games = validated.run.games;
+    const baseCheckpoint = checkpointFromRun({
+      ...validated,
+      run: { ...validated.run, games: [] },
+    });
+    const checkpoint = activeRunCheckpointSchema.parse({
+      ...baseCheckpoint,
+      gamesPlayed: games.length,
+      updatedAtIso: validated.updatedAtIso,
+    });
+    const gameRows: ActiveGameRow[] = games.map((result) =>
+      activeGameRowSchema.parse({
+        runId: validated.run.runId,
+        gameNumber: result.gameNumber,
+        result,
+        updatedAtIso: validated.updatedAtIso,
+      }),
+    );
     await this.db.transaction('rw', this.db.active, this.db.activeGames, async () => {
       await this.db.activeGames.clear();
       await this.db.active.put(checkpoint);
+      if (gameRows.length > 0) await this.db.activeGames.bulkPut(gameRows);
     });
   }
   async appendActiveGame(input: ActiveGameAppend): Promise<void> {
@@ -395,7 +414,7 @@ export class DexieChallengeRepository {
     const rows = await this.db.activeGames
       .where('runId')
       .equals(validatedCheckpoint.runId)
-      .toArray();
+      .sortBy('gameNumber');
     const results = rows.map((row) => activeGameRowSchema.parse(row).result);
     return storedRunRecordSchema.parse({
       recordId: ACTIVE_RECORD_ID,

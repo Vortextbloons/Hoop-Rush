@@ -1,11 +1,22 @@
 <script lang="ts">
-  import type { HoopRushManifest, PlayersIndexEntry, SlotIndex } from '@hoop-rush/data-contracts';
+  import type {
+    HoopRushManifest,
+    PlayersIndexEntry,
+    ProjectionSlot,
+    SlotIndex,
+  } from '@hoop-rush/data-contracts';
   import type { DraftFitNeed, DraftFitTier, LineupRepositionPlan } from '@hoop-rush/engine';
   import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
   import { untrack } from 'svelte';
   import { Search } from '@lucide/svelte';
   import { lowercaseName } from '$lib/roster-browser';
-  import { FIT_NEED_META, FIT_TIER_META, DRAFT_POOL_PAGE_SIZE, poolRowKey } from '$lib/draft-fit';
+  import {
+    FIT_NEED_META,
+    FIT_TIER_META,
+    DRAFT_POOL_PAGE_SIZE,
+    formatNetDelta,
+    poolRowKey,
+  } from '$lib/draft-fit';
   import {
     ratingBadges,
     type DraftPresentation,
@@ -49,7 +60,14 @@
     selectionDisabled?: boolean;
     fitByRow?: ReadonlyMap<
       string,
-      { tier: DraftFitTier; need: DraftFitNeed; netDelta: number | null }
+      {
+        tier: DraftFitTier;
+        need: DraftFitNeed;
+        netDelta: number | null;
+        worstNetDelta?: number | null;
+        warningLabel?: string | null;
+        recommendedSlot?: ProjectionSlot | null;
+      }
     > | null;
     onpick: (player: IndexRow) => void;
     onvisible?: (rows: IndexRow[]) => void;
@@ -276,7 +294,7 @@
                   {@const need = FIT_NEED_META[fit.need]}
                   <span
                     class="flex items-center gap-1 truncate font-mono text-[10px] leading-tight"
-                    title={`${tier.label} · fills ${need.label}${fit.netDelta === null ? '' : ` · ${fit.netDelta > 0 ? '+' : ''}${fit.netDelta} NET vs reference`}`}
+                    title={`${tier.label} · fills ${need.label}${fit.recommendedSlot ? ` · best in ${fit.recommendedSlot}` : ''}${fit.netDelta === null ? '' : ` · ${formatNetDelta(fit.netDelta)} across references`}${fit.worstNetDelta === null || fit.worstNetDelta === undefined ? '' : ` · worst ${formatNetDelta(fit.worstNetDelta)}`}${fit.warningLabel ? ` · watch: ${fit.warningLabel}` : ''}`}
                     data-fit-row={fit.tier}
                   >
                     <span class="h-2 w-2 shrink-0 rounded-full {tier.dot}" aria-hidden="true"

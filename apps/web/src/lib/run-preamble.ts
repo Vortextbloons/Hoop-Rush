@@ -5,8 +5,7 @@ import type {
 } from '@hoop-rush/data-contracts';
 import { getBracket, getEraSimulationProfile, getManifest } from '$lib/data';
 export const FIXED_SANDBOX_ERA = '2010s';
-export type ChallengeDifficulty = 'medium' | 'casual';
-export async function loadRunPreamble(difficulty: ChallengeDifficulty = 'medium'): Promise<{
+export async function loadRunPreamble(): Promise<{
   manifest: HoopRushManifest;
   profile: EraSimulationProfile;
   bracket: OpponentBracket;
@@ -16,8 +15,7 @@ export async function loadRunPreamble(difficulty: ChallengeDifficulty = 'medium'
   if (!profileEntry) {
     throw new Error('The decade simulation profile is unavailable.');
   }
-  const bracketEntry =
-    difficulty === 'casual' ? (manifest.bracketCasual ?? manifest.bracket) : manifest.bracket;
+  const bracketEntry = manifest.bracket;
   if (!bracketEntry) {
     throw new Error('The opponent bracket is unavailable.');
   }

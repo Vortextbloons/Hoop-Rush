@@ -578,8 +578,6 @@ async function auditBracket(
   const details: string[] = [];
   const entries: Array<{ label: string; entry: OpponentIndexEntry }> = [];
   if (manifest.bracket) entries.push({ label: 'bracket', entry: manifest.bracket });
-  if (manifest.bracketCasual)
-    entries.push({ label: 'bracketCasual', entry: manifest.bracketCasual });
   if (entries.length === 0) {
     details.push('bracket: none packaged');
     return { ok: true, details, failures };

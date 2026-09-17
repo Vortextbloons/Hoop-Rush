@@ -30,6 +30,7 @@ import { resolveRebound } from './rebounding.ts';
 import {
   twentySecondClockPressure,
   DEEP_FOUR_SPLIT,
+  DEEP_FOUR_FT_MISS,
   DEEP_FOUR_MAKE_SCALE,
 } from './evolution-rules.ts';
 import { prepareTeam, enginePlayerKey, type TeamPrep } from './prepare.ts';
@@ -403,7 +404,7 @@ function simulationPlayerVersion(player: SimulationPlayer): string {
   return version;
 }
 function unitVersionIdsOf(team: SimulationTeam): readonly string[] {
-  return team.players.map((player) => player.playerVersionId ?? '');
+  return team.players.map((player) => player.playerVersionId ?? `missing:${player.playerId}`);
 }
 export function assistProbabilityPure(
   profile: EraSimulationProfile,
@@ -704,7 +705,7 @@ function resolveShot(
         offenseSide,
         defenseSide,
         shooterSlot,
-        deep ? 4 : freeThrowsForZone(zone),
+        deep ? DEEP_FOUR_FT_MISS : freeThrowsForZone(zone),
         deadBall,
         reboundCounter,
       );

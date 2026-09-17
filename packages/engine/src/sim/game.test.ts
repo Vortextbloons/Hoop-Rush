@@ -89,9 +89,11 @@ describe.skipIf(process.env.HOOP_RUSH_PERF_STRICT !== '1')('game performance goa
     simulateGame(input, ctx);
     const samples: number[] = [];
     for (let i = 0; i < 100; i += 1) {
-      const start = globalThis.performance.now();
+      // eslint-disable-next-line no-restricted-globals -- perf-gated timing probe only, never sim input
+      const start = performance.now();
       simulateGame(input, ctx);
-      samples.push(globalThis.performance.now() - start);
+      // eslint-disable-next-line no-restricted-globals -- perf-gated timing probe only, never sim input
+      samples.push(performance.now() - start);
     }
     samples.sort((a, b) => a - b);
     const median = samples[50];

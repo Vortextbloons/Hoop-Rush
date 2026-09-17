@@ -408,6 +408,16 @@ export function createFixedFiveTransport(options?: {
         typeof record['phase'] === 'string' ? record['phase'] : 'lobby',
       );
       const revision = typeof record['revision'] === 'number' ? record['revision'] : 0;
+      const serverExpiresAt =
+        typeof record['expires_at'] === 'string' &&
+        Number.isFinite(Date.parse(record['expires_at']))
+          ? record['expires_at']
+          : null;
+      const serverCreatedAt =
+        typeof record['created_at'] === 'string' &&
+        Number.isFinite(Date.parse(record['created_at']))
+          ? record['created_at']
+          : null;
       return {
         roomId: idSchema.parse(stringField(record, 'room_id')),
         code: parseRoomCode(code),
@@ -423,8 +433,8 @@ export function createFixedFiveTransport(options?: {
         resultDigest: null,
         confirmedDigest: null,
         successorRoomId: null,
-        expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-        createdAt: new Date().toISOString(),
+        expiresAt: serverExpiresAt ?? new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        createdAt: serverCreatedAt ?? new Date().toISOString(),
       };
     },
     async join(code) {

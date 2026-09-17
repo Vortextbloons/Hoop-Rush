@@ -26,6 +26,104 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: Verify quick/full split and documented suites
+        run: |
+          node --input-type=module <<'EOF'
+          import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+          import { join } from 'node:path';
+          const fail = (msg) => { console.error(`split-check FAILED: ${msg}`); process.exitCode = 1; };
+          const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
+          const quick = pkg.scripts?.['test:quick'] ?? '';
+          const full = pkg.scripts?.['test:run'] ?? '';
+          if (!quick.startsWith('vitest run')) fail(`test:quick must start with 'vitest run': ${quick}`);
+          if (quick === full) fail('test:quick is identical to test:run; the PR gate excludes nothing');
+          const excludes = [...quick.matchAll(/--exclude="([^"]+)"/g)].map((m) => m[1]);
+          if (excludes.length === 0) fail('test:quick has no --exclude flags');
+          for (const p of excludes) {
+            if (!p.startsWith('**/')) fail(`exclude pattern must be a **/ glob: ${p}`);
+          }
+          const toRegExp = (glob) => {
+            let out = '';
+            for (let i = 0; i < glob.length; i++) {
+              if (glob.startsWith('**/', i)) { out += '(?:.*/)?'; i += 2; }
+              else if (glob[i] === '*') out += '[^/]*';
+              else if (glob[i] === '?') out += '[^/]';
+              else out += glob[i].replace(/[.+^${}()|[\]\\]/, '\\$&');
+            }
+            return new RegExp(`^${out}$`);
+          };
+          const walkTests = (dir, acc = []) => {
+            if (!existsSync(dir)) return acc;
+            for (const e of readdirSync(dir)) {
+              const p = join(dir, e);
+              if (statSync(p).isDirectory()) walkTests(p, acc);
+              else if (e.endsWith('.test.ts')) acc.push(p.replace(/\\/g, '/'));
+            }
+            return acc;
+          };
+          const files = [
+            ...walkTests('packages/engine/src'),
+            ...walkTests('packages/data-contracts/src'),
+            ...walkTests('packages/importer/src'),
+            ...walkTests('packages/persistence/src'),
+            ...walkTests('packages/test-fixtures/src'),
+            ...walkTests('tools/cli/src'),
+            ...walkTests('apps/web/src'),
+          ];
+          const excluded = (f) => excludes.some((g) => toRegExp(g).test(f));
+          const knownSlow = [
+            'tools/cli/src/cli-season-reproduce.test.ts',
+            'packages/engine/src/projection/candidate-search.test.ts',
+            'apps/web/src/lib/season/season-postseason-runner.test.ts',
+          ];
+          for (const f of knownSlow) {
+            if (!existsSync(f)) fail(`known-slow suite missing: ${f}`);
+            else if (!excluded(f)) fail(`known-slow suite not excluded from test:quick: ${f}`);
+          }
+          const excludedCount = files.filter(excluded).length;
+          console.log(`test files: ${files.length} full, ${files.length - excludedCount} quick (${excludedCount} excluded)`);
+          if (excludedCount < knownSlow.length) fail('test:quick excludes fewer files than the known-slow set');
+          if (excludedCount >= files.length) fail('test:quick excludes everything');
+          // File-existence check for the suites named in Docs/quality/testing.md
+          // and Docs/quality/verification.md. Keep in sync with those pages.
+          const documented = [
+            'packages/engine/src/bracket/generator.test.ts',
+            'packages/engine/src/challenge/commands.test.ts',
+            'packages/engine/src/challenge/draft-fit-projection.test.ts',
+            'packages/engine/src/challenge/seeds.test.ts',
+            'packages/engine/src/domain/lineup.test.ts',
+            'packages/engine/src/domain/lineup-reposition.test.ts',
+            'packages/engine/src/modes/fixed-five/fixed-five.test.ts',
+            'packages/engine/src/projection/base.test.ts',
+            'packages/engine/src/projection/cache.test.ts',
+            'packages/engine/src/projection/candidate-search.test.ts',
+            'packages/engine/src/projection/ranking.test.ts',
+            'packages/engine/src/season/draft.test.ts',
+            'packages/engine/src/season/free-agency.test.ts',
+            'packages/engine/src/season/home-court.test.ts',
+            'packages/engine/src/season/postseason.test.ts',
+            'packages/engine/src/season/season-commands.test.ts',
+            'packages/engine/src/season/season-game.test.ts',
+            'packages/engine/src/season/state-digest.test.ts',
+            'packages/engine/src/season/tiebreakers.test.ts',
+            'packages/engine/src/sim/facts.test.ts',
+            'packages/engine/src/sim/game.test.ts',
+            'packages/engine/src/sim/possession.test.ts',
+            'packages/engine/src/sim/rng.test.ts',
+            'tools/cli/src/args.test.ts',
+            'tools/cli/src/cli-season-data.test.ts',
+            'tools/cli/src/cli-season-reproduce.test.ts',
+            'apps/web/e2e/classic.spec.ts',
+            'apps/web/e2e/collection.spec.ts',
+            'apps/web/e2e/collection-team-play.spec.ts',
+            'apps/web/e2e/season.spec.ts',
+          ];
+          for (const f of documented) {
+            if (!existsSync(f)) fail(`documented suite missing: ${f} (update Docs/quality/testing.md or verification.md)`);
+          }
+          if (!process.exitCode) console.log('split-check OK');
+          EOF
+
       - name: Quick unit and integration tests
         run: pnpm test:quick
 

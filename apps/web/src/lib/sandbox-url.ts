@@ -17,7 +17,6 @@ import { randomHex } from '$lib/random-hex';
 export interface SandboxUrlState {
   slots: RunPlayerSelection[];
   seed?: Seed;
-  difficulty: 'medium' | 'casual';
 }
 export interface UrlStateValidation {
   ok: boolean;
@@ -68,8 +67,6 @@ export function parseSandboxUrl(
     }
     seed = seedSchema.parse(seedParam);
   }
-  const difficultyParam = url.searchParams.get('difficulty');
-  const difficulty: 'medium' | 'casual' = difficultyParam === 'casual' ? 'casual' : 'medium';
   if (manifest !== null) {
     for (const slot of slots) {
       if (!manifest.modernFranchiseSlots.some((s) => s.franchiseId === slot.franchiseId)) {
@@ -117,20 +114,16 @@ export function parseSandboxUrl(
   }
   return {
     ok: true,
-    state: { slots, seed, difficulty },
+    state: { slots, seed },
     error: null,
   };
 }
-export function buildSandboxHref(
-  slots: RunPlayerSelection[],
-  difficulty: 'medium' | 'casual' = 'medium',
-): SandboxHref {
+export function buildSandboxHref(slots: RunPlayerSelection[]): SandboxHref {
   const params = new URLSearchParams();
   params.set(
     'slots',
     slots.map((slot) => `${slot.playerId}@${slot.franchiseId}/${slot.eraId}`).join(','),
   );
-  if (difficulty === 'casual') params.set('difficulty', 'casual');
   return `/sandbox?${params.toString()}`;
 }
 export function generateSeed(): Seed {

@@ -57,7 +57,6 @@ export function bracketAudit(
   }
   const entries: Array<{ label: string; entry: NonNullable<HoopRushManifest['bracket']> }> = [
     ...(manifest.bracket ? [{ label: 'bracket', entry: manifest.bracket }] : []),
-    ...(manifest.bracketCasual ? [{ label: 'bracketCasual', entry: manifest.bracketCasual }] : []),
   ];
   if (entries.length === 0) {
     return makeReport(

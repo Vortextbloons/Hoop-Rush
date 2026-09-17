@@ -689,6 +689,7 @@ export function simulateSeasonBlockGame(
         effects: pregame,
       });
   if (humanPlays) {
+    const fresh: { gameId: string; availableCount: number }[] = [];
     for (const pid of [...participantFranchiseIds].sort()) {
       if (game.homeFranchiseId !== pid && game.awayFranchiseId !== pid) continue;
       const roster = rosterByFranchise.get(pid);
@@ -697,13 +698,12 @@ export function simulateSeasonBlockGame(
           ? 0
           : roster.players.filter((player) => seam.pregame.get(player.playerVersionId) === true)
               .length;
-      const nextEntry = { gameId: game.gameId, availableCount };
-      if (input.collectedTipAvailability === undefined) {
-        input.collectedTipAvailability = [nextEntry];
-      } else {
-        input.collectedTipAvailability.push(nextEntry);
-      }
+      fresh.push({ gameId: game.gameId, availableCount });
     }
+    const retained = (input.collectedTipAvailability ?? []).filter(
+      (entry) => entry.gameId !== game.gameId,
+    );
+    input.collectedTipAvailability = [...retained, ...fresh];
   }
   const gameInput: SeasonGameSimulationInput = {
     schemaVersion: 1,

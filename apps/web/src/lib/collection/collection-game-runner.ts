@@ -49,7 +49,11 @@ export function runCollectionGame(
     };
     const onMessage = (event: MessageEvent<unknown>): void => {
       const parsed = collectionGameWorkerMessageSchema.safeParse(event.data);
-      if (!parsed.success) return;
+      if (!parsed.success) {
+        cleanup();
+        reject(new Error('The game worker sent a message outside the worker wire schema.'));
+        return;
+      }
       const message = parsed.data;
       if (message.type === 'collection-game-warm-ack') return;
       if (message.requestId !== requestId) return;

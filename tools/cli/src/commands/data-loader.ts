@@ -113,18 +113,15 @@ export class PackagedData {
     this.indexCache = parsed.data;
     return parsed.data;
   }
-  bracket(difficulty: 'medium' | 'casual' = 'medium'): OpponentBracket {
-    if (difficulty === 'medium' && this.bracketCache) return this.bracketCache;
-    const entry =
-      difficulty === 'casual'
-        ? (this.manifest.bracketCasual ?? this.manifest.bracket)
-        : this.manifest.bracket;
+  bracket(): OpponentBracket {
+    if (this.bracketCache) return this.bracketCache;
+    const entry = this.manifest.bracket;
     if (!entry) throw new Error('no bracket packaged in the manifest');
     const { path, bytes } = this.artifact(entry.url);
     verifyHash(path, bytes, entry.contentHash);
     const parsed = opponentBracketSchema.safeParse(parseJson(path, bytes));
     if (!parsed.success) throw new Error(`bracket ${path} fails validation`);
-    if (difficulty === 'medium') this.bracketCache = parsed.data;
+    this.bracketCache = parsed.data;
     return parsed.data;
   }
 }

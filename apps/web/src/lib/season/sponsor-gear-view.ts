@@ -11,7 +11,7 @@ import {
   type SeasonSponsorSlot,
   type SimulationRatings,
 } from '@hoop-rush/data-contracts';
-import { applySponsorBoosts } from '@hoop-rush/engine/src/season/sponsors.ts';
+import { applySponsorBoosts } from '@hoop-rush/engine';
 
 export const SPONSOR_RATING_SHORT_LABELS: Record<SeasonSponsorBoostKey, string> = {
   speed: 'SPD',
