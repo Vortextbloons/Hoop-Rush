@@ -23,6 +23,7 @@ import {
   seasonSubstitutionSchema,
   seasonUnitStintSchema,
 } from '@hoop-rush/data-contracts';
+import { DRAFT_FIT_REFINE_MAX } from '@hoop-rush/engine';
 export const simGameReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('sim game'),
@@ -377,6 +378,68 @@ export const benchmarkReportSchema = z.object({
   baselineComparison: benchmarkBaselineComparisonSchema,
 });
 export type BenchmarkReport = z.infer<typeof benchmarkReportSchema>;
+const draftFitBenchmarkPlayerSchema = z.object({
+  slot: z.enum(['G1', 'G2', 'F1', 'F2', 'C']),
+  playerId: z.string().min(1).max(64),
+  displayName: z.string().min(1).max(96),
+  overall: z.number().int().min(0).max(100),
+});
+const draftFitBenchmarkMetricSchema = z.object({
+  wins: z.number().int().nonnegative(),
+  games: z.number().int().positive(),
+  winRate: z.number().min(0).max(1),
+});
+const draftFitBenchmarkPickSchema = z.object({
+  pick: z.number().int().positive(),
+  playerId: z.string().min(1).max(64),
+  displayName: z.string().min(1).max(96),
+  overall: z.number().int().min(0).max(100),
+  recommendedSlot: z.enum(['G1', 'G2', 'F1', 'F2', 'C']).nullable(),
+  netDelta: z.number().nullable(),
+  worstNetDelta: z.number().nullable(),
+  tier: z.enum(['best', 'strong', 'solid', 'situational', 'poor']),
+  refined: z.boolean(),
+});
+export const draftFitBenchmarkReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('benchmark draft-fit'),
+  seed: z.string().regex(/^[0-9a-f]{16,64}$/),
+  rolls: z.number().int().positive(),
+  gamesPerBenchmark: z.number().int().positive(),
+  refineTopN: z.number().int().nonnegative().max(DRAFT_FIT_REFINE_MAX),
+  eligiblePools: z.number().int().positive(),
+  engineVersion: z.string().min(1).max(64),
+  dataVersion: z.string().min(1).max(64),
+  modelVersion: z.string().min(1).max(64),
+  rows: z.array(
+    z.object({
+      roll: z.number().int().positive(),
+      franchiseId: z.string().min(1).max(64),
+      eraId: z.string().min(1).max(64),
+      baseline: z.object({
+        lineup: z.array(draftFitBenchmarkPlayerSchema).length(5),
+        metric: draftFitBenchmarkMetricSchema,
+      }),
+      suggested: z.object({
+        lineup: z.array(draftFitBenchmarkPlayerSchema).length(5),
+        picks: z.array(draftFitBenchmarkPickSchema).length(5),
+        metric: draftFitBenchmarkMetricSchema,
+      }),
+      deltaWinRate: z.number(),
+      winner: z.enum(['highest-overall', 'suggested', 'tie']),
+    }),
+  ),
+  summary: z.object({
+    highestOverall: draftFitBenchmarkMetricSchema.extend({ averageRollWinRate: z.number() }),
+    suggested: draftFitBenchmarkMetricSchema.extend({ averageRollWinRate: z.number() }),
+    suggestedBetterRolls: z.number().int().nonnegative(),
+    highestOverallBetterRolls: z.number().int().nonnegative(),
+    tiedRolls: z.number().int().nonnegative(),
+    averageWinRateDelta: z.number(),
+    winner: z.enum(['highest-overall', 'suggested', 'tie']),
+  }),
+});
+export type DraftFitBenchmarkReport = z.infer<typeof draftFitBenchmarkReportSchema>;
 export const bracketGenerateReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('bracket generate'),

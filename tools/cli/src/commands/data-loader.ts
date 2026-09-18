@@ -7,12 +7,14 @@ import {
   franchiseEraPoolSchema,
   hoopRushManifestSchema,
   opponentBracketSchema,
+  parseProjectionModelArtifact,
   playersIndexSchema,
   type EraSimulationProfile,
   type FranchiseEraPool,
   type HoopRushManifest,
   type OpponentBracket,
   type PlayersIndex,
+  type ProjectionModelArtifact,
 } from '@hoop-rush/data-contracts';
 import { UsageError } from '../args.ts';
 import { sha256Hex } from '../io.ts';
@@ -59,6 +61,7 @@ export class PackagedData {
   readonly dir: string;
   private readonly poolCache = new Map<string, FranchiseEraPool>();
   private readonly profileCache = new Map<string, EraSimulationProfile>();
+  private projectionModelCache: ProjectionModelArtifact | null = null;
   private bracketCache: OpponentBracket | null = null;
   private indexCache: PlayersIndex | null = null;
   private readonly poolEntries: Map<string, HoopRushManifest['pools'][number]>;
@@ -88,6 +91,16 @@ export class PackagedData {
     if (!parsed.success) throw new Error(`profile ${path} fails validation`);
     this.profileCache.set(eraId, parsed.data);
     return parsed.data;
+  }
+  projectionModel(): ProjectionModelArtifact {
+    if (this.projectionModelCache) return this.projectionModelCache;
+    const entry = this.manifest.projection?.model;
+    if (!entry) throw new Error('no projection model in the manifest');
+    const { path, bytes } = this.artifact(entry.url);
+    verifyHash(path, bytes, entry.contentHash);
+    const parsed = parseProjectionModelArtifact(parseJson(path, bytes));
+    this.projectionModelCache = parsed;
+    return parsed;
   }
   pool(franchiseId: string, eraId: string): FranchiseEraPool {
     const cacheKey = `${franchiseId}/${eraId}`;

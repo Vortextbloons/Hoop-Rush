@@ -6,7 +6,7 @@ import {
   type PeakPlayerSeason,
 } from '@hoop-rush/data-contracts';
 import { DEFAULT_ERA_SIM_PROFILE, buildPlayerSeason } from '@hoop-rush/test-fixtures';
-import { buildProjectionModel } from '@hoop-rush/engine';
+import { buildProjectionModel } from '@hoop-rush/engine/test-helpers/projection';
 import {
   FIT_NEED_META,
   FIT_TIER_META,

@@ -12,6 +12,7 @@ import { helpCommand } from './commands/help.ts';
 import { bracketAudit, BRACKET_AUDIT_OPTIONS } from './commands/bracket-audit.ts';
 import { bracketGenerate, BRACKET_GENERATE_OPTIONS } from './commands/bracket-generate.ts';
 import { benchmark, BENCHMARK_OPTIONS } from './commands/benchmark.ts';
+import { draftFitBenchmark, DRAFT_FIT_BENCHMARK_OPTIONS } from './commands/draft-fit-benchmark.ts';
 import { calibrateRun, calibrateSensitivity, CALIBRATE_OPTIONS } from './commands/calibrate.ts';
 import { calibrateRatings, CALIBRATE_RATINGS_OPTIONS } from './commands/calibrate-ratings.ts';
 import {
@@ -341,6 +342,20 @@ const COMMANDS: Record<string, CommandDef> = {
         profile: getOptionString(args, 'profile') ?? undefined,
         baseline: getOptionString(args, 'baseline') ?? undefined,
         'write-baseline': getOptionString(args, 'write-baseline') ?? undefined,
+      }),
+  },
+  'benchmark draft-fit': {
+    options: DRAFT_FIT_BENCHMARK_OPTIONS,
+    run: (args) =>
+      draftFitBenchmark({
+        manifest: getOptionString(args, 'manifest') ?? undefined,
+        seed: getOptionString(args, 'seed') ?? undefined,
+        samples: getOptionString(args, 'samples') ?? undefined,
+        games: getOptionString(args, 'games') ?? undefined,
+        'refine-top': getOptionString(args, 'refine-top') ?? undefined,
+        era: getOptionString(args, 'era') ?? undefined,
+        franchise: getOptionString(args, 'franchise') ?? undefined,
+        verbose: hasOption(args, 'verbose'),
       }),
   },
   replay: {

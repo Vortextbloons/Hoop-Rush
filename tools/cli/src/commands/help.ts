@@ -92,6 +92,13 @@ Commands:
                          --seed-from N --workers N
                          --baseline <path> Compare matched fingerprints at 125% + noise.
                          --write-baseline <path> Write a versioned JSON baseline.
+  benchmark draft-fit     Compare legal highest-Overall and projected-suggestion fives
+                          across deterministic random franchise/decade rolls.
+                           --samples N       Number of rolls (default 10)
+                           --games N         Games per benchmark tier (default 10)
+                           --seed <hex>      Roll seed (default derived)
+                           --refine-top N    Projected candidates to refine (default 96)
+                           --era <id> --franchise <id>  Optional pool filters
   replay                 Reproduce a saved game input and compare with an expected result.
                          --input <game-input.json> --expected <game-result.json>
   calibrate run          Compare seeded batches against the frozen era profile targets.

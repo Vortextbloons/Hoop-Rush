@@ -566,7 +566,6 @@ export {
   type MinutePlanOptimizationResult,
   type OptimizedMinutePlan,
 } from './projection/index.ts';
-export { buildProjectionModel } from './projection/projection.test-helpers.ts';
 export {
   FIXED_FIVE_SEED_VERSION,
   FIXED_FIVE_SANDBOX_DRAFT_ORDER_VERSION,

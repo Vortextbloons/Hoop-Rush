@@ -4,7 +4,6 @@ import type {
   SimulationTeam,
   SimulationTendencies,
 } from '@hoop-rush/data-contracts';
-import { playerIdSchema } from '@hoop-rush/data-contracts';
 export const BENCHMARK_VERSION = 'benchmark-v1';
 const SLOT_POSITIONS: SimulationPlayer['positions'][] = [['PG'], ['SG'], ['SF'], ['PF'], ['C']];
 const BENCHMARK_TENDENCIES: SimulationTendencies = {
@@ -67,7 +66,7 @@ function benchmarkTeam(teamId: string, displayName: string, targetCenter: number
     teamId,
     displayName,
     players: SLOT_POSITIONS.map((positions, i) => ({
-      playerId: playerIdSchema.parse(`bm-${teamId}-${String(i + 1)}`),
+      playerId: `bm-${teamId}-${String(i + 1)}` as SimulationPlayer['playerId'],
       displayName: `${displayName} ${String(i + 1)}`,
       positions,
       heightInches: 78,
