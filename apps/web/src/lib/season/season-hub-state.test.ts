@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  SEASON_BLOCK_VERSION,
   SEASON_DRAFT_CATALOG_VERSION,
   SEASON_DURABILITY_VERSION,
   SEASON_ROUND_COUNT,
@@ -14,10 +15,12 @@ import {
   type SeasonDraftCandidate,
   type SeasonDraftCatalog,
   type SeasonEffectsState,
+  type SeasonHomeCourtProfile,
   type SeasonPostseasonRotationPayload,
   type SeasonRun,
   type SeasonRunCommand,
   type SeasonStandings,
+  type SeasonSubmitBlockCommand,
 } from '@hoop-rush/data-contracts';
 import {
   franchiseIdSchema,
@@ -27,6 +30,7 @@ import {
   idSchema,
 } from '@hoop-rush/data-contracts';
 import type { SeasonRunSnapshot } from '@hoop-rush/persistence';
+import { SEASON_HOME_COURT_PROFILE } from '@hoop-rush/engine';
 import { generateSeasonSchedule } from '@hoop-rush/engine';
 import { handleSeasonRunCommand } from '@hoop-rush/engine';
 import { seasonPostseasonNextGame } from '@hoop-rush/engine';
@@ -291,6 +295,54 @@ describe('SeasonHubState.quitRun', () => {
     expect(result.ok).toBe(false);
     expect(result.error).toContain('boom');
     expect(hub.snapshot?.run.runId).toBe(RUN_ID);
+    hub.destroy();
+  });
+});
+describe('SeasonHubState.retry', () => {
+  it('re-derives the home-court profile instead of resubmitting the stored copy', async () => {
+    const run = { runId: RUN_ID, rosters: [] } as unknown as SeasonRun;
+    const repo = repoWith({ ...snapshot(), run });
+    const runner = new FakeRunner();
+    const hub = new SeasonHubState(repo, runner);
+    await hub.refresh();
+    const staleHomeCourt: SeasonHomeCourtProfile = {
+      ...SEASON_HOME_COURT_PROFILE,
+      homeDefensiveCommunication: 0.1,
+    };
+    const command: SeasonSubmitBlockCommand = {
+      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      blockVersion: SEASON_BLOCK_VERSION,
+      command: 'submit-season-block',
+      commandId: commandIdSchema.parse('cmd-retry-1'),
+      runId: idSchema.parse(RUN_ID),
+      expectedRevision: 0,
+      blockIndex: 0,
+      rotationDigest: '0'.repeat(32),
+      objectiveId: null,
+      expectedStateRevision: 0,
+      expectedStateDigest: '0'.repeat(32),
+    };
+    const startInput: SeasonBlockStartInput = {
+      run,
+      effects: hubZeroEffects(run),
+      rotations: [],
+      blockIndex: 0,
+      expectedRevision: 0,
+      rotationDigest: '0'.repeat(32),
+      commandId: command.commandId,
+      humanFranchiseId: null,
+      objectiveId: null,
+      homeCourt: staleHomeCourt,
+      catalogUrl: 'https://example.test/season/draft-catalog.json',
+      catalogHash: '0'.repeat(64),
+      profileUrl: 'https://example.test/season/era-sim.json',
+      profileHash: '0'.repeat(64),
+    };
+    hub.block = { ...runningBlock('fake-1', 0), phase: 'failed', command, startInput };
+    await hub.retry();
+    expect(runner.startCalls).toHaveLength(1);
+    expect(runner.startCalls[0]?.homeCourt).toEqual(SEASON_HOME_COURT_PROFILE);
+    expect(runner.startCalls[0]?.homeCourt).not.toBe(staleHomeCourt);
     hub.destroy();
   });
 });

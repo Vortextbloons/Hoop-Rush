@@ -14,6 +14,7 @@ import {
   type SeasonFreeAgencyIndex,
   type SeasonFreeAgencyRoleExpectation,
   type SeasonGameSummary,
+  type SeasonHomeCourtProfile,
   type SeasonInvalidRosterInterruption,
   type SeasonPendingBlockCandidate,
   type SeasonPostseasonRotationPayload,
@@ -1316,9 +1317,18 @@ export class SeasonHubState {
       this.emit();
       return;
     }
+    const start = this.block.startInput;
+    let homeCourt: SeasonHomeCourtProfile;
+    try {
+      homeCourt = await import('./season-assets').then((module) =>
+        module.loadSeasonHomeCourtProfile(),
+      );
+    } catch {
+      homeCourt = start.homeCourt;
+    }
     this.startBlock({
       command: this.block.command,
-      start: this.block.startInput,
+      start: { ...start, homeCourt },
     });
   }
   private get tradeBlockedReason(): 'pending' | 'interrupted' | 'running' | null {
