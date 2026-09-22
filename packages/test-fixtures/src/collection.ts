@@ -2,29 +2,41 @@ import {
   SIMULATION_RATINGS,
   SIMULATION_TENDENCIES,
   collectionCatalogSchema,
+  collectionChallengeDefinitionSchema,
   collectionDifficultyProfileSchema,
   collectionGameRulesV2Schema,
+  collectionProgressionRulesDigest,
+  collectionProgressionRulesSchema,
   seasonDigestHex,
+  COLLECTION_CATALOG_VERSION,
+  COLLECTION_CHALLENGE_REWARD_VERSION,
+  COLLECTION_CHALLENGE_VERSION,
   COLLECTION_DIFFICULTY_VERSION,
   COLLECTION_GAME_REPLAY_VERSION,
   COLLECTION_GAME_RULES_VERSION,
+  COLLECTION_GAME_V2_REPLAY_VERSION,
+  COLLECTION_GAME_V2_VERSION,
   COLLECTION_GAME_VERSION,
   COLLECTION_OBJECTIVE_VERSION,
+  COLLECTION_OVERLAY_VERSION,
+  COLLECTION_PACK_RULES_VERSION,
+  COLLECTION_PROGRESSION_VERSION,
+  COLLECTION_REPLAY_V1_VERSION,
+  COLLECTION_REWARD_V2_VERSION,
   COLLECTION_REWARD_VERSION,
+  COLLECTION_SCHEMA_VERSION,
+  COLLECTION_SET_REWARD_VERSION,
+  COLLECTION_TARGETING_VERSION,
+  COLLECTION_VERSION,
   type CollectionCatalog,
   type CollectionCatalogCard,
+  type CollectionChallengeDefinition,
   type CollectionDifficultyId,
   type CollectionDifficultyProfile,
   type CollectionGameRules,
+  type CollectionProgressionRules,
   type CollectionRarity,
-} from '@hoop-rush/data-contracts';
-import {
-  COLLECTION_CATALOG_VERSION,
-  COLLECTION_OVERLAY_VERSION,
-  COLLECTION_PACK_RULES_VERSION,
-  COLLECTION_REPLAY_VERSION,
-  COLLECTION_SCHEMA_VERSION,
-  COLLECTION_VERSION,
+  type CollectionSetRewardDefinition,
 } from '@hoop-rush/data-contracts';
 
 const FIXTURE_POSITIONS: Record<string, Array<'PG' | 'SG' | 'SF' | 'PF' | 'C'>> = {
@@ -151,7 +163,7 @@ export function buildCollectionFixtureCatalog(
         },
       },
     ],
-    replayVersion: COLLECTION_REPLAY_VERSION,
+    replayVersion: COLLECTION_REPLAY_V1_VERSION,
     ...overrides,
   });
 }
@@ -264,10 +276,10 @@ export function buildCollectionGameRulesFixture(
   const difficulties = buildCollectionDifficultyProfiles();
   return collectionGameRulesV2Schema.parse({
     rulesVersion: COLLECTION_GAME_RULES_VERSION,
-    gameVersion: COLLECTION_GAME_VERSION,
+    gameVersion: COLLECTION_GAME_V2_VERSION,
     teamVersion: 'collection-team-v1',
-    rewardVersion: COLLECTION_REWARD_VERSION,
-    replayVersion: COLLECTION_GAME_REPLAY_VERSION,
+    rewardVersion: COLLECTION_REWARD_V2_VERSION,
+    replayVersion: COLLECTION_GAME_V2_REPLAY_VERSION,
     difficultyVersion: COLLECTION_DIFFICULTY_VERSION,
     objectiveVersion: COLLECTION_OBJECTIVE_VERSION,
     cpuRosterSize: 12,
@@ -295,4 +307,103 @@ export function buildCollectionGameRulesFixture(
     profileVersion: 'profile-fixture',
     ...overrides,
   });
+}
+
+export function buildCollectionProgressionFixture(input: {
+  catalog: CollectionCatalog;
+  targetMultiplierBp?: number;
+  challenges?: CollectionChallengeDefinition[];
+  setRewards?: CollectionSetRewardDefinition[];
+}): CollectionProgressionRules {
+  const { catalog } = input;
+  const setRewards: CollectionSetRewardDefinition[] =
+    input.setRewards ??
+    catalog.sets.map((set) => ({
+      setRewardVersion: COLLECTION_SET_REWARD_VERSION,
+      setId: set.setId,
+      title: set.title,
+      memberCardIds: [...set.memberCardIds].sort(),
+      currency: 'Exchange',
+      amount: 2000,
+      description: `${set.title} completion reward`,
+    }));
+  const firstCard = catalog.cards[0];
+  const defaultChallenges: Array<CollectionChallengeDefinition | null> = [
+    firstCard === undefined
+      ? null
+      : collectionChallengeDefinitionSchema.parse({
+          challengeVersion: COLLECTION_CHALLENGE_VERSION,
+          challengeId: 'challenge-fixture-era-v1',
+          displayName: 'Fixture Era Core',
+          description: 'Fixture era requirement',
+          requirement: {
+            kind: 'era-core',
+            eraId: firstCard.eraId,
+            minimumRosterCount: 2,
+            minimumStarterCount: 1,
+          },
+          difficultyId: 'pro',
+          firstClearCoins: 300,
+          repeatWinCoins: 30,
+        }),
+    firstCard === undefined
+      ? null
+      : collectionChallengeDefinitionSchema.parse({
+          challengeVersion: COLLECTION_CHALLENGE_VERSION,
+          challengeId: 'challenge-fixture-franchise-v1',
+          displayName: 'Fixture Franchise Core',
+          description: 'Fixture franchise requirement',
+          requirement: {
+            kind: 'franchise-core',
+            franchiseId: firstCard.franchiseId,
+            minimumRosterCount: 2,
+            minimumStarterCount: 1,
+          },
+          difficultyId: 'pro',
+          firstClearCoins: 450,
+          repeatWinCoins: 45,
+        }),
+    catalog.sets[0] === undefined
+      ? null
+      : collectionChallengeDefinitionSchema.parse({
+          challengeVersion: COLLECTION_CHALLENGE_VERSION,
+          challengeId: 'challenge-fixture-family-v1',
+          displayName: 'Fixture Family Core',
+          description: 'Fixture family requirement',
+          requirement: {
+            kind: 'set-family-core',
+            setId: catalog.sets[0].setId,
+            minimumRosterCount: 1,
+            minimumStarterCount: 1,
+          },
+          difficultyId: 'pro',
+          firstClearCoins: 700,
+          repeatWinCoins: 70,
+        }),
+  ];
+  const challenges: CollectionChallengeDefinition[] =
+    input.challenges ??
+    defaultChallenges.filter((entry): entry is CollectionChallengeDefinition => entry !== null);
+  const base: Omit<CollectionProgressionRules, 'contentDigest'> = {
+    schemaVersion: 1 as const,
+    progressionVersion: COLLECTION_PROGRESSION_VERSION,
+    targetingVersion: COLLECTION_TARGETING_VERSION,
+    challengeVersion: COLLECTION_CHALLENGE_VERSION,
+    challengeRewardVersion: COLLECTION_CHALLENGE_REWARD_VERSION,
+    setRewardVersion: COLLECTION_SET_REWARD_VERSION,
+    sourceCatalogVersion: COLLECTION_CATALOG_VERSION,
+    sourceCatalogHash: 'a'.repeat(64) as CollectionProgressionRules['sourceCatalogHash'],
+    targetMultiplierBp: input.targetMultiplierBp ?? 80_000,
+    challenges,
+    setRewards,
+    display: {
+      challengesTitle: 'Challenges',
+      challengesBlurb: 'Fixed roster challenges over the single game flow.',
+      targetingBlurb: 'Target a canonical player; rarity odds do not change.',
+      setsTitle: 'Sets',
+      setsBlurb: 'Complete a set once to claim its Exchange reward.',
+    },
+  };
+  const contentDigest = collectionProgressionRulesDigest(base);
+  return collectionProgressionRulesSchema.parse({ ...base, contentDigest });
 }

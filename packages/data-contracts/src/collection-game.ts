@@ -15,15 +15,20 @@ import {
   collectionObjectiveIdSchema,
   collectionObjectiveOfferSchema,
 } from './collection-objective.ts';
-import { collectionGameRewardReceiptSchema } from './collection-reward.ts';
+import {
+  collectionGameRewardReceiptV2Schema,
+  collectionGameRewardReceiptV3Schema,
+} from './collection-reward.ts';
 import {
   COLLECTION_CATALOG_VERSION,
   COLLECTION_COMMAND_V1_VERSION,
+  COLLECTION_GAME_COMMAND_V1_VERSION,
   COLLECTION_GAME_COMMAND_VERSION,
   COLLECTION_GAME_CPU_ROSTER_SIZE,
   COLLECTION_GAME_ENVIRONMENT_ERA_ID,
   COLLECTION_GAME_FIRST_CLEAR_COINS,
   COLLECTION_GAME_HOME_COURT_POLICY,
+  COLLECTION_GAME_V2_REPLAY_VERSION,
   COLLECTION_GAME_REPLAY_VERSION,
   COLLECTION_GAME_REWARD_LOSS_COINS,
   COLLECTION_GAME_REWARD_MARGIN_CAP_POINTS,
@@ -34,15 +39,24 @@ import {
   COLLECTION_GAME_V1_REPLAY_VERSION,
   COLLECTION_GAME_V1_RULES_VERSION,
   COLLECTION_GAME_V1_VERSION,
+  COLLECTION_GAME_V2_VERSION,
   COLLECTION_GAME_VERSION,
   COLLECTION_DIFFICULTY_VERSION,
   COLLECTION_OBJECTIVE_VERSION,
+  COLLECTION_PLAY_SAVE_V2_VERSION,
   COLLECTION_PLAY_SAVE_VERSION,
   COLLECTION_REWARD_V1_VERSION,
+  COLLECTION_REWARD_V2_VERSION,
   COLLECTION_REWARD_VERSION,
   COLLECTION_SCHEMA_VERSION,
   COLLECTION_TEAM_VERSION,
 } from './collection-versions.ts';
+import {
+  collectionChallengeEvaluationSchema,
+  collectionChallengeIdSchema,
+  collectionChallengePreparedSnapshotSchema,
+  collectionChallengeValidationFactsSchema,
+} from './collection-challenge.ts';
 import { commandIdSchema, contentHashSchema, idSchema, seedSchema } from './ids.ts';
 import { REQUIRED_RATING_KEYS } from './simulation.ts';
 import { seasonCheckpointDigestSchema } from './season-digests.ts';
@@ -105,7 +119,7 @@ export const collectionGameEventSchema = z.discriminatedUnion('kind', [
     kind: z.literal('possession'),
     possessionNumber: z.number().int().positive(),
     offenseSide: z.enum(['home', 'away']),
-    pointsScored: z.number().int().min(0).max(4),
+    pointsScored: z.number().int().min(0).max(10),
     participantCardIds: z.array(collectionCardIdSchema),
     statDeltas: z.array(collectionGameStatDeltaSchema),
   }),
@@ -228,6 +242,17 @@ const collectionGameResultV1BaseSchema = z.object({
 });
 
 const collectionGameResultV2BaseSchema = z.object({
+  gameVersion: z.literal(COLLECTION_GAME_V2_VERSION),
+  gameId: collectionGameIdSchema,
+  gameSequence: z.number().int().nonnegative(),
+  catalogVersion: z.literal(COLLECTION_CATALOG_VERSION),
+  rulesVersion: z.literal(COLLECTION_GAME_RULES_VERSION),
+  engineVersion: z.string().min(1).max(64),
+  profileVersion: z.string().min(1).max(64),
+  winner: z.enum(['home', 'away']),
+});
+
+const collectionGameResultV3BaseSchema = z.object({
   gameVersion: z.literal(COLLECTION_GAME_VERSION),
   gameId: collectionGameIdSchema,
   gameSequence: z.number().int().nonnegative(),
@@ -272,11 +297,24 @@ export const collectionGameResultV2Schema = z.discriminatedUnion(
 );
 export type CollectionGameResultV2 = z.infer<typeof collectionGameResultV2Schema>;
 
+export const collectionGameResultV3Schema = z.discriminatedUnion(
+  'outcome',
+  resultVariants(collectionGameResultV3BaseSchema),
+);
+export type CollectionGameResultV3 = z.infer<typeof collectionGameResultV3Schema>;
+
 export const collectionGameResultUnionSchema = z.union([
   collectionGameResultV1Schema,
   collectionGameResultV2Schema,
+  collectionGameResultV3Schema,
 ]);
 export type CollectionGameResultUnion = z.infer<typeof collectionGameResultUnionSchema>;
+
+export const collectionGameResultV1V2UnionSchema = z.union([
+  collectionGameResultV1Schema,
+  collectionGameResultV2Schema,
+]);
+export type CollectionGameResultV1V2Union = z.infer<typeof collectionGameResultV1V2UnionSchema>;
 
 export const collectionGameResultSchema = collectionGameResultV2Schema;
 export type CollectionGameResult = CollectionGameResultV2;
@@ -562,10 +600,10 @@ export type CollectionObjectiveFacts = z.infer<typeof collectionObjectiveFactsSc
 
 export const collectionPreparedGameV2Schema = z
   .object({
-    gameVersion: z.literal(COLLECTION_GAME_VERSION),
+    gameVersion: z.literal(COLLECTION_GAME_V2_VERSION),
     teamVersion: z.literal(COLLECTION_TEAM_VERSION),
-    rewardVersion: z.literal(COLLECTION_REWARD_VERSION),
-    replayVersion: z.literal(COLLECTION_GAME_REPLAY_VERSION),
+    rewardVersion: z.literal(COLLECTION_REWARD_V2_VERSION),
+    replayVersion: z.literal(COLLECTION_GAME_V2_REPLAY_VERSION),
     rulesVersion: z.literal(COLLECTION_GAME_RULES_VERSION),
     difficultyVersion: z.literal(COLLECTION_DIFFICULTY_VERSION),
     objectiveVersion: z.literal(COLLECTION_OBJECTIVE_VERSION),
@@ -623,14 +661,103 @@ export const collectionPreparedGameV2Schema = z
   });
 export type CollectionPreparedGameV2 = z.infer<typeof collectionPreparedGameV2Schema>;
 
+export const collectionPreparedGameV3Schema = z
+  .object({
+    gameVersion: z.literal(COLLECTION_GAME_VERSION),
+    teamVersion: z.literal(COLLECTION_TEAM_VERSION),
+    rewardVersion: z.literal(COLLECTION_REWARD_VERSION),
+    replayVersion: z.literal(COLLECTION_GAME_REPLAY_VERSION),
+    rulesVersion: z.literal(COLLECTION_GAME_RULES_VERSION),
+    difficultyVersion: z.literal(COLLECTION_DIFFICULTY_VERSION),
+    objectiveVersion: z.literal(COLLECTION_OBJECTIVE_VERSION),
+    collectionId: idSchema,
+    gameId: collectionGameIdSchema,
+    gameSequence: z.number().int().nonnegative(),
+    rootSeed: seedSchema,
+    seedPaths: collectionGameSeedPathsV2Schema,
+    seed: seedSchema,
+    playerTeam: collectionActiveTeamSchema,
+    cpuTeam: collectionActiveTeamSchema,
+    difficulty: collectionDifficultyProfileSchema,
+    construction: collectionCpuConstructionFactsSchema,
+    adjustments: collectionRatingAdjustmentsSchema,
+    objectives: collectionObjectiveFactsSchema,
+    firstClearEligible: z.boolean(),
+    challenge: collectionChallengePreparedSnapshotSchema,
+    environmentEraId: z.literal(COLLECTION_GAME_ENVIRONMENT_ERA_ID),
+    profileVersion: z.string().min(1).max(64),
+    profileHash: contentHashSchema,
+    catalogVersion: z.literal(COLLECTION_CATALOG_VERSION),
+    catalogHash: contentHashSchema,
+    rulesHash: contentHashSchema,
+    homeCourtPolicy: z.literal(COLLECTION_GAME_HOME_COURT_POLICY),
+    inputDigest: seasonCheckpointDigestSchema,
+  })
+  .strict()
+  .superRefine((prepared, ctx) => {
+    if (prepared.adjustments.requestedDelta !== prepared.difficulty.ratingShift) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'adjustment delta disagrees with the profile shift',
+      });
+    }
+    if (
+      prepared.objectives.selectedObjectiveId !== null &&
+      !prepared.objectives.offers.some(
+        (offer) => offer.objectiveId === prepared.objectives.selectedObjectiveId,
+      )
+    ) {
+      ctx.addIssue({ code: 'custom', message: 'selected objective is not offered' });
+    }
+    const cpuTeamIds = [...prepared.cpuTeam.starters, ...prepared.cpuTeam.bench];
+    const constructionIds = [...prepared.construction.starters, ...prepared.construction.bench];
+    if (
+      cpuTeamIds.length !== constructionIds.length ||
+      cpuTeamIds.some((cardId, index) => cardId !== constructionIds[index])
+    ) {
+      ctx.addIssue({ code: 'custom', message: 'cpu team and construction rosters disagree' });
+    }
+    const cpuMinutes = prepared.cpuTeam.targetMinutes;
+    const constructionMinutes = prepared.construction.targetMinutes;
+    if (JSON.stringify(cpuMinutes) !== JSON.stringify(constructionMinutes)) {
+      ctx.addIssue({ code: 'custom', message: 'cpu team and construction minutes disagree' });
+    }
+    if (prepared.difficulty.difficultyId !== prepared.challenge.difficultyId) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'challenge difficulty is fixed and must match the prepared difficulty',
+      });
+    }
+    const rosterIds = prepared.challenge.validation.activeRoster.map((entry) => entry.cardId);
+    const teamIds = [...prepared.playerTeam.starters, ...prepared.playerTeam.bench];
+    if (
+      rosterIds.length !== teamIds.length ||
+      rosterIds.some((cardId, index) => cardId !== teamIds[index])
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'challenge validation roster disagrees with the committed team',
+      });
+    }
+  });
+export type CollectionPreparedGameV3 = z.infer<typeof collectionPreparedGameV3Schema>;
+
 export const collectionPreparedGameSchema = collectionPreparedGameV2Schema;
 export type CollectionPreparedGame = CollectionPreparedGameV2;
+export type CollectionCurrentPreparedGame = CollectionPreparedGameV2 | CollectionPreparedGameV3;
 
 export const collectionPreparedGameUnionSchema = z.union([
   collectionPreparedGameV1Schema,
   collectionPreparedGameV2Schema,
+  collectionPreparedGameV3Schema,
 ]);
 export type CollectionPreparedGameUnion = z.infer<typeof collectionPreparedGameUnionSchema>;
+
+export const collectionPreparedGameV1V2UnionSchema = z.union([
+  collectionPreparedGameV1Schema,
+  collectionPreparedGameV2Schema,
+]);
+export type CollectionPreparedGameV1V2Union = z.infer<typeof collectionPreparedGameV1V2UnionSchema>;
 
 export const collectionGameRecordV1Schema = z
   .object({
@@ -651,7 +778,7 @@ export type CollectionGameRecordV1 = z.infer<typeof collectionGameRecordV1Schema
 
 export const collectionGameRecordV2Schema = z
   .object({
-    gameVersion: z.literal(COLLECTION_GAME_VERSION),
+    gameVersion: z.literal(COLLECTION_GAME_V2_VERSION),
     collectionId: idSchema,
     gameId: collectionGameIdSchema,
     gameSequence: z.number().int().nonnegative(),
@@ -661,7 +788,7 @@ export const collectionGameRecordV2Schema = z
     eventDigest: seasonCheckpointDigestSchema,
     resultDigest: seasonCheckpointDigestSchema,
     objectiveEvaluation: collectionObjectiveEvaluationSchema,
-    reward: collectionGameRewardReceiptSchema,
+    reward: collectionGameRewardReceiptV2Schema,
     completedAtIso: z.string().min(1).max(64),
   })
   .strict()
@@ -725,12 +852,134 @@ export const collectionGameRecordV2Schema = z
   });
 export type CollectionGameRecordV2 = z.infer<typeof collectionGameRecordV2Schema>;
 
+export const collectionGameRecordV3Schema = z
+  .object({
+    gameVersion: z.literal(COLLECTION_GAME_VERSION),
+    collectionId: idSchema,
+    gameId: collectionGameIdSchema,
+    gameSequence: z.number().int().nonnegative(),
+    prepared: collectionPreparedGameV3Schema,
+    result: collectionGameResultV3Schema,
+    events: z.array(collectionGameEventSchema).min(1),
+    eventDigest: seasonCheckpointDigestSchema,
+    resultDigest: seasonCheckpointDigestSchema,
+    objectiveEvaluation: collectionObjectiveEvaluationSchema,
+    challengeEvaluation: collectionChallengeEvaluationSchema,
+    reward: collectionGameRewardReceiptV3Schema,
+    completedAtIso: z.string().min(1).max(64),
+  })
+  .strict()
+  .superRefine((record, ctx) => {
+    const prepared = record.prepared;
+    if (prepared.gameId !== record.gameId || prepared.gameSequence !== record.gameSequence) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'record identity does not match the prepared input',
+      });
+    }
+    if (record.result.gameId !== record.gameId) {
+      ctx.addIssue({ code: 'custom', message: 'result identity does not match the record' });
+    }
+    if (record.reward.difficultyId !== prepared.difficulty.difficultyId) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'reward difficulty does not match the prepared input',
+      });
+    }
+    if (record.reward.firstClearEligible !== prepared.firstClearEligible) {
+      ctx.addIssue({ code: 'custom', message: 'reward first-clear eligibility mismatch' });
+    }
+    if (record.reward.playerWin !== (record.result.winner === 'home')) {
+      ctx.addIssue({ code: 'custom', message: 'reward winner does not match the result' });
+    }
+    if (record.reward.gameOutcome !== record.result.outcome) {
+      ctx.addIssue({ code: 'custom', message: 'reward outcome does not match the result' });
+    }
+    if (record.result.outcome === 'completed') {
+      const margin = Math.abs(record.result.home.score - record.result.away.score);
+      if (record.reward.scoreMargin !== margin) {
+        ctx.addIssue({ code: 'custom', message: 'reward score margin does not match the result' });
+      }
+    } else if (record.reward.scoreMargin !== null) {
+      ctx.addIssue({ code: 'custom', message: 'forfeit rewards must not record a score margin' });
+    }
+    const evaluation = record.objectiveEvaluation;
+    if (evaluation.kind === 'not-selected') {
+      if (prepared.objectives.selectedObjectiveId !== null) {
+        ctx.addIssue({ code: 'custom', message: 'evaluation skips the selected objective' });
+      }
+      if (record.reward.objectiveId !== null) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'reward references an objective that was not selected',
+        });
+      }
+    } else if (evaluation.objectiveId !== prepared.objectives.selectedObjectiveId) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'evaluation objective does not match the selection',
+      });
+    }
+    if (evaluation.kind === 'forfeit' && record.result.outcome !== 'forfeit') {
+      ctx.addIssue({ code: 'custom', message: 'forfeit evaluation requires a forfeit result' });
+    }
+    if (evaluation.kind === 'evaluated' && record.result.outcome !== 'completed') {
+      ctx.addIssue({ code: 'custom', message: 'completed evaluation requires a completed result' });
+    }
+    const challenge = record.challengeEvaluation;
+    if (challenge.challengeId !== prepared.challenge.challengeId) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'challenge evaluation references a different challenge',
+      });
+    }
+    if (challenge.difficultyId !== prepared.challenge.difficultyId) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'challenge evaluation difficulty does not match the prepared challenge',
+      });
+    }
+    if (challenge.firstClearEligible !== prepared.challenge.firstClearEligible) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'challenge evaluation first-clear eligibility mismatch',
+      });
+    }
+    if (record.reward.challengeId !== prepared.challenge.challengeId) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'reward challenge id does not match the prepared input',
+      });
+    }
+    if (
+      record.reward.challengeFirstClearEligible !== prepared.challenge.firstClearEligible ||
+      record.reward.challengeFirstClearGranted !== challenge.firstClearGranted ||
+      record.reward.challengeComponentKind !== challenge.componentKind
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'challenge reward facts do not match the challenge evaluation',
+      });
+    }
+    if (
+      challenge.componentKind !== null &&
+      (record.result.outcome !== 'completed' || record.result.winner !== 'home')
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'challenge rewards require a completed player win',
+      });
+    }
+  });
+export type CollectionGameRecordV3 = z.infer<typeof collectionGameRecordV3Schema>;
+
 export const collectionGameRecordSchema = collectionGameRecordV2Schema;
 export type CollectionGameRecord = CollectionGameRecordV2;
 
 export const collectionGameRecordUnionSchema = z.union([
   collectionGameRecordV1Schema,
   collectionGameRecordV2Schema,
+  collectionGameRecordV3Schema,
 ]);
 export type CollectionGameRecordUnion = z.infer<typeof collectionGameRecordUnionSchema>;
 
@@ -751,10 +1000,10 @@ export type CollectionPlayStateV1 = z.infer<typeof collectionPlayStateV1Schema>;
 
 export const collectionPlayStateV2Schema = z
   .object({
-    saveVersion: z.literal(COLLECTION_PLAY_SAVE_VERSION),
+    saveVersion: z.literal(COLLECTION_PLAY_SAVE_V2_VERSION),
     schemaVersion: z.literal(COLLECTION_SCHEMA_VERSION),
     teamVersion: z.literal(COLLECTION_TEAM_VERSION),
-    gameVersion: z.literal(COLLECTION_GAME_VERSION),
+    gameVersion: z.literal(COLLECTION_GAME_V2_VERSION),
     collectionId: idSchema,
     activeTeam: collectionActiveTeamSchema,
     revision: z.number().int().nonnegative(),
@@ -771,12 +1020,48 @@ export const collectionPlayStateV2Schema = z
   });
 export type CollectionPlayStateV2 = z.infer<typeof collectionPlayStateV2Schema>;
 
-export const collectionPlayStateSchema = collectionPlayStateV2Schema;
-export type CollectionPlayState = CollectionPlayStateV2;
+export const collectionPlayStateV3Schema = z
+  .object({
+    saveVersion: z.literal(COLLECTION_PLAY_SAVE_VERSION),
+    schemaVersion: z.literal(COLLECTION_SCHEMA_VERSION),
+    teamVersion: z.literal(COLLECTION_TEAM_VERSION),
+    gameVersion: z.literal(COLLECTION_GAME_VERSION),
+    collectionId: idSchema,
+    activeTeam: collectionActiveTeamSchema,
+    revision: z.number().int().nonnegative(),
+    digest: seasonCheckpointDigestSchema,
+    nextGameSequence: z.number().int().nonnegative(),
+    pendingGame: collectionPreparedGameUnionSchema.nullable(),
+    clearedDifficultyIds: z.array(z.enum(['street', 'pro', 'legend'])).max(3),
+    clearedChallengeIds: z.array(collectionChallengeIdSchema),
+  })
+  .strict()
+  .superRefine((state, ctx) => {
+    if (new Set(state.clearedDifficultyIds).size !== state.clearedDifficultyIds.length) {
+      ctx.addIssue({ code: 'custom', message: 'cleared difficulty ids must be unique' });
+    }
+    const seen = new Set<string>();
+    let previous = '';
+    for (const challengeId of state.clearedChallengeIds) {
+      if (seen.has(challengeId)) {
+        ctx.addIssue({ code: 'custom', message: `duplicate cleared challenge ${challengeId}` });
+      }
+      if (seen.size > 0 && challengeId <= previous) {
+        ctx.addIssue({ code: 'custom', message: 'cleared challenge ids must be canonical sorted' });
+      }
+      seen.add(challengeId);
+      previous = challengeId;
+    }
+  });
+export type CollectionPlayStateV3 = z.infer<typeof collectionPlayStateV3Schema>;
+
+export const collectionPlayStateSchema = collectionPlayStateV3Schema;
+export type CollectionPlayState = CollectionPlayStateV3;
 
 export const collectionPlayStateUnionSchema = z.union([
   collectionPlayStateV1Schema,
   collectionPlayStateV2Schema,
+  collectionPlayStateV3Schema,
 ]);
 export type CollectionPlayStateUnion = z.infer<typeof collectionPlayStateUnionSchema>;
 
@@ -790,6 +1075,15 @@ const collectionGameCommandV1BaseSchema = z.object({
 });
 
 const collectionGameCommandV2BaseSchema = z.object({
+  schemaVersion: z.literal(COLLECTION_SCHEMA_VERSION),
+  commandVersion: z.literal(COLLECTION_GAME_COMMAND_V1_VERSION),
+  commandId: commandIdSchema,
+  collectionId: idSchema,
+  expectedRevision: z.number().int().nonnegative(),
+  expectedDigest: seasonCheckpointDigestSchema,
+});
+
+const collectionGameCommandV3BaseSchema = z.object({
   schemaVersion: z.literal(COLLECTION_SCHEMA_VERSION),
   commandVersion: z.literal(COLLECTION_GAME_COMMAND_VERSION),
   commandId: commandIdSchema,
@@ -884,9 +1178,50 @@ export const collectionGameCommandV2Schema = z.discriminatedUnion('command', [
 ]);
 export type CollectionGameCommandV2 = z.infer<typeof collectionGameCommandV2Schema>;
 
+export const collectionPrepareChallengeGameCommandSchema = collectionGameCommandV3BaseSchema.extend(
+  {
+    command: z.literal('prepare-challenge-game'),
+    challengeId: collectionChallengeIdSchema,
+    objectiveId: collectionObjectiveIdSchema.nullable(),
+  },
+);
+export type CollectionPrepareChallengeGameCommand = z.infer<
+  typeof collectionPrepareChallengeGameCommandSchema
+>;
+
+export const collectionAbandonChallengeGameCommandSchema = collectionGameCommandV3BaseSchema.extend(
+  {
+    command: z.literal('abandon-challenge-game'),
+    gameId: collectionGameIdSchema,
+  },
+);
+export type CollectionAbandonChallengeGameCommand = z.infer<
+  typeof collectionAbandonChallengeGameCommandSchema
+>;
+
+export const collectionAcceptChallengeGameResultCommandSchema =
+  collectionGameCommandV3BaseSchema.extend({
+    command: z.literal('accept-challenge-game-result'),
+    gameId: collectionGameIdSchema,
+    result: collectionGameResultV3Schema,
+    events: z.array(collectionGameEventSchema).min(1),
+    completedAtIso: z.string().min(1).max(64),
+  });
+export type CollectionAcceptChallengeGameResultCommand = z.infer<
+  typeof collectionAcceptChallengeGameResultCommandSchema
+>;
+
+export const collectionGameCommandV3Schema = z.discriminatedUnion('command', [
+  collectionPrepareChallengeGameCommandSchema,
+  collectionAbandonChallengeGameCommandSchema,
+  collectionAcceptChallengeGameResultCommandSchema,
+]);
+export type CollectionGameCommandV3 = z.infer<typeof collectionGameCommandV3Schema>;
+
 export const collectionGameCommandSchema = z.union([
   collectionGameCommandV1Schema,
   collectionGameCommandV2Schema,
+  collectionGameCommandV3Schema,
 ]);
 export type CollectionGameCommand = z.infer<typeof collectionGameCommandSchema>;
 
@@ -927,6 +1262,18 @@ export const collectionGameRejectionSchema = z.discriminatedUnion('code', [
   z.object({ code: z.literal('invalid-adjustment-facts'), detail: z.string() }).strict(),
   z.object({ code: z.literal('invalid-reward-facts'), detail: z.string() }).strict(),
   z.object({ code: z.literal('first-clear-divergence'), detail: z.string() }).strict(),
+  z.object({ code: z.literal('unknown-challenge'), challengeId: z.string() }).strict(),
+  z
+    .object({
+      code: z.literal('challenge-team-ineligible'),
+      challengeId: z.string(),
+      validation: collectionChallengeValidationFactsSchema,
+    })
+    .strict(),
+  z.object({ code: z.literal('challenge-difficulty-divergence'), detail: z.string() }).strict(),
+  z.object({ code: z.literal('challenge-version-mismatch'), detail: z.string() }).strict(),
+  z.object({ code: z.literal('challenge-first-clear-divergence'), detail: z.string() }).strict(),
+  z.object({ code: z.literal('challenge-reward-divergence'), detail: z.string() }).strict(),
 ]);
 export type CollectionGameRejection = z.infer<typeof collectionGameRejectionSchema>;
 
@@ -986,10 +1333,10 @@ const OBJECTIVE_CONDITION_KIND: Record<string, string> = {
 export const collectionGameRulesV2Schema = z
   .object({
     rulesVersion: z.literal(COLLECTION_GAME_RULES_VERSION),
-    gameVersion: z.literal(COLLECTION_GAME_VERSION),
+    gameVersion: z.literal(COLLECTION_GAME_V2_VERSION),
     teamVersion: z.literal(COLLECTION_TEAM_VERSION),
-    rewardVersion: z.literal(COLLECTION_REWARD_VERSION),
-    replayVersion: z.literal(COLLECTION_GAME_REPLAY_VERSION),
+    rewardVersion: z.literal(COLLECTION_REWARD_V2_VERSION),
+    replayVersion: z.literal(COLLECTION_GAME_V2_REPLAY_VERSION),
     difficultyVersion: z.literal(COLLECTION_DIFFICULTY_VERSION),
     objectiveVersion: z.literal(COLLECTION_OBJECTIVE_VERSION),
     cpuRosterSize: z.literal(COLLECTION_GAME_CPU_ROSTER_SIZE),

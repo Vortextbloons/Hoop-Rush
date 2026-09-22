@@ -2,14 +2,21 @@ import Dexie, { type EntityTable, type Table } from 'dexie';
 import {
   CHECKPOINT_SAVE_SCHEMA_VERSION,
   CLASSIC_DRAFT_SCHEMA_VERSION,
-  COLLECTION_PLAY_SAVE_VERSION,
   COLLECTION_PLAY_SAVE_V1_VERSION,
+  COLLECTION_PLAY_SAVE_V2_VERSION,
+  COLLECTION_PLAY_SAVE_VERSION,
+  COLLECTION_SAVE_V1_VERSION,
+  COLLECTION_SAVE_VERSION,
   SAVE_SCHEMA_VERSION,
   canonicalJson,
   seasonDigestHex,
   type ChallengeRun,
 } from '@hoop-rush/data-contracts';
-import { migrateCollectionPlayStateV1 } from '@hoop-rush/engine';
+import {
+  migrateCollectionPlayStateV1,
+  migrateCollectionPlayStateV2,
+  migrateCollectionStateV1,
+} from '@hoop-rush/engine';
 import {
   classicDraftRecordSchema,
   type StoredClassicDraft,
@@ -65,6 +72,9 @@ import type {
 import {
   storedCollectionPlayStateV1Schema,
   storedCollectionPlayStateV2Schema,
+  storedCollectionPlayStateV3Schema,
+  storedCollectionStateV1Schema,
+  storedCollectionStateV2Schema,
 } from '../schemas/collection-record.ts';
 const ACTIVE_RECORD_ID = 'active';
 const CLASSIC_DRAFT_RECORD_ID = 'classic-draft';
@@ -344,6 +354,40 @@ export class HoopRushDatabase extends Dexie {
               ...parsed,
               saveSchemaVersion: COLLECTION_PLAY_SAVE_VERSION,
               playState: migrateCollectionPlayStateV1(parsed.playState),
+            }),
+          );
+        }
+      });
+    this.version(20)
+      .stores(HOOP_RUSH_DATABASE_STORES)
+      .upgrade(async (transaction) => {
+        const stateTable = transaction.table('collectionState');
+        const stateRows: unknown[] = await stateTable.toArray();
+        for (const row of stateRows) {
+          if (typeof row !== 'object' || row === null) continue;
+          const saveSchemaVersion = (row as { saveSchemaVersion?: unknown }).saveSchemaVersion;
+          if (saveSchemaVersion !== COLLECTION_SAVE_V1_VERSION) continue;
+          const parsed = storedCollectionStateV1Schema.parse(row);
+          await stateTable.put(
+            storedCollectionStateV2Schema.parse({
+              ...parsed,
+              saveSchemaVersion: COLLECTION_SAVE_VERSION,
+              state: migrateCollectionStateV1(parsed.state),
+            }),
+          );
+        }
+        const playTable = transaction.table('collectionPlayState');
+        const playRows: unknown[] = await playTable.toArray();
+        for (const row of playRows) {
+          if (typeof row !== 'object' || row === null) continue;
+          const saveSchemaVersion = (row as { saveSchemaVersion?: unknown }).saveSchemaVersion;
+          if (saveSchemaVersion !== COLLECTION_PLAY_SAVE_V2_VERSION) continue;
+          const parsed = storedCollectionPlayStateV2Schema.parse(row);
+          await playTable.put(
+            storedCollectionPlayStateV3Schema.parse({
+              ...parsed,
+              saveSchemaVersion: COLLECTION_PLAY_SAVE_VERSION,
+              playState: migrateCollectionPlayStateV2(parsed.playState),
             }),
           );
         }

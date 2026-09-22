@@ -9,6 +9,7 @@ import {
   type CollectionCatalogCard,
   type CollectionPlayState,
   type CollectionPlayStateV1,
+  type CollectionPlayStateV2,
 } from '@hoop-rush/data-contracts';
 import { CollectionCommandError } from './packs.ts';
 import { initializeCollectionActiveTeam } from './active-team.ts';
@@ -22,6 +23,7 @@ export function collectionPlayStateFactsOf(state: CollectionPlayState): {
   teamVersion: string;
   gameVersion: string;
   clearedDifficultyIds: string[];
+  clearedChallengeIds: string[];
 } {
   return {
     collectionId: state.collectionId,
@@ -33,6 +35,7 @@ export function collectionPlayStateFactsOf(state: CollectionPlayState): {
     teamVersion: state.teamVersion,
     gameVersion: state.gameVersion,
     clearedDifficultyIds: [...state.clearedDifficultyIds].sort(),
+    clearedChallengeIds: [...state.clearedChallengeIds].sort(),
   };
 }
 
@@ -68,6 +71,7 @@ export function initializeCollectionPlayState(input: {
     nextGameSequence: 0,
     pendingGame: null,
     clearedDifficultyIds: [],
+    clearedChallengeIds: [],
   };
   return { ...state, digest: collectionPlayStateDigest(collectionPlayStateFactsOf(state)) };
 }
@@ -85,6 +89,25 @@ export function migrateCollectionPlayStateV1(state: CollectionPlayStateV1): Coll
     nextGameSequence: state.nextGameSequence,
     pendingGame: state.pendingGame,
     clearedDifficultyIds: [],
+    clearedChallengeIds: [],
+  };
+  return { ...migrated, digest: collectionPlayStateDigest(collectionPlayStateFactsOf(migrated)) };
+}
+
+export function migrateCollectionPlayStateV2(state: CollectionPlayStateV2): CollectionPlayState {
+  const migrated: CollectionPlayState = {
+    saveVersion: COLLECTION_PLAY_SAVE_VERSION,
+    schemaVersion: COLLECTION_SCHEMA_VERSION,
+    teamVersion: state.teamVersion,
+    gameVersion: COLLECTION_GAME_VERSION,
+    collectionId: state.collectionId,
+    activeTeam: state.activeTeam,
+    revision: state.revision,
+    digest: '0'.repeat(32),
+    nextGameSequence: state.nextGameSequence,
+    pendingGame: state.pendingGame,
+    clearedDifficultyIds: [...state.clearedDifficultyIds],
+    clearedChallengeIds: [],
   };
   return { ...migrated, digest: collectionPlayStateDigest(collectionPlayStateFactsOf(migrated)) };
 }

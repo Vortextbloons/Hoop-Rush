@@ -5,11 +5,14 @@ import {
   collectionGameIdSchema,
   collectionGameResultUnionSchema,
   collectionGameResultV1Schema,
+  collectionGameResultV1V2UnionSchema,
   collectionPreparedGameUnionSchema,
   collectionPreparedGameV1Schema,
+  collectionPreparedGameV1V2UnionSchema,
 } from './collection-game.ts';
 import {
   COLLECTION_GAME_V1_WORKER_WIRE_VERSION,
+  COLLECTION_GAME_V2_WORKER_WIRE_VERSION,
   COLLECTION_GAME_WORKER_WIRE_VERSION,
 } from './collection-versions.ts';
 
@@ -27,6 +30,22 @@ export const collectionGameWorkerSimulateRequestV1Schema = z
   .strict();
 export type CollectionGameWorkerSimulateRequestV1 = z.infer<
   typeof collectionGameWorkerSimulateRequestV1Schema
+>;
+
+export const collectionGameWorkerSimulateRequestV2Schema = z
+  .object({
+    wireVersion: z.literal(COLLECTION_GAME_V2_WORKER_WIRE_VERSION),
+    type: z.literal('collection-game-simulate'),
+    requestId: z.string().min(1).max(64),
+    prepared: collectionPreparedGameV1V2UnionSchema,
+    catalogUrl: z.string().min(1).max(512),
+    catalogHash: contentHashSchema,
+    profileUrl: z.string().min(1).max(512),
+    profileHash: contentHashSchema,
+  })
+  .strict();
+export type CollectionGameWorkerSimulateRequestV2 = z.infer<
+  typeof collectionGameWorkerSimulateRequestV2Schema
 >;
 
 export const collectionGameWorkerSimulateRequestSchema = z
@@ -78,6 +97,7 @@ export type CollectionGameWorkerRequest = z.infer<typeof collectionGameWorkerReq
 
 export const collectionGameWorkerRequestUnionSchema = z.union([
   collectionGameWorkerSimulateRequestV1Schema,
+  collectionGameWorkerSimulateRequestV2Schema,
   collectionGameWorkerRequestSchema,
 ]);
 export type CollectionGameWorkerRequestUnion = z.infer<
@@ -114,6 +134,22 @@ export const collectionGameWorkerCompleteMessageV1Schema = z
   .strict();
 export type CollectionGameWorkerCompleteMessageV1 = z.infer<
   typeof collectionGameWorkerCompleteMessageV1Schema
+>;
+
+export const collectionGameWorkerCompleteMessageV2Schema = z
+  .object({
+    wireVersion: z.literal(COLLECTION_GAME_V2_WORKER_WIRE_VERSION),
+    type: z.literal('collection-game-complete'),
+    requestId: z.string().min(1).max(64),
+    gameId: collectionGameIdSchema,
+    result: collectionGameResultV1V2UnionSchema,
+    events: z.array(collectionGameEventSchema).min(1),
+    eventDigest: z.string().regex(/^[0-9a-f]{32}$/),
+    resultDigest: z.string().regex(/^[0-9a-f]{32}$/),
+  })
+  .strict();
+export type CollectionGameWorkerCompleteMessageV2 = z.infer<
+  typeof collectionGameWorkerCompleteMessageV2Schema
 >;
 
 export const collectionGameWorkerErrorCodeSchema = z.enum([

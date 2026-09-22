@@ -683,6 +683,8 @@ export {
   toCollectionSimulationPlayer,
   collectionStateDigest,
   collectionStateFactsOf,
+  collectionStateV1Digest,
+  collectionStateV1FactsOf,
 } from './collection/cards.ts';
 export {
   validateCollectionTeamFoundation,
@@ -728,19 +730,24 @@ export {
 } from './collection/objectives.ts';
 export {
   collectionRewardTransactionId,
+  collectionChallengeRewardTransactionId,
   collectionGameRewardReceiptFor,
+  collectionChallengeRewardReceiptFor,
+  collectionChallengeEvaluationFor,
 } from './collection/rewards.ts';
 export {
   initializeCollectionPlayState,
   collectionPlayStateFactsOf,
   collectionPlayStateDigest,
   migrateCollectionPlayStateV1,
+  migrateCollectionPlayStateV2,
 } from './collection/play-state.ts';
 export {
   applyCollectionGameCommand,
   type CollectionGameCommandResult,
 } from './collection/game-commands.ts';
 export { auditCollectionState, auditCollectionFirstClearState } from './collection/audit.ts';
+export { initializeCollectionState, migrateCollectionStateV1 } from './collection/state.ts';
 export {
   WELCOME_COIN_GRANT,
   CollectionCommandError,
@@ -752,4 +759,40 @@ export {
   describeCollectionPackOdds,
   applyCollectionCommand,
   reproduceCollectionPull,
+  validateCollectionTargetPlayer,
 } from './collection/packs.ts';
+export {
+  validateCollectionChallengeTeam,
+  checkCollectionChallengeFeasibility,
+  assertCollectionChallengeFeasible,
+  challengeRequirementMatches,
+  challengeRequirementReferenceExists,
+  challengeRequirementMatchingCards,
+  type CollectionChallengeTeamCheck,
+  type CollectionChallengeFeasibility,
+} from './collection/challenges.ts';
+export {
+  collectionTargetingSeedPath,
+  collectionTargetingSlotSeed,
+  collectionTargetingSlotSeedFromPath,
+  compileTargetEligibility,
+  compileTargetSnapshot,
+  targetEligibleCardIds,
+  selectTargetedCard,
+  describeCollectionTargetOdds,
+  drawCollectionPackSlotsTargeted,
+  type TargetedPackDraw,
+} from './collection/targeting.ts';
+export {
+  validateCollectionProgressionRules,
+  resolveCollectionChallenge,
+} from './collection/progression.ts';
+export {
+  collectionSetProgress,
+  collectionSetRewardTransactionId,
+  setClaimReceiptFor,
+} from './collection/set-rewards.ts';
+export {
+  prepareCollectionChallengeGame,
+  CollectionChallengeTeamIneligibleError,
+} from './collection/challenge-game.ts';

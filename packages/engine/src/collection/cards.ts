@@ -5,6 +5,7 @@ import {
   type CollectionCatalogCard,
   type CollectionCardDefinition,
   type CollectionState,
+  type CollectionStateV1,
   type SimulationPlayer,
   type SimulationRatings,
   type SimulationTendencies,
@@ -100,7 +101,7 @@ export function toCollectionSimulationPlayer(
   };
 }
 
-export function collectionStateDigest(facts: {
+export function collectionStateV1Digest(facts: {
   collectionId: string;
   revision: number;
   claimedWelcome: boolean;
@@ -124,7 +125,7 @@ export function collectionStateDigest(facts: {
   );
 }
 
-export function collectionStateFactsOf(state: CollectionState): {
+export function collectionStateV1FactsOf(state: CollectionStateV1): {
   collectionId: string;
   revision: number;
   claimedWelcome: boolean;
@@ -143,5 +144,67 @@ export function collectionStateFactsOf(state: CollectionState): {
     nextPullSequence: state.nextPullSequence,
     catalogVersion: state.catalogVersion,
     economyVersion: state.economyVersion,
+  };
+}
+
+export function collectionStateDigest(facts: {
+  collectionId: string;
+  revision: number;
+  claimedWelcome: boolean;
+  ownedCardIds: readonly string[];
+  balances: CollectionBalances;
+  nextPullSequence: number;
+  catalogVersion: string;
+  economyVersion: string;
+  progressionVersion: string;
+  progressionHash: string | null;
+  activeTargetPlayerId: string | null;
+  claimedSetIds: readonly string[];
+}): string {
+  return seasonDigestHex(
+    canonicalJson({
+      activeTargetPlayerId: facts.activeTargetPlayerId,
+      balances: facts.balances,
+      catalogVersion: facts.catalogVersion,
+      claimedSetIds: [...facts.claimedSetIds].sort(),
+      claimedWelcome: facts.claimedWelcome,
+      collectionId: facts.collectionId,
+      economyVersion: facts.economyVersion,
+      nextPullSequence: facts.nextPullSequence,
+      ownedCardIds: [...facts.ownedCardIds].sort(),
+      progressionHash: facts.progressionHash,
+      progressionVersion: facts.progressionVersion,
+      revision: facts.revision,
+    }),
+  );
+}
+
+export function collectionStateFactsOf(state: CollectionState): {
+  collectionId: string;
+  revision: number;
+  claimedWelcome: boolean;
+  ownedCardIds: string[];
+  balances: CollectionBalances;
+  nextPullSequence: number;
+  catalogVersion: string;
+  economyVersion: string;
+  progressionVersion: string;
+  progressionHash: string | null;
+  activeTargetPlayerId: string | null;
+  claimedSetIds: string[];
+} {
+  return {
+    collectionId: state.collectionId,
+    revision: state.revision,
+    claimedWelcome: state.claimedWelcome,
+    ownedCardIds: state.owned.map((entry) => entry.cardId),
+    balances: state.balances,
+    nextPullSequence: state.nextPullSequence,
+    catalogVersion: state.catalogVersion,
+    economyVersion: state.economyVersion,
+    progressionVersion: state.progressionVersion,
+    progressionHash: state.progressionHash ?? null,
+    activeTargetPlayerId: state.activeTargetPlayerId,
+    claimedSetIds: [...state.claimedSetIds].sort(),
   };
 }

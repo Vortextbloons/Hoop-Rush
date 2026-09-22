@@ -7,18 +7,28 @@ import {
   type CollectionCommand,
   type CollectionLedgerEntry,
   type CollectionPackDefinition,
+  type CollectionProgressionRules,
   type CollectionPullRecord,
+  type CollectionPullRecordV1,
+  type CollectionPullRecordV2,
   type CollectionRarity,
+  type CollectionSetClaimReceipt,
   type CollectionState,
   type PositionUnion,
   type SlotIndex,
 } from '@hoop-rush/data-contracts';
 import {
   COLLECTION_CATALOG_VERSION,
+  COLLECTION_COMMAND_V1_VERSION,
   COLLECTION_ECONOMY_VERSION,
   COLLECTION_PACK_RULES_VERSION,
+  COLLECTION_PROGRESSION_VERSION,
   COLLECTION_RARITY_ORDER,
+  COLLECTION_REPLAY_VERSION,
   COLLECTION_SCHEMA_VERSION,
+  COLLECTION_SET_REWARD_VERSION,
+  COLLECTION_STATE_SCHEMA_VERSION,
+  COLLECTION_TARGETING_VERSION,
   COLLECTION_VERSION,
 } from '@hoop-rush/data-contracts';
 import { canFillSlot } from '../domain/lineup.ts';
@@ -26,6 +36,17 @@ import { assignLineup } from '../domain/lineup.ts';
 import { createRng, swapAt } from '../sim/rng.ts';
 import { collectionStateDigest, collectionStateFactsOf } from './cards.ts';
 import { collectionPullSeed, collectionStarterSeed } from './seeds.ts';
+import {
+  collectionSetProgress,
+  collectionSetRewardTransactionId,
+  setClaimReceiptFor,
+} from './set-rewards.ts';
+import { validateCollectionProgressionRules } from './progression.ts';
+import {
+  compileTargetSnapshot,
+  describeCollectionTargetOdds,
+  drawCollectionPackSlotsTargeted,
+} from './targeting.ts';
 
 export const WELCOME_COIN_GRANT = 3000;
 
@@ -329,6 +350,8 @@ export function describeCollectionPackOdds(
   };
 }
 
+export { describeCollectionTargetOdds };
+
 function ledgerTxnId(commandId: string, pullSequence: number, index: number): string {
   return `txn-${seasonDigestHex(`collection-txn\u0000${commandId}\u0000${String(pullSequence)}\u0000${String(index)}`)}`;
 }
@@ -344,8 +367,10 @@ function addChecked(a: number, b: number, what: string): number {
 export interface AcceptedCollectionResult {
   status: 'accepted';
   state: CollectionState;
-  pull: CollectionPullRecord;
+  pull: CollectionPullRecord | null;
   ledgerEntries: CollectionLedgerEntry[];
+  setReceipt?: CollectionSetClaimReceipt;
+  targetPlayerId?: string | null;
 }
 
 export interface RejectedCollectionResult {
@@ -359,6 +384,13 @@ function reject(code: string, extra: Record<string, unknown> = {}): RejectedColl
   return { status: 'rejected', rejection: { code, ...extra } };
 }
 
+export function validateCollectionTargetPlayer(
+  catalog: CollectionCatalog,
+  playerId: string,
+): boolean {
+  return catalog.cards.some((card) => card.playerId === playerId);
+}
+
 export function applyCollectionCommand(
   state: CollectionState,
   command: CollectionCommand,
@@ -367,6 +399,8 @@ export function applyCollectionCommand(
   ledger: readonly CollectionLedgerEntry[],
   priorCommands: readonly CollectionCommand[],
   catalogHash: string,
+  progression: CollectionProgressionRules | null,
+  progressionHash: string | null,
 ): CollectionCommandResult {
   if (command.collectionId !== state.collectionId) {
     return reject('collection-mismatch', { expectedCollectionId: state.collectionId });
@@ -399,9 +433,15 @@ export function applyCollectionCommand(
   }
   try {
     if (command.command === 'claim-welcome') {
-      return applyClaimWelcome(state, command, catalog, catalogHash);
+      return applyClaimWelcome(state, command, catalog, catalogHash, progressionHash);
     }
-    return applyOpenPack(state, command, catalog, catalogHash);
+    if (command.command === 'open-pack') {
+      return applyOpenPack(state, command, catalog, catalogHash, progression, progressionHash);
+    }
+    if (command.command === 'set-target-player') {
+      return applySetTargetPlayer(state, command, catalog);
+    }
+    return applyClaimSetReward(state, command, catalog, progression, progressionHash);
   } catch (error) {
     if (error instanceof CollectionCommandError) {
       return reject(error.code, { detail: error.message });
@@ -412,24 +452,36 @@ export function applyCollectionCommand(
 
 function commitState(
   state: CollectionState,
-  owned: CollectionState['owned'],
-  balances: CollectionBalances,
-  claimedWelcome: boolean,
+  update: Partial<
+    Pick<
+      CollectionState,
+      'owned' | 'balances' | 'claimedWelcome' | 'activeTargetPlayerId' | 'claimedSetIds'
+    >
+  >,
+  advancePullSequence: boolean,
+  progressionHash: string | null,
 ): CollectionState {
   const next: CollectionState = {
-    schemaVersion: COLLECTION_SCHEMA_VERSION,
+    schemaVersion: COLLECTION_STATE_SCHEMA_VERSION,
     collectionVersion: COLLECTION_VERSION,
     catalogVersion: COLLECTION_CATALOG_VERSION,
     economyVersion: COLLECTION_ECONOMY_VERSION,
+    progressionVersion: COLLECTION_PROGRESSION_VERSION,
+    progressionHash: (state.progressionHash ??
+      progressionHash) as CollectionState['progressionHash'],
     collectionId: state.collectionId,
     rootSeed: state.rootSeed,
     revision: state.revision + 1,
     digest: '0'.repeat(32),
-    claimedWelcome,
-    owned,
-    balances,
-    nextPullSequence: state.nextPullSequence + 1,
+    claimedWelcome: state.claimedWelcome,
+    owned: state.owned,
+    balances: state.balances,
+    nextPullSequence: state.nextPullSequence,
+    activeTargetPlayerId: state.activeTargetPlayerId,
+    claimedSetIds: state.claimedSetIds,
+    ...update,
   };
+  if (advancePullSequence) next.nextPullSequence = state.nextPullSequence + 1;
   return { ...next, digest: collectionStateDigest(collectionStateFactsOf(next)) };
 }
 
@@ -438,6 +490,7 @@ function applyClaimWelcome(
   command: Extract<CollectionCommand, { command: 'claim-welcome' }>,
   catalog: CollectionCatalog,
   catalogHash: string,
+  progressionHash: string | null,
 ): CollectionCommandResult {
   if (state.claimedWelcome) return reject('already-claimed');
   const welcomeCatalogVersion: string = catalog.catalogVersion;
@@ -469,17 +522,19 @@ function applyClaimWelcome(
     Coins: addChecked(state.balances.Coins, WELCOME_COIN_GRANT, 'welcome grant'),
     Exchange: state.balances.Exchange,
   };
-  const pull: CollectionPullRecord = {
+  const pull: CollectionPullRecordV2 = {
     pullSequence,
     kind: 'welcome',
     packId: undefined,
     packRulesVersion: catalog.packs[0]?.packRulesVersion ?? COLLECTION_PACK_RULES_VERSION,
     economyVersion: COLLECTION_ECONOMY_VERSION,
     catalogVersion: COLLECTION_CATALOG_VERSION,
-    catalogHash: catalogHash as CollectionPullRecord['catalogHash'],
+    catalogHash: catalogHash as CollectionPullRecordV2['catalogHash'],
     commandId: command.commandId,
     seedPath: starter.seedPath,
     slots,
+    replayVersion: COLLECTION_REPLAY_VERSION,
+    targeting: null,
   };
   const ledgerEntries: CollectionLedgerEntry[] = [
     {
@@ -493,7 +548,7 @@ function applyClaimWelcome(
   ];
   return {
     status: 'accepted',
-    state: commitState(state, owned, balances, true),
+    state: commitState(state, { owned, balances, claimedWelcome: true }, true, progressionHash),
     pull,
     ledgerEntries,
   };
@@ -504,6 +559,8 @@ function applyOpenPack(
   command: Extract<CollectionCommand, { command: 'open-pack' }>,
   catalog: CollectionCatalog,
   catalogHash: string,
+  progression: CollectionProgressionRules | null,
+  progressionHash: string | null,
 ): CollectionCommandResult {
   const pack = catalog.packs.find((entry) => entry.packId === command.packId);
   if (pack === undefined) return reject('missing-content', { detail: command.packId });
@@ -518,12 +575,70 @@ function applyOpenPack(
       return reject(error.code, { detail: error.message });
     throw error;
   }
+  const targetPlayerId = state.activeTargetPlayerId;
+  const currentCommand = command.commandVersion !== COLLECTION_COMMAND_V1_VERSION;
+  if (
+    currentCommand &&
+    state.progressionHash !== null &&
+    state.progressionHash !== progressionHash
+  ) {
+    return reject('invalid-progression-rules', {
+      detail: 'collection progression rules do not match the committed state',
+    });
+  }
+  if (targetPlayerId !== null && progression === null) {
+    return reject('invalid-progression-rules', {
+      detail: 'targeting requires the progression rules artifact',
+    });
+  }
   const priceKey = pack.priceCurrency;
   if (state.balances[priceKey] < pack.priceAmount) {
     return reject('insufficient-funds', { currency: priceKey });
   }
   const pullSequence = state.nextPullSequence;
-  const { draws, seedPath } = drawCollectionPackSlots(catalog, pack, state.rootSeed, pullSequence);
+  let draws: PackDraw[];
+  let seedPath: string[];
+  let targeting: CollectionPullRecordV2['targeting'] = null;
+  try {
+    if (targetPlayerId === null) {
+      const result = drawCollectionPackSlots(catalog, pack, state.rootSeed, pullSequence);
+      draws = result.draws;
+      seedPath = result.seedPath;
+    } else {
+      if (progression === null) {
+        return reject('invalid-progression-rules', { detail: 'missing targeting multiplier' });
+      }
+      const snapshot = compileTargetSnapshot({
+        catalog,
+        pack,
+        targetPlayerId,
+        multiplierBp: progression.targetMultiplierBp,
+        pullSequence,
+      });
+      if (snapshot.targetingVersion !== COLLECTION_TARGETING_VERSION) {
+        return reject('targeting-version-mismatch', { detail: snapshot.targetingVersion });
+      }
+      draws = drawCollectionPackSlotsTargeted({
+        catalog,
+        pack,
+        rootSeed: state.rootSeed,
+        pullSequence,
+        target: snapshot,
+      });
+      seedPath = seedPathOf([
+        'collection',
+        'pulls',
+        pack.packId,
+        pack.packRulesVersion,
+        String(pullSequence),
+      ]);
+      targeting = snapshot;
+    }
+  } catch (error) {
+    if (error instanceof CollectionCommandError)
+      return reject(error.code, { detail: error.message });
+    throw error;
+  }
   const byId = new Map(catalog.cards.map((card) => [card.cardId, card]));
   const ownedIds = new Set(state.owned.map((entry) => entry.cardId));
   const owned: CollectionState['owned'] = [...state.owned];
@@ -582,23 +697,165 @@ function applyOpenPack(
       });
     }
   }
-  const pull: CollectionPullRecord = {
-    pullSequence,
-    kind: 'pack',
-    packId: pack.packId,
-    packRulesVersion: pack.packRulesVersion,
-    economyVersion: COLLECTION_ECONOMY_VERSION,
-    catalogVersion: COLLECTION_CATALOG_VERSION,
-    catalogHash: catalogHash as CollectionPullRecord['catalogHash'],
+  const pull: CollectionPullRecord = currentCommand
+    ? {
+        pullSequence,
+        kind: 'pack',
+        packId: pack.packId,
+        packRulesVersion: pack.packRulesVersion,
+        economyVersion: COLLECTION_ECONOMY_VERSION,
+        catalogVersion: COLLECTION_CATALOG_VERSION,
+        catalogHash: catalogHash as CollectionPullRecordV2['catalogHash'],
+        commandId: command.commandId,
+        seedPath,
+        slots,
+        replayVersion: COLLECTION_REPLAY_VERSION,
+        targeting,
+      }
+    : {
+        pullSequence,
+        kind: 'pack',
+        packId: pack.packId,
+        packRulesVersion: pack.packRulesVersion,
+        economyVersion: COLLECTION_ECONOMY_VERSION,
+        catalogVersion: COLLECTION_CATALOG_VERSION,
+        catalogHash: catalogHash as CollectionPullRecordV1['catalogHash'],
+        commandId: command.commandId,
+        seedPath,
+        slots,
+      };
+  return {
+    status: 'accepted',
+    state: commitState(state, { owned, balances }, true, progressionHash),
+    pull,
+    ledgerEntries: entries,
+  };
+}
+
+function applySetTargetPlayer(
+  state: CollectionState,
+  command: Extract<CollectionCommand, { command: 'set-target-player' }>,
+  catalog: CollectionCatalog,
+): CollectionCommandResult {
+  const playerId = command.playerId;
+  if (playerId === null) {
+    if (state.activeTargetPlayerId === null) {
+      return reject('target-unchanged', { playerId: null });
+    }
+    return {
+      status: 'accepted',
+      state: commitState(state, { activeTargetPlayerId: null }, false, state.progressionHash),
+      pull: null,
+      ledgerEntries: [],
+      targetPlayerId: null,
+    };
+  }
+  if (!validateCollectionTargetPlayer(catalog, playerId)) {
+    return reject('unknown-target-player', { playerId });
+  }
+  if (state.activeTargetPlayerId === playerId) {
+    return reject('target-unchanged', { playerId });
+  }
+  return {
+    status: 'accepted',
+    state: commitState(state, { activeTargetPlayerId: playerId }, false, state.progressionHash),
+    pull: null,
+    ledgerEntries: [],
+    targetPlayerId: playerId,
+  };
+}
+
+function applyClaimSetReward(
+  state: CollectionState,
+  command: Extract<CollectionCommand, { command: 'claim-set-reward' }>,
+  catalog: CollectionCatalog,
+  progression: CollectionProgressionRules | null,
+  progressionHash: string | null,
+): CollectionCommandResult {
+  if (
+    progression === null ||
+    (state.progressionHash !== null && state.progressionHash !== progressionHash)
+  ) {
+    return reject('invalid-progression-rules', {
+      detail: 'set rewards require the committed progression rules artifact',
+    });
+  }
+  try {
+    validateCollectionProgressionRules({
+      progression,
+      progressionHash: progressionHash ?? '',
+      catalog,
+    });
+  } catch (error) {
+    if (error instanceof CollectionCommandError) {
+      return reject('invalid-progression-rules', { detail: error.message });
+    }
+    throw error;
+  }
+  const reward = progression.setRewards.find((entry) => entry.setId === command.setId);
+  if (reward === undefined) return reject('unknown-set', { setId: command.setId });
+  if (state.claimedSetIds.includes(command.setId)) {
+    return reject('set-already-claimed', { setId: command.setId });
+  }
+  const catalogSet = catalog.sets.find((entry) => entry.setId === command.setId);
+  if (catalogSet === undefined) return reject('unknown-set', { setId: command.setId });
+  const memberCardIds = [...catalogSet.memberCardIds].sort();
+  if (
+    memberCardIds.length !== reward.memberCardIds.length ||
+    memberCardIds.some((cardId, index) => cardId !== reward.memberCardIds[index])
+  ) {
+    return reject('set-reward-divergence', {
+      detail: `set ${command.setId} reward members do not match the pinned catalog`,
+    });
+  }
+  const ownedCardIds = new Set(state.owned.map((entry) => entry.cardId));
+  const progress = collectionSetProgress({
+    setId: command.setId,
+    title: catalogSet.title,
+    memberCardIds,
+    ownedCardIds,
+  });
+  if (!progress.complete) {
+    return reject('set-incomplete', {
+      setId: command.setId,
+      ownedCount: progress.ownedCount,
+      requiredCount: progress.requiredCount,
+      missingCardIds: progress.missingCardIds,
+    });
+  }
+  const transactionId = collectionSetRewardTransactionId({
+    collectionId: state.collectionId,
+    setId: command.setId,
+    setRewardVersion: reward.setRewardVersion,
     commandId: command.commandId,
-    seedPath,
-    slots,
+  });
+  const receipt = setClaimReceiptFor({
+    reward,
+    memberCardIds,
+    ownedAtClaimCardIds: progress.ownedMemberCardIds,
+    transactionId,
+    commandId: command.commandId,
+    claimedAtIso: command.claimedAtIso,
+  });
+  const balances: CollectionBalances = {
+    Coins: state.balances.Coins,
+    Exchange: addChecked(state.balances.Exchange, reward.amount, 'set reward credit'),
+  };
+  const claimedSetIds = [...state.claimedSetIds, command.setId].sort();
+  const ledgerEntry: CollectionLedgerEntry = {
+    transactionId,
+    commandId: command.commandId,
+    pullSequence: null,
+    currency: reward.currency,
+    amount: reward.amount,
+    reason: 'set-completion-reward',
   };
   return {
     status: 'accepted',
-    state: commitState(state, owned, balances, state.claimedWelcome),
-    pull,
-    ledgerEntries: entries,
+    state: commitState(state, { balances, claimedSetIds }, false, progressionHash),
+    pull: null,
+    ledgerEntries: [ledgerEntry],
+    setReceipt: receipt,
   };
 }
 
@@ -625,7 +882,26 @@ export function reproduceCollectionPull(
   if (pack === undefined) {
     return { ok: false, failures: [`unknown pack ${String(pull.packId)}`] };
   }
-  const { draws } = drawCollectionPackSlots(catalog, pack, rootSeed, pull.pullSequence);
+  const targeting = 'targeting' in pull ? pull.targeting : null;
+  let draws: PackDraw[];
+  try {
+    if (targeting === null || targeting === undefined) {
+      draws = drawCollectionPackSlots(catalog, pack, rootSeed, pull.pullSequence).draws;
+    } else {
+      draws = drawCollectionPackSlotsTargeted({
+        catalog,
+        pack,
+        rootSeed,
+        pullSequence: pull.pullSequence,
+        target: targeting,
+      });
+    }
+  } catch (error) {
+    return {
+      ok: false,
+      failures: [error instanceof Error ? error.message : 'targeted draw failed'],
+    };
+  }
   if (draws.length !== pull.slots.length) {
     return {
       ok: false,

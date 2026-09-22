@@ -25,49 +25,45 @@ import { summaryRatingsSchema } from './player-season.ts';
 import { seasonCheckpointDigestSchema } from './season-digests.ts';
 import {
   COLLECTION_CATALOG_VERSION,
+  COLLECTION_COMMAND_V1_VERSION,
   COLLECTION_COMMAND_VERSION,
   COLLECTION_ECONOMY_VERSION,
   COLLECTION_OVERLAY_VERSION,
   COLLECTION_PACK_RULES_VERSION,
+  COLLECTION_PROGRESSION_VERSION,
+  COLLECTION_REPLAY_V1_VERSION,
   COLLECTION_REPLAY_VERSION,
   COLLECTION_SCHEMA_VERSION,
+  COLLECTION_STATE_SCHEMA_VERSION,
+  COLLECTION_TARGETING_VERSION,
   COLLECTION_VERSION,
 } from './collection-versions.ts';
+import {
+  collectionCardIdSchema,
+  collectionCurrencySchema,
+  collectionFamilySchema,
+  collectionPackIdSchema,
+  collectionRaritySchema,
+  collectionSetIdSchema,
+} from './collection-primitives.ts';
+import { collectionTargetSnapshotSchema } from './collection-targeting.ts';
 
-export const collectionCardIdSchema = z.string().regex(/^card-[0-9a-f]{32}$/);
-export type CollectionCardId = z.infer<typeof collectionCardIdSchema>;
-
-export const collectionRaritySchema = z.enum([
-  'Ember',
-  'Eruption',
-  'Apex',
-  'Titan',
-  'Eclipse',
-  'Immortal',
-]);
-export type CollectionRarity = z.infer<typeof collectionRaritySchema>;
-
-export const collectionFamilySchema = z.enum(['Base', 'Sharpshooter', 'Lockdown', 'Floor General']);
-export type CollectionFamily = z.infer<typeof collectionFamilySchema>;
-
-export const collectionCurrencySchema = z.enum(['Coins', 'Exchange']);
-export type CollectionCurrency = z.infer<typeof collectionCurrencySchema>;
-
-export const collectionPackIdSchema = z.enum([
-  'tip-off',
-  'fast-break',
-  'full-court',
-  'main-event',
-  'spotlight',
-]);
-export type CollectionPackId = z.infer<typeof collectionPackIdSchema>;
-
-export const collectionSetIdSchema = z.enum([
-  'sharpshooter-set',
-  'lockdown-set',
-  'floor-general-set',
-]);
-export type CollectionSetId = z.infer<typeof collectionSetIdSchema>;
+export {
+  collectionCardIdSchema,
+  collectionCurrencySchema,
+  collectionFamilySchema,
+  collectionPackIdSchema,
+  collectionRaritySchema,
+  collectionSetIdSchema,
+} from './collection-primitives.ts';
+export type {
+  CollectionCardId,
+  CollectionCurrency,
+  CollectionFamily,
+  CollectionPackId,
+  CollectionRarity,
+  CollectionSetId,
+} from './collection-primitives.ts';
 
 const ratingDeltaSchema = z.number().int().min(-100).max(100);
 const tendencyDeltaSchema = z.number().min(-100).max(100);
@@ -150,7 +146,7 @@ export const collectionPullSlotResultSchema = z.object({
 });
 export type CollectionPullSlotResult = z.infer<typeof collectionPullSlotResultSchema>;
 
-export const collectionPullRecordSchema = z.object({
+export const collectionPullRecordV1Schema = z.object({
   pullSequence: z.number().int().nonnegative(),
   kind: z.enum(['welcome', 'pack']),
   packId: collectionPackIdSchema.optional(),
@@ -162,7 +158,23 @@ export const collectionPullRecordSchema = z.object({
   seedPath: z.array(z.string().min(1).max(128)).min(1),
   slots: z.array(collectionPullSlotResultSchema).min(1).max(10),
 });
-export type CollectionPullRecord = z.infer<typeof collectionPullRecordSchema>;
+export type CollectionPullRecordV1 = z.infer<typeof collectionPullRecordV1Schema>;
+
+export const collectionPullRecordV2Schema = collectionPullRecordV1Schema
+  .extend({
+    replayVersion: z.literal(COLLECTION_REPLAY_VERSION),
+    targeting: collectionTargetSnapshotSchema.nullable(),
+  })
+  .strict();
+export type CollectionPullRecordV2 = z.infer<typeof collectionPullRecordV2Schema>;
+
+export const collectionPullRecordUnionSchema = z.union([
+  collectionPullRecordV2Schema,
+  collectionPullRecordV1Schema,
+]);
+export const collectionPullRecordSchema = collectionPullRecordUnionSchema;
+export type CollectionPullRecord = z.infer<typeof collectionPullRecordUnionSchema>;
+export type CollectionPullRecordUnion = CollectionPullRecord;
 
 export const collectionLedgerReasonSchema = z.enum([
   'welcome-grant',
@@ -173,6 +185,9 @@ export const collectionLedgerReasonSchema = z.enum([
   'game-objective-reward',
   'game-margin-reward',
   'game-first-clear-reward',
+  'challenge-first-clear-reward',
+  'challenge-repeat-win-reward',
+  'set-completion-reward',
 ]);
 export type CollectionLedgerReason = z.infer<typeof collectionLedgerReasonSchema>;
 
@@ -192,7 +207,7 @@ export const collectionBalancesSchema = z.object({
 });
 export type CollectionBalances = z.infer<typeof collectionBalancesSchema>;
 
-export const collectionStateSchema = z.object({
+export const collectionStateV1Schema = z.object({
   schemaVersion: z.literal(COLLECTION_SCHEMA_VERSION),
   collectionVersion: z.literal(COLLECTION_VERSION),
   catalogVersion: z.literal(COLLECTION_CATALOG_VERSION),
@@ -206,34 +221,131 @@ export const collectionStateSchema = z.object({
   balances: collectionBalancesSchema,
   nextPullSequence: z.number().int().nonnegative(),
 });
-export type CollectionState = z.infer<typeof collectionStateSchema>;
+export type CollectionStateV1 = z.infer<typeof collectionStateV1Schema>;
 
-export const collectionCommandBaseSchema = z.object({
+export const collectionStateV2Schema = z
+  .object({
+    schemaVersion: z.literal(COLLECTION_STATE_SCHEMA_VERSION),
+    collectionVersion: z.literal(COLLECTION_VERSION),
+    catalogVersion: z.literal(COLLECTION_CATALOG_VERSION),
+    economyVersion: z.literal(COLLECTION_ECONOMY_VERSION),
+    progressionVersion: z.literal(COLLECTION_PROGRESSION_VERSION),
+    progressionHash: contentHashSchema.nullable(),
+    collectionId: idSchema,
+    rootSeed: seedSchema,
+    revision: z.number().int().nonnegative(),
+    digest: seasonCheckpointDigestSchema,
+    claimedWelcome: z.boolean(),
+    owned: z.array(collectionOwnedCardSchema),
+    balances: collectionBalancesSchema,
+    nextPullSequence: z.number().int().nonnegative(),
+    activeTargetPlayerId: playerIdSchema.nullable(),
+    claimedSetIds: z.array(collectionSetIdSchema),
+  })
+  .superRefine((state, ctx) => {
+    const seen = new Set<string>();
+    let previous = '';
+    for (const setId of state.claimedSetIds) {
+      if (seen.has(setId)) {
+        ctx.addIssue({ code: 'custom', message: `duplicate claimed set ${setId}` });
+      }
+      if (seen.size > 0 && setId <= previous) {
+        ctx.addIssue({ code: 'custom', message: 'claimed set ids must be canonical sorted' });
+      }
+      seen.add(setId);
+      previous = setId;
+    }
+  });
+export type CollectionStateV2 = z.infer<typeof collectionStateV2Schema>;
+
+export const collectionStateUnionSchema = z.union([
+  collectionStateV2Schema,
+  collectionStateV1Schema,
+]);
+export const collectionStateSchema = collectionStateV2Schema;
+export type CollectionState = CollectionStateV2;
+export type CollectionStateUnion = z.infer<typeof collectionStateUnionSchema>;
+
+export const collectionCommandBaseV1Schema = z.object({
   schemaVersion: z.literal(COLLECTION_SCHEMA_VERSION),
+  commandVersion: z.literal(COLLECTION_COMMAND_V1_VERSION),
+  commandId: commandIdSchema,
+  collectionId: idSchema,
+  expectedRevision: z.number().int().nonnegative(),
+  expectedDigest: seasonCheckpointDigestSchema,
+});
+export type CollectionCommandBaseV1 = z.infer<typeof collectionCommandBaseV1Schema>;
+
+export const collectionCommandBaseV2Schema = z.object({
+  schemaVersion: z.literal(COLLECTION_STATE_SCHEMA_VERSION),
   commandVersion: z.literal(COLLECTION_COMMAND_VERSION),
   commandId: commandIdSchema,
   collectionId: idSchema,
   expectedRevision: z.number().int().nonnegative(),
   expectedDigest: seasonCheckpointDigestSchema,
 });
-export type CollectionCommandBase = z.infer<typeof collectionCommandBaseSchema>;
+export type CollectionCommandBaseV2 = z.infer<typeof collectionCommandBaseV2Schema>;
 
-export const collectionClaimWelcomeCommandSchema = collectionCommandBaseSchema.extend({
+export const collectionCommandBaseSchema = collectionCommandBaseV2Schema;
+
+export const collectionClaimWelcomeCommandV1Schema = collectionCommandBaseV1Schema.extend({
+  command: z.literal('claim-welcome'),
+  acquiredAtIso: z.string().min(1).max(64),
+});
+export type CollectionClaimWelcomeCommandV1 = z.infer<typeof collectionClaimWelcomeCommandV1Schema>;
+
+export const collectionOpenPackCommandV1Schema = collectionCommandBaseV1Schema.extend({
+  command: z.literal('open-pack'),
+  packId: collectionPackIdSchema,
+  acquiredAtIso: z.string().min(1).max(64),
+});
+export type CollectionOpenPackCommandV1 = z.infer<typeof collectionOpenPackCommandV1Schema>;
+
+export const collectionClaimWelcomeCommandSchema = collectionCommandBaseV2Schema.extend({
   command: z.literal('claim-welcome'),
   acquiredAtIso: z.string().min(1).max(64),
 });
 export type CollectionClaimWelcomeCommand = z.infer<typeof collectionClaimWelcomeCommandSchema>;
 
-export const collectionOpenPackCommandSchema = collectionCommandBaseSchema.extend({
+export const collectionOpenPackCommandSchema = collectionCommandBaseV2Schema.extend({
   command: z.literal('open-pack'),
   packId: collectionPackIdSchema,
   acquiredAtIso: z.string().min(1).max(64),
 });
 export type CollectionOpenPackCommand = z.infer<typeof collectionOpenPackCommandSchema>;
 
-export const collectionCommandSchema = z.discriminatedUnion('command', [
+export const collectionSetTargetPlayerCommandSchema = collectionCommandBaseV2Schema.extend({
+  command: z.literal('set-target-player'),
+  playerId: playerIdSchema.nullable(),
+});
+export type CollectionSetTargetPlayerCommand = z.infer<
+  typeof collectionSetTargetPlayerCommandSchema
+>;
+
+export const collectionClaimSetRewardCommandSchema = collectionCommandBaseV2Schema.extend({
+  command: z.literal('claim-set-reward'),
+  setId: collectionSetIdSchema,
+  claimedAtIso: z.string().min(1).max(64),
+});
+export type CollectionClaimSetRewardCommand = z.infer<typeof collectionClaimSetRewardCommandSchema>;
+
+export const collectionCommandV1Schema = z.discriminatedUnion('command', [
+  collectionClaimWelcomeCommandV1Schema,
+  collectionOpenPackCommandV1Schema,
+]);
+export type CollectionCommandV1 = z.infer<typeof collectionCommandV1Schema>;
+
+export const collectionCommandV2Schema = z.discriminatedUnion('command', [
   collectionClaimWelcomeCommandSchema,
   collectionOpenPackCommandSchema,
+  collectionSetTargetPlayerCommandSchema,
+  collectionClaimSetRewardCommandSchema,
+]);
+export type CollectionCommandV2 = z.infer<typeof collectionCommandV2Schema>;
+
+export const collectionCommandSchema = z.union([
+  collectionCommandV1Schema,
+  collectionCommandV2Schema,
 ]);
 export type CollectionCommand = z.infer<typeof collectionCommandSchema>;
 
@@ -255,6 +367,20 @@ export const collectionRejectionSchema = z.discriminatedUnion('code', [
   z.object({ code: z.literal('invalid-definition'), detail: z.string() }),
   z.object({ code: z.literal('no-feasible-starter'), detail: z.string() }),
   z.object({ code: z.literal('arithmetic-overflow'), detail: z.string() }),
+  z.object({ code: z.literal('unknown-target-player'), playerId: z.string() }),
+  z.object({ code: z.literal('target-unchanged'), playerId: z.string().nullable() }),
+  z.object({ code: z.literal('unknown-set'), setId: z.string() }),
+  z.object({
+    code: z.literal('set-incomplete'),
+    setId: z.string(),
+    ownedCount: z.number().int().nonnegative(),
+    requiredCount: z.number().int().positive(),
+    missingCardIds: z.array(collectionCardIdSchema),
+  }),
+  z.object({ code: z.literal('set-already-claimed'), setId: z.string() }),
+  z.object({ code: z.literal('invalid-progression-rules'), detail: z.string() }),
+  z.object({ code: z.literal('targeting-version-mismatch'), detail: z.string() }),
+  z.object({ code: z.literal('set-reward-divergence'), detail: z.string() }),
 ]);
 export type CollectionRejection = z.infer<typeof collectionRejectionSchema>;
 
@@ -297,7 +423,7 @@ export const collectionCatalogSchema = z
     cards: z.array(collectionCatalogCardSchema).min(1),
     sets: z.array(collectionSetDefinitionSchema).min(1),
     packs: z.array(collectionPackDefinitionSchema).min(1),
-    replayVersion: z.literal(COLLECTION_REPLAY_VERSION),
+    replayVersion: z.literal(COLLECTION_REPLAY_V1_VERSION),
   })
   .superRefine((catalog, ctx) => {
     const seen = new Set<string>();

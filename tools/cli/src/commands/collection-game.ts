@@ -17,7 +17,7 @@ import {
   type CollectionDifficultyId,
   type CollectionDifficultyProfile,
   type CollectionGameResult,
-  type CollectionGameRewardReceipt,
+  type CollectionGameRewardReceiptV2,
   type CollectionGameRules,
   type CollectionObjectiveDefinition,
   type CollectionObjectiveEvaluation,
@@ -369,7 +369,7 @@ interface AuditedV2Game {
   firstClearGranted: boolean;
   offeredObjectiveIds: CollectionObjectiveId[];
   evaluation: CollectionObjectiveEvaluation;
-  receipt: CollectionGameRewardReceipt | null;
+  receipt: CollectionGameRewardReceiptV2 | null;
   receiptReproduced: boolean;
   rewardVerified: boolean;
   adjustmentVerified: boolean;
@@ -474,7 +474,7 @@ function verifyRewardReceipt(input: {
   prepared: CollectionPreparedGameV2;
   result: CollectionGameResult;
   evaluation: CollectionObjectiveEvaluation;
-  receipt: CollectionGameRewardReceipt;
+  receipt: CollectionGameRewardReceiptV2;
   failures: string[];
 }): boolean {
   const { prepared, result, evaluation, receipt } = input;

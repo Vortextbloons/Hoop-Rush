@@ -1,10 +1,15 @@
 import {
   canonicalJson,
+  COLLECTION_GAME_V1_VERSION,
+  COLLECTION_GAME_V2_VERSION,
   type CollectionCatalog,
+  type CollectionChallengeEvaluation,
   type CollectionGameEvent,
   type CollectionGameRecordUnion,
+  type CollectionGameResult,
   type CollectionGameResultUnion,
   type CollectionPreparedGameUnion,
+  type CollectionPreparedGameV3,
   type EraSimulationProfile,
 } from '@hoop-rush/data-contracts';
 import { auditSideAccounting } from '../sim/accounting-core.ts';
@@ -21,7 +26,11 @@ import {
   simulateCollectionGame,
 } from './game.ts';
 import { evaluateCollectionObjective } from './objectives.ts';
-import { collectionGameRewardReceiptFor } from './rewards.ts';
+import {
+  collectionChallengeEvaluationFor,
+  collectionChallengeRewardReceiptFor,
+  collectionGameRewardReceiptFor,
+} from './rewards.ts';
 
 const PLAYER_SECONDS_PER_SIDE = (side: { players: Array<{ seconds: number }> }): number =>
   side.players.reduce((sum, player) => sum + player.seconds, 0);
@@ -34,7 +43,7 @@ export function checkCollectionGameResult(
   profile: EraSimulationProfile,
 ): string[] {
   const failures: string[] = [];
-  if (prepared.gameVersion !== 'collection-game-v1') {
+  if (prepared.gameVersion !== COLLECTION_GAME_V1_VERSION) {
     failures.push(...verifyDifficultyRatingAdjustments(prepared, catalog));
   }
   let reproduced: ReturnType<typeof simulateCollectionGame>;
@@ -426,7 +435,7 @@ function eventAudit(
       if (scored !== event.pointsScored) {
         failures.push(`possession ${String(event.possessionNumber)} points do not match the score`);
       }
-      if (event.pointsScored < 0 || event.pointsScored > 4) {
+      if (event.pointsScored < 0 || event.pointsScored > 10) {
         failures.push(`possession ${String(event.possessionNumber)} has impossible points`);
       }
       for (const delta of event.statDeltas) {
@@ -500,7 +509,7 @@ export function checkCollectionGameRecord(
   if (collectionGameResultDigest(record.result) !== record.resultDigest) {
     failures.push('result digest does not match the record');
   }
-  if (record.gameVersion === 'collection-game-v1') {
+  if (record.gameVersion === COLLECTION_GAME_V1_VERSION) {
     return failures;
   }
   const evaluation = evaluateCollectionObjective({
@@ -510,14 +519,34 @@ export function checkCollectionGameRecord(
   if (canonicalJson(evaluation) !== canonicalJson(record.objectiveEvaluation)) {
     failures.push('objective evaluation does not reproduce from the prepared input');
   }
-  const receipt = collectionGameRewardReceiptFor({
+  if (record.gameVersion === COLLECTION_GAME_V2_VERSION) {
+    const receipt = collectionGameRewardReceiptFor({
+      gameId: record.gameId,
+      prepared: record.prepared,
+      result: record.result,
+      evaluation,
+    });
+    if (canonicalJson(receipt) !== canonicalJson(record.reward)) {
+      failures.push('reward receipt does not reproduce from the prepared input');
+    }
+    return failures;
+  }
+  const challengeEvaluation = collectionChallengeEvaluationFor({
+    prepared: record.prepared,
+    result: record.result,
+  });
+  if (canonicalJson(challengeEvaluation) !== canonicalJson(record.challengeEvaluation)) {
+    failures.push('challenge evaluation does not reproduce from the prepared input');
+  }
+  const receipt = collectionChallengeRewardReceiptFor({
     gameId: record.gameId,
     prepared: record.prepared,
     result: record.result,
     evaluation,
+    challengeEvaluation,
   });
   if (canonicalJson(receipt) !== canonicalJson(record.reward)) {
-    failures.push('reward receipt does not reproduce from the prepared input');
+    failures.push('challenge reward receipt does not reproduce from the prepared input');
   }
   return failures;
 }

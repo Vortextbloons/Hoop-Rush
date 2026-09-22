@@ -2,13 +2,15 @@ import {
   COLLECTION_CATALOG_VERSION,
   COLLECTION_GAME_ENVIRONMENT_ERA_ID,
   COLLECTION_GAME_HOME_COURT_POLICY,
-  COLLECTION_GAME_REPLAY_VERSION,
-  COLLECTION_GAME_RULES_VERSION,
   COLLECTION_GAME_V1_REPLAY_VERSION,
+  COLLECTION_GAME_V2_REPLAY_VERSION,
+  COLLECTION_GAME_RULES_VERSION,
   COLLECTION_GAME_V1_RULES_VERSION,
   COLLECTION_GAME_V1_VERSION,
+  COLLECTION_GAME_V2_VERSION,
   COLLECTION_GAME_VERSION,
   COLLECTION_REWARD_V1_VERSION,
+  COLLECTION_REWARD_V2_VERSION,
   COLLECTION_REWARD_VERSION,
   COLLECTION_GAME_REWARD_LOSS_COINS,
   COLLECTION_GAME_REWARD_WIN_COINS,
@@ -198,10 +200,10 @@ export function prepareCollectionBasicGameV2(input: {
     input.gameSequence,
   );
   const prepared: CollectionPreparedGame = {
-    gameVersion: COLLECTION_GAME_VERSION,
+    gameVersion: COLLECTION_GAME_V2_VERSION,
     teamVersion: 'collection-team-v1' as const,
-    rewardVersion: COLLECTION_REWARD_VERSION,
-    replayVersion: COLLECTION_GAME_REPLAY_VERSION,
+    rewardVersion: COLLECTION_REWARD_V2_VERSION,
+    replayVersion: COLLECTION_GAME_V2_REPLAY_VERSION,
     rulesVersion: COLLECTION_GAME_RULES_VERSION,
     difficultyVersion: COLLECTION_DIFFICULTY_VERSION,
     objectiveVersion: COLLECTION_OBJECTIVE_VERSION,
@@ -270,7 +272,7 @@ function diffBoxes(
 
 function buildEvents(
   facts: CollectedFacts,
-  result: Extract<CollectionGameResult, { outcome: 'completed' }>,
+  result: Extract<CollectionGameResultUnion, { outcome: 'completed' }>,
   homeRoster: readonly string[],
   awayRoster: readonly string[],
 ): CollectionGameEvent[] {
@@ -435,7 +437,10 @@ function buildEvents(
 }
 
 interface ResultVersionInfo {
-  gameVersion: typeof COLLECTION_GAME_V1_VERSION | typeof COLLECTION_GAME_VERSION;
+  gameVersion:
+    | typeof COLLECTION_GAME_V1_VERSION
+    | typeof COLLECTION_GAME_V2_VERSION
+    | typeof COLLECTION_GAME_VERSION;
   rulesVersion: typeof COLLECTION_GAME_V1_RULES_VERSION | typeof COLLECTION_GAME_RULES_VERSION;
 }
 
@@ -446,6 +451,9 @@ function resultVersionInfoOf(prepared: CollectionPreparedGameUnion): ResultVersi
       rulesVersion: COLLECTION_GAME_V1_RULES_VERSION,
     };
   }
+  if (prepared.gameVersion === COLLECTION_GAME_V2_VERSION) {
+    return { gameVersion: COLLECTION_GAME_V2_VERSION, rulesVersion: COLLECTION_GAME_RULES_VERSION };
+  }
   return { gameVersion: COLLECTION_GAME_VERSION, rulesVersion: COLLECTION_GAME_RULES_VERSION };
 }
 
@@ -453,7 +461,7 @@ function mapCompletedResult(
   raw: unknown,
   prepared: CollectionPreparedGameUnion,
   exceptions: CollectedFacts['exceptions'],
-): Extract<CollectionGameResult, { outcome: 'completed' }> {
+): Extract<CollectionGameResultUnion, { outcome: 'completed' }> {
   const versions = resultVersionInfoOf(prepared);
   const source = raw as {
     seed: string;
@@ -552,7 +560,7 @@ function mapCompletedResult(
       const { playerVersionId, ...rest } = foulOut;
       return { ...rest, cardId: playerVersionId };
     }),
-  } as unknown as Extract<CollectionGameResult, { outcome: 'completed' }>;
+  } as unknown as Extract<CollectionGameResultUnion, { outcome: 'completed' }>;
 }
 
 export interface SimulatedCollectionGame {

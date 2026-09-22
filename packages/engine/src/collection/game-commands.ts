@@ -1,10 +1,12 @@
 import {
   COLLECTION_CATALOG_VERSION,
   COLLECTION_COMMAND_V1_VERSION,
+  COLLECTION_GAME_COMMAND_V1_VERSION,
   COLLECTION_GAME_V1_VERSION,
+  COLLECTION_GAME_V2_VERSION,
   COLLECTION_GAME_VERSION,
-  COLLECTION_GAME_COMMAND_VERSION,
   canonicalJson,
+  collectionGameRecordV3Schema,
   collectionGameRecordUnionSchema,
   collectionPlayStateSchema,
   type CollectionBalances,
@@ -18,9 +20,14 @@ import {
   type CollectionObjectiveDefinition,
   type CollectionPlayState,
   type CollectionPreparedGameUnion,
+  type CollectionProgressionRules,
   type EraSimulationProfile,
 } from '@hoop-rush/data-contracts';
 import { validateCollectionActiveTeam } from './active-team.ts';
+import {
+  CollectionChallengeTeamIneligibleError,
+  prepareCollectionChallengeGame,
+} from './challenge-game.ts';
 import {
   collectionGameRewardFor,
   prepareCollectionBasicGame,
@@ -30,7 +37,11 @@ import {
 } from './game.ts';
 import { checkCollectionGameResult } from './game-audit.ts';
 import { evaluateCollectionObjective } from './objectives.ts';
-import { collectionGameRewardReceiptFor } from './rewards.ts';
+import {
+  collectionChallengeEvaluationFor,
+  collectionChallengeRewardReceiptFor,
+  collectionGameRewardReceiptFor,
+} from './rewards.ts';
 import { collectionPlayStateDigest, collectionPlayStateFactsOf } from './play-state.ts';
 
 export interface AcceptedGameCommandResult {
@@ -63,7 +74,11 @@ function commitPlayState(
   update: Partial<
     Pick<
       CollectionPlayState,
-      'activeTeam' | 'nextGameSequence' | 'pendingGame' | 'clearedDifficultyIds'
+      | 'activeTeam'
+      | 'nextGameSequence'
+      | 'pendingGame'
+      | 'clearedDifficultyIds'
+      | 'clearedChallengeIds'
     >
   >,
 ): CollectionPlayState {
@@ -114,7 +129,7 @@ function mapTeamIssue(
   }
 }
 
-interface CommandInput {
+export interface CommandInput {
   catalog: CollectionCatalog;
   ownedCardIds: ReadonlySet<string>;
   resolve?: (cardId: string) => CollectionCatalogCard | undefined;
@@ -128,6 +143,8 @@ interface CommandInput {
   rulesHash: string;
   balances: CollectionBalances;
   priorCommands: readonly CollectionGameCommand[];
+  progression: CollectionProgressionRules | null;
+  progressionHash: string | null;
 }
 
 export function applyCollectionGameCommand(
@@ -164,10 +181,29 @@ export function applyCollectionGameCommand(
     if (command.command === 'abandon-basic-game') {
       return applyAbandonBasicGame(playState, command);
     }
+    if (command.command === 'prepare-challenge-game') {
+      return applyPrepareChallengeGame(playState, command, input);
+    }
+    if (command.command === 'abandon-challenge-game') {
+      return applyAbandonChallengeGame(playState, command);
+    }
+    if (command.command === 'accept-challenge-game-result') {
+      return applyAcceptChallengeGameResult(playState, command, input);
+    }
     return applyAcceptBasicGameResult(playState, command, input);
   } catch (error) {
+    if (error instanceof CollectionChallengeTeamIneligibleError) {
+      return reject('challenge-team-ineligible', {
+        challengeId: error.validation.challengeId,
+        validation: error.validation,
+      });
+    }
     if (error instanceof CollectionGameError) {
       return reject(error.code, { detail: error.message });
+    }
+    if (error instanceof Error && 'code' in error) {
+      const code = (error as { code: unknown }).code;
+      if (typeof code === 'string') return reject(code, { detail: error.message });
     }
     throw error;
   }
@@ -285,7 +321,93 @@ function applyPrepareBasicGame(
   };
 }
 
+type PrepareChallengeCommand = Extract<
+  CollectionGameCommand,
+  { command: 'prepare-challenge-game' }
+>;
+
+function applyPrepareChallengeGame(
+  playState: CollectionPlayState,
+  command: PrepareChallengeCommand,
+  input: CommandInput,
+): CollectionGameCommandResult {
+  if (playState.pendingGame !== null) {
+    return reject('pending-game-conflict', { gameId: playState.pendingGame.gameId });
+  }
+  if (input.progression === null) {
+    return reject('invalid-progression-rules', {
+      detail: 'challenge games require the progression rules artifact',
+    });
+  }
+  const catalogVersion: string = input.catalog.catalogVersion;
+  if (catalogVersion !== COLLECTION_CATALOG_VERSION) {
+    return reject('incompatible-content', { detail: catalogVersion });
+  }
+  const resolve =
+    input.resolve ??
+    ((cardId: string) => input.catalog.cards.find((card) => card.cardId === cardId));
+  const check = validateCollectionActiveTeam(playState.activeTeam, resolve, input.ownedCardIds);
+  if (!check.ok) {
+    const first = check.issues[0];
+    if (first === undefined) return reject('invalid-minutes', { detail: 'invalid team' });
+    return mapTeamIssue(
+      first,
+      resolve,
+      playState.activeTeam.starters.length + playState.activeTeam.bench.length,
+    );
+  }
+  let prepared: CollectionPreparedGameUnion;
+  try {
+    prepared = prepareCollectionChallengeGame({
+      collectionId: playState.collectionId,
+      rootSeed: input.rootSeed,
+      gameSequence: playState.nextGameSequence,
+      ownedCardIds: input.ownedCardIds,
+      team: playState.activeTeam,
+      catalog: input.catalog,
+      challengeId: command.challengeId,
+      difficultyProfiles: input.difficultyProfiles,
+      objectiveDefinitions: input.objectiveDefinitions,
+      selectedObjectiveId: command.objectiveId,
+      clearedDifficultyIds: playState.clearedDifficultyIds,
+      clearedChallengeIds: playState.clearedChallengeIds,
+      progression: input.progression,
+      profileVersion: input.profile.profileVersion,
+      profileHash: input.profileHash,
+      catalogHash: input.catalogHash,
+      rulesHash: input.rulesHash,
+    });
+  } catch (error) {
+    if (error instanceof CollectionChallengeTeamIneligibleError) {
+      return reject('challenge-team-ineligible', {
+        challengeId: error.validation.challengeId,
+        validation: error.validation,
+      });
+    }
+    if (error instanceof CollectionGameError) {
+      return reject(error.code, { detail: error.message });
+    }
+    if (error instanceof Error && 'code' in error) {
+      const code = (error as { code: unknown }).code;
+      if (typeof code === 'string') return reject(code, { detail: error.message });
+    }
+    throw error;
+  }
+  return {
+    status: 'accepted',
+    playState: commitPlayState(playState, {
+      pendingGame: prepared,
+      nextGameSequence: playState.nextGameSequence + 1,
+    }),
+    prepared: { gameId: prepared.gameId, gameSequence: prepared.gameSequence },
+  };
+}
+
 type AbandonCommand = Extract<CollectionGameCommand, { command: 'abandon-basic-game' }>;
+type AbandonChallengeCommand = Extract<
+  CollectionGameCommand,
+  { command: 'abandon-challenge-game' }
+>;
 
 function applyAbandonBasicGame(
   playState: CollectionPlayState,
@@ -299,7 +421,28 @@ function applyAbandonBasicGame(
   return { status: 'accepted', playState: commitPlayState(playState, { pendingGame: null }) };
 }
 
+function applyAbandonChallengeGame(
+  playState: CollectionPlayState,
+  command: AbandonChallengeCommand,
+): CollectionGameCommandResult {
+  const pending = playState.pendingGame;
+  if (pending === null) return reject('no-pending-game');
+  if (pending.gameId !== command.gameId) {
+    return reject('pending-game-mismatch', { gameId: pending.gameId });
+  }
+  if (pending.gameVersion !== COLLECTION_GAME_VERSION) {
+    return reject('challenge-version-mismatch', {
+      detail: 'pending game is not a challenge game',
+    });
+  }
+  return { status: 'accepted', playState: commitPlayState(playState, { pendingGame: null }) };
+}
+
 type AcceptCommand = Extract<CollectionGameCommand, { command: 'accept-basic-game-result' }>;
+type AcceptChallengeCommand = Extract<
+  CollectionGameCommand,
+  { command: 'accept-challenge-game-result' }
+>;
 
 function applyAcceptBasicGameResult(
   playState: CollectionPlayState,
@@ -315,11 +458,16 @@ function applyAcceptBasicGameResult(
     return reject('invalid-result', { detail: 'result gameId does not match the pending game' });
   }
   if (
-    command.commandVersion !== COLLECTION_GAME_COMMAND_VERSION &&
+    command.commandVersion === COLLECTION_COMMAND_V1_VERSION &&
     pending.gameVersion !== COLLECTION_GAME_V1_VERSION
   ) {
     return reject('incompatible-content', {
       detail: 'legacy accept commands cannot complete a current prepared game',
+    });
+  }
+  if (pending.gameVersion === COLLECTION_GAME_VERSION) {
+    return reject('invalid-result', {
+      detail: 'challenge games require accept-challenge-game-result',
     });
   }
   if (command.result.gameVersion !== pending.gameVersion) {
@@ -327,39 +475,38 @@ function applyAcceptBasicGameResult(
       detail: 'result version does not match the pending game version',
     });
   }
-  let reproduced: ReturnType<typeof reproduceCollectionGame>;
-  try {
-    reproduced = reproduceCollectionGame(pending, input.catalog, input.profile);
-  } catch (error) {
-    if (error instanceof CollectionGameError) {
-      return reject('invalid-result', { detail: error.message });
-    }
-    if (error instanceof Error && 'code' in error) {
-      const code = (error as { code: unknown }).code;
-      if (typeof code === 'string') return reject(code, { detail: error.message });
-    }
-    throw error;
-  }
-  if (canonicalJson(reproduced.result) !== canonicalJson(command.result)) {
-    return reject('invalid-result', { detail: 'result does not reproduce from the pending input' });
-  }
-  if (canonicalJson(reproduced.events) !== canonicalJson(command.events)) {
-    return reject('invalid-result', { detail: 'events do not reproduce from the pending input' });
-  }
-  const failures = checkCollectionGameResult(
-    command.result,
-    command.events,
-    pending,
-    input.catalog,
-    input.profile,
-  );
-  if (failures.length > 0) {
-    return reject('invalid-result', { detail: failures[0] ?? 'game audit failed' });
-  }
+  const outcome = reproduceOrReject(pending, command, input);
+  if (!outcome.ok) return outcome.rejection;
+  const reproduced = outcome.reproduced;
   if (pending.gameVersion === COLLECTION_GAME_V1_VERSION) {
     return acceptLegacyResult(playState, command, pending, reproduced, input);
   }
   return acceptCurrentResult(playState, command, pending, reproduced, input);
+}
+
+type ReproduceOutcome =
+  | { ok: true; reproduced: ReturnType<typeof reproduceCollectionGame> }
+  | { ok: false; rejection: RejectedGameCommandResult };
+
+function reproduceOrReject(
+  pending: CollectionPreparedGameUnion,
+  command: AcceptCommand | AcceptChallengeCommand,
+  input: CommandInput,
+): ReproduceOutcome {
+  try {
+    return { ok: true, reproduced: reproduceCollectionGame(pending, input.catalog, input.profile) };
+  } catch (error) {
+    if (error instanceof CollectionGameError) {
+      return { ok: false, rejection: reject('invalid-result', { detail: error.message }) };
+    }
+    if (error instanceof Error && 'code' in error) {
+      const code = (error as { code: unknown }).code;
+      if (typeof code === 'string') {
+        return { ok: false, rejection: reject(code, { detail: error.message }) };
+      }
+    }
+    throw error;
+  }
 }
 
 function acceptLegacyResult(
@@ -372,6 +519,22 @@ function acceptLegacyResult(
   const result = command.result;
   if (result.gameVersion !== COLLECTION_GAME_V1_VERSION) {
     return reject('invalid-result', { detail: 'legacy pending game requires a legacy result' });
+  }
+  const failures = checkCollectionGameResult(
+    result,
+    command.events,
+    pending,
+    input.catalog,
+    input.profile,
+  );
+  if (failures.length > 0) {
+    return reject('invalid-result', { detail: failures[0] ?? 'game audit failed' });
+  }
+  if (canonicalJson(reproduced.result) !== canonicalJson(result)) {
+    return reject('invalid-result', { detail: 'result does not reproduce from the pending input' });
+  }
+  if (canonicalJson(reproduced.events) !== canonicalJson(command.events)) {
+    return reject('invalid-result', { detail: 'events do not reproduce from the pending input' });
   }
   const reward = collectionGameRewardFor(result, pending.gameId);
   let balances: CollectionBalances;
@@ -419,13 +582,29 @@ function acceptLegacyResult(
 function acceptCurrentResult(
   playState: CollectionPlayState,
   command: AcceptCommand,
-  pending: Extract<CollectionPreparedGameUnion, { gameVersion: typeof COLLECTION_GAME_VERSION }>,
+  pending: Extract<CollectionPreparedGameUnion, { gameVersion: typeof COLLECTION_GAME_V2_VERSION }>,
   reproduced: ReturnType<typeof reproduceCollectionGame>,
   input: CommandInput,
 ): CollectionGameCommandResult {
   const result = command.result;
-  if (result.gameVersion !== COLLECTION_GAME_VERSION) {
+  if (result.gameVersion !== COLLECTION_GAME_V2_VERSION) {
     return reject('invalid-result', { detail: 'current pending game requires a current result' });
+  }
+  const failures = checkCollectionGameResult(
+    result,
+    command.events,
+    pending,
+    input.catalog,
+    input.profile,
+  );
+  if (failures.length > 0) {
+    return reject('invalid-result', { detail: failures[0] ?? 'game audit failed' });
+  }
+  if (canonicalJson(reproduced.result) !== canonicalJson(result)) {
+    return reject('invalid-result', { detail: 'result does not reproduce from the pending input' });
+  }
+  if (canonicalJson(reproduced.events) !== canonicalJson(command.events)) {
+    return reject('invalid-result', { detail: 'events do not reproduce from the pending input' });
   }
   const difficultyId = pending.difficulty.difficultyId;
   if (pending.firstClearEligible && playState.clearedDifficultyIds.includes(difficultyId)) {
@@ -504,6 +683,150 @@ function acceptCurrentResult(
   return {
     status: 'accepted',
     playState: commitPlayState(playState, { pendingGame: null, clearedDifficultyIds }),
+    record,
+    ledgerEntries,
+    balances,
+  };
+}
+
+function applyAcceptChallengeGameResult(
+  playState: CollectionPlayState,
+  command: AcceptChallengeCommand,
+  input: CommandInput,
+): CollectionGameCommandResult {
+  const pending = playState.pendingGame;
+  if (pending === null) return reject('no-pending-game');
+  if (pending.gameId !== command.gameId) {
+    return reject('pending-game-mismatch', { gameId: pending.gameId });
+  }
+  if (pending.gameVersion !== COLLECTION_GAME_VERSION) {
+    return reject('challenge-version-mismatch', {
+      detail: 'pending game is not a challenge game',
+    });
+  }
+  const result = command.result;
+  if (result.gameVersion !== COLLECTION_GAME_VERSION) {
+    return reject('invalid-result', {
+      detail: 'challenge pending game requires a challenge result',
+    });
+  }
+  if (result.gameId !== pending.gameId) {
+    return reject('invalid-result', { detail: 'result gameId does not match the pending game' });
+  }
+  const outcome = reproduceOrReject(pending, command, input);
+  if (!outcome.ok) return outcome.rejection;
+  const reproduced = outcome.reproduced;
+  const failures = checkCollectionGameResult(
+    result,
+    command.events,
+    pending,
+    input.catalog,
+    input.profile,
+  );
+  if (failures.length > 0) {
+    return reject('invalid-result', { detail: failures[0] ?? 'game audit failed' });
+  }
+  if (canonicalJson(reproduced.result) !== canonicalJson(result)) {
+    return reject('invalid-result', { detail: 'result does not reproduce from the pending input' });
+  }
+  if (canonicalJson(reproduced.events) !== canonicalJson(command.events)) {
+    return reject('invalid-result', { detail: 'events do not reproduce from the pending input' });
+  }
+  const difficultyId = pending.difficulty.difficultyId;
+  if (pending.firstClearEligible && playState.clearedDifficultyIds.includes(difficultyId)) {
+    return reject('first-clear-divergence', {
+      detail: `difficulty ${difficultyId} was already cleared after preparation`,
+    });
+  }
+  if (
+    pending.challenge.firstClearEligible &&
+    playState.clearedChallengeIds.includes(pending.challenge.challengeId)
+  ) {
+    return reject('challenge-first-clear-divergence', {
+      detail: `challenge ${pending.challenge.challengeId} was already cleared after preparation`,
+    });
+  }
+  let evaluation: ReturnType<typeof evaluateCollectionObjective>;
+  try {
+    evaluation = evaluateCollectionObjective({ prepared: pending, result });
+  } catch (error) {
+    if (error instanceof Error && 'code' in error) {
+      const code = (error as { code: unknown }).code;
+      if (typeof code === 'string') return reject(code, { detail: error.message });
+    }
+    throw error;
+  }
+  const challengeEvaluation = collectionChallengeEvaluationFor({ prepared: pending, result });
+  let reward: ReturnType<typeof collectionChallengeRewardReceiptFor>;
+  try {
+    reward = collectionChallengeRewardReceiptFor({
+      gameId: pending.gameId,
+      prepared: pending,
+      result,
+      evaluation,
+      challengeEvaluation,
+    });
+  } catch (error) {
+    if (error instanceof CollectionGameError) {
+      return reject(error.code, { detail: error.message });
+    }
+    if (error instanceof Error && 'code' in error) {
+      const code = (error as { code: unknown }).code;
+      if (typeof code === 'string') return reject(code, { detail: error.message });
+    }
+    throw error;
+  }
+  let balances: CollectionBalances;
+  try {
+    balances = {
+      Coins: addChecked(input.balances.Coins, reward.total, 'challenge game reward'),
+      Exchange: input.balances.Exchange,
+    };
+  } catch (error) {
+    if (error instanceof CollectionGameError) {
+      return reject(error.code, { detail: error.message });
+    }
+    throw error;
+  }
+  if (balances.Coins < 0) {
+    return reject('arithmetic-overflow', { detail: 'negative Coins balance' });
+  }
+  const ledgerEntries: CollectionLedgerEntry[] = reward.components.map((component) => ({
+    transactionId: component.transactionId,
+    commandId: command.commandId,
+    pullSequence: null,
+    currency: 'Coins',
+    amount: component.amount,
+    reason: component.reason,
+  }));
+  const record = collectionGameRecordV3Schema.parse({
+    gameVersion: pending.gameVersion,
+    collectionId: playState.collectionId,
+    gameId: pending.gameId,
+    gameSequence: pending.gameSequence,
+    prepared: pending,
+    result,
+    events: [...command.events],
+    eventDigest: reproduced.eventDigest,
+    resultDigest: reproduced.resultDigest,
+    objectiveEvaluation: evaluation,
+    challengeEvaluation,
+    reward,
+    completedAtIso: command.completedAtIso,
+  });
+  const clearedDifficultyIds = reward.firstClearGranted
+    ? [...playState.clearedDifficultyIds, difficultyId].sort()
+    : [...playState.clearedDifficultyIds];
+  const clearedChallengeIds = challengeEvaluation.firstClearGranted
+    ? [...playState.clearedChallengeIds, pending.challenge.challengeId].sort()
+    : [...playState.clearedChallengeIds];
+  return {
+    status: 'accepted',
+    playState: commitPlayState(playState, {
+      pendingGame: null,
+      clearedDifficultyIds,
+      clearedChallengeIds,
+    }),
     record,
     ledgerEntries,
     balances,

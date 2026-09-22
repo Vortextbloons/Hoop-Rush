@@ -1,4 +1,7 @@
 import {
+  COLLECTION_GAME_V1_VERSION,
+  COLLECTION_GAME_VERSION,
+  type CollectionCommand,
   type CollectionGameRecordUnion,
   type CollectionLedgerEntry,
   type CollectionPlayState,
@@ -17,6 +20,7 @@ export function auditCollectionState(
   pulls: readonly CollectionPullRecord[],
   ledger: readonly CollectionLedgerEntry[],
   gameRecords: readonly CollectionGameRecordUnion[] = [],
+  commands: readonly CollectionCommand[] = [],
 ): CollectionAuditFailure[] {
   const failures: CollectionAuditFailure[] = [];
   const facts = collectionStateFactsOf(state);
@@ -43,17 +47,20 @@ export function auditCollectionState(
       message: `nextPullSequence ${String(state.nextPullSequence)} != pulls ${String(orderedPulls.length)}`,
     });
   }
-  if (state.revision !== orderedPulls.length + gameRecords.length) {
+  const stateOnlyCommands = commands.filter(
+    (command) => command.command === 'set-target-player' || command.command === 'claim-set-reward',
+  ).length;
+  if (state.revision !== orderedPulls.length + gameRecords.length + stateOnlyCommands) {
     failures.push({
       code: 'revision-mismatch',
-      message: `revision ${String(state.revision)} != pulls ${String(orderedPulls.length)} + games ${String(gameRecords.length)}`,
+      message: `revision ${String(state.revision)} != pulls ${String(orderedPulls.length)} + games ${String(gameRecords.length)} + state commands ${String(stateOnlyCommands)}`,
     });
   }
   const ledgerByTransaction = new Map(ledger.map((entry) => [entry.transactionId, entry]));
   const matchedGameTransactions = new Set<string>();
   for (const record of gameRecords) {
     const components =
-      record.gameVersion === 'collection-game-v1'
+      record.gameVersion === COLLECTION_GAME_V1_VERSION
         ? [{ ...record.reward, kind: 'outcome' as const }]
         : record.reward.components;
     for (const component of components) {
@@ -81,11 +88,33 @@ export function auditCollectionState(
     }
   }
   for (const entry of ledger) {
-    if (!entry.reason.startsWith('game-')) continue;
+    if (!entry.reason.startsWith('game-') && !entry.reason.startsWith('challenge-')) continue;
     if (!matchedGameTransactions.has(entry.transactionId)) {
       failures.push({
         code: 'orphan-game-reward',
         message: `ledger game reward ${entry.transactionId} does not match an accepted record`,
+      });
+    }
+  }
+  const claimedSetIds = new Set<string>(state.claimedSetIds);
+  const setRewardEntries = ledger.filter((entry) => entry.reason === 'set-completion-reward');
+  if (setRewardEntries.length !== claimedSetIds.size) {
+    failures.push({
+      code: 'set-reward-count-mismatch',
+      message: `${String(setRewardEntries.length)} set reward ledger entries for ${String(claimedSetIds.size)} claimed sets`,
+    });
+  }
+  for (const entry of setRewardEntries) {
+    if (entry.currency !== 'Exchange' || entry.amount <= 0) {
+      failures.push({
+        code: 'set-reward-invalid-entry',
+        message: `set reward ${entry.transactionId} must be a positive Exchange credit`,
+      });
+    }
+    if (entry.pullSequence !== null) {
+      failures.push({
+        code: 'set-reward-pull-sequence',
+        message: `set reward ${entry.transactionId} must not consume a pull sequence`,
       });
     }
   }
@@ -156,7 +185,7 @@ export function auditCollectionState(
 }
 
 export function auditCollectionFirstClearState(
-  playState: Pick<CollectionPlayState, 'clearedDifficultyIds'>,
+  playState: Pick<CollectionPlayState, 'clearedDifficultyIds' | 'clearedChallengeIds'>,
   gameRecords: readonly CollectionGameRecordUnion[],
   ledger: readonly CollectionLedgerEntry[],
 ): CollectionAuditFailure[] {
@@ -164,7 +193,7 @@ export function auditCollectionFirstClearState(
   const granted = new Map<string, string>();
   let grantedCount = 0;
   for (const record of gameRecords) {
-    if (record.gameVersion === 'collection-game-v1') continue;
+    if (record.gameVersion === COLLECTION_GAME_V1_VERSION) continue;
     if (!record.reward.firstClearGranted) continue;
     grantedCount += 1;
     const difficultyId = record.prepared.difficulty.difficultyId;
@@ -210,6 +239,60 @@ export function auditCollectionFirstClearState(
       failures.push({
         code: 'first-clear-without-record',
         message: `play state declares ${difficultyId} cleared with no accepted v2 record`,
+      });
+    }
+  }
+  const challengeGranted = new Map<string, string>();
+  let challengeGrantedCount = 0;
+  for (const record of gameRecords) {
+    if (record.gameVersion !== COLLECTION_GAME_VERSION) continue;
+    if (!record.challengeEvaluation.firstClearGranted) continue;
+    challengeGrantedCount += 1;
+    const challengeId = record.challengeEvaluation.challengeId;
+    if (challengeGranted.has(challengeId)) {
+      failures.push({
+        code: 'challenge-first-clear-duplicate',
+        message: `challenge ${challengeId} was cleared more than once`,
+      });
+      continue;
+    }
+    if (!record.reward.playerWin || record.result.outcome !== 'completed') {
+      failures.push({
+        code: 'challenge-first-clear-not-a-win',
+        message: `game ${record.gameId} granted a challenge clear without a completed win`,
+      });
+    }
+    if (!record.prepared.challenge.firstClearEligible) {
+      failures.push({
+        code: 'challenge-first-clear-ineligible',
+        message: `game ${record.gameId} granted a challenge clear without prior eligibility`,
+      });
+    }
+    challengeGranted.set(challengeId, record.gameId);
+  }
+  const ledgerChallengeClears = ledger.filter(
+    (entry) => entry.reason === 'challenge-first-clear-reward',
+  );
+  if (ledgerChallengeClears.length !== challengeGrantedCount) {
+    failures.push({
+      code: 'challenge-first-clear-ledger-mismatch',
+      message: `${String(ledgerChallengeClears.length)} challenge first-clear ledger entries for ${String(challengeGrantedCount)} granted clears`,
+    });
+  }
+  const declaredChallenges = new Set<string>(playState.clearedChallengeIds);
+  for (const [challengeId, gameId] of challengeGranted) {
+    if (!declaredChallenges.has(challengeId)) {
+      failures.push({
+        code: 'challenge-first-clear-missing-from-state',
+        message: `game ${gameId} cleared ${challengeId} but play state does not record it`,
+      });
+    }
+  }
+  for (const challengeId of declaredChallenges) {
+    if (!challengeGranted.has(challengeId)) {
+      failures.push({
+        code: 'challenge-first-clear-without-record',
+        message: `play state declares ${challengeId} cleared with no accepted challenge record`,
       });
     }
   }

@@ -4,7 +4,7 @@ import {
   type CollectionCatalog,
   type CollectionCatalogCard,
   type CollectionDifficultyProfile,
-  type CollectionPreparedGameV2,
+  type CollectionCurrentPreparedGame,
   type CollectionRatingAdjustmentEntry,
   type CollectionRatingAdjustmentFact,
   type CollectionRatingAdjustments,
@@ -81,7 +81,7 @@ export function resolveDifficultyRatingAdjustments(
 }
 
 export function materializeAdjustedCpuRatings(
-  prepared: CollectionPreparedGameV2,
+  prepared: CollectionCurrentPreparedGame,
   catalog: CollectionCatalog,
 ): Map<string, SimulationRatings> {
   const byId = catalogIndex(catalog);
@@ -144,7 +144,7 @@ export function materializeAdjustedCpuRatings(
 }
 
 export function verifyDifficultyRatingAdjustments(
-  prepared: CollectionPreparedGameV2,
+  prepared: CollectionCurrentPreparedGame,
   catalog: CollectionCatalog,
 ): string[] {
   const failures: string[] = [];
@@ -181,7 +181,7 @@ export function verifyDifficultyRatingAdjustments(
 }
 
 export function verifyMaterializedAdjustments(
-  prepared: CollectionPreparedGameV2,
+  prepared: CollectionCurrentPreparedGame,
   catalog: CollectionCatalog,
 ): string[] {
   try {

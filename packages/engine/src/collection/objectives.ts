@@ -5,14 +5,15 @@ import {
   seasonDigestHex,
   type CollectionActiveTeam,
   type CollectionDifficultyId,
-  type CollectionGameResult,
+  type CollectionGameResultV2,
+  type CollectionGameResultV3,
   type CollectionGameRules,
   type CollectionObjectiveCondition,
   type CollectionObjectiveDefinition,
   type CollectionObjectiveEvaluation,
   type CollectionObjectiveFacts,
   type CollectionObjectiveId,
-  type CollectionPreparedGameV2,
+  type CollectionCurrentPreparedGame,
 } from '@hoop-rush/data-contracts';
 import { CollectionCommandError } from './packs.ts';
 import { collectionObjectiveOfferSeed } from './seeds.ts';
@@ -181,7 +182,10 @@ export function buildCollectionObjectiveFacts(input: {
   };
 }
 
-type CompletedResult = Extract<CollectionGameResult, { outcome: 'completed' }>;
+type CompletedResult = Extract<
+  CollectionGameResultV2 | CollectionGameResultV3,
+  { outcome: 'completed' }
+>;
 type CompletedSide = CompletedResult['home'];
 type CompletedPlayer = CompletedSide['players'][number];
 
@@ -234,8 +238,8 @@ interface EvaluatedObjective {
 
 function evaluateCondition(
   condition: CollectionObjectiveCondition,
-  result: Extract<CollectionGameResult, { outcome: 'completed' }>,
-  prepared: CollectionPreparedGameV2,
+  result: Extract<CollectionGameResultV2 | CollectionGameResultV3, { outcome: 'completed' }>,
+  prepared: CollectionCurrentPreparedGame,
 ): EvaluatedObjective {
   const home = result.home;
   const away = result.away;
@@ -348,8 +352,8 @@ function evaluateCondition(
 }
 
 export function evaluateCollectionObjective(input: {
-  prepared: CollectionPreparedGameV2;
-  result: CollectionGameResult;
+  prepared: CollectionCurrentPreparedGame;
+  result: CollectionGameResultV2 | CollectionGameResultV3;
 }): CollectionObjectiveEvaluation {
   const selection = input.prepared.objectives;
   if (selection.selectedObjectiveId === null) {

@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import {
   COLLECTION_CATALOG_VERSION,
+  COLLECTION_COMMAND_VERSION,
   COLLECTION_ECONOMY_VERSION,
   COLLECTION_OVERLAY_VERSION,
   COLLECTION_PACK_RULES_VERSION,
@@ -11,7 +12,6 @@ import {
   collectionCommandSchema,
   collectionLedgerEntrySchema,
   collectionPullRecordSchema,
-  collectionStateSchema,
   type CollectionCatalog,
   type CollectionCommand,
   type CollectionLedgerEntry,
@@ -24,6 +24,8 @@ import {
   applyCollectionCommand,
   auditCollectionState,
   collectionStateDigest,
+  collectionStateFactsOf,
+  initializeCollectionState,
   describeCollectionPackOdds,
   drawCollectionPackSlots,
   generateCollectionStarter,
@@ -305,31 +307,23 @@ function genesisRecords(
     reason: 'welcome-grant',
   });
   const chunks = pulls.length;
-  const state = collectionStateSchema.parse({
-    schemaVersion: 1,
-    collectionVersion: 'collection-v1',
-    catalogVersion: 'collection-catalog-v1',
-    economyVersion: 'collection-economy-v1',
+  const base = initializeCollectionState({
     collectionId: 'calibration',
     rootSeed,
-    revision: chunks,
-    digest: '0'.repeat(32),
-    claimedWelcome: true,
-    owned,
-    balances: { Coins: 3000, Exchange: 0 },
-    nextPullSequence: chunks,
+    progressionHash: null,
   });
-  const digest = collectionStateDigest({
-    collectionId: state.collectionId,
-    revision: state.revision,
-    claimedWelcome: state.claimedWelcome,
-    ownedCardIds: state.owned.map((entry) => entry.cardId),
-    balances: state.balances,
-    nextPullSequence: state.nextPullSequence,
-    catalogVersion: state.catalogVersion,
-    economyVersion: state.economyVersion,
-  });
-  return { state: { ...state, digest }, pulls, ledger: [grant], commands: [] };
+  const state: CollectionState = (() => {
+    const draft: CollectionState = {
+      ...base,
+      revision: chunks,
+      claimedWelcome: true,
+      owned,
+      balances: { Coins: 3000, Exchange: 0 },
+      nextPullSequence: chunks,
+    };
+    return { ...draft, digest: collectionStateDigest(collectionStateFactsOf(draft)) };
+  })();
+  return { state, pulls, ledger: [grant], commands: [] };
 }
 
 function runOwnershipCohort(
@@ -371,8 +365,8 @@ function runOwnershipCohort(
         for (const [packIndex, packId] of strategy.packs.entries()) {
           attempts += 1;
           const command = collectionCommandSchema.parse({
-            schemaVersion: 1,
-            commandVersion: 'collection-command-v1',
+            schemaVersion: 2,
+            commandVersion: COLLECTION_COMMAND_VERSION,
             commandId: `cal-${String(shareIndex)}-${strategy.name}-${String(s)}-${String(packIndex)}`,
             collectionId: 'calibration',
             expectedRevision: state.revision,
@@ -389,12 +383,18 @@ function runOwnershipCohort(
             ledger,
             commands,
             catalogHash,
+            null,
+            null,
           );
           if (outcome.status !== 'accepted') {
             failures.push(`ownership ${String(share)}/${strategy.name}: ${outcome.rejection.code}`);
             break;
           }
           accepted += 1;
+          if (outcome.pull === null) {
+            failures.push(`ownership ${String(share)}/${strategy.name}: accepted pull missing`);
+            break;
+          }
           for (const slot of outcome.pull.slots) {
             if (slot.kept) newCards += 1;
             else duplicates += 1;
