@@ -190,7 +190,7 @@ export const collectionChallengePreparedSnapshotSchema = z
     if (snapshot.validation.challengeId !== snapshot.challengeId) {
       ctx.addIssue({ code: 'custom', message: 'validation facts challenge id mismatch' });
     }
-    if (snapshot.validation.success !== true) {
+    if (!snapshot.validation.success) {
       ctx.addIssue({ code: 'custom', message: 'prepared challenge must have passed validation' });
     }
     if (

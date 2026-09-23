@@ -14,10 +14,13 @@ import {
   type CollectionCatalogCard,
   type CollectionChallengeDefinition,
   type CollectionCommand,
+  type CollectionDifficultyId,
   type CollectionGameCommand,
   type CollectionGameResultV3,
   type CollectionProgressionRules,
+  type CollectionPullRecordV2,
   type CollectionState,
+  type CollectionTargetSnapshot,
   type EraId,
 } from '@hoop-rush/data-contracts';
 import {
@@ -203,7 +206,7 @@ function challengeInput() {
     difficultyProfiles: DIFFICULTIES,
     objectiveDefinitions: OBJECTIVES,
     selectedObjectiveId: null,
-    clearedDifficultyIds: [] as string[],
+    clearedDifficultyIds: [] as CollectionDifficultyId[],
     clearedChallengeIds: [] as string[],
     progression: PROGRESSION,
     profileVersion: DEFAULT_ERA_SIM_PROFILE.profileVersion,
@@ -216,7 +219,7 @@ function challengeInput() {
 function playStateFor(state: CollectionState) {
   const play = {
     saveVersion: 3 as const,
-    schemaVersion: COLLECTION_SCHEMA_VERSION,
+    schemaVersion: COLLECTION_SCHEMA_VERSION as 1,
     teamVersion: 'collection-team-v1' as const,
     gameVersion: 'collection-game-v3' as const,
     collectionId: state.collectionId,
@@ -281,7 +284,7 @@ describe('M4.4 challenge validation', () => {
   it('rejects a challenge that cannot be fielded from the pinned catalog', () => {
     const impossible: CollectionChallengeDefinition = {
       challengeVersion: COLLECTION_CHALLENGE_VERSION,
-      challengeId: 'challenge-impossible-v1',
+      challengeId: 'challenge-impossible-v1' as CollectionChallengeDefinition['challengeId'],
       displayName: 'Impossible',
       description: 'Needs eight 1960s starters',
       requirement: {
@@ -351,7 +354,7 @@ describe('M4.4 targeting odds and draws', () => {
       pullSequence: 0,
       target: {
         targetingVersion: COLLECTION_TARGETING_VERSION,
-        targetPlayerId: 'm44-target',
+        targetPlayerId: 'm44-target' as CollectionTargetSnapshot['targetPlayerId'],
         multiplierBp: PROGRESSION.targetMultiplierBp,
         packId: pack.packId,
         packRulesVersion: pack.packRulesVersion,
@@ -429,8 +432,9 @@ describe('M4.4 targeting odds and draws', () => {
     );
     expect(purchase.status).toBe('accepted');
     if (purchase.status !== 'accepted' || purchase.pull === null) return;
-    expect(purchase.pull.replayVersion).toBe('collection-replay-v2');
-    expect(purchase.pull.targeting?.targetPlayerId).toBe('m44-target');
+    const purchasePull = purchase.pull as CollectionPullRecordV2;
+    expect(purchasePull.replayVersion).toBe('collection-replay-v2');
+    expect(purchasePull.targeting?.targetPlayerId).toBe('m44-target');
     const reproduced = reproduceCollectionPull(CATALOG, purchase.pull, state.rootSeed);
     expect(reproduced.failures).toEqual([]);
     expect(reproduced.ok).toBe(true);
@@ -569,25 +573,25 @@ describe('M4.4 set rewards', () => {
   });
 
   it('validates the pinned progression artifact and rejects tampering', () => {
-    expect(() =>
+    expect(() => {
       validateCollectionProgressionRules({
         progression: PROGRESSION,
         progressionHash: HASH,
         catalog: CATALOG,
         verifyFeasibility: true,
-      }),
-    ).not.toThrow();
+      });
+    }).not.toThrow();
     const tampered: CollectionProgressionRules = {
       ...PROGRESSION,
       targetMultiplierBp: 90_000,
     };
-    expect(() =>
+    expect(() => {
       validateCollectionProgressionRules({
         progression: tampered,
         progressionHash: HASH,
         catalog: CATALOG,
-      }),
-    ).toThrowError();
+      });
+    }).toThrow();
   });
 });
 
@@ -659,7 +663,7 @@ describe('M4.4 challenge games', () => {
     expect(preparedResult.status).toBe('accepted');
     if (preparedResult.status !== 'accepted') return;
     const pending = preparedResult.playState.pendingGame;
-    if (pending === null || pending === undefined) throw new Error('no pending game');
+    if (pending === null) throw new Error('no pending game');
     expect(pending.gameVersion).toBe('collection-game-v3');
     if (pending.gameVersion !== 'collection-game-v3') return;
     const simulated = simulateCollectionGame(pending, CATALOG, DEFAULT_ERA_SIM_PROFILE);
@@ -718,7 +722,7 @@ describe('M4.4 challenge games', () => {
     expect(secondPrepared.status).toBe('accepted');
     if (secondPrepared.status !== 'accepted') return;
     const secondPending = secondPrepared.playState.pendingGame;
-    if (secondPending === null || secondPending === undefined) throw new Error('no pending game');
+    if (secondPending === null) throw new Error('no pending game');
     if (secondPending.gameVersion !== 'collection-game-v3') return;
     expect(secondPending.challenge.firstClearEligible).toBe(playerWin ? false : true);
     const secondSimulated = simulateCollectionGame(secondPending, CATALOG, DEFAULT_ERA_SIM_PROFILE);

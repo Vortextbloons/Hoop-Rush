@@ -1,14 +1,23 @@
 <script lang="ts">
-  import type { CollectionCatalog, CollectionPreparedGameV2 } from '@hoop-rush/data-contracts';
+  import type {
+    CollectionCatalog,
+    CollectionPreparedGameV2,
+    CollectionPreparedGameV3,
+  } from '@hoop-rush/data-contracts';
   import { formatMultiplier, objectiveConditionLabel, ratingLabel } from './collection-setup.ts';
+  import { requirementLabel } from './collection-progression-view.ts';
 
   let {
     prepared,
     catalog,
   }: {
-    prepared: CollectionPreparedGameV2;
+    prepared: CollectionPreparedGameV2 | CollectionPreparedGameV3;
     catalog: CollectionCatalog;
   } = $props();
+
+  const challenge = $derived(
+    prepared.gameVersion === 'collection-game-v3' ? prepared.challenge : null,
+  );
 
   const cardById = $derived(new Map(catalog.cards.map((card) => [card.cardId, card])));
   const minutesById = $derived(
@@ -44,12 +53,55 @@
   <div class="flex flex-wrap items-end justify-between gap-2">
     <div>
       <p class="ultimate-eyebrow">Declared matchup</p>
-      <h2 class="font-display text-xl font-extrabold">Matchup ready</h2>
+      <h2 class="font-display text-xl font-extrabold">
+        {challenge ? `Challenge · ${challenge.displayName}` : 'Matchup ready'}
+      </h2>
+      {#if challenge}
+        <p class="mt-1 text-sm text-muted-foreground">
+          {requirementLabel(challenge.requirement)} · snapshotted from the committed team before tip-off
+        </p>
+      {/if}
     </div>
     <p class="font-mono text-xs font-bold tracking-[0.12em] text-muted-foreground uppercase">
       Locked until abandoned
     </p>
   </div>
+
+  {#if challenge}
+    <dl class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div class="rounded-xl bg-surface-2 p-3">
+        <dt class="text-xs text-muted-foreground">Challenge first clear</dt>
+        <dd class="font-bold">
+          {challenge.firstClearEligible ? 'Available' : 'Already claimed'}
+        </dd>
+        <dd class="text-xs text-muted-foreground tabular-nums">
+          {challenge.firstClearCoins} Coins on the first completed win
+        </dd>
+      </div>
+      <div class="rounded-xl bg-surface-2 p-3">
+        <dt class="text-xs text-muted-foreground">Challenge repeat win</dt>
+        <dd class="font-bold tabular-nums">{challenge.repeatWinCoins} Coins</dd>
+        <dd class="text-xs text-muted-foreground">Applies once the challenge has been cleared</dd>
+      </div>
+      <div class="rounded-xl bg-surface-2 p-3">
+        <dt class="text-xs text-muted-foreground">Snapshotted roster facts</dt>
+        <dd class="font-bold tabular-nums">
+          {challenge.validation.rosterCount}/{challenge.validation.requiredRosterCount} active
+        </dd>
+        <dd class="text-xs text-muted-foreground tabular-nums">
+          {challenge.validation.starterCount}/{challenge.validation.requiredStarterCount} starters · team
+          {challenge.validation.teamValid ? 'legal' : 'illegal'}
+        </dd>
+      </div>
+      <div class="rounded-xl bg-surface-2 p-3">
+        <dt class="text-xs text-muted-foreground">Challenge ID</dt>
+        <dd class="truncate font-mono text-xs">{challenge.challengeId}</dd>
+        <dd class="text-xs text-muted-foreground">
+          Fixed {challenge.difficultyId} difficulty
+        </dd>
+      </div>
+    </dl>
+  {/if}
 
   <dl class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
     <div class="rounded-xl bg-surface-2 p-3">

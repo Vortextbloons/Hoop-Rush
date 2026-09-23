@@ -7,7 +7,7 @@ import {
   COLLECTION_GAME_RULES_VERSION,
   COLLECTION_OBJECTIVE_IDS,
   COLLECTION_RARITY_ORDER,
-  COLLECTION_REWARD_VERSION,
+  COLLECTION_REWARD_V2_VERSION,
   canonicalJson,
   collectionGameRulesSchema,
   collectionPreparedGameUnionSchema,
@@ -501,7 +501,7 @@ function verifyRewardReceipt(input: {
     }
     const expectedTxn = collectionRewardTransactionId(
       prepared.gameId,
-      COLLECTION_REWARD_VERSION,
+      COLLECTION_REWARD_V2_VERSION,
       component.kind,
     );
     if (component.transactionId !== expectedTxn) {
@@ -1533,7 +1533,7 @@ export function collectionGameReproduce(args: {
     rewardTransactionId = reward.transactionId;
   } else if (v2Result === null) {
     failures.push('v2 prepared input produced a legacy result version');
-    rewardVersion = COLLECTION_REWARD_VERSION;
+    rewardVersion = COLLECTION_REWARD_V2_VERSION;
     rewardReason = 'game-win-reward';
     rewardAmount = 0;
     rewardTotal = 0;

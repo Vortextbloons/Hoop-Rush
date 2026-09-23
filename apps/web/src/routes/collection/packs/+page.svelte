@@ -4,19 +4,39 @@
   import { onDestroy } from 'svelte';
   import type {
     CollectionCatalog,
+    CollectionProgressionRules,
     CollectionPullRecord,
     CollectionState,
-    HoopRushManifest,
   } from '@hoop-rush/data-contracts';
   import { COLLECTION_RARITY_ORDER } from '@hoop-rush/data-contracts';
   import { z } from 'zod';
-  import { describeCollectionPackOdds } from '@hoop-rush/engine';
+  import { describeCollectionPackOdds, describeCollectionTargetOdds } from '@hoop-rush/engine';
   import { getManifest } from '$lib/data';
   import AsyncState from '$lib/components/AsyncState.svelte';
   import CollectionNav from '$lib/collection/CollectionNav.svelte';
-  import { loadCollectionCatalog } from '$lib/collection/collection-assets.ts';
-  import { ensureCollection, openPack } from '$lib/collection/collection-hub.ts';
+  import ActiveTarget from '$lib/collection/ActiveTarget.svelte';
+  import {
+    loadCollectionCatalog,
+    loadCollectionProgression,
+  } from '$lib/collection/collection-assets.ts';
+  import {
+    ensureCollection,
+    openPack,
+    setTargetPlayer,
+    StaleCollectionPreviewError,
+  } from '$lib/collection/collection-hub.ts';
   import { getCollectionRepo } from '$lib/collection/collection-hub.ts';
+  import { collectionErrorMessage } from '$lib/collection/collection-errors.ts';
+  import {
+    isTargetedPullSlot,
+    packTargetOddsView,
+    pullTargetPlayerId,
+    targetPlayerSummary,
+    targetedReceiptFacts,
+    targetedSummaryForPlayer,
+    type PackTargetOddsView,
+    type TargetedReceiptFacts,
+  } from '$lib/collection/collection-targeting-view.ts';
   import { arenaDuplicate, arenaError, arenaPackOpen, arenaPackReveal } from '$lib/arena-sound';
 
   let mounted = true;
@@ -27,14 +47,20 @@
   let phase = $state<'loading' | 'error' | 'ready'>('loading');
   let error = $state<string | null>(null);
   let catalog = $state<CollectionCatalog | null>(null);
+  let progression = $state<CollectionProgressionRules | null>(null);
+  let progressionError = $state<string | null>(null);
   let collectionState = $state<CollectionState | null>(null);
   let purchasing = $state<string | null>(null);
   let purchaseError = $state<string | null>(null);
+  let staleNotice = $state<string | null>(null);
+  let targetBusy = $state(false);
+  let targetError = $state<string | null>(null);
   let receipt = $state<{
     pull: CollectionPullRecord;
     cardsAdded: number;
     exchangeGained: number;
     balances: { Coins: number; Exchange: number };
+    targeting: TargetedReceiptFacts | null;
   } | null>(null);
   let showAll = $state(false);
   let announcement = $state('');
@@ -64,6 +90,15 @@
     return `Slot ${slotIndex + 1} · ordinary`;
   }
 
+  function playerIdOf(cardId: string): string | null {
+    return catalog?.cards.find((card) => card.cardId === cardId)?.playerId ?? null;
+  }
+
+  function playerNameOf(playerId: string | null): string {
+    if (playerId === null) return '';
+    return catalog?.cards.find((card) => card.playerId === playerId)?.displayName ?? playerId;
+  }
+
   async function load(): Promise<void> {
     try {
       const [loadedCatalog, loadedState] = await Promise.all([
@@ -74,6 +109,21 @@
       catalog = loadedCatalog;
       collectionState = loadedState;
       phase = 'ready';
+      void loadCollectionProgression()
+        .then((loaded) => {
+          if (mounted) {
+            progression = loaded;
+            progressionError = null;
+          }
+        })
+        .catch((failure: unknown) => {
+          if (!mounted) return;
+          progression = null;
+          progressionError =
+            failure instanceof Error
+              ? failure.message
+              : 'The collection progression rules are unavailable.';
+        });
       await restoreReceipt();
     } catch (loadError) {
       if (!mounted) return;
@@ -107,6 +157,11 @@
           .filter((entry) => entry.reason === 'duplicate-conversion')
           .reduce((sum, entry) => sum + entry.amount, 0),
         balances: { ...snapshot.state.balances },
+        targeting: targetedReceiptFacts({
+          pull,
+          playerName: playerNameOf(pullTargetPlayerId(pull)),
+          playerIdOf,
+        }),
       };
     } catch {
       // A missing receipt simply means nothing to restore.
@@ -119,27 +174,86 @@
 
   const balances = $derived(collectionState?.balances ?? { Coins: 0, Exchange: 0 });
   const claimed = $derived(collectionState?.claimedWelcome ?? false);
+  const activeTargetId = $derived(collectionState?.activeTargetPlayerId ?? null);
+  const activeTargetSummary = $derived(
+    catalog && activeTargetId ? targetPlayerSummary(catalog, activeTargetId) : null,
+  );
+  const activeTargetLine = $derived(
+    activeTargetId ? targetedSummaryForPlayer(activeTargetSummary, activeTargetId) : '',
+  );
+  const targetingBlocked = $derived(activeTargetId !== null && progression === null);
+  const targetOddsByPack = $derived.by(() => {
+    const map = new Map<string, PackTargetOddsView>();
+    if (!catalog) return map;
+    const targetPlayerId = progression === null ? null : activeTargetId;
+    const playerName = playerNameOf(targetPlayerId);
+    for (const pack of catalog.packs) {
+      const odds = describeCollectionTargetOdds({
+        catalog,
+        pack,
+        targetPlayerId,
+        multiplierBp: progression?.targetMultiplierBp ?? 10_000,
+      });
+      map.set(
+        pack.packId,
+        packTargetOddsView({
+          odds,
+          playerName,
+          eligibleVersionCount: activeTargetSummary?.versionCount ?? 0,
+        }),
+      );
+    }
+    return map;
+  });
 
-  async function buy(packId: string, price: number): Promise<void> {
-    if (purchasing) return;
+  async function clearTarget(): Promise<void> {
+    if (targetBusy) return;
+    targetBusy = true;
+    targetError = null;
+    try {
+      const next = await setTargetPlayer(null, new Date().toISOString());
+      if (!mounted) return;
+      collectionState = next;
+      announcement = 'Target cleared. Packs draw with equal card weights again.';
+    } catch (failure) {
+      if (!mounted) return;
+      targetError = collectionErrorMessage(failure, 'Clearing the target failed.');
+    } finally {
+      if (mounted) targetBusy = false;
+    }
+  }
+
+  async function buy(packId: string): Promise<void> {
+    if (purchasing || !collectionState) return;
+    const preview = {
+      revision: collectionState.revision,
+      digest: collectionState.digest,
+    };
     purchasing = packId;
     purchaseError = null;
+    staleNotice = null;
     showAll = false;
     try {
       arenaPackOpen();
     } catch {}
     try {
-      const outcome = await openPack(packId, new Date().toISOString());
+      const outcome = await openPack(packId, new Date().toISOString(), preview);
       if (!mounted) return;
       collectionState = outcome.state;
       const pullLedger = outcome.ledgerEntries.filter(
         (entry) => entry.reason === 'duplicate-conversion',
       );
+      const targeting = targetedReceiptFacts({
+        pull: outcome.pull,
+        playerName: playerNameOf(pullTargetPlayerId(outcome.pull)),
+        playerIdOf,
+      });
       receipt = {
         pull: outcome.pull,
         cardsAdded: outcome.pull.slots.filter((slot) => slot.kept).length,
         exchangeGained: pullLedger.reduce((sum, entry) => sum + entry.amount, 0),
         balances: { ...outcome.state.balances },
+        targeting,
       };
       try {
         sessionStorage.setItem(
@@ -149,7 +263,12 @@
       } catch {
         // Receipt restore is best-effort.
       }
-      announcement = `Pack opened. ${receipt.cardsAdded} new cards, plus ${receipt.exchangeGained} Exchange.`;
+      announcement = [
+        `Pack opened. ${receipt.cardsAdded} new cards, plus ${receipt.exchangeGained} Exchange.`,
+        targeting?.summary ?? '',
+      ]
+        .filter((part) => part.length > 0)
+        .join(' ');
       try {
         const order = ['Ember', 'Eruption', 'Apex', 'Titan', 'Eclipse', 'Immortal'];
         let best = 0;
@@ -165,7 +284,13 @@
       try {
         arenaError();
       } catch {}
-      purchaseError = buyError instanceof Error ? buyError.message : 'Purchase failed. Try again.';
+      if (buyError instanceof StaleCollectionPreviewError) {
+        staleNotice = buyError.message;
+        const refreshed = await ensureCollection(new Date().toISOString()).catch(() => null);
+        if (mounted && refreshed) collectionState = refreshed;
+        return;
+      }
+      purchaseError = collectionErrorMessage(buyError, 'Purchase failed. Try again.');
       const refreshed = await ensureCollection(new Date().toISOString()).catch(() => null);
       if (mounted && refreshed) collectionState = refreshed;
     } finally {
@@ -241,6 +366,49 @@
       Go to collection
     </a>
   {:else if catalog}
+    {#if progressionError}
+      <div class="mt-4">
+        <AsyncState
+          kind="error"
+          title="Targeting odds unavailable"
+          message={progressionError}
+          retry={() => {
+            progressionError = null;
+            void loadCollectionProgression()
+              .then((loaded) => {
+                if (mounted) progression = loaded;
+              })
+              .catch((failure: unknown) => {
+                if (!mounted) return;
+                progressionError =
+                  failure instanceof Error
+                    ? failure.message
+                    : 'The collection progression rules are unavailable.';
+              });
+          }}
+        />
+      </div>
+    {/if}
+
+    {#if activeTargetId && catalog}
+      <ActiveTarget
+        playerName={activeTargetSummary?.displayName ?? activeTargetId}
+        summaryLine={activeTargetLine}
+        blurb={progression?.display.targetingBlurb ?? undefined}
+        busy={targetBusy}
+        onClear={clearTarget}
+      />
+      {#if targetError}
+        <p role="alert" class="mt-2 text-sm text-destructive">{targetError}</p>
+      {/if}
+    {/if}
+
+    {#if staleNotice}
+      <p role="status" class="mt-4 rounded-xl border border-accent/50 bg-card p-4 text-sm">
+        {staleNotice}
+      </p>
+    {/if}
+
     {#if purchaseError}
       <p
         role="alert"
@@ -260,9 +428,13 @@
           {receipt.cardsAdded} new cards · +{receipt.exchangeGained} Exchange · balances now
           {receipt.balances.Coins} Coins / {receipt.balances.Exchange} Exchange.
         </p>
+        {#if receipt.targeting}
+          <p class="mt-1 text-sm" role="status">{receipt.targeting.summary}</p>
+        {/if}
         <ul class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {#each visibleReceiptCards as { slot, card } (slot.slotIndex)}
-            <li class="rounded-xl bg-surface-2 p-3 text-sm">
+            {@const targeted = isTargetedPullSlot(receipt.pull, slot.cardId, playerIdOf)}
+            <li class="min-w-0 rounded-xl bg-surface-2 p-3 text-sm">
               <span class="block truncate font-semibold">{card?.displayName ?? slot.cardId}</span>
               <span class="block text-xs text-muted-foreground">
                 {card ? `${card.seasonKey} · ${slot.rarity}` : slot.rarity}
@@ -272,6 +444,9 @@
                   · Duplicate · +{slot.conversionAmount} Exchange
                 {/if}
               </span>
+              {#if targeted}
+                <span class="mt-1 block text-xs font-semibold text-accent"> Targeted player </span>
+              {/if}
             </li>
           {/each}
         </ul>
@@ -281,7 +456,7 @@
             onclick={() => {
               showAll = !showAll;
             }}
-            class="mt-3 rounded-xl bg-surface-2 px-4 py-2 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            class="mt-3 min-h-11 rounded-xl bg-surface-2 px-4 py-2 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             {showAll ? 'Show less' : `Show all ${receiptCards.length}`}
           </button>
@@ -292,11 +467,12 @@
     <ul class="mt-6 grid gap-4 md:grid-cols-2">
       {#each catalog.packs as pack (pack.packId)}
         {@const odds = describeCollectionPackOdds(catalog, pack)}
+        {@const targetOdds = targetOddsByPack.get(pack.packId)}
         {@const affordable = balances[pack.priceCurrency] >= pack.priceAmount}
         {@const shortfall = pack.priceAmount - balances[pack.priceCurrency]}
-        <li class="flex flex-col rounded-2xl border border-border bg-card p-5">
+        <li class="flex min-w-0 flex-col rounded-2xl border border-border bg-card p-5">
           <div class="flex items-start justify-between gap-3">
-            <div>
+            <div class="min-w-0">
               <h2 class="font-display text-xl font-extrabold capitalize">
                 {pack.packId.replace('-', ' ')}
               </h2>
@@ -314,6 +490,15 @@
               <li class="text-muted-foreground">{slotLabel(pack.packId, index)}</li>
             {/each}
           </ul>
+          {#if targetOdds}
+            <p
+              class="mt-3 break-words rounded-xl bg-surface-2 px-3 py-2 text-sm {targetOdds.eligible
+                ? 'text-foreground'
+                : 'text-muted-foreground'}"
+            >
+              {targetOdds.summary}
+            </p>
+          {/if}
           <details class="mt-3 rounded-xl bg-surface-2 p-3 text-sm">
             <summary class="cursor-pointer font-semibold">Odds details</summary>
             <div class="mt-2 overflow-x-auto">
@@ -339,6 +524,15 @@
                       <td class="tabular-nums">{formatChance(odds.atLeastOne[rarity] ?? 0)}</td>
                     </tr>
                   {/each}
+                  {#if targetOdds?.hasTarget}
+                    <tr>
+                      <th scope="row" class="pr-2 font-semibold">Target player</th>
+                      {#each targetOdds.perSlotLabels as label, index (index)}
+                        <td class="pr-2 tabular-nums">{label}</td>
+                      {/each}
+                      <td class="tabular-nums">{targetOdds.atLeastOneLabel}</td>
+                    </tr>
+                  {/if}
                 </tbody>
               </table>
             </div>
@@ -346,14 +540,27 @@
               Pool: {odds.cardCount} slots · duplicate values
               {COLLECTION_RARITY_ORDER.map(
                 (rarity) => `${rarity} +${odds.duplicateExchange[rarity] ?? 0}`,
-              ).join(' · ')}. No pity, boosts, targeting, or duplicate protection.
+              ).join(' · ')}. No pity, no rarity boosts, no duplicate protection. Targeting keeps
+              every rarity weight unchanged.
             </p>
+            {#if targetOdds?.hasTarget}
+              <p class="mt-1 text-xs text-muted-foreground">
+                Target chance is exact and comes from the same compiled pack distributions as the
+                draw. Tiny nonzero values are never rounded to zero.
+              </p>
+            {/if}
           </details>
+          {#if targetingBlocked}
+            <p class="mt-3 text-xs text-destructive">
+              The targeting rules artifact is unavailable, so this pack cannot be opened while a
+              target is active. Clear the target or retry loading.
+            </p>
+          {/if}
           <button
             type="button"
-            onclick={() => buy(pack.packId, pack.priceAmount)}
-            disabled={!affordable || purchasing !== null}
-            class="mt-4 rounded-xl bg-accent px-5 py-2.5 font-bold text-accent-foreground outline-none disabled:cursor-not-allowed disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-ring"
+            onclick={() => buy(pack.packId)}
+            disabled={!affordable || purchasing !== null || targetingBlocked}
+            class="mt-4 min-h-11 rounded-xl bg-accent px-5 py-2.5 font-bold text-accent-foreground outline-none disabled:cursor-not-allowed disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-ring"
           >
             {#if purchasing === pack.packId}
               Opening…
@@ -366,8 +573,23 @@
               Needs {shortfall} more {pack.priceCurrency}.
             </p>
           {/if}
+          {#if targetOdds?.hasTarget && targetOdds.eligible}
+            <p class="mt-2 text-xs text-muted-foreground">
+              Purchase rechecks the state that produced this preview. If the collection changed, the
+              odds refresh and a new click is required.
+            </p>
+          {/if}
         </li>
       {/each}
     </ul>
   {/if}
 </div>
+
+<style>
+  @media (prefers-reduced-motion: reduce) {
+    .ultimate-root :global(*) {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
+</style>

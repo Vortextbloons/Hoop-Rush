@@ -148,13 +148,20 @@ export function selectTargetedCard(input: {
   if (!Number.isSafeInteger(total) || total <= 0) {
     throw new CollectionCommandError('arithmetic-overflow', 'target weights are not positive');
   }
-  const rng = createRng(input.seed as Parameters<typeof createRng>[0]);
+  const rng = createRng(input.seed);
   let cursor = rng.next() * total;
   for (let index = 0; index < ids.length; index += 1) {
     cursor -= weights[index] ?? 0;
-    if (cursor < 0) return ids[index] ?? ids[0]!;
+    if (cursor < 0) {
+      const id = ids[index];
+      if (id !== undefined) return id;
+    }
   }
-  return ids[ids.length - 1]!;
+  const last = ids[ids.length - 1];
+  if (last === undefined) {
+    throw new CollectionCommandError('invalid-definition', 'empty eligible card list');
+  }
+  return last;
 }
 
 function targetProbabilityForRarity(

@@ -22,6 +22,12 @@
     setTotal,
     setTitle,
     eligiblePacks,
+    activeTargetPlayerId = null,
+    targetingAvailable = false,
+    targetBusy = false,
+    targetError = null,
+    onSetTarget,
+    onClearTarget,
     onClose,
   }: {
     card: CollectionCatalogCard | null;
@@ -33,6 +39,12 @@
     setTotal: number;
     setTitle: string | null;
     eligiblePacks: string[];
+    activeTargetPlayerId?: string | null;
+    targetingAvailable?: boolean;
+    targetBusy?: boolean;
+    targetError?: string | null;
+    onSetTarget?: (playerId: string) => void;
+    onClearTarget?: () => void;
     onClose: () => void;
   } = $props();
 
@@ -64,6 +76,17 @@
     resolved ? (Object.entries(resolved.ratings) as Array<[string, number]>) : [],
   );
   const overlayDeltas: Record<string, number | undefined> = $derived(card?.ratingOverlay ?? {});
+  const playerId = $derived(card?.playerId ?? indexEntry?.playerId ?? null);
+  const playerVersionCount = $derived(
+    playerId && catalog ? catalog.cards.filter((entry) => entry.playerId === playerId).length : 0,
+  );
+  const isActiveTarget = $derived(playerId !== null && activeTargetPlayerId === playerId);
+  const activeTargetName = $derived(
+    activeTargetPlayerId && catalog
+      ? (catalog.cards.find((entry) => entry.playerId === activeTargetPlayerId)?.displayName ??
+          activeTargetPlayerId)
+      : null,
+  );
 </script>
 
 <Dialog.Root
@@ -182,6 +205,50 @@
             Eligible packs
           </h3>
           <p class="mt-1 text-sm">{eligiblePacks.join(', ')}</p>
+        {/if}
+        {#if playerId}
+          <h3 class="mt-5 text-sm font-bold uppercase tracking-wide text-muted-foreground">
+            Targeting
+          </h3>
+          {#if !targetingAvailable}
+            <p class="mt-1 text-sm text-muted-foreground">
+              Targeting rules are unavailable, so the target cannot be changed right now.
+            </p>
+          {:else if isActiveTarget}
+            <p class="mt-1 text-sm">
+              <strong>{title}</strong> is your active target. All {playerVersionCount} catalog
+              {playerVersionCount === 1 ? 'version' : 'versions'} are targeted.
+            </p>
+            <button
+              type="button"
+              onclick={onClearTarget}
+              disabled={targetBusy}
+              class="mt-2 min-h-11 rounded-xl bg-surface-2 px-4 py-2 text-sm font-semibold outline-none disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {targetBusy ? 'Clearing…' : 'Clear target'}
+            </button>
+          {:else}
+            <p class="mt-1 text-sm">
+              Target this player to weight every version of them inside its rarity. All
+              {playerVersionCount} catalog
+              {playerVersionCount === 1 ? 'version is' : 'versions are'} targeted in every pack that contains
+              them. Rarity odds, guarantees, and prices do not change.
+            </p>
+            {#if activeTargetName}
+              <p class="mt-1 text-xs text-muted-foreground">Current target: {activeTargetName}</p>
+            {/if}
+            <button
+              type="button"
+              onclick={() => playerId && onSetTarget?.(playerId)}
+              disabled={targetBusy}
+              class="mt-2 min-h-11 rounded-xl bg-accent px-4 py-2 text-sm font-bold text-accent-foreground outline-none disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {targetBusy ? 'Setting…' : 'Target player'}
+            </button>
+          {/if}
+          {#if targetError}
+            <p role="alert" class="mt-2 text-sm text-destructive">{targetError}</p>
+          {/if}
         {/if}
       {:else}
         <p class="mt-4 text-sm text-muted-foreground">Full details load with the card catalog.</p>

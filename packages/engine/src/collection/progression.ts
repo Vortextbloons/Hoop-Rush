@@ -20,22 +20,19 @@ export function validateCollectionProgressionRules(input: {
 }): void {
   const { progression, catalog } = input;
   const failures: string[] = [];
-  if (progression.progressionVersion !== COLLECTION_PROGRESSION_VERSION) {
-    failures.push(`unexpected progression version ${progression.progressionVersion}`);
+  const versionChecks: Array<[string, string, string]> = [
+    ['progressionVersion', progression.progressionVersion, COLLECTION_PROGRESSION_VERSION],
+    ['targetingVersion', progression.targetingVersion, COLLECTION_TARGETING_VERSION],
+    ['challengeVersion', progression.challengeVersion, COLLECTION_CHALLENGE_VERSION],
+    ['setRewardVersion', progression.setRewardVersion, COLLECTION_SET_REWARD_VERSION],
+    ['sourceCatalogVersion', progression.sourceCatalogVersion, COLLECTION_CATALOG_VERSION],
+  ];
+  for (const [label, value, expected] of versionChecks) {
+    if (value !== expected) {
+      failures.push(`unexpected ${label} ${value}`);
+    }
   }
-  if (progression.targetingVersion !== COLLECTION_TARGETING_VERSION) {
-    failures.push(`unexpected targeting version ${progression.targetingVersion}`);
-  }
-  if (progression.challengeVersion !== COLLECTION_CHALLENGE_VERSION) {
-    failures.push(`unexpected challenge version ${progression.challengeVersion}`);
-  }
-  if (progression.setRewardVersion !== COLLECTION_SET_REWARD_VERSION) {
-    failures.push(`unexpected set reward version ${progression.setRewardVersion}`);
-  }
-  if (progression.sourceCatalogVersion !== COLLECTION_CATALOG_VERSION) {
-    failures.push(`unexpected source catalog version ${progression.sourceCatalogVersion}`);
-  }
-  if (progression.sourceCatalogVersion !== catalog.catalogVersion) {
+  if ((progression.sourceCatalogVersion as string) !== catalog.catalogVersion) {
     failures.push('progression rules do not belong to the pinned catalog version');
   }
   if (
@@ -88,7 +85,7 @@ export function validateCollectionProgressionRules(input: {
       failures.push(`duplicate challenge ${challenge.challengeId}`);
     }
     challengeIds.add(challenge.challengeId);
-    if (challenge.challengeVersion !== COLLECTION_CHALLENGE_VERSION) {
+    if ((challenge.challengeVersion as string) !== COLLECTION_CHALLENGE_VERSION) {
       failures.push(`challenge ${challenge.challengeId} has an unexpected version`);
     }
     if (

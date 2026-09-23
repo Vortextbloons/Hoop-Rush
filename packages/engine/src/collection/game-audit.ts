@@ -3,13 +3,10 @@ import {
   COLLECTION_GAME_V1_VERSION,
   COLLECTION_GAME_V2_VERSION,
   type CollectionCatalog,
-  type CollectionChallengeEvaluation,
   type CollectionGameEvent,
   type CollectionGameRecordUnion,
-  type CollectionGameResult,
   type CollectionGameResultUnion,
   type CollectionPreparedGameUnion,
-  type CollectionPreparedGameV3,
   type EraSimulationProfile,
 } from '@hoop-rush/data-contracts';
 import { auditSideAccounting } from '../sim/accounting-core.ts';

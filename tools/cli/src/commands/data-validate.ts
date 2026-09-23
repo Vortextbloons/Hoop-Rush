@@ -1,6 +1,10 @@
 import { readFile, stat } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
-import { validateBracketContent, scheduleInvariants } from '@hoop-rush/engine';
+import {
+  validateBracketContent,
+  scheduleInvariants,
+  validateCollectionProgressionRules,
+} from '@hoop-rush/engine';
 import { pools } from '@hoop-rush/importer';
 import {
   eraSimulationProfileSchema,
@@ -17,23 +21,26 @@ import {
   COLLECTION_DIFFICULTY_VERSION,
   COLLECTION_ECONOMY_VERSION,
   COLLECTION_GAME_FIRST_CLEAR_COINS,
-  COLLECTION_GAME_REPLAY_VERSION,
   COLLECTION_GAME_REWARD_LOSS_COINS,
   COLLECTION_GAME_REWARD_MARGIN_CAP_POINTS,
   COLLECTION_GAME_REWARD_MARGIN_COIN_PER_POINT,
   COLLECTION_GAME_REWARD_OBJECTIVE_COINS,
   COLLECTION_GAME_REWARD_WIN_COINS,
   COLLECTION_GAME_RULES_VERSION,
-  COLLECTION_GAME_VERSION,
+  COLLECTION_GAME_V2_REPLAY_VERSION,
+  COLLECTION_GAME_V2_VERSION,
   COLLECTION_OBJECTIVE_VERSION,
   COLLECTION_OVERLAY_VERSION,
   COLLECTION_PACK_RULES_VERSION,
   COLLECTION_RARITY_ORDER,
-  COLLECTION_REWARD_VERSION,
+  COLLECTION_REWARD_V2_VERSION,
   COLLECTION_TEAM_VERSION,
+  canonicalJson,
   collectionCatalogSchema,
   collectionGameRulesSchema,
   collectionIndexSchema,
+  collectionProgressionRulesSchema,
+  collectionProgressionTargetsSchema,
   collectionScaleRewardCoins,
   seasonFreeAgencyIndexSchema,
   seasonGameTargetsSchema,
@@ -43,11 +50,18 @@ import {
   POSITIONS,
   POSITION_NORMALIZATION_VERSION,
   playableSlotGroups,
+  type CollectionCatalog,
+  type CollectionProgressionRules,
   type HoopRushManifest,
   type OpponentIndexEntry,
 } from '@hoop-rush/data-contracts';
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
 import { sha256Hex } from '../io.ts';
+import {
+  COLLECTION_LAUNCH_CHALLENGES,
+  COLLECTION_TARGET_MULTIPLIER_BP,
+  collectionLaunchSetRewardDefinitions,
+} from '../collection-progression-constants.ts';
 import { DEFAULT_MANIFEST } from './data-loader.ts';
 import { collectionGameTargetsSchema } from './collection-game-calibrate.ts';
 export const DATA_VALIDATE_OPTIONS: Record<string, boolean> = {
@@ -840,6 +854,230 @@ async function auditSeasonFreeAgencyIndex(
   );
   return { ok: failures.length === 0, details, failures };
 }
+function compareLaunchCollectionProgression(
+  rules: CollectionProgressionRules,
+  catalog: CollectionCatalog,
+): string[] {
+  const failures: string[] = [];
+  if (rules.targetMultiplierBp !== COLLECTION_TARGET_MULTIPLIER_BP) {
+    failures.push(
+      `collection-progression: targetMultiplierBp ${String(rules.targetMultiplierBp)} != ${String(COLLECTION_TARGET_MULTIPLIER_BP)}`,
+    );
+  }
+  if (rules.challenges.length !== COLLECTION_LAUNCH_CHALLENGES.length) {
+    failures.push(
+      `collection-progression: ${String(rules.challenges.length)} challenges, want ${String(COLLECTION_LAUNCH_CHALLENGES.length)}`,
+    );
+  }
+  for (let index = 0; index < COLLECTION_LAUNCH_CHALLENGES.length; index += 1) {
+    const expected = COLLECTION_LAUNCH_CHALLENGES[index];
+    if (expected === undefined) continue;
+    const actual = rules.challenges[index];
+    if (actual === undefined || actual.challengeId !== expected.challengeId) {
+      failures.push(
+        `collection-progression: challenge ${String(index)} is ${actual?.challengeId ?? 'missing'}, want ${expected.challengeId}`,
+      );
+      continue;
+    }
+    if (actual.displayName !== expected.displayName) {
+      failures.push(
+        `collection-progression: challenge ${expected.challengeId} display name ${actual.displayName} unexpected`,
+      );
+    }
+    if (actual.difficultyId !== expected.difficultyId) {
+      failures.push(
+        `collection-progression: challenge ${expected.challengeId} difficulty ${actual.difficultyId} != ${expected.difficultyId}`,
+      );
+    }
+    if (
+      actual.firstClearCoins !== expected.firstClearCoins ||
+      actual.repeatWinCoins !== expected.repeatWinCoins
+    ) {
+      failures.push(
+        `collection-progression: challenge ${expected.challengeId} coins ${String(actual.firstClearCoins)}/${String(actual.repeatWinCoins)} != ${String(expected.firstClearCoins)}/${String(expected.repeatWinCoins)}`,
+      );
+    }
+    if (canonicalJson(actual.requirement) !== canonicalJson(expected.requirement)) {
+      failures.push(
+        `collection-progression: challenge ${expected.challengeId} requirement does not match the launch definition`,
+      );
+    }
+  }
+  const launchChallengeIds = new Set(
+    COLLECTION_LAUNCH_CHALLENGES.map((entry) => entry.challengeId),
+  );
+  for (const actual of rules.challenges) {
+    if (!launchChallengeIds.has(actual.challengeId)) {
+      failures.push(`collection-progression: unexpected challenge ${actual.challengeId}`);
+    }
+  }
+  const expectedRewards = collectionLaunchSetRewardDefinitions(catalog);
+  if (rules.setRewards.length !== expectedRewards.length) {
+    failures.push(
+      `collection-progression: ${String(rules.setRewards.length)} set rewards, want ${String(expectedRewards.length)}`,
+    );
+  }
+  for (let index = 0; index < expectedRewards.length; index += 1) {
+    const expected = expectedRewards[index];
+    if (expected === undefined) continue;
+    const actual = rules.setRewards[index];
+    if (actual === undefined || actual.setId !== expected.setId) {
+      failures.push(
+        `collection-progression: set reward ${String(index)} is ${actual?.setId ?? 'missing'}, want ${expected.setId}`,
+      );
+      continue;
+    }
+    if (canonicalJson(actual) !== canonicalJson(expected)) {
+      failures.push(
+        `collection-progression: set reward ${expected.setId} does not match the launch definition`,
+      );
+    }
+  }
+  const launchSetIds = new Set(expectedRewards.map((entry) => entry.setId));
+  for (const actual of rules.setRewards) {
+    if (!launchSetIds.has(actual.setId)) {
+      failures.push(`collection-progression: unexpected set reward ${actual.setId}`);
+    }
+  }
+  return failures;
+}
+
+async function auditCollectionProgression(
+  entry: NonNullable<HoopRushManifest['collection']>,
+  catalog: CollectionCatalog,
+  catalogHash: string,
+  manifestDir: string,
+  verbose: boolean,
+): Promise<AuditResult> {
+  const failures: string[] = [];
+  const details: string[] = [];
+  const ref = entry.progressionRules;
+  if (ref === undefined) {
+    details.push('collection-progression: none packaged (run gen-collection-progression-rules)');
+    return { ok: true, details, failures };
+  }
+  const assetPath = isAbsolute(ref.url) ? ref.url : resolve(manifestDir, ref.url);
+  let content: Buffer;
+  try {
+    const info = await stat(assetPath);
+    if (!info.isFile()) {
+      failures.push(`collection-progression: asset is not a file (${assetPath})`);
+      return { ok: false, details, failures };
+    }
+    content = await readFile(assetPath);
+  } catch {
+    failures.push(`collection-progression: asset missing (${assetPath})`);
+    return { ok: false, details, failures };
+  }
+  const rulesHash = sha256Hex(content);
+  if (rulesHash !== ref.contentHash) {
+    failures.push(`collection-progression: content hash mismatch (${assetPath})`);
+  } else if (verbose) {
+    details.push(`collection-progression: hash verified (${assetPath})`);
+  }
+  let raw: unknown;
+  try {
+    raw = JSON.parse(content.toString('utf8')) as unknown;
+  } catch {
+    failures.push('collection-progression: artifact is not valid JSON');
+    return { ok: false, details, failures };
+  }
+  const parsed = collectionProgressionRulesSchema.safeParse(raw);
+  if (!parsed.success) {
+    failures.push(
+      `collection-progression: schema failure: ${parsed.error.issues[0]?.path.join('.') ?? '(root)'} ${parsed.error.issues[0]?.message ?? 'unknown'}`,
+    );
+    return { ok: false, details, failures };
+  }
+  const rules = parsed.data;
+  try {
+    validateCollectionProgressionRules({
+      progression: rules,
+      progressionHash: rulesHash,
+      catalog,
+      verifyFeasibility: true,
+    });
+  } catch (error) {
+    failures.push(`collection-progression: ${(error as Error).message}`);
+  }
+  if (rules.sourceCatalogHash !== catalogHash) {
+    failures.push('collection-progression: sourceCatalogHash does not match the pinned catalog');
+  }
+  const sourceCatalogVersion: string = rules.sourceCatalogVersion;
+  if (sourceCatalogVersion !== COLLECTION_CATALOG_VERSION) {
+    failures.push(
+      `collection-progression: sourceCatalogVersion ${sourceCatalogVersion} unexpected`,
+    );
+  }
+  failures.push(...compareLaunchCollectionProgression(rules, catalog));
+  details.push(
+    `collection-progression: ${rules.progressionVersion} · ${String(rules.challenges.length)} challenges · ${String(rules.setRewards.length)} set rewards · multiplier ${String(rules.targetMultiplierBp)} bp · ${String(content.length)} bytes`,
+  );
+
+  const targetsRef = entry.progressionTargets;
+  if (targetsRef === undefined) {
+    details.push('collection-progression-targets: none packaged (calibration not frozen)');
+    return { ok: failures.length === 0, details, failures };
+  }
+  const targetsPath = isAbsolute(targetsRef.url)
+    ? targetsRef.url
+    : resolve(manifestDir, targetsRef.url);
+  let targetsContent: Buffer;
+  try {
+    const info = await stat(targetsPath);
+    if (!info.isFile()) {
+      failures.push(`collection-progression-targets: asset is not a file (${targetsPath})`);
+      return { ok: false, details, failures };
+    }
+    targetsContent = await readFile(targetsPath);
+  } catch {
+    failures.push(`collection-progression-targets: asset missing (${targetsPath})`);
+    return { ok: false, details, failures };
+  }
+  if (sha256Hex(targetsContent) !== targetsRef.contentHash) {
+    failures.push(`collection-progression-targets: content hash mismatch (${targetsPath})`);
+  } else if (verbose) {
+    details.push(`collection-progression-targets: hash verified (${targetsPath})`);
+  }
+  let targetsRaw: unknown;
+  try {
+    targetsRaw = JSON.parse(targetsContent.toString('utf8')) as unknown;
+  } catch {
+    failures.push('collection-progression-targets: artifact is not valid JSON');
+    return { ok: false, details, failures };
+  }
+  const targetsParsed = collectionProgressionTargetsSchema.safeParse(targetsRaw);
+  if (!targetsParsed.success) {
+    failures.push(
+      `collection-progression-targets: schema failure: ${targetsParsed.error.issues[0]?.path.join('.') ?? '(root)'} ${targetsParsed.error.issues[0]?.message ?? 'unknown'}`,
+    );
+    return { ok: false, details, failures };
+  }
+  const targets = targetsParsed.data;
+  if (targets.progressionRulesHash !== ref.contentHash) {
+    failures.push(
+      'collection-progression-targets: progressionRulesHash does not match the packaged progression rules',
+    );
+  }
+  if (targets.catalogHash !== catalogHash) {
+    failures.push(
+      'collection-progression-targets: catalogHash does not match the packaged catalog',
+    );
+  }
+  const failedGates = Object.entries(targets.gates)
+    .filter(([, pass]) => !pass)
+    .map(([name]) => name);
+  if (failedGates.length > 0) {
+    failures.push(`collection-progression-targets: failed gates ${failedGates.join(', ')}`);
+  } else if (verbose) {
+    details.push('collection-progression-targets: all recorded gates pass');
+  }
+  details.push(
+    `collection-progression-targets: ${targets.targetsVersion} · ${String(targets.fixtures.length)} fixtures · ${String(Object.keys(targets.gates).length)} gates`,
+  );
+  return { ok: failures.length === 0, details, failures };
+}
+
 async function auditCollectionCatalog(
   manifest: HoopRushManifest,
   manifestDir: string,
@@ -962,6 +1200,15 @@ async function auditCollectionCatalog(
   details.push(
     `collection: ${String(catalog.cards.length)} cards (${String(baseCount)} base + ${String(specialCount)} specials) · ${String(catalog.sets.length)} sets · ${String(catalog.packs.length)} packs · ${String(catalogContent.length)} bytes`,
   );
+  const progression = await auditCollectionProgression(
+    entry,
+    catalog,
+    entry.catalog.contentHash,
+    manifestDir,
+    verbose,
+  );
+  failures.push(...progression.failures);
+  details.push(...progression.details);
   return { ok: failures.length === 0, details, failures };
 }
 const COLLECTION_EXPECTED_OBJECTIVE_THRESHOLDS: Record<string, number> = {
@@ -1043,10 +1290,10 @@ export async function auditCollectionGameRules(
   const rules = parsed.data;
   const versions: Array<[string, string, string]> = [
     ['rulesVersion', rules.rulesVersion, COLLECTION_GAME_RULES_VERSION],
-    ['gameVersion', rules.gameVersion, COLLECTION_GAME_VERSION],
+    ['gameVersion', rules.gameVersion, COLLECTION_GAME_V2_VERSION],
     ['teamVersion', rules.teamVersion, COLLECTION_TEAM_VERSION],
-    ['rewardVersion', rules.rewardVersion, COLLECTION_REWARD_VERSION],
-    ['replayVersion', rules.replayVersion, COLLECTION_GAME_REPLAY_VERSION],
+    ['rewardVersion', rules.rewardVersion, COLLECTION_REWARD_V2_VERSION],
+    ['replayVersion', rules.replayVersion, COLLECTION_GAME_V2_REPLAY_VERSION],
     ['difficultyVersion', rules.difficultyVersion, COLLECTION_DIFFICULTY_VERSION],
     ['objectiveVersion', rules.objectiveVersion, COLLECTION_OBJECTIVE_VERSION],
   ];

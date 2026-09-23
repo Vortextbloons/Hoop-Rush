@@ -66,10 +66,10 @@ export function prepareCollectionChallengeGame(input: {
   if (challenge === undefined) {
     throw new CollectionGameError('unknown-challenge', `unknown challenge ${input.challengeId}`);
   }
-  if (challenge.challengeVersion !== COLLECTION_CHALLENGE_VERSION) {
+  if ((challenge.challengeVersion as string) !== COLLECTION_CHALLENGE_VERSION) {
     throw new CollectionGameError(
       'challenge-version-mismatch',
-      `challenge ${challenge.challengeId} version ${challenge.challengeVersion}`,
+      `challenge ${challenge.challengeId} version ${challenge.challengeVersion as string}`,
     );
   }
   const resolve = (cardId: string) => input.catalog.cards.find((card) => card.cardId === cardId);

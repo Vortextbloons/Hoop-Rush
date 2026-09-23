@@ -1,7 +1,6 @@
 import {
   COLLECTION_CATALOG_VERSION,
   COLLECTION_COMMAND_V1_VERSION,
-  COLLECTION_GAME_COMMAND_V1_VERSION,
   COLLECTION_GAME_V1_VERSION,
   COLLECTION_GAME_V2_VERSION,
   COLLECTION_GAME_VERSION,
@@ -705,11 +704,6 @@ function applyAcceptChallengeGameResult(
     });
   }
   const result = command.result;
-  if (result.gameVersion !== COLLECTION_GAME_VERSION) {
-    return reject('invalid-result', {
-      detail: 'challenge pending game requires a challenge result',
-    });
-  }
   if (result.gameId !== pending.gameId) {
     return reject('invalid-result', { detail: 'result gameId does not match the pending game' });
   }

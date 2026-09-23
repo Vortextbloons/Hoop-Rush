@@ -30,7 +30,6 @@ import {
   type CollectionPlayStateUnion,
   type CollectionPullRecord,
   type CollectionSetClaimReceipt,
-  type CollectionState,
   type CollectionStateUnion,
 } from '@hoop-rush/data-contracts';
 

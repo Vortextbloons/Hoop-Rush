@@ -118,6 +118,14 @@ import {
   COLLECTION_GAME_CALIBRATE_OPTIONS,
 } from './commands/collection-game-calibrate.ts';
 import {
+  collectionProgressionAudit,
+  COLLECTION_PROGRESSION_AUDIT_OPTIONS,
+} from './commands/collection-progression.ts';
+import {
+  collectionProgressionCalibrate,
+  COLLECTION_PROGRESSION_CALIBRATE_OPTIONS,
+} from './commands/collection-progression-calibrate.ts';
+import {
   SEASON_EFFECTS_OPTIONS,
   seasonEffectsCalibrate,
   seasonEffectsDistribution,
@@ -492,6 +500,27 @@ const COMMANDS: Record<string, CommandDef> = {
     options: COLLECTION_GAME_CALIBRATE_OPTIONS,
     run: (args) =>
       collectionGameCalibrate({
+        workers: getOptionString(args, 'workers') ?? undefined,
+        calibrationSeeds: getOptionString(args, 'calibration-seeds') ?? undefined,
+        validationSeeds: getOptionString(args, 'validation-seeds') ?? undefined,
+        out: getOptionString(args, 'out') ?? undefined,
+        manifest: getOptionString(args, 'manifest') ?? undefined,
+        validate: getOptionString(args, 'validate') ?? null,
+      }),
+  },
+  'collection progression-audit': {
+    options: COLLECTION_PROGRESSION_AUDIT_OPTIONS,
+    run: (args) =>
+      collectionProgressionAudit({
+        manifest: getOptionString(args, 'manifest'),
+        player: getOptionString(args, 'player'),
+        input: getOptionString(args, 'input'),
+      }),
+  },
+  'collection progression-calibrate': {
+    options: COLLECTION_PROGRESSION_CALIBRATE_OPTIONS,
+    run: (args) =>
+      collectionProgressionCalibrate({
         workers: getOptionString(args, 'workers') ?? undefined,
         calibrationSeeds: getOptionString(args, 'calibration-seeds') ?? undefined,
         validationSeeds: getOptionString(args, 'validation-seeds') ?? undefined,

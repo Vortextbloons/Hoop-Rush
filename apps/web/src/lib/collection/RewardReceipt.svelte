@@ -1,7 +1,13 @@
 <script lang="ts">
-  import type { CollectionBalances, CollectionGameRecordV2 } from '@hoop-rush/data-contracts';
+  import type {
+    CollectionBalances,
+    CollectionGameRecordV2,
+    CollectionGameRecordV3,
+  } from '@hoop-rush/data-contracts';
   import { formatMultiplier } from './collection-setup.ts';
+  import { requirementLabel } from './collection-progression-view.ts';
   import {
+    challengeRewardView,
     firstClearView,
     objectiveEvaluationView,
     receiptPrimaryReason,
@@ -13,7 +19,7 @@
     balances,
     objectiveTitleOf,
   }: {
-    record: CollectionGameRecordV2;
+    record: CollectionGameRecordV2 | CollectionGameRecordV3;
     balances: CollectionBalances | null;
     objectiveTitleOf?: (objectiveId: string) => string | null;
   } = $props();
@@ -24,6 +30,8 @@
     objectiveEvaluationView(record.objectiveEvaluation, objectiveTitleOf),
   );
   const firstClear = $derived(firstClearView(receipt));
+  const challenge = $derived(record.gameVersion === 'collection-game-v3' ? record : null);
+  const challengeReward = $derived(challengeRewardView(receipt));
   const outcomeLabel = $derived(
     receipt.gameOutcome === 'forfeit'
       ? receipt.playerWin
@@ -74,6 +82,50 @@
     {/if}
     <p class="mt-1 text-xs text-muted-foreground">{evaluation.detail}</p>
   </div>
+
+  {#if challenge && challengeReward}
+    <div class="mt-4 rounded-xl border border-accent/50 bg-surface-2 p-4">
+      <h4 class="text-sm font-bold">Challenge · {challenge.prepared.challenge.displayName}</h4>
+      <p class="mt-1 text-xs text-muted-foreground">
+        {requirementLabel(challenge.prepared.challenge.requirement)} · {challenge.prepared.challenge
+          .difficultyId} · snapshotted before tip-off
+      </p>
+      <p
+        class="mt-2 text-sm font-bold {challengeReward.firstClearGranted
+          ? 'text-accent'
+          : 'text-muted-foreground'}"
+      >
+        {challengeReward.label}
+      </p>
+      <p class="mt-1 text-xs text-muted-foreground">{challengeReward.detail}</p>
+      <dl class="mt-2 grid gap-1 text-xs sm:grid-cols-2">
+        <div class="flex justify-between gap-2">
+          <dt class="text-muted-foreground">First clear</dt>
+          <dd class="tabular-nums">
+            {challenge.prepared.challenge.firstClearCoins} Coins
+            {challenge.prepared.challenge.firstClearEligible ? '(eligible)' : '(claimed)'}
+          </dd>
+        </div>
+        <div class="flex justify-between gap-2">
+          <dt class="text-muted-foreground">Repeat win</dt>
+          <dd class="tabular-nums">{challenge.prepared.challenge.repeatWinCoins} Coins</dd>
+        </div>
+        <div class="flex justify-between gap-2">
+          <dt class="text-muted-foreground">Snapshotted requirement</dt>
+          <dd class="tabular-nums">
+            {challenge.prepared.challenge.validation.rosterCount}/{challenge.prepared.challenge
+              .validation.requiredRosterCount} active ·
+            {challenge.prepared.challenge.validation.starterCount}/{challenge.prepared.challenge
+              .validation.requiredStarterCount} starters
+          </dd>
+        </div>
+        <div class="flex justify-between gap-2">
+          <dt class="text-muted-foreground">Challenge ID</dt>
+          <dd class="truncate font-mono">{challenge.prepared.challenge.challengeId}</dd>
+        </div>
+      </dl>
+    </div>
+  {/if}
 
   <ul class="mt-4 space-y-2">
     {#each rows as row (row.kind)}

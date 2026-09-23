@@ -25,8 +25,6 @@ import {
   COLLECTION_PROGRESSION_VERSION,
   COLLECTION_RARITY_ORDER,
   COLLECTION_REPLAY_VERSION,
-  COLLECTION_SCHEMA_VERSION,
-  COLLECTION_SET_REWARD_VERSION,
   COLLECTION_STATE_SCHEMA_VERSION,
   COLLECTION_TARGETING_VERSION,
   COLLECTION_VERSION,
@@ -615,7 +613,7 @@ function applyOpenPack(
         multiplierBp: progression.targetMultiplierBp,
         pullSequence,
       });
-      if (snapshot.targetingVersion !== COLLECTION_TARGETING_VERSION) {
+      if ((snapshot.targetingVersion as string) !== COLLECTION_TARGETING_VERSION) {
         return reject('targeting-version-mismatch', { detail: snapshot.targetingVersion });
       }
       draws = drawCollectionPackSlotsTargeted({
@@ -885,7 +883,7 @@ export function reproduceCollectionPull(
   const targeting = 'targeting' in pull ? pull.targeting : null;
   let draws: PackDraw[];
   try {
-    if (targeting === null || targeting === undefined) {
+    if (targeting === null) {
       draws = drawCollectionPackSlots(catalog, pack, rootSeed, pull.pullSequence).draws;
     } else {
       draws = drawCollectionPackSlotsTargeted({

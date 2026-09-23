@@ -1,17 +1,12 @@
 import {
-  COLLECTION_CATALOG_VERSION,
-  COLLECTION_ECONOMY_VERSION,
   COLLECTION_GAME_V1_VERSION,
   COLLECTION_GAME_V2_VERSION,
-  COLLECTION_GAME_VERSION,
   COLLECTION_PLAY_SAVE_V2_VERSION,
   COLLECTION_PLAY_SAVE_VERSION,
   COLLECTION_PLAY_SAVE_V1_VERSION,
   COLLECTION_SAVE_V1_VERSION,
   COLLECTION_SAVE_VERSION,
-  COLLECTION_VERSION,
   canonicalJson,
-  collectionStateSchema,
   seedSchema,
   type CollectionBalances,
   type CollectionCatalog,
@@ -26,7 +21,6 @@ import {
   type CollectionProgressionRules,
   type CollectionPullRecord,
   type CollectionState,
-  type CollectionStateUnion,
   type EraSimulationProfile,
 } from '@hoop-rush/data-contracts';
 import {

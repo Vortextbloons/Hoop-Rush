@@ -1,5 +1,7 @@
 import {
   collectionGameRulesSchema,
+  collectionProgressionRulesSchema,
+  loadAsset,
   loadCollectionCatalog as loadPackagedCatalog,
   loadCollectionIndex as loadPackagedIndex,
   parseCollectionCatalog,
@@ -7,6 +9,7 @@ import {
   type CollectionCatalog,
   type CollectionGameRules,
   type CollectionIndex,
+  type CollectionProgressionRules,
 } from '@hoop-rush/data-contracts';
 import { getManifest } from '$lib/data';
 import { memoized, resolveAssetUrl } from '$lib/asset-url';
@@ -52,5 +55,25 @@ export function loadCollectionGameRules(): Promise<CollectionGameRules> {
     const rules = collectionGameRulesSchema.parse(await response.json());
     void writeCachedAsset(entry.contentHash, rules);
     return rules;
+  });
+}
+
+export function loadCollectionProgression(): Promise<CollectionProgressionRules> {
+  return memoized('collection/progression-rules', async () => {
+    const manifest = await getManifest();
+    const entry = manifest.collection?.progressionRules;
+    if (!entry) throw new Error('The collection progression rules are unavailable.');
+    const parseProgression = (value: unknown): CollectionProgressionRules =>
+      collectionProgressionRulesSchema.parse(value);
+    const cached = await readCachedAsset(entry.contentHash, parseProgression);
+    if (cached !== null) return cached;
+    const progression = await loadAsset(
+      resolveAssetUrl(entry.url),
+      collectionProgressionRulesSchema,
+      'collection progression rules',
+      entry.contentHash,
+    );
+    void writeCachedAsset(entry.contentHash, progression);
+    return progression;
   });
 }

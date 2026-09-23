@@ -85,7 +85,6 @@ function collectionBaseRewardFacts(input: {
   evaluation: CollectionObjectiveEvaluation;
 }): BaseRewardFacts {
   const { prepared, result, evaluation } = input;
-  const multiplierBp = prepared.difficulty.rewardMultiplierBp;
   const playerWin = result.winner === 'home';
   const completed = result.outcome === 'completed';
   const scoreMargin = completed ? Math.abs(result.home.score - result.away.score) : null;

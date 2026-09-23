@@ -1,5 +1,5 @@
 import type {
-  CollectionGameRewardReceipt,
+  CollectionGameRewardReceiptUnion,
   CollectionObjectiveEvaluation,
   CollectionRewardComponent,
   CollectionRewardReason,
@@ -31,11 +31,15 @@ function componentLabel(
       return `Margin: ${String(component.marginPoints ?? component.baseAmount)} points`;
     case 'first-clear':
       return `First clear: ${component.difficultyId ?? 'difficulty'}`;
+    case 'challenge-first-clear':
+      return 'Challenge first clear';
+    case 'challenge-repeat-win':
+      return 'Challenge repeat win';
   }
 }
 
 export function rewardComponentRows(
-  receipt: CollectionGameRewardReceipt,
+  receipt: CollectionGameRewardReceiptUnion,
   objectiveTitleOf?: (objectiveId: string) => string | null,
 ): RewardComponentRow[] {
   return receipt.components.map((component) => ({
@@ -44,12 +48,16 @@ export function rewardComponentRows(
     detail:
       component.kind === 'first-clear'
         ? `${String(component.baseAmount)} Coins, not scaled`
-        : `${String(component.baseAmount)} Coins × ${formatMultiplier(component.multiplierBp)}`,
+        : component.kind === 'challenge-first-clear' || component.kind === 'challenge-repeat-win'
+          ? `${String(component.baseAmount)} Coins, fixed by the challenge`
+          : `${String(component.baseAmount)} Coins × ${formatMultiplier(component.multiplierBp)}`,
     amount: component.amount,
   }));
 }
 
-export function receiptPrimaryReason(receipt: CollectionGameRewardReceipt): CollectionRewardReason {
+export function receiptPrimaryReason(
+  receipt: CollectionGameRewardReceiptUnion,
+): CollectionRewardReason {
   const outcome = receipt.components.find((component) => component.kind === 'outcome');
   if (outcome !== undefined) return outcome.reason;
   return receipt.playerWin ? 'game-win-reward' : 'game-loss-reward';
@@ -109,7 +117,7 @@ export interface FirstClearView {
   detail: string;
 }
 
-export function firstClearView(receipt: CollectionGameRewardReceipt): FirstClearView {
+export function firstClearView(receipt: CollectionGameRewardReceiptUnion): FirstClearView {
   if (receipt.firstClearGranted) {
     return {
       granted: true,
@@ -128,5 +136,53 @@ export function firstClearView(receipt: CollectionGameRewardReceipt): FirstClear
     granted: false,
     label: 'First clear already claimed',
     detail: `${receipt.difficultyId} was cleared before this game.`,
+  };
+}
+
+export interface ChallengeRewardView {
+  challengeId: string;
+  componentKind: 'challenge-first-clear' | 'challenge-repeat-win' | null;
+  firstClearGranted: boolean;
+  label: string;
+  detail: string;
+}
+
+export function challengeRewardView(
+  receipt: CollectionGameRewardReceiptUnion,
+): ChallengeRewardView | null {
+  if (receipt.rewardVersion !== 'collection-reward-v3') return null;
+  if (receipt.challengeFirstClearGranted) {
+    return {
+      challengeId: receipt.challengeId,
+      componentKind: receipt.challengeComponentKind,
+      firstClearGranted: true,
+      label: 'Challenge first clear granted',
+      detail: 'The first completed win for this challenge paid its fixed first-clear reward.',
+    };
+  }
+  if (receipt.challengeComponentKind === 'challenge-repeat-win') {
+    return {
+      challengeId: receipt.challengeId,
+      componentKind: receipt.challengeComponentKind,
+      firstClearGranted: false,
+      label: 'Challenge repeat win',
+      detail: 'This challenge was already cleared, so the fixed repeat-win reward applied.',
+    };
+  }
+  if (receipt.playerWin && receipt.gameOutcome === 'completed') {
+    return {
+      challengeId: receipt.challengeId,
+      componentKind: null,
+      firstClearGranted: false,
+      label: 'No challenge reward',
+      detail: 'This challenge already recorded a completed win, so no challenge reward applied.',
+    };
+  }
+  return {
+    challengeId: receipt.challengeId,
+    componentKind: null,
+    firstClearGranted: false,
+    label: 'No challenge reward',
+    detail: 'A challenge reward requires a completed win.',
   };
 }

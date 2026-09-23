@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   COLLECTION_GAME_WORKER_WIRE_VERSION,
+  collectionChallengeDefinitionSchema,
+  collectionProgressionRulesSchema,
   type CollectionActiveTeam,
   type CollectionCatalog,
   type CollectionCatalogCard,
+  type CollectionChallengeDefinition,
   type CollectionGameWorkerCompleteMessage,
   type CollectionPreparedGameUnion,
 } from '@hoop-rush/data-contracts';
@@ -20,9 +23,11 @@ import {
   collectionObjectiveDefinitionsFromRules,
   initializeCollectionActiveTeam,
   prepareCollectionBasicGameV2,
+  prepareCollectionChallengeGame,
   simulateCollectionGame,
 } from '@hoop-rush/engine';
 import { runCollectionGame } from './collection-game-runner';
+import { runFakeCollectionGame } from './fake-collection-game-runner';
 
 const HASH = 'a'.repeat(64);
 const RARITIES: CollectionCatalogCard['rarity'][] = [
@@ -85,6 +90,80 @@ function buildPrepared(catalog: CollectionCatalog): CollectionPreparedGameUnion 
     objectiveDefinitions: collectionObjectiveDefinitionsFromRules(rules),
     selectedObjectiveId: null,
     clearedDifficultyIds: [],
+    profileVersion: DEFAULT_ERA_SIM_PROFILE.profileVersion,
+    profileHash: HASH,
+    catalogHash: HASH,
+    rulesHash: HASH,
+  });
+}
+
+function buildChallengePrepared(catalog: CollectionCatalog): CollectionPreparedGameUnion {
+  const byId = new Map(catalog.cards.map((card) => [card.cardId, card]));
+  const team: CollectionActiveTeam = initializeCollectionActiveTeam(
+    catalog.cards.slice(0, 12).map((card) => card.cardId),
+    (cardId) => byId.get(cardId),
+  );
+  const rules = buildCollectionGameRulesFixture();
+  const challenge: CollectionChallengeDefinition = collectionChallengeDefinitionSchema.parse({
+    challengeVersion: 'collection-challenge-v1',
+    challengeId: 'challenge-franchise-lakers-v1',
+    displayName: 'Fixture Lakers Core',
+    description: 'Fixture challenge over the committed team.',
+    requirement: {
+      kind: 'franchise-core',
+      franchiseId: 'lakers',
+      minimumRosterCount: 5,
+      minimumStarterCount: 2,
+    },
+    difficultyId: 'pro',
+    firstClearCoins: 450,
+    repeatWinCoins: 45,
+  });
+  const progression = collectionProgressionRulesSchema.parse({
+    schemaVersion: 1,
+    progressionVersion: 'collection-progression-v1',
+    targetingVersion: 'collection-targeting-v1',
+    challengeVersion: 'collection-challenge-v1',
+    challengeRewardVersion: 'collection-challenge-reward-v1',
+    setRewardVersion: 'collection-set-reward-v1',
+    sourceCatalogVersion: 'collection-catalog-v1',
+    sourceCatalogHash: HASH,
+    targetMultiplierBp: 80_000,
+    challenges: [challenge],
+    setRewards: [
+      {
+        setRewardVersion: 'collection-set-reward-v1',
+        setId: 'sharpshooter-set',
+        title: 'Envelope',
+        memberCardIds: [catalog.cards[0]?.cardId as string],
+        currency: 'Exchange',
+        amount: 2000,
+        description: 'Fixture set reward.',
+      },
+    ],
+    display: {
+      challengesTitle: 'Challenges',
+      challengesBlurb: 'Fixture challenges.',
+      targetingBlurb: 'Fixture targeting.',
+      setsTitle: 'Sets',
+      setsBlurb: 'Fixture sets.',
+    },
+    contentDigest: '0'.repeat(32),
+  });
+  return prepareCollectionChallengeGame({
+    collectionId: 'collection-test',
+    rootSeed: '0'.repeat(32),
+    gameSequence: 0,
+    ownedCardIds: new Set(catalog.cards.map((card) => card.cardId)),
+    team,
+    catalog,
+    challengeId: challenge.challengeId,
+    difficultyProfiles: buildCollectionDifficultyProfiles(),
+    objectiveDefinitions: collectionObjectiveDefinitionsFromRules(rules),
+    selectedObjectiveId: null,
+    clearedDifficultyIds: [],
+    clearedChallengeIds: [],
+    progression,
     profileVersion: DEFAULT_ERA_SIM_PROFILE.profileVersion,
     profileHash: HASH,
     catalogHash: HASH,
@@ -227,6 +306,30 @@ describe('collection game runner worker envelope', () => {
       seed: null,
     });
     await expect(promise).rejects.toThrow('worker exploded');
+    expect(worker.terminated).toBe(1);
+  });
+
+  it('resolves a v3 challenge prepared game through the fake runner envelope', async () => {
+    const catalog = buildCatalog();
+    const prepared = buildChallengePrepared(catalog);
+    expect(prepared.gameVersion).toBe('collection-game-v3');
+    const worker = new FakeCollectionWorker();
+    const promise = runCollectionGame({
+      prepared,
+      catalogUrl: 'https://example.test/catalog.json',
+      catalogHash: HASH,
+      profileUrl: 'https://example.test/profile.json',
+      profileHash: HASH,
+      requestId: 'req-challenge-1',
+      createWorker: () => worker as unknown as Worker,
+    });
+    worker.emit(
+      await runFakeCollectionGame(prepared, catalog, DEFAULT_ERA_SIM_PROFILE, 'req-challenge-1'),
+    );
+    const message = await promise;
+    expect(message.type).toBe('collection-game-complete');
+    expect(message.result.gameVersion).toBe('collection-game-v3');
+    expect(message.gameId).toBe(prepared.gameId);
     expect(worker.terminated).toBe(1);
   });
 

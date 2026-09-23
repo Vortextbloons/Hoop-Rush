@@ -1,5 +1,6 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
+  import { page } from '$app/state';
   import '$lib/collection/ultimate-theme.css';
   import { onDestroy } from 'svelte';
   import type {
@@ -102,6 +103,7 @@
   }
 
   async function load(): Promise<void> {
+    returnChallengeId = page.url.searchParams.get('challenge');
     try {
       const [loadedCatalog, loadedManifest, loadedState] = await Promise.all([
         loadCollectionCatalog(),
@@ -238,6 +240,7 @@
 
   const claimed = $derived(collectionState?.claimedWelcome ?? false);
   const balances = $derived(collectionState?.balances ?? { Coins: 0, Exchange: 0 });
+  let returnChallengeId = $state<string | null>(null);
 </script>
 
 <svelte:head>
@@ -260,6 +263,24 @@
   </div>
 
   <p class="sr-only" role="status">{announcement}</p>
+
+  {#if returnChallengeId}
+    <p
+      class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-4 text-sm"
+    >
+      <span>
+        Editing your team for challenge
+        <code class="font-mono text-xs">{returnChallengeId}</code>. Save the team, then return to
+        Play.
+      </span>
+      <a
+        href={resolve(`/collection/play?challenge=${returnChallengeId}` as any)}
+        class="inline-flex min-h-11 items-center rounded-xl bg-surface-2 px-4 py-2 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        Back to challenges
+      </a>
+    </p>
+  {/if}
 
   {#if phase === 'loading'}
     <div class="mt-6">

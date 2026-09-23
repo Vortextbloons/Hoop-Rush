@@ -1,5 +1,8 @@
 import {
+  COLLECTION_COMMAND_VERSION,
+  COLLECTION_GAME_COMMAND_V1_VERSION,
   COLLECTION_GAME_COMMAND_VERSION,
+  COLLECTION_STATE_SCHEMA_VERSION,
   collectionCommandSchema,
   collectionGameCommandSchema,
   collectionPackIdSchema,
@@ -12,25 +15,46 @@ import {
   type CollectionGameEvent,
   type CollectionGameRecordUnion,
   type CollectionGameResultUnion,
+  type CollectionGameResultV3,
   type CollectionGameRules,
   type CollectionLedgerEntry,
   type CollectionObjectiveId,
   type CollectionObjectiveOffer,
   type CollectionPlayState,
+  type CollectionProgressionRules,
   type CollectionPullRecord,
+  type CollectionSetClaimReceipt,
   type CollectionState,
   type EraSimulationProfile,
 } from '@hoop-rush/data-contracts';
 import {
   buildCollectionObjectiveFacts,
   collectionObjectiveDefinitionsFromRules,
+  resolveCollectionChallenge,
 } from '@hoop-rush/engine';
-import { DexieCollectionRepository, HoopRushDatabase } from '@hoop-rush/persistence';
+import {
+  CollectionCommandStaleError,
+  DexieCollectionRepository,
+  HoopRushDatabase,
+} from '@hoop-rush/persistence';
 import { getManifest } from '$lib/data';
 import { resolveAssetUrl } from '$lib/asset-url';
-import { loadCollectionCatalog, loadCollectionGameRules } from './collection-assets.ts';
+import {
+  loadCollectionCatalog,
+  loadCollectionGameRules,
+  loadCollectionProgression,
+} from './collection-assets.ts';
 
 export const COLLECTION_ID = 'collection-1';
+
+export class StaleCollectionPreviewError extends Error {
+  constructor(
+    message = 'The collection changed after this preview was shown. Review the refreshed odds and try again.',
+  ) {
+    super(message);
+    this.name = 'StaleCollectionPreviewError';
+  }
+}
 
 let dbInstance: HoopRushDatabase | null = null;
 export function getCollectionDb(): HoopRushDatabase {
@@ -56,6 +80,7 @@ export async function ensureCollection(nowIso: string): Promise<CollectionState>
     collectionId: COLLECTION_ID,
     rootSeed: randomSeedHex(),
     catalogHash: await collectionCatalogHash(),
+    progressionHash: await collectionProgressionHash(),
     createdAtIso: nowIso,
   });
 }
@@ -65,6 +90,27 @@ export async function collectionCatalogHash(): Promise<string> {
   const entry = manifest.collection?.catalog;
   if (!entry) throw new Error('The collection catalog is unavailable.');
   return entry.contentHash;
+}
+
+export async function collectionProgressionHash(): Promise<string | null> {
+  const manifest = await getManifest();
+  return manifest.collection?.progressionRules?.contentHash ?? null;
+}
+
+interface ProgressionCommandArgs {
+  progression: CollectionProgressionRules | null;
+  progressionHash: string | null;
+}
+
+async function progressionCommandArgs(): Promise<ProgressionCommandArgs> {
+  const manifest = await getManifest();
+  const entry = manifest.collection?.progressionRules;
+  if (!entry) return { progression: null, progressionHash: null };
+  try {
+    return { progression: await loadCollectionProgression(), progressionHash: entry.contentHash };
+  } catch {
+    return { progression: null, progressionHash: null };
+  }
 }
 
 export interface ClaimOutcome {
@@ -83,11 +129,12 @@ export async function claimWelcomeStarter(nowIso: string): Promise<ClaimOutcome>
       collectionId: COLLECTION_ID,
       rootSeed: randomSeedHex(),
       catalogHash: await collectionCatalogHash(),
+      progressionHash: await collectionProgressionHash(),
       createdAtIso: nowIso,
     }));
   const command = collectionCommandSchema.parse({
-    schemaVersion: 1,
-    commandVersion: 'collection-command-v1',
+    schemaVersion: COLLECTION_STATE_SCHEMA_VERSION,
+    commandVersion: COLLECTION_COMMAND_VERSION,
     commandId: crypto.randomUUID(),
     collectionId: COLLECTION_ID,
     expectedRevision: state.revision,
@@ -99,6 +146,7 @@ export async function claimWelcomeStarter(nowIso: string): Promise<ClaimOutcome>
     command,
     catalog,
     catalogHash: await collectionCatalogHash(),
+    ...(await progressionCommandArgs()),
     recordedAtIso: nowIso,
   });
   if (!outcome.pull) throw new Error('The starter claim did not produce cards.');
@@ -112,15 +160,32 @@ export interface PackOutcome {
   catalog: CollectionCatalog;
 }
 
-export async function openPack(packId: string, nowIso: string): Promise<PackOutcome> {
+export interface CollectionPreview {
+  revision: number;
+  digest: string;
+}
+
+function assertPreviewCurrent(state: CollectionState, preview?: CollectionPreview): void {
+  if (preview === undefined) return;
+  if (state.revision !== preview.revision || state.digest !== preview.digest) {
+    throw new StaleCollectionPreviewError();
+  }
+}
+
+export async function openPack(
+  packId: string,
+  nowIso: string,
+  preview?: CollectionPreview,
+): Promise<PackOutcome> {
   const repo = getCollectionRepo();
   const catalog = await loadCollectionCatalog();
   const parsedPackId = collectionPackIdSchema.parse(packId);
   const snapshot = await repo.loadCollection(COLLECTION_ID);
   if (!snapshot) throw new Error('Claim the starter before opening packs.');
+  assertPreviewCurrent(snapshot.state, preview);
   const command = collectionCommandSchema.parse({
-    schemaVersion: 1,
-    commandVersion: 'collection-command-v1',
+    schemaVersion: COLLECTION_STATE_SCHEMA_VERSION,
+    commandVersion: COLLECTION_COMMAND_VERSION,
     commandId: crypto.randomUUID(),
     collectionId: COLLECTION_ID,
     expectedRevision: snapshot.state.revision,
@@ -129,18 +194,89 @@ export async function openPack(packId: string, nowIso: string): Promise<PackOutc
     packId: parsedPackId,
     acquiredAtIso: nowIso,
   });
-  const outcome = await repo.applyCollectionCommand({
-    command,
-    catalog,
-    catalogHash: await collectionCatalogHash(),
-    recordedAtIso: nowIso,
-  });
+  let outcome;
+  try {
+    outcome = await repo.applyCollectionCommand({
+      command,
+      catalog,
+      catalogHash: await collectionCatalogHash(),
+      ...(await progressionCommandArgs()),
+      recordedAtIso: nowIso,
+    });
+  } catch (error) {
+    if (error instanceof CollectionCommandStaleError) throw new StaleCollectionPreviewError();
+    throw error;
+  }
   if (!outcome.pull) throw new Error('The pack did not produce cards.');
   return {
     state: outcome.state,
     pull: outcome.pull,
     ledgerEntries: outcome.ledgerEntries,
     catalog,
+  };
+}
+
+export async function setTargetPlayer(
+  playerId: string | null,
+  nowIso: string,
+): Promise<CollectionState> {
+  const repo = getCollectionRepo();
+  const catalog = await loadCollectionCatalog();
+  const snapshot = await repo.loadCollection(COLLECTION_ID);
+  if (!snapshot) throw new Error('Claim the starter before targeting a player.');
+  const command = collectionCommandSchema.parse({
+    schemaVersion: COLLECTION_STATE_SCHEMA_VERSION,
+    commandVersion: COLLECTION_COMMAND_VERSION,
+    commandId: crypto.randomUUID(),
+    collectionId: COLLECTION_ID,
+    expectedRevision: snapshot.state.revision,
+    expectedDigest: snapshot.state.digest,
+    command: 'set-target-player',
+    playerId,
+  });
+  const outcome = await repo.applyCollectionCommand({
+    command,
+    catalog,
+    catalogHash: await collectionCatalogHash(),
+    ...(await progressionCommandArgs()),
+    recordedAtIso: nowIso,
+  });
+  return outcome.state;
+}
+
+export interface SetClaimOutcome {
+  state: CollectionState;
+  receipt: CollectionSetClaimReceipt | null;
+  ledgerEntries: CollectionLedgerEntry[];
+}
+
+export async function claimSetReward(setId: string, nowIso: string): Promise<SetClaimOutcome> {
+  const repo = getCollectionRepo();
+  const catalog = await loadCollectionCatalog();
+  const snapshot = await repo.loadCollection(COLLECTION_ID);
+  if (!snapshot) throw new Error('Claim the starter before claiming a set.');
+  const command = collectionCommandSchema.parse({
+    schemaVersion: COLLECTION_STATE_SCHEMA_VERSION,
+    commandVersion: COLLECTION_COMMAND_VERSION,
+    commandId: crypto.randomUUID(),
+    collectionId: COLLECTION_ID,
+    expectedRevision: snapshot.state.revision,
+    expectedDigest: snapshot.state.digest,
+    command: 'claim-set-reward',
+    setId,
+    claimedAtIso: nowIso,
+  });
+  const outcome = await repo.applyCollectionCommand({
+    command,
+    catalog,
+    catalogHash: await collectionCatalogHash(),
+    ...(await progressionCommandArgs()),
+    recordedAtIso: nowIso,
+  });
+  return {
+    state: outcome.state,
+    receipt: outcome.setReceipt ?? null,
+    ledgerEntries: outcome.ledgerEntries,
   };
 }
 
@@ -182,12 +318,35 @@ export function collectionObjectiveOffers(input: {
   }).offers;
 }
 
+export function collectionChallengeOffers(input: {
+  progression: CollectionProgressionRules;
+  rules: CollectionGameRules;
+  rootSeed: string;
+  challengeId: string;
+  gameSequence: number;
+  team: CollectionActiveTeam;
+}): CollectionObjectiveOffer[] {
+  const challenge = resolveCollectionChallenge(input.progression, input.challengeId);
+  if (challenge === undefined) throw new Error(`unknown challenge ${input.challengeId}`);
+  return collectionObjectiveOffers({
+    rules: input.rules,
+    rootSeed: input.rootSeed,
+    difficultyId: challenge.difficultyId,
+    gameSequence: input.gameSequence,
+    team: input.team,
+  });
+}
+
 function gameCommandBase(
   playState: CollectionPlayState,
   commandId: string,
+  commandVersion:
+    | typeof COLLECTION_GAME_COMMAND_V1_VERSION
+    | typeof COLLECTION_GAME_COMMAND_VERSION = COLLECTION_GAME_COMMAND_V1_VERSION,
 ): {
   schemaVersion: 1;
-  commandVersion: typeof COLLECTION_GAME_COMMAND_VERSION;
+  commandVersion:
+    typeof COLLECTION_GAME_COMMAND_V1_VERSION | typeof COLLECTION_GAME_COMMAND_VERSION;
   commandId: string;
   collectionId: string;
   expectedRevision: number;
@@ -195,7 +354,7 @@ function gameCommandBase(
 } {
   return {
     schemaVersion: 1,
-    commandVersion: COLLECTION_GAME_COMMAND_VERSION,
+    commandVersion,
     commandId,
     collectionId: COLLECTION_ID,
     expectedRevision: playState.revision,
@@ -215,14 +374,16 @@ export const LEGACY_COLLECTION_CPU_WEIGHTS: CollectionCpuRarityWeights = {
 };
 
 async function gameCommandArgs(recordedAtIso: string) {
-  const [catalog, rules, catalogHash, profile, profileHash, rulesHash] = await Promise.all([
-    loadCollectionCatalog(),
-    loadCollectionGameRules(),
-    collectionCatalogHash(),
-    loadCollectionProfile(),
-    collectionProfileHash(),
-    collectionGameRulesHash(),
-  ]);
+  const [catalog, rules, catalogHash, profile, profileHash, rulesHash, progression] =
+    await Promise.all([
+      loadCollectionCatalog(),
+      loadCollectionGameRules(),
+      collectionCatalogHash(),
+      loadCollectionProfile(),
+      collectionProfileHash(),
+      collectionGameRulesHash(),
+      progressionCommandArgs(),
+    ]);
   return {
     catalog,
     catalogHash,
@@ -232,6 +393,7 @@ async function gameCommandArgs(recordedAtIso: string) {
     cpuWeights: LEGACY_COLLECTION_CPU_WEIGHTS,
     difficultyProfiles: rules.difficulties,
     objectiveDefinitions: collectionObjectiveDefinitionsFromRules(rules),
+    ...progression,
     recordedAtIso,
   };
 }
@@ -350,6 +512,89 @@ export async function acceptBasicGameResult(input: {
 export async function loadCommittedGame(gameId: string): Promise<CollectionGameRecordUnion | null> {
   const repo = getCollectionRepo();
   return repo.getGameRecord(COLLECTION_ID, gameId);
+}
+
+export async function prepareChallengeGame(
+  challengeId: string,
+  objectiveId: CollectionObjectiveId | null,
+  nowIso: string,
+): Promise<PreparedGameOutcome> {
+  const repo = getCollectionRepo();
+  const playState = await ensurePlayState(nowIso);
+  if (playState.pendingGame !== null) {
+    return {
+      playState,
+      gameId: playState.pendingGame.gameId,
+      gameSequence: playState.pendingGame.gameSequence,
+    };
+  }
+  const command: CollectionGameCommand = collectionGameCommandSchema.parse({
+    ...gameCommandBase(playState, crypto.randomUUID(), COLLECTION_GAME_COMMAND_VERSION),
+    command: 'prepare-challenge-game',
+    challengeId,
+    objectiveId,
+  });
+  const outcome = await repo.applyCollectionGameCommand({
+    ...(await gameCommandArgs(nowIso)),
+    command,
+  });
+  if (!outcome.prepared) throw new Error('Preparing the challenge did not produce a matchup.');
+  return {
+    playState: outcome.playState,
+    gameId: outcome.prepared.gameId,
+    gameSequence: outcome.prepared.gameSequence,
+  };
+}
+
+export async function abandonChallengeGame(nowIso: string): Promise<CollectionPlayState> {
+  const repo = getCollectionRepo();
+  const playState = await ensurePlayState(nowIso);
+  const pending = playState.pendingGame;
+  if (pending === null) return playState;
+  if (pending.gameVersion !== 'collection-game-v3') {
+    throw new Error('The pending game is not a challenge game.');
+  }
+  const command = collectionGameCommandSchema.parse({
+    ...gameCommandBase(playState, crypto.randomUUID(), COLLECTION_GAME_COMMAND_VERSION),
+    command: 'abandon-challenge-game',
+    gameId: pending.gameId,
+  });
+  const outcome = await repo.applyCollectionGameCommand({
+    ...(await gameCommandArgs(nowIso)),
+    command,
+  });
+  return outcome.playState;
+}
+
+export async function acceptChallengeGameResult(input: {
+  result: CollectionGameResultV3;
+  events: CollectionGameEvent[];
+  completedAtIso: string;
+  recordedAtIso: string;
+}): Promise<AcceptedGameOutcome> {
+  const repo = getCollectionRepo();
+  const playState = await ensurePlayState(input.recordedAtIso);
+  const pending = playState.pendingGame;
+  if (pending === null) throw new Error('No pending game to complete.');
+  if (pending.gameVersion !== 'collection-game-v3') {
+    throw new Error('The pending game is not a challenge game.');
+  }
+  const command: CollectionGameCommand = collectionGameCommandSchema.parse({
+    ...gameCommandBase(playState, crypto.randomUUID(), COLLECTION_GAME_COMMAND_VERSION),
+    command: 'accept-challenge-game-result',
+    gameId: pending.gameId,
+    result: input.result,
+    events: input.events,
+    completedAtIso: input.completedAtIso,
+  });
+  const outcome = await repo.applyCollectionGameCommand({
+    ...(await gameCommandArgs(input.recordedAtIso)),
+    command,
+  });
+  if (!outcome.record || !outcome.balances) {
+    throw new Error('Completing the game did not produce a record.');
+  }
+  return { playState: outcome.playState, record: outcome.record, balances: outcome.balances };
 }
 
 export async function collectionGameRulesHash(): Promise<string> {

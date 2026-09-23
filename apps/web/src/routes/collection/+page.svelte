@@ -16,7 +16,13 @@
   import CollectionCard from '$lib/collection/CollectionCard.svelte';
   import CardDialog from '$lib/collection/CardDialog.svelte';
   import CollectionNav from '$lib/collection/CollectionNav.svelte';
-  import { loadCollectionCatalog, loadCollectionIndex } from '$lib/collection/collection-assets.ts';
+  import ActiveTarget from '$lib/collection/ActiveTarget.svelte';
+  import SetProgress from '$lib/collection/SetProgress.svelte';
+  import {
+    loadCollectionCatalog,
+    loadCollectionIndex,
+    loadCollectionProgression,
+  } from '$lib/collection/collection-assets.ts';
   import {
     buildBookItems,
     COLLECTION_PAGE_SIZE,
@@ -27,8 +33,23 @@
     type CollectionFilters,
     type CollectionSortId,
   } from '$lib/collection/collection-browser.ts';
-  import { claimWelcomeStarter, ensureCollection } from '$lib/collection/collection-hub.ts';
-  import type { CollectionCatalog, CollectionState } from '@hoop-rush/data-contracts';
+  import {
+    claimSetReward,
+    claimWelcomeStarter,
+    ensureCollection,
+    setTargetPlayer,
+  } from '$lib/collection/collection-hub.ts';
+  import {
+    targetPlayerSummary,
+    targetedSummaryForPlayer,
+  } from '$lib/collection/collection-targeting-view.ts';
+  import { collectionErrorMessage } from '$lib/collection/collection-errors.ts';
+  import { setProgressViews } from '$lib/collection/collection-progression-view.ts';
+  import type {
+    CollectionCatalog,
+    CollectionProgressionRules,
+    CollectionState,
+  } from '@hoop-rush/data-contracts';
 
   let mounted = true;
   onDestroy(() => {
@@ -39,12 +60,19 @@
   let error = $state<string | null>(null);
   let manifest = $state<HoopRushManifest | null>(null);
   let catalog = $state<CollectionCatalog | null>(null);
+  let progression = $state<CollectionProgressionRules | null>(null);
+  let progressionError = $state<string | null>(null);
   let entries = $state<CollectionIndexEntry[]>([]);
   let collectionState = $state<CollectionState | null>(null);
   let claiming = $state(false);
   let claimError = $state<string | null>(null);
   let starterCards = $state<CollectionIndexEntry[]>([]);
   let announcement = $state('');
+  let targetBusy = $state(false);
+  let targetError = $state<string | null>(null);
+  let claimingSetId = $state<string | null>(null);
+  let setClaimError = $state<string | null>(null);
+  let searchInput = $state<HTMLInputElement | undefined>(undefined);
 
   let filters = $state<CollectionFilters>({ ...EMPTY_COLLECTION_FILTERS });
   let sort = $state<CollectionSortId>('default');
@@ -113,6 +141,21 @@
           if (mounted) catalog = loaded;
         })
         .catch(() => {});
+      void loadCollectionProgression()
+        .then((loaded) => {
+          if (mounted) {
+            progression = loaded;
+            progressionError = null;
+          }
+        })
+        .catch((failure: unknown) => {
+          if (!mounted) return;
+          progression = null;
+          progressionError =
+            failure instanceof Error
+              ? failure.message
+              : 'The collection progression rules are unavailable.';
+        });
     } catch (loadError) {
       if (!mounted) return;
       error = loadError instanceof Error ? loadError.message : 'Could not load the collection.';
@@ -158,8 +201,7 @@
       announcement = `Starter claimed. ${String(starterCards.length)} new cards, 3,000 Coins.`;
     } catch (claimFailure) {
       if (!mounted) return;
-      claimError =
-        claimFailure instanceof Error ? claimFailure.message : 'Claim failed. Try again.';
+      claimError = collectionErrorMessage(claimFailure, 'Claim failed. Try again.');
     } finally {
       if (mounted) claiming = false;
     }
@@ -181,6 +223,108 @@
   const selectedSetOwned = $derived(
     selectedSet ? selectedSet.memberCardIds.filter((id) => ownedIds.has(id)).length : 0,
   );
+  const activeTargetId = $derived(collectionState?.activeTargetPlayerId ?? null);
+  const activeTargetSummary = $derived(
+    catalog && activeTargetId ? targetPlayerSummary(catalog, activeTargetId) : null,
+  );
+  const activeTargetLine = $derived(
+    activeTargetId ? targetedSummaryForPlayer(activeTargetSummary, activeTargetId) : '',
+  );
+  const setViews = $derived(
+    progression && catalog && collectionState
+      ? setProgressViews({
+          progression,
+          catalog,
+          ownedCardIds: ownedIds,
+          claimedSetIds: collectionState.claimedSetIds,
+        })
+      : [],
+  );
+  const cardNameOf = $derived((cardId: string) => {
+    return (
+      entries.find((entry) => entry.cardId === cardId)?.displayName ??
+      catalog?.cards.find((entry) => entry.cardId === cardId)?.displayName ??
+      cardId
+    );
+  });
+
+  function retryProgression(): void {
+    progressionError = null;
+    void loadCollectionProgression()
+      .then((loaded) => {
+        if (mounted) progression = loaded;
+      })
+      .catch((failure: unknown) => {
+        if (!mounted) return;
+        progressionError =
+          failure instanceof Error
+            ? failure.message
+            : 'The collection progression rules are unavailable.';
+      });
+  }
+
+  async function targetPlayer(playerId: string): Promise<void> {
+    if (targetBusy) return;
+    targetBusy = true;
+    targetError = null;
+    try {
+      const next = await setTargetPlayer(playerId, new Date().toISOString());
+      if (!mounted) return;
+      collectionState = next;
+      const summary = catalog ? targetPlayerSummary(catalog, playerId) : null;
+      announcement = `Target set: ${summary?.displayName ?? playerId}. All ${
+        summary?.versionCount ?? 0
+      } catalog versions are targeted. Rarity odds do not change.`;
+    } catch (failure) {
+      if (!mounted) return;
+      targetError = collectionErrorMessage(failure, 'Setting the target failed.');
+    } finally {
+      if (mounted) targetBusy = false;
+    }
+  }
+
+  async function clearTarget(): Promise<void> {
+    if (targetBusy) return;
+    targetBusy = true;
+    targetError = null;
+    try {
+      const next = await setTargetPlayer(null, new Date().toISOString());
+      if (!mounted) return;
+      collectionState = next;
+      announcement = 'Target cleared. Packs draw with equal card weights again.';
+    } catch (failure) {
+      if (!mounted) return;
+      targetError = collectionErrorMessage(failure, 'Clearing the target failed.');
+    } finally {
+      if (mounted) targetBusy = false;
+    }
+  }
+
+  async function claimSet(setId: string): Promise<void> {
+    if (claimingSetId !== null) return;
+    claimingSetId = setId;
+    setClaimError = null;
+    try {
+      const outcome = await claimSetReward(setId, new Date().toISOString());
+      if (!mounted) return;
+      collectionState = outcome.state;
+      const title =
+        outcome.receipt?.title ??
+        catalog?.sets.find((entry) => entry.setId === setId)?.title ??
+        setId;
+      const amount = outcome.receipt?.amount ?? 0;
+      announcement = `Claimed ${title}: +${amount.toLocaleString('en-US')} Exchange. Exchange balance is now ${outcome.state.balances.Exchange.toLocaleString('en-US')}.`;
+    } catch (failure) {
+      if (!mounted) return;
+      setClaimError = collectionErrorMessage(failure, 'Claiming the set failed.');
+    } finally {
+      if (mounted) claimingSetId = null;
+    }
+  }
+
+  function inspectCard(cardId: string): void {
+    selectedCardId = cardId;
+  }
   const eligiblePacks = $derived.by(() => {
     if (!selectedCard || !catalog) return [];
     const rarityRank = COLLECTION_RARITY_ORDER.indexOf(selectedCard.rarity);
@@ -302,6 +446,45 @@
     {/if}
 
     {#if collectionState?.claimedWelcome}
+      {#if progressionError}
+        <div class="mt-6">
+          <AsyncState
+            kind="error"
+            title="Targeting and sets unavailable"
+            message={progressionError}
+            retry={retryProgression}
+          />
+        </div>
+      {:else}
+        {#if activeTargetId && catalog}
+          <ActiveTarget
+            playerName={activeTargetSummary?.displayName ?? activeTargetId}
+            summaryLine={activeTargetLine}
+            blurb={progression?.display.targetingBlurb ?? undefined}
+            busy={targetBusy}
+            onChange={() => searchInput?.focus()}
+            onClear={clearTarget}
+          />
+          {#if targetError}
+            <p role="alert" class="mt-2 text-sm text-destructive">{targetError}</p>
+          {/if}
+        {/if}
+        {#if setClaimError}
+          <p role="alert" class="mt-2 text-sm text-destructive">{setClaimError}</p>
+        {/if}
+        {#if setViews.length > 0}
+          <SetProgress
+            views={setViews}
+            title={progression?.display.setsTitle ?? 'Sets'}
+            blurb={progression?.display.setsBlurb ?? undefined}
+            {cardNameOf}
+            busySetId={claimingSetId}
+            onClaim={claimSet}
+            onInspect={inspectCard}
+          />
+        {/if}
+      {/if}
+
       <section
         aria-label="Collection filters"
         class="mt-6 rounded-2xl border border-border bg-card p-4"
@@ -310,6 +493,7 @@
           <label class="flex min-w-48 flex-1 items-center gap-2 rounded-xl bg-surface-2 px-3 py-2">
             <span class="sr-only">Search players</span>
             <input
+              bind:this={searchInput}
               type="search"
               placeholder="Search players"
               bind:value={filters.search}
@@ -507,8 +691,15 @@
     setTotal={selectedSet?.memberCardIds.length ?? 0}
     setTitle={selectedSet?.title ?? null}
     {eligiblePacks}
+    activeTargetPlayerId={activeTargetId}
+    targetingAvailable={progression !== null && catalog !== null}
+    {targetBusy}
+    {targetError}
+    onSetTarget={(playerId) => void targetPlayer(playerId)}
+    onClearTarget={() => void clearTarget()}
     onClose={() => {
       selectedCardId = null;
+      targetError = null;
     }}
   />
 {/if}

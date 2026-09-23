@@ -1635,6 +1635,108 @@ export const collectionGameCalibrateReportSchema = z.object({
 });
 export type CollectionGameCalibrateReport = z.infer<typeof collectionGameCalibrateReportSchema>;
 
+export const collectionProgressionAuditChallengeSchema = z.object({
+  challengeId: z.string().min(1).max(64),
+  displayName: z.string().min(1).max(48),
+  difficultyId: z.string().min(1).max(32),
+  requirementKind: z.enum(['era-core', 'franchise-core', 'set-family-core']),
+  requirementId: z.string().min(1).max(64),
+  minimumRosterCount: z.number().int().min(1).max(12),
+  minimumStarterCount: z.number().int().min(1).max(5),
+  firstClearCoins: z.number().int().positive(),
+  repeatWinCoins: z.number().int().positive(),
+  matchingPlayerCount: z.number().int().nonnegative(),
+  matchingCardCount: z.number().int().nonnegative(),
+  feasible: z.boolean(),
+  feasibilityFailures: z.array(z.string().min(1)),
+});
+export type CollectionProgressionAuditChallenge = z.infer<
+  typeof collectionProgressionAuditChallengeSchema
+>;
+
+export const collectionProgressionAuditTargetSchema = z.object({
+  playerId: z.string().min(1).max(64),
+  packs: z.array(
+    z.object({
+      packId: z.string().min(1).max(32),
+      eligibleCardCount: z.number().int().nonnegative(),
+      atLeastOneTarget: z.number().min(0).max(1),
+      perSlot: z.array(z.number().min(0).max(1)),
+    }),
+  ),
+});
+export type CollectionProgressionAuditTarget = z.infer<
+  typeof collectionProgressionAuditTargetSchema
+>;
+
+export const collectionProgressionAuditSetSchema = z.object({
+  setId: z.string().min(1).max(32),
+  title: z.string().min(1).max(96),
+  ownedCount: z.number().int().nonnegative(),
+  requiredCount: z.number().int().positive(),
+  complete: z.boolean(),
+  claimed: z.boolean(),
+  missingCardIds: z.array(z.string().min(1)),
+  rewardCurrency: z.literal('Exchange'),
+  rewardAmount: z.number().int().positive(),
+});
+export type CollectionProgressionAuditSet = z.infer<typeof collectionProgressionAuditSetSchema>;
+
+export const collectionProgressionAuditStateSchema = z.object({
+  collectionId: z.string().min(1).max(64),
+  revision: z.number().int().nonnegative(),
+  activeTargetPlayerId: z.string().nullable(),
+  claimedSetIds: z.array(z.string().min(1)),
+  sets: z.array(collectionProgressionAuditSetSchema),
+  failures: z.array(z.string().min(1)),
+  firstClearFailures: z.array(z.string().min(1)),
+});
+export type CollectionProgressionAuditState = z.infer<typeof collectionProgressionAuditStateSchema>;
+
+export const collectionProgressionAuditReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('collection progression-audit'),
+  catalogVersion: z.string().min(1).max(64),
+  catalogHash: z.string().regex(/^[0-9a-f]{64}$/),
+  progressionVersion: z.string().min(1).max(64),
+  progressionHash: z.string().regex(/^[0-9a-f]{64}$/),
+  targetMultiplierBp: z.number().int().positive(),
+  challenges: z.array(collectionProgressionAuditChallengeSchema),
+  targets: z.array(collectionProgressionAuditTargetSchema),
+  state: collectionProgressionAuditStateSchema.nullable(),
+  pass: z.boolean(),
+});
+export type CollectionProgressionAuditReport = z.infer<
+  typeof collectionProgressionAuditReportSchema
+>;
+
+export const collectionProgressionCalibrateReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('collection progression-calibrate'),
+  catalogHash: z.string().regex(/^[0-9a-f]{64}$/),
+  progressionRulesHash: z.string().regex(/^[0-9a-f]{64}$/),
+  rulesHash: z.string().regex(/^[0-9a-f]{64}$/),
+  engineVersion: z.string().min(1).max(64),
+  workers: z.number().int().positive(),
+  calibrationSeeds: z.number().int().positive(),
+  validationSeeds: z.number().int().positive(),
+  ordinarySlotDraws: z.number().int().nonnegative(),
+  gates: z.record(z.string().min(1).max(160), z.boolean()),
+  fixtures: z.array(
+    z.object({
+      fixtureId: z.string().min(1).max(64),
+      collectionHash: z.string().regex(/^[0-9a-f]{32}$/),
+    }),
+  ),
+  targetsWritten: z.boolean(),
+  targetsPath: z.string().nullable(),
+  pinned: z.boolean(),
+  durationMs: z.number().nonnegative(),
+});
+export type CollectionProgressionCalibrateReport = z.infer<
+  typeof collectionProgressionCalibrateReportSchema
+>;
+
 export const overallsAuditFlagSchema = z.object({
   displayName: z.string().min(1).max(96),
   playerExternalId: z.string().min(1).max(64),

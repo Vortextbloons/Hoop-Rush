@@ -291,6 +291,28 @@ Commands:
                           --seed-from N --seed-to N --out <path>
                           --manifest <path> --validate <path> --write
                           --workers N --input <run.json> --format <format>
+  collection progression-audit
+                         Audit the pinned collection progression rules: every
+                         challenge requirement, feasibility, and matching player
+                         count, sampled per-pack target odds, and optional
+                         exported-state set/first-clear reconciliation.
+                          --player <playerId>    One catalog player's target odds
+                          --input <bundle.json>  Exported collection bundle
+                          --manifest <path>      Manifest (default packaged)
+  collection progression-calibrate
+                         Calibrate M4.4 targeting, challenge, and set economy:
+                         analytic player/pack target odds, at least 1,000,000
+                         simulated ordinary targeted slot draws across tuning
+                         and disjoint held-out seeds, challenge/standard game
+                         cohorts, set claim states, and the M4.3 repeat-rate
+                         envelope. Writes and hash-pins
+                         collection/progression-targets.json.
+                          --workers N            Worker threads (default 8)
+                          --calibration-seeds N  Tuning seed roots (default 6)
+                          --validation-seeds N   Held-out seed roots (default 4)
+                          --out <path>           Artifact path (default packaged)
+                          --manifest <path>      Manifest (default packaged)
+                          --validate <path>      Re-validate a written artifact
   import ratings         Derive ratings/tendencies/traits/contracts from fetched
                          raw-data roster + season-stats (Python stays the fetch
                          layer only). --seasons 2024-25,2023-24 (comma-separated)
