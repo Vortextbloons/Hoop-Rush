@@ -342,7 +342,13 @@ export function createFixedFiveTransport(options?: {
       .from('fixed_five_room_members')
       .select('participant_id, online, ready, picks_committed, locked, last_seen_at')
       .eq('room_id', roomId);
-    if (memberResponse.error) throw new Error(`members failed: ${memberResponse.error.message}`);
+    if (
+      memberResponse.error ||
+      !Array.isArray(memberResponse.data) ||
+      memberResponse.data.length === 0
+    ) {
+      throw new Error('members failed: cannot verify room membership');
+    }
     const row = roomData as FixedFiveRoomRow;
     const memberData: unknown = memberResponse.data;
     const memberRows = (Array.isArray(memberData) ? memberData : []) as FixedFiveMemberRow[];
@@ -358,7 +364,15 @@ export function createFixedFiveTransport(options?: {
     try {
       const snapshot = await fetchSnapshot(roomId);
       emit(roomId, snapshot);
-    } catch {}
+    } catch (error) {
+      const record = rooms.get(roomId);
+      if (!record) return;
+      record.lastSnapshot = null;
+      console.error('Fixed-five realtime refresh failed; snapshot invalidated', {
+        roomId,
+        errorType: error instanceof Error ? error.name : 'UnknownError',
+      });
+    }
   }
   return {
     async create(settingsInput) {

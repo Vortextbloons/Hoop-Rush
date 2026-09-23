@@ -57,11 +57,7 @@ import type {
   SeasonRunRepository,
   SeasonRunSnapshot,
 } from '@hoop-rush/persistence';
-import {
-  isSeasonRunIncompatibleError,
-  SeasonRunLoadError,
-  type SeasonRunIncompatibleInfo,
-} from '@hoop-rush/persistence';
+import { SeasonRunLoadError } from '@hoop-rush/persistence';
 import { newSeasonId } from './season-ids';
 import { sleep } from '$lib/sleep';
 import {
@@ -234,7 +230,6 @@ export class SeasonHubState {
   block: BlockRunState = { ...IDLE_BLOCK };
   postseason: SeasonPostseasonProgress = { ...IDLE_POSTSEASON };
   error: SeasonRunLoadDiagnostic | null = null;
-  incompatible: SeasonRunIncompatibleInfo | null = null;
   pending: SeasonPendingBlockCandidate | null = null;
   interruption: SeasonInvalidRosterInterruption | null = null;
   commandError: SeasonRunCommandError | null = null;
@@ -422,26 +417,10 @@ export class SeasonHubState {
         this.snapshot = getCachedSeasonSnapshot() ?? local;
         this.index = index;
         this.error = null;
-        this.incompatible = null;
         this.emit();
         return;
       }
-      let snapshot: SeasonRunSnapshot | null;
-      try {
-        snapshot = await this.repo.loadActiveRun();
-        this.incompatible = null;
-      } catch (error) {
-        if (isSeasonRunIncompatibleError(error)) {
-          const info: SeasonRunIncompatibleInfo = error.info;
-          this.snapshot = null;
-          this.index = index;
-          this.incompatible = info;
-          this.error = null;
-          this.emit();
-          return;
-        }
-        throw error;
-      }
+      const snapshot: SeasonRunSnapshot | null = await this.repo.loadActiveRun();
       this.snapshot = snapshot;
       this.index = index;
       if (snapshot !== null) {
@@ -480,21 +459,14 @@ export class SeasonHubState {
             }
           : null;
     } catch (error) {
+      this.snapshot = null;
+      this.index = null;
+      this.pending = null;
+      this.interruption = null;
+      clearCachedSeasonSnapshot();
       this.error = seasonRunLoadDiagnosticOf(error);
     }
     this.emit();
-  }
-  async discardIncompatibleRun(): Promise<void> {
-    const incompatible = this.incompatible;
-    if (incompatible === null) return;
-    this.teardownRunners();
-    await this.repo.clearSeasonRun(incompatible.runId);
-    clearCachedSeasonSnapshot();
-    this.channel.announce({ kind: 'clear', runId: incompatible.runId, committedAt: this.now() });
-    this.incompatible = null;
-    this.snapshot = null;
-    this.index = null;
-    await this.refresh();
   }
   async clearSeasonData(): Promise<{
     ok: boolean;
@@ -506,7 +478,6 @@ export class SeasonHubState {
       const { DexieSeasonDraftRepository } = await import('@hoop-rush/persistence');
       await new DexieSeasonDraftRepository().clearSeasonDraft();
       clearCachedSeasonSnapshot();
-      this.incompatible = null;
       this.snapshot = null;
       this.index = null;
       this.pending = null;

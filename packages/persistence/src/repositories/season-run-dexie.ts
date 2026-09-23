@@ -35,7 +35,6 @@ import {
   SEASON_HEALTH_VERSION,
   seasonHealthStateSchema,
   SEASON_RUN_SAVE_SCHEMA_VERSION,
-  SEASON_RUN_SCHEMA_VERSION,
   type SeasonAcceptedBlock,
   type SeasonActiveRunIndex,
   type SeasonCampaignState,
@@ -102,7 +101,6 @@ import {
   SeasonRunCommandStaleStateError,
   type CommitSeasonBlockInput,
   type SeasonRunCommandApplication,
-  type SeasonRunIncompatibleInfo,
   type SeasonRunRepository,
   type SeasonRunSnapshot,
 } from './season-run.ts';
@@ -143,7 +141,7 @@ function SEASON_RUN_SCOPED_TABLES(db: HoopRushDatabase): Table<unknown>[] {
     db.seasonRunPlayerSlices,
   ] as Table<unknown>[];
 }
-function isDevelopmentRow(row: unknown): boolean {
+function hasUnsupportedSaveSchema(row: unknown): boolean {
   if (typeof row !== 'object' || row === null) return false;
   const version = (
     row as {
@@ -152,45 +150,27 @@ function isDevelopmentRow(row: unknown): boolean {
   ).saveSchemaVersion;
   return typeof version === 'number' && version !== SEASON_RUN_SAVE_SCHEMA_VERSION;
 }
-export class SeasonRunIncompatibleError extends Error {
-  readonly info: SeasonRunIncompatibleInfo;
-  constructor(info: SeasonRunIncompatibleInfo) {
-    super(
-      `stored Season Run was made under older rules (schema ${String(info.storedRunSchemaVersion)}); ` +
-        `it cannot continue and must be discarded explicitly. ${LIVE_SEASON_RUN_VERSION_MESSAGE}`,
-    );
-    this.name = 'SeasonRunIncompatibleError';
-    this.info = info;
-  }
+function unsupportedSaveVersionError(row: unknown): SeasonRunLoadError {
+  const version =
+    typeof row === 'object' && row !== null
+      ? (row as { saveSchemaVersion?: unknown }).saveSchemaVersion
+      : undefined;
+  return new SeasonRunLoadError(
+    [
+      `stored save schema ${typeof version === 'number' ? String(version) : 'unknown'} does not match current schema ${String(SEASON_RUN_SAVE_SCHEMA_VERSION)}`,
+    ],
+    `This saved season uses an unsupported version. Restart the season to continue. ${LIVE_SEASON_RUN_VERSION_MESSAGE}`,
+    'SEASON_RUN_VERSION_UNSUPPORTED',
+  );
 }
-export function isSeasonRunIncompatibleError(error: unknown): error is SeasonRunIncompatibleError {
-  return error instanceof SeasonRunIncompatibleError;
-}
-function incompatibleInfoOf(row: unknown): SeasonRunIncompatibleInfo | null {
-  if (typeof row !== 'object' || row === null) return null;
-  const record = row as {
-    saveSchemaVersion?: unknown;
-    run?: {
-      runId?: unknown;
-      versions?: {
-        runSchemaVersion?: unknown;
-      };
-    };
-  };
-  const saveVersion = record.saveSchemaVersion;
-  if (typeof saveVersion !== 'number' || saveVersion === SEASON_RUN_SAVE_SCHEMA_VERSION) {
-    return null;
-  }
-  const runSchemaVersion =
-    typeof record.run?.versions?.runSchemaVersion === 'number'
-      ? record.run.versions.runSchemaVersion
-      : SEASON_RUN_SCHEMA_VERSION - 1;
-  return {
-    storedSaveSchemaVersion:
-      typeof saveVersion === 'number' ? saveVersion : SEASON_RUN_SAVE_SCHEMA_VERSION,
-    storedRunSchemaVersion: runSchemaVersion,
-    runId: typeof record.run?.runId === 'string' ? record.run.runId : 'unknown-legacy-run',
-  };
+function unsupportedRulesVersionError(): SeasonRunLoadError {
+  return new SeasonRunLoadError(
+    [
+      `stored Season Run rule versions do not match the current versions: ${LIVE_SEASON_RUN_VERSION_MESSAGE}`,
+    ],
+    `This saved season uses an unsupported version. Restart the season to continue. ${LIVE_SEASON_RUN_VERSION_MESSAGE}`,
+    'SEASON_RUN_VERSION_UNSUPPORTED',
+  );
 }
 interface SeasonRunRepositoryOptions {
   schedule?: SeasonSchedule;
@@ -262,16 +242,8 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
     seasonScheduleSchema.parse(schedule);
     const checkpoint = await this.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
     if (checkpoint === undefined) return null;
-    if (isDevelopmentRow(checkpoint)) {
-      const info = incompatibleInfoOf(checkpoint);
-      if (info !== null) {
-        throw new SeasonRunIncompatibleError(info);
-      }
-      throw new SeasonRunLoadError(
-        ['stored Season Run checkpoint failed schema validation'],
-        'stored Season Run checkpoint is unidentifiable',
-        'SEASON_RUN_CHECKPOINT_UNIDENTIFIABLE',
-      );
+    if (hasUnsupportedSaveSchema(checkpoint)) {
+      throw unsupportedSaveVersionError(checkpoint);
     }
     return this.loadValidated(checkpoint, schedule);
   }
@@ -296,10 +268,6 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
     try {
       probe = storedSeasonRunRecordSchema.parse(checkpoint);
     } catch (error) {
-      const info = incompatibleInfoOf(checkpoint);
-      if (info !== null) {
-        throw new SeasonRunIncompatibleError(info);
-      }
       throw new SeasonRunLoadError(
         ['stored Season Run checkpoint failed schema validation'],
         `corrupt Season Run checkpoint: ${errorMessage(error)}`,
@@ -307,16 +275,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
       );
     }
     if (!isLiveSeasonRunVersions(probe.run.versions)) {
-      const info = incompatibleInfoOf(checkpoint) ?? {
-        storedSaveSchemaVersion:
-          (checkpoint as { saveSchemaVersion?: number }).saveSchemaVersion ??
-          SEASON_RUN_SAVE_SCHEMA_VERSION,
-        storedRunSchemaVersion: probe.run.versions.runSchemaVersion,
-        runId: probe.run.runId,
-      };
-      throw new SeasonRunIncompatibleError({
-        ...info,
-      });
+      throw unsupportedRulesVersionError();
     }
     const snapshot = await this.db.transaction(
       'r',
@@ -348,10 +307,6 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
     try {
       stored = storedSeasonRunRecordSchema.parse(snapshot.active);
     } catch (error) {
-      const info = incompatibleInfoOf(snapshot.active);
-      if (info !== null) {
-        throw new SeasonRunIncompatibleError(info);
-      }
       throw new SeasonRunLoadError(
         ['stored Season Run checkpoint failed schema validation'],
         `corrupt Season Run checkpoint: ${errorMessage(error)}`,
@@ -359,16 +314,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
       );
     }
     if (!isLiveSeasonRunVersions(stored.run.versions)) {
-      const info = incompatibleInfoOf(snapshot.active) ?? {
-        storedSaveSchemaVersion:
-          (snapshot.active as { saveSchemaVersion?: number }).saveSchemaVersion ??
-          SEASON_RUN_SAVE_SCHEMA_VERSION,
-        storedRunSchemaVersion: stored.run.versions.runSchemaVersion,
-        runId: stored.run.runId,
-      };
-      throw new SeasonRunIncompatibleError({
-        ...info,
-      });
+      throw unsupportedRulesVersionError();
     }
     const failures: string[] = [];
     const runId = stored.run.runId;
@@ -558,15 +504,8 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
       );
     }
     const preflight: unknown = await this.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
-    if (preflight !== undefined && isDevelopmentRow(preflight)) {
-      const info = incompatibleInfoOf(preflight);
-      throw new SeasonRunIncompatibleError(
-        info ?? {
-          storedSaveSchemaVersion: SEASON_RUN_SAVE_SCHEMA_VERSION,
-          storedRunSchemaVersion: SEASON_RUN_SCHEMA_VERSION - 1,
-          runId: 'unknown-legacy-run',
-        },
-      );
+    if (preflight !== undefined && hasUnsupportedSaveSchema(preflight)) {
+      throw unsupportedSaveVersionError(preflight);
     }
     await this.db.transaction(
       'rw',
@@ -1259,15 +1198,8 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
         }
         const existing = await this.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
         if (existing !== undefined) {
-          if (isDevelopmentRow(existing)) {
-            const info = incompatibleInfoOf(existing);
-            throw new SeasonRunIncompatibleError(
-              info ?? {
-                storedSaveSchemaVersion: SEASON_RUN_SAVE_SCHEMA_VERSION,
-                storedRunSchemaVersion: SEASON_RUN_SCHEMA_VERSION - 1,
-                runId: 'unknown-legacy-run',
-              },
-            );
+          if (hasUnsupportedSaveSchema(existing)) {
+            throw unsupportedSaveVersionError(existing);
           }
           const existingParsed = storedSeasonRunRecordSchema.safeParse(existing);
           const existingRunId = existingParsed.success

@@ -515,7 +515,7 @@ describe('season run repository (dexie)', () => {
     await expect(repo.loadActiveRunWithSchedule(invalidSchedule as never)).rejects.toThrow();
   });
 });
-describe('season run development-row auto-clear (M2.4)', () => {
+describe('season run unsupported-version handling', () => {
   function developmentV1Row(runId: string): Record<string, unknown> {
     return {
       recordId: SEASON_RUN_RECORD_ID,
@@ -572,35 +572,33 @@ describe('season run development-row auto-clear (M2.4)', () => {
       effects: mutate(structuredClone(row.effects)),
     });
   }
-  it('reports a stored v1 row as typed incompatible on every load path and preserves it', async () => {
+  it('rejects a stored v1 row as an unsupported version on every load path', async () => {
     const adapters = makeAdapters();
     const { db, repo, run } = adapters;
     await db.seasonRuns.put(developmentV1Row(run.runId) as never);
     await expect(repo.loadActiveRun()).rejects.toMatchObject({
-      name: 'SeasonRunIncompatibleError',
-      info: {
-        storedSaveSchemaVersion: 1,
-        storedRunSchemaVersion: 4,
-        runId: run.runId,
-      },
+      name: 'SeasonRunLoadError',
+      code: 'SEASON_RUN_VERSION_UNSUPPORTED',
     });
     expect(await db.seasonRuns.count()).toBe(1);
     await expect(repo.loadActiveRunWithSchedule(adapters.schedule)).rejects.toMatchObject({
-      name: 'SeasonRunIncompatibleError',
+      name: 'SeasonRunLoadError',
+      code: 'SEASON_RUN_VERSION_UNSUPPORTED',
     });
     expect(await db.seasonRuns.count()).toBe(1);
   });
-  it('reports a stored v2 row as typed incompatible and preserves it', async () => {
+  it('rejects a stored v2 row as an unsupported version', async () => {
     const adapters = makeAdapters();
     const { db, repo } = adapters;
     await db.seasonRuns.put(developmentV2Row(adapters) as never);
     await expect(repo.loadActiveRun()).rejects.toMatchObject({
-      name: 'SeasonRunIncompatibleError',
+      name: 'SeasonRunLoadError',
+      code: 'SEASON_RUN_VERSION_UNSUPPORTED',
     });
     expect(await db.seasonRuns.count()).toBe(1);
     expect(await db.seasonRunIndex.count()).toBe(0);
   });
-  it('never deletes legacy rows with their summaries, details, and blocks', async () => {
+  it('preserves unsupported saves until the explicit restart flow clears them', async () => {
     const adapters = makeAdapters();
     const { db, repo, run } = adapters;
     await db.seasonRuns.put(developmentV1Row(run.runId) as never);
@@ -631,7 +629,8 @@ describe('season run development-row auto-clear (M2.4)', () => {
       }),
     );
     await expect(repo.loadActiveRun()).rejects.toMatchObject({
-      name: 'SeasonRunIncompatibleError',
+      name: 'SeasonRunLoadError',
+      code: 'SEASON_RUN_VERSION_UNSUPPORTED',
     });
     expect(await db.seasonRuns.count()).toBe(1);
     expect(await db.seasonRunIndex.count()).toBe(1);
@@ -639,19 +638,21 @@ describe('season run development-row auto-clear (M2.4)', () => {
     expect(await db.seasonRunDetails.count()).toBe(0);
     expect(await db.seasonRunBlocks.count()).toBe(0);
   });
-  it('commit and promotion reject legacy rows instead of silently rewriting them', async () => {
+  it('commit and promotion reject unsupported rows instead of silently rewriting them', async () => {
     const adapters = makeAdapters();
     const { db, repo, run } = adapters;
     await db.seasonRuns.put(developmentV1Row(run.runId) as never);
     await expect(repo.commitSeasonBlock(commitInputFor(adapters, 0))).rejects.toMatchObject({
-      name: 'SeasonRunIncompatibleError',
+      name: 'SeasonRunLoadError',
+      code: 'SEASON_RUN_VERSION_UNSUPPORTED',
     });
     expect(await db.seasonRuns.count()).toBe(1);
     await db.seasonRuns.put(developmentV2Row(adapters) as never);
     await expect(
       repo.promoteSeasonDraftToRun(buildFixtureStoredDraft(run), run),
     ).rejects.toMatchObject({
-      name: 'SeasonRunIncompatibleError',
+      name: 'SeasonRunLoadError',
+      code: 'SEASON_RUN_VERSION_UNSUPPORTED',
     });
     expect(await db.seasonRuns.count()).toBe(1);
   });
@@ -820,7 +821,7 @@ describe('season run development-row auto-clear (M2.4)', () => {
     }
   });
 });
-describe('season run migration', () => {
+describe('season run storage upgrades', () => {
   afterEach(restoreIndexedDb);
   it('opens a v5-era save at schema version 6 and keeps the stored draft intact', async () => {
     resetIndexedDb();
@@ -852,9 +853,9 @@ describe('season run migration', () => {
     expect(snapshot?.run.games).toHaveLength(1230);
     expect(await seasonDraft.loadSeasonDraft()).toBeNull();
   });
-  it('preserves pre-v10 season rows through migration and requires an explicit reset', async () => {
+  it('rejects unsupported pre-v10 season rows and allows them to be cleared', async () => {
     resetIndexedDb();
-    const runId = 'legacy-migration-run';
+    const runId = 'unsupported-version-run';
     const legacyDb = new Dexie('hoop-rush-saves');
     legacyDb.version(1).stores({ active: 'recordId', completed: 'recordId', history: 'recordId' });
     legacyDb.version(2).stores({
@@ -911,11 +912,12 @@ describe('season run migration', () => {
       seam: buildStubSeasonEngineSeam(),
     });
     await expect(seasonRun.loadActiveRun()).rejects.toMatchObject({
-      name: 'SeasonRunIncompatibleError',
+      name: 'SeasonRunLoadError',
+      code: 'SEASON_RUN_VERSION_UNSUPPORTED',
     });
     expect(await db.seasonRuns.count()).toBe(1);
     expect(await db.seasonRunIndex.count()).toBe(1);
-    await seasonRun.clearSeasonRun(runId);
+    await seasonRun.forceClearActiveSeasonRun();
     expect(await db.seasonRuns.count()).toBe(0);
     expect(await db.seasonRunIndex.count()).toBe(0);
   });
@@ -1854,12 +1856,12 @@ describe('season run M2.5 reload audit (v5)', () => {
     ).rejects.toThrow(/does not advance/);
     expect((await repo.loadActiveRun())?.acceptedBlocks).toHaveLength(1);
   });
-  it('a stored save-schema-v3 row (M2.4) is reported typed incompatible and preserved', async () => {
+  it('a stored save-schema-v3 row is rejected and left for the restart flow to clear', async () => {
     const adapters = makeAdapters();
     const { db, repo, run } = adapters;
     const fixture = buildFixtureRun({ runId: run.runId });
     const { games: _games, ...runWithoutGames } = fixture;
-    const legacyRun = {
+    const unsupportedRun = {
       ...runWithoutGames,
       schemaVersion: 7,
       versions: { ...runWithoutGames.versions, runSchemaVersion: 7 },
@@ -1867,7 +1869,7 @@ describe('season run M2.5 reload audit (v5)', () => {
     const row = {
       recordId: SEASON_RUN_RECORD_ID,
       saveSchemaVersion: 3,
-      run: legacyRun,
+      run: unsupportedRun,
       completedRounds: 0,
       revision: 0,
       lastCommandId: null,
@@ -1881,11 +1883,8 @@ describe('season run M2.5 reload audit (v5)', () => {
     };
     await db.seasonRuns.put(row as never);
     await expect(repo.loadActiveRun()).rejects.toMatchObject({
-      name: 'SeasonRunIncompatibleError',
-      info: {
-        storedSaveSchemaVersion: 3,
-        storedRunSchemaVersion: 7,
-      },
+      name: 'SeasonRunLoadError',
+      code: 'SEASON_RUN_VERSION_UNSUPPORTED',
     });
     expect(await db.seasonRuns.count()).toBe(1);
   });

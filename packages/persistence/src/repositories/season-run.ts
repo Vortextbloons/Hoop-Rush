@@ -69,11 +69,6 @@ export interface SeasonRunSnapshot {
   acceptedBlocks: SeasonAcceptedBlock[];
   effects: SeasonEffectsState;
 }
-export interface SeasonRunIncompatibleInfo {
-  storedSaveSchemaVersion: number;
-  storedRunSchemaVersion: number;
-  runId: string;
-}
 export interface SeasonRunCommandApplication {
   runId: string;
   command: SeasonRunCommand;

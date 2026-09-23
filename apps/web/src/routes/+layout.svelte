@@ -19,9 +19,7 @@
   ];
   const routeId = $derived(page.route.id);
   const isMultiplayerLobby = $derived(routeId === '/multiplayer');
-  const isUltimate = $derived(
-    routeId === '/collection' || routeId?.startsWith('/collection/') === true,
-  );
+  const isUltimate = $derived(routeId?.startsWith('/ultimate/run') === true);
   const showBottomNav = $derived(
     routeId === '/' || routeId === '/roster' || routeId === '/multiplayer',
   );
@@ -46,58 +44,60 @@
 
 <ModeWatcher />
 
-<header class="border-b border-border/70">
-  <div class="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-3 sm:px-6">
-    <a
-      href={homeHref}
-      class="flex items-center gap-2.5 text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-    >
-      <img
-        src={isUltimate ? asset('/ultimate/logo.png') : asset('/app-icon-96.png')}
-        alt=""
-        class="h-9 w-9 rounded-lg object-contain"
-        width="36"
-        height="36"
-        fetchpriority="high"
-        decoding="async"
-      />
-      <span class="font-display text-2xl font-extrabold tracking-tight">
-        Hoop <span class={isUltimate ? 'text-accent' : 'text-primary'}>Rush</span>
-      </span>
-    </a>
-    <div class="flex shrink-0 items-center gap-2">
-      <ArenaSoundToggle />
-      {#if isUltimate}
-        <a
-          href={homeHref}
-          aria-label="Back to home"
-          class="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-muted-foreground outline-none transition-colors hover:bg-surface-2 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <ArrowLeft class="h-4 w-4 shrink-0" />
-          Back
-        </a>
-      {:else if showBottomNav}
-        <nav aria-label="Main navigation" class="hidden items-center gap-1 md:flex">
-          {#each navItems as item (item.id)}
-            {@const active = isActive(item)}
-            <a
-              href={resolve(item.href as any)}
-              aria-current={active ? 'page' : undefined}
-              onpointerenter={() => warmForRoster(item.id)}
-              onfocus={() => warmForRoster(item.id)}
-              class="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring {active
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:bg-surface-2 hover:text-foreground'}"
-            >
-              <item.icon class="h-4 w-4 shrink-0" />
-              {item.label}
-            </a>
-          {/each}
-        </nav>
-      {/if}
+{#if !isUltimate}
+  <header class="border-b border-border/70">
+    <div class="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-3 sm:px-6">
+      <a
+        href={homeHref}
+        class="flex items-center gap-2.5 text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <img
+          src={isUltimate ? asset('/ultimate/logo.png') : asset('/app-icon-96.png')}
+          alt=""
+          class="h-9 w-9 rounded-lg object-contain"
+          width="36"
+          height="36"
+          fetchpriority="high"
+          decoding="async"
+        />
+        <span class="font-display text-2xl font-extrabold tracking-tight">
+          Hoop <span class={isUltimate ? 'text-accent' : 'text-primary'}>Rush</span>
+        </span>
+      </a>
+      <div class="flex shrink-0 items-center gap-2">
+        <ArenaSoundToggle />
+        {#if isUltimate}
+          <a
+            href={homeHref}
+            aria-label="Back to home"
+            class="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-muted-foreground outline-none transition-colors hover:bg-surface-2 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <ArrowLeft class="h-4 w-4 shrink-0" />
+            Back
+          </a>
+        {:else if showBottomNav}
+          <nav aria-label="Main navigation" class="hidden items-center gap-1 md:flex">
+            {#each navItems as item (item.id)}
+              {@const active = isActive(item)}
+              <a
+                href={resolve(item.href as any)}
+                aria-current={active ? 'page' : undefined}
+                onpointerenter={() => warmForRoster(item.id)}
+                onfocus={() => warmForRoster(item.id)}
+                class="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring {active
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-surface-2 hover:text-foreground'}"
+              >
+                <item.icon class="h-4 w-4 shrink-0" />
+                {item.label}
+              </a>
+            {/each}
+          </nav>
+        {/if}
+      </div>
     </div>
-  </div>
-</header>
+  </header>
+{/if}
 
 <main class="min-w-0 overflow-x-clip">
   {@render children()}

@@ -7,7 +7,7 @@
 -- scratch table, so pgTAP state is never role-switched.
 
 begin;
-select plan(113);
+select plan(127);
 
 -- 1. Schema.
 select has_table('public', 'fixed_five_rooms', 'fixed_five_rooms exists');
@@ -74,6 +74,45 @@ select has_function('public', 'fixed_five_versions_valid', array['jsonb'], 'vers
 select has_function('public', 'fixed_five_cron_tick', array[]::text[], 'cron exists');
 select has_policy('public', 'fixed_five_room_members', 'ff members read room membership');
 select col_type_is('public', 'fixed_five_server_versions', 'value', 'text', 'server version values are text');
+select has_function('public', 'fixed_five_random_code', array[]::text[], 'cryptographic room-code generator exists');
+select is(
+  has_function_privilege('authenticated', 'public.fixed_five_room_create(text,text,text,jsonb)', 'EXECUTE'),
+  true, 'authenticated can create fixed-five rooms');
+select is(
+  has_function_privilege('anon', 'public.fixed_five_room_create(text,text,text,jsonb)', 'EXECUTE'),
+  false, 'anon cannot create fixed-five rooms');
+select is(
+  (select count(*)::int
+   from pg_proc p
+   cross join lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) acl
+   where p.oid = 'public.fixed_five_room_create(text,text,text,jsonb)'::regprocedure
+     and acl.grantee = 0
+     and acl.privilege_type = 'EXECUTE'),
+  0, 'room creation is not executable by PUBLIC');
+select is(
+  has_function_privilege('authenticated', 'public.fixed_five_random_code()', 'EXECUTE'),
+  false, 'authenticated cannot call the internal room-code generator');
+select is(
+  has_function_privilege('anon', 'public.fixed_five_random_code()', 'EXECUTE'),
+  false, 'anon cannot call the internal room-code generator');
+select matches(public.fixed_five_random_code(), '^[0-9]{4}$', 'generated room codes preserve four digits');
+select is(
+  (select count(distinct public.fixed_five_random_code()) > 100 from generate_series(1, 128)),
+  true, 'generated room codes have broad sample diversity');
+select ok(
+  position('extensions.gen_random_bytes' in pg_get_functiondef('public.fixed_five_random_code()'::regprocedure)) > 0,
+  'room-code entropy comes from pgcrypto');
+select is(
+  position('random()' in pg_get_functiondef('public.fixed_five_random_code()'::regprocedure)),
+  0, 'room-code generator does not use PostgreSQL random()');
+select is(
+  (select count(*)::int from pg_policies where schemaname = 'public' and tablename = 'fixed_five_room_members' and cmd <> 'SELECT'),
+  0, 'memberships have no direct client write policies');
+select is(
+  (select relrowsecurity from pg_class where oid = 'public.fixed_five_room_members'::regclass),
+  true, 'room memberships have RLS enabled');
+select ok(to_regprocedure('public.season_room_create(text,text)') is null, 'legacy season room-create RPC is removed');
+select ok(to_regprocedure('public.season_room_create(text,text,text)') is null, 'legacy season room-create mode overload is removed');
 
 -- 2. Behavioral harness.
 create table public.ff_pgtap_ctx (name text primary key, value text);

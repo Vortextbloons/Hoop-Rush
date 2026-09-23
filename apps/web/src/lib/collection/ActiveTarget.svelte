@@ -41,7 +41,7 @@
       </button>
     {:else}
       <a
-        href={resolve('/collection')}
+        href={resolve('/ultimate/run/collection' as any)}
         class="inline-flex min-h-11 items-center rounded-xl bg-surface-2 px-4 py-2 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         Change target

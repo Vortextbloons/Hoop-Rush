@@ -18,14 +18,25 @@ test.describe('collection: starter and packs', () => {
     await page.getByPlaceholder('Search players').fill('');
 
     await page.getByRole('link', { name: 'Packs' }).click();
-    await expect(page.getByRole('heading', { name: 'Pack store' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Choose a pack' })).toBeVisible();
     await expect(page.getByRole('button', { name: /Open for 100 Coins/ })).toBeVisible();
 
     await page.getByRole('button', { name: /Open for 100 Coins/ }).click();
+    await expect(page.getByRole('button', { name: 'Skip' })).toBeFocused();
+    await page.getByRole('button', { name: 'Skip' }).click();
     await expect(page.getByRole('heading', { name: 'Pack opened' })).toBeVisible();
-    await expect(page.getByText('balances now')).toBeVisible();
+    await expect(page.getByText('Coins now')).toBeVisible();
 
     await page.reload();
     await expect(page.getByRole('heading', { name: 'Pack opened' })).toBeVisible();
+    await page.getByRole('button', { name: 'Take cards' }).click();
+
+    await page.getByRole('button', { name: /Open for 300 Coins/ }).click();
+    await page.getByRole('button', { name: 'Show all cards' }).click();
+    await expect(page.getByRole('heading', { name: 'Pack opened' })).toBeVisible();
+    await expect(
+      page.getByRole('list', { name: 'Cards in this pack' }).getByRole('listitem'),
+    ).toHaveCount(3);
+    await page.getByRole('button', { name: 'Take cards' }).click();
   });
 });

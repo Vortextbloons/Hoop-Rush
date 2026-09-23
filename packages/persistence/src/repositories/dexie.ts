@@ -336,6 +336,7 @@ export class HoopRushDatabase extends Dexie {
       fixedFiveCompleted: 'roomId',
       fixedFiveHistory: 'recordId, completedAtIso',
     });
+    // Preserve shipped no-op releases in the append-only Dexie version chain.
     this.version(16).stores(HOOP_RUSH_DATABASE_STORES);
     this.version(17).stores(HOOP_RUSH_DATABASE_STORES);
     this.version(18).stores(HOOP_RUSH_DATABASE_STORES);

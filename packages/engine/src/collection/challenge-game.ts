@@ -22,12 +22,18 @@ import {
   type CollectionProgressionRules,
 } from '@hoop-rush/data-contracts';
 import { validateCollectionActiveTeam } from './active-team.ts';
-import { validateCollectionChallengeTeam } from './challenges.ts';
+import {
+  assertCollectionChallengeFeasible,
+  validateCollectionChallengeTeam,
+} from './challenges.ts';
 import { generateCollectionCpuTeamV2 } from './cpu.ts';
 import { resolveDifficultyRatingAdjustments } from './difficulty.ts';
 import { CollectionGameError, collectionPreparedInputDigest } from './game.ts';
 import { buildCollectionObjectiveFacts } from './objectives.ts';
-import { resolveCollectionChallenge } from './progression.ts';
+import {
+  resolveCollectionChallenge,
+  validateCollectionProgressionRules,
+} from './progression.ts';
 import { collectionGameIdV2, collectionGameSeedPathsV2, collectionGameSeedV2 } from './seeds.ts';
 
 export class CollectionChallengeTeamIneligibleError extends CollectionGameError {
@@ -57,15 +63,22 @@ export function prepareCollectionChallengeGame(input: {
   clearedDifficultyIds: readonly CollectionDifficultyId[];
   clearedChallengeIds: readonly string[];
   progression: CollectionProgressionRules;
+  progressionHash: string;
   profileVersion: string;
   profileHash: string;
   catalogHash: string;
   rulesHash: string;
 }): CollectionPreparedGameV3 {
+  validateCollectionProgressionRules({
+    progression: input.progression,
+    progressionHash: input.progressionHash,
+    catalog: input.catalog,
+  });
   const challenge = resolveCollectionChallenge(input.progression, input.challengeId);
   if (challenge === undefined) {
     throw new CollectionGameError('unknown-challenge', `unknown challenge ${input.challengeId}`);
   }
+  assertCollectionChallengeFeasible(challenge, input.catalog);
   if ((challenge.challengeVersion as string) !== COLLECTION_CHALLENGE_VERSION) {
     throw new CollectionGameError(
       'challenge-version-mismatch',

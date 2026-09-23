@@ -4,10 +4,11 @@
   let { current }: { current: 'collection' | 'packs' | 'team' | 'play' } = $props();
 
   const LINKS = [
-    { id: 'collection', label: 'Collection', href: '/collection' },
-    { id: 'packs', label: 'Packs', href: '/collection/packs' },
-    { id: 'team', label: 'Team', href: '/collection/team' },
-    { id: 'play', label: 'Play', href: '/collection/play' },
+    { id: 'hub', label: 'Hub', href: '/ultimate/run' },
+    { id: 'collection', label: 'Collection', href: '/ultimate/run/collection' },
+    { id: 'packs', label: 'Packs', href: '/ultimate/run/packs' },
+    { id: 'team', label: 'Team', href: '/ultimate/run/team' },
+    { id: 'play', label: 'Play', href: '/ultimate/run/play' },
   ] as const;
 </script>
 

@@ -1,72 +1,165 @@
 .ultimate-root {
-  --ur-bg: #0b0b10;
+  --ur-bg: #080b0e;
+  --ur-canvas: #080b0e;
+  --ur-raised: #12191d;
+  --ur-surface: #182126;
+  --ur-interrupt: #202b30;
+  --ur-paper: #f0ecdf;
+  --ur-line: #344047;
+  --ur-line-strong: #657078;
+  --ur-muted: #a9b2b3;
+  --ur-ink: #e8e5dc;
+  --ur-focus: #fff1bd;
+  --ur-success: #81d2a5;
+  --ur-warning: #f0bd65;
+  --ur-danger: #ff8e82;
   --ur-ember: #c65a2e;
   --ur-eruption: #ff5a2a;
   --ur-apex: #ffc53d;
   --ur-titan: #a9b4d8;
   --ur-eclipse: #8b5cf6;
   --ur-immortal: #ffe9b0;
-  --ur-ink: #f2eef4;
-  --ur-accent: #ffc53d;
+  --ur-accent: var(--ur-apex);
+  position: relative;
+  isolation: isolate;
+  overflow-x: clip;
+  background:
+    linear-gradient(
+      90deg,
+      transparent 0,
+      transparent calc(50% - 1px),
+      rgb(224 219 202 / 2.2%) 50%,
+      transparent calc(50% + 1px)
+    ),
+    radial-gradient(ellipse at 50% -20%, rgb(255 197 61 / 5%), transparent 65%), var(--ur-canvas);
+  color: var(--ur-ink);
 }
 
 .ultimate-eyebrow {
+  color: var(--ur-muted);
   font-family: var(--font-display);
-  font-style: italic;
-  text-transform: uppercase;
-  letter-spacing: 0.28em;
-  font-size: 12px;
-  color: var(--ur-apex);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
 }
 
 .ultimate-title {
-  background: linear-gradient(90deg, var(--ur-ink) 20%, var(--ur-apex) 55%, var(--ur-eclipse) 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--ur-paper);
 }
 
 .ultimate-cta {
   background: var(--ur-apex);
   color: #241a02;
 }
+
 .ultimate-cta:hover {
-  filter: brightness(1.08);
+  background: #ffda73;
 }
 
 .ur-rarity {
-  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid currentColor;
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1;
 }
+
 .ur-rarity-ember {
-  background: color-mix(in srgb, #c65a2e 22%, transparent);
-  border-color: color-mix(in srgb, #c65a2e 65%, transparent);
-  color: #f0b48f;
+  border-color: #c65a2e;
+  background: #35221c;
+  color: #ffd2ba;
 }
+
 .ur-rarity-eruption {
-  background: linear-gradient(90deg, #7a1e05, #ff5a2a, #7a1e05);
+  border-color: #ff5a2a;
+  background: #4b2118;
   color: #fff;
 }
+
 .ur-rarity-apex {
-  background: linear-gradient(90deg, #7a5b06, #ffc53d, #7a5b06);
-  color: #241a02;
+  border-color: #ffc53d;
+  background: #3c3218;
+  color: #ffe39a;
 }
+
 .ur-rarity-titan {
-  background: linear-gradient(90deg, #3c4470, #a9b4d8, #3c4470);
-  color: #0d1020;
+  border-color: #a9b4d8;
+  background: #282d3b;
+  color: #dfe5ff;
 }
+
 .ur-rarity-eclipse {
-  background: #050308;
-  border-color: #8b5cf6;
+  border-color: #a588ff;
+  background: #251b3b;
   color: #d9c8ff;
-  text-shadow: 0 0 14px #8b5cf6;
 }
+
 .ur-rarity-immortal {
-  background: linear-gradient(90deg, #8a6a1c, #ffe9b0, #8a6a1c);
-  color: #2a1f04;
+  border-color: #ffe9b0;
+  background: #51442c;
+  color: #fff4d5;
+}
+
+.ur-page-intro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.ur-page-intro h2 {
+  color: var(--ur-paper);
+  font-family: var(--font-display);
+  font-size: clamp(1.7rem, 4vw, 2.35rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+
+.ur-section-title {
+  color: var(--ur-paper);
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.ur-status-badge {
+  display: inline-flex;
+  min-height: 1.65rem;
+  align-items: center;
+  gap: 0.35rem;
+  padding-inline: 0.55rem;
+  border: 1px solid var(--ur-line-strong);
+  color: var(--ur-paper);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.ur-number {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+.ur-focusable:focus-visible,
+.ultimate-root a:focus-visible,
+.ultimate-root button:focus-visible,
+.ultimate-root summary:focus-visible,
+.ultimate-root input:focus-visible,
+.ultimate-root select:focus-visible {
+  outline: 3px solid var(--ur-focus);
+  outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ur-rarity-eclipse {
-    text-shadow: none;
+  .ultimate-root *,
+  .ultimate-root *::before,
+  .ultimate-root *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

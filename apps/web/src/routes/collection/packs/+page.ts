@@ -1,0 +1,8 @@
+import { redirect } from '@sveltejs/kit';
+import { resolve } from '$app/paths';
+
+export const prerender = false;
+
+export function load({ url }: { url: URL }) {
+  redirect(308, `${resolve('/ultimate/run/packs')}${url.search}`);
+}

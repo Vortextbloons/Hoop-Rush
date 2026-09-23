@@ -166,7 +166,7 @@ begin
     v_deadline := now() + interval '90 seconds';
   end if;
   loop
-    v_code := lpad((floor(random() * 10000))::text, 4, '0');
+    v_code := public.fixed_five_random_code();
     begin
       insert into public.fixed_five_rooms (mode, source_mode, variant, versions, root_seed, code, code_active, code_expires_at, phase, deadline_at, deadline_cursor, deadline_participant, deadline_pick_ordinal)
         values (p_mode, p_source_mode, p_variant, p_versions, v_seed, v_code, true, now() + interval '15 minutes', 'lobby', v_deadline, 'lobby', 'p1', 0)
@@ -1073,7 +1073,7 @@ begin
     v_deadline := now() + interval '90 seconds';
   end if;
   loop
-    v_code := lpad((floor(random() * 10000))::text, 4, '0');
+    v_code := public.fixed_five_random_code();
     begin
       insert into public.fixed_five_rooms (mode, source_mode, variant, versions, root_seed, code, code_active, code_expires_at, phase, deadline_at, deadline_cursor, deadline_participant, deadline_pick_ordinal)
         values (v_room.mode, v_room.source_mode, v_room.variant, v_room.versions, v_seed, v_code, true, now() + interval '15 minutes', 'lobby', v_deadline, 'lobby', 'p1', 0)

@@ -164,6 +164,7 @@ function buildChallengePrepared(catalog: CollectionCatalog): CollectionPreparedG
     clearedDifficultyIds: [],
     clearedChallengeIds: [],
     progression,
+    progressionHash: HASH,
     profileVersion: DEFAULT_ERA_SIM_PROFILE.profileVersion,
     profileHash: HASH,
     catalogHash: HASH,

@@ -35,7 +35,6 @@
   } from '$lib/season/season-assets';
   import { getManifest } from '$lib/data';
   import { DexieSeasonDraftRepository } from '@hoop-rush/persistence';
-  import { isSeasonRunIncompatibleError } from '@hoop-rush/persistence';
   import { getSeasonRunRepository } from '$lib/season/season-repo';
   import { clearAllSeasonData } from '$lib/season/season-data-recovery';
   import { seasonRootSeed } from '$lib/season/season-ids';
@@ -96,8 +95,9 @@
         let storedDraft: Awaited<ReturnType<DexieSeasonDraftRepository['loadSeasonDraft']>> = null;
         try {
           storedDraft = await draftRepo.loadSeasonDraft();
-        } catch {
-          await draftRepo.clearSeasonDraft();
+        } catch (error) {
+          brokenRunError =
+            error instanceof Error ? error.message : 'The saved season draft could not be loaded.';
         }
         if (cancelled) return;
         if (storedDraft !== null) {
@@ -125,18 +125,19 @@
                 resumeHref = resolve('/season/run');
               } else {
                 brokenRunError =
-                  'A saved season was found but its checkpoint is missing. Clear the broken save to start over.';
+                  'A saved season was found but its checkpoint is missing. Restart to clear the broken save and start fresh.';
               }
             } catch (error) {
-              if (isSeasonRunIncompatibleError(error)) {
-                resumeHref = resolve('/season/run');
-              } else {
-                brokenRunError =
-                  error instanceof Error ? error.message : 'The saved season could not be loaded.';
-              }
+              brokenRunError =
+                error instanceof Error ? error.message : 'The saved season could not be loaded.';
             }
           }
-        } catch {}
+        } catch (error) {
+          if (!cancelled) {
+            brokenRunError =
+              error instanceof Error ? error.message : 'The saved season could not be loaded.';
+          }
+        }
         loaded = true;
       })
       .catch((error: unknown) => {
@@ -422,7 +423,7 @@
           onclick={() => (clearOpen = true)}
           class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-destructive px-5 py-3 text-xs font-semibold text-white transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
         >
-          Clear saved data
+          Restart season
         </button>
       </div>
       {#if clearError}
@@ -566,10 +567,10 @@
   <Dialog.Content
     class="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-background p-6 shadow-xl outline-none"
   >
-    <Dialog.Title class="font-display text-2xl font-extrabold">Clear season data?</Dialog.Title>
+    <Dialog.Title class="font-display text-2xl font-extrabold">Restart season?</Dialog.Title>
     <Dialog.Description class="mt-1 text-sm text-muted-foreground">
-      This permanently deletes your saved Season Run and any in-progress draft from this browser. It
-      cannot be recovered.
+      This permanently deletes your saved Season Run and any in-progress draft from this browser.
+      You will start a new season from the setup screen.
     </Dialog.Description>
     <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
       <Dialog.Close
@@ -583,7 +584,7 @@
         disabled={clearing}
         class="inline-flex items-center justify-center rounded-xl bg-destructive px-4 py-2 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
       >
-        {clearing ? 'Clearing…' : 'Yes, clear everything'}
+        {clearing ? 'Restarting…' : 'Clear save and restart'}
       </button>
     </div>
   </Dialog.Content>

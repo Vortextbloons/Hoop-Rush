@@ -4,13 +4,11 @@ import type {
   SeasonAcceptTradeOfferRejection,
   SeasonAcceptTradeOfferResult,
   SeasonAdvancePostseasonCommand,
-  SeasonAdvancePostseasonRejection,
   SeasonAdvancePostseasonResult,
   SeasonAlreadyRehabbedRejection,
   SeasonAlreadySpentRejection,
   SeasonBlockMismatchRejection,
   SeasonDeclineTradeOfferCommand,
-  SeasonDeclineTradeOfferRejection,
   SeasonDeclineTradeOfferResult,
   SeasonDraftCatalog,
   SeasonSelectFrontOfficeCommand,
@@ -20,10 +18,8 @@ import type {
   SeasonDuplicateCommandRejection,
   SeasonEffectsState,
   SeasonFastForwardPostseasonCommand,
-  SeasonFastForwardPostseasonRejection,
   SeasonFastForwardPostseasonResult,
   SeasonForfeitInterruptedGameCommand,
-  SeasonForfeitInterruptedGameRejection,
   SeasonForfeitInterruptedGameResult,
   SeasonGameMismatchRejection,
   SeasonGameSummary,
@@ -41,7 +37,6 @@ import type {
   SeasonPostseasonSummary,
   Position,
   SeasonResumeSeasonBlockCommand,
-  SeasonResumeSeasonBlockRejection,
   SeasonResumeSeasonBlockResult,
   SeasonRotationDigestMismatchRejection,
   SeasonRun,
@@ -51,20 +46,15 @@ import type {
   SeasonRunMismatchRejection,
   SeasonRunStage,
   SeasonSelectBlockObjectiveCommand,
-  SeasonSelectBlockObjectiveRejection,
   SeasonSelectBlockObjectiveResult,
   SeasonSpectatePostseasonGameCommand,
-  SeasonSpectatePostseasonGameRejection,
   SeasonSpectatePostseasonGameResult,
   SeasonSpendInfluenceCommand,
-  SeasonSpendInfluenceRejection,
   SeasonSpendInfluenceResult,
   SeasonStaleStateRejection,
   SeasonStartPostseasonCommand,
-  SeasonStartPostseasonRejection,
   SeasonStartPostseasonResult,
   SeasonSubmitPostseasonRotationCommand,
-  SeasonSubmitPostseasonRotationRejection,
   SeasonSubmitPostseasonRotationResult,
   SeasonUnavailablePlayerRejection,
   SeasonWindowNotOpenRejection,
@@ -78,37 +68,27 @@ import type {
   SeasonFreeAgencyIndex,
   SeasonRosterTargets,
   SeasonSelectGmIdentityCommand,
-  SeasonSelectGmIdentityRejection,
   SeasonSelectGmIdentityResult,
   SeasonSelectCampaignOpportunityCommand,
-  SeasonSelectCampaignOpportunityRejection,
   SeasonSelectCampaignOpportunityResult,
   SeasonEvolveGmCampaignCommand,
-  SeasonEvolveGmCampaignRejection,
   SeasonEvolveGmCampaignResult,
   SeasonOpenTradeInquiryCommand,
-  SeasonOpenTradeInquiryRejection,
   SeasonOpenTradeInquiryResult,
   SeasonPendingBlockRejection,
   SeasonSubmitTradeProposalCommand,
-  SeasonSubmitTradeProposalRejection,
   SeasonSubmitTradeProposalResult,
   SeasonRespondToTradeCounterCommand,
-  SeasonRespondToTradeCounterRejection,
   SeasonRespondToTradeCounterResult,
   SeasonTradeNegotiationConflictRejection,
   SeasonTradeNegotiationIllegalRejection,
   SeasonWalkAwayFromTradeCommand,
-  SeasonWalkAwayFromTradeRejection,
   SeasonWalkAwayFromTradeResult,
   SeasonPurchaseTradeInquiryCommand,
-  SeasonPurchaseTradeInquiryRejection,
   SeasonPurchaseTradeInquiryResult,
   SeasonBuySponsorCommand,
-  SeasonBuySponsorRejection,
   SeasonBuySponsorResult,
   SeasonApplySponsorCommand,
-  SeasonApplySponsorRejection,
   SeasonApplySponsorResult,
   SeasonTradeActiveNegotiationRejection,
   SeasonTradeInquiryCapRejection,
@@ -122,7 +102,6 @@ import {
   seasonRunCommandRejectionSchema,
   type SeasonRunAuthority,
 } from '@hoop-rush/data-contracts';
-import { assertNever } from '../sim/assert-never.ts';
 import { expandSeasonRunRosters, seasonNextBlockIndex } from './block.ts';
 import {
   advancePendingAfterForfeit,
@@ -405,28 +384,19 @@ function baseValidation(
       'submit-season-block is handled by the block pipeline, not the run command dispatch',
     );
   }
-  const commandKind = command.command;
-  const rejectedWith = (rejection: SeasonRunCommandRejection): SeasonRunCommandOutput => ({
-    result: {
-      command: commandKind,
-      result: { status: 'rejected', commandId: command.commandId, rejection },
-    } as SeasonRunCommandResult,
-    run,
-    pending,
-  });
   if (command.runId !== run.runId) {
     const rejection: SeasonRunMismatchRejection = {
       code: 'run-mismatch',
       expectedRunId: run.runId,
     };
-    return rejectedWith(rejection);
+    return rejectedCommand(command, rejection, run, pending);
   }
   if (commandAlreadyRecorded(run, command.commandId)) {
     const rejection: SeasonDuplicateCommandRejection = {
       code: 'duplicate-command',
       commandId: command.commandId,
     };
-    return rejectedWith(rejection);
+    return rejectedCommand(command, rejection, run, pending);
   }
   if (
     run.stateRevision !== command.expectedStateRevision ||
@@ -439,7 +409,7 @@ function baseValidation(
       currentStateRevision: run.stateRevision,
       currentStateDigest: run.stateDigest,
     };
-    return rejectedWith(rejection);
+    return rejectedCommand(command, rejection, run, pending);
   }
   const authority = authorityOfContext(context, run);
   const actorPid = context?.actorParticipantId ?? null;
@@ -449,18 +419,28 @@ function baseValidation(
       if (actorPid !== null) {
         const expectedFid = franchiseForParticipant(authority, actorPid);
         if (expectedFid === null || (actorFid !== null && expectedFid !== actorFid)) {
-          return rejectedWith({
-            code: 'run-mismatch',
-            expectedRunId: run.runId,
-          });
+          return rejectedCommand(
+            command,
+            {
+              code: 'run-mismatch',
+              expectedRunId: run.runId,
+            },
+            run,
+            pending,
+          );
         }
       } else if (actorFid !== null) {
         const pid = authorityForFranchise(authority, actorFid);
         if (pid === null) {
-          return rejectedWith({
-            code: 'run-mismatch',
-            expectedRunId: run.runId,
-          });
+          return rejectedCommand(
+            command,
+            {
+              code: 'run-mismatch',
+              expectedRunId: run.runId,
+            },
+            run,
+            pending,
+          );
         }
       }
       const directFid =
@@ -468,10 +448,15 @@ function baseValidation(
           ? command.franchiseId
           : undefined;
       if (directFid !== undefined && actorFid !== null && directFid !== actorFid) {
-        return rejectedWith({
-          code: 'run-mismatch',
-          expectedRunId: run.runId,
-        });
+        return rejectedCommand(
+          command,
+          {
+            code: 'run-mismatch',
+            expectedRunId: run.runId,
+          },
+          run,
+          pending,
+        );
       }
     } else {
       if (
@@ -479,20 +464,30 @@ function baseValidation(
         authority.soloFranchiseId !== null &&
         actorFid !== authority.soloFranchiseId
       ) {
-        return rejectedWith({
-          code: 'run-mismatch',
-          expectedRunId: run.runId,
-        });
+        return rejectedCommand(
+          command,
+          {
+            code: 'run-mismatch',
+            expectedRunId: run.runId,
+          },
+          run,
+          pending,
+        );
       }
       const directFid =
         'franchiseId' in command && typeof command.franchiseId === 'string'
           ? command.franchiseId
           : undefined;
       if (directFid !== undefined && actorFid !== null && directFid !== actorFid) {
-        return rejectedWith({
-          code: 'run-mismatch',
-          expectedRunId: run.runId,
-        });
+        return rejectedCommand(
+          command,
+          {
+            code: 'run-mismatch',
+            expectedRunId: run.runId,
+          },
+          run,
+          pending,
+        );
       }
     }
   } else if (context?.actorFranchiseId) {
@@ -501,115 +496,47 @@ function baseValidation(
         ? command.franchiseId
         : null;
     if (targetFranchiseId !== null && targetFranchiseId !== context.actorFranchiseId) {
-      return rejectedWith({
-        code: 'run-mismatch',
-        expectedRunId: run.runId,
-      });
+      return rejectedCommand(
+        command,
+        {
+          code: 'run-mismatch',
+          expectedRunId: run.runId,
+        },
+        run,
+        pending,
+      );
     }
   }
   return null;
 }
 function rejectedCommand(
-  commandKind: SeasonRunCommand['command'] | SeasonLegacyRunCommand['command'],
-  commandId: string,
+  command: SeasonRunCommand | SeasonLegacyRunCommand,
   rejection: SeasonRunCommandRejection,
   run: SeasonRun,
   pending: SeasonPendingBlockCandidate | null = null,
 ): SeasonRunCommandOutput {
   return {
     result: {
-      command: commandKind,
-      result: { status: 'rejected', commandId, rejection },
+      command: command.command,
+      result: { status: 'rejected', commandId: command.commandId, rejection },
     } as SeasonRunCommandResult,
     run,
     pending,
   };
 }
-function rejectedSelect(
-  command: SeasonSelectBlockObjectiveCommand,
-  rejection: SeasonSelectBlockObjectiveRejection,
-  run: SeasonRun,
-): SeasonRunCommandOutput {
-  return rejectedCommand('select-block-objective', command.commandId, rejection, run);
-}
-function handleSelectBlockObjective(
-  command: SeasonSelectBlockObjectiveCommand,
+type RetiredSeasonRunCommand =
+  | SeasonSelectBlockObjectiveCommand
+  | SeasonSelectGmIdentityCommand
+  | SeasonSelectCampaignOpportunityCommand
+  | SeasonEvolveGmCampaignCommand;
+function handleRetiredSeasonCommand(
+  command: RetiredSeasonRunCommand,
   context: SeasonRunCommandContext,
 ): SeasonRunCommandOutput {
-  const base = baseValidation(command, context.run, null, context);
+  const pending = command.command === 'select-block-objective' ? null : context.pending;
+  const base = baseValidation(command, context.run, pending, context);
   if (base !== null) return base;
-  const run = economyRunOf(context);
-  return rejectedSelect(command, { code: 'retired' }, run);
-}
-function rejectedSelectGmIdentity(
-  command: SeasonSelectGmIdentityCommand,
-  rejection: SeasonSelectGmIdentityRejection,
-  run: SeasonRun,
-): SeasonRunCommandOutput {
-  return rejectedCommand('select-gm-identity', command.commandId, rejection, run);
-}
-function rejectedSelectCampaignOpportunity(
-  command: SeasonSelectCampaignOpportunityCommand,
-  rejection: SeasonSelectCampaignOpportunityRejection,
-  run: SeasonRun,
-): SeasonRunCommandOutput {
-  return rejectedCommand('select-campaign-opportunity', command.commandId, rejection, run);
-}
-function rejectedEvolveGmCampaign(
-  command: SeasonEvolveGmCampaignCommand,
-  rejection: SeasonEvolveGmCampaignRejection,
-  run: SeasonRun,
-): SeasonRunCommandOutput {
-  return rejectedCommand('evolve-gm-campaign', command.commandId, rejection, run);
-}
-function rejectedOpenTradeInquiry(
-  command: SeasonOpenTradeInquiryCommand,
-  rejection: SeasonOpenTradeInquiryRejection,
-  run: SeasonRun,
-): SeasonRunCommandOutput {
-  return rejectedCommand('open-trade-inquiry', command.commandId, rejection, run);
-}
-function rejectedSubmitTradeProposal(
-  command: SeasonSubmitTradeProposalCommand,
-  rejection: SeasonSubmitTradeProposalRejection,
-  run: SeasonRun,
-): SeasonRunCommandOutput {
-  return rejectedCommand('submit-trade-proposal', command.commandId, rejection, run);
-}
-function rejectedRespondToTradeCounter(
-  command: SeasonRespondToTradeCounterCommand,
-  rejection: SeasonRespondToTradeCounterRejection,
-  run: SeasonRun,
-): SeasonRunCommandOutput {
-  return rejectedCommand('respond-to-trade-counter', command.commandId, rejection, run);
-}
-function rejectedWalkAwayFromTrade(
-  command: SeasonWalkAwayFromTradeCommand,
-  rejection: SeasonWalkAwayFromTradeRejection,
-  run: SeasonRun,
-): SeasonRunCommandOutput {
-  return rejectedCommand('walk-away-from-trade', command.commandId, rejection, run);
-}
-function rejectedPurchaseTradeInquiry(
-  command: SeasonPurchaseTradeInquiryCommand,
-  rejection: SeasonPurchaseTradeInquiryRejection,
-  run: SeasonRun,
-): SeasonRunCommandOutput {
-  return rejectedCommand('purchase-trade-inquiry', command.commandId, rejection, run);
-}
-function rejectedBuySponsor(
-  command: SeasonBuySponsorCommand,
-  rejection: SeasonBuySponsorRejection,
-  run: SeasonRun,
-): SeasonRunCommandOutput {
-  return rejectedCommand('buy-sponsor', command.commandId, rejection, run);
-}
-function rejectedApplySponsor(
-  command: SeasonApplySponsorCommand,
-  rejection: SeasonApplySponsorRejection,
-  run: SeasonRun,
-): SeasonRunCommandOutput {
-  return rejectedCommand('apply-sponsor', command.commandId, rejection, run);
+  return rejectedCommand(command, { code: 'retired' }, economyRunOf(context));
 }
 function sponsorHumanFranchiseId(run: SeasonEconomyRun, context: SeasonRunCommandContext): string {
   return (
@@ -635,7 +562,7 @@ function handleBuySponsor(
       .flatMap((entry) => entry.offers)
       .find((candidate) => candidate.instanceId === command.instanceId);
     if (stale !== undefined) {
-      return rejectedBuySponsor(
+      return rejectedCommand(
         command,
         {
           code: 'sponsor-expired',
@@ -645,7 +572,7 @@ function handleBuySponsor(
         run,
       );
     }
-    return rejectedBuySponsor(
+    return rejectedCommand(
       command,
       { code: 'sponsor-not-offered', instanceId: command.instanceId, blockIndex: currentBlock },
       run,
@@ -660,7 +587,7 @@ function handleBuySponsor(
         slots.fuel?.instanceId === command.instanceId,
     );
   if (board.purchasedInstanceIds.includes(command.instanceId) || owned) {
-    return rejectedBuySponsor(
+    return rejectedCommand(
       command,
       {
         code: 'sponsor-already-purchased',
@@ -672,7 +599,7 @@ function handleBuySponsor(
   }
   const balance = run.influence.balances[humanFid] ?? 0;
   if (balance - offer.price < SEASON_INFLUENCE_FLOOR) {
-    return rejectedBuySponsor(
+    return rejectedCommand(
       command,
       {
         code: 'insufficient-balance',
@@ -763,7 +690,7 @@ function handleApplySponsor(
     (item) => item.instanceId === command.instanceId,
   );
   if (vaultIndex === -1) {
-    return rejectedApplySponsor(
+    return rejectedCommand(
       command,
       { code: 'sponsor-not-owned', instanceId: command.instanceId },
       run,
@@ -771,7 +698,7 @@ function handleApplySponsor(
   }
   const vaultItem = sponsors.vault.items[vaultIndex];
   if (vaultItem === undefined) {
-    return rejectedApplySponsor(
+    return rejectedCommand(
       command,
       { code: 'sponsor-not-owned', instanceId: command.instanceId },
       run,
@@ -779,7 +706,7 @@ function handleApplySponsor(
   }
   const entry = sponsorGearEntryOf(vaultItem.entryId);
   if (entry.slot !== command.slot) {
-    return rejectedApplySponsor(
+    return rejectedCommand(
       command,
       {
         code: 'sponsor-slot-mismatch',
@@ -794,7 +721,7 @@ function handleApplySponsor(
     (row) => row.playerVersionId === command.playerVersionId,
   )?.ownerFranchiseId;
   if (owner !== humanFid) {
-    return rejectedApplySponsor(
+    return rejectedCommand(
       command,
       { code: 'sponsor-not-on-roster', playerVersionId: command.playerVersionId },
       run,
@@ -806,7 +733,7 @@ function handleApplySponsor(
     fuel: null,
   };
   if (slots[command.slot] !== null) {
-    return rejectedApplySponsor(
+    return rejectedCommand(
       command,
       {
         code: 'sponsor-slot-occupied',
@@ -818,7 +745,7 @@ function handleApplySponsor(
   }
   for (const slot of SEASON_SPONSOR_SLOTS) {
     if (slots[slot]?.brandFamily === entry.brandFamily) {
-      return rejectedApplySponsor(
+      return rejectedCommand(
         command,
         {
           code: 'sponsor-brand-duplicate',
@@ -878,36 +805,6 @@ function handleApplySponsor(
     pending: null,
   };
 }
-function handleSelectGmIdentity(
-  command: SeasonSelectGmIdentityCommand,
-  context: SeasonRunCommandContext,
-): SeasonRunCommandOutput {
-  const base = baseValidation(command, context.run, context.pending, context);
-  if (base !== null) return base;
-  const economy = economyRunOf(context);
-  const run = economy;
-  return rejectedSelectGmIdentity(command, { code: 'retired' }, run);
-}
-function handleSelectCampaignOpportunity(
-  command: SeasonSelectCampaignOpportunityCommand,
-  context: SeasonRunCommandContext,
-): SeasonRunCommandOutput {
-  const base = baseValidation(command, context.run, context.pending, context);
-  if (base !== null) return base;
-  const economy = economyRunOf(context);
-  const run = economy;
-  return rejectedSelectCampaignOpportunity(command, { code: 'retired' }, run);
-}
-function handleEvolveGmCampaign(
-  command: SeasonEvolveGmCampaignCommand,
-  context: SeasonRunCommandContext,
-): SeasonRunCommandOutput {
-  const base = baseValidation(command, context.run, context.pending, context);
-  if (base !== null) return base;
-  const economy = economyRunOf(context);
-  const run = economy;
-  return rejectedEvolveGmCampaign(command, { code: 'retired' }, run);
-}
 function pendingBlockRejectionOf(
   context: SeasonRunCommandContext,
 ): SeasonPendingBlockRejection | null {
@@ -957,13 +854,7 @@ function handleOpenTradeInquiry(
   const economy = economyRunOf(context);
   const run = economy;
   if (pendingRejection !== null) {
-    return rejectedCommand(
-      'open-trade-inquiry',
-      command.commandId,
-      pendingRejection,
-      run,
-      context.pending,
-    );
+    return rejectedCommand(command, pendingRejection, run, context.pending);
   }
   if (
     !run.trade ||
@@ -974,7 +865,7 @@ function handleOpenTradeInquiry(
       franchiseId: command.toFranchiseId,
       windowIndex: command.windowIndex,
     };
-    return rejectedOpenTradeInquiry(command, rejection, run);
+    return rejectedCommand(command, rejection, run);
   }
   const win = run.trade.windows.find((w) => w.windowIndex === command.windowIndex);
   if (win === undefined) {
@@ -986,7 +877,7 @@ function handleOpenTradeInquiry(
       windowIndex: command.windowIndex,
       activeInquiryId: win.activeInquiryId,
     };
-    return rejectedOpenTradeInquiry(command, rejection, run);
+    return rejectedCommand(command, rejection, run);
   }
   const allowance =
     win.inquiryAllowance ??
@@ -1002,7 +893,7 @@ function handleOpenTradeInquiry(
       inquiriesUsed: used,
       allowance,
     };
-    return rejectedOpenTradeInquiry(command, rejection, run);
+    return rejectedCommand(command, rejection, run);
   }
   const result = openTradeInquiry(run, command.windowIndex, command.toFranchiseId);
   if ('error' in result) {
@@ -1038,27 +929,21 @@ function handleSubmitTradeProposal(
   const run = economy;
   const submitPending = pendingBlockRejectionOf(context);
   if (submitPending !== null) {
-    return rejectedCommand(
-      'submit-trade-proposal',
-      command.commandId,
-      submitPending,
-      run,
-      context.pending,
-    );
+    return rejectedCommand(command, submitPending, run, context.pending);
   }
   const humanFranchiseId =
     context.humanFranchiseId ??
     run.league.teams.find((team) => team.control === 'human')?.franchiseId ??
     null;
   if (command.influenceAmount > 0 && command.influenceFromSender === null) {
-    return rejectedSubmitTradeProposal(
+    return rejectedCommand(
       command,
       { code: 'trade-wrong-fit', reason: 'Influence amount requires a sender' },
       run,
     );
   }
   if (command.influenceAmount === 0 && command.influenceFromSender !== null) {
-    return rejectedSubmitTradeProposal(
+    return rejectedCommand(
       command,
       { code: 'trade-wrong-fit', reason: 'Influence sender requires an amount' },
       run,
@@ -1069,7 +954,7 @@ function handleSubmitTradeProposal(
     command.influenceFromSender !== command.toFranchiseId &&
     (humanFranchiseId === null || command.influenceFromSender !== humanFranchiseId)
   ) {
-    return rejectedSubmitTradeProposal(
+    return rejectedCommand(
       command,
       {
         code: 'trade-wrong-fit',
@@ -1079,7 +964,7 @@ function handleSubmitTradeProposal(
     );
   }
   if (!context.catalog) {
-    return rejectedSubmitTradeProposal(
+    return rejectedCommand(
       command,
       {
         code: 'window-not-open',
@@ -1091,7 +976,7 @@ function handleSubmitTradeProposal(
   }
   const win = run.trade?.windows.find((w) => w.windowIndex === command.windowIndex);
   if (!win || win.status !== 'open') {
-    return rejectedSubmitTradeProposal(
+    return rejectedCommand(
       command,
       {
         code: 'window-not-open',
@@ -1121,15 +1006,11 @@ function handleSubmitTradeProposal(
     const reason = evalResult.reason;
     switch (evalResult.code) {
       case 'trade-wrong-fit':
-        return rejectedSubmitTradeProposal(command, { code: 'trade-wrong-fit', reason }, run);
+        return rejectedCommand(command, { code: 'trade-wrong-fit', reason }, run);
       case 'trade-insufficient-talent':
-        return rejectedSubmitTradeProposal(
-          command,
-          { code: 'trade-insufficient-talent', reason },
-          run,
-        );
+        return rejectedCommand(command, { code: 'trade-insufficient-talent', reason }, run);
       case 'window-not-open':
-        return rejectedSubmitTradeProposal(
+        return rejectedCommand(
           command,
           {
             code: 'window-not-open',
@@ -1139,7 +1020,7 @@ function handleSubmitTradeProposal(
           run,
         );
       default:
-        return rejectedSubmitTradeProposal(command, { code: 'trade-wrong-fit', reason }, run);
+        return rejectedCommand(command, { code: 'trade-wrong-fit', reason }, run);
     }
   }
   const fingerprint = evalResult.proposal.fingerprint;
@@ -1147,7 +1028,7 @@ function handleSubmitTradeProposal(
     n.exchanges.some((e) => e.proposalFingerprint === fingerprint),
   );
   if (duplicate) {
-    return rejectedSubmitTradeProposal(
+    return rejectedCommand(
       command,
       {
         code: 'trade-duplicate-proposal',
@@ -1165,7 +1046,7 @@ function handleSubmitTradeProposal(
     );
   const used = win.negotiations?.length ?? 0;
   if (isNewInquiry && used >= allowance) {
-    return rejectedSubmitTradeProposal(
+    return rejectedCommand(
       command,
       {
         code: 'trade-inquiry-cap',
@@ -1209,7 +1090,7 @@ function handleSubmitTradeProposal(
     : null;
   if (existingForUpdate) {
     if (existingForUpdate.exchangeCount >= 3) {
-      return rejectedSubmitTradeProposal(
+      return rejectedCommand(
         command,
         {
           code: 'trade-exchange-limit',
@@ -1292,7 +1173,7 @@ function handleSubmitTradeProposal(
     const amount = evalResult.proposal.influenceAmount;
     const senderBalance = nextInfluence.balances[sender] ?? 0;
     if (senderBalance - amount < SEASON_INFLUENCE_FLOOR) {
-      return rejectedSubmitTradeProposal(
+      return rejectedCommand(
         command,
         {
           code: 'insufficient-balance',
@@ -1308,7 +1189,7 @@ function handleSubmitTradeProposal(
       (run.influence.windows[sender] ?? []).find((w) => w.windowIndex === command.windowIndex)
         ?.tradeCashSent ?? 0;
     if (sent + amount > 3) {
-      return rejectedSubmitTradeProposal(
+      return rejectedCommand(
         command,
         {
           code: 'trade-cash-cap',
@@ -1453,17 +1334,11 @@ function handleRespondToTradeCounter(
   const run = economy;
   const respondPending = pendingBlockRejectionOf(context);
   if (respondPending !== null) {
-    return rejectedCommand(
-      'respond-to-trade-counter',
-      command.commandId,
-      respondPending,
-      run,
-      context.pending,
-    );
+    return rejectedCommand(command, respondPending, run, context.pending);
   }
   const win = run.trade?.windows.find((w) => w.windowIndex === command.windowIndex);
   if (!win) {
-    return rejectedRespondToTradeCounter(
+    return rejectedCommand(
       command,
       {
         code: 'window-not-open',
@@ -1475,7 +1350,7 @@ function handleRespondToTradeCounter(
   }
   const negotiation = win.negotiations?.find((n) => n.inquiryId === command.inquiryId);
   if (!negotiation) {
-    return rejectedRespondToTradeCounter(
+    return rejectedCommand(
       command,
       {
         code: 'trade-negotiations-closed',
@@ -1485,7 +1360,7 @@ function handleRespondToTradeCounter(
     );
   }
   if (negotiation.exchangeCount >= 3) {
-    return rejectedRespondToTradeCounter(
+    return rejectedCommand(
       command,
       {
         code: 'trade-exchange-limit',
@@ -1502,7 +1377,7 @@ function handleRespondToTradeCounter(
     negotiation.status === 'walked-away' ||
     negotiation.status === 'expired'
   ) {
-    return rejectedRespondToTradeCounter(
+    return rejectedCommand(
       command,
       {
         code: 'trade-negotiations-closed',
@@ -1564,7 +1439,7 @@ function handleRespondToTradeCounter(
   }
   const agreed = resolveNegotiationPackage(negotiation);
   if (agreed === null) {
-    return rejectedRespondToTradeCounter(
+    return rejectedCommand(
       command,
       {
         code: 'trade-negotiations-closed',
@@ -1599,7 +1474,7 @@ function handleRespondToTradeCounter(
       inquiryId: command.inquiryId,
       playerVersionIds: conflictIds,
     };
-    return rejectedRespondToTradeCounter(command, rejection, run);
+    return rejectedCommand(command, rejection, run);
   }
   if (context.catalog !== undefined) {
     const facts = seasonTradeCatalogFactsOf(context.catalog);
@@ -1649,7 +1524,7 @@ function handleRespondToTradeCounter(
         inquiryId: command.inquiryId,
         reasons,
       };
-      return rejectedRespondToTradeCounter(command, rejection, run);
+      return rejectedCommand(command, rejection, run);
     }
   } else {
     const rejection: SeasonTradeNegotiationIllegalRejection = {
@@ -1658,7 +1533,7 @@ function handleRespondToTradeCounter(
       inquiryId: command.inquiryId,
       reasons: ['the draft catalog is unavailable so the final rosters cannot be checked'],
     };
-    return rejectedRespondToTradeCounter(command, rejection, run);
+    return rejectedCommand(command, rejection, run);
   }
   const syntheticOffer: import('@hoop-rush/data-contracts').SeasonTradeOffer = {
     offerId: (negotiation.activeProposalId ?? `prop-${'0'.repeat(32)}`).replace(/^prop-/, 'off-'),
@@ -1745,17 +1620,11 @@ function handleWalkAwayFromTrade(
   const run = economy;
   const walkAwayPending = pendingBlockRejectionOf(context);
   if (walkAwayPending !== null) {
-    return rejectedCommand(
-      'walk-away-from-trade',
-      command.commandId,
-      walkAwayPending,
-      run,
-      context.pending,
-    );
+    return rejectedCommand(command, walkAwayPending, run, context.pending);
   }
   const win = run.trade?.windows.find((w) => w.windowIndex === command.windowIndex);
   if (!win) {
-    return rejectedWalkAwayFromTrade(
+    return rejectedCommand(
       command,
       {
         code: 'window-not-open',
@@ -1767,7 +1636,7 @@ function handleWalkAwayFromTrade(
   }
   const negotiation = win.negotiations?.find((n) => n.inquiryId === command.inquiryId);
   if (!negotiation) {
-    return rejectedWalkAwayFromTrade(
+    return rejectedCommand(
       command,
       {
         code: 'window-not-open',
@@ -1823,17 +1692,11 @@ function handlePurchaseTradeInquiry(
   const run = economy;
   const purchasePending = pendingBlockRejectionOf(context);
   if (purchasePending !== null) {
-    return rejectedCommand(
-      'purchase-trade-inquiry',
-      command.commandId,
-      purchasePending,
-      run,
-      context.pending,
-    );
+    return rejectedCommand(command, purchasePending, run, context.pending);
   }
   const win = run.trade?.windows.find((w) => w.windowIndex === command.windowIndex);
   if (!win || win.status !== 'open') {
-    return rejectedPurchaseTradeInquiry(
+    return rejectedCommand(
       command,
       {
         code: 'window-not-open',
@@ -1844,7 +1707,7 @@ function handlePurchaseTradeInquiry(
     );
   }
   if (win.purchasedInquiryUsed) {
-    return rejectedPurchaseTradeInquiry(
+    return rejectedCommand(
       command,
       {
         code: 'already-spent',
@@ -1861,7 +1724,7 @@ function handlePurchaseTradeInquiry(
         ?.executiveId ?? null,
     );
   if (allowance >= 5) {
-    return rejectedPurchaseTradeInquiry(
+    return rejectedCommand(
       command,
       {
         code: 'trade-inquiry-cap',
@@ -1883,7 +1746,7 @@ function handlePurchaseTradeInquiry(
   const purchaseCost = purchasedInquiryCostOf(evoExec);
   const balance = run.influence.balances[humanFid] ?? 0;
   if (balance - purchaseCost < SEASON_INFLUENCE_FLOOR) {
-    return rejectedPurchaseTradeInquiry(
+    return rejectedCommand(
       command,
       {
         code: 'insufficient-balance',
@@ -2115,20 +1978,6 @@ function handleSelectCourtInnovation(
     pending: null,
   };
 }
-function rejectedSpend(
-  command: SeasonSpendInfluenceCommand,
-  rejection: SeasonSpendInfluenceRejection,
-  run: SeasonRun,
-): SeasonRunCommandOutput {
-  return {
-    result: {
-      command: 'spend-influence',
-      result: { status: 'rejected', commandId: command.commandId, rejection },
-    },
-    run,
-    pending: null,
-  };
-}
 function insufficientBalanceOf(
   franchiseId: string,
   balance: number,
@@ -2155,7 +2004,7 @@ function handleSpendInfluence(
       code: 'no-window',
       franchiseId: command.franchiseId,
     };
-    return rejectedSpend(command, rejection, run);
+    return rejectedCommand(command, rejection, run);
   }
   if (command.purpose === 'extra-trade-offer') {
     const windowIndex = command.windowIndex;
@@ -2169,7 +2018,7 @@ function handleSpendInfluence(
         franchiseId: command.franchiseId,
         windowIndex,
       };
-      return rejectedSpend(command, rejection, run);
+      return rejectedCommand(command, rejection, run);
     }
     const spent = (run.influence.windows[command.franchiseId] ?? []).some(
       (entry) => entry.windowIndex === windowIndex && entry.extraOfferSpent,
@@ -2180,11 +2029,11 @@ function handleSpendInfluence(
         franchiseId: command.franchiseId,
         windowIndex,
       };
-      return rejectedSpend(command, rejection, run);
+      return rejectedCommand(command, rejection, run);
     }
     const balance = run.influence.balances[command.franchiseId] ?? 0;
     if (balance + -1 < SEASON_INFLUENCE_FLOOR) {
-      return rejectedSpend(command, insufficientBalanceOf(command.franchiseId, balance, -1), run);
+      return rejectedCommand(command, insufficientBalanceOf(command.franchiseId, balance, -1), run);
     }
     const generatedOffer = generatedExtraOfferForSpend(
       run.rootSeed,
@@ -2263,11 +2112,11 @@ function handleSpendInfluence(
     injury.missedGamesRemaining > 0;
   if (injury === undefined || !active) {
     const rejection: SeasonInjuryNotActiveRejection = { code: 'injury-not-active', injuryId };
-    return rejectedSpend(command, rejection, run);
+    return rejectedCommand(command, rejection, run);
   }
   if (run.influence.rehabs[injuryId] !== undefined) {
     const rejection: SeasonAlreadyRehabbedRejection = { code: 'already-rehabbed', injuryId };
-    return rejectedSpend(command, rejection, run);
+    return rejectedCommand(command, rejection, run);
   }
   const balance = run.influence.balances[command.franchiseId] ?? 0;
   const rehabCost = rehabPriceOf(
@@ -2275,7 +2124,7 @@ function handleSpendInfluence(
       null,
   );
   if (balance + -rehabCost < SEASON_INFLUENCE_FLOOR) {
-    return rejectedSpend(
+    return rejectedCommand(
       command,
       insufficientBalanceOf(command.franchiseId, balance, -rehabCost),
       run,
@@ -2326,20 +2175,6 @@ function handleSpendInfluence(
     pending: null,
   };
 }
-function rejectedAccept(
-  command: SeasonAcceptTradeOfferCommand,
-  rejection: SeasonAcceptTradeOfferRejection,
-  run: SeasonRun,
-): SeasonRunCommandOutput {
-  return {
-    result: {
-      command: 'accept-trade-offer',
-      result: { status: 'rejected', commandId: command.commandId, rejection },
-    },
-    run,
-    pending: null,
-  };
-}
 function handleAcceptTradeOffer(
   command: SeasonAcceptTradeOfferCommand,
   context: SeasonRunCommandContext,
@@ -2349,13 +2184,7 @@ function handleAcceptTradeOffer(
   const run = economyRunOf(context);
   const acceptPending = pendingBlockRejectionOf(context);
   if (acceptPending !== null) {
-    return rejectedCommand(
-      'accept-trade-offer',
-      command.commandId,
-      acceptPending,
-      run,
-      context.pending,
-    );
+    return rejectedCommand(command, acceptPending, run, context.pending);
   }
   const window = run.trade?.windows.find((entry) => entry.windowIndex === command.windowIndex);
   const offer = window?.offers.find((entry) => entry.offerId === command.offerId);
@@ -2365,7 +2194,7 @@ function handleAcceptTradeOffer(
       windowIndex: command.windowIndex,
       offerId: command.offerId,
     };
-    return rejectedAccept(command, rejection, run);
+    return rejectedCommand(command, rejection, run);
   }
   if (window.status !== 'open') {
     const rejection: SeasonWindowNotOpenRejection = {
@@ -2373,7 +2202,7 @@ function handleAcceptTradeOffer(
       franchiseId: null,
       windowIndex: command.windowIndex,
     };
-    return rejectedAccept(command, rejection, run);
+    return rejectedCommand(command, rejection, run);
   }
   if (offer.status !== 'open') {
     const rejection: SeasonOfferNotOpenRejection = {
@@ -2381,7 +2210,7 @@ function handleAcceptTradeOffer(
       windowIndex: command.windowIndex,
       offerId: command.offerId,
     };
-    return rejectedAccept(command, rejection, run);
+    return rejectedCommand(command, rejection, run);
   }
   const conflictIds: string[] = [];
   const rosterById = new Map(
@@ -2410,7 +2239,7 @@ function handleAcceptTradeOffer(
       offerId: command.offerId,
       playerVersionIds: conflictIds,
     };
-    return rejectedAccept(command, rejection, run);
+    return rejectedCommand(command, rejection, run);
   }
   if (context.catalog !== undefined) {
     const facts = seasonTradeCatalogFactsOf(context.catalog);
@@ -2457,7 +2286,7 @@ function handleAcceptTradeOffer(
         offerId: command.offerId,
         reasons,
       };
-      return rejectedAccept(command, rejection, run);
+      return rejectedCommand(command, rejection, run);
     }
   }
   const applied = applySeasonTrade(run, offer, context.catalog, { commandId: command.commandId });
@@ -2476,20 +2305,6 @@ function handleAcceptTradeOffer(
     pending: null,
   };
 }
-function rejectedDecline(
-  command: SeasonDeclineTradeOfferCommand,
-  rejection: SeasonDeclineTradeOfferRejection,
-  run: SeasonRun,
-): SeasonRunCommandOutput {
-  return {
-    result: {
-      command: 'decline-trade-offer',
-      result: { status: 'rejected', commandId: command.commandId, rejection },
-    },
-    run,
-    pending: null,
-  };
-}
 function handleDeclineTradeOffer(
   command: SeasonDeclineTradeOfferCommand,
   context: SeasonRunCommandContext,
@@ -2499,13 +2314,7 @@ function handleDeclineTradeOffer(
   const run = economyRunOf(context);
   const declinePending = pendingBlockRejectionOf(context);
   if (declinePending !== null) {
-    return rejectedCommand(
-      'decline-trade-offer',
-      command.commandId,
-      declinePending,
-      run,
-      context.pending,
-    );
+    return rejectedCommand(command, declinePending, run, context.pending);
   }
   const trade = run.trade;
   const window = trade?.windows.find((entry) => entry.windowIndex === command.windowIndex);
@@ -2516,7 +2325,7 @@ function handleDeclineTradeOffer(
       windowIndex: command.windowIndex,
       offerId: command.offerId,
     };
-    return rejectedDecline(command, rejection, run);
+    return rejectedCommand(command, rejection, run);
   }
   if (window.status !== 'open') {
     const rejection: SeasonWindowNotOpenRejection = {
@@ -2524,7 +2333,7 @@ function handleDeclineTradeOffer(
       franchiseId: null,
       windowIndex: command.windowIndex,
     };
-    return rejectedDecline(command, rejection, run);
+    return rejectedCommand(command, rejection, run);
   }
   if (offer.status !== 'open') {
     const rejection: SeasonOfferNotOpenRejection = {
@@ -2532,7 +2341,7 @@ function handleDeclineTradeOffer(
       windowIndex: command.windowIndex,
       offerId: command.offerId,
     };
-    return rejectedDecline(command, rejection, run);
+    return rejectedCommand(command, rejection, run);
   }
   const next = advanceRunState({
     ...run,
@@ -2566,21 +2375,6 @@ function handleDeclineTradeOffer(
     pending: null,
   };
 }
-function rejectedResume(
-  command: SeasonResumeSeasonBlockCommand,
-  rejection: SeasonResumeSeasonBlockRejection,
-  run: SeasonRun,
-  pending: SeasonPendingBlockCandidate | null,
-): SeasonRunCommandOutput {
-  return {
-    result: {
-      command: 'resume-season-block',
-      result: { status: 'rejected', commandId: command.commandId, rejection },
-    },
-    run,
-    pending,
-  };
-}
 function handleResumeSeasonBlock(
   command: SeasonResumeSeasonBlockCommand,
   context: SeasonRunCommandContext,
@@ -2593,7 +2387,7 @@ function handleResumeSeasonBlock(
       code: 'no-pending-block',
       blockIndex: command.blockIndex,
     };
-    return rejectedResume(command, rejection, run, pending);
+    return rejectedCommand(command, rejection, run, pending);
   }
   if (pending.blockIndex !== command.blockIndex) {
     const rejection: SeasonBlockMismatchRejection = {
@@ -2601,7 +2395,7 @@ function handleResumeSeasonBlock(
       blockIndex: command.blockIndex,
       pendingBlockIndex: pending.blockIndex,
     };
-    return rejectedResume(command, rejection, run, pending);
+    return rejectedCommand(command, rejection, run, pending);
   }
   if (pending.rotationDigest !== command.rotationDigest) {
     const rejection: SeasonRotationDigestMismatchRejection = {
@@ -2609,7 +2403,7 @@ function handleResumeSeasonBlock(
       rotationDigest: command.rotationDigest,
       pendingRotationDigest: pending.rotationDigest,
     };
-    return rejectedResume(command, rejection, run, pending);
+    return rejectedCommand(command, rejection, run, pending);
   }
   return {
     result: {
@@ -2620,21 +2414,6 @@ function handleResumeSeasonBlock(
         blockIndex: pending.blockIndex,
         nextGameId: pending.nextGameId,
       },
-    },
-    run,
-    pending,
-  };
-}
-function rejectedForfeit(
-  command: SeasonForfeitInterruptedGameCommand,
-  rejection: SeasonForfeitInterruptedGameRejection,
-  run: SeasonRun,
-  pending: SeasonPendingBlockCandidate | null,
-): SeasonRunCommandOutput {
-  return {
-    result: {
-      command: 'forfeit-interrupted-game',
-      result: { status: 'rejected', commandId: command.commandId, rejection },
     },
     run,
     pending,
@@ -2653,7 +2432,7 @@ function handleForfeitInterruptedGame(
       code: 'no-pending-block',
       blockIndex: command.blockIndex,
     };
-    return rejectedForfeit(command, rejection, run, pending);
+    return rejectedCommand(command, rejection, run, pending);
   }
   if (pending.blockIndex !== command.blockIndex) {
     const rejection: SeasonBlockMismatchRejection = {
@@ -2661,7 +2440,7 @@ function handleForfeitInterruptedGame(
       blockIndex: command.blockIndex,
       pendingBlockIndex: pending.blockIndex,
     };
-    return rejectedForfeit(command, rejection, run, pending);
+    return rejectedCommand(command, rejection, run, pending);
   }
   if (pending.nextGameId !== command.nextGameId) {
     const rejection: SeasonGameMismatchRejection = {
@@ -2669,7 +2448,7 @@ function handleForfeitInterruptedGame(
       nextGameId: command.nextGameId,
       pendingNextGameId: pending.nextGameId,
     };
-    return rejectedForfeit(command, rejection, run, pending);
+    return rejectedCommand(command, rejection, run, pending);
   }
   if (humanFranchiseId === null) {
     throw new SeasonRunCommandNotImplementedError(
@@ -2706,20 +2485,6 @@ function postseasonInvalidStageRejection(run: SeasonRun): SeasonInvalidStageReje
     currentStage: run.stage,
   };
 }
-function rejectedStart(
-  command: SeasonStartPostseasonCommand,
-  rejection: SeasonStartPostseasonRejection,
-  run: SeasonRun,
-): SeasonRunCommandOutput {
-  return {
-    result: {
-      command: 'start-postseason',
-      result: { status: 'rejected', commandId: command.commandId, rejection },
-    },
-    run,
-    pending: null,
-  };
-}
 function handleStartPostseason(
   command: SeasonStartPostseasonCommand,
   context: SeasonRunCommandContext,
@@ -2733,7 +2498,7 @@ function handleStartPostseason(
       requiredStage: 'regular-season',
       currentStage: run.stage,
     };
-    return rejectedStart(command, rejection, run);
+    return rejectedCommand(command, rejection, run);
   }
   let postseason: SeasonPostseasonState;
   try {
@@ -2751,7 +2516,7 @@ function handleStartPostseason(
     postseason = seasonPostseasonSetRankings(run.postseason, run.league, rankingResult);
   } catch (error) {
     if (error instanceof SeasonPostseasonInvariantError) {
-      return rejectedStart(command, { code: 'integrity-failure', reason: error.message }, run);
+      return rejectedCommand(command, { code: 'integrity-failure', reason: error.message }, run);
     }
     throw error;
   }
@@ -2771,20 +2536,6 @@ function handleStartPostseason(
     pending: null,
   };
 }
-function rejectedAdvance(
-  command: SeasonAdvancePostseasonCommand,
-  rejection: SeasonAdvancePostseasonRejection,
-  run: SeasonRun,
-): SeasonRunCommandOutput {
-  return {
-    result: {
-      command: 'advance-postseason',
-      result: { status: 'rejected', commandId: command.commandId, rejection },
-    },
-    run,
-    pending: null,
-  };
-}
 function handleAdvancePostseason(
   command: SeasonAdvancePostseasonCommand,
   context: SeasonRunCommandContext,
@@ -2793,7 +2544,7 @@ function handleAdvancePostseason(
   if (base !== null) return base;
   const run = economyRunOf(context);
   if (run.stage === 'regular-season' || run.stage === 'completed') {
-    return rejectedAdvance(command, postseasonInvalidStageRejection(run), run);
+    return rejectedCommand(command, postseasonInvalidStageRejection(run), run);
   }
   if (context.catalog === undefined || context.profile === undefined) {
     throw new SeasonPostseasonContextError(
@@ -2811,16 +2562,16 @@ function handleAdvancePostseason(
     if (!upcoming.includes(target)) {
       const next = seasonPostseasonNextGame(run.postseason);
       if (next.kind === 'integrity-failure') {
-        return rejectedAdvance(command, { code: 'integrity-failure', reason: next.reason }, run);
+        return rejectedCommand(command, { code: 'integrity-failure', reason: next.reason }, run);
       }
       if (next.kind === 'complete') {
-        return rejectedAdvance(
+        return rejectedCommand(
           command,
           { code: 'integrity-failure', reason: 'the postseason is complete' },
           run,
         );
       }
-      return rejectedAdvance(
+      return rejectedCommand(
         command,
         { code: 'wrong-game', targetGameId: target, nextGameId: next.gameId },
         run,
@@ -2933,7 +2684,7 @@ function handleAdvancePostseason(
     integrityReason = 'forfeit requested, but the human franchise has no upcoming game';
   }
   if (integrityReason !== null) {
-    return rejectedAdvance(command, { code: 'integrity-failure', reason: integrityReason }, run);
+    return rejectedCommand(command, { code: 'integrity-failure', reason: integrityReason }, run);
   }
   const stage = seasonPostseasonStageOf(current.postseason);
   const championFranchiseId = current.postseason.championFranchiseId;
@@ -2975,20 +2726,6 @@ function handleAdvancePostseason(
     postseasonSummaries: summaries,
   };
 }
-function rejectedSubmit(
-  command: SeasonSubmitPostseasonRotationCommand,
-  rejection: SeasonSubmitPostseasonRotationRejection,
-  run: SeasonRun,
-): SeasonRunCommandOutput {
-  return {
-    result: {
-      command: 'submit-postseason-rotation',
-      result: { status: 'rejected', commandId: command.commandId, rejection },
-    },
-    run,
-    pending: null,
-  };
-}
 function handleSubmitPostseasonRotation(
   command: SeasonSubmitPostseasonRotationCommand,
   context: SeasonRunCommandContext,
@@ -2997,14 +2734,14 @@ function handleSubmitPostseasonRotation(
   if (base !== null) return base;
   const run = economyRunOf(context);
   if (run.stage === 'regular-season' || run.stage === 'completed') {
-    return rejectedSubmit(command, postseasonInvalidStageRejection(run), run);
+    return rejectedCommand(command, postseasonInvalidStageRejection(run), run);
   }
   const next = seasonPostseasonNextGame(run.postseason);
   if (next.kind === 'integrity-failure') {
-    return rejectedSubmit(command, { code: 'integrity-failure', reason: next.reason }, run);
+    return rejectedCommand(command, { code: 'integrity-failure', reason: next.reason }, run);
   }
   if (next.kind === 'complete') {
-    return rejectedSubmit(
+    return rejectedCommand(
       command,
       { code: 'integrity-failure', reason: 'the postseason is complete' },
       run,
@@ -3016,7 +2753,7 @@ function handleSubmitPostseasonRotation(
       targetGameId: command.targetGameId,
       nextGameId: next.gameId,
     };
-    return rejectedSubmit(command, rejection, run);
+    return rejectedCommand(command, rejection, run);
   }
   const humanFranchiseId = context.humanFranchiseId;
   if (humanFranchiseId === null) {
@@ -3030,7 +2767,7 @@ function handleSubmitPostseasonRotation(
       targetGameId: command.targetGameId,
       nextGameId: next.gameId,
     };
-    return rejectedSubmit(command, rejection, run);
+    return rejectedCommand(command, rejection, run);
   }
   const payload = command.rotation;
   if (payload.franchiseId !== humanFranchiseId) {
@@ -3041,7 +2778,7 @@ function handleSubmitPostseasonRotation(
         `rotation targets ${payload.franchiseId} but the human franchise is ${humanFranchiseId}`,
       ],
     };
-    return rejectedSubmit(command, rejection, run);
+    return rejectedCommand(command, rejection, run);
   }
   if (context.catalog === undefined) {
     throw new SeasonPostseasonContextError(
@@ -3058,7 +2795,7 @@ function handleSubmitPostseasonRotation(
   }
   const rotationFailures = validateSeasonRotation(payload.rotation, memberPlayable);
   if (rotationFailures.length > 0) {
-    return rejectedSubmit(
+    return rejectedCommand(
       command,
       { code: 'invalid-rotation', franchiseId: payload.franchiseId, reasons: rotationFailures },
       run,
@@ -3076,7 +2813,7 @@ function handleSubmitPostseasonRotation(
         playerVersionId,
         reason: 'not-on-roster',
       };
-      return rejectedSubmit(command, rejection, run);
+      return rejectedCommand(command, rejection, run);
     }
   }
   for (const entry of payload.rotation.targetMinutes) {
@@ -3086,7 +2823,7 @@ function handleSubmitPostseasonRotation(
         playerVersionId: entry.playerVersionId,
         reason: 'injured',
       };
-      return rejectedSubmit(command, rejection, run);
+      return rejectedCommand(command, rejection, run);
     }
   }
   {
@@ -3099,7 +2836,7 @@ function handleSubmitPostseasonRotation(
       }
     }
     if (!legalFiveExists(availableMembers)) {
-      return rejectedSubmit(
+      return rejectedCommand(
         command,
         {
           code: 'invalid-rotation',
@@ -3124,7 +2861,7 @@ function handleSubmitPostseasonRotation(
       injury.sameGameReturned !== true &&
       injury.missedGamesRemaining > 0;
     if (injury === undefined || !active) {
-      return rejectedSubmit(
+      return rejectedCommand(
         command,
         {
           code: 'integrity-failure',
@@ -3134,7 +2871,7 @@ function handleSubmitPostseasonRotation(
       );
     }
     if (run.influence.rehabs[rehabInjuryId] !== undefined) {
-      return rejectedSubmit(
+      return rejectedCommand(
         command,
         { code: 'integrity-failure', reason: `injury ${rehabInjuryId} was already rehabilitated` },
         run,
@@ -3153,7 +2890,7 @@ function handleSubmitPostseasonRotation(
         balance,
         required: postseasonRehabCost,
       };
-      return rejectedSubmit(command, rejection, run);
+      return rejectedCommand(command, rejection, run);
     }
     const outcome = rollPostseasonRehabOutcome(run.rootSeed, rehabInjuryId);
     health = applyRiskyRehabOutcome(health, rehabInjuryId, outcome);
@@ -3202,20 +2939,6 @@ function handleSubmitPostseasonRotation(
     pending: null,
   };
 }
-function rejectedSpectate(
-  command: SeasonSpectatePostseasonGameCommand,
-  rejection: SeasonSpectatePostseasonGameRejection,
-  run: SeasonRun,
-): SeasonRunCommandOutput {
-  return {
-    result: {
-      command: 'spectate-postseason-game',
-      result: { status: 'rejected', commandId: command.commandId, rejection },
-    },
-    run,
-    pending: null,
-  };
-}
 function handleSpectatePostseasonGame(
   command: SeasonSpectatePostseasonGameCommand,
   context: SeasonRunCommandContext,
@@ -3224,7 +2947,7 @@ function handleSpectatePostseasonGame(
   if (base !== null) return base;
   const run = economyRunOf(context);
   if (run.stage === 'regular-season' || run.stage === 'completed') {
-    return rejectedSpectate(command, postseasonInvalidStageRejection(run), run);
+    return rejectedCommand(command, postseasonInvalidStageRejection(run), run);
   }
   if (context.catalog === undefined || context.profile === undefined) {
     throw new SeasonPostseasonContextError(
@@ -3233,10 +2956,10 @@ function handleSpectatePostseasonGame(
   }
   const decision = seasonPostseasonNextGame(run.postseason);
   if (decision.kind === 'integrity-failure') {
-    return rejectedSpectate(command, { code: 'integrity-failure', reason: decision.reason }, run);
+    return rejectedCommand(command, { code: 'integrity-failure', reason: decision.reason }, run);
   }
   if (decision.kind === 'complete') {
-    return rejectedSpectate(
+    return rejectedCommand(
       command,
       { code: 'integrity-failure', reason: 'the postseason is complete' },
       run,
@@ -3248,7 +2971,7 @@ function handleSpectatePostseasonGame(
       targetGameId: command.targetGameId,
       nextGameId: decision.gameId,
     };
-    return rejectedSpectate(command, rejection, run);
+    return rejectedCommand(command, rejection, run);
   }
   const humanFranchiseId = context.humanFranchiseId;
   if (
@@ -3260,7 +2983,7 @@ function handleSpectatePostseasonGame(
       targetGameId: command.targetGameId,
       nextGameId: decision.gameId,
     };
-    return rejectedSpectate(command, rejection, run);
+    return rejectedCommand(command, rejection, run);
   }
   const expanded = expandSeasonRunRosters(run, context.catalog);
   const outcome = simulateSeasonPostseasonGame(
@@ -3276,7 +2999,7 @@ function handleSpectatePostseasonGame(
     { resolver: context.postseasonGameResolver },
   );
   if (outcome.kind === 'integrity-failure') {
-    return rejectedSpectate(command, { code: 'integrity-failure', reason: outcome.reason }, run);
+    return rejectedCommand(command, { code: 'integrity-failure', reason: outcome.reason }, run);
   }
   const current = {
     ...run,
@@ -3328,20 +3051,6 @@ function handleSpectatePostseasonGame(
     postseasonSummaries: [outcome.summary],
   };
 }
-function rejectedFastForward(
-  command: SeasonFastForwardPostseasonCommand,
-  rejection: SeasonFastForwardPostseasonRejection,
-  run: SeasonRun,
-): SeasonRunCommandOutput {
-  return {
-    result: {
-      command: 'fast-forward-postseason',
-      result: { status: 'rejected', commandId: command.commandId, rejection },
-    },
-    run,
-    pending: null,
-  };
-}
 function handleFastForwardPostseason(
   command: SeasonFastForwardPostseasonCommand,
   context: SeasonRunCommandContext,
@@ -3350,12 +3059,12 @@ function handleFastForwardPostseason(
   if (base !== null) return base;
   const run = economyRunOf(context);
   if (run.stage === 'regular-season' || run.stage === 'completed') {
-    return rejectedFastForward(command, postseasonInvalidStageRejection(run), run);
+    return rejectedCommand(command, postseasonInvalidStageRejection(run), run);
   }
   if (command.targetGameId !== undefined) {
     const upcoming = seasonPostseasonUpcomingGames(run.postseason);
     if (!upcoming.includes(command.targetGameId)) {
-      return rejectedFastForward(
+      return rejectedCommand(
         command,
         {
           code: 'integrity-failure',
@@ -3370,7 +3079,7 @@ function handleFastForwardPostseason(
     humanFranchiseId !== null &&
     !seasonPostseasonHumanEliminated(run.postseason, humanFranchiseId)
   ) {
-    return rejectedFastForward(
+    return rejectedCommand(
       command,
       {
         code: 'integrity-failure',
@@ -3425,15 +3134,11 @@ function handleFastForwardPostseason(
     summaries.push(outcome.summary);
   }
   if (integrityReason !== null) {
-    return rejectedFastForward(
-      command,
-      { code: 'integrity-failure', reason: integrityReason },
-      run,
-    );
+    return rejectedCommand(command, { code: 'integrity-failure', reason: integrityReason }, run);
   }
   const championFranchiseId = current.postseason.championFranchiseId;
   if (championFranchiseId === null) {
-    return rejectedFastForward(
+    return rejectedCommand(
       command,
       { code: 'integrity-failure', reason: 'the tournament finished without a champion' },
       run,
@@ -3476,23 +3181,6 @@ function freeAgencyRejectionTo(error: FreeAgencyValidationRejection): SeasonRunC
   }
   return parsed.data;
 }
-function rejectedFreeAgency(
-  command:
-    | SeasonDeclareFreeAgentInterestCommand
-    | SeasonSkipFreeAgentMarketCommand
-    | SeasonResolveFreeAgentMarketCommand,
-  rejection: SeasonRunCommandRejection,
-  run: SeasonRun,
-): SeasonRunCommandOutput {
-  return {
-    result: {
-      command: command.command,
-      result: { status: 'rejected', commandId: command.commandId, rejection },
-    } as SeasonRunCommandResult,
-    run,
-    pending: null,
-  };
-}
 function handleDeclareFreeAgentInterest(
   command: SeasonDeclareFreeAgentInterestCommand,
   context: SeasonRunCommandContext,
@@ -3501,7 +3189,7 @@ function handleDeclareFreeAgentInterest(
   if (base !== null) return base;
   const run = economyRunOf(context);
   if (run.freeAgency.windows.every((window) => window.windowIndex !== command.windowIndex)) {
-    return rejectedFreeAgency(
+    return rejectedCommand(
       command,
       {
         code: 'free-agency-window-not-open',
@@ -3522,7 +3210,7 @@ function handleDeclareFreeAgentInterest(
     );
   } catch (error) {
     if (error instanceof FreeAgencyValidationRejection) {
-      return rejectedFreeAgency(command, freeAgencyRejectionTo(error), run);
+      return rejectedCommand(command, freeAgencyRejectionTo(error), run);
     }
     throw error;
   }
@@ -3550,7 +3238,7 @@ function handleSkipFreeAgentMarket(
   if (base !== null) return base;
   const run = economyRunOf(context);
   if (run.freeAgency.windows.every((window) => window.windowIndex !== command.windowIndex)) {
-    return rejectedFreeAgency(
+    return rejectedCommand(
       command,
       {
         code: 'free-agency-window-not-open',
@@ -3570,7 +3258,7 @@ function handleSkipFreeAgentMarket(
     );
   } catch (error) {
     if (error instanceof FreeAgencyValidationRejection) {
-      return rejectedFreeAgency(command, freeAgencyRejectionTo(error), run);
+      return rejectedCommand(command, freeAgencyRejectionTo(error), run);
     }
     throw error;
   }
@@ -3617,7 +3305,7 @@ function handleResolveFreeAgentMarket(
     );
   } catch (error) {
     if (error instanceof FreeAgencyValidationRejection) {
-      return rejectedFreeAgency(command, freeAgencyRejectionTo(error), run);
+      return rejectedCommand(command, freeAgencyRejectionTo(error), run);
     }
     throw error;
   }
@@ -3654,73 +3342,144 @@ function handleResolveFreeAgentMarket(
     pending: null,
   };
 }
-export function handleSeasonRunCommand(
-  command: SeasonRunCommand | SeasonLegacyRunCommand,
+type SeasonRunCommandInput = SeasonRunCommand | SeasonLegacyRunCommand;
+type SeasonRunCommandKind = SeasonRunCommandInput['command'];
+type SeasonRunCommandOf<Kind extends SeasonRunCommandKind> = Extract<
+  SeasonRunCommandInput,
+  { command: Kind }
+>;
+type SeasonRunCommandHandler = (
+  command: SeasonRunCommandInput,
+  context: SeasonRunCommandContext,
+) => SeasonRunCommandOutput;
+function isSeasonRunCommandOf<Kind extends SeasonRunCommandKind>(
+  command: SeasonRunCommandInput,
+  kind: Kind,
+): command is SeasonRunCommandOf<Kind> {
+  return command.command === kind;
+}
+function registerSeasonRunCommandHandler<Kind extends SeasonRunCommandKind>(
+  kind: Kind,
+  handler: (
+    command: SeasonRunCommandOf<Kind>,
+    context: SeasonRunCommandContext,
+  ) => SeasonRunCommandOutput,
+): SeasonRunCommandHandler {
+  return (command, context) => {
+    if (!isSeasonRunCommandOf(command, kind)) {
+      throw new Error(`season run command handler mismatch: ${command.command}`);
+    }
+    return handler(command, context);
+  };
+}
+const seasonRunCommandHandlers = {
+  'select-block-objective': registerSeasonRunCommandHandler(
+    'select-block-objective',
+    handleRetiredSeasonCommand,
+  ),
+  'spend-influence': registerSeasonRunCommandHandler('spend-influence', handleSpendInfluence),
+  'accept-trade-offer': registerSeasonRunCommandHandler(
+    'accept-trade-offer',
+    handleAcceptTradeOffer,
+  ),
+  'decline-trade-offer': registerSeasonRunCommandHandler(
+    'decline-trade-offer',
+    handleDeclineTradeOffer,
+  ),
+  'resume-season-block': registerSeasonRunCommandHandler(
+    'resume-season-block',
+    handleResumeSeasonBlock,
+  ),
+  'forfeit-interrupted-game': registerSeasonRunCommandHandler(
+    'forfeit-interrupted-game',
+    handleForfeitInterruptedGame,
+  ),
+  'start-postseason': registerSeasonRunCommandHandler('start-postseason', handleStartPostseason),
+  'advance-postseason': registerSeasonRunCommandHandler(
+    'advance-postseason',
+    handleAdvancePostseason,
+  ),
+  'submit-postseason-rotation': registerSeasonRunCommandHandler(
+    'submit-postseason-rotation',
+    handleSubmitPostseasonRotation,
+  ),
+  'spectate-postseason-game': registerSeasonRunCommandHandler(
+    'spectate-postseason-game',
+    handleSpectatePostseasonGame,
+  ),
+  'fast-forward-postseason': registerSeasonRunCommandHandler(
+    'fast-forward-postseason',
+    handleFastForwardPostseason,
+  ),
+  'submit-season-block': registerSeasonRunCommandHandler('submit-season-block', () => {
+    throw new SeasonRunCommandNotImplementedError(
+      'submit-season-block is handled by the block pipeline, not the run command dispatch',
+    );
+  }),
+  'declare-free-agent-interest': registerSeasonRunCommandHandler(
+    'declare-free-agent-interest',
+    handleDeclareFreeAgentInterest,
+  ),
+  'skip-free-agent-market': registerSeasonRunCommandHandler(
+    'skip-free-agent-market',
+    handleSkipFreeAgentMarket,
+  ),
+  'resolve-free-agent-market': registerSeasonRunCommandHandler(
+    'resolve-free-agent-market',
+    handleResolveFreeAgentMarket,
+  ),
+  'select-gm-identity': registerSeasonRunCommandHandler(
+    'select-gm-identity',
+    handleRetiredSeasonCommand,
+  ),
+  'select-campaign-opportunity': registerSeasonRunCommandHandler(
+    'select-campaign-opportunity',
+    handleRetiredSeasonCommand,
+  ),
+  'evolve-gm-campaign': registerSeasonRunCommandHandler(
+    'evolve-gm-campaign',
+    handleRetiredSeasonCommand,
+  ),
+  'open-trade-inquiry': registerSeasonRunCommandHandler(
+    'open-trade-inquiry',
+    handleOpenTradeInquiry,
+  ),
+  'submit-trade-proposal': registerSeasonRunCommandHandler(
+    'submit-trade-proposal',
+    handleSubmitTradeProposal,
+  ),
+  'respond-to-trade-counter': registerSeasonRunCommandHandler(
+    'respond-to-trade-counter',
+    handleRespondToTradeCounter,
+  ),
+  'walk-away-from-trade': registerSeasonRunCommandHandler(
+    'walk-away-from-trade',
+    handleWalkAwayFromTrade,
+  ),
+  'purchase-trade-inquiry': registerSeasonRunCommandHandler(
+    'purchase-trade-inquiry',
+    handlePurchaseTradeInquiry,
+  ),
+  'buy-sponsor': registerSeasonRunCommandHandler('buy-sponsor', handleBuySponsor),
+  'apply-sponsor': registerSeasonRunCommandHandler('apply-sponsor', handleApplySponsor),
+  'select-front-office': registerSeasonRunCommandHandler(
+    'select-front-office',
+    handleSelectFrontOffice,
+  ),
+  'select-court-innovation': registerSeasonRunCommandHandler(
+    'select-court-innovation',
+    handleSelectCourtInnovation,
+  ),
+} satisfies Record<SeasonRunCommandKind, SeasonRunCommandHandler>;
+function dispatchSeasonRunCommand(
+  command: SeasonRunCommandInput,
   context: SeasonRunCommandContext,
 ): SeasonRunCommandOutput {
-  switch (command.command) {
-    case 'select-block-objective':
-      return handleSelectBlockObjective(command, context);
-    case 'spend-influence':
-      return handleSpendInfluence(command, context);
-    case 'accept-trade-offer':
-      return handleAcceptTradeOffer(command, context);
-    case 'decline-trade-offer':
-      return handleDeclineTradeOffer(command, context);
-    case 'resume-season-block':
-      return handleResumeSeasonBlock(command, context);
-    case 'forfeit-interrupted-game':
-      return handleForfeitInterruptedGame(command, context);
-    case 'start-postseason':
-      return handleStartPostseason(command, context);
-    case 'advance-postseason':
-      return handleAdvancePostseason(command, context);
-    case 'submit-postseason-rotation':
-      return handleSubmitPostseasonRotation(command, context);
-    case 'spectate-postseason-game':
-      return handleSpectatePostseasonGame(command, context);
-    case 'fast-forward-postseason':
-      return handleFastForwardPostseason(command, context);
-    case 'submit-season-block':
-      throw new SeasonRunCommandNotImplementedError(
-        'submit-season-block is handled by the block pipeline, not the run command dispatch',
-      );
-    case 'declare-free-agent-interest':
-      return handleDeclareFreeAgentInterest(command, context);
-    case 'skip-free-agent-market':
-      return handleSkipFreeAgentMarket(command, context);
-    case 'resolve-free-agent-market':
-      return handleResolveFreeAgentMarket(command, context);
-    case 'select-gm-identity':
-      return handleSelectGmIdentity(command, context);
-    case 'select-campaign-opportunity':
-      return handleSelectCampaignOpportunity(command, context);
-    case 'evolve-gm-campaign':
-      return handleEvolveGmCampaign(command, context);
-    case 'open-trade-inquiry':
-      return handleOpenTradeInquiry(command, context);
-    case 'submit-trade-proposal':
-      return handleSubmitTradeProposal(command, context);
-    case 'respond-to-trade-counter':
-      return handleRespondToTradeCounter(command, context);
-    case 'walk-away-from-trade':
-      return handleWalkAwayFromTrade(command, context);
-    case 'purchase-trade-inquiry':
-      return handlePurchaseTradeInquiry(command, context);
-    case 'buy-sponsor':
-      return handleBuySponsor(command, context);
-    case 'apply-sponsor':
-      return handleApplySponsor(command, context);
-    case 'select-front-office':
-      return handleSelectFrontOffice(command, context);
-    case 'select-court-innovation':
-      return handleSelectCourtInnovation(command, context);
-    default: {
-      const exhaustive: never = command;
-      return assertNever(
-        exhaustive,
-        `unknown season run command ${JSON.stringify(command).slice(0, 128)}`,
-      );
-    }
-  }
+  return seasonRunCommandHandlers[command.command](command, context);
+}
+export function handleSeasonRunCommand(
+  command: SeasonRunCommandInput,
+  context: SeasonRunCommandContext,
+): SeasonRunCommandOutput {
+  return dispatchSeasonRunCommand(command, context);
 }

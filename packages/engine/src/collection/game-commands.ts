@@ -371,6 +371,7 @@ function applyPrepareChallengeGame(
       clearedDifficultyIds: playState.clearedDifficultyIds,
       clearedChallengeIds: playState.clearedChallengeIds,
       progression: input.progression,
+      progressionHash: input.progressionHash ?? '',
       profileVersion: input.profile.profileVersion,
       profileHash: input.profileHash,
       catalogHash: input.catalogHash,

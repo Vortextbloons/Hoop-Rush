@@ -21,7 +21,7 @@ test.describe('collection: team building and basic game', () => {
     await expect(page.getByText("Coach's board")).toBeVisible();
     await page.getByRole('button', { name: 'Auto build' }).click();
     await page.getByRole('button', { name: 'Save team' }).click();
-    await expect(page.getByText(/Saved team/)).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: /Saved team/ })).toBeVisible();
   }
 
   async function selectDifficulty(page: Page, label: string) {
@@ -55,7 +55,7 @@ test.describe('collection: team building and basic game', () => {
     await expect(page.getByText(/records a 0 rating shift/)).toBeVisible();
     await expect(page.getByText('CPU roster').first()).toBeVisible();
 
-    await page.getByRole('button', { name: 'Start game' }).click();
+    await page.getByRole('button', { name: 'Play game' }).click();
     await expect(page.getByRole('heading', { name: /You \d+ · CPU \d+/ })).toBeVisible({
       timeout: 120_000,
     });
@@ -106,7 +106,7 @@ test.describe('collection: team building and basic game', () => {
     await expect(page.getByText('First clear available: +500 Coins')).toBeVisible();
     await page.getByRole('button', { name: 'Prepare matchup' }).click();
     await expect(page.getByRole('heading', { name: 'Matchup ready' })).toBeVisible();
-    await page.getByRole('button', { name: 'Start game' }).click();
+    await page.getByRole('button', { name: 'Play game' }).click();
     await expect(page.getByRole('heading', { name: /You \d+ · CPU \d+/ })).toBeVisible({
       timeout: 120_000,
     });

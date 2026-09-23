@@ -5,7 +5,7 @@ import type {
 } from '@hoop-rush/data-contracts';
 import { COLLECTION_RARITY_ORDER } from '@hoop-rush/data-contracts';
 
-export const COLLECTION_PAGE_SIZE = 48;
+export const COLLECTION_PAGE_SIZE = 24;
 
 export interface CollectionFilters {
   search: string;

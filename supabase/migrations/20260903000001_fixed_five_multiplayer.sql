@@ -122,6 +122,28 @@ end $$;
 alter table public.fixed_five_rooms replica identity full;
 alter table public.fixed_five_room_commands replica identity full;
 
+create or replace function public.fixed_five_random_code()
+returns text
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_bytes bytea;
+  v_value integer;
+begin
+  loop
+    v_bytes := extensions.gen_random_bytes(2);
+    v_value := get_byte(v_bytes, 0) * 256 + get_byte(v_bytes, 1);
+    if v_value < 60000 then
+      return lpad((v_value % 10000)::text, 4, '0');
+    end if;
+  end loop;
+end;
+$$;
+revoke all on function public.fixed_five_random_code() from public, anon, authenticated;
+
 -- RPC: create room. Server-side root seed, rate-limited by UID, 15-minute codes.
 create or replace function public.fixed_five_room_create(p_mode text, p_source_mode text, p_variant text, p_versions jsonb)
 returns jsonb
@@ -168,7 +190,7 @@ begin
     v_deadline := now() + interval '90 seconds';
   end if;
   loop
-    v_code := lpad((floor(random() * 10000))::text, 4, '0');
+    v_code := public.fixed_five_random_code();
     begin
       insert into public.fixed_five_rooms (mode, source_mode, variant, versions, root_seed, code, code_active, code_expires_at, phase, deadline_at, deadline_cursor, deadline_participant, deadline_pick_ordinal)
         values (p_mode, p_source_mode, p_variant, p_versions, v_seed, v_code, true, now() + interval '15 minutes', 'lobby', v_deadline, 'lobby', 'p1', 0)
@@ -392,7 +414,7 @@ begin
   end if;
   delete from public.fixed_five_room_members where room_id = p_room_id and participant_id = 'p2';
   loop
-    v_code := lpad((floor(random() * 10000))::text, 4, '0');
+    v_code := public.fixed_five_random_code();
     begin
       update public.fixed_five_rooms set code = v_code, code_active = true, code_expires_at = now() + interval '15 minutes', revision = revision + 1, updated_at = now()
         where id = p_room_id;
@@ -454,7 +476,7 @@ begin
   end if;
   v_seed := encode(extensions.gen_random_bytes(16), 'hex');
   loop
-    v_code := lpad((floor(random() * 10000))::text, 4, '0');
+    v_code := public.fixed_five_random_code();
     begin
       insert into public.fixed_five_rooms (mode, source_mode, variant, versions, root_seed, code, code_active, code_expires_at, phase)
         values (v_room.mode, v_room.source_mode, v_room.variant, v_room.versions, v_seed, v_code, true, now() + interval '15 minutes', 'lobby')

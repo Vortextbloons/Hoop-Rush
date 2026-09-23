@@ -43,7 +43,7 @@
       line: 'Claim a starter, open seeded packs, grow one permanent collection.',
       status: 'available',
       cta: 'Open collection',
-      href: '/collection' as any,
+      href: '/ultimate/run' as any,
     },
   ] as const;
   let manifest = $state<HoopRushManifest | null>(null);

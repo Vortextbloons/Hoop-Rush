@@ -209,6 +209,7 @@ function challengeInput() {
     clearedDifficultyIds: [] as CollectionDifficultyId[],
     clearedChallengeIds: [] as string[],
     progression: PROGRESSION,
+    progressionHash: HASH,
     profileVersion: DEFAULT_ERA_SIM_PROFILE.profileVersion,
     profileHash: HASH,
     catalogHash: HASH,
@@ -609,6 +610,20 @@ describe('M4.4 challenge games', () => {
     expect(prepared.challenge.firstClearEligible).toBe(true);
     expect(prepared.challenge.validation.success).toBe(true);
     expect(collectionPreparedGameV3Schema.safeParse(prepared).success).toBe(true);
+  });
+
+  it('rejects semantically invalid progression rules before preparing a challenge', () => {
+    const tampered: CollectionProgressionRules = {
+      ...PROGRESSION,
+      targetMultiplierBp: PROGRESSION.targetMultiplierBp + 1,
+    };
+    expect(() =>
+      prepareCollectionChallengeGame({
+        ...challengeInput(),
+        progression: tampered,
+        challengeId: franchiseChallenge().challengeId,
+      }),
+    ).toThrow();
   });
 
   it('keeps challenge CPU and game seeds independent of the challenge id', () => {
