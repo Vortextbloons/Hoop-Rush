@@ -64,8 +64,8 @@ export function eligiblePackCards(
   catalog: CollectionCatalog,
   pack: CollectionPackDefinition,
 ): CollectionCatalogCard[] {
-  return catalog.cards.filter((card) =>
-    pack.eligibleScope === 'specials-only' ? card.family !== 'Base' : true,
+  return catalog.cards.filter(
+    (card) => pack.eligibleScope === 'specials-only' ? card.family !== 'Base' : true,
   );
 }
 

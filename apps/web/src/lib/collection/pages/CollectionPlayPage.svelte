@@ -364,6 +364,31 @@
     return ` ${label} +${String(component.amount)} Coins.`;
   }
 
+  function quarterSplitsOf(gameRecord: CollectionGameRecordUnion): Array<{
+    label: string;
+    home: number;
+    away: number;
+  }> {
+    if (gameRecord.result.outcome !== 'completed') return [];
+    const homePeriods = gameRecord.result.home.periodScores;
+    const awayPeriods = gameRecord.result.away.periodScores;
+    const count = Math.min(homePeriods.length, awayPeriods.length, 8);
+    const splits: Array<{ label: string; home: number; away: number }> = [];
+    for (let index = 0; index < count; index += 1) {
+      const label = index < 4 ? `Q${String(index + 1)}` : `OT${String(index - 3)}`;
+      splits.push({ label, home: homePeriods[index] ?? 0, away: awayPeriods[index] ?? 0 });
+    }
+    return splits;
+  }
+
+  function previewIconOf(kind: string): string {
+    if (kind === 'outcome-win') return '◉';
+    if (kind === 'outcome-loss') return '✕';
+    if (kind === 'margin') return '▂';
+    if (kind === 'first-clear') return '★';
+    return '◎';
+  }
+
   function readFlowFromUrl(): void {
     const params = page.url.searchParams;
     const requestedChallenge = params.get('challenge');
@@ -633,20 +658,38 @@
 </script>
 
 <div class="ur-page ur-play-page">
-  <div class="ur-page-intro">
-    <div>
-      <h2>Prepare the matchup</h2>
+  <div class="ur-pregame-hero">
+    <div class="ur-pregame-copy">
+      <p class="ur-pregame-kicker">Ultimate Run · Pre-game</p>
+      <h2 class="ur-pregame-title">Under the lights</h2>
       <p class="ur-page-description">
-        Scout the opponent, lock your objective, and play one recorded game at a time.
+        Set the matchup, play the committed simulation, then watch its recorded gamecast.
       </p>
     </div>
-    <span class="ur-status-badge">
-      {playState?.pendingGame
-        ? 'Matchup prepared'
-        : playState
-          ? `Game ${playState.nextGameSequence + (record ? 0 : 1)}`
-          : 'Run setup'}
-    </span>
+    <div class="ur-pregame-status">
+      <strong class="ur-number">
+        {playState?.pendingGame
+          ? 'Matchup prepared'
+          : playState
+            ? `Game ${playState.nextGameSequence + (record ? 0 : 1)}`
+            : 'Run setup'}</strong
+      >
+      <small
+        >{playState?.pendingGame
+          ? 'Locked until abandoned'
+          : 'Pre-game · setup locks on prepare'}</small
+      >
+      {#if playState}
+        <span
+          class="ur-clear-dots"
+          aria-label={`${clearedDifficultyIds.length} of 3 difficulty first clears claimed`}
+        >
+          {#each ['street', 'pro', 'legend'] as id (id)}
+            <i data-done={clearedDifficultyIds.includes(id as CollectionDifficultyId)}></i>
+          {/each}
+        </span>
+      {/if}
+    </div>
   </div>
 
   <p class="sr-only" role="status">{announcement}</p>
@@ -677,7 +720,7 @@
     </div>
     <a
       href={resolve('/ultimate/run/collection' as any)}
-      class="mt-3 inline-block min-h-11 rounded-xl bg-accent px-5 py-2.5 font-bold text-accent-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      class="ur-btn-gold mt-3 inline-block px-5 py-2.5 outline-none"
     >
       Go to collection
     </a>
@@ -691,7 +734,7 @@
     </div>
     <a
       href={resolve('/ultimate/run/team' as any)}
-      class="mt-3 inline-block min-h-11 rounded-xl bg-accent px-5 py-2.5 font-bold text-accent-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      class="ur-btn-gold mt-3 inline-block px-5 py-2.5 outline-none"
     >
       Build team
     </a>
@@ -709,8 +752,8 @@
       {#if pendingCurrent && catalog}
         <MatchupReport prepared={pendingCurrent} {catalog} />
       {:else if pendingV1}
-        <section aria-label="Matchup" class="mt-4 rounded-2xl border border-accent/50 bg-card p-5">
-          <h2 class="font-display text-xl font-extrabold">Matchup ready</h2>
+        <section aria-label="Matchup" class="ur-arena-panel mt-4 p-5">
+          <h2 class="ur-section-title">Matchup ready</h2>
           <p class="mt-1 text-sm text-muted-foreground">
             Legacy matchup. Rewards use the recorded M4.2 100/10 table.
           </p>
@@ -738,23 +781,30 @@
           </div>
         </section>
       {/if}
-      <div class="mt-5 flex flex-wrap gap-2">
+      <div class="ur-pending-actions">
         <button
           type="button"
           onclick={play}
           disabled={busy !== 'idle'}
-          class="min-h-11 rounded-xl bg-accent px-5 py-2.5 text-sm font-bold text-accent-foreground outline-none disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-ring"
+          class="ur-btn-gold ur-start-sim px-5 py-2.5 text-sm outline-none disabled:opacity-40"
         >
-          {busy === 'playing' ? 'Playing…' : busy === 'committing' ? 'Committing…' : 'Play game'}
+          {busy === 'playing'
+            ? 'Playing…'
+            : busy === 'committing'
+              ? 'Committing…'
+              : 'Start simulation →'}
         </button>
         <button
           type="button"
           onclick={abandon}
           disabled={busy !== 'idle'}
-          class="min-h-11 rounded-xl bg-surface-2 px-5 py-2.5 text-sm font-bold outline-none disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-ring"
+          class="ur-btn-ghost px-5 py-2.5 text-sm outline-none disabled:opacity-40"
         >
           Abandon matchup
         </button>
+        <span class="ur-pending-note"
+          >Setup locks when you prepare. Abandoning never reuses it.</span
+        >
       </div>
       {#if busy === 'playing'}
         <p class="mt-3 text-sm text-muted-foreground" aria-live="polite">
@@ -762,9 +812,9 @@
         </p>
       {/if}
     {:else if !record}
-      <fieldset class="mt-4" disabled={setupLocked}>
+      <fieldset class="ur-mode-switch" disabled={setupLocked}>
         <legend class="sr-only">Play mode</legend>
-        <div class="flex flex-wrap gap-2">
+        <div class="ur-mode-pills">
           <label class="relative block">
             <input
               type="radio"
@@ -776,11 +826,7 @@
               }}
               class="peer sr-only"
             />
-            <span
-              class="mode-pill flex min-h-11 items-center rounded-xl border-2 border-border bg-surface-2 px-4 py-2 text-sm font-bold"
-            >
-              Standard
-            </span>
+            <span class="mode-pill" class:mode-active={mode === 'standard'}> Standard </span>
           </label>
           <label class="relative block">
             <input
@@ -793,111 +839,109 @@
               }}
               class="peer sr-only"
             />
-            <span
-              class="mode-pill flex min-h-11 items-center rounded-xl border-2 border-border bg-surface-2 px-4 py-2 text-sm font-bold"
-            >
-              Challenges
-            </span>
+            <span class="mode-pill" class:mode-active={mode === 'challenges'}> Challenges </span>
           </label>
         </div>
       </fieldset>
 
       {#if mode === 'standard'}
-        <section aria-label="Game setup" class="mt-4 rounded-2xl border border-border bg-card p-5">
-          <div class="flex flex-wrap items-end justify-between gap-2">
-            <div>
-              <p class="ultimate-eyebrow">Pre-game setup</p>
-              <h2 class="font-display text-xl font-extrabold">Scout the matchup</h2>
-            </div>
-            <p class="text-xs text-muted-foreground">
-              Setup locks when you prepare. Abandon to change it.
-            </p>
-          </div>
-          <div class="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,21rem)]">
-            <div class="space-y-6">
+        <section aria-label="Game setup" class="ur-scout-panel">
+          <div class="ur-scout-grid">
+            <div class="ur-scout-main">
+              <div class="ur-step-head">
+                <span class="ur-step-num" aria-hidden="true">1.</span>
+                <div>
+                  <h2 class="ur-step-title">Scout the matchup</h2>
+                  <p class="ur-step-sub">
+                    Choose the rules and difficulty. Rewards scale with risk.
+                  </p>
+                </div>
+              </div>
               <DifficultyPicker
                 options={difficultyOptions}
                 value={difficultyId}
                 disabled={setupLocked}
+                legend="Difficulty"
                 onChange={(id) => {
                   if (id !== difficultyId) selectedObjectiveId = null;
                   difficultyId = id;
                 }}
               />
+              <div class="ur-step-head ur-step-head--two">
+                <span class="ur-step-num" aria-hidden="true">2.</span>
+                <div>
+                  <h2 class="ur-step-title">Objective</h2>
+                  <p class="ur-step-sub">
+                    The objective changes rewards only. It never changes the opponent.
+                  </p>
+                </div>
+              </div>
               <ObjectivePicker
                 options={objectiveOptions}
                 value={effectiveObjectiveId}
                 disabled={setupLocked}
+                legend="Objective"
                 onChange={(id) => {
                   selectedObjectiveId = id;
                 }}
               />
             </div>
             {#if preview}
-              <section
-                aria-label="Reward preview"
-                class="rounded-2xl border border-border bg-surface-2 p-4 lg:sticky lg:top-4 lg:self-start"
-              >
-                <h3 class="font-display text-base font-extrabold">Exact reward preview</h3>
-                <p class="mt-1 text-xs text-muted-foreground">
-                  {difficultyNameOf(difficultyId)} · {preview.multiplierLabel} on outcome, objective,
-                  and margin. First clear is fixed.
+              <section aria-label="Reward preview" class="ur-reward-preview">
+                <h3 class="ur-reward-title">Expected reward preview</h3>
+                <p class="ur-reward-sub">
+                  {difficultyNameOf(difficultyId)} · {effectiveObjectiveId ?? 'No objective'} · {preview.firstClearClaimed
+                    ? 'First clear claimed'
+                    : 'First clear fixed'}
                 </p>
-                <ul class="mt-3 space-y-2">
+                <ul class="ur-reward-rows">
                   {#each preview.rows as row (row.kind)}
-                    <li
-                      class="flex items-start justify-between gap-3 rounded-lg bg-card px-3 py-2 text-sm"
-                    >
-                      <span>
-                        <span class="block font-semibold">{row.label}</span>
-                        <span class="block text-xs text-muted-foreground">{row.detail}</span>
-                      </span>
-                      <span
-                        class="font-bold tabular-nums {row.coins === 0
-                          ? 'text-muted-foreground'
-                          : 'text-accent'}"
+                    <li>
+                      <span class="ur-reward-icon" aria-hidden="true"
+                        >{previewIconOf(row.kind)}</span
                       >
+                      <span class="ur-reward-copy">
+                        <span class="ur-reward-label">{row.label}</span>
+                        <span class="ur-reward-detail">{row.detail}</span>
+                      </span>
+                      <span class="ur-reward-coins" data-zero={row.coins === 0}>
                         {row.coins === 0 ? '—' : `+${row.coins}`}
                       </span>
                     </li>
                   {/each}
                 </ul>
-                <dl class="mt-3 space-y-1 text-xs text-muted-foreground">
-                  <div class="flex items-center justify-between gap-3">
-                    <dt>Max repeat (win + objective + margin)</dt>
-                    <dd class="font-bold text-foreground tabular-nums">
-                      +{preview.maxRepeatCoins}
-                    </dd>
-                  </div>
-                  <div class="flex items-center justify-between gap-3">
-                    <dt>Max total with first clear</dt>
-                    <dd class="font-bold text-foreground tabular-nums">+{preview.maxTotalCoins}</dd>
-                  </div>
-                </dl>
+                <div class="ur-reward-max">
+                  <span>Max possible reward <small>(win + margin, first clear)</small></span>
+                  <strong class="ur-number">+{preview.maxTotalCoins}</strong>
+                </div>
+                <p class="ur-reward-repeat tabular-nums">
+                  Max repeat {preview.maxRepeatCoins} · win {preview.winCoins} + margin {preview.marginMaxCoins}{preview.objectiveCoins !==
+                  null
+                    ? ` + objective ${preview.objectiveCoins}`
+                    : ''}
+                </p>
                 <button
                   type="button"
                   onclick={prepare}
                   disabled={setupLocked}
-                  class="mt-4 min-h-11 w-full rounded-xl bg-accent px-5 py-2.5 text-sm font-bold text-accent-foreground outline-none disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-ring"
+                  class="ur-btn-gold ur-prepare-btn"
                 >
-                  {busy === 'preparing' ? 'Preparing…' : 'Prepare matchup'}
+                  {busy === 'preparing' ? 'Preparing…' : 'Prepare matchup →'}
                 </button>
-                <p class="mt-2 text-xs text-muted-foreground" aria-live="polite">
-                  Preparing consumes the game sequence. Abandoning never reuses it.
+                <p class="ur-reward-lock" aria-live="polite">
+                  <span aria-hidden="true">◈</span> Setup locks when you prepare. Abandoning never reuses
+                  it.
                 </p>
               </section>
             {/if}
           </div>
         </section>
       {:else}
-        <section
-          aria-label="Challenge browser"
-          class="mt-4 rounded-2xl border border-border bg-card p-5"
-        >
+        <section aria-label="Challenge browser" class="ur-arena-panel mt-4 p-5">
           <div class="flex flex-wrap items-end justify-between gap-2">
             <div>
-              <p class="ultimate-eyebrow">Challenges</p>
-              <h2 class="font-display text-xl font-extrabold">
+              <p class="ur-hero-eyebrow">Challenges</p>
+              <h2 class="ur-section-title">
                 {progression?.display.challengesTitle ?? 'Fixed roster challenges'}
               </h2>
             </div>
@@ -934,7 +978,7 @@
               <AsyncState kind="loading" title="Loading" message="Loading challenges…" />
             </div>
           {:else}
-            <ul class="mt-4 grid gap-4 lg:grid-cols-2">
+            <ul class="ur-challenge-grid mt-4 grid gap-4 lg:grid-cols-2">
               {#each challengeViews as view (view.challengeId)}
                 {@const viewFacts = challengeFacts.get(view.challengeId)}
                 {#if viewFacts}
@@ -954,10 +998,10 @@
               <div
                 bind:this={challengePanel}
                 tabindex="-1"
-                class="mt-6 rounded-2xl border border-border bg-surface-2 p-5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                class="ur-selected-challenge mt-6 p-5 outline-none"
                 aria-label="Selected challenge"
               >
-                <h3 class="font-display text-lg font-extrabold">
+                <h3 class="ur-section-title">
                   {selectedChallenge.displayName}
                 </h3>
                 <p class="mt-1 text-sm text-muted-foreground">
@@ -1015,9 +1059,9 @@
                     {#if challengePreview && challengeReward}
                       <section
                         aria-label="Challenge reward preview"
-                        class="rounded-2xl border border-border bg-card p-4 lg:sticky lg:top-4 lg:self-start"
+                        class="ur-reward-preview p-4 lg:sticky lg:top-4 lg:self-start"
                       >
-                        <h4 class="font-display text-base font-extrabold">Exact reward preview</h4>
+                        <h4 class="ur-section-title ur-reward-title">Exact reward preview</h4>
                         <p class="mt-1 text-xs text-muted-foreground">
                           Standard rewards use the {difficultyNameOf(
                             selectedChallenge.difficultyId,
@@ -1097,7 +1141,7 @@
                           type="button"
                           onclick={prepare}
                           disabled={setupLocked}
-                          class="mt-4 min-h-11 w-full rounded-xl bg-accent px-5 py-2.5 text-sm font-bold text-accent-foreground outline-none disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-ring"
+                          class="ur-btn-gold mt-4 w-full px-5 py-2.5 text-sm outline-none disabled:opacity-40"
                         >
                           {busy === 'preparing' ? 'Preparing…' : 'Prepare challenge'}
                         </button>
@@ -1121,113 +1165,106 @@
     {/if}
 
     {#if record && facts}
+      {@const splits = quarterSplitsOf(record)}
       <section aria-label="Result and gamecast" class="ur-gamecast mt-4">
-        <div class="ur-scoreboard">
-          <div class="ur-scoreboard-heading">
-            <div>
-              <span class="ur-scoreboard-result"
-                >{facts.winner === 'home' ? 'Final · Win' : 'Final · Loss'}</span
-              >
-              <h2 class="ur-scoreboard-title">
-                {record.gameVersion === 'collection-game-v3'
-                  ? record.prepared.challenge.displayName
-                  : record.gameVersion === 'collection-game-v1'
-                    ? 'Ultimate Run game'
-                    : difficultyNameOf(record.prepared.difficulty.difficultyId)}
-              </h2>
-            </div>
-            <button
-              type="button"
-              onclick={prepare}
-              disabled={busy !== 'idle'}
-              class="ur-play-again"
-            >
-              {busy === 'preparing' ? 'Preparing…' : 'Play again'}
-            </button>
-          </div>
-          <div class="ur-scoreline" aria-label="Final score">
-            <div><span>You</span><strong>{facts.homeScore}</strong></div>
-            <span class="ur-score-divider">–</span>
-            <div><span>CPU</span><strong>{facts.awayScore}</strong></div>
-          </div>
-          <div class="ur-scoreboard-foot">
+        <div class="ur-broadcast-mast">
+          <p class="ur-broadcast-note">Recorded from the committed game. This is not live play.</p>
+          <button
+            type="button"
+            onclick={prepare}
+            disabled={busy !== 'idle'}
+            class="ur-play-again ur-play-again--mast"
+          >
+            {busy === 'preparing' ? 'Preparing…' : 'Play again'}
+          </button>
+        </div>
+        <div class="ur-scoreboard ur-final-board">
+          <p class="ur-final-kicker">
+            {facts.winner === 'home' ? 'Final · Win' : 'Final · Loss'}
+            <span aria-hidden="true"> · </span>
             <span>
-              {facts.winner === 'home' ? 'You won' : 'CPU won'}
-              {facts.overtimePeriods > 0
-                ? ` · ${facts.overtimePeriods} overtime${facts.overtimePeriods === 1 ? '' : 's'}`
-                : ''}
+              {record.gameVersion === 'collection-game-v3'
+                ? record.prepared.challenge.displayName
+                : record.gameVersion === 'collection-game-v1'
+                  ? 'Ultimate Run game'
+                  : difficultyNameOf(record.prepared.difficulty.difficultyId)}
             </span>
-            <strong>+{facts.rewardCoins} Coins</strong>
+          </p>
+          <div class="ur-scoreline" aria-label="Final score">
+            <div><span>You</span><strong class="ur-number">{facts.homeScore}</strong></div>
+            <span class="ur-score-divider" aria-hidden="true">-</span>
+            <div><span>CPU</span><strong class="ur-number">{facts.awayScore}</strong></div>
           </div>
-          {#if scoreboardEvent}
-            <p class="ur-live-fact">
-              <span>Recorded timeline</span>
-              <strong
-                >Q{scoreboardEvent.period} · {clockLabel(scoreboardEvent.secondsRemaining)}</strong
-              >
-              <span>{eventLabel(scoreboardEvent)}</span>
-            </p>
+          <p class="ur-final-coins">+{facts.rewardCoins} Coins</p>
+          {#if splits.length > 0}
+            <ol class="ur-quarter-strip" aria-label="Score by quarter">
+              {#each splits as split (split.label)}
+                <li class="tabular-nums">
+                  <span>{split.label}</span><strong>{split.home}-{split.away}</strong>
+                </li>
+              {/each}
+            </ol>
           {/if}
+          <p class="ur-final-meta">
+            {facts.winner === 'home' ? 'You won' : 'CPU won'}
+            {facts.overtimePeriods > 0
+              ? ` · ${facts.overtimePeriods} overtime${facts.overtimePeriods === 1 ? '' : 's'}`
+              : ''}
+          </p>
         </div>
 
-        <div class="ur-gamecast-controls">
-          <div class="flex flex-wrap gap-2" role="group" aria-label="Watch mode">
+        <div class="ur-gamecast-controls ur-control-bar">
+          <div class="ur-speed-pills" role="group" aria-label="Recorded replay speed">
             {#each [{ id: 'fast', label: 'Fast' }, { id: 'standard', label: 'Standard' }, { id: 'slow', label: 'Slow' }] as modeOption (modeOption.id)}
               <button
                 type="button"
                 onclick={() => setMode(modeOption.id as WatchMode)}
                 aria-pressed={watchMode === modeOption.id}
-                class="min-h-11 rounded-xl px-4 py-2 text-sm font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring {watchMode ===
-                modeOption.id
-                  ? 'bg-accent text-accent-foreground'
-                  : 'bg-surface-2'}"
+                class="ur-speed-pill"
+                data-active={watchMode === modeOption.id}
               >
                 {modeOption.label}
               </button>
             {/each}
           </div>
+          {#if watchMode !== 'fast'}
+            <div class="ur-replay-actions">
+              <button type="button" onclick={togglePlayback} class="ur-replay-primary">
+                {playing ? 'Pause recording' : '⏵ Play recording'}
+              </button>
+              <button type="button" onclick={stepOnce} disabled={playing} class="ur-replay-btn">
+                Next event
+              </button>
+              <button type="button" onclick={skipToFinal} class="ur-replay-btn">
+                Skip to final
+              </button>
+            </div>
+          {/if}
         </div>
 
         {#if watchMode !== 'fast'}
-          <div class="mt-3 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onclick={togglePlayback}
-              class="min-h-11 rounded-xl bg-surface-2 px-4 py-2 text-sm font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {playing ? 'Pause' : 'Play'}
-            </button>
-            <button
-              type="button"
-              onclick={stepOnce}
-              disabled={playing}
-              class="min-h-11 rounded-xl bg-surface-2 px-4 py-2 text-sm font-bold outline-none disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              Step
-            </button>
-            <button
-              type="button"
-              onclick={skipToFinal}
-              class="min-h-11 rounded-xl bg-surface-2 px-4 py-2 text-sm font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              Skip to final
-            </button>
-            <span class="text-sm tabular-nums text-muted-foreground" aria-live="off">
-              {Math.min(cursor + 1, shownEvents.length)} / {shownEvents.length}
-              {watchMode === 'standard' ? '· 250 ms per event' : '· 650 ms per event'}
-            </span>
-          </div>
-          <ol class="mt-3 max-h-72 space-y-1 overflow-y-auto pr-1 text-sm" aria-label="Gamecast">
+          <p class="ur-event-meta tabular-nums" aria-live="off">
+            {Math.min(cursor + 1, shownEvents.length)} / {shownEvents.length}
+            {watchMode === 'standard' ? '· 250 ms per event' : '· 650 ms per event'}
+            {#if scoreboardEvent}
+              <span>
+                · Q{scoreboardEvent.period} · {clockLabel(scoreboardEvent.secondsRemaining)}</span
+              >
+            {/if}
+          </p>
+          <ol class="ur-recorded-events" aria-label="Recorded gamecast events">
             {#each shownEvents.slice(0, cursor + 1) as event (event.eventOrder)}
-              <li class="rounded-lg bg-surface-2 px-3 py-2 tabular-nums">{eventLabel(event)}</li>
+              <li class="tabular-nums">
+                <span class="ur-event-q">Q{event.period}</span>{eventLabel(event)}
+              </li>
             {/each}
           </ol>
         {/if}
 
-        <div class="mt-4 grid gap-4 md:grid-cols-2">
-          <div class="rounded-xl bg-surface-2 p-4 text-sm">
-            <h3 class="font-bold">Game facts</h3>
-            <ul class="mt-2 space-y-1 tabular-nums text-muted-foreground">
+        <div class="ur-facts-grid">
+          <div class="ur-facts-panel">
+            <h3>Game facts</h3>
+            <ul class="tabular-nums">
               <li>
                 Top scorer (you): {facts.topHome
                   ? `${nameOf(facts.topHome.cardId)} · ${facts.topHome.points}`
@@ -1250,9 +1287,9 @@
             </ul>
           </div>
           {#if !recordV2}
-            <div class="rounded-xl bg-surface-2 p-4 text-sm">
-              <h3 class="font-bold">Reward receipt</h3>
-              <p class="mt-2 tabular-nums text-muted-foreground">
+            <div class="ur-facts-panel">
+              <h3>Reward breakdown</h3>
+              <p class="tabular-nums">
                 +{facts.rewardCoins} Coins ({facts.rewardReason === 'game-win-reward'
                   ? 'win'
                   : 'loss'}) · balances now {balances.Coins} Coins.
@@ -1305,10 +1342,37 @@
 </div>
 
 <style>
+  .ur-mode-switch {
+    margin-top: 1rem;
+  }
+  .ur-mode-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .mode-pill {
+    display: inline-flex;
+    min-height: 2.75rem;
+    align-items: center;
+    padding: 0.55rem 1.15rem;
+    border: 1px solid color-mix(in srgb, var(--ur-apex) 28%, var(--ur-line-strong));
+    border-radius: 0.55rem;
+    background: linear-gradient(180deg, rgb(255 255 255 / 3%), transparent 40%), var(--ur-surface);
+    color: var(--ur-muted);
+    font-size: 0.82rem;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 5%);
+  }
+  .mode-pill.mode-active,
   input:checked + .mode-pill {
-    border-color: var(--ur-apex);
-    background: color-mix(in srgb, var(--ur-apex) 15%, var(--ur-raised));
-    color: var(--ur-paper);
+    border-color: #ff7a2f;
+    background:
+      linear-gradient(180deg, rgb(255 218 115 / 22%), rgb(255 197 61 / 10%)), var(--ur-raised);
+    color: #ffb37a;
+    box-shadow:
+      0 0 1rem rgb(255 110 30 / 20%),
+      inset 0 1px 0 rgb(255 255 255 / 8%);
   }
   input:focus-visible + .mode-pill {
     outline: 3px solid var(--ur-focus);
@@ -1326,50 +1390,152 @@
     font-size: 0.9rem;
   }
 
+  .ur-pregame-hero {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem 1.5rem;
+    margin-bottom: 1.1rem;
+    padding: clamp(1.1rem, 3vw, 1.8rem);
+    border: 1px solid color-mix(in srgb, var(--ur-apex) 28%, var(--ur-line));
+    border-radius: 0.9rem;
+    background:
+      radial-gradient(ellipse 55% 80% at 50% 0%, rgb(255 196 64 / 22%), transparent 62%),
+      radial-gradient(ellipse 40% 60% at 88% 30%, rgb(255 122 26 / 16%), transparent 60%),
+      linear-gradient(180deg, #181f25, #0b0f13 70%);
+    box-shadow:
+      0 1.2rem 2.6rem rgb(0 0 0 / 45%),
+      inset 0 1px 0 rgb(255 255 255 / 8%);
+  }
+  .ur-pregame-kicker {
+    margin: 0;
+    color: var(--ur-apex);
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+  }
+  .ur-pregame-title {
+    margin: 0.3rem 0 0;
+    color: #fff;
+    font-family: var(--font-display);
+    font-size: clamp(2.2rem, 5.5vw, 3.4rem);
+    font-weight: 900;
+    letter-spacing: -0.03em;
+    line-height: 0.95;
+    text-shadow: 0 2px 18px rgb(0 0 0 / 60%);
+  }
+  .ur-pregame-hero .ur-page-description {
+    max-width: 52ch;
+    margin-top: 0.55rem;
+  }
+  .ur-pregame-status {
+    display: grid;
+    gap: 0.3rem;
+    min-width: min(16rem, 100%);
+    padding: 0.8rem 1rem;
+    border: 1px solid color-mix(in srgb, var(--ur-apex) 35%, var(--ur-line));
+    border-radius: 0.7rem;
+    background: rgb(6 9 12 / 68%);
+  }
+  .ur-pregame-status strong {
+    color: #fff;
+    font-size: 1rem;
+  }
+  .ur-pregame-status small {
+    color: var(--ur-muted);
+    font-size: 0.7rem;
+  }
+  .ur-clear-dots {
+    display: flex;
+    gap: 0.35rem;
+    margin-top: 0.3rem;
+  }
+  .ur-clear-dots i {
+    width: 1.6rem;
+    height: 0.4rem;
+    border-radius: 999px;
+    background: var(--ur-line-strong);
+  }
+  .ur-clear-dots i[data-done='true'] {
+    background: linear-gradient(90deg, #e9a91f, var(--ur-apex));
+    box-shadow: 0 0 8px rgb(255 197 61 / 50%);
+  }
+
   .ur-gamecast {
-    border-top: 3px solid var(--ur-apex);
-    background: var(--ur-raised);
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--ur-apex) 30%, var(--ur-line-strong));
+    border-radius: 0.75rem;
+    background:
+      linear-gradient(180deg, rgb(255 197 61 / 5%), transparent 22%),
+      linear-gradient(165deg, #141c21, #0b1114 75%);
+    box-shadow:
+      0 0 0 1px rgb(0 0 0 / 40%),
+      inset 0 1px 0 rgb(255 255 255 / 6%);
     padding: clamp(0.75rem, 2vw, 1.25rem);
+  }
+
+  .ur-broadcast-mast {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem 1.5rem;
+    padding: 0.8rem 1rem;
+    border: 1px solid color-mix(in srgb, var(--ur-apex) 24%, var(--ur-line));
+    border-radius: 0.75rem;
+    margin-bottom: 0.75rem;
+    background: linear-gradient(180deg, rgb(255 255 255 / 2%), transparent 40%), var(--ur-surface);
+  }
+
+  .ur-broadcast-note {
+    margin: 0;
+    color: var(--ur-muted);
+    font-size: 0.82rem;
   }
 
   .ur-scoreboard {
     overflow: hidden;
     padding: clamp(1rem, 3vw, 1.8rem);
+    border: 1px solid color-mix(in srgb, var(--ur-apex) 32%, var(--ur-line-strong));
+    border-radius: 0.75rem;
     background:
-      linear-gradient(90deg, transparent 49.8%, rgb(240 236 223 / 7%) 50%, transparent 50.2%),
-      repeating-linear-gradient(0deg, transparent 0 31px, rgb(240 236 223 / 3%) 32px), #05080a;
-  }
-
-  .ur-scoreboard-heading {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-  }
-
-  .ur-scoreboard-result {
-    color: var(--ur-apex);
-    font-size: 0.75rem;
-    font-weight: 800;
-    letter-spacing: 0.07em;
-  }
-
-  .ur-scoreboard-title {
-    margin-top: 0.2rem;
-    color: var(--ur-paper);
-    font-family: var(--font-display);
-    font-size: clamp(1.2rem, 4vw, 1.8rem);
-    font-weight: 800;
+      linear-gradient(180deg, rgb(255 197 61 / 7%), transparent 26%),
+      linear-gradient(
+        90deg,
+        transparent 49.8%,
+        color-mix(in srgb, var(--ur-paper) 8%, transparent) 50%,
+        transparent 50.2%
+      ),
+      repeating-linear-gradient(
+        0deg,
+        transparent 0 31px,
+        color-mix(in srgb, var(--ur-paper) 4%, transparent) 32px
+      ),
+      radial-gradient(
+        ellipse at 50% 0%,
+        color-mix(in srgb, var(--ur-apex) 14%, transparent),
+        transparent 62%
+      ),
+      linear-gradient(165deg, #141c21, #0b1114 75%);
+    box-shadow:
+      0 0 2rem rgb(255 197 61 / 8%),
+      inset 0 1px 0 rgb(255 255 255 / 6%);
   }
 
   .ur-play-again {
     min-height: 2.75rem;
     padding: 0.6rem 1rem;
-    background: var(--ur-apex);
+    border: 1px solid var(--ur-apex);
+    border-radius: 0.55rem;
+    background: linear-gradient(180deg, #ffda73, var(--ur-apex));
     color: #241a02;
     font-size: 0.86rem;
-    font-weight: 800;
+    font-weight: 900;
+    box-shadow:
+      0 0.4rem 1.2rem rgb(245 184 31 / 35%),
+      inset 0 1px 0 rgb(255 255 255 / 55%);
   }
 
   .ur-play-again:disabled {
@@ -1383,7 +1549,7 @@
     justify-content: center;
     gap: clamp(0.65rem, 5vw, 3rem);
     padding-block: clamp(1.3rem, 5vw, 3rem);
-    border-block: 1px solid #293237;
+    border-block: 1px solid var(--ur-line-strong);
     margin-block: 1rem;
   }
 
@@ -1401,12 +1567,13 @@
   }
 
   .ur-scoreline strong {
-    color: var(--ur-paper);
+    color: #fff;
     font-family: var(--font-display);
     font-size: clamp(3.7rem, 13vw, 7rem);
-    font-weight: 800;
+    font-weight: 900;
     font-variant-numeric: tabular-nums;
     line-height: 0.95;
+    text-shadow: 0 2px 24px rgb(0 0 0 / 65%);
   }
 
   .ur-score-divider {
@@ -1415,67 +1582,130 @@
     font-size: clamp(2rem, 8vw, 4rem);
   }
 
-  .ur-scoreboard-foot {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    gap: 0.5rem;
-    color: var(--ur-muted);
-    font-size: 0.8rem;
-  }
-
-  .ur-scoreboard-foot strong {
-    color: var(--ur-success);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .ur-live-fact {
-    display: grid;
-    grid-template-columns: auto auto minmax(0, 1fr);
-    gap: 0.35rem 0.75rem;
-    align-items: baseline;
-    margin-top: 1rem;
-    padding-top: 0.75rem;
-    border-top: 1px solid #293237;
-    color: var(--ur-muted);
-    font-size: 0.78rem;
-  }
-
-  .ur-live-fact strong {
-    color: var(--ur-paper);
-    font-variant-numeric: tabular-nums;
-  }
-
   .ur-gamecast-controls {
     display: flex;
-    justify-content: flex-end;
+    justify-content: flex-start;
     margin-top: 1rem;
+    padding-block: 0.75rem;
+    border-block: 1px solid var(--ur-line);
   }
 
-  .ur-gamecast-controls button[aria-pressed='true'] {
-    background: var(--ur-apex);
-    color: #241a02;
+  .ur-recorded-events li {
+    border: 1px solid var(--ur-line);
+    border-inline-start: 2px solid var(--ur-apex);
+    border-radius: 0.6rem;
+    background: var(--ur-surface);
+    padding: 0.6rem 0.75rem;
+  }
+
+  .ur-gamecast .rounded-xl.bg-surface-2 {
+    border: 1px solid color-mix(in srgb, var(--ur-apex) 22%, var(--ur-line));
+    border-radius: 0.75rem;
+    background: var(--ur-surface);
   }
 
   .ur-play-page section[aria-label='Game setup'],
   .ur-play-page section[aria-label='Challenge browser'] {
-    border: 0;
-    border-top: 2px solid var(--ur-line-strong);
-    border-radius: 0;
-    background: var(--ur-raised);
     padding: clamp(1rem, 2.5vw, 1.5rem);
   }
 
-  .ur-play-page section[aria-label='Reward preview'],
-  .ur-play-page section[aria-label='Challenge reward preview'] {
-    border: 1px solid var(--ur-line);
-    border-radius: 0;
-    background: var(--ur-surface);
+  .ur-reward-preview {
+    border: 1px solid color-mix(in srgb, var(--ur-apex) 34%, var(--ur-line-strong));
+    border-radius: 0.75rem;
+    background:
+      linear-gradient(105deg, color-mix(in srgb, var(--ur-apex) 14%, transparent), transparent 62%),
+      linear-gradient(165deg, #141c21, #0b1114 75%);
+    box-shadow:
+      0 0 2rem rgb(255 197 61 / 10%),
+      inset 0 1px 0 rgb(255 255 255 / 6%);
   }
 
-  .ur-play-page .rounded-xl.bg-surface-2,
-  .ur-play-page .rounded-2xl.bg-card {
-    border-radius: 0;
+  .ur-reward-title {
+    font-size: 1.1rem;
+  }
+
+  .ur-reward-preview li,
+  .ur-selected-challenge li {
+    border: 1px solid var(--ur-line);
+    border-radius: 0.6rem;
+  }
+
+  .ur-selected-challenge {
+    border: 1px solid color-mix(in srgb, var(--ur-apex) 30%, var(--ur-line-strong));
+    border-radius: 0.75rem;
+    background:
+      linear-gradient(180deg, rgb(255 197 61 / 5%), transparent 22%),
+      linear-gradient(165deg, #141c21, #0b1114 75%);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 6%);
+  }
+
+  .ur-selected-challenge:focus-visible {
+    outline: 3px solid var(--ur-focus);
+    outline-offset: 2px;
+  }
+
+  .ur-challenge-grid > :global(*) {
+    border: 1px solid color-mix(in srgb, var(--ur-apex) 26%, var(--ur-line-strong)) !important;
+    border-radius: 0.75rem !important;
+    background:
+      linear-gradient(180deg, rgb(255 197 61 / 5%), transparent 22%),
+      linear-gradient(165deg, #141c21, #0b1114 75%) !important;
+    box-shadow:
+      0 0 0 1px rgb(0 0 0 / 40%),
+      inset 0 1px 0 rgb(255 255 255 / 6%) !important;
+  }
+
+  .ur-play-page :global(fieldset .card) {
+    border: 1px solid color-mix(in srgb, var(--ur-apex) 26%, var(--ur-line-strong)) !important;
+    border-radius: 0.75rem !important;
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / 2%), transparent 35%), var(--ur-raised) !important;
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 5%) !important;
+  }
+
+  .ur-play-page :global(fieldset input:checked + .card) {
+    border-color: var(--ur-apex) !important;
+    background:
+      linear-gradient(180deg, rgb(255 218 115 / 16%), rgb(255 197 61 / 7%)), var(--ur-raised) !important;
+    box-shadow:
+      0 0 1.2rem rgb(255 197 61 / 18%),
+      inset 0 1px 0 rgb(255 255 255 / 8%) !important;
+  }
+
+  .ur-play-page :global(fieldset input:focus-visible + .card) {
+    outline: 3px solid var(--ur-focus) !important;
+    outline-offset: 2px !important;
+  }
+
+  .ur-play-page :global(.ur-matchup-report) {
+    border: 1px solid color-mix(in srgb, var(--ur-apex) 30%, var(--ur-line-strong)) !important;
+    border-radius: 0.75rem !important;
+  }
+
+  .ur-play-page :global(.ur-reward-receipt) {
+    border: 1px solid color-mix(in srgb, var(--ur-apex) 30%, var(--ur-line-strong)) !important;
+    border-radius: 0.75rem !important;
+    background:
+      linear-gradient(105deg, color-mix(in srgb, var(--ur-apex) 14%, transparent), transparent 62%),
+      linear-gradient(165deg, #141c21, #0b1114 75%) !important;
+    box-shadow:
+      0 0 2rem rgb(255 197 61 / 10%),
+      inset 0 1px 0 rgb(255 255 255 / 6%) !important;
+  }
+
+  .ur-play-page :global(.ur-reward-receipt .ur-receipt-total) {
+    border: 1px solid var(--ur-apex) !important;
+    border-radius: 0.75rem !important;
+    background: linear-gradient(180deg, #ffda73, var(--ur-apex)) !important;
+    color: #241a02 !important;
+  }
+
+  .ur-play-page :global(.ur-reward-receipt .ur-receipt-total span) {
+    color: #241a02 !important;
+  }
+
+  .ur-play-page .rounded-xl.bg-surface-2 {
+    border-radius: 0.75rem;
   }
 
   .ur-play-page table {
@@ -1491,20 +1721,390 @@
     padding-block: 0.4rem;
   }
 
+  .ur-scout-panel {
+    margin-top: 1rem;
+    border: 1px solid color-mix(in srgb, var(--ur-apex) 26%, var(--ur-line-strong));
+    border-radius: 0.9rem;
+    background: linear-gradient(165deg, #12181d, #0b1014 75%);
+    box-shadow:
+      0 1.2rem 2.5rem rgb(0 0 0 / 40%),
+      inset 0 1px 0 rgb(255 255 255 / 6%);
+    padding: clamp(1rem, 2.6vw, 1.6rem);
+  }
+  .ur-scout-grid {
+    display: grid;
+    gap: 1.4rem;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 21rem);
+    align-items: start;
+  }
+  .ur-scout-main {
+    display: grid;
+    gap: 1.2rem;
+    min-width: 0;
+  }
+  .ur-step-head {
+    display: flex;
+    gap: 0.6rem;
+    align-items: flex-start;
+  }
+  .ur-step-head--two {
+    margin-top: 0.2rem;
+    padding-top: 1.1rem;
+    border-top: 1px solid var(--ur-line);
+  }
+  .ur-step-num {
+    color: var(--ur-apex);
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 900;
+  }
+  .ur-step-title {
+    margin: 0;
+    color: #fff;
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    font-weight: 850;
+  }
+  .ur-step-sub {
+    margin: 0.15rem 0 0;
+    color: var(--ur-muted);
+    font-size: 0.76rem;
+  }
+  .ur-reward-preview {
+    position: sticky;
+    top: 1rem;
+    padding: 1rem;
+    border: 1px solid color-mix(in srgb, var(--ur-apex) 38%, var(--ur-line-strong));
+    border-radius: 0.8rem;
+    background:
+      linear-gradient(165deg, #171310, #0e0c0a 75%), linear-gradient(165deg, #141c21, #0b1114);
+    box-shadow:
+      0 0 2rem rgb(255 150 40 / 10%),
+      inset 0 1px 0 rgb(255 255 255 / 6%);
+  }
+  .ur-reward-title {
+    margin: 0;
+    color: #fff;
+    font-family: var(--font-display);
+    font-size: 1.02rem;
+    font-weight: 850;
+  }
+  .ur-reward-sub {
+    margin: 0.25rem 0 0;
+    color: var(--ur-muted);
+    font-size: 0.7rem;
+  }
+  .ur-reward-rows {
+    display: grid;
+    gap: 0.45rem;
+    margin: 0.8rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .ur-reward-rows li {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.55rem 0.65rem;
+    border: 1px solid var(--ur-line);
+    border-radius: 0.6rem;
+    background: rgb(6 9 12 / 55%);
+  }
+  .ur-reward-icon {
+    display: grid;
+    width: 1.7rem;
+    height: 1.7rem;
+    flex: none;
+    place-items: center;
+    border-radius: 999px;
+    background: rgb(255 197 61 / 12%);
+    color: var(--ur-apex);
+    font-size: 0.8rem;
+    font-weight: 900;
+  }
+  .ur-reward-copy {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+  }
+  .ur-reward-label {
+    color: var(--ur-paper);
+    font-size: 0.8rem;
+    font-weight: 800;
+  }
+  .ur-reward-detail {
+    color: var(--ur-muted);
+    font-size: 0.68rem;
+  }
+  .ur-reward-coins {
+    flex: none;
+    color: var(--ur-apex);
+    font-size: 0.84rem;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+  }
+  .ur-reward-coins[data-zero='true'] {
+    color: var(--ur-muted);
+  }
+  .ur-reward-max {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.6rem;
+    margin-top: 0.8rem;
+    padding-top: 0.7rem;
+    border-top: 1px solid var(--ur-line);
+    color: var(--ur-muted);
+    font-size: 0.74rem;
+  }
+  .ur-reward-max small {
+    font-weight: 500;
+  }
+  .ur-reward-max strong {
+    color: var(--ur-apex);
+    font-size: 1.05rem;
+  }
+  .ur-reward-repeat {
+    margin: 0.3rem 0 0;
+    color: var(--ur-muted);
+    font-size: 0.68rem;
+  }
+  .ur-prepare-btn {
+    width: 100%;
+    margin-top: 0.8rem;
+  }
+  .ur-reward-lock {
+    margin: 0.55rem 0 0;
+    color: var(--ur-muted);
+    font-size: 0.68rem;
+    text-align: center;
+  }
+  .ur-pending-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+    margin-top: 1rem;
+    padding: 0.85rem 1rem;
+    border: 1px solid color-mix(in srgb, var(--ur-apex) 26%, var(--ur-line));
+    border-radius: 0.8rem;
+    background: #10171c;
+  }
+  .ur-start-sim {
+    min-width: 12rem;
+  }
+  .ur-pending-note {
+    color: var(--ur-muted);
+    font-size: 0.72rem;
+  }
+  .ur-final-board {
+    text-align: center;
+  }
+  .ur-final-kicker {
+    margin: 0;
+    color: var(--ur-apex);
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+  }
+  .ur-final-kicker span:last-child {
+    color: #fff;
+    font-family: var(--font-display);
+    font-size: 1.3rem;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+  }
+  .ur-final-coins {
+    margin: 0.2rem 0 0;
+    color: var(--ur-success);
+    font-size: 0.9rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+  .ur-quarter-strip {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.4rem;
+    margin: 0.9rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .ur-quarter-strip li {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid var(--ur-line);
+    border-radius: 0.45rem;
+    background: rgb(6 9 12 / 55%);
+    color: var(--ur-muted);
+    font-size: 0.7rem;
+  }
+  .ur-quarter-strip strong {
+    color: var(--ur-paper);
+  }
+  .ur-final-meta {
+    margin: 0.6rem 0 0;
+    color: var(--ur-muted);
+    font-size: 0.76rem;
+  }
+  .ur-control-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.7rem;
+  }
+  .ur-speed-pills {
+    display: flex;
+    gap: 0.4rem;
+  }
+  .ur-speed-pill {
+    min-height: 2.5rem;
+    padding: 0.45rem 0.95rem;
+    border: 1px solid color-mix(in srgb, var(--ur-apex) 28%, var(--ur-line));
+    border-radius: 0.55rem;
+    background: var(--ur-surface);
+    color: var(--ur-paper);
+    font-size: 0.78rem;
+    font-weight: 800;
+  }
+  .ur-speed-pill[data-active='true'] {
+    border-color: var(--ur-apex);
+    background: linear-gradient(180deg, #ffda73, var(--ur-apex));
+    color: #241a02;
+  }
+  .ur-replay-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .ur-replay-primary {
+    min-height: 2.5rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--ur-apex);
+    border-radius: 0.55rem;
+    background: linear-gradient(180deg, #ffda73, var(--ur-apex));
+    color: #241a02;
+    font-size: 0.8rem;
+    font-weight: 900;
+  }
+  .ur-replay-btn {
+    min-height: 2.5rem;
+    padding: 0.5rem 0.9rem;
+    border: 1px solid color-mix(in srgb, var(--ur-apex) 28%, var(--ur-line));
+    border-radius: 0.55rem;
+    background: var(--ur-surface);
+    color: var(--ur-paper);
+    font-size: 0.78rem;
+    font-weight: 800;
+  }
+  .ur-replay-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+  .ur-event-meta {
+    margin: 0.6rem 0 0;
+    color: var(--ur-muted);
+    font-size: 0.74rem;
+  }
+  .ur-recorded-events {
+    display: grid;
+    gap: 0.3rem;
+    max-height: 18rem;
+    margin: 0.6rem 0 0;
+    padding: 0 0.15rem 0.15rem 0;
+    overflow-y: auto;
+    list-style: none;
+  }
+  .ur-recorded-events li {
+    display: flex;
+    gap: 0.6rem;
+    align-items: baseline;
+    font-size: 0.78rem;
+  }
+  .ur-event-q {
+    flex: none;
+    min-width: 1.8rem;
+    color: var(--ur-apex);
+    font-size: 0.68rem;
+    font-weight: 900;
+  }
+  .ur-facts-grid {
+    display: grid;
+    gap: 0.8rem;
+    margin-top: 1rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ur-facts-panel {
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--ur-line);
+    border-radius: 0.7rem;
+    background: #10171c;
+    font-size: 0.8rem;
+  }
+  .ur-facts-panel h3 {
+    margin: 0 0 0.45rem;
+    color: #fff;
+    font-size: 0.84rem;
+    font-weight: 850;
+  }
+  .ur-facts-panel ul {
+    display: grid;
+    gap: 0.2rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    color: var(--ur-muted);
+  }
+  .ur-facts-panel p {
+    margin: 0;
+    color: var(--ur-muted);
+  }
+  .ur-play-again--mast {
+    min-height: 2.5rem;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .ur-play-page :global(*) {
       animation: none !important;
       transition: none !important;
     }
+
+    .mode-pill {
+      transition: none;
+    }
+  }
+
+  @media (max-width: 1080px) {
+    .ur-scout-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .ur-reward-preview {
+      position: static;
+    }
   }
 
   @media (max-width: 520px) {
-    .ur-live-fact {
-      grid-template-columns: auto 1fr;
+    .ur-pregame-hero {
+      flex-direction: column;
+      align-items: flex-start;
     }
 
-    .ur-live-fact > span:last-child {
-      grid-column: 1 / -1;
+    .ur-pregame-status {
+      width: 100%;
+    }
+
+    .ur-control-bar {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .ur-facts-grid {
+      grid-template-columns: minmax(0, 1fr);
     }
 
     .ur-gamecast-controls {

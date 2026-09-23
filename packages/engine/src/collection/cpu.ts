@@ -102,7 +102,8 @@ export function generateCollectionCpuTeam(
   gameSequence: number,
   weights: CollectionCpuRarityWeights,
 ): CpuTeamResult {
-  const uniquePlayers = new Set(catalog.cards.map((card) => card.playerId));
+  const availableCards = catalog.cards;
+  const uniquePlayers = new Set(availableCards.map((card) => card.playerId));
   if (uniquePlayers.size < COLLECTION_GAME_CPU_ROSTER_SIZE) {
     throw new CollectionCommandError(
       'missing-content',
@@ -111,7 +112,7 @@ export function generateCollectionCpuTeam(
   }
   const perCard = cpuPerCardWeights(catalog, weights);
   const rng = createRng(collectionCpuTeamSeed(rootSeed, gameSequence));
-  const pool = catalog.cards.map((card) => ({
+  const pool = availableCards.map((card) => ({
     playerId: card.playerId,
     positions: card.positions,
     mask: slotMaskOf(card.positions),
@@ -486,14 +487,15 @@ export function generateCollectionCpuTeamV2(
   gameSequence: number,
   profile: CollectionDifficultyProfile,
 ): CpuDifficultyTeamResult {
-  const uniquePlayers = new Set(catalog.cards.map((card) => card.playerId));
+  const availableCards = catalog.cards;
+  const uniquePlayers = new Set(availableCards.map((card) => card.playerId));
   if (uniquePlayers.size < COLLECTION_GAME_CPU_ROSTER_SIZE) {
     throw new CollectionCommandError(
       'missing-content',
       `cpu needs ${String(COLLECTION_GAME_CPU_ROSTER_SIZE)} unique players, catalog has ${String(uniquePlayers.size)}`,
     );
   }
-  const declarations = catalog.cards
+  const declarations = availableCards
     .map((card) => ({
       playerId: card.playerId,
       positions: card.positions,

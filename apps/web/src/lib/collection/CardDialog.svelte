@@ -107,7 +107,7 @@
   <Dialog.Portal>
     <Dialog.Overlay class="fixed inset-0 z-50 bg-black/70" />
     <Dialog.Content
-      class="fixed left-1/2 top-1/2 z-50 max-h-[85vh] w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-border bg-card p-5 outline-none"
+      class="ur-card-dialog fixed left-1/2 top-1/2 z-50 max-h-[88svh] w-[min(34rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-border bg-card p-5 outline-none"
       aria-describedby={undefined}
     >
       <div class="flex items-start justify-between gap-3">
@@ -150,7 +150,11 @@
       </div>
 
       {#if viewMode === 'front'}
-        <section class="ur-dialog-cardfront" aria-label="Card front">
+        <section
+          class="ur-dialog-cardfront ur-dialog-cardfront--{indexEntry?.rarity.toLowerCase() ??
+            'ember'}"
+          aria-label="Card front"
+        >
           <p class="ur-dialog-team">{teamLabel}</p>
           <div class="ur-dialog-face">
             {#if indexEntry}
@@ -165,6 +169,9 @@
                 fallbackInitials={initialsOf(title)}
               />
             {/if}
+            <span class="ur-dialog-overall-stamp" aria-hidden="true">
+              <small>OVR</small><strong>{indexEntry?.overall ?? '—'}</strong>
+            </span>
           </div>
           <p class="ur-dialog-name">{title}</p>
           <p class="ur-dialog-positions">
@@ -332,6 +339,20 @@
 </Dialog.Root>
 
 <style>
+  .ur-card-dialog {
+    border-color: var(--ur-line-strong);
+    border-radius: 0;
+    background:
+      radial-gradient(
+        ellipse at 100% 0%,
+        color-mix(in srgb, var(--ur-apex) 8%, transparent),
+        transparent 40%
+      ),
+      var(--ur-bg);
+    color: var(--ur-paper);
+    box-shadow: 0 1.5rem 5rem rgb(0 0 0 / 62%);
+  }
+
   .ur-card-view-toggle {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -357,14 +378,50 @@
   }
 
   .ur-dialog-cardfront {
+    --ur-dialog-rarity: var(--ur-ember);
+    position: relative;
+    width: min(100%, 27rem);
     margin-top: 1rem;
-    padding: 1rem;
-    border: 2px solid var(--ur-line-strong);
-    border-right-color: var(--ur-apex);
+    padding: 0.9rem;
+    border: 2px solid var(--ur-dialog-rarity);
     background:
-      linear-gradient(0deg, rgb(8 11 14 / 72%), transparent 48%),
-      repeating-linear-gradient(90deg, transparent 0 39px, rgb(240 236 223 / 3%) 40px),
+      linear-gradient(
+        145deg,
+        color-mix(in srgb, var(--ur-dialog-rarity) 16%, transparent),
+        transparent 46%
+      ),
       var(--ur-raised);
+    box-shadow: 0 1rem 2rem rgb(0 0 0 / 25%);
+  }
+
+  .ur-dialog-cardfront--eruption {
+    --ur-dialog-rarity: var(--ur-eruption);
+    border-top-width: 5px;
+  }
+
+  .ur-dialog-cardfront--apex {
+    --ur-dialog-rarity: var(--ur-apex);
+    border-width: 3px;
+    box-shadow:
+      inset 0 0 0 3px color-mix(in srgb, var(--ur-dialog-rarity) 25%, transparent),
+      0 1rem 2rem rgb(0 0 0 / 25%);
+  }
+
+  .ur-dialog-cardfront--titan {
+    --ur-dialog-rarity: var(--ur-titan);
+    border-left-width: 6px;
+  }
+
+  .ur-dialog-cardfront--eclipse {
+    --ur-dialog-rarity: var(--ur-eclipse);
+    box-shadow:
+      inset 0 0 0 4px #211931,
+      inset 0 0 0 5px color-mix(in srgb, var(--ur-dialog-rarity) 65%, transparent);
+  }
+
+  .ur-dialog-cardfront--immortal {
+    --ur-dialog-rarity: var(--ur-immortal);
+    border: 3px double var(--ur-dialog-rarity);
   }
 
   .ur-dialog-team {
@@ -373,18 +430,70 @@
   }
 
   .ur-dialog-face {
-    display: grid;
-    min-height: 12rem;
-    place-items: center;
+    position: relative;
+    min-height: clamp(17rem, 52vw, 24rem);
+    overflow: hidden;
     margin-block: 0.75rem;
     background:
       radial-gradient(
-        ellipse at 50% 110%,
-        transparent 0 4rem,
-        rgb(240 236 223 / 16%) 4.05rem 4.1rem,
-        transparent 4.15rem
+        ellipse at 50% 15%,
+        color-mix(in srgb, var(--ur-dialog-rarity) 36%, transparent),
+        transparent 60%
       ),
-      #1a2529;
+      linear-gradient(160deg, #293a43, #111a1e 78%);
+  }
+
+  .ur-dialog-face :global(.relative) {
+    width: 100%;
+    height: 100%;
+    min-height: inherit;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .ur-dialog-face :global(img) {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 50% 12%;
+    transform: scale(1.12);
+  }
+
+  .ur-dialog-face::after {
+    position: absolute;
+    inset: 35% 0 0;
+    background: linear-gradient(180deg, transparent, rgb(8 11 14 / 58%));
+    content: '';
+    pointer-events: none;
+  }
+
+  .ur-dialog-overall-stamp {
+    position: absolute;
+    z-index: 2;
+    top: 0.75rem;
+    left: 0.75rem;
+    display: grid;
+    min-width: 3.4rem;
+    justify-items: center;
+    padding: 0.3rem 0.45rem 0.4rem;
+    border: 1px solid color-mix(in srgb, var(--ur-dialog-rarity) 75%, var(--ur-paper));
+    background: color-mix(in srgb, var(--ur-bg) 80%, transparent);
+    color: var(--ur-dialog-rarity);
+    line-height: 0.95;
+    backdrop-filter: blur(5px);
+  }
+
+  .ur-dialog-overall-stamp small {
+    font-size: 0.62rem;
+    font-weight: 800;
+  }
+
+  .ur-dialog-overall-stamp strong {
+    font-family: var(--font-display);
+    font-size: 2.1rem;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
   }
 
   .ur-dialog-name {
@@ -416,7 +525,7 @@
     display: flex;
     align-items: baseline;
     gap: 0.4rem;
-    color: var(--ur-apex);
+    color: var(--ur-dialog-rarity, var(--ur-apex));
     font-family: var(--font-display);
     font-size: 2.5rem;
     font-weight: 800;

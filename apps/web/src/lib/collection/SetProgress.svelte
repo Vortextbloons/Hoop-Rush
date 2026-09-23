@@ -22,11 +22,16 @@
   function formatExchange(amount: number): string {
     return amount.toLocaleString('en-US');
   }
+
+  function progressPercentage(owned: number, required: number): number {
+    if (required <= 0) return 0;
+    return Math.round(Math.min((owned / required) * 100, 100));
+  }
 </script>
 
 <section
   aria-labelledby="collection-sets-heading"
-  class="mt-6 rounded-2xl border border-border bg-card p-5"
+  class="ur-set-progress-book mt-6 rounded-2xl border border-border bg-card p-5"
 >
   <h2 id="collection-sets-heading" class="font-display text-xl font-extrabold">{title}</h2>
   <p class="mt-1 text-sm text-muted-foreground">{blurb}</p>
@@ -34,7 +39,7 @@
   <ul class="mt-4 grid gap-4 lg:grid-cols-3">
     {#each views as view (view.setId)}
       {@const status = view.claimed ? 'Claimed' : view.complete ? 'Complete' : 'Incomplete'}
-      <li class="flex min-w-0 flex-col rounded-xl bg-surface-2 p-4">
+      <li class="ur-set-entry flex min-w-0 flex-col rounded-xl bg-surface-2 p-4">
         <div class="flex items-start justify-between gap-2">
           <h3 class="font-display text-base font-extrabold">{view.title}</h3>
           <span
@@ -51,6 +56,17 @@
         <p class="mt-2 text-sm font-semibold tabular-nums">
           {view.ownedCount}/{view.requiredCount} owned
         </p>
+        <div
+          class="ur-set-meter"
+          role="progressbar"
+          aria-label={`${view.title} collection progress`}
+          aria-valuemin="0"
+          aria-valuemax={view.requiredCount}
+          aria-valuenow={view.ownedCount}
+          aria-valuetext={`${view.ownedCount} of ${view.requiredCount} cards owned`}
+        >
+          <span style={`width: ${progressPercentage(view.ownedCount, view.requiredCount)}%`}></span>
+        </div>
         <ul class="mt-2 space-y-1 text-sm">
           {#each view.memberCardIds as cardId (cardId)}
             {@const owned = !view.missingCardIds.includes(cardId)}
@@ -102,3 +118,88 @@
     {/each}
   </ul>
 </section>
+
+<style>
+  .ur-set-progress-book {
+    border: 1px solid var(--ur-line);
+    border-top: 3px solid var(--ur-ember);
+    border-radius: 0;
+    background:
+      linear-gradient(135deg, color-mix(in srgb, var(--ur-ember) 6%, transparent), transparent 42%),
+      var(--ur-raised);
+    padding: clamp(1rem, 2.5vw, 1.4rem);
+  }
+
+  .ur-set-progress-book > h2 {
+    color: var(--ur-paper);
+    font-family: var(--font-display);
+    font-size: clamp(1.4rem, 2.5vw, 1.8rem);
+  }
+
+  .ur-set-progress-book > p {
+    color: var(--ur-muted);
+  }
+
+  .ur-set-entry {
+    border-radius: 0;
+    border: 1px solid var(--ur-line);
+    border-top: 2px solid var(--ur-line-strong);
+    background: var(--ur-bg);
+    padding: 0.9rem;
+  }
+
+  .ur-set-entry h3 {
+    color: var(--ur-paper);
+    font-size: 1rem;
+  }
+
+  .ur-set-entry > p {
+    color: var(--ur-muted);
+  }
+
+  .ur-set-entry > p strong {
+    color: var(--ur-apex);
+  }
+
+  .ur-set-meter {
+    height: 0.42rem;
+    overflow: hidden;
+    margin-top: 0.55rem;
+    background: var(--ur-interrupt);
+  }
+
+  .ur-set-meter > span {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, var(--ur-ember), var(--ur-apex));
+    transition: width 180ms ease;
+  }
+
+  .ur-set-entry > ul {
+    padding-block: 0.2rem;
+  }
+
+  .ur-set-entry > ul li {
+    min-height: 2rem;
+    border-bottom: 1px solid var(--ur-line);
+    padding-block: 0.35rem;
+  }
+
+  .ur-set-entry > ul li > button {
+    border-radius: 0;
+    background: var(--ur-surface);
+    color: var(--ur-paper);
+  }
+
+  .ur-set-entry > button {
+    border-radius: 0;
+    background: var(--ur-accent);
+    color: var(--ur-accent-foreground);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ur-set-meter > span {
+      transition: none;
+    }
+  }
+</style>

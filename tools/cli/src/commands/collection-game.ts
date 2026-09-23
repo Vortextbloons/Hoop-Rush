@@ -940,8 +940,8 @@ export function collectionGameAudit(args: {
   try {
     const perCard = cpuPerCardWeights(catalog, { ...COLLECTION_GAME_CPU_LEGACY_WEIGHTS });
     const specials = catalog.cards.filter((card) => card.family !== 'Base');
-    if (specials.length !== 12) {
-      failures.push(`catalog has ${String(specials.length)} specials, want 12`);
+    if (specials.length !== 6) {
+      failures.push(`catalog has ${String(specials.length)} active specials, want 6`);
     }
     for (const special of specials) {
       if (!((perCard.get(special.cardId) ?? 0) > 0)) {

@@ -50,7 +50,10 @@
   }
 </script>
 
-<section aria-label="Reward receipt" class="mt-4 rounded-2xl border border-border bg-card p-5">
+<section
+  aria-label="Reward receipt"
+  class="ur-reward-receipt mt-4 rounded-2xl border border-border bg-card p-5"
+>
   <div class="flex flex-wrap items-end justify-between gap-3">
     <div>
       <h3 class="ultimate-eyebrow">Reward receipt</h3>
@@ -61,7 +64,7 @@
     </p>
   </div>
 
-  <div class="mt-4 rounded-xl bg-surface-2 p-4">
+  <div class="ur-receipt-objective mt-4 rounded-xl bg-surface-2 p-4">
     <h4 class="text-sm font-bold">Objective</h4>
     <p
       class="mt-1 text-sm font-bold {evaluation.success === null
@@ -84,7 +87,7 @@
   </div>
 
   {#if challenge && challengeReward}
-    <div class="mt-4 rounded-xl border border-accent/50 bg-surface-2 p-4">
+    <div class="ur-receipt-challenge mt-4 rounded-xl border border-accent/50 bg-surface-2 p-4">
       <h4 class="text-sm font-bold">Challenge · {challenge.prepared.challenge.displayName}</h4>
       <p class="mt-1 text-xs text-muted-foreground">
         {requirementLabel(challenge.prepared.challenge.requirement)} · {challenge.prepared.challenge
@@ -127,7 +130,7 @@
     </div>
   {/if}
 
-  <ul class="mt-4 space-y-2">
+  <ul class="ur-receipt-rows mt-4 space-y-2">
     {#each rows as row (row.kind)}
       <li
         class="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface-2 px-4 py-3"
@@ -144,7 +147,7 @@
   </ul>
 
   <div
-    class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent/50 bg-surface-2 px-4 py-3"
+    class="ur-receipt-total mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent/50 bg-surface-2 px-4 py-3"
   >
     <span class="font-display text-base font-extrabold">Total</span>
     <span class="font-display text-xl font-extrabold text-accent tabular-nums">
@@ -152,7 +155,7 @@
     </span>
   </div>
 
-  <dl class="mt-4 grid gap-2 text-sm sm:grid-cols-2">
+  <dl class="ur-receipt-ledger mt-4 grid gap-2 text-sm sm:grid-cols-2">
     <div class="rounded-xl bg-surface-2 px-4 py-3">
       <dt class="text-xs text-muted-foreground">New Coins balance</dt>
       <dd class="font-bold tabular-nums">
@@ -167,6 +170,66 @@
 </section>
 
 <style>
+  .ur-reward-receipt {
+    border: 1px solid var(--ur-line-strong);
+    border-top: 3px solid var(--ur-success);
+    border-radius: 0;
+    background:
+      radial-gradient(
+        ellipse at 100% 0%,
+        color-mix(in srgb, var(--ur-success) 10%, transparent),
+        transparent 35%
+      ),
+      var(--ur-raised);
+    padding: clamp(1rem, 3vw, 1.5rem);
+  }
+
+  .ur-reward-receipt .ultimate-eyebrow {
+    color: var(--ur-success);
+  }
+
+  .ur-receipt-objective {
+    border-inline-start: 3px solid var(--ur-titan);
+    border-radius: 0;
+    background: var(--ur-surface);
+  }
+
+  .ur-receipt-challenge {
+    border-color: var(--ur-ember);
+    border-inline-start-width: 3px;
+    border-radius: 0;
+    background: var(--ur-surface);
+  }
+
+  .ur-receipt-rows li {
+    border-inline-start: 2px solid var(--ur-line-strong);
+    border-radius: 0;
+    background: var(--ur-surface);
+  }
+
+  .ur-receipt-rows li:last-child {
+    border-inline-start-color: var(--ur-apex);
+  }
+
+  .ur-receipt-total {
+    border-color: var(--ur-apex);
+    border-radius: 0;
+    background:
+      linear-gradient(105deg, color-mix(in srgb, var(--ur-apex) 14%, transparent), transparent 62%),
+      var(--ur-bg);
+    padding: 1rem;
+  }
+
+  .ur-receipt-total > span:last-child {
+    font-size: clamp(1.4rem, 4vw, 1.9rem);
+  }
+
+  .ur-receipt-ledger > div {
+    border-top: 1px solid var(--ur-line);
+    background: var(--ur-surface);
+    padding: 0.75rem 1rem;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     section :global(*) {
       transition: none !important;

@@ -30,6 +30,7 @@ import {
   COLLECTION_ECONOMY_VERSION,
   COLLECTION_OVERLAY_VERSION,
   COLLECTION_PACK_RULES_VERSION,
+  COLLECTION_SPECIALS_VERSION,
   COLLECTION_PROGRESSION_VERSION,
   COLLECTION_REPLAY_V1_VERSION,
   COLLECTION_REPLAY_VERSION,
@@ -39,6 +40,7 @@ import {
 } from './collection-versions.ts';
 import {
   collectionCardIdSchema,
+  collectionCardAvailabilitySchema,
   collectionCurrencySchema,
   collectionFamilySchema,
   collectionPackIdSchema,
@@ -49,6 +51,7 @@ import { collectionTargetSnapshotSchema } from './collection-targeting.ts';
 
 export {
   collectionCardIdSchema,
+  collectionCardAvailabilitySchema,
   collectionCurrencySchema,
   collectionFamilySchema,
   collectionPackIdSchema,
@@ -57,6 +60,7 @@ export {
 } from './collection-primitives.ts';
 export type {
   CollectionCardId,
+  CollectionCardAvailability,
   CollectionCurrency,
   CollectionFamily,
   CollectionPackId,
@@ -96,6 +100,7 @@ export const collectionCardDefinitionSchema = z.object({
   playerId: playerIdSchema,
   sourcePlayerVersionId: playerVersionIdSchema,
   family: collectionFamilySchema,
+  availability: collectionCardAvailabilitySchema.optional(),
   rarity: collectionRaritySchema,
   seasonKey: seasonKeySchema,
   franchiseId: franchiseIdSchema,
@@ -413,6 +418,7 @@ export const collectionCatalogSchema = z
     catalogVersion: z.literal(COLLECTION_CATALOG_VERSION),
     collectionVersion: z.literal(COLLECTION_VERSION),
     overlayVersion: z.literal(COLLECTION_OVERLAY_VERSION),
+    specialsVersion: z.literal(COLLECTION_SPECIALS_VERSION).optional(),
     dataVersion: z.string().min(1).max(64),
     ratingsVersion: z.string().min(1).max(64),
     positionNormalizationVersion: positionNormalizationVersionSchema,
@@ -459,6 +465,7 @@ export const collectionIndexEntrySchema = z.object({
   eraId: eraIdSchema,
   rarity: collectionRaritySchema,
   family: collectionFamilySchema,
+  availability: collectionCardAvailabilitySchema.optional(),
   positions: positionUnionSchema,
   overall: z.number().int().min(0).max(100),
 });

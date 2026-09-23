@@ -59,7 +59,7 @@ export function v2Catalog(size = 24, options: { specials?: boolean } = {}): Coll
         buildCollectionFixtureCard(`${card.playerId}-special`, {
           playerId: card.playerId,
           cardId: `card-${seasonDigestHex(`v2-special\u0000${card.cardId}`)}`,
-          family: 'Sharpshooter',
+          family: 'Heat Check',
           positions: card.positions,
           rarity: card.rarity,
           summarySource: {
@@ -75,7 +75,7 @@ export function v2Catalog(size = 24, options: { specials?: boolean } = {}): Coll
     cards,
     sets: [
       {
-        setId: 'sharpshooter-set',
+        setId: 'heat-check-set',
         title: 'V2',
         memberCardIds: [cards[0]?.cardId as string, cards[1]?.cardId as string],
       },

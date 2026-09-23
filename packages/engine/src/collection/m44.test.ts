@@ -104,8 +104,8 @@ function buildCatalog(): CollectionCatalog {
     cards: [...cards, ...targetVersions],
     sets: [
       {
-        setId: 'sharpshooter-set',
-        title: 'Sharpshooters',
+        setId: 'heat-check-set',
+        title: 'Heat Checks',
         memberCardIds: [cards[0]?.cardId as string, cards[1]?.cardId as string],
       },
     ],

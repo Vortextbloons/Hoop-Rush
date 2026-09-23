@@ -77,7 +77,9 @@ export function filterBookItems(
       return false;
     }
     if (filters.rarities.length > 0 && !filters.rarities.includes(item.entry.rarity)) return false;
-    if (filters.families.length > 0 && !filters.families.includes(item.entry.family)) return false;
+    if (filters.families.length > 0) {
+      if (!filters.families.includes(item.entry.family)) return false;
+    }
     if (filters.owned === 'owned' && !item.owned) return false;
     if (filters.owned === 'unowned' && item.owned) return false;
     if (filters.sets.length > 0 && !item.setIds.some((setId) => filters.sets.includes(setId))) {

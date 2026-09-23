@@ -14,6 +14,7 @@ export interface CollectionCardView {
   franchiseId: string;
   rarity: CollectionIndexEntry['rarity'];
   family: CollectionIndexEntry['family'];
+  availability: CollectionIndexEntry['availability'];
   positions: readonly string[];
   overall: number;
   offense: number | null;
@@ -38,6 +39,7 @@ export function collectionCardViewOf(input: {
     franchiseId: entry.franchiseId,
     rarity: entry.rarity,
     family: entry.family,
+    availability: entry.availability,
     positions: entry.positions,
     overall: entry.overall,
     offense: catalogCard?.summarySource?.offenseRating ?? null,

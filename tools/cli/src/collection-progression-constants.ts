@@ -21,7 +21,7 @@ export const COLLECTION_PROGRESSION_DISPLAY: CollectionProgressionDisplay =
       'Target one canonical player. Every eligible version shares the same within-rarity boost, and rarity odds never change.',
     setsTitle: 'Sets',
     setsBlurb:
-      'Own all four exact members of a set to claim its one-time Exchange reward. Cards are never consumed.',
+      'Own all six exact members of the Heat Check set to claim its one-time Exchange reward. Cards are never consumed.',
   });
 
 export const COLLECTION_LAUNCH_CHALLENGES: readonly CollectionChallengeDefinition[] = [
@@ -117,42 +117,12 @@ export const COLLECTION_LAUNCH_CHALLENGES: readonly CollectionChallengeDefinitio
   }),
   collectionChallengeDefinitionSchema.parse({
     challengeVersion: COLLECTION_CHALLENGE_VERSION,
-    challengeId: 'challenge-family-sharpshooter-v1',
-    displayName: 'Sharpshooter Unit',
-    description: 'Win with at least 3 Sharpshooter set members, 2 of them starters.',
+    challengeId: 'challenge-family-heat-check-v1',
+    displayName: 'Heat Check Unit',
+    description: 'Win with at least 3 Heat Check set members, 2 of them starters.',
     requirement: {
       kind: 'set-family-core',
-      setId: 'sharpshooter-set',
-      minimumRosterCount: 3,
-      minimumStarterCount: 2,
-    },
-    difficultyId: 'legend',
-    firstClearCoins: 700,
-    repeatWinCoins: 70,
-  }),
-  collectionChallengeDefinitionSchema.parse({
-    challengeVersion: COLLECTION_CHALLENGE_VERSION,
-    challengeId: 'challenge-family-lockdown-v1',
-    displayName: 'Lockdown Unit',
-    description: 'Win with at least 3 Lockdown set members, 2 of them starters.',
-    requirement: {
-      kind: 'set-family-core',
-      setId: 'lockdown-set',
-      minimumRosterCount: 3,
-      minimumStarterCount: 2,
-    },
-    difficultyId: 'legend',
-    firstClearCoins: 700,
-    repeatWinCoins: 70,
-  }),
-  collectionChallengeDefinitionSchema.parse({
-    challengeVersion: COLLECTION_CHALLENGE_VERSION,
-    challengeId: 'challenge-family-floor-general-v1',
-    displayName: 'Floor General Unit',
-    description: 'Win with at least 3 Floor General set members, 2 of them starters.',
-    requirement: {
-      kind: 'set-family-core',
-      setId: 'floor-general-set',
+      setId: 'heat-check-set',
       minimumRosterCount: 3,
       minimumStarterCount: 2,
     },
@@ -167,27 +137,11 @@ export type CollectionLaunchSetRewardFixed = Omit<CollectionSetRewardDefinition,
 export const COLLECTION_LAUNCH_SET_REWARDS: readonly CollectionLaunchSetRewardFixed[] = [
   {
     setRewardVersion: COLLECTION_SET_REWARD_VERSION,
-    setId: 'sharpshooter-set',
-    title: 'Sharpshooters',
+    setId: 'heat-check-set',
+    title: 'Heat Check',
     currency: 'Exchange',
     amount: 2000,
-    description: 'Own all four Sharpshooters cards to claim 2,000 Exchange once.',
-  },
-  {
-    setRewardVersion: COLLECTION_SET_REWARD_VERSION,
-    setId: 'lockdown-set',
-    title: 'Lockdown',
-    currency: 'Exchange',
-    amount: 2000,
-    description: 'Own all four Lockdown cards to claim 2,000 Exchange once.',
-  },
-  {
-    setRewardVersion: COLLECTION_SET_REWARD_VERSION,
-    setId: 'floor-general-set',
-    title: 'Floor Generals',
-    currency: 'Exchange',
-    amount: 2000,
-    description: 'Own all four Floor Generals cards to claim 2,000 Exchange once.',
+    description: 'Own all six Heat Check cards to claim 2,000 Exchange once.',
   },
 ];
 

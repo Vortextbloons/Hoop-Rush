@@ -7,6 +7,7 @@
   import { formatPositions } from '$lib/player-positions';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
   import { collectionCardViewOf } from './collection-card-view.ts';
+  import { humanizeIdentifier } from './collection-progression-view.ts';
 
   let {
     item,
@@ -29,6 +30,7 @@
     collectionCardViewOf({ entry: item.entry, catalogCard, owned: item.owned }),
   );
   const rarityToken = $derived(view.rarity.toLowerCase());
+  const primaryPosition = $derived(view.positions[0] ?? '—');
 
   function initialsOf(name: string): string {
     return name
@@ -44,13 +46,25 @@
   type="button"
   onclick={() => onSelect(view.cardId)}
   aria-pressed={selected}
-  aria-label={`${view.name}, ${view.season}, ${view.rarity}, Overall ${view.overall}, ${formatPositions(view.positions)}, ${view.owned ? 'owned' : 'unowned'}`}
+  aria-label={`${view.name}, ${view.season}, ${view.rarity}, Overall ${view.overall}, ${formatPositions(view.positions)}, active, ${view.owned ? 'owned' : 'unowned'}`}
   class="ur-card group ur-card--{rarityToken}"
+  class:ur-card--unowned={!view.owned}
 >
-  <span class="ur-card-status" class:ur-card-status-owned={view.owned}>
-    {view.owned ? 'Owned' : 'Catalog'}
+  <span class="ur-card-ovr" aria-hidden="true">
+    <strong>{view.overall}</strong>
+    <span class="ur-card-pos">{primaryPosition}</span>
   </span>
-  <span class="ur-card-team">{view.franchiseId} · {view.season}</span>
+  <span class="ur-card-star" aria-hidden="true">
+    <svg viewBox="0 0 20 20" class="ur-star-icon" class:ur-star-icon--on={selected}>
+      <path
+        d="M10 1.8 12.4 6.7 17.8 7.5 13.9 11.3 14.8 16.7 10 14.1 5.2 16.7 6.1 11.3 2.2 7.5 7.6 6.7Z"
+        fill={selected ? 'currentColor' : 'none'}
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-linejoin="round"
+      />
+    </svg>
+  </span>
   <span class="ur-card-hero">
     {#if manifest}
       <PlayerFace
@@ -62,28 +76,17 @@
     {:else}
       <span class="ur-card-initials" aria-hidden="true">{initialsOf(view.name)}</span>
     {/if}
-  </span>
-  <span class="ur-card-position-list" aria-label={`Positions ${formatPositions(view.positions)}`}>
-    {#each view.positions.slice(0, 3) as position (position)}
-      <span>{position}</span>
-    {/each}
+    <span class="ur-card-owned" class:ur-card-owned--yes={view.owned}>
+      {view.owned ? 'Owned' : 'Catalog'}
+    </span>
   </span>
   <span class="ur-card-nameplate">
     <span class="ur-card-name">{view.name}</span>
-    <span class="ur-card-statline">
-      <span class="ur-card-overall"><small>OVR</small>{view.overall}</span>
-      {#if view.offense !== null && view.defense !== null}
-        <span
-          class="ur-card-comparison"
-          aria-label={`Offense ${view.offense}, defense ${view.defense}`}
-        >
-          <span><small>OFF</small>{view.offense}</span>
-          <span><small>DEF</small>{view.defense}</span>
-        </span>
-      {/if}
+    <span class="ur-card-sub">
+      <span class="ur-card-team">{humanizeIdentifier(view.franchiseId)} · {view.season}</span>
+      <span class="ur-card-family">{view.family}</span>
     </span>
   </span>
-  <span class="ur-card-rarity ur-rarity ur-rarity-{rarityToken}">{view.rarity}</span>
 </button>
 
 <style>
@@ -91,24 +94,46 @@
     position: relative;
     display: flex;
     width: 100%;
-    aspect-ratio: 5 / 7.2;
+    aspect-ratio: 5 / 7.1;
     min-width: 0;
     flex-direction: column;
-    align-items: stretch;
     overflow: hidden;
-    padding: 0.7rem;
-    border: 2px solid var(--ur-rarity);
-    background: linear-gradient(145deg, rgb(240 236 223 / 5%), transparent 46%), var(--ur-raised);
+    border: 2px solid var(--ur-rarity, var(--ur-ember));
+    border-radius: 0.6rem;
+    background:
+      linear-gradient(180deg, transparent 42%, rgb(8 11 14 / 88%)),
+      radial-gradient(
+        ellipse at 50% 12%,
+        color-mix(in srgb, var(--ur-rarity) 38%, transparent),
+        transparent 58%
+      ),
+      var(--ur-card-texture, none),
+      linear-gradient(165deg, #232e35, #10161a 72%);
     color: var(--ur-paper);
     text-align: left;
     outline: none;
+    box-shadow:
+      0 0 1rem color-mix(in srgb, var(--ur-rarity) 32%, transparent),
+      0 0.7rem 1.6rem rgb(0 0 0 / 30%);
+    isolation: isolate;
     transition:
-      border-color 120ms ease,
-      background-color 120ms ease;
+      border-color 140ms ease,
+      box-shadow 140ms ease,
+      transform 140ms ease;
   }
 
-  .ur-card:hover {
-    background-color: var(--ur-surface);
+  .ur-card:hover,
+  .ur-card[aria-pressed='true'] {
+    border-color: color-mix(in srgb, var(--ur-rarity) 72%, white);
+    box-shadow:
+      0 0 1.4rem color-mix(in srgb, var(--ur-rarity) 48%, transparent),
+      0 0.9rem 1.8rem rgb(0 0 0 / 36%);
+  }
+
+  @media (hover: hover) {
+    .ur-card:hover {
+      transform: translateY(-3px);
+    }
   }
 
   .ur-card:focus-visible {
@@ -117,100 +142,166 @@
   }
 
   .ur-card--ember {
-    --ur-rarity: #c65a2e;
-    border-radius: 0 1rem 0 0;
+    --ur-rarity: var(--ur-ember);
+    --ur-card-texture: repeating-linear-gradient(
+      135deg,
+      transparent 0 16px,
+      rgb(198 90 46 / 9%) 17px 18px
+    );
   }
 
   .ur-card--eruption {
-    --ur-rarity: #ff5a2a;
-    border-top-width: 5px;
-    clip-path: polygon(0 0, 86% 0, 100% 8%, 100% 100%, 0 100%);
+    --ur-rarity: var(--ur-eruption);
+    --ur-card-texture: radial-gradient(
+      ellipse at 85% 90%,
+      rgb(255 90 42 / 30%),
+      transparent 55%
+    );
+    border-top-width: 3px;
   }
 
   .ur-card--apex {
-    --ur-rarity: #ffc53d;
+    --ur-rarity: var(--ur-apex);
+    --ur-card-texture: repeating-linear-gradient(
+      115deg,
+      transparent 0 14px,
+      rgb(255 197 61 / 10%) 15px 16px
+    );
     border-width: 3px;
-    outline: 1px solid color-mix(in srgb, var(--ur-rarity) 55%, transparent);
-    outline-offset: -6px;
   }
 
   .ur-card--titan {
-    --ur-rarity: #a9b4d8;
-    border-left-width: 6px;
-    background-image:
-      repeating-linear-gradient(135deg, transparent 0 13px, rgb(169 180 216 / 4%) 14px 15px),
-      linear-gradient(145deg, rgb(240 236 223 / 5%), transparent 46%);
+    --ur-rarity: var(--ur-titan);
+    --ur-card-texture: repeating-linear-gradient(
+      135deg,
+      transparent 0 13px,
+      rgb(169 180 216 / 10%) 14px 15px
+    );
   }
 
   .ur-card--eclipse {
-    --ur-rarity: #a588ff;
-    border: 2px solid #a588ff;
-    box-shadow:
-      inset 0 0 0 4px #211931,
-      inset 0 0 0 5px rgb(165 136 255 / 65%);
+    --ur-rarity: var(--ur-eclipse);
+    --ur-card-texture: radial-gradient(
+        ellipse at 15% 85%,
+        rgb(139 92 246 / 32%),
+        transparent 55%
+      ),
+      radial-gradient(ellipse at 85% 15%, rgb(139 92 246 / 20%), transparent 50%);
   }
 
   .ur-card--immortal {
-    --ur-rarity: #ffe9b0;
+    --ur-rarity: var(--ur-immortal);
+    --ur-card-texture: linear-gradient(
+      115deg,
+      rgb(255 233 176 / 12%),
+      transparent 36%,
+      rgb(255 233 176 / 6%) 67%,
+      transparent
+    );
     border: 3px double var(--ur-rarity);
-    background-image:
-      linear-gradient(
-        110deg,
-        rgb(255 233 176 / 7%),
-        transparent 36%,
-        rgb(255 233 176 / 3%) 63%,
-        transparent
-      ),
-      linear-gradient(145deg, rgb(240 236 223 / 5%), transparent 46%);
   }
 
-  .ur-card-status {
+  .ur-card-ovr {
     position: absolute;
-    z-index: 1;
-    top: 0.65rem;
-    right: 0.65rem;
-    display: inline-flex;
-    min-height: 1.55rem;
-    align-items: center;
-    padding-inline: 0.4rem;
-    background: #252e33;
-    color: #e4e6df;
+    z-index: 3;
+    top: 0.5rem;
+    left: 0.55rem;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
+    text-shadow:
+      0 2px 6px rgb(0 0 0 / 85%),
+      0 0 14px rgb(0 0 0 / 60%);
+  }
+
+  .ur-card-ovr strong {
+    color: #fff;
+    font-family: var(--font-display);
+    font-size: clamp(1.5rem, 4.2vw, 2.1rem);
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+
+  .ur-card-pos {
+    display: inline-grid;
+    min-width: 1.7rem;
+    min-height: 1.25rem;
+    place-items: center;
+    padding-inline: 0.3rem;
+    border: 1px solid color-mix(in srgb, var(--ur-apex) 70%, transparent);
+    border-radius: 0.28rem;
+    background: rgb(8 11 14 / 82%);
+    color: var(--ur-apex);
     font-size: 0.62rem;
     font-weight: 800;
+    letter-spacing: 0.02em;
   }
 
-  .ur-card-status-owned {
-    background: #d9e7d9;
-    color: #163423;
+  .ur-card-star {
+    position: absolute;
+    z-index: 3;
+    top: 0.55rem;
+    right: 0.55rem;
+    color: rgb(240 236 223 / 75%);
+    filter: drop-shadow(0 1px 4px rgb(0 0 0 / 70%));
   }
 
-  .ur-card-team {
-    max-width: 65%;
-    overflow: hidden;
-    color: var(--ur-muted);
-    font-size: clamp(0.62rem, 2.3vw, 0.75rem);
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  .ur-star-icon {
+    width: 1.15rem;
+    height: 1.15rem;
+  }
+
+  .ur-star-icon--on {
+    color: var(--ur-apex);
   }
 
   .ur-card-hero {
+    position: relative;
     display: grid;
     min-height: 0;
-    flex: 1;
-    place-items: center;
-    margin: 0.55rem -0.1rem 0.25rem;
-    background:
-      linear-gradient(180deg, transparent 60%, rgb(8 11 14 / 78%)),
-      repeating-linear-gradient(90deg, transparent 0 37px, rgb(240 236 223 / 3%) 38px), #1b252a;
+    flex: 1 1 auto;
+    place-items: stretch;
+    overflow: hidden;
+    margin: 0;
   }
 
   .ur-card-hero :global(.relative) {
-    border: 2px solid color-mix(in srgb, var(--ur-rarity) 65%, transparent);
-    border-radius: 0.75rem;
-    background: #283338;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .ur-card-hero :global(img) {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 50% 12%;
+    transform: scale(1.1);
+  }
+
+  .ur-card-hero :global(.absolute) {
+    background: transparent;
+  }
+
+  .ur-card--unowned .ur-card-hero :global(img) {
+    filter: saturate(0.55) brightness(0.82);
   }
 
   .ur-card-initials {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: radial-gradient(
+      ellipse at 50% 32%,
+      color-mix(in srgb, var(--ur-rarity) 26%, transparent),
+      transparent 64%
+    );
     color: color-mix(in srgb, var(--ur-paper) 75%, var(--ur-rarity));
     font-family: var(--font-display);
     font-size: clamp(2.6rem, 8vw, 5rem);
@@ -218,115 +309,99 @@
     letter-spacing: -0.04em;
   }
 
-  .ur-card-position-list {
-    display: flex;
-    gap: 0.25rem;
-    margin-top: 0.15rem;
+  .ur-card-owned {
+    position: absolute;
+    z-index: 2;
+    bottom: 0.5rem;
+    left: 0.55rem;
+    display: inline-flex;
+    min-height: 1.25rem;
+    align-items: center;
+    padding-inline: 0.4rem;
+    border: 1px solid rgb(240 236 223 / 35%);
+    border-radius: 0.3rem;
+    background: rgb(8 11 14 / 78%);
+    color: rgb(240 236 223 / 80%);
+    font-size: 0.55rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
   }
 
-  .ur-card-position-list span {
-    display: inline-grid;
-    min-width: 1.35rem;
-    min-height: 1.3rem;
-    place-items: center;
-    border: 1px solid var(--ur-line-strong);
-    color: var(--ur-paper);
-    font-size: 0.6rem;
-    font-weight: 700;
+  .ur-card-owned--yes {
+    border-color: color-mix(in srgb, var(--ur-apex) 65%, transparent);
+    color: var(--ur-apex);
   }
 
   .ur-card-nameplate {
     display: block;
     min-width: 0;
-    margin-top: 0.3rem;
+    flex: 0 0 auto;
+    padding: 0.5rem 0.6rem 0.55rem;
+    border-top: 1px solid color-mix(in srgb, var(--ur-rarity) 55%, transparent);
+    background: linear-gradient(180deg, rgb(10 14 17 / 88%), rgb(8 11 14 / 96%));
   }
 
   .ur-card-name {
-    display: block;
+    display: -webkit-box;
+    min-height: 2.05em;
     overflow: hidden;
-    color: var(--ur-paper);
+    color: #fff;
     font-family: var(--font-display);
-    font-size: clamp(1rem, 3.1vw, 1.35rem);
+    font-size: clamp(0.92rem, 2.5vw, 1.2rem);
     font-weight: 800;
-    line-height: 1.05;
+    line-height: 1.02;
+    text-overflow: ellipsis;
+    text-shadow: 0 1px 6px rgb(0 0 0 / 70%);
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
+  .ur-card-sub {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.4rem;
+    margin-top: 0.22rem;
+  }
+
+  .ur-card-team {
+    min-width: 0;
+    overflow: hidden;
+    color: rgb(240 236 223 / 68%);
+    font-size: 0.66rem;
+    font-weight: 600;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .ur-card-statline {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.3rem;
-    margin-top: 0.3rem;
-  }
-
-  .ur-card-overall {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 0.25rem;
+  .ur-card-family {
+    flex: none;
     color: var(--ur-rarity);
     font-family: var(--font-display);
-    font-size: 1.35rem;
-    font-weight: 800;
-    line-height: 1;
-  }
-
-  .ur-card-overall small,
-  .ur-card-comparison small {
-    color: var(--ur-muted);
-    font-family: var(--font-sans);
-    font-size: 0.58rem;
-    font-weight: 700;
-  }
-
-  .ur-card-comparison {
-    display: inline-flex;
-    gap: 0.45rem;
-    color: var(--ur-paper);
-    font-size: 0.75rem;
-    font-weight: 800;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .ur-card-comparison span {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 0.15rem;
-  }
-
-  .ur-card-rarity {
-    align-self: flex-start;
-    min-height: 1.55rem;
-    margin-top: 0.4rem;
-    padding: 0.3rem 0.45rem;
+    font-size: 0.68rem;
+    font-weight: 900;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    white-space: nowrap;
   }
 
   @media (max-width: 400px) {
-    .ur-card {
-      padding: 0.55rem;
+    .ur-card-ovr strong {
+      font-size: 1.5rem;
     }
 
-    .ur-card-status {
-      top: 0.5rem;
-      right: 0.5rem;
-      min-height: 1.4rem;
-      font-size: 0.56rem;
-    }
-
-    .ur-card-comparison {
-      gap: 0.25rem;
-      font-size: 0.68rem;
-    }
-
-    .ur-card-rarity {
-      font-size: 0.62rem;
+    .ur-card-name {
+      font-size: 0.92rem;
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
     .ur-card {
       transition: none;
+      transform: none;
     }
   }
 </style>

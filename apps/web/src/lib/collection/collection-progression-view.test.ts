@@ -83,7 +83,7 @@ function progressionWith(
 
 describe('requirement labels', () => {
   it('humanizes identifiers', () => {
-    expect(humanizeIdentifier('floor-general-set')).toBe('Floor General Set');
+    expect(humanizeIdentifier('heat-check-set')).toBe('Heat Check Set');
   });
 
   it('labels each requirement kind', () => {
@@ -109,13 +109,13 @@ describe('requirement labels', () => {
       requirementLabel(
         {
           kind: 'set-family-core',
-          setId: 'sharpshooter-set',
+          setId: 'heat-check-set',
           minimumRosterCount: 3,
           minimumStarterCount: 2,
         },
-        () => 'Fixture Sharpshooters',
+        () => 'Fixture Heat Checks',
       ),
-    ).toBe('2 starters and at least 3 active cards from the Fixture Sharpshooters set');
+    ).toBe('2 starters and at least 3 active cards from the Fixture Heat Checks set');
   });
 });
 
@@ -188,7 +188,7 @@ describe('challenge eligibility facts', () => {
     const catalog = buildCollectionFixtureCatalog({
       cards,
       sets: [
-        { setId: 'sharpshooter-set', title: 'Fixture Sharpshooters', memberCardIds: [cardId('1')] },
+        { setId: 'heat-check-set', title: 'Fixture Heat Checks', memberCardIds: [cardId('1')] },
       ],
     });
     const team: CollectionActiveTeam = {
@@ -298,8 +298,8 @@ describe('set progress views', () => {
   const catalog = buildCollectionFixtureCatalog();
   const reward: CollectionSetRewardDefinition = {
     setRewardVersion: 'collection-set-reward-v1',
-    setId: 'sharpshooter-set',
-    title: 'Fixture Sharpshooters',
+    setId: 'heat-check-set',
+    title: 'Fixture Heat Checks',
     memberCardIds: [...(catalog.sets[0]?.memberCardIds ?? [])].sort(),
     currency: 'Exchange',
     amount: 2000,

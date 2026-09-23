@@ -10,6 +10,7 @@ import {
   collectionIndexSchema,
   seasonDigestHex,
   type CollectionCatalog,
+  type CollectionCardDefinition,
   type CollectionPackDefinition,
   type CollectionRarity,
   type SeasonDraftCandidate,
@@ -18,12 +19,17 @@ import {
   COLLECTION_CATALOG_VERSION,
   COLLECTION_OVERLAY_VERSION,
   COLLECTION_PACK_RULES_VERSION,
-  COLLECTION_REPLAY_VERSION,
+  COLLECTION_REPLAY_V1_VERSION,
   COLLECTION_SCHEMA_VERSION,
+  COLLECTION_SPECIALS_VERSION,
   COLLECTION_VERSION,
+  summaryRatingsOfRatings,
 } from '@hoop-rush/data-contracts';
 import { readJson } from './io.ts';
-import { COLLECTION_SPECIALS } from './collection-specials.ts';
+import {
+  COLLECTION_SPECIALS,
+  COLLECTION_SPECIALS_VERSION as AUTHORED_SPECIALS_VERSION,
+} from './collection-specials.ts';
 
 function atomicWriteFileSync(target: string, content: string): void {
   const tmp = `${target}.tmp-${String(Date.now())}-${String(Math.random()).slice(2)}`;
@@ -154,6 +160,63 @@ function specialCardId(sourcePlayerVersionId: string, family: string): string {
   );
 }
 
+function specialSummaryRatings(
+  source: SeasonDraftCandidate,
+  ratingOverlay: CollectionCardDefinition['ratingOverlay'] = {},
+  tendencyOverlay: CollectionCardDefinition['tendencyOverlay'],
+): SeasonDraftCandidate['summaryRatings'] {
+  const positionGroup =
+    source.positions.primary === 'C'
+      ? 'C'
+      : source.positions.primary === 'PG' || source.positions.primary === 'SG'
+        ? 'G'
+        : 'F';
+  const sourceDerived = summaryRatingsOfRatings(
+    source.detailedRatings,
+    source.tendencies,
+    undefined,
+    positionGroup,
+  );
+  const boostedRatings = { ...source.detailedRatings };
+  for (const [key, delta] of Object.entries(ratingOverlay ?? {})) {
+    const ratingKey = key as keyof typeof boostedRatings;
+    boostedRatings[ratingKey] = Math.max(0, Math.min(100, boostedRatings[ratingKey] + delta));
+  }
+  const boostedTendencies = { ...source.tendencies };
+  for (const [key, delta] of Object.entries(tendencyOverlay ?? {})) {
+    const tendencyKey = key as keyof typeof boostedTendencies;
+    const current = boostedTendencies[tendencyKey];
+    if (typeof current === 'number') {
+      boostedTendencies[tendencyKey] = Math.max(0, Math.min(100, current + delta));
+    }
+  }
+  const boostedDerived = summaryRatingsOfRatings(
+    boostedRatings,
+    boostedTendencies,
+    undefined,
+    positionGroup,
+  );
+  const applyDelta = (base: number, before: number, after: number) =>
+    Math.max(0, Math.min(100, base + after - before));
+  return {
+    overallRating: applyDelta(
+      source.summaryRatings.overallRating,
+      sourceDerived.overallRating,
+      boostedDerived.overallRating,
+    ),
+    offenseRating: applyDelta(
+      source.summaryRatings.offenseRating,
+      sourceDerived.offenseRating,
+      boostedDerived.offenseRating,
+    ),
+    defenseRating: applyDelta(
+      source.summaryRatings.defenseRating,
+      sourceDerived.defenseRating,
+      boostedDerived.defenseRating,
+    ),
+  };
+}
+
 function main(): void {
   const manifest = readJson(MANIFEST_PATH) as {
     dataVersion: string;
@@ -192,6 +255,7 @@ function main(): void {
       positions: candidate.positions.playable,
       overlayVersion: COLLECTION_OVERLAY_VERSION,
       sourceProvenance: `${candidate.franchiseId}/${candidate.eraId} ${candidate.seasonKey}`,
+      availability: 'active',
       detailedRatings: candidate.detailedRatings,
       tendencies: candidate.tendencies,
       anchors: candidate.anchors,
@@ -205,7 +269,13 @@ function main(): void {
   const sourceOverallByVersion = new Map(
     candidates.map((candidate) => [candidate.playerVersionId, candidate]),
   );
-  for (const special of COLLECTION_SPECIALS) {
+  if (AUTHORED_SPECIALS_VERSION !== COLLECTION_SPECIALS_VERSION) {
+    throw new Error('authored specials version does not match the data-contract version');
+  }
+  const authoredSpecials = [
+    ...COLLECTION_SPECIALS.map((special) => ({ ...special, availability: 'active' as const })),
+  ];
+  for (const special of authoredSpecials) {
     const source = sourceOverallByVersion.get(special.sourcePlayerVersionId);
     if (source === undefined) {
       throw new Error(
@@ -227,11 +297,18 @@ function main(): void {
       seasonKey: source.seasonKey,
       franchiseId: source.franchiseId,
       eraId: source.eraId,
-      displayName: `${special.rarity} ${special.family} ${source.displayName}`,
+      displayName: `${special.family} ${source.displayName}`,
       positions: source.positions.playable,
       overlayVersion: COLLECTION_OVERLAY_VERSION,
       sourceProvenance: `${source.franchiseId}/${source.eraId} ${source.seasonKey}`,
-      ratingOverlay: special.ratingOverlay,
+      availability: special.availability,
+      ...(special.ratingOverlay !== undefined ? { ratingOverlay: special.ratingOverlay } : {}),
+      ...(special.tendencyOverlay !== undefined
+        ? { tendencyOverlay: special.tendencyOverlay }
+        : {}),
+      ...(special.eligibilityOverlay !== undefined
+        ? { eligibilityOverlay: special.eligibilityOverlay }
+        : {}),
       detailedRatings: source.detailedRatings,
       tendencies: source.tendencies,
       anchors: source.anchors,
@@ -239,31 +316,23 @@ function main(): void {
       heightInches: source.heightInches,
       weightLbs: source.weightLbs,
       playerExternalId: source.playerExternalId,
-      summarySource: source.summaryRatings,
+      summarySource: specialSummaryRatings(source, special.ratingOverlay, special.tendencyOverlay),
     });
   }
   cards.sort((a, b) => (a.cardId < b.cardId ? -1 : 1));
   const byCardId = new Map(cards.map((card) => [card.cardId, card]));
-  const setOf = (
-    family: 'Sharpshooter' | 'Lockdown' | 'Floor General',
-    setId: string,
-    title: string,
-  ) => ({
-    setId: setId as 'sharpshooter-set',
+  const setOf = (family: 'Heat Check', setId: string, title: string) => ({
+    setId: setId as 'heat-check-set',
     title,
     memberCardIds: cards
       .filter((card) => card.family === family)
       .map((card) => card.cardId)
       .sort(),
   });
-  const sets = [
-    setOf('Sharpshooter', 'sharpshooter-set', 'Sharpshooters'),
-    setOf('Lockdown', 'lockdown-set', 'Lockdown'),
-    setOf('Floor General', 'floor-general-set', 'Floor Generals'),
-  ] as CollectionCatalog['sets'];
+  const sets = [setOf('Heat Check', 'heat-check-set', 'Heat Check')] as CollectionCatalog['sets'];
   for (const set of sets) {
-    if (set.memberCardIds.length !== 4) {
-      throw new Error(`set ${set.setId} has ${String(set.memberCardIds.length)} members, want 4`);
+    if (set.memberCardIds.length !== 6) {
+      throw new Error(`set ${set.setId} has ${String(set.memberCardIds.length)} members, want 6`);
     }
     for (const member of set.memberCardIds) {
       if (!byCardId.has(member)) throw new Error(`set ${set.setId} references unknown ${member}`);
@@ -274,6 +343,7 @@ function main(): void {
     catalogVersion: COLLECTION_CATALOG_VERSION,
     collectionVersion: COLLECTION_VERSION,
     overlayVersion: COLLECTION_OVERLAY_VERSION,
+    specialsVersion: COLLECTION_SPECIALS_VERSION,
     dataVersion: manifest.dataVersion,
     ratingsVersion: RATINGS_VERSION,
     positionNormalizationVersion: POSITION_NORMALIZATION_VERSION,
@@ -283,7 +353,7 @@ function main(): void {
     cards,
     sets,
     packs: launchPackDefinitions(),
-    replayVersion: COLLECTION_REPLAY_VERSION,
+    replayVersion: COLLECTION_REPLAY_V1_VERSION,
   };
   const parsed = collectionCatalogSchema.safeParse(catalog);
   if (!parsed.success) {
@@ -309,6 +379,7 @@ function main(): void {
       eraId: card.eraId,
       rarity: card.rarity,
       family: card.family,
+      availability: card.availability,
       positions: card.positions,
       overall: card.summarySource?.overallRating ?? 60,
     })),

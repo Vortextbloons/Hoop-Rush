@@ -31,6 +31,7 @@ import {
   COLLECTION_GAME_V2_VERSION,
   COLLECTION_OBJECTIVE_VERSION,
   COLLECTION_OVERLAY_VERSION,
+  COLLECTION_SPECIALS_VERSION,
   COLLECTION_PACK_RULES_VERSION,
   COLLECTION_RARITY_ORDER,
   COLLECTION_REWARD_V2_VERSION,
@@ -62,6 +63,10 @@ import {
   COLLECTION_TARGET_MULTIPLIER_BP,
   collectionLaunchSetRewardDefinitions,
 } from '../collection-progression-constants.ts';
+import {
+  COLLECTION_SPECIALS,
+  COLLECTION_SPECIALS_VERSION as AUTHORED_SPECIALS_VERSION,
+} from '../collection-specials.ts';
 import { DEFAULT_MANIFEST } from './data-loader.ts';
 import { collectionGameTargetsSchema } from './collection-game-calibrate.ts';
 export const DATA_VALIDATE_OPTIONS: Record<string, boolean> = {
@@ -1152,6 +1157,9 @@ async function auditCollectionCatalog(
   if (overlayVersion !== COLLECTION_OVERLAY_VERSION) {
     failures.push(`collection-catalog: overlayVersion ${overlayVersion} unexpected`);
   }
+  if (catalog.specialsVersion !== COLLECTION_SPECIALS_VERSION) {
+    failures.push(`collection-catalog: specialsVersion ${catalog.specialsVersion} unexpected`);
+  }
   for (const pack of catalog.packs) {
     const packRulesVersion: string = pack.packRulesVersion;
     if (packRulesVersion !== COLLECTION_PACK_RULES_VERSION) {
@@ -1175,16 +1183,61 @@ async function auditCollectionCatalog(
   }
   const baseCount = catalog.cards.filter((card) => card.family === 'Base').length;
   const specialCount = catalog.cards.length - baseCount;
-  if (specialCount !== 12) {
-    failures.push(`collection-catalog: want 12 specials, have ${String(specialCount)}`);
+  const authoredSpecials = [
+    ...COLLECTION_SPECIALS.map((special) => ({ ...special, availability: 'active' as const })),
+  ];
+  const activeSpecialCount = authoredSpecials.length;
+  if (AUTHORED_SPECIALS_VERSION !== COLLECTION_SPECIALS_VERSION) {
+    failures.push('collection-catalog: authored specials version is unexpected');
   }
-  if (catalog.sets.length !== 3) {
-    failures.push(`collection-catalog: want 3 sets, have ${String(catalog.sets.length)}`);
+  if (specialCount !== authoredSpecials.length) {
+    failures.push(
+      `collection-catalog: ${String(specialCount)} special cards do not match ${String(authoredSpecials.length)} authored entries`,
+    );
+  }
+  for (const special of authoredSpecials) {
+    const card = catalog.cards.find(
+      (entry) =>
+        entry.family === special.family &&
+        entry.sourcePlayerVersionId === special.sourcePlayerVersionId,
+    );
+    if (card === undefined) {
+      failures.push(
+        `collection-catalog: missing ${special.family} special for ${special.sourcePlayerVersionId}`,
+      );
+      continue;
+    }
+    if (card.availability !== special.availability) {
+      failures.push(`collection-catalog: ${card.cardId} has unexpected availability`);
+    }
+    if (card.rarity !== special.rarity) {
+      failures.push(`collection-catalog: ${card.cardId} has unexpected rarity`);
+    }
+    if (canonicalJson(card.ratingOverlay ?? {}) !== canonicalJson(special.ratingOverlay ?? {})) {
+      failures.push(`collection-catalog: ${card.cardId} has unexpected rating overlay`);
+    }
+    if (
+      canonicalJson(card.tendencyOverlay ?? {}) !== canonicalJson(special.tendencyOverlay ?? {})
+    ) {
+      failures.push(`collection-catalog: ${card.cardId} has unexpected tendency overlay`);
+    }
+    if (
+      canonicalJson(card.eligibilityOverlay ?? []) !==
+      canonicalJson(special.eligibilityOverlay ?? [])
+    ) {
+      failures.push(`collection-catalog: ${card.cardId} has unexpected eligibility overlay`);
+    }
+  }
+  if (catalog.sets.length !== 1) {
+    failures.push(`collection-catalog: want 1 set, have ${String(catalog.sets.length)}`);
   }
   for (const set of catalog.sets) {
-    if (set.memberCardIds.length !== 4) {
+    if (set.setId !== 'heat-check-set') {
+      failures.push(`collection-catalog: unexpected set ${set.setId}`);
+    }
+    if (set.memberCardIds.length !== 6) {
       failures.push(
-        `collection-catalog: set ${set.setId} has ${String(set.memberCardIds.length)} members, want 4`,
+        `collection-catalog: set ${set.setId} has ${String(set.memberCardIds.length)} members, want 6`,
       );
     }
   }
@@ -1198,7 +1251,7 @@ async function auditCollectionCatalog(
   }
   void COLLECTION_ECONOMY_VERSION;
   details.push(
-    `collection: ${String(catalog.cards.length)} cards (${String(baseCount)} base + ${String(specialCount)} specials) · ${String(catalog.sets.length)} sets · ${String(catalog.packs.length)} packs · ${String(catalogContent.length)} bytes`,
+    `collection: ${String(catalog.cards.length)} cards (${String(baseCount)} base + ${String(activeSpecialCount)} Heat Check specials) · ${String(catalog.sets.length)} set · ${String(catalog.packs.length)} packs · ${String(catalogContent.length)} bytes`,
   );
   const progression = await auditCollectionProgression(
     entry,

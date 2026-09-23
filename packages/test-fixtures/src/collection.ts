@@ -132,8 +132,8 @@ export function buildCollectionFixtureCatalog(
     cards,
     sets: [
       {
-        setId: 'sharpshooter-set',
-        title: 'Fixture Sharpshooters',
+        setId: 'heat-check-set',
+        title: 'Fixture Heat Check',
         memberCardIds: [cards[0]?.cardId, cards[1]?.cardId],
       },
     ],

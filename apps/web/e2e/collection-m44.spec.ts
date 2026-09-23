@@ -25,18 +25,13 @@ test.describe('collection M4.4: targeting, sets, and challenges', () => {
     await expect(page.getByLabel('Active target player')).toBeVisible();
 
     await page.getByRole('link', { name: 'Packs' }).click();
-    await expect(page.getByRole('heading', { name: 'Pack store' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Choose a pack' })).toBeVisible();
     await expect(page.getByText(/P\(at least one /).first()).toBeVisible();
 
     await page.getByRole('button', { name: 'Clear target' }).first().click();
-    await expect(
-      page.getByText('No active target. Every eligible card has equal weight.').first(),
-    ).toBeVisible();
+    await expect(page.getByLabel('Active target player')).toHaveCount(0);
 
     await page.reload();
-    await expect(
-      page.getByText('No active target. Every eligible card has equal weight.').first(),
-    ).toBeVisible();
     await expect(page.getByLabel('Active target player')).toHaveCount(0);
   });
 
@@ -62,6 +57,6 @@ test.describe('collection M4.4: targeting, sets, and challenges', () => {
     const edit = page.getByRole('link', { name: 'Edit team' }).first();
     await expect(edit).toBeVisible();
     await edit.click();
-    await expect(page).toHaveURL(/\/collection\/team/);
+    await expect(page).toHaveURL(/\/ultimate\/run\/team/);
   });
 });

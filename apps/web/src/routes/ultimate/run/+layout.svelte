@@ -2,7 +2,16 @@
   import { onMount, setContext } from 'svelte';
   import { asset, resolve } from '$app/paths';
   import { page } from '$app/state';
-  import { BookOpen, Home, Package, Play, Users } from '@lucide/svelte';
+  import {
+    ArrowLeftRight,
+    BookOpen,
+    Coins,
+    Home,
+    Layers,
+    Package,
+    Play,
+    Users,
+  } from '@lucide/svelte';
   import ArenaSoundToggle from '$lib/components/ArenaSoundToggle.svelte';
   import {
     UltimateRunShell,
@@ -29,6 +38,7 @@
   const balanceExchange = $derived(
     shell.snapshot?.balances.Exchange.toLocaleString('en-US') ?? '—',
   );
+  const ownedCount = $derived(shell.snapshot?.ownedCount.toLocaleString('en-US') ?? '—');
 
   onMount(() => {
     void shell.refresh();
@@ -42,48 +52,51 @@
 
 <div class="ultimate-root min-h-[100svh]">
   <header class="ur-shell-header">
-    <div class="ur-masthead">
-      <div class="flex min-w-0 items-center gap-3">
+    <div class="ur-topbar">
+      <a class="ur-brand" href={resolve('/ultimate/run')} aria-label="Ultimate Run hub">
         <img
           src={asset('/ultimate/logo.svg')}
           alt=""
-          width="44"
-          height="44"
+          width="32"
+          height="32"
           class="ur-mark"
           fetchpriority="high"
           decoding="async"
         />
-        <div class="min-w-0">
-          <p class="ur-mode-name">Ultimate Run</p>
-          <h1 class="ur-page-name">{activeItem.label}</h1>
-        </div>
-      </div>
-      <div class="ur-masthead-actions flex shrink-0 items-center gap-2 sm:gap-3">
+        <span class="ur-brand-name">Ultimate Run</span>
+      </a>
+      <nav aria-label="Ultimate Run" class="ur-desktop-nav ur-nav-pills">
+        {#each items as item (item.id)}
+          {@const active = isNavItemActive(item, routeId)}
+          <a href={resolve(item.href as any)} aria-current={active ? 'page' : undefined}>
+            <item.icon class="h-4 w-4" />
+            {item.label}
+          </a>
+        {/each}
+      </nav>
+      <div class="ur-top-actions">
         <div class="ur-balance-strip" aria-label="Collection balances">
-          <span><strong>{balanceCoins}</strong><small>Coins</small></span>
-          <span><strong>{balanceExchange}</strong><small>Exchange</small></span>
-          <span class="hidden sm:flex"
-            ><strong>{shell.snapshot?.ownedCount.toLocaleString('en-US') ?? '—'}</strong><small
-              >Cards</small
-            ></span
-          >
+          <span class="ur-currency-pill is-coins">
+            <Coins aria-hidden="true" />
+            {balanceCoins} Coins
+          </span>
+          <span class="ur-currency-pill is-exchange">
+            <ArrowLeftRight aria-hidden="true" />
+            {balanceExchange} Exchange
+          </span>
+          <span class="ur-currency-pill is-cards">
+            <Layers aria-hidden="true" />
+            {ownedCount} Cards
+          </span>
         </div>
-        <ArenaSoundToggle />
-        <a class="ur-home-link" href={resolve('/')} aria-label="Return to Hoop Rush home">
-          <Home class="h-4 w-4" />
+        <ArenaSoundToggle className="ur-sound-pill" />
+        <a class="ur-home-pill" href={resolve('/')} aria-label="Return to Hoop Rush home">
+          <Home class="h-4 w-4" aria-hidden="true" />
           <span>Home</span>
         </a>
       </div>
     </div>
-    <nav aria-label="Ultimate Run" class="ur-desktop-nav">
-      {#each items as item (item.id)}
-        {@const active = isNavItemActive(item, routeId)}
-        <a href={resolve(item.href as any)} aria-current={active ? 'page' : undefined}>
-          <item.icon class="h-4 w-4" />
-          {item.label}
-        </a>
-      {/each}
-    </nav>
+    <h1 class="sr-only">{activeItem.label} · Ultimate Run</h1>
   </header>
 
   {#if shell.announcement}
@@ -109,116 +122,121 @@
   .ur-shell-header {
     position: relative;
     z-index: 5;
-    border-bottom: 1px solid var(--ur-line);
-    background: color-mix(in srgb, var(--ur-canvas) 94%, transparent);
+    border-bottom: 1px solid rgb(255 197 61 / 30%);
+    background: #000;
   }
 
-  .ur-masthead {
+  .ur-shell-header::after {
+    position: absolute;
+    inset: auto 0 0;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgb(255 197 61 / 70%) 25%,
+      var(--ur-gold) 50%,
+      rgb(255 197 61 / 70%) 75%,
+      transparent
+    );
+    content: '';
+    pointer-events: none;
+  }
+
+  .ur-topbar {
     display: flex;
     width: min(100% - 2rem, 82rem);
-    min-height: 5.25rem;
+    min-height: 4.25rem;
     margin-inline: auto;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 1rem;
+    gap: 0.75rem 1rem;
+    padding-block: 0.55rem;
+  }
+
+  .ur-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    text-decoration: none;
   }
 
   .ur-mark {
-    width: 2.75rem;
-    height: 2.75rem;
+    width: 2rem;
+    height: 2rem;
     flex: none;
+    filter: drop-shadow(0 0 0.6rem rgb(255 197 61 / 35%));
   }
 
-  .ur-mode-name {
-    color: var(--ur-muted);
+  .ur-brand-name {
+    color: #fff;
     font-family: var(--font-display);
-    font-size: 0.77rem;
-    letter-spacing: 0.1em;
-    line-height: 1;
-  }
-
-  .ur-page-name {
-    overflow: hidden;
-    color: var(--ur-paper);
-    font-family: var(--font-display);
-    font-size: clamp(1.35rem, 3vw, 1.75rem);
+    font-size: 1.05rem;
     font-weight: 800;
-    line-height: 1.1;
-    text-overflow: ellipsis;
+    letter-spacing: 0.01em;
+    line-height: 1;
     white-space: nowrap;
+  }
+
+  .ur-desktop-nav {
+    order: 2;
+  }
+
+  .ur-desktop-nav a {
+    outline: none;
+  }
+
+  .ur-top-actions {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 0.5rem;
+    order: 3;
   }
 
   .ur-balance-strip {
     display: flex;
     align-items: center;
-    gap: clamp(0.6rem, 2vw, 1.35rem);
+    gap: 0.45rem;
     font-variant-numeric: tabular-nums;
   }
 
-  .ur-balance-strip span {
-    display: flex;
-    flex-direction: column;
-    line-height: 1.05;
+  .ur-balance-strip .ur-currency-pill :global(svg) {
+    width: 0.9rem;
+    height: 0.9rem;
   }
 
-  .ur-balance-strip strong {
-    color: var(--ur-paper);
-    font-size: 0.9rem;
+  .ur-top-actions :global(.ur-sound-pill) {
+    min-width: 0 !important;
+    padding: 0.35rem 0.7rem !important;
+    border: 1px solid rgb(255 197 61 / 35%) !important;
+    border-radius: 999px !important;
+    background: #0d1216 !important;
+    color: var(--ur-paper) !important;
+    font-size: 0.75rem !important;
+    letter-spacing: 0.04em !important;
   }
 
-  .ur-balance-strip small {
-    margin-top: 0.2rem;
-    color: var(--ur-muted);
-    font-size: 0.68rem;
-  }
-
-  .ur-home-link {
+  .ur-home-pill {
     display: inline-flex;
-    min-height: 2.75rem;
     align-items: center;
-    gap: 0.45rem;
-    padding-inline: 0.75rem;
-    border: 1px solid var(--ur-line);
+    gap: 0.4rem;
+    padding: 0.35rem 0.7rem;
+    border: 1px solid rgb(255 197 61 / 35%);
+    border-radius: 999px;
+    background: #0d1216;
     color: var(--ur-paper);
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     font-weight: 700;
-  }
-
-  .ur-desktop-nav {
-    display: flex;
-    width: min(100% - 2rem, 82rem);
-    min-height: 3rem;
-    margin-inline: auto;
-    align-items: stretch;
-    gap: 0.25rem;
-  }
-
-  .ur-desktop-nav a {
-    display: inline-flex;
-    min-width: 7rem;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    padding-inline: 1rem;
-    border-bottom: 2px solid transparent;
-    color: var(--ur-muted);
-    font-size: 0.83rem;
-    font-weight: 700;
+    line-height: 1.2;
+    text-decoration: none;
+    white-space: nowrap;
     outline: none;
   }
 
-  .ur-desktop-nav a:hover,
-  .ur-desktop-nav a[aria-current='page'] {
-    border-bottom-color: var(--ur-apex);
-    color: var(--ur-paper);
-  }
-
-  .ur-desktop-nav a[aria-current='page'] {
-    background: linear-gradient(
-      0deg,
-      color-mix(in srgb, var(--ur-apex) 9%, transparent),
-      transparent 80%
-    );
+  .ur-home-pill:hover {
+    border-color: rgb(255 197 61 / 60%);
+    color: #fff;
   }
 
   .ur-main {
@@ -232,32 +250,52 @@
     display: none;
   }
 
-  .ur-home-link:focus-visible,
+  .ur-brand:focus-visible,
+  .ur-home-pill:focus-visible,
   .ur-desktop-nav a:focus-visible,
   .ur-mobile-nav a:focus-visible {
     outline: 3px solid var(--ur-focus);
     outline-offset: 2px;
   }
 
-  @media (max-width: 767px) {
-    .ur-masthead {
-      width: calc(100% - 1.5rem);
-      min-height: 4.5rem;
+  @media (max-width: 1100px) {
+    .ur-topbar {
+      row-gap: 0.6rem;
+    }
+
+    .ur-desktop-nav {
+      flex-basis: 100%;
+      order: 3;
+      overflow-x: auto;
+      justify-content: flex-start;
+      scrollbar-width: thin;
+    }
+
+    .ur-top-actions {
+      order: 2;
+      margin-left: auto;
       flex-wrap: wrap;
-      padding-block: 0.5rem;
+      justify-content: flex-end;
     }
+  }
 
-    .ur-masthead > div:first-child {
-      flex: 1 1 100%;
-    }
-
-    .ur-masthead-actions {
-      width: 100%;
-      justify-content: space-between;
+  @media (max-width: 767px) {
+    .ur-topbar {
+      width: calc(100% - 1.5rem);
     }
 
     .ur-desktop-nav {
       display: none;
+    }
+
+    .ur-top-actions {
+      width: 100%;
+      margin-left: 0;
+      justify-content: flex-start;
+    }
+
+    .ur-balance-strip {
+      flex-wrap: wrap;
     }
 
     .ur-main {
@@ -265,13 +303,11 @@
       padding-bottom: calc(6.75rem + env(safe-area-inset-bottom));
     }
 
-    .ur-home-link {
-      width: 2.75rem;
-      justify-content: center;
-      padding: 0;
+    .ur-home-pill {
+      padding: 0.35rem 0.55rem;
     }
 
-    .ur-home-link span {
+    .ur-home-pill span {
       position: absolute;
       width: 1px;
       height: 1px;
@@ -287,9 +323,8 @@
       grid-template-columns: repeat(5, minmax(0, 1fr));
       min-height: 4.25rem;
       padding: 0.35rem 0.25rem max(0.35rem, env(safe-area-inset-bottom));
-      border-top: 1px solid var(--ur-line);
-      background: color-mix(in srgb, var(--ur-canvas) 97%, transparent);
-      backdrop-filter: blur(18px);
+      border-top: 1px solid rgb(255 197 61 / 30%);
+      background: #0b0e11;
     }
 
     .ur-mobile-nav a {
@@ -300,28 +335,18 @@
       align-items: center;
       justify-content: center;
       gap: 0.2rem;
+      border-radius: 0.6rem;
       color: var(--ur-muted);
       font-size: 0.68rem;
       font-weight: 700;
+      text-decoration: none;
       outline: none;
     }
 
     .ur-mobile-nav a[aria-current='page'] {
-      color: var(--ur-apex);
-    }
-  }
-
-  @media (max-width: 400px) {
-    .ur-balance-strip {
-      gap: 0.45rem;
-    }
-
-    .ur-balance-strip strong {
-      font-size: 0.75rem;
-    }
-
-    .ur-balance-strip small {
-      font-size: 0.62rem;
+      background: linear-gradient(180deg, #ffda73, var(--ur-gold));
+      color: #241a02;
+      box-shadow: 0 2px 14px rgb(255 197 61 / 35%);
     }
   }
 

@@ -80,8 +80,8 @@ function expectedFullDuplicateExchange(
 }
 
 function maxDuplicatePayout(pack: CollectionPackDefinition, catalog: CollectionCatalog): number {
-  const eligible = catalog.cards.filter((card) =>
-    pack.eligibleScope === 'specials-only' ? card.family !== 'Base' : true,
+  const eligible = catalog.cards.filter(
+    (card) => pack.eligibleScope === 'specials-only' ? card.family !== 'Base' : true,
   );
   const bySlot = pack.slots.map((slot) => {
     const floor = slot.kind === 'guaranteed' ? (slot.floorRarity ?? 'Ember') : 'Ember';

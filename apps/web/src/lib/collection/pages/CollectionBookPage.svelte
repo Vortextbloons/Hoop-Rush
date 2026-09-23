@@ -94,7 +94,11 @@
   let pageNum = $state(1);
   let selectedCardId = $state<string | null>(null);
 
-  const FAMILIES = ['Base', 'Sharpshooter', 'Lockdown', 'Floor General'] as const;
+  const FAMILIES = $derived(
+    [...new Set(entries.map((entry) => entry.family))].sort((left, right) =>
+      left.localeCompare(right),
+    ),
+  );
 
   function readFiltersFromUrl(): void {
     const params = page.url.searchParams;
@@ -389,6 +393,16 @@
   const activeTargetLine = $derived(
     activeTargetId ? targetedSummaryForPlayer(activeTargetSummary, activeTargetId) : '',
   );
+  const activeTargetPlayer = $derived.by(() => {
+    if (!catalog || !activeTargetId) return null;
+    const card = catalog.cards.find((entry) => entry.playerId === activeTargetId);
+    if (!card) return null;
+    return {
+      playerId: activeTargetId,
+      playerExternalId: card.playerExternalId,
+      altIds: null,
+    };
+  });
   const setViews = $derived(
     progression && catalog && collectionState
       ? setProgressViews({
@@ -500,17 +514,27 @@
 </script>
 
 <div class="ur-page ur-collection-page">
-  <div class="ur-page-intro">
+  <div class="ur-page-intro ur-book-intro">
     <div>
-      <h2>Build your card book</h2>
+      <p class="ur-hero-eyebrow">Your collection</p>
+      <h2 class="ur-book-title">Your card book</h2>
       <p class="ur-page-description">
-        Search the full catalog, keep your owned cards close, and chase exact set members.
+        Browse the full player card catalog and finish sets to claim their rewards.
       </p>
     </div>
     {#if collectionState}
-      <span class="ur-status-badge"
-        >{collectionState.owned.length} owned · {entries.length.toLocaleString('en-US')} total</span
-      >
+      <div class="ur-stat-duo ur-book-counts" aria-label="Collection totals">
+        <span class="ur-stat-box ur-stat-gold"
+          ><strong class="ur-number">{collectionState.owned.length}</strong><small
+            >Owned</small
+          ></span
+        >
+        <span class="ur-stat-box"
+          ><strong class="ur-number">{entries.length.toLocaleString('en-US')}</strong><small
+            >Catalog</small
+          ></span
+        >
+      </div>
     {/if}
   </div>
 
@@ -536,9 +560,10 @@
     {#if collectionState && !collectionState.claimedWelcome}
       <section
         aria-labelledby="welcome-heading"
-        class="mt-6 rounded-2xl border border-border bg-card p-6"
+        class="ur-starter-claim ur-arena-panel mt-6 p-6"
       >
-        <h2 id="welcome-heading" class="font-display text-2xl font-extrabold">
+        <p class="ur-hero-eyebrow">Welcome grant</p>
+        <h2 id="welcome-heading" class="ur-section-title">
           Claim your starter
         </h2>
         <p class="mt-2 max-w-2xl text-sm text-muted-foreground">
@@ -557,7 +582,7 @@
           type="button"
           onclick={claim}
           disabled={claiming}
-          class="mt-4 rounded-xl bg-accent px-5 py-2.5 font-bold text-accent-foreground outline-none disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-ring"
+          class="ur-starter-claim-button ur-btn-gold mt-4 px-5 py-2.5 outline-none disabled:opacity-50"
         >
           {claiming ? 'Claiming…' : 'Claim starter'}
         </button>
@@ -565,8 +590,9 @@
     {/if}
 
     {#if starterCards.length > 0}
-      <section aria-label="Starter results" class="ur-starter-recap mt-6">
-        <h2 class="font-display text-xl font-extrabold">Starter claimed</h2>
+      <section aria-label="Starter results" class="ur-starter-recap ur-arena-panel mt-6">
+        <p class="ur-hero-eyebrow">Starter claimed</p>
+        <h2 class="ur-section-title">Five cards added</h2>
         <p class="text-sm text-muted-foreground">Five cards added · 3,000 Coins in the balance.</p>
         <ul class="mt-3 grid gap-2 sm:grid-cols-2">
           {#each starterCards as card (card.cardId)}
@@ -601,6 +627,8 @@
             summaryLine={activeTargetLine}
             blurb={progression?.display.targetingBlurb ?? undefined}
             busy={targetBusy}
+            player={activeTargetPlayer}
+            {manifest}
             onChange={() => searchInput?.focus()}
             onClear={clearTarget}
           />
@@ -627,7 +655,7 @@
       <button
         bind:this={filterButton}
         type="button"
-        class="ur-mobile-filter-trigger"
+        class="ur-mobile-filter-trigger ur-btn-ghost"
         onclick={() => void openMobileFilters()}
       >
         Filters{activeFilterCount > 0 ? ` · ${activeFilterCount} applied` : ''}
@@ -640,20 +668,20 @@
         class="ur-collection-filters mt-6"
       >
         <div class="ur-filter-dialog-heading">
-          <h2 id="collection-filter-title" bind:this={filterDialogTitle} tabindex="-1">
+          <h2 id="collection-filter-title" bind:this={filterDialogTitle} tabindex="-1" class="ur-section-title">
             Filter cards
           </h2>
           {#if !desktopFilterLayout}
             <button
               type="button"
-              class="ur-filter-dialog-close"
+              class="ur-filter-dialog-close ur-btn-ghost"
               onclick={() => closeMobileFilters(false)}
             >
               Cancel
             </button>
           {/if}
         </div>
-        <div class="flex flex-wrap gap-2">
+        <div class="ur-filter-pills flex flex-wrap gap-2">
           <label class="flex min-w-48 flex-1 items-center gap-2 rounded-xl bg-surface-2 px-3 py-2">
             <span class="sr-only">Search players</span>
             <input
@@ -777,10 +805,10 @@
         </div>
         {#if !desktopFilterLayout}
           <div class="ur-filter-dialog-actions">
-            <button type="button" class="ur-filter-clear" onclick={resetEditingFilters}
+            <button type="button" class="ur-filter-clear ur-btn-ghost" onclick={resetEditingFilters}
               >Clear</button
             >
-            <button type="button" class="ur-filter-apply" onclick={() => closeMobileFilters(true)}>
+            <button type="button" class="ur-filter-apply ur-btn-gold" onclick={() => closeMobileFilters(true)}>
               Apply filters
             </button>
           </div>
@@ -860,7 +888,7 @@
         </p>
       {:else}
         <ul
-          class="mt-3 grid grid-cols-2 gap-3 min-[480px]:grid-cols-3 min-[768px]:grid-cols-4 min-[1100px]:grid-cols-5"
+          class="ur-card-grid mt-3 grid grid-cols-2 gap-3 min-[480px]:grid-cols-3 min-[768px]:grid-cols-4 min-[1100px]:grid-cols-5"
         >
           {#each paged.pageItems as item (item.entry.cardId)}
             <li>
@@ -876,7 +904,7 @@
             </li>
           {/each}
         </ul>
-        <nav aria-label="Collection pages" class="mt-4 flex items-center justify-center gap-2">
+        <nav aria-label="Collection pages" class="ur-book-pager mt-4 flex items-center justify-center gap-2">
           <button
             type="button"
             disabled={paged.page <= 1}
@@ -884,11 +912,11 @@
               pageNum = paged.page - 1;
               writeFiltersToUrl();
             }}
-            class="rounded-xl bg-surface-2 px-4 py-2 text-sm font-semibold outline-none disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-ring"
+            class="ur-book-page-btn ur-btn-ghost px-4 py-2 text-sm outline-none disabled:opacity-40"
           >
             Previous
           </button>
-          <span class="text-sm tabular-nums">Page {paged.page} / {paged.pageCount}</span>
+          <span class="ur-number text-sm tabular-nums">Page {paged.page} / {paged.pageCount}</span>
           <button
             type="button"
             disabled={paged.page >= paged.pageCount}
@@ -896,7 +924,7 @@
               pageNum = paged.page + 1;
               writeFiltersToUrl();
             }}
-            class="rounded-xl bg-surface-2 px-4 py-2 text-sm font-semibold outline-none disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-ring"
+            class="ur-book-page-btn ur-btn-ghost px-4 py-2 text-sm outline-none disabled:opacity-40"
           >
             Next
           </button>
@@ -938,14 +966,57 @@
     font-size: 0.9rem;
   }
 
+  .ur-book-intro {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.1rem;
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+
+  .ur-book-title {
+    margin: 0.25rem 0 0;
+    color: #fff;
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 5vw, 3.1rem);
+    font-weight: 900;
+    letter-spacing: -0.035em;
+    line-height: 0.95;
+    text-shadow: 0 2px 18px rgb(0 0 0 / 60%);
+  }
+
+  .ur-book-counts {
+    min-width: min(22rem, 100%);
+  }
+
+  .ur-card-grid {
+    gap: clamp(0.65rem, 1.5vw, 1.15rem);
+    overflow: visible;
+  }
+
+  .ur-card-grid > li {
+    min-width: 0;
+    overflow: visible;
+  }
+
   .ur-collection-filters {
     width: min(54rem, calc(100vw - 2rem));
     max-height: min(88svh, 54rem);
     padding: 1rem;
-    border: 1px solid var(--ur-line-strong);
-    background: var(--ur-raised);
+    border: 1px solid color-mix(in srgb, var(--ur-apex) 30%, var(--ur-line-strong));
+    border-radius: 0.75rem;
+    background:
+      linear-gradient(180deg, rgb(255 197 61 / 5%), transparent 22%),
+      linear-gradient(165deg, #141c21, #0b1114 75%);
     color: var(--ur-paper);
-    box-shadow: 0 1.5rem 5rem rgb(0 0 0 / 52%);
+    box-shadow:
+      0 0 0 1px rgb(0 0 0 / 40%),
+      0 1.5rem 5rem rgb(0 0 0 / 52%),
+      inset 0 1px 0 rgb(255 255 255 / 6%);
   }
 
   .ur-collection-filters::backdrop {
@@ -957,19 +1028,14 @@
   .ur-filter-dialog-close,
   .ur-filter-clear,
   .ur-filter-apply {
-    min-height: 2.75rem;
-    padding-inline: 0.9rem;
-    border: 1px solid var(--ur-line-strong);
-    color: var(--ur-paper);
     font-size: 0.84rem;
-    font-weight: 700;
+    font-weight: 800;
   }
 
   .ur-mobile-filter-trigger {
     width: 100%;
     margin-top: 1.5rem;
-    background: var(--ur-raised);
-    text-align: left;
+    justify-content: flex-start;
   }
 
   .ur-filter-dialog-heading {
@@ -981,10 +1047,16 @@
   }
 
   .ur-filter-dialog-heading h2 {
-    color: var(--ur-paper);
-    font-family: var(--font-display);
-    font-size: 1.5rem;
-    font-weight: 800;
+    color: #fff;
+  }
+
+  .ur-filter-pills > label {
+    border: 1px solid color-mix(in srgb, var(--ur-apex) 22%, var(--ur-line-strong));
+    border-radius: 0.75rem;
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / 3%), transparent 40%),
+      var(--ur-surface);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 5%);
   }
 
   .ur-filter-dialog-close,
@@ -1033,8 +1105,11 @@
   }
 
   .ur-filter-group {
-    border: 1px solid var(--ur-line);
-    background: var(--ur-raised);
+    border: 1px solid color-mix(in srgb, var(--ur-apex) 20%, var(--ur-line));
+    border-radius: 0.75rem;
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / 2%), transparent 35%),
+      var(--ur-raised);
     padding: 0.75rem;
   }
 
@@ -1065,9 +1140,15 @@
   .ur-applied-filters button {
     min-height: 2rem;
     padding: 0.25rem 0.55rem;
-    border: 1px solid var(--ur-line-strong);
+    border: 1px solid color-mix(in srgb, var(--ur-apex) 28%, var(--ur-line-strong));
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ur-surface) 85%, transparent);
     color: var(--ur-paper);
     outline: none;
+  }
+
+  .ur-applied-filters button:hover {
+    border-color: var(--ur-apex);
   }
 
   .ur-applied-filters button:focus-visible,
@@ -1080,14 +1161,98 @@
   }
 
   .ur-starter-recap {
+    padding: clamp(1rem, 2.5vw, 1.4rem);
+  }
+
+  .ur-starter-recap li {
+    border: 1px solid var(--ur-line);
+    border-radius: 0.6rem;
+  }
+
+  .ur-book-pager .ur-book-page-btn:hover:not(:disabled) {
+    border-color: var(--ur-apex);
+  }
+
+  .ur-collection-page :global(.ur-set-progress-book) {
+    border: 1px solid color-mix(in srgb, var(--ur-apex) 30%, var(--ur-line-strong));
+    border-radius: 0.75rem;
+    background:
+      linear-gradient(180deg, rgb(255 197 61 / 5%), transparent 22%),
+      linear-gradient(165deg, #141c21, #0b1114 75%);
+    box-shadow:
+      0 0 0 1px rgb(0 0 0 / 40%),
+      inset 0 1px 0 rgb(255 255 255 / 6%);
+  }
+
+  .ur-collection-page :global(.ur-set-entry) {
+    border: 1px solid color-mix(in srgb, var(--ur-apex) 22%, var(--ur-line));
+    border-radius: 0.75rem;
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / 2%), transparent 35%),
+      var(--ur-bg);
+  }
+
+  .ur-collection-page :global(.ur-set-entry:nth-child(1)) {
     border-top: 2px solid var(--ur-apex);
-    background: var(--ur-raised);
-    padding: 1.25rem;
+  }
+
+  .ur-collection-page :global(.ur-set-entry:nth-child(1) .ur-set-meter > span) {
+    background: linear-gradient(90deg, #8a6a1f, var(--ur-apex));
+  }
+
+  .ur-collection-page :global(.ur-set-entry:nth-child(2)) {
+    border-top: 2px solid var(--ur-eruption);
+  }
+
+  .ur-collection-page :global(.ur-set-entry:nth-child(2) .ur-set-meter > span) {
+    background: linear-gradient(90deg, #7a2a18, var(--ur-eruption));
+  }
+
+  .ur-collection-page :global(.ur-set-entry:nth-child(3)) {
+    border-top: 2px solid var(--ur-eclipse);
+  }
+
+  .ur-collection-page :global(.ur-set-entry:nth-child(3) .ur-set-meter > span) {
+    background: linear-gradient(90deg, #4c2a9e, var(--ur-eclipse));
+  }
+
+  .ur-collection-page :global(.ur-set-entry:nth-child(n + 4)) {
+    border-top: 2px solid var(--ur-ember);
+  }
+
+  .ur-collection-page :global(.ur-set-entry:nth-child(n + 4) .ur-set-meter > span) {
+    background: linear-gradient(90deg, #7a3a1e, var(--ur-ember));
+  }
+
+  .ur-collection-page :global(.ur-set-entry > button) {
+    border-radius: 0.55rem;
+  }
+
+  .ur-collection-page :global(.ur-active-target) {
+    border: 1px solid color-mix(in srgb, var(--ur-apex) 34%, var(--ur-line-strong));
+    border-radius: 0.75rem;
+  }
+
+  @media (max-width: 600px) {
+    .ur-book-intro {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+
+    .ur-book-counts {
+      width: 100%;
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {
     .ur-filter-group {
       scroll-behavior: auto;
+    }
+
+    .ur-collection-page :global(*),
+    .ur-book-page-btn {
+      animation: none !important;
+      transition: none !important;
     }
   }
 

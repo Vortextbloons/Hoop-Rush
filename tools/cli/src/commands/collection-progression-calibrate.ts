@@ -432,8 +432,8 @@ interface PackAnalytic {
 
 function buildPackAnalytics(catalog: CollectionCatalog): PackAnalytic[] {
   return catalog.packs.map((pack) => {
-    const eligible = catalog.cards.filter((card) =>
-      pack.eligibleScope === 'specials-only' ? card.family !== 'Base' : true,
+    const eligible = catalog.cards.filter(
+      (card) => pack.eligibleScope === 'specials-only' ? card.family !== 'Base' : true,
     );
     const eligibleCounts = {} as Record<CollectionRarity, number>;
     for (const rarity of COLLECTION_RARITY_ORDER) eligibleCounts[rarity] = 0;
@@ -515,8 +515,8 @@ function expectedFullDuplicateExchange(
 }
 
 function maxDuplicatePayout(pack: CollectionPackDefinition, catalog: CollectionCatalog): number {
-  const eligible = catalog.cards.filter((card) =>
-    pack.eligibleScope === 'specials-only' ? card.family !== 'Base' : true,
+  const eligible = catalog.cards.filter(
+    (card) => pack.eligibleScope === 'specials-only' ? card.family !== 'Base' : true,
   );
   const bySlot = pack.slots.map((slot) => {
     const floor = slot.kind === 'guaranteed' ? (slot.floorRarity ?? 'Ember') : 'Ember';
@@ -1048,11 +1048,11 @@ function runSetReport(input: {
   gates['sets.no-card-consumption'] = noCardConsumption === progression.setRewards.length;
   gates['sets.exact-balance-fold'] = exactBalanceFold === progression.setRewards.length;
   gates['sets.audit-no-divergence'] = auditFailures === 0 && maxAudit.length === 0;
-  gates['sets.max-finite-6000'] =
-    expectedMax === 6000 &&
-    maxExchange === 6000 &&
-    maxLedgerEntries === 3 &&
-    progression.setRewards.length === 3;
+  gates['sets.max-finite-2000'] =
+    expectedMax === 2000 &&
+    maxExchange === 2000 &&
+    maxLedgerEntries === 1 &&
+    progression.setRewards.length === 1;
   const spotlight = catalog.packs.find((entry) => entry.packId === 'spotlight');
   let spotlightMaxPayout = 0;
   let spotlightExpected = 0;

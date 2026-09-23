@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   COLLECTION_GAME_WORKER_WIRE_VERSION,
   collectionChallengeDefinitionSchema,
-  collectionProgressionRulesSchema,
   type CollectionActiveTeam,
   type CollectionCatalog,
   type CollectionCatalogCard,
@@ -16,6 +15,7 @@ import {
   buildCollectionFixtureCard,
   buildCollectionFixtureCatalog,
   buildCollectionGameRulesFixture,
+  buildCollectionProgressionFixture,
 } from '@hoop-rush/test-fixtures';
 import {
   collectionGameEventDigest,
@@ -60,7 +60,7 @@ function buildCatalog(): CollectionCatalog {
     cards,
     sets: [
       {
-        setId: 'sharpshooter-set',
+        setId: 'heat-check-set',
         title: 'Envelope',
         memberCardIds: [cards[0]?.cardId as string, cards[1]?.cardId as string],
       },
@@ -119,37 +119,7 @@ function buildChallengePrepared(catalog: CollectionCatalog): CollectionPreparedG
     firstClearCoins: 450,
     repeatWinCoins: 45,
   });
-  const progression = collectionProgressionRulesSchema.parse({
-    schemaVersion: 1,
-    progressionVersion: 'collection-progression-v1',
-    targetingVersion: 'collection-targeting-v1',
-    challengeVersion: 'collection-challenge-v1',
-    challengeRewardVersion: 'collection-challenge-reward-v1',
-    setRewardVersion: 'collection-set-reward-v1',
-    sourceCatalogVersion: 'collection-catalog-v1',
-    sourceCatalogHash: HASH,
-    targetMultiplierBp: 80_000,
-    challenges: [challenge],
-    setRewards: [
-      {
-        setRewardVersion: 'collection-set-reward-v1',
-        setId: 'sharpshooter-set',
-        title: 'Envelope',
-        memberCardIds: [catalog.cards[0]?.cardId as string],
-        currency: 'Exchange',
-        amount: 2000,
-        description: 'Fixture set reward.',
-      },
-    ],
-    display: {
-      challengesTitle: 'Challenges',
-      challengesBlurb: 'Fixture challenges.',
-      targetingBlurb: 'Fixture targeting.',
-      setsTitle: 'Sets',
-      setsBlurb: 'Fixture sets.',
-    },
-    contentDigest: '0'.repeat(32),
-  });
+  const progression = buildCollectionProgressionFixture({ catalog, challenges: [challenge] });
   return prepareCollectionChallengeGame({
     collectionId: 'collection-test',
     rootSeed: '0'.repeat(32),

@@ -18,7 +18,7 @@ test.describe('collection: team building and basic game', () => {
 
   async function buildTeam(page: Page) {
     await page.goto('/collection/team');
-    await expect(page.getByText("Coach's board")).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Starting five' })).toBeVisible();
     await page.getByRole('button', { name: 'Auto build' }).click();
     await page.getByRole('button', { name: 'Save team' }).click();
     await expect(page.getByRole('status').filter({ hasText: /Saved team/ })).toBeVisible();

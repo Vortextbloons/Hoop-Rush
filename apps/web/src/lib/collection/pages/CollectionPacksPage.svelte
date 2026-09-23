@@ -21,6 +21,7 @@
     type UltimateRunShell,
   } from '$lib/collection/ultimate-shell.svelte';
   import ActiveTarget from '$lib/collection/ActiveTarget.svelte';
+  import PlayerFace from '$lib/components/PlayerFace.svelte';
   import {
     loadCollectionIndex,
     loadCollectionCatalog,
@@ -94,21 +95,39 @@
     spotlight: 'Spotlight',
   };
 
+  function initialsOf(name: string): string {
+    return name
+      .split(/\s+/)
+      .map((part) => part[0] ?? '')
+      .join('')
+      .slice(0, 2)
+      .toUpperCase();
+  }
+
+  const spotlightFaces = $derived.by(() => {
+    if (!catalog) return [];
+    const rank = new Map(COLLECTION_RARITY_ORDER.map((rarity, index) => [rarity, index]));
+    return catalog.cards
+      .filter((card) => card.family !== 'Base')
+      .sort(
+        (a, b) =>
+          (rank.get(b.rarity) ?? 0) - (rank.get(a.rarity) ?? 0) ||
+          (a.cardId < b.cardId ? -1 : 1),
+      )
+      .slice(0, 2)
+      .map((card) => ({
+        playerId: card.playerId,
+        playerExternalId: card.playerExternalId,
+        displayName: card.displayName,
+      }));
+  });
+
   function formatChance(probability: number): string {
     if (probability <= 0) return '0%';
     const percent = probability * 100;
     if (percent >= 10) return `${percent.toFixed(1)}%`;
     if (percent >= 1) return `${percent.toFixed(2)}%`;
     return `${percent.toPrecision(2)}%`;
-  }
-
-  function slotLabel(packId: string, slotIndex: number): string {
-    const pack = catalog?.packs.find((entry) => entry.packId === packId);
-    const slot = pack?.slots[slotIndex];
-    if (!slot) return `Slot ${slotIndex + 1}`;
-    if (slot.kind === 'guaranteed')
-      return `Slot ${slotIndex + 1} · ${slot.floorRarity}+ guaranteed`;
-    return `Slot ${slotIndex + 1} · ordinary`;
   }
 
   function playerIdOf(cardId: string): string | null {
@@ -211,6 +230,16 @@
   const activeTargetLine = $derived(
     activeTargetId ? targetedSummaryForPlayer(activeTargetSummary, activeTargetId) : '',
   );
+  const activeTargetPlayer = $derived.by(() => {
+    if (!catalog || !activeTargetId) return null;
+    const card = catalog.cards.find((entry) => entry.playerId === activeTargetId);
+    if (!card) return null;
+    return {
+      playerId: activeTargetId,
+      playerExternalId: card.playerExternalId,
+      altIds: null,
+    };
+  });
   const targetingBlocked = $derived(activeTargetId !== null && progression === null);
   const targetOddsByPack = $derived.by(() => {
     const map = new Map<string, PackTargetOddsView>();
@@ -362,21 +391,35 @@
 </script>
 
 <div class="ur-page ur-packs-page">
-  <div class="ur-page-intro">
-    <div>
-      <h2>Choose a pack</h2>
-      <p class="ur-page-description">
-        Every slot, guarantee, and currency cost is visible before purchase.
-      </p>
+  <section class="pack-hero" aria-labelledby="pack-store-title">
+    <div class="pack-hero-glow" aria-hidden="true"></div>
+    <div class="pack-hero-inner">
+      <div class="pack-hero-copy">
+        <p class="ur-hero-eyebrow pack-kicker">Pack shelf</p>
+        <h2 id="pack-store-title" class="pack-title">Choose a <span class="pack-gold">pack</span></h2>
+        <p class="ur-page-description">
+          Compare the cost, card slots, guarantees, and exact draw odds before opening.
+        </p>
+      </div>
+      {#if collectionState}
+        <section class="ur-wallet ur-stat-duo" aria-label="Available balance">
+          <p class="ur-wallet-title ur-hero-eyebrow">Available balance</p>
+          <div class="ur-wallet-balances">
+            <p class="ur-stat-box ur-stat-gold">
+              <span class="coin-dot" aria-hidden="true">$</span>
+              <strong class="ur-number">{balances.Coins.toLocaleString('en-US')}</strong>
+              <span><small>Coins</small></span>
+            </p>
+            <p class="ur-stat-box">
+              <span class="exchange-dot" aria-hidden="true">◈</span>
+              <strong class="ur-number">{balances.Exchange.toLocaleString('en-US')}</strong>
+              <span><small>Exchange</small></span>
+            </p>
+          </div>
+        </section>
+      {/if}
     </div>
-    {#if collectionState}
-      <span class="ur-status-badge"
-        >{balances.Coins.toLocaleString('en-US')} Coins · {balances.Exchange.toLocaleString(
-          'en-US',
-        )} Exchange</span
-      >
-    {/if}
-  </div>
+  </section>
 
   <p class="sr-only" role="status">{announcement}</p>
 
@@ -406,7 +449,7 @@
     </div>
     <a
       href={resolve('/ultimate/run/collection' as any)}
-      class="mt-3 inline-block rounded-xl bg-accent px-5 py-2.5 font-bold text-accent-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      class="ur-btn-gold mt-3 inline-block px-5 py-2.5 outline-none"
     >
       Go to collection
     </a>
@@ -441,6 +484,8 @@
         summaryLine={activeTargetLine}
         blurb={progression?.display.targetingBlurb ?? undefined}
         busy={targetBusy}
+        player={activeTargetPlayer}
+        {manifest}
         onClear={clearTarget}
       />
       {#if targetError}
@@ -469,122 +514,182 @@
         {@const targetOdds = targetOddsByPack.get(pack.packId)}
         {@const affordable = balances[pack.priceCurrency] >= pack.priceAmount}
         {@const shortfall = pack.priceAmount - balances[pack.priceCurrency]}
-        <li class="ur-pack-product ur-pack-{pack.packId}">
-          <div class="ur-pack-art" aria-hidden="true"><span>{pack.slots.length}</span></div>
-          <div class="flex items-start justify-between gap-3">
-            <div class="min-w-0">
-              <h2 class="font-display text-xl font-extrabold">
-                {PACK_LABELS[pack.packId] ?? pack.packId}
-              </h2>
-              <p class="text-sm text-muted-foreground">{PACK_BLURBS[pack.packId] ?? ''}</p>
-              <small class="ur-pack-id">{pack.packId}</small>
+        {@const guaranteedCount = pack.slots.filter((slot) => slot.kind === 'guaranteed').length}
+        {@const isExchange = pack.priceCurrency === 'Exchange'}
+        <li
+          class="ur-pack-product"
+          class:pack-exchange={isExchange}
+          class:pack-tip-off={pack.packId === 'tip-off'}
+          class:pack-fast-break={pack.packId === 'fast-break'}
+          class:pack-full-court={pack.packId === 'full-court'}
+          class:pack-main-event={pack.packId === 'main-event'}
+          class:pack-spotlight={pack.packId === 'spotlight'}
+        >
+          <div class="pack-visual" aria-hidden="true">
+            {#if pack.packId === 'spotlight' && spotlightFaces.length > 0}
+              <div class="pack-faces" aria-hidden="true">
+                {#each spotlightFaces as face, faceIndex (face.playerId + '-' + String(faceIndex))}
+                  <div class="spot-face spot-face-{faceIndex}">
+                    {#if manifest}
+                      <PlayerFace
+                        player={{
+                          playerId: face.playerId,
+                          playerExternalId: face.playerExternalId,
+                          altIds: null,
+                        }}
+                        {manifest}
+                        size="sm"
+                        eager
+                        fallbackInitials={initialsOf(face.displayName)}
+                      />
+                    {:else}
+                      <span class="spot-face-initials">{initialsOf(face.displayName)}</span>
+                    {/if}
+                  </div>
+                {/each}
+              </div>
+            {/if}
+            <div class="pack-foil">
+              <span class="foil-brand">UR</span>
+              <span class="foil-name">{PACK_LABELS[pack.packId] ?? pack.packId}</span>
+              <span class="foil-count ur-number">{pack.slots.length}</span>
+              <span class="foil-unit">{pack.slots.length === 1 ? 'CARD' : 'CARDS'}</span>
             </div>
-            <p class="shrink-0 text-right text-sm">
-              <strong class="tabular-nums">{pack.priceAmount} {pack.priceCurrency}</strong>
-              <span class="block text-xs text-muted-foreground"
-                >{pack.slots.length} {pack.slots.length === 1 ? 'card' : 'cards'}</span
-              >
-              {#if pack.slots.some((slot) => slot.kind === 'guaranteed')}
-                <span class="ur-guarantee-badge"
-                  >{pack.slots.filter((slot) => slot.kind === 'guaranteed').length} guaranteed</span
-                >
+            <div class="pack-visual-copy">
+              <h2>{PACK_LABELS[pack.packId] ?? pack.packId}</h2>
+              <p>{PACK_BLURBS[pack.packId] ?? ''}</p>
+              {#if guaranteedCount > 0}
+                <span class="guarantee-pill">
+                  <span class="guarantee-crown" aria-hidden="true">♛</span>
+                  {guaranteedCount} guaranteed
+                </span>
               {/if}
-            </p>
-          </div>
-          <ul class="mt-3 space-y-1 text-sm">
-            {#each pack.slots as slot, index (index)}
-              <li class="text-muted-foreground">{slotLabel(pack.packId, index)}</li>
-            {/each}
-          </ul>
-          {#if targetOdds}
-            <p
-              class="mt-3 break-words rounded-xl bg-surface-2 px-3 py-2 text-sm {targetOdds.eligible
-                ? 'text-foreground'
-                : 'text-muted-foreground'}"
-            >
-              {targetOdds.summary}
-            </p>
-          {/if}
-          <details class="mt-3 rounded-xl bg-surface-2 p-3 text-sm">
-            <summary class="cursor-pointer font-semibold">Odds details</summary>
-            <div class="mt-2 overflow-x-auto">
-              <table class="w-full text-left text-xs">
-                <thead>
-                  <tr class="text-muted-foreground">
-                    <th scope="col" class="pr-2 font-semibold">Rarity</th>
-                    {#each odds.perSlot as slot (slot.slotIndex)}
-                      <th scope="col" class="pr-2 font-semibold">Slot {slot.slotIndex + 1}</th>
-                    {/each}
-                    <th scope="col" class="font-semibold">≥1 in pack</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {#each COLLECTION_RARITY_ORDER as rarity (rarity)}
-                    <tr>
-                      <th scope="row" class="pr-2 font-semibold">{rarity}</th>
-                      {#each odds.perSlot as slot (slot.slotIndex)}
-                        <td class="pr-2 tabular-nums"
-                          >{formatChance(slot.distribution[rarity] ?? 0)}</td
-                        >
-                      {/each}
-                      <td class="tabular-nums">{formatChance(odds.atLeastOne[rarity] ?? 0)}</td>
-                    </tr>
-                  {/each}
-                  {#if targetOdds?.hasTarget}
-                    <tr>
-                      <th scope="row" class="pr-2 font-semibold">Target player</th>
-                      {#each targetOdds.perSlotLabels as label, index (index)}
-                        <td class="pr-2 tabular-nums">{label}</td>
-                      {/each}
-                      <td class="tabular-nums">{targetOdds.atLeastOneLabel}</td>
-                    </tr>
-                  {/if}
-                </tbody>
-              </table>
             </div>
-            <p class="mt-2 text-xs text-muted-foreground">
-              Pool: {odds.cardCount} slots · duplicate values
-              {COLLECTION_RARITY_ORDER.map(
-                (rarity) => `${rarity} +${odds.duplicateExchange[rarity] ?? 0}`,
-              ).join(' · ')}. No pity, no rarity boosts, no duplicate protection. Targeting keeps
-              every rarity weight unchanged.
-            </p>
-            {#if targetOdds?.hasTarget}
-              <p class="mt-1 text-xs text-muted-foreground">
-                Target chance is exact and comes from the same compiled pack distributions as the
-                draw. Tiny nonzero values are never rounded to zero.
+          </div>
+
+          <div class="pack-body">
+            <div class="pack-meta">
+              <p class="pack-meta-cards">
+                <span class="meta-icon" aria-hidden="true">▤</span>
+                <strong class="ur-number"
+                  >{pack.slots.length} {pack.slots.length === 1 ? 'Card' : 'Cards'}</strong
+                >
+                <small>
+                  {pack.slots.length} {pack.slots.length === 1 ? 'slot' : 'slots'}{#if guaranteedCount > 0} · {guaranteedCount} guaranteed{/if}
+                </small>
+              </p>
+              <p
+                class="pack-meta-price"
+                aria-label={`Cost: ${pack.priceAmount} ${pack.priceCurrency}`}
+              >
+                {#if isExchange}
+                  <span class="exchange-dot" aria-hidden="true">◈</span>
+                {:else}
+                  <span class="coin-dot" aria-hidden="true">$</span>
+                {/if}
+                <strong class="ur-number">{pack.priceAmount.toLocaleString('en-US')}</strong>
+                <small>{pack.priceCurrency}</small>
+              </p>
+            </div>
+
+            <section class="ur-odds-preview" aria-label="Odds of at least one card at each rarity">
+              <h3>Chance of at least one</h3>
+              <ul>
+                {#each COLLECTION_RARITY_ORDER as rarity (rarity)}
+                  <li>
+                    <span class="ur-rarity ur-rarity-{rarity.toLowerCase()}">{rarity}</span>
+                    <strong class="ur-number">{formatChance(odds.atLeastOne[rarity] ?? 0)}</strong>
+                  </li>
+                {/each}
+              </ul>
+            </section>
+
+            {#if targetOdds}
+              <p class="ur-target-odds" class:ur-target-odds-ineligible={!targetOdds.eligible}>
+                {targetOdds.summary}
               </p>
             {/if}
-          </details>
-          {#if targetingBlocked}
-            <p class="mt-3 text-xs text-destructive">
-              The targeting rules artifact is unavailable, so this pack cannot be opened while a
-              target is active. Clear the target or retry loading.
-            </p>
-          {/if}
-          <button
-            type="button"
-            onclick={() => buy(pack.packId)}
-            disabled={!affordable || purchasing !== null || targetingBlocked}
-            class="mt-4 min-h-11 rounded-xl bg-accent px-5 py-2.5 font-bold text-accent-foreground outline-none disabled:cursor-not-allowed disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            {#if purchasing === pack.packId}
-              Opening…
-            {:else}
-              Open for {pack.priceAmount} {pack.priceCurrency}
+
+            <details class="ur-pack-odds-details">
+              <summary><span>Odds details</span><span class="details-chevron" aria-hidden="true">›</span></summary>
+              <div class="ur-odds-table-wrap">
+                <table>
+                  <thead>
+                    <tr class="text-muted-foreground">
+                      <th scope="col">Rarity</th>
+                      {#each odds.perSlot as slot (slot.slotIndex)}
+                        <th scope="col">Slot {slot.slotIndex + 1}</th>
+                      {/each}
+                      <th scope="col">≥1 in pack</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {#each COLLECTION_RARITY_ORDER as rarity (rarity)}
+                      <tr>
+                        <th scope="row">{rarity}</th>
+                        {#each odds.perSlot as slot (slot.slotIndex)}
+                          <td class="ur-number">{formatChance(slot.distribution[rarity] ?? 0)}</td>
+                        {/each}
+                        <td class="ur-number">{formatChance(odds.atLeastOne[rarity] ?? 0)}</td>
+                      </tr>
+                    {/each}
+                    {#if targetOdds?.hasTarget}
+                      <tr>
+                        <th scope="row">Target player</th>
+                        {#each targetOdds.perSlotLabels as label, index (index)}
+                          <td class="ur-number">{label}</td>
+                        {/each}
+                        <td class="ur-number">{targetOdds.atLeastOneLabel}</td>
+                      </tr>
+                    {/if}
+                  </tbody>
+                </table>
+              </div>
+              <p class="ur-odds-note">
+                Pool: {odds.cardCount} slots · duplicate values
+                {COLLECTION_RARITY_ORDER.map(
+                  (rarity) => `${rarity} +${odds.duplicateExchange[rarity] ?? 0}`,
+                ).join(' · ')}. No pity, no rarity boosts, no duplicate protection. Targeting keeps
+                every rarity weight unchanged.
+              </p>
+              {#if targetOdds?.hasTarget}
+                <p class="mt-1 text-xs text-muted-foreground">
+                  Target chance is exact and comes from the same compiled pack distributions as the
+                  draw. Tiny nonzero values are never rounded to zero.
+                </p>
+              {/if}
+            </details>
+            {#if targetingBlocked}
+              <p class="ur-target-blocked">
+                The targeting rules artifact is unavailable, so this pack cannot be opened while a
+                target is active. Clear the target or retry loading.
+              </p>
             {/if}
-          </button>
-          {#if !affordable}
-            <p class="mt-2 text-xs text-muted-foreground">
-              Needs {shortfall} more {pack.priceCurrency}.
-            </p>
-          {/if}
-          {#if targetOdds?.hasTarget && targetOdds.eligible}
-            <p class="mt-2 text-xs text-muted-foreground">
-              Purchase rechecks the state that produced this preview. If the collection changed, the
-              odds refresh and a new click is required.
-            </p>
-          {/if}
+            <button
+              type="button"
+              onclick={() => buy(pack.packId)}
+              disabled={!affordable || purchasing !== null || targetingBlocked}
+              class="ur-pack-buy"
+            >
+              <span class="buy-count" aria-hidden="true">1</span>
+              {#if purchasing === pack.packId}
+                Opening…
+              {:else}
+                Open for {pack.priceAmount} {pack.priceCurrency}
+              {/if}
+            </button>
+            {#if !affordable}
+              <p class="ur-pack-shortfall">
+                Needs {shortfall} more {pack.priceCurrency}.
+              </p>
+            {/if}
+            {#if targetOdds?.hasTarget && targetOdds.eligible}
+              <p class="ur-preview-notice">
+                Purchase rechecks the state that produced this preview. If the collection changed, the
+                odds refresh and a new click is required.
+              </p>
+            {/if}
+          </div>
         </li>
       {/each}
     </ul>
@@ -611,170 +716,867 @@
 
 <style>
   .ur-page-description {
-    max-width: 55ch;
-    margin-top: 0.45rem;
+    max-width: 52ch;
+    margin-top: 0.55rem;
+    color: color-mix(in srgb, var(--ur-paper) 74%, transparent);
+    font-size: 0.92rem;
+    line-height: 1.55;
+  }
+
+  .pack-hero {
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 1.1rem;
+    border: 1px solid color-mix(in srgb, var(--ur-apex) 30%, var(--ur-line-strong));
+    border-radius: 0.75rem;
+    background:
+      linear-gradient(180deg, rgb(255 197 61 / 5%), transparent 22%),
+      linear-gradient(165deg, #141c21, #0b1114 75%);
+    box-shadow:
+      0 0 0 1px rgb(0 0 0 / 40%),
+      0 0 2rem rgb(255 197 61 / 6%),
+      0 1.2rem 2.5rem rgb(0 0 0 / 35%),
+      inset 0 1px 0 rgb(255 255 255 / 6%);
+  }
+
+  .pack-hero-glow {
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(105deg, transparent 42%, rgb(255 197 61 / 7%) 50%, transparent 58%),
+      linear-gradient(75deg, transparent 55%, rgb(255 255 255 / 4%) 62%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .pack-hero-inner {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1.25rem;
+    padding: clamp(1.25rem, 3vw, 2.25rem);
+  }
+
+  .pack-kicker {
+    color: var(--ur-apex);
+  }
+
+  .pack-hero-copy .pack-title {
+    margin-top: 0.25rem;
+    color: #fff;
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 5vw, 3.1rem);
+    font-weight: 900;
+    letter-spacing: -0.035em;
+    line-height: 0.95;
+    text-shadow: 0 2px 18px rgb(0 0 0 / 60%);
+  }
+
+  .pack-gold {
+    color: var(--ur-apex);
+  }
+
+  .ur-wallet {
+    min-width: min(100%, 22rem);
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    backdrop-filter: none;
+  }
+
+  .ur-wallet-title {
+    margin-bottom: 0.5rem;
+  }
+
+  .ur-wallet-balances {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.55rem;
+    margin-top: 0;
+  }
+
+  .ur-wallet-balances .ur-stat-box {
+    min-width: 0;
+    align-items: center;
+  }
+
+  .ur-wallet-balances p + p {
+    padding-left: 0.7rem;
+    border-left: 0;
+  }
+
+  .ur-wallet-balances strong {
+    color: var(--ur-paper);
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .ur-wallet-balances .ur-stat-gold strong {
+    color: var(--ur-apex);
+  }
+
+  .ur-wallet-balances span:last-child {
     color: var(--ur-muted);
-    font-size: 0.9rem;
+    font-size: 0.7rem;
+  }
+
+  .ur-wallet-balances small {
+    color: var(--ur-muted);
+    font-size: 0.68rem;
+  }
+
+  .coin-dot,
+  .exchange-dot {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 900;
+  }
+
+  .coin-dot {
+    background: radial-gradient(circle at 35% 30%, #ffe9a8, #f5b81f 60%, #9a6206);
+    color: #3a2703;
+    box-shadow: 0 0 0.7rem rgb(255 197 61 / 55%);
+  }
+
+  .exchange-dot {
+    background: radial-gradient(circle at 35% 30%, #e3d0ff, #8b5cf6 60%, #4c1d95);
+    color: #1e1033;
+    box-shadow: 0 0 0.7rem rgb(139 92 246 / 55%);
   }
 
   .ur-pack-shelf {
     display: grid;
     grid-template-columns: repeat(12, minmax(0, 1fr));
-    gap: 1rem;
+    align-items: stretch;
+    gap: clamp(0.85rem, 1.6vw, 1.25rem);
+    margin-top: 1.5rem;
+    padding: 0;
+    list-style: none;
+  }
+
+  .ur-packs-page :global(.ur-active-target) {
+    border: 1px solid color-mix(in srgb, var(--ur-apex) 34%, var(--ur-line-strong));
+    border-radius: 0.75rem;
   }
 
   .ur-pack-product {
     display: flex;
+    grid-column: span 4;
     min-width: 0;
     flex-direction: column;
-    padding: 1rem;
-    border-top: 2px solid var(--ur-line-strong);
-    background: var(--ur-raised);
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--ur-apex) 30%, var(--ur-line-strong));
+    border-radius: 0.75rem;
+    background:
+      linear-gradient(180deg, rgb(255 197 61 / 5%), transparent 22%),
+      linear-gradient(165deg, #141c21, #0b1114 75%);
+    box-shadow:
+      0 0 0 1px rgb(0 0 0 / 40%),
+      0 0 2rem rgb(255 197 61 / 6%),
+      0 1.2rem 2.5rem rgb(0 0 0 / 35%),
+      inset 0 1px 0 rgb(255 255 255 / 6%);
   }
 
-  .ur-pack-tip-off {
-    grid-column: span 3;
-    border-top-color: var(--ur-ember);
+  .pack-main-event {
+    grid-column: span 7;
+    border-color: color-mix(in srgb, var(--ur-apex) 42%, var(--ur-line-strong));
   }
 
-  .ur-pack-fast-break,
-  .ur-pack-full-court {
-    grid-column: span 4;
-    border-top-color: var(--ur-eruption);
+  .pack-spotlight {
+    grid-column: span 5;
+    border-color: color-mix(in srgb, var(--ur-titan) 55%, var(--ur-line-strong));
+    box-shadow:
+      0 0 0 1px rgb(0 0 0 / 40%),
+      0 0 2rem rgb(169 180 216 / 12%),
+      0 1.2rem 2.5rem rgb(0 0 0 / 35%),
+      inset 0 1px 0 rgb(255 255 255 / 6%);
   }
 
-  .ur-pack-main-event {
-    grid-column: span 8;
-    border-top-color: var(--ur-apex);
-  }
-
-  .ur-pack-spotlight {
-    grid-column: span 4;
-    border-top-color: var(--ur-eclipse);
-  }
-
-  .ur-pack-art {
+  .pack-visual {
     position: relative;
     display: grid;
-    aspect-ratio: 5 / 4;
-    min-height: 6rem;
-    place-items: center;
+    grid-template-columns: 8.5rem minmax(0, 1fr);
+    align-items: center;
+    gap: 1rem;
+    min-height: 11rem;
+    padding: 1.1rem 1.1rem 1rem;
     overflow: hidden;
-    margin-bottom: 1rem;
     background:
-      linear-gradient(0deg, rgb(8 11 14 / 82%), transparent 65%),
-      repeating-linear-gradient(90deg, transparent 0 27px, rgb(240 236 223 / 5%) 28px), #222e33;
+      radial-gradient(22rem 12rem at 20% -40%, rgb(255 197 61 / 30%), transparent 60%),
+      linear-gradient(180deg, #1b1510 0%, #0b0906 100%);
   }
 
-  .ur-pack-art::before,
-  .ur-pack-art::after {
+  .pack-visual::before {
     position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(105deg, transparent 44%, rgb(255 220 130 / 9%) 50%, transparent 56%),
+      linear-gradient(75deg, transparent 60%, rgb(255 255 255 / 5%) 66%, transparent 72%);
     content: '';
     pointer-events: none;
   }
 
-  .ur-pack-art::before {
-    inset: 12% 20%;
-    border: 1px solid rgb(240 236 223 / 24%);
-    border-radius: 50%;
+  .pack-visual::after {
+    position: absolute;
+    inset: auto 0 0;
+    height: 45%;
+    background: radial-gradient(70% 100% at 30% 110%, rgb(255 197 61 / 20%), transparent 70%);
+    content: '';
+    pointer-events: none;
   }
 
-  .ur-pack-art::after {
-    inset: 20% 35%;
-    border: 1px solid rgb(240 236 223 / 20%);
+  .pack-tip-off .pack-visual {
+    background:
+      radial-gradient(22rem 12rem at 20% -40%, rgb(255 197 61 / 34%), transparent 60%),
+      linear-gradient(180deg, #221a0c 0%, #0d0a04 100%);
   }
 
-  .ur-pack-art > span {
+  .pack-tip-off .pack-visual::after {
+    background: radial-gradient(70% 100% at 30% 110%, rgb(255 197 61 / 24%), transparent 70%);
+  }
+
+  .pack-fast-break .pack-visual {
+    background:
+      radial-gradient(22rem 12rem at 20% -40%, rgb(255 90 42 / 42%), transparent 60%),
+      linear-gradient(180deg, #230f0a 0%, #0d0503 100%);
+  }
+
+  .pack-fast-break .pack-visual::after {
+    background: radial-gradient(70% 100% at 30% 110%, rgb(255 90 42 / 28%), transparent 70%);
+  }
+
+  .pack-full-court .pack-visual {
+    background:
+      radial-gradient(24rem 13rem at 80% -40%, rgb(139 92 246 / 44%), transparent 62%),
+      linear-gradient(180deg, #181029 0%, #0b0714 100%);
+  }
+
+  .pack-full-court .pack-visual::after {
+    background: radial-gradient(70% 100% at 50% 110%, rgb(139 92 246 / 30%), transparent 70%);
+  }
+
+  .pack-main-event .pack-visual {
+    background:
+      radial-gradient(26rem 13rem at 15% -40%, rgb(255 197 61 / 40%), transparent 60%),
+      radial-gradient(24rem 12rem at 85% -30%, rgb(255 218 115 / 26%), transparent 62%),
+      linear-gradient(180deg, #241b08 0%, #0e0a03 100%);
+  }
+
+  .pack-main-event .pack-visual::after {
+    background: radial-gradient(70% 100% at 50% 110%, rgb(255 197 61 / 28%), transparent 70%);
+  }
+
+  .pack-spotlight .pack-visual {
+    background:
+      radial-gradient(24rem 13rem at 20% -40%, rgb(169 180 216 / 42%), transparent 62%),
+      radial-gradient(20rem 12rem at 85% 120%, rgb(223 229 255 / 18%), transparent 60%),
+      linear-gradient(180deg, #1b2233 0%, #0a0d16 100%);
+  }
+
+  .pack-spotlight .pack-visual::after {
+    background: radial-gradient(70% 100% at 50% 110%, rgb(169 180 216 / 30%), transparent 70%);
+  }
+
+  .pack-foil {
     position: relative;
     z-index: 1;
+    display: flex;
+    min-height: 9rem;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.1rem;
+    padding: 0.6rem 0.5rem;
+    border: 1px solid rgb(255 220 130 / 70%);
+    border-radius: 0.65rem;
+    background: linear-gradient(160deg, #2a2111 0%, #0f0d08 45%, #3a2c10 100%);
+    box-shadow:
+      inset 0 1px 0 rgb(255 235 180 / 35%),
+      inset 0 -0.6rem 1rem rgb(0 0 0 / 55%),
+      0 0.5rem 1.2rem rgb(0 0 0 / 60%),
+      0 0 1.4rem rgb(255 197 61 / 18%);
+    text-align: center;
+    transform: perspective(30rem) rotateY(-7deg);
+  }
+
+  .pack-foil::before {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(115deg, transparent 42%, rgb(255 240 200 / 22%) 50%, transparent 58%);
+    content: '';
+    pointer-events: none;
+  }
+
+  .pack-spotlight .pack-foil {
+    border-color: rgb(169 180 216 / 80%);
+    background: linear-gradient(160deg, #232c44 0%, #0b0e18 50%, #3d4a6e 100%);
+    box-shadow:
+      inset 0 1px 0 rgb(223 229 255 / 35%),
+      inset 0 -0.6rem 1rem rgb(0 0 0 / 55%),
+      0 0.5rem 1.2rem rgb(0 0 0 / 60%),
+      0 0 1.6rem rgb(169 180 216 / 35%);
+    transform: perspective(30rem) rotateY(7deg);
+  }
+
+  .foil-brand {
+    padding: 0.1rem 0.4rem;
+    border: 1px solid rgb(255 220 130 / 60%);
+    border-radius: 999px;
+    color: var(--ur-apex);
+    font-size: 0.6rem;
+    font-weight: 900;
+    letter-spacing: 0.2em;
+  }
+
+  .pack-spotlight .foil-brand {
+    border-color: rgb(169 180 216 / 60%);
+    color: #dfe5ff;
+  }
+
+  .foil-name {
+    margin-top: 0.3rem;
     color: var(--ur-paper);
     font-family: var(--font-display);
-    font-size: clamp(3rem, 8vw, 5.5rem);
+    font-size: 0.78rem;
     font-weight: 800;
-    line-height: 0.8;
-    text-shadow: 0 2px 8px #080b0e;
+    letter-spacing: 0.06em;
+    line-height: 1.1;
+    text-transform: uppercase;
   }
 
-  .ur-pack-tip-off .ur-pack-art {
-    background-color: #33211d;
+  .foil-count {
+    color: #fff;
+    font-family: var(--font-display);
+    font-size: 2.6rem;
+    font-weight: 800;
+    line-height: 1;
+    text-shadow: 0 0 1rem rgb(255 197 61 / 80%);
   }
 
-  .ur-pack-fast-break .ur-pack-art {
-    background-color: #44251c;
+  .pack-spotlight .foil-count {
+    text-shadow: 0 0 1rem rgb(169 180 216 / 90%);
   }
 
-  .ur-pack-full-court .ur-pack-art {
-    background-color: #26323a;
-  }
-
-  .ur-pack-main-event .ur-pack-art {
-    min-height: 11rem;
-    background-color: #403319;
-  }
-
-  .ur-pack-spotlight .ur-pack-art {
-    background-color: #29213b;
-  }
-
-  .ur-pack-id {
-    display: block;
-    margin-top: 0.25rem;
+  .foil-unit {
     color: var(--ur-muted);
-    font-size: 0.66rem;
+    font-size: 0.6rem;
+    font-weight: 800;
+    letter-spacing: 0.28em;
   }
 
-  .ur-guarantee-badge {
-    display: inline-flex;
-    width: fit-content;
-    min-height: 1.5rem;
-    align-items: center;
+  .pack-visual-copy {
+    position: relative;
+    z-index: 1;
+    min-width: 0;
+  }
+
+  .pack-visual-copy h2 {
+    color: #fff;
+    font-family: var(--font-display);
+    font-size: clamp(1.5rem, 2.4vw, 2rem);
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    line-height: 1;
+    text-shadow: 0 0.15rem 1rem rgb(0 0 0 / 70%);
+  }
+
+  .pack-visual-copy p {
     margin-top: 0.35rem;
-    padding-inline: 0.45rem;
-    border: 1px solid var(--ur-apex);
-    color: #ffe39a;
-    font-size: 0.65rem;
+    color: rgb(255 255 255 / 78%);
+    font-size: 0.8rem;
+    line-height: 1.45;
+    text-shadow: 0 0.1rem 0.6rem rgb(0 0 0 / 70%);
+  }
+
+  .guarantee-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.6rem;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid rgb(255 197 61 / 75%);
+    border-radius: 0.45rem;
+    background: rgb(20 12 2 / 72%);
+    color: #ffd876;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .guarantee-crown {
+    font-size: 0.8rem;
+  }
+
+  .pack-spotlight .guarantee-pill {
+    border-color: rgb(169 180 216 / 75%);
+    background: rgb(18 24 40 / 72%);
+    color: #dfe5ff;
+  }
+
+  .pack-faces {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .spot-face {
+    position: absolute;
+    top: 50%;
+    width: 3.6rem;
+    height: 4.8rem;
+    translate: 0 -50%;
+  }
+
+  .spot-face-0 {
+    left: 0.35rem;
+    transform: rotate(-10deg);
+  }
+
+  .spot-face-1 {
+    left: 7.4rem;
+    transform: rotate(9deg);
+  }
+
+  .spot-face :global(.relative) {
+    width: 100%;
+    height: 100%;
+    border: 1px solid rgb(169 180 216 / 70%);
+    border-radius: 0.55rem;
+    background: #1c2233;
+    box-shadow: 0 0 1rem rgb(169 180 216 / 45%);
+  }
+
+  .spot-face-initials {
+    display: grid;
+    width: 100%;
+    height: 100%;
+    place-items: center;
+    border: 1px solid rgb(169 180 216 / 70%);
+    border-radius: 0.55rem;
+    background: #232c44;
+    color: #dfe5ff;
+    font-family: var(--font-display);
+    font-size: 1rem;
     font-weight: 800;
   }
 
-  .ur-pack-product :global(button) {
-    min-height: 2.75rem;
+  .pack-body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    padding: 0.9rem 1rem 1rem;
+    border-top: 1px solid color-mix(in srgb, var(--ur-apex) 22%, var(--ur-line));
+    background:
+      linear-gradient(180deg, rgb(255 197 61 / 5%), transparent 30%),
+      linear-gradient(165deg, #141c21, #0b1114 75%);
   }
 
-  .ur-pack-product details {
-    border: 1px solid var(--ur-line);
-    background: #0d1316;
-  }
-
-  .ur-pack-product summary {
-    min-height: 2.75rem;
+  .pack-meta {
     display: flex;
     align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding-bottom: 0.8rem;
+    border-bottom: 1px solid var(--ur-line);
   }
 
-  @media (max-width: 900px) {
-    .ur-pack-tip-off,
-    .ur-pack-fast-break,
-    .ur-pack-full-court,
-    .ur-pack-spotlight {
+  .pack-meta-cards {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--ur-paper);
+  }
+
+  .meta-icon {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 1.9rem;
+    height: 1.9rem;
+    border: 1px solid var(--ur-line-strong);
+    border-radius: 0.45rem;
+    background: var(--ur-surface);
+    color: var(--ur-paper);
+    font-size: 0.9rem;
+  }
+
+  .pack-meta-cards strong {
+    font-size: 0.95rem;
+    white-space: nowrap;
+  }
+
+  .pack-meta-cards small {
+    display: block;
+    color: var(--ur-muted);
+    font-size: 0.68rem;
+    font-weight: 400;
+    white-space: nowrap;
+  }
+
+  .pack-meta-price {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.4rem 0.65rem;
+    padding-left: 0.65rem;
+    border: 1px solid color-mix(in srgb, var(--ur-apex) 45%, var(--ur-line-strong));
+    border-radius: 999px;
+    background: rgb(6 9 12 / 72%);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 6%);
+  }
+
+  .pack-meta-price .coin-dot,
+  .pack-meta-price .exchange-dot {
+    width: 1.35rem;
+    height: 1.35rem;
+    font-size: 0.68rem;
+  }
+
+  .pack-meta-price strong {
+    color: var(--ur-paper);
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 800;
+  }
+
+  .pack-meta-price small {
+    color: var(--ur-apex);
+    font-size: 0.68rem;
+    font-weight: 800;
+  }
+
+  .pack-exchange .pack-meta-price {
+    border-color: color-mix(in srgb, var(--ur-titan) 55%, var(--ur-line-strong));
+  }
+
+  .pack-exchange .pack-meta-price small {
+    color: var(--ur-titan);
+  }
+
+  .ur-odds-preview {
+    margin-top: 0.8rem;
+  }
+
+  .ur-odds-preview h3 {
+    color: var(--ur-muted);
+    font-size: 0.68rem;
+    font-weight: 700;
+  }
+
+  .ur-odds-preview ul {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.45rem;
+    margin-top: 0.5rem;
+    padding: 0;
+    list-style: none;
+  }
+
+  .ur-odds-preview li {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.35rem;
+  }
+
+  .ur-odds-preview .ur-rarity {
+    flex: 1;
+    justify-content: center;
+    min-height: 1.45rem;
+    padding: 0.25rem 0.3rem;
+    border-radius: 0.3rem;
+    font-size: 0.6rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .ur-odds-preview .ur-rarity-ember {
+    border-color: #6b7683;
+    background: #2b3138;
+    color: #e8edf2;
+  }
+
+  .ur-odds-preview .ur-rarity-eruption {
+    border-color: #e04a3a;
+    background: #5a1f1a;
+    color: #ffd9d2;
+  }
+
+  .ur-odds-preview .ur-rarity-apex {
+    border-color: #ffc53d;
+    background: #4a3a14;
+    color: #ffe39a;
+  }
+
+  .ur-odds-preview .ur-rarity-titan {
+    border-color: #a588ff;
+    background: #3b2a5e;
+    color: #d9c8ff;
+  }
+
+  .ur-odds-preview .ur-rarity-eclipse {
+    border-color: #ff7a2a;
+    background: #55250f;
+    color: #ffe0c2;
+  }
+
+  .ur-odds-preview .ur-rarity-immortal {
+    border-color: #ffe9b0;
+    background: #5c4c22;
+    color: #fff4d5;
+  }
+
+  .ur-odds-preview strong {
+    flex: none;
+    color: var(--ur-paper);
+    font-size: 0.74rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .ur-target-odds {
+    margin-top: 0.65rem;
+    padding: 0.6rem 0.7rem;
+    border-left: 2px solid var(--ur-accent);
+    background: var(--ur-surface);
+    color: var(--ur-paper);
+    font-size: 0.75rem;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+  }
+
+  .ur-target-odds-ineligible {
+    border-left-color: var(--ur-line-strong);
+    color: var(--ur-muted);
+  }
+
+  .ur-pack-odds-details {
+    margin-top: 0.65rem;
+    border: 1px solid var(--ur-line);
+    border-radius: 0.6rem;
+    background: var(--ur-bg);
+  }
+
+  .ur-pack-odds-details summary {
+    display: flex;
+    min-height: 2.75rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.45rem 0.7rem;
+    color: var(--ur-paper);
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 800;
+    list-style: none;
+  }
+
+  .ur-pack-odds-details summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .details-chevron {
+    color: var(--ur-apex);
+    font-size: 1.1rem;
+    line-height: 1;
+  }
+
+  .pack-spotlight .details-chevron {
+    color: var(--ur-titan);
+  }
+
+  .ur-odds-table-wrap {
+    overflow-x: auto;
+    padding: 0 0.65rem 0.65rem;
+  }
+
+  .ur-pack-odds-details table {
+    width: 100%;
+    min-width: max-content;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 0.65rem;
+    white-space: nowrap;
+  }
+
+  .ur-pack-odds-details th,
+  .ur-pack-odds-details td {
+    padding: 0.4rem 0.45rem;
+    border-bottom: 1px solid var(--ur-line);
+  }
+
+  .ur-pack-odds-details thead th {
+    color: var(--ur-muted);
+    font-weight: 700;
+  }
+
+  .ur-pack-odds-details tbody th {
+    color: var(--ur-paper);
+    font-weight: 700;
+  }
+
+  .ur-pack-odds-details td {
+    color: var(--ur-ink);
+    text-align: right;
+  }
+
+  .ur-odds-note {
+    margin-top: 0.65rem;
+    color: var(--ur-muted);
+    font-size: 0.65rem;
+    line-height: 1.5;
+    white-space: normal;
+  }
+
+  .ur-target-blocked,
+  .ur-pack-shortfall,
+  .ur-preview-notice {
+    margin-top: 0.55rem;
+    font-size: 0.68rem;
+    line-height: 1.45;
+  }
+
+  .ur-target-blocked {
+    color: var(--ur-danger);
+  }
+
+  .ur-pack-shortfall,
+  .ur-preview-notice {
+    color: var(--ur-muted);
+  }
+
+  .ur-pack-buy {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    width: 100%;
+    min-height: 3rem;
+    margin-top: 0.9rem;
+    padding: 0.7rem 0.9rem;
+    border: 1px solid var(--ur-apex);
+    border-radius: 0.55rem;
+    background: linear-gradient(180deg, #ffda73 0%, #f5b81f 55%, #e09b12 100%);
+    color: #2a1c02;
+    font-size: 0.9rem;
+    font-weight: 900;
+    line-height: 1.2;
+    text-align: center;
+    cursor: pointer;
+    box-shadow:
+      0 0.4rem 1.2rem rgb(245 184 31 / 35%),
+      inset 0 1px 0 rgb(255 255 255 / 55%);
+  }
+
+  .ur-pack-buy:hover:not(:disabled) {
+    filter: brightness(1.06);
+  }
+
+  .buy-count {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    border-radius: 999px;
+    background: rgb(0 0 0 / 72%);
+    color: #ffd876;
+    font-size: 0.72rem;
+    font-weight: 900;
+  }
+
+  .pack-exchange .ur-pack-buy {
+    border-color: var(--ur-titan);
+    background: linear-gradient(180deg, #dfe5ff 0%, var(--ur-titan) 55%, #7d8cc0 100%);
+    color: #141a2a;
+    box-shadow:
+      0 0.4rem 1.2rem rgb(169 180 216 / 40%),
+      inset 0 1px 0 rgb(255 255 255 / 45%);
+  }
+
+  .pack-exchange .buy-count {
+    background: rgb(20 26 42 / 80%);
+    color: #dfe5ff;
+  }
+
+  .ur-pack-buy:disabled {
+    border-color: var(--ur-line-strong);
+    background: var(--ur-surface);
+    color: var(--ur-muted);
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  .ur-pack-buy:disabled .buy-count {
+    background: color-mix(in srgb, var(--ur-muted) 25%, transparent);
+    color: var(--ur-muted);
+  }
+
+  .ur-packs-page :global(button:focus-visible),
+  .ur-packs-page :global(summary:focus-visible) {
+    outline: 3px solid var(--ur-focus);
+    outline-offset: 3px;
+  }
+
+  @media (max-width: 1100px) {
+    .ur-pack-product,
+    .pack-main-event,
+    .pack-spotlight {
       grid-column: span 6;
     }
+  }
 
-    .ur-pack-main-event {
+  @media (max-width: 720px) {
+    .pack-hero-inner {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .ur-wallet {
+      width: 100%;
+    }
+
+    .ur-pack-product,
+    .pack-main-event,
+    .pack-spotlight {
       grid-column: span 12;
+    }
+
+    .pack-visual {
+      grid-template-columns: 7rem minmax(0, 1fr);
+    }
+
+    .ur-odds-preview ul {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 
-  @media (max-width: 600px) {
-    .ur-pack-shelf {
-      grid-template-columns: minmax(0, 1fr);
+  @media (max-width: 420px) {
+    .ur-wallet-balances {
+      gap: 0.85rem;
     }
 
-    .ur-pack-tip-off,
-    .ur-pack-fast-break,
-    .ur-pack-full-court,
-    .ur-pack-main-event,
-    .ur-pack-spotlight {
-      grid-column: 1;
+    .pack-meta-cards small {
+      white-space: normal;
     }
   }
 

@@ -211,7 +211,7 @@
     <div class="ur-pack-theater-inner" class:ur-pack-theater-complete={stage === 'complete'}>
       <header class="ur-theater-header">
         <div>
-          <p class="ur-theater-label">Ultimate Run · pack receipt</p>
+          <p class="ur-theater-label">Committed receipt</p>
           <h2 id="pack-theater-title">{stage === 'complete' ? 'Pack opened' : packLabel}</h2>
         </div>
         {#if stage !== 'complete'}
@@ -230,9 +230,14 @@
         The pack result was committed before this presentation began.
       </p>
       <p class="sr-only" role="status" aria-live="polite">{announcement}</p>
+      <p class="ur-theater-context">The pack result is already recorded.</p>
 
       {#if stage === 'complete'}
         <section class="ur-pack-summary" aria-label="Committed pack results">
+          <div class="ur-summary-heading">
+            <h3>Receipt confirmed</h3>
+            <p>These are the cards and balances from this pack.</p>
+          </div>
           <div class="ur-pack-summary-scoreline">
             <div><strong>{receipt.cardsAdded}</strong><span>new cards</span></div>
             <div><strong>+{receipt.exchangeGained}</strong><span>Exchange gained</span></div>
@@ -274,11 +279,16 @@
       {:else if activeCard && activePlan}
         <section
           class="ur-reveal-stage"
+          data-stage={stage}
           aria-label={`Card ${activeCardIndex + 1} of ${cards.length}`}
         >
           <div class="ur-reveal-stage-meta">
             <span>Card {activeCardIndex + 1} of {cards.length}</span>
-            <span class={rarityClass(activePlan.rarity)}>{activePlan.rarity}</span>
+            <span
+              class={stage === 'revealed' ? rarityClass(activePlan.rarity) : 'ur-seal--sealed'}
+              aria-label={stage === 'revealed' ? activePlan.rarity : 'Card sealed'}
+              >{stage === 'revealed' ? activePlan.rarity : 'Sealed'}</span
+            >
           </div>
           {#if stage === 'revealed'}
             <div class="ur-revealed-card">
@@ -292,7 +302,7 @@
               />
             </div>
           {:else}
-            <div class="ur-card-back {rarityClass(activePlan.rarity)}" data-stage={stage}>
+            <div class="ur-card-back ur-seal--sealed" data-stage={stage}>
               <span class="ur-card-back-court" aria-hidden="true"></span>
               <strong>
                 {#if stage === 'entering'}
@@ -334,27 +344,38 @@
 
 <style>
   .ur-pack-theater {
-    width: min(60rem, calc(100vw - 2rem));
+    width: min(70rem, calc(100vw - 2rem));
     max-width: none;
-    max-height: min(92svh, 58rem);
+    max-height: min(94svh, 62rem);
     padding: 0;
     overflow: auto;
-    border: 1px solid #657077;
-    background: #080b0e;
-    color: #f0ecdf;
-    box-shadow: 0 2rem 8rem rgb(0 0 0 / 75%);
+    border: 1px solid var(--ur-line-strong);
+    background: var(--ur-bg);
+    color: var(--ur-ink);
+    box-shadow: 0 2rem 8rem color-mix(in srgb, var(--ur-bg) 84%, transparent);
   }
 
   .ur-pack-theater::backdrop {
-    background: rgb(2 4 5 / 86%);
-    backdrop-filter: blur(8px);
+    background: color-mix(in srgb, var(--ur-bg) 88%, transparent);
+    backdrop-filter: blur(7px);
   }
 
   .ur-pack-theater-inner {
-    min-height: 30rem;
+    min-height: 32rem;
     padding: clamp(1rem, 3vw, 2rem);
     background:
-      repeating-linear-gradient(0deg, transparent 0 43px, rgb(240 236 223 / 2.5%) 44px), #080b0e;
+      linear-gradient(
+        90deg,
+        transparent calc(50% - 1px),
+        color-mix(in srgb, var(--ur-line) 24%, transparent) 50%,
+        transparent calc(50% + 1px)
+      ),
+      radial-gradient(
+        ellipse at 50% 0%,
+        color-mix(in srgb, var(--ur-accent) 10%, transparent),
+        transparent 55%
+      ),
+      var(--ur-bg);
   }
 
   .ur-theater-header {
@@ -362,25 +383,30 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: 1rem;
-    padding-bottom: 1rem;
-    border-bottom: 1px solid #293237;
+    padding-bottom: 0.9rem;
+    border-bottom: 1px solid var(--ur-line);
   }
 
   .ur-theater-label {
-    color: #abb5b8;
+    color: var(--ur-accent);
     font-size: 0.7rem;
     font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
   }
 
   .ur-theater-header h2 {
     margin-top: 0.2rem;
-    color: #f0ecdf;
+    color: var(--ur-paper);
     font-family: var(--font-display);
     font-size: clamp(1.8rem, 5vw, 2.7rem);
     font-weight: 800;
     line-height: 1;
+  }
+
+  .ur-theater-context {
+    padding: 0.55rem 0;
+    border-bottom: 1px solid var(--ur-line);
+    color: var(--ur-muted);
+    font-size: 0.72rem;
   }
 
   .ur-theater-skip,
@@ -388,85 +414,138 @@
   .ur-take-cards {
     min-height: 2.85rem;
     padding: 0.65rem 1rem;
-    border: 1px solid #627077;
-    color: #f0ecdf;
+    border: 1px solid var(--ur-line-strong);
+    color: var(--ur-paper);
     font-size: 0.86rem;
     font-weight: 800;
+    cursor: pointer;
   }
 
   .ur-theater-skip,
   .ur-show-all {
-    background: #192126;
+    background: var(--ur-surface);
   }
 
   .ur-pack-theater button:focus-visible {
-    outline: 3px solid #ffe08a;
+    outline: 3px solid var(--ur-focus);
     outline-offset: 3px;
   }
 
   .ur-reveal-stage {
+    position: relative;
+    isolation: isolate;
     display: grid;
     justify-items: center;
-    padding-block: 1rem 0.5rem;
+    overflow: hidden;
+    margin-top: 1.2rem;
+    padding: clamp(1rem, 3vw, 1.75rem) 1rem 1.25rem;
+    border: 1px solid var(--ur-line);
+    background:
+      radial-gradient(
+        ellipse at 50% 12%,
+        color-mix(in srgb, var(--ur-accent) 14%, transparent),
+        transparent 48%
+      ),
+      repeating-linear-gradient(
+        0deg,
+        transparent 0 3.4rem,
+        color-mix(in srgb, var(--ur-line) 14%, transparent) 3.45rem
+      ),
+      var(--ur-bg);
+  }
+
+  .ur-reveal-stage::before,
+  .ur-reveal-stage::after {
+    position: absolute;
+    z-index: -1;
+    content: '';
+    pointer-events: none;
+  }
+
+  .ur-reveal-stage::before {
+    inset: 8% 15%;
+    border: 1px solid color-mix(in srgb, var(--ur-line-strong) 35%, transparent);
+    border-radius: 50%;
+  }
+
+  .ur-reveal-stage::after {
+    inset: 8% 49.5%;
+    border-inline: 1px solid color-mix(in srgb, var(--ur-line-strong) 28%, transparent);
   }
 
   .ur-reveal-stage-meta {
+    position: relative;
+    z-index: 1;
     display: flex;
-    width: min(100%, 23rem);
+    width: min(100%, 25rem);
     justify-content: space-between;
+    align-items: center;
     gap: 1rem;
-    color: #abb5b8;
+    color: var(--ur-muted);
     font-size: 0.75rem;
     font-variant-numeric: tabular-nums;
   }
 
+  .ur-reveal-stage-meta > span:last-child {
+    display: inline-flex;
+    min-height: 1.5rem;
+    align-items: center;
+    padding: 0.15rem 0.45rem;
+    border: 1px solid currentColor;
+    font-weight: 800;
+  }
+
+  .ur-seal--sealed {
+    color: var(--ur-muted);
+  }
+
   .ur-seal--ember {
-    --ur-reveal-rarity: #c65a2e;
+    --ur-reveal-rarity: var(--ur-ember);
   }
 
   .ur-seal--eruption {
-    --ur-reveal-rarity: #ff5a2a;
+    --ur-reveal-rarity: var(--ur-eruption);
   }
 
   .ur-seal--apex {
-    --ur-reveal-rarity: #ffc53d;
+    --ur-reveal-rarity: var(--ur-apex);
   }
 
   .ur-seal--titan {
-    --ur-reveal-rarity: #a9b4d8;
+    --ur-reveal-rarity: var(--ur-titan);
   }
 
   .ur-seal--eclipse {
-    --ur-reveal-rarity: #a588ff;
+    --ur-reveal-rarity: var(--ur-eclipse);
   }
 
   .ur-seal--immortal {
-    --ur-reveal-rarity: #ffe9b0;
+    --ur-reveal-rarity: var(--ur-immortal);
   }
 
-  .ur-reveal-stage-meta .ur-seal--ember,
-  .ur-reveal-stage-meta .ur-seal--eruption,
-  .ur-reveal-stage-meta .ur-seal--apex,
-  .ur-reveal-stage-meta .ur-seal--titan,
-  .ur-reveal-stage-meta .ur-seal--eclipse,
-  .ur-reveal-stage-meta .ur-seal--immortal {
+  .ur-reveal-stage-meta > span:last-child:not(.ur-seal--sealed) {
     color: var(--ur-reveal-rarity);
-    font-weight: 800;
   }
 
   .ur-card-back {
     position: relative;
     display: flex;
-    width: min(100%, 23rem);
-    min-height: 30rem;
+    width: min(100%, 25rem);
+    min-height: clamp(24rem, 54svh, 34rem);
     flex-direction: column;
     align-items: center;
     justify-content: center;
     overflow: hidden;
     margin-top: 0.75rem;
-    padding: 2rem;
-    border: 2px solid var(--ur-reveal-rarity);
-    background: radial-gradient(ellipse at center, rgb(240 236 223 / 4%), transparent 55%), #10171b;
+    padding: clamp(1.5rem, 5vw, 2.5rem);
+    border: 2px solid var(--ur-reveal-rarity, var(--ur-line-strong));
+    background:
+      radial-gradient(
+        ellipse at center,
+        color-mix(in srgb, var(--ur-paper) 7%, transparent),
+        transparent 55%
+      ),
+      linear-gradient(155deg, color-mix(in srgb, var(--ur-surface) 74%, transparent), var(--ur-bg));
     text-align: center;
     clip-path: polygon(0 0, 89% 0, 100% 6%, 100% 100%, 0 100%);
   }
@@ -474,7 +553,8 @@
   .ur-card-back .ur-card-back-court {
     position: absolute;
     inset: 14% 12%;
-    border: 1px solid color-mix(in srgb, var(--ur-reveal-rarity) 45%, transparent);
+    border: 1px solid
+      color-mix(in srgb, var(--ur-reveal-rarity, var(--ur-line-strong)) 45%, transparent);
     border-radius: 50%;
     pointer-events: none;
   }
@@ -488,12 +568,14 @@
 
   .ur-card-back .ur-card-back-court::before {
     inset: 0 48%;
-    border-inline: 1px solid color-mix(in srgb, var(--ur-reveal-rarity) 40%, transparent);
+    border-inline: 1px solid
+      color-mix(in srgb, var(--ur-reveal-rarity, var(--ur-line-strong)) 40%, transparent);
   }
 
   .ur-card-back .ur-card-back-court::after {
     inset: 37% 0;
-    border-block: 1px solid color-mix(in srgb, var(--ur-reveal-rarity) 40%, transparent);
+    border-block: 1px solid
+      color-mix(in srgb, var(--ur-reveal-rarity, var(--ur-line-strong)) 40%, transparent);
   }
 
   .ur-card-back strong,
@@ -504,7 +586,7 @@
   }
 
   .ur-card-back strong {
-    color: var(--ur-reveal-rarity);
+    color: var(--ur-reveal-rarity, var(--ur-paper));
     font-family: var(--font-display);
     font-size: clamp(2.5rem, 8vw, 4rem);
     font-weight: 800;
@@ -514,12 +596,12 @@
   .ur-card-back-caption,
   .ur-card-clue {
     margin-top: 1rem;
-    color: #c0c8c7;
+    color: var(--ur-muted);
     font-size: 0.9rem;
   }
 
   .ur-card-clue {
-    color: #f0ecdf;
+    color: var(--ur-paper);
     font-family: var(--font-display);
     font-size: 1.55rem;
     font-weight: 700;
@@ -527,7 +609,7 @@
 
   .ur-revealed-card {
     display: grid;
-    min-height: 30rem;
+    min-height: clamp(24rem, 54svh, 34rem);
     place-items: center;
     margin-top: 0.75rem;
   }
@@ -540,10 +622,27 @@
     padding-top: 1.25rem;
   }
 
+  .ur-summary-heading {
+    margin-bottom: 0.9rem;
+  }
+
+  .ur-summary-heading h3 {
+    color: var(--ur-paper);
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 800;
+  }
+
+  .ur-summary-heading p {
+    margin-top: 0.15rem;
+    color: var(--ur-muted);
+    font-size: 0.78rem;
+  }
+
   .ur-pack-summary-scoreline {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    border-block: 1px solid #293237;
+    border-block: 1px solid var(--ur-line);
   }
 
   .ur-pack-summary-scoreline div {
@@ -552,12 +651,12 @@
     flex-direction: column;
     justify-content: center;
     padding: 0.8rem 1rem;
-    border-right: 1px solid #293237;
+    border-right: 1px solid var(--ur-line);
   }
 
   .ur-pack-summary-scoreline strong {
     overflow: hidden;
-    color: #f0ecdf;
+    color: var(--ur-paper);
     font-family: var(--font-display);
     font-size: clamp(1.25rem, 3vw, 2rem);
     font-weight: 800;
@@ -568,13 +667,13 @@
 
   .ur-pack-summary-scoreline span {
     margin-top: 0.2rem;
-    color: #abb5b8;
+    color: var(--ur-muted);
     font-size: 0.72rem;
   }
 
   .ur-targeting-receipt {
     margin-top: 0.8rem;
-    color: #e3cd87;
+    color: var(--ur-accent);
     font-size: 0.85rem;
   }
 
@@ -591,7 +690,7 @@
   .ur-targeted-mark {
     display: inline-block;
     margin: 0.25rem 0 0.2rem 0.5rem;
-    color: #e3cd87;
+    color: var(--ur-accent);
     font-size: 0.68rem;
     font-weight: 800;
   }
@@ -599,14 +698,14 @@
   .ur-take-cards {
     width: 100%;
     margin-top: 1.25rem;
-    border-color: #ffc53d;
-    background: #ffc53d;
-    color: #241a02;
+    border-color: var(--ur-accent);
+    background: var(--ur-accent);
+    color: var(--ur-bg);
   }
 
   .ur-pack-fallback > p {
     margin-top: 0.4rem;
-    color: #c0c8c7;
+    color: var(--ur-muted);
   }
 
   @media (min-width: 700px) {
@@ -626,9 +725,17 @@
       padding: 0.85rem;
     }
 
+    .ur-theater-context {
+      font-size: 0.68rem;
+    }
+
+    .ur-reveal-stage {
+      padding-inline: 0.65rem;
+    }
+
     .ur-card-back,
     .ur-revealed-card {
-      min-height: 26rem;
+      min-height: 24rem;
     }
 
     .ur-pack-summary-scoreline {
@@ -657,12 +764,12 @@
 
   @keyframes court-signal {
     from {
-      border-color: #6b7478;
-      background-color: #0b1114;
+      border-color: var(--ur-line-strong);
+      background-color: var(--ur-bg);
     }
     to {
-      border-color: var(--ur-reveal-rarity);
-      background-color: #141d21;
+      border-color: var(--ur-reveal-rarity, var(--ur-line-strong));
+      background-color: var(--ur-surface);
     }
   }
 </style>

@@ -33,7 +33,7 @@ function buildCatalog(): CollectionCatalog {
     }),
     buildCollectionFixtureCard('fixture-pg', {
       cardId: cardId('2'),
-      family: 'Sharpshooter',
+      family: 'Heat Check',
       rarity: 'Apex',
       displayName: 'Fixture Guard One',
       summarySource: { overallRating: 90, offenseRating: 90, defenseRating: 70 },
@@ -48,8 +48,8 @@ function buildCatalog(): CollectionCatalog {
     cards,
     sets: [
       {
-        setId: 'sharpshooter-set',
-        title: 'Fixture Sharpshooters',
+        setId: 'heat-check-set',
+        title: 'Fixture Heat Checks',
         memberCardIds: [cardId('2')],
       },
     ],
