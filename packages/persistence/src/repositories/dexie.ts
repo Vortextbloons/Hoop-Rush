@@ -349,14 +349,15 @@ export class HoopRushDatabase extends Dexie {
           if (typeof row !== 'object' || row === null) continue;
           const saveSchemaVersion = (row as { saveSchemaVersion?: unknown }).saveSchemaVersion;
           if (saveSchemaVersion !== COLLECTION_PLAY_SAVE_V1_VERSION) continue;
-          const parsed = storedCollectionPlayStateV1Schema.parse(row);
-          await table.put(
-            storedCollectionPlayStateV2Schema.parse({
-              ...parsed,
-              saveSchemaVersion: COLLECTION_PLAY_SAVE_VERSION,
-              playState: migrateCollectionPlayStateV1(parsed.playState),
-            }),
-          );
+          const parsed = storedCollectionPlayStateV1Schema.safeParse(row);
+          if (!parsed.success) continue;
+          const migrated = storedCollectionPlayStateV2Schema.safeParse({
+            ...parsed.data,
+            saveSchemaVersion: COLLECTION_PLAY_SAVE_VERSION,
+            playState: migrateCollectionPlayStateV1(parsed.data.playState),
+          });
+          if (!migrated.success) continue;
+          await table.put(migrated.data);
         }
       });
     this.version(20)
@@ -368,14 +369,15 @@ export class HoopRushDatabase extends Dexie {
           if (typeof row !== 'object' || row === null) continue;
           const saveSchemaVersion = (row as { saveSchemaVersion?: unknown }).saveSchemaVersion;
           if (saveSchemaVersion !== COLLECTION_SAVE_V1_VERSION) continue;
-          const parsed = storedCollectionStateV1Schema.parse(row);
-          await stateTable.put(
-            storedCollectionStateV2Schema.parse({
-              ...parsed,
-              saveSchemaVersion: COLLECTION_SAVE_VERSION,
-              state: migrateCollectionStateV1(parsed.state),
-            }),
-          );
+          const parsed = storedCollectionStateV1Schema.safeParse(row);
+          if (!parsed.success) continue;
+          const migrated = storedCollectionStateV2Schema.safeParse({
+            ...parsed.data,
+            saveSchemaVersion: COLLECTION_SAVE_VERSION,
+            state: migrateCollectionStateV1(parsed.data.state),
+          });
+          if (!migrated.success) continue;
+          await stateTable.put(migrated.data);
         }
         const playTable = transaction.table('collectionPlayState');
         const playRows: unknown[] = await playTable.toArray();
@@ -383,14 +385,15 @@ export class HoopRushDatabase extends Dexie {
           if (typeof row !== 'object' || row === null) continue;
           const saveSchemaVersion = (row as { saveSchemaVersion?: unknown }).saveSchemaVersion;
           if (saveSchemaVersion !== COLLECTION_PLAY_SAVE_V2_VERSION) continue;
-          const parsed = storedCollectionPlayStateV2Schema.parse(row);
-          await playTable.put(
-            storedCollectionPlayStateV3Schema.parse({
-              ...parsed,
-              saveSchemaVersion: COLLECTION_PLAY_SAVE_VERSION,
-              playState: migrateCollectionPlayStateV2(parsed.playState),
-            }),
-          );
+          const parsed = storedCollectionPlayStateV2Schema.safeParse(row);
+          if (!parsed.success) continue;
+          const migrated = storedCollectionPlayStateV3Schema.safeParse({
+            ...parsed.data,
+            saveSchemaVersion: COLLECTION_PLAY_SAVE_VERSION,
+            playState: migrateCollectionPlayStateV2(parsed.data.playState),
+          });
+          if (!migrated.success) continue;
+          await playTable.put(migrated.data);
         }
       });
   }

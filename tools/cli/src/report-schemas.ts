@@ -24,6 +24,19 @@ import {
   seasonUnitStintSchema,
 } from '@hoop-rush/data-contracts';
 import { DRAFT_FIT_REFINE_MAX } from '@hoop-rush/engine';
+
+const calibrationCohortFields = {
+  calibrationSeeds: z.number().int().nonnegative(),
+  validationSeeds: z.number().int().nonnegative(),
+};
+const calibrationCohortPositiveFields = {
+  calibrationSeeds: z.number().int().positive(),
+  validationSeeds: z.number().int().positive(),
+};
+const targetsArtifactFields = {
+  targetsWritten: z.boolean(),
+  targetsPath: z.string().nullable(),
+};
 export const simGameReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('sim game'),
@@ -601,8 +614,7 @@ const bandDistributionEntrySchema = distributionEntrySchema.extend({
 export const seasonRostersCalibrateReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season rosters calibrate'),
-  calibrationSeeds: z.number().int().positive(),
-  validationSeeds: z.number().int().positive(),
+  ...calibrationCohortPositiveFields,
   failures: z.number().int().nonnegative(),
   repairRate: z.number().min(0).max(1),
   backtrackRate: z.number().min(0).max(1),
@@ -640,8 +652,7 @@ export const seasonRostersCalibrateReportSchema = z.object({
     heldOutPassShare: z.number().min(0).max(1),
     heldOutPass: z.boolean(),
   }),
-  targetsWritten: z.boolean(),
-  targetsPath: z.string().nullable(),
+  ...targetsArtifactFields,
   validateOnly: z.boolean(),
   pass: z.boolean(),
 });
@@ -649,8 +660,7 @@ export type SeasonRostersCalibrateReport = z.infer<typeof seasonRostersCalibrate
 export const seasonDraftCalibrateReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season draft calibrate'),
-  calibrationSeeds: z.number().int().positive(),
-  validationSeeds: z.number().int().positive(),
+  ...calibrationCohortPositiveFields,
   durationMs: z.number().nonnegative(),
   variety: distributionEntrySchema,
   minSafePerOffer: z.number().int().nonnegative(),
@@ -686,8 +696,7 @@ export const seasonDraftCalibrateReportSchema = z.object({
     heldOutStrengthPassShare: z.number().min(0).max(1),
     heldOutStrengthPass: z.boolean(),
   }),
-  targetsWritten: z.boolean(),
-  targetsPath: z.string().nullable(),
+  ...targetsArtifactFields,
   pass: z.boolean(),
 });
 export type SeasonDraftCalibrateReport = z.infer<typeof seasonDraftCalibrateReportSchema>;
@@ -820,8 +829,7 @@ export const seasonGameCalibrateReportSchema = z.object({
     heldOutPass: z.boolean(),
   }),
   chunkingIndependent: z.boolean(),
-  targetsWritten: z.boolean(),
-  targetsPath: z.string().nullable(),
+  ...targetsArtifactFields,
   pass: z.boolean(),
 });
 export type SeasonGameCalibrateReport = z.infer<typeof seasonGameCalibrateReportSchema>;
@@ -932,8 +940,7 @@ export const seasonHomeCourtCalibrateReportSchema = z.object({
     possessionStable: z.boolean(),
     monotonic: z.boolean(),
   }),
-  targetsWritten: z.boolean(),
-  targetsPath: z.string().nullable(),
+  ...targetsArtifactFields,
   pass: z.boolean(),
 });
 export type SeasonHomeCourtCalibrateReport = z.infer<typeof seasonHomeCourtCalibrateReportSchema>;
@@ -1017,8 +1024,7 @@ export const seasonEffectsCalibrateReportSchema = z.object({
     chemistrySeparation: z.boolean(),
     sensitivityMonotonic: z.boolean(),
   }),
-  targetsWritten: z.boolean(),
-  targetsPath: z.string().nullable(),
+  ...targetsArtifactFields,
   durationMs: z.number().nonnegative(),
 });
 export type SeasonEffectsCalibrateReport = z.infer<typeof seasonEffectsCalibrateReportSchema>;
@@ -1035,12 +1041,17 @@ export const seasonM25GateSchema = z.object({
   minimumSample: z.number().int().nonnegative(),
 });
 export type SeasonM25GateReport = z.infer<typeof seasonM25GateSchema>;
+const m25CalibrateTailFields = {
+  metrics: z.array(seasonM25GateSchema),
+  skippedGates: z.array(z.string().min(1)),
+  ...targetsArtifactFields,
+  durationMs: z.number().nonnegative(),
+};
 export const seasonHealthCalibrateReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season health calibrate'),
   targetsVersion: z.literal(SEASON_INJURY_TARGETS_VERSION),
-  calibrationSeeds: z.number().int().nonnegative(),
-  validationSeeds: z.number().int().nonnegative(),
+  ...calibrationCohortFields,
   seasonsSimulated: z.number().int().nonnegative(),
   exposures: z.number().int().nonnegative(),
   injuries: z.number().int().nonnegative(),
@@ -1078,19 +1089,14 @@ export const seasonHealthCalibrateReportSchema = z.object({
     standingsIndependent: z.boolean(),
     heldOut: z.boolean(),
   }),
-  metrics: z.array(seasonM25GateSchema),
-  skippedGates: z.array(z.string().min(1)),
-  targetsWritten: z.boolean(),
-  targetsPath: z.string().nullable(),
-  durationMs: z.number().nonnegative(),
+  ...m25CalibrateTailFields,
 });
 export type SeasonHealthCalibrateReport = z.infer<typeof seasonHealthCalibrateReportSchema>;
 export const seasonTradeCalibrateReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season trade calibrate'),
   targetsVersion: z.literal(SEASON_TRADE_TARGETS_VERSION),
-  calibrationSeeds: z.number().int().nonnegative(),
-  validationSeeds: z.number().int().nonnegative(),
+  ...calibrationCohortFields,
   seasonsSimulated: z.number().int().nonnegative(),
   aiTradesMean: z.number(),
   aiTradesMin: z.number().int().nonnegative(),
@@ -1126,19 +1132,14 @@ export const seasonTradeCalibrateReportSchema = z.object({
     noDuplicateQuota: z.boolean().optional(),
     influenceNeverBypass: z.boolean().optional(),
   }),
-  metrics: z.array(seasonM25GateSchema),
-  skippedGates: z.array(z.string().min(1)),
-  targetsWritten: z.boolean(),
-  targetsPath: z.string().nullable(),
-  durationMs: z.number().nonnegative(),
+  ...m25CalibrateTailFields,
 });
 export type SeasonTradeCalibrateReport = z.infer<typeof seasonTradeCalibrateReportSchema>;
 export const seasonInfluenceCalibrateReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season influence calibrate'),
   targetsVersion: z.literal(SEASON_INFLUENCE_TARGETS_VERSION),
-  calibrationSeeds: z.number().int().nonnegative(),
-  validationSeeds: z.number().int().nonnegative(),
+  ...calibrationCohortFields,
   seasonsSimulated: z.number().int().nonnegative(),
   balanceChecks: z.number().int().nonnegative(),
   reconciliationFailures: z.number().int().nonnegative(),
@@ -1173,19 +1174,14 @@ export const seasonInfluenceCalibrateReportSchema = z.object({
     tradeCash: z.boolean().optional(),
     cashReconciliation: z.boolean().optional(),
   }),
-  metrics: z.array(seasonM25GateSchema),
-  skippedGates: z.array(z.string().min(1)),
-  targetsWritten: z.boolean(),
-  targetsPath: z.string().nullable(),
-  durationMs: z.number().nonnegative(),
+  ...m25CalibrateTailFields,
 });
 export type SeasonInfluenceCalibrateReport = z.infer<typeof seasonInfluenceCalibrateReportSchema>;
 export const seasonChallengesCalibrateReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season challenges calibrate'),
   targetsVersion: z.literal(SEASON_CHALLENGE_TARGETS_VERSION),
-  calibrationSeeds: z.number().int().nonnegative(),
-  validationSeeds: z.number().int().nonnegative(),
+  ...calibrationCohortFields,
   seasonsSimulated: z.number().int().nonnegative(),
   blocksDealt: z.number().int().nonnegative(),
   dealCompleteness: z.number().min(0).max(1),
@@ -1204,11 +1200,7 @@ export const seasonChallengesCalibrateReportSchema = z.object({
     threePointSufficiency: z.boolean(),
     heldOut: z.boolean(),
   }),
-  metrics: z.array(seasonM25GateSchema),
-  skippedGates: z.array(z.string().min(1)),
-  targetsWritten: z.boolean(),
-  targetsPath: z.string().nullable(),
-  durationMs: z.number().nonnegative(),
+  ...m25CalibrateTailFields,
 });
 export type SeasonChallengesCalibrateReport = z.infer<typeof seasonChallengesCalibrateReportSchema>;
 export const seasonRunReproduceReportSchema = z.object({
@@ -1285,8 +1277,7 @@ export const seasonPostseasonCalibrateReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season postseason calibrate'),
   targetsVersion: z.literal(SEASON_POSTSEASON_TARGETS_VERSION),
-  calibrationSeeds: z.number().int().nonnegative(),
-  validationSeeds: z.number().int().nonnegative(),
+  ...calibrationCohortFields,
   seasonsSimulated: z.number().int().nonnegative(),
   gamesPlayed: z.number().int().nonnegative(),
   seriesCompleted: z.number().int().nonnegative(),
@@ -1319,11 +1310,7 @@ export const seasonPostseasonCalibrateReportSchema = z.object({
     zeroIntegrityFailures: z.boolean(),
     heldOut: z.boolean(),
   }),
-  metrics: z.array(seasonM25GateSchema),
-  skippedGates: z.array(z.string().min(1)),
-  targetsWritten: z.boolean(),
-  targetsPath: z.string().nullable(),
-  durationMs: z.number().nonnegative(),
+  ...m25CalibrateTailFields,
   pass: z.boolean(),
 });
 export type SeasonPostseasonCalibrateReport = z.infer<typeof seasonPostseasonCalibrateReportSchema>;
@@ -1331,8 +1318,7 @@ export const seasonCampaignCalibrateReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season campaign calibrate'),
   targetsVersion: z.literal(SEASON_CAMPAIGN_TARGETS_VERSION),
-  calibrationSeeds: z.number().int().nonnegative(),
-  validationSeeds: z.number().int().nonnegative(),
+  ...calibrationCohortFields,
   seasonsSimulated: z.number().int().nonnegative(),
   eligibleCheckpoints: z.number().int().nonnegative(),
   offersGenerated: z.number().int().nonnegative(),
@@ -1355,11 +1341,7 @@ export const seasonCampaignCalibrateReportSchema = z.object({
     orderInvariance: z.boolean(),
     heldOut: z.boolean(),
   }),
-  metrics: z.array(seasonM25GateSchema),
-  skippedGates: z.array(z.string().min(1)),
-  targetsWritten: z.boolean(),
-  targetsPath: z.string().nullable(),
-  durationMs: z.number().nonnegative(),
+  ...m25CalibrateTailFields,
 });
 export type SeasonCampaignCalibrateReport = z.infer<typeof seasonCampaignCalibrateReportSchema>;
 export const seasonCampaignAuditReportSchema = z.object({
@@ -1413,8 +1395,7 @@ export const seasonFreeAgencyCalibrateReportSchema = z.object({
     z.literal(SEASON_FREE_AGENCY_TARGETS_VERSION),
     z.literal(SEASON_FREE_AGENCY_TARGETS_VERSION_V1),
   ]),
-  calibrationSeeds: z.number().int().nonnegative(),
-  validationSeeds: z.number().int().nonnegative(),
+  ...calibrationCohortFields,
   seasonsSimulated: z.number().int().nonnegative(),
   windowsOpened: z.number().int().nonnegative(),
   signings: z.number().int().nonnegative(),
@@ -1475,11 +1456,7 @@ export const seasonFreeAgencyCalibrateReportSchema = z.object({
     summaryIdentity: z.boolean(),
     heldOut: z.boolean(),
   }),
-  metrics: z.array(seasonM25GateSchema),
-  skippedGates: z.array(z.string().min(1)),
-  targetsWritten: z.boolean(),
-  targetsPath: z.string().nullable(),
-  durationMs: z.number().nonnegative(),
+  ...m25CalibrateTailFields,
 });
 export type SeasonFreeAgencyCalibrateReport = z.infer<typeof seasonFreeAgencyCalibrateReportSchema>;
 
@@ -1520,8 +1497,7 @@ export const collectionPackCalibrateReportSchema = z.object({
   starterSeeds: z.number().int().nonnegative(),
   heldOutSamples: z.number().int().nonnegative(),
   gates: z.record(z.string(), z.boolean()),
-  targetsWritten: z.boolean(),
-  targetsPath: z.string().nullable(),
+  ...targetsArtifactFields,
   durationMs: z.number().nonnegative(),
 });
 export type CollectionPackCalibrateReport = z.infer<typeof collectionPackCalibrateReportSchema>;
@@ -1611,8 +1587,7 @@ export const collectionGameCalibrateReportSchema = z.object({
   rulesHash: z.string().regex(/^[0-9a-f]{64}$/),
   catalogHash: z.string().regex(/^[0-9a-f]{64}$/),
   workers: z.number().int().positive(),
-  calibrationSeeds: z.number().int().nonnegative(),
-  validationSeeds: z.number().int().nonnegative(),
+  ...calibrationCohortFields,
   projection: z.object({
     calibrationGames: z.number().int().nonnegative(),
     validationGames: z.number().int().nonnegative(),
@@ -1718,8 +1693,7 @@ export const collectionProgressionCalibrateReportSchema = z.object({
   rulesHash: z.string().regex(/^[0-9a-f]{64}$/),
   engineVersion: z.string().min(1).max(64),
   workers: z.number().int().positive(),
-  calibrationSeeds: z.number().int().positive(),
-  validationSeeds: z.number().int().positive(),
+  ...calibrationCohortPositiveFields,
   ordinarySlotDraws: z.number().int().nonnegative(),
   gates: z.record(z.string().min(1).max(160), z.boolean()),
   fixtures: z.array(
@@ -1728,8 +1702,7 @@ export const collectionProgressionCalibrateReportSchema = z.object({
       collectionHash: z.string().regex(/^[0-9a-f]{32}$/),
     }),
   ),
-  targetsWritten: z.boolean(),
-  targetsPath: z.string().nullable(),
+  ...targetsArtifactFields,
   pinned: z.boolean(),
   durationMs: z.number().nonnegative(),
 });

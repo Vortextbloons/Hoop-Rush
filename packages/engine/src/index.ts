@@ -141,21 +141,11 @@ export {
   type AutoRotationMemberInput,
   type AutoRotationProjectionInput,
   type AutoRotationScope,
-  type PlayerId,
   type RecommendSeasonRotationChange,
   type RecommendSeasonRotationFacts,
   type RecommendSeasonRotationInput,
   type RecommendSeasonRotationMetrics,
   type RecommendSeasonRotationResult,
-  type RotationCandidatePlayer,
-  type RotationProjectionContext,
-  type RotationProjectionHorizon,
-  type RotationRecommendationChange,
-  type RotationRecommendationFact,
-  type RotationRecommendationMetrics,
-  type SeasonPlayerLoad,
-  type SeasonRotationRecommendationInput,
-  type SeasonRotationRecommendationResult,
 } from './season/auto-rotation.ts';
 export {
   simulateSeasonGame,
@@ -284,6 +274,10 @@ export {
   foldSeasonTeamAggregates,
   foldSeasonPlayerAggregates,
   foldSeasonAggregates,
+  padSeasonTeamAggregates,
+  padSeasonPlayerAggregates,
+  seasonRosterPlayerVersionIds,
+  seasonRotationPlayerVersionIds,
   auditSeasonAggregates,
   deriveSeasonLeaders,
   provisionalStandingOrder,
@@ -334,7 +328,6 @@ export {
   fatigueBandOf,
   minutePlanHorizonGames,
   minuteStrategyOfPreset,
-  STRATEGY_TO_PRESET,
   MINUTE_PLAN_HEAVY_THRESHOLD_BP,
   FATIGUE_BAND_FRESH_MAX,
   FATIGUE_BAND_READY_MAX,
@@ -428,10 +421,23 @@ export {
   type SeasonRunStateDigestFacts,
 } from './season/state-digest.ts';
 export {
+  compareStrings,
+  comparePairKeys,
+  sortedBy,
+  sortedEntries,
+  sortedNumericEntries,
+  sortedStrings,
+  canonicalEffectsPayload,
+  canonicalHealthPayload,
+  canonicalInfluencePayload,
+} from './season/canonical.ts';
+export {
   openSeasonTradeWindow,
   WINDOW_BLOCK_INDEX_TO_INDEX,
-  TRADE_BAND_1V1,
-  TRADE_BAND_DEFAULT,
+  type SeasonWindowOpenResult,
+} from './season/trades.ts';
+export {
+  TRADE_VALUE_BAND,
   TRADE_PACKAGE_WEIGHTS,
   TRADE_CONSOLIDATION_BEST_MIN_RATIO,
   seasonTradeValueBandFor,
@@ -444,13 +450,12 @@ export {
   fillTradeBackfill,
   tradeOfferBackfillSeed,
   type SeasonTradePackageKind,
-  type SeasonWindowOpenResult,
   type TradeAssetEligibilityInput,
   type TradeAssetEligibilityResult,
   type TradeAssetEligibilityStatus,
   type TradeBackfillSelection,
   type TradeBackfillFill,
-} from './season/trades.ts';
+} from './season/trade-valuation.ts';
 export { TRADE_CASH_PCT_MAX, TRADE_CASH_PCT_PER_POINT } from './season/trade-board.ts';
 export {
   SEASON_FREE_AGENCY_BAND_SIGNING_CAPS,
@@ -595,7 +600,7 @@ export {
   createParticipantClassicDraft,
   type ClassicBuilderCommand,
   type PoolEligibilityPolicy,
-} from './modes/fixed-five/classic-reducer.ts';
+} from './modes/classic/draft.ts';
 export {
   createDuelDraft,
   rerollDuel,
@@ -694,8 +699,10 @@ export {
 export {
   validateCollectionActiveTeam,
   allocateDefaultMinutes,
+  allocateMeritMinutes,
   initializeCollectionActiveTeam,
 } from './collection/active-team.ts';
+export type { CollectionMinuteStrategy } from './collection/minute-plan.ts';
 export {
   generateCollectionCpuTeam,
   generateCollectionCpuTeamV2,

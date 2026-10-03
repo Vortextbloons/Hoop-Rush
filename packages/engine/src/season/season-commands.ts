@@ -139,15 +139,17 @@ import { seasonRunStateDigest } from './state-digest.ts';
 import { seasonRunStateDigestFactsOf } from './state-digest.ts';
 import {
   applySeasonTrade,
+  buildTradeOfferRecord,
+  generatedExtraOfferForSpend,
+  type SeasonEconomyRun,
+} from './trades.ts';
+import {
   fillTradeBackfill,
   seasonEconomyRunOf,
   seasonTradeCatalogFactsOf,
-  seasonTradePlayerHealthFacts,
-  generatedExtraOfferForSpend,
   tradeOfferBackfillSeed,
   tradeRosterLegalityReasons,
-  type SeasonEconomyRun,
-} from './trades.ts';
+} from './trade-valuation.ts';
 import { normalizeEvolutionState } from '@hoop-rush/data-contracts';
 import {
   SEASON_COURT_INNOVATION_CATALOG,
@@ -986,11 +988,6 @@ function handleSubmitTradeProposal(
       run,
     );
   }
-  if (
-    win.activeInquiryId &&
-    win.negotiations?.some((n) => n.inquiryId === win.activeInquiryId && n.status === 'active')
-  ) {
-  }
   const evalResult = evaluateTradeProposal({
     run,
     windowIndex: command.windowIndex,
@@ -1477,7 +1474,10 @@ function handleRespondToTradeCounter(
     return rejectedCommand(command, rejection, run);
   }
   if (context.catalog !== undefined) {
-    const facts = seasonTradeCatalogFactsOf(context.catalog);
+    const facts = seasonTradeCatalogFactsOf(
+      context.catalog,
+      normalizeSponsorGearState(run.sponsors).players.slots,
+    );
     const rosterIdsOf = (franchiseId: string): string[] =>
       run.rosters
         .find((roster) => roster.franchiseId === franchiseId)
@@ -1535,27 +1535,58 @@ function handleRespondToTradeCounter(
     };
     return rejectedCommand(command, rejection, run);
   }
-  const syntheticOffer: import('@hoop-rush/data-contracts').SeasonTradeOffer = {
-    offerId: (negotiation.activeProposalId ?? `prop-${'0'.repeat(32)}`).replace(/^prop-/, 'off-'),
+  const negotiationFacts = seasonTradeCatalogFactsOf(
+    context.catalog,
+    normalizeSponsorGearState(run.sponsors).players.slots,
+  );
+  const humanRosterIdsForOffer =
+    run.rosters
+      .find((roster) => roster.franchiseId === humanFranchiseId)
+      ?.players.map((player) => player.playerVersionId) ?? [];
+  const partnerRosterIdsForOffer =
+    run.rosters
+      .find((roster) => roster.franchiseId === partnerFranchiseId)
+      ?.players.map((player) => player.playerVersionId) ?? [];
+  const humanAfterIds = [
+    ...humanRosterIdsForOffer.filter((id) => !agreed.outgoing.includes(id)),
+    ...agreed.incoming,
+  ];
+  const partnerAfterIds = [
+    ...partnerRosterIdsForOffer.filter((id) => !agreed.incoming.includes(id)),
+    ...agreed.outgoing,
+  ];
+  const negotiationKind =
+    agreed.outgoing.length === 1 && agreed.incoming.length === 1
+      ? ('1-1' as const)
+      : agreed.outgoing.length === 2 && agreed.incoming.length === 2
+        ? ('2-2' as const)
+        : agreed.outgoing.length === 1 && agreed.incoming.length === 2
+          ? ('1-2' as const)
+          : agreed.outgoing.length === 2 && agreed.incoming.length === 1
+            ? ('2-1' as const)
+            : ('2-2' as const);
+  const syntheticOffer = buildTradeOfferRecord({
+    run,
+    catalogFacts: negotiationFacts,
     windowIndex: command.windowIndex,
     seedPath: ['trades', 'window', String(command.windowIndex), 'negotiation', command.inquiryId],
-    toFranchiseId: franchiseIdSchema.parse(humanFranchiseId),
-    fromFranchiseId: franchiseIdSchema.parse(partnerFranchiseId),
-    outgoingPlayerVersionIds: agreed.outgoing,
-    incomingPlayerVersionIds: agreed.incoming,
-    outgoingHealth: agreed.outgoing.map((id) => seasonTradePlayerHealthFacts(run.health, id)),
-    incomingHealth: agreed.incoming.map((id) => seasonTradePlayerHealthFacts(run.health, id)),
-    valueBand: { ratioBasisPoints: 1000, band: '80-120', qualified: true },
-    roleFit: { outgoingRoles: [], incomingRoles: [], notes: `negotiation ${command.inquiryId}` },
-    rosterNeedFacts: {
-      outgoingDepth: 0,
-      incomingDepth: 0,
-      notes: `negotiation ${command.inquiryId}`,
-    },
-    projectedRotationChanges: `negotiation ${command.inquiryId} accepted`,
-    projectedChemistryDisruption: { removedPairs: 0, newPairs: 0 },
+    offerId: (negotiation.activeProposalId ?? `prop-${'0'.repeat(32)}`).replace(/^prop-/, 'off-'),
+    toFranchiseId: humanFranchiseId,
+    fromFranchiseId: partnerFranchiseId,
+    outgoing: agreed.outgoing,
+    incoming: agreed.incoming,
+    kind: negotiationKind,
+    receivingFranchiseId: humanFranchiseId,
+    candidateRosterIds: humanAfterIds,
+    toAfterIds: humanAfterIds,
+    fromAfterIds: partnerAfterIds,
+    beforeIds: humanRosterIdsForOffer,
+    afterIds: humanAfterIds,
+    roleNotes: `negotiation ${command.inquiryId} agreed ${agreed.outgoing.join(', ')} for ${agreed.incoming.join(', ')}`,
+    needNotes: `negotiation ${command.inquiryId} post-swap depth`,
+    rotationText: `negotiation ${command.inquiryId} accepted ${agreed.outgoing.join(', ')} for ${agreed.incoming.join(', ')}; rotations rebuilt deterministically`,
     status: 'accepted',
-  };
+  });
   const applied = applySeasonTrade(run, syntheticOffer, context.catalog, {
     commandId: command.commandId,
   });
@@ -2242,7 +2273,10 @@ function handleAcceptTradeOffer(
     return rejectedCommand(command, rejection, run);
   }
   if (context.catalog !== undefined) {
-    const facts = seasonTradeCatalogFactsOf(context.catalog);
+    const facts = seasonTradeCatalogFactsOf(
+      context.catalog,
+      normalizeSponsorGearState(run.sponsors).players.slots,
+    );
     const rosterIdsOf = (franchiseId: string): string[] =>
       run.rosters
         .find((roster) => roster.franchiseId === franchiseId)

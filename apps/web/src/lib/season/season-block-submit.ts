@@ -9,7 +9,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import { freeAgencyUnresolvedWindowIndex } from '@hoop-rush/engine';
 import { loadSeasonHomeCourtProfile, seasonArtifactUrls } from './season-assets';
-import { newSeasonId } from './season-ids';
+import { newSeasonId } from '$lib/ids';
 import { pendingRotationSetDigest } from './season-lock-preview';
 import type { SubmitBlockEnvelope } from './season-hub-state';
 import type { SeasonRunShellData } from './season-shell-context';

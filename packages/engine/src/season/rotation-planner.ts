@@ -1,9 +1,7 @@
 import { LINEUP_STRUCTURE, type Position, type SeasonRotation } from '@hoop-rush/data-contracts';
 import { canPlay } from '../domain/positions.ts';
-export interface PlannerMember {
-  playerVersionId: string;
-  playable: readonly Position[];
-}
+import type { SeasonRosterMemberInput } from './roster-rules.ts';
+export type PlannerMember = SeasonRosterMemberInput;
 export interface PlannerRotationContext {
   rotation: SeasonRotation;
   members: ReadonlyMap<string, readonly Position[]>;
@@ -20,7 +18,7 @@ export interface PlannerUnitRequest {
   scoreMargin: number;
 }
 export function enumerateLegalFives(
-  members: readonly PlannerMember[],
+  members: readonly SeasonRosterMemberInput[],
   available: ReadonlySet<string>,
 ): string[][] {
   const results: string[][] = [];
@@ -47,34 +45,14 @@ export function enumerateLegalFives(
   solve(0);
   return results;
 }
-const plannerStateCache = new WeakMap<
-  PlannerRotationContext,
-  {
-    members: PlannerMember[];
-    benchIndex: ReadonlyMap<string, number>;
-  }
->();
-function plannerState(context: PlannerRotationContext): {
-  members: PlannerMember[];
-  benchIndex: ReadonlyMap<string, number>;
-} {
-  let state = plannerStateCache.get(context);
-  if (state === undefined) {
-    state = {
-      members: orderedPlannerMembers(context),
-      benchIndex: new Map(
-        context.rotation.benchOrder.map((playerVersionId, index) => [playerVersionId, index]),
-      ),
-    };
-    plannerStateCache.set(context, state);
-  }
-  return state;
+function benchIndexOf(rotation: SeasonRotation): ReadonlyMap<string, number> {
+  return new Map(rotation.benchOrder.map((playerVersionId, index) => [playerVersionId, index]));
 }
 export function chooseInitialUnit(
   context: PlannerRotationContext,
   unavailable: ReadonlySet<string>,
 ): string[] | null {
-  const members = plannerState(context).members;
+  const members = orderedPlannerMembers(context);
   const playableById = new Map(members.map((member) => [member.playerVersionId, member.playable]));
   const starters = context.rotation.starters;
   let startersLegal = starters.length === LINEUP_STRUCTURE.length;
@@ -111,7 +89,8 @@ export function planUnit(
     candidates?: readonly (readonly string[])[];
   } = {},
 ): string[] | null {
-  const { members, benchIndex } = plannerState(context);
+  const members = orderedPlannerMembers(context);
+  const benchIndex = benchIndexOf(context.rotation);
   const available = new Set(
     members.map((member) => member.playerVersionId).filter((id) => !request.unavailable.has(id)),
   );
@@ -160,7 +139,7 @@ export function plannerCandidates(
   context: PlannerRotationContext,
   unavailable: ReadonlySet<string>,
 ): readonly (readonly string[])[] {
-  const members = plannerState(context).members;
+  const members = orderedPlannerMembers(context);
   const available = new Set(
     members.map((member) => member.playerVersionId).filter((id) => !unavailable.has(id)),
   );

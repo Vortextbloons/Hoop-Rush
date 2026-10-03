@@ -27,6 +27,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import { blockRoundRange, canonicalJson } from '@hoop-rush/data-contracts';
 import { provisionalStandingOrder } from './aggregates.ts';
+import { sortedBy } from './canonical.ts';
 export interface SeasonBlockRecapInput {
   runId: string;
   blockIndex: number;
@@ -527,9 +528,7 @@ export function seasonBlockRecapCanonical(recap: SeasonBlockRecap): string {
     blockIndex: recap.blockIndex,
     completedRounds: recap.completedRounds,
     humanRecord: recap.humanRecord,
-    standingsMovement: [...recap.standingsMovement].sort((a, b) =>
-      a.franchiseId < b.franchiseId ? -1 : 1,
-    ),
+    standingsMovement: sortedBy(recap.standingsMovement, (row) => row.franchiseId),
     notablePerformances: [...recap.notablePerformances].sort(
       (a, b) =>
         (a.playerVersionId < b.playerVersionId
@@ -548,17 +547,16 @@ export function seasonBlockRecapCanonical(recap: SeasonBlockRecap): string {
         (a.versionA < b.versionA ? -1 : a.versionA > b.versionA ? 1 : 0) ||
         (a.versionB < b.versionB ? -1 : 1),
     ),
-    upcomingHumanGames: [...recap.upcomingHumanGames].sort((a, b) =>
-      a.gameId < b.gameId ? -1 : 1,
-    ),
-    challengeEvidence: (recap.challengeEvidence ?? [])
-      .map((entry) => ({
+    upcomingHumanGames: sortedBy(recap.upcomingHumanGames, (game) => game.gameId),
+    challengeEvidence: sortedBy(
+      (recap.challengeEvidence ?? []).map((entry) => ({
         challengeId: entry.challengeId,
         success: entry.success,
         reward: entry.reward,
         evaluationFacts: entry.evaluationFacts,
-      }))
-      .sort((a, b) => (a.challengeId < b.challengeId ? -1 : 1)),
+      })),
+      (entry) => entry.challengeId,
+    ),
     freeAgencyEvidence: {
       ...recap.freeAgencyEvidence,
       signings: [...recap.freeAgencyEvidence.signings].sort(

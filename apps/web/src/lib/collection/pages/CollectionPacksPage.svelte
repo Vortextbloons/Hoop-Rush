@@ -85,7 +85,7 @@
     'fast-break': 'Three cards, all ordinary slots.',
     'full-court': 'Five cards with one Eruption-or-better slot.',
     'main-event': 'Ten cards with one Apex-or-better slot.',
-    spotlight: 'One special-only card, Apex or better. Costs Exchange.',
+    spotlight: 'One Heat Check or Arm Guard special, Apex or better. Costs Exchange.',
   };
   const PACK_LABELS: Record<string, string> = {
     'tip-off': 'Tip-Off',
@@ -103,10 +103,13 @@
   };
   const SPECIAL_PACK_COVER_ART: Record<string, string> = {
     'Heat Check': asset('/ultimate/packs/spotlight-heat-check.jpg'),
+    'Arm Guard': asset('/ultimate/cards/arm-guard/luka-doncic.png'),
   };
 
-  const activeSpecialFamily = $derived.by(
-    () => catalog?.cards.find((card) => card.family !== 'Base')?.family ?? 'Featured Special',
+  const activeSpecialFamily = $derived.by(() =>
+    catalog?.cards.some((card) => card.family === 'Arm Guard')
+      ? 'Arm Guard'
+      : (catalog?.cards.find((card) => card.family !== 'Base')?.family ?? 'Featured Special'),
   );
   const activeSpecialCoverArt = $derived(SPECIAL_PACK_COVER_ART[activeSpecialFamily] ?? null);
 
@@ -543,7 +546,7 @@
               <h2>{PACK_LABELS[pack.packId] ?? pack.packId}</h2>
               <p>
                 {pack.packId === 'spotlight'
-                  ? `One ${activeSpecialFamily} special-only card, Apex or better.`
+                  ? PACK_BLURBS.spotlight
                   : (PACK_BLURBS[pack.packId] ?? '')}
               </p>
               {#if guaranteedCount > 0}

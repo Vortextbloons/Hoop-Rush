@@ -1,12 +1,7 @@
-import { dirname, isAbsolute, resolve } from 'node:path';
-import {
-  franchiseEraPoolSchema,
-  hoopRushManifestSchema,
-  type PeakPlayerSeason,
-} from '@hoop-rush/data-contracts';
-import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
+import { type PeakPlayerSeason } from '@hoop-rush/data-contracts';
+import { makeReport, type CliReport } from '../report.ts';
 import { overallsAuditReportSchema } from '../report-schemas.ts';
-import { tryReadJson } from '../io.ts';
+import { loadOverallRows, manifestErrorReport } from './data-overalls.ts';
 
 export const DATA_OVERALLS_AUDIT_OPTIONS: Record<string, boolean> = {
   input: true,
@@ -39,37 +34,11 @@ function rawOf(row: PeakPlayerSeason): number | null {
 }
 
 export function dataOverallsAudit(options: DataOverallsAuditOptions): CliReport {
-  const rawManifest = tryReadJson(options.input);
-  const parsedManifest = hoopRushManifestSchema.safeParse(rawManifest);
-  if (!parsedManifest.success) {
-    const issue = parsedManifest.error.issues[0];
-    return makeReport(
-      'data overalls-audit',
-      { input: options.input },
-      {
-        failures: [
-          `manifest: ${options.input} is missing or invalid (${issue?.path.join('.') ?? 'root'} ${issue?.message ?? 'invalid'})`,
-        ],
-        exitCode: EXIT_USAGE_OR_DATA_ERROR,
-      },
-    );
+  const loaded = loadOverallRows(options.input);
+  if ('failure' in loaded) {
+    return manifestErrorReport('data overalls-audit', { input: options.input }, loaded.failure);
   }
-  const manifest = parsedManifest.data;
-  const manifestDir = dirname(resolve(options.input));
-  const rows: PeakPlayerSeason[] = [];
-  const failures: string[] = [];
-  for (const poolRef of manifest.pools) {
-    const assetPath = isAbsolute(poolRef.url) ? poolRef.url : resolve(manifestDir, poolRef.url);
-    const parsedPool = franchiseEraPoolSchema.safeParse(tryReadJson(assetPath));
-    if (!parsedPool.success) {
-      const issue = parsedPool.error.issues[0];
-      failures.push(
-        `pool ${poolRef.franchiseId}/${poolRef.eraId}: ${poolRef.url} is invalid (${issue?.path.join('.') ?? 'root'} ${issue?.message ?? 'invalid'})`,
-      );
-      continue;
-    }
-    rows.push(...parsedPool.data.players);
-  }
+  const { manifest, rows, failures } = loaded;
   if (failures.length > 0) {
     return makeReport('data overalls-audit', { input: options.input }, { failures, exitCode: 1 });
   }

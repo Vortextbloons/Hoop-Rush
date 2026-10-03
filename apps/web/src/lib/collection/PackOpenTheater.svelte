@@ -56,15 +56,17 @@
   let activeCardIndex = $state(0);
   let beatIndex = $state(0);
   let clueIndex = $state(0);
+  let displayedClueIndex = $state(-1);
   let announcement = $state('');
   let activePullSequence: number | null = null;
   let presentationToken = 0;
   let timer: ReturnType<typeof setTimeout> | null = null;
+  let clueTimer: ReturnType<typeof setTimeout> | null = null;
 
   const activeCard = $derived(cards[activeCardIndex] ?? null);
   const activePlan = $derived(plan?.cards[activeCardIndex] ?? null);
   const activeBeat = $derived(activePlan?.beats[beatIndex] ?? null);
-  const activeClue = $derived(activePlan?.clues[clueIndex] ?? null);
+  const activeClue = $derived(activePlan?.clues[displayedClueIndex] ?? null);
   const revealColor = $derived(
     stage === 'clues' || stage === 'revealed'
       ? `var(--ur-${activePlan?.rarity.toLowerCase() ?? 'apex'})`
@@ -83,6 +85,10 @@
       clearTimeout(timer);
       timer = null;
     }
+    if (clueTimer !== null) {
+      clearTimeout(clueTimer);
+      clueTimer = null;
+    }
   }
 
   function showSummary(message = 'Pack results are ready.'): void {
@@ -97,6 +103,15 @@
     if (stage === 'idle' || stage === 'complete' || stage === 'revealed') return;
     const delay =
       stage === 'opening' ? 1250 : stage === 'clues' ? 700 : stage === 'advancing' ? 240 : 380;
+    if (stage === 'clues') {
+      clueTimer = setTimeout(() => {
+        clueTimer = null;
+        if (token !== presentationToken || stage !== 'clues') return;
+        displayedClueIndex = clueIndex;
+        const clue = activePlan?.clues[clueIndex];
+        if (clue) announcement = `${clue.label}: ${clue.value}.`;
+      }, 175);
+    }
     timer = setTimeout(() => {
       timer = null;
       if (token !== presentationToken) return;
@@ -116,17 +131,13 @@
       } else if (activePlan && activePlan.clues.length > 0) {
         stage = 'clues';
         clueIndex = 0;
-        announcement = activePlan.clues[0]
-          ? `${activePlan.clues[0].label}: ${activePlan.clues[0].value}.`
-          : '';
+        displayedClueIndex = -1;
       } else {
         stage = 'revealed';
       }
     } else if (stage === 'clues') {
       if (activePlan && clueIndex + 1 < activePlan.clues.length) {
         clueIndex += 1;
-        const clue = activePlan.clues[clueIndex];
-        if (clue) announcement = `${clue.label}: ${clue.value}.`;
       } else {
         stage = 'revealed';
       }
@@ -137,6 +148,7 @@
         activeCardIndex += 1;
         beatIndex = 0;
         clueIndex = 0;
+        displayedClueIndex = -1;
         stage = 'entering';
         announcement = `Card ${activeCardIndex + 1} of ${cards.length}.`;
       } else {
@@ -172,6 +184,7 @@
     activeCardIndex = 0;
     beatIndex = 0;
     clueIndex = 0;
+    displayedClueIndex = -1;
     stage = 'opening';
     announcement = `Opening ${packLabel}. Card 1 of ${cards.length}.`;
     await tick();
@@ -358,30 +371,44 @@
               <span aria-hidden="true">→</span>
             </button>
           {:else}
-            {#key `${activeCardIndex}-${stage}-${beatIndex}-${clueIndex}`}
-              <div class="ur-card-back ur-seal--sealed" data-stage={stage}>
-                <span class="ur-card-back-court" aria-hidden="true"></span>
-                <span class="ur-card-back-brand" aria-hidden="true">HR</span>
-                <strong>
-                  {#if stage === 'entering'}
-                    Game on
-                  {:else if stage === 'beats'}
-                    {activeBeat ?? 'Reveal'}
-                  {:else if stage === 'clues' && activeClue}
-                    {activeClue.label}
-                  {:else if stage === 'advancing'}
-                    Next card up
+            <div
+              class="ur-card-back ur-seal--sealed"
+              data-stage={stage}
+              data-beat={stage === 'beats' ? activeBeat : undefined}
+              data-clue-direction={stage === 'clues'
+                ? clueIndex % 2 === 0
+                  ? 'left'
+                  : 'right'
+                : undefined}
+            >
+              <span class="ur-card-back-court" aria-hidden="true"></span>
+              <span class="ur-card-back-brand" aria-hidden="true">HR</span>
+              {#if stage === 'beats' && activeBeat === 'Ignition'}
+                <span class="ur-card-foil" aria-hidden="true"></span>
+              {/if}
+              {#key `${stage}-${clueIndex}`}
+                <div class="ur-card-back-content" class:ur-clue-content={stage === 'clues'}>
+                  <strong>
+                    {#if stage === 'entering'}
+                      Game on
+                    {:else if stage === 'beats'}
+                      {activeBeat ?? 'Reveal'}
+                    {:else if stage === 'clues'}
+                      {activeClue?.label ?? ''}
+                    {:else if stage === 'advancing'}
+                      Next card up
+                    {/if}
+                  </strong>
+                  {#if stage === 'clues'}
+                    <span class="ur-card-clue">{activeClue?.value ?? ''}</span>
+                  {:else}
+                    <span class="ur-card-back-caption"
+                      >{stage === 'entering' ? packLabel : 'Here comes your next player'}</span
+                    >
                   {/if}
-                </strong>
-                {#if stage === 'clues' && activeClue}
-                  <span class="ur-card-clue">{activeClue.value}</span>
-                {:else}
-                  <span class="ur-card-back-caption"
-                    >{stage === 'entering' ? packLabel : 'Here comes your next player'}</span
-                  >
-                {/if}
-              </div>
-            {/key}
+                </div>
+              {/key}
+            </div>
             <div class="ur-charge-track" aria-hidden="true">
               <span style:width={`${charge}%`}></span>
             </div>
@@ -982,14 +1009,58 @@
   .ur-card-back-court {
     transform: rotate(-25deg);
   }
+  .ur-card-back-content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+  }
+  .ur-clue-content {
+    animation: clue-copy 350ms ease-in-out both;
+  }
+  .ur-card-foil {
+    position: absolute;
+    inset: -30% -80%;
+    pointer-events: none;
+    background: linear-gradient(
+      110deg,
+      transparent 42%,
+      #ffffff12 46%,
+      #ffffff80 50%,
+      #ffffff12 54%,
+      transparent 58%
+    );
+    animation: foil-glint 380ms ease-in-out both;
+  }
   .ur-card-back[data-stage='entering'] {
     animation: card-deal 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
   }
-  .ur-card-back[data-stage='beats'] {
-    animation: card-charge 380ms ease-out both;
+  .ur-card-back[data-beat='Pulse'] {
+    transform-origin: 50% 100%;
+    animation: card-pulse 380ms ease-out both;
   }
-  .ur-card-back[data-stage='clues'] {
-    animation: clue-lock 700ms ease-out both;
+  .ur-card-back[data-beat='Ignition'] {
+    animation: card-ignition 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .ur-card-back[data-beat='Lock'] {
+    animation: card-lock 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  .ur-card-back[data-beat='Surge'] {
+    animation: card-surge 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  .ur-card-back[data-beat='Walkout'] {
+    animation: card-walkout 380ms ease-in-out both;
+  }
+  .ur-card-back[data-beat='Reveal'] {
+    animation: card-anticipate 380ms ease-in-out both;
+  }
+  .ur-card-back[data-clue-direction='left'] {
+    animation: clue-cut-left 350ms ease-in-out both;
+  }
+  .ur-card-back[data-clue-direction='right'] {
+    animation: clue-cut-right 350ms ease-in-out both;
   }
   .ur-card-back[data-stage='advancing'] {
     animation: card-away 240ms ease-in both;
@@ -1187,25 +1258,114 @@
       opacity: 1;
     }
   }
-  @keyframes card-charge {
-    0% {
-      transform: scale(0.97) rotate(-1deg);
-    }
-    45% {
-      transform: scale(1.025) rotate(1deg);
-    }
+  @keyframes card-pulse {
+    0%,
     100% {
       transform: none;
     }
+    40% {
+      transform: rotateX(-9deg) rotate(-3deg) translateY(-4px);
+    }
+    72% {
+      transform: rotateX(3deg) rotate(1deg);
+    }
   }
-  @keyframes clue-lock {
+  @keyframes card-ignition {
+    0%,
+    100% {
+      transform: none;
+    }
+    40% {
+      transform: translateY(-16px) rotateY(-12deg) rotate(3deg);
+    }
+    75% {
+      transform: translateY(3px) rotate(-1deg);
+    }
+  }
+  @keyframes foil-glint {
     from {
-      transform: rotateY(14deg) scale(0.95);
-      opacity: 0.5;
+      transform: translateX(-45%);
+      opacity: 0;
+    }
+    35%,
+    65% {
+      opacity: 1;
     }
     to {
+      transform: translateX(45%);
+      opacity: 0;
+    }
+  }
+  @keyframes card-lock {
+    0%,
+    100% {
+      transform: none;
+    }
+    40% {
+      transform: translateY(-6px) translateZ(-65px) rotateX(7deg);
+    }
+    65% {
+      transform: translateZ(18px) rotateX(-3deg);
+    }
+  }
+  @keyframes card-surge {
+    0%,
+    100% {
+      transform: none;
+    }
+    35% {
+      transform: translateX(16px) rotateY(-15deg) rotate(3deg);
+    }
+    70% {
+      transform: translateX(-5px) rotateY(5deg) rotate(-1deg);
+    }
+  }
+  @keyframes card-walkout {
+    0%,
+    100% {
+      transform: none;
+    }
+    55% {
+      transform: translateY(-18px) translateZ(30px) rotateX(6deg) rotateY(-8deg);
+    }
+  }
+  @keyframes card-anticipate {
+    0%,
+    100% {
+      transform: none;
+    }
+    65% {
+      transform: translateY(8px) translateZ(-40px) rotateX(-5deg);
+    }
+  }
+  @keyframes clue-cut-left {
+    0%,
+    100% {
+      transform: none;
+    }
+    50% {
+      transform: translateX(-10px) rotateY(-18deg) rotate(-2deg);
+    }
+  }
+  @keyframes clue-cut-right {
+    0%,
+    100% {
+      transform: none;
+    }
+    50% {
+      transform: translateX(10px) rotateY(18deg) rotate(2deg);
+    }
+  }
+  @keyframes clue-copy {
+    0%,
+    100% {
       transform: none;
       opacity: 1;
+    }
+    45%,
+    55% {
+      transform: translateY(4px);
+      opacity: 0;
     }
   }
   @keyframes card-away {

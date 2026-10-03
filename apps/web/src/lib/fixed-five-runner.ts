@@ -12,7 +12,7 @@ import {
   type Seed,
 } from '@hoop-rush/data-contracts';
 import type { FixedFiveVerificationInput } from '@hoop-rush/engine';
-import { randomUUID } from '$lib/random-id';
+import { randomUUID } from '$lib/ids';
 export type FixedFiveRunnerEvent =
   | {
       kind: 'progress';

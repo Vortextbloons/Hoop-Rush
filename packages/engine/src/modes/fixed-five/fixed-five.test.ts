@@ -30,7 +30,11 @@ const fid = (value: string): FranchiseId => franchiseIdSchema.parse(value);
 const eid = (value: string): EraId => eraIdSchema.parse(value);
 import { DEFAULT_ERA_SIM_PROFILE } from '@hoop-rush/test-fixtures';
 import { createEngineContext } from '../../sim/context.ts';
-import { createClassicDraft } from '../classic/draft.ts';
+import {
+  applyClassicBuilderCommand,
+  createClassicDraft,
+  createParticipantClassicDraft,
+} from '../classic/draft.ts';
 import {
   FIXED_FIVE_TIEBREAK_PATH,
   fixedFiveAutopickSeed,
@@ -48,7 +52,6 @@ import {
   enumerateSandboxSafeMoves,
   type FixedFiveCandidate,
 } from './sandbox-builder.ts';
-import { applyClassicBuilderCommand, createParticipantClassicDraft } from './classic-reducer.ts';
 import {
   claimDuelPlayer,
   createDuelDraft,

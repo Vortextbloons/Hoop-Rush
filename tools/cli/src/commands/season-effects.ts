@@ -45,18 +45,13 @@ import {
 } from './season-game.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR, readJsonFile } from './season-data.ts';
 import { seedIndexRange } from './season-calibration.ts';
+import { createFixtureCohortRunner, seedRangeCalibrateOptions } from '../calibration-harness.ts';
 import { median } from '../stats.ts';
-import { commitTargetsArtifact, runWorkerChunks, validateTargetsArtifact } from '../artifact.ts';
-export const SEASON_EFFECTS_OPTIONS: Record<string, boolean> = {
+import { commitTargetsArtifact, validateTargetsArtifact } from '../artifact.ts';
+export const SEASON_EFFECTS_OPTIONS: Record<string, boolean> = seedRangeCalibrateOptions({
   fixture: true,
-  'seed-from': true,
-  'seed-to': true,
-  workers: true,
-  out: true,
-  manifest: true,
   validate: true,
-  format: true,
-};
+});
 export const SEASON_EFFECTS_CALIBRATION_SEED_COUNT = 256;
 export const SEASON_EFFECTS_VALIDATION_SEED_COUNT = 64;
 export const SEASON_EFFECTS_PRESET_FIXTURES = [
@@ -339,24 +334,15 @@ export type SeasonEffectsCohortRunner = (
 export async function runSeasonEffectsCohort(
   request: SeasonEffectsCohortRequest,
 ): Promise<SeasonEffectsGameFacts[]> {
-  const promises: Array<Promise<SeasonEffectsGameFacts[]>> = [];
-  for (const fixture of request.fixtures) {
-    promises.push(
-      runWorkerChunks<number, SeasonEffectsGameFacts>({
-        workerUrl: new URL('./season-effects-calibration-worker.ts', import.meta.url),
-        workerData: (seedIndices) => ({
-          fixtureId: fixture.fixtureId,
-          fixturePath: fixture.path,
-          seedIndices,
-        }),
-        items: request.seedIndices,
-        workers: request.workers,
-        payloadKey: 'facts',
-      }),
-    );
-  }
-  const chunks = await Promise.all(promises);
-  return chunks.flat();
+  return createFixtureCohortRunner<SeasonEffectsGameFacts>({
+    workerUrl: new URL('./season-effects-calibration-worker.ts', import.meta.url),
+    payloadKey: 'facts',
+    buildWorkerData: (fixture, seedIndices) => ({
+      fixtureId: fixture.fixtureId,
+      fixturePath: fixture.path,
+      seedIndices,
+    }),
+  })(request);
 }
 export function runSeasonEffectsCohortInProcess(
   request: SeasonEffectsCohortRequest,

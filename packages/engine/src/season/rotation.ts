@@ -25,12 +25,8 @@ export function matchStartingFive(
 ): SeasonRosterMemberInput[] | null {
   const ordered = [...members].sort(order ?? canonicalOrder);
   if (!legalFiveExists(ordered)) return null;
-  const plannerMembers = ordered.map((member) => ({
-    playerVersionId: member.playerVersionId,
-    playable: member.playable,
-  }));
   const available = new Set(ordered.map((member) => member.playerVersionId));
-  const first = enumerateLegalFives(plannerMembers, available)[0];
+  const first = enumerateLegalFives(ordered, available)[0];
   if (first === undefined) return null;
   const byId = new Map(ordered.map((member) => [member.playerVersionId, member]));
   const result: SeasonRosterMemberInput[] = [];

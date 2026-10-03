@@ -58,7 +58,7 @@ import type {
   SeasonRunSnapshot,
 } from '@hoop-rush/persistence';
 import { SeasonRunLoadError } from '@hoop-rush/persistence';
-import { newSeasonId } from './season-ids';
+import { newSeasonId } from '$lib/ids';
 import { sleep } from '$lib/sleep';
 import {
   cachedSeasonSnapshotMatches,

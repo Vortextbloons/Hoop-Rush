@@ -13,6 +13,11 @@ import { assignLineup, canFillSlot, validateLineup } from '../domain/lineup.ts';
 import type { SlotIndex } from '@hoop-rush/data-contracts';
 import { CollectionCommandError } from './packs.ts';
 import type { CollectionTeamCheck } from './team.ts';
+import {
+  overallWeightOf,
+  planCollectionMinutes,
+  type CollectionMinuteStrategy,
+} from './minute-plan.ts';
 
 const STARTER_SLOTS: SlotIndex[] = [0, 1, 2, 3, 4];
 
@@ -243,9 +248,50 @@ export function allocateDefaultMinutes(
   return roster.map((entry, index) => ({ cardId: entry.cardId, minutes: minutes[index] ?? 0 }));
 }
 
+export function allocateMeritMinutes(
+  roster: ReadonlyArray<{ cardId: string; starter: boolean; overall: number }>,
+  strategy: CollectionMinuteStrategy = 'balanced',
+  maxMinutes: number = COLLECTION_ACTIVE_TEAM_MAX_TARGET_MINUTES,
+): Array<{ cardId: string; minutes: number }> {
+  const plan = planCollectionMinutes(
+    roster.map((entry) => ({
+      cardId: entry.cardId,
+      starter: entry.starter,
+      overall: entry.overall,
+      weight: overallWeightOf(entry.overall),
+    })),
+    strategy,
+    maxMinutes,
+  );
+  return plan.targetMinutes;
+}
+
+function meritTargetMinutesWithFallback(
+  roster: ReadonlyArray<{ cardId: string; starter: boolean; overall: number }>,
+  strategy: CollectionMinuteStrategy,
+): Array<{ cardId: string; minutes: number }> {
+  const strategies: CollectionMinuteStrategy[] = [strategy, 'deep', 'balanced', 'tight'];
+  const tried = new Set<CollectionMinuteStrategy>();
+  for (const candidate of strategies) {
+    if (tried.has(candidate)) continue;
+    tried.add(candidate);
+    try {
+      return allocateMeritMinutes(roster, candidate);
+    } catch (error) {
+      if (!(error instanceof CollectionCommandError) || error.code !== 'invalid-minutes') {
+        throw error;
+      }
+    }
+  }
+  return allocateDefaultMinutes(
+    roster.map((entry) => ({ cardId: entry.cardId, starter: entry.starter })),
+  );
+}
+
 export function initializeCollectionActiveTeam(
   ownedCardIds: readonly string[],
   resolve: (cardId: string) => CollectionCatalogCard | undefined,
+  strategy: CollectionMinuteStrategy = 'balanced',
 ): CollectionActiveTeam {
   const owned: CollectionCatalogCard[] = [];
   for (const cardId of ownedCardIds) {
@@ -299,8 +345,13 @@ export function initializeCollectionActiveTeam(
     teamVersion: COLLECTION_TEAM_VERSION,
     starters: chosen.map((card) => card.cardId),
     bench: bench.map((card) => card.cardId),
-    targetMinutes: allocateDefaultMinutes(
-      roster.map((card) => ({ cardId: card.cardId, starter: starterIds.has(card.cardId) })),
+    targetMinutes: meritTargetMinutesWithFallback(
+      roster.map((card) => ({
+        cardId: card.cardId,
+        starter: starterIds.has(card.cardId),
+        overall: overallOf(card),
+      })),
+      strategy,
     ),
   });
   return team;

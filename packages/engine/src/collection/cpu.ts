@@ -18,6 +18,12 @@ import { assignLineup, canFillSlot } from '../domain/lineup.ts';
 import { evaluateLineupBalance } from '../challenge/lineup-eval.ts';
 import { createRng, type Rng } from '../sim/rng.ts';
 import { allocateDefaultMinutes, COMPLETION_PROBE_SCAN_CAP } from './active-team.ts';
+import {
+  planCollectionMinutes,
+  policyWeightOf,
+  strategyForDifficulty,
+  tryCollectionMinuteDnp,
+} from './minute-plan.ts';
 import { resolveCollectionCard, toCollectionSimulationPlayer } from './cards.ts';
 import { CollectionCommandError } from './packs.ts';
 import {
@@ -403,76 +409,26 @@ function generateCandidateRoster(pool: CandidatePoolEntry[], rng: Rng): Collecti
   return chosen;
 }
 
-function apportionMinutes(
-  weights: readonly number[],
-  caps: readonly number[],
-  total: number,
-): number[] {
-  const minutes = weights.map(() => 0);
-  let remaining = total;
-  for (let guard = 0; guard < 512 && remaining > 0; guard += 1) {
-    const active = weights
-      .map((weight, index) => ({ weight, index }))
-      .filter((entry) => (minutes[entry.index] ?? 0) < (caps[entry.index] ?? 0));
-    if (active.length === 0) break;
-    const sumWeight = active.reduce((sum, entry) => sum + entry.weight, 0);
-    if (sumWeight <= 0) {
-      throw new CollectionCommandError('invalid-minutes', 'cpu rotation weights sum to zero');
-    }
-    const shares = active.map((entry) => {
-      const numerator = remaining * entry.weight;
-      return {
-        index: entry.index,
-        base: Math.floor(numerator / sumWeight),
-        fraction: numerator % sumWeight,
-      };
-    });
-    for (const share of shares) {
-      minutes[share.index] = (minutes[share.index] ?? 0) + share.base;
-    }
-    let nextRemaining = remaining - shares.reduce((sum, share) => sum + share.base, 0);
-    const order = shares
-      .slice()
-      .sort((left, right) => right.fraction - left.fraction || left.index - right.index);
-    for (const share of order) {
-      if (nextRemaining <= 0) break;
-      if ((minutes[share.index] ?? 0) >= (caps[share.index] ?? 0)) continue;
-      minutes[share.index] = (minutes[share.index] ?? 0) + 1;
-      nextRemaining -= 1;
-    }
-    if (nextRemaining >= remaining) {
-      throw new CollectionCommandError('invalid-minutes', 'cpu rotation apportionment stalled');
-    }
-    remaining = nextRemaining;
-  }
-  if (remaining !== 0) {
-    throw new CollectionCommandError('invalid-minutes', 'cpu rotation minutes do not reach 240');
-  }
-  return minutes;
-}
-
 function meritMinutes(
   roster: ReadonlyArray<{ cardId: string; starter: boolean; overall: number }>,
   profile: CollectionDifficultyProfile,
 ): Array<{ cardId: string; minutes: number }> {
-  const weights = roster.map((entry) => {
-    const base = entry.starter ? profile.rotation.starterWeightBp : profile.rotation.benchWeightBp;
-    const bonus =
-      Math.max(0, entry.overall - profile.rotation.overallBonusFloor) *
-      profile.rotation.overallBonusPerPointBp;
-    return base + bonus;
-  });
-  const caps = roster.map(() => profile.rotation.maxMinutes);
-  const minutes = apportionMinutes(weights, caps, 240);
-  for (let index = 0; index < roster.length; index += 1) {
-    if (roster[index]?.starter === true && (minutes[index] ?? 0) < 1) {
-      throw new CollectionCommandError(
-        'invalid-minutes',
-        `cpu merit rotation starves starter ${String(roster[index]?.cardId)}`,
-      );
-    }
+  const entries = roster.map((entry) => ({
+    cardId: entry.cardId,
+    starter: entry.starter,
+    overall: entry.overall,
+    weight: policyWeightOf(entry.overall, entry.starter, profile.rotation),
+  }));
+  const plan = planCollectionMinutes(
+    entries,
+    strategyForDifficulty(profile.difficultyId),
+    profile.rotation.maxMinutes,
+  );
+  if (profile.difficultyId === 'legend') {
+    const dnp = tryCollectionMinuteDnp(entries, plan, profile.rotation.maxMinutes);
+    if (dnp !== null && dnp.quality >= plan.quality) return dnp.targetMinutes;
   }
-  return roster.map((entry, index) => ({ cardId: entry.cardId, minutes: minutes[index] ?? 0 }));
+  return plan.targetMinutes;
 }
 
 export interface CpuDifficultyTeamResult {
@@ -636,9 +592,7 @@ export function generateCollectionCpuTeamV2(
     starter: starterIds.has(card.cardId),
     overall: overallOf(card),
   }));
-  const targetMinutes = profile.useGeneratedStarters
-    ? allocateDefaultMinutes(rosterEntries.map(({ cardId, starter }) => ({ cardId, starter })))
-    : meritMinutes(rosterEntries, profile);
+  const targetMinutes = meritMinutes(rosterEntries, profile);
   const team = collectionActiveTeamSchema.parse({
     teamVersion: COLLECTION_TEAM_VERSION,
     starters: starters.map((card) => card.cardId),

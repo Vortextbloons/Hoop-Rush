@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { franchiseIdSchema } from './ids.ts';
-import { seasonCheckpointDigestSchema } from './season-digests.ts';
 import { seasonCompactInjuryEventSchema } from './season-health.ts';
 import { seasonCompactPlayerLineSchema, seasonTeamBoxSchema } from './season-game-summary.ts';
 import { conferenceIdSchema } from './season-league.ts';
@@ -12,7 +11,7 @@ import {
   type PlayoffRound,
 } from './season-postseason.ts';
 import { SEASON_POSTSEASON_SUMMARY_VERSION } from './season-versions.ts';
-import { canonicalJson, seasonDigestHex } from './season-hash.ts';
+import { canonicalJson, seasonCheckpointDigestSchema, seasonDigestHex } from './season-hash.ts';
 export const seasonPostseasonRotationEvidenceSchema = z.object({
   playersUsed: z.number().int().min(0).max(10),
   substitutions: z.number().int().min(0),

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { seedSchema } from './ids.ts';
-import { seasonCheckpointDigestSchema } from './season-digests.ts';
+import { seasonCheckpointDigestSchema } from './season-hash.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import { seasonFrontOfficeIdSchema } from './season-evolution.ts';
 import { seasonLeagueSchema } from './season-league.ts';

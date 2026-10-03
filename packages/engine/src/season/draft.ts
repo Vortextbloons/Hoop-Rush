@@ -151,6 +151,9 @@ function createDraft(command: SeasonDraftCommand, catalog: SeasonDraftCatalog): 
   }
   const league = leagueParse.data;
   const humanIds = payload.humanParticipantIds;
+  if (humanIds.length === 0) {
+    return reject('INVALID_CATALOG', 'human participant ids must include at least one participant');
+  }
   if (new Set(humanIds).size !== humanIds.length) {
     return reject('INVALID_CATALOG', 'human participant ids must be distinct');
   }

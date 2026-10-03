@@ -1,10 +1,9 @@
 import { z } from 'zod';
 import { franchiseIdSchema, idSchema } from './ids.ts';
-import { seasonCheckpointDigestSchema } from './season-digests.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import { seasonTradeOfferIdSchema } from './season-trade.ts';
 import { SEASON_TRADE_GRADE_VERSION } from './season-versions.ts';
-import { canonicalJson, seasonDigestHex } from './season-hash.ts';
+import { canonicalJson, seasonCheckpointDigestSchema, seasonDigestHex } from './season-hash.ts';
 export const seasonTradeGradeLabelSchema = z.enum(['A', 'B', 'C', 'D', 'F']);
 export type SeasonTradeGradeLabel = z.infer<typeof seasonTradeGradeLabelSchema>;
 export const seasonTradeGradeSchema = z.object({

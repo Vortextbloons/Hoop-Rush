@@ -1,6 +1,7 @@
-import { parentPort, workerData } from 'node:worker_threads';
+import { workerData } from 'node:worker_threads';
 import { loadCollectionCatalog } from './collection.ts';
 import { loadCollectionGameRules } from './collection-game.ts';
+import { postWorkerFacts } from '../calibration-harness.ts';
 import {
   projectCollectionGameJob,
   type CollectionGameProjectionJob,
@@ -13,8 +14,10 @@ function main(): void {
   };
   const { catalog } = loadCollectionCatalog(manifestPath);
   const { rules } = loadCollectionGameRules(manifestPath);
-  const projections = jobs.map((job) => projectCollectionGameJob(catalog, rules, job));
-  parentPort?.postMessage({ projections });
+  postWorkerFacts(
+    'projections',
+    jobs.map((job) => projectCollectionGameJob(catalog, rules, job)),
+  );
 }
 
 main();

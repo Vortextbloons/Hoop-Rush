@@ -1,5 +1,4 @@
-import { readFileSync } from 'node:fs';
-import { parentPort, workerData } from 'node:worker_threads';
+import { workerData } from 'node:worker_threads';
 import {
   checkSeasonGameResult,
   createSeasonEffectsState,
@@ -8,22 +7,23 @@ import {
 } from '@hoop-rush/engine';
 import { seasonGameSimulationInputSchema } from '@hoop-rush/data-contracts';
 import { seasonGameFixtureSchema } from '../fixture-schema.ts';
+import { postWorkerFacts, readWorkerFixture } from '../calibration-harness.ts';
 import { seasonGameCalibrationSeed } from './season-game.ts';
 import {
   simulateSeasonEffectsGameFacts,
   withFixtureStamina,
   type SeasonEffectsGameFacts,
 } from './season-effects.ts';
+
 interface SeasonEffectsWorkerInput {
   fixtureId: string;
   fixturePath: string;
   seedIndices: number[];
 }
+
 function main(): void {
   const { fixtureId, fixturePath, seedIndices } = workerData as SeasonEffectsWorkerInput;
-  const fixture = seasonGameFixtureSchema.parse(
-    JSON.parse(readFileSync(fixturePath, 'utf8')) as unknown,
-  );
+  const fixture = readWorkerFixture(fixturePath, seasonGameFixtureSchema);
   const facts: SeasonEffectsGameFacts[] = seedIndices.map((index) => {
     const seed = seasonGameCalibrationSeed(index);
     const input = seasonGameSimulationInputSchema.parse({
@@ -37,6 +37,6 @@ function main(): void {
       createSeasonEffectsState,
     });
   });
-  parentPort?.postMessage({ facts });
+  postWorkerFacts('facts', facts);
 }
 main();

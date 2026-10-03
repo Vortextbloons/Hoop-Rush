@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { SeasonLeague } from '@hoop-rush/data-contracts';
   import type { SeasonDraftGenerationProgress } from '$lib/season/season-draft-flow';
-  import { SIM_BAR_FILL_MS } from '$lib/components/season/live-sim-animation';
   let {
     progress = null,
     league = null,
@@ -77,7 +76,7 @@
         <div
           class="sim-bar-fill"
           data-active={phase !== 'done'}
-          style="width: {percent}%; transition: width {SIM_BAR_FILL_MS}ms linear"
+          style="width: {percent}%; transition: width 1800ms ease-out"
         ></div>
       </div>
     </div>
@@ -94,10 +93,12 @@
               class="mt-2 flex flex-wrap items-center gap-1.5"
               aria-label="{conf.label} teams lit"
             >
-              {#each conf.teams as team (team.franchiseId)}
+              {#each conf.teams as team, index (team.franchiseId)}
                 {@const isLit = lit(team.franchiseId, team.control)}
                 <span
                   title={team.franchiseId}
+                  data-lit={isLit}
+                  style:--reveal-delay={`${index * 85}ms`}
                   class="inline-block h-2.5 w-2.5 rounded-full {isLit
                     ? 'bg-primary'
                     : 'bg-border'} {team.control === 'human'
@@ -113,3 +114,30 @@
     <span class="sr-only" aria-live="polite">{stageLine} {percent}%</span>
   </div>
 </div>
+
+<style>
+  span[data-lit='true'] {
+    animation: team-ready 400ms ease-out var(--reveal-delay) both;
+  }
+  @keyframes team-ready {
+    from {
+      opacity: 0.25;
+      transform: scale(0.6);
+    }
+    65% {
+      transform: scale(1.35);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    span[data-lit='true'] {
+      animation: none;
+    }
+    .sim-bar-fill {
+      transition: none !important;
+    }
+  }
+</style>

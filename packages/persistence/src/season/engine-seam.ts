@@ -1,31 +1,26 @@
 import {
-  emptySeasonPlayerAggregate,
-  emptySeasonTeamAggregate,
   seasonEffectsStateSchema,
   type SeasonEffectsState,
-  type SeasonGameSummary,
-  type SeasonLeague,
   type SeasonPairChemistryState,
-  type SeasonPlayerAggregate,
   type SeasonRoster,
-  type SeasonRotation,
-  type SeasonTeamAggregate,
 } from '@hoop-rush/data-contracts';
 import {
   WINDOW_BLOCK_INDEX_TO_INDEX,
   createInitialSeasonInfluenceState,
-  foldSeasonPlayerAggregates,
-  foldSeasonTeamAggregates,
+  padSeasonPlayerAggregates,
+  padSeasonTeamAggregates,
   reconstructSeasonGames,
   reduceSeasonStandings,
+  seasonRosterPlayerVersionIds,
+  seasonRotationPlayerVersionIds,
   seasonRotationSetDigest,
   seasonRunStateDigest as engineSeasonRunStateDigest,
 } from '@hoop-rush/engine';
 import type { SeasonRunEngineSeam } from './engine-seam-types.ts';
 export const seasonRunEngineSeam: SeasonRunEngineSeam = {
   reconstructSeasonGames,
-  foldSeasonTeamAggregates: paddedTeamAggregates,
-  foldSeasonPlayerAggregates: paddedPlayerAggregates,
+  foldSeasonTeamAggregates: padSeasonTeamAggregates,
+  foldSeasonPlayerAggregates: padSeasonPlayerAggregates,
   reduceSeasonStandings,
   seasonRotationSetDigest,
   seasonRosterPlayerVersionIds,
@@ -37,42 +32,6 @@ export const seasonRunEngineSeam: SeasonRunEngineSeam = {
   createInitialSeasonInfluenceState,
   windowBlockIndexToIndex: WINDOW_BLOCK_INDEX_TO_INDEX,
 };
-function paddedTeamAggregates(
-  league: SeasonLeague,
-  summaries: readonly SeasonGameSummary[],
-): SeasonTeamAggregate[] {
-  const folded = foldSeasonTeamAggregates(summaries);
-  const byId = new Map(folded.map((row) => [row.franchiseId, row]));
-  return league.teams
-    .map((team) => byId.get(team.franchiseId) ?? emptySeasonTeamAggregate(team.franchiseId))
-    .sort((a, b) => (a.franchiseId < b.franchiseId ? -1 : 1));
-}
-function paddedPlayerAggregates(
-  rosters: readonly SeasonRoster[],
-  summaries: readonly SeasonGameSummary[],
-): SeasonPlayerAggregate[] {
-  const folded = foldSeasonPlayerAggregates(summaries);
-  const byId = new Map(folded.map((row) => [row.playerVersionId, row]));
-  return rosters
-    .flatMap((roster) =>
-      roster.players.map((player) => {
-        const row = byId.get(player.playerVersionId);
-        if (row !== undefined) return row;
-        return emptySeasonPlayerAggregate(player.playerVersionId, roster.franchiseId);
-      }),
-    )
-    .sort((a, b) => (a.playerVersionId < b.playerVersionId ? -1 : 1));
-}
-function seasonRosterPlayerVersionIds(rosters: readonly SeasonRoster[]): string[] {
-  return [
-    ...new Set(rosters.flatMap((roster) => roster.players.map((player) => player.playerVersionId))),
-  ].sort();
-}
-function seasonRotationPlayerVersionIds(rotations: readonly SeasonRotation[]): string[] {
-  return [
-    ...new Set(rotations.flatMap((rotation) => [...rotation.starters, ...rotation.benchOrder])),
-  ].sort();
-}
 function seasonPairKey(a: string, b: string): string {
   return a < b ? `${a}\u0000${b}` : `${b}\u0000${a}`;
 }

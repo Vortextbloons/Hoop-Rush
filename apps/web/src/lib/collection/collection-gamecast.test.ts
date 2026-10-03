@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CollectionGameEvent } from '@hoop-rush/data-contracts';
-import { clockLabel, eventLabel, visibleEvents } from './collection-gamecast';
+import { clockLabel, eventLabel, visibleEvents, quickCastEvents } from './collection-gamecast';
 import { courtPlay } from './collection-court';
 
 const scoreEvent: Extract<CollectionGameEvent, { kind: 'possession' }> = {
@@ -37,6 +37,32 @@ const scoreEvent: Extract<CollectionGameEvent, { kind: 'possession' }> = {
 };
 
 describe('recorded gamecast presentation', () => {
+  it('caps the opening cast, retains overtime and the exact final, and preserves the recording', () => {
+    const plays = Array.from({ length: 6 }, (_, index) => ({
+      ...scoreEvent,
+      period: index + 1,
+      eventOrder: index,
+      homeScore: 10 * (index + 1),
+    }));
+    const final: CollectionGameEvent = {
+      kind: 'final',
+      eventOrder: 6,
+      period: 6,
+      secondsRemaining: 0,
+      homeScore: 110,
+      awayScore: 108,
+      winner: 'home',
+    };
+    const recording = [...plays, final];
+    const cast = quickCastEvents(recording);
+    expect(cast).toHaveLength(5);
+    expect(cast.at(-1)).toBe(final);
+    expect(cast.at(-2)?.period).toBe(6);
+    expect(cast.map((event) => event.eventOrder)).toEqual([0, 1, 4, 5, 6]);
+    expect(recording).toHaveLength(7);
+    expect(quickCastEvents([final])).toEqual([final]);
+    expect(quickCastEvents([])).toEqual([]);
+  });
   it('uses recorded scoring and defensive facts for court callouts', () => {
     const scoringDelta = scoreEvent.statDeltas[0];
     if (!scoringDelta) throw new Error('Missing scoring fixture');

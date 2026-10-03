@@ -4,7 +4,7 @@ import type {
   CollectionRarity,
 } from '@hoop-rush/data-contracts';
 
-export const COLLECTION_SPECIALS_VERSION = 'collection-specials-v3';
+export const COLLECTION_SPECIALS_VERSION: string = 'collection-specials-v4';
 
 export type AuthoredSpecial = {
   family: Exclude<CollectionFamily, 'Base'>;
@@ -15,6 +15,97 @@ export type AuthoredSpecial = {
 >;
 
 export const COLLECTION_SPECIALS: readonly AuthoredSpecial[] = [
+  {
+    family: 'Arm Guard',
+    rarity: 'Immortal',
+    sourcePlayerVersionId: 'pv-f4d00dd58ebad5097f4e5ba3307a9085',
+    ratingOverlay: {
+      perimeterDefense: 30,
+      defensiveIq: 25,
+      steal: 16,
+      interiorDefense: 45,
+      block: 10,
+      defensiveRebound: 8,
+    },
+  },
+  {
+    family: 'Arm Guard',
+    rarity: 'Immortal',
+    sourcePlayerVersionId: 'pv-6e3acf70d16dfebc4a1d64226c0c2ee0',
+    ratingOverlay: {
+      perimeterDefense: 29,
+      defensiveIq: 29,
+      steal: 15,
+      interiorDefense: 36,
+      block: 17,
+      defensiveRebound: 17,
+    },
+  },
+  {
+    family: 'Arm Guard',
+    rarity: 'Immortal',
+    sourcePlayerVersionId: 'pv-3f5b52ec3a1798b0bad644defdb7c47c',
+    ratingOverlay: {
+      perimeterDefense: 34,
+      defensiveIq: 26,
+      steal: 25,
+      interiorDefense: 38,
+      block: 7,
+      defensiveRebound: 12,
+    },
+  },
+  {
+    family: 'Arm Guard',
+    rarity: 'Immortal',
+    sourcePlayerVersionId: 'pv-d6f09fada4f8f7c1d26258b3b045611d',
+    ratingOverlay: {
+      perimeterDefense: 25,
+      defensiveIq: 21,
+      steal: 12,
+      interiorDefense: 47,
+      block: 10,
+      defensiveRebound: 12,
+    },
+  },
+  {
+    family: 'Arm Guard',
+    rarity: 'Eclipse',
+    sourcePlayerVersionId: 'pv-e672c0d85044e49475d29e2691a16bc8',
+    ratingOverlay: {
+      perimeterDefense: 27,
+      defensiveIq: 20,
+      steal: 18,
+      interiorDefense: 40,
+      block: 10,
+      defensiveRebound: 14,
+    },
+  },
+  {
+    family: 'Arm Guard',
+    rarity: 'Titan',
+    sourcePlayerVersionId: 'pv-91b01c4775957fb343db81099c6d7d37',
+    ratingOverlay: {
+      perimeterDefense: 28,
+      defensiveIq: 20,
+      steal: 17,
+      interiorDefense: 37,
+      block: 9,
+      defensiveRebound: 15,
+    },
+  },
+  {
+    family: 'Arm Guard',
+    rarity: 'Immortal',
+    sourcePlayerVersionId: 'pv-4efd0118ae40c6f4ed7689ee95d6e728',
+    ratingOverlay: {
+      perimeterDefense: 25,
+      defensiveIq: 22,
+      steal: 19,
+      interiorDefense: 39,
+      block: 16,
+      defensiveRebound: 14,
+    },
+  },
   {
     family: 'Heat Check',
     rarity: 'Immortal',
@@ -54,6 +145,13 @@ export const COLLECTION_SPECIALS: readonly AuthoredSpecial[] = [
 ];
 
 export const COLLECTION_SPECIAL_SOURCE_SEASONS: Record<string, string> = {
+  'pv-f4d00dd58ebad5097f4e5ba3307a9085': 'Luka Dončić 2023-24',
+  'pv-6e3acf70d16dfebc4a1d64226c0c2ee0': 'Magic Johnson 1988-89',
+  'pv-3f5b52ec3a1798b0bad644defdb7c47c': 'Trae Young 2021-22',
+  'pv-d6f09fada4f8f7c1d26258b3b045611d': 'James Harden 2018-19',
+  'pv-e672c0d85044e49475d29e2691a16bc8': "D'Angelo Russell 2023-24",
+  'pv-91b01c4775957fb343db81099c6d7d37': 'Jordan Clarkson 2020-21',
+  'pv-4efd0118ae40c6f4ed7689ee95d6e728': 'Bogdan Bogdanović 2020-21',
   'pv-b1ea0fc379982caf201e5ecde1170853': 'Stephen Curry 2015-16',
   'pv-95878fdf2e3c464375ca2d492b1e8c2f': 'Klay Thompson 2014-15',
   'pv-e232bb54fc4d64987c28ee7280b2e544': 'Damian Lillard 2019-20',

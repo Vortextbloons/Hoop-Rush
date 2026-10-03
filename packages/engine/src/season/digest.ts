@@ -20,26 +20,21 @@ export interface SeasonGenerationDigestInput {
   aiPools: readonly SeasonAiPool[];
   diagnostics: SeasonGenerationDiagnostics;
 }
+import { sortedBy, sortedStrings } from './canonical.ts';
 function rosterCanonical(rosters: readonly SeasonRoster[]): unknown[] {
-  return [...rosters]
-    .sort((a, b) => (a.franchiseId < b.franchiseId ? -1 : 1))
-    .map((roster) => ({
-      franchiseId: roster.franchiseId,
-      players: roster.players.map((player) => player.playerVersionId).sort(),
-    }));
+  return sortedBy(rosters, (roster) => roster.franchiseId).map((roster) => ({
+    franchiseId: roster.franchiseId,
+    players: sortedStrings(roster.players.map((player) => player.playerVersionId)),
+  }));
 }
 function rotationCanonical(rotations: readonly SeasonRotation[]): unknown[] {
-  return [...rotations]
-    .sort((a, b) => (a.franchiseId < b.franchiseId ? -1 : 1))
-    .map((rotation) => ({
-      franchiseId: rotation.franchiseId,
-      starters: rotation.starters,
-      benchOrder: rotation.benchOrder,
-      targetMinutes: [...rotation.targetMinutes].sort((a, b) =>
-        a.playerVersionId < b.playerVersionId ? -1 : 1,
-      ),
-      closingFive: rotation.closingFive,
-    }));
+  return sortedBy(rotations, (rotation) => rotation.franchiseId).map((rotation) => ({
+    franchiseId: rotation.franchiseId,
+    starters: rotation.starters,
+    benchOrder: rotation.benchOrder,
+    targetMinutes: sortedBy(rotation.targetMinutes, (entry) => entry.playerVersionId),
+    closingFive: rotation.closingFive,
+  }));
 }
 function diagnosticsCanonical(diagnostics: SeasonGenerationDiagnostics): unknown {
   return {
@@ -51,21 +46,17 @@ function diagnosticsCanonical(diagnostics: SeasonGenerationDiagnostics): unknown
     backtracks: diagnostics.backtracks,
     nodesVisited: diagnostics.nodesVisited,
     nodeBudget: diagnostics.nodeBudget,
-    failedTeams: [...diagnostics.failedTeams].sort(),
-    unmetConstraints: [...diagnostics.unmetConstraints].sort(),
+    failedTeams: sortedStrings(diagnostics.failedTeams),
+    unmetConstraints: sortedStrings(diagnostics.unmetConstraints),
   };
 }
 function aiPoolsCanonical(pools: readonly SeasonAiPool[]): unknown[] {
-  return [...pools]
-    .sort((a, b) => (a.franchiseId < b.franchiseId ? -1 : 1))
-    .map((pool) => ({
+  return sortedBy(pools, (pool) => pool.franchiseId).map((pool) => ({
       franchiseId: pool.franchiseId,
       band: pool.band,
       identity: pool.identity,
-      playerVersionIds: [...pool.playerVersionIds].sort(),
-      anchors: [...pool.anchors]
-        .sort((a, b) => (a.playerVersionId < b.playerVersionId ? -1 : 1))
-        .map((anchor) => ({
+      playerVersionIds: sortedStrings(pool.playerVersionIds),
+      anchors: sortedBy(pool.anchors, (anchor) => anchor.playerVersionId).map((anchor) => ({
           playerVersionId: anchor.playerVersionId,
           qualifyingRole: anchor.qualifyingRole,
           percentileTier: anchor.percentileTier,
@@ -73,7 +64,7 @@ function aiPoolsCanonical(pools: readonly SeasonAiPool[]): unknown[] {
           percentileThreshold: anchor.percentileThreshold,
           seedPath: anchor.seedPath,
         })),
-      selections: [...pool.selections].sort(),
+      selections: sortedStrings(pool.selections),
       allocationSeedPaths: [...pool.allocationSeedPaths].sort((a, b) =>
         JSON.stringify(a) < JSON.stringify(b) ? -1 : 1,
       ),
@@ -88,13 +79,9 @@ export function seasonGenerationDigest(input: SeasonGenerationDigestInput): stri
     rotationVersion: input.rotationVersion,
     targetsVersion: input.targetsVersion,
     rosters: rosterCanonical(input.rosters),
-    ownership: [...input.ownership].sort((a, b) =>
-      a.playerVersionId < b.playerVersionId ? -1 : 1,
-    ),
+    ownership: sortedBy(input.ownership, (row) => row.playerVersionId),
     rotations: rotationCanonical(input.rotations),
-    aiAssignments: [...input.aiAssignments].sort((a, b) =>
-      a.franchiseId < b.franchiseId ? -1 : 1,
-    ),
+    aiAssignments: sortedBy(input.aiAssignments, (row) => row.franchiseId),
     aiPools: aiPoolsCanonical(input.aiPools),
     diagnostics: diagnosticsCanonical(input.diagnostics),
   });

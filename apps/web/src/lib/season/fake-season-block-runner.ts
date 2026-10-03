@@ -1,200 +1,103 @@
 import {
-  SEASON_AGGREGATES_VERSION,
-  SEASON_BLOCK_VERSION,
-  SEASON_CHALLENGE_CATALOG,
-  SEASON_CHALLENGE_TARGETS_VERSION,
-  SEASON_CHALLENGE_VERSION,
-  SEASON_CHECKPOINT_VERSION,
-  SEASON_CHEMISTRY_VERSION,
-  SEASON_EFFECT_TARGETS_VERSION,
-  SEASON_FREE_AGENCY_INDEX_VERSION,
-  SEASON_FREE_AGENCY_TARGETS_VERSION,
-  SEASON_FREE_AGENCY_VERSION,
-  SEASON_GAME_SUMMARY_VERSION,
-  SEASON_GAME_TARGETS_VERSION,
-  SEASON_GAME_VERSION,
-  SEASON_HEALTH_VERSION,
-  SEASON_HOME_COURT_VERSION,
-  SEASON_INFLUENCE_TARGETS_VERSION,
-  SEASON_INFLUENCE_VERSION,
-  SEASON_INJURY_TARGETS_VERSION,
-  SEASON_LEADERS_VERSION,
-  SEASON_LEAGUE_VERSION,
-  SEASON_OBJECTIVE_VERSION,
-  SEASON_RECAP_VERSION,
-  SEASON_SCHEDULE_FORMULA_VERSION,
-  SEASON_SCHEDULE_VERSION,
-  SEASON_SEED_DERIVATION_VERSION,
-  SEASON_STAMINA_VERSION,
-  SEASON_TRADE_TARGETS_VERSION,
-  SEASON_TRADE_VERSION,
-  blockIndexForRound,
+  SEASON_RUN_SCHEMA_VERSION,
   blockRoundRange,
-  commandIdSchema,
-  franchiseIdSchema,
-  idSchema,
-  seasonGameIdSchema,
-  seedSchema,
-  seasonDigestHex,
-  type SeasonBlockRecap,
+  loadEraSimulationProfile,
+  loadSeasonDraftCatalog,
+  type EraSimulationProfile,
   type SeasonCandidateCheckpoint,
-  type SeasonCheckpointState,
-  type SeasonCompactPlayerLine,
+  type SeasonChallengeDeal,
+  type SeasonDraftCatalog,
   type SeasonEffectsState,
-  type SeasonFreeAgencyState,
+  type SeasonFreeAgencyIndex,
   type SeasonGameSummary,
   type SeasonHealthState,
-  type SeasonInfluenceState,
   type SeasonInvalidRosterInterruption,
   type SeasonPendingBlockCandidate,
-  type SeasonPlayerAggregate,
+  type SeasonRetainedGameDetail,
+  type SeasonRosterTargets,
+  type SeasonSchedule,
   type SeasonScoreline,
-  type SeasonStandings,
-  type SeasonTeamAggregate,
-  type SeasonTransactionEntry,
 } from '@hoop-rush/data-contracts';
 import {
-  seasonRunEngineSeam,
-  type SeasonRunSnapshot,
-  type SeasonWindowOpenResult,
-} from '@hoop-rush/persistence';
-import { completeSeasonBlockCommit, type simulateSeasonBlock } from '@hoop-rush/engine';
-import { evaluateSeasonBlockChallenges } from '@hoop-rush/engine';
-import type { SeasonFreeAgencyIndex, SeasonRosterTargets } from '@hoop-rush/data-contracts';
-import { assembleCommittedSnapshot } from '$lib/season/season-block-runner';
-import type {
-  SeasonBlockResumeInput,
-  SeasonBlockRunner,
-  SeasonBlockStartInput,
-  SeasonRunnerEvent,
+  assembleSeasonBlockCandidate,
+  assembleSeasonPendingBlock,
+  auditSeasonBlock,
+  completeSeasonBlockCommit,
+  expandSeasonRunRosters,
+  rosterPlayerIdsOf,
+  seasonBlockGamesOf,
+  seasonBlockRejection,
+  simulateSeasonBlockGame,
+  type SeasonBlockSimulationInput,
+} from '@hoop-rush/engine';
+import type { SeasonRunRepository } from '@hoop-rush/persistence';
+import {
+  acceptWorkerResult,
+  assembleCommittedSnapshot,
+  challengesWithSuccess,
+  objectivesWithSuccess,
+  type SeasonBlockResumeInput,
+  type SeasonBlockRunner,
+  type SeasonBlockStartInput,
+  type SeasonRunnerEvent,
 } from '$lib/season/season-block-runner';
 import { getSeasonRunRepository } from '$lib/season/season-repo';
-import { gamesToLockForBlock } from '$lib/season/season-lock-preview';
-type EngineSimulateBlockOutput = ReturnType<typeof simulateSeasonBlock>;
-type EngineSimulateBlockInput = Parameters<typeof simulateSeasonBlock>[0];
-type EngineCommitOutput = ReturnType<typeof completeSeasonBlockCommit>;
-type EngineCommitInput = Parameters<typeof completeSeasonBlockCommit>[0];
-type FakeCommitOutput = Pick<
-  EngineCommitOutput,
-  | 'checkpointState'
-  | 'stateRevision'
-  | 'stateDigest'
-  | 'window'
-  | 'freeAgency'
-  | 'evolution'
-  | 'sponsors'
->;
-type _FakeSimulateInputParity = EngineSimulateBlockInput extends {
-  command: {
-    blockIndex: number;
+import { loadSeasonSchedule } from './season-assets';
+
+export interface FakeSeasonBlockRunnerDeps {
+  repository?: SeasonRunRepository;
+  schedule?: SeasonSchedule;
+  catalog?: SeasonDraftCatalog;
+  profile?: EraSimulationProfile;
+}
+
+const PROGRESS_BATCH_GAMES = 10;
+
+function scorelineOf(summary: SeasonGameSummary): SeasonScoreline {
+  return {
+    gameId: summary.gameId,
+    homeFranchiseId: summary.homeFranchiseId,
+    homeScore: summary.homeScore,
+    awayScore: summary.awayScore,
+    awayFranchiseId: summary.awayFranchiseId,
   };
 }
-  ? true
-  : never;
-type _FakeCommitInputParity = EngineCommitInput extends {
-  commandId: string;
-  candidate: EngineSimulateBlockOutput;
-}
-  ? true
-  : never;
-export const _fakeSimulateInputParity: _FakeSimulateInputParity = true;
-export const _fakeCommitInputParity: _FakeCommitInputParity = true;
-const PROGRESS_STEP_MS = 40;
-const GAMES_PER_STEP = 15;
-export const FAKE_SEASON_BLOCK_RUNNER_SOURCE = 'fake-season-block-runner' as const;
-export const FAKE_SEASON_BLOCK_CHECKPOINT_COMMITTABLE = false as const;
-export const FAKE_SEASON_BLOCK_NON_COMMITTABLE_REASON =
-  'fake-season-block-runner synthesizes scores, boxes, and ledgers without engine simulation; its checkpoints bypass digest/commit and must never be submitted to the real commit path.' as const;
-function deterministicPoints(gameId: string, base: number): number {
-  let hash = 0;
-  for (let i = 0; i < gameId.length; i += 1) {
-    hash = (hash * 31 + gameId.charCodeAt(i)) >>> 0;
-  }
-  return base + (hash % 41);
-}
-function deterministicScores(gameId: string): {
-  homeScore: number;
-  awayScore: number;
-} {
-  const homeScore = deterministicPoints(gameId, 100);
-  const awayScore = deterministicPoints(`${gameId}x`, 95);
-  return homeScore === awayScore
-    ? { homeScore, awayScore: awayScore + 1 }
-    : { homeScore, awayScore };
-}
-function fakeLiveFactsOf(
-  lines: readonly SeasonScoreline[],
-  humanFranchiseId: string | null,
-  orderByGameId: ReadonlyMap<string, number>,
-): {
-  humanResults: SeasonScoreline[];
-  humanRecord: { wins: number; losses: number };
-  leaguePulse: {
-    closest: SeasonScoreline | null;
-    blowout: SeasonScoreline | null;
-    highestScoring: SeasonScoreline | null;
-  };
-} {
+
+function progressFactsOf(summaries: readonly SeasonGameSummary[], humanFranchiseId: string | null) {
   const humanResults: SeasonScoreline[] = [];
   let wins = 0;
   let losses = 0;
   let closest: SeasonScoreline | null = null;
   let closestMargin = Number.POSITIVE_INFINITY;
-  let closestOrder = Number.POSITIVE_INFINITY;
-  let closestId = '';
   let blowout: SeasonScoreline | null = null;
   let blowoutMargin = -1;
-  let blowoutOrder = Number.POSITIVE_INFINITY;
-  let blowoutId = '';
-  let highest: SeasonScoreline | null = null;
+  let highestScoring: SeasonScoreline | null = null;
   let highestCombined = -1;
-  let highestOrder = Number.POSITIVE_INFINITY;
-  let highestId = '';
-  for (const line of lines) {
-    const margin = Math.abs(line.homeScore - line.awayScore);
-    const combined = line.homeScore + line.awayScore;
-    const order = orderByGameId.get(line.gameId) ?? Number.MAX_SAFE_INTEGER;
-    if (
-      closest === null ||
-      margin < closestMargin ||
-      (margin === closestMargin &&
-        (order < closestOrder || (order === closestOrder && line.gameId < closestId)))
-    ) {
+  for (const summary of summaries) {
+    const line = scorelineOf(summary);
+    const margin = Math.abs(summary.homeScore - summary.awayScore);
+    const combined = summary.homeScore + summary.awayScore;
+    if (margin < closestMargin) {
       closest = line;
       closestMargin = margin;
-      closestOrder = order;
-      closestId = line.gameId;
     }
-    if (
-      blowout === null ||
-      margin > blowoutMargin ||
-      (margin === blowoutMargin &&
-        (order < blowoutOrder || (order === blowoutOrder && line.gameId < blowoutId)))
-    ) {
+    if (margin > blowoutMargin) {
       blowout = line;
       blowoutMargin = margin;
-      blowoutOrder = order;
-      blowoutId = line.gameId;
     }
-    if (
-      highest === null ||
-      combined > highestCombined ||
-      (combined === highestCombined &&
-        (order < highestOrder || (order === highestOrder && line.gameId < highestId)))
-    ) {
-      highest = line;
+    if (combined > highestCombined) {
+      highestScoring = line;
       highestCombined = combined;
-      highestOrder = order;
-      highestId = line.gameId;
     }
     if (
       humanFranchiseId !== null &&
-      (line.homeFranchiseId === humanFranchiseId || line.awayFranchiseId === humanFranchiseId)
+      (summary.homeFranchiseId === humanFranchiseId || summary.awayFranchiseId === humanFranchiseId)
     ) {
       humanResults.push(line);
       const humanScore =
-        line.homeFranchiseId === humanFranchiseId ? line.homeScore : line.awayScore;
-      const oppScore = line.homeFranchiseId === humanFranchiseId ? line.awayScore : line.homeScore;
+        summary.homeFranchiseId === humanFranchiseId ? summary.homeScore : summary.awayScore;
+      const oppScore =
+        summary.homeFranchiseId === humanFranchiseId ? summary.awayScore : summary.homeScore;
       if (humanScore > oppScore) wins += 1;
       else losses += 1;
     }
@@ -202,198 +105,130 @@ function fakeLiveFactsOf(
   return {
     humanResults,
     humanRecord: { wins, losses },
-    leaguePulse: { closest, blowout, highestScoring: highest },
+    leaguePulse: { closest, blowout, highestScoring },
   };
 }
-function emptyLine(playerVersionId: string): SeasonCompactPlayerLine {
-  return {
-    playerVersionId,
-    seconds: 0,
-    points: 0,
-    fieldGoalsMade: 0,
-    fieldGoalsAttempted: 0,
-    threePointersMade: 0,
-    threePointersAttempted: 0,
-    freeThrowsMade: 0,
-    freeThrowsAttempted: 0,
-    offensiveRebounds: 0,
-    defensiveRebounds: 0,
-    assists: 0,
-    steals: 0,
-    blocks: 0,
-    turnovers: 0,
-    fouls: 0,
-  };
-}
-function emptyEffectsState(): SeasonEffectsState {
-  return {
-    schemaVersion: 2,
-    playerStates: [],
-    inactivePlayerStates: [],
-    pairStates: [],
-    archivedPairs: [],
-  };
-}
-function freeAgencyEvidenceOf(input: {
-  blockIndex: number;
-  humanFranchiseId: string | null;
-  freeAgency: SeasonFreeAgencyState;
-}): SeasonBlockRecap['freeAgencyEvidence'] {
-  const freeAgency = input.freeAgency;
-  const resolvedWindow = freeAgency.windows.find(
-    (window) => window.blockIndex === input.blockIndex && window.status === 'resolved',
-  );
-  const parsedHuman =
-    input.humanFranchiseId === null ? null : franchiseIdSchema.parse(input.humanFranchiseId);
-  const humanDelta = parsedHuman === null ? 0 : (freeAgency.seasonSpend[parsedHuman] ?? 0);
-  return {
-    windowIndex: resolvedWindow?.windowIndex ?? null,
-    signings: (resolvedWindow?.signings ?? []).map((signing) => ({
-      franchiseId: signing.franchiseId,
-      playerVersionId: signing.playerVersionId,
-      band: signing.band,
-      influenceCost: signing.influenceCost,
-    })),
-    influenceDelta: -humanDelta,
-    seasonSignings: parsedHuman === null ? 0 : (freeAgency.signingCounts[parsedHuman] ?? 0),
-    seasonSpend: humanDelta,
-  };
-}
-declare global {
-  interface Window {
-    __HOOP_RUSH_E2E_STALL_ONCE__?: boolean;
-    __HOOP_RUSH_E2E_INTERRUPT_ONCE__?: boolean;
-  }
-}
-interface FakeM25CommitInput {
-  health: SeasonHealthState;
-  evolution?: import('@hoop-rush/data-contracts').SeasonEvolutionState | null;
-  sponsors?: import('@hoop-rush/data-contracts').SeasonSponsorGearState | null;
-  transactions: SeasonTransactionEntry[];
-  influence: SeasonInfluenceState;
-  freeAgency: SeasonFreeAgencyState;
-  checkpointState: SeasonCheckpointState;
-  stateRevision: number;
-  stateDigest: string;
-  window: SeasonWindowOpenResult | null;
-}
+
 export class FakeSeasonBlockRunner implements SeasonBlockRunner {
   private readonly listeners = new Set<(event: SeasonRunnerEvent) => void>();
-  private timers = new Set<ReturnType<typeof setTimeout>>();
-  private cancelled = false;
+  private readonly timers = new Set<ReturnType<typeof setTimeout>>();
+  private cancelled: boolean = false;
   private currentBlockIndex: number | null = null;
-  private stallingRequestId: string | null = null;
-  private lastStartInput: SeasonBlockStartInput | null = null;
+
+  constructor(private readonly deps: FakeSeasonBlockRunnerDeps = {}) {}
+
   startBlock(input: SeasonBlockStartInput): string {
     const requestId = `fake-${input.commandId}`;
     this.cancelled = false;
     this.currentBlockIndex = input.blockIndex;
-    this.lastStartInput = input;
     this.emit({ type: 'started', requestId, blockIndex: input.blockIndex });
-    if (typeof window !== 'undefined' && window.__HOOP_RUSH_E2E_STALL_ONCE__) {
-      window.__HOOP_RUSH_E2E_STALL_ONCE__ = false;
-      this.stallingRequestId = requestId;
-      this.emit({
-        type: 'progress',
-        requestId,
-        blockIndex: input.blockIndex,
-        gamesCompleted: 0,
-        gamesTotal: 150,
-        latestGameId: null,
-        latestResult: null,
-        isHumanGame: false,
-        humanRecordInBlock: { wins: 0, losses: 0 },
-        humanResults: [],
-        leaguePulse: { closest: null, blowout: null, highestScoring: null },
-      });
-      return requestId;
-    }
-    if (typeof window !== 'undefined' && window.__HOOP_RUSH_E2E_INTERRUPT_ONCE__) {
-      window.__HOOP_RUSH_E2E_INTERRUPT_ONCE__ = false;
-      void this.interrupt(requestId, input);
-      return requestId;
-    }
-    const { fromRound, toRound } = blockRoundRange(input.blockIndex);
-    const blockGames = input.run.games
-      .filter((game) => game.round >= fromRound && game.round <= toRound)
-      .sort((a, b) => (a.gameId < b.gameId ? -1 : 1));
-    const gamesTotal = blockGames.length;
-    const orderByGameId = new Map(blockGames.map((game, index) => [game.gameId, index]));
-    let completed = 0;
-    const tick = () => {
-      if (this.cancelled) return;
-      try {
-        const done = Math.min(completed + GAMES_PER_STEP, gamesTotal);
-        const slice = blockGames.slice(0, done);
-        const lines = slice.map((game) =>
-          this.scorelineFor(game.gameId, game.homeFranchiseId, game.awayFranchiseId),
-        );
-        const facts = fakeLiveFactsOf(lines, input.humanFranchiseId, orderByGameId);
-        const latest = blockGames[done - 1];
-        const latestResult = latest
-          ? this.scorelineFor(latest.gameId, latest.homeFranchiseId, latest.awayFranchiseId)
-          : null;
-        const isHumanGame =
-          latest !== undefined &&
-          input.humanFranchiseId !== null &&
-          (latest.homeFranchiseId === input.humanFranchiseId ||
-            latest.awayFranchiseId === input.humanFranchiseId);
-        completed = done;
-        this.emit({
-          type: 'progress',
-          requestId,
-          blockIndex: input.blockIndex,
-          gamesCompleted: completed,
-          gamesTotal,
-          latestGameId: latest?.gameId ?? null,
-          latestResult,
-          isHumanGame,
-          humanRecordInBlock: facts.humanRecord,
-          humanResults: facts.humanResults,
-          leaguePulse: facts.leaguePulse,
-        });
-        if (completed >= gamesTotal) {
-          void this.complete(input, requestId);
-        } else {
-          this.timers.add(setTimeout(tick, PROGRESS_STEP_MS));
-        }
-      } catch (error) {
-        this.emit({
-          type: 'error',
-          requestId,
-          blockIndex: input.blockIndex,
-          code: 'internal',
-          message: error instanceof Error ? error.message : String(error),
-          seed: input.run.rootSeed,
-          gameId: null,
-        });
-      }
-    };
-    this.timers.add(setTimeout(tick, PROGRESS_STEP_MS));
+    void this.execute(requestId, input, null);
     return requestId;
   }
+
   resumeBlock(input: SeasonBlockResumeInput): string {
     const requestId = `fake-resume-${input.commandId}`;
     this.cancelled = false;
     this.currentBlockIndex = input.blockIndex;
-    void (async () => {
-      try {
-        const repo = await getSeasonRunRepository();
-        const pending = await repo.loadPendingBlock(input.runId);
-        if (pending === null) throw new Error('no pending block to resume');
-        if (pending.blockIndex !== input.blockIndex) throw new Error('pending block mismatch');
-        if (pending.expectedRevision !== input.expectedRevision) {
-          throw new Error('pending expectedRevision mismatch');
-        }
-        if (pending.rotationDigest !== input.rotationDigest) {
-          throw new Error('pending rotation digest mismatch');
-        }
-        const snapshot = await repo.loadActiveRun();
-        const run = snapshot?.run ?? this.lastStartInput?.run;
-        if (run === undefined) throw new Error('no active run to resume');
-        const startInput: SeasonBlockStartInput = {
-          run,
-          effects: snapshot?.effects ?? this.lastStartInput?.effects ?? emptyEffectsState(),
+    this.emit({ type: 'started', requestId, blockIndex: input.blockIndex });
+    void this.executeResume(requestId, input);
+    return requestId;
+  }
+
+  cancel(requestId: string): void {
+    this.cancelled = true;
+    for (const timer of this.timers) clearTimeout(timer);
+    this.timers.clear();
+    this.emit({ type: 'cancelled', requestId, blockIndex: this.currentBlockIndex ?? 0 });
+  }
+
+  terminate(): void {
+    this.cancelled = true;
+    for (const timer of this.timers) clearTimeout(timer);
+    this.timers.clear();
+    this.listeners.clear();
+  }
+
+  prewarm(): void {}
+
+  subscribe(listener: (event: SeasonRunnerEvent) => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  private emit(event: SeasonRunnerEvent): void {
+    for (const listener of [...this.listeners]) listener(event);
+  }
+
+  private isCancelled(): boolean {
+    return this.cancelled;
+  }
+
+  private delay(): Promise<void> {
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        this.timers.delete(timer);
+        resolve();
+      }, 0);
+      this.timers.add(timer);
+    });
+  }
+
+  private fail(
+    requestId: string,
+    blockIndex: number,
+    code: 'invariant-failure' | 'internal',
+    message: string,
+    seed: string | null,
+  ): void {
+    if (this.isCancelled()) return;
+    this.emit({ type: 'error', requestId, blockIndex, code, message, seed, gameId: null });
+  }
+
+  private async resolveAssets(input: SeasonBlockStartInput): Promise<{
+    repository: SeasonRunRepository;
+    schedule: SeasonSchedule;
+    catalog: SeasonDraftCatalog;
+    profile: EraSimulationProfile;
+  }> {
+    const repository: SeasonRunRepository =
+      this.deps.repository ?? (await getSeasonRunRepository());
+    let schedule = this.deps.schedule;
+    if (schedule === undefined) {
+      schedule = await loadSeasonSchedule();
+    }
+    let catalog = this.deps.catalog;
+    if (catalog === undefined) {
+      catalog = await loadSeasonDraftCatalog(input.catalogUrl, input.catalogHash);
+    }
+    let profile = this.deps.profile;
+    if (profile === undefined) {
+      profile = await loadEraSimulationProfile(input.profileUrl, input.profileHash);
+    }
+    return { repository, schedule, catalog, profile };
+  }
+
+  private async executeResume(requestId: string, input: SeasonBlockResumeInput): Promise<void> {
+    try {
+      const repository = this.deps.repository ?? (await getSeasonRunRepository());
+      if (this.isCancelled()) return;
+      const pending = await repository.loadPendingBlock(input.runId);
+      if (pending === null) throw new Error('no pending block to resume');
+      if (pending.blockIndex !== input.blockIndex) throw new Error('pending block mismatch');
+      if (pending.expectedRevision !== input.expectedRevision) {
+        throw new Error('pending expectedRevision mismatch');
+      }
+      if (pending.rotationDigest !== input.rotationDigest) {
+        throw new Error('pending rotation digest mismatch');
+      }
+      const snapshot = await repository.loadActiveRun();
+      if (this.isCancelled()) return;
+      if (snapshot === null) throw new Error('no active season run to resume');
+      await this.execute(
+        requestId,
+        {
+          run: snapshot.run,
+          effects: snapshot.effects,
           rotations: input.rotations,
           blockIndex: input.blockIndex,
           expectedRevision: input.expectedRevision,
@@ -402,872 +237,384 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
           humanFranchiseId: input.humanFranchiseId,
           objectiveId: pending.objectiveId ?? null,
           challengeDeal: pending.challengeDeal ?? null,
+          campaignOpportunityId:
+            (pending as unknown as { campaignOpportunityId?: string | null })
+              .campaignOpportunityId ?? null,
           homeCourt: input.homeCourt,
           catalogUrl: input.catalogUrl,
           catalogHash: input.catalogHash,
           profileUrl: input.profileUrl,
           profileHash: input.profileHash,
-        };
-        this.lastStartInput = startInput;
-        this.emit({ type: 'started', requestId, blockIndex: input.blockIndex });
-        const { fromRound, toRound } = blockRoundRange(input.blockIndex);
-        const blockGames = run.games
-          .filter((game) => game.round >= fromRound && game.round <= toRound)
-          .sort((a, b) => (a.gameId < b.gameId ? -1 : 1));
-        const remaining = blockGames.filter((game) => game.gameId >= pending.nextGameId);
-        const newSummaries = remaining.map((game) =>
-          this.summaryFor(
-            startInput,
-            game.gameId,
-            game.round,
-            game.homeFranchiseId,
-            game.awayFranchiseId,
-          ),
-        );
-        const summaries = [...pending.summaries, ...newSummaries];
-        const checkpoint = await this.buildCheckpoint(
-          startInput,
-          summaries,
-          pending.health,
-          pending.effects,
-        );
-        if (this.cancelled) return;
-        const freeAgencyAssets = await this.freeAgencyAssetsOf(startInput);
-        const committed = this.committedFacts(
-          startInput,
-          checkpoint,
-          pending.commandId,
-          freeAgencyAssets,
-        );
-        const prior = await loadCurrentSnapshot(this.scheduleOf(startInput)).catch(() => null);
-        if (this.isCancelled()) return;
-        await this.commitCheckpoint(startInput, pending.commandId, checkpoint, {
-          health: pending.health,
-          influence: checkpoint.influence,
-          transactions: checkpoint.transactions,
-          freeAgency: committed.freeAgency,
-          checkpointState: committed.checkpointState,
-          stateRevision: committed.stateRevision,
-          stateDigest: committed.stateDigest,
-          window: committed.window,
-          evolution: committed.evolution,
-          sponsors: committed.sponsors,
-        });
-        if (this.isCancelled()) return;
-        const committedView = this.committedSnapshot(
-          startInput,
-          checkpoint,
-          pending.commandId,
-          committed,
-          prior,
-        );
-        this.emit({ type: 'complete', requestId, checkpoint, snapshot: committedView });
-      } catch (error) {
-        if (this.isCancelled()) return;
-        this.emit({
-          type: 'error',
-          requestId,
-          blockIndex: input.blockIndex,
-          code: 'internal',
-          message: error instanceof Error ? error.message : String(error),
-          seed: null,
-          gameId: null,
-        });
-      }
-    })();
-    return requestId;
-  }
-  cancel(requestId: string): void {
-    this.cancelled = true;
-    for (const timer of this.timers) clearTimeout(timer);
-    this.timers.clear();
-    this.emit({ type: 'cancelled', requestId, blockIndex: this.currentBlockIndex ?? 0 });
-  }
-  terminate(): void {
-    this.cancelled = true;
-    for (const timer of this.timers) clearTimeout(timer);
-    this.timers.clear();
-    this.listeners.clear();
-  }
-  prewarm(): void {}
-  subscribe(listener: (event: SeasonRunnerEvent) => void): () => void {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  }
-  private emit(event: SeasonRunnerEvent): void {
-    for (const listener of this.listeners) listener(event);
-  }
-  private isCancelled(): boolean {
-    return this.cancelled;
-  }
-  private async interrupt(requestId: string, input: SeasonBlockStartInput): Promise<void> {
-    const pending = await this.buildPending(input);
-    const repo = await getSeasonRunRepository();
-    const humanRotation =
-      input.rotations.find((rotation) => rotation.franchiseId === input.humanFranchiseId) ?? null;
-    if (input.humanFranchiseId === null) {
-      throw new Error('invalid-roster interruption without a human franchise');
+        },
+        pending,
+      );
+    } catch (error) {
+      this.fail(
+        requestId,
+        input.blockIndex,
+        'internal',
+        error instanceof Error ? error.message : String(error),
+        null,
+      );
     }
-    const interruption: SeasonInvalidRosterInterruption = {
-      code: 'invalid-roster',
-      runId: input.run.runId,
-      blockIndex: input.blockIndex,
-      commandId: pending.commandId,
-      nextGameId: pending.nextGameId,
-      humanFranchiseId: franchiseIdSchema.parse(input.humanFranchiseId),
-      unavailablePlayerVersionIds: [...(humanRotation?.starters ?? [])],
+  }
+
+  private simulationInput(
+    start: SeasonBlockStartInput,
+    pending: SeasonPendingBlockCandidate | null,
+    schedule: SeasonSchedule,
+    catalog: SeasonDraftCatalog,
+    profile: EraSimulationProfile,
+    priorSummaries: readonly SeasonGameSummary[],
+    effects: SeasonEffectsState,
+    health: SeasonHealthState,
+  ): SeasonBlockSimulationInput {
+    const run = { ...start.run, rotations: start.rotations };
+    const deal: SeasonChallengeDeal | null = start.challengeDeal ?? pending?.challengeDeal ?? null;
+    return {
+      command: {
+        schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+        blockVersion: run.versions.blockVersion,
+        command: 'submit-season-block',
+        commandId: start.commandId,
+        runId: run.runId,
+        expectedRevision: start.expectedRevision,
+        blockIndex: start.blockIndex,
+        rotationDigest: start.rotationDigest,
+        objectiveId: start.objectiveId ?? null,
+        ...(deal !== null ? { challengeIds: [...deal.challengeIds] } : {}),
+        campaignOpportunityId: start.campaignOpportunityId ?? null,
+        expectedStateRevision: run.stateRevision,
+        expectedStateDigest: run.stateDigest,
+      },
+      run,
+      expanded: expandSeasonRunRosters(run, catalog),
+      schedule,
+      catalog,
+      profile,
+      humanFranchiseId: start.humanFranchiseId,
+      rosterPlayerIds: rosterPlayerIdsOf(run),
+      priorSummaries: [...priorSummaries],
+      effects,
+      health,
+      objectiveId: start.objectiveId ?? null,
+      ...(deal !== null
+        ? {
+            challengeDeal: deal,
+            objectives: (
+              run as unknown as {
+                objectives?: SeasonBlockSimulationInput['objectives'];
+              }
+            ).objectives,
+          }
+        : {}),
+      campaignState: (
+        run as unknown as {
+          campaign?: SeasonBlockSimulationInput['campaignState'];
+        }
+      ).campaign,
+      influence: run.influence,
+      transactions: run.transactions,
     };
-    await repo.savePendingBlock(pending, interruption);
+  }
+
+  private async execute(
+    requestId: string,
+    start: SeasonBlockStartInput,
+    pending: SeasonPendingBlockCandidate | null,
+  ): Promise<void> {
+    const seed = start.run.rootSeed;
+    try {
+      const { repository, schedule, catalog, profile } = await this.resolveAssets(start);
+      if (this.isCancelled()) return;
+      const snapshot = await repository.loadActiveRun().catch(() => null);
+      if (this.isCancelled()) return;
+      const priorSummaries = snapshot?.summaries ?? [];
+      const priorAcceptedBlocks = snapshot?.acceptedBlocks ?? [];
+      const priorRetainedDetails = snapshot?.retainedDetails ?? [];
+      const simInput = this.simulationInput(
+        start,
+        pending,
+        schedule,
+        catalog,
+        profile,
+        priorSummaries,
+        pending?.effects ?? start.effects,
+        pending?.health ?? start.run.health,
+      );
+      const rejection = seasonBlockRejection(simInput);
+      if (rejection !== null) {
+        throw new Error(`block submission rejected by the engine: ${rejection.code}`);
+      }
+      const games = seasonBlockGamesOf(schedule, start.blockIndex);
+      const startIndex =
+        pending === null ? 0 : games.findIndex((game) => game.gameId === pending.nextGameId);
+      if (startIndex < 0) {
+        throw new Error(
+          `startGameId ${String(pending?.nextGameId)} is not a game of block ${String(start.blockIndex)}`,
+        );
+      }
+      const { fromRound } = blockRoundRange(start.blockIndex);
+      let previousRound =
+        startIndex > 0 ? (games[startIndex - 1]?.round ?? fromRound) : fromRound - 1;
+      let effects = simInput.effects;
+      let health = simInput.health;
+      const summaries: SeasonGameSummary[] = [...(pending?.summaries ?? [])];
+      const retainedDetails: SeasonRetainedGameDetail[] = [...(pending?.retainedDetails ?? [])];
+      for (let index = startIndex; index < games.length; index += PROGRESS_BATCH_GAMES) {
+        if (this.isCancelled()) return;
+        const end = Math.min(index + PROGRESS_BATCH_GAMES, games.length);
+        for (let gameIndex = index; gameIndex < end; gameIndex += 1) {
+          const game = games[gameIndex];
+          if (game === undefined) continue;
+          const outcome = simulateSeasonBlockGame({
+            input: simInput,
+            game,
+            effects,
+            health,
+            options: {
+              skipRecoveryTick: !(previousRound !== 0 && game.round > previousRound),
+            },
+          });
+          if ('interruption' in outcome) {
+            await this.persistInterruption(
+              requestId,
+              start,
+              simInput,
+              { ...outcome.interruption },
+              summaries,
+              retainedDetails,
+              effects,
+              health,
+              repository,
+            );
+            return;
+          }
+          effects = outcome.effects;
+          health = outcome.health;
+          previousRound = game.round;
+          summaries.push(outcome.summary);
+          if (outcome.retainedDetail !== null) retainedDetails.push(outcome.retainedDetail);
+        }
+        const latest = summaries[summaries.length - 1] ?? null;
+        const facts = progressFactsOf(summaries, start.humanFranchiseId);
+        this.emit({
+          type: 'progress',
+          requestId,
+          blockIndex: start.blockIndex,
+          gamesCompleted: summaries.length,
+          gamesTotal: games.length,
+          latestGameId: latest?.gameId ?? null,
+          latestResult: latest !== null ? scorelineOf(latest) : null,
+          isHumanGame:
+            latest !== null &&
+            start.humanFranchiseId !== null &&
+            (latest.homeFranchiseId === start.humanFranchiseId ||
+              latest.awayFranchiseId === start.humanFranchiseId),
+          humanRecordInBlock: facts.humanRecord,
+          humanResults: facts.humanResults,
+          leaguePulse: facts.leaguePulse,
+        });
+        await this.delay();
+      }
+      if (this.isCancelled()) return;
+      const candidate = assembleSeasonBlockCandidate({
+        input: simInput,
+        summaries,
+        retainedDetails,
+        effects,
+        health,
+      });
+      const auditFailures = auditSeasonBlock(candidate, simInput);
+      if (auditFailures.length > 0) {
+        this.fail(requestId, start.blockIndex, 'invariant-failure', auditFailures.join('; '), seed);
+        return;
+      }
+      const gateFailures = acceptWorkerResult(candidate, {
+        runId: start.run.runId,
+        blockIndex: start.blockIndex,
+        revision: start.expectedRevision,
+        rotationDigest: start.rotationDigest,
+        expectedStateRevision: start.run.stateRevision,
+        expectedStateDigest: start.run.stateDigest,
+      });
+      if (gateFailures.length > 0) {
+        this.fail(requestId, start.blockIndex, 'invariant-failure', gateFailures.join('; '), seed);
+        return;
+      }
+      await this.commitCandidate(
+        requestId,
+        start,
+        simInput,
+        candidate,
+        { schedule, catalog, profile },
+        { priorSummaries, priorAcceptedBlocks, priorRetainedDetails },
+        repository,
+      );
+    } catch (error) {
+      this.fail(
+        requestId,
+        start.blockIndex,
+        'internal',
+        error instanceof Error ? error.message : String(error),
+        seed,
+      );
+    }
+  }
+
+  private async persistInterruption(
+    requestId: string,
+    start: SeasonBlockStartInput,
+    simInput: SeasonBlockSimulationInput,
+    interruption: SeasonInvalidRosterInterruption,
+    summaries: readonly SeasonGameSummary[],
+    retainedDetails: readonly SeasonRetainedGameDetail[],
+    effects: SeasonEffectsState,
+    health: SeasonHealthState,
+    repository: SeasonRunRepository,
+  ): Promise<void> {
+    const pending = assembleSeasonPendingBlock({
+      run: simInput.run,
+      commandId: simInput.command.commandId,
+      blockIndex: start.blockIndex,
+      expectedRevision: start.expectedRevision,
+      expectedStateRevision: start.run.stateRevision,
+      expectedStateDigest: start.run.stateDigest,
+      objectiveId: start.objectiveId ?? null,
+      challengeDeal: simInput.challengeDeal ?? null,
+      challengeIds: simInput.command.challengeIds,
+      campaignOpportunityId: simInput.command.campaignOpportunityId ?? null,
+      nextGameId: interruption.nextGameId,
+      summaries,
+      retainedDetails,
+      effects,
+      health,
+      rotationDigest: start.rotationDigest,
+    });
+    await repository.savePendingBlock(pending, interruption);
+    if (this.isCancelled()) return;
     this.emit({
       type: 'interrupted',
       requestId,
-      runId: input.run.runId,
-      blockIndex: input.blockIndex,
+      runId: pending.runId,
+      blockIndex: pending.blockIndex,
       pending,
       interruption,
     });
   }
-  private async buildPending(input: SeasonBlockStartInput): Promise<SeasonPendingBlockCandidate> {
-    const { fromRound, toRound } = blockRoundRange(input.blockIndex);
-    const blockGames = input.run.games
-      .filter((game) => game.round >= fromRound && game.round <= toRound)
-      .sort((a, b) => (a.gameId < b.gameId ? -1 : 1));
-    const nextHumanGame =
-      blockGames.find(
-        (game) =>
-          game.homeFranchiseId === input.humanFranchiseId ||
-          game.awayFranchiseId === input.humanFranchiseId,
-      ) ?? blockGames[0];
-    const schedule = this.scheduleOf(input);
-    const current = await loadCurrentSnapshot(schedule);
-    const allSummaries = current?.summaries ?? [];
-    const played = seasonRunEngineSeam
-      .reconstructSeasonGames(schedule, allSummaries)
-      .filter((game) => game.status !== 'scheduled');
-    return {
-      schemaVersion: 1,
-      blockVersion: SEASON_BLOCK_VERSION,
-      runId: input.run.runId,
-      commandId: input.commandId,
-      blockIndex: input.blockIndex,
-      expectedRevision: input.expectedRevision,
-      expectedStateRevision: input.run.stateRevision,
-      expectedStateDigest: input.run.stateDigest,
-      objectiveId: null,
-      challengeDeal: input.challengeDeal ?? null,
-      nextGameId: nextHumanGame?.gameId ?? seasonGameIdSchema.parse('s000001'),
-      summaries: [],
-      retainedDetails: [],
-      effects: seasonRunEngineSeam.zeroSeasonEffectsState(input.run.rosters),
-      health: this.interruptionHealthFor(input),
-      standings: seasonRunEngineSeam.reduceSeasonStandings(input.run.league, played),
-      teamAggregates: seasonRunEngineSeam.foldSeasonTeamAggregates(input.run.league, allSummaries),
-      playerAggregates: seasonRunEngineSeam.foldSeasonPlayerAggregates(
-        input.run.rosters,
-        allSummaries,
-      ),
-      rotationDigest: input.rotationDigest,
+
+  private async commitCandidate(
+    requestId: string,
+    start: SeasonBlockStartInput,
+    simInput: SeasonBlockSimulationInput,
+    candidate: SeasonCandidateCheckpoint,
+    assets: {
+      schedule: SeasonSchedule;
+      catalog: SeasonDraftCatalog;
+      profile: EraSimulationProfile;
+    },
+    priors: {
+      priorSummaries: SeasonGameSummary[];
+      priorAcceptedBlocks: import('@hoop-rush/data-contracts').SeasonAcceptedBlock[];
+      priorRetainedDetails: SeasonRetainedGameDetail[];
+    },
+    repository: SeasonRunRepository,
+  ): Promise<void> {
+    const authoritative: SeasonCandidateCheckpoint = {
+      ...candidate,
+      freeAgency: start.run.freeAgency,
     };
-  }
-  private scorelineFor(
-    gameId: string,
-    homeFranchiseId: string,
-    awayFranchiseId: string,
-  ): SeasonScoreline {
-    const { homeScore, awayScore } = deterministicScores(gameId);
-    return {
-      gameId: seasonGameIdSchema.parse(gameId),
-      homeFranchiseId: franchiseIdSchema.parse(homeFranchiseId),
-      homeScore,
-      awayScore,
-      awayFranchiseId: franchiseIdSchema.parse(awayFranchiseId),
-    };
-  }
-  private summaryFor(
-    input: SeasonBlockStartInput,
-    gameId: string,
-    round: number,
-    homeFranchiseId: string,
-    awayFranchiseId: string,
-  ): SeasonGameSummary {
-    const { homeScore, awayScore } = deterministicScores(gameId);
-    const parsedGameId = seasonGameIdSchema.parse(gameId);
-    const parsedHome = franchiseIdSchema.parse(homeFranchiseId);
-    const parsedAway = franchiseIdSchema.parse(awayFranchiseId);
-    const homeRoster =
-      input.run.rosters.find((roster) => roster.franchiseId === homeFranchiseId)?.players ?? [];
-    const awayRoster =
-      input.run.rosters.find((roster) => roster.franchiseId === awayFranchiseId)?.players ?? [];
-    const lines = (roster: typeof homeRoster, score: number): SeasonCompactPlayerLine[] => {
-      const ten = roster.slice(0, 10).map((entry) => entry.playerVersionId);
-      const withPoints = ten.map((playerVersionId, index) => {
-        const line = emptyLine(playerVersionId);
-        line.seconds = 20 * 60 + index * 45;
-        line.points = index === 0 ? score - 20 : 8 + ((index * 5 + score) % 14);
-        return line;
-      });
-      return withPoints;
-    };
-    return {
-      schemaVersion: 1,
-      summaryVersion: SEASON_GAME_SUMMARY_VERSION,
-      gameId: parsedGameId,
-      round,
-      homeFranchiseId: parsedHome,
-      awayFranchiseId: parsedAway,
-      status: 'final',
-      overtimePeriods: 0,
-      homeScore,
-      awayScore,
-      forfeitLoserFranchiseId: null,
-      homeBox: {
-        franchiseId: parsedHome,
-        points: homeScore,
-        fieldGoalsMade: 40,
-        fieldGoalsAttempted: 88,
-        threePointersMade: 10,
-        threePointersAttempted: 30,
-        freeThrowsMade: 20,
-        freeThrowsAttempted: 26,
-        offensiveRebounds: 10,
-        defensiveRebounds: 30,
-        assists: 24,
-        steals: 7,
-        blocks: 5,
-        turnovers: 13,
-        fouls: 19,
-        possessions: 96,
-      },
-      awayBox: {
-        franchiseId: parsedAway,
-        points: awayScore,
-        fieldGoalsMade: 38,
-        fieldGoalsAttempted: 86,
-        threePointersMade: 9,
-        threePointersAttempted: 28,
-        freeThrowsMade: 19,
-        freeThrowsAttempted: 25,
-        offensiveRebounds: 9,
-        defensiveRebounds: 29,
-        assists: 22,
-        steals: 8,
-        blocks: 4,
-        turnovers: 15,
-        fouls: 21,
-        possessions: 94,
-      },
-      homePlayers: lines(homeRoster, homeScore),
-      awayPlayers: lines(awayRoster, awayScore),
-      injuryEvents: [],
-    };
-  }
-  private async complete(input: SeasonBlockStartInput, requestId: string): Promise<void> {
-    if (this.cancelled) return;
-    const { fromRound, toRound } = blockRoundRange(input.blockIndex);
-    const blockGames = input.run.games.filter(
-      (game) => game.round >= fromRound && game.round <= toRound,
-    );
-    const summaries: SeasonGameSummary[] = blockGames.map((game) =>
-      this.summaryFor(input, game.gameId, game.round, game.homeFranchiseId, game.awayFranchiseId),
-    );
-    const checkpoint = await this.buildCheckpoint(
-      input,
-      summaries,
-      this.fakeHealthFor(input),
-      null,
-    );
-    let committed: {
-      checkpointState: SeasonCheckpointState;
-      stateRevision: number;
-      stateDigest: string;
-      window: SeasonWindowOpenResult | null;
-      freeAgency: SeasonFreeAgencyState;
-      evolution: import('@hoop-rush/data-contracts').SeasonEvolutionState;
-      sponsors: import('@hoop-rush/data-contracts').SeasonSponsorGearState;
+    let freeAgencyAssets: {
+      freeAgencyIndex: SeasonFreeAgencyIndex;
+      freeAgencyTargets: SeasonRosterTargets;
     } | null = null;
-    const prior = await loadCurrentSnapshot(this.scheduleOf(input)).catch(() => null);
-    try {
-      const freeAgencyAssets = await this.freeAgencyAssetsOf(input);
-      if (this.isCancelled()) return;
-      committed = this.committedFacts(input, checkpoint, input.commandId, freeAgencyAssets);
-      await this.commitCheckpoint(input, input.commandId, checkpoint, {
-        health: this.fakeHealthFor(input),
-        influence: checkpoint.influence,
-        transactions: checkpoint.transactions,
-        freeAgency: committed.freeAgency,
-        checkpointState: committed.checkpointState,
-        stateRevision: committed.stateRevision,
-        stateDigest: committed.stateDigest,
-        window: committed.window,
-        evolution: committed.evolution,
-        sponsors: committed.sponsors,
-      });
-    } catch (error) {
-      if (this.isCancelled()) return;
-      this.emit({
-        type: 'error',
-        requestId,
-        blockIndex: input.blockIndex,
-        code: 'internal',
-        message: error instanceof Error ? error.message : String(error),
-        seed: input.run.rootSeed,
-        gameId: null,
-      });
-      return;
+    if (start.blockIndex === 2 || start.blockIndex === 4 || start.blockIndex === 6) {
+      const module = await import('./season-assets');
+      const [freeAgencyIndex, freeAgencyTargets] = await Promise.all([
+        module.loadSeasonFreeAgencyIndex(),
+        module.loadSeasonFreeAgencyTargets(),
+      ]);
+      freeAgencyAssets = { freeAgencyIndex, freeAgencyTargets };
     }
     if (this.isCancelled()) return;
-    const snapshot = this.committedSnapshot(input, checkpoint, input.commandId, committed, prior);
-    this.emit({ type: 'complete', requestId, checkpoint, snapshot });
-  }
-  private committedSnapshot(
-    input: SeasonBlockStartInput,
-    checkpoint: SeasonCandidateCheckpoint,
-    commandId: import('@hoop-rush/data-contracts').CommandId,
-    committed: {
-      checkpointState: SeasonCheckpointState;
-      stateRevision: number;
-      stateDigest: string;
-      window: SeasonWindowOpenResult | null;
-      freeAgency: SeasonFreeAgencyState;
-      sponsors?: import('@hoop-rush/data-contracts').SeasonSponsorGearState | null;
-    },
-    prior: SeasonRunSnapshot | null,
-  ): SeasonRunSnapshot {
-    const schedule = this.scheduleOf(input);
-    const current = prior;
-    return assembleCommittedSnapshot({
-      run: input.run,
-      rotations: input.rotations,
-      checkpoint,
-      commandId,
-      rotationDigest: input.rotationDigest,
-      window: committed.window,
+    const committed = completeSeasonBlockCommit({
+      run: { ...start.run, rotations: start.rotations },
+      candidate: authoritative,
+      commandId: start.commandId,
+      rotationDigest: start.rotationDigest,
+      humanFranchiseId: start.humanFranchiseId,
+      catalog: assets.catalog,
+      effects: authoritative.effects,
+      freeAgencyIndex: freeAgencyAssets?.freeAgencyIndex,
+      freeAgencyTargets: freeAgencyAssets?.freeAgencyTargets,
+      profile: start.blockIndex === 3 ? assets.profile : undefined,
+      schedule: start.blockIndex === 3 ? assets.schedule : undefined,
+      priorSummaries: priors.priorSummaries,
+    });
+    const window = committed.window;
+    const objectives = objectivesWithSuccess(start.run, authoritative);
+    const challenges = committed.challenges ?? challengesWithSuccess(start.run, authoritative);
+    const campaign = committed.campaign ?? null;
+    await repository.commitSeasonBlock({
+      runId: authoritative.runId,
+      revision: authoritative.revision + 1,
+      commandId: start.commandId,
+      rotationDigest: authoritative.rotationDigest,
+      checkpointDigest: authoritative.digest,
+      completedRounds: authoritative.completedRounds,
+      standings: authoritative.standings,
+      teamAggregates: authoritative.teamAggregates,
+      playerAggregates: authoritative.playerAggregates,
+      summaries: authoritative.gameSummaries,
+      retainedDetails: [...priors.priorRetainedDetails, ...authoritative.retainedDetails],
+      recap: authoritative.recap,
+      rotations: window !== null ? window.rotations : start.rotations,
+      effects: window !== null ? window.effects : authoritative.effects,
       freeAgency: committed.freeAgency,
-      sponsors: committed.sponsors ?? input.run.sponsors,
-      challenges:
-        (
-          committed as unknown as {
-            challenges?: import('@hoop-rush/data-contracts').SeasonChallengeState | null;
-          }
-        ).challenges ?? this.challengesWithSuccess(input, checkpoint),
+      health: authoritative.health,
+      transactions: window !== null ? window.transactions : authoritative.transactions,
+      influence: window !== null ? window.influence : authoritative.influence,
+      trade: window !== null ? window.trade : start.run.trade,
+      objectives,
+      challenges,
+      campaign,
+      evolution: committed.evolution,
+      sponsors: committed.sponsors,
       checkpointState: committed.checkpointState,
       stateRevision: committed.stateRevision,
       stateDigest: committed.stateDigest,
-      schedule,
-      priorSummaries: current?.summaries ?? [],
-      priorAcceptedBlocks: current?.acceptedBlocks ?? [],
-      priorRetainedDetails: current?.retainedDetails ?? [],
+      expectedStateRevision: start.run.stateRevision,
+      expectedStateDigest: start.run.stateDigest,
+      window,
     });
-  }
-  private async freeAgencyAssetsOf(input: SeasonBlockStartInput): Promise<
-    | {
-        freeAgencyIndex?: SeasonFreeAgencyIndex;
-        freeAgencyTargets?: SeasonRosterTargets;
-      }
-    | undefined
-  > {
-    if (input.blockIndex !== 2 && input.blockIndex !== 4 && input.blockIndex !== 6) {
-      return undefined;
-    }
-    const module = await import('./season-assets');
-    const [freeAgencyIndex, freeAgencyTargets] = await Promise.all([
-      module.loadSeasonFreeAgencyIndex(),
-      module.loadSeasonFreeAgencyTargets(),
-    ]);
-    return { freeAgencyIndex, freeAgencyTargets };
-  }
-  private async buildCheckpoint(
-    input: SeasonBlockStartInput,
-    summaries: SeasonGameSummary[],
-    health: SeasonHealthState,
-    effectsOverride: SeasonEffectsState | null,
-  ): Promise<SeasonCandidateCheckpoint> {
-    const completedRounds = input.blockIndex === 8 ? 82 : (input.blockIndex + 1) * 10;
-    const schedule = this.scheduleOf(input);
-    const current = await loadCurrentSnapshot(schedule);
-    const allSummaries = [...(current?.summaries ?? []), ...summaries];
-    const played = seasonRunEngineSeam
-      .reconstructSeasonGames(schedule, allSummaries)
-      .filter((game) => game.status !== 'scheduled');
-    const standings: SeasonStandings = seasonRunEngineSeam.reduceSeasonStandings(
-      input.run.league,
-      played,
-    );
-    const teamAggregates: SeasonTeamAggregate[] = seasonRunEngineSeam.foldSeasonTeamAggregates(
-      input.run.league,
-      allSummaries,
-    );
-    const playerAggregates: SeasonPlayerAggregate[] =
-      seasonRunEngineSeam.foldSeasonPlayerAggregates(input.run.rosters, allSummaries);
-    const challengeDeal = input.challengeDeal ?? null;
-    const challengeEvaluation =
-      challengeDeal !== null && input.blockIndex <= 7
-        ? evaluateSeasonBlockChallenges({
-            deal: challengeDeal,
-            blockIndex: input.blockIndex,
-            humanFranchiseId: input.humanFranchiseId,
-            summaries,
-          })
-        : null;
-    const recap: SeasonBlockRecap = {
-      schemaVersion: 1,
-      recapVersion: SEASON_RECAP_VERSION,
-      runId: input.run.runId,
-      blockIndex: input.blockIndex,
-      completedRounds,
-      humanRecord: null,
-      standingsMovement: [],
-      notablePerformances: [],
-      streaks: [],
-      versionSpotlights: [],
-      upcomingHumanGames: [],
-      injuryEvidence: {
-        injuries: 0,
-        bySeverity: { minor: 0, moderate: 0, major: 0, 'season-ending': 0 },
-        sameGameReturns: 0,
-        seasonEnding: 0,
-        returnedThisBlock: 0,
-        activeAtBlockEnd: health.injuries.filter((record) => record.missedGamesRemaining > 0)
-          .length,
-        humanTeamInjuries: [],
-      },
-      objectiveEvidence: null,
-      challengeEvidence:
-        challengeEvaluation !== null
-          ? challengeEvaluation.results.map((result) => ({
-              challengeId: result.challengeId,
-              success: result.success,
-              reward:
-                SEASON_CHALLENGE_CATALOG.find((entry) => entry.challengeId === result.challengeId)
-                  ?.reward ?? 1,
-              evaluationFacts: result.facts,
-            }))
-          : undefined,
-      tradeEvidence: { tradesAccepted: 0, influenceDelta: 0 },
-      freeAgencyEvidence: freeAgencyEvidenceOf({
-        blockIndex: input.blockIndex,
-        humanFranchiseId: input.humanFranchiseId,
-        freeAgency: input.run.freeAgency,
-      }),
-      influenceBalance: {
-        humanBalance:
-          input.humanFranchiseId === null
-            ? 0
-            : (this.fakeInfluenceFor(input, input.blockIndex).balances[input.humanFranchiseId] ??
-              0),
-      },
-    };
-    const effects =
-      effectsOverride ?? seasonRunEngineSeam.zeroSeasonEffectsState(input.run.rosters);
-    const stateRevision = input.run.stateRevision + 1;
-    return {
-      schemaVersion: 1,
-      checkpointVersion: SEASON_CHECKPOINT_VERSION,
-      runId: input.run.runId,
-      rootSeed: input.run.rootSeed,
-      versions: {
-        blockVersion: SEASON_BLOCK_VERSION,
-        summaryVersion: SEASON_GAME_SUMMARY_VERSION,
-        aggregatesVersion: SEASON_AGGREGATES_VERSION,
-        recapVersion: SEASON_RECAP_VERSION,
-        leadersVersion: SEASON_LEADERS_VERSION,
-        homeCourtVersion: SEASON_HOME_COURT_VERSION,
-        gameVersion: SEASON_GAME_VERSION,
-        gameTargetsVersion: SEASON_GAME_TARGETS_VERSION,
-        seedDerivationVersion: SEASON_SEED_DERIVATION_VERSION,
-        staminaVersion: SEASON_STAMINA_VERSION,
-        chemistryVersion: SEASON_CHEMISTRY_VERSION,
-        effectsTargetsVersion: SEASON_EFFECT_TARGETS_VERSION,
-        healthVersion: SEASON_HEALTH_VERSION,
-        tradeVersion: SEASON_TRADE_VERSION,
-        influenceVersion: SEASON_INFLUENCE_VERSION,
-        objectiveVersion: SEASON_OBJECTIVE_VERSION,
-        challengeVersion: SEASON_CHALLENGE_VERSION,
-        challengeTargetsVersion: SEASON_CHALLENGE_TARGETS_VERSION,
-        injuryTargetsVersion: SEASON_INJURY_TARGETS_VERSION,
-        tradeTargetsVersion: SEASON_TRADE_TARGETS_VERSION,
-        influenceTargetsVersion: SEASON_INFLUENCE_TARGETS_VERSION,
-        freeAgencyVersion: SEASON_FREE_AGENCY_VERSION,
-        freeAgencyIndexVersion: SEASON_FREE_AGENCY_INDEX_VERSION,
-        freeAgencyTargetsVersion: SEASON_FREE_AGENCY_TARGETS_VERSION,
-      },
-      blockIndex: input.blockIndex,
-      completedRounds,
-      revision: input.expectedRevision,
-      rotationDigest: input.rotationDigest,
-      standings,
-      teamAggregates,
-      playerAggregates,
-      gameSummaries: summaries,
-      retainedDetails: [],
-      recap,
-      effects,
-      health,
-      influence: this.fakeInfluenceFor(input, input.blockIndex, challengeEvaluation),
-      freeAgency: input.run.freeAgency,
-      transactions: this.fakeTransactionsFor(input.blockIndex, challengeEvaluation),
-      objective: {
-        objectiveId: input.objectiveId ?? null,
-        success: input.objectiveId === null ? null : false,
-        evaluation: {
-          objectiveId: input.objectiveId ?? 'win-six',
-          blockIndex: input.blockIndex,
-          success: false,
-          facts: {
-            games: 0,
-            wins: 0,
-            pointsAllowed: 0,
-            reboundMargin: 0,
-            tipsWithAtLeastEightAvailable: 0,
-            tipsTotal: 0,
-            benchMinutes: 0,
-            turnovers: 0,
-          },
-          tipCountedGames: 0,
-        },
-      },
-      challenges: challengeEvaluation ?? undefined,
-      challengeIds: challengeDeal !== null ? [...challengeDeal.challengeIds] : undefined,
-      expectedStateRevision: input.run.stateRevision,
-      expectedStateDigest: input.run.stateDigest,
-      stateRevision,
-      stateDigest: seasonDigestHex(`${input.run.runId}:${String(stateRevision)}`),
-      digest: seasonDigestHex(`${input.run.runId}:${String(input.blockIndex)}`),
-    };
-  }
-  private async commitCheckpoint(
-    input: SeasonBlockStartInput,
-    commandId: import('@hoop-rush/data-contracts').CommandId,
-    checkpoint: SeasonCandidateCheckpoint,
-    m25: FakeM25CommitInput,
-  ): Promise<void> {
-    const repo = await getSeasonRunRepository();
-    await repo.commitSeasonBlock({
-      runId: input.run.runId,
-      revision: checkpoint.revision + 1,
-      commandId,
-      rotationDigest: checkpoint.rotationDigest,
-      checkpointDigest: checkpoint.digest,
-      completedRounds: checkpoint.completedRounds,
-      standings: checkpoint.standings,
-      teamAggregates: checkpoint.teamAggregates,
-      playerAggregates: checkpoint.playerAggregates,
-      summaries: checkpoint.gameSummaries,
-      retainedDetails: [],
-      recap: checkpoint.recap,
-      rotations: input.rotations,
-      effects: checkpoint.effects,
-      freeAgency: m25.freeAgency,
-      health: m25.health,
-      transactions: m25.transactions,
-      influence: m25.influence,
-      trade: null,
-      objectives: this.objectivesWithBlockSuccess(input, checkpoint),
-      challenges: this.challengesWithSuccess(input, checkpoint),
-      checkpointState: m25.checkpointState,
-      stateRevision: m25.stateRevision,
-      stateDigest: m25.stateDigest,
-      expectedStateRevision: input.run.stateRevision,
-      expectedStateDigest: input.run.stateDigest,
-      window: m25.window,
-      evolution: m25.evolution ?? input.run.evolution,
-      sponsors: m25.sponsors ?? input.run.sponsors,
+    if (this.isCancelled()) return;
+    const snapshot = assembleCommittedSnapshot({
+      run: start.run,
+      rotations: start.rotations,
+      checkpoint: authoritative,
+      commandId: start.commandId,
+      rotationDigest: start.rotationDigest,
+      window,
+      freeAgency: committed.freeAgency,
+      campaign,
+      challenges,
+      evolution: committed.evolution,
+      sponsors: committed.sponsors,
+      checkpointState: committed.checkpointState,
+      stateRevision: committed.stateRevision,
+      stateDigest: committed.stateDigest,
+      schedule: assets.schedule,
+      priorSummaries: priors.priorSummaries,
+      priorAcceptedBlocks: priors.priorAcceptedBlocks,
+      priorRetainedDetails: priors.priorRetainedDetails,
     });
-  }
-  private objectivesWithBlockSuccess(
-    input: SeasonBlockStartInput,
-    checkpoint: SeasonCandidateCheckpoint,
-  ): SeasonBlockStartInput['run']['objectives'] {
-    const objectives = input.run.objectives;
-    if (checkpoint.blockIndex === 8) return objectives;
-    const selection = objectives.selections[checkpoint.blockIndex];
-    if (selection === undefined) return objectives;
-    return {
-      ...objectives,
-      selections: {
-        ...objectives.selections,
-        [checkpoint.blockIndex]: { ...selection, success: checkpoint.objective?.success ?? null },
-      },
-    };
-  }
-  private challengesWithSuccess(
-    input: SeasonBlockStartInput,
-    checkpoint: SeasonCandidateCheckpoint,
-  ): import('@hoop-rush/data-contracts').SeasonChallengeState | null | undefined {
-    const base = (
-      input.run as unknown as {
-        challenges?: import('@hoop-rush/data-contracts').SeasonChallengeState | null;
-      }
-    ).challenges;
-    if (base === undefined || base === null) return base;
-    if (checkpoint.challenges === undefined) return base;
-    const evaluation = checkpoint.challenges;
-    if (base.evaluations.some((entry) => entry.blockIndex === evaluation.blockIndex)) return base;
-    return {
-      ...base,
-      evaluations: [...base.evaluations, evaluation].sort((a, b) => a.blockIndex - b.blockIndex),
-    };
-  }
-  private committedFacts(
-    input: SeasonBlockStartInput,
-    checkpoint: EngineSimulateBlockOutput,
-    commandId: import('@hoop-rush/data-contracts').CommandId,
-    freeAgencyAssets?: {
-      freeAgencyIndex?: SeasonFreeAgencyIndex;
-      freeAgencyTargets?: SeasonRosterTargets;
-    },
-  ): FakeCommitOutput {
-    return completeSeasonBlockCommit({
-      run: { ...input.run, rotations: input.rotations },
-      candidate: checkpoint,
-      commandId,
-      rotationDigest: input.rotationDigest,
-      humanFranchiseId: input.humanFranchiseId,
-      effects: checkpoint.effects,
-      freeAgencyIndex: freeAgencyAssets?.freeAgencyIndex,
-      freeAgencyTargets: freeAgencyAssets?.freeAgencyTargets,
-    });
-  }
-  private fakeHealthFor(input: SeasonBlockStartInput): SeasonHealthState {
-    const humanRoster =
-      input.run.rosters.find((roster) => roster.franchiseId === input.humanFranchiseId)?.players ??
-      [];
-    const activePlayer = humanRoster[0]?.playerVersionId ?? 'pv-unknown';
-    const returnedPlayer = humanRoster[1]?.playerVersionId ?? 'pv-unknown';
-    const { toRound } = blockRoundRange(input.blockIndex);
-    if (input.humanFranchiseId === null) {
-      return { schemaVersion: 1, healthVersion: SEASON_HEALTH_VERSION, injuries: [] };
-    }
-    const fid = franchiseIdSchema.parse(input.humanFranchiseId);
-    return {
-      schemaVersion: 1,
-      healthVersion: SEASON_HEALTH_VERSION,
-      injuries: [
-        {
-          injuryId: 'inj-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-          playerVersionId: activePlayer,
-          franchiseId: fid,
-          gameId: seasonGameIdSchema.parse('s000001'),
-          type: 'soft-tissue',
-          severity: 'moderate',
-          occurredBeforeHalftime: false,
-          sameGameReturn: false,
-          sameGameReturned: null,
-          missedGamesTotal: 12,
-          missedGamesRemaining: 2,
-          actualReturnRound: null,
-          seasonEnding: false,
-          rehabModifier: 0 as const,
-          recurrenceWindowRoundsRemaining: 0,
-          seedPath: ['e2e', 'fake-runner', 'health', 'active'],
-        },
-        {
-          injuryId: 'inj-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-          playerVersionId: returnedPlayer,
-          franchiseId: fid,
-          gameId: seasonGameIdSchema.parse('s000002'),
-          type: 'upper-body',
-          severity: 'minor',
-          occurredBeforeHalftime: true,
-          sameGameReturn: true,
-          sameGameReturned: true,
-          missedGamesTotal: 4,
-          missedGamesRemaining: 0,
-          actualReturnRound: toRound,
-          seasonEnding: false,
-          rehabModifier: 0 as const,
-          recurrenceWindowRoundsRemaining: 6,
-          seedPath: ['e2e', 'fake-runner', 'health', 'returned'],
-        },
-      ],
-    };
-  }
-  private interruptionHealthFor(input: SeasonBlockStartInput): SeasonHealthState {
-    const humanRoster =
-      input.run.rosters.find((roster) => roster.franchiseId === input.humanFranchiseId)?.players ??
-      [];
-    const humanRotation =
-      input.rotations.find((rotation) => rotation.franchiseId === input.humanFranchiseId) ?? null;
-    const starters =
-      humanRotation?.starters ?? humanRoster.slice(0, 5).map((p) => p.playerVersionId);
-    if (input.humanFranchiseId === null) {
-      return { schemaVersion: 1, healthVersion: SEASON_HEALTH_VERSION, injuries: [] };
-    }
-    const fid = franchiseIdSchema.parse(input.humanFranchiseId);
-    const injuries = starters.map((playerVersionId, index) => ({
-      injuryId: `inj-${String(index).padStart(31, 'c')}`,
-      playerVersionId,
-      franchiseId: fid,
-      gameId: seasonGameIdSchema.parse('s000001'),
-      type: 'lower-body' as const,
-      severity: 'major' as const,
-      occurredBeforeHalftime: false,
-      sameGameReturn: false,
-      sameGameReturned: null,
-      missedGamesTotal: 10,
-      missedGamesRemaining: 8,
-      actualReturnRound: null,
-      seasonEnding: false,
-      rehabModifier: 0 as const,
-      recurrenceWindowRoundsRemaining: 0,
-      seedPath: ['e2e', 'fake-runner', 'interruption'],
-    }));
-    return {
-      schemaVersion: 1,
-      healthVersion: SEASON_HEALTH_VERSION,
-      injuries,
-    };
-  }
-  private fakeInfluenceFor(
-    input: SeasonBlockStartInput,
-    blockIndex: number,
-    challengeEvaluation?: import('@hoop-rush/data-contracts').SeasonBlockChallengeEvaluation | null,
-  ): SeasonInfluenceState {
-    const franchiseIds = input.run.league.teams.map((team) => team.franchiseId);
-    const human = input.humanFranchiseId;
-    const baseBalance = 2 + blockIndex + 1;
-    const balances = new Map<string, number>(
-      franchiseIds.map((franchiseId) => [franchiseId, baseBalance]),
-    );
-    const ledger: SeasonInfluenceState['ledger'] = [];
-    for (const franchiseId of franchiseIds) {
-      ledger.push({
-        entryId: idSchema.parse(`influence-initial-${franchiseId}`),
-        franchiseId,
-        source: 'initial-grant',
-        blockIndex: null,
-        commandId: null,
-        requestedDelta: 2,
-        appliedDelta: 2,
-        balanceAfter: 2,
-        explanation: 'Initial +2 Influence grant at run creation',
-      });
-      for (let block = 0; block <= blockIndex; block += 1) {
-        ledger.push({
-          entryId: idSchema.parse(`influence-block-${String(block)}-${franchiseId}`),
-          franchiseId,
-          source: 'block-grant',
-          blockIndex: block,
-          commandId: commandIdSchema.parse(`grant-${String(block)}`),
-          requestedDelta: 1,
-          appliedDelta: 1,
-          balanceAfter: 3 + block,
-          explanation: `+1 Influence grant for accepted block ${String(block + 1)}`,
-        });
-      }
-      if (
-        human !== null &&
-        franchiseId === human &&
-        challengeEvaluation !== null &&
-        challengeEvaluation !== undefined
-      ) {
-        const ordered = [...challengeEvaluation.results].sort((a, b) =>
-          a.challengeId < b.challengeId ? -1 : 1,
-        );
-        for (const result of ordered) {
-          if (!result.success) continue;
-          const requestedDelta =
-            SEASON_CHALLENGE_CATALOG.find((entry) => entry.challengeId === result.challengeId)
-              ?.reward ?? 1;
-          const before = balances.get(franchiseId) ?? baseBalance;
-          const appliedDelta = Math.max(0, Math.min(requestedDelta, 8 - before));
-          balances.set(franchiseId, before + appliedDelta);
-          ledger.push({
-            entryId: idSchema.parse(
-              `influence-challenge-${String(blockIndex)}-${franchiseId}-${result.challengeId}`,
-            ),
-            franchiseId,
-            source: 'challenge-reward',
-            blockIndex,
-            commandId: null,
-            requestedDelta,
-            appliedDelta,
-            balanceAfter: before + appliedDelta,
-            explanation: `+${String(requestedDelta)} Influence challenge reward ${result.challengeId} (block ${String(blockIndex)})`,
-          });
-        }
-      }
-    }
-    return {
-      schemaVersion: 1,
-      influenceVersion: SEASON_INFLUENCE_VERSION,
-      balances: Object.fromEntries(
-        franchiseIds.map((franchiseId) => [franchiseId, balances.get(franchiseId) ?? baseBalance]),
-      ),
-      ledger,
-      windows: {},
-      rehabs: {},
-    };
-  }
-  private fakeTransactionsFor(
-    blockIndex: number,
-    challengeEvaluation?: import('@hoop-rush/data-contracts').SeasonBlockChallengeEvaluation | null,
-  ): SeasonTransactionEntry[] {
-    const transactions: SeasonTransactionEntry[] = [];
-    for (let block = 0; block <= blockIndex; block += 1) {
-      transactions.push({
-        transactionId: idSchema.parse(`tx-grant-${String(block)}`),
-        commandId: commandIdSchema.parse(`grant-${String(block)}`),
-        franchiseId: null,
-        type: 'block-grant',
-        blockIndex: block,
-        appliedAtStateRevision: block + 1,
-        payload: {},
-        explanation: `+1 Influence block grant for all franchises (block ${String(block + 1)})`,
-      });
-    }
-    if (challengeEvaluation !== null && challengeEvaluation !== undefined) {
-      const ordered = [...challengeEvaluation.results].sort((a, b) =>
-        a.challengeId < b.challengeId ? -1 : 1,
-      );
-      for (const result of ordered) {
-        if (!result.success) continue;
-        const reward =
-          SEASON_CHALLENGE_CATALOG.find((entry) => entry.challengeId === result.challengeId)
-            ?.reward ?? 1;
-        transactions.push({
-          transactionId: idSchema.parse(`tx-challenge-${String(blockIndex)}-${result.challengeId}`),
-          commandId: commandIdSchema.parse(`grant-${String(blockIndex)}`),
-          franchiseId: null,
-          type: 'challenge-reward',
-          blockIndex,
-          appliedAtStateRevision: blockIndex + 1,
-          payload: { blockIndex, challengeId: result.challengeId },
-          explanation: `+${String(reward)} Influence challenge reward ${result.challengeId} (block ${String(blockIndex + 1)})`,
-        });
-      }
-    }
-    return transactions;
-  }
-  private scheduleOf(input: SeasonBlockStartInput) {
-    return {
-      schemaVersion: 1,
-      scheduleVersion: SEASON_SCHEDULE_VERSION,
-      formulaVersion: SEASON_SCHEDULE_FORMULA_VERSION,
-      leagueVersion: SEASON_LEAGUE_VERSION,
-      generationSeed: seedSchema.parse('0'.repeat(32)),
-      rounds: 82,
-      games: input.run.games.map((game) => ({
-        gameId: game.gameId,
-        round: game.round,
-        homeFranchiseId: game.homeFranchiseId,
-        awayFranchiseId: game.awayFranchiseId,
-      })),
-    } as const;
-  }
-  static gamesToLock(blockIndex: number): number {
-    return gamesToLockForBlock(blockIndex);
-  }
-  static blockIndexOfRound(round: number): number {
-    return blockIndexForRound(round);
+    if (this.isCancelled()) return;
+    this.emit({ type: 'complete', requestId, checkpoint: authoritative, snapshot });
   }
 }
-async function loadCurrentSnapshot(schedule: unknown): Promise<SeasonRunSnapshot | null> {
-  const { loadActiveRunWithSchedule } = (await import('@hoop-rush/persistence')) as unknown as {
-    loadActiveRunWithSchedule?: (schedule: unknown) => Promise<SeasonRunSnapshot | null>;
-  };
-  return loadActiveRunWithSchedule ? await loadActiveRunWithSchedule(schedule) : null;
-}
-export function createFakeSeasonBlockRunner(): SeasonBlockRunner {
-  return new FakeSeasonBlockRunner();
+
+export function createFakeSeasonBlockRunner(
+  deps: FakeSeasonBlockRunnerDeps = {},
+): SeasonBlockRunner {
+  return new FakeSeasonBlockRunner(deps);
 }

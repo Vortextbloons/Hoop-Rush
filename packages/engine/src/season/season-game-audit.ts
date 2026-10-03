@@ -7,6 +7,7 @@ import type {
 import { auditSideAccounting } from '../sim/accounting-core.ts';
 import { createEngineContext } from '../sim/context.ts';
 import {
+  MAX_PERIODS_HARD_CAP,
   OVERTIME_PERIOD_SECONDS,
   REGULATION_PERIOD_SECONDS,
   REGULATION_TOTAL_SECONDS,
@@ -409,7 +410,7 @@ function substitutionAudit(
     if (sub === undefined) continue;
     if (
       sub.period < 1 ||
-      sub.period > 12 ||
+      sub.period > MAX_PERIODS_HARD_CAP ||
       !Number.isInteger(sub.secondsRemaining) ||
       sub.secondsRemaining < 0 ||
       sub.secondsRemaining > REGULATION_PERIOD_SECONDS

@@ -40,8 +40,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import { humanUpcomingGames } from './season-lock-preview';
 import {
-  TRADE_BAND_1V1,
-  TRADE_BAND_DEFAULT,
+  TRADE_VALUE_BAND,
   blockFreeAgencyEvidenceOf as engineFreeAgencyEvidenceOf,
   blockTradeEvidenceOf as engineTradeEvidenceOf,
   foldSeasonAggregates as foldEngineSeasonAggregates,
@@ -1090,9 +1089,8 @@ export interface TradeFitContext {
   toFranchiseName?: string | null;
   attemptNumber?: number;
 }
-function tradeBandOf(fit?: TradeFitContext): { lower: number; upper: number } {
-  const is1v1 = fit?.outgoingCount === 1 && fit.incomingCount === 1;
-  return is1v1 ? TRADE_BAND_1V1 : TRADE_BAND_DEFAULT;
+function tradeBandOf(_fit?: TradeFitContext): { lower: number; upper: number } {
+  return TRADE_VALUE_BAND;
 }
 function tradeRatioOf(raw: string): number | null {
   const match = /\bratio\s+(\d{2,6})\b/i.exec(raw);

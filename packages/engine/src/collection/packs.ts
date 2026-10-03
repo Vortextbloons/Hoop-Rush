@@ -46,7 +46,7 @@ import {
   drawCollectionPackSlotsTargeted,
 } from './targeting.ts';
 
-export const WELCOME_COIN_GRANT = 3000;
+export const WELCOME_COIN_GRANT = 0;
 
 export class CollectionCommandError extends Error {
   readonly code: string;
@@ -534,16 +534,19 @@ function applyClaimWelcome(
     replayVersion: COLLECTION_REPLAY_VERSION,
     targeting: null,
   };
-  const ledgerEntries: CollectionLedgerEntry[] = [
-    {
-      transactionId: ledgerTxnId(command.commandId, pullSequence, 0),
-      commandId: command.commandId,
-      pullSequence,
-      currency: 'Coins',
-      amount: WELCOME_COIN_GRANT,
-      reason: 'welcome-grant',
-    },
-  ];
+  const ledgerEntries: CollectionLedgerEntry[] =
+    WELCOME_COIN_GRANT === 0
+      ? []
+      : [
+          {
+            transactionId: ledgerTxnId(command.commandId, pullSequence, 0),
+            commandId: command.commandId,
+            pullSequence,
+            currency: 'Coins',
+            amount: WELCOME_COIN_GRANT,
+            reason: 'welcome-grant',
+          },
+        ];
   return {
     status: 'accepted',
     state: commitState(state, { owned, balances, claimedWelcome: true }, true, progressionHash),

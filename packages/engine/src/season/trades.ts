@@ -1,8 +1,7 @@
 import {
-  SEASON_SEED_NAMESPACES,
+  SEASON_TRADE_PACKAGE_MAX,
   SEASON_TRADE_VERSION,
   franchiseIdSchema,
-  seasonNamespaceSeed,
   type Position,
   type SeasonDraftCatalog,
   type SeasonEffectsState,
@@ -11,116 +10,63 @@ import {
   type SeasonRoster,
   type SeasonRotation,
   type SeasonRun,
-  type SeasonPlayerSponsorSlots,
-  type SeasonTradeBoardTeamProfile,
-  type SeasonTradeNeed,
   type SeasonTradeOffer,
-  type SeasonTradeOfferValueBand,
-  type SeasonTradePriority,
   type SeasonTradeRosterChange,
   type SeasonTradeState,
-  type SeasonTradeValueTrend,
-  type SeasonTradeWindowState,
   type SeasonTransactionEntry,
-  type SimulationRatings,
 } from '@hoop-rush/data-contracts';
 import { slotGroupOf, type SlotGroup } from '../domain/positions.ts';
-import { createRng, shuffle } from '../sim/rng.ts';
 import { canonicalPlayerPairs } from './chemistry.ts';
 import { reconcileSeasonEffects } from './effects.ts';
-import { applyRiskyRehabOutcome, rollSeasonRehabOutcome } from './injuries.ts';
-import { applySeasonInfluenceSpend } from './influence.ts';
 import { buildMinimalRotation, validateSeasonRotation } from './rotation.ts';
-import { validateSeasonRoster, type SeasonRosterMemberInput } from './roster-rules.ts';
-import {
-  SEASON_ROSTER_MAX_SIZE,
-  SEASON_ROSTER_MIN_SIZE,
-  SEASON_TRADE_PACKAGE_MAX,
-  normalizeSponsorGearState,
-} from '@hoop-rush/data-contracts';
-import { applySponsorBoosts } from './sponsors.ts';
-import { drawHexInt } from './season-seeds.ts';
+import { type SeasonRosterMemberInput } from './roster-rules.ts';
 import { seasonRunStateDigest, seasonRunStateDigestFactsOf } from './state-digest.ts';
 import { seasonTransactionEntry } from './transactions.ts';
+import { applyAiInfluenceSpends, generateTradeBoardProfiles } from './trade-board.ts';
+import {
+  aiFranchiseIdsOf,
+  coverageDepthOf,
+  fillTradeBackfill,
+  kindOrderStartingAt,
+  packageKindOf,
+  packageSizesOf,
+  pickDistinct,
+  rankedBySeed,
+  ratioMutuallyWithinBand,
+  rosterIsLegal,
+  rosterPlayerVersionIdsOf,
+  seasonEconomyRunOf,
+  seasonTradeCatalogFactsOf,
+  seasonTradePackageRatio,
+  seasonTradePlayerHealthFacts,
+  seasonTradePlayerValue,
+  seasonTradeValueBandFor,
+  seedInt,
+  slotGroupsOf,
+  sponsorSlotsOf,
+  swappedRosterIds,
+  tradeOfferBackfillSeed,
+  tradeRosterLegalityReasons,
+  tradeSeed,
+  TRADE_VALUE_BAND,
+  SeasonTradeFactsError,
+  SeasonTradeInvariantError,
+  type SeasonEconomyRun,
+  type SeasonTradeCatalogFacts,
+  type SeasonTradePackageKind,
+} from './trade-valuation.ts';
+export { seasonEconomyRunOf, type SeasonEconomyRun } from './trade-valuation.ts';
+export type { TradeBackfillFill, TradeBackfillSelection } from './trade-valuation.ts';
+export { selectTradeBackfill } from './trade-valuation.ts';
 export const WINDOW_BLOCK_INDEX_TO_INDEX: Readonly<Record<number, number>> = {
   2: 0,
   4: 1,
   5: 2,
 };
-export const TRADE_BAND_1V1 = { lower: 850, upper: 1150 } as const;
-export const TRADE_BAND_DEFAULT = { lower: 850, upper: 1150 } as const;
-export const TRADE_PACKAGE_WEIGHTS = [1, 0.4, 0.3, 0.2, 0.15] as const;
-export const TRADE_CONSOLIDATION_BEST_MIN_RATIO = 700;
-export type TradeAssetEligibilityStatus = 'eligible' | 'protected' | 'availability-risk';
-export interface TradeAssetEligibilityInput {
-  playerVersionId: string;
-  fromFranchiseId?: string;
-  protectedIds: readonly string[];
-  available: boolean;
-  hasBlockingInjury?: boolean;
-}
-export interface TradeAssetEligibilityResult {
-  status: TradeAssetEligibilityStatus;
-  reason: string | null;
-}
-export function tradeAssetEligibilityOf(
-  input: TradeAssetEligibilityInput,
-): TradeAssetEligibilityResult {
-  if (input.protectedIds.includes(input.playerVersionId)) {
-    return { status: 'protected', reason: 'Off limits' };
-  }
-  const blocking = input.hasBlockingInjury ?? !input.available;
-  if (blocking) {
-    return { status: 'availability-risk', reason: 'Out with injury — harder to move' };
-  }
-  return { status: 'eligible', reason: null };
-}
-const RATIO_SCHEMA_BOUNDS = { lower: 800, upper: 1200 } as const;
-export type SeasonTradePackageKind = '1-1' | '2-2' | '1-2' | '2-1';
-function packageKindOf(seed: string): SeasonTradePackageKind {
-  const draw = seedInt(seed, 100);
-  if (draw < 40) return '1-1';
-  if (draw < 70) return '2-2';
-  if (draw < 85) return '1-2';
-  return '2-1';
-}
-export function packageSizesOf(kind: SeasonTradePackageKind): {
-  outgoing: number;
-  incoming: number;
-} {
-  if (kind === '1-1') return { outgoing: 1, incoming: 1 };
-  if (kind === '2-2') return { outgoing: 2, incoming: 2 };
-  if (kind === '1-2') return { outgoing: 1, incoming: 2 };
-  return { outgoing: 2, incoming: 1 };
-}
-const VALUE_OFFENSE_WEIGHT = 0.45;
-const VALUE_DEFENSE_WEIGHT = 0.4;
-const VALUE_PHYSICAL_WEIGHT = 0.15;
-const VALUE_UNAVAILABLE_FACTOR = 0.7;
-const VALUE_WORKLOAD_MAX_PENALTY = 0.15;
-const VALUE_ROLE_FIT_BONUS_PER_SHORTAGE = 0.02;
-const VALUE_ROLE_FIT_NEUTRAL_DEPTH = 3;
-const AI_EXTRA_OFFER_WILLINGNESS_PERCENT = 25;
-const AI_REHAB_WILLINGNESS_PERCENT = 30;
 const AI_TRADE_TARGET_RANGE = 2;
 const AI_TRADE_ATTEMPT_BUDGET = 40;
 const AI_TRADE_SEASON_CAP = 12;
 const OFFER_PROBE_BUDGET = 7;
-export class SeasonTradeFactsError extends Error {
-  constructor(message: string) {
-    super(`season trades: ${message}`);
-    this.name = 'SeasonTradeFactsError';
-  }
-}
-export class SeasonTradeInvariantError extends Error {
-  constructor(message: string) {
-    super(`season trades invariant: ${message}`);
-    this.name = 'SeasonTradeInvariantError';
-  }
-}
-export type SeasonEconomyRun = SeasonRun & {
-  effects: SeasonEffectsState;
-};
 export interface SeasonWindowOpenResult {
   trade: SeasonTradeState;
   influence: SeasonInfluenceState;
@@ -142,457 +88,6 @@ export interface SeasonOpenTradeWindowInput {
   catalog?: SeasonDraftCatalog;
   effects?: SeasonEffectsState;
 }
-export interface SeasonTradeCatalogFacts {
-  playable: ReadonlyMap<string, readonly Position[]>;
-  ratings: ReadonlyMap<string, SimulationRatings>;
-  primary: ReadonlyMap<string, Position>;
-}
-export function seasonTradeCatalogFactsOf(
-  catalog: SeasonDraftCatalog,
-  applied?: Record<string, SeasonPlayerSponsorSlots>,
-): SeasonTradeCatalogFacts {
-  const playable = new Map<string, readonly Position[]>();
-  const ratings = new Map<string, SimulationRatings>();
-  const primary = new Map<string, Position>();
-  for (const candidate of catalog.candidates) {
-    playable.set(candidate.playerVersionId, candidate.positions.playable);
-    const slots = applied?.[candidate.playerVersionId];
-    ratings.set(
-      candidate.playerVersionId,
-      slots === undefined
-        ? candidate.detailedRatings
-        : applySponsorBoosts(candidate.detailedRatings, slots),
-    );
-    primary.set(candidate.playerVersionId, candidate.positions.primary);
-  }
-  return { playable, ratings, primary };
-}
-function sponsorSlotsOf(run: SeasonEconomyRun): Record<string, SeasonPlayerSponsorSlots> {
-  return normalizeSponsorGearState(run.sponsors).players.slots;
-}
-export interface SeasonTradePlayerHealthFacts {
-  available: boolean;
-  activeInjuryIds: string[];
-}
-export function seasonTradePlayerHealthFacts(
-  health: SeasonHealthState,
-  playerVersionId: string,
-): SeasonTradePlayerHealthFacts {
-  const activeInjuryIds = health.injuries
-    .filter(
-      (injury) =>
-        injury.playerVersionId === playerVersionId &&
-        injury.sameGameReturned !== true &&
-        injury.missedGamesRemaining > 0,
-    )
-    .map((injury) => injury.injuryId);
-  return { available: activeInjuryIds.length === 0, activeInjuryIds };
-}
-export function seasonEconomyRunOf(run: SeasonRun, effects?: SeasonEffectsState): SeasonEconomyRun {
-  if (effects !== undefined) return { ...run, effects };
-  if ('effects' in run && run.effects !== undefined) {
-    return run as SeasonEconomyRun;
-  }
-  throw new SeasonTradeFactsError(
-    'the effects state is required (the persistence record keeps it beside the run snapshot)',
-  );
-}
-export interface SeasonTradeValueContext {
-  run: SeasonEconomyRun;
-  catalogFacts: SeasonTradeCatalogFacts;
-  receivingFranchiseId: string;
-  candidateRosterIds?: readonly string[];
-}
-export function seasonTradePlayerValue(
-  playerVersionId: string,
-  context: SeasonTradeValueContext,
-): number {
-  const ratings = context.catalogFacts.ratings.get(playerVersionId);
-  if (ratings === undefined) {
-    throw new SeasonTradeFactsError(`no detailed ratings for ${playerVersionId}`);
-  }
-  const mean = (...values: number[]): number =>
-    values.reduce((sum, value) => sum + value, 0) / values.length;
-  const offense = mean(
-    ratings.insideScoring,
-    ratings.closeShot,
-    ratings.midrange,
-    ratings.threePoint,
-    ratings.freeThrow,
-    ratings.ballHandling,
-    ratings.passing,
-    ratings.offensiveIq,
-  );
-  const defense = mean(
-    ratings.perimeterDefense,
-    ratings.interiorDefense,
-    ratings.steal,
-    ratings.block,
-    ratings.defensiveIq,
-    ratings.offensiveRebound,
-    ratings.defensiveRebound,
-  );
-  const physical = mean(ratings.speed, ratings.strength, ratings.vertical);
-  const contribution =
-    VALUE_OFFENSE_WEIGHT * offense +
-    VALUE_DEFENSE_WEIGHT * defense +
-    VALUE_PHYSICAL_WEIGHT * physical;
-  const availabilityFactor = seasonTradePlayerHealthFacts(context.run.health, playerVersionId)
-    .available
-    ? 1
-    : VALUE_UNAVAILABLE_FACTOR;
-  const load =
-    context.run.effects.playerStates.find((player) => player.playerVersionId === playerVersionId)
-      ?.recentLoadBasisPoints ?? 0;
-  const workloadFactor = 1 - (VALUE_WORKLOAD_MAX_PENALTY * load) / 10000;
-  const primary = context.catalogFacts.primary.get(playerVersionId);
-  let roleFitFactor = 1;
-  if (primary !== undefined) {
-    const group = slotGroupOf(primary);
-    const roster =
-      context.candidateRosterIds ??
-      rosterPlayerVersionIdsOf(context.run, context.receivingFranchiseId);
-    let groupDepth = 0;
-    for (const id of roster) {
-      const playable = context.catalogFacts.playable.get(id);
-      if (playable !== undefined && canPlayGroup(playable, group)) groupDepth += 1;
-    }
-    roleFitFactor =
-      1 +
-      VALUE_ROLE_FIT_BONUS_PER_SHORTAGE * Math.max(0, VALUE_ROLE_FIT_NEUTRAL_DEPTH - groupDepth);
-  }
-  const value = contribution * availabilityFactor * workloadFactor * roleFitFactor;
-  return Math.round(Math.min(100, Math.max(0, value)) * 100) / 100;
-}
-function canPlayGroup(playable: readonly Position[], group: SlotGroup): boolean {
-  return playable.some((position) => slotGroupOf(position) === group);
-}
-export function seasonTradeValueBandFor(input: {
-  kind: SeasonTradePackageKind;
-  outgoingValues: readonly number[];
-  incomingValues: readonly number[];
-}): SeasonTradeOfferValueBand {
-  const outgoing = seasonTradePackageValue(input.outgoingValues);
-  const incoming = seasonTradePackageValue(input.incomingValues);
-  if (outgoing <= 0) throw new SeasonTradeInvariantError('outgoing trade value must be positive');
-  const raw = Math.round((1000 * incoming) / outgoing);
-  const ratioBasisPoints = Math.min(
-    RATIO_SCHEMA_BOUNDS.upper,
-    Math.max(RATIO_SCHEMA_BOUNDS.lower, raw),
-  );
-  const bounds = input.kind === '1-1' ? TRADE_BAND_1V1 : TRADE_BAND_DEFAULT;
-  const qualified = ratioBasisPoints >= bounds.lower && ratioBasisPoints <= bounds.upper;
-  return {
-    ratioBasisPoints,
-    band: input.kind === '1-1' ? '85-115' : '80-120',
-    qualified,
-  };
-}
-export function ratioMutuallyWithinBand(
-  ratioBasisPoints: number,
-  kind: SeasonTradePackageKind,
-): boolean {
-  const bounds = kind === '1-1' ? TRADE_BAND_1V1 : TRADE_BAND_DEFAULT;
-  if (ratioBasisPoints < bounds.lower || ratioBasisPoints > bounds.upper) return false;
-  const reciprocal = Math.ceil(1000000 / ratioBasisPoints);
-  return reciprocal >= bounds.lower && reciprocal <= bounds.upper;
-}
-export function seasonTradePackageValue(values: readonly number[]): number {
-  if (values.length === 0) return 0;
-  const sorted = [...values].sort((a, b) => b - a);
-  let total = 0;
-  for (let i = 0; i < sorted.length; i += 1) {
-    const weight = TRADE_PACKAGE_WEIGHTS[i] ?? 0.15;
-    total += (sorted[i] ?? 0) * weight;
-  }
-  return Math.round(total * 100) / 100;
-}
-export function seasonTradeBestValue(values: readonly number[]): number {
-  if (values.length === 0) return 0;
-  return Math.max(...values);
-}
-export function seasonTradePackageRatio(input: {
-  outgoingValues: readonly number[];
-  incomingValues: readonly number[];
-}): number {
-  const outgoing = seasonTradePackageValue(input.outgoingValues);
-  const incoming = seasonTradePackageValue(input.incomingValues);
-  if (outgoing <= 0) return 0;
-  return Math.round((1000 * incoming) / outgoing);
-}
-export function rosterPlayerVersionIdsOf(run: SeasonRun, franchiseId: string): string[] {
-  const roster = run.rosters.find((entry) => entry.franchiseId === franchiseId);
-  if (roster === undefined) throw new SeasonTradeInvariantError(`unknown roster ${franchiseId}`);
-  return roster.players.map((player) => player.playerVersionId);
-}
-function aiFranchiseIdsOf(run: SeasonRun, humanFranchiseId: string): string[] {
-  const authority = run.authority;
-  if (authority.kind === 'season-multiplayer') {
-    const excluded = new Set([authority.p1.franchiseId, authority.p2.franchiseId]);
-    return run.league.teams
-      .map((team) => team.franchiseId)
-      .filter((franchiseId) => !excluded.has(franchiseId))
-      .sort();
-  }
-  return run.league.teams
-    .map((team) => team.franchiseId)
-    .filter((franchiseId) => franchiseId !== humanFranchiseId)
-    .sort();
-}
-function tradeSeed(rootSeed: string, ...keys: string[]): string {
-  return seasonNamespaceSeed(rootSeed, SEASON_SEED_NAMESPACES.trades, ...keys);
-}
-export function tradeOfferBackfillSeed(rootSeed: string, seedPath: readonly string[]): string {
-  return tradeSeed(rootSeed, ...seedPath, 'backfill');
-}
-function seedInt(seed: string, modulus: number): number {
-  return drawHexInt(seed) % modulus;
-}
-function rankedBySeed<T>(
-  items: readonly T[],
-  seedOf: (item: T) => string,
-  keyOf: (item: T) => string,
-): T[] {
-  return [...items].sort((a, b) => {
-    const seedA = seedOf(a);
-    const seedB = seedOf(b);
-    if (seedA !== seedB) return seedA < seedB ? -1 : 1;
-    const keyA = keyOf(a);
-    const keyB = keyOf(b);
-    return keyA < keyB ? -1 : keyA > keyB ? 1 : 0;
-  });
-}
-function pickDistinct<T>(
-  items: readonly T[],
-  seedOf: (item: T) => string,
-  keyOf: (item: T) => string,
-  k: number,
-): T[] {
-  if (k < 1 || k > items.length) {
-    throw new SeasonTradeInvariantError(
-      `cannot pick ${String(k)} of ${String(items.length)} items`,
-    );
-  }
-  return rankedBySeed(items, seedOf, keyOf).slice(0, k);
-}
-function primaryGroupOf(facts: SeasonTradeCatalogFacts, playerVersionId: string): SlotGroup | null {
-  const primary = facts.primary.get(playerVersionId);
-  return primary === undefined ? null : slotGroupOf(primary);
-}
-function slotGroupsOf(facts: SeasonTradeCatalogFacts, playerVersionId: string): SlotGroup[] {
-  const playable = facts.playable.get(playerVersionId);
-  if (playable === undefined) return [];
-  const groups = new Set<SlotGroup>();
-  for (const position of playable) groups.add(slotGroupOf(position));
-  return (['G', 'F', 'C'] as const).filter((group) => groups.has(group));
-}
-function swappedRosterIds(
-  rosterIds: readonly string[],
-  removed: readonly string[],
-  added: readonly string[],
-): string[] {
-  return [...rosterIds.filter((id) => !removed.includes(id)), ...added];
-}
-function rosterIsLegal(rosterIds: readonly string[], facts: SeasonTradeCatalogFacts): boolean {
-  return rosterLegalityReasons(rosterIds, facts).length === 0;
-}
-export function tradeRosterLegalityReasons(
-  rosterIds: readonly string[],
-  facts: SeasonTradeCatalogFacts,
-): string[] {
-  return rosterLegalityReasons(rosterIds, facts);
-}
-function rosterLegalityReasons(
-  rosterIds: readonly string[],
-  facts: SeasonTradeCatalogFacts,
-): string[] {
-  const failures: string[] = [];
-  if (rosterIds.length < SEASON_ROSTER_MIN_SIZE || rosterIds.length > SEASON_ROSTER_MAX_SIZE) {
-    failures.push(`roster must hold 10-15 players (got ${String(rosterIds.length)})`);
-  }
-  if (new Set(rosterIds).size !== rosterIds.length) {
-    failures.push('roster must contain distinct playerVersionIds');
-  }
-  const members: SeasonRosterMemberInput[] = rosterIds.map((playerVersionId) => ({
-    playerVersionId,
-    playable: facts.playable.get(playerVersionId) ?? [],
-  }));
-  if (!rotationSubsetExists(members)) {
-    failures.push('roster has no legal ten-player rotation subset');
-  }
-  return failures;
-}
-function rotationSubsetExists(members: readonly SeasonRosterMemberInput[]): boolean {
-  if (members.length < 10) return false;
-  const extras = members.length - 10;
-  if (extras === 0) {
-    return validateTenMemberRotation(members);
-  }
-  const byId = new Map(members.map((member) => [member.playerVersionId, member]));
-  const ids = [...members.map((member) => member.playerVersionId)].sort();
-  const total = 1 << ids.length;
-  for (let mask = 0; mask < total; mask += 1) {
-    if (bitCount(mask) !== extras) continue;
-    const subset: SeasonRosterMemberInput[] = [];
-    for (let i = 0; i < ids.length; i += 1) {
-      if ((mask & (1 << i)) === 0) {
-        const member = byId.get(ids[i] as string);
-        if (member !== undefined) subset.push(member);
-      }
-    }
-    if (subset.length === 10 && validateTenMemberRotation(subset)) return true;
-  }
-  return false;
-}
-function bitCount(value: number): number {
-  let count = 0;
-  let v = value;
-  while (v > 0) {
-    count += v & 1;
-    v >>= 1;
-  }
-  return count;
-}
-function validateTenMemberRotation(members: readonly SeasonRosterMemberInput[]): boolean {
-  return validateSeasonRoster(members).length === 0;
-}
-const TRADE_BACKFILL_WALK_ATTEMPT_CAP = 2000;
-export interface TradeBackfillSelection {
-  picks: string[];
-  entries: SeasonRoster['players'];
-}
-export function selectTradeBackfill(input: {
-  catalog: SeasonDraftCatalog;
-  run: SeasonEconomyRun;
-  receivingFranchiseId: string;
-  rosterAfterIds: readonly string[];
-  seed: string;
-}): TradeBackfillSelection | null {
-  const needed = SEASON_ROSTER_MIN_SIZE - input.rosterAfterIds.length;
-  if (needed <= 0) return { picks: [], entries: [] };
-  const facts = seasonTradeCatalogFactsOf(input.catalog, sponsorSlotsOf(input.run));
-  const owned = new Set(input.run.ownership.map((row) => row.playerVersionId));
-  for (const id of input.rosterAfterIds) owned.add(id);
-  const ordering = createRng(seasonNamespaceSeed(input.seed, 'backfill-order'));
-  const pool = shuffle(
-    input.catalog.candidates.filter(
-      (candidate) =>
-        !owned.has(candidate.playerVersionId) &&
-        seasonTradePlayerHealthFacts(input.run.health, candidate.playerVersionId).available,
-    ),
-    ordering,
-  );
-  const ordered = [...pool].sort(
-    (a, b) =>
-      seasonTradePlayerValue(a.playerVersionId, {
-        run: input.run,
-        catalogFacts: facts,
-        receivingFranchiseId: input.receivingFranchiseId,
-        candidateRosterIds: input.rosterAfterIds,
-      }) -
-      seasonTradePlayerValue(b.playerVersionId, {
-        run: input.run,
-        catalogFacts: facts,
-        receivingFranchiseId: input.receivingFranchiseId,
-        candidateRosterIds: input.rosterAfterIds,
-      }),
-  );
-  const ids = ordered.map((candidate) => candidate.playerVersionId);
-  if (ids.length < needed) return null;
-  const legal = (picks: readonly string[]): boolean =>
-    rosterLegalityReasons([...input.rosterAfterIds, ...picks], facts).length === 0;
-  let picks = ids.slice(0, needed);
-  if (legal(picks)) return toBackfillSelection(input.catalog, picks);
-  let attempts = 0;
-  let improved = true;
-  while (!legal(picks) && improved && attempts < TRADE_BACKFILL_WALK_ATTEMPT_CAP) {
-    improved = false;
-    for (let i = 0; i < picks.length; i += 1) {
-      for (const alt of ids) {
-        attempts += 1;
-        if (attempts >= TRADE_BACKFILL_WALK_ATTEMPT_CAP) break;
-        if (picks.includes(alt)) continue;
-        const next = [...picks];
-        next[i] = alt;
-        if (legal(next)) {
-          picks = next;
-          improved = true;
-          break;
-        }
-      }
-      if (improved) break;
-    }
-  }
-  if (!legal(picks)) return null;
-  return toBackfillSelection(input.catalog, picks);
-}
-function toBackfillSelection(catalog: SeasonDraftCatalog, picks: string[]): TradeBackfillSelection {
-  const byId = new Map(
-    catalog.candidates.map((candidate) => [candidate.playerVersionId, candidate]),
-  );
-  return {
-    picks: [...picks],
-    entries: picks.map((playerVersionId) => {
-      const candidate = byId.get(playerVersionId);
-      if (candidate === undefined) {
-        throw new SeasonTradeInvariantError(
-          `backfill references unknown version ${playerVersionId}`,
-        );
-      }
-      return {
-        playerVersionId: candidate.playerVersionId,
-        playerId: candidate.playerId,
-        franchiseId: candidate.franchiseId,
-        eraId: candidate.eraId,
-        seasonKey: candidate.seasonKey,
-        displayName: candidate.displayName,
-      };
-    }),
-  };
-}
-export interface TradeBackfillFill {
-  toBackfill: SeasonRoster['players'];
-  fromBackfill: SeasonRoster['players'];
-  toIdsFilled: string[];
-  fromIdsFilled: string[];
-}
-export function fillTradeBackfill(input: {
-  catalog: SeasonDraftCatalog;
-  run: SeasonEconomyRun;
-  toFranchiseId: string;
-  fromFranchiseId: string;
-  toIds: readonly string[];
-  fromIds: readonly string[];
-  seed: string;
-}): TradeBackfillFill | null {
-  const toSelection = selectTradeBackfill({
-    catalog: input.catalog,
-    run: input.run,
-    receivingFranchiseId: input.toFranchiseId,
-    rosterAfterIds: input.toIds,
-    seed: seasonNamespaceSeed(input.seed, 'to'),
-  });
-  if (toSelection === null) return null;
-  const fromSelection = selectTradeBackfill({
-    catalog: {
-      ...input.catalog,
-      candidates: input.catalog.candidates.filter(
-        (candidate) => !toSelection.picks.includes(candidate.playerVersionId),
-      ),
-    },
-    run: input.run,
-    receivingFranchiseId: input.fromFranchiseId,
-    rosterAfterIds: input.fromIds,
-    seed: seasonNamespaceSeed(input.seed, 'from'),
-  });
-  if (fromSelection === null) return null;
-  return {
-    toBackfill: toSelection.entries,
-    fromBackfill: fromSelection.entries,
-    toIdsFilled: [...input.toIds, ...toSelection.picks],
-    fromIdsFilled: [...input.fromIds, ...fromSelection.picks],
-  };
-}
 interface OfferGenerationContext {
   run: SeasonEconomyRun;
   rootSeed: string;
@@ -607,6 +102,82 @@ interface OfferCandidate {
   outgoing: string[];
   incoming: string[];
   rawRatio: number;
+}
+export interface TradeOfferRecordInput {
+  run: SeasonEconomyRun;
+  catalogFacts: SeasonTradeCatalogFacts;
+  windowIndex: number;
+  seedPath: string[];
+  offerId: string;
+  toFranchiseId: string;
+  fromFranchiseId: string;
+  outgoing: readonly string[];
+  incoming: readonly string[];
+  kind: SeasonTradePackageKind;
+  receivingFranchiseId: string;
+  candidateRosterIds: readonly string[];
+  toAfterIds: readonly string[];
+  fromAfterIds: readonly string[];
+  beforeIds: readonly string[];
+  afterIds: readonly string[];
+  roleNotes: string;
+  needNotes: string;
+  rotationText: string;
+  status: SeasonTradeOffer['status'];
+}
+export function buildTradeOfferRecord(input: TradeOfferRecordInput): SeasonTradeOffer {
+  const outgoingValues = input.outgoing.map((id) =>
+    seasonTradePlayerValue(id, {
+      run: input.run,
+      catalogFacts: input.catalogFacts,
+      receivingFranchiseId: input.receivingFranchiseId,
+      candidateRosterIds: input.candidateRosterIds,
+    }),
+  );
+  const incomingValues = input.incoming.map((id) =>
+    seasonTradePlayerValue(id, {
+      run: input.run,
+      catalogFacts: input.catalogFacts,
+      receivingFranchiseId: input.receivingFranchiseId,
+      candidateRosterIds: input.candidateRosterIds,
+    }),
+  );
+  return {
+    offerId: input.offerId,
+    windowIndex: input.windowIndex,
+    seedPath: [...input.seedPath],
+    toFranchiseId: franchiseIdSchema.parse(input.toFranchiseId),
+    fromFranchiseId: franchiseIdSchema.parse(input.fromFranchiseId),
+    outgoingPlayerVersionIds: [...input.outgoing],
+    incomingPlayerVersionIds: [...input.incoming],
+    outgoingHealth: input.outgoing.map((id) => seasonTradePlayerHealthFacts(input.run.health, id)),
+    incomingHealth: input.incoming.map((id) => seasonTradePlayerHealthFacts(input.run.health, id)),
+    valueBand: seasonTradeValueBandFor({
+      kind: input.kind,
+      outgoingValues,
+      incomingValues,
+    }),
+    roleFit: {
+      outgoingRoles: input.outgoing.map((id) => slotGroupsOf(input.catalogFacts, id).join('/')),
+      incomingRoles: input.incoming.map((id) => slotGroupsOf(input.catalogFacts, id).join('/')),
+      notes: input.roleNotes,
+    },
+    rosterNeedFacts: {
+      outgoingDepth: coverageDepthOf(input.fromAfterIds, input.outgoing, input.catalogFacts),
+      incomingDepth: coverageDepthOf(input.toAfterIds, input.incoming, input.catalogFacts),
+      notes: input.needNotes,
+    },
+    projectedRotationChanges: input.rotationText,
+    projectedChemistryDisruption: {
+      removedPairs: canonicalPlayerPairs(input.beforeIds).filter(
+        ([a, b]) => input.outgoing.includes(a) || input.outgoing.includes(b),
+      ).length,
+      newPairs: canonicalPlayerPairs(input.afterIds).filter(
+        ([a, b]) => input.incoming.includes(a) || input.incoming.includes(b),
+      ).length,
+    },
+    status: input.status,
+  };
 }
 function humanOfferCandidate(
   context: OfferGenerationContext,
@@ -680,11 +251,6 @@ function rankedAiFranchises(
     (id) => id,
   );
 }
-function kindOrderStartingAt(kind: SeasonTradePackageKind): SeasonTradePackageKind[] {
-  const order: SeasonTradePackageKind[] = ['1-1', '2-2', '1-2', '2-1'];
-  const start = order.indexOf(kind);
-  return [...order.slice(start), ...order.slice(0, start)];
-}
 export function generateHumanTradeOffer(
   context: OfferGenerationContext,
   seedPath: string[],
@@ -697,11 +263,12 @@ export function generateHumanTradeOffer(
   for (const aiFranchiseId of franchises) {
     let best: OfferCandidate | null = null;
     for (const kind of kinds) {
-      const bounds = kind === '1-1' ? TRADE_BAND_1V1 : TRADE_BAND_DEFAULT;
       for (let probe = 0; probe < OFFER_PROBE_BUDGET; probe += 1) {
         const candidate = humanOfferCandidate(context, seedPath, aiFranchiseId, kind, probe);
         if (candidate === null) continue;
-        const inRange = candidate.rawRatio >= bounds.lower && candidate.rawRatio <= bounds.upper;
+        const inRange =
+          candidate.rawRatio >= TRADE_VALUE_BAND.lower &&
+          candidate.rawRatio <= TRADE_VALUE_BAND.upper;
         if (inRange) {
           best = candidate;
           break;
@@ -729,47 +296,6 @@ function assembleHumanOffer(
   const aiRosterIds = rosterPlayerVersionIdsOf(run, candidate.aiFranchiseId);
   const humanAfter = swappedRosterIds(humanRosterIds, candidate.outgoing, candidate.incoming);
   const aiAfter = swappedRosterIds(aiRosterIds, candidate.incoming, candidate.outgoing);
-  const outgoingValues = candidate.outgoing.map((id) =>
-    seasonTradePlayerValue(id, {
-      run,
-      catalogFacts,
-      receivingFranchiseId: humanFranchiseId,
-      candidateRosterIds: humanAfter,
-    }),
-  );
-  const incomingValues = candidate.incoming.map((id) =>
-    seasonTradePlayerValue(id, {
-      run,
-      catalogFacts,
-      receivingFranchiseId: humanFranchiseId,
-      candidateRosterIds: humanAfter,
-    }),
-  );
-  const valueBand = seasonTradeValueBandFor({
-    kind: candidate.kind,
-    outgoingValues,
-    incomingValues,
-  });
-  const outgoingHealth = candidate.outgoing.map((id) =>
-    seasonTradePlayerHealthFacts(run.health, id),
-  );
-  const incomingHealth = candidate.incoming.map((id) =>
-    seasonTradePlayerHealthFacts(run.health, id),
-  );
-  const outgoingRoles = candidate.outgoing.map((id) => slotGroupsOf(catalogFacts, id).join('/'));
-  const incomingRoles = candidate.incoming.map((id) => slotGroupsOf(catalogFacts, id).join('/'));
-  const roleFit = {
-    outgoingRoles,
-    incomingRoles,
-    notes: `${humanFranchiseId} sends ${candidate.outgoing.join(', ')}; ${candidate.aiFranchiseId} sends ${candidate.incoming.join(', ')}`,
-  };
-  const incomingDepth = coverageDepthOf(humanAfter, candidate.incoming, catalogFacts);
-  const outgoingDepth = coverageDepthOf(aiAfter, candidate.outgoing, catalogFacts);
-  const rosterNeedFacts = {
-    outgoingDepth,
-    incomingDepth,
-    notes: `${humanFranchiseId} post-swap depth at the incoming primary group: ${String(incomingDepth)}; ${candidate.aiFranchiseId} post-swap depth at the outgoing primary group: ${String(outgoingDepth)}`,
-  };
   const rotation = run.rotations.find((entry) => entry.franchiseId === humanFranchiseId);
   const minutesById = new Map(
     (rotation?.targetMinutes ?? []).map((entry) => [entry.playerVersionId, entry.minutes]),
@@ -780,55 +306,35 @@ function assembleHumanOffer(
   const incomingFacts = candidate.incoming
     .map((id) => `${id} (${String(minutesById.get(id) ?? 16)} min)`)
     .join(', ');
-  const projectedRotationChanges = [
-    `${outgoingFacts} leave the ${humanFranchiseId} rotation`,
-    `${incomingFacts} join by splitting the replaced players' target minutes`,
-    'a side dealt below ten auto-signs replacement depth to ten',
-    'starters/bench/closing five rebuilt deterministically by matchStartingFive',
-  ].join('; ');
-  const removedPairs = canonicalPlayerPairs(humanRosterIds).filter(
-    ([a, b]) => candidate.outgoing.includes(a) || candidate.outgoing.includes(b),
-  ).length;
-  const newPairs = canonicalPlayerPairs(humanAfter).filter(
-    ([a, b]) => candidate.incoming.includes(a) || candidate.incoming.includes(b),
-  ).length;
-  const projectedChemistryDisruption = { removedPairs, newPairs };
-  return {
-    offerId,
+  const incomingDepth = coverageDepthOf(humanAfter, candidate.incoming, catalogFacts);
+  const outgoingDepth = coverageDepthOf(aiAfter, candidate.outgoing, catalogFacts);
+  return buildTradeOfferRecord({
+    run,
+    catalogFacts,
     windowIndex,
     seedPath,
-    toFranchiseId: franchiseIdSchema.parse(humanFranchiseId),
-    fromFranchiseId: franchiseIdSchema.parse(candidate.aiFranchiseId),
-    outgoingPlayerVersionIds: candidate.outgoing,
-    incomingPlayerVersionIds: candidate.incoming,
-    outgoingHealth,
-    incomingHealth,
-    valueBand,
-    roleFit,
-    rosterNeedFacts,
-    projectedRotationChanges,
-    projectedChemistryDisruption,
+    offerId,
+    toFranchiseId: humanFranchiseId,
+    fromFranchiseId: candidate.aiFranchiseId,
+    outgoing: candidate.outgoing,
+    incoming: candidate.incoming,
+    kind: candidate.kind,
+    receivingFranchiseId: humanFranchiseId,
+    candidateRosterIds: humanAfter,
+    toAfterIds: humanAfter,
+    fromAfterIds: aiAfter,
+    beforeIds: humanRosterIds,
+    afterIds: humanAfter,
+    roleNotes: `${humanFranchiseId} sends ${candidate.outgoing.join(', ')}; ${candidate.aiFranchiseId} sends ${candidate.incoming.join(', ')}`,
+    needNotes: `${humanFranchiseId} post-swap depth at the incoming primary group: ${String(incomingDepth)}; ${candidate.aiFranchiseId} post-swap depth at the outgoing primary group: ${String(outgoingDepth)}`,
+    rotationText: [
+      `${outgoingFacts} leave the ${humanFranchiseId} rotation`,
+      `${incomingFacts} join by splitting the replaced players' target minutes`,
+      'a side dealt below ten auto-signs replacement depth to ten',
+      'starters/bench/closing five rebuilt deterministically by matchStartingFive',
+    ].join('; '),
     status: 'open',
-  };
-}
-function coverageDepthOf(
-  rosterIds: readonly string[],
-  movedIn: readonly string[],
-  facts: SeasonTradeCatalogFacts,
-): number {
-  const groups = new Set<SlotGroup>();
-  for (const id of movedIn) {
-    const group = primaryGroupOf(facts, id);
-    if (group !== null) groups.add(group);
-  }
-  if (groups.size === 0) return 0;
-  let depth = 0;
-  for (const id of rosterIds) {
-    const playable = facts.playable.get(id);
-    if (playable === undefined) continue;
-    if ([...groups].some((group) => canPlayGroup(playable, group))) depth += 1;
-  }
-  return depth;
+  });
 }
 export function generatedExtraOfferForSpend(
   rootSeed: string,
@@ -979,68 +485,30 @@ function assembleAiOffer(
   const rosterB = rosterPlayerVersionIdsOf(run, candidate.b);
   const bAfter = swappedRosterIds(rosterB, candidate.incoming, candidate.outgoing);
   const aAfter = swappedRosterIds(rosterA, candidate.outgoing, candidate.incoming);
-  const outgoingValues = candidate.incoming.map((id) =>
-    seasonTradePlayerValue(id, {
-      run,
-      catalogFacts,
-      receivingFranchiseId: candidate.b,
-      candidateRosterIds: bAfter,
-    }),
-  );
-  const incomingValues = candidate.outgoing.map((id) =>
-    seasonTradePlayerValue(id, {
-      run,
-      catalogFacts,
-      receivingFranchiseId: candidate.b,
-      candidateRosterIds: bAfter,
-    }),
-  );
-  const valueBand = seasonTradeValueBandFor({
-    kind: candidate.kind,
-    outgoingValues,
-    incomingValues,
-  });
-  const outgoingHealth = candidate.incoming.map((id) =>
-    seasonTradePlayerHealthFacts(run.health, id),
-  );
-  const incomingHealth = candidate.outgoing.map((id) =>
-    seasonTradePlayerHealthFacts(run.health, id),
-  );
-  const outgoingRoles = candidate.incoming.map((id) => slotGroupsOf(catalogFacts, id).join('/'));
-  const incomingRoles = candidate.outgoing.map((id) => slotGroupsOf(catalogFacts, id).join('/'));
   const outgoingDepth = coverageDepthOf(aAfter, candidate.incoming, catalogFacts);
   const incomingDepth = coverageDepthOf(bAfter, candidate.outgoing, catalogFacts);
-  const removedPairs = canonicalPlayerPairs(rosterB).filter(
-    ([x, y]) => candidate.incoming.includes(x) || candidate.incoming.includes(y),
-  ).length;
-  const newPairs = canonicalPlayerPairs(bAfter).filter(
-    ([x, y]) => candidate.outgoing.includes(x) || candidate.outgoing.includes(y),
-  ).length;
-  return {
-    offerId,
+  return buildTradeOfferRecord({
+    run,
+    catalogFacts,
     windowIndex,
     seedPath,
-    toFranchiseId: franchiseIdSchema.parse(candidate.b),
-    fromFranchiseId: franchiseIdSchema.parse(candidate.a),
-    outgoingPlayerVersionIds: candidate.incoming,
-    incomingPlayerVersionIds: candidate.outgoing,
-    outgoingHealth,
-    incomingHealth,
-    valueBand,
-    roleFit: {
-      outgoingRoles,
-      incomingRoles,
-      notes: `${candidate.b} sends ${candidate.incoming.join(', ')} to ${candidate.a} for ${candidate.outgoing.join(', ')}`,
-    },
-    rosterNeedFacts: {
-      outgoingDepth,
-      incomingDepth,
-      notes: `${candidate.a} post-swap depth at the moved group: ${String(outgoingDepth)}; ${candidate.b} post-swap depth: ${String(incomingDepth)}`,
-    },
-    projectedRotationChanges: `AI-to-AI: ${candidate.a} and ${candidate.b} rotations rebuilt deterministically; vacated minutes split across joiners; short sides auto-sign depth to ten`,
-    projectedChemistryDisruption: { removedPairs, newPairs },
+    offerId,
+    toFranchiseId: candidate.b,
+    fromFranchiseId: candidate.a,
+    outgoing: candidate.incoming,
+    incoming: candidate.outgoing,
+    kind: candidate.kind,
+    receivingFranchiseId: candidate.b,
+    candidateRosterIds: bAfter,
+    toAfterIds: bAfter,
+    fromAfterIds: aAfter,
+    beforeIds: rosterB,
+    afterIds: bAfter,
+    roleNotes: `${candidate.b} sends ${candidate.incoming.join(', ')} to ${candidate.a} for ${candidate.outgoing.join(', ')}`,
+    needNotes: `${candidate.a} post-swap depth at the moved group: ${String(outgoingDepth)}; ${candidate.b} post-swap depth: ${String(incomingDepth)}`,
+    rotationText: `AI-to-AI: ${candidate.a} and ${candidate.b} rotations rebuilt deterministically; vacated minutes split across joiners; short sides auto-sign depth to ten`,
     status: 'accepted',
-  };
+  });
 }
 function priorAiTradeCount(run: SeasonRun, humanFranchiseId: string): number {
   let count = 0;
@@ -1056,135 +524,6 @@ function priorAiTradeCount(run: SeasonRun, humanFranchiseId: string): number {
     }
   }
   return count;
-}
-interface AiSpendResult {
-  health: SeasonHealthState;
-  influence: SeasonInfluenceState;
-  transactions: SeasonTransactionEntry[];
-}
-function applyAiInfluenceSpends(
-  run: SeasonRun,
-  rootSeed: string,
-  windowIndex: number,
-  blockIndex: number,
-  humanFranchiseId: string,
-): AiSpendResult {
-  let health = run.health;
-  let influence = run.influence;
-  const transactions: SeasonTransactionEntry[] = [];
-  const appliedAtStateRevision = run.stateRevision + 1;
-  const ai = aiFranchiseIdsOf(run, humanFranchiseId);
-  for (const franchiseId of ai) {
-    const extraSeed = tradeSeed(
-      rootSeed,
-      'window',
-      String(windowIndex),
-      'ai-spend',
-      franchiseId,
-      'extra-offer',
-    );
-    const wantExtra = seedInt(extraSeed, 100) < AI_EXTRA_OFFER_WILLINGNESS_PERCENT;
-    const fid = franchiseIdSchema.parse(franchiseId);
-    const spentExtra = (influence.windows[fid] ?? []).some(
-      (window) => window.windowIndex === windowIndex && window.extraOfferSpent,
-    );
-    const balance = influence.balances[fid] ?? 0;
-    if (wantExtra && !spentExtra && balance >= 1) {
-      const commandId = `ai-window-${String(windowIndex)}-${franchiseId}-extra-offer`;
-      const result = applySeasonInfluenceSpend({
-        influence,
-        franchiseId,
-        source: 'extra-trade-offer',
-        requestedDelta: -1,
-        blockIndex,
-        commandId,
-        explanation: `AI ${franchiseId} spent 1 Influence on an extra trade offer (window ${String(windowIndex)})`,
-        windowIndex,
-      });
-      influence = result.influence;
-      transactions.push(
-        seasonTransactionEntry({
-          transactionId: `txn-${commandId}`,
-          commandId,
-          franchiseId,
-          type: 'influence-spend',
-          blockIndex,
-          appliedAtStateRevision,
-          payload: { purpose: 'extra-trade-offer', windowIndex },
-          explanation: `AI ${franchiseId} spent 1 Influence on an extra trade offer`,
-        }),
-      );
-    }
-    const activeInjuries = health.injuries
-      .filter(
-        (injury) =>
-          injury.franchiseId === franchiseId &&
-          injury.sameGameReturned !== true &&
-          injury.missedGamesRemaining > 0,
-      )
-      .sort((x, y) => (x.injuryId < y.injuryId ? -1 : 1));
-    if (activeInjuries.length > 0) {
-      const pick = rankedBySeed(
-        activeInjuries,
-        (injury) =>
-          tradeSeed(
-            rootSeed,
-            'window',
-            String(windowIndex),
-            'ai-spend',
-            franchiseId,
-            'rehab',
-            injury.injuryId,
-          ),
-        (injury) => injury.injuryId,
-      )[0];
-      const rehabSeed = tradeSeed(
-        rootSeed,
-        'window',
-        String(windowIndex),
-        'ai-spend',
-        franchiseId,
-        'rehab',
-      );
-      const wantRehab = seedInt(rehabSeed, 100) < AI_REHAB_WILLINGNESS_PERCENT;
-      const currentBalance = influence.balances[franchiseIdSchema.parse(franchiseId)] ?? 0;
-      if (
-        pick !== undefined &&
-        wantRehab &&
-        influence.rehabs[pick.injuryId] === undefined &&
-        currentBalance >= 2
-      ) {
-        const outcome = rollSeasonRehabOutcome(rootSeed, pick.injuryId);
-        health = applyRiskyRehabOutcome(health, pick.injuryId, outcome);
-        const commandId = `ai-window-${String(windowIndex)}-${franchiseId}-risky-rehab`;
-        const result = applySeasonInfluenceSpend({
-          influence,
-          franchiseId,
-          source: 'risky-rehab',
-          requestedDelta: -2,
-          blockIndex,
-          commandId,
-          explanation: `AI ${franchiseId} risky rehab for ${pick.injuryId} (${outcome})`,
-          injuryId: pick.injuryId,
-          rehabOutcome: outcome,
-        });
-        influence = result.influence;
-        transactions.push(
-          seasonTransactionEntry({
-            transactionId: `txn-${commandId}`,
-            commandId,
-            franchiseId,
-            type: 'influence-spend',
-            blockIndex,
-            appliedAtStateRevision,
-            payload: { purpose: 'risky-rehab', injuryId: pick.injuryId, outcome },
-            explanation: `AI ${franchiseId} risky rehab for ${pick.injuryId} (${outcome})`,
-          }),
-        );
-      }
-    }
-  }
-  return { health, influence, transactions };
 }
 function applyAiTrades(
   run: SeasonEconomyRun,
@@ -1237,179 +576,6 @@ function applyAiTrades(
     attempted += 1;
   }
   return { run: working, offers, transactions: working.transactions };
-}
-const TRADE_BOARD_PROFILE_COUNT = 8;
-const TRADE_BOARD_NEEDS: readonly SeasonTradeNeed[] = [
-  'ball-handling',
-  'shooting',
-  'perimeter-defense',
-  'interior-defense',
-  'rebounding',
-  'availability',
-  'rotation-talent',
-  'depth',
-];
-const TRADE_BOARD_PRIORITIES: readonly SeasonTradePriority[] = [
-  'talent',
-  'fit',
-  'availability',
-  'depth',
-  'influence',
-];
-const TRADE_BOARD_TRENDS = ['rising', 'stable', 'falling'] as const;
-const TRADE_BOARD_COMPETITOR_INTERESTS = ['low', 'possible', 'strong', 'preferred-fit'] as const;
-export interface TradeBoardProfilesInput {
-  run: SeasonRun;
-  rootSeed: string;
-  windowIndex: number;
-  humanFranchiseId: string;
-  catalogFacts: SeasonTradeCatalogFacts;
-}
-export function generateTradeBoardProfiles(input: TradeBoardProfilesInput): {
-  boardProfiles: SeasonTradeBoardTeamProfile[];
-  canonicalTeamOrder: SeasonTradeWindowState['canonicalTeamOrder'];
-  valueTrends: SeasonTradeValueTrend[];
-} {
-  const { run, rootSeed, windowIndex, humanFranchiseId, catalogFacts } = input;
-  const aiIds = aiFranchiseIdsOf(run, humanFranchiseId);
-  const boardSeed = seasonNamespaceSeed(
-    rootSeed,
-    SEASON_SEED_NAMESPACES.trades,
-    'window',
-    String(windowIndex),
-    'board',
-  );
-  const boardRng = createRng(boardSeed);
-  const selected = shuffle(aiIds, boardRng).slice(0, TRADE_BOARD_PROFILE_COUNT);
-  const rosterByFranchise = new Map<string, SeasonRoster>(
-    run.rosters.map((roster) => [roster.franchiseId, roster]),
-  );
-  const rotationByFranchise = new Map<string, SeasonRotation>(
-    run.rotations.map((rotation) => [rotation.franchiseId, rotation]),
-  );
-  const boardProfiles: SeasonTradeBoardTeamProfile[] = [];
-  for (const franchiseId of selected) {
-    const teamSeed = seasonNamespaceSeed(
-      rootSeed,
-      SEASON_SEED_NAMESPACES.trades,
-      'window',
-      String(windowIndex),
-      'board',
-      franchiseId,
-    );
-    const teamRng = createRng(teamSeed);
-    const rosterIds = rosterPlayerVersionIdsOf(run, franchiseId);
-    const rosterSet = new Set(rosterIds);
-    const rotation = rotationByFranchise.get(franchiseId);
-    let listed: string[] = [];
-    let discussable: string[] = [];
-    let protectedIds: string[] = [];
-    if (rotation !== undefined) {
-      const starters = rotation.starters.filter((id) => rosterSet.has(id));
-      const bench = rotation.benchOrder.filter((id) => rosterSet.has(id));
-      protectedIds = starters.slice(0, 5);
-      listed = bench.slice(0, 1);
-      discussable = bench.slice(1, 3);
-    }
-    if (listed.length === 0 || protectedIds.length === 0) {
-      const roster = rosterByFranchise.get(franchiseId);
-      const ordered = roster?.players.map((player) => player.playerVersionId) ?? rosterIds;
-      if (protectedIds.length === 0) protectedIds = ordered.slice(0, 5);
-      if (listed.length === 0) listed = ordered.slice(5, 6);
-      if (discussable.length === 0) discussable = ordered.slice(6, 8);
-    }
-    listed = listed.filter((id) => !protectedIds.includes(id)).slice(0, 1);
-    discussable = discussable
-      .filter((id) => !protectedIds.includes(id) && !listed.includes(id))
-      .slice(0, 2);
-    const groupDepth: Record<SlotGroup, number> = { G: 0, F: 0, C: 0 };
-    for (const id of rosterIds) {
-      const playable = catalogFacts.playable.get(id);
-      if (playable === undefined) continue;
-      for (const group of ['G', 'F', 'C'] as const) {
-        if (canPlayGroup(playable, group)) groupDepth[group] += 1;
-      }
-    }
-    const thinnest: SlotGroup =
-      groupDepth.G <= groupDepth.F && groupDepth.G <= groupDepth.C
-        ? 'G'
-        : groupDepth.C <= groupDepth.F
-          ? 'C'
-          : 'F';
-    const thinCandidates: SeasonTradeNeed[] =
-      thinnest === 'G'
-        ? ['ball-handling', 'shooting']
-        : thinnest === 'C'
-          ? ['interior-defense', 'rebounding']
-          : ['perimeter-defense', 'shooting'];
-    const needs: SeasonTradeNeed[] = [teamRng.pick(thinCandidates)];
-    const hasInjury = run.health.injuries.some(
-      (injury) =>
-        injury.franchiseId === franchiseId &&
-        injury.sameGameReturned !== true &&
-        injury.missedGamesRemaining > 0,
-    );
-    const firstNeed = needs[0];
-    if (hasInjury && firstNeed !== 'availability' && teamRng.chance(0.5)) {
-      needs.push('availability');
-    } else if (teamRng.chance(0.6)) {
-      const remaining = TRADE_BOARD_NEEDS.filter((need) => !needs.includes(need));
-      if (remaining.length > 0) needs.push(teamRng.pick(remaining));
-    }
-    const priority: SeasonTradePriority = needs.includes('availability')
-      ? teamRng.chance(0.5)
-        ? 'availability'
-        : teamRng.pick(TRADE_BOARD_PRIORITIES)
-      : teamRng.pick(TRADE_BOARD_PRIORITIES);
-    const rationale =
-      `${franchiseId} seeks ${needs.join(' + ')}; ` +
-      `listening on ${listed[0] ?? 'bench depth'} with ${priority} priority.`;
-    const hardConstraints = ['Protected players unavailable'];
-    let competitorInterest: SeasonTradeBoardTeamProfile['competitorInterest'];
-    const listedId = listed[0];
-    if (listedId !== undefined && teamRng.chance(0.35)) {
-      competitorInterest = {
-        [listedId]: teamRng.pick([...TRADE_BOARD_COMPETITOR_INTERESTS]),
-      };
-    }
-    boardProfiles.push({
-      franchiseId: franchiseIdSchema.parse(franchiseId),
-      needs,
-      priority,
-      listedPlayerIds: listed,
-      discussablePlayerIds: discussable,
-      protectedPlayerIds: protectedIds,
-      hardConstraints,
-      rationale,
-      ...(competitorInterest === undefined ? {} : { competitorInterest }),
-    });
-  }
-  const canonicalTeamOrder = selected.map((id) => franchiseIdSchema.parse(id));
-  const humanRosterIds = (() => {
-    try {
-      return rosterPlayerVersionIdsOf(run, humanFranchiseId);
-    } catch {
-      return [];
-    }
-  })();
-  const valueTrends: SeasonTradeValueTrend[] = humanRosterIds.slice(0, 6).map((playerVersionId) => {
-    const trendSeed = seasonNamespaceSeed(
-      rootSeed,
-      SEASON_SEED_NAMESPACES.trades,
-      'window',
-      String(windowIndex),
-      'board',
-      'trend',
-      playerVersionId,
-    );
-    const trend = createRng(trendSeed).pick([...TRADE_BOARD_TRENDS]);
-    return {
-      playerVersionId,
-      trend,
-      basis: `Board estimate holds ${playerVersionId} ${trend} this window.`,
-    };
-  });
-  return { boardProfiles, canonicalTeamOrder, valueTrends };
 }
 export function openSeasonTradeWindow(
   input: SeasonOpenTradeWindowInput,
@@ -1626,8 +792,10 @@ export function applySeasonTrade(
   const toIdsAfter = toEntries.map((player) => player.playerVersionId);
   const fromIdsAfter = fromEntries.map((player) => player.playerVersionId);
   const legalityFailures = [
-    ...rosterLegalityReasons(toIdsAfter, facts).map((reason) => `${toFranchiseId}: ${reason}`),
-    ...rosterLegalityReasons(fromIdsAfter, facts).map((reason) => `${fromFranchiseId}: ${reason}`),
+    ...tradeRosterLegalityReasons(toIdsAfter, facts).map((reason) => `${toFranchiseId}: ${reason}`),
+    ...tradeRosterLegalityReasons(fromIdsAfter, facts).map(
+      (reason) => `${fromFranchiseId}: ${reason}`,
+    ),
   ];
   if (legalityFailures.length > 0) {
     throw new SeasonTradeInvariantError(
@@ -1707,7 +875,9 @@ export function applySeasonTrade(
         : injury,
     ),
   };
-  const windowBlockIndex = windowBlockIndexOf(run, offer.windowIndex);
+  const windowBlockIndex =
+    run.trade?.windows.find((window) => window.windowIndex === offer.windowIndex)?.blockIndex ??
+    null;
   const entry = seasonTransactionEntry({
     transactionId: `txn-trade-${offer.offerId}`,
     commandId: options.commandId ?? null,
@@ -1778,11 +948,6 @@ export function applySeasonTrade(
       },
     ],
   };
-}
-function windowBlockIndexOf(run: SeasonRun, windowIndex: number): number | null {
-  return (
-    run.trade?.windows.find((window) => window.windowIndex === windowIndex)?.blockIndex ?? null
-  );
 }
 function repairRotationAfterTrade(
   oldRotation: SeasonRotation,
@@ -1857,27 +1022,4 @@ function splitMinutesEvenly(total: number, parts: number): number[] {
   const base = Math.floor(total / parts);
   const remainder = total - base * parts;
   return Array.from({ length: parts }, (_, index) => base + (index < remainder ? 1 : 0));
-}
-export function expireTradeOffersForBlock(
-  trade: SeasonTradeState | null,
-  blockIndex: number,
-): SeasonTradeState | null {
-  if (trade === null) return null;
-  const windows: SeasonTradeWindowState[] = trade.windows.map((window) => {
-    if (window.status === 'open' && window.blockIndex + 1 === blockIndex) {
-      return {
-        ...window,
-        status: 'closed',
-        offers: window.offers.map((offer) =>
-          offer.status === 'open' ? { ...offer, status: 'expired' as const } : offer,
-        ),
-      };
-    }
-    return window;
-  });
-  const changed = windows.some((window, index) => {
-    const prior = trade.windows[index];
-    return prior === undefined || window !== prior;
-  });
-  return changed ? { ...trade, windows } : trade;
 }

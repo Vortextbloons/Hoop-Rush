@@ -2,25 +2,180 @@ import {
   SEASON_INFLUENCE_FLOOR,
   SEASON_TRADE_PACKAGE_MAX,
   franchiseIdSchema,
-  seasonNamespaceSeed,
+  normalizeSponsorGearState,
   type SeasonDraftCatalog,
+  type SeasonHealthState,
+  type SeasonInfluenceState,
+  type SeasonRoster,
+  type SeasonRotation,
   type SeasonRun,
+  type SeasonTradeBoardTeamProfile,
+  type SeasonTradeNeed,
   type SeasonTradeNegotiation,
+  type SeasonTradePriority,
   type SeasonTradeProposal,
   type SeasonTradeState,
+  type SeasonTradeValueTrend,
   type SeasonTradeWindowState,
+  type SeasonTransactionEntry,
 } from '@hoop-rush/data-contracts';
+import { createRng, shuffle } from '../sim/rng.ts';
+import { applyRiskyRehabOutcome, rollSeasonRehabOutcome } from './injuries.ts';
+import { applySeasonInfluenceSpend } from './influence.ts';
+import { seasonTransactionEntry } from './transactions.ts';
 import {
+  aiFranchiseIdsOf,
+  canPlayGroup,
   fillTradeBackfill,
+  fingerprintOf,
+  rankedBySeed,
+  rosterPlayerVersionIdsOf,
   seasonTradeBestValue,
   seasonTradeCatalogFactsOf,
   seasonTradePackageValue,
   seasonTradePlayerValue,
+  seedInt,
   tradeAssetEligibilityOf,
-  TRADE_BAND_1V1,
-  TRADE_BAND_DEFAULT,
+  tradeSeed,
+  TRADE_VALUE_BAND,
   TRADE_CONSOLIDATION_BEST_MIN_RATIO,
-} from './trades.ts';
+  type SeasonEconomyRun,
+  type SeasonTradeCatalogFacts,
+} from './trade-valuation.ts';
+import type { SlotGroup } from '../domain/positions.ts';
+
+const AI_EXTRA_OFFER_WILLINGNESS_PERCENT = 25;
+const AI_REHAB_WILLINGNESS_PERCENT = 30;
+export interface AiSpendResult {
+  health: SeasonHealthState;
+  influence: SeasonInfluenceState;
+  transactions: SeasonTransactionEntry[];
+}
+export function applyAiInfluenceSpends(
+  run: SeasonRun,
+  rootSeed: string,
+  windowIndex: number,
+  blockIndex: number,
+  humanFranchiseId: string,
+): AiSpendResult {
+  let health = run.health;
+  let influence = run.influence;
+  const transactions: SeasonTransactionEntry[] = [];
+  const appliedAtStateRevision = run.stateRevision + 1;
+  const ai = aiFranchiseIdsOf(run, humanFranchiseId);
+  for (const franchiseId of ai) {
+    const extraSeed = tradeSeed(
+      rootSeed,
+      'window',
+      String(windowIndex),
+      'ai-spend',
+      franchiseId,
+      'extra-offer',
+    );
+    const wantExtra = seedInt(extraSeed, 100) < AI_EXTRA_OFFER_WILLINGNESS_PERCENT;
+    const fid = franchiseIdSchema.parse(franchiseId);
+    const spentExtra = (influence.windows[fid] ?? []).some(
+      (window) => window.windowIndex === windowIndex && window.extraOfferSpent,
+    );
+    const balance = influence.balances[fid] ?? 0;
+    if (wantExtra && !spentExtra && balance >= 1) {
+      const commandId = `ai-window-${String(windowIndex)}-${franchiseId}-extra-offer`;
+      const result = applySeasonInfluenceSpend({
+        influence,
+        franchiseId,
+        source: 'extra-trade-offer',
+        requestedDelta: -1,
+        blockIndex,
+        commandId,
+        explanation: `AI ${franchiseId} spent 1 Influence on an extra trade offer (window ${String(windowIndex)})`,
+        windowIndex,
+      });
+      influence = result.influence;
+      transactions.push(
+        seasonTransactionEntry({
+          transactionId: `txn-${commandId}`,
+          commandId,
+          franchiseId,
+          type: 'influence-spend',
+          blockIndex,
+          appliedAtStateRevision,
+          payload: { purpose: 'extra-trade-offer', windowIndex },
+          explanation: `AI ${franchiseId} spent 1 Influence on an extra trade offer`,
+        }),
+      );
+    }
+    const activeInjuries = health.injuries
+      .filter(
+        (injury) =>
+          injury.franchiseId === franchiseId &&
+          injury.sameGameReturned !== true &&
+          injury.missedGamesRemaining > 0,
+      )
+      .sort((x, y) => (x.injuryId < y.injuryId ? -1 : 1));
+    if (activeInjuries.length > 0) {
+      const pick = rankedBySeed(
+        activeInjuries,
+        (injury) =>
+          tradeSeed(
+            rootSeed,
+            'window',
+            String(windowIndex),
+            'ai-spend',
+            franchiseId,
+            'rehab',
+            injury.injuryId,
+          ),
+        (injury) => injury.injuryId,
+      )[0];
+      const rehabSeed = tradeSeed(
+        rootSeed,
+        'window',
+        String(windowIndex),
+        'ai-spend',
+        franchiseId,
+        'rehab',
+      );
+      const wantRehab = seedInt(rehabSeed, 100) < AI_REHAB_WILLINGNESS_PERCENT;
+      const currentBalance = influence.balances[franchiseIdSchema.parse(franchiseId)] ?? 0;
+      if (
+        pick !== undefined &&
+        wantRehab &&
+        influence.rehabs[pick.injuryId] === undefined &&
+        currentBalance >= 2
+      ) {
+        const outcome = rollSeasonRehabOutcome(rootSeed, pick.injuryId);
+        health = applyRiskyRehabOutcome(health, pick.injuryId, outcome);
+        const commandId = `ai-window-${String(windowIndex)}-${franchiseId}-risky-rehab`;
+        const result = applySeasonInfluenceSpend({
+          influence,
+          franchiseId,
+          source: 'risky-rehab',
+          requestedDelta: -2,
+          blockIndex,
+          commandId,
+          explanation: `AI ${franchiseId} risky rehab for ${pick.injuryId} (${outcome})`,
+          injuryId: pick.injuryId,
+          rehabOutcome: outcome,
+        });
+        influence = result.influence;
+        transactions.push(
+          seasonTransactionEntry({
+            transactionId: `txn-${commandId}`,
+            commandId,
+            franchiseId,
+            type: 'influence-spend',
+            blockIndex,
+            appliedAtStateRevision,
+            payload: { purpose: 'risky-rehab', injuryId: pick.injuryId, outcome },
+            explanation: `AI ${franchiseId} risky rehab for ${pick.injuryId} (${outcome})`,
+          }),
+        );
+      }
+    }
+  }
+  return { health, influence, transactions };
+}
+
 export const TRADE_INQUIRY_BASE = 3;
 export const TRADE_INQUIRY_MAX = 5;
 export const TRADE_EXCHANGE_MAX = 3;
@@ -28,14 +183,8 @@ export const TRADE_CASH_MAX_PER_PROPOSAL = 2;
 export const TRADE_CASH_MAX_PER_WINDOW = 3;
 export const TRADE_CASH_PCT_PER_POINT = 8;
 export const TRADE_CASH_PCT_MAX = 16;
-export const TRADE_MIN_TALENT_RATIO = 800;
 function boardSeed(rootSeed: string, windowIndex: number, ...keys: string[]): string {
-  return seasonNamespaceSeed(rootSeed, 'trades', 'window', String(windowIndex), ...keys);
-}
-function fingerprintOf(outgoing: readonly string[], incoming: readonly string[]): string {
-  const o = [...outgoing].sort().join(',');
-  const i = [...incoming].sort().join(',');
-  return `${o}|${i}`;
+  return tradeSeed(rootSeed, 'window', String(windowIndex), ...keys);
 }
 export type TradeProposalEvaluation =
   | {
@@ -101,7 +250,10 @@ export function evaluateTradeProposal(input: {
   if (outgoingPlayerVersionIds.length === 0 && incomingPlayerVersionIds.length === 0) {
     return { ok: false, code: 'roster-illegal', reason: 'Influence cannot be only asset' };
   }
-  const catalogFacts = seasonTradeCatalogFactsOf(catalog);
+  const catalogFacts = seasonTradeCatalogFactsOf(
+    catalog,
+    normalizeSponsorGearState(run.sponsors).players.slots,
+  );
   const humanFranchiseId =
     run.league.teams.find((t) => t.control === 'human')?.franchiseId ??
     run.league.teams[0]?.franchiseId ??
@@ -145,7 +297,7 @@ export function evaluateTradeProposal(input: {
   ];
   const filled = fillTradeBackfill({
     catalog,
-    run: run as unknown as import('./trades.ts').SeasonEconomyRun,
+    run: run as SeasonEconomyRun,
     toFranchiseId,
     fromFranchiseId,
     toIds: toAfterRaw,
@@ -162,12 +314,7 @@ export function evaluateTradeProposal(input: {
   }
   const fromAfter = filled.fromIdsFilled;
   const toAfter = filled.toIdsFilled;
-  const checkRoster = (ids: readonly string[]) => {
-    if (ids.length < 10 || ids.length > 15) return false;
-    if (new Set(ids).size !== ids.length) return false;
-    return true;
-  };
-  if (!checkRoster(fromAfter) || !checkRoster(toAfter)) {
+  if (!legalRosterSize(fromAfter) || !legalRosterSize(toAfter)) {
     return { ok: false, code: 'roster-illegal', reason: 'resulting roster 10-15' };
   }
   const boardProfile = win.boardProfiles?.find((p) => p.franchiseId === toFranchiseId);
@@ -205,16 +352,17 @@ export function evaluateTradeProposal(input: {
       }
     }
   }
+  const economy = run as SeasonEconomyRun;
   const fromAfterValues = fromAfter.map((id) =>
     seasonTradePlayerValue(id, {
-      run: run as unknown as import('./trades.ts').SeasonEconomyRun,
+      run: economy,
       catalogFacts,
       receivingFranchiseId: fromFranchiseId,
     }),
   );
   const toAfterValues = toAfter.map((id) =>
     seasonTradePlayerValue(id, {
-      run: run as unknown as import('./trades.ts').SeasonEconomyRun,
+      run: economy,
       catalogFacts,
       receivingFranchiseId: toFranchiseId,
     }),
@@ -223,14 +371,14 @@ export function evaluateTradeProposal(input: {
   const toTotal = toAfterValues.reduce((a, b) => a + b, 0);
   const outgoingValues = outgoingPlayerVersionIds.map((id) =>
     seasonTradePlayerValue(id, {
-      run: run as unknown as import('./trades.ts').SeasonEconomyRun,
+      run: economy,
       catalogFacts,
       receivingFranchiseId: fromFranchiseId,
     }),
   );
   const incomingValues = incomingPlayerVersionIds.map((id) =>
     seasonTradePlayerValue(id, {
-      run: run as unknown as import('./trades.ts').SeasonEconomyRun,
+      run: economy,
       catalogFacts,
       receivingFranchiseId: toFranchiseId,
     }),
@@ -240,8 +388,7 @@ export function evaluateTradeProposal(input: {
   const rawRatio = outPackage > 0 ? Math.round((1000 * inPackage) / outPackage) : 0;
   const outBest = seasonTradeBestValue(outgoingValues);
   const inBest = seasonTradeBestValue(incomingValues);
-  const is1v1 = outgoingPlayerVersionIds.length === 1 && incomingPlayerVersionIds.length === 1;
-  const band = is1v1 ? TRADE_BAND_1V1 : TRADE_BAND_DEFAULT;
+  const band = TRADE_VALUE_BAND;
   let adjusted = rawRatio;
   if (influenceAmount > 0) {
     const pct = Math.min(influenceAmount * TRADE_CASH_PCT_PER_POINT, TRADE_CASH_PCT_MAX);
@@ -253,25 +400,23 @@ export function evaluateTradeProposal(input: {
     if (influenceAmount > TRADE_CASH_MAX_PER_PROPOSAL) {
       return { ok: false, code: 'trade-cash-cap', reason: 'cash >2 per proposal' };
     }
-    if (influenceAmount > 0) {
-      if (influenceFromSender === null) {
-        throw new Error('trade proposal with Influence amount requires a sender');
-      }
-      const senderFid = franchiseIdSchema.parse(influenceFromSender);
-      const senderWindows = run.influence.windows[senderFid] ?? [];
-      const senderWin = senderWindows.find((w) => w.windowIndex === windowIndex);
-      const sent = senderWin?.tradeCashSent ?? 0;
-      if (sent + influenceAmount > TRADE_CASH_MAX_PER_WINDOW) {
-        return {
-          ok: false,
-          code: 'trade-cash-cap',
-          reason: `per-window cap ${String(TRADE_CASH_MAX_PER_WINDOW)}`,
-        };
-      }
-      const senderBalance = run.influence.balances[senderFid] ?? 0;
-      if (senderBalance - influenceAmount < SEASON_INFLUENCE_FLOOR) {
-        return { ok: false, code: 'insufficient-balance', reason: 'balance' };
-      }
+    if (influenceFromSender === null) {
+      throw new Error('trade proposal with Influence amount requires a sender');
+    }
+    const senderFid = franchiseIdSchema.parse(influenceFromSender);
+    const senderWindows = run.influence.windows[senderFid] ?? [];
+    const senderWin = senderWindows.find((w) => w.windowIndex === windowIndex);
+    const sent = senderWin?.tradeCashSent ?? 0;
+    if (sent + influenceAmount > TRADE_CASH_MAX_PER_WINDOW) {
+      return {
+        ok: false,
+        code: 'trade-cash-cap',
+        reason: `per-window cap ${String(TRADE_CASH_MAX_PER_WINDOW)}`,
+      };
+    }
+    const senderBalance = run.influence.balances[senderFid] ?? 0;
+    if (senderBalance - influenceAmount < SEASON_INFLUENCE_FLOOR) {
+      return { ok: false, code: 'insufficient-balance', reason: 'balance' };
     }
   }
   const finalRatio = adjusted;
@@ -335,6 +480,163 @@ export function evaluateTradeProposal(input: {
     expectedStateDigest: run.stateDigest,
   };
   return { ok: true, proposal };
+}
+function legalRosterSize(ids: readonly string[]): boolean {
+  if (ids.length < 10 || ids.length > 15) return false;
+  return new Set(ids).size === ids.length;
+}
+const TRADE_BOARD_PROFILE_COUNT = 8;
+const TRADE_BOARD_NEEDS: readonly SeasonTradeNeed[] = [
+  'ball-handling',
+  'shooting',
+  'perimeter-defense',
+  'interior-defense',
+  'rebounding',
+  'availability',
+  'rotation-talent',
+  'depth',
+];
+const TRADE_BOARD_PRIORITIES: readonly SeasonTradePriority[] = [
+  'talent',
+  'fit',
+  'availability',
+  'depth',
+  'influence',
+];
+const TRADE_BOARD_TRENDS = ['rising', 'stable', 'falling'] as const;
+const TRADE_BOARD_COMPETITOR_INTERESTS = ['low', 'possible', 'strong', 'preferred-fit'] as const;
+export interface TradeBoardProfilesInput {
+  run: SeasonRun;
+  rootSeed: string;
+  windowIndex: number;
+  humanFranchiseId: string;
+  catalogFacts: SeasonTradeCatalogFacts;
+}
+export function generateTradeBoardProfiles(input: TradeBoardProfilesInput): {
+  boardProfiles: SeasonTradeBoardTeamProfile[];
+  canonicalTeamOrder: SeasonTradeWindowState['canonicalTeamOrder'];
+  valueTrends: SeasonTradeValueTrend[];
+} {
+  const { run, rootSeed, windowIndex, humanFranchiseId, catalogFacts } = input;
+  const aiIds = aiFranchiseIdsOf(run, humanFranchiseId);
+  const boardRng = createRng(tradeSeed(rootSeed, 'window', String(windowIndex), 'board'));
+  const selected = shuffle(aiIds, boardRng).slice(0, TRADE_BOARD_PROFILE_COUNT);
+  const rosterByFranchise = new Map<string, SeasonRoster>(
+    run.rosters.map((roster) => [roster.franchiseId, roster]),
+  );
+  const rotationByFranchise = new Map<string, SeasonRotation>(
+    run.rotations.map((rotation) => [rotation.franchiseId, rotation]),
+  );
+  const boardProfiles: SeasonTradeBoardTeamProfile[] = [];
+  for (const franchiseId of selected) {
+    const teamRng = createRng(
+      tradeSeed(rootSeed, 'window', String(windowIndex), 'board', franchiseId),
+    );
+    const rosterIds = rosterPlayerVersionIdsOf(run, franchiseId);
+    const rosterSet = new Set(rosterIds);
+    const rotation = rotationByFranchise.get(franchiseId);
+    let listed: string[] = [];
+    let discussable: string[] = [];
+    let protectedIds: string[] = [];
+    if (rotation !== undefined) {
+      const starters = rotation.starters.filter((id) => rosterSet.has(id));
+      const bench = rotation.benchOrder.filter((id) => rosterSet.has(id));
+      protectedIds = starters.slice(0, 5);
+      listed = bench.slice(0, 1);
+      discussable = bench.slice(1, 3);
+    }
+    if (listed.length === 0 || protectedIds.length === 0) {
+      const roster = rosterByFranchise.get(franchiseId);
+      const ordered = roster?.players.map((player) => player.playerVersionId) ?? rosterIds;
+      if (protectedIds.length === 0) protectedIds = ordered.slice(0, 5);
+      if (listed.length === 0) listed = ordered.slice(5, 6);
+      if (discussable.length === 0) discussable = ordered.slice(6, 8);
+    }
+    listed = listed.filter((id) => !protectedIds.includes(id)).slice(0, 1);
+    discussable = discussable
+      .filter((id) => !protectedIds.includes(id) && !listed.includes(id))
+      .slice(0, 2);
+    const groupDepth: Record<SlotGroup, number> = { G: 0, F: 0, C: 0 };
+    for (const id of rosterIds) {
+      const playable = catalogFacts.playable.get(id);
+      if (playable === undefined) continue;
+      for (const group of ['G', 'F', 'C'] as const) {
+        if (canPlayGroup(playable, group)) groupDepth[group] += 1;
+      }
+    }
+    const thinnest: SlotGroup =
+      groupDepth.G <= groupDepth.F && groupDepth.G <= groupDepth.C
+        ? 'G'
+        : groupDepth.C <= groupDepth.F
+          ? 'C'
+          : 'F';
+    const thinCandidates: SeasonTradeNeed[] =
+      thinnest === 'G'
+        ? ['ball-handling', 'shooting']
+        : thinnest === 'C'
+          ? ['interior-defense', 'rebounding']
+          : ['perimeter-defense', 'shooting'];
+    const needs: SeasonTradeNeed[] = [teamRng.pick(thinCandidates)];
+    const hasInjury = run.health.injuries.some(
+      (injury) =>
+        injury.franchiseId === franchiseId &&
+        injury.sameGameReturned !== true &&
+        injury.missedGamesRemaining > 0,
+    );
+    const firstNeed = needs[0];
+    if (hasInjury && firstNeed !== 'availability' && teamRng.chance(0.5)) {
+      needs.push('availability');
+    } else if (teamRng.chance(0.6)) {
+      const remaining = TRADE_BOARD_NEEDS.filter((need) => !needs.includes(need));
+      if (remaining.length > 0) needs.push(teamRng.pick(remaining));
+    }
+    const priority: SeasonTradePriority = needs.includes('availability')
+      ? teamRng.chance(0.5)
+        ? 'availability'
+        : teamRng.pick(TRADE_BOARD_PRIORITIES)
+      : teamRng.pick(TRADE_BOARD_PRIORITIES);
+    const rationale =
+      `${franchiseId} seeks ${needs.join(' + ')}; ` +
+      `listening on ${listed[0] ?? 'bench depth'} with ${priority} priority.`;
+    const hardConstraints = ['Protected players unavailable'];
+    let competitorInterest: SeasonTradeBoardTeamProfile['competitorInterest'];
+    const listedId = listed[0];
+    if (listedId !== undefined && teamRng.chance(0.35)) {
+      competitorInterest = {
+        [listedId]: teamRng.pick([...TRADE_BOARD_COMPETITOR_INTERESTS]),
+      };
+    }
+    boardProfiles.push({
+      franchiseId: franchiseIdSchema.parse(franchiseId),
+      needs,
+      priority,
+      listedPlayerIds: listed,
+      discussablePlayerIds: discussable,
+      protectedPlayerIds: protectedIds,
+      hardConstraints,
+      rationale,
+      ...(competitorInterest === undefined ? {} : { competitorInterest }),
+    });
+  }
+  const canonicalTeamOrder = selected.map((id) => franchiseIdSchema.parse(id));
+  const humanRosterIds = (() => {
+    try {
+      return rosterPlayerVersionIdsOf(run, humanFranchiseId);
+    } catch {
+      return [];
+    }
+  })();
+  const valueTrends: SeasonTradeValueTrend[] = humanRosterIds.slice(0, 6).map((playerVersionId) => {
+    const trend = createRng(
+      tradeSeed(rootSeed, 'window', String(windowIndex), 'board', 'trend', playerVersionId),
+    ).pick([...TRADE_BOARD_TRENDS]);
+    return {
+      playerVersionId,
+      trend,
+      basis: `Board estimate holds ${playerVersionId} ${trend} this window.`,
+    };
+  });
+  return { boardProfiles, canonicalTeamOrder, valueTrends };
 }
 export function openTradeInquiry(
   run: SeasonRun,

@@ -19,7 +19,7 @@ import {
   type FixedFiveRoomSnapshot,
   type Id,
 } from '@hoop-rush/data-contracts';
-import { randomUUID } from '$lib/random-id';
+import { randomUUID } from '$lib/ids';
 type FixedFiveClient = SupabaseClient;
 const sharedClients = new Map<string, FixedFiveClient>();
 let supabaseModulePromise: Promise<typeof import('@supabase/supabase-js')> | null = null;

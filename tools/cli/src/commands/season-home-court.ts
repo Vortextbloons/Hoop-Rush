@@ -15,7 +15,6 @@ import {
   createEngineContext,
   simulateSeasonGame,
 } from '@hoop-rush/engine';
-import { parseSeedRange, parseWorkers } from '../args.ts';
 import { makeReport, type CliReport } from '../report.ts';
 import { seasonHomeCourtCalibrateReportSchema } from '../report-schemas.ts';
 import { seasonGameFixtureSchema } from '../fixture-schema.ts';
@@ -24,20 +23,17 @@ import {
   resolveSeasonGameFixturePath,
   type SeasonGameEngineDeps,
 } from './season-game.ts';
-import { seasonCalibrationSeed, seedIndexRange } from './season-calibration.ts';
+import { seasonCalibrationSeed } from './season-calibration.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR, readJsonFile } from './season-data.ts';
-import { commitTargetsArtifact, runWorkerChunks } from '../artifact.ts';
-export const SEASON_HOME_COURT_CALIBRATE_OPTIONS: Record<string, boolean> = {
-  fixture: true,
-  'seed-from': true,
-  'seed-to': true,
-  workers: true,
-  constants: true,
-  out: true,
-  manifest: true,
-  validate: true,
-  format: true,
-};
+import {
+  createFixtureCohortRunner,
+  resolveCalibrationArgs,
+  runCalibratedSeeds,
+  seedRangeCalibrateOptions,
+} from '../calibration-harness.ts';
+import { commitTargetsArtifact } from '../artifact.ts';
+export const SEASON_HOME_COURT_CALIBRATE_OPTIONS: Record<string, boolean> =
+  seedRangeCalibrateOptions({ fixture: true, constants: true, validate: true });
 export const SEASON_HOME_COURT_CALIBRATION_SEED_COUNT = 1024;
 export const SEASON_HOME_COURT_VALIDATION_SEED_COUNT = 256;
 export const SEASON_HOME_COURT_SEED_TOTAL =
@@ -137,25 +133,21 @@ export type SeasonHomeCourtCohortRunner = (
 export async function runSeasonHomeCourtCohort(
   request: SeasonHomeCourtCohortRequest,
 ): Promise<SeasonHomeCourtGameFacts[]> {
-  const promises: Array<Promise<SeasonHomeCourtGameFacts[]>> = [];
-  for (const fixture of request.fixtures) {
-    promises.push(
-      runWorkerChunks<number, SeasonHomeCourtGameFacts>({
-        workerUrl: new URL('./season-home-court-calibration-worker.ts', import.meta.url),
-        workerData: (seedIndices) => ({
-          fixtureId: fixture.fixtureId,
-          fixturePath: fixture.path,
-          seedIndices,
-          profile: request.profile,
-        }),
-        items: request.seedIndices,
-        workers: request.workers,
-        payloadKey: 'facts',
-      }),
-    );
-  }
-  const chunks = await Promise.all(promises);
-  return chunks.flat();
+  return createFixtureCohortRunner<SeasonHomeCourtGameFacts>({
+    workerUrl: new URL('./season-home-court-calibration-worker.ts', import.meta.url),
+    payloadKey: 'facts',
+    buildWorkerData: (fixture, seedIndices, extra) => ({
+      fixtureId: fixture.fixtureId,
+      fixturePath: fixture.path,
+      seedIndices,
+      profile: (extra as { profile: SeasonHomeCourtProfile }).profile,
+    }),
+  })({
+    fixtures: request.fixtures,
+    seedIndices: request.seedIndices,
+    workers: request.workers,
+    extra: { profile: request.profile },
+  });
 }
 export function runSeasonHomeCourtCohortInProcess(
   request: SeasonHomeCourtCohortRequest,
@@ -281,11 +273,20 @@ export async function seasonHomeCourtCalibrate(
   if (fixtureIds.length === 0) {
     throw new Error('--fixture needs at least one fixture id');
   }
-  const { from: seedFrom, to: seedTo } = parseSeedRange(args, SEASON_HOME_COURT_SEED_TOTAL - 1, {
-    requireOrder: true,
+  const {
+    from: seedFrom,
+    to: seedTo,
+    workers,
+    calibrationIndices,
+    validationIndices,
+  } = resolveCalibrationArgs(args, {
+    calibrationSeedCount: SEASON_HOME_COURT_CALIBRATION_SEED_COUNT,
+    validationSeedCount: SEASON_HOME_COURT_VALIDATION_SEED_COUNT,
+    defaultWorkers: 4,
+    clampWorkers: true,
+    mode: 'split',
     error: Error,
   });
-  const workers = parseWorkers(args, 4, { clampToAtLeastOne: true });
   const profile = profileOfConstants(args.constants);
   const fixtures = fixtureIds.map((id) => {
     const fixture = loadSeasonGameFixture(id);
@@ -303,28 +304,14 @@ export async function seasonHomeCourtCalibrate(
       ? (request: SeasonHomeCourtCohortRequest) =>
           runSeasonHomeCourtCohortInProcess(request, engineDeps)
       : runSeasonHomeCourtCohort);
-  const calibrationIndices = seedIndexRange(
-    seedFrom,
-    Math.min(seedTo, SEASON_HOME_COURT_CALIBRATION_SEED_COUNT - 1),
+  const {
+    calibration: calibrationFacts,
+    validation: validationFacts,
+    durationMs,
+  } = await runCalibratedSeeds(
+    () => runCohort({ fixtures, seedIndices: calibrationIndices, workers, profile }),
+    () => runCohort({ fixtures, seedIndices: validationIndices, workers, profile }),
   );
-  const validationIndices = seedIndexRange(
-    Math.max(seedFrom, SEASON_HOME_COURT_CALIBRATION_SEED_COUNT),
-    seedTo,
-  );
-  const started = Date.now();
-  const calibrationFacts = await runCohort({
-    fixtures,
-    seedIndices: calibrationIndices,
-    workers,
-    profile,
-  });
-  const validationFacts = await runCohort({
-    fixtures,
-    seedIndices: validationIndices,
-    workers,
-    profile,
-  });
-  const durationMs = Date.now() - started;
   const calibration = foldWinRates(calibrationFacts);
   const validation = foldWinRates(validationFacts);
   const achievedHomeWinRate = validation.achievedHomeWinRate;

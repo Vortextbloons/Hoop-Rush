@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { EraSimulationProfile } from './era-sim-profile.ts';
 import { contentHashSchema, eraIdSchema, playerIdSchema, seedSchema } from './ids.ts';
-import { seasonCheckpointDigestSchema } from './season-digests.ts';
+import { seasonCheckpointDigestSchema } from './season-hash.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import {
   PROJECTION_MODEL_VERSION,

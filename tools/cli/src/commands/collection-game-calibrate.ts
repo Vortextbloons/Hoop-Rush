@@ -18,7 +18,12 @@ import {
 import { ENGINE_VERSION } from '@hoop-rush/engine';
 import { makeReport, type CliReport } from '../report.ts';
 import { collectionGameCalibrateReportSchema } from '../report-schemas.ts';
-import { runWorkerChunks, validateTargetsArtifact } from '../artifact.ts';
+import { validateTargetsArtifact } from '../artifact.ts';
+import {
+  createSeedChunkRunner,
+  resolveCountCalibrationArgs,
+  seedCountCalibrateOptions,
+} from '../calibration-harness.ts';
 import { DEFAULT_MANIFEST, readJsonFile, sha256Hex } from './season-data.ts';
 import { loadCollectionCatalog } from './collection.ts';
 import { loadCollectionGameRules } from './collection-game.ts';
@@ -28,15 +33,9 @@ import {
   type CollectionGameProjectionJob,
 } from './collection-game-projection.ts';
 
-export const COLLECTION_GAME_CALIBRATE_OPTIONS: Record<string, boolean> = {
-  workers: true,
-  'calibration-seeds': true,
-  'validation-seeds': true,
-  out: true,
-  manifest: true,
-  validate: true,
-  format: true,
-};
+export const COLLECTION_GAME_CALIBRATE_OPTIONS: Record<string, boolean> = seedCountCalibrateOptions(
+  { validate: true },
+);
 
 export const DEFAULT_COLLECTION_GAME_TARGETS = resolve(
   dirname(DEFAULT_MANIFEST),
@@ -111,13 +110,11 @@ function projectViaWorkers(
   workers: number,
 ): Promise<CollectionGameProjection[]> {
   if (jobs.length === 0) return Promise.resolve([]);
-  return runWorkerChunks<CollectionGameProjectionJob, CollectionGameProjection>({
+  return createSeedChunkRunner<CollectionGameProjectionJob, CollectionGameProjection>({
     workerUrl: new URL('./collection-game-calibration-worker.ts', import.meta.url),
-    workerData: (chunk) => ({ manifestPath, jobs: chunk }),
-    items: jobs,
-    workers,
     payloadKey: 'projections',
-  });
+    buildWorkerData: (chunk) => ({ manifestPath, jobs: chunk }),
+  })([...jobs], workers);
 }
 
 function aggregate(projections: readonly CollectionGameProjection[]): {
@@ -229,9 +226,16 @@ export async function collectionGameCalibrate(args: {
     return report;
   }
 
-  const workers = Math.max(1, Number.parseInt(args.workers ?? '4', 10) || 4);
-  const calibrationSeeds = Math.max(1, Number.parseInt(args.calibrationSeeds ?? '16', 10) || 16);
-  const validationSeeds = Math.max(1, Number.parseInt(args.validationSeeds ?? '8', 10) || 8);
+  const {
+    calibrationCount: calibrationSeeds,
+    validationCount: validationSeeds,
+    workers,
+  } = resolveCountCalibrationArgs(args, {
+    calibrationDefault: 16,
+    validationDefault: 8,
+    workersDefault: 4,
+    clampWorkers: true,
+  });
   let loaded: { catalog: CollectionCatalog; catalogHash: string };
   let rules: CollectionGameRules;
   let rulesHash: string;

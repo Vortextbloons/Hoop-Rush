@@ -21,7 +21,7 @@ export const COLLECTION_PROGRESSION_DISPLAY: CollectionProgressionDisplay =
       'Target one canonical player. Every eligible version shares the same within-rarity boost, and rarity odds never change.',
     setsTitle: 'Sets',
     setsBlurb:
-      'Own all six exact members of the Heat Check set to claim its one-time Exchange reward. Cards are never consumed.',
+      'Complete Heat Check or Arm Guard to claim its one-time Exchange reward. Cards are never consumed.',
   });
 
 export const COLLECTION_LAUNCH_CHALLENGES: readonly CollectionChallengeDefinition[] = [
@@ -135,6 +135,14 @@ export const COLLECTION_LAUNCH_CHALLENGES: readonly CollectionChallengeDefinitio
 export type CollectionLaunchSetRewardFixed = Omit<CollectionSetRewardDefinition, 'memberCardIds'>;
 
 export const COLLECTION_LAUNCH_SET_REWARDS: readonly CollectionLaunchSetRewardFixed[] = [
+  {
+    setRewardVersion: COLLECTION_SET_REWARD_VERSION,
+    setId: 'arm-guard-set',
+    title: 'Arm Guard',
+    currency: 'Exchange',
+    amount: 2500,
+    description: 'Own all seven Arm Guard cards to claim 2,500 Exchange once.',
+  },
   {
     setRewardVersion: COLLECTION_SET_REWARD_VERSION,
     setId: 'heat-check-set',

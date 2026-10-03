@@ -6,8 +6,11 @@ import {
 } from '@hoop-rush/data-contracts';
 import {
   allocateDefaultMinutes,
+  allocateMeritMinutes,
+  CollectionCommandError,
   initializeCollectionActiveTeam,
   validateCollectionActiveTeam,
+  type CollectionMinuteStrategy,
   type CollectionTeamCheck,
 } from '@hoop-rush/engine';
 
@@ -131,11 +134,54 @@ export function slotEligibility(positions: readonly Position[], slotIndex: numbe
 export function buildAutoDraft(
   ownedCardIds: readonly string[],
   resolve: (cardId: string) => CollectionCatalogCard | undefined,
+  strategy: CollectionMinuteStrategy = 'balanced',
 ): TeamDraft {
-  return draftFromTeam(initializeCollectionActiveTeam(ownedCardIds, resolve));
+  return draftFromTeam(initializeCollectionActiveTeam(ownedCardIds, resolve, strategy));
 }
 
-export function balanceDraftMinutes(draft: TeamDraft): TeamDraft {
+export const MINUTE_STRATEGIES: readonly CollectionMinuteStrategy[] = [
+  'tight',
+  'balanced',
+  'deep',
+];
+
+export function balanceDraftMinutes(
+  draft: TeamDraft,
+  resolve: (cardId: string) => CollectionCatalogCard | undefined,
+  strategy: CollectionMinuteStrategy = 'balanced',
+): TeamDraft {
+  const starterCount = draft.starters.filter((cardId) => cardId !== null).length;
+  if (starterCount !== 5) {
+    return legacyBalanceDraftMinutes(draft);
+  }
+  const roster = draftRoster(draft);
+  const starterIds = new Set(draft.starters.filter((cardId): cardId is string => cardId !== null));
+  const meritRoster = roster.map((cardId) => ({
+    cardId,
+    starter: starterIds.has(cardId),
+    overall: resolve(cardId)?.summarySource?.overallRating ?? 60,
+  }));
+  const strategies: CollectionMinuteStrategy[] = [strategy, 'deep', 'balanced', 'tight'];
+  const tried = new Set<CollectionMinuteStrategy>();
+  for (const candidate of strategies) {
+    if (tried.has(candidate)) continue;
+    tried.add(candidate);
+    try {
+      const balanced = allocateMeritMinutes(meritRoster, candidate);
+      return {
+        ...draft,
+        minutes: Object.fromEntries(balanced.map((entry) => [entry.cardId, entry.minutes])),
+      };
+    } catch (error) {
+      if (!(error instanceof CollectionCommandError) || error.code !== 'invalid-minutes') {
+        throw error;
+      }
+    }
+  }
+  return legacyBalanceDraftMinutes(draft);
+}
+
+export function legacyBalanceDraftMinutes(draft: TeamDraft): TeamDraft {
   const roster = draftRoster(draft);
   const starterIds = new Set(draft.starters.filter((cardId): cardId is string => cardId !== null));
   const balanced = allocateDefaultMinutes(

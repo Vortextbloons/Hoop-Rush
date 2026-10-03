@@ -13,6 +13,8 @@ import type {
 } from '@hoop-rush/data-contracts';
 import {
   SEASON_DRAFT_VERSION,
+  generationWorkerProgressSchema,
+  generationWorkerRequestSchema,
   seasonLeagueGenerationResultSchema,
 } from '@hoop-rush/data-contracts';
 import {
@@ -23,7 +25,7 @@ import {
   type SeasonAiGenerationProgress,
 } from '@hoop-rush/engine';
 import { recordFromState, type SeasonDraftRepository } from '@hoop-rush/persistence';
-import { newSeasonId } from './season-ids';
+import { newSeasonId } from '$lib/ids';
 import { sleep } from '$lib/sleep';
 import {
   GENERATION_WORKER_WIRE_SCHEMA_VERSION,
@@ -318,6 +320,7 @@ export class SeasonDraftFlow {
       input,
       targets,
     };
+    generationWorkerRequestSchema.parse(request);
     const worker = new Worker(
       new URL('../../workers/season-draft-generation-worker.ts', import.meta.url),
       { type: 'module' },
@@ -345,13 +348,15 @@ export class SeasonDraftFlow {
         if (message.requestId !== request.requestId) return;
         if (settled) return;
         if (message.type === 'progress') {
+          const validated = generationWorkerProgressSchema.safeParse(message);
+          if (!validated.success) return;
           armTimeout();
           this.setProgress({
-            phase: message.phase,
-            completed: message.completed,
-            total: message.total,
-            ...(message.teamsCompleted !== undefined
-              ? { teamsCompleted: message.teamsCompleted }
+            phase: validated.data.phase,
+            completed: validated.data.completed,
+            total: validated.data.total,
+            ...(validated.data.teamsCompleted !== undefined
+              ? { teamsCompleted: validated.data.teamsCompleted }
               : {}),
           });
           return;

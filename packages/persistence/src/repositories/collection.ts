@@ -543,11 +543,16 @@ export class DexieCollectionRepository {
   async clearCollection(collectionId: string): Promise<void> {
     await this.db.transaction(
       'rw',
-      this.db.collectionState,
-      this.db.collectionOwnership,
-      this.db.collectionPulls,
-      this.db.collectionLedger,
-      this.db.collectionCommands,
+      [
+        this.db.collectionState,
+        this.db.collectionOwnership,
+        this.db.collectionPulls,
+        this.db.collectionLedger,
+        this.db.collectionCommands,
+        this.db.collectionPlayState,
+        this.db.collectionGames,
+        this.db.collectionGameCommands,
+      ],
       async () => {
         await this.db.collectionState.delete(collectionId);
         await this.db.collectionOwnership
@@ -566,14 +571,6 @@ export class DexieCollectionRepository {
           .where('[collectionId+commandId]')
           .between([collectionId, ''], [collectionId, '￿'])
           .delete();
-      },
-    );
-    await this.db.transaction(
-      'rw',
-      this.db.collectionPlayState,
-      this.db.collectionGames,
-      this.db.collectionGameCommands,
-      async () => {
         await this.db.collectionPlayState.delete(collectionId);
         await this.db.collectionGames
           .where('[collectionId+gameId]')

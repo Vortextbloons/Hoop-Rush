@@ -18,7 +18,7 @@ import {
   seasonRunCommandBaseSchema,
   windowIndexSchema,
 } from './season-command-base.ts';
-import { seasonRotationSetDigestSchema } from './season-digests.ts';
+import { seasonRotationSetDigestSchema } from './season-hash.ts';
 import {
   seasonFreeAgencyRoleExpectationSchema,
   seasonFreeAgencySigningSchema,

@@ -25,7 +25,7 @@
     legend?: string;
     onChange: (objectiveId: CollectionObjectiveId | null) => void;
   } = $props();
-  const icons = {
+  const icons: Record<CollectionObjectiveId, typeof Target> = {
     'obj-three-barrage-v1': Crosshair,
     'obj-lock-score-v1': Shield,
     'obj-bench-spark-v1': Users,
@@ -57,12 +57,10 @@
           <span class="objective-icon" aria-hidden="true"><Icon size={23} strokeWidth={1.7} /></span
           >
           <span class="ur-obj-bonus"
-            >{option.coinBonus === null ? 'Free play' : `+${option.coinBonus} coins`}</span
+            >{option.coinBonus === null ? 'No bonus' : `+${option.coinBonus} Coins`}</span
           >
           <span class="ur-obj-title">{option.title}</span>
-          <span class="ur-obj-cond"
-            >{option.objectiveId === null ? 'Focus on the win.' : option.conditionLabel}</span
-          >
+          <span class="ur-obj-cond">{option.conditionLabel}</span>
           <span class="selection-mark" aria-hidden="true"
             >{#if selected}<Check size={12} strokeWidth={3} />{/if}</span
           >

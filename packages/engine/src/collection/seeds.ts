@@ -44,6 +44,8 @@ export function collectionPullSeed(
 
 export type CollectionGameSeedNamespace = 'games' | 'cpu-teams';
 
+const GAME_ID_SEPARATOR = String.fromCharCode(0);
+
 function gameNamespaceSeed(
   derivationVersion: string,
   rootSeed: string,
@@ -63,6 +65,47 @@ function gameNamespaceSeed(
   );
 }
 
+function gameSeedWithVersion(
+  derivationVersion: string,
+  rootSeed: string,
+  gameSequence: number,
+): string {
+  return gameNamespaceSeed(derivationVersion, rootSeed, 'games', String(gameSequence));
+}
+
+function cpuTeamSeedWithVersion(
+  derivationVersion: string,
+  rootSeed: string,
+  ...keys: string[]
+): string {
+  return gameNamespaceSeed(derivationVersion, rootSeed, 'cpu-teams', ...keys);
+}
+
+function gameIdWithVersion(derivationVersion: string, rootSeed: string, ...keys: string[]): string {
+  return `game-${seasonDigestHex([derivationVersion, rootSeed, 'game-id', ...keys].join(GAME_ID_SEPARATOR))}`;
+}
+
+function gameSeedPathFor(gameSequence: number): string[] {
+  return ['collection', 'games', String(gameSequence)];
+}
+
+function cpuTeamSeedPathFor(gameSequence: number): string[] {
+  return ['collection', COLLECTION_SEED_NAMESPACES.cpuTeams, String(gameSequence)];
+}
+
+function difficultyBasePathFor(
+  difficultyId: CollectionDifficultyId,
+  gameSequence: number,
+): string[] {
+  return [
+    'collection',
+    COLLECTION_SEED_NAMESPACES.cpuTeams,
+    'difficulty',
+    difficultyId,
+    String(gameSequence),
+  ];
+}
+
 export function collectionGameNamespaceSeed(
   rootSeed: string,
   namespace: CollectionGameSeedNamespace,
@@ -77,11 +120,19 @@ export function collectionGameNamespaceSeed(
 }
 
 export function collectionCpuTeamSeed(rootSeed: string, gameSequence: number): string {
-  return collectionGameNamespaceSeed(rootSeed, 'cpu-teams', String(gameSequence));
+  return cpuTeamSeedWithVersion(
+    COLLECTION_GAME_V1_SEED_DERIVATION_VERSION,
+    rootSeed,
+    String(gameSequence),
+  );
 }
 
 export function collectionGameSeed(rootSeed: string, gameSequence: number): string {
-  return collectionGameNamespaceSeed(rootSeed, 'games', String(gameSequence));
+  return gameSeedWithVersion(
+    COLLECTION_GAME_V1_SEED_DERIVATION_VERSION,
+    rootSeed,
+    gameSequence,
+  );
 }
 
 export function collectionGameSeedPaths(gameSequence: number): {
@@ -89,18 +140,17 @@ export function collectionGameSeedPaths(gameSequence: number): {
   cpuTeam: string[];
 } {
   return {
-    game: ['collection', 'games', String(gameSequence)],
-    cpuTeam: ['collection', COLLECTION_SEED_NAMESPACES.cpuTeams, String(gameSequence)],
+    game: gameSeedPathFor(gameSequence),
+    cpuTeam: cpuTeamSeedPathFor(gameSequence),
   };
 }
 
 export function collectionGameId(rootSeed: string, gameSequence: number): string {
-  const separator = String.fromCharCode(0);
-  return `game-${seasonDigestHex(
-    [COLLECTION_GAME_V1_SEED_DERIVATION_VERSION, rootSeed, 'game-id', String(gameSequence)].join(
-      separator,
-    ),
-  )}`;
+  return gameIdWithVersion(
+    COLLECTION_GAME_V1_SEED_DERIVATION_VERSION,
+    rootSeed,
+    String(gameSequence),
+  );
 }
 
 export function collectionGameNamespaceSeedV2(
@@ -117,9 +167,9 @@ export function collectionCpuDifficultySeed(
   gameSequence: number,
   ...keys: string[]
 ): string {
-  return collectionGameNamespaceSeedV2(
+  return cpuTeamSeedWithVersion(
+    COLLECTION_GAME_SEED_DERIVATION_VERSION,
     rootSeed,
-    'cpu-teams',
     'difficulty',
     difficultyId,
     String(gameSequence),
@@ -159,7 +209,11 @@ export function collectionObjectiveOfferSeed(
 }
 
 export function collectionGameSeedV2(rootSeed: string, gameSequence: number): string {
-  return collectionGameNamespaceSeedV2(rootSeed, 'games', String(gameSequence));
+  return gameSeedWithVersion(
+    COLLECTION_GAME_SEED_DERIVATION_VERSION,
+    rootSeed,
+    gameSequence,
+  );
 }
 
 export function collectionGameSeedPathsV2(
@@ -173,15 +227,9 @@ export function collectionGameSeedPathsV2(
   candidate: string[];
   objectives: string[];
 } {
-  const base = [
-    'collection',
-    COLLECTION_SEED_NAMESPACES.cpuTeams,
-    'difficulty',
-    difficultyId,
-    String(gameSequence),
-  ];
+  const base = difficultyBasePathFor(difficultyId, gameSequence);
   return {
-    game: ['collection', 'games', String(gameSequence)],
+    game: gameSeedPathFor(gameSequence),
     cpuTeam: [...base],
     difficulty: ['collection', COLLECTION_SEED_NAMESPACES.cpuTeams, 'difficulty', difficultyId],
     identity: [...base, 'identity'],
@@ -200,14 +248,10 @@ export function collectionGameIdV2(
   difficultyId: CollectionDifficultyId,
   gameSequence: number,
 ): string {
-  const separator = String.fromCharCode(0);
-  return `game-${seasonDigestHex(
-    [
-      COLLECTION_GAME_SEED_DERIVATION_VERSION,
-      rootSeed,
-      'game-id',
-      difficultyId,
-      String(gameSequence),
-    ].join(separator),
-  )}`;
+  return gameIdWithVersion(
+    COLLECTION_GAME_SEED_DERIVATION_VERSION,
+    rootSeed,
+    difficultyId,
+    String(gameSequence),
+  );
 }

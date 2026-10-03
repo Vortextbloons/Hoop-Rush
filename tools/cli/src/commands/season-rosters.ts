@@ -29,7 +29,11 @@ import {
   seasonRostersCalibrateReportSchema,
   seasonRostersGenerateReportSchema,
 } from '../report-schemas.ts';
-import { parseCount } from '../args.ts';
+import {
+  createSeedChunkRunner,
+  resolveCountCalibrationArgs,
+  seedCountCalibrateOptions,
+} from '../calibration-harness.ts';
 import { seasonCalibrationSeed } from './season-calibration.ts';
 import {
   DEFAULT_MANIFEST,
@@ -43,7 +47,7 @@ import {
   roleTierThresholdsOf,
 } from './season-data.ts';
 import type { RosterCalibrationWorkerRun } from './rosters-calibration-worker.ts';
-import { commitTargetsArtifact, runWorkerChunk, runWorkerChunks } from '../artifact.ts';
+import { commitTargetsArtifact, runWorkerChunk } from '../artifact.ts';
 export const SEASON_ROSTERS_GENERATE_OPTIONS: Record<string, boolean> = {
   seed: true,
   draft: true,
@@ -57,16 +61,10 @@ export const SEASON_ROSTERS_AUDIT_OPTIONS: Record<string, boolean> = {
   'human-franchises': true,
   format: true,
 };
-export const SEASON_ROSTERS_CALIBRATE_OPTIONS: Record<string, boolean> = {
-  workers: true,
-  'calibration-seeds': true,
-  'validation-seeds': true,
-  out: true,
-  manifest: true,
+export const SEASON_ROSTERS_CALIBRATE_OPTIONS: Record<string, boolean> = seedCountCalibrateOptions({
   targets: true,
   validate: false,
-  format: true,
-};
+});
 export const rosterCalibrationSeed = seasonCalibrationSeed;
 export const ORDER_INVARIANCE_SEED_COUNT = 2;
 function humanRostersOf(state: SeasonDraftState): Array<{
@@ -616,13 +614,11 @@ async function runCalibrationChunks(args: {
   workers: number;
   targets: SeasonRosterTargets;
 }): Promise<RosterCalibrationWorkerRun[]> {
-  return runWorkerChunks<Seed, RosterCalibrationWorkerRun>({
+  return createSeedChunkRunner<Seed, RosterCalibrationWorkerRun>({
     workerUrl: new URL('./rosters-calibration-worker.ts', import.meta.url),
-    workerData: (seeds) => ({ ...args, seeds, variant: 'roster' }),
-    items: args.seeds,
-    workers: args.workers,
     payloadKey: 'runs',
-  });
+    buildWorkerData: (seeds, extra) => ({ ...extra, seeds, variant: 'roster' }),
+  })(args.seeds, args.workers, { ...args });
 }
 async function runOrderInvarianceChunk(args: {
   seeds: Seed[];
@@ -690,9 +686,12 @@ export async function seasonRostersCalibrate(
   },
   deps: SeasonRostersCalibrateDeps = {},
 ): Promise<CliReport> {
-  const calibrationCount = parseCount(args['calibration-seeds'], '--calibration-seeds', 256);
-  const validationCount = parseCount(args['validation-seeds'], '--validation-seeds', 64);
-  const workers = Math.max(1, parseCount(args.workers, '--workers', 4));
+  const { calibrationCount, validationCount, workers } = resolveCountCalibrationArgs(args, {
+    calibrationDefault: 256,
+    validationDefault: 64,
+    workersDefault: 4,
+    clampWorkers: true,
+  });
   const manifestPath = args.manifest ?? DEFAULT_MANIFEST;
   const validateOnly = args.validate === true;
   let targets: SeasonRosterTargets;

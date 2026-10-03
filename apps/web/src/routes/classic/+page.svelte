@@ -30,7 +30,7 @@
     type ClassicGuardTarget,
   } from '$lib/classic-nav-guard';
   import { startClassicRun } from '$lib/classic-run';
-  import { randomUUID } from '$lib/random-id';
+  import { randomUUID } from '$lib/ids';
   import { resolvePlayerRefs } from '$lib/player-refs';
   import { poolSortLabel, presentationForVariant, variantLabel } from '$lib/draft-presentation';
   import {
@@ -105,6 +105,7 @@
       unregister = null;
     };
   });
+  let dataGen = 0;
   function loadClassicData() {
     manifestError = null;
     indexError = null;
@@ -113,33 +114,36 @@
     index = null;
     draft = null;
     draftLoaded = false;
+    const gen = ++dataGen;
     let cancelled = false;
     getManifest().then(
       (m) => {
-        if (cancelled) return;
+        if (cancelled || gen !== dataGen) return;
         manifest = m;
       },
       (error: unknown) => {
-        if (!cancelled) manifestError = error instanceof Error ? error.message : String(error);
+        if (!cancelled && gen === dataGen)
+          manifestError = error instanceof Error ? error.message : String(error);
       },
     );
     getPlayersIndex().then(
       (ix) => {
-        if (cancelled) return;
+        if (cancelled || gen !== dataGen) return;
         index = ix;
       },
       (error: unknown) => {
-        if (!cancelled) indexError = error instanceof Error ? error.message : String(error);
+        if (!cancelled && gen === dataGen)
+          indexError = error instanceof Error ? error.message : String(error);
       },
     );
     loadClassicDraftState().then(
       (saved) => {
-        if (cancelled) return;
+        if (cancelled || gen !== dataGen) return;
         draft = saved;
         draftLoaded = true;
       },
       (error: unknown) => {
-        if (cancelled) return;
+        if (cancelled || gen !== dataGen) return;
         draftError = error instanceof Error ? error.message : String(error);
         draftLoaded = true;
       },
@@ -305,8 +309,9 @@
     return next;
   }
   async function applyRoll(next: ClassicDraftState, axis: 'both' | 'franchise' | 'era') {
-    draft = await persist(next);
+    const saved = await persist(next);
     if (!mounted) return;
+    draft = saved;
     if (next.roll) {
       reelAxis = axis;
       spinKey += 1;
@@ -333,7 +338,9 @@
         },
         createEngineContext(),
       );
-      draft = await persist(next);
+      const saved = await persist(next);
+      if (!mounted) return;
+      draft = saved;
       if (!mounted) return;
       reelAxis = 'both';
       spinKey += 1;
@@ -411,8 +418,9 @@
       if (next.status === 'complete' && !alreadyDrafted) {
         starting = true;
         closePicker();
-        draft = await persist(next);
+        const saved = await persist(next);
         if (!mounted) return;
+        draft = saved;
         try {
           arenaDraftPick(false);
         } catch {}

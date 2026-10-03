@@ -8,6 +8,13 @@ import {
   type SeasonRunAuthority,
 } from '@hoop-rush/data-contracts';
 import { seasonBlockRecapCanonical } from './recap.ts';
+import {
+  canonicalEffectsPayload,
+  canonicalHealthPayload,
+  canonicalInfluencePayload,
+  sortedBy,
+  sortedEntries,
+} from './canonical.ts';
 export function reconstructSeasonGames(
   schedule: SeasonSchedule,
   summaries: readonly SeasonGameSummary[],
@@ -58,7 +65,7 @@ function standingsCanonical(candidate: SeasonCheckpointFacts): unknown {
   return {
     schemaVersion: candidate.standings.schemaVersion,
     standingsVersion: candidate.standings.standingsVersion,
-    rows: [...candidate.standings.rows].sort((a, b) => (a.franchiseId < b.franchiseId ? -1 : 1)),
+    rows: sortedBy(candidate.standings.rows, (row) => row.franchiseId),
   };
 }
 export function authorityCanonical(authority: SeasonRunAuthority): unknown {
@@ -77,15 +84,9 @@ export function authorityCanonical(authority: SeasonRunAuthority): unknown {
     timerPolicyVersion: authority.timerPolicyVersion,
     authorityVersion: authority.authorityVersion,
     multiplayerVersion: authority.multiplayerVersion,
-    control: Object.fromEntries(
-      Object.entries(authority.control).sort(([a], [b]) => (a < b ? -1 : 1)),
-    ),
-    missStreak: Object.fromEntries(
-      Object.entries(authority.missStreak).sort(([a], [b]) => (a < b ? -1 : 1)),
-    ),
-    reclaimRequests: Object.fromEntries(
-      Object.entries(authority.reclaimRequests).sort(([a], [b]) => (a < b ? -1 : 1)),
-    ),
+    control: Object.fromEntries(sortedEntries(authority.control)),
+    missStreak: Object.fromEntries(sortedEntries(authority.missStreak)),
+    reclaimRequests: Object.fromEntries(sortedEntries(authority.reclaimRequests)),
     timeoutEvents: [...authority.timeoutEvents].sort((a, b) => {
       if (a.participantId !== b.participantId) return a.participantId < b.participantId ? -1 : 1;
       return a.atRevision - b.atRevision;
@@ -107,49 +108,15 @@ export function seasonCheckpointCanonical(candidate: SeasonCheckpointFacts): str
     revision: candidate.revision,
     rotationDigest: candidate.rotationDigest,
     standings: standingsCanonical(candidate),
-    teamAggregates: [...candidate.teamAggregates].sort((a, b) =>
-      a.franchiseId < b.franchiseId ? -1 : 1,
-    ),
-    playerAggregates: [...candidate.playerAggregates].sort((a, b) =>
-      a.playerVersionId < b.playerVersionId ? -1 : 1,
-    ),
-    gameSummaries: [...candidate.gameSummaries].sort((a, b) => (a.gameId < b.gameId ? -1 : 1)),
-    retainedDetails: [...candidate.retainedDetails].sort((a, b) => (a.gameId < b.gameId ? -1 : 1)),
+    teamAggregates: sortedBy(candidate.teamAggregates, (row) => row.franchiseId),
+    playerAggregates: sortedBy(candidate.playerAggregates, (row) => row.playerVersionId),
+    gameSummaries: sortedBy(candidate.gameSummaries, (row) => row.gameId),
+    retainedDetails: sortedBy(candidate.retainedDetails, (row) => row.gameId),
     recap: seasonBlockRecapCanonical(candidate.recap),
-    effects: canonicalJson({
-      schemaVersion: candidate.effects.schemaVersion,
-      playerStates: [...candidate.effects.playerStates].sort((a, b) =>
-        a.playerVersionId < b.playerVersionId ? -1 : 1,
-      ),
-      pairStates: [...candidate.effects.pairStates].sort((a, b) =>
-        a.a < b.a ? -1 : a.a > b.a ? 1 : a.b < b.b ? -1 : a.b > b.b ? 1 : 0,
-      ),
-    }),
-    health: canonicalJson({
-      schemaVersion: candidate.health.schemaVersion,
-      healthVersion: candidate.health.healthVersion,
-      injuries: [...candidate.health.injuries].sort((a, b) => (a.injuryId < b.injuryId ? -1 : 1)),
-    }),
-    influence: canonicalJson({
-      schemaVersion: candidate.influence.schemaVersion,
-      influenceVersion: candidate.influence.influenceVersion,
-      balances: candidate.influence.balances,
-      ledger: [...candidate.influence.ledger].sort((a, b) => (a.entryId < b.entryId ? -1 : 1)),
-      windows: Object.fromEntries(
-        Object.entries(candidate.influence.windows)
-          .sort(([a], [b]) => (a < b ? -1 : 1))
-          .map(([franchiseId, windows]) => [
-            franchiseId,
-            [...windows].sort((a, b) => a.windowIndex - b.windowIndex),
-          ]),
-      ),
-      rehabs: Object.fromEntries(
-        Object.entries(candidate.influence.rehabs).sort(([a], [b]) => (a < b ? -1 : 1)),
-      ),
-    }),
-    transactions: [...candidate.transactions].sort((a, b) =>
-      a.transactionId < b.transactionId ? -1 : 1,
-    ),
+    effects: canonicalEffectsPayload(candidate.effects),
+    health: canonicalHealthPayload(candidate.health),
+    influence: canonicalInfluencePayload(candidate.influence),
+    transactions: sortedBy(candidate.transactions, (entry) => entry.transactionId),
     objective: candidate.objective,
     challenges: (
       candidate as unknown as {

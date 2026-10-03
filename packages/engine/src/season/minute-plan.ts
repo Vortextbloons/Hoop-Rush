@@ -44,14 +44,6 @@ function envelopeStarterTotal(strategy: SeasonMinutePolicyStrategy): number {
       return 5 * SEASON_ROTATION_PRESET_TARGETS['bench-heavy'].starters;
   }
 }
-export const STRATEGY_TO_PRESET: Record<
-  SeasonMinutePolicyStrategy,
-  keyof typeof SEASON_ROTATION_PRESET_TARGETS
-> = {
-  'starter-heavy': 'tight',
-  balanced: 'balanced',
-  'bench-heavy': 'bench-heavy',
-};
 export function minuteStrategyOfPreset(
   preset: keyof typeof SEASON_ROTATION_PRESET_TARGETS,
 ): SeasonMinutePolicyStrategy {

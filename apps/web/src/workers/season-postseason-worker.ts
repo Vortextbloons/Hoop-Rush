@@ -150,6 +150,15 @@ async function runPostseason(request: SeasonPostseasonWorkerStartRequest): Promi
 self.onmessage = (event: MessageEvent<unknown>): void => {
   const parsed = seasonPostseasonWorkerRequestSchema.safeParse(event.data);
   if (!parsed.success) {
+    const rawId =
+      typeof event.data === 'object' &&
+      event.data !== null &&
+      typeof (event.data as { requestId?: unknown }).requestId === 'string'
+        ? (event.data as { requestId: string }).requestId
+        : null;
+    if (rawId !== null && rawId.length > 0) {
+      postError(rawId.slice(0, 64), 'internal', 'season postseason wire mismatch');
+    }
     return;
   }
   const request = parsed.data;

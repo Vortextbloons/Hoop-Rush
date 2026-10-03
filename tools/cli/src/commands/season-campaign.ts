@@ -19,29 +19,20 @@ import {
   generateSeasonSchedule,
 } from '@hoop-rush/engine';
 import { makeReport, type CliReport } from '../report.ts';
-import { parseSeedRange, parseWorkers } from '../args.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR } from './season-data.ts';
+import { resolveCalibrationArgs, seedRangeCalibrateOptions } from '../calibration-harness.ts';
 import {
   gateValue,
   gateSummary,
   m25ToleranceGate,
   seasonCalibrationSeed,
-  seedIndexRange,
   type M25Gate,
 } from './season-calibration.ts';
 import { runSeasonM25, type SeasonM25SeasonFacts } from './season-m25-core.ts';
 import { commitTargetsArtifact, validateTargetsArtifact } from '../artifact.ts';
-export const SEASON_CAMPAIGN_CALIBRATE_OPTIONS: Record<string, boolean> = {
-  input: true,
-  'seed-from': true,
-  'seed-to': true,
-  workers: true,
-  out: true,
-  manifest: true,
-  validate: true,
-  write: false,
-  format: true,
-};
+export const SEASON_CAMPAIGN_CALIBRATE_OPTIONS: Record<string, boolean> = seedRangeCalibrateOptions(
+  { input: true, validate: true, write: false },
+);
 export const SEASON_CAMPAIGN_AUDIT_OPTIONS: Record<string, boolean> = {
   input: true,
   manifest: true,
@@ -568,7 +559,15 @@ export function validateSeasonCampaignTargets(
 }
 export function seasonCampaignCalibrate(args: SeasonCampaignArgs): CliReport {
   const started = Date.now();
-  const { from, to } = parseSeedRange(args, SEASON_CAMPAIGN_CALIBRATION_SEED_COUNT - 1);
+  const { from, to, workers, calibrationIndices, validationIndices } = resolveCalibrationArgs(
+    args,
+    {
+      calibrationSeedCount: SEASON_CAMPAIGN_CALIBRATION_SEED_COUNT,
+      validationSeedCount: SEASON_CAMPAIGN_VALIDATION_SEED_COUNT,
+      defaultWorkers: 1,
+      mode: 'append',
+    },
+  );
   const outPath = args.out ?? DEFAULT_CAMPAIGN_TARGETS;
   const validateOnly = args['validate'] !== null;
   const writeRequested =
@@ -578,9 +577,6 @@ export function seasonCampaignCalibrate(args: SeasonCampaignArgs): CliReport {
   if (validateOnly) {
     return validateSeasonCampaignTargets(args, resolve(args.validate ?? outPath));
   }
-  const workers = parseWorkers(args, 1);
-  const calibrationIndices = seedIndexRange(from, to);
-  const validationIndices = seedIndexRange(to + 1, to + SEASON_CAMPAIGN_VALIDATION_SEED_COUNT);
   let calibrationFacts: CampaignCohortFacts;
   let heldOutFacts: CampaignCohortFacts;
   try {

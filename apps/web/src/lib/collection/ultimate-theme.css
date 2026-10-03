@@ -41,8 +41,7 @@
       rgb(120 70 20 / 7%) 52%,
       transparent 72%
     ),
-    linear-gradient(180deg, #0a0d11 0%, #080b0e 58%, #0b0906 100%),
-    var(--ur-canvas);
+    linear-gradient(180deg, #0a0d11 0%, #080b0e 58%, #0b0906 100%), var(--ur-canvas);
   color: var(--ur-ink);
 }
 
@@ -168,24 +167,14 @@
   position: relative;
   isolation: isolate;
   background:
-    radial-gradient(
-      ellipse 62% 30% at 50% 0%,
-      rgb(255 196 64 / 12%),
-      transparent 70%
-    ),
-    radial-gradient(
-      ellipse 80% 24% at 50% 100%,
-      rgb(201 140 69 / 12%),
-      transparent 70%
-    );
+    radial-gradient(ellipse 62% 30% at 50% 0%, rgb(255 196 64 / 12%), transparent 70%),
+    radial-gradient(ellipse 80% 24% at 50% 100%, rgb(201 140 69 / 12%), transparent 70%);
 }
 
 .ur-panel-gold {
   border: 1px solid var(--ur-gold-line);
   border-radius: 12px;
-  background:
-    linear-gradient(180deg, rgb(255 255 255 / 4%), transparent 22%),
-    var(--ur-panel);
+  background: linear-gradient(180deg, rgb(255 255 255 / 4%), transparent 22%), var(--ur-panel);
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 6%),
     0 12px 32px rgb(0 0 0 / 45%);
@@ -356,9 +345,7 @@
   padding: 0.85rem 1rem;
   border: 1px solid var(--ur-gold-line);
   border-radius: 12px;
-  background:
-    linear-gradient(180deg, rgb(255 255 255 / 4%), transparent 24%),
-    var(--ur-panel);
+  background: linear-gradient(180deg, rgb(255 255 255 / 4%), transparent 24%), var(--ur-panel);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 6%);
 }
 
@@ -458,6 +445,44 @@
   font-size: 0.65rem;
   font-weight: 800;
   letter-spacing: 0.08em;
+}
+
+@keyframes ur-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ultimate-root .ur-page {
+  animation: ur-arrive 280ms ease-out both;
+}
+
+.ultimate-root .ur-gamecast,
+.ultimate-root .ur-pending-actions,
+.ultimate-root .ur-selected-challenge {
+  animation: ur-arrive 320ms ease-out both;
+}
+
+.ultimate-root .ur-btn-gold,
+.ultimate-root .ur-btn-ghost {
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.ultimate-root .ur-btn-gold:enabled:hover,
+.ultimate-root .ur-btn-ghost:enabled:hover {
+  transform: translateY(-2px);
+}
+
+.ultimate-root .ur-btn-gold:enabled:active,
+.ultimate-root .ur-btn-ghost:enabled:active {
+  transform: translateY(1px) scale(0.98);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -49,7 +49,6 @@ import {
 } from '@hoop-rush/engine';
 import { makeReport, type CliReport } from '../report.ts';
 import { seasonFreeAgencyCalibrateReportSchema } from '../report-schemas.ts';
-import { parseSeedRange, parseWorkers } from '../args.ts';
 import {
   DEFAULT_MANIFEST,
   DEFAULT_SEASON_DIR,
@@ -63,7 +62,6 @@ import {
   m25ToleranceGate,
   mean,
   seasonCalibrationSeed,
-  seedIndexRange,
   share,
   type M25Gate,
 } from './season-calibration.ts';
@@ -78,17 +76,10 @@ import {
   runnerPipelineInput,
   type SeasonBlockRunnerState,
 } from './season-block.ts';
+import { resolveCalibrationArgs, seedRangeCalibrateOptions } from '../calibration-harness.ts';
 import { m25FreshRun, m25RunStateFacts, M25_TRADE_WINDOW_BLOCKS } from './season-m25-core.ts';
-export const SEASON_FREE_AGENCY_CALIBRATE_OPTIONS: Record<string, boolean> = {
-  input: true,
-  'seed-from': true,
-  'seed-to': true,
-  workers: true,
-  out: true,
-  manifest: true,
-  validate: true,
-  format: true,
-};
+export const SEASON_FREE_AGENCY_CALIBRATE_OPTIONS: Record<string, boolean> =
+  seedRangeCalibrateOptions({ input: true, validate: true });
 export const DEFAULT_FREE_AGENCY_TARGETS = resolve(DEFAULT_SEASON_DIR, 'free-agency-targets.json');
 export const SEASON_FREE_AGENCY_CALIBRATION_SEED_COUNT = 8;
 export const SEASON_FREE_AGENCY_VALIDATION_SEED_COUNT = 4;
@@ -1411,17 +1402,22 @@ export function seasonFreeAgencyCalibrate(
   } = {},
 ): CliReport {
   const started = Date.now();
-  const { from, to } = parseSeedRange(args, SEASON_FREE_AGENCY_CALIBRATION_SEED_COUNT - 1);
+  const { from, to, workers, calibrationIndices, validationIndices } = resolveCalibrationArgs(
+    args,
+    {
+      calibrationSeedCount: SEASON_FREE_AGENCY_CALIBRATION_SEED_COUNT,
+      validationSeedCount: SEASON_FREE_AGENCY_VALIDATION_SEED_COUNT,
+      defaultWorkers: 1,
+      mode: 'append',
+    },
+  );
   const outPath = args.out ?? DEFAULT_FREE_AGENCY_TARGETS;
   const validateOnly = args.validate !== null;
   if (validateOnly) {
     return validateSeasonFreeAgencyTargets(args, resolve(args.validate ?? outPath));
   }
-  const workers = parseWorkers(args, 1);
   const manifestPath = args.manifest ?? DEFAULT_MANIFEST;
   const runSeason = deps.runSeason ?? defaultRunner(manifestPath);
-  const calibrationIndices = seedIndexRange(from, to);
-  const validationIndices = seedIndexRange(to + 1, to + SEASON_FREE_AGENCY_VALIDATION_SEED_COUNT);
   let calibration: SeasonFreeAgencySeasonFacts[];
   let heldOut: SeasonFreeAgencySeasonFacts[];
   try {

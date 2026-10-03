@@ -361,6 +361,58 @@ export function repositionClassicPlayer(
     }),
   };
 }
+export type ClassicBuilderCommand =
+  | {
+      kind: 'reroll';
+      axis: 'franchise' | 'era';
+    }
+  | {
+      kind: 'classic-pick';
+      playerId: PlayerId;
+      slotIndex: SlotIndex;
+    }
+  | {
+      kind: 'classic-reposition';
+      playerId: PlayerId;
+      slotIndex: SlotIndex;
+    };
+export type PoolEligibilityPolicy = (entry: ClassicDraftCatalog[number]) => boolean;
+export function applyClassicBuilderCommand(
+  state: ClassicDraftState,
+  catalog: ClassicDraftCatalog,
+  command: ClassicBuilderCommand,
+  context: EngineContext,
+  eligibility?: PoolEligibilityPolicy,
+): ClassicDraftState {
+  const effectiveCatalog = eligibility ? catalog.filter(eligibility) : catalog;
+  if (command.kind === 'reroll') {
+    return command.axis === 'franchise'
+      ? rerollClassicFranchise(state, effectiveCatalog, context)
+      : rerollClassicEra(state, effectiveCatalog, context);
+  }
+  if (command.kind === 'classic-reposition') {
+    return repositionClassicPlayer(state, effectiveCatalog, command);
+  }
+  return draftClassicPlayer(
+    state,
+    effectiveCatalog,
+    { playerId: command.playerId, slotIndex: command.slotIndex },
+    context,
+  );
+}
+export function createParticipantClassicDraft(
+  draftId: string,
+  variant: ClassicDraftState['variant'],
+  participantSeed: Seed,
+  dataVersion: string,
+  catalog: ClassicDraftCatalog,
+  context: EngineContext,
+): ClassicDraftState {
+  return createClassicDraft(
+    { draftId, variant, seed: participantSeed, dataVersion, catalog },
+    context,
+  );
+}
 export interface ClassicChallengeEnvironment {
   runId: string;
   runSeed: Seed;

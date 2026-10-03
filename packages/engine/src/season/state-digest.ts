@@ -23,6 +23,7 @@ import {
   normalizeEvolutionState,
 } from '@hoop-rush/data-contracts';
 import { authorityCanonical } from './checkpoint.ts';
+import { comparePairKeys, sortedBy, sortedEntries, sortedNumericEntries } from './canonical.ts';
 export interface SeasonRunStateDigestFacts {
   stateRevision: number;
   stage: SeasonRunStage;
@@ -45,9 +46,6 @@ export interface SeasonRunStateDigestFacts {
   rotations: readonly SeasonRotation[];
   effects: SeasonEffectsState;
   authority?: SeasonRunAuthority;
-}
-function sortedBy<T>(items: readonly T[], keyOf: (item: T) => string): T[] {
-  return [...items].sort((a, b) => (keyOf(a) < keyOf(b) ? -1 : keyOf(a) > keyOf(b) ? 1 : 0));
 }
 function postseasonCanonical(postseason: SeasonPostseasonState): unknown {
   return {
@@ -84,16 +82,12 @@ export function seasonRunStateDigest(facts: SeasonRunStateDigestFacts): string {
       balances: facts.influence.balances,
       ledger: sortedBy(facts.influence.ledger, (entry) => entry.entryId),
       windows: Object.fromEntries(
-        Object.entries(facts.influence.windows)
-          .sort(([a], [b]) => (a < b ? -1 : 1))
-          .map(([franchiseId, windows]) => [
-            franchiseId,
-            [...windows].sort((a, b) => a.windowIndex - b.windowIndex),
-          ]),
+        sortedEntries(facts.influence.windows).map(([franchiseId, windows]) => [
+          franchiseId,
+          [...windows].sort((a, b) => a.windowIndex - b.windowIndex),
+        ]),
       ),
-      rehabs: Object.fromEntries(
-        Object.entries(facts.influence.rehabs).sort(([a], [b]) => (a < b ? -1 : 1)),
-      ),
+      rehabs: Object.fromEntries(sortedEntries(facts.influence.rehabs)),
     },
     transactions: sortedBy(facts.transactions, (entry) => entry.transactionId),
     trade: facts.trade
@@ -140,9 +134,7 @@ export function seasonRunStateDigest(facts: SeasonRunStateDigestFacts): string {
             schemaVersion: facts.challenges.schemaVersion,
             challengeVersion: facts.challenges.challengeVersion,
             catalog: facts.challenges.catalog,
-            deals: Object.fromEntries(
-              Object.entries(facts.challenges.deals).sort(([a], [b]) => Number(a) - Number(b)),
-            ),
+            deals: Object.fromEntries(sortedNumericEntries(facts.challenges.deals)),
             evaluations: [...facts.challenges.evaluations].sort(
               (a, b) => a.blockIndex - b.blockIndex,
             ),
@@ -172,9 +164,7 @@ export function seasonRunStateDigest(facts: SeasonRunStateDigestFacts): string {
             players: {
               schemaVersion: facts.sponsors.players.schemaVersion,
               gearVersion: facts.sponsors.players.gearVersion,
-              slots: Object.fromEntries(
-                Object.entries(facts.sponsors.players.slots).sort(([a], [b]) => (a < b ? -1 : 1)),
-              ),
+              slots: Object.fromEntries(sortedEntries(facts.sponsors.players.slots)),
             },
           },
         }
@@ -187,23 +177,17 @@ export function seasonRunStateDigest(facts: SeasonRunStateDigestFacts): string {
             startingIdentity: facts.campaign.startingIdentity,
             startingFocus: facts.campaign.startingFocus,
             offers: Object.fromEntries(
-              Object.entries(facts.campaign.offers)
-                .sort(([a], [b]) => Number(a) - Number(b))
-                .map(([blockIndex, offers]) => [
-                  blockIndex,
-                  sortedBy(offers, (o) => o.opportunityId),
-                ]),
+              sortedNumericEntries(facts.campaign.offers).map(([blockIndex, offers]) => [
+                blockIndex,
+                sortedBy(offers, (o) => o.opportunityId),
+              ]),
             ),
-            selections: Object.fromEntries(
-              Object.entries(facts.campaign.selections).sort(([a], [b]) => Number(a) - Number(b)),
-            ),
+            selections: Object.fromEntries(sortedNumericEntries(facts.campaign.selections)),
             evaluations: sortedBy(
               facts.campaign.evaluations,
               (e) => `${String(e.blockIndex)}:${e.opportunityId}`,
             ),
-            branchState: Object.fromEntries(
-              Object.entries(facts.campaign.branchState).sort(([a], [b]) => (a < b ? -1 : 1)),
-            ),
+            branchState: Object.fromEntries(sortedEntries(facts.campaign.branchState)),
             evolutionOffers: facts.campaign.evolutionOffers
               ? sortedBy(facts.campaign.evolutionOffers, (o) => o.offerId)
               : null,
@@ -219,9 +203,7 @@ export function seasonRunStateDigest(facts: SeasonRunStateDigestFacts): string {
     effects: canonicalJson({
       schemaVersion: facts.effects.schemaVersion,
       playerStates: sortedBy(facts.effects.playerStates, (player) => player.playerVersionId),
-      pairStates: [...facts.effects.pairStates].sort((a, b) =>
-        a.a < b.a ? -1 : a.a > b.a ? 1 : a.b < b.b ? -1 : a.b > b.b ? 1 : 0,
-      ),
+      pairStates: [...facts.effects.pairStates].sort(comparePairKeys),
     }),
     authority: authorityCanonical(
       facts.authority ?? {

@@ -5,10 +5,14 @@
     open,
     onOpenChange,
     children,
+    fitContent = false,
+    onOpenAutoFocus,
   }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     children: Snippet;
+    fitContent?: boolean;
+    onOpenAutoFocus?: (event: Event) => void;
   } = $props();
 </script>
 
@@ -18,7 +22,10 @@
     <Dialog.Content
       escapeKeydownBehavior="ignore"
       interactOutsideBehavior="ignore"
-      class="sim-modal-content sim-live-modal-content fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[88dvh] w-full overflow-y-auto rounded-t-2xl border-t border-border bg-surface-1 shadow-2xl shadow-black/40 outline-none sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-w-xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border"
+      {onOpenAutoFocus}
+      class="sim-modal-content {fitContent
+        ? ''
+        : 'sim-live-modal-content'} fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[88dvh] w-full overflow-y-auto rounded-t-2xl border-t border-border bg-surface-1 shadow-2xl shadow-black/40 outline-none sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-w-xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border"
     >
       {@render children()}
     </Dialog.Content>

@@ -11,8 +11,7 @@ import {
   COLLECTION_TARGETING_VERSION,
 } from './collection-versions.ts';
 import { contentHashSchema } from './ids.ts';
-import { seasonCheckpointDigestSchema } from './season-digests.ts';
-import { canonicalJson, seasonDigestHex } from './season-hash.ts';
+import { canonicalJson, seasonCheckpointDigestSchema, seasonDigestHex } from './season-hash.ts';
 
 export const collectionProgressionDisplaySchema = z
   .object({

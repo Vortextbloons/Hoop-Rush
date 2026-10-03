@@ -158,6 +158,14 @@ function collectionState(): CollectionState {
   });
 }
 
+function collectionStateWithCoins(state: CollectionState, coins: number): CollectionState {
+  const next = {
+    ...state,
+    balances: { Coins: coins, Exchange: state.balances.Exchange },
+  };
+  return { ...next, digest: collectionStateDigest(collectionStateFactsOf(next)) };
+}
+
 function commandFor(
   state: CollectionState,
   command: CollectionCommand['command'],
@@ -395,14 +403,17 @@ describe('M4.4 targeting odds and draws', () => {
     );
     expect(welcome.status).toBe('accepted');
     if (welcome.status !== 'accepted') return;
+    expect(welcome.state.balances.Coins).toBe(0);
+    expect(welcome.ledgerEntries).toEqual([]);
+    const funded = collectionStateWithCoins(welcome.state, 100);
     const targetCommand = commandFor(
-      welcome.state,
+      funded,
       'set-target-player',
       { playerId: 'm44-target' },
       'cmd-2',
     );
     const target = applyCollectionCommand(
-      welcome.state,
+      funded,
       targetCommand,
       CATALOG,
       [],

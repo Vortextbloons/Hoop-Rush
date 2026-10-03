@@ -6,7 +6,7 @@ import {
   idSchema,
   seedSchema,
 } from './ids.ts';
-import { seasonCheckpointDigestSchema } from './season-digests.ts';
+import { seasonCheckpointDigestSchema } from './season-hash.ts';
 import { seasonEffectsStateSchema } from './season-effects.ts';
 import { seasonGameSummarySchema } from './season-game-summary.ts';
 import { postseasonGameIdSchema } from './season-postseason.ts';

@@ -29,5 +29,5 @@ export const collectionPackIdSchema = z.enum([
 ]);
 export type CollectionPackId = z.infer<typeof collectionPackIdSchema>;
 
-export const collectionSetIdSchema = z.enum(['heat-check-set']);
+export const collectionSetIdSchema = z.enum(['heat-check-set', 'arm-guard-set']);
 export type CollectionSetId = z.infer<typeof collectionSetIdSchema>;

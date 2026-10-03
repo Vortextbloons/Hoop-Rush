@@ -178,7 +178,7 @@ function specialSummaryRatings(
     positionGroup,
   );
   const boostedRatings = { ...source.detailedRatings };
-  for (const [key, delta] of Object.entries(ratingOverlay ?? {})) {
+  for (const [key, delta] of Object.entries(ratingOverlay)) {
     const ratingKey = key as keyof typeof boostedRatings;
     boostedRatings[ratingKey] = Math.max(0, Math.min(100, boostedRatings[ratingKey] + delta));
   }
@@ -321,18 +321,28 @@ function main(): void {
   }
   cards.sort((a, b) => (a.cardId < b.cardId ? -1 : 1));
   const byCardId = new Map(cards.map((card) => [card.cardId, card]));
-  const setOf = (family: 'Heat Check', setId: string, title: string) => ({
-    setId: setId as 'heat-check-set',
+  const setOf = (
+    family: string,
+    setId: CollectionCatalog['sets'][number]['setId'],
+    title: string,
+  ) => ({
+    setId,
     title,
     memberCardIds: cards
       .filter((card) => card.family === family)
       .map((card) => card.cardId)
       .sort(),
   });
-  const sets = [setOf('Heat Check', 'heat-check-set', 'Heat Check')] as CollectionCatalog['sets'];
+  const sets = [
+    setOf('Heat Check', 'heat-check-set', 'Heat Check'),
+    setOf('Arm Guard', 'arm-guard-set', 'Arm Guard'),
+  ] as CollectionCatalog['sets'];
   for (const set of sets) {
-    if (set.memberCardIds.length !== 6) {
-      throw new Error(`set ${set.setId} has ${String(set.memberCardIds.length)} members, want 6`);
+    const expectedCount = set.setId === 'arm-guard-set' ? 7 : 6;
+    if (set.memberCardIds.length !== expectedCount) {
+      throw new Error(
+        `set ${set.setId} has ${String(set.memberCardIds.length)} members, want ${String(expectedCount)}`,
+      );
     }
     for (const member of set.memberCardIds) {
       if (!byCardId.has(member)) throw new Error(`set ${set.setId} references unknown ${member}`);

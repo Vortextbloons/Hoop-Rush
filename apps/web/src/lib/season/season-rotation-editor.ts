@@ -1,11 +1,9 @@
 import {
   LINEUP_STRUCTURE,
   SEASON_ROSTER_MAX_SIZE,
-  SEASON_ROTATION_PRESET_TARGETS,
   SEASON_ROTATION_SIZE,
   canPlay,
   type Position,
-  type SeasonMinutePolicyStrategy,
   type SeasonRotation,
   type SeasonRotationPreset,
   type SlotGroup,
@@ -50,20 +48,6 @@ export function presetLabel(preset: SeasonRotationPreset): string {
     case 'bench-heavy':
       return 'Bench-Heavy';
   }
-}
-export function strategyLabel(strategy: SeasonMinutePolicyStrategy): string {
-  switch (strategy) {
-    case 'starter-heavy':
-      return 'Starter-Heavy';
-    case 'balanced':
-      return 'Balanced';
-    case 'bench-heavy':
-      return 'Bench-Heavy';
-  }
-}
-export function presetMinutes(preset: SeasonRotationPreset, roleIndex: number): number {
-  const table = SEASON_ROTATION_PRESET_TARGETS[preset];
-  return roleIndex < 5 ? table.starters : (table.bench[roleIndex - 5] ?? 0);
 }
 export interface PresetPlayerLoad {
   staminaRating: number;
@@ -171,9 +155,6 @@ export class RotationEditor {
   activeMemberIds(): string[] {
     return [...this.rotation.starters, ...this.rotation.benchOrder];
   }
-  isActive(playerVersionId: string): boolean {
-    return this.activeIds.has(playerVersionId);
-  }
   inactiveMembers(): RotationMember[] {
     return this.members.filter((member) => !this.activeIds.has(member.playerVersionId));
   }
@@ -271,9 +252,6 @@ export class RotationEditor {
     };
     return this.validate();
   }
-  adjustMinutes(playerVersionId: string, delta: number): string[] {
-    return this.setMinutes(playerVersionId, this.minutesFor(playerVersionId) + delta);
-  }
   balanceMinutesTotal(): RebalanceResult {
     const total = this.rotation.targetMinutes.reduce((sum, entry) => sum + entry.minutes, 0);
     const gap = 240 - total;
@@ -338,68 +316,6 @@ export class RotationEditor {
           adjustments: [],
         };
       }
-    }
-    const candidate = { ...this.rotation, targetMinutes: [...byId.values()] };
-    const failures = validateSeasonRotation(candidate, this.memberPlayable);
-    if (failures.length > 0) return { failures, adjustments: [] };
-    this.rotation = candidate;
-    return { failures: [], adjustments };
-  }
-  rebalanceMinutes(playerVersionId: string, minutes: number): RebalanceResult {
-    if (!this.activeIds.has(playerVersionId)) {
-      return {
-        failures: [`${playerVersionId} is not an active rotation member`],
-        adjustments: [],
-      };
-    }
-    const clamped = Math.max(0, Math.min(48, Math.round(minutes)));
-    const current = this.minutesFor(playerVersionId);
-    const delta = clamped - current;
-    if (delta === 0) return { failures: [], adjustments: [] };
-    const take = delta > 0;
-    const others = this.rotation.targetMinutes
-      .filter((entry) => entry.playerVersionId !== playerVersionId)
-      .map((entry) => ({
-        playerVersionId: entry.playerVersionId,
-        minutes: entry.minutes,
-        benchIndex: this.benchIndex(entry.playerVersionId),
-      }))
-      .sort((a, b) =>
-        take
-          ? b.minutes - a.minutes || a.benchIndex - b.benchIndex
-          : a.minutes - b.minutes || a.benchIndex - b.benchIndex,
-      );
-    const byId = new Map(
-      this.rotation.targetMinutes.map((entry) => [entry.playerVersionId, entry]),
-    );
-    const set = (id: string, minutesValue: number) =>
-      byId.set(id, { playerVersionId: id, minutes: minutesValue });
-    set(playerVersionId, clamped);
-    const adjustments: MinuteAdjustment[] = [{ playerVersionId, minutes: clamped, delta }];
-    let remaining = Math.abs(delta);
-    for (const other of others) {
-      if (remaining <= 0) break;
-      const capacity = take ? other.minutes : 48 - other.minutes;
-      const give = Math.min(remaining, Math.max(0, capacity));
-      if (give <= 0) continue;
-      const next = other.minutes + (take ? -give : give);
-      set(other.playerVersionId, next);
-      adjustments.push({
-        playerVersionId: other.playerVersionId,
-        minutes: next,
-        delta: take ? -give : give,
-      });
-      remaining -= give;
-    }
-    if (remaining > 0) {
-      return {
-        failures: [
-          take
-            ? `cannot raise ${playerVersionId} to ${String(clamped)} minutes: not enough minutes available from teammates`
-            : `cannot lower ${playerVersionId} to ${String(clamped)} minutes: no teammates have capacity`,
-        ],
-        adjustments: [],
-      };
     }
     const candidate = { ...this.rotation, targetMinutes: [...byId.values()] };
     const failures = validateSeasonRotation(candidate, this.memberPlayable);
@@ -490,18 +406,6 @@ export class RotationEditor {
     this.rotation = applySeasonRotationPreset(this.rotation, preset);
     return this.validate();
   }
-  applyFlatPreset(preset: SeasonRotationPreset): string[] {
-    this.rotation = applySeasonRotationPreset(this.rotation, preset);
-    return this.validate();
-  }
-  applyRotation(candidate: SeasonRotation): SeasonRotation {
-    const failures = validateSeasonRotation(candidate, this.memberPlayable);
-    if (failures.length > 0) {
-      throw new Error(`rotation plan rejected: ${failures[0] ?? 'invalid rotation'}`);
-    }
-    this.rotation = candidate;
-    return this.rotation;
-  }
   applyAutoRotation(candidate: SeasonRotation): SeasonRotation {
     const nextActive = new Set([...candidate.starters, ...candidate.benchOrder]);
     const playable = new Map<string, readonly Position[]>();
@@ -538,22 +442,6 @@ export class RotationEditor {
       if (current !== undefined) starters[otherSlot] = current;
     }
     return this.commit({ ...this.rotation, starters, benchOrder });
-  }
-  assignClosing(slotIndex: number, playerVersionId: string): string[] {
-    const current = this.rotation.closingFive[slotIndex];
-    if (current === playerVersionId) return [];
-    if (!this.activeIds.has(playerVersionId)) {
-      return [`${playerVersionId} is not an active rotation member`];
-    }
-    const closingFive = [...this.rotation.closingFive];
-    const otherSlot = closingFive.indexOf(playerVersionId);
-    if (otherSlot !== -1) {
-      closingFive[slotIndex] = playerVersionId;
-      if (current !== undefined) closingFive[otherSlot] = current;
-    } else {
-      closingFive[slotIndex] = playerVersionId;
-    }
-    return this.commit({ ...this.rotation, closingFive });
   }
   private commit(candidate: SeasonRotation): string[] {
     const failures = validateSeasonRotation(candidate, this.memberPlayable);

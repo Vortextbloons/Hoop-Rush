@@ -791,7 +791,7 @@ export function applyFreeAgencyDeclaration(
     }
     const balance = run.influence.balances[fid] ?? 0;
     const maximum = Math.max(...targets.map((target) => target.influence));
-    if (balance < maximum || balance < SEASON_INFLUENCE_FLOOR + maximum) {
+    if (balance < SEASON_INFLUENCE_FLOOR + maximum) {
       throw new FreeAgencyValidationRejection({
         code: 'free-agency-insufficient-balance',
         franchiseId,

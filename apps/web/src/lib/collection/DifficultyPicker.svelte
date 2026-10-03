@@ -52,12 +52,10 @@
           <span class="ur-diff-name">{option.displayName}</span>
           <span class="ur-diff-band">{option.bandLabel}</span>
           <span class="ur-diff-mult"
-            ><strong>{option.rewardMultiplierLabel}</strong><span>coin multiplier</span></span
+            ><strong>{option.rewardMultiplierLabel}</strong><span>Coins multiplier</span></span
           >
           <span class="ur-diff-clear" data-claimed={option.firstClearClaimed}
-            >{option.firstClearClaimed
-              ? 'First clear claimed'
-              : `+${option.firstClearCoins} first clear`}</span
+            >{option.firstClearLabel}</span
           >
         </span>
       </label>

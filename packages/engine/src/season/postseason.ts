@@ -348,6 +348,9 @@ export function seasonPostseasonHumanEliminated(
   humanFranchiseId: string,
 ): boolean {
   const humanId = franchiseIdSchema.parse(humanFranchiseId);
+  if (state.championFranchiseId !== null) {
+    return state.championFranchiseId !== humanId;
+  }
   if (state.bracket === null) {
     for (const conference of CONFERENCES) {
       const playIn = state.playIn[conference];

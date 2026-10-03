@@ -26,7 +26,7 @@ export function ultimateNextActionOf(input: UltimateNextActionInput): UltimateNe
       kind: 'claim-starter',
       label: 'Claim your starter',
       href: '/ultimate/run/collection',
-      detail: 'Five cards and 3,000 Coins begin your run.',
+      detail: 'Five starter cards begin your run — earn Coins from games.',
     };
   }
   if (!input.team.exists || !input.team.valid || !input.team.saved) {

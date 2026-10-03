@@ -52,11 +52,6 @@ function isContentHashMismatch(error: unknown): boolean {
 export function isCollectionContentHashMismatch(error: unknown): boolean {
   return isContentHashMismatch(error);
 }
-function parseObservedContentHash(error: unknown): string | null {
-  if (!(error instanceof Error)) return null;
-  const match = error.message.match(CONTENT_HASH_MISMATCH);
-  return match?.[2] ?? null;
-}
 async function retryWithFreshManifest<T>(
   original: unknown,
   expectedHash: string,
@@ -67,7 +62,6 @@ async function retryWithFreshManifest<T>(
   load: (url: string, contentHash: string) => Promise<T>,
 ): Promise<T> {
   if (!isContentHashMismatch(original)) throw original;
-  const observedHash = parseObservedContentHash(original);
   let fresh: HoopRushManifest;
   try {
     fresh = await reloadManifest();
@@ -78,9 +72,6 @@ async function retryWithFreshManifest<T>(
   if (!entry) throw original;
   if (entry.contentHash !== expectedHash) {
     return load(entry.url, entry.contentHash);
-  }
-  if (observedHash && observedHash !== expectedHash) {
-    return load(entry.url, observedHash);
   }
   throw original;
 }

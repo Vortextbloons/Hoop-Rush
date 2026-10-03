@@ -13,7 +13,7 @@ import {
   type ChallengeCreation,
 } from '@hoop-rush/engine';
 import { challengeRepository } from '$lib/challenge-repo';
-import { randomUUID } from '$lib/random-id';
+import { randomUUID } from '$lib/ids';
 import { FIXED_SANDBOX_ERA, loadRunPreamble } from '$lib/run-preamble';
 export async function startSandboxRun(players: PeakPlayerSeason[], seed: Seed): Promise<void> {
   if (players.length !== 5) {

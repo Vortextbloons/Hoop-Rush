@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { commandIdSchema, idSchema } from './ids.ts';
-import { seasonCheckpointDigestSchema } from './season-digests.ts';
+import { seasonCheckpointDigestSchema } from './season-hash.ts';
 import { SEASON_RUN_SCHEMA_VERSION } from './season-versions.ts';
 export const seasonRunCommandBaseSchema = z.object({
   schemaVersion: z.union([

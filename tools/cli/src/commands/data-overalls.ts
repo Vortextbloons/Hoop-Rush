@@ -6,6 +6,76 @@ import {
 } from '@hoop-rush/data-contracts';
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
 import { tryReadJson } from '../io.ts';
+
+export interface OverallPoolFilter {
+  franchise?: string;
+  era?: string;
+}
+
+export type OverallManifest = ReturnType<typeof hoopRushManifestSchema.parse>;
+
+export function parseOverallManifest(
+  input: string,
+): { manifest: OverallManifest } | { failure: string } {
+  const rawManifest = tryReadJson(input);
+  const parsedManifest = hoopRushManifestSchema.safeParse(rawManifest);
+  if (!parsedManifest.success) {
+    const issue = parsedManifest.error.issues[0];
+    return {
+      failure: `manifest: ${input} is missing or invalid (${issue?.path.join('.') ?? 'root'} ${issue?.message ?? 'invalid'})`,
+    };
+  }
+  return { manifest: parsedManifest.data };
+}
+
+export function poolInvalidLine(
+  poolRef: { franchiseId: string; eraId: string; url: string },
+  issue: unknown,
+): string {
+  const record =
+    typeof issue === 'object' && issue !== null
+      ? (issue as { path?: unknown; message?: unknown })
+      : null;
+  const path = Array.isArray(record?.path)
+    ? record.path.map((part) => String(part)).join('.')
+    : 'root';
+  const rawMessage = record?.message;
+  const message = typeof rawMessage === 'string' ? rawMessage : 'invalid';
+  return `pool ${poolRef.franchiseId}/${poolRef.eraId}: ${poolRef.url} is invalid (${path} ${message})`;
+}
+
+export function loadOverallRows(
+  input: string,
+  filter: OverallPoolFilter = {},
+):
+  | { manifest: OverallManifest; rows: PeakPlayerSeason[]; failures: string[] }
+  | { failure: string } {
+  const parsed = parseOverallManifest(input);
+  if ('failure' in parsed) return parsed;
+  const manifestDir = dirname(resolve(input));
+  const rows: PeakPlayerSeason[] = [];
+  const failures: string[] = [];
+  for (const poolRef of parsed.manifest.pools) {
+    if (filter.franchise !== undefined && poolRef.franchiseId !== filter.franchise) continue;
+    if (filter.era !== undefined && poolRef.eraId !== filter.era) continue;
+    const assetPath = isAbsolute(poolRef.url) ? poolRef.url : resolve(manifestDir, poolRef.url);
+    const parsedPool = franchiseEraPoolSchema.safeParse(tryReadJson(assetPath));
+    if (!parsedPool.success) {
+      failures.push(poolInvalidLine(poolRef, parsedPool.error.issues[0]));
+      continue;
+    }
+    rows.push(...parsedPool.data.players);
+  }
+  return { manifest: parsed.manifest, rows, failures };
+}
+
+export function manifestErrorReport(
+  command: string,
+  input: Record<string, unknown>,
+  failure: string,
+): CliReport {
+  return makeReport(command, input, { failures: [failure], exitCode: EXIT_USAGE_OR_DATA_ERROR });
+}
 export const DATA_OVERALLS_OPTIONS: Record<string, boolean> = {
   input: true,
   franchise: true,
@@ -68,43 +138,21 @@ export function dataOveralls(options: DataOverallsOptions): CliReport {
       exitCode: EXIT_USAGE_OR_DATA_ERROR,
     });
   }
-  const rawManifest = tryReadJson(options.input);
-  const parsedManifest = hoopRushManifestSchema.safeParse(rawManifest);
-  if (!parsedManifest.success) {
-    const issue = parsedManifest.error.issues[0];
-    return makeReport('data overalls', input, {
-      failures: [
-        `manifest: ${options.input} is missing or invalid (${issue?.path.join('.') ?? 'root'} ${issue?.message ?? 'invalid'})`,
-      ],
-      exitCode: EXIT_USAGE_OR_DATA_ERROR,
-    });
+  const loaded = loadOverallRows(options.input, {
+    ...(options.franchise === undefined ? {} : { franchise: options.franchise }),
+    ...(options.era === undefined ? {} : { era: options.era }),
+  });
+  if ('failure' in loaded) {
+    return manifestErrorReport('data overalls', input, loaded.failure);
   }
-  const manifest = parsedManifest.data;
-  const manifestDir = dirname(resolve(options.input));
+  const { manifest, failures } = loaded;
   const nameFilter = options.player?.toLocaleLowerCase();
   const rows: OverallRow[] = [];
-  const failures: string[] = [];
-  for (const poolRef of manifest.pools) {
-    if (options.franchise !== undefined && poolRef.franchiseId !== options.franchise) continue;
-    if (options.era !== undefined && poolRef.eraId !== options.era) continue;
-    const assetPath = isAbsolute(poolRef.url) ? poolRef.url : resolve(manifestDir, poolRef.url);
-    const parsedPool = franchiseEraPoolSchema.safeParse(tryReadJson(assetPath));
-    if (!parsedPool.success) {
-      const issue = parsedPool.error.issues[0];
-      failures.push(
-        `pool ${poolRef.franchiseId}/${poolRef.eraId}: ${poolRef.url} is invalid (${issue?.path.join('.') ?? 'root'} ${issue?.message ?? 'invalid'})`,
-      );
+  for (const player of loaded.rows) {
+    if (nameFilter !== undefined && !player.displayName.toLocaleLowerCase().includes(nameFilter)) {
       continue;
     }
-    for (const player of parsedPool.data.players) {
-      if (
-        nameFilter !== undefined &&
-        !player.displayName.toLocaleLowerCase().includes(nameFilter)
-      ) {
-        continue;
-      }
-      rows.push(rowFromPlayer(player));
-    }
+    rows.push(rowFromPlayer(player));
   }
   rows.sort(
     (a, b) =>

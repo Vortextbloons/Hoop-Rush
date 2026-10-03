@@ -11,7 +11,7 @@ import type {
   RecommendSeasonRotationResult,
   SearchLens,
 } from '@hoop-rush/engine';
-import { newSeasonId } from './season-ids';
+import { newSeasonId } from '$lib/ids';
 import { seasonArtifactUrls } from './season-assets';
 import type {
   ProjectionRotationLoadRow,

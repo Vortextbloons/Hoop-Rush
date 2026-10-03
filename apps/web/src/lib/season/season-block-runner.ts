@@ -44,7 +44,7 @@ import type {
 import type { SeasonSchedule } from '@hoop-rush/data-contracts';
 import type { EraSimulationProfile } from '@hoop-rush/data-contracts';
 import type { SeasonArtifactUrls } from './season-assets';
-import { randomUUID } from '$lib/random-id';
+import { randomUUID } from '$lib/ids';
 export type SeasonRunnerEvent =
   | {
       type: 'started';
@@ -204,6 +204,8 @@ export function buildWorkerRequest(
     profileUrl: opts.artifacts.profileUrl,
     profileHash: opts.artifacts.profileHash,
     priorSummaries,
+    priorRetainedDetails:
+      state.resumePending !== null ? [...state.resumePending.retainedDetails] : [],
     priorStandings: opts.priorStandings,
     priorTeamAggregates: opts.priorTeamAggregates,
     priorPlayerAggregates: opts.priorPlayerAggregates,
@@ -800,14 +802,24 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       };
       const repository = await resolveRepository();
       if (abandonIfNotLive(requestId, epoch)) return;
-      await repository.savePendingBlock(pending, interruption);
+      const priorRetained = state.resumePending?.retainedDetails ?? [];
+      const priorPendingSummaries = state.resumePending?.summaries ?? [];
+      const mergedPending: typeof pending = {
+        ...pending,
+        summaries: mergeSortedSummaries(priorPendingSummaries, pending.summaries),
+        retainedDetails: mergeSortedDetails(
+          priorRetained,
+          dedupeNewByGameId(priorRetained, pending.retainedDetails),
+        ),
+      };
+      await repository.savePendingBlock(mergedPending, interruption);
       if (abandonIfNotLive(requestId, epoch)) return;
       emit({
         type: 'interrupted',
         requestId,
-        runId: pending.runId,
-        blockIndex: pending.blockIndex,
-        pending,
+        runId: mergedPending.runId,
+        blockIndex: mergedPending.blockIndex,
+        pending: mergedPending,
         interruption,
       });
     } catch (error) {
@@ -1336,7 +1348,7 @@ export function assembleCommittedSnapshot(input: {
     effects: window !== null ? window.effects : checkpoint.effects,
   };
 }
-function objectivesWithSuccess(
+export function objectivesWithSuccess(
   run: SeasonRun,
   checkpoint: SeasonCandidateCheckpoint,
 ): SeasonObjectiveState | undefined {
@@ -1353,7 +1365,7 @@ function objectivesWithSuccess(
     },
   };
 }
-function challengesWithSuccess(
+export function challengesWithSuccess(
   run: SeasonRun,
   checkpoint: SeasonCandidateCheckpoint,
 ): SeasonRun['challenges'] {

@@ -9,8 +9,7 @@
   } from '@hoop-rush/data-contracts';
   import {
     seasonTradePackageRatio,
-    TRADE_BAND_1V1,
-    TRADE_BAND_DEFAULT,
+    TRADE_VALUE_BAND,
     TRADE_CASH_PCT_MAX,
     TRADE_CASH_PCT_PER_POINT,
     TRADE_PACKAGE_WEIGHTS,
@@ -203,9 +202,7 @@
       return Math.round(rawEstimate * (1 - influencePct / 100));
     return rawEstimate;
   });
-  const valueBand = $derived(
-    outgoing.length === 1 && incoming.length === 1 ? TRADE_BAND_1V1 : TRADE_BAND_DEFAULT,
-  );
+  const valueBand = $derived(TRADE_VALUE_BAND);
   const isLikelyGift = $derived(
     adjustedEstimate !== null && adjustedEstimate < valueBand.lower && hasOnePlusOne,
   );

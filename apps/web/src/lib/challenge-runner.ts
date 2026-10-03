@@ -15,7 +15,7 @@ import {
   type CompletedRunIndex,
   type StoredRunRecord,
 } from '@hoop-rush/persistence';
-import { randomUUID } from '$lib/random-id';
+import { randomUUID } from '$lib/ids';
 import { sleep } from '$lib/sleep';
 export const REVEAL_INTERVAL_MS = 36;
 export type RunnerPhase = 'idle' | 'starting' | 'running' | 'paused' | 'finished' | 'error';

@@ -4,12 +4,16 @@ import {
   seasonDigestHex,
   seasonTradeGradeLogSchema,
   type SeasonGameSummary,
+  type SeasonPlayerAggregate,
   type SeasonPostseasonSummary,
   type SeasonRun,
+  type SeasonTeamAggregate,
   type SeasonTradeGrade,
   type SeasonTradeGradeLabel,
   type SeasonTradeGradeLog,
 } from '@hoop-rush/data-contracts';
+import { foldSeasonPlayerAggregates, foldSeasonTeamAggregates } from './aggregates.ts';
+
 export const SEASON_TRADE_GRADE_MIN_SAMPLE = 5;
 export const SEASON_TRADE_GRADE_NEUTRAL_SCORE = 50;
 const PRODUCTION_LEVEL_WEIGHT = 0.7;
@@ -32,31 +36,13 @@ export interface SeasonTradeGradesInput {
   summaries: SeasonGameSummary[];
   postseasonSummaries: SeasonPostseasonSummary[];
 }
-interface PlayerPostTradeFacts {
-  appearances: number;
-  starts: number;
-  seconds: number;
+interface PlayerProduction {
   valueBases: number[];
   efficiencyValues: number[];
   shotsList: number[];
   wins: boolean[];
 }
-interface PostTradeFacts {
-  players: Map<string, PlayerPostTradeFacts>;
-  teamGames: Map<string, number>;
-  teamWins: Map<string, number>;
-}
 type FoldLine = SeasonGameSummary['homePlayers'][number];
-interface FoldGame {
-  homeFranchiseId: string;
-  awayFranchiseId: string;
-  status: 'final' | 'forfeit';
-  forfeitLoserFranchiseId: string | null;
-  homeScore: number;
-  awayScore: number;
-  homePlayers: readonly FoldLine[];
-  awayPlayers: readonly FoldLine[];
-}
 function shotsUsedOf(line: { fieldGoalsAttempted: number; freeThrowsAttempted: number }): number {
   return line.fieldGoalsAttempted + 0.44 * line.freeThrowsAttempted;
 }
@@ -102,7 +88,7 @@ function mvpValueBaseOf(line: {
     PLAYMAKING_ASSIST_WEIGHT * line.assists
   );
 }
-function mvpValueOf(row: PlayerPostTradeFacts, index: number, leagueAverageTs: number): number {
+function mvpValueOf(row: PlayerProduction, index: number, leagueAverageTs: number): number {
   const valueBase = row.valueBases[index] ?? 0;
   const shots = row.shotsList[index] ?? 0;
   const efficiency = row.efficiencyValues[index] ?? 0;
@@ -111,22 +97,32 @@ function mvpValueOf(row: PlayerPostTradeFacts, index: number, leagueAverageTs: n
     valueBase + (efficiency - leagueAverageTs) * shots + (won ? TEAM_BONUS.win : TEAM_BONUS.loss)
   );
 }
-function foldPostTradeFacts(games: readonly FoldGame[]): PostTradeFacts {
-  const players = new Map<string, PlayerPostTradeFacts>();
-  const teamGames = new Map<string, number>();
-  const teamWins = new Map<string, number>();
-  const rowOf = (playerVersionId: string): PlayerPostTradeFacts => {
+function asRegularSummary(summary: SeasonPostseasonSummary, index: number): SeasonGameSummary {
+  return {
+    ...summary,
+    schemaVersion: 1,
+    summaryVersion: 'season-game-summary-v4',
+    gameId: `s${String(90000 + index).padStart(6, '0')}`,
+    round: 82,
+    overtimePeriods: 0,
+    injuryEvents: [],
+  } as unknown as SeasonGameSummary;
+}
+function postTradeSummariesOf(
+  summaries: readonly SeasonGameSummary[],
+  postseason: readonly SeasonPostseasonSummary[],
+  postTradeFirstRound: number,
+): SeasonGameSummary[] {
+  const regular = summaries.filter((summary) => summary.round >= postTradeFirstRound);
+  const adapted = postseason.map((summary, index) => asRegularSummary(summary, index));
+  return [...regular, ...adapted];
+}
+function foldProduction(games: readonly SeasonGameSummary[]): Map<string, PlayerProduction> {
+  const players = new Map<string, PlayerProduction>();
+  const rowOf = (playerVersionId: string): PlayerProduction => {
     let row = players.get(playerVersionId);
     if (row === undefined) {
-      row = {
-        appearances: 0,
-        starts: 0,
-        seconds: 0,
-        valueBases: [],
-        efficiencyValues: [],
-        shotsList: [],
-        wins: [],
-      };
+      row = { valueBases: [], efficiencyValues: [], shotsList: [], wins: [] };
       players.set(playerVersionId, row);
     }
     return row;
@@ -136,35 +132,27 @@ function foldPostTradeFacts(games: readonly FoldGame[]): PostTradeFacts {
       game.status === 'forfeit'
         ? game.forfeitLoserFranchiseId !== game.homeFranchiseId
         : game.homeScore > game.awayScore;
-    teamGames.set(game.homeFranchiseId, (teamGames.get(game.homeFranchiseId) ?? 0) + 1);
-    teamGames.set(game.awayFranchiseId, (teamGames.get(game.awayFranchiseId) ?? 0) + 1);
-    if (homeWon) teamWins.set(game.homeFranchiseId, (teamWins.get(game.homeFranchiseId) ?? 0) + 1);
-    else teamWins.set(game.awayFranchiseId, (teamWins.get(game.awayFranchiseId) ?? 0) + 1);
     if (game.status === 'forfeit') continue;
     const foldLines = (lines: readonly FoldLine[], won: boolean): void => {
       for (const line of lines) {
+        if (line.seconds <= 0) continue;
         const row = rowOf(line.playerVersionId);
-        row.seconds += line.seconds;
-        if (line.started === true) row.starts += 1;
-        if (line.seconds > 0) {
-          row.appearances += 1;
-          row.valueBases.push(mvpValueBaseOf(line));
-          row.efficiencyValues.push(trueShootingOf(line));
-          row.shotsList.push(shotsUsedOf(line));
-          row.wins.push(won);
-        }
+        row.valueBases.push(mvpValueBaseOf(line));
+        row.efficiencyValues.push(trueShootingOf(line));
+        row.shotsList.push(shotsUsedOf(line));
+        row.wins.push(won);
       }
     };
     foldLines(game.homePlayers, homeWon);
     foldLines(game.awayPlayers, !homeWon);
   }
-  return { players, teamGames, teamWins };
+  return players;
 }
-function leagueAverageTsOf(facts: PostTradeFacts): number {
+function leagueAverageTsOf(production: Map<string, PlayerProduction>): number {
   let points = 0;
   let shots = 0;
-  for (const row of facts.players.values()) {
-    for (let index = 0; index < row.appearances; index += 1) {
+  for (const row of production.values()) {
+    for (let index = 0; index < row.valueBases.length; index += 1) {
       const lineShots = row.shotsList[index] ?? 0;
       if (lineShots > 0) {
         points += (row.efficiencyValues[index] ?? 0) * 2 * lineShots;
@@ -174,42 +162,50 @@ function leagueAverageTsOf(facts: PostTradeFacts): number {
   }
   return shots > 0 ? points / (2 * shots) : 0.5;
 }
-function accumulatedProductionOf(facts: PostTradeFacts, playerVersionId: string): number {
-  const row = facts.players.get(playerVersionId);
-  if (row === undefined || row.appearances === 0) return 0;
-  const baseline = leagueAverageTsOf(facts);
+function accumulatedProductionOf(
+  production: Map<string, PlayerProduction>,
+  leagueAverageTs: number,
+  playerVersionId: string,
+): number {
+  const row = production.get(playerVersionId);
+  if (row === undefined || row.valueBases.length === 0) return 0;
   let total = 0;
-  for (let index = 0; index < row.appearances; index += 1) {
-    total += mvpValueOf(row, index, baseline);
+  for (let index = 0; index < row.valueBases.length; index += 1) {
+    total += mvpValueOf(row, index, leagueAverageTs);
   }
   return Math.max(0, total);
 }
 function accumulatedProductionOfSet(
-  facts: PostTradeFacts,
+  production: Map<string, PlayerProduction>,
+  leagueAverageTs: number,
   playerVersionIds: readonly string[],
 ): number {
   let total = 0;
   for (const id of playerVersionIds) {
-    total += accumulatedProductionOf(facts, id);
+    total += accumulatedProductionOf(production, leagueAverageTs, id);
   }
   return total;
 }
-function referenceProductionOf(facts: PostTradeFacts): number {
+function referenceProductionOf(
+  production: Map<string, PlayerProduction>,
+  leagueAverageTs: number,
+): number {
   let best = 0;
-  for (const playerVersionId of facts.players.keys()) {
-    const value = accumulatedProductionOf(facts, playerVersionId);
+  for (const playerVersionId of production.keys()) {
+    const value = accumulatedProductionOf(production, leagueAverageTs, playerVersionId);
     if (value > best) best = value;
   }
   return best;
 }
 function productionComponentOf(
-  facts: PostTradeFacts,
+  production: Map<string, PlayerProduction>,
+  leagueAverageTs: number,
   received: readonly string[],
   sent: readonly string[],
 ): number {
-  const receivedValue = accumulatedProductionOfSet(facts, received);
-  const sentValue = accumulatedProductionOfSet(facts, sent);
-  const reference = referenceProductionOf(facts);
+  const receivedValue = accumulatedProductionOfSet(production, leagueAverageTs, received);
+  const sentValue = accumulatedProductionOfSet(production, leagueAverageTs, sent);
+  const reference = referenceProductionOf(production, leagueAverageTs);
   const absolute = (100 * receivedValue) / Math.max(reference, CONSISTENCY_REFERENCE_EPSILON);
   const edge =
     receivedValue + sentValue <= CONSISTENCY_REFERENCE_EPSILON
@@ -220,55 +216,39 @@ function productionComponentOf(
   return clampScore(PRODUCTION_LEVEL_WEIGHT * absolute + PRODUCTION_EDGE_WEIGHT * edge);
 }
 function availabilityComponentOf(
-  facts: PostTradeFacts,
+  players: ReadonlyMap<string, SeasonPlayerAggregate>,
   received: readonly string[],
   teamGames: number,
 ): number {
   if (teamGames <= 0 || received.length === 0) return 0;
   let appearances = 0;
   for (const id of received) {
-    appearances += facts.players.get(id)?.appearances ?? 0;
+    appearances += players.get(id)?.appearances ?? 0;
   }
   return clampScore((100 * appearances) / (received.length * teamGames));
 }
 function minutesComponentOf(
-  facts: PostTradeFacts,
+  players: ReadonlyMap<string, SeasonPlayerAggregate>,
   received: readonly string[],
   teamGames: number,
 ): number {
   if (teamGames <= 0 || received.length === 0) return 0;
   let total = 0;
   for (const id of received) {
-    const row = facts.players.get(id);
+    const row = players.get(id);
     if (row === undefined) continue;
     const minutesPerGame = row.seconds / 60 / teamGames;
-    const startsPerGame = row.starts / teamGames;
+    const startsPerGame = row.started / teamGames;
     total += (0.7 * minutesPerGame) / MINUTES_FULL_GAME + (0.3 * startsPerGame) / STARTS_FULL_GAME;
   }
   return clampScore((100 * total) / received.length);
 }
-function preTradeWinRateOf(
-  summaries: readonly SeasonGameSummary[],
+function teamRecordOf(
+  teams: readonly SeasonTeamAggregate[],
   franchiseId: string,
-  postTradeFirstRound: number,
-): number {
-  let games = 0;
-  let wins = 0;
-  for (const summary of summaries) {
-    if (summary.round >= postTradeFirstRound) continue;
-    const home = summary.homeFranchiseId === franchiseId;
-    const away = summary.awayFranchiseId === franchiseId;
-    if (!home && !away) continue;
-    games += 1;
-    const won =
-      summary.status === 'forfeit'
-        ? summary.forfeitLoserFranchiseId !== franchiseId
-        : home
-          ? summary.homeScore > summary.awayScore
-          : summary.awayScore > summary.homeScore;
-    if (won) wins += 1;
-  }
-  return games > 0 ? wins / games : 0.5;
+): { games: number; wins: number } {
+  const row = teams.find((entry) => entry.franchiseId === franchiseId);
+  return { games: row?.gamesPlayed ?? 0, wins: row?.wins ?? 0 };
 }
 function clampScore(value: number): number {
   return Math.min(100, Math.max(0, value));
@@ -298,11 +278,18 @@ export function deriveSeasonTradeGrades(input: SeasonTradeGradesInput): SeasonTr
   const grades: SeasonTradeGrade[] = [];
   for (const window of run.trade?.windows ?? []) {
     const postTradeFirstRound = postTradeFirstRoundOf(window.blockIndex);
-    const postTradeGames: FoldGame[] = [
-      ...input.summaries.filter((summary) => summary.round >= postTradeFirstRound),
-      ...input.postseasonSummaries,
-    ];
-    const postTradeFacts = foldPostTradeFacts(postTradeGames);
+    const postTradeGames = postTradeSummariesOf(
+      input.summaries,
+      input.postseasonSummaries,
+      postTradeFirstRound,
+    );
+    const teamAggregates = foldSeasonTeamAggregates(postTradeGames);
+    const playerAggregates = foldSeasonPlayerAggregates(postTradeGames);
+    const playerById = new Map(playerAggregates.map((row) => [row.playerVersionId, row]));
+    const production = foldProduction(postTradeGames);
+    const leagueAverageTs = leagueAverageTsOf(production);
+    const preTradeGames = input.summaries.filter((summary) => summary.round < postTradeFirstRound);
+    const preTradeTeams = foldSeasonTeamAggregates(preTradeGames);
     for (const offer of window.offers) {
       if (offer.status !== 'accepted') continue;
       const sides = [
@@ -318,40 +305,40 @@ export function deriveSeasonTradeGrades(input: SeasonTradeGradesInput): SeasonTr
         },
       ];
       for (const side of sides) {
-        const teamGames = postTradeFacts.teamGames.get(side.franchiseId) ?? 0;
-        const receivedValue = accumulatedProductionOfSet(postTradeFacts, side.received);
-        const sentValue = accumulatedProductionOfSet(postTradeFacts, side.sent);
-        const reference = referenceProductionOf(postTradeFacts);
+        const { games: teamGames, wins: postWins } = teamRecordOf(teamAggregates, side.franchiseId);
+        const receivedValue = accumulatedProductionOfSet(
+          production,
+          leagueAverageTs,
+          side.received,
+        );
+        const sentValue = accumulatedProductionOfSet(production, leagueAverageTs, side.sent);
+        const reference = referenceProductionOf(production, leagueAverageTs);
         const appearances = side.received.reduce(
-          (total, id) => total + (postTradeFacts.players.get(id)?.appearances ?? 0),
+          (total, id) => total + (playerById.get(id)?.appearances ?? 0),
           0,
         );
         let minutesPerGame = 0;
         let startsPerGame = 0;
         for (const id of side.received) {
-          const row = postTradeFacts.players.get(id);
-          if (row === undefined) continue;
+          const row = playerById.get(id);
+          if (row === undefined || teamGames <= 0) continue;
           minutesPerGame += row.seconds / 60 / teamGames / side.received.length;
-          startsPerGame += row.starts / teamGames / side.received.length;
+          startsPerGame += row.started / teamGames / side.received.length;
         }
-        const postWins = postTradeFacts.teamWins.get(side.franchiseId) ?? 0;
         const postWinRate = teamGames > 0 ? postWins / teamGames : 0.5;
-        const preWinRate = preTradeWinRateOf(
-          input.summaries,
-          side.franchiseId,
-          postTradeFirstRound,
-        );
+        const preRecord = teamRecordOf(preTradeTeams, side.franchiseId);
+        const preWinRate = preRecord.games > 0 ? preRecord.wins / preRecord.games : 0.5;
         const neutral = teamGames < SEASON_TRADE_GRADE_MIN_SAMPLE;
         const components = neutral
           ? { production: 0, availability: 0, minutes: 0, trend: 0 }
           : {
               production: Math.round(
-                productionComponentOf(postTradeFacts, side.received, side.sent),
+                productionComponentOf(production, leagueAverageTs, side.received, side.sent),
               ),
               availability: Math.round(
-                availabilityComponentOf(postTradeFacts, side.received, teamGames),
+                availabilityComponentOf(playerById, side.received, teamGames),
               ),
-              minutes: Math.round(minutesComponentOf(postTradeFacts, side.received, teamGames)),
+              minutes: Math.round(minutesComponentOf(playerById, side.received, teamGames)),
               trend: Math.round(clampScore(50 + 50 * (postWinRate - preWinRate))),
             };
         const score = neutral

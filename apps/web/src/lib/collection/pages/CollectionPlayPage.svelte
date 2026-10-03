@@ -1,8 +1,6 @@
 <script lang="ts">
-  import { asset, resolve } from '$app/paths';
+  import { resolve } from '$app/paths';
   import { getManifest } from '$lib/data';
-  import PlayerFace from '$lib/components/PlayerFace.svelte';
-  import { collectionCardArtOf } from '$lib/collection/collection-card-art';
   import { page } from '$app/state';
   import '$lib/collection/ultimate-theme.css';
   import { getContext, onDestroy, tick } from 'svelte';
@@ -23,9 +21,11 @@
   import { validateCollectionChallengeTeam } from '@hoop-rush/engine';
   import AsyncState from '$lib/components/AsyncState.svelte';
   import ChallengeCard from '$lib/collection/ChallengeCard.svelte';
+  import CollectionBoxScore from '$lib/collection/CollectionBoxScore.svelte';
   import DifficultyPicker from '$lib/collection/DifficultyPicker.svelte';
   import MatchupReport from '$lib/collection/MatchupReport.svelte';
   import GamecastCourt from '$lib/collection/GamecastCourt.svelte';
+  import QuickGamecast from '$lib/collection/QuickGamecast.svelte';
   import ObjectivePicker from '$lib/collection/ObjectivePicker.svelte';
   import MatchupCard from '$lib/collection/MatchupCard.svelte';
   import RewardReceipt from '$lib/collection/RewardReceipt.svelte';
@@ -51,6 +51,7 @@
   } from '$lib/collection/collection-hub.ts';
   import { runCollectionGame } from '$lib/collection/collection-game-runner.ts';
   import { collectionErrorMessage } from '$lib/collection/collection-errors.ts';
+  import { startersOf } from '$lib/collection/collection-box-score';
   import {
     cadenceFor,
     clockLabel,
@@ -111,6 +112,7 @@
   let cursor = $state(0);
   let playing = $state(false);
   let firstWatch = $state(false);
+  let castOpen = $state(false);
   let savedResultAnnouncement = '';
   let playbackTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -308,6 +310,12 @@
     try {
       arenaGameResult(record?.result.winner === 'home');
     } catch {}
+  }
+
+  function finishCast(): void {
+    castOpen = false;
+    resultView = 'recap';
+    revealResult();
   }
 
   function scheduleTick(): void {
@@ -556,6 +564,9 @@
     busy = 'preparing';
     flowError = null;
     try {
+      const anticipation = new Promise<void>((done) =>
+        setTimeout(done, window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 650),
+      );
       const nowIso = new Date().toISOString();
       const outcome =
         mode === 'challenges'
@@ -568,6 +579,7 @@
               difficultyId,
               objectiveId: effectiveObjectiveId,
             });
+      await anticipation;
       if (!mounted) return;
       playState = outcome.playState;
       record = null;
@@ -621,6 +633,7 @@
     const matchup = pending;
     if (busy !== 'idle' || !matchup) return;
     busy = 'playing';
+    castOpen = true;
     flowError = null;
     stopPlayback();
     try {
@@ -684,7 +697,7 @@
       }
       cursor = 0;
       watchMode = 'standard';
-      resultView = 'replay';
+      resultView = 'recap';
       const committed = record;
       const won = committed?.result.winner === 'home';
       const coins = committed === null ? 0 : rewardCoinsOf(committed);
@@ -699,11 +712,10 @@
       savedResultAnnouncement = `${won ? 'You won' : 'CPU won'}. +${String(coins)} Coins.${objectiveNote}${challengeNote}`;
       firstWatch = true;
       announcement = 'Game ready. Watching the recorded gamecast.';
-      playing = true;
-      scheduleTick();
       busy = 'idle';
     } catch (playError) {
       if (!mounted) return;
+      castOpen = false;
       try {
         arenaError();
       } catch {}
@@ -713,6 +725,10 @@
     }
   }
 </script>
+
+{#if castOpen}
+  <QuickGamecast {record} {nameOf} onComplete={finishCast} />
+{/if}
 
 <div class="ur-page ur-play-page">
   <div class="ur-pregame-hero">
@@ -1241,7 +1257,7 @@
       {/if}
     {/if}
 
-    {#if record && facts}
+    {#if record && facts && !castOpen}
       {@const splits = quarterSplitsOf(record)}
       <section aria-label="Result and gamecast" class="ur-gamecast mt-4">
         <div class="ur-broadcast-mast">
@@ -1491,71 +1507,14 @@
         {/if}
         {#if resultView === 'box' && record.result.outcome === 'completed'}
           {@const completed = record.result}
-          <div class="mt-4 grid gap-4 md:grid-cols-2">
-            {#each [{ side: completed.home, label: 'Your box score' }, { side: completed.away, label: 'CPU box score' }] as box (box.label)}
-              <div class="overflow-x-auto rounded-xl bg-surface-2 p-4">
-                <h3 class="text-sm font-bold">{box.label} · {box.side.score}</h3>
-                <table class="mt-2 w-full text-left text-xs tabular-nums">
-                  <thead>
-                    <tr class="text-muted-foreground">
-                      <th scope="col" class="pr-2">Player</th>
-                      <th scope="col" class="pr-2">Min</th>
-                      <th scope="col" class="pr-2">Pts</th>
-                      <th scope="col" class="pr-2">Reb</th>
-                      <th scope="col" class="pr-2">Ast</th>
-                      <th scope="col" class="pr-2">TO</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {#each box.side.players as player (player.cardId)}
-                      {@const card = byId.get(player.cardId)}
-                      {@const artwork = collectionCardArtOf(card ?? null)}
-                      <tr>
-                        <th scope="row" class="pr-2 font-semibold"
-                          ><span class="box-player"
-                            ><span class="box-card-symbol" aria-hidden="true">
-                              {#if artwork}<img src={asset(artwork)} alt="" loading="lazy" />
-                              {:else if card && manifest}<PlayerFace
-                                  player={{
-                                    playerId: card.playerId,
-                                    playerExternalId: card.playerExternalId,
-                                    altIds: null,
-                                  }}
-                                  {manifest}
-                                  size="sm"
-                                  fallbackInitials={card.displayName
-                                    .split(' ')
-                                    .map((part) => part[0] ?? '')
-                                    .join('')
-                                    .slice(0, 2)}
-                                />
-                              {:else}<span
-                                  >{nameOf(player.cardId)
-                                    .split(' ')
-                                    .map((part) => part[0] ?? '')
-                                    .join('')
-                                    .slice(0, 2)}</span
-                                >{/if}
-                            </span><span
-                              >{nameOf(player.cardId)}<small
-                                >{byId.get(player.cardId)?.rarity ?? ''} · {byId.get(player.cardId)
-                                  ?.positions[0] ?? ''}</small
-                              ></span
-                            ></span
-                          ></th
-                        >
-                        <td class="pr-2">{player.minutes.toFixed(1)}</td>
-                        <td class="pr-2">{player.points}</td>
-                        <td class="pr-2">{player.rebounds.total}</td>
-                        <td class="pr-2">{player.assists}</td>
-                        <td class="pr-2">{player.turnovers}</td>
-                      </tr>
-                    {/each}
-                  </tbody>
-                </table>
-              </div>
-            {/each}
-          </div>
+          <CollectionBoxScore
+            result={completed}
+            starters={startersOf(record)}
+            {facts}
+            {nameOf}
+            cardOf={(cardId) => byId.get(cardId)}
+            {manifest}
+          />
         {/if}
         {#if resultView === 'box' && record.result.outcome !== 'completed'}
           <p class="replay-disclaimer">
@@ -1636,41 +1595,6 @@
     color: var(--ur-muted);
     font-size: 0.7rem;
     margin-bottom: 0.5rem;
-  }
-  .box-player {
-    display: flex;
-    align-items: center;
-    gap: 0.55rem;
-    min-width: 9rem;
-    padding: 0.4rem 0;
-  }
-  .box-player small {
-    display: block;
-    color: var(--ur-muted);
-    font-size: 0.6rem;
-    font-weight: 500;
-  }
-  .box-card-symbol > img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-  }
-  .box-card-symbol :global(> div) {
-    width: 100%;
-    height: 100%;
-    background: transparent;
-  }
-  .box-card-symbol {
-    display: grid;
-    place-items: center;
-    width: 1.75rem;
-    height: 2.25rem;
-    border: 1px solid var(--ur-apex);
-    border-radius: 0.25rem;
-    color: var(--ur-apex);
-    background: #ffcd5910;
-    overflow: hidden;
-    font-size: 0.65rem;
   }
   @media (max-width: 520px) {
     .scorer-spotlight {
@@ -1934,12 +1858,6 @@
     padding: 0.6rem 0.75rem;
   }
 
-  .ur-gamecast .rounded-xl.bg-surface-2 {
-    border: 1px solid color-mix(in srgb, var(--ur-apex) 22%, var(--ur-line));
-    border-radius: 0.75rem;
-    background: var(--ur-surface);
-  }
-
   .ur-play-page section[aria-label='Game setup'],
   .ur-play-page section[aria-label='Challenge browser'] {
     padding: clamp(1rem, 2.5vw, 1.5rem);
@@ -2038,23 +1956,6 @@
 
   .ur-play-page :global(.ur-reward-receipt .ur-receipt-total span) {
     color: #241a02 !important;
-  }
-
-  .ur-play-page .rounded-xl.bg-surface-2 {
-    border-radius: 0.75rem;
-  }
-
-  .ur-play-page table {
-    border-collapse: collapse;
-  }
-
-  .ur-play-page tbody tr {
-    border-top: 1px solid var(--ur-line);
-  }
-
-  .ur-play-page th,
-  .ur-play-page td {
-    padding-block: 0.4rem;
   }
 
   .ur-scout-panel {

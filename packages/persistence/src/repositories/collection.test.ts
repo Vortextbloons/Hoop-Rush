@@ -6,6 +6,7 @@ import {
   COLLECTION_STATE_SCHEMA_VERSION,
   collectionCommandSchema,
   collectionGameCommandSchema,
+  commandIdSchema,
   type CollectionCatalog,
   type CollectionCatalogCard,
   type CollectionCommand,
@@ -214,14 +215,29 @@ async function seedCollectionRows(
       },
     });
   }
+  const coinBalance = input.balances?.Coins ?? 0;
+  if (coinBalance > 0) {
+    await db.collectionLedger.put({
+      collectionId: input.collectionId,
+      transactionId: `txn-${'f'.repeat(32)}`,
+      entry: {
+        transactionId: `txn-${'f'.repeat(32)}`,
+        commandId: commandIdSchema.parse('seed-coins'),
+        pullSequence: null,
+        currency: 'Coins',
+        amount: coinBalance,
+        reason: 'welcome-grant',
+      },
+    });
+  }
 }
 
 describe('M4.4 collection persistence', () => {
   afterEach(restoreIndexedDb);
 
-  it('round-trips a v2 collection with targeting and set claims', async () => {
+  it('welcome starter grants cards without Coins', async () => {
     resetIndexedDb();
-    const db = new TestDatabase(testDatabaseName('collection-m44'));
+    const db = new TestDatabase(testDatabaseName('collection-welcome'));
     const repo = new DexieCollectionRepository(db);
     const state = await repo.initializeCollection({
       collectionId: 'collection-1',
@@ -230,8 +246,6 @@ describe('M4.4 collection persistence', () => {
       progressionHash: HASH,
       createdAtIso: '2026-01-01T00:00:00.000Z',
     });
-    expect(state.schemaVersion).toBe(COLLECTION_STATE_SCHEMA_VERSION);
-
     const welcomeCommand = commandFor(
       state,
       'claim-welcome',
@@ -245,9 +259,25 @@ describe('M4.4 collection persistence', () => {
     });
     expect(welcome.pull?.kind).toBe('welcome');
     expect(v2Pull(welcome.pull)?.replayVersion).toBe('collection-replay-v2');
+    expect(welcome.state.balances.Coins).toBe(0);
+    expect(welcome.ledgerEntries).toEqual([]);
+  });
+
+  it('round-trips a v2 collection with targeting and set claims', async () => {
+    resetIndexedDb();
+    const db = new TestDatabase(testDatabaseName('collection-m44'));
+    const repo = new DexieCollectionRepository(db);
+    await seedCollectionRows(db, {
+      collectionId: 'collection-1',
+      ownedCardIds: CATALOG.cards.map((card) => card.cardId),
+      balances: { Coins: 100, Exchange: 0 },
+    });
+    const loaded = await repo.loadCollection('collection-1');
+    if (loaded === null) throw new Error('collection missing');
+    expect(loaded.state.schemaVersion).toBe(COLLECTION_STATE_SCHEMA_VERSION);
 
     const targetCommand = commandFor(
-      welcome.state,
+      loaded.state,
       'set-target-player',
       { playerId: 'persist-000' },
       'cmd-target',
@@ -278,8 +308,8 @@ describe('M4.4 collection persistence', () => {
     expect(reloaded).not.toBeNull();
     expect(reloaded?.state.activeTargetPlayerId).toBe('persist-000');
     expect(reloaded?.state.claimedSetIds).toEqual([]);
-    expect(reloaded?.pulls).toHaveLength(2);
-    expect(reloaded?.commands).toHaveLength(3);
+    expect(reloaded?.pulls).toHaveLength(CATALOG.cards.length + 1);
+    expect(reloaded?.commands).toHaveLength(2);
   });
 
   it('returns stored outcomes for identical retries without double effects', async () => {
@@ -313,33 +343,22 @@ describe('M4.4 collection persistence', () => {
     ).resolves.toMatchObject({ duplicate: true });
     const reloaded = await repo.loadCollection('collection-1');
     expect(reloaded?.pulls).toHaveLength(1);
-    expect(welcome.state.balances.Coins).toBe(3000);
+    expect(welcome.state.balances.Coins).toBe(0);
   });
 
   it('rejects a stale target preview and accepts the refreshed one', async () => {
     resetIndexedDb();
     const db = new TestDatabase(testDatabaseName('collection-stale'));
     const repo = new DexieCollectionRepository(db);
-    const state = await repo.initializeCollection({
+    await seedCollectionRows(db, {
       collectionId: 'collection-1',
-      rootSeed: '0'.repeat(32),
-      catalogHash: HASH,
-      progressionHash: HASH,
-      createdAtIso: '2026-01-01T00:00:00.000Z',
+      ownedCardIds: CATALOG.cards.map((card) => card.cardId),
+      balances: { Coins: 100, Exchange: 0 },
     });
-    const welcomeCommand = commandFor(
-      state,
-      'claim-welcome',
-      { acquiredAtIso: '2026-01-01T00:00:00.000Z' },
-      'cmd-welcome',
-    );
-    const welcome = await repo.applyCollectionCommand({
-      command: welcomeCommand,
-      ...collectionArgs(),
-      recordedAtIso: '2026-01-01T00:00:00.000Z',
-    });
+    const seeded = await repo.loadCollection('collection-1');
+    if (seeded === null) throw new Error('collection missing');
     const first = commandFor(
-      welcome.state,
+      seeded.state,
       'set-target-player',
       { playerId: 'persist-000' },
       'cmd-target-1',
@@ -350,7 +369,7 @@ describe('M4.4 collection persistence', () => {
       recordedAtIso: '2026-01-01T00:00:00.000Z',
     });
     const stale = commandFor(
-      welcome.state,
+      seeded.state,
       'open-pack',
       { packId: 'tip-off', acquiredAtIso: '2026-01-01T00:00:00.000Z' },
       'cmd-stale',
@@ -374,7 +393,7 @@ describe('M4.4 collection persistence', () => {
       recordedAtIso: '2026-01-01T00:00:00.000Z',
     });
     expect(accepted.pull).not.toBeNull();
-    expect(accepted.state.balances.Coins).toBe(2900);
+    expect(accepted.state.balances.Coins).toBe(0);
   });
 
   it('claims a set once with an Exchange ledger entry that folds to the balance', async () => {

@@ -19,7 +19,7 @@ import {
   type SeasonGameTargets,
   type SeasonRotationPreset,
 } from '@hoop-rush/data-contracts';
-import { parseSeedRange, parseWorkers, UsageError } from '../args.ts';
+import { UsageError } from '../args.ts';
 import { seasonGameFixtureSchema, type SeasonGameFixture } from '../fixture-schema.ts';
 import { makeReport, type CliReport } from '../report.ts';
 import {
@@ -28,23 +28,23 @@ import {
   type SeasonGameSimulateReport,
 } from '../report-schemas.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR, readJsonFile } from './season-data.ts';
-import { seasonCalibrationSeed, seedIndexRange } from './season-calibration.ts';
+import { seasonCalibrationSeed } from './season-calibration.ts';
+import { commitTargetsArtifact } from '../artifact.ts';
+import {
+  createFixtureCohortRunner,
+  resolveCalibrationArgs,
+  runCalibratedSeeds,
+  seedRangeCalibrateOptions,
+} from '../calibration-harness.ts';
 import { percentile } from '../stats.ts';
-import { commitTargetsArtifact, runWorkerChunks } from '../artifact.ts';
 export const SEASON_GAME_SIMULATE_OPTIONS: Record<string, boolean> = {
   input: true,
   seed: true,
   format: true,
 };
-export const SEASON_GAME_CALIBRATE_OPTIONS: Record<string, boolean> = {
+export const SEASON_GAME_CALIBRATE_OPTIONS: Record<string, boolean> = seedRangeCalibrateOptions({
   fixture: true,
-  'seed-from': true,
-  'seed-to': true,
-  workers: true,
-  out: true,
-  manifest: true,
-  format: true,
-};
+});
 export const SEASON_GAME_CALIBRATION_SEED_COUNT = 1024;
 export const SEASON_GAME_VALIDATION_SEED_COUNT = 256;
 export const SEASON_GAME_CALIBRATION_SEED_TOTAL =
@@ -175,25 +175,21 @@ export type SeasonGameCohortRunner = (
 export async function runSeasonGameCohort(
   request: SeasonGameCohortRequest,
 ): Promise<SeasonGameGameFacts[]> {
-  const promises: Array<Promise<SeasonGameGameFacts[]>> = [];
-  for (const fixture of request.fixtures) {
-    promises.push(
-      runWorkerChunks<number, SeasonGameGameFacts>({
-        workerUrl: new URL('./season-game-calibration-worker.ts', import.meta.url),
-        workerData: (seedIndices) => ({
-          fixtureId: fixture.fixtureId,
-          fixturePath: fixture.path,
-          seedIndices,
-          ...(request.effects === true ? { effects: true } : {}),
-        }),
-        items: request.seedIndices,
-        workers: request.workers,
-        payloadKey: 'facts',
-      }),
-    );
-  }
-  const chunks = await Promise.all(promises);
-  return chunks.flat();
+  return createFixtureCohortRunner<SeasonGameGameFacts>({
+    workerUrl: new URL('./season-game-calibration-worker.ts', import.meta.url),
+    payloadKey: 'facts',
+    buildWorkerData: (fixture, seedIndices, extra) => ({
+      fixtureId: fixture.fixtureId,
+      fixturePath: fixture.path,
+      seedIndices,
+      ...((extra as { effects?: boolean }).effects === true ? { effects: true } : {}),
+    }),
+  })({
+    fixtures: request.fixtures,
+    seedIndices: request.seedIndices,
+    workers: request.workers,
+    extra: { effects: request.effects },
+  });
 }
 export async function runSeasonGameCohortInProcess(
   request: SeasonGameCohortRequest,
@@ -504,14 +500,19 @@ export async function seasonGameCalibrate(
   if (fixtureIds.length === 0) {
     throw new UsageError('--fixture needs at least one fixture id');
   }
-  const { from: seedFrom, to: seedTo } = parseSeedRange(
-    args,
-    SEASON_GAME_CALIBRATION_SEED_TOTAL - 1,
-    {
-      requireOrder: true,
-    },
-  );
-  const workers = parseWorkers(args, 4, { clampToAtLeastOne: true });
+  const {
+    from: seedFrom,
+    to: seedTo,
+    workers,
+    calibrationIndices,
+    validationIndices,
+  } = resolveCalibrationArgs(args, {
+    calibrationSeedCount: SEASON_GAME_CALIBRATION_SEED_COUNT,
+    validationSeedCount: SEASON_GAME_VALIDATION_SEED_COUNT,
+    defaultWorkers: 4,
+    clampWorkers: true,
+    mode: 'split',
+  });
   const manifestPath = args.manifest ?? DEFAULT_MANIFEST;
   const fixtures = fixtureIds.map((id) => {
     const fixture = loadSeasonGameFixture(id);
@@ -533,14 +534,6 @@ export async function seasonGameCalibrate(
       .map((fixture) => fixture.preset),
   ).size;
   const hasAllPresetFixtures = presetCount === 3;
-  const calibrationIndices = seedIndexRange(
-    seedFrom,
-    Math.min(seedTo, SEASON_GAME_CALIBRATION_SEED_COUNT - 1),
-  );
-  const validationIndices = seedIndexRange(
-    Math.max(seedFrom, SEASON_GAME_CALIBRATION_SEED_COUNT),
-    seedTo,
-  );
   const simulate = deps.simulateSeasonGame ?? simulateSeasonGame;
   const check = deps.checkSeasonGameResult ?? checkSeasonGameResult;
   const engineDeps: SeasonGameEngineDeps = {
@@ -552,20 +545,26 @@ export async function seasonGameCalibrate(
     (deps.simulateSeasonGame !== undefined || deps.checkSeasonGameResult !== undefined
       ? (request: SeasonGameCohortRequest) => runSeasonGameCohortInProcess(request, engineDeps)
       : runSeasonGameCohort);
-  const start = Date.now();
-  const calibrationFacts = await runCohort({
-    fixtures,
-    seedIndices: calibrationIndices,
-    workers,
-    ...(effects ? { effects: true } : {}),
-  });
-  const validationFacts = await runCohort({
-    fixtures,
-    seedIndices: validationIndices,
-    workers,
-    ...(effects ? { effects: true } : {}),
-  });
-  const durationMs = Date.now() - start;
+  const {
+    calibration: calibrationFacts,
+    validation: validationFacts,
+    durationMs,
+  } = await runCalibratedSeeds(
+    () =>
+      runCohort({
+        fixtures,
+        seedIndices: calibrationIndices,
+        workers,
+        ...(effects ? { effects: true } : {}),
+      }),
+    () =>
+      runCohort({
+        fixtures,
+        seedIndices: validationIndices,
+        workers,
+        ...(effects ? { effects: true } : {}),
+      }),
+  );
   const probeIndices = calibrationIndices.slice(0, SEASON_GAME_CHUNKING_PROBE_COUNT);
   const probeFacts = await runCohort({
     fixtures,

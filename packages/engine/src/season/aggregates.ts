@@ -2,11 +2,16 @@ import {
   SEASON_LEADER_DEPTH,
   SEASON_LEADER_MIN_GAME_SHARE,
   SEASON_LEADERS_VERSION,
+  emptySeasonPlayerAggregate,
+  emptySeasonTeamAggregate,
   type SeasonGameSummary,
   type SeasonLeaderCategory,
   type SeasonLeaderEntry,
   type SeasonLeaders,
+  type SeasonLeague,
   type SeasonPlayerAggregate,
+  type SeasonRoster,
+  type SeasonRotation,
   type SeasonStandings,
   type SeasonTeamAggregate,
 } from '@hoop-rush/data-contracts';
@@ -244,6 +249,42 @@ export function foldSeasonAggregates(summaries: readonly SeasonGameSummary[]): {
     teams: foldSeasonTeamAggregates(summaries),
     players: foldSeasonPlayerAggregates(summaries),
   };
+}
+export function padSeasonTeamAggregates(
+  league: SeasonLeague,
+  summaries: readonly SeasonGameSummary[],
+): SeasonTeamAggregate[] {
+  const folded = foldSeasonTeamAggregates(summaries);
+  const byId = new Map(folded.map((row) => [row.franchiseId, row]));
+  return league.teams
+    .map((team) => byId.get(team.franchiseId) ?? emptySeasonTeamAggregate(team.franchiseId))
+    .sort((a, b) => (a.franchiseId < b.franchiseId ? -1 : 1));
+}
+export function padSeasonPlayerAggregates(
+  rosters: readonly SeasonRoster[],
+  summaries: readonly SeasonGameSummary[],
+): SeasonPlayerAggregate[] {
+  const folded = foldSeasonPlayerAggregates(summaries);
+  const byId = new Map(folded.map((row) => [row.playerVersionId, row]));
+  return rosters
+    .flatMap((roster) =>
+      roster.players.map((player) => {
+        const row = byId.get(player.playerVersionId);
+        if (row !== undefined) return row;
+        return emptySeasonPlayerAggregate(player.playerVersionId, roster.franchiseId);
+      }),
+    )
+    .sort((a, b) => (a.playerVersionId < b.playerVersionId ? -1 : 1));
+}
+export function seasonRosterPlayerVersionIds(rosters: readonly SeasonRoster[]): string[] {
+  return [
+    ...new Set(rosters.flatMap((roster) => roster.players.map((player) => player.playerVersionId))),
+  ].sort();
+}
+export function seasonRotationPlayerVersionIds(rotations: readonly SeasonRotation[]): string[] {
+  return [
+    ...new Set(rotations.flatMap((rotation) => [...rotation.starters, ...rotation.benchOrder])),
+  ].sort();
 }
 export function auditSeasonAggregates(input: {
   teams: readonly SeasonTeamAggregate[];

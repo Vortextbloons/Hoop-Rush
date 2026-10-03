@@ -13,7 +13,7 @@ import {
   playerIdSchema,
   seasonDigestHex,
 } from '@hoop-rush/data-contracts';
-import { enumerateLegalFives, type PlannerMember } from '../season/rotation-planner.ts';
+import { enumerateLegalFives } from '../season/rotation-planner.ts';
 import {
   buildMinutePlanCandidates,
   minutePlanHorizonGames,
@@ -335,7 +335,7 @@ function rotationsFor(input: {
   >;
 }): SeasonRotation[] {
   const { roster, members, lens, rotationsCap } = input;
-  const plannerMembers: PlannerMember[] = [...roster]
+  const plannerMembers: SeasonRosterMemberInput[] = [...roster]
     .map((id) => ({ playerVersionId: id, playable: members.get(id)?.playable ?? [] }))
     .sort((a, b) => (a.playerVersionId < b.playerVersionId ? -1 : 1));
   const all = new Set(roster);

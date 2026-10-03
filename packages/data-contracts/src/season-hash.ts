@@ -1,3 +1,9 @@
+import { z } from 'zod';
+const hex32Digest = z.string().regex(/^[0-9a-f]{32}$/);
+export const seasonCheckpointDigestSchema = hex32Digest;
+export type SeasonCheckpointDigest = z.infer<typeof seasonCheckpointDigestSchema>;
+export const seasonRotationSetDigestSchema = hex32Digest;
+export type SeasonRotationSetDigest = z.infer<typeof seasonRotationSetDigestSchema>;
 export const FNV_OFFSET_32 = 0x811c9dc5;
 const FNV_PRIME_32 = 0x01000193;
 export function fnv1a32(material: string, offset = FNV_OFFSET_32): number {

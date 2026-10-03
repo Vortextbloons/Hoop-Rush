@@ -8,6 +8,23 @@ import type {
 export type WatchMode = 'fast' | 'standard' | 'slow';
 export const STANDARD_EVENT_MS = 900;
 export const SLOW_EVENT_MS = 1400;
+export const QUICK_CAST_BEAT_MS = 800;
+
+export function quickCastEvents(events: readonly CollectionGameEvent[]): CollectionGameEvent[] {
+  const highlights: CollectionGameEvent[] = [];
+  const periods = [...new Set(events.map((event) => event.period))];
+  for (const period of periods) {
+    const plays = events.filter((event) => event.period === period && event.kind === 'possession');
+    const highlight =
+      plays.findLast((event) => event.kind === 'possession' && event.pointsScored >= 3) ??
+      plays.findLast((event) => event.kind === 'possession' && event.pointsScored > 0);
+    if (highlight) highlights.push(highlight);
+  }
+  const final = events.findLast((event) => event.kind === 'final');
+  const selected =
+    highlights.length <= 4 ? highlights : [...highlights.slice(0, 2), ...highlights.slice(-2)];
+  return final ? [...selected, final] : selected;
+}
 
 export function cadenceFor(mode: WatchMode): number | null {
   if (mode === 'fast') return null;

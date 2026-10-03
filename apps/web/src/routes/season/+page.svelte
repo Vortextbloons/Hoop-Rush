@@ -37,7 +37,7 @@
   import { DexieSeasonDraftRepository } from '@hoop-rush/persistence';
   import { getSeasonRunRepository } from '$lib/season/season-repo';
   import { clearAllSeasonData } from '$lib/season/season-data-recovery';
-  import { seasonRootSeed } from '$lib/season/season-ids';
+  import { seasonRootSeed } from '$lib/ids';
   import { buildSeasonRunFromGeneration, sha256Hex } from '$lib/season/season-run-builder';
   let manifest = $state<HoopRushManifest | null>(null);
   let league = $state<SeasonLeague | null>(null);
@@ -52,6 +52,7 @@
   let actionError = $state<string | null>(null);
   let generationError: string | null = $state(null);
   let generationProgress = $state<SeasonDraftGenerationProgress | null>(null);
+  let generationReveal = $state(false);
   let promoting = $state(false);
   let promoteError: string | null = $state(null);
   let resumeHref: string | null = $state(null);
@@ -283,19 +284,25 @@
     void runCommand(() => flow!.finalize());
   }
   async function generateLeague() {
-    if (!flow) return;
+    if (!flow || busy) return;
     busy = true;
+    generationReveal = true;
     actionError = null;
     generationError = null;
     generationProgress = flow.generationProgress;
+    const anticipation = new Promise<void>((done) =>
+      setTimeout(done, window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 2400),
+    );
     try {
       const generation = await flow.generate();
+      if (generation !== null) await anticipation;
       if (generation === null && flow.error !== null) {
         generationError = flow.error;
       }
     } catch (error) {
       generationError = flow.error ?? (error instanceof Error ? error.message : String(error));
     } finally {
+      generationReveal = false;
       board = flow.state();
       busy = false;
     }
@@ -485,6 +492,8 @@
         {/if}
       </div>
     </div>
+  {:else if generationReveal}
+    <LeagueGenerationArena progress={generationProgress} {league} />
   {:else if draftStage === 'drafting' || draftStage === 'ready'}
     <div
       class="mx-auto mt-6 flex w-full max-w-4xl flex-col gap-4 px-3 pb-[max(6rem,env(safe-area-inset-bottom))] sm:mt-8 sm:px-0"

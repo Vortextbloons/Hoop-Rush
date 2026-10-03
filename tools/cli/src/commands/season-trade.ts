@@ -22,8 +22,8 @@ import {
 } from '@hoop-rush/engine';
 import { makeReport, type CliReport } from '../report.ts';
 import { seasonTradeCalibrateReportSchema } from '../report-schemas.ts';
-import { parseSeedRange, parseWorkers } from '../args.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR, readJsonFile } from './season-data.ts';
+import { resolveCalibrationArgs, seedRangeCalibrateOptions } from '../calibration-harness.ts';
 import {
   gateValue,
   gateSummary,
@@ -31,21 +31,14 @@ import {
   m25ToleranceGate,
   mean,
   seasonCalibrationSeed,
-  seedIndexRange,
   type M25Gate,
 } from './season-calibration.ts';
 import { runSeasonM25, type SeasonM25SeasonFacts } from './season-m25-core.ts';
 import { commitTargetsArtifact, validateTargetsArtifact } from '../artifact.ts';
-export const SEASON_TRADE_CALIBRATE_OPTIONS: Record<string, boolean> = {
+export const SEASON_TRADE_CALIBRATE_OPTIONS: Record<string, boolean> = seedRangeCalibrateOptions({
   input: true,
-  'seed-from': true,
-  'seed-to': true,
-  workers: true,
-  out: true,
-  manifest: true,
   validate: true,
-  format: true,
-};
+});
 export const SEASON_TRADE_AUDIT_OPTIONS: Record<string, boolean> = {
   input: true,
   manifest: true,
@@ -777,15 +770,20 @@ export function validateSeasonTradeTargets(args: SeasonTradeArgs, outPath: strin
 }
 export function seasonTradeCalibrate(args: SeasonTradeArgs): CliReport {
   const started = Date.now();
-  const { from, to } = parseSeedRange(args, SEASON_TRADE_CALIBRATION_SEED_COUNT - 1);
+  const { from, to, workers, calibrationIndices, validationIndices } = resolveCalibrationArgs(
+    args,
+    {
+      calibrationSeedCount: SEASON_TRADE_CALIBRATION_SEED_COUNT,
+      validationSeedCount: SEASON_TRADE_VALIDATION_SEED_COUNT,
+      defaultWorkers: 1,
+      mode: 'append',
+    },
+  );
   const outPath = args.out ?? DEFAULT_TRADE_TARGETS;
   const validateOnly = args['validate'] !== null;
   if (validateOnly) {
     return validateSeasonTradeTargets(args, resolve(args.validate ?? outPath));
   }
-  const workers = parseWorkers(args, 1);
-  const calibrationIndices = seedIndexRange(from, to);
-  const validationIndices = seedIndexRange(to + 1, to + SEASON_TRADE_VALIDATION_SEED_COUNT);
   let calibration: SeasonM25SeasonFacts[];
   let heldOut: SeasonM25SeasonFacts[];
   try {

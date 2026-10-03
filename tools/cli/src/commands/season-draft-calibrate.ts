@@ -22,7 +22,6 @@ import {
 import { applySeasonDraftCommand, generateAiLeague } from '@hoop-rush/engine';
 import { makeReport, type CliReport } from '../report.ts';
 import { seasonDraftCalibrateReportSchema } from '../report-schemas.ts';
-import { parseCount } from '../args.ts';
 import {
   DEFAULT_MANIFEST,
   DEFAULT_SEASON_DIR,
@@ -32,15 +31,15 @@ import {
 } from './season-data.ts';
 import { rosterCalibrationSeed } from './season-rosters.ts';
 import { percentile } from '../stats.ts';
-import { commitTargetsArtifact, runWorkerChunks } from '../artifact.ts';
-export const SEASON_DRAFT_CALIBRATE_OPTIONS: Record<string, boolean> = {
-  workers: true,
-  'calibration-seeds': true,
-  'validation-seeds': true,
-  out: true,
-  manifest: true,
-  format: true,
-};
+import { commitTargetsArtifact } from '../artifact.ts';
+import {
+  createSeedChunkRunner,
+  resolveCountCalibrationArgs,
+  seedCountCalibrateOptions,
+} from '../calibration-harness.ts';
+export const SEASON_DRAFT_CALIBRATE_OPTIONS: Record<string, boolean> = seedCountCalibrateOptions(
+  {},
+);
 export const DEFAULT_OFFER_TARGETS = resolve(DEFAULT_SEASON_DIR, 'offer-targets.json');
 export interface SeasonDraftCalibrationRun {
   seed: Seed;
@@ -406,13 +405,11 @@ async function runCalibrationChunks(args: {
   workers: number;
   targets: SeasonRosterTargets;
 }): Promise<SeasonDraftCalibrationRun[]> {
-  return runWorkerChunks<Seed, SeasonDraftCalibrationRun>({
+  return createSeedChunkRunner<Seed, SeasonDraftCalibrationRun>({
     workerUrl: new URL('./draft-calibration-worker.ts', import.meta.url),
-    workerData: (seeds) => ({ ...args, seeds }),
-    items: args.seeds,
-    workers: args.workers,
     payloadKey: 'runs',
-  });
+    buildWorkerData: (seeds, extra) => ({ ...extra, seeds }),
+  })(args.seeds, args.workers, { ...args });
 }
 export async function seasonDraftCalibrate(args: {
   workers?: string;
@@ -421,9 +418,12 @@ export async function seasonDraftCalibrate(args: {
   out?: string;
   manifest?: string;
 }): Promise<CliReport> {
-  const calibrationCount = parseCount(args['calibration-seeds'], '--calibration-seeds', 256);
-  const validationCount = parseCount(args['validation-seeds'], '--validation-seeds', 64);
-  const workers = Math.max(1, parseCount(args.workers, '--workers', 4));
+  const { calibrationCount, validationCount, workers } = resolveCountCalibrationArgs(args, {
+    calibrationDefault: 256,
+    validationDefault: 64,
+    workersDefault: 4,
+    clampWorkers: true,
+  });
   const manifestPath = args.manifest ?? DEFAULT_MANIFEST;
   const catalogPath = resolveSeasonArtifact(manifestPath, 'draftCatalog').path;
   const leaguePath = resolveSeasonArtifact(manifestPath, 'league').path;

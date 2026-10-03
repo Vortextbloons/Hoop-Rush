@@ -45,8 +45,8 @@ import {
 } from '@hoop-rush/persistence';
 import type { CommitPostseasonAdvancementInput } from '@hoop-rush/persistence';
 import type { SeasonArtifactUrls } from './season-assets';
-import { randomUUID } from '$lib/random-id';
-import { newSeasonId } from './season-ids';
+import { randomUUID } from '$lib/ids';
+import { newSeasonId } from '$lib/ids';
 import {
   postseasonPostCommandEffects,
   seasonPostseasonCommitResultDigest,

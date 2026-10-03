@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { franchiseIdSchema } from './ids.ts';
 import { seasonRunCommandBaseSchema } from './season-command-base.ts';
 import { seasonCandidateCheckpointSchema } from './season-checkpoint.ts';
-import { seasonRotationSetDigestSchema } from './season-digests.ts';
+import { seasonRotationSetDigestSchema } from './season-hash.ts';
 import { seasonObjectiveIdSchema } from './season-objective.ts';
 import { seasonCampaignOpportunityIdSchema } from './season-campaign.ts';
 import { seasonChallengeIdSchema } from './season-challenge.ts';

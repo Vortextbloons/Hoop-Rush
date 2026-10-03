@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { franchiseIdSchema, seedSchema } from './ids.ts';
-import { seasonCheckpointDigestSchema, seasonRotationSetDigestSchema } from './season-digests.ts';
+import { seasonCheckpointDigestSchema, seasonRotationSetDigestSchema } from './season-hash.ts';
 import { seasonGameSummarySchema, seasonRetainedGameDetailSchema } from './season-game-summary.ts';
 import { seasonPlayerAggregateSchema, seasonTeamAggregateSchema } from './season-aggregates.ts';
 import { seasonStandingsSchema } from './season-standings.ts';
@@ -76,8 +76,8 @@ export const seasonCheckpointVersionsSchema = z.object({
   multiplayerVersion: z.string().optional(),
 });
 export type SeasonCheckpointVersions = z.infer<typeof seasonCheckpointVersionsSchema>;
-export { seasonCheckpointDigestSchema, type SeasonCheckpointDigest } from './season-digests.ts';
-export { seasonRotationSetDigestSchema, type SeasonRotationSetDigest } from './season-digests.ts';
+export { seasonCheckpointDigestSchema, type SeasonCheckpointDigest } from './season-hash.ts';
+export { seasonRotationSetDigestSchema, type SeasonRotationSetDigest } from './season-hash.ts';
 export const seasonCandidateCheckpointSchema = z.object({
   schemaVersion: z.literal(1),
   checkpointVersion: z.literal(SEASON_CHECKPOINT_VERSION),

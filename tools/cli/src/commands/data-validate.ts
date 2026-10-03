@@ -1158,7 +1158,9 @@ async function auditCollectionCatalog(
     failures.push(`collection-catalog: overlayVersion ${overlayVersion} unexpected`);
   }
   if (catalog.specialsVersion !== COLLECTION_SPECIALS_VERSION) {
-    failures.push(`collection-catalog: specialsVersion ${catalog.specialsVersion} unexpected`);
+    failures.push(
+      `collection-catalog: specialsVersion ${String(catalog.specialsVersion)} unexpected`,
+    );
   }
   for (const pack of catalog.packs) {
     const packRulesVersion: string = pack.packRulesVersion;
@@ -1228,17 +1230,23 @@ async function auditCollectionCatalog(
       failures.push(`collection-catalog: ${card.cardId} has unexpected eligibility overlay`);
     }
   }
-  if (catalog.sets.length !== 1) {
-    failures.push(`collection-catalog: want 1 set, have ${String(catalog.sets.length)}`);
+  if (catalog.sets.length !== 2) {
+    failures.push(`collection-catalog: want 2 sets, have ${String(catalog.sets.length)}`);
   }
   for (const set of catalog.sets) {
-    if (set.setId !== 'heat-check-set') {
-      failures.push(`collection-catalog: unexpected set ${set.setId}`);
-    }
-    if (set.memberCardIds.length !== 6) {
+    const family = set.setId === 'arm-guard-set' ? 'Arm Guard' : 'Heat Check';
+    const expectedMembers = catalog.cards
+      .filter((card) => card.family === family)
+      .map((card) => card.cardId)
+      .sort();
+    const expectedCount = set.setId === 'arm-guard-set' ? 7 : 6;
+    if (set.memberCardIds.length !== expectedCount) {
       failures.push(
-        `collection-catalog: set ${set.setId} has ${String(set.memberCardIds.length)} members, want 6`,
+        `collection-catalog: set ${set.setId} has ${String(set.memberCardIds.length)} members, want ${String(expectedCount)}`,
       );
+    }
+    if (canonicalJson([...set.memberCardIds].sort()) !== canonicalJson(expectedMembers)) {
+      failures.push(`collection-catalog: set ${set.setId} membership does not match ${family}`);
     }
   }
   if (catalog.packs.length !== 5) {
@@ -1251,7 +1259,7 @@ async function auditCollectionCatalog(
   }
   void COLLECTION_ECONOMY_VERSION;
   details.push(
-    `collection: ${String(catalog.cards.length)} cards (${String(baseCount)} base + ${String(activeSpecialCount)} Heat Check specials) · ${String(catalog.sets.length)} set · ${String(catalog.packs.length)} packs · ${String(catalogContent.length)} bytes`,
+    `collection: ${String(catalog.cards.length)} cards (${String(baseCount)} base + ${String(activeSpecialCount)} specials) · ${String(catalog.sets.length)} sets · ${String(catalog.packs.length)} packs · ${String(catalogContent.length)} bytes`,
   );
   const progression = await auditCollectionProgression(
     entry,

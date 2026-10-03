@@ -10,30 +10,21 @@ import {
 import { createEngineContext } from '@hoop-rush/engine';
 import { makeReport, type CliReport } from '../report.ts';
 import { seasonInfluenceCalibrateReportSchema } from '../report-schemas.ts';
-import { parseSeedRange, parseWorkers } from '../args.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR } from './season-data.ts';
+import { resolveCalibrationArgs, seedRangeCalibrateOptions } from '../calibration-harness.ts';
 import {
   gateValue,
   gateSummary,
   m25RangeGate,
   m25ToleranceGate,
   seasonCalibrationSeed,
-  seedIndexRange,
   share,
   type M25Gate,
 } from './season-calibration.ts';
 import { runSeasonM25, type SeasonM25SeasonFacts } from './season-m25-core.ts';
 import { commitTargetsArtifact, validateTargetsArtifact } from '../artifact.ts';
-export const SEASON_INFLUENCE_CALIBRATE_OPTIONS: Record<string, boolean> = {
-  input: true,
-  'seed-from': true,
-  'seed-to': true,
-  workers: true,
-  out: true,
-  manifest: true,
-  validate: true,
-  format: true,
-};
+export const SEASON_INFLUENCE_CALIBRATE_OPTIONS: Record<string, boolean> =
+  seedRangeCalibrateOptions({ input: true, validate: true });
 export const DEFAULT_INFLUENCE_TARGETS = resolve(DEFAULT_SEASON_DIR, 'influence-targets.json');
 export const SEASON_INFLUENCE_CALIBRATION_SEED_COUNT = 12;
 export const SEASON_INFLUENCE_VALIDATION_SEED_COUNT = 4;
@@ -523,15 +514,20 @@ export function validateSeasonInfluenceTargets(
 }
 export function seasonInfluenceCalibrate(args: SeasonInfluenceArgs): CliReport {
   const started = Date.now();
-  const { from, to } = parseSeedRange(args, SEASON_INFLUENCE_CALIBRATION_SEED_COUNT - 1);
+  const { from, to, workers, calibrationIndices, validationIndices } = resolveCalibrationArgs(
+    args,
+    {
+      calibrationSeedCount: SEASON_INFLUENCE_CALIBRATION_SEED_COUNT,
+      validationSeedCount: SEASON_INFLUENCE_VALIDATION_SEED_COUNT,
+      defaultWorkers: 1,
+      mode: 'append',
+    },
+  );
   const outPath = args.out ?? DEFAULT_INFLUENCE_TARGETS;
   const validateOnly = args['validate'] !== null;
   if (validateOnly) {
     return validateSeasonInfluenceTargets(args, resolve(args.validate ?? outPath));
   }
-  const workers = parseWorkers(args, 1);
-  const calibrationIndices = seedIndexRange(from, to);
-  const validationIndices = seedIndexRange(to + 1, to + SEASON_INFLUENCE_VALIDATION_SEED_COUNT);
   let calibration: SeasonM25SeasonFacts[];
   let heldOut: SeasonM25SeasonFacts[];
   try {

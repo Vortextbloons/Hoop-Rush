@@ -11,7 +11,7 @@ import type {
 } from '@hoop-rush/data-contracts';
 import { SEASON_MINUTE_POLICY_VERSION, seasonDigestHex } from '@hoop-rush/data-contracts';
 import { applySeasonRotationPreset, validateSeasonRotation } from '../season/rotation.ts';
-import { chooseInitialUnit, type PlannerMember } from '../season/rotation-planner.ts';
+import { chooseInitialUnit } from '../season/rotation-planner.ts';
 import {
   benchReliefOf,
   fatigueBandOf,
@@ -238,7 +238,7 @@ export function projectSeasonRoster(
     }
     byVersion.set(version, player);
   }
-  const members: PlannerMember[] = players.map((player) => ({
+  const members: { playerVersionId: string; playable: readonly Position[] }[] = players.map((player) => ({
     playerVersionId: player.playerVersionId ?? player.playerId,
     playable: player.positions,
   }));

@@ -1,9 +1,8 @@
 import { z } from 'zod';
 import { franchiseIdSchema } from './ids.ts';
-import { seasonCheckpointDigestSchema } from './season-digests.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import { SEASON_AWARDS_VERSION } from './season-versions.ts';
-import { canonicalJson, seasonDigestHex } from './season-hash.ts';
+import { canonicalJson, seasonCheckpointDigestSchema, seasonDigestHex } from './season-hash.ts';
 export const seasonAwardRecipientSchema = z.object({
   playerVersionId: playerVersionIdSchema,
   franchiseId: franchiseIdSchema,

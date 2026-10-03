@@ -80,6 +80,7 @@
   let claimError = $state<string | null>(null);
   let starterCards = $state<CollectionIndexEntry[]>([]);
   let starterPull = $state<CollectionPullRecord | null>(null);
+  let starterExchangeGained = $state(0);
   let starterAnimate = $state(false);
   let announcement = $state('');
   let targetBusy = $state(false);
@@ -101,6 +102,7 @@
   const editingSort = $derived(mobileFilterOpen ? draftSort : sort);
   let pageNum = $state(1);
   let selectedCardId = $state<string | null>(null);
+  let loadGen = 0;
 
   const FAMILIES = $derived(
     [...new Set(entries.map((entry) => entry.family))].sort((left, right) =>
@@ -151,6 +153,7 @@
   }
 
   async function load(): Promise<void> {
+    const gen = ++loadGen;
     readFiltersFromUrl();
     try {
       const [loadedManifest, loadedIndex, loadedState] = await Promise.all([
@@ -158,25 +161,25 @@
         loadCollectionIndex(),
         ensureCollection(new Date().toISOString()),
       ]);
-      if (!mounted) return;
+      if (!mounted || gen !== loadGen) return;
       manifest = loadedManifest;
       entries = loadedIndex.cards;
       collectionState = loadedState;
       phase = 'ready';
       void loadCollectionCatalog()
         .then((loaded) => {
-          if (mounted) catalog = loaded;
+          if (mounted && gen === loadGen) catalog = loaded;
         })
         .catch(() => {});
       void loadCollectionProgression()
         .then((loaded) => {
-          if (mounted) {
+          if (mounted && gen === loadGen) {
             progression = loaded;
             progressionError = null;
           }
         })
         .catch((failure: unknown) => {
-          if (!mounted) return;
+          if (!mounted || gen !== loadGen) return;
           progression = null;
           progressionError =
             failure instanceof Error
@@ -184,7 +187,7 @@
               : 'The collection progression rules are unavailable.';
         });
     } catch (loadError) {
-      if (!mounted) return;
+      if (!mounted || gen !== loadGen) return;
       error = loadError instanceof Error ? loadError.message : 'Could not load the collection.';
       phase = 'error';
     }
@@ -379,9 +382,19 @@
         .filter((entry) => entry !== undefined);
       starterPull = outcome.pull;
       starterAnimate = true;
-      announcement = `Starter claimed. ${String(starterCards.length)} new cards, 3,000 Coins.`;
+      starterExchangeGained = outcome.ledgerEntries
+        .filter((entry) => entry.reason === 'duplicate-conversion')
+        .reduce((sum, entry) => sum + entry.amount, 0);
+      const keptCount = outcome.pull.slots.filter((slot) => slot.kept).length;
+      announcement = `Starter claimed. ${String(keptCount)} new cards, plus ${String(starterExchangeGained)} Exchange. Balance is now ${outcome.state.balances.Coins.toLocaleString('en-US')} Coins.`;
       try {
-        arenaPackReveal('Ember');
+        const order = ['Ember', 'Eruption', 'Apex', 'Titan', 'Eclipse', 'Immortal'];
+        let best = 0;
+        for (const slot of outcome.pull.slots) {
+          const rank = order.indexOf(slot.rarity);
+          if (rank > best) best = rank;
+        }
+        arenaPackReveal(order[best] ?? 'Ember');
       } catch {}
     } catch (claimFailure) {
       if (!mounted) return;
@@ -421,7 +434,7 @@
       ? {
           pull: starterPull,
           cardsAdded: starterPull.slots.filter((slot) => slot.kept).length,
-          exchangeGained: 0,
+          exchangeGained: starterExchangeGained,
           balances: { ...collectionState.balances },
           targetingSummary: null as string | null,
         }
@@ -616,6 +629,7 @@
         message={error ?? 'Unknown error.'}
         retry={() => {
           phase = 'loading';
+          loadGen += 1;
           void load();
         }}
       />
@@ -626,13 +640,13 @@
         <p class="ur-hero-eyebrow">Welcome grant</p>
         <h2 id="welcome-heading" class="ur-section-title">Claim your starter</h2>
         <p class="mt-2 max-w-2xl text-sm text-muted-foreground">
-          One free five-card starter plus a one-time grant of 3,000 Coins. Starter cards are drawn
+          One free five-card starter. You begin with 0 Coins — win games to fund packs. Starter cards are drawn
           from Ember base cards and always form a legal five. This grant can be claimed once.
         </p>
         <ul class="mt-3 list-disc pl-5 text-sm text-muted-foreground">
           <li>Five new, distinct players from Ember base cards</li>
           <li>Rarity before claiming: 100% Ember</li>
-          <li>Welcome grant: 3,000 Coins, starting Exchange: 0</li>
+          <li>Starting balance: 0 Coins, 0 Exchange</li>
         </ul>
         {#if claimError}
           <p role="alert" class="mt-3 text-sm text-negative">{claimError}</p>
@@ -651,8 +665,8 @@
     {#if starterCards.length > 0}
       <section aria-label="Starter results" class="ur-starter-recap ur-arena-panel mt-6">
         <p class="ur-hero-eyebrow">Starter claimed</p>
-        <h2 class="ur-section-title">Five cards added</h2>
-        <p class="text-sm text-muted-foreground">Five cards added · 3,000 Coins in the balance.</p>
+        <h2 class="ur-section-title">{starterCards.length} cards added</h2>
+        <p class="text-sm text-muted-foreground">{starterCards.length} cards added · {collectionState?.balances.Coins.toLocaleString('en-US') ?? ''} Coins in the balance.</p>
         <ul class="mt-3 grid gap-2 sm:grid-cols-2">
           {#each starterCards as card (card.cardId)}
             <li class="flex items-center gap-3 rounded-xl bg-surface-2 p-3">

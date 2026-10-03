@@ -14,31 +14,21 @@ import {
 import { createEngineContext, deriveSeasonAwards, handleSeasonRunCommand } from '@hoop-rush/engine';
 import { makeReport, type CliReport } from '../report.ts';
 import { seasonPostseasonCalibrateReportSchema } from '../report-schemas.ts';
-import { parseSeedRange } from '../args.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR, readJsonFile } from './season-data.ts';
+import { resolveCalibrationArgs, seedRangeCalibrateOptions } from '../calibration-harness.ts';
 import {
   gateSummary,
   m25RangeGate,
   m25ToleranceGate,
   mean,
   seasonCalibrationSeed,
-  seedIndexRange,
   type M25Gate,
 } from './season-calibration.ts';
 import { runSeasonM25, type SeasonM25SeasonFacts } from './season-m25-core.ts';
 import { commitTargetsArtifact } from '../artifact.ts';
 import { loadPackagedData, PackagedData } from './data-loader.ts';
-export const SEASON_POSTSEASON_CALIBRATE_OPTIONS: Record<string, boolean> = {
-  input: true,
-  'seed-from': true,
-  'seed-to': true,
-  workers: true,
-  out: true,
-  manifest: true,
-  validate: true,
-  write: false,
-  format: true,
-};
+export const SEASON_POSTSEASON_CALIBRATE_OPTIONS: Record<string, boolean> =
+  seedRangeCalibrateOptions({ input: true, validate: true, write: false });
 export const DEFAULT_POSTSEASON_TARGETS = resolve(DEFAULT_SEASON_DIR, 'postseason-targets.json');
 export const SEASON_POSTSEASON_CALIBRATION_SEED_COUNT = 8;
 export const SEASON_POSTSEASON_VALIDATION_SEED_COUNT = 4;
@@ -486,19 +476,13 @@ export function seasonPostseasonCalibrate(
   const runSeason =
     deps.runSeason ??
     ((rootSeed: Seed) => simulateSeasonPostseasonFacts(rootSeed, { manifestPath }));
-  const { from, to } = parseSeedRange(
-    args,
-    SEASON_POSTSEASON_CALIBRATION_SEED_COUNT + SEASON_POSTSEASON_VALIDATION_SEED_COUNT - 1,
-    { requireOrder: true, error: Error },
-  );
-  const calibrationIndices = seedIndexRange(
-    from,
-    Math.min(to, SEASON_POSTSEASON_CALIBRATION_SEED_COUNT - 1),
-  );
-  const validationIndices = seedIndexRange(
-    Math.max(from, SEASON_POSTSEASON_CALIBRATION_SEED_COUNT),
-    to,
-  );
+  const { from, to, calibrationIndices, validationIndices } = resolveCalibrationArgs(args, {
+    calibrationSeedCount: SEASON_POSTSEASON_CALIBRATION_SEED_COUNT,
+    validationSeedCount: SEASON_POSTSEASON_VALIDATION_SEED_COUNT,
+    defaultWorkers: 1,
+    mode: 'split',
+    error: Error,
+  });
   const started = Date.now();
   const calibrationFacts = calibrationIndices.map((index) =>
     runSeason(seasonCalibrationSeed(index)),

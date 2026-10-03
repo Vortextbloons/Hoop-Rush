@@ -144,6 +144,7 @@ export interface ClaimOutcome {
   state: CollectionState;
   pull: CollectionPullRecord;
   exchange: number;
+  ledgerEntries: import('@hoop-rush/data-contracts').CollectionLedgerEntry[];
 }
 
 export async function claimWelcomeStarter(nowIso: string): Promise<ClaimOutcome> {
@@ -177,7 +178,12 @@ export async function claimWelcomeStarter(nowIso: string): Promise<ClaimOutcome>
     recordedAtIso: nowIso,
   });
   if (!outcome.pull) throw new Error('The starter claim did not produce cards.');
-  return { state: outcome.state, pull: outcome.pull, exchange: outcome.state.balances.Exchange };
+  return {
+    state: outcome.state,
+    pull: outcome.pull,
+    exchange: outcome.state.balances.Exchange,
+    ledgerEntries: outcome.ledgerEntries,
+  };
 }
 
 export interface PackOutcome {

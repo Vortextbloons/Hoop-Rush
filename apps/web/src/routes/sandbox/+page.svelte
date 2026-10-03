@@ -87,6 +87,7 @@
   let lastVisible: IndexRow[] = [];
   let lastVisibleKey = '';
   let pageScoreGen = 0;
+  let dataGen = 0;
   let pickerPlayer = $state<IndexRow | null>(null);
   let pickerTrigger = $state<HTMLElement | null>(null);
   let pickerFallbackId = $state<string | null>(null);
@@ -97,31 +98,34 @@
     indexError = null;
     manifest = null;
     index = null;
+    const gen = ++dataGen;
     let cancelled = false;
     let restored = false;
     function maybeRestore(): void {
-      if (restored || cancelled || manifest === null || index === null) return;
+      if (restored || cancelled || gen !== dataGen || manifest === null || index === null) return;
       restored = true;
       restoreUrlState(manifest, index);
     }
     getManifest().then(
       (m) => {
-        if (cancelled) return;
+        if (cancelled || gen !== dataGen) return;
         manifest = m;
         maybeRestore();
       },
       (error: unknown) => {
-        if (!cancelled) manifestError = error instanceof Error ? error.message : String(error);
+        if (!cancelled && gen === dataGen)
+          manifestError = error instanceof Error ? error.message : String(error);
       },
     );
     getPlayersIndex().then(
       (ix) => {
-        if (cancelled) return;
+        if (cancelled || gen !== dataGen) return;
         index = ix;
         maybeRestore();
       },
       (error: unknown) => {
-        if (!cancelled) indexError = error instanceof Error ? error.message : String(error);
+        if (!cancelled && gen === dataGen)
+          indexError = error instanceof Error ? error.message : String(error);
       },
     );
     return () => {
@@ -312,7 +316,7 @@
     resolveRefsToPlayers(result.state.slots).then(
       () => {
         if (!mounted) return;
-        slots = filled;
+        slots = slots.map((current, i) => current ?? filled[i] ?? null);
         pickerPlayer = null;
       },
       () => {},

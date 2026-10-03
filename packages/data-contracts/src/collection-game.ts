@@ -59,7 +59,7 @@ import {
 } from './collection-challenge.ts';
 import { commandIdSchema, contentHashSchema, idSchema, seedSchema } from './ids.ts';
 import { REQUIRED_RATING_KEYS } from './simulation.ts';
-import { seasonCheckpointDigestSchema } from './season-digests.ts';
+import { seasonCheckpointDigestSchema } from './season-hash.ts';
 import {
   seasonGamePlayerResultSchema,
   seasonGameSideResultSchema,

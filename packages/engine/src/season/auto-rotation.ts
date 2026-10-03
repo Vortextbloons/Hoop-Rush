@@ -22,9 +22,9 @@ import {
   riskScoreOf,
   type FatigueBand,
 } from './minute-plan.ts';
-import { legalFiveExists } from './roster-rules.ts';
+import { legalFiveExists, type SeasonRosterMemberInput } from './roster-rules.ts';
 import { validateSeasonRotation } from './rotation.ts';
-import { enumerateLegalFives, type PlannerMember } from './rotation-planner.ts';
+import { enumerateLegalFives } from './rotation-planner.ts';
 import {
   ProjectionCache,
   projectedQualityWeights,
@@ -55,61 +55,6 @@ export interface AutoRotationProjectionInput {
   eraProfile: EraSimulationProfile;
   model: ProjectionModelArtifact;
 }
-
-export type PlayerId = string;
-
-export interface SeasonPlayerLoad {
-  staminaRating: number;
-  durability: number;
-  fatigueBasisPoints: number;
-  recentLoadBasisPoints: number;
-}
-
-export type RotationCandidatePlayer = AutoRotationMemberInput;
-export type RotationProjectionHorizon = number;
-export type RotationProjectionContext = AutoRotationProjectionInput;
-export type RotationRecommendationChange = RecommendSeasonRotationChange;
-export type RotationRecommendationMetrics = RecommendSeasonRotationMetrics;
-export interface RotationRecommendationFact {
-  key: string;
-  value: string;
-  detail?: string;
-}
-
-export type RotationProjectionHorizonInput = RotationProjectionHorizon;
-
-export interface SeasonRotationRecommendationInput {
-  roster: readonly RotationCandidatePlayer[];
-  current: SeasonRotation;
-  loadByPlayerId: Readonly<Record<PlayerId, SeasonPlayerLoad>>;
-  unavailablePlayerIds: readonly PlayerId[];
-  excludedPlayerIds?: readonly PlayerId[];
-  horizon: RotationProjectionHorizon;
-  seed: string;
-  scope: 'minutes-only' | 'full';
-  keepActive10: boolean;
-  allowDnp?: boolean;
-  projection?: RotationProjectionContext | null;
-  franchiseId?: string;
-  sharedPossessions?: ReadonlyMap<string, number> | null;
-}
-
-export type SeasonRotationRecommendationResult =
-  | {
-      status: 'recommended';
-      candidate: SeasonRotation;
-      alternatives: readonly SeasonRotation[];
-      changes: readonly RotationRecommendationChange[];
-      metrics: RotationRecommendationMetrics;
-      degraded: boolean;
-      facts: readonly RotationRecommendationFact[];
-    }
-  | {
-      status: 'unavailable';
-      code: 'fewer-than-ten-eligible' | 'no-legal-five' | 'no-valid-rotation';
-      message: string;
-      facts: readonly RotationRecommendationFact[];
-    };
 
 export interface RecommendSeasonRotationInput {
   franchiseId: string;
@@ -261,57 +206,9 @@ function fmt2(value: number): string {
   return (Math.round(value * 100) / 100).toFixed(2);
 }
 
-function isSpecRecommendationInput(
-  value: RecommendSeasonRotationInput | SeasonRotationRecommendationInput,
-): value is SeasonRotationRecommendationInput {
-  return 'loadByPlayerId' in value || 'unavailablePlayerIds' in value || !('unavailable' in value);
-}
-
-function normalizeRecommendationInput(
-  raw: RecommendSeasonRotationInput | SeasonRotationRecommendationInput,
-): RecommendSeasonRotationInput {
-  if (!isSpecRecommendationInput(raw)) return raw;
-  const spec = raw;
-  const merged: AutoRotationMemberInput[] = spec.roster.map((member) => {
-    const load = spec.loadByPlayerId[member.playerVersionId];
-    if (load) {
-      return {
-        ...member,
-        staminaRating: load.staminaRating,
-        durability: load.durability,
-        fatigueBasisPoints: load.fatigueBasisPoints,
-        recentLoadBasisPoints: load.recentLoadBasisPoints,
-      };
-    }
-    return { ...member };
-  });
-  return {
-    franchiseId: spec.franchiseId ?? spec.current.franchiseId,
-    roster: merged,
-    unavailable: [...spec.unavailablePlayerIds],
-    excluded: spec.excludedPlayerIds !== undefined ? [...spec.excludedPlayerIds] : undefined,
-    current: spec.current,
-    horizon: spec.horizon,
-    seed: spec.seed,
-    scope: spec.scope,
-    keepActive10: spec.keepActive10,
-    allowDnp: spec.allowDnp,
-    projection: spec.projection ?? null,
-    sharedPossessions: spec.sharedPossessions ?? null,
-  };
-}
-
 export function recommendSeasonRotation(
-  rawInput: RecommendSeasonRotationInput | SeasonRotationRecommendationInput,
-): RecommendSeasonRotationResult & {
-  candidate?: SeasonRotation;
-  alternatives?: readonly SeasonRotation[];
-  changes?: readonly RotationRecommendationChange[];
-  metrics?: RotationRecommendationMetrics;
-  code?: 'fewer-than-ten-eligible' | 'no-legal-five' | 'no-valid-rotation';
-  message?: string;
-} {
-  const input: RecommendSeasonRotationInput = normalizeRecommendationInput(rawInput);
+  input: RecommendSeasonRotationInput,
+): RecommendSeasonRotationResult {
   const scope: AutoRotationScope = input.scope ?? 'full';
   const keepActive10 = input.keepActive10 ?? false;
   const franchiseId = franchiseIdSchema.parse(input.franchiseId);
@@ -883,14 +780,10 @@ function representativeTraceRotation(
 }
 
 function firstLegalFive(
-  members: readonly { playerVersionId: string; playable: readonly Position[] }[],
+  members: readonly SeasonRosterMemberInput[],
 ): string[] | null {
-  const planner: PlannerMember[] = members.map((member) => ({
-    playerVersionId: member.playerVersionId,
-    playable: member.playable,
-  }));
   const available = new Set(members.map((member) => member.playerVersionId));
-  const first = enumerateLegalFives(planner, available)[0];
+  const first = enumerateLegalFives(members, available)[0];
   return first === undefined ? null : [...first];
 }
 
@@ -953,7 +846,7 @@ function rankStarterVariants(input: {
   rng: ReturnType<typeof createRng>;
   synergyPenaltyOf?: (five: readonly string[]) => number;
 }): string[][] {
-  const members: PlannerMember[] = [...input.active]
+  const members: SeasonRosterMemberInput[] = [...input.active]
     .sort()
     .map((id) => ({ playerVersionId: id, playable: input.byId.get(id)?.playable ?? [] }));
   const available = new Set(input.active);

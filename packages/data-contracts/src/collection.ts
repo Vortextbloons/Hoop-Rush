@@ -22,7 +22,7 @@ import {
   simulationTendenciesSchema,
 } from './simulation.ts';
 import { summaryRatingsSchema } from './player-season.ts';
-import { seasonCheckpointDigestSchema } from './season-digests.ts';
+import { seasonCheckpointDigestSchema } from './season-hash.ts';
 import {
   COLLECTION_CATALOG_VERSION,
   COLLECTION_COMMAND_V1_VERSION,

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { eraIdSchema } from './ids.ts';
-import { seasonCheckpointDigestSchema } from './season-digests.ts';
+import { seasonCheckpointDigestSchema } from './season-hash.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import {
   PROJECTION_MODEL_VERSION,

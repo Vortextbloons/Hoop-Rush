@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { contentHashSchema, eraIdSchema, franchiseIdSchema, idSchema, seedSchema } from './ids.ts';
-import { seasonCheckpointDigestSchema } from './season-digests.ts';
 import { postseasonGameIdSchema } from './season-postseason.ts';
 import { seasonPostseasonSummarySchema } from './season-postseason-summary.ts';
 import { seasonCommandLogDigest, seasonCommandLogSchema } from './season-command-log.ts';
@@ -8,7 +7,7 @@ import { seasonEffectsStateSchema } from './season-effects.ts';
 import { seasonRunSchema, seasonRunVersionsSchema } from './season-run.ts';
 import { seasonAlmanacSchema } from './season-almanac.ts';
 import { SEASON_REPLAY_EXPORT_VERSION } from './season-versions.ts';
-import { canonicalJson, seasonDigestHex } from './season-hash.ts';
+import { canonicalJson, seasonCheckpointDigestSchema, seasonDigestHex } from './season-hash.ts';
 export const seasonReplayExportSchema = z.object({
   schemaVersion: z.literal(1),
   replayExportVersion: z.literal(SEASON_REPLAY_EXPORT_VERSION),

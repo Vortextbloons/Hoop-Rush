@@ -1,8 +1,7 @@
 import { z } from 'zod';
 import { franchiseIdSchema, seedSchema } from './ids.ts';
-import { seasonCheckpointDigestSchema } from './season-digests.ts';
 import { SEASON_ALMANAC_VERSION } from './season-versions.ts';
-import { canonicalJson, seasonDigestHex } from './season-hash.ts';
+import { canonicalJson, seasonCheckpointDigestSchema, seasonDigestHex } from './season-hash.ts';
 export const seasonAlmanacSchema = z.object({
   schemaVersion: z.literal(1),
   almanacVersion: z.literal(SEASON_ALMANAC_VERSION),

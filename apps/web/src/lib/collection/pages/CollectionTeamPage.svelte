@@ -25,6 +25,7 @@
     STARTER_SLOT_GROUPS,
     STARTER_SLOT_LABELS,
     TEAM_MINUTES_TOTAL,
+    MINUTE_STRATEGIES,
     balanceDraftMinutes,
     blockedCardIds,
     buildAutoDraft,
@@ -38,6 +39,7 @@
     slotEligibility,
     type TeamDraft,
   } from '$lib/collection/collection-team-utils.ts';
+  import type { CollectionMinuteStrategy } from '@hoop-rush/engine';
   import {
     ULTIMATE_RUN_SHELL_CONTEXT,
     type UltimateRunShell,
@@ -65,6 +67,7 @@
   let announcement = $state('');
   let slotButtons = $state<(HTMLButtonElement | undefined)[]>([]);
   let ownedCardsSection = $state<HTMLElement | undefined>(undefined);
+  let minuteStrategy = $state<CollectionMinuteStrategy>('balanced');
 
   const byId = $derived(
     new Map((catalog?.cards ?? []).map((card) => [card.cardId, card] as const)),
@@ -311,7 +314,7 @@
   function autoBuild(): void {
     if (!catalog) return;
     try {
-      draft = buildAutoDraft(ownedIds, resolveCard);
+      draft = buildAutoDraft(ownedIds, resolveCard, minuteStrategy);
       target = null;
       saveError = null;
     } catch (buildError) {
@@ -320,8 +323,16 @@
   }
 
   function balanceMinutes(): void {
-    draft = balanceDraftMinutes(draft);
+    draft = balanceDraftMinutes(draft, resolveCard, minuteStrategy);
     saveError = null;
+  }
+
+  function applyMinuteStrategy(strategy: CollectionMinuteStrategy): void {
+    minuteStrategy = strategy;
+    if (draftRoster(draft).length > 0) {
+      draft = balanceDraftMinutes(draft, resolveCard, strategy);
+      saveError = null;
+    }
   }
 
   function resetMinutes(): void {
@@ -666,6 +677,19 @@
             </div>
             <div class="minutes-head-actions">
               <strong class="minutes-score">{total}<span>/{TEAM_MINUTES_TOTAL}</span></strong>
+              <div class="strategy-segment" role="group" aria-label="Minute strategy">
+                {#each MINUTE_STRATEGIES as option (option)}
+                  <button
+                    type="button"
+                    class="strategy-option"
+                    class:strategy-active={minuteStrategy === option}
+                    aria-pressed={minuteStrategy === option}
+                    onclick={() => applyMinuteStrategy(option)}
+                  >
+                    {option === 'tight' ? 'Stars' : option === 'balanced' ? 'Balanced' : 'Deep'}
+                  </button>
+                {/each}
+              </div>
               <button type="button" onclick={balanceMinutes} class="btn-ghost btn-auto">
                 Auto-balance minutes
               </button>
@@ -689,57 +713,77 @@
           <ul class="minutes-list">
             {#each draftRoster(draft) as cardId (cardId)}
               {@const card = byId.get(cardId)}
+              {@const cardMinutes = draft.minutes[cardId] ?? 0}
               <li class="minutes-row">
-                <span class="bench-avatar">
-                  {#if collectionCardArtOf(card ?? null)}
-                    <img
-                      class="special-card-art"
-                      src={asset(collectionCardArtOf(card ?? null)!)}
-                      alt=""
-                      loading="lazy"
-                    />
-                  {:else if card && manifest}
-                    <PlayerFace
-                      player={{
-                        playerId: card.playerId,
-                        playerExternalId: card.playerExternalId,
-                        altIds: null,
-                      }}
-                      {manifest}
-                      size="sm"
-                      fallbackInitials={initialsOf(card.displayName)}
-                    />
-                  {/if}
-                </span>
-                <label for={`minutes-${cardId}`} class="minutes-label">
-                  <strong>{card?.displayName ?? cardId}</strong>
-                  <span>
-                    {#if card}<span class="pos-badge">{card.positions[0]}</span>{/if}
-                    {card ? `${card.rarity} · OVR ${overallOf(card)}` : 'Team card'}
+                <div class="minutes-top">
+                  <span class="bench-avatar">
+                    {#if collectionCardArtOf(card ?? null)}
+                      <img
+                        class="special-card-art"
+                        src={asset(collectionCardArtOf(card ?? null)!)}
+                        alt=""
+                        loading="lazy"
+                      />
+                    {:else if card && manifest}
+                      <PlayerFace
+                        player={{
+                          playerId: card.playerId,
+                          playerExternalId: card.playerExternalId,
+                          altIds: null,
+                        }}
+                        {manifest}
+                        size="sm"
+                        fallbackInitials={initialsOf(card.displayName)}
+                      />
+                    {/if}
                   </span>
-                </label>
-                <div class="stepper">
-                  <button
-                    type="button"
-                    onclick={() => adjustMinutes(cardId, -1)}
-                    disabled={(draft.minutes[cardId] ?? 0) <= 0}
-                    aria-label={`Decrease ${card?.displayName ?? cardId} minutes`}>−</button
-                  >
+                  <label for={`minutes-${cardId}`} class="minutes-label">
+                    <strong>{card?.displayName ?? cardId}</strong>
+                    <span>
+                      {#if card}<span class="pos-badge">{card.positions[0]}</span>{/if}
+                      {card ? `${card.rarity} · OVR ${overallOf(card)}` : 'Team card'}
+                    </span>
+                  </label>
+                  <div class="stepper">
+                    <button
+                      type="button"
+                      onclick={() => adjustMinutes(cardId, -1)}
+                      disabled={cardMinutes <= 0}
+                      aria-label={`Decrease ${card?.displayName ?? cardId} minutes`}>−</button
+                    >
+                    <input
+                      id={`minutes-${cardId}`}
+                      type="number"
+                      min="0"
+                      max="48"
+                      value={cardMinutes}
+                      onchange={(event) => setMinutes(cardId, event.currentTarget.valueAsNumber)}
+                      aria-label={`${card?.displayName ?? cardId} target minutes`}
+                    />
+                    <button
+                      type="button"
+                      onclick={() => adjustMinutes(cardId, 1)}
+                      disabled={cardMinutes >= 48}
+                      aria-label={`Increase ${card?.displayName ?? cardId} minutes`}>+</button
+                    >
+                  </div>
+                </div>
+                <div class="minutes-slider-row">
+                  <span aria-hidden="true" class="minutes-slider-min">0</span>
                   <input
-                    id={`minutes-${cardId}`}
-                    type="number"
+                    id={`minutes-slider-${cardId}`}
+                    class="minutes-slider"
+                    type="range"
                     min="0"
                     max="48"
-                    value={draft.minutes[cardId] ?? 0}
-                    onchange={(event) => setMinutes(cardId, event.currentTarget.valueAsNumber)}
-                    aria-label={`${card?.displayName ?? cardId} target minutes`}
+                    step="1"
+                    value={cardMinutes}
+                    style={`--slider-fill: ${(cardMinutes / 48) * 100}%`}
+                    oninput={(event) => setMinutes(cardId, event.currentTarget.valueAsNumber)}
+                    aria-label={`${card?.displayName ?? cardId} minutes slider`}
+                    aria-valuetext={`${String(cardMinutes)} minutes`}
                   />
-                  <button
-                    type="button"
-                    onclick={() => adjustMinutes(cardId, 1)}
-                    disabled={(draft.minutes[cardId] ?? 0) >= 48}
-                    aria-label={`Increase ${card?.displayName ?? cardId} minutes`}>+</button
-                  >
+                  <span aria-hidden="true" class="minutes-slider-max">48</span>
                 </div>
               </li>
             {/each}
@@ -1465,6 +1509,83 @@
     background: linear-gradient(180deg, #141d22, #0d1418);
   }
 
+  .minutes-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.15rem;
+  }
+
+  .minutes-top {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .minutes-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.15rem 0.1rem 0.25rem;
+  }
+
+  .minutes-slider-min,
+  .minutes-slider-max {
+    flex: 0 0 auto;
+    color: var(--ur-muted);
+    font-size: 0.62rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .minutes-slider {
+    flex: 1;
+    min-width: 0;
+    min-height: 2rem;
+    accent-color: var(--ur-apex);
+    cursor: pointer;
+  }
+
+  .minutes-slider::-webkit-slider-runnable-track {
+    height: 0.4rem;
+    border-radius: 999px;
+    background: linear-gradient(
+      90deg,
+      var(--ur-apex) 0%,
+      var(--ur-apex) var(--slider-fill, 50%),
+      #0a0f12 var(--slider-fill, 50%)
+    );
+    border: 1px solid color-mix(in srgb, var(--ur-apex) 35%, transparent);
+  }
+
+  .minutes-slider::-webkit-slider-thumb {
+    width: 1.1rem;
+    height: 1.1rem;
+    margin-top: -0.4rem;
+    border-radius: 50%;
+    background: var(--ur-apex);
+    border: 1px solid #ffd97a;
+  }
+
+  .minutes-slider::-moz-range-track {
+    height: 0.4rem;
+    border-radius: 999px;
+    background: #0a0f12;
+    border: 1px solid color-mix(in srgb, var(--ur-apex) 35%, transparent);
+  }
+
+  .minutes-slider::-moz-range-progress {
+    height: 0.4rem;
+    border-radius: 999px;
+    background: var(--ur-apex);
+  }
+
+  .minutes-slider::-moz-range-thumb {
+    width: 1rem;
+    height: 1rem;
+    border-radius: 50%;
+    background: var(--ur-apex);
+    border: 1px solid #ffd97a;
+  }
+
   .bench-avatar {
     flex: 0 0 auto;
     overflow: hidden;
@@ -1649,6 +1770,26 @@
     display: flex;
     align-items: center;
     gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+  .strategy-segment {
+    display: inline-flex;
+    border: 1px solid var(--ur-line);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .strategy-option {
+    padding: 0.3rem 0.7rem;
+    font-size: 0.72rem;
+    color: var(--ur-muted);
+    background: transparent;
+  }
+  .strategy-option + .strategy-option {
+    border-left: 1px solid var(--ur-line);
+  }
+  .strategy-active {
+    color: #0e1418;
+    background: var(--ur-apex);
   }
   .btn-auto {
     white-space: nowrap;

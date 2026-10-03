@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { franchiseIdSchema } from './ids.ts';
-import { seasonCheckpointDigestSchema } from './season-digests.ts';
+import { seasonCheckpointDigestSchema } from './season-hash.ts';
 import {
   SEASON_AUTHORITY_VERSION,
   SEASON_MULTIPLAYER_VERSION,
