@@ -905,15 +905,26 @@
 
       {#if mode === 'standard'}
         <section aria-label="Game setup" class="ur-scout-panel">
+          <div class="ur-arcade-banner">
+            <div>
+              <span class="ur-arcade-eyebrow">Your lineup. Your arena.</span>
+              <h2>Choose your matchup</h2>
+            </div>
+            <svg class="ur-court-stamp" viewBox="0 0 180 90" fill="none" aria-hidden="true">
+              <rect x="1" y="1" width="178" height="88" rx="3" />
+              <path d="M90 1v88M1 23h28v44H1m178-44h-28v44h28" />
+              <circle cx="90" cy="45" r="17" /><path
+                d="M29 30a15 15 0 0 1 0 30m122-30a15 15 0 0 0 0 30M1 10a43 43 0 0 1 0 70m178-70a43 43 0 0 0 0 70"
+              />
+            </svg>
+          </div>
           <div class="ur-scout-grid">
             <div class="ur-scout-main">
               <div class="ur-step-head">
-                <span class="ur-step-num" aria-hidden="true">1.</span>
+                <span class="ur-step-num" aria-hidden="true">01</span>
                 <div>
-                  <h2 class="ur-step-title">Scout the matchup</h2>
-                  <p class="ur-step-sub">
-                    Choose the rules and difficulty. Rewards scale with risk.
-                  </p>
+                  <h2 class="ur-step-title">Pick your difficulty</h2>
+                  <p class="ur-step-sub">Raise the stakes. Raise the payout.</p>
                 </div>
               </div>
               <DifficultyPicker
@@ -927,12 +938,9 @@
                 }}
               />
               <div class="ur-step-head ur-step-head--two">
-                <span class="ur-step-num" aria-hidden="true">2.</span>
+                <span class="ur-step-num" aria-hidden="true">02</span>
                 <div>
-                  <h2 class="ur-step-title">Objective</h2>
-                  <p class="ur-step-sub">
-                    The objective changes rewards only. It never changes the opponent.
-                  </p>
+                  <h2 class="ur-step-title">Add a bonus objective</h2>
                 </div>
               </div>
               <ObjectivePicker
@@ -947,11 +955,19 @@
             </div>
             {#if preview}
               <section aria-label="Reward preview" class="ur-reward-preview">
-                <h3 class="ur-reward-title">Expected reward preview</h3>
+                <div class="ur-payout-heading">
+                  <h3 class="ur-reward-title">Coin payout</h3>
+                  <span>{preview.multiplierLabel}</span>
+                </div>
+                <div class="ur-reward-max">
+                  <span>Max possible reward</span>
+                  <strong class="ur-number">+{preview.maxTotalCoins}</strong>
+                  <small>COINS</small>
+                </div>
                 <p class="ur-reward-sub">
-                  {difficultyNameOf(difficultyId)} · {effectiveObjectiveId ?? 'No objective'} · {preview.firstClearClaimed
-                    ? 'First clear claimed'
-                    : 'First clear fixed'}
+                  {difficultyNameOf(difficultyId)} · {objectiveOptions.find(
+                    (option) => option.objectiveId === effectiveObjectiveId,
+                  )?.title ?? 'No objective'}
                 </p>
                 <ul class="ur-reward-rows">
                   {#each preview.rows as row (row.kind)}
@@ -960,8 +976,11 @@
                         >{previewIconOf(row.kind)}</span
                       >
                       <span class="ur-reward-copy">
-                        <span class="ur-reward-label">{row.label}</span>
-                        <span class="ur-reward-detail">{row.detail}</span>
+                        <span class="ur-reward-label"
+                          >{row.kind === 'first-clear' && preview.firstClearClaimed
+                            ? 'First clear claimed'
+                            : row.label}</span
+                        >
                       </span>
                       <span class="ur-reward-coins" data-zero={row.coins === 0}>
                         {row.coins === 0 ? '—' : `+${row.coins}`}
@@ -969,16 +988,16 @@
                     </li>
                   {/each}
                 </ul>
-                <div class="ur-reward-max">
-                  <span>Max possible reward <small>(win + margin, first clear)</small></span>
-                  <strong class="ur-number">+{preview.maxTotalCoins}</strong>
-                </div>
-                <p class="ur-reward-repeat tabular-nums">
-                  Max repeat {preview.maxRepeatCoins} · win {preview.winCoins} + margin {preview.marginMaxCoins}{preview.objectiveCoins !==
-                  null
-                    ? ` + objective ${preview.objectiveCoins}`
-                    : ''}
-                </p>
+                <details class="ur-payout-details">
+                  <summary>How rewards work</summary>
+                  {#each preview.rows as row (row.kind)}<p>
+                      <strong>{row.label}:</strong>
+                      {row.detail}
+                    </p>{/each}
+                  <p>
+                    Repeat game maximum: {preview.maxRepeatCoins} coins. Win and loss rewards are alternatives.
+                  </p>
+                </details>
                 <button
                   type="button"
                   onclick={prepare}
@@ -988,8 +1007,7 @@
                   {busy === 'preparing' ? 'Preparing…' : 'Prepare matchup →'}
                 </button>
                 <p class="ur-reward-lock" aria-live="polite">
-                  <span aria-hidden="true">◈</span> Setup locks when you prepare. Abandoning never reuses
-                  it.
+                  Setup locks on prepare. Abandoning uses a new matchup.
                 </p>
               </section>
             {/if}
@@ -2043,7 +2061,7 @@
     margin-top: 1rem;
     border: 1px solid color-mix(in srgb, var(--ur-apex) 26%, var(--ur-line-strong));
     border-radius: 0.9rem;
-    background: linear-gradient(165deg, #12181d, #0b1014 75%);
+    background: radial-gradient(ellipse at 0 0, rgb(105 216 238 / 6%), transparent 60%), #0c121a;
     box-shadow:
       0 1.2rem 2.5rem rgb(0 0 0 / 40%),
       inset 0 1px 0 rgb(255 255 255 / 6%);
@@ -2052,7 +2070,7 @@
   .ur-scout-grid {
     display: grid;
     gap: 1.4rem;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 21rem);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 18rem);
     align-items: start;
   }
   .ur-scout-main {
@@ -2071,17 +2089,24 @@
     border-top: 1px solid var(--ur-line);
   }
   .ur-step-num {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    flex: none;
+    border: 1px solid var(--ur-line);
+    border-radius: 0.35rem;
     color: var(--ur-apex);
     font-family: var(--font-display);
     font-size: 1rem;
-    font-weight: 900;
   }
   .ur-step-title {
     margin: 0;
     color: #fff;
     font-family: var(--font-display);
-    font-size: 1.15rem;
+    font-size: 1.35rem;
     font-weight: 850;
+    text-transform: uppercase;
   }
   .ur-step-sub {
     margin: 0.15rem 0 0;
@@ -2151,10 +2176,7 @@
     font-size: 0.8rem;
     font-weight: 800;
   }
-  .ur-reward-detail {
-    color: var(--ur-muted);
-    font-size: 0.68rem;
-  }
+
   .ur-reward-coins {
     flex: none;
     color: var(--ur-apex);
@@ -2165,29 +2187,7 @@
   .ur-reward-coins[data-zero='true'] {
     color: var(--ur-muted);
   }
-  .ur-reward-max {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 0.6rem;
-    margin-top: 0.8rem;
-    padding-top: 0.7rem;
-    border-top: 1px solid var(--ur-line);
-    color: var(--ur-muted);
-    font-size: 0.74rem;
-  }
-  .ur-reward-max small {
-    font-weight: 500;
-  }
-  .ur-reward-max strong {
-    color: var(--ur-apex);
-    font-size: 1.05rem;
-  }
-  .ur-reward-repeat {
-    margin: 0.3rem 0 0;
-    color: var(--ur-muted);
-    font-size: 0.68rem;
-  }
+
   .ur-prepare-btn {
     width: 100%;
     margin-top: 0.8rem;
@@ -2197,6 +2197,114 @@
     color: var(--ur-muted);
     font-size: 0.68rem;
     text-align: center;
+  }
+  .ur-arcade-banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding-bottom: 1.3rem;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid var(--ur-line);
+  }
+  .ur-arcade-eyebrow {
+    color: #69d8ee;
+    font-size: 0.65rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+  }
+  .ur-arcade-banner h2 {
+    margin-top: 0.3rem;
+    color: var(--ur-paper);
+    font-family: var(--font-display);
+    font-size: clamp(1.8rem, 3vw, 2.6rem);
+    text-transform: uppercase;
+    line-height: 1.1;
+  }
+  .ur-court-stamp {
+    width: 9rem;
+    flex: none;
+    stroke: #69d8ee;
+    opacity: 0.35;
+    stroke-width: 1.5;
+    transform: rotate(-6deg);
+  }
+  .ur-payout-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .ur-payout-heading > span {
+    padding: 0.2rem 0.5rem;
+    border: 1px solid var(--ur-gold-line);
+    border-radius: 0.3rem;
+    color: var(--ur-apex);
+    font-size: 0.75rem;
+    font-weight: 800;
+  }
+  .ur-reward-max {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.1rem;
+    margin: 1rem 0;
+    padding: 1.1rem 0.5rem;
+    border: 1px solid var(--ur-gold-line);
+    border-radius: 0.4rem;
+    background:
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 3px,
+        rgb(255 197 61 / 3%) 3px,
+        rgb(255 197 61 / 3%) 4px
+      ),
+      #080b0e;
+  }
+  .ur-reward-max > span {
+    color: var(--ur-muted);
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .ur-reward-max strong {
+    color: #ffd65a;
+    font-family: var(--font-display);
+    font-size: 4rem;
+    line-height: 1.2;
+    text-shadow: 0 0 24px rgb(255 197 61 / 20%);
+  }
+  .ur-reward-max small {
+    color: var(--ur-apex);
+    font-size: 0.6rem;
+    letter-spacing: 0.25em;
+  }
+  .ur-payout-details {
+    margin-top: 0.85rem;
+    color: var(--ur-muted);
+    font-size: 0.68rem;
+  }
+  .ur-payout-details summary {
+    cursor: pointer;
+    padding: 0.2rem 0;
+  }
+  .ur-payout-details p {
+    margin-top: 0.5rem;
+    line-height: 1.5;
+  }
+  .ur-payout-details summary:focus-visible {
+    outline: 2px solid var(--ur-focus);
+    outline-offset: 3px;
+  }
+  @media (max-width: 560px) {
+    .ur-court-stamp {
+      width: 5rem;
+    }
+    .ur-arcade-banner {
+      gap: 0.5rem;
+    }
   }
   .ur-pending-actions {
     display: flex;

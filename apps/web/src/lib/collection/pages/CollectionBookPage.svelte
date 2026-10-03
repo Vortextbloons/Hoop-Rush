@@ -50,9 +50,14 @@
   import { collectionErrorMessage } from '$lib/collection/collection-errors.ts';
   import { collectionCardArtOf } from '$lib/collection/collection-card-art.ts';
   import { setProgressViews } from '$lib/collection/collection-progression-view.ts';
+  import PackOpenTheater from '$lib/collection/PackOpenTheater.svelte';
+  import { collectionCardViewOf } from '$lib/collection/collection-card-view.ts';
+  import { packRevealPlanOf } from '$lib/collection/pack-reveal-plan.ts';
+  import { arenaPackOpen, arenaPackReveal } from '$lib/arena-sound';
   import type {
     CollectionCatalog,
     CollectionProgressionRules,
+    CollectionPullRecord,
     CollectionState,
   } from '@hoop-rush/data-contracts';
 
@@ -74,6 +79,8 @@
   let claiming = $state(false);
   let claimError = $state<string | null>(null);
   let starterCards = $state<CollectionIndexEntry[]>([]);
+  let starterPull = $state<CollectionPullRecord | null>(null);
+  let starterAnimate = $state(false);
   let announcement = $state('');
   let targetBusy = $state(false);
   let targetError = $state<string | null>(null);
@@ -355,14 +362,27 @@
     claiming = true;
     claimError = null;
     try {
+      arenaPackOpen();
+    } catch {}
+    try {
       const outcome = await claimWelcomeStarter(new Date().toISOString());
       if (!mounted) return;
       collectionState = outcome.state;
+      if (!catalog) {
+        try {
+          catalog = await loadCollectionCatalog();
+        } catch {}
+      }
       const byId = new Map(entries.map((entry) => [entry.cardId, entry]));
       starterCards = outcome.pull.slots
         .map((slot) => byId.get(slot.cardId))
         .filter((entry) => entry !== undefined);
+      starterPull = outcome.pull;
+      starterAnimate = true;
       announcement = `Starter claimed. ${String(starterCards.length)} new cards, 3,000 Coins.`;
+      try {
+        arenaPackReveal('Ember');
+      } catch {}
     } catch (claimFailure) {
       if (!mounted) return;
       claimError = collectionErrorMessage(claimFailure, 'Claim failed. Try again.');
@@ -370,6 +390,43 @@
       if (mounted) claiming = false;
     }
   }
+
+  function takeStarter(): void {
+    starterPull = null;
+    starterAnimate = false;
+  }
+
+  const starterTheaterCards = $derived.by(() => {
+    if (!starterPull || !catalog) return [];
+    const cardsById = new Map(catalog.cards.map((card) => [card.cardId, card]));
+    const entriesById = new Map(entries.map((entry) => [entry.cardId, entry]));
+    return starterPull.slots.map((slot) => {
+      const card = cardsById.get(slot.cardId) ?? null;
+      const entry = entriesById.get(slot.cardId);
+      return {
+        slot,
+        card,
+        view: entry ? collectionCardViewOf({ entry, catalogCard: card, owned: slot.kept }) : null,
+        targeted: false,
+      };
+    });
+  });
+  const starterRevealPlan = $derived(
+    starterPull && catalog
+      ? packRevealPlanOf({ pull: starterPull, catalogCards: catalog.cards })
+      : null,
+  );
+  const starterReceipt = $derived(
+    starterPull && collectionState
+      ? {
+          pull: starterPull,
+          cardsAdded: starterPull.slots.filter((slot) => slot.kept).length,
+          exchangeGained: 0,
+          balances: { ...collectionState.balances },
+          targetingSummary: null as string | null,
+        }
+      : null,
+  );
 
   const selectedCard = $derived(
     selectedCardId && catalog
@@ -610,6 +667,18 @@
           {/each}
         </ul>
       </section>
+    {/if}
+
+    {#if starterReceipt}
+      <PackOpenTheater
+        receipt={starterReceipt}
+        cards={starterTheaterCards}
+        plan={starterRevealPlan}
+        {manifest}
+        packLabel="Starter"
+        animateOnOpen={starterAnimate}
+        onTake={takeStarter}
+      />
     {/if}
 
     {#if collectionState?.claimedWelcome}
