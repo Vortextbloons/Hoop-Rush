@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CollectionGameEvent } from '@hoop-rush/data-contracts';
 import { clockLabel, eventLabel, visibleEvents } from './collection-gamecast';
+import { courtPlay } from './collection-court';
 
 const scoreEvent: Extract<CollectionGameEvent, { kind: 'possession' }> = {
   kind: 'possession',
@@ -36,6 +37,48 @@ const scoreEvent: Extract<CollectionGameEvent, { kind: 'possession' }> = {
 };
 
 describe('recorded gamecast presentation', () => {
+  it('uses recorded scoring and defensive facts for court callouts', () => {
+    const scoringDelta = scoreEvent.statDeltas[0];
+    if (!scoringDelta) throw new Error('Missing scoring fixture');
+    expect(courtPlay(scoreEvent)).toMatchObject({
+      label: 'Three-pointer',
+      cardId: 'scorer',
+      side: 'home',
+      shot: true,
+      made: true,
+    });
+    const blocked = {
+      ...scoreEvent,
+      pointsScored: 0,
+      statDeltas: [
+        { ...scoringDelta, points: 0, fieldGoalsMade: 0, threePointMade: 0 },
+        {
+          ...scoringDelta,
+          cardId: 'defender',
+          side: 'away' as const,
+          points: 0,
+          fieldGoalsMade: 0,
+          fieldGoalsAttempted: 0,
+          threePointMade: 0,
+          threePointAttempted: 0,
+          blocks: 1,
+        },
+      ],
+    };
+    expect(courtPlay(blocked)).toMatchObject({
+      label: 'Blocked shot',
+      cardId: 'defender',
+      side: 'away',
+      made: false,
+    });
+    expect(courtPlay({ ...scoreEvent, pointsScored: 0, statDeltas: [] })).toMatchObject({
+      label: 'Possession',
+      cardId: null,
+      shot: false,
+      made: false,
+    });
+  });
+
   it('attributes points only to the recorded scoring delta and labels overtime', () => {
     expect(eventLabel(scoreEvent, () => 'Mitch Richmond')).toBe(
       'OT1 1:01 — You 104 · CPU 101 · Mitch Richmond +3',

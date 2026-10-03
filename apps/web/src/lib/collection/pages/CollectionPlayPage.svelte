@@ -1,10 +1,14 @@
 <script lang="ts">
-  import { resolve } from '$app/paths';
+  import { asset, resolve } from '$app/paths';
+  import { getManifest } from '$lib/data';
+  import PlayerFace from '$lib/components/PlayerFace.svelte';
+  import { collectionCardArtOf } from '$lib/collection/collection-card-art';
   import { page } from '$app/state';
   import '$lib/collection/ultimate-theme.css';
   import { getContext, onDestroy, tick } from 'svelte';
   import type {
     CollectionCatalog,
+    HoopRushManifest,
     CollectionCatalogCard,
     CollectionChallengeValidationFacts,
     CollectionDifficultyId,
@@ -21,6 +25,7 @@
   import ChallengeCard from '$lib/collection/ChallengeCard.svelte';
   import DifficultyPicker from '$lib/collection/DifficultyPicker.svelte';
   import MatchupReport from '$lib/collection/MatchupReport.svelte';
+  import GamecastCourt from '$lib/collection/GamecastCourt.svelte';
   import ObjectivePicker from '$lib/collection/ObjectivePicker.svelte';
   import MatchupCard from '$lib/collection/MatchupCard.svelte';
   import RewardReceipt from '$lib/collection/RewardReceipt.svelte';
@@ -82,6 +87,7 @@
   let phase = $state<'loading' | 'error' | 'ready'>('loading');
   let error = $state<string | null>(null);
   let catalog = $state<CollectionCatalog | null>(null);
+  let manifest = $state<HoopRushManifest | null>(null);
   let rules = $state<CollectionGameRules | null>(null);
   let progression = $state<CollectionProgressionRules | null>(null);
   let progressionError = $state<string | null>(null);
@@ -104,6 +110,8 @@
   let watchMode = $state<WatchMode>('standard');
   let cursor = $state(0);
   let playing = $state(false);
+  let firstWatch = $state(false);
+  let savedResultAnnouncement = '';
   let playbackTimer: ReturnType<typeof setTimeout> | null = null;
 
   const byId = $derived(
@@ -293,6 +301,15 @@
     }
   }
 
+  function revealResult(): void {
+    if (!firstWatch) return;
+    firstWatch = false;
+    announcement = savedResultAnnouncement;
+    try {
+      arenaGameResult(record?.result.winner === 'home');
+    } catch {}
+  }
+
   function scheduleTick(): void {
     if (playbackTimer !== null) {
       clearTimeout(playbackTimer);
@@ -307,6 +324,7 @@
         scheduleTick();
       } else {
         playing = false;
+        revealResult();
       }
     }, cadence);
   }
@@ -319,6 +337,7 @@
     const events = record ? visibleEvents(record.events, mode) : [];
     const index = events.findIndex((event) => event.eventOrder >= order);
     cursor = index < 0 ? Math.max(0, events.length - 1) : index;
+    if (mode === 'fast') revealResult();
     if (resume && mode !== 'fast') {
       playing = true;
       scheduleTick();
@@ -327,12 +346,14 @@
 
   function selectResultView(view: 'recap' | 'replay' | 'box'): void {
     stopPlayback();
+    if (view !== 'replay') revealResult();
     resultView = view;
   }
 
   function seekReplay(value: number): void {
     stopPlayback();
     cursor = Math.max(0, Math.min(value, shownEvents.length - 1));
+    if (cursor >= shownEvents.length - 1) revealResult();
   }
 
   function changeMatchup(): void {
@@ -357,11 +378,13 @@
   function stepOnce(): void {
     if (playing || shownEvents.length === 0) return;
     cursor = Math.min(cursor + 1, shownEvents.length - 1);
+    if (cursor >= shownEvents.length - 1) revealResult();
   }
 
   function skipToFinal(): void {
     stopPlayback();
     cursor = Math.max(0, shownEvents.length - 1);
+    revealResult();
   }
 
   function difficultyNameOf(id: CollectionDifficultyId): string {
@@ -440,13 +463,15 @@
   async function load(): Promise<void> {
     try {
       const nowIso = new Date().toISOString();
-      const [loadedCatalog, loadedState, loadedRules] = await Promise.all([
+      const [loadedCatalog, loadedState, loadedRules, loadedManifest] = await Promise.all([
         loadCollectionCatalog(),
         ensureCollection(nowIso),
         loadCollectionGameRules(),
+        getManifest(),
       ]);
       if (!mounted) return;
       catalog = loadedCatalog;
+      manifest = loadedManifest;
       collectionState = loadedState;
       rules = loadedRules;
       readFlowFromUrl();
@@ -658,8 +683,8 @@
         // Receipt restore is best-effort.
       }
       cursor = 0;
-      playing = false;
-      resultView = 'recap';
+      watchMode = 'standard';
+      resultView = 'replay';
       const committed = record;
       const won = committed?.result.winner === 'home';
       const coins = committed === null ? 0 : rewardCoinsOf(committed);
@@ -671,10 +696,11 @@
         }
       }
       const challengeNote = committed === null ? '' : challengeRewardNoteOf(committed);
-      announcement = `${won ? 'You won' : 'CPU won'}. +${String(coins)} Coins.${objectiveNote}${challengeNote}`;
-      try {
-        arenaGameResult(won);
-      } catch {}
+      savedResultAnnouncement = `${won ? 'You won' : 'CPU won'}. +${String(coins)} Coins.${objectiveNote}${challengeNote}`;
+      firstWatch = true;
+      announcement = 'Game ready. Watching the recorded gamecast.';
+      playing = true;
+      scheduleTick();
       busy = 'idle';
     } catch (playError) {
       if (!mounted) return;
@@ -787,7 +813,7 @@
 
     {#if pending}
       {#if pendingCurrent && catalog}
-        <MatchupReport prepared={pendingCurrent} {catalog} />
+        <MatchupReport prepared={pendingCurrent} {catalog} {manifest} />
       {:else if pendingV1}
         <section aria-label="Matchup" class="ur-arena-panel mt-4 p-5">
           <h2 class="ur-section-title">Matchup ready</h2>
@@ -1298,6 +1324,12 @@
         </div>
 
         {#if resultView === 'replay'}
+          <GamecastCourt
+            event={scoreboardEvent}
+            {nameOf}
+            {playing}
+            duration={cadenceFor(watchMode) ?? 900}
+          />
           <p class="replay-disclaimer">
             Replay of your saved game · playback does not change the result or rewards.
           </p>
@@ -1342,6 +1374,7 @@
               {#if scorer && scorerCard}
                 <div class="replay-player">
                   <MatchupCard
+                    {manifest}
                     card={scorerCard}
                     compact
                     detail={`${scorer.points} points this play · ${scorer.side === 'home' ? 'Your team' : 'CPU'}`}
@@ -1362,7 +1395,7 @@
             </label>
             <p class="ur-event-meta tabular-nums" aria-live="off">
               {Math.min(cursor + 1, shownEvents.length)} / {shownEvents.length}
-              {watchMode === 'standard' ? '· 250 ms per event' : '· 650 ms per event'}
+              {watchMode === 'standard' ? '· Highlights' : '· Every play'}
               {#if scoreboardEvent}
                 <span>
                   · Q{scoreboardEvent.period} · {clockLabel(scoreboardEvent.secondsRemaining)}</span
@@ -1389,6 +1422,7 @@
               {#if card && leader.top}<div>
                   <p>{leader.label}</p>
                   <MatchupCard
+                    {manifest}
                     {card}
                     compact
                     detail={`${leader.top.points} points · Final game stats`}
@@ -1456,10 +1490,35 @@
                   </thead>
                   <tbody>
                     {#each box.side.players as player (player.cardId)}
+                      {@const card = byId.get(player.cardId)}
+                      {@const artwork = collectionCardArtOf(card ?? null)}
                       <tr>
                         <th scope="row" class="pr-2 font-semibold"
                           ><span class="box-player"
-                            ><span class="box-card-symbol" aria-hidden="true">▱</span><span
+                            ><span class="box-card-symbol" aria-hidden="true">
+                              {#if artwork}<img src={asset(artwork)} alt="" loading="lazy" />
+                              {:else if card && manifest}<PlayerFace
+                                  player={{
+                                    playerId: card.playerId,
+                                    playerExternalId: card.playerExternalId,
+                                    altIds: null,
+                                  }}
+                                  {manifest}
+                                  size="sm"
+                                  fallbackInitials={card.displayName
+                                    .split(' ')
+                                    .map((part) => part[0] ?? '')
+                                    .join('')
+                                    .slice(0, 2)}
+                                />
+                              {:else}<span
+                                  >{nameOf(player.cardId)
+                                    .split(' ')
+                                    .map((part) => part[0] ?? '')
+                                    .join('')
+                                    .slice(0, 2)}</span
+                                >{/if}
+                            </span><span
                               >{nameOf(player.cardId)}<small
                                 >{byId.get(player.cardId)?.rarity ?? ''} · {byId.get(player.cardId)
                                   ?.positions[0] ?? ''}</small
@@ -1573,6 +1632,16 @@
     font-size: 0.6rem;
     font-weight: 500;
   }
+  .box-card-symbol > img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+  .box-card-symbol :global(> div) {
+    width: 100%;
+    height: 100%;
+    background: transparent;
+  }
   .box-card-symbol {
     display: grid;
     place-items: center;
@@ -1582,7 +1651,8 @@
     border-radius: 0.25rem;
     color: var(--ur-apex);
     background: #ffcd5910;
-    font-size: 1.4rem;
+    overflow: hidden;
+    font-size: 0.65rem;
   }
   @media (max-width: 520px) {
     .scorer-spotlight {

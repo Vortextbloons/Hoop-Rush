@@ -1,6 +1,7 @@
 <script lang="ts">
   import type {
     CollectionCatalog,
+    HoopRushManifest,
     CollectionPreparedGameV2,
     CollectionPreparedGameV3,
   } from '@hoop-rush/data-contracts';
@@ -11,9 +12,11 @@
   let {
     prepared,
     catalog,
+    manifest = null,
   }: {
     prepared: CollectionPreparedGameV2 | CollectionPreparedGameV3;
     catalog: CollectionCatalog;
+    manifest?: HoopRushManifest | null;
   } = $props();
 
   const challenge = $derived(
@@ -155,7 +158,7 @@
     <div class="starter-deck">
       {#each prepared.playerTeam.starters as cardId (cardId)}
         {@const card = cardById.get(cardId)}
-        {#if card}<MatchupCard {card} />{/if}
+        {#if card}<MatchupCard {manifest} {card} />{/if}
       {/each}
     </div>
     <div class="versus-line"><span></span><strong>VS</strong><span></span></div>
@@ -167,6 +170,7 @@
       {#each prepared.construction.starters as cardId (cardId)}
         {@const card = cardById.get(cardId)}
         {#if card}<MatchupCard
+            {manifest}
             {card}
             detail={`${minutesById.get(cardId) ?? 0} min${closingFive.has(cardId) ? ' · Closer' : ''}`}
           />{/if}
@@ -186,6 +190,7 @@
               {#each team.ids as cardId (cardId)}
                 {@const card = cardById.get(cardId)}
                 {#if card}<MatchupCard
+                    {manifest}
                     {card}
                     compact
                     detail={team.label === 'CPU bench'

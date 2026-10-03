@@ -11,9 +11,14 @@ import {
   type CollectionIndex,
   type CollectionProgressionRules,
 } from '@hoop-rush/data-contracts';
-import { getManifest } from '$lib/data';
+import { getManifest, isCollectionContentHashMismatch, reloadManifest } from '$lib/data';
 import { memoized, resolveAssetUrl } from '$lib/asset-url';
 import { readCachedAsset, writeCachedAsset } from '$lib/pool-cache';
+
+function cacheBustedAssetUrl(url: string): string {
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}v=${String(Date.now())}`;
+}
 
 export function loadCollectionIndex(): Promise<CollectionIndex> {
   return memoized('collection/index', async () => {
@@ -60,20 +65,43 @@ export function loadCollectionGameRules(): Promise<CollectionGameRules> {
 
 export function loadCollectionProgression(): Promise<CollectionProgressionRules> {
   return memoized('collection/progression-rules', async () => {
-    const manifest = await getManifest();
-    const entry = manifest.collection?.progressionRules;
-    if (!entry) throw new Error('The collection progression rules are unavailable.');
-    const parseProgression = (value: unknown): CollectionProgressionRules =>
-      collectionProgressionRulesSchema.parse(value);
-    const cached = await readCachedAsset(entry.contentHash, parseProgression);
-    if (cached !== null) return cached;
-    const progression = await loadAsset(
-      resolveAssetUrl(entry.url),
-      collectionProgressionRulesSchema,
-      'collection progression rules',
-      entry.contentHash,
-    );
-    void writeCachedAsset(entry.contentHash, progression);
-    return progression;
+    const load = async (): Promise<CollectionProgressionRules> => {
+      const manifest = await getManifest();
+      const entry = manifest.collection?.progressionRules;
+      if (!entry) throw new Error('The collection progression rules are unavailable.');
+      const parseProgression = (value: unknown): CollectionProgressionRules =>
+        collectionProgressionRulesSchema.parse(value);
+      const cached = await readCachedAsset(entry.contentHash, parseProgression);
+      if (cached !== null) return cached;
+      const progression = await loadAsset(
+        resolveAssetUrl(entry.url),
+        collectionProgressionRulesSchema,
+        'collection progression rules',
+        entry.contentHash,
+      );
+      void writeCachedAsset(entry.contentHash, progression);
+      return progression;
+    };
+    try {
+      return await load();
+    } catch (error) {
+      if (!isCollectionContentHashMismatch(error)) throw error;
+      await reloadManifest().catch(() => null);
+      const manifest = await getManifest();
+      const entry = manifest.collection?.progressionRules;
+      if (!entry) throw new Error('The collection progression rules are unavailable.');
+      const parseProgression = (value: unknown): CollectionProgressionRules =>
+        collectionProgressionRulesSchema.parse(value);
+      const cached = await readCachedAsset(entry.contentHash, parseProgression);
+      if (cached !== null) return cached;
+      const progression = await loadAsset(
+        cacheBustedAssetUrl(resolveAssetUrl(entry.url)),
+        collectionProgressionRulesSchema,
+        'collection progression rules',
+        entry.contentHash,
+      );
+      void writeCachedAsset(entry.contentHash, progression);
+      return progression;
+    }
   });
 }

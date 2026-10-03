@@ -48,6 +48,7 @@
     targetedSummaryForPlayer,
   } from '$lib/collection/collection-targeting-view.ts';
   import { collectionErrorMessage } from '$lib/collection/collection-errors.ts';
+  import { collectionCardArtOf } from '$lib/collection/collection-card-art.ts';
   import { setProgressViews } from '$lib/collection/collection-progression-view.ts';
   import type {
     CollectionCatalog,
@@ -420,6 +421,13 @@
       cardId
     );
   });
+  const cardArtOf = $derived((cardId: string) => {
+    const entry =
+      entries.find((entry) => entry.cardId === cardId) ??
+      catalog?.cards.find((entry) => entry.cardId === cardId) ??
+      null;
+    return collectionCardArtOf(entry);
+  });
 
   function retryProgression(): void {
     progressionError = null;
@@ -525,8 +533,7 @@
     {#if collectionState}
       <div class="ur-stat-duo ur-book-counts" aria-label="Collection totals">
         <span class="ur-stat-box ur-stat-gold"
-          ><strong class="ur-number">{collectionState.owned.length}</strong><small
-            >Owned</small
+          ><strong class="ur-number">{collectionState.owned.length}</strong><small>Owned</small
           ></span
         >
         <span class="ur-stat-box"
@@ -558,14 +565,9 @@
     </div>
   {:else}
     {#if collectionState && !collectionState.claimedWelcome}
-      <section
-        aria-labelledby="welcome-heading"
-        class="ur-starter-claim ur-arena-panel mt-6 p-6"
-      >
+      <section aria-labelledby="welcome-heading" class="ur-starter-claim ur-arena-panel mt-6 p-6">
         <p class="ur-hero-eyebrow">Welcome grant</p>
-        <h2 id="welcome-heading" class="ur-section-title">
-          Claim your starter
-        </h2>
+        <h2 id="welcome-heading" class="ur-section-title">Claim your starter</h2>
         <p class="mt-2 max-w-2xl text-sm text-muted-foreground">
           One free five-card starter plus a one-time grant of 3,000 Coins. Starter cards are drawn
           from Ember base cards and always form a legal five. This grant can be claimed once.
@@ -645,6 +647,7 @@
             title={progression?.display.setsTitle ?? 'Sets'}
             blurb={progression?.display.setsBlurb ?? undefined}
             {cardNameOf}
+            {cardArtOf}
             busySetId={claimingSetId}
             onClaim={claimSet}
             onInspect={inspectCard}
@@ -668,7 +671,12 @@
         class="ur-collection-filters mt-6"
       >
         <div class="ur-filter-dialog-heading">
-          <h2 id="collection-filter-title" bind:this={filterDialogTitle} tabindex="-1" class="ur-section-title">
+          <h2
+            id="collection-filter-title"
+            bind:this={filterDialogTitle}
+            tabindex="-1"
+            class="ur-section-title"
+          >
             Filter cards
           </h2>
           {#if !desktopFilterLayout}
@@ -808,7 +816,11 @@
             <button type="button" class="ur-filter-clear ur-btn-ghost" onclick={resetEditingFilters}
               >Clear</button
             >
-            <button type="button" class="ur-filter-apply ur-btn-gold" onclick={() => closeMobileFilters(true)}>
+            <button
+              type="button"
+              class="ur-filter-apply ur-btn-gold"
+              onclick={() => closeMobileFilters(true)}
+            >
               Apply filters
             </button>
           </div>
@@ -904,7 +916,10 @@
             </li>
           {/each}
         </ul>
-        <nav aria-label="Collection pages" class="ur-book-pager mt-4 flex items-center justify-center gap-2">
+        <nav
+          aria-label="Collection pages"
+          class="ur-book-pager mt-4 flex items-center justify-center gap-2"
+        >
           <button
             type="button"
             disabled={paged.page <= 1}
@@ -1053,9 +1068,7 @@
   .ur-filter-pills > label {
     border: 1px solid color-mix(in srgb, var(--ur-apex) 22%, var(--ur-line-strong));
     border-radius: 0.75rem;
-    background:
-      linear-gradient(180deg, rgb(255 255 255 / 3%), transparent 40%),
-      var(--ur-surface);
+    background: linear-gradient(180deg, rgb(255 255 255 / 3%), transparent 40%), var(--ur-surface);
     box-shadow: inset 0 1px 0 rgb(255 255 255 / 5%);
   }
 
@@ -1107,9 +1120,7 @@
   .ur-filter-group {
     border: 1px solid color-mix(in srgb, var(--ur-apex) 20%, var(--ur-line));
     border-radius: 0.75rem;
-    background:
-      linear-gradient(180deg, rgb(255 255 255 / 2%), transparent 35%),
-      var(--ur-raised);
+    background: linear-gradient(180deg, rgb(255 255 255 / 2%), transparent 35%), var(--ur-raised);
     padding: 0.75rem;
   }
 
@@ -1187,9 +1198,7 @@
   .ur-collection-page :global(.ur-set-entry) {
     border: 1px solid color-mix(in srgb, var(--ur-apex) 22%, var(--ur-line));
     border-radius: 0.75rem;
-    background:
-      linear-gradient(180deg, rgb(255 255 255 / 2%), transparent 35%),
-      var(--ur-bg);
+    background: linear-gradient(180deg, rgb(255 255 255 / 2%), transparent 35%), var(--ur-bg);
   }
 
   .ur-collection-page :global(.ur-set-entry:nth-child(1)) {

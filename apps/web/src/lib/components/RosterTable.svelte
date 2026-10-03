@@ -168,7 +168,6 @@
             </tr>
           {:else}
             {@const player = item.player}
-            {@const mobileTeamExternalId = teamSlotFor(player)}
             {@const teamExternalId = teamSlotFor(player)}
             <tr
               role="button"

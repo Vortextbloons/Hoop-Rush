@@ -1,5 +1,6 @@
 <script lang="ts">
   import { ArrowUpRight, Check, Layers, LockKeyhole } from '@lucide/svelte';
+  import { asset } from '$app/paths';
   import CurrencyIcon from './CurrencyIcon.svelte';
   import type { SetProgressView } from './collection-progression-view.ts';
 
@@ -8,6 +9,7 @@
     title = 'Sets',
     blurb = 'Three four-card sets. Own every member to claim its one-time Exchange reward. Claiming never consumes or locks cards.',
     cardNameOf,
+    cardArtOf = null,
     busySetId = null,
     onClaim,
     onInspect,
@@ -16,6 +18,7 @@
     title?: string;
     blurb?: string;
     cardNameOf: (cardId: string) => string;
+    cardArtOf?: ((cardId: string) => string | null) | null;
     busySetId?: string | null;
     onClaim: (setId: string) => void;
     onInspect: (cardId: string) => void;
@@ -85,6 +88,7 @@
             {@const playerName = fullName.startsWith(`${view.title} `)
               ? fullName.slice(view.title.length + 1)
               : fullName}
+            {@const artwork = cardArtOf?.(cardId) ?? null}
             <li class="member-slot" class:owned>
               <div class="member-topline">
                 <span class="member-family">{view.title}</span>
@@ -95,11 +99,15 @@
                 {/if}
               </div>
               <div class="card-mark" aria-hidden="true">
-                {playerName
-                  .split(' ')
-                  .map((part) => part.charAt(0))
-                  .slice(0, 2)
-                  .join('')}
+                {#if artwork}
+                  <img class="card-art" src={asset(artwork)} alt="" loading="lazy" />
+                {:else}
+                  {playerName
+                    .split(' ')
+                    .map((part) => part.charAt(0))
+                    .slice(0, 2)
+                    .join('')}
+                {/if}
               </div>
               <p class="member-name">{playerName}</p>
               {#if owned}
@@ -335,6 +343,7 @@
     place-items: center;
     min-height: 5.5rem;
     margin: 0.65rem 0;
+    overflow: hidden;
     font-size: 3rem;
     font-style: italic;
     letter-spacing: -0.06em;
@@ -347,6 +356,22 @@
       color-mix(in srgb, var(--ur-line) 18%, transparent) 9px
     );
     border-radius: 0.3rem;
+  }
+  .card-mark:has(.card-art) {
+    padding: 0;
+    background: var(--ur-bg);
+  }
+  .card-art {
+    width: 100%;
+    height: 100%;
+    min-height: 5.5rem;
+    aspect-ratio: 2 / 3;
+    object-fit: cover;
+    object-position: center 20%;
+    display: block;
+  }
+  .member-slot:not(.owned) .card-art {
+    filter: saturate(0.6) brightness(0.85);
   }
   .member-name {
     flex: 1;

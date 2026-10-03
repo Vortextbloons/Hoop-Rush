@@ -39,7 +39,7 @@ export function getManifest(): Promise<HoopRushManifest> {
   }
   return manifestPromise;
 }
-function reloadManifest(): Promise<HoopRushManifest> {
+export function reloadManifest(): Promise<HoopRushManifest> {
   manifestPromise = loadManifest(cacheBustedUrl(manifestUrl()));
   manifestPromise.catch(() => {
     manifestPromise = null;
@@ -48,6 +48,9 @@ function reloadManifest(): Promise<HoopRushManifest> {
 }
 function isContentHashMismatch(error: unknown): boolean {
   return error instanceof Error && CONTENT_HASH_MISMATCH.test(error.message);
+}
+export function isCollectionContentHashMismatch(error: unknown): boolean {
+  return isContentHashMismatch(error);
 }
 function parseObservedContentHash(error: unknown): string | null {
   if (!(error instanceof Error)) return null;

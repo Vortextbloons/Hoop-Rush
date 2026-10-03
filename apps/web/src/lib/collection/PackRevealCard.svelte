@@ -91,7 +91,7 @@
     --ur-reveal-rarity: var(--ur-ember);
     display: grid;
     width: min(100%, 24rem);
-    min-height: 30rem;
+    min-height: var(--ur-pack-card-height, 30rem);
     grid-template-rows: minmax(0, 1fr) auto;
     overflow: hidden;
     border: 2px solid var(--ur-reveal-rarity);
@@ -140,7 +140,7 @@
   .ur-reveal-face {
     position: relative;
     display: grid;
-    min-height: 16rem;
+    min-height: var(--ur-pack-face-height, 16rem);
     place-items: stretch;
     overflow: hidden;
     padding: 0;

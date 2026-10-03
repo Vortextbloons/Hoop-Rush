@@ -28,7 +28,7 @@
   };
 
   type RevealStage =
-    'idle' | 'entering' | 'beats' | 'clues' | 'revealed' | 'advancing' | 'complete';
+    'idle' | 'opening' | 'entering' | 'beats' | 'clues' | 'revealed' | 'advancing' | 'complete';
 
   let {
     receipt,
@@ -51,6 +51,7 @@
   let dialog = $state<HTMLDialogElement | undefined>(undefined);
   let skipButton = $state<HTMLButtonElement | undefined>(undefined);
   let takeButton = $state<HTMLButtonElement | undefined>(undefined);
+  let nextButton = $state<HTMLButtonElement | undefined>(undefined);
   let stage = $state<RevealStage>('idle');
   let activeCardIndex = $state(0);
   let beatIndex = $state(0);
@@ -64,6 +65,18 @@
   const activePlan = $derived(plan?.cards[activeCardIndex] ?? null);
   const activeBeat = $derived(activePlan?.beats[beatIndex] ?? null);
   const activeClue = $derived(activePlan?.clues[clueIndex] ?? null);
+  const revealColor = $derived(
+    stage === 'clues' || stage === 'revealed'
+      ? `var(--ur-${activePlan?.rarity.toLowerCase() ?? 'apex'})`
+      : '#c7d5e3',
+  );
+  const charge = $derived(
+    stage === 'clues' || stage === 'revealed'
+      ? 100
+      : stage === 'beats'
+        ? ((beatIndex + 1) / (activePlan?.beats.length ?? 1)) * 100
+        : 0,
+  );
 
   function clearTimer(): void {
     if (timer !== null) {
@@ -81,8 +94,9 @@
 
   function scheduleNext(token: number): void {
     clearTimer();
-    if (stage === 'idle' || stage === 'complete') return;
-    const delay = stage === 'clues' ? 620 : stage === 'revealed' ? 920 : 420;
+    if (stage === 'idle' || stage === 'complete' || stage === 'revealed') return;
+    const delay =
+      stage === 'opening' ? 1250 : stage === 'clues' ? 700 : stage === 'advancing' ? 240 : 380;
     timer = setTimeout(() => {
       timer = null;
       if (token !== presentationToken) return;
@@ -91,7 +105,9 @@
   }
 
   function advance(token: number): void {
-    if (stage === 'entering') {
+    if (stage === 'opening') {
+      stage = 'entering';
+    } else if (stage === 'entering') {
       stage = 'beats';
       beatIndex = 0;
     } else if (stage === 'beats') {
@@ -128,6 +144,12 @@
         return;
       }
     }
+    if (stage === 'revealed') {
+      announcement = `${activeCard?.card?.displayName ?? activeCard?.slot.cardId}. ${activePlan?.rarity}. ${activeCard?.slot.kept ? 'New card.' : `Duplicate. ${activeCard?.slot.conversionAmount} Exchange.`}`;
+      void tick().then(() => {
+        if (token === presentationToken && stage === 'revealed') nextButton?.focus();
+      });
+    }
     scheduleNext(token);
   }
 
@@ -150,7 +172,7 @@
     activeCardIndex = 0;
     beatIndex = 0;
     clueIndex = 0;
-    stage = 'entering';
+    stage = 'opening';
     announcement = `Opening ${packLabel}. Card 1 of ${cards.length}.`;
     await tick();
     if (token !== presentationToken || activePullSequence !== sequence) return;
@@ -211,7 +233,7 @@
     <div class="ur-pack-theater-inner" class:ur-pack-theater-complete={stage === 'complete'}>
       <header class="ur-theater-header">
         <div>
-          <p class="ur-theater-label">Committed receipt</p>
+          <p class="ur-theater-label">Hoop Rush · Pack drop</p>
           <h2 id="pack-theater-title">{stage === 'complete' ? 'Pack opened' : packLabel}</h2>
         </div>
         {#if stage !== 'complete'}
@@ -227,16 +249,15 @@
       </header>
 
       <p id="pack-theater-description" class="sr-only">
-        The pack result was committed before this presentation began.
+        Watch each card reveal, then choose Next card. Skip shows all your cards immediately.
       </p>
       <p class="sr-only" role="status" aria-live="polite">{announcement}</p>
-      <p class="ur-theater-context">The pack result is already recorded.</p>
 
       {#if stage === 'complete'}
         <section class="ur-pack-summary" aria-label="Committed pack results">
           <div class="ur-summary-heading">
-            <h3>Receipt confirmed</h3>
-            <p>These are the cards and balances from this pack.</p>
+            <h3>Your haul</h3>
+            <p>{packLabel} · All {cards.length} cards revealed</p>
           </div>
           <div class="ur-pack-summary-scoreline">
             <div><strong>{receipt.cardsAdded}</strong><span>new cards</span></div>
@@ -280,6 +301,8 @@
         <section
           class="ur-reveal-stage"
           data-stage={stage}
+          data-rarity={stage === 'clues' || stage === 'revealed' ? activePlan.rarity : 'sealed'}
+          style:--drop-color={revealColor}
           aria-label={`Card ${activeCardIndex + 1} of ${cards.length}`}
         >
           <div class="ur-reveal-stage-meta">
@@ -290,7 +313,31 @@
               >{stage === 'revealed' ? activePlan.rarity : 'Sealed'}</span
             >
           </div>
-          {#if stage === 'revealed'}
+          <div class="ur-arena-lights" aria-hidden="true"></div>
+          <div class="ur-court-floor" aria-hidden="true"></div>
+          {#if stage === 'opening'}
+            <div class="ur-pack-rip" aria-hidden="true">
+              <div class="ur-pack-wrapper">
+                <span class="ur-pack-brand">HOOP<br />RUSH</span>
+                <span class="ur-pack-name">{packLabel}</span>
+                <span class="ur-pack-tear">OPEN THE GAME</span>
+              </div>
+              <div class="ur-pack-lid"></div>
+              <span class="ur-pack-rip-light"></span>
+            </div>
+            <p class="ur-drop-caption">Breaking the seal</p>
+          {:else if stage === 'revealed'}
+            <div class="ur-impact" aria-hidden="true">
+              <span class="ur-impact-ring"></span>
+              {#each Array.from({ length: 18 }, (_, index) => index) as spark (spark)}
+                <i
+                  style:--angle={`${spark * 20}deg`}
+                  style:--distance={`${150 + (spark % 4) * 35}px`}
+                  style:--delay={`${(spark % 3) * 40}ms`}
+                ></i>
+              {/each}
+            </div>
+            <p class="ur-rarity-callout">{activePlan.rarity}</p>
             <div class="ur-revealed-card">
               <PackRevealCard
                 view={activeCard.view}
@@ -301,29 +348,58 @@
                 conversionAmount={activeCard.slot.conversionAmount}
               />
             </div>
+            <button
+              bind:this={nextButton}
+              type="button"
+              class="ur-next-card"
+              onclick={() => advance(presentationToken)}
+            >
+              {activeCardIndex + 1 < cards.length ? 'Next card' : 'See your haul'}
+              <span aria-hidden="true">→</span>
+            </button>
           {:else}
-            <div class="ur-card-back ur-seal--sealed" data-stage={stage}>
-              <span class="ur-card-back-court" aria-hidden="true"></span>
-              <strong>
-                {#if stage === 'entering'}
-                  Sealed card
-                {:else if stage === 'beats'}
-                  {activeBeat ?? 'Reveal'}
-                {:else if stage === 'clues' && activeClue}
-                  {activeClue.label}
-                {:else if stage === 'advancing'}
-                  Next card up
+            {#key `${activeCardIndex}-${stage}-${beatIndex}-${clueIndex}`}
+              <div class="ur-card-back ur-seal--sealed" data-stage={stage}>
+                <span class="ur-card-back-court" aria-hidden="true"></span>
+                <span class="ur-card-back-brand" aria-hidden="true">HR</span>
+                <strong>
+                  {#if stage === 'entering'}
+                    Game on
+                  {:else if stage === 'beats'}
+                    {activeBeat ?? 'Reveal'}
+                  {:else if stage === 'clues' && activeClue}
+                    {activeClue.label}
+                  {:else if stage === 'advancing'}
+                    Next card up
+                  {/if}
+                </strong>
+                {#if stage === 'clues' && activeClue}
+                  <span class="ur-card-clue">{activeClue.value}</span>
+                {:else}
+                  <span class="ur-card-back-caption"
+                    >{stage === 'entering' ? packLabel : 'Here comes your next player'}</span
+                  >
                 {/if}
-              </strong>
-              {#if stage === 'clues' && activeClue}
-                <span class="ur-card-clue">{activeClue.value}</span>
-              {:else}
-                <span class="ur-card-back-caption"
-                  >{stage === 'entering' ? packLabel : 'The result is already recorded'}</span
-                >
-              {/if}
+              </div>
+            {/key}
+            <div class="ur-charge-track" aria-hidden="true">
+              <span style:width={`${charge}%`}></span>
             </div>
           {/if}
+          <ol class="ur-pack-progress" aria-label="Pack reveal progress">
+            {#each cards as item, index (item.slot.slotIndex)}
+              <li
+                class:ur-progress-done={index < activeCardIndex ||
+                  (index === activeCardIndex && stage === 'revealed')}
+                class:ur-progress-active={index === activeCardIndex}
+                aria-current={index === activeCardIndex ? 'step' : undefined}
+              >
+                <span class="sr-only"
+                  >Card {index + 1}{index < activeCardIndex ? ', revealed' : ''}</span
+                >
+              </li>
+            {/each}
+          </ol>
           {#if cards.length > 1}
             <button type="button" class="ur-show-all" onclick={skipToSummary}>Show all cards</button
             >
@@ -344,6 +420,7 @@
 
 <style>
   .ur-pack-theater {
+    margin: auto;
     width: min(70rem, calc(100vw - 2rem));
     max-width: none;
     max-height: min(94svh, 62rem);
@@ -400,13 +477,6 @@
     font-size: clamp(1.8rem, 5vw, 2.7rem);
     font-weight: 800;
     line-height: 1;
-  }
-
-  .ur-theater-context {
-    padding: 0.55rem 0;
-    border-bottom: 1px solid var(--ur-line);
-    color: var(--ur-muted);
-    font-size: 0.72rem;
   }
 
   .ur-theater-skip,
@@ -608,6 +678,8 @@
   }
 
   .ur-revealed-card {
+    --ur-pack-card-height: clamp(21rem, 48svh, 30rem);
+    --ur-pack-face-height: clamp(11rem, 25svh, 16rem);
     display: grid;
     min-height: clamp(24rem, 54svh, 34rem);
     place-items: center;
@@ -725,10 +797,6 @@
       padding: 0.85rem;
     }
 
-    .ur-theater-context {
-      font-size: 0.68rem;
-    }
-
     .ur-reveal-stage {
       padding-inline: 0.65rem;
     }
@@ -747,9 +815,478 @@
     }
   }
 
-  @media (prefers-reduced-motion: no-preference) {
-    .ur-card-back[data-stage='beats'] {
-      animation: court-signal 360ms ease-out both;
+  .ur-reveal-stage {
+    min-height: 39rem;
+    perspective: 1100px;
+    border-color: color-mix(in srgb, var(--drop-color) 28%, transparent);
+    background:
+      radial-gradient(
+        ellipse at 50% 45%,
+        color-mix(in srgb, var(--drop-color) 16%, transparent),
+        transparent 65%
+      ),
+      #080d14;
+  }
+
+  .ur-arena-lights {
+    position: absolute;
+    z-index: -1;
+    inset: -30% -15%;
+    background:
+      conic-gradient(
+        from 175deg at 25% 0%,
+        transparent 0deg,
+        color-mix(in srgb, var(--drop-color) 15%, transparent) 12deg,
+        transparent 24deg
+      ),
+      conic-gradient(
+        from 160deg at 75% 0%,
+        transparent 0deg,
+        color-mix(in srgb, var(--drop-color) 15%, transparent) 12deg,
+        transparent 24deg
+      );
+    transform-origin: top center;
+    animation: arena-sweep 7s ease-in-out infinite alternate;
+  }
+
+  .ur-court-floor {
+    position: absolute;
+    z-index: -1;
+    inset: 64% -35% -60%;
+    border: 2px solid color-mix(in srgb, var(--drop-color) 30%, transparent);
+    border-radius: 50%;
+    background:
+      repeating-linear-gradient(90deg, transparent 0 79px, #ffffff0c 80px 81px),
+      repeating-linear-gradient(0deg, transparent 0 79px, #ffffff0c 80px 81px);
+    transform: rotateX(65deg);
+  }
+
+  .ur-pack-rip {
+    position: relative;
+    width: min(70vw, 18rem);
+    height: 27rem;
+    margin-top: 2rem;
+    perspective: 900px;
+  }
+
+  .ur-pack-wrapper {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 2rem;
+    border: 2px solid #ffe19b;
+    background:
+      repeating-linear-gradient(135deg, transparent 0 22px, #ffffff0b 23px 24px),
+      linear-gradient(145deg, #46505c, #101720 45%, #67501e);
+    box-shadow:
+      0 0 60px #ffc53d26,
+      inset 0 0 0 7px #ffffff12;
+    clip-path: polygon(
+      0 0,
+      100% 0,
+      100% 100%,
+      95% 98%,
+      90% 100%,
+      85% 98%,
+      80% 100%,
+      75% 98%,
+      70% 100%,
+      65% 98%,
+      60% 100%,
+      55% 98%,
+      50% 100%,
+      45% 98%,
+      40% 100%,
+      35% 98%,
+      30% 100%,
+      25% 98%,
+      20% 100%,
+      15% 98%,
+      10% 100%,
+      5% 98%,
+      0 100%
+    );
+    animation: wrapper-rip 1250ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+
+  .ur-pack-brand {
+    font-family: var(--font-display);
+    font-weight: 900;
+    font-style: italic;
+    font-size: 4.8rem;
+    line-height: 0.85;
+    letter-spacing: -0.05em;
+    color: #fff3d6;
+    text-shadow: 4px 4px 0 #8e6414;
+  }
+
+  .ur-pack-name {
+    margin-top: 1.5rem;
+    color: #ffe19b;
+    font-weight: 800;
+  }
+  .ur-pack-tear {
+    margin-top: 2.5rem;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    color: #d5dde6;
+  }
+  .ur-pack-lid {
+    position: absolute;
+    inset: -1rem 0 auto;
+    height: 2.5rem;
+    border: 2px solid #ffe19b;
+    background: repeating-linear-gradient(90deg, #ac812c 0 3px, #ebd28c 4px 5px);
+    animation: lid-rip 1250ms ease-in both;
+  }
+
+  .ur-pack-rip-light {
+    position: absolute;
+    inset: 5% -40%;
+    background: radial-gradient(ellipse, #fff3d6 0, #ffc53d88 18%, transparent 65%);
+    pointer-events: none;
+    animation: seal-light 1250ms ease-out both;
+  }
+
+  .ur-drop-caption {
+    color: var(--ur-paper);
+    font-size: 0.75rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .ur-card-back {
+    min-height: 29rem;
+    width: min(100%, 21rem);
+    border-color: var(--drop-color);
+    color: var(--drop-color);
+    background:
+      repeating-linear-gradient(135deg, transparent 0 20px, #ffffff06 21px 22px),
+      linear-gradient(150deg, #273340, #0b111a 65%);
+    box-shadow: inset 0 0 0 6px #ffffff08;
+  }
+  .ur-card-back-brand {
+    position: absolute;
+    top: 2rem;
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 5rem;
+    font-weight: 900;
+    color: #ffffff12;
+  }
+  .ur-card-back strong {
+    color: var(--drop-color);
+    font-size: clamp(2rem, 7vw, 3rem);
+  }
+  .ur-card-back-court {
+    transform: rotate(-25deg);
+  }
+  .ur-card-back[data-stage='entering'] {
+    animation: card-deal 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  .ur-card-back[data-stage='beats'] {
+    animation: card-charge 380ms ease-out both;
+  }
+  .ur-card-back[data-stage='clues'] {
+    animation: clue-lock 700ms ease-out both;
+  }
+  .ur-card-back[data-stage='advancing'] {
+    animation: card-away 240ms ease-in both;
+  }
+  .ur-charge-track {
+    width: min(100%, 21rem);
+    height: 3px;
+    margin-top: 1rem;
+    background: #ffffff1c;
+  }
+  .ur-charge-track span {
+    display: block;
+    height: 100%;
+    background: var(--drop-color);
+    box-shadow: 0 0 12px var(--drop-color);
+    transition: width 300ms ease-out;
+  }
+  .ur-rarity-callout {
+    position: absolute;
+    top: 3.5rem;
+    z-index: 2;
+    color: var(--drop-color);
+    font-family: var(--font-display);
+    font-weight: 900;
+    font-size: clamp(2.1rem, 6vw, 3.2rem);
+    font-style: italic;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    animation: rarity-hit 650ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .ur-revealed-card {
+    position: relative;
+    z-index: 1;
+    margin-top: 4.5rem;
+    min-height: 0;
+    width: min(100%, 21rem);
+    filter: drop-shadow(0 12px 35px color-mix(in srgb, var(--drop-color) 28%, transparent));
+    animation: reveal-slam 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .ur-impact {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .ur-impact-ring {
+    position: absolute;
+    left: calc(50% - 10rem);
+    top: 12rem;
+    width: 20rem;
+    height: 20rem;
+    border: 2px solid var(--drop-color);
+    border-radius: 50%;
+    animation: impact-ring 950ms ease-out both;
+  }
+  .ur-impact i {
+    position: absolute;
+    left: 50%;
+    top: 45%;
+    width: 4px;
+    height: 24px;
+    background: var(--drop-color);
+    transform: rotate(var(--angle));
+    animation: spark-launch 900ms var(--delay) ease-out both;
+  }
+  .ur-reveal-stage[data-rarity='Ember'] .ur-impact {
+    opacity: 0.35;
+  }
+  .ur-reveal-stage[data-rarity='Eclipse'],
+  .ur-reveal-stage[data-rarity='Immortal'] {
+    background:
+      radial-gradient(
+        ellipse at 50% 42%,
+        color-mix(in srgb, var(--drop-color) 28%, transparent),
+        transparent 70%
+      ),
+      #060910;
+  }
+  .ur-reveal-stage[data-rarity='Immortal'] .ur-rarity-callout {
+    letter-spacing: 0.2em;
+  }
+  .ur-next-card {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 3rem;
+    min-height: 3rem;
+    margin-top: 1.2rem;
+    padding: 0.75rem 1.5rem;
+    border: 1px solid #ffe19b;
+    border-bottom: 4px solid #a76f10;
+    border-radius: 0.3rem;
+    background: linear-gradient(#ffe19b, #ffc53d);
+    color: #241804;
+    font-weight: 900;
+    cursor: pointer;
+  }
+  .ur-next-card:hover {
+    filter: brightness(1.08);
+  }
+  .ur-pack-progress {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    padding: 0;
+    list-style: none;
+  }
+  .ur-pack-progress li {
+    width: 1.6rem;
+    height: 0.3rem;
+    background: #ffffff24;
+    border-radius: 2px;
+  }
+  .ur-pack-progress .ur-progress-done {
+    background: var(--ur-apex);
+  }
+  .ur-pack-progress .ur-progress-active {
+    outline: 1px solid var(--ur-paper);
+    outline-offset: 3px;
+  }
+  .ur-show-all {
+    min-height: 2.75rem;
+    margin-top: 0.8rem;
+    border: 0;
+    background: transparent;
+    color: var(--ur-muted);
+    font-size: 0.75rem;
+  }
+  .ur-pack-summary {
+    animation: haul-enter 400ms ease-out both;
+  }
+  .ur-summary-heading h3 {
+    font-size: 2rem;
+    font-style: italic;
+  }
+
+  @keyframes arena-sweep {
+    to {
+      transform: rotate(8deg) scale(1.05);
+    }
+  }
+  @keyframes wrapper-rip {
+    0% {
+      opacity: 0;
+      transform: translateY(50px) rotateY(-25deg) rotate(-8deg) scale(0.8);
+    }
+    25%,
+    50% {
+      opacity: 1;
+      transform: none;
+    }
+    70% {
+      transform: translateY(10px) scale(1.03);
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(160px) rotate(12deg) scale(1.2);
+      opacity: 0;
+    }
+  }
+  @keyframes lid-rip {
+    0%,
+    50% {
+      transform: none;
+      opacity: 1;
+    }
+    100% {
+      transform: translate(100px, -180px) rotate(45deg);
+      opacity: 0;
+    }
+  }
+  @keyframes seal-light {
+    0%,
+    50% {
+      transform: scale(0.1);
+      opacity: 0;
+    }
+    70% {
+      opacity: 0.8;
+    }
+    100% {
+      transform: scale(1.5);
+      opacity: 0;
+    }
+  }
+  @keyframes card-deal {
+    from {
+      transform: translateY(70px) rotateY(-35deg) rotate(-8deg) scale(0.85);
+      opacity: 0;
+    }
+    to {
+      transform: none;
+      opacity: 1;
+    }
+  }
+  @keyframes card-charge {
+    0% {
+      transform: scale(0.97) rotate(-1deg);
+    }
+    45% {
+      transform: scale(1.025) rotate(1deg);
+    }
+    100% {
+      transform: none;
+    }
+  }
+  @keyframes clue-lock {
+    from {
+      transform: rotateY(14deg) scale(0.95);
+      opacity: 0.5;
+    }
+    to {
+      transform: none;
+      opacity: 1;
+    }
+  }
+  @keyframes card-away {
+    to {
+      transform: translateX(-150px) rotate(-12deg) scale(0.7);
+      opacity: 0;
+    }
+  }
+  @keyframes reveal-slam {
+    from {
+      transform: rotateY(85deg) translateY(30px) scale(0.65);
+      opacity: 0;
+    }
+    65% {
+      transform: rotateY(-6deg) translateY(-8px) scale(1.04);
+      opacity: 1;
+    }
+    to {
+      transform: none;
+      opacity: 1;
+    }
+  }
+  @keyframes rarity-hit {
+    from {
+      transform: scale(1.8) translateY(-15px);
+      opacity: 0;
+    }
+    to {
+      transform: none;
+      opacity: 1;
+    }
+  }
+  @keyframes impact-ring {
+    from {
+      transform: scale(0.4);
+      opacity: 0.7;
+    }
+    to {
+      transform: scale(2.5);
+      opacity: 0;
+    }
+  }
+  @keyframes spark-launch {
+    from {
+      transform: rotate(var(--angle)) translateY(-60px) scaleY(1);
+      opacity: 0;
+    }
+    20% {
+      opacity: 0.8;
+    }
+    to {
+      transform: rotate(var(--angle)) translateY(calc(-1 * var(--distance))) scaleY(0.2);
+      opacity: 0;
+    }
+  }
+  @keyframes haul-enter {
+    from {
+      transform: translateY(15px);
+      opacity: 0;
+    }
+    to {
+      transform: none;
+      opacity: 1;
+    }
+  }
+
+  @media (max-width: 520px) {
+    .ur-reveal-stage {
+      min-height: 36rem;
+    }
+    .ur-pack-rip {
+      height: 24rem;
+    }
+    .ur-pack-brand {
+      font-size: 4rem;
+    }
+    .ur-card-back {
+      min-height: 27rem;
+    }
+    .ur-revealed-card {
+      width: min(100%, 19rem);
     }
   }
 
@@ -759,17 +1296,6 @@
       animation: none !important;
       transition: none !important;
       scroll-behavior: auto !important;
-    }
-  }
-
-  @keyframes court-signal {
-    from {
-      border-color: var(--ur-line-strong);
-      background-color: var(--ur-bg);
-    }
-    to {
-      border-color: var(--ur-reveal-rarity, var(--ur-line-strong));
-      background-color: var(--ur-surface);
     }
   }
 </style>

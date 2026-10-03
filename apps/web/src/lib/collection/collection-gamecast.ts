@@ -6,8 +6,8 @@ import type {
 } from '@hoop-rush/data-contracts';
 
 export type WatchMode = 'fast' | 'standard' | 'slow';
-export const STANDARD_EVENT_MS = 250;
-export const SLOW_EVENT_MS = 650;
+export const STANDARD_EVENT_MS = 900;
+export const SLOW_EVENT_MS = 1400;
 
 export function cadenceFor(mode: WatchMode): number | null {
   if (mode === 'fast') return null;

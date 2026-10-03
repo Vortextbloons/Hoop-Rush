@@ -1,16 +1,30 @@
 <script lang="ts">
-  import type { CollectionCatalogCard } from '@hoop-rush/data-contracts';
-  import { Layers, Flame, Trophy, Shield, Sparkles, Crown, UserRound } from '@lucide/svelte';
+  import type { CollectionCatalogCard, HoopRushManifest } from '@hoop-rush/data-contracts';
+  import { Flame, Trophy, Shield, Sparkles, Crown } from '@lucide/svelte';
+  import { asset } from '$app/paths';
+  import PlayerFace from '$lib/components/PlayerFace.svelte';
+  import { collectionCardArtOf } from './collection-card-art';
 
   let {
     card,
     compact = false,
     detail = '',
+    manifest = null,
   }: {
     card: CollectionCatalogCard;
     compact?: boolean;
     detail?: string;
+    manifest?: HoopRushManifest | null;
   } = $props();
+
+  const artwork = $derived(collectionCardArtOf(card));
+  const initials = $derived(
+    card.displayName
+      .split(' ')
+      .map((part) => part[0] ?? '')
+      .join('')
+      .slice(0, 2),
+  );
 
   const Emblem = $derived(
     card.rarity === 'Immortal'
@@ -36,8 +50,18 @@
     <span>{card.positions[0] ?? '—'}</span>
   </div>
   <div class="card-art" aria-hidden="true">
-    <Layers class="card-outline" size={compact ? 26 : 54} strokeWidth={1} />
-    <UserRound class="card-player" size={compact ? 28 : 76} strokeWidth={1.2} />
+    {#if artwork}
+      <img class="card-image" src={asset(artwork)} alt="" loading="lazy" />
+    {:else if manifest}
+      <PlayerFace
+        player={{ playerId: card.playerId, playerExternalId: card.playerExternalId, altIds: null }}
+        {manifest}
+        size={compact ? 'sm' : 'xl'}
+        fallbackInitials={initials}
+      />
+    {:else}
+      <span class="card-initials">{initials}</span>
+    {/if}
   </div>
   <div class="card-identity">
     <span class="card-rarity"><Emblem size={12} /> {card.rarity}</span>
@@ -97,23 +121,33 @@
   .card-art {
     position: relative;
     display: grid;
-    height: 7rem;
-    place-items: end center;
+    height: 10rem;
+    place-items: center;
     margin: 0.35rem;
     border-bottom: 1px solid color-mix(in srgb, var(--foil) 30%, transparent);
     background: repeating-linear-gradient(125deg, transparent 0 17px, #ffffff04 18px 19px);
   }
-  .card-art :global(.card-outline) {
-    position: absolute;
-    right: 0.35rem;
-    top: 0.5rem;
-    color: var(--foil);
-    opacity: 0.2;
-    transform: rotate(12deg);
+  .card-image {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
   }
-  .card-art :global(.card-player) {
+  .card-art :global(> div) {
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+    background: transparent;
+  }
+  .card-art :global(img:not(.card-image)) {
+    object-fit: contain;
+    object-position: bottom;
+    transform: none;
+  }
+  .card-initials {
     color: var(--foil);
-    opacity: 0.65;
+    font-family: var(--font-display);
+    font-size: 3rem;
+    font-weight: 900;
   }
   .card-identity {
     padding: 0.55rem 0.65rem 0.75rem;
@@ -157,12 +191,15 @@
   }
   .compact .card-art {
     width: 2.5rem;
-    height: 2.8rem;
+    height: 3.5rem;
     flex: none;
     border: 0;
   }
   .compact .card-identity {
     padding: 0.5rem;
+  }
+  .compact .card-initials {
+    font-size: 1rem;
   }
   .compact h4 {
     font-size: 0.8rem;

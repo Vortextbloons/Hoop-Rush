@@ -574,15 +574,33 @@ function applyOpenPack(
     throw error;
   }
   const targetPlayerId = state.activeTargetPlayerId;
+  let effectiveProgressionHash = progressionHash;
   const currentCommand = command.commandVersion !== COLLECTION_COMMAND_V1_VERSION;
   if (
     currentCommand &&
     state.progressionHash !== null &&
     state.progressionHash !== progressionHash
   ) {
-    return reject('invalid-progression-rules', {
-      detail: 'collection progression rules do not match the committed state',
-    });
+    if (progression === null || progressionHash === null) {
+      if (targetPlayerId !== null) {
+        return reject('invalid-progression-rules', {
+          detail: 'collection progression rules do not match the committed state',
+        });
+      }
+      effectiveProgressionHash = state.progressionHash;
+    } else {
+      try {
+        validateCollectionProgressionRules({
+          progression,
+          progressionHash,
+          catalog,
+        });
+      } catch (error) {
+        return reject('invalid-progression-rules', {
+          detail: error instanceof Error ? error.message : 'invalid progression rules',
+        });
+      }
+    }
   }
   if (targetPlayerId !== null && progression === null) {
     return reject('invalid-progression-rules', {
@@ -724,7 +742,7 @@ function applyOpenPack(
       };
   return {
     status: 'accepted',
-    state: commitState(state, { owned, balances }, true, progressionHash),
+    state: commitState(state, { owned, balances }, true, effectiveProgressionHash),
     pull,
     ledgerEntries: entries,
   };
@@ -770,18 +788,28 @@ function applyClaimSetReward(
   progression: CollectionProgressionRules | null,
   progressionHash: string | null,
 ): CollectionCommandResult {
-  if (
-    progression === null ||
-    (state.progressionHash !== null && state.progressionHash !== progressionHash)
-  ) {
+  if (progression === null || progressionHash === null) {
     return reject('invalid-progression-rules', {
       detail: 'set rewards require the committed progression rules artifact',
     });
   }
+  if (state.progressionHash !== null && state.progressionHash !== progressionHash) {
+    try {
+      validateCollectionProgressionRules({
+        progression,
+        progressionHash,
+        catalog,
+      });
+    } catch (error) {
+      return reject('invalid-progression-rules', {
+        detail: error instanceof Error ? error.message : 'invalid progression rules',
+      });
+    }
+  }
   try {
     validateCollectionProgressionRules({
       progression,
-      progressionHash: progressionHash ?? '',
+      progressionHash,
       catalog,
     });
   } catch (error) {
