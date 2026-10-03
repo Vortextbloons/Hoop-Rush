@@ -4,8 +4,12 @@
     CollectionIndexEntry,
     HoopRushManifest,
   } from '@hoop-rush/data-contracts';
+  import { resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
   import { formatPositions } from '$lib/player-positions';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
+  import TeamLogo from '$lib/components/TeamLogo.svelte';
+  import { asset } from '$app/paths';
+  import { collectionCardArtOf } from './collection-card-art.ts';
   import { collectionCardViewOf } from './collection-card-view.ts';
   import { humanizeIdentifier } from './collection-progression-view.ts';
 
@@ -30,7 +34,15 @@
     collectionCardViewOf({ entry: item.entry, catalogCard, owned: item.owned }),
   );
   const rarityToken = $derived(view.rarity.toLowerCase());
+  const artwork = $derived(collectionCardArtOf(view));
   const primaryPosition = $derived(view.positions[0] ?? '—');
+  const franchiseSlot = $derived(
+    manifest?.modernFranchiseSlots.find((entry) => entry.franchiseId === view.franchiseId) ?? null,
+  );
+  const eraIdentity = $derived(
+    manifest ? resolveEraTeamIdentity(manifest, view.franchiseId, view.eraId) : null,
+  );
+  const teamLabel = $derived(eraIdentity?.displayLabel ?? humanizeIdentifier(view.franchiseId));
 
   function initialsOf(name: string): string {
     return name
@@ -66,7 +78,9 @@
     </svg>
   </span>
   <span class="ur-card-hero">
-    {#if manifest}
+    {#if artwork}
+      <img class="ur-special-art" src={asset(artwork)} alt="" loading="lazy" />
+    {:else if manifest}
       <PlayerFace
         player={{ playerId: view.playerId, playerExternalId: view.playerExternalId, altIds: null }}
         {manifest}
@@ -83,13 +97,42 @@
   <span class="ur-card-nameplate">
     <span class="ur-card-name">{view.name}</span>
     <span class="ur-card-sub">
-      <span class="ur-card-team">{humanizeIdentifier(view.franchiseId)} · {view.season}</span>
-      <span class="ur-card-family">{view.family}</span>
+      <span class="ur-card-team">
+        {#if manifest && franchiseSlot}
+          <TeamLogo
+            {manifest}
+            franchiseId={view.franchiseId}
+            teamExternalId={franchiseSlot.teamExternalId}
+            logoCandidates={eraIdentity?.logoCandidates ?? []}
+            className="ur-card-team-logo"
+          />
+        {/if}
+        <span class="ur-card-team-text">{teamLabel} · {view.season}</span>
+      </span>
+      <span class="ur-card-family">
+        {#if artwork}
+          <img
+            class="ur-collection-emblem"
+            src={asset('/ultimate/cards/heat-check/emblem.png')}
+            alt=""
+            loading="lazy"
+          />
+        {/if}
+        {view.family}
+      </span>
     </span>
   </span>
 </button>
 
 <style>
+  .ur-collection-emblem {
+    display: inline-block;
+    width: 1.4rem;
+    height: 1.4rem;
+    object-fit: contain;
+    vertical-align: middle;
+  }
+
   .ur-card {
     position: relative;
     display: flex;
@@ -107,8 +150,7 @@
         color-mix(in srgb, var(--ur-rarity) 38%, transparent),
         transparent 58%
       ),
-      var(--ur-card-texture, none),
-      linear-gradient(165deg, #232e35, #10161a 72%);
+      var(--ur-card-texture, none), linear-gradient(165deg, #232e35, #10161a 72%);
     color: var(--ur-paper);
     text-align: left;
     outline: none;
@@ -152,11 +194,7 @@
 
   .ur-card--eruption {
     --ur-rarity: var(--ur-eruption);
-    --ur-card-texture: radial-gradient(
-      ellipse at 85% 90%,
-      rgb(255 90 42 / 30%),
-      transparent 55%
-    );
+    --ur-card-texture: radial-gradient(ellipse at 85% 90%, rgb(255 90 42 / 30%), transparent 55%);
     border-top-width: 3px;
   }
 
@@ -181,11 +219,8 @@
 
   .ur-card--eclipse {
     --ur-rarity: var(--ur-eclipse);
-    --ur-card-texture: radial-gradient(
-        ellipse at 15% 85%,
-        rgb(139 92 246 / 32%),
-        transparent 55%
-      ),
+    --ur-card-texture:
+      radial-gradient(ellipse at 15% 85%, rgb(139 92 246 / 32%), transparent 55%),
       radial-gradient(ellipse at 85% 15%, rgb(139 92 246 / 20%), transparent 50%);
   }
 
@@ -288,6 +323,11 @@
     background: transparent;
   }
 
+  .ur-card-hero .ur-special-art {
+    object-position: center;
+    transform: none;
+  }
+
   .ur-card--unowned .ur-card-hero :global(img) {
     filter: saturate(0.55) brightness(0.82);
   }
@@ -368,11 +408,27 @@
   }
 
   .ur-card-team {
+    display: flex;
     min-width: 0;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 0.35rem;
     overflow: hidden;
     color: rgb(240 236 223 / 68%);
     font-size: 0.66rem;
     font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ur-card-team :global(.ur-card-team-logo) {
+    width: 1.1rem;
+    height: 1.1rem;
+  }
+
+  .ur-card-team-text {
+    min-width: 0;
+    overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }

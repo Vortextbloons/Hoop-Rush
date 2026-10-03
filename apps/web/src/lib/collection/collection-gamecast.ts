@@ -30,15 +30,27 @@ export function clockLabel(secondsRemaining: number): string {
   return `${String(minutes)}:${String(seconds).padStart(2, '0')}`;
 }
 
-export function eventLabel(event: CollectionGameEvent): string {
+export function eventLabel(
+  event: CollectionGameEvent,
+  nameOf?: (cardId: string) => string,
+): string {
   const score = `You ${String(event.homeScore)} · CPU ${String(event.awayScore)}`;
+  const period = event.period > 4 ? `OT${String(event.period - 4)}` : `Q${String(event.period)}`;
   switch (event.kind) {
-    case 'possession':
-      return `Q${String(event.period)} ${clockLabel(event.secondsRemaining)} — ${score}${event.pointsScored > 0 ? ` (+${String(event.pointsScored)})` : ''}`;
+    case 'possession': {
+      const scorer = event.statDeltas.find((delta) => delta.points > 0);
+      const action =
+        scorer && nameOf
+          ? ` · ${nameOf(scorer.cardId)} +${String(scorer.points)}`
+          : event.pointsScored > 0
+            ? ` (+${String(event.pointsScored)})`
+            : '';
+      return `${period} ${clockLabel(event.secondsRemaining)} — ${score}${action}`;
+    }
     case 'substitution':
-      return `Q${String(event.period)} ${clockLabel(event.secondsRemaining)} — Substitution (${event.reason})`;
+      return `${period} ${clockLabel(event.secondsRemaining)} — ${nameOf ? `${nameOf(event.playerInCardId)} in · ${nameOf(event.playerOutCardId)} out` : 'Substitution'} (${event.reason})`;
     case 'period-end':
-      return `End of Q${String(event.period)} — ${score}`;
+      return `End of ${period} — ${score}`;
     case 'final':
       return `Final — ${score}`;
   }

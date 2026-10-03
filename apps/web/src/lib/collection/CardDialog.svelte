@@ -11,6 +11,9 @@
   import { X } from '@lucide/svelte';
   import { formatPositions } from '$lib/player-positions';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
+  import TeamLogo from '$lib/components/TeamLogo.svelte';
+  import { asset } from '$app/paths';
+  import { collectionCardArtOf } from './collection-card-art.ts';
 
   let {
     card,
@@ -49,6 +52,7 @@
   } = $props();
 
   const resolved = $derived(card ? resolveCollectionCard(card, card) : null);
+  const artwork = $derived(collectionCardArtOf(card ?? indexEntry));
   const baseCard = $derived(
     card && catalog && card.family !== 'Base'
       ? (catalog.cards.find(
@@ -62,6 +66,19 @@
       ? (resolveEraTeamIdentity(manifest, card.franchiseId, card.eraId).displayLabel ??
           `${card.franchiseId} ${card.seasonKey}`)
       : (indexEntry?.seasonKey ?? ''),
+  );
+  const logoFranchiseId = $derived(card?.franchiseId ?? indexEntry?.franchiseId ?? null);
+  const logoEraId = $derived(card?.eraId ?? indexEntry?.eraId ?? null);
+  const logoSlot = $derived(
+    logoFranchiseId
+      ? (manifest.modernFranchiseSlots.find((entry) => entry.franchiseId === logoFranchiseId)
+          ?.teamExternalId ?? null)
+      : null,
+  );
+  const logoCandidates = $derived(
+    logoFranchiseId && logoEraId
+      ? (resolveEraTeamIdentity(manifest, logoFranchiseId, logoEraId).logoCandidates ?? [])
+      : [],
   );
   function initialsOf(name: string): string {
     return name
@@ -115,13 +132,24 @@
           <Dialog.Title class="font-display text-2xl font-extrabold leading-tight"
             >{title}</Dialog.Title
           >
-          <p class="text-sm text-muted-foreground">
-            {teamLabel}
-            {#if card}
-              · {card.seasonKey} · {formatPositions(card.positions)}
-            {:else if indexEntry}
-              · {indexEntry.seasonKey} · {formatPositions(indexEntry.positions)}
+          <p class="flex items-center gap-1.5 text-sm text-muted-foreground">
+            {#if logoFranchiseId && logoSlot}
+              <TeamLogo
+                {manifest}
+                franchiseId={logoFranchiseId}
+                teamExternalId={logoSlot}
+                {logoCandidates}
+                className="h-4 w-4"
+              />
             {/if}
+            <span>
+              {teamLabel}
+              {#if card}
+                · {card.seasonKey} · {formatPositions(card.positions)}
+              {:else if indexEntry}
+                · {indexEntry.seasonKey} · {formatPositions(indexEntry.positions)}
+              {/if}
+            </span>
           </p>
         </div>
         <Dialog.Close
@@ -155,9 +183,24 @@
             'ember'}"
           aria-label="Card front"
         >
-          <p class="ur-dialog-team">{teamLabel}</p>
+          <p class="ur-dialog-team">
+            <span class="ur-dialog-team-row">
+              {#if logoFranchiseId && logoSlot}
+                <TeamLogo
+                  {manifest}
+                  franchiseId={logoFranchiseId}
+                  teamExternalId={logoSlot}
+                  {logoCandidates}
+                  className="h-5 w-5"
+                />
+              {/if}
+              <span>{teamLabel}</span>
+            </span>
+          </p>
           <div class="ur-dialog-face">
-            {#if indexEntry}
+            {#if artwork}
+              <img src={asset(artwork)} alt="" class="ur-special-art" />
+            {:else if indexEntry}
               <PlayerFace
                 player={{
                   playerId: indexEntry.playerId,
@@ -429,6 +472,12 @@
     font-size: 0.78rem;
   }
 
+  .ur-dialog-team-row {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
   .ur-dialog-face {
     position: relative;
     min-height: clamp(17rem, 52vw, 24rem);
@@ -458,6 +507,13 @@
     object-fit: cover;
     object-position: 50% 12%;
     transform: scale(1.12);
+  }
+
+  .ur-dialog-face .ur-special-art {
+    position: absolute;
+    inset: 0;
+    object-position: center;
+    transform: none;
   }
 
   .ur-dialog-face::after {

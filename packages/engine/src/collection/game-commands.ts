@@ -509,73 +509,141 @@ function reproduceOrReject(
   }
 }
 
+type ReproducedCollectionGame = ReturnType<typeof reproduceCollectionGame>;
+
+function verifyReproducedResult(
+  reproduced: ReproducedCollectionGame,
+  command: AcceptCommand | AcceptChallengeCommand,
+  pending: CollectionPreparedGameUnion,
+  input: CommandInput,
+): RejectedGameCommandResult | null {
+  const failures = checkCollectionGameResult(
+    command.result,
+    command.events,
+    pending,
+    input.catalog,
+    input.profile,
+    reproduced,
+  );
+  if (failures.length > 0) {
+    return reject('invalid-result', { detail: failures[0] ?? 'game audit failed' });
+  }
+  if (canonicalJson(reproduced.result) !== canonicalJson(command.result)) {
+    return reject('invalid-result', { detail: 'result does not reproduce from the pending input' });
+  }
+  if (canonicalJson(reproduced.events) !== canonicalJson(command.events)) {
+    return reject('invalid-result', { detail: 'events do not reproduce from the pending input' });
+  }
+  return null;
+}
+
+type StepOutcome<T> = { ok: true; value: T } | { ok: false; rejection: RejectedGameCommandResult };
+type BalanceOutcome =
+  { ok: true; balances: CollectionBalances } | { ok: false; rejection: RejectedGameCommandResult };
+type LedgerComponent = Pick<CollectionLedgerEntry, 'transactionId' | 'amount' | 'reason'>;
+
+function tryCodedStep<T>(fn: () => T): StepOutcome<T> {
+  try {
+    return { ok: true, value: fn() };
+  } catch (error) {
+    if (error instanceof CollectionGameError) {
+      return { ok: false, rejection: reject(error.code, { detail: error.message }) };
+    }
+    if (error instanceof Error && 'code' in error) {
+      const code = (error as { code: unknown }).code;
+      if (typeof code === 'string')
+        return { ok: false, rejection: reject(code, { detail: error.message }) };
+    }
+    throw error;
+  }
+}
+
+function applyCoinsBalance(
+  balances: CollectionBalances,
+  amount: number,
+  what: string,
+  rejectNegative = false,
+): BalanceOutcome {
+  try {
+    const next: CollectionBalances = {
+      Coins: addChecked(balances.Coins, amount, what),
+      Exchange: balances.Exchange,
+    };
+    if (rejectNegative && next.Coins < 0) {
+      return {
+        ok: false,
+        rejection: reject('arithmetic-overflow', { detail: 'negative Coins balance' }),
+      };
+    }
+    return { ok: true, balances: next };
+  } catch (error) {
+    if (error instanceof CollectionGameError) {
+      return { ok: false, rejection: reject(error.code, { detail: error.message }) };
+    }
+    throw error;
+  }
+}
+
+function buildLedgerEntries(
+  components: readonly LedgerComponent[],
+  commandId: CollectionLedgerEntry['commandId'],
+): CollectionLedgerEntry[] {
+  return components.map((component) => ({
+    transactionId: component.transactionId,
+    commandId,
+    pullSequence: null,
+    currency: 'Coins' as const,
+    amount: component.amount,
+    reason: component.reason,
+  }));
+}
+
+function buildBaseRecordFields(
+  playState: CollectionPlayState,
+  pending: CollectionPreparedGameUnion,
+  command: AcceptCommand | AcceptChallengeCommand,
+  reproduced: ReproducedCollectionGame,
+): Record<string, unknown> {
+  return {
+    gameVersion: pending.gameVersion,
+    collectionId: playState.collectionId,
+    gameId: pending.gameId,
+    gameSequence: pending.gameSequence,
+    prepared: pending,
+    result: command.result,
+    events: [...command.events],
+    eventDigest: reproduced.eventDigest,
+    resultDigest: reproduced.resultDigest,
+    completedAtIso: command.completedAtIso,
+  };
+}
+
 function acceptLegacyResult(
   playState: CollectionPlayState,
   command: AcceptCommand,
   pending: Extract<CollectionPreparedGameUnion, { gameVersion: typeof COLLECTION_GAME_V1_VERSION }>,
-  reproduced: ReturnType<typeof reproduceCollectionGame>,
+  reproduced: ReproducedCollectionGame,
   input: CommandInput,
 ): CollectionGameCommandResult {
   const result = command.result;
   if (result.gameVersion !== COLLECTION_GAME_V1_VERSION) {
     return reject('invalid-result', { detail: 'legacy pending game requires a legacy result' });
   }
-  const failures = checkCollectionGameResult(
-    result,
-    command.events,
-    pending,
-    input.catalog,
-    input.profile,
-  );
-  if (failures.length > 0) {
-    return reject('invalid-result', { detail: failures[0] ?? 'game audit failed' });
-  }
-  if (canonicalJson(reproduced.result) !== canonicalJson(result)) {
-    return reject('invalid-result', { detail: 'result does not reproduce from the pending input' });
-  }
-  if (canonicalJson(reproduced.events) !== canonicalJson(command.events)) {
-    return reject('invalid-result', { detail: 'events do not reproduce from the pending input' });
-  }
+  const invalid = verifyReproducedResult(reproduced, command, pending, input);
+  if (invalid !== null) return invalid;
   const reward = collectionGameRewardFor(result, pending.gameId);
-  let balances: CollectionBalances;
-  try {
-    balances = {
-      Coins: addChecked(input.balances.Coins, reward.amount, 'game reward'),
-      Exchange: input.balances.Exchange,
-    };
-  } catch (error) {
-    if (error instanceof CollectionGameError) {
-      return reject(error.code, { detail: error.message });
-    }
-    throw error;
-  }
-  const ledgerEntry: CollectionLedgerEntry = {
-    transactionId: reward.transactionId,
-    commandId: command.commandId,
-    pullSequence: null,
-    currency: 'Coins',
-    amount: reward.amount,
-    reason: reward.reason,
-  };
+  const credited = applyCoinsBalance(input.balances, reward.amount, 'game reward');
+  if (!credited.ok) return credited.rejection;
   const record = collectionGameRecordUnionSchema.parse({
-    gameVersion: pending.gameVersion,
-    collectionId: playState.collectionId,
-    gameId: pending.gameId,
-    gameSequence: pending.gameSequence,
-    prepared: pending,
-    result,
-    events: [...command.events],
-    eventDigest: reproduced.eventDigest,
-    resultDigest: reproduced.resultDigest,
+    ...buildBaseRecordFields(playState, pending, command, reproduced),
     reward,
-    completedAtIso: command.completedAtIso,
   });
   return {
     status: 'accepted',
     playState: commitPlayState(playState, { pendingGame: null }),
     record,
-    ledgerEntries: [ledgerEntry],
-    balances,
+    ledgerEntries: buildLedgerEntries([reward], command.commandId),
+    balances: credited.balances,
   };
 }
 
@@ -583,99 +651,40 @@ function acceptCurrentResult(
   playState: CollectionPlayState,
   command: AcceptCommand,
   pending: Extract<CollectionPreparedGameUnion, { gameVersion: typeof COLLECTION_GAME_V2_VERSION }>,
-  reproduced: ReturnType<typeof reproduceCollectionGame>,
+  reproduced: ReproducedCollectionGame,
   input: CommandInput,
 ): CollectionGameCommandResult {
   const result = command.result;
   if (result.gameVersion !== COLLECTION_GAME_V2_VERSION) {
     return reject('invalid-result', { detail: 'current pending game requires a current result' });
   }
-  const failures = checkCollectionGameResult(
-    result,
-    command.events,
-    pending,
-    input.catalog,
-    input.profile,
-  );
-  if (failures.length > 0) {
-    return reject('invalid-result', { detail: failures[0] ?? 'game audit failed' });
-  }
-  if (canonicalJson(reproduced.result) !== canonicalJson(result)) {
-    return reject('invalid-result', { detail: 'result does not reproduce from the pending input' });
-  }
-  if (canonicalJson(reproduced.events) !== canonicalJson(command.events)) {
-    return reject('invalid-result', { detail: 'events do not reproduce from the pending input' });
-  }
+  const invalid = verifyReproducedResult(reproduced, command, pending, input);
+  if (invalid !== null) return invalid;
   const difficultyId = pending.difficulty.difficultyId;
   if (pending.firstClearEligible && playState.clearedDifficultyIds.includes(difficultyId)) {
     return reject('first-clear-divergence', {
       detail: `difficulty ${difficultyId} was already cleared after preparation`,
     });
   }
-  let evaluation: ReturnType<typeof evaluateCollectionObjective>;
-  try {
-    evaluation = evaluateCollectionObjective({ prepared: pending, result });
-  } catch (error) {
-    if (error instanceof Error && 'code' in error) {
-      const code = (error as { code: unknown }).code;
-      if (typeof code === 'string') return reject(code, { detail: error.message });
-    }
-    throw error;
-  }
-  let reward: ReturnType<typeof collectionGameRewardReceiptFor>;
-  try {
-    reward = collectionGameRewardReceiptFor({
+  const evaluated = tryCodedStep(() => evaluateCollectionObjective({ prepared: pending, result }));
+  if (!evaluated.ok) return evaluated.rejection;
+  const evaluation = evaluated.value;
+  const receipt = tryCodedStep(() =>
+    collectionGameRewardReceiptFor({
       gameId: pending.gameId,
       prepared: pending,
       result,
       evaluation,
-    });
-  } catch (error) {
-    if (error instanceof CollectionGameError) {
-      return reject(error.code, { detail: error.message });
-    }
-    if (error instanceof Error && 'code' in error) {
-      const code = (error as { code: unknown }).code;
-      if (typeof code === 'string') return reject(code, { detail: error.message });
-    }
-    throw error;
-  }
-  let balances: CollectionBalances;
-  try {
-    balances = {
-      Coins: addChecked(input.balances.Coins, reward.total, 'game reward'),
-      Exchange: input.balances.Exchange,
-    };
-  } catch (error) {
-    if (error instanceof CollectionGameError) {
-      return reject(error.code, { detail: error.message });
-    }
-    throw error;
-  }
-  if (balances.Coins < 0) {
-    return reject('arithmetic-overflow', { detail: 'negative Coins balance' });
-  }
-  const ledgerEntries: CollectionLedgerEntry[] = reward.components.map((component) => ({
-    transactionId: component.transactionId,
-    commandId: command.commandId,
-    pullSequence: null,
-    currency: 'Coins',
-    amount: component.amount,
-    reason: component.reason,
-  }));
+    }),
+  );
+  if (!receipt.ok) return receipt.rejection;
+  const reward = receipt.value;
+  const credited = applyCoinsBalance(input.balances, reward.total, 'game reward', true);
+  if (!credited.ok) return credited.rejection;
   const record = collectionGameRecordUnionSchema.parse({
-    gameVersion: pending.gameVersion,
-    collectionId: playState.collectionId,
-    gameId: pending.gameId,
-    gameSequence: pending.gameSequence,
-    prepared: pending,
-    result,
-    events: [...command.events],
-    eventDigest: reproduced.eventDigest,
-    resultDigest: reproduced.resultDigest,
+    ...buildBaseRecordFields(playState, pending, command, reproduced),
     objectiveEvaluation: evaluation,
     reward,
-    completedAtIso: command.completedAtIso,
   });
   const clearedDifficultyIds = reward.firstClearGranted
     ? [...playState.clearedDifficultyIds, difficultyId].sort()
@@ -684,8 +693,8 @@ function acceptCurrentResult(
     status: 'accepted',
     playState: commitPlayState(playState, { pendingGame: null, clearedDifficultyIds }),
     record,
-    ledgerEntries,
-    balances,
+    ledgerEntries: buildLedgerEntries(reward.components, command.commandId),
+    balances: credited.balances,
   };
 }
 
@@ -711,22 +720,8 @@ function applyAcceptChallengeGameResult(
   const outcome = reproduceOrReject(pending, command, input);
   if (!outcome.ok) return outcome.rejection;
   const reproduced = outcome.reproduced;
-  const failures = checkCollectionGameResult(
-    result,
-    command.events,
-    pending,
-    input.catalog,
-    input.profile,
-  );
-  if (failures.length > 0) {
-    return reject('invalid-result', { detail: failures[0] ?? 'game audit failed' });
-  }
-  if (canonicalJson(reproduced.result) !== canonicalJson(result)) {
-    return reject('invalid-result', { detail: 'result does not reproduce from the pending input' });
-  }
-  if (canonicalJson(reproduced.events) !== canonicalJson(command.events)) {
-    return reject('invalid-result', { detail: 'events do not reproduce from the pending input' });
-  }
+  const invalid = verifyReproducedResult(reproduced, command, pending, input);
+  if (invalid !== null) return invalid;
   const difficultyId = pending.difficulty.difficultyId;
   if (pending.firstClearEligible && playState.clearedDifficultyIds.includes(difficultyId)) {
     return reject('first-clear-divergence', {
@@ -741,73 +736,28 @@ function applyAcceptChallengeGameResult(
       detail: `challenge ${pending.challenge.challengeId} was already cleared after preparation`,
     });
   }
-  let evaluation: ReturnType<typeof evaluateCollectionObjective>;
-  try {
-    evaluation = evaluateCollectionObjective({ prepared: pending, result });
-  } catch (error) {
-    if (error instanceof Error && 'code' in error) {
-      const code = (error as { code: unknown }).code;
-      if (typeof code === 'string') return reject(code, { detail: error.message });
-    }
-    throw error;
-  }
+  const evaluated = tryCodedStep(() => evaluateCollectionObjective({ prepared: pending, result }));
+  if (!evaluated.ok) return evaluated.rejection;
+  const evaluation = evaluated.value;
   const challengeEvaluation = collectionChallengeEvaluationFor({ prepared: pending, result });
-  let reward: ReturnType<typeof collectionChallengeRewardReceiptFor>;
-  try {
-    reward = collectionChallengeRewardReceiptFor({
+  const receipt = tryCodedStep(() =>
+    collectionChallengeRewardReceiptFor({
       gameId: pending.gameId,
       prepared: pending,
       result,
       evaluation,
       challengeEvaluation,
-    });
-  } catch (error) {
-    if (error instanceof CollectionGameError) {
-      return reject(error.code, { detail: error.message });
-    }
-    if (error instanceof Error && 'code' in error) {
-      const code = (error as { code: unknown }).code;
-      if (typeof code === 'string') return reject(code, { detail: error.message });
-    }
-    throw error;
-  }
-  let balances: CollectionBalances;
-  try {
-    balances = {
-      Coins: addChecked(input.balances.Coins, reward.total, 'challenge game reward'),
-      Exchange: input.balances.Exchange,
-    };
-  } catch (error) {
-    if (error instanceof CollectionGameError) {
-      return reject(error.code, { detail: error.message });
-    }
-    throw error;
-  }
-  if (balances.Coins < 0) {
-    return reject('arithmetic-overflow', { detail: 'negative Coins balance' });
-  }
-  const ledgerEntries: CollectionLedgerEntry[] = reward.components.map((component) => ({
-    transactionId: component.transactionId,
-    commandId: command.commandId,
-    pullSequence: null,
-    currency: 'Coins',
-    amount: component.amount,
-    reason: component.reason,
-  }));
+    }),
+  );
+  if (!receipt.ok) return receipt.rejection;
+  const reward = receipt.value;
+  const credited = applyCoinsBalance(input.balances, reward.total, 'challenge game reward', true);
+  if (!credited.ok) return credited.rejection;
   const record = collectionGameRecordV3Schema.parse({
-    gameVersion: pending.gameVersion,
-    collectionId: playState.collectionId,
-    gameId: pending.gameId,
-    gameSequence: pending.gameSequence,
-    prepared: pending,
-    result,
-    events: [...command.events],
-    eventDigest: reproduced.eventDigest,
-    resultDigest: reproduced.resultDigest,
+    ...buildBaseRecordFields(playState, pending, command, reproduced),
     objectiveEvaluation: evaluation,
     challengeEvaluation,
     reward,
-    completedAtIso: command.completedAtIso,
   });
   const clearedDifficultyIds = reward.firstClearGranted
     ? [...playState.clearedDifficultyIds, difficultyId].sort()
@@ -823,7 +773,7 @@ function applyAcceptChallengeGameResult(
       clearedChallengeIds,
     }),
     record,
-    ledgerEntries,
-    balances,
+    ledgerEntries: buildLedgerEntries(reward.components, command.commandId),
+    balances: credited.balances,
   };
 }

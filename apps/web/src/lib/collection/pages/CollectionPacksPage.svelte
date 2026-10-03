@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { resolve } from '$app/paths';
+  import { asset, resolve } from '$app/paths';
   import '$lib/collection/ultimate-theme.css';
   import { onDestroy } from 'svelte';
   import type {
@@ -21,7 +21,7 @@
     type UltimateRunShell,
   } from '$lib/collection/ultimate-shell.svelte';
   import ActiveTarget from '$lib/collection/ActiveTarget.svelte';
-  import PlayerFace from '$lib/components/PlayerFace.svelte';
+  import CurrencyIcon from '$lib/collection/CurrencyIcon.svelte';
   import {
     loadCollectionIndex,
     loadCollectionCatalog,
@@ -95,32 +95,20 @@
     spotlight: 'Spotlight',
   };
 
-  function initialsOf(name: string): string {
-    return name
-      .split(/\s+/)
-      .map((part) => part[0] ?? '')
-      .join('')
-      .slice(0, 2)
-      .toUpperCase();
-  }
+  const PACK_COVER_ART: Record<string, string> = {
+    'tip-off': asset('/ultimate/packs/tip-off.jpg'),
+    'fast-break': asset('/ultimate/packs/fast-break.jpg'),
+    'full-court': asset('/ultimate/packs/full-court.jpg'),
+    'main-event': asset('/ultimate/packs/main-event.jpg'),
+  };
+  const SPECIAL_PACK_COVER_ART: Record<string, string> = {
+    'Heat Check': asset('/ultimate/packs/spotlight-heat-check.jpg'),
+  };
 
-  const spotlightFaces = $derived.by(() => {
-    if (!catalog) return [];
-    const rank = new Map(COLLECTION_RARITY_ORDER.map((rarity, index) => [rarity, index]));
-    return catalog.cards
-      .filter((card) => card.family !== 'Base')
-      .sort(
-        (a, b) =>
-          (rank.get(b.rarity) ?? 0) - (rank.get(a.rarity) ?? 0) ||
-          (a.cardId < b.cardId ? -1 : 1),
-      )
-      .slice(0, 2)
-      .map((card) => ({
-        playerId: card.playerId,
-        playerExternalId: card.playerExternalId,
-        displayName: card.displayName,
-      }));
-  });
+  const activeSpecialFamily = $derived.by(
+    () => catalog?.cards.find((card) => card.family !== 'Base')?.family ?? 'Featured Special',
+  );
+  const activeSpecialCoverArt = $derived(SPECIAL_PACK_COVER_ART[activeSpecialFamily] ?? null);
 
   function formatChance(probability: number): string {
     if (probability <= 0) return '0%';
@@ -396,7 +384,9 @@
     <div class="pack-hero-inner">
       <div class="pack-hero-copy">
         <p class="ur-hero-eyebrow pack-kicker">Pack shelf</p>
-        <h2 id="pack-store-title" class="pack-title">Choose a <span class="pack-gold">pack</span></h2>
+        <h2 id="pack-store-title" class="pack-title">
+          Choose a <span class="pack-gold">pack</span>
+        </h2>
         <p class="ur-page-description">
           Compare the cost, card slots, guarantees, and exact draw odds before opening.
         </p>
@@ -406,12 +396,12 @@
           <p class="ur-wallet-title ur-hero-eyebrow">Available balance</p>
           <div class="ur-wallet-balances">
             <p class="ur-stat-box ur-stat-gold">
-              <span class="coin-dot" aria-hidden="true">$</span>
+              <CurrencyIcon currency="Coins" />
               <strong class="ur-number">{balances.Coins.toLocaleString('en-US')}</strong>
               <span><small>Coins</small></span>
             </p>
             <p class="ur-stat-box">
-              <span class="exchange-dot" aria-hidden="true">◈</span>
+              <CurrencyIcon currency="Exchange" />
               <strong class="ur-number">{balances.Exchange.toLocaleString('en-US')}</strong>
               <span><small>Exchange</small></span>
             </p>
@@ -516,6 +506,10 @@
         {@const shortfall = pack.priceAmount - balances[pack.priceCurrency]}
         {@const guaranteedCount = pack.slots.filter((slot) => slot.kind === 'guaranteed').length}
         {@const isExchange = pack.priceCurrency === 'Exchange'}
+        {@const coverArt =
+          pack.packId === 'spotlight'
+            ? activeSpecialCoverArt
+            : (PACK_COVER_ART[pack.packId] ?? null)}
         <li
           class="ur-pack-product"
           class:pack-exchange={isExchange}
@@ -526,38 +520,32 @@
           class:pack-spotlight={pack.packId === 'spotlight'}
         >
           <div class="pack-visual" aria-hidden="true">
-            {#if pack.packId === 'spotlight' && spotlightFaces.length > 0}
-              <div class="pack-faces" aria-hidden="true">
-                {#each spotlightFaces as face, faceIndex (face.playerId + '-' + String(faceIndex))}
-                  <div class="spot-face spot-face-{faceIndex}">
-                    {#if manifest}
-                      <PlayerFace
-                        player={{
-                          playerId: face.playerId,
-                          playerExternalId: face.playerExternalId,
-                          altIds: null,
-                        }}
-                        {manifest}
-                        size="sm"
-                        eager
-                        fallbackInitials={initialsOf(face.displayName)}
-                      />
-                    {:else}
-                      <span class="spot-face-initials">{initialsOf(face.displayName)}</span>
-                    {/if}
-                  </div>
-                {/each}
-              </div>
-            {/if}
             <div class="pack-foil">
+              {#if coverArt}
+                <img
+                  class="pack-cover-image"
+                  src={coverArt}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                />
+              {/if}
               <span class="foil-brand">UR</span>
-              <span class="foil-name">{PACK_LABELS[pack.packId] ?? pack.packId}</span>
+              <span class="foil-name"
+                >{pack.packId === 'spotlight'
+                  ? activeSpecialFamily
+                  : (PACK_LABELS[pack.packId] ?? pack.packId)}</span
+              >
               <span class="foil-count ur-number">{pack.slots.length}</span>
               <span class="foil-unit">{pack.slots.length === 1 ? 'CARD' : 'CARDS'}</span>
             </div>
             <div class="pack-visual-copy">
               <h2>{PACK_LABELS[pack.packId] ?? pack.packId}</h2>
-              <p>{PACK_BLURBS[pack.packId] ?? ''}</p>
+              <p>
+                {pack.packId === 'spotlight'
+                  ? `One ${activeSpecialFamily} special-only card, Apex or better.`
+                  : (PACK_BLURBS[pack.packId] ?? '')}
+              </p>
               {#if guaranteedCount > 0}
                 <span class="guarantee-pill">
                   <span class="guarantee-crown" aria-hidden="true">♛</span>
@@ -575,18 +563,16 @@
                   >{pack.slots.length} {pack.slots.length === 1 ? 'Card' : 'Cards'}</strong
                 >
                 <small>
-                  {pack.slots.length} {pack.slots.length === 1 ? 'slot' : 'slots'}{#if guaranteedCount > 0} · {guaranteedCount} guaranteed{/if}
+                  {pack.slots.length}
+                  {pack.slots.length === 1 ? 'slot' : 'slots'}{#if guaranteedCount > 0}
+                    · {guaranteedCount} guaranteed{/if}
                 </small>
               </p>
               <p
                 class="pack-meta-price"
                 aria-label={`Cost: ${pack.priceAmount} ${pack.priceCurrency}`}
               >
-                {#if isExchange}
-                  <span class="exchange-dot" aria-hidden="true">◈</span>
-                {:else}
-                  <span class="coin-dot" aria-hidden="true">$</span>
-                {/if}
+                <CurrencyIcon currency={pack.priceCurrency} size={22} />
                 <strong class="ur-number">{pack.priceAmount.toLocaleString('en-US')}</strong>
                 <small>{pack.priceCurrency}</small>
               </p>
@@ -611,7 +597,10 @@
             {/if}
 
             <details class="ur-pack-odds-details">
-              <summary><span>Odds details</span><span class="details-chevron" aria-hidden="true">›</span></summary>
+              <summary
+                ><span>Odds details</span><span class="details-chevron" aria-hidden="true">›</span
+                ></summary
+              >
               <div class="ur-odds-table-wrap">
                 <table>
                   <thead>
@@ -685,8 +674,8 @@
             {/if}
             {#if targetOdds?.hasTarget && targetOdds.eligible}
               <p class="ur-preview-notice">
-                Purchase rechecks the state that produced this preview. If the collection changed, the
-                odds refresh and a new click is required.
+                Purchase rechecks the state that produced this preview. If the collection changed,
+                the odds refresh and a new click is required.
               </p>
             {/if}
           </div>
@@ -829,31 +818,6 @@
     font-size: 0.68rem;
   }
 
-  .coin-dot,
-  .exchange-dot {
-    display: inline-flex;
-    flex: none;
-    align-items: center;
-    justify-content: center;
-    width: 1.6rem;
-    height: 1.6rem;
-    border-radius: 999px;
-    font-size: 0.8rem;
-    font-weight: 900;
-  }
-
-  .coin-dot {
-    background: radial-gradient(circle at 35% 30%, #ffe9a8, #f5b81f 60%, #9a6206);
-    color: #3a2703;
-    box-shadow: 0 0 0.7rem rgb(255 197 61 / 55%);
-  }
-
-  .exchange-dot {
-    background: radial-gradient(circle at 35% 30%, #e3d0ff, #8b5cf6 60%, #4c1d95);
-    color: #1e1033;
-    box-shadow: 0 0 0.7rem rgb(139 92 246 / 55%);
-  }
-
   .ur-pack-shelf {
     display: grid;
     grid-template-columns: repeat(12, minmax(0, 1fr));
@@ -894,10 +858,10 @@
 
   .pack-spotlight {
     grid-column: span 5;
-    border-color: color-mix(in srgb, var(--ur-titan) 55%, var(--ur-line-strong));
+    border-color: color-mix(in srgb, var(--ur-eruption) 55%, var(--ur-line-strong));
     box-shadow:
       0 0 0 1px rgb(0 0 0 / 40%),
-      0 0 2rem rgb(169 180 216 / 12%),
+      0 0 2rem rgb(255 90 42 / 12%),
       0 1.2rem 2.5rem rgb(0 0 0 / 35%),
       inset 0 1px 0 rgb(255 255 255 / 6%);
   }
@@ -908,7 +872,7 @@
     grid-template-columns: 8.5rem minmax(0, 1fr);
     align-items: center;
     gap: 1rem;
-    min-height: 11rem;
+    min-height: 14rem;
     padding: 1.1rem 1.1rem 1rem;
     overflow: hidden;
     background:
@@ -978,20 +942,21 @@
 
   .pack-spotlight .pack-visual {
     background:
-      radial-gradient(24rem 13rem at 20% -40%, rgb(169 180 216 / 42%), transparent 62%),
-      radial-gradient(20rem 12rem at 85% 120%, rgb(223 229 255 / 18%), transparent 60%),
-      linear-gradient(180deg, #1b2233 0%, #0a0d16 100%);
+      radial-gradient(24rem 13rem at 20% -40%, rgb(255 90 42 / 48%), transparent 62%),
+      radial-gradient(20rem 12rem at 85% 120%, rgb(255 197 61 / 22%), transparent 60%),
+      linear-gradient(180deg, #2b1009 0%, #0d0503 100%);
   }
 
   .pack-spotlight .pack-visual::after {
-    background: radial-gradient(70% 100% at 50% 110%, rgb(169 180 216 / 30%), transparent 70%);
+    background: radial-gradient(70% 100% at 50% 110%, rgb(255 90 42 / 34%), transparent 70%);
   }
 
   .pack-foil {
     position: relative;
     z-index: 1;
     display: flex;
-    min-height: 9rem;
+    min-height: 0;
+    aspect-ratio: 2 / 3;
     flex-direction: column;
     align-items: center;
     justify-content: center;
@@ -999,6 +964,8 @@
     padding: 0.6rem 0.5rem;
     border: 1px solid rgb(255 220 130 / 70%);
     border-radius: 0.65rem;
+    isolation: isolate;
+    overflow: hidden;
     background: linear-gradient(160deg, #2a2111 0%, #0f0d08 45%, #3a2c10 100%);
     box-shadow:
       inset 0 1px 0 rgb(255 235 180 / 35%),
@@ -1012,27 +979,61 @@
   .pack-foil::before {
     position: absolute;
     inset: 0;
+    z-index: 1;
     border-radius: inherit;
-    background: linear-gradient(115deg, transparent 42%, rgb(255 240 200 / 22%) 50%, transparent 58%);
+    background: linear-gradient(
+      115deg,
+      transparent 42%,
+      rgb(255 240 200 / 22%) 50%,
+      transparent 58%
+    );
     content: '';
     pointer-events: none;
   }
 
+  .pack-foil::after {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background: linear-gradient(
+      180deg,
+      rgb(0 0 0 / 56%) 0%,
+      transparent 30%,
+      transparent 61%,
+      rgb(0 0 0 / 65%) 100%
+    );
+    content: '';
+    pointer-events: none;
+  }
+
+  .pack-cover-image {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
   .pack-spotlight .pack-foil {
-    border-color: rgb(169 180 216 / 80%);
-    background: linear-gradient(160deg, #232c44 0%, #0b0e18 50%, #3d4a6e 100%);
+    border-color: rgb(255 123 67 / 88%);
+    background: linear-gradient(160deg, #3a160d 0%, #140806 50%, #672514 100%);
     box-shadow:
-      inset 0 1px 0 rgb(223 229 255 / 35%),
+      inset 0 1px 0 rgb(255 217 178 / 38%),
       inset 0 -0.6rem 1rem rgb(0 0 0 / 55%),
       0 0.5rem 1.2rem rgb(0 0 0 / 60%),
-      0 0 1.6rem rgb(169 180 216 / 35%);
+      0 0 1.6rem rgb(255 90 42 / 38%);
     transform: perspective(30rem) rotateY(7deg);
   }
 
   .foil-brand {
+    position: absolute;
+    top: 0.55rem;
+    z-index: 2;
     padding: 0.1rem 0.4rem;
     border: 1px solid rgb(255 220 130 / 60%);
     border-radius: 999px;
+    background: rgb(8 8 8 / 72%);
     color: var(--ur-apex);
     font-size: 0.6rem;
     font-weight: 900;
@@ -1040,22 +1041,29 @@
   }
 
   .pack-spotlight .foil-brand {
-    border-color: rgb(169 180 216 / 60%);
-    color: #dfe5ff;
+    border-color: rgb(255 184 123 / 78%);
+    color: #ffe0c2;
   }
 
   .foil-name {
-    margin-top: 0.3rem;
+    position: absolute;
+    top: 1.95rem;
+    z-index: 2;
+    max-width: calc(100% - 0.7rem);
     color: var(--ur-paper);
     font-family: var(--font-display);
-    font-size: 0.78rem;
+    font-size: 0.7rem;
     font-weight: 800;
     letter-spacing: 0.06em;
     line-height: 1.1;
+    text-shadow: 0 1px 8px #000;
     text-transform: uppercase;
   }
 
   .foil-count {
+    position: absolute;
+    bottom: 0.9rem;
+    z-index: 2;
     color: #fff;
     font-family: var(--font-display);
     font-size: 2.6rem;
@@ -1065,11 +1073,14 @@
   }
 
   .pack-spotlight .foil-count {
-    text-shadow: 0 0 1rem rgb(169 180 216 / 90%);
+    text-shadow: 0 0 1rem rgb(255 90 42 / 96%);
   }
 
   .foil-unit {
-    color: var(--ur-muted);
+    position: absolute;
+    bottom: 0.35rem;
+    z-index: 2;
+    color: #f4d8ba;
     font-size: 0.6rem;
     font-weight: 800;
     letter-spacing: 0.28em;
@@ -1117,60 +1128,6 @@
 
   .guarantee-crown {
     font-size: 0.8rem;
-  }
-
-  .pack-spotlight .guarantee-pill {
-    border-color: rgb(169 180 216 / 75%);
-    background: rgb(18 24 40 / 72%);
-    color: #dfe5ff;
-  }
-
-  .pack-faces {
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
-  }
-
-  .spot-face {
-    position: absolute;
-    top: 50%;
-    width: 3.6rem;
-    height: 4.8rem;
-    translate: 0 -50%;
-  }
-
-  .spot-face-0 {
-    left: 0.35rem;
-    transform: rotate(-10deg);
-  }
-
-  .spot-face-1 {
-    left: 7.4rem;
-    transform: rotate(9deg);
-  }
-
-  .spot-face :global(.relative) {
-    width: 100%;
-    height: 100%;
-    border: 1px solid rgb(169 180 216 / 70%);
-    border-radius: 0.55rem;
-    background: #1c2233;
-    box-shadow: 0 0 1rem rgb(169 180 216 / 45%);
-  }
-
-  .spot-face-initials {
-    display: grid;
-    width: 100%;
-    height: 100%;
-    place-items: center;
-    border: 1px solid rgb(169 180 216 / 70%);
-    border-radius: 0.55rem;
-    background: #232c44;
-    color: #dfe5ff;
-    font-family: var(--font-display);
-    font-size: 1rem;
-    font-weight: 800;
   }
 
   .pack-body {
@@ -1239,13 +1196,6 @@
     border-radius: 999px;
     background: rgb(6 9 12 / 72%);
     box-shadow: inset 0 1px 0 rgb(255 255 255 / 6%);
-  }
-
-  .pack-meta-price .coin-dot,
-  .pack-meta-price .exchange-dot {
-    width: 1.35rem;
-    height: 1.35rem;
-    font-size: 0.68rem;
   }
 
   .pack-meta-price strong {
@@ -1400,7 +1350,7 @@
   }
 
   .pack-spotlight .details-chevron {
-    color: var(--ur-titan);
+    color: var(--ur-eruption);
   }
 
   .ur-odds-table-wrap {

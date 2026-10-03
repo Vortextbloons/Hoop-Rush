@@ -2,16 +2,7 @@
   import { onMount, setContext } from 'svelte';
   import { asset, resolve } from '$app/paths';
   import { page } from '$app/state';
-  import {
-    ArrowLeftRight,
-    BookOpen,
-    Coins,
-    Home,
-    Layers,
-    Package,
-    Play,
-    Users,
-  } from '@lucide/svelte';
+  import { BookOpen, Home, Layers, Package, Play, Users } from '@lucide/svelte';
   import ArenaSoundToggle from '$lib/components/ArenaSoundToggle.svelte';
   import {
     UltimateRunShell,
@@ -34,10 +25,6 @@
 
   const routeId = $derived(page.route.id ?? '');
   const activeItem = $derived(items.find((item) => isNavItemActive(item, routeId)) ?? items[0]!);
-  const balanceCoins = $derived(shell.snapshot?.balances.Coins.toLocaleString('en-US') ?? '—');
-  const balanceExchange = $derived(
-    shell.snapshot?.balances.Exchange.toLocaleString('en-US') ?? '—',
-  );
   const ownedCount = $derived(shell.snapshot?.ownedCount.toLocaleString('en-US') ?? '—');
 
   onMount(() => {
@@ -55,7 +42,7 @@
     <div class="ur-topbar">
       <a class="ur-brand" href={resolve('/ultimate/run')} aria-label="Ultimate Run hub">
         <img
-          src={asset('/ultimate/logo.svg')}
+          src={asset('/ultimate/logo.png')}
           alt=""
           width="32"
           height="32"
@@ -75,15 +62,7 @@
         {/each}
       </nav>
       <div class="ur-top-actions">
-        <div class="ur-balance-strip" aria-label="Collection balances">
-          <span class="ur-currency-pill is-coins">
-            <Coins aria-hidden="true" />
-            {balanceCoins} Coins
-          </span>
-          <span class="ur-currency-pill is-exchange">
-            <ArrowLeftRight aria-hidden="true" />
-            {balanceExchange} Exchange
-          </span>
+        <div class="ur-balance-strip" aria-label="Collection cards">
           <span class="ur-currency-pill is-cards">
             <Layers aria-hidden="true" />
             {ownedCount} Cards

@@ -11,7 +11,6 @@ import {
   type CollectionCatalog,
   type CollectionCpuRarityWeights,
   type CollectionDifficultyId,
-  type CollectionGameCommand,
   type CollectionGameEvent,
   type CollectionGameRecordUnion,
   type CollectionGameResultUnion,
@@ -28,6 +27,7 @@ import {
   type EraSimulationProfile,
 } from '@hoop-rush/data-contracts';
 import {
+  applyCollectionGameCommand as applyEngineGameCommand,
   buildCollectionObjectiveFacts,
   collectionObjectiveDefinitionsFromRules,
   resolveCollectionChallenge,
@@ -36,6 +36,7 @@ import {
   CollectionCommandStaleError,
   DexieCollectionRepository,
   HoopRushDatabase,
+  type CollectionGameCommandApplier,
 } from '@hoop-rush/persistence';
 import { getManifest } from '$lib/data';
 import { resolveAssetUrl } from '$lib/asset-url';
@@ -44,6 +45,7 @@ import {
   loadCollectionGameRules,
   loadCollectionProgression,
 } from './collection-assets.ts';
+import { runCollectionGameVerification } from './collection-verify-runner.ts';
 
 export const COLLECTION_ID = 'collection-1';
 
@@ -62,8 +64,33 @@ export function getCollectionDb(): HoopRushDatabase {
   return dbInstance;
 }
 
+const ACCEPT_RESULT_COMMANDS = new Set([
+  'accept-basic-game-result',
+  'accept-challenge-game-result',
+]);
+
+const workerGameCommandApplier: CollectionGameCommandApplier = async (
+  playState,
+  command,
+  input,
+) => {
+  if (!ACCEPT_RESULT_COMMANDS.has(command.command)) {
+    return applyEngineGameCommand(playState, command, input);
+  }
+  const assets = await collectionGameWorkerAssets();
+  return runCollectionGameVerification({
+    playState,
+    command,
+    engineInput: input,
+    assets,
+    requestId: command.commandId,
+  });
+};
+
 export function getCollectionRepo(): DexieCollectionRepository {
-  return new DexieCollectionRepository(getCollectionDb());
+  return new DexieCollectionRepository(getCollectionDb(), {
+    applyGameCommand: workerGameCommandApplier,
+  });
 }
 
 function randomSeedHex(): string {
@@ -398,20 +425,27 @@ async function gameCommandArgs(recordedAtIso: string) {
   };
 }
 
+async function submitGameCommand(
+  playState: CollectionPlayState,
+  recordedAtIso: string,
+  payload: Record<string, unknown>,
+) {
+  const command = collectionGameCommandSchema.parse(payload);
+  return getCollectionRepo().applyCollectionGameCommand({
+    ...(await gameCommandArgs(recordedAtIso)),
+    command,
+  });
+}
+
 export async function setActiveTeam(
   team: CollectionActiveTeam,
   nowIso: string,
 ): Promise<CollectionPlayState> {
-  const repo = getCollectionRepo();
   const playState = await ensurePlayState(nowIso);
-  const command = collectionGameCommandSchema.parse({
+  const outcome = await submitGameCommand(playState, nowIso, {
     ...gameCommandBase(playState, crypto.randomUUID()),
     command: 'set-active-team',
     team,
-  });
-  const outcome = await repo.applyCollectionGameCommand({
-    ...(await gameCommandArgs(nowIso)),
-    command,
   });
   return outcome.playState;
 }
@@ -431,7 +465,6 @@ export async function prepareBasicGame(
   nowIso: string,
   setup: PrepareGameSetup,
 ): Promise<PreparedGameOutcome> {
-  const repo = getCollectionRepo();
   const playState = await ensurePlayState(nowIso);
   if (playState.pendingGame !== null) {
     return {
@@ -440,15 +473,11 @@ export async function prepareBasicGame(
       gameSequence: playState.pendingGame.gameSequence,
     };
   }
-  const command: CollectionGameCommand = collectionGameCommandSchema.parse({
+  const outcome = await submitGameCommand(playState, nowIso, {
     ...gameCommandBase(playState, crypto.randomUUID()),
     command: 'prepare-basic-game',
     difficultyId: setup.difficultyId,
     objectiveId: setup.objectiveId,
-  });
-  const outcome = await repo.applyCollectionGameCommand({
-    ...(await gameCommandArgs(nowIso)),
-    command,
   });
   if (!outcome.prepared) throw new Error('Preparing the game did not produce a matchup.');
   return {
@@ -459,18 +488,13 @@ export async function prepareBasicGame(
 }
 
 export async function abandonBasicGame(nowIso: string): Promise<CollectionPlayState> {
-  const repo = getCollectionRepo();
   const playState = await ensurePlayState(nowIso);
   const pending = playState.pendingGame;
   if (pending === null) return playState;
-  const command = collectionGameCommandSchema.parse({
+  const outcome = await submitGameCommand(playState, nowIso, {
     ...gameCommandBase(playState, crypto.randomUUID()),
     command: 'abandon-basic-game',
     gameId: pending.gameId,
-  });
-  const outcome = await repo.applyCollectionGameCommand({
-    ...(await gameCommandArgs(nowIso)),
-    command,
   });
   return outcome.playState;
 }
@@ -487,21 +511,16 @@ export async function acceptBasicGameResult(input: {
   completedAtIso: string;
   recordedAtIso: string;
 }): Promise<AcceptedGameOutcome> {
-  const repo = getCollectionRepo();
   const playState = await ensurePlayState(input.recordedAtIso);
   const pending = playState.pendingGame;
   if (pending === null) throw new Error('No pending game to complete.');
-  const command: CollectionGameCommand = collectionGameCommandSchema.parse({
+  const outcome = await submitGameCommand(playState, input.recordedAtIso, {
     ...gameCommandBase(playState, crypto.randomUUID()),
     command: 'accept-basic-game-result',
     gameId: pending.gameId,
     result: input.result,
     events: input.events,
     completedAtIso: input.completedAtIso,
-  });
-  const outcome = await repo.applyCollectionGameCommand({
-    ...(await gameCommandArgs(input.recordedAtIso)),
-    command,
   });
   if (!outcome.record || !outcome.balances) {
     throw new Error('Completing the game did not produce a record.');
@@ -519,7 +538,6 @@ export async function prepareChallengeGame(
   objectiveId: CollectionObjectiveId | null,
   nowIso: string,
 ): Promise<PreparedGameOutcome> {
-  const repo = getCollectionRepo();
   const playState = await ensurePlayState(nowIso);
   if (playState.pendingGame !== null) {
     return {
@@ -528,15 +546,11 @@ export async function prepareChallengeGame(
       gameSequence: playState.pendingGame.gameSequence,
     };
   }
-  const command: CollectionGameCommand = collectionGameCommandSchema.parse({
+  const outcome = await submitGameCommand(playState, nowIso, {
     ...gameCommandBase(playState, crypto.randomUUID(), COLLECTION_GAME_COMMAND_VERSION),
     command: 'prepare-challenge-game',
     challengeId,
     objectiveId,
-  });
-  const outcome = await repo.applyCollectionGameCommand({
-    ...(await gameCommandArgs(nowIso)),
-    command,
   });
   if (!outcome.prepared) throw new Error('Preparing the challenge did not produce a matchup.');
   return {
@@ -547,21 +561,16 @@ export async function prepareChallengeGame(
 }
 
 export async function abandonChallengeGame(nowIso: string): Promise<CollectionPlayState> {
-  const repo = getCollectionRepo();
   const playState = await ensurePlayState(nowIso);
   const pending = playState.pendingGame;
   if (pending === null) return playState;
   if (pending.gameVersion !== 'collection-game-v3') {
     throw new Error('The pending game is not a challenge game.');
   }
-  const command = collectionGameCommandSchema.parse({
+  const outcome = await submitGameCommand(playState, nowIso, {
     ...gameCommandBase(playState, crypto.randomUUID(), COLLECTION_GAME_COMMAND_VERSION),
     command: 'abandon-challenge-game',
     gameId: pending.gameId,
-  });
-  const outcome = await repo.applyCollectionGameCommand({
-    ...(await gameCommandArgs(nowIso)),
-    command,
   });
   return outcome.playState;
 }
@@ -572,24 +581,19 @@ export async function acceptChallengeGameResult(input: {
   completedAtIso: string;
   recordedAtIso: string;
 }): Promise<AcceptedGameOutcome> {
-  const repo = getCollectionRepo();
   const playState = await ensurePlayState(input.recordedAtIso);
   const pending = playState.pendingGame;
   if (pending === null) throw new Error('No pending game to complete.');
   if (pending.gameVersion !== 'collection-game-v3') {
     throw new Error('The pending game is not a challenge game.');
   }
-  const command: CollectionGameCommand = collectionGameCommandSchema.parse({
+  const outcome = await submitGameCommand(playState, input.recordedAtIso, {
     ...gameCommandBase(playState, crypto.randomUUID(), COLLECTION_GAME_COMMAND_VERSION),
     command: 'accept-challenge-game-result',
     gameId: pending.gameId,
     result: input.result,
     events: input.events,
     completedAtIso: input.completedAtIso,
-  });
-  const outcome = await repo.applyCollectionGameCommand({
-    ...(await gameCommandArgs(input.recordedAtIso)),
-    command,
   });
   if (!outcome.record || !outcome.balances) {
     throw new Error('Completing the game did not produce a record.');

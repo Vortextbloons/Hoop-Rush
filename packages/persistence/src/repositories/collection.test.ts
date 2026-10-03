@@ -25,10 +25,15 @@ import {
   collectionObjectiveDefinitionsFromRules,
   collectionStateDigest,
   collectionStateFactsOf,
+  initializeCollectionActiveTeam,
   initializeCollectionState,
   simulateCollectionGame,
 } from '@hoop-rush/engine';
-import { CollectionCommandStaleError, DexieCollectionRepository } from './collection.ts';
+import {
+  CollectionCommandStaleError,
+  DexieCollectionRepository,
+  type LoadedPlayState,
+} from './collection.ts';
 import { HOOP_RUSH_DATABASE_STORES, HoopRushDatabase } from './dexie.ts';
 import {
   resetIndexedDb,
@@ -618,5 +623,174 @@ describe('M4.4 collection persistence', () => {
     });
     expect(duplicate.duplicate).toBe(true);
     expect(duplicate.record?.gameId).toBe(pending.gameId);
+  });
+});
+
+describe('collection repository concurrency guards', () => {
+  afterEach(restoreIndexedDb);
+
+  function gameInputs() {
+    const rules = buildCollectionGameRulesFixture();
+    const difficulties = buildCollectionDifficultyProfiles();
+    const objectives = collectionObjectiveDefinitionsFromRules(rules);
+    return { difficulties, objectives };
+  }
+
+  it('does not let a raced play-state initialization erase a prepared game', async () => {
+    resetIndexedDb();
+    const db = new TestDatabase(testDatabaseName('collection-ensure-race'));
+    const repo = new DexieCollectionRepository(db);
+    await seedCollectionRows(db, {
+      collectionId: 'collection-1',
+      ownedCardIds: CATALOG.cards.map((card) => card.cardId),
+      balances: { Coins: 0, Exchange: 0 },
+    });
+    const first = await repo.ensurePlayState({
+      collectionId: 'collection-1',
+      catalog: CATALOG,
+      catalogHash: HASH,
+      recordedAtIso: '2026-01-01T00:00:00.000Z',
+    });
+    const { difficulties, objectives } = gameInputs();
+    const prepare = collectionGameCommandSchema.parse({
+      schemaVersion: 1,
+      commandVersion: 'collection-game-command-v1',
+      commandId: 'prepare-race',
+      collectionId: 'collection-1',
+      expectedRevision: first.playState.revision,
+      expectedDigest: first.playState.digest,
+      command: 'prepare-basic-game',
+      difficultyId: difficulties[0]?.difficultyId,
+      objectiveId: null,
+    });
+    const prepared = await repo.applyCollectionGameCommand({
+      command: prepare,
+      catalog: CATALOG,
+      catalogHash: HASH,
+      profile: DEFAULT_ERA_SIM_PROFILE,
+      profileHash: HASH,
+      rulesHash: HASH,
+      cpuWeights: EMPTY_WEIGHTS,
+      difficultyProfiles: difficulties,
+      objectiveDefinitions: objectives,
+      progression: PROGRESSION,
+      progressionHash: HASH,
+      recordedAtIso: '2026-01-01T00:00:00.000Z',
+    });
+    expect(prepared.playState.pendingGame).not.toBeNull();
+
+    class StaleProbeRepository extends DexieCollectionRepository {
+      private probed = false;
+      override async loadPlayState(collectionId: string): Promise<LoadedPlayState | null> {
+        if (!this.probed) {
+          this.probed = true;
+          return null;
+        }
+        return super.loadPlayState(collectionId);
+      }
+    }
+    const raced = new StaleProbeRepository(db);
+    const ensured = await raced.ensurePlayState({
+      collectionId: 'collection-1',
+      catalog: CATALOG,
+      catalogHash: HASH,
+      recordedAtIso: '2026-01-01T00:00:00.000Z',
+    });
+    expect(ensured.playState.revision).toBe(prepared.playState.revision);
+    expect(ensured.playState.digest).toBe(prepared.playState.digest);
+    expect(ensured.playState.pendingGame?.gameId).toBe(
+      prepared.playState.pendingGame?.gameId ?? null,
+    );
+    const reloaded = await repo.loadPlayState('collection-1');
+    expect(reloaded?.playState.revision).toBe(prepared.playState.revision);
+    expect(reloaded?.playState.digest).toBe(prepared.playState.digest);
+    expect(reloaded?.playState.pendingGame).not.toBeNull();
+    db.close();
+  });
+
+  it('rejects a second initialization instead of overwriting the collection', async () => {
+    resetIndexedDb();
+    const db = new TestDatabase(testDatabaseName('collection-init-race'));
+    const repo = new DexieCollectionRepository(db);
+    const created = await repo.initializeCollection({
+      collectionId: 'collection-1',
+      rootSeed: '0'.repeat(32),
+      catalogHash: HASH,
+      progressionHash: HASH,
+      createdAtIso: '2026-01-01T00:00:00.000Z',
+    });
+    await expect(
+      repo.initializeCollection({
+        collectionId: 'collection-1',
+        rootSeed: '1'.repeat(32),
+        catalogHash: HASH,
+        progressionHash: HASH,
+        createdAtIso: '2026-01-02T00:00:00.000Z',
+      }),
+    ).rejects.toThrow(/already initialized/);
+    const reloaded = await repo.loadCollection('collection-1');
+    expect(reloaded?.state.digest).toBe(created.digest);
+    db.close();
+  });
+
+  it('routes game command application through the injected applier', async () => {
+    resetIndexedDb();
+    const db = new TestDatabase(testDatabaseName('collection-applier'));
+    const byId = new Map(CATALOG.cards.map((card) => [card.cardId, card]));
+    const team = initializeCollectionActiveTeam(
+      CATALOG.cards.map((card) => card.cardId),
+      (cardId) => byId.get(cardId),
+    );
+    const seen: string[] = [];
+    const repo = new DexieCollectionRepository(db, {
+      applyGameCommand: (playState, command) => {
+        seen.push(command.command);
+        return Promise.resolve({
+          status: 'rejected' as const,
+          rejection: { code: 'applier-probe', expectedRevision: playState.revision },
+        });
+      },
+    });
+    await seedCollectionRows(db, {
+      collectionId: 'collection-1',
+      ownedCardIds: CATALOG.cards.map((card) => card.cardId),
+      balances: { Coins: 0, Exchange: 0 },
+    });
+    const play = await repo.ensurePlayState({
+      collectionId: 'collection-1',
+      catalog: CATALOG,
+      catalogHash: HASH,
+      recordedAtIso: '2026-01-01T00:00:00.000Z',
+    });
+    const command = collectionGameCommandSchema.parse({
+      schemaVersion: 1,
+      commandVersion: 'collection-game-command-v1',
+      commandId: 'applier-probe',
+      collectionId: 'collection-1',
+      expectedRevision: play.playState.revision,
+      expectedDigest: play.playState.digest,
+      command: 'set-active-team',
+      team,
+    });
+    await expect(
+      repo.applyCollectionGameCommand({
+        command,
+        catalog: CATALOG,
+        catalogHash: HASH,
+        profile: DEFAULT_ERA_SIM_PROFILE,
+        profileHash: HASH,
+        rulesHash: HASH,
+        cpuWeights: EMPTY_WEIGHTS,
+        difficultyProfiles: buildCollectionDifficultyProfiles(),
+        objectiveDefinitions: [],
+        progression: PROGRESSION,
+        progressionHash: HASH,
+        recordedAtIso: '2026-01-01T00:00:00.000Z',
+      }),
+    ).rejects.toThrow(/applier-probe/);
+    expect(seen).toEqual(['set-active-team']);
+    const untouched = await repo.loadPlayState('collection-1');
+    expect(untouched?.playState.revision).toBe(play.playState.revision);
+    db.close();
   });
 });

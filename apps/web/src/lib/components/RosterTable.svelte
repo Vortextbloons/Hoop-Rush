@@ -14,6 +14,7 @@
   } from '$lib/roster-browser';
   import { formatPositions } from '$lib/player-positions';
   import PlayerFace from './PlayerFace.svelte';
+  import TeamLogo from './TeamLogo.svelte';
   let {
     items,
     columns,
@@ -64,6 +65,15 @@
   function teamLabelFor(player: RosterDetailRow): string {
     const identity = resolveEraTeamIdentity(manifest, player.franchiseId, player.eraId);
     return identity.abbreviationLabel ?? franchiseAbbreviation(player.franchiseId);
+  }
+  function teamSlotFor(player: RosterDetailRow): string | null {
+    return (
+      manifest.modernFranchiseSlots.find((entry) => entry.franchiseId === player.franchiseId)
+        ?.teamExternalId ?? null
+    );
+  }
+  function logoCandidatesFor(player: RosterDetailRow): string[] {
+    return resolveEraTeamIdentity(manifest, player.franchiseId, player.eraId).logoCandidates ?? [];
   }
   function compareLabel(player: RosterDetailRow): string {
     const added = isCompared(player);
@@ -158,6 +168,8 @@
             </tr>
           {:else}
             {@const player = item.player}
+            {@const mobileTeamExternalId = teamSlotFor(player)}
+            {@const teamExternalId = teamSlotFor(player)}
             <tr
               role="button"
               tabindex="0"
@@ -198,8 +210,17 @@
                   />
                   <span class="min-w-0">
                     <span class="block truncate text-base font-bold">{player.displayName}</span>
-                    <span class="block text-xs text-muted-foreground">
-                      {teamLabelFor(player)}
+                    <span class="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      {#if teamExternalId}
+                        <TeamLogo
+                          {manifest}
+                          franchiseId={player.franchiseId}
+                          {teamExternalId}
+                          logoCandidates={logoCandidatesFor(player)}
+                          className="h-4 w-4"
+                        />
+                      {/if}
+                      <span class="truncate">{teamLabelFor(player)}</span>
                     </span>
                   </span>
                 </div>
@@ -232,6 +253,7 @@
       </li>
     {:else}
       {@const player = item.player}
+      {@const mobileTeamExternalId = teamSlotFor(player)}
       <li>
         <div
           role="button"
@@ -268,9 +290,22 @@
             />
             <span class="min-w-0 flex-1">
               <span class="block truncate text-base font-bold">{player.displayName}</span>
-              <span class="mt-0.5 block text-xs leading-snug text-muted-foreground">
-                {teamLabelFor(player)} · {eraLabel.get(player.eraId) ?? player.eraId} · {player.seasonKey}
-                · {formatPositions(player.positionsPlayable)}
+              <span
+                class="mt-0.5 flex items-center gap-1.5 text-xs leading-snug text-muted-foreground"
+              >
+                {#if mobileTeamExternalId}
+                  <TeamLogo
+                    {manifest}
+                    franchiseId={player.franchiseId}
+                    teamExternalId={mobileTeamExternalId}
+                    logoCandidates={logoCandidatesFor(player)}
+                    className="h-4 w-4"
+                  />
+                {/if}
+                <span class="min-w-0 truncate">
+                  {teamLabelFor(player)} · {eraLabel.get(player.eraId) ?? player.eraId} · {player.seasonKey}
+                  · {formatPositions(player.positionsPlayable)}
+                </span>
               </span>
             </span>
           </div>

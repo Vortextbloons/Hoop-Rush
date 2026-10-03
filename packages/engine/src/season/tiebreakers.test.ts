@@ -408,4 +408,25 @@ describe('tiebreak ranking (M2.6, tiebreaker-v1)', () => {
     }
     expect(eastRanking(spec).ranked).toEqual(ranking.ranked);
   });
+  it('determines one division winner before applying champion priority', () => {
+    const east = franchisesInConference(league, 'east');
+    const hawks = east[0] ?? 'hawks';
+    const celtics = east[1] ?? 'celtics';
+    const hornets = east[3] ?? 'hornets';
+    const spec = overrides(
+      conferenceWithTie('east', [hawks, celtics, hornets], { w: 40, l: 42 }, 0),
+      {
+        [hawks]: { h2h: { [hornets]: 3 } },
+        [hornets]: { h2h: { [celtics]: 3 } },
+        [celtics]: { h2h: { [hawks]: 2 } },
+      },
+    );
+    const ranking = eastRanking(spec);
+    expect(ranking.ranked.slice(0, 3)).toEqual([celtics, hawks, hornets]);
+    const championResolutions = ranking.resolutions.filter(
+      (entry) => entry.rule === 'division-champion',
+    );
+    expect(championResolutions.length).toBeGreaterThanOrEqual(1);
+    expect(eastRanking(spec).ranked).toEqual(ranking.ranked);
+  });
 });

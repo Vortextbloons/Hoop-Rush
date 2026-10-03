@@ -3343,139 +3343,69 @@ function handleResolveFreeAgentMarket(
   };
 }
 type SeasonRunCommandInput = SeasonRunCommand | SeasonLegacyRunCommand;
-type SeasonRunCommandKind = SeasonRunCommandInput['command'];
-type SeasonRunCommandOf<Kind extends SeasonRunCommandKind> = Extract<
-  SeasonRunCommandInput,
-  { command: Kind }
->;
-type SeasonRunCommandHandler = (
-  command: SeasonRunCommandInput,
-  context: SeasonRunCommandContext,
-) => SeasonRunCommandOutput;
-function isSeasonRunCommandOf<Kind extends SeasonRunCommandKind>(
-  command: SeasonRunCommandInput,
-  kind: Kind,
-): command is SeasonRunCommandOf<Kind> {
-  return command.command === kind;
-}
-function registerSeasonRunCommandHandler<Kind extends SeasonRunCommandKind>(
-  kind: Kind,
-  handler: (
-    command: SeasonRunCommandOf<Kind>,
-    context: SeasonRunCommandContext,
-  ) => SeasonRunCommandOutput,
-): SeasonRunCommandHandler {
-  return (command, context) => {
-    if (!isSeasonRunCommandOf(command, kind)) {
-      throw new Error(`season run command handler mismatch: ${command.command}`);
-    }
-    return handler(command, context);
-  };
-}
-const seasonRunCommandHandlers = {
-  'select-block-objective': registerSeasonRunCommandHandler(
-    'select-block-objective',
-    handleRetiredSeasonCommand,
-  ),
-  'spend-influence': registerSeasonRunCommandHandler('spend-influence', handleSpendInfluence),
-  'accept-trade-offer': registerSeasonRunCommandHandler(
-    'accept-trade-offer',
-    handleAcceptTradeOffer,
-  ),
-  'decline-trade-offer': registerSeasonRunCommandHandler(
-    'decline-trade-offer',
-    handleDeclineTradeOffer,
-  ),
-  'resume-season-block': registerSeasonRunCommandHandler(
-    'resume-season-block',
-    handleResumeSeasonBlock,
-  ),
-  'forfeit-interrupted-game': registerSeasonRunCommandHandler(
-    'forfeit-interrupted-game',
-    handleForfeitInterruptedGame,
-  ),
-  'start-postseason': registerSeasonRunCommandHandler('start-postseason', handleStartPostseason),
-  'advance-postseason': registerSeasonRunCommandHandler(
-    'advance-postseason',
-    handleAdvancePostseason,
-  ),
-  'submit-postseason-rotation': registerSeasonRunCommandHandler(
-    'submit-postseason-rotation',
-    handleSubmitPostseasonRotation,
-  ),
-  'spectate-postseason-game': registerSeasonRunCommandHandler(
-    'spectate-postseason-game',
-    handleSpectatePostseasonGame,
-  ),
-  'fast-forward-postseason': registerSeasonRunCommandHandler(
-    'fast-forward-postseason',
-    handleFastForwardPostseason,
-  ),
-  'submit-season-block': registerSeasonRunCommandHandler('submit-season-block', () => {
-    throw new SeasonRunCommandNotImplementedError(
-      'submit-season-block is handled by the block pipeline, not the run command dispatch',
-    );
-  }),
-  'declare-free-agent-interest': registerSeasonRunCommandHandler(
-    'declare-free-agent-interest',
-    handleDeclareFreeAgentInterest,
-  ),
-  'skip-free-agent-market': registerSeasonRunCommandHandler(
-    'skip-free-agent-market',
-    handleSkipFreeAgentMarket,
-  ),
-  'resolve-free-agent-market': registerSeasonRunCommandHandler(
-    'resolve-free-agent-market',
-    handleResolveFreeAgentMarket,
-  ),
-  'select-gm-identity': registerSeasonRunCommandHandler(
-    'select-gm-identity',
-    handleRetiredSeasonCommand,
-  ),
-  'select-campaign-opportunity': registerSeasonRunCommandHandler(
-    'select-campaign-opportunity',
-    handleRetiredSeasonCommand,
-  ),
-  'evolve-gm-campaign': registerSeasonRunCommandHandler(
-    'evolve-gm-campaign',
-    handleRetiredSeasonCommand,
-  ),
-  'open-trade-inquiry': registerSeasonRunCommandHandler(
-    'open-trade-inquiry',
-    handleOpenTradeInquiry,
-  ),
-  'submit-trade-proposal': registerSeasonRunCommandHandler(
-    'submit-trade-proposal',
-    handleSubmitTradeProposal,
-  ),
-  'respond-to-trade-counter': registerSeasonRunCommandHandler(
-    'respond-to-trade-counter',
-    handleRespondToTradeCounter,
-  ),
-  'walk-away-from-trade': registerSeasonRunCommandHandler(
-    'walk-away-from-trade',
-    handleWalkAwayFromTrade,
-  ),
-  'purchase-trade-inquiry': registerSeasonRunCommandHandler(
-    'purchase-trade-inquiry',
-    handlePurchaseTradeInquiry,
-  ),
-  'buy-sponsor': registerSeasonRunCommandHandler('buy-sponsor', handleBuySponsor),
-  'apply-sponsor': registerSeasonRunCommandHandler('apply-sponsor', handleApplySponsor),
-  'select-front-office': registerSeasonRunCommandHandler(
-    'select-front-office',
-    handleSelectFrontOffice,
-  ),
-  'select-court-innovation': registerSeasonRunCommandHandler(
-    'select-court-innovation',
-    handleSelectCourtInnovation,
-  ),
-} satisfies Record<SeasonRunCommandKind, SeasonRunCommandHandler>;
 function dispatchSeasonRunCommand(
   command: SeasonRunCommandInput,
   context: SeasonRunCommandContext,
 ): SeasonRunCommandOutput {
-  return seasonRunCommandHandlers[command.command](command, context);
+  switch (command.command) {
+    case 'select-block-objective':
+    case 'select-gm-identity':
+    case 'select-campaign-opportunity':
+    case 'evolve-gm-campaign':
+      return handleRetiredSeasonCommand(command, context);
+    case 'spend-influence':
+      return handleSpendInfluence(command, context);
+    case 'accept-trade-offer':
+      return handleAcceptTradeOffer(command, context);
+    case 'decline-trade-offer':
+      return handleDeclineTradeOffer(command, context);
+    case 'resume-season-block':
+      return handleResumeSeasonBlock(command, context);
+    case 'forfeit-interrupted-game':
+      return handleForfeitInterruptedGame(command, context);
+    case 'start-postseason':
+      return handleStartPostseason(command, context);
+    case 'advance-postseason':
+      return handleAdvancePostseason(command, context);
+    case 'submit-postseason-rotation':
+      return handleSubmitPostseasonRotation(command, context);
+    case 'spectate-postseason-game':
+      return handleSpectatePostseasonGame(command, context);
+    case 'fast-forward-postseason':
+      return handleFastForwardPostseason(command, context);
+    case 'submit-season-block':
+      throw new SeasonRunCommandNotImplementedError(
+        'submit-season-block is handled by the block pipeline, not the run command dispatch',
+      );
+    case 'declare-free-agent-interest':
+      return handleDeclareFreeAgentInterest(command, context);
+    case 'skip-free-agent-market':
+      return handleSkipFreeAgentMarket(command, context);
+    case 'resolve-free-agent-market':
+      return handleResolveFreeAgentMarket(command, context);
+    case 'open-trade-inquiry':
+      return handleOpenTradeInquiry(command, context);
+    case 'submit-trade-proposal':
+      return handleSubmitTradeProposal(command, context);
+    case 'respond-to-trade-counter':
+      return handleRespondToTradeCounter(command, context);
+    case 'walk-away-from-trade':
+      return handleWalkAwayFromTrade(command, context);
+    case 'purchase-trade-inquiry':
+      return handlePurchaseTradeInquiry(command, context);
+    case 'buy-sponsor':
+      return handleBuySponsor(command, context);
+    case 'apply-sponsor':
+      return handleApplySponsor(command, context);
+    case 'select-front-office':
+      return handleSelectFrontOffice(command, context);
+    case 'select-court-innovation':
+      return handleSelectCourtInnovation(command, context);
+    default: {
+      const exhaustive: never = command;
+      throw new Error(`unhandled season run command: ${JSON.stringify(exhaustive)}`);
+    }
+  }
 }
 export function handleSeasonRunCommand(
   command: SeasonRunCommandInput,

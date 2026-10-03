@@ -1,11 +1,20 @@
 import { z } from 'zod';
 import { contentHashSchema, seedSchema } from './ids.ts';
+import { collectionCardIdSchema } from './collection-primitives.ts';
+import { collectionDifficultyProfileSchema } from './collection-difficulty.ts';
+import { collectionObjectiveDefinitionSchema } from './collection-objective.ts';
+import { collectionBalancesSchema, collectionLedgerEntrySchema } from './collection.ts';
+import { collectionProgressionRulesSchema } from './collection-progression.ts';
 import {
   collectionGameEventSchema,
   collectionGameIdSchema,
+  collectionGameRecordUnionSchema,
   collectionGameResultUnionSchema,
   collectionGameResultV1Schema,
   collectionGameResultV1V2UnionSchema,
+  collectionGameCommandSchema,
+  collectionCpuRarityWeightsSchema,
+  collectionPlayStateSchema,
   collectionPreparedGameUnionSchema,
   collectionPreparedGameV1Schema,
   collectionPreparedGameV1V2UnionSchema,
@@ -88,10 +97,38 @@ export const collectionGameWorkerWarmRequestSchema = z
   .strict();
 export type CollectionGameWorkerWarmRequest = z.infer<typeof collectionGameWorkerWarmRequestSchema>;
 
+export const collectionGameWorkerVerifyRequestSchema = z
+  .object({
+    wireVersion: z.literal(COLLECTION_GAME_WORKER_WIRE_VERSION),
+    type: z.literal('collection-game-verify'),
+    requestId: z.string().min(1).max(64),
+    playState: collectionPlayStateSchema,
+    command: collectionGameCommandSchema,
+    catalogUrl: z.string().min(1).max(512),
+    catalogHash: contentHashSchema,
+    profileUrl: z.string().min(1).max(512),
+    profileHash: contentHashSchema,
+    rootSeed: seedSchema,
+    ownedCardIds: z.array(collectionCardIdSchema),
+    cpuWeights: collectionCpuRarityWeightsSchema,
+    difficultyProfiles: z.array(collectionDifficultyProfileSchema),
+    objectiveDefinitions: z.array(collectionObjectiveDefinitionSchema),
+    rulesHash: contentHashSchema,
+    balances: collectionBalancesSchema,
+    priorCommands: z.array(collectionGameCommandSchema),
+    progression: collectionProgressionRulesSchema.nullable(),
+    progressionHash: contentHashSchema.nullable(),
+  })
+  .strict();
+export type CollectionGameWorkerVerifyRequest = z.infer<
+  typeof collectionGameWorkerVerifyRequestSchema
+>;
+
 export const collectionGameWorkerRequestSchema = z.discriminatedUnion('type', [
   collectionGameWorkerSimulateRequestSchema,
   collectionGameWorkerCancelRequestSchema,
   collectionGameWorkerWarmRequestSchema,
+  collectionGameWorkerVerifyRequestSchema,
 ]);
 export type CollectionGameWorkerRequest = z.infer<typeof collectionGameWorkerRequestSchema>;
 
@@ -186,9 +223,56 @@ export type CollectionGameWorkerWarmAckMessage = z.infer<
   typeof collectionGameWorkerWarmAckMessageSchema
 >;
 
+export const collectionGameWorkerPreparedGameRefSchema = z.object({
+  gameId: collectionGameIdSchema,
+  gameSequence: z.number().int().min(0),
+});
+export type CollectionGameWorkerPreparedGameRef = z.infer<
+  typeof collectionGameWorkerPreparedGameRefSchema
+>;
+
+export const collectionGameWorkerAcceptedOutcomeSchema = z.object({
+  status: z.literal('accepted'),
+  playState: collectionPlayStateSchema,
+  prepared: collectionGameWorkerPreparedGameRefSchema.optional(),
+  record: collectionGameRecordUnionSchema.optional(),
+  ledgerEntries: z.array(collectionLedgerEntrySchema).optional(),
+  balances: collectionBalancesSchema.optional(),
+});
+export type CollectionGameWorkerAcceptedOutcome = z.infer<
+  typeof collectionGameWorkerAcceptedOutcomeSchema
+>;
+
+export const collectionGameWorkerRejectedOutcomeSchema = z.object({
+  status: z.literal('rejected'),
+  rejection: z.looseObject({ code: z.string() }),
+});
+export type CollectionGameWorkerRejectedOutcome = z.infer<
+  typeof collectionGameWorkerRejectedOutcomeSchema
+>;
+
+export const collectionGameWorkerOutcomeSchema = z.discriminatedUnion('status', [
+  collectionGameWorkerAcceptedOutcomeSchema,
+  collectionGameWorkerRejectedOutcomeSchema,
+]);
+export type CollectionGameWorkerOutcome = z.infer<typeof collectionGameWorkerOutcomeSchema>;
+
+export const collectionGameWorkerVerifiedMessageSchema = z
+  .object({
+    wireVersion: z.literal(COLLECTION_GAME_WORKER_WIRE_VERSION),
+    type: z.literal('collection-game-verified'),
+    requestId: z.string().min(1).max(64),
+    outcome: collectionGameWorkerOutcomeSchema,
+  })
+  .strict();
+export type CollectionGameWorkerVerifiedMessage = z.infer<
+  typeof collectionGameWorkerVerifiedMessageSchema
+>;
+
 export const collectionGameWorkerMessageSchema = z.discriminatedUnion('type', [
   collectionGameWorkerCompleteMessageSchema,
   collectionGameWorkerErrorMessageSchema,
   collectionGameWorkerWarmAckMessageSchema,
+  collectionGameWorkerVerifiedMessageSchema,
 ]);
 export type CollectionGameWorkerMessage = z.infer<typeof collectionGameWorkerMessageSchema>;

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { resolve } from '$app/paths';
+  import { asset, resolve } from '$app/paths';
   import { page } from '$app/state';
   import '$lib/collection/ultimate-theme.css';
   import { getContext, onDestroy, tick } from 'svelte';
@@ -14,6 +14,7 @@
   import { getManifest } from '$lib/data';
   import AsyncState from '$lib/components/AsyncState.svelte';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
+  import { collectionCardArtOf } from '../collection-card-art.ts';
   import { loadCollectionCatalog } from '$lib/collection/collection-assets.ts';
   import {
     ensureCollection,
@@ -499,7 +500,14 @@
                       <span class="slot-ovr">{card ? overallOf(card) : ''}</span>
                     </span>
                     <span class="slot-face">
-                      {#if card && manifest}
+                      {#if collectionCardArtOf(card ?? null)}
+                        <img
+                          class="special-card-art"
+                          src={asset(collectionCardArtOf(card ?? null)!)}
+                          alt=""
+                          loading="lazy"
+                        />
+                      {:else if card && manifest}
                         <PlayerFace
                           player={{
                             playerId: card.playerId,
@@ -539,7 +547,14 @@
               {@const card = byId.get(cardId)}
               <li>
                 <span class="rotation-face">
-                  {#if card && manifest}
+                  {#if collectionCardArtOf(card ?? null)}
+                    <img
+                      class="special-card-art"
+                      src={asset(collectionCardArtOf(card ?? null)!)}
+                      alt=""
+                      loading="lazy"
+                    />
+                  {:else if card && manifest}
                     <PlayerFace
                       player={{
                         playerId: card.playerId,
@@ -596,7 +611,14 @@
               {@const card = byId.get(cardId)}
               <li class="bench-row">
                 <span class="bench-avatar">
-                  {#if card && manifest}
+                  {#if collectionCardArtOf(card ?? null)}
+                    <img
+                      class="special-card-art"
+                      src={asset(collectionCardArtOf(card ?? null)!)}
+                      alt=""
+                      loading="lazy"
+                    />
+                  {:else if card && manifest}
                     <PlayerFace
                       player={{
                         playerId: card.playerId,
@@ -669,7 +691,14 @@
               {@const card = byId.get(cardId)}
               <li class="minutes-row">
                 <span class="bench-avatar">
-                  {#if card && manifest}
+                  {#if collectionCardArtOf(card ?? null)}
+                    <img
+                      class="special-card-art"
+                      src={asset(collectionCardArtOf(card ?? null)!)}
+                      alt=""
+                      loading="lazy"
+                    />
+                  {:else if card && manifest}
                     <PlayerFace
                       player={{
                         playerId: card.playerId,
@@ -792,7 +821,14 @@
             {@const reason = assignmentReason(card)}
             <li class="owned-row">
               <span class="bench-avatar">
-                {#if manifest}
+                {#if collectionCardArtOf(card)}
+                  <img
+                    class="special-card-art"
+                    src={asset(collectionCardArtOf(card)!)}
+                    alt=""
+                    loading="lazy"
+                  />
+                {:else if manifest}
                   <PlayerFace
                     player={{
                       playerId: card.playerId,
@@ -846,6 +882,14 @@
 </div>
 
 <style>
+  .special-card-art {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 25%;
+    border-radius: inherit;
+  }
+
   .team-page {
     position: relative;
     color: var(--ur-paper);

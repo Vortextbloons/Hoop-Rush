@@ -61,6 +61,62 @@ function playedGameOf(game: SeasonGame): PlayedGame {
     ]),
   };
 }
+interface StandingsWinLossUpdate {
+  label: string;
+  homeFranchiseId: string;
+  awayFranchiseId: string;
+  winner: string;
+  loser: string;
+  winnerPointsFor: number;
+  winnerPointsAgainst: number;
+  loserPointsFor: number;
+  loserPointsAgainst: number;
+}
+function applyWinLoss(
+  rows: Map<string, SeasonStandingsRow>,
+  teamsById: Map<string, { conference: string; division: string }>,
+  update: StandingsWinLossUpdate,
+): void {
+  const winnerRow = rows.get(update.winner);
+  const loserRow = rows.get(update.loser);
+  if (winnerRow === undefined || loserRow === undefined) {
+    throw new Error(`${update.label} references a franchise outside the league`);
+  }
+  winnerRow.wins += 1;
+  loserRow.losses += 1;
+  winnerRow.gamesPlayed += 1;
+  loserRow.gamesPlayed += 1;
+  const homeRow = update.homeFranchiseId === update.winner ? winnerRow : loserRow;
+  const awayRow = update.awayFranchiseId === update.winner ? winnerRow : loserRow;
+  if (update.homeFranchiseId === update.winner) homeRow.homeWins += 1;
+  else homeRow.homeLosses += 1;
+  if (update.awayFranchiseId === update.winner) awayRow.awayWins += 1;
+  else awayRow.awayLosses += 1;
+  const homeTeam = teamsById.get(update.homeFranchiseId);
+  const awayTeam = teamsById.get(update.awayFranchiseId);
+  if (homeTeam === undefined || awayTeam === undefined) {
+    throw new Error(`${update.label} references a franchise outside the league`);
+  }
+  if (homeTeam.conference === awayTeam.conference) {
+    winnerRow.conferenceWins += 1;
+    loserRow.conferenceLosses += 1;
+    if (homeTeam.division === awayTeam.division) {
+      winnerRow.divisionWins += 1;
+      loserRow.divisionLosses += 1;
+    }
+  }
+  winnerRow.pointsFor += update.winnerPointsFor;
+  winnerRow.pointsAgainst += update.winnerPointsAgainst;
+  loserRow.pointsFor += update.loserPointsFor;
+  loserRow.pointsAgainst += update.loserPointsAgainst;
+  const winnerHeadToHead = winnerRow.headToHead.find((entry) => entry.franchiseId === update.loser);
+  const loserHeadToHead = loserRow.headToHead.find((entry) => entry.franchiseId === update.winner);
+  if (winnerHeadToHead === undefined || loserHeadToHead === undefined) {
+    throw new Error(`${update.label} has no head-to-head slot for its participants`);
+  }
+  winnerHeadToHead.wins += 1;
+  loserHeadToHead.losses += 1;
+}
 export function reduceSeasonStandings(
   league: SeasonLeague,
   games: readonly SeasonGame[],
@@ -100,48 +156,17 @@ export function reduceSeasonStandings(
       throw new Error(`game ${game.gameId} references a franchise outside the league`);
     }
     const played = playedGameOf(game);
-    const winnerRow = rows.get(played.winner);
-    const loserRow = rows.get(played.loser);
-    if (winnerRow === undefined || loserRow === undefined) {
-      throw new Error(`game ${game.gameId} references a franchise outside the league`);
-    }
-    winnerRow.wins += 1;
-    loserRow.losses += 1;
-    winnerRow.gamesPlayed += 1;
-    loserRow.gamesPlayed += 1;
-    const homeRow = game.homeFranchiseId === played.winner ? winnerRow : loserRow;
-    const awayRow = game.awayFranchiseId === played.winner ? winnerRow : loserRow;
-    if (game.homeFranchiseId === played.winner) homeRow.homeWins += 1;
-    else homeRow.homeLosses += 1;
-    if (game.awayFranchiseId === played.winner) awayRow.awayWins += 1;
-    else awayRow.awayLosses += 1;
-    if (home.conference === away.conference) {
-      const confWinner = game.homeFranchiseId === played.winner ? homeRow : awayRow;
-      const confLoser = game.homeFranchiseId === played.winner ? awayRow : homeRow;
-      confWinner.conferenceWins += 1;
-      confLoser.conferenceLosses += 1;
-      if (home.division === away.division) {
-        confWinner.divisionWins += 1;
-        confLoser.divisionLosses += 1;
-      }
-    }
-    const forPoints = played.pointsFor;
-    const againstPoints = played.pointsAgainst;
-    for (const row of [winnerRow, loserRow]) {
-      row.pointsFor += forPoints.get(row.franchiseId) ?? 0;
-      row.pointsAgainst += againstPoints.get(row.franchiseId) ?? 0;
-    }
-    const winnerHeadToHead = winnerRow.headToHead.find(
-      (entry) => entry.franchiseId === played.loser,
-    );
-    const loserHeadToHead = loserRow.headToHead.find(
-      (entry) => entry.franchiseId === played.winner,
-    );
-    if (winnerHeadToHead === undefined || loserHeadToHead === undefined) {
-      throw new Error(`game ${game.gameId} has no head-to-head slot for its participants`);
-    }
-    winnerHeadToHead.wins += 1;
-    loserHeadToHead.losses += 1;
+    applyWinLoss(rows, teams, {
+      label: `game ${game.gameId}`,
+      homeFranchiseId: game.homeFranchiseId,
+      awayFranchiseId: game.awayFranchiseId,
+      winner: played.winner,
+      loser: played.loser,
+      winnerPointsFor: played.pointsFor.get(played.winner) ?? 0,
+      winnerPointsAgainst: played.pointsAgainst.get(played.winner) ?? 0,
+      loserPointsFor: played.pointsFor.get(played.loser) ?? 0,
+      loserPointsAgainst: played.pointsAgainst.get(played.loser) ?? 0,
+    });
   }
   const reduced = league.teams.map((team) => {
     const row = rows.get(team.franchiseId);
@@ -205,42 +230,17 @@ export function extendSeasonStandings(
       loserPointsFor = loser === summary.homeFranchiseId ? homeScore : awayScore;
       loserPointsAgainst = loser === summary.homeFranchiseId ? awayScore : homeScore;
     }
-    const winnerRow = rows.get(winner);
-    const loserRow = rows.get(loser);
-    if (winnerRow === undefined || loserRow === undefined) {
-      throw new Error(`summary ${summary.gameId} references a franchise outside the league`);
-    }
-    winnerRow.wins += 1;
-    loserRow.losses += 1;
-    winnerRow.gamesPlayed += 1;
-    loserRow.gamesPlayed += 1;
-    const homeRow = summary.homeFranchiseId === winner ? winnerRow : loserRow;
-    const awayRow = summary.awayFranchiseId === winner ? winnerRow : loserRow;
-    if (summary.homeFranchiseId === winner) homeRow.homeWins += 1;
-    else homeRow.homeLosses += 1;
-    if (summary.awayFranchiseId === winner) awayRow.awayWins += 1;
-    else awayRow.awayLosses += 1;
-    if (homeTeam.conference === awayTeam.conference) {
-      const confWinner = summary.homeFranchiseId === winner ? homeRow : awayRow;
-      const confLoser = summary.homeFranchiseId === winner ? awayRow : homeRow;
-      confWinner.conferenceWins += 1;
-      confLoser.conferenceLosses += 1;
-      if (homeTeam.division === awayTeam.division) {
-        confWinner.divisionWins += 1;
-        confLoser.divisionLosses += 1;
-      }
-    }
-    winnerRow.pointsFor += winnerPointsFor;
-    winnerRow.pointsAgainst += winnerPointsAgainst;
-    loserRow.pointsFor += loserPointsFor;
-    loserRow.pointsAgainst += loserPointsAgainst;
-    const winnerHeadToHead = winnerRow.headToHead.find((entry) => entry.franchiseId === loser);
-    const loserHeadToHead = loserRow.headToHead.find((entry) => entry.franchiseId === winner);
-    if (winnerHeadToHead === undefined || loserHeadToHead === undefined) {
-      throw new Error(`summary ${summary.gameId} has no head-to-head slot for its participants`);
-    }
-    winnerHeadToHead.wins += 1;
-    loserHeadToHead.losses += 1;
+    applyWinLoss(rows, teams, {
+      label: `summary ${summary.gameId}`,
+      homeFranchiseId: summary.homeFranchiseId,
+      awayFranchiseId: summary.awayFranchiseId,
+      winner,
+      loser,
+      winnerPointsFor,
+      winnerPointsAgainst,
+      loserPointsFor,
+      loserPointsAgainst,
+    });
   }
   return {
     schemaVersion: 1,

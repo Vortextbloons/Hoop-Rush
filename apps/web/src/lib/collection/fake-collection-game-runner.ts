@@ -19,13 +19,14 @@ export function runFakeCollectionGame(
   profile: EraSimulationProfile,
   requestId = 'fake-request-1',
 ): Promise<CollectionGameWorkerCompleteMessage> {
-  const { result, events } = simulateCollectionGame(prepared, catalog, profile);
+  const simulated = simulateCollectionGame(prepared, catalog, profile);
+  const { result, events } = simulated;
   if (result.gameVersion !== prepared.gameVersion) {
     return Promise.reject(
       new Error('The simulated result version does not match the prepared game.'),
     );
   }
-  const failures = checkCollectionGameResult(result, events, prepared, catalog, profile);
+  const failures = checkCollectionGameResult(result, events, prepared, catalog, profile, simulated);
   if (failures.length > 0) {
     return Promise.reject(new Error(failures[0] ?? 'The fake game failed its audit.'));
   }

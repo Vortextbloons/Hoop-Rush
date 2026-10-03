@@ -22,6 +22,7 @@
   import DifficultyPicker from '$lib/collection/DifficultyPicker.svelte';
   import MatchupReport from '$lib/collection/MatchupReport.svelte';
   import ObjectivePicker from '$lib/collection/ObjectivePicker.svelte';
+  import MatchupCard from '$lib/collection/MatchupCard.svelte';
   import RewardReceipt from '$lib/collection/RewardReceipt.svelte';
   import {
     loadCollectionCatalog,
@@ -99,6 +100,7 @@
   let challengeObjectiveId = $state<CollectionObjectiveId | null>(null);
   let challengePanel = $state<HTMLElement | undefined>(undefined);
 
+  let resultView = $state<'recap' | 'replay' | 'box'>('recap');
   let watchMode = $state<WatchMode>('standard');
   let cursor = $state(0);
   let playing = $state(false);
@@ -310,9 +312,35 @@
   }
 
   function setMode(mode: WatchMode): void {
+    const order = scoreboardEvent?.eventOrder ?? 0;
+    const resume = playing;
     stopPlayback();
     watchMode = mode;
-    cursor = 0;
+    const events = record ? visibleEvents(record.events, mode) : [];
+    const index = events.findIndex((event) => event.eventOrder >= order);
+    cursor = index < 0 ? Math.max(0, events.length - 1) : index;
+    if (resume && mode !== 'fast') {
+      playing = true;
+      scheduleTick();
+    }
+  }
+
+  function selectResultView(view: 'recap' | 'replay' | 'box'): void {
+    stopPlayback();
+    resultView = view;
+  }
+
+  function seekReplay(value: number): void {
+    stopPlayback();
+    cursor = Math.max(0, Math.min(value, shownEvents.length - 1));
+  }
+
+  function changeMatchup(): void {
+    stopPlayback();
+    record = null;
+    try {
+      sessionStorage.removeItem('collection-last-game');
+    } catch {}
   }
 
   function togglePlayback(): void {
@@ -471,6 +499,7 @@
         selectedChallengeId = committed.prepared.challenge.challengeId;
       }
       cursor = 0;
+      resultView = 'recap';
     } catch {
       // No restored game simply means nothing to resume watching.
     }
@@ -498,6 +527,7 @@
   async function prepare(): Promise<void> {
     if (busy !== 'idle') return;
     if (mode === 'challenges' && selectedChallengeId === null) return;
+    stopPlayback();
     busy = 'preparing';
     flowError = null;
     try {
@@ -629,6 +659,7 @@
       }
       cursor = 0;
       playing = false;
+      resultView = 'recap';
       const committed = record;
       const won = committed?.result.winner === 'home';
       const coins = committed === null ? 0 : rewardCoinsOf(committed);
@@ -660,10 +691,14 @@
 <div class="ur-page ur-play-page">
   <div class="ur-pregame-hero">
     <div class="ur-pregame-copy">
-      <p class="ur-pregame-kicker">Ultimate Run · Pre-game</p>
-      <h2 class="ur-pregame-title">Under the lights</h2>
+      <p class="ur-pregame-kicker">Ultimate Run · {record ? 'Post-game' : 'Pre-game'}</p>
+      <h2 class="ur-pregame-title">
+        {record ? 'The final whistle' : pending ? 'Ready for tip-off' : 'Under the lights'}
+      </h2>
       <p class="ur-page-description">
-        Set the matchup, play the committed simulation, then watch its recorded gamecast.
+        {record
+          ? 'Review the game, collect your rewards, and get ready for the next matchup.'
+          : 'Bring your lineup. Pick your challenge. Own the court.'}
       </p>
     </div>
     <div class="ur-pregame-status">
@@ -677,7 +712,9 @@
       <small
         >{playState?.pendingGame
           ? 'Locked until abandoned'
-          : 'Pre-game · setup locks on prepare'}</small
+          : record
+            ? 'Game saved · Rewards credited'
+            : 'Pre-game · setup locks on prepare'}</small
       >
       {#if playState}
         <span
@@ -788,11 +825,7 @@
           disabled={busy !== 'idle'}
           class="ur-btn-gold ur-start-sim px-5 py-2.5 text-sm outline-none disabled:opacity-40"
         >
-          {busy === 'playing'
-            ? 'Playing…'
-            : busy === 'committing'
-              ? 'Committing…'
-              : 'Start simulation →'}
+          {busy === 'playing' ? 'Playing…' : busy === 'committing' ? 'Saving game…' : 'Tip off →'}
         </button>
         <button
           type="button"
@@ -803,7 +836,7 @@
           Abandon matchup
         </button>
         <span class="ur-pending-note"
-          >Setup locks when you prepare. Abandoning never reuses it.</span
+          >Your lineup is locked. Abandon this matchup to change your setup.</span
         >
       </div>
       {#if busy === 'playing'}
@@ -1168,7 +1201,19 @@
       {@const splits = quarterSplitsOf(record)}
       <section aria-label="Result and gamecast" class="ur-gamecast mt-4">
         <div class="ur-broadcast-mast">
-          <p class="ur-broadcast-note">Recorded from the committed game. This is not live play.</p>
+          <div>
+            <p class="ur-broadcast-note">Game saved · Rewards added to your collection</p>
+            <div class="result-navigation" role="group" aria-label="Game result view">
+              {#each [{ id: 'recap', label: 'Recap' }, { id: 'replay', label: 'Replay' }, { id: 'box', label: 'Box score' }] as view (view.id)}
+                <button
+                  type="button"
+                  aria-pressed={resultView === view.id}
+                  onclick={() => selectResultView(view.id as 'recap' | 'replay' | 'box')}
+                  >{view.label}</button
+                >
+              {/each}
+            </div>
+          </div>
           <button
             type="button"
             onclick={prepare}
@@ -1177,10 +1222,24 @@
           >
             {busy === 'preparing' ? 'Preparing…' : 'Play again'}
           </button>
+          <button
+            type="button"
+            onclick={changeMatchup}
+            disabled={busy !== 'idle'}
+            class="ur-replay-btn">Change matchup</button
+          >
         </div>
         <div class="ur-scoreboard ur-final-board">
           <p class="ur-final-kicker">
-            {facts.winner === 'home' ? 'Final · Win' : 'Final · Loss'}
+            {resultView === 'replay' && watchMode !== 'fast'
+              ? 'Recorded replay'
+              : record.result.outcome !== 'completed'
+                ? facts.winner === 'home'
+                  ? 'Win by forfeit'
+                  : 'Loss by forfeit'
+                : facts.winner === 'home'
+                  ? 'Final · Win'
+                  : 'Final · Loss'}
             <span aria-hidden="true"> · </span>
             <span>
               {record.gameVersion === 'collection-game-v3'
@@ -1190,119 +1249,195 @@
                   : difficultyNameOf(record.prepared.difficulty.difficultyId)}
             </span>
           </p>
-          <div class="ur-scoreline" aria-label="Final score">
-            <div><span>You</span><strong class="ur-number">{facts.homeScore}</strong></div>
+          <div
+            class="ur-scoreline"
+            aria-label={resultView === 'replay' ? 'Replay score' : 'Final score'}
+          >
+            <div>
+              <span>You</span><strong class="ur-number"
+                >{resultView === 'replay' && scoreboardEvent
+                  ? scoreboardEvent.homeScore
+                  : facts.homeScore}</strong
+              >
+            </div>
             <span class="ur-score-divider" aria-hidden="true">-</span>
-            <div><span>CPU</span><strong class="ur-number">{facts.awayScore}</strong></div>
+            <div>
+              <span>CPU</span><strong class="ur-number"
+                >{resultView === 'replay' && scoreboardEvent
+                  ? scoreboardEvent.awayScore
+                  : facts.awayScore}</strong
+              >
+            </div>
           </div>
-          <p class="ur-final-coins">+{facts.rewardCoins} Coins</p>
-          {#if splits.length > 0}
-            <ol class="ur-quarter-strip" aria-label="Score by quarter">
-              {#each splits as split (split.label)}
+          {#if resultView !== 'replay'}
+            <p class="ur-final-coins">+{facts.rewardCoins} Coins</p>
+            {#if splits.length > 0}
+              <ol class="ur-quarter-strip" aria-label="Score by quarter">
+                {#each splits as split (split.label)}
+                  <li class="tabular-nums">
+                    <span>{split.label}</span><strong>{split.home}-{split.away}</strong>
+                  </li>
+                {/each}
+              </ol>
+            {/if}
+            <p class="ur-final-meta">
+              {facts.winner === 'home' ? 'You won' : 'CPU won'}
+              {facts.overtimePeriods > 0
+                ? ` · ${facts.overtimePeriods} overtime${facts.overtimePeriods === 1 ? '' : 's'}`
+                : ''}
+            </p>
+          {:else}
+            <p class="replay-clock">
+              {scoreboardEvent?.kind === 'final'
+                ? 'FINAL'
+                : scoreboardEvent
+                  ? `${scoreboardEvent.period > 4 ? `OT${scoreboardEvent.period - 4}` : `Q${scoreboardEvent.period}`} · ${clockLabel(scoreboardEvent.secondsRemaining)}`
+                  : 'No recorded events'}
+            </p>
+          {/if}
+        </div>
+
+        {#if resultView === 'replay'}
+          <p class="replay-disclaimer">
+            Replay of your saved game · playback does not change the result or rewards.
+          </p>
+          <div class="ur-gamecast-controls ur-control-bar">
+            <div class="ur-speed-pills" role="group" aria-label="Recorded replay speed">
+              {#each [{ id: 'fast', label: 'Final only' }, { id: 'standard', label: 'Highlights' }, { id: 'slow', label: 'Every play' }] as modeOption (modeOption.id)}
+                <button
+                  type="button"
+                  onclick={() => setMode(modeOption.id as WatchMode)}
+                  aria-pressed={watchMode === modeOption.id}
+                  class="ur-speed-pill"
+                  data-active={watchMode === modeOption.id}
+                >
+                  {modeOption.label}
+                </button>
+              {/each}
+            </div>
+            {#if watchMode !== 'fast'}
+              <div class="ur-replay-actions">
+                <button type="button" onclick={togglePlayback} class="ur-replay-primary">
+                  {playing ? 'Pause recording' : '⏵ Play recording'}
+                </button>
+                <button
+                  type="button"
+                  onclick={stepOnce}
+                  disabled={playing || cursor >= shownEvents.length - 1}
+                  class="ur-replay-btn"
+                >
+                  Next event
+                </button>
+                <button type="button" onclick={skipToFinal} class="ur-replay-btn">
+                  Skip to final
+                </button>
+              </div>
+            {/if}
+          </div>
+
+          {#if watchMode !== 'fast'}
+            {#if scoreboardEvent?.kind === 'possession'}
+              {@const scorer = scoreboardEvent.statDeltas.find((delta) => delta.points > 0)}
+              {@const scorerCard = scorer ? byId.get(scorer.cardId) : null}
+              {#if scorer && scorerCard}
+                <div class="replay-player">
+                  <MatchupCard
+                    card={scorerCard}
+                    compact
+                    detail={`${scorer.points} points this play · ${scorer.side === 'home' ? 'Your team' : 'CPU'}`}
+                  />
+                </div>
+              {/if}
+            {/if}
+            <label class="replay-scrubber"
+              ><span>Game timeline</span>
+              <input
+                type="range"
+                min="0"
+                max={Math.max(0, shownEvents.length - 1)}
+                value={cursor}
+                disabled={shownEvents.length === 0}
+                oninput={(event) => seekReplay(Number(event.currentTarget.value))}
+              />
+            </label>
+            <p class="ur-event-meta tabular-nums" aria-live="off">
+              {Math.min(cursor + 1, shownEvents.length)} / {shownEvents.length}
+              {watchMode === 'standard' ? '· 250 ms per event' : '· 650 ms per event'}
+              {#if scoreboardEvent}
+                <span>
+                  · Q{scoreboardEvent.period} · {clockLabel(scoreboardEvent.secondsRemaining)}</span
+                >
+              {/if}
+            </p>
+            <ol class="ur-recorded-events" aria-label="Recorded gamecast events">
+              {#each shownEvents
+                .slice(Math.max(0, cursor - 5), cursor + 1)
+                .reverse() as event (event.eventOrder)}
                 <li class="tabular-nums">
-                  <span>{split.label}</span><strong>{split.home}-{split.away}</strong>
+                  <span class="ur-event-q"
+                    >{event.period > 4 ? `OT${event.period - 4}` : `Q${event.period}`}</span
+                  >{eventLabel(event, nameOf)}
                 </li>
               {/each}
             </ol>
           {/if}
-          <p class="ur-final-meta">
-            {facts.winner === 'home' ? 'You won' : 'CPU won'}
-            {facts.overtimePeriods > 0
-              ? ` · ${facts.overtimePeriods} overtime${facts.overtimePeriods === 1 ? '' : 's'}`
-              : ''}
-          </p>
-        </div>
-
-        <div class="ur-gamecast-controls ur-control-bar">
-          <div class="ur-speed-pills" role="group" aria-label="Recorded replay speed">
-            {#each [{ id: 'fast', label: 'Fast' }, { id: 'standard', label: 'Standard' }, { id: 'slow', label: 'Slow' }] as modeOption (modeOption.id)}
-              <button
-                type="button"
-                onclick={() => setMode(modeOption.id as WatchMode)}
-                aria-pressed={watchMode === modeOption.id}
-                class="ur-speed-pill"
-                data-active={watchMode === modeOption.id}
-              >
-                {modeOption.label}
-              </button>
-            {/each}
-          </div>
-          {#if watchMode !== 'fast'}
-            <div class="ur-replay-actions">
-              <button type="button" onclick={togglePlayback} class="ur-replay-primary">
-                {playing ? 'Pause recording' : '⏵ Play recording'}
-              </button>
-              <button type="button" onclick={stepOnce} disabled={playing} class="ur-replay-btn">
-                Next event
-              </button>
-              <button type="button" onclick={skipToFinal} class="ur-replay-btn">
-                Skip to final
-              </button>
-            </div>
-          {/if}
-        </div>
-
-        {#if watchMode !== 'fast'}
-          <p class="ur-event-meta tabular-nums" aria-live="off">
-            {Math.min(cursor + 1, shownEvents.length)} / {shownEvents.length}
-            {watchMode === 'standard' ? '· 250 ms per event' : '· 650 ms per event'}
-            {#if scoreboardEvent}
-              <span>
-                · Q{scoreboardEvent.period} · {clockLabel(scoreboardEvent.secondsRemaining)}</span
-              >
-            {/if}
-          </p>
-          <ol class="ur-recorded-events" aria-label="Recorded gamecast events">
-            {#each shownEvents.slice(0, cursor + 1) as event (event.eventOrder)}
-              <li class="tabular-nums">
-                <span class="ur-event-q">Q{event.period}</span>{eventLabel(event)}
-              </li>
-            {/each}
-          </ol>
         {/if}
-
-        <div class="ur-facts-grid">
-          <div class="ur-facts-panel">
-            <h3>Game facts</h3>
-            <ul class="tabular-nums">
-              <li>
-                Top scorer (you): {facts.topHome
-                  ? `${nameOf(facts.topHome.cardId)} · ${facts.topHome.points}`
-                  : '—'}
-              </li>
-              <li>
-                Top scorer (CPU): {facts.topAway
-                  ? `${nameOf(facts.topAway.cardId)} · ${facts.topAway.points}`
-                  : '—'}
-              </li>
-              <li>Lead changes: {facts.leadChanges}</li>
-              <li>
-                Biggest lead: {facts.biggestLead.side === 'tied'
-                  ? 'none'
-                  : `${facts.biggestLead.side === 'home' ? 'You' : 'CPU'} by ${facts.biggestLead.points}`}
-              </li>
-              {#if facts.exceptions > 0}
-                <li>Short-handed foul exceptions: {facts.exceptions}</li>
-              {/if}
-            </ul>
+        {#if resultView === 'recap'}
+          <div class="scorer-spotlight">
+            {#each [{ top: facts.topHome, label: 'Your leading scorer' }, { top: facts.topAway, label: 'CPU leading scorer' }] as leader (leader.label)}
+              {@const card = leader.top ? byId.get(leader.top.cardId) : null}
+              {#if card && leader.top}<div>
+                  <p>{leader.label}</p>
+                  <MatchupCard
+                    {card}
+                    compact
+                    detail={`${leader.top.points} points · Final game stats`}
+                  />
+                </div>{/if}
+            {/each}
           </div>
-          {#if !recordV2}
+          <div class="ur-facts-grid">
             <div class="ur-facts-panel">
-              <h3>Reward breakdown</h3>
-              <p class="tabular-nums">
-                +{facts.rewardCoins} Coins ({facts.rewardReason === 'game-win-reward'
-                  ? 'win'
-                  : 'loss'}) · balances now {balances.Coins} Coins.
-              </p>
+              <h3>Game facts</h3>
+              <ul class="tabular-nums">
+                <li>
+                  Top scorer (you): {facts.topHome
+                    ? `${nameOf(facts.topHome.cardId)} · ${facts.topHome.points}`
+                    : '—'}
+                </li>
+                <li>
+                  Top scorer (CPU): {facts.topAway
+                    ? `${nameOf(facts.topAway.cardId)} · ${facts.topAway.points}`
+                    : '—'}
+                </li>
+                <li>Lead changes: {facts.leadChanges}</li>
+                <li>
+                  Biggest lead: {facts.biggestLead.side === 'tied'
+                    ? 'none'
+                    : `${facts.biggestLead.side === 'home' ? 'You' : 'CPU'} by ${facts.biggestLead.points}`}
+                </li>
+                {#if facts.exceptions > 0}
+                  <li>Short-handed foul exceptions: {facts.exceptions}</li>
+                {/if}
+              </ul>
             </div>
+            {#if !recordV2}
+              <div class="ur-facts-panel">
+                <h3>Reward breakdown</h3>
+                <p class="tabular-nums">
+                  +{facts.rewardCoins} Coins ({facts.rewardReason === 'game-win-reward'
+                    ? 'win'
+                    : 'loss'}) · balances now {balances.Coins} Coins.
+                </p>
+              </div>
+            {/if}
+          </div>
+
+          {#if recordV2}
+            <RewardReceipt record={recordV2} {balances} {objectiveTitleOf} />
           {/if}
-        </div>
-
-        {#if recordV2}
-          <RewardReceipt record={recordV2} {balances} {objectiveTitleOf} />
         {/if}
-
-        {#if record.result.outcome === 'completed'}
+        {#if resultView === 'box' && record.result.outcome === 'completed'}
           {@const completed = record.result}
           <div class="mt-4 grid gap-4 md:grid-cols-2">
             {#each [{ side: completed.home, label: 'Your box score' }, { side: completed.away, label: 'CPU box score' }] as box (box.label)}
@@ -1322,7 +1457,16 @@
                   <tbody>
                     {#each box.side.players as player (player.cardId)}
                       <tr>
-                        <th scope="row" class="pr-2 font-semibold">{nameOf(player.cardId)}</th>
+                        <th scope="row" class="pr-2 font-semibold"
+                          ><span class="box-player"
+                            ><span class="box-card-symbol" aria-hidden="true">▱</span><span
+                              >{nameOf(player.cardId)}<small
+                                >{byId.get(player.cardId)?.rarity ?? ''} · {byId.get(player.cardId)
+                                  ?.positions[0] ?? ''}</small
+                              ></span
+                            ></span
+                          ></th
+                        >
                         <td class="pr-2">{player.minutes.toFixed(1)}</td>
                         <td class="pr-2">{player.points}</td>
                         <td class="pr-2">{player.rebounds.total}</td>
@@ -1336,12 +1480,116 @@
             {/each}
           </div>
         {/if}
+        {#if resultView === 'box' && record.result.outcome !== 'completed'}
+          <p class="replay-disclaimer">
+            This game ended by forfeit. No player box score was recorded.
+          </p>
+        {/if}
       </section>
     {/if}
   {/if}
 </div>
 
 <style>
+  .result-navigation {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.75rem;
+  }
+  .result-navigation button {
+    min-height: 2.75rem;
+    padding: 0.55rem 1.1rem;
+    border: 1px solid var(--ur-line-strong);
+    border-radius: 0.4rem;
+    color: var(--ur-muted);
+    background: var(--ur-bg);
+    font-weight: 800;
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
+  .result-navigation button[aria-pressed='true'] {
+    color: #101a23;
+    background: var(--ur-apex);
+    border-color: var(--ur-apex);
+  }
+  .result-navigation button:focus-visible {
+    outline: 2px solid var(--ur-focus);
+    outline-offset: 3px;
+  }
+  .replay-player {
+    max-width: 24rem;
+    margin-top: 1rem;
+  }
+  .replay-clock {
+    margin-top: 0.7rem;
+    color: var(--ur-apex);
+    font:
+      800 1.2rem ui-monospace,
+      monospace;
+  }
+  .replay-disclaimer {
+    margin: 1rem 0;
+    color: var(--ur-muted);
+    font-size: 0.8rem;
+  }
+  .replay-scrubber {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-top: 1rem;
+    color: var(--ur-muted);
+    font-size: 0.75rem;
+  }
+  .replay-scrubber input {
+    flex: 1;
+    min-width: 8rem;
+    accent-color: var(--ur-apex);
+    height: 2rem;
+    cursor: pointer;
+  }
+  .scorer-spotlight {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+  .scorer-spotlight p {
+    color: var(--ur-muted);
+    font-size: 0.7rem;
+    margin-bottom: 0.5rem;
+  }
+  .box-player {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    min-width: 9rem;
+    padding: 0.4rem 0;
+  }
+  .box-player small {
+    display: block;
+    color: var(--ur-muted);
+    font-size: 0.6rem;
+    font-weight: 500;
+  }
+  .box-card-symbol {
+    display: grid;
+    place-items: center;
+    width: 1.75rem;
+    height: 2.25rem;
+    border: 1px solid var(--ur-apex);
+    border-radius: 0.25rem;
+    color: var(--ur-apex);
+    background: #ffcd5910;
+    font-size: 1.4rem;
+  }
+  @media (max-width: 520px) {
+    .scorer-spotlight {
+      grid-template-columns: 1fr;
+    }
+  }
+
   .ur-mode-switch {
     margin-top: 1rem;
   }

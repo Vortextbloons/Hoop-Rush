@@ -2,6 +2,7 @@ import {
   COLLECTION_GAME_WORKER_WIRE_VERSION,
   collectionGameWorkerMessageSchema,
   collectionGameWorkerRequestSchema,
+  collectionGameWorkerVerifiedMessageSchema,
   loadCollectionCatalog,
   loadEraSimulationProfile,
   type CollectionCatalog,
@@ -9,10 +10,13 @@ import {
   type CollectionGameWorkerErrorCode,
   type CollectionGameWorkerErrorMessage,
   type CollectionGameWorkerSimulateRequest,
+  type CollectionGameWorkerVerifyRequest,
+  type CollectionGameWorkerVerifiedMessage,
   type EraSimulationProfile,
   type Seed,
 } from '@hoop-rush/data-contracts';
 import {
+  applyCollectionGameCommand,
   checkCollectionGameResult,
   collectionGameEventDigest,
   collectionGameResultDigest,
@@ -95,7 +99,8 @@ async function handleSimulate(request: CollectionGameWorkerSimulateRequest): Pro
       );
       return;
     }
-    const { result, events } = simulateCollectionGame(prepared, catalog, profile);
+    const simulated = simulateCollectionGame(prepared, catalog, profile);
+    const { result, events } = simulated;
     if (isStale(requestId)) return;
     if (result.gameVersion !== prepared.gameVersion) {
       postError(
@@ -107,7 +112,14 @@ async function handleSimulate(request: CollectionGameWorkerSimulateRequest): Pro
       );
       return;
     }
-    const failures = checkCollectionGameResult(result, events, prepared, catalog, profile);
+    const failures = checkCollectionGameResult(
+      result,
+      events,
+      prepared,
+      catalog,
+      profile,
+      simulated,
+    );
     if (failures.length > 0) {
       postError(
         requestId,
@@ -138,6 +150,53 @@ async function handleSimulate(request: CollectionGameWorkerSimulateRequest): Pro
       error instanceof Error ? error.message : 'unknown worker failure',
       prepared.gameId,
       prepared.seed,
+    );
+  }
+}
+
+async function handleVerify(request: CollectionGameWorkerVerifyRequest): Promise<void> {
+  const { requestId } = request;
+  currentRequestId = requestId;
+  cancelled = false;
+  try {
+    const [catalog, profile] = await Promise.all([
+      loadCatalogCached(request.catalogUrl, request.catalogHash),
+      loadProfileCached(request.profileUrl, request.profileHash),
+    ]);
+    if (isStale(requestId)) return;
+    const outcome = applyCollectionGameCommand(request.playState, request.command, {
+      catalog,
+      ownedCardIds: new Set(request.ownedCardIds),
+      rootSeed: request.rootSeed,
+      cpuWeights: request.cpuWeights,
+      difficultyProfiles: request.difficultyProfiles,
+      objectiveDefinitions: request.objectiveDefinitions,
+      profile,
+      profileHash: request.profileHash,
+      catalogHash: request.catalogHash,
+      rulesHash: request.rulesHash,
+      balances: request.balances,
+      priorCommands: request.priorCommands,
+      progression: request.progression,
+      progressionHash: request.progressionHash,
+    });
+    if (isStale(requestId)) return;
+    const verified: CollectionGameWorkerVerifiedMessage = {
+      wireVersion: COLLECTION_GAME_WORKER_WIRE_VERSION,
+      type: 'collection-game-verified',
+      requestId,
+      outcome,
+    };
+    collectionGameWorkerVerifiedMessageSchema.parse(verified);
+    self.postMessage(verified);
+  } catch (error) {
+    if (isStale(requestId)) return;
+    postError(
+      requestId,
+      'internal',
+      error instanceof Error ? error.message : 'unknown worker failure',
+      null,
+      null,
     );
   }
 }
@@ -174,5 +233,9 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
     return;
   }
   if (cancelled && request.requestId === currentRequestId) return;
+  if (request.type === 'collection-game-verify') {
+    void handleVerify(request);
+    return;
+  }
   void handleSimulate(request);
 };

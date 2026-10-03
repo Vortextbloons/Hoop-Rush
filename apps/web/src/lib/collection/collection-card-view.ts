@@ -12,6 +12,7 @@ export interface CollectionCardView {
   name: string;
   season: string;
   franchiseId: string;
+  eraId: CollectionIndexEntry['eraId'];
   rarity: CollectionIndexEntry['rarity'];
   family: CollectionIndexEntry['family'];
   availability: CollectionIndexEntry['availability'];
@@ -37,6 +38,7 @@ export function collectionCardViewOf(input: {
     name: entry.displayName,
     season: entry.seasonKey,
     franchiseId: entry.franchiseId,
+    eraId: entry.eraId,
     rarity: entry.rarity,
     family: entry.family,
     availability: entry.availability,

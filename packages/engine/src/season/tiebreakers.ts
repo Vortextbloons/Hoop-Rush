@@ -44,6 +44,7 @@ interface RankContext {
   resolutions: SeasonTiebreakResolution[];
   conference: SeasonConferenceId;
   seed: string;
+  divisionChampions: Map<string, string> | null;
 }
 const TWO_TEAM_CRITERIA: readonly TiebreakCriterion[] = [
   headToHeadCriterion(),
@@ -122,27 +123,73 @@ function recordVsEligibleOf(
   }
   return { wins, losses };
 }
+function standingsRowOf(ctx: RankContext, franchiseId: string): SeasonStandingsRow {
+  const row = ctx.rowOf.get(franchiseId);
+  if (row === undefined) {
+    throw new Error(`tiebreak: no standings row for ${franchiseId}`);
+  }
+  return row;
+}
+
+function divisionLeadersOf(ctx: RankContext, ids: readonly string[]): string[] {
+  let leaders: string[] = [];
+  for (const franchiseId of ids) {
+    const row = standingsRowOf(ctx, franchiseId);
+    const top = leaders[0];
+    if (top === undefined) {
+      leaders.push(franchiseId);
+      continue;
+    }
+    const topRow = standingsRowOf(ctx, top);
+    const byPct = compareWinPct(row.wins, row.losses, topRow.wins, topRow.losses);
+    if (byPct < 0) leaders = [franchiseId];
+    else if (byPct === 0) leaders.push(franchiseId);
+  }
+  return leaders;
+}
+
+function divisionChampionsOf(ctx: RankContext): Map<string, string> {
+  if (ctx.divisionChampions !== null) return ctx.divisionChampions;
+  const divisions = new Map<string, string[]>();
+  for (const team of ctx.league.teams) {
+    const ids = divisions.get(team.division);
+    if (ids === undefined) divisions.set(team.division, [team.franchiseId]);
+    else ids.push(team.franchiseId);
+  }
+  const champions = new Map<string, string>();
+  for (const division of [...divisions.keys()].sort()) {
+    const ids = divisions.get(division);
+    const first = ids?.[0];
+    if (ids === undefined || first === undefined) continue;
+    const leaders = divisionLeadersOf(ctx, ids);
+    if (leaders.length === 1) {
+      const champion = leaders[0];
+      if (champion !== undefined) champions.set(division, champion);
+      continue;
+    }
+    const neutral: RankContext = {
+      ...ctx,
+      sameEligible: null,
+      oppositeEligible: null,
+      divisionChampions: new Map<string, string>(),
+    };
+    const ordered = resolveTieGroup(
+      neutral,
+      [...leaders].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)),
+    );
+    const winner = ordered[0];
+    if (winner !== undefined) champions.set(division, winner);
+  }
+  ctx.divisionChampions = champions;
+  return champions;
+}
+
 function isDivisionChampion(ctx: RankContext, franchiseId: string): boolean {
   const team = ctx.league.teams.find((entry) => entry.franchiseId === franchiseId);
   if (team === undefined) {
     throw new Error(`tiebreak: ${franchiseId} is not part of the league`);
   }
-  const row = ctx.rowOf.get(franchiseId);
-  if (row === undefined) {
-    throw new Error(`tiebreak: no standings row for ${franchiseId}`);
-  }
-  for (const other of ctx.league.teams) {
-    if (other.franchiseId === franchiseId || other.division !== team.division) continue;
-    const otherRow = ctx.rowOf.get(other.franchiseId);
-    if (otherRow === undefined) {
-      throw new Error(`tiebreak: no standings row for ${other.franchiseId}`);
-    }
-    const byPct = compareWinPct(otherRow.wins, otherRow.losses, row.wins, row.losses);
-    if (byPct === -1 || (byPct === 0 && otherRow.wins > row.wins)) {
-      return false;
-    }
-  }
-  return true;
+  return divisionChampionsOf(ctx).get(team.division) === franchiseId;
 }
 function recordLabelOf(wins: number, losses: number): string {
   return `${String(wins)}-${String(losses)}`;
@@ -562,6 +609,7 @@ function freshContext(league: SeasonLeague, standings: SeasonStandings, seed: st
     resolutions: [],
     conference: 'east',
     seed,
+    divisionChampions: null,
   };
 }
 export function rankSeasonPostseason(

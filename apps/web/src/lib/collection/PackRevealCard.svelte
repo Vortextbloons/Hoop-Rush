@@ -2,6 +2,8 @@
   import type { CollectionRarity, HoopRushManifest } from '@hoop-rush/data-contracts';
   import { formatPositions } from '$lib/player-positions';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
+  import { asset } from '$app/paths';
+  import { collectionCardArtOf } from './collection-card-art.ts';
   import type { CollectionCardView } from './collection-card-view.ts';
 
   let {
@@ -22,6 +24,8 @@
     compact?: boolean;
   } = $props();
 
+  const artwork = $derived(collectionCardArtOf(view));
+
   function initialsOf(name: string): string {
     return name
       .split(' ')
@@ -37,7 +41,9 @@
   class:ur-reveal-card-compact={compact}
 >
   <div class="ur-reveal-face" aria-hidden="true">
-    {#if view && manifest}
+    {#if artwork}
+      <img src={asset(artwork)} alt="" class="ur-special-art" />
+    {:else if view && manifest}
       <PlayerFace
         player={{
           playerId: view.playerId,
@@ -164,6 +170,13 @@
     object-fit: cover;
     object-position: 50% 12%;
     transform: scale(1.12);
+  }
+
+  .ur-reveal-face .ur-special-art {
+    position: absolute;
+    inset: 0;
+    object-position: center;
+    transform: none;
   }
 
   .ur-reveal-overall {

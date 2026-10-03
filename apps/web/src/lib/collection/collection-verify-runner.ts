@@ -2,34 +2,46 @@ import {
   COLLECTION_GAME_WORKER_WIRE_VERSION,
   collectionGameWorkerMessageSchema,
   collectionGameWorkerRequestSchema,
-  type CollectionGameWorkerCompleteMessage,
-  type CollectionPreparedGameUnion,
+  type CollectionGameCommand,
+  type CollectionPlayState,
 } from '@hoop-rush/data-contracts';
+import type { CollectionGameCommandInput, CollectionGameCommandResult } from '@hoop-rush/engine';
+import type { CollectionGameWorkerAssets } from './collection-hub';
 
-export interface CollectionGameRunInput {
-  prepared: CollectionPreparedGameUnion;
-  catalogUrl: string;
-  catalogHash: string;
-  profileUrl: string;
-  profileHash: string;
+export interface CollectionGameVerifyRunInput {
+  playState: CollectionPlayState;
+  command: CollectionGameCommand;
+  engineInput: CollectionGameCommandInput;
+  assets: CollectionGameWorkerAssets;
   requestId?: string;
   createWorker?: () => Worker;
 }
 
-export function runCollectionGame(
-  input: CollectionGameRunInput,
-): Promise<CollectionGameWorkerCompleteMessage> {
+export function runCollectionGameVerification(
+  input: CollectionGameVerifyRunInput,
+): Promise<CollectionGameCommandResult> {
   return new Promise((resolve, reject) => {
     const requestId = input.requestId ?? crypto.randomUUID();
     const request = collectionGameWorkerRequestSchema.parse({
       wireVersion: COLLECTION_GAME_WORKER_WIRE_VERSION,
-      type: 'collection-game-simulate',
+      type: 'collection-game-verify',
       requestId,
-      prepared: input.prepared,
-      catalogUrl: input.catalogUrl,
-      catalogHash: input.catalogHash,
-      profileUrl: input.profileUrl,
-      profileHash: input.profileHash,
+      playState: input.playState,
+      command: input.command,
+      catalogUrl: input.assets.catalogUrl,
+      catalogHash: input.engineInput.catalogHash,
+      profileUrl: input.assets.profileUrl,
+      profileHash: input.engineInput.profileHash,
+      rootSeed: input.engineInput.rootSeed,
+      ownedCardIds: [...input.engineInput.ownedCardIds],
+      cpuWeights: input.engineInput.cpuWeights,
+      difficultyProfiles: input.engineInput.difficultyProfiles,
+      objectiveDefinitions: input.engineInput.objectiveDefinitions,
+      rulesHash: input.engineInput.rulesHash,
+      balances: input.engineInput.balances,
+      priorCommands: [...input.engineInput.priorCommands],
+      progression: input.engineInput.progression,
+      progressionHash: input.engineInput.progressionHash,
     });
     let worker: Worker;
     try {
@@ -58,23 +70,17 @@ export function runCollectionGame(
       if (message.type === 'collection-game-warm-ack') return;
       if (message.requestId !== requestId) return;
       cleanup();
-      if (message.type === 'collection-game-complete') {
-        if (message.gameId !== input.prepared.gameId) {
-          reject(new Error('The worker returned a different game.'));
-          return;
-        }
-        if (message.result.gameVersion !== input.prepared.gameVersion) {
-          reject(new Error('The worker returned a result for a different game version.'));
-          return;
-        }
-        resolve(message);
+      if (message.type === 'collection-game-verified') {
+        resolve(message.outcome as CollectionGameCommandResult);
         return;
       }
-      if (message.type === 'collection-game-error') {
-        reject(new Error(message.message));
-        return;
-      }
-      reject(new Error('The game worker sent an unexpected message.'));
+      reject(
+        new Error(
+          message.type === 'collection-game-error'
+            ? message.message
+            : 'The game worker sent an unexpected message.',
+        ),
+      );
     };
     const onError = (event: ErrorEvent): void => {
       cleanup();

@@ -21,6 +21,7 @@ import {
   collectionGameEventDigest,
   collectionGameResultDigest,
   simulateCollectionGame,
+  type SimulatedCollectionGame,
 } from './game.ts';
 import { evaluateCollectionObjective } from './objectives.ts';
 import {
@@ -38,24 +39,25 @@ export function checkCollectionGameResult(
   prepared: CollectionPreparedGameUnion,
   catalog: CollectionCatalog,
   profile: EraSimulationProfile,
+  reproduced?: SimulatedCollectionGame,
 ): string[] {
   const failures: string[] = [];
   if (prepared.gameVersion !== COLLECTION_GAME_V1_VERSION) {
     failures.push(...verifyDifficultyRatingAdjustments(prepared, catalog));
   }
-  let reproduced: ReturnType<typeof simulateCollectionGame>;
+  let audited: SimulatedCollectionGame;
   try {
-    reproduced = simulateCollectionGame(prepared, catalog, profile);
+    audited = reproduced ?? simulateCollectionGame(prepared, catalog, profile);
   } catch (error) {
     return [`reproduction failed: ${(error as Error).message}`];
   }
-  if (canonicalJson(reproduced.result) !== canonicalJson(result)) {
+  if (canonicalJson(audited.result) !== canonicalJson(result)) {
     failures.push('determinism: re-running the prepared input produced a different result');
   }
-  if (canonicalJson(reproduced.events) !== canonicalJson([...events])) {
+  if (canonicalJson(audited.events) !== canonicalJson([...events])) {
     failures.push('determinism: re-running the prepared input produced different events');
   }
-  if (collectionGameResultDigest(result) !== collectionGameResultDigest(reproduced.result)) {
+  if (collectionGameResultDigest(result) !== collectionGameResultDigest(audited.result)) {
     failures.push('result digest mismatch');
   }
   if (result.gameId !== prepared.gameId || result.gameSequence !== prepared.gameSequence) {

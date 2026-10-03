@@ -5,6 +5,7 @@
     CollectionPreparedGameV3,
   } from '@hoop-rush/data-contracts';
   import { formatMultiplier, objectiveConditionLabel, ratingLabel } from './collection-setup.ts';
+  import MatchupCard from './MatchupCard.svelte';
   import { requirementLabel } from './collection-progression-view.ts';
 
   let {
@@ -38,14 +39,6 @@
   function nameOf(cardId: string): string {
     return cardById.get(cardId)?.displayName ?? 'Unknown card';
   }
-
-  function overallOf(cardId: string): number | null {
-    return cardById.get(cardId)?.summarySource?.overallRating ?? null;
-  }
-
-  function positionOf(cardId: string): string {
-    return cardById.get(cardId)?.positions[0] ?? '—';
-  }
 </script>
 
 <section aria-label="Declared matchup" class="ur-matchup-report mt-4">
@@ -58,10 +51,10 @@
       <p class="ur-prepared-sub">
         {challenge
           ? `${requirementLabel(challenge.requirement)} · snapshotted from the committed team before tip-off.`
-          : 'The simulation is ready. Start the game and watch the action unfold.'}
+          : 'Your cards are on the floor. Scout the opposition, then tip off.'}
       </p>
     </div>
-    <p class="ur-lock-stamp">Locked until abandoned</p>
+    <p class="ur-lock-stamp">Roster locked</p>
   </div>
 
   {#if challenge}
@@ -154,56 +147,66 @@
     {/if}
   </div>
 
-  <div class="ur-roster-grid">
-    <div class="ur-roster-col">
-      <h3>Your starters</h3>
-      <ul>
-        {#each prepared.playerTeam.starters as cardId (cardId)}
-          <li>
-            <span class="ur-row-main">
-              <span class="ur-row-name">{nameOf(cardId)}</span>
-              <span class="ur-row-sub tabular-nums">
-                {overallOf(cardId) === null ? '' : `OVR ${overallOf(cardId)}`}
-              </span>
-            </span>
-            <span class="ur-pos-badge">{positionOf(cardId)}</span>
-          </li>
-        {/each}
-      </ul>
+  <div class="matchup-stage">
+    <div class="team-heading">
+      <h3>Your starting five</h3>
+      <span>YOUR TEAM</span>
     </div>
-    <div class="ur-roster-col">
-      <h3>CPU roster</h3>
-      <ul>
-        {#each cpuRoster as cardId (cardId)}
-          <li>
-            <span class="ur-row-main">
-              <span class="ur-cpu-tags">
-                <span
-                  class="ur-rarity-pill"
-                  data-rarity={(cardById.get(cardId)?.rarity ?? '').toLowerCase()}
-                >
-                  {cardById.get(cardId)?.rarity ?? '—'}
-                </span>
-                <span class="ur-row-name">{nameOf(cardId)}</span>
-                {#if prepared.construction.starters.includes(cardId)}
-                  <span class="ur-tag">starter</span>
-                {/if}
-                {#if closingFive.has(cardId)}
-                  <span class="ur-tag ur-tag-closer">closer</span>
-                {/if}
-              </span>
-            </span>
-            <span class="ur-row-sub tabular-nums">
-              {minutesById.get(cardId) ?? 0} min
-            </span>
-          </li>
-        {/each}
-      </ul>
+    <div class="starter-deck">
+      {#each prepared.playerTeam.starters as cardId (cardId)}
+        {@const card = cardById.get(cardId)}
+        {#if card}<MatchupCard {card} />{/if}
+      {/each}
     </div>
+    <div class="versus-line"><span></span><strong>VS</strong><span></span></div>
+    <div class="team-heading opponent">
+      <h3>CPU starting five</h3>
+      <span>{prepared.construction.identity} · {cpuRoster.length} CARDS</span>
+    </div>
+    <div class="starter-deck">
+      {#each prepared.construction.starters as cardId (cardId)}
+        {@const card = cardById.get(cardId)}
+        {#if card}<MatchupCard
+            {card}
+            detail={`${minutesById.get(cardId) ?? 0} min${closingFive.has(cardId) ? ' · Closer' : ''}`}
+          />{/if}
+      {/each}
+    </div>
+    <details class="bench-drawer">
+      <summary
+        >Scout the benches <span
+          >{prepared.playerTeam.bench.length} yours · {prepared.construction.bench.length} CPU</span
+        ></summary
+      >
+      <div class="bench-teams">
+        {#each [{ label: 'Your bench', ids: prepared.playerTeam.bench }, { label: 'CPU bench', ids: prepared.construction.bench }] as team (team.label)}
+          <div>
+            <h3>{team.label}</h3>
+            <div class="bench-cards">
+              {#each team.ids as cardId (cardId)}
+                {@const card = cardById.get(cardId)}
+                {#if card}<MatchupCard
+                    {card}
+                    compact
+                    detail={team.label === 'CPU bench'
+                      ? `${minutesById.get(cardId) ?? 0} min${closingFive.has(cardId) ? ' · Closer' : ''}`
+                      : ''}
+                  />{/if}
+              {/each}
+            </div>
+          </div>
+        {/each}
+      </div>
+    </details>
   </div>
 
-  <div class="ur-adjustment-strip">
-    <h3>Declared CPU rating adjustment</h3>
+  <details class="ur-adjustment-strip">
+    <summary
+      >Difficulty rating adjustments <span
+        >{prepared.adjustments.requestedDelta > 0 ? '+' : ''}{prepared.adjustments.requestedDelta} CPU
+        ratings</span
+      ></summary
+    >
     {#if prepared.adjustments.requestedDelta === 0}
       <p>
         {prepared.difficulty.displayName} records a 0 rating shift, so no per-card adjustment facts were
@@ -239,10 +242,107 @@
         {/each}
       </div>
     {/if}
-  </div>
+  </details>
 </section>
 
 <style>
+  .matchup-stage {
+    padding: clamp(0.85rem, 2.4vw, 1.25rem);
+    background: radial-gradient(ellipse at center, #233a493d, transparent 70%);
+  }
+  .team-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+  .team-heading h3,
+  .bench-teams h3 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+  }
+  .team-heading > span {
+    color: #8bc9e0;
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .opponent > span {
+    color: #ffaf7d;
+  }
+  .starter-deck {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.65rem;
+  }
+  .versus-line {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin: 1.2rem 0;
+  }
+  .versus-line span {
+    height: 1px;
+    width: 25%;
+    background: var(--ur-line-strong);
+  }
+  .versus-line strong {
+    color: var(--ur-apex);
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-style: italic;
+  }
+  .bench-drawer {
+    margin-top: 1rem;
+    border-top: 1px solid var(--ur-line);
+    padding-top: 0.8rem;
+  }
+  summary {
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 800;
+  }
+  summary > span {
+    margin-left: 0.5rem;
+    color: var(--ur-muted);
+    font-size: 0.7rem;
+    font-weight: 500;
+  }
+  summary:focus-visible {
+    outline: 2px solid var(--ur-focus);
+    outline-offset: 4px;
+  }
+  .bench-teams {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+  .bench-cards {
+    display: grid;
+    gap: 0.4rem;
+    margin-top: 0.6rem;
+  }
+  @media (max-width: 620px) {
+    .starter-deck {
+      grid-template-columns: repeat(5, 8rem);
+      overflow-x: auto;
+      padding-bottom: 0.75rem;
+      scroll-snap-type: x proximity;
+    }
+    .starter-deck :global(.match-card) {
+      scroll-snap-align: start;
+    }
+    .bench-teams {
+      grid-template-columns: 1fr;
+    }
+  }
+
   .ur-matchup-report {
     overflow: hidden;
     border: 1px solid color-mix(in srgb, var(--ur-apex) 30%, var(--ur-line-strong));
@@ -369,117 +469,6 @@
     color: var(--ur-muted);
     font-size: 0.76rem;
   }
-  .ur-roster-grid {
-    display: grid;
-    gap: 0.9rem;
-    padding: clamp(0.85rem, 2.4vw, 1.25rem);
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .ur-roster-col h3 {
-    margin: 0 0 0.55rem;
-    padding-bottom: 0.45rem;
-    border-bottom: 1px solid var(--ur-line-strong);
-    color: #fff;
-    font-family: var(--font-display);
-    font-size: 0.95rem;
-    font-weight: 850;
-  }
-  .ur-roster-col ul {
-    display: grid;
-    gap: 0.35rem;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-  .ur-roster-col li {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.6rem;
-    min-height: 2.6rem;
-    padding: 0.45rem 0.6rem;
-    border: 1px solid var(--ur-line);
-    border-radius: 0.55rem;
-    background: #0e1418;
-  }
-  .ur-row-main {
-    display: flex;
-    min-width: 0;
-    flex: 1;
-    flex-direction: column;
-  }
-  .ur-row-name {
-    overflow: hidden;
-    color: var(--ur-paper);
-    font-size: 0.8rem;
-    font-weight: 700;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .ur-row-sub {
-    color: var(--ur-muted);
-    font-size: 0.68rem;
-  }
-  .ur-pos-badge {
-    display: inline-grid;
-    min-width: 1.7rem;
-    height: 1.45rem;
-    flex: none;
-    place-items: center;
-    padding-inline: 0.35rem;
-    border: 1px solid color-mix(in srgb, var(--ur-apex) 55%, transparent);
-    border-radius: 0.35rem;
-    color: var(--ur-apex);
-    font-size: 0.64rem;
-    font-weight: 900;
-  }
-  .ur-cpu-tags {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.35rem;
-  }
-  .ur-rarity-pill {
-    padding: 0.14rem 0.4rem;
-    border: 1px solid currentColor;
-    border-radius: 0.3rem;
-    font-size: 0.6rem;
-    font-weight: 800;
-  }
-  .ur-rarity-pill[data-rarity='apex'] {
-    color: var(--ur-apex);
-    background: rgb(255 197 61 / 10%);
-  }
-  .ur-rarity-pill[data-rarity='eclipse'] {
-    color: #c4b0ff;
-    background: rgb(139 92 246 / 14%);
-  }
-  .ur-rarity-pill[data-rarity='eruption'] {
-    color: #ff8a5c;
-    background: rgb(255 90 42 / 12%);
-  }
-  .ur-rarity-pill[data-rarity='ember'] {
-    color: #e0a37c;
-    background: rgb(198 90 46 / 12%);
-  }
-  .ur-rarity-pill[data-rarity='titan'] {
-    color: var(--ur-titan);
-    background: rgb(169 180 216 / 12%);
-  }
-  .ur-rarity-pill[data-rarity='immortal'] {
-    color: var(--ur-immortal);
-    background: rgb(255 233 176 / 10%);
-  }
-  .ur-tag {
-    color: var(--ur-muted);
-    font-size: 0.6rem;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-  .ur-tag-closer {
-    color: var(--ur-apex);
-  }
   .ur-adjustment-strip {
     margin: 0 clamp(0.85rem, 2.4vw, 1.25rem) clamp(0.85rem, 2.4vw, 1.25rem);
     padding: 0.8rem 0.9rem;
@@ -488,7 +477,7 @@
     border-radius: 0.15rem 0.6rem 0.6rem 0.15rem;
     background: #10171c;
   }
-  .ur-adjustment-strip h3 {
+  .ur-adjustment-strip summary {
     margin: 0;
     color: #fff;
     font-size: 0.8rem;
@@ -538,9 +527,6 @@
   @media (max-width: 900px) {
     .ur-fact-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-    .ur-roster-grid {
-      grid-template-columns: minmax(0, 1fr);
     }
     .ur-adjust-grid {
       grid-template-columns: minmax(0, 1fr);

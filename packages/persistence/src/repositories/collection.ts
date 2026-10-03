@@ -36,6 +36,8 @@ import {
   migrateCollectionPlayStateV2,
   migrateCollectionStateV1,
   validateCollectionProgressionRules,
+  type CollectionGameCommandInput,
+  type CollectionGameCommandResult,
 } from '@hoop-rush/engine';
 import { HoopRushDatabase } from './dexie.ts';
 import {
@@ -102,6 +104,16 @@ export class CollectionGameCommandConflictError extends Error {
   }
 }
 
+export type CollectionGameCommandApplier = (
+  playState: CollectionPlayState,
+  command: CollectionGameCommand,
+  input: CollectionGameCommandInput,
+) => Promise<CollectionGameCommandResult>;
+
+export interface DexieCollectionRepositoryOptions {
+  applyGameCommand?: CollectionGameCommandApplier;
+}
+
 export interface LoadedCollection {
   state: CollectionState;
   pulls: CollectionPullRecord[];
@@ -144,99 +156,123 @@ function checked<T>(parse: () => T, label: string): T {
 
 export class DexieCollectionRepository {
   private readonly db: HoopRushDatabase;
-  constructor(db: HoopRushDatabase = new HoopRushDatabase()) {
+  private readonly applyGameCommand: CollectionGameCommandApplier;
+  constructor(
+    db: HoopRushDatabase = new HoopRushDatabase(),
+    options: DexieCollectionRepositoryOptions = {},
+  ) {
     this.db = db;
+    this.applyGameCommand =
+      options.applyGameCommand ??
+      ((playState, command, input) =>
+        Promise.resolve(applyEngineGameCommand(playState, command, input)));
   }
 
   async loadCollection(collectionId: string): Promise<LoadedCollection | null> {
-    const row = await this.db.collectionState.get(collectionId);
-    if (row === undefined) return null;
-    const savedVersion: number = row.saveSchemaVersion;
-    if (savedVersion !== COLLECTION_SAVE_VERSION && savedVersion !== COLLECTION_SAVE_V1_VERSION) {
-      throw new CollectionLoadError('unsupported', [
-        `saveSchemaVersion ${String(savedVersion)} != ${String(COLLECTION_SAVE_VERSION)}`,
-      ]);
-    }
-    const parsedRow = checked(() => storedCollectionStateUnionSchema.parse(row), 'state row');
-    const state: CollectionState =
-      parsedRow.saveSchemaVersion === COLLECTION_SAVE_VERSION
-        ? parsedRow.state
-        : migrateCollectionStateV1(parsedRow.state);
-    const ownership = await this.db.collectionOwnership
-      .where('[collectionId+cardId]')
-      .between([collectionId, ''], [collectionId, '￿'])
-      .toArray();
-    const pulls = await this.db.collectionPulls
-      .where('[collectionId+pullSequence]')
-      .between([collectionId, -1], [collectionId, Number.MAX_SAFE_INTEGER])
-      .toArray();
-    const ledger = await this.db.collectionLedger
-      .where('[collectionId+transactionId]')
-      .between([collectionId, ''], [collectionId, '￿'])
-      .toArray();
-    const commands = await this.db.collectionCommands
-      .where('[collectionId+commandId]')
-      .between([collectionId, ''], [collectionId, '￿'])
-      .toArray();
-    const owned = checked(
-      () => ownership.map((entry) => storedCollectionOwnershipSchema.parse(entry).owned),
-      'ownership rows',
+    return this.db.transaction(
+      'r',
+      [
+        this.db.collectionState,
+        this.db.collectionOwnership,
+        this.db.collectionPulls,
+        this.db.collectionLedger,
+        this.db.collectionCommands,
+        this.db.collectionGames,
+      ],
+      async (): Promise<LoadedCollection | null> => {
+        const row = await this.db.collectionState.get(collectionId);
+        if (row === undefined) return null;
+        const savedVersion: number = row.saveSchemaVersion;
+        if (
+          savedVersion !== COLLECTION_SAVE_VERSION &&
+          savedVersion !== COLLECTION_SAVE_V1_VERSION
+        ) {
+          throw new CollectionLoadError('unsupported', [
+            `saveSchemaVersion ${String(savedVersion)} != ${String(COLLECTION_SAVE_VERSION)}`,
+          ]);
+        }
+        const parsedRow = checked(() => storedCollectionStateUnionSchema.parse(row), 'state row');
+        const state: CollectionState =
+          parsedRow.saveSchemaVersion === COLLECTION_SAVE_VERSION
+            ? parsedRow.state
+            : migrateCollectionStateV1(parsedRow.state);
+        const ownership = await this.db.collectionOwnership
+          .where('[collectionId+cardId]')
+          .between([collectionId, ''], [collectionId, '￿'])
+          .toArray();
+        const pulls = await this.db.collectionPulls
+          .where('[collectionId+pullSequence]')
+          .between([collectionId, -1], [collectionId, Number.MAX_SAFE_INTEGER])
+          .toArray();
+        const ledger = await this.db.collectionLedger
+          .where('[collectionId+transactionId]')
+          .between([collectionId, ''], [collectionId, '￿'])
+          .toArray();
+        const commands = await this.db.collectionCommands
+          .where('[collectionId+commandId]')
+          .between([collectionId, ''], [collectionId, '￿'])
+          .toArray();
+        const owned = checked(
+          () => ownership.map((entry) => storedCollectionOwnershipSchema.parse(entry).owned),
+          'ownership rows',
+        );
+        const pullRecords = checked(
+          () =>
+            pulls
+              .map((entry) => storedCollectionPullSchema.parse(entry).pull)
+              .sort((a, b) => a.pullSequence - b.pullSequence),
+          'pull rows',
+        );
+        const ledgerEntries = checked(
+          () => ledger.map((entry) => storedCollectionLedgerSchema.parse(entry).entry),
+          'ledger rows',
+        );
+        const priorCommands = checked(
+          () => commands.map((entry) => storedCollectionCommandSchema.parse(entry).command),
+          'command rows',
+        );
+        const gameRows = await this.db.collectionGames
+          .where('[collectionId+gameId]')
+          .between([collectionId, ''], [collectionId, '￿'])
+          .toArray();
+        const gameRecords = checked(
+          () =>
+            gameRows
+              .map((entry) => storedCollectionGameSchema.parse(entry).record)
+              .sort((a, b) => a.gameSequence - b.gameSequence),
+          'game rows',
+        );
+        const ownedIds = new Set(owned.map((entry) => entry.cardId));
+        const stateIds = new Set(state.owned.map((entry) => entry.cardId));
+        const diagnostics: string[] = [];
+        if (ownedIds.size !== owned.length) diagnostics.push('duplicate ownership rows');
+        for (const id of ownedIds) {
+          if (!stateIds.has(id)) diagnostics.push(`ownership row ${id} missing from state`);
+        }
+        for (const id of stateIds) {
+          if (!ownedIds.has(id)) diagnostics.push(`state ownership ${id} missing a row`);
+        }
+        const failures = auditCollectionState(
+          state,
+          pullRecords,
+          ledgerEntries,
+          gameRecords,
+          priorCommands,
+        );
+        for (const failure of failures) diagnostics.push(`${failure.code}: ${failure.message}`);
+        if (diagnostics.length > 0) {
+          throw new CollectionLoadError('divergent', diagnostics);
+        }
+        return {
+          state,
+          pulls: pullRecords,
+          ledger: ledgerEntries,
+          commands: priorCommands,
+          gameRecords,
+          catalogHash: parsedRow.catalogHash,
+        };
+      },
     );
-    const pullRecords = checked(
-      () =>
-        pulls
-          .map((entry) => storedCollectionPullSchema.parse(entry).pull)
-          .sort((a, b) => a.pullSequence - b.pullSequence),
-      'pull rows',
-    );
-    const ledgerEntries = checked(
-      () => ledger.map((entry) => storedCollectionLedgerSchema.parse(entry).entry),
-      'ledger rows',
-    );
-    const priorCommands = checked(
-      () => commands.map((entry) => storedCollectionCommandSchema.parse(entry).command),
-      'command rows',
-    );
-    const gameRows = await this.db.collectionGames
-      .where('[collectionId+gameId]')
-      .between([collectionId, ''], [collectionId, '￿'])
-      .toArray();
-    const gameRecords = checked(
-      () =>
-        gameRows
-          .map((entry) => storedCollectionGameSchema.parse(entry).record)
-          .sort((a, b) => a.gameSequence - b.gameSequence),
-      'game rows',
-    );
-    const ownedIds = new Set(owned.map((entry) => entry.cardId));
-    const stateIds = new Set(state.owned.map((entry) => entry.cardId));
-    const diagnostics: string[] = [];
-    if (ownedIds.size !== owned.length) diagnostics.push('duplicate ownership rows');
-    for (const id of ownedIds) {
-      if (!stateIds.has(id)) diagnostics.push(`ownership row ${id} missing from state`);
-    }
-    for (const id of stateIds) {
-      if (!ownedIds.has(id)) diagnostics.push(`state ownership ${id} missing a row`);
-    }
-    const failures = auditCollectionState(
-      state,
-      pullRecords,
-      ledgerEntries,
-      gameRecords,
-      priorCommands,
-    );
-    for (const failure of failures) diagnostics.push(`${failure.code}: ${failure.message}`);
-    if (diagnostics.length > 0) {
-      throw new CollectionLoadError('divergent', diagnostics);
-    }
-    return {
-      state,
-      pulls: pullRecords,
-      ledger: ledgerEntries,
-      commands: priorCommands,
-      gameRecords,
-      catalogHash: parsedRow.catalogHash,
-    };
   }
 
   async initializeCollection(input: {
@@ -246,28 +282,34 @@ export class DexieCollectionRepository {
     progressionHash: string | null;
     createdAtIso: string;
   }): Promise<CollectionState> {
-    const existing = await this.db.collectionState.get(input.collectionId);
-    if (existing !== undefined) {
-      throw new CollectionLoadError('incompatible', [
-        'collection already initialized; reset explicitly',
-      ]);
-    }
-    const rootSeed = seedSchema.parse(input.rootSeed);
-    const state = initializeCollectionState({
-      collectionId: input.collectionId,
-      rootSeed,
-      progressionHash: input.progressionHash,
-    });
-    await this.db.collectionState.put(
-      storedCollectionStateSchema.parse({
-        collectionId: input.collectionId,
-        saveSchemaVersion: COLLECTION_SAVE_VERSION,
-        state,
-        catalogHash: input.catalogHash,
-        updatedAtIso: input.createdAtIso,
-      }),
+    return this.db.transaction(
+      'rw',
+      this.db.collectionState,
+      async (): Promise<CollectionState> => {
+        const existing = await this.db.collectionState.get(input.collectionId);
+        if (existing !== undefined) {
+          throw new CollectionLoadError('incompatible', [
+            'collection already initialized; reset explicitly',
+          ]);
+        }
+        const rootSeed = seedSchema.parse(input.rootSeed);
+        const state = initializeCollectionState({
+          collectionId: input.collectionId,
+          rootSeed,
+          progressionHash: input.progressionHash,
+        });
+        await this.db.collectionState.put(
+          storedCollectionStateSchema.parse({
+            collectionId: input.collectionId,
+            saveSchemaVersion: COLLECTION_SAVE_VERSION,
+            state,
+            catalogHash: input.catalogHash,
+            updatedAtIso: input.createdAtIso,
+          }),
+        );
+        return state;
+      },
     );
-    return state;
   }
 
   async applyCollectionCommand(input: {
@@ -458,28 +500,44 @@ export class DexieCollectionRepository {
     playState: LoadedPlayState | null;
     catalogHash: string;
   }> {
-    const snapshot = await this.loadCollection(collectionId);
-    if (snapshot === null)
-      throw new CollectionLoadError('missing', [`no collection ${collectionId}`]);
-    const playState = await this.loadPlayState(collectionId);
-    const gameCommandRows = await this.db.collectionGameCommands
-      .where('[collectionId+commandId]')
-      .between([collectionId, ''], [collectionId, '￿'])
-      .toArray();
-    const gameCommands = checked(
-      () => gameCommandRows.map((entry) => storedCollectionGameCommandSchema.parse(entry).command),
-      'game command rows',
+    return this.db.transaction(
+      'r',
+      [
+        this.db.collectionState,
+        this.db.collectionOwnership,
+        this.db.collectionPulls,
+        this.db.collectionLedger,
+        this.db.collectionCommands,
+        this.db.collectionGames,
+        this.db.collectionPlayState,
+        this.db.collectionGameCommands,
+      ],
+      async () => {
+        const snapshot = await this.loadCollection(collectionId);
+        if (snapshot === null)
+          throw new CollectionLoadError('missing', [`no collection ${collectionId}`]);
+        const playState = await this.loadPlayState(collectionId);
+        const gameCommandRows = await this.db.collectionGameCommands
+          .where('[collectionId+commandId]')
+          .between([collectionId, ''], [collectionId, '￿'])
+          .toArray();
+        const gameCommands = checked(
+          () =>
+            gameCommandRows.map((entry) => storedCollectionGameCommandSchema.parse(entry).command),
+          'game command rows',
+        );
+        return {
+          state: snapshot.state,
+          pulls: snapshot.pulls,
+          ledger: snapshot.ledger,
+          commands: snapshot.commands,
+          gameRecords: snapshot.gameRecords,
+          gameCommands,
+          playState,
+          catalogHash: snapshot.catalogHash,
+        };
+      },
     );
-    return {
-      state: snapshot.state,
-      pulls: snapshot.pulls,
-      ledger: snapshot.ledger,
-      commands: snapshot.commands,
-      gameRecords: snapshot.gameRecords,
-      gameCommands,
-      playState,
-      catalogHash: snapshot.catalogHash,
-    };
   }
 
   async clearCollection(collectionId: string): Promise<void> {
@@ -530,53 +588,64 @@ export class DexieCollectionRepository {
   }
 
   async loadPlayState(collectionId: string): Promise<LoadedPlayState | null> {
-    const row = await this.db.collectionPlayState.get(collectionId);
-    if (row === undefined) return null;
-    const savedVersion: number = row.saveSchemaVersion;
-    if (
-      savedVersion !== COLLECTION_PLAY_SAVE_VERSION &&
-      savedVersion !== COLLECTION_PLAY_SAVE_V2_VERSION &&
-      savedVersion !== COLLECTION_PLAY_SAVE_V1_VERSION
-    ) {
-      throw new CollectionLoadError('unsupported', [
-        `play saveSchemaVersion ${String(savedVersion)} is not supported`,
-      ]);
-    }
-    const parsed = checked(() => storedCollectionPlayStateUnionSchema.parse(row), 'play state row');
-    const playState =
-      parsed.saveSchemaVersion === COLLECTION_PLAY_SAVE_VERSION
-        ? parsed.playState
-        : parsed.saveSchemaVersion === COLLECTION_PLAY_SAVE_V2_VERSION
-          ? migrateCollectionPlayStateV2(parsed.playState)
-          : migrateCollectionPlayStateV1(parsed.playState);
-    const gameRows = await this.db.collectionGames
-      .where('[collectionId+gameId]')
-      .between([collectionId, ''], [collectionId, '￿'])
-      .toArray();
-    const ledgerRows = await this.db.collectionLedger
-      .where('[collectionId+transactionId]')
-      .between([collectionId, ''], [collectionId, '￿'])
-      .toArray();
-    const gameRecords = checked(
-      () => gameRows.map((entry) => storedCollectionGameSchema.parse(entry).record),
-      'game rows',
+    return this.db.transaction(
+      'r',
+      this.db.collectionPlayState,
+      this.db.collectionGames,
+      this.db.collectionLedger,
+      async (): Promise<LoadedPlayState | null> => {
+        const row = await this.db.collectionPlayState.get(collectionId);
+        if (row === undefined) return null;
+        const savedVersion: number = row.saveSchemaVersion;
+        if (
+          savedVersion !== COLLECTION_PLAY_SAVE_VERSION &&
+          savedVersion !== COLLECTION_PLAY_SAVE_V2_VERSION &&
+          savedVersion !== COLLECTION_PLAY_SAVE_V1_VERSION
+        ) {
+          throw new CollectionLoadError('unsupported', [
+            `play saveSchemaVersion ${String(savedVersion)} is not supported`,
+          ]);
+        }
+        const parsed = checked(
+          () => storedCollectionPlayStateUnionSchema.parse(row),
+          'play state row',
+        );
+        const playState =
+          parsed.saveSchemaVersion === COLLECTION_PLAY_SAVE_VERSION
+            ? parsed.playState
+            : parsed.saveSchemaVersion === COLLECTION_PLAY_SAVE_V2_VERSION
+              ? migrateCollectionPlayStateV2(parsed.playState)
+              : migrateCollectionPlayStateV1(parsed.playState);
+        const gameRows = await this.db.collectionGames
+          .where('[collectionId+gameId]')
+          .between([collectionId, ''], [collectionId, '￿'])
+          .toArray();
+        const ledgerRows = await this.db.collectionLedger
+          .where('[collectionId+transactionId]')
+          .between([collectionId, ''], [collectionId, '￿'])
+          .toArray();
+        const gameRecords = checked(
+          () => gameRows.map((entry) => storedCollectionGameSchema.parse(entry).record),
+          'game rows',
+        );
+        const ledgerEntries = checked(
+          () => ledgerRows.map((entry) => storedCollectionLedgerSchema.parse(entry).entry),
+          'ledger rows',
+        );
+        const failures = auditCollectionFirstClearState(playState, gameRecords, ledgerEntries);
+        if (failures.length > 0) {
+          throw new CollectionLoadError(
+            'divergent',
+            failures.map((failure) => `${failure.code}: ${failure.message}`),
+          );
+        }
+        return {
+          playState,
+          rootSeed: parsed.rootSeed,
+          catalogHash: parsed.catalogHash,
+        };
+      },
     );
-    const ledgerEntries = checked(
-      () => ledgerRows.map((entry) => storedCollectionLedgerSchema.parse(entry).entry),
-      'ledger rows',
-    );
-    const failures = auditCollectionFirstClearState(playState, gameRecords, ledgerEntries);
-    if (failures.length > 0) {
-      throw new CollectionLoadError(
-        'divergent',
-        failures.map((failure) => `${failure.code}: ${failure.message}`),
-      );
-    }
-    return {
-      playState,
-      rootSeed: parsed.rootSeed,
-      catalogHash: parsed.catalogHash,
-    };
   }
 
   async getGameRecord(
@@ -596,33 +665,49 @@ export class DexieCollectionRepository {
   }): Promise<LoadedPlayState> {
     const existing = await this.loadPlayState(input.collectionId);
     if (existing !== null) return existing;
-    const snapshot = await this.loadCollection(input.collectionId);
-    if (snapshot === null) {
-      throw new CollectionLoadError('missing', [`no collection ${input.collectionId}`]);
-    }
-    if (!snapshot.state.claimedWelcome) {
-      throw new CollectionLoadError('incompatible', [
-        'claim the starter before team play; no ownership to initialize from',
-      ]);
-    }
-    const ownedCardIds = snapshot.state.owned.map((entry) => entry.cardId);
-    const catalogById = new Map(input.catalog.cards.map((card) => [card.cardId, card]));
-    const playState = initializeCollectionPlayState({
-      collectionId: input.collectionId as CollectionPlayState['collectionId'],
-      ownedCardIds,
-      resolve: (cardId) => catalogById.get(cardId),
-    });
-    await this.db.collectionPlayState.put(
-      storedCollectionPlayStateSchema.parse({
-        collectionId: input.collectionId,
-        saveSchemaVersion: COLLECTION_PLAY_SAVE_VERSION,
-        playState,
-        rootSeed: snapshot.state.rootSeed,
-        catalogHash: input.catalogHash,
-        updatedAtIso: input.recordedAtIso,
-      }),
+    return this.db.transaction(
+      'rw',
+      [
+        this.db.collectionState,
+        this.db.collectionOwnership,
+        this.db.collectionPulls,
+        this.db.collectionLedger,
+        this.db.collectionCommands,
+        this.db.collectionPlayState,
+        this.db.collectionGames,
+      ],
+      async (): Promise<LoadedPlayState> => {
+        const raced = await this.loadPlayState(input.collectionId);
+        if (raced !== null) return raced;
+        const snapshot = await this.loadCollection(input.collectionId);
+        if (snapshot === null) {
+          throw new CollectionLoadError('missing', [`no collection ${input.collectionId}`]);
+        }
+        if (!snapshot.state.claimedWelcome) {
+          throw new CollectionLoadError('incompatible', [
+            'claim the starter before team play; no ownership to initialize from',
+          ]);
+        }
+        const ownedCardIds = snapshot.state.owned.map((entry) => entry.cardId);
+        const catalogById = new Map(input.catalog.cards.map((card) => [card.cardId, card]));
+        const playState = initializeCollectionPlayState({
+          collectionId: input.collectionId as CollectionPlayState['collectionId'],
+          ownedCardIds,
+          resolve: (cardId) => catalogById.get(cardId),
+        });
+        await this.db.collectionPlayState.put(
+          storedCollectionPlayStateSchema.parse({
+            collectionId: input.collectionId,
+            saveSchemaVersion: COLLECTION_PLAY_SAVE_VERSION,
+            playState,
+            rootSeed: snapshot.state.rootSeed,
+            catalogHash: input.catalogHash,
+            updatedAtIso: input.recordedAtIso,
+          }),
+        );
+        return { playState, rootSeed: snapshot.state.rootSeed, catalogHash: input.catalogHash };
+      },
     );
-    return { playState, rootSeed: snapshot.state.rootSeed, catalogHash: input.catalogHash };
   }
 
   async applyCollectionGameCommand(input: {
@@ -670,7 +755,7 @@ export class DexieCollectionRepository {
     }
     const ownedCardIds = new Set(snapshot.state.owned.map((entry) => entry.cardId));
     const catalogById = new Map(catalog.cards.map((card) => [card.cardId, card]));
-    const outcome = applyEngineGameCommand(play.playState, command, {
+    const outcome = await this.applyGameCommand(play.playState, command, {
       catalog,
       ownedCardIds,
       resolve: (cardId) => catalogById.get(cardId),

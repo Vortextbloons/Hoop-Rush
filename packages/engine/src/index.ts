@@ -745,6 +745,7 @@ export {
 export {
   applyCollectionGameCommand,
   type CollectionGameCommandResult,
+  type CommandInput as CollectionGameCommandInput,
 } from './collection/game-commands.ts';
 export { auditCollectionState, auditCollectionFirstClearState } from './collection/audit.ts';
 export { initializeCollectionState, migrateCollectionStateV1 } from './collection/state.ts';

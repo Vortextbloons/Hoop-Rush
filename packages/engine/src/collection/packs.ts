@@ -64,8 +64,8 @@ export function eligiblePackCards(
   catalog: CollectionCatalog,
   pack: CollectionPackDefinition,
 ): CollectionCatalogCard[] {
-  return catalog.cards.filter(
-    (card) => pack.eligibleScope === 'specials-only' ? card.family !== 'Base' : true,
+  return catalog.cards.filter((card) =>
+    pack.eligibleScope === 'specials-only' ? card.family !== 'Base' : true,
   );
 }
 
@@ -465,8 +465,8 @@ function commitState(
     catalogVersion: COLLECTION_CATALOG_VERSION,
     economyVersion: COLLECTION_ECONOMY_VERSION,
     progressionVersion: COLLECTION_PROGRESSION_VERSION,
-    progressionHash: (state.progressionHash ??
-      progressionHash) as CollectionState['progressionHash'],
+    progressionHash: (progressionHash ??
+      state.progressionHash) as CollectionState['progressionHash'],
     collectionId: state.collectionId,
     rootSeed: state.rootSeed,
     revision: state.revision + 1,

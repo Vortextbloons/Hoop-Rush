@@ -12,6 +12,8 @@
   import { validateCollectionActiveTeam } from '@hoop-rush/engine';
   import AsyncState from '$lib/components/AsyncState.svelte';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
+  import { collectionCardArtOf } from '../collection-card-art.ts';
+  import CurrencyIcon from '$lib/collection/CurrencyIcon.svelte';
   import { getManifest } from '$lib/data';
   import {
     ensureCollection,
@@ -315,8 +317,22 @@
         <div class="ur-hub-scoreline" aria-label="Collection totals">
           <div class="ur-stat-tile">
             <svg viewBox="0 0 20 20" aria-hidden="true" class="ur-stat-icon">
-              <rect x="2.5" y="5.5" width="11" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6" />
-              <path d="M5.5 5.5V4a1.5 1.5 0 0 1 1.5-1.5h8A1.5 1.5 0 0 1 16.5 4v9" fill="none" stroke="currentColor" stroke-width="1.6" />
+              <rect
+                x="2.5"
+                y="5.5"
+                width="11"
+                height="12"
+                rx="1.5"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              />
+              <path
+                d="M5.5 5.5V4a1.5 1.5 0 0 1 1.5-1.5h8A1.5 1.5 0 0 1 16.5 4v9"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              />
             </svg>
             <strong class="ur-number">{fmt(ownedCount)}</strong>
             <span>Cards owned</span>
@@ -330,8 +346,20 @@
           </div>
           <div class="ur-stat-tile">
             <svg viewBox="0 0 20 20" aria-hidden="true" class="ur-stat-icon">
-              <path d="M10 2.5 17.5 6.5 10 10.5 2.5 6.5Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
-              <path d="m2.5 10 7.5 4 7.5-4M2.5 13.5 10 17.5l7.5-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+              <path
+                d="M10 2.5 17.5 6.5 10 10.5 2.5 6.5Z"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linejoin="round"
+              />
+              <path
+                d="m2.5 10 7.5 4 7.5-4M2.5 13.5 10 17.5l7.5-4"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linejoin="round"
+              />
             </svg>
             <strong class="ur-number">{totalCount > 0 ? fmt(totalCount) : '—'}</strong>
             <span>In the collection</span>
@@ -341,7 +369,7 @@
             </span>
           </div>
           <div class="ur-stat-tile">
-            <span class="ur-coin" aria-hidden="true">C</span>
+            <CurrencyIcon currency="Coins" />
             <strong class="ur-number">{fmt(coins)}</strong>
             <span>Coins</span>
             <small>{fmt(exchange)} Exchange</small>
@@ -378,11 +406,14 @@
             {#each teamCards as card, index (savedTeam.starters[index])}
               {@const ovr = card ? overallOf(card.cardId) : null}
               {@const tone = card?.rarity.toLowerCase() ?? 'empty'}
+              {@const artwork = collectionCardArtOf(card)}
               <li class="ur-hub-player-card ur-hub-player-card--{tone}">
                 <span class="ur-hub-slot">{SHORT_SLOT_LABELS[index] ?? '—'}</span>
                 <span class="ur-hub-ovr ur-number">{ovr ?? '—'}</span>
                 <span class="ur-hub-face">
-                  {#if manifest && card}
+                  {#if artwork}
+                    <img src={asset(artwork)} alt="" loading="lazy" />
+                  {:else if manifest && card}
                     <PlayerFace
                       player={{
                         playerId: card.playerId,
@@ -400,7 +431,17 @@
                 <span class="ur-hub-player-name">{card?.displayName ?? 'Open slot'}</span>
                 <span class="ur-hub-player-facts">{card?.rarity ?? 'Choose a card'}</span>
                 <span class="ur-hub-mark" aria-hidden="true">
-                  <img src={asset('/ultimate/logo.svg')} alt="" width="18" height="18" loading="lazy" />
+                  <img
+                    src={asset(
+                      card?.family === 'Heat Check'
+                        ? '/ultimate/cards/heat-check/emblem.png'
+                        : '/ultimate/logo.png',
+                    )}
+                    alt=""
+                    width="18"
+                    height="18"
+                    loading="lazy"
+                  />
                 </span>
               </li>
             {/each}
@@ -454,14 +495,26 @@
           </div>
           <div class="ur-reward-trio">
             <div>
-              <span class="ur-coin ur-coin--sm" aria-hidden="true">C</span>
+              <CurrencyIcon currency="Coins" size={18} />
               <strong class="ur-number">+ {fmt(rewardCoins)}</strong>
               <span>Coins earned</span>
             </div>
             <div>
               <svg viewBox="0 0 20 20" aria-hidden="true" class="ur-trio-icon">
-                <path d="M10 2.5 17.5 6.5 10 10.5 2.5 6.5Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
-                <path d="m2.5 10 7.5 4 7.5-4M2.5 13.5 10 17.5l7.5-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+                <path
+                  d="M10 2.5 17.5 6.5 10 10.5 2.5 6.5Z"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="m2.5 10 7.5 4 7.5-4M2.5 13.5 10 17.5l7.5-4"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linejoin="round"
+                />
               </svg>
               <strong>{objectiveSummaryOf(recentGame)}</strong>
               <span>Objective</span>
@@ -495,7 +548,10 @@
             <ul class="ur-set-progress-list">
               {#each chaseSets as set (set.setId)}
                 {@const tone = setTone(set.title, set.setId)}
-                {@const pct = set.requiredCount > 0 ? Math.round((set.ownedCount / set.requiredCount) * 100) : 0}
+                {@const pct =
+                  set.requiredCount > 0
+                    ? Math.round((set.ownedCount / set.requiredCount) * 100)
+                    : 0}
                 <li>
                   <span class="ur-set-glyph ur-set-glyph--{tone}" aria-hidden="true">
                     {setGlyph(set.title, set.setId)}
@@ -503,10 +559,18 @@
                   <span class="ur-set-meta">
                     <span class="ur-set-row">
                       <span class="ur-set-name">{set.title}</span>
-                      <span class="ur-set-count ur-number">{set.ownedCount} / {set.requiredCount}</span>
+                      <span class="ur-set-count ur-number"
+                        >{set.ownedCount} / {set.requiredCount}</span
+                      >
                     </span>
-                    <span class="ur-progress-track" aria-label={`${set.ownedCount} of ${set.requiredCount} cards`}>
-                      <span class="ur-progress-fill ur-progress-fill--{tone}" style={`width:${Math.min(100, pct)}%`}></span>
+                    <span
+                      class="ur-progress-track"
+                      aria-label={`${set.ownedCount} of ${set.requiredCount} cards`}
+                    >
+                      <span
+                        class="ur-progress-fill ur-progress-fill--{tone}"
+                        style={`width:${Math.min(100, pct)}%`}
+                      ></span>
                     </span>
                   </span>
                   <span class="ur-set-pct ur-number ur-set-pct--{tone}">{pct}%</span>
@@ -515,11 +579,23 @@
             </ul>
             <div class="ur-pack-art" aria-hidden="true">
               <div class="ur-pack ur-pack--back">
-                <img src={asset('/ultimate/logo.svg')} alt="" width="40" height="40" loading="lazy" />
+                <img
+                  src={asset('/ultimate/logo.png')}
+                  alt=""
+                  width="40"
+                  height="40"
+                  loading="lazy"
+                />
                 <span>UR</span>
               </div>
               <div class="ur-pack ur-pack--front">
-                <img src={asset('/ultimate/logo.svg')} alt="" width="52" height="52" loading="lazy" />
+                <img
+                  src={asset('/ultimate/logo.png')}
+                  alt=""
+                  width="52"
+                  height="52"
+                  loading="lazy"
+                />
                 <span>UR</span>
               </div>
             </div>
@@ -542,15 +618,24 @@
             {#each shelfPacks as pack (pack.packId)}
               <li>
                 <a class="ur-shelf-row" href={resolve('/ultimate/run/packs' as any)}>
-                  <span class="ur-shelf-thumb ur-shelf-thumb--{packTone(pack.packId)}" aria-hidden="true">
-                    <img src={asset('/ultimate/logo.svg')} alt="" width="26" height="26" loading="lazy" />
+                  <span
+                    class="ur-shelf-thumb ur-shelf-thumb--{packTone(pack.packId)}"
+                    aria-hidden="true"
+                  >
+                    <img
+                      src={asset('/ultimate/logo.png')}
+                      alt=""
+                      width="26"
+                      height="26"
+                      loading="lazy"
+                    />
                   </span>
                   <span class="ur-shelf-meta">
                     <strong>{packNameOf(pack.packId)}</strong>
                     <small>{pack.slots.length} {pack.slots.length === 1 ? 'card' : 'cards'}</small>
                   </span>
                   <span class="ur-pack-price">
-                    <span class="ur-coin ur-coin--sm" aria-hidden="true">C</span>
+                    <CurrencyIcon currency="Coins" size={18} />
                     <span class="ur-number">{fmt(pack.priceAmount)} {pack.priceCurrency}</span>
                   </span>
                   <span class="ur-chevron" aria-hidden="true">›</span>
@@ -568,15 +653,35 @@
         <a class="ur-recent-receipt" href={resolve('/ultimate/run/packs' as any)}>
           <span class="ur-receipt-gift" aria-hidden="true">
             <svg viewBox="0 0 20 20" class="ur-gift-icon">
-              <rect x="2.5" y="7.5" width="15" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6" />
-              <path d="M2.5 4.5h15V7.5h-15zM10 4.5v13" fill="none" stroke="currentColor" stroke-width="1.6" />
-              <path d="M10 4.5C7.5 4.5 5.5 4 5.5 2.8 5.5 1.9 6.2 1.5 7 1.5c1.6 0 3 3 3 3Zm0 0c2.5 0 4.5-.5 4.5-1.7 0-.9-.7-1.3-1.5-1.3-1.6 0-3 3-3 3Z" fill="none" stroke="currentColor" stroke-width="1.3" />
+              <rect
+                x="2.5"
+                y="7.5"
+                width="15"
+                height="10"
+                rx="1.5"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              />
+              <path
+                d="M2.5 4.5h15V7.5h-15zM10 4.5v13"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              />
+              <path
+                d="M10 4.5C7.5 4.5 5.5 4 5.5 2.8 5.5 1.9 6.2 1.5 7 1.5c1.6 0 3 3 3 3Zm0 0c2.5 0 4.5-.5 4.5-1.7 0-.9-.7-1.3-1.5-1.3-1.6 0-3 3-3 3Z"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.3"
+              />
             </svg>
           </span>
           <span class="ur-receipt-copy">
             <strong>{packNameOf(latestPull.packId)} received</strong>
             <small>
-              {latestPull.newCount} new {latestPull.newCount === 1 ? 'card' : 'cards'} · +{latestPull.exchangeGained} Exchange from duplicates
+              {latestPull.newCount} new {latestPull.newCount === 1 ? 'card' : 'cards'} · +{latestPull.exchangeGained}
+              Exchange from duplicates
             </small>
           </span>
           <span class="ur-receipt-view">View receipt <span aria-hidden="true">→</span></span>
@@ -642,7 +747,12 @@
     align-items: flex-start;
     justify-content: center;
     padding: clamp(1.25rem, 3vw, 2.25rem);
-    background: linear-gradient(90deg, rgb(8 11 14 / 82%) 0%, rgb(8 11 14 / 55%) 55%, transparent 100%);
+    background: linear-gradient(
+      90deg,
+      rgb(8 11 14 / 82%) 0%,
+      rgb(8 11 14 / 55%) 55%,
+      transparent 100%
+    );
   }
 
   .ur-hub-overline {
@@ -764,27 +874,6 @@
     background: linear-gradient(90deg, var(--ur-ember), var(--ur-apex));
   }
 
-  .ur-coin {
-    display: inline-grid;
-    width: 1.5rem;
-    height: 1.5rem;
-    place-items: center;
-    margin-bottom: 0.35rem;
-    border-radius: 999px;
-    background: radial-gradient(circle at 35% 30%, #ffe39a, var(--ur-apex) 60%, #9a7414);
-    color: #241a02;
-    font-size: 0.8rem;
-    font-weight: 900;
-    box-shadow: inset 0 0 0 2px rgb(36 26 2 / 25%);
-  }
-
-  .ur-coin--sm {
-    width: 1.1rem;
-    height: 1.1rem;
-    margin-bottom: 0;
-    font-size: 0.62rem;
-  }
-
   .ur-hub-lineup {
     position: relative;
     display: flex;
@@ -795,10 +884,20 @@
     padding: clamp(1rem, 2.4vw, 1.75rem);
     border-left: 1px solid rgb(255 197 61 / 14%);
     background:
-      radial-gradient(ellipse 42% 58% at 50% 52%, transparent 58%, rgb(255 197 61 / 10%) 60%, transparent 62%),
+      radial-gradient(
+        ellipse 42% 58% at 50% 52%,
+        transparent 58%,
+        rgb(255 197 61 / 10%) 60%,
+        transparent 62%
+      ),
       radial-gradient(ellipse 60% 45% at 50% 0%, rgb(255 255 255 / 10%), transparent 60%),
       repeating-linear-gradient(90deg, transparent 0 79px, rgb(240 236 223 / 4%) 80px),
-      linear-gradient(180deg, rgb(201 140 69 / 22%) 0%, rgb(201 140 69 / 10%) 30%, rgb(10 14 17 / 72%) 78%);
+      linear-gradient(
+        180deg,
+        rgb(201 140 69 / 22%) 0%,
+        rgb(201 140 69 / 10%) 30%,
+        rgb(10 14 17 / 72%) 78%
+      );
   }
 
   .ur-hub-lineup::before {
@@ -893,7 +992,11 @@
     border: 1px solid color-mix(in srgb, var(--ur-card-glow) 75%, white 8%);
     border-radius: 0.65rem;
     background:
-      linear-gradient(165deg, color-mix(in srgb, var(--ur-card-glow) 22%, transparent), transparent 46%),
+      linear-gradient(
+        165deg,
+        color-mix(in srgb, var(--ur-card-glow) 22%, transparent),
+        transparent 46%
+      ),
       linear-gradient(180deg, #1b2329 0%, #0c1114 78%);
     box-shadow:
       0 0 1.1rem color-mix(in srgb, var(--ur-card-glow) 32%, transparent),
@@ -906,7 +1009,11 @@
     inset: auto 12% -0.6rem;
     height: 1.1rem;
     border-radius: 999px;
-    background: radial-gradient(ellipse, color-mix(in srgb, var(--ur-card-glow) 55%, transparent), transparent 70%);
+    background: radial-gradient(
+      ellipse,
+      color-mix(in srgb, var(--ur-card-glow) 55%, transparent),
+      transparent 70%
+    );
     filter: blur(6px);
     content: '';
     pointer-events: none;

@@ -590,7 +590,18 @@ describe('sandbox snake draft', () => {
     let state = createSandboxDuelDraft(ROOT);
     const first = state.firstPicker;
     const other = first === 'p1' ? 'p2' : 'p1';
-    const expectedOrder = [first, other, other, first, first, other, other, first, first, other];
+    const expectedOrder: ('p1' | 'p2')[] = [
+      first,
+      other,
+      other,
+      first,
+      first,
+      other,
+      other,
+      first,
+      first,
+      other,
+    ];
 
     for (let i = 0; i < expectedOrder.length; i += 1) {
       const actor = expectedOrder[i];

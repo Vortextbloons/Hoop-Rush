@@ -621,12 +621,8 @@ export class SeasonHubState {
     opportunityId: string;
   }): Promise<void> {
     const command: SeasonRunCommand = {
-      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      ...this.commandBase('camp'),
       command: 'select-campaign-opportunity',
-      commandId: newSeasonId('camp'),
-      runId: this.requiredRunId(),
-      expectedStateRevision: this.requiredStateRevision(),
-      expectedStateDigest: this.requiredStateDigest(),
       blockIndex: input.blockIndex,
       opportunityId: input.opportunityId,
     };
@@ -634,36 +630,24 @@ export class SeasonHubState {
   }
   async selectFrontOffice(input: { executiveId: string }): Promise<void> {
     const command: SeasonRunCommand = {
-      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      ...this.commandBase('fo'),
       command: 'select-front-office',
-      commandId: newSeasonId('fo'),
-      runId: this.requiredRunId(),
-      expectedStateRevision: this.requiredStateRevision(),
-      expectedStateDigest: this.requiredStateDigest(),
       executiveId: input.executiveId as never,
     };
     await this.dispatch(command);
   }
   async selectCourtInnovation(input: { innovationId: string }): Promise<void> {
     const command: SeasonRunCommand = {
-      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      ...this.commandBase('ci'),
       command: 'select-court-innovation',
-      commandId: newSeasonId('ci'),
-      runId: this.requiredRunId(),
-      expectedStateRevision: this.requiredStateRevision(),
-      expectedStateDigest: this.requiredStateDigest(),
       innovationId: input.innovationId as never,
     };
     await this.dispatch(command);
   }
   async openTradeInquiry(input: { windowIndex: number; toFranchiseId: string }): Promise<void> {
     const command: SeasonRunCommand = {
-      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      ...this.commandBase('inq'),
       command: 'open-trade-inquiry',
-      commandId: newSeasonId('inq'),
-      runId: this.requiredRunId(),
-      expectedStateRevision: this.requiredStateRevision(),
-      expectedStateDigest: this.requiredStateDigest(),
       windowIndex: input.windowIndex,
       toFranchiseId: franchiseIdSchema.parse(input.toFranchiseId),
     };
@@ -689,12 +673,8 @@ export class SeasonHubState {
       return;
     }
     const command: SeasonRunCommand = {
-      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      ...this.commandBase('prop'),
       command: 'submit-trade-proposal',
-      commandId: newSeasonId('prop'),
-      runId: this.requiredRunId(),
-      expectedStateRevision: this.requiredStateRevision(),
-      expectedStateDigest: this.requiredStateDigest(),
       windowIndex: input.windowIndex,
       toFranchiseId: franchiseIdSchema.parse(input.toFranchiseId),
       outgoingPlayerVersionIds: input.outgoingPlayerVersionIds,
@@ -723,12 +703,8 @@ export class SeasonHubState {
       }
     }
     const command: SeasonRunCommand = {
-      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      ...this.commandBase('resp'),
       command: 'respond-to-trade-counter',
-      commandId: newSeasonId('resp'),
-      runId: this.requiredRunId(),
-      expectedStateRevision: this.requiredStateRevision(),
-      expectedStateDigest: this.requiredStateDigest(),
       windowIndex: input.windowIndex,
       inquiryId: input.inquiryId,
       accept: input.accept,
@@ -737,12 +713,8 @@ export class SeasonHubState {
   }
   async walkAwayFromTrade(input: { windowIndex: number; inquiryId: string }): Promise<void> {
     const command: SeasonRunCommand = {
-      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      ...this.commandBase('walk'),
       command: 'walk-away-from-trade',
-      commandId: newSeasonId('walk'),
-      runId: this.requiredRunId(),
-      expectedStateRevision: this.requiredStateRevision(),
-      expectedStateDigest: this.requiredStateDigest(),
       windowIndex: input.windowIndex,
       inquiryId: input.inquiryId,
     };
@@ -750,24 +722,16 @@ export class SeasonHubState {
   }
   async purchaseTradeInquiry(input: { windowIndex: number }): Promise<void> {
     const command: SeasonRunCommand = {
-      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      ...this.commandBase('purch'),
       command: 'purchase-trade-inquiry',
-      commandId: newSeasonId('purch'),
-      runId: this.requiredRunId(),
-      expectedStateRevision: this.requiredStateRevision(),
-      expectedStateDigest: this.requiredStateDigest(),
       windowIndex: input.windowIndex,
     };
     await this.dispatch(command);
   }
   async buySponsor(input: { instanceId: string }): Promise<void> {
     const command: SeasonRunCommand = {
-      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      ...this.commandBase('spon'),
       command: 'buy-sponsor',
-      commandId: newSeasonId('spon'),
-      runId: this.requiredRunId(),
-      expectedStateRevision: this.requiredStateRevision(),
-      expectedStateDigest: this.requiredStateDigest(),
       instanceId: input.instanceId,
     };
     await this.dispatch(command);
@@ -778,12 +742,8 @@ export class SeasonHubState {
     slot: 'shoe' | 'apparel' | 'fuel';
   }): Promise<void> {
     const command: SeasonRunCommand = {
-      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      ...this.commandBase('spon'),
       command: 'apply-sponsor',
-      commandId: newSeasonId('spon'),
-      runId: this.requiredRunId(),
-      expectedStateRevision: this.requiredStateRevision(),
-      expectedStateDigest: this.requiredStateDigest(),
       instanceId: input.instanceId,
       playerVersionId: input.playerVersionId,
       slot: input.slot,
@@ -796,12 +756,8 @@ export class SeasonHubState {
     injuryId?: string;
   }): Promise<void> {
     const command: SeasonRunCommand = {
-      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      ...this.commandBase('inf'),
       command: 'spend-influence',
-      commandId: newSeasonId('inf'),
-      runId: this.requiredRunId(),
-      expectedStateRevision: this.requiredStateRevision(),
-      expectedStateDigest: this.requiredStateDigest(),
       franchiseId: this.requiredHumanFranchiseId(),
       purpose: input.purpose,
       ...(input.purpose === 'extra-trade-offer' ? { windowIndex: input.windowIndex } : {}),
@@ -822,12 +778,8 @@ export class SeasonHubState {
       return;
     }
     const command: SeasonRunCommand = {
-      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      ...this.commandBase('acc'),
       command: 'accept-trade-offer',
-      commandId: newSeasonId('acc'),
-      runId: this.requiredRunId(),
-      expectedStateRevision: this.requiredStateRevision(),
-      expectedStateDigest: this.requiredStateDigest(),
       windowIndex: input.windowIndex,
       offerId: input.offerId,
     };
@@ -846,12 +798,8 @@ export class SeasonHubState {
       return;
     }
     const command: SeasonRunCommand = {
-      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      ...this.commandBase('dec'),
       command: 'decline-trade-offer',
-      commandId: newSeasonId('dec'),
-      runId: this.requiredRunId(),
-      expectedStateRevision: this.requiredStateRevision(),
-      expectedStateDigest: this.requiredStateDigest(),
       windowIndex: input.windowIndex,
       offerId: input.offerId,
     };
@@ -861,12 +809,8 @@ export class SeasonHubState {
     const pending = this.pending;
     if (pending === null) return;
     const command: SeasonRunCommand = {
-      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      ...this.commandBase('for'),
       command: 'forfeit-interrupted-game',
-      commandId: newSeasonId('for'),
-      runId: this.requiredRunId(),
-      expectedStateRevision: this.requiredStateRevision(),
-      expectedStateDigest: this.requiredStateDigest(),
       blockIndex: pending.blockIndex,
       nextGameId: pending.nextGameId,
     };
@@ -881,12 +825,8 @@ export class SeasonHubState {
     }[];
   }): Promise<void> {
     const command: SeasonRunCommand = {
-      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      ...this.commandBase('fad'),
       command: 'declare-free-agent-interest',
-      commandId: newSeasonId('fad'),
-      runId: this.requiredRunId(),
-      expectedStateRevision: this.requiredStateRevision(),
-      expectedStateDigest: this.requiredStateDigest(),
       franchiseId: this.requiredHumanFranchiseId(),
       windowIndex: input.windowIndex,
       targets: input.targets,
@@ -895,12 +835,8 @@ export class SeasonHubState {
   }
   async skipFreeAgentMarket(input: { windowIndex: number }): Promise<void> {
     const command: SeasonRunCommand = {
-      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      ...this.commandBase('fas'),
       command: 'skip-free-agent-market',
-      commandId: newSeasonId('fas'),
-      runId: this.requiredRunId(),
-      expectedStateRevision: this.requiredStateRevision(),
-      expectedStateDigest: this.requiredStateDigest(),
       franchiseId: this.requiredHumanFranchiseId(),
       windowIndex: input.windowIndex,
     };
@@ -940,12 +876,8 @@ export class SeasonHubState {
       return;
     }
     const command: SeasonRunCommand = {
-      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      ...this.commandBase('far'),
       command: 'resolve-free-agent-market',
-      commandId: newSeasonId('far'),
-      runId: this.requiredRunId(),
-      expectedStateRevision: this.requiredStateRevision(),
-      expectedStateDigest: this.requiredStateDigest(),
       windowIndex: input.windowIndex,
     };
     await this.dispatch(command);
@@ -957,12 +889,8 @@ export class SeasonHubState {
   }
   async startPostseason(): Promise<void> {
     const command: SeasonRunCommand = {
-      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      ...this.commandBase('pst'),
       command: 'start-postseason',
-      commandId: newSeasonId('pst'),
-      runId: this.requiredRunId(),
-      expectedStateRevision: this.requiredStateRevision(),
-      expectedStateDigest: this.requiredStateDigest(),
     };
     await this.dispatchPostseason(command);
   }
@@ -982,12 +910,8 @@ export class SeasonHubState {
   }
   async forfeitPostseasonGame(input: { targetGameId: string }): Promise<void> {
     const command: SeasonRunCommand = {
-      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      ...this.commandBase('for'),
       command: 'advance-postseason',
-      commandId: newSeasonId('for'),
-      runId: this.requiredRunId(),
-      expectedStateRevision: this.requiredStateRevision(),
-      expectedStateDigest: this.requiredStateDigest(),
       targetGameId: postseasonGameIdSchema.parse(input.targetGameId),
       forfeit: true,
     };
@@ -999,12 +923,8 @@ export class SeasonHubState {
     rotation: SeasonPostseasonRotationPayload;
   }): Promise<void> {
     const command: SeasonRunCommand = {
-      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      ...this.commandBase('sub'),
       command: 'submit-postseason-rotation',
-      commandId: newSeasonId('sub'),
-      runId: this.requiredRunId(),
-      expectedStateRevision: this.requiredStateRevision(),
-      expectedStateDigest: this.requiredStateDigest(),
       targetGameId: postseasonGameIdSchema.parse(input.targetGameId),
       rotation: input.rotation,
     };
@@ -1441,6 +1361,20 @@ export class SeasonHubState {
       };
       this.emit();
     }
+  }
+  private commandBase(
+    prefix: string,
+  ): Pick<
+    SeasonRunCommand,
+    'schemaVersion' | 'commandId' | 'runId' | 'expectedStateRevision' | 'expectedStateDigest'
+  > {
+    return {
+      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      commandId: newSeasonId(prefix),
+      runId: this.requiredRunId(),
+      expectedStateRevision: this.requiredStateRevision(),
+      expectedStateDigest: this.requiredStateDigest(),
+    };
   }
   private requiredRunId(): Id {
     const runId = this.snapshot?.run.runId;
