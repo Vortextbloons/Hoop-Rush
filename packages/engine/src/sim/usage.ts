@@ -45,8 +45,28 @@ export function lineupMeanUsage(team: SimulationTeam): number {
   const total = team.players.reduce((sum, p) => sum + Math.max(0.5, p.tendencies.usageRate), 0);
   return total / team.players.length;
 }
+const HIGH_USAGE_THRESHOLD = 23;
+export function usageCongestionScale(player: SimulationPlayer, team: SimulationTeam): number {
+  const highUsage = team.players.filter((p) => p.tendencies.usageRate >= HIGH_USAGE_THRESHOLD);
+  if (highUsage.length < 2 || player.tendencies.usageRate < HIGH_USAGE_THRESHOLD) return 1;
+  const ordered = [...highUsage].sort((a, b) => b.tendencies.usageRate - a.tendencies.usageRate);
+  let rank = ordered.length;
+  for (let i = 0; i < ordered.length; i += 1) {
+    const peer = ordered[i];
+    if (peer === undefined) continue;
+    if (peer.playerId === player.playerId) {
+      rank = i;
+      break;
+    }
+  }
+  if (rank === 0) return 1;
+  return Math.max(0.55, 1 - 0.14 * rank - 0.06 * Math.max(0, highUsage.length - 2));
+}
 export function relativeUsage(player: SimulationPlayer, team: SimulationTeam): number {
-  return Math.max(0.5, player.tendencies.usageRate) / Math.max(1e-9, lineupMeanUsage(team));
+  const base =
+    Math.max(0.5, player.tendencies.usageRate) /
+    Math.max(1e-9, ENGINE_CONSTANTS.usageRoleReference);
+  return base * usageCongestionScale(player, team);
 }
 export function initiatorRole(player: SimulationPlayer, team: SimulationTeam): number {
   const curved = Math.pow(

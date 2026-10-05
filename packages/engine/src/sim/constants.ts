@@ -1,6 +1,9 @@
 import type { ShotZone, SlotGroup } from '@hoop-rush/data-contracts';
 import type { PositionResponsibilityModifiers } from './position-responsibilities.ts';
 import type { ActionType } from './usage.ts';
+// m3-engine-v23: usage role weights normalize against a fixed league reference
+// instead of lineup-mean usage; role caps raised so multiple high-usage peaks
+// can still separate instead of saturating together.
 // m3-engine-v22: free-throw integrity — non-final misses are dead-ball team
 // rebounds, a live final miss continues only through an explicit offensive
 // rebound, and rebound opportunities count live contests only.
@@ -11,7 +14,7 @@ import type { ActionType } from './usage.ts';
 // seeded 5-offer shop per block, vault + 3-slot equipment, sponsor boosts
 // applied to ratings inputs (sim, trade valuation, AI kits); formulas unchanged.
 // m3-engine-v19: season parity tune (season-trade-v7, season-free-agency-v3).
-export const ENGINE_VERSION = 'm3-engine-v22';
+export const ENGINE_VERSION = 'm3-engine-v23';
 export const ENGINE_CONSTANTS = {
   version: ENGINE_VERSION,
   zoneBaseMake: {
@@ -87,12 +90,13 @@ export const ENGINE_CONSTANTS = {
   threePointLowVolumeEraPull: 0.05,
   threePointEraPull: 0.3,
   usageExponent: 1.6,
+  usageRoleReference: 20,
   initiatorRoleExponent: 1.6,
   finisherRoleExponent: 1.25,
   initiatorRoleMin: 0.65,
-  initiatorRoleMax: 1.48,
+  initiatorRoleMax: 2.05,
   finisherRoleMin: 0.7,
-  finisherRoleMax: 1.28,
+  finisherRoleMax: 1.72,
   twoPointAnchorMin: 0.82,
   twoPointAnchorMax: 1.32,
   twoPointAnchorSkillScale: 0.3,
