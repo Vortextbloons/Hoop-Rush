@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { z } from 'zod';
 import {
   COHORT_NORMALIZATION_VERSION,
@@ -12,7 +12,7 @@ import {
   simulationTendenciesSchema,
   type OverallScale,
 } from '@hoop-rush/data-contracts';
-import { NBA_ROOT, PUBLIC_DATA } from '../config.ts';
+import { NBA_ROOT, PUBLIC_DATA, REPO_ROOT } from '../config.ts';
 import { fileExists, readJson, writeJsonRetry } from '../json.ts';
 import { DEFAULT_RATINGS_MODEL_ARTIFACT } from './artifact.ts';
 import { getEra } from './era.ts';
@@ -34,7 +34,7 @@ const referenceStatsSchema = z.looseObject({
       'turnovers',
       'tsPct',
       'usageRate',
-    ].map((key) => [key, z.number().finite().nullable().optional()]),
+    ].map((key) => [key, z.number().nullable().optional()]),
   ),
 });
 const referenceRosterSchema = z.looseObject({
@@ -61,7 +61,8 @@ export function buildOverallScale(
   const sorted = population.map(([, score]) => score).sort((a, b) => a - b);
   const knots: OverallScale['knots'] = [];
   for (let i = 0; i < sorted.length;) {
-    const score = sorted[i]!;
+    const score = sorted[i];
+    if (score === undefined) break;
     let end = i + 1;
     while (end < sorted.length && sorted[end] === score) end += 1;
     const percentile = 1 - (i + (end - i) / 2) / sorted.length;
@@ -69,8 +70,12 @@ export function buildOverallScale(
     i = end;
   }
   if (knots.length >= 2) {
-    knots[0] = { ...knots[0]!, overall: 40, percentile: 1 };
-    knots[knots.length - 1] = { ...knots[knots.length - 1]!, overall: 99, percentile: 0 };
+    const first = knots[0];
+    const last = knots[knots.length - 1];
+    if (first !== undefined) knots[0] = { ...first, overall: 40, percentile: 1 };
+    if (last !== undefined) {
+      knots[knots.length - 1] = { ...last, overall: 99, percentile: 0 };
+    }
   }
   return overallScaleSchema.parse({
     schemaVersion: 1,
@@ -91,6 +96,7 @@ export function buildOverallScale(
 export function calibrateOverallScale(
   output = join(PUBLIC_DATA, 'ratings-model.json'),
 ): OverallScale {
+  output = resolve(REPO_ROOT, output);
   const samples: { key: string; score: number }[] = [];
   for (let year = 1996; year <= 2024; year += 1) {
     const season = `${String(year)}-${String((year + 1) % 100).padStart(2, '0')}`;
@@ -114,7 +120,10 @@ export function calibrateOverallScale(
         eraPace: era.pace,
         eraThreeRate: era.league3PARate,
       }).profile;
-      samples.push({ key: `${player.externalId}|${season}`, score: profile.rawOverallScore });
+      samples.push({
+        key: `${player.externalId ?? ''}|${season}`,
+        score: profile.rawOverallScore,
+      });
     }
   }
   const scale = buildOverallScale(samples);

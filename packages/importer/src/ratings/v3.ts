@@ -91,13 +91,21 @@ function normalizeMemberships(values: readonly number[]): ArchetypeMemberships {
   if (last) result[last] = Math.round((result[last] + 1 - sum) * 1000000) / 1000000;
   return result;
 }
+function observedTrueShooting(stats: StatsRow): number | null {
+  return typeof stats.tsPct === 'number' &&
+    Number.isFinite(stats.tsPct) &&
+    stats.tsPct >= 0 &&
+    stats.tsPct <= 1
+    ? stats.tsPct
+    : null;
+}
 function confidenceFor(stats: StatsRow): {
   label: ProductionEvidence['confidence'];
   factor: number;
 } {
   const games = Math.max(0, Math.trunc(safeFloat(stats.gamesPlayed)));
   const minutes = Math.max(0, safeFloat(stats.minutes));
-  const advanced = typeof stats.tsPct === 'number' && Number.isFinite(stats.tsPct);
+  const advanced = observedTrueShooting(stats) !== null;
   if (games >= 50 && minutes >= 1500 && advanced) return { label: 'high', factor: 1 };
   if (games >= 30 && minutes >= 750) return { label: 'medium', factor: 0.75 };
   return { label: 'low', factor: 0.45 };
@@ -115,7 +123,7 @@ export function effectiveUsageFor(stats: StatsRow, eraPace?: number | null): num
   if (mpg <= 0) return null;
   return clamp((100 * possessionsPerGame) / (pace * (mpg / 48)), 0, 45);
 }
-function productionEvidence(
+export function productionEvidence(
   stats: StatsRow,
   eraPace?: number | null,
   eraThreeRate?: number | null,
@@ -139,7 +147,7 @@ function productionEvidence(
     impliedUsage !== null && (reportedUsage === null || impliedUsage - reportedUsage > 8)
       ? impliedUsage
       : (reportedUsage ?? 18);
-  const ts = safeFloat(stats.tsPct, 0.52);
+  const ts = observedTrueShooting(stats);
 
   // Cross-era fairness: modern spacing inflates raw efficiency (league TS
   // ~0.58 today vs ~0.53 in 1990), so the efficiency terms measure margin
@@ -171,7 +179,7 @@ function productionEvidence(
       (astPer36 - 3.5) * 0.9 +
       (usage - 20) * 0.1 -
       Math.max(0, usage - 30) * 0.22 +
-      (stats.tsPct == null ? 0 : (ts - tsRef) * 85 * loadFactor * efficiencyScale) +
+      (ts === null ? 0 : (ts - tsRef) * 85 * loadFactor * efficiencyScale) +
       stocks,
     0,
     100,

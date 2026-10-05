@@ -16,7 +16,7 @@ export const overallScaleSchema = z
     knots: z
       .array(
         z.object({
-          score: z.number().finite(),
+          score: z.number(),
           overall: z.number().min(40).max(99),
           percentile: z.number().min(0).max(1),
         }),
@@ -25,8 +25,9 @@ export const overallScaleSchema = z
   })
   .superRefine((scale, context) => {
     for (let i = 1; i < scale.knots.length; i += 1) {
-      const previous = scale.knots[i - 1]!;
-      const current = scale.knots[i]!;
+      const previous = scale.knots[i - 1];
+      const current = scale.knots[i];
+      if (previous === undefined || current === undefined) continue;
       if (
         current.score <= previous.score ||
         current.overall < previous.overall ||
@@ -51,8 +52,11 @@ export function overallForScore(
   percentile: number;
 } {
   if (!Number.isFinite(score)) throw new Error('overall score must be finite');
-  const first = scale.knots[0]!;
-  const last = scale.knots[scale.knots.length - 1]!;
+  const first = scale.knots[0];
+  const last = scale.knots[scale.knots.length - 1];
+  if (first === undefined || last === undefined) {
+    throw new Error('overall scale requires at least two knots');
+  }
   if (score <= first.score)
     return { overall: Math.round(first.overall), percentile: first.percentile };
   if (score >= last.score)
@@ -61,11 +65,16 @@ export function overallForScore(
   let high = scale.knots.length - 1;
   while (high - low > 1) {
     const middle = Math.floor((low + high) / 2);
-    if (scale.knots[middle]!.score <= score) low = middle;
+    const middleKnot = scale.knots[middle];
+    if (middleKnot === undefined) throw new Error('overall scale knot missing');
+    if (middleKnot.score <= score) low = middle;
     else high = middle;
   }
-  const left = scale.knots[low]!;
-  const right = scale.knots[high]!;
+  const left = scale.knots[low];
+  const right = scale.knots[high];
+  if (left === undefined || right === undefined) {
+    throw new Error('overall scale knot missing');
+  }
   const fraction = (score - left.score) / (right.score - left.score);
   return {
     overall: Math.max(

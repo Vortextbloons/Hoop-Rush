@@ -93,9 +93,7 @@
     height: 3.5rem;
     border: 1px solid rgb(196 132 255 / 70%);
     border-radius: 0.8rem;
-    background:
-      radial-gradient(circle at 30% 25%, #8b5cf6, #3b2068 70%),
-      #1c1332;
+    background: radial-gradient(circle at 30% 25%, #8b5cf6, #3b2068 70%), #1c1332;
     color: #efe6ff;
     font-family: var(--font-display);
     font-size: 1.15rem;

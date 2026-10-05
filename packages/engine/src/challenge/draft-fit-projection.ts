@@ -193,7 +193,8 @@ function assignedFromSlots(
     if (player === undefined || slot === undefined) return null;
     const slotIndex = DRAFT_FIT_SLOTS.findIndex((entry) => entry.slot === slot);
     if (slotIndex < 0 || assigned[slotIndex] !== null || used.has(playerKey(player))) return null;
-    if (!canPlay(player.positions, DRAFT_FIT_SLOTS[slotIndex]!.group)) return null;
+    const fitSlot = DRAFT_FIT_SLOTS[slotIndex];
+    if (fitSlot === undefined || !canPlay(player.positions, fitSlot.group)) return null;
     used.add(playerKey(player));
     assigned[slotIndex] = player;
   }
@@ -228,7 +229,7 @@ function repositionPlanFor(
             {
               playerId: player.playerId,
               positions: player.positions,
-              slotIndex: slotIndex as SlotIndex,
+              slotIndex: slotIndex,
             },
           ],
     ),
@@ -243,10 +244,11 @@ function projectionLineupOf(
   if (assigned.length !== DRAFT_FIT_SLOTS.length || assigned.some((player) => player === null)) {
     return null;
   }
-  return DRAFT_FIT_SLOTS.map((entry, index) => ({
-    slot: entry.slot,
-    player: assigned[index]!,
-  })) as ProjectionLineup;
+  return DRAFT_FIT_SLOTS.map((entry, index) => {
+    const player = assigned[index];
+    if (player === null) throw new Error('projection lineup requires five players');
+    return { slot: entry.slot, player };
+  }) as ProjectionLineup;
 }
 
 function projectionReferences(
@@ -281,7 +283,7 @@ function candidateCanBePlaced(
   allowDisplacement: boolean,
 ): boolean {
   return DRAFT_FIT_SLOTS.some((_, slotIndex) => {
-    const plan = repositionPlanFor(assigned, candidate, slotIndex as SlotIndex);
+    const plan = repositionPlanFor(assigned, candidate, slotIndex);
     if (plan === null) return false;
     return allowDisplacement || plan.moves.every((move) => move.fromSlot === null);
   });
@@ -416,32 +418,22 @@ export function scoreDraftPool(input: {
       const { eraProfile, model } = input.projection;
       const references = projectionReferences(model, eraProfile.eraId);
       const baseAssigned = currentAssigned;
-      const baseFives =
-        baseAssigned === null
-          ? null
-          : references.map((reference) => fillWithReference(baseAssigned, reference.players));
-      const baseNets =
-        baseFives === null || baseFives.some((five) => five === null)
-          ? null
-          : references.map(
-              (reference, referenceIndex) =>
-                projectedNetRatings(
-                  baseFives[referenceIndex]!,
-                  [reference],
-                  eraProfile,
-                  model,
-                )?.[0] ?? null,
-            );
+      const baseFives = references.map((reference) =>
+        fillWithReference(baseAssigned, reference.players),
+      );
+      const baseNets = baseFives.some((five) => five === null)
+        ? null
+        : references.map((reference, referenceIndex) => {
+            const five = baseFives[referenceIndex];
+            if (five === undefined || five === null) return null;
+            return projectedNetRatings(five, [reference], eraProfile, model)?.[0] ?? null;
+          });
       if (baseNets !== null && !baseNets.some((net) => net === null)) {
         for (const entry of eligibleScreened.slice(0, refineTopN)) {
           let best: DraftFitRefinedProjection | null = null;
           for (let targetIndex = 0; targetIndex < DRAFT_FIT_SLOTS.length; targetIndex += 1) {
             try {
-              const plan = repositionPlanFor(
-                baseAssigned!,
-                entry.candidate,
-                targetIndex as SlotIndex,
-              );
+              const plan = repositionPlanFor(baseAssigned, entry.candidate, targetIndex);
               if (
                 plan === null ||
                 (!(input.allowDisplacement ?? true) &&
@@ -462,16 +454,21 @@ export function scoreDraftPool(input: {
                   : (projectedNetRatings(five, [reference], eraProfile, model)?.[0] ?? null);
               });
               if (allCandidateNets.some((net) => net === null)) continue;
-              const deltas = allCandidateNets.map(
-                (net, referenceIndex) => net! - (baseNets[referenceIndex] ?? 0),
-              );
+              const deltas = allCandidateNets.map((net, referenceIndex) => {
+                if (net === null) return 0;
+                return net - (baseNets[referenceIndex] ?? 0);
+              });
+              const targetSlot = DRAFT_FIT_SLOTS[targetIndex];
+              if (targetSlot === undefined) continue;
               const projection: DraftFitRefinedProjection = {
                 netDelta: round1(mean(deltas)),
                 neutralNetDelta: round1(deltas[0] ?? 0),
                 worstNetDelta: round1(Math.min(...deltas)),
-                netRating: round1(mean(allCandidateNets.map((net) => net!))),
-                recommendedSlot: DRAFT_FIT_SLOTS[targetIndex]!.slot,
-                rearrangementCount: Math.max(0, (plan?.moves.length ?? 1) - 1),
+                netRating: round1(
+                  mean(allCandidateNets.filter((net): net is number => net !== null)),
+                ),
+                recommendedSlot: targetSlot.slot,
+                rearrangementCount: Math.max(0, plan.moves.length - 1),
               };
               if (betterRefinedProjection(projection, best)) best = projection;
             } catch {

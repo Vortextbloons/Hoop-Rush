@@ -1090,6 +1090,7 @@ export interface TradeFitContext {
   attemptNumber?: number;
 }
 function tradeBandOf(_fit?: TradeFitContext): { lower: number; upper: number } {
+  void _fit;
   return TRADE_VALUE_BAND;
 }
 function tradeRatioOf(raw: string): number | null {

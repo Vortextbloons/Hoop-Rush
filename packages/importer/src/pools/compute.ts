@@ -12,7 +12,6 @@ import {
   REQUIRED_RATING_KEYS,
   SELECTION_SCORE_VERSION,
   SOURCE_VERSION,
-  overallBandForPercentile,
   overallForScore,
   type OverallScale,
   franchiseEraPoolSchema,
@@ -590,6 +589,7 @@ export function neutralSelectionScoreFor(
   summary: SummaryRatingsRaw | undefined,
   _stats: SeasonStatsInput,
 ): number {
+  void _stats;
   return rawOverallScoreFor(player, summary);
 }
 type OverallScoreInput = { ratingProfile?: unknown };
@@ -611,8 +611,8 @@ export function rawOverallScoreFor(
 }
 export function selectionScore(
   peakScore: number,
-  offenseRating: number,
-  defenseRating: number,
+  _offenseRating: number,
+  _defenseRating: number,
   _usageRate: number | null,
   teamMinutes: number,
   teamGames: number,
@@ -622,7 +622,7 @@ export function selectionScore(
   // Rank peaks by holistic evidence first: three-point-era offense ratings
   // used to outvote MVP production (1989-90 Magic over 1986-87). The peak
   // score below carries the season; offense/defense break ties.
-  const raw = 0.8 * peakScore + 0.12 * offenseRating + 0.08 * defenseRating + 0.02 * mpg;
+  const raw = peakScore + 0.02 * mpg;
   return Math.round(raw * availability * 1000) / 1000;
 }
 export function peakSelectionBlend(_neutralScore: number, rawOverallScore: number): number {
@@ -645,10 +645,7 @@ export function candidateKey(candidate: Candidate): readonly number[] {
   const games = Math.trunc(numFrom(stint.gamesPlayed));
   return [
     selectionScore(
-      peakSelectionBlend(
-        neutralSelectionScoreFor(candidate.player, summary, candidate.stats),
-        rawOverallScoreFor(candidate.player, summary),
-      ),
+      rawOverallScoreFor(candidate.player, summary),
       safeFloat(summary?.offenseRating),
       safeFloat(summary?.defenseRating),
       nullableFrom(candidate.stats.usageRate),
@@ -719,15 +716,8 @@ function minutesOf(row: PoolOverallRow): number | null {
   return typeof minutes === 'number' && Number.isFinite(minutes) ? minutes : null;
 }
 export function minutesFloorOverall(overall: number, minutes: number | null): number {
-  // A proven rotation workload cannot grade as a scrub: seasons with real
-  // minutes compress into 60-64 instead of scattering through the 40s-50s.
-  // Rank order is preserved (monotonic), the percentile stays honest, and
-  // unobserved minutes (null) never qualify.
-  if (minutes === null || minutes < MINUTES_FLOOR_SAMPLE || overall >= MINUTES_FLOOR_OVERALL) {
-    return overall;
-  }
-  const clamped = Math.max(40, Math.min(59, Math.round(overall)));
-  return 60 + Math.round(((clamped - 40) / 20) * 4);
+  if (minutes === null || minutes < MINUTES_FLOOR_SAMPLE) return overall;
+  return Math.max(MINUTES_FLOOR_OVERALL, overall);
 }
 function hasRawOverallScore(row: PoolOverallRow): boolean {
   const raw = row.ratingProfile?.rawOverallScore;
@@ -749,10 +739,10 @@ export function normalizePoolOveralls(
       mapped?.overall ?? profile?.canonicalOverall ?? row.summaryRatings.overallRating,
       minutesOf(row),
     );
-    if (mapped && profile) {
+    if (mapped && profile && scale) {
       profile.canonicalOverall = mapped.overall;
       profile.overallPercentile = mapped.percentile;
-      profile.overallCohortVersion = scale!.version;
+      profile.overallCohortVersion = scale.version;
     }
   }
   return { totalRowCount: rows.length, rowsWithoutRawOverall };

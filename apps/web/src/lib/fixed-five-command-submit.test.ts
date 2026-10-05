@@ -87,6 +87,7 @@ describe('fixed-five command submission', () => {
       payload: { kind: 'confirm-result', resultDigest: digest, verified: true },
       expectedRevision: 7,
       resync: async () => {
+        await Promise.resolve();
         authoritativeRevision = 9;
       },
       retryAfterResync: () => true,

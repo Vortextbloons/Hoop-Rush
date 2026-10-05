@@ -139,11 +139,7 @@ export function buildAutoDraft(
   return draftFromTeam(initializeCollectionActiveTeam(ownedCardIds, resolve, strategy));
 }
 
-export const MINUTE_STRATEGIES: readonly CollectionMinuteStrategy[] = [
-  'tight',
-  'balanced',
-  'deep',
-];
+export const MINUTE_STRATEGIES: readonly CollectionMinuteStrategy[] = ['tight', 'balanced', 'deep'];
 
 export function balanceDraftMinutes(
   draft: TeamDraft,

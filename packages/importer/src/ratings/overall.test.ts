@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ratingProfileSchema,
+  ratingsModelArtifactSchema,
   overallForScore,
   overallScaleSchema,
   REQUIRED_RATING_KEYS,
@@ -9,6 +10,7 @@ import {
 import { DEFAULT_RATINGS_MODEL_ARTIFACT } from './artifact.ts';
 import { buildOverallScale } from './overall-calibration.ts';
 import { deriveRatingProfile, tendenciesForProfile, type RatingProfileInput } from './v3.ts';
+import { normalizePoolOveralls } from '../pools/compute.ts';
 import { starterStats } from './ratings-test-support.ts';
 
 const scale = buildOverallScale(
@@ -81,8 +83,11 @@ describe('total ability overall', () => {
       );
       expect(ratingProfileSchema.safeParse(result.profile).success).toBe(true);
     }
-    expect(derive({ ratings: profiles[4]! }).profile.rawOverallScore).toBeGreaterThan(
-      derive({ ratings: profiles[2]! }).profile.rawOverallScore,
+    const elite = profiles[4];
+    const starter = profiles[2];
+    if (elite === undefined || starter === undefined) throw new Error('fixture profiles missing');
+    expect(derive({ ratings: elite }).profile.rawOverallScore).toBeGreaterThan(
+      derive({ ratings: starter }).profile.rawOverallScore,
     );
   });
 
@@ -148,6 +153,23 @@ describe('total ability overall', () => {
     expect(input.stats.steals).not.toBeNull();
   });
 
+  it('requires matching frozen scales in v3 artifacts while retaining legacy readability', () => {
+    expect(ratingsModelArtifactSchema.safeParse(DEFAULT_RATINGS_MODEL_ARTIFACT).success).toBe(true);
+    expect(
+      ratingsModelArtifactSchema.safeParse({ ...DEFAULT_RATINGS_MODEL_ARTIFACT, schemaVersion: 3 })
+        .success,
+    ).toBe(false);
+    expect(
+      ratingsModelArtifactSchema.safeParse({ ...input.artifact, schemaVersion: 3 }).success,
+    ).toBe(true);
+    expect(
+      ratingsModelArtifactSchema.safeParse({
+        ...input.artifact,
+        schemaVersion: 3,
+        modelVersion: 'different',
+      }).success,
+    ).toBe(false);
+  });
   it('requires reconciling diagnostics for v3 while reading legacy v2 profiles', () => {
     const profile = derive().profile;
     const legacy = { ...profile, schemaVersion: 2, overallDiagnostics: undefined };
@@ -169,12 +191,33 @@ describe('frozen overall scale', () => {
       { key: 'b|2000-01', score: 60 },
       { key: 'c|2000-01', score: 70 },
     ];
-    expect(buildOverallScale([...samples, samples[0]!])).toEqual(
+    const duplicate = samples[0];
+    if (duplicate === undefined) throw new Error('fixture sample missing');
+    expect(buildOverallScale([...samples, duplicate])).toEqual(
       buildOverallScale([...samples].reverse()),
     );
     expect(() => buildOverallScale([...samples, { key: 'a|2000-01', score: 51 }])).toThrow(
       'conflicting',
     );
+  });
+  it('maps identical profiles independently of pool additions and order', () => {
+    const makeRow = (id: string) => ({
+      playerId: id,
+      franchiseId: 'lakers',
+      seasonKey: '2000-01',
+      summaryRatings: { ...derive().summaryRatings },
+      ratingProfile: { ...derive().profile },
+    });
+    const alone = [makeRow('a')];
+    const together = [makeRow('b'), makeRow('a')];
+    normalizePoolOveralls(alone, scale);
+    normalizePoolOveralls(together, scale);
+    expect(together[1]?.summaryRatings).toEqual(alone[0]?.summaryRatings);
+    expect(together[1]?.ratingProfile.overallPercentile).toEqual(
+      alone[0]?.ratingProfile.overallPercentile,
+    );
+    normalizePoolOveralls(together.reverse(), scale);
+    expect(together[0]?.summaryRatings).toEqual(alone[0]?.summaryRatings);
   });
   it('interpolates monotonically with bounds and rejects malformed mappings', () => {
     let last = 40;

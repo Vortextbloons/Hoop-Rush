@@ -71,7 +71,7 @@ export function runCollectionGameVerification(
       if (message.requestId !== requestId) return;
       cleanup();
       if (message.type === 'collection-game-verified') {
-        resolve(message.outcome as CollectionGameCommandResult);
+        resolve(message.outcome);
         return;
       }
       reject(

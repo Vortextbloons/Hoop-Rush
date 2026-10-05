@@ -545,7 +545,9 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
           throw new Error(`commitSeasonBlock: duplicate commandId ${input.commandId}`);
         }
         if (this.seam.seasonRotationSetDigest(input.rotations) !== input.rotationDigest) {
-          throw new Error('commitSeasonBlock: rotation digest does not match the submitted rotations');
+          throw new Error(
+            'commitSeasonBlock: rotation digest does not match the submitted rotations',
+          );
         }
         if (input.completedRounds < cursor.completedRounds) {
           throw new Error('commitSeasonBlock: completedRounds regression');

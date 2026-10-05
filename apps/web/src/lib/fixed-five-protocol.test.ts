@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
@@ -19,17 +20,24 @@ const MIGRATION_PATH = fileURLToPath(
 );
 
 function serverVersionLocks(): Record<string, string> {
-  const sql = readFileSync(MIGRATION_PATH, 'utf8');
-  const block = sql.match(
-    /insert into public\.fixed_five_server_versions[\s\S]*?on conflict \(key\)/,
-  );
-  if (block === null) throw new Error('server version seed block not found in the migration');
   const locks: Record<string, string> = {};
-  for (const match of block[0].matchAll(/\(\s*'([^']+)'\s*,\s*'([^']+)'\s*\)/g)) {
-    const key = match[1];
-    const value = match[2];
-    if (key !== undefined && value !== undefined) locks[key] = value;
+  const directory = dirname(MIGRATION_PATH);
+  for (const file of readdirSync(directory)
+    .filter((name) => name.endsWith('.sql'))
+    .sort()) {
+    const sql = readFileSync(join(directory, file), 'utf8');
+    for (const block of sql.matchAll(
+      /insert into public\.fixed_five_server_versions[\s\S]*?on conflict \(key\)/g,
+    )) {
+      for (const match of block[0].matchAll(/\(\s*'([^']+)'\s*,\s*'([^']+)'\s*\)/g)) {
+        const key = match[1];
+        const value = match[2];
+        if (key !== undefined && value !== undefined) locks[key] = value;
+      }
+    }
   }
+  if (Object.keys(locks).length === 0)
+    throw new Error('server version seed blocks not found in migrations');
   return locks;
 }
 

@@ -779,9 +779,7 @@ function representativeTraceRotation(
   return current;
 }
 
-function firstLegalFive(
-  members: readonly SeasonRosterMemberInput[],
-): string[] | null {
+function firstLegalFive(members: readonly SeasonRosterMemberInput[]): string[] | null {
   const available = new Set(members.map((member) => member.playerVersionId));
   const first = enumerateLegalFives(members, available)[0];
   return first === undefined ? null : [...first];

@@ -142,9 +142,14 @@ describe('scoreDraftPoolMemo', () => {
       context: context(),
     });
     expect(secondSlots).not.toBe(firstSlots);
+    const firstLocked = locked[0];
+    const secondLocked = locked[1];
+    if (firstLocked === undefined || secondLocked === undefined) {
+      throw new Error('fixture locked players missing');
+    }
     const reordered = scoreDraftPoolMemo({
       pool,
-      locked: [locked[1]!, locked[0]!],
+      locked: [secondLocked, firstLocked],
       lockedSlots: ['G1', 'C'],
       context: context(),
     });

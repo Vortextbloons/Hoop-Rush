@@ -4,10 +4,7 @@ import {
   type CollectionDifficultyId,
   type CollectionGameRules,
 } from '@hoop-rush/data-contracts';
-import {
-  generateCollectionCpuTeamV2,
-  resolveDifficultyRatingAdjustments,
-} from '@hoop-rush/engine';
+import { generateCollectionCpuTeamV2, resolveDifficultyRatingAdjustments } from '@hoop-rush/engine';
 
 export interface CollectionGameProjectionJob {
   difficultyId: CollectionDifficultyId;

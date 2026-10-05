@@ -32,6 +32,10 @@ import {
 } from './commands/data-defense-bpm-correlation.ts';
 import { dataDerive, DATA_DERIVE_OPTIONS } from './commands/data-derive.ts';
 import { dataLineageAudit, DATA_LINEAGE_AUDIT_OPTIONS } from './commands/data-lineage-audit.ts';
+import {
+  dataOverallsCompare,
+  DATA_OVERALLS_COMPARE_OPTIONS,
+} from './commands/data-overalls-compare.ts';
 import { dataOveralls, DATA_OVERALLS_OPTIONS } from './commands/data-overalls.ts';
 import { dataOverallsAudit, DATA_OVERALLS_AUDIT_OPTIONS } from './commands/data-overalls-audit.ts';
 import {
@@ -257,6 +261,15 @@ const COMMANDS: Record<string, CommandDef> = {
       const input = parseOption(args, 'input', DEFAULT_MANIFEST);
       return dataValidate(input, hasOption(args, 'verbose'));
     },
+  },
+  'data overalls-compare': {
+    options: DATA_OVERALLS_COMPARE_OPTIONS,
+    run: (args) =>
+      dataOverallsCompare({
+        input: parseOption(args, 'input', DEFAULT_MANIFEST),
+        baseline: s(args, 'baseline'),
+        output: s(args, 'output'),
+      }),
   },
   'data overalls': {
     options: DATA_OVERALLS_OPTIONS,

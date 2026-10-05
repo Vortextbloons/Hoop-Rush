@@ -12,7 +12,7 @@ import {
   type MockInstance,
 } from 'vitest';
 import { parsePool } from '@hoop-rush/data-contracts';
-import { COHORT_NORMALIZATION_VERSION, MANIFEST_SCHEMA_VERSION } from '@hoop-rush/data-contracts';
+import { MANIFEST_SCHEMA_VERSION } from '@hoop-rush/data-contracts';
 import { readJson, sha256File, writeJson } from '../json.ts';
 import { normalizePositionLabels } from './positions.ts';
 import {
@@ -31,6 +31,7 @@ import {
   loadBbrefIds,
   loadCareerPositionLabels,
   maxLowConfidenceShareFor,
+  minutesFloorOverall,
   neutralSelectionScoreFor,
   peakSelectionBlend,
   normalizePoolOveralls,
@@ -46,6 +47,17 @@ import {
   type PoolBuildFailure,
 } from './compute.ts';
 const TEAM = '1610612747';
+describe('rotation-minutes floor', () => {
+  it('preserves monotonic Overall across the floor boundary', () => {
+    const scores = Array.from({ length: 591 }, (_, i) => 40 + i / 10);
+    const overalls = scores.map((score) => minutesFloorOverall(score, 1500));
+    expect(overalls.every((value, i) => value >= (overalls[i - 1] ?? value))).toBe(true);
+    expect(minutesFloorOverall(59, 1500)).toBe(60);
+    expect(minutesFloorOverall(60, 1500)).toBe(60);
+    expect(minutesFloorOverall(59, 1499)).toBe(59);
+    expect(minutesFloorOverall(59, null)).toBe(59);
+  });
+});
 const env = vi.hoisted(() => ({ nba: '', data: '', cache: '' }));
 vi.mock('../config.js', () => ({
   get NBA_ROOT() {
@@ -642,9 +654,10 @@ describe('sanitizeAnchors', () => {
 });
 describe('selectionScore', () => {
   it('ranks peaks raw-first with a modest availability adjustment', () => {
-    expect(selectionScore(90, 85, 80, 25, 2400, 80)).toBe(89.113);
+    expect(selectionScore(90, 85, 80, 25, 2400, 80)).toBe(90.512);
+    expect(selectionScore(90, 30, 99, 25, 2400, 80)).toBe(90.512);
   });
-  it('clamps usage to 40 and mpg to 48', () => {
+  it('bounds the playing-time adjustment', () => {
     expect(selectionScore(60, 60, 60, 50, 4000, 50)).toBe(60.008);
   });
   it('treats null usage as 0 and guards zero team games', () => {

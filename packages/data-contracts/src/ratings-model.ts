@@ -124,60 +124,73 @@ export const ratingProfileSchema = z
     }
   });
 export type RatingProfile = z.infer<typeof ratingProfileSchema>;
-export const ratingsModelArtifactSchema = z.object({
-  schemaVersion: z.union([z.literal(2), z.literal(3)]),
-  overallScale: overallScaleSchema.optional(),
-  impactModelVersion: z.string().min(1).max(64).optional(),
-  modelVersion: z.string().min(1).max(64),
-  ratingsVersion: z.string().min(1).max(64),
-  benchmarkVersion: z.string().min(1).max(64),
-  seedVersion: z.string().min(1).max(64),
-  confidenceTargetSamplesPerContext: z.number().int().positive(),
-  sampleCountPerContext: z.number().int().positive(),
-  contexts: z.array(z.enum(['weak', 'average', 'strong', 'interior-heavy', 'perimeter-heavy'])),
-  mapping: z.object({
-    impactPerNetRating: z.number(),
-    impactPerWinProbability: z.number(),
-    impactPerEfficiency: z.number(),
-    impactPerDefensiveEfficiency: z.number(),
-    impactPerTurnovers: z.number(),
-    impactPerRebound: z.number(),
-    impactPerShotQuality: z.number(),
-    shrinkageGames: z.number().positive(),
-  }),
-  playerAdjustments: z
-    .record(
-      z.string().min(1),
-      z.object({
-        adjustment: z.number().min(-6).max(6),
-        confidence: z.number().min(0).max(1),
-        sampleCount: z.number().int().nonnegative(),
-        metrics: z
-          .object({
-            netRating: z.number(),
-            winProbability: z.number(),
-            offensiveEfficiency: z.number(),
-            defensiveEfficiency: z.number(),
-            turnovers: z.number(),
-            rebounds: z.number(),
-            shotQuality: z.number(),
-          })
-          .optional(),
-      }),
-    )
-    .optional(),
-  distributionTargets: z.object({
-    exceptionalMin: z.number().min(95).max(100),
-    mvpMin: z.number().min(90).max(100),
-    rotationMax: z.number().min(0).max(95),
-  }),
-  regressionGates: z.array(
-    z.object({
-      playerId: z.string().min(1),
-      min: z.number().min(0).max(100),
-      max: z.number().min(0).max(100),
+export const ratingsModelArtifactSchema = z
+  .object({
+    schemaVersion: z.union([z.literal(2), z.literal(3)]),
+    overallScale: overallScaleSchema.optional(),
+    impactModelVersion: z.string().min(1).max(64).optional(),
+    modelVersion: z.string().min(1).max(64),
+    ratingsVersion: z.string().min(1).max(64),
+    benchmarkVersion: z.string().min(1).max(64),
+    seedVersion: z.string().min(1).max(64),
+    confidenceTargetSamplesPerContext: z.number().int().positive(),
+    sampleCountPerContext: z.number().int().positive(),
+    contexts: z.array(z.enum(['weak', 'average', 'strong', 'interior-heavy', 'perimeter-heavy'])),
+    mapping: z.object({
+      impactPerNetRating: z.number(),
+      impactPerWinProbability: z.number(),
+      impactPerEfficiency: z.number(),
+      impactPerDefensiveEfficiency: z.number(),
+      impactPerTurnovers: z.number(),
+      impactPerRebound: z.number(),
+      impactPerShotQuality: z.number(),
+      shrinkageGames: z.number().positive(),
     }),
-  ),
-  generatedAt: z.iso.datetime(),
-});
+    playerAdjustments: z
+      .record(
+        z.string().min(1),
+        z.object({
+          adjustment: z.number().min(-6).max(6),
+          confidence: z.number().min(0).max(1),
+          sampleCount: z.number().int().nonnegative(),
+          metrics: z
+            .object({
+              netRating: z.number(),
+              winProbability: z.number(),
+              offensiveEfficiency: z.number(),
+              defensiveEfficiency: z.number(),
+              turnovers: z.number(),
+              rebounds: z.number(),
+              shotQuality: z.number(),
+            })
+            .optional(),
+        }),
+      )
+      .optional(),
+    distributionTargets: z.object({
+      exceptionalMin: z.number().min(95).max(100),
+      mvpMin: z.number().min(90).max(100),
+      rotationMax: z.number().min(0).max(95),
+    }),
+    regressionGates: z.array(
+      z.object({
+        playerId: z.string().min(1),
+        min: z.number().min(0).max(100),
+        max: z.number().min(0).max(100),
+      }),
+    ),
+    generatedAt: z.iso.datetime(),
+  })
+  .superRefine((artifact, context) => {
+    if (
+      artifact.schemaVersion === 3 &&
+      (!artifact.overallScale || artifact.overallScale.modelVersion !== artifact.modelVersion)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['overallScale'],
+        message: 'v3 artifacts require a matching frozen scale',
+      });
+    }
+  });
 export type RatingsModelArtifact = z.infer<typeof ratingsModelArtifactSchema>;

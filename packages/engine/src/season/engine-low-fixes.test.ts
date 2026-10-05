@@ -223,21 +223,30 @@ describe('season low fixes', () => {
   it('rejects non-finite numeric input at the season game boundary', () => {
     const context = createEngineContext();
     const withNaNRating = buildInput('nan-rating');
+    const nanRatingPlayer = withNaNRating.home.players[0];
+    if (nanRatingPlayer === undefined) throw new Error('fixture player missing');
     withNaNRating.home.players[0] = {
-      ...withNaNRating.home.players[0]!,
-      ratings: { ...withNaNRating.home.players[0]!.ratings, threePoint: NaN },
+      ...nanRatingPlayer,
+      ratings: { ...nanRatingPlayer.ratings, threePoint: NaN },
     };
     expect(() => simulateSeasonGame(withNaNRating, context)).toThrow(/non-finite/);
     const withInfiniteTendency = buildInput('inf-tendency');
+    const infTendencyPlayer = withInfiniteTendency.away.players[3];
+    if (infTendencyPlayer === undefined) throw new Error('fixture player missing');
     withInfiniteTendency.away.players[3] = {
-      ...withInfiniteTendency.away.players[3]!,
-      tendencies: { ...withInfiniteTendency.away.players[3]!.tendencies, usageRate: Infinity },
+      ...infTendencyPlayer,
+      tendencies: { ...infTendencyPlayer.tendencies, usageRate: Infinity },
     };
     expect(() => simulateSeasonGame(withInfiniteTendency, context)).toThrow(/non-finite/);
     const withNaNStamina = withStamina(buildInput('nan-stamina'));
+    const nanStaminaPlayer = withNaNStamina.home.players[1];
+    const nanStamina = nanStaminaPlayer?.stamina;
+    if (nanStaminaPlayer === undefined || nanStamina === undefined) {
+      throw new Error('fixture player missing');
+    }
     withNaNStamina.home.players[1] = {
-      ...withNaNStamina.home.players[1]!,
-      stamina: { ...withNaNStamina.home.players[1]!.stamina!, rating: NaN },
+      ...nanStaminaPlayer,
+      stamina: { ...nanStamina, rating: NaN },
     };
     expect(() => simulateSeasonGame(withNaNStamina, context)).toThrow(/non-finite/);
     expect(() =>

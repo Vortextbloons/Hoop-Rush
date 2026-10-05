@@ -47,12 +47,13 @@ export function policyWeightOf(
   policy: CollectionDifficultyRotationPolicy,
 ): number {
   const base = starter ? policy.starterWeightBp : policy.benchWeightBp;
-  const bonus =
-    Math.max(0, overall - policy.overallBonusFloor) * policy.overallBonusPerPointBp;
+  const bonus = Math.max(0, overall - policy.overallBonusFloor) * policy.overallBonusPerPointBp;
   return base + bonus;
 }
 
-export function strategyForDifficulty(difficultyId: CollectionDifficultyId): CollectionMinuteStrategy {
+export function strategyForDifficulty(
+  difficultyId: CollectionDifficultyId,
+): CollectionMinuteStrategy {
   switch (difficultyId) {
     case 'street':
       return 'deep';
@@ -95,7 +96,10 @@ function resolveGroupTotals(
     starterTotal > starterCapacity ||
     benchTotal > benchCapacity
   ) {
-    throw new CollectionCommandError('invalid-minutes', 'failed to fit minute totals to roster caps');
+    throw new CollectionCommandError(
+      'invalid-minutes',
+      'failed to fit minute totals to roster caps',
+    );
   }
   return { starterTotal, benchTotal };
 }
@@ -273,14 +277,14 @@ export function tryCollectionMinuteDnp(
   const bench = entries.filter((entry) => !entry.starter);
   if (bench.length === 0) return null;
   const minutesById = new Map(plan.targetMinutes.map((row) => [row.cardId, row.minutes]));
-  const ranked = [...bench].sort(
-    (a, b) => a.overall - b.overall || (a.cardId < b.cardId ? -1 : 1),
-  );
+  const ranked = [...bench].sort((a, b) => a.overall - b.overall || (a.cardId < b.cardId ? -1 : 1));
   const worst = ranked[0];
   if (worst === undefined) return null;
   const worstMinutes = minutesById.get(worst.cardId) ?? 0;
   if (worstMinutes <= COLLECTION_MINUTE_DNP_MIN_MINUTES) return null;
-  const bestRemaining = Math.max(...bench.filter((entry) => entry.cardId !== worst.cardId).map((entry) => entry.overall));
+  const bestRemaining = Math.max(
+    ...bench.filter((entry) => entry.cardId !== worst.cardId).map((entry) => entry.overall),
+  );
   if (!(bestRemaining >= worst.overall + COLLECTION_MINUTE_DNP_OVERALL_GAP)) return null;
   const remaining = entries.filter((entry) => entry.cardId !== worst.cardId);
   const weightSum = remaining.reduce((sum, entry) => sum + Math.max(0, entry.weight), 0);

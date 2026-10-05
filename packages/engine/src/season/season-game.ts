@@ -1418,7 +1418,7 @@ function assertFiniteSeasonGameInput(input: SeasonGameSimulationInput): void {
       }
       if (player.anchors !== undefined) {
         for (const [key, value] of Object.entries(player.anchors)) {
-          if (value === null || value === undefined) continue;
+          if (value === null) continue;
           assertFiniteNumber(value, `${prefix}.anchors.${key}`);
         }
       }

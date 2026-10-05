@@ -390,6 +390,7 @@ function runChallengeJob(input: {
   catalogHash: string;
   rulesHash: string;
   profileHash: string;
+  progressionHash: string;
   job: ProgressionChallengeJob;
 }): ProgressionGameResult {
   const { catalog, rules, progression, profile, objectives, job } = input;
@@ -431,6 +432,7 @@ function runChallengeJob(input: {
       profileHash: input.profileHash,
       catalogHash: input.catalogHash,
       rulesHash: input.rulesHash,
+      progressionHash: input.progressionHash,
     });
     const prepared =
       job.mode === 'repeat'
@@ -615,7 +617,7 @@ function main(): void {
     return;
   }
   const { rules, rulesHash } = loadCollectionGameRules(input.manifestPath);
-  const { progression } = loadCollectionProgressionRules(input.manifestPath);
+  const { progression, progressionHash } = loadCollectionProgressionRules(input.manifestPath);
   const { profile, profileHash } = loadCollectionGameProfile(input.manifestPath);
   const objectives = collectionObjectiveDefinitionsFromRules(rules);
   const results = (input.jobs as ProgressionGameJob[]).map((job) => {
@@ -629,6 +631,7 @@ function main(): void {
           catalogHash,
           rulesHash,
           profileHash,
+          progressionHash,
           job,
         })
       : runStandardJob({

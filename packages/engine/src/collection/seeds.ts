@@ -128,11 +128,7 @@ export function collectionCpuTeamSeed(rootSeed: string, gameSequence: number): s
 }
 
 export function collectionGameSeed(rootSeed: string, gameSequence: number): string {
-  return gameSeedWithVersion(
-    COLLECTION_GAME_V1_SEED_DERIVATION_VERSION,
-    rootSeed,
-    gameSequence,
-  );
+  return gameSeedWithVersion(COLLECTION_GAME_V1_SEED_DERIVATION_VERSION, rootSeed, gameSequence);
 }
 
 export function collectionGameSeedPaths(gameSequence: number): {
@@ -209,11 +205,7 @@ export function collectionObjectiveOfferSeed(
 }
 
 export function collectionGameSeedV2(rootSeed: string, gameSequence: number): string {
-  return gameSeedWithVersion(
-    COLLECTION_GAME_SEED_DERIVATION_VERSION,
-    rootSeed,
-    gameSequence,
-  );
+  return gameSeedWithVersion(COLLECTION_GAME_SEED_DERIVATION_VERSION, rootSeed, gameSequence);
 }
 
 export function collectionGameSeedPathsV2(

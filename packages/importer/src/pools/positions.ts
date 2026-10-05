@@ -1,9 +1,6 @@
 import { POSITION_NORMALIZATION_VERSION, type Position } from '@hoop-rush/data-contracts';
 import type { PositionOverride } from '../positions/overrides.ts';
-import {
-  normalizePositionLabels,
-  positionsForSourceLabel,
-} from '../positions/normalize.ts';
+import { normalizePositionLabels, positionsForSourceLabel } from '../positions/normalize.ts';
 export {
   normalizePositionLabels,
   POSITION_LABEL_MAP,

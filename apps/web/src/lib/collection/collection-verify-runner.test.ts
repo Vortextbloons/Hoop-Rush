@@ -63,7 +63,7 @@ function buildCatalog(): CollectionCatalog {
   });
 }
 
-function buildChallenge(catalog: CollectionCatalog): CollectionChallengeDefinition {
+function buildChallenge(): CollectionChallengeDefinition {
   return collectionChallengeDefinitionSchema.parse({
     challengeVersion: 'collection-challenge-v1',
     challengeId: 'challenge-franchise-lakers-v1',
@@ -105,7 +105,7 @@ function buildEngineInput(catalog: CollectionCatalog): CollectionGameCommandInpu
     priorCommands: [],
     progression: buildCollectionProgressionFixture({
       catalog,
-      challenges: [buildChallenge(catalog)],
+      challenges: [buildChallenge()],
     }),
     progressionHash: HASH,
   };

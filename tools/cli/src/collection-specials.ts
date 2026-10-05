@@ -31,7 +31,7 @@ export const COLLECTION_SPECIALS: readonly AuthoredSpecial[] = [
   {
     family: 'Arm Guard',
     rarity: 'Immortal',
-    sourcePlayerVersionId: 'pv-6e3acf70d16dfebc4a1d64226c0c2ee0',
+    sourcePlayerVersionId: 'pv-b6f7c0f4a71f25601b18bd2634c856e4',
     ratingOverlay: {
       perimeterDefense: 29,
       defensiveIq: 29,
@@ -57,7 +57,7 @@ export const COLLECTION_SPECIALS: readonly AuthoredSpecial[] = [
   {
     family: 'Arm Guard',
     rarity: 'Immortal',
-    sourcePlayerVersionId: 'pv-d6f09fada4f8f7c1d26258b3b045611d',
+    sourcePlayerVersionId: 'pv-eff5d20d8eaa3de1f44664138e6155bd',
     ratingOverlay: {
       perimeterDefense: 25,
       defensiveIq: 21,
@@ -146,9 +146,9 @@ export const COLLECTION_SPECIALS: readonly AuthoredSpecial[] = [
 
 export const COLLECTION_SPECIAL_SOURCE_SEASONS: Record<string, string> = {
   'pv-f4d00dd58ebad5097f4e5ba3307a9085': 'Luka Dončić 2023-24',
-  'pv-6e3acf70d16dfebc4a1d64226c0c2ee0': 'Magic Johnson 1988-89',
+  'pv-b6f7c0f4a71f25601b18bd2634c856e4': 'Magic Johnson 1988-89',
   'pv-3f5b52ec3a1798b0bad644defdb7c47c': 'Trae Young 2021-22',
-  'pv-d6f09fada4f8f7c1d26258b3b045611d': 'James Harden 2018-19',
+  'pv-eff5d20d8eaa3de1f44664138e6155bd': 'James Harden 2018-19',
   'pv-e672c0d85044e49475d29e2691a16bc8': "D'Angelo Russell 2023-24",
   'pv-91b01c4775957fb343db81099c6d7d37': 'Jordan Clarkson 2020-21',
   'pv-4efd0118ae40c6f4ed7689ee95d6e728': 'Bogdan Bogdanović 2020-21',

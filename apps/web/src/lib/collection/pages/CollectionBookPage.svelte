@@ -640,8 +640,9 @@
         <p class="ur-hero-eyebrow">Welcome grant</p>
         <h2 id="welcome-heading" class="ur-section-title">Claim your starter</h2>
         <p class="mt-2 max-w-2xl text-sm text-muted-foreground">
-          One free five-card starter. You begin with 0 Coins — win games to fund packs. Starter cards are drawn
-          from Ember base cards and always form a legal five. This grant can be claimed once.
+          One free five-card starter. You begin with 0 Coins — win games to fund packs. Starter
+          cards are drawn from Ember base cards and always form a legal five. This grant can be
+          claimed once.
         </p>
         <ul class="mt-3 list-disc pl-5 text-sm text-muted-foreground">
           <li>Five new, distinct players from Ember base cards</li>
@@ -666,7 +667,11 @@
       <section aria-label="Starter results" class="ur-starter-recap ur-arena-panel mt-6">
         <p class="ur-hero-eyebrow">Starter claimed</p>
         <h2 class="ur-section-title">{starterCards.length} cards added</h2>
-        <p class="text-sm text-muted-foreground">{starterCards.length} cards added · {collectionState?.balances.Coins.toLocaleString('en-US') ?? ''} Coins in the balance.</p>
+        <p class="text-sm text-muted-foreground">
+          {starterCards.length} cards added · {collectionState?.balances.Coins.toLocaleString(
+            'en-US',
+          ) ?? ''} Coins in the balance.
+        </p>
         <ul class="mt-3 grid gap-2 sm:grid-cols-2">
           {#each starterCards as card (card.cardId)}
             <li class="flex items-center gap-3 rounded-xl bg-surface-2 p-3">

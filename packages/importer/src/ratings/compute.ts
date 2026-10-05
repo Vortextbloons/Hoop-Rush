@@ -355,6 +355,7 @@ export function computeForSeason(season: string, force = false, overallOnly = fa
   }
   if (overallOnly) {
     const artifact = loadRatingsModelArtifact();
+    if (!artifact.overallScale) throw new Error('Overall rebuild requires calibrate overall');
     const era = seasonContext(season);
     for (const player of roster) {
       const ratings = simulationRatingsSchema.parse(player.ratings);
@@ -385,6 +386,7 @@ export function computeForSeason(season: string, force = false, overallOnly = fa
   const evidenceById = loadEvidenceMap(out);
   const context = seasonContext(season);
   const artifact = loadRatingsModelArtifact();
+  if (!artifact.overallScale) throw new Error('Rating generation requires calibrate overall');
   const threePointReconstruction = loadThreePointReconstructionArtifact();
   const ratePriorsByGroup = pooledRatePriors(roster, statsList);
   const teamWinPctMap = estimateTeamWinPctMap(statsList);

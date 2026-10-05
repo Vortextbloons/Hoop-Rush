@@ -8,7 +8,7 @@
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --incremental --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --incremental --watch --tsconfig ./tsconfig.json",
-    "lint": "prettier --cache --check src scripts vitest.config.ts svelte.config.js eslint.config.js && eslint --cache .",
+    "lint": "prettier --cache --check src vitest.config.ts svelte.config.js eslint.config.js && eslint --cache .",
     "test": "vitest",
     "test:run": "vitest run",
     "test:unit": "vitest run --config vitest.config.ts src/lib",

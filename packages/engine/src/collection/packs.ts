@@ -534,19 +534,7 @@ function applyClaimWelcome(
     replayVersion: COLLECTION_REPLAY_VERSION,
     targeting: null,
   };
-  const ledgerEntries: CollectionLedgerEntry[] =
-    WELCOME_COIN_GRANT === 0
-      ? []
-      : [
-          {
-            transactionId: ledgerTxnId(command.commandId, pullSequence, 0),
-            commandId: command.commandId,
-            pullSequence,
-            currency: 'Coins',
-            amount: WELCOME_COIN_GRANT,
-            reason: 'welcome-grant',
-          },
-        ];
+  const ledgerEntries: CollectionLedgerEntry[] = [];
   return {
     status: 'accepted',
     state: commitState(state, { owned, balances, claimedWelcome: true }, true, progressionHash),

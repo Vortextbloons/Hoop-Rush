@@ -238,10 +238,12 @@ export function projectSeasonRoster(
     }
     byVersion.set(version, player);
   }
-  const members: { playerVersionId: string; playable: readonly Position[] }[] = players.map((player) => ({
-    playerVersionId: player.playerVersionId ?? player.playerId,
-    playable: player.positions,
-  }));
+  const members: { playerVersionId: string; playable: readonly Position[] }[] = players.map(
+    (player) => ({
+      playerVersionId: player.playerVersionId ?? player.playerId,
+      playable: player.positions,
+    }),
+  );
   const memberPlayable = new Map<string, readonly Position[]>(
     members.map((member) => [member.playerVersionId, member.playable]),
   );

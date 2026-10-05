@@ -52,24 +52,24 @@ function diagnosticsCanonical(diagnostics: SeasonGenerationDiagnostics): unknown
 }
 function aiPoolsCanonical(pools: readonly SeasonAiPool[]): unknown[] {
   return sortedBy(pools, (pool) => pool.franchiseId).map((pool) => ({
-      franchiseId: pool.franchiseId,
-      band: pool.band,
-      identity: pool.identity,
-      playerVersionIds: sortedStrings(pool.playerVersionIds),
-      anchors: sortedBy(pool.anchors, (anchor) => anchor.playerVersionId).map((anchor) => ({
-          playerVersionId: anchor.playerVersionId,
-          qualifyingRole: anchor.qualifyingRole,
-          percentileTier: anchor.percentileTier,
-          roleScore: anchor.roleScore,
-          percentileThreshold: anchor.percentileThreshold,
-          seedPath: anchor.seedPath,
-        })),
-      selections: sortedStrings(pool.selections),
-      allocationSeedPaths: [...pool.allocationSeedPaths].sort((a, b) =>
-        JSON.stringify(a) < JSON.stringify(b) ? -1 : 1,
-      ),
-      repairCount: pool.repairCount,
-    }));
+    franchiseId: pool.franchiseId,
+    band: pool.band,
+    identity: pool.identity,
+    playerVersionIds: sortedStrings(pool.playerVersionIds),
+    anchors: sortedBy(pool.anchors, (anchor) => anchor.playerVersionId).map((anchor) => ({
+      playerVersionId: anchor.playerVersionId,
+      qualifyingRole: anchor.qualifyingRole,
+      percentileTier: anchor.percentileTier,
+      roleScore: anchor.roleScore,
+      percentileThreshold: anchor.percentileThreshold,
+      seedPath: anchor.seedPath,
+    })),
+    selections: sortedStrings(pool.selections),
+    allocationSeedPaths: [...pool.allocationSeedPaths].sort((a, b) =>
+      JSON.stringify(a) < JSON.stringify(b) ? -1 : 1,
+    ),
+    repairCount: pool.repairCount,
+  }));
 }
 export function seasonGenerationDigest(input: SeasonGenerationDigestInput): string {
   const canonical = JSON.stringify({

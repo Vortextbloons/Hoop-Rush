@@ -6,6 +6,11 @@ Usage:
   pnpm hoop-rush <command> [options]
 
 Commands:
+  calibrate overall      Freeze the total-ability Overall scale from qualified
+                         1996�97 through 2024�25 source seasons.
+                          --output <path>  Ratings model artifact
+  data overalls-compare  Compare a saved baseline with the current packaged pools.
+                          --baseline <path> --output <path>
   data validate          Validate the manifest, lineage, eras, pools, era
                          simulation profiles, and opponent artifacts.
                          --input <path>   Manifest path (default apps/web/static/data/manifest.json)
@@ -20,9 +25,9 @@ Commands:
                           --input <path>   Manifest path (default apps/web/static/data/manifest.json)
                           --franchise <id> --era <id> --status <available|unavailable>
   data overalls-distribution
-                         Cohort percentile Overall distribution over every
+                         Frozen-scale Overall distribution over every
                          packaged franchise-era row: band counts/percentages
-                         vs targets, medians, min/max, and per-era breakdowns.
+                         vs reference targets, medians, min/max, and per-era breakdowns.
                           --input <path>   Manifest path (default apps/web/static/data/manifest.json)
   data overalls-audit    Raw vs canonical vs final Overall audit: raw
                          distribution, minutes-floor violations (>=1500 min
@@ -327,6 +332,7 @@ Commands:
                          raw-data roster + season-stats (Python stays the fetch
                          layer only). --seasons 2024-25,2023-24 (comma-separated)
                          --force-ratings       Recompute already-rated seasons
+                          --overall-only   Rebuild Overall without changing skills
   import pools           Build franchise-era pools (spec/02) and update the
                          manifest pool index.
                          --pools lakers/1990s,celtics/1980s  Targets (comma-sep)

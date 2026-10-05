@@ -287,8 +287,7 @@ export function attachAiProjectionSummaries(input: {
       best === undefined ? null : best.projection.minutes.map((row) => row.playerVersionId);
     const selectedKey = [...selected].sort().join(',');
     const bestKey = bestIds === null ? null : [...bestIds].sort().join(',');
-    const selectedIsBest =
-      selectedKey !== '' && bestKey !== null && selectedKey === bestKey;
+    const selectedIsBest = selectedKey !== '' && bestKey !== null && selectedKey === bestKey;
     const searchDigest = seasonDigestHex(
       JSON.stringify({
         seed: search.audit.seed,

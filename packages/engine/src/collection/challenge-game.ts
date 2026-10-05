@@ -30,10 +30,7 @@ import { generateCollectionCpuTeamV2 } from './cpu.ts';
 import { resolveDifficultyRatingAdjustments } from './difficulty.ts';
 import { CollectionGameError, collectionPreparedInputDigest } from './game.ts';
 import { buildCollectionObjectiveFacts } from './objectives.ts';
-import {
-  resolveCollectionChallenge,
-  validateCollectionProgressionRules,
-} from './progression.ts';
+import { resolveCollectionChallenge, validateCollectionProgressionRules } from './progression.ts';
 import { collectionGameIdV2, collectionGameSeedPathsV2, collectionGameSeedV2 } from './seeds.ts';
 
 export class CollectionChallengeTeamIneligibleError extends CollectionGameError {
