@@ -6,6 +6,7 @@ import {
   simulateChallengeBestOf,
   toSimulationPlayer,
   type ChallengeCreation,
+  type EngineContext,
 } from '@hoop-rush/engine';
 import {
   FIXED_SANDBOX_ERA,
@@ -14,6 +15,7 @@ import {
   seedSchema,
   simulationTeamSchema,
   type ChallengeRun,
+  type EraSimulationProfile,
   type PeakPlayerSeason,
   type PlayersIndex,
   type PlayersIndexEntry,
@@ -266,27 +268,35 @@ export function resolvePoolLineup(spec: string, data: PackagedData): PeakPlayerS
     return player;
   });
 }
-export function simChallenge(args: {
-  lineup?: string;
-  seed?: string;
-  reruns?: string;
-  era?: string;
-  profile?: string;
-  bracket?: string;
-}): CliReport {
+export interface ChallengeSetup {
+  lineupSpec: string;
+  seed: string;
+  eraId: string;
+  creation: ChallengeCreation;
+  profile: EraSimulationProfile;
+  context: EngineContext;
+}
+export function prepareChallenge(
+  args: {
+    lineup?: string;
+    seed?: string;
+    era?: string;
+    profile?: string;
+    bracket?: string;
+  },
+  commandLabel = 'sim challenge',
+): ChallengeSetup {
   const lineupSpec = args.lineup;
   if (lineupSpec === undefined) {
     throw new UsageError(
-      'sim challenge requires --lineup <playerId[,playerId@franchise/era] or Name[,Name@Franchise/era]>',
+      `${commandLabel} requires --lineup <playerId[,playerId@franchise/era] or Name[,Name@Franchise/era]>`,
     );
   }
   const rawSeed = args.seed;
-  if (rawSeed === undefined) throw new UsageError('sim challenge requires --seed <hex>');
+  if (rawSeed === undefined) throw new UsageError(`${commandLabel} requires --seed <hex>`);
   const parsedSeed = seedSchema.safeParse(rawSeed);
   if (!parsedSeed.success) throw new UsageError(`--seed must be hex (got "${rawSeed}")`);
   const seed = parsedSeed.data;
-  const reruns = parseCount(args.reruns, '--reruns', BEST_OF_ATTEMPTS);
-  if (reruns < 1) throw new UsageError('--reruns must be >= 1');
   const eraId = args.era ?? FIXED_SANDBOX_ERA;
   const packaged = loadPackagedData();
   const data = new PackagedData(packaged.manifest, packaged.dir);
@@ -327,6 +337,19 @@ export function simChallenge(args: {
     profile,
     bracket,
   };
+  return { lineupSpec, seed, eraId, creation, profile, context };
+}
+export function simChallenge(args: {
+  lineup?: string;
+  seed?: string;
+  reruns?: string;
+  era?: string;
+  profile?: string;
+  bracket?: string;
+}): CliReport {
+  const { lineupSpec, seed, eraId, creation, profile, context } = prepareChallenge(args);
+  const reruns = parseCount(args.reruns, '--reruns', BEST_OF_ATTEMPTS);
+  if (reruns < 1) throw new UsageError('--reruns must be >= 1');
   const started = performance.now();
   let run: ChallengeRun;
   try {

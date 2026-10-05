@@ -25,6 +25,7 @@ function usageFailure(command: string, input: Record<string, unknown>, message: 
 export const IMPORT_RATINGS_OPTIONS: Record<string, boolean> = {
   seasons: true,
   'force-ratings': false,
+  'overall-only': false,
   workers: true,
   format: true,
   verbose: false,
@@ -40,11 +41,17 @@ function parseWorkerCount(raw: string | null | undefined): number | undefined {
 export async function importRatings(args: {
   seasons?: string | null;
   forceRatings?: boolean;
+  overallOnly?: boolean;
   workers?: string | null;
 }): Promise<CliReport> {
   const seasons = splitList(args.seasons ?? null) ?? DEFAULT_SEASONS;
   try {
-    await ratings.run(seasons, args.forceRatings ?? false, parseWorkerCount(args.workers));
+    await ratings.run(
+      seasons,
+      args.forceRatings ?? false,
+      parseWorkerCount(args.workers),
+      args.overallOnly ?? false,
+    );
   } catch (error) {
     return usageFailure(
       'import ratings',

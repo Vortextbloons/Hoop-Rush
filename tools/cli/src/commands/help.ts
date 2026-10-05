@@ -78,6 +78,16 @@ Commands:
                                                packaged era profile)
                          --profile <path>      Override the packaged era profile
                          --bracket <path>      Override the packaged bracket artifact
+  sim challenge-average  Run N complete 82-game challenges against the frozen bracket and
+                         report the mean of every stat across attempts (plus min/max/sd).
+                         Same options as sim challenge; --reruns defaults to 10 and is
+                         the number of attempts averaged. Use this to debug variance.
+                         --lineup <ref[,...]>  Five players in G,G,F,F,C slot order
+                         --seed <hex>          Run seed (required)
+                         --reruns N            Attempts to average (default 10)
+                         --era <eraId>         Simulation era (default 2010s)
+                         --profile <path>      Override the packaged era profile
+                         --bracket <path>      Override the packaged bracket artifact
   bracket audit          Validate the frozen 30-team bracket and 82-game schedule:
                          schema/hash/versions, legal balanced lineups, duplicates,
                          strength percentiles and median, schedule counts and repeats,

@@ -715,57 +715,21 @@ describe('normalizePoolOveralls', () => {
         : {}),
     };
   }
-  it('ranks globally by raw overall and stamps the percentile band + profile fields', () => {
-    const rows = [
-      row('p-4', 'lakers', 60),
-      row('p-1', 'lakers', 90),
-      row('p-2', 'celtics', 80),
-      row('p-3', 'lakers', 80),
-    ];
-    const diagnostics = normalizePoolOveralls(rows);
-    expect(diagnostics).toEqual({ totalRowCount: 4, rowsWithoutRawOverall: 0 });
-    const [p4, p1, p2, p3] = rows;
-    expect(p1?.summaryRatings.overallRating).toBe(99);
-    expect(p1?.ratingProfile).toEqual({
-      schemaVersion: 2,
-      modelVersion: 'ratings-model-v3.3',
-      canonicalOverall: 70,
-      rawOverallScore: 90,
-      overallPercentile: 0.25,
-      overallCohortVersion: COHORT_NORMALIZATION_VERSION,
-    });
-    expect(p2?.summaryRatings.overallRating).toBe(81);
-    expect(p2?.ratingProfile?.overallPercentile).toBe(0.5);
-    expect(p3?.summaryRatings.overallRating).toBe(75);
-    expect(p3?.ratingProfile?.overallPercentile).toBe(0.75);
-    expect(p4?.summaryRatings.overallRating).toBe(68);
-    expect(p4?.ratingProfile?.overallPercentile).toBe(1);
-    expect(p2?.playerId).toBe('p-2');
-    expect(p3?.playerId).toBe('p-3');
-    expect(p4?.summaryRatings.offenseRating).toBe(60);
-    expect(p4?.summaryRatings.defenseRating).toBe(60);
+  it('preserves canonical ratings independently of other players and input order', () => {
+    const rows = [row('p-1', 'lakers', 90, 95), row('p-2', 'celtics', 60, 70)];
+    expect(normalizePoolOveralls(rows)).toEqual({ totalRowCount: 2, rowsWithoutRawOverall: 0 });
+    expect(rows.map((player) => player.summaryRatings.overallRating)).toEqual([95, 70]);
+    const alone = [row('p-1', 'lakers', 90, 95)];
+    normalizePoolOveralls(alone);
+    expect(alone[0]?.summaryRatings).toEqual(rows[0]?.summaryRatings);
+    normalizePoolOveralls(rows.reverse());
+    expect(rows.map((player) => player.summaryRatings.overallRating)).toEqual([70, 95]);
   });
-  it('ranks rows without rawOverallScore by canonical overall and leaves profile fields untouched', () => {
+  it('preserves legacy canonical ratings without stamping new model metadata', () => {
     const rows = [row('p-1', 'lakers', undefined, 55), row('p-2', 'lakers', undefined, 95)];
-    const diagnostics = normalizePoolOveralls(rows);
-    expect(diagnostics).toEqual({ totalRowCount: 2, rowsWithoutRawOverall: 2 });
-    const [p1, p2] = rows;
-    expect(p2?.summaryRatings.overallRating).toBe(99);
-    expect(p2?.ratingProfile).toEqual({
-      schemaVersion: 2,
-      modelVersion: 'ratings-model-v3.3',
-      canonicalOverall: 95,
-      overallPercentile: undefined,
-      overallCohortVersion: undefined,
-    });
-    expect(p1?.summaryRatings.overallRating).toBe(75);
-    expect(p1?.ratingProfile).toEqual({
-      schemaVersion: 2,
-      modelVersion: 'ratings-model-v3.3',
-      canonicalOverall: 55,
-      overallPercentile: undefined,
-      overallCohortVersion: undefined,
-    });
+    expect(normalizePoolOveralls(rows)).toEqual({ totalRowCount: 2, rowsWithoutRawOverall: 2 });
+    expect(rows.map((player) => player.summaryRatings.overallRating)).toEqual([55, 95]);
+    expect(rows[0]?.ratingProfile?.overallCohortVersion).toBeUndefined();
   });
 });
 describe('parsePoolTargets', () => {
@@ -1069,55 +1033,17 @@ describe('computePool error and skip paths', () => {
     expect(pool.detail).toContain('policy-v2');
   });
 });
-describe('neutralSelectionScoreFor', () => {
-  function profile(over: Record<string, unknown> = {}): { ratingProfile: Record<string, unknown> } {
-    return {
-      ratingProfile: {
-        rawOverallScore: 64.35,
-        canonicalOverall: 73,
-        baseScore: 65.07,
-        offenseRating: 70,
-        defenseRating: 62,
-        production: { score: 71.7, weight: 0.25 },
-        ...over,
-      },
-    };
-  }
-  it('excludes team context so individual production picks the peak', () => {
-    // 1999-00 Payton (All-NBA First Team) carries a lottery-team penalty in
-    // raw that 1997-98 does not; neutral form restores the production winner.
-    const neutral = neutralSelectionScoreFor(
-      profile(),
-      { overallRating: 73 },
-      {
-        steals: 100,
-        blocks: 10,
-      },
-    );
-    // base 65.07 * 0.75 + prod 71.7 * 0.25 + defense credit + two-way bonus
-    expect(neutral).toBeCloseTo(64.85, 1);
-    expect(neutral).toBeGreaterThan(
+describe('individual peak selection', () => {
+  it('uses the shared raw score without reintroducing defense or context bonuses', () => {
+    expect(
       neutralSelectionScoreFor(
-        profile({ baseScore: 64.14, production: { score: 65.2, weight: 0.25 } }),
-        { overallRating: 74 },
+        { ratingProfile: { rawOverallScore: 64.35 } },
+        { overallRating: 73 },
         { steals: 100, blocks: 10 },
       ),
-    );
-  });
-  it('falls back to the raw overall when no profile is present', () => {
+    ).toBe(64.35);
     expect(neutralSelectionScoreFor({}, { overallRating: 91 }, {})).toBe(91);
-  });
-});
-describe('peakSelectionBlend', () => {
-  it('weighs individual merit first with context breaking near-ties', () => {
-    // 1993-94 Pippen (neutral 65.95, raw 67.25) edges 1994-95 (66.09/66.05):
-    // the 55-win first-option year keeps its peak over the respectively
-    // noisier 47-win follow-up.
-    expect(peakSelectionBlend(65.95, 67.25)).toBeCloseTo(66.275, 2);
-    expect(peakSelectionBlend(65.95, 67.25)).toBeGreaterThan(peakSelectionBlend(66.09, 66.05));
-    // But context cannot outvote clearly better production: 1999-00 Payton
-    // (neutral 64.51, raw 64.35) keeps his peak over 61-win 1997-98 (62.55).
-    expect(peakSelectionBlend(64.51, 64.35)).toBeGreaterThan(peakSelectionBlend(62.55, 65));
+    expect(peakSelectionBlend(65.95, 67.25)).toBe(67.25);
   });
 });
 describe('maxLowConfidenceShareFor', () => {

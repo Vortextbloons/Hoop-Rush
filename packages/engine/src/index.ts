@@ -52,6 +52,7 @@ export { toSimulationPlayer } from './modes/sandbox/adapters.ts';
 export {
   BEST_OF_ATTEMPTS,
   chooseBestRunSeed,
+  simulateChallengeAttempts,
   simulateChallengeBestOf,
 } from './modes/sandbox/selection.ts';
 export {

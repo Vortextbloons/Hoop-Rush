@@ -12,7 +12,6 @@
 ![SvelteKit](https://img.shields.io/badge/SvelteKit-static-4a4a55?style=flat-square&logo=svelte&logoColor=white)
 ![pnpm](https://img.shields.io/badge/pnpm-workspace-f69220?style=flat-square&logo=pnpm&logoColor=white)
 ![Vitest](https://img.shields.io/badge/Vitest-tested-6e9f18?style=flat-square&logo=vitest&logoColor=white)
-![Playwright](https://img.shields.io/badge/Playwright-e2e-2eade0?style=flat-square&logo=playwright&logoColor=white)
 
 </div>
 
@@ -35,7 +34,7 @@
 - **Zod** for runtime validation at trust boundaries
 - **Dexie / IndexedDB** for local persistence
 - **Web Workers** for batch simulation
-- **Vitest · fast-check · Playwright** for tests
+- **Vitest · fast-check** for tests
 
 ## Repository Layout
 
@@ -74,7 +73,6 @@ pnpm dev
 | `pnpm format:check` | Prettier check |
 | `pnpm test:run` | Run the full test suite once |
 | `pnpm test:quick` | Fast PR test gate (excludes slow suites) |
-| `pnpm e2e` / `pnpm e2e:smoke` | Full / smoke Playwright journeys (build first) |
 | `pnpm test:import-nba` | Python NBA fetch-layer tests |
 | `pnpm build` / `pnpm preview` | Build / serve the static bundle |
 | `pnpm verify` | Full gate: check + lint + tests + build |

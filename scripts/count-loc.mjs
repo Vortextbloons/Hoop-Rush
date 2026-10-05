@@ -15,7 +15,6 @@ const SKIP_DIRS = new Set([
   '.turbo',
   '.cache',
   '.nyc_output',
-  'playwright-report',
   'test-results',
   'raw-data',
   '.raw_nba_cache',

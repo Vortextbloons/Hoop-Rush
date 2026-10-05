@@ -9,12 +9,7 @@ export default tseslint.config(
     languageOptions: {
       parserOptions: {
         projectService: {
-          allowDefaultProject: [
-            'vitest.config.ts',
-            'vitest.jsdom.config.ts',
-            'playwright.config.ts',
-            'e2e/*.ts',
-          ],
+          allowDefaultProject: ['vitest.config.ts', 'vitest.jsdom.config.ts'],
           maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 16,
         },
         tsconfigRootDir: import.meta.dirname,
@@ -46,12 +41,7 @@ export default tseslint.config(
       parser: tseslint.parser,
       parserOptions: {
         projectService: {
-          allowDefaultProject: [
-            'vitest.config.ts',
-            'vitest.jsdom.config.ts',
-            'playwright.config.ts',
-            'e2e/*.ts',
-          ],
+          allowDefaultProject: ['vitest.config.ts', 'vitest.jsdom.config.ts'],
           maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 16,
         },
         tsconfigRootDir: import.meta.dirname,

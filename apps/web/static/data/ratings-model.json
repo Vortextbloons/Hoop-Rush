@@ -1,7 +1,6943 @@
 {
-  "schemaVersion": 2,
-  "modelVersion": "ratings-model-v3.6",
-  "ratingsVersion": "ratings-v3.12",
+  "schemaVersion": 3,
+  "overallScale": {
+    "schemaVersion": 1,
+    "version": "overall-scale-v1",
+    "modelVersion": "ratings-model-v4.0",
+    "reference": {
+      "firstSeason": "1996-97",
+      "lastSeason": "2024-25",
+      "minimumGames": 50,
+      "minimumMinutes": 1500,
+      "sampleCount": 5047,
+      "contentHash": "f5b39daf4cf91e592a70dd0b4ec20b03c5ff34c68c637034b787635bc7c8f3ce"
+    },
+    "knots": [
+      {
+        "score": 45.72,
+        "overall": 40,
+        "percentile": 1
+      },
+      {
+        "score": 48.14,
+        "overall": 40,
+        "percentile": 0.9997027937388547
+      },
+      {
+        "score": 48.46,
+        "overall": 40,
+        "percentile": 0.9995046562314246
+      },
+      {
+        "score": 48.82,
+        "overall": 40,
+        "percentile": 0.9993065187239945
+      },
+      {
+        "score": 49.06,
+        "overall": 40,
+        "percentile": 0.9991083812165643
+      },
+      {
+        "score": 49.1,
+        "overall": 40,
+        "percentile": 0.9989102437091342
+      },
+      {
+        "score": 49.33,
+        "overall": 40,
+        "percentile": 0.998712106201704
+      },
+      {
+        "score": 49.5,
+        "overall": 40,
+        "percentile": 0.9985139686942738
+      },
+      {
+        "score": 49.54,
+        "overall": 40,
+        "percentile": 0.9983158311868436
+      },
+      {
+        "score": 49.63,
+        "overall": 40,
+        "percentile": 0.9981176936794135
+      },
+      {
+        "score": 49.65,
+        "overall": 40,
+        "percentile": 0.9979195561719834
+      },
+      {
+        "score": 49.72,
+        "overall": 40,
+        "percentile": 0.9977214186645532
+      },
+      {
+        "score": 49.77,
+        "overall": 40,
+        "percentile": 0.9975232811571231
+      },
+      {
+        "score": 49.8,
+        "overall": 40,
+        "percentile": 0.9973251436496929
+      },
+      {
+        "score": 49.81,
+        "overall": 40,
+        "percentile": 0.9971270061422627
+      },
+      {
+        "score": 49.82,
+        "overall": 41,
+        "percentile": 0.9969288686348325
+      },
+      {
+        "score": 49.83,
+        "overall": 41,
+        "percentile": 0.9967307311274024
+      },
+      {
+        "score": 49.88,
+        "overall": 41,
+        "percentile": 0.9964335248662571
+      },
+      {
+        "score": 49.97,
+        "overall": 41,
+        "percentile": 0.996136318605112
+      },
+      {
+        "score": 50.07,
+        "overall": 41,
+        "percentile": 0.9959381810976818
+      },
+      {
+        "score": 50.12,
+        "overall": 41,
+        "percentile": 0.9956409748365366
+      },
+      {
+        "score": 50.13,
+        "overall": 41,
+        "percentile": 0.9953437685753913
+      },
+      {
+        "score": 50.2,
+        "overall": 41,
+        "percentile": 0.9951456310679612
+      },
+      {
+        "score": 50.24,
+        "overall": 41,
+        "percentile": 0.9947493560531009
+      },
+      {
+        "score": 50.26,
+        "overall": 41,
+        "percentile": 0.9943530810382405
+      },
+      {
+        "score": 50.28,
+        "overall": 41,
+        "percentile": 0.9940558747770953
+      },
+      {
+        "score": 50.4,
+        "overall": 41,
+        "percentile": 0.9937586685159501
+      },
+      {
+        "score": 50.42,
+        "overall": 41,
+        "percentile": 0.9935605310085199
+      },
+      {
+        "score": 50.43,
+        "overall": 41,
+        "percentile": 0.9933623935010898
+      },
+      {
+        "score": 50.46,
+        "overall": 41,
+        "percentile": 0.9931642559936597
+      },
+      {
+        "score": 50.47,
+        "overall": 41,
+        "percentile": 0.9929661184862294
+      },
+      {
+        "score": 50.48,
+        "overall": 41,
+        "percentile": 0.9926689122250842
+      },
+      {
+        "score": 50.54,
+        "overall": 41,
+        "percentile": 0.992371705963939
+      },
+      {
+        "score": 50.55,
+        "overall": 41,
+        "percentile": 0.9921735684565088
+      },
+      {
+        "score": 50.58,
+        "overall": 41,
+        "percentile": 0.9916782246879334
+      },
+      {
+        "score": 50.61,
+        "overall": 42,
+        "percentile": 0.991182880919358
+      },
+      {
+        "score": 50.62,
+        "overall": 42,
+        "percentile": 0.9908856746582128
+      },
+      {
+        "score": 50.64,
+        "overall": 42,
+        "percentile": 0.9905884683970676
+      },
+      {
+        "score": 50.68,
+        "overall": 42,
+        "percentile": 0.9902912621359223
+      },
+      {
+        "score": 50.71,
+        "overall": 42,
+        "percentile": 0.9899940558747771
+      },
+      {
+        "score": 50.73,
+        "overall": 42,
+        "percentile": 0.9897959183673469
+      },
+      {
+        "score": 50.74,
+        "overall": 42,
+        "percentile": 0.9895977808599168
+      },
+      {
+        "score": 50.75,
+        "overall": 42,
+        "percentile": 0.9893005745987715
+      },
+      {
+        "score": 50.77,
+        "overall": 42,
+        "percentile": 0.9890033683376264
+      },
+      {
+        "score": 50.79,
+        "overall": 42,
+        "percentile": 0.9888052308301961
+      },
+      {
+        "score": 50.81,
+        "overall": 42,
+        "percentile": 0.988508024569051
+      },
+      {
+        "score": 50.84,
+        "overall": 42,
+        "percentile": 0.9882108183079057
+      },
+      {
+        "score": 50.86,
+        "overall": 42,
+        "percentile": 0.9880126808004756
+      },
+      {
+        "score": 50.87,
+        "overall": 42,
+        "percentile": 0.9878145432930454
+      },
+      {
+        "score": 50.93,
+        "overall": 42,
+        "percentile": 0.9876164057856153
+      },
+      {
+        "score": 50.95,
+        "overall": 42,
+        "percentile": 0.98731919952447
+      },
+      {
+        "score": 50.96,
+        "overall": 42,
+        "percentile": 0.9870219932633247
+      },
+      {
+        "score": 50.98,
+        "overall": 42,
+        "percentile": 0.9868238557558946
+      },
+      {
+        "score": 51.01,
+        "overall": 42,
+        "percentile": 0.9865266494947493
+      },
+      {
+        "score": 51.04,
+        "overall": 42,
+        "percentile": 0.9862294432336042
+      },
+      {
+        "score": 51.05,
+        "overall": 42,
+        "percentile": 0.9859322369724589
+      },
+      {
+        "score": 51.1,
+        "overall": 42,
+        "percentile": 0.9856350307113136
+      },
+      {
+        "score": 51.11,
+        "overall": 42,
+        "percentile": 0.9854368932038835
+      },
+      {
+        "score": 51.14,
+        "overall": 43,
+        "percentile": 0.9850406181890232
+      },
+      {
+        "score": 51.16,
+        "overall": 43,
+        "percentile": 0.9846443431741628
+      },
+      {
+        "score": 51.18,
+        "overall": 43,
+        "percentile": 0.9844462056667327
+      },
+      {
+        "score": 51.19,
+        "overall": 43,
+        "percentile": 0.9842480681593025
+      },
+      {
+        "score": 51.2,
+        "overall": 43,
+        "percentile": 0.9839508618981573
+      },
+      {
+        "score": 51.23,
+        "overall": 43,
+        "percentile": 0.9836536556370121
+      },
+      {
+        "score": 51.24,
+        "overall": 43,
+        "percentile": 0.9834555181295819
+      },
+      {
+        "score": 51.25,
+        "overall": 43,
+        "percentile": 0.9832573806221517
+      },
+      {
+        "score": 51.27,
+        "overall": 43,
+        "percentile": 0.9830592431147216
+      },
+      {
+        "score": 51.28,
+        "overall": 43,
+        "percentile": 0.9826629680998613
+      },
+      {
+        "score": 51.3,
+        "overall": 43,
+        "percentile": 0.982266693085001
+      },
+      {
+        "score": 51.31,
+        "overall": 43,
+        "percentile": 0.9819694868238558
+      },
+      {
+        "score": 51.32,
+        "overall": 43,
+        "percentile": 0.9815732118089955
+      },
+      {
+        "score": 51.33,
+        "overall": 43,
+        "percentile": 0.9810778680404201
+      },
+      {
+        "score": 51.34,
+        "overall": 43,
+        "percentile": 0.9806815930255597
+      },
+      {
+        "score": 51.36,
+        "overall": 43,
+        "percentile": 0.9803843867644145
+      },
+      {
+        "score": 51.39,
+        "overall": 43,
+        "percentile": 0.9798890429958391
+      },
+      {
+        "score": 51.41,
+        "overall": 44,
+        "percentile": 0.9794927679809788
+      },
+      {
+        "score": 51.42,
+        "overall": 44,
+        "percentile": 0.9792946304735486
+      },
+      {
+        "score": 51.43,
+        "overall": 44,
+        "percentile": 0.9789974242124034
+      },
+      {
+        "score": 51.45,
+        "overall": 44,
+        "percentile": 0.9787002179512582
+      },
+      {
+        "score": 51.46,
+        "overall": 44,
+        "percentile": 0.978502080443828
+      },
+      {
+        "score": 51.49,
+        "overall": 44,
+        "percentile": 0.9783039429363979
+      },
+      {
+        "score": 51.5,
+        "overall": 44,
+        "percentile": 0.9779076679215375
+      },
+      {
+        "score": 51.52,
+        "overall": 44,
+        "percentile": 0.9775113929066772
+      },
+      {
+        "score": 51.53,
+        "overall": 44,
+        "percentile": 0.977214186645532
+      },
+      {
+        "score": 51.54,
+        "overall": 44,
+        "percentile": 0.9769169803843868
+      },
+      {
+        "score": 51.55,
+        "overall": 44,
+        "percentile": 0.9766197741232415
+      },
+      {
+        "score": 51.56,
+        "overall": 44,
+        "percentile": 0.975926292847236
+      },
+      {
+        "score": 51.57,
+        "overall": 44,
+        "percentile": 0.9753318803249456
+      },
+      {
+        "score": 51.59,
+        "overall": 44,
+        "percentile": 0.9750346740638003
+      },
+      {
+        "score": 51.61,
+        "overall": 44,
+        "percentile": 0.974737467802655
+      },
+      {
+        "score": 51.63,
+        "overall": 44,
+        "percentile": 0.9745393302952249
+      },
+      {
+        "score": 51.64,
+        "overall": 44,
+        "percentile": 0.9743411927877947
+      },
+      {
+        "score": 51.65,
+        "overall": 44,
+        "percentile": 0.9740439865266495
+      },
+      {
+        "score": 51.66,
+        "overall": 45,
+        "percentile": 0.9735486427580741
+      },
+      {
+        "score": 51.67,
+        "overall": 45,
+        "percentile": 0.9731523677432138
+      },
+      {
+        "score": 51.68,
+        "overall": 45,
+        "percentile": 0.9729542302357836
+      },
+      {
+        "score": 51.69,
+        "overall": 45,
+        "percentile": 0.9727560927283535
+      },
+      {
+        "score": 51.71,
+        "overall": 45,
+        "percentile": 0.9724588864672082
+      },
+      {
+        "score": 51.72,
+        "overall": 45,
+        "percentile": 0.972161680206063
+      },
+      {
+        "score": 51.73,
+        "overall": 45,
+        "percentile": 0.9719635426986328
+      },
+      {
+        "score": 51.74,
+        "overall": 45,
+        "percentile": 0.9714681989300574
+      },
+      {
+        "score": 51.75,
+        "overall": 45,
+        "percentile": 0.970972855161482
+      },
+      {
+        "score": 51.76,
+        "overall": 45,
+        "percentile": 0.9707747176540519
+      },
+      {
+        "score": 51.77,
+        "overall": 45,
+        "percentile": 0.9705765801466217
+      },
+      {
+        "score": 51.81,
+        "overall": 45,
+        "percentile": 0.9703784426391916
+      },
+      {
+        "score": 51.82,
+        "overall": 45,
+        "percentile": 0.9699821676243313
+      },
+      {
+        "score": 51.83,
+        "overall": 45,
+        "percentile": 0.9691896175946106
+      },
+      {
+        "score": 51.85,
+        "overall": 45,
+        "percentile": 0.9685952050723202
+      },
+      {
+        "score": 51.86,
+        "overall": 45,
+        "percentile": 0.9683970675648901
+      },
+      {
+        "score": 51.88,
+        "overall": 45,
+        "percentile": 0.9681989300574598
+      },
+      {
+        "score": 51.89,
+        "overall": 45,
+        "percentile": 0.9680007925500297
+      },
+      {
+        "score": 51.9,
+        "overall": 46,
+        "percentile": 0.9677035862888845
+      },
+      {
+        "score": 51.91,
+        "overall": 46,
+        "percentile": 0.9673073112740241
+      },
+      {
+        "score": 51.92,
+        "overall": 46,
+        "percentile": 0.9669110362591639
+      },
+      {
+        "score": 51.93,
+        "overall": 46,
+        "percentile": 0.9666138299980186
+      },
+      {
+        "score": 51.94,
+        "overall": 46,
+        "percentile": 0.9664156924905885
+      },
+      {
+        "score": 51.95,
+        "overall": 46,
+        "percentile": 0.9662175549831583
+      },
+      {
+        "score": 51.96,
+        "overall": 46,
+        "percentile": 0.965920348722013
+      },
+      {
+        "score": 51.97,
+        "overall": 46,
+        "percentile": 0.9654250049534376
+      },
+      {
+        "score": 51.99,
+        "overall": 46,
+        "percentile": 0.9649296611848623
+      },
+      {
+        "score": 52,
+        "overall": 46,
+        "percentile": 0.964533386170002
+      },
+      {
+        "score": 52.01,
+        "overall": 46,
+        "percentile": 0.9641371111551417
+      },
+      {
+        "score": 52.02,
+        "overall": 46,
+        "percentile": 0.9637408361402814
+      },
+      {
+        "score": 52.03,
+        "overall": 46,
+        "percentile": 0.9631464236179909
+      },
+      {
+        "score": 52.04,
+        "overall": 46,
+        "percentile": 0.9625520110957004
+      },
+      {
+        "score": 52.05,
+        "overall": 47,
+        "percentile": 0.9618585298196949
+      },
+      {
+        "score": 52.06,
+        "overall": 47,
+        "percentile": 0.9612641172974044
+      },
+      {
+        "score": 52.07,
+        "overall": 47,
+        "percentile": 0.9610659797899742
+      },
+      {
+        "score": 52.08,
+        "overall": 47,
+        "percentile": 0.9607687735288291
+      },
+      {
+        "score": 52.09,
+        "overall": 47,
+        "percentile": 0.9602734297602536
+      },
+      {
+        "score": 52.11,
+        "overall": 47,
+        "percentile": 0.9595799484842481
+      },
+      {
+        "score": 52.12,
+        "overall": 47,
+        "percentile": 0.9587873984545274
+      },
+      {
+        "score": 52.13,
+        "overall": 47,
+        "percentile": 0.9579948484248069
+      },
+      {
+        "score": 52.14,
+        "overall": 47,
+        "percentile": 0.9574995046562315
+      },
+      {
+        "score": 52.16,
+        "overall": 47,
+        "percentile": 0.9573013671488013
+      },
+      {
+        "score": 52.17,
+        "overall": 47,
+        "percentile": 0.957004160887656
+      },
+      {
+        "score": 52.18,
+        "overall": 47,
+        "percentile": 0.9566078858727958
+      },
+      {
+        "score": 52.19,
+        "overall": 48,
+        "percentile": 0.9560134733505052
+      },
+      {
+        "score": 52.2,
+        "overall": 48,
+        "percentile": 0.9555181295819298
+      },
+      {
+        "score": 52.21,
+        "overall": 48,
+        "percentile": 0.9550227858133544
+      },
+      {
+        "score": 52.22,
+        "overall": 48,
+        "percentile": 0.9542302357836339
+      },
+      {
+        "score": 52.23,
+        "overall": 48,
+        "percentile": 0.9536358232613433
+      },
+      {
+        "score": 52.24,
+        "overall": 48,
+        "percentile": 0.953239548246483
+      },
+      {
+        "score": 52.25,
+        "overall": 48,
+        "percentile": 0.9527442044779076
+      },
+      {
+        "score": 52.26,
+        "overall": 48,
+        "percentile": 0.9523479294630474
+      },
+      {
+        "score": 52.27,
+        "overall": 48,
+        "percentile": 0.9521497919556172
+      },
+      {
+        "score": 52.28,
+        "overall": 48,
+        "percentile": 0.951852585694472
+      },
+      {
+        "score": 52.29,
+        "overall": 48,
+        "percentile": 0.9513572419258965
+      },
+      {
+        "score": 52.3,
+        "overall": 48,
+        "percentile": 0.9509609669110363
+      },
+      {
+        "score": 52.31,
+        "overall": 48,
+        "percentile": 0.950564691896176
+      },
+      {
+        "score": 52.32,
+        "overall": 49,
+        "percentile": 0.9499702793738855
+      },
+      {
+        "score": 52.34,
+        "overall": 49,
+        "percentile": 0.9495740043590252
+      },
+      {
+        "score": 52.35,
+        "overall": 49,
+        "percentile": 0.9490786605904498
+      },
+      {
+        "score": 52.36,
+        "overall": 49,
+        "percentile": 0.9484842480681593
+      },
+      {
+        "score": 52.37,
+        "overall": 49,
+        "percentile": 0.9479889042995839
+      },
+      {
+        "score": 52.38,
+        "overall": 49,
+        "percentile": 0.9473944917772934
+      },
+      {
+        "score": 52.39,
+        "overall": 49,
+        "percentile": 0.9468991480087181
+      },
+      {
+        "score": 52.4,
+        "overall": 49,
+        "percentile": 0.9465028729938577
+      },
+      {
+        "score": 52.41,
+        "overall": 49,
+        "percentile": 0.9460075292252823
+      },
+      {
+        "score": 52.43,
+        "overall": 49,
+        "percentile": 0.9453140479492768
+      },
+      {
+        "score": 52.44,
+        "overall": 49,
+        "percentile": 0.9448187041807015
+      },
+      {
+        "score": 52.45,
+        "overall": 50,
+        "percentile": 0.9445214979195562
+      },
+      {
+        "score": 52.46,
+        "overall": 50,
+        "percentile": 0.9442242916584109
+      },
+      {
+        "score": 52.47,
+        "overall": 50,
+        "percentile": 0.9440261541509808
+      },
+      {
+        "score": 52.49,
+        "overall": 50,
+        "percentile": 0.9433326728749752
+      },
+      {
+        "score": 52.5,
+        "overall": 50,
+        "percentile": 0.9426391915989697
+      },
+      {
+        "score": 52.51,
+        "overall": 50,
+        "percentile": 0.9423419853378244
+      },
+      {
+        "score": 52.52,
+        "overall": 50,
+        "percentile": 0.9419457103229641
+      },
+      {
+        "score": 52.53,
+        "overall": 50,
+        "percentile": 0.9416485040618189
+      },
+      {
+        "score": 52.54,
+        "overall": 50,
+        "percentile": 0.9412522290469586
+      },
+      {
+        "score": 52.55,
+        "overall": 50,
+        "percentile": 0.9407568852783832
+      },
+      {
+        "score": 52.56,
+        "overall": 50,
+        "percentile": 0.9402615415098078
+      },
+      {
+        "score": 52.57,
+        "overall": 50,
+        "percentile": 0.9398652664949475
+      },
+      {
+        "score": 52.58,
+        "overall": 50,
+        "percentile": 0.9392708539726571
+      },
+      {
+        "score": 52.59,
+        "overall": 51,
+        "percentile": 0.9384783039429364
+      },
+      {
+        "score": 52.61,
+        "overall": 51,
+        "percentile": 0.9378838914206459
+      },
+      {
+        "score": 52.62,
+        "overall": 51,
+        "percentile": 0.9371904101446404
+      },
+      {
+        "score": 52.63,
+        "overall": 51,
+        "percentile": 0.9365959976223499
+      },
+      {
+        "score": 52.64,
+        "overall": 51,
+        "percentile": 0.9359025163463444
+      },
+      {
+        "score": 52.65,
+        "overall": 51,
+        "percentile": 0.9348127600554785
+      },
+      {
+        "score": 52.66,
+        "overall": 51,
+        "percentile": 0.9336239350108976
+      },
+      {
+        "score": 52.67,
+        "overall": 52,
+        "percentile": 0.9328313849811769
+      },
+      {
+        "score": 52.68,
+        "overall": 52,
+        "percentile": 0.9324351099663166
+      },
+      {
+        "score": 52.69,
+        "overall": 52,
+        "percentile": 0.9321379037051714
+      },
+      {
+        "score": 52.7,
+        "overall": 52,
+        "percentile": 0.9318406974440262
+      },
+      {
+        "score": 52.71,
+        "overall": 52,
+        "percentile": 0.9315434911828809
+      },
+      {
+        "score": 52.73,
+        "overall": 52,
+        "percentile": 0.9311472161680207
+      },
+      {
+        "score": 52.74,
+        "overall": 52,
+        "percentile": 0.9304537348920151
+      },
+      {
+        "score": 52.75,
+        "overall": 52,
+        "percentile": 0.9295621161085793
+      },
+      {
+        "score": 52.76,
+        "overall": 52,
+        "percentile": 0.9286704973251436
+      },
+      {
+        "score": 52.77,
+        "overall": 52,
+        "percentile": 0.9280760848028532
+      },
+      {
+        "score": 52.78,
+        "overall": 52,
+        "percentile": 0.9276798097879929
+      },
+      {
+        "score": 52.79,
+        "overall": 52,
+        "percentile": 0.9273826035268476
+      },
+      {
+        "score": 52.8,
+        "overall": 52,
+        "percentile": 0.9271844660194175
+      },
+      {
+        "score": 52.81,
+        "overall": 53,
+        "percentile": 0.9269863285119874
+      },
+      {
+        "score": 52.82,
+        "overall": 53,
+        "percentile": 0.9266891222508421
+      },
+      {
+        "score": 52.83,
+        "overall": 53,
+        "percentile": 0.9262928472359817
+      },
+      {
+        "score": 52.84,
+        "overall": 53,
+        "percentile": 0.9259956409748366
+      },
+      {
+        "score": 52.85,
+        "overall": 53,
+        "percentile": 0.9256984347136913
+      },
+      {
+        "score": 52.86,
+        "overall": 53,
+        "percentile": 0.925401228452546
+      },
+      {
+        "score": 52.87,
+        "overall": 53,
+        "percentile": 0.9249058846839706
+      },
+      {
+        "score": 52.88,
+        "overall": 53,
+        "percentile": 0.92411333465425
+      },
+      {
+        "score": 52.89,
+        "overall": 53,
+        "percentile": 0.9235189221319595
+      },
+      {
+        "score": 52.9,
+        "overall": 53,
+        "percentile": 0.9230235783633842
+      },
+      {
+        "score": 52.91,
+        "overall": 53,
+        "percentile": 0.9225282345948088
+      },
+      {
+        "score": 52.92,
+        "overall": 53,
+        "percentile": 0.9219338220725183
+      },
+      {
+        "score": 52.93,
+        "overall": 53,
+        "percentile": 0.9214384783039429
+      },
+      {
+        "score": 52.94,
+        "overall": 54,
+        "percentile": 0.9212403407965127
+      },
+      {
+        "score": 52.95,
+        "overall": 54,
+        "percentile": 0.9208440657816525
+      },
+      {
+        "score": 52.96,
+        "overall": 54,
+        "percentile": 0.920348722013077
+      },
+      {
+        "score": 52.97,
+        "overall": 54,
+        "percentile": 0.9199524469982168
+      },
+      {
+        "score": 52.98,
+        "overall": 54,
+        "percentile": 0.9195561719833565
+      },
+      {
+        "score": 52.99,
+        "overall": 54,
+        "percentile": 0.918961759461066
+      },
+      {
+        "score": 53,
+        "overall": 54,
+        "percentile": 0.9179710719239151
+      },
+      {
+        "score": 53.01,
+        "overall": 54,
+        "percentile": 0.9170794531404795
+      },
+      {
+        "score": 53.02,
+        "overall": 54,
+        "percentile": 0.9161878343570438
+      },
+      {
+        "score": 53.03,
+        "overall": 55,
+        "percentile": 0.9153952843273232
+      },
+      {
+        "score": 53.04,
+        "overall": 55,
+        "percentile": 0.9148999405587478
+      },
+      {
+        "score": 53.05,
+        "overall": 55,
+        "percentile": 0.9143055280364573
+      },
+      {
+        "score": 53.06,
+        "overall": 55,
+        "percentile": 0.9134139092530216
+      },
+      {
+        "score": 53.07,
+        "overall": 55,
+        "percentile": 0.9122250842084406
+      },
+      {
+        "score": 53.08,
+        "overall": 55,
+        "percentile": 0.9115316029324351
+      },
+      {
+        "score": 53.09,
+        "overall": 55,
+        "percentile": 0.9112343966712899
+      },
+      {
+        "score": 53.1,
+        "overall": 55,
+        "percentile": 0.9106399841489994
+      },
+      {
+        "score": 53.12,
+        "overall": 55,
+        "percentile": 0.9099465028729938
+      },
+      {
+        "score": 53.13,
+        "overall": 56,
+        "percentile": 0.9092530215969883
+      },
+      {
+        "score": 53.14,
+        "overall": 56,
+        "percentile": 0.9086586090746979
+      },
+      {
+        "score": 53.15,
+        "overall": 56,
+        "percentile": 0.9081632653061225
+      },
+      {
+        "score": 53.16,
+        "overall": 56,
+        "percentile": 0.9073707152764018
+      },
+      {
+        "score": 53.17,
+        "overall": 56,
+        "percentile": 0.9066772340003962
+      },
+      {
+        "score": 53.18,
+        "overall": 56,
+        "percentile": 0.9060828214781058
+      },
+      {
+        "score": 53.19,
+        "overall": 56,
+        "percentile": 0.9051912026946701
+      },
+      {
+        "score": 53.2,
+        "overall": 56,
+        "percentile": 0.9044977214186646
+      },
+      {
+        "score": 53.21,
+        "overall": 56,
+        "percentile": 0.9041014464038042
+      },
+      {
+        "score": 53.22,
+        "overall": 57,
+        "percentile": 0.9034079651277986
+      },
+      {
+        "score": 53.23,
+        "overall": 57,
+        "percentile": 0.9028135526055082
+      },
+      {
+        "score": 53.24,
+        "overall": 57,
+        "percentile": 0.9021200713295027
+      },
+      {
+        "score": 53.25,
+        "overall": 57,
+        "percentile": 0.9014265900534971
+      },
+      {
+        "score": 53.26,
+        "overall": 57,
+        "percentile": 0.9008321775312067
+      },
+      {
+        "score": 53.27,
+        "overall": 57,
+        "percentile": 0.8997424212403408
+      },
+      {
+        "score": 53.28,
+        "overall": 57,
+        "percentile": 0.8988508024569051
+      },
+      {
+        "score": 53.29,
+        "overall": 57,
+        "percentile": 0.8983554586883297
+      },
+      {
+        "score": 53.3,
+        "overall": 57,
+        "percentile": 0.8979591836734694
+      },
+      {
+        "score": 53.31,
+        "overall": 58,
+        "percentile": 0.897364771151179
+      },
+      {
+        "score": 53.32,
+        "overall": 58,
+        "percentile": 0.8966712898751734
+      },
+      {
+        "score": 53.33,
+        "overall": 58,
+        "percentile": 0.896275014860313
+      },
+      {
+        "score": 53.34,
+        "overall": 58,
+        "percentile": 0.8956806023380226
+      },
+      {
+        "score": 53.36,
+        "overall": 58,
+        "percentile": 0.8946899148008718
+      },
+      {
+        "score": 53.37,
+        "overall": 58,
+        "percentile": 0.8938973647711512
+      },
+      {
+        "score": 53.38,
+        "overall": 58,
+        "percentile": 0.8931048147414306
+      },
+      {
+        "score": 53.39,
+        "overall": 58,
+        "percentile": 0.8921141272042797
+      },
+      {
+        "score": 53.4,
+        "overall": 59,
+        "percentile": 0.8913215771745592
+      },
+      {
+        "score": 53.41,
+        "overall": 59,
+        "percentile": 0.8906280958985536
+      },
+      {
+        "score": 53.42,
+        "overall": 59,
+        "percentile": 0.889835545868833
+      },
+      {
+        "score": 53.43,
+        "overall": 59,
+        "percentile": 0.8890429958391124
+      },
+      {
+        "score": 53.44,
+        "overall": 59,
+        "percentile": 0.8882504458093917
+      },
+      {
+        "score": 53.45,
+        "overall": 59,
+        "percentile": 0.8877551020408163
+      },
+      {
+        "score": 53.46,
+        "overall": 59,
+        "percentile": 0.8872597582722409
+      },
+      {
+        "score": 53.47,
+        "overall": 59,
+        "percentile": 0.8866653457499505
+      },
+      {
+        "score": 53.48,
+        "overall": 60,
+        "percentile": 0.88607093322766
+      },
+      {
+        "score": 53.49,
+        "overall": 60,
+        "percentile": 0.8854765207053695
+      },
+      {
+        "score": 53.5,
+        "overall": 60,
+        "percentile": 0.884783039429364
+      },
+      {
+        "score": 53.51,
+        "overall": 60,
+        "percentile": 0.8839904893996433
+      },
+      {
+        "score": 53.52,
+        "overall": 60,
+        "percentile": 0.8833960768773529
+      },
+      {
+        "score": 53.53,
+        "overall": 60,
+        "percentile": 0.8827025956013473
+      },
+      {
+        "score": 53.55,
+        "overall": 60,
+        "percentile": 0.8819100455716267
+      },
+      {
+        "score": 53.56,
+        "overall": 60,
+        "percentile": 0.8808202892807608
+      },
+      {
+        "score": 53.57,
+        "overall": 61,
+        "percentile": 0.879730532989895
+      },
+      {
+        "score": 53.58,
+        "overall": 61,
+        "percentile": 0.8789379829601743
+      },
+      {
+        "score": 53.59,
+        "overall": 61,
+        "percentile": 0.8780463641767386
+      },
+      {
+        "score": 53.6,
+        "overall": 61,
+        "percentile": 0.8772538141470181
+      },
+      {
+        "score": 53.61,
+        "overall": 61,
+        "percentile": 0.8764612641172974
+      },
+      {
+        "score": 53.62,
+        "overall": 61,
+        "percentile": 0.8754705765801466
+      },
+      {
+        "score": 53.63,
+        "overall": 62,
+        "percentile": 0.8742817515355656
+      },
+      {
+        "score": 53.64,
+        "overall": 62,
+        "percentile": 0.8732910639984149
+      },
+      {
+        "score": 53.65,
+        "overall": 62,
+        "percentile": 0.8725975827224094
+      },
+      {
+        "score": 53.66,
+        "overall": 62,
+        "percentile": 0.8718050326926887
+      },
+      {
+        "score": 53.67,
+        "overall": 62,
+        "percentile": 0.8708143451555379
+      },
+      {
+        "score": 53.68,
+        "overall": 62,
+        "percentile": 0.8700217951258173
+      },
+      {
+        "score": 53.69,
+        "overall": 62,
+        "percentile": 0.8697245888646721
+      },
+      {
+        "score": 53.7,
+        "overall": 62,
+        "percentile": 0.8691301763423815
+      },
+      {
+        "score": 53.71,
+        "overall": 63,
+        "percentile": 0.868337626312661
+      },
+      {
+        "score": 53.72,
+        "overall": 63,
+        "percentile": 0.8676441450366554
+      },
+      {
+        "score": 53.73,
+        "overall": 63,
+        "percentile": 0.8666534574995046
+      },
+      {
+        "score": 53.74,
+        "overall": 63,
+        "percentile": 0.8654646324549238
+      },
+      {
+        "score": 53.75,
+        "overall": 63,
+        "percentile": 0.8646720824252031
+      },
+      {
+        "score": 53.76,
+        "overall": 63,
+        "percentile": 0.8641767386566277
+      },
+      {
+        "score": 53.77,
+        "overall": 63,
+        "percentile": 0.8633841886269071
+      },
+      {
+        "score": 53.78,
+        "overall": 64,
+        "percentile": 0.8627897761046166
+      },
+      {
+        "score": 53.79,
+        "overall": 64,
+        "percentile": 0.8621953635823261
+      },
+      {
+        "score": 53.8,
+        "overall": 64,
+        "percentile": 0.8614028135526055
+      },
+      {
+        "score": 53.81,
+        "overall": 64,
+        "percentile": 0.8604121260154547
+      },
+      {
+        "score": 53.82,
+        "overall": 65,
+        "percentile": 0.8593223697245889
+      },
+      {
+        "score": 53.83,
+        "overall": 65,
+        "percentile": 0.8585298196948683
+      },
+      {
+        "score": 53.84,
+        "overall": 65,
+        "percentile": 0.8577372696651476
+      },
+      {
+        "score": 53.85,
+        "overall": 65,
+        "percentile": 0.8566475133742817
+      },
+      {
+        "score": 53.86,
+        "overall": 65,
+        "percentile": 0.8554586883297008
+      },
+      {
+        "score": 53.87,
+        "overall": 65,
+        "percentile": 0.85446800079255
+      },
+      {
+        "score": 53.88,
+        "overall": 65,
+        "percentile": 0.8533782445016842
+      },
+      {
+        "score": 53.89,
+        "overall": 65,
+        "percentile": 0.8522884882108184
+      },
+      {
+        "score": 53.9,
+        "overall": 65,
+        "percentile": 0.8512978006736676
+      },
+      {
+        "score": 53.91,
+        "overall": 65,
+        "percentile": 0.8505052506439469
+      },
+      {
+        "score": 53.92,
+        "overall": 65,
+        "percentile": 0.8496136318605112
+      },
+      {
+        "score": 53.93,
+        "overall": 65,
+        "percentile": 0.8485238755696454
+      },
+      {
+        "score": 53.94,
+        "overall": 65,
+        "percentile": 0.8478303942936398
+      },
+      {
+        "score": 53.95,
+        "overall": 65,
+        "percentile": 0.846839706756489
+      },
+      {
+        "score": 53.96,
+        "overall": 65,
+        "percentile": 0.8450564691896176
+      },
+      {
+        "score": 53.97,
+        "overall": 65,
+        "percentile": 0.843075094115316
+      },
+      {
+        "score": 53.98,
+        "overall": 66,
+        "percentile": 0.8415890628095899
+      },
+      {
+        "score": 53.99,
+        "overall": 66,
+        "percentile": 0.840499306518724
+      },
+      {
+        "score": 54,
+        "overall": 66,
+        "percentile": 0.8391123439667129
+      },
+      {
+        "score": 54.01,
+        "overall": 66,
+        "percentile": 0.8375272439072716
+      },
+      {
+        "score": 54.02,
+        "overall": 66,
+        "percentile": 0.8361402813552605
+      },
+      {
+        "score": 54.03,
+        "overall": 66,
+        "percentile": 0.8346542500495344
+      },
+      {
+        "score": 54.04,
+        "overall": 66,
+        "percentile": 0.8331682187438082
+      },
+      {
+        "score": 54.05,
+        "overall": 66,
+        "percentile": 0.8321775312066574
+      },
+      {
+        "score": 54.06,
+        "overall": 66,
+        "percentile": 0.8310877749157916
+      },
+      {
+        "score": 54.07,
+        "overall": 66,
+        "percentile": 0.8301961561323559
+      },
+      {
+        "score": 54.08,
+        "overall": 66,
+        "percentile": 0.8297998811174956
+      },
+      {
+        "score": 54.09,
+        "overall": 66,
+        "percentile": 0.829205468595205
+      },
+      {
+        "score": 54.1,
+        "overall": 66,
+        "percentile": 0.8280166435506241
+      },
+      {
+        "score": 54.11,
+        "overall": 66,
+        "percentile": 0.8268278185060431
+      },
+      {
+        "score": 54.12,
+        "overall": 66,
+        "percentile": 0.8261343372300376
+      },
+      {
+        "score": 54.13,
+        "overall": 66,
+        "percentile": 0.8252427184466019
+      },
+      {
+        "score": 54.14,
+        "overall": 66,
+        "percentile": 0.8243510996631662
+      },
+      {
+        "score": 54.15,
+        "overall": 66,
+        "percentile": 0.8235585496334457
+      },
+      {
+        "score": 54.16,
+        "overall": 66,
+        "percentile": 0.8226669308500099
+      },
+      {
+        "score": 54.17,
+        "overall": 66,
+        "percentile": 0.821577174559144
+      },
+      {
+        "score": 54.18,
+        "overall": 66,
+        "percentile": 0.8200911432534179
+      },
+      {
+        "score": 54.19,
+        "overall": 66,
+        "percentile": 0.8191004557162671
+      },
+      {
+        "score": 54.2,
+        "overall": 66,
+        "percentile": 0.8182088369328314
+      },
+      {
+        "score": 54.21,
+        "overall": 66,
+        "percentile": 0.8172181493956806
+      },
+      {
+        "score": 54.22,
+        "overall": 66,
+        "percentile": 0.8165246681196751
+      },
+      {
+        "score": 54.23,
+        "overall": 66,
+        "percentile": 0.8155339805825242
+      },
+      {
+        "score": 54.24,
+        "overall": 66,
+        "percentile": 0.8142460867842283
+      },
+      {
+        "score": 54.25,
+        "overall": 66,
+        "percentile": 0.8133544680007926
+      },
+      {
+        "score": 54.26,
+        "overall": 66,
+        "percentile": 0.8125619179710719
+      },
+      {
+        "score": 54.27,
+        "overall": 66,
+        "percentile": 0.811373092926491
+      },
+      {
+        "score": 54.28,
+        "overall": 66,
+        "percentile": 0.8102833366356251
+      },
+      {
+        "score": 54.29,
+        "overall": 66,
+        "percentile": 0.8093917178521894
+      },
+      {
+        "score": 54.3,
+        "overall": 66,
+        "percentile": 0.8082028928076085
+      },
+      {
+        "score": 54.31,
+        "overall": 67,
+        "percentile": 0.8068159302555974
+      },
+      {
+        "score": 54.32,
+        "overall": 67,
+        "percentile": 0.8060233802258767
+      },
+      {
+        "score": 54.33,
+        "overall": 67,
+        "percentile": 0.805032692688726
+      },
+      {
+        "score": 54.34,
+        "overall": 67,
+        "percentile": 0.8034475926292848
+      },
+      {
+        "score": 54.35,
+        "overall": 67,
+        "percentile": 0.8017634238161284
+      },
+      {
+        "score": 54.36,
+        "overall": 67,
+        "percentile": 0.8005745987715475
+      },
+      {
+        "score": 54.37,
+        "overall": 67,
+        "percentile": 0.799980186249257
+      },
+      {
+        "score": 54.38,
+        "overall": 67,
+        "percentile": 0.7992867049732515
+      },
+      {
+        "score": 54.39,
+        "overall": 67,
+        "percentile": 0.7982960174361007
+      },
+      {
+        "score": 54.4,
+        "overall": 67,
+        "percentile": 0.7968099861303745
+      },
+      {
+        "score": 54.41,
+        "overall": 67,
+        "percentile": 0.7953239548246482
+      },
+      {
+        "score": 54.42,
+        "overall": 67,
+        "percentile": 0.7941351297800674
+      },
+      {
+        "score": 54.43,
+        "overall": 67,
+        "percentile": 0.7928472359817713
+      },
+      {
+        "score": 54.44,
+        "overall": 67,
+        "percentile": 0.7916584109371905
+      },
+      {
+        "score": 54.45,
+        "overall": 67,
+        "percentile": 0.7908658609074698
+      },
+      {
+        "score": 54.46,
+        "overall": 67,
+        "percentile": 0.7899742421240341
+      },
+      {
+        "score": 54.47,
+        "overall": 67,
+        "percentile": 0.7889835545868833
+      },
+      {
+        "score": 54.48,
+        "overall": 67,
+        "percentile": 0.7881910045571627
+      },
+      {
+        "score": 54.49,
+        "overall": 67,
+        "percentile": 0.7868040420051516
+      },
+      {
+        "score": 54.5,
+        "overall": 67,
+        "percentile": 0.7853180106994254
+      },
+      {
+        "score": 54.51,
+        "overall": 67,
+        "percentile": 0.7842282544085595
+      },
+      {
+        "score": 54.52,
+        "overall": 67,
+        "percentile": 0.7829403606102635
+      },
+      {
+        "score": 54.53,
+        "overall": 67,
+        "percentile": 0.7814543293045373
+      },
+      {
+        "score": 54.54,
+        "overall": 67,
+        "percentile": 0.7794729542302358
+      },
+      {
+        "score": 54.55,
+        "overall": 67,
+        "percentile": 0.7774915791559343
+      },
+      {
+        "score": 54.56,
+        "overall": 67,
+        "percentile": 0.7758074103427779
+      },
+      {
+        "score": 54.57,
+        "overall": 67,
+        "percentile": 0.7744204477907668
+      },
+      {
+        "score": 54.58,
+        "overall": 67,
+        "percentile": 0.7735288290073311
+      },
+      {
+        "score": 54.59,
+        "overall": 67,
+        "percentile": 0.7725381414701803
+      },
+      {
+        "score": 54.6,
+        "overall": 68,
+        "percentile": 0.7713493164255993
+      },
+      {
+        "score": 54.61,
+        "overall": 68,
+        "percentile": 0.7704576976421637
+      },
+      {
+        "score": 54.62,
+        "overall": 68,
+        "percentile": 0.7691698038438677
+      },
+      {
+        "score": 54.63,
+        "overall": 68,
+        "percentile": 0.7677828412918566
+      },
+      {
+        "score": 54.64,
+        "overall": 68,
+        "percentile": 0.7669902912621359
+      },
+      {
+        "score": 54.65,
+        "overall": 68,
+        "percentile": 0.7662968099861304
+      },
+      {
+        "score": 54.66,
+        "overall": 68,
+        "percentile": 0.7656033287101248
+      },
+      {
+        "score": 54.67,
+        "overall": 68,
+        "percentile": 0.7647117099266891
+      },
+      {
+        "score": 54.68,
+        "overall": 68,
+        "percentile": 0.7638200911432534
+      },
+      {
+        "score": 54.7,
+        "overall": 68,
+        "percentile": 0.7631266098672479
+      },
+      {
+        "score": 54.71,
+        "overall": 68,
+        "percentile": 0.7621359223300971
+      },
+      {
+        "score": 54.72,
+        "overall": 68,
+        "percentile": 0.7606498910243709
+      },
+      {
+        "score": 54.73,
+        "overall": 68,
+        "percentile": 0.7593619972260749
+      },
+      {
+        "score": 54.74,
+        "overall": 68,
+        "percentile": 0.7584703784426392
+      },
+      {
+        "score": 54.75,
+        "overall": 68,
+        "percentile": 0.7574796909054884
+      },
+      {
+        "score": 54.76,
+        "overall": 68,
+        "percentile": 0.7566871408757678
+      },
+      {
+        "score": 54.77,
+        "overall": 68,
+        "percentile": 0.7553992470774717
+      },
+      {
+        "score": 54.78,
+        "overall": 68,
+        "percentile": 0.7536160095106004
+      },
+      {
+        "score": 54.79,
+        "overall": 68,
+        "percentile": 0.7520309094511591
+      },
+      {
+        "score": 54.8,
+        "overall": 68,
+        "percentile": 0.7502476718842876
+      },
+      {
+        "score": 54.81,
+        "overall": 68,
+        "percentile": 0.7485635030711313
+      },
+      {
+        "score": 54.82,
+        "overall": 68,
+        "percentile": 0.7469784030116902
+      },
+      {
+        "score": 54.83,
+        "overall": 68,
+        "percentile": 0.7457895779671091
+      },
+      {
+        "score": 54.84,
+        "overall": 68,
+        "percentile": 0.7447988904299584
+      },
+      {
+        "score": 54.85,
+        "overall": 68,
+        "percentile": 0.7434119278779473
+      },
+      {
+        "score": 54.86,
+        "overall": 68,
+        "percentile": 0.7418268278185061
+      },
+      {
+        "score": 54.87,
+        "overall": 68,
+        "percentile": 0.7402417277590647
+      },
+      {
+        "score": 54.88,
+        "overall": 68,
+        "percentile": 0.7386566276996236
+      },
+      {
+        "score": 54.89,
+        "overall": 69,
+        "percentile": 0.7370715276401822
+      },
+      {
+        "score": 54.9,
+        "overall": 69,
+        "percentile": 0.735486427580741
+      },
+      {
+        "score": 54.91,
+        "overall": 69,
+        "percentile": 0.7338022587675848
+      },
+      {
+        "score": 54.92,
+        "overall": 69,
+        "percentile": 0.7324152962155737
+      },
+      {
+        "score": 54.93,
+        "overall": 69,
+        "percentile": 0.7313255399247077
+      },
+      {
+        "score": 54.94,
+        "overall": 69,
+        "percentile": 0.730334852387557
+      },
+      {
+        "score": 54.95,
+        "overall": 69,
+        "percentile": 0.7295423023578363
+      },
+      {
+        "score": 54.96,
+        "overall": 69,
+        "percentile": 0.7284525460669704
+      },
+      {
+        "score": 54.97,
+        "overall": 69,
+        "percentile": 0.7273627897761046
+      },
+      {
+        "score": 54.98,
+        "overall": 69,
+        "percentile": 0.7260748959778086
+      },
+      {
+        "score": 54.99,
+        "overall": 69,
+        "percentile": 0.7246879334257975
+      },
+      {
+        "score": 55,
+        "overall": 69,
+        "percentile": 0.7234991083812166
+      },
+      {
+        "score": 55.01,
+        "overall": 69,
+        "percentile": 0.7224093520903507
+      },
+      {
+        "score": 55.02,
+        "overall": 69,
+        "percentile": 0.7212205270457698
+      },
+      {
+        "score": 55.03,
+        "overall": 70,
+        "percentile": 0.7196354269863285
+      },
+      {
+        "score": 55.04,
+        "overall": 70,
+        "percentile": 0.7180503269268872
+      },
+      {
+        "score": 55.05,
+        "overall": 70,
+        "percentile": 0.7165642956211611
+      },
+      {
+        "score": 55.06,
+        "overall": 70,
+        "percentile": 0.71517733306915
+      },
+      {
+        "score": 55.07,
+        "overall": 70,
+        "percentile": 0.713988508024569
+      },
+      {
+        "score": 55.08,
+        "overall": 70,
+        "percentile": 0.7127996829799881
+      },
+      {
+        "score": 55.09,
+        "overall": 70,
+        "percentile": 0.7117099266891223
+      },
+      {
+        "score": 55.1,
+        "overall": 70,
+        "percentile": 0.7103229641371112
+      },
+      {
+        "score": 55.11,
+        "overall": 70,
+        "percentile": 0.708836932831385
+      },
+      {
+        "score": 55.12,
+        "overall": 70,
+        "percentile": 0.707648107786804
+      },
+      {
+        "score": 55.13,
+        "overall": 70,
+        "percentile": 0.7066574202496533
+      },
+      {
+        "score": 55.14,
+        "overall": 70,
+        "percentile": 0.7056667327125025
+      },
+      {
+        "score": 55.15,
+        "overall": 70,
+        "percentile": 0.7040816326530612
+      },
+      {
+        "score": 55.16,
+        "overall": 70,
+        "percentile": 0.7026946701010501
+      },
+      {
+        "score": 55.17,
+        "overall": 70,
+        "percentile": 0.7016049138101843
+      },
+      {
+        "score": 55.18,
+        "overall": 70,
+        "percentile": 0.6998216762433129
+      },
+      {
+        "score": 55.19,
+        "overall": 70,
+        "percentile": 0.6979393699227263
+      },
+      {
+        "score": 55.2,
+        "overall": 70,
+        "percentile": 0.6967505448781455
+      },
+      {
+        "score": 55.21,
+        "overall": 70,
+        "percentile": 0.6953635823261344
+      },
+      {
+        "score": 55.22,
+        "overall": 71,
+        "percentile": 0.693679413512978
+      },
+      {
+        "score": 55.23,
+        "overall": 71,
+        "percentile": 0.6924905884683971
+      },
+      {
+        "score": 55.24,
+        "overall": 71,
+        "percentile": 0.6914999009312464
+      },
+      {
+        "score": 55.25,
+        "overall": 71,
+        "percentile": 0.689914800871805
+      },
+      {
+        "score": 55.26,
+        "overall": 71,
+        "percentile": 0.688626907073509
+      },
+      {
+        "score": 55.27,
+        "overall": 71,
+        "percentile": 0.6876362195363582
+      },
+      {
+        "score": 55.28,
+        "overall": 71,
+        "percentile": 0.686150188230632
+      },
+      {
+        "score": 55.29,
+        "overall": 71,
+        "percentile": 0.6850604319397662
+      },
+      {
+        "score": 55.3,
+        "overall": 71,
+        "percentile": 0.6837725381414701
+      },
+      {
+        "score": 55.31,
+        "overall": 71,
+        "percentile": 0.6820883693283138
+      },
+      {
+        "score": 55.32,
+        "overall": 71,
+        "percentile": 0.6808995442837329
+      },
+      {
+        "score": 55.33,
+        "overall": 71,
+        "percentile": 0.6795125817317218
+      },
+      {
+        "score": 55.34,
+        "overall": 71,
+        "percentile": 0.6781256191797107
+      },
+      {
+        "score": 55.35,
+        "overall": 71,
+        "percentile": 0.6768377253814146
+      },
+      {
+        "score": 55.36,
+        "overall": 71,
+        "percentile": 0.6753516940756885
+      },
+      {
+        "score": 55.37,
+        "overall": 71,
+        "percentile": 0.6742619377848227
+      },
+      {
+        "score": 55.38,
+        "overall": 71,
+        "percentile": 0.6731721814939569
+      },
+      {
+        "score": 55.39,
+        "overall": 71,
+        "percentile": 0.6715870814345155
+      },
+      {
+        "score": 55.4,
+        "overall": 71,
+        "percentile": 0.6698038438676441
+      },
+      {
+        "score": 55.41,
+        "overall": 71,
+        "percentile": 0.668317812561918
+      },
+      {
+        "score": 55.42,
+        "overall": 71,
+        "percentile": 0.6672280562710521
+      },
+      {
+        "score": 55.43,
+        "overall": 71,
+        "percentile": 0.6654448187041807
+      },
+      {
+        "score": 55.44,
+        "overall": 71,
+        "percentile": 0.6632653061224489
+      },
+      {
+        "score": 55.45,
+        "overall": 71,
+        "percentile": 0.6615811373092926
+      },
+      {
+        "score": 55.46,
+        "overall": 71,
+        "percentile": 0.6597978997424212
+      },
+      {
+        "score": 55.47,
+        "overall": 71,
+        "percentile": 0.6581137309292648
+      },
+      {
+        "score": 55.48,
+        "overall": 71,
+        "percentile": 0.6567267683772537
+      },
+      {
+        "score": 55.49,
+        "overall": 71,
+        "percentile": 0.6548444620566674
+      },
+      {
+        "score": 55.5,
+        "overall": 71,
+        "percentile": 0.6527640182286507
+      },
+      {
+        "score": 55.51,
+        "overall": 71,
+        "percentile": 0.6510798494154943
+      },
+      {
+        "score": 55.52,
+        "overall": 71,
+        "percentile": 0.6496928868634833
+      },
+      {
+        "score": 55.53,
+        "overall": 71,
+        "percentile": 0.6480087180503269
+      },
+      {
+        "score": 55.54,
+        "overall": 71,
+        "percentile": 0.6462254804834555
+      },
+      {
+        "score": 55.55,
+        "overall": 72,
+        "percentile": 0.6448385179314444
+      },
+      {
+        "score": 55.56,
+        "overall": 72,
+        "percentile": 0.6434515553794333
+      },
+      {
+        "score": 55.57,
+        "overall": 72,
+        "percentile": 0.6420645928274222
+      },
+      {
+        "score": 55.58,
+        "overall": 72,
+        "percentile": 0.6408757677828413
+      },
+      {
+        "score": 55.59,
+        "overall": 72,
+        "percentile": 0.6395878739845453
+      },
+      {
+        "score": 55.6,
+        "overall": 72,
+        "percentile": 0.638002773925104
+      },
+      {
+        "score": 55.61,
+        "overall": 72,
+        "percentile": 0.636714880126808
+      },
+      {
+        "score": 55.62,
+        "overall": 72,
+        "percentile": 0.6357241925896573
+      },
+      {
+        "score": 55.63,
+        "overall": 72,
+        "percentile": 0.6345353675450762
+      },
+      {
+        "score": 55.64,
+        "overall": 72,
+        "percentile": 0.63285119873192
+      },
+      {
+        "score": 55.65,
+        "overall": 72,
+        "percentile": 0.6312660986724787
+      },
+      {
+        "score": 55.66,
+        "overall": 72,
+        "percentile": 0.6293837923518922
+      },
+      {
+        "score": 55.67,
+        "overall": 72,
+        "percentile": 0.6274024172775907
+      },
+      {
+        "score": 55.68,
+        "overall": 72,
+        "percentile": 0.6259163859718645
+      },
+      {
+        "score": 55.69,
+        "overall": 72,
+        "percentile": 0.6246284921735685
+      },
+      {
+        "score": 55.7,
+        "overall": 72,
+        "percentile": 0.6234396671289875
+      },
+      {
+        "score": 55.71,
+        "overall": 72,
+        "percentile": 0.6222508420844066
+      },
+      {
+        "score": 55.72,
+        "overall": 72,
+        "percentile": 0.6210620170398257
+      },
+      {
+        "score": 55.73,
+        "overall": 72,
+        "percentile": 0.6196750544878146
+      },
+      {
+        "score": 55.74,
+        "overall": 72,
+        "percentile": 0.6183871606895186
+      },
+      {
+        "score": 55.75,
+        "overall": 72,
+        "percentile": 0.6171983356449375
+      },
+      {
+        "score": 55.76,
+        "overall": 72,
+        "percentile": 0.6161085793540717
+      },
+      {
+        "score": 55.77,
+        "overall": 72,
+        "percentile": 0.6151178918169209
+      },
+      {
+        "score": 55.78,
+        "overall": 72,
+        "percentile": 0.6140281355260551
+      },
+      {
+        "score": 55.79,
+        "overall": 72,
+        "percentile": 0.6130374479889042
+      },
+      {
+        "score": 55.8,
+        "overall": 72,
+        "percentile": 0.6117495541906083
+      },
+      {
+        "score": 55.81,
+        "overall": 72,
+        "percentile": 0.6103625916385972
+      },
+      {
+        "score": 55.82,
+        "overall": 72,
+        "percentile": 0.6085793540717257
+      },
+      {
+        "score": 55.83,
+        "overall": 72,
+        "percentile": 0.606498910243709
+      },
+      {
+        "score": 55.84,
+        "overall": 72,
+        "percentile": 0.6056072914602735
+      },
+      {
+        "score": 55.85,
+        "overall": 72,
+        "percentile": 0.6045175351694076
+      },
+      {
+        "score": 55.86,
+        "overall": 72,
+        "percentile": 0.6027342976025362
+      },
+      {
+        "score": 55.87,
+        "overall": 72,
+        "percentile": 0.6014464038042402
+      },
+      {
+        "score": 55.88,
+        "overall": 72,
+        "percentile": 0.6003566475133744
+      },
+      {
+        "score": 55.89,
+        "overall": 72,
+        "percentile": 0.598771547453933
+      },
+      {
+        "score": 55.9,
+        "overall": 72,
+        "percentile": 0.5967901723796314
+      },
+      {
+        "score": 55.91,
+        "overall": 72,
+        "percentile": 0.5954032098276203
+      },
+      {
+        "score": 55.92,
+        "overall": 73,
+        "percentile": 0.5945115910441847
+      },
+      {
+        "score": 55.93,
+        "overall": 73,
+        "percentile": 0.5931246284921736
+      },
+      {
+        "score": 55.94,
+        "overall": 73,
+        "percentile": 0.5916385971864474
+      },
+      {
+        "score": 55.95,
+        "overall": 73,
+        "percentile": 0.5901525658807212
+      },
+      {
+        "score": 55.96,
+        "overall": 73,
+        "percentile": 0.5886665345749951
+      },
+      {
+        "score": 55.97,
+        "overall": 73,
+        "percentile": 0.587378640776699
+      },
+      {
+        "score": 55.98,
+        "overall": 73,
+        "percentile": 0.5857935407172578
+      },
+      {
+        "score": 55.99,
+        "overall": 73,
+        "percentile": 0.5844065781652467
+      },
+      {
+        "score": 56,
+        "overall": 73,
+        "percentile": 0.5831186843669507
+      },
+      {
+        "score": 56.01,
+        "overall": 73,
+        "percentile": 0.5816326530612245
+      },
+      {
+        "score": 56.02,
+        "overall": 73,
+        "percentile": 0.5802456905092134
+      },
+      {
+        "score": 56.03,
+        "overall": 73,
+        "percentile": 0.5786605904497721
+      },
+      {
+        "score": 56.04,
+        "overall": 73,
+        "percentile": 0.5773726966514761
+      },
+      {
+        "score": 56.05,
+        "overall": 73,
+        "percentile": 0.5765801466217555
+      },
+      {
+        "score": 56.06,
+        "overall": 73,
+        "percentile": 0.5757875965920349
+      },
+      {
+        "score": 56.07,
+        "overall": 73,
+        "percentile": 0.5749950465623143
+      },
+      {
+        "score": 56.08,
+        "overall": 73,
+        "percentile": 0.5742024965325936
+      },
+      {
+        "score": 56.09,
+        "overall": 73,
+        "percentile": 0.5733108777491579
+      },
+      {
+        "score": 56.1,
+        "overall": 73,
+        "percentile": 0.5721220527045769
+      },
+      {
+        "score": 56.11,
+        "overall": 73,
+        "percentile": 0.5709332276599961
+      },
+      {
+        "score": 56.12,
+        "overall": 74,
+        "percentile": 0.5699425401228453
+      },
+      {
+        "score": 56.13,
+        "overall": 74,
+        "percentile": 0.5689518525856945
+      },
+      {
+        "score": 56.14,
+        "overall": 74,
+        "percentile": 0.5679611650485437
+      },
+      {
+        "score": 56.15,
+        "overall": 74,
+        "percentile": 0.5672676837725381
+      },
+      {
+        "score": 56.16,
+        "overall": 74,
+        "percentile": 0.5666732712502477
+      },
+      {
+        "score": 56.17,
+        "overall": 74,
+        "percentile": 0.5655835149593818
+      },
+      {
+        "score": 56.18,
+        "overall": 74,
+        "percentile": 0.5639984148999406
+      },
+      {
+        "score": 56.19,
+        "overall": 74,
+        "percentile": 0.562017039825639
+      },
+      {
+        "score": 56.2,
+        "overall": 74,
+        "percentile": 0.5605310085199129
+      },
+      {
+        "score": 56.21,
+        "overall": 74,
+        "percentile": 0.5595403209827621
+      },
+      {
+        "score": 56.22,
+        "overall": 74,
+        "percentile": 0.5583514959381811
+      },
+      {
+        "score": 56.23,
+        "overall": 74,
+        "percentile": 0.5572617396473152
+      },
+      {
+        "score": 56.24,
+        "overall": 74,
+        "percentile": 0.5561719833564494
+      },
+      {
+        "score": 56.25,
+        "overall": 74,
+        "percentile": 0.5548840895581534
+      },
+      {
+        "score": 56.26,
+        "overall": 74,
+        "percentile": 0.5533980582524272
+      },
+      {
+        "score": 56.27,
+        "overall": 74,
+        "percentile": 0.5515157519318408
+      },
+      {
+        "score": 56.28,
+        "overall": 74,
+        "percentile": 0.5495343768575391
+      },
+      {
+        "score": 56.29,
+        "overall": 74,
+        "percentile": 0.548147414305528
+      },
+      {
+        "score": 56.3,
+        "overall": 74,
+        "percentile": 0.5470576580146622
+      },
+      {
+        "score": 56.31,
+        "overall": 74,
+        "percentile": 0.5458688329700813
+      },
+      {
+        "score": 56.32,
+        "overall": 75,
+        "percentile": 0.5446800079255003
+      },
+      {
+        "score": 56.33,
+        "overall": 75,
+        "percentile": 0.5433921141272042
+      },
+      {
+        "score": 56.34,
+        "overall": 75,
+        "percentile": 0.5423023578363384
+      },
+      {
+        "score": 56.35,
+        "overall": 75,
+        "percentile": 0.5413116702991876
+      },
+      {
+        "score": 56.36,
+        "overall": 75,
+        "percentile": 0.5402219140083218
+      },
+      {
+        "score": 56.37,
+        "overall": 75,
+        "percentile": 0.5393302952248861
+      },
+      {
+        "score": 56.38,
+        "overall": 75,
+        "percentile": 0.5382405389340201
+      },
+      {
+        "score": 56.39,
+        "overall": 75,
+        "percentile": 0.536853576382009
+      },
+      {
+        "score": 56.4,
+        "overall": 75,
+        "percentile": 0.5355656825837132
+      },
+      {
+        "score": 56.41,
+        "overall": 75,
+        "percentile": 0.5340796512779868
+      },
+      {
+        "score": 56.42,
+        "overall": 75,
+        "percentile": 0.5322964137111155
+      },
+      {
+        "score": 56.43,
+        "overall": 75,
+        "percentile": 0.5308103824053894
+      },
+      {
+        "score": 56.44,
+        "overall": 75,
+        "percentile": 0.5294234198533783
+      },
+      {
+        "score": 56.45,
+        "overall": 75,
+        "percentile": 0.5278383197939369
+      },
+      {
+        "score": 56.46,
+        "overall": 75,
+        "percentile": 0.5264513572419258
+      },
+      {
+        "score": 56.47,
+        "overall": 75,
+        "percentile": 0.5250643946899147
+      },
+      {
+        "score": 56.48,
+        "overall": 75,
+        "percentile": 0.5235783633841886
+      },
+      {
+        "score": 56.49,
+        "overall": 75,
+        "percentile": 0.5217951258173172
+      },
+      {
+        "score": 56.5,
+        "overall": 75,
+        "percentile": 0.5199128194967307
+      },
+      {
+        "score": 56.51,
+        "overall": 75,
+        "percentile": 0.5183277194372895
+      },
+      {
+        "score": 56.52,
+        "overall": 75,
+        "percentile": 0.5169407568852784
+      },
+      {
+        "score": 56.53,
+        "overall": 75,
+        "percentile": 0.5158510005944126
+      },
+      {
+        "score": 56.54,
+        "overall": 75,
+        "percentile": 0.5148603130572618
+      },
+      {
+        "score": 56.55,
+        "overall": 75,
+        "percentile": 0.513869625520111
+      },
+      {
+        "score": 56.56,
+        "overall": 75,
+        "percentile": 0.5124826629680999
+      },
+      {
+        "score": 56.57,
+        "overall": 75,
+        "percentile": 0.5108975629086586
+      },
+      {
+        "score": 56.58,
+        "overall": 75,
+        "percentile": 0.5097087378640777
+      },
+      {
+        "score": 56.59,
+        "overall": 75,
+        "percentile": 0.5084208440657816
+      },
+      {
+        "score": 56.6,
+        "overall": 75,
+        "percentile": 0.5067366752526253
+      },
+      {
+        "score": 56.61,
+        "overall": 75,
+        "percentile": 0.5048543689320388
+      },
+      {
+        "score": 56.62,
+        "overall": 75,
+        "percentile": 0.5028729938577372
+      },
+      {
+        "score": 56.63,
+        "overall": 75,
+        "percentile": 0.5013869625520111
+      },
+      {
+        "score": 56.64,
+        "overall": 75,
+        "percentile": 0.5002972062611453
+      },
+      {
+        "score": 56.65,
+        "overall": 75,
+        "percentile": 0.4991083812165643
+      },
+      {
+        "score": 56.66,
+        "overall": 75,
+        "percentile": 0.49782048741826823
+      },
+      {
+        "score": 56.67,
+        "overall": 75,
+        "percentile": 0.49653259361997226
+      },
+      {
+        "score": 56.68,
+        "overall": 75,
+        "percentile": 0.49554190608282145
+      },
+      {
+        "score": 56.69,
+        "overall": 76,
+        "percentile": 0.4942540122845255
+      },
+      {
+        "score": 56.7,
+        "overall": 76,
+        "percentile": 0.4929661184862294
+      },
+      {
+        "score": 56.71,
+        "overall": 76,
+        "percentile": 0.49167822468793343
+      },
+      {
+        "score": 56.72,
+        "overall": 76,
+        "percentile": 0.49039033088963746
+      },
+      {
+        "score": 56.73,
+        "overall": 76,
+        "percentile": 0.4893005745987715
+      },
+      {
+        "score": 56.74,
+        "overall": 76,
+        "percentile": 0.487418268278185
+      },
+      {
+        "score": 56.75,
+        "overall": 76,
+        "percentile": 0.4858331682187438
+      },
+      {
+        "score": 56.76,
+        "overall": 76,
+        "percentile": 0.48474341192787795
+      },
+      {
+        "score": 56.77,
+        "overall": 76,
+        "percentile": 0.4836536556370121
+      },
+      {
+        "score": 56.78,
+        "overall": 76,
+        "percentile": 0.4826629680998613
+      },
+      {
+        "score": 56.79,
+        "overall": 76,
+        "percentile": 0.48137507430156523
+      },
+      {
+        "score": 56.8,
+        "overall": 76,
+        "percentile": 0.4802853180106994
+      },
+      {
+        "score": 56.81,
+        "overall": 76,
+        "percentile": 0.4793936992272637
+      },
+      {
+        "score": 56.82,
+        "overall": 76,
+        "percentile": 0.4780067366752526
+      },
+      {
+        "score": 56.83,
+        "overall": 76,
+        "percentile": 0.4766197741232415
+      },
+      {
+        "score": 56.84,
+        "overall": 76,
+        "percentile": 0.47543094907866057
+      },
+      {
+        "score": 56.85,
+        "overall": 76,
+        "percentile": 0.47384584901921933
+      },
+      {
+        "score": 56.86,
+        "overall": 76,
+        "percentile": 0.4723598177134931
+      },
+      {
+        "score": 56.87,
+        "overall": 76,
+        "percentile": 0.470972855161482
+      },
+      {
+        "score": 56.88,
+        "overall": 76,
+        "percentile": 0.4694868238557559
+      },
+      {
+        "score": 56.89,
+        "overall": 76,
+        "percentile": 0.46780265504259955
+      },
+      {
+        "score": 56.9,
+        "overall": 76,
+        "percentile": 0.4662175549831583
+      },
+      {
+        "score": 56.91,
+        "overall": 76,
+        "percentile": 0.4647315236774321
+      },
+      {
+        "score": 56.92,
+        "overall": 76,
+        "percentile": 0.46255201109570043
+      },
+      {
+        "score": 56.93,
+        "overall": 76,
+        "percentile": 0.4609669110362592
+      },
+      {
+        "score": 56.94,
+        "overall": 76,
+        "percentile": 0.4599762234991084
+      },
+      {
+        "score": 56.95,
+        "overall": 76,
+        "percentile": 0.4586883297008124
+      },
+      {
+        "score": 56.96,
+        "overall": 76,
+        "percentile": 0.4575985734099465
+      },
+      {
+        "score": 56.97,
+        "overall": 76,
+        "percentile": 0.4564097483653655
+      },
+      {
+        "score": 56.98,
+        "overall": 76,
+        "percentile": 0.4550227858133544
+      },
+      {
+        "score": 56.99,
+        "overall": 76,
+        "percentile": 0.45373489201505846
+      },
+      {
+        "score": 57,
+        "overall": 76,
+        "percentile": 0.45224886070933223
+      },
+      {
+        "score": 57.01,
+        "overall": 76,
+        "percentile": 0.45086189815732114
+      },
+      {
+        "score": 57.02,
+        "overall": 76,
+        "percentile": 0.44947493560531004
+      },
+      {
+        "score": 57.03,
+        "overall": 76,
+        "percentile": 0.4478898355458688
+      },
+      {
+        "score": 57.04,
+        "overall": 76,
+        "percentile": 0.44670101050128785
+      },
+      {
+        "score": 57.05,
+        "overall": 76,
+        "percentile": 0.4454131167029919
+      },
+      {
+        "score": 57.06,
+        "overall": 77,
+        "percentile": 0.4437289478898355
+      },
+      {
+        "score": 57.07,
+        "overall": 77,
+        "percentile": 0.44244105409153955
+      },
+      {
+        "score": 57.08,
+        "overall": 77,
+        "percentile": 0.4413512978006736
+      },
+      {
+        "score": 57.09,
+        "overall": 77,
+        "percentile": 0.43966712898751736
+      },
+      {
+        "score": 57.1,
+        "overall": 77,
+        "percentile": 0.437982960174361
+      },
+      {
+        "score": 57.11,
+        "overall": 77,
+        "percentile": 0.4364969288686348
+      },
+      {
+        "score": 57.12,
+        "overall": 77,
+        "percentile": 0.4352090350703388
+      },
+      {
+        "score": 57.13,
+        "overall": 77,
+        "percentile": 0.43451555379433326
+      },
+      {
+        "score": 57.14,
+        "overall": 77,
+        "percentile": 0.43392114127204284
+      },
+      {
+        "score": 57.15,
+        "overall": 77,
+        "percentile": 0.4328313849811769
+      },
+      {
+        "score": 57.16,
+        "overall": 77,
+        "percentile": 0.43124628492173567
+      },
+      {
+        "score": 57.17,
+        "overall": 77,
+        "percentile": 0.4298593223697246
+      },
+      {
+        "score": 57.18,
+        "overall": 77,
+        "percentile": 0.4286704973251436
+      },
+      {
+        "score": 57.19,
+        "overall": 77,
+        "percentile": 0.42748167228056266
+      },
+      {
+        "score": 57.2,
+        "overall": 77,
+        "percentile": 0.4266891222508421
+      },
+      {
+        "score": 57.21,
+        "overall": 77,
+        "percentile": 0.42589657222112143
+      },
+      {
+        "score": 57.22,
+        "overall": 77,
+        "percentile": 0.4247077471765405
+      },
+      {
+        "score": 57.23,
+        "overall": 77,
+        "percentile": 0.4233207846245294
+      },
+      {
+        "score": 57.24,
+        "overall": 77,
+        "percentile": 0.4225282345948088
+      },
+      {
+        "score": 57.25,
+        "overall": 77,
+        "percentile": 0.4220328908262334
+      },
+      {
+        "score": 57.26,
+        "overall": 77,
+        "percentile": 0.4209431345353676
+      },
+      {
+        "score": 57.27,
+        "overall": 78,
+        "percentile": 0.4195561719833565
+      },
+      {
+        "score": 57.28,
+        "overall": 78,
+        "percentile": 0.41856548444620567
+      },
+      {
+        "score": 57.29,
+        "overall": 78,
+        "percentile": 0.41807014067763026
+      },
+      {
+        "score": 57.3,
+        "overall": 78,
+        "percentile": 0.4172775906479097
+      },
+      {
+        "score": 57.31,
+        "overall": 78,
+        "percentile": 0.41618783435704376
+      },
+      {
+        "score": 57.32,
+        "overall": 78,
+        "percentile": 0.4149990093124628
+      },
+      {
+        "score": 57.33,
+        "overall": 78,
+        "percentile": 0.413909253021597
+      },
+      {
+        "score": 57.34,
+        "overall": 78,
+        "percentile": 0.4131167029918764
+      },
+      {
+        "score": 57.35,
+        "overall": 78,
+        "percentile": 0.41232415296215574
+      },
+      {
+        "score": 57.36,
+        "overall": 78,
+        "percentile": 0.4110362591638598
+      },
+      {
+        "score": 57.37,
+        "overall": 78,
+        "percentile": 0.4094511591044184
+      },
+      {
+        "score": 57.38,
+        "overall": 78,
+        "percentile": 0.4077669902912622
+      },
+      {
+        "score": 57.39,
+        "overall": 78,
+        "percentile": 0.40628095898553596
+      },
+      {
+        "score": 57.4,
+        "overall": 78,
+        "percentile": 0.405092133940955
+      },
+      {
+        "score": 57.41,
+        "overall": 78,
+        "percentile": 0.4037051713889439
+      },
+      {
+        "score": 57.42,
+        "overall": 78,
+        "percentile": 0.40251634634436295
+      },
+      {
+        "score": 57.43,
+        "overall": 78,
+        "percentile": 0.40162472756092726
+      },
+      {
+        "score": 57.44,
+        "overall": 78,
+        "percentile": 0.4009312462849217
+      },
+      {
+        "score": 57.45,
+        "overall": 78,
+        "percentile": 0.40013869625520115
+      },
+      {
+        "score": 57.46,
+        "overall": 78,
+        "percentile": 0.3994452149791956
+      },
+      {
+        "score": 57.47,
+        "overall": 78,
+        "percentile": 0.39875173370319006
+      },
+      {
+        "score": 57.48,
+        "overall": 78,
+        "percentile": 0.39776104616603924
+      },
+      {
+        "score": 57.49,
+        "overall": 78,
+        "percentile": 0.3965722211214583
+      },
+      {
+        "score": 57.5,
+        "overall": 78,
+        "percentile": 0.39548246483059246
+      },
+      {
+        "score": 57.51,
+        "overall": 78,
+        "percentile": 0.3945908460471568
+      },
+      {
+        "score": 57.52,
+        "overall": 78,
+        "percentile": 0.39360015851000596
+      },
+      {
+        "score": 57.53,
+        "overall": 78,
+        "percentile": 0.3928076084802853
+      },
+      {
+        "score": 57.54,
+        "overall": 78,
+        "percentile": 0.3920150584505647
+      },
+      {
+        "score": 57.55,
+        "overall": 79,
+        "percentile": 0.39072716465226864
+      },
+      {
+        "score": 57.56,
+        "overall": 79,
+        "percentile": 0.3895383396076877
+      },
+      {
+        "score": 57.57,
+        "overall": 79,
+        "percentile": 0.38894392708539727
+      },
+      {
+        "score": 57.58,
+        "overall": 79,
+        "percentile": 0.38834951456310685
+      },
+      {
+        "score": 57.59,
+        "overall": 79,
+        "percentile": 0.3876560332871013
+      },
+      {
+        "score": 57.6,
+        "overall": 79,
+        "percentile": 0.38706162076481077
+      },
+      {
+        "score": 57.61,
+        "overall": 79,
+        "percentile": 0.38656627699623536
+      },
+      {
+        "score": 57.62,
+        "overall": 79,
+        "percentile": 0.38597186447394494
+      },
+      {
+        "score": 57.63,
+        "overall": 79,
+        "percentile": 0.3852783831979394
+      },
+      {
+        "score": 57.64,
+        "overall": 79,
+        "percentile": 0.38458490192193384
+      },
+      {
+        "score": 57.65,
+        "overall": 79,
+        "percentile": 0.3829998018624926
+      },
+      {
+        "score": 57.66,
+        "overall": 79,
+        "percentile": 0.38141470180305137
+      },
+      {
+        "score": 57.67,
+        "overall": 79,
+        "percentile": 0.37982960174361
+      },
+      {
+        "score": 57.68,
+        "overall": 79,
+        "percentile": 0.37794729542302363
+      },
+      {
+        "score": 57.69,
+        "overall": 79,
+        "percentile": 0.37656033287101254
+      },
+      {
+        "score": 57.7,
+        "overall": 79,
+        "percentile": 0.37517337031900144
+      },
+      {
+        "score": 57.71,
+        "overall": 79,
+        "percentile": 0.37378640776699024
+      },
+      {
+        "score": 57.72,
+        "overall": 79,
+        "percentile": 0.3725975827224094
+      },
+      {
+        "score": 57.73,
+        "overall": 79,
+        "percentile": 0.37091341390925303
+      },
+      {
+        "score": 57.74,
+        "overall": 79,
+        "percentile": 0.3693283138498118
+      },
+      {
+        "score": 57.75,
+        "overall": 79,
+        "percentile": 0.36873390132752126
+      },
+      {
+        "score": 57.76,
+        "overall": 79,
+        "percentile": 0.368337626312661
+      },
+      {
+        "score": 57.77,
+        "overall": 79,
+        "percentile": 0.3678422825440856
+      },
+      {
+        "score": 57.78,
+        "overall": 79,
+        "percentile": 0.3664553199920745
+      },
+      {
+        "score": 57.79,
+        "overall": 79,
+        "percentile": 0.36496928868634837
+      },
+      {
+        "score": 57.8,
+        "overall": 79,
+        "percentile": 0.36407766990291257
+      },
+      {
+        "score": 57.81,
+        "overall": 79,
+        "percentile": 0.363285119873192
+      },
+      {
+        "score": 57.82,
+        "overall": 79,
+        "percentile": 0.36209629482861105
+      },
+      {
+        "score": 57.83,
+        "overall": 79,
+        "percentile": 0.3608084010303151
+      },
+      {
+        "score": 57.84,
+        "overall": 79,
+        "percentile": 0.35961957598573413
+      },
+      {
+        "score": 57.85,
+        "overall": 79,
+        "percentile": 0.35793540717257777
+      },
+      {
+        "score": 57.86,
+        "overall": 79,
+        "percentile": 0.3565484446205667
+      },
+      {
+        "score": 57.87,
+        "overall": 79,
+        "percentile": 0.355755894590846
+      },
+      {
+        "score": 57.88,
+        "overall": 79,
+        "percentile": 0.3551614820685556
+      },
+      {
+        "score": 57.89,
+        "overall": 79,
+        "percentile": 0.35456706954626516
+      },
+      {
+        "score": 57.9,
+        "overall": 79,
+        "percentile": 0.35367545076282936
+      },
+      {
+        "score": 57.91,
+        "overall": 79,
+        "percentile": 0.3524866257182485
+      },
+      {
+        "score": 57.92,
+        "overall": 79,
+        "percentile": 0.35119873191995243
+      },
+      {
+        "score": 57.93,
+        "overall": 79,
+        "percentile": 0.3497127006142263
+      },
+      {
+        "score": 57.94,
+        "overall": 79,
+        "percentile": 0.34802853180106996
+      },
+      {
+        "score": 57.95,
+        "overall": 79,
+        "percentile": 0.34693877551020413
+      },
+      {
+        "score": 57.96,
+        "overall": 79,
+        "percentile": 0.34604715672676833
+      },
+      {
+        "score": 57.97,
+        "overall": 79,
+        "percentile": 0.3445611254210422
+      },
+      {
+        "score": 57.98,
+        "overall": 79,
+        "percentile": 0.3435704378838914
+      },
+      {
+        "score": 57.99,
+        "overall": 79,
+        "percentile": 0.34277788785417085
+      },
+      {
+        "score": 58,
+        "overall": 79,
+        "percentile": 0.3415890628095899
+      },
+      {
+        "score": 58.01,
+        "overall": 79,
+        "percentile": 0.34040023776500894
+      },
+      {
+        "score": 58.02,
+        "overall": 79,
+        "percentile": 0.3394095502278581
+      },
+      {
+        "score": 58.03,
+        "overall": 79,
+        "percentile": 0.33861700019813745
+      },
+      {
+        "score": 58.04,
+        "overall": 79,
+        "percentile": 0.33772538141470176
+      },
+      {
+        "score": 58.05,
+        "overall": 79,
+        "percentile": 0.3365365563701208
+      },
+      {
+        "score": 58.06,
+        "overall": 79,
+        "percentile": 0.3355458688329701
+      },
+      {
+        "score": 58.07,
+        "overall": 80,
+        "percentile": 0.33435704378838915
+      },
+      {
+        "score": 58.08,
+        "overall": 80,
+        "percentile": 0.33297008123637806
+      },
+      {
+        "score": 58.09,
+        "overall": 80,
+        "percentile": 0.3322765999603725
+      },
+      {
+        "score": 58.1,
+        "overall": 80,
+        "percentile": 0.33158311868436696
+      },
+      {
+        "score": 58.11,
+        "overall": 80,
+        "percentile": 0.33059243114721615
+      },
+      {
+        "score": 58.12,
+        "overall": 80,
+        "percentile": 0.3298989498712106
+      },
+      {
+        "score": 58.13,
+        "overall": 80,
+        "percentile": 0.32880919358034477
+      },
+      {
+        "score": 58.14,
+        "overall": 80,
+        "percentile": 0.3274222310283337
+      },
+      {
+        "score": 58.15,
+        "overall": 80,
+        "percentile": 0.3262334059837527
+      },
+      {
+        "score": 58.16,
+        "overall": 80,
+        "percentile": 0.3247473746780265
+      },
+      {
+        "score": 58.17,
+        "overall": 80,
+        "percentile": 0.3236576183871607
+      },
+      {
+        "score": 58.18,
+        "overall": 80,
+        "percentile": 0.32266693085000986
+      },
+      {
+        "score": 58.19,
+        "overall": 80,
+        "percentile": 0.3213790370517139
+      },
+      {
+        "score": 58.2,
+        "overall": 80,
+        "percentile": 0.3204874182682782
+      },
+      {
+        "score": 58.21,
+        "overall": 80,
+        "percentile": 0.3195957994848425
+      },
+      {
+        "score": 58.22,
+        "overall": 80,
+        "percentile": 0.31840697444026156
+      },
+      {
+        "score": 58.23,
+        "overall": 80,
+        "percentile": 0.31692094313453534
+      },
+      {
+        "score": 58.24,
+        "overall": 80,
+        "percentile": 0.3152367743213791
+      },
+      {
+        "score": 58.25,
+        "overall": 80,
+        "percentile": 0.31414701803051315
+      },
+      {
+        "score": 58.26,
+        "overall": 80,
+        "percentile": 0.3133544680007926
+      },
+      {
+        "score": 58.27,
+        "overall": 80,
+        "percentile": 0.31216564295621163
+      },
+      {
+        "score": 58.28,
+        "overall": 80,
+        "percentile": 0.3109768179116307
+      },
+      {
+        "score": 58.29,
+        "overall": 80,
+        "percentile": 0.31028333663562513
+      },
+      {
+        "score": 58.3,
+        "overall": 80,
+        "percentile": 0.30998613037447986
+      },
+      {
+        "score": 58.31,
+        "overall": 80,
+        "percentile": 0.30899544283732916
+      },
+      {
+        "score": 58.32,
+        "overall": 80,
+        "percentile": 0.30760848028531806
+      },
+      {
+        "score": 58.33,
+        "overall": 80,
+        "percentile": 0.30661779274816725
+      },
+      {
+        "score": 58.34,
+        "overall": 80,
+        "percentile": 0.30572617396473156
+      },
+      {
+        "score": 58.35,
+        "overall": 80,
+        "percentile": 0.3049336239350109
+      },
+      {
+        "score": 58.36,
+        "overall": 80,
+        "percentile": 0.3035466613829998
+      },
+      {
+        "score": 58.37,
+        "overall": 80,
+        "percentile": 0.3021596988309887
+      },
+      {
+        "score": 58.39,
+        "overall": 80,
+        "percentile": 0.3007727362789776
+      },
+      {
+        "score": 58.4,
+        "overall": 80,
+        "percentile": 0.2992867049732514
+      },
+      {
+        "score": 58.41,
+        "overall": 80,
+        "percentile": 0.2983950861898157
+      },
+      {
+        "score": 58.42,
+        "overall": 80,
+        "percentile": 0.29770160491381015
+      },
+      {
+        "score": 58.43,
+        "overall": 80,
+        "percentile": 0.2971071923915197
+      },
+      {
+        "score": 58.44,
+        "overall": 80,
+        "percentile": 0.2965127798692292
+      },
+      {
+        "score": 58.45,
+        "overall": 80,
+        "percentile": 0.29572022983950863
+      },
+      {
+        "score": 58.46,
+        "overall": 80,
+        "percentile": 0.2950267485635031
+      },
+      {
+        "score": 58.47,
+        "overall": 80,
+        "percentile": 0.2942341985337824
+      },
+      {
+        "score": 58.48,
+        "overall": 80,
+        "percentile": 0.29344164850406185
+      },
+      {
+        "score": 58.49,
+        "overall": 80,
+        "percentile": 0.29245096096691103
+      },
+      {
+        "score": 58.5,
+        "overall": 80,
+        "percentile": 0.2913612046760452
+      },
+      {
+        "score": 58.51,
+        "overall": 80,
+        "percentile": 0.29066772340003966
+      },
+      {
+        "score": 58.52,
+        "overall": 80,
+        "percentile": 0.2893798296017436
+      },
+      {
+        "score": 58.53,
+        "overall": 80,
+        "percentile": 0.2881910045571626
+      },
+      {
+        "score": 58.54,
+        "overall": 80,
+        "percentile": 0.28739845452744206
+      },
+      {
+        "score": 58.55,
+        "overall": 80,
+        "percentile": 0.28630869823657623
+      },
+      {
+        "score": 58.56,
+        "overall": 80,
+        "percentile": 0.2853180106994254
+      },
+      {
+        "score": 58.57,
+        "overall": 80,
+        "percentile": 0.2842282544085596
+      },
+      {
+        "score": 58.58,
+        "overall": 80,
+        "percentile": 0.2828412918565485
+      },
+      {
+        "score": 58.59,
+        "overall": 80,
+        "percentile": 0.28125619179710715
+      },
+      {
+        "score": 58.6,
+        "overall": 80,
+        "percentile": 0.2796710917376659
+      },
+      {
+        "score": 58.61,
+        "overall": 80,
+        "percentile": 0.2785813354468001
+      },
+      {
+        "score": 58.62,
+        "overall": 81,
+        "percentile": 0.27788785417079453
+      },
+      {
+        "score": 58.63,
+        "overall": 81,
+        "percentile": 0.2772934416485041
+      },
+      {
+        "score": 58.64,
+        "overall": 81,
+        "percentile": 0.27650089161878344
+      },
+      {
+        "score": 58.65,
+        "overall": 81,
+        "percentile": 0.2755102040816326
+      },
+      {
+        "score": 58.66,
+        "overall": 81,
+        "percentile": 0.2744204477907668
+      },
+      {
+        "score": 58.67,
+        "overall": 81,
+        "percentile": 0.27333069149990097
+      },
+      {
+        "score": 58.68,
+        "overall": 81,
+        "percentile": 0.27234000396275015
+      },
+      {
+        "score": 58.69,
+        "overall": 81,
+        "percentile": 0.2712502476718843
+      },
+      {
+        "score": 58.7,
+        "overall": 81,
+        "percentile": 0.2705567663958788
+      },
+      {
+        "score": 58.71,
+        "overall": 81,
+        "percentile": 0.26986328511987323
+      },
+      {
+        "score": 58.72,
+        "overall": 81,
+        "percentile": 0.26847632256786214
+      },
+      {
+        "score": 58.73,
+        "overall": 81,
+        "percentile": 0.2672874975232812
+      },
+      {
+        "score": 58.74,
+        "overall": 81,
+        "percentile": 0.2663958787398455
+      },
+      {
+        "score": 58.75,
+        "overall": 81,
+        "percentile": 0.26520705369526454
+      },
+      {
+        "score": 58.76,
+        "overall": 81,
+        "percentile": 0.26431543491182885
+      },
+      {
+        "score": 58.78,
+        "overall": 81,
+        "percentile": 0.2635228848821082
+      },
+      {
+        "score": 58.79,
+        "overall": 81,
+        "percentile": 0.2627303348523875
+      },
+      {
+        "score": 58.8,
+        "overall": 81,
+        "percentile": 0.2623340598375272
+      },
+      {
+        "score": 58.81,
+        "overall": 81,
+        "percentile": 0.2618387160689518
+      },
+      {
+        "score": 58.82,
+        "overall": 81,
+        "percentile": 0.26104616603923125
+      },
+      {
+        "score": 58.83,
+        "overall": 81,
+        "percentile": 0.26015454725579557
+      },
+      {
+        "score": 58.84,
+        "overall": 81,
+        "percentile": 0.2593619972260749
+      },
+      {
+        "score": 58.85,
+        "overall": 81,
+        "percentile": 0.2585694471963542
+      },
+      {
+        "score": 58.86,
+        "overall": 81,
+        "percentile": 0.25787596592034867
+      },
+      {
+        "score": 58.87,
+        "overall": 81,
+        "percentile": 0.25728155339805825
+      },
+      {
+        "score": 58.88,
+        "overall": 81,
+        "percentile": 0.25638993461462256
+      },
+      {
+        "score": 58.89,
+        "overall": 81,
+        "percentile": 0.25539924707747175
+      },
+      {
+        "score": 58.9,
+        "overall": 81,
+        "percentile": 0.2546066970477512
+      },
+      {
+        "score": 58.91,
+        "overall": 81,
+        "percentile": 0.2538141470180305
+      },
+      {
+        "score": 58.92,
+        "overall": 81,
+        "percentile": 0.25312066574202496
+      },
+      {
+        "score": 58.93,
+        "overall": 81,
+        "percentile": 0.25252625321973454
+      },
+      {
+        "score": 58.94,
+        "overall": 81,
+        "percentile": 0.251832771943729
+      },
+      {
+        "score": 58.95,
+        "overall": 81,
+        "percentile": 0.2510402219140083
+      },
+      {
+        "score": 58.96,
+        "overall": 81,
+        "percentile": 0.2504458093917179
+      },
+      {
+        "score": 58.97,
+        "overall": 82,
+        "percentile": 0.24985139686942737
+      },
+      {
+        "score": 58.98,
+        "overall": 82,
+        "percentile": 0.2490588468397068
+      },
+      {
+        "score": 58.99,
+        "overall": 82,
+        "percentile": 0.2476718842876957
+      },
+      {
+        "score": 59,
+        "overall": 82,
+        "percentile": 0.24628492173568461
+      },
+      {
+        "score": 59.01,
+        "overall": 82,
+        "percentile": 0.24549237170596394
+      },
+      {
+        "score": 59.02,
+        "overall": 82,
+        "percentile": 0.24489795918367352
+      },
+      {
+        "score": 59.03,
+        "overall": 82,
+        "percentile": 0.24410540915395285
+      },
+      {
+        "score": 59.04,
+        "overall": 82,
+        "percentile": 0.24331285912423217
+      },
+      {
+        "score": 59.05,
+        "overall": 82,
+        "percentile": 0.24271844660194175
+      },
+      {
+        "score": 59.06,
+        "overall": 82,
+        "percentile": 0.24172775906479094
+      },
+      {
+        "score": 59.07,
+        "overall": 82,
+        "percentile": 0.2410342777887854
+      },
+      {
+        "score": 59.08,
+        "overall": 82,
+        "percentile": 0.24053893402020998
+      },
+      {
+        "score": 59.09,
+        "overall": 82,
+        "percentile": 0.23994452149791956
+      },
+      {
+        "score": 59.1,
+        "overall": 82,
+        "percentile": 0.2396473152367743
+      },
+      {
+        "score": 59.11,
+        "overall": 82,
+        "percentile": 0.23885476520705373
+      },
+      {
+        "score": 59.12,
+        "overall": 82,
+        "percentile": 0.23766594016247278
+      },
+      {
+        "score": 59.13,
+        "overall": 82,
+        "percentile": 0.23657618387160695
+      },
+      {
+        "score": 59.14,
+        "overall": 82,
+        "percentile": 0.235486427580741
+      },
+      {
+        "score": 59.15,
+        "overall": 82,
+        "percentile": 0.2344957400435903
+      },
+      {
+        "score": 59.16,
+        "overall": 82,
+        "percentile": 0.23340598375272437
+      },
+      {
+        "score": 59.17,
+        "overall": 82,
+        "percentile": 0.23201902120071327
+      },
+      {
+        "score": 59.18,
+        "overall": 82,
+        "percentile": 0.23063205864870218
+      },
+      {
+        "score": 59.19,
+        "overall": 82,
+        "percentile": 0.22944323360412122
+      },
+      {
+        "score": 59.2,
+        "overall": 83,
+        "percentile": 0.22865068357440066
+      },
+      {
+        "score": 59.21,
+        "overall": 83,
+        "percentile": 0.22805627105211013
+      },
+      {
+        "score": 59.22,
+        "overall": 83,
+        "percentile": 0.2269665147612443
+      },
+      {
+        "score": 59.23,
+        "overall": 83,
+        "percentile": 0.22587675847037847
+      },
+      {
+        "score": 59.24,
+        "overall": 83,
+        "percentile": 0.22478700217951253
+      },
+      {
+        "score": 59.25,
+        "overall": 83,
+        "percentile": 0.22349910838121656
+      },
+      {
+        "score": 59.26,
+        "overall": 83,
+        "percentile": 0.2227065583514959
+      },
+      {
+        "score": 59.27,
+        "overall": 83,
+        "percentile": 0.2222112145829206
+      },
+      {
+        "score": 59.28,
+        "overall": 83,
+        "percentile": 0.22151773330691504
+      },
+      {
+        "score": 59.29,
+        "overall": 83,
+        "percentile": 0.2208242520309095
+      },
+      {
+        "score": 59.3,
+        "overall": 83,
+        "percentile": 0.22022983950861896
+      },
+      {
+        "score": 59.31,
+        "overall": 83,
+        "percentile": 0.21963542698632854
+      },
+      {
+        "score": 59.32,
+        "overall": 83,
+        "percentile": 0.219041014464038
+      },
+      {
+        "score": 59.33,
+        "overall": 83,
+        "percentile": 0.21785218941945705
+      },
+      {
+        "score": 59.34,
+        "overall": 83,
+        "percentile": 0.2166633643748762
+      },
+      {
+        "score": 59.35,
+        "overall": 83,
+        "percentile": 0.21587081434515554
+      },
+      {
+        "score": 59.36,
+        "overall": 83,
+        "percentile": 0.21468198930057458
+      },
+      {
+        "score": 59.37,
+        "overall": 83,
+        "percentile": 0.21369130176342377
+      },
+      {
+        "score": 59.38,
+        "overall": 83,
+        "percentile": 0.2128987517337032
+      },
+      {
+        "score": 59.39,
+        "overall": 83,
+        "percentile": 0.21200713295026752
+      },
+      {
+        "score": 59.4,
+        "overall": 83,
+        "percentile": 0.21111551416683183
+      },
+      {
+        "score": 59.41,
+        "overall": 83,
+        "percentile": 0.21032296413711116
+      },
+      {
+        "score": 59.42,
+        "overall": 83,
+        "percentile": 0.20893600158510006
+      },
+      {
+        "score": 59.43,
+        "overall": 83,
+        "percentile": 0.2076481077868041
+      },
+      {
+        "score": 59.44,
+        "overall": 83,
+        "percentile": 0.2072518327719437
+      },
+      {
+        "score": 59.45,
+        "overall": 83,
+        "percentile": 0.20665742024965328
+      },
+      {
+        "score": 59.46,
+        "overall": 83,
+        "percentile": 0.20596393897364773
+      },
+      {
+        "score": 59.47,
+        "overall": 83,
+        "percentile": 0.20546859520507232
+      },
+      {
+        "score": 59.48,
+        "overall": 83,
+        "percentile": 0.20507232019021204
+      },
+      {
+        "score": 59.49,
+        "overall": 83,
+        "percentile": 0.20467604517535165
+      },
+      {
+        "score": 59.5,
+        "overall": 83,
+        "percentile": 0.20427977016049137
+      },
+      {
+        "score": 59.51,
+        "overall": 83,
+        "percentile": 0.2038834951456311
+      },
+      {
+        "score": 59.53,
+        "overall": 83,
+        "percentile": 0.20338815137705568
+      },
+      {
+        "score": 59.54,
+        "overall": 83,
+        "percentile": 0.20289280760848027
+      },
+      {
+        "score": 59.55,
+        "overall": 83,
+        "percentile": 0.20249653259362
+      },
+      {
+        "score": 59.56,
+        "overall": 83,
+        "percentile": 0.20219932633247473
+      },
+      {
+        "score": 59.57,
+        "overall": 83,
+        "percentile": 0.2020011888250446
+      },
+      {
+        "score": 59.58,
+        "overall": 83,
+        "percentile": 0.20170398256389932
+      },
+      {
+        "score": 59.59,
+        "overall": 83,
+        "percentile": 0.2012086387953239
+      },
+      {
+        "score": 59.6,
+        "overall": 83,
+        "percentile": 0.20071329502674862
+      },
+      {
+        "score": 59.61,
+        "overall": 83,
+        "percentile": 0.19982167624331282
+      },
+      {
+        "score": 59.62,
+        "overall": 83,
+        "percentile": 0.19902912621359226
+      },
+      {
+        "score": 59.63,
+        "overall": 83,
+        "percentile": 0.1983356449375867
+      },
+      {
+        "score": 59.64,
+        "overall": 83,
+        "percentile": 0.19714681989300575
+      },
+      {
+        "score": 59.65,
+        "overall": 83,
+        "percentile": 0.19625520110957007
+      },
+      {
+        "score": 59.66,
+        "overall": 83,
+        "percentile": 0.19556171983356452
+      },
+      {
+        "score": 59.67,
+        "overall": 83,
+        "percentile": 0.19467010105012883
+      },
+      {
+        "score": 59.68,
+        "overall": 83,
+        "percentile": 0.19387755102040816
+      },
+      {
+        "score": 59.69,
+        "overall": 83,
+        "percentile": 0.19328313849811773
+      },
+      {
+        "score": 59.7,
+        "overall": 83,
+        "percentile": 0.1926887259758272
+      },
+      {
+        "score": 59.71,
+        "overall": 83,
+        "percentile": 0.1916980384386764
+      },
+      {
+        "score": 59.72,
+        "overall": 83,
+        "percentile": 0.19090548840895583
+      },
+      {
+        "score": 59.73,
+        "overall": 83,
+        "percentile": 0.19050921339409554
+      },
+      {
+        "score": 59.74,
+        "overall": 83,
+        "percentile": 0.189914800871805
+      },
+      {
+        "score": 59.75,
+        "overall": 83,
+        "percentile": 0.18951852585694473
+      },
+      {
+        "score": 59.76,
+        "overall": 83,
+        "percentile": 0.1893203883495146
+      },
+      {
+        "score": 59.77,
+        "overall": 83,
+        "percentile": 0.18882504458093918
+      },
+      {
+        "score": 59.79,
+        "overall": 83,
+        "percentile": 0.18783435704378837
+      },
+      {
+        "score": 59.8,
+        "overall": 83,
+        "percentile": 0.18684366950663756
+      },
+      {
+        "score": 59.81,
+        "overall": 84,
+        "percentile": 0.186150188230632
+      },
+      {
+        "score": 59.82,
+        "overall": 84,
+        "percentile": 0.1856548444620567
+      },
+      {
+        "score": 59.83,
+        "overall": 84,
+        "percentile": 0.18506043193976618
+      },
+      {
+        "score": 59.84,
+        "overall": 84,
+        "percentile": 0.18426788191004562
+      },
+      {
+        "score": 59.85,
+        "overall": 84,
+        "percentile": 0.1837725381414702
+      },
+      {
+        "score": 59.86,
+        "overall": 84,
+        "percentile": 0.18288091935803452
+      },
+      {
+        "score": 59.87,
+        "overall": 84,
+        "percentile": 0.1818902318208837
+      },
+      {
+        "score": 59.88,
+        "overall": 84,
+        "percentile": 0.1813948880523083
+      },
+      {
+        "score": 59.89,
+        "overall": 84,
+        "percentile": 0.18070140677630275
+      },
+      {
+        "score": 59.9,
+        "overall": 84,
+        "percentile": 0.1800079255002972
+      },
+      {
+        "score": 59.91,
+        "overall": 84,
+        "percentile": 0.17911630671686152
+      },
+      {
+        "score": 59.92,
+        "overall": 84,
+        "percentile": 0.17842282544085597
+      },
+      {
+        "score": 59.93,
+        "overall": 84,
+        "percentile": 0.1781256191797107
+      },
+      {
+        "score": 59.94,
+        "overall": 84,
+        "percentile": 0.1776302754111353
+      },
+      {
+        "score": 59.95,
+        "overall": 84,
+        "percentile": 0.17654051912026947
+      },
+      {
+        "score": 59.96,
+        "overall": 84,
+        "percentile": 0.17554983158311865
+      },
+      {
+        "score": 59.98,
+        "overall": 84,
+        "percentile": 0.1748563503071131
+      },
+      {
+        "score": 60,
+        "overall": 84,
+        "percentile": 0.17426193778482268
+      },
+      {
+        "score": 60.01,
+        "overall": 84,
+        "percentile": 0.1738656627699624
+      },
+      {
+        "score": 60.02,
+        "overall": 84,
+        "percentile": 0.173370319001387
+      },
+      {
+        "score": 60.03,
+        "overall": 84,
+        "percentile": 0.1729740439865266
+      },
+      {
+        "score": 60.04,
+        "overall": 84,
+        "percentile": 0.1724787002179513
+      },
+      {
+        "score": 60.05,
+        "overall": 84,
+        "percentile": 0.17208242520309092
+      },
+      {
+        "score": 60.06,
+        "overall": 84,
+        "percentile": 0.17168615018823064
+      },
+      {
+        "score": 60.07,
+        "overall": 84,
+        "percentile": 0.17089360015850996
+      },
+      {
+        "score": 60.08,
+        "overall": 84,
+        "percentile": 0.16990291262135926
+      },
+      {
+        "score": 60.09,
+        "overall": 84,
+        "percentile": 0.1692094313453537
+      },
+      {
+        "score": 60.1,
+        "overall": 84,
+        "percentile": 0.16881315633049332
+      },
+      {
+        "score": 60.11,
+        "overall": 84,
+        "percentile": 0.16831781256191802
+      },
+      {
+        "score": 60.12,
+        "overall": 84,
+        "percentile": 0.16782246879334262
+      },
+      {
+        "score": 60.13,
+        "overall": 84,
+        "percentile": 0.16712898751733707
+      },
+      {
+        "score": 60.14,
+        "overall": 84,
+        "percentile": 0.16653457499504654
+      },
+      {
+        "score": 60.15,
+        "overall": 84,
+        "percentile": 0.16613829998018625
+      },
+      {
+        "score": 60.16,
+        "overall": 84,
+        "percentile": 0.1654448187041807
+      },
+      {
+        "score": 60.17,
+        "overall": 84,
+        "percentile": 0.16475133742817516
+      },
+      {
+        "score": 60.18,
+        "overall": 84,
+        "percentile": 0.16385971864473947
+      },
+      {
+        "score": 60.19,
+        "overall": 84,
+        "percentile": 0.16316623736873392
+      },
+      {
+        "score": 60.2,
+        "overall": 84,
+        "percentile": 0.16286903110758866
+      },
+      {
+        "score": 60.21,
+        "overall": 84,
+        "percentile": 0.16227461858529824
+      },
+      {
+        "score": 60.22,
+        "overall": 84,
+        "percentile": 0.16148206855557756
+      },
+      {
+        "score": 60.23,
+        "overall": 84,
+        "percentile": 0.16088765603328714
+      },
+      {
+        "score": 60.24,
+        "overall": 84,
+        "percentile": 0.16059044977214187
+      },
+      {
+        "score": 60.25,
+        "overall": 84,
+        "percentile": 0.1602932435109966
+      },
+      {
+        "score": 60.26,
+        "overall": 84,
+        "percentile": 0.1597978997424212
+      },
+      {
+        "score": 60.27,
+        "overall": 84,
+        "percentile": 0.15920348722013078
+      },
+      {
+        "score": 60.28,
+        "overall": 84,
+        "percentile": 0.15851000594412523
+      },
+      {
+        "score": 60.29,
+        "overall": 84,
+        "percentile": 0.15781652466811968
+      },
+      {
+        "score": 60.3,
+        "overall": 84,
+        "percentile": 0.15732118089954428
+      },
+      {
+        "score": 60.31,
+        "overall": 84,
+        "percentile": 0.157023974638399
+      },
+      {
+        "score": 60.32,
+        "overall": 84,
+        "percentile": 0.1564295621161086
+      },
+      {
+        "score": 60.34,
+        "overall": 84,
+        "percentile": 0.15533980582524276
+      },
+      {
+        "score": 60.35,
+        "overall": 84,
+        "percentile": 0.1545472557955221
+      },
+      {
+        "score": 60.36,
+        "overall": 84,
+        "percentile": 0.15385377451951654
+      },
+      {
+        "score": 60.38,
+        "overall": 84,
+        "percentile": 0.1527640182286507
+      },
+      {
+        "score": 60.4,
+        "overall": 84,
+        "percentile": 0.15147612443035463
+      },
+      {
+        "score": 60.41,
+        "overall": 84,
+        "percentile": 0.15048543689320393
+      },
+      {
+        "score": 60.42,
+        "overall": 84,
+        "percentile": 0.14979195561719838
+      },
+      {
+        "score": 60.43,
+        "overall": 84,
+        "percentile": 0.14919754309490785
+      },
+      {
+        "score": 60.44,
+        "overall": 84,
+        "percentile": 0.14880126808004757
+      },
+      {
+        "score": 60.45,
+        "overall": 84,
+        "percentile": 0.14820685555775703
+      },
+      {
+        "score": 60.46,
+        "overall": 84,
+        "percentile": 0.14731523677432135
+      },
+      {
+        "score": 60.47,
+        "overall": 84,
+        "percentile": 0.1466217554983158
+      },
+      {
+        "score": 60.48,
+        "overall": 84,
+        "percentile": 0.14632454923717064
+      },
+      {
+        "score": 60.49,
+        "overall": 84,
+        "percentile": 0.14582920546859524
+      },
+      {
+        "score": 60.5,
+        "overall": 84,
+        "percentile": 0.1452347929463047
+      },
+      {
+        "score": 60.51,
+        "overall": 84,
+        "percentile": 0.14464038042401428
+      },
+      {
+        "score": 60.52,
+        "overall": 85,
+        "percentile": 0.14404596790172375
+      },
+      {
+        "score": 60.53,
+        "overall": 85,
+        "percentile": 0.14364969288686347
+      },
+      {
+        "score": 60.54,
+        "overall": 85,
+        "percentile": 0.14325341787200319
+      },
+      {
+        "score": 60.56,
+        "overall": 85,
+        "percentile": 0.14275807410342778
+      },
+      {
+        "score": 60.57,
+        "overall": 85,
+        "percentile": 0.1423617990885675
+      },
+      {
+        "score": 60.58,
+        "overall": 85,
+        "percentile": 0.14206459282742223
+      },
+      {
+        "score": 60.59,
+        "overall": 85,
+        "percentile": 0.14156924905884682
+      },
+      {
+        "score": 60.6,
+        "overall": 85,
+        "percentile": 0.1409748365365564
+      },
+      {
+        "score": 60.61,
+        "overall": 85,
+        "percentile": 0.140479492767981
+      },
+      {
+        "score": 60.62,
+        "overall": 85,
+        "percentile": 0.14018228650683573
+      },
+      {
+        "score": 60.63,
+        "overall": 85,
+        "percentile": 0.13988508024569046
+      },
+      {
+        "score": 60.64,
+        "overall": 85,
+        "percentile": 0.13919159896968492
+      },
+      {
+        "score": 60.65,
+        "overall": 85,
+        "percentile": 0.1385971864473945
+      },
+      {
+        "score": 60.66,
+        "overall": 85,
+        "percentile": 0.13829998018624923
+      },
+      {
+        "score": 60.67,
+        "overall": 85,
+        "percentile": 0.13800277392510407
+      },
+      {
+        "score": 60.68,
+        "overall": 85,
+        "percentile": 0.13780463641767382
+      },
+      {
+        "score": 60.69,
+        "overall": 85,
+        "percentile": 0.13701208638795326
+      },
+      {
+        "score": 60.7,
+        "overall": 85,
+        "percentile": 0.13602139885080244
+      },
+      {
+        "score": 60.72,
+        "overall": 85,
+        "percentile": 0.13542698632851202
+      },
+      {
+        "score": 60.73,
+        "overall": 85,
+        "percentile": 0.13473350505250647
+      },
+      {
+        "score": 60.74,
+        "overall": 85,
+        "percentile": 0.1339409550227858
+      },
+      {
+        "score": 60.75,
+        "overall": 85,
+        "percentile": 0.1334456112542104
+      },
+      {
+        "score": 60.76,
+        "overall": 85,
+        "percentile": 0.132950267485635
+      },
+      {
+        "score": 60.77,
+        "overall": 85,
+        "percentile": 0.13215771745591443
+      },
+      {
+        "score": 60.78,
+        "overall": 85,
+        "percentile": 0.13146423617990888
+      },
+      {
+        "score": 60.79,
+        "overall": 85,
+        "percentile": 0.1306716861501882
+      },
+      {
+        "score": 60.81,
+        "overall": 85,
+        "percentile": 0.12997820487418266
+      },
+      {
+        "score": 60.83,
+        "overall": 85,
+        "percentile": 0.12948286110560725
+      },
+      {
+        "score": 60.84,
+        "overall": 85,
+        "percentile": 0.12908658609074697
+      },
+      {
+        "score": 60.85,
+        "overall": 85,
+        "percentile": 0.12849217356845655
+      },
+      {
+        "score": 60.86,
+        "overall": 85,
+        "percentile": 0.12789776104616601
+      },
+      {
+        "score": 60.87,
+        "overall": 85,
+        "percentile": 0.12760055478502086
+      },
+      {
+        "score": 60.88,
+        "overall": 85,
+        "percentile": 0.12720427977016047
+      },
+      {
+        "score": 60.89,
+        "overall": 85,
+        "percentile": 0.1269070735090153
+      },
+      {
+        "score": 60.9,
+        "overall": 85,
+        "percentile": 0.12670893600158506
+      },
+      {
+        "score": 60.91,
+        "overall": 85,
+        "percentile": 0.12611452347929464
+      },
+      {
+        "score": 60.92,
+        "overall": 85,
+        "percentile": 0.1254210422032891
+      },
+      {
+        "score": 60.93,
+        "overall": 85,
+        "percentile": 0.12512383594214382
+      },
+      {
+        "score": 60.94,
+        "overall": 85,
+        "percentile": 0.12472756092728354
+      },
+      {
+        "score": 60.95,
+        "overall": 85,
+        "percentile": 0.12393501089756287
+      },
+      {
+        "score": 60.96,
+        "overall": 85,
+        "percentile": 0.12334059837527245
+      },
+      {
+        "score": 60.98,
+        "overall": 85,
+        "percentile": 0.12304339211412718
+      },
+      {
+        "score": 60.99,
+        "overall": 86,
+        "percentile": 0.1226471170992669
+      },
+      {
+        "score": 61,
+        "overall": 86,
+        "percentile": 0.12234991083812163
+      },
+      {
+        "score": 61.01,
+        "overall": 86,
+        "percentile": 0.1221517733306915
+      },
+      {
+        "score": 61.02,
+        "overall": 86,
+        "percentile": 0.12185456706954623
+      },
+      {
+        "score": 61.03,
+        "overall": 86,
+        "percentile": 0.12155736080840107
+      },
+      {
+        "score": 61.04,
+        "overall": 86,
+        "percentile": 0.12135922330097082
+      },
+      {
+        "score": 61.05,
+        "overall": 86,
+        "percentile": 0.12106201703982566
+      },
+      {
+        "score": 61.07,
+        "overall": 86,
+        "percentile": 0.12056667327125026
+      },
+      {
+        "score": 61.08,
+        "overall": 86,
+        "percentile": 0.12007132950267485
+      },
+      {
+        "score": 61.1,
+        "overall": 86,
+        "percentile": 0.1193778482266693
+      },
+      {
+        "score": 61.11,
+        "overall": 86,
+        "percentile": 0.11868436695066376
+      },
+      {
+        "score": 61.12,
+        "overall": 86,
+        "percentile": 0.11808995442837333
+      },
+      {
+        "score": 61.13,
+        "overall": 86,
+        "percentile": 0.11759461065979793
+      },
+      {
+        "score": 61.14,
+        "overall": 86,
+        "percentile": 0.11719833564493753
+      },
+      {
+        "score": 61.15,
+        "overall": 86,
+        "percentile": 0.11680206063007725
+      },
+      {
+        "score": 61.16,
+        "overall": 86,
+        "percentile": 0.11660392312264711
+      },
+      {
+        "score": 61.17,
+        "overall": 86,
+        "percentile": 0.11640578561521697
+      },
+      {
+        "score": 61.18,
+        "overall": 86,
+        "percentile": 0.11600951060035669
+      },
+      {
+        "score": 61.19,
+        "overall": 86,
+        "percentile": 0.11541509807806616
+      },
+      {
+        "score": 61.2,
+        "overall": 86,
+        "percentile": 0.11501882306320588
+      },
+      {
+        "score": 61.22,
+        "overall": 86,
+        "percentile": 0.11472161680206061
+      },
+      {
+        "score": 61.25,
+        "overall": 86,
+        "percentile": 0.11442441054091534
+      },
+      {
+        "score": 61.26,
+        "overall": 86,
+        "percentile": 0.11412720427977019
+      },
+      {
+        "score": 61.27,
+        "overall": 86,
+        "percentile": 0.1137309292649098
+      },
+      {
+        "score": 61.28,
+        "overall": 86,
+        "percentile": 0.1132355854963345
+      },
+      {
+        "score": 61.29,
+        "overall": 86,
+        "percentile": 0.11264117297404397
+      },
+      {
+        "score": 61.3,
+        "overall": 86,
+        "percentile": 0.11224489795918369
+      },
+      {
+        "score": 61.31,
+        "overall": 86,
+        "percentile": 0.11174955419060828
+      },
+      {
+        "score": 61.32,
+        "overall": 86,
+        "percentile": 0.1109570041608876
+      },
+      {
+        "score": 61.33,
+        "overall": 86,
+        "percentile": 0.11036259163859719
+      },
+      {
+        "score": 61.34,
+        "overall": 86,
+        "percentile": 0.1099663166237369
+      },
+      {
+        "score": 61.35,
+        "overall": 86,
+        "percentile": 0.10966911036259164
+      },
+      {
+        "score": 61.37,
+        "overall": 86,
+        "percentile": 0.10927283534773136
+      },
+      {
+        "score": 61.39,
+        "overall": 87,
+        "percentile": 0.10877749157915595
+      },
+      {
+        "score": 61.41,
+        "overall": 87,
+        "percentile": 0.10838121656429567
+      },
+      {
+        "score": 61.42,
+        "overall": 87,
+        "percentile": 0.1080840103031504
+      },
+      {
+        "score": 61.44,
+        "overall": 87,
+        "percentile": 0.10788587279572026
+      },
+      {
+        "score": 61.45,
+        "overall": 87,
+        "percentile": 0.10729146027342973
+      },
+      {
+        "score": 61.46,
+        "overall": 87,
+        "percentile": 0.10649891024370917
+      },
+      {
+        "score": 61.48,
+        "overall": 87,
+        "percentile": 0.10600356647513376
+      },
+      {
+        "score": 61.49,
+        "overall": 87,
+        "percentile": 0.10560729146027348
+      },
+      {
+        "score": 61.5,
+        "overall": 87,
+        "percentile": 0.10511194769169807
+      },
+      {
+        "score": 61.52,
+        "overall": 87,
+        "percentile": 0.10441846641569252
+      },
+      {
+        "score": 61.54,
+        "overall": 87,
+        "percentile": 0.10362591638597185
+      },
+      {
+        "score": 61.58,
+        "overall": 87,
+        "percentile": 0.10303150386368143
+      },
+      {
+        "score": 61.6,
+        "overall": 87,
+        "percentile": 0.10253616009510602
+      },
+      {
+        "score": 61.61,
+        "overall": 87,
+        "percentile": 0.10213988508024574
+      },
+      {
+        "score": 61.62,
+        "overall": 87,
+        "percentile": 0.10194174757281549
+      },
+      {
+        "score": 61.63,
+        "overall": 87,
+        "percentile": 0.10174361006538535
+      },
+      {
+        "score": 61.64,
+        "overall": 87,
+        "percentile": 0.10134733505052507
+      },
+      {
+        "score": 61.65,
+        "overall": 87,
+        "percentile": 0.10095106003566479
+      },
+      {
+        "score": 61.67,
+        "overall": 87,
+        "percentile": 0.10075292252823465
+      },
+      {
+        "score": 61.68,
+        "overall": 87,
+        "percentile": 0.10045571626708938
+      },
+      {
+        "score": 61.71,
+        "overall": 87,
+        "percentile": 0.10015851000594411
+      },
+      {
+        "score": 61.72,
+        "overall": 87,
+        "percentile": 0.0996631662373687
+      },
+      {
+        "score": 61.73,
+        "overall": 87,
+        "percentile": 0.0991678224687933
+      },
+      {
+        "score": 61.74,
+        "overall": 87,
+        "percentile": 0.09896968496136316
+      },
+      {
+        "score": 61.75,
+        "overall": 87,
+        "percentile": 0.09857340994650288
+      },
+      {
+        "score": 61.76,
+        "overall": 87,
+        "percentile": 0.09797899742421246
+      },
+      {
+        "score": 61.77,
+        "overall": 87,
+        "percentile": 0.09748365365563705
+      },
+      {
+        "score": 61.79,
+        "overall": 87,
+        "percentile": 0.09708737864077666
+      },
+      {
+        "score": 61.8,
+        "overall": 87,
+        "percentile": 0.09669110362591637
+      },
+      {
+        "score": 61.82,
+        "overall": 87,
+        "percentile": 0.09619575985734097
+      },
+      {
+        "score": 61.83,
+        "overall": 87,
+        "percentile": 0.09570041608876556
+      },
+      {
+        "score": 61.84,
+        "overall": 87,
+        "percentile": 0.09530414107390528
+      },
+      {
+        "score": 61.85,
+        "overall": 87,
+        "percentile": 0.09500693481276001
+      },
+      {
+        "score": 61.86,
+        "overall": 87,
+        "percentile": 0.09461065979789973
+      },
+      {
+        "score": 61.87,
+        "overall": 87,
+        "percentile": 0.09371904101446404
+      },
+      {
+        "score": 61.88,
+        "overall": 87,
+        "percentile": 0.09292649098474337
+      },
+      {
+        "score": 61.89,
+        "overall": 87,
+        "percentile": 0.09262928472359822
+      },
+      {
+        "score": 61.9,
+        "overall": 87,
+        "percentile": 0.09213394095502281
+      },
+      {
+        "score": 61.91,
+        "overall": 87,
+        "percentile": 0.09144045967901726
+      },
+      {
+        "score": 61.93,
+        "overall": 87,
+        "percentile": 0.09074697840301171
+      },
+      {
+        "score": 61.94,
+        "overall": 87,
+        "percentile": 0.08995442837329104
+      },
+      {
+        "score": 61.95,
+        "overall": 87,
+        "percentile": 0.08945908460471563
+      },
+      {
+        "score": 61.96,
+        "overall": 87,
+        "percentile": 0.08916187834357048
+      },
+      {
+        "score": 61.97,
+        "overall": 87,
+        "percentile": 0.08886467208242521
+      },
+      {
+        "score": 61.98,
+        "overall": 87,
+        "percentile": 0.08866653457499507
+      },
+      {
+        "score": 62,
+        "overall": 87,
+        "percentile": 0.0883693283138498
+      },
+      {
+        "score": 62.01,
+        "overall": 87,
+        "percentile": 0.08777491579155938
+      },
+      {
+        "score": 62.02,
+        "overall": 87,
+        "percentile": 0.08727957202298398
+      },
+      {
+        "score": 62.03,
+        "overall": 87,
+        "percentile": 0.08708143451555383
+      },
+      {
+        "score": 62.04,
+        "overall": 87,
+        "percentile": 0.08678422825440857
+      },
+      {
+        "score": 62.06,
+        "overall": 87,
+        "percentile": 0.0864870219932633
+      },
+      {
+        "score": 62.07,
+        "overall": 87,
+        "percentile": 0.08618981573211804
+      },
+      {
+        "score": 62.08,
+        "overall": 87,
+        "percentile": 0.08569447196354274
+      },
+      {
+        "score": 62.1,
+        "overall": 87,
+        "percentile": 0.08519912819496733
+      },
+      {
+        "score": 62.11,
+        "overall": 87,
+        "percentile": 0.08490192193382207
+      },
+      {
+        "score": 62.12,
+        "overall": 87,
+        "percentile": 0.0846047156726768
+      },
+      {
+        "score": 62.13,
+        "overall": 87,
+        "percentile": 0.08430750941153164
+      },
+      {
+        "score": 62.15,
+        "overall": 87,
+        "percentile": 0.0841093719041014
+      },
+      {
+        "score": 62.17,
+        "overall": 87,
+        "percentile": 0.08381216564295624
+      },
+      {
+        "score": 62.18,
+        "overall": 87,
+        "percentile": 0.08331682187438083
+      },
+      {
+        "score": 62.19,
+        "overall": 87,
+        "percentile": 0.08282147810580542
+      },
+      {
+        "score": 62.21,
+        "overall": 87,
+        "percentile": 0.08242520309094514
+      },
+      {
+        "score": 62.22,
+        "overall": 87,
+        "percentile": 0.08202892807608475
+      },
+      {
+        "score": 62.23,
+        "overall": 87,
+        "percentile": 0.08153358430750945
+      },
+      {
+        "score": 62.24,
+        "overall": 87,
+        "percentile": 0.08093917178521892
+      },
+      {
+        "score": 62.25,
+        "overall": 88,
+        "percentile": 0.08024569050921337
+      },
+      {
+        "score": 62.27,
+        "overall": 88,
+        "percentile": 0.07945314047949281
+      },
+      {
+        "score": 62.31,
+        "overall": 88,
+        "percentile": 0.07885872795720228
+      },
+      {
+        "score": 62.32,
+        "overall": 88,
+        "percentile": 0.07856152169605701
+      },
+      {
+        "score": 62.34,
+        "overall": 88,
+        "percentile": 0.07826431543491186
+      },
+      {
+        "score": 62.35,
+        "overall": 88,
+        "percentile": 0.07796710917376659
+      },
+      {
+        "score": 62.36,
+        "overall": 88,
+        "percentile": 0.07776897166633645
+      },
+      {
+        "score": 62.37,
+        "overall": 88,
+        "percentile": 0.07757083415890631
+      },
+      {
+        "score": 62.38,
+        "overall": 88,
+        "percentile": 0.07727362789776104
+      },
+      {
+        "score": 62.4,
+        "overall": 88,
+        "percentile": 0.07677828412918564
+      },
+      {
+        "score": 62.41,
+        "overall": 88,
+        "percentile": 0.07638200911432536
+      },
+      {
+        "score": 62.42,
+        "overall": 88,
+        "percentile": 0.07608480285318009
+      },
+      {
+        "score": 62.43,
+        "overall": 88,
+        "percentile": 0.07578759659203482
+      },
+      {
+        "score": 62.44,
+        "overall": 88,
+        "percentile": 0.07558945908460468
+      },
+      {
+        "score": 62.45,
+        "overall": 88,
+        "percentile": 0.0751931840697444
+      },
+      {
+        "score": 62.47,
+        "overall": 88,
+        "percentile": 0.074697840301169
+      },
+      {
+        "score": 62.49,
+        "overall": 88,
+        "percentile": 0.07440063404002373
+      },
+      {
+        "score": 62.5,
+        "overall": 88,
+        "percentile": 0.07410342777887857
+      },
+      {
+        "score": 62.51,
+        "overall": 88,
+        "percentile": 0.07350901525658804
+      },
+      {
+        "score": 62.52,
+        "overall": 88,
+        "percentile": 0.07291460273429762
+      },
+      {
+        "score": 62.53,
+        "overall": 88,
+        "percentile": 0.07241925896572221
+      },
+      {
+        "score": 62.54,
+        "overall": 88,
+        "percentile": 0.0719239151971468
+      },
+      {
+        "score": 62.56,
+        "overall": 88,
+        "percentile": 0.07152764018228652
+      },
+      {
+        "score": 62.57,
+        "overall": 88,
+        "percentile": 0.07123043392114126
+      },
+      {
+        "score": 62.58,
+        "overall": 88,
+        "percentile": 0.07103229641371112
+      },
+      {
+        "score": 62.59,
+        "overall": 88,
+        "percentile": 0.07063602139885083
+      },
+      {
+        "score": 62.6,
+        "overall": 88,
+        "percentile": 0.07023974638399044
+      },
+      {
+        "score": 62.62,
+        "overall": 88,
+        "percentile": 0.0700416088765603
+      },
+      {
+        "score": 62.64,
+        "overall": 88,
+        "percentile": 0.06974440261541515
+      },
+      {
+        "score": 62.65,
+        "overall": 88,
+        "percentile": 0.06934812760055475
+      },
+      {
+        "score": 62.66,
+        "overall": 88,
+        "percentile": 0.06885278383197935
+      },
+      {
+        "score": 62.67,
+        "overall": 88,
+        "percentile": 0.06835744006340405
+      },
+      {
+        "score": 62.7,
+        "overall": 88,
+        "percentile": 0.06786209629482864
+      },
+      {
+        "score": 62.72,
+        "overall": 88,
+        "percentile": 0.06726768377253811
+      },
+      {
+        "score": 62.73,
+        "overall": 88,
+        "percentile": 0.06687140875767783
+      },
+      {
+        "score": 62.74,
+        "overall": 88,
+        "percentile": 0.06667327125024769
+      },
+      {
+        "score": 62.76,
+        "overall": 88,
+        "percentile": 0.06647513374281755
+      },
+      {
+        "score": 62.78,
+        "overall": 88,
+        "percentile": 0.06617792748167228
+      },
+      {
+        "score": 62.82,
+        "overall": 88,
+        "percentile": 0.065781652466812
+      },
+      {
+        "score": 62.83,
+        "overall": 88,
+        "percentile": 0.0652863086982366
+      },
+      {
+        "score": 62.87,
+        "overall": 88,
+        "percentile": 0.06479096492966119
+      },
+      {
+        "score": 62.88,
+        "overall": 88,
+        "percentile": 0.06449375866851592
+      },
+      {
+        "score": 62.89,
+        "overall": 88,
+        "percentile": 0.06429562116108578
+      },
+      {
+        "score": 62.9,
+        "overall": 88,
+        "percentile": 0.06409748365365564
+      },
+      {
+        "score": 62.91,
+        "overall": 88,
+        "percentile": 0.0638993461462255
+      },
+      {
+        "score": 62.92,
+        "overall": 88,
+        "percentile": 0.06340400237765009
+      },
+      {
+        "score": 62.93,
+        "overall": 88,
+        "percentile": 0.06290865860907469
+      },
+      {
+        "score": 62.94,
+        "overall": 88,
+        "percentile": 0.0625123835942144
+      },
+      {
+        "score": 62.97,
+        "overall": 88,
+        "percentile": 0.06191797107192387
+      },
+      {
+        "score": 62.98,
+        "overall": 88,
+        "percentile": 0.06132355854963345
+      },
+      {
+        "score": 63,
+        "overall": 88,
+        "percentile": 0.06072914602734303
+      },
+      {
+        "score": 63.01,
+        "overall": 88,
+        "percentile": 0.06023380225876762
+      },
+      {
+        "score": 63.02,
+        "overall": 88,
+        "percentile": 0.059936595997622355
+      },
+      {
+        "score": 63.04,
+        "overall": 88,
+        "percentile": 0.059738458490192214
+      },
+      {
+        "score": 63.05,
+        "overall": 88,
+        "percentile": 0.059540320982762074
+      },
+      {
+        "score": 63.06,
+        "overall": 88,
+        "percentile": 0.05924311472161681
+      },
+      {
+        "score": 63.07,
+        "overall": 88,
+        "percentile": 0.058846839706756526
+      },
+      {
+        "score": 63.08,
+        "overall": 88,
+        "percentile": 0.05854963344561126
+      },
+      {
+        "score": 63.09,
+        "overall": 88,
+        "percentile": 0.058252427184465994
+      },
+      {
+        "score": 63.12,
+        "overall": 88,
+        "percentile": 0.05775708341589059
+      },
+      {
+        "score": 63.13,
+        "overall": 88,
+        "percentile": 0.057360808401030305
+      },
+      {
+        "score": 63.15,
+        "overall": 88,
+        "percentile": 0.057162670893600165
+      },
+      {
+        "score": 63.16,
+        "overall": 88,
+        "percentile": 0.0568654646324549
+      },
+      {
+        "score": 63.19,
+        "overall": 88,
+        "percentile": 0.05637012086387949
+      },
+      {
+        "score": 63.2,
+        "overall": 88,
+        "percentile": 0.05577570834158907
+      },
+      {
+        "score": 63.22,
+        "overall": 88,
+        "percentile": 0.05537943332672879
+      },
+      {
+        "score": 63.23,
+        "overall": 88,
+        "percentile": 0.05508222706558352
+      },
+      {
+        "score": 63.24,
+        "overall": 88,
+        "percentile": 0.054785020804438256
+      },
+      {
+        "score": 63.25,
+        "overall": 88,
+        "percentile": 0.054586883297008115
+      },
+      {
+        "score": 63.26,
+        "overall": 88,
+        "percentile": 0.05428967703586285
+      },
+      {
+        "score": 63.27,
+        "overall": 88,
+        "percentile": 0.05379433326728755
+      },
+      {
+        "score": 63.28,
+        "overall": 88,
+        "percentile": 0.053298989498712146
+      },
+      {
+        "score": 63.3,
+        "overall": 88,
+        "percentile": 0.05300178323756688
+      },
+      {
+        "score": 63.31,
+        "overall": 88,
+        "percentile": 0.05280364573013674
+      },
+      {
+        "score": 63.33,
+        "overall": 88,
+        "percentile": 0.0526055082227066
+      },
+      {
+        "score": 63.34,
+        "overall": 88,
+        "percentile": 0.05240737071527635
+      },
+      {
+        "score": 63.35,
+        "overall": 88,
+        "percentile": 0.052209233207846206
+      },
+      {
+        "score": 63.38,
+        "overall": 89,
+        "percentile": 0.05191202694670105
+      },
+      {
+        "score": 63.41,
+        "overall": 89,
+        "percentile": 0.051614820685555785
+      },
+      {
+        "score": 63.45,
+        "overall": 89,
+        "percentile": 0.051416683178125644
+      },
+      {
+        "score": 63.49,
+        "overall": 89,
+        "percentile": 0.05111947691698038
+      },
+      {
+        "score": 63.5,
+        "overall": 89,
+        "percentile": 0.05082227065583511
+      },
+      {
+        "score": 63.51,
+        "overall": 89,
+        "percentile": 0.050525064394689956
+      },
+      {
+        "score": 63.53,
+        "overall": 89,
+        "percentile": 0.05022785813354469
+      },
+      {
+        "score": 63.56,
+        "overall": 89,
+        "percentile": 0.05002972062611455
+      },
+      {
+        "score": 63.58,
+        "overall": 89,
+        "percentile": 0.04963344561125416
+      },
+      {
+        "score": 63.59,
+        "overall": 89,
+        "percentile": 0.049237170596393875
+      },
+      {
+        "score": 63.6,
+        "overall": 89,
+        "percentile": 0.049039033088963735
+      },
+      {
+        "score": 63.62,
+        "overall": 89,
+        "percentile": 0.048642758074103454
+      },
+      {
+        "score": 63.63,
+        "overall": 89,
+        "percentile": 0.04824648305924306
+      },
+      {
+        "score": 63.64,
+        "overall": 89,
+        "percentile": 0.04804834555181292
+      },
+      {
+        "score": 63.65,
+        "overall": 89,
+        "percentile": 0.04785020804438278
+      },
+      {
+        "score": 63.67,
+        "overall": 89,
+        "percentile": 0.04765207053695264
+      },
+      {
+        "score": 63.68,
+        "overall": 89,
+        "percentile": 0.04735486427580737
+      },
+      {
+        "score": 63.71,
+        "overall": 89,
+        "percentile": 0.04695858926094709
+      },
+      {
+        "score": 63.72,
+        "overall": 89,
+        "percentile": 0.046661382999801826
+      },
+      {
+        "score": 63.74,
+        "overall": 89,
+        "percentile": 0.046463245492371685
+      },
+      {
+        "score": 63.76,
+        "overall": 89,
+        "percentile": 0.046265107984941545
+      },
+      {
+        "score": 63.77,
+        "overall": 89,
+        "percentile": 0.046066970477511404
+      },
+      {
+        "score": 63.79,
+        "overall": 89,
+        "percentile": 0.045868832970081264
+      },
+      {
+        "score": 63.8,
+        "overall": 89,
+        "percentile": 0.04567069546265112
+      },
+      {
+        "score": 63.81,
+        "overall": 89,
+        "percentile": 0.04547255795522087
+      },
+      {
+        "score": 63.87,
+        "overall": 89,
+        "percentile": 0.04527442044779073
+      },
+      {
+        "score": 63.9,
+        "overall": 89,
+        "percentile": 0.04507628294036059
+      },
+      {
+        "score": 63.91,
+        "overall": 89,
+        "percentile": 0.044779076679215324
+      },
+      {
+        "score": 63.92,
+        "overall": 89,
+        "percentile": 0.04448187041807017
+      },
+      {
+        "score": 63.95,
+        "overall": 89,
+        "percentile": 0.04428373291064003
+      },
+      {
+        "score": 63.97,
+        "overall": 89,
+        "percentile": 0.044085595403209776
+      },
+      {
+        "score": 63.99,
+        "overall": 89,
+        "percentile": 0.04378838914206462
+      },
+      {
+        "score": 64,
+        "overall": 89,
+        "percentile": 0.043293045373489214
+      },
+      {
+        "score": 64.01,
+        "overall": 89,
+        "percentile": 0.04289677035862893
+      },
+      {
+        "score": 64.03,
+        "overall": 89,
+        "percentile": 0.04269863285119868
+      },
+      {
+        "score": 64.08,
+        "overall": 89,
+        "percentile": 0.042401426590053526
+      },
+      {
+        "score": 64.11,
+        "overall": 89,
+        "percentile": 0.04210422032890826
+      },
+      {
+        "score": 64.13,
+        "overall": 89,
+        "percentile": 0.04190608282147812
+      },
+      {
+        "score": 64.15,
+        "overall": 89,
+        "percentile": 0.04170794531404798
+      },
+      {
+        "score": 64.22,
+        "overall": 89,
+        "percentile": 0.04150980780661784
+      },
+      {
+        "score": 64.26,
+        "overall": 89,
+        "percentile": 0.041311670299187586
+      },
+      {
+        "score": 64.27,
+        "overall": 89,
+        "percentile": 0.04101446403804243
+      },
+      {
+        "score": 64.3,
+        "overall": 89,
+        "percentile": 0.040717257776897164
+      },
+      {
+        "score": 64.31,
+        "overall": 89,
+        "percentile": 0.040519120269467024
+      },
+      {
+        "score": 64.32,
+        "overall": 89,
+        "percentile": 0.04032098276203688
+      },
+      {
+        "score": 64.34,
+        "overall": 89,
+        "percentile": 0.03992470774717649
+      },
+      {
+        "score": 64.37,
+        "overall": 89,
+        "percentile": 0.03952843273231621
+      },
+      {
+        "score": 64.4,
+        "overall": 89,
+        "percentile": 0.03933029522488607
+      },
+      {
+        "score": 64.42,
+        "overall": 89,
+        "percentile": 0.0390330889637408
+      },
+      {
+        "score": 64.43,
+        "overall": 89,
+        "percentile": 0.03873588270259565
+      },
+      {
+        "score": 64.44,
+        "overall": 89,
+        "percentile": 0.038537745195165396
+      },
+      {
+        "score": 64.46,
+        "overall": 89,
+        "percentile": 0.038339607687735255
+      },
+      {
+        "score": 64.47,
+        "overall": 89,
+        "percentile": 0.038141470180305115
+      },
+      {
+        "score": 64.48,
+        "overall": 90,
+        "percentile": 0.03784426391915985
+      },
+      {
+        "score": 64.52,
+        "overall": 90,
+        "percentile": 0.03734892015058455
+      },
+      {
+        "score": 64.53,
+        "overall": 90,
+        "percentile": 0.03695264513572416
+      },
+      {
+        "score": 64.59,
+        "overall": 90,
+        "percentile": 0.036655438874579005
+      },
+      {
+        "score": 64.63,
+        "overall": 90,
+        "percentile": 0.03635823261343374
+      },
+      {
+        "score": 64.64,
+        "overall": 90,
+        "percentile": 0.03596195759857346
+      },
+      {
+        "score": 64.66,
+        "overall": 90,
+        "percentile": 0.035565682583713065
+      },
+      {
+        "score": 64.68,
+        "overall": 90,
+        "percentile": 0.035367545076282925
+      },
+      {
+        "score": 64.69,
+        "overall": 90,
+        "percentile": 0.035169407568852784
+      },
+      {
+        "score": 64.73,
+        "overall": 90,
+        "percentile": 0.0347731325539925
+      },
+      {
+        "score": 64.75,
+        "overall": 90,
+        "percentile": 0.03437685753913211
+      },
+      {
+        "score": 64.76,
+        "overall": 90,
+        "percentile": 0.034079651277986955
+      },
+      {
+        "score": 64.77,
+        "overall": 91,
+        "percentile": 0.03378244501684169
+      },
+      {
+        "score": 64.79,
+        "overall": 91,
+        "percentile": 0.03358430750941155
+      },
+      {
+        "score": 64.8,
+        "overall": 91,
+        "percentile": 0.03328710124826628
+      },
+      {
+        "score": 64.81,
+        "overall": 91,
+        "percentile": 0.032989894987121016
+      },
+      {
+        "score": 64.82,
+        "overall": 91,
+        "percentile": 0.03269268872597586
+      },
+      {
+        "score": 64.83,
+        "overall": 91,
+        "percentile": 0.032395482464830594
+      },
+      {
+        "score": 64.84,
+        "overall": 91,
+        "percentile": 0.03219734495740045
+      },
+      {
+        "score": 64.85,
+        "overall": 91,
+        "percentile": 0.03199920744997031
+      },
+      {
+        "score": 64.86,
+        "overall": 91,
+        "percentile": 0.03180106994254017
+      },
+      {
+        "score": 64.88,
+        "overall": 91,
+        "percentile": 0.03160293243510992
+      },
+      {
+        "score": 64.89,
+        "overall": 91,
+        "percentile": 0.031305726173964765
+      },
+      {
+        "score": 64.93,
+        "overall": 91,
+        "percentile": 0.0310085199128195
+      },
+      {
+        "score": 64.94,
+        "overall": 91,
+        "percentile": 0.030810382405389358
+      },
+      {
+        "score": 64.96,
+        "overall": 91,
+        "percentile": 0.030612244897959218
+      },
+      {
+        "score": 64.98,
+        "overall": 91,
+        "percentile": 0.030414107390529077
+      },
+      {
+        "score": 65,
+        "overall": 91,
+        "percentile": 0.030215969883098825
+      },
+      {
+        "score": 65.01,
+        "overall": 91,
+        "percentile": 0.030017832375668685
+      },
+      {
+        "score": 65.03,
+        "overall": 91,
+        "percentile": 0.02972062611452353
+      },
+      {
+        "score": 65.07,
+        "overall": 91,
+        "percentile": 0.029423419853378263
+      },
+      {
+        "score": 65.08,
+        "overall": 91,
+        "percentile": 0.029225282345948123
+      },
+      {
+        "score": 65.09,
+        "overall": 91,
+        "percentile": 0.029027144838517982
+      },
+      {
+        "score": 65.11,
+        "overall": 91,
+        "percentile": 0.02882900733108773
+      },
+      {
+        "score": 65.15,
+        "overall": 91,
+        "percentile": 0.028531801069942575
+      },
+      {
+        "score": 65.16,
+        "overall": 91,
+        "percentile": 0.02823459480879731
+      },
+      {
+        "score": 65.18,
+        "overall": 91,
+        "percentile": 0.028036457301367168
+      },
+      {
+        "score": 65.22,
+        "overall": 91,
+        "percentile": 0.0277392510402219
+      },
+      {
+        "score": 65.23,
+        "overall": 91,
+        "percentile": 0.027442044779076635
+      },
+      {
+        "score": 65.24,
+        "overall": 91,
+        "percentile": 0.027243907271646495
+      },
+      {
+        "score": 65.29,
+        "overall": 91,
+        "percentile": 0.027045769764216354
+      },
+      {
+        "score": 65.31,
+        "overall": 91,
+        "percentile": 0.026847632256786214
+      },
+      {
+        "score": 65.36,
+        "overall": 91,
+        "percentile": 0.026649494749356073
+      },
+      {
+        "score": 65.39,
+        "overall": 91,
+        "percentile": 0.026451357241925932
+      },
+      {
+        "score": 65.41,
+        "overall": 91,
+        "percentile": 0.026253219734495792
+      },
+      {
+        "score": 65.44,
+        "overall": 91,
+        "percentile": 0.02605508222706554
+      },
+      {
+        "score": 65.46,
+        "overall": 91,
+        "percentile": 0.025757875965920385
+      },
+      {
+        "score": 65.47,
+        "overall": 92,
+        "percentile": 0.02546066970477512
+      },
+      {
+        "score": 65.49,
+        "overall": 92,
+        "percentile": 0.025163463443629852
+      },
+      {
+        "score": 65.51,
+        "overall": 92,
+        "percentile": 0.024866257182484697
+      },
+      {
+        "score": 65.53,
+        "overall": 92,
+        "percentile": 0.024668119675054445
+      },
+      {
+        "score": 65.56,
+        "overall": 92,
+        "percentile": 0.024469982167624305
+      },
+      {
+        "score": 65.58,
+        "overall": 92,
+        "percentile": 0.024271844660194164
+      },
+      {
+        "score": 65.59,
+        "overall": 92,
+        "percentile": 0.024073707152764023
+      },
+      {
+        "score": 65.6,
+        "overall": 92,
+        "percentile": 0.023875569645333883
+      },
+      {
+        "score": 65.61,
+        "overall": 92,
+        "percentile": 0.0234792946304736
+      },
+      {
+        "score": 65.63,
+        "overall": 92,
+        "percentile": 0.02308301961561321
+      },
+      {
+        "score": 65.64,
+        "overall": 92,
+        "percentile": 0.02288488210818307
+      },
+      {
+        "score": 65.66,
+        "overall": 92,
+        "percentile": 0.022587675847037803
+      },
+      {
+        "score": 65.7,
+        "overall": 92,
+        "percentile": 0.022290469585892647
+      },
+      {
+        "score": 65.72,
+        "overall": 92,
+        "percentile": 0.022092332078462507
+      },
+      {
+        "score": 65.77,
+        "overall": 92,
+        "percentile": 0.021894194571032255
+      },
+      {
+        "score": 65.83,
+        "overall": 92,
+        "percentile": 0.021696057063602114
+      },
+      {
+        "score": 65.84,
+        "overall": 92,
+        "percentile": 0.021497919556171974
+      },
+      {
+        "score": 65.86,
+        "overall": 92,
+        "percentile": 0.021299782048741833
+      },
+      {
+        "score": 65.87,
+        "overall": 92,
+        "percentile": 0.021101644541311693
+      },
+      {
+        "score": 65.92,
+        "overall": 92,
+        "percentile": 0.020903507033881552
+      },
+      {
+        "score": 65.93,
+        "overall": 92,
+        "percentile": 0.02070536952645141
+      },
+      {
+        "score": 65.96,
+        "overall": 92,
+        "percentile": 0.02050723201902116
+      },
+      {
+        "score": 65.99,
+        "overall": 92,
+        "percentile": 0.02030909451159102
+      },
+      {
+        "score": 66,
+        "overall": 92,
+        "percentile": 0.02011095700416088
+      },
+      {
+        "score": 66.02,
+        "overall": 92,
+        "percentile": 0.019912819496730738
+      },
+      {
+        "score": 66.03,
+        "overall": 92,
+        "percentile": 0.019714681989300598
+      },
+      {
+        "score": 66.05,
+        "overall": 92,
+        "percentile": 0.01941747572815533
+      },
+      {
+        "score": 66.08,
+        "overall": 92,
+        "percentile": 0.019120269467010065
+      },
+      {
+        "score": 66.09,
+        "overall": 92,
+        "percentile": 0.018922131959579924
+      },
+      {
+        "score": 66.1,
+        "overall": 92,
+        "percentile": 0.018723994452149784
+      },
+      {
+        "score": 66.11,
+        "overall": 92,
+        "percentile": 0.018525856944719643
+      },
+      {
+        "score": 66.14,
+        "overall": 92,
+        "percentile": 0.018327719437289502
+      },
+      {
+        "score": 66.17,
+        "overall": 92,
+        "percentile": 0.018030513176144236
+      },
+      {
+        "score": 66.21,
+        "overall": 92,
+        "percentile": 0.017634238161283955
+      },
+      {
+        "score": 66.23,
+        "overall": 92,
+        "percentile": 0.01733703190013869
+      },
+      {
+        "score": 66.29,
+        "overall": 93,
+        "percentile": 0.017138894392708548
+      },
+      {
+        "score": 66.31,
+        "overall": 93,
+        "percentile": 0.01684168813156328
+      },
+      {
+        "score": 66.32,
+        "overall": 93,
+        "percentile": 0.016544481870418015
+      },
+      {
+        "score": 66.43,
+        "overall": 93,
+        "percentile": 0.01624727560927286
+      },
+      {
+        "score": 66.51,
+        "overall": 93,
+        "percentile": 0.015950069348127593
+      },
+      {
+        "score": 66.52,
+        "overall": 93,
+        "percentile": 0.015751931840697453
+      },
+      {
+        "score": 66.54,
+        "overall": 93,
+        "percentile": 0.015553794333267312
+      },
+      {
+        "score": 66.55,
+        "overall": 93,
+        "percentile": 0.015355656825837172
+      },
+      {
+        "score": 66.56,
+        "overall": 93,
+        "percentile": 0.01515751931840692
+      },
+      {
+        "score": 66.65,
+        "overall": 93,
+        "percentile": 0.01495938181097678
+      },
+      {
+        "score": 66.66,
+        "overall": 93,
+        "percentile": 0.014761244303546639
+      },
+      {
+        "score": 66.86,
+        "overall": 93,
+        "percentile": 0.014563106796116498
+      },
+      {
+        "score": 66.89,
+        "overall": 93,
+        "percentile": 0.014265900534971232
+      },
+      {
+        "score": 66.91,
+        "overall": 93,
+        "percentile": 0.013968694273826077
+      },
+      {
+        "score": 66.92,
+        "overall": 93,
+        "percentile": 0.013770556766395825
+      },
+      {
+        "score": 66.98,
+        "overall": 93,
+        "percentile": 0.013572419258965684
+      },
+      {
+        "score": 66.99,
+        "overall": 93,
+        "percentile": 0.013374281751535544
+      },
+      {
+        "score": 67.09,
+        "overall": 93,
+        "percentile": 0.013176144244105403
+      },
+      {
+        "score": 67.11,
+        "overall": 94,
+        "percentile": 0.012978006736675263
+      },
+      {
+        "score": 67.16,
+        "overall": 94,
+        "percentile": 0.012779869229245122
+      },
+      {
+        "score": 67.17,
+        "overall": 94,
+        "percentile": 0.012581731721814982
+      },
+      {
+        "score": 67.29,
+        "overall": 94,
+        "percentile": 0.01238359421438473
+      },
+      {
+        "score": 67.31,
+        "overall": 94,
+        "percentile": 0.01218545670695459
+      },
+      {
+        "score": 67.37,
+        "overall": 94,
+        "percentile": 0.011987319199524449
+      },
+      {
+        "score": 67.39,
+        "overall": 94,
+        "percentile": 0.011591044184664168
+      },
+      {
+        "score": 67.45,
+        "overall": 94,
+        "percentile": 0.011194769169803886
+      },
+      {
+        "score": 67.66,
+        "overall": 94,
+        "percentile": 0.010996631662373635
+      },
+      {
+        "score": 67.72,
+        "overall": 94,
+        "percentile": 0.010798494154943494
+      },
+      {
+        "score": 67.73,
+        "overall": 94,
+        "percentile": 0.010600356647513354
+      },
+      {
+        "score": 67.81,
+        "overall": 95,
+        "percentile": 0.010402219140083213
+      },
+      {
+        "score": 67.84,
+        "overall": 95,
+        "percentile": 0.010204081632653073
+      },
+      {
+        "score": 67.98,
+        "overall": 95,
+        "percentile": 0.010005944125222932
+      },
+      {
+        "score": 67.99,
+        "overall": 95,
+        "percentile": 0.009807806617792791
+      },
+      {
+        "score": 68,
+        "overall": 95,
+        "percentile": 0.00960966911036254
+      },
+      {
+        "score": 68.02,
+        "overall": 95,
+        "percentile": 0.0094115316029324
+      },
+      {
+        "score": 68.17,
+        "overall": 95,
+        "percentile": 0.009213394095502259
+      },
+      {
+        "score": 68.19,
+        "overall": 95,
+        "percentile": 0.009015256588072118
+      },
+      {
+        "score": 68.25,
+        "overall": 95,
+        "percentile": 0.008817119080641977
+      },
+      {
+        "score": 68.32,
+        "overall": 95,
+        "percentile": 0.008618981573211837
+      },
+      {
+        "score": 68.4,
+        "overall": 95,
+        "percentile": 0.008420844065781696
+      },
+      {
+        "score": 68.45,
+        "overall": 95,
+        "percentile": 0.008222706558351445
+      },
+      {
+        "score": 68.5,
+        "overall": 95,
+        "percentile": 0.008024569050921304
+      },
+      {
+        "score": 68.54,
+        "overall": 95,
+        "percentile": 0.007826431543491164
+      },
+      {
+        "score": 68.65,
+        "overall": 95,
+        "percentile": 0.007628294036061023
+      },
+      {
+        "score": 68.71,
+        "overall": 95,
+        "percentile": 0.007430156528630882
+      },
+      {
+        "score": 68.75,
+        "overall": 95,
+        "percentile": 0.007232019021200742
+      },
+      {
+        "score": 68.84,
+        "overall": 95,
+        "percentile": 0.007033881513770601
+      },
+      {
+        "score": 68.85,
+        "overall": 95,
+        "percentile": 0.00683574400634035
+      },
+      {
+        "score": 68.86,
+        "overall": 95,
+        "percentile": 0.006637606498910209
+      },
+      {
+        "score": 68.93,
+        "overall": 95,
+        "percentile": 0.0064394689914800685
+      },
+      {
+        "score": 69.11,
+        "overall": 95,
+        "percentile": 0.006241331484049928
+      },
+      {
+        "score": 69.21,
+        "overall": 95,
+        "percentile": 0.006043193976619787
+      },
+      {
+        "score": 69.22,
+        "overall": 95,
+        "percentile": 0.005845056469189647
+      },
+      {
+        "score": 69.4,
+        "overall": 95,
+        "percentile": 0.005646918961759506
+      },
+      {
+        "score": 69.47,
+        "overall": 96,
+        "percentile": 0.0054487814543292545
+      },
+      {
+        "score": 69.6,
+        "overall": 96,
+        "percentile": 0.005250643946899114
+      },
+      {
+        "score": 69.69,
+        "overall": 96,
+        "percentile": 0.005052506439468973
+      },
+      {
+        "score": 69.7,
+        "overall": 96,
+        "percentile": 0.004854368932038833
+      },
+      {
+        "score": 69.73,
+        "overall": 96,
+        "percentile": 0.004656231424608692
+      },
+      {
+        "score": 69.8,
+        "overall": 96,
+        "percentile": 0.004458093917178552
+      },
+      {
+        "score": 69.91,
+        "overall": 96,
+        "percentile": 0.004160887656033285
+      },
+      {
+        "score": 69.95,
+        "overall": 96,
+        "percentile": 0.003863681394888019
+      },
+      {
+        "score": 70.05,
+        "overall": 96,
+        "percentile": 0.0036655438874578783
+      },
+      {
+        "score": 70.18,
+        "overall": 96,
+        "percentile": 0.0034674063800277377
+      },
+      {
+        "score": 70.36,
+        "overall": 96,
+        "percentile": 0.003269268872597597
+      },
+      {
+        "score": 70.48,
+        "overall": 96,
+        "percentile": 0.0030711313651674566
+      },
+      {
+        "score": 70.58,
+        "overall": 97,
+        "percentile": 0.002872993857737316
+      },
+      {
+        "score": 70.61,
+        "overall": 97,
+        "percentile": 0.0025757875965920496
+      },
+      {
+        "score": 70.74,
+        "overall": 97,
+        "percentile": 0.002278581335446783
+      },
+      {
+        "score": 70.81,
+        "overall": 98,
+        "percentile": 0.0020804438280166426
+      },
+      {
+        "score": 70.88,
+        "overall": 98,
+        "percentile": 0.001882306320586502
+      },
+      {
+        "score": 71.02,
+        "overall": 98,
+        "percentile": 0.0016841688131563615
+      },
+      {
+        "score": 71.48,
+        "overall": 98,
+        "percentile": 0.0014860313057262209
+      },
+      {
+        "score": 71.52,
+        "overall": 98,
+        "percentile": 0.0012878937982959693
+      },
+      {
+        "score": 71.62,
+        "overall": 98,
+        "percentile": 0.0010897562908658287
+      },
+      {
+        "score": 72.55,
+        "overall": 98,
+        "percentile": 0.0008916187834356881
+      },
+      {
+        "score": 72.88,
+        "overall": 99,
+        "percentile": 0.0006934812760055475
+      },
+      {
+        "score": 72.92,
+        "overall": 99,
+        "percentile": 0.000495343768575407
+      },
+      {
+        "score": 73.34,
+        "overall": 99,
+        "percentile": 0.0002972062611452664
+      },
+      {
+        "score": 74.48,
+        "overall": 99,
+        "percentile": 0
+      }
+    ]
+  },
+  "impactModelVersion": "ratings-model-v3.6",
+  "modelVersion": "ratings-model-v4.0",
+  "ratingsVersion": "ratings-v4.0",
   "benchmarkVersion": "ratings-benchmarks-v1",
   "seedVersion": "ratings-seeds-v1",
   "confidenceTargetSamplesPerContext": 256,
@@ -41905,5 +48841,5 @@
     "rotationMax": 89
   },
   "regressionGates": [],
-  "generatedAt": "2026-09-08T00:57:10.928Z"
+  "generatedAt": "2026-10-05T00:00:00.000Z"
 }

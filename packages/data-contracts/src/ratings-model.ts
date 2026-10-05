@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { overallScaleSchema } from './overall-scale.ts';
 export const ratingArchetypeSchema = z.enum([
   'primaryCreator',
   'secondaryCreator',
@@ -70,24 +71,63 @@ export const calibratedImpactSchema = z.object({
   artifactVersion: z.string().min(1).max(64),
 });
 export type CalibratedImpact = z.infer<typeof calibratedImpactSchema>;
-export const ratingProfileSchema = z.object({
-  schemaVersion: z.literal(2),
-  modelVersion: z.string().min(1).max(64),
-  memberships: archetypeMembershipsSchema,
-  baseScore: z.number().min(0).max(100),
-  nonlinear: nonlinearComponentsSchema,
-  production: productionEvidenceSchema,
-  calibratedImpact: calibratedImpactSchema,
-  canonicalOverall: z.number().int().min(0).max(100),
-  rawOverallScore: z.number().min(-10).max(120),
-  overallPercentile: z.number().min(0).max(1).optional(),
-  overallCohortVersion: z.string().min(1).max(64).optional(),
-  offenseRating: z.number().int().min(0).max(100),
-  defenseRating: z.number().int().min(0).max(100),
+export const overallDiagnosticsSchema = z.object({
+  schemaVersion: z.literal(1),
+  abilityBase: z.number().min(0).max(100),
+  abilityContribution: z.number().min(0).max(100),
+  productionContribution: z.number().min(0).max(100),
+  confidenceWeight: z.number().min(0).max(0.5),
+  rawScore: z.number().min(0).max(100),
+  mappingVersion: z.string().min(1).max(64),
 });
+export const ratingProfileSchema = z
+  .object({
+    schemaVersion: z.union([z.literal(2), z.literal(3)]),
+    overallDiagnostics: overallDiagnosticsSchema.optional(),
+    modelVersion: z.string().min(1).max(64),
+    memberships: archetypeMembershipsSchema,
+    baseScore: z.number().min(0).max(100),
+    nonlinear: nonlinearComponentsSchema,
+    production: productionEvidenceSchema,
+    calibratedImpact: calibratedImpactSchema,
+    canonicalOverall: z.number().int().min(0).max(100),
+    rawOverallScore: z.number().min(-10).max(120),
+    overallPercentile: z.number().min(0).max(1).optional(),
+    overallCohortVersion: z.string().min(1).max(64).optional(),
+    offenseRating: z.number().int().min(0).max(100),
+    defenseRating: z.number().int().min(0).max(100),
+  })
+  .superRefine((profile, context) => {
+    if (profile.schemaVersion === 3 && profile.overallDiagnostics === undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['overallDiagnostics'],
+        message: 'v3 profiles require overall diagnostics',
+      });
+    }
+    const diagnostics = profile.overallDiagnostics;
+    if (
+      diagnostics &&
+      (Math.abs(diagnostics.rawScore - profile.rawOverallScore) > 0.011 ||
+        Math.abs(
+          diagnostics.abilityContribution +
+            diagnostics.productionContribution -
+            diagnostics.rawScore,
+        ) > 0.021 ||
+        Math.abs(diagnostics.confidenceWeight - profile.production.weight) > 0.00001)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['overallDiagnostics'],
+        message: 'overall contributions must reconcile',
+      });
+    }
+  });
 export type RatingProfile = z.infer<typeof ratingProfileSchema>;
 export const ratingsModelArtifactSchema = z.object({
-  schemaVersion: z.literal(2),
+  schemaVersion: z.union([z.literal(2), z.literal(3)]),
+  overallScale: overallScaleSchema.optional(),
+  impactModelVersion: z.string().min(1).max(64).optional(),
   modelVersion: z.string().min(1).max(64),
   ratingsVersion: z.string().min(1).max(64),
   benchmarkVersion: z.string().min(1).max(64),

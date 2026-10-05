@@ -71,6 +71,7 @@ export function buildRatingsModelArtifact(input: {
     confidenceTargetSamplesPerContext: input.artifact.confidenceTargetSamplesPerContext,
     sampleCountPerContext: input.samples,
     playerAdjustments: input.playerAdjustments,
+    impactModelVersion: RATING_MODEL_VERSION,
   });
 }
 function teamMetric(result: ReturnType<typeof simulateGame>, side: 'home' | 'away') {

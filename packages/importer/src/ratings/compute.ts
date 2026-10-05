@@ -12,6 +12,7 @@ import { DEFAULT_SEASONS, RAW_CACHE, ensureOutputDir } from '../config.ts';
 import { clamp, fileExists, parseJsonLoose, readJson, safeFloat, writeJsonRetry } from '../json.ts';
 import { chunkList, defaultWorkerCount, runWorker } from '../shared/worker-pool.ts';
 import { join } from 'node:path';
+import { deriveRatingProfile } from './v3.ts';
 import { deriveTraits } from './traits.ts';
 import { deriveContract } from './contracts.ts';
 import { derivePlayerRecord, fieldPublished, positionGroup, type SeasonContext } from './v2.ts';
@@ -303,7 +304,7 @@ export function pooledRatePriors(
   }
   return priors;
 }
-export function computeForSeason(season: string, force = false): void {
+export function computeForSeason(season: string, force = false, overallOnly = false): void {
   const out = ensureOutputDir(season);
   const rosterPath = `${out}/roster.json`;
   const statsPath = `${out}/season-stats.json`;
@@ -328,7 +329,11 @@ export function computeForSeason(season: string, force = false): void {
   const rosterParsed = z.array(rosterPlayerSchema).safeParse(rosterRaw);
   const statsRaw = readJson(statsPath);
   const statsParsed = z.array(ratingsStatsRowSchema).safeParse(statsRaw);
-  const roster = rosterParsed.success ? rosterParsed.data : [];
+  const roster = rosterParsed.success
+    ? overallOnly
+      ? (rosterRaw as RosterPlayer[])
+      : rosterParsed.data
+    : [];
   const statsList = statsParsed.success ? statsParsed.data : [];
   if (roster.length === 0) {
     console.log(`  ! ${season}: empty roster, skipping`);
@@ -347,6 +352,35 @@ export function computeForSeason(season: string, force = false): void {
     if (typeof pid === 'string' && pid !== '') {
       statsById.set(pid, s);
     }
+  }
+  if (overallOnly) {
+    const artifact = loadRatingsModelArtifact();
+    const era = seasonContext(season);
+    for (const player of roster) {
+      const ratings = simulationRatingsSchema.parse(player.ratings);
+      const tendencies = simulationTendenciesSchema.parse(player.tendencies);
+      const stats = statsById.get(player.externalId ?? '') ?? {};
+      const derived = deriveRatingProfile({
+        ratings,
+        tendencies,
+        stats,
+        position: player.position ?? 'SF',
+        heightInches: safeHeight(player.heightInches),
+        playerId: player.externalId ? `p-${player.externalId}` : (player.id ?? undefined),
+        artifact,
+        eraPace: era.pace,
+        eraThreeRate: era.league3PARate,
+      });
+      player.ratingProfile = ratingProfileSchema.parse(derived.profile);
+      player.summaryRatings = derived.summaryRatings;
+      player.contract = deriveContract(
+        derived.summaryRatings.overallRating,
+        Math.trunc(safeFloat(stats.age ?? player.age, 25)),
+      );
+    }
+    writeJsonRetry(rosterPath, roster);
+    console.log(`  [OK] rebuilt overall for ${String(roster.length)} players in ${season}`);
+    return;
   }
   const evidenceById = loadEvidenceMap(out);
   const context = seasonContext(season);
@@ -451,23 +485,37 @@ export function computeForSeason(season: string, force = false): void {
 export function defaultRatingsWorkers(): number {
   return defaultWorkerCount(8);
 }
-function runRatingsChunk(seasons: readonly string[], force: boolean): Promise<void> {
+function runRatingsChunk(
+  seasons: readonly string[],
+  force: boolean,
+  overallOnly: boolean,
+): Promise<void> {
   return runWorker<undefined>(new URL('./ratings-worker.ts', import.meta.url), {
     seasons: [...seasons],
     force,
+    overallOnly,
   });
 }
-export async function run(seasons?: string[], force = false, workers?: number): Promise<void> {
+export async function run(
+  seasons?: string[],
+  force = false,
+  workers?: number,
+  overallOnly = false,
+): Promise<void> {
   const target = seasons ?? DEFAULT_SEASONS;
   console.log('[ratings] deriving ratings from real stats');
   const workerCount =
     workers === undefined ? defaultRatingsWorkers() : Math.max(1, Math.trunc(workers));
   if (workerCount <= 1 || target.length <= 1) {
     for (const season of target) {
-      computeForSeason(season, force);
+      computeForSeason(season, force || overallOnly, overallOnly);
     }
     return;
   }
-  await Promise.all(chunkList(target, workerCount).map((chunk) => runRatingsChunk(chunk, force)));
+  await Promise.all(
+    chunkList(target, workerCount).map((chunk) =>
+      runRatingsChunk(chunk, force || overallOnly, overallOnly),
+    ),
+  );
 }
 export { fieldPublished };

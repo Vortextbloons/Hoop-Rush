@@ -3,11 +3,12 @@ import { computeForSeason } from './compute.ts';
 const data = workerData as {
   seasons: string[];
   force: boolean;
+  overallOnly: boolean;
 };
 if (parentPort === null) {
   throw new Error('ratings worker must run inside a worker thread');
 }
 for (const season of data.seasons) {
-  computeForSeason(season, data.force);
+  computeForSeason(season, data.force, data.overallOnly);
 }
 parentPort.postMessage({ done: data.seasons.length });

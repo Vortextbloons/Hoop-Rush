@@ -312,6 +312,63 @@ export const simChallengeReportSchema = z.object({
   invariantFailures: z.number().int().nonnegative(),
 });
 export type SimChallengeReport = z.infer<typeof simChallengeReportSchema>;
+const cliSpreadSchema = z.object({
+  mean: z.number().nonnegative(),
+  min: z.number().nonnegative(),
+  max: z.number().nonnegative(),
+  stddev: z.number().nonnegative(),
+});
+const madeAttemptedSpreadSchema = z.object({
+  made: cliSpreadSchema,
+  attempted: cliSpreadSchema,
+});
+export const simChallengeAverageReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('sim challenge-average'),
+  lineup: z.string().min(1).max(320),
+  seed: z.string().min(1).max(64),
+  eraId: z.string().min(1).max(64),
+  attempts: z.number().int().positive(),
+  engineVersion: z.string().min(1).max(64),
+  dataVersion: z.string().min(1).max(64),
+  profileVersion: z.string().min(1).max(64),
+  bracketVersion: z.string().min(1).max(64),
+  scheduleVersion: z.string().min(1).max(64),
+  outcomes: z.object({
+    perfect: z.number().int().nonnegative(),
+    eliminated: z.number().int().nonnegative(),
+  }),
+  record: z.object({
+    wins: cliSpreadSchema,
+    losses: cliSpreadSchema,
+    gamesPlayed: cliSpreadSchema,
+  }),
+  teamPossessions: cliSpreadSchema,
+  playerAverages: z.array(
+    z.object({
+      playerId: z.string().min(1).max(64),
+      gamesPlayed: cliSpreadSchema,
+      minutes: cliSpreadSchema,
+      points: cliSpreadSchema,
+      rebounds: z.object({
+        total: cliSpreadSchema,
+        offensive: cliSpreadSchema,
+        defensive: cliSpreadSchema,
+      }),
+      assists: cliSpreadSchema,
+      steals: cliSpreadSchema,
+      blocks: cliSpreadSchema,
+      turnovers: cliSpreadSchema,
+      fouls: cliSpreadSchema,
+      fieldGoals: madeAttemptedSpreadSchema,
+      threes: madeAttemptedSpreadSchema,
+      freeThrows: madeAttemptedSpreadSchema,
+    }),
+  ),
+  timingMs: z.number().nonnegative(),
+  invariantFailures: z.number().int().nonnegative(),
+});
+export type SimChallengeAverageReport = z.infer<typeof simChallengeAverageReportSchema>;
 export const bracketAuditReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('bracket audit'),

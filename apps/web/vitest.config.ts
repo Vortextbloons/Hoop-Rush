@@ -18,7 +18,7 @@ export default defineConfig({
     root: path.dirname(fileURLToPath(import.meta.url)),
     environment: 'node',
     include: ['src/**/*.test.ts'],
-    exclude: [...defaultExclude, 'e2e/**', 'src/lib/components/__tests__/**'],
+    exclude: [...defaultExclude, 'src/lib/components/__tests__/**'],
     setupFiles: ['src/test/svelte-testing.ts'],
     css: false,
     passWithNoTests: true,

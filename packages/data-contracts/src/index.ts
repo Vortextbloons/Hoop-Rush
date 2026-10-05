@@ -166,3 +166,5 @@ export {
   SIMULATION_RATINGS,
   SIMULATION_TENDENCIES,
 } from './season-schemas-fixtures.ts';
+
+export * from './overall-scale.ts';

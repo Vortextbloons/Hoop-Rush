@@ -42,12 +42,12 @@ export function chooseBestRun(runs: readonly ChallengeRun[]): ChallengeRun {
   }
   return best;
 }
-export function simulateChallengeBestOf(
+export function simulateChallengeAttempts(
   creation: ChallengeCreation,
   profile: EraSimulationProfile,
   context: EngineContext,
   attempts: number = BEST_OF_ATTEMPTS,
-): ChallengeRun {
+): ChallengeRun[] {
   const runs: ChallengeRun[] = [];
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     const attemptRun = createChallenge({
@@ -56,7 +56,15 @@ export function simulateChallengeBestOf(
     });
     runs.push(simulateChallenge(attemptRun, profile, context));
   }
-  return chooseBestRun(runs);
+  return runs;
+}
+export function simulateChallengeBestOf(
+  creation: ChallengeCreation,
+  profile: EraSimulationProfile,
+  context: EngineContext,
+  attempts: number = BEST_OF_ATTEMPTS,
+): ChallengeRun {
+  return chooseBestRun(simulateChallengeAttempts(creation, profile, context, attempts));
 }
 export interface BestOfChoice {
   chosenRunSeed: Seed;

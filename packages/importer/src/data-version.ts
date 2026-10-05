@@ -1,1 +1,1 @@
-export const DATA_VERSION = 'm17-ratings-v3.12';
+export const DATA_VERSION = 'm17-ratings-v4.0';

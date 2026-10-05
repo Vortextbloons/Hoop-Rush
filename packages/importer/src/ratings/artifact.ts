@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import {
   RATINGS_VERSION,
+  COHORT_NORMALIZATION_VERSION,
   RATING_MODEL_VERSION,
   ratingsModelArtifactSchema,
   type RatingsModelArtifact,
@@ -56,6 +57,15 @@ function loadRatingsModelArtifactUncached(path: string): RatingsModelArtifact {
   if (parsed.data.modelVersion !== RATING_MODEL_VERSION) {
     throw new Error(
       `ratings model artifact ${path} is ${parsed.data.modelVersion}; expected ${RATING_MODEL_VERSION}`,
+    );
+  }
+  if (
+    !parsed.data.overallScale ||
+    parsed.data.overallScale.modelVersion !== RATING_MODEL_VERSION ||
+    parsed.data.overallScale.version !== COHORT_NORMALIZATION_VERSION
+  ) {
+    throw new Error(
+      `ratings model artifact ${path} requires the current frozen overall scale; run calibrate overall`,
     );
   }
   return parsed.data;

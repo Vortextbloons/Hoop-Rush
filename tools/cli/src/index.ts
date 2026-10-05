@@ -14,12 +14,17 @@ import { bracketGenerate, BRACKET_GENERATE_OPTIONS } from './commands/bracket-ge
 import { benchmark, BENCHMARK_OPTIONS } from './commands/benchmark.ts';
 import { draftFitBenchmark, DRAFT_FIT_BENCHMARK_OPTIONS } from './commands/draft-fit-benchmark.ts';
 import { calibrateRun, calibrateSensitivity, CALIBRATE_OPTIONS } from './commands/calibrate.ts';
+import { calibrateOverall, CALIBRATE_OVERALL_OPTIONS } from './commands/calibrate-overall.ts';
 import { calibrateRatings, CALIBRATE_RATINGS_OPTIONS } from './commands/calibrate-ratings.ts';
 import {
   calibrateThreePoint,
   CALIBRATE_THREE_POINT_OPTIONS,
 } from './commands/calibrate-three-point.ts';
 import { simChallenge, SIM_CHALLENGE_OPTIONS } from './commands/challenge.ts';
+import {
+  simChallengeAverage,
+  SIM_CHALLENGE_AVERAGE_OPTIONS,
+} from './commands/challenge-average.ts';
 import { dataCoverage, DATA_COVERAGE_OPTIONS } from './commands/data-coverage.ts';
 import {
   defenseBpmCorrelation,
@@ -242,6 +247,10 @@ interface CommandDef {
 }
 const COMMANDS: Record<string, CommandDef> = {
   help: { options: {}, run: () => helpCommand() },
+  'calibrate overall': {
+    options: CALIBRATE_OVERALL_OPTIONS,
+    run: (args) => calibrateOverall(s(args, 'output')),
+  },
   'data validate': {
     options: DATA_VALIDATE_OPTIONS,
     run: (args) => {
@@ -320,6 +329,11 @@ const COMMANDS: Record<string, CommandDef> = {
     options: SIM_CHALLENGE_OPTIONS,
     run: (args) =>
       simChallenge(pickU(args, ['lineup', 'seed', 'reruns', 'era', 'profile', 'bracket'])),
+  },
+  'sim challenge-average': {
+    options: SIM_CHALLENGE_AVERAGE_OPTIONS,
+    run: (args) =>
+      simChallengeAverage(pickU(args, ['lineup', 'seed', 'reruns', 'era', 'profile', 'bracket'])),
   },
   'bracket audit': {
     options: BRACKET_AUDIT_OPTIONS,
@@ -746,6 +760,7 @@ const COMMANDS: Record<string, CommandDef> = {
       importRatings({
         seasons: n(args, 'seasons'),
         forceRatings: hasOption(args, 'force-ratings'),
+        overallOnly: hasOption(args, 'overall-only'),
         workers: n(args, 'workers'),
       }),
   },

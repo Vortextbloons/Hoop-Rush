@@ -13,6 +13,8 @@ import {
   SELECTION_SCORE_VERSION,
   SOURCE_VERSION,
   overallBandForPercentile,
+  overallForScore,
+  type OverallScale,
   franchiseEraPoolSchema,
   coverageSummarySchema,
   playerSeasonStatsSchema,
@@ -59,7 +61,6 @@ import { positionOverrideFor } from '../positions/overrides.ts';
 import { primaryPositionForSource } from '../positions/normalize.ts';
 import { canonicalPlayerName } from '../identity.ts';
 import { derivePlayerRecord } from '../ratings/v2.ts';
-import { defenseCreditFor, twoWayBonusFor } from '../ratings/v3.ts';
 import { getEra } from '../ratings/era.ts';
 import { loadRatingsModelArtifact } from '../ratings/artifact.ts';
 export { POSITION_LABEL_MAP, buildPlayerPositions, normalizePositionLabels } from './positions.ts';
@@ -584,60 +585,14 @@ const overallScoreProfileSchema = z.looseObject({
   rawOverallScore: z.unknown().optional(),
   canonicalOverall: z.unknown().optional(),
 });
-const neutralScoreProfileSchema = z.looseObject({
-  rawOverallScore: z.unknown().optional(),
-  canonicalOverall: z.unknown().optional(),
-  baseScore: z.unknown().optional(),
-  offenseRating: z.unknown().optional(),
-  defenseRating: z.unknown().optional(),
-  production: z
-    .looseObject({
-      score: z.unknown().optional(),
-      weight: z.unknown().optional(),
-    })
-    .optional(),
-});
 export function neutralSelectionScoreFor(
   player: OverallScoreInput,
   summary: SummaryRatingsRaw | undefined,
-  stats: SeasonStatsInput,
+  _stats: SeasonStatsInput,
 ): number {
-  // Peak selection answers "best individual season", so team context stays
-  // out: rawOverallScore bundles teamDelta (±5 for title vs lottery teams),
-  // which let a 61-win season outvote an All-NBA First Team year with
-  // clearly better individual production (1997-98 Payton over 1999-00).
-  // Neutral form keeps base, production, and individual two-way credit.
-  const profileParsed = neutralScoreProfileSchema.safeParse(player.ratingProfile);
-  const profile = profileParsed.success ? profileParsed.data : undefined;
-  const base = typeof profile?.baseScore === 'number' ? profile.baseScore : null;
-  const production = profile?.production;
-  const prodScore = typeof production?.score === 'number' ? production.score : null;
-  const prodWeight =
-    typeof production?.weight === 'number' && Number.isFinite(production.weight)
-      ? clamp(production.weight, 0, 1)
-      : null;
-  const offense =
-    typeof profile?.offenseRating === 'number'
-      ? profile.offenseRating
-      : safeFloat(summary?.offenseRating);
-  const defense =
-    typeof profile?.defenseRating === 'number'
-      ? profile.defenseRating
-      : safeFloat(summary?.defenseRating);
-  if (base === null || prodScore === null || prodWeight === null) {
-    return rawOverallScoreFor(player, summary);
-  }
-  const observedStocks = stats.steals != null && stats.blocks != null;
-  return (
-    base * (1 - prodWeight) +
-    prodScore * prodWeight +
-    defenseCreditFor(defense, false, observedStocks) +
-    twoWayBonusFor(offense, defense)
-  );
+  return rawOverallScoreFor(player, summary);
 }
-type OverallScoreInput = {
-  ratingProfile?: unknown;
-};
+type OverallScoreInput = { ratingProfile?: unknown };
 export function rawOverallScoreFor(
   player: OverallScoreInput,
   summary: SummaryRatingsRaw | undefined,
@@ -670,12 +625,8 @@ export function selectionScore(
   const raw = 0.8 * peakScore + 0.12 * offenseRating + 0.08 * defenseRating + 0.02 * mpg;
   return Math.round(raw * availability * 1000) / 1000;
 }
-export function peakSelectionBlend(neutralScore: number, rawOverallScore: number): number {
-  // Individual merit first (60%), holistic context second (20%): team wins
-  // and elite lifts nudge near-ties but cannot outvote clearly better
-  // individual production (1999-00 Payton keeps his All-NBA First Team year
-  // over 61-win 1997-98).
-  return 0.75 * neutralScore + 0.25 * rawOverallScore;
+export function peakSelectionBlend(_neutralScore: number, rawOverallScore: number): number {
+  return rawOverallScore;
 }
 export type Candidate = {
   season: string;
@@ -749,6 +700,7 @@ export type PoolOverallRow = {
     overallCohortVersion?: string;
     schemaVersion?: number;
     modelVersion?: string;
+    overallDiagnostics?: RatingProfile['overallDiagnostics'];
   } | null;
   eraId?: string;
   minutes?: number | null;
@@ -781,68 +733,29 @@ function hasRawOverallScore(row: PoolOverallRow): boolean {
   const raw = row.ratingProfile?.rawOverallScore;
   return typeof raw === 'number' && Number.isFinite(raw);
 }
-function rankingProxy(row: PoolOverallRow): number {
-  if (hasRawOverallScore(row)) {
-    return row.ratingProfile?.rawOverallScore as number;
-  }
-  const canonical = row.ratingProfile?.canonicalOverall;
-  if (typeof canonical === 'number' && Number.isFinite(canonical)) {
-    return canonical;
-  }
-  return row.summaryRatings.overallRating;
-}
-export function normalizePoolOveralls(rows: PoolOverallRow[]): PoolOverallDiagnostics {
-  const totalRowCount = rows.length;
+export function normalizePoolOveralls(
+  rows: PoolOverallRow[],
+  scale?: OverallScale,
+): PoolOverallDiagnostics {
   let rowsWithoutRawOverall = 0;
   for (const row of rows) {
+    const profile = row.ratingProfile;
     if (!hasRawOverallScore(row)) rowsWithoutRawOverall += 1;
-  }
-  const ranked = [...rows].sort((a, b) => {
-    const score = rankingProxy(b) - rankingProxy(a);
-    if (score !== 0) return score;
-    return (
-      a.playerId.localeCompare(b.playerId) ||
-      a.seasonKey.localeCompare(b.seasonKey) ||
-      a.franchiseId.localeCompare(b.franchiseId)
-    );
-  });
-  const eraCounts = new Map<string, number>();
-  for (const row of rows) {
-    const eraId = row.eraId ?? 'unknown';
-    eraCounts.set(eraId, (eraCounts.get(eraId) ?? 0) + 1);
-  }
-  const eraGroups = new Map<string, PoolOverallRow[]>();
-  for (const row of ranked) {
-    const eraId = row.eraId ?? 'unknown';
-    let group = eraGroups.get(eraId);
-    if (!group) {
-      group = [];
-      eraGroups.set(eraId, group);
-    }
-    group.push(row);
-  }
-  const eraIndexMap = new Map<PoolOverallRow, number>();
-  for (const [, group] of eraGroups) {
-    group.forEach((row, idx) => eraIndexMap.set(row, idx));
-  }
-  ranked.forEach((row, globalIndex) => {
-    const pGlobal = globalIndex / totalRowCount;
-    const eraId = row.eraId ?? 'unknown';
-    const eraTotal = eraCounts.get(eraId) ?? totalRowCount;
-    const eraIdx = eraIndexMap.get(row) ?? globalIndex;
-    const pEra = eraTotal > 0 ? eraIdx / eraTotal : pGlobal;
-    const pBlended = 0.65 * pGlobal + 0.35 * pEra;
+    const mapped =
+      scale && profile?.schemaVersion === 3 && hasRawOverallScore(row)
+        ? overallForScore(profile.rawOverallScore as number, scale)
+        : null;
     row.summaryRatings.overallRating = minutesFloorOverall(
-      overallBandForPercentile(pBlended),
+      mapped?.overall ?? profile?.canonicalOverall ?? row.summaryRatings.overallRating,
       minutesOf(row),
     );
-    if (hasRawOverallScore(row) && row.ratingProfile != null) {
-      row.ratingProfile.overallPercentile =
-        Math.round(((globalIndex + 1) / totalRowCount) * 10000) / 10000;
-      row.ratingProfile.overallCohortVersion = COHORT_NORMALIZATION_VERSION;
+    if (mapped && profile) {
+      profile.canonicalOverall = mapped.overall;
+      profile.overallPercentile = mapped.percentile;
+      profile.overallCohortVersion = scale!.version;
     }
-  });
-  return { totalRowCount, rowsWithoutRawOverall };
+  }
+  return { totalRowCount: rows.length, rowsWithoutRawOverall };
 }
 export function loadBbrefIds(): Record<string, string> {
   const path = join(RAW_CACHE, 'bbref_ids.json');
@@ -1619,7 +1532,10 @@ function applyOverallCohortNormalization(): Array<{
       });
     } catch {}
   }
-  const diagnostics = normalizePoolOveralls(pools.flatMap((pool) => pool.players));
+  const diagnostics = normalizePoolOveralls(
+    pools.flatMap((pool) => pool.players),
+    loadRatingsModelArtifact().overallScale,
+  );
   const rewritten: Array<{
     franchiseId: string;
     eraId: string;

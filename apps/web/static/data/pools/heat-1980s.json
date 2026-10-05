@@ -1,6 +1,6 @@
 {
   "schemaVersion": 5,
-  "dataVersion": "m17-ratings-v3.12",
+  "dataVersion": "m17-ratings-v4.0",
   "franchiseId": "heat",
   "eraId": "1980s",
   "eligibility": {
@@ -67,8 +67,8 @@
         "teamGames": 65,
         "teamMinutes": 944
       },
-      "selectionScore": 52.246,
-      "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
+      "selectionScore": 55.998,
+      "selectionScoreVersion": "selection-v4.0-ratings-v4.0",
       "stats": {
         "gamesPlayed": 65,
         "minutes": 944,
@@ -101,13 +101,22 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 70,
+        "overallRating": 72,
         "offenseRating": 58,
         "defenseRating": 58
       },
       "ratingProfile": {
-        "schemaVersion": 2,
-        "modelVersion": "ratings-model-v3.6",
+        "schemaVersion": 3,
+        "overallDiagnostics": {
+          "schemaVersion": 1,
+          "abilityBase": 58,
+          "abilityContribution": 44.31,
+          "productionContribution": 11.41,
+          "confidenceWeight": 0.236,
+          "rawScore": 55.72,
+          "mappingVersion": "overall-scale-v1"
+        },
+        "modelVersion": "ratings-model-v4.0",
         "memberships": {
           "primaryCreator": 0.01915,
           "secondaryCreator": 0.037964,
@@ -120,7 +129,7 @@
           "rebounder": 0.184817,
           "defensiveAnchor": 0.162519
         },
-        "baseScore": 56.47,
+        "baseScore": 58,
         "nonlinear": {
           "creation": 55.576956791746035,
           "penetration": 55.818074590730916,
@@ -142,12 +151,12 @@
           }
         },
         "production": {
-          "score": 28.781925588723556,
-          "weight": 0.10759878419452887,
+          "score": 48.33650591730696,
+          "weight": 0.236,
           "confidence": "medium",
           "sampleGames": 65,
           "sampleMinutes": 944,
-          "shrinkage": 0.23910840932117527
+          "shrinkage": 0.6293333333333333
         },
         "calibratedImpact": {
           "adjustment": 0.226,
@@ -155,12 +164,12 @@
           "sampleCount": 1280,
           "artifactVersion": "ratings-model-v3.6"
         },
-        "canonicalOverall": 51,
-        "rawOverallScore": 50.99,
+        "canonicalOverall": 72,
+        "rawOverallScore": 55.72,
+        "overallPercentile": 0.6210620170398257,
+        "overallCohortVersion": "overall-scale-v1",
         "offenseRating": 58,
-        "defenseRating": 58,
-        "overallPercentile": 0.7268,
-        "overallCohortVersion": "overall-cohort-v7"
+        "defenseRating": 58
       },
       "detailedRatings": {
         "insideScoring": 62,
@@ -764,9 +773,9 @@
         }
       },
       "source": {
-        "dataVersion": "m17-ratings-v3.12",
-        "ratingsVersion": "ratings-v3.12",
-        "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
+        "dataVersion": "m17-ratings-v4.0",
+        "ratingsVersion": "ratings-v4.0",
+        "selectionScoreVersion": "selection-v4.0-ratings-v4.0",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v13",
         "lineageRuleVersion": "lineage-v1"
@@ -806,8 +815,8 @@
         "teamGames": 79,
         "teamMinutes": 2142
       },
-      "selectionScore": 55.836,
-      "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
+      "selectionScore": 58.153,
+      "selectionScoreVersion": "selection-v4.0-ratings-v4.0",
       "stats": {
         "gamesPlayed": 79,
         "minutes": 2142,
@@ -840,13 +849,22 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 76,
+        "overallRating": 75,
         "offenseRating": 62,
         "defenseRating": 62
       },
       "ratingProfile": {
-        "schemaVersion": 2,
-        "modelVersion": "ratings-model-v3.6",
+        "schemaVersion": 3,
+        "overallDiagnostics": {
+          "schemaVersion": 1,
+          "abilityBase": 62,
+          "abilityContribution": 31,
+          "productionContribution": 25.62,
+          "confidenceWeight": 0.5,
+          "rawScore": 56.62,
+          "mappingVersion": "overall-scale-v1"
+        },
+        "modelVersion": "ratings-model-v4.0",
         "memberships": {
           "primaryCreator": 0.031656,
           "secondaryCreator": 0.057804,
@@ -859,7 +877,7 @@
           "rebounder": 0.171153,
           "defensiveAnchor": 0.171275
         },
-        "baseScore": 58.74,
+        "baseScore": 62,
         "nonlinear": {
           "creation": 63.54973679936668,
           "penetration": 60.50517907533811,
@@ -881,12 +899,12 @@
           }
         },
         "production": {
-          "score": 45.75298588504612,
-          "weight": 0.2342668863261944,
+          "score": 51.247675584264954,
+          "weight": 0.5,
           "confidence": "high",
           "sampleGames": 79,
           "sampleMinutes": 2142,
-          "shrinkage": 0.3904448105436574
+          "shrinkage": 1
         },
         "calibratedImpact": {
           "adjustment": 0.481,
@@ -894,12 +912,12 @@
           "sampleCount": 1280,
           "artifactVersion": "ratings-model-v3.6"
         },
-        "canonicalOverall": 56,
-        "rawOverallScore": 53.72,
+        "canonicalOverall": 75,
+        "rawOverallScore": 56.62,
+        "overallPercentile": 0.5028729938577372,
+        "overallCohortVersion": "overall-scale-v1",
         "offenseRating": 62,
-        "defenseRating": 62,
-        "overallPercentile": 0.4681,
-        "overallCohortVersion": "overall-cohort-v7"
+        "defenseRating": 62
       },
       "detailedRatings": {
         "insideScoring": 67,
@@ -1504,9 +1522,9 @@
         }
       },
       "source": {
-        "dataVersion": "m17-ratings-v3.12",
-        "ratingsVersion": "ratings-v3.12",
-        "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
+        "dataVersion": "m17-ratings-v4.0",
+        "ratingsVersion": "ratings-v4.0",
+        "selectionScoreVersion": "selection-v4.0-ratings-v4.0",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v13",
         "lineageRuleVersion": "lineage-v1"
@@ -1546,8 +1564,8 @@
         "teamGames": 79,
         "teamMinutes": 2349
       },
-      "selectionScore": 55.002,
-      "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
+      "selectionScore": 57.207,
+      "selectionScoreVersion": "selection-v4.0-ratings-v4.0",
       "stats": {
         "gamesPlayed": 79,
         "minutes": 2349,
@@ -1580,13 +1598,22 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 74,
+        "overallRating": 71,
         "offenseRating": 63,
-        "defenseRating": 62
+        "defenseRating": 61
       },
       "ratingProfile": {
-        "schemaVersion": 2,
-        "modelVersion": "ratings-model-v3.6",
+        "schemaVersion": 3,
+        "overallDiagnostics": {
+          "schemaVersion": 1,
+          "abilityBase": 62.3,
+          "abilityContribution": 31.15,
+          "productionContribution": 24.17,
+          "confidenceWeight": 0.5,
+          "rawScore": 55.32,
+          "mappingVersion": "overall-scale-v1"
+        },
+        "modelVersion": "ratings-model-v4.0",
         "memberships": {
           "primaryCreator": 0.067469,
           "secondaryCreator": 0.107268,
@@ -1599,7 +1626,7 @@
           "rebounder": 0.069543,
           "defensiveAnchor": 0.109848
         },
-        "baseScore": 58.79,
+        "baseScore": 62.3,
         "nonlinear": {
           "creation": 71.22234075684088,
           "penetration": 62.195015505423854,
@@ -1621,12 +1648,12 @@
           }
         },
         "production": {
-          "score": 40.82087156741901,
-          "weight": 0.2430896598701834,
+          "score": 48.33275868287592,
+          "weight": 0.5,
           "confidence": "high",
           "sampleGames": 79,
           "sampleMinutes": 2349,
-          "shrinkage": 0.4051494331169724
+          "shrinkage": 1
         },
         "calibratedImpact": {
           "adjustment": -0.341,
@@ -1634,12 +1661,12 @@
           "sampleCount": 1280,
           "artifactVersion": "ratings-model-v3.6"
         },
-        "canonicalOverall": 54,
-        "rawOverallScore": 52.46,
+        "canonicalOverall": 71,
+        "rawOverallScore": 55.32,
+        "overallPercentile": 0.6808995442837329,
+        "overallCohortVersion": "overall-scale-v1",
         "offenseRating": 63,
-        "defenseRating": 62,
-        "overallPercentile": 0.5815,
-        "overallCohortVersion": "overall-cohort-v7"
+        "defenseRating": 61
       },
       "detailedRatings": {
         "insideScoring": 61,
@@ -2244,9 +2271,9 @@
         }
       },
       "source": {
-        "dataVersion": "m17-ratings-v3.12",
-        "ratingsVersion": "ratings-v3.12",
-        "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
+        "dataVersion": "m17-ratings-v4.0",
+        "ratingsVersion": "ratings-v4.0",
+        "selectionScoreVersion": "selection-v4.0-ratings-v4.0",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v13",
         "lineageRuleVersion": "lineage-v1"
@@ -2286,8 +2313,8 @@
         "teamGames": 82,
         "teamMinutes": 2435
       },
-      "selectionScore": 54.17,
-      "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
+      "selectionScore": 57.162,
+      "selectionScoreVersion": "selection-v4.0-ratings-v4.0",
       "stats": {
         "gamesPlayed": 82,
         "minutes": 2435,
@@ -2320,13 +2347,22 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 72,
+        "overallRating": 71,
         "offenseRating": 61,
         "defenseRating": 61
       },
       "ratingProfile": {
-        "schemaVersion": 2,
-        "modelVersion": "ratings-model-v3.6",
+        "schemaVersion": 3,
+        "overallDiagnostics": {
+          "schemaVersion": 1,
+          "abilityBase": 61,
+          "abilityContribution": 30.5,
+          "productionContribution": 24.96,
+          "confidenceWeight": 0.5,
+          "rawScore": 55.46,
+          "mappingVersion": "overall-scale-v1"
+        },
+        "modelVersion": "ratings-model-v4.0",
         "memberships": {
           "primaryCreator": 0.027028,
           "secondaryCreator": 0.049246,
@@ -2339,7 +2375,7 @@
           "rebounder": 0.15824,
           "defensiveAnchor": 0.160175
         },
-        "baseScore": 57.3,
+        "baseScore": 61,
         "nonlinear": {
           "creation": 60.61007213851008,
           "penetration": 59.093789352164215,
@@ -2361,12 +2397,12 @@
           }
         },
         "production": {
-          "score": 44.9480927018153,
-          "weight": 0.24955110713021011,
+          "score": 49.922324362049295,
+          "weight": 0.5,
           "confidence": "high",
           "sampleGames": 82,
           "sampleMinutes": 2435,
-          "shrinkage": 0.41591851188368356
+          "shrinkage": 1
         },
         "calibratedImpact": {
           "adjustment": 0.137,
@@ -2374,12 +2410,12 @@
           "sampleCount": 1280,
           "artifactVersion": "ratings-model-v3.6"
         },
-        "canonicalOverall": 52,
-        "rawOverallScore": 51.72,
+        "canonicalOverall": 71,
+        "rawOverallScore": 55.46,
+        "overallPercentile": 0.6597978997424212,
+        "overallCohortVersion": "overall-scale-v1",
         "offenseRating": 61,
-        "defenseRating": 61,
-        "overallPercentile": 0.6537,
-        "overallCohortVersion": "overall-cohort-v7"
+        "defenseRating": 61
       },
       "detailedRatings": {
         "insideScoring": 67,
@@ -2983,9 +3019,9 @@
         }
       },
       "source": {
-        "dataVersion": "m17-ratings-v3.12",
-        "ratingsVersion": "ratings-v3.12",
-        "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
+        "dataVersion": "m17-ratings-v4.0",
+        "ratingsVersion": "ratings-v4.0",
+        "selectionScoreVersion": "selection-v4.0-ratings-v4.0",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v13",
         "lineageRuleVersion": "lineage-v1"
@@ -3028,8 +3064,8 @@
         "teamGames": 63,
         "teamMinutes": 884
       },
-      "selectionScore": 49.323,
-      "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
+      "selectionScore": 54.11,
+      "selectionScoreVersion": "selection-v4.0-ratings-v4.0",
       "stats": {
         "gamesPlayed": 63,
         "minutes": 884,
@@ -3062,26 +3098,35 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 44,
+        "overallRating": 65,
         "offenseRating": 56,
         "defenseRating": 56
       },
       "ratingProfile": {
-        "schemaVersion": 2,
-        "modelVersion": "ratings-model-v3.6",
-        "memberships": {
-          "primaryCreator": 0.020694,
-          "secondaryCreator": 0.040893,
-          "scoringGuard": 0.036593,
-          "movementSpacer": 0.079357,
-          "twoWayWing": 0.155829,
-          "connector": 0.088756,
-          "interiorFinisher": 0.109928,
-          "stretchBig": 0.140955,
-          "rebounder": 0.168868,
-          "defensiveAnchor": 0.158127
+        "schemaVersion": 3,
+        "overallDiagnostics": {
+          "schemaVersion": 1,
+          "abilityBase": 56,
+          "abilityContribution": 43.62,
+          "productionContribution": 10.3,
+          "confidenceWeight": 0.22100000000000003,
+          "rawScore": 53.92,
+          "mappingVersion": "overall-scale-v1"
         },
-        "baseScore": 53.01,
+        "modelVersion": "ratings-model-v4.0",
+        "memberships": {
+          "primaryCreator": 0.021227,
+          "secondaryCreator": 0.041946,
+          "scoringGuard": 0.037536,
+          "movementSpacer": 0.077431,
+          "twoWayWing": 0.144632,
+          "connector": 0.084463,
+          "interiorFinisher": 0.11276,
+          "stretchBig": 0.144585,
+          "rebounder": 0.173218,
+          "defensiveAnchor": 0.162202
+        },
+        "baseScore": 56,
         "nonlinear": {
           "creation": 55.36702195223706,
           "penetration": 55.872584463837974,
@@ -3091,24 +3136,24 @@
           "rimProtection": 61.91926441069406,
           "possessionControl": 56.597,
           "synergyBonus": 0,
-          "weaknessPenalty": -3.9468921238370323,
+          "weaknessPenalty": -3.9669538391562607,
           "weaknesses": {
-            "turnoverLiability": 4.868402106837388,
+            "turnoverLiability": 4.8810536090550585,
             "inefficientUsage": 0,
-            "defensiveTargeting": 0.7802328095238092,
-            "spacingLimitation": 0.004959758218308637,
-            "foulRisk": 5.954911571999999,
+            "defensiveTargeting": 0.7815635452380949,
+            "spacingLimitation": 0.0048941373429065614,
+            "foulRisk": 6,
             "deficientRebounding": 0,
             "hollowAnchor": 0
           }
         },
         "production": {
-          "score": 27.20503583376855,
-          "weight": 0.10206147781325339,
+          "score": 46.59106272677837,
+          "weight": 0.22100000000000003,
           "confidence": "medium",
           "sampleGames": 63,
           "sampleMinutes": 884,
-          "shrinkage": 0.226803284029452
+          "shrinkage": 0.5893333333333334
         },
         "calibratedImpact": {
           "adjustment": 0.292,
@@ -3116,12 +3161,12 @@
           "sampleCount": 1280,
           "artifactVersion": "ratings-model-v3.6"
         },
-        "canonicalOverall": 46,
-        "rawOverallScore": 47.88,
+        "canonicalOverall": 65,
+        "rawOverallScore": 53.92,
+        "overallPercentile": 0.8496136318605112,
+        "overallCohortVersion": "overall-scale-v1",
         "offenseRating": 56,
-        "defenseRating": 56,
-        "overallPercentile": 0.9757,
-        "overallCohortVersion": "overall-cohort-v7"
+        "defenseRating": 56
       },
       "detailedRatings": {
         "insideScoring": 60,
@@ -3725,9 +3770,9 @@
         }
       },
       "source": {
-        "dataVersion": "m17-ratings-v3.12",
-        "ratingsVersion": "ratings-v3.12",
-        "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
+        "dataVersion": "m17-ratings-v4.0",
+        "ratingsVersion": "ratings-v4.0",
+        "selectionScoreVersion": "selection-v4.0-ratings-v4.0",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v13",
         "lineageRuleVersion": "lineage-v1"
@@ -3767,8 +3812,8 @@
         "teamGames": 81,
         "teamMinutes": 2470
       },
-      "selectionScore": 60.924,
-      "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
+      "selectionScore": 62.395,
+      "selectionScoreVersion": "selection-v4.0-ratings-v4.0",
       "stats": {
         "gamesPlayed": 81,
         "minutes": 2470,
@@ -3801,13 +3846,22 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 85,
+        "overallRating": 86,
         "offenseRating": 68,
-        "defenseRating": 61
+        "defenseRating": 60
       },
       "ratingProfile": {
-        "schemaVersion": 2,
-        "modelVersion": "ratings-model-v3.6",
+        "schemaVersion": 3,
+        "overallDiagnostics": {
+          "schemaVersion": 1,
+          "abilityBase": 65.2,
+          "abilityContribution": 32.6,
+          "productionContribution": 28.47,
+          "confidenceWeight": 0.5,
+          "rawScore": 61.07,
+          "mappingVersion": "overall-scale-v1"
+        },
+        "modelVersion": "ratings-model-v4.0",
         "memberships": {
           "primaryCreator": 0.097213,
           "secondaryCreator": 0.170952,
@@ -3820,7 +3874,7 @@
           "rebounder": 0.043241,
           "defensiveAnchor": 0.074842
         },
-        "baseScore": 63.74,
+        "baseScore": 65.2,
         "nonlinear": {
           "creation": 83.29954185503959,
           "penetration": 66.71640732322085,
@@ -3842,12 +3896,12 @@
           }
         },
         "production": {
-          "score": 55.1027023502372,
-          "weight": 0.249894872702292,
+          "score": 56.94003699403132,
+          "weight": 0.5,
           "confidence": "high",
           "sampleGames": 81,
           "sampleMinutes": 2470,
-          "shrinkage": 0.41649145450382
+          "shrinkage": 1
         },
         "calibratedImpact": {
           "adjustment": 0.494,
@@ -3855,12 +3909,12 @@
           "sampleCount": 1280,
           "artifactVersion": "ratings-model-v3.6"
         },
-        "canonicalOverall": 64,
-        "rawOverallScore": 59.13,
+        "canonicalOverall": 86,
+        "rawOverallScore": 61.07,
+        "overallPercentile": 0.12056667327125026,
+        "overallCohortVersion": "overall-scale-v1",
         "offenseRating": 68,
-        "defenseRating": 61,
-        "overallPercentile": 0.1468,
-        "overallCohortVersion": "overall-cohort-v7"
+        "defenseRating": 60
       },
       "detailedRatings": {
         "insideScoring": 64,
@@ -4465,9 +4519,9 @@
         }
       },
       "source": {
-        "dataVersion": "m17-ratings-v3.12",
-        "ratingsVersion": "ratings-v3.12",
-        "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
+        "dataVersion": "m17-ratings-v4.0",
+        "ratingsVersion": "ratings-v4.0",
+        "selectionScoreVersion": "selection-v4.0-ratings-v4.0",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v13",
         "lineageRuleVersion": "lineage-v1"
@@ -4507,8 +4561,8 @@
         "teamGames": 80,
         "teamMinutes": 2613
       },
-      "selectionScore": 56.086,
-      "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
+      "selectionScore": 57.901,
+      "selectionScoreVersion": "selection-v4.0-ratings-v4.0",
       "stats": {
         "gamesPlayed": 80,
         "minutes": 2613,
@@ -4541,13 +4595,22 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 76,
+        "overallRating": 73,
         "offenseRating": 65,
-        "defenseRating": 59
+        "defenseRating": 58
       },
       "ratingProfile": {
-        "schemaVersion": 2,
-        "modelVersion": "ratings-model-v3.6",
+        "schemaVersion": 3,
+        "overallDiagnostics": {
+          "schemaVersion": 1,
+          "abilityBase": 62.55,
+          "abilityContribution": 31.28,
+          "productionContribution": 24.8,
+          "confidenceWeight": 0.5,
+          "rawScore": 56.08,
+          "mappingVersion": "overall-scale-v1"
+        },
+        "modelVersion": "ratings-model-v4.0",
         "memberships": {
           "primaryCreator": 0.073702,
           "secondaryCreator": 0.135498,
@@ -4560,7 +4623,7 @@
           "rebounder": 0.054637,
           "defensiveAnchor": 0.089569
         },
-        "baseScore": 60.15,
+        "baseScore": 62.55,
         "nonlinear": {
           "creation": 75.08789694811169,
           "penetration": 62.4538325721614,
@@ -4582,12 +4645,12 @@
           }
         },
         "production": {
-          "score": 44.64013086470856,
-          "weight": 0.25412107950401164,
+          "score": 49.60990581433003,
+          "weight": 0.5,
           "confidence": "high",
           "sampleGames": 80,
           "sampleMinutes": 2613,
-          "shrinkage": 0.4235351325066861
+          "shrinkage": 1
         },
         "calibratedImpact": {
           "adjustment": 0,
@@ -4595,12 +4658,12 @@
           "sampleCount": 1280,
           "artifactVersion": "ratings-model-v3.6"
         },
-        "canonicalOverall": 56,
-        "rawOverallScore": 53.71,
+        "canonicalOverall": 73,
+        "rawOverallScore": 56.08,
+        "overallPercentile": 0.5742024965325936,
+        "overallCohortVersion": "overall-scale-v1",
         "offenseRating": 65,
-        "defenseRating": 59,
-        "overallPercentile": 0.4697,
-        "overallCohortVersion": "overall-cohort-v7"
+        "defenseRating": 58
       },
       "detailedRatings": {
         "insideScoring": 60,
@@ -5205,9 +5268,9 @@
         }
       },
       "source": {
-        "dataVersion": "m17-ratings-v3.12",
-        "ratingsVersion": "ratings-v3.12",
-        "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
+        "dataVersion": "m17-ratings-v4.0",
+        "ratingsVersion": "ratings-v4.0",
+        "selectionScoreVersion": "selection-v4.0-ratings-v4.0",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v13",
         "lineageRuleVersion": "lineage-v1"
@@ -5246,8 +5309,8 @@
         "teamGames": 53,
         "teamMinutes": 1096
       },
-      "selectionScore": 51.617,
-      "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
+      "selectionScore": 55.679,
+      "selectionScoreVersion": "selection-v4.0-ratings-v4.0",
       "stats": {
         "gamesPlayed": 53,
         "minutes": 1096,
@@ -5280,13 +5343,22 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 67,
+        "overallRating": 72,
         "offenseRating": 57,
         "defenseRating": 59
       },
       "ratingProfile": {
-        "schemaVersion": 2,
-        "modelVersion": "ratings-model-v3.6",
+        "schemaVersion": 3,
+        "overallDiagnostics": {
+          "schemaVersion": 1,
+          "abilityBase": 57.7,
+          "abilityContribution": 41.89,
+          "productionContribution": 13.74,
+          "confidenceWeight": 0.274,
+          "rawScore": 55.63,
+          "mappingVersion": "overall-scale-v1"
+        },
+        "modelVersion": "ratings-model-v4.0",
         "memberships": {
           "primaryCreator": 0.022803,
           "secondaryCreator": 0.0422,
@@ -5299,7 +5371,7 @@
           "rebounder": 0.190234,
           "defensiveAnchor": 0.171885
         },
-        "baseScore": 55.11,
+        "baseScore": 57.7,
         "nonlinear": {
           "creation": 56.94444160662731,
           "penetration": 57.41626122098096,
@@ -5321,12 +5393,12 @@
           }
         },
         "production": {
-          "score": 35.504979221707714,
-          "weight": 0.10827078880660071,
+          "score": 50.149876987211734,
+          "weight": 0.274,
           "confidence": "medium",
           "sampleGames": 53,
           "sampleMinutes": 1096,
-          "shrinkage": 0.24060175290355718
+          "shrinkage": 0.7306666666666667
         },
         "calibratedImpact": {
           "adjustment": -1.02,
@@ -5334,12 +5406,12 @@
           "sampleCount": 1280,
           "artifactVersion": "ratings-model-v3.6"
         },
-        "canonicalOverall": 50,
-        "rawOverallScore": 50.48,
+        "canonicalOverall": 72,
+        "rawOverallScore": 55.63,
+        "overallPercentile": 0.6345353675450762,
+        "overallCohortVersion": "overall-scale-v1",
         "offenseRating": 57,
-        "defenseRating": 59,
-        "overallPercentile": 0.7867,
-        "overallCohortVersion": "overall-cohort-v7"
+        "defenseRating": 59
       },
       "detailedRatings": {
         "insideScoring": 65,
@@ -5944,9 +6016,9 @@
         }
       },
       "source": {
-        "dataVersion": "m17-ratings-v3.12",
-        "ratingsVersion": "ratings-v3.12",
-        "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
+        "dataVersion": "m17-ratings-v4.0",
+        "ratingsVersion": "ratings-v4.0",
+        "selectionScoreVersion": "selection-v4.0-ratings-v4.0",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v13",
         "lineageRuleVersion": "lineage-v1"
@@ -5986,8 +6058,8 @@
         "teamGames": 77,
         "teamMinutes": 1763
       },
-      "selectionScore": 51.668,
-      "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
+      "selectionScore": 55.674,
+      "selectionScoreVersion": "selection-v4.0-ratings-v4.0",
       "stats": {
         "gamesPlayed": 77,
         "minutes": 1763,
@@ -6020,13 +6092,22 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 64,
+        "overallRating": 67,
         "offenseRating": 61,
         "defenseRating": 57
       },
       "ratingProfile": {
-        "schemaVersion": 2,
-        "modelVersion": "ratings-model-v3.6",
+        "schemaVersion": 3,
+        "overallDiagnostics": {
+          "schemaVersion": 1,
+          "abilityBase": 59.599999999999994,
+          "abilityContribution": 29.8,
+          "productionContribution": 24.54,
+          "confidenceWeight": 0.5,
+          "rawScore": 54.34,
+          "mappingVersion": "overall-scale-v1"
+        },
+        "modelVersion": "ratings-model-v4.0",
         "memberships": {
           "primaryCreator": 0.025401,
           "secondaryCreator": 0.048277,
@@ -6039,7 +6120,7 @@
           "rebounder": 0.163965,
           "defensiveAnchor": 0.152661
         },
-        "baseScore": 56.19,
+        "baseScore": 59.6,
         "nonlinear": {
           "creation": 58.87919358339462,
           "penetration": 58.38174665667319,
@@ -6061,12 +6142,12 @@
           }
         },
         "production": {
-          "score": 35.70110900455087,
-          "weight": 0.21334936388568015,
+          "score": 49.079403074889214,
+          "weight": 0.5,
           "confidence": "high",
           "sampleGames": 77,
           "sampleMinutes": 1763,
-          "shrinkage": 0.3555822731428003
+          "shrinkage": 1
         },
         "calibratedImpact": {
           "adjustment": -0.687,
@@ -6074,12 +6155,12 @@
           "sampleCount": 1280,
           "artifactVersion": "ratings-model-v3.6"
         },
-        "canonicalOverall": 48,
-        "rawOverallScore": 49.32,
+        "canonicalOverall": 67,
+        "rawOverallScore": 54.34,
+        "overallPercentile": 0.8034475926292848,
+        "overallCohortVersion": "overall-scale-v1",
         "offenseRating": 61,
-        "defenseRating": 57,
-        "overallPercentile": 0.8952,
-        "overallCohortVersion": "overall-cohort-v7"
+        "defenseRating": 57
       },
       "detailedRatings": {
         "insideScoring": 67,
@@ -6683,9 +6764,9 @@
         }
       },
       "source": {
-        "dataVersion": "m17-ratings-v3.12",
-        "ratingsVersion": "ratings-v3.12",
-        "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
+        "dataVersion": "m17-ratings-v4.0",
+        "ratingsVersion": "ratings-v4.0",
+        "selectionScoreVersion": "selection-v4.0-ratings-v4.0",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v13",
         "lineageRuleVersion": "lineage-v1"
@@ -6725,8 +6806,8 @@
         "teamGames": 55,
         "teamMinutes": 1220
       },
-      "selectionScore": 53.087,
-      "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
+      "selectionScore": 56.387,
+      "selectionScoreVersion": "selection-v4.0-ratings-v4.0",
       "stats": {
         "gamesPlayed": 55,
         "minutes": 1220,
@@ -6759,26 +6840,35 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 72,
+        "overallRating": 73,
         "offenseRating": 60,
         "defenseRating": 59
       },
       "ratingProfile": {
-        "schemaVersion": 2,
-        "modelVersion": "ratings-model-v3.6",
-        "memberships": {
-          "primaryCreator": 0.034292,
-          "secondaryCreator": 0.066802,
-          "scoringGuard": 0.041517,
-          "movementSpacer": 0.093697,
-          "twoWayWing": 0.143543,
-          "connector": 0.126574,
-          "interiorFinisher": 0.091298,
-          "stretchBig": 0.122164,
-          "rebounder": 0.141456,
-          "defensiveAnchor": 0.138657
+        "schemaVersion": 3,
+        "overallDiagnostics": {
+          "schemaVersion": 1,
+          "abilityBase": 59.65,
+          "abilityContribution": 41.46,
+          "productionContribution": 14.51,
+          "confidenceWeight": 0.305,
+          "rawScore": 55.97,
+          "mappingVersion": "overall-scale-v1"
         },
-        "baseScore": 56.96,
+        "modelVersion": "ratings-model-v4.0",
+        "memberships": {
+          "primaryCreator": 0.035258,
+          "secondaryCreator": 0.068682,
+          "scoringGuard": 0.042686,
+          "movementSpacer": 0.091636,
+          "twoWayWing": 0.133539,
+          "connector": 0.120733,
+          "interiorFinisher": 0.093868,
+          "stretchBig": 0.125603,
+          "rebounder": 0.145438,
+          "defensiveAnchor": 0.142557
+        },
+        "baseScore": 59.65,
         "nonlinear": {
           "creation": 64.82604374058502,
           "penetration": 59.30380497070885,
@@ -6787,25 +6877,25 @@
           "switchability": 59.934743867831756,
           "rimProtection": 61.130322883468956,
           "possessionControl": 64.133,
-          "synergyBonus": 0.0127514068358081,
-          "weaknessPenalty": -2.419021023828572,
+          "synergyBonus": 0.013110611869150877,
+          "weaknessPenalty": -2.4326466189428064,
           "weaknesses": {
-            "turnoverLiability": 4.107533760000001,
+            "turnoverLiability": 4.123740098223939,
             "inefficientUsage": 0,
-            "defensiveTargeting": 0.6145268071428575,
+            "defensiveTargeting": 0.616142366666667,
             "spacingLimitation": 0,
-            "foulRisk": 2.3927071499999997,
+            "foulRisk": 2.414960532,
             "deficientRebounding": 0,
             "hollowAnchor": 0
           }
         },
         "production": {
-          "score": 34.11920898208709,
-          "weight": 0.11685371517027865,
+          "score": 47.58023850526183,
+          "weight": 0.305,
           "confidence": "medium",
           "sampleGames": 55,
           "sampleMinutes": 1220,
-          "shrinkage": 0.2596749226006192
+          "shrinkage": 0.8133333333333334
         },
         "calibratedImpact": {
           "adjustment": -0.375,
@@ -6813,12 +6903,12 @@
           "sampleCount": 1280,
           "artifactVersion": "ratings-model-v3.6"
         },
-        "canonicalOverall": 52,
-        "rawOverallScore": 51.79,
+        "canonicalOverall": 73,
+        "rawOverallScore": 55.97,
+        "overallPercentile": 0.587378640776699,
+        "overallCohortVersion": "overall-scale-v1",
         "offenseRating": 60,
-        "defenseRating": 59,
-        "overallPercentile": 0.6454,
-        "overallCohortVersion": "overall-cohort-v7"
+        "defenseRating": 59
       },
       "detailedRatings": {
         "insideScoring": 62,
@@ -7422,9 +7512,9 @@
         }
       },
       "source": {
-        "dataVersion": "m17-ratings-v3.12",
-        "ratingsVersion": "ratings-v3.12",
-        "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
+        "dataVersion": "m17-ratings-v4.0",
+        "ratingsVersion": "ratings-v4.0",
+        "selectionScoreVersion": "selection-v4.0-ratings-v4.0",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v13",
         "lineageRuleVersion": "lineage-v1"
@@ -7464,8 +7554,8 @@
         "teamGames": 43,
         "teamMinutes": 559
       },
-      "selectionScore": 51.274,
-      "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
+      "selectionScore": 55.135,
+      "selectionScoreVersion": "selection-v4.0-ratings-v4.0",
       "stats": {
         "gamesPlayed": 43,
         "minutes": 559,
@@ -7498,26 +7588,35 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 69,
+        "overallRating": 72,
         "offenseRating": 58,
         "defenseRating": 54
       },
       "ratingProfile": {
-        "schemaVersion": 2,
-        "modelVersion": "ratings-model-v3.6",
-        "memberships": {
-          "primaryCreator": 0.060638,
-          "secondaryCreator": 0.106622,
-          "scoringGuard": 0.047713,
-          "movementSpacer": 0.136986,
-          "twoWayWing": 0.120108,
-          "connector": 0.17151,
-          "interiorFinisher": 0.064852,
-          "stretchBig": 0.115341,
-          "rebounder": 0.08249,
-          "defensiveAnchor": 0.09374
+        "schemaVersion": 3,
+        "overallDiagnostics": {
+          "schemaVersion": 1,
+          "abilityBase": 56.6,
+          "abilityContribution": 52.52,
+          "productionContribution": 3.31,
+          "confidenceWeight": 0.072111,
+          "rawScore": 55.83,
+          "mappingVersion": "overall-scale-v1"
         },
-        "baseScore": 54.56,
+        "modelVersion": "ratings-model-v4.0",
+        "memberships": {
+          "primaryCreator": 0.042227,
+          "secondaryCreator": 0.091994,
+          "scoringGuard": 0.051004,
+          "movementSpacer": 0.146436,
+          "twoWayWing": 0.128393,
+          "connector": 0.158935,
+          "interiorFinisher": 0.069326,
+          "stretchBig": 0.123297,
+          "rebounder": 0.08818,
+          "defensiveAnchor": 0.100208
+        },
+        "baseScore": 56.6,
         "nonlinear": {
           "creation": 63.45707724048805,
           "penetration": 57.3078653185497,
@@ -7526,25 +7625,25 @@
           "switchability": 55.976180345914116,
           "rimProtection": 52.428615471994256,
           "possessionControl": 65.798,
-          "synergyBonus": 0.011625559172199238,
-          "weaknessPenalty": -1.3011068915985013,
+          "synergyBonus": 0.008095789557116944,
+          "weaknessPenalty": -1.302424881303468,
           "weaknesses": {
-            "turnoverLiability": 0.48315796445637615,
+            "turnoverLiability": 0.469971414765101,
             "inefficientUsage": 0,
-            "defensiveTargeting": 1.3863099333333337,
+            "defensiveTargeting": 1.360528333333334,
             "spacingLimitation": 0,
-            "foulRisk": 1.2614733899999997,
-            "deficientRebounding": 0.6958436874999999,
+            "foulRisk": 1.2843402299999997,
+            "deficientRebounding": 0.7158214375,
             "hollowAnchor": 0
           }
         },
         "production": {
-          "score": 24.07247017893996,
-          "weight": 0.03797603234696924,
+          "score": 45.874402498890795,
+          "weight": 0.072111,
           "confidence": "low",
           "sampleGames": 43,
           "sampleMinutes": 559,
-          "shrinkage": 0.1406519716554416
+          "shrinkage": 0.3204933333333333
         },
         "calibratedImpact": {
           "adjustment": 0.112,
@@ -7552,12 +7651,12 @@
           "sampleCount": 1280,
           "artifactVersion": "ratings-model-v3.6"
         },
-        "canonicalOverall": 51,
-        "rawOverallScore": 50.91,
+        "canonicalOverall": 72,
+        "rawOverallScore": 55.83,
+        "overallPercentile": 0.606498910243709,
+        "overallCohortVersion": "overall-scale-v1",
         "offenseRating": 58,
-        "defenseRating": 54,
-        "overallPercentile": 0.741,
-        "overallCohortVersion": "overall-cohort-v7"
+        "defenseRating": 54
       },
       "detailedRatings": {
         "insideScoring": 55,
@@ -8162,9 +8261,9 @@
         }
       },
       "source": {
-        "dataVersion": "m17-ratings-v3.12",
-        "ratingsVersion": "ratings-v3.12",
-        "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
+        "dataVersion": "m17-ratings-v4.0",
+        "ratingsVersion": "ratings-v4.0",
+        "selectionScoreVersion": "selection-v4.0-ratings-v4.0",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v13",
         "lineageRuleVersion": "lineage-v1"
@@ -8204,8 +8303,8 @@
         "teamGames": 75,
         "teamMinutes": 1206
       },
-      "selectionScore": 51.378,
-      "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
+      "selectionScore": 55.364,
+      "selectionScoreVersion": "selection-v4.0-ratings-v4.0",
       "stats": {
         "gamesPlayed": 75,
         "minutes": 1206,
@@ -8238,26 +8337,35 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 62,
+        "overallRating": 67,
         "offenseRating": 58,
         "defenseRating": 58
       },
       "ratingProfile": {
-        "schemaVersion": 2,
-        "modelVersion": "ratings-model-v3.6",
-        "memberships": {
-          "primaryCreator": 0.022122,
-          "secondaryCreator": 0.047429,
-          "scoringGuard": 0.035851,
-          "movementSpacer": 0.093753,
-          "twoWayWing": 0.15795,
-          "connector": 0.104333,
-          "interiorFinisher": 0.091299,
-          "stretchBig": 0.156843,
-          "rebounder": 0.133257,
-          "defensiveAnchor": 0.157163
+        "schemaVersion": 3,
+        "overallDiagnostics": {
+          "schemaVersion": 1,
+          "abilityBase": 58,
+          "abilityContribution": 40.51,
+          "productionContribution": 14.03,
+          "confidenceWeight": 0.3015,
+          "rawScore": 54.54,
+          "mappingVersion": "overall-scale-v1"
         },
-        "baseScore": 55.5,
+        "modelVersion": "ratings-model-v4.0",
+        "memberships": {
+          "primaryCreator": 0.022739,
+          "secondaryCreator": 0.048752,
+          "scoringGuard": 0.036852,
+          "movementSpacer": 0.091669,
+          "twoWayWing": 0.146907,
+          "connector": 0.099495,
+          "interiorFinisher": 0.093846,
+          "stretchBig": 0.161219,
+          "rebounder": 0.136975,
+          "defensiveAnchor": 0.161546
+        },
+        "baseScore": 58,
         "nonlinear": {
           "creation": 58.790794060634475,
           "penetration": 56.23276838436021,
@@ -8266,25 +8374,25 @@
           "switchability": 60.02915249990177,
           "rimProtection": 63.24254882552003,
           "possessionControl": 61.0575,
-          "synergyBonus": 0.029181244736842044,
-          "weaknessPenalty": -2.668034181777435,
+          "synergyBonus": 0.02944814210526309,
+          "weaknessPenalty": -2.6865830803239623,
           "weaknesses": {
-            "turnoverLiability": 2.4658285964546396,
+            "turnoverLiability": 2.473225564129301,
             "inefficientUsage": 0,
-            "defensiveTargeting": 0.6917937857142858,
+            "defensiveTargeting": 0.69315925,
             "spacingLimitation": 0,
-            "foulRisk": 4.689536976,
+            "foulRisk": 4.735330128,
             "deficientRebounding": 0,
             "hollowAnchor": 0
           }
         },
         "production": {
-          "score": 29.047916436615022,
-          "weight": 0.1307962980815579,
+          "score": 46.52195349875444,
+          "weight": 0.3015,
           "confidence": "medium",
           "sampleGames": 75,
           "sampleMinutes": 1206,
-          "shrinkage": 0.29065844018123976
+          "shrinkage": 0.804
         },
         "calibratedImpact": {
           "adjustment": 0.253,
@@ -8292,12 +8400,12 @@
           "sampleCount": 1280,
           "artifactVersion": "ratings-model-v3.6"
         },
-        "canonicalOverall": 49,
-        "rawOverallScore": 49.54,
+        "canonicalOverall": 67,
+        "rawOverallScore": 54.54,
+        "overallPercentile": 0.7794729542302358,
+        "overallCohortVersion": "overall-scale-v1",
         "offenseRating": 58,
-        "defenseRating": 58,
-        "overallPercentile": 0.8794,
-        "overallCohortVersion": "overall-cohort-v7"
+        "defenseRating": 58
       },
       "detailedRatings": {
         "insideScoring": 61,
@@ -8902,9 +9010,9 @@
         }
       },
       "source": {
-        "dataVersion": "m17-ratings-v3.12",
-        "ratingsVersion": "ratings-v3.12",
-        "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
+        "dataVersion": "m17-ratings-v4.0",
+        "ratingsVersion": "ratings-v4.0",
+        "selectionScoreVersion": "selection-v4.0-ratings-v4.0",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v13",
         "lineageRuleVersion": "lineage-v1"
@@ -8947,8 +9055,8 @@
         "teamGames": 77,
         "teamMinutes": 2311
       },
-      "selectionScore": 52.512,
-      "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
+      "selectionScore": 55.002,
+      "selectionScoreVersion": "selection-v4.0-ratings-v4.0",
       "stats": {
         "gamesPlayed": 77,
         "minutes": 2311,
@@ -8981,13 +9089,22 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 66,
+        "overallRating": 63,
         "offenseRating": 61,
         "defenseRating": 58
       },
       "ratingProfile": {
-        "schemaVersion": 2,
-        "modelVersion": "ratings-model-v3.6",
+        "schemaVersion": 3,
+        "overallDiagnostics": {
+          "schemaVersion": 1,
+          "abilityBase": 59.949999999999996,
+          "abilityContribution": 29.98,
+          "productionContribution": 23.24,
+          "confidenceWeight": 0.5,
+          "rawScore": 53.22,
+          "mappingVersion": "overall-scale-v1"
+        },
+        "modelVersion": "ratings-model-v4.0",
         "memberships": {
           "primaryCreator": 0.040303,
           "secondaryCreator": 0.063474,
@@ -9000,7 +9117,7 @@
           "rebounder": 0.113645,
           "defensiveAnchor": 0.132984
         },
-        "baseScore": 56.97,
+        "baseScore": 59.95,
         "nonlinear": {
           "creation": 62.30992922221324,
           "penetration": 58.9598501137946,
@@ -9022,12 +9139,12 @@
           }
         },
         "production": {
-          "score": 38.70465909162353,
-          "weight": 0.2394512511017365,
+          "score": 46.48344821450116,
+          "weight": 0.5,
           "confidence": "high",
           "sampleGames": 77,
           "sampleMinutes": 2311,
-          "shrinkage": 0.3990854185028942
+          "shrinkage": 1
         },
         "calibratedImpact": {
           "adjustment": -1.066,
@@ -9035,12 +9152,12 @@
           "sampleCount": 1280,
           "artifactVersion": "ratings-model-v3.6"
         },
-        "canonicalOverall": 50,
-        "rawOverallScore": 50.1,
+        "canonicalOverall": 57,
+        "rawOverallScore": 53.22,
+        "overallPercentile": 0.9034079651277986,
+        "overallCohortVersion": "overall-scale-v1",
         "offenseRating": 61,
-        "defenseRating": 58,
-        "overallPercentile": 0.8221,
-        "overallCohortVersion": "overall-cohort-v7"
+        "defenseRating": 58
       },
       "detailedRatings": {
         "insideScoring": 61,
@@ -9645,9 +9762,9 @@
         }
       },
       "source": {
-        "dataVersion": "m17-ratings-v3.12",
-        "ratingsVersion": "ratings-v3.12",
-        "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
+        "dataVersion": "m17-ratings-v4.0",
+        "ratingsVersion": "ratings-v4.0",
+        "selectionScoreVersion": "selection-v4.0-ratings-v4.0",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v13",
         "lineageRuleVersion": "lineage-v1"
@@ -9687,8 +9804,8 @@
         "teamGames": 68,
         "teamMinutes": 1338
       },
-      "selectionScore": 56.517,
-      "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
+      "selectionScore": 59.067,
+      "selectionScoreVersion": "selection-v4.0-ratings-v4.0",
       "stats": {
         "gamesPlayed": 68,
         "minutes": 1338,
@@ -9721,26 +9838,35 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 79,
+        "overallRating": 80,
         "offenseRating": 66,
-        "defenseRating": 56
+        "defenseRating": 55
       },
       "ratingProfile": {
-        "schemaVersion": 2,
-        "modelVersion": "ratings-model-v3.6",
-        "memberships": {
-          "primaryCreator": 0.04635,
-          "secondaryCreator": 0.091596,
-          "scoringGuard": 0.062181,
-          "movementSpacer": 0.22105,
-          "twoWayWing": 0.107787,
-          "connector": 0.189796,
-          "interiorFinisher": 0.051419,
-          "stretchBig": 0.11935,
-          "rebounder": 0.044011,
-          "defensiveAnchor": 0.06646
+        "schemaVersion": 3,
+        "overallDiagnostics": {
+          "schemaVersion": 1,
+          "abilityBase": 62.15,
+          "abilityContribution": 41.36,
+          "productionContribution": 17.09,
+          "confidenceWeight": 0.3345,
+          "rawScore": 58.45,
+          "mappingVersion": "overall-scale-v1"
         },
-        "baseScore": 61.24,
+        "modelVersion": "ratings-model-v4.0",
+        "memberships": {
+          "primaryCreator": 0.040805,
+          "secondaryCreator": 0.086919,
+          "scoringGuard": 0.063602,
+          "movementSpacer": 0.226099,
+          "twoWayWing": 0.110249,
+          "connector": 0.184663,
+          "interiorFinisher": 0.052594,
+          "stretchBig": 0.122077,
+          "rebounder": 0.045016,
+          "defensiveAnchor": 0.067976
+        },
+        "baseScore": 62.15,
         "nonlinear": {
           "creation": 66.85227719582755,
           "penetration": 60.950779967869295,
@@ -9749,25 +9875,25 @@
           "switchability": 55.92677504191654,
           "rimProtection": 52.350000744065994,
           "possessionControl": 69.4225,
-          "synergyBonus": 0.4957389536877113,
-          "weaknessPenalty": -0.782091698,
+          "synergyBonus": 0.5028472224968082,
+          "weaknessPenalty": -0.783008058107143,
           "weaknesses": {
             "turnoverLiability": 0,
             "inefficientUsage": 0,
-            "defensiveTargeting": 1.1772372,
+            "defensiveTargeting": 1.1706993142857143,
             "spacingLimitation": 0,
             "foulRisk": 0,
-            "deficientRebounding": 1.1230324999999999,
+            "deficientRebounding": 1.1322655625,
             "hollowAnchor": 0
           }
         },
         "production": {
-          "score": 34.33228102891671,
-          "weight": 0.1335799859055673,
+          "score": 51.08181367049624,
+          "weight": 0.3345,
           "confidence": "medium",
           "sampleGames": 68,
           "sampleMinutes": 1338,
-          "shrinkage": 0.2968444131234829
+          "shrinkage": 0.892
         },
         "calibratedImpact": {
           "adjustment": -0.376,
@@ -9775,12 +9901,12 @@
           "sampleCount": 1280,
           "artifactVersion": "ratings-model-v3.6"
         },
-        "canonicalOverall": 58,
-        "rawOverallScore": 55.14,
+        "canonicalOverall": 80,
+        "rawOverallScore": 58.45,
+        "overallPercentile": 0.29572022983950863,
+        "overallCohortVersion": "overall-scale-v1",
         "offenseRating": 66,
-        "defenseRating": 56,
-        "overallPercentile": 0.3674,
-        "overallCohortVersion": "overall-cohort-v7"
+        "defenseRating": 55
       },
       "detailedRatings": {
         "insideScoring": 64,
@@ -10385,9 +10511,9 @@
         }
       },
       "source": {
-        "dataVersion": "m17-ratings-v3.12",
-        "ratingsVersion": "ratings-v3.12",
-        "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
+        "dataVersion": "m17-ratings-v4.0",
+        "ratingsVersion": "ratings-v4.0",
+        "selectionScoreVersion": "selection-v4.0-ratings-v4.0",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v13",
         "lineageRuleVersion": "lineage-v1"
@@ -10426,8 +10552,8 @@
         "teamGames": 54,
         "teamMinutes": 1065
       },
-      "selectionScore": 54.22,
-      "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
+      "selectionScore": 58.402,
+      "selectionScoreVersion": "selection-v4.0-ratings-v4.0",
       "stats": {
         "gamesPlayed": 54,
         "minutes": 1065,
@@ -10460,26 +10586,35 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 75,
+        "overallRating": 80,
         "offenseRating": 62,
-        "defenseRating": 60
+        "defenseRating": 59
       },
       "ratingProfile": {
-        "schemaVersion": 2,
-        "modelVersion": "ratings-model-v3.6",
-        "memberships": {
-          "primaryCreator": 0.067597,
-          "secondaryCreator": 0.130705,
-          "scoringGuard": 0.049335,
-          "movementSpacer": 0.111803,
-          "twoWayWing": 0.127259,
-          "connector": 0.191988,
-          "interiorFinisher": 0.058759,
-          "stretchBig": 0.09539,
-          "rebounder": 0.070468,
-          "defensiveAnchor": 0.096696
+        "schemaVersion": 3,
+        "overallDiagnostics": {
+          "schemaVersion": 1,
+          "abilityBase": 60.95,
+          "abilityContribution": 44.72,
+          "productionContribution": 13.59,
+          "confidenceWeight": 0.26625,
+          "rawScore": 58.32,
+          "mappingVersion": "overall-scale-v1"
         },
-        "baseScore": 57.78,
+        "modelVersion": "ratings-model-v4.0",
+        "memberships": {
+          "primaryCreator": 0.059871,
+          "secondaryCreator": 0.124782,
+          "scoringGuard": 0.050768,
+          "movementSpacer": 0.11505,
+          "twoWayWing": 0.130955,
+          "connector": 0.187928,
+          "interiorFinisher": 0.060465,
+          "stretchBig": 0.098161,
+          "rebounder": 0.072514,
+          "defensiveAnchor": 0.099506
+        },
+        "baseScore": 60.95,
         "nonlinear": {
           "creation": 72.90272901859926,
           "penetration": 61.158238272561235,
@@ -10488,25 +10623,25 @@
           "switchability": 59.424497598668616,
           "rimProtection": 53.10343179088828,
           "possessionControl": 67.6555,
-          "synergyBonus": 0.09697260177240187,
-          "weaknessPenalty": -2.8215562162547623,
+          "synergyBonus": 0.0858891169832311,
+          "weaknessPenalty": -2.8254033110333334,
           "weaknesses": {
             "turnoverLiability": 6,
             "inefficientUsage": 0,
-            "defensiveTargeting": 0.5052209761904766,
+            "defensiveTargeting": 0.5014398333333338,
             "spacingLimitation": 0,
-            "foulRisk": 1.2288210899999998,
-            "deficientRebounding": 0.5646526875,
+            "foulRisk": 1.2375007799999997,
+            "deficientRebounding": 0.571069125,
             "hollowAnchor": 0
           }
         },
         "production": {
-          "score": 35.820326687117564,
-          "weight": 0.10733482642777156,
+          "score": 51.05706292628935,
+          "weight": 0.26625,
           "confidence": "medium",
           "sampleGames": 54,
           "sampleMinutes": 1065,
-          "shrinkage": 0.23852183650615902
+          "shrinkage": 0.71
         },
         "calibratedImpact": {
           "adjustment": -0.995,
@@ -10514,12 +10649,12 @@
           "sampleCount": 1280,
           "artifactVersion": "ratings-model-v3.6"
         },
-        "canonicalOverall": 54,
-        "rawOverallScore": 52.92,
+        "canonicalOverall": 80,
+        "rawOverallScore": 58.32,
+        "overallPercentile": 0.30760848028531806,
+        "overallCohortVersion": "overall-scale-v1",
         "offenseRating": 62,
-        "defenseRating": 60,
-        "overallPercentile": 0.5392,
-        "overallCohortVersion": "overall-cohort-v7"
+        "defenseRating": 59
       },
       "detailedRatings": {
         "insideScoring": 58,
@@ -11124,9 +11259,9 @@
         }
       },
       "source": {
-        "dataVersion": "m17-ratings-v3.12",
-        "ratingsVersion": "ratings-v3.12",
-        "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
+        "dataVersion": "m17-ratings-v4.0",
+        "ratingsVersion": "ratings-v4.0",
+        "selectionScoreVersion": "selection-v4.0-ratings-v4.0",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v13",
         "lineageRuleVersion": "lineage-v1"
@@ -11165,8 +11300,8 @@
         "teamGames": 74,
         "teamMinutes": 2408
       },
-      "selectionScore": 60.988,
-      "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
+      "selectionScore": 59.099,
+      "selectionScoreVersion": "selection-v4.0-ratings-v4.0",
       "stats": {
         "gamesPlayed": 74,
         "minutes": 2408,
@@ -11199,13 +11334,22 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 86,
+        "overallRating": 79,
         "offenseRating": 59,
         "defenseRating": 67
       },
       "ratingProfile": {
-        "schemaVersion": 2,
-        "modelVersion": "ratings-model-v3.6",
+        "schemaVersion": 3,
+        "overallDiagnostics": {
+          "schemaVersion": 1,
+          "abilityBase": 61.8,
+          "abilityContribution": 30.9,
+          "productionContribution": 26.9,
+          "confidenceWeight": 0.5,
+          "rawScore": 57.8,
+          "mappingVersion": "overall-scale-v1"
+        },
+        "modelVersion": "ratings-model-v4.0",
         "memberships": {
           "primaryCreator": 0.021887,
           "secondaryCreator": 0.030018,
@@ -11218,7 +11362,7 @@
           "rebounder": 0.215189,
           "defensiveAnchor": 0.213504
         },
-        "baseScore": 60.82,
+        "baseScore": 61.8,
         "nonlinear": {
           "creation": 56.77824995455002,
           "penetration": 59.240424666371005,
@@ -11228,7 +11372,7 @@
           "rimProtection": 71.63641197883388,
           "possessionControl": 58.4385,
           "synergyBonus": 0,
-          "weaknessPenalty": -2.275362186076071,
+          "weaknessPenalty": -1.9346154602261563,
           "weaknesses": {
             "turnoverLiability": 3.4760702197267084,
             "inefficientUsage": 0,
@@ -11236,16 +11380,16 @@
             "spacingLimitation": 0.05567782352669214,
             "foulRisk": 2.1582974279999996,
             "deficientRebounding": 0,
-            "hollowAnchor": 1.002196252499749
+            "hollowAnchor": 0
           }
         },
         "production": {
-          "score": 56.043346467180314,
-          "weight": 0.23998276140710015,
+          "score": 53.802886893290236,
+          "weight": 0.5,
           "confidence": "high",
           "sampleGames": 74,
           "sampleMinutes": 2408,
-          "shrinkage": 0.3999712690118336
+          "shrinkage": 1
         },
         "calibratedImpact": {
           "adjustment": -0.077,
@@ -11253,12 +11397,12 @@
           "sampleCount": 1280,
           "artifactVersion": "ratings-model-v3.6"
         },
-        "canonicalOverall": 66,
-        "rawOverallScore": 60.17,
+        "canonicalOverall": 79,
+        "rawOverallScore": 57.8,
+        "overallPercentile": 0.36407766990291257,
+        "overallCohortVersion": "overall-scale-v1",
         "offenseRating": 59,
-        "defenseRating": 67,
-        "overallPercentile": 0.1141,
-        "overallCohortVersion": "overall-cohort-v7"
+        "defenseRating": 67
       },
       "detailedRatings": {
         "insideScoring": 70,
@@ -11862,9 +12006,9 @@
         }
       },
       "source": {
-        "dataVersion": "m17-ratings-v3.12",
-        "ratingsVersion": "ratings-v3.12",
-        "selectionScoreVersion": "selection-v3.14-ratings-v3.12",
+        "dataVersion": "m17-ratings-v4.0",
+        "ratingsVersion": "ratings-v4.0",
+        "selectionScoreVersion": "selection-v4.0-ratings-v4.0",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v13",
         "lineageRuleVersion": "lineage-v1"

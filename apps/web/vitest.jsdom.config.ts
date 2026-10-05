@@ -20,7 +20,7 @@ export default defineProject({
     include: ['src/lib/components/__tests__/**/*.test.ts'],
     setupFiles: ['src/test/svelte-testing.ts'],
     css: false,
-    exclude: [...defaultExclude, 'e2e/**'],
+    exclude: [...defaultExclude],
     passWithNoTests: true,
     isolate: false,
     experimental: {
