@@ -552,10 +552,6 @@
     await shell.hub?.resumeBlock();
     mirrorHub();
   };
-  shell.selectCampaignOpportunity = async (input) => {
-    await shell.hub?.selectCampaignOpportunity(input);
-    mirrorHub();
-  };
   shell.selectFrontOffice = async (input) => {
     await shell.hub?.selectFrontOffice(input);
     mirrorHub();

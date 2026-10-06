@@ -1,7 +1,8 @@
 import {
   createEngineContext,
-  simulateGame,
-  checkGameResult,
+  duelGameEvents,
+  findWeakestOpponent,
+  shared82GameEvents,
   verifyFixedFiveCompetition,
   type EngineContext,
 } from '@hoop-rush/engine';
@@ -16,13 +17,8 @@ import {
   type FixedFiveWorkerResults,
   type FixedFiveWorkerVerificationFailed,
   type FixedFiveWorkerVerified,
+  type OpponentBracket,
 } from '@hoop-rush/data-contracts';
-import {
-  fixedFiveDuelGameSeed,
-  fixedFiveH2HSeed,
-  fixedFiveSharedGameSeed,
-  findWeakestOpponent,
-} from '@hoop-rush/engine';
 const BATCH = 4;
 let currentRequestId: string | null = null;
 let requestToken = 0;
@@ -63,6 +59,14 @@ function maybeProgress(
     completedGames,
     totalGames,
   });
+}
+function normalizeSimulationError(message: string): string {
+  return message
+    .replace(/ failed invariants: [\s\S]*$/, ' failed invariants')
+    .replace(
+      /^shared82 (?:p1|p2) game (\d+) failed invariants$/,
+      'shared82 game $1 failed invariants',
+    );
 }
 self.onmessage = (event: MessageEvent<unknown>): void => {
   const parsed = fixedFiveWorkerRequestSchema.safeParse(event.data);
@@ -134,31 +138,26 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
         let p1Wins = 0;
         let p2Wins = 0;
         let delivered = 0;
-        for (let gameNumber = 1; gameNumber <= 7; gameNumber += 1) {
+        const events = duelGameEvents(
+          {
+            p1Team: request.p1Team,
+            p2Team: request.p2Team,
+            profile: request.profile,
+            rootSeed: request.rootSeed,
+            dataVersion: request.dataVersion,
+          },
+          context,
+        );
+        for (;;) {
           if (token !== requestToken) return;
-          if (p1Wins === 4 || p2Wins === 4) break;
-          const seed = fixedFiveDuelGameSeed(request.rootSeed, gameNumber);
-          const displayHomeP1 = gameNumber % 2 === 1;
-          const result = simulateGame(
-            {
-              schemaVersion: 2,
-              seed,
-              gameNumber,
-              dataVersion: request.dataVersion,
-              profile: request.profile,
-              home: displayHomeP1 ? request.p1Team : request.p2Team,
-              away: displayHomeP1 ? request.p2Team : request.p1Team,
-            },
-            context,
-          );
-          const failures = checkGameResult(result);
-          if (failures.length > 0)
-            throw new Error(`duel game ${String(gameNumber)} failed invariants`);
-          const homeIsP1 = result.home.teamId === request.p1Team.teamId;
-          if ((result.winner === 'home') === homeIsP1) p1Wins += 1;
+          const next = events.next();
+          if (next.done) break;
+          const { game } = next.value;
+          const homeIsP1 = game.home.teamId === request.p1Team.teamId;
+          if ((game.winner === 'home') === homeIsP1) p1Wins += 1;
           else p2Wins += 1;
           delivered += 1;
-          pending.push({ tag: 'duel', game: result });
+          pending.push(next.value);
           if (pending.length >= BATCH) flush(request.requestId);
           maybeProgress(
             request.requestId,
@@ -186,65 +185,30 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
       }
       const total = 82 + 82 - h2hSet.size;
       let delivered = 0;
-      for (
-        let gameNumber = request.startGameNumber;
-        gameNumber <= 82 && token === requestToken;
-        gameNumber += 1
-      ) {
-        const entry = request.bracket.schedule[gameNumber - 1];
-        if (!entry) continue;
-        if (h2hSet.has(gameNumber)) {
-          const seed = fixedFiveH2HSeed(request.rootSeed, gameNumber);
-          const result = simulateGame(
-            {
-              schemaVersion: 2,
-              seed,
-              gameNumber,
-              dataVersion: request.dataVersion,
-              profile: request.profile,
-              home: request.p1Team,
-              away: request.p2Team,
-            },
-            context,
-          );
-          const failures = checkGameResult(result);
-          if (failures.length > 0)
-            throw new Error(`H2H game ${String(gameNumber)} failed invariants`);
-          pending.push({ tag: 'h2h', game: result });
-          delivered += 1;
-        } else {
-          const opponent = request.bracket.opponents.find((o) => o.opponentId === entry.opponentId);
-          if (!opponent) throw new Error(`unknown opponent ${entry.opponentId}`);
-          for (const participant of ['p1', 'p2'] as const) {
-            if (token !== requestToken) return;
-            const seed = fixedFiveSharedGameSeed(request.rootSeed, participant, gameNumber);
-            const home = participant === 'p1' ? request.p1Team : request.p2Team;
-            const result = simulateGame(
-              {
-                schemaVersion: 2,
-                seed,
-                gameNumber,
-                dataVersion: request.dataVersion,
-                profile: request.profile,
-                home,
-                away: {
-                  teamId: opponent.teamId,
-                  displayName: opponent.displayName,
-                  players: opponent.players,
-                },
-              },
-              context,
-            );
-            const failures = checkGameResult(result);
-            if (failures.length > 0)
-              throw new Error(`shared82 game ${String(gameNumber)} failed invariants`);
-            pending.push({ tag: participant, game: result });
-            delivered += 1;
-          }
-        }
+      const events = shared82GameEvents(
+        {
+          p1Team: request.p1Team,
+          p2Team: request.p2Team,
+          bracket: request.bracket as OpponentBracket,
+          profile: request.profile,
+          rootSeed: request.rootSeed,
+          dataVersion: request.dataVersion,
+        },
+        context,
+        request.startGameNumber,
+      );
+      for (;;) {
+        if (token !== requestToken) return;
+        const next = events.next();
+        if (next.done) break;
+        const event = next.value;
+        pending.push(event);
+        delivered += 1;
+        if (event.tag === 'p1') continue;
         if (pending.length >= BATCH) flush(request.requestId);
         maybeProgress(request.requestId, delivered, total);
-        if (gameNumber % BATCH === 0) await new Promise((resolve) => setTimeout(resolve, 0));
+        if (event.game.gameNumber % BATCH === 0)
+          await new Promise((resolve) => setTimeout(resolve, 0));
       }
       if (token !== requestToken) return;
       flush(request.requestId);
@@ -258,7 +222,11 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
       });
     } catch (error) {
       if (token !== requestToken) return;
-      postError(request.requestId, error instanceof Error ? error.message : String(error));
+      const message = error instanceof Error ? error.message : String(error);
+      postError(
+        request.requestId,
+        request.type === 'fixed-five-verify' ? message : normalizeSimulationError(message),
+      );
     }
   })();
 };

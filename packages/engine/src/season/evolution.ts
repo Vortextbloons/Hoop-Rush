@@ -71,18 +71,6 @@ export function campaignBonusOf(executiveId: SeasonFrontOfficeId | null | undefi
   return frontOfficeEntryOf(executiveId).campaignBonus;
 }
 
-export function applyCampaignBonus(
-  executiveId: SeasonFrontOfficeId | null | undefined,
-  balanceBefore: number,
-  cap: number,
-): { requested: number; credited: number } {
-  const bonus = campaignBonusOf(executiveId);
-  if (bonus <= 0) return { requested: 0, credited: 0 };
-  const requested = 1;
-  const credited = Math.max(0, Math.min(requested, cap - balanceBefore));
-  return { requested, credited };
-}
-
 export function evolutionVersions(): {
   frontOfficeVersion: typeof SEASON_FRONT_OFFICE_VERSION;
   courtInnovationVersion: typeof SEASON_COURT_INNOVATION_VERSION;

@@ -100,10 +100,6 @@ export interface SeasonRunShellData {
   resolveFreeAgentMarket: (input: { windowIndex: number }) => Promise<void>;
   forfeitInterruptedGame: () => Promise<void>;
   resumeBlock: () => Promise<void>;
-  selectCampaignOpportunity?: (input: {
-    blockIndex: number;
-    opportunityId: string;
-  }) => Promise<void>;
   selectFrontOffice?: (input: { executiveId: string }) => Promise<void>;
   selectCourtInnovation?: (input: { innovationId: string }) => Promise<void>;
   openTradeInquiry?: (input: { windowIndex: number; toFranchiseId: string }) => Promise<void>;
@@ -203,7 +199,6 @@ export function initialSeasonRunShellData(): SeasonRunShellData {
     resolveFreeAgentMarket: () => Promise.resolve(),
     forfeitInterruptedGame: () => Promise.resolve(),
     resumeBlock: () => Promise.resolve(),
-    selectCampaignOpportunity: () => Promise.resolve(),
     selectFrontOffice: () => Promise.resolve(),
     selectCourtInnovation: () => Promise.resolve(),
     openTradeInquiry: () => Promise.resolve(),

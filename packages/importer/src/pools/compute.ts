@@ -60,6 +60,7 @@ import { positionOverrideFor } from '../positions/overrides.ts';
 import { primaryPositionForSource } from '../positions/normalize.ts';
 import { canonicalPlayerName } from '../identity.ts';
 import { derivePlayerRecord } from '../ratings/v2.ts';
+import { loadOverallEvidence } from '../ratings/overall-evidence.ts';
 import { getEra } from '../ratings/era.ts';
 import { loadRatingsModelArtifact } from '../ratings/artifact.ts';
 export { POSITION_LABEL_MAP, buildPlayerPositions, normalizePositionLabels } from './positions.ts';
@@ -283,7 +284,12 @@ function refreshedFallbackPlayer(
     season,
     position,
     heightInches,
-    stats,
+    stats: {
+      ...stats,
+      ...loadOverallEvidence(season, currentRatingsModelArtifact().schemaVersion === 4).get(
+        playerExternalId,
+      ),
+    },
     playerId: `p-${playerExternalId}`,
     era: getEra(season),
     artifact: currentRatingsModelArtifact(),
@@ -732,7 +738,7 @@ export function normalizePoolOveralls(
     const profile = row.ratingProfile;
     if (!hasRawOverallScore(row)) rowsWithoutRawOverall += 1;
     const mapped =
-      scale && profile?.schemaVersion === 3 && hasRawOverallScore(row)
+      scale && profile && (profile.schemaVersion ?? 0) >= 3 && hasRawOverallScore(row)
         ? overallForScore(profile.rawOverallScore as number, scale)
         : null;
     row.summaryRatings.overallRating = minutesFloorOverall(

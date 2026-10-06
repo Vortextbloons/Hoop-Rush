@@ -96,12 +96,6 @@ import {
   SEASON_FULL_SIMULATE_OPTIONS,
 } from './commands/season-block.ts';
 import {
-  seasonCampaignAudit,
-  SEASON_CAMPAIGN_AUDIT_OPTIONS,
-  seasonCampaignCalibrate,
-  SEASON_CAMPAIGN_CALIBRATE_OPTIONS,
-} from './commands/season-campaign.ts';
-import {
   seasonDraftCalibrate,
   SEASON_DRAFT_CALIBRATE_OPTIONS,
 } from './commands/season-draft-calibrate.ts';
@@ -269,6 +263,7 @@ const COMMANDS: Record<string, CommandDef> = {
         input: parseOption(args, 'input', DEFAULT_MANIFEST),
         baseline: s(args, 'baseline'),
         output: s(args, 'output'),
+        allowInputChanges: hasOption(args, 'allow-input-changes'),
       }),
   },
   'data overalls': {
@@ -590,19 +585,6 @@ const COMMANDS: Record<string, CommandDef> = {
   'season health calibrate': {
     options: SEASON_HEALTH_CALIBRATE_OPTIONS,
     run: (args) => seasonHealthCalibrate({ input: n(args, 'input'), ...seedRange(args) }),
-  },
-  'season campaign audit': {
-    options: SEASON_CAMPAIGN_AUDIT_OPTIONS,
-    run: (args) => seasonCampaignAudit(pick(args, ['input', 'manifest'])),
-  },
-  'season campaign calibrate': {
-    options: SEASON_CAMPAIGN_CALIBRATE_OPTIONS,
-    run: (args) =>
-      seasonCampaignCalibrate({
-        input: n(args, 'input'),
-        write: hasOption(args, 'write'),
-        ...seedRange(args),
-      }),
   },
   'season trade audit': {
     options: SEASON_TRADE_AUDIT_OPTIONS,

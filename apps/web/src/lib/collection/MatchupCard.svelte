@@ -1,9 +1,7 @@
 <script lang="ts">
   import type { CollectionCatalogCard, HoopRushManifest } from '@hoop-rush/data-contracts';
   import { Flame, Trophy, Shield, Sparkles, Crown } from '@lucide/svelte';
-  import { asset } from '$app/paths';
-  import PlayerFace from '$lib/components/PlayerFace.svelte';
-  import { collectionCardArtOf } from './collection-card-art';
+  import CollectionCardFace from './CollectionCardFace.svelte';
 
   let {
     card,
@@ -16,15 +14,6 @@
     detail?: string;
     manifest?: HoopRushManifest | null;
   } = $props();
-
-  const artwork = $derived(collectionCardArtOf(card));
-  const initials = $derived(
-    card.displayName
-      .split(' ')
-      .map((part) => part[0] ?? '')
-      .join('')
-      .slice(0, 2),
-  );
 
   const Emblem = $derived(
     card.rarity === 'Immortal'
@@ -50,18 +39,7 @@
     <span>{card.positions[0] ?? '—'}</span>
   </div>
   <div class="card-art" aria-hidden="true">
-    {#if artwork}
-      <img class="card-image" src={asset(artwork)} alt="" loading="lazy" />
-    {:else if manifest}
-      <PlayerFace
-        player={{ playerId: card.playerId, playerExternalId: card.playerExternalId, altIds: null }}
-        {manifest}
-        size={compact ? 'sm' : 'xl'}
-        fallbackInitials={initials}
-      />
-    {:else}
-      <span class="card-initials">{initials}</span>
-    {/if}
+    <CollectionCardFace {card} {manifest} size={compact ? 'sm' : 'xl'} loading="lazy" />
   </div>
   <div class="card-identity">
     <span class="card-rarity"><Emblem size={12} /> {card.rarity}</span>
@@ -127,23 +105,23 @@
     border-bottom: 1px solid color-mix(in srgb, var(--foil) 30%, transparent);
     background: repeating-linear-gradient(125deg, transparent 0 17px, #ffffff04 18px 19px);
   }
-  .card-image {
+  .card-art :global(.ur-special-art) {
     width: 100%;
     height: 100%;
     object-fit: contain;
   }
-  .card-art :global(> div) {
+  .card-art :global(.relative) {
     width: 100%;
     height: 100%;
     border-radius: 0;
     background: transparent;
   }
-  .card-art :global(img:not(.card-image)) {
+  .card-art :global(img:not(.ur-special-art)) {
     object-fit: contain;
     object-position: bottom;
     transform: none;
   }
-  .card-initials {
+  .card-art :global(.ur-card-face-initials) {
     color: var(--foil);
     font-family: var(--font-display);
     font-size: 3rem;
@@ -198,7 +176,7 @@
   .compact .card-identity {
     padding: 0.5rem;
   }
-  .compact .card-initials {
+  .compact .card-art :global(.ur-card-face-initials) {
     font-size: 1rem;
   }
   .compact h4 {

@@ -8,8 +8,14 @@ import {
   type SimulationRatings,
 } from '@hoop-rush/data-contracts';
 import { DEFAULT_RATINGS_MODEL_ARTIFACT } from './artifact.ts';
-import { buildOverallScale } from './overall-calibration.ts';
-import { deriveRatingProfile, tendenciesForProfile, type RatingProfileInput } from './v3.ts';
+import { buildOverallScale, fitRecognitionPriors } from './overall-calibration.ts';
+import {
+  deriveRatingProfile,
+  offensiveAbilityFor,
+  defensiveAbilityFor,
+  tendenciesForProfile,
+  type RatingProfileInput,
+} from './v3.ts';
 import { normalizePoolOveralls } from '../pools/compute.ts';
 import { starterStats } from './ratings-test-support.ts';
 
@@ -78,8 +84,8 @@ describe('total ability overall', () => {
     for (const ratings of profiles) {
       const result = derive({ ratings });
       expect(result.profile.baseScore).toBeCloseTo(
-        0.65 * result.summaryRatings.offenseRating + 0.35 * result.summaryRatings.defenseRating,
-        8,
+        0.65 * offensiveAbilityFor(ratings, input.tendencies) + 0.35 * defensiveAbilityFor(ratings),
+        1,
       );
       expect(ratingProfileSchema.safeParse(result.profile).success).toBe(true);
     }
@@ -131,6 +137,7 @@ describe('total ability overall', () => {
       'minutes',
       'points',
       'rebounds',
+      'offensiveRebounds',
       'assists',
       'steals',
       'blocks',
@@ -151,6 +158,150 @@ describe('total ability overall', () => {
     const zero = derive({ stats: { ...input.stats, steals: 0, blocks: 0 } });
     expect(missing.profile.production.score).toBe(zero.profile.production.score);
     expect(input.stats.steals).not.toBeNull();
+  });
+
+  it('values comparable scoring routes without requiring guard skills from every scorer', () => {
+    const interior = { ...ratings, insideScoring: 90, midrange: 60, threePoint: 40 };
+    const perimeter = { ...ratings, insideScoring: 40, midrange: 60, threePoint: 90 };
+    expect(derive({ ratings: interior }).profile.rawOverallScore).toBe(
+      derive({ ratings: perimeter }).profile.rawOverallScore,
+    );
+    const finisher = derive({
+      ratings: { ...interior, passing: 35, ballHandling: 35 },
+      stats: { ...input.stats, points: 900, usageRate: 16 },
+    });
+    const creator = derive({
+      ratings: interior,
+      stats: { ...input.stats, points: 1800, usageRate: 28 },
+    });
+    expect(creator.profile.rawOverallScore).toBeGreaterThan(finisher.profile.rawOverallScore);
+  });
+
+  it('does not dilute defensive ability when offensive production evidence increases', () => {
+    const stronger = {
+      ...ratings,
+      interiorDefense: 75,
+      perimeterDefense: 75,
+      defensiveIq: 75,
+      block: 75,
+      steal: 75,
+      defensiveRebound: 75,
+      speed: 75,
+      strength: 75,
+      vertical: 75,
+    };
+    const gains = [{ ...input.stats, gamesPlayed: 10, minutes: 300 }, input.stats].map(
+      (stats) =>
+        derive({ stats, ratings: stronger }).profile.rawOverallScore -
+        derive({ stats }).profile.rawOverallScore,
+    );
+    expect(gains[0]).toBeCloseTo(gains[1] ?? 0, 2);
+    expect(gains[1]).toBeCloseTo(3.5, 2);
+  });
+
+  it('normalizes individual production by possession exposure rather than team success', () => {
+    const slower: RatingProfileInput['stats'] = { ...input.stats, possessionPace: 90 };
+    const faster: RatingProfileInput['stats'] = { ...input.stats, possessionPace: 120 };
+    for (const key of ['points', 'assists', 'offensiveRebounds', 'fga', 'fta', 'turnovers'])
+      faster[key] = (Number(slower[key]) * 120) / 90;
+    expect(derive({ stats: slower }).profile.rawOverallScore).toBe(
+      derive({ stats: faster }).profile.rawOverallScore,
+    );
+  });
+
+  it('fits shared recognition priors deterministically and preserves small-sample shrinkage', () => {
+    const samples = [
+      { key: 'a', score: 65, defense: 70, honors: ['MVP-1', 'DEF1'] as const },
+      { key: 'b', score: 75, defense: 80, honors: ['MVP-1', 'DEF1'] as const },
+      { key: 'c', score: 55, defense: 60, honors: [] },
+    ];
+    const priors = fitRecognitionPriors(samples);
+    expect(fitRecognitionPriors([...samples].reverse())).toEqual(priors);
+    const first = samples[0];
+    if (!first) throw new Error('missing fixture sample');
+    expect(fitRecognitionPriors([...samples, first])).toEqual(priors);
+    expect(() => fitRecognitionPriors([...samples, { ...first, score: 66 }])).toThrow(
+      'conflicting',
+    );
+    const artifact = { ...input.artifact, recognitionPriors: priors };
+    const full = derive({ artifact, stats: { ...input.stats, honors: ['MVP-1'] } }).profile;
+    const small = derive({
+      artifact,
+      stats: { ...input.stats, honors: ['MVP-1'], gamesPlayed: 10, minutes: 300 },
+    }).profile;
+    const diagnostics = full.overallDiagnostics;
+    const smallDiagnostics = small.overallDiagnostics;
+    if (diagnostics?.schemaVersion !== 2 || smallDiagnostics?.schemaVersion !== 2)
+      throw new Error('missing diagnostics');
+    expect(smallDiagnostics.recognitionWeight).toBeLessThan(diagnostics.recognitionWeight);
+    expect(ratingProfileSchema.safeParse(full).success).toBe(true);
+    expect(
+      derive({ artifact, playerId: 'another', stats: { ...input.stats, honors: ['MVP-1'] } })
+        .profile.rawOverallScore,
+    ).toBe(full.rawOverallScore);
+    expect(
+      derive({ artifact, stats: { ...input.stats, honors: ['MVP-1', 'NBA1', 'NBA2'] } }).profile
+        .rawOverallScore,
+    ).toBe(full.rawOverallScore);
+    expect(ratingsModelArtifactSchema.safeParse({ ...artifact, schemaVersion: 4 }).success).toBe(
+      true,
+    );
+    expect(
+      ratingsModelArtifactSchema.safeParse({
+        ...artifact,
+        schemaVersion: 4,
+        recognitionPriors: undefined,
+      }).success,
+    ).toBe(false);
+    const evidenced = Object.fromEntries(
+      ['insideScoring', 'midrange', 'passing', 'interiorDefense', 'perimeterDefense'].map((key) => [
+        key,
+        {
+          kind: 'derived' as const,
+          confidence: 'high' as const,
+          methodVersion: 'test',
+          sourceVersion: 'test',
+          sourceFields: ['observed'],
+        },
+      ]),
+    );
+    const complete = derive({
+      artifact,
+      abilityProvenance: evidenced,
+      stats: { ...input.stats, honors: ['MVP-1'] },
+    }).profile.overallDiagnostics;
+    if (complete?.schemaVersion !== 2) throw new Error('missing diagnostics');
+    expect(complete.recognitionWeight).toBe(0);
+    const unrecognized = derive({ artifact, stats: input.stats }).profile.overallDiagnostics;
+    if (unrecognized?.schemaVersion !== 2) throw new Error('missing diagnostics');
+    expect(unrecognized.recognitionHonor).toBeNull();
+    expect(unrecognized.recognitionPrior).toBe(priors.population?.mean);
+    expect(unrecognized.recognitionWeight).toBeGreaterThan(0);
+    const observedUnrecognized = derive({ artifact, abilityProvenance: evidenced }).profile
+      .overallDiagnostics;
+    if (observedUnrecognized?.schemaVersion !== 2) throw new Error('missing diagnostics');
+    expect(observedUnrecognized.recognitionWeight).toBe(0);
+  });
+
+  it('values interior and perimeter defensive routes symmetrically', () => {
+    const interior = {
+      ...ratings,
+      interiorDefense: 90,
+      perimeterDefense: 50,
+      block: 90,
+      steal: 50,
+    };
+    const perimeter = {
+      ...ratings,
+      interiorDefense: 50,
+      perimeterDefense: 90,
+      block: 50,
+      steal: 90,
+    };
+    expect(defensiveAbilityFor(interior)).toBe(defensiveAbilityFor(perimeter));
+    expect(derive({ ratings: interior, position: 'C' }).profile.rawOverallScore).toBe(
+      derive({ ratings: perimeter, position: 'PG' }).profile.rawOverallScore,
+    );
   });
 
   it('requires matching frozen scales in v3 artifacts while retaining legacy readability', () => {

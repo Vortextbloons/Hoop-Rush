@@ -15,6 +15,7 @@ export const DATA_OVERALLS_COMPARE_OPTIONS: Record<string, boolean> = {
   baseline: true,
   output: true,
   format: true,
+  'allow-input-changes': false,
 };
 
 const baselineSchema = z.object({
@@ -65,6 +66,7 @@ export function dataOverallsCompare(options: {
   input: string;
   baseline?: string;
   output?: string;
+  allowInputChanges?: boolean;
 }): CliReport {
   try {
     if (!options.baseline || !options.output)
@@ -76,6 +78,7 @@ export function dataOverallsCompare(options: {
     const slot = (row: PeakPlayerSeason) =>
       `${row.playerExternalId}|${row.franchiseId}|${row.eraId}`;
     const previous = new Map(baseline.rows.map((row) => [slot(row), row]));
+    const currentSlots = new Set(loaded.rows.map(slot));
     const changes = loaded.rows.map((row) => {
       const old = previous.get(slot(row));
       return {
@@ -97,6 +100,7 @@ export function dataOverallsCompare(options: {
     });
     let checked = 0;
     let changed = 0;
+    const changedBySeason: Record<string, number> = {};
     const seasons = new Map<string, Record<string, unknown>[]>();
     const seasonIndexes = new Map<string, number>();
     for (const fingerprint of baseline.fingerprints ?? []) {
@@ -123,7 +127,10 @@ export function dataOverallsCompare(options: {
           ]),
         )
         .digest('hex');
-      if (hash !== fingerprint.hash) changed += 1;
+      if (hash !== fingerprint.hash) {
+        changed += 1;
+        changedBySeason[fingerprint.season] = (changedBySeason[fingerprint.season] ?? 0) + 1;
+      }
       checked += 1;
     }
     const examples = [
@@ -133,6 +140,18 @@ export function dataOverallsCompare(options: {
       'Anthony Davis',
       'Anthony Edwards',
       'Carmelo Anthony',
+      'Tim Duncan',
+      'Hakeem Olajuwon',
+      'Bill Russell',
+      'Wilt Chamberlain',
+      'Kevin Garnett',
+      "Shaquille O'Neal",
+      'Kobe Bryant',
+      'Scottie Pippen',
+      'Moses Malone',
+      'Pete Maravich',
+      'Michael Adams',
+      'Dave Bing',
     ].map((name) => ({
       player: name,
       previousPeak:
@@ -151,7 +170,18 @@ export function dataOverallsCompare(options: {
       schemaVersion: 1,
       dataVersion: loaded.manifest.dataVersion,
       reference: artifact.overallScale?.reference,
-      simulationInputs: { checked, changed },
+      simulationInputs: { checked, changed, changedBySeason },
+      addedEntries: changes.filter((row) => row.previousSeason === null).length,
+      removedEntries: baseline.rows
+        .filter((row) => !currentSlots.has(slot(row)))
+        .map((row) => ({
+          player: row.displayName,
+          playerExternalId: row.playerExternalId,
+          franchise: row.franchiseId,
+          era: row.eraId,
+          season: row.seasonKey,
+          overall: row.summaryRatings.overallRating,
+        })),
       before: distribution(baseline.rows),
       after: distribution(loaded.rows),
       positions: {
@@ -179,8 +209,11 @@ export function dataOverallsCompare(options: {
         ),
         `report: ${options.output}`,
       ],
-      failures: changed ? ['Overall rebuild changed stored simulation inputs'] : [],
-      exitCode: changed ? 1 : 0,
+      failures:
+        changed && !options.allowInputChanges
+          ? ['Overall rebuild changed stored simulation inputs']
+          : [],
+      exitCode: changed && !options.allowInputChanges ? 1 : 0,
     });
   } catch (error) {
     return makeReport('data overalls-compare', options, {

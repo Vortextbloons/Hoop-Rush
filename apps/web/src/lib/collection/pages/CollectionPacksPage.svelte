@@ -1,21 +1,16 @@
 <script lang="ts">
   import { asset, resolve } from '$app/paths';
   import '$lib/collection/ultimate-theme.css';
-  import { onDestroy } from 'svelte';
+  import { getContext, onDestroy, untrack } from 'svelte';
   import type {
-    CollectionCatalog,
     CollectionIndexEntry,
     CollectionProgressionRules,
     CollectionPullRecord,
-    CollectionState,
-    HoopRushManifest,
   } from '@hoop-rush/data-contracts';
   import { COLLECTION_RARITY_ORDER } from '@hoop-rush/data-contracts';
   import { z } from 'zod';
   import { describeCollectionPackOdds, describeCollectionTargetOdds } from '@hoop-rush/engine';
-  import { getManifest } from '$lib/data';
   import AsyncState from '$lib/components/AsyncState.svelte';
-  import { getContext } from 'svelte';
   import {
     ULTIMATE_RUN_SHELL_CONTEXT,
     type UltimateRunShell,
@@ -24,11 +19,9 @@
   import CurrencyIcon from '$lib/collection/CurrencyIcon.svelte';
   import {
     loadCollectionIndex,
-    loadCollectionCatalog,
     loadCollectionProgression,
   } from '$lib/collection/collection-assets.ts';
   import {
-    ensureCollection,
     openPack,
     setTargetPlayer,
     StaleCollectionPreviewError,
@@ -57,14 +50,24 @@
     mounted = false;
   });
 
-  let phase = $state<'loading' | 'error' | 'ready'>('loading');
-  let error = $state<string | null>(null);
-  let catalog = $state<CollectionCatalog | null>(null);
+  const collectionState = $derived(shell.state);
+  const catalog = $derived(shell.catalog);
+  const manifest = $derived(shell.manifest);
+  let pageStatus = $state<'loading' | 'error' | 'ready'>('loading');
+  let pageError = $state<string | null>(null);
+  const phase = $derived<'loading' | 'error' | 'ready'>(
+    shell.phase === 'error' ||
+      (shell.phase === 'ready' && shell.catalog === null) ||
+      pageError !== null
+      ? 'error'
+      : shell.phase === 'ready' && pageStatus === 'ready'
+        ? 'ready'
+        : 'loading',
+  );
+  const error = $derived(shell.error ?? shell.catalogError ?? pageError);
   let indexEntries = $state<CollectionIndexEntry[]>([]);
-  let manifest = $state<HoopRushManifest | null>(null);
   let progression = $state<CollectionProgressionRules | null>(null);
   let progressionError = $state<string | null>(null);
-  let collectionState = $state<CollectionState | null>(null);
   let purchasing = $state<string | null>(null);
   let purchaseError = $state<string | null>(null);
   let staleNotice = $state<string | null>(null);
@@ -131,19 +134,13 @@
   }
 
   async function load(): Promise<void> {
+    pageStatus = 'loading';
+    pageError = null;
     try {
-      const [loadedCatalog, loadedIndex, loadedManifest, loadedState] = await Promise.all([
-        loadCollectionCatalog(),
-        loadCollectionIndex(),
-        getManifest(),
-        ensureCollection(new Date().toISOString()),
-      ]);
+      const loadedIndex = await loadCollectionIndex();
       if (!mounted) return;
-      catalog = loadedCatalog;
       indexEntries = loadedIndex.cards;
-      manifest = loadedManifest;
-      collectionState = loadedState;
-      phase = 'ready';
+      pageStatus = 'ready';
       void loadCollectionProgression()
         .then((loaded) => {
           if (mounted) {
@@ -162,9 +159,16 @@
       await restoreReceipt();
     } catch (loadError) {
       if (!mounted) return;
-      error = loadError instanceof Error ? loadError.message : 'Could not load the packs.';
-      phase = 'error';
+      pageError = loadError instanceof Error ? loadError.message : 'Could not load the packs.';
+      pageStatus = 'error';
     }
+  }
+
+  function retry(): void {
+    pageStatus = 'loading';
+    pageError = null;
+    if (shell.phase === 'error' || shell.catalogError !== null) void shell.refresh();
+    else void load();
   }
 
   const lastReceiptSchema = z.object({
@@ -205,11 +209,8 @@
   }
 
   $effect(() => {
-    void load();
-  });
-
-  $effect(() => {
-    if (collectionState && catalog) shell.sync(collectionState, catalog.cards.length);
+    if (shell.phase !== 'ready') return;
+    void untrack(load);
   });
 
   const balances = $derived(collectionState?.balances ?? { Coins: 0, Exchange: 0 });
@@ -261,9 +262,10 @@
     targetBusy = true;
     targetError = null;
     try {
-      const next = await setTargetPlayer(null, new Date().toISOString());
+      await setTargetPlayer(null, new Date().toISOString());
       if (!mounted) return;
-      collectionState = next;
+      await shell.reloadCollection();
+      if (!mounted) return;
       announcement = 'Target cleared. Packs draw with equal card weights again.';
     } catch (failure) {
       if (!mounted) return;
@@ -288,7 +290,8 @@
     try {
       const outcome = await openPack(packId, new Date().toISOString(), preview);
       if (!mounted) return;
-      collectionState = outcome.state;
+      await shell.reloadCollection();
+      if (!mounted) return;
       const pullLedger = outcome.ledgerEntries.filter(
         (entry) => entry.reason === 'duplicate-conversion',
       );
@@ -336,13 +339,11 @@
       } catch {}
       if (buyError instanceof StaleCollectionPreviewError) {
         staleNotice = buyError.message;
-        const refreshed = await ensureCollection(new Date().toISOString()).catch(() => null);
-        if (mounted && refreshed) collectionState = refreshed;
+        await shell.reloadCollection();
         return;
       }
       purchaseError = collectionErrorMessage(buyError, 'Purchase failed. Try again.');
-      const refreshed = await ensureCollection(new Date().toISOString()).catch(() => null);
-      if (mounted && refreshed) collectionState = refreshed;
+      await shell.reloadCollection();
     } finally {
       if (mounted) purchasing = null;
     }
@@ -422,15 +423,7 @@
     </div>
   {:else if phase === 'error'}
     <div class="mt-6">
-      <AsyncState
-        kind="error"
-        title="Couldn't load"
-        message={error ?? 'Unknown error.'}
-        retry={() => {
-          phase = 'loading';
-          void load();
-        }}
-      />
+      <AsyncState kind="error" title="Couldn't load" message={error ?? 'Unknown error.'} {retry} />
     </div>
   {:else if !claimed}
     <div class="mt-6">

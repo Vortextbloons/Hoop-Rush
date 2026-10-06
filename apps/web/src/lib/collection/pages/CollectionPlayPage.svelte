@@ -1,12 +1,9 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
-  import { getManifest } from '$lib/data';
   import { page } from '$app/state';
   import '$lib/collection/ultimate-theme.css';
-  import { getContext, onDestroy, tick } from 'svelte';
+  import { getContext, onDestroy, tick, untrack } from 'svelte';
   import type {
-    CollectionCatalog,
-    HoopRushManifest,
     CollectionCatalogCard,
     CollectionChallengeValidationFacts,
     CollectionDifficultyId,
@@ -15,7 +12,6 @@
     CollectionObjectiveId,
     CollectionPlayState,
     CollectionProgressionRules,
-    CollectionState,
   } from '@hoop-rush/data-contracts';
   import { collectionGameIdSchema } from '@hoop-rush/data-contracts';
   import { validateCollectionChallengeTeam } from '@hoop-rush/engine';
@@ -30,7 +26,6 @@
   import MatchupCard from '$lib/collection/MatchupCard.svelte';
   import RewardReceipt from '$lib/collection/RewardReceipt.svelte';
   import {
-    loadCollectionCatalog,
     loadCollectionGameRules,
     loadCollectionProgression,
   } from '$lib/collection/collection-assets.ts';
@@ -42,7 +37,6 @@
     collectionChallengeOffers,
     collectionGameWorkerAssets,
     collectionObjectiveOffers,
-    ensureCollection,
     ensurePlayStateSnapshot,
     loadCommittedGame,
     prepareBasicGame,
@@ -85,14 +79,24 @@
     stopPlayback();
   });
 
-  let phase = $state<'loading' | 'error' | 'ready'>('loading');
-  let error = $state<string | null>(null);
-  let catalog = $state<CollectionCatalog | null>(null);
-  let manifest = $state<HoopRushManifest | null>(null);
+  const collectionState = $derived(shell.state);
+  const catalog = $derived(shell.catalog);
+  const manifest = $derived(shell.manifest);
+  let pageStatus = $state<'loading' | 'error' | 'ready'>('loading');
+  let pageError = $state<string | null>(null);
+  const phase = $derived<'loading' | 'error' | 'ready'>(
+    shell.phase === 'error' ||
+      (shell.phase === 'ready' && shell.catalog === null) ||
+      pageError !== null
+      ? 'error'
+      : shell.phase === 'ready' && pageStatus === 'ready'
+        ? 'ready'
+        : 'loading',
+  );
+  const error = $derived(shell.error ?? shell.catalogError ?? pageError);
   let rules = $state<CollectionGameRules | null>(null);
   let progression = $state<CollectionProgressionRules | null>(null);
   let progressionError = $state<string | null>(null);
-  let collectionState = $state<CollectionState | null>(null);
   let playState = $state<CollectionPlayState | null>(null);
   let rootSeed = $state<string | null>(null);
   let busy = $state<'idle' | 'preparing' | 'playing' | 'committing'>('idle');
@@ -469,28 +473,22 @@
   }
 
   async function load(): Promise<void> {
+    pageStatus = 'loading';
+    pageError = null;
     try {
-      const nowIso = new Date().toISOString();
-      const [loadedCatalog, loadedState, loadedRules, loadedManifest] = await Promise.all([
-        loadCollectionCatalog(),
-        ensureCollection(nowIso),
-        loadCollectionGameRules(),
-        getManifest(),
-      ]);
+      const loadedRules = await loadCollectionGameRules();
       if (!mounted) return;
-      catalog = loadedCatalog;
-      manifest = loadedManifest;
-      collectionState = loadedState;
       rules = loadedRules;
       readFlowFromUrl();
-      if (loadedState.claimedWelcome) {
+      if (collectionState?.claimedWelcome) {
         const snapshot = await ensurePlayStateSnapshot(new Date().toISOString());
         if (!mounted) return;
         playState = snapshot.playState;
         rootSeed = snapshot.rootSeed;
         await restoreLastGame();
+        if (!mounted) return;
       }
-      phase = 'ready';
+      pageStatus = 'ready';
       void loadCollectionProgression()
         .then((loaded) => {
           if (!mounted) return;
@@ -513,9 +511,16 @@
         });
     } catch (loadError) {
       if (!mounted) return;
-      error = loadError instanceof Error ? loadError.message : 'Could not load play.';
-      phase = 'error';
+      pageError = loadError instanceof Error ? loadError.message : 'Could not load play.';
+      pageStatus = 'error';
     }
+  }
+
+  function retry(): void {
+    pageStatus = 'loading';
+    pageError = null;
+    if (shell.phase === 'error' || shell.catalogError !== null) void shell.refresh();
+    else void load();
   }
 
   async function restoreLastGame(): Promise<void> {
@@ -539,20 +544,16 @@
   }
 
   $effect(() => {
-    void load();
-  });
-
-  $effect(() => {
-    if (collectionState && catalog) shell.sync(collectionState, catalog.cards.length);
+    if (shell.phase !== 'ready') return;
+    void untrack(load);
   });
 
   async function refreshState(): Promise<void> {
-    const [loadedState, snapshot] = await Promise.all([
-      ensureCollection(new Date().toISOString()),
+    const [snapshot] = await Promise.all([
       ensurePlayStateSnapshot(new Date().toISOString()),
+      shell.reloadCollection(),
     ]);
     if (!mounted) return;
-    collectionState = loadedState;
     playState = snapshot.playState;
     rootSeed = snapshot.rootSeed;
   }
@@ -670,12 +671,13 @@
         }
         if (!mounted) return;
         playState = accepted.playState;
-        collectionState = { ...(collectionState as CollectionState), balances: accepted.balances };
         record = accepted.record;
         if (accepted.record.gameVersion === 'collection-game-v3') {
           mode = 'challenges';
           selectedChallengeId = accepted.record.prepared.challenge.challengeId;
         }
+        await shell.reloadCollection();
+        if (!mounted) return;
       } catch (acceptError) {
         const recovered = await loadCommittedGame(matchup.gameId).catch(() => null);
         if (!mounted) return;
@@ -779,15 +781,7 @@
     </div>
   {:else if phase === 'error'}
     <div class="mt-6">
-      <AsyncState
-        kind="error"
-        title="Couldn't load"
-        message={error ?? 'Unknown error.'}
-        retry={() => {
-          phase = 'loading';
-          void load();
-        }}
-      />
+      <AsyncState kind="error" title="Couldn't load" message={error ?? 'Unknown error.'} {retry} />
     </div>
   {:else if !claimed}
     <div class="mt-6">

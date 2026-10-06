@@ -49,7 +49,7 @@ def _nullable(value: Any) -> float | None:
     return f
 
 try:
-    from nba_api.stats.endpoints import leaguedashplayerstats
+    from nba_api.stats.endpoints import leaguedashplayerstats, leagueleaders, playercareerstats
 except Exception as exc:  # pragma: no cover
     print(
         f"Could not import nba_api: {exc}\n"
@@ -263,16 +263,16 @@ def estimate_usage(fga: float, fta: float, tov: float, gp: int, pace: float = 95
 
 def _coverage_ok(coverage: dict[str, Any], out_key: str, games: int) -> bool:
     """A family counts as a season total only when the source logged it in at
-    least three-quarters of the player's games. Partial sums (e.g. FGA in 58
+    all of the player's games. Partial sums (e.g. FGA in 58
     of 81 games) look complete but produce fictional rates, while nulling errs
     toward conservative estimates downstream."""
     if games <= 0:
         return False
     try:
-        present = float(coverage.get(out_key, games))
+        present = float(coverage.get(out_key, 0))
     except (ValueError, TypeError):
         return False
-    return (present / games) >= 0.75
+    return present >= games
 
 
 def _drop_inconsistent_shooting(t: dict[str, Any]) -> None:
@@ -348,9 +348,9 @@ def stats_from_stints(season: str) -> list[dict[str, Any]]:
                 continue
             row[key] = row.get(key, 0.0) + f
             try:
-                covered = float(stint_coverage.get(key, stint_games))
+                covered = float(stint_coverage.get(key, 0))
             except (ValueError, TypeError):
-                covered = float(stint_games)
+                covered = 0.0
             row_coverage[key] = row_coverage.get(key, 0.0) + covered
 
     def _num(t: dict[str, Any], key: str, default: float = 0.0) -> float:
@@ -459,11 +459,140 @@ def stats_from_stints(season: str) -> list[dict[str, Any]]:
     return out
 
 
+def full_season_totals(season: str) -> list[dict[str, Any]]:
+    source = read_cache("league_leaders_totals", season=season)
+    if source is None:
+        source = with_retry(lambda: leagueleaders.LeagueLeaders(
+            season=season, per_mode48="Totals", scope="S", timeout=20,
+        ).get_normalized_dict()["LeagueLeaders"])
+        write_cache("league_leaders_totals", source, season=season)
+    rows = totals_from_leaders(source, season)
+    stint_path = ensure_output_dir(season) / 'stints.json'
+    if not stint_path.exists():
+        return rows
+    stints = json.loads(stint_path.read_text(encoding='utf-8'))
+    known = {row['playerExternalId'] for row in rows}
+    missing = sorted({row['playerExternalId'] for row in stints} - known)
+    fallback = {row['playerExternalId']: row for row in stats_from_stints(season)}
+    for identity in missing:
+        career = read_cache('player_career_totals', player=identity)
+        if career is None:
+            try:
+                career = with_retry(lambda: playercareerstats.PlayerCareerStats(
+                    player_id=identity, per_mode36='Totals', timeout=20,
+                ).get_normalized_dict()['SeasonTotalsRegularSeason'])
+            except KeyError:
+                career = []
+            write_cache('player_career_totals', career, player=identity)
+        season_rows = [row for row in career if row['SEASON_ID'] == season and row['LEAGUE_ID'] == '00']
+        total = next((row for row in season_rows if row['TEAM_ID'] == 0), None)
+        if total is None and len(season_rows) == 1:
+            total = season_rows[0]
+        if total is None:
+            reconstructed = fallback.get(identity)
+            if reconstructed is None:
+                raise ValueError(f'missing NBA totals and validated stint evidence for {identity} in {season}')
+            rows.append(reconstructed)
+            continue
+        converted = validated_career_total(total, season)
+        converted['statsSource'] = 'nba-career-totals'
+        rows.append(converted)
+        for stint in stints:
+            if stint['playerExternalId'] != identity:
+                continue
+            team = next((row for row in season_rows if str(row['TEAM_ID']) == stint['teamExternalId']), None)
+            if team is None:
+                raise ValueError(f'missing authoritative NBA stint for {identity} in {season}')
+            repair_stint(stint, validated_career_total(team, season))
+    by_player = {row['playerExternalId']: row for row in rows}
+    counts = {}
+    for stint in stints:
+        identity = stint['playerExternalId']
+        counts[identity] = counts.get(identity, 0) + 1
+    for stint in stints:
+        total = by_player.get(stint['playerExternalId'])
+        if total and counts[stint['playerExternalId']] == 1 and total['gamesPlayed'] == stint['gamesPlayed']:
+            repair_stint(stint, total)
+    write_json(stint_path, stints)
+    return sorted(rows, key=lambda row: row['playerExternalId'])
+
+
+def repair_stint(stint: dict[str, Any], total: dict[str, Any]) -> None:
+    fields = ['minutes', 'points', 'rebounds', 'offensiveRebounds', 'defensiveRebounds',
+              'assists', 'steals', 'blocks', 'turnovers', 'fouls', 'fgm', 'fga',
+              'tpm', 'tpa', 'ftm', 'fta']
+    stint['gamesPlayed'] = total['gamesPlayed']
+    stint['coverage'] = {key: total['gamesPlayed'] if total[key] is not None else 0 for key in fields}
+    for key in fields:
+        stint[key] = total[key]
+    stint['statsSource'] = total['statsSource']
+    if total.get('sourceIssues'):
+        stint['sourceIssues'] = total['sourceIssues']
+
+
+def validated_career_total(row: dict[str, Any], season: str) -> dict[str, Any]:
+    try:
+        result = totals_from_leaders([row], season)[0]
+    except ValueError as error:
+        if not str(error).startswith('inconsistent point accounting'):
+            raise
+        sanitized = {**row, **{key: None for key in ['FGM', 'FGA', 'FTM', 'FTA', 'FG3M', 'FG3A']}}
+        result = totals_from_leaders([sanitized], season)[0]
+        result['sourceIssues'] = ['shooting-accounting-mismatch']
+    result['statsSource'] = 'nba-career-totals'
+    return result
+
+
+def totals_from_leaders(source: list[dict[str, Any]], season: str) -> list[dict[str, Any]]:
+    year = int(season[:4])
+    fields = {"MIN": "minutes", "PTS": "points", "REB": "rebounds", "AST": "assists",
+              "OREB": "offensiveRebounds", "DREB": "defensiveRebounds", "STL": "steals",
+              "BLK": "blocks", "TOV": "turnovers", "PF": "fouls", "FGM": "fgm",
+              "FGA": "fga", "FG3M": "tpm", "FG3A": "tpa", "FTM": "ftm", "FTA": "fta"}
+    first_year = {"OREB": 1973, "DREB": 1973, "STL": 1973, "BLK": 1973,
+                  "TOV": 1977, "FG3M": 1979, "FG3A": 1979}
+    result = []
+    seen = set()
+    for row in source:
+        pid = str(_safe_int(row.get("PLAYER_ID")))
+        if pid == "0" or pid in seen:
+            raise ValueError("season totals require unique, valid player IDs")
+        seen.add(pid)
+        gp = _safe_int(row.get("GP"))
+        item = {key: (_nullable(row.get(field)) if year >= first_year.get(field, 0) else None)
+                for field, key in fields.items()}
+        minutes = item["minutes"]
+        if gp <= 0 or minutes is None or minutes <= 0 or minutes > gp * 70:
+            raise ValueError(f"invalid full-season workload for {pid}")
+        for made, attempted in (("fgm", "fga"), ("ftm", "fta"), ("tpm", "tpa")):
+            if item[made] is not None and (item[attempted] is None or item[made] > item[attempted]):
+                raise ValueError(f"inconsistent shooting totals for {pid}")
+        if all(item[k] is not None for k in ("points", "fgm", "ftm")):
+            accounted = 2 * item["fgm"] + (item["tpm"] or 0) + item["ftm"]
+            if abs(item["points"] - accounted) > 0.01:
+                raise ValueError(f"inconsistent point accounting for {pid}")
+        fga, fta = item["fga"], item["fta"]
+        item.update({
+            "playerExternalId": pid, "season": season, "teamExternalId": None,
+            "gamesPlayed": gp, "starts": None, "per": None, "boxPlusMinus": None,
+            "usageRate": None, "winShares": None, "vorp": None,
+            "tsPct": (item["points"] / (2 * (fga + 0.44 * fta))
+                      if item["points"] is not None and fga and fta is not None else None),
+            "efgPct": ((item["fgm"] + 0.5 * (item["tpm"] or 0)) / fga
+                       if item["fgm"] is not None and fga else None),
+            "statsSource": "nba-leaders-totals",
+        })
+        result.append(item)
+    return result
+
+
 def run(season: str, roster: list[dict[str, Any]]) -> None:
     out = ensure_output_dir(season)
     print(f"[{season}] fetching season stats")
     payload = fetch_league_dash(season)
     rows = to_player_season_stats(payload, season, roster)
+    if not rows:
+        rows = full_season_totals(season)
     if not rows:
         rows = stats_from_stints(season)
         if rows:

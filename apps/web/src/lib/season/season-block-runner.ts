@@ -44,6 +44,7 @@ import type {
 import type { SeasonSchedule } from '@hoop-rush/data-contracts';
 import type { EraSimulationProfile } from '@hoop-rush/data-contracts';
 import type { SeasonArtifactUrls } from './season-assets';
+import { getSeasonRunRepository } from '$lib/season/season-repo';
 import { randomUUID } from '$lib/ids';
 export type SeasonRunnerEvent =
   | {
@@ -132,19 +133,18 @@ export interface SeasonBlockRunner {
   prewarm(): void;
   subscribe(listener: (event: SeasonRunnerEvent) => void): () => void;
 }
+export interface SeasonBlockTransport {
+  postMessage(message: unknown): void;
+  onMessage(listener: (data: unknown) => void): void;
+  onError(listener: (message: string) => void): void;
+  terminate(): void;
+}
 export interface SeasonBlockRunnerDeps {
   repository?: SeasonRunRepository;
   schedule?: SeasonSchedule;
   workerUrl?: string;
   artifacts?: () => Promise<SeasonArtifactUrls>;
-  simulate?: (
-    request: SeasonWorkerStartRequest,
-    onProgress: (progress: SeasonWorkerProgress) => void,
-  ) => Promise<
-    | { status: 'complete'; candidate: unknown; pending: unknown }
-    | { status: 'interrupted'; pending: unknown }
-    | { status: 'error'; code: string; message: string }
-  >;
+  transportFactory?: () => SeasonBlockTransport;
 }
 export interface WorkerRequestState {
   blockIndex: number;
@@ -257,9 +257,35 @@ export function acceptWorkerResult(
   }
   return failures;
 }
+function createWorkerTransport(workerUrl?: string): SeasonBlockTransport {
+  const worker =
+    workerUrl !== undefined
+      ? new Worker(workerUrl, { type: 'module' })
+      : new Worker(new URL('../../workers/season-block-worker.ts', import.meta.url), {
+          type: 'module',
+        });
+  return {
+    postMessage(message: unknown): void {
+      worker.postMessage(message);
+    },
+    onMessage(listener: (data: unknown) => void): void {
+      worker.addEventListener('message', (event: MessageEvent<unknown>) => {
+        listener(event.data);
+      });
+    },
+    onError(listener: (message: string) => void): void {
+      worker.addEventListener('error', (event) => {
+        listener(event.message);
+      });
+    },
+    terminate(): void {
+      worker.terminate();
+    },
+  };
+}
 export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): SeasonBlockRunner {
   const listeners = new Set<(event: SeasonRunnerEvent) => void>();
-  let worker: Worker | null = null;
+  let transport: SeasonBlockTransport | null = null;
   let currentRequestId: string | null = null;
   let postedRequestId: string | null = null;
   let cancellationEpoch = 0;
@@ -298,8 +324,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
   async function resolveRepository(): Promise<SeasonRunRepository> {
     if (repositoryPromise !== null) return repositoryPromise;
     const schedule = await resolveSchedule();
-    const module = await import('@hoop-rush/persistence');
-    return new module.DexieSeasonRunRepository(undefined, { schedule });
+    return getSeasonRunRepository(schedule);
   }
   function emit(event: SeasonRunnerEvent): void {
     for (const listener of [...listeners]) listener(event);
@@ -449,114 +474,113 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       throw error;
     }
   }
-  function createWorker(): Worker {
-    if (worker !== null) return worker;
-    worker =
-      deps.workerUrl !== undefined
-        ? new Worker(deps.workerUrl, { type: 'module' })
-        : new Worker(new URL('../../workers/season-block-worker.ts', import.meta.url), {
-            type: 'module',
-          });
-    worker.addEventListener('error', (event) => {
-      if (warmRequestId !== null) {
+  function handleTransportError(message: string): void {
+    if (warmRequestId !== null) {
+      warmRequestId = null;
+      if (currentRequestId === null) warmed = false;
+    }
+    if (currentRequestId === null || current === null) return;
+    const requestId = currentRequestId;
+    const blockIndex = current.blockIndex;
+    emit({
+      type: 'error',
+      requestId,
+      blockIndex,
+      code: 'internal',
+      message,
+      seed: null,
+      gameId: null,
+    });
+    currentRequestId = null;
+    current = null;
+    postedRequestId = null;
+  }
+  function handleTransportMessage(data: unknown): void {
+    const parsed = seasonWorkerMessageSchema.safeParse(data);
+    if (!parsed.success) {
+      console.warn('[season-block-runner] dropped unparsable worker message', data);
+      failOnUnparsableEnvelope();
+      return;
+    }
+    if (parsed.data.type === 'season-block-warm-ack') {
+      if (parsed.data.requestId === warmRequestId) {
         warmRequestId = null;
-        if (currentRequestId === null) warmed = false;
+        warmed = true;
       }
-      if (currentRequestId === null || current === null) return;
-      const requestId = currentRequestId;
-      const blockIndex = current.blockIndex;
+      return;
+    }
+    if (parsed.data.type === 'season-block-error' && parsed.data.requestId === warmRequestId) {
+      warmRequestId = null;
+      warmed = false;
+      return;
+    }
+    if (parsed.data.requestId !== currentRequestId) {
+      // Stale but well-formed envelopes are expected during cancel/resume races and must
+      // not fail the live request, so they stay a warn-and-drop.
+      console.warn(
+        `[season-block-runner] dropped message for stale requestId ${parsed.data.requestId} (expected ${String(currentRequestId)})`,
+      );
+      return;
+    }
+    const message = parsed.data;
+    if (current === null) return;
+    if (message.type === 'season-block-progress') {
       emit({
-        type: 'error',
-        requestId,
-        blockIndex,
-        code: 'internal',
-        message: event.message,
-        seed: null,
-        gameId: null,
+        type: 'progress',
+        requestId: message.requestId,
+        blockIndex: message.blockIndex,
+        gamesCompleted: message.gamesCompleted,
+        gamesTotal: message.gamesTotal,
+        latestGameId: message.latestGameId,
+        latestResult: message.latestResult,
+        isHumanGame: message.isHumanGame,
+        humanRecordInBlock: message.humanRecordInBlock,
+        humanResults: message.humanResults,
+        leaguePulse: message.leaguePulse,
       });
+      return;
+    }
+    if (message.type === 'season-block-error') {
+      const requestId = message.requestId;
+      const blockIndex = current.blockIndex;
+      if (message.code === 'cancelled') {
+        if (cancelledRequestIds.has(requestId)) {
+          signalCancellation(requestId);
+        } else {
+          emit({ type: 'cancelled', requestId, blockIndex });
+        }
+      } else if (cancelledRequestIds.has(requestId)) {
+        signalCancellation(requestId);
+      } else {
+        emit({
+          type: 'error',
+          requestId,
+          blockIndex,
+          code: message.code,
+          message: message.message,
+          seed: message.seed,
+          gameId: message.gameId,
+        });
+      }
       currentRequestId = null;
       current = null;
       postedRequestId = null;
-    });
-    worker.addEventListener('message', (event: MessageEvent<unknown>) => {
-      const parsed = seasonWorkerMessageSchema.safeParse(event.data);
-      if (!parsed.success) {
-        console.warn('[season-block-runner] dropped unparsable worker message', event.data);
-        failOnUnparsableEnvelope();
-        return;
-      }
-      if (parsed.data.type === 'season-block-warm-ack') {
-        if (parsed.data.requestId === warmRequestId) {
-          warmRequestId = null;
-          warmed = true;
-        }
-        return;
-      }
-      if (parsed.data.type === 'season-block-error' && parsed.data.requestId === warmRequestId) {
-        warmRequestId = null;
-        warmed = false;
-        return;
-      }
-      if (parsed.data.requestId !== currentRequestId) {
-        // Stale but well-formed envelopes are expected during cancel/resume races and must
-        // not fail the live request, so they stay a warn-and-drop.
-        console.warn(
-          `[season-block-runner] dropped message for stale requestId ${parsed.data.requestId} (expected ${String(currentRequestId)})`,
-        );
-        return;
-      }
-      const message = parsed.data;
-      if (current === null) return;
-      if (message.type === 'season-block-progress') {
-        emit({
-          type: 'progress',
-          requestId: message.requestId,
-          blockIndex: message.blockIndex,
-          gamesCompleted: message.gamesCompleted,
-          gamesTotal: message.gamesTotal,
-          latestGameId: message.latestGameId,
-          latestResult: message.latestResult,
-          isHumanGame: message.isHumanGame,
-          humanRecordInBlock: message.humanRecordInBlock,
-          humanResults: message.humanResults,
-          leaguePulse: message.leaguePulse,
-        });
-        return;
-      }
-      if (message.type === 'season-block-error') {
-        const requestId = message.requestId;
-        const blockIndex = current.blockIndex;
-        if (message.code === 'cancelled') {
-          if (cancelledRequestIds.has(requestId)) {
-            signalCancellation(requestId);
-          } else {
-            emit({ type: 'cancelled', requestId, blockIndex });
-          }
-        } else if (cancelledRequestIds.has(requestId)) {
-          signalCancellation(requestId);
-        } else {
-          emit({
-            type: 'error',
-            requestId,
-            blockIndex,
-            code: message.code,
-            message: message.message,
-            seed: message.seed,
-            gameId: message.gameId,
-          });
-        }
-        currentRequestId = null;
-        current = null;
-        postedRequestId = null;
-        return;
-      }
-      if (message.result.status === 'interrupted') {
-        void acceptInterruption(message.result.pending);
-        return;
-      }
-      void acceptCandidate(message.result.checkpoint);
-    });
-    return worker;
+      return;
+    }
+    if (message.result.status === 'interrupted') {
+      void acceptInterruption(message.result.pending);
+      return;
+    }
+    void acceptCandidate(message.result.checkpoint);
+  }
+  function createTransport(): SeasonBlockTransport {
+    if (transport !== null) return transport;
+    const factory = deps.transportFactory ?? (() => createWorkerTransport(deps.workerUrl));
+    const target = factory();
+    transport = target;
+    target.onError(handleTransportError);
+    target.onMessage(handleTransportMessage);
+    return target;
   }
   async function acceptCandidate(checkpoint: SeasonCandidateCheckpoint): Promise<void> {
     const requestId = currentRequestId;
@@ -940,7 +964,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
           if (consumePreWorkerCancellation(requestId)) return;
           if (!requestLive(requestId, requestEpoch)) return;
           const plainStart = buildRequest(requestId, current, schedule, artifacts);
-          const target = createWorker();
+          const target = createTransport();
           target.postMessage(plainStart);
           postedRequestId = requestId;
           warmed = true;
@@ -1056,7 +1080,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
             resumePending: pending,
           };
           const plainStart = buildRequest(requestId, current, schedule, artifacts);
-          const target = createWorker();
+          const target = createTransport();
           target.postMessage(plainStart);
           postedRequestId = requestId;
           warmed = true;
@@ -1085,8 +1109,8 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       if (!cancelledRequestIds.has(requestId)) {
         cancelledRequestIds.set(requestId, current?.blockIndex ?? 0);
       }
-      if (worker === null || postedRequestId !== requestId) return;
-      worker.postMessage(
+      if (transport === null || postedRequestId !== requestId) return;
+      transport.postMessage(
         seasonWorkerCancelRequestSchema.parse({
           schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
           type: 'season-block-cancel',
@@ -1095,8 +1119,8 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       );
     },
     terminate(): void {
-      worker?.terminate();
-      worker = null;
+      transport?.terminate();
+      transport = null;
       currentRequestId = null;
       current = null;
       postedRequestId = null;
@@ -1119,7 +1143,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
             if (warmRequestId === pendingWarmId) warmRequestId = null;
             return;
           }
-          const target = createWorker();
+          const target = createTransport();
           target.postMessage(
             seasonWorkerWarmRequestSchema.parse({
               schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,

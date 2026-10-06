@@ -168,3 +168,4 @@ export {
 } from './season-schemas-fixtures.ts';
 
 export * from './overall-scale.ts';
+export * from './overall-evidence.ts';

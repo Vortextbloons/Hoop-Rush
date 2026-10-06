@@ -5,20 +5,26 @@ export {
   BAND_ORDER,
   IDENTITIES,
   DEFAULT_IDENTITY_PRIORITY_ROLES,
-  SeasonAiGenerationError,
+  POOL_COMPOSITION_TARGETS,
+  identityPriorityRolesOf,
+} from './ai/constants.ts';
+export { SeasonAiGenerationError } from './ai/state.ts';
+export {
   SeasonAiTargetsError,
   assignAiBandsAndIdentities,
-  attachAiProjectionSummaries,
-  evaluateSeasonRoster,
-  fiveReachableFromCounts,
-  generateAiLeague,
-  identityPriorityRolesOf,
-  runSeasonRosterCalibrationSeeds,
   validateSeasonRosterTargets,
+} from './ai/candidates.ts';
+export { evaluateSeasonRoster, attachAiProjectionSummaries } from './ai/finalize.ts';
+export { fiveReachableFromCounts } from './ai/reachability.ts';
+export { generateAiLeague } from './ai/generation.ts';
+export {
+  runSeasonRosterCalibrationSeeds,
+  type SeasonRosterCalibrationRunV2,
+} from './ai/calibration.ts';
+export {
   type SeasonAiGenerationInput,
   type SeasonAiGenerationPhase,
   type SeasonAiGenerationProgress,
   type SeasonAiGenerationProgressPhase,
-  type SeasonRosterCalibrationRunV2,
-} from './ai-generation.ts';
+} from './ai/types.ts';
 export type { SeasonLeagueGenerationResult } from '@hoop-rush/data-contracts';

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, setContext } from 'svelte';
+  import { onDestroy, onMount, setContext } from 'svelte';
   import { asset, resolve } from '$app/paths';
   import { page } from '$app/state';
   import { BookOpen, Home, Layers, Package, Play, Users } from '@lucide/svelte';
@@ -29,6 +29,10 @@
 
   onMount(() => {
     void shell.refresh();
+  });
+
+  onDestroy(() => {
+    shell.dispose();
   });
 </script>
 

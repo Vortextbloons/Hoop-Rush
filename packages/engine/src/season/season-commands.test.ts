@@ -8,6 +8,7 @@ import {
   seasonGameIdSchema,
   seasonRunSchema,
   type FranchiseId,
+  type SeasonCampaignOpportunity,
   type SeasonDraftCatalog,
   type SeasonEffectsState,
   type SeasonGameEffectsTransition,
@@ -25,8 +26,6 @@ import {
 } from '@hoop-rush/data-contracts';
 import { buildEraSimulationProfile } from '@hoop-rush/test-fixtures';
 import { buildEmptyCampaignState, normalizeCampaignState } from './campaign.ts';
-import { generateSeasonCampaignOffers } from './campaign.ts';
-import { generateSeasonSchedule } from './schedule.ts';
 import { handleSeasonRunCommand, type SeasonRunCommandContext } from './season-commands.ts';
 import { seasonObjectiveChoicesForBlock } from './objectives.ts';
 import { openSeasonTradeWindow, seasonEconomyRunOf } from './trades.ts';
@@ -2526,28 +2525,37 @@ describe('campaign commands', () => {
       effects: zeroEffectsOf(run),
     };
   }
+  function fixedCampaignOffers(
+    blockIndex: number,
+  ): [SeasonCampaignOpportunity, SeasonCampaignOpportunity] {
+    const offerOf = (slot: 0 | 1): SeasonCampaignOpportunity => {
+      const suffix = String(blockIndex * 2 + slot + 1).padStart(8, '0');
+      return {
+        opportunityId: `copp-${suffix}`,
+        branchId: `cbr-${suffix}`,
+        templateId: `ctpl-${suffix}`,
+        blockIndex,
+        identity: 'win-now',
+        family: 'results',
+        prerequisiteId: null,
+        target: { kind: 'block-wins', comparisonOperator: 'gte', threshold: 6, window: 'block' },
+        breakthrough: null,
+        completedReward: { rewardId: `rew-${suffix}`, type: 'influence', amount: 1 },
+        breakthroughReward: null,
+        feasibilityFacts: {},
+        seedPath: ['campaign', String(blockIndex), 'offers', String(slot)],
+      };
+    };
+    return [offerOf(0), offerOf(1)];
+  }
   function runWithBlockOffers(run: SeasonRun, blockIndex: number): SeasonRun {
-    const schedule = generateSeasonSchedule({
-      league: run.league,
-      seed: run.schedule.generationSeed,
-    });
-    const offers = generateSeasonCampaignOffers({
-      rootSeed: run.rootSeed,
-      blockIndex,
-      humanFranchiseId: HUMAN,
-      schedule,
-      standings: run.standings,
-      health: run.health,
-      rotations: run.rotations,
-      rosters: run.rosters,
-      transactions: run.transactions,
-      summaries: [],
-      campaignState: normalizeCampaignState(run.campaign),
-    });
     const campaign = normalizeCampaignState(run.campaign);
     return {
       ...run,
-      campaign: { ...campaign, offers: { ...campaign.offers, [blockIndex]: offers } },
+      campaign: {
+        ...campaign,
+        offers: { ...campaign.offers, [blockIndex]: fixedCampaignOffers(blockIndex) },
+      },
     };
   }
   it('rejects select-gm-identity as retired without mutating the run', () => {

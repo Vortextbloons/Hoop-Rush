@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import {
-  SEASON_CAMPAIGN_TARGETS_VERSION,
   SEASON_CHALLENGE_TARGETS_VERSION,
   SEASON_EFFECT_TARGETS_LEGACY_VERSION,
   SEASON_EFFECT_TARGETS_VERSION,
@@ -1226,7 +1225,6 @@ export const seasonInfluenceCalibrateReportSchema = z.object({
     rehabSpendRate: z.boolean(),
     heldOut: z.boolean(),
     zeroFloor: z.boolean().optional(),
-    campaignRewards: z.boolean().optional(),
     inquiryPurchases: z.boolean().optional(),
     tradeCash: z.boolean().optional(),
     cashReconciliation: z.boolean().optional(),
@@ -1371,51 +1369,6 @@ export const seasonPostseasonCalibrateReportSchema = z.object({
   pass: z.boolean(),
 });
 export type SeasonPostseasonCalibrateReport = z.infer<typeof seasonPostseasonCalibrateReportSchema>;
-export const seasonCampaignCalibrateReportSchema = z.object({
-  schemaVersion: z.literal(1),
-  command: z.literal('season campaign calibrate'),
-  targetsVersion: z.literal(SEASON_CAMPAIGN_TARGETS_VERSION),
-  ...calibrationCohortFields,
-  seasonsSimulated: z.number().int().nonnegative(),
-  eligibleCheckpoints: z.number().int().nonnegative(),
-  offersGenerated: z.number().int().nonnegative(),
-  offerPerCheckpointFailures: z.number().int().nonnegative(),
-  unsupportedFactFailures: z.number().int().nonnegative(),
-  duplicateRewardFailures: z.number().int().nonnegative(),
-  branchViolations: z.number().int().nonnegative(),
-  evolutionViolations: z.number().int().nonnegative(),
-  determinismFailures: z.number().int().nonnegative(),
-  orderInvarianceFailures: z.number().int().nonnegative(),
-  completedShare: z.number().min(0).max(1),
-  breakthroughShare: z.number().min(0).max(1),
-  gates: z.object({
-    offersPerCheckpoint: z.boolean(),
-    zeroUnsupportedFact: z.boolean(),
-    zeroDuplicateReward: z.boolean(),
-    zeroBranch: z.boolean(),
-    zeroEvolution: z.boolean(),
-    determinism: z.boolean(),
-    orderInvariance: z.boolean(),
-    heldOut: z.boolean(),
-  }),
-  ...m25CalibrateTailFields,
-});
-export type SeasonCampaignCalibrateReport = z.infer<typeof seasonCampaignCalibrateReportSchema>;
-export const seasonCampaignAuditReportSchema = z.object({
-  schemaVersion: z.literal(1),
-  command: z.literal('season campaign audit'),
-  eligibleCheckpoints: z.number().int().nonnegative(),
-  offersGenerated: z.number().int().nonnegative(),
-  offerPerCheckpointFailures: z.number().int().nonnegative(),
-  unsupportedFactFailures: z.number().int().nonnegative(),
-  duplicateRewardFailures: z.number().int().nonnegative(),
-  branchViolations: z.number().int().nonnegative(),
-  evolutionViolations: z.number().int().nonnegative(),
-  determinismFailures: z.number().int().nonnegative(),
-  orderInvarianceFailures: z.number().int().nonnegative(),
-  pass: z.boolean(),
-});
-export type SeasonCampaignAuditReport = z.infer<typeof seasonCampaignAuditReportSchema>;
 export const seasonFreeAgencyAuditCountsSchema = z.object({
   windowOrderFailures: z.number().int().nonnegative(),
   candidateUniquenessFailures: z.number().int().nonnegative(),

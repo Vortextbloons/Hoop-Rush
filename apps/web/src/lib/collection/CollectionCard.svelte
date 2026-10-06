@@ -6,9 +6,9 @@
   } from '@hoop-rush/data-contracts';
   import { resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
   import { formatPositions } from '$lib/player-positions';
-  import PlayerFace from '$lib/components/PlayerFace.svelte';
   import TeamLogo from '$lib/components/TeamLogo.svelte';
   import { asset } from '$app/paths';
+  import CollectionCardFace from './CollectionCardFace.svelte';
   import { collectionCardArtOf } from './collection-card-art.ts';
   import { collectionCardViewOf } from './collection-card-view.ts';
   import { humanizeIdentifier } from './collection-progression-view.ts';
@@ -43,15 +43,6 @@
     manifest ? resolveEraTeamIdentity(manifest, view.franchiseId, view.eraId) : null,
   );
   const teamLabel = $derived(eraIdentity?.displayLabel ?? humanizeIdentifier(view.franchiseId));
-
-  function initialsOf(name: string): string {
-    return name
-      .split(' ')
-      .map((part) => part[0] ?? '')
-      .join('')
-      .slice(0, 2)
-      .toUpperCase();
-  }
 </script>
 
 <button
@@ -59,7 +50,7 @@
   onclick={() => onSelect(view.cardId)}
   aria-pressed={selected}
   aria-label={`${view.name}, ${view.season}, ${view.rarity}, Overall ${view.overall}, ${formatPositions(view.positions)}, active, ${view.owned ? 'owned' : 'unowned'}`}
-  class="ur-card group ur-card--{rarityToken}"
+  class="ur-card group ur-rarity-tone-{rarityToken}"
   class:ur-card--unowned={!view.owned}
 >
   <span class="ur-card-ovr" aria-hidden="true">
@@ -78,18 +69,7 @@
     </svg>
   </span>
   <span class="ur-card-hero">
-    {#if artwork}
-      <img class="ur-special-art" src={asset(artwork)} alt="" loading="lazy" />
-    {:else if manifest}
-      <PlayerFace
-        player={{ playerId: view.playerId, playerExternalId: view.playerExternalId, altIds: null }}
-        {manifest}
-        size="xl"
-        fallbackInitials={initialsOf(view.name)}
-      />
-    {:else}
-      <span class="ur-card-initials" aria-hidden="true">{initialsOf(view.name)}</span>
-    {/if}
+    <CollectionCardFace {view} {manifest} size="xl" {artwork} loading="lazy" />
     <span class="ur-card-owned" class:ur-card-owned--yes={view.owned}>
       {view.owned ? 'Owned' : 'Catalog'}
     </span>
@@ -183,8 +163,7 @@
     outline-offset: 3px;
   }
 
-  .ur-card--ember {
-    --ur-rarity: var(--ur-ember);
+  .ur-card.ur-rarity-tone-ember {
     --ur-card-texture: repeating-linear-gradient(
       135deg,
       transparent 0 16px,
@@ -192,14 +171,12 @@
     );
   }
 
-  .ur-card--eruption {
-    --ur-rarity: var(--ur-eruption);
+  .ur-card.ur-rarity-tone-eruption {
     --ur-card-texture: radial-gradient(ellipse at 85% 90%, rgb(255 90 42 / 30%), transparent 55%);
     border-top-width: 3px;
   }
 
-  .ur-card--apex {
-    --ur-rarity: var(--ur-apex);
+  .ur-card.ur-rarity-tone-apex {
     --ur-card-texture: repeating-linear-gradient(
       115deg,
       transparent 0 14px,
@@ -208,8 +185,7 @@
     border-width: 3px;
   }
 
-  .ur-card--titan {
-    --ur-rarity: var(--ur-titan);
+  .ur-card.ur-rarity-tone-titan {
     --ur-card-texture: repeating-linear-gradient(
       135deg,
       transparent 0 13px,
@@ -217,15 +193,13 @@
     );
   }
 
-  .ur-card--eclipse {
-    --ur-rarity: var(--ur-eclipse);
+  .ur-card.ur-rarity-tone-eclipse {
     --ur-card-texture:
       radial-gradient(ellipse at 15% 85%, rgb(139 92 246 / 32%), transparent 55%),
       radial-gradient(ellipse at 85% 15%, rgb(139 92 246 / 20%), transparent 50%);
   }
 
-  .ur-card--immortal {
-    --ur-rarity: var(--ur-immortal);
+  .ur-card.ur-rarity-tone-immortal {
     --ur-card-texture: linear-gradient(
       115deg,
       rgb(255 233 176 / 12%),
@@ -323,7 +297,7 @@
     background: transparent;
   }
 
-  .ur-card-hero .ur-special-art {
+  .ur-card-hero :global(.ur-special-art) {
     object-position: center;
     transform: none;
   }
@@ -332,7 +306,7 @@
     filter: saturate(0.55) brightness(0.82);
   }
 
-  .ur-card-initials {
+  .ur-card-hero :global(.ur-card-face-initials) {
     position: absolute;
     inset: 0;
     display: grid;

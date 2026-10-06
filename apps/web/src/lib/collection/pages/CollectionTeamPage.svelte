@@ -1,26 +1,16 @@
 <script lang="ts">
-  import { asset, resolve } from '$app/paths';
+  import { resolve } from '$app/paths';
   import { page } from '$app/state';
   import '$lib/collection/ultimate-theme.css';
-  import { getContext, onDestroy, tick } from 'svelte';
+  import { getContext, onDestroy, tick, untrack } from 'svelte';
   import type {
     CollectionActiveTeam,
-    CollectionCatalog,
     CollectionCatalogCard,
     CollectionPlayState,
-    CollectionState,
-    HoopRushManifest,
   } from '@hoop-rush/data-contracts';
-  import { getManifest } from '$lib/data';
   import AsyncState from '$lib/components/AsyncState.svelte';
-  import PlayerFace from '$lib/components/PlayerFace.svelte';
-  import { collectionCardArtOf } from '../collection-card-art.ts';
-  import { loadCollectionCatalog } from '$lib/collection/collection-assets.ts';
-  import {
-    ensureCollection,
-    ensurePlayState,
-    setActiveTeam,
-  } from '$lib/collection/collection-hub.ts';
+  import CollectionCardFace from '$lib/collection/CollectionCardFace.svelte';
+  import { ensurePlayState, setActiveTeam } from '$lib/collection/collection-hub.ts';
   import {
     STARTER_SLOT_GROUPS,
     STARTER_SLOT_LABELS,
@@ -52,11 +42,21 @@
     mounted = false;
   });
 
-  let phase = $state<'loading' | 'error' | 'ready'>('loading');
-  let error = $state<string | null>(null);
-  let catalog = $state<CollectionCatalog | null>(null);
-  let manifest = $state<HoopRushManifest | null>(null);
-  let collectionState = $state<CollectionState | null>(null);
+  const collectionState = $derived(shell.state);
+  const catalog = $derived(shell.catalog);
+  const manifest = $derived(shell.manifest);
+  let pageStatus = $state<'loading' | 'error' | 'ready'>('loading');
+  let pageError = $state<string | null>(null);
+  const phase = $derived<'loading' | 'error' | 'ready'>(
+    shell.phase === 'error' ||
+      (shell.phase === 'ready' && shell.catalog === null) ||
+      pageError !== null
+      ? 'error'
+      : shell.phase === 'ready' && pageStatus === 'ready'
+        ? 'ready'
+        : 'loading',
+  );
+  const error = $derived(shell.error ?? shell.catalogError ?? pageError);
   let playState = $state<CollectionPlayState | null>(null);
   let draft = $state<TeamDraft>(emptyDraft());
   let target = $state<{ kind: 'starter'; index: number } | { kind: 'bench' } | null>(null);
@@ -154,15 +154,6 @@
     draft.bench.reduce((sum, cardId) => sum + (draft.minutes[cardId] ?? 0), 0),
   );
 
-  function initialsOf(name: string): string {
-    return name
-      .split(' ')
-      .map((part) => part[0] ?? '')
-      .join('')
-      .slice(0, 2)
-      .toUpperCase();
-  }
-
   function overallOf(card: CollectionCatalogCard): number {
     return card.summarySource?.overallRating ?? 60;
   }
@@ -173,36 +164,33 @@
 
   async function load(): Promise<void> {
     returnChallengeId = page.url.searchParams.get('challenge');
+    pageStatus = 'loading';
+    pageError = null;
     try {
-      const [loadedCatalog, loadedManifest, loadedState] = await Promise.all([
-        loadCollectionCatalog(),
-        getManifest(),
-        ensureCollection(new Date().toISOString()),
-      ]);
-      if (!mounted) return;
-      catalog = loadedCatalog;
-      manifest = loadedManifest;
-      collectionState = loadedState;
-      if (loadedState.claimedWelcome) {
+      if (collectionState?.claimedWelcome) {
         const play = await ensurePlayState(new Date().toISOString());
         if (!mounted) return;
         playState = play;
         draft = draftFromTeam(play.activeTeam);
       }
-      phase = 'ready';
+      pageStatus = 'ready';
     } catch (loadError) {
       if (!mounted) return;
-      error = loadError instanceof Error ? loadError.message : 'Could not load the team.';
-      phase = 'error';
+      pageError = loadError instanceof Error ? loadError.message : 'Could not load the team.';
+      pageStatus = 'error';
     }
   }
 
-  $effect(() => {
-    void load();
-  });
+  function retry(): void {
+    pageStatus = 'loading';
+    pageError = null;
+    if (shell.phase === 'error' || shell.catalogError !== null) void shell.refresh();
+    else void load();
+  }
 
   $effect(() => {
-    if (collectionState && catalog) shell.sync(collectionState, catalog.cards.length);
+    if (shell.phase !== 'ready') return;
+    void untrack(load);
   });
 
   function selectStarterSlot(index: number): void {
@@ -379,6 +367,12 @@
   let returnChallengeId = $state<string | null>(null);
 </script>
 
+{#snippet questionFallback()}
+  <span class="avatar-fallback" aria-hidden="true">?</span>
+{/snippet}
+
+{#snippet noFallback()}{/snippet}
+
 <div class="team-page">
   <div class="team-hero">
     <div class="team-hero-copy">
@@ -439,15 +433,7 @@
     </div>
   {:else if phase === 'error'}
     <div class="mt-6">
-      <AsyncState
-        kind="error"
-        title="Couldn't load"
-        message={error ?? 'Unknown error.'}
-        retry={() => {
-          phase = 'loading';
-          void load();
-        }}
-      />
+      <AsyncState kind="error" title="Couldn't load" message={error ?? 'Unknown error.'} {retry} />
     </div>
   {:else if !claimed}
     <div class="mt-6">
@@ -500,7 +486,7 @@
                     aria-label={card
                       ? `${STARTER_SLOT_LABELS[index]} starter: ${card.displayName}. Select to replace.`
                       : `Empty ${STARTER_SLOT_LABELS[index]} starter slot. Select, then pick a card.`}
-                    class="slot-card"
+                    class="slot-card ur-rarity-tone-{card ? rarityToken(card) : 'empty'}"
                     data-rarity={card ? rarityToken(card) : 'empty'}
                     data-active={target?.kind === 'starter' && target.index === index}
                   >
@@ -511,28 +497,10 @@
                       <span class="slot-ovr">{card ? overallOf(card) : ''}</span>
                     </span>
                     <span class="slot-face">
-                      {#if collectionCardArtOf(card ?? null)}
-                        <img
-                          class="special-card-art"
-                          src={asset(collectionCardArtOf(card ?? null)!)}
-                          alt=""
-                          loading="lazy"
-                        />
-                      {:else if card && manifest}
-                        <PlayerFace
-                          player={{
-                            playerId: card.playerId,
-                            playerExternalId: card.playerExternalId,
-                            altIds: null,
-                          }}
-                          {manifest}
-                          size="court"
-                          fallbackInitials={initialsOf(card.displayName)}
-                        />
+                      {#if card}
+                        <CollectionCardFace {card} {manifest} size="court" loading="lazy" />
                       {:else}
-                        <span class="slot-silhouette" aria-hidden="true">
-                          {card ? initialsOf(card.displayName) : '+'}
-                        </span>
+                        <span class="slot-silhouette" aria-hidden="true">+</span>
                       {/if}
                     </span>
                     <span class="slot-nameplate">
@@ -558,23 +526,13 @@
               {@const card = byId.get(cardId)}
               <li>
                 <span class="rotation-face">
-                  {#if collectionCardArtOf(card ?? null)}
-                    <img
-                      class="special-card-art"
-                      src={asset(collectionCardArtOf(card ?? null)!)}
-                      alt=""
-                      loading="lazy"
-                    />
-                  {:else if card && manifest}
-                    <PlayerFace
-                      player={{
-                        playerId: card.playerId,
-                        playerExternalId: card.playerExternalId,
-                        altIds: null,
-                      }}
+                  {#if card}
+                    <CollectionCardFace
+                      {card}
                       {manifest}
                       size="sm"
-                      fallbackInitials={initialsOf(card.displayName)}
+                      fallback={questionFallback}
+                      loading="lazy"
                     />
                   {:else}
                     <span class="avatar-fallback" aria-hidden="true">?</span>
@@ -622,23 +580,13 @@
               {@const card = byId.get(cardId)}
               <li class="bench-row">
                 <span class="bench-avatar">
-                  {#if collectionCardArtOf(card ?? null)}
-                    <img
-                      class="special-card-art"
-                      src={asset(collectionCardArtOf(card ?? null)!)}
-                      alt=""
-                      loading="lazy"
-                    />
-                  {:else if card && manifest}
-                    <PlayerFace
-                      player={{
-                        playerId: card.playerId,
-                        playerExternalId: card.playerExternalId,
-                        altIds: null,
-                      }}
+                  {#if card}
+                    <CollectionCardFace
+                      {card}
                       {manifest}
                       size="sm"
-                      fallbackInitials={initialsOf(card?.displayName ?? cardId)}
+                      fallback={questionFallback}
+                      loading="lazy"
                     />
                   {:else}
                     <span class="avatar-fallback" aria-hidden="true">?</span>
@@ -717,23 +665,13 @@
               <li class="minutes-row">
                 <div class="minutes-top">
                   <span class="bench-avatar">
-                    {#if collectionCardArtOf(card ?? null)}
-                      <img
-                        class="special-card-art"
-                        src={asset(collectionCardArtOf(card ?? null)!)}
-                        alt=""
-                        loading="lazy"
-                      />
-                    {:else if card && manifest}
-                      <PlayerFace
-                        player={{
-                          playerId: card.playerId,
-                          playerExternalId: card.playerExternalId,
-                          altIds: null,
-                        }}
+                    {#if card}
+                      <CollectionCardFace
+                        {card}
                         {manifest}
                         size="sm"
-                        fallbackInitials={initialsOf(card.displayName)}
+                        fallback={noFallback}
+                        loading="lazy"
                       />
                     {/if}
                   </span>
@@ -865,25 +803,7 @@
             {@const reason = assignmentReason(card)}
             <li class="owned-row">
               <span class="bench-avatar">
-                {#if collectionCardArtOf(card)}
-                  <img
-                    class="special-card-art"
-                    src={asset(collectionCardArtOf(card)!)}
-                    alt=""
-                    loading="lazy"
-                  />
-                {:else if manifest}
-                  <PlayerFace
-                    player={{
-                      playerId: card.playerId,
-                      playerExternalId: card.playerExternalId,
-                      altIds: null,
-                    }}
-                    {manifest}
-                    size="sm"
-                    fallbackInitials={initialsOf(card.displayName)}
-                  />
-                {/if}
+                <CollectionCardFace {card} {manifest} size="sm" fallback={noFallback} />
               </span>
               <span class="owned-copy">
                 <strong>{card.displayName}</strong>
@@ -926,7 +846,9 @@
 </div>
 
 <style>
-  .special-card-art {
+  .slot-face :global(.ur-special-art),
+  .rotation-face :global(.ur-special-art),
+  .bench-avatar :global(.ur-special-art) {
     width: 100%;
     height: 100%;
     object-fit: cover;
@@ -1309,6 +1231,7 @@
   }
 
   .slot-card {
+    --slot-glow: var(--ur-rarity, var(--ur-line-strong));
     display: flex;
     position: relative;
     width: min(100%, 10.5rem);
@@ -1337,24 +1260,6 @@
     outline-offset: 2px;
   }
 
-  .slot-card[data-rarity='apex'] {
-    --slot-glow: var(--ur-apex);
-  }
-  .slot-card[data-rarity='eclipse'] {
-    --slot-glow: var(--ur-eclipse);
-  }
-  .slot-card[data-rarity='eruption'] {
-    --slot-glow: var(--ur-eruption);
-  }
-  .slot-card[data-rarity='ember'] {
-    --slot-glow: var(--ur-ember);
-  }
-  .slot-card[data-rarity='titan'] {
-    --slot-glow: var(--ur-titan);
-  }
-  .slot-card[data-rarity='immortal'] {
-    --slot-glow: var(--ur-immortal);
-  }
   .slot-card[data-rarity='empty'] {
     --slot-glow: var(--ur-line-strong);
     border-style: dashed;
@@ -1423,7 +1328,8 @@
     transform: none !important;
   }
 
-  .slot-silhouette {
+  .slot-silhouette,
+  .slot-face :global(.ur-card-face-initials) {
     display: grid;
     height: 100%;
     min-height: 6.5rem;
@@ -2139,7 +2045,8 @@
     }
 
     .slot-face,
-    .slot-silhouette {
+    .slot-silhouette,
+    .slot-face :global(.ur-card-face-initials) {
       min-height: 5.25rem;
     }
 

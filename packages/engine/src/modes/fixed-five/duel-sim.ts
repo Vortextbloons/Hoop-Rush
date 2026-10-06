@@ -21,11 +21,11 @@ export interface DuelSimulationOutput {
   result: FixedFiveDuelResult;
   games: GameResult[];
 }
-export function simulateDuelSeries(
+export type DuelGameEvent = { tag: 'duel'; game: GameResult };
+export function* duelGameEvents(
   input: DuelSimulationInput,
   context: EngineContext,
-): DuelSimulationOutput {
-  const games: GameResult[] = [];
+): Generator<DuelGameEvent, void, undefined> {
   let p1Wins = 0;
   let p2Wins = 0;
   for (let gameNumber = 1; gameNumber <= 7; gameNumber += 1) {
@@ -49,11 +49,20 @@ export function simulateDuelSeries(
     const failures = checkGameResult(result);
     if (failures.length > 0)
       throw new Error(`duel game ${String(gameNumber)} failed invariants: ${failures.join('; ')}`);
-    games.push(result);
+    yield { tag: 'duel', game: result };
     const homeIsP1 = result.home.teamId === input.p1Team.teamId;
     const p1Won = (result.winner === 'home') === homeIsP1;
     if (p1Won) p1Wins += 1;
     else p2Wins += 1;
+  }
+}
+export function simulateDuelSeries(
+  input: DuelSimulationInput,
+  context: EngineContext,
+): DuelSimulationOutput {
+  const games: GameResult[] = [];
+  for (const event of duelGameEvents(input, context)) {
+    games.push(event.game);
   }
   return summarizeDuelGames({
     games,

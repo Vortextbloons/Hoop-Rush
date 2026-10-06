@@ -31,7 +31,7 @@ export const COLLECTION_SPECIALS: readonly AuthoredSpecial[] = [
   {
     family: 'Arm Guard',
     rarity: 'Immortal',
-    sourcePlayerVersionId: 'pv-b6f7c0f4a71f25601b18bd2634c856e4',
+    sourcePlayerVersionId: 'pv-4f9bfe1ff8fb4b3bed084899071a304f',
     ratingOverlay: {
       perimeterDefense: 29,
       defensiveIq: 29,
@@ -57,7 +57,7 @@ export const COLLECTION_SPECIALS: readonly AuthoredSpecial[] = [
   {
     family: 'Arm Guard',
     rarity: 'Immortal',
-    sourcePlayerVersionId: 'pv-eff5d20d8eaa3de1f44664138e6155bd',
+    sourcePlayerVersionId: 'pv-4afe048538d49ee119577d575e006235',
     ratingOverlay: {
       perimeterDefense: 25,
       defensiveIq: 21,
@@ -121,13 +121,13 @@ export const COLLECTION_SPECIALS: readonly AuthoredSpecial[] = [
   {
     family: 'Heat Check',
     rarity: 'Eclipse',
-    sourcePlayerVersionId: 'pv-e232bb54fc4d64987c28ee7280b2e544',
+    sourcePlayerVersionId: 'pv-f2e43505f31f8451015c0f1b91645ef5',
     ratingOverlay: { threePoint: 10, midrange: 5, offensiveIq: 3, ballHandling: 2 },
   },
   {
     family: 'Heat Check',
     rarity: 'Titan',
-    sourcePlayerVersionId: 'pv-3403aab8d9062e9499e652cefe30bcc8',
+    sourcePlayerVersionId: 'pv-c324a9f4360b5e5812c5602a46fe8ec4',
     ratingOverlay: { threePoint: 10, midrange: 5, offensiveIq: 3, ballHandling: 2 },
   },
   {
@@ -146,16 +146,16 @@ export const COLLECTION_SPECIALS: readonly AuthoredSpecial[] = [
 
 export const COLLECTION_SPECIAL_SOURCE_SEASONS: Record<string, string> = {
   'pv-f4d00dd58ebad5097f4e5ba3307a9085': 'Luka Dončić 2023-24',
-  'pv-b6f7c0f4a71f25601b18bd2634c856e4': 'Magic Johnson 1988-89',
+  'pv-4f9bfe1ff8fb4b3bed084899071a304f': 'Magic Johnson 1988-89',
   'pv-3f5b52ec3a1798b0bad644defdb7c47c': 'Trae Young 2021-22',
-  'pv-eff5d20d8eaa3de1f44664138e6155bd': 'James Harden 2018-19',
+  'pv-4afe048538d49ee119577d575e006235': 'James Harden 2018-19',
   'pv-e672c0d85044e49475d29e2691a16bc8': "D'Angelo Russell 2023-24",
   'pv-91b01c4775957fb343db81099c6d7d37': 'Jordan Clarkson 2020-21',
   'pv-4efd0118ae40c6f4ed7689ee95d6e728': 'Bogdan Bogdanović 2020-21',
   'pv-b1ea0fc379982caf201e5ecde1170853': 'Stephen Curry 2015-16',
   'pv-95878fdf2e3c464375ca2d492b1e8c2f': 'Klay Thompson 2014-15',
-  'pv-e232bb54fc4d64987c28ee7280b2e544': 'Damian Lillard 2019-20',
-  'pv-3403aab8d9062e9499e652cefe30bcc8': 'Devin Booker 2023-24',
+  'pv-f2e43505f31f8451015c0f1b91645ef5': 'Damian Lillard 2019-20',
+  'pv-c324a9f4360b5e5812c5602a46fe8ec4': 'Devin Booker 2023-24',
   'pv-df08d554ee506d60278c77225edb0b44': 'Jamal Murray 2025-26',
   'pv-861bb119df8ca81d3c77b327ee6c55e9': 'Reggie Miller 1989-90',
 };

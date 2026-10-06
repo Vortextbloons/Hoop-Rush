@@ -8,7 +8,6 @@ import {
   type FranchiseId,
   type Id,
   type SeasonActiveRunIndex,
-  type SeasonCampaignState,
   type SeasonDraftCatalog,
   type SeasonEffectsState,
   type SeasonFreeAgencyIndex,
@@ -183,6 +182,7 @@ function postCommandEffects(run: SeasonRun, prior: SeasonEffectsState): SeasonEf
   return withEffects.effects ?? prior;
 }
 const handleRunCommand = handleSeasonRunCommand;
+type RunCommandOutput = ReturnType<typeof handleRunCommand>;
 const IDLE_BLOCK: BlockRunState = {
   requestId: null,
   blockIndex: null,
@@ -616,18 +616,6 @@ export class SeasonHubState {
     }
     this.emit();
   }
-  async selectCampaignOpportunity(input: {
-    blockIndex: number;
-    opportunityId: string;
-  }): Promise<void> {
-    const command: SeasonRunCommand = {
-      ...this.commandBase('camp'),
-      command: 'select-campaign-opportunity',
-      blockIndex: input.blockIndex,
-      opportunityId: input.opportunityId,
-    };
-    await this.dispatch(command);
-  }
   async selectFrontOffice(input: { executiveId: string }): Promise<void> {
     const command: SeasonRunCommand = {
       ...this.commandBase('fo'),
@@ -664,12 +652,10 @@ export class SeasonHubState {
     try {
       await this.ensureCatalog();
     } catch (error) {
-      this.commandError = {
-        command: 'submit-trade-proposal',
-        rejection: null,
-        message: `The draft catalog is unavailable: ${error instanceof Error ? error.message : String(error)}`,
-      };
-      this.emit();
+      this.failCommand(
+        'submit-trade-proposal',
+        `The draft catalog is unavailable: ${error instanceof Error ? error.message : String(error)}`,
+      );
       return;
     }
     const command: SeasonRunCommand = {
@@ -693,12 +679,10 @@ export class SeasonHubState {
       try {
         await this.ensureCatalog();
       } catch (error) {
-        this.commandError = {
-          command: 'respond-to-trade-counter',
-          rejection: null,
-          message: `The draft catalog is unavailable: ${error instanceof Error ? error.message : String(error)}`,
-        };
-        this.emit();
+        this.failCommand(
+          'respond-to-trade-counter',
+          `The draft catalog is unavailable: ${error instanceof Error ? error.message : String(error)}`,
+        );
         return;
       }
     }
@@ -769,12 +753,10 @@ export class SeasonHubState {
     try {
       await this.ensureCatalog();
     } catch (error) {
-      this.commandError = {
-        command: 'accept-trade-offer',
-        rejection: null,
-        message: `The draft catalog is unavailable: ${error instanceof Error ? error.message : String(error)}`,
-      };
-      this.emit();
+      this.failCommand(
+        'accept-trade-offer',
+        `The draft catalog is unavailable: ${error instanceof Error ? error.message : String(error)}`,
+      );
       return;
     }
     const command: SeasonRunCommand = {
@@ -789,12 +771,10 @@ export class SeasonHubState {
     try {
       await this.ensureCatalog();
     } catch (error) {
-      this.commandError = {
-        command: 'decline-trade-offer',
-        rejection: null,
-        message: `The draft catalog is unavailable: ${error instanceof Error ? error.message : String(error)}`,
-      };
-      this.emit();
+      this.failCommand(
+        'decline-trade-offer',
+        `The draft catalog is unavailable: ${error instanceof Error ? error.message : String(error)}`,
+      );
       return;
     }
     const command: SeasonRunCommand = {
@@ -846,12 +826,7 @@ export class SeasonHubState {
     const snapshot = this.snapshot;
     this.commandError = null;
     if (snapshot === null) {
-      this.commandError = {
-        command: 'resolve-free-agent-market',
-        rejection: null,
-        message: 'The active run is not loaded yet.',
-      };
-      this.emit();
+      this.failCommand('resolve-free-agent-market', 'The active run is not loaded yet.');
       return;
     }
     try {
@@ -867,12 +842,10 @@ export class SeasonHubState {
         if (catalog !== null) this.catalog = catalog;
       });
     } catch (error) {
-      this.commandError = {
-        command: 'resolve-free-agent-market',
-        rejection: null,
-        message: `The free-agency market assets are unavailable: ${error instanceof Error ? error.message : String(error)}`,
-      };
-      this.emit();
+      this.failCommand(
+        'resolve-free-agent-market',
+        `The free-agency market assets are unavailable: ${error instanceof Error ? error.message : String(error)}`,
+      );
       return;
     }
     const command: SeasonRunCommand = {
@@ -969,98 +942,112 @@ export class SeasonHubState {
   loadPostseasonSummary(runId: string, gameId: string): Promise<SeasonPostseasonSummary | null> {
     return this.repo.loadPostseasonSummary(runId, gameId);
   }
-  private requirePostseasonStage(command: SeasonRunCommand['command']): boolean {
-    const stage = this.snapshot?.run.stage ?? null;
-    if (stage === 'play-in' || stage === 'playoffs') return true;
+  private failCommand(command: SeasonRunCommand['command'], message: string): void {
+    this.commandError = { command, rejection: null, message };
+    this.emit();
+  }
+  private rejectCommand(
+    command: SeasonRunCommand['command'],
+    rejection: SeasonRunCommandRejection,
+  ): void {
     this.commandError = {
       command,
-      rejection: {
-        code: 'invalid-stage',
-        requiredStage: 'play-in',
-        currentStage: stage ?? 'regular-season',
-      },
-      message: describeCommandRejection(command, {
-        code: 'invalid-stage',
-        requiredStage: 'play-in',
-        currentStage: stage ?? 'regular-season',
-      }),
+      rejection,
+      message: describeCommandRejection(command, rejection),
     };
     this.emit();
-    return false;
   }
-  private async dispatchPostseason(command: SeasonRunCommand): Promise<void> {
+  private adoptCommittedRun(run: SeasonRun, effects: SeasonEffectsState): boolean {
+    const snapshot = this.snapshot;
+    if (snapshot === null) return false;
+    this.snapshot = { ...snapshot, run, effects };
+    setCachedSeasonSnapshot(this.snapshot);
+    return true;
+  }
+  private async executeRunCommand(
+    command: SeasonRunCommand,
+    hooks: {
+      beforeExecute?: () => boolean;
+      prepare?: () => Promise<boolean>;
+      context: (snapshot: SeasonRunSnapshot) => SeasonRunCommandContext;
+      apply: (output: RunCommandOutput, snapshot: SeasonRunSnapshot) => Promise<void>;
+    },
+  ): Promise<void> {
     const snapshot = this.snapshot;
     this.commandError = null;
     if (snapshot === null) {
-      this.commandError = {
-        command: command.command,
-        rejection: null,
-        message: 'The active run is not loaded yet.',
-      };
-      this.emit();
+      this.failCommand(command.command, 'The active run is not loaded yet.');
       return;
     }
-    let profile: EraSimulationProfile;
+    if (hooks.beforeExecute !== undefined && !hooks.beforeExecute()) return;
+    if (hooks.prepare !== undefined && !(await hooks.prepare())) return;
     try {
-      profile = await this.loadProfile();
+      const output = handleRunCommand(command, hooks.context(snapshot));
+      const envelope = output.result;
+      if (envelope.result.status === 'rejected') {
+        this.rejectCommand(command.command, envelope.result.rejection);
+        return;
+      }
+      await hooks.apply(output, snapshot);
     } catch (error) {
-      this.commandError = {
-        command: command.command,
-        rejection: null,
-        message: `The season era profile is unavailable: ${error instanceof Error ? error.message : String(error)}`,
-      };
-      this.emit();
-      return;
+      this.failCommand(command.command, error instanceof Error ? error.message : String(error));
     }
-    try {
-      const output = handleRunCommand(command, {
+  }
+  private requirePostseasonStage(command: SeasonRunCommand['command']): boolean {
+    const stage = this.snapshot?.run.stage ?? null;
+    if (stage === 'play-in' || stage === 'playoffs') return true;
+    this.rejectCommand(command, {
+      code: 'invalid-stage',
+      requiredStage: 'play-in',
+      currentStage: stage ?? 'regular-season',
+    });
+    return false;
+  }
+  private async dispatchPostseason(command: SeasonRunCommand): Promise<void> {
+    let profile: EraSimulationProfile | null = null;
+    await this.executeRunCommand(command, {
+      prepare: async () => {
+        try {
+          profile = await this.loadProfile();
+          return true;
+        } catch (error) {
+          this.failCommand(
+            command.command,
+            `The season era profile is unavailable: ${error instanceof Error ? error.message : String(error)}`,
+          );
+          return false;
+        }
+      },
+      context: (snapshot) => ({
         run: snapshot.run,
         pending: null,
         humanFranchiseId: this.humanFranchiseId(),
         effects: snapshot.effects,
         catalog: this.catalog ?? undefined,
-        profile,
-      } satisfies SeasonRunCommandContext);
-      const envelope = output.result;
-      if (envelope.result.status === 'rejected') {
-        this.commandError = {
-          command: command.command,
-          rejection: envelope.result.rejection,
-          message: describeCommandRejection(command.command, envelope.result.rejection),
+        profile: profile ?? undefined,
+      }),
+      apply: async (output, snapshot) => {
+        const summaries = output.postseasonSummaries ?? [];
+        const commitInput: CommitPostseasonAdvancementInput = {
+          runId: snapshot.run.runId,
+          run: output.run,
+          summaries,
+          effects: postCommandEffects(output.run, snapshot.effects),
+          command,
+          preStateRevision: command.expectedStateRevision,
+          preStateDigest: command.expectedStateDigest,
+          resultDigest: seasonPostseasonCommitResultDigest(command.commandId, [], summaries),
+          relatedGameIds: summaries.map((summary) => summary.gameId),
+          transactionIds: seasonPostseasonTransactionIdsOf(output.run, command.commandId),
         };
-        this.emit();
-        return;
-      }
-      const summaries = output.postseasonSummaries ?? [];
-      const commitInput: CommitPostseasonAdvancementInput = {
-        runId: snapshot.run.runId,
-        run: output.run,
-        summaries,
-        effects: postCommandEffects(output.run, snapshot.effects),
-        command,
-        preStateRevision: command.expectedStateRevision,
-        preStateDigest: command.expectedStateDigest,
-        resultDigest: seasonPostseasonCommitResultDigest(command.commandId, [], summaries),
-        relatedGameIds: summaries.map((summary) => summary.gameId),
-        transactionIds: seasonPostseasonTransactionIdsOf(output.run, command.commandId),
-      };
-      await this.repo.commitPostseasonAdvancement(commitInput);
-      this.commandError = null;
-      if (this.snapshot !== null) {
-        const effects = postCommandEffects(output.run, snapshot.effects);
-        this.snapshot = { ...this.snapshot, run: output.run, effects };
-        setCachedSeasonSnapshot(this.snapshot);
-        this.emit();
-      }
-      await this.refresh();
-    } catch (error) {
-      this.commandError = {
-        command: command.command,
-        rejection: null,
-        message: error instanceof Error ? error.message : String(error),
-      };
-      this.emit();
-    }
+        await this.repo.commitPostseasonAdvancement(commitInput);
+        this.commandError = null;
+        if (this.adoptCommittedRun(output.run, postCommandEffects(output.run, snapshot.effects))) {
+          this.emit();
+        }
+        await this.refresh();
+      },
+    });
   }
   private onPostseasonRunnerEvent(event: SeasonPostseasonEvent): void {
     if (event.type === 'started') {
@@ -1230,7 +1217,7 @@ export class SeasonHubState {
   }
   private tradeReceiptOf(
     command: SeasonRunCommand,
-    envelope: ReturnType<typeof handleRunCommand>['result'],
+    envelope: RunCommandOutput['result'],
     stateRevision: number,
   ): SeasonTradeReceipt | null {
     if (envelope.result.status !== 'accepted') return null;
@@ -1273,31 +1260,16 @@ export class SeasonHubState {
     return null;
   }
   private async dispatch(command: SeasonRunCommand): Promise<void> {
-    const snapshot = this.snapshot;
-    this.commandError = null;
     this.commandReceipt = null;
-    if (snapshot === null) {
-      this.commandError = {
-        command: command.command,
-        rejection: null,
-        message: 'The active run is not loaded yet.',
-      };
-      this.emit();
-      return;
-    }
-    if (TRADE_COMMANDS.has(command.command) && this.tradeBlockedReason !== null) {
-      const blockIndex = this.pending?.blockIndex ?? this.nextBlockIndex() ?? 0;
-      const rejection = { code: 'pending-block', blockIndex } as const;
-      this.commandError = {
-        command: command.command,
-        rejection,
-        message: describeCommandRejection(command.command, rejection),
-      };
-      this.emit();
-      return;
-    }
-    try {
-      const output = handleRunCommand(command, {
+    await this.executeRunCommand(command, {
+      beforeExecute: () => {
+        if (!TRADE_COMMANDS.has(command.command) || this.tradeBlockedReason === null) return true;
+        const blockIndex = this.pending?.blockIndex ?? this.nextBlockIndex() ?? 0;
+        const rejection = { code: 'pending-block', blockIndex } as const;
+        this.rejectCommand(command.command, rejection);
+        return false;
+      },
+      context: (snapshot) => ({
         run: snapshot.run,
         pending: this.pending,
         humanFranchiseId: this.humanFranchiseId(),
@@ -1305,62 +1277,48 @@ export class SeasonHubState {
         catalog: this.catalog ?? undefined,
         freeAgencyIndex: this.freeAgencyIndex ?? undefined,
         freeAgencyTargets: this.freeAgencyTargets ?? undefined,
-      } satisfies SeasonRunCommandContext);
-      const envelope = output.result;
-      if (envelope.result.status === 'rejected') {
-        this.commandError = {
-          command: command.command,
-          rejection: envelope.result.rejection,
-          message: describeCommandRejection(command.command, envelope.result.rejection),
-        };
-        this.emit();
-        return;
-      }
-      const beforeRosterKey = rosterKeyOfRun(snapshot.run.rosters);
-      const pendingInterruption =
-        command.command === 'forfeit-interrupted-game' && output.pending !== null
-          ? this.interruptionStateForPending(output.pending)
-          : undefined;
-      if (command.command === 'forfeit-interrupted-game') {
-        this.interruption = pendingInterruption ?? null;
-      } else if (output.pending === null) {
-        this.interruption = null;
-      }
-      await this.repo.applySeasonRunCommand({
-        runId: snapshot.run.runId,
-        command,
-        run: output.run,
-        effects: postCommandEffects(output.run, snapshot.effects),
-        pending: output.pending,
-        ...(pendingInterruption !== undefined && pendingInterruption !== null
-          ? { pendingInterruption }
-          : {}),
-      });
-      this.commandError = null;
-      this.commandReceipt = this.tradeReceiptOf(command, envelope, output.run.stateRevision);
-      this.pending = output.pending;
-      if (this.snapshot !== null) {
-        const effects = postCommandEffects(output.run, this.snapshot.effects);
-        this.snapshot = { ...this.snapshot, run: output.run, effects };
-        setCachedSeasonSnapshot(this.snapshot);
-        this.channel.announce({
-          kind: 'commit',
-          runId: output.run.runId,
-          revision: output.run.stateRevision,
-          committedAt: this.now(),
+      }),
+      apply: async (output, snapshot) => {
+        const beforeRosterKey = rosterKeyOfRun(snapshot.run.rosters);
+        const pendingInterruption =
+          command.command === 'forfeit-interrupted-game' && output.pending !== null
+            ? this.interruptionStateForPending(output.pending)
+            : undefined;
+        if (command.command === 'forfeit-interrupted-game') {
+          this.interruption = pendingInterruption ?? null;
+        } else if (output.pending === null) {
+          this.interruption = null;
+        }
+        await this.repo.applySeasonRunCommand({
+          runId: snapshot.run.runId,
+          command,
+          run: output.run,
+          effects: postCommandEffects(output.run, snapshot.effects),
+          pending: output.pending,
+          ...(pendingInterruption !== undefined && pendingInterruption !== null
+            ? { pendingInterruption }
+            : {}),
         });
-        this.emit();
-      }
-      if (beforeRosterKey === rosterKeyOfRun(output.run.rosters)) return;
-      await this.refresh();
-    } catch (error) {
-      this.commandError = {
-        command: command.command,
-        rejection: null,
-        message: error instanceof Error ? error.message : String(error),
-      };
-      this.emit();
-    }
+        this.commandError = null;
+        this.commandReceipt = this.tradeReceiptOf(command, output.result, output.run.stateRevision);
+        this.pending = output.pending;
+        const current = this.snapshot;
+        if (
+          current !== null &&
+          this.adoptCommittedRun(output.run, postCommandEffects(output.run, current.effects))
+        ) {
+          this.channel.announce({
+            kind: 'commit',
+            runId: output.run.runId,
+            revision: output.run.stateRevision,
+            committedAt: this.now(),
+          });
+          this.emit();
+        }
+        if (beforeRosterKey === rosterKeyOfRun(output.run.rosters)) return;
+        await this.refresh();
+      },
+    });
   }
   private commandBase(
     prefix: string,
@@ -1544,59 +1502,6 @@ function indexAfterCommit(
     humanWins: humanRow?.wins ?? index.humanWins,
     humanLosses: humanRow?.losses ?? index.humanLosses,
     updatedAtIso: new Date(now()).toISOString(),
-  };
-}
-export interface CampaignViewModel {
-  offers: SeasonCampaignState['offers'];
-  selections: SeasonCampaignState['selections'];
-  evaluations: SeasonCampaignState['evaluations'];
-  branchState: SeasonCampaignState['branchState'];
-  rewardEntitlements: SeasonCampaignState['rewardEntitlements'];
-  appliedRewardIds: SeasonCampaignState['appliedRewardIds'];
-  currentBlockIndex: number | null;
-  isOpportunityRequired: boolean;
-  nextBlockOpportunityIds: string[];
-}
-export function campaignViewModel(
-  run: SeasonRun | null,
-  nextBlockIndex: number | null,
-): CampaignViewModel | null {
-  if (run === null) return null;
-  const campaign = run.campaign ?? {
-    schemaVersion: 1,
-    campaignVersion: 'season-campaign-v3',
-    startingIdentity: null,
-    startingFocus: null,
-    offers: {},
-    selections: {},
-    evaluations: [],
-    branchState: {},
-    evolutionOffers: null,
-    evolutionSelection: null,
-    rewardEntitlements: {
-      influenceEarned: 0,
-      inquiryCredits: 0,
-      informationBenefits: 0,
-      followUpUnlocks: [],
-    },
-    appliedRewardIds: [],
-  };
-  const completedBlocks = Math.ceil(run.cursor.completedRounds / 10);
-  const targetBlock = nextBlockIndex ?? completedBlocks;
-  const isOpportunityRequired =
-    targetBlock >= 0 && targetBlock < 8 && campaign.selections[targetBlock] === undefined;
-  const nextOffers =
-    targetBlock >= 0 && targetBlock < 8 ? (campaign.offers[targetBlock] ?? null) : null;
-  return {
-    offers: campaign.offers,
-    selections: campaign.selections,
-    evaluations: campaign.evaluations,
-    branchState: campaign.branchState,
-    rewardEntitlements: campaign.rewardEntitlements,
-    appliedRewardIds: campaign.appliedRewardIds,
-    currentBlockIndex: targetBlock,
-    isOpportunityRequired,
-    nextBlockOpportunityIds: nextOffers?.map((o) => o.opportunityId) ?? [],
   };
 }
 export interface TradeBoardViewModel {

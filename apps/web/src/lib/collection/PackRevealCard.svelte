@@ -1,9 +1,7 @@
 <script lang="ts">
   import type { CollectionRarity, HoopRushManifest } from '@hoop-rush/data-contracts';
   import { formatPositions } from '$lib/player-positions';
-  import PlayerFace from '$lib/components/PlayerFace.svelte';
-  import { asset } from '$app/paths';
-  import { collectionCardArtOf } from './collection-card-art.ts';
+  import CollectionCardFace from './CollectionCardFace.svelte';
   import type { CollectionCardView } from './collection-card-view.ts';
 
   let {
@@ -24,44 +22,19 @@
     compact?: boolean;
   } = $props();
 
-  const artwork = $derived(collectionCardArtOf(view));
-
-  function initialsOf(name: string): string {
-    return name
-      .split(' ')
-      .map((part) => part[0] ?? '')
-      .join('')
-      .slice(0, 2)
-      .toUpperCase();
-  }
+  const rarityToken = $derived(rarity.toLowerCase());
 </script>
 
-<article
-  class="ur-reveal-card ur-reveal-card--{rarity.toLowerCase()}"
-  class:ur-reveal-card-compact={compact}
->
+<article class="ur-reveal-card ur-rarity-tone-{rarityToken}" class:ur-reveal-card-compact={compact}>
   <div class="ur-reveal-face" aria-hidden="true">
-    {#if artwork}
-      <img src={asset(artwork)} alt="" class="ur-special-art" />
-    {:else if view && manifest}
-      <PlayerFace
-        player={{
-          playerId: view.playerId,
-          playerExternalId: view.playerExternalId,
-          altIds: null,
-        }}
-        {manifest}
-        size={compact ? 'sm' : 'xl'}
-        fallbackInitials={initialsOf(displayName)}
-      />
-    {:else}
-      <span class="ur-reveal-initials">{initialsOf(displayName)}</span>
-    {/if}
-    {#if view}
-      <span class="ur-reveal-overall" aria-hidden="true">
-        <small>OVR</small><strong>{view.overall}</strong>
-      </span>
-    {/if}
+    <CollectionCardFace
+      {view}
+      {manifest}
+      {rarity}
+      size={compact ? 'sm' : 'xl'}
+      {displayName}
+      showOverall={view !== null}
+    />
   </div>
   <div class="ur-reveal-copy">
     <span class="ur-reveal-rarity">{rarity}</span>
@@ -88,52 +61,43 @@
 
 <style>
   .ur-reveal-card {
-    --ur-reveal-rarity: var(--ur-ember);
     display: grid;
     width: min(100%, 24rem);
     min-height: var(--ur-pack-card-height, 30rem);
     grid-template-rows: minmax(0, 1fr) auto;
     overflow: hidden;
-    border: 2px solid var(--ur-reveal-rarity);
+    border: 2px solid var(--ur-rarity, var(--ur-ember));
     background: var(--ur-bg);
     color: var(--ur-paper);
     clip-path: polygon(0 0, 91% 0, 100% 5%, 100% 100%, 0 100%);
   }
 
-  .ur-reveal-card--ember {
-    --ur-reveal-rarity: var(--ur-ember);
-  }
-
-  .ur-reveal-card--eruption {
-    --ur-reveal-rarity: var(--ur-eruption);
+  .ur-reveal-card.ur-rarity-tone-eruption {
     border-top-width: 5px;
   }
 
-  .ur-reveal-card--apex {
-    --ur-reveal-rarity: var(--ur-apex);
-    box-shadow: inset 0 0 0 4px color-mix(in srgb, var(--ur-reveal-rarity) 18%, transparent);
+  .ur-reveal-card.ur-rarity-tone-apex {
+    box-shadow: inset 0 0 0 4px
+      color-mix(in srgb, var(--ur-rarity, var(--ur-ember)) 18%, transparent);
   }
 
-  .ur-reveal-card--titan {
-    --ur-reveal-rarity: var(--ur-titan);
+  .ur-reveal-card.ur-rarity-tone-titan {
     border-left-width: 6px;
     background-image: repeating-linear-gradient(
       135deg,
       transparent 0 16px,
-      color-mix(in srgb, var(--ur-reveal-rarity) 8%, transparent) 17px 18px
+      color-mix(in srgb, var(--ur-rarity, var(--ur-ember)) 8%, transparent) 17px 18px
     );
   }
 
-  .ur-reveal-card--eclipse {
-    --ur-reveal-rarity: var(--ur-eclipse);
+  .ur-reveal-card.ur-rarity-tone-eclipse {
     box-shadow:
       inset 0 0 0 5px #211931,
-      inset 0 0 0 6px color-mix(in srgb, var(--ur-reveal-rarity) 60%, transparent);
+      inset 0 0 0 6px color-mix(in srgb, var(--ur-rarity, var(--ur-ember)) 60%, transparent);
   }
 
-  .ur-reveal-card--immortal {
-    --ur-reveal-rarity: var(--ur-immortal);
-    border: 4px double var(--ur-reveal-rarity);
+  .ur-reveal-card.ur-rarity-tone-immortal {
+    border: 4px double var(--ur-rarity, var(--ur-ember));
     background-image: linear-gradient(115deg, rgb(255 233 176 / 9%), transparent 48%);
   }
 
@@ -148,7 +112,7 @@
       linear-gradient(180deg, transparent 38%, rgb(8 11 14 / 76%)),
       radial-gradient(
         ellipse at 50% 18%,
-        color-mix(in srgb, var(--ur-reveal-rarity) 32%, transparent),
+        color-mix(in srgb, var(--ur-rarity, var(--ur-ember)) 32%, transparent),
         transparent 62%
       ),
       repeating-linear-gradient(90deg, transparent 0 42px, rgb(240 236 223 / 3%) 43px),
@@ -172,43 +136,15 @@
     transform: scale(1.12);
   }
 
-  .ur-reveal-face .ur-special-art {
+  .ur-reveal-face :global(.ur-special-art) {
     position: absolute;
     inset: 0;
     object-position: center;
     transform: none;
   }
 
-  .ur-reveal-overall {
-    position: absolute;
-    z-index: 2;
-    top: 0.7rem;
-    left: 0.7rem;
-    display: grid;
-    min-width: 3.25rem;
-    justify-items: center;
-    padding: 0.28rem 0.4rem 0.35rem;
-    border: 1px solid color-mix(in srgb, var(--ur-reveal-rarity) 74%, var(--ur-paper));
-    background: color-mix(in srgb, var(--ur-bg) 82%, transparent);
-    color: var(--ur-reveal-rarity);
-    line-height: 0.95;
-    backdrop-filter: blur(5px);
-  }
-
-  .ur-reveal-overall small {
-    font-size: 0.62rem;
-    font-weight: 800;
-  }
-
-  .ur-reveal-overall strong {
-    font-family: var(--font-display);
-    font-size: 2rem;
-    font-weight: 900;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .ur-reveal-initials {
-    color: var(--ur-reveal-rarity);
+  .ur-reveal-face :global(.ur-card-face-initials) {
+    color: var(--ur-rarity, var(--ur-ember));
     font-family: var(--font-display);
     font-size: clamp(3rem, 10vw, 5rem);
     font-weight: 800;
@@ -219,7 +155,7 @@
   }
 
   .ur-reveal-rarity {
-    color: var(--ur-reveal-rarity);
+    color: var(--ur-rarity, var(--ur-ember));
     font-size: 0.68rem;
     font-weight: 800;
     letter-spacing: 0.08em;
@@ -276,6 +212,11 @@
   }
 
   .ur-reveal-card-compact {
+    --ur-face-overall-inset: 0.3rem;
+    --ur-face-overall-min-width: 1.8rem;
+    --ur-face-overall-padding: 0.12rem 0.2rem;
+    --ur-face-overall-size: 1.1rem;
+    --ur-face-overall-small-size: 0.42rem;
     width: 100%;
     min-height: 5.5rem;
     grid-template-columns: 4.25rem minmax(0, 1fr);
@@ -287,29 +228,14 @@
   .ur-reveal-card-compact .ur-reveal-face {
     min-height: 0;
     padding: 0.4rem;
-    border-right: 1px solid var(--ur-reveal-rarity);
+    border-right: 1px solid var(--ur-rarity, var(--ur-ember));
   }
 
   .ur-reveal-card-compact .ur-reveal-face :global(.relative) {
     min-height: 0;
   }
 
-  .ur-reveal-card-compact .ur-reveal-overall {
-    top: 0.3rem;
-    left: 0.3rem;
-    min-width: 1.8rem;
-    padding: 0.12rem 0.2rem;
-  }
-
-  .ur-reveal-card-compact .ur-reveal-overall small {
-    font-size: 0.42rem;
-  }
-
-  .ur-reveal-card-compact .ur-reveal-overall strong {
-    font-size: 1.1rem;
-  }
-
-  .ur-reveal-card-compact .ur-reveal-initials {
+  .ur-reveal-card-compact .ur-reveal-face :global(.ur-card-face-initials) {
     font-size: 1.6rem;
   }
 

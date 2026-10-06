@@ -10,6 +10,7 @@ import {
   seasonGameIdSchema,
   seasonRunCommandSchema,
   seasonFrontOfficeSelectionSchema,
+  type SeasonCampaignOpportunity,
   type SeasonEffectsState,
   type SeasonPendingBlockCandidate,
   type SeasonRun,
@@ -41,7 +42,7 @@ import {
   buildFixtureStoredDraft,
   buildStubSeasonEngineSeam,
 } from '../testing/season-run-fixture.ts';
-import { buildEmptyCampaignState, generateSeasonCampaignOffers } from '@hoop-rush/engine';
+import { buildEmptyCampaignState } from '@hoop-rush/engine';
 import { applySeasonBlockInfluenceGrants } from '@hoop-rush/engine';
 import { buildFullSeasonDataset } from '../benchmark/season-run.ts';
 import {
@@ -1134,33 +1135,40 @@ describe('season run M2.5 pending blocks (v5)', () => {
   });
 });
 describe('season run M2.5 command application (v5)', () => {
-  function block0Offers(adapters: Adapters) {
-    const humanFranchiseId =
-      adapters.run.league.teams.find((team) => team.control === 'human')?.franchiseId ?? null;
-    return generateSeasonCampaignOffers({
-      rootSeed: adapters.run.rootSeed,
-      blockIndex: 0,
-      humanFranchiseId,
-      schedule: adapters.schedule,
-      standings: adapters.seam.reduceSeasonStandings(adapters.run.league, []),
-      health: adapters.run.health,
-      rotations: adapters.run.rotations,
-      rosters: adapters.run.rosters,
-      transactions: [],
-      summaries: [],
-      campaignState: adapters.run.campaign ?? buildEmptyCampaignState(),
-    });
+  function fixedCampaignOffers(
+    blockIndex: number,
+  ): [SeasonCampaignOpportunity, SeasonCampaignOpportunity] {
+    const offerOf = (slot: 0 | 1): SeasonCampaignOpportunity => {
+      const suffix = String(blockIndex * 2 + slot + 1).padStart(8, '0');
+      return {
+        opportunityId: `copp-${suffix}`,
+        branchId: `cbr-${suffix}`,
+        templateId: `ctpl-${suffix}`,
+        blockIndex,
+        identity: 'win-now',
+        family: 'results',
+        prerequisiteId: null,
+        target: { kind: 'block-wins', comparisonOperator: 'gte', threshold: 6, window: 'block' },
+        breakthrough: null,
+        completedReward: { rewardId: `rew-${suffix}`, type: 'influence', amount: 1 },
+        breakthroughReward: null,
+        feasibilityFacts: {},
+        seedPath: ['campaign', String(blockIndex), 'offers', String(slot)],
+      };
+    };
+    return [offerOf(0), offerOf(1)];
   }
-  function firstCampaignOffer(adapters: Adapters) {
-    const offer = block0Offers(adapters)[0];
-    if (offer === undefined) throw new Error('expected block-0 campaign offers');
-    return offer;
+  function block0Offers(): [SeasonCampaignOpportunity, SeasonCampaignOpportunity] {
+    return fixedCampaignOffers(0);
+  }
+  function firstCampaignOffer(): SeasonCampaignOpportunity {
+    return block0Offers()[0];
   }
   function selectCampaignCommand(
     adapters: Adapters,
     overrides: Partial<SeasonRunCommand> = {},
   ): SeasonRunCommand {
-    const offer = firstCampaignOffer(adapters);
+    const offer = firstCampaignOffer();
     return seasonRunCommandSchema.parse({
       schemaVersion: 11,
       command: 'select-campaign-opportunity',
@@ -1175,8 +1183,8 @@ describe('season run M2.5 command application (v5)', () => {
   }
   function postCommandRun(adapters: Adapters): SeasonRun {
     const { run } = adapters;
-    const offers = block0Offers(adapters);
-    const offer = firstCampaignOffer(adapters);
+    const offers = block0Offers();
+    const offer = firstCampaignOffer();
     const campaign = {
       ...(run.campaign ?? buildEmptyCampaignState()),
       offers: { ...(run.campaign?.offers ?? {}), 0: offers },
@@ -1201,7 +1209,7 @@ describe('season run M2.5 command application (v5)', () => {
     const adapters = makeAdapters();
     const { repo, run } = adapters;
     await promote(adapters);
-    const offer = firstCampaignOffer(adapters);
+    const offer = firstCampaignOffer();
     await repo.applySeasonRunCommand({
       runId: run.runId,
       command: selectCampaignCommand(adapters),

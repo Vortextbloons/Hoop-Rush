@@ -11,12 +11,18 @@ import {
   simulationRatingsSchema,
   simulationTendenciesSchema,
   type OverallScale,
+  recognitionPriorsSchema,
+  individualHonorSchema,
+  provenanceMapSchema,
+  type IndividualHonor,
+  type RecognitionPriors,
 } from '@hoop-rush/data-contracts';
 import { NBA_ROOT, PUBLIC_DATA, REPO_ROOT } from '../config.ts';
 import { fileExists, readJson, writeJsonRetry } from '../json.ts';
 import { DEFAULT_RATINGS_MODEL_ARTIFACT } from './artifact.ts';
 import { getEra } from './era.ts';
-import { deriveRatingProfile } from './v3.ts';
+import { deriveRatingProfile, defensiveAbilityFor } from './v3.ts';
+import { loadOverallEvidence } from './overall-evidence.ts';
 
 const referenceStatsSchema = z.looseObject({
   playerExternalId: z.string().min(1),
@@ -43,7 +49,62 @@ const referenceRosterSchema = z.looseObject({
   heightInches: z.number().nullable().optional(),
   ratings: z.unknown().optional(),
   tendencies: z.unknown().optional(),
+  provenance: provenanceMapSchema.optional(),
 });
+export function fitRecognitionPriors(
+  samples: readonly {
+    key: string;
+    score: number;
+    defense: number;
+    honors: readonly IndividualHonor[];
+  }[],
+): RecognitionPriors {
+  const byKey = new Map<string, (typeof samples)[number]>();
+  for (const sample of samples) {
+    const previous = byKey.get(sample.key);
+    if (
+      previous &&
+      (previous.score !== sample.score ||
+        previous.defense !== sample.defense ||
+        [...previous.honors].sort().join(',') !== [...sample.honors].sort().join(','))
+    )
+      throw new Error(`conflicting recognition reference season ${sample.key}`);
+    byKey.set(sample.key, sample);
+  }
+  const unique = [...byKey.values()].sort((a, b) => a.key.localeCompare(b.key));
+  const mean = (values: readonly number[]) =>
+    values.reduce((sum, value) => sum + value, 0) / values.length;
+  const variance = (values: readonly number[]) => {
+    const center = mean(values);
+    return (
+      values.reduce((sum, value) => sum + (value - center) ** 2, 0) / Math.max(1, values.length - 1)
+    );
+  };
+  const entries: RecognitionPriors['entries'] = {};
+  for (const honor of individualHonorSchema.options) {
+    const values = unique
+      .filter((sample) => sample.honors.includes(honor))
+      .map((sample) => (honor.startsWith('DEF') ? sample.defense : sample.score));
+    if (values.length >= 2)
+      entries[honor] = {
+        mean: mean(values),
+        variance: Math.max(1, variance(values)),
+        sampleCount: values.length,
+      };
+  }
+  return recognitionPriorsSchema.parse({
+    version: 'recognition-priors-v1',
+    referenceStandardDeviation: Math.sqrt(
+      Math.max(1, variance(unique.map((sample) => sample.score))),
+    ),
+    population: {
+      mean: mean(unique.map((sample) => sample.score)),
+      variance: Math.max(1, variance(unique.map((sample) => sample.score))),
+      sampleCount: unique.length,
+    },
+    entries,
+  });
+}
 
 export function buildOverallScale(
   samples: readonly { key: string; score: number }[],
@@ -98,6 +159,7 @@ export function calibrateOverallScale(
 ): OverallScale {
   output = resolve(REPO_ROOT, output);
   const samples: { key: string; score: number }[] = [];
+  const inputs: { key: string; input: Parameters<typeof deriveRatingProfile>[0] }[] = [];
   for (let year = 1996; year <= 2024; year += 1) {
     const season = `${String(year)}-${String((year + 1) % 100).padStart(2, '0')}`;
     const directory = join(NBA_ROOT, season);
@@ -107,25 +169,42 @@ export function calibrateOverallScale(
     const byId = new Map(stats.map((row) => [row.playerExternalId, row]));
     const roster = z.array(referenceRosterSchema).parse(readJson(join(directory, 'roster.json')));
     const era = getEra(season);
+    const evidence = loadOverallEvidence(season, true);
     for (const player of roster) {
       const row = byId.get(player.externalId ?? '');
       if (!row || row.gamesPlayed < 50 || row.minutes < 1500) continue;
-      const profile = deriveRatingProfile({
+      const key = `${player.externalId ?? ''}|${season}`;
+      const input: Parameters<typeof deriveRatingProfile>[0] = {
         ratings: simulationRatingsSchema.parse(player.ratings),
         tendencies: simulationTendenciesSchema.parse(player.tendencies),
-        stats: row,
+        stats: { ...row, ...evidence.get(player.externalId ?? '') },
+        abilityProvenance: player.provenance,
         position: player.position ?? 'SF',
         heightInches: player.heightInches ?? null,
         artifact: DEFAULT_RATINGS_MODEL_ARTIFACT,
         eraPace: era.pace,
         eraThreeRate: era.league3PARate,
-      }).profile;
-      samples.push({
-        key: `${player.externalId ?? ''}|${season}`,
-        score: profile.rawOverallScore,
-      });
+      };
+      inputs.push({ key, input });
     }
   }
+  const recognitionPriors = fitRecognitionPriors(
+    inputs.map(({ key, input }) => {
+      const profile = deriveRatingProfile(input).profile;
+      return {
+        key,
+        score: profile.rawOverallScore,
+        defense: defensiveAbilityFor(input.ratings),
+        honors: z.array(individualHonorSchema).parse(input.stats.honors ?? []),
+      };
+    }),
+  );
+  for (const { key, input } of inputs)
+    samples.push({
+      key,
+      score: deriveRatingProfile({ ...input, artifact: { ...input.artifact, recognitionPriors } })
+        .profile.rawOverallScore,
+    });
   const scale = buildOverallScale(samples);
   const existing = fileExists(output) ? ratingsModelArtifactSchema.parse(readJson(output)) : null;
   const artifact = ratingsModelArtifactSchema.parse({
@@ -136,7 +215,8 @@ export function calibrateOverallScale(
           impactModelVersion: existing.impactModelVersion ?? existing.modelVersion,
         }
       : {}),
-    schemaVersion: 3,
+    schemaVersion: 4,
+    recognitionPriors,
     modelVersion: RATING_MODEL_VERSION,
     ratingsVersion: RATINGS_VERSION,
     overallScale: scale,

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { overallScaleSchema } from './overall-scale.ts';
+import { individualHonorSchema, recognitionPriorsSchema } from './overall-evidence.ts';
 export const ratingArchetypeSchema = z.enum([
   'primaryCreator',
   'secondaryCreator',
@@ -71,7 +72,7 @@ export const calibratedImpactSchema = z.object({
   artifactVersion: z.string().min(1).max(64),
 });
 export type CalibratedImpact = z.infer<typeof calibratedImpactSchema>;
-export const overallDiagnosticsSchema = z.object({
+const legacyOverallDiagnosticsSchema = z.object({
   schemaVersion: z.literal(1),
   abilityBase: z.number().min(0).max(100),
   abilityContribution: z.number().min(0).max(100),
@@ -80,9 +81,28 @@ export const overallDiagnosticsSchema = z.object({
   rawScore: z.number().min(0).max(100),
   mappingVersion: z.string().min(1).max(64),
 });
+export const overallDiagnosticsSchema = z.union([
+  legacyOverallDiagnosticsSchema,
+  legacyOverallDiagnosticsSchema.extend({
+    schemaVersion: z.literal(2),
+    offensiveAbility: z.number().min(0).max(100),
+    offensiveValue: z.number().min(0).max(100),
+    defensiveValue: z.number().min(0).max(100),
+    defensiveAbility: z.number().min(0).max(100),
+    rawBeforeRecognition: z.number().min(0).max(100),
+    recognitionContribution: z.number().min(0).max(100),
+    recognitionWeight: z.number().min(0).max(0.75),
+    recognitionPrior: z.number().min(0).max(100).nullable(),
+    recognitionHonor: individualHonorSchema.nullable(),
+    defensiveRecognitionWeight: z.number().min(0).max(0.75),
+    paceUsed: z.number().min(50).max(160),
+    paceSource: z.enum(['team-totals-possession-estimate', 'league-era']),
+    effectiveDefenseWeight: z.number().min(0).max(1),
+  }),
+]);
 export const ratingProfileSchema = z
   .object({
-    schemaVersion: z.union([z.literal(2), z.literal(3)]),
+    schemaVersion: z.union([z.literal(2), z.literal(3), z.literal(4)]),
     overallDiagnostics: overallDiagnosticsSchema.optional(),
     modelVersion: z.string().min(1).max(64),
     memberships: archetypeMembershipsSchema,
@@ -98,7 +118,7 @@ export const ratingProfileSchema = z
     defenseRating: z.number().int().min(0).max(100),
   })
   .superRefine((profile, context) => {
-    if (profile.schemaVersion === 3 && profile.overallDiagnostics === undefined) {
+    if (profile.schemaVersion >= 3 && profile.overallDiagnostics === undefined) {
       context.addIssue({
         code: 'custom',
         path: ['overallDiagnostics'],
@@ -106,13 +126,21 @@ export const ratingProfileSchema = z
       });
     }
     const diagnostics = profile.overallDiagnostics;
+    if (profile.schemaVersion === 4 && diagnostics?.schemaVersion !== 2) {
+      context.addIssue({
+        code: 'custom',
+        path: ['overallDiagnostics'],
+        message: 'v4 requires component diagnostics',
+      });
+    }
     if (
       diagnostics &&
       (Math.abs(diagnostics.rawScore - profile.rawOverallScore) > 0.011 ||
         Math.abs(
           diagnostics.abilityContribution +
             diagnostics.productionContribution -
-            diagnostics.rawScore,
+            diagnostics.rawScore +
+            (diagnostics.schemaVersion === 2 ? diagnostics.recognitionContribution : 0),
         ) > 0.021 ||
         Math.abs(diagnostics.confidenceWeight - profile.production.weight) > 0.00001)
     ) {
@@ -126,7 +154,8 @@ export const ratingProfileSchema = z
 export type RatingProfile = z.infer<typeof ratingProfileSchema>;
 export const ratingsModelArtifactSchema = z
   .object({
-    schemaVersion: z.union([z.literal(2), z.literal(3)]),
+    schemaVersion: z.union([z.literal(2), z.literal(3), z.literal(4)]),
+    recognitionPriors: recognitionPriorsSchema.optional(),
     overallScale: overallScaleSchema.optional(),
     impactModelVersion: z.string().min(1).max(64).optional(),
     modelVersion: z.string().min(1).max(64),
@@ -183,13 +212,20 @@ export const ratingsModelArtifactSchema = z
   })
   .superRefine((artifact, context) => {
     if (
-      artifact.schemaVersion === 3 &&
+      artifact.schemaVersion >= 3 &&
       (!artifact.overallScale || artifact.overallScale.modelVersion !== artifact.modelVersion)
     ) {
       context.addIssue({
         code: 'custom',
         path: ['overallScale'],
         message: 'v3 artifacts require a matching frozen scale',
+      });
+    }
+    if (artifact.schemaVersion === 4 && !artifact.recognitionPriors?.population) {
+      context.addIssue({
+        code: 'custom',
+        path: ['recognitionPriors'],
+        message: 'v4 artifacts require frozen population and recognition priors',
       });
     }
   });

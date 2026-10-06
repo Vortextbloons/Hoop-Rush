@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   PLAYER_VERSION_ID_VERSION,
   SEASON_DRAFT_CATALOG_VERSION,
@@ -26,6 +26,7 @@ import {
 } from '@hoop-rush/test-fixtures';
 import {
   assembleSeasonPendingBlock,
+  dealSeasonBlockChallenges,
   generateSeasonSchedule,
   seasonCheckpointDigest,
   seasonRotationSetDigest,
@@ -33,7 +34,6 @@ import {
 import { acceptWorkerResult } from './season-block-runner';
 import type { SeasonBlockStartInput, SeasonRunnerEvent } from './season-block-runner';
 import type { SeasonRunSnapshot } from '@hoop-rush/persistence';
-import { createFakeSeasonBlockRunner } from './fake-season-block-runner';
 
 const commitSeasonBlock = vi.hoisted(() => vi.fn(() => Promise.resolve(undefined)));
 const savePendingBlock = vi.hoisted(() => vi.fn(() => Promise.resolve(undefined)));
@@ -43,10 +43,24 @@ const loadPendingBlock = vi.hoisted(() =>
 const loadActiveRun = vi.hoisted(() =>
   vi.fn((): Promise<SeasonRunSnapshot | null> => Promise.resolve(null)),
 );
-vi.mock('$lib/season/season-repo', () => ({
-  getSeasonRunRepository: () =>
-    Promise.resolve({ commitSeasonBlock, savePendingBlock, loadPendingBlock, loadActiveRun }),
-}));
+let createFakeSeasonBlockRunner: (typeof import('./fake-season-block-runner'))['createFakeSeasonBlockRunner'];
+
+beforeEach(async () => {
+  vi.resetModules();
+  vi.doMock('$lib/season/season-repo', () => ({
+    getSeasonRunRepository: () =>
+      Promise.resolve({
+        commitSeasonBlock,
+        savePendingBlock,
+        loadPendingBlock,
+        loadActiveRun,
+        loadBlockHistory: () => Promise.resolve([]),
+        loadRetainedDetails: () => Promise.resolve([]),
+      }),
+  }));
+  createFakeSeasonBlockRunner = (await import('./fake-season-block-runner'))
+    .createFakeSeasonBlockRunner;
+});
 
 const LEAGUE = buildSeasonLeague({}, { humanFranchiseId: franchiseIdSchema.parse('lakers') });
 
@@ -143,6 +157,16 @@ function buildZeroEffects(run: SeasonRun): SeasonEffectsState {
   };
 }
 
+function snapshotOf(run: SeasonRun, effects: SeasonEffectsState): SeasonRunSnapshot {
+  return {
+    run,
+    summaries: [],
+    retainedDetails: [],
+    acceptedBlocks: [],
+    effects,
+  };
+}
+
 function fixtureBlock0(): {
   run: SeasonRun;
   schedule: SeasonSchedule;
@@ -153,6 +177,14 @@ function fixtureBlock0(): {
     seed: seedSchema.parse('a'.repeat(32)),
   });
   const run = buildSeasonRunFixture({ schedule, stateDigest: 'a'.repeat(32) });
+  const humanFranchiseId = franchiseIdSchema.parse('lakers');
+  const challengeDeal = dealSeasonBlockChallenges(run.rootSeed, 0, {
+    league: run.league,
+    schedule,
+    standings: run.standings,
+    humanFranchiseId,
+  });
+  if (challengeDeal === null) throw new Error('block 0 must be offered a challenge deal');
   const input: SeasonBlockStartInput = {
     run,
     effects: buildZeroEffects(run),
@@ -161,8 +193,9 @@ function fixtureBlock0(): {
     expectedRevision: 0,
     rotationDigest: seasonRotationSetDigest(run.rotations),
     commandId: commandIdSchema.parse('cmd-fake-1'),
-    humanFranchiseId: franchiseIdSchema.parse('lakers'),
+    humanFranchiseId,
     objectiveId: null,
+    challengeDeal,
     homeCourt: SEASON_NEUTRAL_HOME_COURT,
     catalogUrl: 'https://example.test/season/draft-catalog.json',
     catalogHash: '0'.repeat(64),
@@ -203,6 +236,7 @@ function collect(runner: ReturnType<typeof createFakeSeasonBlockRunner>): {
 describe('fake season block runner contract', () => {
   it('emits the same event types in the same order as the real runner', async () => {
     const { run, schedule, input } = fixtureBlock0();
+    loadActiveRun.mockResolvedValue(snapshotOf(run, input.effects));
     const runner = createFakeSeasonBlockRunner({
       schedule,
       catalog: catalogOf(run),
@@ -247,6 +281,7 @@ describe('fake season block runner contract', () => {
 
   it('produces an engine checkpoint that passes the real digest/commit gate', async () => {
     const { run, schedule, input } = fixtureBlock0();
+    loadActiveRun.mockResolvedValue(snapshotOf(run, input.effects));
     const runner = createFakeSeasonBlockRunner({
       schedule,
       catalog: catalogOf(run),
@@ -293,6 +328,7 @@ describe('fake season block runner contract', () => {
       expectedStateRevision: run.stateRevision,
       expectedStateDigest: run.stateDigest,
       objectiveId: null,
+      challengeDeal: input.challengeDeal,
       nextGameId: firstGame.gameId,
       summaries: [],
       retainedDetails: [],
@@ -301,13 +337,7 @@ describe('fake season block runner contract', () => {
       rotationDigest: seasonRotationSetDigest(run.rotations),
     });
     loadPendingBlock.mockResolvedValueOnce(pending);
-    loadActiveRun.mockResolvedValueOnce({
-      run,
-      summaries: [],
-      retainedDetails: [],
-      acceptedBlocks: [],
-      effects,
-    });
+    loadActiveRun.mockResolvedValue(snapshotOf(run, effects));
     const runner = createFakeSeasonBlockRunner({
       schedule,
       catalog: catalogOf(run),
@@ -342,6 +372,7 @@ describe('fake season block runner contract', () => {
 
   it('fails loudly when there is no pending block to resume', async () => {
     const { run, schedule, input } = fixtureBlock0();
+    loadActiveRun.mockResolvedValue(snapshotOf(run, input.effects));
     loadPendingBlock.mockResolvedValueOnce(null);
     const runner = createFakeSeasonBlockRunner({
       schedule,

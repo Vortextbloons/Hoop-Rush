@@ -219,6 +219,7 @@ export async function importRunAll(args: {
     }
   }
   const fetchArgs: string[] = ['--seasons', ...seasons, '--workers', String(workers)];
+  fetchArgs.push('--include-overall-evidence');
   if (args.includeSchedule) fetchArgs.push('--include-schedule');
   if (args.forceStints) fetchArgs.push('--force-stints');
   if (args.skipBbref) fetchArgs.push('--skip-bbref');

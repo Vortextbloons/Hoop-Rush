@@ -21,6 +21,7 @@ import { canonicalPlayerName } from '../identity.ts';
 import { positionOverrideFor } from '../positions/overrides.ts';
 import { primaryPositionForSource } from '../positions/normalize.ts';
 import { loadRatingsModelArtifact } from './artifact.ts';
+import { loadOverallEvidence } from './overall-evidence.ts';
 import { loadThreePointReconstructionArtifact } from '../reconstruction/artifact.ts';
 const rosterPlayerSchema = z.looseObject({
   externalId: z.string().nullable().optional(),
@@ -326,14 +327,16 @@ export function computeForSeason(season: string, force = false, overallOnly = fa
     return;
   }
   const rosterRaw = parseJsonLoose(rosterText);
-  const rosterParsed = z.array(rosterPlayerSchema).safeParse(rosterRaw);
+  const rosterParsed = z
+    .array(force ? rosterPlayerSchema.omit({ ratingProfile: true }) : rosterPlayerSchema)
+    .safeParse(rosterRaw);
+  if (!rosterParsed.success)
+    throw new Error(`invalid ${season} roster: ${rosterParsed.error.message}`);
   const statsRaw = readJson(statsPath);
   const statsParsed = z.array(ratingsStatsRowSchema).safeParse(statsRaw);
-  const roster = rosterParsed.success
-    ? overallOnly
-      ? (rosterRaw as RosterPlayer[])
-      : rosterParsed.data
-    : [];
+  const roster = overallOnly
+    ? (rosterRaw as RosterPlayer[])
+    : (rosterParsed.data as RosterPlayer[]);
   const statsList = statsParsed.success ? statsParsed.data : [];
   if (roster.length === 0) {
     console.log(`  ! ${season}: empty roster, skipping`);
@@ -357,13 +360,18 @@ export function computeForSeason(season: string, force = false, overallOnly = fa
     const artifact = loadRatingsModelArtifact();
     if (!artifact.overallScale) throw new Error('Overall rebuild requires calibrate overall');
     const era = seasonContext(season);
+    const overallEvidence = loadOverallEvidence(season, artifact.schemaVersion === 4);
     for (const player of roster) {
       const ratings = simulationRatingsSchema.parse(player.ratings);
       const tendencies = simulationTendenciesSchema.parse(player.tendencies);
-      const stats = statsById.get(player.externalId ?? '') ?? {};
+      const stats = {
+        ...statsById.get(player.externalId ?? ''),
+        ...overallEvidence.get(player.externalId ?? ''),
+      };
       const derived = deriveRatingProfile({
         ratings,
         tendencies,
+        abilityProvenance: player.provenance,
         stats,
         position: player.position ?? 'SF',
         heightInches: safeHeight(player.heightInches),
@@ -392,6 +400,7 @@ export function computeForSeason(season: string, force = false, overallOnly = fa
   const teamWinPctMap = estimateTeamWinPctMap(statsList);
   const playerWinPctMap = loadPlayerWinPctMap(season);
   const standingsWinPctMap = loadStandingsMap(out);
+  const overallEvidence = loadOverallEvidence(season, artifact.schemaVersion === 4);
   let computed = 0;
   for (const player of roster) {
     const extId = player.externalId ?? '';
@@ -442,7 +451,7 @@ export function computeForSeason(season: string, force = false, overallOnly = fa
     }
     const baseStats: RatingsStatsRow = statsById.get(extId) ?? {};
     const evidence = extId !== '' ? (evidenceById.get(extId) ?? {}) : {};
-    const stats: RatingsStatsRow = { ...baseStats, ...evidence };
+    const stats: RatingsStatsRow = { ...baseStats, ...evidence, ...overallEvidence.get(extId) };
     const rosterTeamId = typeof player.teamExternalId === 'string' ? player.teamExternalId : null;
     const playerWinPct = extId ? (playerWinPctMap.get(extId) ?? null) : null;
     const standingsWinPct = teamWinPctForPlayer(stats, rosterTeamId, standingsWinPctMap);

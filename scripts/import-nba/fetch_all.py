@@ -143,6 +143,7 @@ def main() -> int:
     parser.add_argument("--seasons", nargs="*", default=None)
     parser.add_argument("--include-schedule", action="store_true")
     parser.add_argument("--force-stints", action="store_true")
+    parser.add_argument("--include-overall-evidence", action="store_true")
     parser.add_argument("--workers", type=int, default=config.MAX_WORKERS)
     parser.add_argument(
         "--skip-bbref", action="store_true",
@@ -192,6 +193,12 @@ def main() -> int:
             print(f"  ! {message}")
             failures.append(message)
         _require_output(config.RAW_CACHE / BBREF_IDS_FILENAME, BBREF_IDS_FILENAME, failures)
+
+    if args.include_overall_evidence:
+        try:
+            _import("fetch_overall_evidence").run(seasons)
+        except Exception as exc:
+            failures.append(f"Overall evidence fetch failed: {exc}")
 
     try:
         metrics = _import("util").import_metrics()

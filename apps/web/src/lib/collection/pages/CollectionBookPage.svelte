@@ -3,19 +3,13 @@
   import { resolve } from '$app/paths';
   import '$lib/collection/ultimate-theme.css';
   import { page } from '$app/state';
-  import { onDestroy, onMount, tick } from 'svelte';
-  import type {
-    CollectionIndexEntry,
-    CollectionSetId,
-    HoopRushManifest,
-  } from '@hoop-rush/data-contracts';
+  import { getContext, onDestroy, onMount, tick, untrack } from 'svelte';
+  import type { CollectionIndexEntry, CollectionSetId } from '@hoop-rush/data-contracts';
   import { COLLECTION_RARITY_ORDER } from '@hoop-rush/data-contracts';
-  import { getManifest } from '$lib/data';
   import { DETAILED_POSITIONS } from '$lib/player-positions';
   import AsyncState from '$lib/components/AsyncState.svelte';
   import CollectionCard from '$lib/collection/CollectionCard.svelte';
   import CardDialog from '$lib/collection/CardDialog.svelte';
-  import { getContext } from 'svelte';
   import {
     ULTIMATE_RUN_SHELL_CONTEXT,
     type UltimateRunShell,
@@ -23,7 +17,6 @@
   import ActiveTarget from '$lib/collection/ActiveTarget.svelte';
   import SetProgress from '$lib/collection/SetProgress.svelte';
   import {
-    loadCollectionCatalog,
     loadCollectionIndex,
     loadCollectionProgression,
   } from '$lib/collection/collection-assets.ts';
@@ -40,7 +33,6 @@
   import {
     claimSetReward,
     claimWelcomeStarter,
-    ensureCollection,
     setTargetPlayer,
   } from '$lib/collection/collection-hub.ts';
   import {
@@ -54,12 +46,7 @@
   import { collectionCardViewOf } from '$lib/collection/collection-card-view.ts';
   import { packRevealPlanOf } from '$lib/collection/pack-reveal-plan.ts';
   import { arenaPackOpen, arenaPackReveal } from '$lib/arena-sound';
-  import type {
-    CollectionCatalog,
-    CollectionProgressionRules,
-    CollectionPullRecord,
-    CollectionState,
-  } from '@hoop-rush/data-contracts';
+  import type { CollectionProgressionRules, CollectionPullRecord } from '@hoop-rush/data-contracts';
 
   const shell = getContext<UltimateRunShell>(ULTIMATE_RUN_SHELL_CONTEXT);
 
@@ -68,14 +55,22 @@
     mounted = false;
   });
 
-  let phase = $state<'loading' | 'error' | 'ready'>('loading');
-  let error = $state<string | null>(null);
-  let manifest = $state<HoopRushManifest | null>(null);
-  let catalog = $state<CollectionCatalog | null>(null);
+  const collectionState = $derived(shell.state);
+  const catalog = $derived(shell.catalog);
+  const manifest = $derived(shell.manifest);
+  let pageStatus = $state<'loading' | 'error' | 'ready'>('loading');
+  let pageError = $state<string | null>(null);
+  const phase = $derived<'loading' | 'error' | 'ready'>(
+    shell.phase === 'error' || pageError !== null
+      ? 'error'
+      : shell.phase === 'ready' && pageStatus === 'ready'
+        ? 'ready'
+        : 'loading',
+  );
+  const error = $derived(shell.error ?? pageError);
   let progression = $state<CollectionProgressionRules | null>(null);
   let progressionError = $state<string | null>(null);
   let entries = $state<CollectionIndexEntry[]>([]);
-  let collectionState = $state<CollectionState | null>(null);
   let claiming = $state(false);
   let claimError = $state<string | null>(null);
   let starterCards = $state<CollectionIndexEntry[]>([]);
@@ -155,22 +150,13 @@
   async function load(): Promise<void> {
     const gen = ++loadGen;
     readFiltersFromUrl();
+    pageStatus = 'loading';
+    pageError = null;
     try {
-      const [loadedManifest, loadedIndex, loadedState] = await Promise.all([
-        getManifest(),
-        loadCollectionIndex(),
-        ensureCollection(new Date().toISOString()),
-      ]);
+      const loadedIndex = await loadCollectionIndex();
       if (!mounted || gen !== loadGen) return;
-      manifest = loadedManifest;
       entries = loadedIndex.cards;
-      collectionState = loadedState;
-      phase = 'ready';
-      void loadCollectionCatalog()
-        .then((loaded) => {
-          if (mounted && gen === loadGen) catalog = loaded;
-        })
-        .catch(() => {});
+      pageStatus = 'ready';
       void loadCollectionProgression()
         .then((loaded) => {
           if (mounted && gen === loadGen) {
@@ -188,22 +174,27 @@
         });
     } catch (loadError) {
       if (!mounted || gen !== loadGen) return;
-      error = loadError instanceof Error ? loadError.message : 'Could not load the collection.';
-      phase = 'error';
+      pageError = loadError instanceof Error ? loadError.message : 'Could not load the collection.';
+      pageStatus = 'error';
     }
   }
 
+  function retry(): void {
+    loadGen += 1;
+    pageStatus = 'loading';
+    pageError = null;
+    if (shell.phase === 'error') void shell.refresh();
+    else void load();
+  }
+
   $effect(() => {
-    void load();
+    if (shell.phase !== 'ready') return;
+    void untrack(load);
   });
 
   $effect(() => {
     page.url.search;
     if (phase === 'ready') readFiltersFromUrl();
-  });
-
-  $effect(() => {
-    if (collectionState && entries.length > 0) shell.sync(collectionState, entries.length);
   });
 
   const ownedIds = $derived(new Set((collectionState?.owned ?? []).map((entry) => entry.cardId)));
@@ -370,12 +361,8 @@
     try {
       const outcome = await claimWelcomeStarter(new Date().toISOString());
       if (!mounted) return;
-      collectionState = outcome.state;
-      if (!catalog) {
-        try {
-          catalog = await loadCollectionCatalog();
-        } catch {}
-      }
+      await shell.reloadCollection();
+      if (!mounted) return;
       const byId = new Map(entries.map((entry) => [entry.cardId, entry]));
       starterCards = outcome.pull.slots
         .map((slot) => byId.get(slot.cardId))
@@ -519,9 +506,10 @@
     targetBusy = true;
     targetError = null;
     try {
-      const next = await setTargetPlayer(playerId, new Date().toISOString());
+      await setTargetPlayer(playerId, new Date().toISOString());
       if (!mounted) return;
-      collectionState = next;
+      await shell.reloadCollection();
+      if (!mounted) return;
       const summary = catalog ? targetPlayerSummary(catalog, playerId) : null;
       announcement = `Target set: ${summary?.displayName ?? playerId}. All ${
         summary?.versionCount ?? 0
@@ -539,9 +527,10 @@
     targetBusy = true;
     targetError = null;
     try {
-      const next = await setTargetPlayer(null, new Date().toISOString());
+      await setTargetPlayer(null, new Date().toISOString());
       if (!mounted) return;
-      collectionState = next;
+      await shell.reloadCollection();
+      if (!mounted) return;
       announcement = 'Target cleared. Packs draw with equal card weights again.';
     } catch (failure) {
       if (!mounted) return;
@@ -558,7 +547,8 @@
     try {
       const outcome = await claimSetReward(setId, new Date().toISOString());
       if (!mounted) return;
-      collectionState = outcome.state;
+      await shell.reloadCollection();
+      if (!mounted) return;
       const title =
         outcome.receipt?.title ??
         catalog?.sets.find((entry) => entry.setId === setId)?.title ??
@@ -623,16 +613,7 @@
     </div>
   {:else if phase === 'error'}
     <div class="mt-6">
-      <AsyncState
-        kind="error"
-        title="Couldn't load"
-        message={error ?? 'Unknown error.'}
-        retry={() => {
-          phase = 'loading';
-          loadGen += 1;
-          void load();
-        }}
-      />
+      <AsyncState kind="error" title="Couldn't load" message={error ?? 'Unknown error.'} {retry} />
     </div>
   {:else}
     {#if collectionState && !collectionState.claimedWelcome}

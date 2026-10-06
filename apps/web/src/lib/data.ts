@@ -1,10 +1,5 @@
 import {
-  loadManifest,
   loadPool,
-  loadEraSimulationProfile,
-  loadOpponentBracket,
-  loadPlayersIndex,
-  loadRosterDetails,
   parseEraSimulationProfile,
   parseOpponentBracket,
   parsePlayersIndex,
@@ -20,61 +15,28 @@ import {
   type RosterDetails,
 } from '@hoop-rush/data-contracts';
 import { resolveAssetUrl } from './asset-url';
-import { readCachedAsset, readCachedPool, writeCachedAsset, writeCachedPool } from './pool-cache';
-let manifestPromise: Promise<HoopRushManifest> | null = null;
-function manifestUrl(): string {
-  return resolveAssetUrl('manifest.json');
-}
-const CONTENT_HASH_MISMATCH = /content hash mismatch: expected ([0-9a-f]{64}), got ([0-9a-f]{64})/;
+import { readCachedPool, writeCachedPool } from './pool-cache';
+import {
+  clearManifestAssetCaches,
+  clearManifestCache,
+  getManifest,
+  isContentHashMismatch,
+  loadManifestAsset,
+  reloadManifest,
+  retryWithFreshManifest,
+} from './manifest-assets';
+
+export { getManifest, reloadManifest };
+
 function cacheBustedUrl(url: string): string {
   const separator = url.includes('?') ? '&' : '?';
   return `${url}${separator}v=${String(Date.now())}`;
 }
-export function getManifest(): Promise<HoopRushManifest> {
-  if (!manifestPromise) {
-    manifestPromise = loadManifest(manifestUrl());
-    manifestPromise.catch(() => {
-      manifestPromise = null;
-    });
-  }
-  return manifestPromise;
-}
-export function reloadManifest(): Promise<HoopRushManifest> {
-  manifestPromise = loadManifest(cacheBustedUrl(manifestUrl()));
-  manifestPromise.catch(() => {
-    manifestPromise = null;
-  });
-  return manifestPromise;
-}
-function isContentHashMismatch(error: unknown): boolean {
-  return error instanceof Error && CONTENT_HASH_MISMATCH.test(error.message);
-}
+
 export function isCollectionContentHashMismatch(error: unknown): boolean {
   return isContentHashMismatch(error);
 }
-async function retryWithFreshManifest<T>(
-  original: unknown,
-  expectedHash: string,
-  findEntry: (manifest: HoopRushManifest) => {
-    url: string;
-    contentHash: string;
-  } | null,
-  load: (url: string, contentHash: string) => Promise<T>,
-): Promise<T> {
-  if (!isContentHashMismatch(original)) throw original;
-  let fresh: HoopRushManifest;
-  try {
-    fresh = await reloadManifest();
-  } catch {
-    throw original;
-  }
-  const entry = findEntry(fresh);
-  if (!entry) throw original;
-  if (entry.contentHash !== expectedHash) {
-    return load(entry.url, entry.contentHash);
-  }
-  throw original;
-}
+
 const poolCache = new Map<string, Promise<FranchiseEraPool>>();
 export function getPool(entry: PoolIndexEntry): Promise<FranchiseEraPool> {
   const key = `${entry.franchiseId}/${entry.eraId}`;
@@ -126,88 +88,44 @@ async function loadPoolForKey(
     );
   }
 }
-const profileCache = new Map<string, Promise<EraSimulationProfile>>();
+
 export function getEraSimulationProfile(
   entry: SimProfileIndexEntry,
 ): Promise<EraSimulationProfile> {
-  const key = entry.eraId;
-  let promise = profileCache.get(key);
-  if (!promise) {
-    promise = loadProfileFor(entry);
-    profileCache.set(key, promise);
-    promise.catch(() => {
-      profileCache.delete(key);
-    });
-  }
-  return promise;
+  return loadManifestAsset({
+    key: `data/era-profile/${entry.eraId}`,
+    label: 'era simulation profile',
+    parse: parseEraSimulationProfile,
+    entry,
+    find: (manifest) => manifest.eraSimulationProfiles.find((p) => p.eraId === entry.eraId) ?? null,
+    missingMessage: 'The era simulation profile is unavailable.',
+    retryOnHashMismatch: true,
+  });
 }
-async function loadProfileFor(entry: SimProfileIndexEntry): Promise<EraSimulationProfile> {
-  const cached = await readCachedAsset(entry.contentHash, parseEraSimulationProfile);
-  if (cached !== null) return cached;
-  const load = (url: string, contentHash: string, bustCache = false) =>
-    loadEraSimulationProfile(
-      bustCache ? cacheBustedUrl(resolveAssetUrl(url)) : resolveAssetUrl(url),
-      contentHash,
-    ).then((profile) => {
-      void writeCachedAsset(contentHash, profile);
-      return profile;
-    });
-  try {
-    return await load(entry.url, entry.contentHash);
-  } catch (error: unknown) {
-    return retryWithFreshManifest(
-      error,
-      entry.contentHash,
-      (manifest) => manifest.eraSimulationProfiles.find((p) => p.eraId === entry.eraId) ?? null,
-      (url, contentHash) => load(url, contentHash, true),
-    );
-  }
-}
-const bracketCache = new Map<string, Promise<OpponentBracket>>();
+
 export function getBracket(entry: OpponentIndexEntry): Promise<OpponentBracket> {
-  const key = entry.url;
-  let promise = bracketCache.get(key);
-  if (!promise) {
-    promise = loadBracketFor(entry);
-    bracketCache.set(key, promise);
-    promise.catch(() => {
-      bracketCache.delete(key);
-    });
-  }
-  return promise;
+  return loadManifestAsset({
+    key: `data/bracket/${entry.url}`,
+    label: 'opponent bracket',
+    parse: parseOpponentBracket,
+    entry,
+    find: (manifest) => manifest.bracket ?? null,
+    missingMessage: 'The opponent bracket is unavailable.',
+    retryOnHashMismatch: true,
+  });
 }
-async function loadBracketFor(entry: OpponentIndexEntry): Promise<OpponentBracket> {
-  const cached = await readCachedAsset(entry.contentHash, parseOpponentBracket);
-  if (cached !== null) return cached;
-  const load = (url: string, contentHash: string, bustCache = false) =>
-    loadOpponentBracket(
-      bustCache ? cacheBustedUrl(resolveAssetUrl(url)) : resolveAssetUrl(url),
-      contentHash,
-    ).then((bracket) => {
-      void writeCachedAsset(contentHash, bracket);
-      return bracket;
-    });
-  try {
-    return await load(entry.url, entry.contentHash);
-  } catch (error: unknown) {
-    return retryWithFreshManifest(
-      error,
-      entry.contentHash,
-      (manifest) => manifest.bracket ?? null,
-      (url, contentHash) => load(url, contentHash, true),
-    );
-  }
-}
-let playersIndexPromise: Promise<PlayersIndex> | null = null;
+
 export function getPlayersIndex(): Promise<PlayersIndex> {
-  if (!playersIndexPromise) {
-    playersIndexPromise = loadPlayersIndexFor();
-    playersIndexPromise.catch(() => {
-      playersIndexPromise = null;
-    });
-  }
-  return playersIndexPromise;
+  return loadManifestAsset({
+    key: 'data/players-index',
+    label: 'players index',
+    parse: parsePlayersIndex,
+    find: (manifest) => manifest.playersIndex ?? null,
+    missingMessage: 'The global players index is unavailable.',
+    retryOnHashMismatch: true,
+  });
 }
+
 export function warmManifest(): void {
   if (typeof window === 'undefined') return;
   void getManifest().catch(() => {});
@@ -221,75 +139,20 @@ export function warmPlayersIndex(): void {
     return;
   void getPlayersIndex().catch(() => {});
 }
-async function loadPlayersIndexFor(): Promise<PlayersIndex> {
-  const manifest = await getManifest();
-  const entry = manifest.playersIndex;
-  if (!entry) {
-    throw new Error('The global players index is unavailable.');
-  }
-  const cached = await readCachedAsset(entry.contentHash, parsePlayersIndex);
-  if (cached !== null) return cached;
-  const load = (url: string, contentHash: string, bustCache = false) =>
-    loadPlayersIndex(
-      bustCache ? cacheBustedUrl(resolveAssetUrl(url)) : resolveAssetUrl(url),
-      contentHash,
-    ).then((index) => {
-      void writeCachedAsset(contentHash, index);
-      return index;
-    });
-  try {
-    return await load(entry.url, entry.contentHash);
-  } catch (error) {
-    return retryWithFreshManifest(
-      error,
-      entry.contentHash,
-      (fresh) => fresh.playersIndex ?? null,
-      (url, contentHash) => load(url, contentHash, true),
-    );
-  }
-}
-let rosterDetailsPromise: Promise<RosterDetails> | null = null;
+
 export function getRosterDetails(): Promise<RosterDetails> {
-  if (!rosterDetailsPromise) {
-    rosterDetailsPromise = loadRosterDetailsFor();
-    rosterDetailsPromise.catch(() => {
-      rosterDetailsPromise = null;
-    });
-  }
-  return rosterDetailsPromise;
+  return loadManifestAsset({
+    key: 'data/roster-details',
+    label: 'roster details',
+    parse: parseRosterDetails,
+    find: (manifest) => manifest.rosterDetails ?? null,
+    missingMessage: 'Roster details are unavailable.',
+    retryOnHashMismatch: true,
+  });
 }
-async function loadRosterDetailsFor(): Promise<RosterDetails> {
-  const manifest = await getManifest();
-  const entry = manifest.rosterDetails;
-  if (!entry) {
-    throw new Error('Roster details are unavailable.');
-  }
-  const cached = await readCachedAsset(entry.contentHash, parseRosterDetails);
-  if (cached !== null) return cached;
-  const load = (url: string, contentHash: string, bustCache = false) =>
-    loadRosterDetails(
-      bustCache ? cacheBustedUrl(resolveAssetUrl(url)) : resolveAssetUrl(url),
-      contentHash,
-    ).then((details) => {
-      void writeCachedAsset(contentHash, details);
-      return details;
-    });
-  try {
-    return await load(entry.url, entry.contentHash);
-  } catch (error) {
-    return retryWithFreshManifest(
-      error,
-      entry.contentHash,
-      (fresh) => fresh.rosterDetails ?? null,
-      (url, contentHash) => load(url, contentHash, true),
-    );
-  }
-}
+
 export function clearDataLoaderCaches(): void {
-  manifestPromise = null;
+  clearManifestCache();
+  clearManifestAssetCaches('data/');
   poolCache.clear();
-  profileCache.clear();
-  bracketCache.clear();
-  playersIndexPromise = null;
-  rosterDetailsPromise = null;
 }

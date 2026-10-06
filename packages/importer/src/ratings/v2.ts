@@ -1217,6 +1217,7 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
   const v3 = deriveRatingProfile({
     ratings,
     tendencies,
+    abilityProvenance: provenance,
     stats: input.stats,
     position: input.position,
     heightInches: input.heightInches,

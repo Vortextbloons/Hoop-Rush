@@ -479,13 +479,7 @@ export {
 } from './season/free-agency.ts';
 export { reconcileSeasonEffects, type SeasonEffectsReconcileInput } from './season/effects.ts';
 export {
-  generateSeasonCampaignOffers,
-  evaluateSeasonCampaignOpportunity,
-  generateSeasonCampaignEvolutionOffers,
-  applySeasonCampaignEvolutionSelection,
-  applySeasonCampaignReward,
   buildEmptyCampaignState,
-  buildInitialCampaignState,
   normalizeCampaignState,
   SEASON_CAMPAIGN_VERSION,
   SEASON_CAMPAIGN_TARGETS_VERSION,
@@ -635,11 +629,15 @@ export {
   findWeakestOpponent,
   h2hGameNumbersFor,
   simulateShared82,
+  shared82GameEvents,
+  type Shared82GameEvent,
   type Shared82SimulationInput,
   type Shared82SimulationOutput,
 } from './modes/fixed-five/shared82.ts';
 export {
   simulateDuelSeries,
+  duelGameEvents,
+  type DuelGameEvent,
   type DuelSimulationInput,
   type DuelSimulationOutput,
 } from './modes/fixed-five/duel-sim.ts';

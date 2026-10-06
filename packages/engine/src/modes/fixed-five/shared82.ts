@@ -54,17 +54,19 @@ function opponentById(bracket: OpponentBracket, opponentId: string): BracketOppo
   if (!opponent) throw new Error(`unknown opponent ${opponentId}`);
   return opponent;
 }
-export function simulateShared82(
+export type Shared82GameEvent =
+  | { tag: 'h2h'; game: GameResult }
+  | { tag: 'p1'; game: GameResult }
+  | { tag: 'p2'; game: GameResult };
+export function* shared82GameEvents(
   input: Shared82SimulationInput,
   context: EngineContext,
-): Shared82SimulationOutput {
+  startGameNumber = 1,
+): Generator<Shared82GameEvent, void, undefined> {
   const weakest = findWeakestOpponent(input.bracket);
   const h2hNumbers = h2hGameNumbersFor(input.bracket, weakest.opponentId);
   const h2hSet = new Set(h2hNumbers);
-  const h2h: GameResult[] = [];
-  const p1NonH2h: GameResult[] = [];
-  const p2NonH2h: GameResult[] = [];
-  for (let gameNumber = 1; gameNumber <= 82; gameNumber += 1) {
+  for (let gameNumber = startGameNumber; gameNumber <= 82; gameNumber += 1) {
     const entry = input.bracket.schedule[gameNumber - 1];
     if (!entry) throw new Error(`schedule missing game ${String(gameNumber)}`);
     if (h2hSet.has(gameNumber)) {
@@ -84,7 +86,7 @@ export function simulateShared82(
       const failures = checkGameResult(result);
       if (failures.length > 0)
         throw new Error(`H2H game ${String(gameNumber)} failed invariants: ${failures.join('; ')}`);
-      h2h.push(result);
+      yield { tag: 'h2h', game: result };
       continue;
     }
     const opponent = opponentById(input.bracket, entry.opponentId);
@@ -110,7 +112,7 @@ export function simulateShared82(
       throw new Error(
         `shared82 p1 game ${String(gameNumber)} failed invariants: ${p1Failures.join('; ')}`,
       );
-    p1NonH2h.push(p1Result);
+    yield { tag: 'p1', game: p1Result };
     const p2Seed = fixedFiveSharedGameSeed(input.rootSeed, 'p2', gameNumber);
     const p2Result = simulateGame(
       {
@@ -133,7 +135,20 @@ export function simulateShared82(
       throw new Error(
         `shared82 p2 game ${String(gameNumber)} failed invariants: ${p2Failures.join('; ')}`,
       );
-    p2NonH2h.push(p2Result);
+    yield { tag: 'p2', game: p2Result };
+  }
+}
+export function simulateShared82(
+  input: Shared82SimulationInput,
+  context: EngineContext,
+): Shared82SimulationOutput {
+  const h2h: GameResult[] = [];
+  const p1NonH2h: GameResult[] = [];
+  const p2NonH2h: GameResult[] = [];
+  for (const event of shared82GameEvents(input, context)) {
+    if (event.tag === 'h2h') h2h.push(event.game);
+    else if (event.tag === 'p1') p1NonH2h.push(event.game);
+    else p2NonH2h.push(event.game);
   }
   const summary = summarizeShared82Games({
     bracket: input.bracket,

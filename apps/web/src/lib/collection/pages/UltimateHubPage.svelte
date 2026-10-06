@@ -1,35 +1,22 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte';
+  import { getContext, onDestroy, untrack } from 'svelte';
   import { asset, resolve } from '$app/paths';
   import type {
-    CollectionCatalog,
     CollectionGameRecordUnion,
     CollectionPlayState,
     CollectionProgressionRules,
-    CollectionState,
-    HoopRushManifest,
   } from '@hoop-rush/data-contracts';
   import { validateCollectionActiveTeam } from '@hoop-rush/engine';
   import AsyncState from '$lib/components/AsyncState.svelte';
-  import PlayerFace from '$lib/components/PlayerFace.svelte';
-  import { collectionCardArtOf } from '../collection-card-art.ts';
+  import CollectionCardFace from '$lib/collection/CollectionCardFace.svelte';
   import CurrencyIcon from '$lib/collection/CurrencyIcon.svelte';
-  import { getManifest } from '$lib/data';
-  import {
-    ensureCollection,
-    ensurePlayStateSnapshot,
-    loadCommittedGame,
-  } from '$lib/collection/collection-hub.ts';
-  import {
-    loadCollectionCatalog,
-    loadCollectionProgression,
-  } from '$lib/collection/collection-assets.ts';
+  import { ensurePlayStateSnapshot, loadCommittedGame } from '$lib/collection/collection-hub.ts';
+  import { loadCollectionProgression } from '$lib/collection/collection-assets.ts';
   import {
     humanizeIdentifier,
     setProgressViews,
   } from '$lib/collection/collection-progression-view.ts';
   import { ultimateNextActionOf } from '$lib/collection/ultimate-hub.ts';
-  import { getContext } from 'svelte';
   import {
     ULTIMATE_RUN_SHELL_CONTEXT,
     type UltimateRunShell,
@@ -43,29 +30,35 @@
 
   const SHORT_SLOT_LABELS = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
 
-  let phase = $state<'loading' | 'error' | 'ready'>('loading');
-  let error = $state<string | null>(null);
-  let collectionState = $state<CollectionState | null>(null);
-  let catalog = $state<CollectionCatalog | null>(null);
+  const collectionState = $derived(shell.state);
+  const catalog = $derived(shell.catalog);
+  const manifest = $derived(shell.manifest);
+  let pageStatus = $state<'loading' | 'error' | 'ready'>('loading');
+  let pageError = $state<string | null>(null);
+  const phase = $derived<'loading' | 'error' | 'ready'>(
+    shell.phase === 'error' ||
+      (shell.phase === 'ready' && shell.catalog === null) ||
+      pageError !== null
+      ? 'error'
+      : shell.phase === 'ready' && pageStatus === 'ready'
+        ? 'ready'
+        : 'loading',
+  );
+  const error = $derived(shell.error ?? shell.catalogError ?? pageError);
   let progression = $state<CollectionProgressionRules | null>(null);
   let playState = $state<CollectionPlayState | null>(null);
-  let manifest = $state<HoopRushManifest | null>(null);
   let recentGame = $state<CollectionGameRecordUnion | null>(null);
 
   async function load(): Promise<void> {
-    phase = 'loading';
-    error = null;
+    const state = collectionState;
+    if (!state) {
+      pageError = 'Ultimate Run could not load.';
+      pageStatus = 'error';
+      return;
+    }
+    pageStatus = 'loading';
+    pageError = null;
     try {
-      const [state, loadedCatalog, loadedManifest] = await Promise.all([
-        ensureCollection(new Date().toISOString()),
-        loadCollectionCatalog(),
-        getManifest(),
-      ]);
-      if (!mounted) return;
-      collectionState = state;
-      catalog = loadedCatalog;
-      manifest = loadedManifest;
-      shell.sync(state, loadedCatalog.cards.length);
       if (state.claimedWelcome) {
         const snapshot = await ensurePlayStateSnapshot(new Date().toISOString());
         if (!mounted) return;
@@ -73,8 +66,10 @@
         const rawGameId = sessionStorage.getItem('collection-last-game');
         if (rawGameId) {
           recentGame = await loadCommittedGame(rawGameId).catch(() => null);
+          if (!mounted) return;
         }
       }
+      pageStatus = 'ready';
       void loadCollectionProgression()
         .then((loaded) => {
           if (mounted) progression = loaded;
@@ -82,20 +77,23 @@
         .catch(() => {
           if (mounted) progression = null;
         });
-      phase = 'ready';
     } catch (failure) {
       if (!mounted) return;
-      error = failure instanceof Error ? failure.message : 'Ultimate Run could not load.';
-      phase = 'error';
+      pageError = failure instanceof Error ? failure.message : 'Ultimate Run could not load.';
+      pageStatus = 'error';
     }
   }
 
-  $effect(() => {
-    void load();
-  });
+  function retry(): void {
+    pageStatus = 'loading';
+    pageError = null;
+    if (shell.phase === 'error' || shell.catalogError !== null) void shell.refresh();
+    else void load();
+  }
 
   $effect(() => {
-    if (collectionState && catalog) shell.sync(collectionState, catalog.cards.length);
+    if (shell.phase !== 'ready') return;
+    void untrack(load);
   });
 
   const ownedIds = $derived(new Set((collectionState?.owned ?? []).map((card) => card.cardId)));
@@ -161,15 +159,6 @@
   const latestPull = $derived(shell.snapshot?.latestPull ?? null);
   const chaseSets = $derived(sets.slice(0, 3));
   const shelfPacks = $derived(availablePacks.slice(0, 3));
-
-  function initialsOf(name: string): string {
-    return name
-      .split(' ')
-      .map((part) => part[0] ?? '')
-      .join('')
-      .slice(0, 2)
-      .toUpperCase();
-  }
 
   function overallOf(cardId: string): number | null {
     return (
@@ -268,6 +257,10 @@
   }
 </script>
 
+{#snippet emptyFace()}
+  <span class="ur-hub-empty-face" aria-hidden="true">+</span>
+{/snippet}
+
 <svelte:head>
   <meta
     name="description"
@@ -287,7 +280,7 @@
       kind="error"
       title="Your run could not load"
       message={error ?? 'Unknown error.'}
-      retry={() => void load()}
+      {retry}
     />
   {:else if collectionState}
     <section class="ur-hub-hero" aria-labelledby="hub-hero-title">
@@ -406,23 +399,17 @@
             {#each teamCards as card, index (savedTeam.starters[index])}
               {@const ovr = card ? overallOf(card.cardId) : null}
               {@const tone = card?.rarity.toLowerCase() ?? 'empty'}
-              {@const artwork = collectionCardArtOf(card)}
-              <li class="ur-hub-player-card ur-hub-player-card--{tone}">
+              <li class="ur-hub-player-card ur-rarity-tone-{tone}">
                 <span class="ur-hub-slot">{SHORT_SLOT_LABELS[index] ?? '—'}</span>
                 <span class="ur-hub-ovr ur-number">{ovr ?? '—'}</span>
                 <span class="ur-hub-face">
-                  {#if artwork}
-                    <img src={asset(artwork)} alt="" loading="lazy" />
-                  {:else if manifest && card}
-                    <PlayerFace
-                      player={{
-                        playerId: card.playerId,
-                        playerExternalId: card.playerExternalId,
-                        altIds: null,
-                      }}
+                  {#if card}
+                    <CollectionCardFace
+                      {card}
                       {manifest}
                       size="xl"
-                      fallbackInitials={initialsOf(card.displayName)}
+                      fallback={emptyFace}
+                      loading="lazy"
                     />
                   {:else}
                     <span class="ur-hub-empty-face" aria-hidden="true">+</span>
@@ -981,8 +968,8 @@
   }
 
   .ur-hub-player-card {
-    --ur-card-glow: var(--ur-ember);
-    --ur-card-chip: var(--ur-ember);
+    --ur-card-glow: var(--ur-rarity, var(--ur-ember));
+    --ur-card-chip: var(--ur-rarity, var(--ur-ember));
     position: relative;
     display: flex;
     min-width: 0;
@@ -1019,34 +1006,9 @@
     pointer-events: none;
   }
 
-  .ur-hub-player-card--apex {
-    --ur-card-glow: var(--ur-apex);
-    --ur-card-chip: var(--ur-apex);
-  }
-
-  .ur-hub-player-card--eruption {
+  .ur-hub-player-card.ur-rarity-tone-eruption {
     --ur-card-glow: #ff4a2a;
     --ur-card-chip: #ff4a2a;
-  }
-
-  .ur-hub-player-card--eclipse {
-    --ur-card-glow: var(--ur-eclipse);
-    --ur-card-chip: var(--ur-eclipse);
-  }
-
-  .ur-hub-player-card--ember {
-    --ur-card-glow: var(--ur-ember);
-    --ur-card-chip: var(--ur-ember);
-  }
-
-  .ur-hub-player-card--titan {
-    --ur-card-glow: var(--ur-titan);
-    --ur-card-chip: var(--ur-titan);
-  }
-
-  .ur-hub-player-card--immortal {
-    --ur-card-glow: var(--ur-immortal);
-    --ur-card-chip: var(--ur-immortal);
   }
 
   .ur-hub-slot {

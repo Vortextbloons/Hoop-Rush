@@ -145,13 +145,6 @@ export class SeasonRunShell implements SeasonRunShellData {
   };
   forfeitInterruptedGame = (): Promise<void> => Promise.resolve();
   resumeBlock = (): Promise<void> => Promise.resolve();
-  selectCampaignOpportunity = (input: {
-    blockIndex: number;
-    opportunityId: string;
-  }): Promise<void> => {
-    void input;
-    return Promise.resolve();
-  };
   selectFrontOffice = (input: { executiveId: string }): Promise<void> => {
     void input;
     return Promise.resolve();

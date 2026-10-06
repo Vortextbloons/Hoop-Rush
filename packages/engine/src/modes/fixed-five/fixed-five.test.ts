@@ -72,8 +72,13 @@ import {
   enumerateSandboxDuelSafeMoves,
   enumerateClassicSafeMoves,
 } from './timeout.ts';
-import { findWeakestOpponent, h2hGameNumbersFor, simulateShared82 } from './shared82.ts';
-import { simulateDuelSeries } from './duel-sim.ts';
+import {
+  findWeakestOpponent,
+  h2hGameNumbersFor,
+  shared82GameEvents,
+  simulateShared82,
+} from './shared82.ts';
+import { duelGameEvents, simulateDuelSeries } from './duel-sim.ts';
 import { fixedFiveResultDigest } from './digest.ts';
 import { verifyFixedFiveCompetition } from './verification.ts';
 const context = createEngineContext();
@@ -795,6 +800,66 @@ describe('duel series', () => {
       context,
     );
     expect(JSON.stringify(out.result)).toBe(JSON.stringify(again.result));
+  });
+});
+describe('fixed-five generator parity', () => {
+  it('yields shared-82 games that rebuild the bulk result in order', () => {
+    const bracket = buildFixtureBracket();
+    const p1Team = buildLegalSimulationTeam({ teamId: 'p1', displayName: 'P1' });
+    const p2Team = buildLegalSimulationTeam({ teamId: 'p2', displayName: 'P2' });
+    const input = {
+      p1Team,
+      p2Team,
+      bracket,
+      profile: DEFAULT_ERA_SIM_PROFILE,
+      rootSeed: ROOT,
+      dataVersion: 'data-v1',
+    };
+    const events = [...shared82GameEvents(input, context)];
+    const bulk = simulateShared82(input, context);
+    const weakest = findWeakestOpponent(bracket);
+    const h2hNumbers = new Set(h2hGameNumbersFor(bracket, weakest.opponentId));
+    const expectedTags: Array<'h2h' | 'p1' | 'p2'> = [];
+    for (let gameNumber = 1; gameNumber <= 82; gameNumber += 1) {
+      if (h2hNumbers.has(gameNumber)) expectedTags.push('h2h');
+      else expectedTags.push('p1', 'p2');
+    }
+    expect(events.map((event) => event.tag)).toEqual(expectedTags);
+    const h2h = events.filter((event) => event.tag === 'h2h').map((event) => event.game);
+    const p1 = events.filter((event) => event.tag === 'p1').map((event) => event.game);
+    const p2 = events.filter((event) => event.tag === 'p2').map((event) => event.game);
+    expect(h2h).toStrictEqual(bulk.h2hResults);
+    expect(p1).toStrictEqual(bulk.p1Games.filter((game) => !h2hNumbers.has(game.gameNumber)));
+    expect(p2).toStrictEqual(bulk.p2Games.filter((game) => !h2hNumbers.has(game.gameNumber)));
+    for (const event of events) {
+      if (event.tag !== 'h2h') continue;
+      expect(event.game.home.teamId).toBe('p1');
+      expect(event.game.away.teamId).toBe('p2');
+    }
+  });
+  it('yields duel games that rebuild the bulk series including the early stop', () => {
+    const p1Team = buildLegalSimulationTeam({ teamId: 'p1', displayName: 'P1' });
+    const p2Team = buildLegalSimulationTeam({ teamId: 'p2', displayName: 'P2' });
+    const input = {
+      p1Team,
+      p2Team,
+      profile: DEFAULT_ERA_SIM_PROFILE,
+      rootSeed: ROOT,
+      dataVersion: 'data-v1',
+    };
+    const events = [...duelGameEvents(input, context)];
+    const bulk = simulateDuelSeries(input, context);
+    expect(events.map((event) => event.game)).toStrictEqual(bulk.games);
+    expect(events.length).toBe(bulk.result.games.length);
+    expect(events.length).toBe(bulk.result.stoppedAtGame);
+    expect(events.length).toBeGreaterThanOrEqual(4);
+    expect(events.length).toBeLessThan(7);
+    expect([bulk.result.p1Wins, bulk.result.p2Wins]).toContain(4);
+    events.forEach((event, index) => {
+      const gameNumber = index + 1;
+      expect(event.game.gameNumber).toBe(gameNumber);
+      expect(event.game.home.teamId).toBe(gameNumber % 2 === 1 ? 'p1' : 'p2');
+    });
   });
 });
 describe('result digest', () => {
