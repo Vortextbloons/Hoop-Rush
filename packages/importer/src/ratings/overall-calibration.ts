@@ -194,7 +194,7 @@ export function calibrateOverallScale(
       return {
         key,
         score: profile.rawOverallScore,
-        defense: defensiveAbilityFor(input.ratings),
+        defense: defensiveAbilityFor(input.ratings, input.position),
         honors: z.array(individualHonorSchema).parse(input.stats.honors ?? []),
       };
     }),

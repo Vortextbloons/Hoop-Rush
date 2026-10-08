@@ -701,6 +701,19 @@ describe('overallBandForPercentile', () => {
     expect(overallBandForPercentile(-0.1)).toBe(99);
     expect(overallBandForPercentile(1.5)).toBe(40);
   });
+  it('gives higher overalls a thinner share inside the top bands', () => {
+    const count = (overall: number) => {
+      let hits = 0;
+      for (let step = 0; step < 20000; step += 1) {
+        if (overallBandForPercentile((step + 0.5) / 20000) === overall) hits += 1;
+      }
+      return hits;
+    };
+    expect(count(99)).toBeLessThanOrEqual(count(98));
+    expect(count(98)).toBeLessThanOrEqual(count(97));
+    expect(count(96)).toBeLessThanOrEqual(count(95));
+    expect(count(95)).toBeLessThanOrEqual(count(94));
+  });
 });
 describe('normalizePoolOveralls', () => {
   function row(

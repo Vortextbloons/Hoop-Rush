@@ -227,16 +227,39 @@ export function offensiveAbilityFor(
     0.03 * ratings.offensiveRebound
   );
 }
-export function defensiveAbilityFor(ratings: SimulationRatings): number {
-  const containment = [ratings.interiorDefense, ratings.perimeterDefense];
-  const disruption = [ratings.block, ratings.steal];
-  const routeValue = (routes: readonly number[]) => 0.6 * Math.max(...routes) + 0.4 * mean(routes);
+export function defensePositionGroup(position?: string | null): 'G' | 'F' | 'C' {
+  // Same buckets as positionGroup: only listed wings are forwards. F-C and
+  // C-F are centers, matching how interior defense is already derived.
+  if (position === 'PG' || position === 'SG' || position === 'G') return 'G';
+  if (position === 'PF' || position === 'SF' || position === 'F') return 'F';
+  return 'C';
+}
+const DEFENSE_ABILITY_SHARES: Record<
+  'G' | 'F' | 'C',
+  {
+    perimeter: number;
+    interior: number;
+    steal: number;
+    block: number;
+    iq: number;
+    rebound: number;
+  }
+> = {
+  // Guard and center weights are mirrors, so an interior anchor and a
+  // perimeter stopper with the same skill profile grade the same.
+  C: { perimeter: 0.03, interior: 0.62, steal: 0.02, block: 0.2, iq: 0.05, rebound: 0.08 },
+  F: { perimeter: 0.325, interior: 0.325, steal: 0.11, block: 0.11, iq: 0.05, rebound: 0.08 },
+  G: { perimeter: 0.62, interior: 0.03, steal: 0.2, block: 0.02, iq: 0.05, rebound: 0.08 },
+};
+export function defensiveAbilityFor(ratings: SimulationRatings, position?: string | null): number {
+  const shares = DEFENSE_ABILITY_SHARES[defensePositionGroup(position)];
   return (
-    0.5 * routeValue(containment) +
-    0.2 * ratings.defensiveIq +
-    0.15 * ratings.defensiveRebound +
-    0.1 * routeValue(disruption) +
-    0.05 * mean([ratings.speed, ratings.strength, ratings.vertical])
+    shares.perimeter * ratings.perimeterDefense +
+    shares.interior * ratings.interiorDefense +
+    shares.steal * ratings.steal +
+    shares.block * ratings.block +
+    shares.iq * ratings.defensiveIq +
+    shares.rebound * ratings.defensiveRebound
   );
 }
 function evidenceCoverage(input: RatingProfileInput, keys: readonly string[]): number {
@@ -277,7 +300,7 @@ function recognitionFor(input: RatingProfileInput, domain: 'overall' | 'defense'
   return {
     honor: honor ?? null,
     prior: prior.mean,
-    weight: Math.min(0.75, variance / (variance + prior.variance)) * sample,
+    weight: Math.min(0.2, variance / (variance + prior.variance)) * sample,
   };
 }
 function deriveNonlinear(
@@ -487,7 +510,7 @@ export function computeOffenseDefense(
   offenseRating: number;
   defenseRating: number;
 } {
-  const group = position === 'PG' || position === 'SG' ? 'G' : position === 'C' ? 'C' : 'F';
+  const group = defensePositionGroup(position);
   return offenseDefenseOf(ratings, tendencies, eraThreeRate, position == null ? null : group);
 }
 export function deriveRatingProfile(input: RatingProfileInput): DerivedRatingProfile {
@@ -518,7 +541,7 @@ export function deriveRatingProfile(input: RatingProfileInput): DerivedRatingPro
     input.position,
   );
   const offensiveAbility = offensiveAbilityFor(input.ratings, input.tendencies);
-  const defensiveAbility = defensiveAbilityFor(input.ratings);
+  const defensiveAbility = defensiveAbilityFor(input.ratings, input.position);
   const defensiveRecognition = recognitionFor(input, 'defense');
   const defensiveValue =
     defensiveAbility * (1 - defensiveRecognition.weight) +

@@ -778,18 +778,15 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     totals.blocks !== null &&
     (totals.defRimFga ?? 0) >= 20;
   // Event rate is not containment: a gambling shot-blocker piles blocks while
-  // giving up position, so the fallback slope stays flatter than the event
-  // rating and leans on rebounding evidence instead.
+  // giving up position. The block term is capped, and rim FG% or rebounding
+  // still moves the rating. The slope has to reach the high 80s for a
+  // high-minute 3-block anchor; the old 4.5-per-block line topped out in the 70s.
+  const interiorBlock = clamp((blkPer36 - 0.8) * 16, -6, 32);
+  const interiorPosition = position === 'C' ? 6 : position === 'F' ? 2 : -8;
   const interior =
     hasRimEvidence && totals.defFgPct !== null
-      ? 54 +
-        (0.52 - totals.defFgPct) * 100 +
-        blkPer36 * 5 +
-        (position === 'C' ? 5 : position === 'F' ? 1 : -5)
-      : 54 +
-        blkPer36 * 4.5 +
-        Math.max(0, (rebPer36Signal ?? 8) - 8) * 1.0 +
-        (position === 'C' ? 5 : position === 'F' ? 1 : -6);
+      ? 52 + (0.52 - totals.defFgPct) * 100 + interiorBlock + interiorPosition
+      : 52 + interiorBlock + Math.max(0, (rebPer36Signal ?? 8) - 8) * 1.2 + interiorPosition;
   const interiorKind: ProvenanceKind = hasRimEvidence ? 'derived' : 'estimated';
   const interiorConfidence = minConfidence([
     hasRimEvidence ? confidenceForSample('derived', gp, minutes, 'partial') : 'low',

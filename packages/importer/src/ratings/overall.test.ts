@@ -84,7 +84,8 @@ describe('total ability overall', () => {
     for (const ratings of profiles) {
       const result = derive({ ratings });
       expect(result.profile.baseScore).toBeCloseTo(
-        0.65 * offensiveAbilityFor(ratings, input.tendencies) + 0.35 * defensiveAbilityFor(ratings),
+        0.65 * offensiveAbilityFor(ratings, input.tendencies) +
+          0.35 * defensiveAbilityFor(ratings, 'SG'),
         1,
       );
       expect(ratingProfileSchema.safeParse(result.profile).success).toBe(true);
@@ -298,10 +299,110 @@ describe('total ability overall', () => {
       block: 50,
       steal: 90,
     };
-    expect(defensiveAbilityFor(interior)).toBe(defensiveAbilityFor(perimeter));
+    expect(defensiveAbilityFor(interior, 'C')).toBe(defensiveAbilityFor(perimeter, 'G'));
+    expect(defensiveAbilityFor(interior, 'C')).toBeGreaterThan(defensiveAbilityFor(interior, 'G'));
     expect(derive({ ratings: interior, position: 'C' }).profile.rawOverallScore).toBe(
       derive({ ratings: perimeter, position: 'PG' }).profile.rawOverallScore,
     );
+  });
+
+  it('puts a low-usage rim protector in the mid-80s and keeps a two-way star above him', () => {
+    const neutral = Object.fromEntries(
+      Object.keys(player.ratings).map((key) => [key, 60]),
+    ) as typeof player.ratings;
+    const anchorRatings = {
+      ...neutral,
+      interiorDefense: 90,
+      block: 94,
+      defensiveRebound: 86,
+      defensiveIq: 82,
+      perimeterDefense: 60,
+      steal: 72,
+      insideScoring: 58,
+      closeShot: 55,
+      midrange: 52,
+      threePoint: 40,
+      passing: 52,
+      ballHandling: 50,
+      offensiveIq: 60,
+    };
+    const anchorStats = starterStats({
+      points: 780,
+      usageRate: 15,
+      assists: 140,
+      tsPct: 0.5,
+      fga: 700,
+      fgm: 300,
+    });
+    const anchor = derive({ ratings: anchorRatings, position: 'C', stats: anchorStats });
+    const anchorDiagnostics = anchor.profile.overallDiagnostics;
+    if (anchorDiagnostics?.schemaVersion !== 2) throw new Error('missing diagnostics');
+    expect(anchorDiagnostics.defensiveAbility).toBeGreaterThanOrEqual(86);
+    expect(anchorDiagnostics.defensiveAbility).toBeLessThanOrEqual(93);
+    expect(anchorDiagnostics.recognitionWeight).toBeLessThanOrEqual(0.2);
+    const role = derive({
+      ratings: { ...anchorRatings, interiorDefense: 60, block: 55, defensiveRebound: 62 },
+      position: 'C',
+      stats: anchorStats,
+    });
+    const centerLift = anchor.profile.rawOverallScore - role.profile.rawOverallScore;
+    expect(centerLift).toBeGreaterThan(4);
+    expect(centerLift).toBeLessThan(12);
+    const star = derive({
+      ratings: {
+        ...anchorRatings,
+        insideScoring: 94,
+        closeShot: 90,
+        midrange: 86,
+        threePoint: 78,
+        freeThrow: 84,
+        passing: 80,
+        ballHandling: 78,
+        offensiveIq: 88,
+      },
+      position: 'C',
+      stats: starterStats({ points: 2200, usageRate: 31, assists: 280, tsPct: 0.58 }),
+    });
+    expect(star.profile.rawOverallScore).toBeGreaterThan(anchor.profile.rawOverallScore + 8);
+    const starDiagnostics = star.profile.overallDiagnostics;
+    if (starDiagnostics?.schemaVersion !== 2) throw new Error('missing diagnostics');
+    expect(starDiagnostics.offensiveAbility).toBeGreaterThan(80);
+    const scorerRatings = {
+      ...neutral,
+      insideScoring: 92,
+      threePoint: 88,
+      midrange: 80,
+      passing: 84,
+      ballHandling: 86,
+      offensiveIq: 84,
+      perimeterDefense: 42,
+      interiorDefense: 40,
+      block: 32,
+      steal: 40,
+    };
+    const scorer = derive({ ratings: scorerRatings, position: 'PG' });
+    const scorerWithRim = derive({
+      ratings: { ...scorerRatings, interiorDefense: 90, block: 94 },
+      position: 'PG',
+    });
+    expect(scorerWithRim.profile.rawOverallScore - scorer.profile.rawOverallScore).toBeLessThan(
+      centerLift,
+    );
+    const population = [
+      ...Array.from({ length: 5000 }, (_, index) => {
+        const t = index / 4999;
+        return { key: `filler-${String(index)}`, score: 40 + 42 * t ** 8 };
+      }),
+      { key: 'anchor', score: anchor.profile.rawOverallScore },
+      { key: 'star', score: star.profile.rawOverallScore },
+    ];
+    const cohort = buildOverallScale(population);
+    const anchorOverall = overallForScore(anchor.profile.rawOverallScore, cohort).overall;
+    const starOverall = overallForScore(star.profile.rawOverallScore, cohort).overall;
+    expect(anchorOverall).toBeGreaterThanOrEqual(84);
+    expect(anchorOverall).toBeLessThanOrEqual(89);
+    expect(starOverall).toBeGreaterThanOrEqual(94);
+    expect(starOverall).toBeGreaterThan(anchorOverall);
   });
 
   it('requires matching frozen scales in v3 artifacts while retaining legacy readability', () => {
@@ -383,5 +484,22 @@ describe('frozen overall scale', () => {
       overallScaleSchema.safeParse({ ...scale, knots: [...scale.knots].reverse() }).success,
     ).toBe(false);
     expect(() => overallForScore(NaN, scale)).toThrow();
+  });
+  it('thins 99 below 98 below 97 on a uniform cohort', () => {
+    const samples = Array.from({ length: 12000 }, (_, index) => ({
+      key: String(index),
+      score: index / 10,
+    }));
+    const cohort = buildOverallScale(samples);
+    const counts = new Map<number, number>();
+    for (const sample of samples) {
+      const overall = overallForScore(sample.score, cohort).overall;
+      counts.set(overall, (counts.get(overall) ?? 0) + 1);
+    }
+    const count = (overall: number) => counts.get(overall) ?? 0;
+    expect(count(99)).toBeLessThanOrEqual(count(98));
+    expect(count(98)).toBeLessThanOrEqual(count(97));
+    expect(count(96)).toBeLessThanOrEqual(count(95));
+    expect(count(95)).toBeLessThanOrEqual(count(94));
   });
 });

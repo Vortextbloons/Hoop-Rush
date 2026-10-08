@@ -16,21 +16,33 @@ export const OVERALL_BANDS: readonly OverallBand[] = [
   { label: '65-69', min: 65, max: 69, share: 0.14 },
   { label: '40-64', min: 40, max: 64, share: 0.14 },
 ];
-function clampRatingBand(value: number): number {
-  return Math.min(99, Math.max(40, Math.round(value)));
+function integerSlices(band: OverallBand): { overall: number; share: number }[] {
+  const count = band.max - band.min + 1;
+  const weightSum = (count * (count + 1)) / 2;
+  const slices: { overall: number; share: number }[] = [];
+  for (let step = 0; step < count; step += 1) {
+    slices.push({
+      overall: band.max - step,
+      share: (band.share * (step + 1)) / weightSum,
+    });
+  }
+  return slices;
 }
 export function overallBandForPercentile(
   p: number,
   bands: readonly OverallBand[] = OVERALL_BANDS,
 ): number {
+  const percentile = Math.min(1, Math.max(0, p));
   let start = 0;
+  const lastBand = bands[bands.length - 1];
   for (const band of bands) {
-    const end = start + band.share;
-    if (p < end - 1e-9 || band === bands[bands.length - 1]) {
-      const span = Math.max(1e-9, end - start);
-      return clampRatingBand(band.max - ((p - start) / span) * (band.max - band.min));
+    const slices = integerSlices(band);
+    for (const slice of slices) {
+      const end = start + slice.share;
+      const lastSlice = band === lastBand && slice.overall === band.min;
+      if (percentile < end - 1e-9 || lastSlice) return slice.overall;
+      start = end;
     }
-    start = end;
   }
   return 40;
 }
