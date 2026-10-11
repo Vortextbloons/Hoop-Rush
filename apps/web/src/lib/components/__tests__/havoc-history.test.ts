@@ -32,7 +32,7 @@ describe('Havoc Hall of Freaks', () => {
     expect(container.querySelector('[data-havoc-detail-normal-record]')?.textContent).toContain(
       '62–20',
     );
-    expect(container.textContent).toContain('havoc-rules-v1');
+    expect(container.textContent).toContain('havoc-rules-v2');
     expect(container.textContent).toContain('Normal combined');
     expect(container.textContent).toContain('Production index');
     state.destroy();

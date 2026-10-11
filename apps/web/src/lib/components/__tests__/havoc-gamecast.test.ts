@@ -38,7 +38,7 @@ describe('Havoc gamecast', () => {
     });
     state.advance(10000);
     const { container } = renderGamecast(state);
-    expect(container.querySelector('[data-score="human"]')?.textContent.trim()).toBe('-3');
+    expect(container.querySelector('[data-score="human"]')?.textContent.trim()).toBe('-8');
     expect(container.querySelector('[data-score="opponent"]')?.textContent.trim()).toBe('3');
     state.destroy();
   });
@@ -65,7 +65,7 @@ describe('Havoc gamecast', () => {
     expect(
       container.querySelector('[data-havoc-mutation-badge="possession-refund"]'),
     ).not.toBeNull();
-    expect(container.textContent).toContain('+4');
+    expect(container.textContent).toContain('+3');
     state.destroy();
   });
 

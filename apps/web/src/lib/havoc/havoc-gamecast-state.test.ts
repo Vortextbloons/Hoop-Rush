@@ -39,9 +39,9 @@ describe('HavocGamecastState', () => {
     const gamecast = await openGamecast(service);
     gamecast.advance(10000);
     expect(gamecast.finished).toBe(true);
-    expect(gamecast.humanScore).toBe(-3);
+    expect(gamecast.humanScore).toBe(-8);
     expect(gamecast.opponentScore).toBe(3);
-    expect(gamecast.announcement).toContain('-3');
+    expect(gamecast.announcement).toContain('-8');
     gamecast.destroy();
   });
 
@@ -70,8 +70,8 @@ describe('HavocGamecastState', () => {
     const scoring = gamecast.items.find((item) =>
       item.scoring?.addends.some((addend) => addend.source === 'four-point-dunk'),
     );
-    expect(scoring?.scoring?.points).toBe(4);
-    expect(scoring?.text).toContain('+4');
+    expect(scoring?.scoring?.points).toBe(3);
+    expect(scoring?.text).toContain('+3');
     gamecast.destroy();
   });
 

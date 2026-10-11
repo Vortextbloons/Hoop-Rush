@@ -47,6 +47,19 @@ export default defineConfig({
           if (id.includes('node_modules/bits-ui')) return 'vendor-bits-ui';
           if (id.includes('node_modules/dexie')) return 'vendor-dexie';
           if (id.includes('node_modules/@lucide/')) return 'vendor-lucide';
+          // Keep workspace packages in package-owned chunks. Rollup's default
+          // splitting previously scattered data-contracts modules into the
+          // engine chunk, creating a circular chunk dependency. Any module
+          // top-level read of an imported constant (e.g. `X.length`) then
+          // crashed with `Cannot read properties of undefined` depending on
+          // chunk evaluation order. Package-owned chunks keep the chunk graph
+          // acyclic (engine -> data-contracts) so evaluation order is safe.
+          if (id.includes('packages/data-contracts') || id.includes('@hoop-rush/data-contracts'))
+            return 'hoop-data-contracts';
+          if (id.includes('packages/engine') || id.includes('@hoop-rush/engine'))
+            return 'hoop-engine';
+          if (id.includes('packages/persistence') || id.includes('@hoop-rush/persistence'))
+            return 'hoop-persistence';
         },
       },
     },

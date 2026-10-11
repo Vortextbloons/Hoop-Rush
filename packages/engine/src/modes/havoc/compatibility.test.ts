@@ -132,8 +132,10 @@ describe('havoc bundle enumeration', () => {
     const definitions = allDefinitions();
     const tierTwo = definitions.filter((definition) => definition.tier === 2);
     const tierOne = definitions.filter((definition) => definition.tier === 1);
-    expect(enumerateHavocBundles(definitions, 2)).toHaveLength(tierTwo.length * tierOne.length);
-    for (const bundle of enumerateHavocBundles(definitions, 2)) {
+    const bundles = enumerateHavocBundles(definitions, 2);
+    expect(bundles.length).toBeGreaterThan(0);
+    expect(bundles.length).toBeLessThan(tierTwo.length * tierOne.length);
+    for (const bundle of bundles) {
       const tiers = bundle.mutationIds.map(
         (mutationId) => havocMutationDefinitionOf(mutationId).tier,
       );
@@ -163,6 +165,18 @@ describe('havoc bundle enumeration', () => {
     expect(
       havocBundleIsCompatible(
         { tier: 2, mutationIds: ['four-point-dunk', 'sniper-gene'] },
+        definitions,
+      ),
+    ).toBe(false);
+    expect(
+      havocBundleIsCompatible(
+        { tier: 2, mutationIds: ['second-chance-jackpot', 'glass-eater'] },
+        definitions,
+      ),
+    ).toBe(false);
+    expect(
+      havocBundleIsCompatible(
+        { tier: 2, mutationIds: ['four-point-dunk', 'glass-eater'] },
         definitions,
       ),
     ).toBe(true);

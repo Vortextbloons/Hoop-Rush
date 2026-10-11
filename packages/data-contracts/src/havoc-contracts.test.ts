@@ -101,6 +101,23 @@ describe('havoc mutation catalog', () => {
         operations: [{ op: 'height-set', inches: 60 }],
         eventRules: ['clone-army'],
       }).success,
+    ).toBe(true);
+    expect(
+      havocMutationDefinitionSchema.safeParse({
+        mutationId: 'clone-army',
+        tier: 3,
+        name: 'Clone Army',
+        description: 'desc',
+        downside: '',
+        operations: [
+          { op: 'cap-rating', field: 'threePoint', value: 30 },
+          { op: 'cap-rating', field: 'midrange', value: 40 },
+          { op: 'cap-rating', field: 'freeThrow', value: 70 },
+          { op: 'cap-rating', field: 'ballHandling', value: 20 },
+          { op: 'cap-rating', field: 'speed', value: 15 },
+        ],
+        eventRules: ['clone-army'],
+      }).success,
     ).toBe(false);
   });
 
@@ -129,8 +146,8 @@ describe('havoc mutation catalog', () => {
   it('keeps the version set literal', () => {
     const parsed = havocVersionSetSchema.safeParse({
       schemaVersion: HAVOC_SCHEMA_VERSION,
-      rulesVersion: 'havoc-rules-v1',
-      mutationCatalogVersion: 'havoc-mutations-v1',
+      rulesVersion: 'havoc-rules-v2',
+      mutationCatalogVersion: 'havoc-mutations-v2',
       seedDerivationVersion: 'havoc-seeds-v1',
       engineVersion: 'm3-engine-v24',
       profileVersion: 'p',

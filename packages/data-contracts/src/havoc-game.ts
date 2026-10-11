@@ -351,7 +351,7 @@ export const havocEventSchema = z.discriminatedUnion('kind', [
   }),
   havocEventBase.extend({
     kind: z.literal('heat-check'),
-    outcome: z.enum(['armed', 'consumed']),
+    outcome: z.enum(['armed', 'consumed', 'expired']),
     ownerInstanceId: havocInstanceIdSchema,
     side: havocSideSchema,
     scoringSequence: z.number().int().nonnegative().nullable(),
@@ -386,7 +386,7 @@ export const havocEventSchema = z.discriminatedUnion('kind', [
   }),
   havocEventBase.extend({
     kind: z.literal('bounty'),
-    outcome: z.enum(['armed', 'consumed']),
+    outcome: z.enum(['armed', 'consumed', 'expired']),
     ownerInstanceId: havocInstanceIdSchema,
     side: havocSideSchema,
     blockedInstanceId: havocInstanceIdSchema.nullable(),
@@ -404,7 +404,7 @@ export const havocEventSchema = z.discriminatedUnion('kind', [
     ownerInstanceId: havocInstanceIdSchema,
     side: havocSideSchema,
     attemptOrdinal: z.number().int().positive(),
-    rolled: z.number().int().min(1).max(6),
+    rolled: z.number().int().min(1).max(4),
     nominal: z.union([z.literal(2), z.literal(3)]),
     scoringSequence: z.number().int().nonnegative().nullable(),
   }),

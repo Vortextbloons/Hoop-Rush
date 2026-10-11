@@ -2,8 +2,8 @@ import { z } from 'zod';
 import { contentHashSchema } from './ids.ts';
 
 export const HAVOC_SCHEMA_VERSION = 1;
-export const HAVOC_RULES_VERSION = 'havoc-rules-v1';
-export const HAVOC_MUTATION_CATALOG_VERSION = 'havoc-mutations-v1';
+export const HAVOC_RULES_VERSION = 'havoc-rules-v2';
+export const HAVOC_MUTATION_CATALOG_VERSION = 'havoc-mutations-v2';
 export const HAVOC_SEED_DERIVATION_VERSION = 'havoc-seeds-v1';
 export const HAVOC_COMPARISON_VERSION = 'havoc-comparison-v1';
 export const HAVOC_REPORT_VERSION = 'havoc-report-v1';

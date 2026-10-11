@@ -23,7 +23,6 @@ import { projectExpectedLedger, type LedgerSide } from './expected-ledger.ts';
 import { resolveReference } from './reference-lineups.ts';
 import { identifyWeaknesses } from './weaknesses.ts';
 import { normalizeValue } from './normalize.ts';
-const SLOT_ORDER: readonly ProjectionSlot[] = PROJECTION_SLOTS;
 const referenceTeamCache = new WeakMap<readonly SimulationPlayer[], SimulationTeam>();
 function referenceTeamOf(reference: ProjectionReferenceFive): SimulationTeam {
   let team = referenceTeamCache.get(reference.players);
@@ -167,7 +166,7 @@ function creationOf(input: {
   return {
     score: normalize(raw, 'creation', scale),
     initiatorShare: Object.fromEntries(
-      SLOT_ORDER.map((slot, index) => [slot, initiatorShares[index] ?? 0]),
+      PROJECTION_SLOTS.map((slot, index) => [slot, initiatorShares[index] ?? 0]),
     ) as ProjectionCreation['initiatorShare'],
     primaryShare: sortedShares[0] ?? 0,
     topTwoShare: (sortedShares[0] ?? 0) + (sortedShares[1] ?? 0),
@@ -178,7 +177,7 @@ function creationOf(input: {
 }
 function validateAndBuildTeam(input: BaseFiveProjectionInput): SimulationTeam {
   const slots = input.lineup.map((entry) => entry.slot);
-  for (const slot of SLOT_ORDER) {
+  for (const slot of PROJECTION_SLOTS) {
     if (!slots.includes(slot)) {
       throw new Error(`projection: missing slot ${slot}`);
     }
@@ -196,7 +195,7 @@ function validateAndBuildTeam(input: BaseFiveProjectionInput): SimulationTeam {
       );
     }
   }
-  const ordered = SLOT_ORDER.map((slot) => {
+  const ordered = PROJECTION_SLOTS.map((slot) => {
     const entry = input.lineup.find((candidate) => candidate.slot === slot);
     if (entry === undefined) throw new Error(`projection: missing slot ${slot}`);
     return entry.player;
@@ -297,7 +296,7 @@ function sideOf(input: {
     actions: facts.actions,
     zones: facts.zones,
     shooters: Object.fromEntries(
-      SLOT_ORDER.map((slot, index) => [slot, facts.shooters[index] ?? 0]),
+      PROJECTION_SLOTS.map((slot, index) => [slot, facts.shooters[index] ?? 0]),
     ) as ProjectionSide['shooters'],
     players: contributions,
   };
@@ -319,7 +318,7 @@ export function projectBaseFive(input: BaseFiveProjectionInput): BaseFiveProject
   const offense = sideOf({
     facts: expected.offense,
     players: team.players,
-    slots: SLOT_ORDER,
+    slots: PROJECTION_SLOTS,
     coverage,
     expectedOpponentShotQuality: expected.defense.aggregateMakePct,
     spacingRaw: prep.spacing,
@@ -327,7 +326,7 @@ export function projectBaseFive(input: BaseFiveProjectionInput): BaseFiveProject
   const defense = sideOf({
     facts: expected.defense,
     players: reference.players,
-    slots: SLOT_ORDER,
+    slots: PROJECTION_SLOTS,
     coverage,
     expectedOpponentShotQuality: expected.offense.aggregateMakePct,
     spacingRaw: referencePrep.spacing,
@@ -376,7 +375,7 @@ export function projectBaseFive(input: BaseFiveProjectionInput): BaseFiveProject
     inputDigest,
     digest,
     lineup: team.players.map((player, index) => ({
-      slot: SLOT_ORDER[index] ?? 'PG',
+      slot: PROJECTION_SLOTS[index] ?? 'PG',
       playerId: player.playerId,
       playerVersionId: player.playerVersionId ?? null,
       displayName: player.displayName,

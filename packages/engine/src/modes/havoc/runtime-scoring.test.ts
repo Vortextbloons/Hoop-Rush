@@ -91,8 +91,8 @@ function eventOf(tape: { events: HavocEvent[] }, kind: HavocEvent['kind']): Havo
 }
 
 describe('havoc field-goal value resolution', () => {
-  it('resolves six-point and twelve-point dunks exactly', () => {
-    const six = havocFieldGoalValue({
+  it('resolves four-point and eight-point dunks exactly', () => {
+    const four = havocFieldGoalValue({
       nominal: 2,
       three: false,
       roulette: null,
@@ -103,12 +103,12 @@ describe('havoc field-goal value resolution', () => {
       bounty: false,
       doubleOrNothing: false,
     });
-    expect(six.points).toBe(6);
-    expect(six.addends).toEqual([
-      { source: 'four-point-dunk', points: 2 },
-      { source: 'reverse-basketball', points: 2 },
+    expect(four.points).toBe(4);
+    expect(four.addends).toEqual([
+      { source: 'four-point-dunk', points: 1 },
+      { source: 'reverse-basketball', points: 1 },
     ]);
-    const twelve = havocFieldGoalValue({
+    const eight = havocFieldGoalValue({
       nominal: 2,
       three: false,
       roulette: null,
@@ -119,11 +119,11 @@ describe('havoc field-goal value resolution', () => {
       bounty: false,
       doubleOrNothing: true,
     });
-    expect(twelve.points).toBe(12);
-    expect(twelve.multipliers).toEqual([{ source: 'double-or-nothing', factor: 2 }]);
+    expect(eight.points).toBe(8);
+    expect(eight.multipliers).toEqual([{ source: 'double-or-nothing', factor: 2 }]);
   });
 
-  it('applies roulette before other bonuses and multipliers', () => {
+  it('applies a single multiplier in stable order', () => {
     const value = havocFieldGoalValue({
       nominal: 3,
       three: true,
@@ -135,14 +135,10 @@ describe('havoc field-goal value resolution', () => {
       bounty: true,
       doubleOrNothing: true,
     });
-    expect(value.points).toBe((3 + 1 - 1) * 2 * 2 * 2);
+    expect(value.points).toBe((3 + 1 - 2) * 2);
     const contributions = value.contributions.reduce((sum, entry) => sum + entry.points, 0);
     expect(contributions).toBe(value.points - 3);
-    expect(value.multipliers.map((entry) => entry.source)).toEqual([
-      'heat-check',
-      'the-bounty',
-      'double-or-nothing',
-    ]);
+    expect(value.multipliers.map((entry) => entry.source)).toEqual(['heat-check']);
   });
 
   it('handles negative roulette results and reverse threes', () => {
@@ -169,7 +165,7 @@ describe('havoc field-goal value resolution', () => {
       bounty: false,
       doubleOrNothing: true,
     });
-    expect(three.points).toBe(0);
+    expect(three.points).toBe(-2);
   });
 });
 
@@ -186,7 +182,7 @@ describe('havoc scoring mutations in simulation', () => {
     slot('C', ['second-chance-jackpot']),
   ]);
 
-  it('scores a twelve-point dunk with four-point dunk, reverse, and double or nothing', () => {
+  it('scores an eight-point dunk with four-point dunk, reverse, and double or nothing', () => {
     const run = searchScenario(
       48,
       dunkHuman,
@@ -204,11 +200,12 @@ describe('havoc scoring mutations in simulation', () => {
     if (entry === undefined) return;
     expect(entry.nominalPoints).toBe(2);
     expect(entry.addends).toEqual([
-      { source: 'four-point-dunk', points: 2 },
-      { source: 'reverse-basketball', points: 2 },
+      { source: 'four-point-dunk', points: 1 },
+      { source: 'reverse-basketball', points: 1 },
     ]);
     expect(entry.multipliers).toContainEqual({ source: 'double-or-nothing', factor: 2 });
-    expect(entry.points).toBe(12);
+    expect(entry.multipliers).toHaveLength(1);
+    expect(entry.points).toBe(8);
   });
 
   it('arms and consumes heat check on consecutive makes', () => {
@@ -246,7 +243,7 @@ describe('havoc scoring mutations in simulation', () => {
     const base =
       entry.nominalPoints + entry.addends.reduce((sum, addend) => sum + addend.points, 0);
     expect(entry.points).toBe(base * 2);
-    // three consecutive made field goals precede the arming
+    // four consecutive made field goals precede the arming
     const shooterInstanceId = consumed.ownerInstanceId;
     const makesBefore = run.tape.events.filter(
       (event, index) =>
@@ -254,8 +251,8 @@ describe('havoc scoring mutations in simulation', () => {
         event.shooterInstanceId === shooterInstanceId &&
         index < run.tape.events.indexOf(consumed),
     );
-    const lastThree = makesBefore.slice(-3);
-    expect(lastThree.every((event) => event.kind === 'shot-attempt' && event.made)).toBe(true);
+    const lastFour = makesBefore.slice(-4);
+    expect(lastFour.every((event) => event.kind === 'shot-attempt' && event.made)).toBe(true);
   });
 
   it('doubles an immediate own-rebound putback', () => {
@@ -301,7 +298,7 @@ describe('havoc scoring mutations in simulation', () => {
     }
   });
 
-  it('rolls basketball roulette on every fifth official attempt', () => {
+  it('rolls basketball roulette on every seventh official attempt', () => {
     const rouletteHuman = buildScenarioTeam('human', [
       slot('PG', ['basketball-roulette']),
       slot('SG', []),
@@ -323,9 +320,9 @@ describe('havoc scoring mutations in simulation', () => {
     const rolls = run.tape.events.filter((event) => event.kind === 'roulette');
     expect(rolls.length).toBeGreaterThan(0);
     for (const roll of rolls) {
-      expect(roll.attemptOrdinal % 5).toBe(0);
+      expect(roll.attemptOrdinal % 7).toBe(0);
       expect(roll.rolled).toBeGreaterThanOrEqual(1);
-      expect(roll.rolled).toBeLessThanOrEqual(6);
+      expect(roll.rolled).toBeLessThanOrEqual(4);
       if (roll.scoringSequence !== null) {
         const entry = entriesOf(run.tape).find(
           (candidate) => candidate.sequence === roll.scoringSequence,
@@ -336,7 +333,7 @@ describe('havoc scoring mutations in simulation', () => {
         });
       }
     }
-    // missed fifth attempts retain the roll with a null scoring reference
+    // missed seventh attempts retain the roll with a null scoring reference
     const missedRoll = rolls.find((roll) => roll.scoringSequence === null);
     if (missedRoll !== undefined) {
       expect(missedRoll.rolled).toBeGreaterThanOrEqual(1);
@@ -391,7 +388,7 @@ describe('havoc scoring mutations in simulation', () => {
         event.assisterInstanceId === first.assisterInstanceId &&
         index < run.tape.events.indexOf(first),
     );
-    expect(assistsBefore.length % 3).toBe(0);
+    expect(assistsBefore.length % 4).toBe(0);
   });
 
   it('expires unused rebound-loop extra possessions at game end', () => {

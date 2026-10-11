@@ -223,10 +223,10 @@ export const havocMutationDefinitionSchema = z
         message: 'tier-2/3 mutations require exactly one event rule',
       });
     }
-    if (definition.operations.length !== 0) {
+    if (definition.operations.length > 4) {
       ctx.addIssue({
         code: 'custom',
-        message: 'tier-2/3 launch mutations own no profile operations',
+        message: 'tier-2/3 mutations own at most four downside profile operations',
       });
     }
   });

@@ -89,7 +89,7 @@ describe('havoc presentation helpers', () => {
     if (scoring === undefined) throw new Error('negative tape scoring missing');
     const text = havocScoringTextOf(scoring, context.playerName);
     expect(text).toContain('Marcus Webb');
-    expect(text).toContain('-1');
+    expect(text).toContain('-2');
     expect(text).toContain('Double or Nothing');
     const endEvent = tape.events[tape.events.length - 1];
     if (endEvent === undefined) throw new Error('tape game-end missing');

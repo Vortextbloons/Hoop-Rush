@@ -122,6 +122,22 @@ const TIER_TWO_RULES: Record<
   'basketball-roulette': 'basketball-roulette',
 };
 
+const TIER_TWO_DOWNSIDE_OPERATIONS: Record<string, HavocProfileOperation[]> = {
+  'four-point-dunk': [
+    { op: 'cap-rating', field: 'threePoint', value: 30 },
+    { op: 'raise-tendency', field: 'turnoverRate', value: 20 },
+  ],
+  'golden-assist': [
+    { op: 'cap-tendency', field: 'shotRate', value: 30 },
+    { op: 'raise-tendency', field: 'turnoverRate', value: 20 },
+  ],
+  'second-chance-jackpot': [{ op: 'cap-rating', field: 'defensiveRebound', value: 30 }],
+  'and-one-machine': [
+    { op: 'cap-rating', field: 'freeThrow', value: 70 },
+    { op: 'raise-tendency', field: 'foulRate', value: 50 },
+  ],
+};
+
 const TIER_THREE_RULES: Record<
   | 'clone-army'
   | 'time-lord'
@@ -181,7 +197,7 @@ describe('havoc mutation catalog', () => {
     (mutationId, rule) => {
       const definition = havocMutationDefinitionOf(mutationId as HavocMutationId);
       expect(definition.tier).toBe(2);
-      expect(definition.operations).toEqual([]);
+      expect(definition.operations).toEqual(TIER_TWO_DOWNSIDE_OPERATIONS[mutationId] ?? []);
       expect(definition.eventRules).toEqual([rule]);
     },
   );

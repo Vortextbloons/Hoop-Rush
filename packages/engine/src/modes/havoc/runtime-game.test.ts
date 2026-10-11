@@ -76,10 +76,12 @@ describe('havoc runtime smoke', () => {
 });
 
 // Captured after the foul-avoidance calibration; default 24/24 games must not drift
-// again without an explicit behavior change.
-const DEFAULT_HAVOC_RESULT_DIGEST = 'c600303650ef19aa6a10484c6ccac186';
+// again without an explicit behavior change. Recaptured for the v2 balance patch
+// (single-multiplier cap, retuned point buffs); tapes are byte-identical, only the
+// embedded rules/catalog version in results changed the result digests.
+const DEFAULT_HAVOC_RESULT_DIGEST = '717ae3c484f962c028079d06b6dc01f4';
 const DEFAULT_HAVOC_TAPE_DIGEST = '4dcada61bfa5b995ed96cf237bf8e3b1';
-const LOCKED_HAVOC_RESULT_DIGEST = 'a1e08c56cf91c28289366e2cf517b366';
+const LOCKED_HAVOC_RESULT_DIGEST = '1bab18d054aa2b1c2d6923d23918d580';
 const LOCKED_HAVOC_TAPE_DIGEST = 'f246ced818f50974ec7a84925edd6f08';
-const LOCKED_NORMAL_RESULT_DIGEST = '6f043858f5bb72445e702b9e0c4c7368';
+const LOCKED_NORMAL_RESULT_DIGEST = '3c83a06caf52b268c4085dd6e08cb8fc';
 const LOCKED_NORMAL_TAPE_DIGEST = 'c903a35e900ef912423b7c6cbee5b4ee';

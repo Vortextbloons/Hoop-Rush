@@ -204,18 +204,24 @@ export const HAVOC_MUTATION_DEFINITIONS: readonly HavocMutationDefinition[] = [
     mutationId: 'four-point-dunk',
     tier: 2,
     name: 'Four-Point Dunk',
-    description: 'A made dunk scores two extra points, added before any multipliers.',
-    downside: 'Only shots actually classified as dunks qualify.',
-    operations: [],
+    description: 'A made dunk scores one extra point, added before any multipliers.',
+    downside: 'Caps three-point at 30 and raises turnover rate to 20.',
+    operations: [
+      { op: 'cap-rating', field: 'threePoint', value: 30 },
+      { op: 'raise-tendency', field: 'turnoverRate', value: 20 },
+    ],
     eventRules: ['four-point-dunk'],
   }),
   defineHavocMutation({
     mutationId: 'golden-assist',
     tier: 2,
     name: 'Golden Assist',
-    description: 'Every third credited assist adds one extra point for the passer.',
-    downside: 'No extra field-goal or free-throw make is created.',
-    operations: [],
+    description: 'Every fourth credited assist adds one extra point for the passer.',
+    downside: 'Caps shot rate at 30 and raises turnover rate to 20.',
+    operations: [
+      { op: 'cap-tendency', field: 'shotRate', value: 30 },
+      { op: 'raise-tendency', field: 'turnoverRate', value: 20 },
+    ],
     eventRules: ['golden-assist'],
   }),
   defineHavocMutation({
@@ -223,8 +229,9 @@ export const HAVOC_MUTATION_DEFINITIONS: readonly HavocMutationDefinition[] = [
     tier: 2,
     name: 'Heat Check',
     description:
-      'Three consecutive made field goals arm a double-value next made field goal; the rewarded make consumes it.',
-    downside: 'An unarmed miss resets the streak.',
+      'Four consecutive made field goals arm a double-value next made field goal; the rewarded make consumes it.',
+    downside:
+      'Any miss resets the streak, and an unused armed effect expires after three possessions.',
     operations: [],
     eventRules: ['heat-check'],
   }),
@@ -233,8 +240,8 @@ export const HAVOC_MUTATION_DEFINITIONS: readonly HavocMutationDefinition[] = [
     tier: 2,
     name: 'Second Chance Jackpot',
     description: "A made putback of the player's own offensive rebound scores double.",
-    downside: 'A miss or an intervening action loses that putback chance.',
-    operations: [],
+    downside: 'Caps defensive rebounding at 30.',
+    operations: [{ op: 'cap-rating', field: 'defensiveRebound', value: 30 }],
     eventRules: ['second-chance-jackpot'],
   }),
   defineHavocMutation({
@@ -242,9 +249,12 @@ export const HAVOC_MUTATION_DEFINITIONS: readonly HavocMutationDefinition[] = [
     tier: 2,
     name: 'And-One Machine',
     description:
-      'A made field goal plus a shooting foul earns three free-throw attempts instead of one.',
-    downside: 'The bonus attempts still have to be made.',
-    operations: [],
+      'A made field goal plus a shooting foul earns two free-throw attempts instead of one.',
+    downside: 'Caps free throw at 70 and raises foul rate to 50.',
+    operations: [
+      { op: 'cap-rating', field: 'freeThrow', value: 70 },
+      { op: 'raise-tendency', field: 'foulRate', value: 50 },
+    ],
     eventRules: ['and-one-machine'],
   }),
   defineHavocMutation({
@@ -262,8 +272,8 @@ export const HAVOC_MUTATION_DEFINITIONS: readonly HavocMutationDefinition[] = [
     tier: 2,
     name: 'Rebound Loop',
     description:
-      'Every third offensive rebound earns the team a queued extra possession after the current one.',
-    downside: 'The earned possession uses real game time and a fresh shot clock.',
+      'Every fifth offensive rebound earns the team a queued extra possession after the current one.',
+    downside: 'The earned possession runs on a rushed 12-second shot clock.',
     operations: [],
     eventRules: ['rebound-loop'],
   }),
@@ -273,7 +283,8 @@ export const HAVOC_MUTATION_DEFINITIONS: readonly HavocMutationDefinition[] = [
     name: 'The Bounty',
     description:
       "Blocking the opponent's top-ranked starter arms a double-value next made field goal.",
-    downside: 'Only blocks on that ranked starter arm the effect.',
+    downside:
+      'Only blocks on that ranked starter arm the effect, and it expires after two possessions.',
     operations: [],
     eventRules: ['the-bounty'],
   }),
@@ -291,7 +302,7 @@ export const HAVOC_MUTATION_DEFINITIONS: readonly HavocMutationDefinition[] = [
     tier: 2,
     name: 'Basketball Roulette',
     description:
-      'Every fifth field-goal attempt rolls a 1-6 point value instead of the shot nominal value.',
+      'Every seventh field-goal attempt rolls a 1-4 point value instead of the shot nominal value.',
     downside: 'The rolled value can be lower than a normal make.',
     operations: [],
     eventRules: ['basketball-roulette'],
@@ -332,8 +343,8 @@ export const HAVOC_MUTATION_DEFINITIONS: readonly HavocMutationDefinition[] = [
     tier: 3,
     name: 'Reverse Basketball',
     description:
-      'Adds two points to each made two-pointer and subtracts one from each made three-pointer on the owner team.',
-    downside: 'Three-pointers are worth one less.',
+      'Adds one point to each made two-pointer and subtracts two from each made three-pointer on the owner team.',
+    downside: 'Three-pointers are worth two less.',
     operations: [],
     eventRules: ['reverse-basketball'],
   }),
@@ -341,8 +352,8 @@ export const HAVOC_MUTATION_DEFINITIONS: readonly HavocMutationDefinition[] = [
     mutationId: 'double-or-nothing',
     tier: 3,
     name: 'Double or Nothing',
-    description: "Doubles the owner's team made field goals and free throws.",
-    downside: 'Every missed field goal or free throw subtracts one point; scores can go negative.',
+    description: "Doubles the owner's team made field goals.",
+    downside: 'Every missed field goal or free throw subtracts two points; scores can go negative.',
     operations: [],
     eventRules: ['double-or-nothing'],
   }),

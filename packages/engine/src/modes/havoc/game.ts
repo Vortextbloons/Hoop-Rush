@@ -77,6 +77,16 @@ const HAVOC_FINISH_HEIGHT_POINTS = 0.015;
 const HAVOC_WINGSPAN_REBOUND_WEIGHT = 0.1;
 const HAVOC_EQUALIZER_CAP = 85;
 const HAVOC_HIGHLIGHT_LIMIT = 16;
+const HAVOC_HEAT_STREAK_ARMS_AT = 4;
+const HAVOC_HEAT_EXPIRY_POSSESSIONS = 3;
+const HAVOC_BOUNTY_EXPIRY_POSSESSIONS = 2;
+const HAVOC_ROULETTE_EVERY_ATTEMPTS = 7;
+const HAVOC_ROULETTE_MIN = 1;
+const HAVOC_ROULETTE_MAX = 4;
+const HAVOC_REBOUND_LOOP_EVERY = 5;
+const HAVOC_GOLDEN_ASSIST_EVERY = 4;
+const HAVOC_DOUBLE_MISS_PENALTY = -2;
+const HAVOC_EXTRA_POSSESSION_RUSH_SECONDS = 12;
 
 export class HavocSimulationExhaustedError extends Error {
   readonly code = 'havoc-overtime-exhausted';
@@ -122,7 +132,9 @@ export interface HavocFieldGoalValue {
 
 /**
  * Exact `(nominal + Σ addends) × Π multipliers` resolution in the stable
- * evidence order. `contributions` are the incremental score deltas at the
+ * evidence order. At most one doubling multiplier applies per make: the first
+ * active source in stable order (heat-check, putback, bounty, double-or-nothing)
+ * wins. `contributions` are the incremental score deltas at the
  * point each component applies; they sum to `points - nominal`.
  */
 export function havocFieldGoalValue(input: HavocFieldGoalValueInput): HavocFieldGoalValue {
@@ -136,17 +148,17 @@ export function havocFieldGoalValue(input: HavocFieldGoalValueInput): HavocField
     value += points;
   };
   if (input.roulette !== null) add('roulette', input.roulette - input.nominal);
-  if (input.fourPointDunk) add('four-point-dunk', 2);
-  if (input.reverseBasketball) add('reverse-basketball', input.three ? -1 : 2);
+  if (input.fourPointDunk) add('four-point-dunk', 1);
+  if (input.reverseBasketball) add('reverse-basketball', input.three ? -2 : 1);
   const multiply = (source: HavocScoringSource): void => {
     multipliers.push({ source, factor: 2 });
     contributions.push({ source, points: value });
     value *= 2;
   };
   if (input.heatCheck) multiply('heat-check');
-  if (input.putback) multiply('second-chance-jackpot');
-  if (input.bounty) multiply('the-bounty');
-  if (input.doubleOrNothing) multiply('double-or-nothing');
+  else if (input.putback) multiply('second-chance-jackpot');
+  else if (input.bounty) multiply('the-bounty');
+  else if (input.doubleOrNothing) multiply('double-or-nothing');
   return { addends, multipliers, points: value, contributions };
 }
 
@@ -181,6 +193,7 @@ interface ParticipantState {
   swappedBy: string | null;
   fgStreak: number;
   heatArmed: boolean;
+  heatArmedAt: number | null;
   fgaCount: number;
   assistCount: number;
   shootingFoulsDrawn: number;
@@ -188,6 +201,7 @@ interface ParticipantState {
   reboundLoopCount: number;
   putbackArmedAt: number | null;
   bountyArmed: boolean;
+  bountyArmedAt: number | null;
   activeSeconds: number;
   simPlayer: SimulationPlayer;
   evidence: HavocEvidence | undefined;
@@ -342,6 +356,7 @@ class HavocGameRuntime implements HavocRuntimeHooks {
   private lastTimeLord: [number, number];
   private lastCapped: string[] = [];
   private equalizerApplied = false;
+  private rushedExtraSide: SideIndex | null = null;
   private tripContext: TripContext | null = null;
   private readonly input: HavocGameInput;
   private readonly context: EngineContext;
@@ -398,6 +413,7 @@ class HavocGameRuntime implements HavocRuntimeHooks {
         swappedBy: null,
         fgStreak: 0,
         heatArmed: false,
+        heatArmedAt: null,
         fgaCount: 0,
         assistCount: 0,
         shootingFoulsDrawn: 0,
@@ -405,6 +421,7 @@ class HavocGameRuntime implements HavocRuntimeHooks {
         reboundLoopCount: 0,
         putbackArmedAt: null,
         bountyArmed: false,
+        bountyArmedAt: null,
         activeSeconds: 0,
         simPlayer: undefined as unknown as SimulationPlayer,
         evidence: undefined,
@@ -519,9 +536,14 @@ class HavocGameRuntime implements HavocRuntimeHooks {
   }
 
   private fullShotClockOf(side: SideIndex): number {
-    if (this.activeOwners(side, 'time-lord').length > 0) return 30;
-    if (this.activeOwners((1 - side) as SideIndex, 'time-lord').length > 0) return 12;
-    return ENGINE_CONSTANTS.shotClockSeconds;
+    let limit: number;
+    if (this.activeOwners(side, 'time-lord').length > 0) limit = 30;
+    else if (this.activeOwners((1 - side) as SideIndex, 'time-lord').length > 0) limit = 12;
+    else limit = ENGINE_CONSTANTS.shotClockSeconds;
+    if (this.rushedExtraSide === side) {
+      limit = Math.min(limit, HAVOC_EXTRA_POSSESSION_RUSH_SECONDS);
+    }
+    return limit;
   }
 
   reboundShotClock(side: SideIndex): number {
@@ -789,11 +811,15 @@ class HavocGameRuntime implements HavocRuntimeHooks {
     let roulette: { owner: ParticipantState; rolled: number; ordinal: number } | null = null;
     if (shooter.mutations.has('basketball-roulette')) {
       shooter.fgaCount += 1;
-      if (shooter.fgaCount % 5 === 0) {
+      if (shooter.fgaCount % HAVOC_ROULETTE_EVERY_ATTEMPTS === 0) {
         const rng = this.context.rngFactory(
           runtimeSeed(this.input.seed, 'roulette', shooter.instanceId, shooter.fgaCount),
         );
-        roulette = { owner: shooter, rolled: rng.nextInt(1, 6), ordinal: shooter.fgaCount };
+        roulette = {
+          owner: shooter,
+          rolled: rng.nextInt(HAVOC_ROULETTE_MIN, HAVOC_ROULETTE_MAX),
+          ordinal: shooter.fgaCount,
+        };
       }
     }
     let scoringSequence: number | null = null;
@@ -871,13 +897,19 @@ class HavocGameRuntime implements HavocRuntimeHooks {
           actorInstanceId: shooter.instanceId,
           beneficiaryInstanceId: null,
           nominalPoints: 0,
-          addends: [{ source: 'double-or-nothing', points: -1 }],
+          addends: [{ source: 'double-or-nothing', points: HAVOC_DOUBLE_MISS_PENALTY }],
           multipliers: [],
-          points: -1,
+          points: HAVOC_DOUBLE_MISS_PENALTY,
           owners: doubleOwners.map((owner) => owner.instanceId),
           originalEventSequence: shotSequence,
         });
-        this.attribute([{ owner: penaltyOwner, mutationId: 'double-or-nothing', points: -1 }]);
+        this.attribute([
+          {
+            owner: penaltyOwner,
+            mutationId: 'double-or-nothing',
+            points: HAVOC_DOUBLE_MISS_PENALTY,
+          },
+        ]);
       }
     }
     const mutate = (participant: ParticipantState, mutationId: HavocMutationId): void => {
@@ -932,6 +964,7 @@ class HavocGameRuntime implements HavocRuntimeHooks {
       if (args.made) {
         if (heatBefore) {
           shooter.heatArmed = false;
+          shooter.heatArmedAt = null;
           shooter.fgStreak = 0;
           mutate(shooter, 'heat-check');
           this.pushEvent({
@@ -943,8 +976,9 @@ class HavocGameRuntime implements HavocRuntimeHooks {
           });
         } else {
           shooter.fgStreak += 1;
-          if (shooter.fgStreak >= 3) {
+          if (shooter.fgStreak >= HAVOC_HEAT_STREAK_ARMS_AT) {
             shooter.heatArmed = true;
+            shooter.heatArmedAt = this.possessionId;
             mutate(shooter, 'heat-check');
             this.pushEvent({
               kind: 'heat-check',
@@ -955,12 +989,24 @@ class HavocGameRuntime implements HavocRuntimeHooks {
             });
           }
         }
-      } else if (!heatBefore) {
+      } else {
         shooter.fgStreak = 0;
+        if (shooter.heatArmed) {
+          shooter.heatArmed = false;
+          shooter.heatArmedAt = null;
+          this.pushEvent({
+            kind: 'heat-check',
+            outcome: 'expired',
+            ownerInstanceId: shooter.instanceId,
+            side: team.side,
+            scoringSequence: null,
+          });
+        }
       }
     }
     if (args.made && bountyBefore) {
       shooter.bountyArmed = false;
+      shooter.bountyArmedAt = null;
       mutate(shooter, 'the-bounty');
       this.pushEvent({
         kind: 'bounty',
@@ -1003,7 +1049,6 @@ class HavocGameRuntime implements HavocRuntimeHooks {
     });
     const doubleOwners = this.activeOwners(args.side, 'double-or-nothing');
     if (args.made) {
-      const doubled = doubleOwners.length > 0;
       this.pushScoring({
         side: team.side,
         kind: 'free-throw',
@@ -1011,17 +1056,11 @@ class HavocGameRuntime implements HavocRuntimeHooks {
         beneficiaryInstanceId: null,
         nominalPoints: 1,
         addends: [],
-        multipliers: doubled ? [{ source: 'double-or-nothing', factor: 2 }] : [],
-        points: doubled ? 2 : 1,
-        owners: doubleOwners.map((owner) => owner.instanceId),
+        multipliers: [],
+        points: 1,
+        owners: [],
         originalEventSequence: attemptSequence,
       });
-      if (doubled) {
-        const primary = doubleOwners[0];
-        if (primary !== undefined) {
-          this.attribute([{ owner: primary, mutationId: 'double-or-nothing', points: 1 }]);
-        }
-      }
     } else if (doubleOwners.length > 0) {
       const primary = doubleOwners[0];
       if (primary !== undefined) {
@@ -1031,13 +1070,15 @@ class HavocGameRuntime implements HavocRuntimeHooks {
           actorInstanceId: shooter.instanceId,
           beneficiaryInstanceId: null,
           nominalPoints: 0,
-          addends: [{ source: 'double-or-nothing', points: -1 }],
+          addends: [{ source: 'double-or-nothing', points: HAVOC_DOUBLE_MISS_PENALTY }],
           multipliers: [],
-          points: -1,
+          points: HAVOC_DOUBLE_MISS_PENALTY,
           owners: doubleOwners.map((owner) => owner.instanceId),
           originalEventSequence: attemptSequence,
         });
-        this.attribute([{ owner: primary, mutationId: 'double-or-nothing', points: -1 }]);
+        this.attribute([
+          { owner: primary, mutationId: 'double-or-nothing', points: HAVOC_DOUBLE_MISS_PENALTY },
+        ]);
       }
     }
   }
@@ -1055,7 +1096,7 @@ class HavocGameRuntime implements HavocRuntimeHooks {
     });
     if (!passer.mutations.has('golden-assist')) return;
     passer.assistCount += 1;
-    if (passer.assistCount % 3 !== 0) return;
+    if (passer.assistCount % HAVOC_GOLDEN_ASSIST_EVERY !== 0) return;
     const counters = this.rollupFor(passer, 'golden-assist');
     if (counters !== undefined) counters.triggers += 1;
     const scoringSequence = this.pushScoring({
@@ -1092,7 +1133,7 @@ class HavocGameRuntime implements HavocRuntimeHooks {
     if (!offensive) return;
     if (participant.mutations.has('rebound-loop')) {
       participant.reboundLoopCount += 1;
-      if (participant.reboundLoopCount % 3 === 0) {
+      if (participant.reboundLoopCount % HAVOC_REBOUND_LOOP_EVERY === 0) {
         const counters = this.rollupFor(participant, 'rebound-loop');
         if (counters !== undefined) {
           counters.triggers += 1;
@@ -1145,6 +1186,7 @@ class HavocGameRuntime implements HavocRuntimeHooks {
       !blockerState.bountyArmed
     ) {
       blockerState.bountyArmed = true;
+      blockerState.bountyArmedAt = this.possessionId;
       const counters = this.rollupFor(blockerState, 'the-bounty');
       if (counters !== undefined) counters.triggers += 1;
       this.pushEvent({
@@ -1188,8 +1230,8 @@ class HavocGameRuntime implements HavocRuntimeHooks {
       const shooter = this.requireParticipant(args.shooter);
       if (shooter.mutations.has('and-one-machine')) {
         andOneShooter = shooter;
-        freeThrowsAwarded += 2;
-        bonusAttempts = 2;
+        freeThrowsAwarded += 1;
+        bonusAttempts = 1;
       }
     }
     const technicalFreeThrows =
@@ -1209,14 +1251,14 @@ class HavocGameRuntime implements HavocRuntimeHooks {
       const counters = this.rollupFor(andOneShooter, 'and-one-machine');
       if (counters !== undefined) {
         counters.triggers += 1;
-        counters.freeThrowsGranted += 2;
+        counters.freeThrowsGranted += 1;
       }
       this.pushEvent({
         kind: 'and-one-bonus',
         shooterInstanceId: andOneShooter.instanceId,
         side: this.teams[args.offenseSide].side,
         foulSequence,
-        bonusFreeThrows: 2,
+        bonusFreeThrows: 1,
       });
     }
     if (args.shooting && args.shooter !== null) {
@@ -1251,6 +1293,38 @@ class HavocGameRuntime implements HavocRuntimeHooks {
     this.possessionId = possessionId;
     this.shotKindOrdinal = 0;
     this.coverageCache = null;
+    for (const team of this.teams) {
+      for (const participant of team.participants) {
+        if (participant.heatArmed && participant.heatArmedAt !== null) {
+          if (possessionId - participant.heatArmedAt >= HAVOC_HEAT_EXPIRY_POSSESSIONS) {
+            participant.heatArmed = false;
+            participant.heatArmedAt = null;
+            participant.fgStreak = 0;
+            this.pushEvent({
+              kind: 'heat-check',
+              outcome: 'expired',
+              ownerInstanceId: participant.instanceId,
+              side: team.side,
+              scoringSequence: null,
+            });
+          }
+        }
+        if (participant.bountyArmed && participant.bountyArmedAt !== null) {
+          if (possessionId - participant.bountyArmedAt >= HAVOC_BOUNTY_EXPIRY_POSSESSIONS) {
+            participant.bountyArmed = false;
+            participant.bountyArmedAt = null;
+            this.pushEvent({
+              kind: 'bounty',
+              outcome: 'expired',
+              ownerInstanceId: participant.instanceId,
+              side: team.side,
+              blockedInstanceId: null,
+              scoringSequence: null,
+            });
+          }
+        }
+      }
+    }
   }
 
   onPossessionEnd(offense: SideIndex): void {
@@ -1269,6 +1343,7 @@ class HavocGameRuntime implements HavocRuntimeHooks {
       });
     }
     this.coverageCache = null;
+    this.rushedExtraSide = null;
   }
 
   beginTipoff(): void {
@@ -1355,6 +1430,12 @@ class HavocGameRuntime implements HavocRuntimeHooks {
   }
 
   private endPowersFor(participant: ParticipantState): void {
+    participant.heatArmed = false;
+    participant.heatArmedAt = null;
+    participant.fgStreak = 0;
+    participant.bountyArmed = false;
+    participant.bountyArmedAt = null;
+    participant.putbackArmedAt = null;
     if (participant.swapWith !== null) {
       const target = this.globalById(participant.swapWith);
       const targetId = participant.swapWith;
@@ -1589,6 +1670,7 @@ class HavocGameRuntime implements HavocRuntimeHooks {
       const counters = this.rollupFor(owner, 'rebound-loop');
       if (counters !== undefined) counters.extraPossessionsUsed += 1;
     }
+    this.rushedExtraSide = team.sideIndex;
     this.pushEvent({
       kind: 'extra-possession',
       outcome: 'started',

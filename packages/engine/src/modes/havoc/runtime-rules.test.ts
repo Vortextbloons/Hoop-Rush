@@ -159,7 +159,7 @@ describe('havoc tier-2 rules', () => {
     if (run === null) return;
     const loop = eventsOf(run, 'rebound-loop')[0];
     if (loop?.kind !== 'rebound-loop') throw new Error('missing rebound loop');
-    expect(loop.reboundOrdinal % 3).toBe(0);
+    expect(loop.reboundOrdinal % 5).toBe(0);
     expect(loop.granted).toBeGreaterThanOrEqual(1);
     const started = run.tape.events.find(
       (event) => event.kind === 'extra-possession' && event.outcome === 'started',
@@ -177,7 +177,7 @@ describe('havoc tier-2 rules', () => {
     expect(loop.ownerInstanceId).toBe(run.input.home.starters[0]?.instanceId);
   });
 
-  it('grants three free throws on an and-one', () => {
+  it('grants two free throws on an and-one', () => {
     const human = buildScenarioTeam('human', humanSlotMutation('PG', 'and-one-machine'));
     const run = searchScenario(
       48,
@@ -189,11 +189,11 @@ describe('havoc tier-2 rules', () => {
     if (run === null) return;
     const bonus = eventsOf(run, 'and-one-bonus')[0];
     if (bonus?.kind !== 'and-one-bonus') throw new Error('missing and-one');
-    expect(bonus.bonusFreeThrows).toBe(2);
+    expect(bonus.bonusFreeThrows).toBe(1);
     const foul = run.tape.events.find((event) => event.sequence === bonus.foulSequence);
     if (foul?.kind !== 'foul') throw new Error('missing foul');
     expect(foul.shooting).toBe(true);
-    expect(foul.freeThrowsAwarded).toBe(3);
+    expect(foul.freeThrowsAwarded).toBe(2);
     const attempts = run.tape.events.filter(
       (event) =>
         event.kind === 'free-throw-attempt' &&
@@ -201,11 +201,11 @@ describe('havoc tier-2 rules', () => {
         event.possessionId === foul.possessionId &&
         event.sequence > foul.sequence,
     );
-    const firstTrip = attempts.slice(0, 3);
-    expect(firstTrip.length).toBeGreaterThanOrEqual(3);
+    const firstTrip = attempts.slice(0, 2);
+    expect(firstTrip.length).toBeGreaterThanOrEqual(2);
     expect(
       firstTrip.filter((event) => event.kind === 'free-throw-attempt' && event.bonus).length,
-    ).toBe(2);
+    ).toBe(1);
   });
 
   it('arms the bounty only on the highest-ranked opponent starter', () => {
@@ -495,7 +495,7 @@ describe('havoc overtime and free throws', () => {
     expect(otEntries.length).toBeGreaterThan(0);
   });
 
-  it('doubles made free throws and penalizes misses under double or nothing', () => {
+  it('penalizes misses by two under double or nothing without doubling free throws', () => {
     const human = buildScenarioTeam('human', [
       scenarioSlot('PG', ['double-or-nothing']),
       ...plainSlots().slice(1),
@@ -507,30 +507,30 @@ describe('havoc overtime and free throws', () => {
       (candidate) =>
         candidate.tape.scoring.some(
           (entry) =>
-            entry.kind === 'free-throw' &&
-            entry.multipliers.some((multiplier) => multiplier.source === 'double-or-nothing'),
+            entry.kind === 'adjustment' &&
+            entry.addends.some(
+              (addend) => addend.source === 'double-or-nothing' && addend.points === -2,
+            ),
         ),
     );
-    expect(run, 'expected a doubled free throw').not.toBeNull();
+    expect(run, 'expected a double-or-nothing penalty').not.toBeNull();
     if (run === null) return;
-    const doubled = run.tape.scoring.find(
-      (entry) =>
-        entry.kind === 'free-throw' &&
-        entry.multipliers.some((multiplier) => multiplier.source === 'double-or-nothing'),
-    );
-    expect(doubled?.points).toBe(2);
-    expect(doubled?.nominalPoints).toBe(1);
     const missed = run.tape.scoring.find(
       (entry) =>
         entry.kind === 'adjustment' &&
         entry.addends.some(
-          (addend) => addend.source === 'double-or-nothing' && addend.points === -1,
+          (addend) => addend.source === 'double-or-nothing' && addend.points === -2,
         ),
     );
-    expect(missed?.points).toBe(-1);
+    expect(missed?.points).toBe(-2);
+    for (const entry of run.tape.scoring) {
+      if (entry.kind !== 'free-throw') continue;
+      expect(entry.points).toBe(1);
+      expect(entry.multipliers).toEqual([]);
+    }
   });
 
-  it('records a six-point dunk without double or nothing', () => {
+  it('records a four-point dunk without double or nothing', () => {
     const human = buildScenarioTeam('human', [
       scenarioSlot('PG', ['four-point-dunk']),
       scenarioSlot('SG', ['reverse-basketball']),
@@ -542,12 +542,12 @@ describe('havoc overtime and free throws', () => {
       buildScenarioTeam('opponent', plainSlots()),
       (candidate) => candidate.tape.events.some((event) => event.kind === 'four-point-dunk'),
     );
-    expect(run, 'expected a six-point dunk scenario').not.toBeNull();
+    expect(run, 'expected a four-point dunk scenario').not.toBeNull();
     if (run === null) return;
     const event = eventsOf(run, 'four-point-dunk')[0];
     if (event?.kind !== 'four-point-dunk') throw new Error('missing dunk');
     const entry = entryOf(run, event.scoringSequence);
-    expect(entry?.points).toBe(6);
+    expect(entry?.points).toBe(4);
     expect(entry?.multipliers).toEqual([]);
   });
 });
