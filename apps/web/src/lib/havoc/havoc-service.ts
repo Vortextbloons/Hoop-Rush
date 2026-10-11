@@ -54,7 +54,7 @@ import {
   havocGameSummaryOf,
   type HavocStoredGame,
 } from '@hoop-rush/engine';
-import { DexieHavocRepository, type HavocRepository } from '@hoop-rush/persistence';
+import { DexieHavocRepository, HavocLoadError, type HavocRepository } from '@hoop-rush/persistence';
 import { getManifest } from '$lib/data';
 import { newRequestId, newSeasonId, seasonRootSeed } from '$lib/ids';
 import { loadRunPreamble } from '$lib/run-preamble';
@@ -578,6 +578,16 @@ class HavocAppService implements HavocService {
     );
   }
 
+  async discardStaleActiveRun(): Promise<void> {
+    return this.guard(async () => {
+      await this.repository.clearActiveRun();
+      this.run = null;
+      this.lastRunId = null;
+      this.lastAcceptedResult = null;
+      this.lastWatched = null;
+    });
+  }
+
   dispose(): void {
     this.runner.dispose();
     this.listeners.clear();
@@ -846,6 +856,9 @@ class HavocAppService implements HavocService {
       return await work();
     } catch (error) {
       if (error instanceof HavocServiceError) throw error;
+      if (error instanceof HavocLoadError && error.code === 'unsupported') {
+        throw new HavocServiceError('unsupported-version', messageOf(error));
+      }
       throw new HavocServiceError('storage', messageOf(error));
     }
   }

@@ -36,7 +36,7 @@ import {
   runCalibratedSeeds,
   seedRangeCalibrateOptions,
 } from '../calibration-harness.ts';
-import { percentile } from '../stats.ts';
+import { lowerMedian, percentile } from '../stats.ts';
 export const SEASON_GAME_SIMULATE_OPTIONS: Record<string, boolean> = {
   input: true,
   seed: true,
@@ -408,10 +408,6 @@ function renderSimulateDetails(
   }
   return details;
 }
-function median(values: readonly number[]): number {
-  const sorted = [...values].sort((a, b) => a - b);
-  return sorted[Math.floor(sorted.length / 2)] ?? 0;
-}
 function envelope(values: readonly number[]): [number, number] {
   const sorted = [...values].sort((a, b) => a - b);
   return [percentile(sorted, 0.01), percentile(sorted, 0.99)];
@@ -470,9 +466,9 @@ function aggregateFixture(
     fixtureId,
     preset: null,
     sample,
-    starterSecondsMedian: median(starter),
-    benchSecondsMedian: median(bench),
-    benchRoleMedianSeconds: benchRole.map(median),
+    starterSecondsMedian: lowerMedian(starter),
+    benchSecondsMedian: lowerMedian(bench),
+    benchRoleMedianSeconds: benchRole.map(lowerMedian),
     aggregateEnvelopes,
     failures: { games: failureGames, checks: failureChecks, determinism: determinismFailures },
   };

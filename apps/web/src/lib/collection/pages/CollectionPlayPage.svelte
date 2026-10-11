@@ -2,7 +2,7 @@
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
   import '$lib/collection/ultimate-theme.css';
-  import { getContext, onDestroy, tick, untrack } from 'svelte';
+  import { tick } from 'svelte';
   import type {
     CollectionCatalogCard,
     CollectionChallengeValidationFacts,
@@ -25,10 +25,7 @@
   import ObjectivePicker from '$lib/collection/ObjectivePicker.svelte';
   import MatchupCard from '$lib/collection/MatchupCard.svelte';
   import RewardReceipt from '$lib/collection/RewardReceipt.svelte';
-  import {
-    loadCollectionGameRules,
-    loadCollectionProgression,
-  } from '$lib/collection/collection-assets.ts';
+  import { loadCollectionGameRules } from '$lib/collection/collection-assets.ts';
   import {
     abandonBasicGame,
     abandonChallengeGame,
@@ -66,34 +63,48 @@
     type ChallengeCardView,
   } from '$lib/collection/collection-progression-view.ts';
   import { arenaError, arenaGameResult } from '$lib/arena-sound';
-  import {
-    ULTIMATE_RUN_SHELL_CONTEXT,
-    type UltimateRunShell,
-  } from '$lib/collection/ultimate-shell.svelte';
+  import { onDestroy } from 'svelte';
+  import { createUltimatePageShell } from './ultimate-page.svelte.ts';
 
-  const shell = getContext<UltimateRunShell>(ULTIMATE_RUN_SHELL_CONTEXT);
-
-  let mounted = true;
+  const pageShell = createUltimatePageShell({
+    failureMessage: 'Could not load play.',
+    load: async (ctx) => {
+      rules = await loadCollectionGameRules();
+      if (!pageShell.isMounted()) return false;
+      readFlowFromUrl();
+      if (pageShell.collectionState?.claimedWelcome) {
+        const snapshot = await ensurePlayStateSnapshot(new Date().toISOString());
+        if (!pageShell.isMounted()) return false;
+        playState = snapshot.playState;
+        rootSeed = snapshot.rootSeed;
+        await restoreLastGame();
+        if (!pageShell.isMounted()) return false;
+      }
+      ctx.markReady();
+      pageShell.startProgressionLoad((loaded, progressionFailure) => {
+        progression = loaded;
+        progressionError = progressionFailure;
+        if (
+          loaded !== null &&
+          selectedChallengeId !== null &&
+          !loaded.challenges.some((challenge) => challenge.challengeId === selectedChallengeId)
+        ) {
+          selectedChallengeId = null;
+        }
+      });
+    },
+  });
+  const shell = pageShell.shell;
   onDestroy(() => {
-    mounted = false;
     stopPlayback();
   });
 
-  const collectionState = $derived(shell.state);
-  const catalog = $derived(shell.catalog);
-  const manifest = $derived(shell.manifest);
-  let pageStatus = $state<'loading' | 'error' | 'ready'>('loading');
-  let pageError = $state<string | null>(null);
-  const phase = $derived<'loading' | 'error' | 'ready'>(
-    shell.phase === 'error' ||
-      (shell.phase === 'ready' && shell.catalog === null) ||
-      pageError !== null
-      ? 'error'
-      : shell.phase === 'ready' && pageStatus === 'ready'
-        ? 'ready'
-        : 'loading',
-  );
-  const error = $derived(shell.error ?? shell.catalogError ?? pageError);
+  const collectionState = $derived(pageShell.collectionState);
+  const catalog = $derived(pageShell.catalog);
+  const manifest = $derived(pageShell.manifest);
+  const phase = $derived(pageShell.phase);
+  const error = $derived(pageShell.error);
+  const retry = pageShell.retry;
   let rules = $state<CollectionGameRules | null>(null);
   let progression = $state<CollectionProgressionRules | null>(null);
   let progressionError = $state<string | null>(null);
@@ -330,7 +341,7 @@
     const cadence = cadenceFor(watchMode);
     if (cadence === null || !playing) return;
     playbackTimer = setTimeout(() => {
-      if (!mounted) return;
+      if (!pageShell.isMounted()) return;
       if (cursor < shownEvents.length - 1) {
         cursor += 1;
         scheduleTick();
@@ -445,11 +456,11 @@
   }
 
   function previewIconOf(kind: string): string {
-    if (kind === 'outcome-win') return '◉';
-    if (kind === 'outcome-loss') return '✕';
-    if (kind === 'margin') return '▂';
-    if (kind === 'first-clear') return '★';
-    return '◎';
+    if (kind === 'outcome-win') return 'â—‰';
+    if (kind === 'outcome-loss') return 'âœ•';
+    if (kind === 'margin') return 'â–‚';
+    if (kind === 'first-clear') return 'â˜…';
+    return 'â—Ž';
   }
 
   function readFlowFromUrl(): void {
@@ -472,57 +483,6 @@
     challengePanel?.focus();
   }
 
-  async function load(): Promise<void> {
-    pageStatus = 'loading';
-    pageError = null;
-    try {
-      const loadedRules = await loadCollectionGameRules();
-      if (!mounted) return;
-      rules = loadedRules;
-      readFlowFromUrl();
-      if (collectionState?.claimedWelcome) {
-        const snapshot = await ensurePlayStateSnapshot(new Date().toISOString());
-        if (!mounted) return;
-        playState = snapshot.playState;
-        rootSeed = snapshot.rootSeed;
-        await restoreLastGame();
-        if (!mounted) return;
-      }
-      pageStatus = 'ready';
-      void loadCollectionProgression()
-        .then((loaded) => {
-          if (!mounted) return;
-          progression = loaded;
-          progressionError = null;
-          if (
-            selectedChallengeId !== null &&
-            !loaded.challenges.some((challenge) => challenge.challengeId === selectedChallengeId)
-          ) {
-            selectedChallengeId = null;
-          }
-        })
-        .catch((failure: unknown) => {
-          if (!mounted) return;
-          progression = null;
-          progressionError =
-            failure instanceof Error
-              ? failure.message
-              : 'The collection progression rules are unavailable.';
-        });
-    } catch (loadError) {
-      if (!mounted) return;
-      pageError = loadError instanceof Error ? loadError.message : 'Could not load play.';
-      pageStatus = 'error';
-    }
-  }
-
-  function retry(): void {
-    pageStatus = 'loading';
-    pageError = null;
-    if (shell.phase === 'error' || shell.catalogError !== null) void shell.refresh();
-    else void load();
-  }
-
   async function restoreLastGame(): Promise<void> {
     try {
       const rawGameId = sessionStorage.getItem('collection-last-game');
@@ -530,7 +490,7 @@
       const parsedGameId = collectionGameIdSchema.safeParse(rawGameId);
       if (!parsedGameId.success) return;
       const committed = await loadCommittedGame(parsedGameId.data);
-      if (!mounted || !committed) return;
+      if (!pageShell.isMounted() || !committed) return;
       record = committed;
       if (committed.gameVersion === 'collection-game-v3') {
         mode = 'challenges';
@@ -543,17 +503,12 @@
     }
   }
 
-  $effect(() => {
-    if (shell.phase !== 'ready') return;
-    void untrack(load);
-  });
-
   async function refreshState(): Promise<void> {
     const [snapshot] = await Promise.all([
       ensurePlayStateSnapshot(new Date().toISOString()),
       shell.reloadCollection(),
     ]);
-    if (!mounted) return;
+    if (!pageShell.isMounted()) return;
     playState = snapshot.playState;
     rootSeed = snapshot.rootSeed;
   }
@@ -581,7 +536,7 @@
               objectiveId: effectiveObjectiveId,
             });
       await anticipation;
-      if (!mounted) return;
+      if (!pageShell.isMounted()) return;
       playState = outcome.playState;
       record = null;
       try {
@@ -594,10 +549,10 @@
           ? `Challenge matchup prepared: ${selectedChallenge.displayName}.`
           : `Matchup prepared at ${difficultyNameOf(difficultyId)}.`;
     } catch (prepareError) {
-      if (!mounted) return;
+      if (!pageShell.isMounted()) return;
       flowError = collectionErrorMessage(prepareError, 'Preparing failed.');
     } finally {
-      if (mounted) busy = 'idle';
+      if (pageShell.isMounted()) busy = 'idle';
     }
   }
 
@@ -615,7 +570,7 @@
         challengeName !== null
           ? await abandonChallengeGame(new Date().toISOString())
           : await abandonBasicGame(new Date().toISOString());
-      if (!mounted) return;
+      if (!pageShell.isMounted()) return;
       playState = next;
       record = null;
       announcement =
@@ -623,10 +578,10 @@
           ? `Challenge abandoned: ${challengeName}. No reward or clear was granted and the game sequence advanced.`
           : 'Matchup abandoned. Prepare a new game when ready.';
     } catch (abandonError) {
-      if (!mounted) return;
+      if (!pageShell.isMounted()) return;
       flowError = collectionErrorMessage(abandonError, 'Abandoning failed.');
     } finally {
-      if (mounted) busy = 'idle';
+      if (pageShell.isMounted()) busy = 'idle';
     }
   }
 
@@ -646,7 +601,7 @@
         profileUrl: assets.profileUrl,
         profileHash: assets.profileHash,
       });
-      if (!mounted) return;
+      if (!pageShell.isMounted()) return;
       busy = 'committing';
       const completedAtIso = new Date().toISOString();
       try {
@@ -669,7 +624,7 @@
             recordedAtIso: new Date().toISOString(),
           });
         }
-        if (!mounted) return;
+        if (!pageShell.isMounted()) return;
         playState = accepted.playState;
         record = accepted.record;
         if (accepted.record.gameVersion === 'collection-game-v3') {
@@ -677,19 +632,19 @@
           selectedChallengeId = accepted.record.prepared.challenge.challengeId;
         }
         await shell.reloadCollection();
-        if (!mounted) return;
+        if (!pageShell.isMounted()) return;
       } catch (acceptError) {
         const recovered = await loadCommittedGame(matchup.gameId).catch(() => null);
-        if (!mounted) return;
+        if (!pageShell.isMounted()) return;
         if (recovered) {
           await refreshState().catch(() => undefined);
-          if (!mounted) return;
+          if (!pageShell.isMounted()) return;
           record = recovered;
         } else {
           throw acceptError;
         }
       }
-      if (!mounted) return;
+      if (!pageShell.isMounted()) return;
       try {
         if (collectionGameIdSchema.safeParse(matchup.gameId).success) {
           sessionStorage.setItem('collection-last-game', matchup.gameId);
@@ -716,14 +671,14 @@
       announcement = 'Game ready. Watching the recorded gamecast.';
       busy = 'idle';
     } catch (playError) {
-      if (!mounted) return;
+      if (!pageShell.isMounted()) return;
       castOpen = false;
       try {
         arenaError();
       } catch {}
       flowError = collectionErrorMessage(playError, 'The game failed. Try again.');
       await refreshState().catch(() => undefined);
-      if (mounted) busy = 'idle';
+      if (pageShell.isMounted()) busy = 'idle';
     }
   }
 </script>
@@ -735,7 +690,7 @@
 <div class="ur-page ur-play-page">
   <div class="ur-pregame-hero">
     <div class="ur-pregame-copy">
-      <p class="ur-pregame-kicker">Ultimate Run · {record ? 'Post-game' : 'Pre-game'}</p>
+      <p class="ur-pregame-kicker">Ultimate Run Â· {record ? 'Post-game' : 'Pre-game'}</p>
       <h2 class="ur-pregame-title">
         {record ? 'The final whistle' : pending ? 'Ready for tip-off' : 'Under the lights'}
       </h2>
@@ -757,8 +712,8 @@
         >{playState?.pendingGame
           ? 'Locked until abandoned'
           : record
-            ? 'Game saved · Rewards credited'
-            : 'Pre-game · setup locks on prepare'}</small
+            ? 'Game saved Â· Rewards credited'
+            : 'Pre-game Â· setup locks on prepare'}</small
       >
       {#if playState}
         <span
@@ -777,7 +732,7 @@
 
   {#if phase === 'loading'}
     <div class="mt-6">
-      <AsyncState kind="loading" title="Loading" message="Loading play…" />
+      <AsyncState kind="loading" title="Loading" message="Loading playâ€¦" />
     </div>
   {:else if phase === 'error'}
     <div class="mt-6">
@@ -836,7 +791,7 @@
               <ul class="mt-2 space-y-1 text-sm">
                 {#each pendingPlayerStarters as card, index (index)}
                   <li class="tabular-nums">
-                    {card ? `${card.displayName} · Overall ${overallOf(card)}` : 'Unknown card'}
+                    {card ? `${card.displayName} Â· Overall ${overallOf(card)}` : 'Unknown card'}
                   </li>
                 {/each}
               </ul>
@@ -846,7 +801,7 @@
               <ul class="mt-2 space-y-1 text-sm">
                 {#each pendingCpuStarters as card, index (index)}
                   <li class="tabular-nums">
-                    {card ? `${card.displayName} · Overall ${overallOf(card)}` : 'Unknown card'}
+                    {card ? `${card.displayName} Â· Overall ${overallOf(card)}` : 'Unknown card'}
                   </li>
                 {/each}
               </ul>
@@ -861,7 +816,11 @@
           disabled={busy !== 'idle'}
           class="ur-btn-gold ur-start-sim px-5 py-2.5 text-sm outline-none disabled:opacity-40"
         >
-          {busy === 'playing' ? 'Playing…' : busy === 'committing' ? 'Saving game…' : 'Tip off →'}
+          {busy === 'playing'
+            ? 'Playingâ€¦'
+            : busy === 'committing'
+              ? 'Saving gameâ€¦'
+              : 'Tip off â†’'}
         </button>
         <button
           type="button"
@@ -975,7 +934,7 @@
                   <small>COINS</small>
                 </div>
                 <p class="ur-reward-sub">
-                  {difficultyNameOf(difficultyId)} · {objectiveOptions.find(
+                  {difficultyNameOf(difficultyId)} Â· {objectiveOptions.find(
                     (option) => option.objectiveId === effectiveObjectiveId,
                   )?.title ?? 'No objective'}
                 </p>
@@ -993,7 +952,7 @@
                         >
                       </span>
                       <span class="ur-reward-coins" data-zero={row.coins === 0}>
-                        {row.coins === 0 ? '—' : `+${row.coins}`}
+                        {row.coins === 0 ? 'â€”' : `+${row.coins}`}
                       </span>
                     </li>
                   {/each}
@@ -1014,7 +973,7 @@
                   disabled={setupLocked}
                   class="ur-btn-gold ur-prepare-btn"
                 >
-                  {busy === 'preparing' ? 'Preparing…' : 'Prepare matchup →'}
+                  {busy === 'preparing' ? 'Preparingâ€¦' : 'Prepare matchup â†’'}
                 </button>
                 <p class="ur-reward-lock" aria-live="polite">
                   Setup locks on prepare. Abandoning uses a new matchup.
@@ -1046,23 +1005,16 @@
                 message={progressionError}
                 retry={() => {
                   progressionError = null;
-                  void loadCollectionProgression()
-                    .then((loaded) => {
-                      if (mounted) progression = loaded;
-                    })
-                    .catch((failure: unknown) => {
-                      if (!mounted) return;
-                      progressionError =
-                        failure instanceof Error
-                          ? failure.message
-                          : 'The collection progression rules are unavailable.';
-                    });
+                  pageShell.startProgressionLoad((loaded, progressionFailure) => {
+                    progression = loaded;
+                    progressionError = progressionFailure;
+                  });
                 }}
               />
             </div>
           {:else if progression === null}
             <div class="mt-4">
-              <AsyncState kind="loading" title="Loading" message="Loading challenges…" />
+              <AsyncState kind="loading" title="Loading" message="Loading challengesâ€¦" />
             </div>
           {:else}
             <ul class="ur-challenge-grid mt-4 grid gap-4 lg:grid-cols-2">
@@ -1092,13 +1044,13 @@
                   {selectedChallenge.displayName}
                 </h3>
                 <p class="mt-1 text-sm text-muted-foreground">
-                  {requirementLabel(selectedChallenge.requirement, setTitleOf)} ·
-                  {difficultyNameOf(selectedChallenge.difficultyId)} difficulty · snapshotted when you
+                  {requirementLabel(selectedChallenge.requirement, setTitleOf)} Â·
+                  {difficultyNameOf(selectedChallenge.difficultyId)} difficulty Â· snapshotted when you
                   prepare
                 </p>
                 <p class="mt-2 text-sm tabular-nums">
                   Team progress: {selectedChallengeFacts.rosterCount}/{selectedChallengeFacts.requiredRosterCount}
-                  matching active cards · {selectedChallengeFacts.starterCount}/{selectedChallengeFacts.requiredStarterCount}
+                  matching active cards Â· {selectedChallengeFacts.starterCount}/{selectedChallengeFacts.requiredStarterCount}
                   matching starters
                 </p>
                 {#if !selectedChallengeFacts.success}
@@ -1123,10 +1075,10 @@
                       Full requirement facts
                     </summary>
                     <p class="mt-2">
-                      Team legal: {selectedChallengeFacts.teamValid ? 'yes' : 'no'} · matching card IDs:
+                      Team legal: {selectedChallengeFacts.teamValid ? 'yes' : 'no'} Â· matching card IDs:
                       {selectedChallengeFacts.matchingCardIds.length === 0
                         ? 'none'
-                        : selectedChallengeFacts.matchingCardIds.join(', ')} · team issues:
+                        : selectedChallengeFacts.matchingCardIds.join(', ')} Â· team issues:
                       {selectedChallengeFacts.teamIssueCodes.length === 0
                         ? 'none'
                         : selectedChallengeFacts.teamIssueCodes.join(', ')}
@@ -1174,7 +1126,7 @@
                                   ? 'text-muted-foreground'
                                   : 'text-accent'}"
                               >
-                                {row.coins === 0 ? '—' : `+${row.coins}`}
+                                {row.coins === 0 ? 'â€”' : `+${row.coins}`}
                               </span>
                             </li>
                           {/each}
@@ -1199,7 +1151,7 @@
                                   ? 'text-muted-foreground'
                                   : 'text-accent'}"
                               >
-                                {row.coins === 0 ? '—' : `+${row.coins}`}
+                                {row.coins === 0 ? 'â€”' : `+${row.coins}`}
                               </span>
                             </li>
                           {/each}
@@ -1230,7 +1182,7 @@
                           disabled={setupLocked}
                           class="ur-btn-gold mt-4 w-full px-5 py-2.5 text-sm outline-none disabled:opacity-40"
                         >
-                          {busy === 'preparing' ? 'Preparing…' : 'Prepare challenge'}
+                          {busy === 'preparing' ? 'Preparingâ€¦' : 'Prepare challenge'}
                         </button>
                         <p class="mt-2 text-xs text-muted-foreground" aria-live="polite">
                           Preparing locks the matchup and consumes the game sequence. Abandoning
@@ -1256,7 +1208,7 @@
       <section aria-label="Result and gamecast" class="ur-gamecast mt-4">
         <div class="ur-broadcast-mast">
           <div>
-            <p class="ur-broadcast-note">Game saved · Rewards added to your collection</p>
+            <p class="ur-broadcast-note">Game saved Â· Rewards added to your collection</p>
             <div class="result-navigation" role="group" aria-label="Game result view">
               {#each [{ id: 'recap', label: 'Recap' }, { id: 'replay', label: 'Replay' }, { id: 'box', label: 'Box score' }] as view (view.id)}
                 <button
@@ -1274,7 +1226,7 @@
             disabled={busy !== 'idle'}
             class="ur-play-again ur-play-again--mast"
           >
-            {busy === 'preparing' ? 'Preparing…' : 'Play again'}
+            {busy === 'preparing' ? 'Preparingâ€¦' : 'Play again'}
           </button>
           <button
             type="button"
@@ -1292,9 +1244,9 @@
                   ? 'Win by forfeit'
                   : 'Loss by forfeit'
                 : facts.winner === 'home'
-                  ? 'Final · Win'
-                  : 'Final · Loss'}
-            <span aria-hidden="true"> · </span>
+                  ? 'Final Â· Win'
+                  : 'Final Â· Loss'}
+            <span aria-hidden="true"> Â· </span>
             <span>
               {record.gameVersion === 'collection-game-v3'
                 ? record.prepared.challenge.displayName
@@ -1337,7 +1289,7 @@
             <p class="ur-final-meta">
               {facts.winner === 'home' ? 'You won' : 'CPU won'}
               {facts.overtimePeriods > 0
-                ? ` · ${facts.overtimePeriods} overtime${facts.overtimePeriods === 1 ? '' : 's'}`
+                ? ` Â· ${facts.overtimePeriods} overtime${facts.overtimePeriods === 1 ? '' : 's'}`
                 : ''}
             </p>
           {:else}
@@ -1345,7 +1297,7 @@
               {scoreboardEvent?.kind === 'final'
                 ? 'FINAL'
                 : scoreboardEvent
-                  ? `${scoreboardEvent.period > 4 ? `OT${scoreboardEvent.period - 4}` : `Q${scoreboardEvent.period}`} · ${clockLabel(scoreboardEvent.secondsRemaining)}`
+                  ? `${scoreboardEvent.period > 4 ? `OT${scoreboardEvent.period - 4}` : `Q${scoreboardEvent.period}`} Â· ${clockLabel(scoreboardEvent.secondsRemaining)}`
                   : 'No recorded events'}
             </p>
           {/if}
@@ -1359,7 +1311,7 @@
             duration={cadenceFor(watchMode) ?? 900}
           />
           <p class="replay-disclaimer">
-            Replay of your saved game · playback does not change the result or rewards.
+            Replay of your saved game Â· playback does not change the result or rewards.
           </p>
           <div class="ur-gamecast-controls ur-control-bar">
             <div class="ur-speed-pills" role="group" aria-label="Recorded replay speed">
@@ -1378,7 +1330,7 @@
             {#if watchMode !== 'fast'}
               <div class="ur-replay-actions">
                 <button type="button" onclick={togglePlayback} class="ur-replay-primary">
-                  {playing ? 'Pause recording' : '⏵ Play recording'}
+                  {playing ? 'Pause recording' : 'âµ Play recording'}
                 </button>
                 <button
                   type="button"
@@ -1405,7 +1357,7 @@
                     {manifest}
                     card={scorerCard}
                     compact
-                    detail={`${scorer.points} points this play · ${scorer.side === 'home' ? 'Your team' : 'CPU'}`}
+                    detail={`${scorer.points} points this play Â· ${scorer.side === 'home' ? 'Your team' : 'CPU'}`}
                   />
                 </div>
               {/if}
@@ -1423,10 +1375,12 @@
             </label>
             <p class="ur-event-meta tabular-nums" aria-live="off">
               {Math.min(cursor + 1, shownEvents.length)} / {shownEvents.length}
-              {watchMode === 'standard' ? '· Highlights' : '· Every play'}
+              {watchMode === 'standard' ? 'Â· Highlights' : 'Â· Every play'}
               {#if scoreboardEvent}
                 <span>
-                  · Q{scoreboardEvent.period} · {clockLabel(scoreboardEvent.secondsRemaining)}</span
+                  Â· Q{scoreboardEvent.period} Â· {clockLabel(
+                    scoreboardEvent.secondsRemaining,
+                  )}</span
                 >
               {/if}
             </p>
@@ -1453,7 +1407,7 @@
                     {manifest}
                     {card}
                     compact
-                    detail={`${leader.top.points} points · Final game stats`}
+                    detail={`${leader.top.points} points Â· Final game stats`}
                   />
                 </div>{/if}
             {/each}
@@ -1464,13 +1418,13 @@
               <ul class="tabular-nums">
                 <li>
                   Top scorer (you): {facts.topHome
-                    ? `${nameOf(facts.topHome.cardId)} · ${facts.topHome.points}`
-                    : '—'}
+                    ? `${nameOf(facts.topHome.cardId)} Â· ${facts.topHome.points}`
+                    : 'â€”'}
                 </li>
                 <li>
                   Top scorer (CPU): {facts.topAway
-                    ? `${nameOf(facts.topAway.cardId)} · ${facts.topAway.points}`
-                    : '—'}
+                    ? `${nameOf(facts.topAway.cardId)} Â· ${facts.topAway.points}`
+                    : 'â€”'}
                 </li>
                 <li>Lead changes: {facts.leadChanges}</li>
                 <li>
@@ -1489,7 +1443,7 @@
                 <p class="tabular-nums">
                   +{facts.rewardCoins} Coins ({facts.rewardReason === 'game-win-reward'
                     ? 'win'
-                    : 'loss'}) · balances now {balances.Coins} Coins.
+                    : 'loss'}) Â· balances now {balances.Coins} Coins.
                 </p>
               </div>
             {/if}

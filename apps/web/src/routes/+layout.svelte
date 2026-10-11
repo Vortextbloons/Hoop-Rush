@@ -19,6 +19,7 @@
   ];
   const routeId = $derived(page.route.id);
   const isMultiplayerLobby = $derived(routeId === '/multiplayer');
+  const isHavoc = $derived(routeId?.startsWith('/havoc') === true);
   const isUltimate = $derived(routeId?.startsWith('/ultimate/run') === true);
   const showBottomNav = $derived(
     routeId === '/' || routeId === '/roster' || routeId === '/multiplayer',
@@ -45,7 +46,7 @@
 <ModeWatcher />
 
 {#if !isUltimate}
-  <header class="border-b border-border/70">
+  <header class="border-b border-border/70" class:havoc-header={isHavoc}>
     <div class="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-3 sm:px-6">
       <a
         href={homeHref}
@@ -99,7 +100,7 @@
   </header>
 {/if}
 
-<main class="min-w-0 overflow-x-clip">
+<main class="min-w-0 overflow-x-clip" class:havoc-main={isHavoc}>
   {@render children()}
 </main>
 
@@ -108,3 +109,21 @@
 {/if}
 
 <Toaster richColors closeButton theme="system" />
+
+<style>
+  .havoc-header {
+    background: #141b39;
+    border-color: #465273;
+    --color-foreground: #f2f4ff;
+    --color-primary: #ffd782;
+    --color-muted-foreground: #c1cae4;
+    --color-surface-2: #303c63;
+    --color-card: #20294c;
+    --color-border: #465273;
+    --color-ring: #f290c5;
+    color: #f2f4ff;
+  }
+  .havoc-main {
+    background: #141b39;
+  }
+</style>

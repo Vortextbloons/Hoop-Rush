@@ -85,7 +85,7 @@ const HAVOC_ROULETTE_MIN = 1;
 const HAVOC_ROULETTE_MAX = 4;
 const HAVOC_REBOUND_LOOP_EVERY = 5;
 const HAVOC_GOLDEN_ASSIST_EVERY = 4;
-const HAVOC_DOUBLE_MISS_PENALTY = -2;
+const HAVOC_DOUBLE_MISS_PENALTY = -1;
 const HAVOC_EXTRA_POSSESSION_RUSH_SECONDS = 12;
 
 export class HavocSimulationExhaustedError extends Error {
@@ -131,10 +131,12 @@ export interface HavocFieldGoalValue {
 }
 
 /**
- * Exact `(nominal + Σ addends) × Π multipliers` resolution in the stable
- * evidence order. At most one doubling multiplier applies per make: the first
+ * Exact `(nominal + Σ pre-addends) × Π multipliers + dunk bonus` resolution in
+ * the stable evidence order. Roulette and reverse-basketball apply before
+ * multipliers. At most one doubling multiplier applies per make: the first
  * active source in stable order (heat-check, putback, bounty, double-or-nothing)
- * wins. `contributions` are the incremental score deltas at the
+ * wins. The four-point-dunk bonus applies after multipliers so doublings never
+ * multiply it. `contributions` are the incremental score deltas at the
  * point each component applies; they sum to `points - nominal`.
  */
 export function havocFieldGoalValue(input: HavocFieldGoalValueInput): HavocFieldGoalValue {
@@ -148,7 +150,6 @@ export function havocFieldGoalValue(input: HavocFieldGoalValueInput): HavocField
     value += points;
   };
   if (input.roulette !== null) add('roulette', input.roulette - input.nominal);
-  if (input.fourPointDunk) add('four-point-dunk', 1);
   if (input.reverseBasketball) add('reverse-basketball', input.three ? -2 : 1);
   const multiply = (source: HavocScoringSource): void => {
     multipliers.push({ source, factor: 2 });
@@ -159,6 +160,7 @@ export function havocFieldGoalValue(input: HavocFieldGoalValueInput): HavocField
   else if (input.putback) multiply('second-chance-jackpot');
   else if (input.bounty) multiply('the-bounty');
   else if (input.doubleOrNothing) multiply('double-or-nothing');
+  if (input.fourPointDunk) add('four-point-dunk', 1);
   return { addends, multipliers, points: value, contributions };
 }
 

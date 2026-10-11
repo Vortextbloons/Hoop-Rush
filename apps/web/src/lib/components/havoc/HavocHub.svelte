@@ -20,6 +20,9 @@
   async function abandon() {
     if (await hub.abandon()) onAbandoned();
   }
+  async function discardStale() {
+    if (await hub.discardStaleRun()) onAbandoned();
+  }
 </script>
 
 <section class="h-shell" data-havoc-hub>
@@ -81,6 +84,11 @@
         >{/if}
     </section>
     {#if hub.error !== null}<p class="h-alert" role="alert">{hub.error}</p>{/if}
+    {#if hub.error !== null && hub.isUnsupportedVersionError()}<button
+        class="h-button mt-4"
+        data-havoc-discard-stale
+        onclick={() => void discardStale()}>Discard outdated run and start fresh</button
+      >{/if}
     {#if hub.notice !== null}<p class="h-alert" role="status">{hub.notice}</p>{/if}
     <div class="mt-6"><HavocLineupLock slots={run.lineup} /></div>
     {#if !hub.busy}<button

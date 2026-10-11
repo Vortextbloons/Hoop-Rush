@@ -133,5 +133,6 @@ export interface HavocService {
   readComparison(): Promise<HavocComparison | null>;
   readReport(): Promise<HavocReport | null>;
   abandon(): Promise<HavocCommandResult>;
+  discardStaleActiveRun(): Promise<void>;
   dispose(): void;
 }

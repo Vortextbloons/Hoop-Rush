@@ -9,13 +9,8 @@ import {
   foldHavocSeasonStats,
   type HavocSeasonStats,
 } from '$lib/components/havoc/havoc-presentation';
-import { HavocServiceError } from './havoc-service-contract.ts';
 import { HavocGamecastState } from './havoc-gamecast-state.svelte.ts';
-
-function errorMessageOf(error: unknown): string {
-  if (error instanceof HavocServiceError) return error.message;
-  return error instanceof Error ? error.message : String(error);
-}
+import { errorMessageOf } from './havoc-state-util.ts';
 
 export class HavocHubState {
   run = $state.raw<HavocRunView | null>(null);
@@ -257,6 +252,31 @@ export class HavocHubState {
       this.run = null;
       this.games = [];
       this.seasonStats = null;
+      return true;
+    } catch (error) {
+      if (!this.isDestroyed()) this.error = errorMessageOf(error);
+      return false;
+    } finally {
+      if (!this.isDestroyed()) this.busy = false;
+    }
+  }
+
+  isUnsupportedVersionError(): boolean {
+    return this.error !== null && this.error.includes('havoc-rules-v');
+  }
+
+  async discardStaleRun(): Promise<boolean> {
+    if (this.busy) return false;
+    this.busy = true;
+    this.error = null;
+    try {
+      await this.service.discardStaleActiveRun();
+      if (this.isDestroyed()) return false;
+      this.closeGamecast();
+      this.run = null;
+      this.games = [];
+      this.seasonStats = null;
+      this.notice = 'The outdated run was discarded. Start a fresh draft.';
       return true;
     } catch (error) {
       if (!this.isDestroyed()) this.error = errorMessageOf(error);

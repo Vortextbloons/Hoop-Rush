@@ -31,7 +31,7 @@ import {
   resolveSeasonArtifact,
 } from './season-data.ts';
 import { rosterCalibrationSeed } from './season-rosters.ts';
-import { percentile } from '../stats.ts';
+import { lowerMedian, percentile } from '../stats.ts';
 import { commitTargetsArtifact } from '../artifact.ts';
 import {
   createSeedChunkRunner,
@@ -325,10 +325,6 @@ export function runSeasonDraftCalibrationSeeds(args: {
     }),
   );
 }
-function median(values: readonly number[]): number {
-  const sorted = [...values].sort((a, b) => a - b);
-  return sorted[Math.floor(sorted.length / 2)] ?? 0;
-}
 function distribution(values: readonly number[]): {
   median: number;
   range: [number, number];
@@ -338,7 +334,7 @@ function distribution(values: readonly number[]): {
 } {
   const sorted = [...values].sort((a, b) => a - b);
   return {
-    median: median(sorted),
+    median: lowerMedian(sorted),
     range: [percentile(sorted, 0.01), percentile(sorted, 0.99)],
     min: sorted[0] ?? 0,
     max: sorted[sorted.length - 1] ?? 0,

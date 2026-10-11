@@ -343,3 +343,89 @@
 .havoc-world .h-affected-grid dt {
   font-size: 10px;
 }
+
+.havoc-world .h-card-body {
+  flex: none;
+}
+.havoc-world .h-card-scroll {
+  height: 360px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  overscroll-behavior-y: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.havoc-world .h-card-scroll::-webkit-scrollbar {
+  display: none;
+}
+.havoc-world .h-card-scroll:focus-visible {
+  outline: 2px solid var(--h-pink);
+  outline-offset: 3px;
+}
+.havoc-world {
+  --color-surface-1: #20294c;
+  --color-surface-2: #303c63;
+  --color-card: #20294c;
+  --color-border: #465273;
+  --color-muted-foreground: #c1cae4;
+  --color-foreground: #f2f4ff;
+  --color-primary: #ffd782;
+  --color-primary-foreground: #141b39;
+}
+
+.h-result-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: #060b24b3;
+  backdrop-filter: blur(4px);
+}
+.havoc-world.h-result-dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 61;
+  width: min(720px, calc(100vw - 24px));
+  max-height: calc(100dvh - 32px);
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: #20294c;
+  border: 1px solid #465273;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 24px 80px #060b2466;
+}
+.havoc-world.h-result-dialog .h-header {
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.havoc-world.h-result-dialog .h-subtitle {
+  font-size: 1.5rem;
+}
+@media (max-width: 600px) {
+  .havoc-world.h-result-dialog {
+    padding: 18px;
+  }
+}
+
+@media (max-width: 600px) {
+  .havoc-world .h-shell {
+    padding: 24px 12px 40px;
+  }
+  .havoc-world.h-result-dialog {
+    width: calc(100vw - 16px);
+    max-height: calc(100dvh - 16px);
+    padding: 16px;
+  }
+  .havoc-world.h-result-dialog .h-header {
+    align-items: flex-start;
+  }
+  .havoc-world.h-result-dialog .h-button {
+    padding: 10px 14px;
+    min-height: 44px;
+    flex-shrink: 0;
+  }
+}

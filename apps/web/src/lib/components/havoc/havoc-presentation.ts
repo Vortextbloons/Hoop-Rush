@@ -245,7 +245,7 @@ export function havocEventTextOf(event: HavocEvent, context: HavocEventNameConte
     case 'great-equalizer':
       return `The Great Equalizer ${event.outcome} — ${String(event.cappedInstanceIds.length)} opponent${event.cappedInstanceIds.length === 1 ? '' : 's'} capped`;
     case 'four-point-dunk':
-      return `${name(event.shooterInstanceId)} four-point dunk (+2)`;
+      return `${name(event.shooterInstanceId)} four-point dunk (+1)`;
     case 'golden-assist':
       return `${name(event.assisterInstanceId)} golden assist (+1)`;
     case 'heat-check':
@@ -281,11 +281,16 @@ export function havocScoringTextOf(
   if (entry.kind !== 'adjustment') {
     parts.push(`${String(entry.nominalPoints)} nominal`);
   }
+  const dunkAddends = entry.addends.filter((addend) => addend.source === 'four-point-dunk');
   for (const addend of entry.addends) {
+    if (addend.source === 'four-point-dunk') continue;
     parts.push(`${havocScoringSourceLabel(addend.source)} ${formatSignedPoints(addend.points)}`);
   }
   for (const multiplier of entry.multipliers) {
     parts.push(`${havocScoringSourceLabel(multiplier.source)} ×2`);
+  }
+  for (const addend of dunkAddends) {
+    parts.push(`${havocScoringSourceLabel(addend.source)} ${formatSignedPoints(addend.points)}`);
   }
   const label =
     entry.kind === 'field-goal'
@@ -437,4 +442,14 @@ export function havocFieldLabel(field: string): string {
 
 export function mutationEntriesSummary(entries: readonly HavocMutationEntry[]): string {
   return entries.map((entry) => mutationNameOf(entry.mutationId)).join(', ');
+}
+
+export function havocDeltaTitle(winsGained: number): string {
+  if (winsGained >= 20) return 'Game changers';
+  if (winsGained >= 10) return 'Power surge';
+  if (winsGained > 0) return 'Extra edge';
+  if (winsGained == 0) return 'Even split';
+  if (winsGained > -10) return 'Power tradeoff';
+  if (winsGained > -20) return 'Backfire';
+  return 'Havoc overload';
 }

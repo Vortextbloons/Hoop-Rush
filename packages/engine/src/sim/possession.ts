@@ -45,6 +45,49 @@ import { ENGINE_CONSTANTS } from './constants.ts';
 import { creationScore } from '../domain/archetypes.ts';
 import type { SeasonHomeCourtMechanisms } from '../season/home-court.ts';
 import type { SeasonEffectsHook } from '../season/effects.ts';
+
+const HAVOC_RUSH_MAX_VIOLATION = 0.25;
+const HAVOC_RUSH_VIOLATION_SCALE = 0.35;
+const HAVOC_RUSH_MIN_MAKE_PENALTY = 0.02;
+const HAVOC_RUSH_MAKE_PENALTY_SCALE = 0.3;
+const HAVOC_RUSH_MAX_MAKE_PENALTY = 0.1;
+
+export interface HavocRushResolution {
+  /** The shortened clock expired before any attempt. */
+  violation: boolean;
+  /** Make-probability penalty charged to the hurried attempt (fractions). */
+  makePenalty: number;
+}
+
+/**
+ * Resolve a possession whose natural duration exceeds its active shot clock.
+ *
+ * The overrun fraction (`(natural - limit) / natural`) drives both outcomes: a
+ * calibrated share of possessions still expires without a shot, and the rest
+ * attempt a hurried shot at reduced quality. This replaces the old behaviour
+ * that turned every shortened-clock possession into a violation.
+ */
+export function resolveHavocRushedPossession(
+  rng: Rng,
+  naturalSeconds: number,
+  limitSeconds: number,
+): HavocRushResolution {
+  const overrun =
+    naturalSeconds > 0
+      ? Math.min(1, Math.max(0, (naturalSeconds - limitSeconds) / naturalSeconds))
+      : 0;
+  const violationProbability = Math.min(
+    HAVOC_RUSH_MAX_VIOLATION,
+    overrun * HAVOC_RUSH_VIOLATION_SCALE,
+  );
+  const violation = rng.chance(violationProbability);
+  const makePenalty = Math.min(
+    HAVOC_RUSH_MAX_MAKE_PENALTY,
+    HAVOC_RUSH_MIN_MAKE_PENALTY + overrun * HAVOC_RUSH_MAKE_PENALTY_SCALE,
+  );
+  return { violation, makePenalty };
+}
+
 export interface TripResolution {
   secondsElapsed: number;
   ended: boolean;
@@ -170,6 +213,7 @@ export class PossessionStepper {
   private handlerSlot = 0;
   private shooterVersion: string | undefined;
   private defenderVersion: string | undefined;
+  private rushMakePenalty = 0;
   private readonly tripRebounds: [number, number] = [0, 0];
   constructor(ctx: TripContext, offenseSide: SideIndex) {
     this.ctx = ctx;
@@ -294,19 +338,35 @@ export class PossessionStepper {
           )
         : Math.max(raw, ENGINE_CONSTANTS.minimumTripSeconds);
     if (planned > clock.remaining && planned <= state.secondsRemaining) {
-      const team = teams[offense];
-      const teamPrep = preps[offense];
-      const handler = rng.weightedPick(team.players, teamPrep.initiatorPickTable);
-      const handlerSlot = slotOf(teamPrep, handler);
-      this.handlerVersion = handler.playerVersionId;
-      this.handlerSlot = handlerSlot >= 0 ? handlerSlot : 0;
-      consumeTime(state, Math.min(Math.max(0, clock.remaining), state.secondsRemaining));
+      // The active clock is shorter than this possession would naturally run.
+      // Resolve it as a rushed possession instead of an automatic violation: a
+      // calibrated share still expires, the rest burn the clock and attempt a
+      // hurried shot at reduced quality.
+      const rush = resolveHavocRushedPossession(rng, planned, clock.remaining);
+      if (rush.violation) {
+        const team = teams[offense];
+        const teamPrep = preps[offense];
+        const handler = rng.weightedPick(team.players, teamPrep.initiatorPickTable);
+        const handlerSlot = slotOf(teamPrep, handler);
+        this.handlerVersion = handler.playerVersionId;
+        this.handlerSlot = handlerSlot >= 0 ? handlerSlot : 0;
+        consumeTime(state, Math.min(Math.max(0, clock.remaining), state.secondsRemaining));
+        clock.remaining = 0;
+        recorder.shotClockViolation(offense, this.handlerSlot);
+        havoc.onShotClockViolation(offense, full);
+        recorder.possession(offense);
+        this.ctx.possessionStart = 'deadBall';
+        return this.endedStep(true);
+      }
+      const rushed = consumeTime(
+        state,
+        Math.min(Math.max(0, clock.remaining), state.secondsRemaining),
+      );
       clock.remaining = 0;
-      recorder.shotClockViolation(offense, this.handlerSlot);
-      havoc.onShotClockViolation(offense, full);
-      recorder.possession(offense);
-      this.ctx.possessionStart = 'deadBall';
-      return this.endedStep(true);
+      this.rushMakePenalty = rush.makePenalty;
+      this.deadBall = rushed >= this.startedRemaining - ENGINE_CONSTANTS.minimumStartSeconds;
+      this.phase = 'security';
+      return { ended: false, pause: false, periodEnded: false, finished: false };
     }
     const consumed = consumeTime(state, Math.min(planned, state.secondsRemaining));
     clock.remaining = Math.max(0, clock.remaining - consumed);
@@ -480,7 +540,14 @@ export class PossessionStepper {
     const { recorder } = this.ctx;
     const offense = this.offenseSide;
     const defense = (1 - offense) as SideIndex;
-    const outcome = resolveShot(this.ctx, offense, defense, this.deadBall, this.tripRebounds);
+    const outcome = resolveShot(
+      this.ctx,
+      offense,
+      defense,
+      this.deadBall,
+      this.tripRebounds,
+      this.rushMakePenalty,
+    );
     this.shooterVersion = outcome.shooterVersion;
     this.defenderVersion = outcome.defenderVersion;
     if (!outcome.continues) {
@@ -801,6 +868,7 @@ function resolveShot(
   defenseSide: SideIndex,
   deadBall: boolean,
   reboundCounter: [number, number],
+  rushMakePenalty = 0,
 ): ShotOutcome {
   const { rng, recorder, state, profile } = ctx;
   const havoc = ctx.havoc;
@@ -872,7 +940,7 @@ function resolveShot(
       : {
           contestScale: havocPlan.coverage.contestScale,
           contestPointDelta: havocPlan.coverage.contestPointDelta,
-          makePointDelta: havocPlan.coverage.makePointDelta,
+          makePointDelta: havocPlan.coverage.makePointDelta - rushMakePenalty,
           shooterEvidence: havoc?.evidenceOf(shooter),
           defenderEvidence: havoc?.evidenceOf(defender),
         };

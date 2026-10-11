@@ -31,6 +31,14 @@
     },
     {
       code: '03',
+      name: 'Hoop Havoc',
+      line: 'Draft five mutated freaks, then chase 82-0 against the frozen gauntlet.',
+      status: 'available',
+      cta: 'Start Havoc',
+      href: '/havoc' as any,
+    },
+    {
+      code: '04',
       name: 'Season Run',
       line: '10-round draft. Build 10, then play 82 games.',
       status: 'available',
@@ -38,20 +46,12 @@
       href: '/season' as any,
     },
     {
-      code: '04',
+      code: '05',
       name: 'Ultimate Run',
       line: 'Claim a starter, open seeded packs, grow one permanent collection.',
       status: 'available',
       cta: 'Open collection',
       href: '/ultimate/run' as any,
-    },
-    {
-      code: '05',
-      name: 'Hoop Havoc',
-      line: 'Draft five mutated freaks, then chase 82-0 against the frozen gauntlet.',
-      status: 'available',
-      cta: 'Start Havoc',
-      href: '/havoc' as any,
     },
   ] as const;
   let manifest = $state<HoopRushManifest | null>(null);
@@ -59,9 +59,9 @@
   let classicDraft = $state.raw<ClassicDraftState | null>(null);
   let recent = $state.raw<CompletedRunIndex[]>([]);
   let seasonRun = $state.raw<SeasonActiveRunIndex | null>(null);
-  const playersIndexModes = new Set(['01', '02', '03']);
-  function warmPlayersIndexForMode(modeCode: string): void {
-    if (!playersIndexModes.has(modeCode)) return;
+  const playersIndexHrefs = new Set(['/classic', '/sandbox', '/season']);
+  function warmPlayersIndexForMode(modeHref: string): void {
+    if (!playersIndexHrefs.has(modeHref)) return;
     if (
       typeof navigator !== 'undefined' &&
       (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData ===
@@ -188,14 +188,14 @@
         <a
           href={resolve(mode.href)}
           data-sveltekit-preload-code="hover"
-          onpointerenter={() => warmPlayersIndexForMode(mode.code)}
-          onfocus={() => warmPlayersIndexForMode(mode.code)}
-          class="group flex h-full flex-col rounded-xl bg-card p-6 outline-none transition-colors hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring sm:p-7 {mode.code ===
-          '04'
+          onpointerenter={() => warmPlayersIndexForMode(mode.href)}
+          onfocus={() => warmPlayersIndexForMode(mode.href)}
+          class="group flex h-full flex-col rounded-xl bg-card p-6 outline-none transition-colors hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring sm:p-7 {mode.href ===
+          '/ultimate/run'
             ? 'border border-accent/60'
             : ''}"
         >
-          {#if mode.code === '04'}
+          {#if mode.href === '/ultimate/run'}
             <img
               src={asset('/ultimate/logo.png')}
               alt=""

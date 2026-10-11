@@ -1,11 +1,6 @@
 import type { HavocDraftState } from '@hoop-rush/data-contracts';
 import type { HavocRunView, HavocService } from './havoc-service-contract.ts';
-import { HavocServiceError } from './havoc-service-contract.ts';
-
-function errorMessageOf(error: unknown): string {
-  if (error instanceof HavocServiceError) return error.message;
-  return error instanceof Error ? error.message : String(error);
-}
+import { errorMessageOf } from './havoc-state-util.ts';
 
 export class HavocDraftController {
   run = $state.raw<HavocRunView | null>(null);
@@ -77,6 +72,26 @@ export class HavocDraftController {
     const accepted = await this.runCommand(() => this.service.lockLineup());
     if (accepted) this.locked = true;
     return accepted;
+  }
+
+  isUnsupportedVersionError(): boolean {
+    return this.error !== null && this.error.includes('havoc-rules-v');
+  }
+
+  async discardStaleRun(): Promise<boolean> {
+    if (this.busy) return false;
+    this.busy = true;
+    this.error = null;
+    try {
+      await this.service.discardStaleActiveRun();
+      await this.load();
+      return true;
+    } catch (error) {
+      this.error = errorMessageOf(error);
+      return false;
+    } finally {
+      this.busy = false;
+    }
   }
 
   destroy(): void {

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
-  import { Zap, ArrowRight, Trophy } from '@lucide/svelte';
+  import { Zap, ArrowRight } from '@lucide/svelte';
   import type { HavocDraftController } from '$lib/havoc/havoc-draft-state.svelte';
   import HavocDraftBoard from './HavocDraftBoard.svelte';
   let {
@@ -76,12 +76,6 @@
           >
         </div>
       </div>
-      <div class="h-challenge">
-        <Trophy size={48} strokeWidth={1.5} /><span class="h-eyebrow"
-          >The perfect season challenge</span
-        ><strong>82–0</strong>
-        <p>Five players. Thirty opponents.<br />One impossible-looking mission.</p>
-      </div>
     </div>
     <ol class="h-steps">
       <li><strong>1</strong> Pick five powered-up legends</li>
@@ -103,52 +97,20 @@
         class="h-button secondary mt-3"
         onclick={() => void controller.load()}>Try again</button
       >
+      {#if controller.isUnsupportedVersionError()}<button
+          class="h-button mt-3"
+          data-havoc-discard-stale
+          onclick={() => void controller.discardStaleRun()}
+          >Discard outdated run and start fresh</button
+        >{/if}
     </div>{/if}
 </section>
 
 <style>
   .h-intro {
-    display: grid;
-    grid-template-columns: 1.5fr 1fr;
-    gap: 48px;
-    align-items: center;
     padding: 32px 0;
   }
   h1 span {
     color: #f290c5;
-  }
-  .h-challenge {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 18px;
-    background: #20294c;
-    border: 2px solid #ffd782;
-    border-radius: 50% 50% 24px 24px;
-    padding: 48px 24px;
-    color: #ffd782;
-    text-align: center;
-    transform: rotate(3deg);
-  }
-  .h-challenge strong {
-    font-family: var(--font-display);
-    font-size: 6rem;
-    font-weight: 900;
-    line-height: 1;
-  }
-  .h-challenge p {
-    color: #c1cae4;
-    font-size: 14px;
-  }
-  @media (max-width: 760px) {
-    .h-intro {
-      grid-template-columns: 1fr;
-      gap: 28px;
-    }
-    .h-challenge {
-      transform: none;
-      padding: 28px;
-      border-radius: 24px;
-    }
   }
 </style>

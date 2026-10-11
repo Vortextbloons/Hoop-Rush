@@ -204,7 +204,7 @@ export const HAVOC_MUTATION_DEFINITIONS: readonly HavocMutationDefinition[] = [
     mutationId: 'four-point-dunk',
     tier: 2,
     name: 'Four-Point Dunk',
-    description: 'A made dunk scores one extra point, added before any multipliers.',
+    description: 'A made dunk scores one extra point, added after any multipliers.',
     downside: 'Caps three-point at 30 and raises turnover rate to 20.',
     operations: [
       { op: 'cap-rating', field: 'threePoint', value: 30 },
@@ -353,7 +353,7 @@ export const HAVOC_MUTATION_DEFINITIONS: readonly HavocMutationDefinition[] = [
     tier: 3,
     name: 'Double or Nothing',
     description: "Doubles the owner's team made field goals.",
-    downside: 'Every missed field goal or free throw subtracts two points; scores can go negative.',
+    downside: 'Every missed field goal or free throw subtracts one point; scores can go negative.',
     operations: [],
     eventRules: ['double-or-nothing'],
   }),

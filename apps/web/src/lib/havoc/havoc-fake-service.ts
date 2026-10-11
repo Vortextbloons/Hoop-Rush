@@ -1098,6 +1098,10 @@ export class FakeHavocService implements HavocService {
     });
   }
 
+  async discardStaleActiveRun(): Promise<void> {
+    this.runState = null;
+  }
+
   dispose(): void {
     this.listeners.clear();
   }
@@ -1485,9 +1489,9 @@ export function buildNegativeScoreTape(gameNumber = 1): HavocGameTape {
       actorInstanceId: instanceId,
       beneficiaryInstanceId: null,
       nominalPoints: -1,
-      addends: [{ source: 'double-or-nothing', points: -2 }],
+      addends: [{ source: 'double-or-nothing', points: -1 }],
       multipliers: [],
-      points: -2,
+      points: -1,
       owners: [],
       originalEventSequence: null,
     });
@@ -1499,7 +1503,7 @@ export function buildNegativeScoreTape(gameNumber = 1): HavocGameTape {
     gameNumber,
     period: 4,
     clockSeconds: 0,
-    homeScore: -8,
+    homeScore: -3,
     awayScore: 3,
     winner: 'away',
   });
@@ -2041,14 +2045,18 @@ function sumStatLines(lines: readonly HavocStatLine[]): HavocStatLine {
   return total;
 }
 
+function havocMvpIndexOf(line: HavocStatLine): number {
+  return (
+    HAVOC_MVP_INDEX_WEIGHTS.points * line.points +
+    HAVOC_MVP_INDEX_WEIGHTS.rebounds * line.rebounds.total +
+    HAVOC_MVP_INDEX_WEIGHTS.assists * line.assists +
+    HAVOC_MVP_INDEX_WEIGHTS.steals * line.steals +
+    HAVOC_MVP_INDEX_WEIGHTS.blocks * line.blocks +
+    HAVOC_MVP_INDEX_WEIGHTS.turnovers * line.turnovers
+  );
+}
+
 function statDeltaOf(havoc: HavocStatLine, normal: HavocStatLine): HavocStatDelta {
-  const index = (line: HavocStatLine): number =>
-    10 * line.points +
-    12 * line.rebounds.total +
-    15 * line.assists +
-    30 * line.steals +
-    30 * line.blocks -
-    10 * line.turnovers;
   return {
     secondsPlayed: havoc.secondsPlayed - normal.secondsPlayed,
     minutes: havoc.minutes - normal.minutes,
@@ -2068,7 +2076,7 @@ function statDeltaOf(havoc: HavocStatLine, normal: HavocStatLine): HavocStatDelt
     turnovers: havoc.turnovers - normal.turnovers,
     fouls: havoc.fouls - normal.fouls,
     adjustments: havoc.adjustments - normal.adjustments,
-    productionIndex: index(havoc) - index(normal),
+    productionIndex: havocMvpIndexOf(havoc) - havocMvpIndexOf(normal),
   };
 }
 
@@ -2137,13 +2145,6 @@ function buildFakeSlots(): HavocSlotComparison[] {
     });
     const havocCombined = sumStatLines(havocLines.map((entry) => entry.line));
     const normalCombined = normalStarter;
-    const indexOf = (line: HavocStatLine): number =>
-      10 * line.points +
-      12 * line.rebounds.total +
-      15 * line.assists +
-      30 * line.steals +
-      30 * line.blocks -
-      10 * line.turnovers;
     return havocSlotComparisonSchema.parse({
       slot,
       displayName: HUMAN_STARTER_NAMES[index] ?? 'Marcus Webb',
@@ -2163,9 +2164,9 @@ function buildFakeSlots(): HavocSlotComparison[] {
       },
       deltas: statDeltaOf(havocCombined, normalCombined),
       productionIndex: {
-        havoc: indexOf(havocCombined),
-        normal: indexOf(normalCombined),
-        gain: indexOf(havocCombined) - indexOf(normalCombined),
+        havoc: havocMvpIndexOf(havocCombined),
+        normal: havocMvpIndexOf(normalCombined),
+        gain: havocMvpIndexOf(havocCombined) - havocMvpIndexOf(normalCombined),
       },
     });
   });

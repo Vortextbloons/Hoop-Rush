@@ -11,8 +11,7 @@
     "lint": "prettier --cache --check src vitest.config.ts svelte.config.js eslint.config.js && eslint --cache .",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:unit": "vitest run --config vitest.config.ts src/lib",
-    "test:components": "vitest run src/lib/components/__tests__"
+    "test:unit": "vitest run --config vitest.config.ts src/lib"
   },
   "dependencies": {
     "@hoop-rush/data-contracts": "workspace:*",
@@ -32,11 +31,9 @@
     "@sveltejs/kit": "^2.70.2",
     "@sveltejs/vite-plugin-svelte": "^7.2.0",
     "@tailwindcss/vite": "^4.3.3",
-    "@testing-library/svelte": "^5.4.2",
     "@types/node": "catalog:",
     "eslint": "catalog:",
     "eslint-plugin-svelte": "^3.22.0",
-    "jsdom": "^30.0.1",
     "svelte": "^5.56.8",
     "svelte-check": "^4.7.4",
     "tailwindcss": "^4.3.3",

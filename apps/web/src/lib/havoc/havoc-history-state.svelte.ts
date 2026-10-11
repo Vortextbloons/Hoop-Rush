@@ -1,16 +1,11 @@
 import type { HavocComparison, HavocReport } from '@hoop-rush/data-contracts';
 import type { HavocHistoryView, HavocRunView, HavocService } from './havoc-service-contract.ts';
-import { HavocServiceError } from './havoc-service-contract.ts';
+import { errorMessageOf } from './havoc-state-util.ts';
 
 export interface HavocHistoryDetail {
   run: HavocRunView;
   report: HavocReport | null;
   comparison: HavocComparison | null;
-}
-
-function errorMessageOf(error: unknown): string {
-  if (error instanceof HavocServiceError) return error.message;
-  return error instanceof Error ? error.message : String(error);
 }
 
 export class HavocHistoryState {

@@ -39,9 +39,9 @@ describe('HavocGamecastState', () => {
     const gamecast = await openGamecast(service);
     gamecast.advance(10000);
     expect(gamecast.finished).toBe(true);
-    expect(gamecast.humanScore).toBe(-8);
+    expect(gamecast.humanScore).toBe(-3);
     expect(gamecast.opponentScore).toBe(3);
-    expect(gamecast.announcement).toContain('-8');
+    expect(gamecast.announcement).toContain('-3');
     gamecast.destroy();
   });
 

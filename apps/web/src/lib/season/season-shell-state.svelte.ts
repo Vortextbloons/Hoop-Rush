@@ -3,14 +3,12 @@ import type {
   PlayersIndexEntry,
   SeasonActiveRunIndex,
   SeasonDraftCatalog,
-  SeasonFreeAgencyRoleExpectation,
   SeasonFreeAgencyState,
   SeasonHealthState,
   SeasonInfluenceState,
   SeasonInvalidRosterInterruption,
   SeasonLeague,
   SeasonPendingBlockCandidate,
-  SeasonPostseasonRotationPayload,
   SeasonRun,
   SeasonSchedule,
   SeasonTeam,
@@ -23,13 +21,13 @@ import type {
   SeasonHubState,
   SeasonRunLoadDiagnostic,
   SeasonRunCommandError,
-  SeasonSpendInfluencePurpose,
   SeasonTradeReceipt,
 } from './season-hub-state';
 import type { HubPostseasonProgress } from './season-postseason-presentation';
 import type { SeasonFaceRef } from './season-branding';
 import type { RotationEditor } from './season-rotation-editor';
 import type { SeasonRunShellData } from './season-shell-context';
+import { idleBlockRunState, idlePostseasonProgress } from './season-shell-context';
 export class SeasonRunShell implements SeasonRunShellData {
   ready = $state(false);
   error = $state<SeasonRunLoadDiagnostic | null>(null);
@@ -37,22 +35,7 @@ export class SeasonRunShell implements SeasonRunShellData {
   hub = $state<SeasonHubState | null>(null);
   snapshot = $state.raw<SeasonRunSnapshot | null>(null);
   index = $state<SeasonActiveRunIndex | null>(null);
-  block = $state<BlockRunState>({
-    requestId: null,
-    blockIndex: null,
-    phase: 'idle',
-    gamesCompleted: 0,
-    gamesTotal: 0,
-    latestGameId: null,
-    latestResult: null,
-    isHumanGame: false,
-    humanRecordInBlock: { wins: 0, losses: 0 },
-    humanResults: [],
-    leaguePulse: { closest: null, blowout: null, highestScoring: null },
-    error: null,
-    command: null,
-    startInput: null,
-  });
+  block = $state<BlockRunState>(idleBlockRunState());
   manifest = $state.raw<HoopRushManifest | null>(null);
   league = $state.raw<SeasonLeague | null>(null);
   catalog = $state.raw<SeasonDraftCatalog | null>(null);
@@ -85,136 +68,42 @@ export class SeasonRunShell implements SeasonRunShellData {
   } | null>(null);
   acknowledgeExternalChange = (): void => {};
   prewarmWorker = (): void => {};
-  playerName = (playerVersionId: string): string => {
-    void playerVersionId;
-    return '—';
-  };
-  playablePositions = (playerVersionId: string): readonly string[] => {
-    void playerVersionId;
-    return [];
-  };
-  franchiseName = (franchiseId: string): string => {
-    void franchiseId;
-    return '—';
-  };
-  franchiseAbbrev = (franchiseId: string): string => {
-    void franchiseId;
-    return '—';
-  };
+  playerName: SeasonRunShellData['playerName'] = () => '—';
+  playablePositions: SeasonRunShellData['playablePositions'] = () => [];
+  franchiseName: SeasonRunShellData['franchiseName'] = () => '—';
+  franchiseAbbrev: SeasonRunShellData['franchiseAbbrev'] = () => '—';
   cancelBlock = (): void => {};
   retryBlock = (): void => {};
   refresh = async (): Promise<void> => {};
-  quitRun = (): Promise<{
-    ok: boolean;
-    error: string | null;
-  }> => Promise.resolve({ ok: false, error: 'season shell not ready' });
-  spendInfluence = (input: {
-    purpose: SeasonSpendInfluencePurpose;
-    windowIndex?: number;
-    injuryId?: string;
-  }): Promise<void> => {
-    void input;
-    return Promise.resolve();
-  };
-  acceptTradeOffer = (input: { windowIndex: number; offerId: string }): Promise<void> => {
-    void input;
-    return Promise.resolve();
-  };
-  declineTradeOffer = (input: { windowIndex: number; offerId: string }): Promise<void> => {
-    void input;
-    return Promise.resolve();
-  };
-  declareFreeAgentInterest = (input: {
-    windowIndex: number;
-    targets: {
-      playerVersionId: string;
-      roleExpectation: SeasonFreeAgencyRoleExpectation;
-      influence: number;
-    }[];
-  }): Promise<void> => {
-    void input;
-    return Promise.resolve();
-  };
-  skipFreeAgentMarket = (input: { windowIndex: number }): Promise<void> => {
-    void input;
-    return Promise.resolve();
-  };
-  resolveFreeAgentMarket = (input: { windowIndex: number }): Promise<void> => {
-    void input;
-    return Promise.resolve();
-  };
+  quitRun: SeasonRunShellData['quitRun'] = () =>
+    Promise.resolve({ ok: false, error: 'season shell not ready' });
+  spendInfluence: SeasonRunShellData['spendInfluence'] = () => Promise.resolve();
+  acceptTradeOffer: SeasonRunShellData['acceptTradeOffer'] = () => Promise.resolve();
+  declineTradeOffer: SeasonRunShellData['declineTradeOffer'] = () => Promise.resolve();
+  declareFreeAgentInterest: SeasonRunShellData['declareFreeAgentInterest'] = () =>
+    Promise.resolve();
+  skipFreeAgentMarket: SeasonRunShellData['skipFreeAgentMarket'] = () => Promise.resolve();
+  resolveFreeAgentMarket: SeasonRunShellData['resolveFreeAgentMarket'] = () => Promise.resolve();
   forfeitInterruptedGame = (): Promise<void> => Promise.resolve();
   resumeBlock = (): Promise<void> => Promise.resolve();
-  selectFrontOffice = (input: { executiveId: string }): Promise<void> => {
-    void input;
-    return Promise.resolve();
-  };
-  selectCourtInnovation = (input: { innovationId: string }): Promise<void> => {
-    void input;
-    return Promise.resolve();
-  };
-  openTradeInquiry = (input: { windowIndex: number; toFranchiseId: string }): Promise<void> => {
-    void input;
-    return Promise.resolve();
-  };
-  submitTradeProposal = (input: {
-    windowIndex: number;
-    toFranchiseId: string;
-    outgoingPlayerVersionIds: string[];
-    incomingPlayerVersionIds: string[];
-    influenceAmount: number;
-    influenceFromSender: string | null;
-  }): Promise<void> => {
-    void input;
-    return Promise.resolve();
-  };
-  respondToTradeCounter = (input: {
-    windowIndex: number;
-    inquiryId: string;
-    accept: boolean;
-  }): Promise<void> => {
-    void input;
-    return Promise.resolve();
-  };
-  walkAwayFromTrade = (input: { windowIndex: number; inquiryId: string }): Promise<void> => {
-    void input;
-    return Promise.resolve();
-  };
-  purchaseTradeInquiry = (input: { windowIndex: number }): Promise<void> => {
-    void input;
-    return Promise.resolve();
-  };
+  selectFrontOffice: NonNullable<SeasonRunShellData['selectFrontOffice']> = () => Promise.resolve();
+  selectCourtInnovation: NonNullable<SeasonRunShellData['selectCourtInnovation']> = () =>
+    Promise.resolve();
+  openTradeInquiry: NonNullable<SeasonRunShellData['openTradeInquiry']> = () => Promise.resolve();
+  submitTradeProposal: NonNullable<SeasonRunShellData['submitTradeProposal']> = () =>
+    Promise.resolve();
+  respondToTradeCounter: NonNullable<SeasonRunShellData['respondToTradeCounter']> = () =>
+    Promise.resolve();
+  walkAwayFromTrade: NonNullable<SeasonRunShellData['walkAwayFromTrade']> = () => Promise.resolve();
+  purchaseTradeInquiry: NonNullable<SeasonRunShellData['purchaseTradeInquiry']> = () =>
+    Promise.resolve();
   startPostseason = (): Promise<void> => Promise.resolve();
-  advancePostseason = (input?: { targetGameId?: string }): Promise<void> => {
-    void input;
-    return Promise.resolve();
-  };
-  forfeitPostseasonGame = (input: { targetGameId: string }): Promise<void> => {
-    void input;
-    return Promise.resolve();
-  };
-  submitPostseasonRotation = (input: {
-    targetGameId: string;
-    rotation: SeasonPostseasonRotationPayload;
-  }): Promise<void> => {
-    void input;
-    return Promise.resolve();
-  };
-  spectatePostseasonGame = (input: { targetGameId: string }): Promise<void> => {
-    void input;
-    return Promise.resolve();
-  };
-  fastForwardPostseason = (input?: { targetGameId?: string }): Promise<void> => {
-    void input;
-    return Promise.resolve();
-  };
+  advancePostseason: SeasonRunShellData['advancePostseason'] = () => Promise.resolve();
+  forfeitPostseasonGame: SeasonRunShellData['forfeitPostseasonGame'] = () => Promise.resolve();
+  submitPostseasonRotation: SeasonRunShellData['submitPostseasonRotation'] = () =>
+    Promise.resolve();
+  spectatePostseasonGame: SeasonRunShellData['spectatePostseasonGame'] = () => Promise.resolve();
+  fastForwardPostseason: SeasonRunShellData['fastForwardPostseason'] = () => Promise.resolve();
   cancelPostseason = (): void => {};
-  postseason = $state<HubPostseasonProgress>({
-    phase: 'idle',
-    gamesCompleted: 0,
-    gamesTotal: 0,
-    latestGameId: null,
-    latestResult: null,
-    error: null,
-  });
+  postseason = $state<HubPostseasonProgress>(idlePostseasonProgress());
 }

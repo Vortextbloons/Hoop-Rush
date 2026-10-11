@@ -16,7 +16,7 @@ import {
   havocPeriodLabel,
   havocScoringTextOf,
 } from '$lib/components/havoc/havoc-presentation';
-import { HavocServiceError } from './havoc-service-contract.ts';
+import { errorMessageOf } from './havoc-state-util.ts';
 
 export type HavocPlaybackSpeed = 1 | 2 | 4 | 8;
 
@@ -378,7 +378,7 @@ export class HavocGamecastState {
       return true;
     } catch (error) {
       if (!this.isDestroyed()) {
-        this.error = error instanceof HavocServiceError ? error.message : String(error);
+        this.error = errorMessageOf(error);
       }
       return false;
     } finally {

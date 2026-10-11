@@ -1225,6 +1225,26 @@ describe('DexieHavocRepository', () => {
     db.close();
   });
 
+  it('reports legacy v1 rules as unsupported and allows explicit discard', async () => {
+    const { db, repo } = createRepository('havoc-legacy-v1');
+    await applyDraftChain(repo, true);
+    const raw = await db.havocActiveRuns.get(HAVOC_ACTIVE_RECORD_ID);
+    if (raw === undefined) throw new Error('expected an active row');
+    const v1State = JSON.parse(
+      JSON.stringify(raw.state)
+        .replaceAll('havoc-rules-v2', 'havoc-rules-v1')
+        .replaceAll('havoc-mutations-v2', 'havoc-mutations-v1'),
+    ) as typeof raw.state;
+    await db.havocActiveRuns.put({ ...raw, state: v1State });
+    const error = await expectHavocLoadError(repo.loadActiveRun(), 'unsupported');
+    expect(error.diagnostics.join('; ')).toContain('havoc-rules-v1');
+    expect(await db.havocActiveRuns.count()).toBe(1);
+    await repo.clearActiveRun();
+    expect(await repo.loadActiveRun()).toBeNull();
+    expect(await db.havocActiveRuns.count()).toBe(0);
+    db.close();
+  });
+
   it('rolls back every table when one write in the commit fails', async () => {
     const { db, repo } = createRepository('havoc-rollback');
     const states = await applyDraftChain(repo, true);

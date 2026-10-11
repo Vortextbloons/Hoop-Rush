@@ -404,6 +404,56 @@ describe('havoc tier-3 rules', () => {
     expect(violations).toBeGreaterThanOrEqual(twelveSecondViolations);
   });
 
+  it('turns shortened-clock possessions into rushed attempts instead of automatic violations', () => {
+    const human = buildScenarioTeam('human', humanSlotMutation('PG', 'time-lord'));
+    const away = buildScenarioTeam('opponent', plainSlots());
+    const seeds = 8;
+    let opponentAttempts = 0;
+    let opponentViolations = 0;
+    let opponentPoints = 0;
+    for (let index = 0; index < seeds; index += 1) {
+      const run = runScenario(human, away, `havoc-rush-${String(index)}`);
+      for (const event of run.tape.events) {
+        if (event.kind === 'shot-attempt' && event.side === 'opponent') opponentAttempts += 1;
+        if (event.kind === 'shot-clock-violation' && event.limitSeconds === 12) {
+          opponentViolations += 1;
+        }
+      }
+      opponentPoints += run.result.away.points;
+    }
+    // The 12-second side must mostly get shots away rather than letting the
+    // clock expire, and its offense must not collapse toward zero.
+    expect(opponentAttempts).toBeGreaterThan(opponentViolations * 4);
+    expect(opponentPoints / seeds).toBeGreaterThan(50);
+  });
+
+  it('keeps shortened-clock outcomes healthy across pace profiles', () => {
+    const human = buildScenarioTeam('human', humanSlotMutation('PG', 'time-lord'));
+    const away = buildScenarioTeam('opponent', plainSlots());
+    for (const pace of [92, 100, 108]) {
+      let attempts = 0;
+      let violations = 0;
+      for (let index = 0; index < 6; index += 1) {
+        const run = runScenario(
+          human,
+          away,
+          `havoc-rush-pace-${String(pace)}-${String(index)}`,
+          1,
+          {
+            pace,
+          },
+        );
+        for (const event of run.tape.events) {
+          if (event.kind === 'shot-attempt' && event.side === 'opponent') attempts += 1;
+          if (event.kind === 'shot-clock-violation' && event.limitSeconds === 12) {
+            violations += 1;
+          }
+        }
+      }
+      expect(attempts, `pace ${String(pace)}`).toBeGreaterThan(violations);
+    }
+  });
+
   it('applies and ends body snatcher without retargeting', () => {
     const ownerTendencies: Partial<SimulationTendencies> = { ...FOUL_MAGNET, foulRate: 20 };
     const human = buildScenarioTeam('human', [
@@ -495,7 +545,7 @@ describe('havoc overtime and free throws', () => {
     expect(otEntries.length).toBeGreaterThan(0);
   });
 
-  it('penalizes misses by two under double or nothing without doubling free throws', () => {
+  it('penalizes misses by one under double or nothing without doubling free throws', () => {
     const human = buildScenarioTeam('human', [
       scenarioSlot('PG', ['double-or-nothing']),
       ...plainSlots().slice(1),
@@ -509,7 +559,7 @@ describe('havoc overtime and free throws', () => {
           (entry) =>
             entry.kind === 'adjustment' &&
             entry.addends.some(
-              (addend) => addend.source === 'double-or-nothing' && addend.points === -2,
+              (addend) => addend.source === 'double-or-nothing' && addend.points === -1,
             ),
         ),
     );
@@ -519,10 +569,10 @@ describe('havoc overtime and free throws', () => {
       (entry) =>
         entry.kind === 'adjustment' &&
         entry.addends.some(
-          (addend) => addend.source === 'double-or-nothing' && addend.points === -2,
+          (addend) => addend.source === 'double-or-nothing' && addend.points === -1,
         ),
     );
-    expect(missed?.points).toBe(-2);
+    expect(missed?.points).toBe(-1);
     for (const entry of run.tape.scoring) {
       if (entry.kind !== 'free-throw') continue;
       expect(entry.points).toBe(1);

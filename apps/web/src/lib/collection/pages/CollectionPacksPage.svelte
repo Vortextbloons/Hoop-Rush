@@ -1,7 +1,6 @@
 <script lang="ts">
   import { asset, resolve } from '$app/paths';
   import '$lib/collection/ultimate-theme.css';
-  import { getContext, onDestroy, untrack } from 'svelte';
   import type {
     CollectionIndexEntry,
     CollectionProgressionRules,
@@ -11,16 +10,10 @@
   import { z } from 'zod';
   import { describeCollectionPackOdds, describeCollectionTargetOdds } from '@hoop-rush/engine';
   import AsyncState from '$lib/components/AsyncState.svelte';
-  import {
-    ULTIMATE_RUN_SHELL_CONTEXT,
-    type UltimateRunShell,
-  } from '$lib/collection/ultimate-shell.svelte';
+  import { createUltimatePageShell } from './ultimate-page.svelte.ts';
   import ActiveTarget from '$lib/collection/ActiveTarget.svelte';
   import CurrencyIcon from '$lib/collection/CurrencyIcon.svelte';
-  import {
-    loadCollectionIndex,
-    loadCollectionProgression,
-  } from '$lib/collection/collection-assets.ts';
+  import { loadCollectionIndex } from '$lib/collection/collection-assets.ts';
   import {
     openPack,
     setTargetPlayer,
@@ -43,28 +36,27 @@
   import { collectionCardViewOf } from '$lib/collection/collection-card-view.ts';
   import { packRevealPlanOf } from '$lib/collection/pack-reveal-plan.ts';
 
-  const shell = getContext<UltimateRunShell>(ULTIMATE_RUN_SHELL_CONTEXT);
-
-  let mounted = true;
-  onDestroy(() => {
-    mounted = false;
+  const page = createUltimatePageShell({
+    failureMessage: 'Could not load the packs.',
+    load: async (ctx) => {
+      const loadedIndex = await loadCollectionIndex();
+      if (!page.isMounted()) return false;
+      indexEntries = loadedIndex.cards;
+      ctx.markReady();
+      page.startProgressionLoad((loaded, progressionFailure) => {
+        progression = loaded;
+        progressionError = progressionFailure;
+      });
+      await restoreReceipt();
+    },
   });
-
-  const collectionState = $derived(shell.state);
-  const catalog = $derived(shell.catalog);
-  const manifest = $derived(shell.manifest);
-  let pageStatus = $state<'loading' | 'error' | 'ready'>('loading');
-  let pageError = $state<string | null>(null);
-  const phase = $derived<'loading' | 'error' | 'ready'>(
-    shell.phase === 'error' ||
-      (shell.phase === 'ready' && shell.catalog === null) ||
-      pageError !== null
-      ? 'error'
-      : shell.phase === 'ready' && pageStatus === 'ready'
-        ? 'ready'
-        : 'loading',
-  );
-  const error = $derived(shell.error ?? shell.catalogError ?? pageError);
+  const shell = page.shell;
+  const collectionState = $derived(page.collectionState);
+  const catalog = $derived(page.catalog);
+  const manifest = $derived(page.manifest);
+  const phase = $derived(page.phase);
+  const error = $derived(page.error);
+  const retry = page.retry;
   let indexEntries = $state<CollectionIndexEntry[]>([]);
   let progression = $state<CollectionProgressionRules | null>(null);
   let progressionError = $state<string | null>(null);
@@ -133,44 +125,6 @@
     return catalog?.cards.find((card) => card.playerId === playerId)?.displayName ?? playerId;
   }
 
-  async function load(): Promise<void> {
-    pageStatus = 'loading';
-    pageError = null;
-    try {
-      const loadedIndex = await loadCollectionIndex();
-      if (!mounted) return;
-      indexEntries = loadedIndex.cards;
-      pageStatus = 'ready';
-      void loadCollectionProgression()
-        .then((loaded) => {
-          if (mounted) {
-            progression = loaded;
-            progressionError = null;
-          }
-        })
-        .catch((failure: unknown) => {
-          if (!mounted) return;
-          progression = null;
-          progressionError =
-            failure instanceof Error
-              ? failure.message
-              : 'The collection progression rules are unavailable.';
-        });
-      await restoreReceipt();
-    } catch (loadError) {
-      if (!mounted) return;
-      pageError = loadError instanceof Error ? loadError.message : 'Could not load the packs.';
-      pageStatus = 'error';
-    }
-  }
-
-  function retry(): void {
-    pageStatus = 'loading';
-    pageError = null;
-    if (shell.phase === 'error' || shell.catalogError !== null) void shell.refresh();
-    else void load();
-  }
-
   const lastReceiptSchema = z.object({
     pullSequence: z.number().int().nonnegative(),
   });
@@ -183,7 +137,7 @@
       const saved = result.data;
       const repo = getCollectionRepo();
       const snapshot = await repo.loadCollection(collectionState.collectionId);
-      if (!mounted || !snapshot) return;
+      if (!page.isMounted() || !snapshot) return;
       const pull = snapshot.pulls.find((entry) => entry.pullSequence === saved.pullSequence);
       if (!pull) return;
       const pullLedger = snapshot.ledger.filter(
@@ -207,11 +161,6 @@
       // A missing receipt simply means nothing to restore.
     }
   }
-
-  $effect(() => {
-    if (shell.phase !== 'ready') return;
-    void untrack(load);
-  });
 
   const balances = $derived(collectionState?.balances ?? { Coins: 0, Exchange: 0 });
   const claimed = $derived(collectionState?.claimedWelcome ?? false);
@@ -263,15 +212,15 @@
     targetError = null;
     try {
       await setTargetPlayer(null, new Date().toISOString());
-      if (!mounted) return;
+      if (!page.isMounted()) return;
       await shell.reloadCollection();
-      if (!mounted) return;
+      if (!page.isMounted()) return;
       announcement = 'Target cleared. Packs draw with equal card weights again.';
     } catch (failure) {
-      if (!mounted) return;
+      if (!page.isMounted()) return;
       targetError = collectionErrorMessage(failure, 'Clearing the target failed.');
     } finally {
-      if (mounted) targetBusy = false;
+      if (page.isMounted()) targetBusy = false;
     }
   }
 
@@ -289,9 +238,9 @@
     } catch {}
     try {
       const outcome = await openPack(packId, new Date().toISOString(), preview);
-      if (!mounted) return;
+      if (!page.isMounted()) return;
       await shell.reloadCollection();
-      if (!mounted) return;
+      if (!page.isMounted()) return;
       const pullLedger = outcome.ledgerEntries.filter(
         (entry) => entry.reason === 'duplicate-conversion',
       );
@@ -333,7 +282,7 @@
         if (receipt.cardsAdded === 0) arenaDuplicate();
       } catch {}
     } catch (buyError) {
-      if (!mounted) return;
+      if (!page.isMounted()) return;
       try {
         arenaError();
       } catch {}
@@ -345,7 +294,7 @@
       purchaseError = collectionErrorMessage(buyError, 'Purchase failed. Try again.');
       await shell.reloadCollection();
     } finally {
-      if (mounted) purchasing = null;
+      if (page.isMounted()) purchasing = null;
     }
   }
 
@@ -419,7 +368,7 @@
 
   {#if phase === 'loading'}
     <div class="mt-6">
-      <AsyncState kind="loading" title="Loading" message="Loading the pack store…" />
+      <AsyncState kind="loading" title="Loading" message="Loading the pack storeâ€¦" />
     </div>
   {:else if phase === 'error'}
     <div class="mt-6">
@@ -448,17 +397,10 @@
           message={progressionError}
           retry={() => {
             progressionError = null;
-            void loadCollectionProgression()
-              .then((loaded) => {
-                if (mounted) progression = loaded;
-              })
-              .catch((failure: unknown) => {
-                if (!mounted) return;
-                progressionError =
-                  failure instanceof Error
-                    ? failure.message
-                    : 'The collection progression rules are unavailable.';
-              });
+            page.startProgressionLoad((loaded, progressionFailure) => {
+              progression = loaded;
+              progressionError = progressionFailure;
+            });
           }}
         />
       </div>
@@ -544,7 +486,7 @@
               </p>
               {#if guaranteedCount > 0}
                 <span class="guarantee-pill">
-                  <span class="guarantee-crown" aria-hidden="true">♛</span>
+                  <span class="guarantee-crown" aria-hidden="true">â™›</span>
                   {guaranteedCount} guaranteed
                 </span>
               {/if}
@@ -554,14 +496,14 @@
           <div class="pack-body">
             <div class="pack-meta">
               <p class="pack-meta-cards">
-                <span class="meta-icon" aria-hidden="true">▤</span>
+                <span class="meta-icon" aria-hidden="true">â–¤</span>
                 <strong class="ur-number"
                   >{pack.slots.length} {pack.slots.length === 1 ? 'Card' : 'Cards'}</strong
                 >
                 <small>
                   {pack.slots.length}
                   {pack.slots.length === 1 ? 'slot' : 'slots'}{#if guaranteedCount > 0}
-                    · {guaranteedCount} guaranteed{/if}
+                    Â· {guaranteedCount} guaranteed{/if}
                 </small>
               </p>
               <p
@@ -594,7 +536,7 @@
 
             <details class="ur-pack-odds-details">
               <summary
-                ><span>Odds details</span><span class="details-chevron" aria-hidden="true">›</span
+                ><span>Odds details</span><span class="details-chevron" aria-hidden="true">â€º</span
                 ></summary
               >
               <div class="ur-odds-table-wrap">
@@ -605,7 +547,7 @@
                       {#each odds.perSlot as slot (slot.slotIndex)}
                         <th scope="col">Slot {slot.slotIndex + 1}</th>
                       {/each}
-                      <th scope="col">≥1 in pack</th>
+                      <th scope="col">â‰¥1 in pack</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -631,10 +573,10 @@
                 </table>
               </div>
               <p class="ur-odds-note">
-                Pool: {odds.cardCount} slots · duplicate values
+                Pool: {odds.cardCount} slots Â· duplicate values
                 {COLLECTION_RARITY_ORDER.map(
                   (rarity) => `${rarity} +${odds.duplicateExchange[rarity] ?? 0}`,
-                ).join(' · ')}. No pity, no rarity boosts, no duplicate protection. Targeting keeps
+                ).join(' Â· ')}. No pity, no rarity boosts, no duplicate protection. Targeting keeps
                 every rarity weight unchanged.
               </p>
               {#if targetOdds?.hasTarget}
@@ -658,7 +600,7 @@
             >
               <span class="buy-count" aria-hidden="true">1</span>
               {#if purchasing === pack.packId}
-                Opening…
+                Openingâ€¦
               {:else}
                 Open for {pack.priceAmount} {pack.priceCurrency}
               {/if}

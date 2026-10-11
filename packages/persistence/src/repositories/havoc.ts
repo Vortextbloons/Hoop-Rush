@@ -2,7 +2,12 @@ import type { Table } from 'dexie';
 import { z } from 'zod';
 import {
   HAVOC_GAME_COUNT,
+  HAVOC_MUTATION_CATALOG_VERSION,
+  HAVOC_REPORT_VERSION,
+  HAVOC_RULES_VERSION,
+  HAVOC_COMPARISON_VERSION,
   HAVOC_SAVE_SCHEMA_VERSION,
+  HAVOC_SEED_DERIVATION_VERSION,
   canonicalJson,
   havocCommandResultSchema,
   havocCommandSchema,
@@ -72,6 +77,7 @@ export interface HavocHistoryEntry {
 
 export interface HavocRepository {
   loadActiveRun(): Promise<HavocRunState | null>;
+  clearActiveRun(): Promise<void>;
   loadCommandResult(commandId: string): Promise<HavocCommandResult | null>;
   applyOutcome(input: HavocApplyOutcomeInput): Promise<HavocCommandResult>;
   listRunGames(runId: string, variant: HavocVariant): Promise<HavocGameResult[]>;
@@ -204,10 +210,47 @@ function assertStoredSaveVersion(row: unknown, label: string): void {
   }
 }
 
+function collectHavocVersionStrings(value: unknown, out: string[]): void {
+  if (typeof value === 'string') {
+    if (
+      value.startsWith('havoc-rules-') ||
+      value.startsWith('havoc-mutations-') ||
+      value.startsWith('havoc-seeds-') ||
+      value.startsWith('havoc-comparison-') ||
+      value.startsWith('havoc-report-')
+    ) {
+      out.push(value);
+    }
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const entry of value) collectHavocVersionStrings(entry, out);
+    return;
+  }
+  if (typeof value === 'object' && value !== null) {
+    for (const entry of Object.values(value)) collectHavocVersionStrings(entry, out);
+  }
+}
+
 function parseStored<T>(schema: z.ZodType<T>, row: unknown, label: string): T {
   assertStoredSaveVersion(row, label);
   const parsed = schema.safeParse(row);
   if (!parsed.success) {
+    const seen: string[] = [];
+    collectHavocVersionStrings(row, seen);
+    const current = new Set([
+      HAVOC_RULES_VERSION,
+      HAVOC_MUTATION_CATALOG_VERSION,
+      HAVOC_SEED_DERIVATION_VERSION,
+      HAVOC_COMPARISON_VERSION,
+      HAVOC_REPORT_VERSION,
+    ]);
+    const stale = [...new Set(seen)].filter((version) => !current.has(version));
+    if (stale.length > 0) {
+      throw new HavocLoadError('unsupported', [
+        `${label}: stored version ${stale.join(', ')} does not match current ${HAVOC_RULES_VERSION}/${HAVOC_MUTATION_CATALOG_VERSION}; the v2 balance patch changed scoring so v1 runs cannot be replayed — discard the stale active run to start fresh (${parsed.error.message})`,
+      ]);
+    }
     throw new HavocLoadError('corrupt', [`${label}: ${parsed.error.message}`]);
   }
   return parsed.data;
@@ -339,6 +382,10 @@ export class DexieHavocRepository implements HavocRepository {
     const row: unknown = await this.db.havocActiveRuns.get(HAVOC_ACTIVE_RECORD_ID);
     if (row === undefined) return null;
     return parseStored(storedHavocActiveRunSchema, row, 'active run').state;
+  }
+
+  async clearActiveRun(): Promise<void> {
+    await this.db.havocActiveRuns.delete(HAVOC_ACTIVE_RECORD_ID);
   }
 
   async loadCommandResult(commandId: string): Promise<HavocCommandResult | null> {

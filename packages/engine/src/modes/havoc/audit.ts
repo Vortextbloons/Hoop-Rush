@@ -297,11 +297,13 @@ function checkTape(
       );
     }
     let points = entry.nominalPoints;
+    let dunkBonus = 0;
     for (const addend of entry.addends) {
       const rawSource: string = addend.source;
       if (!isScoringSource(addend.source))
         fail('scoring-entry', `unknown scoring source ${rawSource}`);
-      points += addend.points;
+      if (addend.source === 'four-point-dunk') dunkBonus += addend.points;
+      else points += addend.points;
     }
     for (const multiplier of entry.multipliers) {
       const rawSource: string = multiplier.source;
@@ -309,6 +311,7 @@ function checkTape(
         fail('scoring-entry', `unknown scoring source ${rawSource}`);
       points *= multiplier.factor;
     }
+    points += dunkBonus;
     if (points !== entry.points) {
       fail(
         'points-ledger',

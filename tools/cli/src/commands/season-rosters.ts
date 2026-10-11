@@ -35,6 +35,7 @@ import {
   seedCountCalibrateOptions,
 } from '../calibration-harness.ts';
 import { seasonCalibrationSeed } from './season-calibration.ts';
+import { lowerMedian } from '../stats.ts';
 import {
   DEFAULT_MANIFEST,
   DEFAULT_ROSTER_TARGETS,
@@ -583,10 +584,6 @@ export function seasonRostersAudit(args: {
     },
   );
 }
-function median(values: readonly number[]): number {
-  const sorted = [...values].sort((a, b) => a - b);
-  return sorted[Math.floor(sorted.length / 2)] ?? 0;
-}
 function distribution(values: readonly number[]): {
   median: number;
   range: [number, number];
@@ -596,7 +593,7 @@ function distribution(values: readonly number[]): {
 } {
   const sorted = [...values].sort((a, b) => a - b);
   return {
-    median: median(sorted),
+    median: lowerMedian(sorted),
     range: [sorted[0] ?? 0, sorted[sorted.length - 1] ?? 0],
     min: sorted[0] ?? 0,
     max: sorted[sorted.length - 1] ?? 0,

@@ -51,6 +51,10 @@ class MemoryHavocRepository implements HavocRepository {
     return this.active;
   }
 
+  async clearActiveRun(): Promise<void> {
+    this.active = null;
+  }
+
   async loadCommandResult(commandId: string): Promise<HavocCommandResult | null> {
     return this.commands.get(commandId) ?? null;
   }

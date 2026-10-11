@@ -91,7 +91,7 @@ function eventOf(tape: { events: HavocEvent[] }, kind: HavocEvent['kind']): Havo
 }
 
 describe('havoc field-goal value resolution', () => {
-  it('resolves four-point and eight-point dunks exactly', () => {
+  it('resolves four-point and seven-point dunks exactly', () => {
     const four = havocFieldGoalValue({
       nominal: 2,
       three: false,
@@ -105,10 +105,10 @@ describe('havoc field-goal value resolution', () => {
     });
     expect(four.points).toBe(4);
     expect(four.addends).toEqual([
-      { source: 'four-point-dunk', points: 1 },
       { source: 'reverse-basketball', points: 1 },
+      { source: 'four-point-dunk', points: 1 },
     ]);
-    const eight = havocFieldGoalValue({
+    const seven = havocFieldGoalValue({
       nominal: 2,
       three: false,
       roulette: null,
@@ -119,8 +119,8 @@ describe('havoc field-goal value resolution', () => {
       bounty: false,
       doubleOrNothing: true,
     });
-    expect(eight.points).toBe(8);
-    expect(eight.multipliers).toEqual([{ source: 'double-or-nothing', factor: 2 }]);
+    expect(seven.points).toBe(7);
+    expect(seven.multipliers).toEqual([{ source: 'double-or-nothing', factor: 2 }]);
   });
 
   it('applies a single multiplier in stable order', () => {
@@ -182,7 +182,7 @@ describe('havoc scoring mutations in simulation', () => {
     slot('C', ['second-chance-jackpot']),
   ]);
 
-  it('scores an eight-point dunk with four-point dunk, reverse, and double or nothing', () => {
+  it('scores a seven-point dunk with four-point dunk, reverse, and double or nothing', () => {
     const run = searchScenario(
       48,
       dunkHuman,
@@ -200,12 +200,12 @@ describe('havoc scoring mutations in simulation', () => {
     if (entry === undefined) return;
     expect(entry.nominalPoints).toBe(2);
     expect(entry.addends).toEqual([
-      { source: 'four-point-dunk', points: 1 },
       { source: 'reverse-basketball', points: 1 },
+      { source: 'four-point-dunk', points: 1 },
     ]);
     expect(entry.multipliers).toContainEqual({ source: 'double-or-nothing', factor: 2 });
     expect(entry.multipliers).toHaveLength(1);
-    expect(entry.points).toBe(8);
+    expect(entry.points).toBe(7);
   });
 
   it('arms and consumes heat check on consecutive makes', () => {

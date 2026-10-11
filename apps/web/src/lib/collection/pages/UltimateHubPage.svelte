@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { getContext, onDestroy, untrack } from 'svelte';
   import { asset, resolve } from '$app/paths';
   import type {
     CollectionGameRecordUnion,
@@ -11,90 +10,49 @@
   import CollectionCardFace from '$lib/collection/CollectionCardFace.svelte';
   import CurrencyIcon from '$lib/collection/CurrencyIcon.svelte';
   import { ensurePlayStateSnapshot, loadCommittedGame } from '$lib/collection/collection-hub.ts';
-  import { loadCollectionProgression } from '$lib/collection/collection-assets.ts';
   import {
     humanizeIdentifier,
     setProgressViews,
   } from '$lib/collection/collection-progression-view.ts';
   import { ultimateNextActionOf } from '$lib/collection/ultimate-hub.ts';
-  import {
-    ULTIMATE_RUN_SHELL_CONTEXT,
-    type UltimateRunShell,
-  } from '$lib/collection/ultimate-shell.svelte';
+  import { createUltimatePageShell } from './ultimate-page.svelte.ts';
 
-  const shell = getContext<UltimateRunShell>(ULTIMATE_RUN_SHELL_CONTEXT);
-  let mounted = true;
-  onDestroy(() => {
-    mounted = false;
-  });
-
-  const SHORT_SLOT_LABELS = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
-
-  const collectionState = $derived(shell.state);
-  const catalog = $derived(shell.catalog);
-  const manifest = $derived(shell.manifest);
-  let pageStatus = $state<'loading' | 'error' | 'ready'>('loading');
-  let pageError = $state<string | null>(null);
-  const phase = $derived<'loading' | 'error' | 'ready'>(
-    shell.phase === 'error' ||
-      (shell.phase === 'ready' && shell.catalog === null) ||
-      pageError !== null
-      ? 'error'
-      : shell.phase === 'ready' && pageStatus === 'ready'
-        ? 'ready'
-        : 'loading',
-  );
-  const error = $derived(shell.error ?? shell.catalogError ?? pageError);
-  let progression = $state<CollectionProgressionRules | null>(null);
-  let playState = $state<CollectionPlayState | null>(null);
-  let recentGame = $state<CollectionGameRecordUnion | null>(null);
-
-  async function load(): Promise<void> {
-    const state = collectionState;
-    if (!state) {
-      pageError = 'Ultimate Run could not load.';
-      pageStatus = 'error';
-      return;
-    }
-    pageStatus = 'loading';
-    pageError = null;
-    try {
+  const pageShell = createUltimatePageShell({
+    failureMessage: 'Ultimate Run could not load.',
+    load: async (ctx) => {
+      const state = pageShell.collectionState;
+      if (!state) {
+        ctx.fail('Ultimate Run could not load.');
+        return;
+      }
       if (state.claimedWelcome) {
         const snapshot = await ensurePlayStateSnapshot(new Date().toISOString());
-        if (!mounted) return;
+        if (!pageShell.isMounted()) return false;
         playState = snapshot.playState;
         const rawGameId = sessionStorage.getItem('collection-last-game');
         if (rawGameId) {
           recentGame = await loadCommittedGame(rawGameId).catch(() => null);
-          if (!mounted) return;
+          if (!pageShell.isMounted()) return false;
         }
       }
-      pageStatus = 'ready';
-      void loadCollectionProgression()
-        .then((loaded) => {
-          if (mounted) progression = loaded;
-        })
-        .catch(() => {
-          if (mounted) progression = null;
-        });
-    } catch (failure) {
-      if (!mounted) return;
-      pageError = failure instanceof Error ? failure.message : 'Ultimate Run could not load.';
-      pageStatus = 'error';
-    }
-  }
-
-  function retry(): void {
-    pageStatus = 'loading';
-    pageError = null;
-    if (shell.phase === 'error' || shell.catalogError !== null) void shell.refresh();
-    else void load();
-  }
-
-  $effect(() => {
-    if (shell.phase !== 'ready') return;
-    void untrack(load);
+      ctx.markReady();
+      pageShell.startProgressionLoad((loaded) => {
+        progression = loaded;
+      });
+    },
   });
+  const shell = pageShell.shell;
+  const SHORT_SLOT_LABELS = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
+
+  const collectionState = $derived(pageShell.collectionState);
+  const catalog = $derived(pageShell.catalog);
+  const manifest = $derived(pageShell.manifest);
+  const phase = $derived(pageShell.phase);
+  const error = $derived(pageShell.error);
+  const retry = pageShell.retry;
+  let progression = $state<CollectionProgressionRules | null>(null);
+  let playState = $state<CollectionPlayState | null>(null);
+  let recentGame = $state<CollectionGameRecordUnion | null>(null);
 
   const ownedIds = $derived(new Set((collectionState?.owned ?? []).map((card) => card.cardId)));
   const savedTeam = $derived(playState?.activeTeam ?? null);
@@ -273,7 +231,7 @@
     <AsyncState
       kind="loading"
       title="Opening your run"
-      message="Loading your collection and lineup…"
+      message="Loading your collection and lineupâ€¦"
     />
   {:else if phase === 'error'}
     <AsyncState
@@ -354,7 +312,7 @@
                 stroke-linejoin="round"
               />
             </svg>
-            <strong class="ur-number">{totalCount > 0 ? fmt(totalCount) : '—'}</strong>
+            <strong class="ur-number">{totalCount > 0 ? fmt(totalCount) : 'â€”'}</strong>
             <span>In the collection</span>
             <small>{completePct}% complete</small>
             <span class="ur-mini-track" aria-hidden="true">
@@ -400,8 +358,8 @@
               {@const ovr = card ? overallOf(card.cardId) : null}
               {@const tone = card?.rarity.toLowerCase() ?? 'empty'}
               <li class="ur-hub-player-card ur-rarity-tone-{tone}">
-                <span class="ur-hub-slot">{SHORT_SLOT_LABELS[index] ?? '—'}</span>
-                <span class="ur-hub-ovr ur-number">{ovr ?? '—'}</span>
+                <span class="ur-hub-slot">{SHORT_SLOT_LABELS[index] ?? 'â€”'}</span>
+                <span class="ur-hub-ovr ur-number">{ovr ?? 'â€”'}</span>
                 <span class="ur-hub-face">
                   {#if card}
                     <CollectionCardFace
@@ -449,7 +407,7 @@
           <h3 id="run-snapshot-title">Last game</h3>
           <a class="ur-panel-link" href={resolve('/ultimate/run/play' as any)}>
             {playState?.pendingGame ? 'Resume' : recentGame ? 'Play again' : 'Play'}
-            <span aria-hidden="true">→</span>
+            <span aria-hidden="true">â†’</span>
           </a>
         </div>
         {#if playState?.pendingGame}
@@ -474,9 +432,9 @@
               {gameScore.home}<span> - </span>{gameScore.away}
             </strong>
             <p>
-              Final score · {gameLabelOf(recentGame)}
+              Final score Â· {gameLabelOf(recentGame)}
               {#if timeAgo(recentGame.completedAtIso)}
-                <span class="ur-game-ago"> · {timeAgo(recentGame.completedAtIso)}</span>
+                <span class="ur-game-ago"> Â· {timeAgo(recentGame.completedAtIso)}</span>
               {/if}
             </p>
           </div>
@@ -512,7 +470,7 @@
               <span>Margin</span>
             </div>
           </div>
-          <a class="ur-quiet-link" href={resolve(resultHref(recentGame) as any)}>View result →</a>
+          <a class="ur-quiet-link" href={resolve(resultHref(recentGame) as any)}>View result â†’</a>
         {:else}
           <div class="ur-score-hero">
             <span class="ur-status-badge">No game in progress</span>
@@ -526,7 +484,7 @@
         <div class="ur-panel-heading">
           <h3 id="collection-chase-title">Collection chase</h3>
           <a class="ur-panel-link" href={resolve('/ultimate/run/collection' as any)}>
-            Browse cards <span aria-hidden="true">→</span>
+            Browse cards <span aria-hidden="true">â†’</span>
           </a>
         </div>
         <p class="ur-panel-sub">Progress across the three launch sets.</p>
@@ -596,7 +554,7 @@
         <div class="ur-panel-heading">
           <h3 id="pack-shortcuts-title">On the shelf</h3>
           <a class="ur-panel-link" href={resolve('/ultimate/run/packs' as any)}>
-            Full odds <span aria-hidden="true">→</span>
+            Full odds <span aria-hidden="true">â†’</span>
           </a>
         </div>
         <p class="ur-panel-sub">Useful packs you can afford now.</p>
@@ -625,7 +583,7 @@
                     <CurrencyIcon currency="Coins" size={18} />
                     <span class="ur-number">{fmt(pack.priceAmount)} {pack.priceCurrency}</span>
                   </span>
-                  <span class="ur-chevron" aria-hidden="true">›</span>
+                  <span class="ur-chevron" aria-hidden="true">â€º</span>
                 </a>
               </li>
             {/each}
@@ -667,11 +625,11 @@
           <span class="ur-receipt-copy">
             <strong>{packNameOf(latestPull.packId)} received</strong>
             <small>
-              {latestPull.newCount} new {latestPull.newCount === 1 ? 'card' : 'cards'} · +{latestPull.exchangeGained}
+              {latestPull.newCount} new {latestPull.newCount === 1 ? 'card' : 'cards'} Â· +{latestPull.exchangeGained}
               Exchange from duplicates
             </small>
           </span>
-          <span class="ur-receipt-view">View receipt <span aria-hidden="true">→</span></span>
+          <span class="ur-receipt-view">View receipt <span aria-hidden="true">â†’</span></span>
         </a>
       {/if}
     </div>

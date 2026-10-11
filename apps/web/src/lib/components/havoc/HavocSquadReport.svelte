@@ -1,10 +1,19 @@
 <script lang="ts">
+  import { Dialog } from 'bits-ui';
   import {
     HAVOC_GAME_COUNT,
     type HavocComparison,
     type HavocStatLine,
   } from '@hoop-rush/data-contracts';
   import type { HavocLineupSlotView } from '$lib/havoc/havoc-service-contract';
+  import {
+    havocMvpFormulaLabel,
+    mutationNameOf,
+    mutationDescriptionOf,
+    mutationDownsideOf,
+    mutationTierOf,
+    formatSignedPoints,
+  } from './havoc-presentation';
   import HavocPlayerArt from './HavocPlayerArt.svelte';
   let {
     comparison,
@@ -30,7 +39,8 @@
     return key === 'rebounds' ? line.rebounds.total : line[key];
   }
   function change(value: number) {
-    return `${value > 0 ? '+' : ''}${(value / HAVOC_GAME_COUNT).toFixed(1)}`;
+    const rounded = Number((value / HAVOC_GAME_COUNT).toFixed(1));
+    return `${rounded > 0 ? '+' : ''}${rounded === 0 ? '0.0' : rounded.toFixed(1)}`;
   }
   function shootingChange(
     havoc: HavocStatLine,
@@ -47,37 +57,110 @@
       ? '—'
       : ((line[key].made / line[key].attempted) * 100).toFixed(1);
   }
+  function usageOf(line: HavocStatLine): number {
+    return line.fieldGoals.attempted + 0.44 * line.freeThrows.attempted + line.turnovers;
+  }
+  const havocTeamUsage = $derived(
+    comparison.slots.reduce((sum, slot) => sum + usageOf(slot.havoc.combined), 0),
+  );
+  const normalTeamUsage = $derived(
+    comparison.slots.reduce((sum, slot) => sum + usageOf(slot.normal.combined), 0),
+  );
+  function usageShare(line: HavocStatLine, teamTotal: number): string {
+    if (teamTotal <= 0) return '—';
+    return ((usageOf(line) / teamTotal) * 100).toFixed(1);
+  }
+  function usageChange(havoc: HavocStatLine, normal: HavocStatLine): string {
+    if (havocTeamUsage <= 0 || normalTeamUsage <= 0) return '—';
+    const delta = usageOf(havoc) / havocTeamUsage - usageOf(normal) / normalTeamUsage;
+    return `${delta > 0 ? '+' : ''}${(delta * 100).toFixed(1)} pp`;
+  }
+  let selectedSlot = $state<string | null>(null);
+  let detailsOpen = $state(false);
+  const selectedPlayer = $derived(comparison.slots.find((player) => player.slot === selectedSlot));
+  const selectedSource = $derived(lineup.find((player) => player.slot === selectedSlot));
 </script>
 
-<section class="mt-8" aria-labelledby="h-squad-report" data-havoc-squad-report>
-  <div class="h-header">
-    <div>
-      <p class="h-eyebrow">Your five · Season stats</p>
-      <h2 id="h-squad-report" class="h-subtitle mt-2">With powers. Without powers.</h2>
-      <p class="h-copy mt-2">
-        Per-game averages across both 82-game seasons. Each position includes its starter,
-        replacement, and any clone.
-      </p>
-    </div>
-    <div class="h-legend"><span>Havoc</span><span>Normal</span><span>Change</span></div>
+<section class="h-panel mt-4" aria-labelledby="h-squad-report" data-havoc-squad-report>
+  <h2 id="h-squad-report" class="h-subtitle">Season box score</h2>
+  <p class="h-copy text-xs mt-2">
+    Per-game Havoc stats. The signed value below is the change from Normal. Select a player for both
+    lines and their powers. Each position includes replacements and clones.
+  </p>
+  <p class="h-mobile-hint h-copy text-xs mt-2">Swipe the stats to see every column.</p>
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex (The scrollable box score needs keyboard access.) -->
+  <div class="h-box-score mt-4" role="region" aria-label="Player season box score" tabindex="0">
+    <table>
+      <thead
+        ><tr
+          ><th scope="col">Player</th>{#each stats as stat (stat.key)}<th scope="col"
+              >{stat.label}</th
+            >{/each}</tr
+        ></thead
+      >
+      <tbody>
+        {#each comparison.slots as player (player.slot)}
+          {@const source = lineup.find((slot) => slot.slot === player.slot)}
+          <tr data-havoc-player-stats={player.slot}>
+            <th scope="row">
+              <button
+                class="h-player-button"
+                onclick={() => {
+                  selectedSlot = player.slot;
+                  detailsOpen = true;
+                }}
+                aria-label="View {player.displayName} stats and powers"
+              >
+                <HavocPlayerArt
+                  playerId={player.playerId}
+                  displayName={player.displayName}
+                  franchiseId={source?.franchiseId}
+                  seasonKey={source?.seasonKey}
+                />
+                <span
+                  ><span class="h-player-name">{player.displayName}</span><span
+                    class="h-player-caption"
+                    >{player.slot}{comparison.mvp.slot === player.slot ? ' / MVP' : ''} / View details</span
+                  ></span
+                >
+              </button>
+            </th>
+            {#each stats as stat (stat.key)}
+              {@const delta = player.deltas[stat.key]}
+              <td data-havoc-stat={stat.key}>
+                <span class="h-box-value">{average(total(player.havoc.combined, stat.key))}</span>
+                <span
+                  class="h-box-delta"
+                  class:better={stat.key === 'turnovers' ? delta < 0 : delta > 0}
+                  class:worse={stat.key === 'turnovers' ? delta > 0 : delta < 0}
+                  >{change(delta)}</span
+                >
+              </td>
+            {/each}
+          </tr>
+        {/each}
+      </tbody>
+    </table>
   </div>
-  <div class="h-performance-grid">
-    {#each comparison.slots as player (player.slot)}
-      {@const source = lineup.find((slot) => slot.slot === player.slot)}
-      <article class="h-panel h-performance" data-havoc-player-stats={player.slot}>
-        <header class="flex items-center gap-4">
-          <HavocPlayerArt
-            playerId={player.playerId}
-            displayName={player.displayName}
-            franchiseId={source?.franchiseId}
-            seasonKey={source?.seasonKey}
-          />
+</section>
+<Dialog.Root bind:open={detailsOpen}>
+  <Dialog.Portal>
+    <Dialog.Overlay class="h-result-overlay" />
+    <Dialog.Content class="havoc-world h-result-dialog">
+      {#if selectedPlayer !== undefined}
+        {@const player = selectedPlayer}
+        <header class="h-header">
           <div>
-            <p class="h-eyebrow">{player.slot}</p>
-            <h3 class="h-subtitle">{player.displayName}</h3>
-            <p class="h-copy text-xs">{source?.nickname ?? ''}</p>
+            <p class="h-eyebrow">{player.slot} / Season comparison</p>
+            <Dialog.Title class="h-subtitle mt-2">{player.displayName}</Dialog.Title>
           </div>
+          <Dialog.Close class="h-button secondary" aria-label="Close player details"
+            >Close</Dialog.Close
+          >
         </header>
+        <Dialog.Description class="h-copy text-xs"
+          >Per-game averages over 82 games, including this position's replacements and clones.</Dialog.Description
+        >
         <div class="h-stat-columns" aria-hidden="true">
           <span>Per game</span><span>Havoc</span><span>Normal</span><span>Change</span>
         </div>
@@ -107,25 +190,170 @@
                 {delta === null ? '—' : `${delta > 0 ? '+' : ''}${delta.toFixed(1)} pp`}
               </dd>
             </div>{/each}
+          <div class="h-stat-columns" data-havoc-stat="usage">
+            <dt>USG%</dt>
+            <dd class="h-powered">{usageShare(player.havoc.combined, havocTeamUsage)}</dd>
+            <dd>{usageShare(player.normal.combined, normalTeamUsage)}</dd>
+            <dd>{usageChange(player.havoc.combined, player.normal.combined)}</dd>
+          </div>
         </dl>
-      </article>
-    {/each}
-  </div>
-</section>
+
+        <h3 class="h-subtitle mt-6">Player powers</h3>
+        <p class="h-copy text-xs mt-2">
+          Direct power points count recorded score adjustments. Shared abilities show totals across
+          their owners.
+        </p>
+        <ul class="h-player-powers mt-3">
+          {#each selectedSource?.mutations ?? [] as entry (entry.mutationId)}
+            {@const power = comparison.mutations.find(
+              (value) => value.mutationId === entry.mutationId,
+            )}
+            <li>
+              <details>
+                <summary
+                  >{mutationNameOf(
+                    entry.mutationId,
+                  )}{#if power !== undefined && mutationTierOf(entry.mutationId) !== 1}<span
+                      class="h-copy text-xs"
+                    >
+                      · {formatSignedPoints(power.pointsDelta)} direct pts{power.ownerCount > 1
+                        ? ' across all owners'
+                        : ''}</span
+                    >{/if}</summary
+                >
+                <p class="h-copy text-xs">{mutationDescriptionOf(entry.mutationId)}</p>
+                {#if mutationDownsideOf(entry.mutationId)}<p class="h-copy text-xs">
+                    Tradeoff: {mutationDownsideOf(entry.mutationId)}
+                  </p>{/if}
+                {#if power !== undefined && mutationTierOf(entry.mutationId) !== 1}
+                  <p class="h-copy text-xs mt-2">
+                    {power.triggers} activations · {power.freeThrowsGranted} bonus free throws · {power.turnoversCancelled}
+                    turnovers saved · {power.extraPossessionsUsed}/{power.extraPossessionsEarned} extra
+                    possessions used · {power.extraPossessionsExpired} expired · {power.swapSeconds}s
+                    ratings swapped · {power.capSeconds}s ratings capped.
+                  </p>
+                  {#if power.ownerCount > 1}<p class="h-copy text-xs">
+                      Shared ability: these are combined totals for all {power.ownerCount} owners.
+                    </p>{/if}
+                {/if}
+              </details>
+            </li>
+          {/each}
+        </ul>
+
+        {#if comparison.mvp.slot === player.slot}
+          <details class="mt-2">
+            <summary>How the MVP was chosen</summary>
+            <p class="h-copy text-xs">
+              Production index: {comparison.mvp.havocIndex} with powers / {comparison.mvp
+                .normalIndex} without powers ({formatSignedPoints(comparison.mvp.gain)} gain).
+            </p>
+            <p class="h-copy text-xs">
+              {havocMvpFormulaLabel(comparison.mvpIndexWeights)}. Highest gain wins; ties use the
+              Havoc index, then draft order. Includes replacements and clones.
+            </p>
+          </details>
+        {/if}
+      {/if}
+    </Dialog.Content>
+  </Dialog.Portal>
+</Dialog.Root>
 
 <style>
-  .h-performance-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
+  .h-box-score {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+  .h-box-score:focus-visible {
+    outline: 2px solid var(--h-pink);
+    outline-offset: 3px;
+  }
+  .h-mobile-hint {
+    display: none;
+  }
+  .h-player-button :global(.h-player-art) {
+    width: 36px;
+    height: 36px;
+  }
+  .h-player-button :global(.h-initials) {
+    font-size: 1.25rem;
+  }
+  .h-player-button :global(.h-team-crest) {
+    display: none;
+  }
+  table {
+    width: 100%;
+    min-width: 620px;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+  }
+  thead th {
+    font-size: 10px;
+    color: #c1cae4;
+    padding: 8px 10px;
+    text-align: right;
+  }
+  thead th:first-child {
+    text-align: left;
+  }
+  tbody tr {
+    border-top: 1px solid #465273;
+  }
+  tbody th {
+    width: 38%;
+    text-align: left;
+  }
+  td {
+    padding: 10px;
+    text-align: right;
+  }
+  .h-box-value {
+    display: block;
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .h-box-delta {
+    display: block;
+    font-size: 10px;
+    color: #aab9db;
+  }
+  .better {
+    color: #8bceaf;
+  }
+  .worse {
+    color: #f290c5;
+  }
+  .h-player-button {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-align: left;
+    padding: 10px 4px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .h-player-button:hover {
+    background: #303c63;
+  }
+  .h-player-name {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .h-player-caption {
+    display: block;
+    color: #c1cae4;
+    font-size: 10px;
+    margin-top: 3px;
   }
   .h-stat-columns {
     display: grid;
     grid-template-columns: 1fr repeat(3, 0.8fr);
     align-items: center;
-    gap: 12px;
-    padding: 9px 0;
-    border-bottom: 1px solid #3c486b;
+    gap: 8px;
+    padding: 8px 0;
+    border-bottom: 1px solid #465273;
     font-size: 13px;
     font-variant-numeric: tabular-nums;
   }
@@ -133,45 +361,62 @@
     text-align: right;
   }
   .h-stat-columns[aria-hidden] {
-    margin-top: 12px;
+    margin-top: 16px;
     font-size: 10px;
-    color: #aab9db;
+    color: #c1cae4;
   }
   .h-stat-columns dt {
     color: #c1cae4;
     font-size: 11px;
+  }
+  .h-powered {
+    color: #ffd782;
     font-weight: 700;
   }
-  .h-stat-columns dd {
-    color: #aab9db;
+  .h-player-powers > li {
+    border-bottom: 1px solid #465273;
   }
-  .h-stat-columns .h-powered {
-    color: #ffd782;
-    font-weight: 800;
-  }
-  .h-stat-columns .better {
-    color: #8bceaf;
-  }
-  .h-stat-columns .worse {
-    color: #f290c5;
-  }
-  .h-legend {
-    display: flex;
-    gap: 18px;
-    font-size: 12px;
-  }
-  .h-legend span:first-child {
-    color: #ffd782;
-  }
-  .h-legend span:nth-child(2) {
-    color: #aab9db;
-  }
-  .h-legend span:last-child {
-    color: #8bceaf;
-  }
-  @media (max-width: 760px) {
-    .h-performance-grid {
-      grid-template-columns: 1fr;
+  @media (max-width: 600px) {
+    .h-mobile-hint {
+      display: block;
+    }
+    table {
+      min-width: 540px;
+    }
+    thead th:first-child,
+    tbody th {
+      position: sticky;
+      left: 0;
+      z-index: 1;
+      background: #20294c;
+      width: 152px;
+      min-width: 152px;
+      max-width: 152px;
+      box-shadow: 4px 0 8px #141b3933;
+    }
+    .h-player-button {
+      gap: 8px;
+      min-height: 64px;
+      padding-right: 8px;
+    }
+    .h-player-name {
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+    .h-player-caption {
+      font-size: 9px;
+    }
+    .h-player-button :global(.h-player-art) {
+      width: 28px;
+      height: 28px;
+    }
+    td,
+    thead th {
+      padding: 8px;
+    }
+    .h-stat-columns {
+      gap: 6px;
+      font-size: 12px;
     }
   }
 </style>

@@ -6,12 +6,7 @@ import type {
   HavocSimulationProgress,
 } from './havoc-service-contract.ts';
 import { HAVOC_GAME_COUNT } from '@hoop-rush/data-contracts';
-import { HavocServiceError } from './havoc-service-contract.ts';
-
-function errorMessageOf(error: unknown): string {
-  if (error instanceof HavocServiceError) return error.message;
-  return error instanceof Error ? error.message : String(error);
-}
+import { errorMessageOf } from './havoc-state-util.ts';
 
 export class HavocResultState {
   run = $state.raw<HavocRunView | null>(null);
@@ -67,12 +62,14 @@ export class HavocResultState {
   }
 
   async load(): Promise<void> {
+    if (this.isDestroyed()) return;
     if (this.run === null) this.loading = true;
+    this.error = null;
     try {
       const snapshot = await this.service.loadActive();
       if (this.isDestroyed()) return;
-      this.run = snapshot.run;
       if (snapshot.run === null) {
+        this.run = null;
         this.report = null;
         this.comparison = null;
         const history = await this.service.listHistory();
@@ -91,14 +88,12 @@ export class HavocResultState {
       }
       const report = await this.service.readReport();
       if (this.isDestroyed()) return;
+      const comparison =
+        snapshot.run.comparisonStatus === 'complete' ? await this.service.readComparison() : null;
+      if (this.isDestroyed()) return;
+      this.run = snapshot.run;
       this.report = report;
-      if (snapshot.run.comparisonStatus === 'complete') {
-        const comparison = await this.service.readComparison();
-        if (this.isDestroyed()) return;
-        this.comparison = comparison;
-      } else {
-        this.comparison = null;
-      }
+      this.comparison = comparison;
     } catch (error) {
       if (!this.isDestroyed()) this.error = errorMessageOf(error);
     } finally {
@@ -107,7 +102,7 @@ export class HavocResultState {
   }
 
   async runNormalSeason(): Promise<void> {
-    if (this.busy) return;
+    if (this.busy || this.isDestroyed()) return;
     this.busy = true;
     this.error = null;
     this.notice = null;
@@ -137,13 +132,14 @@ export class HavocResultState {
   }
 
   async cancelComparison(): Promise<void> {
+    if (this.cancelling || this.isDestroyed()) return;
     this.cancelling = true;
     try {
       await this.service.cancelSimulation();
     } catch (error) {
-      this.error = errorMessageOf(error);
+      if (!this.isDestroyed()) this.error = errorMessageOf(error);
     } finally {
-      this.cancelling = false;
+      if (!this.isDestroyed()) this.cancelling = false;
     }
   }
 

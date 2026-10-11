@@ -59,6 +59,7 @@ import {
   validateCollectionProgressionRules,
 } from '@hoop-rush/engine';
 import { makeReport, type CliReport } from '../report.ts';
+import { median } from '../stats.ts';
 import { collectionProgressionCalibrateReportSchema } from '../report-schemas.ts';
 import { validateTargetsArtifact } from '../artifact.ts';
 import { atomicWriteFileSync } from '../io.ts';
@@ -155,14 +156,6 @@ function quantile(sorted: readonly number[], fraction: number): number {
   if (sorted.length === 0) return 0;
   const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil(fraction * sorted.length) - 1));
   return sorted[index] ?? 0;
-}
-
-function medianOf(values: readonly number[]): number {
-  if (values.length === 0) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  const middle = Math.floor(sorted.length / 2);
-  if (sorted.length % 2 === 1) return sorted[middle] ?? 0;
-  return ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2;
 }
 
 function genesisRecords(input: {
@@ -539,7 +532,7 @@ function eligibleTargetPlayerIds(analytic: PackAnalytic): string[] {
   }));
   counts.sort((a, b) => a.count - b.count || (a.playerId < b.playerId ? -1 : 1));
   if (counts.length === 0) return [];
-  const medianCount = medianOf(counts.map((entry) => entry.count));
+  const medianCount = median(counts.map((entry) => entry.count));
   const medianEntry = [...counts].sort(
     (a, b) =>
       Math.abs(a.count - medianCount) - Math.abs(b.count - medianCount) ||

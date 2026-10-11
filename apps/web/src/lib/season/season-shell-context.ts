@@ -30,6 +30,34 @@ import type { HubPostseasonProgress } from './season-postseason-presentation';
 import type { SeasonFaceRef } from './season-branding';
 import type { RotationEditor } from './season-rotation-editor';
 export const SEASON_RUN_SHELL_CONTEXT = 'hoop-rush:season-run-shell';
+export function idleBlockRunState(): BlockRunState {
+  return {
+    requestId: null,
+    blockIndex: null,
+    phase: 'idle',
+    gamesCompleted: 0,
+    gamesTotal: 0,
+    latestGameId: null,
+    latestResult: null,
+    isHumanGame: false,
+    humanRecordInBlock: { wins: 0, losses: 0 },
+    humanResults: [],
+    leaguePulse: { closest: null, blowout: null, highestScoring: null },
+    error: null,
+    command: null,
+    startInput: null,
+  };
+}
+export function idlePostseasonProgress(): HubPostseasonProgress {
+  return {
+    phase: 'idle',
+    gamesCompleted: 0,
+    gamesTotal: 0,
+    latestGameId: null,
+    latestResult: null,
+    error: null,
+  };
+}
 export interface SeasonRunShellData {
   ready: boolean;
   error: SeasonRunLoadDiagnostic | null;
@@ -129,97 +157,4 @@ export interface SeasonRunShellData {
   fastForwardPostseason: (input?: { targetGameId?: string }) => Promise<void>;
   cancelPostseason: () => void;
   postseason: HubPostseasonProgress;
-}
-export function initialSeasonRunShellData(): SeasonRunShellData {
-  return {
-    ready: false,
-    error: null,
-    hubError: null,
-    hub: null,
-    snapshot: null,
-    index: null,
-    block: {
-      requestId: null,
-      blockIndex: null,
-      phase: 'idle',
-      gamesCompleted: 0,
-      gamesTotal: 0,
-      latestGameId: null,
-      latestResult: null,
-      isHumanGame: false,
-      humanRecordInBlock: { wins: 0, losses: 0 },
-      humanResults: [],
-      leaguePulse: { closest: null, blowout: null, highestScoring: null },
-      error: null,
-      command: null,
-      startInput: null,
-    },
-    manifest: null,
-    league: null,
-    catalog: null,
-    schedule: null,
-    playerSlice: new Map(),
-    playerSliceReady: false,
-    facesByVersion: new Map(),
-    facesReady: false,
-    playersIndex: null,
-    run: null,
-    humanFranchiseId: null,
-    humanTeam: null,
-    nextBlockIndex: null,
-    seasonComplete: false,
-    editor: null,
-    editorKey: null,
-    health: null,
-    influence: null,
-    trade: null,
-    freeAgency: null,
-    objectives: null,
-    challenges: null,
-    pending: null,
-    interruption: null,
-    commandError: null,
-    commandReceipt: null,
-    externalChange: null,
-    acknowledgeExternalChange: () => undefined,
-    prewarmWorker: () => undefined,
-    playerName: () => '—',
-    playablePositions: () => [],
-    franchiseName: () => '—',
-    franchiseAbbrev: () => '—',
-    cancelBlock: () => undefined,
-    retryBlock: () => undefined,
-    refresh: () => Promise.resolve(),
-    quitRun: () => Promise.resolve({ ok: false, error: 'season shell not ready' }),
-    spendInfluence: () => Promise.resolve(),
-    acceptTradeOffer: () => Promise.resolve(),
-    declineTradeOffer: () => Promise.resolve(),
-    declareFreeAgentInterest: () => Promise.resolve(),
-    skipFreeAgentMarket: () => Promise.resolve(),
-    resolveFreeAgentMarket: () => Promise.resolve(),
-    forfeitInterruptedGame: () => Promise.resolve(),
-    resumeBlock: () => Promise.resolve(),
-    selectFrontOffice: () => Promise.resolve(),
-    selectCourtInnovation: () => Promise.resolve(),
-    openTradeInquiry: () => Promise.resolve(),
-    submitTradeProposal: () => Promise.resolve(),
-    respondToTradeCounter: () => Promise.resolve(),
-    walkAwayFromTrade: () => Promise.resolve(),
-    purchaseTradeInquiry: () => Promise.resolve(),
-    startPostseason: () => Promise.resolve(),
-    advancePostseason: () => Promise.resolve(),
-    forfeitPostseasonGame: () => Promise.resolve(),
-    submitPostseasonRotation: () => Promise.resolve(),
-    spectatePostseasonGame: () => Promise.resolve(),
-    fastForwardPostseason: () => Promise.resolve(),
-    cancelPostseason: () => undefined,
-    postseason: {
-      phase: 'idle',
-      gamesCompleted: 0,
-      gamesTotal: 0,
-      latestGameId: null,
-      latestResult: null,
-      error: null,
-    },
-  };
 }

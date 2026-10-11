@@ -1,18 +1,18 @@
 <script lang="ts">
+  import { Dialog } from 'bits-ui';
   import { resolve } from '$app/paths';
-  import { Trophy, ArrowRight } from '@lucide/svelte';
+  import { ArrowRight } from '@lucide/svelte';
   import type { HavocResultState } from '$lib/havoc/havoc-result-state.svelte';
   import HavocComparisonView from './HavocComparisonView.svelte';
-  import HavocMvpCard from './HavocMvpCard.svelte';
   import HavocLineupLock from './HavocLineupLock.svelte';
   import HavocSquadReport from './HavocSquadReport.svelte';
-  import HavocAbilityReport from './HavocAbilityReport.svelte';
   import HavocComparisonChart from './HavocComparisonChart.svelte';
   import HavocGameDetail from './HavocGameDetail.svelte';
-  import { havocRecordLabel } from './havoc-presentation';
+  import { havocRecordLabel, havocDeltaTitle, formatSignedPoints } from './havoc-presentation';
   let { state: resultState }: { state: HavocResultState } = $props();
   const run = $derived(resultState.run);
   const comparison = $derived(resultState.comparison);
+  let gameDetailsOpen = $state(false);
   let selectedGame = $state<number | null>(null);
   const completed = $derived(
     resultState.progress?.variant === 'normal'
@@ -55,94 +55,120 @@
           data-havoc-run-normal
           onclick={() => void resultState.runNormalSeason()}>Finish season report</button
         >{/if}
+      {#if resultState.busy}<button
+          class="h-button secondary mt-4"
+          disabled={resultState.cancelling}
+          onclick={() => void resultState.cancelComparison()}
+          >{resultState.cancelling ? 'Pausing...' : 'Pause report preparation'}</button
+        >{/if}
     </div>
   {:else}
-    <header class="h-header">
-      <div>
-        <p class="h-eyebrow">Hoop Havoc · Final buzzer</p>
-        <h1 class="h-title mt-3">
-          {run.perfectSeason ? 'Perfect. Absolute havoc.' : 'That was your havoc.'}
-        </h1>
+    <header class="h-panel h-result-hero">
+      <p class="h-eyebrow">Hoop Havoc · Season report</p>
+      <h1 class="h-subtitle mt-2">
+        {comparison !== null && resultState.comparisonComplete
+          ? havocDeltaTitle(comparison.winsGained)
+          : 'Season complete'}
+      </h1>
+      <div class="h-record-comparison mt-4">
+        <div>
+          <p class="h-eyebrow">With powers</p>
+          <p class="h-result-record" data-havoc-final-record>
+            {havocRecordLabel(run.havocWins, run.havocLosses)}
+          </p>
+        </div>
+        {#if comparison !== null && resultState.comparisonComplete}
+          <div>
+            <p class="h-eyebrow">Without powers</p>
+            <p class="h-result-record">
+              {havocRecordLabel(comparison.normal.wins, comparison.normal.losses)}
+            </p>
+          </div>
+          <div>
+            <p class="h-eyebrow">Wins delta</p>
+            <p class="h-result-record" class:h-negative={comparison.winsGained < 0}>
+              {formatSignedPoints(comparison.winsGained)}
+            </p>
+          </div>
+        {/if}
       </div>
-      <Trophy size={64} color="#ffd782" strokeWidth={1.5} />
-    </header>
-    <div class="h-panel">
-      <p class="h-eyebrow">Your final record</p>
-      <p class="h-score">{havocRecordLabel(run.havocWins, run.havocLosses)}</p>
       <p class="h-copy mt-3" data-havoc-result-objective>
         {run.perfectSeason
-          ? '82 wins. Zero losses. Your squad cleared the perfect season challenge.'
-          : 'The 82–0 challenge is over. See what your squad pulled off, then build your next five.'}
+          ? '82 wins. Zero losses. Perfect season challenge cleared.'
+          : '82 games complete. See how your five finished.'}
       </p>
-    </div>
-    {#if resultState.report !== null}<dl class="h-stats">
-        <div>
-          <dt>Average score margin</dt>
-          <dd>{(resultState.report.havoc.differential / 82).toFixed(1)}</dd>
-        </div>
-        <div>
-          <dt>Wins gained with powers</dt>
-          <dd>
-            {comparison ? `${comparison.winsGained >= 0 ? '+' : ''}${comparison.winsGained}` : '—'}
-          </dd>
-        </div>
-        <div>
-          <dt>Direct power points</dt>
-          <dd data-havoc-direct-mutation-points>{resultState.report.directMutationPoints}</dd>
-        </div>
-      </dl>{/if}
-    {#if comparison !== null && resultState.comparisonComplete}<HavocMvpCard {comparison} />
-      <div class="h-panel mt-6">
-        <h2 class="h-subtitle">Same squad. Without powers.</h2>
-        <p class="h-copy mt-2">
-          The unmutated five finished {havocRecordLabel(
-            comparison.normal.wins,
-            comparison.normal.losses,
-          )} against the same opponents. This compares two seasons; it doesn't isolate the effect of each
-          power.
+      {#if comparison !== null && resultState.comparisonComplete}
+        <p class="h-copy text-xs mt-2">
+          Same squad, opponents and seeds. Deltas compare the two seasons; individual abilities
+          can't be isolated from them.
         </p>
-      </div>{:else}<p class="h-alert" data-havoc-comparison-unsupported>
+        <dl class="h-result-metrics mt-4">
+          <div>
+            <dt>Scored / game</dt>
+            <dd>
+              {comparison.havoc.averagePointsFor.toFixed(1)} / {comparison.normal.averagePointsFor.toFixed(
+                1,
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt>Allowed / game</dt>
+            <dd>
+              {comparison.havoc.averagePointsAgainst.toFixed(1)} / {comparison.normal.averagePointsAgainst.toFixed(
+                1,
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt>Margin delta / game</dt>
+            <dd>
+              {formatSignedPoints(
+                Number((comparison.differentialDelta / comparison.havoc.games).toFixed(1)),
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt>Direct power points</dt>
+            <dd data-havoc-direct-mutation-points>
+              {resultState.report?.directMutationPoints ??
+                comparison.mutations.reduce((sum, power) => sum + power.pointsDelta, 0)}
+            </dd>
+          </div>
+        </dl>
+      {/if}
+    </header>
+    {#if run.comparisonStatus === 'unsupported'}
+      <p class="h-alert mt-4" data-havoc-comparison-unsupported>
         This saved season uses older rules. Its results are preserved, but a matching comparison is
         unavailable.
-      </p>{/if}
+      </p>
+      {#if resultState.report !== null}<dl class="h-result-metrics mt-4">
+          <div>
+            <dt>Average score margin</dt>
+            <dd>
+              {(resultState.report.havoc.differential / resultState.report.havoc.games).toFixed(1)}
+            </dd>
+          </div>
+          <div>
+            <dt>Direct power points</dt>
+            <dd>{resultState.report.directMutationPoints}</dd>
+          </div>
+        </dl>{/if}
+    {/if}
     {#if comparison !== null && resultState.comparisonComplete}
-      <dl class="h-stats">
-        <div>
-          <dt>Scored per game · Havoc / Normal</dt>
-          <dd>
-            {comparison.havoc.averagePointsFor.toFixed(1)}
-            <span class="text-lg text-muted-foreground"
-              >/ {comparison.normal.averagePointsFor.toFixed(1)}</span
-            >
-          </dd>
-        </div>
-        <div>
-          <dt>Allowed per game · Havoc / Normal</dt>
-          <dd>
-            {comparison.havoc.averagePointsAgainst.toFixed(1)}
-            <span class="text-lg text-muted-foreground"
-              >/ {comparison.normal.averagePointsAgainst.toFixed(1)}</span
-            >
-          </dd>
-        </div>
-        <div>
-          <dt>Normal record</dt>
-          <dd>{havocRecordLabel(comparison.normal.wins, comparison.normal.losses)}</dd>
-        </div>
-      </dl>
       <HavocSquadReport {comparison} lineup={run.lineup} />
-      <section class="h-panel mt-6">
-        <h2 class="h-subtitle mb-4">Your season, game by game</h2>
+      <details class="h-panel mt-4">
+        <summary>Your season, game by game · 82 matched results</summary>
         <HavocComparisonChart
           {comparison}
           {selectedGame}
-          onSelect={(gameNumber) => (selectedGame = gameNumber)}
-        />{#if selectedGame !== null}<HavocGameDetail {comparison} gameNumber={selectedGame} />{/if}
-      </section>
+          onSelect={(gameNumber) => {
+            selectedGame = gameNumber;
+            gameDetailsOpen = true;
+          }}
+        />
+      </details>
     {:else}<div class="mt-6"><HavocLineupLock slots={run.lineup} /></div>{/if}
-    {#if comparison !== null && resultState.comparisonComplete}<HavocAbilityReport
-        {comparison}
-      />{/if}
     <div class="h-actions mt-6">
       <a class="h-button" href={resolve('/havoc')}>Draft another squad <ArrowRight size={18} /></a
       ><a class="h-link" href={resolve('/havoc/history')}>Hall of Freaks</a>
@@ -159,3 +185,67 @@
   {#if resultState.error !== null}<p role="alert" class="h-alert">{resultState.error}</p>{/if}
   {#if resultState.notice !== null}<p role="status" class="h-alert">{resultState.notice}</p>{/if}
 </section>
+<Dialog.Root bind:open={gameDetailsOpen}>
+  <Dialog.Portal>
+    <Dialog.Overlay class="h-result-overlay" />
+    <Dialog.Content class="havoc-world h-result-dialog">
+      <header class="h-header">
+        <Dialog.Title class="h-subtitle">Game {selectedGame} comparison</Dialog.Title><Dialog.Close
+          class="h-button secondary">Close</Dialog.Close
+        >
+      </header>
+      <Dialog.Description class="h-copy text-xs"
+        >The same matchup, with and without powers.</Dialog.Description
+      >
+      {#if comparison !== null && selectedGame !== null}<HavocGameDetail
+          {comparison}
+          gameNumber={selectedGame}
+        />{/if}
+    </Dialog.Content>
+  </Dialog.Portal>
+</Dialog.Root>
+
+<style>
+  .h-result-hero {
+    border-top: 3px solid var(--h-gold);
+  }
+  .h-record-comparison {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    align-items: end;
+  }
+  .h-result-record {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 900;
+    color: var(--h-gold);
+  }
+  .h-result-record.h-negative {
+    color: var(--h-pink);
+  }
+  .h-result-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+    border-top: 1px solid #465273;
+    padding-top: 16px;
+  }
+  .h-result-metrics dt {
+    font-size: 11px;
+    color: #c1cae4;
+  }
+  .h-result-metrics dd {
+    font-size: 16px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  @media (max-width: 600px) {
+    .h-result-metrics {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .h-record-comparison {
+      gap: 8px;
+    }
+  }
+</style>
