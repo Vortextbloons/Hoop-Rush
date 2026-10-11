@@ -113,7 +113,7 @@ export {
   type SeasonPostseasonGameResolver,
   type SeasonPostseasonGameOutcome,
   type SeasonPostseasonGameSimulationInput,
-} from './season/postseason.ts';
+} from './season/postseason/index.ts';
 export {
   deriveSeasonAwards,
   SEASON_AWARD_MIN_GAME_SHARE,

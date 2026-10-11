@@ -36,7 +36,7 @@ import {
 } from './season-economy-test-support.ts';
 import { seasonPlayerAvailable } from './injuries.ts';
 import { matchStartingFive } from './rotation.ts';
-import { zeroSeasonGameTransition, type SeasonPostseasonGameResolver } from './postseason.ts';
+import { zeroSeasonGameTransition, type SeasonPostseasonGameResolver } from './postseason/index.ts';
 vi.mock('./injuries.ts', async (importOriginal) => {
   const original = await importOriginal<typeof import('./injuries.ts')>();
   return {

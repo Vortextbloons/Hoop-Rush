@@ -46,7 +46,7 @@ import {
   zeroSeasonGameTransition,
   type SeasonPostseasonGameFacts,
   type SeasonPostseasonGameResolver,
-} from './postseason.ts';
+} from './postseason/index.ts';
 import { matchStartingFive } from './rotation.ts';
 import { handleSeasonRunCommand, type SeasonRunCommandContext } from './season-commands.ts';
 import { buildEconomyTestRun, zeroEffectsOf } from './season-economy-test-support.ts';

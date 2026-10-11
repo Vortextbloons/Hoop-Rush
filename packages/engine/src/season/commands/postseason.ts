@@ -40,7 +40,7 @@ import {
   seasonPostseasonUpcomingGames,
   simulateSeasonPostseasonGame,
   type SeasonPostseasonRankingsInput,
-} from '../postseason.ts';
+} from '../postseason/index.ts';
 import { legalFiveExists, type SeasonRosterMemberInput } from '../roster-rules.ts';
 import { seasonRotationSetDigest, validateSeasonRotation } from '../rotation.ts';
 import { rankSeasonPostseason } from '../tiebreakers.ts';

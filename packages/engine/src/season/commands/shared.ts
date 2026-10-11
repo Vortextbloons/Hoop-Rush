@@ -51,7 +51,10 @@ import type {
 } from '@hoop-rush/data-contracts';
 import { authorityForFranchise, franchiseForParticipant } from '@hoop-rush/data-contracts';
 import { deriveSeasonAwards } from '../awards.ts';
-import type { SeasonPostseasonGameResolver, SeasonPostseasonRankingsFn } from '../postseason.ts';
+import type {
+  SeasonPostseasonGameResolver,
+  SeasonPostseasonRankingsFn,
+} from '../postseason/index.ts';
 import { seasonRunStateDigest, seasonRunStateDigestFactsOf } from '../state-digest.ts';
 import type { SeasonEconomyRun } from '../trades.ts';
 import { seasonEconomyRunOf } from '../trade-valuation.ts';
