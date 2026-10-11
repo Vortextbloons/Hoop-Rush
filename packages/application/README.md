@@ -51,17 +51,21 @@ Landed:
 
 Next:
 
-1. Stage 3: replace the mirrored shell state with selectors over
-   `session.getSnapshot()` and a thin reactive presenter (delete the
-   placeholder façade and manual cache mirroring in
-   `apps/web/src/routes/season/run/+layout.svelte` and
-   `apps/web/src/lib/season/season-shell-state.svelte.ts`).
-2. Stage 2 remainder: move block acceptance/commit sequencing out of
+1. Stage 2 remainder: move block acceptance/commit sequencing out of
    `season-block-runner.ts` (jobs return candidates + progress, the session
    validates and requests the atomic commit) and postseason orchestration out
    of `season-postseason-runner.ts`.
-3. Stages 4-7 as planned: engine orchestration split, remaining modes,
+2. Stages 4-7 as planned: engine orchestration split, remaining modes,
    storage/multiplayer adapters, tooling and deletion.
+
+Stage 3 landed: `apps/web/src/lib/season/season-shell-state.svelte.ts` is now
+the reactive presenter — one subscription mirrors `session.getSnapshot()`
+into `$state`, cheap views are `$derived`, and the layout
+(`routes/season/run/+layout.svelte`, 957 → 428 lines) only owns session
+lifetime, navigation, dialogs, and rendering. The mirrored `recomputeRunFacts`
+cycle and the 160-line command façade are gone; local editor state survives
+progress emits and unchanged-rotation commits (covered by
+`season-shell-state.test.ts`).
 
 Determinism guard for all of it: seeded block/postseason digests, the
 committed fixtures under `tools/cli/src/fixtures/`, and the golden suites must

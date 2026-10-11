@@ -110,3 +110,7 @@ paths change (stages 2, 4, and 6).
   postseason wire, selectors); web now constructs it through
   `season-session-ports.ts`. The old web hub and module cache are deleted;
   the session test suite (23 tests) runs in the application package.
+- 2026-10-11, stage 3: `season-shell-state.svelte.ts` became the reactive
+  presenter (single mirror of `session.getSnapshot()`, `$derived` views,
+  `init`/`dispose` lifetime); `routes/season/run/+layout.svelte` dropped from
+  957 to 428 lines with markup unchanged. New presenter suite (7 tests).

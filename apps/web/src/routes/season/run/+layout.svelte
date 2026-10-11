@@ -5,54 +5,21 @@
   import { resolve } from '$app/paths';
   import { Briefcase, LogOut, RefreshCw, Trophy, Users, X, Zap } from '@lucide/svelte';
   import { Dialog } from 'bits-ui';
-  import {
-    franchiseAbbreviation,
-    humanTeamOf,
-    type PlayersIndexEntry,
-    type Position,
-  } from '@hoop-rush/data-contracts';
   import { ordinal, provisionalRanking, recordLabel } from '$lib/season/season-presentation';
-  import { loadSeasonLeague, loadSeasonSchedule } from '$lib/season/season-assets';
-  import { getManifest, getPlayersIndex } from '$lib/data';
-  import { seasonRunLoadDiagnosticOf, SeasonSession } from '@hoop-rush/application/season';
-  import { createSeasonSessionPorts } from '$lib/season/season-session-ports';
   import { SeasonRunShell } from '$lib/season/season-shell-state.svelte';
-  import {
-    SEASON_RUN_SHELL_CONTEXT,
-    type SeasonRunShellData,
-  } from '$lib/season/season-shell-context';
-  import { catalogCandidateMap } from '$lib/season/season-catalog-index';
-  import {
-    buildVersionFaceIndex,
-    freeAgencyVersionTuples,
-    versionTupleOfRosterEntry,
-  } from '$lib/season/season-branding';
-  import {
-    createRotationEditor,
-    rotationEditorNeedsPositionRefresh,
-  } from '$lib/season/season-rotation-editor';
-  import {
-    hasPostseasonHubMethods,
-    idlePostseasonProgress,
-    POSTSEASON_ORCHESTRATION_UNAVAILABLE,
-  } from '$lib/season/season-postseason-presentation';
+  import { SEASON_RUN_SHELL_CONTEXT } from '$lib/season/season-shell-context';
   import { isNavItemActive } from '$lib/nav-items';
   import {
     buildSeasonNavGroups,
     seasonMobileNavOf,
     type SeasonNavGroup,
   } from '$lib/season/season-nav';
-  import {
-    playablePositionsOfSlice,
-    playerSliceOf,
-    type SeasonRunPlayerSlice,
-  } from '$lib/season/season-player-slice';
   import BottomNav from '$lib/components/BottomNav.svelte';
   import SeasonMasthead from '$lib/components/season/SeasonMasthead.svelte';
-  import type { RotationEditor } from '$lib/season/season-rotation-editor';
-  import type { SeasonRunPlayerSliceEntry } from '@hoop-rush/persistence';
   import '$lib/season/season-theme.css';
   let { children } = $props();
+  const shell = new SeasonRunShell();
+  setContext(SEASON_RUN_SHELL_CONTEXT, shell);
   const groups: SeasonNavGroup[] = $derived.by(() => {
     const stage = (shell.run?.stage ?? null) as Parameters<typeof buildSeasonNavGroups>[1]['stage'];
     return buildSeasonNavGroups(
@@ -70,215 +37,24 @@
     );
   });
   const { primary: mobilePrimary, overflow: mobileOverflow } = $derived(seasonMobileNavOf(groups));
+  const routeId = $derived(page.route.id);
   const activeSubGroup = $derived.by(
     () => groups.find((group) => group.children.some((c) => isNavItemActive(c, routeId))) ?? null,
   );
-  const shell = new SeasonRunShell();
-  setContext(SEASON_RUN_SHELL_CONTEXT, shell);
-  const routeId = $derived(page.route.id);
   const leagueRoute = $derived(routeId === '/season/run/league');
   const shellWidthClass = $derived(
     leagueRoute
       ? 'max-w-6xl xl:max-w-[96rem] 2xl:max-w-[110rem]'
       : 'max-w-6xl xl:max-w-7xl 2xl:max-w-[88rem]',
   );
-  let playersIndex: PlayersIndexEntry[] | null = null;
-  let faceIndexKey = '';
-  let lastHeavyMirrorAt = 0;
-  let lastHeavySnapshot: unknown = null;
-  let lastHeavyBlockPhase: string | null = null;
-  let tradeCacheSource: unknown = null;
-  let tradeCacheClone: NonNullable<SeasonRunShellData['trade']> | null = null;
-  function cloneTradeState(trade: NonNullable<SeasonRunShellData['trade']>) {
-    if (trade === tradeCacheSource && tradeCacheClone !== null) return tradeCacheClone;
-    const cloned = {
-      ...trade,
-      windows: trade.windows.map((window) => ({
-        ...window,
-        offers: window.offers.map((offer) => ({
-          ...offer,
-          seedPath: [...offer.seedPath],
-          outgoingPlayerVersionIds: [...offer.outgoingPlayerVersionIds],
-          incomingPlayerVersionIds: [...offer.incomingPlayerVersionIds],
-          outgoingHealth: offer.outgoingHealth.map((entry) => ({
-            ...entry,
-            activeInjuryIds: [...entry.activeInjuryIds],
-          })),
-          incomingHealth: offer.incomingHealth.map((entry) => ({
-            ...entry,
-            activeInjuryIds: [...entry.activeInjuryIds],
-          })),
-          valueBand: { ...offer.valueBand },
-          roleFit: {
-            ...offer.roleFit,
-            outgoingRoles: [...offer.roleFit.outgoingRoles],
-            incomingRoles: [...offer.roleFit.incomingRoles],
-          },
-          rosterNeedFacts: { ...offer.rosterNeedFacts },
-          projectedChemistryDisruption: { ...offer.projectedChemistryDisruption },
-        })),
-        boardProfiles: window.boardProfiles?.map((profile) => ({
-          ...profile,
-          needs: [...profile.needs],
-          listedPlayerIds: [...profile.listedPlayerIds],
-          discussablePlayerIds: [...profile.discussablePlayerIds],
-          protectedPlayerIds: [...profile.protectedPlayerIds],
-          hardConstraints: [...profile.hardConstraints],
-          competitorInterest:
-            profile.competitorInterest === undefined
-              ? undefined
-              : { ...profile.competitorInterest },
-        })),
-        canonicalTeamOrder:
-          window.canonicalTeamOrder === undefined ? undefined : [...window.canonicalTeamOrder],
-        negotiations: window.negotiations?.map((negotiation) => ({
-          ...negotiation,
-          exchanges: negotiation.exchanges.map((exchange) => ({ ...exchange })),
-          rejectedPlayerVersionIds: [...negotiation.rejectedPlayerVersionIds],
-          expressedInterests: [...negotiation.expressedInterests],
-        })),
-        valueTrends: window.valueTrends?.map((trend) => ({ ...trend })),
-      })),
-      humanDirectNegotiations: trade.humanDirectNegotiations?.map((negotiation) => ({
-        ...negotiation,
-        confirmations: { ...negotiation.confirmations },
-        currentProposal:
-          negotiation.currentProposal === null ? null : { ...negotiation.currentProposal },
-        counterProposal:
-          negotiation.counterProposal === null ? null : { ...negotiation.counterProposal },
-      })),
+  $effect(() => {
+    if (!import.meta.env.SSR) {
+      void shell.init();
+    }
+    return () => {
+      shell.dispose();
     };
-    tradeCacheSource = trade;
-    tradeCacheClone = cloned;
-    return cloned;
-  }
-  function recomputeRunFacts(): void {
-    const snapshot = shell.snapshot;
-    const run = snapshot?.run ?? null;
-    shell.run = run;
-    const humanTeam = run === null ? null : humanTeamOf(run.league);
-    shell.humanTeam = humanTeam;
-    shell.humanFranchiseId = humanTeam?.franchiseId ?? null;
-    shell.nextBlockIndex = snapshot === null ? null : snapshot.acceptedBlocks.length;
-    shell.seasonComplete = (shell.nextBlockIndex ?? 0) >= 9;
-    shell.health = run?.health ?? null;
-    shell.influence = run?.influence ?? null;
-    shell.trade =
-      run?.trade !== null && run?.trade !== undefined ? cloneTradeState(run.trade) : null;
-    shell.freeAgency = run?.freeAgency ?? null;
-    shell.objectives = run?.objectives ?? null;
-    shell.challenges =
-      (run as unknown as { challenges?: SeasonRunShellData['challenges'] })?.challenges ?? null;
-    if (run !== null) {
-      rebuildFacesIfNeeded(run);
-      const rebuilt = rebuildRotationEditor(run);
-      shell.editor = rebuilt.editor;
-      shell.editorKey = rebuilt.key;
-    } else {
-      shell.facesByVersion = new Map();
-      faceIndexKey = '';
-      shell.editor = null;
-      shell.editorKey = null;
-    }
-  }
-  function rebuildFacesIfNeeded(run: NonNullable<SeasonRunShellData['run']>): void {
-    if (playersIndex === null) return;
-    const catalog = shell.catalog;
-    const freeAgencyKey =
-      run.freeAgency === null || run.freeAgency === undefined
-        ? 'no-fa'
-        : run.freeAgency.windows
-            .map((window) =>
-              window.candidates.map((candidate) => candidate.playerVersionId).join(','),
-            )
-            .join('|');
-    const key = `${run.runId}:${run.rosters
-      .map(
-        (roster) =>
-          `${roster.franchiseId}:${roster.players.map((p) => p.playerVersionId).join(',')}`,
-      )
-      .join('|')}:${freeAgencyKey}:${catalog === null ? 'no-catalog' : 'catalog'}`;
-    if (key === faceIndexKey) return;
-    const candidates = catalog === null ? null : catalogCandidateMap(catalog);
-    const tuples = [
-      ...run.rosters.flatMap((roster) =>
-        roster.players.map((entry) =>
-          versionTupleOfRosterEntry(entry, candidates?.get(entry.playerVersionId) ?? null),
-        ),
-      ),
-      ...freeAgencyVersionTuples(run.freeAgency, catalog),
-    ];
-    shell.facesByVersion = buildVersionFaceIndex(playersIndex, tuples);
-    faceIndexKey = key;
-  }
-  function rebuildRotationEditor(run: NonNullable<SeasonRunShellData['run']>): {
-    editor: RotationEditor | null;
-    key: string | null;
-  } {
-    const franchiseId = shell.humanFranchiseId;
-    if (franchiseId === null) return { editor: null, key: null };
-    const rotation = run.rotations.find((r) => r.franchiseId === franchiseId);
-    const roster = run.rosters.find((r) => r.franchiseId === franchiseId);
-    if (rotation === undefined || roster === undefined) return { editor: null, key: null };
-    const key = `${run.runId}:${rotation.starters.join(',')}:${rotation.closingFive.join(',')}`;
-    const rosterIds = roster.players.map((entry) => entry.playerVersionId);
-    if (
-      shell.editorKey === key &&
-      shell.editor !== null &&
-      !rotationEditorNeedsPositionRefresh(
-        shell.editor,
-        rosterIds,
-        (playerVersionId) =>
-          playablePositionsOfSlice(shell.playerSlice, playerVersionId) as readonly Position[],
-      )
-    ) {
-      return { editor: shell.editor, key };
-    }
-    const members = roster.players.map((entry) => ({
-      playerVersionId: entry.playerVersionId,
-      displayName: entry.displayName,
-      playable: playablePositionsOfSlice(
-        shell.playerSlice,
-        entry.playerVersionId,
-      ) as readonly Position[],
-      franchiseId: entry.franchiseId,
-      eraId: entry.eraId,
-      seasonKey: entry.seasonKey,
-    }));
-    return { editor: createRotationEditor(rotation, members), key };
-  }
-  function mirrorHub(forceHeavy = false): void {
-    const hub = shell.hub;
-    if (hub === null) return;
-    shell.snapshot = hub.snapshot;
-    shell.index = hub.index;
-    shell.block = hub.block;
-    shell.postseason = hasPostseasonHubMethods(hub) ? hub.postseason : shell.postseason;
-    shell.pending = hub.pending;
-    shell.interruption = hub.interruption;
-    shell.commandError = hub.commandError;
-    shell.commandReceipt = hub.commandReceipt;
-    shell.hubError = hub.error;
-    shell.externalChange = hub.externalChange;
-    const phase = hub.block.phase;
-    const snapshotChanged = shell.snapshot !== lastHeavySnapshot;
-    const phaseChanged = phase !== lastHeavyBlockPhase;
-    const now = Date.now();
-    const isTerminal = phase !== 'running';
-    if (
-      !forceHeavy &&
-      !snapshotChanged &&
-      !phaseChanged &&
-      !isTerminal &&
-      now - lastHeavyMirrorAt < 1000
-    )
-      return;
-    lastHeavyMirrorAt = now;
-    lastHeavySnapshot = shell.snapshot;
-    lastHeavyBlockPhase = phase;
-    recomputeRunFacts();
-  }
-  let unsubscribeHub: (() => void) | null = null;
+  });
   let quitOpen = $state(false);
   let quitting = $state(false);
   let quitError: string | null = $state(null);
@@ -305,7 +81,6 @@
       clearOpen = false;
       shell.error = null;
       shell.hubError = null;
-      mirrorHub();
       await goto(resolve('/season'));
     } catch (error) {
       clearError = error instanceof Error ? error.message : String(error);
@@ -329,312 +104,6 @@
       quitting = false;
     }
   }
-  $effect(() => {
-    if (!import.meta.env.SSR) {
-      void initShell();
-    }
-    return () => {
-      unsubscribeHub?.();
-      unsubscribeHub = null;
-      const hub = shell.hub;
-      if (hub !== null) {
-        hub.destroy();
-        shell.hub = null;
-      }
-    };
-  });
-  async function initShell(): Promise<void> {
-    try {
-      const [manifest, league, schedule] = await Promise.all([
-        getManifest(),
-        loadSeasonLeague(),
-        loadSeasonSchedule(),
-      ]);
-      shell.manifest = manifest;
-      shell.league = league;
-      shell.schedule = schedule;
-      const hub = new SeasonSession(await createSeasonSessionPorts({ schedule }));
-      shell.hub = hub;
-      unsubscribeHub = hub.subscribe(() => mirrorHub());
-      hub.prewarm();
-      await hub.refresh();
-      mirrorHub(true);
-      await loadPlayerSlice();
-      mirrorHub(true);
-      scheduleLazyWork();
-    } catch (error) {
-      shell.error = seasonRunLoadDiagnosticOf(error, 'SEASON_RUN_INIT_FAILED');
-    } finally {
-      shell.ready = true;
-    }
-  }
-  async function loadPlayerSlice(): Promise<void> {
-    const runId = shell.snapshot?.run.runId ?? null;
-    if (runId === null) {
-      shell.playerSlice = new Map();
-      shell.playerSliceReady = true;
-      return;
-    }
-    try {
-      const entries = await shell.hub?.loadPlayerSlice(runId);
-      shell.playerSlice = playerSliceOf(entries ?? []);
-    } catch {
-      shell.playerSlice = new Map();
-    } finally {
-      shell.playerSliceReady = true;
-    }
-  }
-  function scheduleLazyWork(): void {
-    const run = () => {
-      void lazyLoadAssets();
-    };
-    if (typeof requestIdleCallback !== 'undefined') {
-      requestIdleCallback(run, { timeout: 2500 });
-    } else {
-      setTimeout(run, 0);
-    }
-  }
-  async function lazyLoadAssets(): Promise<void> {
-    if (import.meta.env.SSR) return;
-    try {
-      const [{ loadSeasonDraftCatalog }, index] = await Promise.all([
-        import('$lib/season/season-assets'),
-        getPlayersIndex(),
-      ]);
-      const catalog = await loadSeasonDraftCatalog();
-      shell.catalog = catalog;
-      if (shell.hub !== null) {
-        shell.hub.catalog = catalog;
-      }
-      playersIndex = index.players;
-      shell.playersIndex = index.players;
-      shell.facesReady = true;
-      if (shell.run !== null) {
-        rebuildFacesIfNeeded(shell.run);
-      }
-      await topUpPlayerSliceFromCatalog(catalog);
-      mirrorHub();
-      shell.hub?.prewarm();
-    } catch {}
-  }
-  async function topUpPlayerSliceFromCatalog(
-    catalog: NonNullable<SeasonRunShellData['catalog']>,
-  ): Promise<void> {
-    const run = shell.run;
-    const hub = shell.hub;
-    if (run === null || hub === null) return;
-    const byVersion = new Map<string, SeasonRunPlayerSliceEntry>();
-    for (const entry of shell.playerSlice.values()) {
-      byVersion.set(entry.playerVersionId, entry);
-    }
-    const candidates = new Map(
-      catalog.candidates.map((candidate) => [candidate.playerVersionId, candidate]),
-    );
-    const missing: SeasonRunPlayerSliceEntry[] = [];
-    for (const roster of run.rosters) {
-      for (const entry of roster.players) {
-        if (byVersion.has(entry.playerVersionId)) continue;
-        const candidate = candidates.get(entry.playerVersionId);
-        if (candidate === undefined) continue;
-        missing.push({
-          playerVersionId: entry.playerVersionId,
-          playerId: entry.playerId,
-          franchiseId: candidate.franchiseId,
-          eraId: candidate.eraId,
-          seasonKey: candidate.seasonKey,
-          displayName: entry.displayName,
-          positionsPlayable: [...candidate.positions.playable],
-          summaryRatings: { ...candidate.summaryRatings },
-          staminaRating: candidate.stamina.rating,
-          durabilityRating: candidate.durability.rating,
-        });
-      }
-    }
-    if (missing.length === 0) return;
-    await hub.upsertPlayerSlice(run.runId, missing);
-    const merged = playerSliceOf([...byVersion.values(), ...missing]);
-    shell.playerSlice = merged;
-  }
-  shell.cancelBlock = () => shell.hub?.cancel();
-  shell.retryBlock = () => void shell.hub?.retry();
-  shell.acknowledgeExternalChange = () => {
-    shell.hub?.acknowledgeExternalChange();
-    shell.externalChange = null;
-  };
-  shell.prewarmWorker = () => shell.hub?.prewarm();
-  shell.refresh = async () => {
-    await shell.hub?.refresh();
-    mirrorHub();
-  };
-  shell.quitRun = async () => {
-    if (shell.hub === null) {
-      return { ok: false, error: 'season hub is not ready' };
-    }
-    return shell.hub.quitRun();
-  };
-  shell.spendInfluence = async (input) => {
-    await shell.hub?.spendInfluence(input);
-    mirrorHub();
-  };
-  shell.acceptTradeOffer = async (input) => {
-    await shell.hub?.acceptTradeOffer(input);
-    mirrorHub();
-    if (shell.catalog !== null) {
-      await topUpPlayerSliceFromCatalog(shell.catalog);
-      mirrorHub();
-    }
-  };
-  shell.declineTradeOffer = async (input) => {
-    await shell.hub?.declineTradeOffer(input);
-    mirrorHub();
-  };
-  shell.declareFreeAgentInterest = async (input) => {
-    await shell.hub?.declareFreeAgentInterest(input);
-    mirrorHub();
-  };
-  shell.skipFreeAgentMarket = async (input) => {
-    await shell.hub?.skipFreeAgentMarket(input);
-    mirrorHub();
-  };
-  shell.resolveFreeAgentMarket = async (input) => {
-    await shell.hub?.resolveFreeAgentMarket(input);
-    mirrorHub();
-    if (shell.catalog !== null) {
-      await topUpPlayerSliceFromCatalog(shell.catalog);
-      mirrorHub();
-    }
-  };
-  shell.forfeitInterruptedGame = async () => {
-    await shell.hub?.forfeitInterruptedGame();
-    mirrorHub();
-  };
-  shell.resumeBlock = async () => {
-    await shell.hub?.resumeBlock();
-    mirrorHub();
-  };
-  shell.selectFrontOffice = async (input) => {
-    await shell.hub?.selectFrontOffice(input);
-    mirrorHub();
-  };
-  shell.selectCourtInnovation = async (input) => {
-    await shell.hub?.selectCourtInnovation(input);
-    mirrorHub();
-  };
-  shell.openTradeInquiry = async (input) => {
-    await shell.hub?.openTradeInquiry(input);
-    mirrorHub();
-  };
-  shell.submitTradeProposal = async (input) => {
-    await shell.hub?.submitTradeProposal(input);
-    mirrorHub();
-  };
-  shell.respondToTradeCounter = async (input) => {
-    await shell.hub?.respondToTradeCounter(input);
-    mirrorHub();
-    if (shell.catalog !== null) {
-      await topUpPlayerSliceFromCatalog(shell.catalog);
-      mirrorHub();
-    }
-  };
-  shell.walkAwayFromTrade = async (input) => {
-    await shell.hub?.walkAwayFromTrade(input);
-    mirrorHub();
-  };
-  shell.purchaseTradeInquiry = async (input) => {
-    await shell.hub?.purchaseTradeInquiry(input);
-    mirrorHub();
-  };
-  function postseasonUnavailable(): void {
-    shell.postseason = {
-      ...idlePostseasonProgress(),
-      phase: 'failed',
-      error: { code: 'unavailable', message: POSTSEASON_ORCHESTRATION_UNAVAILABLE },
-    };
-  }
-  shell.startPostseason = async () => {
-    const hub = shell.hub;
-    if (hub === null) return;
-    if (!hasPostseasonHubMethods(hub)) {
-      postseasonUnavailable();
-      return;
-    }
-    await hub.startPostseason();
-    mirrorHub();
-  };
-  shell.advancePostseason = async (input) => {
-    const hub = shell.hub;
-    if (hub === null) return;
-    if (!hasPostseasonHubMethods(hub)) {
-      postseasonUnavailable();
-      return;
-    }
-    await hub.advancePostseason(input);
-    mirrorHub();
-  };
-  shell.forfeitPostseasonGame = async (input) => {
-    const hub = shell.hub;
-    if (hub === null) return;
-    if (!hasPostseasonHubMethods(hub)) {
-      postseasonUnavailable();
-      return;
-    }
-    await hub.forfeitPostseasonGame(input);
-    mirrorHub();
-  };
-  shell.submitPostseasonRotation = async (input) => {
-    const hub = shell.hub;
-    if (hub === null) return;
-    if (!hasPostseasonHubMethods(hub)) {
-      postseasonUnavailable();
-      return;
-    }
-    await hub.submitPostseasonRotation(input);
-    mirrorHub();
-  };
-  shell.spectatePostseasonGame = async (input) => {
-    const hub = shell.hub;
-    if (hub === null) return;
-    if (!hasPostseasonHubMethods(hub)) {
-      postseasonUnavailable();
-      return;
-    }
-    await hub.spectatePostseasonGame(input);
-    mirrorHub();
-  };
-  shell.fastForwardPostseason = async (input) => {
-    const hub = shell.hub;
-    if (hub === null) return;
-    if (!hasPostseasonHubMethods(hub)) {
-      postseasonUnavailable();
-      return;
-    }
-    await hub.fastForwardPostseason(input);
-    mirrorHub();
-  };
-  shell.cancelPostseason = () => {
-    const hub = shell.hub;
-    if (hub !== null && hasPostseasonHubMethods(hub)) {
-      hub.cancelPostseason();
-    }
-  };
-  shell.playerName = (playerVersionId: string): string => {
-    for (const roster of shell.run?.rosters ?? []) {
-      const entry = roster.players.find((p) => p.playerVersionId === playerVersionId);
-      if (entry !== undefined) return entry.displayName;
-    }
-    return '';
-  };
-  shell.playablePositions = (playerVersionId: string): readonly string[] =>
-    playablePositionsOfSlice(shell.playerSlice, playerVersionId);
-  shell.franchiseName = (franchiseId: string): string => {
-    return (
-      shell.manifest?.modernFranchiseSlots.find((slot) => slot.franchiseId === franchiseId)
-        ?.displayName ?? franchiseId
-    );
-  };
-  shell.franchiseAbbrev = (franchiseId: string): string => {
-    return franchiseAbbreviation(franchiseId);
-  };
   const rankingWeak = new WeakMap<object, ReturnType<typeof provisionalRanking>>();
   const rankingByDigest = new Map<string, ReturnType<typeof provisionalRanking>>();
   function standingsDigest(
