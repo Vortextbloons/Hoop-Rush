@@ -1047,6 +1047,10 @@ export function createInMemoryDraftDuelTransport(options?: {
       if (record.snapshot.phase !== 'championship') {
         throw Object.assign(new Error('phase'), { code: 'phase', retryable: false });
       }
+      if (record.snapshot.successorRoomId) {
+        const successor = recordFor(record.snapshot.successorRoomId);
+        return { snapshot: successor.snapshot, code: successor.code };
+      }
       const created = await createRoom({
         fairness: record.snapshot.settings.fairness,
         presentation: record.snapshot.settings.presentation,

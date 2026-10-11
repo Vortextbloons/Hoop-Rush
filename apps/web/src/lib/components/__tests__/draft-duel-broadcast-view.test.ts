@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { render } from '@testing-library/svelte';
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render } from '@testing-library/svelte';
 import {
   DRAFT_DUEL_TAPE_STAT_FIELDS,
   DRAFT_DUEL_TAPE_VERSION,
@@ -181,6 +181,8 @@ describe('BroadcastView', () => {
         progress: 0.35,
         localParticipantId: 'p1' as const,
         feed,
+        speed: 1,
+        onspeedchange: vi.fn(),
       },
     });
     expect(container.querySelector('[data-score="local"]')?.textContent).toBe('12');
@@ -206,13 +208,16 @@ describe('BroadcastView', () => {
         progress: 0.35,
         localParticipantId: 'p1' as const,
         feed,
+        speed: 1,
+        onspeedchange: vi.fn(),
       },
     });
-    expect(container.querySelector('.score-clock')?.textContent).toContain('Q2 · 5:30');
+    expect(container.querySelector('.bc-clock')?.textContent).toContain('Q2 · 5:30');
     expect(getByText('No score · Rebound')).toBeTruthy();
   });
 
-  it('has no skip or seek controls', () => {
+  it('has no skip or seek controls beyond the playback speed toggle', async () => {
+    const onspeedchange = vi.fn();
     const { container } = render(BroadcastView, {
       props: {
         output: makeOutput(),
@@ -220,11 +225,19 @@ describe('BroadcastView', () => {
         progress: 0.35,
         localParticipantId: 'p1' as const,
         feed,
+        speed: 1,
+        onspeedchange,
       },
     });
-    expect(
-      container.querySelectorAll('button, input, select, textarea, [role="slider"]'),
-    ).toHaveLength(0);
+    expect(container.querySelectorAll('input, select, textarea, [role="slider"]')).toHaveLength(0);
     expect(container.textContent.toLowerCase()).not.toMatch(/skip|seek/);
+    const speedButtons = Array.from(container.querySelectorAll('.bc-speed-btn'));
+    expect(speedButtons.map((button) => button.textContent)).toEqual(['1×', '2×']);
+    expect(speedButtons.map((button) => button.getAttribute('aria-pressed'))).toEqual([
+      'true',
+      'false',
+    ]);
+    if (speedButtons[1]) await fireEvent.click(speedButtons[1]);
+    expect(onspeedchange).toHaveBeenCalledWith(2);
   });
 });

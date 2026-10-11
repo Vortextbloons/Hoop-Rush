@@ -1,12 +1,20 @@
-import { canonicalJson } from '@hoop-rush/data-contracts';
-import { FoldHavocAggregate, buildHavocGameInput } from '@hoop-rush/engine';
+import { HAVOC_GAME_COUNT, canonicalJson, type HavocRunState } from '@hoop-rush/data-contracts';
+import {
+  FoldHavocAggregate,
+  buildHavocGameInput,
+  createHavocCommandEnvironment,
+} from '@hoop-rush/engine';
 import { UsageError } from '../args.ts';
 import { EXIT_USAGE_OR_DATA_ERROR, makeReport, type CliReport } from '../report.ts';
 import {
   HavocCliError,
+  acceptHavocCliVariant,
+  adaptHavocCliCatalog,
+  canonicalHavocComparisonOf,
+  canonicalHavocReportOf,
   havocAuditReportSchema,
-  havocCliComparisonOf,
   havocCliInputPairCheck,
+  havocCliLockSourcesOf,
   havocCliReportDigest,
   havocSimulateReportSchema,
   loadHavocCliAssets,
@@ -215,13 +223,17 @@ export function auditHavocSimulateReport(
     findings.push(`game: the report recorded ${String(report.failures.length)} failures`);
   }
 
+  const environment = createHavocCommandEnvironment(adaptHavocCliCatalog(assets));
+  const lockSources = havocCliLockSourcesOf(assets);
   let havocRun: HavocCliVariantRun | null = null;
   let normalRun: HavocCliVariantRun | null = null;
+  let acceptedState: HavocRunState | null = null;
   if (replayed !== null) {
     havocRun = simulateHavocCliVariant({
       locked: replayed.locked,
       variant: 'havoc',
       gameNumbers: report.havoc.games.map((game) => game.gameNumber),
+      retainResults: true,
     });
     checks.havocGames = havocRun.games.length;
     if (!compareReSimulatedGames('havoc', report.havoc, havocRun, findings)) {
@@ -232,6 +244,7 @@ export function auditHavocSimulateReport(
         locked: replayed.locked,
         variant: 'normal',
         gameNumbers: report.normal.games.map((game) => game.gameNumber),
+        retainResults: true,
       });
       checks.normalGames = normalRun.games.length;
       if (!compareReSimulatedGames('normal', report.normal, normalRun, findings)) {
@@ -267,20 +280,75 @@ export function auditHavocSimulateReport(
     (report.normal === null || reconcileAggregate('normal', report.normal, findings));
   if (!aggregatesOk) checks.aggregates = false;
 
-  if (report.comparison !== null && havocRun !== null && normalRun !== null) {
-    const recomputed = havocCliComparisonOf(havocRun, normalRun);
-    if (!sameJson(recomputed, report.comparison)) {
-      findings.push('aggregate: comparison section disagrees with the re-simulated paired seasons');
+  if (replayed !== null && havocRun !== null && havocRun.failures.length === 0) {
+    try {
+      acceptedState = acceptHavocCliVariant({
+        state: replayed.state,
+        environment,
+        lockSources,
+        run: havocRun,
+      });
+    } catch (error) {
+      findings.push(
+        `aggregate: havoc acceptance replay failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
       checks.aggregates = false;
     }
   }
   if (
-    report.comparison === null &&
-    report.normal !== null &&
+    replayed !== null &&
+    acceptedState !== null &&
     havocRun !== null &&
-    normalRun !== null
+    normalRun !== null &&
+    havocRun.failures.length === 0 &&
+    normalRun.failures.length === 0 &&
+    havocRun.results.length === HAVOC_GAME_COUNT &&
+    normalRun.results.length === HAVOC_GAME_COUNT &&
+    report.comparison !== null &&
+    report.report !== null
   ) {
-    findings.push('aggregate: normal season recorded without a comparison section');
+    try {
+      const stateAfterNormal = acceptHavocCliVariant({
+        state: acceptedState,
+        environment,
+        lockSources,
+        run: normalRun,
+      });
+      const recomputedComparison = canonicalHavocComparisonOf({
+        runId: report.runId,
+        locked: replayed.locked,
+        havoc: havocRun,
+        normal: normalRun,
+      });
+      if (!sameJson(recomputedComparison, report.comparison)) {
+        findings.push(
+          'aggregate: canonical comparison disagrees with the re-simulated paired seasons',
+        );
+        checks.aggregates = false;
+      }
+      const recomputedReport = canonicalHavocReportOf({
+        state: stateAfterNormal,
+        havoc: havocRun,
+        normal: normalRun,
+        comparison: recomputedComparison,
+      });
+      if (!sameJson(recomputedReport, report.report)) {
+        findings.push('aggregate: canonical report disagrees with the re-simulated paired seasons');
+        checks.aggregates = false;
+      }
+    } catch (error) {
+      findings.push(
+        `aggregate: canonical comparison/report replay failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      checks.aggregates = false;
+    }
+  }
+  if (report.normal !== null && (report.comparison === null || report.report === null)) {
+    findings.push('aggregate: normal season recorded without the canonical comparison/report');
+    checks.aggregates = false;
+  }
+  if (report.normal === null && (report.comparison !== null || report.report !== null)) {
+    findings.push('aggregate: comparison/report recorded without a normal season');
     checks.aggregates = false;
   }
 
@@ -312,10 +380,22 @@ function unwrapReportJson(value: unknown): unknown {
   return value;
 }
 
-export function havocAudit(args: { input: string | null; manifest: string | null }): CliReport {
-  const input = { input: args.input, manifest: args.manifest };
-  const inputPath = args.input;
-  if (inputPath === null) throw new UsageError('havoc audit requires --input <report.json>');
+export function havocAudit(args: {
+  input: string | null;
+  positional?: string | null;
+  manifest: string | null;
+}): CliReport {
+  const positional = args.positional ?? null;
+  if (args.input !== null && positional !== null && args.input !== positional) {
+    throw new UsageError(
+      `havoc audit received both --input and a positional report path; provide one`,
+    );
+  }
+  const inputPath = args.input ?? positional;
+  const input = { input: inputPath, manifest: args.manifest };
+  if (inputPath === null) {
+    throw new UsageError('havoc audit requires --input <report.json> or a positional path');
+  }
   let parsedReport: HavocSimulateReport;
   try {
     const parsed = havocSimulateReportSchema.safeParse(

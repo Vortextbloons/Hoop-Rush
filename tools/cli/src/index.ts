@@ -331,7 +331,22 @@ const COMMANDS: Record<string, CommandDef> = {
   },
   'havoc audit': {
     options: HAVOC_AUDIT_OPTIONS,
-    run: (args) => havocAudit({ input: n(args, 'input'), manifest: n(args, 'manifest') }),
+    run: (args) => {
+      const inline = args.command[2] ?? null;
+      const trailing = args.positional[0] ?? null;
+      if (
+        args.command.length > 3 ||
+        args.positional.length > 1 ||
+        (inline !== null && trailing !== null)
+      ) {
+        throw new UsageError('havoc audit accepts at most one report path');
+      }
+      return havocAudit({
+        input: n(args, 'input'),
+        positional: inline ?? trailing,
+        manifest: n(args, 'manifest'),
+      });
+    },
   },
   'havoc calibrate': {
     options: HAVOC_CALIBRATE_OPTIONS,
@@ -890,7 +905,8 @@ async function main(argv: string[]): Promise<{
       format: 'text',
     };
   }
-  if (parsed.positional.length > 0) {
+  const positionalLimit = commandKey === 'havoc audit' ? 1 : 0;
+  if (parsed.positional.length > positionalLimit) {
     return {
       report: usageError(`unexpected positional arguments: ${parsed.positional.join(' ')}`),
       format: 'text',

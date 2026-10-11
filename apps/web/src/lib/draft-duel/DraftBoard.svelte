@@ -1,5 +1,9 @@
 <script lang="ts">
-  import type { DraftDuelOfferedPick, DraftDuelPresentation } from '@hoop-rush/data-contracts';
+  import type {
+    DraftDuelOfferedPick,
+    DraftDuelPresentation,
+    HoopRushManifest,
+  } from '@hoop-rush/data-contracts';
   import { DRAFT_DUEL_PICK_ANIMATION_MS } from '@hoop-rush/data-contracts';
   import DraftCard from './DraftCard.svelte';
 
@@ -8,18 +12,20 @@
     active,
     round,
     presentation,
+    manifest = null,
     selectedSlot = null,
     disabled = false,
-    onpick,
+    onchoose,
     onconsider,
   }: {
     offers: DraftDuelOfferedPick[];
     active: boolean;
     round: number;
     presentation: DraftDuelPresentation;
+    manifest?: HoopRushManifest | null;
     selectedSlot?: number | null;
     disabled?: boolean;
-    onpick?: (pick: DraftDuelOfferedPick) => void;
+    onchoose?: (pick: DraftDuelOfferedPick) => void;
     onconsider?: (pick: DraftDuelOfferedPick | null) => void;
   } = $props();
 
@@ -38,7 +44,7 @@
 
   function pickCard(pick: DraftDuelOfferedPick): void {
     if (!canPick || !pick.available) return;
-    onpick?.(pick);
+    onchoose?.(pick);
   }
 
   function considerCard(pick: DraftDuelOfferedPick | null): void {
@@ -60,7 +66,7 @@
     <div class="dd-board-heading">
       <p class="dd-board-round" data-round-label>Round {round} of 5</p>
       <p class="dd-board-turn" data-turn-label>
-        {active ? 'Your pick' : disabled ? 'Picks locked' : 'Opponent picking'}
+        {disabled ? 'Picks locked' : active ? 'Your pick' : 'Opponent picking'}
       </p>
     </div>
     <span class="dd-board-dots" aria-hidden="true">
@@ -80,6 +86,7 @@
         <DraftCard
           card={pick.card}
           {presentation}
+          {manifest}
           disabled={!canPick || !pick.available}
           reason={pick.reason ?? (!active ? 'turn' : null)}
           selected={selectedSlot === pick.slot}
@@ -176,8 +183,8 @@
   }
 
   .dd-board-dots .current {
-    border-color: var(--color-accent);
-    background: var(--color-accent);
+    border-color: var(--color-primary);
+    background: var(--color-primary);
   }
 
   .dd-board-grid {
@@ -196,7 +203,7 @@
 
   .dd-board-slot[data-state='considering'] {
     border-radius: 14px;
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 35%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 35%, transparent);
   }
 
   @keyframes dd-picked {

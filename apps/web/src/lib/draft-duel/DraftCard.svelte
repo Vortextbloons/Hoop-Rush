@@ -3,14 +3,17 @@
     DraftDuelCard,
     DraftDuelPresentation,
     DraftDuelUnavailableReason,
+    HoopRushManifest,
   } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
+  import PlayerFace from '$lib/components/PlayerFace.svelte';
   import { formatPositions } from '$lib/player-positions';
   import { DRAFT_DUEL_REASON_LABELS, draftDuelCardView } from './draft-duel-card-view.ts';
 
   let {
     card,
     presentation,
+    manifest = null,
     disabled = false,
     reason = null,
     selected = false,
@@ -21,6 +24,7 @@
   }: {
     card: DraftDuelCard;
     presentation: DraftDuelPresentation;
+    manifest?: HoopRushManifest | null;
     disabled?: boolean;
     reason?: DraftDuelUnavailableReason | null;
     selected?: boolean;
@@ -97,11 +101,21 @@
   onclick={handleSelect}
   onpointerenter={considerOn}
   onpointerleave={considerOff}
+  onpointerdown={considerOn}
   onfocus={considerOn}
   onblur={considerOff}
 >
   <span class="dd-card-top">
-    <span class="dd-card-face" aria-hidden="true">{initials}</span>
+    {#if manifest && card.playerExternalId}
+      <PlayerFace
+        player={{ playerId: card.playerId, playerExternalId: card.playerExternalId, altIds: null }}
+        {manifest}
+        size="sm"
+        fallbackInitials={initials}
+      />
+    {:else}
+      <span class="dd-card-face" aria-hidden="true">{initials}</span>
+    {/if}
     <span class="dd-card-ident">
       <span class="dd-card-name">{view.displayName}</span>
       <span class="dd-card-season">{view.seasonKey}</span>
@@ -168,7 +182,7 @@
 
   .dd-card-considering {
     border-style: dashed;
-    border-color: var(--color-accent);
+    border-color: var(--color-primary);
   }
 
   .dd-card-disabled {
@@ -183,10 +197,10 @@
   }
 
   .dd-card-elite {
-    border-color: var(--color-accent);
+    border-color: var(--color-primary);
     box-shadow:
-      0 0 0 1px color-mix(in srgb, var(--color-accent) 40%, transparent),
-      0 0 18px color-mix(in srgb, var(--color-accent) 18%, transparent);
+      0 0 0 1px color-mix(in srgb, var(--color-primary) 40%, transparent),
+      0 0 18px color-mix(in srgb, var(--color-primary) 18%, transparent);
   }
 
   .dd-card-elite::before {
@@ -197,13 +211,13 @@
     right: 12%;
     height: 2px;
     border-radius: 999px;
-    background: linear-gradient(90deg, transparent, var(--color-accent), transparent);
+    background: linear-gradient(90deg, transparent, var(--color-primary), transparent);
   }
 
   .dd-card-elite.dd-card-selected {
     box-shadow:
       0 0 0 1px color-mix(in srgb, var(--color-primary) 55%, transparent),
-      0 0 18px color-mix(in srgb, var(--color-accent) 24%, transparent);
+      0 0 18px color-mix(in srgb, var(--color-primary) 24%, transparent);
   }
 
   .dd-card-top {
@@ -256,10 +270,10 @@
     flex: none;
     justify-items: center;
     padding: 0.15rem 0.35rem 0.2rem;
-    border: 1px solid color-mix(in srgb, var(--color-accent) 60%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-primary) 60%, transparent);
     border-radius: 8px;
     background: color-mix(in srgb, var(--color-surface-2) 80%, transparent);
-    color: var(--color-accent);
+    color: var(--color-primary);
     line-height: 0.95;
   }
 
@@ -310,10 +324,10 @@
     display: inline-flex;
     align-items: center;
     padding: 0.12rem 0.45rem;
-    border: 1px solid color-mix(in srgb, var(--color-accent) 55%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-primary) 55%, transparent);
     border-radius: 999px;
-    background: color-mix(in srgb, var(--color-accent) 10%, transparent);
-    color: var(--color-accent);
+    background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+    color: var(--color-primary);
     font-family: var(--font-mono);
     font-size: 9px;
     font-weight: 800;

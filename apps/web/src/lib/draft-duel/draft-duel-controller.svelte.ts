@@ -41,6 +41,7 @@ import { DraftDuelRunner } from '$lib/draft-duel-runner';
 import {
   draftDuelVisibleEventCount,
   draftDuelVisibleState,
+  type DraftDuelPlaybackSpeed,
   type DraftDuelVisibleState,
 } from '$lib/draft-duel-playback';
 import {
@@ -84,6 +85,7 @@ export class DraftDuelController {
   notice = $state<string | null>(null);
   integrityFailed = $state(false);
   muted = $state(false);
+  playbackSpeed = $state<DraftDuelPlaybackSpeed>(1);
 
   private transport: DraftDuelMultiplayerTransport = getDraftDuelTransport();
   private repo = new DexieDraftDuelRepository();
@@ -91,9 +93,12 @@ export class DraftDuelController {
   private subscriptions: Array<{ unsubscribe: () => void }> = [];
   private tickTimer: ReturnType<typeof setInterval> | null = null;
   private rafId: number | null = null;
+  private playbackElapsedMs = 0;
+  private playbackLastFrameMs: number | null = null;
   private commands: DraftDuelCommand[] = [];
   private resolvedCursor: string | null = null;
   private deadlineResolving = false;
+  private deadlineRetryAtMs = 0;
   private syncing = false;
   private syncQueued = false;
   private preparingSinceMs = $state<number | null>(null);
@@ -403,7 +408,17 @@ export class DraftDuelController {
   }
 
   async confirmRematch(): Promise<void> {
-    await this.submit({ kind: 'rematch-confirm' });
+    const accepted = await this.submit({ kind: 'rematch-confirm' });
+    if (!accepted || !this.roomId) return;
+    this.busy = true;
+    try {
+      await this.transport.rematch(this.roomId);
+      await this.syncFromServer();
+    } catch (error) {
+      this.error = friendlyDraftDuelJoinError(error);
+    } finally {
+      this.busy = false;
+    }
   }
 
   async followRematch(): Promise<Id | null> {
@@ -477,6 +492,10 @@ export class DraftDuelController {
     this.muted = muted;
   }
 
+  setPlaybackSpeed(speed: DraftDuelPlaybackSpeed): void {
+    this.playbackSpeed = speed;
+  }
+
   dispose(): void {
     this.disposed = true;
     if (this.tickTimer !== null) {
@@ -530,6 +549,7 @@ export class DraftDuelController {
   }
 
   private applySnapshot(snapshot: DraftDuelRoomSnapshot): void {
+    if (this.disposed || (this.snapshot && snapshot.revision < this.snapshot.revision)) return;
     const previousPhase = this.snapshot?.phase ?? null;
     const previousBroadcastGame = this.snapshot?.broadcast?.gameNumber ?? null;
     this.snapshot = snapshot;
@@ -567,6 +587,7 @@ export class DraftDuelController {
       this.phase === 'drafting' &&
       deadline &&
       this.now >= Date.parse(deadline.deadlineAt) &&
+      this.now >= this.deadlineRetryAtMs &&
       this.resolvedCursor !== deadline.cursor
     ) {
       void this.resolveDeadline(deadline.cursor, deadline.pickOrdinal);
@@ -598,17 +619,12 @@ export class DraftDuelController {
         seedPath: timeoutPick.seedPath,
       };
       await this.transport.commitFallback(this.roomId, cursor, payload);
-      await this.transport.submitCommand({
-        schemaVersion: 1,
-        roomId: this.roomId,
-        commandId: commandIdSchema.parse(`timeout-${cursor}-${String(timeoutPick.pickOrdinal)}`),
-        actorParticipantId: this.participantId,
-        payload,
-      });
-      this.resolvedCursor = cursor;
+      const receipt = await this.transport.resolveTimeout(this.roomId);
+      if (receipt?.accepted) this.resolvedCursor = cursor;
+      else this.deadlineRetryAtMs = Date.now() + AUTO_START_RETRY_MS;
       await this.syncFromServer();
     } catch {
-      this.resolvedCursor = cursor;
+      this.deadlineRetryAtMs = Date.now() + AUTO_START_RETRY_MS;
     } finally {
       this.deadlineResolving = false;
     }
@@ -648,8 +664,13 @@ export class DraftDuelController {
       return;
     }
     this.syncing = true;
+    const isDisposed = () => this.disposed;
     try {
+      const resumed = await this.transport.resume(this.roomId);
+      if (isDisposed()) return;
+      this.applySnapshot(resumed.snapshot);
       const commands = await this.transport.refetch(this.roomId, -1);
+      if (isDisposed()) return;
       this.commands = commands;
       await this.repo.appendCommands(this.roomId, commands);
       this.rebuildDraft();
@@ -777,12 +798,18 @@ export class DraftDuelController {
     if (!broadcast || this.rafId !== null || this.disposed) return;
     const startedAt = Date.parse(broadcast.startedAtIso);
     const duration = broadcast.durationMs;
+    this.playbackElapsedMs = clamp01((Date.now() - startedAt) / duration) * duration;
+    this.playbackLastFrameMs = null;
     const loop = () => {
       if (this.disposed || this.snapshot?.phase !== 'broadcasting') {
         this.rafId = null;
         return;
       }
-      const progress = clamp01((Date.now() - startedAt) / duration);
+      const nowMs = Date.now();
+      const lastFrameMs = this.playbackLastFrameMs ?? nowMs;
+      this.playbackLastFrameMs = nowMs;
+      this.playbackElapsedMs += (nowMs - lastFrameMs) * this.playbackSpeed;
+      const progress = clamp01(this.playbackElapsedMs / duration);
       this.progress = progress;
       if (progress >= 1) {
         this.rafId = null;
@@ -940,9 +967,9 @@ export class DraftDuelController {
         seasonKey: entry.card.seasonKey,
       };
       this.consideration = consideration;
-      const token = `${playerVersionId}:${String(event.sentAtMs)}`;
+      const currentConsideration = this.consideration;
       setTimeout(() => {
-        if (`${playerVersionId}:${String(event.sentAtMs)}` === token) {
+        if (!this.disposed && this.consideration === currentConsideration) {
           this.consideration = null;
         }
       }, 2000);

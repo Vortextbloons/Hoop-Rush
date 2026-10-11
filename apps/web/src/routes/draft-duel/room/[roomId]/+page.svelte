@@ -35,7 +35,12 @@
   const controller = new DraftDuelController();
   let copiedCode = $state(false);
   let copiedLink = $state(false);
-  let pendingPick = $state<DraftDuelOfferedPick | null>(null);
+  let pendingSelection = $state<{ pick: DraftDuelOfferedPick; ordinal: number } | null>(null);
+  const pendingPick = $derived(
+    pendingSelection?.ordinal === controller.draft?.pickOrdinal && controller.activeTurn
+      ? (pendingSelection?.pick ?? null)
+      : null,
+  );
   let followingRematch = false;
 
   onMount(() => {
@@ -113,10 +118,6 @@
     return map;
   });
 
-  $effect(() => {
-    void controller.draft?.pickOrdinal;
-    pendingPick = null;
-  });
   const lastPlayedGame = $derived(controller.series?.games.at(-1) ?? null);
   const lastOutput = $derived(
     lastPlayedGame ? (controller.outputs[lastPlayedGame.gameNumber] ?? null) : null,
@@ -395,8 +396,11 @@
               presentation={controller.snapshot.settings.presentation}
               manifest={controller.assets?.manifest ?? null}
               selectedSlot={pendingPick?.slot ?? null}
-              disabled={!controller.activeTurn}
-              onchoose={(pick) => (pendingPick = pick)}
+              disabled={controller.busy}
+              onchoose={(pick) => {
+                if (controller.draft)
+                  pendingSelection = { pick, ordinal: controller.draft.pickOrdinal };
+              }}
               onconsider={(pick) => controller.consider(pick?.card ?? null)}
             />
             {#if controller.localRoster}
@@ -421,10 +425,10 @@
           legalSlots={pendingPick?.legalSlots ?? []}
           onplace={(slotIndex) => {
             const pick = pendingPick;
-            pendingPick = null;
+            pendingSelection = null;
             if (pick) void controller.pickOffer(pick, slotIndex);
           }}
-          onclose={() => (pendingPick = null)}
+          onclose={() => (pendingSelection = null)}
         />
       </section>
     {:else if controller.phase === 'lineup-showdown'}
@@ -505,6 +509,8 @@
           output={controller.currentOutput}
           visible={controller.visible}
           progress={controller.progress}
+          speed={controller.playbackSpeed}
+          onspeedchange={(speed) => controller.setPlaybackSpeed(speed)}
           localParticipantId={controller.participantId ?? 'p1'}
           feed={controller.feed}
           cards={playerCards}
@@ -536,6 +542,8 @@
           cards={playerCards}
           manifest={controller.assets?.manifest ?? null}
           rematchRequested={controller.rivalRematchRequested}
+          localRematchRequested={controller.myRematchRequested}
+          rematchBusy={controller.busy}
           rematchConfirmed={controller.successorRoomId !== null}
           onrematch={() => controller.requestRematch()}
           onconfirmrematch={() => controller.confirmRematch()}

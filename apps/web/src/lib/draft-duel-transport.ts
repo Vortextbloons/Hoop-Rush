@@ -58,6 +58,7 @@ async function transientSenderChannel(
   const existing = transientSenderChannels.get(roomId);
   if (existing) return existing;
   const creating = (async (): Promise<RealtimeChannel> => {
+    const { REALTIME_SUBSCRIBE_STATES } = await loadSupabaseModule();
     try {
       await client.realtime.setAuth();
     } catch {
@@ -71,7 +72,7 @@ async function transientSenderChannel(
         resolve();
       }, 1500);
       channel.subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
+        if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) {
           clearTimeout(timer);
           resolve();
         }

@@ -255,6 +255,13 @@ function baseProps(overrides: Partial<ChampionshipProps> = {}): ChampionshipProp
 }
 
 describe('ChampionshipView', () => {
+  it('shows a waiting state after requesting a rematch', () => {
+    const { getByText, queryByRole } = render(ChampionshipView, {
+      props: { ...baseProps(), localRematchRequested: true },
+    });
+    expect(getByText('Waiting for your opponent to accept the rematch.')).toBeTruthy();
+    expect(queryByRole('button', { name: 'Request rematch' })).toBeNull();
+  });
   it('renders the champion hero with the series score', () => {
     const { getByText, getByLabelText } = render(ChampionshipView, { props: baseProps() });
     expect(getByText('You are the champion')).toBeTruthy();

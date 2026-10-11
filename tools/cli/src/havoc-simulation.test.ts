@@ -86,8 +86,8 @@ function writeFixtureManifest(dir: string): string {
 describe('havoc CLI simulation determinism', () => {
   it('replays the same seed and picks to identical digests across two runs', () => {
     const assets = fixtureAssets();
-    const first = simulateFixture(assets, 4, true);
-    const second = simulateFixture(assets, 4, true);
+    const first = simulateFixture(assets, 4, false);
+    const second = simulateFixture(assets, 4, false);
     expect(second).toEqual(first);
     expect(second.reportDigest).toBe(first.reportDigest);
     expect(second.draft.lockedDigest).toBe(first.draft.lockedDigest);
@@ -173,6 +173,8 @@ describe('havoc CLI simulation determinism', () => {
     const comparison = report.comparison;
     if (comparison === null) throw new Error('comparison missing');
     expect(comparison.games).toHaveLength(82);
+    expect(comparison.havoc.games).toBe(82);
+    expect(comparison.normal.games).toBe(82);
     for (const pair of comparison.games) {
       expect(pair.havoc.humanScore).toBe(
         report.havoc.games.find((game) => game.gameNumber === pair.gameNumber)?.summary.humanScore,
@@ -182,15 +184,21 @@ describe('havoc CLI simulation determinism', () => {
           .humanScore,
       );
     }
+    const derived = report.report;
+    if (derived === null) throw new Error('derived report missing');
+    expect(derived.status).toBe('complete');
+    expect(derived.mvp).toEqual(comparison.mvp);
+    expect(derived.lineup).toHaveLength(5);
+    expect(derived.comparison?.runId).toBe(report.runId);
   });
 });
 
 describe('havoc CLI audit command', () => {
-  it('passes on a small simulated set and fails on a corrupted result digest', async () => {
+  it('passes on a simulated set and fails on a corrupted result digest', async () => {
     await withTmpDir(async (dir) => {
       const manifestPath = writeFixtureManifest(dir);
       const assets = loadHavocCliAssets(manifestPath);
-      const report = simulateFixture(assets, 4, true);
+      const report = simulateFixture(assets, 82, true);
       expect(havocSimulateReportSchema.safeParse(report).success).toBe(true);
       const reportPath = join(dir, 'report.json');
       writeFileSync(reportPath, JSON.stringify(report));
@@ -212,8 +220,8 @@ describe('havoc CLI audit command', () => {
       expect(payload.checks.paired).toBe(true);
       expect(payload.checks.aggregates).toBe(true);
       expect(payload.checks.digests).toBe(true);
-      expect(payload.checks.havocGames).toBe(4);
-      expect(payload.checks.normalGames).toBe(4);
+      expect(payload.checks.havocGames).toBe(82);
+      expect(payload.checks.normalGames).toBe(82);
 
       const corrupted = structuredClone(report);
       const firstGame = corrupted.havoc.games[0];
@@ -223,7 +231,6 @@ describe('havoc CLI audit command', () => {
       const bad = await runCli([
         'havoc',
         'audit',
-        '--input',
         reportPath,
         '--manifest',
         manifestPath,

@@ -7,7 +7,7 @@
     HoopRushManifest,
   } from '@hoop-rush/data-contracts';
   import { DRAFT_DUEL_TAPE_STAT_FIELDS } from '@hoop-rush/data-contracts';
-  import type { DraftDuelVisibleState } from '$lib/draft-duel-playback';
+  import type { DraftDuelPlaybackSpeed, DraftDuelVisibleState } from '$lib/draft-duel-playback';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
   import TeamLogo from '$lib/components/TeamLogo.svelte';
   import { SLOT_LABELS } from '$lib/player-positions';
@@ -21,6 +21,8 @@
     feed,
     cards = {},
     manifest = null,
+    speed,
+    onspeedchange,
   }: {
     output: DraftDuelGameOutput;
     visible: DraftDuelVisibleState;
@@ -29,7 +31,11 @@
     feed: DraftDuelFeedLine[];
     cards?: Record<string, DraftDuelCard>;
     manifest?: HoopRushManifest | null;
+    speed: DraftDuelPlaybackSpeed;
+    onspeedchange: (speed: DraftDuelPlaybackSpeed) => void;
   } = $props();
+
+  const speeds: DraftDuelPlaybackSpeed[] = [1, 2];
 
   const POINTS = DRAFT_DUEL_TAPE_STAT_FIELDS.indexOf('points');
   const FIELD_GOAL_MAKES = DRAFT_DUEL_TAPE_STAT_FIELDS.indexOf('fieldGoalMakes');
@@ -210,6 +216,18 @@
           ></span>
         {/each}
       </span>
+      <div class="bc-speed" role="group" aria-label="Playback speed">
+        {#each speeds as option (option)}
+          <button
+            type="button"
+            class="bc-speed-btn"
+            aria-pressed={speed === option}
+            onclick={() => onspeedchange(option)}
+          >
+            {option}×
+          </button>
+        {/each}
+      </div>
     </div>
     <div class="bc-team opp">
       <span class="bc-team-label">Opponent</span>
@@ -264,7 +282,7 @@
                 <span class="bc-ident-text">
                   <span class="bc-name">{row.name}</span>
                   <span class="bc-sub">
-                    {#if manifest && teamLogoSlot(row.card)}
+                    {#if manifest && row.card && teamLogoSlot(row.card)}
                       <TeamLogo
                         {manifest}
                         franchiseId={row.card.franchiseId}
@@ -485,6 +503,40 @@
 
   .bc-quarter.now {
     background: var(--color-primary);
+  }
+
+  .bc-speed {
+    display: inline-flex;
+    gap: 4px;
+    margin-top: 2px;
+  }
+
+  .bc-speed-btn {
+    padding: 3px 10px;
+    border: 1px solid var(--color-line-strong);
+    border-radius: 999px;
+    background: var(--color-surface-2);
+    color: var(--color-muted-foreground);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+  }
+
+  .bc-speed-btn:hover {
+    color: var(--color-foreground);
+  }
+
+  .bc-speed-btn[aria-pressed='true'] {
+    border-color: color-mix(in srgb, var(--color-primary) 55%, transparent);
+    background: color-mix(in srgb, var(--color-primary) 14%, transparent);
+    color: var(--color-primary);
+  }
+
+  .bc-speed-btn:focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
   }
 
   .bc-progress {

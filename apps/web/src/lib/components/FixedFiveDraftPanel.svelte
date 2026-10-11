@@ -826,7 +826,7 @@
             <h3 class="font-display text-lg font-extrabold tracking-tight uppercase">Your five</h3>
           </div>
           <ul class="flex flex-col divide-y divide-border/60">
-            {#each myPicks as pick (pick.playerId)}
+            {#each myPicks as pick (`${pick.playerId}:${String(pick.slotIndex)}`)}
               {@const row =
                 (pick.playerVersionId ? indexByVersionId.get(pick.playerVersionId) : null) ??
                 indexById.get(pick.playerId) ??
@@ -877,7 +877,7 @@
       <DraftValuePanel
         players={resolvedLineupPlayers}
         {presentation}
-        poolScores={rollFitReport?.top ?? null}
+        poolScores={rollFitReport?.scores ?? null}
         missingNeeds={rollFitReport?.missingNeeds ?? []}
         refinedCount={rollFitReport?.refinedCount ?? 0}
         onSuggestionPick={disabled || !rollView.turn ? undefined : pickSuggested}
@@ -934,7 +934,7 @@
       <DraftValuePanel
         players={resolvedLineupPlayers}
         {presentation}
-        poolScores={sandboxFitReport?.top ?? null}
+        poolScores={sandboxFitReport?.scores ?? null}
         missingNeeds={sandboxFitReport?.missingNeeds ?? []}
         refinedCount={sandboxFitReport?.refinedCount ?? 0}
         onSuggestionPick={disabled || !sandboxDuelView.turn ? undefined : pickSuggested}
@@ -981,7 +981,7 @@
       <DraftValuePanel
         players={resolvedLineupPlayers}
         {presentation}
-        poolScores={sandboxFitReport?.top ?? null}
+        poolScores={sandboxFitReport?.scores ?? null}
         missingNeeds={sandboxFitReport?.missingNeeds ?? []}
         refinedCount={sandboxFitReport?.refinedCount ?? 0}
         onSuggestionPick={disabled || sandboxLocked ? undefined : pickSuggested}

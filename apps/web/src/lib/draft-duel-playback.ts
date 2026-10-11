@@ -16,6 +16,8 @@ export interface DraftDuelVisibleState {
   awayPlayerLines: DraftDuelTapeStatLine[];
   periods: DraftDuelVisiblePeriod[];
 }
+
+export type DraftDuelPlaybackSpeed = 1 | 2;
 export interface DraftDuelPlaybackPositionInput {
   startedAtIso: string;
   durationMs: number;

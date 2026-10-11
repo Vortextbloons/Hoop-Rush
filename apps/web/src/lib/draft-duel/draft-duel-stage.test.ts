@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render } from '@testing-library/svelte';
 import { draftDuelCardSchema } from '@hoop-rush/data-contracts';
+import { buildManifest } from '@hoop-rush/test-fixtures';
 import DraftBoard from './DraftBoard.svelte';
 import RosterRail from './RosterRail.svelte';
 import ReactionBar from './ReactionBar.svelte';
@@ -29,6 +30,37 @@ const offers = Array.from({ length: 8 }, (_, slot) => ({
 }));
 
 describe('draft-duel components smoke', () => {
+  it('loads offer headshots through the board and falls back when images fail', async () => {
+    const headshotCard = draftDuelCardSchema.parse({ ...card, playerExternalId: '2544' });
+    const { container } = render(DraftBoard, {
+      props: {
+        offers: [
+          { slot: 0, available: true, reason: null, legalSlots: [0, 1], card: headshotCard },
+        ],
+        active: true,
+        round: 1,
+        presentation: 'ratings',
+        manifest: buildManifest(),
+      },
+    });
+    const image = container.querySelector('img');
+    expect(image?.src).toContain('/2544.png');
+    await fireEvent.error(image as HTMLImageElement);
+    expect(container.querySelector('img')).toBeNull();
+    expect(container.textContent).toContain('TP');
+  });
+
+  it('labels an opponent turn and enables picks when the turn changes', async () => {
+    const onchoose = vi.fn();
+    const props = { offers, active: false, round: 2, presentation: 'ratings' as const, onchoose };
+    const { container, rerender } = render(DraftBoard, { props });
+    expect(container.querySelector('[data-turn-label]')?.textContent).toContain('Opponent picking');
+    await fireEvent.click(container.querySelector('button') as HTMLButtonElement);
+    expect(onchoose).not.toHaveBeenCalled();
+    await rerender({ ...props, active: true });
+    await fireEvent.click(container.querySelector('button') as HTMLButtonElement);
+    expect(onchoose).toHaveBeenCalledTimes(1);
+  });
   it('renders the board and reports the chosen card', async () => {
     const onchoose = vi.fn();
     const { container } = render(DraftBoard, {

@@ -23,6 +23,8 @@
     cards = {},
     manifest = null,
     rematchRequested,
+    localRematchRequested = false,
+    rematchBusy = false,
     rematchConfirmed,
     onrematch,
     onconfirmrematch,
@@ -35,6 +37,8 @@
     cards?: Record<string, DraftDuelCard>;
     manifest?: HoopRushManifest | null;
     rematchRequested: boolean;
+    localRematchRequested?: boolean;
+    rematchBusy?: boolean;
     rematchConfirmed: boolean;
     onrematch: () => void;
     onconfirmrematch: () => void;
@@ -708,17 +712,19 @@
         Rematch confirmed — the new series is being prepared.
       </p>
     {:else if rematchRequested}
-      <p class="rematch-state" data-state="requested">
-        Rematch requested — both players must confirm.
-      </p>
-      <button type="button" class="rematch-btn" onclick={onconfirmrematch}>
-        Confirm rematch
+      <p class="rematch-state" data-state="requested">Your opponent requested a rematch.</p>
+      <button type="button" class="rematch-btn" disabled={rematchBusy} onclick={onconfirmrematch}>
+        {rematchBusy ? 'Preparing rematch…' : 'Confirm rematch'}
       </button>
+    {:else if localRematchRequested}
+      <p class="rematch-state" data-state="waiting" role="status">
+        Waiting for your opponent to accept the rematch.
+      </p>
     {:else}
       <p class="rematch-state" data-state="idle">Run it back?</p>
-      <button type="button" class="rematch-btn" onclick={onrematch}>
+      <button type="button" class="rematch-btn" disabled={rematchBusy} onclick={onrematch}>
         <Repeat size={15} aria-hidden="true" />
-        Request rematch
+        {rematchBusy ? 'Requesting rematch…' : 'Request rematch'}
       </button>
     {/if}
   </section>

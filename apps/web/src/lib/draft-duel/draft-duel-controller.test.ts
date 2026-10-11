@@ -16,6 +16,7 @@ import {
   type Id,
 } from '@hoop-rush/data-contracts';
 import { createEngineContext, simulateRecordedGame } from '@hoop-rush/engine';
+import * as engine from '@hoop-rush/engine';
 import { buildLegalSimulationTeam, DEFAULT_ERA_SIM_PROFILE } from '@hoop-rush/test-fixtures';
 import type { DraftDuelAssets } from './draft-duel-assets';
 import { DraftDuelController } from './draft-duel-controller.svelte';
@@ -31,6 +32,7 @@ type ControllerLifecycle = {
   rebuildDraft: () => void;
   ensureGamePipeline: () => Promise<void>;
   persistActive: () => Promise<void>;
+  resolveDeadline: (cursor: string, pickOrdinal: number) => Promise<void>;
   repo: {
     appendCommands: (...args: unknown[]) => Promise<void>;
     saveVerification: (...args: unknown[]) => Promise<void>;
@@ -103,7 +105,139 @@ describe('Draft Duel ready check progression', () => {
     controller.dispose();
     vi.unstubAllGlobals();
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
+
+  function isolateSync() {
+    controller.assets = {} as DraftDuelAssets;
+    const lifecycle = controller as unknown as ControllerLifecycle;
+    vi.spyOn(lifecycle, 'rebuildDraft').mockImplementation(() => {});
+    vi.spyOn(lifecycle, 'ensureGamePipeline').mockResolvedValue();
+    vi.spyOn(lifecycle, 'persistActive').mockResolvedValue();
+    vi.spyOn(lifecycle.repo, 'appendCommands').mockResolvedValue();
+    return lifecycle;
+  }
+
+  it('refreshes accepted commands without a realtime notification', async () => {
+    isolateSync();
+    unsubscribe();
+    await controller.readyForNextGame();
+    expect(controller.phase).toBe('preparing-game');
+    expect(controller.localReady).toBe(true);
+  });
+
+  it('does not roll back to an older room snapshot', () => {
+    const lifecycle = controller as unknown as ControllerLifecycle;
+    const current = controller.snapshot;
+    if (!current) throw new Error('Missing snapshot');
+    lifecycle.applySnapshot({ ...current, revision: current.revision - 1, phase: 'lobby' });
+    expect(controller.phase).toBe('lineup-showdown');
+  });
+
+  function stubManualRaf(): () => void {
+    const scheduled: FrameRequestCallback[] = [];
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn((callback: FrameRequestCallback) => {
+        scheduled.push(callback);
+        return scheduled.length;
+      }),
+    );
+    return () => {
+      const frame = scheduled.at(-1);
+      if (frame) frame(Date.now());
+    };
+  }
+
+  function applyBroadcastSnapshot(startedAtMs: number): void {
+    const lifecycle = controller as unknown as ControllerLifecycle;
+    const current = controller.snapshot;
+    if (!current) throw new Error('Missing snapshot');
+    lifecycle.applySnapshot({
+      ...current,
+      revision: current.revision + 1,
+      phase: 'broadcasting',
+      broadcast: {
+        gameNumber: 1,
+        startedAtIso: new Date(startedAtMs).toISOString(),
+        durationMs: 20_000,
+      },
+    });
+  }
+
+  it('resumes broadcast progress from wall clock when attaching mid-broadcast', () => {
+    const tick = stubManualRaf();
+    applyBroadcastSnapshot(Date.now() - 10_000);
+    tick();
+    expect(controller.progress).toBeCloseTo(0.5, 5);
+  });
+
+  it('doubles broadcast playback progress at 2x speed', () => {
+    const tick = stubManualRaf();
+    applyBroadcastSnapshot(Date.now());
+    tick();
+    expect(controller.progress).toBe(0);
+
+    controller.playbackSpeed = 2;
+    for (let frame = 0; frame < 5; frame++) {
+      vi.advanceTimersByTime(1000);
+      tick();
+    }
+    expect(controller.progress).toBeCloseTo(0.5, 5);
+  });
+
+  it.each([false, true])(
+    'resolves an opponent timeout with transient failure=%s',
+    async (failFirst) => {
+      unsubscribe();
+      const lifecycle = isolateSync();
+      const created = await transport.create({
+        fairness: 'unfair',
+        presentation: 'ratings',
+        versions: defaultDraftDuelVersionLocks({
+          catalogHash: contentHashSchema.parse('a'.repeat(64)),
+        }),
+      });
+      roomId = created.snapshot.roomId;
+      lifecycle.roomId = roomId;
+      await transport.join(created.code);
+      await submit('p1', { kind: 'ready', ready: true });
+      await submit('p2', { kind: 'ready', ready: true });
+      await submit('p1', { kind: 'start' });
+      const started = (await transport.resume(roomId)).snapshot;
+      const deadline = started.deadline;
+      if (!deadline) throw new Error('Missing deadline');
+      controller.snapshot = null;
+      lifecycle.applySnapshot(started);
+      controller.participantId = deadline.participantId === 'p1' ? 'p2' : 'p1';
+      controller.draft = { status: 'drafting', pickOrdinal: 0 } as NonNullable<
+        typeof controller.draft
+      >;
+      vi.spyOn(engine, 'draftDuelTimeoutPick').mockReturnValue({
+        pickOrdinal: 0,
+        playerId: playerIdSchema.parse('timeout-player'),
+        playerVersionId: playerVersionIdSchema.parse(`pv-${'1'.repeat(32)}`),
+        slotIndex: 0,
+        seedPath: 'draft-duel/timeout/0',
+      });
+      vi.setSystemTime(new Date(deadline.deadlineAt));
+      if (failFirst)
+        vi.spyOn(transport, 'commitFallback').mockRejectedValueOnce(new Error('network'));
+      await lifecycle.resolveDeadline(deadline.cursor, 0);
+      if (failFirst) {
+        expect(
+          (await transport.refetch(roomId, -1)).filter(
+            (c) => c.payload.kind === 'timeout-autopick',
+          ),
+        ).toHaveLength(0);
+        await vi.advanceTimersByTimeAsync(5000);
+      }
+      const commands = await transport.refetch(roomId, -1);
+      const timeout = commands.filter((command) => command.payload.kind === 'timeout-autopick');
+      expect(timeout).toHaveLength(1);
+      expect(timeout[0]?.actorParticipantId).toBe(deadline.participantId);
+    },
+  );
 
   it.each(['local', 'opponent'])('starts Game 1 when %s readies first', async (first) => {
     if (first === 'local') {

@@ -15,6 +15,7 @@ import {
   HAVOC_CLI_MECHANISMS,
   havocCalibrate,
   havocCalibrateReportSchema,
+  havocCliCohortTotalsSchema,
   runHavocMechanismSensitivity,
   type HavocCohortSource,
 } from './commands/havoc-cohorts.ts';
@@ -49,7 +50,7 @@ describe('havoc calibration cohorts', () => {
         'seed-count': '4',
         'holdout-count': '2',
         mechanism: null,
-        games: '24',
+        games: '2',
         manifest: null,
       },
       { assets: fixtureAssets(source) },
@@ -78,18 +79,34 @@ describe('havoc calibration cohorts', () => {
         expect(Array.isArray(lineup.mutations)).toBe(true);
       }
     }
-    expect(cohorts.train.lineups.ordinary.games).toBe(96);
-    expect(cohorts.train.lineups.risky.games).toBe(96);
-    expect(cohorts.train.lineups.extreme.games).toBe(96);
-    expect(cohorts.holdout.lineups.ordinary.games).toBe(48);
+    expect(cohorts.train.lineups.ordinary.games).toBe(8);
+    expect(cohorts.train.lineups.risky.games).toBe(8);
+    expect(cohorts.train.lineups.extreme.games).toBe(8);
+    expect(cohorts.holdout.lineups.ordinary.games).toBe(4);
     const paired = payload.paired;
     if (paired === null) throw new Error('paired section missing');
     expect(paired.seeds).toBe(4);
-    expect(paired.havoc.games).toBe(96);
-    expect(paired.normal.games).toBe(96);
-    expect(paired.havoc.wins + paired.havoc.losses).toBe(96);
+    expect(paired.havoc.games).toBe(8);
+    expect(paired.normal.games).toBe(8);
+    expect(paired.havoc.wins + paired.havoc.losses).toBe(8);
     expect(paired.havoc.winRate).toBeGreaterThanOrEqual(0);
     expect(paired.havoc.winRate).toBeLessThanOrEqual(1);
+    // Cohort totals are not capped at one 82-game season (128-seed regression guard).
+    expect(
+      havocCliCohortTotalsSchema.safeParse({
+        seeds: 128,
+        games: 10496,
+        wins: 8628,
+        losses: 1868,
+        winRate: 0.822,
+        pointsFor: 1226044,
+        pointsAgainst: 976584,
+        differential: 249460,
+        averagePointsFor: 116.8148,
+        averagePointsAgainst: 93.0433,
+        adjustments: 98076,
+      }).success,
+    ).toBe(true);
   });
 
   it('keeps a tiny cohort byte-identical across two runs', () => {

@@ -727,7 +727,7 @@
         <DraftValuePanel
           players={resolvedDraftPlayers}
           {presentation}
-          poolScores={fitReport?.top ?? null}
+          poolScores={fitReport?.scores ?? null}
           missingNeeds={fitReport?.missingNeeds ?? []}
           refinedCount={fitReport?.refinedCount ?? 0}
           onSuggestionPick={pickSuggested}

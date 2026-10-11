@@ -31,8 +31,20 @@
     onSuggestionPick?: (playerId: string) => void;
   } = $props();
   const hideRatings = $derived(presentation === 'ball-knowledge');
-  const showSuggestions = $derived(!hideRatings && (poolScores?.length ?? 0) > 0);
-  const topSuggestions = $derived((poolScores ?? []).slice(0, 5));
+  const topSuggestions = $derived.by((): DraftFitScore[] => {
+    const candidates =
+      refinedCount > 0 ? (poolScores ?? []).filter((score) => score.refined) : (poolScores ?? []);
+    const seen = new Set<string>();
+    const suggestions: DraftFitScore[] = [];
+    for (const score of candidates) {
+      if (seen.has(score.playerId)) continue;
+      seen.add(score.playerId);
+      suggestions.push(score);
+      if (suggestions.length >= 5) break;
+    }
+    return suggestions;
+  });
+  const showSuggestions = $derived(!hideRatings && topSuggestions.length > 0);
   const needsText = $derived(
     missingNeeds.length === 0
       ? null
@@ -66,6 +78,9 @@
   });
   function delta(value: number): string {
     return value > 0 ? `+${String(value)}` : String(value);
+  }
+  function playerRowKey(player: PeakPlayerSeason, index: number): string {
+    return `${player.franchiseId}/${player.eraId}/${player.seasonKey}/${player.playerId}#${String(index)}`;
   }
 </script>
 
@@ -182,7 +197,7 @@
     </p>
   {:else if hideRatings}
     <ul class="divide-y divide-border/60">
-      {#each players as player (player.playerId)}
+      {#each players as player, index (playerRowKey(player, index))}
         <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
           <span class="min-w-0 flex-1 sm:min-w-36">
             <span class="block text-sm font-bold">{player.displayName}</span>
@@ -196,7 +211,7 @@
     </p>
   {:else}
     <ul class="divide-y divide-border/60">
-      {#each players as player, index (player.playerId)}
+      {#each players as player, index (playerRowKey(player, index))}
         {@const value = values[index]}
         {#if value}
           <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">

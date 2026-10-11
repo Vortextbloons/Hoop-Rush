@@ -263,7 +263,7 @@
           },
         ]),
       );
-      pageScores = report.top;
+      pageScores = report.scores;
       pageRefinedCount = report.refinedCount;
       pageNeeds = report.missingNeeds;
     } catch {

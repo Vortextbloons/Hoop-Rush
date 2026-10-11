@@ -788,12 +788,18 @@ export function acceptHavocCliVariant(input: {
       input.run.variant === 'havoc'
         ? havocAcceptGameCommandSchema.parse({
             ...base,
-            commandId: havocCliAcceptCommandId(state.runSeed, `accept-h-${String(game.gameNumber)}`),
+            commandId: havocCliAcceptCommandId(
+              state.runSeed,
+              `accept-h-${String(game.gameNumber)}`,
+            ),
             command: 'accept-havoc-game',
           })
         : havocAcceptNormalGameCommandSchema.parse({
             ...base,
-            commandId: havocCliAcceptCommandId(state.runSeed, `accept-n-${String(game.gameNumber)}`),
+            commandId: havocCliAcceptCommandId(
+              state.runSeed,
+              `accept-n-${String(game.gameNumber)}`,
+            ),
             command: 'accept-havoc-normal-game',
           });
     state = applyOrThrow(state, command, input.environment, input.lockSources);

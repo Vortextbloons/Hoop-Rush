@@ -1,17 +1,24 @@
 import { HAVOC_MUTATION_DEFINITIONS } from '@hoop-rush/engine';
-import { seedSchema, type HavocMutationDefinition, type Seed } from '@hoop-rush/data-contracts';
+import {
+  HAVOC_GAME_COUNT,
+  seedSchema,
+  type HavocMutationDefinition,
+  type Seed,
+} from '@hoop-rush/data-contracts';
 import { UsageError } from '../args.ts';
 import { EXIT_USAGE_OR_DATA_ERROR, makeReport, type CliReport } from '../report.ts';
 import {
   HavocCliError,
+  acceptHavocCliVariant,
   adaptHavocCliCatalog,
+  canonicalHavocComparisonOf,
+  canonicalHavocReportOf,
   havocCliDraftPlanOf,
   havocCliGameNumbers,
   havocCliLineupOf,
   havocCliLockSourcesOf,
   havocCliPicksSchema,
   havocCliReportDigest,
-  havocCliComparisonOf,
   havocSimulateReportSchema,
   loadHavocCliAssets,
   lockedInputsDigest,
@@ -77,10 +84,63 @@ export function runHavocCliSimulation(
     plan: options.plan,
   });
   const gameNumbers = havocCliGameNumbers(options.games ?? undefined);
-  const havoc = simulateHavocCliVariant({ locked: replay.locked, variant: 'havoc', gameNumbers });
+  if (options.comparison && gameNumbers.length !== HAVOC_GAME_COUNT) {
+    throw new HavocCliError(
+      'comparison-games',
+      `--comparison requires the full ${String(HAVOC_GAME_COUNT)}-game season (got ${String(gameNumbers.length)})`,
+    );
+  }
+  const havoc = simulateHavocCliVariant({
+    locked: replay.locked,
+    variant: 'havoc',
+    gameNumbers,
+    retainResults: options.comparison,
+  });
   const normal = options.comparison
-    ? simulateHavocCliVariant({ locked: replay.locked, variant: 'normal', gameNumbers })
+    ? simulateHavocCliVariant({
+        locked: replay.locked,
+        variant: 'normal',
+        gameNumbers,
+        retainResults: true,
+      })
     : null;
+  let acceptedState = replay.state;
+  if (havoc.failures.length === 0) {
+    acceptedState = acceptHavocCliVariant({
+      state: acceptedState,
+      environment,
+      lockSources,
+      run: havoc,
+    });
+  }
+  let comparison: HavocSimulateReport['comparison'] = null;
+  let derivedReport: HavocSimulateReport['report'] = null;
+  if (
+    normal !== null &&
+    havoc.failures.length === 0 &&
+    normal.failures.length === 0 &&
+    havoc.results.length === HAVOC_GAME_COUNT &&
+    normal.results.length === HAVOC_GAME_COUNT
+  ) {
+    acceptedState = acceptHavocCliVariant({
+      state: acceptedState,
+      environment,
+      lockSources,
+      run: normal,
+    });
+    comparison = canonicalHavocComparisonOf({
+      runId,
+      locked: replay.locked,
+      havoc,
+      normal,
+    });
+    derivedReport = canonicalHavocReportOf({
+      state: acceptedState,
+      havoc,
+      normal,
+      comparison,
+    });
+  }
   const failures: HavocCliFailure[] = [...havoc.failures, ...(normal?.failures ?? [])];
   const lineup = havocCliLineupOf(replay.locked.picks);
   const report = havocSimulateReportSchema.parse({
@@ -106,7 +166,8 @@ export function runHavocCliSimulation(
       normal === null
         ? null
         : { variant: 'normal', games: [...normal.games], aggregate: normal.aggregate },
-    comparison: normal === null ? null : havocCliComparisonOf(havoc, normal),
+    comparison,
+    report: derivedReport,
     failures,
     audits: {
       games: havoc.games.length + (normal?.games.length ?? 0),
@@ -190,7 +251,12 @@ export function havocSimulate(args: {
     }
     if (report.comparison !== null) {
       details.push(
-        `comparison: wins gained ${String(report.comparison.winsGained)} · differential delta ${String(report.comparison.differentialDelta)}`,
+        `comparison: wins gained ${String(report.comparison.winsGained)} · differential delta ${String(report.comparison.differentialDelta)} · MVP ${report.comparison.mvp.displayName} (index gain ${String(report.comparison.mvp.gain)})`,
+      );
+    }
+    if (report.report !== null) {
+      details.push(
+        `report: status ${report.report.status} · direct mutation points ${String(report.report.directMutationPoints)} · top gain ${String(report.report.topGains[0]?.pointsDelta ?? 0)} · top loss ${String(report.report.topLosses[0]?.pointsDelta ?? 0)}`,
       );
     }
     details.push(
