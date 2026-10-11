@@ -66,6 +66,6 @@ describe('shipped Season Run league generation', () => {
       });
       expect(replay).toEqual(generation);
     },
-    20000,
+    120_000,
   );
 });

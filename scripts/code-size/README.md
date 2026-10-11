@@ -1,0 +1,96 @@
+# Code-size harness
+
+Acceptance for the maintainability refactor measures **maintained source**
+separately from tests, styles, docs, and generated data.
+
+```bash
+python scripts/code-size/measure.py --output scripts/code-size/baseline.json
+```
+
+- Sources: Git-tracked plus non-ignored untracked files (`.ts`, `.js`, `.mjs`,
+  `.cjs`, `.svelte`, `.css`, `.scss`, `.html`, `.py`, `.sql`, `.sh`, `.ps1`).
+- Markdown docs, JSON generated data, and `raw-data/` are not counted.
+- Svelte files are split into `<script>`, `<style>`, and markup sections.
+- `maintained source = runtime + scripts + ui-script + ui-markup`; `test`,
+  `styles`, `config`, `sql`, and `html` are reported separately.
+
+## Stage 1 baseline (2026-10-11, HEAD `f38f594c` + stage-1 fixes)
+
+```
+291,535 physical lines; 284,433 nonblank; 1,024 files
+maintained source: 227,979 physical (runtime + scripts + svelte script + svelte markup)
+
+role            physical  nonblank
+runtime*         178,077   175,178
+test              38,488    37,326
+ui-markup*        26,512    26,044
+ui-script*        20,012    19,431
+styles            18,369    16,937
+sql                6,284     6,168
+scripts*           3,378     2,951
+config               383       366
+html                  32        32
+
+area                            physical  production
+apps/web                         103,084      96,408
+packages/engine                   80,288      61,408
+tools/cli                         41,629      40,705
+packages/data-contracts           24,960      21,900
+packages/persistence              13,812       9,184
+packages/importer                 11,989      10,399
+supabase                           8,454       6,284
+scripts                            3,776       3,378
+packages/test-fixtures             3,512       3,350
+```
+
+Duplication evidence: `repeated-code-evidence.json` (produced at baseline).
+
+## Baseline verification (stage 1)
+
+| Gate | Result |
+| --- | --- |
+| `pnpm static` (check + lint) | Pass. `svelte-check`: 0 errors, 1 pre-existing a11y warning (`AwardsSection.svelte`). |
+| `pnpm test:run` | 103 files / 996 tests: 995 passed, 1 skipped. |
+| `pnpm build` | Pass (client + SSR). |
+| `pnpm hoop-rush data validate` | `data validate: OK`. |
+
+Known baseline instability: `tools/cli/src/season-generation.integration.test.ts`
+(full league generation, 3 seeds) took ~24 s under full-suite load against a
+20 s ceiling. It passes standalone (~20 s of test time). Stage 1 raised the
+per-test ceiling to 120 s; the determinism assertions are unchanged.
+
+## Golden and determinism sources
+
+Committed fixtures (`tools/cli/src/fixtures/`): `season-run.json`,
+`season-draft-commands.json`, `season-draft-finalized.json`,
+`season-game-*.json` (tight/overtime/balanced/...), challenge, and sensitivity
+fixtures.
+
+Named seed modules: `packages/engine/src/challenge/seeds.ts`,
+`packages/engine/src/season/season-seeds.ts`,
+`packages/data-contracts/src/season-seeds.ts`,
+`packages/data-contracts/src/havoc-seeds.ts`.
+
+Deterministic CLI checks:
+
+```text
+pnpm hoop-rush season block audit
+pnpm hoop-rush season full simulate
+pnpm hoop-rush season benchmark determinism
+pnpm hoop-rush season run reproduce
+pnpm hoop-rush season postseason audit
+pnpm hoop-rush season free-agency audit
+pnpm hoop-rush season draft reproduce
+pnpm hoop-rush collection game-reproduce
+pnpm hoop-rush collection pull-reproduce
+```
+
+Performance: existing benchmark reports live in `Docs/quality/benchmarks/`
+(local-only). Re-run and compare the CLI benchmarks when execution or storage
+paths change (stages 2, 4, and 6).
+
+## Baseline log
+
+- 2026-10-11, stage 1: baseline captured before any refactor stage. Full test
+  run recorded above; the one timeout was repro'd isolated, then its ceiling
+  was raised to 120 s.
