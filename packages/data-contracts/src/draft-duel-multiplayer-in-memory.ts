@@ -40,20 +40,16 @@ function mulberry32Seed(seed: number): () => number {
   };
 }
 
-function engineDraw(seedMaterial: string): number {
-  return mulberry32Seed(fnv1a32(seedMaterial))();
-}
-
 export function draftDuelFirstPickerFor(rootSeed: string): DraftDuelParticipantId {
-  return engineDraw(`hoop-rush:${DRAFT_DUEL_SEED_VERSION}:${rootSeed}:first-picker`) < 0.5
-    ? 'p1'
-    : 'p2';
+  return seedByteParity(rootSeed, 0) ? 'p1' : 'p2';
 }
 
 export function draftDuelHomeWinnerFor(rootSeed: string): DraftDuelParticipantId {
-  return engineDraw(`hoop-rush:${DRAFT_DUEL_SEED_VERSION}:${rootSeed}:home-draw`) < 0.5
-    ? 'p1'
-    : 'p2';
+  return seedByteParity(rootSeed, 2) ? 'p1' : 'p2';
+}
+
+function seedByteParity(rootSeed: string, offset: number): boolean {
+  return Number.parseInt(rootSeed.slice(offset, offset + 2), 16) % 2 === 0;
 }
 
 function otherParticipant(participantId: DraftDuelParticipantId): DraftDuelParticipantId {

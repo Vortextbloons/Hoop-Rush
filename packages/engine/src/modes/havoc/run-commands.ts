@@ -222,6 +222,19 @@ function applyCompleteHavocComparison(
       'both 82-game seasons must be accepted before the comparison completes',
     );
   }
+  const mvpPick = state.locked.picks.find((pick) => pick.slot === command.mvp.slot);
+  if (
+    mvpPick === undefined ||
+    mvpPick.card.source.playerId !== command.mvp.playerId ||
+    mvpPick.card.source.playerVersionId !== command.mvp.playerVersionId
+  ) {
+    return rejectHavocCommand(
+      state,
+      command,
+      'digest-mismatch',
+      'the MVP does not match the locked lineup',
+    );
+  }
   return acceptHavocCommand(state, command, {
     ...state,
     revision: state.revision + 1,

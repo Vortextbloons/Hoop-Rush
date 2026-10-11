@@ -137,10 +137,10 @@ select is(
   0, 'room-code generator does not use PostgreSQL random()');
 select is(
   public.draft_duel_first_picker('0123456789abcdef0123456789abcdef'),
-  'p1', 'first picker derivation matches the engine seed draw');
+  'p2', 'first picker derivation matches the engine seed bytes');
 select is(
   public.draft_duel_home_winner('aabbccddeeff00112233445566778899'),
-  'p1', 'home winner derivation matches the engine seed draw');
+  'p2', 'home winner derivation matches the engine seed bytes');
 
 -- 2. Behavioral harness.
 create table public.dd_pgtap_ctx (name text primary key, value text);

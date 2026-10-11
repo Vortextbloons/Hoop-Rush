@@ -761,7 +761,7 @@ describe('DexieHavocRepository', () => {
 
   it('rejects stale revisions from a second reader', async () => {
     const { db, repo } = createRepository('havoc-stale');
-    const states = await applyDraftChain(repo, true);
+    await applyDraftChain(repo, true);
     const stale = buildHavocRunState({
       runId: RUN_ID,
       revision: 4,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SeasonDraftCatalog } from '@hoop-rush/data-contracts';
-import { havocClaimKeyOf } from '@hoop-rush/data-contracts';
+import { contentHashSchema, havocClaimKeyOf } from '@hoop-rush/data-contracts';
 import { buildSeasonDraftCatalog } from '@hoop-rush/test-fixtures';
 import {
   AdaptHavocCatalog,
@@ -50,8 +50,13 @@ describe('havoc catalog adaptation', () => {
     const first = AdaptHavocCatalog(catalog, source);
     const second = AdaptHavocCatalog(catalog, source);
     expect(first).toEqual(second);
-    first.candidates[0]!.profile.ratings.insideScoring = 1;
-    expect(catalog.candidates[0]!.detailedRatings.insideScoring).not.toBe(1);
+    const adaptedFirst = first.candidates[0];
+    const packagedFirst = catalog.candidates[0];
+    if (adaptedFirst === undefined || packagedFirst === undefined) {
+      throw new Error('missing candidate');
+    }
+    adaptedFirst.profile.ratings.insideScoring = 1;
+    expect(packagedFirst.detailedRatings.insideScoring).not.toBe(1);
   });
 
   it('rejects catalog version and data version mismatches', () => {
@@ -84,12 +89,17 @@ describe('havoc catalog adaptation', () => {
     const catalog = buildSeasonDraftCatalog();
     const source = buildHavocCatalogSource(catalog);
     expect(havocCatalogSourcesEqual(source, { ...source })).toBe(true);
-    expect(havocCatalogSourcesEqual(source, { ...source, catalogHash: 'f'.repeat(64) })).toBe(
-      false,
-    );
-    expect(() =>
-      assertHavocCatalogSourceMatches(source, { ...source, positionNormalizationVersion: 'x' }),
-    ).toThrow(/mismatch/);
-    expect(() => assertHavocCatalogSourceMatches(source, { ...source })).not.toThrow();
+    expect(
+      havocCatalogSourcesEqual(source, {
+        ...source,
+        catalogHash: contentHashSchema.parse('f'.repeat(64)),
+      }),
+    ).toBe(false);
+    expect(() => {
+      assertHavocCatalogSourceMatches(source, { ...source, positionNormalizationVersion: 'x' });
+    }).toThrow(/mismatch/);
+    expect(() => {
+      assertHavocCatalogSourceMatches(source, { ...source });
+    }).not.toThrow();
   });
 });

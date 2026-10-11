@@ -1,6 +1,6 @@
 import type { DraftDuelParticipantId, Seed } from '@hoop-rush/data-contracts';
 import { seedSchema } from '@hoop-rush/data-contracts';
-import { FNV_OFFSET_32, createRng, fnv1a32, hex32 } from '../../sim/rng.ts';
+import { FNV_OFFSET_32, fnv1a32, hex32 } from '../../sim/rng.ts';
 
 export const DRAFT_DUEL_SEED_VERSION = 'draft-duel-v1';
 export const DRAFT_DUEL_FAIR_BAND_VERSION = 'draft-duel-fair-bands-v1';
@@ -8,6 +8,9 @@ function hexSeed(material: string): Seed {
   const high = fnv1a32(material);
   const low = fnv1a32(`${material}:tail`, FNV_OFFSET_32 ^ high);
   return seedSchema.parse(`${hex32(high)}${hex32(low)}`);
+}
+function seedByteParity(rootSeed: Seed, offset: number): boolean {
+  return Number.parseInt(rootSeed.slice(offset, offset + 2), 16) % 2 === 0;
 }
 export function draftDuelSharedBandSeed(rootSeed: Seed, attempt: number): Seed {
   if (!Number.isInteger(attempt) || attempt < 0) {
@@ -50,8 +53,7 @@ export function draftDuelSafetySeed(
   );
 }
 export function draftDuelFirstPicker(rootSeed: Seed): DraftDuelParticipantId {
-  const rng = createRng(`hoop-rush:${DRAFT_DUEL_SEED_VERSION}:${rootSeed}:first-picker`);
-  return rng.chance(0.5) ? 'p1' : 'p2';
+  return seedByteParity(rootSeed, 0) ? 'p1' : 'p2';
 }
 export function draftDuelTimeoutSeed(
   rootSeed: Seed,
@@ -74,8 +76,7 @@ export function draftDuelTimeoutSeedPath(
   return `rootSeed/timeout/${participantId}/${String(pickOrdinal)}`;
 }
 export function draftDuelHomeWinner(rootSeed: Seed): DraftDuelParticipantId {
-  const rng = createRng(`hoop-rush:${DRAFT_DUEL_SEED_VERSION}:${rootSeed}:home-draw`);
-  return rng.chance(0.5) ? 'p1' : 'p2';
+  return seedByteParity(rootSeed, 2) ? 'p1' : 'p2';
 }
 export function draftDuelGameSeed(rootSeed: Seed, gameNumber: number): Seed {
   if (!Number.isInteger(gameNumber) || gameNumber < 1 || gameNumber > 7) {

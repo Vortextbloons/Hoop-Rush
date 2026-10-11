@@ -356,6 +356,7 @@ export class PossessionStepper {
       const awards = havoc?.onFoul({
         fouler,
         foulerSide: offense,
+        offenseSide: offense,
         shooter: null,
         shooting: false,
         madeShot: false,
@@ -386,6 +387,7 @@ export class PossessionStepper {
     const awards = havoc?.onFoul({
       fouler,
       foulerSide: defense,
+      offenseSide: offense,
       shooter: null,
       shooting: false,
       madeShot: false,
@@ -827,9 +829,9 @@ function resolveShot(
     havocPlan === null
       ? undefined
       : {
-          contestScale: havocPlan.contestScale,
-          contestPointDelta: havocPlan.contestPointDelta,
-          makePointDelta: havocPlan.makePointDelta,
+          contestScale: havocPlan.coverage.contestScale,
+          contestPointDelta: havocPlan.coverage.contestPointDelta,
+          makePointDelta: havocPlan.coverage.makePointDelta,
           shooterEvidence: havoc?.evidenceOf(shooter),
           defenderEvidence: havoc?.evidenceOf(defender),
         };
@@ -843,6 +845,7 @@ function resolveShot(
       passed: shot.passed,
       shotKind: havocPlan.shotKind,
       putback: havocPlan.putback,
+      zone,
     });
   };
   const foulP = shootingFoulProbability(shooter, defender, zone, profile);
@@ -867,6 +870,7 @@ function resolveShot(
     const awards = havoc?.onFoul({
       fouler: defender,
       foulerSide: defenseSide,
+      offenseSide,
       shooter,
       shooting: true,
       madeShot: made,
@@ -935,7 +939,7 @@ function resolveShot(
     zone,
     action,
     havoc?.evidenceOf(defender),
-    havocPlan?.blockPointDelta ?? 0,
+    havocPlan?.coverage.blockPointDelta ?? 0,
   );
   if (rng.chance(blockP)) {
     recorder.block(defenseSide, defenderSlot >= 0 ? defenderSlot : 0);

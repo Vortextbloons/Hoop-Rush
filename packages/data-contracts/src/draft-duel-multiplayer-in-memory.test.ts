@@ -160,11 +160,11 @@ async function playDraft(
 }
 
 describe('in-memory Draft Duel transport', () => {
-  it('derives first picker and home winner like the engine seed draws', () => {
-    expect(draftDuelFirstPickerFor('0123456789abcdef0123456789abcdef')).toBe('p1');
+  it('derives first picker and home winner from seed bytes like the engine', () => {
+    expect(draftDuelFirstPickerFor('0123456789abcdef0123456789abcdef')).toBe('p2');
     expect(draftDuelHomeWinnerFor('0123456789abcdef0123456789abcdef')).toBe('p2');
-    expect(draftDuelFirstPickerFor('aabbccddeeff00112233445566778899')).toBe('p2');
-    expect(draftDuelHomeWinnerFor('aabbccddeeff00112233445566778899')).toBe('p1');
+    expect(draftDuelFirstPickerFor('aabbccddeeff00112233445566778899')).toBe('p1');
+    expect(draftDuelHomeWinnerFor('aabbccddeeff00112233445566778899')).toBe('p2');
   });
 
   it('joins two clients and plays a strict alternating pick flow', async () => {

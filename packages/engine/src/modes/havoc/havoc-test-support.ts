@@ -1,18 +1,30 @@
 import type {
+  EraSimulationProfile,
   HavocCatalog,
   HavocCatalogSource,
   HavocCreateDraftCommand,
   SeasonDraftCatalog,
 } from '@hoop-rush/data-contracts';
-import { HAVOC_SCHEMA_VERSION, contentHashSchema, seedFromString } from '@hoop-rush/data-contracts';
-import { buildHavocVersionSet, buildSeasonDraftCatalog } from '@hoop-rush/test-fixtures';
+import {
+  HAVOC_SCHEMA_VERSION,
+  contentHashSchema,
+  eraSimulationProfileSchema,
+  havocCreateDraftCommandSchema,
+  seedFromString,
+  seedSchema,
+} from '@hoop-rush/data-contracts';
+import {
+  buildHavocEraProfile,
+  buildHavocVersionSet,
+  buildSeasonDraftCatalog,
+} from '@hoop-rush/test-fixtures';
 import { createRng } from '../../sim/rng.ts';
 import { AdaptHavocCatalog } from './catalog.ts';
 import type { HavocCommandEnvironment } from './draft-commands.ts';
 import { createHavocCommandEnvironment } from './draft-commands.ts';
 import { HAVOC_MUTATION_DEFINITIONS } from './mutations.ts';
 
-export const HAVOC_TEST_RUN_SEED = seedFromString('havoc-test-run');
+export const HAVOC_TEST_RUN_SEED = seedSchema.parse(seedFromString('havoc-test-run'));
 export const HAVOC_TEST_RUN_ID = 'havoc-test-run';
 
 export function buildHavocCatalogSource(catalog: SeasonDraftCatalog): HavocCatalogSource {
@@ -45,11 +57,15 @@ export function buildHavocEnvironmentFixture(adapted: HavocCatalog): HavocComman
   });
 }
 
+export function buildHavocEraProfileFixture(): EraSimulationProfile {
+  return eraSimulationProfileSchema.parse(buildHavocEraProfile());
+}
+
 export function buildHavocCreateCommandFixture(
   fixture: HavocCatalogFixture,
   overrides: Partial<HavocCreateDraftCommand> = {},
 ): HavocCreateDraftCommand {
-  return {
+  return havocCreateDraftCommandSchema.parse({
     schemaVersion: HAVOC_SCHEMA_VERSION,
     commandId: 'cmd-create',
     runId: HAVOC_TEST_RUN_ID,
@@ -58,5 +74,5 @@ export function buildHavocCreateCommandFixture(
     versionSet: buildHavocVersionSet(),
     catalog: fixture.source,
     ...overrides,
-  };
+  });
 }

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type {
-  HavocCatalogSource,
   Position,
   SeasonDraftCandidate,
   SeasonDraftCatalog,
+  Seed,
 } from '@hoop-rush/data-contracts';
 import {
   PLAYER_VERSION_ID_VERSION,
@@ -13,6 +13,7 @@ import {
   SEASON_DURABILITY_VERSION,
   SEASON_STAMINA_VERSION,
   havocClaimKeyOf,
+  havocDraftCardSeed,
   havocDraftOfferSchema,
   playerIdSchema,
   playerVersionId,
@@ -20,64 +21,28 @@ import {
   seasonDraftCandidateSchema,
   seasonKeySchema,
   seedFromString,
+  seedSchema,
 } from '@hoop-rush/data-contracts';
 import { buildSeasonDraftCandidate } from '@hoop-rush/test-fixtures';
 import { createRng } from '../../sim/rng.ts';
+import { HavocCatalogCoverageError } from './api.ts';
+import { AdaptHavocCatalog } from './catalog.ts';
 import {
   HAVOC_TEST_RUN_SEED,
   buildHavocCatalogFixture,
   buildHavocCatalogSource,
   buildHavocEnvironmentFixture,
 } from './havoc-test-support.ts';
-import { HavocCatalogCoverageError } from './api.ts';
-import { drawHavocCardTier, GenerateHavocOffer } from './offers.ts';
 import { havocMutationDefinitionOf } from './mutations.ts';
+import { GenerateHavocOffer, drawHavocCardTier } from './offers.ts';
 
 const fixture = buildHavocCatalogFixture();
-const environment = buildHavocFixtureEnvironment(fixture.adapted);
+const environment = buildHavocEnvironmentFixture(fixture.adapted);
 
 const SLOT_ORDER: readonly Position[] = ['PG', 'SG', 'SF', 'PF', 'C'];
 
-function generateOffer(overrides: {
-  readonly runSeed?: string;
-  readonly round?: number;
-  readonly slot?: Position;
-  readonly offerIndex?: number;
-  readonly draftedClaimKeys?: readonly string[];
-  readonly rerollUsed?: boolean;
-  readonly catalog?: SeasonDraftCatalog;
-}) {
-  const catalog = overrides.catalog ?? fixture.adapted;
-  const source =
-    overrides.catalog === undefined ? undefined : buildHavocCatalogSource(overrides.catalog);
-  const environmentForCatalog =
-    source === undefined ? environment : buildHavocEnvironmentFixture(fixture.adapted);
-  void environmentForCatalog;
-  return GenerateHavocOffer(
-    {
-      catalog: overrides.catalog === undefined ? catalog : adaptForTest(overrides.catalog),
-      runSeed: (overrides.runSeed ?? HAVOC_TEST_RUN_SEED) as never,
-      round: overrides.round ?? 1,
-      slot: overrides.slot ?? 'PG',
-      offerIndex: overrides.offerIndex ?? 0,
-      draftedClaimKeys: overrides.draftedClaimKeys ?? [],
-      rerollUsed: overrides.rerollUsed ?? false,
-    },
-    environment,
-  );
-}
-
-function adaptForTest(catalog: SeasonDraftCatalog) {
-  const source: HavocCatalogSource = buildHavocCatalogSource(catalog);
-  // Reuse the production adapter for synthesized catalogs.
-  const { AdaptHavocCatalog } = requireCatalogAdapter();
-  return AdaptHavocCatalog(catalog, source);
-}
-
-import { AdaptHavocCatalog } from './catalog.ts';
-
-function requireCatalogAdapter() {
-  return { AdaptHavocCatalog };
+function testSeed(value: string): Seed {
+  return seedSchema.parse(seedFromString(value));
 }
 
 function customCandidate(input: {
@@ -113,15 +78,12 @@ function customCandidate(input: {
   });
 }
 
-function customCatalog(
-  candidates: readonly SeasonDraftCandidate[],
-  overrides: { readonly catalogVersion?: string } = {},
-): SeasonDraftCatalog {
+function customCatalog(candidates: readonly SeasonDraftCandidate[]): SeasonDraftCatalog {
   const first = candidates[0];
   if (first === undefined) throw new Error('custom catalog requires a candidate');
   return seasonDraftCatalogSchema.parse({
     schemaVersion: 1,
-    catalogVersion: overrides.catalogVersion ?? SEASON_DRAFT_CATALOG_VERSION,
+    catalogVersion: SEASON_DRAFT_CATALOG_VERSION,
     dataVersion: `m10-${RATINGS_VERSION}`,
     ratingsVersion: RATINGS_VERSION,
     positionNormalizationVersion: POSITION_NORMALIZATION_VERSION,
@@ -139,22 +101,65 @@ function customCatalog(
   });
 }
 
-function findForcedTierSeed(tier: 1 | 2 | 3): string {
-  for (let index = 0; index < 20_000; index += 1) {
-    const runSeed = seedFromString(`havoc-forced-tier-${String(tier)}-${String(index)}`);
-    let forced = true;
-    for (let cardIndex = 0; cardIndex < 3; cardIndex += 1) {
-      const rng = createRng(
-        // Stream derivation matches GenerateHavocOffer exactly.
-        await import('./offers.ts'),
-      );
-      void rng;
-      forced = false;
-    }
-    void forced;
-    if (index < 0) break;
-  }
-  return HAVOC_TEST_RUN_SEED;
+function fillerClaims(): SeasonDraftCandidate[] {
+  const slots: readonly [Position, ...Position[]][] = [
+    ['SG', 'SF', 'PF', 'C'],
+    ['SF', 'PF', 'C'],
+    ['PF', 'C'],
+    ['C'],
+  ];
+  return slots.map((playable, index) =>
+    customCandidate({
+      playerId: `p-fill-${String(index)}`,
+      seasonKey: '1995-96',
+      franchiseId: 'lakers',
+      index: index + 10,
+      playable,
+      overall: 70,
+    }),
+  );
+}
+
+function generateOffer(overrides: {
+  readonly runSeed?: Seed;
+  readonly round?: number;
+  readonly slot?: Position;
+  readonly offerIndex?: number;
+  readonly draftedClaimKeys?: readonly string[];
+  readonly rerollUsed?: boolean;
+  readonly catalog?: SeasonDraftCatalog;
+}) {
+  const adapted =
+    overrides.catalog === undefined
+      ? fixture.adapted
+      : AdaptHavocCatalog(overrides.catalog, buildHavocCatalogSource(overrides.catalog));
+  const offerEnvironment =
+    overrides.catalog === undefined ? environment : buildHavocEnvironmentFixture(adapted);
+  return GenerateHavocOffer(
+    {
+      catalog: adapted,
+      runSeed: overrides.runSeed ?? HAVOC_TEST_RUN_SEED,
+      round: overrides.round ?? 1,
+      slot: overrides.slot ?? 'PG',
+      offerIndex: overrides.offerIndex ?? 0,
+      draftedClaimKeys: overrides.draftedClaimKeys ?? [],
+      rerollUsed: overrides.rerollUsed ?? false,
+    },
+    offerEnvironment,
+  );
+}
+
+function allTierClaims(): SeasonDraftCandidate[] {
+  return Array.from({ length: 6 }, (_value, index) =>
+    customCandidate({
+      playerId: `p-weak-${String(index)}`,
+      seasonKey: '1995-96',
+      franchiseId: 'lakers',
+      index: index + 20,
+      playable: ['PG', 'SG', 'SF', 'PF', 'C'],
+      overall: 1,
+    }),
+  );
 }
 
 describe('havoc offer generation', () => {
@@ -193,7 +198,7 @@ describe('havoc offer generation', () => {
     for (let round = 1; round <= SLOT_ORDER.length; round += 1) {
       const slot = SLOT_ORDER[round - 1];
       if (slot === undefined) throw new Error('missing slot');
-      const offer = generateOffer({ round, slot, draftedClaimKeys: drafted, rerollUsed: true });
+      const offer = generateOffer({ round, slot, draftedClaimKeys: drafted });
       for (const card of offer.cards) {
         expect(card.slot).toBe(slot);
         expect(card.source.positions).toContain(slot);
@@ -211,26 +216,24 @@ describe('havoc offer generation', () => {
     expect(rerolled.cards).toHaveLength(3);
   });
 
-  it('excludes drafted claims and all traded variants of the same person-season', () => {
-    const shared = customCandidate({
-      playerId: 'p-shared',
-      seasonKey: '1995-96',
-      franchiseId: 'lakers',
-      index: 0,
-      playable: ['PG'],
-      overall: 70,
-    });
-    const traded = customCandidate({
-      playerId: 'p-shared',
-      seasonKey: '1995-96',
-      franchiseId: 'celtics',
-      index: 1,
-      playable: ['PG'],
-      overall: 70,
-    });
+  it('allows two seasons of one person but only one variant of one person-season', () => {
     const catalog = customCatalog([
-      shared,
-      traded,
+      customCandidate({
+        playerId: 'p-shared',
+        seasonKey: '1995-96',
+        franchiseId: 'lakers',
+        index: 0,
+        playable: ['PG'],
+        overall: 70,
+      }),
+      customCandidate({
+        playerId: 'p-shared',
+        seasonKey: '1995-96',
+        franchiseId: 'celtics',
+        index: 1,
+        playable: ['PG'],
+        overall: 70,
+      }),
       customCandidate({
         playerId: 'p-shared',
         seasonKey: '1996-97',
@@ -248,85 +251,101 @@ describe('havoc offer generation', () => {
         overall: 71,
       }),
       customCandidate({
-        playerId: 'p-third',
+        playerId: 'p-extra',
         seasonKey: '1995-96',
         franchiseId: 'warriors',
         index: 4,
         playable: ['PG'],
         overall: 72,
       }),
-      customCandidate({
-        playerId: 'p-flex',
-        seasonKey: '1995-96',
-        franchiseId: 'lakers',
-        index: 5,
-        playable: ['PG', 'SG', 'SF', 'PF', 'C'],
-        overall: 73,
-      }),
-      customCandidate({
-        playerId: 'p-wing-a',
-        seasonKey: '1995-96',
-        franchiseId: 'lakers',
-        index: 6,
-        playable: ['SG', 'SF', 'PF', 'C'],
-        overall: 70,
-      }),
-      customCandidate({
-        playerId: 'p-wing-b',
-        seasonKey: '1995-96',
-        franchiseId: 'lakers',
-        index: 7,
-        playable: ['SG', 'SF', 'PF', 'C'],
-        overall: 70,
-      }),
-      customCandidate({
-        playerId: 'p-wing-c',
-        seasonKey: '1995-96',
-        franchiseId: 'lakers',
-        index: 8,
-        playable: ['SG', 'SF', 'PF', 'C'],
-        overall: 70,
-      }),
+      ...fillerClaims(),
     ]);
-    const sharedClaim = havocClaimKeyOf('p-shared', '1995-96');
-    const seasonClaim = havocClaimKeyOf('p-shared', '1996-97');
-
-    const open = generateOffer({ catalog });
-    const sharedCards = open.cards.filter(
-      (card) => havocClaimKeyOf(card.source.playerId, card.source.seasonKey ?? '') === sharedClaim,
-    );
-    expect(sharedCards).toHaveLength(1);
-    const seasonCards = open.cards.filter(
+    const seasonClaim = havocClaimKeyOf('p-shared', '1995-96');
+    const otherClaim = havocClaimKeyOf('p-shared', '1996-97');
+    const offer = generateOffer({
+      catalog,
+      draftedClaimKeys: [havocClaimKeyOf('p-extra', '1995-96')],
+    });
+    const sharedCards = offer.cards.filter(
       (card) => havocClaimKeyOf(card.source.playerId, card.source.seasonKey ?? '') === seasonClaim,
     );
-    expect(seasonCards).toHaveLength(1);
+    const otherCards = offer.cards.filter(
+      (card) => havocClaimKeyOf(card.source.playerId, card.source.seasonKey ?? '') === otherClaim,
+    );
+    expect(sharedCards).toHaveLength(1);
+    expect(otherCards).toHaveLength(1);
+    const versions = new Set(sharedCards.map((card) => card.source.playerVersionId));
+    expect(versions.size).toBe(1);
+    expect([...versions][0]).toBeDefined();
+  });
 
-    const excluded = generateOffer({ catalog, draftedClaimKeys: [sharedClaim] });
-    for (const card of excluded.cards) {
-      expect(card.source.playerId).not.toBe('p-shared');
-      expect(card.source.seasonKey).not.toBe('1995-96');
-    }
-    let sharedSeasonStillDraftable = false;
+  it('excludes every traded variant of a drafted person-season', () => {
+    const catalog = customCatalog([
+      customCandidate({
+        playerId: 'p-shared',
+        seasonKey: '1995-96',
+        franchiseId: 'lakers',
+        index: 0,
+        playable: ['PG'],
+        overall: 70,
+      }),
+      customCandidate({
+        playerId: 'p-shared',
+        seasonKey: '1995-96',
+        franchiseId: 'celtics',
+        index: 1,
+        playable: ['PG'],
+        overall: 70,
+      }),
+      customCandidate({
+        playerId: 'p-shared',
+        seasonKey: '1996-97',
+        franchiseId: 'lakers',
+        index: 2,
+        playable: ['PG'],
+        overall: 70,
+      }),
+      customCandidate({
+        playerId: 'p-other',
+        seasonKey: '1995-96',
+        franchiseId: 'bulls',
+        index: 3,
+        playable: ['PG'],
+        overall: 71,
+      }),
+      customCandidate({
+        playerId: 'p-extra',
+        seasonKey: '1995-96',
+        franchiseId: 'warriors',
+        index: 4,
+        playable: ['PG'],
+        overall: 72,
+      }),
+      ...fillerClaims(),
+    ]);
     for (let index = 0; index < 12; index += 1) {
       const offer = generateOffer({
         catalog,
-        draftedClaimKeys: [sharedClaim],
-        runSeed: seedFromString(`havoc-claim-test-${String(index)}`),
+        draftedClaimKeys: [havocClaimKeyOf('p-shared', '1995-96')],
+        runSeed: testSeed(`havoc-claim-test-${String(index)}`),
       });
-      if (
+      expect(offer.cards).toHaveLength(3);
+      for (const card of offer.cards) {
+        const claim = havocClaimKeyOf(card.source.playerId, card.source.seasonKey ?? '');
+        expect(claim).not.toBe(havocClaimKeyOf('p-shared', '1995-96'));
+      }
+      expect(
         offer.cards.some(
           (card) =>
-            havocClaimKeyOf(card.source.playerId, card.source.seasonKey ?? '') === seasonClaim,
-        )
-      ) {
-        sharedSeasonStillDraftable = true;
-      }
+            havocClaimKeyOf(card.source.playerId, card.source.seasonKey ?? '') ===
+            havocClaimKeyOf('p-shared', '1996-97'),
+        ),
+      ).toBe(true);
     }
-    expect(sharedSeasonStillDraftable).toBe(true);
   });
 
   it('raises HavocCatalogCoverageError instead of relaxing positions', () => {
-    const catalog = customCatalog([
+    const lonePg = customCatalog([
       customCandidate({
         playerId: 'p-lone-pg',
         seasonKey: '1995-96',
@@ -335,45 +354,23 @@ describe('havoc offer generation', () => {
         playable: ['PG'],
         overall: 70,
       }),
-      customCandidate({
-        playerId: 'p-flex-a',
-        seasonKey: '1995-96',
-        franchiseId: 'lakers',
-        index: 1,
-        playable: ['SG', 'SF', 'PF', 'C'],
-        overall: 70,
-      }),
-      customCandidate({
-        playerId: 'p-flex-b',
-        seasonKey: '1995-96',
-        franchiseId: 'lakers',
-        index: 2,
-        playable: ['SG', 'SF', 'PF', 'C'],
-        overall: 71,
-      }),
-      customCandidate({
-        playerId: 'p-flex-c',
-        seasonKey: '1995-96',
-        franchiseId: 'lakers',
-        index: 3,
-        playable: ['SG', 'SF', 'PF', 'C'],
-        overall: 72,
-      }),
+      ...fillerClaims(),
     ]);
-    expect(() => generateOffer({ catalog })).toThrow(HavocCatalogCoverageError);
+    let caught: unknown;
     try {
-      generateOffer({ catalog });
+      generateOffer({ catalog: lonePg });
     } catch (error) {
-      expect(error).toBeInstanceOf(HavocCatalogCoverageError);
-      if (error instanceof HavocCatalogCoverageError) {
-        expect(error.code).toBe('catalog-coverage');
-        expect(error.slot).toBe('PG');
-      }
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(HavocCatalogCoverageError);
+    if (caught instanceof HavocCatalogCoverageError) {
+      expect(caught.code).toBe('catalog-coverage');
+      expect(caught.slot).toBe('PG');
     }
   });
 
-  it('raises HavocCatalogCoverageError when the remaining positions cannot complete', () => {
-    const catalog = customCatalog([
+  it('raises HavocCatalogCoverageError when remaining positions cannot complete', () => {
+    const pgOnly = customCatalog([
       customCandidate({
         playerId: 'p-pg-a',
         seasonKey: '1995-96',
@@ -399,57 +396,35 @@ describe('havoc offer generation', () => {
         overall: 72,
       }),
     ]);
-    expect(() => generateOffer({ catalog })).toThrow(HavocCatalogCoverageError);
+    expect(() => generateOffer({ catalog: pgOnly })).toThrow(HavocCatalogCoverageError);
   });
 
   it('keeps tier and mutation packages independent of candidate identity and strength', () => {
-    const weak = customCatalog([
-      customCandidate({
-        playerId: 'p-weak-a',
-        seasonKey: '1995-96',
-        franchiseId: 'lakers',
-        index: 0,
-        playable: ['PG', 'SG', 'SF', 'PF', 'C'],
-        overall: 1,
-      }),
-      customCandidate({
-        playerId: 'p-weak-b',
-        seasonKey: '1995-96',
-        franchiseId: 'lakers',
-        index: 1,
-        playable: ['PG', 'SG', 'SF', 'PF', 'C'],
-        overall: 1,
-      }),
-      customCandidate({
-        playerId: 'p-weak-c',
-        seasonKey: '1995-96',
-        franchiseId: 'lakers',
-        index: 2,
-        playable: ['PG', 'SG', 'SF', 'PF', 'C'],
-        overall: 1,
-      }),
-    ]);
+    const weak = customCatalog(allTierClaims());
     const offerA = generateOffer({});
     const offerB = generateOffer({ catalog: weak });
     for (let cardIndex = 0; cardIndex < 3; cardIndex += 1) {
-      expect(offerB.cards[cardIndex]!.tier).toBe(offerA.cards[cardIndex]!.tier);
-      expect(offerB.cards[cardIndex]!.mutations).toEqual(offerA.cards[cardIndex]!.mutations);
+      const cardA = offerA.cards[cardIndex];
+      const cardB = offerB.cards[cardIndex];
+      if (cardA === undefined || cardB === undefined) throw new Error('missing card');
+      expect(cardB.tier).toBe(cardA.tier);
+      expect(cardB.mutations).toEqual(cardA.mutations);
     }
   });
 
   it('draws Growth Spurt samples inside 6..12 inches', () => {
     let sawGrowthSpurt = false;
     for (let index = 0; index < 40; index += 1) {
-      const offer = generateOffer({ runSeed: seedFromString(`havoc-growth-${String(index)}`) });
+      const offer = generateOffer({ runSeed: testSeed(`havoc-growth-${String(index)}`) });
       for (const card of offer.cards) {
         for (const entry of card.mutations) {
           if (entry.mutationId !== 'growth-spurt') continue;
           sawGrowthSpurt = true;
-          expect(entry.sampledHeightDelta).toBeGreaterThanOrEqual(6);
-          expect(entry.sampledHeightDelta).toBeLessThanOrEqual(12);
-          const baseline = card.effective.physical.baselineHeightInches;
+          const delta = entry.sampledHeightDelta ?? 0;
+          expect(delta).toBeGreaterThanOrEqual(6);
+          expect(delta).toBeLessThanOrEqual(12);
           expect(card.effective.physical.heightInches).toBe(
-            Math.min(108, baseline + (entry.sampledHeightDelta ?? 6)),
+            Math.min(108, card.effective.physical.baselineHeightInches + delta),
           );
         }
       }
@@ -459,12 +434,12 @@ describe('havoc offer generation', () => {
 
   it('generates forced all-tier-1, all-tier-2, and all-tier-3 boards', () => {
     for (const tier of [1, 2, 3] as const) {
-      let runSeed: string | null = null;
+      let runSeed: Seed | null = null;
       for (let index = 0; index < 20_000 && runSeed === null; index += 1) {
-        const candidate = seedFromString(`havoc-forced-tier-${String(tier)}-${String(index)}`);
+        const candidate = testSeed(`havoc-forced-tier-${String(tier)}-${String(index)}`);
         let all = true;
         for (let cardIndex = 0; cardIndex < 3; cardIndex += 1) {
-          const rng = createRng(havocDraftCardSeedForTest(candidate, 1, 0, cardIndex));
+          const rng = createRng(havocDraftCardSeed(candidate, 1, 0, cardIndex, 'tier'));
           if (drawHavocCardTier(rng) !== tier) {
             all = false;
             break;
@@ -490,50 +465,22 @@ describe('havoc offer generation', () => {
           expect(tiers.filter((value) => value === 1)).toHaveLength(1);
         } else {
           expect(card.mutations).toHaveLength(1);
-          expect(havocMutationDefinitionOf(card.mutations[0]!.mutationId).tier).toBe(3);
+          const single = card.mutations[0];
+          if (single === undefined) throw new Error('missing tier-3 mutation');
+          expect(havocMutationDefinitionOf(single.mutationId).tier).toBe(3);
         }
       }
     }
   });
 });
 
-function havocDraftCardSeedForTest(
-  runSeed: string,
-  round: number,
-  offerIndex: number,
-  cardIndex: number,
-): string {
-  // Mirrors the frozen derivation documented in havoc-seeds.ts.
-  const material = [
-    'havoc-seeds-v1',
-    'havoc-v1',
-    runSeed,
-    'draft',
-    round,
-    'offer',
-    offerIndex,
-    'card',
-    cardIndex,
-    'tier',
-  ]
-    .map((part) => String(part))
-    .join('\u0000');
-  return digestHex(material);
-}
-
-import { seasonDigestHex } from '@hoop-rush/data-contracts';
-
-function digestHex(material: string): string {
-  return seasonDigestHex(material);
-}
-
 describe('havoc tier distribution', () => {
   it('draws 60/30/10 over a fixed 100,000-card cohort within one percentage point', () => {
     const counts = { 1: 0, 2: 0, 3: 0 };
     const total = 100_000;
     for (let index = 0; index < total; index += 1) {
-      const runSeed = seedFromString(`havoc-tier-cohort-${String(index)}`);
-      const rng = createRng(havocDraftCardSeedForTest(runSeed, 1, 0, 0));
+      const runSeed = testSeed(`havoc-tier-cohort-${String(index)}`);
+      const rng = createRng(havocDraftCardSeed(runSeed, 1, 0, 0, 'tier'));
       counts[drawHavocCardTier(rng)] += 1;
     }
     expect(counts[1] / total).toBeGreaterThan(0.59);

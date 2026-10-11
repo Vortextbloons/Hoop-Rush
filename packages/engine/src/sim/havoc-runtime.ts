@@ -85,6 +85,7 @@ export interface HavocRuntimeHooks {
   onFoul(args: {
     fouler: SimulationPlayer;
     foulerSide: SideIndex;
+    offenseSide: SideIndex;
     shooter: SimulationPlayer | null;
     shooting: boolean;
     madeShot: boolean;
@@ -100,6 +101,7 @@ export interface HavocRuntimeHooks {
     passed: boolean;
     shotKind: HavocShotKind;
     putback: boolean;
+    zone: ShotZone;
   }): void;
 
   onFreeThrow(args: {

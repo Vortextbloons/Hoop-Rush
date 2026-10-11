@@ -330,10 +330,12 @@ function applyLockLineup(
   if (draft.status !== 'complete') {
     return rejectHavocCommand(state, command, 'not-drafting', 'the draft is not complete');
   }
-  const matches = command.picks.every((entry, index) => {
-    const pick = draft.picks[index];
-    return pick !== undefined && pick.slot === entry.slot && pick.card.cardId === entry.cardId;
-  });
+  const matches =
+    command.picks.length === HAVOC_DRAFT_ROUNDS &&
+    command.picks.every((entry, index) => {
+      const pick = draft.picks[index];
+      return pick !== undefined && pick.slot === entry.slot && pick.card.cardId === entry.cardId;
+    });
   if (!matches) {
     return rejectHavocCommand(
       state,

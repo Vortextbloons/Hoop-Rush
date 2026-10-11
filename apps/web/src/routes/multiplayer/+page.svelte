@@ -223,6 +223,14 @@
     {/if}
   </header>
 
+  <a class="draft-duel-banner" href={resolve('/draft-duel')}>
+    <div>
+      <span class="eyebrow">New mode</span>
+      <p>Draft Duel · five rounds, eight cards, best-of-seven broadcast</p>
+    </div>
+    <ArrowRight size={16} aria-hidden="true" />
+  </a>
+
   <div class="match-layout">
     <div class="mode-selection">
       <div class="section-heading">
@@ -497,6 +505,33 @@
     grid-template-columns: minmax(0, 1fr) 370px;
     gap: 24px;
     align-items: start;
+  }
+  .draft-duel-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 16px 0 0;
+    padding: 12px 16px;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    text-decoration: none;
+    color: inherit;
+    background: var(--color-surface, transparent);
+  }
+  .draft-duel-banner:hover {
+    border-color: var(--color-primary);
+  }
+  .draft-duel-banner .eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-family: 'Roboto Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--color-muted-foreground);
+  }
+  .draft-duel-banner p {
+    margin: 2px 0 0;
+    font-weight: 600;
   }
   .section-heading {
     display: flex;

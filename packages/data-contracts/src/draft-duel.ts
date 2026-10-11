@@ -78,7 +78,7 @@ export const draftDuelVersionLocksSchema = z.object({
 });
 export type DraftDuelVersionLocks = z.infer<typeof draftDuelVersionLocksSchema>;
 export function defaultDraftDuelVersionLocks(
-  overrides: Partial<DraftDuelVersionLocks> & { catalogHash: string },
+  overrides: Partial<Omit<DraftDuelVersionLocks, 'catalogHash'>> & { catalogHash: string },
 ): DraftDuelVersionLocks {
   return {
     dataVersion: overrides.dataVersion ?? 'unknown',

@@ -16,7 +16,6 @@ import {
   type DraftDuelSeriesGame,
   type DraftDuelVersionLocks,
   type Id,
-  type Seed,
 } from '@hoop-rush/data-contracts';
 import {
   applyDraftDuelPick,
@@ -30,7 +29,6 @@ import {
   draftDuelStandouts,
   draftDuelTimeoutPick,
   createDraftDuelDraft,
-  type DraftDuelCatalog,
 } from '@hoop-rush/engine';
 import { DexieDraftDuelRepository, type DraftDuelCompletionRecap } from '@hoop-rush/persistence';
 import { newRequestId } from '$lib/ids';
@@ -241,7 +239,7 @@ export class DraftDuelController {
   );
   successorRoomId = $derived(this.snapshot?.successorRoomId ?? null);
 
-  async attach(roomId: Id): Promise<void> {
+  async attach(roomId: string): Promise<void> {
     if (this.disposed) return;
     this.roomId = idSchema.parse(roomId);
     try {
@@ -623,7 +621,7 @@ export class DraftDuelController {
     const snapshot = this.snapshot;
     const assets = this.assets;
     if (!snapshot || !assets) return;
-    const rootSeed = snapshot.rootSeed as Seed | null;
+    const rootSeed = snapshot.rootSeed;
     if (!rootSeed) {
       this.draft = null;
       return;
@@ -694,7 +692,7 @@ export class DraftDuelController {
     if (!snapshot || !assets || !rosters || !this.roomId || !this.participantId) {
       throw new Error('Draft Duel game inputs are incomplete.');
     }
-    const rootSeed = snapshot.rootSeed as Seed | null;
+    const rootSeed = snapshot.rootSeed;
     if (!rootSeed) throw new Error('Draft Duel root seed is missing.');
     const homeParticipantId = draftDuelHomeForGame(homeWinner, gameNumber);
     const awayParticipantId = otherParticipant(homeParticipantId);
@@ -845,16 +843,17 @@ export class DraftDuelController {
       broadcast: snapshot.broadcast,
       verification: this.verification,
     });
-    const champion = snapshot.series?.champion ?? null;
-    if (snapshot.phase === 'championship' && champion && !this.completedPersisted) {
+    const series = snapshot.series;
+    const champion = series?.champion ?? null;
+    if (snapshot.phase === 'championship' && champion && series && !this.completedPersisted) {
       this.completedPersisted = true;
       const recap: DraftDuelCompletionRecap = {
         roomId: this.roomId,
         champion,
-        series: snapshot.series!,
+        series,
         mvp: this.seriesMvp,
         standouts: this.seriesStandouts,
-        games: snapshot.series?.games.length ?? 0,
+        games: series.games.length,
       };
       if (recap.games >= 1) await this.repo.complete(recap);
     }
@@ -869,16 +868,17 @@ export class DraftDuelController {
   }): void {
     if (event.participantId === this.participantId) return;
     if (event.kind === 'consideration' && event.playerVersionId && this.assets) {
-      const entry = this.assets.catalog.byVersionId.get(event.playerVersionId);
+      const playerVersionId = event.playerVersionId;
+      const entry = this.assets.catalog.byVersionId.get(playerVersionId);
       if (!entry) return;
       const consideration = {
         displayName: entry.card.displayName,
         seasonKey: entry.card.seasonKey,
       };
       this.consideration = consideration;
-      const token = `${event.playerVersionId}:${String(event.sentAtMs)}`;
+      const token = `${playerVersionId}:${String(event.sentAtMs)}`;
       setTimeout(() => {
-        if (`${event.playerVersionId}:${String(event.sentAtMs)}` === token) {
+        if (`${playerVersionId}:${String(event.sentAtMs)}` === token) {
           this.consideration = null;
         }
       }, 2000);

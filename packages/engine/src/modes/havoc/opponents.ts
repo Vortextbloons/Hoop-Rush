@@ -76,7 +76,9 @@ function opponentSourceOf(
     displayName: player.displayName,
     franchiseId: opponent.teamId,
     eraId: profile.eraId,
-    seasonKey: opponent.seasonKey,
+    // The bracket team season is not authoritative evidence of a mixed-lineup
+    // player's own season, so the opponent source claims no player season key.
+    seasonKey: null,
     positions: [...player.positions],
     originalOverall: catalogOverall === undefined ? fallback.overallRating : catalogOverall,
     overallSource: catalogOverall === undefined ? 'derived' : 'catalog',
@@ -86,7 +88,13 @@ function opponentSourceOf(
 }
 
 function opponentSlotPlayers(opponent: BracketOpponent): readonly SimulationPlayer[] {
-  const bySlot: (SimulationPlayer | undefined)[] = new Array(5).fill(undefined);
+  const bySlot: (SimulationPlayer | undefined)[] = [
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+  ];
   for (const assignment of opponent.lineup.assignments) {
     if (bySlot[assignment.slotIndex] !== undefined) {
       throw new Error(
