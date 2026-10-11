@@ -3,18 +3,14 @@
     DraftDuelCard,
     DraftDuelPresentation,
     DraftDuelUnavailableReason,
-    HoopRushManifest,
   } from '@hoop-rush/data-contracts';
-  import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
-  import PlayerFace from '$lib/components/PlayerFace.svelte';
-  import TeamLogo from '$lib/components/TeamLogo.svelte';
+  import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
   import { formatPositions } from '$lib/player-positions';
   import { DRAFT_DUEL_REASON_LABELS, draftDuelCardView } from './draft-duel-card-view.ts';
 
   let {
     card,
     presentation,
-    manifest = null,
     disabled = false,
     reason = null,
     selected = false,
@@ -25,7 +21,6 @@
   }: {
     card: DraftDuelCard;
     presentation: DraftDuelPresentation;
-    manifest?: HoopRushManifest | null;
     disabled?: boolean;
     reason?: DraftDuelUnavailableReason | null;
     selected?: boolean;
@@ -39,14 +34,6 @@
   const reasonLabel = $derived(reason === null ? null : DRAFT_DUEL_REASON_LABELS[reason]);
   const franchiseLabel = $derived(franchiseAbbreviation(card.franchiseId));
   const positionsLabel = $derived(formatPositions(view.positions));
-  const franchiseSlot = $derived(
-    manifest?.modernFranchiseSlots.find((slot) => slot.franchiseId === card.franchiseId) ?? null,
-  );
-  const logoCandidates = $derived(
-    manifest
-      ? (resolveEraTeamIdentity(manifest, card.franchiseId, card.eraId).logoCandidates ?? [])
-      : [],
-  );
   const initials = $derived(
     view.displayName
       .split(' ')
@@ -114,16 +101,7 @@
   onblur={considerOff}
 >
   <span class="dd-card-top">
-    {#if manifest && card.playerExternalId}
-      <PlayerFace
-        player={{ playerId: card.playerId, playerExternalId: card.playerExternalId, altIds: null }}
-        {manifest}
-        size="sm"
-        fallbackInitials={initials}
-      />
-    {:else}
-      <span class="dd-card-face" aria-hidden="true">{initials}</span>
-    {/if}
+    <span class="dd-card-face" aria-hidden="true">{initials}</span>
     <span class="dd-card-ident">
       <span class="dd-card-name">{view.displayName}</span>
       <span class="dd-card-season">{view.seasonKey}</span>
@@ -138,18 +116,7 @@
   <span class="dd-card-meta">
     <span class="dd-card-positions">{positionsLabel}</span>
     {#if !compact}
-      <span class="dd-card-franchise">
-        {#if manifest && franchiseSlot}
-          <TeamLogo
-            {manifest}
-            franchiseId={card.franchiseId}
-            teamExternalId={franchiseSlot.teamExternalId}
-            {logoCandidates}
-            className="h-4 w-4"
-          />
-        {/if}
-        {franchiseLabel} · {view.eraId}
-      </span>
+      <span class="dd-card-franchise">{franchiseLabel} · {view.eraId}</span>
     {/if}
   </span>
   <span class="dd-card-foot">
@@ -201,7 +168,7 @@
 
   .dd-card-considering {
     border-style: dashed;
-    border-color: var(--color-primary);
+    border-color: var(--color-accent);
   }
 
   .dd-card-disabled {
@@ -216,10 +183,10 @@
   }
 
   .dd-card-elite {
-    border-color: var(--color-primary);
+    border-color: var(--color-accent);
     box-shadow:
-      0 0 0 1px color-mix(in srgb, var(--color-primary) 40%, transparent),
-      0 0 18px color-mix(in srgb, var(--color-primary) 18%, transparent);
+      0 0 0 1px color-mix(in srgb, var(--color-accent) 40%, transparent),
+      0 0 18px color-mix(in srgb, var(--color-accent) 18%, transparent);
   }
 
   .dd-card-elite::before {
@@ -230,13 +197,13 @@
     right: 12%;
     height: 2px;
     border-radius: 999px;
-    background: linear-gradient(90deg, transparent, var(--color-primary), transparent);
+    background: linear-gradient(90deg, transparent, var(--color-accent), transparent);
   }
 
   .dd-card-elite.dd-card-selected {
     box-shadow:
       0 0 0 1px color-mix(in srgb, var(--color-primary) 55%, transparent),
-      0 0 18px color-mix(in srgb, var(--color-primary) 24%, transparent);
+      0 0 18px color-mix(in srgb, var(--color-accent) 24%, transparent);
   }
 
   .dd-card-top {
@@ -289,10 +256,10 @@
     flex: none;
     justify-items: center;
     padding: 0.15rem 0.35rem 0.2rem;
-    border: 1px solid color-mix(in srgb, var(--color-primary) 60%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-accent) 60%, transparent);
     border-radius: 8px;
     background: color-mix(in srgb, var(--color-surface-2) 80%, transparent);
-    color: var(--color-primary);
+    color: var(--color-accent);
     line-height: 0.95;
   }
 
@@ -326,9 +293,6 @@
   }
 
   .dd-card-franchise {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -346,10 +310,10 @@
     display: inline-flex;
     align-items: center;
     padding: 0.12rem 0.45rem;
-    border: 1px solid color-mix(in srgb, var(--color-primary) 55%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-accent) 55%, transparent);
     border-radius: 999px;
-    background: color-mix(in srgb, var(--color-primary) 10%, transparent);
-    color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+    color: var(--color-accent);
     font-family: var(--font-mono);
     font-size: 9px;
     font-weight: 800;

@@ -1,9 +1,5 @@
 <script lang="ts">
-  import type {
-    DraftDuelOfferedPick,
-    DraftDuelPresentation,
-    HoopRushManifest,
-  } from '@hoop-rush/data-contracts';
+  import type { DraftDuelOfferedPick, DraftDuelPresentation } from '@hoop-rush/data-contracts';
   import { DRAFT_DUEL_PICK_ANIMATION_MS } from '@hoop-rush/data-contracts';
   import DraftCard from './DraftCard.svelte';
 
@@ -12,38 +8,24 @@
     active,
     round,
     presentation,
-    manifest = null,
     selectedSlot = null,
     disabled = false,
-    onchoose,
+    onpick,
     onconsider,
   }: {
     offers: DraftDuelOfferedPick[];
     active: boolean;
     round: number;
     presentation: DraftDuelPresentation;
-    manifest?: HoopRushManifest | null;
     selectedSlot?: number | null;
     disabled?: boolean;
-    onchoose?: (pick: DraftDuelOfferedPick) => void;
+    onpick?: (pick: DraftDuelOfferedPick) => void;
     onconsider?: (pick: DraftDuelOfferedPick | null) => void;
   } = $props();
 
   let consideringSlot = $state<number | null>(null);
-  let roundFlash = $state(false);
-  let lastRound = round;
   const canPick = $derived(active && !disabled);
   const boardState = $derived(disabled ? 'disabled' : active ? 'active' : 'waiting');
-
-  $effect(() => {
-    if (round === lastRound) return;
-    lastRound = round;
-    roundFlash = true;
-    const timer = setTimeout(() => {
-      roundFlash = false;
-    }, 900);
-    return () => clearTimeout(timer);
-  });
 
   function slotState(
     pick: DraftDuelOfferedPick,
@@ -56,7 +38,7 @@
 
   function pickCard(pick: DraftDuelOfferedPick): void {
     if (!canPick || !pick.available) return;
-    onchoose?.(pick);
+    onpick?.(pick);
   }
 
   function considerCard(pick: DraftDuelOfferedPick | null): void {
@@ -77,9 +59,6 @@
   <header class="dd-board-head">
     <div class="dd-board-heading">
       <p class="dd-board-round" data-round-label>Round {round} of 5</p>
-      {#if roundFlash}
-        <span class="dd-new-round" data-new-round="true">New offers</span>
-      {/if}
       <p class="dd-board-turn" data-turn-label>
         {active ? 'Your pick' : disabled ? 'Picks locked' : 'Opponent picking'}
       </p>
@@ -101,7 +80,6 @@
         <DraftCard
           card={pick.card}
           {presentation}
-          {manifest}
           disabled={!canPick || !pick.available}
           reason={pick.reason ?? (!active ? 'turn' : null)}
           selected={selectedSlot === pick.slot}
@@ -157,37 +135,6 @@
     line-height: 1.05;
   }
 
-  .dd-new-round {
-    padding: 0.14rem 0.5rem;
-    border: 1px solid color-mix(in srgb, var(--color-primary) 55%, transparent);
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--color-primary) 12%, transparent);
-    color: var(--color-primary);
-    font-family: var(--font-mono);
-    font-size: 9px;
-    font-weight: 800;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    animation: dd-new-round 900ms ease-out both;
-  }
-
-  @keyframes dd-new-round {
-    0% {
-      opacity: 0;
-      transform: translateY(-4px) scale(0.94);
-    }
-    18% {
-      opacity: 1;
-      transform: none;
-    }
-    72% {
-      opacity: 1;
-    }
-    100% {
-      opacity: 0;
-    }
-  }
-
   .dd-board-turn {
     border-radius: 999px;
     padding: 0.15rem 0.55rem;
@@ -229,8 +176,8 @@
   }
 
   .dd-board-dots .current {
-    border-color: var(--color-primary);
-    background: var(--color-primary);
+    border-color: var(--color-accent);
+    background: var(--color-accent);
   }
 
   .dd-board-grid {
@@ -249,7 +196,7 @@
 
   .dd-board-slot[data-state='considering'] {
     border-radius: 14px;
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 35%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 35%, transparent);
   }
 
   @keyframes dd-picked {
@@ -274,8 +221,7 @@
 
   @media (prefers-reduced-motion: reduce) {
     .dd-board-slot,
-    .dd-board-slot[data-state='picked'],
-    .dd-new-round {
+    .dd-board-slot[data-state='picked'] {
       animation: none;
     }
   }
