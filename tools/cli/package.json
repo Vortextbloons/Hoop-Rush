@@ -7,7 +7,7 @@
   },
   "scripts": {
     "check": "tsc --noEmit --incremental",
-    "lint": "prettier --cache --check src vitest.config.ts eslint.config.js && eslint --cache .",
+    "lint": "prettier --cache --check src vitest.config.ts eslint.config.js && eslint --cache src vitest.config.ts eslint.config.js",
     "test": "vitest",
     "test:run": "vitest run",
     "hoop-rush": "node src/index.ts",

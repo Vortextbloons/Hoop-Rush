@@ -97,7 +97,7 @@ export function createTripContext(
     profile,
     teams,
     teamUnits: [unitVersionIdsOf(teams[0]), unitVersionIdsOf(teams[1])],
-    personalFouls: [new Map(), new Map()],
+    personalFouls: [new Map<string, number>(), new Map<string, number>()],
     preps: [prepareTeam(teams[0], profile), prepareTeam(teams[1], profile)],
     meanTripSeconds: meanTripSeconds(profile),
     eraPossEstimatePerTrip: eraPossEstimatePerTrip(profile) ?? 1,
