@@ -152,3 +152,10 @@ paths change (stages 2, 4, and 6).
   plus `types/errors` and a 35-line facade; importers moved to
   `./block/index.ts` and the old module deleted. Pure moves; engine,
   application, web, and `cli-season-reproduce` suites unchanged.
+- 2026-10-11, stage 4e: regular-season/postseason duplication collapsed:
+  `rollInjuryWithSeedNamespace` / `rollRehabOutcomeWithSeedNamespace` and
+  `seasonGameHealthSeamWithRoll` in `injuries.ts`/`health.ts`, plus
+  `injury-events.ts` (side lookup, same-game returns, compact injury events).
+  The two modes now delegate; deliberate differences (postseason ignores the
+  rehab premium) stay pinned by `injuries.test.ts`. Block-0 golden digest and
+  all postseason/command suites unchanged.

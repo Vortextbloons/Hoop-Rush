@@ -4,17 +4,12 @@ import {
   franchiseIdSchema,
   seasonNamespaceSeed,
   type Position,
-  type SeasonCompactInjuryEvent,
   type SeasonEffectsState,
   type SeasonGamePlayerInput,
   type SeasonGameSimulationInput,
   type SeasonHealthState,
-  type SeasonInjuryRecord,
   type SeasonInvalidRosterInterruption,
-  type SeasonRemovalEvent,
   type SeasonRetainedGameDetail,
-  type SeasonReturnEvent,
-  type SeasonRoster,
   type SeasonRotation,
   type SeasonSchedule,
   type SeasonScheduleGame,
@@ -33,6 +28,11 @@ import {
   seasonPregameAvailabilityOf,
 } from '../health.ts';
 import { applySeasonGameHealthTransition } from '../injuries.ts';
+import {
+  compactSeasonInjuryEvents,
+  sameGameReturnResolutionsOf,
+  seasonSideOfPlayer,
+} from '../injury-events.ts';
 import { resolveHomeGameRule } from '../evolution.ts';
 import { seasonBlockGameCount } from '../recap.ts';
 import { simulateSeasonGameWithEffects } from '../season-game.ts';
@@ -145,6 +145,10 @@ export function simulateSeasonBlockGame(
   };
   const homePlayers = activePlayers(homeRoster, homeRotation);
   const awayPlayers = activePlayers(awayRoster, awayRotation);
+  const missingSide = (playerVersionId: string): Error =>
+    new SeasonBlockInvariantError(
+      `season block: version ${playerVersionId} plays neither side of ${game.gameId}`,
+    );
   const seed = seasonNamespaceSeed(run.rootSeed, SEASON_SEED_NAMESPACES.scheduleGames, game.gameId);
   let pregame = effects;
   if (!(options.skipRecoveryTick ?? false)) {
@@ -201,7 +205,6 @@ export function simulateSeasonBlockGame(
     : seasonGameHealthSeam(run, health, {
         rootSeed: run.rootSeed,
         gameId: game.gameId,
-        round: game.round,
         homeFranchiseId: game.homeFranchiseId,
         awayFranchiseId: game.awayFranchiseId,
         targetMinutesByPlayer,
@@ -250,14 +253,14 @@ export function simulateSeasonBlockGame(
       available: seam.pregame.get(player.playerVersionId) ?? true,
     })),
     removals: seam.removals.map((removal) => ({
-      side: sideOfPlayer(game, removal.playerVersionId, rosterByFranchise),
+      side: seasonSideOfPlayer(homeRoster, awayRoster, removal.playerVersionId, missingSide),
       playerVersionId: removal.playerVersionId,
       period: removal.clock.period,
       secondsRemaining: removal.clock.seconds,
       reason: 'injury',
     })),
     returns: seam.returns.map((ret) => ({
-      side: sideOfPlayer(game, ret.playerVersionId, rosterByFranchise),
+      side: seasonSideOfPlayer(homeRoster, awayRoster, ret.playerVersionId, missingSide),
       playerVersionId: ret.playerVersionId,
       period: ret.clock.period,
       secondsRemaining: ret.clock.seconds,
@@ -296,7 +299,13 @@ export function simulateSeasonBlockGame(
     newInjuries: seam.newInjuries,
     sameGameReturned,
   });
-  const injuryEvents = compactInjuryEventsOf(game, rosterByFranchise, seam, result);
+  const injuryEvents = compactSeasonInjuryEvents({
+    homeRoster,
+    awayRoster,
+    seam,
+    result,
+    missing: missingSide,
+  });
   const summary = seasonGameSummaryFromResult(result, game, transition, injuryEvents);
   const summaryFailures = auditSeasonGameSummary(summary);
   if (summaryFailures.length > 0) {
@@ -380,83 +389,4 @@ export function positionsOf(input: SeasonBlockSimulationInput): Map<string, read
     positions.set(player.playerVersionId, player.positions);
   }
   return positions;
-}
-function sideOfPlayer(
-  game: SeasonScheduleGame,
-  playerVersionId: string,
-  rosterByFranchise: ReadonlyMap<string, SeasonRoster>,
-): 'home' | 'away' {
-  const homeRoster = rosterByFranchise.get(game.homeFranchiseId);
-  if (homeRoster?.players.some((player) => player.playerVersionId === playerVersionId)) {
-    return 'home';
-  }
-  const awayRoster = rosterByFranchise.get(game.awayFranchiseId);
-  if (awayRoster?.players.some((player) => player.playerVersionId === playerVersionId)) {
-    return 'away';
-  }
-  throw new Error(`season block: version ${playerVersionId} plays neither side of ${game.gameId}`);
-}
-function sameGameReturnResolutionsOf(
-  newInjuries: readonly SeasonInjuryRecord[],
-  result: ReturnType<typeof simulateSeasonGameWithEffects>['result'],
-): {
-  injuryId: string;
-  returned: boolean;
-}[] {
-  const candidates = newInjuries.filter((record) => record.sameGameReturn);
-  if (candidates.length === 0) return [];
-  const returnedIds = new Set<string>();
-  if (result.outcome === 'completed') {
-    for (const side of [result.home, result.away]) {
-      for (const ret of side.returns) returnedIds.add(ret.playerVersionId);
-    }
-  }
-  return candidates.map((record) => ({
-    injuryId: record.injuryId,
-    returned: returnedIds.has(record.playerVersionId),
-  }));
-}
-function compactInjuryEventsOf(
-  game: SeasonScheduleGame,
-  rosterByFranchise: ReadonlyMap<string, SeasonRoster>,
-  seam: ReturnType<typeof seasonGameHealthSeam>,
-  result: ReturnType<typeof simulateSeasonGameWithEffects>['result'],
-): SeasonCompactInjuryEvent[] {
-  if (seam.newInjuries.length === 0) return [];
-  const appliedRemovalByPlayer = new Map<string, SeasonRemovalEvent>();
-  const appliedReturnByPlayer = new Map<string, SeasonReturnEvent>();
-  if (result.outcome === 'completed') {
-    for (const event of result.removals) {
-      appliedRemovalByPlayer.set(event.playerVersionId, event);
-    }
-    for (const side of [result.home, result.away]) {
-      for (const event of side.returns) {
-        appliedReturnByPlayer.set(event.playerVersionId, event);
-      }
-    }
-  }
-  const rolledRemovalByPlayer = new Map(
-    seam.removals.map((removal) => [removal.playerVersionId, removal.clock]),
-  );
-  return seam.newInjuries.map((record) => {
-    const appliedRemoval = appliedRemovalByPlayer.get(record.playerVersionId);
-    const rolledRemoval = rolledRemovalByPlayer.get(record.playerVersionId);
-    const removedClock =
-      appliedRemoval !== undefined
-        ? { period: appliedRemoval.period, seconds: appliedRemoval.secondsRemaining }
-        : (rolledRemoval ?? { period: 1, seconds: 720 });
-    const appliedReturn = appliedReturnByPlayer.get(record.playerVersionId);
-    return {
-      playerVersionId: record.playerVersionId,
-      side: sideOfPlayer(game, record.playerVersionId, rosterByFranchise),
-      type: record.type,
-      severity: record.severity,
-      removedClock,
-      returned: appliedReturn !== undefined,
-      returnClock:
-        appliedReturn !== undefined
-          ? { period: appliedReturn.period, seconds: appliedReturn.secondsRemaining }
-          : null,
-    };
-  });
 }

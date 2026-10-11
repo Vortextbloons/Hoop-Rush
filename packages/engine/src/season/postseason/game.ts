@@ -33,6 +33,11 @@ import { seasonFranchiseLegalFiveFacts, seasonPregameAvailabilityOf } from '../h
 import { SEASON_HOME_COURT_PROFILE } from '../home-court.ts';
 import { resolveHomeGameRule } from '../evolution.ts';
 import { applySeasonGameHealthTransition } from '../injuries.ts';
+import {
+  compactSeasonInjuryEvents,
+  sameGameReturnResolutionsOf,
+  seasonSideOfPlayer,
+} from '../injury-events.ts';
 import { conferenceOf } from '../league.ts';
 import { simulateSeasonGameWithEffects } from '../season-game.ts';
 import { findSeriesOrNull } from './bracket.ts';
@@ -231,6 +236,8 @@ export function simulateSeasonPostseasonGame(
   const ordinal = seasonPostseasonGameOrdinal(gameId);
   const round = SEASON_ROUND_COUNT;
   const pregame = effects;
+  const missingSide = (playerVersionId: string): Error =>
+    new SeasonPostseasonInvariantError(`version ${playerVersionId} plays neither side of the game`);
   const seam = forfeitPending
     ? {
         pregame: seasonPregameAvailabilityOf(run.health, [...homePlayers, ...awayPlayers]),
@@ -256,7 +263,6 @@ export function simulateSeasonPostseasonGame(
         run,
         health: run.health,
         gameId,
-        round,
         homeFranchiseId: homeId,
         awayFranchiseId: awayId,
         targetMinutesByPlayer: targetMinutes,
@@ -288,14 +294,14 @@ export function simulateSeasonPostseasonGame(
       available: seam.pregame.get(player.playerVersionId) ?? true,
     })),
     removals: seam.removals.map((removal) => ({
-      side: sideOfPlayer(homeRoster, awayRoster, removal.playerVersionId),
+      side: seasonSideOfPlayer(homeRoster, awayRoster, removal.playerVersionId, missingSide),
       playerVersionId: removal.playerVersionId,
       period: removal.clock.period,
       secondsRemaining: removal.clock.seconds,
       reason: 'injury' as const,
     })),
     returns: seam.returns.map((ret) => ({
-      side: sideOfPlayer(homeRoster, awayRoster, ret.playerVersionId),
+      side: seasonSideOfPlayer(homeRoster, awayRoster, ret.playerVersionId, missingSide),
       playerVersionId: ret.playerVersionId,
       period: ret.clock.period,
       secondsRemaining: ret.clock.seconds,
@@ -330,11 +336,12 @@ export function simulateSeasonPostseasonGame(
     newInjuries: seam.newInjuries,
     sameGameReturned,
   });
-  const injuryEvents = compactPostseasonInjuryEvents({
+  const injuryEvents = compactSeasonInjuryEvents({
     homeRoster,
     awayRoster,
     seam,
     result,
+    missing: missingSide,
   });
   const factsOf = roundFactsOf(run.postseason, run.league, gameId);
   const summary = seasonPostseasonSummaryFromGame({
@@ -394,97 +401,6 @@ function expandedPlayer(
     );
   }
   return player;
-}
-function sideOfPlayer(
-  homeRoster: SeasonRun['rosters'][number],
-  awayRoster: SeasonRun['rosters'][number],
-  playerVersionId: string,
-): 'home' | 'away' {
-  if (homeRoster.players.some((player) => player.playerVersionId === playerVersionId)) {
-    return 'home';
-  }
-  if (awayRoster.players.some((player) => player.playerVersionId === playerVersionId)) {
-    return 'away';
-  }
-  throw new SeasonPostseasonInvariantError(
-    `version ${playerVersionId} plays neither side of the game`,
-  );
-}
-function sameGameReturnResolutionsOf(
-  newInjuries: readonly SeasonInjuryRecord[],
-  result: SeasonGameSimulationResult,
-): {
-  injuryId: string;
-  returned: boolean;
-}[] {
-  const candidates = newInjuries.filter((record) => record.sameGameReturn);
-  if (candidates.length === 0) return [];
-  const returnedIds = new Set<string>();
-  if (result.outcome === 'completed') {
-    for (const side of [result.home, result.away]) {
-      for (const ret of side.returns) returnedIds.add(ret.playerVersionId);
-    }
-  }
-  return candidates.map((record) => ({
-    injuryId: record.injuryId,
-    returned: returnedIds.has(record.playerVersionId),
-  }));
-}
-function compactPostseasonInjuryEvents(input: {
-  homeRoster: SeasonRun['rosters'][number];
-  awayRoster: SeasonRun['rosters'][number];
-  seam: ReturnType<typeof postseasonGameHealthSeam>;
-  result: SeasonGameSimulationResult;
-}): SeasonCompactInjuryEvent[] {
-  if (input.seam.newInjuries.length === 0) return [];
-  const appliedRemovalByPlayer = new Map<
-    string,
-    {
-      period: number;
-      seconds: number;
-    }
-  >();
-  const appliedReturnByPlayer = new Map<
-    string,
-    {
-      period: number;
-      seconds: number;
-    }
-  >();
-  if (input.result.outcome === 'completed') {
-    for (const event of input.result.removals) {
-      appliedRemovalByPlayer.set(event.playerVersionId, {
-        period: event.period,
-        seconds: event.secondsRemaining,
-      });
-    }
-    for (const side of [input.result.home, input.result.away]) {
-      for (const event of side.returns) {
-        appliedReturnByPlayer.set(event.playerVersionId, {
-          period: event.period,
-          seconds: event.secondsRemaining,
-        });
-      }
-    }
-  }
-  const rolledRemovalByPlayer = new Map(
-    input.seam.removals.map((removal) => [removal.playerVersionId, removal.clock]),
-  );
-  return input.seam.newInjuries.map((record) => {
-    const appliedRemoval = appliedRemovalByPlayer.get(record.playerVersionId);
-    const rolledRemoval = rolledRemovalByPlayer.get(record.playerVersionId);
-    const removedClock = appliedRemoval ?? rolledRemoval ?? { period: 1, seconds: 720 };
-    const appliedReturn = appliedReturnByPlayer.get(record.playerVersionId);
-    return {
-      playerVersionId: record.playerVersionId,
-      side: sideOfPlayer(input.homeRoster, input.awayRoster, record.playerVersionId),
-      type: record.type,
-      severity: record.severity,
-      removedClock,
-      returned: appliedReturn !== undefined,
-      returnClock: appliedReturn ?? null,
-    };
-  });
 }
 function roundFactsOf(
   state: SeasonPostseasonState,

@@ -16,7 +16,12 @@ import {
   type SeasonTeamBox,
 } from '@hoop-rush/data-contracts';
 import { foldSeasonPlayerAggregates, foldSeasonTeamAggregates } from './aggregates.ts';
-import { rollSeasonInjuryForPlayer, seasonPlayerAvailable } from './injuries.ts';
+import {
+  rollSeasonInjuryForPlayer,
+  seasonPlayerAvailable,
+  type SeasonInjuryRollInput,
+  type SeasonInjuryRollResult,
+} from './injuries.ts';
 import { chooseInitialUnit, type PlannerRotationContext } from './rotation-planner.ts';
 import { reduceSeasonStandings } from './standings.ts';
 export type { SeasonInvalidRosterInterruption } from '@hoop-rush/data-contracts';
@@ -84,20 +89,20 @@ export function seasonPregameAvailabilityOf(
   }
   return map;
 }
-export function seasonGameHealthSeam(
-  run: HealthRunView,
-  health: SeasonHealthState,
-  input: {
-    rootSeed: string;
-    gameId: string;
-    round: number;
-    homeFranchiseId: string;
-    awayFranchiseId: string;
-    targetMinutesByPlayer: ReadonlyMap<string, number>;
-    durabilityByPlayer?: ReadonlyMap<string, number>;
-    effects?: SeasonEffectsState;
-  },
-): {
+export interface SeasonGameHealthSeamInput {
+  run: HealthRunView;
+  health: SeasonHealthState;
+  rootSeed: string;
+  gameId: string;
+  homeFranchiseId: string;
+  awayFranchiseId: string;
+  targetMinutesByPlayer: ReadonlyMap<string, number>;
+  durabilityByPlayer?: ReadonlyMap<string, number>;
+  effects?: SeasonEffectsState;
+  rollInjury: (input: SeasonInjuryRollInput) => SeasonInjuryRollResult;
+  missingRosterError: (franchiseId: string) => Error;
+}
+export interface SeasonGameHealthSeamResult {
   pregame: ReadonlyMap<string, boolean>;
   removals: readonly {
     playerVersionId: string;
@@ -116,8 +121,13 @@ export function seasonGameHealthSeam(
     reason: 'injury-return';
   }[];
   newInjuries: readonly SeasonInjuryRecord[];
-} {
-  const rosterByFranchise = new Map(run.rosters.map((roster) => [roster.franchiseId, roster]));
+}
+export function seasonGameHealthSeamWithRoll(
+  input: SeasonGameHealthSeamInput,
+): SeasonGameHealthSeamResult {
+  const rosterByFranchise = new Map(
+    input.run.rosters.map((roster) => [roster.franchiseId, roster]),
+  );
   const fatigueOf = new Map<string, number>();
   const loadOf = new Map<string, number>();
   for (const player of input.effects?.playerStates ?? []) {
@@ -126,7 +136,7 @@ export function seasonGameHealthSeam(
   }
   const recurrenceOf = new Map<string, number>();
   const rehabPremiumOf = new Map<string, number>();
-  for (const record of health.injuries) {
+  for (const record of input.health.injuries) {
     const current = recurrenceOf.get(record.playerVersionId) ?? 0;
     if (record.recurrenceWindowRoundsRemaining > current) {
       recurrenceOf.set(record.playerVersionId, record.recurrenceWindowRoundsRemaining);
@@ -162,14 +172,14 @@ export function seasonGameHealthSeam(
   for (const franchiseId of [input.homeFranchiseId, input.awayFranchiseId]) {
     const roster = rosterByFranchise.get(franchiseIdSchema.parse(franchiseId));
     if (roster === undefined) {
-      throw new Error(`season health: game ${input.gameId} references roster ${franchiseId}`);
+      throw input.missingRosterError(franchiseId);
     }
     for (const player of roster.players) {
-      const available = seasonPlayerAvailable(health, player.playerVersionId);
+      const available = seasonPlayerAvailable(input.health, player.playerVersionId);
       pregame.set(player.playerVersionId, available);
       const targetMinutes = input.targetMinutesByPlayer.get(player.playerVersionId) ?? 0;
       if (targetMinutes <= 0 || !available) continue;
-      const roll = rollSeasonInjuryForPlayer({
+      const roll = input.rollInjury({
         rootSeed: input.rootSeed,
         gameId: input.gameId,
         playerVersionId: player.playerVersionId,
@@ -200,6 +210,28 @@ export function seasonGameHealthSeam(
     }
   }
   return { pregame, removals, returns, newInjuries };
+}
+export function seasonGameHealthSeam(
+  run: HealthRunView,
+  health: SeasonHealthState,
+  input: {
+    rootSeed: string;
+    gameId: string;
+    homeFranchiseId: string;
+    awayFranchiseId: string;
+    targetMinutesByPlayer: ReadonlyMap<string, number>;
+    durabilityByPlayer?: ReadonlyMap<string, number>;
+    effects?: SeasonEffectsState;
+  },
+): SeasonGameHealthSeamResult {
+  return seasonGameHealthSeamWithRoll({
+    run,
+    health,
+    ...input,
+    rollInjury: rollSeasonInjuryForPlayer,
+    missingRosterError: (franchiseId) =>
+      new Error('season health: game ' + input.gameId + ' references roster ' + franchiseId),
+  });
 }
 function partialGamesOf(summaries: readonly SeasonGameSummary[]): SeasonRun['games'] {
   return summaries.map((summary) => ({

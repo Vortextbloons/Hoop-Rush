@@ -45,9 +45,6 @@ const INJURY_TYPES: readonly SeasonInjuryType[] = [
   'upper-body',
   'illness',
 ];
-function injurySeed(rootSeed: string, ...keys: string[]): string {
-  return seasonNamespaceSeed(rootSeed, SEASON_SEED_NAMESPACES.injuries, ...keys);
-}
 function u32Of(seed: string): number {
   return drawHexInt(seed) >>> 0;
 }
@@ -118,21 +115,22 @@ export function seasonInjuryRiskBasisPoints(input: {
 export function seasonInjuryIdOf(seedPath: readonly string[]): string {
   return `inj-${seasonDigestHex(seedPath.join('\u0000'))}`;
 }
-export function rollSeasonInjuryForPlayer(input: SeasonInjuryRollInput): SeasonInjuryRollResult {
+export function rollInjuryWithSeedNamespace(
+  seedNamespace: string,
+  input: SeasonInjuryRollInput,
+  rehabPremiumBasisPoints: number,
+): SeasonInjuryRollResult {
   const riskBasisPoints = seasonInjuryRiskBasisPoints({
     durabilityRating: input.durabilityRating,
     fatigueBasisPoints: input.fatigueBasisPoints,
     recentLoadBasisPoints: input.recentLoadBasisPoints,
     targetMinutes: input.targetMinutes,
     recurrenceWindowRoundsRemaining: input.recurrenceWindowRoundsRemaining,
-    rehabPremiumBasisPoints: input.rehabPremiumBasisPoints,
+    rehabPremiumBasisPoints,
   });
-  const occurrenceSeed = injurySeed(
-    input.rootSeed,
-    input.gameId,
-    input.playerVersionId,
-    'occurrence',
-  );
+  const seedOf = (...keys: string[]): string =>
+    seasonNamespaceSeed(input.rootSeed, seedNamespace, ...keys);
+  const occurrenceSeed = seedOf(input.gameId, input.playerVersionId, 'occurrence');
   if (!rollBp(occurrenceSeed, riskBasisPoints)) {
     return {
       riskBasisPoints,
@@ -142,7 +140,7 @@ export function rollSeasonInjuryForPlayer(input: SeasonInjuryRollInput): SeasonI
       injury: null,
     };
   }
-  const severitySeed = injurySeed(input.rootSeed, input.gameId, input.playerVersionId, 'severity');
+  const severitySeed = seedOf(input.gameId, input.playerVersionId, 'severity');
   const severityRoll = u32Of(severitySeed) % 10000;
   const severity: SeasonInjurySeverity =
     severityRoll < SEASON_INJURY_MINOR_BP
@@ -152,9 +150,9 @@ export function rollSeasonInjuryForPlayer(input: SeasonInjuryRollInput): SeasonI
         : severityRoll < SEASON_INJURY_MAJOR_BP
           ? 'major'
           : 'season-ending';
-  const typeSeed = injurySeed(input.rootSeed, input.gameId, input.playerVersionId, 'type');
+  const typeSeed = seedOf(input.gameId, input.playerVersionId, 'type');
   const type = INJURY_TYPES[uniformInt(typeSeed, 0, INJURY_TYPES.length - 1)] ?? 'lower-body';
-  const clockSeed = injurySeed(input.rootSeed, input.gameId, input.playerVersionId, 'clock');
+  const clockSeed = seedOf(input.gameId, input.playerVersionId, 'clock');
   const exposureSeconds = uniformInt(
     clockSeed,
     0,
@@ -162,17 +160,12 @@ export function rollSeasonInjuryForPlayer(input: SeasonInjuryRollInput): SeasonI
   );
   const removalClock = clockFromTipoffSeconds(exposureSeconds);
   const occurredBeforeHalftime = exposureSeconds < HALFTIME_SECOND;
-  const sameGameReturnSeed = injurySeed(
-    input.rootSeed,
-    input.gameId,
-    input.playerVersionId,
-    'same-game-return',
-  );
+  const sameGameReturnSeed = seedOf(input.gameId, input.playerVersionId, 'same-game-return');
   const sameGameReturn =
     severity === 'minor' &&
     occurredBeforeHalftime &&
     rollBp(sameGameReturnSeed, SEASON_INJURY_SAME_GAME_RETURN_BP);
-  const returnSeed = injurySeed(input.rootSeed, input.gameId, input.playerVersionId, 'return');
+  const returnSeed = seedOf(input.gameId, input.playerVersionId, 'return');
   let returnClock: {
     period: number;
     seconds: number;
@@ -188,12 +181,7 @@ export function rollSeasonInjuryForPlayer(input: SeasonInjuryRollInput): SeasonI
     const range = SEASON_INJURY_RECOVERY_RANGES[severity];
     missedGamesTotal = uniformInt(returnSeed, range[0], range[1]);
   }
-  const seedPath: string[] = [
-    SEASON_SEED_NAMESPACES.injuries,
-    input.gameId,
-    input.playerVersionId,
-    'occurrence',
-  ];
+  const seedPath: string[] = [seedNamespace, input.gameId, input.playerVersionId, 'occurrence'];
   const injury: SeasonInjuryRecord = {
     injuryId: seasonInjuryIdOf(seedPath),
     playerVersionId: input.playerVersionId,
@@ -213,6 +201,13 @@ export function rollSeasonInjuryForPlayer(input: SeasonInjuryRollInput): SeasonI
     seedPath,
   };
   return { riskBasisPoints, occurred: true, removalClock, returnClock, injury };
+}
+export function rollSeasonInjuryForPlayer(input: SeasonInjuryRollInput): SeasonInjuryRollResult {
+  return rollInjuryWithSeedNamespace(
+    SEASON_SEED_NAMESPACES.injuries,
+    input,
+    input.rehabPremiumBasisPoints ?? 0,
+  );
 }
 export interface SeasonGameHealthTransitionInput {
   gameId: string;
@@ -277,9 +272,16 @@ export function seasonPlayerAvailable(health: SeasonHealthState, playerVersionId
       record.sameGameReturned !== true,
   );
 }
-export function rollSeasonRehabOutcome(rootSeed: string, injuryId: string): 'success' | 'failure' {
-  const seed = injurySeed(rootSeed, injuryId, 'rehab');
+export function rollRehabOutcomeWithSeedNamespace(
+  seedNamespace: string,
+  rootSeed: string,
+  injuryId: string,
+): 'success' | 'failure' {
+  const seed = seasonNamespaceSeed(rootSeed, seedNamespace, injuryId, 'rehab');
   return rollBp(seed, SEASON_INJURY_REHAB_SUCCESS_BP) ? 'success' : 'failure';
+}
+export function rollSeasonRehabOutcome(rootSeed: string, injuryId: string): 'success' | 'failure' {
+  return rollRehabOutcomeWithSeedNamespace(SEASON_SEED_NAMESPACES.injuries, rootSeed, injuryId);
 }
 export function applyRiskyRehabOutcome(
   health: SeasonHealthState,
