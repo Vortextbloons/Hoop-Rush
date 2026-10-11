@@ -21,7 +21,7 @@
 
 | | |
 | --- | --- |
-| **Sandbox & Classic modes** | Draft your five-man lineup and play through an 82-game challenge run against a frozen 30-team bracket. |
+| **Multiple modes** | Classic and Sandbox (five-player 82-game challenge), Hoop Havoc (mutated five), Season Run (ten-player league), Ultimate Run (collection), plus optional multiplayer lobbies — all local-first. |
 | **Credible simulation** | A seeded, possession-by-possession engine produces realistic box scores, fatigue, and season reports — no scripted outcomes. |
 | **Deterministic by design** | Every run is reproducible from its seed. Replays, audits, and calibration all come from the same engine. |
 | **Saved on your machine** | Runs save, reload, and resume through IndexedDB. Local-first — no account, no backend required. |
