@@ -7,20 +7,8 @@ import {
 } from '@hoop-rush/data-contracts';
 import type { Table } from 'dexie';
 import type { HoopRushDatabase } from './dexie.ts';
-export class SeasonRunLoadError extends Error {
-  readonly code: string;
-  readonly failures: readonly string[];
-  constructor(failures: readonly string[], message?: string, code = 'SEASON_RUN_LOAD_FAILED') {
-    super(
-      message ??
-        `Season Run reload validation failed (${String(failures.length)} failure(s)): ` +
-          failures.join('; '),
-    );
-    this.name = 'SeasonRunLoadError';
-    this.code = code;
-    this.failures = failures;
-  }
-}
+import { SeasonRunLoadError } from '@hoop-rush/data-contracts';
+export { SeasonRunLoadError };
 export function SEASON_RUN_SCOPED_TABLES(db: HoopRushDatabase): Table<unknown>[] {
   return [
     db.seasonRuns,

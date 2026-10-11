@@ -52,6 +52,7 @@ export * from './season-trade-cohort.ts';
 export * from './season-commands-cohort.ts';
 export * from './workers-cohort.ts';
 export * from './season-cursor.ts';
+export * from './season-errors.ts';
 export * from './season-postseason.ts';
 export * from './season-postseason-summary.ts';
 export * from './season-awards.ts';

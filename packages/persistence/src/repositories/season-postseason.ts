@@ -37,14 +37,7 @@ export interface PromoteChampionInput {
   expectedRevision: number;
 }
 export type { SeasonCommandLogEntry };
-export class SeasonPostseasonIntegrityError extends Error {
-  readonly reason: string;
-  constructor(reason: string) {
-    super(`season postseason integrity failure: ${reason}`);
-    this.name = 'SeasonPostseasonIntegrityError';
-    this.reason = reason;
-  }
-}
+export { SeasonPostseasonIntegrityError } from '@hoop-rush/data-contracts';
 export interface SeasonPostseasonRepository {
   commitPostseasonAdvancement(input: CommitPostseasonAdvancementInput): Promise<void>;
   loadPostseasonSummaries(runId: string): Promise<SeasonPostseasonSummary[]>;
